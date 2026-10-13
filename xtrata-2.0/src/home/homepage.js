@@ -145,7 +145,7 @@ const createChessBoard = (className = '') => {
 // ---------------------------------------------------------------------------
 // Radio: homepage plays go through the site radio already in the header, so
 // there is only ever one player and plays are counted like any other listen.
-// Free to the listener: the paid per-play path lives in the Xtrata Music app.
+// Free to the listener: the paid per-play path lives on the radio page (passkey wallet).
 const radioApi = () =>
   window.XtrataRadio && typeof window.XtrataRadio.playToken === 'function' ? window.XtrataRadio : null;
 
