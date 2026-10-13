@@ -1,33 +1,18 @@
 import type { Env } from '../lib/db';
-import { chainConfig, chainStates, paidPlaysTotal } from '../lib/radio-chain-likes';
+import { likesFor, paidPlaysFor, songCounts } from '../lib/onchain-counts';
 
 /**
- * GET /radio/song-stats?id=N — one song's on-chain counters for the radio's display:
- *   likes  the likes contract's current total for the song (read from the chain)
- *   plays  paid plays: the paid-plays contract's own per-song counter (`get-total`), so every paid
- *          play from every wallet counts the moment it confirms. (Not the D1 copy of the event log
- *          kept for the homepage tally: that only advances when the homepage asks, so it can trail.)
+ * GET /radio/song-stats?id=N — one song's on-chain likes and paid plays for the radio's display.
+ * Same source as the catalogue and every other page (functions/lib/onchain-counts.ts), so the
+ * numbers always agree. The paid-play index is brought up to date first (at most one chain check
+ * every 20 s), so a play shows up here as soon as it has confirmed.
  * Each is null when it could not be read: a failed read is never reported as zero.
  */
-const RADIO_CORE_INDEX = 3;
+type Counts = typeof songCounts;
 
-type Deps = { chainConfig: typeof chainConfig; chainStates: typeof chainStates; paidPlaysTotal: typeof paidPlaysTotal };
-
-export async function songStats(env: Env, id: number, deps: Deps = { chainConfig, chainStates, paidPlaysTotal }) {
-  const [likes, plays] = await Promise.all([
-    (async () => {
-      try {
-        const config = await deps.chainConfig(env);
-        if (!config.enabled) return null;
-        const [row] = await deps.chainStates(config.contract, [id], undefined, env);
-        return Number(row.total);
-      } catch { return null; }
-    })(),
-    (async () => {
-      try { return await deps.paidPlaysTotal(RADIO_CORE_INDEX, id, env); } catch { return null; }
-    })()
-  ]);
-  return { id, likes, plays };
+export async function songStats(env: Env, id: number, counts: Counts = songCounts) {
+  const c = await counts(env, [id], { wait: true });
+  return { id, likes: likesFor(c, id), plays: paidPlaysFor(c, id) };
 }
 
 export async function onRequest({ request, env }: { request: Request; env: Env }) {

@@ -1,9 +1,9 @@
 import {radioArtist,radioTitle} from '../../src/lib/radio/artist-credits.mjs';
-import {catalogueChainTotals} from './radio-chain-totals';
+import {likesFor,paidPlaysFor,songCounts} from './onchain-counts';
 import { safeArtwork } from '../../src/lib/radio/inscription-metadata';
 import { queryAll, type Env } from './db';
 export const RADIO_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
-export async function catalogueReport(env: Env, url: URL) {
+export async function catalogueReport(env: Env, url: URL, waitUntil?: (promise: Promise<unknown>) => void) {
  const range=url.searchParams.get('range') || '24h';
  const hours: Record<string,number>={'24h':24,'7d':168,'30d':720};
  if (range!=='all' && !hours[range]) throw new Error('Invalid period');
@@ -46,8 +46,11 @@ export async function catalogueReport(env: Env, url: URL) {
    partials:Math.max(0,m.starts-m.plays-inProgress),repeats:m.unique_browsers===null?null:Math.max(0,m.plays-m.unique_browsers),
    completion_rate:m.plays?100*m.completions/m.plays:null};
  });
- const {totals:confirmed,status:chainLikesStatus}=url.searchParams.get('chainLikes')==='0'?{totals:new Map<number,string>(),status:'not-requested'}:await catalogueChainTotals(env,tracks.map((r:any)=>r.id));
- for(const track of tracks)Object.assign(track,{onchain_likes:confirmed.get(track.id)??null});
- return {range,since,until:now,onchain_likes_status:chainLikesStatus,measured_since:(state.results?.[0] as any)?.measured_since,tracks,
+ // On-chain likes and paid plays come from the one shared source (functions/lib/onchain-counts.ts),
+ // so the catalogue, the radio and the homepage always show the same numbers for a song.
+ const counts=await songCounts(env,tracks.map((r:any)=>r.id),{likes:url.searchParams.get('chainLikes')!=='0',waitUntil});
+ for(const track of tracks)Object.assign(track,{onchain_likes:likesFor(counts,track.id),paid_plays:paidPlaysFor(counts,track.id)});
+ const chainLikesStatus=counts.likesStatus;
+ return {range,since,until:now,onchain_likes_status:chainLikesStatus,paid_plays_status:counts.paidPlaysStatus,measured_since:(state.results?.[0] as any)?.measured_since,tracks,
  notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML entries are included only after embedded audio is verified. Titles/artists use inscription metadata and supplied artist-credit corrections. On-chain likes are confirmed wallet endorsements. Saved favourites are synced browser favourites, independent of the period. Neither proves unique people. Livestream listeners are not included.'};
 }

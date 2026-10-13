@@ -253,6 +253,64 @@ export async function readMusicStats(env: StatsEnv): Promise<MusicStats> {
   };
 }
 
+/**
+ * The paid-play index is the ONE source for paid-play numbers everywhere (homepage tally, Music
+ * Heroes, lounge history, the song catalogue and the radio's ▶ counter). It is a copy of the
+ * paid-plays contract's own event log, so it always agrees with the contract once it has caught
+ * up. Every reader calls this first: at most one chain check per MIN_REFRESH_MS, and the very
+ * first copy (an empty index) is awaited so nobody is shown zeros.
+ */
+export async function freshenPaidPlayIndex(
+  env: StatsEnv,
+  {transport = fetch, now = Date.now(), waitUntil, wait = false}: {transport?: Transport; now?: number; waitUntil?: (promise: Promise<unknown>) => void; wait?: boolean} = {}
+): Promise<void> {
+  const db = env.DB;
+  if (!db) throw Error('Missing D1 binding');
+  const state = await readState(db);
+  if (now - state.checkedAt < refreshInterval(state)) return;
+  const first = state.cursor === 0;
+  const run = refreshMusicStats(env, transport, now, first ? FIRST_VISIT_PAGES : MAX_PAGES_PER_REFRESH);
+  if (first || wait || !waitUntil) await run;
+  else waitUntil(run);
+}
+
+export type IndexStatus = 'ready' | 'syncing';
+/** ready: every play in the contract log is in the index (as of the last check). */
+export async function paidPlayIndexStatus(env: StatsEnv): Promise<IndexStatus> {
+  const state = await readState(env.DB!);
+  return state.total > 0 && state.cursor >= state.total ? 'ready' : 'syncing';
+}
+
+/** Paid plays per song on one core, from the index. Songs with none are simply absent (0). */
+export async function songPaidPlays(env: StatsEnv, core = 3): Promise<Map<number, number>> {
+  const result = await env.DB!.prepare('SELECT song_id, COUNT(*) AS plays FROM music_paid_plays WHERE core = ? GROUP BY song_id').bind(core).all();
+  return new Map((result.results as Array<{song_id: number; plays: number}>).map(row => [Number(row.song_id), Number(row.plays)]));
+}
+
+export type IndexedPlay = {txid: string; core: number; id: number; amount: number; total: number; payer: string; recipient: string; timestamp?: number};
+/**
+ * One page of paid plays, newest first, in the same shape the browser readers parse from the
+ * contract log (`total` is the song's running count at that play). `total` (the page's) is null
+ * while the index is still catching up, so readers keep saying "loading" instead of "complete".
+ */
+export async function paidPlaysPage(env: StatsEnv, offset: number, limit: number): Promise<{total: number | null; results: IndexedPlay[]}> {
+  const db = env.DB!;
+  const [count, rows, status] = await Promise.all([
+    db.prepare('SELECT COUNT(*) AS n FROM music_paid_plays').first(),
+    db.prepare(`SELECT txid, payer, recipient, core, song_id, block_time,
+        ROW_NUMBER() OVER (PARTITION BY core, song_id ORDER BY pos) AS running
+      FROM music_paid_plays ORDER BY pos DESC LIMIT ? OFFSET ?`).bind(limit, offset).all(),
+    paidPlayIndexStatus(env)
+  ]);
+  return {
+    total: status === 'ready' ? Number((count as any)?.n ?? 0) : null,
+    results: (rows.results as any[]).map(row => ({
+      txid: String(row.txid), core: Number(row.core), id: Number(row.song_id), amount: 50, total: Number(row.running),
+      payer: String(row.payer), recipient: String(row.recipient), ...(row.block_time ? {timestamp: Number(row.block_time)} : {})
+    }))
+  };
+}
+
 export async function handleMusicStats(
   request: Request,
   env: StatsEnv,
@@ -267,20 +325,10 @@ export async function handleMusicStats(
   if (request.method !== 'GET') return reply({error: 'GET required'}, 405);
   if (!env.DB) return reply({error: 'Music statistics are not available on this deployment yet.'}, 503);
   try {
-    let stats = await readMusicStats(env);
-    const state = await readState(env.DB);
-    if (now - state.checkedAt >= refreshInterval(state)) {
-      if (stats.plays === 0 && state.cursor === 0) {
-        // First ever visit: wait for a first batch so the reader gets real numbers, but not
-        // for the whole history. Later refreshes copy the rest.
-        await refreshMusicStats(env, transport, now, FIRST_VISIT_PAGES);
-        stats = await readMusicStats(env);
-      } else {
-        const refresh = refreshMusicStats(env, transport, now);
-        if (waitUntil) waitUntil(refresh);
-        else await refresh;
-      }
-    }
+    // First ever visit: waits for a first batch so the reader gets real numbers, but not for
+    // the whole history. Later refreshes copy the rest in the background.
+    await freshenPaidPlayIndex(env, {transport, now, waitUntil});
+    const stats = await readMusicStats(env);
     return reply(stats, 200, 'public, max-age=15');
   } catch {
     return reply({error: 'Music statistics are not activated yet. The operator must apply migration 022.'}, 503);

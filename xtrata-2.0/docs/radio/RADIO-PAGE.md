@@ -50,12 +50,10 @@ The "less than $1" wording is fixed text: revisit it if STX trades above $1.
 
 ## This song on-chain
 
-The display shows the current song's **♥ likes** (the likes contract's total) and **▶ paid
-plays** (the paid-plays contract's own per-song counter, `get-total(core, id)`: every paid play
-from every wallet, read live; not the D1 copy of the event log, which only advances when the
-homepage tally asks and so can trail) from
-`GET /radio/song-stats?id=N` (functions/radio/song-stats.ts). Asked again on each song change and
-when a like or unlike confirms. A count that could not be read is hidden, never shown as 0.
+The display shows the current song's **♥ likes** and **▶ paid plays** from
+`GET /radio/song-stats?id=N`, which reads the same shared source as the catalogue and every other
+page (see [ONCHAIN-COUNTS.md](ONCHAIN-COUNTS.md)). Asked again on each song change and when a like
+or unlike confirms. A count that could not be read is hidden, never shown as 0.
 
 ## Timeline
 
@@ -64,6 +62,15 @@ or drag to jump; arrow keys move 5 s. The engine exposes `getPosition()`, `seek(
 `currentSource()`. Peaks come from decoding the song once at a low sample rate (skipped for files
 over 20 MB or low-memory devices, which keep a plain bar). Skipped-over audio never counts towards
 a listen or a paid play.
+
+## Play and pause
+
+The radio plays when the listener presses play (or picks a song: a tuning-strip tick, a liked
+song, "Play" on the likes list) and keeps playing in a background tab. Once stopped, by the pause
+button, media keys, headphones or the OS, it stays stopped until play is pressed again: the stuck
+watchdog, the no-signal retry and the media-error retune all respect the pause, the pause is saved
+so the next page does not start playing either, and nothing starts on a click elsewhere on the
+page (no "tap anywhere"). Choosing a station only changes what is cued.
 
 ## Checks
 
