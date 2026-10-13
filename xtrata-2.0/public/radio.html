@@ -162,10 +162,10 @@
   .likesFoot{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11.5px;color:var(--mut)}
   .strap{font-size:12.5px;color:var(--mut);margin:0} .strap a{color:var(--acc)}
 
-  /* the walnut receiver widget: compact, bottom-right on this page */
-  .xtrata-radio{left:auto !important;right:18px}
-  .xtrata-radio__stage{width:min(420px,calc(100vw - 36px)) !important}
-  .xtrata-radio.is-min .xtrata-radio__stage{width:min(300px,calc(100vw - 36px)) !important}
+  /* The corner widget is not used on this page: the receiver above is the radio. The engine from
+     /xtrata-radio.js still runs (this page drives it through window.XtrataRadio), only its floating
+     widget is hidden. */
+  .xtrata-radio{display:none !important}
   @media(max-width:980px){
     main{grid-template-columns:1fr}
     /* One column: pay-per-play goes to the very top (CSS order only: the wallet box is never moved
