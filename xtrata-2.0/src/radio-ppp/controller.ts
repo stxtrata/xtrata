@@ -201,10 +201,16 @@ export function createPppController(deps: PppDeps) {
 
   /**
    * Passkey-only: the listener has no main wallet in play (none connected, or one that is not
-   * invited) and the deployment allows it. A connected, invited main wallet keeps the linked flow.
+   * invited), the deployment allows it, and this device's listening wallet is not linked to a main
+   * wallet. A connected, invited main wallet keeps the linked flow.
    */
   // `gateFor` must be the current main: a gate fetched for a previous wallet says nothing about this one.
-  const solo = () => gate?.passkeyOnly === true && (!deps.main() || (gateFor === deps.main() && !gate.allowed));
+  // A listening wallet that is already linked to a main wallet belongs to a Stacks wallet holder: it is
+  // never passkey-only. Without that main connected it asks for the wallet, exactly as before. Only a new
+  // visitor, or a wallet that was never linked, goes passkey-only. (Until the frame has answered, `status`
+  // is unknown and the visitor is treated as new, so the first check can run.)
+  const soloOpen = () => gate?.passkeyOnly === true && (!deps.main() || (gateFor === deps.main() && !gate.allowed));
+  const solo = () => soloOpen() && !status?.linked;
   const chosenKey = (listening: string) => key('return-to', listening);
   const chosenAddress = (listening = status?.address): string | undefined => {
     if (!listening) return undefined;
@@ -528,6 +534,7 @@ export function createPppController(deps: PppDeps) {
     }),
 
     switchOn: () => task('Confirm in the listening wallet…', async () => {
+      if (!usable()) throw new Error('Connect your wallet first.');
       await holdTab();
       await bridge!.request('listening.approveSession', onTerms());
       setPayingOn(true);
@@ -570,6 +577,7 @@ export function createPppController(deps: PppDeps) {
     },
 
     returnFunds: (mode: ReturnMode) => task('Check the return in the listening wallet…', async () => {
+      if (!usable()) throw new Error('Connect your wallet first.');
       if (!status?.address) throw new Error('Unlock the listening wallet first.');
       // A linked main wallet always wins; otherwise the destination is the one the listener chose
       // or the funder found on chain. The frame shows the full address and the listener confirms it.
