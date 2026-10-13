@@ -109,7 +109,7 @@ export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
       else if (view.state === 'known') lines.push(`Locked · ${short(view.address!)}`);
       else {
         lines.push(`Unlocked · ${short(view.address!)}`);
-        lines.push(view.linked ? `Returns go to your main wallet ${short(view.linked)}` : 'Not linked to a main wallet yet.');
+        lines.push(view.linked ? `Returns go to your main wallet ${short(view.linked)}` : 'No main wallet linked. You choose where returns go.');
         lines.push(view.session
           ? `Paying as you listen · up to ${view.session.playsLeft.toLocaleString()} more plays remaining`
           : 'Not paying. Music plays free.');

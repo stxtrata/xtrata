@@ -7,7 +7,8 @@
  * public history. Music always keeps playing: any failure means that start plays free.
  */
 import { deserializeTransaction, cvToJSON } from '@stacks/transactions';
-import { linkData, type LinkRequest } from '../lib/listening-wallet/link';
+import { isMainnetStandardAddress, linkData, type LinkRequest } from '../lib/listening-wallet/link';
+import type { FunderResult } from '../lib/listening-wallet/funder';
 import {
   balanceState, costPerPlay, DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, fundingAllowance, LIKE_FEE, playsCovered, RESERVE, TARGET,
   type BalanceState, type ReturnMode
@@ -24,6 +25,8 @@ export interface GateConfig {
   radioUrl: string | null;
   walletOrigin: string | null;
   canary: boolean;
+  /** Listeners without a Stacks wallet may use a passkey listening wallet alone (default off). */
+  passkeyOnly?: boolean;
   limits: { playFee: string; returnFee: string; maxSessionPlays: number; sessionHours: number };
 }
 export interface StoredLink { listening: string; issued: number; mainSignature: string }
@@ -60,6 +63,8 @@ export interface PppDeps {
   changed(): void;
   /** A like or unlike from the listening wallet confirmed: the radio should re-read its likes. */
   likesChanged?(): void;
+  /** Who funded this listening wallet (first meaningful deposit). `{ok:false}` means the lookup failed, not that there is none. */
+  funder?(listening: string): Promise<FunderResult>;
   /** The song's on-chain like state for the main wallet, including linked listening wallets (`by`). */
   likeState?(main: string, song: number): Promise<{ liked: boolean; by: string[] }>;
   /** A like/unlike from the listening wallet was sent, or could not be: the radio's heart follows. */
@@ -109,6 +114,16 @@ export interface Snapshot {
   armed: boolean;
   /** Unresolved payments older than 30 minutes that the chain has never seen. */
   stuck: number;
+  /** Passkey-only: no main wallet is involved; the listening address is the listener. */
+  solo: boolean;
+  /** Where a return would go: the linked main wallet, else the address the listener chose, else the funder. */
+  returnTo?: string;
+  returnToKind?: 'linked' | 'chosen' | 'funder';
+  funderState: 'unknown' | 'found' | 'none' | 'failed';
+  /** More than one address has sent meaningful funds, so the first is only a suggestion. */
+  funderMultiple: boolean;
+  /** Passkey-only needs a wallet box that can return to a chosen address and like unlinked. */
+  walletCannotSolo: boolean;
 }
 
 const UNRESOLVED: Entry['status'][] = ['prepared', 'signed', 'unknown', 'pending'];
@@ -147,6 +162,10 @@ export function createPppController(deps: PppDeps) {
   let mainLinksFor: string | undefined;
   let mainLinksAt = -Infinity;
   const notSeen = new Set<string>();
+  // Passkey-only: who funded this wallet (first meaningful deposit), looked up on the page (the frame is offline).
+  let funderRes: { for: string; res: FunderResult; at: number } | null = null;
+  let funderLooking = false;
+  let funderFails = 0;
   let verified = false;
   let lockHeld = false;
   // One-tap unlock: an unlock panel opened in the frame on page load, waiting for the listener.
@@ -180,17 +199,43 @@ export function createPppController(deps: PppDeps) {
   const setPendingDeposit = (d: PendingDeposit | null) => { if (status?.address) deps.store.set(key('deposit', status.address), JSON.stringify(d)); };
   const stuck = () => unresolved().filter((e) => deps.now() - e.created > STUCK_AFTER_MS && notSeen.has(e.txid!));
 
+  /**
+   * Passkey-only: the listener has no main wallet in play (none connected, or one that is not
+   * invited) and the deployment allows it. A connected, invited main wallet keeps the linked flow.
+   */
+  // `gateFor` must be the current main: a gate fetched for a previous wallet says nothing about this one.
+  const solo = () => gate?.passkeyOnly === true && (!deps.main() || (gateFor === deps.main() && !gate.allowed));
+  const chosenKey = (listening: string) => key('return-to', listening);
+  const chosenAddress = (listening = status?.address): string | undefined => {
+    if (!listening) return undefined;
+    const v = deps.store.get(chosenKey(listening));
+    return v && isMainnetStandardAddress(v) && v !== listening ? v : undefined;
+  };
+  const funderFor = (listening = status?.address) => (funderRes && funderRes.for === listening ? funderRes.res : null);
+  /** linked main wallet always wins, then the address the listener chose, then the funder. */
+  function returnTarget(): { to: string; kind: 'linked' | 'chosen' | 'funder' } | undefined {
+    if (!status?.address) return undefined;
+    if (status.linked) return { to: status.linked, kind: 'linked' };
+    const chosen = chosenAddress();
+    if (chosen) return { to: chosen, kind: 'chosen' };
+    const f = funderFor();
+    if (f?.ok && f.funder) return { to: f.funder, kind: 'funder' };
+    return undefined;
+  }
+
   function step(): Step {
     if (!gate?.enabled) return 'off';
     if (!gate.here) return 'elsewhere';
     const main = deps.main();
-    if (!main) return 'connect';
-    if (!gate.allowed) return 'not-invited';
+    if (!solo()) {
+      if (!main) return 'connect';
+      if (!gate.allowed) return 'not-invited';
+    }
     if (!status) return 'loading';
     if (status.state === 'unsupported') return 'unsupported';
     if (status.state === 'none') return 'intro';
     if (status.state === 'known') return 'locked';
-    if (status.linked !== main) return 'link';
+    if (!solo() && status.linked !== main) return 'link';
     if (balance === undefined) return 'loading';
     if (balance > TARGET) return 'over';
     if (balance < RESERVE + costPerPlay(fee())) return 'fund';
@@ -209,7 +254,11 @@ export function createPppController(deps: PppDeps) {
     walletOutdated: walletLacks('like'),
     linkedListening: mainLinksFor && mainLinksFor === deps.main() ? mainLinks.map((l) => l.listening) : [],
     serverLinked: !!serverLink && serverLinkFor === `${deps.main()}:${status?.address}`,
-    stuck: stuck().length, armed
+    stuck: stuck().length, armed,
+    solo: solo(), returnTo: returnTarget()?.to, returnToKind: returnTarget()?.kind,
+    funderState: (() => { const f = funderFor(); return !f ? 'unknown' : !f.ok ? 'failed' : f.funder ? 'found' : 'none'; })(),
+    funderMultiple: (() => { const f = funderFor(); return !!f && f.ok && f.distinct > 1; })(),
+    walletCannotSolo: solo() && walletLacks('standalone')
   });
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
@@ -225,7 +274,11 @@ export function createPppController(deps: PppDeps) {
     } finally { busy = null; await refresh(true); }
   }
 
+  /** Pay-per-play is open to this visitor: on, on the radio host, and either invited with a main wallet or passkey-only. */
+  const usable = () => !!gate?.enabled && gate.here && (solo() || (!!deps.main() && gate.allowed));
+
   async function ensureBridge() {
+    if (!usable()) throw new Error('Pay-per-play is not open to this wallet yet. Listening stays free.');
     if (!gate?.walletOrigin) throw new Error('Pay-per-play is switched off right now. Listening stays free.');
     bridge ??= await deps.bridge(gate.walletOrigin);
     return bridge;
@@ -253,6 +306,26 @@ export function createPppController(deps: PppDeps) {
     if (serverLinkFor === id && serverLink) return;
     serverLink = mainLinks.find((l) => l.listening === status!.address) ?? null;
     serverLinkFor = id;
+  }
+
+  /**
+   * Passkey-only: find who funded the wallet, once it holds something. A failed lookup is reported
+   * as failed (and retried after a minute), never as "nobody funded it".
+   */
+  async function lookupFunder() {
+    const listening = status?.address;
+    if (!solo() || !listening || status?.linked || !deps.funder || funderLooking) return;
+    if (!balance || balance <= 0n) return;
+    const known = funderFor(listening);
+    if (known?.ok && known.funder) return;
+    // Back off after failures (1, 2, 4... minutes, at most 30) so a dust-heavy history cannot hammer the API.
+    const wait = known?.ok ? 30_000 : Math.min(60_000 * 2 ** Math.max(0, funderFails - 1), 30 * 60_000);
+    if (funderRes && funderRes.for === listening && deps.now() - funderRes.at < wait) return;
+    funderLooking = true;
+    try { funderRes = { for: listening, res: await deps.funder(listening), at: deps.now() }; }
+    catch { funderRes = { for: listening, res: { ok: false }, at: deps.now() }; }
+    finally { funderLooking = false; }
+    funderFails = funderRes.res.ok ? 0 : funderFails + 1;
   }
 
   async function reconcile() {
@@ -303,7 +376,7 @@ export function createPppController(deps: PppDeps) {
       const main = deps.main();
       // The kill switch and allowlist are re-read at least every 5 minutes, and on every action.
       if (force || !gate || gateFor !== main || deps.now() - gateAt > 300_000) { gate = await deps.config(main); gateAt = deps.now(); gateFor = main; }
-      if (!gate.enabled || !gate.here || !main || !gate.allowed) {
+      if (!gate.enabled || !gate.here || (!solo() && (!main || !gate.allowed))) {
         if (bridge && status?.session) await bridge.request('listening.stop').catch(() => undefined);
         if (armed) void disarm();
         deps.changed();
@@ -311,8 +384,9 @@ export function createPppController(deps: PppDeps) {
       }
       await ensureBridge();
       status = await bridge!.request<StatusResult>('listening.status');
-      await lookupServerLink(main);
+      if (main && gate.allowed) await lookupServerLink(main);
       await refreshBalance(force);
+      await lookupFunder();
       await reconcile();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Pay-per-play could not refresh. Listening stays free.';
@@ -411,7 +485,7 @@ export function createPppController(deps: PppDeps) {
       await b.request('listening.unlock', { mode: 'create', terms: onTerms() });
       status = await b.request<StatusResult>('listening.status');
       setPayingOn(true);
-      say('Wallet created ✓ Next: link it.');
+      say(solo() ? 'Wallet created ✓ Next: add 1 STX.' : 'Wallet created ✓ Next: link it.');
       await holdTab();
     }),
 
@@ -481,15 +555,37 @@ export function createPppController(deps: PppDeps) {
       say('Locked ✓');
     }),
 
+    /** Passkey-only: send returns to this address instead of the funder. Public data, kept on this device. */
+    setReturnAddress: (address: string) => {
+      const a = String(address ?? '').trim();
+      if (!status?.address) return say('', 'Unlock the listening wallet first.');
+      if (!isMainnetStandardAddress(a)) return say('', 'Enter a standard mainnet address (it starts with SP).');
+      if (a === status.address) return say('', 'That is this listening wallet itself. Enter a different address.');
+      deps.store.set(chosenKey(status.address), a);
+      say('Returns will go to that address. You confirm it in the listening wallet before anything is sent.');
+    },
+    clearReturnAddress: () => {
+      if (status?.address) deps.store.set(chosenKey(status.address), '');
+      deps.changed();
+    },
+
     returnFunds: (mode: ReturnMode) => task('Check the return in the listening wallet…', async () => {
-      if (!status?.address || !status.linked) throw new Error('Link your main wallet first.');
+      if (!status?.address) throw new Error('Unlock the listening wallet first.');
+      // A linked main wallet always wins; otherwise the destination is the one the listener chose
+      // or the funder found on chain. The frame shows the full address and the listener confirms it.
+      const target = returnTarget();
+      if (!target) throw new Error(solo() ? 'Choose where to send the funds first.' : 'Link your main wallet first.');
+      if (target.kind !== 'linked' && walletLacks('standalone')) throw new Error('The listening wallet box needs an update before it can return to another address. Try again shortly.');
       if (unresolved().length) throw new Error('Wait for the pending payment to confirm, then return funds.');
       const { balance: b, nonce } = await deps.chain.account(status.address);
       balance = b;
-      const r = await bridge!.request<ReturnResult>('listening.prepareReturn', { mode, balance: b.toString(), nonce: nonce.toString(), fee: DEFAULT_RETURN_FEE.toString() });
-      if (r.recipient !== status.linked) throw new Error('Return destination does not match your linked main wallet. Nothing was sent.');
+      const r = await bridge!.request<ReturnResult>('listening.prepareReturn', {
+        mode, balance: b.toString(), nonce: nonce.toString(), fee: DEFAULT_RETURN_FEE.toString(),
+        ...(target.kind === 'linked' ? {} : { destination: target.to })
+      });
+      if (r.recipient !== target.to) throw new Error('Return destination does not match what you approved. Nothing was sent.');
       const tx = deserializeTransaction(r.raw) as any;
-      if (cvToJSON(tx.payload.recipient).value !== status.linked || String(tx.payload.amount) !== r.amount)
+      if (cvToJSON(tx.payload.recipient).value !== target.to || String(tx.payload.amount) !== r.amount)
         throw new Error('Signed return does not match what you approved. Nothing was sent.');
       const entry: Entry = {
         id: randomId(), address: status.address, kind: 'withdraw', core: 0, song: 0, recipient: r.recipient, amount: r.amount,
@@ -501,7 +597,7 @@ export function createPppController(deps: PppDeps) {
       catch (e) { saveEntry({ ...entry, status: 'unknown', note: (e as Error).message }); throw e; }
       if (mode === 'all') setPayingOn(false);
       say(mode === 'all'
-        ? 'Returned to your wallet ✓ Paying is off.'
+        ? (target.kind === 'linked' ? 'Returned to your wallet ✓ Paying is off.' : 'Returned ✓ Paying is off.')
         : 'Excess returned ✓ Switch paying back on to continue.');
     })
   };
@@ -567,15 +663,18 @@ export function createPppController(deps: PppDeps) {
     const label = d.title ? `“${d.title}”` : `song #${d.song}`;
     const fail = (m: string) => { error = m; message = ''; try { deps.likeFailed?.(d.song); } catch { /* radio */ } deps.changed(); };
     const s = step(), main = deps.main();
+    // Passkey-only: the listening address itself is the liker.
+    const who = solo() ? status?.address : main;
     if (s === 'locked') {
       likeAfterUnlock = { ...d, at: deps.now() };
       say(`Unlock to like ${label}. It sends straight after.`);
       return;
     }
     if (s === 'link') return fail('Link the listening wallet to your main wallet first, so your likes count for it.');
+    if (solo() && walletLacks('standalone')) return fail('The listening wallet box needs an update before it can like on its own. Try again shortly.');
     if (s === 'fund') return fail('Top up the listening wallet to like: each like or unlike costs 0.0002 STX.');
     if (s === 'over') return fail('Return the excess first: the listening wallet holds more than 1 STX.');
-    if (s !== 'ready' || !main) return fail('Still checking the listening wallet. Try the heart again in a moment.');
+    if (s !== 'ready' || !who) return fail('Still checking the listening wallet. Try the heart again in a moment.');
     if (!status?.session) return fail('Paying is switched off. Switch it on to like from the listening wallet.');
     if (!lockHeld) return fail('Pay-per-play is running in another tab. Like from that tab.');
     // One like per song at a time: locked until the last one confirms, then 3 more seconds, so a
@@ -589,13 +688,15 @@ export function createPppController(deps: PppDeps) {
     // Read the song's current state (it may have changed on another device), so the tap toggles it.
     let by: string[] | undefined;
     checkingLike = true;
-    try { by = deps.likeState ? (await deps.likeState(main, d.song)).by : d.likedBy ?? []; }
+    try { by = deps.likeState ? (await deps.likeState(who, d.song)).by : d.likedBy ?? []; }
     catch { by = d.likedBy; }
     finally { checkingLike = false; } // like() below takes over synchronously, before any await
     if (!by) return fail(`Could not check ${label} right now. Try the heart again.`);
     const listening = status.address!;
     const mine = by.includes(listening);
-    if (!mine && by.length) return fail(`${label} was liked from your main wallet${by.includes(main) ? '' : ' or another listening wallet'}. Unlike it there (♥ ON-CHAIN).`);
+    if (!mine && by.length) return fail(solo()
+      ? `${label} was liked from another wallet of yours. Unlike it there.`
+      : `${label} was liked from your main wallet${by.includes(main!) ? '' : ' or another listening wallet'}. Unlike it there (♥ ON-CHAIN).`);
     await like({ song: d.song, liked: !mine, title: d.title, artist: d.artist });
   }
 

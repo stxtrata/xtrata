@@ -4,6 +4,8 @@
  * Gate (Cloudflare Pages variables):
  *   RADIO_PPP_ENABLED = "1"          global kill switch; anything else turns pay-per-play off
  *   RADIO_PPP_ALLOWLIST = "SP…,SP…"  main wallets allowed during the canary; "all" opens it
+ *   RADIO_PPP_PASSKEY_ONLY = "1"     optional: listeners without a Stacks wallet may use a passkey
+ *                                    listening wallet alone (default off; returns go to the funder)
  *   RADIO_LISTENING_WALLET_ORIGIN    exact wallet origin, e.g. https://wallet.xtrata.xyz
  *   RADIO_PPP_HOST                   the only host pay-per-play runs on, e.g. radio.xtrata.xyz
  *                                    (functions/lib/radio-host.ts explains why it is not xtrata.xyz)
@@ -15,7 +17,7 @@ import { isRadioHost, radioHost, type RadioHostEnv } from './radio-host';
 import { isMainnetStandardAddress, validateLinkRequest, verifyLinkSignature, type LinkRequest } from '../../src/lib/listening-wallet/link';
 import { DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, MAX_SESSION_PLAYS } from '../../src/lib/listening-wallet/policy';
 
-export type PppEnv = RadioHostEnv & { RADIO_PPP_ENABLED?: string; RADIO_PPP_ALLOWLIST?: string; RADIO_LISTENING_WALLET_ORIGIN?: string };
+export type PppEnv = RadioHostEnv & { RADIO_PPP_ENABLED?: string; RADIO_PPP_ALLOWLIST?: string; RADIO_PPP_PASSKEY_ONLY?: string; RADIO_LISTENING_WALLET_ORIGIN?: string };
 
 export const MAX_LINKS_PER_MAIN = 5;
 export const MAX_LINKS_PER_HOUR = 500;
@@ -40,6 +42,9 @@ export function gate(env: PppEnv, main: string | null, request?: Request) {
     radioUrl: host ? `https://${host}/radio.html` : null,
     walletOrigin: here ? origin : null,
     canary: !list.includes('all'),
+    // Passkey-only listeners have no main wallet. Default off; "1" lets anyone on the radio host
+    // use a listening wallet alone. Nothing about it is stored server-side, so this only gates the UI.
+    passkeyOnly: here && env.RADIO_PPP_PASSKEY_ONLY === '1',
     limits: {
       playFee: DEFAULT_PLAY_FEE.toString(),
       returnFee: DEFAULT_RETURN_FEE.toString(),

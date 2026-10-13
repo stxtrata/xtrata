@@ -28,8 +28,11 @@ export interface StatusResult {
   features?: string[];
 }
 
-/** Features of the current wallet build: `cancel` (listening.cancel), `like` (listening.signLike at LIKE_FEE). */
-export const LISTENING_FEATURES = ['cancel', 'like'] as const;
+/**
+ * Features of the current wallet build: `cancel` (listening.cancel), `like` (listening.signLike at LIKE_FEE),
+ * `standalone` (returns to a page-supplied destination and likes without a linked main wallet).
+ */
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone'] as const;
 
 export interface TermsParams {
   fee: string;
@@ -89,6 +92,12 @@ export interface ReturnParams {
   balance: string;
   nonce: string;
   fee: string;
+  /**
+   * Where the funds go when no main wallet is linked (a passkey-only listener): the funder the
+   * page found on chain, or an address the listener typed. Ignored when a main wallet is linked,
+   * which always wins. The wallet shows the full address and the listener confirms it there.
+   */
+  destination?: string;
 }
 
 export interface SignedResult {

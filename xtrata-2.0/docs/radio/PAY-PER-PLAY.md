@@ -180,7 +180,8 @@ repository secrets: `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages: Edit) 
      "https://wallet.xtrata.xyz"` are already in `wrangler.toml` `[vars]`.
    - Add two **Secrets** in the dashboard (Settings → Variables and Secrets → Production, type
      Secret): `RADIO_PPP_ENABLED` = `1` and `RADIO_PPP_ALLOWLIST` = the canary main wallet
-     address(es), comma-separated. Secrets can be changed without a code push.
+     address(es), comma-separated. Secrets can be changed without a code push. Optional third
+     secret: `RADIO_PPP_PASSKEY_ONLY` = `1` (see Passkey-only listeners below).
    - Redeploy (a push to main, or retry the latest production deployment).
 5. **Check the radio address is locked down** before turning anything on:
    - `curl -sI https://radio.xtrata.xyz/runtime/` → `302` to `https://xtrata.xyz/runtime/`
@@ -192,6 +193,39 @@ repository secrets: `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages: Edit) 
 6. **Kill switch:** set the `RADIO_PPP_ENABLED` secret to `0` and retry the latest deployment. Open radios stop new payments at
    their next check: on the next song once the cached setting is over 5 minutes old, or immediately
    on any action. Broadcast transactions cannot be recalled.
+
+## Passkey-only listeners (no Stacks wallet)
+
+A listener with no Stacks wallet can create a listening wallet from a passkey, get an address, have
+anyone send it about 1 STX, and start paying artists. No connect, no link, no popups.
+
+**Switch:** a third secret, `RADIO_PPP_PASSKEY_ONLY` = `1` (default off; anything else is off). It
+needs `RADIO_PPP_ENABLED=1` and only works on the radio host. It does not widen
+`RADIO_PPP_ALLOWLIST`: a connected, invited main wallet keeps the linked flow, and a connected but
+not-invited wallet can still listen passkey-only. Redeploy the **main** project after changing it
+(the wallet box needs the matching build, which deploys from main; an older box still pays but says
+it cannot return to another address or like yet).
+
+**Where returns go**, in this order:
+1. the linked main wallet, if the listening wallet was ever linked (always wins);
+2. an address the listener typed in the panel;
+3. the **funder**: the sender of the first deposit of at least 0.1 STX from a plain `SP` address
+   (contracts, self-sends and dust are skipped). The page finds it from Hiro `stx_inbound`
+   (`src/lib/listening-wallet/funder.ts`); the wallet box stays offline.
+
+The wallet box never trusts the page: it shows the **full** destination address and the listener
+confirms it there. A failed lookup is shown as "could not check", never "no funder", and nothing is
+sent without a destination. Known weakness: whoever sends 0.1 STX first becomes the default, and an
+exchange hot wallet looks like any other sender, so the panel shows the address in full and offers a
+different one. The confirm step is the safeguard; treat the default as a suggestion.
+
+**Identity:** passkey-only likes are signed from the listening address and listed under it (likes
+page and heart); plays are credited to it. Linking a main wallet later moves them under that wallet
+via the existing link. The panel gently points to Xverse/Leather and never blocks.
+
+**Canary:** test with disposable wallets only (AGENTS.md). Check: create with no wallet connected,
+fund from a second disposable wallet, confirm a paid play, like a song, then return all and confirm
+the full address shown in the wallet box is the funder.
 
 ## Canary checklist
 
