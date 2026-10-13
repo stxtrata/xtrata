@@ -305,8 +305,7 @@ for every other script too.
   are then no longer credited to the main wallet.
 - Each linked listening wallet adds one contract read per 25 songs when the main wallet's likes are
   loaded. New links are capped at 500 an hour.
-- One listening-wallet passkey per authenticator: creating a second on the same device is refused
-  ("use Unlock instead"). "Use a different listening wallet" lets the listener pick any of theirs.
+- Creating a wallet with no main wallet (passkey-only) on a device that already has one is refused ("use Unlock instead"): the new passkey excludes the existing ones so a duplicate is not made quietly. A wallet made FOR a main wallet address is a new passkey beside the others (named "Xtrata listening wallet · SP…"), so each address on one device can have its own. "Use a different listening wallet" lets the listener pick any of theirs.
 - The one-tab lock is per browser. Two devices unlocking the same wallet at once can race on a
   nonce: one transaction is rejected (no double payment) and the play is free. A server-side lease
   is a possible follow-up.

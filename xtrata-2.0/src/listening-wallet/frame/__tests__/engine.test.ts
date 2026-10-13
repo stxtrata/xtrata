@@ -405,6 +405,13 @@ describe('one listening wallet per main-wallet address', () => {
     expect(b.panels.at(-1)!.title).toContain(shortOf(MAIN));
   });
 
+  it('with no address given, a second passkey still excludes the existing ones so it is not quietly duplicated', async () => {
+    const b = box();
+    await b.makeFor(MAIN, mainKey);
+    await b.h['listening.unlock']({ mode: 'create' }).catch(() => undefined);
+    expect(b.creates.at(-1)?.exclude).toEqual(['cred-1']);
+  });
+
   it('switching to another address locks the open wallet and moves to that address', async () => {
     const b = box();
     const a1 = await b.makeFor(MAIN, mainKey);
@@ -421,7 +428,8 @@ describe('one listening wallet per main-wallet address', () => {
     const a1 = await b.makeFor(MAIN, mainKey);
     const r = await b.h['listening.unlock']({ mode: 'create', main: MAIN_B });
     expect(r.address).not.toBe(a1);
-    expect(b.creates.at(-1)).toMatchObject({ exclude: ['cred-1'], name: `Xtrata listening wallet · ${shortOf(MAIN_B)}` });
+    // Nothing is excluded: a real authenticator refuses a new passkey when an excluded credential is already on it.
+    expect(b.creates.at(-1)).toMatchObject({ exclude: [], name: `Xtrata listening wallet · ${shortOf(MAIN_B)}` });
     const panel = b.panels.find((p) => p.kind === 'create' && p.summary?.includes('separate'))!;
     expect(panel.summary).toContain(shortOf(MAIN_B));
     await b.link(MAIN_B, keyB, r.address);

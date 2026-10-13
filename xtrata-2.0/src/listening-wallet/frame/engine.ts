@@ -26,7 +26,8 @@ export interface PasskeyPort {
   available(): boolean;
   /**
    * Create a discoverable passkey; `prf` is set when the authenticator evaluated PRF at creation.
-   * `exclude` lists this device's existing listening-wallet credentials so they are not duplicated.
+   * `exclude` lists existing listening-wallet credentials the authenticator must not duplicate: given when making a
+   * wallet with no main wallet, empty when making one for a specific main wallet (a new passkey beside the others).
    */
   create(exclude?: string[], name?: string): Promise<{ credentialId: string; prf?: Uint8Array }>;
   /** Assertion with PRF. Without a credential id the browser offers any listening-wallet passkey. */
@@ -231,7 +232,12 @@ export function createListeningEngine(deps: {
           : [])
       ],
       confirmLabel: terms ? 'Create and pay as I listen' : 'Create with passkey'
-    }, () => deps.passkey.create(existing.map((w) => w.credentialId), main ? `Xtrata listening wallet · ${short(main)}` : undefined));
+    }, () => deps.passkey.create(
+      // A wallet for a specific address is meant to be a NEW passkey beside the others. Excluding the existing
+      // credentials there makes the authenticator refuse ("already registered") on exactly the device that has them.
+      // Without an address the old guard stays: do not quietly make a duplicate of a wallet this device already has.
+      main ? [] : existing.map((w) => w.credentialId),
+      main ? `Xtrata listening wallet · ${short(main)}` : undefined));
 
     // Prove PRF is live AND stable before the address is ever shown for funding
     // (docs/PASSKEY-WALLET.md §3.1). A wallet whose PRF output changes is unreachable.
