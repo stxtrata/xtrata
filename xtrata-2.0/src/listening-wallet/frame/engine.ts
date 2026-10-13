@@ -17,7 +17,7 @@ import {
 import { likeCallOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
 import type {
   LinkParams, LinkResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams, SignPlayParams,
-  StatusResult, TermsParams, UnlockParams, UnlockResult
+  StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
 } from '../../lib/listening-wallet/messages';
 import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
 
@@ -28,7 +28,7 @@ export interface PasskeyPort {
    * Create a discoverable passkey; `prf` is set when the authenticator evaluated PRF at creation.
    * `exclude` lists this device's existing listening-wallet credentials so they are not duplicated.
    */
-  create(exclude?: string[]): Promise<{ credentialId: string; prf?: Uint8Array }>;
+  create(exclude?: string[], name?: string): Promise<{ credentialId: string; prf?: Uint8Array }>;
   /** Assertion with PRF. Without a credential id the browser offers any listening-wallet passkey. */
   evaluate(credentialId?: string): Promise<{ credentialId: string; prf: Uint8Array }>;
 }
@@ -88,6 +88,7 @@ interface WalletRecord {
 interface Stored { version: 1; wallets: WalletRecord[]; last?: string }
 
 const STORE_KEY = 'xtrata.listening-wallet.v1';
+const MAX_WALLETS = 25;
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
 /** STX without trailing zeros, for the one-line summaries (0.00035, 1). */
 const stxs = (v: bigint) => stx(v).replace(/\.?0+$/, '');
@@ -147,7 +148,8 @@ export function createListeningEngine(deps: {
   const lastRecord = () => { const s = load(); return s.wallets.find((w) => w.credentialId === s.last); };
   const remember = (rec: WalletRecord) => {
     const s = load();
-    s.wallets = [rec, ...s.wallets.filter((w) => w.credentialId !== rec.credentialId)].slice(0, 5);
+    // One listening wallet per main-wallet address, plus a passkey-only one: never silently forget a wallet that may hold funds.
+    s.wallets = [rec, ...s.wallets.filter((w) => w.credentialId !== rec.credentialId)].slice(0, MAX_WALLETS);
     s.last = rec.credentialId;
     save(s);
   };
@@ -159,13 +161,40 @@ export function createListeningEngine(deps: {
   };
 
   const features = [...LISTENING_FEATURES];
-  const status = (): StatusResult => {
-    if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
-    if (identity) return { state: 'unlocked', address: identity.address, linked: record(credentialId)?.link?.main, session: summary(), features };
-    const last = lastRecord();
-    return last ? { state: 'known', address: last.address, linked: last.link?.main, session: null, features } : { state: 'none', session: null, features };
+  const validMain = (m: unknown): string | undefined => (typeof m === 'string' && isMainnetStandardAddress(m) ? m : undefined);
+  /**
+   * Which of this device's listening wallets serves a connected main wallet: the one linked to it; else a wallet
+   * that was never linked (a passkey-only one) which that wallet can claim by linking; else none, and the page
+   * offers a new one. Without a main wallet, the one used last. A wallet linked to a DIFFERENT main wallet is
+   * never offered: each address keeps its own plays, likes and funds.
+   */
+  const pick = (main?: string): WalletRecord | undefined => {
+    if (!main) return lastRecord();
+    const wallets = load().wallets;
+    return wallets.find((w) => w.link?.main === main) ?? wallets.find((w) => !w.link);
   };
-  const refreshIdle = () => deps.ui.idle(status());
+  // The main wallet the open listening wallet was unlocked for, and the one the idle view follows.
+  let unlockedFor: string | undefined;
+  let viewMain: string | undefined;
+  /** Main wallets the device's OTHER listening wallets belong to: not the reported wallet's, and not the connected one. */
+  const othersOf = (shown: WalletRecord | undefined, main?: string): { others?: string[] } => {
+    const mine = new Set([shown?.link?.main, main].filter(Boolean));
+    const others = [...new Set(load().wallets.flatMap((w) => (w.link && !mine.has(w.link.main) ? [w.link.main] : [])))];
+    return others.length ? { others } : {};
+  };
+  const status = (main?: string): StatusResult => {
+    if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
+    if (identity) {
+      const open = record(credentialId);
+      return { state: 'unlocked', address: identity.address, linked: open?.link?.main, ...othersOf(open, main), session: summary(), features };
+    }
+    const last = pick(main);
+    return last
+      ? { state: 'known', address: last.address, linked: last.link?.main, ...othersOf(last, main), session: null, features }
+      : { state: 'none', ...othersOf(undefined, main), session: null, features };
+  };
+  const refreshIdle = () => deps.ui.idle(status(viewMain));
+  const lockNow = () => { identity = null; ledger = null; credentialId = null; unlockedFor = undefined; };
 
   /** One panel at a time: the listener answers inside the frame, so stacking prompts would confuse. */
   async function interact<T>(run: () => Promise<T>): Promise<T> {
@@ -179,7 +208,7 @@ export function createListeningEngine(deps: {
     return identity;
   };
 
-  async function create(terms?: SessionTerms): Promise<ListeningIdentity> {
+  async function create(terms?: SessionTerms, main?: string): Promise<ListeningIdentity> {
     const existing = load().wallets;
     const created = await deps.ui.act({
       kind: 'create',
@@ -187,7 +216,7 @@ export function createListeningEngine(deps: {
       // One glance: the price, and the one rule that matters. Everything else is under Details.
       summary: (terms ? termsLine(terms) + '. ' : '')
         + 'Keep under 1 STX: lose the passkey, lose the funds.'
-        + (existing.length ? ' (A second wallet on this device.)' : ''),
+        + (existing.length ? (main ? ` (A separate wallet for ${short(main)}.)` : ' (A second wallet on this device.)') : ''),
       lines: [
         'A small spending wallet for paying artists as you listen. It is made from a passkey on this device, so there is nothing to install and no key is stored anywhere.',
         'Your browser will ask you to save a passkey (Face ID, Touch ID, Windows Hello or your phone).',
@@ -198,11 +227,11 @@ export function createListeningEngine(deps: {
         'Anyone who can use this passkey on an unlocked device can spend it.',
         'If you lose the passkey, whatever is in this wallet is lost. You can return funds to a wallet of yours at any time.',
         ...(existing.length
-          ? [`This device already has a listening wallet (${existing.map((w) => short(w.address)).join(', ')}). A new one is a separate wallet: to reach the old one later, choose its passkey when unlocking.`]
+          ? [`This device already has a listening wallet (${existing.map((w) => short(w.address)).join(', ')}). A new one is a separate wallet${main ? ` for ${short(main)}: each address keeps its own plays, likes and funds. The old one is still there for the wallet it belongs to` : ': to reach the old one later, choose its passkey when unlocking'}.`]
           : [])
       ],
       confirmLabel: terms ? 'Create and pay as I listen' : 'Create with passkey'
-    }, () => deps.passkey.create(existing.map((w) => w.credentialId)));
+    }, () => deps.passkey.create(existing.map((w) => w.credentialId), main ? `Xtrata listening wallet · ${short(main)}` : undefined));
 
     // Prove PRF is live AND stable before the address is ever shown for funding
     // (docs/PASSKEY-WALLET.md §3.1). A wallet whose PRF output changes is unreachable.
@@ -232,17 +261,27 @@ export function createListeningEngine(deps: {
     }
   }
 
-  async function unlockExisting(anyPasskey = false, terms?: SessionTerms): Promise<ListeningIdentity> {
-    const last = anyPasskey ? undefined : lastRecord();
+  /** A name from the page, kept to plain letters, digits and . _ - so it cannot carry anything but a name. */
+  const cleanLabel = (v: unknown) => (typeof v === 'string' ? v.replace(/[^\p{L}\p{N}._ -]/gu, '').trim().slice(0, 40) : '');
+
+  async function unlockExisting(anyPasskey = false, terms?: SessionTerms, label?: string, forMain?: string): Promise<ListeningIdentity> {
+    const last = anyPasskey ? undefined : pick(forMain);
+    // A listening wallet linked to a main wallet is that person's wallet: greet them by it. The listening
+    // address is plumbing for them. Without a link (passkey-only) the listening address is the identity.
+    const main = last?.link?.main;
+    const owner = main ? [cleanLabel(label), short(main)].filter(Boolean).join(' · ') : '';
+    const who = main ? (cleanLabel(label) || short(main)) : '';
     const r = await deps.ui.act({
       kind: 'unlock',
-      title: 'Welcome back',
-      summary: [last ? short(last.address) : '', terms ? termsLine(terms) : 'Unlock for this visit'].filter(Boolean).join(' · '),
+      title: who ? `Welcome back, ${who}` : 'Welcome back',
+      summary: [main ? (cleanLabel(label) ? short(main) : '') : last ? short(last.address) : '', terms ? termsLine(terms) : 'Unlock for this visit'].filter(Boolean).join(' · '),
       // Kept short: on the radio this panel opens by itself and its button should sit in view.
       lines: terms
-        ? [last ? `Wallet ${short(last.address)}. One passkey tap unlocks it for this visit and carries on paying as you listen.` : 'Use your listening-wallet passkey to unlock it for this visit and carry on paying as you listen.',
+        ? [main ? `Plays and likes are credited to ${owner}. One passkey tap unlocks your listening wallet for this visit and carries on paying as you listen.`
+            : last ? `Wallet ${short(last.address)}. One passkey tap unlocks it for this visit and carries on paying as you listen.` : 'Use your listening-wallet passkey to unlock it for this visit and carry on paying as you listen.',
           `Each song you listen to for 30 seconds pays ${stx(50n)} STX to its holder, plus a ${stx(terms.fee)} STX network fee, for up to ${stx(terms.budget)} STX before it asks again. Switch off any time.`]
-        : [last ? `Wallet ${short(last.address)}. Use its passkey to unlock it for this visit.` : 'Use your listening-wallet passkey to unlock it for this visit.',
+        : [main ? `Plays and likes are credited to ${owner}. Use your listening wallet's passkey to unlock it for this visit.`
+            : last ? `Wallet ${short(last.address)}. Use its passkey to unlock it for this visit.` : 'Use your listening-wallet passkey to unlock it for this visit.',
           'The key is rebuilt from your passkey and forgotten when you lock or close this page.'],
       confirmLabel: terms ? 'Unlock and keep paying' : 'Unlock with passkey'
     }, () => deps.passkey.evaluate(last?.credentialId));
@@ -283,18 +322,32 @@ export function createListeningEngine(deps: {
   }
 
   const handlers = {
-    'listening.status': async (): Promise<StatusResult> => status(),
+    'listening.status': async (params?: unknown): Promise<StatusResult> => {
+      const main = validMain((params as StatusParams | undefined)?.main);
+      viewMain = main;
+      // A different main wallet is connected than the one this wallet was opened for, and another of this
+      // device's wallets serves it: close this one. Locking only ever denies service, and the page then
+      // offers the right wallet (or a new one). A wallet opened for this same main wallet stays open.
+      if (identity && main !== unlockedFor) {
+        if (pick(main)?.credentialId !== credentialId) { lockNow(); refreshIdle(); }
+        else unlockedFor = main;
+      }
+      return status(main);
+    },
 
     'listening.unlock': (params: unknown): Promise<UnlockResult> => interact(async () => {
       const p = params as UnlockParams;
       if (p?.mode !== 'create' && p?.mode !== 'unlock') throw new Error('Choose create or unlock.');
       if (!deps.passkey.available()) throw new Error('This browser does not support passkeys. Listening stays free.');
       const terms = termsFrom(p.terms, now());
+      const main = validMain(p.main);
+      viewMain = main;
       if (!identity) {
         // The terms are shown on the same panel as the passkey button, so that one confirm click
         // inside the frame both unlocks and approves paying as you listen.
-        const id = p.mode === 'create' ? await create(terms) : await unlockExisting(p.anyPasskey === true, terms);
+        const id = p.mode === 'create' ? await create(terms, main) : await unlockExisting(p.anyPasskey === true, terms, p.label, main);
         identity = id;
+        unlockedFor = main;
         if (terms) ledger = new SessionLedger(terms, now());
       } else if (terms) await approve(terms, 'Approve paying as you listen');
       return { address: identity.address, session: summary() };
@@ -430,7 +483,7 @@ export function createListeningEngine(deps: {
 
     'listening.stop': async () => { ledger = null; refreshIdle(); return { stopped: true }; },
 
-    'listening.lock': async () => { identity = null; ledger = null; credentialId = null; refreshIdle(); return { locked: true }; }
+    'listening.lock': async () => { lockNow(); refreshIdle(); return { locked: true }; }
   };
 
   refreshIdle();

@@ -32,6 +32,7 @@ export function stageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'ent
     case 'elsewhere': return view(0, 'open the pay-per-play radio');
     case 'connect': return view(0, 'connect your wallet above');
     case 'not-invited': return view(0, 'this wallet is not in the test yet', true);
+    case 'wrong-wallet': return view(0, 'connect the wallet this listening wallet belongs to', true);
     case 'unsupported': return view(1, 'this browser cannot make a passkey wallet', true);
     case 'intro': return view(1, 'create your passkey listening wallet');
     case 'locked': return view(1, 'unlock your passkey listening wallet');
@@ -77,6 +78,7 @@ function soloStageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'entrie
  */
 export function showSteps(s: Pick<Snapshot, 'step' | 'entries' | 'linked'> & { solo?: boolean }, stage: StageView | null) {
   if (!stage || stage.at >= stagesFor(!!s.solo).length) return false;
+  if (s.step === 'wrong-wallet') return false; // not setup: this device already has a listening wallet, for another wallet
   if (s.entries.some((e) => e.kind === 'play')) return false; // has paid before: not first-time setup
   return !(s.step === 'locked' && s.linked); // a returning, already linked wallet just unlocks
 }

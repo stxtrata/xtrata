@@ -20,6 +20,11 @@ export interface StatusResult {
   address?: string;
   /** Main wallet this listening wallet is linked to, if verified on this device. */
   linked?: string;
+  /**
+   * Main wallets that OTHER listening wallets on this device are linked to (public addresses, other than the
+   * one reported here), so the page can say "this device already has a listening wallet for ...". Absent when none.
+   */
+  others?: string[];
   session: SessionSummary | null;
   /**
    * What this wallet build can do, so the radio can tell an out-of-date wallet box (deployed
@@ -30,9 +35,15 @@ export interface StatusResult {
 
 /**
  * Features of the current wallet build: `cancel` (listening.cancel), `like` (listening.signLike at LIKE_FEE),
- * `standalone` (returns to a page-supplied destination and likes without a linked main wallet).
+ * `standalone` (returns to a page-supplied destination and likes without a linked main wallet),
+ * `multi` (one listening wallet per main-wallet address: status, unlock and create take the connected `main`).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi'] as const;
+
+/** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
+export interface StatusParams {
+  main?: string;
+}
 
 export interface TermsParams {
   fee: string;
@@ -43,8 +54,18 @@ export interface TermsParams {
 
 export interface UnlockParams {
   mode: 'create' | 'unlock';
+  /**
+   * The connected main wallet. Unlock opens the listening wallet linked to it (or a never-linked one it can
+   * claim); create makes a new one for it. Only chooses among this device's wallets: it grants nothing.
+   */
+  main?: string;
   /** Unlock: let the listener pick any listening-wallet passkey instead of this device's last one. */
   anyPasskey?: boolean;
+  /**
+   * Display only: a name for the linked main wallet (e.g. its BNS name), which the offline wallet box cannot look up.
+   * The box sanitises it and always shows the main wallet's address beside it.
+   */
+  label?: string;
   /** Optional: approve these session terms in the same step as the passkey tap. */
   terms?: TermsParams;
 }

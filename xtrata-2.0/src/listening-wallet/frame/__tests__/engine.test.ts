@@ -53,7 +53,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -76,7 +76,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi'] });
     expect(s.map.size).toBe(0);
   });
 
@@ -284,5 +284,189 @@ describe('listening wallet engine (wallet origin)', () => {
     expect(panel.lines).toContain(ATTACKER);
     expect(panel.warnings?.join(' ')).toContain(MAIN);
     expect(await s.h['listening.status']()).toMatchObject({ linked: MAIN });
+  });
+});
+
+describe('the unlock card says whose wallet it is', () => {
+  const shortOf = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
+  const sign = (main: string, key: string, issued: number) => signMessageHashRsv({ messageHash: linkHash({ main, listening: ADDRESS, issued }), privateKey: createStacksPrivateKey(key) }).data;
+  const linkedLocked = async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create' });
+    await s.h['listening.link']({ main: MAIN, issued: s.now(), mainSignature: sign(MAIN, mainKey, s.now()) });
+    await s.h['listening.lock']();
+    return s;
+  };
+
+  it('a linked listener is greeted by its main wallet, not the listening address', async () => {
+    const s = await linkedLocked();
+    await s.h['listening.unlock']({ mode: 'unlock', terms: s.terms(), label: 'jim.btc' });
+    const panel = s.panels.at(-1)!;
+    expect(panel.kind).toBe('unlock');
+    expect(panel.title).toBe('Welcome back, jim.btc');
+    const text = [panel.title, panel.summary, ...panel.lines].join(' ');
+    expect(text).toContain(shortOf(MAIN));
+    expect(text).toMatch(/credited to jim\.btc/);
+    expect(text).not.toContain(shortOf(ADDRESS));
+  });
+
+  it('without a name it shows the main wallet address, still not the listening address', async () => {
+    const s = await linkedLocked();
+    await s.h['listening.unlock']({ mode: 'unlock' });
+    const panel = s.panels.at(-1)!;
+    expect(panel.title).toBe(`Welcome back, ${shortOf(MAIN)}`);
+    expect([panel.title, panel.summary, ...panel.lines].join(' ')).not.toContain(shortOf(ADDRESS));
+  });
+
+  it('keeps only a plain name from the page', async () => {
+    const s = await linkedLocked();
+    await s.h['listening.unlock']({ mode: 'unlock', label: '<img src=x onerror=1> alice.btc'.repeat(3) });
+    const title = s.panels.at(-1)!.title;
+    expect(title).not.toMatch(/[<>=]/);
+    expect(title.length).toBeLessThanOrEqual('Welcome back, '.length + 40);
+  });
+
+  it('a passkey-only wallet (no link) keeps its own address as the identity', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create' });
+    await s.h['listening.lock']();
+    await s.h['listening.unlock']({ mode: 'unlock', label: 'jim.btc' }); // a label means nothing without a link
+    const panel = s.panels.at(-1)!;
+    expect(panel.title).toBe('Welcome back');
+    expect([panel.summary, ...panel.lines].join(' ')).toContain(shortOf(ADDRESS));
+    expect(panel.title).not.toContain('jim.btc');
+  });
+});
+
+describe('one listening wallet per main-wallet address', () => {
+  const shortOf = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
+  const keyB = privateKeyToString(makeRandomPrivKey()).slice(0, 64) + '01';
+  const MAIN_B = getAddressFromPrivateKey(keyB, TransactionVersion.Mainnet);
+  const keyC = privateKeyToString(makeRandomPrivKey()).slice(0, 64) + '01';
+  const MAIN_C = getAddressFromPrivateKey(keyC, TransactionVersion.Mainnet);
+
+  function box() {
+    let time = 1_760_000_000_000, n = 0;
+    const map = new Map<string, string>();
+    const prfs = new Map<string, Uint8Array>();
+    const panels: Panel[] = [];
+    const creates: { exclude?: string[]; name?: string }[] = [];
+    const evaluated: (string | undefined)[] = [];
+    const engine = createListeningEngine({
+      passkey: {
+        available: () => true,
+        create: async (exclude, name) => {
+          const id = `cred-${++n}`;
+          prfs.set(id, Uint8Array.from({ length: 32 }, (_, i) => (i * 3 + n * 11) % 256));
+          creates.push({ exclude, name });
+          return { credentialId: id, prf: prfs.get(id)!.slice() };
+        },
+        evaluate: async (id) => { evaluated.push(id); const k = id ?? 'cred-1'; return { credentialId: k, prf: prfs.get(k)!.slice() }; }
+      },
+      store: { get: (k) => map.get(k) ?? null, set: (k, v) => void map.set(k, v) },
+      now: () => time,
+      ui: { act: async (panel, action) => { panels.push(panel); return action(); }, cancel: () => false, idle: () => {} }
+    });
+    const h = engine.handlers;
+    const link = async (main: string, key: string, listening: string) => {
+      const issued = time++;
+      await h['listening.link']({ main, issued, mainSignature: signMessageHashRsv({ messageHash: linkHash({ main, listening, issued }), privateKey: createStacksPrivateKey(key) }).data });
+    };
+    /** A wallet for `main`, linked to it, then locked again. */
+    const makeFor = async (main: string, key: string) => {
+      const r = await h['listening.unlock']({ mode: 'create', main });
+      await link(main, key, r.address);
+      await h['listening.lock']();
+      return r.address as string;
+    };
+    return { h, map, panels, creates, evaluated, makeFor, link };
+  }
+
+  it('each address has its own wallet: status answers for the connected address, a new address gets none', async () => {
+    const b = box();
+    const a1 = await b.makeFor(MAIN, mainKey);
+    const a2 = await b.makeFor(MAIN_B, keyB);
+    expect(a1).not.toBe(a2);
+    expect(await b.h['listening.status']({ main: MAIN })).toMatchObject({ state: 'known', address: a1, linked: MAIN });
+    expect(await b.h['listening.status']({ main: MAIN_B })).toMatchObject({ state: 'known', address: a2, linked: MAIN_B });
+    // never offers a wallet that belongs to a different address
+    expect(await b.h['listening.status']({ main: MAIN_C })).toMatchObject({ state: 'none' });
+    // without a main wallet it is the one used last, as before
+    expect(await b.h['listening.status']()).toMatchObject({ address: a2 });
+  });
+
+  it('unlock opens the wallet for the connected address, not the last one used', async () => {
+    const b = box();
+    await b.makeFor(MAIN, mainKey);
+    await b.makeFor(MAIN_B, keyB);
+    b.evaluated.length = 0;
+    await b.h['listening.unlock']({ mode: 'unlock', main: MAIN });
+    expect(b.evaluated).toEqual(['cred-1']);
+    expect(b.panels.at(-1)!.title).toContain(shortOf(MAIN));
+  });
+
+  it('switching to another address locks the open wallet and moves to that address', async () => {
+    const b = box();
+    const a1 = await b.makeFor(MAIN, mainKey);
+    const a2 = await b.makeFor(MAIN_B, keyB);
+    await b.h['listening.unlock']({ mode: 'unlock', main: MAIN, terms: { fee: '300', maxPlays: 3, budget: '1000', expires: 1_760_000_000_000 + 3600_000 } });
+    expect(await b.h['listening.status']({ main: MAIN })).toMatchObject({ state: 'unlocked', address: a1 }); // same address: stays open
+    const after = await b.h['listening.status']({ main: MAIN_B });
+    expect(after).toMatchObject({ state: 'known', address: a2, linked: MAIN_B, session: null });
+    await expect(b.h['listening.signPlay']({ core: 3, song: 1, receipt: 'ab'.repeat(16), fee: '300', nonce: '0', balance: '500000' })).rejects.toThrow(/Unlock/);
+  });
+
+  it('a new address gets a separate wallet, named for it in the passkey list, and the old one stays', async () => {
+    const b = box();
+    const a1 = await b.makeFor(MAIN, mainKey);
+    const r = await b.h['listening.unlock']({ mode: 'create', main: MAIN_B });
+    expect(r.address).not.toBe(a1);
+    expect(b.creates.at(-1)).toMatchObject({ exclude: ['cred-1'], name: `Xtrata listening wallet · ${shortOf(MAIN_B)}` });
+    const panel = b.panels.find((p) => p.kind === 'create' && p.summary?.includes('separate'))!;
+    expect(panel.summary).toContain(shortOf(MAIN_B));
+    await b.link(MAIN_B, keyB, r.address);
+    await b.h['listening.lock']();
+    expect(await b.h['listening.status']({ main: MAIN })).toMatchObject({ address: a1 });
+  });
+
+  it('a never-linked (passkey-only) wallet can be claimed by the first address that links it, then belongs to it', async () => {
+    const b = box();
+    const solo = await b.h['listening.unlock']({ mode: 'create' }); // no main wallet
+    await b.h['listening.lock']();
+    expect(await b.h['listening.status']({ main: MAIN })).toMatchObject({ state: 'known', address: solo.address, linked: undefined });
+    await b.h['listening.unlock']({ mode: 'unlock', main: MAIN });
+    await b.link(MAIN, mainKey, solo.address);
+    await b.h['listening.lock']();
+    expect(await b.h['listening.status']({ main: MAIN })).toMatchObject({ address: solo.address, linked: MAIN });
+    expect(await b.h['listening.status']({ main: MAIN_B })).toMatchObject({ state: 'none' }); // no longer anyone else's to claim
+  });
+
+  it('an unlinked wallet open with no main wallet connected stays open when one connects that it serves, and closes when another serves it', async () => {
+    const b = box();
+    const mine = await b.makeFor(MAIN, mainKey);
+    const solo = await b.h['listening.unlock']({ mode: 'create' });
+    expect(await b.h['listening.status']({ main: MAIN_B })).toMatchObject({ state: 'unlocked', address: solo.address }); // can be claimed by B
+    await b.link(MAIN_B, keyB, solo.address);
+    expect(await b.h['listening.status']({ main: MAIN })).toMatchObject({ state: 'known', address: mine }); // MAIN has its own: solo-then-B wallet closes
+  });
+
+  it('reports which other addresses have a wallet on this device, so the page can say so', async () => {
+    const b = box();
+    await b.makeFor(MAIN, mainKey);
+    await b.makeFor(MAIN_B, keyB);
+    // a third address has none: it hears about both
+    expect((await b.h['listening.status']({ main: MAIN_C })).others?.slice().sort()).toEqual([MAIN, MAIN_B].sort());
+    // a connected address with its own wallet hears about the other one only
+    expect(await b.h['listening.status']({ main: MAIN })).toMatchObject({ linked: MAIN, others: [MAIN_B] });
+    // no other wallets: the field is left out
+    const solo = box();
+    await solo.makeFor(MAIN, mainKey);
+    expect(await solo.h['listening.status']({ main: MAIN })).not.toHaveProperty('others');
+  });
+
+  it('keeps up to 25 wallets on the device', async () => {
+    const b = box();
+    for (let i = 0; i < 27; i++) await b.h['listening.unlock']({ mode: 'create' }), await b.h['listening.lock']();
+    expect(JSON.parse(b.map.get('xtrata.listening-wallet.v1')!).wallets).toHaveLength(25);
   });
 });

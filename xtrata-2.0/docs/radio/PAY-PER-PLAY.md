@@ -203,8 +203,11 @@ anyone send it about 1 STX, and start paying artists. No connect, no link, no po
 needs `RADIO_PPP_ENABLED=1` and only works on the radio host. It does not widen
 `RADIO_PPP_ALLOWLIST`: a connected, invited main wallet keeps the linked flow, and a connected but
 not-invited wallet can still listen passkey-only. Redeploy the **main** project after changing it
-(the wallet box needs the matching build, which deploys from main; an older box still pays but says
-it cannot return to another address or like yet).
+(the wallet box needs the matching build. It is a direct-upload Pages project, and the GitHub Action
+skips silently while the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repo secrets are unset, so
+deploy it by hand: `npm run build:listening-wallet`, then in `dist-listening-wallet`
+`npx wrangler pages deploy . --project-name xtrata-listening-wallet --branch main`. An older box
+still pays but says it cannot return to another address or like yet).
 
 **Where returns go**, in this order:
 1. the linked main wallet, if the listening wallet was ever linked (always wins);
@@ -226,6 +229,39 @@ via the existing link. The panel gently points to Xverse/Leather and never block
 **Canary:** test with disposable wallets only (AGENTS.md). Check: create with no wallet connected,
 fund from a second disposable wallet, confirm a paid play, like a song, then return all and confirm
 the full address shown in the wallet box is the funder.
+
+## One listening wallet per wallet address
+
+A person with a Stacks wallet that has several addresses (Xverse, Leather) gets a **separate listening
+wallet for each address they connect**, on the same device. Each is linked to its own address, so that
+address's plays, likes and returns stay separate, like a playlist per profile. A passkey-only listener
+(no Stacks wallet) stays a single wallet.
+
+How it works (wallet box feature `multi`; `src/listening-wallet/frame/engine.ts`):
+- The page passes the connected address to `listening.status` and `listening.unlock`. The box answers
+  with **the wallet linked to that address**; else a wallet that was never linked (a passkey-only one,
+  which the first address to link it claims); else none, and the page offers a new one for that address.
+  A wallet linked to a *different* address is never offered. The address only chooses among this
+  device's wallets: it grants nothing, and every unlock, create, link and return still needs the
+  passkey and the in-box confirm with the full address.
+- Switching to another address while a wallet is open locks it (the box does this itself on the next
+  status call), drops what it was waiting to pay, and shows the new address's wallet or the set-up step.
+  A wallet opened for the same address stays open.
+- Creating a wallet for an address names the passkey `Xtrata listening wallet · SP…` so several are
+  can be told apart in the password manager. The device remembers up to 25 wallets (it never silently forgets
+  one that may hold funds). Funds in an address's wallet are reached by connecting that address.
+- The wallet box greets a linked wallet as "Welcome back, <name or short main address>" (the page passes
+  the BNS name as a display-only `label`, sanitised by the box). The panel shows "Credited to <name ·
+  address>" and keeps the listening address in a "Listening wallet (technical)" row, needed to fund it.
+- **Connecting an address with no wallet here** starts the normal set-up. If this device already has
+  wallets for other addresses, the box reports them (`others`, public addresses only) and the panel
+  says so first: "This device already has a listening wallet for <name>. If you meant to use that one,
+  switch to that wallet", then offers "Set up for <address>" as a new account. An address that already
+  has its wallet is never asked anything: it unlocks with one passkey tap. With no wallet connected the
+  panel lists the addresses this device has wallets for.
+- **Older wallet box** (no `multi`): it ignores the address and answers with its last wallet. If that
+  wallet is linked to a different address the panel stays on `wrong-wallet`: locked, with no unlock,
+  paying, likes, deposits, links or returns, and the box is told to update. Deploy the box by hand.
 
 ## Canary checklist
 
