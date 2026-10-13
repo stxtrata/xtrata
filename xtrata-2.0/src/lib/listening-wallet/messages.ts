@@ -20,6 +20,11 @@ export interface StatusResult {
   address?: string;
   /** Main wallet this listening wallet is linked to, if verified on this device. */
   linked?: string;
+  /**
+   * Main wallets that OTHER listening wallets on this device are linked to (public addresses, other than the
+   * one reported here), so the page can say "this device already has a listening wallet for ...". Absent when none.
+   */
+  others?: string[];
   session: SessionSummary | null;
   /**
    * What this wallet build can do, so the radio can tell an out-of-date wallet box (deployed

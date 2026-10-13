@@ -450,6 +450,20 @@ describe('one listening wallet per main-wallet address', () => {
     expect(await b.h['listening.status']({ main: MAIN })).toMatchObject({ state: 'known', address: mine }); // MAIN has its own: solo-then-B wallet closes
   });
 
+  it('reports which other addresses have a wallet on this device, so the page can say so', async () => {
+    const b = box();
+    await b.makeFor(MAIN, mainKey);
+    await b.makeFor(MAIN_B, keyB);
+    // a third address has none: it hears about both
+    expect((await b.h['listening.status']({ main: MAIN_C })).others?.slice().sort()).toEqual([MAIN, MAIN_B].sort());
+    // a connected address with its own wallet hears about the other one only
+    expect(await b.h['listening.status']({ main: MAIN })).toMatchObject({ linked: MAIN, others: [MAIN_B] });
+    // no other wallets: the field is left out
+    const solo = box();
+    await solo.makeFor(MAIN, mainKey);
+    expect(await solo.h['listening.status']({ main: MAIN })).not.toHaveProperty('others');
+  });
+
   it('keeps up to 25 wallets on the device', async () => {
     const b = box();
     for (let i = 0; i < 27; i++) await b.h['listening.unlock']({ mode: 'create' }), await b.h['listening.lock']();

@@ -155,6 +155,8 @@ function start(root: HTMLElement) {
     return names.get(address) ?? null;
   };
   const who = (address?: string) => { const n = nameOf(address); return n ? `${n} · ${short(address)}` : short(address); };
+  /** Up to two wallets by name and address, then "and N more". */
+  const whoList = (addresses: string[]) => addresses.slice(0, 2).map(who).join(' and ') + (addresses.length > 2 ? ` and ${addresses.length - 2} more` : '');
   type Shown = Snapshot['entries'][number] & { title?: string; artist?: string };
   // Song names exactly as the radio shows them: its catalogue, then the radio's own title and artist
   // overrides (artist-credits), then what was playing when the entry was made.
@@ -439,9 +441,12 @@ function start(root: HTMLElement) {
       }
       case 'connect':
         if (s.linked) {
-          // This device's listening wallet belongs to a Stacks wallet: only that wallet unlocks it here.
-          key.push(el('p', `This device's listening wallet is linked to ${who(s.linked)}. Connect that wallet to keep paying artists.`));
-          lines.push(el('p', 'Your plays, likes and any funds returned stay with that wallet. Listening is always free.'));
+          // This device has a listening wallet for a Stacks wallet: connect it to keep paying. Any other wallet gets its own.
+          const mine = [s.linked, ...s.others];
+          key.push(el('p', mine.length > 1
+            ? `This device has listening wallets for ${whoList(mine)}. Connect one of them to keep paying artists.`
+            : `This device's listening wallet is linked to ${who(s.linked)}. Connect that wallet to keep paying artists.`));
+          lines.push(el('p', 'Connect a different wallet instead and it gets a listening wallet of its own: each address keeps its own plays, likes and funds. Listening is always free.'));
         } else {
           key.push(el('p', 'Connect your wallet to pay artists as you listen.'));
           lines.push(el('p', 'Every payment is recorded on-chain. Listening is always free.'));
@@ -468,10 +473,15 @@ function start(root: HTMLElement) {
           ? 'You get a small listening wallet made from a passkey on this device: no app or Stacks wallet needed, and no key stored anywhere. Keep no more than 1 STX in it. Anything left can be sent back to whoever funded it.'
           : 'You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.', 'ppp-warn'));
         // Two clear doors for a visitor with no wallet connected: a new passkey-only wallet, or their Stacks wallet.
-        // One listening wallet per wallet address: another address on this device has its own, and its plays and likes stay separate.
-        if (!s.solo && s.main) lines.push(el('p', `This is the listening wallet for ${who(s.main)}. Each wallet address you connect gets its own on this device, so plays and likes stay separate, like a playlist per profile.`, 'ppp-mute'));
+        // One listening wallet per wallet address. If this device already has one for another address, say so first:
+        // a mistake (wrong wallet connected) is one tap away, and otherwise this address is set up as a new account.
+        if (!s.solo && s.main && s.others.length) {
+          key.push(el('p', `This device already has a listening wallet for ${whoList(s.others)}. If you meant to use that one, switch to that wallet.`, 'ppp-warn'));
+          lines.push(el('p', `Otherwise, set up a new listening wallet for ${who(s.main)} below. Each address keeps its own plays, likes and funds, like a playlist per profile.`));
+        } else if (!s.solo && s.main) lines.push(el('p', `This is the listening wallet for ${who(s.main)}. Each wallet address you connect gets its own on this device, so plays and likes stay separate, like a playlist per profile.`, 'ppp-mute'));
         if (s.solo) lines.push(el('p', 'Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.', 'ppp-mute'));
-        actions.push(button(s.solo ? 'Turn on pay-per-play · no wallet needed' : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
+        actions.push(button(s.solo ? 'Turn on pay-per-play · no wallet needed' : s.others.length && s.main ? `Set up for ${short(s.main)}` : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
+        if (!s.solo && s.main && s.others.length) actions.push(button('Switch wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
         if (s.solo) actions.push(button('I have a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
         actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
         break;

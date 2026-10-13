@@ -253,6 +253,12 @@ How it works (wallet box feature `multi`; `src/listening-wallet/frame/engine.ts`
 - The wallet box greets a linked wallet as "Welcome back, <name or short main address>" (the page passes
   the BNS name as a display-only `label`, sanitised by the box). The panel shows "Credited to <name ·
   address>" and keeps the listening address in a "Listening wallet (technical)" row, needed to fund it.
+- **Connecting an address with no wallet here** starts the normal set-up. If this device already has
+  wallets for other addresses, the box reports them (`others`, public addresses only) and the panel
+  says so first: "This device already has a listening wallet for <name>. If you meant to use that one,
+  switch to that wallet", then offers "Set up for <address>" as a new account. An address that already
+  has its wallet is never asked anything: it unlocks with one passkey tap. With no wallet connected the
+  panel lists the addresses this device has wallets for.
 - **Older wallet box** (no `multi`): it ignores the address and answers with its last wallet. If that
   wallet is linked to a different address the panel stays on `wrong-wallet`: locked, with no unlock,
   paying, likes, deposits, links or returns, and the box is told to update. Deploy the box by hand.

@@ -132,6 +132,8 @@ export interface Snapshot {
   walletCannotSolo: boolean;
   /** The wallet box predates one listening wallet per address: it answers with its last wallet whichever address is connected. */
   walletCannotMulti: boolean;
+  /** Main wallets that other listening wallets on this device belong to (not the connected one, not this wallet's). */
+  others: string[];
 }
 
 const UNRESOLVED: Entry['status'][] = ['prepared', 'signed', 'unknown', 'pending'];
@@ -285,7 +287,8 @@ export function createPppController(deps: PppDeps) {
     funderState: (() => { const f = funderFor(); return !f ? 'unknown' : !f.ok ? 'failed' : f.funder ? 'found' : 'none'; })(),
     funderMultiple: (() => { const f = funderFor(); return !!f && f.ok && f.distinct > 1; })(),
     walletCannotSolo: solo() && walletLacks('standalone'),
-    walletCannotMulti: walletLacks('multi')
+    walletCannotMulti: walletLacks('multi'),
+    others: (status?.others ?? []).filter((a) => a !== deps.main() && a !== status?.linked)
   });
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
