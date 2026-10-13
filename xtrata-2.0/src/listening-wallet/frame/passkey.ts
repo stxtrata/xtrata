@@ -43,13 +43,13 @@ export function browserPasskey(): PasskeyPort {
   return {
     available: () => typeof window.PublicKeyCredential === 'function' && !!navigator.credentials,
 
-    async create(exclude: string[] = []) {
+    async create(exclude: string[] = [], name = 'Xtrata listening wallet') {
       let cred: PublicKeyCredential | null;
       try {
         cred = (await navigator.credentials.create({
           publicKey: {
             rp: { name: 'Xtrata listening wallet', id: location.hostname },
-            user: { id: random(16), name: 'Xtrata listening wallet', displayName: 'Xtrata listening wallet' },
+            user: { id: random(16), name, displayName: name },
             challenge: random(32),
             pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
             authenticatorSelection: { residentKey: 'required', requireResidentKey: true, userVerification: 'required' },
