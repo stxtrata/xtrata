@@ -168,6 +168,9 @@ function start(root: HTMLElement) {
   const link = (label: string, href: string) => { const a = el('a', label) as HTMLAnchorElement; a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
 
   let lastStage: StageView | null = null;
+  // radio.xtrata.xyz/radio#give (the homepage's "Gift Stacks music") opens the gift section once it is there.
+  let wantGive = location.hash === '#give';
+  if (wantGive) history.replaceState(null, '', location.pathname + location.search);
   let walletShown = false; // the listener opened the resting wallet box
   // BNS names (e.g. jim.btc), looked up once per address per page view. A wallet with a name is shown by that
   // name wherever its address would be; without one (or while the lookup runs) the short address stands in.
@@ -614,6 +617,12 @@ function start(root: HTMLElement) {
     const giftFold = gifts.renderFold(s);
     $('.ppp-gifts').hidden = !giftFold;
     if (giftFold && !$('.ppp-gift-body').contains(giftFold)) $('.ppp-gift-body').replaceChildren(giftFold);
+    if (giftFold && wantGive) {
+      wantGive = false;
+      const fold = $('.ppp-gifts') as HTMLDetailsElement;
+      fold.open = true;
+      requestAnimationFrame(() => fold.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    }
     $('.ppp-body').replaceChildren(...lines);
     $('.ppp-actions').replaceChildren(...actions);
     $('.ppp-actions2').replaceChildren(...more);

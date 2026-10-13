@@ -84,9 +84,9 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   }),
   Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
-    title: 'New: pay-per-play with a passkey.',
-    line: 'Set up your Xtrata Music wallet in your browser for 1 STX. No app, no extension.',
-    cta: 'Become a Music Hero', href: 'https://radio.xtrata.xyz/radio', newTab: true
+    title: 'New: send on-chain music to any phone.',
+    line: 'A gift link, Safari and Face ID. No app, no wallet, no STX of their own.',
+    cta: 'Gift Stacks music', href: 'https://radio.xtrata.xyz/radio#give', newTab: true
   }),
   Object.freeze({
     id: 'chess', tag: 'Play', tone: 'amber',
