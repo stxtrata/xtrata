@@ -263,6 +263,31 @@ How it works (wallet box feature `multi`; `src/listening-wallet/frame/engine.ts`
   wallet is linked to a different address the panel stays on `wrong-wallet`: locked, with no unlock,
   paying, likes, deposits, links or returns, and the box is told to update. Deploy the box by hand.
 
+## iPhone, iPad and Safari: the passkey is made in a new tab
+
+WebKit (Safari, and every iPhone and iPad browser, which must use WebKit) refuses to **create** a passkey inside a
+cross-origin frame, even with `publickey-credentials-create` allowed and a tap: the request fails at once with no
+system prompt ("cancelled or timed out"). It does allow **signing in** there, PRF included: on 13 Oct 2026 an iPhone
+(iOS 26, Safari) unlocked a synced listening wallet in the frame and made paid plays and likes.
+
+So on WebKit (`webkitOnly()` in `src/listening-wallet/frame/passkey.ts`) the create panel says "Make my passkey (new
+tab)". That tap opens `https://wallet.xtrata.xyz/create` (`create.html`, a second entry in the wallet build) with
+`noopener`. The page only registers the passkey; it never evaluates PRF, derives, signs or stores anything. The
+request rides in the URL fragment and is public: a random 16-byte user id, the passkey name
+(`Xtrata listening wallet[ · SP…] · ABCD`) and the credentials not to duplicate; anything else is refused.
+
+Back in the radio tab, "Made your passkey?" → "I made it: use my passkey" signs in with any passkey and accepts only
+one whose user id is the one the frame chose, so an older passkey synced to the device cannot pass for the new one
+(even after the site data was cleared). The usual second sign-in then checks PRF is stable before the address is
+shown. Other browsers still create inside the frame.
+
+**Gifts claim only into a wallet created in this browser** (`createdHere`, remembered per listening address by the
+radio). A wallet unlocked from a passkey made elsewhere shows the gift link as one quiet line, with "Forget this
+gift link here"; the server also refuses a second gift for the same wallet.
+
+Wallet box deploy now uploads `create.html` too (same command). Check it is live:
+`curl -s -o /dev/null -w '%{http_code}\n' https://wallet.xtrata.xyz/create` prints 200.
+
 ## Canary checklist
 
 Use a **disposable** main wallet and a small amount (AGENTS.md: never personal, deployer or sponsor

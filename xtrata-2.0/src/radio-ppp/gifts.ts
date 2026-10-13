@@ -172,7 +172,7 @@ export function createGifts(deps: GiftDeps) {
     if (v.status === 'pending-deposit') return [el('p', `🎁 ${fromLabel(v)} is still sending this gift. Check back in a few minutes.`, 'ppp-warn')];
     // An existing wallet is open (linked, funded or used before): the gift is not for it. One quiet line,
     // so it does not read as if this wallet were the gift.
-    const notNew = !!s.listening && (!!s.linked || !!s.creditedTo || (s.balance ?? 0n) > 0n || s.entries.length > 0);
+    const notNew = !!s.listening && (!s.createdHere || !!s.linked || !!s.creditedTo || (s.balance ?? 0n) > 0n || s.entries.length > 0);
     if (notNew)
       return [el('p', '🎁 A gift link is also waiting on this device. Gifts are for brand-new listening wallets, not this one: share the link with someone new.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet')];
     const amount = BigInt(v.amount);
@@ -180,7 +180,7 @@ export function createGifts(deps: GiftDeps) {
     const out: HTMLElement[] = [head];
     // Only a brand-new, empty wallet with no main wallet linked takes a gift automatically. A listener who
     // unlocks a wallet they already had (e.g. one linked to their Stacks wallet) keeps the gift link for later.
-    const ready = !!s.listening && !s.linked && !s.creditedTo && s.step === 'fund' && (s.balance ?? 1n) === 0n && !s.depositPending && !s.entries.length;
+    const ready = !!s.listening && s.createdHere && !s.linked && !s.creditedTo && s.step === 'fund' && (s.balance ?? 1n) === 0n && !s.depositPending && !s.entries.length;
     const siteKey = s.gate?.gifts?.turnstileSiteKey;
     if (ready) {
       if (siteKey && !turnstile.token) { out.push(el('p', 'One quick check and it is yours:', 'ppp-mute'), turnstileBox(siteKey)); }

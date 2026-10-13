@@ -564,6 +564,16 @@ describe('passkey-only listening (no Stacks wallet)', () => {
     expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', depositPending: false, payingOn: true });
   });
 
+  it('only a wallet created in this browser counts as made here (a gift link claims into nothing else)', async () => {
+    const s = solo();
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    expect(s.ppp.snapshot().createdHere).toBe(true);
+    // the same wallet reached after the site data was cleared (its passkey still syncs): not made here
+    for (const k of [...s.store.keys()]) if (k.includes('created')) s.store.delete(k);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ listening: LISTENING, createdHere: false });
+  });
+
   it('a wallet linked elsewhere (passkey synced to a new device) says whose it is, without changing where returns go', async () => {
     const s = solo();
     s.chain.funder = { ok: true, funder: HOLDER, distinct: 1 };
