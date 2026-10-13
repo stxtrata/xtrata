@@ -121,8 +121,13 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   await context.close();
 
   // ---- a listener with a Stacks wallet, who is also the admin: gift a friend, make campaign links
-  const giver = await browser.newContext({ viewport });
-  await giver.addInitScript(([key, main]) => { localStorage.setItem(key, JSON.stringify({ isConnected: true, address: main, network: 'mainnet' })); }, ['xtrata.v15.1.wallet.session', ADMIN]);
+  const giver = await browser.newContext({ viewport, permissions: ['clipboard-read', 'clipboard-write'] });
+  const GIFT_ID = 'a'.repeat(24), MY_CODE = 'ZyXwVuTsRqPoNmLkJiHgFe';
+  await giver.addInitScript(([key, main, mine, id, code]) => {
+    localStorage.setItem(key, JSON.stringify({ isConnected: true, address: main, network: 'mainnet' }));
+    // one friend gift already paid for: its link can be copied and shared
+    localStorage.setItem(mine, JSON.stringify([{ id, code, amount: '250000', at: Date.now(), txid: '0x' + 'b'.repeat(64) }]));
+  }, ['xtrata.v15.1.wallet.session', ADMIN, 'xtrata.radio.gift.mine.v1:' + ADMIN, GIFT_ID, MY_CODE]);
   await giver.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.origin === WALLET) {
@@ -135,6 +140,7 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
       return json(route, { enabled: true, allowed: true, here: true, radioUrl: SITE + '/radio.html', canary: true, walletOrigin: WALLET, passkeyOnly: true, limits,
         gifts: { enabled: true, treasury: TREASURY, turnstileSiteKey: null, admin: true, fee: '3000' } });
     if (url.pathname === '/radio/listening-wallet/link') return json(route, { links: [] });
+    if (url.pathname === '/radio/gift/confirm' || url.pathname === '/radio/gift') return json(route, { status: 'live', amount: '250000', source: 'friend', from: ADMIN, label: '', expires: Date.now() + 86400000 });
     if (url.pathname.startsWith('/hiro/') || url.pathname.startsWith('/radio/counts') || url.pathname.startsWith('/radio/chain-likes')) return json(route, {}, 404);
     try { const path = url.pathname.slice(1) || 'index.html'; return route.fulfill({ body: await readFile(new URL(path, pub)), headers: { 'content-type': type(path) } }); }
     catch { return route.fulfill({ status: 404, body: '' }); }
@@ -151,6 +157,19 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   assert.match(await fold.locator('.ppp-gift-amount').innerText(), /^0\.5 STX · about 1,420 paid plays · you pay 0\.503 STX/);
   await fold.getByRole('button', { name: 'Gift 0.5 STX' }).waitFor();
   await fold.getByRole('button', { name: 'Sign and make links' }).waitFor();
+  // Copy and Share answer the click: the label changes and the button turns green for a moment.
+  const copyLink = fold.getByRole('button', { name: 'Copy link' });
+  await copyLink.waitFor();
+  await copyLink.click();
+  const copied = fold.locator('button[data-feedback^="gift-copy:"]');
+  await copied.filter({ hasText: 'Copied ✓' }).waitFor();
+  assert.match(await copied.getAttribute('class'), /is-done/);
+  assert.equal(await gp.evaluate(() => navigator.clipboard.readText()), `${SITE}/radio.html#gift=${MY_CODE}`);
+  if (shots) await fold.screenshot({ path: `${shots}/gift-fold-copied-${viewport.width}.png` });
+  await gp.waitForFunction(() => document.querySelector('button[data-feedback^="gift-copy:"]')?.textContent === 'Copy link', null, { timeout: 5000 }); // back after a moment
+  await gp.evaluate(() => { delete navigator.share; }).catch(() => {});
+  await fold.getByRole('button', { name: 'Share' }).click();
+  await fold.locator('button[data-feedback^="gift-share:"]').filter({ hasText: /Shared ✓|Link copied ✓/ }).waitFor();
   if (shots) await fold.screenshot({ path: `${shots}/gift-fold-${viewport.width}.png` });
   const overflow = await gp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 1, `no horizontal scroll at ${viewport.width}px (${overflow})`);

@@ -17,6 +17,7 @@ import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { createNameCache } from '../lib/bns/name-cache';
 import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
 import { createGifts } from './gifts';
+import { copyButton } from './feedback';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -407,7 +408,7 @@ function start(root: HTMLElement) {
     // wallet it is plumbing (needed to fund it), so it comes after who they are and is labelled as technical.
     const listeningRow = () => {
       if (!s.listening) return;
-      const copy = button('Copy', () => void navigator.clipboard?.writeText(s.listening || ''), 'tiny');
+      const copy = copyButton('copy-listening', 'Copy', () => s.listening || '', 'tiny', () => render(ppp.snapshot()));
       rows.push(...fact(s.linked ? 'Listening wallet (technical)' : 'Listening wallet', short(s.listening), 'ppp-addr-short', copy));
     };
     if (!s.linked) listeningRow();
@@ -534,7 +535,7 @@ function start(root: HTMLElement) {
           // No wallet to deposit from: the address is the whole interface. Anyone can send to it.
           lines.push(el('p', 'Ask a friend, or send from an exchange or any Stacks wallet, to this address. About 1 STX is plenty. Whatever is left can be returned to whoever sent it.'));
           lines.push(el('p', s.listening || '', 'ppp-addr-full'));
-          if (s.listening && !s.depositPending) actions.push(button('Copy my address', () => void navigator.clipboard?.writeText(s.listening || ''), 'primary'));
+          if (s.listening && !s.depositPending) actions.push(copyButton('copy-address', 'Copy my address', () => s.listening || '', 'primary', () => render(ppp.snapshot())));
         } else lines.push(el('p', `Or send STX from an exchange to the listening wallet address (Copy above).`, 'ppp-mute'));
         if (s.depositPending && s.depositTxid) { const p = el('p', 'Funds on their way · paying starts by itself when they land. ', 'ppp-warn'); p.append(link('View', explorer(s.depositTxid))); key.push(p); }
         else if (s.allowance > 0n && !s.solo) actions.push(button(`Deposit ${stx(s.allowance)} STX from my wallet`, () => void ppp.deposit(), 'primary'));
