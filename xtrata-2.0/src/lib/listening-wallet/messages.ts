@@ -45,6 +45,11 @@ export interface UnlockParams {
   mode: 'create' | 'unlock';
   /** Unlock: let the listener pick any listening-wallet passkey instead of this device's last one. */
   anyPasskey?: boolean;
+  /**
+   * Display only: a name for the linked main wallet (e.g. its BNS name), which the offline wallet box cannot look up.
+   * The box sanitises it and always shows the main wallet's address beside it.
+   */
+  label?: string;
   /** Optional: approve these session terms in the same step as the passkey tap. */
   terms?: TermsParams;
 }

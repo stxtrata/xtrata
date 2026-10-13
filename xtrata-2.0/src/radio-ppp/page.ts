@@ -102,6 +102,7 @@ function start(root: HTMLElement) {
       return { liked: row.liked, by: Array.isArray(row.by) ? row.by.filter((a: unknown) => typeof a === 'string') : row.liked ? [main] : [] };
     },
     likeSent: (song, liked) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-sent', { detail: { song, liked } })),
+    nameOf: (a) => nameOf(a) ?? undefined,
     likeConfirmed: (song, liked) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-confirmed', { detail: { song, liked } })),
     likeFailed: (song) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-failed', { detail: { song } }))
   });
@@ -190,6 +191,7 @@ function start(root: HTMLElement) {
   /** One-word state for the header pill, coloured by how things stand. */
   function statePill(s: Snapshot): [string, string] {
     if (['elsewhere', 'connect', 'not-invited', 'unsupported', 'loading'].includes(s.step)) return ['', ''];
+    if (s.step === 'wrong-wallet') return ['WRONG WALLET', 'warn'];
     if (s.step === 'over') return ['OVER 1 STX', 'bad'];
     if (s.step === 'locked') return ['LOCKED', 'mute'];
     if (s.step === 'intro' || s.step === 'link') return ['', '']; // the SETUP HELPER badge says it
@@ -214,7 +216,7 @@ function start(root: HTMLElement) {
   /** The next step, from the top bar or a nudge: connect, open the pay-per-play radio, or unlock. */
   const go = () => {
     const s = ppp.snapshot();
-    if (s.step === 'connect') { (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(); return; }
+    if (s.step === 'connect' || s.step === 'wrong-wallet') { (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(); return; }
     if (s.step === 'elsewhere' && s.gate?.radioUrl) { location.href = s.gate.radioUrl; return; }
     if (s.step === 'locked' && !s.armed && !s.busy) void ppp.unlock();
     if (s.step === 'ready' && !s.payingOn && !s.busy) void ppp.switchOn();
@@ -235,6 +237,7 @@ function start(root: HTMLElement) {
       case 'elsewhere': return set('Pay-per-play radio', 'quiet', 'Open the pay-per-play radio');
       case 'connect': top.hidden = true; return; // "Connect wallet" sits right beside it
       case 'intro': return set('Set up pay-per-play', '', 'Create your passkey listening wallet');
+      case 'wrong-wallet': return set(`Connect ${nameOf(s.linked) ?? short(s.linked)}`, 'warn', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`);
       case 'locked': return set(s.payingOn ? 'Unlock · keep paying' : 'Unlock wallet', '', 'Opens the listening wallet: one tap there asks for your passkey');
       case 'link': return set('Finish setup', 'warn', 'Link the listening wallet to your main wallet');
       case 'fund': return set(s.entries.some((e) => e.kind === 'play') ? 'Out of funds · top up' : 'Add funds', 'warn', 'Add up to 1 STX to keep paying artists');
@@ -257,13 +260,14 @@ function start(root: HTMLElement) {
     connect: 'Not paying artists',
     intro: 'Not paying artists',
     locked: 'Locked · not paying artists',
+    'wrong-wallet': 'Wrong wallet connected · not paying artists',
     link: 'Not paying artists yet',
     fund: 'Out of funds · artists unpaid',
     over: 'Paused · artists unpaid',
     ready: 'Paying is off · artists get nothing'
   };
   const NUDGE_ACTION: Partial<Record<Snapshot['step'], string>> = {
-    elsewhere: 'Pay as I listen', connect: 'Connect', intro: 'Set up', locked: 'Unlock',
+    elsewhere: 'Pay as I listen', connect: 'Connect', 'wrong-wallet': 'Switch wallet', intro: 'Set up', locked: 'Unlock',
     link: 'Finish setup', fund: 'Top up', over: 'Fix it', ready: 'Switch on'
   };
   function renderMode(s: Snapshot) {
@@ -351,7 +355,7 @@ function start(root: HTMLElement) {
     // (an approval or the one-tap unlock) and otherwise rests closed, with a toggle to look inside.
     const asking = !!s.busy || s.armed;
     // Nothing to look at in a resting box before a wallet exists (or while it loads).
-    const showFrame = !['elsewhere', 'connect', 'not-invited', 'unsupported', 'off'].includes(s.step)
+    const showFrame = !['elsewhere', 'connect', 'wrong-wallet', 'not-invited', 'unsupported', 'off'].includes(s.step)
       && (asking || !['intro', 'loading'].includes(s.step));
     frameWrap.hidden = !showFrame;
     frameWrap.classList.toggle('ppp-frame--rest', !asking && !walletShown);
@@ -381,14 +385,20 @@ function start(root: HTMLElement) {
     const facts = $('.ppp-facts');
     const rows: HTMLElement[] = [];
     if (s.main && s.gate?.here && !s.solo) rows.push(...fact('Your wallet', who(s.main), 'ppp-addr-short'));
-    if (s.listening) {
+    // The listening address is the identity only for a passkey-only listener. For anyone linked to a main
+    // wallet it is plumbing (needed to fund it), so it comes after who they are and is labelled as technical.
+    const listeningRow = () => {
+      if (!s.listening) return;
       const copy = button('Copy', () => void navigator.clipboard?.writeText(s.listening || ''), 'tiny');
-      rows.push(...fact('Listening wallet', short(s.listening), 'ppp-addr-short', copy));
-    }
+      rows.push(...fact(s.linked ? 'Listening wallet (technical)' : 'Listening wallet', short(s.listening), 'ppp-addr-short', copy));
+    };
+    if (!s.linked) listeningRow();
     // Which main wallet this listening wallet serves: its likes and paid plays count for that wallet.
     if (s.listening && s.step !== 'intro') {
-      if (s.linked) rows.push(...fact('Linked to', `${who(s.linked)} · returns go here`, s.linked === s.main || s.solo ? 'ppp-ok' : 'ppp-warn'));
-      else if (s.solo) {
+      if (s.linked) {
+        rows.push(...fact('Credited to', `${who(s.linked)} · plays, likes and returns`, s.linked === s.main || s.solo ? 'ppp-ok' : 'ppp-warn'));
+        listeningRow();
+      } else if (s.solo) {
         // Passkey-only: returns go back where the money came from, unless the listener chose another address.
         const where = s.returnTo
           ? `${short(s.returnTo)} · ${s.returnToKind === 'chosen' ? 'chosen by you' : 'sent the first funds'}`
@@ -436,6 +446,14 @@ function start(root: HTMLElement) {
           key.push(el('p', 'Connect your wallet to pay artists as you listen.'));
           lines.push(el('p', 'Every payment is recorded on-chain. Listening is always free.'));
         }
+        break;
+      case 'wrong-wallet':
+        // A different Stacks wallet is connected than the one this device's listening wallet belongs to.
+        key.push(el('p', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`, 'ppp-warn'));
+        lines.push(el('p', `You are connected as ${who(s.main)}. Listening is still free, and nothing is paid from the listening wallet while this wallet is connected.`));
+        lines.push(el('p', 'Lost access to that wallet? You can link this listening wallet to the connected one instead (under Wallet, below). It asks for your passkey and shows the full address to confirm.', 'ppp-mute'));
+        actions.push(button('Switch wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(), 'primary'));
+        more.push(button(`Link to ${short(s.main)} instead`, () => ppp.allowRelink(), 'quiet'));
         break;
       case 'not-invited':
         key.push(el('p', 'Coming soon. Listening is free.', 'ppp-mute'));

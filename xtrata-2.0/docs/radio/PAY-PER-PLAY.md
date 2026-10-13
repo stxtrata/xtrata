@@ -203,8 +203,11 @@ anyone send it about 1 STX, and start paying artists. No connect, no link, no po
 needs `RADIO_PPP_ENABLED=1` and only works on the radio host. It does not widen
 `RADIO_PPP_ALLOWLIST`: a connected, invited main wallet keeps the linked flow, and a connected but
 not-invited wallet can still listen passkey-only. Redeploy the **main** project after changing it
-(the wallet box needs the matching build, which deploys from main; an older box still pays but says
-it cannot return to another address or like yet).
+(the wallet box needs the matching build. It is a direct-upload Pages project, and the GitHub Action
+skips silently while the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repo secrets are unset, so
+deploy it by hand: `npm run build:listening-wallet`, then in `dist-listening-wallet`
+`npx wrangler pages deploy . --project-name xtrata-listening-wallet --branch main`. An older box
+still pays but says it cannot return to another address or like yet).
 
 **Where returns go**, in this order:
 1. the linked main wallet, if the listening wallet was ever linked (always wins);
@@ -226,6 +229,21 @@ via the existing link. The panel gently points to Xverse/Leather and never block
 **Canary:** test with disposable wallets only (AGENTS.md). Check: create with no wallet connected,
 fund from a second disposable wallet, confirm a paid play, like a song, then return all and confirm
 the full address shown in the wallet box is the funder.
+
+## Linked listeners and a different connected wallet
+
+A listening wallet linked to a main wallet belongs to that wallet: the panel names the main wallet
+(BNS name first) as who plays, likes and returns are credited to, and the listening address is only a
+technical row in the Wallet fold (it is still needed to fund it). The wallet box greets it as
+"Welcome back, <name or short main address>"; the page passes the BNS name as a display-only `label`
+(the box is offline and sanitises it).
+
+If a **different** main wallet is connected on that device, the panel stays on the `wrong-wallet`
+step: locked, no unlock card, no paying, likes, deposits, links or returns through that listener (the
+heart falls back to the connected wallet's own like path), and an unlocked listener is locked again.
+It says which wallet to connect. The one way out is "Link to <connected wallet> instead" in the Wallet
+fold, for a lost original wallet: it opens the usual unlock, and the box still asks "Change where
+returns go?" with the full address before anything is replaced.
 
 ## Canary checklist
 

@@ -74,11 +74,13 @@ export interface PppDeps {
   likeConfirmed?(song: number, liked: boolean): void;
   /** Pause between checks while a like waits for an earlier transaction (tests pass a fake). */
   wait?(ms: number): Promise<void>;
+  /** A display name (e.g. BNS) for a main wallet, if one is already known. Shown in the wallet box; never needed. */
+  nameOf?(address: string): string | undefined;
 }
 
 export type Step =
   | 'off' | 'elsewhere' | 'connect' | 'not-invited' | 'unsupported' | 'intro' | 'locked' | 'link' | 'loading'
-  | 'fund' | 'over' | 'ready';
+  | 'wrong-wallet' | 'fund' | 'over' | 'ready';
 
 export interface Snapshot {
   step: Step;
@@ -215,6 +217,17 @@ export function createPppController(deps: PppDeps) {
   // is unknown and the visitor is treated as new, so the first check can run.)
   const soloOpen = () => gate?.passkeyOnly === true && (!deps.main() || (gateFor === deps.main() && !gate.allowed));
   const solo = () => soloOpen() && !status?.linked;
+  /**
+   * This device's listening wallet is linked to one main wallet and a different one is connected. The
+   * listener stays locked: nothing unlocks, pays, likes or links through it until the linked wallet is
+   * connected. The one way out is `allowRelink` for the connected wallet (it still needs the passkey and
+   * a confirm in the wallet box), so a lost original wallet cannot strand funds.
+   */
+  let relinkFor: string | undefined;
+  const mismatch = () => {
+    const main = deps.main();
+    return !solo() && !!main && !!status?.linked && status.linked !== main && relinkFor !== main;
+  };
   const chosenKey = (listening: string) => key('return-to', listening);
   const chosenAddress = (listening = status?.address): string | undefined => {
     if (!listening) return undefined;
@@ -244,6 +257,7 @@ export function createPppController(deps: PppDeps) {
     if (!status) return 'loading';
     if (status.state === 'unsupported') return 'unsupported';
     if (status.state === 'none') return 'intro';
+    if (mismatch()) return 'wrong-wallet';
     if (status.state === 'known') return 'locked';
     if (!solo() && status.linked !== main) return 'link';
     if (balance === undefined) return 'loading';
@@ -286,10 +300,15 @@ export function createPppController(deps: PppDeps) {
   }
 
   /** Pay-per-play is open to this visitor: on, on the radio host, and either invited with a main wallet or passkey-only. */
-  const usable = () => !!gate?.enabled && gate.here && (solo() || (!!deps.main() && gate.allowed));
+  const open = () => !!gate?.enabled && gate.here && (solo() || (!!deps.main() && gate.allowed));
+  /** Open, and not a different wallet's listener: what every action that unlocks, pays or likes requires. */
+  const usable = () => open() && !mismatch();
+  const wrongWalletMessage = () => 'This device\'s listening wallet belongs to another wallet. Connect that wallet to pay artists or like songs.';
+  const guardMatch = () => { if (mismatch()) throw new Error(wrongWalletMessage()); };
 
+  // The bridge itself only needs `open`: the page must read which wallet the listener is linked to before it can know.
   async function ensureBridge() {
-    if (!usable()) throw new Error('Pay-per-play is not open to this wallet yet. Listening stays free.');
+    if (!open()) throw new Error('Pay-per-play is not open to this wallet yet. Listening stays free.');
     if (!gate?.walletOrigin) throw new Error('Pay-per-play is switched off right now. Listening stays free.');
     bridge ??= await deps.bridge(gate.walletOrigin);
     return bridge;
@@ -398,6 +417,13 @@ export function createPppController(deps: PppDeps) {
       }
       await ensureBridge();
       status = await bridge!.request<StatusResult>('listening.status');
+      if (mismatch() && status.state === 'unlocked') {
+        // Another wallet was connected while this listener was unlocked (it is not that wallet's): lock it again.
+        forgetQueue();
+        await bridge!.request('listening.lock').catch(() => undefined);
+        balance = undefined;
+        status = await bridge!.request<StatusResult>('listening.status');
+      }
       if (main && gate.allowed) await lookupServerLink(main);
       await refreshBalance(force);
       await lookupFunder();
@@ -415,8 +441,10 @@ export function createPppController(deps: PppDeps) {
 
   /** Unlock inside the frame, resuming paying unless this device switched it off. */
   async function unlockWith(b: Bridge, anyPasskey: boolean) {
+    guardMatch();
     const resume = !status?.address || payingOn(status.address);
-    await b.request('listening.unlock', { mode: 'unlock', terms: resume ? onTerms() : undefined, anyPasskey });
+    const label = status?.linked ? deps.nameOf?.(status.linked) : undefined;
+    await b.request('listening.unlock', { mode: 'unlock', terms: resume ? onTerms() : undefined, anyPasskey, ...(label ? { label } : {}) });
     status = await b.request<StatusResult>('listening.status');
     if (resume) {
       // Picked a different wallet that this device has switched off: honour that.
@@ -514,7 +542,22 @@ export function createPppController(deps: PppDeps) {
       return disarm(async () => { if (step() === 'locked' || step() === 'intro') await run(); });
     },
 
+    /**
+     * The connected wallet is not the one this listener is linked to, and the listener means to move to it
+     * (the original wallet is lost, or this is the wallet they use now). Unlocking and linking then go ahead as
+     * usual: the passkey tap and the "Change where returns go?" confirm in the wallet box still decide it.
+     */
+    allowRelink: () => {
+      const main = deps.main();
+      if (!main || !mismatch()) return;
+      relinkFor = main;
+      armOff = false;
+      deps.changed();
+      void refresh(true);
+    },
+
     link: () => task('Sign in your wallet…', async () => {
+      guardMatch();
       const main = deps.main();
       if (!main || !status?.address) throw new Error('Connect your main wallet first.');
       const saved = (await deps.links(main)).find((l) => l.listening === status!.address);
@@ -532,6 +575,7 @@ export function createPppController(deps: PppDeps) {
     }),
 
     deposit: () => task('Approve the deposit in your wallet…', async () => {
+      guardMatch();
       const main = deps.main();
       if (!main || !status?.address) throw new Error('Connect your main wallet first.');
       if (pendingDeposit()) throw new Error('A deposit is still confirming. Wait for it before adding more.');
@@ -732,6 +776,7 @@ export function createPppController(deps: PppDeps) {
       say(`Unlock to like ${label}. It sends straight after.`);
       return;
     }
+    if (s === 'wrong-wallet') return fail(wrongWalletMessage());
     if (s === 'link') return fail('Link the listening wallet to your main wallet first, so your likes count for it.');
     if (solo() && walletLacks('standalone')) return fail('The listening wallet box needs an update before it can like on its own. Try again shortly.');
     if (s === 'fund') return fail('Top up the listening wallet to like: each like or unlike costs 0.0002 STX.');
