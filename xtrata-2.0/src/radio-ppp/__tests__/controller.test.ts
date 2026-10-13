@@ -548,6 +548,20 @@ describe('passkey-only listening (no Stacks wallet)', () => {
     expect(s.savedLinks).toHaveLength(0);
   });
 
+  it('a gift is tracked like a deposit: on its way, then paying starts once it lands', async () => {
+    const s = solo();
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    const gift = '0x' + 'c'.repeat(64);
+    s.ppp.giftSent(gift, 250_000n);
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', depositPending: true, depositTxid: gift });
+    expect(s.ppp.snapshot().message).toMatch(/Gift on its way/);
+    s.ppp.giftSent('0x' + 'd'.repeat(64), 250_000n); // a second gift for the same wallet is ignored
+    expect(s.ppp.snapshot().depositTxid).toBe(gift);
+    s.chain.mined.add(gift); s.chain.balance = 250_000n;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', depositPending: false, payingOn: true });
+  });
+
   it('stays off by default: without the flag a visitor with no wallet is asked to connect', async () => {
     const s = setup();
     s.setMain(undefined);

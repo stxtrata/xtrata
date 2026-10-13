@@ -1,0 +1,595 @@
+/**
+ * Radio gift wallets (server). Plan: Xtrata Music project, claude/radio-gift-wallets-plan.md.
+ *
+ * A gift link funds a NEW listening wallet from the gift treasury: a dedicated wallet whose key is a
+ * Cloudflare secret and which holds only gift money (never the admin's own, deployer or sponsor
+ * wallets).
+ *
+ * How the treasury never pays twice:
+ *  - ONE send at a time. A send (claim or refund) is a row in radio_gift_sends with its nonce and
+ *    signed bytes, written BEFORE broadcast; a partial unique index allows only one unsettled send,
+ *    so concurrent requests cannot both send.
+ *  - The send row and the gift's change of state are written in ONE transaction (D1 batch), so there
+ *    is never a send without its gift marked, nor a gift marked without its send.
+ *  - A send is settled only by the chain, read from ONE source (the Hiro indexer): one of its
+ *    transactions succeeded (done), or the indexer shows its nonce executed by something that did not
+ *    pay (seen twice, minutes apart) before the gift is released to be sent again.
+ *  - Nothing is ever released because a broadcast failed: a refused or unanswered broadcast stays
+ *    open and is retried. A stuck send is re-signed with the SAME nonce and a higher fee, so at most
+ *    one of its transactions can ever land.
+ *  - A friend's deposit is never forgotten: unpaid gifts are kept (abandoned) and still matched by
+ *    memo; a memo'd deposit that matches no gift is recorded for a refund (radio_gift_orphans).
+ *
+ * Variables (Cloudflare Pages):
+ *   RADIO_GIFT_ENABLED = "1"            kill switch; anything else stops claims, new gifts and refunds
+ *   RADIO_GIFT_TREASURY_KEY             the treasury's private key (secret)
+ *   RADIO_GIFT_ADMIN = "SP…"            the only address that may sign campaign requests
+ *   RADIO_GIFT_DAILY_CAP                campaign microSTX claimable per 24 h (default 2 STX)
+ *   RADIO_GIFT_ESCROW_CAP               most friend-gift money held at once (default 25 STX)
+ *   RADIO_GIFT_TURNSTILE_SITE_KEY / _SECRET   optional Cloudflare Turnstile check on claims
+ *   TELEMETRY_SALT                      salts the IP hash used for per-IP limits (no IP is stored)
+ * Gifts also need pay-per-play to be on and the radio host (functions/lib/radio-listening-wallet.ts).
+ */
+import { AnchorMode, getAddressFromPrivateKey, makeSTXTokenTransfer, TransactionVersion, encodeStructuredData } from '@stacks/transactions';
+import { StacksMainnet } from '@stacks/network';
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+import { queryAll, run } from './db';
+import { applyHiroApiKey, getHiroApiKeys, isTransientHiroStatus, shouldRetryWithNextHiroKey } from './hiro-keys';
+import { gate, type PppEnv } from './radio-listening-wallet';
+import { isMainnetStandardAddress } from '../../src/lib/listening-wallet/link';
+import {
+  campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_FEE_CAP, GIFT_MEMO, giftCodeHash, giftDepositMemo, isGiftCode, newGiftCode,
+  validateCampaign, validGiftAmount, verifyCampaignSignature, type CampaignRequest, type GiftView
+} from '../../src/lib/listening-wallet/gifts';
+
+export type GiftEnv = PppEnv & {
+  RADIO_GIFT_ENABLED?: string;
+  RADIO_GIFT_TREASURY_KEY?: string;
+  RADIO_GIFT_ADMIN?: string;
+  RADIO_GIFT_DAILY_CAP?: string;
+  RADIO_GIFT_ESCROW_CAP?: string;
+  RADIO_GIFT_TURNSTILE_SITE_KEY?: string;
+  RADIO_GIFT_TURNSTILE_SECRET?: string;
+  TELEMETRY_SALT?: string;
+};
+
+export const DEFAULT_DAILY_CAP = 2_000_000n;
+export const DEFAULT_ESCROW_CAP = 25_000_000n;
+/** Claims per IP (hashed) per 24 hours. */
+export const CLAIMS_PER_IP = 3;
+/** Friend gifts started per IP per hour (each needs a real deposit to go live). */
+export const CREATES_PER_IP = 10;
+/** A friend gift nobody paid for is dropped after this long (after one last look for its deposit). */
+export const PENDING_DEPOSIT_MS = 24 * 3600_000;
+/** A sent transaction not yet confirmed is broadcast again (same bytes) this often. */
+export const REBROADCAST_MS = 2 * 60_000;
+/** A send still unconfirmed this long after its last signature is re-signed: same nonce, higher fee. */
+export const BUMP_AFTER_MS = 15 * 60_000;
+/** A used nonce with no successful send must still be the case this much later before release. */
+export const NONCE_SETTLE_MS = 5 * 60_000;
+
+export class GiftError extends Error {
+  constructor(message: string, public status = 400) { super(message); this.name = 'GiftError'; }
+}
+
+// ---------------------------------------------------------------------------- chain
+
+export interface ChainTransfer {
+  /** aborted: mined but failed (its nonce is used); dropped: left the mempool (may still come back). */
+  status: 'success' | 'pending' | 'aborted' | 'dropped';
+  sender: string; recipient: string; amount: bigint; memo: string;
+}
+export interface GiftChain {
+  /** Confirmed balance (microSTX). */
+  balance(address: string): Promise<bigint>;
+  /** Number of transactions involving the address (sent or received), including the mempool. */
+  activity(address: string): Promise<number>;
+  /** Next nonce counting the mempool (to sign with). */
+  nonce(address: string): Promise<bigint>;
+  /**
+   * The highest nonce the INDEXER has seen executed for the address (null: none yet). Read from the
+   * same source as `transfer`, so "nonce used" and "our transaction succeeded" can never disagree
+   * because one of them lags.
+   */
+  executedNonce(address: string): Promise<bigint | null>;
+  /** Broadcast signed bytes, once (never re-posted). Throws on any failure; callers treat that as "maybe sent". */
+  broadcast(raw: Uint8Array, txid: string): Promise<string>;
+  /** An STX transfer by txid, or null when the chain does not know it (yet). */
+  transfer(txid: string): Promise<ChainTransfer | null>;
+  /** STX transfers TO an address with their memos: the mempool, then the newest confirmed pages. */
+  inbound(address: string): Promise<(ChainTransfer & { txid: string })[]>;
+}
+
+const HIRO = 'https://api.mainnet.hiro.so';
+const memoText = (hex: unknown) => {
+  if (typeof hex !== 'string') return '';
+  try { return new TextDecoder().decode(hexToBytes(hex.replace(/^0x/, ''))).replace(/\0+$/, '').trim(); } catch { return ''; }
+};
+const parseTransfer = (tx: any): ChainTransfer & { txid: string } => {
+  const s = String(tx.tx_status);
+  const status = s === 'success' && tx.canonical !== false && !tx.is_unanchored ? 'success'
+    : s === 'pending' || s === 'success' ? 'pending' : s.startsWith('dropped') ? 'dropped' : 'aborted';
+  return { txid: String(tx.tx_id), status, sender: String(tx.sender_address), recipient: String(tx.token_transfer.recipient_address), amount: BigInt(tx.token_transfer.amount), memo: memoText(tx.token_transfer.memo) };
+};
+
+export function hiroGiftChain(env: GiftEnv): GiftChain {
+  const fetchHiro = async (path: string, init: RequestInit = {}) => {
+    const keys = [...getHiroApiKeys(env), null];
+    let last: unknown;
+    for (let i = 0; i < keys.length; i++) {
+      const headers = new Headers(init.headers); applyHiroApiKey(headers, keys[i]);
+      try {
+        const r = await fetch(HIRO + path, { ...init, headers, signal: AbortSignal.timeout(10_000) });
+        if (i < keys.length - 1 && shouldRetryWithNextHiroKey(r.status)) continue;
+        return r;
+      } catch (e) { last = e; }
+    }
+    throw last instanceof Error ? last : new Error('Hiro request failed');
+  };
+  const read = async <T,>(path: string): Promise<T> => {
+    for (let attempt = 0; ; attempt++) {
+      const r = await fetchHiro(path);
+      if (r.ok) return (await r.json()) as T;
+      if (attempt < 2 && isTransientHiroStatus(r.status)) { await new Promise((ok) => setTimeout(ok, 300 * (attempt + 1))); continue; }
+      throw new GiftError('Could not reach the chain right now. Try again shortly.', 503);
+    }
+  };
+  const int = (v: unknown, what: string) => { if (!Number.isSafeInteger(v) || (v as number) < 0) throw new GiftError(`Could not read ${what} right now.`, 503); return v as number; };
+  return {
+    async balance(address) {
+      const b = await read<{ balance?: unknown }>(`/extended/v2/addresses/${address}/balances/stx`);
+      if (typeof b.balance !== 'string' || !/^\d+$/.test(b.balance)) throw new GiftError('Could not read a balance right now.', 503);
+      return BigInt(b.balance);
+    },
+    async activity(address) {
+      const [done, waiting] = await Promise.all([
+        read<{ total?: unknown }>(`/extended/v1/address/${address}/transactions?limit=1`),
+        read<{ total?: unknown }>(`/extended/v1/address/${address}/mempool?limit=1`)
+      ]);
+      return int(done.total, 'the wallet') + int(waiting.total, 'the wallet');
+    },
+    async nonce(address) {
+      return BigInt(int((await read<{ possible_next_nonce?: unknown }>(`/extended/v1/address/${address}/nonces`)).possible_next_nonce, 'the treasury nonce'));
+    },
+    async executedNonce(address) {
+      const n = await read<{ last_executed_tx_nonce?: unknown }>(`/extended/v1/address/${address}/nonces`);
+      if (n.last_executed_tx_nonce === null) return null;
+      return BigInt(int(n.last_executed_tx_nonce, 'the treasury nonce'));
+    },
+    async broadcast(raw, txid) {
+      // Exactly one POST: a retry after a lost response can come back as a refusal of bytes the node
+      // already holds. Whatever happens here, the send stays open and the chain decides.
+      const headers = new Headers({ 'content-type': 'application/octet-stream' });
+      applyHiroApiKey(headers, getHiroApiKeys(env)[0] ?? null);
+      const r = await fetch(HIRO + '/v2/transactions', { method: 'POST', headers, body: raw as BodyInit, signal: AbortSignal.timeout(10_000) });
+      if (!r.ok) throw new GiftError(`Broadcast answered ${r.status}`, 502);
+      return txid;
+    },
+    async transfer(txid) {
+      const r = await fetchHiro(`/extended/v1/tx/${txid}`);
+      if (r.status === 404) return null;
+      if (!r.ok) throw new GiftError('Could not check the transaction right now.', 503);
+      const tx = await r.json() as any;
+      if (tx.tx_type !== 'token_transfer' || !tx.token_transfer) throw new GiftError('That transaction is not an STX transfer.', 400);
+      return parseTransfer(tx);
+    },
+    async inbound(address) {
+      const pages = await Promise.all([
+        read<{ results?: unknown }>(`/extended/v1/address/${address}/mempool?limit=50`),
+        ...[0, 50, 100, 150].map((offset) => read<{ results?: unknown }>(`/extended/v1/address/${address}/transactions?limit=50&offset=${offset}`))
+      ]);
+      if (pages.some((p) => !Array.isArray(p.results))) throw new GiftError('Could not read the treasury right now.', 503);
+      return pages.flatMap((p) => p.results as any[]).filter((tx) => tx?.tx_type === 'token_transfer' && tx.token_transfer?.recipient_address === address).map(parseTransfer);
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------- config
+
+export function treasuryAddress(env: GiftEnv): string | null {
+  const key = typeof env.RADIO_GIFT_TREASURY_KEY === 'string' ? env.RADIO_GIFT_TREASURY_KEY.trim() : '';
+  if (!/^[0-9a-fA-F]{64}(01)?$/.test(key)) return null;
+  try { return getAddressFromPrivateKey(key, TransactionVersion.Mainnet); } catch { return null; }
+}
+const adminAddress = (env: GiftEnv) => (isMainnetStandardAddress(env.RADIO_GIFT_ADMIN?.trim()) ? env.RADIO_GIFT_ADMIN!.trim() : null);
+const micro = (value: string | undefined, fallback: bigint) => (typeof value === 'string' && /^\d{1,12}$/.test(value.trim()) ? BigInt(value.trim()) : fallback);
+
+/** What the radio page needs to know (public). Gifts are off unless every piece is in place. */
+export function giftsConfig(env: GiftEnv, main: string | null, request?: Request) {
+  const g = gate(env, null, request);
+  const treasury = treasuryAddress(env);
+  const enabled = g.enabled && g.here && env.RADIO_GIFT_ENABLED === '1' && !!treasury;
+  const turnstile = enabled && env.RADIO_GIFT_TURNSTILE_SITE_KEY && env.RADIO_GIFT_TURNSTILE_SECRET ? env.RADIO_GIFT_TURNSTILE_SITE_KEY : null;
+  return { enabled, treasury: enabled ? treasury : null, turnstileSiteKey: turnstile, admin: enabled && !!main && main === adminAddress(env), fee: GIFT_FEE.toString() };
+}
+
+const requireEnabled = (env: GiftEnv, request?: Request) => {
+  const c = giftsConfig(env, null, request);
+  if (!c.enabled || !c.treasury) throw new GiftError('Gifts are switched off right now. Listening stays free.', 503);
+  return { treasury: c.treasury, key: env.RADIO_GIFT_TREASURY_KEY!.trim() };
+};
+
+// ---------------------------------------------------------------------------- storage
+
+export async function ensureGiftTables(env: GiftEnv) {
+  await run(env, `CREATE TABLE IF NOT EXISTS radio_gifts(
+    id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, amount INTEGER NOT NULL, source TEXT NOT NULL,
+    gifter TEXT, label TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, deposit_txid TEXT UNIQUE,
+    created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, claimed_by TEXT UNIQUE, claim_txid TEXT,
+    claimed_at INTEGER, ip_hash TEXT, refund_txid TEXT, updated_at INTEGER NOT NULL)`);
+  await run(env, 'CREATE INDEX IF NOT EXISTS radio_gifts_status ON radio_gifts(status, expires_at)');
+  await run(env, 'CREATE INDEX IF NOT EXISTS radio_gifts_claimed ON radio_gifts(claimed_at)');
+  await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_sends(
+    id TEXT PRIMARY KEY, gift_id TEXT NOT NULL, kind TEXT NOT NULL, nonce INTEGER NOT NULL, recipient TEXT NOT NULL,
+    amount INTEGER NOT NULL, fee INTEGER NOT NULL, txids TEXT NOT NULL, raw TEXT NOT NULL, status TEXT NOT NULL,
+    created_at INTEGER NOT NULL, signed_at INTEGER NOT NULL, broadcast_at INTEGER NOT NULL, nonce_used_at INTEGER, updated_at INTEGER NOT NULL)`);
+  await run(env, "CREATE UNIQUE INDEX IF NOT EXISTS radio_gift_sends_one_open ON radio_gift_sends(status) WHERE status='sent'");
+  await run(env, 'CREATE TABLE IF NOT EXISTS radio_gift_campaigns(hash TEXT PRIMARY KEY, admin TEXT NOT NULL, created_at INTEGER NOT NULL)');
+  await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_orphans(txid TEXT PRIMARY KEY, gift_id TEXT, sender TEXT NOT NULL, amount INTEGER NOT NULL,
+    reason TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
+}
+
+type Row = {
+  id: string; code_hash: string; amount: number; source: 'campaign' | 'friend'; gifter: string | null; label: string; status: string;
+  deposit_txid: string | null; created_at: number; expires_at: number; claimed_by: string | null; claim_txid: string | null;
+  claimed_at: number | null; ip_hash: string | null; refund_txid: string | null; updated_at: number;
+};
+type Send = {
+  id: string; gift_id: string; kind: 'claim' | 'refund'; nonce: number; recipient: string; amount: number; fee: number;
+  txids: string; raw: string; status: 'sent' | 'done' | 'void'; created_at: number; signed_at: number; broadcast_at: number; nonce_used_at: number | null;
+};
+const all = async <T,>(env: GiftEnv, sql: string, binds: unknown[] = []) => ((await queryAll(env, sql, binds)).results ?? []) as T[];
+const one = async <T = Row,>(env: GiftEnv, sql: string, binds: unknown[] = []) => (await all<T>(env, sql, binds))[0] ?? null;
+const changed = (r: unknown) => { const x = r as { meta?: { changes?: number }; changes?: number }; return x?.meta?.changes ?? x?.changes ?? 0; };
+const isConstraint = (e: unknown) => /UNIQUE|constraint/i.test(String((e as Error)?.message ?? e));
+const randomId = () => bytesToHex(crypto.getRandomValues(new Uint8Array(12)));
+export const ipHash = (env: GiftEnv, ip: string | null) => (ip ? bytesToHex(sha256(new TextEncoder().encode(`${env.TELEMETRY_SALT || 'xtrata-radio-gifts'}:${ip}`))).slice(0, 32) : null);
+const gift = (env: GiftEnv, id: string) => one(env, 'SELECT * FROM radio_gifts WHERE id=?', [id]);
+
+const view = (r: Row): GiftView => ({
+  // An abandoned gift is still waiting for its payment, as far as anyone looking at it is concerned.
+  status: (r.status === 'abandoned' ? 'pending-deposit' : ['pending-deposit', 'live', 'claiming', 'claimed', 'expired', 'refunding', 'refunded'].includes(r.status) ? r.status : 'unknown') as GiftView['status'],
+  amount: String(r.amount), source: r.source, from: r.gifter, label: r.label, expires: r.expires_at
+});
+
+/** Money the treasury holds for others: unclaimed friend gifts (amount + fee) and deposits awaiting a refund. */
+const owedToFriends = async (env: GiftEnv) => {
+  const r = await one<{ owed: number }>(env, `SELECT COALESCE(SUM(amount + ?), 0) AS owed FROM radio_gifts WHERE source='friend' AND status IN ('live','refunding')`, [Number(GIFT_FEE)]);
+  const o = await one<{ owed: number }>(env, "SELECT COALESCE(SUM(amount), 0) AS owed FROM radio_gift_orphans WHERE status='needs-refund'");
+  return BigInt(r?.owed ?? 0) + BigInt(o?.owed ?? 0);
+};
+const d1 = (env: GiftEnv) => ((env as any).DB ?? (env as any).D1 ?? (env as any).db) as { prepare(q: string): any; batch(list: any[]): Promise<any[]> };
+
+// ---------------------------------------------------------------------------- treasury sends
+
+async function sign(key: string, recipient: string, amount: bigint, nonce: bigint, fee: bigint) {
+  const tx = await makeSTXTokenTransfer({ recipient, amount, senderKey: key, network: new StacksMainnet(), nonce, fee, memo: GIFT_MEMO, anchorMode: AnchorMode.Any });
+  return { raw: tx.serialize(), txid: '0x' + tx.txid() };
+}
+
+/**
+ * Starts the one open send. The gift's change of state and the send row (nonce, bytes, txid) are
+ * written in one transaction BEFORE broadcast: if the gift is no longer in the expected state, or
+ * another send is open, nothing is written and nothing is sent. After that, the send stays open
+ * whatever the broadcast says; only the chain settles it.
+ */
+async function startSend(env: GiftEnv, deps: GiftDeps, treasury: string, key: string, kind: 'claim' | 'refund', r: Row, recipient: string, ip: string | null = null) {
+  if (await one(env, "SELECT id FROM radio_gift_sends WHERE status='sent'")) throw new GiftError('The gift treasury is sending another gift. Trying again in a moment…', 503);
+  const done = await one<{ n: number | null }>(env, "SELECT MAX(nonce) AS n FROM radio_gift_sends WHERE status='done'");
+  const floor = done?.n === null || done?.n === undefined ? 0n : BigInt(done.n) + 1n;
+  const fromChain = await deps.chain.nonce(treasury);
+  const nonce = fromChain > floor ? fromChain : floor;
+  const amount = BigInt(r.amount);
+  const tx = await sign(key, recipient, amount, nonce, GIFT_FEE);
+  const id = randomId(), now = deps.now, db = d1(env);
+  const markGift = kind === 'claim'
+    ? db.prepare(`UPDATE radio_gifts SET status='claiming', claimed_by=?, claim_txid=?, claimed_at=?, ip_hash=COALESCE(?, ip_hash), updated_at=? WHERE id=? AND status='live'`)
+      .bind(recipient, tx.txid, now, ip, now, r.id)
+    : db.prepare(`UPDATE radio_gifts SET status='refunding', refund_txid=?, updated_at=? WHERE id=? AND status='live'`).bind(tx.txid, now, r.id);
+  const insertSend = db.prepare(`INSERT INTO radio_gift_sends(id, gift_id, kind, nonce, recipient, amount, fee, txids, raw, status, created_at, signed_at, broadcast_at, updated_at)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?, ?, ?
+    WHERE EXISTS (SELECT 1 FROM radio_gifts WHERE id=? AND ${kind === 'claim' ? "status='claiming' AND claim_txid=?" : "status='refunding' AND refund_txid=?"})`)
+    .bind(id, r.id, kind, Number(nonce), recipient, r.amount, Number(GIFT_FEE), JSON.stringify([tx.txid]), bytesToHex(tx.raw), now, now, now, now, r.id, tx.txid);
+  try { await db.batch([markGift, insertSend]); }
+  catch (e) {
+    if (isConstraint(e)) throw new GiftError(/claimed_by/.test(String((e as Error)?.message)) ? 'This listening wallet has already had a gift.' : 'The gift treasury is sending another gift. Trying again in a moment…', /claimed_by/.test(String((e as Error)?.message)) ? 409 : 503);
+    throw e;
+  }
+  if (!(await one(env, 'SELECT id FROM radio_gift_sends WHERE id=?', [id]))) throw new GiftError('This gift has just changed. Refresh and try again.', 409);
+  // Any failure here only means "maybe not sent yet": the sweep rebroadcasts the same bytes.
+  await deps.chain.broadcast(tx.raw, tx.txid).catch(() => undefined);
+  return tx.txid;
+}
+
+/** Puts a gift back after its send can no longer land, so it can be claimed (or refunded) again. */
+async function release(env: GiftEnv, kind: 'claim' | 'refund', giftId: string, txids: string[], now: number) {
+  const list = txids.map(() => '?').join(',');
+  if (kind === 'claim') await run(env, `UPDATE radio_gifts SET status='live', claimed_by=NULL, claim_txid=NULL, claimed_at=NULL, updated_at=? WHERE id=? AND status='claiming' AND claim_txid IN (${list})`, [now, giftId, ...txids]);
+  else await run(env, `UPDATE radio_gifts SET status='live', refund_txid=NULL, updated_at=? WHERE id=? AND status='refunding' AND refund_txid IN (${list})`, [now, giftId, ...txids]);
+}
+
+/**
+ * Settles the open send from the chain: done when any of its transactions succeeded; released when its
+ * nonce is used without a success (seen twice, NONCE_SETTLE_MS apart); otherwise kept alive by
+ * rebroadcasting, and re-signed with the same nonce and a higher fee when stuck.
+ */
+async function settleOpenSend(env: GiftEnv, deps: GiftDeps, key: string, treasury: string) {
+  const s = await one<Send>(env, "SELECT * FROM radio_gift_sends WHERE status='sent'");
+  if (!s) return null;
+  const txids: string[] = JSON.parse(s.txids);
+  // Written together with its gift (startSend), so the gift must point at one of these transactions.
+  const g = await gift(env, s.gift_id);
+  const ref = s.kind === 'claim' ? g?.status === 'claiming' && g.claim_txid : g?.status === 'refunding' && g.refund_txid;
+  if (!ref || !txids.includes(ref)) {
+    // Fail closed: nothing is sent until the admin looks. Loud, because every gift waits on it.
+    console.error('[radio:gifts] ALERT treasury blocked: open send without its gift', { send: s.id, gift: s.gift_id });
+    return 'inconsistent';
+  }
+  const seen = await Promise.all(txids.map((t) => deps.chain.transfer(t)));
+  const won = txids.find((_, i) => seen[i]?.status === 'success');
+  const now = deps.now;
+  if (won) {
+    if (!changed(await run(env, "UPDATE radio_gift_sends SET status='done', updated_at=? WHERE id=? AND status='sent'", [now, s.id]))) return 'raced';
+    if (s.kind === 'claim') await run(env, `UPDATE radio_gifts SET status='claimed', claim_txid=?, updated_at=? WHERE id=? AND status='claiming'`, [won, now, s.gift_id]);
+    else await run(env, `UPDATE radio_gifts SET status='refunded', refund_txid=?, updated_at=? WHERE id=? AND status='refunding'`, [won, now, s.gift_id]);
+    return 'settled';
+  }
+  const executed = await deps.chain.executedNonce(treasury);
+  if (executed !== null && executed >= BigInt(s.nonce)) {
+    // The indexer has executed this nonce and shows none of ours paid: none of them ever can. Seen
+    // again minutes later before acting, as a second guard against a half-indexed block.
+    if (!s.nonce_used_at) { await run(env, 'UPDATE radio_gift_sends SET nonce_used_at=?, updated_at=? WHERE id=?', [now, now, s.id]); return 'nonce-used'; }
+    if (now - s.nonce_used_at < NONCE_SETTLE_MS) return 'nonce-used';
+    if (!changed(await run(env, "UPDATE radio_gift_sends SET status='void', updated_at=? WHERE id=? AND status='sent'", [now, s.id]))) return 'raced';
+    await release(env, s.kind, s.gift_id, txids, now);
+    return 'released';
+  }
+  if (now - s.signed_at > BUMP_AFTER_MS && BigInt(s.fee) < GIFT_FEE_CAP) {
+    // Same nonce, same recipient and amount, higher fee: whichever lands first, only one can.
+    const fee = BigInt(s.fee) * 2n > GIFT_FEE_CAP ? GIFT_FEE_CAP : BigInt(s.fee) * 2n;
+    const tx = await sign(key, s.recipient, BigInt(s.amount), BigInt(s.nonce), fee);
+    const next = [...txids, tx.txid];
+    if (!changed(await run(env, "UPDATE radio_gift_sends SET fee=?, txids=?, raw=?, signed_at=?, broadcast_at=?, updated_at=? WHERE id=? AND status='sent' AND txids=?",
+      [Number(fee), JSON.stringify(next), bytesToHex(tx.raw), now, now, now, s.id, s.txids]))) return 'raced';
+    if (s.kind === 'claim') await run(env, "UPDATE radio_gifts SET claim_txid=?, updated_at=? WHERE id=? AND status='claiming'", [tx.txid, now, s.gift_id]);
+    else await run(env, "UPDATE radio_gifts SET refund_txid=?, updated_at=? WHERE id=? AND status='refunding'", [tx.txid, now, s.gift_id]);
+    await deps.chain.broadcast(tx.raw, tx.txid).catch(() => undefined);
+    return 'bumped';
+  }
+  if (now - s.broadcast_at > REBROADCAST_MS) {
+    await run(env, 'UPDATE radio_gift_sends SET broadcast_at=?, updated_at=? WHERE id=?', [now, now, s.id]);
+    await deps.chain.broadcast(hexToBytes(s.raw), txids[txids.length - 1]).catch(() => undefined);
+    return 'rebroadcast';
+  }
+  return 'pending';
+}
+
+// ---------------------------------------------------------------------------- deps
+
+export interface GiftDeps {
+  chain: GiftChain;
+  now: number;
+  /** Cloudflare Turnstile check; true when it passes or when Turnstile is not configured. */
+  human?: (token: unknown, ip: string | null) => Promise<boolean>;
+}
+
+export async function turnstilePasses(env: GiftEnv, token: unknown, ip: string | null): Promise<boolean> {
+  if (!env.RADIO_GIFT_TURNSTILE_SECRET || !env.RADIO_GIFT_TURNSTILE_SITE_KEY) return true;
+  if (typeof token !== 'string' || !token || token.length > 2048) return false;
+  const body = new FormData();
+  body.set('secret', env.RADIO_GIFT_TURNSTILE_SECRET); body.set('response', token);
+  if (ip) body.set('remoteip', ip);
+  try {
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body, signal: AbortSignal.timeout(8000) });
+    return !!(await r.json() as { success?: boolean }).success;
+  } catch { return false; }
+}
+
+// ---------------------------------------------------------------------------- gifts
+
+/** A gift by its code (the recipient, POST so the code stays out of URLs) or its id (the friend who paid). */
+export async function giftStatus(env: GiftEnv, by: { code?: string | null; id?: string | null }): Promise<GiftView & { id?: string }> {
+  await ensureGiftTables(env);
+  let r: Row | null = null;
+  if (by.code !== undefined && by.code !== null) {
+    if (!isGiftCode(by.code)) throw new GiftError('That gift link is not valid.', 404);
+    r = await one(env, 'SELECT * FROM radio_gifts WHERE code_hash=?', [giftCodeHash(by.code)]);
+  } else if (typeof by.id === 'string' && /^[0-9a-f]{24}$/.test(by.id)) r = await gift(env, by.id);
+  if (!r) throw new GiftError('That gift link is not valid.', 404);
+  return { ...view(r), ...(by.id ? { id: r.id } : {}) };
+}
+
+/** If this listening wallet was funded by a gift: who it came from and where returns go. */
+export async function giftForWallet(env: GiftEnv, wallet: string) {
+  if (!isMainnetStandardAddress(wallet)) throw new GiftError('Mainnet wallet address required.');
+  await ensureGiftTables(env);
+  const r = await one(env, "SELECT * FROM radio_gifts WHERE claimed_by=? AND status IN ('claiming','claimed')", [wallet]);
+  if (!r) return { gift: null };
+  return { gift: { returnTo: r.gifter ?? treasuryAddress(env), from: r.gifter, source: r.source, amount: String(r.amount), txid: r.claim_txid, label: r.label } };
+}
+
+/** Admin: links paid from the campaign pool. Each signed request works once. The codes exist in clear only in this reply. */
+export async function createCampaign(env: GiftEnv, body: { request: CampaignRequest; signature: string }, deps: GiftDeps, request?: Request) {
+  requireEnabled(env, request);
+  const admin = adminAddress(env);
+  if (!admin) throw new GiftError('No gift admin is set for this deployment.', 403);
+  let req: CampaignRequest;
+  try { req = validateCampaign(body?.request, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
+  if (req.admin !== admin || !verifyCampaignSignature(req, body.signature, admin)) throw new GiftError('Only the gift admin can make campaign links.', 403);
+  await ensureGiftTables(env);
+  const hash = bytesToHex(sha256(encodeStructuredData(campaignData(req))));
+  try { await run(env, 'INSERT INTO radio_gift_campaigns(hash, admin, created_at) VALUES(?, ?, ?)', [hash, admin, deps.now]); }
+  catch (e) { if (isConstraint(e)) throw new GiftError('That request was already used. Sign a new one.', 409); throw e; }
+  const codes: string[] = [];
+  for (let i = 0; i < req.count; i++) {
+    const code = newGiftCode();
+    await run(env, `INSERT INTO radio_gifts(id, code_hash, amount, source, gifter, label, status, created_at, expires_at, updated_at)
+      VALUES(?, ?, ?, 'campaign', NULL, ?, 'live', ?, ?, ?)`, [randomId(), giftCodeHash(code), Number(req.amount), req.label, deps.now, deps.now + GIFT_EXPIRY_MS, deps.now]);
+    codes.push(code);
+  }
+  return { codes, amount: req.amount, expires: deps.now + GIFT_EXPIRY_MS };
+}
+
+/** Any listener with a Stacks wallet: start a friend gift. It goes live once their deposit (with its memo) confirms. */
+export async function createFriendGift(env: GiftEnv, body: { gifter: string; amount: string }, deps: GiftDeps, ip: string | null, request?: Request) {
+  const { treasury } = requireEnabled(env, request);
+  if (!isMainnetStandardAddress(body?.gifter) || body.gifter === treasury) throw new GiftError('Connect a Stacks wallet to give a gift.');
+  if (typeof body.amount !== 'string' || !/^\d{1,9}$/.test(body.amount) || !validGiftAmount(BigInt(body.amount))) throw new GiftError('A gift is 0.1 to 1 STX.');
+  await ensureGiftTables(env);
+  const h = ipHash(env, ip);
+  if (h && (await all(env, "SELECT id FROM radio_gifts WHERE ip_hash=? AND source='friend' AND created_at>?", [h, deps.now - 3600_000])).length >= CREATES_PER_IP)
+    throw new GiftError('Too many gifts started from here in the last hour. Try again later.', 429);
+  if ((await owedToFriends(env)) + BigInt(body.amount) + GIFT_FEE > micro(env.RADIO_GIFT_ESCROW_CAP, DEFAULT_ESCROW_CAP))
+    throw new GiftError('The gift treasury is full right now. Try again in a few days.', 503);
+  const code = newGiftCode(), id = randomId();
+  await run(env, `INSERT INTO radio_gifts(id, code_hash, amount, source, gifter, label, status, created_at, expires_at, ip_hash, updated_at)
+    VALUES(?, ?, ?, 'friend', ?, '', 'pending-deposit', ?, ?, ?, ?)`, [id, giftCodeHash(code), Number(body.amount), body.gifter, deps.now, deps.now + GIFT_EXPIRY_MS, h, deps.now]);
+  return { id, code, depositTo: treasury, deposit: (BigInt(body.amount) + GIFT_FEE).toString(), memo: giftDepositMemo(id), expires: deps.now + GIFT_EXPIRY_MS };
+}
+
+/**
+ * The gifter's deposit: from the gifter, to the treasury, for amount + fee, with this gift's memo.
+ * With a txid it checks that transaction; without one (the wallet never reported it) it looks for the
+ * memo among the treasury's recent deposits. Safe to call again while it confirms.
+ */
+export async function confirmFriendGift(env: GiftEnv, body: { id: string; txid?: string }, deps: GiftDeps, request?: Request) {
+  const { treasury } = requireEnabled(env, request);
+  if (typeof body?.id !== 'string' || !/^[0-9a-f]{24}$/.test(body.id)) throw new GiftError('Unknown gift.', 404);
+  let txid: string | null = null;
+  if (body.txid !== undefined && body.txid !== null && body.txid !== '') {
+    txid = typeof body.txid === 'string' ? '0x' + body.txid.replace(/^0x/, '').toLowerCase() : '';
+    if (!/^0x[0-9a-f]{64}$/.test(txid)) throw new GiftError('Transaction id required.');
+  }
+  await ensureGiftTables(env);
+  const r = await gift(env, body.id);
+  if (!r || r.source !== 'friend') throw new GiftError('Unknown gift.', 404);
+  return checkDeposit(env, r, txid, treasury, deps);
+}
+
+async function checkDeposit(env: GiftEnv, r: Row, txid: string | null, treasury: string, deps: GiftDeps): Promise<GiftView> {
+  if (r.status !== 'pending-deposit' && r.status !== 'abandoned') return view(r);
+  const expected = BigInt(r.amount) + GIFT_FEE, memo = giftDepositMemo(r.id);
+  const matches = (t: ChainTransfer) => t.sender === r.gifter && t.recipient === treasury && t.amount === expected && t.memo === memo;
+  let t: (ChainTransfer & { txid: string }) | null = null;
+  const known = txid ?? r.deposit_txid;
+  if (known) { const x = await deps.chain.transfer(known); t = x ? { ...x, txid: known } : null; }
+  else t = (await deps.chain.inbound(treasury)).find(matches) ?? null;
+  if (!t) return view(r); // not seen yet
+  if (!matches(t)) throw new GiftError('That transaction does not match this gift (it needs this gift’s memo, amount and your address).', 400);
+  if (t.status === 'aborted' || t.status === 'dropped') {
+    await run(env, "UPDATE radio_gifts SET deposit_txid=NULL, updated_at=? WHERE id=? AND status IN ('pending-deposit','abandoned') AND deposit_txid=?", [deps.now, r.id, t.txid]);
+    throw new GiftError('That payment did not go through. Nothing was taken; try again.', 400);
+  }
+  // Only a verified match is ever stored, so a made-up txid cannot hold a gift open.
+  if (r.deposit_txid !== t.txid) {
+    try { await run(env, "UPDATE radio_gifts SET deposit_txid=?, updated_at=? WHERE id=? AND status IN ('pending-deposit','abandoned')", [t.txid, deps.now, r.id]); }
+    catch (e) { if (isConstraint(e)) throw new GiftError('That payment already paid for another gift.', 409); throw e; }
+  }
+  // A payment that pays for its gift is never also owed back (in case a scan listed it earlier).
+  await run(env, "UPDATE radio_gift_orphans SET status='resolved', reason=reason || ' (paid for its gift)', updated_at=? WHERE txid=? AND status='needs-refund'", [deps.now, t.txid]);
+  if (t.status === 'pending') return view((await gift(env, r.id))!);
+  // Confirmed (even long after it was abandoned): live from now, for 30 days.
+  await run(env, "UPDATE radio_gifts SET status='live', expires_at=?, updated_at=? WHERE id=? AND status IN ('pending-deposit','abandoned')", [deps.now + GIFT_EXPIRY_MS, deps.now, r.id]);
+  return view((await gift(env, r.id))!);
+}
+
+/**
+ * Matches every memo'd deposit the treasury can see: one for a waiting gift makes it live; one that
+ * belongs to no waiting gift is recorded in radio_gift_orphans as `needs-refund` (and set aside from
+ * campaign money) for the admin to return. Confirmed deposits only.
+ */
+async function scanDeposits(env: GiftEnv, treasury: string, deps: GiftDeps) {
+  for (const t of await deps.chain.inbound(treasury)) {
+    const m = /^gift ([0-9a-f]{24})$/.exec(t.memo);
+    if (!m || t.status !== 'success') continue;
+    const r = await gift(env, m[1]);
+    if (r && ['pending-deposit', 'abandoned'].includes(r.status) && (!r.deposit_txid || r.deposit_txid === t.txid)) {
+      // Only a definite mismatch (wrong sender or amount) makes an orphan. A read that failed is retried
+      // on the next scan, never turned into "this payment belongs to nothing".
+      try { if ((await checkDeposit(env, r, t.txid, treasury, deps)).status === 'live') continue; }
+      catch (e) { if (!(e instanceof GiftError && e.status === 400)) continue; }
+      if ((await gift(env, m[1]))?.status === 'pending-deposit') continue; // still confirming: not an orphan
+    }
+    if (r?.deposit_txid === t.txid) continue; // this payment is the one that made its gift live
+    await run(env, `INSERT INTO radio_gift_orphans(txid, gift_id, sender, amount, reason, status, created_at, updated_at) VALUES(?, ?, ?, ?, ?, 'needs-refund', ?, ?)
+      ON CONFLICT(txid) DO NOTHING`, [t.txid, m[1], t.sender, Number(t.amount), r ? `gift ${r.status}` : 'unknown gift', deps.now, deps.now]);
+  }
+}
+
+/** The recipient: fund this brand-new listening wallet from the gift. */
+export async function claimGift(env: GiftEnv, body: { code: string; wallet: string; turnstile?: string }, deps: GiftDeps, ip: string | null, request?: Request) {
+  const { treasury, key } = requireEnabled(env, request);
+  if (!isGiftCode(body?.code)) throw new GiftError('That gift link is not valid.', 404);
+  if (!isMainnetStandardAddress(body.wallet) || body.wallet === treasury) throw new GiftError('A listening wallet address is required.');
+  await ensureGiftTables(env);
+  let r = await one(env, 'SELECT * FROM radio_gifts WHERE code_hash=?', [giftCodeHash(body.code)]);
+  if (!r) throw new GiftError('That gift link is not valid.', 404);
+  if (r.claimed_by === body.wallet && ['claiming', 'claimed'].includes(r.status)) return { txid: r.claim_txid!, amount: String(r.amount), already: true };
+  if (r.status === 'pending-deposit' || r.status === 'abandoned') {
+    try { await checkDeposit(env, r, null, treasury, deps); }
+    catch { throw new GiftError('Could not check this gift’s payment right now. Try again shortly.', 503); }
+    r = (await gift(env, r.id))!;
+    if (r.status === 'pending-deposit' || r.status === 'abandoned') throw new GiftError('This gift is not paid for yet. Ask your friend to finish sending it.', 409);
+  }
+  if (r.status === 'claiming') throw new GiftError('This gift is being sent to another wallet right now.', 409);
+  if (r.status !== 'live') throw new GiftError(['expired', 'refunding', 'refunded'].includes(r.status) ? 'This gift has expired.' : 'This gift has already been claimed.', 410);
+  if (r.expires_at < deps.now) throw new GiftError('This gift has expired.', 410);
+  if (deps.human && !(await deps.human(body.turnstile, ip))) throw new GiftError('Please complete the quick check and try again.', 403);
+  if (await one(env, 'SELECT id FROM radio_gifts WHERE claimed_by=?', [body.wallet])) throw new GiftError('This listening wallet has already had a gift.', 409);
+  const h = ipHash(env, ip);
+  if (h && (await all(env, "SELECT id FROM radio_gifts WHERE ip_hash=? AND claimed_at>? AND status IN ('claiming','claimed')", [h, deps.now - 86_400_000])).length >= CLAIMS_PER_IP)
+    throw new GiftError('Too many gifts claimed from here today. Try again tomorrow.', 429);
+  const amount = BigInt(r.amount);
+  if (r.source === 'campaign') {
+    const today = await one<{ amount: number }>(env, "SELECT COALESCE(SUM(amount),0) AS amount FROM radio_gifts WHERE source='campaign' AND status IN ('claiming','claimed') AND claimed_at>?", [deps.now - 86_400_000]);
+    if (BigInt(today?.amount ?? 0) + amount > micro(env.RADIO_GIFT_DAILY_CAP, DEFAULT_DAILY_CAP))
+      throw new GiftError("Today's free gifts have all been given. This link still works tomorrow.", 429);
+  }
+  // Only a brand-new wallet: gifts are for getting started, not for topping up.
+  if ((await deps.chain.activity(body.wallet)) > 0 || (await deps.chain.balance(body.wallet)) > 0n)
+    throw new GiftError('Gifts are for brand-new listening wallets. This one has already been used.', 409);
+  // Campaign gifts never spend friends' money: what the treasury owes them is set aside.
+  const spare = (await deps.chain.balance(treasury)) - (r.source === 'campaign' ? await owedToFriends(env) : 0n);
+  if (spare < amount + GIFT_FEE) throw new GiftError('The gift treasury needs topping up. Try again later.', 503);
+  // Only one send can be open at a time (startSend), so these checks cannot be raced past: a
+  // concurrent claim waits for this one to settle, then checks again with it counted.
+  const txid = await startSend(env, deps, treasury, key, 'claim', r, body.wallet, h);
+  return { txid, amount: amount.toString(), already: false };
+}
+
+/**
+ * Housekeeping (runs after gift requests, in the background). In order:
+ *  1. the open send, settled from the chain (see settleOpenSend)
+ *  2. campaign links past expiry become `expired` (their STX stays in the treasury)
+ *  3. friend gifts nobody paid for: one last look for the deposit, then dropped after a day
+ *  4. an expired friend gift is refunded to the gifter (amount; the fee they paid covers the refund)
+ * A chain read that fails skips that item; it never turns into "nothing there".
+ */
+export async function sweepGifts(env: GiftEnv, deps: GiftDeps) {
+  if (env.RADIO_GIFT_ENABLED !== '1') return { did: 'off' };
+  const treasury = treasuryAddress(env), key = env.RADIO_GIFT_TREASURY_KEY?.trim();
+  if (!treasury || !key) return { did: 'off' };
+  await ensureGiftTables(env);
+  const open = await settleOpenSend(env, deps, key, treasury).catch(() => 'unreadable');
+  if (open) return { did: open }; // one item per call: anything else waits for the next request
+  if (changed(await run(env, "UPDATE radio_gifts SET status='expired', updated_at=? WHERE source='campaign' AND status='live' AND expires_at<?", [deps.now, deps.now]))) return { did: 'expired' };
+  // A friend gift nobody paid for within a day is set aside (abandoned), never deleted: its memo is
+  // still recognised if the payment turns up later.
+  if (changed(await run(env, "UPDATE radio_gifts SET status='abandoned', updated_at=? WHERE status='pending-deposit' AND deposit_txid IS NULL AND created_at<?", [deps.now, deps.now - PENDING_DEPOSIT_MS])))
+    return { did: 'abandoned' };
+  // Every few minutes: memo'd deposits that belong to no waiting gift (paid twice, wrong amount, a
+  // gift already live with another payment) are recorded for a refund. Friends' money is never lost.
+  const last = await one<{ value: number }>(env, "SELECT created_at AS value FROM radio_gift_orphans WHERE txid='scan'");
+  if (!last || deps.now - last.value > 10 * 60_000) {
+    await run(env, "INSERT INTO radio_gift_orphans(txid, gift_id, sender, amount, reason, status, created_at, updated_at) VALUES('scan', NULL, '', 0, 'scan marker', 'marker', ?, ?) ON CONFLICT(txid) DO UPDATE SET created_at=excluded.created_at", [deps.now, deps.now]);
+    try { await scanDeposits(env, treasury, deps); } catch { /* could not read: try again later */ }
+    return { did: 'deposits-scanned' };
+  }
+  const due = await one(env, "SELECT * FROM radio_gifts WHERE source='friend' AND status='live' AND expires_at<? ORDER BY expires_at LIMIT 1", [deps.now]);
+  if (!due?.gifter) return { did: 'nothing' };
+  try {
+    const txid = await startSend(env, deps, treasury, key, 'refund', due, due.gifter);
+    return { did: 'refund-sent', id: due.id, txid };
+  } catch { return { did: 'refund-later' }; }
+}
