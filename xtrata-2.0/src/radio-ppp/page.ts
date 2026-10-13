@@ -40,6 +40,10 @@ function start(root: HTMLElement) {
     main: () => { const s = sessionStore.load(); return s.isConnected && s.network === 'mainnet' ? s.address : undefined; },
     config: (main) => json('/radio/listening-wallet/config?main=' + encodeURIComponent(main || '')) as Promise<GateConfig>,
     links: async (main) => (await json('/radio/listening-wallet/link?main=' + encodeURIComponent(main))).links ?? [],
+    mainOf: async (listening) => {
+      const r = (await json('/radio/listening-wallet/link?listening=' + encodeURIComponent(listening))).links as { listening: string; main: string }[] | undefined;
+      return r?.find((l) => l.listening === listening)?.main ?? null;
+    },
     saveLink: async (body) => { await json('/radio/listening-wallet/link', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); },
     bridge: async (origin) => {
       frame = document.createElement('iframe');
@@ -418,6 +422,7 @@ function start(root: HTMLElement) {
         rows.push(...fact('Credited to', `${who(s.linked)} · plays, likes and returns`, s.linked === s.main || s.solo ? 'ppp-ok' : 'ppp-warn'));
         listeningRow();
       } else if (s.solo) {
+        if (s.creditedTo) rows.push(...fact('Credited to', `${who(s.creditedTo)} · plays and likes`, 'ppp-ok'));
         // Passkey-only: returns go back where the money came from, unless the listener chose another address.
         const where = s.returnTo
           ? `${who(s.returnTo)} · ${s.returnToKind === 'chosen' ? 'chosen by you' : 'sent the first funds'}`
@@ -602,6 +607,9 @@ function start(root: HTMLElement) {
     }
     // A gift link in play goes first: it is why this visitor is here.
     key.unshift(...gifts.banner(s));
+    // A passkey synced to this device opened someone's existing wallet: say whose, first.
+    if (s.solo && s.creditedTo && s.listening && !['intro', 'off', 'elsewhere', 'loading'].includes(s.step))
+      key.unshift(el('p', `This is ${who(s.creditedTo)}'s listening wallet. Plays and likes count for ${who(s.creditedTo)}. Connect it (top right) to see its likes here too.`, 'ppp-ok'));
     $('.ppp-key').replaceChildren(...key);
     const giftFold = gifts.renderFold(s);
     $('.ppp-gifts').hidden = !giftFold;

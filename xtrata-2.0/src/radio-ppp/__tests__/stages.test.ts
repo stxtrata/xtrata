@@ -32,6 +32,7 @@ describe('pay-per-play steps', () => {
     expect(showSteps({ step: 'fund', entries: [], linked: 'SP1' }, at('fund'))).toBe(true); // linked, not yet paid: still setting up
     expect(showSteps({ step: 'locked', entries: [], linked: 'SP1' }, at('locked'))).toBe(false); // returning: just unlock
     expect(showSteps({ step: 'fund', entries: [{ kind: 'play' }] as any, linked: 'SP1' }, at('fund'))).toBe(false); // out of funds: just top up
+    expect(showSteps({ step: 'ready', entries: [], linked: undefined, solo: true, creditedTo: 'SP1' }, stageOf({ step: 'ready', payingOn: false, session: null, entries: [], gate: null, solo: true } as any))).toBe(false); // an existing wallet on a new device
     expect(showSteps({ step: 'ready', entries: [{ kind: 'play' }] as any, linked: 'SP1' }, at('ready', { entries: [{ kind: 'play', status: 'confirmed' }] }))).toBe(false);
     expect(showSteps({ step: 'intro', entries: [], linked: undefined }, null)).toBe(false);
   });

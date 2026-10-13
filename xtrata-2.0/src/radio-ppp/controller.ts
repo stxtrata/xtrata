@@ -67,6 +67,11 @@ export interface PppDeps {
   likesChanged?(): void;
   /** Who funded this listening wallet (first meaningful deposit). `{ok:false}` means the lookup failed, not that there is none. */
   funder?(listening: string): Promise<FunderResult>;
+  /**
+   * The main wallet the server holds a verified, dual-signed link for (public). Used only to say whose
+   * listening wallet this is when no Stacks wallet is connected, e.g. a passkey synced to a new device.
+   */
+  mainOf?(listening: string): Promise<string | null>;
   /** The song's on-chain like state for the main wallet, including linked listening wallets (`by`). */
   likeState?(main: string, song: number): Promise<{ liked: boolean; by: string[] }>;
   /** A like/unlike from the listening wallet was sent, or could not be: the radio's heart follows. */
@@ -136,6 +141,11 @@ export interface Snapshot {
   walletCannotMulti: boolean;
   /** Main wallets that other listening wallets on this device belong to (not the connected one, not this wallet's). */
   others: string[];
+  /**
+   * No Stacks wallet connected, but the server holds a link for this listening wallet: whose wallet it is
+   * (display only: returns and signing still follow the wallet box's own records).
+   */
+  creditedTo?: string;
 }
 
 const UNRESOLVED: Entry['status'][] = ['prepared', 'signed', 'unknown', 'pending'];
@@ -178,6 +188,8 @@ export function createPppController(deps: PppDeps) {
   let funderRes: { for: string; res: FunderResult; at: number } | null = null;
   let funderLooking = false;
   let funderFails = 0;
+  let creditedRes: { for: string; main: string | null; ok: boolean; at: number } | null = null;
+  let creditedLooking = false;
   let verified = false;
   let lockHeld = false;
   // One-tap unlock: an unlock panel opened in the frame on page load, waiting for the listener.
@@ -290,7 +302,8 @@ export function createPppController(deps: PppDeps) {
     funderMultiple: (() => { const f = funderFor(); return !!f && f.ok && f.distinct > 1; })(),
     walletCannotSolo: solo() && walletLacks('standalone'),
     walletCannotMulti: walletLacks('multi'),
-    others: (status?.others ?? []).filter((a) => a !== deps.main() && a !== status?.linked)
+    others: (status?.others ?? []).filter((a) => a !== deps.main() && a !== status?.linked),
+    creditedTo: solo() && status?.address && creditedRes?.for === status.address && creditedRes.main ? creditedRes.main : undefined
   });
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
@@ -371,6 +384,21 @@ export function createPppController(deps: PppDeps) {
     funderFails = funderRes.res.ok ? 0 : funderFails + 1;
   }
 
+  /**
+   * Passkey-only view of a wallet that IS linked (its passkey synced to a device where no Stacks wallet is
+   * connected): ask the server whose it is, so the panel can say so. A failed lookup is retried after a
+   * minute rather than read as "not linked".
+   */
+  async function lookupCredited() {
+    const listening = status?.address;
+    if (!solo() || !listening || status?.linked || !deps.mainOf || creditedLooking) return;
+    if (creditedRes && creditedRes.for === listening && (creditedRes.ok || deps.now() - creditedRes.at < 60_000)) return;
+    creditedLooking = true;
+    try { creditedRes = { for: listening, main: await deps.mainOf(listening), ok: true, at: deps.now() }; }
+    catch { creditedRes = { for: listening, main: null, ok: false, at: deps.now() }; }
+    finally { creditedLooking = false; }
+  }
+
   async function reconcile() {
     const listening = status?.address;
     if (!listening) return;
@@ -440,6 +468,7 @@ export function createPppController(deps: PppDeps) {
       if (main && gate.allowed) await lookupServerLink(main);
       await refreshBalance(force);
       await lookupFunder();
+      await lookupCredited();
       await reconcile();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Pay-per-play could not refresh. Listening stays free.';

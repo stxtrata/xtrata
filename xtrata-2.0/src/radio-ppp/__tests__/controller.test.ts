@@ -32,6 +32,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     enabled: true, allowed: true, here: true, radioUrl: 'https://radio.xtrata.test/radio.html', walletOrigin: 'https://wallet.xtrata.test', canary: true,
     limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 }, ...over
   };
+  const server = { mains: new Map<string, string>(), mainOfFails: false, mainOfCalls: 0 };
   const chain = { balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
   const savedLinks: any[] = [];
   const store = new Map<string, string>();
@@ -96,6 +97,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     changed: () => {},
     likesChanged: () => { likesChanged++; },
     funder: async () => { chain.funderCalls++; return chain.funder; },
+    mainOf: async (listening) => { server.mainOfCalls++; if (server.mainOfFails) throw new Error('503'); return server.mains.get(listening) ?? null; },
     likeState: async (_main, song) => { if (likeReadFails) throw new Error('503'); const by = likeBy.get(song) ?? []; return { liked: by.length > 0, by }; },
     likeSent: (song, liked) => { sent.push([song, liked]); },
     likeFailed: (song) => { failed.push(song); },
@@ -108,7 +110,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     chain.nonce = BigInt(chain.broadcasts.length);
   };
   const settle = () => new Promise((r) => setTimeout(r, 0));
-  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, confirmed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations, requests, names, engine };
+  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, confirmed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations, requests, names, engine, server };
 }
 
 describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', () => {
@@ -560,6 +562,39 @@ describe('passkey-only listening (no Stacks wallet)', () => {
     s.chain.mined.add(gift); s.chain.balance = 250_000n;
     await s.ppp.forceRefresh();
     expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', depositPending: false, payingOn: true });
+  });
+
+  it('a wallet linked elsewhere (passkey synced to a new device) says whose it is, without changing where returns go', async () => {
+    const s = solo();
+    s.chain.funder = { ok: true, funder: HOLDER, distinct: 1 };
+    s.server.mains.set(LISTENING, MAIN);
+    await funded(s);
+    expect(s.ppp.snapshot()).toMatchObject({ solo: true, creditedTo: MAIN, returnTo: HOLDER, returnToKind: 'funder' });
+    const calls = s.server.mainOfCalls;
+    await s.ppp.forceRefresh();
+    expect(s.server.mainOfCalls).toBe(calls); // asked once per wallet
+  });
+
+  it('a failed lookup of whose wallet it is shows nothing and is tried again a minute later', async () => {
+    const s = solo();
+    s.server.mainOfFails = true;
+    await funded(s);
+    expect(s.ppp.snapshot().creditedTo).toBeUndefined();
+    s.server.mainOfFails = false; s.server.mains.set(LISTENING, MAIN);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().creditedTo).toBeUndefined(); // too soon
+    s.tick(61_000);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().creditedTo).toBe(MAIN);
+  });
+
+  it('with a Stacks wallet connected the link comes from that wallet, not from this lookup', async () => {
+    const s = setup({ passkeyOnly: true });
+    s.server.mains.set(LISTENING, MAIN);
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    expect(s.ppp.snapshot()).toMatchObject({ solo: false });
+    expect(s.ppp.snapshot().creditedTo).toBeUndefined();
+    expect(s.server.mainOfCalls).toBe(0);
   });
 
   it('stays off by default: without the flag a visitor with no wallet is asked to connect', async () => {
