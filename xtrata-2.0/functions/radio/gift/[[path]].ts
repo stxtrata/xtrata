@@ -30,7 +30,8 @@ export async function onRequest(context: Ctx) {
   try {
     if (request.method === 'GET') {
       const q = new URL(request.url).searchParams;
-      if (action === 'for') return reply(await giftForWallet(env, q.get('wallet') ?? ''));
+      // The recipient's page asks this while its gift is on its way, which also keeps the sends moving.
+      if (action === 'for') { const r = reply(await giftForWallet(env, q.get('wallet') ?? '')); later(); return r; }
       if (action === '') { const r = reply(await giftStatus(env, { id: q.get('id') })); later(); return r; }
       return reply({ error: 'Not found' }, 404);
     }

@@ -135,13 +135,32 @@ export function createGifts(deps: GiftDeps) {
     }
   }
 
-  /** Lines for the top of the panel while a gift link is in play. */
+  // While a gift is on its way to this wallet: ask the server how the send is going every 30 s. That
+  // also keeps the treasury's sends moving (a failed broadcast is retried on these requests), and
+  // says so plainly if the network keeps refusing it, instead of a silent wait.
+  let sending: { wallet: string; at: number; state?: string; problem?: string | null } | null = null;
+  function watchSending(s: Snapshot): HTMLElement[] {
+    if (!s.listening || !s.depositPending || s.step !== 'fund') { sending = null; return []; }
+    if (!sending || sending.wallet !== s.listening || deps.now() - sending.at > 30_000) {
+      const wallet = s.listening;
+      sending = { ...(sending?.wallet === wallet ? sending : {}), wallet, at: deps.now() };
+      deps.json('/radio/gift/for?wallet=' + encodeURIComponent(wallet))
+        .then((r) => { if (sending?.wallet === wallet) { sending.state = r?.gift?.state; sending.problem = r?.gift?.problem ?? null; deps.changed(); } })
+        .catch(() => { /* asked again in 30 s */ });
+    }
+    return sending.state === 'sending' && sending.problem
+      ? [el('p', `🎁 Your gift is waiting to go out (${sending.problem}). It is retried automatically.`, 'ppp-warn')]
+      : [];
+  }
+
+  /** Lines for the top of the panel while a gift link is in play, or a gift is on its way. */
   function banner(s: Snapshot): HTMLElement[] {
-    if (!incoming || ['off', 'elsewhere'].includes(s.step)) return [];
+    const status = watchSending(s);
+    if (!incoming || ['off', 'elsewhere'].includes(s.step)) return status;
     const v = incoming.view;
     if (incoming.error && !v) return [el('p', `🎁 ${incoming.error}`, 'ppp-warn')];
     if (!v) return [el('p', '🎁 Checking your gift…', 'ppp-mute')];
-    if (incoming.done) return [];
+    if (incoming.done) return status;
     if (v.status === 'claimed' || v.status === 'claiming') return [el('p', '🎁 This gift link has already been used.', 'ppp-mute')];
     if (['expired', 'refunding', 'refunded'].includes(v.status)) return [el('p', '🎁 This gift link has expired.', 'ppp-mute')];
     if (v.status === 'pending-deposit') return [el('p', `🎁 ${fromLabel(v)} is still sending this gift. Check back in a few minutes.`, 'ppp-warn')];

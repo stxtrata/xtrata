@@ -64,6 +64,8 @@ export const CREATES_PER_IP = 10;
 export const PENDING_DEPOSIT_MS = 24 * 3600_000;
 /** A sent transaction not yet confirmed is broadcast again (same bytes) this often. */
 export const REBROADCAST_MS = 2 * 60_000;
+/** ...and this often while its last broadcast failed. */
+export const RETRY_FAILED_MS = 20_000;
 /** A send still unconfirmed this long after its last signature is re-signed: same nonce, higher fee. */
 export const BUMP_AFTER_MS = 15 * 60_000;
 /** A used nonce with no successful send must still be the case this much later before release. */
@@ -158,13 +160,25 @@ export function hiroGiftChain(env: GiftEnv): GiftChain {
       return BigInt(int(n.last_executed_tx_nonce, 'the treasury nonce'));
     },
     async broadcast(raw, txid) {
-      // Exactly one POST: a retry after a lost response can come back as a refusal of bytes the node
-      // already holds. Whatever happens here, the send stays open and the chain decides.
-      const headers = new Headers({ 'content-type': 'application/octet-stream' });
-      applyHiroApiKey(headers, getHiroApiKeys(env)[0] ?? null);
-      const r = await fetch(HIRO + '/v2/transactions', { method: 'POST', headers, body: raw as BodyInit, signal: AbortSignal.timeout(10_000) });
-      if (!r.ok) throw new GiftError(`Broadcast answered ${r.status}`, 502);
-      return txid;
+      // Keys are tried in turn ONLY when Hiro turned the request away before reading it (401/403/429):
+      // that is the same rotation as every read, and without it one bad or throttled key meant no gift
+      // was ever broadcast. A POST that threw (lost response) is never repeated here: the send stays
+      // open and the sweep sends the same bytes again later.
+      // api.hiro.so first: it is the host the sponsor relay has broadcast through from these same
+      // Functions in production for months; the mainnet host is the fallback.
+      const attempts = ['https://api.hiro.so', HIRO].flatMap((host) => [...getHiroApiKeys(env), null].map((key) => ({ host, key })));
+      for (let i = 0; i < attempts.length; i++) {
+        const headers = new Headers({ 'content-type': 'application/octet-stream' });
+        applyHiroApiKey(headers, attempts[i].key);
+        const r = await fetch(attempts[i].host + '/v2/transactions', { method: 'POST', headers, body: raw.slice() as BodyInit, signal: AbortSignal.timeout(15_000) });
+        if (r.ok) return txid;
+        if (i < attempts.length - 1 && shouldRetryWithNextHiroKey(r.status)) continue;
+        const text = await r.text().catch(() => '');
+        let reason = '';
+        try { const j = JSON.parse(text); reason = [j.reason, j.error].filter(Boolean).join(': '); } catch { reason = text.slice(0, 120); }
+        throw new GiftError(`Broadcast refused (HTTP ${r.status}${reason ? `, ${reason}` : ''})`, 502);
+      }
+      throw new GiftError('Broadcast refused', 502);
     },
     async transfer(txid) {
       const r = await fetchHiro(`/extended/v1/tx/${txid}`);
@@ -225,6 +239,8 @@ export async function ensureGiftTables(env: GiftEnv) {
     amount INTEGER NOT NULL, fee INTEGER NOT NULL, txids TEXT NOT NULL, raw TEXT NOT NULL, status TEXT NOT NULL,
     created_at INTEGER NOT NULL, signed_at INTEGER NOT NULL, broadcast_at INTEGER NOT NULL, nonce_used_at INTEGER, updated_at INTEGER NOT NULL)`);
   await run(env, "CREATE UNIQUE INDEX IF NOT EXISTS radio_gift_sends_one_open ON radio_gift_sends(status) WHERE status='sent'");
+  // Added after the first release: why the last broadcast failed (null when it went through).
+  await run(env, 'ALTER TABLE radio_gift_sends ADD COLUMN last_error TEXT').catch(() => undefined);
   await run(env, 'CREATE TABLE IF NOT EXISTS radio_gift_campaigns(hash TEXT PRIMARY KEY, admin TEXT NOT NULL, created_at INTEGER NOT NULL)');
   await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_orphans(txid TEXT PRIMARY KEY, gift_id TEXT, sender TEXT NOT NULL, amount INTEGER NOT NULL,
     reason TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
@@ -238,6 +254,7 @@ type Row = {
 type Send = {
   id: string; gift_id: string; kind: 'claim' | 'refund'; nonce: number; recipient: string; amount: number; fee: number;
   txids: string; raw: string; status: 'sent' | 'done' | 'void'; created_at: number; signed_at: number; broadcast_at: number; nonce_used_at: number | null;
+  last_error: string | null;
 };
 const all = async <T,>(env: GiftEnv, sql: string, binds: unknown[] = []) => ((await queryAll(env, sql, binds)).results ?? []) as T[];
 const one = async <T = Row,>(env: GiftEnv, sql: string, binds: unknown[] = []) => (await all<T>(env, sql, binds))[0] ?? null;
@@ -297,9 +314,24 @@ async function startSend(env: GiftEnv, deps: GiftDeps, treasury: string, key: st
     throw e;
   }
   if (!(await one(env, 'SELECT id FROM radio_gift_sends WHERE id=?', [id]))) throw new GiftError('This gift has just changed. Refresh and try again.', 409);
-  // Any failure here only means "maybe not sent yet": the sweep rebroadcasts the same bytes.
-  await deps.chain.broadcast(tx.raw, tx.txid).catch(() => undefined);
+  // Any failure here only means "maybe not sent yet": the sweep sends the same bytes again (soon,
+  // because the failure is recorded), and the reason is kept so it can be seen and fixed.
+  await sendBytes(env, deps, id, tx.raw, tx.txid);
   return tx.txid;
+}
+
+/** Broadcasts and records how it went (`last_error`), so a failing send is retried soon and visible. */
+async function sendBytes(env: GiftEnv, deps: GiftDeps, sendId: string, raw: Uint8Array, txid: string) {
+  try {
+    await deps.chain.broadcast(raw, txid);
+    await run(env, 'UPDATE radio_gift_sends SET last_error=NULL, updated_at=? WHERE id=?', [deps.now, sendId]);
+    return true;
+  } catch (e) {
+    const reason = String((e as Error)?.message || e).slice(0, 200);
+    console.error('[radio:gifts] broadcast failed', { send: sendId, txid, reason });
+    await run(env, 'UPDATE radio_gift_sends SET last_error=?, broadcast_at=?, updated_at=? WHERE id=?', [reason, deps.now, deps.now, sendId]).catch(() => undefined);
+    return false;
+  }
 }
 
 /** Puts a gift back after its send can no longer land, so it can be claimed (or refunded) again. */
@@ -354,12 +386,13 @@ async function settleOpenSend(env: GiftEnv, deps: GiftDeps, key: string, treasur
       [Number(fee), JSON.stringify(next), bytesToHex(tx.raw), now, now, now, s.id, s.txids]))) return 'raced';
     if (s.kind === 'claim') await run(env, "UPDATE radio_gifts SET claim_txid=?, updated_at=? WHERE id=? AND status='claiming'", [tx.txid, now, s.gift_id]);
     else await run(env, "UPDATE radio_gifts SET refund_txid=?, updated_at=? WHERE id=? AND status='refunding'", [tx.txid, now, s.gift_id]);
-    await deps.chain.broadcast(tx.raw, tx.txid).catch(() => undefined);
+    await sendBytes(env, deps, s.id, tx.raw, tx.txid);
     return 'bumped';
   }
-  if (now - s.broadcast_at > REBROADCAST_MS) {
+  // Sent again every 2 minutes while unconfirmed; every 20 seconds while the last attempt failed.
+  if (now - s.broadcast_at > (s.last_error ? RETRY_FAILED_MS : REBROADCAST_MS)) {
     await run(env, 'UPDATE radio_gift_sends SET broadcast_at=?, updated_at=? WHERE id=?', [now, now, s.id]);
-    await deps.chain.broadcast(hexToBytes(s.raw), txids[txids.length - 1]).catch(() => undefined);
+    await sendBytes(env, deps, s.id, hexToBytes(s.raw), txids[txids.length - 1]);
     return 'rebroadcast';
   }
   return 'pending';
@@ -406,7 +439,12 @@ export async function giftForWallet(env: GiftEnv, wallet: string) {
   await ensureGiftTables(env);
   const r = await one(env, "SELECT * FROM radio_gifts WHERE claimed_by=? AND status IN ('claiming','claimed')", [wallet]);
   if (!r) return { gift: null };
-  return { gift: { returnTo: r.gifter ?? treasuryAddress(env), from: r.gifter, source: r.source, amount: String(r.amount), txid: r.claim_txid, label: r.label } };
+  // While it is on its way: whether the last broadcast went through, and why not if it did not.
+  const send = r.status === 'claiming' ? await one<Send>(env, "SELECT * FROM radio_gift_sends WHERE gift_id=? AND kind='claim' AND status='sent'", [r.id]) : null;
+  return { gift: {
+    returnTo: r.gifter ?? treasuryAddress(env), from: r.gifter, source: r.source, amount: String(r.amount), txid: r.claim_txid, label: r.label,
+    state: r.status === 'claimed' ? 'arrived' : 'sending', problem: send?.last_error ?? null
+  } };
 }
 
 /** Admin: links paid from the campaign pool. Each signed request works once. The codes exist in clear only in this reply. */
