@@ -15,6 +15,7 @@ import { findFunder } from '../lib/listening-wallet/funder';
 import { hasInstalledStacksWallet } from '../lib/wallet/installed';
 import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
+import { createGifts } from './gifts';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -93,7 +94,8 @@ function start(root: HTMLElement) {
       set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* history is a convenience */ } }
     },
     changed: () => render(ppp.snapshot()),
-    funder: (listening) => findFunder(listening, api),
+    // A gifted wallet returns to whoever paid for the gift (the gift record), else to its first funder.
+    funder: (listening) => gifts.funder(listening, () => findFunder(listening, api), !!ppp.snapshot().gate?.gifts?.enabled),
     likesChanged: () => { void (window as any).XtrataRadio?.refreshLikes?.(); },
     likeState: async (main, song) => {
       const r = await json('/radio/chain-likes?' + new URLSearchParams({ wallet: main, ids: String(song) }));
@@ -104,6 +106,25 @@ function start(root: HTMLElement) {
     likeSent: (song, liked) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-sent', { detail: { song, liked } })),
     likeConfirmed: (song, liked) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-confirmed', { detail: { song, liked } })),
     likeFailed: (song) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-failed', { detail: { song } }))
+  });
+
+  const gifts = createGifts({
+    json,
+    main: () => { const s = sessionStore.load(); return s.isConnected && s.network === 'mainnet' ? s.address : undefined; },
+    pay: (main, recipient, amount, memo) => new Promise((resolve, reject) => showStxTransfer({
+      recipient, amount: amount.toString(), memo, stxAddress: main, network: new StacksMainnet(),
+      appDetails: { name: 'Xtrata Radio · gift', icon: '/favicon.svg' },
+      onFinish: (r) => resolve(r.txId || ''), onCancel: () => reject(new Error('Gift cancelled. Nothing was sent.')), onError: reject
+    })),
+    sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
+    giftSent: (txid, amount) => ppp.giftSent(txid, amount),
+    who: (address) => who(address),
+    changed: () => render(ppp.snapshot()),
+    store: {
+      get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+      set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* best effort */ } }
+    },
+    now: Date.now
   });
 
   // The radio's heart asks here first: the listening wallet signs the like when it can, for the main wallet.
@@ -193,7 +214,7 @@ function start(root: HTMLElement) {
     if (s.step === 'over') return ['OVER 1 STX', 'bad'];
     if (s.step === 'locked') return ['LOCKED', 'mute'];
     if (s.step === 'intro' || s.step === 'link') return ['', '']; // the SETUP HELPER badge says it
-    if (s.step === 'fund') return s.entries.length ? ['OUT OF FUNDS', 'bad'] : ['ADD FUNDS', 'warn'];
+    if (s.step === 'fund') return s.depositPending ? ['ON ITS WAY', 'warn'] : s.entries.length ? ['OUT OF FUNDS', 'bad'] : ['ADD FUNDS', 'warn'];
     return s.payingOn && s.session && s.session.playsLeft > 0 ? ['ON · PAYING', 'ok'] : ['OFF', 'mute'];
   }
 
@@ -237,7 +258,8 @@ function start(root: HTMLElement) {
       case 'intro': return set('Set up pay-per-play', '', 'Create your passkey listening wallet');
       case 'locked': return set(s.payingOn ? 'Unlock · keep paying' : 'Unlock wallet', '', 'Opens the listening wallet: one tap there asks for your passkey');
       case 'link': return set('Finish setup', 'warn', 'Link the listening wallet to your main wallet');
-      case 'fund': return set(s.entries.some((e) => e.kind === 'play') ? 'Out of funds · top up' : 'Add funds', 'warn', 'Add up to 1 STX to keep paying artists');
+      case 'fund': return s.depositPending ? set('Funds on their way', 'quiet', 'Paying starts by itself when they land')
+        : set(s.entries.some((e) => e.kind === 'play') ? 'Out of funds · top up' : 'Add funds', 'warn', 'Add up to 1 STX to keep paying artists');
       case 'over': return set('Over 1 STX', 'warn', 'Return the excess to keep paying');
       case 'loading': return set('Pay-per-play', 'quiet', 'Checking the listening wallet');
       case 'ready':
@@ -258,7 +280,7 @@ function start(root: HTMLElement) {
     intro: 'Not paying artists',
     locked: 'Locked · not paying artists',
     link: 'Not paying artists yet',
-    fund: 'Out of funds · artists unpaid',
+    fund: 'No funds yet · artists unpaid',
     over: 'Paused · artists unpaid',
     ready: 'Paying is off · artists get nothing'
   };
@@ -279,7 +301,8 @@ function start(root: HTMLElement) {
       onair.querySelector('.onair-sub')!.textContent = paying ? `Paying artists · ${left.toLocaleString()} plays left` : 'Not paying';
     }
     if (nudge) {
-      nudge.hidden = mode !== 'off';
+      // Funds already on their way: nothing to nag about.
+      nudge.hidden = mode !== 'off' || (s.step === 'fund' && s.depositPending);
       if (mode === 'off') {
         const perStx = Math.floor(Number(1_000_000n / costPerPlay(BigInt(s.gate?.limits.playFee ?? '300'))));
         nudge.querySelector('.nudge-t')!.textContent = '⚠ ' + warning;
@@ -452,9 +475,10 @@ function start(root: HTMLElement) {
           : 'You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.', 'ppp-warn'));
         // Two clear doors for a visitor with no wallet connected: a new passkey-only wallet, or their Stacks wallet.
         if (s.solo) lines.push(el('p', 'Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.', 'ppp-mute'));
-        actions.push(button(s.solo ? 'Turn on pay-per-play · no wallet needed' : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
-        if (s.solo) actions.push(button('I have a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
-        actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
+        actions.push(button(gifts.liveGift() ? 'Claim my gift · no wallet needed' : s.solo ? 'Turn on pay-per-play · no wallet needed' : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
+        // A gift is for a brand-new wallet: one button, nothing else to choose.
+        if (s.solo && !gifts.liveGift()) actions.push(button('I have a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
+        if (!gifts.liveGift()) actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
         break;
       case 'locked':
         if (s.armed) {
@@ -476,7 +500,8 @@ function start(root: HTMLElement) {
         key.push(el('p', 'Checking the listening wallet balance…', 'ppp-mute'));
         break;
       case 'fund': {
-        if (s.entries.length) key.push(el('p', 'Out of funds · top up to keep paying', 'ppp-bad'));
+        if (s.depositPending) { /* the "on their way" line below says it all */ }
+        else if (s.entries.length) key.push(el('p', 'Out of funds · top up to keep paying', 'ppp-bad'));
         else key.push(el('p', `Add funds · 1 STX ≈ ${Math.floor(Number(1_000_000n / cost)).toLocaleString()} songs`));
         if (s.entries.length) lines.push(el('p', 'Songs play free until you top up. Paying carries on by itself once the top-up confirms.'));
         if (s.payingOn && !s.entries.length) lines.push(el('p', 'Paying is switched on. Once funds arrive it starts with the next song you listen to for 30 seconds.', 'ppp-ok'));
@@ -484,9 +509,9 @@ function start(root: HTMLElement) {
           // No wallet to deposit from: the address is the whole interface. Anyone can send to it.
           lines.push(el('p', 'Ask a friend, or send from an exchange or any Stacks wallet, to this address. About 1 STX is plenty. Whatever is left can be returned to whoever sent it.'));
           lines.push(el('p', s.listening || '', 'ppp-addr-full'));
-          if (s.listening) actions.push(button('Copy my address', () => void navigator.clipboard?.writeText(s.listening || ''), 'primary'));
+          if (s.listening && !s.depositPending) actions.push(button('Copy my address', () => void navigator.clipboard?.writeText(s.listening || ''), 'primary'));
         } else lines.push(el('p', `Or send STX from an exchange to the listening wallet address (Copy above).`, 'ppp-mute'));
-        if (s.depositPending && s.depositTxid) { const p = el('p', 'Deposit on its way… ', 'ppp-warn'); p.append(link('View', explorer(s.depositTxid))); key.push(p); }
+        if (s.depositPending && s.depositTxid) { const p = el('p', 'Funds on their way · paying starts by itself when they land. ', 'ppp-warn'); p.append(link('View', explorer(s.depositTxid))); key.push(p); }
         else if (s.allowance > 0n && !s.solo) actions.push(button(`Deposit ${stx(s.allowance)} STX from my wallet`, () => void ppp.deposit(), 'primary'));
         break;
       }
@@ -543,13 +568,18 @@ function start(root: HTMLElement) {
     // While the wallet box is asking for a tap it is the only thing to press: page buttons step aside.
     if (busy) actions.length = 0;
     // The balance is the one wallet detail a listener needs at a glance: on the same line once set up.
-    if (s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step)) {
+    if (s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step) && !(s.step === 'fund' && s.depositPending && s.balance === 0n)) {
       const tone = s.balanceState === 'ok' ? 'ppp-ok' : s.balanceState === 'low' ? 'ppp-warn' : 'ppp-bad';
       const first = key.at(0);
       if (s.step === 'ready' && first) first.append(el('span', ` · ${stxShort(s.balance)} STX`, tone));
       else key.push(el('p', `Balance ${stxShort(s.balance)} STX`, tone));
     }
+    // A gift link in play goes first: it is why this visitor is here.
+    key.unshift(...gifts.banner(s));
     $('.ppp-key').replaceChildren(...key);
+    const giftFold = gifts.renderFold(s);
+    $('.ppp-gifts').hidden = !giftFold;
+    if (giftFold && !$('.ppp-gift-body').contains(giftFold)) $('.ppp-gift-body').replaceChildren(giftFold);
     $('.ppp-body').replaceChildren(...lines);
     $('.ppp-actions').replaceChildren(...actions);
     $('.ppp-actions2').replaceChildren(...more);

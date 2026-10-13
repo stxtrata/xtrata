@@ -28,6 +28,8 @@ export interface GateConfig {
   /** Listeners without a Stacks wallet may use a passkey listening wallet alone (default off). */
   passkeyOnly?: boolean;
   limits: { playFee: string; returnFee: string; maxSessionPlays: number; sessionHours: number };
+  /** Gift wallets (functions/lib/radio-gifts.ts): off unless the deployment has a gift treasury. */
+  gifts?: { enabled: boolean; treasury: string | null; turnstileSiteKey: string | null; admin: boolean; fee: string };
 }
 export interface StoredLink { listening: string; issued: number; mainSignature: string }
 
@@ -504,6 +506,17 @@ export function createPppController(deps: PppDeps) {
       say(solo() ? 'Wallet created ✓ Next: add 1 STX.' : 'Wallet created ✓ Next: link it.');
       await holdTab();
     }),
+
+    /**
+     * A gift funded this wallet (the server sent it from the gift treasury): tracked exactly like a
+     * deposit, so the panel says it is on its way and paying starts by itself once it confirms.
+     */
+    giftSent: (txid: string, amount: bigint) => {
+      if (!status?.address || pendingDeposit()) return;
+      setPendingDeposit({ txid, amount: amount.toString(), at: deps.now() });
+      balanceAt = -Infinity;
+      say('🎁 Gift on its way ✓ Usually arrives in a few minutes.');
+    },
 
     unlock: (anyPasskey = false): Promise<void> => {
       const run = () => task('Waiting for your passkey…', async () => unlockWith(await ensureBridge(), anyPasskey));

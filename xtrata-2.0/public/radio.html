@@ -6,6 +6,13 @@
 <title>Xtrata Radio — inscribed music, live from the chain</title>
 <meta name="description" content="A radio station whose entire catalogue lives on-chain. Every song is an inscription. Tune between curated, liked and full-chain bands." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<script>
+// Gift links carry their code after "#" (browsers never send it to a server). Move it to this device
+// at once and take it out of the address bar, so it is not bookmarked, shared or synced by accident.
+(function(){try{var m=/(?:^|[#&])gift=([A-Za-z0-9_-]{22})(?:&|$)/.exec(location.hash);if(!m)return;
+localStorage.setItem('xtrata.radio.gift.incoming.v1',JSON.stringify({code:m[1],at:Date.now()}));
+history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
+</script>
 <style>
   /* Xtrata Radio — a late-night FM receiver: dark glass, cyan display light, amber accents. */
   :root{color-scheme:dark;--bg:#06080d;--panel:#0f1521;--panel2:#0b111b;--line:#223047;--ink:#e6edf6;--mut:#8b9bb4;
@@ -323,6 +330,19 @@
   .ppp-key p{margin:4px 0 8px}
   .ppp-msg{color:var(--cyan)!important;font-size:12px!important;min-height:1em}.ppp-err{color:#ff8a8a!important;font-size:12px!important;overflow-wrap:anywhere}
   .ppp-err:empty,.ppp-msg:empty{display:none}
+  .ppp .ppp-gift{color:#ffd36e;font-weight:600}
+  .ppp-gift-fold input[type=range]{width:100%;accent-color:#e9b949}
+  .ppp-gift-amount{font-size:12px!important;color:var(--ink)!important}
+  .ppp-gift-list{list-style:none;margin:8px 0;padding:0}
+  .ppp-gift-list li{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(34,48,71,.5);font-size:12px}
+  .ppp-gift-list .t{flex:1;color:var(--ink)}
+  .ppp-gift-admin{margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .ppp-gift-admin p{flex-basis:100%;margin:2px 0!important}
+  .ppp-gift-admin input{font:inherit;font-size:12px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:80px}
+  .ppp-gift-admin label{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--mut)}
+  .ppp-gift-admin>input{flex:1;min-width:140px;width:auto}
+  .ppp-gift-admin textarea{flex-basis:100%;font-family:var(--mono);font-size:11px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px}
+  .ppp-gift-check{margin:6px 0}
   .ppp-history{margin-top:10px;font-size:12px;color:var(--mut)}
   .ppp-history summary{cursor:pointer;color:var(--cyan);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase}
   .ppp-row{margin:6px 0;overflow-wrap:anywhere;line-height:1.5}
@@ -422,6 +442,7 @@
         <details class="ppp-fold ppp-recent" hidden><summary>♪ Recently played</summary><ol class="ppp-recent-list"></ol><details class="ppp-history" hidden></details></details>
         <details class="ppp-fold ppp-wallets" hidden><summary>◎ Wallet</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
         <details class="ppp-fold ppp-more" hidden><summary>? How it works</summary><div class="ppp-body"></div></details>
+        <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Gift Stacks music</summary><div class="ppp-gift-body"></div></details>
       </div>
     </section>
     <details class="likes" id="likesBox" open>
@@ -789,7 +810,7 @@
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=0e3aea19ec98')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=0e1b0583a648')}).catch(function(){});
 </script>
 </body>
 </html>
