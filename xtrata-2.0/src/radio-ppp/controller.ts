@@ -146,6 +146,11 @@ export interface Snapshot {
    * (display only: returns and signing still follow the wallet box's own records).
    */
   creditedTo?: string;
+  /**
+   * This wallet was created on this device (in this browser), not unlocked from a passkey made elsewhere. Only such
+   * a wallet takes a gift: gifts are for brand-new listening wallets.
+   */
+  createdHere: boolean;
 }
 
 const UNRESOLVED: Entry['status'][] = ['prepared', 'signed', 'unknown', 'pending'];
@@ -303,7 +308,8 @@ export function createPppController(deps: PppDeps) {
     walletCannotSolo: solo() && walletLacks('standalone'),
     walletCannotMulti: walletLacks('multi'),
     others: (status?.others ?? []).filter((a) => a !== deps.main() && a !== status?.linked),
-    creditedTo: solo() && status?.address && creditedRes?.for === status.address && creditedRes.main ? creditedRes.main : undefined
+    creditedTo: solo() && status?.address && creditedRes?.for === status.address && creditedRes.main ? creditedRes.main : undefined,
+    createdHere: !!status?.address && deps.store.get(key('created', status.address)) === '1'
   });
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
@@ -570,6 +576,7 @@ export function createPppController(deps: PppDeps) {
       const b = await ensureBridge();
       await b.request('listening.unlock', { mode: 'create', terms: onTerms(), ...(deps.main() ? { main: deps.main() } : {}) });
       status = await readStatus(b);
+      if (status.address) deps.store.set(key('created', status.address), '1');
       setPayingOn(true);
       say(solo() ? 'Wallet created ✓ Next: add 1 STX.' : 'Wallet created ✓ Next: link it.');
       await holdTab();

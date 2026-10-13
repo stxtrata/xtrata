@@ -42,6 +42,10 @@ export function walletHeaders(parents: string[]): string {
     '  Cache-Control: no-cache',
     '/',
     '  Cache-Control: no-cache',
+    '/create',
+    '  Cache-Control: no-cache',
+    '/create.html',
+    '  Cache-Control: no-cache',
     ''
   ].join('\n');
 }
@@ -61,7 +65,11 @@ export default defineConfig(({ mode }) => {
     publicDir: false,
     envDir: __dirname,
     define: { 'import.meta.env.VITE_LISTENING_WALLET_PARENTS': JSON.stringify(parents.join(',')) },
-    build: { outDir, emptyOutDir: true, modulePreload: { polyfill: false }, sourcemap: false, target: 'es2020' },
+    build: {
+      outDir, emptyOutDir: true, modulePreload: { polyfill: false }, sourcemap: false, target: 'es2020',
+      // index.html is the frame the radio embeds; create.html makes a passkey top-level where a frame may not.
+      rollupOptions: { input: { index: resolve(__dirname, 'src/listening-wallet/frame/index.html'), create: resolve(__dirname, 'src/listening-wallet/frame/create.html') } }
+    },
     plugins: [headers]
   };
 });

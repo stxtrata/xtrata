@@ -11588,7 +11588,8 @@ function p5(t) {
       walletCannotSolo: Tt() && B("standalone"),
       walletCannotMulti: B("multi"),
       others: ((i == null ? void 0 : i.others) ?? []).filter((K) => K !== t.main() && K !== (i == null ? void 0 : i.linked)),
-      creditedTo: Tt() && (i != null && i.address) && (m == null ? void 0 : m.for) === i.address && m.main ? m.main : void 0
+      creditedTo: Tt() && (i != null && i.address) && (m == null ? void 0 : m.for) === i.address && m.main ? m.main : void 0,
+      createdHere: !!(i != null && i.address) && t.store.get(rt("created", i.address)) === "1"
     };
   }, O = (x, M = "") => {
     y = x, w = M, t.changed();
@@ -11765,7 +11766,7 @@ function p5(t) {
     forceRefresh: () => wt(!0),
     create: () => st("Waiting for your passkey…", async () => {
       const x = await Re();
-      await x.request("listening.unlock", { mode: "create", terms: mr(), ...t.main() ? { main: t.main() } : {} }), i = await Me(x), et(!0), O(Tt() ? "Wallet created ✓ Next: add 1 STX." : "Wallet created ✓ Next: link it."), await Je();
+      await x.request("listening.unlock", { mode: "create", terms: mr(), ...t.main() ? { main: t.main() } : {} }), i = await Me(x), i.address && t.store.set(rt("created", i.address), "1"), et(!0), O(Tt() ? "Wallet created ✓ Next: add 1 STX." : "Wallet created ✓ Next: link it."), await Je();
     }),
     /**
      * A gift funded this wallet (the server sent it from the gift treasury): tracked exactly like a
@@ -12566,9 +12567,9 @@ function h$(t) {
     if (j.status === "claimed" || j.status === "claiming") return [mt("p", "🎁 This gift link has already been used.", "ppp-mute")];
     if (["expired", "refunding", "refunded"].includes(j.status)) return [mt("p", "🎁 This gift link has expired.", "ppp-mute")];
     if (j.status === "pending-deposit") return [mt("p", `🎁 ${a(j)} is still sending this gift. Check back in a few minutes.`, "ppp-warn")];
-    if (!!L.listening && (!!L.linked || !!L.creditedTo || (L.balance ?? 0n) > 0n || L.entries.length > 0))
+    if (!!L.listening && (!L.createdHere || !!L.linked || !!L.creditedTo || (L.balance ?? 0n) > 0n || L.entries.length > 0))
       return [mt("p", "🎁 A gift link is also waiting on this device. Gifts are for brand-new listening wallets, not this one: share the link with someone new.", "ppp-mute"), bs("Forget this gift link here", o, "quiet")];
-    const J = BigInt(j.amount), Ft = [mt("p", `🎁 ${a(j)} sent you ${ms(J)} STX of on-chain music: about ${Qd(J).toLocaleString()} paid plays.`, "ppp-gift")], ze = !!L.listening && !L.linked && !L.creditedTo && L.step === "fund" && (L.balance ?? 1n) === 0n && !L.depositPending && !L.entries.length, Te = (jt = (Tt = L.gate) == null ? void 0 : Tt.gifts) == null ? void 0 : jt.turnstileSiteKey;
+    const J = BigInt(j.amount), Ft = [mt("p", `🎁 ${a(j)} sent you ${ms(J)} STX of on-chain music: about ${Qd(J).toLocaleString()} paid plays.`, "ppp-gift")], ze = !!L.listening && L.createdHere && !L.linked && !L.creditedTo && L.step === "fund" && (L.balance ?? 1n) === 0n && !L.depositPending && !L.entries.length, Te = (jt = (Tt = L.gate) == null ? void 0 : Tt.gifts) == null ? void 0 : jt.turnstileSiteKey;
     return ze ? (Te && !c.token ? Ft.push(mt("p", "One quick check and it is yours:", "ppp-mute"), f(Te)) : !e.claiming && !e.error && !e.waiting && l(L), (e.claiming || e.waiting) && Ft.push(mt("p", e.waiting ? "Another gift is on its way out first. Yours is next…" : "Sending your gift…", "ppp-cyan")), e.error && Ft.push(mt("p", e.error, "ppp-bad"), bs("Try again", () => {
       e.error = void 0, l(L);
     }))) : L.step === "intro" ? Ft.push(mt("p", "Tap below: your passkey makes a listening wallet, and the gift lands in it.", "ppp-mute")) : L.listening && L.linked ? Ft.push(mt("p", "Gifts are for brand-new listening wallets, and this one is linked to a Stacks wallet. The link still works for someone new.", "ppp-mute"), bs("Forget this gift link here", o, "quiet")) : L.listening && (L.balance ?? 0n) > 0n && Ft.push(mt("p", "Gifts are for brand-new listening wallets, and this one already has funds. Share the link with someone new instead.", "ppp-mute"), bs("Forget this gift link here", o, "quiet")), Ft;

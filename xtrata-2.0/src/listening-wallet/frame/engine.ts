@@ -21,6 +21,8 @@ import type {
 } from '../../lib/listening-wallet/messages';
 import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
 
+const b64u = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
 export interface PasskeyPort {
   /** WebAuthn present at all. PRF support is only known after a real ceremony. */
   available(): boolean;
@@ -29,9 +31,23 @@ export interface PasskeyPort {
    * `exclude` lists existing listening-wallet credentials the authenticator must not duplicate: given when making a
    * wallet with no main wallet, empty when making one for a specific main wallet (a new passkey beside the others).
    */
-  create(exclude?: string[], name?: string): Promise<{ credentialId: string; prf?: Uint8Array }>;
-  /** Assertion with PRF. Without a credential id the browser offers any listening-wallet passkey. */
-  evaluate(credentialId?: string): Promise<{ credentialId: string; prf: Uint8Array }>;
+  create(exclude?: string[], name?: string, userId?: string): Promise<{ credentialId: string; prf?: Uint8Array }>;
+  /**
+   * Assertion with PRF. Without a credential id the browser offers any listening-wallet passkey. `userHandle` is the
+   * passkey's public user id (base64url), used to recognise a passkey made in another tab.
+   */
+  evaluate(credentialId?: string): Promise<{ credentialId: string; prf: Uint8Array; userHandle?: string }>;
+  /**
+   * True where passkeys cannot be CREATED inside this frame (WebKit: Safari and every iPhone browser refuse
+   * creation in a cross-origin frame, though they allow sign-in). The passkey is then made on a top-level
+   * wallet page in a new tab (`openCreator`), and the frame signs in with it as usual.
+   */
+  createsInNewTab?(): boolean;
+  /**
+   * Opens the top-level create page. Must run synchronously inside the listener's tap (popup rules). `userId` (16 random
+   * bytes, base64url, public) becomes the new passkey's user id, so the frame can tell that exact passkey apart.
+   */
+  openCreator?(exclude: string[], name: string, userId: string): void;
 }
 
 export interface Panel {
@@ -211,7 +227,9 @@ export function createListeningEngine(deps: {
 
   async function create(terms?: SessionTerms, main?: string): Promise<ListeningIdentity> {
     const existing = load().wallets;
-    const created = await deps.ui.act({
+    const exclude = main ? [] : existing.map((w) => w.credentialId);
+    const name = main ? `Xtrata listening wallet · ${short(main)}` : undefined;
+    const createPanel: Panel = {
       kind: 'create',
       title: 'New listening wallet',
       // One glance: the price, and the one rule that matters. Everything else is under Details.
@@ -232,12 +250,44 @@ export function createListeningEngine(deps: {
           : [])
       ],
       confirmLabel: terms ? 'Create and pay as I listen' : 'Create with passkey'
-    }, () => deps.passkey.create(
-      // A wallet for a specific address is meant to be a NEW passkey beside the others. Excluding the existing
-      // credentials there makes the authenticator refuse ("already registered") on exactly the device that has them.
-      // Without an address the old guard stays: do not quietly make a duplicate of a wallet this device already has.
-      main ? [] : existing.map((w) => w.credentialId),
-      main ? `Xtrata listening wallet · ${short(main)}` : undefined));
+    };
+    let created: { credentialId: string; prf?: Uint8Array };
+    if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
+      created = await deps.ui.act(createPanel, () => deps.passkey.create(
+        // A wallet for a specific address is meant to be a NEW passkey beside the others. Excluding the existing
+        // credentials there makes the authenticator refuse ("already registered") on exactly the device that has them.
+        // Without an address the old guard stays: do not quietly make a duplicate of a wallet this device already has.
+        exclude, name));
+    } else {
+      // This browser will not make a passkey inside a frame: make it on wallet.xtrata.xyz in a new tab, then
+      // sign in with it here. Nothing secret crosses between the tabs: the frame picks a random public user id for
+      // the new passkey and only accepts a sign-in that comes back with it (an older passkey synced to this
+      // device cannot pass for the new one, even when this device has no record of it).
+      const idBytes = crypto.getRandomValues(new Uint8Array(16));
+      const userId = b64u(idBytes);
+      // Four characters to tell this passkey apart in the device's passkey list.
+      const tag = Array.from(idBytes.slice(0, 2), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+      const label = `${name ?? 'Xtrata listening wallet'} · ${tag}`;
+      await deps.ui.act({
+        ...createPanel,
+        lines: [...createPanel.lines, 'On this browser the passkey is made on a wallet.xtrata.xyz page that opens in a new tab. Make it there, then come back to this tab.'],
+        confirmLabel: 'Make my passkey (new tab)'
+      }, async () => { deps.passkey.openCreator!(exclude, label, userId); return true; });
+      created = await deps.ui.act({
+        kind: 'confirm-passkey',
+        title: 'Made your passkey?',
+        summary: `In the new tab, tap "Create passkey". Then come back here, tap below and choose "${label}".`,
+        lines: ['The wallet is ready as soon as that passkey is confirmed.'],
+        confirmLabel: 'I made it: use my passkey'
+      }, async () => {
+        const r = await deps.passkey.evaluate();
+        if (r.userHandle !== userId) {
+          r.prf.fill(0);
+          throw Object.assign(new Error(`That is a different passkey. Choose "${label}", the one you just made (or make it in the new tab first).`), { retryable: true });
+        }
+        return r;
+      });
+    }
 
     // Prove PRF is live AND stable before the address is ever shown for funding
     // (docs/PASSKEY-WALLET.md §3.1). A wallet whose PRF output changes is unreachable.

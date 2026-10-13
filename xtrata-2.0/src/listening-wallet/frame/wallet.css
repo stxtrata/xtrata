@@ -20,3 +20,8 @@ button.primary:disabled { background: #2a6f66; color: #b9d9d3; border-color: #2a
 #p-more { margin-top: 2px; color: var(--muted); font-size: 13px; }
 #p-more summary { cursor: pointer; color: var(--accent); }
 #p-more-warn { margin: 6px 0; padding: 6px 6px 6px 22px; border: 1px solid var(--warn); border-radius: 8px; color: var(--warn); }
+/* The top-level create page (create.html). */
+.muted { color: var(--muted); }
+.ok { color: var(--accent); }
+#c-error { color: var(--bad); min-height: 1em; }
+main.create { max-width: 520px; margin: 0 auto; padding-top: 18px; }
