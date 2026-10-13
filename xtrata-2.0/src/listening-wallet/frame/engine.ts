@@ -176,11 +176,22 @@ export function createListeningEngine(deps: {
   // The main wallet the open listening wallet was unlocked for, and the one the idle view follows.
   let unlockedFor: string | undefined;
   let viewMain: string | undefined;
+  /** Main wallets the device's OTHER listening wallets belong to: not the reported wallet's, and not the connected one. */
+  const othersOf = (shown: WalletRecord | undefined, main?: string): { others?: string[] } => {
+    const mine = new Set([shown?.link?.main, main].filter(Boolean));
+    const others = [...new Set(load().wallets.flatMap((w) => (w.link && !mine.has(w.link.main) ? [w.link.main] : [])))];
+    return others.length ? { others } : {};
+  };
   const status = (main?: string): StatusResult => {
     if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
-    if (identity) return { state: 'unlocked', address: identity.address, linked: record(credentialId)?.link?.main, session: summary(), features };
+    if (identity) {
+      const open = record(credentialId);
+      return { state: 'unlocked', address: identity.address, linked: open?.link?.main, ...othersOf(open, main), session: summary(), features };
+    }
     const last = pick(main);
-    return last ? { state: 'known', address: last.address, linked: last.link?.main, session: null, features } : { state: 'none', session: null, features };
+    return last
+      ? { state: 'known', address: last.address, linked: last.link?.main, ...othersOf(last, main), session: null, features }
+      : { state: 'none', ...othersOf(undefined, main), session: null, features };
   };
   const refreshIdle = () => deps.ui.idle(status(viewMain));
   const lockNow = () => { identity = null; ledger = null; credentialId = null; unlockedFor = undefined; };

@@ -899,6 +899,33 @@ describe('one listening wallet per wallet address', () => {
     expect(s.chain.broadcasts).toHaveLength(0);
   });
 
+  it('tells a new address that this device already has a listening wallet for another, and lists it', async () => {
+    const s = setup({ passkeyOnly: true });
+    await linkedAndPaying(s);
+    s.setMain(OTHER);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'intro', others: [MAIN] });
+    // an address that already has its own wallet is not asked anything: it just unlocks
+    s.setMain(MAIN);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().others).toEqual([]);
+    expect(['locked', 'ready', 'fund']).toContain(s.ppp.snapshot().step);
+  });
+
+  it('with no wallet connected, lists the wallets this device has listening wallets for', async () => {
+    const s = setup({ passkeyOnly: true });
+    await linkedAndPaying(s);
+    s.setMain(OTHER);
+    await s.ppp.forceRefresh();
+    await s.ppp.create();
+    await s.ppp.link();
+    s.setMain(undefined);
+    await s.ppp.forceRefresh();
+    const snap = s.ppp.snapshot();
+    expect(snap.step).toBe('connect');
+    expect([snap.linked, ...snap.others].sort()).toEqual([MAIN, OTHER].sort());
+  });
+
   it('asks the box about the connected address on every call, and says nothing about one when none is connected', async () => {
     const s = setup({ passkeyOnly: true });
     await linkedAndPaying(s);
