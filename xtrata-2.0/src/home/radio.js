@@ -243,7 +243,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
           // session-only: a false positive must never permanently blacklist a song
           if (currentTokenId) trackCache.set(String(currentTokenId), null);
           silentSince = 0;
-          player.pause();
+          pauseOwn();
           void tuneToNextTrack();
         }
       }
@@ -966,7 +966,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // Self-healing state: the radio must never stay silently stuck — see the
   // NO SIGNAL retry (bottom of tuneToNextTrack) and the stuck-watchdog below.
   let noSignalRetries = 0;
-  let manualPause = false;       // user pressed pause — the watchdog must respect it
+  // The listener stopped the music (pause button, media keys, headphones, OS controls). Nothing
+  // restarts it until they press play again: no watchdog, retry, error retune or tap-anywhere.
+  let manualPause = false;
+  // Pauses the radio makes itself (changing song, skipping a dud) are not the listener's.
+  let ownPauseAt = -1e9;
+  const pauseOwn = () => { ownPauseAt = performance.now(); try { player.pause(); } catch { /* noop */ } };
   let lastTuneAt = 0;
   let hadGesture = false;        // autoplay policy: only auto-retry after a real user gesture
   try {
@@ -1407,7 +1412,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         return;
       } catch (error) {
         radioLog(`play FAILED #${track.tokenId}`, { error: String(error), mediaError: player.error && player.error.code, ready: player.readyState, net: player.networkState }, track.tokenId);
-        try { player.pause(); player.removeAttribute('src'); player.load(); } catch { /* reset for next attempt */ }
+        try { pauseOwn(); player.removeAttribute('src'); player.load(); } catch { /* reset for next attempt */ }
         trackCache.delete(track.tokenId); // stalled stream: retry later, don't dud
         // Autoplay refusal, decode failure, or stall — try another station.
       }
@@ -1423,7 +1428,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       setNow(`-- NO SIGNAL — RETUNING IN ${Math.round(delay / 1000)}S --`, false);
       radioLog('no signal — scheduling auto-retune', { retry: noSignalRetries, delayMs: delay });
       window.setTimeout(() => {
-        if (on && token === tuneToken && player.paused && hadGesture) void tuneToNextTrack();
+        if (on && token === tuneToken && player.paused && hadGesture && !manualPause) void tuneToNextTrack();
       }, delay);
     }
   };
@@ -1447,10 +1452,19 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     // NOT while we are the ones changing the source. Swapping src aborts the previous
     // load and surfaces as an error on the element; retuning here would discard the
     // song the listener just asked for and replace it with an unrequested one.
-    if (on && !tuneInFlight) {
+    if (on && !tuneInFlight && !manualPause) {
       void tuneToNextTrack();
     }
   });
+  // Any pause the radio did not make itself is the listener's: remember it (and save it, so the
+  // next page does not start playing either) until they press play.
+  player.addEventListener('pause', () => {
+    if (!on || tuneInFlight || player.ended || performance.now() - ownPauseAt < 1500) return;
+    manualPause = true;
+    persist();
+    emit();
+  });
+  player.addEventListener('play', () => { manualPause = false; });
 
   const switchOn = () => {
     on = true;
@@ -1488,7 +1502,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   toggleButton.addEventListener('click', () => (on ? switchOff() : switchOn()));
   const skip = (direction) => {
     if (!on) return;
-    player.pause();
+    pauseOwn();
     if (direction === 'prev' && history.length > 1) {
       history.pop(); // current
       void tuneToNextTrack(history.pop());
@@ -1517,6 +1531,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const persist = () => {
     saveState({
       on,
+      paused: on && manualPause,
       volumeStep,
       tokenId: currentTokenId,
       position: Number.isFinite(player.currentTime) ? player.currentTime : 0,
@@ -1569,16 +1584,20 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         persist();
       };
       try { player.currentTime = Math.max(0, Number(saved.position) || 0); } catch { /* pre-metadata */ }
+      // Paused here, or the browser will not play before a tap: the song waits, cued, for the
+      // play button. Never "tap anywhere": a click elsewhere on the page must not start music.
+      const waitForPlay = (text) => {
+        manualPause = true;
+        writeScreen(text);
+        player.addEventListener('playing', begin, { once: true });
+        emit();
+      };
+      if (saved.paused) { waitForPlay('PAUSED — PRESS ▶ TO PLAY'); return; }
       try {
         await player.play();
         begin();
       } catch {
-        writeScreen('▶ TAP ANYWHERE TO RESUME');
-        const once = () => {
-          document.removeEventListener('pointerdown', once, true);
-          player.play().then(begin).catch(() => { writeScreen('▶ RADIO PAUSED — CLICK TO RETUNE'); });
-        };
-        document.addEventListener('pointerdown', once, true);
+        waitForPlay('▶ PRESS PLAY TO RESUME');
       }
     };
     void resume();
@@ -1613,7 +1632,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       // the listener jumps somewhere else. Dropping it costs one preload, and keeps
       // "what plays after this" honest rather than a leftover from the old sequence.
       preloadQueue.length = 0;
-      if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); }
+      if (!on) { switchOn(); } else { pauseOwn(); void tuneToNextTrack(); }
     },
     nudgeVolume,
     /** The listener's order for the LIKED station: inscription ids, first plays first. */
@@ -1832,14 +1851,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     const wantRadio = (new URLSearchParams(window.location.search).get('radio') || '').toLowerCase();
     if (['fullscreen', 'full', 'fs', '1', 'on'].includes(wantRadio)) {
       setFull(true);
-      if (!(saved && saved.on && saved.tokenId)) {
-        writeScreen('▶ TAP ANYWHERE TO START THE RADIO');
-        const onceStart = () => {
-          document.removeEventListener('pointerdown', onceStart, true);
-          if (!on) switchOn();
-        };
-        document.addEventListener('pointerdown', onceStart, true);
-      }
+      if (!(saved && saved.on && saved.tokenId)) writeScreen('▶ PRESS PLAY TO START THE RADIO');
     }
   } catch { /* noop */ }
 

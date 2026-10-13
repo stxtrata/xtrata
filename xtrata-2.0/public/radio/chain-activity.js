@@ -12,25 +12,15 @@ async function json(url) {
   return response.json();
 }
 
+// Paid plays come from the site's paid-play index (/api/music-plays): the same source as the
+// homepage tally and every song count, kept current from the contract's own event log. Browsers
+// no longer page the contract log from Hiro themselves.
+export const PLAYS_PAGE = 500;
 async function logs(offset = 0) {
   if(localHost()){const data=await json('/chain/plays?offset='+offset);if(!Array.isArray(data.results))throw Error('Invalid contract log response');return {scanned:data.results.length,total:Number.isSafeInteger(data.total)?data.total:null,plays:data.results.map(parsePaidPlayEvent).filter(Boolean)};}
-  const bases = localHost() ? ['https://api.mainnet.hiro.so'] : ['/hiro/mainnet', 'https://api.mainnet.hiro.so'];
-  const paths = [
-    `/extended/v2/smart-contracts/${encodeURIComponent(PAID_PLAYS_CONTRACT)}/logs?limit=20&offset=${offset}`,
-    `/extended/v1/contract/${encodeURIComponent(PAID_PLAYS_CONTRACT)}/events?limit=20&offset=${offset}`
-  ];
-  let last;
-  for (const base of bases) for (const path of paths) {
-    try {
-      const data = await json(base + path);
-      if (!Array.isArray(data.results)) throw Error('Invalid contract log response');
-      return {scanned: data.results.length, total: Number.isSafeInteger(data.total) ? data.total : null, plays: data.results.map(parsePaidPlayEvent).filter(Boolean)};
-    } catch (error) {
-      if(error.status===429)throw error;
-      last = error;
-    }
-  }
-  throw last || Error('Contract activity is unavailable');
+  const data = await json(`/api/music-plays?offset=${offset}&limit=${PLAYS_PAGE}`);
+  if (!Array.isArray(data.results)) throw Error('Invalid paid play response');
+  return {scanned: data.results.length, total: Number.isSafeInteger(data.total) ? data.total : null, plays: data.results.filter(play => cachedPlay(play))};
 }
 
 async function catalogue(url) {
