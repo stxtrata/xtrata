@@ -705,3 +705,81 @@ describe('passkey-only listening (no Stacks wallet)', () => {
     expect(s.chain.broadcasts).toHaveLength(1);
   });
 });
+
+describe('plays heard while the wallet is busy are queued, not lost', () => {
+  const ready = async (s: ReturnType<typeof setup>) => { await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); };
+  const flush = async (s: ReturnType<typeof setup>) => { for (let i = 0; i < 20; i++) await s.settle(); };
+  const plays = (s: ReturnType<typeof setup>) => s.ppp.snapshot().entries.filter((e) => e.kind === 'play');
+
+  it('a song that crosses 30 seconds while a like is being signed is paid once the like confirms', async () => {
+    const s = setup();
+    await ready(s);
+    const like = s.ppp.toggleLike({ song: 3, title: 'A like' }); // starts: the wallet is now busy with it
+    await s.ppp.onListened({ song: 7, id: rid(2), title: 'Night Drive' });
+    expect(s.ppp.snapshot().queued).toBe(1);
+    expect(s.chain.broadcasts).toHaveLength(0);
+    await like; await flush(s);
+    expect(s.chain.broadcasts).toHaveLength(1); // the like; the play waits for its nonce
+    expect(s.ppp.snapshot().queued).toBe(1);
+    s.mineAll(); s.tick(MIN_PLAY_INTERVAL_MS);
+    await s.ppp.forceRefresh(); await flush(s);
+    expect(plays(s)).toHaveLength(1);
+    expect(plays(s)[0]).toMatchObject({ song: 7, id: rid(2), title: 'Night Drive', status: 'pending', recipient: HOLDER });
+    expect((deserializeTransaction(s.chain.broadcasts[1]) as any).auth.spendingCondition.nonce).toBe(1n);
+    expect(s.ppp.snapshot().queued).toBe(0);
+  });
+
+  it('songs heard while an earlier payment confirms are paid one at a time, oldest first', async () => {
+    const s = setup();
+    await ready(s);
+    await s.ppp.onListened({ song: 7, id: rid(2) });
+    s.tick(MIN_PLAY_INTERVAL_MS);
+    await s.ppp.onListened({ song: 8, id: rid(3) });
+    s.tick(MIN_PLAY_INTERVAL_MS);
+    await s.ppp.onListened({ song: 9, id: rid(4) });
+    expect(s.chain.broadcasts).toHaveLength(1);
+    expect(s.ppp.snapshot().queued).toBe(2);
+    s.mineAll(); s.tick(MIN_PLAY_INTERVAL_MS); await s.ppp.forceRefresh(); await flush(s);
+    expect(s.chain.broadcasts).toHaveLength(2);
+    expect(s.ppp.snapshot().queued).toBe(1);
+    s.mineAll(); s.tick(MIN_PLAY_INTERVAL_MS); await s.ppp.forceRefresh(); await flush(s);
+    expect(s.chain.broadcasts).toHaveLength(3);
+    expect(plays(s).map((e) => e.song).sort()).toEqual([7, 8, 9]);
+    expect(s.ppp.snapshot().queued).toBe(0);
+  });
+
+  it('the same listen is never paid twice, and a backlog is capped', async () => {
+    const s = setup();
+    await ready(s);
+    await s.ppp.onListened({ song: 7, id: rid(2) });
+    await s.ppp.onListened({ song: 7, id: rid(2) });
+    expect(s.ppp.snapshot().queued).toBe(0);
+    for (let i = 0; i < 14; i++) await s.ppp.onListened({ song: 100 + i, id: rid(50 + i) });
+    expect(s.ppp.snapshot().queued).toBe(10);
+    expect(plays(s)).toHaveLength(1);
+  });
+
+  it('a listen that waited more than 30 minutes plays free instead of paying late', async () => {
+    const s = setup();
+    await ready(s);
+    await s.ppp.onListened({ song: 7, id: rid(2) });
+    await s.ppp.onListened({ song: 8, id: rid(3) });
+    expect(s.ppp.snapshot().queued).toBe(1);
+    s.mineAll(); s.tick(31 * 60_000);
+    await s.ppp.forceRefresh(); await flush(s);
+    expect(s.ppp.snapshot().queued).toBe(0);
+    expect(plays(s)).toHaveLength(1);
+  });
+
+  it('switching paying off or locking forgets queued songs', async () => {
+    const s = setup();
+    await ready(s);
+    await s.ppp.onListened({ song: 7, id: rid(2) });
+    await s.ppp.onListened({ song: 8, id: rid(3) });
+    expect(s.ppp.snapshot().queued).toBe(1);
+    await s.ppp.switchOff();
+    expect(s.ppp.snapshot().queued).toBe(0);
+    s.mineAll(); s.tick(MIN_PLAY_INTERVAL_MS); await s.ppp.forceRefresh(); await flush(s);
+    expect(plays(s)).toHaveLength(1);
+  });
+});

@@ -114,6 +114,8 @@ export interface Snapshot {
   armed: boolean;
   /** Unresolved payments older than 30 minutes that the chain has never seen. */
   stuck: number;
+  /** Songs heard for 30 seconds and waiting to be paid (the wallet was busy with a like or an earlier payment). */
+  queued: number;
   /** Passkey-only: no main wallet is involved; the listening address is the listener. */
   solo: boolean;
   /** Where a return would go: the linked main wallet, else the address the listener chose, else the funder. */
@@ -261,6 +263,7 @@ export function createPppController(deps: PppDeps) {
     linkedListening: mainLinksFor && mainLinksFor === deps.main() ? mainLinks.map((l) => l.listening) : [],
     serverLinked: !!serverLink && serverLinkFor === `${deps.main()}:${status?.address}`,
     stuck: stuck().length, armed,
+    queued: queue.length,
     solo: solo(), returnTo: returnTarget()?.to, returnToKind: returnTarget()?.kind,
     funderState: (() => { const f = funderFor(); return !f ? 'unknown' : !f.ok ? 'failed' : f.funder ? 'found' : 'none'; })(),
     funderMultiple: (() => { const f = funderFor(); return !!f && f.ok && f.distinct > 1; })(),
@@ -401,6 +404,8 @@ export function createPppController(deps: PppDeps) {
     else if (armed) void disarm();
     if (likesConfirmed) { likesConfirmed = false; try { deps.likesChanged?.(); } catch { /* the radio re-reads on its own schedule */ } }
     deps.changed();
+    // A confirmation may have freed the wallet for songs waiting to be paid.
+    if (queue.length && !draining) void drain();
   }
 
   /** Unlock inside the frame, resuming paying unless this device switched it off. */
@@ -551,12 +556,14 @@ export function createPppController(deps: PppDeps) {
     }),
 
     switchOff: () => task('Switching off…', async () => {
+      forgetQueue();
       await bridge?.request('listening.stop');
       setPayingOn(false);
       say('Paying is off. Music stays free.');
     }),
 
     lock: () => task('Locking…', async () => {
+      forgetQueue();
       await bridge?.request('listening.lock');
       balance = undefined;
       say('Locked ✓');
@@ -611,23 +618,63 @@ export function createPppController(deps: PppDeps) {
   };
 
   /**
-   * Called once a song has been heard for 30 seconds (half of a shorter song): that is a play,
-   * and a play gets paid. Never throws and never affects playback.
+   * A song heard for 30 seconds (half of a shorter song) is a play, and a play gets paid. It is queued the
+   * moment it is heard and paid as soon as the wallet is free: only one transaction can be in flight per
+   * wallet (nonces), so a like, a return or an earlier play still confirming used to make a play that
+   * crossed 30 seconds at that moment go unpaid. Never throws and never affects playback.
    */
+  type Heard = { song: number; id: string; title?: string; artist?: string; at: number };
+  const queue: Heard[] = [];
+  const QUEUE_MAX = 10;
+  const QUEUE_TTL_MS = 30 * 60_000;
+  let draining = false;
+  const walletBusy = () => paying || !!busy || liking || checkingLike;
+  const forgetQueue = () => { if (queue.length) { queue.length = 0; deps.changed(); } };
+
   async function onListened(detail: { song: number; id: string; title?: string; artist?: string }) {
-    if (paying || busy || liking || checkingLike) return;
+    if (!queue.some((q) => q.id === detail.id) && !entries().some((e) => e.id === detail.id)) {
+      queue.push({ ...detail, at: deps.now() });
+      if (queue.length > QUEUE_MAX) queue.shift(); // oldest first: a long backlog is not worth paying hours later
+    }
+    if (walletBusy() || unresolved().length) {
+      const n = queue.length;
+      message = `Queued ${n === 1 ? 'this song' : n + ' songs'}: paid as soon as the wallet is free.`;
+      deps.changed();
+    }
+    await drain();
+  }
+
+  /** Pay queued songs one at a time, oldest first. Called when a play is heard and whenever the wallet frees up. */
+  async function drain() {
+    if (draining) return;
+    draining = true;
+    try {
+      while (queue.length) {
+        while (queue.length && deps.now() - queue[0].at > QUEUE_TTL_MS) queue.shift(); // too old: that listen plays free
+        if (!queue.length || walletBusy()) return; // the blocker calls drain() again when it finishes
+        const outcome = await payOne(queue[0]);
+        if (outcome === 'wait') return; // retried after the earlier transaction confirms (refresh)
+        queue.shift();
+      }
+    } finally { draining = false; deps.changed(); }
+  }
+
+  /** 'wait' keeps the song queued; 'done' drops it (paid, or not payable now: it plays free). */
+  async function payOne(detail: Heard): Promise<'wait' | 'done'> {
     paying = true;
     try {
       // Background tabs barely run timers: catch up on confirmations and the kill switch here.
       await refresh();
       const s = step();
-      if (s !== 'ready' || !payingOn() || !status?.session || status.session.playsLeft < 1 || !lockHeld || unresolved().length) return;
+      if (s === 'loading') return 'wait';
+      if (s !== 'ready' || !payingOn() || !status?.session || status.session.playsLeft < 1 || !lockHeld) return 'done';
+      if (unresolved().length) return 'wait'; // one transaction in flight per wallet
       if (!verified) { await deps.chain.verify(); verified = true; }
       const listening = status.address!;
       const { balance: b, nonce } = await deps.chain.account(listening);
       balance = b; balanceAt = deps.now();
       const recipient = await deps.chain.owner(RADIO_CORE_INDEX, detail.song);
-      if (recipient === listening || recipient === deps.main()) return; // you hold this song: plays free
+      if (recipient === listening || recipient === deps.main()) return 'done'; // you hold this song: plays free
       const signed = await bridge!.request<SignedResult>('listening.signPlay', {
         core: RADIO_CORE_INDEX, song: detail.song, receipt: detail.id, fee: fee().toString(), nonce: nonce.toString(), balance: b.toString()
       });
@@ -647,8 +694,10 @@ export function createPppController(deps: PppDeps) {
         error = (e as Error).message;
       }
       status = await bridge!.request<StatusResult>('listening.status');
+      return 'done';
     } catch (e) {
       message = 'This song played free: ' + (e instanceof Error ? e.message : 'payment unavailable');
+      return 'done';
     } finally {
       paying = false;
       deps.changed();
@@ -756,6 +805,7 @@ export function createPppController(deps: PppDeps) {
     } finally {
       liking = false;
       deps.changed();
+      void drain(); // a play that crossed 30 seconds while this like was signing is paid next
     }
   }
 
