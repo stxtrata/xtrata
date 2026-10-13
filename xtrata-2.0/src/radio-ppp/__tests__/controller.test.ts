@@ -16,6 +16,9 @@ const PRF = Uint8Array.from({ length: 32 }, (_, i) => i);
 const LISTENING = 'SPHRV6ESV321YCV6W990X4FKXB4S9D7F665FSCTV';
 const mainKey = privateKeyToString(makeRandomPrivKey()).slice(0, 64) + '01';
 const MAIN = getAddressFromPrivateKey(mainKey, TransactionVersion.Mainnet);
+// A second main wallet with its own key (for tests where a different wallet links).
+const otherKey = privateKeyToString(makeRandomPrivKey()).slice(0, 64) + '01';
+const OTHER_MAIN = getAddressFromPrivateKey(otherKey, TransactionVersion.Mainnet);
 const HOLDER = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const rid = (n: number) => n.toString(16).padStart(32, '0');
 
@@ -32,6 +35,8 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
   const chain = { balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
   const savedLinks: any[] = [];
   const store = new Map<string, string>();
+  const requests: [string, any][] = [];
+  const names = new Map<string, string>();
   let evaluations = 0;
   const walletStore = new Map<string, string>();
   const held: { panel: Panel; tap: () => void; cancel: () => void }[] = [];
@@ -52,11 +57,12 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     now: () => time,
     main: () => main,
     config: async () => ({ ...gate, allowed: gate.allowed && !!main }),
-    links: async () => savedLinks.map((l) => ({ listening: l.listening, issued: l.issued, mainSignature: l.mainSignature })),
+    links: async (m) => savedLinks.filter((l) => !l.main || l.main === m).map((l) => ({ listening: l.listening, issued: l.issued, mainSignature: l.mainSignature })),
     saveLink: async (body) => { savedLinks.push(body); },
     // `oldWallet`: a wallet box built before `features`, `listening.cancel` and `listening.signLike`.
     bridge: async () => ({
       request: async (m: string, p?: unknown) => {
+        requests.push([m, p]);
         if (opts.oldWallet && ['listening.cancel', 'listening.signLike'].includes(m)) return new Promise(() => {});
         const r = await (engine.handlers as any)[m](p);
         if (opts.oldWallet && m === 'listening.status') { const { features: _f, ...rest } = r; return rest; }
@@ -72,7 +78,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
       broadcast: async (raw, txid) => { if (chain.rejectNext) { chain.rejectNext = false; throw Object.assign(new Error('Node rejected the fee as too low.'), { feeRejected: true }); } chain.broadcasts.push(raw); return txid; },
       transaction: async (txid) => (chain.mined.has(txid) ? { tx_status: 'success', canonical: true, is_unanchored: false, fee_rate: 300 } : null)
     },
-    signWithMain: async (_m, data) => signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(data))), privateKey: createStacksPrivateKey(mainKey) }).data,
+    signWithMain: async (m, data) => signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(data))), privateKey: createStacksPrivateKey(m === OTHER_MAIN ? otherKey : mainKey) }).data,
     deposit: async (_m, _r, amount) => { chain.balance += amount; return '0x' + 'd'.repeat(64); },
     validate: validateSaved,
     tabLock: async () => opts.tabLock ?? true,
@@ -84,14 +90,15 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     likeSent: (song, liked) => { sent.push([song, liked]); },
     likeFailed: (song) => { failed.push(song); },
     likeConfirmed: (song, liked) => { confirmed.push([song, liked]); },
-    wait: async (ms) => { time += ms; opts.onWait?.(); }
+    wait: async (ms) => { time += ms; opts.onWait?.(); },
+    nameOf: (a) => names.get(a)
   });
   const mineAll = () => {
     for (const raw of chain.broadcasts) chain.mined.add('0x' + deserializeTransaction(raw).txid());
     chain.nonce = BigInt(chain.broadcasts.length);
   };
   const settle = () => new Promise((r) => setTimeout(r, 0));
-  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, confirmed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations };
+  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, confirmed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations, requests, names, engine };
 }
 
 describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', () => {
@@ -832,5 +839,104 @@ describe('likes while paying', () => {
     s.tick(5_000);
     await s.ppp.toggleLike({ song: 3 }); // the list (likeBy) still says nothing: must be an UNLIKE, not a repeat like
     expect(s.sent).toEqual([[3, true], [3, false]]);
+  });
+});
+
+describe('a different wallet connected than the one this listening wallet belongs to', () => {
+  const OTHER = OTHER_MAIN; // a different main wallet, with its own key
+  const linkedAndPaying = async (s: ReturnType<typeof setup>) => { await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); };
+  const calls = (s: ReturnType<typeof setup>, m: string) => s.requests.filter(([name]) => name === m);
+
+  it('stays locked with a reason: no unlock, no pay, no like, no link, no deposit, no return', async () => {
+    const s = setup({ passkeyOnly: true }, { hold: ['unlock'] });
+    await linkedAndPaying(s);
+    await s.ppp.lock();
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().step).toBe('locked');
+    s.setMain(OTHER);
+    await s.ppp.forceRefresh();
+    await s.settle(); // a waiting unlock panel is withdrawn
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'wrong-wallet', main: OTHER, linked: MAIN, solo: false, armed: false });
+    expect(s.held).toHaveLength(0); // no unlock panel was opened in the wallet box
+    const before = s.requests.length;
+    await s.ppp.unlock();
+    await s.ppp.link();
+    await s.ppp.deposit();
+    await s.ppp.switchOn();
+    await s.ppp.returnFunds('all');
+    await s.ppp.toggleLike({ song: 7 });
+    await s.ppp.onListened({ song: 7, id: rid(9) });
+    expect(s.requests.slice(before).filter(([m]) => m !== 'listening.status')).toEqual([]); // nothing reached the wallet
+    expect(s.chain.broadcasts).toHaveLength(0);
+    expect(s.ppp.snapshot().error).toMatch(/belongs to another wallet/);
+    expect(s.ppp.heart({ song: 7 })).toBe(false); // the radio's own like path handles the tap
+  });
+
+  it('connecting the linked wallet again unlocks as normal', async () => {
+    const s = setup({ passkeyOnly: true });
+    await linkedAndPaying(s);
+    s.setMain(OTHER);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().step).toBe('wrong-wallet');
+    s.setMain(MAIN);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().step).not.toBe('wrong-wallet');
+  });
+
+  it('an unlocked listener is locked again, and its queue dropped, when another wallet connects', async () => {
+    const s = setup({ passkeyOnly: true });
+    await linkedAndPaying(s);
+    expect(s.ppp.snapshot().step).toBe('ready');
+    s.setMain(OTHER);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'wrong-wallet', queued: 0 });
+    expect(calls(s, 'listening.lock').length).toBeGreaterThan(0);
+    expect((await (s.engine.handlers as any)['listening.status']()).state).toBe('known');
+    await s.ppp.onListened({ song: 7, id: rid(3) });
+    expect(s.chain.broadcasts).toHaveLength(0);
+  });
+
+  it('a lost original wallet can be replaced: allowRelink opens the usual unlock and link, and still confirms in the wallet box', async () => {
+    const s = setup({ passkeyOnly: true });
+    await linkedAndPaying(s);
+    await s.ppp.lock();
+    s.setMain(OTHER);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().step).toBe('wrong-wallet');
+    s.ppp.allowRelink();
+    await s.settle();
+    await s.ppp.forceRefresh();
+    // the usual one-tap unlock opens by itself (the test wallet confirms at once), then the usual link step
+    expect(s.ppp.snapshot().step).toBe('link');
+    await s.ppp.link();
+    expect(s.ppp.snapshot()).toMatchObject({ linked: OTHER });
+    // relinking never carries over to a third wallet
+    s.setMain(MAIN);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().step).toBe('wrong-wallet');
+  });
+
+  it('allowRelink does nothing when the wallets already match', async () => {
+    const s = setup({ passkeyOnly: true });
+    await linkedAndPaying(s);
+    s.ppp.allowRelink();
+    s.setMain(OTHER);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().step).toBe('wrong-wallet');
+  });
+
+  it('passes the main wallet name to the wallet box when unlocking, and nothing for a passkey-only wallet', async () => {
+    const s = setup({ passkeyOnly: true });
+    await linkedAndPaying(s);
+    s.names.set(MAIN, 'jim.btc');
+    await s.ppp.lock();
+    await s.ppp.unlock();
+    expect(calls(s, 'listening.unlock').at(-1)![1]).toMatchObject({ label: 'jim.btc' });
+    const t = setup({ passkeyOnly: true });
+    t.setMain(undefined);
+    await t.ppp.forceRefresh(); await t.ppp.create();
+    await t.ppp.lock();
+    await t.ppp.unlock();
+    expect(calls(t, 'listening.unlock').at(-1)![1]).not.toHaveProperty('label');
   });
 });

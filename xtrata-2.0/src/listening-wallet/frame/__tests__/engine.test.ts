@@ -286,3 +286,54 @@ describe('listening wallet engine (wallet origin)', () => {
     expect(await s.h['listening.status']()).toMatchObject({ linked: MAIN });
   });
 });
+
+describe('the unlock card says whose wallet it is', () => {
+  const shortOf = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
+  const sign = (main: string, key: string, issued: number) => signMessageHashRsv({ messageHash: linkHash({ main, listening: ADDRESS, issued }), privateKey: createStacksPrivateKey(key) }).data;
+  const linkedLocked = async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create' });
+    await s.h['listening.link']({ main: MAIN, issued: s.now(), mainSignature: sign(MAIN, mainKey, s.now()) });
+    await s.h['listening.lock']();
+    return s;
+  };
+
+  it('a linked listener is greeted by its main wallet, not the listening address', async () => {
+    const s = await linkedLocked();
+    await s.h['listening.unlock']({ mode: 'unlock', terms: s.terms(), label: 'jim.btc' });
+    const panel = s.panels.at(-1)!;
+    expect(panel.kind).toBe('unlock');
+    expect(panel.title).toBe('Welcome back, jim.btc');
+    const text = [panel.title, panel.summary, ...panel.lines].join(' ');
+    expect(text).toContain(shortOf(MAIN));
+    expect(text).toMatch(/credited to jim\.btc/);
+    expect(text).not.toContain(shortOf(ADDRESS));
+  });
+
+  it('without a name it shows the main wallet address, still not the listening address', async () => {
+    const s = await linkedLocked();
+    await s.h['listening.unlock']({ mode: 'unlock' });
+    const panel = s.panels.at(-1)!;
+    expect(panel.title).toBe(`Welcome back, ${shortOf(MAIN)}`);
+    expect([panel.title, panel.summary, ...panel.lines].join(' ')).not.toContain(shortOf(ADDRESS));
+  });
+
+  it('keeps only a plain name from the page', async () => {
+    const s = await linkedLocked();
+    await s.h['listening.unlock']({ mode: 'unlock', label: '<img src=x onerror=1> alice.btc'.repeat(3) });
+    const title = s.panels.at(-1)!.title;
+    expect(title).not.toMatch(/[<>=]/);
+    expect(title.length).toBeLessThanOrEqual('Welcome back, '.length + 40);
+  });
+
+  it('a passkey-only wallet (no link) keeps its own address as the identity', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create' });
+    await s.h['listening.lock']();
+    await s.h['listening.unlock']({ mode: 'unlock', label: 'jim.btc' }); // a label means nothing without a link
+    const panel = s.panels.at(-1)!;
+    expect(panel.title).toBe('Welcome back');
+    expect([panel.summary, ...panel.lines].join(' ')).toContain(shortOf(ADDRESS));
+    expect(panel.title).not.toContain('jim.btc');
+  });
+});

@@ -36,6 +36,11 @@ describe('pay-per-play steps', () => {
     expect(showSteps({ step: 'intro', entries: [], linked: undefined }, null)).toBe(false);
   });
 
+  it('a wrong wallet is a blocked step, shown without the setup track', () => {
+    expect(at('wrong-wallet')).toMatchObject({ at: 0, blocked: true, caption: 'Step 1 of 4 · connect the wallet this listening wallet belongs to' });
+    expect(showSteps({ step: 'wrong-wallet', entries: [], linked: 'SP1' }, at('wrong-wallet'))).toBe(false);
+  });
+
   it('has nothing new to show while hidden or loading', () => {
     expect(at('off')).toBeNull();
     expect(at('loading')).toBeNull();

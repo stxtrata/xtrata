@@ -232,17 +232,27 @@ export function createListeningEngine(deps: {
     }
   }
 
-  async function unlockExisting(anyPasskey = false, terms?: SessionTerms): Promise<ListeningIdentity> {
+  /** A name from the page, kept to plain letters, digits and . _ - so it cannot carry anything but a name. */
+  const cleanLabel = (v: unknown) => (typeof v === 'string' ? v.replace(/[^\p{L}\p{N}._ -]/gu, '').trim().slice(0, 40) : '');
+
+  async function unlockExisting(anyPasskey = false, terms?: SessionTerms, label?: string): Promise<ListeningIdentity> {
     const last = anyPasskey ? undefined : lastRecord();
+    // A listening wallet linked to a main wallet is that person's wallet: greet them by it. The listening
+    // address is plumbing for them. Without a link (passkey-only) the listening address is the identity.
+    const main = last?.link?.main;
+    const owner = main ? [cleanLabel(label), short(main)].filter(Boolean).join(' · ') : '';
+    const who = main ? (cleanLabel(label) || short(main)) : '';
     const r = await deps.ui.act({
       kind: 'unlock',
-      title: 'Welcome back',
-      summary: [last ? short(last.address) : '', terms ? termsLine(terms) : 'Unlock for this visit'].filter(Boolean).join(' · '),
+      title: who ? `Welcome back, ${who}` : 'Welcome back',
+      summary: [main ? (cleanLabel(label) ? short(main) : '') : last ? short(last.address) : '', terms ? termsLine(terms) : 'Unlock for this visit'].filter(Boolean).join(' · '),
       // Kept short: on the radio this panel opens by itself and its button should sit in view.
       lines: terms
-        ? [last ? `Wallet ${short(last.address)}. One passkey tap unlocks it for this visit and carries on paying as you listen.` : 'Use your listening-wallet passkey to unlock it for this visit and carry on paying as you listen.',
+        ? [main ? `Plays and likes are credited to ${owner}. One passkey tap unlocks your listening wallet for this visit and carries on paying as you listen.`
+            : last ? `Wallet ${short(last.address)}. One passkey tap unlocks it for this visit and carries on paying as you listen.` : 'Use your listening-wallet passkey to unlock it for this visit and carry on paying as you listen.',
           `Each song you listen to for 30 seconds pays ${stx(50n)} STX to its holder, plus a ${stx(terms.fee)} STX network fee, for up to ${stx(terms.budget)} STX before it asks again. Switch off any time.`]
-        : [last ? `Wallet ${short(last.address)}. Use its passkey to unlock it for this visit.` : 'Use your listening-wallet passkey to unlock it for this visit.',
+        : [main ? `Plays and likes are credited to ${owner}. Use your listening wallet's passkey to unlock it for this visit.`
+            : last ? `Wallet ${short(last.address)}. Use its passkey to unlock it for this visit.` : 'Use your listening-wallet passkey to unlock it for this visit.',
           'The key is rebuilt from your passkey and forgotten when you lock or close this page.'],
       confirmLabel: terms ? 'Unlock and keep paying' : 'Unlock with passkey'
     }, () => deps.passkey.evaluate(last?.credentialId));
@@ -293,7 +303,7 @@ export function createListeningEngine(deps: {
       if (!identity) {
         // The terms are shown on the same panel as the passkey button, so that one confirm click
         // inside the frame both unlocks and approves paying as you listen.
-        const id = p.mode === 'create' ? await create(terms) : await unlockExisting(p.anyPasskey === true, terms);
+        const id = p.mode === 'create' ? await create(terms) : await unlockExisting(p.anyPasskey === true, terms, p.label);
         identity = id;
         if (terms) ledger = new SessionLedger(terms, now());
       } else if (terms) await approve(terms, 'Approve paying as you listen');
