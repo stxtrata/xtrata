@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import {
@@ -9,7 +9,7 @@ import {
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
-  BUMP_AFTER_MS, claimGift, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, GiftError, giftForWallet, giftsConfig,
+  BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, GiftError, giftForWallet, giftsConfig,
   giftStatus, NONCE_SETTLE_MS, REBROADCAST_MS, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv
 } from '../radio-gifts';
 import { campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_MEMO, giftCodeHash, giftDepositMemo, type CampaignRequest } from '../../../src/lib/listening-wallet/gifts';
@@ -354,5 +354,43 @@ describe('radio gift wallets', () => {
     s.chain.balances.set(s.treasury, 303000n * 2n + 50_000n);
     const [code] = (await s.campaign(1)).codes;
     await expect(s.claim(code)).rejects.toThrow(/topping up/);
+  });
+
+  it('a failed broadcast is recorded, shown to the recipient, and sent again within seconds', async () => {
+    const s = setup();
+    const [code] = (await s.campaign(1)).codes;
+    const w = wallet();
+    s.chain.broadcastMode = 'refuse';
+    const out = await s.claim(code, w);
+    expect(s.chain.sent).toHaveLength(0);
+    expect((await giftForWallet(s.env, w)).gift).toMatchObject({ state: 'sending', problem: expect.stringMatching(/Broadcast answered 400|400/) });
+    s.tick(RETRY_FAILED_MS + 1);
+    expect((await sweepGifts(s.env, s.deps())).did).toBe('rebroadcast');
+    expect(s.chain.sent.map((t) => t.txid)).toEqual([out.txid]); // the same bytes, not a new transaction
+    expect((await giftForWallet(s.env, w)).gift).toMatchObject({ state: 'sending', problem: null });
+    expect((await s.land()).did).toBe('settled');
+    expect((await giftForWallet(s.env, w)).gift).toMatchObject({ state: 'arrived' });
+  });
+
+  it('broadcasting tries the next Hiro key when one is turned away, but never re-posts after a lost response', async () => {
+    const env = { HIRO_API_KEY_1: 'bad', HIRO_API_KEY_2: 'good' } as any;
+    const keys: (string | null)[] = [];
+    const fetcher = vi.fn(async (url: string, init: RequestInit) => {
+      const k = new Headers(init.headers).get('x-hiro-api-key');
+      keys.push(k);
+      expect(url).toBe('https://api.hiro.so/v2/transactions');
+      return k === 'bad' ? new Response('{}', { status: 401 }) : new Response('"0xabc"', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      expect(await hiroGiftChain(env).broadcast(new Uint8Array([1, 2, 3]), '0xabc')).toBe('0xabc');
+      expect(keys).toEqual(['bad', 'good']);
+      fetcher.mockImplementation(async () => new Response(JSON.stringify({ error: 'transaction rejected', reason: 'NotEnoughFunds' }), { status: 400 }));
+      await expect(hiroGiftChain(env).broadcast(new Uint8Array([1]), '0x1')).rejects.toThrow(/HTTP 400, NotEnoughFunds/);
+      fetcher.mockClear();
+      fetcher.mockImplementation(async () => { throw new Error('connection reset'); });
+      await expect(hiroGiftChain(env).broadcast(new Uint8Array([1]), '0x1')).rejects.toThrow(/connection reset/);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally { vi.unstubAllGlobals(); }
   });
 });

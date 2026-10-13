@@ -50,6 +50,7 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 
 ## Operating
 
+- **A gift stuck "on its way".** The recipient's panel shows the reason the network gave (`radio_gift_sends.last_error`, also logged as `[radio:gifts] broadcast failed`). The same bytes are retried every 20 seconds while failing, on any gift request (the recipient's page asks every 30 seconds).
 - **Treasury blocked.** `[radio:gifts] ALERT treasury blocked` in the logs means an open send doesn't match its gift. Nothing is sent until someone looks.
   - Check `radio_gift_sends WHERE status='sent'` against `radio_gifts`.
 - **Refunds by hand** (`radio_gift_orphans WHERE status='needs-refund'`).

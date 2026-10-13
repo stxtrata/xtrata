@@ -12,7 +12,8 @@ CREATE INDEX IF NOT EXISTS radio_gifts_claimed ON radio_gifts(claimed_at);
 CREATE TABLE IF NOT EXISTS radio_gift_sends(
   id TEXT PRIMARY KEY, gift_id TEXT NOT NULL, kind TEXT NOT NULL, nonce INTEGER NOT NULL, recipient TEXT NOT NULL,
   amount INTEGER NOT NULL, fee INTEGER NOT NULL, txids TEXT NOT NULL, raw TEXT NOT NULL, status TEXT NOT NULL,
-  created_at INTEGER NOT NULL, signed_at INTEGER NOT NULL, broadcast_at INTEGER NOT NULL, nonce_used_at INTEGER, updated_at INTEGER NOT NULL);
+  created_at INTEGER NOT NULL, signed_at INTEGER NOT NULL, broadcast_at INTEGER NOT NULL, nonce_used_at INTEGER, updated_at INTEGER NOT NULL,
+  last_error TEXT);
 CREATE UNIQUE INDEX IF NOT EXISTS radio_gift_sends_one_open ON radio_gift_sends(status) WHERE status='sent';
 -- Signed admin campaign requests already used (SIP-018 message hash): each works once.
 CREATE TABLE IF NOT EXISTS radio_gift_campaigns(hash TEXT PRIMARY KEY, admin TEXT NOT NULL, created_at INTEGER NOT NULL);
