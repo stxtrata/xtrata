@@ -773,7 +773,7 @@
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=8e7e3b8f5db7" defer></script>
+<script src="/xtrata-radio.js?v=ff1046e9db53" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -789,7 +789,7 @@
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=775ba8debaef')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=0e3aea19ec98')}).catch(function(){});
 </script>
 </body>
 </html>

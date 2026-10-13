@@ -70,6 +70,8 @@ export interface PppDeps {
   /** A like/unlike from the listening wallet was sent, or could not be: the radio's heart follows. */
   likeSent?(song: number, liked: boolean): void;
   likeFailed?(song: number): void;
+  /** The wallet's own transaction check saw a like or unlike confirm: the heart stops waiting for the likes list. */
+  likeConfirmed?(song: number, liked: boolean): void;
   /** Pause between checks while a like waits for an earlier transaction (tests pass a fake). */
   wait?(ms: number): Promise<void>;
 }
@@ -361,7 +363,10 @@ export function createPppController(deps: PppDeps) {
         const s = String(tx.tx_status);
         if (s === 'success' && tx.canonical !== false && tx.is_unanchored === false) {
           saveEntry({ ...e, status: 'confirmed', confirmedAt: deps.now(), actualFee: String(tx.fee_rate ?? e.fee), raw: undefined });
-          if (e.kind === 'like') likesConfirmed = true;
+          if (e.kind === 'like') {
+            likesConfirmed = true;
+            if (e.status !== 'confirmed' && typeof e.liked === 'boolean') try { deps.likeConfirmed?.(e.song, e.liked); } catch { /* radio */ }
+          }
         } else if (s.startsWith('abort_') || s.startsWith('dropped_')) {
           saveEntry({ ...e, status: 'failed', note: s, raw: undefined });
         } else if (e.status !== 'pending') saveEntry({ ...e, status: 'pending' });
@@ -750,8 +755,11 @@ export function createPppController(deps: PppDeps) {
     finally { checkingLike = false; } // like() below takes over synchronously, before any await
     if (!by) return fail(`Could not check ${label} right now. Try the heart again.`);
     const listening = status.address!;
-    const mine = by.includes(listening);
-    if (!mine && by.length) return fail(solo()
+    // The likes list can lag a few minutes behind a like this wallet has already seen confirm: trust our own
+    // recent confirmed like or unlike of this song over a stale read, so the next tap goes the right way.
+    const lastSure = previous?.status === 'confirmed' && typeof previous.liked === 'boolean' && deps.now() - (previous.confirmedAt ?? previous.created) < 5 * 60_000 ? previous.liked : undefined;
+    const mine = lastSure ?? by.includes(listening);
+    if (!mine && by.some((a) => a !== listening)) return fail(solo()
       ? `${label} was liked from another wallet of yours. Unlike it there.`
       : `${label} was liked from your main wallet${by.includes(main!) ? '' : ' or another listening wallet'}. Unlike it there (♥ ON-CHAIN).`);
     await like({ song: d.song, liked: !mine, title: d.title, artist: d.artist });

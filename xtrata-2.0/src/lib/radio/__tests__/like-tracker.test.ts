@@ -54,4 +54,37 @@ describe('radio heart like tracker', () => {
     t.started(5, true);
     expect(t.pending(5)).toBe(true);
   });
+
+  it('goes red as soon as the wallet sees its own like confirm, even while the likes list lags', () => {
+    const { t, chain, tick } = setup();
+    t.started(7, true); t.sent(7, true);
+    tick(60_000);
+    expect([t.shown(7), t.pending(7), t.locked(7)]).toEqual([true, true, true]); // sent, list still empty: orange
+    t.confirmed(7, true);
+    expect([t.shown(7), t.pending(7), t.locked(7)]).toEqual([true, false, true]); // red at once, locked 3 s
+    tick(LIKE_COOL_MS);
+    expect([t.shown(7), t.pending(7), t.locked(7)]).toEqual([true, false, false]); // free again; still red while the list lags
+    tick(120_000);
+    expect(t.shown(7)).toBe(true);
+    chain.add('7'); // the list catches up: nothing changes on screen
+    expect([t.shown(7), t.pending(7), t.locked(7)]).toEqual([true, false, false]);
+  });
+
+  it('an unlike that confirmed shows as unliked while the list still says liked, then follows the list', () => {
+    const { t, chain, tick } = setup();
+    chain.add('9');
+    t.started(9, false); t.sent(9, false);
+    t.confirmed(9, false);
+    tick(LIKE_COOL_MS);
+    expect([t.shown(9), t.pending(9), t.locked(9)]).toEqual([false, false, false]);
+    chain.delete('9');
+    expect([t.shown(9), t.locked(9)]).toEqual([false, false]);
+  });
+
+  it('a confirmed like that is never matched by the list stops overriding it after 5 minutes', () => {
+    const { t, tick } = setup();
+    t.confirmed(4, true);
+    tick(LIKE_SENT_MS);
+    expect([t.shown(4), t.pending(4), t.locked(4)]).toEqual([false, false, false]); // back to the list's state
+  });
 });
