@@ -761,7 +761,7 @@
     $('prev').addEventListener('click',function(){api.prev()});
     $('next').addEventListener('click',function(){api.next()});
     $('heart').addEventListener('click',function(){api.toggleLike()});
-    Array.prototype.forEach.call($('bands').children,function(b){b.addEventListener('click',function(){api.setBand(b.dataset.b);if(!api.isOn())api.switchOn()})});
+    Array.prototype.forEach.call($('bands').children,function(b){b.addEventListener('click',function(){api.setBand(b.dataset.b)})});
     $('presetBtn').addEventListener('click',function(){api.cyclePreset()});
   }
   var tries=0,t=setInterval(function(){
@@ -770,7 +770,7 @@
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=2bceb2c0438b" defer></script>
+<script src="/xtrata-radio.js?v=04a7f66a2451" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
