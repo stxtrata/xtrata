@@ -75,6 +75,11 @@ export function createGifts(deps: GiftDeps) {
       .catch((e: Error) => { incoming = { ...incoming!, error: e.message }; deps.changed(); });
   }
   const liveGift = () => !!incoming?.view && incoming.view.status === 'live' && !incoming.done;
+  /**
+   * "Not now": forget the link on this device without touching the gift itself. It stays unclaimed on the
+   * server, so opening the same link again brings it back (until it is claimed or expires).
+   */
+  const setAside = () => { incoming = null; deps.store.set(INCOMING_KEY, null); deps.changed(); };
   const fromLabel = (v: GiftView) => (v.from ? deps.who(v.from) : v.label ? `Xtrata Radio · ${v.label}` : 'Xtrata Radio');
 
   let turnstile: { token?: string; rendered?: boolean; box?: HTMLElement } = {};
@@ -167,7 +172,9 @@ export function createGifts(deps: GiftDeps) {
     const amount = BigInt(v.amount);
     const head = el('p', `🎁 ${fromLabel(v)} sent you ${stxNice(amount)} STX of on-chain music: about ${giftPlays(amount).toLocaleString()} paid plays.`, 'ppp-gift');
     const out: HTMLElement[] = [head];
-    const ready = !!s.listening && s.step === 'fund' && (s.balance ?? 1n) === 0n && !s.depositPending && !s.entries.length;
+    // Only a brand-new, empty wallet with no main wallet linked takes a gift automatically. A listener who
+    // unlocks a wallet they already had (e.g. one linked to their Stacks wallet) keeps the gift link for later.
+    const ready = !!s.listening && !s.linked && s.step === 'fund' && (s.balance ?? 1n) === 0n && !s.depositPending && !s.entries.length;
     const siteKey = s.gate?.gifts?.turnstileSiteKey;
     if (ready) {
       if (siteKey && !turnstile.token) { out.push(el('p', 'One quick check and it is yours:', 'ppp-mute'), turnstileBox(siteKey)); }
@@ -175,7 +182,8 @@ export function createGifts(deps: GiftDeps) {
       if (incoming.claiming || incoming.waiting) out.push(el('p', incoming.waiting ? 'Another gift is on its way out first. Yours is next…' : 'Sending your gift…', 'ppp-cyan'));
       if (incoming.error) out.push(el('p', incoming.error, 'ppp-bad'), button('Try again', () => { incoming!.error = undefined; void claim(s); }));
     } else if (s.step === 'intro') out.push(el('p', 'Tap below: your passkey makes a listening wallet, and the gift lands in it.', 'ppp-mute'));
-    else if (s.listening && (s.balance ?? 0n) > 0n) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one already has funds. Share the link with someone new instead.', 'ppp-mute'));
+    else if (s.listening && s.linked) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one is linked to a Stacks wallet. The link still works for someone new.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet'));
+    else if (s.listening && (s.balance ?? 0n) > 0n) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one already has funds. Share the link with someone new instead.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet'));
     return out;
   }
 
@@ -324,5 +332,5 @@ export function createGifts(deps: GiftDeps) {
     return fold;
   }
 
-  return { banner, funder, renderFold, liveGift };
+  return { banner, funder, renderFold, liveGift, setAside };
 }

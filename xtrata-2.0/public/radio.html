@@ -810,7 +810,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=fa7344649b53')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=6ecb782c7b63')}).catch(function(){});
 </script>
 </body>
 </html>
