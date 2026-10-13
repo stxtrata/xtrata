@@ -21,7 +21,7 @@ const rid = (n: number) => n.toString(16).padStart(32, '0');
 
 function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[]; onWait?: () => void; oldWallet?: boolean } = {}) {
   let likesChanged = 0;
-  const likeBy = new Map<number, string[]>(), sent: [number, boolean][] = [], failed: number[] = [];
+  const likeBy = new Map<number, string[]>(), sent: [number, boolean][] = [], failed: number[] = [], confirmed: [number, boolean][] = [];
   let likeReadFails = false;
   let time = 1_760_000_000_000;
   let main: string | undefined = MAIN;
@@ -83,6 +83,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     likeState: async (_main, song) => { if (likeReadFails) throw new Error('503'); const by = likeBy.get(song) ?? []; return { liked: by.length > 0, by }; },
     likeSent: (song, liked) => { sent.push([song, liked]); },
     likeFailed: (song) => { failed.push(song); },
+    likeConfirmed: (song, liked) => { confirmed.push([song, liked]); },
     wait: async (ms) => { time += ms; opts.onWait?.(); }
   });
   const mineAll = () => {
@@ -90,7 +91,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     chain.nonce = BigInt(chain.broadcasts.length);
   };
   const settle = () => new Promise((r) => setTimeout(r, 0));
-  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations };
+  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, confirmed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations };
 }
 
 describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', () => {
@@ -781,5 +782,55 @@ describe('plays heard while the wallet is busy are queued, not lost', () => {
     expect(s.ppp.snapshot().queued).toBe(0);
     s.mineAll(); s.tick(MIN_PLAY_INTERVAL_MS); await s.ppp.forceRefresh(); await flush(s);
     expect(plays(s)).toHaveLength(1);
+  });
+});
+
+describe('likes while paying', () => {
+  const ready = async (s: ReturnType<typeof setup>) => { await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); };
+  const flush = async (s: ReturnType<typeof setup>) => { for (let i = 0; i < 20; i++) await s.settle(); };
+
+  it('tells the radio the moment its own like confirms, so the heart does not wait for the likes list', async () => {
+    const s = setup();
+    await ready(s);
+    await s.ppp.toggleLike({ song: 3, title: 'Heart' });
+    expect(s.sent).toEqual([[3, true]]);
+    expect(s.confirmed).toEqual([]);
+    s.mineAll();
+    await s.ppp.forceRefresh();
+    expect(s.confirmed).toEqual([[3, true]]);
+    await s.ppp.forceRefresh();
+    expect(s.confirmed).toHaveLength(1); // once only
+  });
+
+  it('a like tapped while a payment confirms goes ahead of songs heard after it', async () => {
+    let waits = 0, queuedWhileWaiting = -1;
+    const holder: { s?: ReturnType<typeof setup> } = {};
+    const s = holder.s = setup({}, {
+      onWait: () => {
+        waits++;
+        if (waits === 1) { void s.ppp.onListened({ song: 8, id: rid(3) }); queuedWhileWaiting = s.ppp.snapshot().queued; } // heard while the like waits
+        else s.mineAll();                                                                                                   // then the payment confirms
+      }
+    });
+    await ready(s);
+    await s.ppp.onListened({ song: 7, id: rid(2) });  // payment pending
+    await s.ppp.toggleLike({ song: 3 });               // waits for it to confirm, then sends
+    expect(queuedWhileWaiting).toBe(1);
+    expect(s.sent).toEqual([[3, true]]);
+    await flush(s);
+    const order = () => s.ppp.snapshot().entries.map((e) => e.kind + ':' + e.song).reverse();
+    expect(order()).toEqual(['play:7', 'like:3']);   // song 8 did not jump the like
+    s.mineAll(); s.tick(MIN_PLAY_INTERVAL_MS); await s.ppp.forceRefresh(); await flush(s);
+    expect(order()).toEqual(['play:7', 'like:3', 'play:8']);
+  });
+
+  it('the next tap follows our own confirmed like even if the likes list still lags', async () => {
+    const s = setup();
+    await ready(s);
+    await s.ppp.toggleLike({ song: 3 });
+    s.mineAll(); await s.ppp.forceRefresh();
+    s.tick(5_000);
+    await s.ppp.toggleLike({ song: 3 }); // the list (likeBy) still says nothing: must be an UNLIKE, not a repeat like
+    expect(s.sent).toEqual([[3, true], [3, false]]);
   });
 });

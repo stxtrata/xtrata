@@ -728,6 +728,10 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     const d = e.detail;
     if (d && Number.isSafeInteger(d.song) && typeof d.liked === 'boolean') { likeTrack.sent(d.song, d.liked); emit(); }
   });
+  window.addEventListener('xtrata:radio-like-confirmed', (e) => {
+    const d = e.detail;
+    if (d && Number.isSafeInteger(d.song) && typeof d.liked === 'boolean') { likeTrack.confirmed(d.song, d.liked); emit(); }
+  });
   window.addEventListener('xtrata:radio-like-failed', (e) => { if (e.detail && likeTrack.failed(e.detail.song)) emit(); });
   const toggleLike = () => {
     // On the pay-per-play radio a listener's listening wallet toggles the like itself, straight on the

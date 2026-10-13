@@ -102,6 +102,7 @@ function start(root: HTMLElement) {
       return { liked: row.liked, by: Array.isArray(row.by) ? row.by.filter((a: unknown) => typeof a === 'string') : row.liked ? [main] : [] };
     },
     likeSent: (song, liked) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-sent', { detail: { song, liked } })),
+    likeConfirmed: (song, liked) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-confirmed', { detail: { song, liked } })),
     likeFailed: (song) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-failed', { detail: { song } }))
   });
 
