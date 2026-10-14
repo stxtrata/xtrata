@@ -43,9 +43,15 @@ export interface GiftInfo {
   /** The gift treasury: transfers from it are the gift, anything else that arrived is a top-up. */
   treasury: string;
   state: 'arriving' | 'arrived' | 'sending';
-  /** The album this gift came with. Null for a plain gift: the radio then carries on as normal. */
+  /** The album of the newest gift that came with one. Null for plain gifts: the radio then carries on as normal. */
   player: PlayerView | null;
+  /** Every gift this wallet has taken, oldest first (older cached records have none: the fields above are then the only gift). */
+  gifts?: GiftEntry[];
+  /** The albums on this wallet's shelf, oldest first, one per player however many gifts brought it. */
+  players?: PlayerView[];
 }
+/** One gift in a wallet: who paid for it (where its unused plays go back to), the transaction that carried it, and its album. */
+export interface GiftEntry { txid: string | null; returnTo: string; from: string | null; source: string; amount: string; state: 'arrived' | 'sending'; player: PlayerView | null }
 export interface StoredLink { listening: string; issued: number; mainSignature: string }
 
 export interface Bridge { request<T = unknown>(method: string, params?: unknown): Promise<T> }
@@ -179,7 +185,7 @@ export interface Snapshot {
    */
   brandNew: boolean;
   /** This wallet was gifted (the server says so). `player` is the album that came with it, if any. */
-  gift: { player: PlayerView | null; from: string | null; source: string; amount: string } | null;
+  gift: { player: PlayerView | null; players: PlayerView[]; from: string | null; source: string; amount: string } | null;
   /** Paid plays this gifted wallet still buys, counting payments in flight and songs waiting to be paid. */
   giftPlays: number;
   /** Why a gift player is silent right now. Null while it may play. Transient failures never set it. */
@@ -386,7 +392,7 @@ export function createPppController(deps: PppDeps) {
     const { balance: b, nonce } = await deps.chain.account(listening);
     const h = await deps.history!(listening, true);
     if (!h.ok) return null;
-    const ledger = buildLedger({ self: listening, balance: b, inbound: h.inbound, outgoing: h.outgoing, gift: { sender: info.treasury, payer: info.returnTo } });
+    const ledger = buildLedger({ self: listening, balance: b, inbound: h.inbound, outgoing: h.outgoing, gift: { sender: info.treasury, payer: info.returnTo, gifts: (info.gifts ?? []).filter((g) => /^\d+$/.test(g.amount)).map((g) => ({ txid: g.txid ?? '', payer: g.returnTo, amount: BigInt(g.amount) })) } });
     if (!ledger.ok) return null;
     const plan = planReturns(ledger.parts, DEFAULT_RETURN_FEE);
     return { balance: b, nonce, parts: ledger.parts, steps: plan.steps, tooSmall: plan.tooSmall.length };
@@ -441,7 +447,7 @@ export function createPppController(deps: PppDeps) {
     creditedTo: solo() && status?.address && creditedRes?.for === status.address && creditedRes.main ? creditedRes.main : undefined,
     createdHere: !!status?.address && deps.store.get(key('created', status.address)) === '1',
     brandNew: !!status?.address && balance === 0n && unusedRes?.for === status.address && unusedRes.unused,
-    gift: (() => { const g = giftNow(); return g ? { player: g.player, from: g.from, source: g.source, amount: g.amount } : null; })(),
+    gift: (() => { const g = giftNow(); return g ? { player: g.player, players: g.players ?? (g.player ? [g.player] : []), from: g.from, source: g.source, amount: g.amount } : null; })(),
     giftPlays: giftNow() ? playsLeftNow() : 0,
     giftStop: giftStop(),
     returnPlan: returnPlanView()

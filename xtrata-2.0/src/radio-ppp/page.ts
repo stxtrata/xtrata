@@ -9,7 +9,8 @@ import { requestStructuredSignature } from '../lib/wallet/structured-sign';
 import { showStxTransfer } from '../lib/wallet/connect';
 import { costPerPlay, HOLDER_PAYMENT, stx } from '../lib/listening-wallet/policy';
 import { account, api, balance, broadcast, owner, transaction, validateSaved, verify } from '../radio-test-wallet/chain';
-import { createPppController, type GateConfig, type Snapshot } from './controller';
+import { createPppController, type GateConfig, type GiftEntry, type Snapshot } from './controller';
+import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { showSteps, stagesFor, stageOf, type StageView } from './stages';
 import { findFunder } from '../lib/listening-wallet/funder';
 import { readHistory } from '../lib/listening-wallet/ledger';
@@ -109,8 +110,16 @@ function start(root: HTMLElement) {
       const r = await json('/radio/gift/for?wallet=' + encodeURIComponent(listening));
       const g = r?.gift;
       if (!g) return null;
-      if (typeof g.returnTo !== 'string' || typeof g.treasury !== 'string') throw new Error('Unreadable gift record.');
-      return { returnTo: g.returnTo, from: typeof g.from === 'string' ? g.from : null, source: String(g.source ?? ''), amount: String(g.amount ?? '0'), treasury: g.treasury, state: g.state === 'sending' ? 'sending' : 'arrived', player: g.player ?? null };
+      const one = (x: any): GiftEntry => {
+        if (typeof x?.returnTo !== 'string' || typeof x?.treasury !== 'string') throw new Error('Unreadable gift record.');
+        return { txid: typeof x.txid === 'string' ? x.txid : null, returnTo: x.returnTo, from: typeof x.from === 'string' ? x.from : null, source: String(x.source ?? ''), amount: String(x.amount ?? '0'), state: x.state === 'sending' ? 'sending' : 'arrived', player: x.player ?? null };
+      };
+      const list: any[] = Array.isArray(r?.gifts) && r.gifts.length ? r.gifts : [g];
+      const entries = list.map(one);
+      const players: PlayerView[] = [];
+      for (const e of entries) if (e.player && !players.some((p) => p.id === e.player!.id)) players.push(e.player);
+      const first = entries[0];
+      return { returnTo: first.returnTo, from: first.from, source: first.source, amount: first.amount, treasury: g.treasury, state: entries.some((e) => e.state === 'sending') ? 'sending' : 'arrived', player: [...entries].reverse().find((e) => e.player)?.player ?? null, gifts: entries, players };
     },
     history: (listening, withOutgoing) => readHistory(listening, (path) => api(path), withOutgoing),
     likesChanged: () => { void (window as any).XtrataRadio?.refreshLikes?.(); },
