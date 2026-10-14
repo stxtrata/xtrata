@@ -194,6 +194,8 @@ function start(root: HTMLElement) {
     if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
     const lock = !!p && !!s.albumLock?.locked;
     if (lock !== lockPushed) { radio.setGiftLock?.(lock); lockPushed = lock; }
+    // Per-wallet song memory lasts only while this passkey stays unlocked on this page.
+    if (['locked', 'intro', 'wrong-wallet', 'unsupported', 'connect', 'not-invited', 'off', 'elsewhere'].includes(s.step)) radio.forgetWallets?.();
   };
 
   const short = (a?: string) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');

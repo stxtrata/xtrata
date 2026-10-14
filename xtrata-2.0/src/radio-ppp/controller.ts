@@ -739,16 +739,6 @@ export function createPppController(deps: PppDeps) {
     if (queue.length && !draining) void drain();
   }
 
-  /** The album that was open when this wallet was last used on this device opens again after an unlock (best effort). */
-  async function reopenAlbum(b: Bridge) {
-    const root = status?.root;
-    if (!root || status?.slot || walletLacks('slots')) return;
-    const n = Number(deps.store.get(key('slot', root)));
-    if (!Number.isSafeInteger(n) || n < 1) return;
-    try { await b.request<OpenSlotResult>('listening.openSlot', { slot: n }); status = await readStatus(b); balance = undefined; balanceAt = -Infinity; }
-    catch { /* stays on the listener's own wallet */ }
-  }
-
   /** Unlock inside the frame, resuming paying unless this device switched it off. */
   async function unlockWith(b: Bridge, anyPasskey: boolean) {
     guardMatch();
@@ -761,7 +751,7 @@ export function createPppController(deps: PppDeps) {
       if (!payingOn(status.address)) await b.request('listening.stop');
       else await holdTab();
     }
-    await reopenAlbum(b);
+    // An unlock always lands on the passkey's own first wallet (the plain player); albums are chosen from there.
     say(resume ? 'Unlocked ✓' : 'Unlocked ✓ Paying is off.');
     const queued = likeAfterUnlock;
     likeAfterUnlock = null;
@@ -963,8 +953,6 @@ export function createPppController(deps: PppDeps) {
       await bridge!.request<OpenSlotResult>('listening.openSlot', { slot });
       status = await readStatus(bridge!);
       balance = undefined; balanceAt = -Infinity; preview = null; previewFailed = false;
-      const root = status.root;
-      if (root) deps.store.set(key('slot', root), String(slot));
       say(slot === 0 ? 'Back to your own wallet ✓' : 'Album opened ✓');
     }),
 

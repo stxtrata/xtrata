@@ -835,6 +835,54 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // otherwise resume the previous song), or coming back from another album. Stays set until a tune consumes it.
   let albumStartPending = false;
 
+  // What each wallet of this unlocked session last had on ('' = the first wallet, otherwise the album's id): its
+  // song and position. Switching back to a wallet in the same session resumes there; a page refresh (a new passkey
+  // unlock) or locking forgets all of it, and the first wallet / a freshly opened album starts clean.
+  const walletMemory = new Map();
+  let resumeAt = null; // {id, position}: seek to this when that song next starts
+  const rememberWallet = () => {
+    if (!on || !currentTokenId) return;
+    if (giftPlayer && !inAlbum(currentTokenId)) return; // an album that was only opened, never started
+    walletMemory.set(giftPlayer ? giftPlayer.id : '', { tokenId: String(currentTokenId), position: Number(player.currentTime) || 0 });
+  };
+
+  // Put a remembered song back, cued and paused at its position: the listener presses play (nothing is charged or
+  // started behind their back). Radio off: it is the song the next switch-on tunes to.
+  const cueTrack = async (mem) => {
+    if (!on) { forcedNext = mem.tokenId; resumeAt = { id: mem.tokenId, position: mem.position }; return; }
+    const track = await resolveTrack(String(mem.tokenId));
+    if (!track || !on || !allowed(track.tokenId)) return;
+    const token = ++tuneToken;
+    // this cue supersedes any tune still in flight, so it lowers the flag that tune would have lowered
+    const endCue = () => { if (token === tuneToken) tuneInFlight = false; };
+    endCue();
+    pauseOwn();
+    stopTicker();
+    supportStarts.select(Number(track.tokenId));
+    listens.select(Number(track.tokenId));
+    playCounter.select(PLAYABLE_CONTRACT, Number(track.tokenId));
+    player.src = track.src;
+    const seek = () => { try { player.currentTime = mem.position; } catch { /* pre-metadata */ } };
+    if (player.readyState >= 1) seek(); else player.addEventListener('loadedmetadata', seek, { once: true });
+    currentTokenId = track.tokenId || null;
+    nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', album: track.album || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
+    manualPause = true;
+    writeScreen('PRESS ▶ TO PLAY');
+    player.addEventListener('playing', () => {
+      if (token !== tuneToken) return; // the listener moved on first
+      setNow('', true);
+      startTicker(track);
+      void fetchRelatives(track.tokenId);
+      startVu();
+      if (history[history.length - 1] !== track) history.push(track);
+      window.setTimeout(() => { void preloadNextTrack(); }, 1500);
+      persist();
+      emit();
+    }, { once: true });
+    persist();
+    emit();
+  };
+
   // Show the album's first song as the one waiting, without touching the audio (the listener has paused or
   // the browser will not autoplay): pressing play then tunes to it (see playPause).
   const showAlbumStart = async (id) => {
@@ -845,19 +893,23 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     emit();
   };
 
-  // The album just became the music (loaded, locked, or freshly opened): drop what was cued for the old mode and
-  // "previous" history from outside it, and if a foreign song is on air (or the album is freshly opened) move to
-  // the album's first song, unless the listener paused or the browser needs a tap first.
+  // The album just became the music (loaded, locked, or opened): drop what was cued for the old mode and
+  // "previous" history from outside it. Opened again within the same session, it resumes where it was. Opened fresh
+  // it starts at its first song; if a foreign song is on air move there, unless the listener paused or the browser
+  // needs a tap first.
   const enterAlbum = (fresh = false) => {
     if (!giftPlayer) return;
-    if (fresh) {
+    const remembered = fresh ? walletMemory.get(giftPlayer.id) : null;
+    const back = remembered && inAlbum(remembered.tokenId) ? remembered : null;
+    if (fresh && !back) {
       albumStartPending = true;
       // a new listen of the album: songs heard last time must not be skipped by the no-repeat cycle
       giftPlayer.tracks.forEach((id) => played.delete(id));
       savePlayed();
-    }
+    } else if (back) albumStartPending = false;
     preloadQueue.length = 0;
     if (gated()) history.splice(0, history.length, ...history.filter((t) => inAlbum(t.tokenId)));
+    if (back) { void cueTrack(back); return; }
     const firstId = giftPlayer.tracks[0];
     if (!on) { if (albumStartPending) forcedNext = firstId; return; }
     if (!albumStartPending && currentTokenId && inAlbum(currentTokenId)) { requeueForMode(); return; }
@@ -1452,6 +1504,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       if (player.src !== track.src) {
         player.src = track.src;
       }
+      if (resumeAt && resumeAt.id === String(track.tokenId)) {
+        const at = resumeAt.position;
+        resumeAt = null;
+        const seek = () => { try { player.currentTime = at; } catch { /* pre-metadata */ } };
+        if (player.readyState >= 1) seek(); else player.addEventListener('loadedmetadata', seek, { once: true });
+      } else resumeAt = null;
       radioLog(`play #${track.tokenId}`, { src: (track.src || '').slice(0, 80) }, track.tokenId);
       try {
         // Watchdog: a broken stream (e.g. bad 206 range responses on big
@@ -1728,16 +1786,23 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
      */
     setGiftPlayer: (def) => {
       const tracks = def && Array.isArray(def.tracks) ? def.tracks.map(String).filter((id) => /^\d{1,9}$/.test(id)).slice(0, 40) : [];
+      const nextId = tracks.length ? String(def.id || '') : '';
+      if (nextId !== (giftPlayer ? giftPlayer.id : '')) rememberWallet(); // leaving a wallet: note where it was
       if (!tracks.length) {
+        const wasAlbum = !!giftPlayer;
         giftPlayer = null;
         albumStartPending = false;
         if (band === 'gift') setBand('fm'); else emit();
+        const back = wasAlbum ? walletMemory.get('') : null;
+        if (back) void cueTrack(back); // back on the first wallet: its last song, cued at its position
         return;
       }
       const first = !giftPlayer || giftPlayer.id !== def.id;
       giftPlayer = { id: String(def.id || ''), title: String(def.title || '').slice(0, 60), subtitle: String(def.subtitle || '').slice(0, 80), tracks };
       if (first) { setBand('gift'); enterAlbum(true); } else emit();
     },
+    /** The listening wallet was locked (or another passkey opened): nothing is remembered across that. */
+    forgetWallets: () => { walletMemory.clear(); resumeAt = null; },
     /** While locked, the loaded album is the only band: no FM, LIKED or CHAIN. A page default, not security. */
     setGiftLock: (on) => {
       const next = !!on;
