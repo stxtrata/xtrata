@@ -28,6 +28,8 @@ export interface StatusResult {
   session: SessionSummary | null;
   /** Which of the passkey's wallets is open (0 = the listener's own wallet; others belong to albums). Only while unlocked. */
   slot?: number;
+  /** The passkey's own wallet (slot 0): it signs every like, so likes and plays all count for one listener. Only while unlocked. */
+  root?: string;
   /**
    * What this wallet build can do, so the radio can tell an out-of-date wallet box (deployed
    * separately) from a broken one. Absent on builds older than this field.
@@ -40,9 +42,10 @@ export interface StatusResult {
  * `standalone` (returns to a page-supplied destination and likes without a linked main wallet),
  * `multi` (one listening wallet per main-wallet address: status, unlock and create take the connected `main`),
  * `partial` (listening.prepareReturn accepts mode `amount` with an `amount`, to return part of the balance),
- * `slots` (listening.slotAddress, listening.openSlot and listening.bindSlot: one passkey, many derived wallets).
+ * `slots` (listening.slotAddress, listening.openSlot and listening.bindSlot: one passkey, many derived wallets),
+ * `rootLike` (listening.signLike always signs with the passkey's own wallet, whichever album wallet is open, and status reports it as `root`).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {

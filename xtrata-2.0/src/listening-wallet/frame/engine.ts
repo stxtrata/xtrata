@@ -209,7 +209,7 @@ export function createListeningEngine(deps: {
     if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
     if (identity) {
       const open = record(credentialId);
-      return { state: 'unlocked', address: identity.address, slot, linked: open?.link?.main, ...othersOf(open, main), session: summary(), features };
+      return { state: 'unlocked', address: identity.address, slot, root: (root ?? identity).address, linked: open?.link?.main, ...othersOf(open, main), session: summary(), features };
     }
     const last = pick(main);
     return last
@@ -521,22 +521,23 @@ export function createListeningEngine(deps: {
     // A like or unlike is a deliberate tap on the radio's heart, covered by the approved session:
     // it moves nothing (Deny mode, no post-conditions) and costs only the session's network fee.
     'listening.signLike': async (params: unknown): Promise<SignedResult> => {
-      const id = requireUnlocked();
+      const open = requireUnlocked();
       if (!ledger) throw new Error('Paying is switched off, so likes go through your main wallet.');
-      // Linked or not, the like is signed by this wallet. Unlinked likes count for the listening
-      // address itself (the page lists passkey-only listeners under it).
+      // Every like is signed by the passkey's own wallet, whichever album wallet is open, so all of a
+      // listener's likes live under one address (linked or not: unlinked likes count for that address).
+      const id = root ?? open;
       if (signing) throw new Error('Still signing. Try the like again in a moment.');
       signing = true;
       try {
         const p = params as SignLikeParams;
         const fee = bigintParam(p?.fee, 'fee'), nonce = bigintParam(p?.nonce, 'nonce'), balance = bigintParam(p?.balance, 'balance');
         if (balance > TARGET) throw new Error('This wallet holds more than 1 STX. Return the excess first.');
-        if (balance < RESERVE + fee) throw new Error('Balance too low for the like fee. Top up first.');
+        if (balance < RESERVE + fee) throw new Error('Your main listener wallet is out of funds. Top it up to like songs.');
         const options = likeCallOptions(id.publicKey, { song: p.song, liked: p.liked, fee, nonce });
         const session = ledger;
         session.consumeLike(fee, now());
         const tx = await makeContractCall({ ...options, senderKey: id.privateKey });
-        if (identity !== id || ledger !== session) throw new Error('Listening stopped before signing finished. Nothing was returned.');
+        if (identity !== open || ledger !== session) throw new Error('Listening stopped before signing finished. Nothing was returned.');
         refreshIdle();
         return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid() };
       } finally {
