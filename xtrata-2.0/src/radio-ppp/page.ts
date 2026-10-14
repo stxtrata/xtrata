@@ -7,7 +7,7 @@ import { WalletBridgeClient } from '../lib/wallet/passkey/bridge/client';
 import { createWalletSessionStore } from '../lib/wallet/session';
 import { requestStructuredSignature } from '../lib/wallet/structured-sign';
 import { showStxTransfer } from '../lib/wallet/connect';
-import { costPerPlay, HOLDER_PAYMENT, stx } from '../lib/listening-wallet/policy';
+import { costPerPlay, HOLDER_PAYMENT, stx, TARGET } from '../lib/listening-wallet/policy';
 import { account, api, balance, broadcast, owner, transaction, validateSaved, verify } from '../radio-test-wallet/chain';
 import { createPppController, type GateConfig, type Snapshot } from './controller';
 import { showSteps, stagesFor, stageOf, type StageView } from './stages';
@@ -404,6 +404,34 @@ function start(root: HTMLElement) {
   };
   for (const ms of [1500, 4000, 9000]) setTimeout(() => render(ppp.snapshot()), ms);
 
+  /**
+   * An album wallet is open, and the main listener wallet that signs every like has run out of funds. Loud on purpose:
+   * the address, a copy button and (with a main wallet connected) a one-tap top-up. Quiet again once funds are on the way.
+   */
+  function likeFundsBanner(s: Snapshot): HTMLElement[] {
+    const f = s.likeFunds;
+    if (!f || !f.album || (!f.low && !f.pending)) return [];
+    const box = el('div', '', 'ppp-pick ppp-lowbox');
+    if (!f.low) {
+      const p = el('p', 'Top-up for your main listener wallet is on its way. ', 'ppp-warn');
+      if (f.txid) p.append(link('View', explorer(f.txid)));
+      box.append(p);
+      return [box];
+    }
+    box.append(el('p', '⚠ YOUR MAIN LISTENER WALLET IS OUT OF FUNDS', 'ppp-bad ppp-lowtitle'));
+    box.append(el('p', 'It signs every like for all your albums, so they all count for you. Likes are paused until it has a little STX. 0.1 STX is hundreds of likes.'));
+    box.append(el('p', f.address, 'ppp-addr-full'));
+    const row = el('div', '', 'ppp-open-row'); // not .ppp-actions: the panel refills the first element with that class
+    row.append(copyButton('copy-likes-address', 'Copy address', () => f.address, 'primary', () => render(ppp.snapshot())));
+    if (f.main && !s.solo) {
+      const room = TARGET - (f.balance ?? 0n);
+      if (room > 0n) row.append(button(`Pay ${stx(room)} STX from my wallet`, () => void ppp.topUpLikes(), 'primary'));
+    }
+    box.append(row);
+    box.append(el('p', 'Send STX to that address from any Stacks wallet or an exchange. Likes carry on by themselves once it arrives.', 'ppp-mute'));
+    return [box];
+  }
+
   function render(s: Snapshot) {
     syncIdentity(s);
     syncGift(s);
@@ -692,6 +720,7 @@ function start(root: HTMLElement) {
     }
     // A gift link in play goes first: it is why this visitor is here.
     key.unshift(...gifts.banner(s));
+    key.unshift(...likeFundsBanner(s));
     // Inside an app's own browser (Instagram, X, ...) passkeys often fail: before anything else, offer the real one.
     if (inApp && (gifts.pendingCode() || ['intro', 'locked', 'unsupported'].includes(s.step))) key.unshift(...openElsewhere(inApp, gifts.pendingCode()));
     // A passkey synced to this device opened someone's existing wallet: say whose, first.

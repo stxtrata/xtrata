@@ -54,7 +54,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -77,7 +77,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike'] });
     expect(s.map.size).toBe(0);
   });
 
@@ -127,7 +127,7 @@ describe('listening wallet engine (wallet origin)', () => {
     await expect(s.h['listening.signLike'](like())).rejects.toThrow(/Paying is switched off/);
     await s.h['listening.approveSession'](s.terms(3000));
     // Unlinked is fine: a passkey-only listener likes under the listening address itself.
-    await expect(s.h['listening.signLike'](like(true, '0', '100'))).rejects.toThrow(/Balance too low/);
+    await expect(s.h['listening.signLike'](like(true, '0', '100'))).rejects.toThrow(/out of funds/);
     const issued = s.now(), link = { main: MAIN, listening: ADDRESS, issued };
     await s.h['listening.link']({ main: MAIN, issued, mainSignature: signMessageHashRsv({ messageHash: linkHash(link), privateKey: createStacksPrivateKey(mainKey) }).data });
     const before = (await s.h['listening.status']()).session!.budgetLeft;
@@ -146,7 +146,7 @@ describe('listening wallet engine (wallet origin)', () => {
     await expect(s.h['listening.signLike'](like(false, '1'))).rejects.toThrow(/Too soon/);
     s.tick(MIN_LIKE_INTERVAL_MS);
     await expect(s.h['listening.signLike'](like(false, '1', String(TARGET + 1n)))).rejects.toThrow(/more than 1 STX/);
-    await expect(s.h['listening.signLike'](like(false, '1', '3100'))).rejects.toThrow(/Top up/);
+    await expect(s.h['listening.signLike'](like(false, '1', '3100'))).rejects.toThrow(/out of funds/);
     await expect(s.h['listening.signLike'](like(false, '1', '3200'))).resolves.toBeDefined(); // 3000 reserve + 200 fee
     s.tick(MIN_LIKE_INTERVAL_MS);
     await expect(s.h['listening.signLike']({ ...like(false, '1'), fee: '300' })).rejects.toThrow(/0.0002 STX/);
@@ -564,6 +564,20 @@ describe('one passkey, many wallets (slots)', () => {
     await s.h['listening.signPlay'](play('500000', '0'));
     s.tick(MIN_PLAY_INTERVAL_MS);
     await expect(s.h['listening.signPlay'](play('500000', '1'))).rejects.toThrow(/number of paid plays/);
+  });
+
+  it('signs every like with the passkey\'s own wallet, whichever album wallet is open, and reports it as root', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+    expect(await s.h['listening.status']()).toMatchObject({ slot: 0, root: ADDRESS });
+    await s.h['listening.openSlot']({ slot: 2 });
+    expect(await s.h['listening.status']()).toMatchObject({ address: SLOT2, slot: 2, root: ADDRESS });
+    const like = (liked = true, nonce = '0', balance = '500000') => ({ song: 1234, liked, fee: '200', nonce, balance });
+    const signer = (raw: string) => addressToString({ type: 0, version: 22, hash160: (deserializeTransaction(raw) as any).auth.spendingCondition.signer } as any);
+    expect(signer((await s.h['listening.signLike'](like())).raw)).toBe(ADDRESS);
+    // the album wallet's own balance never matters: the page sends the main listener wallet's
+    s.tick(MIN_LIKE_INTERVAL_MS);
+    await expect(s.h['listening.signLike'](like(false, '1', '100'))).rejects.toThrow(/main listener wallet is out of funds/);
   });
 
   it('switching changes nothing about where returns go: a linked passkey sends every wallet to its main wallet', async () => {

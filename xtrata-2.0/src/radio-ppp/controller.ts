@@ -186,6 +186,12 @@ export interface Snapshot {
   giftStop: { reason: GiftStopReason; text: string } | null;
   /** How a gifted wallet's balance will go back, worked out from the chain on request. */
   returnPlan: ReturnPlanView;
+  /**
+   * The wallet that signs and pays for every like: the passkey's own (main listener) wallet, whichever album is open.
+   * `low` is set once its balance is known to be below what one like needs; `album` means an album wallet is the open one,
+   * so this is a different address from `listening`. Null until a wallet is unlocked.
+   */
+  likeFunds: { address: string; balance?: bigint; low: boolean; album: boolean; pending: boolean; txid?: string; main?: string } | null;
 }
 export type GiftStopReason = 'connect' | 'locked' | 'link' | 'over' | 'arriving' | 'out' | 'off' | 'tab';
 export type ReturnPlanView =
@@ -203,6 +209,7 @@ export const definitelyRejected = (e: unknown) => {
 };
 /** After a like or unlike confirms, the same song's heart stays locked this long. */
 export const LIKE_COOLDOWN_MS = 3_000;
+const OUT_OF_LIKES = 'Your main listener wallet is out of funds, so likes are paused. Top it up (it only needs a little) and your likes carry on.';
 const randomId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
 
 export function createPppController(deps: PppDeps) {
@@ -213,6 +220,8 @@ export function createPppController(deps: PppDeps) {
   let status: StatusResult | null = null;
   let balance: bigint | undefined;
   let balanceAt = -Infinity;
+  // The passkey's own wallet signs the likes: its balance is read separately while an album wallet is open.
+  let rootBalance: { for: string; value: bigint; at: number } | null = null;
   let busy: string | null = null;
   let paying = false;
   let liking = false;
@@ -266,12 +275,25 @@ export function createPppController(deps: PppDeps) {
   const payingOn = (listening = status?.address) => !!listening && deps.store.get(key('on', listening)) !== '0';
   const setPayingOn = (on: boolean) => { if (status?.address) deps.store.set(key('on', status.address), on ? '1' : '0'); };
   const unresolved = () => entries().filter((e) => UNRESOLVED.includes(e.status));
+  /** Everything still confirming for the open wallet and, while an album is open, for the like-signing wallet too. */
+  const unresolvedAll = () => (albumOpen() ? [...unresolved(), ...entries(likeAddr()).filter((e) => UNRESOLVED.includes(e.status))] : unresolved());
   type PendingDeposit = { txid: string; amount: string; at: number };
   const pendingDeposit = (): PendingDeposit | null => {
-    if (!status?.address) return null;
-    try { return JSON.parse(deps.store.get(key('deposit', status.address)) || 'null'); } catch { return null; }
+    return pendingDepositOf(status?.address);
   };
-  const setPendingDeposit = (d: PendingDeposit | null) => { if (status?.address) deps.store.set(key('deposit', status.address), JSON.stringify(d)); };
+  const pendingDepositOf = (listening?: string): PendingDeposit | null => {
+    if (!listening) return null;
+    try { return JSON.parse(deps.store.get(key('deposit', listening)) || 'null'); } catch { return null; }
+  };
+  const setPendingDeposit = (d: PendingDeposit | null, listening = status?.address) => { if (listening) deps.store.set(key('deposit', listening), JSON.stringify(d)); };
+  /** The wallet that signs likes: the passkey's own, even while an album wallet is open (boxes before `rootLike` sign with the open one). */
+  const likeAddr = (): string | undefined => (walletLacks('rootLike') ? status?.address : status?.root ?? status?.address);
+  const albumOpen = () => !!status?.address && likeAddr() !== status.address;
+  const likeBalance = (): bigint | undefined => {
+    if (!albumOpen()) return balance;
+    return rootBalance && rootBalance.for === likeAddr() ? rootBalance.value : undefined;
+  };
+  const likeLow = (b: bigint | undefined) => b !== undefined && b < RESERVE + LIKE_FEE;
   const stuck = () => unresolved().filter((e) => deps.now() - e.created > STUCK_AFTER_MS && notSeen.has(e.txid!));
 
   /**
@@ -444,7 +466,13 @@ export function createPppController(deps: PppDeps) {
     gift: (() => { const g = giftNow(); return g ? { player: g.player, from: g.from, source: g.source, amount: g.amount } : null; })(),
     giftPlays: giftNow() ? playsLeftNow() : 0,
     giftStop: giftStop(),
-    returnPlan: returnPlanView()
+    returnPlan: returnPlanView(),
+    likeFunds: (() => {
+      const address = likeAddr();
+      if (!address || status?.state !== 'unlocked') return null;
+      const b = likeBalance();
+      return { address, balance: b, low: likeLow(b), album: albumOpen(), pending: !!pendingDepositOf(address), txid: pendingDepositOf(address)?.txid, main: deps.main() };
+    })()
   });
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
@@ -486,6 +514,16 @@ export function createPppController(deps: PppDeps) {
     if (!force && deps.now() - balanceAt < 30_000) return;
     balance = await deps.chain.balance(status.address);
     balanceAt = deps.now();
+    await refreshRootBalance(force);
+  }
+
+  /** While an album wallet is open, the main listener wallet that signs the likes needs its own balance reading. */
+  async function refreshRootBalance(force = false) {
+    const root = likeAddr();
+    if (!albumOpen() || !root || status?.state !== 'unlocked') return;
+    if (!force && rootBalance?.for === root && deps.now() - rootBalance.at < 30_000) return;
+    try { rootBalance = { for: root, value: await deps.chain.balance(root), at: deps.now() }; }
+    catch { /* unknown, not "empty": the banner waits for a real answer */ }
   }
 
   /**
@@ -557,14 +595,16 @@ export function createPppController(deps: PppDeps) {
     if (!listening) return false;
     let confirmed: bigint | undefined;
     let landed = false;
-    for (const e of unresolved()) {
+    const nonces = new Map<string, bigint>();
+    for (const e of unresolvedAll()) {
       try {
         const tx = await deps.chain.transaction(e.txid!);
         if (!tx) {
           notSeen.add(e.txid!);
           // A different transaction already used this nonce: ours can never confirm.
           // Only after 15 minutes: the node's nonce can run ahead of the transaction index for a while.
-          if (deps.now() - e.created > 15 * 60_000) confirmed ??= await deps.chain.confirmedNonce(listening);
+          if (deps.now() - e.created > 15 * 60_000 && !nonces.has(e.address)) nonces.set(e.address, await deps.chain.confirmedNonce(e.address));
+          confirmed = nonces.get(e.address);
           if (confirmed !== undefined && confirmed > BigInt(e.nonce)) { saveEntry({ ...e, status: 'failed', note: 'nonce used by another transaction', raw: undefined }); continue; }
           // Never broadcast, or outcome unknown: resend the SAME signed bytes (idempotent), never a replacement.
           if ((e.status === 'unknown' || e.status === 'signed') && e.raw) {
@@ -587,14 +627,16 @@ export function createPppController(deps: PppDeps) {
         } else if (e.status !== 'pending') saveEntry({ ...e, status: 'pending' });
       } catch { /* try again on the next refresh */ }
     }
-    const d = pendingDeposit();
-    if (d) {
+    for (const at of albumOpen() ? [listening, likeAddr()!] : [listening]) {
+      const d = pendingDepositOf(at);
+      if (!d) continue;
       try {
         const tx = await deps.chain.transaction(d.txid);
         const s = String(tx?.tx_status ?? '');
         if ((s === 'success' && tx.is_unanchored === false) || s.startsWith('abort_') || s.startsWith('dropped_') || (!tx && deps.now() - d.at > 2 * 3600_000)) {
-          setPendingDeposit(null);
+          setPendingDeposit(null, at);
           balanceAt = -Infinity;
+          rootBalance = null;
           // "Gift on its way" / "deposit on its way" is over: say nothing rather than leave it up while paying.
           if (/on its way/i.test(message)) message = '';
         }
@@ -631,6 +673,7 @@ export function createPppController(deps: PppDeps) {
       await lookupGift();
       // A payment that has just landed has changed the balance: read it again now, so plays-left is exact.
       if (await reconcile()) await refreshBalance(true);
+      await refreshRootBalance(); // a confirmed top-up clears the cached one: read it again now
     } catch (e) {
       error = e instanceof Error ? e.message : 'Pay-per-play could not refresh. Listening stays free.';
     }
@@ -865,6 +908,24 @@ export function createPppController(deps: PppDeps) {
       say('Deposit sent ✓ Usually confirms in a few minutes.');
     }),
 
+    /**
+     * Top up the main listener wallet (the one that signs every like) from the connected main wallet. Works whichever
+     * album is open; with the main listener wallet open it is the same deposit as `deposit`.
+     */
+    topUpLikes: () => task('Approve the top-up in your wallet…', async () => {
+      guardMatch();
+      const main = deps.main(), to = likeAddr();
+      if (!main || !to) throw new Error('Connect your main wallet first, or send STX to the address shown.');
+      if (pendingDepositOf(to)) throw new Error('A top-up is still confirming. Wait for it before adding more.');
+      const current = await deps.chain.balance(to);
+      if (albumOpen()) rootBalance = { for: to, value: current, at: deps.now() }; else { balance = current; balanceAt = deps.now(); }
+      const amount = fundingAllowance(current);
+      if (amount <= 0n) throw new Error('Your main listener wallet already holds 1 STX. No top-up needed.');
+      const txid = await deps.deposit(main, to, amount);
+      if (txid) setPendingDeposit({ txid, amount: amount.toString(), at: deps.now() }, to);
+      say('Top-up sent ✓ Likes carry on once it confirms, usually a few minutes.');
+    }),
+
     switchOn: () => task('Confirm in the listening wallet…', async () => {
       if (!usable()) throw new Error('Connect your wallet first.');
       await holdTab();
@@ -1034,9 +1095,13 @@ export function createPppController(deps: PppDeps) {
   async function toggleLike(d: { song: number; title?: string; artist?: string; likedBy?: string[] }) {
     const label = d.title ? `“${d.title}”` : `song #${d.song}`;
     const fail = (m: string) => { error = m; message = ''; try { deps.likeFailed?.(d.song); } catch { /* radio */ } deps.changed(); };
-    const s = step(), main = deps.main();
+    // Likes are signed by the passkey's own wallet. While an album wallet is open its funds and plays are its own business:
+    // only the main listener wallet's funds matter for a like.
+    const album = albumOpen();
+    const s0 = step(), main = deps.main();
+    const s = album && (s0 === 'fund' || s0 === 'over') ? 'ready' : s0;
     // Passkey-only: the listening address itself is the liker.
-    const who = solo() ? status?.address : main;
+    const who = solo() ? likeAddr() : main;
     if (s === 'locked') {
       likeAfterUnlock = { ...d, at: deps.now() };
       say(`Unlock to like ${label}. It sends straight after.`);
@@ -1047,12 +1112,17 @@ export function createPppController(deps: PppDeps) {
     if (solo() && walletLacks('standalone')) return fail('The listening wallet box needs an update before it can like on its own. Try again shortly.');
     if (s === 'fund') return fail('Top up the listening wallet to like: each like or unlike costs 0.0002 STX.');
     if (s === 'over') return fail('Return the excess first: the listening wallet holds more than 1 STX.');
+    if (album) {
+      await refreshRootBalance(true);
+      const b = likeBalance();
+      if (likeLow(b)) { deps.changed(); return fail(OUT_OF_LIKES); }
+    }
     if (s !== 'ready' || !who) return fail('Still checking the listening wallet. Try the heart again in a moment.');
     if (!status?.session) return fail('Paying is switched off. Switch it on to like from the listening wallet.');
     if (!lockHeld) return fail('Pay-per-play is running in another tab. Like from that tab.');
     // One like per song at a time: locked until the last one confirms, then 3 more seconds, so a
     // like cannot be toggled on and off in quick succession (each costs a network fee).
-    const previous = entries().find((e) => e.kind === 'like' && e.song === d.song);
+    const previous = entries(likeAddr()).find((e) => e.kind === 'like' && e.song === d.song);
     if (previous && UNRESOLVED.includes(previous.status))
       return fail(`Your last like for ${label} is still on its way. It can change again once it confirms.`);
     if (liking) return fail('One like at a time: your last one is still being sent.');
@@ -1065,7 +1135,7 @@ export function createPppController(deps: PppDeps) {
     catch { by = d.likedBy; }
     finally { checkingLike = false; } // like() below takes over synchronously, before any await
     if (!by) return fail(`Could not check ${label} right now. Try the heart again.`);
-    const listening = status.address!;
+    const listening = likeAddr()!;
     // The likes list can lag a few minutes behind a like this wallet has already seen confirm: trust our own
     // recent confirmed like or unlike of this song over a stale read, so the next tap goes the right way.
     const lastSure = previous?.status === 'confirmed' && typeof previous.liked === 'boolean' && deps.now() - (previous.confirmedAt ?? previous.created) < 5 * 60_000 ? previous.liked : undefined;
@@ -1086,15 +1156,17 @@ export function createPppController(deps: PppDeps) {
       say(`${d.liked ? 'Liking' : 'Unliking'} ${label}…`);
       // One transaction in flight per wallet (nonces): wait up to 2 minutes for an earlier one to confirm.
       const until = deps.now() + 120_000;
-      while (paying || unresolved().length) {
+      while (paying || (albumOpen() ? entries(likeAddr()).some((e) => UNRESOLVED.includes(e.status)) : unresolved().length)) {
         if (deps.now() > until) throw new Error('An earlier payment is still confirming. Try the like again shortly.');
         await wait(5_000);
         await refresh(true);
       }
-      if (step() !== 'ready' || !status?.session) throw new Error('Paying stopped before the like was sent.');
-      const listening = status.address!;
+      if ((!albumOpen() && step() !== 'ready') || status?.state !== 'unlocked' || !status.session) throw new Error('Paying stopped before the like was sent.');
+      const listening = likeAddr()!;
       const { balance: b, nonce } = await deps.chain.account(listening);
-      balance = b; balanceAt = deps.now();
+      if (albumOpen()) rootBalance = { for: listening, value: b, at: deps.now() };
+      else { balance = b; balanceAt = deps.now(); }
+      if (likeLow(b)) throw new Error(OUT_OF_LIKES);
       const signed = await bridge!.request<SignedResult>('listening.signLike', {
         song: d.song, liked: d.liked, fee: LIKE_FEE.toString(), nonce: nonce.toString(), balance: b.toString()
       });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createStacksPrivateKey, cvToJSON, deserializeTransaction, encodeStructuredData, getAddressFromPrivateKey, makeRandomPrivKey,
+  addressToString, createStacksPrivateKey, cvToJSON, deserializeTransaction, encodeStructuredData, getAddressFromPrivateKey, makeRandomPrivKey,
   privateKeyToString, signMessageHashRsv, TransactionVersion
 } from '@stacks/transactions';
 import { sha256 } from '@noble/hashes/sha256';
@@ -35,7 +35,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 }, ...over
   };
   const server = { mains: new Map<string, string>(), mainOfFails: false, mainOfCalls: 0 };
-  const chain = { balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, accountFails: false, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
+  const chain = { balanceOf: new Map<string, bigint>(), deposits: [] as [string, bigint][], balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, accountFails: false, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
   const gift = { info: null as GiftInfo | null, fails: false, calls: 0, inbound: [] as InboundTransfer[], outgoing: [] as Outgoing[], historyFails: false };
   const savedLinks: any[] = [];
   const store = new Map<string, string>();
@@ -85,15 +85,15 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     }),
     chain: {
       verify: async () => {},
-      balance: async () => chain.balance,
-      account: async () => { if (chain.accountFails) throw new Error('Node busy (503)'); return { balance: chain.balance, nonce: chain.nonce }; },
+      balance: async (a) => chain.balanceOf.get(a) ?? chain.balance,
+      account: async (a) => { if (chain.accountFails) throw new Error('Node busy (503)'); return { balance: chain.balanceOf.get(a) ?? chain.balance, nonce: chain.nonce }; },
       confirmedNonce: async () => chain.confirmed,
       owner: async () => chain.owner,
       broadcast: async (raw, txid) => { if (chain.rejectNext) { chain.rejectNext = false; throw Object.assign(new Error('Node rejected the fee as too low.'), { feeRejected: true }); } chain.broadcasts.push(raw); return txid; },
       transaction: async (txid) => (chain.mined.has(txid) ? { tx_status: 'success', canonical: true, is_unanchored: false, fee_rate: 300 } : null)
     },
     signWithMain: async (m, data) => signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(data))), privateKey: createStacksPrivateKey(m === OTHER_MAIN ? otherKey : mainKey) }).data,
-    deposit: async (_m, _r, amount) => { chain.balance += amount; return '0x' + 'd'.repeat(64); },
+    deposit: async (_m, r, amount) => { chain.deposits.push([r, amount]); if (chain.balanceOf.has(r)) chain.balanceOf.set(r, chain.balanceOf.get(r)! + amount); else chain.balance += amount; return '0x' + 'd'.repeat(64); },
     validate: validateSaved,
     tabLock: async () => opts.tabLock ?? true,
     store: { get: (k) => store.get(k) ?? null, set: (k, v) => void store.set(k, v) },
@@ -479,6 +479,70 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
     await liking;
     expect(s.ppp.snapshot().entries.filter((e) => e.kind === 'play')).toHaveLength(0);
     expect(s.chain.broadcasts).toHaveLength(1);
+  });
+
+  describe('with an album wallet open (the main listener wallet still signs every like)', () => {
+    const signer = (raw: string) => addressToString({ type: 0, version: 22, hash160: (deserializeTransaction(raw) as any).auth.spendingCondition.signer } as any);
+    const album = async (s: ReturnType<typeof setup>, albumBalance = 0n) => {
+      await ready(s);
+      const opened = await (s.engine.handlers as any)['listening.openSlot']({ slot: 2 });
+      s.chain.balanceOf.set(opened.address, albumBalance);
+      await s.ppp.forceRefresh();
+      return opened.address as string;
+    };
+
+    it('signs from the first wallet and files the like under it, whatever the album wallet holds', async () => {
+      const s = setup();
+      const slot = await album(s);
+      expect(s.ppp.snapshot()).toMatchObject({ listening: slot, likeFunds: { address: LISTENING, album: true, low: false } });
+      expect(s.ppp.heart({ song: 7, title: 'Night Drive' })).toBe(true);
+      await settleLike(s);
+      expect(s.chain.broadcasts).toHaveLength(1);
+      expect(signer(s.chain.broadcasts[0])).toBe(LISTENING);
+      expect(s.sent).toEqual([[7, true]]);
+      expect(s.ppp.snapshot().entries).toHaveLength(0); // the open album wallet's own list stays its own
+      s.mineAll(); await s.ppp.forceRefresh();
+      expect(s.likesChanged()).toBe(1);
+      expect(JSON.parse(s.store.get(`xtrata.ppp.v1.entries:${LISTENING}`)!)[0]).toMatchObject({ kind: 'like', song: 7, status: 'confirmed', address: LISTENING });
+      // tapped again: it unlikes from the same wallet
+      s.likeBy.set(7, [LISTENING]); s.tick(5_000);
+      await s.ppp.toggleLike({ song: 7 });
+      expect(signer(s.chain.broadcasts[1])).toBe(LISTENING);
+    });
+
+    it('says the main listener wallet is out of funds, shows its address, and carries on after a top-up', async () => {
+      const s = setup();
+      await album(s);
+      const DEPOSIT = '0x' + 'd'.repeat(64);
+      s.chain.mined.add(DEPOSIT); // the deposit `ready` made has long confirmed
+      s.chain.balanceOf.set(LISTENING, 0n);
+      await s.ppp.forceRefresh();
+      s.chain.mined.delete(DEPOSIT);
+      expect(s.ppp.snapshot().likeFunds).toMatchObject({ address: LISTENING, album: true, low: true, balance: 0n, pending: false });
+      await s.ppp.toggleLike({ song: 7 });
+      expect(s.chain.broadcasts).toHaveLength(0);
+      expect(s.ppp.snapshot().error).toMatch(/main listener wallet is out of funds/);
+      expect(s.failed).toEqual([7]);
+      await s.ppp.topUpLikes();
+      expect(s.chain.deposits.at(-1)).toEqual([LISTENING, TARGET]);
+      expect(s.ppp.snapshot().likeFunds).toMatchObject({ low: false, pending: true });
+      await s.ppp.topUpLikes();
+      expect(s.chain.deposits).toHaveLength(2); // the first is `ready`'s own deposit: no second top-up while one is confirming
+      expect(s.ppp.snapshot().error).toMatch(/still confirming/);
+      s.tick(5_000);
+      await s.ppp.toggleLike({ song: 7 });
+      expect(signer(s.chain.broadcasts[0])).toBe(LISTENING);
+    });
+
+    it('does not read an unreadable balance as empty', async () => {
+      const s = setup();
+      await album(s);
+      expect(s.ppp.snapshot().likeFunds?.low).toBe(false);
+      s.chain.accountFails = true;
+      await s.ppp.toggleLike({ song: 7 });
+      expect(s.ppp.snapshot().error).toMatch(/Like not sent: Node busy/);
+      expect(s.ppp.snapshot().error).not.toMatch(/out of funds/);
+    });
   });
 });
 

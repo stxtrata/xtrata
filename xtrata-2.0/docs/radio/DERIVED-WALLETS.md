@@ -27,8 +27,10 @@ The wallet box deploys separately: `npm run build:listening-wallet`, then `wrang
 - `GET /radio/gift/shelf?root=SP…&after=<number>&limit=<=100` pages the albums in a passkey's numbered wallets (`{ total, next, shelf: [{ slot, address, state, player, ... }] }`). Public data only. The wallet box re-derives every address from its number, so a row whose address does not match is ignored.
 - `GET /radio/listening-wallet/link?listening=…` resolves a numbered wallet to the main wallet its passkey is linked to (`mainsFor`), unless the numbered wallet has a link of its own.
 
-## Not done yet: counting plays and likes under one listener
-`music_paid_plays` totals and on-chain likes still resolve a listening wallet to a main wallet through `radio_listening_wallets` only (`functions/lib/music-stats.ts`, `functions/radio/chain-likes.ts`), and likes read each linked wallet separately. Hundreds of numbered wallets need:
-- the stats join to go through `radio_listening_slots` as well (a view that unions direct links with root links, with the table-missing fallback kept), and
-- likes signed from one wallet. Proposal: the wallet box signs a like with the passkey's own wallet whichever album is open, so a listener's likes live in one place.
-Until then, plays from numbered wallets are paid and recorded on chain as normal but are not yet credited to the main wallet in those totals.
+## Likes: always signed by the first wallet
+The wallet box (`rootLike` feature) signs every like with the passkey's own wallet (slot 0), whichever album wallet is open, and reports it as `root` in `listening.status`. So a listener's likes live under one address, and `chain-likes.ts` keeps reading one wallet per listener rather than hundreds.
+
+The cost is that the first wallet needs a little STX (a like is a 0.0002 STX network fee) even when the listener only uses albums. The radio therefore reads that wallet's balance while an album is open (`likeFunds` in the controller snapshot) and, when it is out of funds, shows a red banner above the player with the full address, a copy button and, with a main wallet connected, a one-tap top-up (`topUpLikes`). Likes pause (never fall back to signing from the album wallet) until the top-up lands. Controllers that meet an older box without `rootLike` keep the old behaviour (the open wallet signs).
+
+## Not done yet: counting plays under one listener
+`music_paid_plays` totals still resolve a listening wallet to a main wallet through `radio_listening_wallets` only (`functions/lib/music-stats.ts`). Numbered wallets need the stats join to go through `radio_listening_slots` as well (a view that unions direct links with root links, with the table-missing fallback kept). Until then, plays from numbered wallets are paid and recorded on chain as normal but are not yet credited to the main wallet in those totals.
