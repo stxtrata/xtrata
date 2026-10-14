@@ -579,14 +579,15 @@ describe('album wallets (numbered wallets of one passkey)', () => {
     expect(s.ppp.snapshot()).toMatchObject({ listening: LISTENING, slot: 0 });
   });
 
-  it('opens the album that was open before a lock, after the next unlock', async () => {
+  it('an unlock always lands on the first wallet, even if an album was open before the lock', async () => {
     const s = setup();
     await ready(s);
     const { address } = await s.ppp.bindAlbum(4);
     await s.ppp.openAlbum(4);
     expect(s.ppp.snapshot().listening).toBe(address);
     await s.ppp.lock(); await s.ppp.unlock();
-    expect(s.ppp.snapshot()).toMatchObject({ listening: address, slot: 4 });
+    expect(s.ppp.snapshot()).toMatchObject({ slot: 0 });
+    expect(s.ppp.snapshot().listening).not.toBe(address);
   });
 
   describe('the curated-album lock', () => {

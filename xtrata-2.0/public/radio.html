@@ -317,6 +317,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp a.ppp-open-in{display:inline-flex;align-items:center;font-size:13px;background:var(--cyan);color:#04121a;border:1px solid var(--cyan);border-radius:8px;padding:8px 12px;min-height:40px;font-weight:700;text-decoration:none}
   .ppp button.quiet{color:var(--mut)}
   .ppp button.tiny{min-height:0;padding:2px 8px;font-size:11px;color:var(--cyan)}
+  .ppp button.tiny.primary{color:#04121a} /* the album Play button was cyan text on a cyan fill: invisible */
   .ppp button:disabled{opacity:.55;cursor:wait}
   /* every panel button answers a press; copy and share say what happened (src/radio-ppp/feedback.ts) */
   .ppp button{transition:transform .08s,background-color .2s,border-color .2s,color .2s}
@@ -813,7 +814,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=e37be657b735" defer></script>
+<script src="/xtrata-radio.js?v=39219677b471" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -829,7 +830,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=e0c93a9eb1f8')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=9152c801c6db')}).catch(function(){});
 </script>
 </body>
 </html>

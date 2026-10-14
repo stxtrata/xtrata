@@ -115,7 +115,7 @@ it('once unlocked, the tuner and lists work again', async () => {
   api.setGiftLock(false);
   api.playToken('7773');
   await vi.waitFor(() => expect(asked.includes('7773')).toBe(true), { timeout: 5000 });
-});
+}, 30000);
 
 it('pressing play on a paused foreign song starts the album instead of resuming that song', async () => {
   const api = await startOnFm();
@@ -147,19 +147,62 @@ it('a refreshed page does not resume the previous album song: it waits on the fi
   expect(String(api.getState().nowPlaying?.tokenId)).toBe('11');
 });
 
-it('leaving an album and coming back starts it from the first song again', async () => {
+it('the same album re-announced mid-listen does not restart it', async () => {
   const api = initXtrataRadio({ tokenIds: ['7777'] })!;
   api.setGiftPlayer(album);
   api.switchOn();
   await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('11'), { timeout: 5000 });
-  api.next(); await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('12'), { timeout: 5000 });
-  api.setGiftPlayer({ id: 'other', title: 'Other', subtitle: '', tracks: [21, 22] });
-  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('21'), { timeout: 5000 });
-  api.setGiftPlayer(album);
-  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('11'), { timeout: 5000 });
-  api.setGiftPlayer({ ...album }); // the same album re-announced mid-listen must not restart it
+  api.setGiftPlayer({ ...album });
   api.next(); await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('12'), { timeout: 5000 });
   api.setGiftPlayer({ ...album });
   await new Promise((r) => setTimeout(r, 80));
   expect(String(api.getState().nowPlaying?.tokenId)).toBe('12');
+}, 30000);
+
+const second = { id: 'other', title: 'Other', subtitle: '', tracks: [21, 22] };
+const nowId = (api: any) => String(api.getState().nowPlaying?.tokenId);
+
+it('switching wallets inside one session resumes each wallet where it was, cued at its position', async () => {
+  let position = 0;
+  const seeks: number[] = [];
+  vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(1); // metadata is there, so the seek is immediate
+  vi.spyOn(HTMLMediaElement.prototype, 'currentTime', 'get').mockImplementation(() => position);
+  vi.spyOn(HTMLMediaElement.prototype, 'currentTime', 'set').mockImplementation((v: number) => { seeks.push(v); });
+  const api = initXtrataRadio({ tokenIds: ['7777'] })!;
+  api.setGiftPlayer(album);
+  api.switchOn();
+  await vi.waitFor(() => expect(nowId(api)).toBe('11'), { timeout: 5000 });
+  api.next(); await vi.waitFor(() => expect(nowId(api)).toBe('12'), { timeout: 5000 });
+  position = 42;
+  api.setGiftPlayer(second);
+  await vi.waitFor(() => expect(nowId(api)).toBe('21'), { timeout: 5000 });
+  position = 0; seeks.length = 0;
+  api.setGiftPlayer(album); // back: song 12 at 42s, not song 11
+  await vi.waitFor(() => expect(nowId(api)).toBe('12'), { timeout: 5000 });
+  await vi.waitFor(() => expect(seeks).toContain(42), { timeout: 5000 });
+  await new Promise((r) => setTimeout(r, 60));
+  expect(nowId(api)).toBe('12');
+}, 30000);
+
+it('the first wallet comes back as it was after visiting an album', async () => {
+  const api = await startOnFm();
+  await vi.waitFor(() => expect(nowId(api)).not.toBe('undefined'), { timeout: 5000 });
+  const before = nowId(api);
+  api.setGiftPlayer(album);
+  await vi.waitFor(() => expect(nowId(api)).toBe('11'), { timeout: 5000 });
+  api.setGiftPlayer(null);
+  await vi.waitFor(() => expect(nowId(api)).toBe(before), { timeout: 5000 });
+}, 30000);
+
+it('locking forgets every wallet: the album starts clean at its first song', async () => {
+  const api = initXtrataRadio({ tokenIds: ['7777'] })!;
+  api.setGiftPlayer(album);
+  api.switchOn();
+  await vi.waitFor(() => expect(nowId(api)).toBe('11'), { timeout: 5000 });
+  api.next(); await vi.waitFor(() => expect(nowId(api)).toBe('12'), { timeout: 5000 });
+  api.setGiftPlayer(second);
+  await vi.waitFor(() => expect(nowId(api)).toBe('21'), { timeout: 5000 });
+  api.forgetWallets();
+  api.setGiftPlayer(album);
+  await vi.waitFor(() => expect(nowId(api)).toBe('11'), { timeout: 5000 });
 }, 30000);
