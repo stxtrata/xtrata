@@ -96,7 +96,7 @@ export function createShelf(deps: ShelfDeps) {
     pinOnly.setAttribute('aria-pressed', String(pinnedOnly));
 
     const parts: HTMLElement[] = [];
-    if (s.slot > 0) parts.push(button('← Back to my own wallet', () => deps.open(0), 'quiet'));
+    if (s.slot > 0) parts.push(button('← My player', () => deps.open(0), 'quiet'));
     if (!list.length) parts.push(el('p', 'No album matches that.', 'ppp-mute'));
     else {
       const ol = el('ul', '', 'ppp-shelf-list');
@@ -131,5 +131,13 @@ export function createShelf(deps: ShelfDeps) {
 
   /** The number of albums held, for the fold's title. */
   const count = () => total || items.length;
-  return { render, invalidate, count };
+  /** The album the listener played most recently on this device (else the newest): the switcher's second tab. */
+  const latest = (): { slot: number; title: string } | null => {
+    if (!root || !items.length) return null;
+    const rec = recents(root);
+    const best = [...items].filter((a) => a.player).sort((a, b) => (rec[b.slot] ?? 0) - (rec[a.slot] ?? 0) || b.slot - a.slot)[0];
+    return best ? { slot: best.slot, title: best.player!.title } : null;
+  };
+
+  return { render, invalidate, count, latest };
 }

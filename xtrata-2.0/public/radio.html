@@ -317,6 +317,11 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp a.ppp-open-in{display:inline-flex;align-items:center;font-size:13px;background:var(--cyan);color:#04121a;border:1px solid var(--cyan);border-radius:8px;padding:8px 12px;min-height:40px;font-weight:700;text-decoration:none}
   .ppp button.quiet{color:var(--mut)}
   .ppp button.tiny{min-height:0;padding:2px 8px;font-size:11px;color:var(--cyan)}
+  .ppp-switch{display:flex;gap:8px;margin:8px 0 10px}
+  .ppp-switch button.ppp-tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 10px;border-radius:10px}
+  .ppp-switch button.ppp-tab .tt{font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ppp-switch button.ppp-tab .ts{font-size:11px;opacity:.75}
+  .ppp-switch button.ppp-tab[aria-pressed="true"]{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--cyan);background:rgba(34,211,238,.10)}
   .ppp button.tiny.primary{color:#04121a} /* the album Play button was cyan text on a cyan fill: invisible */
   .ppp button:disabled{opacity:.55;cursor:wait}
   /* every panel button answers a press; copy and share say what happened (src/radio-ppp/feedback.ts) */
@@ -448,6 +453,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <ol class="ppp-steps" hidden aria-label="Pay-per-play stages"></ol>
       <p class="ppp-stage" hidden></p>
       <!-- Top to bottom: what to do now, the wallet box when it needs a tap, buttons; details folded below. -->
+      <div class="ppp-switch" hidden></div>
       <div class="ppp-key"></div>
       <p class="ppp-frame-label" hidden><span>Listening wallet · approvals happen in this box</span></p>
       <div class="ppp-frame" hidden></div>
@@ -814,7 +820,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=39219677b471" defer></script>
+<script src="/xtrata-radio.js?v=c8110418c4bc" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -830,7 +836,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=9152c801c6db')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=5d20cd2f8393')}).catch(function(){});
 </script>
 </body>
 </html>

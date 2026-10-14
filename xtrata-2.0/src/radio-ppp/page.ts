@@ -190,7 +190,7 @@ function start(root: HTMLElement) {
       radio.setGiftPlayer(p ? { id: p.id, title: p.title, subtitle: p.subtitle, tracks: p.tracks.map((t) => t.id) } : null);
       giftPushed = id;
     }
-    const stop = p ? s.giftStop?.text ?? null : null;
+    const stop = s.giftStop?.text ?? null; // any passkey wallet is paid-only, not just a gifted album
     if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
     const lock = !!p && !!s.albumLock?.locked;
     if (lock !== lockPushed) { radio.setGiftLock?.(lock); lockPushed = lock; }
@@ -501,7 +501,7 @@ function start(root: HTMLElement) {
     const listeningRow = () => {
       if (!s.listening) return;
       const copy = copyButton('copy-listening', 'Copy', () => s.listening || '', 'tiny', () => render(ppp.snapshot()));
-      rows.push(...fact(s.linked ? 'Listening wallet (technical)' : 'Listening wallet', short(s.listening), 'ppp-addr-short', copy));
+      rows.push(...fact(s.slot > 0 ? 'Album wallet' : s.linked ? 'My player (technical)' : 'My player wallet', short(s.listening), 'ppp-addr-short', copy));
     };
     if (!s.linked) listeningRow();
     // Which main wallet this listening wallet serves: its likes and paid plays count for that wallet.
@@ -665,10 +665,10 @@ function start(root: HTMLElement) {
     if (s.solo && s.walletCannotSolo)
       lines.push(el('p', 'The listening wallet box is still updating. Paid plays work; returning to another address and likes start working once it has.', 'ppp-warn'));
     if (s.solo && ['fund', 'ready'].includes(s.step)) {
-      if ((s.balance ?? 0n) > 0n) lines.push(returnPicker(s));
+      if ((s.balance ?? 0n) > 0n && s.slot === 0) lines.push(returnPicker(s));
       lines.push(walletTip());
       // Once a paid play has landed, a single quiet pointer outside the fold. Never a blocker.
-      if (s.step === 'ready' && (s.entries as Shown[]).some((e) => e.kind === 'play' && e.status === 'confirmed')) {
+      if (s.slot === 0 && s.step === 'ready' && (s.entries as Shown[]).some((e) => e.kind === 'play' && e.status === 'confirmed')) {
         const tip = el('p', 'New to Stacks? ', 'ppp-mute');
         tip.append(link('Get Xverse or Leather', 'https://www.xverse.app/download'), ' (free) to keep your plays and likes under a wallet of your own.');
         key.push(tip);
@@ -699,7 +699,7 @@ function start(root: HTMLElement) {
     // Gift edition: the interface speaks in plays, not STX. Whatever the radio is doing, the meter says how many are left.
     if (s.gift?.player && ['fund', 'ready', 'over', 'locked', 'link', 'loading'].includes(s.step)) {
       const head = el('p', '', 'ppp-gift');
-      head.append(`🎁 Gift Edition · ${s.gift.player.title}`);
+      head.append(`💿 Album · ${s.gift.player.title}`);
       if (s.gift.player.subtitle) head.append(' · ', s.gift.player.subtitle);
       const meter = ['ready', 'fund', 'over'].includes(s.step) && s.balance !== undefined
         ? el('span', s.giftPlays === 0 ? ' · no plays left' : ` · ${s.giftPlays.toLocaleString()} ${s.giftPlays === 1 ? 'play' : 'plays'} left`, s.giftPlays === 0 ? 'ppp-bad' : s.giftPlays <= 20 ? 'ppp-warn' : 'ppp-ok')
@@ -744,6 +744,29 @@ function start(root: HTMLElement) {
     if (s.solo && s.creditedTo && s.listening && !['intro', 'off', 'elsewhere', 'loading'].includes(s.step))
       key.unshift(el('p', `This is ${who(s.creditedTo)}'s listening wallet. Plays and likes count for ${who(s.creditedTo)}. Connect it (top right) to see its likes here too.`, 'ppp-ok'));
     $('.ppp-key').replaceChildren(...key);
+    // The two places a listener can be: the open-world player (wallet 0), and the album that is open (or was last). Every
+    // other album is picked from "My albums", which then takes the second tab's place.
+    const switcher = document.querySelector('.ppp-switch') as HTMLElement | null;
+    if (switcher) {
+      const latestAlbum = shelf.latest();
+      const inAlbum = s.slot > 0;
+      const show = ['fund', 'ready', 'over'].includes(s.step) && (inAlbum || !!latestAlbum);
+      switcher.hidden = !show;
+      if (show) {
+        const tab = (title: string, bal: bigint | undefined, active: boolean, run: () => void) => {
+          const b = button('', run, 'ppp-tab') as HTMLButtonElement;
+          b.setAttribute('aria-pressed', String(active));
+          b.append(el('span', title, 'tt'), el('span', bal === undefined ? '…' : `${stxShort(bal)} STX`, 'ts'));
+          b.disabled = !!s.busy;
+          return b;
+        };
+        const albumTitle = inAlbum ? s.gift?.player?.title ?? 'Album' : latestAlbum!.title;
+        switcher.replaceChildren(
+          tab('🎧 My player', inAlbum ? s.likeFunds?.balance : s.balance, !inAlbum, () => { if (inAlbum) void ppp.openAlbum(0); }),
+          tab('💿 ' + albumTitle, inAlbum ? s.balance : undefined, inAlbum, () => { if (!inAlbum && latestAlbum) void ppp.openAlbum(latestAlbum.slot); })
+        );
+      }
+    }
     const shelfBox = shelf.render(s);
     const shelfFold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
     if (shelfFold) {
