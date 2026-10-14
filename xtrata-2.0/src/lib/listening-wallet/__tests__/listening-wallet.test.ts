@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getAddressFromPrivateKey, TransactionVersion, makeRandomPrivKey, privateKeyToString, createStacksPrivateKey, signMessageHashRsv } from '@stacks/transactions';
-import { deriveListeningIdentity, LISTENING_HKDF_INFO, LISTENING_PRF_SALT } from '../derive';
+import { deriveListeningIdentity, deriveSlotIdentity, isSlot, LISTENING_HKDF_INFO, LISTENING_PRF_SALT, listeningBase, MAX_SLOT, slotInfo } from '../derive';
+import { signSlotBinding, validateSlotBinding, verifySlotSignature } from '../slots';
 import { linkHash, signLink, validateLinkRequest, verifyLinkSignature, LINK_MAX_AGE_MS } from '../link';
 import {
   balanceState, costPerPlay, fundingAllowance, playsCovered, returnPlan, SessionLedger, stx, TARGET,
@@ -31,6 +32,67 @@ describe('listening key derivation', () => {
   });
   it('refuses short PRF output rather than weakening the key', async () => {
     await expect(deriveListeningIdentity(new Uint8Array(16))).rejects.toThrow(/at least 32/);
+  });
+});
+
+describe('derived wallets (slots) of one passkey', () => {
+  it('slot 0 is the wallet every listener already has; other slots are locked by known answers too', async () => {
+    // Scalars cross-checked with an independent RFC 5869 HKDF (Python hmac/hashlib), info = <label>/slot/<n>.
+    expect(slotInfo(0)).toBe('xtrata-radio-listening-key-v1');
+    expect(slotInfo(7)).toBe('xtrata-radio-listening-key-v1/slot/7');
+    const base = await listeningBase(prf);
+    expect(await deriveSlotIdentity(base, 0)).toEqual(await deriveListeningIdentity(prf));
+    const vectors: [number, string, string][] = [
+      [1, 'f2fecabcfbba3ab1e1e152fded76aedd5ec4905a5ea795419c8fc127bf15fdda', 'SP3ANJ3MWZKPPAEN8JAHBXA7QZ85GDHDZR47V8ZC1'],
+      [2, 'c8f67d6af10c2920b9cdccf8f17e6453ec7fd793e027f76a6a49bb2c2ea21f96', 'SP1H6JGJNMR9KJPKGSR70TDRDBGH0TZZKAH9Q2THA'],
+      [100, '016e24b2fa32ea2090641eb1321a04a292771c8b2fce57a6ad17589dca220cab', 'SP1GV2VVEV8640AZ109BM721GEVQMPFPFWW8995NV']
+    ];
+    for (const [slot, scalar, address] of vectors) {
+      const id = await deriveSlotIdentity(base, slot);
+      expect(id.privateKey).toBe(scalar + '01');
+      expect(id.address).toBe(address);
+    }
+  });
+  it('gives a different wallet per slot, the same wallet each time, and a different set per passkey', async () => {
+    const base = await listeningBase(prf);
+    const addrs = new Set<string>();
+    for (let n = 0; n < 40; n++) addrs.add((await deriveSlotIdentity(base, n)).address);
+    expect(addrs.size).toBe(40);
+    expect((await deriveSlotIdentity(await listeningBase(prf.slice()), 5)).address).toBe((await deriveSlotIdentity(base, 5)).address);
+    const other = Uint8Array.from(prf); other[0] ^= 1;
+    expect((await deriveSlotIdentity(await listeningBase(other), 5)).address).not.toBe((await deriveSlotIdentity(base, 5)).address);
+  });
+  it('keeps the secret non-extractable and refuses slots out of range', async () => {
+    const base = await listeningBase(prf);
+    expect(base.extractable).toBe(false);
+    await expect(crypto.subtle.exportKey('raw', base)).rejects.toBeTruthy();
+    for (const bad of [-1, 1.5, MAX_SLOT + 1, NaN, '1' as unknown as number]) await expect(deriveSlotIdentity(base, bad)).rejects.toThrow(/not available/);
+    expect(isSlot(0) && isSlot(MAX_SLOT) && !isSlot(MAX_SLOT + 1)).toBe(true);
+    await expect(listeningBase(new Uint8Array(16))).rejects.toThrow(/at least 32/);
+  });
+  it('a binding needs BOTH keys, and neither signature works for another address, slot or time', async () => {
+    const base = await listeningBase(prf);
+    const root = await deriveSlotIdentity(base, 0), slot = await deriveSlotIdentity(base, 3), now = 1_760_000_000_000;
+    const b = { root: root.address, slot: 3, address: slot.address, issued: now };
+    expect(() => validateSlotBinding(b, now)).not.toThrow();
+    const rootSig = signSlotBinding(b, root.privateKey), slotSig = signSlotBinding(b, slot.privateKey);
+    expect(verifySlotSignature(b, rootSig, root.address) && verifySlotSignature(b, slotSig, slot.address)).toBe(true);
+    expect(verifySlotSignature(b, rootSig, slot.address)).toBe(false);
+    expect(verifySlotSignature({ ...b, slot: 4 }, rootSig, root.address)).toBe(false);
+    expect(verifySlotSignature({ ...b, address: root.address }, slotSig, slot.address)).toBe(false);
+    expect(verifySlotSignature({ ...b, issued: now + 1 }, slotSig, slot.address)).toBe(false);
+    expect(verifySlotSignature(b, 'nope', root.address)).toBe(false);
+    // a signature made for the link message cannot be replayed as a binding
+    expect(verifySlotSignature(b, signLink({ main: root.address, listening: slot.address, issued: now }, root.privateKey), root.address)).toBe(false);
+  });
+  it('validates addresses, slot number and freshness', async () => {
+    const base = await listeningBase(prf);
+    const root = await deriveSlotIdentity(base, 0), slot = await deriveSlotIdentity(base, 1), now = 1_760_000_000_000;
+    const ok = { root: root.address, slot: 1, address: slot.address, issued: now };
+    expect(() => validateSlotBinding({ ...ok, slot: 0 }, now)).toThrow(/1 or more/);
+    expect(() => validateSlotBinding({ ...ok, address: root.address }, now)).toThrow(/different/);
+    expect(() => validateSlotBinding({ ...ok, issued: now - LINK_MAX_AGE_MS - 1 }, now)).toThrow(/expired/);
+    expect(() => validateSlotBinding({ ...ok, root: 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG' }, now)).toThrow();
   });
 });
 
