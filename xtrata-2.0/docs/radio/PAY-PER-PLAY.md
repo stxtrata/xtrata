@@ -281,9 +281,18 @@ one whose user id is the one the frame chose, so an older passkey synced to the 
 (even after the site data was cleared). The usual second sign-in then checks PRF is stable before the address is
 shown. Other browsers still create inside the frame.
 
-**Gifts claim only into a wallet created in this browser** (`createdHere`, remembered per listening address by the
-radio). A wallet unlocked from a passkey made elsewhere shows the gift link as one quiet line, with "Forget this
-gift link here"; the server also refuses a second gift for the same wallet.
+**Gifts claim only into a brand-new wallet**: one created in this browser (`createdHere`, remembered per listening
+address by the radio), or one that has never been used (`brandNew`: confirmed balance 0 and confirmed nonce 0, which
+covers a passkey made in the new tab after the radio page reloaded). A wallet unlocked from an older passkey shows
+the gift link as one quiet line, with "Forget this gift link here"; the server also refuses a second gift for the
+same wallet.
+
+**Apps' built-in browsers.** A link tapped inside Instagram, Facebook, X, TikTok, LinkedIn and similar opens in the
+app's own web view, where passkeys are unreliable. Those views name their app in the user agent
+(`src/radio-ppp/in-app.ts`), so the panel leads with "You are in Instagram's built-in browser…", an "Open in Safari"
+link (`x-safari-https://…` on iPhone, a Chrome intent on Android) that carries any waiting gift code, and "Copy
+link". The usual buttons stay below it. Apps that use Safari's own view (Messages, Mail) keep Safari's user agent and
+are not flagged. Not yet tried on real phones: which apps honour the "Open in Safari" link.
 
 Wallet box deploy now uploads `create.html` too (same command). Check it is live:
 `curl -s -o /dev/null -w '%{http_code}\n' https://wallet.xtrata.xyz/create` prints 200.
@@ -302,12 +311,14 @@ wallets).
 - [ ] Second tab: shows "already running in another tab", plays free.
 - [ ] Send 0.5 STX extra from another wallet: radio shows the over-1-STX warning; Return excess
       leaves exactly 1 STX; Return all leaves 0. Both land in the linked main wallet.
-- [ ] iPhone Safari and Android Chrome: create and unlock (PRF inside a cross-origin iframe has only
-      been tested in desktop Chrome's virtual authenticator so far).
-- [ ] Desktop Safari, Firefox, Edge: note which say "not available here" (iPhone Edge failed PRF
-      in the July spike).
-- [ ] Synced passkey on a second device: "I already have a listening wallet" unlocks the same
-      address and restores the link.
+- [x] iPhone Safari (iOS 26), 13 Oct: unlock and PRF inside the frame work; creating inside the frame does not, so the
+      passkey is made in a new tab (#507). Gift claimed, paid plays and a like confirmed on chain.
+- [ ] Android Chrome: create and unlock inside the frame (expected to work, as in desktop Chrome).
+- [ ] Desktop Safari: create in the new tab, unlock in the frame.
+- [ ] Apps' built-in browsers on iPhone (X, Instagram, WhatsApp, Telegram, LinkedIn): does "Open in Safari" open
+      Safari with the gift, and does anything work in place?
+- [x] Synced passkey on a second device, 13 Oct: "I already have a listening wallet" on the iPhone unlocked a wallet
+      made on the Mac (same address).
 - [ ] Cover the wallet frame (e.g. dev tools opacity 0.3): confirm is refused in Chrome.
 - [ ] Kill switch: set `RADIO_PPP_ENABLED=0`, redeploy, confirm the panel disappears and no new plays pay.
 - [ ] Record txids and results in docs/radio/reports/.
