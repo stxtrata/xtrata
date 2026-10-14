@@ -126,3 +126,40 @@ it('pressing play on a paused foreign song starts the album instead of resuming 
   api.playPause();
   await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('11'), { timeout: 5000 });
 });
+
+it('a freshly opened album starts at its first song even if later songs aired before', async () => {
+  localStorage.setItem('xtrata.radio.played.v1', JSON.stringify(['11']));
+  const api = initXtrataRadio({ tokenIds: ['7777'] })!;
+  api.setGiftPlayer(album);
+  api.playPause();
+  await vi.waitFor(() => expect(asked[0]).toBe('11'), { timeout: 5000 });
+  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('11'), { timeout: 5000 });
+});
+
+it('a refreshed page does not resume the previous album song: it waits on the first song', async () => {
+  localStorage.setItem('xtrata.radio.v1', JSON.stringify({ on: true, tokenId: '13', position: 42, paused: true }));
+  const api = initXtrataRadio({ tokenIds: ['7777'] })!;
+  api.setGiftPlayer(album);
+  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('11'), { timeout: 5000 });
+  api.playPause();
+  await vi.waitFor(() => expect(asked.includes('11')).toBe(true), { timeout: 5000 });
+  await new Promise((r) => setTimeout(r, 60));
+  expect(String(api.getState().nowPlaying?.tokenId)).toBe('11');
+});
+
+it('leaving an album and coming back starts it from the first song again', async () => {
+  const api = initXtrataRadio({ tokenIds: ['7777'] })!;
+  api.setGiftPlayer(album);
+  api.switchOn();
+  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('11'), { timeout: 5000 });
+  api.next(); await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('12'), { timeout: 5000 });
+  api.setGiftPlayer({ id: 'other', title: 'Other', subtitle: '', tracks: [21, 22] });
+  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('21'), { timeout: 5000 });
+  api.setGiftPlayer(album);
+  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('11'), { timeout: 5000 });
+  api.setGiftPlayer({ ...album }); // the same album re-announced mid-listen must not restart it
+  api.next(); await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('12'), { timeout: 5000 });
+  api.setGiftPlayer({ ...album });
+  await new Promise((r) => setTimeout(r, 80));
+  expect(String(api.getState().nowPlaying?.tokenId)).toBe('12');
+}, 30000);

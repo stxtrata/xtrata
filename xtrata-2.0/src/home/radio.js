@@ -831,16 +831,38 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     window.setTimeout(() => { void preloadNextTrack(); }, 150);
   }
 
-  // The album just became the music (loaded, or locked): drop what was cued for the old mode and "previous" history
-  // from outside it, and if a foreign song is on air move to the album's first song (unless the listener paused).
-  const enterAlbum = () => {
+  // A freshly opened album always starts at its first song: a first load, a page refresh (which would
+  // otherwise resume the previous song), or coming back from another album. Stays set until a tune consumes it.
+  let albumStartPending = false;
+
+  // Show the album's first song as the one waiting, without touching the audio (the listener has paused or
+  // the browser will not autoplay): pressing play then tunes to it (see playPause).
+  const showAlbumStart = async (id) => {
+    const track = await resolveTrack(String(id));
+    if (!track || !albumStartPending || !giftPlayer || giftPlayer.tracks[0] !== String(id)) return;
+    nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', album: track.album || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
+    writeScreen('PRESS ▶ TO PLAY');
+    emit();
+  };
+
+  // The album just became the music (loaded, locked, or freshly opened): drop what was cued for the old mode and
+  // "previous" history from outside it, and if a foreign song is on air (or the album is freshly opened) move to
+  // the album's first song, unless the listener paused or the browser needs a tap first.
+  const enterAlbum = (fresh = false) => {
     if (!giftPlayer) return;
+    if (fresh) {
+      albumStartPending = true;
+      // a new listen of the album: songs heard last time must not be skipped by the no-repeat cycle
+      giftPlayer.tracks.forEach((id) => played.delete(id));
+      savePlayed();
+    }
     preloadQueue.length = 0;
     if (gated()) history.splice(0, history.length, ...history.filter((t) => inAlbum(t.tokenId)));
-    if (!on) return;
-    if (currentTokenId && inAlbum(currentTokenId)) { requeueForMode(); return; }
-    forcedNext = giftPlayer.tracks[0];
-    if (giftStop || manualPause) return; // the first album song starts at the next play
+    const firstId = giftPlayer.tracks[0];
+    if (!on) { if (albumStartPending) forcedNext = firstId; return; }
+    if (!albumStartPending && currentTokenId && inAlbum(currentTokenId)) { requeueForMode(); return; }
+    forcedNext = firstId;
+    if (giftStop || manualPause) { void showAlbumStart(firstId); return; } // the first album song starts at the next play
     pauseOwn();
     void tuneToNextTrack();
   };
@@ -1355,6 +1377,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     // with forcedNext already spent — so the retry picked a random track and the
     // listener got a song they never chose, with nothing said about it.
     const requestedId = forcedNext;
+    albumStartPending = false;
     tuneInFlight = true;
     // Only the CURRENT tune may lower the flag. A superseded tune returning early
     // would otherwise clear it while the newer one is still swapping src — reopening
@@ -1626,7 +1649,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       currentTokenId = track.tokenId || null;
       nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', album: track.album || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
       emit();
+      const resumedTune = tuneToken;
       const begin = () => {
+        if (tuneToken !== resumedTune) return; // the listener already moved on (e.g. an album starting at its first song)
         try { if (Number(saved.position) > 1 && player.currentTime < 1) player.currentTime = Number(saved.position); } catch { /* noop */ }
         currentTokenId = track.tokenId || null;
         setNow('', true);
@@ -1647,12 +1672,16 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         player.addEventListener('playing', begin, { once: true });
         emit();
       };
-      if (saved.paused) { waitForPlay('PAUSED — PRESS ▶ TO PLAY'); return; }
+      // The album may have loaded while this was still resolving: it starts at its first song, not here.
+      const albumFirst = () => { if (giftPlayer && albumStartPending) enterAlbum(); };
+      if (saved.paused) { waitForPlay('PAUSED — PRESS ▶ TO PLAY'); albumFirst(); return; }
       try {
         await player.play();
         begin();
+        albumFirst();
       } catch {
         waitForPlay('▶ PRESS PLAY TO RESUME');
+        albumFirst();
       }
     };
     void resume();
@@ -1668,7 +1697,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     playPause: () => {
       if (giftStop && (!on || player.paused)) { if (!on) switchOn(); else refuseForGift(); return; }
       if (!on) { switchOn(); }
-      else if (player.paused && band === 'gift' && giftPlayer && currentTokenId && !inAlbum(currentTokenId)) { manualPause = false; void tuneToNextTrack(); }
+      else if (player.paused && band === 'gift' && giftPlayer && (albumStartPending || (currentTokenId && !inAlbum(currentTokenId)))) { manualPause = false; void tuneToNextTrack(); }
       else if (player.paused) { manualPause = false; player.play().catch(() => { void tuneToNextTrack(); }); }
       else { manualPause = true; player.pause(); }
     },
@@ -1701,12 +1730,13 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       const tracks = def && Array.isArray(def.tracks) ? def.tracks.map(String).filter((id) => /^\d{1,9}$/.test(id)).slice(0, 40) : [];
       if (!tracks.length) {
         giftPlayer = null;
+        albumStartPending = false;
         if (band === 'gift') setBand('fm'); else emit();
         return;
       }
       const first = !giftPlayer || giftPlayer.id !== def.id;
       giftPlayer = { id: String(def.id || ''), title: String(def.title || '').slice(0, 60), subtitle: String(def.subtitle || '').slice(0, 80), tracks };
-      if (first) { setBand('gift'); enterAlbum(); } else emit();
+      if (first) { setBand('gift'); enterAlbum(true); } else emit();
     },
     /** While locked, the loaded album is the only band: no FM, LIKED or CHAIN. A page default, not security. */
     setGiftLock: (on) => {
