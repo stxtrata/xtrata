@@ -53,6 +53,12 @@ export type WalletMethod =
   | 'listening.signLike'
   /** Show a return review inside the frame; sign only if the listener confirms. */
   | 'listening.prepareReturn'
+  /** Address of one of this passkey's derived wallets (unlocked only; moves nothing). */
+  | 'listening.slotAddress'
+  /** Switch the open wallet to another of this passkey's wallets, without another passkey tap. */
+  | 'listening.openSlot'
+  /** Both the first wallet and the derived one sign that they belong together (no spending, no popup). */
+  | 'listening.bindSlot'
   /** Withdraw a waiting panel, as if the listener pressed Cancel. Can never approve anything. */
   | 'listening.cancel'
   /** Stop paying but stay unlocked. */
@@ -73,6 +79,9 @@ export const WALLET_METHODS: readonly WalletMethod[] = [
   'listening.signPlay',
   'listening.signLike',
   'listening.prepareReturn',
+  'listening.slotAddress',
+  'listening.openSlot',
+  'listening.bindSlot',
   'listening.cancel',
   'listening.stop',
   'listening.lock'

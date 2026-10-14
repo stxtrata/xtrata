@@ -9,15 +9,16 @@
  * confirmed INSIDE this frame, so the embedding page can ask but cannot approve.
  */
 import { makeContractCall, makeSTXTokenTransfer } from '@stacks/transactions';
-import { deriveListeningIdentity, type ListeningIdentity } from '../../lib/listening-wallet/derive';
+import { deriveSlotIdentity, isSlot, listeningBase, type ListeningIdentity } from '../../lib/listening-wallet/derive';
+import { signSlotBinding, validateSlotBinding } from '../../lib/listening-wallet/slots';
 import { isMainnetStandardAddress, signLink, verifyLinkSignature } from '../../lib/listening-wallet/link';
 import {
   costPerPlay, LIKE_FEE, RESERVE, returnPlan, SessionLedger, stx, TARGET, validateSessionTerms, type SessionTerms
 } from '../../lib/listening-wallet/policy';
 import { likeCallOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
 import type {
-  LinkParams, LinkResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams, SignPlayParams,
-  StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
+  BindSlotParams, BindSlotResult, LinkParams, LinkResult, OpenSlotResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams,
+  SignPlayParams, SlotAddressResult, SlotParams, StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
 } from '../../lib/listening-wallet/messages';
 import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
 
@@ -147,7 +148,12 @@ export function createListeningEngine(deps: {
   now?: () => number;
 }) {
   const now = deps.now ?? Date.now;
+  /** The open wallet: the passkey's own (slot 0) or one derived from it for an album (slot n). */
   let identity: ListeningIdentity | null = null;
+  /** The passkey's own wallet, and the non-extractable key every other wallet is derived from. Both drop on lock. */
+  let root: ListeningIdentity | null = null;
+  let base: CryptoKey | null = null;
+  let slot = 0;
   let credentialId: string | null = null;
   let ledger: SessionLedger | null = null;
   let interactive = false;
@@ -203,7 +209,7 @@ export function createListeningEngine(deps: {
     if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
     if (identity) {
       const open = record(credentialId);
-      return { state: 'unlocked', address: identity.address, linked: open?.link?.main, ...othersOf(open, main), session: summary(), features };
+      return { state: 'unlocked', address: identity.address, slot, linked: open?.link?.main, ...othersOf(open, main), session: summary(), features };
     }
     const last = pick(main);
     return last
@@ -211,7 +217,7 @@ export function createListeningEngine(deps: {
       : { state: 'none', ...othersOf(undefined, main), session: null, features };
   };
   const refreshIdle = () => deps.ui.idle(status(viewMain));
-  const lockNow = () => { identity = null; ledger = null; credentialId = null; unlockedFor = undefined; };
+  const lockNow = () => { identity = null; root = null; base = null; slot = 0; ledger = null; credentialId = null; unlockedFor = undefined; };
 
   /** One panel at a time: the listener answers inside the frame, so stacking prompts would confuse. */
   async function interact<T>(run: () => Promise<T>): Promise<T> {
@@ -225,7 +231,7 @@ export function createListeningEngine(deps: {
     return identity;
   };
 
-  async function create(terms?: SessionTerms, main?: string): Promise<ListeningIdentity> {
+  async function create(terms?: SessionTerms, main?: string): Promise<{ id: ListeningIdentity; base: CryptoKey }> {
     const existing = load().wallets;
     const exclude = main ? [] : existing.map((w) => w.credentialId);
     const name = main ? `Xtrata listening wallet · ${short(main)}` : undefined;
@@ -308,10 +314,11 @@ export function createListeningEngine(deps: {
       }
       if (!equalBytes(outputs[0], outputs[1]))
         throw new Error('This passkey did not give a stable result, so pay-per-play is not available on this device. Nothing was funded. Listening stays free.');
-      const id = await deriveListeningIdentity(outputs[0]);
+      const key = await listeningBase(outputs[0]);
+      const id = await deriveSlotIdentity(key, 0);
       credentialId = created.credentialId;
       remember({ credentialId: created.credentialId, address: id.address });
-      return id;
+      return { id, base: key };
     } finally {
       outputs.forEach((o) => o.fill(0));
     }
@@ -320,7 +327,7 @@ export function createListeningEngine(deps: {
   /** A name from the page, kept to plain letters, digits and . _ - so it cannot carry anything but a name. */
   const cleanLabel = (v: unknown) => (typeof v === 'string' ? v.replace(/[^\p{L}\p{N}._ -]/gu, '').trim().slice(0, 40) : '');
 
-  async function unlockExisting(anyPasskey = false, terms?: SessionTerms, label?: string, forMain?: string): Promise<ListeningIdentity> {
+  async function unlockExisting(anyPasskey = false, terms?: SessionTerms, label?: string, forMain?: string): Promise<{ id: ListeningIdentity; base: CryptoKey }> {
     const last = anyPasskey ? undefined : pick(forMain);
     // A listening wallet linked to a main wallet is that person's wallet: greet them by it. The listening
     // address is plumbing for them. Without a link (passkey-only) the listening address is the identity.
@@ -357,12 +364,13 @@ export function createListeningEngine(deps: {
         if (again.credentialId !== r.credentialId || !equalBytes(r.prf, again.prf))
           throw new Error('This passkey did not give a stable result on this device. Nothing was signed. Use the device where you created it.');
       }
-      const id = await deriveListeningIdentity(r.prf);
+      const key = await listeningBase(r.prf);
+      const id = await deriveSlotIdentity(key, 0);
       if (known && known.address !== id.address)
         throw new Error('This passkey no longer gives the same wallet on this device. Nothing was signed. Use another device to return its funds.');
       credentialId = r.credentialId;
       remember({ ...(known ?? {}), credentialId: r.credentialId, address: id.address });
-      return id;
+      return { id, base: key };
     } finally {
       r.prf.fill(0);
       second?.fill(0);
@@ -401,8 +409,10 @@ export function createListeningEngine(deps: {
       if (!identity) {
         // The terms are shown on the same panel as the passkey button, so that one confirm click
         // inside the frame both unlocks and approves paying as you listen.
-        const id = p.mode === 'create' ? await create(terms, main) : await unlockExisting(p.anyPasskey === true, terms, p.label, main);
-        identity = id;
+        const opened = p.mode === 'create' ? await create(terms, main) : await unlockExisting(p.anyPasskey === true, terms, p.label, main);
+        identity = root = opened.id;
+        base = opened.base;
+        slot = 0;
         unlockedFor = main;
         if (terms) ledger = new SessionLedger(terms, now());
       } else if (terms) await approve(terms, 'Approve paying as you listen');
@@ -414,6 +424,8 @@ export function createListeningEngine(deps: {
     // link for an address they control.
     'listening.link': (params: unknown): Promise<LinkResult> => interact(async () => {
       const id = requireUnlocked();
+      // The link belongs to the passkey and is signed by its own wallet; albums inherit it through their binding.
+      if (slot !== 0) throw new Error('Open your own listening wallet to link a main wallet.');
       const p = params as LinkParams;
       const link = { main: p?.main, listening: id.address, issued: p?.issued };
       if (!isMainnetStandardAddress(link.main) || link.main === id.address || !Number.isSafeInteger(link.issued))
@@ -440,6 +452,41 @@ export function createListeningEngine(deps: {
       remember({ credentialId: credentialId!, address: id.address, ...(rec ?? {}), link: { main: link.main, issued: link.issued, mainSignature: p.mainSignature } });
       return { main: link.main, listening: id.address, issued: link.issued, listeningSignature: signLink(link, id.privateKey) };
     }),
+
+    // One passkey, many wallets: other wallets are derived on demand from the key held since unlock, so none of
+    // these need another passkey tap. They only choose WHICH of the passkey's wallets is open; nothing here
+    // can move money or change where returns go (that stays with the passkey's link, confirmed in a panel).
+    'listening.slotAddress': async (params: unknown): Promise<SlotAddressResult> => {
+      requireUnlocked();
+      const n = (params as SlotParams | undefined)?.slot;
+      if (!isSlot(n) || !base) throw new Error('That wallet number is not available.');
+      return { slot: n, address: (await deriveSlotIdentity(base, n)).address };
+    },
+
+    'listening.openSlot': async (params: unknown): Promise<OpenSlotResult> => {
+      requireUnlocked();
+      const n = (params as SlotParams | undefined)?.slot;
+      if (!isSlot(n) || !base) throw new Error('That wallet number is not available.');
+      if (signing) throw new Error('Still signing. Switch again in a moment.');
+      if (interactive) throw new Error('The listening wallet is waiting for you in its panel.');
+      if (n === slot) return { slot, address: identity!.address, session: summary() };
+      const next = await deriveSlotIdentity(base, n);
+      if (!identity || !base || signing) throw new Error('Wallet locked or busy. Nothing changed.');
+      identity = next;
+      slot = n;
+      refreshIdle();
+      return { slot, address: next.address, session: summary() };
+    },
+
+    'listening.bindSlot': async (params: unknown): Promise<BindSlotResult> => {
+      requireUnlocked();
+      const p = params as BindSlotParams | undefined;
+      if (!base || !root) throw new Error('Unlock the listening wallet first.');
+      if (!isSlot(p?.slot)) throw new Error('That wallet number is not available.');
+      const derived = await deriveSlotIdentity(base, p!.slot);
+      const binding = validateSlotBinding({ root: root.address, slot: p!.slot, address: derived.address, issued: p!.issued }, now());
+      return { ...binding, rootSignature: signSlotBinding(binding, root.privateKey), slotSignature: signSlotBinding(binding, derived.privateKey) };
+    },
 
     'listening.approveSession': (params: unknown): Promise<SessionSummary> => interact(async () => {
       requireUnlocked();

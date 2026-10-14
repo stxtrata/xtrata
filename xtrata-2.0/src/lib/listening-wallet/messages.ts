@@ -26,6 +26,8 @@ export interface StatusResult {
    */
   others?: string[];
   session: SessionSummary | null;
+  /** Which of the passkey's wallets is open (0 = the listener's own wallet; others belong to albums). Only while unlocked. */
+  slot?: number;
   /**
    * What this wallet build can do, so the radio can tell an out-of-date wallet box (deployed
    * separately) from a broken one. Absent on builds older than this field.
@@ -37,9 +39,10 @@ export interface StatusResult {
  * Features of the current wallet build: `cancel` (listening.cancel), `like` (listening.signLike at LIKE_FEE),
  * `standalone` (returns to a page-supplied destination and likes without a linked main wallet),
  * `multi` (one listening wallet per main-wallet address: status, unlock and create take the connected `main`),
- * `partial` (listening.prepareReturn accepts mode `amount` with an `amount`, to return part of the balance).
+ * `partial` (listening.prepareReturn accepts mode `amount` with an `amount`, to return part of the balance),
+ * `slots` (listening.slotAddress, listening.openSlot and listening.bindSlot: one passkey, many derived wallets).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {
@@ -134,4 +137,33 @@ export interface ReturnResult extends SignedResult {
   fee: string;
   recipient: string;
   mode: 'excess' | 'all' | 'amount';
+}
+
+/** `listening.slotAddress`: the address of one of this passkey's wallets. Needs an unlocked wallet; moves nothing. */
+export interface SlotParams {
+  slot: number;
+}
+export interface SlotAddressResult {
+  slot: number;
+  address: string;
+}
+/** `listening.openSlot`: make that wallet the open one (plays, likes and returns then use it). No passkey tap. */
+export interface OpenSlotResult extends UnlockResult {
+  slot: number;
+}
+/**
+ * `listening.bindSlot`: both the passkey's first wallet and the derived wallet sign that the derived one belongs to
+ * the first (see slots.ts). The page sends the pair to the server, so credit follows the root's link.
+ */
+export interface BindSlotParams {
+  slot: number;
+  issued: number;
+}
+export interface BindSlotResult {
+  root: string;
+  slot: number;
+  address: string;
+  issued: number;
+  rootSignature: string;
+  slotSignature: string;
 }

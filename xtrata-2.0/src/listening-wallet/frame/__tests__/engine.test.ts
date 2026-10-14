@@ -6,6 +6,7 @@ import {
 import { createListeningEngine, CancelledError, type Panel, type PasskeyPort } from '../engine';
 import { deriveListeningIdentity } from '../../../lib/listening-wallet/derive';
 import { linkHash, verifyLinkSignature } from '../../../lib/listening-wallet/link';
+import { verifySlotSignature } from '../../../lib/listening-wallet/slots';
 import { MIN_LIKE_INTERVAL_MS, MIN_PLAY_INTERVAL_MS, TARGET } from '../../../lib/listening-wallet/policy';
 import { LIKES_CONTRACT } from '../../../lib/listening-wallet/tx';
 import { assertNoSecrets } from '../../../lib/wallet/passkey/bridge/protocol';
@@ -53,7 +54,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -76,7 +77,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots'] });
     expect(s.map.size).toBe(0);
   });
 
@@ -520,5 +521,115 @@ describe('one listening wallet per main-wallet address', () => {
     const b = box();
     for (let i = 0; i < 27; i++) await b.h['listening.unlock']({ mode: 'create' }), await b.h['listening.lock']();
     expect(JSON.parse(b.map.get('xtrata.listening-wallet.v1')!).wallets).toHaveLength(25);
+  });
+});
+
+describe('one passkey, many wallets (slots)', () => {
+  const SLOT1 = 'SP3ANJ3MWZKPPAEN8JAHBXA7QZ85GDHDZR47V8ZC1';
+  const SLOT2 = 'SP1H6JGJNMR9KJPKGSR70TDRDBGH0TZZKAH9Q2THA';
+
+  it('gives the address of any slot without a tap, only while unlocked, and never key material', async () => {
+    const s = setup();
+    await expect(s.h['listening.slotAddress']({ slot: 1 })).rejects.toThrow(/Unlock/);
+    await s.h['listening.unlock']({ mode: 'create' });
+    const before = s.evaluations(), panels = s.panels.length;
+    const r = await s.h['listening.slotAddress']({ slot: 1 });
+    expect(r).toEqual({ slot: 1, address: SLOT1 });
+    assertNoSecrets(r);
+    expect((await s.h['listening.slotAddress']({ slot: 0 })).address).toBe(ADDRESS);
+    expect(s.evaluations()).toBe(before);
+    expect(s.panels).toHaveLength(panels);
+    for (const bad of [-1, 1.5, 100_001, '1', undefined]) await expect(s.h['listening.slotAddress']({ slot: bad })).rejects.toThrow(/not available/);
+  });
+
+  it('switches the open wallet and signs plays and likes as that wallet, with one shared session budget', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create', terms: s.terms(3) });
+    expect(await s.h['listening.status']()).toMatchObject({ state: 'unlocked', address: ADDRESS, slot: 0 });
+    const before = s.evaluations();
+    const opened = await s.h['listening.openSlot']({ slot: 1 });
+    expect(opened).toMatchObject({ slot: 1, address: SLOT1 });
+    expect(s.evaluations()).toBe(before);
+    expect(await s.h['listening.status']()).toMatchObject({ state: 'unlocked', address: SLOT1, slot: 1 });
+    const signed = await s.h['listening.signPlay'](play());
+    expect(deserializeTransaction(signed.raw).auth.spendingCondition.signer).toBeTruthy();
+    const tx = deserializeTransaction(signed.raw) as any;
+    expect(addressToString({ type: 0, version: 22, hash160: tx.auth.spendingCondition.signer } as any)).toBe(SLOT1);
+    // the session's play budget is for the listener, whichever wallet pays
+    s.tick(MIN_PLAY_INTERVAL_MS);
+    await s.h['listening.openSlot']({ slot: 2 });
+    await s.h['listening.signPlay'](play('500000', '0'));
+    s.tick(MIN_PLAY_INTERVAL_MS);
+    await s.h['listening.openSlot']({ slot: 0 });
+    await s.h['listening.signPlay'](play('500000', '0'));
+    s.tick(MIN_PLAY_INTERVAL_MS);
+    await expect(s.h['listening.signPlay'](play('500000', '1'))).rejects.toThrow(/number of paid plays/);
+  });
+
+  it('switching changes nothing about where returns go: a linked passkey sends every wallet to its main wallet', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+    const issued = s.now(), link = { main: MAIN, listening: ADDRESS, issued };
+    const mainSignature = signMessageHashRsv({ messageHash: linkHash(link), privateKey: createStacksPrivateKey(mainKey) }).data;
+    await s.h['listening.link']({ main: MAIN, issued, mainSignature });
+    await s.h['listening.openSlot']({ slot: 1 });
+    // linking is the passkey's own wallet's job
+    await expect(s.h['listening.link']({ main: MAIN, issued, mainSignature })).rejects.toThrow(/own listening wallet/);
+    const r = await s.h['listening.prepareReturn']({ mode: 'all', balance: '900000', nonce: '0', fee: '3000' });
+    expect(r.recipient).toBe(MAIN);
+    const tx = deserializeTransaction(r.raw) as any;
+    expect(addressToString({ type: 0, version: 22, hash160: tx.auth.spendingCondition.signer } as any)).toBe(SLOT1);
+  });
+
+  it('binds a slot to the passkey wallet with both signatures and no panel; refuses root, bad numbers and stale times', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create' });
+    const panels = s.panels.length;
+    const b = await s.h['listening.bindSlot']({ slot: 2, issued: s.now() });
+    assertNoSecrets(b);
+    expect(b).toMatchObject({ root: ADDRESS, slot: 2, address: SLOT2 });
+    expect(verifySlotSignature(b, b.rootSignature, ADDRESS) && verifySlotSignature(b, b.slotSignature, SLOT2)).toBe(true);
+    expect(s.panels).toHaveLength(panels);
+    // binding is the same whichever wallet is open
+    await s.h['listening.openSlot']({ slot: 5 });
+    expect(await s.h['listening.bindSlot']({ slot: 2, issued: s.now() })).toMatchObject({ root: ADDRESS, address: SLOT2 });
+    await expect(s.h['listening.bindSlot']({ slot: 0, issued: s.now() })).rejects.toThrow(/1 or more/);
+    await expect(s.h['listening.bindSlot']({ slot: -3, issued: s.now() })).rejects.toThrow(/not available/);
+    await expect(s.h['listening.bindSlot']({ slot: 2, issued: s.now() - 16 * 60_000 })).rejects.toThrow(/expired/);
+  });
+
+  it('lock drops every wallet: nothing can be derived or switched afterwards, and an unlock starts at the passkey wallet', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create' });
+    await s.h['listening.openSlot']({ slot: 3 });
+    await s.h['listening.lock']();
+    await expect(s.h['listening.slotAddress']({ slot: 1 })).rejects.toThrow(/Unlock/);
+    await expect(s.h['listening.openSlot']({ slot: 1 })).rejects.toThrow(/Unlock/);
+    await expect(s.h['listening.bindSlot']({ slot: 1, issued: s.now() })).rejects.toThrow(/Unlock/);
+    expect(await s.h['listening.status']()).toMatchObject({ state: 'known', address: ADDRESS });
+    expect((await s.h['listening.status']()).slot).toBeUndefined();
+    await s.h['listening.unlock']({ mode: 'unlock' });
+    expect(await s.h['listening.status']()).toMatchObject({ address: ADDRESS, slot: 0 });
+  });
+
+  it('will not switch wallet while a panel is waiting for the listener, and the panel then signs for the wallet it was shown for', async () => {
+    let release!: () => void;
+    const waiting = new Promise<void>((r) => { release = r; });
+    const map = new Map<string, string>();
+    const engine = createListeningEngine({
+      passkey: { available: () => true, create: async () => ({ credentialId: 'cred-1', prf: PRF.slice() }), evaluate: async (id) => ({ credentialId: id ?? 'cred-1', prf: PRF.slice() }) },
+      store: { get: (k) => map.get(k) ?? null, set: (k, v) => void map.set(k, v) },
+      now: () => 1_760_000_000_000,
+      ui: { act: async (panel, action) => { if (panel.kind === 'return') await waiting; return action(); }, cancel: () => false, idle: () => undefined }
+    });
+    const h = engine.handlers as any;
+    await h['listening.unlock']({ mode: 'create' });
+    const pending = h['listening.prepareReturn']({ mode: 'all', balance: '900000', nonce: '0', fee: '3000', destination: 'SP1RKMSSGS3TCZW6HXFYXAM0DGHS2VNKSBTB4G183' });
+    await expect(h['listening.openSlot']({ slot: 1 })).rejects.toThrow(/waiting for you in its panel/);
+    release();
+    const r = await pending;
+    const tx = deserializeTransaction(r.raw) as any;
+    expect(addressToString({ type: 0, version: 22, hash160: tx.auth.spendingCondition.signer } as any)).toBe(ADDRESS);
+    await expect(h['listening.openSlot']({ slot: 1 })).resolves.toMatchObject({ address: SLOT1 });
   });
 });

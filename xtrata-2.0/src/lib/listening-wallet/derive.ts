@@ -18,15 +18,23 @@ import { getAddressFromPrivateKey, publicKeyToString, pubKeyfromPrivKey, Transac
 
 /** PRF input. Distinct from the passkey wallet's salt so the two are unrelated. */
 export const LISTENING_PRF_SALT = new TextEncoder().encode('xtrata.radio.listening-wallet.v1');
-/** HKDF domain separator for the listening key. */
+/** HKDF domain separator for the listening key. This is slot 0, the wallet every listener already has. */
 export const LISTENING_HKDF_INFO = 'xtrata-radio-listening-key-v1';
+/**
+ * More wallets from the same passkey: slot n (n >= 1) uses the same HKDF with `<info>/slot/<n>`. Each is an
+ * ordinary separate wallet (its own balance and nonce), so money is kept apart by address. Slot 0 keeps the
+ * original label exactly; the known-answer tests lock every vector.
+ */
+export const MAX_SLOT = 100_000;
+export const isSlot = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= MAX_SLOT;
+export const slotInfo = (slot: number) => (slot === 0 ? LISTENING_HKDF_INFO : `${LISTENING_HKDF_INFO}/slot/${slot}`);
 
 const MIN_PRF_BYTES = 32;
 /** secp256k1 group order. A derived scalar must be in [1, N). */
 const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
 export class ListeningKeyError extends Error {
-  constructor(readonly code: 'PRF_TOO_SHORT' | 'KEY_OUT_OF_RANGE' | 'NO_CRYPTO', message: string) {
+  constructor(readonly code: 'PRF_TOO_SHORT' | 'KEY_OUT_OF_RANGE' | 'NO_CRYPTO' | 'SLOT_OUT_OF_RANGE', message: string) {
     super(message);
     this.name = 'ListeningKeyError';
   }
@@ -41,15 +49,25 @@ export interface ListeningIdentity {
 
 const toHex = (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
-/** HKDF-SHA256(PRF output) → 32-byte secp256k1 scalar → mainnet Stacks account. */
-export async function deriveListeningIdentity(prfOutput: Uint8Array): Promise<ListeningIdentity> {
+/**
+ * The passkey's secret as a non-extractable HKDF key. Held in the wallet origin's memory while unlocked so any slot
+ * can be derived without another passkey tap; it cannot be read back out of the browser, only used to derive.
+ */
+export async function listeningBase(prfOutput: Uint8Array): Promise<CryptoKey> {
   if (prfOutput.length < MIN_PRF_BYTES)
     throw new ListeningKeyError('PRF_TOO_SHORT', `Passkey returned ${prfOutput.length} bytes; at least ${MIN_PRF_BYTES} are required.`);
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) throw new ListeningKeyError('NO_CRYPTO', 'This browser cannot derive the listening wallet.');
-  const base = await subtle.importKey('raw', prfOutput as unknown as BufferSource, 'HKDF', false, ['deriveBits']);
+  return subtle.importKey('raw', prfOutput as unknown as BufferSource, 'HKDF', false, ['deriveBits']);
+}
+
+/** One wallet of the passkey: HKDF-SHA256(secret, slotInfo(slot)) → secp256k1 scalar → mainnet Stacks account. */
+export async function deriveSlotIdentity(base: CryptoKey, slot: number): Promise<ListeningIdentity> {
+  if (!isSlot(slot)) throw new ListeningKeyError('SLOT_OUT_OF_RANGE', 'That wallet number is not available.');
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) throw new ListeningKeyError('NO_CRYPTO', 'This browser cannot derive the listening wallet.');
   const scalar = new Uint8Array(await subtle.deriveBits(
-    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: new TextEncoder().encode(LISTENING_HKDF_INFO) },
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: new TextEncoder().encode(slotInfo(slot)) },
     base,
     256
   ));
@@ -67,4 +85,9 @@ export async function deriveListeningIdentity(prfOutput: Uint8Array): Promise<Li
   } finally {
     scalar.fill(0);
   }
+}
+
+/** Slot 0: the listening wallet itself. */
+export async function deriveListeningIdentity(prfOutput: Uint8Array): Promise<ListeningIdentity> {
+  return deriveSlotIdentity(await listeningBase(prfOutput), 0);
 }
