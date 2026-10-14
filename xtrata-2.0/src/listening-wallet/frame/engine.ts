@@ -13,11 +13,11 @@ import { deriveSlotIdentity, isSlot, listeningBase, type ListeningIdentity } fro
 import { signSlotBinding, validateSlotBinding } from '../../lib/listening-wallet/slots';
 import { isMainnetStandardAddress, signLink, verifyLinkSignature } from '../../lib/listening-wallet/link';
 import {
-  costPerPlay, LIKE_FEE, RESERVE, returnPlan, SessionLedger, stx, TARGET, validateSessionTerms, type SessionTerms
+  costPerPlay, LIKE_FEE, MOVE_FEE_CAP, MOVE_MIN, RESERVE, returnPlan, SessionLedger, stx, TARGET, validateSessionTerms, type SessionTerms
 } from '../../lib/listening-wallet/policy';
-import { likeCallOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
+import { likeCallOptions, moveTransferOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
 import type {
-  BindSlotParams, BindSlotResult, LinkParams, LinkResult, OpenSlotResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams,
+  BindSlotParams, BindSlotResult, LinkParams, LinkResult, MoveParams, MoveResult, OpenSlotResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams,
   SignPlayParams, SlotAddressResult, SlotParams, StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
 } from '../../lib/listening-wallet/messages';
 import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
@@ -486,6 +486,32 @@ export function createListeningEngine(deps: {
       const derived = await deriveSlotIdentity(base, p!.slot);
       const binding = validateSlotBinding({ root: root.address, slot: p!.slot, address: derived.address, issued: p!.issued }, now());
       return { ...binding, rootSignature: signSlotBinding(binding, root.privateKey), slotSignature: signSlotBinding(binding, derived.privateKey) };
+    },
+
+    // Money between the passkey's own wallets (My player <-> an album, or the first-wallet likes float). The destination is a
+    // wallet NUMBER derived here, never an address from the page, so it can only ever land with the same listener: no panel.
+    'listening.signMove': async (params: unknown): Promise<MoveResult> => {
+      const open = requireUnlocked();
+      const p = params as MoveParams | undefined;
+      if (!base || !root) throw new Error('Unlock the listening wallet first.');
+      const fromSlot = p?.from === undefined ? slot : p.from;
+      if (!isSlot(p?.to) || !isSlot(fromSlot) || p!.to === fromSlot) throw new Error('Choose two different wallets of this passkey.');
+      if (signing) throw new Error('Still signing. Try again in a moment.');
+      signing = true;
+      try {
+        const amount = bigintParam(p!.amount, 'amount'), fee = bigintParam(p!.fee, 'fee'), nonce = bigintParam(p!.nonce, 'nonce'), balance = bigintParam(p!.balance, 'balance');
+        if (amount < MOVE_MIN) throw new Error('That is too small to move.');
+        if (fee < 1n || fee > MOVE_FEE_CAP) throw new Error('That network fee is not allowed.');
+        if (balance < amount + fee + RESERVE) throw new Error('Not enough in that wallet to move this and keep its reserve.');
+        const source = fromSlot === slot ? open : fromSlot === 0 ? root : await deriveSlotIdentity(base, fromSlot);
+        const target = await deriveSlotIdentity(base, p!.to);
+        const tx = await makeSTXTokenTransfer({ ...moveTransferOptions(target.address, amount, fee, nonce), senderKey: source.privateKey });
+        if (identity !== open) throw new Error('Wallet locked before the move was signed. Nothing moved.');
+        refreshIdle();
+        return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), from: source.address, to: target.address, amount: amount.toString(), fee: fee.toString() };
+      } finally {
+        signing = false;
+      }
     },
 
     'listening.approveSession': (params: unknown): Promise<SessionSummary> => interact(async () => {

@@ -28,6 +28,9 @@ export const MIN_PLAY_INTERVAL_MS = 20_000;
 export const MIN_LIKE_INTERVAL_MS = 3_000;
 /** Network fee for one like or unlike (set-liked): 0.0002 STX, the same as the main-wallet like page. */
 export const LIKE_FEE = 200n;
+/** Money moved between a passkey's own wallets: at least this much, and the network fee may not exceed the cap. */
+export const MOVE_MIN = 5_000n;
+export const MOVE_FEE_CAP = 10_000n;
 /** A session only lives in the wallet frame's memory, so it also ends when the page closes. */
 export const MAX_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_SESSION_PLAYS = 3_000;

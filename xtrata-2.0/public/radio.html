@@ -317,6 +317,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp a.ppp-open-in{display:inline-flex;align-items:center;font-size:13px;background:var(--cyan);color:#04121a;border:1px solid var(--cyan);border-radius:8px;padding:8px 12px;min-height:40px;font-weight:700;text-decoration:none}
   .ppp button.quiet{color:var(--mut)}
   .ppp button.tiny{min-height:0;padding:2px 8px;font-size:11px;color:var(--cyan)}
+  .ppp-topup{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
+  .ppp-switch{display:flex;gap:8px;margin:8px 0 10px}
+  .ppp-switch button.ppp-tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 10px;border-radius:10px}
+  .ppp-switch button.ppp-tab .tt{font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ppp-switch button.ppp-tab .ts{font-size:11px;opacity:.75}
+  .ppp-switch button.ppp-tab[aria-pressed="true"]{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--cyan);background:rgba(34,211,238,.10)}
   .ppp button.tiny.primary{color:#04121a} /* the album Play button was cyan text on a cyan fill: invisible */
   .ppp button:disabled{opacity:.55;cursor:wait}
   /* every panel button answers a press; copy and share say what happened (src/radio-ppp/feedback.ts) */
@@ -448,6 +454,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <ol class="ppp-steps" hidden aria-label="Pay-per-play stages"></ol>
       <p class="ppp-stage" hidden></p>
       <!-- Top to bottom: what to do now, the wallet box when it needs a tap, buttons; details folded below. -->
+      <div class="ppp-switch" hidden></div>
       <div class="ppp-key"></div>
       <p class="ppp-frame-label" hidden><span>Listening wallet · approvals happen in this box</span></p>
       <div class="ppp-frame" hidden></div>
@@ -640,7 +647,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     state=s;
     var np=s.nowPlaying, stage=$('stage');
     $('tuner').classList.toggle('locked',!!s.giftLocked);
-    $('tuner').title=s.giftLocked?'Locked to this album until you add funds':'';
+    $('tuner').title=s.giftLocked?'This album plays only its own songs':'';
     $('stn').textContent=(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
     $('ttl').textContent=np?np.title:(s.on?'TUNING…':'— OFF AIR —');
     $('artst').textContent=np&&np.artist?np.artist:'';
@@ -654,7 +661,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     stage.classList.toggle('paused',!playing);
     $('fnote').textContent=s.on?(np?'NO ARTWORK':'TUNING…'):'PRESS POWER TO TUNE IN';
     var art=$('art');
-    if(np&&np.cover){if($('cover').getAttribute('src')!==np.cover)$('cover').src=np.cover;art.classList.add('has-cover');}
+    var coverUrl=s.albumCover?s.albumCover.url:(np&&np.cover);
+    if(coverUrl){if($('cover').getAttribute('src')!==coverUrl)$('cover').src=coverUrl;art.classList.add('has-cover');}
     else{art.classList.remove('has-cover');$('cover').removeAttribute('src');document.documentElement.style.setProperty('--glow','94,233,255');}
     var pill=$('idpill'),vb=$('viewbtn'),al=$('artLink');
     if(np){pill.style.display='';pill.textContent='INSCRIPTION #'+np.tokenId;vb.classList.add('show');vb.href=np.href;al.style.display='';al.href=np.href;}
@@ -814,7 +822,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=39219677b471" defer></script>
+<script src="/xtrata-radio.js?v=367c9f614c5f" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -830,7 +838,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=9152c801c6db')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=d3a65db238eb')}).catch(function(){});
 </script>
 </body>
 </html>

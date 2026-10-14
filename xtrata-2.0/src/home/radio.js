@@ -440,6 +440,33 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       }
     } catch { /* noop */ }
   };
+  // An album's cover: any inscription the creator names. An image inscription is used as it is; a page that embeds an
+  // image (the same way songs carry theirs) gives that image. Not found or not an image: no cover, never an error.
+  const coverCache = new Map();
+  const resolveCover = async (id) => {
+    const wanted = String(id);
+    if (coverCache.has(wanted)) return coverCache.get(wanted);
+    const cores = ['SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3', 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0', 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1'];
+    let url = '';
+    try {
+      for (const core of cores) {
+        const src = `/runtime/content?contractId=${encodeURIComponent(core)}&tokenId=${wanted}&network=mainnet`;
+        const res = await fetch(src);
+        const mime = (res.headers.get('content-type') || '').toLowerCase();
+        if (!res.ok || mime.includes('application/json')) { try { await res.body?.cancel(); } catch { /* noop */ } continue; }
+        if (mime.startsWith('image/')) { try { await res.body?.cancel(); } catch { /* noop */ } url = src; }
+        else if (mime.includes('text/html')) {
+          const found = (await res.text()).match(/<img[^>]+src="(data:image\/[^"]+)"/i);
+          if (found) url = found[1].replace(/&amp;/g, '&');
+        } else { try { await res.body?.cancel(); } catch { /* noop */ } }
+        break;
+      }
+    } catch { return ''; } // a hiccup: try again next time, do not remember "no cover"
+    coverCache.set(wanted, url);
+    return url;
+  };
+  let albumCoverUrl = '';
+
   const resolveTrack = async (tokenId) => {
     if (IGNORE_IDS.has(String(tokenId))) {
       radioLog(`ignored #${tokenId}`, 'on the hardcoded ignore list', tokenId);
@@ -658,6 +685,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     on,
     playing: on && !player.paused && !player.ended,
     gift: giftPlayer ? { id: giftPlayer.id, title: giftPlayer.title, subtitle: giftPlayer.subtitle, tracks: giftPlayer.tracks.length } : null, giftStop, giftLocked: gated(),
+    albumCover: giftPlayer && albumCoverUrl ? { url: albumCoverUrl, tokenId: giftPlayer.cover } : null,
     likesStatus: chainState?.snapshot().status || 'disconnected', likesRetryAt: chainState?.snapshot().retryAt, likesCheckedAt: chainState?.snapshot().checkedAt, band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
     loop: player.loop,
@@ -798,7 +826,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const gated = () => !!giftPlayer && giftLock;
   const inAlbum = (id) => !!giftPlayer && giftPlayer.tracks.includes(String(id));
   const allowed = (id) => !gated() || inAlbum(id);
-  const LOCKED_TEXT = 'LOCKED TO THIS ALBUM — ADD FUNDS TO UNLOCK';
+  const LOCKED_TEXT = 'THIS ALBUM PLAYS ONLY ITS OWN SONGS';
   const setBand = (next) => {
     if (!bandList().includes(next)) return;
     band = next;
@@ -1791,6 +1819,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       if (!tracks.length) {
         const wasAlbum = !!giftPlayer;
         giftPlayer = null;
+        albumCoverUrl = '';
         albumStartPending = false;
         if (band === 'gift') setBand('fm'); else emit();
         const back = wasAlbum ? walletMemory.get('') : null;
@@ -1798,7 +1827,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         return;
       }
       const first = !giftPlayer || giftPlayer.id !== def.id;
-      giftPlayer = { id: String(def.id || ''), title: String(def.title || '').slice(0, 60), subtitle: String(def.subtitle || '').slice(0, 80), tracks };
+      const cover = Number.isSafeInteger(def.cover) && def.cover > 0 ? String(def.cover) : null;
+      if (first || !giftPlayer || giftPlayer.cover !== cover) {
+        albumCoverUrl = '';
+        if (cover) void resolveCover(cover).then((url) => { if (giftPlayer && giftPlayer.cover === cover && url) { albumCoverUrl = url; emit(); } });
+      }
+      giftPlayer = { id: String(def.id || ''), title: String(def.title || '').slice(0, 60), subtitle: String(def.subtitle || '').slice(0, 80), tracks, cover };
       if (first) { setBand('gift'); enterAlbum(true); } else emit();
     },
     /** The listening wallet was locked (or another passkey opened): nothing is remembered across that. */
@@ -1907,10 +1941,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   artEl.addEventListener('click', (event) => event.stopPropagation());
   const renderArt = (snap) => {
     const np = snap.nowPlaying;
-    const cover = np && np.cover;
+    // an album shows its own cover for every song; otherwise the playing song's
+    const album = snap.albumCover;
+    const cover = album ? album.url : np && np.cover;
     if (cover) {
       if (artImg.getAttribute('src') !== cover) artImg.src = cover;
-      artEl.href = '/i/' + np.tokenId;
+      artEl.href = '/i/' + (album ? album.tokenId : np.tokenId);
       artEl.classList.add('has-art');
     } else {
       artEl.classList.remove('has-art');

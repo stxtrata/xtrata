@@ -9,7 +9,7 @@ import { requestStructuredSignature } from '../lib/wallet/structured-sign';
 import { showStxTransfer } from '../lib/wallet/connect';
 import { costPerPlay, HOLDER_PAYMENT, stx, TARGET } from '../lib/listening-wallet/policy';
 import { account, api, balance, broadcast, owner, transaction, validateSaved, verify } from '../radio-test-wallet/chain';
-import { createPppController, type GateConfig, type Snapshot } from './controller';
+import { createPppController, TOP_UP_CHOICES, type GateConfig, type Snapshot } from './controller';
 import { showSteps, stagesFor, stageOf, type StageView } from './stages';
 import { findFunder } from '../lib/listening-wallet/funder';
 import { readHistory } from '../lib/listening-wallet/ledger';
@@ -185,12 +185,12 @@ function start(root: HTMLElement) {
     const radio = (window as any).XtrataRadio;
     if (!radio?.setGiftPlayer || !radio?.setGiftStop) return; // pushed again at the next render, once the radio is there
     const p = s.step === 'off' || s.step === 'elsewhere' ? null : s.gift?.player ?? null;
-    const id = p ? p.id + ':' + p.tracks.map((t) => t.id).join(',') : '';
+    const id = p ? p.id + ':' + p.cover + ':' + p.tracks.map((t) => t.id).join(',') : '';
     if (id !== giftPushed) {
-      radio.setGiftPlayer(p ? { id: p.id, title: p.title, subtitle: p.subtitle, tracks: p.tracks.map((t) => t.id) } : null);
+      radio.setGiftPlayer(p ? { id: p.id, title: p.title, subtitle: p.subtitle, tracks: p.tracks.map((t) => t.id), cover: p.cover } : null);
       giftPushed = id;
     }
-    const stop = p ? s.giftStop?.text ?? null : null;
+    const stop = s.giftStop?.text ?? null; // any passkey wallet is paid-only, not just a gifted album
     if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
     const lock = !!p && !!s.albumLock?.locked;
     if (lock !== lockPushed) { radio.setGiftLock?.(lock); lockPushed = lock; }
@@ -425,6 +425,20 @@ function start(root: HTMLElement) {
    * An album wallet is open, and the main listener wallet that signs every like has run out of funds. Loud on purpose:
    * the address, a copy button and (with a main wallet connected) a one-tap top-up. Quiet again once funds are on the way.
    */
+  /** Add plays to the open album from My player: one tap per amount, greyed out when My player cannot cover it. */
+  function topUpAlbumRow(s: Snapshot, cls = ''): HTMLElement {
+    const box = el('div', '', 'ppp-topup');
+    const mine = s.likeFunds?.balance;
+    box.append(el('span', 'Add plays from My player: ', 'ppp-mute'));
+    for (const amount of TOP_UP_CHOICES) {
+      const b = button(`+${(Number(amount) / 1e6).toFixed(2)} STX`, () => void ppp.topUpAlbum(amount), cls) as HTMLButtonElement;
+      b.disabled = mine === undefined || mine < amount + 6_000n || s.depositPending || !!s.busy;
+      box.append(b);
+    }
+    if (mine !== undefined && mine < TOP_UP_CHOICES[0] + 6_000n) box.append(el('p', 'My player is nearly empty: add STX to it first (switch to My player above).', 'ppp-mute'));
+    return box;
+  }
+
   function likeFundsBanner(s: Snapshot): HTMLElement[] {
     const f = s.likeFunds;
     if (!f || !f.album || (!f.low && !f.pending)) return [];
@@ -501,7 +515,7 @@ function start(root: HTMLElement) {
     const listeningRow = () => {
       if (!s.listening) return;
       const copy = copyButton('copy-listening', 'Copy', () => s.listening || '', 'tiny', () => render(ppp.snapshot()));
-      rows.push(...fact(s.linked ? 'Listening wallet (technical)' : 'Listening wallet', short(s.listening), 'ppp-addr-short', copy));
+      rows.push(...fact(s.slot > 0 ? 'Album wallet' : s.linked ? 'My player (technical)' : 'My player wallet', short(s.listening), 'ppp-addr-short', copy));
     };
     if (!s.linked) listeningRow();
     // Which main wallet this listening wallet serves: its likes and paid plays count for that wallet.
@@ -665,10 +679,10 @@ function start(root: HTMLElement) {
     if (s.solo && s.walletCannotSolo)
       lines.push(el('p', 'The listening wallet box is still updating. Paid plays work; returning to another address and likes start working once it has.', 'ppp-warn'));
     if (s.solo && ['fund', 'ready'].includes(s.step)) {
-      if ((s.balance ?? 0n) > 0n) lines.push(returnPicker(s));
+      if ((s.balance ?? 0n) > 0n && s.slot === 0) lines.push(returnPicker(s));
       lines.push(walletTip());
       // Once a paid play has landed, a single quiet pointer outside the fold. Never a blocker.
-      if (s.step === 'ready' && (s.entries as Shown[]).some((e) => e.kind === 'play' && e.status === 'confirmed')) {
+      if (s.slot === 0 && s.step === 'ready' && (s.entries as Shown[]).some((e) => e.kind === 'play' && e.status === 'confirmed')) {
         const tip = el('p', 'New to Stacks? ', 'ppp-mute');
         tip.append(link('Get Xverse or Leather', 'https://www.xverse.app/download'), ' (free) to keep your plays and likes under a wallet of your own.');
         key.push(tip);
@@ -683,6 +697,7 @@ function start(root: HTMLElement) {
     // Quieter actions live in the "Wallet & history" fold.
     if (['ready', 'fund'].includes(s.step) && (s.returnTo || s.gift) && (s.balance ?? 0n) > 0n)
       more.push(button(s.linked ? 'Return all to my wallet' : s.gift ? 'Return what is left…' : `Return all to ${who(s.returnTo)}`, () => void ppp.returnFunds('all'), 'quiet'));
+    if (s.slot > 0 && s.gift?.player && ['ready', 'fund'].includes(s.step) && s.giftPlays > 20) more.push(topUpAlbumRow(s, 'quiet'));
     if (['ready', 'fund', 'link', 'over'].includes(s.step)) more.push(button('Lock', () => void ppp.lock(), 'quiet'));
     if (showFrame && !asking) more.push(button(walletShown ? 'Hide listening wallet box' : 'Show listening wallet box', () => { walletShown = !walletShown; render(ppp.snapshot()); }, 'quiet'));
 
@@ -699,7 +714,7 @@ function start(root: HTMLElement) {
     // Gift edition: the interface speaks in plays, not STX. Whatever the radio is doing, the meter says how many are left.
     if (s.gift?.player && ['fund', 'ready', 'over', 'locked', 'link', 'loading'].includes(s.step)) {
       const head = el('p', '', 'ppp-gift');
-      head.append(`🎁 Gift Edition · ${s.gift.player.title}`);
+      head.append(`💿 Album · ${s.gift.player.title}`);
       if (s.gift.player.subtitle) head.append(' · ', s.gift.player.subtitle);
       const meter = ['ready', 'fund', 'over'].includes(s.step) && s.balance !== undefined
         ? el('span', s.giftPlays === 0 ? ' · no plays left' : ` · ${s.giftPlays.toLocaleString()} ${s.giftPlays === 1 ? 'play' : 'plays'} left`, s.giftPlays === 0 ? 'ppp-bad' : s.giftPlays <= 20 ? 'ppp-warn' : 'ppp-ok')
@@ -711,10 +726,14 @@ function start(root: HTMLElement) {
       key.unshift(head);
       // Running out is the moment a wallet of their own helps; quiet, never in the way, never a popup.
       if (s.giftPlays <= 20 && ['ready', 'fund'].includes(s.step) && !s.depositPending) {
+        if (s.slot > 0) {
+          key.splice(1, 0, el('p', s.giftPlays === 0 ? 'This album is out of plays.' : 'Running low on plays for this album.', 'ppp-mute'), topUpAlbumRow(s, 'primary'));
+        } else {
         const tip = el('p', s.giftPlays === 0 ? 'Your gift plays are all used. ' : 'Running low. ', 'ppp-mute');
         tip.append('To keep going, send STX to your listening address (shown below) from any Stacks wallet or an exchange. ');
         tip.append(link('Xverse', 'https://www.xverse.app/download'), ' and ', link('Leather', 'https://leather.io/install-extension'), ' are free and make it one tap.');
         key.splice(1, 0, tip);
+        }
       }
     }
     // A gifted wallet returns each part to whoever it came from: show the split before anything is sent.
@@ -744,6 +763,29 @@ function start(root: HTMLElement) {
     if (s.solo && s.creditedTo && s.listening && !['intro', 'off', 'elsewhere', 'loading'].includes(s.step))
       key.unshift(el('p', `This is ${who(s.creditedTo)}'s listening wallet. Plays and likes count for ${who(s.creditedTo)}. Connect it (top right) to see its likes here too.`, 'ppp-ok'));
     $('.ppp-key').replaceChildren(...key);
+    // The two places a listener can be: the open-world player (wallet 0), and the album that is open (or was last). Every
+    // other album is picked from "My albums", which then takes the second tab's place.
+    const switcher = document.querySelector('.ppp-switch') as HTMLElement | null;
+    if (switcher) {
+      const latestAlbum = shelf.latest();
+      const inAlbum = s.slot > 0;
+      const show = ['fund', 'ready', 'over'].includes(s.step) && (inAlbum || !!latestAlbum);
+      switcher.hidden = !show;
+      if (show) {
+        const tab = (title: string, bal: bigint | undefined, active: boolean, run: () => void) => {
+          const b = button('', run, 'ppp-tab') as HTMLButtonElement;
+          b.setAttribute('aria-pressed', String(active));
+          b.append(el('span', title, 'tt'), el('span', bal === undefined ? '…' : `${stxShort(bal)} STX`, 'ts'));
+          b.disabled = !!s.busy;
+          return b;
+        };
+        const albumTitle = inAlbum ? s.gift?.player?.title ?? 'Album' : latestAlbum!.title;
+        switcher.replaceChildren(
+          tab('🎧 My player', inAlbum ? s.likeFunds?.balance : s.balance, !inAlbum, () => { if (inAlbum) void ppp.openAlbum(0); }),
+          tab('💿 ' + albumTitle, inAlbum ? s.balance : undefined, inAlbum, () => { if (!inAlbum && latestAlbum) void ppp.openAlbum(latestAlbum.slot); })
+        );
+      }
+    }
     const shelfBox = shelf.render(s);
     const shelfFold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
     if (shelfFold) {

@@ -19,6 +19,7 @@ export const PLAYS_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-
 /** Core index for xtrata-v3-2-3 in the plays contract's config (core-1, core-2, core-3). */
 export const RADIO_CORE_INDEX = 3;
 export const RETURN_MEMO = 'Xtrata listening wallet return';
+export const MOVE_MEMO = 'Xtrata listening wallet move';
 export const LIKES_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0';
 
 /** set-liked(id, liked): Deny mode with no post-conditions, so it cannot move any asset. */
@@ -81,4 +82,9 @@ export function playCallOptions(address: string, publicKey: string, p: PlayReque
 
 export function returnTransferOptions(recipient: string, amount: bigint, fee: bigint, nonce: bigint) {
   return { recipient, amount, fee, nonce, network: new StacksMainnet(), memo: RETURN_MEMO, anchorMode: AnchorMode.Any };
+}
+
+/** A transfer between two wallets of the SAME passkey (the first wallet and its album wallets). */
+export function moveTransferOptions(recipient: string, amount: bigint, fee: bigint, nonce: bigint) {
+  return { recipient, amount, fee, nonce, network: new StacksMainnet(), memo: MOVE_MEMO, anchorMode: AnchorMode.Any };
 }

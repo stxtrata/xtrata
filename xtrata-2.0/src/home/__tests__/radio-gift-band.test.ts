@@ -206,3 +206,27 @@ it('locking forgets every wallet: the album starts clean at its first song', asy
   api.setGiftPlayer(album);
   await vi.waitFor(() => expect(nowId(api)).toBe('11'), { timeout: 5000 });
 }, 30000);
+
+it('an album can show its own cover: an image inscription as it is, or the image a page carries', async () => {
+  const seen: string[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo) => {
+    const url = String(input);
+    const m = url.match(/runtime\/content\?.*tokenId=(\d+)/);
+    if (m) seen.push(m[1]);
+    if (m && m[1] === '4242') return new Response('png', { headers: { 'content-type': 'image/png' } });
+    if (m && m[1] === '4343') return new Response('<html><img src="data:image/png;base64,QUJD"></html>', { headers: { 'content-type': 'text/html' } });
+    if (m && m[1] === '4444') return new Response('{"error":"nope"}', { status: 404, headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify({ tracks: [] }));
+  }));
+  const api = initXtrataRadio({ tokenIds: ['7777'] })!;
+  expect(api.getState().albumCover).toBeNull();
+  api.setGiftPlayer({ ...album, cover: 4242 });
+  await vi.waitFor(() => expect(api.getState().albumCover?.url).toContain('tokenId=4242'));
+  api.setGiftPlayer({ ...album, id: 'def', cover: 4343 });
+  await vi.waitFor(() => expect(api.getState().albumCover?.url).toBe('data:image/png;base64,QUJD'));
+  api.setGiftPlayer({ ...album, id: 'ghi', cover: 4444 });
+  await new Promise((r) => setTimeout(r, 30));
+  expect(api.getState().albumCover).toBeNull(); // not an image: songs' own art, never an error
+  api.setGiftPlayer(null);
+  expect(api.getState().albumCover).toBeNull();
+});
