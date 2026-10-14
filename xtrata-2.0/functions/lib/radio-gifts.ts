@@ -42,7 +42,7 @@ import {
   isPlayerId, playerData, playerHash, validatePlayer, validatePlayerRequest, verifyPlayerSignature, type PlayerDefinition, type PlayerRequest, type PlayerView
 } from '../../src/lib/listening-wallet/gift-players';
 import {
-  campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_MAX, GIFT_FEE_CAP, GIFT_MEMO, giftCodeHash, giftDepositMemo, isGiftCode, newGiftCode,
+  campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_FEE_CAP, GIFT_MEMO, giftCodeHash, giftDepositMemo, isGiftCode, newGiftCode,
   validateCampaign, validGiftAmount, verifyCampaignSignature, type CampaignRequest, type GiftView
 } from '../../src/lib/listening-wallet/gifts';
 
@@ -250,11 +250,6 @@ export async function ensureGiftTables(env: GiftEnv) {
     tracks TEXT NOT NULL, cover INTEGER, status TEXT NOT NULL DEFAULT 'active', created_at INTEGER NOT NULL)`);
   // Added with gift players: the player a link opens (null for every earlier gift).
   await run(env, 'ALTER TABLE radio_gifts ADD COLUMN player_id TEXT').catch(() => undefined);
-  // Added with several gifts per wallet. `claimed_by` was UNIQUE (one gift per wallet) and a live table cannot drop that,
-  // so a new claim stores its own gift id there (still unique) and the wallet in `recipient`. Earlier gifts have no
-  // recipient: for them the wallet is `claimed_by`. Read the wallet through `COALESCE(recipient, claimed_by)`.
-  await run(env, 'ALTER TABLE radio_gifts ADD COLUMN recipient TEXT').catch(() => undefined);
-  await run(env, 'CREATE INDEX IF NOT EXISTS radio_gifts_recipient ON radio_gifts(recipient)');
   await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_orphans(txid TEXT PRIMARY KEY, gift_id TEXT, sender TEXT NOT NULL, amount INTEGER NOT NULL,
     reason TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
 }
@@ -262,7 +257,7 @@ export async function ensureGiftTables(env: GiftEnv) {
 type Row = {
   id: string; code_hash: string; amount: number; source: 'campaign' | 'friend'; gifter: string | null; label: string; status: string;
   deposit_txid: string | null; created_at: number; expires_at: number; claimed_by: string | null; claim_txid: string | null;
-  claimed_at: number | null; ip_hash: string | null; refund_txid: string | null; updated_at: number; player_id?: string | null; recipient?: string | null;
+  claimed_at: number | null; ip_hash: string | null; refund_txid: string | null; updated_at: number; player_id?: string | null;
 };
 type Send = {
   id: string; gift_id: string; kind: 'claim' | 'refund'; nonce: number; recipient: string; amount: number; fee: number;
@@ -314,8 +309,8 @@ async function startSend(env: GiftEnv, deps: GiftDeps, treasury: string, key: st
   const tx = await sign(key, recipient, amount, nonce, GIFT_FEE);
   const id = randomId(), now = deps.now, db = d1(env);
   const markGift = kind === 'claim'
-    ? db.prepare(`UPDATE radio_gifts SET status='claiming', claimed_by=?, recipient=?, claim_txid=?, claimed_at=?, ip_hash=COALESCE(?, ip_hash), updated_at=? WHERE id=? AND status='live'`)
-      .bind(r.id, recipient, tx.txid, now, ip, now, r.id)
+    ? db.prepare(`UPDATE radio_gifts SET status='claiming', claimed_by=?, claim_txid=?, claimed_at=?, ip_hash=COALESCE(?, ip_hash), updated_at=? WHERE id=? AND status='live'`)
+      .bind(recipient, tx.txid, now, ip, now, r.id)
     : db.prepare(`UPDATE radio_gifts SET status='refunding', refund_txid=?, updated_at=? WHERE id=? AND status='live'`).bind(tx.txid, now, r.id);
   const insertSend = db.prepare(`INSERT INTO radio_gift_sends(id, gift_id, kind, nonce, recipient, amount, fee, txids, raw, status, created_at, signed_at, broadcast_at, updated_at)
     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?, ?, ?
@@ -323,7 +318,7 @@ async function startSend(env: GiftEnv, deps: GiftDeps, treasury: string, key: st
     .bind(id, r.id, kind, Number(nonce), recipient, r.amount, Number(GIFT_FEE), JSON.stringify([tx.txid]), bytesToHex(tx.raw), now, now, now, now, r.id, tx.txid);
   try { await db.batch([markGift, insertSend]); }
   catch (e) {
-    if (isConstraint(e)) throw new GiftError('The gift treasury is sending another gift. Trying again in a moment…', 503);
+    if (isConstraint(e)) throw new GiftError(/claimed_by/.test(String((e as Error)?.message)) ? 'This listening wallet has already had a gift.' : 'The gift treasury is sending another gift. Trying again in a moment…', /claimed_by/.test(String((e as Error)?.message)) ? 409 : 503);
     throw e;
   }
   if (!(await one(env, 'SELECT id FROM radio_gift_sends WHERE id=?', [id]))) throw new GiftError('This gift has just changed. Refresh and try again.', 409);
@@ -350,7 +345,7 @@ async function sendBytes(env: GiftEnv, deps: GiftDeps, sendId: string, raw: Uint
 /** Puts a gift back after its send can no longer land, so it can be claimed (or refunded) again. */
 async function release(env: GiftEnv, kind: 'claim' | 'refund', giftId: string, txids: string[], now: number) {
   const list = txids.map(() => '?').join(',');
-  if (kind === 'claim') await run(env, `UPDATE radio_gifts SET status='live', claimed_by=NULL, recipient=NULL, claim_txid=NULL, claimed_at=NULL, updated_at=? WHERE id=? AND status='claiming' AND claim_txid IN (${list})`, [now, giftId, ...txids]);
+  if (kind === 'claim') await run(env, `UPDATE radio_gifts SET status='live', claimed_by=NULL, claim_txid=NULL, claimed_at=NULL, updated_at=? WHERE id=? AND status='claiming' AND claim_txid IN (${list})`, [now, giftId, ...txids]);
   else await run(env, `UPDATE radio_gifts SET status='live', refund_txid=NULL, updated_at=? WHERE id=? AND status='refunding' AND refund_txid IN (${list})`, [now, giftId, ...txids]);
 }
 
@@ -446,30 +441,21 @@ export async function giftStatus(env: GiftEnv, by: { code?: string | null; id?: 
   return { ...view(r), ...(r.player_id ? { player: await playerView(env, r.player_id) } : {}), ...(by.id ? { id: r.id } : {}) };
 }
 
-/**
- * The gifts this listening wallet has been sent, oldest first: each with who it came from, where its unused part
- * goes back to, the transaction that carried it, and its player. `gift` repeats the oldest one for pages that
- * only know about a single gift.
- */
+/** If this listening wallet was funded by a gift: who it came from and where returns go. */
 export async function giftForWallet(env: GiftEnv, wallet: string) {
   if (!isMainnetStandardAddress(wallet)) throw new GiftError('Mainnet wallet address required.');
   await ensureGiftTables(env);
-  const rows = await all<Row>(env, "SELECT * FROM radio_gifts WHERE COALESCE(recipient, claimed_by)=? AND status IN ('claiming','claimed') ORDER BY claimed_at, id", [wallet]);
-  if (!rows.length) return { gift: null, gifts: [] };
-  const treasury = treasuryAddress(env);
-  const gifts = [];
-  for (const r of rows) {
-    // While it is on its way: whether the last broadcast went through, and why not if it did not.
-    const send = r.status === 'claiming' ? await one<Send>(env, "SELECT * FROM radio_gift_sends WHERE gift_id=? AND kind='claim' AND status='sent'", [r.id]) : null;
-    gifts.push({
-      returnTo: r.gifter ?? treasury, from: r.gifter, source: r.source, amount: String(r.amount), txid: r.claim_txid, label: r.label,
-      state: r.status === 'claimed' ? 'arrived' : 'sending', problem: send?.last_error ?? null,
-      // The gift treasury is where the gift's money came from: the page needs it to tell a gift from a later top-up.
-      treasury,
-      player: r.player_id ? await playerView(env, r.player_id) : null
-    });
-  }
-  return { gift: gifts[0], gifts };
+  const r = await one(env, "SELECT * FROM radio_gifts WHERE claimed_by=? AND status IN ('claiming','claimed')", [wallet]);
+  if (!r) return { gift: null };
+  // While it is on its way: whether the last broadcast went through, and why not if it did not.
+  const send = r.status === 'claiming' ? await one<Send>(env, "SELECT * FROM radio_gift_sends WHERE gift_id=? AND kind='claim' AND status='sent'", [r.id]) : null;
+  return { gift: {
+    returnTo: r.gifter ?? treasuryAddress(env), from: r.gifter, source: r.source, amount: String(r.amount), txid: r.claim_txid, label: r.label,
+    state: r.status === 'claimed' ? 'arrived' : 'sending', problem: send?.last_error ?? null,
+    // The gift treasury is where the gift's money came from: the page needs it to tell the gift from a later top-up.
+    treasury: treasuryAddress(env),
+    player: r.player_id ? await playerView(env, r.player_id) : null
+  } };
 }
 
 /** Admin: links paid from the campaign pool. Each signed request works once. The codes exist in clear only in this reply. */
@@ -641,7 +627,7 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
   await ensureGiftTables(env);
   let r = await one(env, 'SELECT * FROM radio_gifts WHERE code_hash=?', [giftCodeHash(body.code)]);
   if (!r) throw new GiftError('That gift link is not valid.', 404);
-  if ((r.recipient ?? r.claimed_by) === body.wallet && ['claiming', 'claimed'].includes(r.status)) return { txid: r.claim_txid!, amount: String(r.amount), already: true };
+  if (r.claimed_by === body.wallet && ['claiming', 'claimed'].includes(r.status)) return { txid: r.claim_txid!, amount: String(r.amount), already: true };
   if (r.status === 'pending-deposit' || r.status === 'abandoned') {
     try { await checkDeposit(env, r, null, treasury, deps); }
     catch { throw new GiftError('Could not check this gift’s payment right now. Try again shortly.', 503); }
@@ -652,6 +638,7 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
   if (r.status !== 'live') throw new GiftError(['expired', 'refunding', 'refunded'].includes(r.status) ? 'This gift has expired.' : 'This gift has already been claimed.', 410);
   if (r.expires_at < deps.now) throw new GiftError('This gift has expired.', 410);
   if (deps.human && !(await deps.human(body.turnstile, ip))) throw new GiftError('Please complete the quick check and try again.', 403);
+  if (await one(env, 'SELECT id FROM radio_gifts WHERE claimed_by=?', [body.wallet])) throw new GiftError('This listening wallet has already had a gift.', 409);
   const h = ipHash(env, ip);
   if (h && (await all(env, "SELECT id FROM radio_gifts WHERE ip_hash=? AND claimed_at>? AND status IN ('claiming','claimed')", [h, deps.now - 86_400_000])).length >= CLAIMS_PER_IP)
     throw new GiftError('Too many gifts claimed from here today. Try again tomorrow.', 429);
@@ -661,11 +648,9 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
     if (BigInt(today?.amount ?? 0) + amount > micro(env.RADIO_GIFT_DAILY_CAP, DEFAULT_DAILY_CAP))
       throw new GiftError("Today's free gifts have all been given. This link still works tomorrow.", 429);
   }
-  // A wallet can take several gifts (a new album each), up to the 1 STX a listening wallet is meant to hold: what it
-  // holds now plus gifts still on their way to it plus this one.
-  const onTheWay = await one<{ amount: number }>(env, "SELECT COALESCE(SUM(amount),0) AS amount FROM radio_gifts WHERE COALESCE(recipient, claimed_by)=? AND status='claiming'", [body.wallet]);
-  if ((await deps.chain.balance(body.wallet)) + BigInt(onTheWay?.amount ?? 0) + amount > GIFT_MAX)
-    throw new GiftError('This listening wallet already holds plenty of plays. Use some up and this gift will still be here.', 409);
+  // Only a brand-new wallet: gifts are for getting started, not for topping up.
+  if ((await deps.chain.activity(body.wallet)) > 0 || (await deps.chain.balance(body.wallet)) > 0n)
+    throw new GiftError('Gifts are for brand-new listening wallets. This one has already been used.', 409);
   // Campaign gifts never spend friends' money: what the treasury owes them is set aside.
   const spare = (await deps.chain.balance(treasury)) - (r.source === 'campaign' ? await owedToFriends(env) : 0n);
   if (spare < amount + GIFT_FEE) throw new GiftError('The gift treasury needs topping up. Try again later.', 503);
