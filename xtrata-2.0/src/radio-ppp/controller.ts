@@ -183,8 +183,8 @@ export interface Snapshot {
   /** Paid plays this gifted wallet still buys, counting payments in flight and songs waiting to be paid. */
   giftPlays: number;
   /**
-   * A curated album stays the only thing on the radio until the listener funds a wallet of their own: a deposit of at least
-   * 0.1 STX from an address that is neither the gifter nor the gift treasury, into the album's wallet or the listener's own.
+   * A curated album stays the only thing on the radio until its own wallet is topped up: a deposit of at least
+   * 0.1 STX from an address that is neither the gifter nor the gift treasury (the listener's other wallets count).
    * A default of the radio page, not security. `known` is false until the answer has been read (the radio then waits).
    */
   albumLock: { locked: boolean; known: boolean } | null;
@@ -413,33 +413,36 @@ export function createPppController(deps: PppDeps) {
   type Unlock = { for: string; ok: boolean; open: boolean; at: number };
   let unlockRes: Unlock | null = null;
   let unlockLooking = false;
-  const unlockKey = (root: string) => key('unlocked', root);
+  // Per album wallet: the listener's own wallet history says nothing about whether THIS album was ever topped up.
+  const unlockKey = (album: string) => key('album-unlocked', album);
   /** Only a curated album (an album wallet that was gifted with a player) is ever locked. */
   const lockWanted = () => !!status?.address && albumOpen() && !!giftNow()?.player;
   function albumLock(): Snapshot['albumLock'] {
     if (!lockWanted()) return null;
-    const root = likeAddr()!;
-    if (deps.store.get(unlockKey(root)) === '1') return { locked: false, known: true };
-    return unlockRes?.for === root && unlockRes.ok ? { locked: !unlockRes.open, known: true } : { locked: true, known: false };
+    const album = status!.address!;
+    if (deps.store.get(unlockKey(album)) === '1') return { locked: false, known: true };
+    return unlockRes?.for === album && unlockRes.ok ? { locked: !unlockRes.open, known: true } : { locked: true, known: false };
   }
-  /** Reads the inbound transfers of the album's wallet and the listener's own; a positive answer is remembered for good. */
+  /**
+   * Reads the inbound transfers of the album's own wallet. A deposit of at least 0.1 STX from anyone but the gifter and the
+   * gift treasury (the listener's own wallets count) opens it; a positive answer is remembered for good, an unreadable list
+   * keeps it locked and is tried again.
+   */
   async function lookupUnlock() {
     if (!lockWanted() || !deps.history || unlockLooking) return;
-    const root = likeAddr()!, info = giftNow()!, album = status!.address!;
-    if (deps.store.get(unlockKey(root)) === '1') return;
-    if (unlockRes?.for === root && deps.now() - unlockRes.at < (unlockRes.ok ? 2 * 60_000 : 60_000)) return;
+    const info = giftNow()!, album = status!.address!;
+    if (deps.store.get(unlockKey(album)) === '1') return;
+    if (unlockRes?.for === album && deps.now() - unlockRes.at < (unlockRes.ok ? 2 * 60_000 : 60_000)) return;
     unlockLooking = true;
     try {
-      let open = false, ok = true;
-      for (const wallet of [root, album]) {
-        const h = await deps.history(wallet, false);
-        if (!h.ok) { ok = false; continue; }
-        if (h.inbound.some((t) => isMainnetStandardAddress(t.sender) && t.sender !== wallet && t.sender !== album && t.sender !== root && t.sender !== info.from && t.sender !== info.treasury && BigInt(t.amount) >= MIN_FUNDING)) { open = true; break; }
+      const h = await deps.history(album, false);
+      if (!h.ok) unlockRes = { for: album, ok: false, open: false, at: deps.now() };
+      else {
+        const open = h.inbound.some((t) => isMainnetStandardAddress(t.sender) && t.sender !== album && t.sender !== info.from && t.sender !== info.treasury && BigInt(t.amount) >= MIN_FUNDING);
+        unlockRes = { for: album, ok: true, open, at: deps.now() };
+        if (open) deps.store.set(unlockKey(album), '1');
       }
-      // A qualifying deposit settles it; an unreadable list never reads as "no deposit" for good.
-      unlockRes = { for: root, ok: open || ok, open, at: deps.now() };
-      if (open) deps.store.set(unlockKey(root), '1');
-    } catch { unlockRes = { for: root, ok: false, open: false, at: deps.now() }; }
+    } catch { unlockRes = { for: album, ok: false, open: false, at: deps.now() }; }
     finally { unlockLooking = false; }
   }
 
