@@ -30,7 +30,7 @@
  *   TELEMETRY_SALT                      salts the IP hash used for per-IP limits (no IP is stored)
  * Gifts also need pay-per-play to be on and the radio host (functions/lib/radio-listening-wallet.ts).
  */
-import { AnchorMode, getAddressFromPrivateKey, makeSTXTokenTransfer, TransactionVersion, encodeStructuredData } from '@stacks/transactions';
+import { AnchorMode, cvToHex, cvToJSON, getAddressFromPrivateKey, hexToCV, makeSTXTokenTransfer, TransactionVersion, encodeStructuredData, uintCV } from '@stacks/transactions';
 import { StacksMainnet } from '@stacks/network';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
@@ -104,7 +104,12 @@ export interface GiftChain {
   transfer(txid: string): Promise<ChainTransfer | null>;
   /** STX transfers TO an address with their memos: the mempool, then the newest confirmed pages. */
   inbound(address: string): Promise<(ChainTransfer & { txid: string })[]>;
+  /** Who holds a song (an inscription of the radio's core contract); null when no one does. Throws when the chain cannot say. */
+  ownerOf(tokenId: number): Promise<string | null>;
 }
+
+/** The core contract the radio's songs live on. */
+const SONG_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
 
 const HIRO = 'https://api.mainnet.hiro.so';
 const memoText = (hex: unknown) => {
@@ -198,8 +203,31 @@ export function hiroGiftChain(env: GiftEnv): GiftChain {
       ]);
       if (pages.some((p) => !Array.isArray(p.results))) throw new GiftError('Could not read the treasury right now.', 503);
       return pages.flatMap((p) => p.results as any[]).filter((tx) => tx?.tx_type === 'token_transfer' && tx.token_transfer?.recipient_address === address).map(parseTransfer);
+    },
+    async ownerOf(tokenId) {
+      const [address, name] = SONG_CONTRACT.split('.');
+      const r = await fetchHiro(`/v2/contracts/call-read/${address}/${name}/get-owner`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sender: address, arguments: [cvToHex(uintCV(tokenId))] })
+      });
+      if (!r.ok) throw new GiftError(`Could not check who owns song #${tokenId} right now. Try again shortly.`, 503);
+      const body = await r.json().catch(() => null) as { okay?: boolean; result?: string } | null;
+      if (!body?.okay || typeof body.result !== 'string') throw new GiftError(`Could not check who owns song #${tokenId} right now. Try again shortly.`, 503);
+      const holder = principalIn(cvToJSON(hexToCV(body.result)));
+      if (holder === undefined) throw new GiftError(`Could not read who owns song #${tokenId}.`, 503);
+      return holder;
     }
   };
+}
+
+/** The principal inside a `(ok (some principal))` reply; null for `(ok none)`; undefined when it is neither. */
+export function principalIn(json: any): string | null | undefined {
+  let v = json;
+  for (let i = 0; i < 4 && v; i++) {
+    if (v.type === 'principal' && typeof v.value === 'string') return v.value;
+    if (typeof v.type === 'string' && v.type.includes('none')) return null;
+    v = v.value;
+  }
+  return v === null ? null : undefined;
 }
 
 // ---------------------------------------------------------------------------- config
@@ -555,6 +583,19 @@ export async function playerView(env: GiftEnv, id: string): Promise<PlayerView |
   };
 }
 
+/** Every song must be held by this wallet right now. A song held by a contract (for example listed for sale) does not count. */
+export async function requireSongOwner(deps: GiftDeps, owner: string, ids: number[]) {
+  for (let i = 0; i < ids.length; i += 8) {
+    const holders = await Promise.all(ids.slice(i, i + 8).map(async (id) => [id, await deps.chain.ownerOf(id)] as const));
+    for (const [id, holder] of holders) {
+      if (holder === owner) continue;
+      throw new GiftError(holder && holder.includes('.')
+        ? `Song #${id} is held by a contract (listed for sale?). An album can only be made from songs in your own wallet.`
+        : `Song #${id} is not in this wallet. An album can only be made by the wallet that owns all of its songs.`, 403);
+    }
+  }
+}
+
 /** Admin: store a player definition. Needs the admin's signature over its hash; each signed request works once. */
 export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefinition; request: PlayerRequest; signature: string }, deps: GiftDeps, request?: Request) {
   requireEnabled(env, request);
@@ -569,6 +610,9 @@ export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefin
   const songs = await catalogueSongs(env, wanted);
   const missing = wanted.find((n) => !songs.has(n));
   if (missing !== undefined) throw new GiftError(`Song #${missing} is not a ready song in the radio catalogue.`, 400);
+  // An album is made by whoever owns all of its songs, and nobody else (the core contract applies the same rule to an
+  // inscription whose parents are the songs). Checked here against the chain, for every song, at the moment of creation.
+  await requireSongOwner(deps, req.admin, wanted);
   const hash = playerHash(def);
   const existing = await one<{ id: string }>(env, 'SELECT id FROM radio_gift_players WHERE hash=?', [hash]);
   if (existing) return { id: existing.id, title: def.title, tracks: def.tracks.length, existing: true };

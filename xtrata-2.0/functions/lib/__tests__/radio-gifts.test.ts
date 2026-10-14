@@ -3,14 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import {
-  createStacksPrivateKey, cvToString, deserializeTransaction, encodeStructuredData, getAddressFromPrivateKey, makeRandomPrivKey,
+  createStacksPrivateKey, cvToHex, cvToString, noneCV, principalCV, responseOkCV, someCV, deserializeTransaction, encodeStructuredData, getAddressFromPrivateKey, makeRandomPrivKey,
   privateKeyToString, signMessageHashRsv, TransactionVersion
 } from '@stacks/transactions';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
   BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
-  giftStatus, nextSlot, NONCE_SETTLE_MS, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv
+  giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv
 } from '../radio-gifts';
 import { deriveSlotIdentity, listeningBase } from '../../../src/lib/listening-wallet/derive';
 import { signSlotBinding } from '../../../src/lib/listening-wallet/slots';
@@ -62,6 +62,9 @@ function setup(over: Partial<GiftEnv> = {}) {
     activity: new Map<string, number>(),
     txs: new Map<string, ChainTransfer>(),
     inbound: [] as Tx[],
+    /** Who holds each song: by default the admin holds every one (see `holder`). */
+    owners: new Map<number, string | null>(),
+    ownerError: false,
     mempoolNonce: 7n, executed: 6n as bigint | null,
     broadcastMode: 'ok' as 'ok' | 'refuse' | 'unclear'
   };
@@ -78,7 +81,11 @@ function setup(over: Partial<GiftEnv> = {}) {
       return txid;
     },
     transfer: async (txid) => chain.txs.get(txid) ?? null,
-    inbound: async () => chain.inbound
+    inbound: async () => chain.inbound,
+    ownerOf: async (id) => {
+      if (chain.ownerError) throw new GiftError('Could not check who owns a song right now.', 503);
+      return chain.owners.has(id) ? chain.owners.get(id)! : addr(adminKey);
+    }
   };
   let now = T0;
   const deps = () => ({ chain: fake, now, human: async () => true });
@@ -398,6 +405,24 @@ describe('radio gift wallets', () => {
   });
 });
 
+describe('song holder lookup', () => {
+  const reply = (cv: ReturnType<typeof responseOkCV>) => new Response(JSON.stringify({ okay: true, result: cvToHex(cv) }));
+  it('reads who holds a song from the core contract, and says "could not check" when it cannot', async () => {
+    const env = { RADIO_GIFT_ENABLED: '1' } as GiftEnv;
+    const holder = addr(key());
+    const fetcher = vi.fn(async () => reply(responseOkCV(someCV(principalCV(holder)))));
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      expect(await hiroGiftChain(env).ownerOf(2187)).toBe(holder);
+      expect(String((fetcher.mock.calls[0] as unknown[])[0])).toContain('/xtrata-v3-2-3/get-owner');
+      fetcher.mockImplementation(async () => reply(responseOkCV(noneCV())));
+      expect(await hiroGiftChain(env).ownerOf(2187)).toBeNull();
+      fetcher.mockImplementation(async () => new Response('nope', { status: 500 }));
+      await expect(hiroGiftChain(env).ownerOf(2187)).rejects.toMatchObject({ status: 503 });
+    } finally { vi.unstubAllGlobals(); }
+  });
+});
+
 describe('radio gift players', () => {
   const SONGS = [785, 2186, 2187, 2188];
   const catalogue = (s: ReturnType<typeof setup>, rows: [number, string, string, number, string][] = SONGS.map((n, i) => [n, `Song ${i + 1}`, 'The Artist', 1, 'ready'])) => {
@@ -429,6 +454,35 @@ describe('radio gift players', () => {
       id: out.id, title: 'Proof of Sound', subtitle: 'The Artist', cover: 785, paidOnly: true,
       tracks: SONGS.map((id, i) => ({ id, title: `Song ${i + 1}`, artist: 'The Artist' }))
     });
+  });
+
+  it('only the wallet that owns every song can make its album', async () => {
+    const s = setup(); catalogue(s);
+    const other = key();
+    s.chain.owners.set(2187, addr(other)); // one song belongs to someone else
+    await expect(make(s)).rejects.toMatchObject({ status: 403, message: /Song #2187 is not in this wallet/ });
+    s.chain.owners.set(2187, 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.some-market'); // listed in a contract
+    await expect(make(s)).rejects.toMatchObject({ status: 403, message: /held by a contract/ });
+    s.chain.owners.set(2187, null); // nobody holds it
+    await expect(make(s)).rejects.toMatchObject({ status: 403 });
+    await ensureGiftTables(s.env);
+    expect(s.db.sql.prepare('SELECT * FROM radio_gift_players').all()).toHaveLength(0);
+    s.chain.owners.delete(2187); // back in the admin's wallet
+    await expect(make(s)).resolves.toMatchObject({ existing: false });
+  });
+
+  it('a chain that cannot say who owns a song is "try again", never "allowed"', async () => {
+    const s = setup(); catalogue(s);
+    s.chain.ownerError = true;
+    await expect(make(s)).rejects.toMatchObject({ status: 503 });
+    await ensureGiftTables(s.env);
+    expect(s.db.sql.prepare('SELECT * FROM radio_gift_players').all()).toHaveLength(0);
+  });
+
+  it('reads a holder out of a contract reply', () => {
+    expect(principalIn({ type: '(response (optional principal) UnknownType)', value: { type: '(optional principal)', value: { type: 'principal', value: 'SP123' } } })).toBe('SP123');
+    expect(principalIn({ type: '(response (optional none) UnknownType)', value: { type: '(optional none)', value: null } })).toBeNull();
+    expect(principalIn({ type: 'uint', value: '5' })).toBeUndefined();
   });
 
   it('refuses anyone but the admin, a signature for a different definition, a stale request and a replay', async () => {
