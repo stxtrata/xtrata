@@ -53,7 +53,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -76,7 +76,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial'] });
     expect(s.map.size).toBe(0);
   });
 
@@ -225,6 +225,50 @@ describe('listening wallet engine (wallet origin)', () => {
       const r = await s.h['listening.prepareReturn'](ret(OTHER));
       expect(r.recipient).toBe(MAIN);
       expect(s.panels.at(-1)!.lines.join(' ')).not.toContain(OTHER);
+    });
+
+    it('returns a chosen amount to the supplied destination, showing the amount and the full address', async () => {
+      const s = setup();
+      await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+      const r = await s.h['listening.prepareReturn']({ mode: 'amount', amount: '250000', balance: '900000', nonce: '2', fee: '3000', destination: OTHER });
+      expect(r).toMatchObject({ recipient: OTHER, amount: '250000', fee: '3000', mode: 'amount' });
+      const tx = deserializeTransaction(r.raw) as any;
+      expect(cvToJSON(tx.payload.recipient).value).toBe(OTHER);
+      expect(tx.payload.amount).toBe(250000n);
+      const panel = s.panels.at(-1)!;
+      expect(panel.title).toBe('Return part of the balance');
+      expect(panel.lines.join(' ')).toContain(OTHER);
+      expect(panel.lines.join(' ')).toContain('0.250000');
+      // 900000 - 250000 - 3000 stays in the wallet
+      expect(panel.lines.join(' ')).toContain('0.647000');
+    });
+
+    it('refuses an amount that is missing, zero, not a plain number or more than the balance covers', async () => {
+      const s = setup();
+      await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+      const base = { mode: 'amount' as const, balance: '900000', nonce: '2', fee: '3000', destination: OTHER };
+      await expect(s.h['listening.prepareReturn'](base)).rejects.toThrow(/Invalid amount/);
+      await expect(s.h['listening.prepareReturn']({ ...base, amount: '0' })).rejects.toThrow(/Choose an amount/);
+      await expect(s.h['listening.prepareReturn']({ ...base, amount: '-5' })).rejects.toThrow(/Invalid amount/);
+      await expect(s.h['listening.prepareReturn']({ ...base, amount: '1.5' })).rejects.toThrow(/Invalid amount/);
+      await expect(s.h['listening.prepareReturn']({ ...base, amount: '899000' })).rejects.toThrow(/cannot cover/);
+      expect(s.panels.filter((p) => p.kind === 'return')).toHaveLength(0);
+    });
+
+    it('applies the same destination rules to an amount return', async () => {
+      const s = setup();
+      await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+      const part = (destination?: string) => ({ mode: 'amount' as const, amount: '100000', balance: '900000', nonce: '2', fee: '3000', ...(destination === undefined ? {} : { destination }) });
+      await expect(s.h['listening.prepareReturn'](part())).rejects.toThrow(/Choose where to send/);
+      await expect(s.h['listening.prepareReturn'](part(OTHER + '.contract'))).rejects.toThrow(/standard mainnet address/);
+      await expect(s.h['listening.prepareReturn'](part(ADDRESS))).rejects.toThrow(/this listening wallet itself/);
+    });
+
+    it('a cancelled amount return signs nothing and the build reports the partial feature', async () => {
+      const s = setup({ cancel: ['return'] });
+      await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+      await expect(s.h['listening.prepareReturn']({ mode: 'amount', amount: '100000', balance: '900000', nonce: '2', fee: '3000', destination: OTHER })).rejects.toBeInstanceOf(CancelledError);
+      expect((await s.h['listening.status']()).features).toContain('partial');
     });
 
     it('a cancelled return signs nothing', async () => {

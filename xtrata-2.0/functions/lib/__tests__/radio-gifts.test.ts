@@ -9,9 +9,10 @@ import {
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
-  BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, GiftError, giftForWallet, giftsConfig,
+  BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
   giftStatus, NONCE_SETTLE_MS, REBROADCAST_MS, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv
 } from '../radio-gifts';
+import { playerData, playerHash, type PlayerDefinition, type PlayerRequest } from '../../../src/lib/listening-wallet/gift-players';
 import { campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_MEMO, giftCodeHash, giftDepositMemo, type CampaignRequest } from '../../../src/lib/listening-wallet/gifts';
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
 
@@ -392,5 +393,111 @@ describe('radio gift wallets', () => {
       await expect(hiroGiftChain(env).broadcast(new Uint8Array([1]), '0x1')).rejects.toThrow(/connection reset/);
       expect(fetcher).toHaveBeenCalledTimes(1);
     } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+describe('radio gift players', () => {
+  const SONGS = [785, 2186, 2187, 2188];
+  const catalogue = (s: ReturnType<typeof setup>, rows: [number, string, string, number, string][] = SONGS.map((n, i) => [n, `Song ${i + 1}`, 'The Artist', 1, 'ready'])) => {
+    s.db.sql.exec('CREATE TABLE radio_metadata (token_id INTEGER PRIMARY KEY, title TEXT, artist TEXT, is_song INTEGER, status TEXT)');
+    for (const [id, title, artist, isSong, status] of rows) s.db.sql.prepare('INSERT INTO radio_metadata VALUES(?,?,?,?,?)').run(id, title, artist, isSong, status);
+  };
+  const definition = (over: Partial<PlayerDefinition> = {}): PlayerDefinition => ({ title: 'Proof of Sound', subtitle: 'The Artist', tracks: SONGS, cover: 785, ...over });
+  const signed = (s: ReturnType<typeof setup>, def = definition(), k = s.adminKey) => {
+    const request: PlayerRequest = { admin: s.admin, hash: playerHash(def), issued: s.now() };
+    const signature = signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(playerData(request)))), privateKey: createStacksPrivateKey(k) }).data;
+    return { definition: def, request, signature };
+  };
+  const make = (s: ReturnType<typeof setup>, def = definition(), k = s.adminKey) => createPlayer(s.env, signed(s, def, k), s.deps(), s.request);
+  const campaignFor = (s: ReturnType<typeof setup>, player: string | undefined, k = s.adminKey) => {
+    const req: CampaignRequest = { admin: s.admin, count: 1, amount: '100000', label: 'Gift Edition', issued: s.now(), ...(player ? { player } : {}) };
+    const signature = signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(campaignData(req)))), privateKey: createStacksPrivateKey(k) }).data;
+    return { req, signature, run: () => createCampaign(s.env, { request: req, signature }, s.deps(), s.request) };
+  };
+
+  it('the admin signs a definition once; only its hash is signed and the catalogue supplies every title and artist', async () => {
+    const s = setup(); catalogue(s);
+    const out = await make(s);
+    expect(out).toMatchObject({ title: 'Proof of Sound', tracks: 4, existing: false });
+    expect(out.id).toMatch(/^[0-9a-f]{16}$/);
+    const body = signed(s);
+    await expect(createPlayer(s.env, body, s.deps(), s.request)).resolves.toMatchObject({ id: out.id, existing: true });
+    const { playerView } = await import('../radio-gifts');
+    expect(await playerView(s.env, out.id)).toEqual({
+      id: out.id, title: 'Proof of Sound', subtitle: 'The Artist', cover: 785, paidOnly: true,
+      tracks: SONGS.map((id, i) => ({ id, title: `Song ${i + 1}`, artist: 'The Artist' }))
+    });
+  });
+
+  it('refuses anyone but the admin, a signature for a different definition, a stale request and a replay', async () => {
+    const s = setup(); catalogue(s);
+    await expect(make(s, definition(), key())).rejects.toMatchObject({ status: 403 });
+    const body = signed(s);
+    await expect(createPlayer(s.env, { ...body, definition: definition({ title: 'Something else' }) }, s.deps(), s.request)).rejects.toMatchObject({ status: 400 });
+    await expect(createPlayer(s.env, { ...body, definition: definition({ tracks: [785, 2186] }) }, s.deps(), s.request)).rejects.toMatchObject({ status: 400 });
+    const stale = signed(s);
+    s.tick(16 * 60_000);
+    await expect(createPlayer(s.env, stale, s.deps(), s.request)).rejects.toMatchObject({ status: 400 });
+    await ensureGiftTables(s.env);
+    expect(s.db.sql.prepare('SELECT * FROM radio_gift_players').all()).toHaveLength(0);
+  });
+
+  it('only songs already in the radio catalogue can be in a player', async () => {
+    const s = setup();
+    catalogue(s, [[785, 'A', 'X', 1, 'ready'], [2186, 'B', 'X', 0, 'ready'], [2187, 'C', 'X', 1, 'failed']]);
+    await expect(make(s, definition({ tracks: [785, 2186], cover: null }))).rejects.toThrow(/Song #2186/);
+    await expect(make(s, definition({ tracks: [785, 2187], cover: null }))).rejects.toThrow(/Song #2187/);
+    await expect(make(s, definition({ tracks: [785, 99999], cover: null }))).rejects.toThrow(/Song #99999/);
+    await expect(make(s, definition({ tracks: [785], cover: 4242 }))).rejects.toThrow(/Song #4242/);
+    await expect(make(s, definition({ tracks: [785], cover: null }))).resolves.toMatchObject({ tracks: 1 });
+  });
+
+  it('rejects bad definitions before touching the catalogue', async () => {
+    const s = setup(); catalogue(s);
+    for (const bad of [
+      definition({ title: '' }), definition({ title: 'x'.repeat(61) }), definition({ title: '<b>hi</b>' }), definition({ subtitle: 'line\nbreak' }),
+      definition({ tracks: [] }), definition({ tracks: [785, 785] }), definition({ tracks: Array.from({ length: 41 }, (_, i) => i + 1) }),
+      definition({ tracks: [0] }), definition({ tracks: [1.5] }), definition({ cover: -1 })
+    ]) await expect(make(s, bad)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('a campaign link opens its player: the id is part of the signature, and it must exist', async () => {
+    const s = setup(); catalogue(s);
+    const { id } = await make(s);
+    const withPlayer = campaignFor(s, id);
+    const { codes, player } = await withPlayer.run();
+    expect(player).toBe(id);
+    expect(await giftStatus(s.env, { code: codes[0] })).toMatchObject({ status: 'live', player: { id, title: 'Proof of Sound', paidOnly: true } });
+    // the signature does not cover a different player, and one that does not exist is refused
+    const other = campaignFor(s, id.replace(/./, (c) => (c === 'a' ? 'b' : 'a')));
+    await expect(createCampaign(s.env, { request: other.req, signature: withPlayer.signature }, s.deps(), s.request)).rejects.toMatchObject({ status: 403 });
+    s.tick(1);
+    await expect(campaignFor(s, 'f'.repeat(16)).run()).rejects.toThrow(/does not exist/);
+    // a campaign without a player is what it always was
+    const plain = campaignFor(s, undefined);
+    s.tick(1);
+    const plainOut = await campaignFor(s, undefined).run();
+    expect(plain.req.player).toBeUndefined();
+    expect((await giftStatus(s.env, { code: plainOut.codes[0] })).player).toBeUndefined();
+  });
+
+  it('a claimed gift tells the wallet its player and where the gift money came from', async () => {
+    const s = setup(); catalogue(s);
+    const { id } = await make(s);
+    const [code] = (await campaignFor(s, id).run()).codes;
+    const w = wallet();
+    await s.claim(code, w);
+    await s.land();
+    const f = (await giftForWallet(s.env, w)).gift as any;
+    expect(f).toMatchObject({ state: 'arrived', treasury: s.treasury, returnTo: s.treasury, player: { id, tracks: expect.any(Array) } });
+    expect(f.player.tracks).toHaveLength(4);
+  });
+
+  it('a song that later leaves the catalogue is dropped from the player instead of failing it', async () => {
+    const s = setup(); catalogue(s);
+    const { id } = await make(s);
+    s.db.sql.prepare("UPDATE radio_metadata SET status='failed' WHERE token_id=2187").run();
+    const { playerView } = await import('../radio-gifts');
+    expect((await playerView(s.env, id))!.tracks.map((t) => t.id)).toEqual([785, 2186, 2188]);
   });
 });

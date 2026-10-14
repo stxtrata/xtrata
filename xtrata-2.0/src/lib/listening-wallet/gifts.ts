@@ -71,6 +71,11 @@ export interface CampaignRequest {
   /** A short label shown to recipients, e.g. "Launch week". ASCII, up to 40 characters. */
   label: string;
   issued: number;
+  /**
+   * A gift player these links open (see gift-players.ts). Part of what the admin signs only when present,
+   * so a request without one is exactly what it always was.
+   */
+  player?: string;
 }
 
 export function validateCampaign(req: CampaignRequest, now = Date.now()): CampaignRequest {
@@ -78,6 +83,7 @@ export function validateCampaign(req: CampaignRequest, now = Date.now()): Campai
   if (!Number.isSafeInteger(req.count) || req.count < 1 || req.count > CAMPAIGN_MAX_LINKS) throw new Error(`Make 1 to ${CAMPAIGN_MAX_LINKS} links at a time.`);
   if (typeof req.amount !== 'string' || !/^\d{1,9}$/.test(req.amount) || !validGiftAmount(BigInt(req.amount))) throw new Error('Each gift must be 0.1 to 1 STX.');
   if (typeof req.label !== 'string' || !/^[ -~]{0,40}$/.test(req.label)) throw new Error('Label: up to 40 plain characters.');
+  if (req.player !== undefined && !(typeof req.player === 'string' && /^[0-9a-f]{16}$/.test(req.player))) throw new Error('That is not a gift player id.');
   if (!Number.isSafeInteger(req.issued) || req.issued > now + 60_000 || now - req.issued > CAMPAIGN_MAX_AGE_MS) throw new Error('Request expired. Sign again.');
   return req;
 }
@@ -90,7 +96,8 @@ export const campaignData = (req: CampaignRequest) => ({
     count: uintCV(req.count),
     amount: uintCV(BigInt(req.amount)),
     label: stringAsciiCV(req.label),
-    issued: uintCV(req.issued)
+    issued: uintCV(req.issued),
+    ...(req.player ? { player: stringAsciiCV(req.player) } : {})
   })
 });
 
@@ -116,4 +123,6 @@ export interface GiftView {
   from: string | null;
   label: string;
   expires: number;
+  /** The gift player this link opens, when it has one (resolved from the catalogue by the server). */
+  player?: import('./gift-players').PlayerView | null;
 }

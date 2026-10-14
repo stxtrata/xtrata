@@ -71,3 +71,45 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 
 - `npx vitest run functions/lib/__tests__/radio-gifts.test.ts`: double-pay paths, caps, deposits, refunds, orphans.
 - `node scripts/test-radio-gift-browser.mjs [shots]`: link → passkey → automatic claim (including a busy treasury), with the real wallet frame. Also the gift fold and admin box. Build the test wallet first (see the file header).
+
+## Gift players (Gift Edition)
+
+A gift link can carry a **player**: a named album that loads onto the radio when the recipient claims the gift. The recipient gets the album as its own looping band, a plays-left meter, and **no free mode**: when the paid plays run out the radio stops until they add more. Plan and decisions: Xtrata Music project, `claude/radio-gift-player-plan.md`.
+
+Code: `src/lib/listening-wallet/gift-players.ts` (rules, signing), `functions/lib/radio-gifts.ts` (`createPlayer`, `playerView`), `src/lib/listening-wallet/ledger.ts` (where money came from), `src/radio-ppp/controller.ts` (plays, stop, returns), `src/home/radio.js` (the gift band).
+
+### Making one (admin, phase 1)
+
+1. Open the radio as the gift admin: **🎁 Gift Stacks music → Gift players**. Enter a title, an optional artist, and the radio song numbers in play order (1 to 40, ready songs in the radio catalogue). Sign once. The server stores the definition; titles and artists shown to listeners come from the catalogue, never from what was typed.
+2. Under **Campaign links** pick the player, a size (300 / 500 / 1,000 plays or Max = 1 STX), how many links, and sign. Links look like any other gift link.
+- A player never changes. A new version is a new player, so a link already sent cannot become something its sender did not mean.
+- Migration `functions/migrations/028_radio_gift_players.sql` (the tables are also created on first use).
+
+### What the recipient sees
+
+- The link says who sent “Title”, how many songs and about how many plays. One tap makes the passkey wallet and the gift lands in it.
+- The radio switches to the album (looping, in order). The panel shows `🎁 Gift Edition · Title · N plays left`; the interface speaks in plays, not STX.
+- **Stop rules.** The radio stops (and says why on its screen) when: the wallet is locked, paying is switched off, there are no paid plays left (counting payments in flight and songs waiting to be paid), or the wallet is over 1 STX. A slow or failed read of the chain or the server is **not** a reason to stop, and a payment that could not be made stays queued and counts against the plays: it never turns into a free song.
+- Running low (20 plays) or out: one quiet line pointing at the listening address and, as an optional extra, Xverse and Leather. Never a popup, never a block.
+
+### Where the money goes back to
+
+A gifted wallet returns each part of its balance to whoever it came from:
+
+| Part | Goes to |
+| --- | --- |
+| Unused gift | the gifter (friend gift) or the treasury (campaign) |
+| What a listener added | the address that sent it |
+| Above 1 STX | the sender of the newest deposit |
+| Dust or a contract sender | an address the listener chooses |
+
+- **How it is worked out.** The page reads the wallet's inbound transfers and its outgoing transfers from Hiro, attributes money (not addresses): deposits from the treasury are the gift, deposits of at least 0.1 STX from a standard address belong to that sender, a return reduces what the address it went to had put in first, and spending uses the oldest money first. If the history is incomplete, too long, or does not add up to the balance, the answer is **“Could not check”** and nothing is sent.
+- **One part at a time.** Only one transaction can be in flight per wallet, so the first press shows the split and the next press returns the first part; press again after it confirms for the next. Each part pays its own network fee.
+- **Checked before it is broadcast.** The page compares what the wallet box signed (destination and exact amount) with what it asked for.
+- **Linked to a main wallet.** Everything goes to that wallet, as it always has.
+- Needs the wallet box with the `partial` feature (returns of a chosen amount). `npm run build:listening-wallet`, then deploy `dist-listening-wallet` to the wallet Pages project by hand. Until then a split return says the box needs an update; nothing is sent.
+
+### Known limits
+
+- The outgoing list shares Hiro's transactions endpoint with plays, so a wallet with more than about 1,000 transactions reads as “could not check”. The listener can still choose an address to return to.
+- Phase 1 has no follow-likes and no onboarding prompt beyond the quiet pointer above.

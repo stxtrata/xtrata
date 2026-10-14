@@ -9,6 +9,8 @@
 import { deserializeTransaction, cvToJSON } from '@stacks/transactions';
 import { isMainnetStandardAddress, linkData, type LinkRequest } from '../lib/listening-wallet/link';
 import type { FunderResult } from '../lib/listening-wallet/funder';
+import { buildLedger, excessTarget, planReturns, type History, type LedgerPart, type ReturnStep } from '../lib/listening-wallet/ledger';
+import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import {
   balanceState, costPerPlay, DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, fundingAllowance, LIKE_FEE, playsCovered, RESERVE, TARGET,
   type BalanceState, type ReturnMode
@@ -30,6 +32,19 @@ export interface GateConfig {
   limits: { playFee: string; returnFee: string; maxSessionPlays: number; sessionHours: number };
   /** Gift wallets (functions/lib/radio-gifts.ts): off unless the deployment has a gift treasury. */
   gifts?: { enabled: boolean; treasury: string | null; turnstileSiteKey: string | null; admin: boolean; fee: string };
+}
+/** What the server knows about a gifted listening wallet (GET /radio/gift/for). */
+export interface GiftInfo {
+  /** Where the unused part of the gift goes back to: the friend who paid, or the treasury for a campaign. */
+  returnTo: string;
+  from: string | null;
+  source: string;
+  amount: string;
+  /** The gift treasury: transfers from it are the gift, anything else that arrived is a top-up. */
+  treasury: string;
+  state: 'arriving' | 'arrived' | 'sending';
+  /** The album this gift came with. Null for a plain gift: the radio then carries on as normal. */
+  player: PlayerView | null;
 }
 export interface StoredLink { listening: string; issued: number; mainSignature: string }
 
@@ -83,6 +98,12 @@ export interface PppDeps {
   wait?(ms: number): Promise<void>;
   /** A display name (e.g. BNS) for a main wallet, if one is already known. Shown in the wallet box; never needed. */
   nameOf?(address: string): string | undefined;
+  /**
+   * Was this listening wallet gifted? `null` means it was not; a rejection means the server could not be asked (never read as "not a gift").
+   */
+  giftInfo?(listening: string): Promise<GiftInfo | null>;
+  /** Every inbound (and outgoing) STX transfer of the listening wallet, or `{ok:false}` when the list is not complete. */
+  history?(listening: string, withOutgoing: boolean): Promise<History>;
 }
 
 export type Step =
@@ -157,7 +178,20 @@ export interface Snapshot {
    * into it. Unknown (not yet read, or the read failed) counts as false.
    */
   brandNew: boolean;
+  /** This wallet was gifted (the server says so). `player` is the album that came with it, if any. */
+  gift: { player: PlayerView | null; from: string | null; source: string; amount: string } | null;
+  /** Paid plays this gifted wallet still buys, counting payments in flight and songs waiting to be paid. */
+  giftPlays: number;
+  /** Why a gift player is silent right now. Null while it may play. Transient failures never set it. */
+  giftStop: { reason: GiftStopReason; text: string } | null;
+  /** How a gifted wallet's balance will go back, worked out from the chain on request. */
+  returnPlan: ReturnPlanView;
 }
+export type GiftStopReason = 'connect' | 'locked' | 'link' | 'over' | 'arriving' | 'out' | 'off' | 'tab';
+export type ReturnPlanView =
+  | { state: 'none' }
+  | { state: 'ready'; steps: { to: string | null; kind: ReturnStep['kind']; send: string }[]; kept: number; excess: string | null }
+  | { state: 'unavailable' };
 
 const UNRESOLVED: Entry['status'][] = ['prepared', 'signed', 'unknown', 'pending'];
 const STUCK_AFTER_MS = 30 * 60_000;
@@ -202,6 +236,11 @@ export function createPppController(deps: PppDeps) {
   let creditedRes: { for: string; main: string | null; ok: boolean; at: number } | null = null;
   let unusedRes: { for: string; unused: boolean } | null = null;
   let creditedLooking = false;
+  // Gift: what the server says about this wallet (kept on this device so the album survives an unreachable server).
+  let giftRes: { for: string; info: GiftInfo | null; ok: boolean; at: number } | null = null;
+  let giftLooking = false;
+  let preview: { at: number; balance: bigint; plan: ReturnPlanView; steps: ReturnStep[]; parts: LedgerPart[] } | null = null;
+  let previewFailed = false;
   let verified = false;
   let lockHeld = false;
   // One-tap unlock: an unlock panel opened in the frame on page load, waiting for the listener.
@@ -275,6 +314,90 @@ export function createPppController(deps: PppDeps) {
     return undefined;
   }
 
+  // ---------------------------------------------------------------- gifted wallets
+  const giftKey = (listening: string) => key('gift', listening);
+  /** The gift record for the open wallet: the latest answer, else the one kept from last time. */
+  function giftNow(): GiftInfo | null {
+    const listening = status?.address;
+    if (!listening) return null;
+    if (giftRes?.for === listening) return giftRes.info;
+    try {
+      const v = JSON.parse(deps.store.get(giftKey(listening)) || 'null');
+      return v && typeof v.returnTo === 'string' && typeof v.treasury === 'string' ? (v as GiftInfo) : null;
+    } catch { return null; }
+  }
+  /**
+   * Asks the server whether this wallet was gifted. A failed answer keeps what was known and is tried again a
+   * minute later; it never turns a gifted wallet into an ordinary one (and so never lets a gift player play free).
+   */
+  async function lookupGift() {
+    const listening = status?.address;
+    if (!listening || !deps.giftInfo || !gate?.gifts?.enabled || giftLooking) return;
+    const known = giftRes?.for === listening ? giftRes : null;
+    const wait = !known ? 0 : !known.ok ? 60_000 : known.info ? 30 * 60_000 : 10 * 60_000;
+    if (known && deps.now() - known.at < wait) return;
+    giftLooking = true;
+    const before = giftNow();
+    try {
+      const info = await deps.giftInfo(listening);
+      giftRes = { for: listening, info, ok: true, at: deps.now() };
+      deps.store.set(giftKey(listening), JSON.stringify(info));
+    } catch { giftRes = { for: listening, info: before, ok: false, at: deps.now() }; }
+    finally { giftLooking = false; }
+  }
+
+  const inFlight = () => entries().reduce((sum, e) => (UNRESOLVED.includes(e.status) ? sum + BigInt(e.amount || '0') + BigInt(e.fee || '0') : sum), 0n);
+  /** Paid plays this wallet can still buy: the balance less what is already on its way out and songs waiting to be paid. */
+  function playsLeftNow(): number {
+    if (balance === undefined) return 0;
+    const spendable = balance - inFlight() - BigInt(queue.length) * costPerPlay(fee());
+    return spendable > 0n ? playsCovered(spendable, fee()) : 0;
+  }
+  const OUT_TEXT = 'OUT OF PLAYS — ADD MORE TO KEEP LISTENING';
+  /**
+   * A gift player has no free mode: it plays only while paid plays are available. Anything that is merely
+   * unknown (the balance is still loading, a read failed) is never a reason to stop.
+   */
+  function giftStop(): Snapshot['giftStop'] {
+    if (!giftNow()?.player) return null;
+    const stop = (reason: GiftStopReason, text: string) => ({ reason, text });
+    switch (step()) {
+      case 'connect': case 'wrong-wallet': return stop('connect', 'CONNECT YOUR WALLET TO LISTEN');
+      case 'locked': return stop('locked', 'UNLOCK TO LISTEN');
+      case 'link': return stop('link', 'FINISH SETUP TO LISTEN');
+      case 'over': return stop('over', 'OVER 1 STX — RETURN THE EXCESS');
+      case 'fund': return pendingDeposit() ? stop('arriving', 'YOUR PLAYS ARE ARRIVING') : stop('out', OUT_TEXT);
+      case 'ready':
+        if (!payingOn() || !status?.session || status.session.playsLeft < 1) return stop('off', 'PAYING IS OFF — SWITCH ON TO LISTEN');
+        if (!lockHeld) return stop('tab', 'PLAYING IN ANOTHER TAB');
+        return playsLeftNow() < 1 ? stop('out', OUT_TEXT) : null;
+      default: return null;
+    }
+  }
+
+  // ---------------------------------------------------------------- returns that follow the money
+  const PREVIEW_MS = 3 * 60_000;
+  /** A gifted, unlinked wallet splits its balance by where each part came from. A linked one returns to its main wallet. */
+  const ledgerReturns = () => !!giftNow() && !!deps.history && !status?.linked;
+
+  async function readLedger(): Promise<{ balance: bigint; nonce: bigint; parts: LedgerPart[]; steps: ReturnStep[]; tooSmall: number } | null> {
+    const listening = status!.address!;
+    const info = giftNow()!;
+    const { balance: b, nonce } = await deps.chain.account(listening);
+    const h = await deps.history!(listening, true);
+    if (!h.ok) return null;
+    const ledger = buildLedger({ self: listening, balance: b, inbound: h.inbound, outgoing: h.outgoing, gift: { sender: info.treasury, payer: info.returnTo } });
+    if (!ledger.ok) return null;
+    const plan = planReturns(ledger.parts, DEFAULT_RETURN_FEE);
+    return { balance: b, nonce, parts: ledger.parts, steps: plan.steps, tooSmall: plan.tooSmall.length };
+  }
+
+  const returnPlanView = (): ReturnPlanView => {
+    if (previewFailed) return { state: 'unavailable' };
+    if (!preview || deps.now() - preview.at > PREVIEW_MS || (balance !== undefined && balance !== preview.balance)) return { state: 'none' };
+    return preview.plan;
+  };
+
   function step(): Step {
     if (!gate?.enabled) return 'off';
     if (!gate.here) return 'elsewhere';
@@ -317,7 +440,11 @@ export function createPppController(deps: PppDeps) {
     others: (status?.others ?? []).filter((a) => a !== deps.main() && a !== status?.linked),
     creditedTo: solo() && status?.address && creditedRes?.for === status.address && creditedRes.main ? creditedRes.main : undefined,
     createdHere: !!status?.address && deps.store.get(key('created', status.address)) === '1',
-    brandNew: !!status?.address && balance === 0n && unusedRes?.for === status.address && unusedRes.unused
+    brandNew: !!status?.address && balance === 0n && unusedRes?.for === status.address && unusedRes.unused,
+    gift: (() => { const g = giftNow(); return g ? { player: g.player, from: g.from, source: g.source, amount: g.amount } : null; })(),
+    giftPlays: giftNow() ? playsLeftNow() : 0,
+    giftStop: giftStop(),
+    returnPlan: returnPlanView()
   });
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
@@ -425,10 +552,11 @@ export function createPppController(deps: PppDeps) {
     catch { /* unknown: not brand-new for now; tried again on the next refresh */ }
   }
 
-  async function reconcile() {
+  async function reconcile(): Promise<boolean> {
     const listening = status?.address;
-    if (!listening) return;
+    if (!listening) return false;
     let confirmed: bigint | undefined;
+    let landed = false;
     for (const e of unresolved()) {
       try {
         const tx = await deps.chain.transaction(e.txid!);
@@ -449,6 +577,7 @@ export function createPppController(deps: PppDeps) {
         const s = String(tx.tx_status);
         if (s === 'success' && tx.canonical !== false && tx.is_unanchored === false) {
           saveEntry({ ...e, status: 'confirmed', confirmedAt: deps.now(), actualFee: String(tx.fee_rate ?? e.fee), raw: undefined });
+          landed = true;
           if (e.kind === 'like') {
             likesConfirmed = true;
             if (e.status !== 'confirmed' && typeof e.liked === 'boolean') try { deps.likeConfirmed?.(e.song, e.liked); } catch { /* radio */ }
@@ -471,6 +600,7 @@ export function createPppController(deps: PppDeps) {
         }
       } catch { /* keep waiting */ }
     }
+    return landed;
   }
 
   async function refresh(force = false) {
@@ -498,7 +628,9 @@ export function createPppController(deps: PppDeps) {
       await lookupFunder();
       await lookupCredited();
       await lookupUnused();
-      await reconcile();
+      await lookupGift();
+      // A payment that has just landed has changed the balance: read it again now, so plays-left is exact.
+      if (await reconcile()) await refreshBalance(true);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Pay-per-play could not refresh. Listening stays free.';
     }
@@ -592,6 +724,82 @@ export function createPppController(deps: PppDeps) {
     return true;
   }
 
+  /**
+   * Ask the listening wallet to sign one return and send it. The page checks what came back against what it asked
+   * for (destination and exact amount) before anything is broadcast, so a wallet box that signed something else
+   * is caught here, not on-chain.
+   */
+  async function sendReturn(p: { mode: ReturnMode; to: string; linked: boolean; amount?: bigint }, acct?: { balance: bigint; nonce: bigint }) {
+    const listening = status!.address!;
+    const { balance: b, nonce } = acct ?? await deps.chain.account(listening);
+    balance = b;
+    const r = await bridge!.request<ReturnResult>('listening.prepareReturn', {
+      mode: p.mode, balance: b.toString(), nonce: nonce.toString(), fee: DEFAULT_RETURN_FEE.toString(),
+      ...(p.amount !== undefined ? { amount: p.amount.toString() } : {}),
+      ...(p.linked ? {} : { destination: p.to })
+    });
+    if (r.recipient !== p.to) throw new Error('Return destination does not match what you approved. Nothing was sent.');
+    const expected = p.mode === 'amount' ? p.amount : p.mode === 'all' ? b - DEFAULT_RETURN_FEE : b - TARGET - DEFAULT_RETURN_FEE;
+    const tx = deserializeTransaction(r.raw) as any;
+    if (cvToJSON(tx.payload.recipient).value !== p.to || String(tx.payload.amount) !== r.amount || (expected !== undefined && r.amount !== expected.toString()))
+      throw new Error('Signed return does not match what you approved. Nothing was sent.');
+    const entry: Entry = {
+      id: randomId(), address: listening, kind: 'withdraw', core: 0, song: 0, recipient: r.recipient, amount: r.amount,
+      fee: r.fee, nonce: nonce.toString(), created: deps.now(), status: 'signed', raw: r.raw, txid: r.txid
+    };
+    deps.validate(entry);
+    saveEntry(entry);
+    try { await deps.chain.broadcast(r.raw, r.txid); saveEntry({ ...entry, status: 'pending' }); }
+    catch (e) { saveEntry({ ...entry, status: 'unknown', note: (e as Error).message }); throw e; }
+    return r;
+  }
+
+  /**
+   * A gifted wallet gives each part of its balance back to whoever it came from: the unused gift to the gifter (or
+   * the treasury), a listener's own top-up to the listener who sent it. The first call works the split out and shows
+   * it; the next one, with the same balance, returns the first part. Each part is its own transaction (one at a time).
+   */
+  async function returnByLedger(mode: ReturnMode) {
+    if (unresolved().length) throw new Error('Wait for the pending payment to confirm, then return funds.');
+    if (walletLacks('standalone')) throw new Error('The listening wallet box needs an update before it can return to another address. Try again shortly.');
+    const led = await readLedger().catch(() => null);
+    if (!led) {
+      preview = null; previewFailed = true;
+      throw new Error('Could not check where the funds came from right now. Nothing was sent. Try again shortly.');
+    }
+    previewFailed = false;
+    balance = led.balance;
+    const acct = { balance: led.balance, nonce: led.nonce };
+    if (mode === 'excess') {
+      const to = excessTarget(led.parts) ?? chosenAddress();
+      if (!to) throw new Error('Choose where to send the excess first.');
+      await sendReturn({ mode: 'excess', to, linked: false }, acct);
+      preview = null;
+      say('Excess returned ✓ Switch paying back on to continue.');
+      return;
+    }
+    const steps = led.steps;
+    if (!steps.length) throw new Error('What is left is too small to return: the network fee would take all of it.');
+    const same = !!preview && preview.balance === led.balance && deps.now() - preview.at <= PREVIEW_MS
+      && preview.steps.length === steps.length && preview.steps.every((x, i) => x.to === steps[i].to && x.mode === steps[i].mode && x.send === steps[i].send);
+    if (!same) {
+      preview = {
+        at: deps.now(), balance: led.balance, steps, parts: led.parts,
+        plan: { state: 'ready', steps: steps.map((x) => ({ to: x.to, kind: x.kind, send: x.send.toString() })), kept: led.tooSmall, excess: excessTarget(led.parts) }
+      };
+      say(steps.length > 1 ? `This goes back in ${steps.length} parts, each to whoever it came from. Check below, then confirm.` : 'Check where it goes, then confirm.');
+      return;
+    }
+    const step = steps[0];
+    const to = step.to ?? chosenAddress();
+    if (!to) throw new Error('Choose where to send the rest first.');
+    if (step.mode === 'amount' && walletLacks('partial')) throw new Error('The listening wallet box needs an update before it can return in parts. Try again shortly.');
+    await sendReturn({ mode: step.mode, to, linked: false, ...(step.mode === 'amount' ? { amount: step.send } : {}) }, acct);
+    preview = null;
+    if (steps.length === 1) { setPayingOn(false); say('Returned ✓ Paying is off.'); }
+    else say(`Returned ✓ ${steps.length - 1} more ${steps.length === 2 ? 'part' : 'parts'} to go. Return again once this one confirms.`);
+  }
+
   const actions = {
     forceRefresh: () => refresh(true),
 
@@ -613,6 +821,7 @@ export function createPppController(deps: PppDeps) {
       if (!status?.address || pendingDeposit()) return;
       setPendingDeposit({ txid, amount: amount.toString(), at: deps.now() });
       balanceAt = -Infinity;
+      giftRes = null; // the record now exists: ask for it (and the album that came with it) on the next refresh
       say('🎁 Gift on its way ✓ Usually arrives in a few minutes.');
     },
 
@@ -704,30 +913,15 @@ export function createPppController(deps: PppDeps) {
     returnFunds: (mode: ReturnMode) => task('Check the return in the listening wallet…', async () => {
       if (!usable()) throw new Error('Connect your wallet first.');
       if (!status?.address) throw new Error('Unlock the listening wallet first.');
+      // A gifted wallet splits its balance by where each part came from (the gift, and each top-up).
+      if (ledgerReturns()) return returnByLedger(mode);
       // A linked main wallet always wins; otherwise the destination is the one the listener chose
       // or the funder found on chain. The frame shows the full address and the listener confirms it.
       const target = returnTarget();
       if (!target) throw new Error(solo() ? 'Choose where to send the funds first.' : 'Link your main wallet first.');
       if (target.kind !== 'linked' && walletLacks('standalone')) throw new Error('The listening wallet box needs an update before it can return to another address. Try again shortly.');
       if (unresolved().length) throw new Error('Wait for the pending payment to confirm, then return funds.');
-      const { balance: b, nonce } = await deps.chain.account(status.address);
-      balance = b;
-      const r = await bridge!.request<ReturnResult>('listening.prepareReturn', {
-        mode, balance: b.toString(), nonce: nonce.toString(), fee: DEFAULT_RETURN_FEE.toString(),
-        ...(target.kind === 'linked' ? {} : { destination: target.to })
-      });
-      if (r.recipient !== target.to) throw new Error('Return destination does not match what you approved. Nothing was sent.');
-      const tx = deserializeTransaction(r.raw) as any;
-      if (cvToJSON(tx.payload.recipient).value !== target.to || String(tx.payload.amount) !== r.amount)
-        throw new Error('Signed return does not match what you approved. Nothing was sent.');
-      const entry: Entry = {
-        id: randomId(), address: status.address, kind: 'withdraw', core: 0, song: 0, recipient: r.recipient, amount: r.amount,
-        fee: r.fee, nonce: nonce.toString(), created: deps.now(), status: 'signed', raw: r.raw, txid: r.txid
-      };
-      deps.validate(entry);
-      saveEntry(entry);
-      try { await deps.chain.broadcast(r.raw, r.txid); saveEntry({ ...entry, status: 'pending' }); }
-      catch (e) { saveEntry({ ...entry, status: 'unknown', note: (e as Error).message }); throw e; }
+      await sendReturn({ mode, to: target.to, linked: target.kind === 'linked' });
       if (mode === 'all') setPayingOn(false);
       say(mode === 'all'
         ? (target.kind === 'linked' ? 'Returned to your wallet ✓ Paying is off.' : 'Returned ✓ Paying is off.')
@@ -814,7 +1008,10 @@ export function createPppController(deps: PppDeps) {
       status = await readStatus(bridge!);
       return 'done';
     } catch (e) {
-      message = 'This song played free: ' + (e instanceof Error ? e.message : 'payment unavailable');
+      const why = e instanceof Error ? e.message : 'payment unavailable';
+      // A gift player has no free mode: the song stays queued (and counts against the plays) and is tried again.
+      if (giftNow()?.player) { message = 'Payment is taking a moment: ' + why; return 'wait'; }
+      message = 'This song played free: ' + why;
       return 'done';
     } finally {
       paying = false;

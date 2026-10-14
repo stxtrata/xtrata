@@ -39,6 +39,9 @@ import { applyHiroApiKey, getHiroApiKeys, isTransientHiroStatus, shouldRetryWith
 import { gate, type PppEnv } from './radio-listening-wallet';
 import { isMainnetStandardAddress } from '../../src/lib/listening-wallet/link';
 import {
+  isPlayerId, playerData, playerHash, validatePlayer, validatePlayerRequest, verifyPlayerSignature, type PlayerDefinition, type PlayerRequest, type PlayerView
+} from '../../src/lib/listening-wallet/gift-players';
+import {
   campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_FEE_CAP, GIFT_MEMO, giftCodeHash, giftDepositMemo, isGiftCode, newGiftCode,
   validateCampaign, validGiftAmount, verifyCampaignSignature, type CampaignRequest, type GiftView
 } from '../../src/lib/listening-wallet/gifts';
@@ -242,6 +245,11 @@ export async function ensureGiftTables(env: GiftEnv) {
   // Added after the first release: why the last broadcast failed (null when it went through).
   await run(env, 'ALTER TABLE radio_gift_sends ADD COLUMN last_error TEXT').catch(() => undefined);
   await run(env, 'CREATE TABLE IF NOT EXISTS radio_gift_campaigns(hash TEXT PRIMARY KEY, admin TEXT NOT NULL, created_at INTEGER NOT NULL)');
+  await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_players(
+    id TEXT PRIMARY KEY, hash TEXT NOT NULL UNIQUE, owner TEXT NOT NULL, title TEXT NOT NULL, subtitle TEXT NOT NULL DEFAULT '',
+    tracks TEXT NOT NULL, cover INTEGER, status TEXT NOT NULL DEFAULT 'active', created_at INTEGER NOT NULL)`);
+  // Added with gift players: the player a link opens (null for every earlier gift).
+  await run(env, 'ALTER TABLE radio_gifts ADD COLUMN player_id TEXT').catch(() => undefined);
   await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_orphans(txid TEXT PRIMARY KEY, gift_id TEXT, sender TEXT NOT NULL, amount INTEGER NOT NULL,
     reason TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
 }
@@ -249,7 +257,7 @@ export async function ensureGiftTables(env: GiftEnv) {
 type Row = {
   id: string; code_hash: string; amount: number; source: 'campaign' | 'friend'; gifter: string | null; label: string; status: string;
   deposit_txid: string | null; created_at: number; expires_at: number; claimed_by: string | null; claim_txid: string | null;
-  claimed_at: number | null; ip_hash: string | null; refund_txid: string | null; updated_at: number;
+  claimed_at: number | null; ip_hash: string | null; refund_txid: string | null; updated_at: number; player_id?: string | null;
 };
 type Send = {
   id: string; gift_id: string; kind: 'claim' | 'refund'; nonce: number; recipient: string; amount: number; fee: number;
@@ -430,7 +438,7 @@ export async function giftStatus(env: GiftEnv, by: { code?: string | null; id?: 
     r = await one(env, 'SELECT * FROM radio_gifts WHERE code_hash=?', [giftCodeHash(by.code)]);
   } else if (typeof by.id === 'string' && /^[0-9a-f]{24}$/.test(by.id)) r = await gift(env, by.id);
   if (!r) throw new GiftError('That gift link is not valid.', 404);
-  return { ...view(r), ...(by.id ? { id: r.id } : {}) };
+  return { ...view(r), ...(r.player_id ? { player: await playerView(env, r.player_id) } : {}), ...(by.id ? { id: r.id } : {}) };
 }
 
 /** If this listening wallet was funded by a gift: who it came from and where returns go. */
@@ -443,7 +451,10 @@ export async function giftForWallet(env: GiftEnv, wallet: string) {
   const send = r.status === 'claiming' ? await one<Send>(env, "SELECT * FROM radio_gift_sends WHERE gift_id=? AND kind='claim' AND status='sent'", [r.id]) : null;
   return { gift: {
     returnTo: r.gifter ?? treasuryAddress(env), from: r.gifter, source: r.source, amount: String(r.amount), txid: r.claim_txid, label: r.label,
-    state: r.status === 'claimed' ? 'arrived' : 'sending', problem: send?.last_error ?? null
+    state: r.status === 'claimed' ? 'arrived' : 'sending', problem: send?.last_error ?? null,
+    // The gift treasury is where the gift's money came from: the page needs it to tell the gift from a later top-up.
+    treasury: treasuryAddress(env),
+    player: r.player_id ? await playerView(env, r.player_id) : null
   } };
 }
 
@@ -456,17 +467,70 @@ export async function createCampaign(env: GiftEnv, body: { request: CampaignRequ
   try { req = validateCampaign(body?.request, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
   if (req.admin !== admin || !verifyCampaignSignature(req, body.signature, admin)) throw new GiftError('Only the gift admin can make campaign links.', 403);
   await ensureGiftTables(env);
+  // A link can only open a player that exists (the id is part of what the admin signed).
+  if (req.player && !(await one<{ id: string }>(env, "SELECT id FROM radio_gift_players WHERE id=? AND status='active'", [req.player])))
+    throw new GiftError('That gift player does not exist.', 400);
   const hash = bytesToHex(sha256(encodeStructuredData(campaignData(req))));
   try { await run(env, 'INSERT INTO radio_gift_campaigns(hash, admin, created_at) VALUES(?, ?, ?)', [hash, admin, deps.now]); }
   catch (e) { if (isConstraint(e)) throw new GiftError('That request was already used. Sign a new one.', 409); throw e; }
   const codes: string[] = [];
   for (let i = 0; i < req.count; i++) {
     const code = newGiftCode();
-    await run(env, `INSERT INTO radio_gifts(id, code_hash, amount, source, gifter, label, status, created_at, expires_at, updated_at)
-      VALUES(?, ?, ?, 'campaign', NULL, ?, 'live', ?, ?, ?)`, [randomId(), giftCodeHash(code), Number(req.amount), req.label, deps.now, deps.now + GIFT_EXPIRY_MS, deps.now]);
+    await run(env, `INSERT INTO radio_gifts(id, code_hash, amount, source, gifter, label, status, created_at, expires_at, updated_at, player_id)
+      VALUES(?, ?, ?, 'campaign', NULL, ?, 'live', ?, ?, ?, ?)`, [randomId(), giftCodeHash(code), Number(req.amount), req.label, deps.now, deps.now + GIFT_EXPIRY_MS, deps.now, req.player ?? null]);
     codes.push(code);
   }
-  return { codes, amount: req.amount, expires: deps.now + GIFT_EXPIRY_MS };
+  return { codes, amount: req.amount, expires: deps.now + GIFT_EXPIRY_MS, ...(req.player ? { player: req.player } : {}) };
+}
+
+// ---------------------------------------------------------------------------- gift players
+
+/** The songs of a definition, as the catalogue knows them. Anything not a ready song is simply absent. */
+async function catalogueSongs(env: GiftEnv, ids: number[]) {
+  const rows = ids.length
+    ? await all<{ token_id: number; title: string | null; artist: string | null }>(
+        env, `SELECT token_id, title, artist FROM radio_metadata WHERE status='ready' AND is_song=1 AND token_id IN (${ids.map(() => '?').join(',')})`, ids)
+    : [];
+  return new Map(rows.map((r) => [Number(r.token_id), { title: r.title ?? '', artist: r.artist ?? '' }]));
+}
+
+/** A player as a recipient sees it. Titles and artists come from the catalogue, never from whoever made the player. */
+export async function playerView(env: GiftEnv, id: string): Promise<PlayerView | null> {
+  const p = await one<{ id: string; title: string; subtitle: string; tracks: string; cover: number | null; status: string }>(env, 'SELECT * FROM radio_gift_players WHERE id=?', [id]);
+  if (!p || p.status !== 'active') return null;
+  const ids = JSON.parse(p.tracks) as number[];
+  const songs = await catalogueSongs(env, ids);
+  return {
+    id: p.id, title: p.title, subtitle: p.subtitle,
+    tracks: ids.filter((n) => songs.has(n)).map((n) => ({ id: n, ...songs.get(n)! })),
+    cover: p.cover ?? null, paidOnly: true
+  };
+}
+
+/** Admin: store a player definition. Needs the admin's signature over its hash; each signed request works once. */
+export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefinition; request: PlayerRequest; signature: string }, deps: GiftDeps, request?: Request) {
+  requireEnabled(env, request);
+  const admin = adminAddress(env);
+  if (!admin) throw new GiftError('No gift admin is set for this deployment.', 403);
+  let def: PlayerDefinition, req: PlayerRequest;
+  try { def = validatePlayer(body?.definition); req = validatePlayerRequest(body?.request, def, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
+  if (req.admin !== admin || !verifyPlayerSignature(req, body.signature, admin)) throw new GiftError('Only the gift admin can make gift players.', 403);
+  await ensureGiftTables(env);
+  const wanted = [...new Set([...def.tracks, ...(def.cover ? [def.cover] : [])])];
+  const songs = await catalogueSongs(env, wanted);
+  const missing = wanted.find((n) => !songs.has(n));
+  if (missing !== undefined) throw new GiftError(`Song #${missing} is not a ready song in the radio catalogue.`, 400);
+  const hash = playerHash(def);
+  const existing = await one<{ id: string }>(env, 'SELECT id FROM radio_gift_players WHERE hash=?', [hash]);
+  if (existing) return { id: existing.id, title: def.title, tracks: def.tracks.length, existing: true };
+  const signed = bytesToHex(sha256(encodeStructuredData(playerData(req))));
+  try { await run(env, 'INSERT INTO radio_gift_campaigns(hash, admin, created_at) VALUES(?, ?, ?)', [signed, admin, deps.now]); }
+  catch (e) { if (isConstraint(e)) throw new GiftError('That request was already used. Sign a new one.', 409); throw e; }
+  const id = randomId().slice(0, 16);
+  if (!isPlayerId(id)) throw new GiftError('Could not make a player id. Try again.', 500);
+  await run(env, `INSERT INTO radio_gift_players(id, hash, owner, title, subtitle, tracks, cover, status, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+    [id, hash, admin, def.title, def.subtitle, JSON.stringify(def.tracks), def.cover, deps.now]);
+  return { id, title: def.title, tracks: def.tracks.length, existing: false };
 }
 
 /** Any listener with a Stacks wallet: start a friend gift. It goes live once their deposit (with its memo) confirms. */

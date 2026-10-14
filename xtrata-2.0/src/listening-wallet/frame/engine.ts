@@ -512,13 +512,13 @@ export function createListeningEngine(deps: {
       }
       const main = linkedMain ?? supplied;
       const toLabel = linkedMain ? 'your main wallet' : 'this address';
-      if (p?.mode !== 'excess' && p?.mode !== 'all') throw new Error('Choose Return excess or Return all.');
-      const plan = returnPlan(p.mode, bigintParam(p.balance, 'balance'), bigintParam(p.fee, 'fee'));
+      if (p?.mode !== 'excess' && p?.mode !== 'all' && p?.mode !== 'amount') throw new Error('Choose Return excess, Return all or an amount.');
+      const plan = returnPlan(p.mode, bigintParam(p.balance, 'balance'), bigintParam(p.fee, 'fee'), p.mode === 'amount' ? bigintParam(p.amount, 'amount') : undefined);
       const nonce = bigintParam(p.nonce, 'nonce');
       ledger = null; // pause new paid plays while a return is prepared
       await deps.ui.act({
         kind: 'return',
-        title: p.mode === 'all' ? 'Return everything' : 'Return the excess',
+        title: p.mode === 'all' ? 'Return everything' : p.mode === 'amount' ? 'Return part of the balance' : 'Return the excess',
         summary: `Send ${stx(plan.amount)} STX to ${toLabel} ${main}. Network fee ${stx(plan.fee)} STX.`,
         lines: [
           `Send ${stx(plan.amount)} STX to ${toLabel} ${main}.`,

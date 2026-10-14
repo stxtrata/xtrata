@@ -82,6 +82,16 @@ describe('1 STX policy', () => {
     expect(() => returnPlan('all', 2_000n, 3_000n)).toThrow(/cannot cover/);
     expect(() => returnPlan('all', TARGET, 50_000n)).toThrow(/range/);
   });
+  it('computes Return an amount exactly, with the fee paid from what stays', () => {
+    expect(returnPlan('amount', 1_000_000n, 3_000n, 400_000n)).toEqual({ mode: 'amount', amount: 400_000n, fee: 3_000n, remaining: 597_000n });
+    // spending everything but the fee is allowed: the recipient still gets exactly the amount
+    expect(returnPlan('amount', 403_000n, 3_000n, 400_000n)).toMatchObject({ amount: 400_000n, remaining: 0n });
+    expect(() => returnPlan('amount', 402_999n, 3_000n, 400_000n)).toThrow(/cannot cover/);
+    expect(() => returnPlan('amount', 1_000_000n, 3_000n)).toThrow(/Choose an amount/);
+    expect(() => returnPlan('amount', 1_000_000n, 3_000n, 0n)).toThrow(/Choose an amount/);
+    expect(() => returnPlan('amount', 1_000_000n, 3_000n, -5n)).toThrow(/Choose an amount/);
+    expect(() => returnPlan('amount', 1_000_000n, 50_000n, 1n)).toThrow(/range/);
+  });
   it('enforces session terms: fee, count, budget, spacing and expiry', () => {
     const now = 1_000_000;
     expect(() => validateSessionTerms({ fee: 200n, maxPlays: 1, budget: 1000n, expires: now + 1000 }, now)).toThrow(/fee/);
