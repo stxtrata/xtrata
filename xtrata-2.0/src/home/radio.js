@@ -657,7 +657,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
-    gift: giftPlayer ? { id: giftPlayer.id, title: giftPlayer.title, subtitle: giftPlayer.subtitle, tracks: giftPlayer.tracks.length } : null, giftStop,
+    gift: giftPlayer ? { id: giftPlayer.id, title: giftPlayer.title, subtitle: giftPlayer.subtitle, tracks: giftPlayer.tracks.length } : null, giftStop, giftLocked: gated(),
     likesStatus: chainState?.snapshot().status || 'disconnected', likesRetryAt: chainState?.snapshot().retryAt, likesCheckedAt: chainState?.snapshot().checkedAt, band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
     loop: player.loop,
@@ -793,6 +793,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
 
   const BANDS = ['fm', 'liked', 'chain'];
   const bandList = () => (giftPlayer ? (giftLock ? ['gift'] : ['gift', ...BANDS]) : BANDS);
+  // A locked album is the only music: whatever asks for a song (the tuner, a list, a preloaded or remembered track,
+  // "previous") is checked against it at the one place a song actually starts. A page default, not security.
+  const gated = () => !!giftPlayer && giftLock;
+  const inAlbum = (id) => !!giftPlayer && giftPlayer.tracks.includes(String(id));
+  const allowed = (id) => !gated() || inAlbum(id);
+  const LOCKED_TEXT = 'LOCKED TO THIS ALBUM — ADD FUNDS TO UNLOCK';
   const setBand = (next) => {
     if (!bandList().includes(next)) return;
     band = next;
@@ -824,6 +830,20 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     preloadQueue.length = 0;
     window.setTimeout(() => { void preloadNextTrack(); }, 150);
   }
+
+  // The album just became the music (loaded, or locked): drop what was cued for the old mode and "previous" history
+  // from outside it, and if a foreign song is on air move to the album's first song (unless the listener paused).
+  const enterAlbum = () => {
+    if (!giftPlayer) return;
+    preloadQueue.length = 0;
+    if (gated()) history.splice(0, history.length, ...history.filter((t) => inAlbum(t.tokenId)));
+    if (!on) return;
+    if (currentTokenId && inAlbum(currentTokenId)) { requeueForMode(); return; }
+    forcedNext = giftPlayer.tracks[0];
+    if (giftStop || manualPause) return; // the first album song starts at the next play
+    pauseOwn();
+    void tuneToNextTrack();
+  };
 
   const setShuffle = (nextOn) => {
     shuffleMode = Boolean(nextOn);
@@ -1378,6 +1398,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       // Keep the queue topped up in the background.
       window.setTimeout(() => { void preloadNextTrack(); }, 300);
       if (token !== tuneToken || !on) { endTune(); return; }
+      if (track && !allowed(track.tokenId)) {
+        radioLog(`blocked #${track.tokenId}`, 'the open album is locked: only its own songs play', track.tokenId);
+        trackOverride = null;
+        if (requestedId) { setNow('-- ' + LOCKED_TEXT + ' --', false); endTune(); return; }
+        // Never keep a stale foreign song cued; the next pick comes from the album band.
+        preloadQueue.length = 0;
+        track = null;
+      }
       if (!track) {
         if (requestedId) {
           // Be honest rather than substituting. Silently playing something else is
@@ -1640,6 +1668,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     playPause: () => {
       if (giftStop && (!on || player.paused)) { if (!on) switchOn(); else refuseForGift(); return; }
       if (!on) { switchOn(); }
+      else if (player.paused && band === 'gift' && giftPlayer && currentTokenId && !inAlbum(currentTokenId)) { manualPause = false; void tuneToNextTrack(); }
       else if (player.paused) { manualPause = false; player.play().catch(() => { void tuneToNextTrack(); }); }
       else { manualPause = true; player.pause(); }
     },
@@ -1655,6 +1684,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     getState: () => stateSnapshot(),
     unlike: (id) => openOnchainLikes(id),
     playToken: (id) => {
+      if (!allowed(id)) { writeScreen(LOCKED_TEXT); return; }
       forcedNext = String(id);
       // Anything cued was chosen to follow the PREVIOUS song, so it is stale the moment
       // the listener jumps somewhere else. Dropping it costs one preload, and keeps
@@ -1676,7 +1706,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       }
       const first = !giftPlayer || giftPlayer.id !== def.id;
       giftPlayer = { id: String(def.id || ''), title: String(def.title || '').slice(0, 60), subtitle: String(def.subtitle || '').slice(0, 80), tracks };
-      if (first) setBand('gift'); else emit();
+      if (first) { setBand('gift'); enterAlbum(); } else emit();
     },
     /** While locked, the loaded album is the only band: no FM, LIKED or CHAIN. A page default, not security. */
     setGiftLock: (on) => {
@@ -1684,6 +1714,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       if (next === giftLock) return;
       giftLock = next;
       if (giftLock && giftPlayer && band !== 'gift') setBand('gift'); else emit();
+      if (giftLock) enterAlbum();
     },
     /** Refuse to start or advance (a gift player whose paid plays are used up). Pass null to allow playback again. */
     setGiftStop: (text) => {

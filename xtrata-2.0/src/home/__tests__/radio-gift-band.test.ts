@@ -73,3 +73,56 @@ it('a locked album is the only band until it is unlocked', () => {
   api.setBand('liked');
   expect(api.getState().band).toBe('liked');
 });
+
+const ALBUM = ['11', '12', '13'];
+const startOnFm = async () => {
+  const api = initXtrataRadio({ tokenIds: ['7771', '7772', '7773', '7774'] })!;
+  api.switchOn();
+  await vi.waitFor(() => expect(asked.length).toBeGreaterThan(0), { timeout: 5000 });
+  asked.length = 0;
+  return api;
+};
+
+it('loading an album while another song is on air moves to the album\'s first song', async () => {
+  const api = await startOnFm();
+  api.setGiftPlayer(album);
+  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('11'), { timeout: 5000 });
+});
+
+it('a locked album refuses every other way of starting a song: the tuner, lists, previous and stale cues', async () => {
+  const api = await startOnFm();
+  api.next(); await vi.waitFor(() => expect(asked.length).toBeGreaterThan(0), { timeout: 5000 }); // FM history and cues exist
+  api.setGiftPlayer(album);
+  api.setGiftLock(true);
+  expect(api.getState().giftLocked).toBe(true);
+  await vi.waitFor(() => expect(asked.includes('11')).toBe(true), { timeout: 5000 });
+  asked.length = 0;
+  api.playToken('7773'); // the tuning strip, a list row, a relative tile
+  api.prev(); api.prev();
+  for (let i = 0; i < 6; i++) { api.next(); await new Promise((r) => setTimeout(r, 15)); }
+  await new Promise((r) => setTimeout(r, 120));
+  expect(asked.filter((id) => !ALBUM.includes(id))).toEqual([]);
+  expect(asked.length).toBeGreaterThan(0);
+});
+
+it('once unlocked, the tuner and lists work again', async () => {
+  const api = await startOnFm();
+  api.setGiftPlayer(album);
+  api.setGiftLock(true);
+  api.playToken('7773');
+  await new Promise((r) => setTimeout(r, 60));
+  expect(asked.includes('7773')).toBe(false);
+  api.setGiftLock(false);
+  api.playToken('7773');
+  await vi.waitFor(() => expect(asked.includes('7773')).toBe(true), { timeout: 5000 });
+});
+
+it('pressing play on a paused foreign song starts the album instead of resuming that song', async () => {
+  const api = await startOnFm();
+  api.playPause(); // pause
+  api.setGiftPlayer(album);
+  api.setGiftLock(true);
+  asked.length = 0;
+  api.playPause();
+  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('11'), { timeout: 5000 });
+});

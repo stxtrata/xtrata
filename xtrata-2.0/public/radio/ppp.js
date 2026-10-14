@@ -140,8 +140,8 @@ function Ca(t) {
         return k.readAsArrayBuffer(S), N;
       }
       function m(S) {
-        var k = new FileReader(), N = g(k), U = /charset=([A-Za-z0-9_-]+)/.exec(S.type), Q = U ? U[1] : "utf-8";
-        return k.readAsText(S, Q), N;
+        var k = new FileReader(), N = g(k), U = /charset=([A-Za-z0-9_-]+)/.exec(S.type), Z = U ? U[1] : "utf-8";
+        return k.readAsText(S, Z), N;
       }
       function b(S) {
         for (var k = new Uint8Array(S), N = new Array(k.length), U = 0; U < k.length; U++)
@@ -204,12 +204,12 @@ function Ca(t) {
         var k = S.toUpperCase();
         return _.indexOf(k) > -1 ? k : S;
       }
-      function v(S, k) {
-        if (!(this instanceof v))
+      function $(S, k) {
+        if (!(this instanceof $))
           throw new TypeError('Please use the "new" operator, this DOM object constructor cannot be called as a function.');
         k = k || {};
         var N = k.body;
-        if (S instanceof v) {
+        if (S instanceof $) {
           if (S.bodyUsed)
             throw new TypeError("Already read");
           this.url = S.url, this.credentials = S.credentials, k.headers || (this.headers = new d(S.headers)), this.method = S.method, this.mode = S.mode, this.signal = S.signal, !N && S._bodyInit != null && (N = S._bodyInit, S.bodyUsed = !0);
@@ -227,20 +227,20 @@ function Ca(t) {
           if (U.test(this.url))
             this.url = this.url.replace(U, "$1_=" + (/* @__PURE__ */ new Date()).getTime());
           else {
-            var Q = /\?/;
-            this.url += (Q.test(this.url) ? "&" : "?") + "_=" + (/* @__PURE__ */ new Date()).getTime();
+            var Z = /\?/;
+            this.url += (Z.test(this.url) ? "&" : "?") + "_=" + (/* @__PURE__ */ new Date()).getTime();
           }
         }
       }
-      v.prototype.clone = function() {
-        return new v(this, { body: this._bodyInit });
+      $.prototype.clone = function() {
+        return new $(this, { body: this._bodyInit });
       };
       function I(S) {
         var k = new FormData();
         return S.trim().split("&").forEach(function(N) {
           if (N) {
-            var U = N.split("="), Q = U.shift().replace(/\+/g, " "), G = U.join("=").replace(/\+/g, " ");
-            k.append(decodeURIComponent(Q), decodeURIComponent(G));
+            var U = N.split("="), Z = U.shift().replace(/\+/g, " "), G = U.join("=").replace(/\+/g, " ");
+            k.append(decodeURIComponent(Z), decodeURIComponent(G));
           }
         }), k;
       }
@@ -250,9 +250,9 @@ function Ca(t) {
           return U.indexOf(`
 `) === 0 ? U.substr(1, U.length) : U;
         }).forEach(function(U) {
-          var Q = U.split(":"), G = Q.shift().trim();
+          var Z = U.split(":"), G = Z.shift().trim();
           if (G) {
-            var ot = Q.join(":").trim();
+            var ot = Z.join(":").trim();
             try {
               k.append(G, ot);
             } catch (Gt) {
@@ -261,7 +261,7 @@ function Ca(t) {
           }
         }), k;
       }
-      P.call(v.prototype);
+      P.call($.prototype);
       function Y(S, k) {
         if (!(this instanceof Y))
           throw new TypeError('Please use the "new" operator, this DOM object constructor cannot be called as a function.');
@@ -297,8 +297,8 @@ function Ca(t) {
       }
       function q(S, k) {
         return new Promise(function(N, U) {
-          var Q = new v(S, k);
-          if (Q.signal && Q.signal.aborted)
+          var Z = new $(S, k);
+          if (Z.signal && Z.signal.aborted)
             return U(new e.DOMException("Aborted", "AbortError"));
           var G = new XMLHttpRequest();
           function ot() {
@@ -309,7 +309,7 @@ function Ca(t) {
               statusText: G.statusText,
               headers: R(G.getAllResponseHeaders() || "")
             };
-            Q.url.indexOf("file://") === 0 && (G.status < 200 || G.status > 599) ? E.status = 200 : E.status = G.status, E.url = "responseURL" in G ? G.responseURL : E.headers.get("X-Request-URL");
+            Z.url.indexOf("file://") === 0 && (G.status < 200 || G.status > 599) ? E.status = 200 : E.status = G.status, E.url = "responseURL" in G ? G.responseURL : E.headers.get("X-Request-URL");
             var T = "response" in G ? G.response : G.responseText;
             setTimeout(function() {
               N(new Y(T, E));
@@ -334,23 +334,23 @@ function Ca(t) {
               return E;
             }
           }
-          if (G.open(Q.method, Gt(Q.url), !0), Q.credentials === "include" ? G.withCredentials = !0 : Q.credentials === "omit" && (G.withCredentials = !1), "responseType" in G && (r.blob ? G.responseType = "blob" : r.arrayBuffer && (G.responseType = "arraybuffer")), k && typeof k.headers == "object" && !(k.headers instanceof d || n.Headers && k.headers instanceof n.Headers)) {
+          if (G.open(Z.method, Gt(Z.url), !0), Z.credentials === "include" ? G.withCredentials = !0 : Z.credentials === "omit" && (G.withCredentials = !1), "responseType" in G && (r.blob ? G.responseType = "blob" : r.arrayBuffer && (G.responseType = "arraybuffer")), k && typeof k.headers == "object" && !(k.headers instanceof d || n.Headers && k.headers instanceof n.Headers)) {
             var Ht = [];
             Object.getOwnPropertyNames(k.headers).forEach(function(E) {
               Ht.push(a(E)), G.setRequestHeader(E, c(k.headers[E]));
-            }), Q.headers.forEach(function(E, T) {
+            }), Z.headers.forEach(function(E, T) {
               Ht.indexOf(T) === -1 && G.setRequestHeader(T, E);
             });
           } else
-            Q.headers.forEach(function(E, T) {
+            Z.headers.forEach(function(E, T) {
               G.setRequestHeader(T, E);
             });
-          Q.signal && (Q.signal.addEventListener("abort", ot), G.onreadystatechange = function() {
-            G.readyState === 4 && Q.signal.removeEventListener("abort", ot);
-          }), G.send(typeof Q._bodyInit > "u" ? null : Q._bodyInit);
+          Z.signal && (Z.signal.addEventListener("abort", ot), G.onreadystatechange = function() {
+            G.readyState === 4 && Z.signal.removeEventListener("abort", ot);
+          }), G.send(typeof Z._bodyInit > "u" ? null : Z._bodyInit);
         });
       }
-      return q.polyfill = !0, n.fetch || (n.fetch = q, n.Headers = d, n.Request = v, n.Response = Y), e.Headers = d, e.Request = v, e.Response = Y, e.fetch = q, Object.defineProperty(e, "__esModule", { value: !0 }), e;
+      return q.polyfill = !0, n.fetch || (n.fetch = q, n.Headers = d, n.Request = $, n.Response = Y), e.Headers = d, e.Request = $, e.Response = Y, e.fetch = q, Object.defineProperty(e, "__esModule", { value: !0 }), e;
     })({});
   })(typeof self < "u" ? self : Ne);
 })();
@@ -1249,9 +1249,9 @@ class jt {
     this.x = e, this.y = n, this.z = r;
   }
   static fromAffine(e) {
-    if (!(e instanceof Lt))
+    if (!(e instanceof kt))
       throw new TypeError("JacobianPoint#fromAffine: expected Point");
-    return e.equals(Lt.ZERO) ? jt.ZERO : new jt(e.x, e.y, Jt);
+    return e.equals(kt.ZERO) ? jt.ZERO : new jt(e.x, e.y, Jt);
   }
   static toAffineBatch(e) {
     const n = ob(e.map((r) => r.z));
@@ -1282,8 +1282,8 @@ class jt {
     const c = V(s * s), f = V(a * a), d = V(n * f), l = V(i * c), g = V(V(r * a) * f), h = V(V(o * s) * c), m = V(l - d), b = V(h - g);
     if (m === _t)
       return b === _t ? this.double() : jt.ZERO;
-    const C = V(m * m), P = V(m * C), _ = V(d * C), p = V(b * b - P - Nr * _), v = V(b * (_ - p) - g * P), I = V(s * a * m);
-    return new jt(p, v, I);
+    const C = V(m * m), P = V(m * C), _ = V(d * C), p = V(b * b - P - Nr * _), $ = V(b * (_ - p) - g * P), I = V(s * a * m);
+    return new jt(p, $, I);
   }
   subtract(e) {
     return this.add(e.negate());
@@ -1318,7 +1318,7 @@ class jt {
     return r;
   }
   wNAF(e, n) {
-    !n && this.equals(jt.BASE) && (n = Lt.BASE);
+    !n && this.equals(jt.BASE) && (n = kt.BASE);
     const r = n && n._WINDOW_SIZE || 1;
     if (256 % r)
       throw new Error("Point#wNAF: Invalid precomputation window, must be power of 2");
@@ -1352,10 +1352,10 @@ class jt {
     e == null && (e = i ? Sf : xi(s));
     const o = e, a = V(o * o), c = V(a * o), f = V(n * a), d = V(r * c), l = V(s * o);
     if (i)
-      return Lt.ZERO;
+      return kt.ZERO;
     if (l !== Jt)
       throw new Error("invZ was invalid");
-    return new Lt(f, d);
+    return new kt(f, d);
   }
 }
 jt.BASE = new jt(Vt.Gx, Vt.Gy, Jt);
@@ -1365,7 +1365,7 @@ function Ao(t, e) {
   return t ? n : e;
 }
 const Vc = /* @__PURE__ */ new WeakMap();
-class Lt {
+class kt {
   constructor(e, n) {
     this.x = e, this.y = n;
   }
@@ -1383,11 +1383,11 @@ class Lt {
     let i = ib(s);
     const o = (i & Jt) === Jt;
     n ? o && (i = V(-i)) : (e[0] & 1) === 1 !== o && (i = V(-i));
-    const a = new Lt(r, i);
+    const a = new kt(r, i);
     return a.assertValidity(), a;
   }
   static fromUncompressedHex(e) {
-    const n = Je(e.subarray(1, En + 1)), r = Je(e.subarray(En + 1, En * 2 + 1)), s = new Lt(n, r);
+    const n = Je(e.subarray(1, En + 1)), r = Je(e.subarray(En + 1, En * 2 + 1)), s = new kt(n, r);
     return s.assertValidity(), s;
   }
   static fromHex(e) {
@@ -1401,13 +1401,13 @@ class Lt {
     throw new Error(`Point.fromHex: received invalid point. Expected 32-${ia} compressed bytes or ${oa} uncompressed bytes, not ${r}`);
   }
   static fromPrivateKey(e) {
-    return Lt.BASE.multiply(us(e));
+    return kt.BASE.multiply(us(e));
   }
   static fromSignature(e, n, r) {
     const { r: s, s: i } = u0(n);
     if (![0, 1, 2, 3].includes(r))
       throw new Error("Cannot recover: invalid recovery bit");
-    const o = Jl(Dn(e)), { n: a } = Vt, c = r === 2 || r === 3 ? s + a : s, f = xi(c, a), d = V(-o * f, a), l = V(i * f, a), g = r & 1 ? "03" : "02", h = Lt.fromHex(g + _r(c)), m = Lt.BASE.multiplyAndAddUnsafe(h, d, l);
+    const o = Jl(Dn(e)), { n: a } = Vt, c = r === 2 || r === 3 ? s + a : s, f = xi(c, a), d = V(-o * f, a), l = V(i * f, a), g = r & 1 ? "03" : "02", h = kt.fromHex(g + _r(c)), m = kt.BASE.multiplyAndAddUnsafe(h, d, l);
     if (!m)
       throw new Error("Cannot recover signature: point at infinify");
     return m.assertValidity(), m;
@@ -1437,7 +1437,7 @@ class Lt {
     return this.x === e.x && this.y === e.y;
   }
   negate() {
-    return new Lt(this.x, V(-this.y));
+    return new kt(this.x, V(-this.y));
   }
   double() {
     return jt.fromAffine(this).double().toAffine();
@@ -1452,12 +1452,12 @@ class Lt {
     return jt.fromAffine(this).multiply(e, this).toAffine();
   }
   multiplyAndAddUnsafe(e, n, r) {
-    const s = jt.fromAffine(this), i = n === _t || n === Jt || this !== Lt.BASE ? s.multiplyUnsafe(n) : s.multiply(n), o = jt.fromAffine(e).multiplyUnsafe(r), a = i.add(o);
+    const s = jt.fromAffine(this), i = n === _t || n === Jt || this !== kt.BASE ? s.multiplyUnsafe(n) : s.multiply(n), o = jt.fromAffine(e).multiplyUnsafe(r), a = i.add(o);
     return a.equals(jt.ZERO) ? void 0 : a.toAffine();
   }
 }
-Lt.BASE = new Lt(Vt.Gx, Vt.Gy);
-Lt.ZERO = new Lt(_t, _t);
+kt.BASE = new kt(Vt.Gx, Vt.Gy);
+kt.ZERO = new kt(_t, _t);
 function $f(t) {
   return Number.parseInt(t[0], 16) >= 8 ? "00" + t : t;
 }
@@ -1621,7 +1621,7 @@ function rn(t, e) {
   return r;
 }
 function ib(t) {
-  const { P: e } = Vt, n = BigInt(6), r = BigInt(11), s = BigInt(22), i = BigInt(23), o = BigInt(44), a = BigInt(88), c = t * t * t % e, f = c * c * t % e, d = rn(f, Fi) * f % e, l = rn(d, Fi) * f % e, g = rn(l, Nr) * c % e, h = rn(g, r) * g % e, m = rn(h, s) * h % e, b = rn(m, o) * m % e, C = rn(b, a) * b % e, P = rn(C, o) * m % e, _ = rn(P, Fi) * f % e, p = rn(_, i) * h % e, v = rn(p, n) * c % e, I = rn(v, Nr);
+  const { P: e } = Vt, n = BigInt(6), r = BigInt(11), s = BigInt(22), i = BigInt(23), o = BigInt(44), a = BigInt(88), c = t * t * t % e, f = c * c * t % e, d = rn(f, Fi) * f % e, l = rn(d, Fi) * f % e, g = rn(l, Nr) * c % e, h = rn(g, r) * g % e, m = rn(h, s) * h % e, b = rn(m, o) * m % e, C = rn(b, a) * b % e, P = rn(C, o) * m % e, _ = rn(P, Fi) * f % e, p = rn(_, i) * h % e, $ = rn(p, n) * c % e, I = rn($, Nr);
   if (I * I % e !== t)
     throw new Error("Cannot find square root");
   return I;
@@ -1716,7 +1716,7 @@ function l0(t, e, n, r = !0) {
   const { n: s } = Vt, i = Jl(t, !0);
   if (!oi(i))
     return;
-  const o = xi(i, s), a = Lt.BASE.multiply(i), c = V(a.x, s);
+  const o = xi(i, s), a = kt.BASE.multiply(i), c = V(a.x, s);
   if (c === _t)
     return;
   const f = V(o * V(e + n * c, s), s);
@@ -1746,7 +1746,7 @@ function us(t) {
   return e;
 }
 function tu(t) {
-  return t instanceof Lt ? (t.assertValidity(), t) : Lt.fromHex(t);
+  return t instanceof kt ? (t.assertValidity(), t) : kt.fromHex(t);
 }
 function u0(t) {
   if (t instanceof Qe)
@@ -1758,14 +1758,14 @@ function u0(t) {
   }
 }
 function oo(t, e = !1) {
-  return Lt.fromPrivateKey(t).toRawBytes(e);
+  return kt.fromPrivateKey(t).toRawBytes(e);
 }
 function cb(t, e, n, r = !1) {
-  return Lt.fromSignature(t, e, n).toRawBytes(r);
+  return kt.fromSignature(t, e, n).toRawBytes(r);
 }
 function Lf(t) {
   const e = t instanceof Uint8Array, n = typeof t == "string", r = (e || n) && t.length;
-  return e ? r === ia || r === oa : n ? r === ia * 2 || r === oa * 2 : t instanceof Lt;
+  return e ? r === ia || r === oa : n ? r === ia * 2 || r === oa * 2 : t instanceof kt;
 }
 function eu(t, e, n = !1) {
   if (Lf(t))
@@ -1838,7 +1838,7 @@ function db(t, e, n, r = fb) {
   } catch {
     return !1;
   }
-  const { n: f } = Vt, d = xi(o, f), l = V(a * d, f), g = V(i * d, f), h = Lt.BASE.multiplyAndAddUnsafe(c, l, g);
+  const { n: f } = Vt, d = xi(o, f), l = V(a * d, f), g = V(i * d, f), h = kt.BASE.multiplyAndAddUnsafe(c, l, g);
   return h ? V(h.x, f) === i : !1;
 }
 function ca(t) {
@@ -1868,7 +1868,7 @@ class ai {
   }
 }
 function hb(t) {
-  return Lt.fromPrivateKey(t).toRawX();
+  return kt.fromPrivateKey(t).toRawX();
 }
 class g0 {
   constructor(e, n, r = oe.randomBytes()) {
@@ -1880,7 +1880,7 @@ class g0 {
       throw new TypeError("sign: Expected 32 bytes of aux randomness");
   }
   getScalar(e) {
-    const n = Lt.fromPrivateKey(e), r = n.hasEvenY() ? e : Vt.n - e;
+    const n = kt.fromPrivateKey(e), r = n.hasEvenY() ? e : Vt.n - e;
     return { point: n, scalar: r, x: n.toRawX() };
   }
   initNonce(e, n) {
@@ -1923,7 +1923,7 @@ function y0(t, e, n) {
   };
 }
 function w0(t, e, n, r) {
-  const s = Lt.BASE.multiplyAndAddUnsafe(e, us(n), V(-r, Vt.n));
+  const s = kt.BASE.multiplyAndAddUnsafe(e, us(n), V(-r, Vt.n));
   return !(!s || !s.hasEvenY() || s.x !== t);
 }
 async function b0(t, e, n) {
@@ -1952,7 +1952,7 @@ const yb = {
   signSync: gb,
   verifySync: m0
 };
-Lt.BASE._setWindowSize(8);
+kt.BASE._setWindowSize(8);
 const qe = {
   node: o0,
   web: typeof self == "object" && "crypto" in self ? self.crypto : void 0
@@ -1993,8 +1993,8 @@ const qe = {
       throw new Error("The environment doesn't have randomBytes function");
   },
   randomPrivateKey: () => oe.hashToPrivateKey(oe.randomBytes(ls + 8)),
-  precompute(t = 8, e = Lt.BASE) {
-    const n = e === Lt.BASE ? e : new Lt(e.x, e.y);
+  precompute(t = 8, e = kt.BASE) {
+    const n = e === kt.BASE ? e : new kt(e.x, e.y);
     return n._setWindowSize(t), n.multiply(Fi), n;
   },
   sha256: async (...t) => {
@@ -2062,7 +2062,7 @@ Object.defineProperties(oe, {
 const wb = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
   CURVE: Vt,
-  Point: Lt,
+  Point: kt,
   Signature: Qe,
   getPublicKey: oo,
   getSharedSecret: eu,
@@ -2206,9 +2206,9 @@ function Nb(t) {
     for (var m = 0, b = 0, C = 0, P = h.length; C !== P && h[C] === 0; )
       C++, m++;
     for (var _ = (P - C) * f + 1 >>> 0, p = new Uint8Array(_); C !== P; ) {
-      for (var v = h[C], I = 0, R = _ - 1; (v !== 0 || I < b) && R !== -1; R--, I++)
-        v += 256 * p[R] >>> 0, p[R] = v % o >>> 0, v = v / o >>> 0;
-      if (v !== 0)
+      for (var $ = h[C], I = 0, R = _ - 1; ($ !== 0 || I < b) && R !== -1; R--, I++)
+        $ += 256 * p[R] >>> 0, p[R] = $ % o >>> 0, $ = $ / o >>> 0;
+      if ($ !== 0)
         throw new Error("Non-zero carry");
       b = I, C++;
     }
@@ -2229,12 +2229,12 @@ function Nb(t) {
       var p = h.charCodeAt(m);
       if (p > 255)
         return;
-      var v = e[p];
-      if (v === 255)
+      var $ = e[p];
+      if ($ === 255)
         return;
-      for (var I = 0, R = P - 1; (v !== 0 || I < C) && R !== -1; R--, I++)
-        v += o * _[R] >>> 0, _[R] = v % 256 >>> 0, v = v / 256 >>> 0;
-      if (v !== 0)
+      for (var I = 0, R = P - 1; ($ !== 0 || I < C) && R !== -1; R--, I++)
+        $ += o * _[R] >>> 0, _[R] = $ % 256 >>> 0, $ = $ / 256 >>> 0;
+      if ($ !== 0)
         throw new Error("Non-zero carry");
       C = I, m++;
     }
@@ -2291,13 +2291,13 @@ let Gb = class extends Zl {
       Io[h] = e.getUint32(n, !0);
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, f = this.h3 | 0, d = f, l = this.h4 | 0, g = l;
     for (let h = 0; h < 5; h++) {
-      const m = 4 - h, b = zb[h], C = Rb[h], P = nu[h], _ = ru[h], p = Fb[h], v = jb[h];
+      const m = 4 - h, b = zb[h], C = Rb[h], P = nu[h], _ = ru[h], p = Fb[h], $ = jb[h];
       for (let I = 0; I < 16; I++) {
         const R = $o(r + Cf(h, i, a, f) + Io[P[I]] + b, p[I]) + l | 0;
         r = l, l = f, f = $o(a, 10) | 0, a = i, i = R;
       }
       for (let I = 0; I < 16; I++) {
-        const R = $o(s + Cf(m, o, c, d) + Io[_[I]] + C, v[I]) + g | 0;
+        const R = $o(s + Cf(m, o, c, d) + Io[_[I]] + C, $[I]) + g | 0;
         s = g, g = d, d = $o(c, 10) | 0, c = o, o = R;
       }
     }
@@ -2453,14 +2453,14 @@ let Na = class extends Zl {
     for (let p = 0; p < 16; p++, n += 4)
       cr[p] = e.getUint32(n), lr[p] = e.getUint32(n += 4);
     for (let p = 16; p < 80; p++) {
-      const v = cr[p - 15] | 0, I = lr[p - 15] | 0, R = xt.rotrSH(v, I, 1) ^ xt.rotrSH(v, I, 8) ^ xt.shrSH(v, I, 7), Y = xt.rotrSL(v, I, 1) ^ xt.rotrSL(v, I, 8) ^ xt.shrSL(v, I, 7), O = cr[p - 2] | 0, q = lr[p - 2] | 0, S = xt.rotrSH(O, q, 19) ^ xt.rotrBH(O, q, 61) ^ xt.shrSH(O, q, 6), k = xt.rotrSL(O, q, 19) ^ xt.rotrBL(O, q, 61) ^ xt.shrSL(O, q, 6), N = xt.add4L(Y, k, lr[p - 7], lr[p - 16]), U = xt.add4H(N, R, S, cr[p - 7], cr[p - 16]);
+      const $ = cr[p - 15] | 0, I = lr[p - 15] | 0, R = xt.rotrSH($, I, 1) ^ xt.rotrSH($, I, 8) ^ xt.shrSH($, I, 7), Y = xt.rotrSL($, I, 1) ^ xt.rotrSL($, I, 8) ^ xt.shrSL($, I, 7), O = cr[p - 2] | 0, q = lr[p - 2] | 0, S = xt.rotrSH(O, q, 19) ^ xt.rotrBH(O, q, 61) ^ xt.shrSH(O, q, 6), k = xt.rotrSL(O, q, 19) ^ xt.rotrBL(O, q, 61) ^ xt.shrSL(O, q, 6), N = xt.add4L(Y, k, lr[p - 7], lr[p - 16]), U = xt.add4H(N, R, S, cr[p - 7], cr[p - 16]);
       cr[p] = U | 0, lr[p] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: f, Dl: d, Eh: l, El: g, Fh: h, Fl: m, Gh: b, Gl: C, Hh: P, Hl: _ } = this;
     for (let p = 0; p < 80; p++) {
-      const v = xt.rotrSH(l, g, 14) ^ xt.rotrSH(l, g, 18) ^ xt.rotrBH(l, g, 41), I = xt.rotrSL(l, g, 14) ^ xt.rotrSL(l, g, 18) ^ xt.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = xt.add5L(_, I, Y, g1[p], lr[p]), q = xt.add5H(O, P, v, R, p1[p], cr[p]), S = O | 0, k = xt.rotrSH(r, s, 28) ^ xt.rotrBH(r, s, 34) ^ xt.rotrBH(r, s, 39), N = xt.rotrSL(r, s, 28) ^ xt.rotrBL(r, s, 34) ^ xt.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Q = s & o ^ s & c ^ o & c;
+      const $ = xt.rotrSH(l, g, 14) ^ xt.rotrSH(l, g, 18) ^ xt.rotrBH(l, g, 41), I = xt.rotrSL(l, g, 14) ^ xt.rotrSL(l, g, 18) ^ xt.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = xt.add5L(_, I, Y, g1[p], lr[p]), q = xt.add5H(O, P, $, R, p1[p], cr[p]), S = O | 0, k = xt.rotrSH(r, s, 28) ^ xt.rotrBH(r, s, 34) ^ xt.rotrBH(r, s, 39), N = xt.rotrSL(r, s, 28) ^ xt.rotrBL(r, s, 34) ^ xt.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Z = s & o ^ s & c ^ o & c;
       P = b | 0, _ = C | 0, b = h | 0, C = m | 0, h = l | 0, m = g | 0, { h: l, l: g } = xt.add(f | 0, d | 0, q | 0, S | 0), f = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
-      const G = xt.add3L(S, N, Q);
+      const G = xt.add3L(S, N, Z);
       r = xt.add3H(G, q, k, U), s = G | 0;
     }
     ({ h: r, l: s } = xt.add(this.Ah | 0, this.Al | 0, r | 0, s | 0)), { h: i, l: o } = xt.add(this.Bh | 0, this.Bl | 0, i | 0, o | 0), { h: a, l: c } = xt.add(this.Ch | 0, this.Cl | 0, a | 0, c | 0), { h: f, l: d } = xt.add(this.Dh | 0, this.Dl | 0, f | 0, d | 0), { h: l, l: g } = xt.add(this.Eh | 0, this.El | 0, l | 0, g | 0), { h, l: m } = xt.add(this.Fh | 0, this.Fl | 0, h | 0, m | 0), { h: b, l: C } = xt.add(this.Gh | 0, this.Gl | 0, b | 0, C | 0), { h: P, l: _ } = xt.add(this.Hh | 0, this.Hl | 0, P | 0, _ | 0), this.set(r, s, i, o, a, c, f, d, l, g, h, m, b, C, P, _);
@@ -2568,7 +2568,7 @@ function C1(t) {
   if (t.length === 130 && r !== "04" || t.length === 66 && r !== "02" && r !== "03" || !L1(t))
     return e;
   try {
-    return Lt.fromHex(t).assertValidity(), {
+    return kt.fromHex(t).assertValidity(), {
       result: !0,
       reason_data: null,
       reason: null
@@ -2718,9 +2718,9 @@ Pa.crypto = typeof globalThis == "object" && "crypto" in globalThis ? globalThis
   }
   function a(E, T) {
     s(E);
-    const Ct = T.outputLen;
-    if (E.length < Ct)
-      throw new Error("digestInto() expects output buffer of length at least " + Ct);
+    const Lt = T.outputLen;
+    if (E.length < Lt)
+      throw new Error("digestInto() expects output buffer of length at least " + Lt);
   }
   function c(E) {
     return new Uint8Array(E.buffer, E.byteOffset, E.byteLength);
@@ -2757,12 +2757,12 @@ Pa.crypto = typeof globalThis == "object" && "crypto" in globalThis ? globalThis
     if (s(E), C)
       return E.toHex();
     let T = "";
-    for (let Ct = 0; Ct < E.length; Ct++)
-      T += P[E[Ct]];
+    for (let Lt = 0; Lt < E.length; Lt++)
+      T += P[E[Lt]];
     return T;
   }
   const p = { _0: 48, _9: 57, A: 65, F: 70, a: 97, f: 102 };
-  function v(E) {
+  function $(E) {
     if (E >= p._0 && E <= p._9)
       return E - p._0;
     if (E >= p.A && E <= p.F)
@@ -2775,29 +2775,29 @@ Pa.crypto = typeof globalThis == "object" && "crypto" in globalThis ? globalThis
       throw new Error("hex string expected, got " + typeof E);
     if (C)
       return Uint8Array.fromHex(E);
-    const T = E.length, Ct = T / 2;
+    const T = E.length, Lt = T / 2;
     if (T % 2)
       throw new Error("hex string expected, got unpadded hex of length " + T);
-    const wt = new Uint8Array(Ct);
-    for (let ct = 0, $t = 0; ct < Ct; ct++, $t += 2) {
-      const Mt = v(E.charCodeAt($t)), qt = v(E.charCodeAt($t + 1));
+    const gt = new Uint8Array(Lt);
+    for (let ct = 0, $t = 0; ct < Lt; ct++, $t += 2) {
+      const Mt = $(E.charCodeAt($t)), qt = $(E.charCodeAt($t + 1));
       if (Mt === void 0 || qt === void 0) {
         const Kt = E[$t] + E[$t + 1];
         throw new Error('hex string expected, got non-hex character "' + Kt + '" at index ' + $t);
       }
-      wt[ct] = Mt * 16 + qt;
+      gt[ct] = Mt * 16 + qt;
     }
-    return wt;
+    return gt;
   }
   const R = async () => {
   };
   t.nextTick = R;
-  async function Y(E, T, Ct) {
-    let wt = Date.now();
+  async function Y(E, T, Lt) {
+    let gt = Date.now();
     for (let ct = 0; ct < E; ct++) {
-      Ct(ct);
-      const $t = Date.now() - wt;
-      $t >= 0 && $t < T || (await (0, t.nextTick)(), wt += $t);
+      Lt(ct);
+      const $t = Date.now() - gt;
+      $t >= 0 && $t < T || (await (0, t.nextTick)(), gt += $t);
     }
   }
   function O(E) {
@@ -2816,36 +2816,36 @@ Pa.crypto = typeof globalThis == "object" && "crypto" in globalThis ? globalThis
   }
   function N(...E) {
     let T = 0;
-    for (let wt = 0; wt < E.length; wt++) {
-      const ct = E[wt];
+    for (let gt = 0; gt < E.length; gt++) {
+      const ct = E[gt];
       s(ct), T += ct.length;
     }
-    const Ct = new Uint8Array(T);
-    for (let wt = 0, ct = 0; wt < E.length; wt++) {
-      const $t = E[wt];
-      Ct.set($t, ct), ct += $t.length;
+    const Lt = new Uint8Array(T);
+    for (let gt = 0, ct = 0; gt < E.length; gt++) {
+      const $t = E[gt];
+      Lt.set($t, ct), ct += $t.length;
     }
-    return Ct;
+    return Lt;
   }
   function U(E, T) {
     if (T !== void 0 && {}.toString.call(T) !== "[object Object]")
       throw new Error("options should be object or undefined");
     return Object.assign(E, T);
   }
-  class Q {
+  class Z {
   }
-  t.Hash = Q;
+  t.Hash = Z;
   function G(E) {
-    const T = (wt) => E().update(S(wt)).digest(), Ct = E();
-    return T.outputLen = Ct.outputLen, T.blockLen = Ct.blockLen, T.create = () => E(), T;
+    const T = (gt) => E().update(S(gt)).digest(), Lt = E();
+    return T.outputLen = Lt.outputLen, T.blockLen = Lt.blockLen, T.create = () => E(), T;
   }
   function ot(E) {
-    const T = (wt, ct) => E(ct).update(S(wt)).digest(), Ct = E({});
-    return T.outputLen = Ct.outputLen, T.blockLen = Ct.blockLen, T.create = (wt) => E(wt), T;
+    const T = (gt, ct) => E(ct).update(S(gt)).digest(), Lt = E({});
+    return T.outputLen = Lt.outputLen, T.blockLen = Lt.blockLen, T.create = (gt) => E(gt), T;
   }
   function Gt(E) {
-    const T = (wt, ct) => E(ct).update(S(wt)).digest(), Ct = E({});
-    return T.outputLen = Ct.outputLen, T.blockLen = Ct.blockLen, T.create = (wt) => E(wt), T;
+    const T = (gt, ct) => E(ct).update(S(gt)).digest(), Lt = E({});
+    return T.outputLen = Lt.outputLen, T.blockLen = Lt.blockLen, T.create = (gt) => E(gt), T;
   }
   t.wrapConstructor = G, t.wrapConstructorWithOpts = ot, t.wrapXOFConstructorWithOpts = Gt;
   function Ht(E = 32) {
@@ -4495,13 +4495,13 @@ let p2 = class extends uu {
       To[h] = e.getUint32(n, !0);
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, f = this.h3 | 0, d = f, l = this.h4 | 0, g = l;
     for (let h = 0; h < 5; h++) {
-      const m = 4 - h, b = d2[h], C = h2[h], P = du[h], _ = hu[h], p = u2[h], v = f2[h];
+      const m = 4 - h, b = d2[h], C = h2[h], P = du[h], _ = hu[h], p = u2[h], $ = f2[h];
       for (let I = 0; I < 16; I++) {
         const R = Bo(r + id(h, i, a, f) + To[P[I]] + b, p[I]) + l | 0;
         r = l, l = f, f = Bo(a, 10) | 0, a = i, i = R;
       }
       for (let I = 0; I < 16; I++) {
-        const R = Bo(s + id(m, o, c, d) + To[_[I]] + C, v[I]) + g | 0;
+        const R = Bo(s + id(m, o, c, d) + To[_[I]] + C, $[I]) + g | 0;
         s = g, g = d, d = Bo(c, 10) | 0, c = o, o = R;
       }
     }
@@ -4653,14 +4653,14 @@ let ja = class extends uu {
     for (let p = 0; p < 16; p++, n += 4)
       gr[p] = e.getUint32(n), yr[p] = e.getUint32(n += 4);
     for (let p = 16; p < 80; p++) {
-      const v = gr[p - 15] | 0, I = yr[p - 15] | 0, R = St.rotrSH(v, I, 1) ^ St.rotrSH(v, I, 8) ^ St.shrSH(v, I, 7), Y = St.rotrSL(v, I, 1) ^ St.rotrSL(v, I, 8) ^ St.shrSL(v, I, 7), O = gr[p - 2] | 0, q = yr[p - 2] | 0, S = St.rotrSH(O, q, 19) ^ St.rotrBH(O, q, 61) ^ St.shrSH(O, q, 6), k = St.rotrSL(O, q, 19) ^ St.rotrBL(O, q, 61) ^ St.shrSL(O, q, 6), N = St.add4L(Y, k, yr[p - 7], yr[p - 16]), U = St.add4H(N, R, S, gr[p - 7], gr[p - 16]);
+      const $ = gr[p - 15] | 0, I = yr[p - 15] | 0, R = St.rotrSH($, I, 1) ^ St.rotrSH($, I, 8) ^ St.shrSH($, I, 7), Y = St.rotrSL($, I, 1) ^ St.rotrSL($, I, 8) ^ St.shrSL($, I, 7), O = gr[p - 2] | 0, q = yr[p - 2] | 0, S = St.rotrSH(O, q, 19) ^ St.rotrBH(O, q, 61) ^ St.shrSH(O, q, 6), k = St.rotrSL(O, q, 19) ^ St.rotrBL(O, q, 61) ^ St.shrSL(O, q, 6), N = St.add4L(Y, k, yr[p - 7], yr[p - 16]), U = St.add4H(N, R, S, gr[p - 7], gr[p - 16]);
       gr[p] = U | 0, yr[p] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: f, Dl: d, Eh: l, El: g, Fh: h, Fl: m, Gh: b, Gl: C, Hh: P, Hl: _ } = this;
     for (let p = 0; p < 80; p++) {
-      const v = St.rotrSH(l, g, 14) ^ St.rotrSH(l, g, 18) ^ St.rotrBH(l, g, 41), I = St.rotrSL(l, g, 14) ^ St.rotrSL(l, g, 18) ^ St.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = St.add5L(_, I, Y, O2[p], yr[p]), q = St.add5H(O, P, v, R, H2[p], gr[p]), S = O | 0, k = St.rotrSH(r, s, 28) ^ St.rotrBH(r, s, 34) ^ St.rotrBH(r, s, 39), N = St.rotrSL(r, s, 28) ^ St.rotrBL(r, s, 34) ^ St.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Q = s & o ^ s & c ^ o & c;
+      const $ = St.rotrSH(l, g, 14) ^ St.rotrSH(l, g, 18) ^ St.rotrBH(l, g, 41), I = St.rotrSL(l, g, 14) ^ St.rotrSL(l, g, 18) ^ St.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = St.add5L(_, I, Y, O2[p], yr[p]), q = St.add5H(O, P, $, R, H2[p], gr[p]), S = O | 0, k = St.rotrSH(r, s, 28) ^ St.rotrBH(r, s, 34) ^ St.rotrBH(r, s, 39), N = St.rotrSL(r, s, 28) ^ St.rotrBL(r, s, 34) ^ St.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Z = s & o ^ s & c ^ o & c;
       P = b | 0, _ = C | 0, b = h | 0, C = m | 0, h = l | 0, m = g | 0, { h: l, l: g } = St.add(f | 0, d | 0, q | 0, S | 0), f = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
-      const G = St.add3L(S, N, Q);
+      const G = St.add3L(S, N, Z);
       r = St.add3H(G, q, k, U), s = G | 0;
     }
     ({ h: r, l: s } = St.add(this.Ah | 0, this.Al | 0, r | 0, s | 0)), { h: i, l: o } = St.add(this.Bh | 0, this.Bl | 0, i | 0, o | 0), { h: a, l: c } = St.add(this.Ch | 0, this.Cl | 0, a | 0, c | 0), { h: f, l: d } = St.add(this.Dh | 0, this.Dl | 0, f | 0, d | 0), { h: l, l: g } = St.add(this.Eh | 0, this.El | 0, l | 0, g | 0), { h, l: m } = St.add(this.Fh | 0, this.Fl | 0, h | 0, m | 0), { h: b, l: C } = St.add(this.Gh | 0, this.Gl | 0, b | 0, C | 0), { h: P, l: _ } = St.add(this.Hh | 0, this.Hl | 0, P | 0, _ | 0), this.set(r, s, i, o, a, c, f, d, l, g, h, m, b, C, P, _);
@@ -4691,9 +4691,9 @@ Ls(() => new j2());
 var ga = { exports: {} };
 ga.exports;
 (function(t, e) {
-  var n = 200, r = "__lodash_hash_undefined__", s = 9007199254740991, i = "[object Arguments]", o = "[object Array]", a = "[object Boolean]", c = "[object Date]", f = "[object Error]", d = "[object Function]", l = "[object GeneratorFunction]", g = "[object Map]", h = "[object Number]", m = "[object Object]", b = "[object Promise]", C = "[object RegExp]", P = "[object Set]", _ = "[object String]", p = "[object Symbol]", v = "[object WeakMap]", I = "[object ArrayBuffer]", R = "[object DataView]", Y = "[object Float32Array]", O = "[object Float64Array]", q = "[object Int8Array]", S = "[object Int16Array]", k = "[object Int32Array]", N = "[object Uint8Array]", U = "[object Uint8ClampedArray]", Q = "[object Uint16Array]", G = "[object Uint32Array]", ot = /[\\^$.*+?()[\]{}|]/g, Gt = /\w*$/, Ht = /^\[object .+?Constructor\]$/, E = /^(?:0|[1-9]\d*)$/, T = {};
-  T[i] = T[o] = T[I] = T[R] = T[a] = T[c] = T[Y] = T[O] = T[q] = T[S] = T[k] = T[g] = T[h] = T[m] = T[C] = T[P] = T[_] = T[p] = T[N] = T[U] = T[Q] = T[G] = !0, T[f] = T[d] = T[v] = !1;
-  var Ct = typeof Ne == "object" && Ne && Ne.Object === Object && Ne, wt = typeof self == "object" && self && self.Object === Object && self, ct = Ct || wt || Function("return this")(), $t = e && !e.nodeType && e, Mt = $t && !0 && t && !t.nodeType && t, qt = Mt && Mt.exports === $t;
+  var n = 200, r = "__lodash_hash_undefined__", s = 9007199254740991, i = "[object Arguments]", o = "[object Array]", a = "[object Boolean]", c = "[object Date]", f = "[object Error]", d = "[object Function]", l = "[object GeneratorFunction]", g = "[object Map]", h = "[object Number]", m = "[object Object]", b = "[object Promise]", C = "[object RegExp]", P = "[object Set]", _ = "[object String]", p = "[object Symbol]", $ = "[object WeakMap]", I = "[object ArrayBuffer]", R = "[object DataView]", Y = "[object Float32Array]", O = "[object Float64Array]", q = "[object Int8Array]", S = "[object Int16Array]", k = "[object Int32Array]", N = "[object Uint8Array]", U = "[object Uint8ClampedArray]", Z = "[object Uint16Array]", G = "[object Uint32Array]", ot = /[\\^$.*+?()[\]{}|]/g, Gt = /\w*$/, Ht = /^\[object .+?Constructor\]$/, E = /^(?:0|[1-9]\d*)$/, T = {};
+  T[i] = T[o] = T[I] = T[R] = T[a] = T[c] = T[Y] = T[O] = T[q] = T[S] = T[k] = T[g] = T[h] = T[m] = T[C] = T[P] = T[_] = T[p] = T[N] = T[U] = T[Z] = T[G] = !0, T[f] = T[d] = T[$] = !1;
+  var Lt = typeof Ne == "object" && Ne && Ne.Object === Object && Ne, gt = typeof self == "object" && self && self.Object === Object && self, ct = Lt || gt || Function("return this")(), $t = e && !e.nodeType && e, Mt = $t && !0 && t && !t.nodeType && t, qt = Mt && Mt.exports === $t;
   function Kt(y, L) {
     return y.set(L[0], L[1]), y;
   }
@@ -4743,18 +4743,18 @@ ga.exports;
       return y(L(M));
     };
   }
-  function It(y) {
+  function Bt(y) {
     var L = -1, M = Array(y.size);
     return y.forEach(function(et) {
       M[++L] = et;
     }), M;
   }
-  var mt = Array.prototype, Rt = Function.prototype, Ft = Object.prototype, Ot = ct["__core-js_shared__"], ae = function() {
+  var bt = Array.prototype, Rt = Function.prototype, Ft = Object.prototype, Ot = ct["__core-js_shared__"], ae = function() {
     var y = /[^.]+$/.exec(Ot && Ot.keys && Ot.keys.IE_PROTO || "");
     return y ? "Symbol(src)_1." + y : "";
-  }(), ft = Rt.toString, ht = Ft.hasOwnProperty, u = Ft.toString, x = RegExp(
-    "^" + ft.call(ht).replace(ot, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
-  ), A = qt ? ct.Buffer : void 0, D = ct.Symbol, rt = ct.Uint8Array, dt = it(Object.getPrototypeOf, Object), ce = Object.create, ee = Ft.propertyIsEnumerable, xe = mt.splice, fn = Object.getOwnPropertySymbols, dn = A ? A.isBuffer : void 0, we = it(Object.keys, Object), pe = Ee(ct, "DataView"), en = Ee(ct, "Map"), nn = Ee(ct, "Promise"), pt = Ee(ct, "Set"), Dt = Ee(ct, "WeakMap"), Wt = Ee(Object, "create"), hn = qr(pe), Gr = qr(en), Ii = qr(nn), Ue = qr(pt), rr = qr(Dt), Nt = D ? D.prototype : void 0, he = Nt ? Nt.valueOf : void 0;
+  }(), ut = Rt.toString, dt = Ft.hasOwnProperty, u = Ft.toString, x = RegExp(
+    "^" + ut.call(dt).replace(ot, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
+  ), v = qt ? ct.Buffer : void 0, D = ct.Symbol, rt = ct.Uint8Array, ft = it(Object.getPrototypeOf, Object), ce = Object.create, ee = Ft.propertyIsEnumerable, xe = bt.splice, fn = Object.getOwnPropertySymbols, dn = v ? v.isBuffer : void 0, pe = it(Object.keys, Object), ge = Ee(ct, "DataView"), en = Ee(ct, "Map"), nn = Ee(ct, "Promise"), ht = Ee(ct, "Set"), Dt = Ee(ct, "WeakMap"), Wt = Ee(Object, "create"), hn = qr(ge), Gr = qr(en), Ii = qr(nn), Ue = qr(ht), rr = qr(Dt), Nt = D ? D.prototype : void 0, he = Nt ? Nt.valueOf : void 0;
   function Pe(y) {
     var L = -1, M = y ? y.length : 0;
     for (this.clear(); ++L < M; ) {
@@ -4774,11 +4774,11 @@ ga.exports;
       var M = L[y];
       return M === r ? void 0 : M;
     }
-    return ht.call(L, y) ? L[y] : void 0;
+    return dt.call(L, y) ? L[y] : void 0;
   }
   function Rn(y) {
     var L = this.__data__;
-    return Wt ? L[y] !== void 0 : ht.call(L, y);
+    return Wt ? L[y] !== void 0 : dt.call(L, y);
   }
   function Ke(y, L) {
     var M = this.__data__;
@@ -4821,7 +4821,7 @@ ga.exports;
       this.set(et[0], et[1]);
     }
   }
-  function J() {
+  function tt() {
     this.__data__ = {
       hash: new Pe(),
       map: new (en || Ie)(),
@@ -4840,7 +4840,7 @@ ga.exports;
   function Vr(y, L) {
     return $n(this, y).set(y, L), this;
   }
-  j.prototype.clear = J, j.prototype.delete = be, j.prototype.get = Se, j.prototype.has = ki, j.prototype.set = Vr;
+  j.prototype.clear = tt, j.prototype.delete = be, j.prototype.get = Se, j.prototype.has = ki, j.prototype.set = Vr;
   function Ve(y) {
     this.__data__ = new Ie(y);
   }
@@ -4856,7 +4856,7 @@ ga.exports;
   function go(y) {
     return this.__data__.has(y);
   }
-  function ge(y, L) {
+  function ye(y, L) {
     var M = this.__data__;
     if (M instanceof Ie) {
       var et = M.__data__;
@@ -4866,16 +4866,16 @@ ga.exports;
     }
     return M.set(y, L), this;
   }
-  Ve.prototype.clear = Li, Ve.prototype.delete = Ci, Ve.prototype.get = rc, Ve.prototype.has = go, Ve.prototype.set = ge;
+  Ve.prototype.clear = Li, Ve.prototype.delete = Ci, Ve.prototype.get = rc, Ve.prototype.has = go, Ve.prototype.set = ye;
   function sc(y, L) {
     var M = lc(y) || Py(y) ? B(y.length, String) : [], et = M.length, Ae = !!et;
     for (var Oe in y)
-      ht.call(y, Oe) && !(Ae && (Oe == "length" || My(Oe, et))) && M.push(Oe);
+      dt.call(y, Oe) && !(Ae && (Oe == "length" || My(Oe, et))) && M.push(Oe);
     return M;
   }
   function yo(y, L, M) {
     var et = y[L];
-    (!(ht.call(y, L) && of(et, M)) || M === void 0 && !(L in y)) && (y[L] = M);
+    (!(dt.call(y, L) && of(et, M)) || M === void 0 && !(L in y)) && (y[L] = M);
   }
   function Gn(y, L) {
     for (var M = y.length; M--; )
@@ -4884,7 +4884,7 @@ ga.exports;
     return -1;
   }
   function wo(y, L) {
-    return y && yt(L, uc(L), y);
+    return y && pt(L, uc(L), y);
   }
   function ir(y, L, M, et, Ae, Oe, Kn) {
     var De;
@@ -4895,7 +4895,7 @@ ga.exports;
     var lf = lc(y);
     if (lf) {
       if (De = Cy(y), !L)
-        return lt(y, De);
+        return mt(y, De);
     } else {
       var Ds = In(y), uf = Ds == d || Ds == l;
       if (Oy(y))
@@ -4939,10 +4939,10 @@ ga.exports;
   }
   function Ti(y) {
     if (!sf(y))
-      return we(y);
+      return pe(y);
     var L = [];
     for (var M in Object(y))
-      ht.call(y, M) && M != "constructor" && L.push(M);
+      dt.call(y, M) && M != "constructor" && L.push(M);
     return L;
   }
   function cc(y, L) {
@@ -4955,7 +4955,7 @@ ga.exports;
     var L = new y.constructor(y.byteLength);
     return new rt(L).set(new rt(y)), L;
   }
-  function $(y, L) {
+  function A(y, L) {
     var M = L ? w(y.buffer) : y.buffer;
     return new y.constructor(M, y.byteOffset, y.byteLength);
   }
@@ -4963,28 +4963,28 @@ ga.exports;
     var et = L ? M(at(y), !0) : at(y);
     return un(et, Kt, new y.constructor());
   }
-  function Z(y) {
+  function Q(y) {
     var L = new y.constructor(y.source, Gt.exec(y));
     return L.lastIndex = y.lastIndex, L;
   }
-  function tt(y, L, M) {
-    var et = L ? M(It(y), !0) : It(y);
+  function J(y, L, M) {
+    var et = L ? M(Bt(y), !0) : Bt(y);
     return un(et, de, new y.constructor());
   }
   function K(y) {
     return he ? Object(he.call(y)) : {};
   }
-  function gt(y, L) {
+  function yt(y, L) {
     var M = L ? w(y.buffer) : y.buffer;
     return new y.constructor(M, y.byteOffset, y.length);
   }
-  function lt(y, L) {
+  function mt(y, L) {
     var M = -1, et = y.length;
     for (L || (L = Array(et)); ++M < et; )
       L[M] = y[M];
     return L;
   }
-  function yt(y, L, M, et) {
+  function pt(y, L, M, et) {
     M || (M = {});
     for (var Ae = -1, Oe = L.length; ++Ae < Oe; ) {
       var Kn = L[Ae], De = void 0;
@@ -4993,7 +4993,7 @@ ga.exports;
     return M;
   }
   function ke(y, L) {
-    return yt(y, gn(y), L);
+    return pt(y, gn(y), L);
   }
   function He(y) {
     return Bi(y, uc, gn);
@@ -5007,7 +5007,7 @@ ga.exports;
     return ac(M) ? M : void 0;
   }
   var gn = fn ? it(fn, Object) : jy, In = oc;
-  (pe && In(new pe(new ArrayBuffer(1))) != R || en && In(new en()) != g || nn && In(nn.resolve()) != b || pt && In(new pt()) != P || Dt && In(new Dt()) != v) && (In = function(y) {
+  (ge && In(new ge(new ArrayBuffer(1))) != R || en && In(new en()) != g || nn && In(nn.resolve()) != b || ht && In(new ht()) != P || Dt && In(new Dt()) != $) && (In = function(y) {
     var L = u.call(y), M = L == m ? y.constructor : void 0, et = M ? qr(M) : void 0;
     if (et)
       switch (et) {
@@ -5020,16 +5020,16 @@ ga.exports;
         case Ue:
           return P;
         case rr:
-          return v;
+          return $;
       }
     return L;
   });
   function Cy(y) {
     var L = y.length, M = y.constructor(L);
-    return L && typeof y[0] == "string" && ht.call(y, "index") && (M.index = y.index, M.input = y.input), M;
+    return L && typeof y[0] == "string" && dt.call(y, "index") && (M.index = y.index, M.input = y.input), M;
   }
   function By(y) {
-    return typeof y.constructor == "function" && !sf(y) ? ic(dt(y)) : {};
+    return typeof y.constructor == "function" && !sf(y) ? ic(ft(y)) : {};
   }
   function Ty(y, L, M, et) {
     var Ae = y.constructor;
@@ -5040,7 +5040,7 @@ ga.exports;
       case c:
         return new Ae(+y);
       case R:
-        return $(y, et);
+        return A(y, et);
       case Y:
       case O:
       case q:
@@ -5048,18 +5048,18 @@ ga.exports;
       case k:
       case N:
       case U:
-      case Q:
+      case Z:
       case G:
-        return gt(y, et);
+        return yt(y, et);
       case g:
         return H(y, et, M);
       case h:
       case _:
         return new Ae(y);
       case C:
-        return Z(y);
+        return Q(y);
       case P:
-        return tt(y, et, M);
+        return J(y, et, M);
       case p:
         return K(y);
     }
@@ -5081,7 +5081,7 @@ ga.exports;
   function qr(y) {
     if (y != null) {
       try {
-        return ft.call(y);
+        return ut.call(y);
       } catch {
       }
       try {
@@ -5098,7 +5098,7 @@ ga.exports;
     return y === L || y !== y && L !== L;
   }
   function Py(y) {
-    return Hy(y) && ht.call(y, "callee") && (!ee.call(y, "callee") || u.call(y) == i);
+    return Hy(y) && dt.call(y, "callee") && (!ee.call(y, "callee") || u.call(y) == i);
   }
   var lc = Array.isArray;
   function af(y) {
@@ -5968,13 +5968,13 @@ let Vx = class extends gu {
       _o[h] = e.getUint32(n, !0);
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, f = this.h3 | 0, d = f, l = this.h4 | 0, g = l;
     for (let h = 0; h < 5; h++) {
-      const m = 4 - h, b = Gx[h], C = Kx[h], P = wu[h], _ = bu[h], p = zx[h], v = Rx[h];
+      const m = 4 - h, b = Gx[h], C = Kx[h], P = wu[h], _ = bu[h], p = zx[h], $ = Rx[h];
       for (let I = 0; I < 16; I++) {
         const R = No(r + fd(h, i, a, f) + _o[P[I]] + b, p[I]) + l | 0;
         r = l, l = f, f = No(a, 10) | 0, a = i, i = R;
       }
       for (let I = 0; I < 16; I++) {
-        const R = No(s + fd(m, o, c, d) + _o[_[I]] + C, v[I]) + g | 0;
+        const R = No(s + fd(m, o, c, d) + _o[_[I]] + C, $[I]) + g | 0;
         s = g, g = d, d = No(c, 10) | 0, c = o, o = R;
       }
     }
@@ -6126,14 +6126,14 @@ let Ka = class extends gu {
     for (let p = 0; p < 16; p++, n += 4)
       mr[p] = e.getUint32(n), xr[p] = e.getUint32(n += 4);
     for (let p = 16; p < 80; p++) {
-      const v = mr[p - 15] | 0, I = xr[p - 15] | 0, R = Et.rotrSH(v, I, 1) ^ Et.rotrSH(v, I, 8) ^ Et.shrSH(v, I, 7), Y = Et.rotrSL(v, I, 1) ^ Et.rotrSL(v, I, 8) ^ Et.shrSL(v, I, 7), O = mr[p - 2] | 0, q = xr[p - 2] | 0, S = Et.rotrSH(O, q, 19) ^ Et.rotrBH(O, q, 61) ^ Et.shrSH(O, q, 6), k = Et.rotrSL(O, q, 19) ^ Et.rotrBL(O, q, 61) ^ Et.shrSL(O, q, 6), N = Et.add4L(Y, k, xr[p - 7], xr[p - 16]), U = Et.add4H(N, R, S, mr[p - 7], mr[p - 16]);
+      const $ = mr[p - 15] | 0, I = xr[p - 15] | 0, R = Et.rotrSH($, I, 1) ^ Et.rotrSH($, I, 8) ^ Et.shrSH($, I, 7), Y = Et.rotrSL($, I, 1) ^ Et.rotrSL($, I, 8) ^ Et.shrSL($, I, 7), O = mr[p - 2] | 0, q = xr[p - 2] | 0, S = Et.rotrSH(O, q, 19) ^ Et.rotrBH(O, q, 61) ^ Et.shrSH(O, q, 6), k = Et.rotrSL(O, q, 19) ^ Et.rotrBL(O, q, 61) ^ Et.shrSL(O, q, 6), N = Et.add4L(Y, k, xr[p - 7], xr[p - 16]), U = Et.add4H(N, R, S, mr[p - 7], mr[p - 16]);
       mr[p] = U | 0, xr[p] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: f, Dl: d, Eh: l, El: g, Fh: h, Fl: m, Gh: b, Gl: C, Hh: P, Hl: _ } = this;
     for (let p = 0; p < 80; p++) {
-      const v = Et.rotrSH(l, g, 14) ^ Et.rotrSH(l, g, 18) ^ Et.rotrBH(l, g, 41), I = Et.rotrSL(l, g, 14) ^ Et.rotrSL(l, g, 18) ^ Et.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = Et.add5L(_, I, Y, yS[p], xr[p]), q = Et.add5H(O, P, v, R, gS[p], mr[p]), S = O | 0, k = Et.rotrSH(r, s, 28) ^ Et.rotrBH(r, s, 34) ^ Et.rotrBH(r, s, 39), N = Et.rotrSL(r, s, 28) ^ Et.rotrBL(r, s, 34) ^ Et.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Q = s & o ^ s & c ^ o & c;
+      const $ = Et.rotrSH(l, g, 14) ^ Et.rotrSH(l, g, 18) ^ Et.rotrBH(l, g, 41), I = Et.rotrSL(l, g, 14) ^ Et.rotrSL(l, g, 18) ^ Et.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = Et.add5L(_, I, Y, yS[p], xr[p]), q = Et.add5H(O, P, $, R, gS[p], mr[p]), S = O | 0, k = Et.rotrSH(r, s, 28) ^ Et.rotrBH(r, s, 34) ^ Et.rotrBH(r, s, 39), N = Et.rotrSL(r, s, 28) ^ Et.rotrBL(r, s, 34) ^ Et.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Z = s & o ^ s & c ^ o & c;
       P = b | 0, _ = C | 0, b = h | 0, C = m | 0, h = l | 0, m = g | 0, { h: l, l: g } = Et.add(f | 0, d | 0, q | 0, S | 0), f = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
-      const G = Et.add3L(S, N, Q);
+      const G = Et.add3L(S, N, Z);
       r = Et.add3H(G, q, k, U), s = G | 0;
     }
     ({ h: r, l: s } = Et.add(this.Ah | 0, this.Al | 0, r | 0, s | 0)), { h: i, l: o } = Et.add(this.Bh | 0, this.Bl | 0, i | 0, o | 0), { h: a, l: c } = Et.add(this.Ch | 0, this.Cl | 0, a | 0, c | 0), { h: f, l: d } = Et.add(this.Dh | 0, this.Dl | 0, f | 0, d | 0), { h: l, l: g } = Et.add(this.Eh | 0, this.El | 0, l | 0, g | 0), { h, l: m } = Et.add(this.Fh | 0, this.Fl | 0, h | 0, m | 0), { h: b, l: C } = Et.add(this.Gh | 0, this.Gl | 0, b | 0, C | 0), { h: P, l: _ } = Et.add(this.Hh | 0, this.Hl | 0, P | 0, _ | 0), this.set(r, s, i, o, a, c, f, d, l, g, h, m, b, C, P, _);
@@ -6165,12 +6165,12 @@ var Tt;
 (function(t) {
   t.Int = "int", t.UInt = "uint", t.Buffer = "buffer", t.BoolTrue = "true", t.BoolFalse = "false", t.PrincipalStandard = "address", t.PrincipalContract = "contract", t.ResponseOk = "ok", t.ResponseErr = "err", t.OptionalNone = "none", t.OptionalSome = "some", t.List = "list", t.Tuple = "tuple", t.StringASCII = "ascii", t.StringUTF8 = "utf8";
 })(Tt || (Tt = {}));
-var ye;
+var we;
 (function(t) {
   t[t.int = 0] = "int", t[t.uint = 1] = "uint", t[t.buffer = 2] = "buffer", t[t.true = 3] = "true", t[t.false = 4] = "false", t[t.address = 5] = "address", t[t.contract = 6] = "contract", t[t.ok = 7] = "ok", t[t.err = 8] = "err", t[t.none = 9] = "none", t[t.some = 10] = "some", t[t.list = 11] = "list", t[t.tuple = 12] = "tuple", t[t.ascii = 13] = "ascii", t[t.utf8 = 14] = "utf8";
-})(ye || (ye = {}));
+})(we || (we = {}));
 function mu(t) {
-  return ye[t];
+  return we[t];
 }
 const SS = () => ({ type: Tt.BoolTrue }), ES = () => ({ type: Tt.BoolFalse }), AS = (t) => {
   if (t.byteLength > 1048576)
@@ -6604,7 +6604,7 @@ function zS(t) {
       return CS(r, s, i);
     case zt.ContractCall:
       const o = di(e), a = an(e), c = an(e), f = [], d = e.readUInt32BE();
-      for (let v = 0; v < d; v++) {
+      for (let $ = 0; $ < d; $++) {
         const I = Nn(e);
         f.push(I);
       }
@@ -6613,28 +6613,28 @@ function zS(t) {
       const l = an(e), g = an(e, 4, 1e5);
       return yd(l, g);
     case zt.VersionedSmartContract: {
-      const v = e.readUInt8Enum(al, (Y) => {
+      const $ = e.readUInt8Enum(al, (Y) => {
         throw new Error(`Cannot recognize ClarityVersion: ${Y}`);
       }), I = an(e), R = an(e, 4, Lx);
-      return yd(I, R, v);
+      return yd(I, R, $);
     }
     case zt.PoisonMicroblock:
       return MS();
     case zt.Coinbase: {
-      const v = e.readBytes(ss);
-      return wd(v);
+      const $ = e.readBytes(ss);
+      return wd($);
     }
     case zt.CoinbaseToAltRecipient: {
-      const v = e.readBytes(ss), I = Nn(e);
-      return wd(v, I);
+      const $ = e.readBytes(ss), I = Nn(e);
+      return wd($, I);
     }
     case zt.NakamotoCoinbase: {
-      const v = e.readBytes(ss), I = Nn(e), R = e.readBytes(ol);
-      return NS(v, I, R);
+      const $ = e.readBytes(ss), I = Nn(e), R = e.readBytes(ol);
+      return NS($, I, R);
     }
     case zt.TenureChange:
-      const h = st(e.readBytes(20)), m = st(e.readBytes(20)), b = st(e.readBytes(20)), C = st(e.readBytes(32)), P = e.readUInt32BE(), _ = e.readUInt8Enum(ul, (v) => {
-        throw new Error(`Cannot recognize TenureChangeCause: ${v}`);
+      const h = st(e.readBytes(20)), m = st(e.readBytes(20)), b = st(e.readBytes(20)), C = st(e.readBytes(32)), P = e.readUInt32BE(), _ = e.readUInt8Enum(ul, ($) => {
+        throw new Error(`Cannot recognize TenureChangeCause: ${$}`);
       }), p = st(e.readBytes(20));
       return _S(h, m, b, C, P, _, p);
   }
@@ -6764,40 +6764,40 @@ function Nn(t) {
     const r = t.slice(0, 2).toLowerCase() === "0x";
     e = new Zt(Pt(r ? t.slice(2) : t));
   } else t instanceof Uint8Array ? e = new Zt(t) : e = t;
-  switch (e.readUInt8Enum(ye, (r) => {
+  switch (e.readUInt8Enum(we, (r) => {
     throw new Be(`Cannot recognize Clarity Type: ${r}`);
   })) {
-    case ye.int:
+    case we.int:
       return $S(Gc(e.readBytes(16)));
-    case ye.uint:
+    case we.uint:
       return IS(e.readBytes(16));
-    case ye.buffer:
+    case we.buffer:
       const r = e.readUInt32BE();
       return AS(e.readBytes(r));
-    case ye.true:
+    case we.true:
       return SS();
-    case ye.false:
+    case we.false:
       return ES();
-    case ye.address:
+    case we.address:
       const s = di(e);
       return qS(s);
-    case ye.contract:
+    case we.contract:
       const i = di(e), o = an(e);
       return jp(i, o);
-    case ye.ok:
+    case we.ok:
       return YS(Nn(e));
-    case ye.err:
+    case we.err:
       return XS(Nn(e));
-    case ye.none:
+    case we.none:
       return Np();
-    case ye.some:
+    case we.some:
       return _p(Nn(e));
-    case ye.list:
+    case we.list:
       const a = e.readUInt32BE(), c = [];
       for (let b = 0; b < a; b++)
         c.push(Nn(e));
       return kS(c);
-    case ye.tuple:
+    case we.tuple:
       const f = e.readUInt32BE(), d = {};
       for (let b = 0; b < f; b++) {
         const C = an(e).content;
@@ -6806,10 +6806,10 @@ function Nn(t) {
         d[C] = Nn(e);
       }
       return JS(d);
-    case ye.ascii:
+    case we.ascii:
       const l = e.readUInt32BE(), g = Bw(e.readBytes(l));
       return ZS(g);
-    case ye.utf8:
+    case we.utf8:
       const h = e.readUInt32BE(), m = io(e.readBytes(h));
       return QS(m);
     default:
@@ -6962,7 +6962,7 @@ function Si(t) {
   };
 }
 function x3(t, e, n = ne.Compressed) {
-  const r = _w(e), s = new Qe(mf(r.r), mf(r.s)), i = Lt.fromSignature(t, s, r.recoveryId), o = n === ne.Compressed;
+  const r = _w(e), s = new Qe(mf(r.r), mf(r.s)), i = kt.fromSignature(t, s, r.recoveryId), o = n === ne.Compressed;
   return i.toHex(o);
 }
 function S3(t) {
@@ -6981,10 +6981,10 @@ function E3(t) {
   return st(oo(t.slice(0, 32), e));
 }
 function A3(t) {
-  return Lt.fromHex(Iu(t)).toHex(!0);
+  return kt.fromHex(Iu(t)).toHex(!0);
 }
 function v3(t) {
-  return Lt.fromHex(Iu(t)).toHex(!1);
+  return kt.fromHex(Iu(t)).toHex(!1);
 }
 function $3(t, e) {
   t = Xl(t);
@@ -7773,13 +7773,13 @@ let pE = class extends Mu {
       Do[h] = e.getUint32(n, !0);
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, f = this.h3 | 0, d = f, l = this.h4 | 0, g = l;
     for (let h = 0; h < 5; h++) {
-      const m = 4 - h, b = dE[h], C = hE[h], P = Nu[h], _ = _u[h], p = uE[h], v = fE[h];
+      const m = 4 - h, b = dE[h], C = hE[h], P = Nu[h], _ = _u[h], p = uE[h], $ = fE[h];
       for (let I = 0; I < 16; I++) {
         const R = Oo(r + Hd(h, i, a, f) + Do[P[I]] + b, p[I]) + l | 0;
         r = l, l = f, f = Oo(a, 10) | 0, a = i, i = R;
       }
       for (let I = 0; I < 16; I++) {
-        const R = Oo(s + Hd(m, o, c, d) + Do[_[I]] + C, v[I]) + g | 0;
+        const R = Oo(s + Hd(m, o, c, d) + Do[_[I]] + C, $[I]) + g | 0;
         s = g, g = d, d = Oo(c, 10) | 0, c = o, o = R;
       }
     }
@@ -8046,14 +8046,14 @@ let qa = class extends Mu {
     for (let p = 0; p < 16; p++, n += 4)
       Ar[p] = e.getUint32(n), vr[p] = e.getUint32(n += 4);
     for (let p = 16; p < 80; p++) {
-      const v = Ar[p - 15] | 0, I = vr[p - 15] | 0, R = At.rotrSH(v, I, 1) ^ At.rotrSH(v, I, 8) ^ At.shrSH(v, I, 7), Y = At.rotrSL(v, I, 1) ^ At.rotrSL(v, I, 8) ^ At.shrSL(v, I, 7), O = Ar[p - 2] | 0, q = vr[p - 2] | 0, S = At.rotrSH(O, q, 19) ^ At.rotrBH(O, q, 61) ^ At.shrSH(O, q, 6), k = At.rotrSL(O, q, 19) ^ At.rotrBL(O, q, 61) ^ At.shrSL(O, q, 6), N = At.add4L(Y, k, vr[p - 7], vr[p - 16]), U = At.add4H(N, R, S, Ar[p - 7], Ar[p - 16]);
+      const $ = Ar[p - 15] | 0, I = vr[p - 15] | 0, R = At.rotrSH($, I, 1) ^ At.rotrSH($, I, 8) ^ At.shrSH($, I, 7), Y = At.rotrSL($, I, 1) ^ At.rotrSL($, I, 8) ^ At.shrSL($, I, 7), O = Ar[p - 2] | 0, q = vr[p - 2] | 0, S = At.rotrSH(O, q, 19) ^ At.rotrBH(O, q, 61) ^ At.shrSH(O, q, 6), k = At.rotrSL(O, q, 19) ^ At.rotrBL(O, q, 61) ^ At.shrSL(O, q, 6), N = At.add4L(Y, k, vr[p - 7], vr[p - 16]), U = At.add4H(N, R, S, Ar[p - 7], Ar[p - 16]);
       Ar[p] = U | 0, vr[p] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: f, Dl: d, Eh: l, El: g, Fh: h, Fl: m, Gh: b, Gl: C, Hh: P, Hl: _ } = this;
     for (let p = 0; p < 80; p++) {
-      const v = At.rotrSH(l, g, 14) ^ At.rotrSH(l, g, 18) ^ At.rotrBH(l, g, 41), I = At.rotrSL(l, g, 14) ^ At.rotrSL(l, g, 18) ^ At.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = At.add5L(_, I, Y, jE[p], vr[p]), q = At.add5H(O, P, v, R, FE[p], Ar[p]), S = O | 0, k = At.rotrSH(r, s, 28) ^ At.rotrBH(r, s, 34) ^ At.rotrBH(r, s, 39), N = At.rotrSL(r, s, 28) ^ At.rotrBL(r, s, 34) ^ At.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Q = s & o ^ s & c ^ o & c;
+      const $ = At.rotrSH(l, g, 14) ^ At.rotrSH(l, g, 18) ^ At.rotrBH(l, g, 41), I = At.rotrSL(l, g, 14) ^ At.rotrSL(l, g, 18) ^ At.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = At.add5L(_, I, Y, jE[p], vr[p]), q = At.add5H(O, P, $, R, FE[p], Ar[p]), S = O | 0, k = At.rotrSH(r, s, 28) ^ At.rotrBH(r, s, 34) ^ At.rotrBH(r, s, 39), N = At.rotrSL(r, s, 28) ^ At.rotrBL(r, s, 34) ^ At.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Z = s & o ^ s & c ^ o & c;
       P = b | 0, _ = C | 0, b = h | 0, C = m | 0, h = l | 0, m = g | 0, { h: l, l: g } = At.add(f | 0, d | 0, q | 0, S | 0), f = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
-      const G = At.add3L(S, N, Q);
+      const G = At.add3L(S, N, Z);
       r = At.add3H(G, q, k, U), s = G | 0;
     }
     ({ h: r, l: s } = At.add(this.Ah | 0, this.Al | 0, r | 0, s | 0)), { h: i, l: o } = At.add(this.Bh | 0, this.Bl | 0, i | 0, o | 0), { h: a, l: c } = At.add(this.Ch | 0, this.Cl | 0, a | 0, c | 0), { h: f, l: d } = At.add(this.Dh | 0, this.Dl | 0, f | 0, d | 0), { h: l, l: g } = At.add(this.Eh | 0, this.El | 0, l | 0, g | 0), { h, l: m } = At.add(this.Fh | 0, this.Fl | 0, h | 0, m | 0), { h: b, l: C } = At.add(this.Gh | 0, this.Gl | 0, b | 0, C | 0), { h: P, l: _ } = At.add(this.Hh | 0, this.Hl | 0, P | 0, _ | 0), this.set(r, s, i, o, a, c, f, d, l, g, h, m, b, C, P, _);
@@ -8233,7 +8233,7 @@ function ug(t) {
   var e, n, r;
   return (r = (n = (e = t.head) === null || e === void 0 ? void 0 : e.querySelector('meta[name="csp-nonce"]')) === null || n === void 0 ? void 0 : n.getAttribute("content")) !== null && r !== void 0 ? r : void 0;
 }
-const bt = (t, e, ...n) => {
+const wt = (t, e, ...n) => {
   let r = null, s = !1, i = !1;
   const o = [], a = (f) => {
     for (let d = 0; d < f.length; d++)
@@ -8338,7 +8338,7 @@ const bt = (t, e, ...n) => {
   const n = e.$elm$ = t.$elm$, r = t.$children$, s = e.$children$, i = e.$tag$, o = e.$text$;
   o === null ? (Xe = i === "svg" ? !0 : i === "foreignObject" ? !1 : Xe, dg(t, e, Xe), r !== null && s !== null ? A4(n, r, e, s) : s !== null ? (t.$text$ !== null && (n.textContent = ""), hg(n, null, e, s, 0, s.length - 1)) : r !== null && pg(r, 0, r.length - 1), Xe && i === "svg" && (Xe = !1)) : t.$text$ !== o && (n.data = o);
 }, v4 = (t, e) => {
-  const n = t.$hostElement$, r = t.$vnode$ || Ll(null, null), s = g4(e) ? e : bt(null, null, e);
+  const n = t.$hostElement$, r = t.$vnode$ || Ll(null, null), s = g4(e) ? e : wt(null, null, e);
   lg = n.tagName, s.$tag$ = null, s.$flags$ |= 4, t.$vnode$ = s, s.$elm$ = r.$elm$ = n.shadowRoot || n, ea = n["s-sc"], Oi(r, s);
 }, gg = (t, e) => {
   e && !t.$onRenderResolve$ && e["s-p"] && e["s-p"].push(new Promise((n) => t.$onRenderResolve$ = n));
@@ -8738,10 +8738,10 @@ function _e(t, e) {
     return n;
   if (n instanceof Uint8Array)
     if (e) {
-      const r = hA(BigInt(`0x${Bt(n)}`), BigInt(n.byteLength * 8));
+      const r = hA(BigInt(`0x${Ct(n)}`), BigInt(n.byteLength * 8));
       return BigInt(r.toString());
     } else
-      return BigInt(`0x${Bt(n)}`);
+      return BigInt(`0x${Ct(n)}`);
   if (n != null && typeof n == "object" && n.constructor.name === "BN")
     return BigInt(n.toString());
   throw new TypeError("Invalid value type. Must be a number, bigint, integer-string, hex-string, or Uint8Array.");
@@ -8773,7 +8773,7 @@ function hA(t, e) {
   return dA(t, e - BigInt(1)) ? t - (BigInt(1) << e) : t;
 }
 const pA = Array.from({ length: 256 }, (t, e) => e.toString(16).padStart(2, "0"));
-function Bt(t) {
+function Ct(t) {
   if (!(t instanceof Uint8Array))
     throw new Error("Uint8Array expected");
   let e = "";
@@ -8890,10 +8890,10 @@ var nt;
 (function(t) {
   t[t.Address = 0] = "Address", t[t.Principal = 1] = "Principal", t[t.LengthPrefixedString = 2] = "LengthPrefixedString", t[t.MemoString = 3] = "MemoString", t[t.AssetInfo = 4] = "AssetInfo", t[t.PostCondition = 5] = "PostCondition", t[t.PublicKey = 6] = "PublicKey", t[t.LengthPrefixedList = 7] = "LengthPrefixedList", t[t.Payload = 8] = "Payload", t[t.MessageSignature = 9] = "MessageSignature", t[t.StructuredDataSignature = 10] = "StructuredDataSignature", t[t.TransactionAuthField = 11] = "TransactionAuthField";
 })(nt || (nt = {}));
-var kt;
+var It;
 (function(t) {
   t[t.TokenTransfer = 0] = "TokenTransfer", t[t.SmartContract = 1] = "SmartContract", t[t.VersionedSmartContract = 6] = "VersionedSmartContract", t[t.ContractCall = 2] = "ContractCall", t[t.PoisonMicroblock = 3] = "PoisonMicroblock", t[t.Coinbase = 4] = "Coinbase", t[t.CoinbaseToAltRecipient = 5] = "CoinbaseToAltRecipient", t[t.TenureChange = 7] = "TenureChange", t[t.NakamotoCoinbase = 8] = "NakamotoCoinbase";
-})(kt || (kt = {}));
+})(It || (It = {}));
 var Ml;
 (function(t) {
   t[t.Clarity1 = 1] = "Clarity1", t[t.Clarity2 = 2] = "Clarity2", t[t.Clarity3 = 3] = "Clarity3";
@@ -9116,13 +9116,13 @@ class RA extends Gu {
       Go[h] = e.getUint32(n, !0);
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, f = this.h3 | 0, d = f, l = this.h4 | 0, g = l;
     for (let h = 0; h < 5; h++) {
-      const m = 4 - h, b = jA[h], C = zA[h], P = Ku[h], _ = Vu[h], p = DA[h], v = FA[h];
+      const m = 4 - h, b = jA[h], C = zA[h], P = Ku[h], _ = Vu[h], p = DA[h], $ = FA[h];
       for (let I = 0; I < 16; I++) {
         const R = Ro(r + eh(h, i, a, f) + Go[P[I]] + b, p[I]) + l | 0;
         r = l, l = f, f = Ro(a, 10) | 0, a = i, i = R;
       }
       for (let I = 0; I < 16; I++) {
-        const R = Ro(s + eh(m, o, c, d) + Go[_[I]] + C, v[I]) + g | 0;
+        const R = Ro(s + eh(m, o, c, d) + Go[_[I]] + C, $[I]) + g | 0;
         s = g, g = d, d = Ro(c, 10) | 0, c = o, o = R;
       }
     }
@@ -9389,14 +9389,14 @@ class tc extends Gu {
     for (let p = 0; p < 16; p++, n += 4)
       kr[p] = e.getUint32(n), Lr[p] = e.getUint32(n += 4);
     for (let p = 16; p < 80; p++) {
-      const v = kr[p - 15] | 0, I = Lr[p - 15] | 0, R = vt.rotrSH(v, I, 1) ^ vt.rotrSH(v, I, 8) ^ vt.shrSH(v, I, 7), Y = vt.rotrSL(v, I, 1) ^ vt.rotrSL(v, I, 8) ^ vt.shrSL(v, I, 7), O = kr[p - 2] | 0, q = Lr[p - 2] | 0, S = vt.rotrSH(O, q, 19) ^ vt.rotrBH(O, q, 61) ^ vt.shrSH(O, q, 6), k = vt.rotrSL(O, q, 19) ^ vt.rotrBL(O, q, 61) ^ vt.shrSL(O, q, 6), N = vt.add4L(Y, k, Lr[p - 7], Lr[p - 16]), U = vt.add4H(N, R, S, kr[p - 7], kr[p - 16]);
+      const $ = kr[p - 15] | 0, I = Lr[p - 15] | 0, R = vt.rotrSH($, I, 1) ^ vt.rotrSH($, I, 8) ^ vt.shrSH($, I, 7), Y = vt.rotrSL($, I, 1) ^ vt.rotrSL($, I, 8) ^ vt.shrSL($, I, 7), O = kr[p - 2] | 0, q = Lr[p - 2] | 0, S = vt.rotrSH(O, q, 19) ^ vt.rotrBH(O, q, 61) ^ vt.shrSH(O, q, 6), k = vt.rotrSL(O, q, 19) ^ vt.rotrBL(O, q, 61) ^ vt.shrSL(O, q, 6), N = vt.add4L(Y, k, Lr[p - 7], Lr[p - 16]), U = vt.add4H(N, R, S, kr[p - 7], kr[p - 16]);
       kr[p] = U | 0, Lr[p] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: f, Dl: d, Eh: l, El: g, Fh: h, Fl: m, Gh: b, Gl: C, Hh: P, Hl: _ } = this;
     for (let p = 0; p < 80; p++) {
-      const v = vt.rotrSH(l, g, 14) ^ vt.rotrSH(l, g, 18) ^ vt.rotrBH(l, g, 41), I = vt.rotrSL(l, g, 14) ^ vt.rotrSL(l, g, 18) ^ vt.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = vt.add5L(_, I, Y, w8[p], Lr[p]), q = vt.add5H(O, P, v, R, y8[p], kr[p]), S = O | 0, k = vt.rotrSH(r, s, 28) ^ vt.rotrBH(r, s, 34) ^ vt.rotrBH(r, s, 39), N = vt.rotrSL(r, s, 28) ^ vt.rotrBL(r, s, 34) ^ vt.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Q = s & o ^ s & c ^ o & c;
+      const $ = vt.rotrSH(l, g, 14) ^ vt.rotrSH(l, g, 18) ^ vt.rotrBH(l, g, 41), I = vt.rotrSL(l, g, 14) ^ vt.rotrSL(l, g, 18) ^ vt.rotrBL(l, g, 41), R = l & h ^ ~l & b, Y = g & m ^ ~g & C, O = vt.add5L(_, I, Y, w8[p], Lr[p]), q = vt.add5H(O, P, $, R, y8[p], kr[p]), S = O | 0, k = vt.rotrSH(r, s, 28) ^ vt.rotrBH(r, s, 34) ^ vt.rotrBH(r, s, 39), N = vt.rotrSL(r, s, 28) ^ vt.rotrBL(r, s, 34) ^ vt.rotrBL(r, s, 39), U = r & i ^ r & a ^ i & a, Z = s & o ^ s & c ^ o & c;
       P = b | 0, _ = C | 0, b = h | 0, C = m | 0, h = l | 0, m = g | 0, { h: l, l: g } = vt.add(f | 0, d | 0, q | 0, S | 0), f = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
-      const G = vt.add3L(S, N, Q);
+      const G = vt.add3L(S, N, Z);
       r = vt.add3H(G, q, k, U), s = G | 0;
     }
     ({ h: r, l: s } = vt.add(this.Ah | 0, this.Al | 0, r | 0, s | 0)), { h: i, l: o } = vt.add(this.Bh | 0, this.Bl | 0, i | 0, o | 0), { h: a, l: c } = vt.add(this.Ch | 0, this.Cl | 0, a | 0, c | 0), { h: f, l: d } = vt.add(this.Dh | 0, this.Dl | 0, f | 0, d | 0), { h: l, l: g } = vt.add(this.Eh | 0, this.El | 0, l | 0, g | 0), { h, l: m } = vt.add(this.Fh | 0, this.Fl | 0, h | 0, m | 0), { h: b, l: C } = vt.add(this.Gh | 0, this.Gl | 0, b | 0, C | 0), { h: P, l: _ } = vt.add(this.Hh | 0, this.Hl | 0, P | 0, _ | 0), this.set(r, s, i, o, a, c, f, d, l, g, h, m, b, C, P, _);
@@ -9504,7 +9504,7 @@ function Tc(t, e = !1) {
     case F.UInt:
       return e ? t.value.toString() : t.value;
     case F.Buffer:
-      return `0x${Bt(t.buffer)}`;
+      return `0x${Ct(t.buffer)}`;
     case F.OptionalNone:
       return null;
     case F.OptionalSome:
@@ -9660,28 +9660,28 @@ function gi(t) {
   };
 }
 function N8(t, e, n = re.Compressed) {
-  const r = wA(e.data), s = new Qe(qd(r.r), qd(r.s)), i = Lt.fromSignature(t, s, r.recoveryId), o = n === re.Compressed;
+  const r = wA(e.data), s = new Qe(qd(r.r), qd(r.s)), i = kt.fromSignature(t, s, r.recoveryId), o = n === re.Compressed;
   return i.toHex(o);
 }
 function _8(t) {
   return { type: nt.PublicKey, data: t };
 }
 function $i(t) {
-  return !Bt(t.data).startsWith("04");
+  return !Ct(t.data).startsWith("04");
 }
 function $a(t) {
   return t.data.slice();
 }
 function U8(t) {
   const e = O8(t), n = oo(e.data.slice(0, 32), e.compressed);
-  return gi(Bt(n));
+  return gi(Ct(n));
 }
 function P8(t) {
-  const e = typeof t == "string" ? t : Bt(t), n = Lt.fromHex(e).toHex(!0);
+  const e = typeof t == "string" ? t : Ct(t), n = kt.fromHex(e).toHex(!0);
   return gi(n);
 }
 function H8(t) {
-  const e = typeof t == "string" ? t : Bt(t), n = Lt.fromHex(e).toHex(!1);
+  const e = typeof t == "string" ? t : Ct(t), n = kt.fromHex(e).toHex(!1);
   return gi(n);
 }
 function Pl(t) {
@@ -9708,7 +9708,7 @@ function F8(t) {
 function j8(t, e, n) {
   return typeof t == "string" && (t = Dg(t)), typeof n == "string" && (n = ah(n)), {
     type: nt.Payload,
-    payloadType: kt.TokenTransfer,
+    payloadType: It.TokenTransfer,
     recipient: t,
     amount: _e(e, !1),
     memo: n ?? ah("")
@@ -9717,7 +9717,7 @@ function j8(t, e, n) {
 function z8(t, e, n, r) {
   return typeof t == "string" && (t = Wu(t)), typeof e == "string" && (e = Ss(e)), typeof n == "string" && (n = Ss(n)), {
     type: nt.Payload,
-    payloadType: kt.ContractCall,
+    payloadType: It.ContractCall,
     contractAddress: t,
     contractName: e,
     functionName: n,
@@ -9727,31 +9727,31 @@ function z8(t, e, n, r) {
 function ih(t, e, n) {
   return typeof t == "string" && (t = Ss(t)), typeof e == "string" && (e = Z8(e)), typeof n == "number" ? {
     type: nt.Payload,
-    payloadType: kt.VersionedSmartContract,
+    payloadType: It.VersionedSmartContract,
     clarityVersion: n,
     contractName: t,
     codeBody: e
   } : {
     type: nt.Payload,
-    payloadType: kt.SmartContract,
+    payloadType: It.SmartContract,
     contractName: t,
     codeBody: e
   };
 }
 function R8() {
-  return { type: nt.Payload, payloadType: kt.PoisonMicroblock };
+  return { type: nt.Payload, payloadType: It.PoisonMicroblock };
 }
 function oh(t, e) {
   if (t.byteLength != is)
     throw Error(`Coinbase buffer size must be ${is} bytes`);
   return e != null ? {
     type: nt.Payload,
-    payloadType: kt.CoinbaseToAltRecipient,
+    payloadType: It.CoinbaseToAltRecipient,
     coinbaseBytes: t,
     recipient: e
   } : {
     type: nt.Payload,
-    payloadType: kt.Coinbase,
+    payloadType: It.Coinbase,
     coinbaseBytes: t
   };
 }
@@ -9762,7 +9762,7 @@ function G8(t, e, n) {
     throw Error(`VRF proof buffer size must be ${Tl} bytes`);
   return {
     type: nt.Payload,
-    payloadType: kt.NakamotoCoinbase,
+    payloadType: It.NakamotoCoinbase,
     coinbaseBytes: t,
     recipient: e.type === F.OptionalSome ? e.value : void 0,
     vrfProof: n
@@ -9775,7 +9775,7 @@ var Hl;
 function K8(t, e, n, r, s, i, o) {
   return {
     type: nt.Payload,
-    payloadType: kt.TenureChange,
+    payloadType: It.TenureChange,
     tenureHash: t,
     previousTenureHash: e,
     burnViewHash: n,
@@ -9788,80 +9788,80 @@ function K8(t, e, n, r, s, i, o) {
 function Wg(t) {
   const e = [];
   switch (e.push(t.payloadType), t.payloadType) {
-    case kt.TokenTransfer:
+    case It.TokenTransfer:
       e.push(le(t.recipient)), e.push(Fr(t.amount, !1, 8)), e.push(Xn(t.memo));
       break;
-    case kt.ContractCall:
+    case It.ContractCall:
       e.push(Xn(t.contractAddress)), e.push(Xn(t.contractName)), e.push(Xn(t.functionName));
       const n = new Uint8Array(4);
       xs(n, t.functionArgs.length, 0), e.push(n), t.functionArgs.forEach((r) => {
         e.push(le(r));
       });
       break;
-    case kt.SmartContract:
+    case It.SmartContract:
       e.push(Xn(t.contractName)), e.push(Xn(t.codeBody));
       break;
-    case kt.VersionedSmartContract:
+    case It.VersionedSmartContract:
       e.push(t.clarityVersion), e.push(Xn(t.contractName)), e.push(Xn(t.codeBody));
       break;
-    case kt.PoisonMicroblock:
+    case It.PoisonMicroblock:
       break;
-    case kt.Coinbase:
+    case It.Coinbase:
       e.push(t.coinbaseBytes);
       break;
-    case kt.CoinbaseToAltRecipient:
+    case It.CoinbaseToAltRecipient:
       e.push(t.coinbaseBytes), e.push(le(t.recipient));
       break;
-    case kt.NakamotoCoinbase:
+    case It.NakamotoCoinbase:
       e.push(t.coinbaseBytes), e.push(le(t.recipient ? Kg(t.recipient) : Gg())), e.push(t.vrfProof);
       break;
-    case kt.TenureChange:
+    case It.TenureChange:
       e.push(te(t.tenureHash)), e.push(te(t.previousTenureHash)), e.push(te(t.burnViewHash)), e.push(te(t.previousTenureEnd)), e.push(xs(new Uint8Array(4), t.previousTenureBlocks)), e.push(EA(new Uint8Array(1), t.cause)), e.push(te(t.publicKeyHash));
       break;
   }
   return fe(e);
 }
 function V8(t) {
-  switch (t.readUInt8Enum(kt, (n) => {
+  switch (t.readUInt8Enum(It, (n) => {
     throw new Error(`Cannot recognize PayloadType: ${n}`);
   })) {
-    case kt.TokenTransfer:
+    case It.TokenTransfer:
       const n = ln(t), r = _e(t.readBytes(8), !1), s = Yg(t);
       return j8(n, r, s);
-    case kt.ContractCall:
+    case It.ContractCall:
       const i = yi(t), o = cn(t), a = cn(t), c = [], f = t.readUInt32BE();
       for (let p = 0; p < f; p++) {
-        const v = ln(t);
-        c.push(v);
+        const $ = ln(t);
+        c.push($);
       }
       return z8(i, o, a, c);
-    case kt.SmartContract:
+    case It.SmartContract:
       const d = cn(t), l = cn(t, 4, 1e5);
       return ih(d, l);
-    case kt.VersionedSmartContract: {
+    case It.VersionedSmartContract: {
       const p = t.readUInt8Enum(Ml, (R) => {
         throw new Error(`Cannot recognize ClarityVersion: ${R}`);
-      }), v = cn(t), I = cn(t, 4, 1e5);
-      return ih(v, I, p);
+      }), $ = cn(t), I = cn(t, 4, 1e5);
+      return ih($, I, p);
     }
-    case kt.PoisonMicroblock:
+    case It.PoisonMicroblock:
       return R8();
-    case kt.Coinbase: {
+    case It.Coinbase: {
       const p = t.readBytes(is);
       return oh(p);
     }
-    case kt.CoinbaseToAltRecipient: {
-      const p = t.readBytes(is), v = ln(t);
-      return oh(p, v);
+    case It.CoinbaseToAltRecipient: {
+      const p = t.readBytes(is), $ = ln(t);
+      return oh(p, $);
     }
-    case kt.NakamotoCoinbase: {
-      const p = t.readBytes(is), v = ln(t), I = t.readBytes(Tl);
-      return G8(p, v, I);
+    case It.NakamotoCoinbase: {
+      const p = t.readBytes(is), $ = ln(t), I = t.readBytes(Tl);
+      return G8(p, $, I);
     }
-    case kt.TenureChange:
-      const g = Bt(t.readBytes(20)), h = Bt(t.readBytes(20)), m = Bt(t.readBytes(20)), b = Bt(t.readBytes(32)), C = t.readUInt32BE(), P = t.readUInt8Enum(Hl, (p) => {
+    case It.TenureChange:
+      const g = Ct(t.readBytes(20)), h = Ct(t.readBytes(20)), m = Ct(t.readBytes(20)), b = Ct(t.readBytes(32)), C = t.readUInt32BE(), P = t.readUInt8Enum(Hl, (p) => {
         throw new Error(`Cannot recognize TenureChangeCause: ${p}`);
-      }), _ = Bt(t.readBytes(20));
+      }), _ = Ct(t.readBytes(20));
       return K8(g, h, m, b, C, P, _);
   }
 }
@@ -9895,7 +9895,7 @@ var Sn;
   t[t.PublicKeyCompressed = 0] = "PublicKeyCompressed", t[t.PublicKeyUncompressed = 1] = "PublicKeyUncompressed", t[t.SignatureCompressed = 2] = "SignatureCompressed", t[t.SignatureUncompressed = 3] = "SignatureUncompressed";
 })(Sn || (Sn = {}));
 function Ol(t) {
-  return Og(Bt(t.readBytes(Ja)));
+  return Og(Ct(t.readBytes(Ja)));
 }
 function Zs(t, e) {
   return {
@@ -9994,7 +9994,7 @@ function ho(t) {
   return e.push(te(fo(t.version, 1))), e.push(te(t.hash160)), fe(e);
 }
 function yi(t) {
-  const e = Za(Bt(t.readBytes(1))), n = Bt(t.readBytes(20));
+  const e = Za(Ct(t.readBytes(1))), n = Ct(t.readBytes(20));
   return { type: nt.Address, version: e, hash160: n };
 }
 function Xg(t) {
@@ -10021,7 +10021,7 @@ function wi(t) {
 }
 function cn(t, e, n) {
   e = e || 1;
-  const r = Za(Bt(t.readBytes(e))), s = zu(t.readBytes(r));
+  const r = Za(Ct(t.readBytes(e))), s = zu(t.readBytes(r));
   return Ss(s, e, n ?? 128);
 }
 function Z8(t) {
@@ -10033,7 +10033,7 @@ function ah(t) {
   return { type: nt.MemoString, content: t };
 }
 function Q8(t) {
-  const e = [], n = vi(t.content), r = g6(Bt(n), Ea * 2);
+  const e = [], n = vi(t.content), r = g6(Ct(n), Ea * 2);
   return e.push(te(r)), fe(e);
 }
 function Yg(t) {
@@ -10067,7 +10067,7 @@ function Qu(t) {
   return fe(n);
 }
 function Qg(t, e, n) {
-  const r = Za(Bt(t.readBytes(4))), s = [];
+  const r = Za(Ct(t.readBytes(4))), s = [];
   for (let i = 0; i < r; i++)
     switch (e) {
       case nt.Address:
@@ -10112,7 +10112,7 @@ function t6(t) {
     case ze.STX:
       return r = t.readUInt8Enum(Ji, (a) => {
         throw new Ze(`Could not read ${a} as FungibleConditionCode`);
-      }), i = BigInt(`0x${Bt(t.readBytes(8))}`), {
+      }), i = BigInt(`0x${Ct(t.readBytes(8))}`), {
         type: nt.PostCondition,
         conditionType: ze.STX,
         principal: n,
@@ -10122,7 +10122,7 @@ function t6(t) {
     case ze.Fungible:
       return s = Dl(t), r = t.readUInt8Enum(Ji, (a) => {
         throw new Ze(`Could not read ${a} as FungibleConditionCode`);
-      }), i = BigInt(`0x${Bt(t.readBytes(8))}`), {
+      }), i = BigInt(`0x${Ct(t.readBytes(8))}`), {
         type: nt.PostCondition,
         conditionType: ze.Fungible,
         principal: n,
@@ -10269,11 +10269,11 @@ class Gi {
     return mA(this.readBytes(2), 0);
   }
   readBigUIntLE(e) {
-    const n = this.readBytes(e).slice().reverse(), r = Bt(n);
+    const n = this.readBytes(e).slice().reverse(), r = Ct(n);
     return BigInt(`0x${r}`);
   }
   readBigUIntBE(e) {
-    const n = this.readBytes(e), r = Bt(n);
+    const n = this.readBytes(e), r = Ct(n);
     return BigInt(`0x${r}`);
   }
   get readOffset() {
@@ -10354,9 +10354,9 @@ const p6 = (t) => t.length % 2 == 0 ? t : `0${t}`, g6 = (t, e) => t.padEnd(e, "0
 function Fl(t) {
   return xp(t);
 }
-const eo = (t) => GA(qu(t)), Ju = (t) => Bt(S8(t)), y6 = (t) => Bt(eo(t)), w6 = (t) => {
+const eo = (t) => GA(qu(t)), Ju = (t) => Ct(S8(t)), y6 = (t) => Ct(eo(t)), w6 = (t) => {
   const e = eo(t), n = Qa(new Uint8Array([0]), new Uint8Array([e.length]), e), r = eo(n);
-  return Bt(r);
+  return Ct(r);
 }, b6 = (t, e) => {
   if (t > 15 || e.length > 15)
     throw Error("P2SH multisig address can only contain up to 15 public keys");
@@ -10365,7 +10365,7 @@ const eo = (t) => GA(qu(t)), Ju = (t) => Bt(S8(t)), y6 = (t) => Bt(eo(t)), w6 = 
     n.push(i.length), n.push(i);
   }), n.push(80 + e.length), n.push(174);
   const r = fe(n), s = eo(r);
-  return Bt(s);
+  return Ct(s);
 }, m6 = (t, e) => {
   if (t > 15 || e.length > 15)
     throw Error("P2WSH multisig address can only contain up to 15 public keys");
@@ -10376,14 +10376,14 @@ const eo = (t) => GA(qu(t)), Ju = (t) => Bt(S8(t)), y6 = (t) => Bt(eo(t)), w6 = 
   const r = fe(n), s = qu(r), i = [];
   i.push(0), i.push(s.length), i.push(s);
   const o = fe(i), a = eo(o);
-  return Bt(a);
+  return Ct(a);
 };
 function x6(t) {
   return /^[a-zA-Z]([a-zA-Z0-9]|[-_!?+<>=/*])*$|^[-+=/*]$|^[<>]=?$/.test(t) && t.length < 128;
 }
 function ny(t) {
   const e = le(t);
-  return `0x${Bt(e)}`;
+  return `0x${Ct(e)}`;
 }
 function S6(t) {
   return ln(t);
@@ -10398,7 +10398,7 @@ const ti = (t) => {
 function tf() {
   return {
     type: nt.MessageSignature,
-    data: Bt(new Uint8Array(Ja))
+    data: Ct(new Uint8Array(Ja))
   };
 }
 function ry(t, e, n, r) {
@@ -10452,7 +10452,7 @@ function v6(t) {
   return xA(r, t.signaturesRequired, 0), e.push(r), fe(e);
 }
 function $6(t, e) {
-  const n = Bt(e.readBytes(20)), r = BigInt(`0x${Bt(e.readBytes(8))}`), s = BigInt(`0x${Bt(e.readBytes(8))}`), i = e.readUInt8Enum(re, (a) => {
+  const n = Ct(e.readBytes(20)), r = BigInt(`0x${Ct(e.readBytes(8))}`), s = BigInt(`0x${Ct(e.readBytes(8))}`), i = e.readUInt8Enum(re, (a) => {
     throw new Ze(`Could not parse ${a} as PubKeyEncoding`);
   });
   if (t === Yt.SerializeP2WPKH && i != re.Compressed)
@@ -10468,7 +10468,7 @@ function $6(t, e) {
   };
 }
 function I6(t, e) {
-  const n = Bt(e.readBytes(20)), r = BigInt("0x" + Bt(e.readBytes(8))), s = BigInt("0x" + Bt(e.readBytes(8))), i = Qg(e, nt.TransactionAuthField).values;
+  const n = Ct(e.readBytes(20)), r = BigInt("0x" + Ct(e.readBytes(8))), s = BigInt("0x" + Ct(e.readBytes(8))), i = Qg(e, nt.TransactionAuthField).values;
   let o = !1, a = 0;
   for (const f of i)
     switch (f.contents.type) {
@@ -10502,7 +10502,7 @@ function Nc(t) {
   return e === Yt.SerializeP2PKH || e === Yt.SerializeP2WPKH ? $6(e, t) : I6(e, t);
 }
 function sy(t, e, n, r) {
-  const i = t + Bt(new Uint8Array([e])) + Bt(Fr(n, !1, 8)) + Bt(Fr(r, !1, 8));
+  const i = t + Ct(new Uint8Array([e])) + Ct(Fr(n, !1, 8)) + Ct(Fr(r, !1, 8));
   if (te(i).byteLength !== 49)
     throw Error("Invalid signature hash length");
   return Ju(te(i));
@@ -10681,17 +10681,17 @@ class O6 {
       this.anchorMode = CA(o);
     else
       switch (r.payloadType) {
-        case kt.Coinbase:
-        case kt.CoinbaseToAltRecipient:
-        case kt.NakamotoCoinbase:
-        case kt.PoisonMicroblock:
-        case kt.TenureChange:
+        case It.Coinbase:
+        case It.CoinbaseToAltRecipient:
+        case It.NakamotoCoinbase:
+        case It.PoisonMicroblock:
+        case It.TenureChange:
           this.anchorMode = je.OnChainOnly;
           break;
-        case kt.ContractCall:
-        case kt.SmartContract:
-        case kt.VersionedSmartContract:
-        case kt.TokenTransfer:
+        case It.ContractCall:
+        case It.SmartContract:
+        case It.VersionedSmartContract:
+        case It.TokenTransfer:
           this.anchorMode = je.Any;
           break;
       }
@@ -11635,87 +11635,87 @@ const Pi = ["prepared", "signed", "unknown", "pending"], O5 = 30 * 6e4, zs = (t)
   return (e == null ? void 0 : e.feeRejected) === !0 || /\(400\)/.test((e == null ? void 0 : e.message) ?? "");
 }, D5 = 3e3, Bh = "Your main listener wallet is out of funds, so likes are paused. Top it up (it only needs a little) and your likes carry on.", Th = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (t) => t.toString(16).padStart(2, "0")).join("");
 function F5(t) {
-  let e = null, n = -1 / 0, r, s = null, i = null, o, a = -1 / 0, c = null, f = null, d = !1, l = !1, g = !1, h = null, m = !1, b = "", C = "", P, _ = null, p, v = [], I, R = -1 / 0;
+  let e = null, n = -1 / 0, r, s = null, i = null, o, a = -1 / 0, c = null, f = null, d = !1, l = !1, g = !1, h = null, m = !1, b = "", C = "", P, _ = null, p, $ = [], I, R = -1 / 0;
   const Y = /* @__PURE__ */ new Set();
-  let O = null, q = !1, S = 0, k = null, N = null, U = !1, Q = null, G = !1, ot = null, Gt = !1, Ht = !1, E = !1, T = !1, Ct = !1, wt = 0, ct = null, $t = Promise.resolve();
-  const Mt = () => BigInt((e == null ? void 0 : e.limits.playFee) ?? po.toString()), qt = (w) => !!i && !(i.features ?? []).includes(w), Kt = (w, $) => `xtrata.ppp.v1.${w}:${$}`, de = (w = i == null ? void 0 : i.address) => {
+  let O = null, q = !1, S = 0, k = null, N = null, U = !1, Z = null, G = !1, ot = null, Gt = !1, Ht = !1, E = !1, T = !1, Lt = !1, gt = 0, ct = null, $t = Promise.resolve();
+  const Mt = () => BigInt((e == null ? void 0 : e.limits.playFee) ?? po.toString()), qt = (w) => !!i && !(i.features ?? []).includes(w), Kt = (w, A) => `xtrata.ppp.v1.${w}:${A}`, de = (w = i == null ? void 0 : i.address) => {
     if (!w) return [];
     try {
-      const $ = JSON.parse(t.store.get(Kt("entries", w)) || "[]");
-      return Array.isArray($) ? $ : [];
+      const A = JSON.parse(t.store.get(Kt("entries", w)) || "[]");
+      return Array.isArray(A) ? A : [];
     } catch {
       return [];
     }
   }, Ut = (w) => {
-    const $ = [w, ...de(w.address).filter((H) => !(H.txid === w.txid && H.kind === w.kind))].slice(0, 200);
-    t.store.set(Kt("entries", w.address), JSON.stringify($));
+    const A = [w, ...de(w.address).filter((H) => !(H.txid === w.txid && H.kind === w.kind))].slice(0, 200);
+    t.store.set(Kt("entries", w.address), JSON.stringify(A));
   }, Ge = (w = i == null ? void 0 : i.address) => !!w && t.store.get(Kt("on", w)) !== "0", un = (w) => {
     i != null && i.address && t.store.set(Kt("on", i.address), w ? "1" : "0");
-  }, B = () => de().filter((w) => Pi.includes(w.status)), X = () => mt() ? [...B(), ...de(It()).filter((w) => Pi.includes(w.status))] : B(), z = () => at(i == null ? void 0 : i.address), at = (w) => {
+  }, B = () => de().filter((w) => Pi.includes(w.status)), X = () => bt() ? [...B(), ...de(Bt()).filter((w) => Pi.includes(w.status))] : B(), z = () => at(i == null ? void 0 : i.address), at = (w) => {
     if (!w) return null;
     try {
       return JSON.parse(t.store.get(Kt("deposit", w)) || "null");
     } catch {
       return null;
     }
-  }, it = (w, $ = i == null ? void 0 : i.address) => {
-    $ && t.store.set(Kt("deposit", $), JSON.stringify(w));
-  }, It = () => qt("rootLike") ? i == null ? void 0 : i.address : (i == null ? void 0 : i.root) ?? (i == null ? void 0 : i.address), mt = () => !!(i != null && i.address) && It() !== i.address, Rt = () => mt() ? c && c.for === It() ? c.value : void 0 : o, Ft = (w) => w !== void 0 && w < jr + Pc, Ot = () => B().filter((w) => t.now() - w.created > O5 && Y.has(w.txid)), ae = () => (e == null ? void 0 : e.passkeyOnly) === !0 && (!t.main() || r === t.main() && !e.allowed), ft = () => ae() && !(i != null && i.linked), ht = () => {
+  }, it = (w, A = i == null ? void 0 : i.address) => {
+    A && t.store.set(Kt("deposit", A), JSON.stringify(w));
+  }, Bt = () => qt("rootLike") ? i == null ? void 0 : i.address : (i == null ? void 0 : i.root) ?? (i == null ? void 0 : i.address), bt = () => !!(i != null && i.address) && Bt() !== i.address, Rt = () => bt() ? c && c.for === Bt() ? c.value : void 0 : o, Ft = (w) => w !== void 0 && w < jr + Pc, Ot = () => B().filter((w) => t.now() - w.created > O5 && Y.has(w.txid)), ae = () => (e == null ? void 0 : e.passkeyOnly) === !0 && (!t.main() || r === t.main() && !e.allowed), ut = () => ae() && !(i != null && i.linked), dt = () => {
     const w = t.main();
-    return !ft() && !!w && !!(i != null && i.linked) && i.linked !== w;
+    return !ut() && !!w && !!(i != null && i.linked) && i.linked !== w;
   }, u = (w) => Kt("return-to", w), x = (w = i == null ? void 0 : i.address) => {
     if (!w) return;
-    const $ = t.store.get(u(w));
-    return $ && Or($) && $ !== w ? $ : void 0;
-  }, A = (w = i == null ? void 0 : i.address) => O && O.for === w ? O.res : null;
+    const A = t.store.get(u(w));
+    return A && Or(A) && A !== w ? A : void 0;
+  }, v = (w = i == null ? void 0 : i.address) => O && O.for === w ? O.res : null;
   function D() {
     if (!(i != null && i.address)) return;
     if (i.linked) return { to: i.linked, kind: "linked" };
     const w = x();
     if (w) return { to: w, kind: "chosen" };
-    const $ = A();
-    if ($ != null && $.ok && $.funder) return { to: $.funder, kind: "funder" };
+    const A = v();
+    if (A != null && A.ok && A.funder) return { to: A.funder, kind: "funder" };
   }
   const rt = (w) => Kt("gift", w);
-  function dt() {
+  function ft() {
     const w = i == null ? void 0 : i.address;
     if (!w) return null;
-    if ((Q == null ? void 0 : Q.for) === w) return Q.info;
+    if ((Z == null ? void 0 : Z.for) === w) return Z.info;
     try {
-      const $ = JSON.parse(t.store.get(rt(w)) || "null");
-      return $ && typeof $.returnTo == "string" && typeof $.treasury == "string" ? $ : null;
+      const A = JSON.parse(t.store.get(rt(w)) || "null");
+      return A && typeof A.returnTo == "string" && typeof A.treasury == "string" ? A : null;
     } catch {
       return null;
     }
   }
   async function ce() {
-    var tt;
+    var J;
     const w = i == null ? void 0 : i.address;
-    if (!w || !t.giftInfo || !((tt = e == null ? void 0 : e.gifts) != null && tt.enabled) || G) return;
-    const $ = (Q == null ? void 0 : Q.for) === w ? Q : null, H = $ ? $.ok ? $.info ? 30 * 6e4 : 10 * 6e4 : 6e4 : 0;
-    if ($ && t.now() - $.at < H) return;
+    if (!w || !t.giftInfo || !((J = e == null ? void 0 : e.gifts) != null && J.enabled) || G) return;
+    const A = (Z == null ? void 0 : Z.for) === w ? Z : null, H = A ? A.ok ? A.info ? 30 * 6e4 : 10 * 6e4 : 6e4 : 0;
+    if (A && t.now() - A.at < H) return;
     G = !0;
-    const Z = dt();
+    const Q = ft();
     try {
       const K = await t.giftInfo(w);
-      Q = { for: w, info: K, ok: !0, at: t.now() }, t.store.set(rt(w), JSON.stringify(K));
+      Z = { for: w, info: K, ok: !0, at: t.now() }, t.store.set(rt(w), JSON.stringify(K));
     } catch {
-      Q = { for: w, info: Z, ok: !1, at: t.now() };
+      Z = { for: w, info: Q, ok: !1, at: t.now() };
     } finally {
       G = !1;
     }
   }
-  const ee = () => de().reduce((w, $) => Pi.includes($.status) ? w + BigInt($.amount || "0") + BigInt($.fee || "0") : w, 0n);
+  const ee = () => de().reduce((w, A) => Pi.includes(A.status) ? w + BigInt(A.amount || "0") + BigInt(A.fee || "0") : w, 0n);
   function xe() {
     if (o === void 0) return 0;
-    const w = o - ee() - BigInt(ge.length) * zr(Mt());
+    const w = o - ee() - BigInt(ye.length) * zr(Mt());
     return w > 0n ? Ih(w, Mt()) : 0;
   }
   const fn = "OUT OF PLAYS — ADD MORE TO KEEP LISTENING";
   function dn() {
-    var $;
-    if (!(($ = dt()) != null && $.player)) return null;
-    const w = (H, Z) => ({ reason: H, text: Z });
+    var A;
+    if (!((A = ft()) != null && A.player)) return null;
+    const w = (H, Q) => ({ reason: H, text: Q });
     switch (Ue()) {
       case "connect":
       case "wrong-wallet":
@@ -11734,64 +11734,57 @@ function F5(t) {
         return null;
     }
   }
-  let we = null, pe = !1;
-  const en = (w) => Kt("unlocked", w), nn = () => {
+  let pe = null, ge = !1;
+  const en = (w) => Kt("album-unlocked", w), nn = () => {
     var w;
-    return !!(i != null && i.address) && mt() && !!((w = dt()) != null && w.player);
+    return !!(i != null && i.address) && bt() && !!((w = ft()) != null && w.player);
   };
-  function pt() {
+  function ht() {
     if (!nn()) return null;
-    const w = It();
-    return t.store.get(en(w)) === "1" ? { locked: !1, known: !0 } : (we == null ? void 0 : we.for) === w && we.ok ? { locked: !we.open, known: !0 } : { locked: !0, known: !1 };
+    const w = i.address;
+    return t.store.get(en(w)) === "1" ? { locked: !1, known: !0 } : (pe == null ? void 0 : pe.for) === w && pe.ok ? { locked: !pe.open, known: !0 } : { locked: !0, known: !1 };
   }
   async function Dt() {
-    if (!nn() || !t.history || pe) return;
-    const w = It(), $ = dt(), H = i.address;
-    if (t.store.get(en(w)) !== "1" && !((we == null ? void 0 : we.for) === w && t.now() - we.at < (we.ok ? 2 * 6e4 : 6e4))) {
-      pe = !0;
+    if (!nn() || !t.history || ge) return;
+    const w = ft(), A = i.address;
+    if (t.store.get(en(A)) !== "1" && !((pe == null ? void 0 : pe.for) === A && t.now() - pe.at < (pe.ok ? 2 * 6e4 : 6e4))) {
+      ge = !0;
       try {
-        let Z = !1, tt = !0;
-        for (const K of [w, H]) {
-          const gt = await t.history(K, !1);
-          if (!gt.ok) {
-            tt = !1;
-            continue;
-          }
-          if (gt.inbound.some((lt) => Or(lt.sender) && lt.sender !== K && lt.sender !== H && lt.sender !== w && lt.sender !== $.from && lt.sender !== $.treasury && BigInt(lt.amount) >= rf)) {
-            Z = !0;
-            break;
-          }
+        const H = await t.history(A, !1);
+        if (!H.ok) pe = { for: A, ok: !1, open: !1, at: t.now() };
+        else {
+          const Q = H.inbound.some((J) => Or(J.sender) && J.sender !== A && J.sender !== w.from && J.sender !== w.treasury && BigInt(J.amount) >= rf);
+          pe = { for: A, ok: !0, open: Q, at: t.now() }, Q && t.store.set(en(A), "1");
         }
-        we = { for: w, ok: Z || tt, open: Z, at: t.now() }, Z && t.store.set(en(w), "1");
       } catch {
-        we = { for: w, ok: !1, open: !1, at: t.now() };
+        pe = { for: A, ok: !1, open: !1, at: t.now() };
       } finally {
-        pe = !1;
+        ge = !1;
       }
     }
   }
-  const Wt = 3 * 6e4, hn = () => !!dt() && !!t.history && !(i != null && i.linked);
+  const Wt = 3 * 6e4, hn = () => !!ft() && !!t.history && !(i != null && i.linked);
   async function Gr() {
-    const w = i.address, $ = dt(), { balance: H, nonce: Z } = await t.chain.account(w), tt = await t.history(w, !0);
-    if (!tt.ok) return null;
-    const K = P5({ self: w, balance: H, inbound: tt.inbound, outgoing: tt.outgoing, gift: { sender: $.treasury, payer: $.returnTo } });
+    const w = i.address, A = ft(), { balance: H, nonce: Q } = await t.chain.account(w), J = await t.history(w, !0);
+    if (!J.ok) return null;
+    const K = P5({ self: w, balance: H, inbound: J.inbound, outgoing: J.outgoing, gift: { sender: A.treasury, payer: A.returnTo } });
     if (!K.ok) return null;
-    const gt = H5(K.parts, qo);
-    return { balance: H, nonce: Z, parts: K.parts, steps: gt.steps, tooSmall: gt.tooSmall.length };
+    const yt = H5(K.parts, qo);
+    return { balance: H, nonce: Q, parts: K.parts, steps: yt.steps, tooSmall: yt.tooSmall.length };
   }
   const Ii = () => Gt ? { state: "unavailable" } : !ot || t.now() - ot.at > Wt || o !== void 0 && o !== ot.balance ? { state: "none" } : ot.plan;
   function Ue() {
     if (!(e != null && e.enabled)) return "off";
     if (!e.here) return "elsewhere";
     const w = t.main();
-    if (!ft()) {
+    if (!ut()) {
       if (!w) return "connect";
       if (!e.allowed) return "not-invited";
     }
-    return i ? i.state === "unsupported" ? "unsupported" : i.state === "none" ? "intro" : ht() ? "wrong-wallet" : i.state === "known" ? "locked" : !ft() && i.linked !== w ? "link" : o === void 0 ? "loading" : o > rs ? "over" : o < jr + zr(Mt()) ? "fund" : "ready" : "loading";
+    return i ? i.state === "unsupported" ? "unsupported" : i.state === "none" ? "intro" : dt() ? "wrong-wallet" : i.state === "known" ? "locked" : !ut() && i.linked !== w ? "link" : o === void 0 ? "loading" : o > rs ? "over" : o < jr + zr(Mt()) ? "fund" : "ready" : "loading";
   }
   const rr = () => {
-    var w, $, H, Z;
+    var w, A, H, Q;
     return {
       step: Ue(),
       busy: f,
@@ -11808,68 +11801,68 @@ function F5(t) {
       session: (i == null ? void 0 : i.session) ?? null,
       payingOn: Ge(),
       entries: de(),
-      depositTxid: (($ = z()) == null ? void 0 : $.txid) ?? P,
+      depositTxid: ((A = z()) == null ? void 0 : A.txid) ?? P,
       depositPending: !!z(),
       walletOutdated: qt("like"),
-      linkedListening: I && I === t.main() ? v.map((tt) => tt.listening) : [],
+      linkedListening: I && I === t.main() ? $.map((J) => J.listening) : [],
       serverLinked: !!_ && p === `${t.main()}:${i == null ? void 0 : i.address}`,
       stuck: Ot().length,
       armed: T,
-      queued: ge.length,
-      solo: ft(),
+      queued: ye.length,
+      solo: ut(),
       returnTo: (H = D()) == null ? void 0 : H.to,
-      returnToKind: (Z = D()) == null ? void 0 : Z.kind,
+      returnToKind: (Q = D()) == null ? void 0 : Q.kind,
       funderState: (() => {
-        const tt = A();
-        return tt ? tt.ok ? tt.funder ? "found" : "none" : "failed" : "unknown";
+        const J = v();
+        return J ? J.ok ? J.funder ? "found" : "none" : "failed" : "unknown";
       })(),
       funderMultiple: (() => {
-        const tt = A();
-        return !!tt && tt.ok && tt.distinct > 1;
+        const J = v();
+        return !!J && J.ok && J.distinct > 1;
       })(),
-      walletCannotSolo: ft() && qt("standalone"),
+      walletCannotSolo: ut() && qt("standalone"),
       walletCannotMulti: qt("multi"),
-      others: ((i == null ? void 0 : i.others) ?? []).filter((tt) => tt !== t.main() && tt !== (i == null ? void 0 : i.linked)),
-      creditedTo: ft() && (i != null && i.address) && (k == null ? void 0 : k.for) === i.address && k.main ? k.main : void 0,
+      others: ((i == null ? void 0 : i.others) ?? []).filter((J) => J !== t.main() && J !== (i == null ? void 0 : i.linked)),
+      creditedTo: ut() && (i != null && i.address) && (k == null ? void 0 : k.for) === i.address && k.main ? k.main : void 0,
       createdHere: !!(i != null && i.address) && t.store.get(Kt("created", i.address)) === "1",
       brandNew: !!(i != null && i.address) && o === 0n && (N == null ? void 0 : N.for) === i.address && N.unused,
       gift: (() => {
-        const tt = dt();
-        return tt ? { player: tt.player, from: tt.from, source: tt.source, amount: tt.amount } : null;
+        const J = ft();
+        return J ? { player: J.player, from: J.from, source: J.source, amount: J.amount } : null;
       })(),
-      giftPlays: dt() ? xe() : 0,
+      giftPlays: ft() ? xe() : 0,
       giftStop: dn(),
-      albumLock: pt(),
+      albumLock: ht(),
       returnPlan: Ii(),
       slot: (i == null ? void 0 : i.state) === "unlocked" ? i.slot ?? 0 : 0,
       root: (i == null ? void 0 : i.state) === "unlocked" ? i.root ?? i.address : void 0,
       walletCannotAlbums: qt("slots"),
       likeFunds: (() => {
-        var gt;
-        const tt = It();
-        if (!tt || (i == null ? void 0 : i.state) !== "unlocked") return null;
+        var yt;
+        const J = Bt();
+        if (!J || (i == null ? void 0 : i.state) !== "unlocked") return null;
         const K = Rt();
-        return { address: tt, balance: K, low: Ft(K), album: mt(), pending: !!at(tt), txid: (gt = at(tt)) == null ? void 0 : gt.txid, main: t.main() };
+        return { address: J, balance: K, low: Ft(K), album: bt(), pending: !!at(J), txid: (yt = at(J)) == null ? void 0 : yt.txid, main: t.main() };
       })()
     };
-  }, Nt = (w, $ = "") => {
-    b = w, C = $, t.changed();
+  }, Nt = (w, A = "") => {
+    b = w, C = A, t.changed();
   };
-  async function he(w, $) {
+  async function he(w, A) {
     if (!f) {
       f = w, C = "", t.changed();
       try {
-        await $();
+        await A();
       } catch (H) {
-        const Z = H instanceof Error ? H.message : String(H);
-        C = /Cancelled in the listening wallet/.test(Z) ? "" : Z, C || (b = "Not now. Nothing was signed.", Ct = !0);
+        const Q = H instanceof Error ? H.message : String(H);
+        C = /Cancelled in the listening wallet/.test(Q) ? "" : Q, C || (b = "Not now. Nothing was signed.", Lt = !0);
       } finally {
-        f = null, await J(!0);
+        f = null, await tt(!0);
       }
     }
   }
-  const Pe = () => !!(e != null && e.enabled) && e.here && (ft() || !!t.main() && e.allowed), _s = () => Pe() && !ht(), Kr = () => "This device's listening wallet belongs to another wallet. Connect that wallet to pay artists or like songs.", pn = () => {
-    if (ht()) throw new Error(Kr());
+  const Pe = () => !!(e != null && e.enabled) && e.here && (ut() || !!t.main() && e.allowed), _s = () => Pe() && !dt(), Kr = () => "This device's listening wallet belongs to another wallet. Connect that wallet to pay artists or like songs.", pn = () => {
+    if (dt()) throw new Error(Kr());
   };
   async function Rn() {
     if (!Pe()) throw new Error("Pay-per-play is not open to this wallet yet. Listening stays free.");
@@ -11877,31 +11870,31 @@ function F5(t) {
     return s ?? (s = await t.bridge(e.walletOrigin)), s;
   }
   const Ke = (w) => {
-    const $ = t.main();
-    return w.request("listening.status", $ ? { main: $ } : void 0);
+    const A = t.main();
+    return w.request("listening.status", A ? { main: A } : void 0);
   };
   async function Ie(w = !1) {
     i != null && i.address && (!w && t.now() - a < 3e4 || (o = await t.chain.balance(i.address), a = t.now(), await sr(w)));
   }
   async function sr(w = !1) {
-    const $ = It();
-    if (!(!mt() || !$ || (i == null ? void 0 : i.state) !== "unlocked") && !(!w && (c == null ? void 0 : c.for) === $ && t.now() - c.at < 3e4))
+    const A = Bt();
+    if (!(!bt() || !A || (i == null ? void 0 : i.state) !== "unlocked") && !(!w && (c == null ? void 0 : c.for) === A && t.now() - c.at < 3e4))
       try {
-        c = { for: $, value: await t.chain.balance($), at: t.now() };
+        c = { for: A, value: await t.chain.balance(A), at: t.now() };
       } catch {
       }
   }
   async function Us(w) {
-    if ((I !== w || t.now() - R >= 6e4) && (v = await t.links(w), I = w, R = t.now()), (i == null ? void 0 : i.state) !== "unlocked" || i.linked === w) return;
-    const $ = `${w}:${i.address}`;
-    p === $ && _ || (_ = v.find((H) => H.listening === i.address) ?? null, p = $);
+    if ((I !== w || t.now() - R >= 6e4) && ($ = await t.links(w), I = w, R = t.now()), (i == null ? void 0 : i.state) !== "unlocked" || i.linked === w) return;
+    const A = `${w}:${i.address}`;
+    p === A && _ || (_ = $.find((H) => H.listening === i.address) ?? null, p = A);
   }
   async function Ps() {
     const w = i == null ? void 0 : i.address;
-    if (!ft() || !w || i != null && i.linked || !t.funder || q || !o || o <= 0n) return;
-    const $ = A(w);
-    if ($ != null && $.ok && $.funder) return;
-    const H = $ != null && $.ok ? 3e4 : Math.min(6e4 * 2 ** Math.max(0, S - 1), 30 * 6e4);
+    if (!ut() || !w || i != null && i.linked || !t.funder || q || !o || o <= 0n) return;
+    const A = v(w);
+    if (A != null && A.ok && A.funder) return;
+    const H = A != null && A.ok ? 3e4 : Math.min(6e4 * 2 ** Math.max(0, S - 1), 30 * 6e4);
     if (!(O && O.for === w && t.now() - O.at < H)) {
       q = !0;
       try {
@@ -11916,7 +11909,7 @@ function F5(t) {
   }
   async function Hs() {
     const w = i == null ? void 0 : i.address;
-    if (!(!ft() || !w || i != null && i.linked || !t.mainOf || U) && !(k && k.for === w && (k.ok || t.now() - k.at < 6e4))) {
+    if (!(!ut() || !w || i != null && i.linked || !t.mainOf || U) && !(k && k.for === w && (k.ok || t.now() - k.at < 6e4))) {
       U = !0;
       try {
         k = { for: w, main: await t.mainOf(w), ok: !0, at: t.now() };
@@ -11936,59 +11929,59 @@ function F5(t) {
       }
   }
   async function j() {
-    var tt;
+    var J;
     const w = i == null ? void 0 : i.address;
     if (!w) return !1;
-    let $, H = !1;
-    const Z = /* @__PURE__ */ new Map();
+    let A, H = !1;
+    const Q = /* @__PURE__ */ new Map();
     for (const K of X())
       try {
-        const gt = await t.chain.transaction(K.txid);
-        if (!gt) {
-          if (Y.add(K.txid), t.now() - K.created > 15 * 6e4 && !Z.has(K.address) && Z.set(K.address, await t.chain.confirmedNonce(K.address)), $ = Z.get(K.address), $ !== void 0 && $ > BigInt(K.nonce)) {
+        const yt = await t.chain.transaction(K.txid);
+        if (!yt) {
+          if (Y.add(K.txid), t.now() - K.created > 15 * 6e4 && !Q.has(K.address) && Q.set(K.address, await t.chain.confirmedNonce(K.address)), A = Q.get(K.address), A !== void 0 && A > BigInt(K.nonce)) {
             Ut({ ...K, status: "failed", note: "nonce used by another transaction", raw: void 0 });
             continue;
           }
           if ((K.status === "unknown" || K.status === "signed") && K.raw)
             try {
               await t.chain.broadcast(K.raw, K.txid), Ut({ ...K, status: "pending" });
-            } catch (yt) {
-              zs(yt) && Ut({ ...K, status: "failed", note: yt.message, raw: void 0 });
+            } catch (pt) {
+              zs(pt) && Ut({ ...K, status: "failed", note: pt.message, raw: void 0 });
             }
           continue;
         }
         Y.delete(K.txid);
-        const lt = String(gt.tx_status);
-        if (lt === "success" && gt.canonical !== !1 && gt.is_unanchored === !1) {
-          if (Ut({ ...K, status: "confirmed", confirmedAt: t.now(), actualFee: String(gt.fee_rate ?? K.fee), raw: void 0 }), H = !0, K.kind === "like" && (m = !0, K.status !== "confirmed" && typeof K.liked == "boolean"))
+        const mt = String(yt.tx_status);
+        if (mt === "success" && yt.canonical !== !1 && yt.is_unanchored === !1) {
+          if (Ut({ ...K, status: "confirmed", confirmedAt: t.now(), actualFee: String(yt.fee_rate ?? K.fee), raw: void 0 }), H = !0, K.kind === "like" && (m = !0, K.status !== "confirmed" && typeof K.liked == "boolean"))
             try {
-              (tt = t.likeConfirmed) == null || tt.call(t, K.song, K.liked);
+              (J = t.likeConfirmed) == null || J.call(t, K.song, K.liked);
             } catch {
             }
-        } else lt.startsWith("abort_") || lt.startsWith("dropped_") ? Ut({ ...K, status: "failed", note: lt, raw: void 0 }) : K.status !== "pending" && Ut({ ...K, status: "pending" });
+        } else mt.startsWith("abort_") || mt.startsWith("dropped_") ? Ut({ ...K, status: "failed", note: mt, raw: void 0 }) : K.status !== "pending" && Ut({ ...K, status: "pending" });
       } catch {
       }
-    for (const K of mt() ? [w, It()] : [w]) {
-      const gt = at(K);
-      if (gt)
+    for (const K of bt() ? [w, Bt()] : [w]) {
+      const yt = at(K);
+      if (yt)
         try {
-          const lt = await t.chain.transaction(gt.txid), yt = String((lt == null ? void 0 : lt.tx_status) ?? "");
-          (yt === "success" && lt.is_unanchored === !1 || yt.startsWith("abort_") || yt.startsWith("dropped_") || !lt && t.now() - gt.at > 2 * 36e5) && (it(null, K), a = -1 / 0, c = null, /on its way/i.test(b) && (b = ""));
+          const mt = await t.chain.transaction(yt.txid), pt = String((mt == null ? void 0 : mt.tx_status) ?? "");
+          (pt === "success" && mt.is_unanchored === !1 || pt.startsWith("abort_") || pt.startsWith("dropped_") || !mt && t.now() - yt.at > 2 * 36e5) && (it(null, K), a = -1 / 0, c = null, /on its way/i.test(b) && (b = ""));
         } catch {
         }
     }
     return H;
   }
-  async function J(w = !1) {
-    var $;
+  async function tt(w = !1) {
+    var A;
     try {
       const H = t.main();
-      if ((w || !e || r !== H || t.now() - n > 3e5) && (e = await t.config(H), n = t.now(), r = H), !e.enabled || !e.here || !ft() && (!H || !e.allowed)) {
+      if ((w || !e || r !== H || t.now() - n > 3e5) && (e = await t.config(H), n = t.now(), r = H), !e.enabled || !e.here || !ut() && (!H || !e.allowed)) {
         s && (i != null && i.session) && await s.request("listening.stop").catch(() => {
         }), T && Vr(), t.changed();
         return;
       }
-      await Rn(), i = await Ke(s), ht() && i.state === "unlocked" && (ir(), await s.request("listening.lock").catch(() => {
+      await Rn(), i = await Ke(s), dt() && i.state === "unlocked" && (ir(), await s.request("listening.lock").catch(() => {
       }), o = void 0, i = await Ke(s)), H && e.allowed && await Us(H), await Ie(w), await Ps(), await Hs(), await Os(), await ce(), await Dt(), await j() && await Ie(!0), await sr();
     } catch (H) {
       C = H instanceof Error ? H.message : "Pay-per-play could not refresh. Listening stays free.";
@@ -11996,42 +11989,42 @@ function F5(t) {
     if (Ue() === "locked" ? ki() : T && Vr(), m) {
       m = !1;
       try {
-        ($ = t.likesChanged) == null || $.call(t);
+        (A = t.likesChanged) == null || A.call(t);
       } catch {
       }
     }
-    t.changed(), ge.length && !Gn && Bi();
+    t.changed(), ye.length && !Gn && Bi();
   }
   async function be(w) {
-    const $ = i == null ? void 0 : i.root;
-    if (!$ || i != null && i.slot || qt("slots")) return;
-    const H = Number(t.store.get(Kt("slot", $)));
+    const A = i == null ? void 0 : i.root;
+    if (!A || i != null && i.slot || qt("slots")) return;
+    const H = Number(t.store.get(Kt("slot", A)));
     if (!(!Number.isSafeInteger(H) || H < 1))
       try {
         await w.request("listening.openSlot", { slot: H }), i = await Ke(w), o = void 0, a = -1 / 0;
       } catch {
       }
   }
-  async function Se(w, $) {
+  async function Se(w, A) {
     var K;
     pn();
-    const H = !(i != null && i.address) || Ge(i.address), Z = i != null && i.linked ? (K = t.nameOf) == null ? void 0 : K.call(t, i.linked) : void 0;
-    await w.request("listening.unlock", { mode: "unlock", terms: H ? Ve() : void 0, anyPasskey: $, ...t.main() ? { main: t.main() } : {}, ...Z ? { label: Z } : {} }), i = await Ke(w), H && (Ge(i.address) ? await Li() : await w.request("listening.stop")), await be(w), Nt(H ? "Unlocked ✓" : "Unlocked ✓ Paying is off.");
-    const tt = h;
-    h = null, tt && t.now() - tt.at < 12e4 && setTimeout(() => void J(!0).then(() => Ti(tt)), 0);
+    const H = !(i != null && i.address) || Ge(i.address), Q = i != null && i.linked ? (K = t.nameOf) == null ? void 0 : K.call(t, i.linked) : void 0;
+    await w.request("listening.unlock", { mode: "unlock", terms: H ? Ve() : void 0, anyPasskey: A, ...t.main() ? { main: t.main() } : {}, ...Q ? { label: Q } : {} }), i = await Ke(w), H && (Ge(i.address) ? await Li() : await w.request("listening.stop")), await be(w), Nt(H ? "Unlocked ✓" : "Unlocked ✓ Paying is off.");
+    const J = h;
+    h = null, J && t.now() - J.at < 12e4 && setTimeout(() => void tt(!0).then(() => Ti(J)), 0);
   }
   function ki() {
-    T || f || Ct || wt >= 3 || !s || !(i != null && i.address) || (T = !0, $t = (async () => {
+    T || f || Lt || gt >= 3 || !s || !(i != null && i.address) || (T = !0, $t = (async () => {
       try {
-        await Se(s, !1), wt = 0;
+        await Se(s, !1), gt = 0;
       } catch (w) {
-        const $ = w instanceof Error ? w.message : String(w);
-        /Cancelled in the listening wallet/.test($) ? ct || (Ct = !0, Nt("Not now. Nothing was signed.")) : /did not answer/.test($) ? await (s == null ? void 0 : s.request("listening.cancel").catch(() => {
-        })) : (wt++, C = $);
+        const A = w instanceof Error ? w.message : String(w);
+        /Cancelled in the listening wallet/.test(A) ? ct || (Lt = !0, Nt("Not now. Nothing was signed.")) : /did not answer/.test(A) ? await (s == null ? void 0 : s.request("listening.cancel").catch(() => {
+        })) : (gt++, C = A);
       } finally {
         T = !1;
         const w = ct;
-        ct = null, w ? await w() : await J(!0);
+        ct = null, w ? await w() : await tt(!0);
       }
     })());
   }
@@ -12053,22 +12046,22 @@ function F5(t) {
       })), new Error("Pay-per-play is already running in another tab. This tab plays free.");
     return !0;
   }
-  async function Ci(w, $) {
-    const H = i.address, { balance: Z, nonce: tt } = $ ?? await t.chain.account(H);
-    o = Z;
+  async function Ci(w, A) {
+    const H = i.address, { balance: Q, nonce: J } = A ?? await t.chain.account(H);
+    o = Q;
     const K = await s.request("listening.prepareReturn", {
       mode: w.mode,
-      balance: Z.toString(),
-      nonce: tt.toString(),
+      balance: Q.toString(),
+      nonce: J.toString(),
       fee: qo.toString(),
       ...w.amount !== void 0 ? { amount: w.amount.toString() } : {},
       ...w.linked ? {} : { destination: w.to }
     });
     if (K.recipient !== w.to) throw new Error("Return destination does not match what you approved. Nothing was sent.");
-    const gt = w.mode === "amount" ? w.amount : w.mode === "all" ? Z - qo : Z - rs - qo, lt = ef(K.raw);
-    if (Zn(lt.payload.recipient).value !== w.to || String(lt.payload.amount) !== K.amount || gt !== void 0 && K.amount !== gt.toString())
+    const yt = w.mode === "amount" ? w.amount : w.mode === "all" ? Q - qo : Q - rs - qo, mt = ef(K.raw);
+    if (Zn(mt.payload.recipient).value !== w.to || String(mt.payload.amount) !== K.amount || yt !== void 0 && K.amount !== yt.toString())
       throw new Error("Signed return does not match what you approved. Nothing was sent.");
-    const yt = {
+    const pt = {
       id: Th(),
       address: H,
       kind: "withdraw",
@@ -12077,63 +12070,63 @@ function F5(t) {
       recipient: K.recipient,
       amount: K.amount,
       fee: K.fee,
-      nonce: tt.toString(),
+      nonce: J.toString(),
       created: t.now(),
       status: "signed",
       raw: K.raw,
       txid: K.txid
     };
-    t.validate(yt), Ut(yt);
+    t.validate(pt), Ut(pt);
     try {
-      await t.chain.broadcast(K.raw, K.txid), Ut({ ...yt, status: "pending" });
+      await t.chain.broadcast(K.raw, K.txid), Ut({ ...pt, status: "pending" });
     } catch (ke) {
-      throw Ut({ ...yt, status: "unknown", note: ke.message }), ke;
+      throw Ut({ ...pt, status: "unknown", note: ke.message }), ke;
     }
     return K;
   }
   async function rc(w) {
     if (B().length) throw new Error("Wait for the pending payment to confirm, then return funds.");
     if (qt("standalone")) throw new Error("The listening wallet box needs an update before it can return to another address. Try again shortly.");
-    const $ = await Gr().catch(() => null);
-    if (!$)
+    const A = await Gr().catch(() => null);
+    if (!A)
       throw ot = null, Gt = !0, new Error("Could not check where the funds came from right now. Nothing was sent. Try again shortly.");
-    Gt = !1, o = $.balance;
-    const H = { balance: $.balance, nonce: $.nonce };
+    Gt = !1, o = A.balance;
+    const H = { balance: A.balance, nonce: A.nonce };
     if (w === "excess") {
-      const lt = Ch($.parts) ?? x();
-      if (!lt) throw new Error("Choose where to send the excess first.");
-      await Ci({ mode: "excess", to: lt, linked: !1 }, H), ot = null, Nt("Excess returned ✓ Switch paying back on to continue.");
+      const mt = Ch(A.parts) ?? x();
+      if (!mt) throw new Error("Choose where to send the excess first.");
+      await Ci({ mode: "excess", to: mt, linked: !1 }, H), ot = null, Nt("Excess returned ✓ Switch paying back on to continue.");
       return;
     }
-    const Z = $.steps;
-    if (!Z.length) throw new Error("What is left is too small to return: the network fee would take all of it.");
-    if (!(!!ot && ot.balance === $.balance && t.now() - ot.at <= Wt && ot.steps.length === Z.length && ot.steps.every((lt, yt) => lt.to === Z[yt].to && lt.mode === Z[yt].mode && lt.send === Z[yt].send))) {
+    const Q = A.steps;
+    if (!Q.length) throw new Error("What is left is too small to return: the network fee would take all of it.");
+    if (!(!!ot && ot.balance === A.balance && t.now() - ot.at <= Wt && ot.steps.length === Q.length && ot.steps.every((mt, pt) => mt.to === Q[pt].to && mt.mode === Q[pt].mode && mt.send === Q[pt].send))) {
       ot = {
         at: t.now(),
-        balance: $.balance,
-        steps: Z,
-        parts: $.parts,
-        plan: { state: "ready", steps: Z.map((lt) => ({ to: lt.to, kind: lt.kind, send: lt.send.toString() })), kept: $.tooSmall, excess: Ch($.parts) }
-      }, Nt(Z.length > 1 ? `This goes back in ${Z.length} parts, each to whoever it came from. Check below, then confirm.` : "Check where it goes, then confirm.");
+        balance: A.balance,
+        steps: Q,
+        parts: A.parts,
+        plan: { state: "ready", steps: Q.map((mt) => ({ to: mt.to, kind: mt.kind, send: mt.send.toString() })), kept: A.tooSmall, excess: Ch(A.parts) }
+      }, Nt(Q.length > 1 ? `This goes back in ${Q.length} parts, each to whoever it came from. Check below, then confirm.` : "Check where it goes, then confirm.");
       return;
     }
-    const K = Z[0], gt = K.to ?? x();
-    if (!gt) throw new Error("Choose where to send the rest first.");
+    const K = Q[0], yt = K.to ?? x();
+    if (!yt) throw new Error("Choose where to send the rest first.");
     if (K.mode === "amount" && qt("partial")) throw new Error("The listening wallet box needs an update before it can return in parts. Try again shortly.");
-    await Ci({ mode: K.mode, to: gt, linked: !1, ...K.mode === "amount" ? { amount: K.send } : {} }, H), ot = null, Z.length === 1 ? (un(!1), Nt("Returned ✓ Paying is off.")) : Nt(`Returned ✓ ${Z.length - 1} more ${Z.length === 2 ? "part" : "parts"} to go. Return again once this one confirms.`);
+    await Ci({ mode: K.mode, to: yt, linked: !1, ...K.mode === "amount" ? { amount: K.send } : {} }, H), ot = null, Q.length === 1 ? (un(!1), Nt("Returned ✓ Paying is off.")) : Nt(`Returned ✓ ${Q.length - 1} more ${Q.length === 2 ? "part" : "parts"} to go. Return again once this one confirms.`);
   }
   const go = {
-    forceRefresh: () => J(!0),
+    forceRefresh: () => tt(!0),
     create: () => he("Waiting for your passkey…", async () => {
       const w = await Rn();
-      await w.request("listening.unlock", { mode: "create", terms: Ve(), ...t.main() ? { main: t.main() } : {} }), i = await Ke(w), i.address && t.store.set(Kt("created", i.address), "1"), un(!0), Nt(ft() ? "Wallet created ✓ Next: add 1 STX." : "Wallet created ✓ Next: link it."), await Li();
+      await w.request("listening.unlock", { mode: "create", terms: Ve(), ...t.main() ? { main: t.main() } : {} }), i = await Ke(w), i.address && t.store.set(Kt("created", i.address), "1"), un(!0), Nt(ut() ? "Wallet created ✓ Next: add 1 STX." : "Wallet created ✓ Next: link it."), await Li();
     }),
     /**
      * A gift funded this wallet (the server sent it from the gift treasury): tracked exactly like a
      * deposit, so the panel says it is on its way and paying starts by itself once it confirms.
      */
-    giftSent: (w, $) => {
-      !(i != null && i.address) || z() || (it({ txid: w, amount: $.toString(), at: t.now() }), a = -1 / 0, Q = null, Nt("🎁 Gift on its way ✓ Usually arrives in a few minutes."));
+    giftSent: (w, A) => {
+      !(i != null && i.address) || z() || (it({ txid: w, amount: A.toString(), at: t.now() }), a = -1 / 0, Z = null, Nt("🎁 Gift on its way ✓ Usually arrives in a few minutes."));
     },
     /**
      * Albums live in numbered wallets of the open passkey. `bindAlbum` proves a number belongs to the passkey (both
@@ -12145,8 +12138,8 @@ function F5(t) {
       return (await Rn()).request("listening.bindSlot", { slot: w, issued: t.now() });
     },
     /** An album's gift was sent to its wallet (the server sent it from the gift treasury): track it, and open the album. */
-    albumArriving: async (w, $, H, Z) => {
-      it({ txid: H, amount: Z.toString(), at: t.now() }, $), Q = null, await go.openAlbum(w), Nt("🎁 Album on its way ✓ Usually arrives in a few minutes.");
+    albumArriving: async (w, A, H, Q) => {
+      it({ txid: H, amount: Q.toString(), at: t.now() }, A), Z = null, await go.openAlbum(w), Nt("🎁 Album on its way ✓ Usually arrives in a few minutes.");
     },
     /** Make a numbered wallet the open one (0 = the listener's own). Plays, funds and the heart's album follow it. */
     openAlbum: (w) => he("Opening…", async () => {
@@ -12155,25 +12148,25 @@ function F5(t) {
       if (d || l || g) throw new Error("Still sending a payment. Open the album again in a moment.");
       if ((i.slot ?? 0) === w) return;
       ir(), await s.request("listening.openSlot", { slot: w }), i = await Ke(s), o = void 0, a = -1 / 0, ot = null, Gt = !1;
-      const $ = i.root;
-      $ && t.store.set(Kt("slot", $), String(w)), Nt(w === 0 ? "Back to your own wallet ✓" : "Album opened ✓");
+      const A = i.root;
+      A && t.store.set(Kt("slot", A), String(w)), Nt(w === 0 ? "Back to your own wallet ✓" : "Album opened ✓");
     }),
     unlock: (w = !1) => {
-      const $ = () => he("Waiting for your passkey…", async () => Se(await Rn(), w));
+      const A = () => he("Waiting for your passkey…", async () => Se(await Rn(), w));
       return T ? w ? qt("cancel") ? (Nt("Tap Cancel in the listening wallet box first, then choose a different wallet."), Promise.resolve()) : Vr(async () => {
-        (Ue() === "locked" || Ue() === "intro") && await $();
-      }) : $t : $();
+        (Ue() === "locked" || Ue() === "intro") && await A();
+      }) : $t : A();
     },
     link: () => he("Sign in your wallet…", async () => {
       pn();
       const w = t.main();
       if (!w || !(i != null && i.address)) throw new Error("Connect your main wallet first.");
-      const $ = (await t.links(w)).find((H) => H.listening === i.address);
-      if ($)
-        await s.request("listening.link", { main: w, issued: $.issued, mainSignature: $.mainSignature });
+      const A = (await t.links(w)).find((H) => H.listening === i.address);
+      if (A)
+        await s.request("listening.link", { main: w, issued: A.issued, mainSignature: A.mainSignature });
       else {
-        const H = { main: w, listening: i.address, issued: t.now() }, Z = await t.signWithMain(w, C5(H)), tt = await s.request("listening.link", { main: w, issued: H.issued, mainSignature: Z });
-        await t.saveLink({ ...H, mainSignature: Z, listeningSignature: tt.listeningSignature }), R = -1 / 0;
+        const H = { main: w, listening: i.address, issued: t.now() }, Q = await t.signWithMain(w, C5(H)), J = await s.request("listening.link", { main: w, issued: H.issued, mainSignature: Q });
+        await t.saveLink({ ...H, mainSignature: Q, listeningSignature: J.listeningSignature }), R = -1 / 0;
       }
       Nt("Linked ✓");
     }),
@@ -12183,9 +12176,9 @@ function F5(t) {
       if (!w || !(i != null && i.address)) throw new Error("Connect your main wallet first.");
       if (z()) throw new Error("A deposit is still confirming. Wait for it before adding more.");
       await Ie(!0);
-      const $ = Hc(o ?? 0n);
-      if ($ <= 0n) throw new Error("This wallet already holds 1 STX. No deposit needed.");
-      P = await t.deposit(w, i.address, $), P && it({ txid: P, amount: $.toString(), at: t.now() }), Nt("Deposit sent ✓ Usually confirms in a few minutes.");
+      const A = Hc(o ?? 0n);
+      if (A <= 0n) throw new Error("This wallet already holds 1 STX. No deposit needed.");
+      P = await t.deposit(w, i.address, A), P && it({ txid: P, amount: A.toString(), at: t.now() }), Nt("Deposit sent ✓ Usually confirms in a few minutes.");
     }),
     /**
      * Top up the main listener wallet (the one that signs every like) from the connected main wallet. Works whichever
@@ -12193,15 +12186,15 @@ function F5(t) {
      */
     topUpLikes: () => he("Approve the top-up in your wallet…", async () => {
       pn();
-      const w = t.main(), $ = It();
-      if (!w || !$) throw new Error("Connect your main wallet first, or send STX to the address shown.");
-      if (at($)) throw new Error("A top-up is still confirming. Wait for it before adding more.");
-      const H = await t.chain.balance($);
-      mt() ? c = { for: $, value: H, at: t.now() } : (o = H, a = t.now());
-      const Z = Hc(H);
-      if (Z <= 0n) throw new Error("Your main listener wallet already holds 1 STX. No top-up needed.");
-      const tt = await t.deposit(w, $, Z);
-      tt && it({ txid: tt, amount: Z.toString(), at: t.now() }, $), Nt("Top-up sent ✓ Likes carry on once it confirms, usually a few minutes.");
+      const w = t.main(), A = Bt();
+      if (!w || !A) throw new Error("Connect your main wallet first, or send STX to the address shown.");
+      if (at(A)) throw new Error("A top-up is still confirming. Wait for it before adding more.");
+      const H = await t.chain.balance(A);
+      bt() ? c = { for: A, value: H, at: t.now() } : (o = H, a = t.now());
+      const Q = Hc(H);
+      if (Q <= 0n) throw new Error("Your main listener wallet already holds 1 STX. No top-up needed.");
+      const J = await t.deposit(w, A, Q);
+      J && it({ txid: J, amount: Q.toString(), at: t.now() }, A), Nt("Top-up sent ✓ Likes carry on once it confirms, usually a few minutes.");
     }),
     switchOn: () => he("Confirm in the listening wallet…", async () => {
       if (!_s()) throw new Error("Connect your wallet first.");
@@ -12221,11 +12214,11 @@ function F5(t) {
     }),
     /** Passkey-only: send returns to this address instead of the funder. Public data, kept on this device. */
     setReturnAddress: (w) => {
-      const $ = String(w ?? "").trim();
+      const A = String(w ?? "").trim();
       if (!(i != null && i.address)) return Nt("", "Unlock the listening wallet first.");
-      if (!Or($)) return Nt("", "Enter a standard mainnet address (it starts with SP).");
-      if ($ === i.address) return Nt("", "That is this listening wallet itself. Enter a different address.");
-      t.store.set(u(i.address), $), Nt("Returns will go to that address. You confirm it in the listening wallet before anything is sent.");
+      if (!Or(A)) return Nt("", "Enter a standard mainnet address (it starts with SP).");
+      if (A === i.address) return Nt("", "That is this listening wallet itself. Enter a different address.");
+      t.store.set(u(i.address), A), Nt("Returns will go to that address. You confirm it in the listening wallet before anything is sent.");
     },
     clearReturnAddress: () => {
       i != null && i.address && t.store.set(u(i.address), ""), t.changed();
@@ -12234,21 +12227,21 @@ function F5(t) {
       if (!_s()) throw new Error("Connect your wallet first.");
       if (!(i != null && i.address)) throw new Error("Unlock the listening wallet first.");
       if (hn()) return rc(w);
-      const $ = D();
-      if (!$) throw new Error(ft() ? "Choose where to send the funds first." : "Link your main wallet first.");
-      if ($.kind !== "linked" && qt("standalone")) throw new Error("The listening wallet box needs an update before it can return to another address. Try again shortly.");
+      const A = D();
+      if (!A) throw new Error(ut() ? "Choose where to send the funds first." : "Link your main wallet first.");
+      if (A.kind !== "linked" && qt("standalone")) throw new Error("The listening wallet box needs an update before it can return to another address. Try again shortly.");
       if (B().length) throw new Error("Wait for the pending payment to confirm, then return funds.");
-      await Ci({ mode: w, to: $.to, linked: $.kind === "linked" }), w === "all" && un(!1), Nt(w === "all" ? $.kind === "linked" ? "Returned to your wallet ✓ Paying is off." : "Returned ✓ Paying is off." : "Excess returned ✓ Switch paying back on to continue.");
+      await Ci({ mode: w, to: A.to, linked: A.kind === "linked" }), w === "all" && un(!1), Nt(w === "all" ? A.kind === "linked" ? "Returned to your wallet ✓ Paying is off." : "Returned ✓ Paying is off." : "Excess returned ✓ Switch paying back on to continue.");
     })
-  }, ge = [], sc = 10, yo = 30 * 6e4;
+  }, ye = [], sc = 10, yo = 30 * 6e4;
   let Gn = !1;
   const wo = () => d || !!f || l || g, ir = () => {
-    ge.length && (ge.length = 0, t.changed());
+    ye.length && (ye.length = 0, t.changed());
   };
   async function ic(w) {
-    if (!ge.some(($) => $.id === w.id) && !de().some(($) => $.id === w.id) && (ge.push({ ...w, at: t.now() }), ge.length > sc && ge.shift()), wo() || B().length) {
-      const $ = ge.length;
-      b = `Queued ${$ === 1 ? "this song" : $ + " songs"}: paid as soon as the wallet is free.`, t.changed();
+    if (!ye.some((A) => A.id === w.id) && !de().some((A) => A.id === w.id) && (ye.push({ ...w, at: t.now() }), ye.length > sc && ye.shift()), wo() || B().length) {
+      const A = ye.length;
+      b = `Queued ${A === 1 ? "this song" : A + " songs"}: paid as soon as the wallet is free.`, t.changed();
     }
     await Bi();
   }
@@ -12256,10 +12249,10 @@ function F5(t) {
     if (!Gn) {
       Gn = !0;
       try {
-        for (; ge.length; ) {
-          for (; ge.length && t.now() - ge[0].at > yo; ) ge.shift();
-          if (!ge.length || wo() || await oc(ge[0]) === "wait") return;
-          ge.shift();
+        for (; ye.length; ) {
+          for (; ye.length && t.now() - ye[0].at > yo; ) ye.shift();
+          if (!ye.length || wo() || await oc(ye[0]) === "wait") return;
+          ye.shift();
         }
       } finally {
         Gn = !1, t.changed();
@@ -12267,55 +12260,55 @@ function F5(t) {
     }
   }
   async function oc(w) {
-    var $;
+    var A;
     d = !0;
     try {
-      await J();
+      await tt();
       const H = Ue();
       if (H === "loading") return "wait";
       if (H !== "ready" || !Ge() || !(i != null && i.session) || i.session.playsLeft < 1 || !E) return "done";
       if (B().length) return "wait";
       Ht || (await t.chain.verify(), Ht = !0);
-      const Z = i.address, { balance: tt, nonce: K } = await t.chain.account(Z);
-      o = tt, a = t.now();
-      const gt = await t.chain.owner(Oc, w.song);
-      if (gt === Z || gt === t.main()) return "done";
-      const lt = await s.request("listening.signPlay", {
+      const Q = i.address, { balance: J, nonce: K } = await t.chain.account(Q);
+      o = J, a = t.now();
+      const yt = await t.chain.owner(Oc, w.song);
+      if (yt === Q || yt === t.main()) return "done";
+      const mt = await s.request("listening.signPlay", {
         core: Oc,
         song: w.song,
         receipt: w.id,
         fee: Mt().toString(),
         nonce: K.toString(),
-        balance: tt.toString()
-      }), yt = {
+        balance: J.toString()
+      }), pt = {
         id: w.id,
-        address: Z,
+        address: Q,
         kind: "play",
         core: Oc,
         song: w.song,
-        recipient: gt,
+        recipient: yt,
         amount: "50",
         fee: Mt().toString(),
         nonce: K.toString(),
         created: t.now(),
         status: "signed",
-        raw: lt.raw,
-        txid: lt.txid,
+        raw: mt.raw,
+        txid: mt.txid,
         // Display only: the radio's title and artist for this song, kept with the public history.
         ...w.title ? { title: String(w.title).slice(0, 120) } : {},
         ...w.artist ? { artist: String(w.artist).slice(0, 120) } : {}
       };
-      t.validate(yt), Ut(yt);
+      t.validate(pt), Ut(pt);
       const ke = w.title ? `“${w.title}”${w.artist ? ` by ${w.artist}` : ""}` : `song #${w.song}`;
       try {
-        await t.chain.broadcast(lt.raw, lt.txid), Ut({ ...yt, status: "pending" }), b = `♪ Paid ${ke}`, C = "";
+        await t.chain.broadcast(mt.raw, mt.txid), Ut({ ...pt, status: "pending" }), b = `♪ Paid ${ke}`, C = "";
       } catch (He) {
-        Ut({ ...yt, status: zs(He) ? "failed" : "unknown", note: He.message, ...zs(He) ? { raw: void 0 } : {} }), C = He.message;
+        Ut({ ...pt, status: zs(He) ? "failed" : "unknown", note: He.message, ...zs(He) ? { raw: void 0 } : {} }), C = He.message;
       }
       return i = await Ke(s), "done";
     } catch (H) {
-      const Z = H instanceof Error ? H.message : "payment unavailable";
-      return ($ = dt()) != null && $.player ? (b = "Payment is taking a moment: " + Z, "wait") : (b = "This song played free: " + Z, "done");
+      const Q = H instanceof Error ? H.message : "payment unavailable";
+      return (A = ft()) != null && A.player ? (b = "Payment is taking a moment: " + Q, "wait") : (b = "This song played free: " + Q, "done");
     } finally {
       d = !1, t.changed();
     }
@@ -12324,7 +12317,7 @@ function F5(t) {
     return !(e != null && e.here) || !["ready", "fund", "over", "locked", "link", "loading"].includes(Ue()) || qt("like") ? !1 : (Ti(w), !0);
   }
   async function Ti(w) {
-    const $ = w.title ? `“${w.title}”` : `song #${w.song}`, H = (gn) => {
+    const A = w.title ? `“${w.title}”` : `song #${w.song}`, H = (gn) => {
       var In;
       C = gn, b = "";
       try {
@@ -12332,72 +12325,72 @@ function F5(t) {
       } catch {
       }
       t.changed();
-    }, Z = mt(), tt = Ue(), K = t.main(), gt = Z && (tt === "fund" || tt === "over") ? "ready" : tt, lt = ft() ? It() : K;
-    if (gt === "locked") {
-      h = { ...w, at: t.now() }, Nt(`Unlock to like ${$}. It sends straight after.`);
+    }, Q = bt(), J = Ue(), K = t.main(), yt = Q && (J === "fund" || J === "over") ? "ready" : J, mt = ut() ? Bt() : K;
+    if (yt === "locked") {
+      h = { ...w, at: t.now() }, Nt(`Unlock to like ${A}. It sends straight after.`);
       return;
     }
-    if (gt === "wrong-wallet") return H(Kr());
-    if (gt === "link") return H("Link the listening wallet to your main wallet first, so your likes count for it.");
-    if (ft() && qt("standalone")) return H("The listening wallet box needs an update before it can like on its own. Try again shortly.");
-    if (gt === "fund") return H("Top up the listening wallet to like: each like or unlike costs 0.0002 STX.");
-    if (gt === "over") return H("Return the excess first: the listening wallet holds more than 1 STX.");
-    if (Z) {
+    if (yt === "wrong-wallet") return H(Kr());
+    if (yt === "link") return H("Link the listening wallet to your main wallet first, so your likes count for it.");
+    if (ut() && qt("standalone")) return H("The listening wallet box needs an update before it can like on its own. Try again shortly.");
+    if (yt === "fund") return H("Top up the listening wallet to like: each like or unlike costs 0.0002 STX.");
+    if (yt === "over") return H("Return the excess first: the listening wallet holds more than 1 STX.");
+    if (Q) {
       await sr(!0);
       const gn = Rt();
       if (Ft(gn))
         return t.changed(), H(Bh);
     }
-    if (gt !== "ready" || !lt) return H("Still checking the listening wallet. Try the heart again in a moment.");
+    if (yt !== "ready" || !mt) return H("Still checking the listening wallet. Try the heart again in a moment.");
     if (!(i != null && i.session)) return H("Paying is switched off. Switch it on to like from the listening wallet.");
     if (!E) return H("Pay-per-play is running in another tab. Like from that tab.");
-    const yt = de(It()).find((gn) => gn.kind === "like" && gn.song === w.song);
-    if (yt && Pi.includes(yt.status))
-      return H(`Your last like for ${$} is still on its way. It can change again once it confirms.`);
+    const pt = de(Bt()).find((gn) => gn.kind === "like" && gn.song === w.song);
+    if (pt && Pi.includes(pt.status))
+      return H(`Your last like for ${A} is still on its way. It can change again once it confirms.`);
     if (l) return H("One like at a time: your last one is still being sent.");
-    if ((yt == null ? void 0 : yt.status) === "confirmed" && t.now() - (yt.confirmedAt ?? 0) < D5)
-      return H(`Your like for ${$} has only just confirmed. Try again in a moment.`);
+    if ((pt == null ? void 0 : pt.status) === "confirmed" && t.now() - (pt.confirmedAt ?? 0) < D5)
+      return H(`Your like for ${A} has only just confirmed. Try again in a moment.`);
     let ke;
     g = !0;
     try {
-      ke = t.likeState ? (await t.likeState(lt, w.song)).by : w.likedBy ?? [];
+      ke = t.likeState ? (await t.likeState(mt, w.song)).by : w.likedBy ?? [];
     } catch {
       ke = w.likedBy;
     } finally {
       g = !1;
     }
-    if (!ke) return H(`Could not check ${$} right now. Try the heart again.`);
-    const He = It(), Ee = ((yt == null ? void 0 : yt.status) === "confirmed" && typeof yt.liked == "boolean" && t.now() - (yt.confirmedAt ?? yt.created) < 5 * 6e4 ? yt.liked : void 0) ?? ke.includes(He);
-    if (!Ee && ke.some((gn) => gn !== He)) return H(ft() ? `${$} was liked from another wallet of yours. Unlike it there.` : `${$} was liked from your main wallet${ke.includes(K) ? "" : " or another listening wallet"}. Unlike it there (♥ ON-CHAIN).`);
+    if (!ke) return H(`Could not check ${A} right now. Try the heart again.`);
+    const He = Bt(), Ee = ((pt == null ? void 0 : pt.status) === "confirmed" && typeof pt.liked == "boolean" && t.now() - (pt.confirmedAt ?? pt.created) < 5 * 6e4 ? pt.liked : void 0) ?? ke.includes(He);
+    if (!Ee && ke.some((gn) => gn !== He)) return H(ut() ? `${A} was liked from another wallet of yours. Unlike it there.` : `${A} was liked from your main wallet${ke.includes(K) ? "" : " or another listening wallet"}. Unlike it there (♥ ON-CHAIN).`);
     await cc({ song: w.song, liked: !Ee, title: w.title, artist: w.artist });
   }
   async function cc(w) {
-    var Z, tt, K;
+    var Q, J, K;
     if (l) {
       Nt("Still sending your last like. Try again in a moment.");
       return;
     }
     l = !0;
-    const $ = w.title ? `“${w.title}”${w.artist ? ` by ${w.artist}` : ""}` : `song #${w.song}`, H = t.wait ?? ((gt) => new Promise((lt) => setTimeout(lt, gt)));
+    const A = w.title ? `“${w.title}”${w.artist ? ` by ${w.artist}` : ""}` : `song #${w.song}`, H = t.wait ?? ((yt) => new Promise((mt) => setTimeout(mt, yt)));
     try {
-      Nt(`${w.liked ? "Liking" : "Unliking"} ${$}…`);
-      const gt = t.now() + 12e4;
-      for (; d || (mt() ? de(It()).some((Ee) => Pi.includes(Ee.status)) : B().length); ) {
-        if (t.now() > gt) throw new Error("An earlier payment is still confirming. Try the like again shortly.");
-        await H(5e3), await J(!0);
+      Nt(`${w.liked ? "Liking" : "Unliking"} ${A}…`);
+      const yt = t.now() + 12e4;
+      for (; d || (bt() ? de(Bt()).some((Ee) => Pi.includes(Ee.status)) : B().length); ) {
+        if (t.now() > yt) throw new Error("An earlier payment is still confirming. Try the like again shortly.");
+        await H(5e3), await tt(!0);
       }
-      if (!mt() && Ue() !== "ready" || (i == null ? void 0 : i.state) !== "unlocked" || !i.session) throw new Error("Paying stopped before the like was sent.");
-      const lt = It(), { balance: yt, nonce: ke } = await t.chain.account(lt);
-      if (mt() ? c = { for: lt, value: yt, at: t.now() } : (o = yt, a = t.now()), Ft(yt)) throw new Error(Bh);
+      if (!bt() && Ue() !== "ready" || (i == null ? void 0 : i.state) !== "unlocked" || !i.session) throw new Error("Paying stopped before the like was sent.");
+      const mt = Bt(), { balance: pt, nonce: ke } = await t.chain.account(mt);
+      if (bt() ? c = { for: mt, value: pt, at: t.now() } : (o = pt, a = t.now()), Ft(pt)) throw new Error(Bh);
       const He = await s.request("listening.signLike", {
         song: w.song,
         liked: w.liked,
         fee: Pc.toString(),
         nonce: ke.toString(),
-        balance: yt.toString()
+        balance: pt.toString()
       }), $n = {
         id: Th(),
-        address: lt,
+        address: mt,
         kind: "like",
         core: 0,
         song: w.song,
@@ -12415,20 +12408,20 @@ function F5(t) {
       };
       t.validate($n), Ut($n);
       try {
-        await t.chain.broadcast(He.raw, He.txid), Ut({ ...$n, status: "pending" }), b = `${w.liked ? "♥ Liked" : "Unliked"} ${$}`, C = "";
+        await t.chain.broadcast(He.raw, He.txid), Ut({ ...$n, status: "pending" }), b = `${w.liked ? "♥ Liked" : "Unliked"} ${A}`, C = "";
         try {
-          (Z = t.likeSent) == null || Z.call(t, w.song, w.liked);
+          (Q = t.likeSent) == null || Q.call(t, w.song, w.liked);
         } catch {
         }
       } catch (Ee) {
         if (Ut({ ...$n, status: zs(Ee) ? "failed" : "unknown", note: Ee.message, ...zs(Ee) ? { raw: void 0 } : {} }), C = Ee.message, zs(Ee)) try {
-          (tt = t.likeFailed) == null || tt.call(t, w.song);
+          (J = t.likeFailed) == null || J.call(t, w.song);
         } catch {
         }
       }
       i = await Ke(s);
-    } catch (gt) {
-      C = "Like not sent: " + (gt instanceof Error ? gt.message : "the listening wallet is unavailable");
+    } catch (yt) {
+      C = "Like not sent: " + (yt instanceof Error ? yt.message : "the listening wallet is unavailable");
       try {
         (K = t.likeFailed) == null || K.call(t, w.song);
       } catch {
@@ -12437,7 +12430,7 @@ function F5(t) {
       l = !1, t.changed(), Bi();
     }
   }
-  return { snapshot: rr, refresh: J, onListened: ic, heart: ac, toggleLike: Ti, ...go };
+  return { snapshot: rr, refresh: tt, onListened: ic, heart: ac, toggleLike: Ti, ...go };
 }
 const Sy = ["Connect", "Passkey", "Link & fund", "Listen"], Ey = ["Passkey", "Add 1 STX", "Listen"], Vl = (t) => t ? Ey : Sy;
 function j5(t) {
@@ -12813,11 +12806,11 @@ function $y(t, e, n, r, s) {
     }
   }, i;
 }
-const Qs = (t, e, n, r, s) => $y(t, e, async () => await vy(n()) ? { label: "Copied ✓", ok: !0 } : { label: "Copy failed", ok: !1 }, r, s), Wr = "xtrata.radio.gift.incoming.v1", Gh = (t) => "xtrata.radio.gift.mine.v1:" + t, ut = (t, e = "", n = "") => {
+const Qs = (t, e, n, r, s) => $y(t, e, async () => await vy(n()) ? { label: "Copied ✓", ok: !0 } : { label: "Copy failed", ok: !1 }, r, s), Wr = "xtrata.radio.gift.incoming.v1", Gh = (t) => "xtrata.radio.gift.mine.v1:" + t, lt = (t, e = "", n = "") => {
   const r = document.createElement(t);
   return e && (r.textContent = e), n && (r.className = n), r;
 }, Cr = (t, e, n = "") => {
-  const r = ut("button", t, n);
+  const r = lt("button", t, n);
   return r.type = "button", r.onclick = e, r;
 }, Hi = (t, e) => {
   const n = document.createElement("option");
@@ -12855,7 +12848,7 @@ function Ov(t) {
   let c = {};
   const f = (B) => {
     if (c.box) return c.box;
-    const X = ut("div", "", "ppp-gift-check");
+    const X = lt("div", "", "ppp-gift-check");
     c.box = X;
     const z = () => {
       const at = window.turnstile;
@@ -12874,7 +12867,7 @@ function Ov(t) {
   };
   let d;
   async function l(B) {
-    var at, it, It, mt, Rt;
+    var at, it, Bt, bt, Rt;
     if (!e || e.claiming || !B.listening) return;
     const X = !!((at = e.view) != null && at.player);
     if (X && !B.root) return;
@@ -12896,28 +12889,28 @@ function Ov(t) {
         if (!Number.isSafeInteger(u) || u < 1) throw new Error("Could not pick a wallet number for this album. Try again.");
         Ft = u;
         for (let x = 0; ; x++) {
-          const A = await t.album.bind(Ft);
-          if (Ot = A.address, ae = await z({ wallet: Ot, binding: A }), ae.res.status === 409 && /just taken/.test(((It = ae.r) == null ? void 0 : It.error) || "") && x < 5) {
+          const v = await t.album.bind(Ft);
+          if (Ot = v.address, ae = await z({ wallet: Ot, binding: v }), ae.res.status === 409 && /just taken/.test(((Bt = ae.r) == null ? void 0 : Bt.error) || "") && x < 5) {
             Ft += 1;
             continue;
           }
           break;
         }
       } else ae = await z({ wallet: Ot });
-      const { res: ft, r: ht } = ae;
-      if (ft.status === 503 && /sending another gift/.test((ht == null ? void 0 : ht.error) || "")) {
+      const { res: ut, r: dt } = ae;
+      if (ut.status === 503 && /sending another gift/.test((dt == null ? void 0 : dt.error) || "")) {
         e.waiting = !0, clearTimeout(d), d = setTimeout(() => {
           e && (e.waiting = !1, t.changed());
         }, 12e3);
         return;
       }
-      if (!ft.ok)
-        throw (ft.status === 404 || ft.status === 410 || ft.status === 409 && /already had a gift|brand-new/.test((ht == null ? void 0 : ht.error) || "")) && t.store.set(Wr, null), new Error((ht == null ? void 0 : ht.error) || `Could not claim the gift (${ft.status}).`);
-      e.done = !0, t.store.set(Wr, null), X ? await t.album.arrived(Ft, Ot, ht.txid, BigInt(ht.amount)) : t.giftSent(ht.txid, BigInt(ht.amount));
+      if (!ut.ok)
+        throw (ut.status === 404 || ut.status === 410 || ut.status === 409 && /already had a gift|brand-new/.test((dt == null ? void 0 : dt.error) || "")) && t.store.set(Wr, null), new Error((dt == null ? void 0 : dt.error) || `Could not claim the gift (${ut.status}).`);
+      e.done = !0, t.store.set(Wr, null), X ? await t.album.arrived(Ft, Ot, dt.txid, BigInt(dt.amount)) : t.giftSent(dt.txid, BigInt(dt.amount));
     } catch (Ft) {
       e.error = Ft.message, c.token = void 0;
       try {
-        (Rt = (mt = window.turnstile) == null ? void 0 : mt.reset) == null || Rt.call(mt, c.box);
+        (Rt = (bt = window.turnstile) == null ? void 0 : bt.reset) == null || Rt.call(bt, c.box);
       } catch {
       }
     } finally {
@@ -12936,42 +12929,42 @@ function Ov(t) {
       }).catch(() => {
       });
     }
-    return g.state === "sending" && g.problem ? [ut("p", `🎁 Your gift is waiting to go out (${g.problem}). It is retried automatically.`, "ppp-warn")] : [];
+    return g.state === "sending" && g.problem ? [lt("p", `🎁 Your gift is waiting to go out (${g.problem}). It is retried automatically.`, "ppp-warn")] : [];
   }
   function m(B, X) {
     var Rt, Ft;
-    const z = X.player, at = BigInt(X.amount), it = [ut("p", `🎁 ${a(X)} sent you “${z.title}”${z.subtitle ? ` by ${z.subtitle}` : ""}: ${z.tracks.length} ${z.tracks.length === 1 ? "song" : "songs"} and ${Dc(at).toLocaleString()} plays of on-chain music.`, "ppp-gift")];
+    const z = X.player, at = BigInt(X.amount), it = [lt("p", `🎁 ${a(X)} sent you “${z.title}”${z.subtitle ? ` by ${z.subtitle}` : ""}: ${z.tracks.length} ${z.tracks.length === 1 ? "song" : "songs"} and ${Dc(at).toLocaleString()} plays of on-chain music.`, "ppp-gift")];
     if (!(!!B.root && ["fund", "ready", "over", "link"].includes(B.step)))
-      return it.push(ut("p", B.step === "intro" ? "Tap below: your passkey makes a listening wallet, and the album arrives in its own wallet. You can keep as many albums as you like." : B.step === "locked" ? "Unlock your listening wallet and the album arrives in its own wallet." : "Open your listening wallet and the album arrives in its own wallet.", "ppp-mute")), it;
+      return it.push(lt("p", B.step === "intro" ? "Tap below: your passkey makes a listening wallet, and the album arrives in its own wallet. You can keep as many albums as you like." : B.step === "locked" ? "Unlock your listening wallet and the album arrives in its own wallet." : "Open your listening wallet and the album arrives in its own wallet.", "ppp-mute")), it;
     if (B.walletCannotAlbums)
-      return it.push(ut("p", "The listening wallet box is still updating. The album arrives as soon as it has: reload in a few minutes.", "ppp-warn")), it;
-    const mt = (Ft = (Rt = B.gate) == null ? void 0 : Rt.gifts) == null ? void 0 : Ft.turnstileSiteKey;
-    return mt && !c.token ? it.push(ut("p", "One quick check and it is yours:", "ppp-mute"), f(mt)) : !e.claiming && !e.error && !e.waiting && l(B), (e.claiming || e.waiting) && it.push(ut("p", e.waiting ? "Another gift is on its way out first. Yours is next…" : "Sending your album…", "ppp-cyan")), e.error && it.push(ut("p", e.error, "ppp-bad"), Cr("Try again", () => {
+      return it.push(lt("p", "The listening wallet box is still updating. The album arrives as soon as it has: reload in a few minutes.", "ppp-warn")), it;
+    const bt = (Ft = (Rt = B.gate) == null ? void 0 : Rt.gifts) == null ? void 0 : Ft.turnstileSiteKey;
+    return bt && !c.token ? it.push(lt("p", "One quick check and it is yours:", "ppp-mute"), f(bt)) : !e.claiming && !e.error && !e.waiting && l(B), (e.claiming || e.waiting) && it.push(lt("p", e.waiting ? "Another gift is on its way out first. Yours is next…" : "Sending your album…", "ppp-cyan")), e.error && it.push(lt("p", e.error, "ppp-bad"), Cr("Try again", () => {
       e.error = void 0, l(B);
     })), it;
   }
   function b(B) {
-    var ae, ft;
+    var ae, ut;
     const X = h(B);
     if (!e || ["off", "elsewhere"].includes(B.step)) return X;
     const z = e.view;
-    if (e.error && !z) return [ut("p", `🎁 ${e.error}`, "ppp-warn")];
-    if (!z) return [ut("p", "🎁 Checking your gift…", "ppp-mute")];
+    if (e.error && !z) return [lt("p", `🎁 ${e.error}`, "ppp-warn")];
+    if (!z) return [lt("p", "🎁 Checking your gift…", "ppp-mute")];
     if (e.done) return X;
-    if (z.status === "claimed" || z.status === "claiming") return [ut("p", "🎁 This gift link has already been used.", "ppp-mute")];
-    if (["expired", "refunding", "refunded"].includes(z.status)) return [ut("p", "🎁 This gift link has expired.", "ppp-mute")];
-    if (z.status === "pending-deposit") return [ut("p", `🎁 ${a(z)} is still sending this gift. Check back in a few minutes.`, "ppp-warn")];
+    if (z.status === "claimed" || z.status === "claiming") return [lt("p", "🎁 This gift link has already been used.", "ppp-mute")];
+    if (["expired", "refunding", "refunded"].includes(z.status)) return [lt("p", "🎁 This gift link has expired.", "ppp-mute")];
+    if (z.status === "pending-deposit") return [lt("p", `🎁 ${a(z)} is still sending this gift. Check back in a few minutes.`, "ppp-warn")];
     if (z.player) return [...m(B, z), ...X];
     if (!!B.listening && (!(B.createdHere || B.brandNew) || !!B.linked || !!B.creditedTo || (B.balance ?? 0n) > 0n || B.entries.length > 0))
-      return [ut("p", "🎁 A gift link is also waiting on this device. Gifts are for brand-new listening wallets, not this one: share the link with someone new.", "ppp-mute"), Cr("Forget this gift link here", o, "quiet")];
-    const it = BigInt(z.amount), It = Dc(it).toLocaleString(), Rt = [ut(
+      return [lt("p", "🎁 A gift link is also waiting on this device. Gifts are for brand-new listening wallets, not this one: share the link with someone new.", "ppp-mute"), Cr("Forget this gift link here", o, "quiet")];
+    const it = BigInt(z.amount), Bt = Dc(it).toLocaleString(), Rt = [lt(
       "p",
-      `🎁 ${a(z)} sent you ${Gs(it)} STX of on-chain music: about ${It} paid plays.`,
+      `🎁 ${a(z)} sent you ${Gs(it)} STX of on-chain music: about ${Bt} paid plays.`,
       "ppp-gift"
-    )], Ft = !!B.listening && (B.createdHere || B.brandNew) && !B.linked && !B.creditedTo && B.step === "fund" && (B.balance ?? 1n) === 0n && !B.depositPending && !B.entries.length, Ot = (ft = (ae = B.gate) == null ? void 0 : ae.gifts) == null ? void 0 : ft.turnstileSiteKey;
-    return Ft ? (Ot && !c.token ? Rt.push(ut("p", "One quick check and it is yours:", "ppp-mute"), f(Ot)) : !e.claiming && !e.error && !e.waiting && l(B), (e.claiming || e.waiting) && Rt.push(ut("p", e.waiting ? "Another gift is on its way out first. Yours is next…" : "Sending your gift…", "ppp-cyan")), e.error && Rt.push(ut("p", e.error, "ppp-bad"), Cr("Try again", () => {
+    )], Ft = !!B.listening && (B.createdHere || B.brandNew) && !B.linked && !B.creditedTo && B.step === "fund" && (B.balance ?? 1n) === 0n && !B.depositPending && !B.entries.length, Ot = (ut = (ae = B.gate) == null ? void 0 : ae.gifts) == null ? void 0 : ut.turnstileSiteKey;
+    return Ft ? (Ot && !c.token ? Rt.push(lt("p", "One quick check and it is yours:", "ppp-mute"), f(Ot)) : !e.claiming && !e.error && !e.waiting && l(B), (e.claiming || e.waiting) && Rt.push(lt("p", e.waiting ? "Another gift is on its way out first. Yours is next…" : "Sending your gift…", "ppp-cyan")), e.error && Rt.push(lt("p", e.error, "ppp-bad"), Cr("Try again", () => {
       e.error = void 0, l(B);
-    }))) : B.step === "intro" ? Rt.push(ut("p", "Tap below: your passkey makes a listening wallet, and the gift lands in it.", "ppp-mute")) : B.listening && B.linked ? Rt.push(ut("p", "Gifts are for brand-new listening wallets, and this one is linked to a Stacks wallet. The link still works for someone new.", "ppp-mute"), Cr("Forget this gift link here", o, "quiet")) : B.listening && (B.balance ?? 0n) > 0n && Rt.push(ut("p", "Gifts are for brand-new listening wallets, and this one already has funds. Share the link with someone new instead.", "ppp-mute"), Cr("Forget this gift link here", o, "quiet")), Rt;
+    }))) : B.step === "intro" ? Rt.push(lt("p", "Tap below: your passkey makes a listening wallet, and the gift lands in it.", "ppp-mute")) : B.listening && B.linked ? Rt.push(lt("p", "Gifts are for brand-new listening wallets, and this one is linked to a Stacks wallet. The link still works for someone new.", "ppp-mute"), Cr("Forget this gift link here", o, "quiet")) : B.listening && (B.balance ?? 0n) > 0n && Rt.push(lt("p", "Gifts are for brand-new listening wallets, and this one already has funds. Share the link with someone new instead.", "ppp-mute"), Cr("Forget this gift link here", o, "quiet")), Rt;
   }
   async function C(B, X, z) {
     var at;
@@ -12983,8 +12976,8 @@ function Ov(t) {
     }
     return X();
   }
-  const P = ut("div", "", "ppp-gift-fold");
-  let _ = 250000n, p = "", v = "", I = null;
+  const P = lt("div", "", "ppp-gift-fold");
+  let _ = 250000n, p = "", $ = "", I = null;
   const R = (B) => {
     try {
       const X = JSON.parse(t.store.get(Gh(B)) || "[]");
@@ -13007,16 +13000,16 @@ function Ov(t) {
   }
   async function S(B) {
     if (p) return;
-    p = "Starting your gift…", v = "", t.changed();
+    p = "Starting your gift…", $ = "", t.changed();
     let X = null;
     try {
       X = await t.json("/radio/gift/create", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ gifter: B, amount: _.toString() }) });
       const z = R(B);
       z.unshift({ id: X.id, code: X.code, amount: _.toString(), at: t.now() }), Y(B, z), p = "Approve the gift in your wallet…", t.changed();
-      const at = await t.pay(B, X.depositTo, BigInt(X.deposit), X.memo), it = R(B), It = it.find((mt) => mt.id === X.id);
-      It && (It.txid = at, It.view = { status: "pending-deposit", amount: _.toString(), source: "friend", from: B, label: "", expires: 0 }), Y(B, it), v = "Sent ✓ Your link works as soon as the payment confirms (a few minutes).", q(B);
+      const at = await t.pay(B, X.depositTo, BigInt(X.deposit), X.memo), it = R(B), Bt = it.find((bt) => bt.id === X.id);
+      Bt && (Bt.txid = at, Bt.view = { status: "pending-deposit", amount: _.toString(), source: "friend", from: B, label: "", expires: 0 }), Y(B, it), $ = "Sent ✓ Your link works as soon as the payment confirms (a few minutes).", q(B);
     } catch (z) {
-      v = z.message || "Not sent.";
+      $ = z.message || "Not sent.";
     } finally {
       p = "", t.changed();
     }
@@ -13031,86 +13024,86 @@ function Ov(t) {
   };
   async function U(B, X) {
     if (!p) {
-      p = "Checking the player…", v = "", t.changed();
+      p = "Checking the player…", $ = "", t.changed();
       try {
         const z = X.tracks.split(/[\s,]+/).filter(Boolean).map((Ft) => Number(Ft.replace(/^#/, ""))), at = _v({ title: X.title.trim(), subtitle: X.subtitle.trim(), tracks: z, cover: null });
         p = "Sign in your wallet…", t.changed();
-        const it = { admin: B, hash: Uv(at), issued: t.now() }, It = await t.sign(B, Pv(it));
+        const it = { admin: B, hash: Uv(at), issued: t.now() }, Bt = await t.sign(B, Pv(it));
         p = "Making the player…", t.changed();
-        const mt = await t.json("/radio/gift/player", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ definition: at, request: it, signature: It }) }), Rt = N(B).filter((Ft) => Ft.id !== mt.id);
-        Rt.unshift({ id: mt.id, title: mt.title, tracks: mt.tracks }), t.store.set(k(B), JSON.stringify(Rt.slice(0, 30))), v = `${mt.existing ? "That player already exists" : "Player made"} ✓ “${mt.title}” · ${mt.tracks} songs. Pick it below for a campaign.`;
+        const bt = await t.json("/radio/gift/player", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ definition: at, request: it, signature: Bt }) }), Rt = N(B).filter((Ft) => Ft.id !== bt.id);
+        Rt.unshift({ id: bt.id, title: bt.title, tracks: bt.tracks }), t.store.set(k(B), JSON.stringify(Rt.slice(0, 30))), $ = `${bt.existing ? "That player already exists" : "Player made"} ✓ “${bt.title}” · ${bt.tracks} songs. Pick it below for a campaign.`;
       } catch (z) {
-        v = z.message || "Not made.";
+        $ = z.message || "Not made.";
       } finally {
         p = "", t.changed();
       }
     }
   }
-  async function Q(B, X, z, at, it) {
+  async function Z(B, X, z, at, it) {
     if (!p) {
-      p = "Sign in your wallet…", v = "", I = null, t.changed();
+      p = "Sign in your wallet…", $ = "", I = null, t.changed();
       try {
-        const It = { admin: B, count: X, amount: z.toString(), label: at, issued: t.now(), ...it ? { player: it } : {} }, mt = await t.sign(B, Tv(It));
+        const Bt = { admin: B, count: X, amount: z.toString(), label: at, issued: t.now(), ...it ? { player: it } : {} }, bt = await t.sign(B, Tv(Bt));
         p = "Making links…", t.changed();
-        const Rt = await t.json("/radio/gift/campaign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: It, signature: mt }) });
+        const Rt = await t.json("/radio/gift/campaign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: Bt, signature: bt }) });
         I = { codes: Rt.codes, amount: Rt.amount };
-      } catch (It) {
-        v = It.message || "Not made.";
+      } catch (Bt) {
+        $ = Bt.message || "Not made.";
       } finally {
         p = "", t.changed();
       }
     }
   }
-  const G = (B, X) => Lv(B || location.origin + "/radio.html", X), ot = (B) => Hv({ title: "On-chain music for you", text: "I sent you some on-chain music on Xtrata Radio 🎁", url: B }), Gt = ut("input");
+  const G = (B, X) => Lv(B || location.origin + "/radio.html", X), ot = (B) => Hv({ title: "On-chain music for you", text: "I sent you some on-chain music on Xtrata Radio 🎁", url: B }), Gt = lt("input");
   Gt.type = "range", Gt.min = String(Iv), Gt.max = String(Hh), Gt.step = "50000", Gt.value = String(_), Gt.setAttribute("aria-label", "Gift amount");
-  const Ht = ut("p", "", "ppp-gift-amount"), E = Cr("", () => {
+  const Ht = lt("p", "", "ppp-gift-amount"), E = Cr("", () => {
     const B = t.main();
     B && S(B);
   }, "primary"), T = () => {
-    Ht.textContent = Ct(), E.textContent = `Gift ${Gs(_)} STX`;
+    Ht.textContent = Lt(), E.textContent = `Gift ${Gs(_)} STX`;
   };
   Gt.oninput = () => {
     _ = BigInt(Gt.value), T();
   };
-  const Ct = () => `${Gs(_)} STX · about ${Dc(_).toLocaleString()} paid plays · you pay ${Gs(_ + kv)} STX with the network fee`;
+  const Lt = () => `${Gs(_)} STX · about ${Dc(_).toLocaleString()} paid plays · you pay ${Gs(_ + kv)} STX with the network fee`;
   T();
-  const wt = ut("input");
-  wt.type = "number", wt.min = "1", wt.max = String(Cv), wt.value = "10", wt.setAttribute("aria-label", "How many links");
-  const ct = ut("input");
+  const gt = lt("input");
+  gt.type = "number", gt.min = "1", gt.max = String(Cv), gt.value = "10", gt.setAttribute("aria-label", "How many links");
+  const ct = lt("input");
   ct.type = "number", ct.min = "0.1", ct.max = "1", ct.step = "0.05", ct.value = String(Number(jh(zh[0])) / 1e6), ct.setAttribute("aria-label", "STX per link");
-  const $t = ut("input");
+  const $t = lt("input");
   $t.maxLength = 60, $t.placeholder = "Title, e.g. Proof of Sound", $t.setAttribute("aria-label", "Player title");
-  const Mt = ut("input");
+  const Mt = lt("input");
   Mt.maxLength = 80, Mt.placeholder = "Artist (optional)", Mt.setAttribute("aria-label", "Player subtitle");
-  const qt = ut("textarea");
+  const qt = lt("textarea");
   qt.rows = 3, qt.placeholder = "Radio song numbers in play order, e.g. 1021, 1022, 1023", qt.setAttribute("aria-label", "Songs");
-  const Kt = ut("select");
+  const Kt = lt("select");
   Kt.setAttribute("aria-label", "Gift player");
-  const de = ut("select");
+  const de = lt("select");
   de.setAttribute("aria-label", "Plays per link");
   for (const B of zh) de.append(Hi(`${B.toLocaleString()} plays`, String(jh(B))));
   de.append(Hi("Max (1 STX)", String(Hh)), Hi("Custom STX", "")), de.onchange = () => {
     de.value && (ct.value = String(Number(de.value) / 1e6));
   };
-  const Ut = ut("input");
+  const Ut = lt("input");
   Ut.maxLength = 40, Ut.placeholder = "Label, e.g. Launch week", Ut.setAttribute("aria-label", "Campaign label");
   function Ge(B) {
-    var it, It, mt, Rt, Ft;
+    var it, Bt, bt, Rt, Ft;
     const X = (it = B.gate) == null ? void 0 : it.gifts;
     if (!(X != null && X.enabled) || ["off", "elsewhere", "unsupported"].includes(B.step)) return null;
-    const z = t.main(), at = [ut("p", "Give someone on-chain music. They need no wallet: a passkey and your link is all it takes.", "ppp-mute")];
+    const z = t.main(), at = [lt("p", "Give someone on-chain music. They need no wallet: a passkey and your link is all it takes.", "ppp-mute")];
     if (!z)
-      at.push(ut("p", "Connect a Stacks wallet (top right) to send a gift."));
+      at.push(lt("p", "Connect a Stacks wallet (top right) to send a gift."));
     else {
       E.disabled = !!p, at.push(Gt, Ht, E), t.now() - O > 3e4 && (O = t.now(), q(z));
       const Ot = R(z);
       if (Ot.length) {
-        const ae = ut("ul", "", "ppp-gift-list");
-        for (const ft of Ot.slice(0, 10)) {
-          const ht = (It = ft.view) == null ? void 0 : It.status, u = ft.error ? ft.error : !ht || ht === "pending-deposit" ? ft.txid ? "payment confirming…" : "waiting for your payment" : ht === "live" ? "ready to share" : ht === "claiming" || ht === "claimed" ? "claimed ✓" : ht === "refunding" ? "expired · refund on its way" : ht === "refunded" ? "expired · refunded to you" : ht, x = ut("li");
-          if (x.append(ut("span", `${Gs(BigInt(ft.amount))} STX`, "t"), ut("span", u, ((mt = ft.view) == null ? void 0 : mt.status) === "claimed" ? "ppp-ok" : "ppp-mute")), ((Rt = ft.view) == null ? void 0 : Rt.status) === "live") {
-            const A = G(((Ft = B.gate) == null ? void 0 : Ft.radioUrl) ?? null, ft.code);
-            x.append(Qs("gift-copy:" + ft.id, "Copy link", () => A, "tiny", t.changed), $y("gift-share:" + ft.id, "Share", () => ot(A), "tiny", t.changed));
+        const ae = lt("ul", "", "ppp-gift-list");
+        for (const ut of Ot.slice(0, 10)) {
+          const dt = (Bt = ut.view) == null ? void 0 : Bt.status, u = ut.error ? ut.error : !dt || dt === "pending-deposit" ? ut.txid ? "payment confirming…" : "waiting for your payment" : dt === "live" ? "ready to share" : dt === "claiming" || dt === "claimed" ? "claimed ✓" : dt === "refunding" ? "expired · refund on its way" : dt === "refunded" ? "expired · refunded to you" : dt, x = lt("li");
+          if (x.append(lt("span", `${Gs(BigInt(ut.amount))} STX`, "t"), lt("span", u, ((bt = ut.view) == null ? void 0 : bt.status) === "claimed" ? "ppp-ok" : "ppp-mute")), ((Rt = ut.view) == null ? void 0 : Rt.status) === "live") {
+            const v = G(((Ft = B.gate) == null ? void 0 : Ft.radioUrl) ?? null, ut.code);
+            x.append(Qs("gift-copy:" + ut.id, "Copy link", () => v, "tiny", t.changed), $y("gift-share:" + ut.id, "Share", () => ot(v), "tiny", t.changed));
           }
           ae.append(x);
         }
@@ -13118,37 +13111,37 @@ function Ov(t) {
       }
       if (X.admin) {
         const ae = Cr("Sign and make links", () => {
-          const A = BigInt(Math.round(Number(ct.value) * 1e6));
-          Q(z, Number(wt.value), A, Ut.value.trim(), Kt.value || void 0);
-        }), ft = ut("div", "", "ppp-gift-admin"), ht = (A, D) => {
-          const rt = ut("label", A);
+          const v = BigInt(Math.round(Number(ct.value) * 1e6));
+          Z(z, Number(gt.value), v, Ut.value.trim(), Kt.value || void 0);
+        }), ut = lt("div", "", "ppp-gift-admin"), dt = (v, D) => {
+          const rt = lt("label", v);
           return rt.append(D), rt;
         }, u = N(z), x = Kt.value;
-        if (Kt.replaceChildren(Hi("No player (plain gift)", ""), ...u.map((A) => Hi(`${A.title} · ${A.tracks} songs`, A.id))), u.some((A) => A.id === x) && (Kt.value = x), ft.append(
-          ut("p", "Gift players (admin) · an album that comes with the gift", "ppp-cyan"),
+        if (Kt.replaceChildren(Hi("No player (plain gift)", ""), ...u.map((v) => Hi(`${v.title} · ${v.tracks} songs`, v.id))), u.some((v) => v.id === x) && (Kt.value = x), ut.append(
+          lt("p", "Gift players (admin) · an album that comes with the gift", "ppp-cyan"),
           $t,
           Mt,
           qt,
           Cr("Sign and make player", () => void U(z, { title: $t.value, subtitle: Mt.value, tracks: qt.value })),
-          ut("p", "Campaign links (admin) · paid from the gift treasury", "ppp-cyan"),
-          ht("Player ", Kt),
-          ht("Plays each ", de),
-          ht("Links ", wt),
-          ht("STX each ", ct),
+          lt("p", "Campaign links (admin) · paid from the gift treasury", "ppp-cyan"),
+          dt("Player ", Kt),
+          dt("Plays each ", de),
+          dt("Links ", gt),
+          dt("STX each ", ct),
           Ut,
           ae
         ), I) {
-          const A = I.codes.map((rt) => {
-            var dt;
-            return G(((dt = B.gate) == null ? void 0 : dt.radioUrl) ?? null, rt);
+          const v = I.codes.map((rt) => {
+            var ft;
+            return G(((ft = B.gate) == null ? void 0 : ft.radioUrl) ?? null, rt);
           }).join(`
-`), D = ut("textarea");
-          D.readOnly = !0, D.value = A, D.rows = Math.min(8, I.codes.length), ft.append(ut("p", `${I.codes.length} links, ${Gs(BigInt(I.amount))} STX each. Copy them now: they are not shown again.`, "ppp-warn"), D, Qs("campaign-copy", "Copy all", () => A, "tiny", t.changed));
+`), D = lt("textarea");
+          D.readOnly = !0, D.value = v, D.rows = Math.min(8, I.codes.length), ut.append(lt("p", `${I.codes.length} links, ${Gs(BigInt(I.amount))} STX each. Copy them now: they are not shown again.`, "ppp-warn"), D, Qs("campaign-copy", "Copy all", () => v, "tiny", t.changed));
         }
-        at.push(ft);
+        at.push(ut);
       }
     }
-    return p && at.push(ut("p", p, "ppp-cyan")), v && at.push(ut("p", v, /✓/.test(v) ? "ppp-ok" : "ppp-warn")), P.replaceChildren(...at), P;
+    return p && at.push(lt("p", p, "ppp-cyan")), $ && at.push(lt("p", $, /✓/.test($) ? "ppp-ok" : "ppp-warn")), P.replaceChildren(...at), P;
   }
   return { banner: b, funder: C, renderFold: Ge, liveGift: i, setAside: o, pendingCode: () => e && !e.done && (!e.view || e.view.status === "live") ? e.code : null };
 }
@@ -13217,7 +13210,7 @@ function Kv(t) {
     }
   }, b = (k) => new Set(m(g(k), []).filter((N) => Number.isSafeInteger(N))), C = (k) => {
     const N = m(h(k), {}), U = {};
-    for (const [Q, G] of Object.entries(N)) Number.isSafeInteger(Number(Q)) && typeof G == "number" && (U[Number(Q)] = G);
+    for (const [Z, G] of Object.entries(N)) Number.isSafeInteger(Number(Z)) && typeof G == "number" && (U[Number(Z)] = G);
     return U;
   };
   async function P(k) {
@@ -13225,13 +13218,13 @@ function Kv(t) {
       s = !0, i = !1;
       try {
         const N = [];
-        let U = 0, Q = 0;
+        let U = 0, Z = 0;
         for (let G = 0; G < Gv / 100 + 1; G++) {
           const ot = await t.json(`/radio/gift/shelf?root=${encodeURIComponent(k)}&after=${U}&limit=100`);
-          if (N.push(...Fv(ot == null ? void 0 : ot.shelf)), Q = Number(ot == null ? void 0 : ot.total) || N.length, !(ot != null && ot.next) || !Number.isSafeInteger(ot.next)) break;
+          if (N.push(...Fv(ot == null ? void 0 : ot.shelf)), Z = Number(ot == null ? void 0 : ot.total) || N.length, !(ot != null && ot.next) || !Number.isSafeInteger(ot.next)) break;
           U = ot.next;
         }
-        k === e && (n = N, r = Q, o = t.now());
+        k === e && (n = N, r = Z, o = t.now());
       } catch {
         i = !0;
       } finally {
@@ -13245,19 +13238,19 @@ function Kv(t) {
   p.type = "search", p.placeholder = "Search title, artist or #", p.setAttribute("aria-label", "Search your albums"), p.oninput = () => {
     a = p.value, d = Ks, t.changed();
   };
-  const v = Fe("select");
-  v.setAttribute("aria-label", "Sort albums");
+  const $ = Fe("select");
+  $.setAttribute("aria-label", "Sort albums");
   for (const k of Dv) {
     const N = document.createElement("option");
-    N.value = k.value, N.textContent = k.label, v.append(N);
+    N.value = k.value, N.textContent = k.label, $.append(N);
   }
-  v.onchange = () => {
-    c = v.value, d = Ks, t.changed();
+  $.onchange = () => {
+    c = $.value, d = Ks, t.changed();
   };
   const I = Vs("", () => {
     f = !f, d = Ks, t.changed();
   }, "tiny"), R = Fe("div", "", "ppp-shelf-tools");
-  R.append(p, v, I);
+  R.append(p, $, I);
   const Y = Fe("div"), O = Fe("div");
   function q(k) {
     const N = k.step === "off" || k.step === "elsewhere" ? void 0 : k.root;
@@ -13266,22 +13259,22 @@ function Kv(t) {
       return i ? (O.replaceChildren(Fe("p", "Could not read your albums right now. They are safe in your wallet.", "ppp-warn"), Vs("Try again", () => {
         o = -1 / 0, t.changed();
       }, "quiet")), l.replaceChildren(O), l) : null;
-    const U = b(N), Q = C(N), G = zv(n, { query: a, sort: c, pinnedOnly: f, pins: U, recents: Q });
-    p.value !== a && (p.value = a), v.value = c, I.textContent = f ? "★ Pinned only" : "☆ Pinned only", I.setAttribute("aria-pressed", String(f));
+    const U = b(N), Z = C(N), G = zv(n, { query: a, sort: c, pinnedOnly: f, pins: U, recents: Z });
+    p.value !== a && (p.value = a), $.value = c, I.textContent = f ? "★ Pinned only" : "☆ Pinned only", I.setAttribute("aria-pressed", String(f));
     const ot = [];
     if (k.slot > 0 && ot.push(Vs("← Back to my own wallet", () => t.open(0), "quiet")), !G.length) ot.push(Fe("p", "No album matches that.", "ppp-mute"));
     else {
       const Gt = Fe("ul", "", "ppp-shelf-list");
       for (const Ht of G.slice(0, d)) {
-        const E = Fe("li", "", Ht.slot === k.slot ? "now" : ""), T = U.has(Ht.slot), Ct = Vs(T ? "★" : "☆", () => {
+        const E = Fe("li", "", Ht.slot === k.slot ? "now" : ""), T = U.has(Ht.slot), Lt = Vs(T ? "★" : "☆", () => {
           const Mt = new Set(U);
           T ? Mt.delete(Ht.slot) : Mt.add(Ht.slot), t.store.set(g(N), JSON.stringify([...Mt])), t.changed();
         }, "tiny");
-        Ct.setAttribute("aria-label", T ? `Unpin ${Ht.player.title}` : `Pin ${Ht.player.title}`);
-        const wt = [Ht.player.subtitle, `${Ht.player.tracks.length} ${Ht.player.tracks.length === 1 ? "song" : "songs"}`, Ht.state === "sending" ? "arriving…" : ""].filter(Boolean).join(" · "), ct = Ht.slot === k.slot, $t = Vs(ct ? "Playing" : "Play", () => {
-          t.store.set(h(N), JSON.stringify(Rv({ ...Q, [Ht.slot]: t.now() }))), t.open(Ht.slot);
+        Lt.setAttribute("aria-label", T ? `Unpin ${Ht.player.title}` : `Pin ${Ht.player.title}`);
+        const gt = [Ht.player.subtitle, `${Ht.player.tracks.length} ${Ht.player.tracks.length === 1 ? "song" : "songs"}`, Ht.state === "sending" ? "arriving…" : ""].filter(Boolean).join(" · "), ct = Ht.slot === k.slot, $t = Vs(ct ? "Playing" : "Play", () => {
+          t.store.set(h(N), JSON.stringify(Rv({ ...Z, [Ht.slot]: t.now() }))), t.open(Ht.slot);
         }, ct ? "tiny" : "tiny primary");
-        $t.disabled = ct, E.append(Ct, Fe("span", Ht.player.title, "t"), Fe("span", " " + wt, "ppp-mute"), $t), Gt.append(E);
+        $t.disabled = ct, E.append(Lt, Fe("span", Ht.player.title, "t"), Fe("span", " " + gt, "ppp-mute"), $t), Gt.append(E);
       }
       ot.push(Gt), G.length > d && ot.push(Vs(`Show more (${G.length - d} left)`, () => {
         d += Ks, t.changed();
@@ -13319,12 +13312,12 @@ function Wv(t, e) {
 const Xv = (t) => Iy(t) ? "Safari" : ky(t) ? "Chrome" : "your browser", Kh = document.getElementById("ppp");
 Kh && Yv(Kh);
 function Yv(t) {
-  var ht;
+  var dt;
   const e = hw(), n = (u) => t.querySelector(u), r = n(".ppp-frame");
   let s = null;
   const i = async (u, x) => {
-    const A = await fetch(u, { cache: "no-store", ...x, signal: AbortSignal.timeout(15e3) }), D = await A.json().catch(() => ({}));
-    if (!A.ok) throw new Error((D == null ? void 0 : D.error) || `Request failed (${A.status}).`);
+    const v = await fetch(u, { cache: "no-store", ...x, signal: AbortSignal.timeout(15e3) }), D = await v.json().catch(() => ({}));
+    if (!v.ok) throw new Error((D == null ? void 0 : D.error) || `Request failed (${v.status}).`);
     return D;
   }, o = F5({
     now: Date.now,
@@ -13335,21 +13328,21 @@ function Yv(t) {
     config: (u) => i("/radio/listening-wallet/config?main=" + encodeURIComponent(u || "")),
     links: async (u) => (await i("/radio/listening-wallet/link?main=" + encodeURIComponent(u))).links ?? [],
     mainOf: async (u) => {
-      var A;
+      var v;
       const x = (await i("/radio/listening-wallet/link?listening=" + encodeURIComponent(u))).links;
-      return ((A = x == null ? void 0 : x.find((D) => D.listening === u)) == null ? void 0 : A.main) ?? null;
+      return ((v = x == null ? void 0 : x.find((D) => D.listening === u)) == null ? void 0 : v.main) ?? null;
     },
     saveLink: async (u) => {
       await i("/radio/listening-wallet/link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(u) });
     },
     bridge: async (u) => {
       s = document.createElement("iframe"), s.title = "Xtrata listening wallet", s.setAttribute("allow", `publickey-credentials-get ${u}; publickey-credentials-create ${u}`), s.referrerPolicy = "no-referrer";
-      const x = new Promise((dt, ce) => {
-        s.addEventListener("load", () => dt(), { once: !0 }), setTimeout(() => ce(new Error("The listening wallet did not load. Listening stays free.")), 15e3);
+      const x = new Promise((ft, ce) => {
+        s.addEventListener("load", () => ft(), { once: !0 }), setTimeout(() => ce(new Error("The listening wallet did not load. Listening stays free.")), 15e3);
       });
       s.src = u + "/", r.replaceChildren(s), await x;
-      const A = new sw({ walletOrigin: u, frame: s, timeoutMs: 30 * 6e4 }), D = /* @__PURE__ */ new Set(["listening.unlock", "listening.link", "listening.approveSession", "listening.prepareReturn"]), rt = (dt, ce) => D.has(dt) ? A.request(dt, ce) : Promise.race([
-        A.request(dt, ce),
+      const v = new sw({ walletOrigin: u, frame: s, timeoutMs: 30 * 6e4 }), D = /* @__PURE__ */ new Set(["listening.unlock", "listening.link", "listening.approveSession", "listening.prepareReturn"]), rt = (ft, ce) => D.has(ft) ? v.request(ft, ce) : Promise.race([
+        v.request(ft, ce),
         new Promise((ee, xe) => setTimeout(() => xe(new Error("The listening wallet is not answering. Listening stays free.")), 1e4))
       ]);
       return await rt("listening.status"), { request: rt };
@@ -13368,25 +13361,25 @@ function Yv(t) {
       }
     },
     signWithMain: (u, x) => vh({ ...x, network: "mainnet", stxAddress: u }),
-    deposit: (u, x, A) => new Promise((D, rt) => mh({
+    deposit: (u, x, v) => new Promise((D, rt) => mh({
       recipient: x,
-      amount: A.toString(),
+      amount: v.toString(),
       memo: "Xtrata listening wallet",
       stxAddress: u,
       network: new jc(),
       appDetails: { name: "Xtrata Radio · pay-per-play", icon: "/favicon.svg" },
-      onFinish: (dt) => D(dt.txId || ""),
+      onFinish: (ft) => D(ft.txId || ""),
       onCancel: () => rt(new Error("Deposit cancelled. Nothing was sent.")),
       onError: rt
     })),
     validate: I5,
     tabLock: (u) => new Promise((x) => {
-      const A = navigator.locks;
-      if (!(A != null && A.request)) {
+      const v = navigator.locks;
+      if (!(v != null && v.request)) {
         x(!0);
         return;
       }
-      A.request("xtrata-ppp:" + u, { ifAvailable: !0 }, async (D) => {
+      v.request("xtrata-ppp:" + u, { ifAvailable: !0 }, async (D) => {
         x(!!D), D && await new Promise(() => {
         });
       });
@@ -13409,23 +13402,23 @@ function Yv(t) {
     changed: () => Ot(o.snapshot()),
     // A gifted wallet returns to whoever paid for the gift (the gift record), else to its first funder.
     funder: (u) => {
-      var x, A;
-      return a.funder(u, () => M5(u, Hr), !!((A = (x = o.snapshot().gate) == null ? void 0 : x.gifts) != null && A.enabled));
+      var x, v;
+      return a.funder(u, () => M5(u, Hr), !!((v = (x = o.snapshot().gate) == null ? void 0 : x.gifts) != null && v.enabled));
     },
     // Was this wallet gifted, and with which album? A failed request throws: it is never read as "not a gift".
     giftInfo: async (u) => {
-      const x = await i("/radio/gift/for?wallet=" + encodeURIComponent(u)), A = x == null ? void 0 : x.gift;
-      if (!A) return null;
-      if (typeof A.returnTo != "string" || typeof A.treasury != "string") throw new Error("Unreadable gift record.");
-      return { returnTo: A.returnTo, from: typeof A.from == "string" ? A.from : null, source: String(A.source ?? ""), amount: String(A.amount ?? "0"), treasury: A.treasury, state: A.state === "sending" ? "sending" : "arrived", player: A.player ?? null };
+      const x = await i("/radio/gift/for?wallet=" + encodeURIComponent(u)), v = x == null ? void 0 : x.gift;
+      if (!v) return null;
+      if (typeof v.returnTo != "string" || typeof v.treasury != "string") throw new Error("Unreadable gift record.");
+      return { returnTo: v.returnTo, from: typeof v.from == "string" ? v.from : null, source: String(v.source ?? ""), amount: String(v.amount ?? "0"), treasury: v.treasury, state: v.state === "sending" ? "sending" : "arrived", player: v.player ?? null };
     },
-    history: (u, x) => U5(u, (A) => Hr(A), x),
+    history: (u, x) => U5(u, (v) => Hr(v), x),
     likesChanged: () => {
       var u, x;
       (x = (u = window.XtrataRadio) == null ? void 0 : u.refreshLikes) == null || x.call(u);
     },
     likeState: async (u, x) => {
-      const A = await i("/radio/chain-likes?" + new URLSearchParams({ wallet: u, ids: String(x) })), D = Array.isArray(A == null ? void 0 : A.rows) ? A.rows.find((rt) => (rt == null ? void 0 : rt.id) === x) : null;
+      const v = await i("/radio/chain-likes?" + new URLSearchParams({ wallet: u, ids: String(x) })), D = Array.isArray(v == null ? void 0 : v.rows) ? v.rows.find((rt) => (rt == null ? void 0 : rt.id) === x) : null;
       if (!D || typeof D.liked != "boolean") throw new Error("Like state unavailable.");
       return { liked: D.liked, by: Array.isArray(D.by) ? D.by.filter((rt) => typeof rt == "string") : D.liked ? [u] : [] };
     },
@@ -13439,21 +13432,21 @@ function Yv(t) {
       const u = e.load();
       return u.isConnected && u.network === "mainnet" ? u.address : void 0;
     },
-    pay: (u, x, A, D) => new Promise((rt, dt) => mh({
+    pay: (u, x, v, D) => new Promise((rt, ft) => mh({
       recipient: x,
-      amount: A.toString(),
+      amount: v.toString(),
       memo: D,
       stxAddress: u,
       network: new jc(),
       appDetails: { name: "Xtrata Radio · gift", icon: "/favicon.svg" },
       onFinish: (ce) => rt(ce.txId || ""),
-      onCancel: () => dt(new Error("Gift cancelled. Nothing was sent.")),
-      onError: dt
+      onCancel: () => ft(new Error("Gift cancelled. Nothing was sent.")),
+      onError: ft
     })),
     sign: (u, x) => vh({ ...x, network: "mainnet", stxAddress: u }),
     giftSent: (u, x) => o.giftSent(u, x),
-    album: { bind: (u) => o.bindAlbum(u), arrived: async (u, x, A, D) => {
-      c.invalidate(), await o.albumArriving(u, x, A, D);
+    album: { bind: (u) => o.bindAlbum(u), arrived: async (u, x, v, D) => {
+      c.invalidate(), await o.albumArriving(u, x, v, D);
     } },
     who: (u) => U(u),
     changed: () => Ot(o.snapshot()),
@@ -13508,80 +13501,80 @@ function Yv(t) {
     return u.solo && u.step !== "off" && u.step !== "elsewhere" ? u.listening : void 0;
   };
   const d = (u) => {
-    var A, D;
+    var v, D;
     const x = window.XtrataRadioListeningIdentity();
-    x !== f && (f = x, (D = (A = window.XtrataRadio) == null ? void 0 : A.refreshLikes) == null || D.call(A));
+    x !== f && (f = x, (D = (v = window.XtrataRadio) == null ? void 0 : v.refreshLikes) == null || D.call(v));
   };
   let l = "", g = null, h = !1;
   const m = (u) => {
     var ce, ee, xe, fn;
     const x = window.XtrataRadio;
     if (!(x != null && x.setGiftPlayer) || !(x != null && x.setGiftStop)) return;
-    const A = u.step === "off" || u.step === "elsewhere" ? null : ((ce = u.gift) == null ? void 0 : ce.player) ?? null, D = A ? A.id + ":" + A.tracks.map((dn) => dn.id).join(",") : "";
-    D !== l && (x.setGiftPlayer(A ? { id: A.id, title: A.title, subtitle: A.subtitle, tracks: A.tracks.map((dn) => dn.id) } : null), l = D);
-    const rt = A ? ((ee = u.giftStop) == null ? void 0 : ee.text) ?? null : null;
+    const v = u.step === "off" || u.step === "elsewhere" ? null : ((ce = u.gift) == null ? void 0 : ce.player) ?? null, D = v ? v.id + ":" + v.tracks.map((dn) => dn.id).join(",") : "";
+    D !== l && (x.setGiftPlayer(v ? { id: v.id, title: v.title, subtitle: v.subtitle, tracks: v.tracks.map((dn) => dn.id) } : null), l = D);
+    const rt = v ? ((ee = u.giftStop) == null ? void 0 : ee.text) ?? null : null;
     rt !== g && (x.setGiftStop(rt), g = rt);
-    const dt = !!A && !!((xe = u.albumLock) != null && xe.locked);
-    dt !== h && ((fn = x.setGiftLock) == null || fn.call(x, dt), h = dt);
+    const ft = !!v && !!((xe = u.albumLock) != null && xe.locked);
+    ft !== h && ((fn = x.setGiftLock) == null || fn.call(x, ft), h = ft);
   }, b = (u) => u ? u.slice(0, 6) + "…" + u.slice(-4) : "", C = (u) => (Number(u) / 1e6).toFixed(u < 1000n ? 6 : 4), P = (u) => {
     const x = Math.round((Date.now() - u) / 6e4);
     return x < 1 ? "now" : x < 60 ? `${x}m` : x < 1440 ? `${Math.round(x / 60)}h` : `${Math.round(x / 1440)}d`;
-  }, _ = (u) => `https://explorer.hiro.so/txid/${u}?chain=mainnet`, p = (u, x = "", A = "") => {
+  }, _ = (u) => `https://explorer.hiro.so/txid/${u}?chain=mainnet`, p = (u, x = "", v = "") => {
     const D = document.createElement(u);
-    return x && (D.textContent = x), A && (D.className = A), D;
-  }, v = (u, x, A = "") => {
-    const D = p("button", u, A);
+    return x && (D.textContent = x), v && (D.className = v), D;
+  }, $ = (u, x, v = "") => {
+    const D = p("button", u, v);
     return D.type = "button", D.onclick = x, D;
   }, I = (u, x) => {
-    const A = p("a", u);
-    return A.href = x, A.target = "_blank", A.rel = "noopener", A;
+    const v = p("a", u);
+    return v.href = x, v.target = "_blank", v.rel = "noopener", v;
   };
   let R = null, Y = location.hash === "#give";
   Y && history.replaceState(null, "", location.pathname + location.search);
   let O = !1;
   const q = Av((u) => Ev({ address: u, network: "mainnet" }), () => Ot(o.snapshot())), S = (u) => q.get(u), k = qv(navigator.userAgent), N = (u, x) => {
-    const A = navigator.userAgent, D = Xv(A), rt = `${location.origin}${location.pathname}${x ? `#gift=${x}` : ""}`, dt = [p("p", `You are in ${u}'s built-in browser, where passkeys often do not work. Open this page in ${D} to make your listening wallet${x ? " and claim your gift" : ""}.`, "ppp-warn")], ce = p("div", "", "ppp-open-row"), ee = Wv(rt, A);
+    const v = navigator.userAgent, D = Xv(v), rt = `${location.origin}${location.pathname}${x ? `#gift=${x}` : ""}`, ft = [p("p", `You are in ${u}'s built-in browser, where passkeys often do not work. Open this page in ${D} to make your listening wallet${x ? " and claim your gift" : ""}.`, "ppp-warn")], ce = p("div", "", "ppp-open-row"), ee = Wv(rt, v);
     if (ee) {
       const xe = p("a", `Open in ${D}`, "primary ppp-open-in");
       xe.href = ee, xe.dataset.homeAction = "radio:open-in-browser", ce.append(xe);
     }
-    return ce.append(Qs("copy-page-link", "Copy link", () => rt, ee ? "" : "primary", () => Ot(o.snapshot()))), dt.push(ce, p("p", `If that does not open ${D}, use ${u}'s menu (••• or ⋮) and choose "Open in ${D === "your browser" ? "browser" : D}", or paste the copied link there.`, "ppp-mute")), dt;
-  }, U = (u) => S(u) ?? b(u), Q = (u) => u.slice(0, 2).map(U).join(" and ") + (u.length > 2 ? ` and ${u.length - 2} more` : ""), G = /* @__PURE__ */ new Map();
+    return ce.append(Qs("copy-page-link", "Copy link", () => rt, ee ? "" : "primary", () => Ot(o.snapshot()))), ft.push(ce, p("p", `If that does not open ${D}, use ${u}'s menu (••• or ⋮) and choose "Open in ${D === "your browser" ? "browser" : D}", or paste the copied link there.`, "ppp-mute")), ft;
+  }, U = (u) => S(u) ?? b(u), Z = (u) => u.slice(0, 2).map(U).join(" and ") + (u.length > 2 ? ` and ${u.length - 2} more` : ""), G = /* @__PURE__ */ new Map();
   let ot = !1;
   const Gt = (u) => !u || /^(?:Inscription )?#\d+$/.test(u.trim()), Ht = () => {
     ot || (ot = !0, fetch("/radio/counts?range=all&chainLikes=0", { cache: "no-store", signal: AbortSignal.timeout(2e4) }).then((u) => u.ok ? u.json() : null).then((u) => {
       for (const x of Array.isArray(u == null ? void 0 : u.tracks) ? u.tracks : []) {
-        const A = Number(x == null ? void 0 : x.id);
-        Number.isSafeInteger(A) && G.set(A, { title: typeof x.title == "string" ? x.title : void 0, artist: typeof x.artist == "string" ? x.artist : void 0 });
+        const v = Number(x == null ? void 0 : x.id);
+        Number.isSafeInteger(v) && G.set(v, { title: typeof x.title == "string" ? x.title : void 0, artist: typeof x.artist == "string" ? x.artist : void 0 });
       }
       Ot(o.snapshot());
     }).catch(() => {
       ot = !1;
     }));
   }, E = (u, x) => {
-    const A = G.get(u), D = $v(u, [A == null ? void 0 : A.title, x == null ? void 0 : x.title].find((dt) => !Gt(dt)) || ""), rt = vv(u, (A == null ? void 0 : A.artist) || (x == null ? void 0 : x.artist) || "");
+    const v = G.get(u), D = $v(u, [v == null ? void 0 : v.title, x == null ? void 0 : x.title].find((ft) => !Gt(ft)) || ""), rt = vv(u, (v == null ? void 0 : v.artist) || (x == null ? void 0 : x.artist) || "");
     return { title: D, artist: rt };
   }, T = (u) => {
-    const { title: x, artist: A } = E(u.song, u);
-    return x ? `“${x}”${A ? ` — ${A}` : ""}` : `Song #${u.song}${A ? ` — ${A}` : ""}`;
-  }, Ct = { confirmed: "ppp-ok", pending: "ppp-warn", signed: "ppp-warn", unknown: "ppp-warn", prepared: "ppp-warn", failed: "ppp-bad", cancelled: "ppp-mute" }, wt = { confirmed: "confirmed", pending: "confirming", signed: "sending", unknown: "checking", prepared: "preparing", failed: "failed", cancelled: "cancelled" };
+    const { title: x, artist: v } = E(u.song, u);
+    return x ? `“${x}”${v ? ` — ${v}` : ""}` : `Song #${u.song}${v ? ` — ${v}` : ""}`;
+  }, Lt = { confirmed: "ppp-ok", pending: "ppp-warn", signed: "ppp-warn", unknown: "ppp-warn", prepared: "ppp-warn", failed: "ppp-bad", cancelled: "ppp-mute" }, gt = { confirmed: "confirmed", pending: "confirming", signed: "sending", unknown: "checking", prepared: "preparing", failed: "failed", cancelled: "cancelled" };
   function ct(u) {
     return ["elsewhere", "connect", "not-invited", "unsupported", "loading"].includes(u.step) ? ["", ""] : u.step === "wrong-wallet" ? ["WRONG WALLET", "warn"] : u.step === "over" ? ["OVER 1 STX", "bad"] : u.step === "locked" ? ["LOCKED", "mute"] : u.step === "intro" || u.step === "link" ? ["", ""] : u.step === "fund" ? u.depositPending ? ["ON ITS WAY", "warn"] : u.entries.length ? ["OUT OF FUNDS", "bad"] : ["ADD FUNDS", "warn"] : u.payingOn && u.session && u.session.playsLeft > 0 ? ["ON · PAYING", "ok"] : ["OFF", "mute"];
   }
-  function $t(u, x, A = "", D) {
-    const rt = p("dt", u), dt = p("dd", x, A);
-    return D && dt.append(" ", D), [rt, dt];
+  function $t(u, x, v = "", D) {
+    const rt = p("dt", u), ft = p("dd", x, v);
+    return D && ft.append(" ", D), [rt, ft];
   }
   const Mt = document.getElementById("ppp-top"), qt = () => {
     (r.hidden || r.classList.contains("ppp-frame--rest") ? t : r).scrollIntoView({ behavior: "smooth", block: "center" }), t.classList.remove("ppp-flash"), t.offsetWidth, t.classList.add("ppp-flash");
   }, Kt = () => {
-    var x, A;
+    var x, v;
     const u = o.snapshot();
     if (u.step === "connect" || u.step === "wrong-wallet") {
       (x = document.getElementById("radio-wallet-connect")) == null || x.click();
       return;
     }
-    if (u.step === "elsewhere" && ((A = u.gate) != null && A.radioUrl)) {
+    if (u.step === "elsewhere" && ((v = u.gate) != null && v.radioUrl)) {
       location.href = u.gate.radioUrl;
       return;
     }
@@ -13590,9 +13583,9 @@ function Yv(t) {
   Mt && (Mt.onclick = Kt);
   function de(u) {
     if (!Mt) return;
-    const x = (D, rt, dt) => {
-      Mt.hidden = !1, Mt.className = "ppp-top" + (rt ? " is-" + rt : ""), Mt.replaceChildren(p("span", "", "dot"), document.createTextNode(D)), Mt.title = dt;
-    }, A = u.session ? Math.min(u.session.playsLeft, u.playsLeft) : 0;
+    const x = (D, rt, ft) => {
+      Mt.hidden = !1, Mt.className = "ppp-top" + (rt ? " is-" + rt : ""), Mt.replaceChildren(p("span", "", "dot"), document.createTextNode(D)), Mt.title = ft;
+    }, v = u.session ? Math.min(u.session.playsLeft, u.playsLeft) : 0;
     switch (u.step) {
       case "off":
       case "not-invited":
@@ -13619,11 +13612,11 @@ function Yv(t) {
       case "loading":
         return x("Pay-per-play", "quiet", "Checking the listening wallet");
       case "ready":
-        return u.payingOn && A > 0 ? x(`On · ${A.toLocaleString()} plays left`, "on", "Paying artists as you listen") : x("Paying off · switch on", "off", "Pay-per-play is switched off");
+        return u.payingOn && v > 0 ? x(`On · ${v.toLocaleString()} plays left`, "on", "Paying artists as you listen") : x("Paying off · switch on", "off", "Pay-per-play is switched off");
     }
   }
   const Ut = document.getElementById("pppNudge"), Ge = document.getElementById("onair");
-  (ht = Ut == null ? void 0 : Ut.querySelector("button")) == null || ht.addEventListener("click", () => Kt());
+  (dt = Ut == null ? void 0 : Ut.querySelector("button")) == null || dt.addEventListener("click", () => Kt());
   const un = {
     elsewhere: "Listening free · artists get nothing",
     connect: "Not paying artists",
@@ -13646,11 +13639,11 @@ function Yv(t) {
     ready: "Switch on"
   };
   function X(u) {
-    var dt;
+    var ft;
     if (u.step === "loading") return;
-    const x = u.session ? Math.min(u.session.playsLeft, u.playsLeft) : 0, A = u.step === "ready" && u.payingOn && x > 0, D = A ? "" : un[u.step] ?? "", rt = A ? "on" : D ? "off" : "";
-    if (rt ? document.documentElement.dataset.ppp = rt : delete document.documentElement.dataset.ppp, Ge && (Ge.hidden = !rt, Ge.querySelector(".onair-sub").textContent = A ? `Paying artists · ${x.toLocaleString()} plays left` : "Not paying"), Ut && (Ut.hidden = rt !== "off" || u.step === "fund" && u.depositPending, rt === "off")) {
-      const ce = Math.floor(Number(1000000n / zr(BigInt(((dt = u.gate) == null ? void 0 : dt.limits.playFee) ?? "300"))));
+    const x = u.session ? Math.min(u.session.playsLeft, u.playsLeft) : 0, v = u.step === "ready" && u.payingOn && x > 0, D = v ? "" : un[u.step] ?? "", rt = v ? "on" : D ? "off" : "";
+    if (rt ? document.documentElement.dataset.ppp = rt : delete document.documentElement.dataset.ppp, Ge && (Ge.hidden = !rt, Ge.querySelector(".onair-sub").textContent = v ? `Paying artists · ${x.toLocaleString()} plays left` : "Not paying"), Ut && (Ut.hidden = rt !== "off" || u.step === "fund" && u.depositPending, rt === "off")) {
+      const ce = Math.floor(Number(1000000n / zr(BigInt(((ft = u.gate) == null ? void 0 : ft.limits.playFee) ?? "300"))));
       Ut.querySelector(".nudge-t").textContent = "⚠ " + D, Ut.querySelector(".nudge-s").textContent = `1 STX (less than $1) pays for ${ce.toLocaleString()} plays, on-chain, straight to the artists.`, Ut.querySelector("button").textContent = B[u.step] ?? "Start paying";
     }
   }
@@ -13658,49 +13651,49 @@ function Yv(t) {
   function at(u) {
     const x = p("div", "", "ppp-pick");
     u.funderMultiple && u.returnToKind === "funder" && x.append(p("p", "More than one address has sent funds. Returns go to the first. Choose another below if that is not right.", "ppp-warn")), u.returnToKind === "funder" && x.append(p("p", "If the funds came from an exchange, choose your own address instead: exchanges often cannot take a refund.", "ppp-mute"));
-    const A = p("input");
-    A.type = "text", A.placeholder = "SP… address to send returns to", A.autocomplete = "off", A.spellcheck = !1, A.setAttribute("aria-label", "Address to return funds to"), A.value = z, A.oninput = () => {
-      z = A.value;
+    const v = p("input");
+    v.type = "text", v.placeholder = "SP… address to send returns to", v.autocomplete = "off", v.spellcheck = !1, v.setAttribute("aria-label", "Address to return funds to"), v.value = z, v.oninput = () => {
+      z = v.value;
     };
-    const D = v(u.returnToKind === "chosen" ? "Change address" : "Use this address", () => {
-      o.setReturnAddress(A.value), z = "";
+    const D = $(u.returnToKind === "chosen" ? "Change address" : "Use this address", () => {
+      o.setReturnAddress(v.value), z = "";
     }, "tiny");
-    return x.append(A, " ", D), u.returnToKind === "chosen" && x.append(" ", v("Back to the funder", () => o.clearReturnAddress(), "tiny")), x;
+    return x.append(v, " ", D), u.returnToKind === "chosen" && x.append(" ", $("Back to the funder", () => o.clearReturnAddress(), "tiny")), x;
   }
   const it = "Your plays and likes are listed under this listening address. To keep them under a wallet of your own, get Xverse or Leather (both free), connect it here, and link this listening wallet to it.";
-  function It() {
+  function Bt() {
     const u = p("p", it + " ", "ppp-mute");
     return u.append(I("Xverse", "https://www.xverse.app/download"), " · ", I("Leather", "https://leather.io/install-extension")), u;
   }
-  let mt = "";
+  let bt = "";
   const Rt = (u) => {
-    const x = document.documentElement, A = u.solo && !u.main ? u.listening ? b(u.listening) : "new" : "", D = K5() ? "1" : "";
-    `${A}|${D}` !== mt && (mt = `${A}|${D}`, A ? x.dataset.pppSolo = A : delete x.dataset.pppSolo, D ? x.dataset.pppWalletInstalled = D : delete x.dataset.pppWalletInstalled, window.dispatchEvent(new Event("xtrata:ppp-header")));
+    const x = document.documentElement, v = u.solo && !u.main ? u.listening ? b(u.listening) : "new" : "", D = K5() ? "1" : "";
+    `${v}|${D}` !== bt && (bt = `${v}|${D}`, v ? x.dataset.pppSolo = v : delete x.dataset.pppSolo, D ? x.dataset.pppWalletInstalled = D : delete x.dataset.pppWalletInstalled, window.dispatchEvent(new Event("xtrata:ppp-header")));
   };
   for (const u of [1500, 4e3, 9e3]) setTimeout(() => Ot(o.snapshot()), u);
   function Ft(u) {
     const x = u.likeFunds;
     if (!x || !x.album || !x.low && !x.pending) return [];
-    const A = p("div", "", "ppp-pick ppp-lowbox");
+    const v = p("div", "", "ppp-pick ppp-lowbox");
     if (!x.low) {
       const rt = p("p", "Top-up for your main listener wallet is on its way. ", "ppp-warn");
-      return x.txid && rt.append(I("View", _(x.txid))), A.append(rt), [A];
+      return x.txid && rt.append(I("View", _(x.txid))), v.append(rt), [v];
     }
-    A.append(p("p", "⚠ YOUR MAIN LISTENER WALLET IS OUT OF FUNDS", "ppp-bad ppp-lowtitle")), A.append(p("p", "It signs every like for all your albums, so they all count for you. Likes are paused until it has a little STX. 0.1 STX is hundreds of likes.")), A.append(p("p", x.address, "ppp-addr-full"));
+    v.append(p("p", "⚠ YOUR MAIN LISTENER WALLET IS OUT OF FUNDS", "ppp-bad ppp-lowtitle")), v.append(p("p", "It signs every like for all your albums, so they all count for you. Likes are paused until it has a little STX. 0.1 STX is hundreds of likes.")), v.append(p("p", x.address, "ppp-addr-full"));
     const D = p("div", "", "ppp-open-row");
     if (D.append(Qs("copy-likes-address", "Copy address", () => x.address, "primary", () => Ot(o.snapshot()))), x.main && !u.solo) {
       const rt = rs - (x.balance ?? 0n);
-      rt > 0n && D.append(v(`Pay ${wn(rt)} STX from my wallet`, () => void o.topUpLikes(), "primary"));
+      rt > 0n && D.append($(`Pay ${wn(rt)} STX from my wallet`, () => void o.topUpLikes(), "primary"));
     }
-    return A.append(D), A.append(p("p", "Send STX to that address from any Stacks wallet or an exchange. Likes carry on by themselves once it arrives.", "ppp-mute")), [A];
+    return v.append(D), v.append(p("p", "Send STX to that address from any Stacks wallet or an exchange. Likes carry on by themselves once it arrives.", "ppp-mute")), [v];
   }
   function Ot(u) {
     var pn, Rn, Ke, Ie, sr, Us, Ps, Hs, Os;
     if (d(), m(u), Rt(u), de(u), X(u), t.hidden = u.step === "off", t.hidden) return;
-    const [x, A] = ct(u), D = n(".ppp-state");
-    D.textContent = x, D.className = "ppp-state" + (A ? " ppp-state--" + A : ""), D.hidden = !x;
-    const rt = !!u.busy || u.armed, dt = !["elsewhere", "connect", "wrong-wallet", "not-invited", "unsupported", "off"].includes(u.step) && (rt || !["intro", "loading"].includes(u.step));
-    r.hidden = !dt, r.classList.toggle("ppp-frame--rest", !rt && !O);
+    const [x, v] = ct(u), D = n(".ppp-state");
+    D.textContent = x, D.className = "ppp-state" + (v ? " ppp-state--" + v : ""), D.hidden = !x;
+    const rt = !!u.busy || u.armed, ft = !["elsewhere", "connect", "wrong-wallet", "not-invited", "unsupported", "off"].includes(u.step) && (rt || !["intro", "loading"].includes(u.step));
+    r.hidden = !ft, r.classList.toggle("ppp-frame--rest", !rt && !O);
     const ce = n(".ppp-frame-label");
     ce.hidden = !0;
     const ee = j5(u) ?? R;
@@ -13708,141 +13701,141 @@ function Yv(t) {
     const xe = R5(u, ee);
     n(".ppp-badge").hidden = !xe;
     const fn = n(".ppp-steps"), dn = n(".ppp-stage");
-    fn.hidden = dn.hidden = !xe, ee && xe && (fn.replaceChildren(...Vl(u.solo).map((j, J) => {
-      const be = p("li", "", J < ee.at ? "done" : J === ee.at ? ee.blocked ? "now blocked" : "now" : "");
-      return be.append(p("span", J < ee.at ? "✓" : String(J + 1), "n"), j), J === ee.at && be.setAttribute("aria-current", "step"), be;
+    fn.hidden = dn.hidden = !xe, ee && xe && (fn.replaceChildren(...Vl(u.solo).map((j, tt) => {
+      const be = p("li", "", tt < ee.at ? "done" : tt === ee.at ? ee.blocked ? "now blocked" : "now" : "");
+      return be.append(p("span", tt < ee.at ? "✓" : String(tt + 1), "n"), j), tt === ee.at && be.setAttribute("aria-current", "step"), be;
     })), dn.textContent = ee.caption, dn.className = "ppp-stage " + (ee.at >= Vl(u.solo).length ? "ppp-ok" : ee.blocked ? "ppp-bad" : "ppp-cyan"));
-    const we = n(".ppp-facts"), pe = [];
-    u.main && ((pn = u.gate) != null && pn.here) && !u.solo && pe.push(...$t("Your wallet", U(u.main), "ppp-addr-short"));
+    const pe = n(".ppp-facts"), ge = [];
+    u.main && ((pn = u.gate) != null && pn.here) && !u.solo && ge.push(...$t("Your wallet", U(u.main), "ppp-addr-short"));
     const en = () => {
       if (!u.listening) return;
       const j = Qs("copy-listening", "Copy", () => u.listening || "", "tiny", () => Ot(o.snapshot()));
-      pe.push(...$t(u.linked ? "Listening wallet (technical)" : "Listening wallet", b(u.listening), "ppp-addr-short", j));
+      ge.push(...$t(u.linked ? "Listening wallet (technical)" : "Listening wallet", b(u.listening), "ppp-addr-short", j));
     };
     if (u.linked || en(), u.listening && u.step !== "intro")
       if (u.linked)
-        pe.push(...$t("Credited to", `${U(u.linked)} · plays, likes and returns`, u.linked === u.main || u.solo ? "ppp-ok" : "ppp-warn")), en();
+        ge.push(...$t("Credited to", `${U(u.linked)} · plays, likes and returns`, u.linked === u.main || u.solo ? "ppp-ok" : "ppp-warn")), en();
       else if (u.solo) {
-        u.creditedTo && pe.push(...$t("Credited to", `${U(u.creditedTo)} · plays and likes`, "ppp-ok"));
+        u.creditedTo && ge.push(...$t("Credited to", `${U(u.creditedTo)} · plays and likes`, "ppp-ok"));
         const j = u.gift ? "to whoever it came from: the unused gift to the sender, your own top-ups to you" : u.returnTo ? `${U(u.returnTo)} · ${u.returnToKind === "chosen" ? "chosen by you" : "sent the first funds"}` : u.funderState === "failed" ? "could not check who funded it right now" : "set when it is funded";
-        pe.push(...$t("Returns go to", u.gift ? j : u.returnTo && !S(u.returnTo) ? j.replace(b(u.returnTo), u.returnTo) : j, u.returnTo && !u.gift ? "ppp-addr-full" : "ppp-mute"));
-      } else pe.push(...$t("Linked to", "not linked yet", "ppp-warn"));
+        ge.push(...$t("Returns go to", u.gift ? j : u.returnTo && !S(u.returnTo) ? j.replace(b(u.returnTo), u.returnTo) : j, u.returnTo && !u.gift ? "ppp-addr-full" : "ppp-mute"));
+      } else ge.push(...$t("Linked to", "not linked yet", "ppp-warn"));
     if (u.linkedListening.length && ((Rn = u.gate) != null && Rn.here)) {
-      const j = u.linkedListening.map((J) => b(J) + (J === u.listening ? " (this one)" : "")).join(", ");
-      pe.push(...$t(u.linkedListening.length === 1 ? "Listening wallet linked to you" : "Listening wallets linked to you", j, "ppp-addr-short"));
+      const j = u.linkedListening.map((tt) => b(tt) + (tt === u.listening ? " (this one)" : "")).join(", ");
+      ge.push(...$t(u.linkedListening.length === 1 ? "Listening wallet linked to you" : "Listening wallets linked to you", j, "ppp-addr-short"));
     }
     if (u.balance !== void 0 && ["fund", "ready", "over"].includes(u.step)) {
       const j = u.balanceState === "ok" ? "ppp-ok" : u.balanceState === "low" ? "ppp-warn" : "ppp-bad";
-      pe.push(...$t("Balance", `${wn(u.balance)} STX · about ${u.playsLeft.toLocaleString()} plays`, j));
+      ge.push(...$t("Balance", `${wn(u.balance)} STX · about ${u.playsLeft.toLocaleString()} plays`, j));
     }
     const nn = u.entries.find((j) => j.kind === "play");
-    nn && Ht(), nn && pe.push(...$t("Last paid song", `${T(nn)} → ${U(nn.recipient)}`, Ct[nn.status] || "")), we.replaceChildren(...pe), we.hidden = !pe.length;
-    const pt = [], Dt = [], Wt = [], hn = [], Gr = zr(BigInt(((Ke = u.gate) == null ? void 0 : Ke.limits.playFee) ?? "300")), Ii = `Each song you listen to for 30 seconds sends ${wn(Rl)} STX to whoever holds it, plus a ${wn(Gr - Rl)} STX network fee. It is optional and leaves a permanent on-chain record that you paid the artist.`, Ue = !!u.busy;
+    nn && Ht(), nn && ge.push(...$t("Last paid song", `${T(nn)} → ${U(nn.recipient)}`, Lt[nn.status] || "")), pe.replaceChildren(...ge), pe.hidden = !ge.length;
+    const ht = [], Dt = [], Wt = [], hn = [], Gr = zr(BigInt(((Ke = u.gate) == null ? void 0 : Ke.limits.playFee) ?? "300")), Ii = `Each song you listen to for 30 seconds sends ${wn(Rl)} STX to whoever holds it, plus a ${wn(Gr - Rl)} STX network fee. It is optional and leaves a permanent on-chain record that you paid the artist.`, Ue = !!u.busy;
     switch (u.step) {
       case "elsewhere": {
-        if (pt.push(p("p", "Pay artists as you listen.")), (Ie = u.gate) != null && Ie.radioUrl) {
-          const J = p("p");
-          J.append(I("Open the pay-per-play radio →", u.gate.radioUrl)), pt.push(J);
+        if (ht.push(p("p", "Pay artists as you listen.")), (Ie = u.gate) != null && Ie.radioUrl) {
+          const tt = p("p");
+          tt.append(I("Open the pay-per-play radio →", u.gate.radioUrl)), ht.push(tt);
         }
         Dt.push(p("p", "Pay-per-play has its own address, where nothing else on Xtrata can reach your listening wallet."));
         break;
       }
       case "connect":
         if (u.linked) {
-          const J = [u.linked, ...u.others];
-          pt.push(p("p", J.length > 1 ? `This device has listening wallets for ${Q(J)}. Connect one of them to keep paying artists.` : `This device's listening wallet is linked to ${U(u.linked)}. Connect that wallet to keep paying artists.`)), Dt.push(p("p", "Connect a different wallet instead and it gets a listening wallet of its own: each address keeps its own plays, likes and funds. Listening is always free."));
+          const tt = [u.linked, ...u.others];
+          ht.push(p("p", tt.length > 1 ? `This device has listening wallets for ${Z(tt)}. Connect one of them to keep paying artists.` : `This device's listening wallet is linked to ${U(u.linked)}. Connect that wallet to keep paying artists.`)), Dt.push(p("p", "Connect a different wallet instead and it gets a listening wallet of its own: each address keeps its own plays, likes and funds. Listening is always free."));
         } else
-          pt.push(p("p", "Connect your wallet to pay artists as you listen.")), Dt.push(p("p", "Every payment is recorded on-chain. Listening is always free."));
+          ht.push(p("p", "Connect your wallet to pay artists as you listen.")), Dt.push(p("p", "Every payment is recorded on-chain. Listening is always free."));
         break;
       case "wrong-wallet":
-        pt.push(p("p", `This device's listening wallet belongs to ${U(u.linked)}. Connect that wallet to pay artists or like songs.`, "ppp-warn")), Dt.push(p("p", `You are connected as ${U(u.main)}. Listening is still free, and nothing is paid from the listening wallet while this wallet is connected.`)), Dt.push(p("p", "The listening wallet box is updating. Once it has, each wallet address gets its own listening wallet on this device.", "ppp-mute")), Wt.push(v("Switch wallet", () => {
-          var J;
-          return (J = document.getElementById("radio-wallet-connect")) == null ? void 0 : J.click();
+        ht.push(p("p", `This device's listening wallet belongs to ${U(u.linked)}. Connect that wallet to pay artists or like songs.`, "ppp-warn")), Dt.push(p("p", `You are connected as ${U(u.main)}. Listening is still free, and nothing is paid from the listening wallet while this wallet is connected.`)), Dt.push(p("p", "The listening wallet box is updating. Once it has, each wallet address gets its own listening wallet on this device.", "ppp-mute")), Wt.push($("Switch wallet", () => {
+          var tt;
+          return (tt = document.getElementById("radio-wallet-connect")) == null ? void 0 : tt.click();
         }, "primary"));
         break;
       case "not-invited":
-        pt.push(p("p", "Coming soon. Listening is free.", "ppp-mute"));
+        ht.push(p("p", "Coming soon. Listening is free.", "ppp-mute"));
         break;
       case "unsupported":
-        pt.push(p("p", "Needs a passkey this browser cannot make. Try Chrome or Safari.", "ppp-warn"));
+        ht.push(p("p", "Needs a passkey this browser cannot make. Try Chrome or Safari.", "ppp-warn"));
         break;
       case "intro":
-        pt.push(p("p", `Pay artists ${wn(Gr)} STX a song as you listen.`)), Dt.push(p("p", Ii)), Dt.push(p("p", "Once it has funds, every song you listen to for 30 seconds pays automatically until you switch it off or the wallet runs out. No popups while you listen.", "ppp-ok")), Dt.push(p("p", u.solo ? "You get a small listening wallet made from a passkey on this device: no app or Stacks wallet needed, and no key stored anywhere. Keep no more than 1 STX in it. Anything left can be sent back to whoever funded it." : "You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.", "ppp-warn")), !u.solo && u.main && u.others.length ? (pt.push(p("p", `This device already has a listening wallet for ${Q(u.others)}. If you meant to use that one, switch to that wallet.`, "ppp-warn")), Dt.push(p("p", `Otherwise, set up a new listening wallet for ${U(u.main)} below. Each address keeps its own plays, likes and funds, like a playlist per profile.`))) : !u.solo && u.main && Dt.push(p("p", `This is the listening wallet for ${U(u.main)}. Each wallet address you connect gets its own on this device, so plays and likes stay separate, like a playlist per profile.`, "ppp-mute")), u.solo && Dt.push(p("p", "Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.", "ppp-mute"));
+        ht.push(p("p", `Pay artists ${wn(Gr)} STX a song as you listen.`)), Dt.push(p("p", Ii)), Dt.push(p("p", "Once it has funds, every song you listen to for 30 seconds pays automatically until you switch it off or the wallet runs out. No popups while you listen.", "ppp-ok")), Dt.push(p("p", u.solo ? "You get a small listening wallet made from a passkey on this device: no app or Stacks wallet needed, and no key stored anywhere. Keep no more than 1 STX in it. Anything left can be sent back to whoever funded it." : "You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.", "ppp-warn")), !u.solo && u.main && u.others.length ? (ht.push(p("p", `This device already has a listening wallet for ${Z(u.others)}. If you meant to use that one, switch to that wallet.`, "ppp-warn")), Dt.push(p("p", `Otherwise, set up a new listening wallet for ${U(u.main)} below. Each address keeps its own plays, likes and funds, like a playlist per profile.`))) : !u.solo && u.main && Dt.push(p("p", `This is the listening wallet for ${U(u.main)}. Each wallet address you connect gets its own on this device, so plays and likes stay separate, like a playlist per profile.`, "ppp-mute")), u.solo && Dt.push(p("p", "Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.", "ppp-mute"));
         const j = a.liveGift();
-        Wt.push(v(j ? "Claim my gift · no wallet needed" : u.solo ? "Turn on pay-per-play · no wallet needed" : u.others.length && u.main ? `Set up for ${U(u.main)}` : "Turn on pay-per-play", () => void o.create(), "primary")), !j && !u.solo && u.main && u.others.length && Wt.push(v("Switch wallet", () => {
-          var J;
-          return (J = document.getElementById("radio-wallet-connect")) == null ? void 0 : J.click();
-        })), !j && u.solo && Wt.push(v("I have a Stacks wallet", () => {
-          var J;
-          return (J = document.getElementById("radio-wallet-connect")) == null ? void 0 : J.click();
-        })), Wt.push(v("I already have a listening wallet", () => void o.unlock(!0))), j && Wt.push(v("Not now", () => a.setAside(), "quiet"));
+        Wt.push($(j ? "Claim my gift · no wallet needed" : u.solo ? "Turn on pay-per-play · no wallet needed" : u.others.length && u.main ? `Set up for ${U(u.main)}` : "Turn on pay-per-play", () => void o.create(), "primary")), !j && !u.solo && u.main && u.others.length && Wt.push($("Switch wallet", () => {
+          var tt;
+          return (tt = document.getElementById("radio-wallet-connect")) == null ? void 0 : tt.click();
+        })), !j && u.solo && Wt.push($("I have a Stacks wallet", () => {
+          var tt;
+          return (tt = document.getElementById("radio-wallet-connect")) == null ? void 0 : tt.click();
+        })), Wt.push($("I already have a listening wallet", () => void o.unlock(!0))), j && Wt.push($("Not now", () => a.setAside(), "quiet"));
         break;
       case "locked":
-        u.armed || (pt.push(p("p", "Locked.", "ppp-mute")), Wt.push(v(u.payingOn ? "Unlock and keep paying" : "Unlock", () => void o.unlock(), "primary"))), hn.push(v("Use a different listening wallet", () => void o.unlock(!0), "quiet"));
+        u.armed || (ht.push(p("p", "Locked.", "ppp-mute")), Wt.push($(u.payingOn ? "Unlock and keep paying" : "Unlock", () => void o.unlock(), "primary"))), hn.push($("Use a different listening wallet", () => void o.unlock(!0), "quiet"));
         break;
       case "link":
-        pt.push(p("p", `Link to ${U(u.main)} · free`)), Dt.push(p("p", "Linking is a signature, not a transaction: no fee and no spending permission. Afterwards, funds can only be returned to this main wallet, and your likes and paid plays count for it.")), Dt.push(p("p", "The listening wallet will show the full address. Check it is yours before confirming.", "ppp-warn")), Wt.push(v(u.serverLinked ? "Confirm my wallet" : "Link to my wallet", () => void o.link(), "primary"));
+        ht.push(p("p", `Link to ${U(u.main)} · free`)), Dt.push(p("p", "Linking is a signature, not a transaction: no fee and no spending permission. Afterwards, funds can only be returned to this main wallet, and your likes and paid plays count for it.")), Dt.push(p("p", "The listening wallet will show the full address. Check it is yours before confirming.", "ppp-warn")), Wt.push($(u.serverLinked ? "Confirm my wallet" : "Link to my wallet", () => void o.link(), "primary"));
         break;
       case "loading":
-        pt.push(p("p", "Checking the listening wallet balance…", "ppp-mute"));
+        ht.push(p("p", "Checking the listening wallet balance…", "ppp-mute"));
         break;
       case "fund": {
-        if (u.depositPending || ((sr = u.gift) != null && sr.player ? pt.push(p("p", "Out of plays · add more to keep listening", "ppp-bad")) : u.entries.length ? pt.push(p("p", "Out of funds · top up to keep paying", "ppp-bad")) : pt.push(p("p", `Add funds · 1 STX ≈ ${Math.floor(Number(1000000n / Gr)).toLocaleString()} songs`))), (Us = u.gift) != null && Us.player ? Dt.push(p("p", "This player has no free mode: it carries on by itself once the plays arrive.")) : u.entries.length && Dt.push(p("p", "Songs play free until you top up. Paying carries on by itself once the top-up confirms.")), u.payingOn && !u.entries.length && Dt.push(p("p", "Paying is switched on. Once funds arrive it starts with the next song you listen to for 30 seconds.", "ppp-ok")), u.solo ? (Dt.push(p("p", "Ask a friend, or send from an exchange or any Stacks wallet, to this address. About 1 STX is plenty. Whatever is left can be returned to whoever sent it.")), Dt.push(p("p", u.listening || "", "ppp-addr-full")), u.listening && !u.depositPending && Wt.push(Qs("copy-address", "Copy my address", () => u.listening || "", "primary", () => Ot(o.snapshot())))) : Dt.push(p("p", "Or send STX from an exchange to the listening wallet address (Copy above).", "ppp-mute")), u.depositPending && u.depositTxid) {
-          const J = p("p", "Funds on their way · paying starts by itself when they land. ", "ppp-warn");
-          J.append(I("View", _(u.depositTxid))), pt.push(J);
-        } else u.allowance > 0n && !u.solo && Wt.push(v(`Deposit ${wn(u.allowance)} STX from my wallet`, () => void o.deposit(), "primary"));
+        if (u.depositPending || ((sr = u.gift) != null && sr.player ? ht.push(p("p", "Out of plays · add more to keep listening", "ppp-bad")) : u.entries.length ? ht.push(p("p", "Out of funds · top up to keep paying", "ppp-bad")) : ht.push(p("p", `Add funds · 1 STX ≈ ${Math.floor(Number(1000000n / Gr)).toLocaleString()} songs`))), (Us = u.gift) != null && Us.player ? Dt.push(p("p", "This player has no free mode: it carries on by itself once the plays arrive.")) : u.entries.length && Dt.push(p("p", "Songs play free until you top up. Paying carries on by itself once the top-up confirms.")), u.payingOn && !u.entries.length && Dt.push(p("p", "Paying is switched on. Once funds arrive it starts with the next song you listen to for 30 seconds.", "ppp-ok")), u.solo ? (Dt.push(p("p", "Ask a friend, or send from an exchange or any Stacks wallet, to this address. About 1 STX is plenty. Whatever is left can be returned to whoever sent it.")), Dt.push(p("p", u.listening || "", "ppp-addr-full")), u.listening && !u.depositPending && Wt.push(Qs("copy-address", "Copy my address", () => u.listening || "", "primary", () => Ot(o.snapshot())))) : Dt.push(p("p", "Or send STX from an exchange to the listening wallet address (Copy above).", "ppp-mute")), u.depositPending && u.depositTxid) {
+          const tt = p("p", "Funds on their way · paying starts by itself when they land. ", "ppp-warn");
+          tt.append(I("View", _(u.depositTxid))), ht.push(tt);
+        } else u.allowance > 0n && !u.solo && Wt.push($(`Deposit ${wn(u.allowance)} STX from my wallet`, () => void o.deposit(), "primary"));
         break;
       }
       case "over":
-        pt.push(p("p", "Over 1 STX · return the excess to keep paying", "ppp-bad")), u.solo && !u.returnTo && (pt.push(p("p", u.funderState === "failed" ? "Could not check who funded this wallet. Enter an address to send the excess to." : "Enter an address to send the excess to.")), pt.push(at(u))), (!u.solo || u.returnTo) && Wt.push(v("Return excess", () => void o.returnFunds("excess"), "primary"), v("Return all", () => void o.returnFunds("all")));
+        ht.push(p("p", "Over 1 STX · return the excess to keep paying", "ppp-bad")), u.solo && !u.returnTo && (ht.push(p("p", u.funderState === "failed" ? "Could not check who funded this wallet. Enter an address to send the excess to." : "Enter an address to send the excess to.")), ht.push(at(u))), (!u.solo || u.returnTo) && Wt.push($("Return excess", () => void o.returnFunds("excess"), "primary"), $("Return all", () => void o.returnFunds("all")));
         break;
       case "ready":
         if (u.payingOn && u.session && u.session.playsLeft > 0) {
-          const J = Math.min(u.session.playsLeft, u.playsLeft);
-          pt.push(p("p", `Paying as you listen · up to ${J.toLocaleString()} plays left`, "ppp-ok")), Dt.push(p("p", "Each song pays its holder once you have heard 30 seconds of it. Skips stay free. The heart likes or unlikes from this wallet for 0.0002 STX.")), Wt.push(v("Switch off", () => void o.switchOff()));
+          const tt = Math.min(u.session.playsLeft, u.playsLeft);
+          ht.push(p("p", `Paying as you listen · up to ${tt.toLocaleString()} plays left`, "ppp-ok")), Dt.push(p("p", "Each song pays its holder once you have heard 30 seconds of it. Skips stay free. The heart likes or unlikes from this wallet for 0.0002 STX.")), Wt.push($("Switch off", () => void o.switchOff()));
         } else
-          pt.push(p("p", "Paying is off. Music stays free.", "ppp-mute")), Wt.push(v("Switch on paying as I listen", () => void o.switchOn(), "primary"));
-        u.queued && pt.push(p("p", u.queued === 1 ? "1 song waiting to be paid · sends as soon as the last transaction confirms" : `${u.queued} songs waiting to be paid · sent one at a time as each transaction confirms`, "ppp-warn")), u.balanceState === "low" && pt.push(p("p", "Running low · top up", "ppp-warn")), u.depositPending ? pt.push(p("p", "Top-up on its way…", "ppp-warn")) : u.allowance > 0n && u.balanceState !== "ok" && !u.solo && Wt.push(v(`Top up ${wn(u.allowance)} STX`, () => void o.deposit()));
+          ht.push(p("p", "Paying is off. Music stays free.", "ppp-mute")), Wt.push($("Switch on paying as I listen", () => void o.switchOn(), "primary"));
+        u.queued && ht.push(p("p", u.queued === 1 ? "1 song waiting to be paid · sends as soon as the last transaction confirms" : `${u.queued} songs waiting to be paid · sent one at a time as each transaction confirms`, "ppp-warn")), u.balanceState === "low" && ht.push(p("p", "Running low · top up", "ppp-warn")), u.depositPending ? ht.push(p("p", "Top-up on its way…", "ppp-warn")) : u.allowance > 0n && u.balanceState !== "ok" && !u.solo && Wt.push($(`Top up ${wn(u.allowance)} STX`, () => void o.deposit()));
         break;
     }
-    if (u.solo && u.walletCannotSolo && Dt.push(p("p", "The listening wallet box is still updating. Paid plays work; returning to another address and likes start working once it has.", "ppp-warn")), u.solo && ["fund", "ready"].includes(u.step) && ((u.balance ?? 0n) > 0n && Dt.push(at(u)), Dt.push(It()), u.step === "ready" && u.entries.some((j) => j.kind === "play" && j.status === "confirmed"))) {
+    if (u.solo && u.walletCannotSolo && Dt.push(p("p", "The listening wallet box is still updating. Paid plays work; returning to another address and likes start working once it has.", "ppp-warn")), u.solo && ["fund", "ready"].includes(u.step) && ((u.balance ?? 0n) > 0n && Dt.push(at(u)), Dt.push(Bt()), u.step === "ready" && u.entries.some((j) => j.kind === "play" && j.status === "confirmed"))) {
       const j = p("p", "New to Stacks? ", "ppp-mute");
-      j.append(I("Get Xverse or Leather", "https://www.xverse.app/download"), " (free) to keep your plays and likes under a wallet of your own."), pt.push(j);
+      j.append(I("Get Xverse or Leather", "https://www.xverse.app/download"), " (free) to keep your plays and likes under a wallet of your own."), ht.push(j);
     }
-    if (u.walletOutdated && Dt.push(p("p", "The listening wallet box is an older version, so likes go through your main wallet for now. Paid plays work as normal.", "ppp-warn")), u.stuck && (pt.push(p("p", u.stuck === 1 ? "1 payment has not appeared on-chain after 30 minutes." : `${u.stuck} payments have not appeared on-chain after 30 minutes.`, "ppp-warn")), Wt.push(v("Clear stuck payments", () => void o.clearStuck()))), ["ready", "fund"].includes(u.step) && (u.returnTo || u.gift) && (u.balance ?? 0n) > 0n && hn.push(v(u.linked ? "Return all to my wallet" : u.gift ? "Return what is left…" : `Return all to ${U(u.returnTo)}`, () => void o.returnFunds("all"), "quiet")), ["ready", "fund", "link", "over"].includes(u.step) && hn.push(v("Lock", () => void o.lock(), "quiet")), dt && !rt && hn.push(v(O ? "Hide listening wallet box" : "Show listening wallet box", () => {
+    if (u.walletOutdated && Dt.push(p("p", "The listening wallet box is an older version, so likes go through your main wallet for now. Paid plays work as normal.", "ppp-warn")), u.stuck && (ht.push(p("p", u.stuck === 1 ? "1 payment has not appeared on-chain after 30 minutes." : `${u.stuck} payments have not appeared on-chain after 30 minutes.`, "ppp-warn")), Wt.push($("Clear stuck payments", () => void o.clearStuck()))), ["ready", "fund"].includes(u.step) && (u.returnTo || u.gift) && (u.balance ?? 0n) > 0n && hn.push($(u.linked ? "Return all to my wallet" : u.gift ? "Return what is left…" : `Return all to ${U(u.returnTo)}`, () => void o.returnFunds("all"), "quiet")), ["ready", "fund", "link", "over"].includes(u.step) && hn.push($("Lock", () => void o.lock(), "quiet")), ft && !rt && hn.push($(O ? "Hide listening wallet box" : "Show listening wallet box", () => {
       O = !O, Ot(o.snapshot());
     }, "quiet")), [...Wt, ...hn].forEach((j) => j.disabled = Ue), Ue && (Wt.length = 0), u.balance !== void 0 && ["fund", "ready", "over"].includes(u.step) && !(u.step === "fund" && u.depositPending && u.balance === 0n) && !((Ps = u.gift) != null && Ps.player)) {
-      const j = u.balanceState === "ok" ? "ppp-ok" : u.balanceState === "low" ? "ppp-warn" : "ppp-bad", J = pt.at(0);
-      u.step === "ready" && J ? J.append(p("span", ` · ${C(u.balance)} STX`, j)) : pt.push(p("p", `Balance ${C(u.balance)} STX`, j));
+      const j = u.balanceState === "ok" ? "ppp-ok" : u.balanceState === "low" ? "ppp-warn" : "ppp-bad", tt = ht.at(0);
+      u.step === "ready" && tt ? tt.append(p("span", ` · ${C(u.balance)} STX`, j)) : ht.push(p("p", `Balance ${C(u.balance)} STX`, j));
     }
     if ((Hs = u.gift) != null && Hs.player && ["fund", "ready", "over", "locked", "link", "loading"].includes(u.step)) {
       const j = p("p", "", "ppp-gift");
       j.append(`🎁 Gift Edition · ${u.gift.player.title}`), u.gift.player.subtitle && j.append(" · ", u.gift.player.subtitle);
-      const J = ["ready", "fund", "over"].includes(u.step) && u.balance !== void 0 ? p("span", u.giftPlays === 0 ? " · no plays left" : ` · ${u.giftPlays.toLocaleString()} ${u.giftPlays === 1 ? "play" : "plays"} left`, u.giftPlays === 0 ? "ppp-bad" : u.giftPlays <= 20 ? "ppp-warn" : "ppp-ok") : null;
-      J && j.append(J);
-      const be = (Os = pt.at(0)) == null ? void 0 : Os.querySelector(":scope > span.ppp-ok, :scope > span.ppp-warn, :scope > span.ppp-bad");
-      if (u.step === "ready" && be && /STX/.test(be.textContent ?? "") && be.remove(), pt.unshift(j), u.giftPlays <= 20 && ["ready", "fund"].includes(u.step) && !u.depositPending) {
+      const tt = ["ready", "fund", "over"].includes(u.step) && u.balance !== void 0 ? p("span", u.giftPlays === 0 ? " · no plays left" : ` · ${u.giftPlays.toLocaleString()} ${u.giftPlays === 1 ? "play" : "plays"} left`, u.giftPlays === 0 ? "ppp-bad" : u.giftPlays <= 20 ? "ppp-warn" : "ppp-ok") : null;
+      tt && j.append(tt);
+      const be = (Os = ht.at(0)) == null ? void 0 : Os.querySelector(":scope > span.ppp-ok, :scope > span.ppp-warn, :scope > span.ppp-bad");
+      if (u.step === "ready" && be && /STX/.test(be.textContent ?? "") && be.remove(), ht.unshift(j), u.giftPlays <= 20 && ["ready", "fund"].includes(u.step) && !u.depositPending) {
         const Se = p("p", u.giftPlays === 0 ? "Your gift plays are all used. " : "Running low. ", "ppp-mute");
-        Se.append("To keep going, send STX to your listening address (shown below) from any Stacks wallet or an exchange. "), Se.append(I("Xverse", "https://www.xverse.app/download"), " and ", I("Leather", "https://leather.io/install-extension"), " are free and make it one tap."), pt.splice(1, 0, Se);
+        Se.append("To keep going, send STX to your listening address (shown below) from any Stacks wallet or an exchange. "), Se.append(I("Xverse", "https://www.xverse.app/download"), " and ", I("Leather", "https://leather.io/install-extension"), " are free and make it one tap."), ht.splice(1, 0, Se);
       }
     }
     if (u.gift && !u.linked && ["fund", "ready", "over"].includes(u.step) && u.returnPlan.state === "ready") {
-      const j = u.returnPlan, J = p("div", "", "ppp-pick");
-      J.append(p("p", j.steps.length > 1 ? "This goes back in parts, each to whoever it came from:" : "This goes back to whoever it came from:", "ppp-cyan"));
+      const j = u.returnPlan, tt = p("div", "", "ppp-pick");
+      tt.append(p("p", j.steps.length > 1 ? "This goes back in parts, each to whoever it came from:" : "This goes back to whoever it came from:", "ppp-cyan"));
       const be = p("ul", "", "ppp-gift-list");
       j.steps.forEach((Se, ki) => {
         const Vr = Se.kind === "gift" ? "the unused gift" : Se.kind === "deposit" ? "what was added to it" : "the rest", Ve = p("li");
         Ve.append(p("span", `${ki + 1}. ${wn(BigInt(Se.send))} STX · ${Vr}`, "t"), p("span", Se.to ? ` → ${U(Se.to)}` : " → choose an address below", Se.to ? "ppp-mute" : "ppp-warn")), be.append(Ve);
-      }), J.append(be), j.kept && J.append(p("p", "A very small part is not worth its network fee, so it stays in the wallet or travels with the last part.", "ppp-mute")), j.steps.some((Se) => !Se.to) && J.append(at(u)), J.append(v(j.steps.length > 1 ? `Confirm part 1 of ${j.steps.length}` : "Confirm and return", () => void o.returnFunds("all"), "primary")), pt.push(J);
+      }), tt.append(be), j.kept && tt.append(p("p", "A very small part is not worth its network fee, so it stays in the wallet or travels with the last part.", "ppp-mute")), j.steps.some((Se) => !Se.to) && tt.append(at(u)), tt.append($(j.steps.length > 1 ? `Confirm part 1 of ${j.steps.length}` : "Confirm and return", () => void o.returnFunds("all"), "primary")), ht.push(tt);
     }
-    pt.unshift(...a.banner(u)), pt.unshift(...Ft(u)), k && (a.pendingCode() || ["intro", "locked", "unsupported"].includes(u.step)) && pt.unshift(...N(k, a.pendingCode())), u.solo && u.creditedTo && u.listening && !["intro", "off", "elsewhere", "loading"].includes(u.step) && pt.unshift(p("p", `This is ${U(u.creditedTo)}'s listening wallet. Plays and likes count for ${U(u.creditedTo)}. Connect it (top right) to see its likes here too.`, "ppp-ok")), n(".ppp-key").replaceChildren(...pt);
+    ht.unshift(...a.banner(u)), ht.unshift(...Ft(u)), k && (a.pendingCode() || ["intro", "locked", "unsupported"].includes(u.step)) && ht.unshift(...N(k, a.pendingCode())), u.solo && u.creditedTo && u.listening && !["intro", "off", "elsewhere", "loading"].includes(u.step) && ht.unshift(p("p", `This is ${U(u.creditedTo)}'s listening wallet. Plays and likes count for ${U(u.creditedTo)}. Connect it (top right) to see its likes here too.`, "ppp-ok")), n(".ppp-key").replaceChildren(...ht);
     const rr = c.render(u), Nt = document.querySelector(".ppp-shelf");
     if (Nt) {
       Nt.hidden = !rr;
       const j = Nt.querySelector("summary");
       j && (j.textContent = c.count() > 0 ? `♪ My albums (${c.count()})` : "♪ My albums");
-      const J = Nt.querySelector(".ppp-shelf-body");
-      rr && J && !J.contains(rr) && J.replaceChildren(rr);
+      const tt = Nt.querySelector(".ppp-shelf-body");
+      rr && tt && !tt.contains(rr) && tt.replaceChildren(rr);
     }
     const he = a.renderFold(u);
     if (n(".ppp-gifts").hidden = !he, he && !n(".ppp-gift-body").contains(he) && n(".ppp-gift-body").replaceChildren(he), he && Y) {
@@ -13852,32 +13845,32 @@ function Yv(t) {
     }
     n(".ppp-body").replaceChildren(...Dt), n(".ppp-actions").replaceChildren(...Wt), n(".ppp-actions2").replaceChildren(...hn);
     const Pe = u.busy || u.message || "";
-    n(".ppp-msg").textContent = Pe && pt.some((j) => (j.textContent ?? "").startsWith(Pe.replace(/[.✓\s]+$/, ""))) ? "" : Pe, n(".ppp-err").textContent = u.error;
+    n(".ppp-msg").textContent = Pe && ht.some((j) => (j.textContent ?? "").startsWith(Pe.replace(/[.✓\s]+$/, ""))) ? "" : Pe, n(".ppp-err").textContent = u.error;
     const _s = u.entries.filter((j) => j.kind === "play");
     n(".ppp-recent").hidden = !u.entries.length, n(".ppp-recent-list").replaceChildren(..._s.slice(0, 5).map((j) => {
-      const J = p("li"), be = j.status === "confirmed" ? "ok" : j.status === "failed" ? "bad" : "warn";
-      return J.append(p("span", "", "d " + be), p("span", T(j), "t"), p("span", P(j.created), "ppp-mute")), j.txid && J.append(I("tx", _(j.txid))), J;
-    })), n(".ppp-wallets").hidden = !(we.childElementCount || hn.length), n(".ppp-more").hidden = !Dt.length;
+      const tt = p("li"), be = j.status === "confirmed" ? "ok" : j.status === "failed" ? "bad" : "warn";
+      return tt.append(p("span", "", "d " + be), p("span", T(j), "t"), p("span", P(j.created), "ppp-mute")), j.txid && tt.append(I("tx", _(j.txid))), tt;
+    })), n(".ppp-wallets").hidden = !(pe.childElementCount || hn.length), n(".ppp-more").hidden = !Dt.length;
     const Kr = n(".ppp-history");
     Kr.hidden = !u.entries.length, u.entries.length && Ht(), Kr.replaceChildren(p("summary", `All activity (${u.entries.length})`), ...u.entries.slice(0, 20).map((j) => {
-      const J = p("div", "", "ppp-row"), be = j.kind === "play" ? [p("span", T(j), "ppp-song"), p("span", ` · ${wn(BigInt(j.amount))} STX to ${U(j.recipient)}`, "ppp-mute")] : j.kind === "like" ? [p("span", `${j.liked ? "♥ Liked" : "Unliked"} ${T(j)}`, "ppp-song"), p("span", ` · for ${u.linked ? U(u.linked) : "this listening wallet"}`, "ppp-mute")] : [p("span", `Returned ${wn(BigInt(j.amount))} STX`, "ppp-song"), p("span", ` to ${U(j.recipient)}`, "ppp-mute")];
-      return J.append(
-        p("span", wt[j.status] || j.status, "ppp-status " + (Ct[j.status] || "")),
+      const tt = p("div", "", "ppp-row"), be = j.kind === "play" ? [p("span", T(j), "ppp-song"), p("span", ` · ${wn(BigInt(j.amount))} STX to ${U(j.recipient)}`, "ppp-mute")] : j.kind === "like" ? [p("span", `${j.liked ? "♥ Liked" : "Unliked"} ${T(j)}`, "ppp-song"), p("span", ` · for ${u.linked ? U(u.linked) : "this listening wallet"}`, "ppp-mute")] : [p("span", `Returned ${wn(BigInt(j.amount))} STX`, "ppp-song"), p("span", ` to ${U(j.recipient)}`, "ppp-mute")];
+      return tt.append(
+        p("span", gt[j.status] || j.status, "ppp-status " + (Lt[j.status] || "")),
         ...be,
         p("span", ` · ${new Date(j.created).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} `, "ppp-mute")
-      ), j.txid && J.append(I("tx ↗", _(j.txid))), J;
+      ), j.txid && tt.append(I("tx ↗", _(j.txid))), tt;
     }));
   }
-  const ae = /* @__PURE__ */ new Map(), ft = () => {
+  const ae = /* @__PURE__ */ new Map(), ut = () => {
     const u = window.XtrataRadio;
     return u != null && u.subscribe ? (u.subscribe((x) => {
-      const A = x == null ? void 0 : x.nowPlaying;
-      A && Number.isSafeInteger(Number(A.tokenId)) && ae.set(Number(A.tokenId), { title: A.title || void 0, artist: A.artist || void 0 });
+      const v = x == null ? void 0 : x.nowPlaying;
+      v && Number.isSafeInteger(Number(v.tokenId)) && ae.set(Number(v.tokenId), { title: v.title || void 0, artist: v.artist || void 0 });
     }), !0) : !1;
   };
-  if (!ft()) {
+  if (!ut()) {
     const u = setInterval(() => {
-      ft() && clearInterval(u);
+      ut() && clearInterval(u);
     }, 500);
     setTimeout(() => clearInterval(u), 6e4);
   }
@@ -13885,8 +13878,8 @@ function Yv(t) {
     const x = u.detail;
     if (x && Number.isSafeInteger(x.song) && typeof x.id == "string" && /^[0-9a-f]{32}$/.test(x.id)) {
       Ht();
-      const A = E(x.song, ae.get(x.song));
-      o.onListened({ song: x.song, id: x.id, title: A.title || void 0, artist: A.artist || void 0 });
+      const v = E(x.song, ae.get(x.song));
+      o.onListened({ song: x.song, id: x.id, title: v.title || void 0, artist: v.artist || void 0 });
     }
   }), window.addEventListener("xtrata:wallet-changed", () => void o.refresh()), document.addEventListener("visibilitychange", () => {
     document.hidden || o.refresh();
@@ -13934,7 +13927,7 @@ const Zv = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbG
       (i) => this.installedProviders.findIndex((o) => o.id === i.id) === -1
       // keep providers NOT already in installed list
     ), r = this.installedProviders.length > 0, s = n.length > 0;
-    return bt("div", { class: "modal-container animate-in fade-in fixed inset-0 z-[8999] box-border flex h-full w-full items-end bg-[#00000040] md:items-center md:justify-center" }, bt("div", { class: "fixed inset-0 z-[8999]", onClick: () => this.handleCloseModal() }), bt("div", { class: "modal-body animate-in md:zoom-in-50 slide-in-from-bottom md:slide-in-from-bottom-0 z-[9000] box-border flex max-h-[calc(100%-24px)] w-full max-w-full cursor-default flex-col overflow-y-scroll rounded-2xl rounded-b-none bg-white p-6 text-sm leading-snug shadow-[0_4px_5px_0_#00000005,0_16px_40px_0_#00000014] md:max-h-[calc(100%-48px)] md:w-[400px] md:rounded-b-2xl" }, bt("div", { class: "flex flex-col space-y-[10px]" }, bt("div", { class: "flex items-center" }, bt("div", { class: "flex-1 text-xl font-medium text-[#242629]" }, "Connect a wallet"), bt("button", { class: "rounded-full bg-transparent p-1 transition-colors hover:bg-gray-100 active:scale-95", onClick: () => this.handleCloseModal() }, bt("span", { class: "sr-only" }, "Close popup"), bt("img", { src: Zv }))), r ? bt("p", null, "Select the wallet you want to connect to.") : bt("p", null, "You don't have any wallets in your browser that support this app. You need to install a wallet to proceed.")), !e && !t && bt("div", { class: "mx-auto mt-4 rounded-xl bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-500" }, "Unfortunately, your browser isn't supported"), r && bt("div", { class: "mt-6" }, bt("p", { class: "mb-4 text-sm font-medium" }, "Installed wallets"), bt("ul", { class: "space-y-3" }, this.installedProviders.map((i) => bt("li", { class: "flex items-center gap-3 rounded-[10px] border border-[#EFEFF2] p-[14px]" }, bt("div", { class: "aspect-square basis-9 overflow-hidden" }, bt("img", { src: i.icon, class: "h-full w-full rounded-[10px] bg-gray-700" })), bt("div", { class: "flex-1" }, bt("div", { class: "text-sm font-medium text-[#242629]" }, i.name), i.webUrl && bt("a", { href: i.webUrl, class: "text-sm", rel: "noopener noreferrer" }, new URL(i.webUrl).hostname)), bt("button", { class: "rounded-[10px] border border-[#333] bg-[#323232] px-4 py-2 text-sm font-medium text-[#EFEFEF] shadow-[0_1px_2px_0_#0000000A] outline-[#FFBD7A] transition-all hover:bg-[#0C0C0D] hover:text-white hover:shadow-[0_8px_16px_0_#00000020] focus:outline focus:outline-[3px] active:scale-95", onClick: () => this.handleSelectProvider(i.id) }, "Connect"))))), s && bt("div", { class: "mt-6" }, r ? bt("p", { class: "mb-4 text-sm font-medium" }, "Other wallets") : bt("div", { class: "mb-5 flex justify-between" }, bt("p", { class: "text-sm font-medium" }, "Recommended wallets"), bt("a", { class: "flex cursor-pointer items-center space-x-[5px] text-xs transition-colors hover:text-[#242629] hover:underline focus:underline", href: "https://docs.hiro.so/what-is-a-wallet", rel: "noopener noreferrer", target: "_blank" }, bt("svg", { xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 16 16", fill: "none" }, bt("path", { stroke: "#74777D", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.2", d: "M8.006 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" }), bt("path", { stroke: "#74777D", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.2", d: "M5.97 5.9a2.1 2.1 0 0 1 4.08.7c0 1.4-2.1 2.1-2.1 2.1M8.006 11.5h.01" })), bt("p", null, "What is a wallet? ", bt("span", { class: "align-text-bottom text-[9px]" }, "↗")))), bt("ul", { class: "space-y-3" }, n.map((i) => bt("li", { class: "flex items-center gap-3 rounded-[10px] border border-[#EFEFF2] p-[14px]" }, bt("div", { class: "aspect-square basis-9 overflow-hidden" }, bt("img", { src: i.icon, class: "h-full w-full rounded-[10px] bg-gray-700" })), bt("div", { class: "flex-1" }, bt("div", { class: "text-sm font-medium text-[#242629]" }, i.name), i.webUrl && bt("a", { href: i.webUrl, class: "text-sm", rel: "noopener noreferrer" }, new URL(i.webUrl).hostname)), this.getInstallUrl(i, t, e) && bt("a", { class: "rounded-[10px] border border-[#EFEFF2] px-4 py-2 text-sm font-medium shadow-[0_1px_2px_0_#0000000A] outline-[#FFBD7A] transition-colors hover:text-[#242629] hover:shadow-[0_1px_2px_0_#00000010] focus:outline focus:outline-[3px] active:scale-95", href: this.getInstallUrl(i, t, e), rel: "noopener noreferrer", target: "_blank" }, i.id === "AsignaProvider" ? "Open" : "Install", " →")))))));
+    return wt("div", { class: "modal-container animate-in fade-in fixed inset-0 z-[8999] box-border flex h-full w-full items-end bg-[#00000040] md:items-center md:justify-center" }, wt("div", { class: "fixed inset-0 z-[8999]", onClick: () => this.handleCloseModal() }), wt("div", { class: "modal-body animate-in md:zoom-in-50 slide-in-from-bottom md:slide-in-from-bottom-0 z-[9000] box-border flex max-h-[calc(100%-24px)] w-full max-w-full cursor-default flex-col overflow-y-scroll rounded-2xl rounded-b-none bg-white p-6 text-sm leading-snug shadow-[0_4px_5px_0_#00000005,0_16px_40px_0_#00000014] md:max-h-[calc(100%-48px)] md:w-[400px] md:rounded-b-2xl" }, wt("div", { class: "flex flex-col space-y-[10px]" }, wt("div", { class: "flex items-center" }, wt("div", { class: "flex-1 text-xl font-medium text-[#242629]" }, "Connect a wallet"), wt("button", { class: "rounded-full bg-transparent p-1 transition-colors hover:bg-gray-100 active:scale-95", onClick: () => this.handleCloseModal() }, wt("span", { class: "sr-only" }, "Close popup"), wt("img", { src: Zv }))), r ? wt("p", null, "Select the wallet you want to connect to.") : wt("p", null, "You don't have any wallets in your browser that support this app. You need to install a wallet to proceed.")), !e && !t && wt("div", { class: "mx-auto mt-4 rounded-xl bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-500" }, "Unfortunately, your browser isn't supported"), r && wt("div", { class: "mt-6" }, wt("p", { class: "mb-4 text-sm font-medium" }, "Installed wallets"), wt("ul", { class: "space-y-3" }, this.installedProviders.map((i) => wt("li", { class: "flex items-center gap-3 rounded-[10px] border border-[#EFEFF2] p-[14px]" }, wt("div", { class: "aspect-square basis-9 overflow-hidden" }, wt("img", { src: i.icon, class: "h-full w-full rounded-[10px] bg-gray-700" })), wt("div", { class: "flex-1" }, wt("div", { class: "text-sm font-medium text-[#242629]" }, i.name), i.webUrl && wt("a", { href: i.webUrl, class: "text-sm", rel: "noopener noreferrer" }, new URL(i.webUrl).hostname)), wt("button", { class: "rounded-[10px] border border-[#333] bg-[#323232] px-4 py-2 text-sm font-medium text-[#EFEFEF] shadow-[0_1px_2px_0_#0000000A] outline-[#FFBD7A] transition-all hover:bg-[#0C0C0D] hover:text-white hover:shadow-[0_8px_16px_0_#00000020] focus:outline focus:outline-[3px] active:scale-95", onClick: () => this.handleSelectProvider(i.id) }, "Connect"))))), s && wt("div", { class: "mt-6" }, r ? wt("p", { class: "mb-4 text-sm font-medium" }, "Other wallets") : wt("div", { class: "mb-5 flex justify-between" }, wt("p", { class: "text-sm font-medium" }, "Recommended wallets"), wt("a", { class: "flex cursor-pointer items-center space-x-[5px] text-xs transition-colors hover:text-[#242629] hover:underline focus:underline", href: "https://docs.hiro.so/what-is-a-wallet", rel: "noopener noreferrer", target: "_blank" }, wt("svg", { xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 16 16", fill: "none" }, wt("path", { stroke: "#74777D", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.2", d: "M8.006 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" }), wt("path", { stroke: "#74777D", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.2", d: "M5.97 5.9a2.1 2.1 0 0 1 4.08.7c0 1.4-2.1 2.1-2.1 2.1M8.006 11.5h.01" })), wt("p", null, "What is a wallet? ", wt("span", { class: "align-text-bottom text-[9px]" }, "↗")))), wt("ul", { class: "space-y-3" }, n.map((i) => wt("li", { class: "flex items-center gap-3 rounded-[10px] border border-[#EFEFF2] p-[14px]" }, wt("div", { class: "aspect-square basis-9 overflow-hidden" }, wt("img", { src: i.icon, class: "h-full w-full rounded-[10px] bg-gray-700" })), wt("div", { class: "flex-1" }, wt("div", { class: "text-sm font-medium text-[#242629]" }, i.name), i.webUrl && wt("a", { href: i.webUrl, class: "text-sm", rel: "noopener noreferrer" }, new URL(i.webUrl).hostname)), this.getInstallUrl(i, t, e) && wt("a", { class: "rounded-[10px] border border-[#EFEFF2] px-4 py-2 text-sm font-medium shadow-[0_1px_2px_0_#0000000A] outline-[#FFBD7A] transition-colors hover:text-[#242629] hover:shadow-[0_1px_2px_0_#00000010] focus:outline focus:outline-[3px] active:scale-95", href: this.getInstallUrl(i, t, e), rel: "noopener noreferrer", target: "_blank" }, i.id === "AsignaProvider" ? "Open" : "Install", " →")))))));
   }
   static get assetsDirs() {
     return ["assets"];

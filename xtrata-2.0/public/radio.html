@@ -303,6 +303,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-addr-full{font-family:var(--mono);font-size:12px;word-break:break-all;user-select:all}
   .ppp-pick{margin:6px 0}
   .ppp .ppp-lowbox{border:2px solid #ff8a8a;border-radius:8px;background:rgba(255,138,138,.09);padding:10px 12px;margin:8px 0}
+  #tuner.locked{opacity:.35;cursor:not-allowed}
   .ppp-shelf-tools{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.ppp-shelf-tools input{flex:1 1 11em;min-width:0}
   .ppp-shelf-list{list-style:none;margin:6px 0;padding:0}.ppp-shelf-list li{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line,rgba(255,255,255,.08))}.ppp-shelf-list li.now{color:var(--cyan)}.ppp-shelf-list .t{font-weight:600}.ppp-shelf-list li button:last-child{margin-left:auto}
   .ppp .ppp-lowtitle{font-weight:700;letter-spacing:.6px;margin:0 0 6px}
@@ -521,8 +522,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     var r=$('ticks').getBoundingClientRect();var f=Math.min(1,Math.max(0,(clientX-r.left)/r.width));
     return Math.round(f*(catalogue.length-1));
   }
-  function preview(i){tuneIndex=i;placeNeedle(i);var t=catalogue[i];$('tunerNow').textContent=nameOf(t.id)+' · #'+t.id}
-  function tuneTo(i){if(!api||!catalogue[i])return;preview(i);api.playToken(catalogue[i].id)}
+  function preview(i){if(state&&state.giftLocked)return;tuneIndex=i;placeNeedle(i);var t=catalogue[i];$('tunerNow').textContent=nameOf(t.id)+' · #'+t.id}
+  function tuneTo(i){if(!api||!catalogue[i]||(state&&state.giftLocked))return;preview(i);api.playToken(catalogue[i].id)}
   (function(){
     var tuner=$('tuner'),dragging=false;
     tuner.addEventListener('pointerdown',function(e){if(!catalogue.length)return;dragging=true;tuner.classList.add('dragging');tuner.setPointerCapture(e.pointerId);preview(indexAt(e.clientX))});
@@ -637,6 +638,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   function render(s){
     state=s;
     var np=s.nowPlaying, stage=$('stage');
+    $('tuner').classList.toggle('locked',!!s.giftLocked);
+    $('tuner').title=s.giftLocked?'Locked to this album until you add funds':'';
     $('stn').textContent=(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
     $('ttl').textContent=np?np.title:(s.on?'TUNING…':'— OFF AIR —');
     $('artst').textContent=np&&np.artist?np.artist:'';
@@ -810,7 +813,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=d2b3495b4277" defer></script>
+<script src="/xtrata-radio.js?v=32002ad7792f" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -826,7 +829,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=3d3354ad45c7')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=e0c93a9eb1f8')}).catch(function(){});
 </script>
 </body>
 </html>

@@ -37,7 +37,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
   };
   const server = { mains: new Map<string, string>(), mainOfFails: false, mainOfCalls: 0 };
   const chain = { balanceOf: new Map<string, bigint>(), deposits: [] as [string, bigint][], balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, accountFails: false, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
-  const gift = { info: null as GiftInfo | null, fails: false, calls: 0, inbound: [] as InboundTransfer[], outgoing: [] as Outgoing[], historyFails: false };
+  const gift = { inboundBy: new Map<string, InboundTransfer[]>(), info: null as GiftInfo | null, fails: false, calls: 0, inbound: [] as InboundTransfer[], outgoing: [] as Outgoing[], historyFails: false };
   const savedLinks: any[] = [];
   const store = new Map<string, string>();
   const requests: [string, any][] = [];
@@ -109,7 +109,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     wait: async (ms) => { time += ms; opts.onWait?.(); },
     nameOf: (a) => names.get(a),
     giftInfo: async () => { gift.calls++; if (gift.fails) throw new Error('503'); return gift.info; },
-    history: async () => (gift.historyFails ? { ok: false } : { ok: true, inbound: gift.inbound, outgoing: gift.outgoing })
+    history: async (w) => (gift.historyFails ? { ok: false } : { ok: true, inbound: gift.inboundBy.get(w) ?? gift.inbound, outgoing: gift.outgoing })
   });
   const mineAll = () => {
     for (const raw of chain.broadcasts) chain.mined.add('0x' + deserializeTransaction(raw).txid());
@@ -603,7 +603,7 @@ describe('album wallets (numbered wallets of one passkey)', () => {
       return s;
     };
 
-    it('locks the radio to the album until a stranger funds a wallet of the listener with at least 0.1 STX', async () => {
+    it('locks the radio to the album until ITS wallet gets at least 0.1 STX from someone other than the gifter or the treasury', async () => {
       const s = await open();
       expect(s.ppp.snapshot().albumLock).toEqual({ locked: true, known: true });
       // not enough, or from the gifter or the treasury: still locked
@@ -616,6 +616,17 @@ describe('album wallets (numbered wallets of one passkey)', () => {
       // remembered: it stays open even if the list cannot be read later
       s.gift.historyFails = true;
       s.tick(10 * 60_000); await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot().albumLock).toEqual({ locked: false, known: true });
+    });
+
+    it('is not opened by money the listener\'s own first wallet received long ago; the listener topping the album up from it does open it', async () => {
+      const s = await open();
+      s.gift.inboundBy.set(LISTENING, [inbound(FRIEND, '5000000', 9)]); // years of deposits into the first wallet
+      s.gift.inbound = [inbound(TREASURY, '100000', 1)];                 // the album wallet has only the gift itself
+      s.tick(3 * 60_000); await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot().albumLock).toEqual({ locked: true, known: true });
+      s.gift.inbound.push(inbound(LISTENING, '100000', 2));              // topped up from the first wallet
+      s.tick(3 * 60_000); await s.ppp.forceRefresh();
       expect(s.ppp.snapshot().albumLock).toEqual({ locked: false, known: true });
     });
 
