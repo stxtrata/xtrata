@@ -136,6 +136,7 @@ function start(root: HTMLElement) {
     })),
     sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
     giftSent: (txid, amount) => ppp.giftSent(txid, amount),
+    album: { bind: (slot) => ppp.bindAlbum(slot), arrived: (slot, address, txid, amount) => ppp.albumArriving(slot, address, txid, amount) },
     who: (address) => who(address),
     changed: () => render(ppp.snapshot()),
     store: {

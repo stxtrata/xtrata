@@ -8,6 +8,7 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { createPppController, type GateConfig } from '../controller';
 import { CancelledError, createListeningEngine, type Panel } from '../../listening-wallet/frame/engine';
 import { verifyLinkSignature } from '../../lib/listening-wallet/link';
+import { verifySlotSignature } from '../../lib/listening-wallet/slots';
 import { MIN_PLAY_INTERVAL_MS, TARGET } from '../../lib/listening-wallet/policy';
 import { validateSaved } from '../../radio-test-wallet/chain';
 import type { FunderResult, InboundTransfer } from '../../lib/listening-wallet/funder';
@@ -543,6 +544,58 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
       expect(s.ppp.snapshot().error).toMatch(/Like not sent: Node busy/);
       expect(s.ppp.snapshot().error).not.toMatch(/out of funds/);
     });
+  });
+});
+
+describe('album wallets (numbered wallets of one passkey)', () => {
+  const ready = async (s: ReturnType<typeof setup>) => { await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); };
+
+  it('proves a number belongs to the passkey with both signatures, without a popup', async () => {
+    const s = setup();
+    await ready(s);
+    const before = s.evaluations();
+    const b = await s.ppp.bindAlbum(3);
+    expect(s.evaluations()).toBe(before);
+    expect(b).toMatchObject({ root: LISTENING, slot: 3 });
+    expect(verifySlotSignature(b, b.rootSignature, LISTENING)).toBe(true);
+    expect(verifySlotSignature(b, b.slotSignature, b.address)).toBe(true);
+    expect(b.address).not.toBe(LISTENING);
+  });
+
+  it('opens an album wallet, tracks its arriving gift there, and reads that wallet\'s own balance and album', async () => {
+    const s = setup({ gifts: { enabled: true, treasury: HOLDER, turnstileSiteKey: null, admin: false, fee: '3000' } });
+    await ready(s);
+    const { address } = await s.ppp.bindAlbum(2);
+    s.chain.balanceOf.set(address, 0n);
+    s.gift.info = { returnTo: HOLDER, from: null, source: 'campaign', amount: '100000', treasury: HOLDER, state: 'sending', player: { id: '0123456789abcdef', title: 'Proof of Sound', subtitle: 'Someone', tracks: [{ id: 11, title: 'One', artist: 'X' }], cover: null, paidOnly: true } } as any;
+    await s.ppp.albumArriving(2, address, '0x' + 'a'.repeat(64), 100_000n);
+    const snap = s.ppp.snapshot();
+    expect(snap).toMatchObject({ listening: address, slot: 2, root: LISTENING, depositPending: true, likeFunds: { address: LISTENING, album: true } });
+    expect(snap.gift?.player?.title).toBe('Proof of Sound');
+    expect(JSON.parse(s.store.get(`xtrata.ppp.v1.deposit:${address}`)!)).toMatchObject({ txid: '0x' + 'a'.repeat(64), amount: '100000' });
+    expect(JSON.parse(s.store.get(`xtrata.ppp.v1.deposit:${LISTENING}`) ?? 'null')).not.toMatchObject({ txid: '0x' + 'a'.repeat(64) });
+    // back to the listener's own wallet
+    await s.ppp.openAlbum(0);
+    expect(s.ppp.snapshot()).toMatchObject({ listening: LISTENING, slot: 0 });
+  });
+
+  it('opens the album that was open before a lock, after the next unlock', async () => {
+    const s = setup();
+    await ready(s);
+    const { address } = await s.ppp.bindAlbum(4);
+    await s.ppp.openAlbum(4);
+    expect(s.ppp.snapshot().listening).toBe(address);
+    await s.ppp.lock(); await s.ppp.unlock();
+    expect(s.ppp.snapshot()).toMatchObject({ listening: address, slot: 4 });
+  });
+
+  it('says the wallet box needs an update when it cannot hold albums', async () => {
+    const s = setup({}, { oldWallet: true });
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    expect(s.ppp.snapshot().walletCannotAlbums).toBe(true);
+    await expect(s.ppp.bindAlbum(1)).rejects.toThrow(/needs an update/);
+    await s.ppp.openAlbum(1);
+    expect(s.ppp.snapshot().error).toMatch(/needs an update/);
   });
 });
 
