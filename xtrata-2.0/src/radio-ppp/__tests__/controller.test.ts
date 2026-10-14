@@ -10,7 +10,9 @@ import { CancelledError, createListeningEngine, type Panel } from '../../listeni
 import { verifyLinkSignature } from '../../lib/listening-wallet/link';
 import { MIN_PLAY_INTERVAL_MS, TARGET } from '../../lib/listening-wallet/policy';
 import { validateSaved } from '../../radio-test-wallet/chain';
-import type { FunderResult } from '../../lib/listening-wallet/funder';
+import type { FunderResult, InboundTransfer } from '../../lib/listening-wallet/funder';
+import type { Outgoing } from '../../lib/listening-wallet/ledger';
+import type { GiftInfo } from '../controller';
 
 const PRF = Uint8Array.from({ length: 32 }, (_, i) => i);
 const LISTENING = 'SPHRV6ESV321YCV6W990X4FKXB4S9D7F665FSCTV';
@@ -33,7 +35,8 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 }, ...over
   };
   const server = { mains: new Map<string, string>(), mainOfFails: false, mainOfCalls: 0 };
-  const chain = { balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
+  const chain = { balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, accountFails: false, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
+  const gift = { info: null as GiftInfo | null, fails: false, calls: 0, inbound: [] as InboundTransfer[], outgoing: [] as Outgoing[], historyFails: false };
   const savedLinks: any[] = [];
   const store = new Map<string, string>();
   const requests: [string, any][] = [];
@@ -83,7 +86,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     chain: {
       verify: async () => {},
       balance: async () => chain.balance,
-      account: async () => ({ balance: chain.balance, nonce: chain.nonce }),
+      account: async () => { if (chain.accountFails) throw new Error('Node busy (503)'); return { balance: chain.balance, nonce: chain.nonce }; },
       confirmedNonce: async () => chain.confirmed,
       owner: async () => chain.owner,
       broadcast: async (raw, txid) => { if (chain.rejectNext) { chain.rejectNext = false; throw Object.assign(new Error('Node rejected the fee as too low.'), { feeRejected: true }); } chain.broadcasts.push(raw); return txid; },
@@ -103,14 +106,16 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     likeFailed: (song) => { failed.push(song); },
     likeConfirmed: (song, liked) => { confirmed.push([song, liked]); },
     wait: async (ms) => { time += ms; opts.onWait?.(); },
-    nameOf: (a) => names.get(a)
+    nameOf: (a) => names.get(a),
+    giftInfo: async () => { gift.calls++; if (gift.fails) throw new Error('503'); return gift.info; },
+    history: async () => (gift.historyFails ? { ok: false } : { ok: true, inbound: gift.inbound, outgoing: gift.outgoing })
   });
   const mineAll = () => {
     for (const raw of chain.broadcasts) chain.mined.add('0x' + deserializeTransaction(raw).txid());
     chain.nonce = BigInt(chain.broadcasts.length);
   };
   const settle = () => new Promise((r) => setTimeout(r, 0));
-  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, confirmed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations, requests, names, engine, server };
+  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, confirmed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations, requests, names, engine, server, gift };
 }
 
 describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', () => {
@@ -1060,6 +1065,177 @@ describe('one listening wallet per wallet address', () => {
       s.setMain(MAIN);
       await s.ppp.forceRefresh();
       expect(s.ppp.snapshot().step).not.toBe('wrong-wallet');
+    });
+  });
+});
+
+describe('gifted wallets and gift players', () => {
+  const TREASURY = 'SP1RKMSSGS3TCZW6HXFYXAM0DGHS2VNKSBTB4G183';
+  const GIFTER = 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP';
+  const DEPOSITOR = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+  const PLAYER = { id: '0123456789abcdef', title: 'Proof of Sound', subtitle: 'Someone', tracks: [{ id: 11, title: 'One', artist: 'X' }], cover: null, paidOnly: true as const };
+  const INFO: GiftInfo = { returnTo: GIFTER, from: GIFTER, source: 'friend', amount: '300000', treasury: TREASURY, state: 'arrived', player: PLAYER };
+  const inb = (sender: string, amount: bigint, blockHeight: number): InboundTransfer => ({ sender, amount: String(amount), txId: `0xin${blockHeight}`, blockHeight, txIndex: 0 });
+  const out = (recipient: string, amount: bigint, blockHeight: number): Outgoing => ({ recipient, amount, txId: `0xout${blockHeight}`, blockHeight, txIndex: 0 });
+  const gifted = async (balance: bigint, info: GiftInfo | null = INFO, opts: Parameters<typeof setup>[1] = {}) => {
+    const s = setup({ passkeyOnly: true, gifts: { enabled: true, treasury: TREASURY, turnstileSiteKey: null, admin: false, fee: '3000' } }, opts);
+    s.setMain(undefined);
+    s.gift.info = info;
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    s.chain.balance = balance;
+    await s.ppp.forceRefresh();
+    return s;
+  };
+  const lastSent = (s: Awaited<ReturnType<typeof gifted>>) => {
+    const tx = deserializeTransaction(s.chain.broadcasts.at(-1)!) as any;
+    return { to: cvToJSON(tx.payload.recipient).value as string, amount: String(tx.payload.amount) };
+  };
+
+  it('knows the album and counts plays in plays: what the balance buys after the reserve', async () => {
+    const s = await gifted(100_000n);
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', giftPlays: 277, giftStop: null, gift: { player: { title: 'Proof of Sound' } } });
+  });
+
+  it('a wallet that was not gifted is an ordinary one: no album, no stop', async () => {
+    const s = await gifted(0n, null);
+    expect(s.ppp.snapshot()).toMatchObject({ gift: null, giftStop: null });
+  });
+
+  it('a gift without an album never stops the radio', async () => {
+    const s = await gifted(0n, { ...INFO, player: null });
+    expect(s.ppp.snapshot().giftStop).toBeNull();
+  });
+
+  it('stops the moment there is no play left to pay for, and says so', async () => {
+    const s = await gifted(3_349n); // reserve 3,000 + 349: not one whole play
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', giftPlays: 0, giftStop: { reason: 'out' } });
+  });
+
+  it('a top-up on its way reads as arriving, not as out of plays', async () => {
+    const s = await gifted(0n);
+    s.ppp.giftSent('0x' + 'e'.repeat(64), 250_000n);
+    expect(s.ppp.snapshot().giftStop).toMatchObject({ reason: 'arriving' });
+  });
+
+  it('a payment on its way is already spent: the last play stops the radio before it confirms', async () => {
+    const s = await gifted(3_000n + 350n); // exactly one play
+    expect(s.ppp.snapshot()).toMatchObject({ giftPlays: 1, giftStop: null });
+    await s.ppp.onListened({ song: 7, id: rid(2) });
+    expect(s.chain.broadcasts).toHaveLength(1);
+    expect(s.ppp.snapshot()).toMatchObject({ giftPlays: 0, giftStop: { reason: 'out' } });
+  });
+
+  it('locked, switched off and over 1 STX each have their own reason; none is free listening', async () => {
+    const s = await gifted(100_000n);
+    await s.ppp.switchOff();
+    expect(s.ppp.snapshot().giftStop).toMatchObject({ reason: 'off' });
+    const over = await gifted(TARGET + 1n);
+    expect(over.ppp.snapshot().giftStop).toMatchObject({ reason: 'over' });
+    const locked = await gifted(100_000n);
+    await locked.ppp.lock();
+    expect(locked.ppp.snapshot().giftStop).toMatchObject({ reason: 'locked' });
+  });
+
+  it('an unreachable server or a slow balance read never stops the music or forgets the album', async () => {
+    const s = await gifted(100_000n);
+    s.gift.fails = true;
+    s.tick(31 * 60_000);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ gift: { player: { title: 'Proof of Sound' } }, giftStop: null });
+  });
+
+  it('a payment that cannot be made right now stays queued and counts against the plays (no free song)', async () => {
+    const s = await gifted(100_000n);
+    const before = s.ppp.snapshot().giftPlays;
+    s.chain.accountFails = true;
+    await s.ppp.onListened({ song: 7, id: rid(3) });
+    expect(s.chain.broadcasts).toHaveLength(0);
+    expect(s.ppp.snapshot()).toMatchObject({ queued: 1, giftPlays: before - 1 });
+    s.chain.accountFails = false;
+    await s.ppp.forceRefresh();
+    await s.settle();
+    expect(s.chain.broadcasts).toHaveLength(1);
+    expect(s.ppp.snapshot().queued).toBe(0);
+  });
+
+  describe('returns follow the money', () => {
+    it('shows the split first, then returns a top-up to the depositor and the unused gift to the gifter, one part at a time', async () => {
+      const s = await gifted(500_000n);
+      s.gift.inbound = [inb(TREASURY, 300_000n, 10), inb(DEPOSITOR, 200_000n, 20)];
+      await s.ppp.returnFunds('all');
+      expect(s.chain.broadcasts).toHaveLength(0); // nothing is sent until the listener has seen where it goes
+      const plan = s.ppp.snapshot().returnPlan;
+      expect(plan).toMatchObject({ state: 'ready', steps: [{ to: DEPOSITOR, kind: 'deposit', send: '197000' }, { to: GIFTER, kind: 'gift', send: '297000' }] });
+
+      await s.ppp.returnFunds('all');
+      expect(lastSent(s)).toEqual({ to: DEPOSITOR, amount: '197000' });
+      expect(s.ppp.snapshot().payingOn).toBe(true); // more to return
+      expect(s.ppp.snapshot().message).toMatch(/1 more part/);
+
+      s.mineAll();
+      s.chain.balance = 300_000n;
+      s.gift.outgoing = [out(DEPOSITOR, 197_000n, 30)];
+      await s.ppp.forceRefresh();
+      await s.ppp.returnFunds('all');
+      await s.ppp.returnFunds('all');
+      expect(lastSent(s)).toEqual({ to: GIFTER, amount: '297000' });
+      expect(s.ppp.snapshot().payingOn).toBe(false);
+    });
+
+    it('the same balance with no top-up goes entirely back to the gifter, in one part', async () => {
+      const s = await gifted(120_000n);
+      s.gift.inbound = [inb(TREASURY, 300_000n, 10)];
+      s.gift.outgoing = [];
+      // 180,000 of the gift was spent on plays and fees
+      await s.ppp.returnFunds('all');
+      await s.ppp.returnFunds('all');
+      expect(lastSent(s)).toEqual({ to: GIFTER, amount: '117000' });
+      expect(s.ppp.snapshot().payingOn).toBe(false);
+    });
+
+    it('does not send when the chain cannot be read completely: could not check, nothing sent', async () => {
+      const s = await gifted(120_000n);
+      s.gift.historyFails = true;
+      await s.ppp.returnFunds('all');
+      expect(s.ppp.snapshot().error).toMatch(/Could not check where the funds came from/);
+      expect(s.ppp.snapshot().returnPlan).toEqual({ state: 'unavailable' });
+      expect(s.chain.broadcasts).toHaveLength(0);
+    });
+
+    it('a history that does not add up is also "could not check"', async () => {
+      const s = await gifted(500_000n);
+      s.gift.inbound = [inb(TREASURY, 100_000n, 10)]; // balance is more than anything that was ever deposited
+      await s.ppp.returnFunds('all');
+      expect(s.ppp.snapshot().error).toMatch(/Could not check/);
+      expect(s.chain.broadcasts).toHaveLength(0);
+    });
+
+    it('a preview goes stale when the balance changes, so a different split is never confirmed blind', async () => {
+      const s = await gifted(500_000n);
+      s.gift.inbound = [inb(TREASURY, 300_000n, 10), inb(DEPOSITOR, 200_000n, 20)];
+      await s.ppp.returnFunds('all');
+      expect(s.ppp.snapshot().returnPlan.state).toBe('ready');
+      s.chain.balance = 450_000n; // a play went through meanwhile
+      await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot().returnPlan).toEqual({ state: 'none' });
+    });
+
+    it('excess above 1 STX goes to whoever sent the newest deposit', async () => {
+      const s = await gifted(TARGET + 500_000n);
+      s.gift.inbound = [inb(TREASURY, 300_000n, 10), inb(DEPOSITOR, 1_200_000n, 20)];
+      await s.ppp.returnFunds('excess');
+      expect(lastSent(s)).toEqual({ to: DEPOSITOR, amount: '497000' });
+    });
+
+    it('a gifted wallet linked to a main wallet returns everything to that wallet, as before', async () => {
+      const s = setup({ gifts: { enabled: true, treasury: TREASURY, turnstileSiteKey: null, admin: false, fee: '3000' } });
+      s.gift.info = INFO;
+      await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link();
+      s.chain.balance = 500_000n;
+      s.gift.inbound = [inb(TREASURY, 300_000n, 10), inb(DEPOSITOR, 200_000n, 20)];
+      await s.ppp.forceRefresh();
+      await s.ppp.returnFunds('all');
+      expect(lastSent(s as any)).toEqual({ to: MAIN, amount: '497000' });
     });
   });
 });
