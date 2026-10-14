@@ -36,7 +36,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { queryAll, run } from './db';
 import { applyHiroApiKey, getHiroApiKeys, isTransientHiroStatus, shouldRetryWithNextHiroKey } from './hiro-keys';
-import { gate, type PppEnv } from './radio-listening-wallet';
+import { checkSlotBinding, ensureSlotTable, gate, type PppEnv, type SlotSubmission } from './radio-listening-wallet';
 import { isMainnetStandardAddress } from '../../src/lib/listening-wallet/link';
 import {
   isPlayerId, playerData, playerHash, validatePlayer, validatePlayerRequest, verifyPlayerSignature, type PlayerDefinition, type PlayerRequest, type PlayerView
@@ -250,6 +250,11 @@ export async function ensureGiftTables(env: GiftEnv) {
     tracks TEXT NOT NULL, cover INTEGER, status TEXT NOT NULL DEFAULT 'active', created_at INTEGER NOT NULL)`);
   // Added with gift players: the player a link opens (null for every earlier gift).
   await run(env, 'ALTER TABLE radio_gifts ADD COLUMN player_id TEXT').catch(() => undefined);
+  // Added with derived wallets: a gift claimed into one of a passkey's numbered wallets records which passkey (its first
+  // wallet, `root`) and which number. One gift per (root, number): two phones with the same passkey can never share a wallet.
+  await run(env, 'ALTER TABLE radio_gifts ADD COLUMN root TEXT').catch(() => undefined);
+  await run(env, 'ALTER TABLE radio_gifts ADD COLUMN slot INTEGER').catch(() => undefined);
+  await run(env, 'CREATE UNIQUE INDEX IF NOT EXISTS radio_gifts_root_slot ON radio_gifts(root, slot) WHERE root IS NOT NULL');
   await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_orphans(txid TEXT PRIMARY KEY, gift_id TEXT, sender TEXT NOT NULL, amount INTEGER NOT NULL,
     reason TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
 }
@@ -257,7 +262,7 @@ export async function ensureGiftTables(env: GiftEnv) {
 type Row = {
   id: string; code_hash: string; amount: number; source: 'campaign' | 'friend'; gifter: string | null; label: string; status: string;
   deposit_txid: string | null; created_at: number; expires_at: number; claimed_by: string | null; claim_txid: string | null;
-  claimed_at: number | null; ip_hash: string | null; refund_txid: string | null; updated_at: number; player_id?: string | null;
+  claimed_at: number | null; ip_hash: string | null; refund_txid: string | null; updated_at: number; player_id?: string | null; root?: string | null; slot?: number | null;
 };
 type Send = {
   id: string; gift_id: string; kind: 'claim' | 'refund'; nonce: number; recipient: string; amount: number; fee: number;
@@ -299,7 +304,7 @@ async function sign(key: string, recipient: string, amount: bigint, nonce: bigin
  * another send is open, nothing is written and nothing is sent. After that, the send stays open
  * whatever the broadcast says; only the chain settles it.
  */
-async function startSend(env: GiftEnv, deps: GiftDeps, treasury: string, key: string, kind: 'claim' | 'refund', r: Row, recipient: string, ip: string | null = null) {
+async function startSend(env: GiftEnv, deps: GiftDeps, treasury: string, key: string, kind: 'claim' | 'refund', r: Row, recipient: string, ip: string | null = null, bind: SlotSubmission | null = null) {
   if (await one(env, "SELECT id FROM radio_gift_sends WHERE status='sent'")) throw new GiftError('The gift treasury is sending another gift. Trying again in a moment…', 503);
   const done = await one<{ n: number | null }>(env, "SELECT MAX(nonce) AS n FROM radio_gift_sends WHERE status='done'");
   const floor = done?.n === null || done?.n === undefined ? 0n : BigInt(done.n) + 1n;
@@ -309,15 +314,23 @@ async function startSend(env: GiftEnv, deps: GiftDeps, treasury: string, key: st
   const tx = await sign(key, recipient, amount, nonce, GIFT_FEE);
   const id = randomId(), now = deps.now, db = d1(env);
   const markGift = kind === 'claim'
-    ? db.prepare(`UPDATE radio_gifts SET status='claiming', claimed_by=?, claim_txid=?, claimed_at=?, ip_hash=COALESCE(?, ip_hash), updated_at=? WHERE id=? AND status='live'`)
-      .bind(recipient, tx.txid, now, ip, now, r.id)
+    ? db.prepare(`UPDATE radio_gifts SET status='claiming', claimed_by=?, claim_txid=?, claimed_at=?, ip_hash=COALESCE(?, ip_hash), root=?, slot=?, updated_at=? WHERE id=? AND status='live'`)
+      .bind(recipient, tx.txid, now, ip, bind?.root ?? null, bind?.slot ?? null, now, r.id)
     : db.prepare(`UPDATE radio_gifts SET status='refunding', refund_txid=?, updated_at=? WHERE id=? AND status='live'`).bind(tx.txid, now, r.id);
   const insertSend = db.prepare(`INSERT INTO radio_gift_sends(id, gift_id, kind, nonce, recipient, amount, fee, txids, raw, status, created_at, signed_at, broadcast_at, updated_at)
     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?, ?, ?
     WHERE EXISTS (SELECT 1 FROM radio_gifts WHERE id=? AND ${kind === 'claim' ? "status='claiming' AND claim_txid=?" : "status='refunding' AND refund_txid=?"})`)
     .bind(id, r.id, kind, Number(nonce), recipient, r.amount, Number(GIFT_FEE), JSON.stringify([tx.txid]), bytesToHex(tx.raw), now, now, now, now, r.id, tx.txid);
-  try { await db.batch([markGift, insertSend]); }
+  // The proof that this numbered wallet belongs to the passkey is kept with the gift, in the same transaction, so credit
+  // for its plays can follow the passkey's link (INSERT OR IGNORE: a released claim leaves a still-true binding behind).
+  const writes = [markGift, insertSend];
+  if (kind === 'claim' && bind) writes.push(db.prepare(`INSERT OR IGNORE INTO radio_listening_slots(address, root, slot, issued, root_signature, slot_signature, created_at)
+    SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM radio_gifts WHERE id=? AND status='claiming' AND claim_txid=?)`)
+    .bind(bind.address, bind.root, bind.slot, bind.issued, bind.rootSignature, bind.slotSignature, now, r.id, tx.txid));
+  try { await db.batch(writes); }
   catch (e) {
+    if (bind && isConstraint(e) && /root|slot/i.test(String((e as Error)?.message)) && await one(env, 'SELECT id FROM radio_gifts WHERE root=? AND slot=?', [bind.root, bind.slot]))
+      throw new GiftError('That wallet number was just taken by another gift. Trying the next one…', 409);
     if (isConstraint(e)) throw new GiftError(/claimed_by/.test(String((e as Error)?.message)) ? 'This listening wallet has already had a gift.' : 'The gift treasury is sending another gift. Trying again in a moment…', /claimed_by/.test(String((e as Error)?.message)) ? 409 : 503);
     throw e;
   }
@@ -345,7 +358,7 @@ async function sendBytes(env: GiftEnv, deps: GiftDeps, sendId: string, raw: Uint
 /** Puts a gift back after its send can no longer land, so it can be claimed (or refunded) again. */
 async function release(env: GiftEnv, kind: 'claim' | 'refund', giftId: string, txids: string[], now: number) {
   const list = txids.map(() => '?').join(',');
-  if (kind === 'claim') await run(env, `UPDATE radio_gifts SET status='live', claimed_by=NULL, claim_txid=NULL, claimed_at=NULL, updated_at=? WHERE id=? AND status='claiming' AND claim_txid IN (${list})`, [now, giftId, ...txids]);
+  if (kind === 'claim') await run(env, `UPDATE radio_gifts SET status='live', claimed_by=NULL, claim_txid=NULL, claimed_at=NULL, root=NULL, slot=NULL, updated_at=? WHERE id=? AND status='claiming' AND claim_txid IN (${list})`, [now, giftId, ...txids]);
   else await run(env, `UPDATE radio_gifts SET status='live', refund_txid=NULL, updated_at=? WHERE id=? AND status='refunding' AND refund_txid IN (${list})`, [now, giftId, ...txids]);
 }
 
@@ -456,6 +469,41 @@ export async function giftForWallet(env: GiftEnv, wallet: string) {
     treasury: treasuryAddress(env),
     player: r.player_id ? await playerView(env, r.player_id) : null
   } };
+}
+
+/**
+ * The next free wallet number for a passkey (its first wallet is `root`): one above the highest used or reserved so far,
+ * counting gifts still on their way. A suggestion only; the unique index on (root, number) settles a race.
+ */
+export async function nextSlot(env: GiftEnv, root: string) {
+  if (!isMainnetStandardAddress(root)) throw new GiftError('Mainnet wallet address required.');
+  await ensureGiftTables(env);
+  await ensureSlotTable(env);
+  const a = await one<{ n: number | null }>(env, "SELECT MAX(slot) AS n FROM radio_gifts WHERE root=? AND status IN ('claiming','claimed')", [root]);
+  const b = await one<{ n: number | null }>(env, 'SELECT MAX(slot) AS n FROM radio_listening_slots WHERE root=?', [root]);
+  return { next: Math.max(a?.n ?? 0, b?.n ?? 0) + 1 };
+}
+
+/**
+ * The albums in a passkey's numbered wallets, in number order, a page at a time (a listener may hold hundreds). Public
+ * data only: which catalogue songs, no balances. The wallet box re-derives every address from its number and ignores
+ * a row whose address does not match, so this list can only ever add what the passkey itself would derive.
+ */
+export async function shelfFor(env: GiftEnv, root: string, after = 0, limit = 50) {
+  if (!isMainnetStandardAddress(root)) throw new GiftError('Mainnet wallet address required.');
+  await ensureGiftTables(env);
+  const from = Number.isSafeInteger(after) && after > 0 ? after : 0, n = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 50, 1), 100);
+  const rows = await all<Row>(env, "SELECT * FROM radio_gifts WHERE root=? AND slot>? AND status IN ('claiming','claimed') ORDER BY slot LIMIT ?", [root, from, n + 1]);
+  const page = rows.slice(0, n);
+  const total = await one<{ n: number }>(env, "SELECT COUNT(*) AS n FROM radio_gifts WHERE root=? AND status IN ('claiming','claimed')", [root]);
+  return {
+    total: total?.n ?? 0,
+    next: rows.length > n ? page[page.length - 1].slot : null,
+    shelf: await Promise.all(page.map(async (g) => ({
+      slot: g.slot!, address: g.claimed_by!, state: g.status === 'claimed' ? 'arrived' : 'sending', amount: String(g.amount), label: g.label,
+      from: g.gifter, source: g.source, player: g.player_id ? await playerView(env, g.player_id) : null
+    })))
+  };
 }
 
 /** Admin: links paid from the campaign pool. Each signed request works once. The codes exist in clear only in this reply. */
@@ -620,7 +668,7 @@ async function scanDeposits(env: GiftEnv, treasury: string, deps: GiftDeps) {
 }
 
 /** The recipient: fund this brand-new listening wallet from the gift. */
-export async function claimGift(env: GiftEnv, body: { code: string; wallet: string; turnstile?: string }, deps: GiftDeps, ip: string | null, request?: Request) {
+export async function claimGift(env: GiftEnv, body: { code: string; wallet: string; turnstile?: string; binding?: SlotSubmission }, deps: GiftDeps, ip: string | null, request?: Request) {
   const { treasury, key } = requireEnabled(env, request);
   if (!isGiftCode(body?.code)) throw new GiftError('That gift link is not valid.', 404);
   if (!isMainnetStandardAddress(body.wallet) || body.wallet === treasury) throw new GiftError('A listening wallet address is required.');
@@ -628,6 +676,18 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
   let r = await one(env, 'SELECT * FROM radio_gifts WHERE code_hash=?', [giftCodeHash(body.code)]);
   if (!r) throw new GiftError('That gift link is not valid.', 404);
   if (r.claimed_by === body.wallet && ['claiming', 'claimed'].includes(r.status)) return { txid: r.claim_txid!, amount: String(r.amount), already: true };
+  // A gift can go into one of the listener's numbered wallets (one per album) when the wallet is proven to belong to
+  // their passkey. Only albums do: a starter gift goes to the listener's own wallet, once.
+  let bind: SlotSubmission | null = null;
+  if (body.binding !== undefined) {
+    try { bind = { ...checkSlotBinding(body.binding, deps.now), rootSignature: body.binding.rootSignature, slotSignature: body.binding.slotSignature }; }
+    catch (e) { throw new GiftError((e as Error).message, (e as { status?: number }).status ?? 400); }
+    if (bind.address !== body.wallet) throw new GiftError('That proof is for a different wallet.', 400);
+    if (!r.player_id) throw new GiftError('A starter gift goes to your own listening wallet. Open it there.', 400);
+    await ensureSlotTable(env);
+    const taken = await one<{ id: string }>(env, 'SELECT id FROM radio_gifts WHERE root=? AND slot=? AND id<>?', [bind.root, bind.slot, r.id]);
+    if (taken) throw new GiftError('That wallet number was just taken by another gift. Trying the next one…', 409);
+  }
   if (r.status === 'pending-deposit' || r.status === 'abandoned') {
     try { await checkDeposit(env, r, null, treasury, deps); }
     catch { throw new GiftError('Could not check this gift’s payment right now. Try again shortly.', 503); }
@@ -656,7 +716,7 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
   if (spare < amount + GIFT_FEE) throw new GiftError('The gift treasury needs topping up. Try again later.', 503);
   // Only one send can be open at a time (startSend), so these checks cannot be raced past: a
   // concurrent claim waits for this one to settle, then checks again with it counted.
-  const txid = await startSend(env, deps, treasury, key, 'claim', r, body.wallet, h);
+  const txid = await startSend(env, deps, treasury, key, 'claim', r, body.wallet, h, bind);
   return { txid, amount: amount.toString(), already: false };
 }
 

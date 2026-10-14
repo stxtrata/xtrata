@@ -1,6 +1,6 @@
 import {
   claimGift, confirmFriendGift, createCampaign, createFriendGift, createPlayer, GiftError, giftForWallet, giftStatus, hiroGiftChain,
-  sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
+  nextSlot, shelfFor, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
 } from '../../lib/radio-gifts';
 
 /**
@@ -8,7 +8,9 @@ import {
  *   POST /radio/gift/status        {code}   a gift link's status (recipient; POST keeps the code out of URLs and logs)
  *   GET  /radio/gift?id=…          a friend gift's status (the friend who paid for it)
  *   GET  /radio/gift/for?wallet=…  was this listening wallet gifted, and where do returns go
- *   POST /radio/gift/claim         {code, wallet, turnstile?}   fund a brand-new listening wallet
+ *   GET  /radio/gift/slots?root=…  the next free numbered-wallet number for a passkey (its first wallet is the root)
+ *   GET  /radio/gift/shelf?root=…&after=…&limit=…   the albums in a passkey's numbered wallets, a page at a time
+ *   POST /radio/gift/claim         {code, wallet, turnstile?, binding?}   fund a brand-new listening wallet (binding: an album into a numbered wallet)
  *   POST /radio/gift/create        {gifter, amount}             start a friend gift
  *   POST /radio/gift/confirm       {id, txid?}                  the friend's deposit (found by its memo without a txid)
  *   POST /radio/gift/campaign      {request, signature}         admin: campaign links (request.player opens a gift player)
@@ -33,6 +35,8 @@ export async function onRequest(context: Ctx) {
       const q = new URL(request.url).searchParams;
       // The recipient's page asks this while its gift is on its way, which also keeps the sends moving.
       if (action === 'for') { const r = reply(await giftForWallet(env, q.get('wallet') ?? '')); later(); return r; }
+      if (action === 'slots') return reply(await nextSlot(env, q.get('root') ?? ''));
+      if (action === 'shelf') return reply(await shelfFor(env, q.get('root') ?? '', Number(q.get('after') ?? 0), Number(q.get('limit') ?? 50)));
       if (action === '') { const r = reply(await giftStatus(env, { id: q.get('id') })); later(); return r; }
       return reply({ error: 'Not found' }, 404);
     }
