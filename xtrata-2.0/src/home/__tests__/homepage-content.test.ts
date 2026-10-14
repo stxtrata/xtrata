@@ -19,6 +19,8 @@ import {
 const indexHtml = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
 const homepageSource = readFileSync(new URL('../homepage.js', import.meta.url), 'utf8');
 const homeMainSource = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
+// Grid tiles' frames are made in the live-frame manager (moved out of main.js on 30 Sep, b1816405).
+const liveFrameSource = readFileSync(new URL('../live-frame-manager.js', import.meta.url), 'utf8');
 const radioSource = readFileSync(new URL('../radio.js', import.meta.url), 'utf8');
 const configSource = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
 const homeStyles = readFileSync(new URL('../styles/home.css', import.meta.url), 'utf8');
@@ -335,7 +337,10 @@ describe('inscription iframe permissions', () => {
     const sites = [...homeMainSource.matchAll(/frame\.sandbox = 'allow-scripts( allow-pointer-lock allow-downloads)?';/g)];
     expect(sites.filter((m) => m[1]).every((m) =>
       homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 160).includes('INSCRIPTION_FRAME_ALLOW'))).toBe(true);
-    expect(sites.length).toBe(6);
+    expect(sites.length).toBe(5);
+    // The sixth thumbnail kind, the explorer grid tiles, lives in the live-frame manager: sandboxed, and never granted.
+    expect([...liveFrameSource.matchAll(/frame\.sandbox = 'allow-scripts';/g)].length).toBe(1);
+    expect(liveFrameSource).not.toMatch(/INSCRIPTION_FRAME_ALLOW|autoplay|\.allow\s*=/);
     const granting = sites.filter((m) =>
       homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 120).includes('INSCRIPTION_FRAME_ALLOW')
     );
@@ -351,6 +356,7 @@ describe('inscription iframe permissions', () => {
   it('keeps the sandbox itself intact', () => {
     // Delegating a feature must never turn into relaxing the origin boundary.
     expect(homeMainSource).not.toContain("sandbox = 'allow-scripts allow-same-origin'");
+    expect(liveFrameSource).not.toContain('allow-same-origin');
   });
 });
 
