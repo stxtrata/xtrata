@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createStacksPrivateKey, getAddressFromPrivateKey, makeRandomPrivKey, privateKeyToString, signMessageHashRsv, TransactionVersion } from '@stacks/transactions';
 import { onRequest as config } from '../listening-wallet/config';
 import { onRequest as link } from '../listening-wallet/link';
+import { ensureSlotTable } from '../../lib/radio-listening-wallet';
 import { onRequest as chainLikes, mergeLinkedRows } from '../chain-likes';
 import { resetChainReadState } from '../../lib/radio-chain-likes';
 import { Cl, serializeCV } from '@stacks/transactions';
@@ -106,6 +107,24 @@ describe('listening-wallet actions credited to the main wallet', () => {
     const r = await (await link({ env, request: get(`/radio/listening-wallet/link?listening=${LISTENING},${MAIN}`) })).json();
     expect(r.links).toEqual([{ listening: LISTENING, main: MAIN }]);
     expect((await link({ env, request: get('/radio/listening-wallet/link?listening=' + Array(101).fill(LISTENING).join(',')) })).status).toBe(400);
+  });
+
+  it('credits a numbered wallet to the main wallet its passkey is linked to, with no link of its own', async () => {
+    await post(submission());
+    const slotA = addr(key()), slotB = addr(key()), orphan = addr(key()), unlinkedRoot = addr(key()), under = addr(key());
+    await ensureSlotTable(env);
+    const bind = db.prepare('INSERT INTO radio_listening_slots(address, root, slot, issued, root_signature, slot_signature, created_at) VALUES(?,?,?,?,?,?,?)');
+    bind.run(slotA, LISTENING, 1, NOW, 'r', 's', NOW);
+    bind.run(slotB, LISTENING, 2, NOW, 'r', 's', NOW);
+    bind.run(under, unlinkedRoot, 1, NOW, 'r', 's', NOW); // its passkey has no link: nothing to credit
+    const r = await (await link({ env, request: get(`/radio/listening-wallet/link?listening=${slotA},${slotB},${LISTENING},${under},${orphan}`) })).json();
+    expect(r.links).toEqual(expect.arrayContaining([{ listening: slotA, main: MAIN }, { listening: slotB, main: MAIN }, { listening: LISTENING, main: MAIN }]));
+    expect(r.links).toHaveLength(3);
+    // a direct link on the numbered wallet itself wins over its passkey's
+    const other = key(), otherMain = addr(other);
+    db.prepare('INSERT INTO radio_listening_wallets(listening, main, issued, main_signature, listening_signature, created_at, updated_at) VALUES(?,?,?,?,?,?,?)').run(slotB, otherMain, NOW, 'm', 'l', NOW, NOW);
+    const again = await (await link({ env, request: get(`/radio/listening-wallet/link?listening=${slotA},${slotB}`) })).json();
+    expect(again.links).toEqual(expect.arrayContaining([{ listening: slotA, main: MAIN }, { listening: slotB, main: otherMain }]));
   });
 
   it('merges likes: liked if the main wallet or a linked listening wallet liked it, and says which', () => {

@@ -10,8 +10,10 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
   BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
-  giftStatus, NONCE_SETTLE_MS, REBROADCAST_MS, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv
+  giftStatus, nextSlot, NONCE_SETTLE_MS, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv
 } from '../radio-gifts';
+import { deriveSlotIdentity, listeningBase } from '../../../src/lib/listening-wallet/derive';
+import { signSlotBinding } from '../../../src/lib/listening-wallet/slots';
 import { playerData, playerHash, type PlayerDefinition, type PlayerRequest } from '../../../src/lib/listening-wallet/gift-players';
 import { campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_MEMO, giftCodeHash, giftDepositMemo, type CampaignRequest } from '../../../src/lib/listening-wallet/gifts';
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
@@ -499,5 +501,110 @@ describe('radio gift players', () => {
     s.db.sql.prepare("UPDATE radio_metadata SET status='failed' WHERE token_id=2187").run();
     const { playerView } = await import('../radio-gifts');
     expect((await playerView(s.env, id))!.tracks.map((t) => t.id)).toEqual([785, 2186, 2188]);
+  });
+  describe('albums in numbered wallets (one passkey, many wallets)', () => {
+    const PRF = Uint8Array.from({ length: 32 }, (_, i) => i + 7);
+    const passkey = async () => {
+      const base = await listeningBase(PRF);
+      const root = await deriveSlotIdentity(base, 0);
+      const proof = async (slot: number, issued: number, over: Partial<{ root: string; address: string; signer: string }> = {}) => {
+        const id = await deriveSlotIdentity(base, slot);
+        const b = { root: over.root ?? root.address, slot, address: over.address ?? id.address, issued };
+        return { id, binding: { ...b, rootSignature: signSlotBinding(b, root.privateKey), slotSignature: signSlotBinding(b, over.signer ?? id.privateKey) } };
+      };
+      return { root, proof };
+    };
+    const album = async (s: ReturnType<typeof setup>, n = 1) => {
+      catalogue(s);
+      const { id } = await make(s);
+      const req: CampaignRequest = { admin: s.admin, count: n, amount: '100000', label: 'Gift Edition', issued: s.now(), player: id };
+      const signature = signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(campaignData(req)))), privateKey: createStacksPrivateKey(s.adminKey) }).data;
+      return (await createCampaign(s.env, { request: req, signature }, s.deps(), s.request)).codes;
+    };
+    const claimInto = (s: ReturnType<typeof setup>, code: string, p: { id: { address: string }; binding: any }) =>
+      claimGift(s.env, { code, wallet: p.id.address, binding: p.binding }, s.deps(), null, s.request);
+
+    it('an album goes into the next numbered wallet with a binding signed by both keys, and the shelf lists it', async () => {
+      const s = setup(); const codes = await album(s, 3);
+      const { root, proof } = await passkey();
+      expect(await nextSlot(s.env, root.address)).toEqual({ next: 1 });
+      const a = await proof(1, s.now());
+      const out = await claimInto(s, codes[0], a);
+      expect(out.already).toBe(false);
+      expect(decode(s.chain.sent[0].raw)).toMatchObject({ recipient: a.id.address, amount: 100000n });
+      expect(await nextSlot(s.env, root.address)).toEqual({ next: 2 });
+      await s.land();
+      s.tick(1_000);
+      const b = await proof(2, s.now());
+      await claimInto(s, codes[1], b); await s.land();
+      const page = await shelfFor(s.env, root.address);
+      expect(page).toMatchObject({ total: 2, next: null });
+      expect(page.shelf.map((x) => [x.slot, x.address, x.state])).toEqual([[1, a.id.address, 'arrived'], [2, b.id.address, 'arrived']]);
+      expect(page.shelf[0].player).toMatchObject({ title: 'Proof of Sound' });
+      // each numbered wallet is its own gift record, and the binding is stored for credit
+      expect((await giftForWallet(s.env, b.id.address)).gift).toMatchObject({ player: { title: 'Proof of Sound' } });
+      expect(s.db.sql.prepare('SELECT address, root, slot FROM radio_listening_slots ORDER BY slot').all()).toEqual([
+        { address: a.id.address, root: root.address, slot: 1 }, { address: b.id.address, root: root.address, slot: 2 }]);
+      // repeating the same claim is the same gift, not another
+      expect(await claimInto(s, codes[0], a)).toMatchObject({ already: true });
+    });
+
+    it('pages the shelf for a large collection', async () => {
+      const s = setup(); await album(s, 1);
+      const { root } = await passkey();
+      const insert = s.db.sql.prepare("INSERT INTO radio_gifts(id, code_hash, amount, source, label, status, created_at, expires_at, claimed_by, claim_txid, claimed_at, updated_at, root, slot) VALUES(?, ?, 100000, 'campaign', '', 'claimed', 1, 2, ?, ?, 1, 1, ?, ?)");
+      for (let n = 1; n <= 130; n++) insert.run('g' + n, 'h' + n, 'w' + n, 't' + n, root.address, n);
+      const first = await shelfFor(s.env, root.address, 0, 50);
+      expect(first).toMatchObject({ total: 130, next: 50 });
+      expect(first.shelf).toHaveLength(50);
+      const last = await shelfFor(s.env, root.address, 100, 50);
+      expect(last.shelf.map((x) => x.slot)).toEqual(Array.from({ length: 30 }, (_, i) => 101 + i));
+      expect(last.next).toBeNull();
+      expect((await shelfFor(s.env, root.address, 0, 9999)).shelf).toHaveLength(100); // never more than 100 a page
+      expect(await nextSlot(s.env, root.address)).toEqual({ next: 131 });
+      await expect(shelfFor(s.env, 'nope')).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('refuses a binding that is not signed by both keys, is for another wallet or number, or is stale', async () => {
+      const s = setup(); const codes = await album(s, 4);
+      const { root, proof } = await passkey();
+      const stranger = key();
+      const wrongSlotKey = await proof(1, s.now(), { signer: stranger });
+      await expect(claimInto(s, codes[0], wrongSlotKey)).rejects.toThrow(/not proven to belong/);
+      const forged = await proof(1, s.now(), { address: wallet() }); // an address the passkey does not derive: the slot key cannot have signed it
+      await expect(claimInto(s, codes[0], forged)).rejects.toThrow(/not proven to belong/);
+      const other = await proof(2, s.now());
+      await expect(claimGift(s.env, { code: codes[0], wallet: wallet(), binding: other.binding }, s.deps(), null, s.request)).rejects.toThrow(/different wallet/);
+      const stale = await proof(3, s.now() - 16 * 60_000);
+      await expect(claimInto(s, codes[0], stale)).rejects.toThrow(/expired/);
+      const rootAsSlot = await proof(1, s.now());
+      await expect(claimInto(s, codes[0], { ...rootAsSlot, binding: { ...rootAsSlot.binding, slot: 0 } })).rejects.toThrow();
+      expect(s.chain.sent).toHaveLength(0);
+      expect(sends(s)).toHaveLength(0);
+      expect(await nextSlot(s.env, root.address)).toEqual({ next: 1 });
+    });
+
+    it('a starter gift (no album) goes only to the listener’s own wallet, never a numbered one', async () => {
+      const s = setup();
+      const [code] = (await s.campaign(1)).codes;
+      const { proof } = await passkey();
+      await expect(claimInto(s, code, await proof(1, s.now()))).rejects.toThrow(/starter gift/);
+      expect(s.chain.sent).toHaveLength(0);
+    });
+
+    it('a number is used once per passkey: a second gift for it is refused, while another passkey can use the same number', async () => {
+      const s = setup(); const codes = await album(s, 3);
+      const { proof } = await passkey();
+      const one = await proof(1, s.now());
+      await claimInto(s, codes[0], one);
+      await s.land();
+      s.tick(1_000);
+      await expect(claimInto(s, codes[1], await proof(1, s.now()))).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/just taken/) });
+      // another passkey can use number 1 for itself
+      const otherPrf = Uint8Array.from({ length: 32 }, (_, i) => 200 - i);
+      const base = await listeningBase(otherPrf), root = await deriveSlotIdentity(base, 0), id = await deriveSlotIdentity(base, 1);
+      const b = { root: root.address, slot: 1, address: id.address, issued: s.now() };
+      await expect(claimInto(s, codes[1], { id, binding: { ...b, rootSignature: signSlotBinding(b, root.privateKey), slotSignature: signSlotBinding(b, id.privateKey) } })).resolves.toMatchObject({ already: false });
+    });
   });
 });

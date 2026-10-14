@@ -19,3 +19,16 @@ Never change the labels or the HKDF settings: `src/lib/listening-wallet/__tests_
 
 ## Shipping
 The wallet box deploys separately: `npm run build:listening-wallet`, then `wrangler pages deploy` from `dist-listening-wallet`. The radio page checks `features` for `slots` before using any of these calls, as it does for `partial`.
+
+## Server (step 2)
+- `radio_gifts` gains `root` (the passkey's first wallet) and `slot`, with a unique index on `(root, slot)`. A new table `radio_listening_slots` stores each numbered wallet's binding (both signatures). Both are created at runtime; `functions/migrations/029_radio_derived_wallets.sql` is the same thing for a fresh database.
+- `GET /radio/gift/slots?root=SP…` returns `{ next }`, the next free number. It is a suggestion; the unique index settles a race (a clash answers 409 "just taken" and the page asks again).
+- `POST /radio/gift/claim` takes an optional `binding` (`root, slot, address, issued, rootSignature, slotSignature`). The address must be the claimed wallet, both signatures must verify, and the binding must be under 15 minutes old. Only a gift with an album (player) can go into a numbered wallet: a starter gift goes to the listener's own wallet, once, with the same brand-new-wallet rule as before.
+- `GET /radio/gift/shelf?root=SP…&after=<number>&limit=<=100` pages the albums in a passkey's numbered wallets (`{ total, next, shelf: [{ slot, address, state, player, ... }] }`). Public data only. The wallet box re-derives every address from its number, so a row whose address does not match is ignored.
+- `GET /radio/listening-wallet/link?listening=…` resolves a numbered wallet to the main wallet its passkey is linked to (`mainsFor`), unless the numbered wallet has a link of its own.
+
+## Not done yet: counting plays and likes under one listener
+`music_paid_plays` totals and on-chain likes still resolve a listening wallet to a main wallet through `radio_listening_wallets` only (`functions/lib/music-stats.ts`, `functions/radio/chain-likes.ts`), and likes read each linked wallet separately. Hundreds of numbered wallets need:
+- the stats join to go through `radio_listening_slots` as well (a view that unions direct links with root links, with the table-missing fallback kept), and
+- likes signed from one wallet. Proposal: the wallet box signs a like with the passkey's own wallet whichever album is open, so a listener's likes live in one place.
+Until then, plays from numbered wallets are paid and recorded on chain as normal but are not yet credited to the main wallet in those totals.
