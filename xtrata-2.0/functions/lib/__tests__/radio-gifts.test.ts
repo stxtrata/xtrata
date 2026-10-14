@@ -10,7 +10,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
   BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
-  giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv
+  adminAddresses, giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv
 } from '../radio-gifts';
 import { deriveSlotIdentity, listeningBase } from '../../../src/lib/listening-wallet/derive';
 import { signSlotBinding } from '../../../src/lib/listening-wallet/slots';
@@ -454,6 +454,45 @@ describe('radio gift players', () => {
       id: out.id, title: 'Proof of Sound', subtitle: 'The Artist', cover: 785, paidOnly: true,
       tracks: SONGS.map((id, i) => ({ id, title: `Song ${i + 1}`, artist: 'The Artist' }))
     });
+  });
+
+  it('several admins: each can make albums from the songs it holds, and a stranger still cannot', async () => {
+    const second = key();
+    const s = setup(); catalogue(s);
+    s.env.RADIO_GIFT_ADMIN = `${s.admin}, ${addr(second)}`;
+    expect(giftsConfig(s.env, addr(second), s.request).admin).toBe(true);
+    expect(giftsConfig(s.env, s.admin, s.request).admin).toBe(true);
+    expect(giftsConfig(s.env, wallet(), s.request).admin).toBe(false);
+    for (const id of SONGS) s.chain.owners.set(id, addr(second)); // the second admin holds the songs
+    await expect(make(s)).rejects.toMatchObject({ status: 403, message: /not in this wallet/ }); // the first admin does not
+    await expect(make(s, definition(), second)).rejects.toMatchObject({ status: 403 }); // signed by the second key but names the first admin
+    const out = await createPlayer(s.env, (() => {
+      const request: PlayerRequest = { admin: addr(second), hash: playerHash(definition()), issued: s.now() };
+      const signature = signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(playerData(request)))), privateKey: createStacksPrivateKey(second) }).data;
+      return { definition: definition(), request, signature };
+    })(), s.deps(), s.request);
+    expect(out).toMatchObject({ existing: false });
+    await expect(make(s, definition({ title: 'Other' }), key())).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('lists admins by commas or spaces and ignores anything that is not an address', () => {
+    const real = 'SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX';
+    expect(adminAddresses({ RADIO_GIFT_ADMIN: `${real},  nonsense ; ${real} ${wallet()}` } as GiftEnv)).toHaveLength(2);
+    expect(adminAddresses({ RADIO_GIFT_ADMIN: real } as GiftEnv)).toEqual([real]);
+    expect(adminAddresses({} as GiftEnv)).toEqual([]);
+  });
+
+  it('an album never stops working: selling a song afterwards changes nothing for the album or its links', async () => {
+    const s = setup(); catalogue(s);
+    const out = await make(s);
+    await campaignFor(s, out.id).run();
+    for (const id of SONGS) s.chain.owners.set(id, wallet()); // every song is sold to someone else
+    const { playerView } = await import('../radio-gifts');
+    expect((await playerView(s.env, out.id))?.tracks).toHaveLength(4);
+    s.tick(1000);
+    await expect(campaignFor(s, out.id).run()).resolves.toMatchObject({ player: out.id });
+    s.chain.ownerError = true; // and a chain outage never touches an existing album
+    expect((await playerView(s.env, out.id))?.tracks).toHaveLength(4);
   });
 
   it('only the wallet that owns every song can make its album', async () => {

@@ -23,7 +23,7 @@
  * Variables (Cloudflare Pages):
  *   RADIO_GIFT_ENABLED = "1"            kill switch; anything else stops claims, new gifts and refunds
  *   RADIO_GIFT_TREASURY_KEY             the treasury's private key (secret)
- *   RADIO_GIFT_ADMIN = "SP…"            the only address that may sign campaign requests
+ *   RADIO_GIFT_ADMIN = "SP…"            the addresses that may sign campaign and player requests (several: separate with commas)
  *   RADIO_GIFT_DAILY_CAP                campaign microSTX claimable per 24 h (default 2 STX)
  *   RADIO_GIFT_ESCROW_CAP               most friend-gift money held at once (default 25 STX)
  *   RADIO_GIFT_TURNSTILE_SITE_KEY / _SECRET   optional Cloudflare Turnstile check on claims
@@ -237,7 +237,10 @@ export function treasuryAddress(env: GiftEnv): string | null {
   if (!/^[0-9a-fA-F]{64}(01)?$/.test(key)) return null;
   try { return getAddressFromPrivateKey(key, TransactionVersion.Mainnet); } catch { return null; }
 }
-const adminAddress = (env: GiftEnv) => (isMainnetStandardAddress(env.RADIO_GIFT_ADMIN?.trim()) ? env.RADIO_GIFT_ADMIN!.trim() : null);
+/** The gift admins: `RADIO_GIFT_ADMIN` is one address or several separated by commas or spaces. Anything that is not a mainnet address is ignored. */
+export const adminAddresses = (env: GiftEnv): string[] =>
+  [...new Set((env.RADIO_GIFT_ADMIN ?? '').split(/[\s,;]+/).map((a) => a.trim()).filter((a) => isMainnetStandardAddress(a)))];
+const isAdmin = (env: GiftEnv, address: unknown) => typeof address === 'string' && adminAddresses(env).includes(address);
 const micro = (value: string | undefined, fallback: bigint) => (typeof value === 'string' && /^\d{1,12}$/.test(value.trim()) ? BigInt(value.trim()) : fallback);
 
 /** What the radio page needs to know (public). Gifts are off unless every piece is in place. */
@@ -246,7 +249,7 @@ export function giftsConfig(env: GiftEnv, main: string | null, request?: Request
   const treasury = treasuryAddress(env);
   const enabled = g.enabled && g.here && env.RADIO_GIFT_ENABLED === '1' && !!treasury;
   const turnstile = enabled && env.RADIO_GIFT_TURNSTILE_SITE_KEY && env.RADIO_GIFT_TURNSTILE_SECRET ? env.RADIO_GIFT_TURNSTILE_SITE_KEY : null;
-  return { enabled, treasury: enabled ? treasury : null, turnstileSiteKey: turnstile, admin: enabled && !!main && main === adminAddress(env), fee: GIFT_FEE.toString() };
+  return { enabled, treasury: enabled ? treasury : null, turnstileSiteKey: turnstile, admin: enabled && !!main && isAdmin(env, main), fee: GIFT_FEE.toString() };
 }
 
 const requireEnabled = (env: GiftEnv, request?: Request) => {
@@ -537,11 +540,11 @@ export async function shelfFor(env: GiftEnv, root: string, after = 0, limit = 50
 /** Admin: links paid from the campaign pool. Each signed request works once. The codes exist in clear only in this reply. */
 export async function createCampaign(env: GiftEnv, body: { request: CampaignRequest; signature: string }, deps: GiftDeps, request?: Request) {
   requireEnabled(env, request);
-  const admin = adminAddress(env);
-  if (!admin) throw new GiftError('No gift admin is set for this deployment.', 403);
+  if (!adminAddresses(env).length) throw new GiftError('No gift admin is set for this deployment.', 403);
   let req: CampaignRequest;
   try { req = validateCampaign(body?.request, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
-  if (req.admin !== admin || !verifyCampaignSignature(req, body.signature, admin)) throw new GiftError('Only the gift admin can make campaign links.', 403);
+  if (!isAdmin(env, req.admin) || !verifyCampaignSignature(req, body.signature, req.admin)) throw new GiftError('Only the gift admin can make campaign links.', 403);
+  const admin = req.admin;
   await ensureGiftTables(env);
   // A link can only open a player that exists (the id is part of what the admin signed).
   if (req.player && !(await one<{ id: string }>(env, "SELECT id FROM radio_gift_players WHERE id=? AND status='active'", [req.player])))
@@ -599,11 +602,11 @@ export async function requireSongOwner(deps: GiftDeps, owner: string, ids: numbe
 /** Admin: store a player definition. Needs the admin's signature over its hash; each signed request works once. */
 export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefinition; request: PlayerRequest; signature: string }, deps: GiftDeps, request?: Request) {
   requireEnabled(env, request);
-  const admin = adminAddress(env);
-  if (!admin) throw new GiftError('No gift admin is set for this deployment.', 403);
+  if (!adminAddresses(env).length) throw new GiftError('No gift admin is set for this deployment.', 403);
   let def: PlayerDefinition, req: PlayerRequest;
   try { def = validatePlayer(body?.definition); req = validatePlayerRequest(body?.request, def, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
-  if (req.admin !== admin || !verifyPlayerSignature(req, body.signature, admin)) throw new GiftError('Only the gift admin can make gift players.', 403);
+  if (!isAdmin(env, req.admin) || !verifyPlayerSignature(req, body.signature, req.admin)) throw new GiftError('Only the gift admin can make gift players.', 403);
+  const admin = req.admin;
   await ensureGiftTables(env);
   // Only the songs must be ready songs. The cover is any inscription (an image, or a page with one): it need not be a song.
   const wanted = [...new Set(def.tracks)];

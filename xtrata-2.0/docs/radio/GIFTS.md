@@ -50,7 +50,7 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 2. Fund it with the float: 10 STX.
 3. Set secrets:
    - `RADIO_GIFT_TREASURY_KEY`: the treasury's private key (64 hex characters, optionally ending `01`).
-   - `RADIO_GIFT_ADMIN`: your own address. It only signs campaign requests and never holds gift money.
+   - `RADIO_GIFT_ADMIN`: your own address. It only signs campaign and player requests and never holds gift money. Several admins: separate the addresses with commas, e.g. `SP…jim,SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX`. Every admin can make campaign links (paid from the treasury, within the daily cap) and albums from the songs it holds.
    - Optional: `RADIO_GIFT_DAILY_CAP` and `RADIO_GIFT_ESCROW_CAP` (microSTX), and the two Turnstile keys.
    - `RADIO_GIFT_ENABLED` = `1` last.
 4. Optionally apply `functions/migrations/027_radio_gifts.sql`. The tables are also created on first use.
@@ -83,6 +83,7 @@ Code: `src/lib/listening-wallet/gift-players.ts` (rules, signing), `functions/li
 1. Open the radio as the gift admin: **🎁 Gift Stacks music → Gift players**. Enter a title, an optional artist, and the radio song numbers in play order (1 to 40, ready songs in the radio catalogue). Sign once. The server stores the definition; titles and artists shown to listeners come from the catalogue, never from what was typed.
 2. Under **Campaign links** pick the player, a size (300 / 500 / 1,000 plays or Max = 1 STX), how many links, and sign. Links look like any other gift link.
 - **An album is made by the wallet that owns all of its songs.** When a player is created the server asks the core contract (`get-owner`) who holds each song, and every one must be the signing wallet. A song held by someone else, by a contract (for example listed for sale) or by no one refuses the player; a chain that cannot answer says "try again", never "allowed". The check runs at creation only: an album already made stays valid if a song is sold later. The core contract applies the same rule natively to an inscription minted with the songs as its **parents** (the minter must own every parent), which is the planned on-chain form of an album (see the Xtrata Music project doc `radio-editions-and-sales-plan.md`).
+- **An album never stops working.** Nothing deactivates a player or a link that has been made: selling a song afterwards, or a chain outage, changes nothing for existing albums, their links or recipients (tested). Only songs the radio catalogue cannot confirm are left out of the album view.
 - A player never changes. A new version is a new player, so a link already sent cannot become something its sender did not mean.
 - Migration `functions/migrations/028_radio_gift_players.sql` (the tables are also created on first use).
 
