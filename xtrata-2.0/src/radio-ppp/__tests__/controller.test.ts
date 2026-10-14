@@ -567,6 +567,22 @@ describe('passkey-only listening (no Stacks wallet)', () => {
     s.chain.mined.add(gift); s.chain.balance = 250_000n;
     await s.ppp.forceRefresh();
     expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', depositPending: false, payingOn: true });
+    expect(s.ppp.snapshot().message).not.toMatch(/on its way/); // gone once it has landed
+  });
+
+  it('an empty wallet that never sent anything counts as brand-new even when made elsewhere; one that was used does not', async () => {
+    const s = solo();
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    for (const k of [...s.store.keys()]) if (k.includes('created')) s.store.delete(k); // e.g. made in another tab, then this page reloaded
+    s.chain.confirmed = 0n;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ createdHere: false, brandNew: true });
+    const used = solo();
+    await used.ppp.forceRefresh(); await used.ppp.create();
+    for (const k of [...used.store.keys()]) if (k.includes('created')) used.store.delete(k);
+    used.chain.confirmed = 3n; // it has sent transactions (e.g. returned a gift)
+    await used.ppp.forceRefresh();
+    expect(used.ppp.snapshot()).toMatchObject({ createdHere: false, brandNew: false });
   });
 
   it('only a wallet created in this browser counts as made here (a gift link claims into nothing else)', async () => {

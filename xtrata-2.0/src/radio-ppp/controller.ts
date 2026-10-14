@@ -172,6 +172,12 @@ export interface Snapshot {
    * a wallet takes a gift: gifts are for brand-new listening wallets.
    */
   createdHere: boolean;
+  /**
+   * The open wallet has never held or sent anything (confirmed balance 0 and confirmed nonce 0): brand-new
+   * whichever device made it, e.g. a passkey made in another tab after this page reloaded. Gifts may claim
+   * into it. Unknown (not yet read, or the read failed) counts as false.
+   */
+  brandNew: boolean;
   /** This wallet was gifted (the server says so). `player` is the album that came with it, if any. */
   gift: { player: PlayerView | null; from: string | null; source: string; amount: string } | null;
   /** Paid plays this gifted wallet still buys, counting payments in flight and songs waiting to be paid. */
@@ -228,6 +234,7 @@ export function createPppController(deps: PppDeps) {
   let funderLooking = false;
   let funderFails = 0;
   let creditedRes: { for: string; main: string | null; ok: boolean; at: number } | null = null;
+  let unusedRes: { for: string; unused: boolean } | null = null;
   let creditedLooking = false;
   // Gift: what the server says about this wallet (kept on this device so the album survives an unreachable server).
   let giftRes: { for: string; info: GiftInfo | null; ok: boolean; at: number } | null = null;
@@ -433,6 +440,7 @@ export function createPppController(deps: PppDeps) {
     others: (status?.others ?? []).filter((a) => a !== deps.main() && a !== status?.linked),
     creditedTo: solo() && status?.address && creditedRes?.for === status.address && creditedRes.main ? creditedRes.main : undefined,
     createdHere: !!status?.address && deps.store.get(key('created', status.address)) === '1',
+    brandNew: !!status?.address && balance === 0n && unusedRes?.for === status.address && unusedRes.unused,
     gift: (() => { const g = giftNow(); return g ? { player: g.player, from: g.from, source: g.source, amount: g.amount } : null; })(),
     giftPlays: giftNow() ? playsLeftNow() : 0,
     giftStop: giftStop(),
@@ -532,6 +540,18 @@ export function createPppController(deps: PppDeps) {
     finally { creditedLooking = false; }
   }
 
+  /**
+   * Whether an empty wallet has ever been used: its confirmed nonce is 0 only if it never sent anything, and a
+   * balance of 0 then means it never held anything either. Read once per wallet; a failed read is retried later.
+   */
+  async function lookupUnused() {
+    const listening = status?.address;
+    if (!listening || status?.state !== 'unlocked' || balance !== 0n || unusedRes?.for === listening) return;
+    if (deps.store.get(key('created', listening)) === '1') return; // made here: already known to be new
+    try { unusedRes = { for: listening, unused: (await deps.chain.confirmedNonce(listening)) === 0n }; }
+    catch { /* unknown: not brand-new for now; tried again on the next refresh */ }
+  }
+
   async function reconcile(): Promise<boolean> {
     const listening = status?.address;
     if (!listening) return false;
@@ -575,6 +595,8 @@ export function createPppController(deps: PppDeps) {
         if ((s === 'success' && tx.is_unanchored === false) || s.startsWith('abort_') || s.startsWith('dropped_') || (!tx && deps.now() - d.at > 2 * 3600_000)) {
           setPendingDeposit(null);
           balanceAt = -Infinity;
+          // "Gift on its way" / "deposit on its way" is over: say nothing rather than leave it up while paying.
+          if (/on its way/i.test(message)) message = '';
         }
       } catch { /* keep waiting */ }
     }
@@ -605,6 +627,7 @@ export function createPppController(deps: PppDeps) {
       await refreshBalance(force);
       await lookupFunder();
       await lookupCredited();
+      await lookupUnused();
       await lookupGift();
       // A payment that has just landed has changed the balance: read it again now, so plays-left is exact.
       if (await reconcile()) await refreshBalance(true);

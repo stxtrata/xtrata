@@ -19,6 +19,7 @@ import { createNameCache } from '../lib/bns/name-cache';
 import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
 import { createGifts } from './gifts';
 import { copyButton } from './feedback';
+import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -193,7 +194,7 @@ function start(root: HTMLElement) {
   const link = (label: string, href: string) => { const a = el('a', label) as HTMLAnchorElement; a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
 
   let lastStage: StageView | null = null;
-  // radio.xtrata.xyz/radio#give (the homepage's "Gift Stacks music") opens the gift section once it is there.
+  // radio.xtrata.xyz/radio#give (the homepage's "Send someone a wallet") opens the gift section once it is there.
   let wantGive = location.hash === '#give';
   if (wantGive) history.replaceState(null, '', location.pathname + location.search);
   let walletShown = false; // the listener opened the resting wallet box
@@ -201,6 +202,19 @@ function start(root: HTMLElement) {
   // name wherever its address would be; without one (or while the lookup runs) the short address stands in.
   const names = createNameCache((address) => resolvePrimaryBnsName({ address, network: 'mainnet' }), () => render(ppp.snapshot()));
   const nameOf = (address?: string) => names.get(address);
+  const inApp = inAppBrowser(navigator.userAgent);
+  /** "Open in Safari" for a visitor inside an app's built-in browser, carrying a waiting gift code with them. */
+  const openElsewhere = (app: string, code: string | null): HTMLElement[] => {
+    const ua = navigator.userAgent, browser = browserName(ua);
+    const url = `${location.origin}${location.pathname}${code ? `#gift=${code}` : ''}`;
+    const out: HTMLElement[] = [el('p', `You are in ${app}'s built-in browser, where passkeys often do not work. Open this page in ${browser} to make your listening wallet${code ? ' and claim your gift' : ''}.`, 'ppp-warn')];
+    const row = el('div', '', 'ppp-open-row'); // not .ppp-actions: the panel refills the first element with that class
+    const href = openInBrowserHref(url, ua);
+    if (href) { const a = el('a', `Open in ${browser}`, 'primary ppp-open-in') as HTMLAnchorElement; a.href = href; a.dataset.homeAction = 'radio:open-in-browser'; row.append(a); }
+    row.append(copyButton('copy-page-link', 'Copy link', () => url, href ? '' : 'primary', () => render(ppp.snapshot())));
+    out.push(row, el('p', `If that does not open ${browser}, use ${app}'s menu (••• or ⋮) and choose "Open in ${browser === 'your browser' ? 'browser' : browser}", or paste the copied link there.`, 'ppp-mute'));
+    return out;
+  };
   const who = (address?: string) => nameOf(address) ?? short(address);
   /** Up to two wallets, then "and N more". */
   const whoList = (addresses: string[]) => addresses.slice(0, 2).map(who).join(' and ') + (addresses.length > 2 ? ` and ${addresses.length - 2} more` : '');
@@ -678,6 +692,8 @@ function start(root: HTMLElement) {
     }
     // A gift link in play goes first: it is why this visitor is here.
     key.unshift(...gifts.banner(s));
+    // Inside an app's own browser (Instagram, X, ...) passkeys often fail: before anything else, offer the real one.
+    if (inApp && (gifts.pendingCode() || ['intro', 'locked', 'unsupported'].includes(s.step))) key.unshift(...openElsewhere(inApp, gifts.pendingCode()));
     // A passkey synced to this device opened someone's existing wallet: say whose, first.
     if (s.solo && s.creditedTo && s.listening && !['intro', 'off', 'elsewhere', 'loading'].includes(s.step))
       key.unshift(el('p', `This is ${who(s.creditedTo)}'s listening wallet. Plays and likes count for ${who(s.creditedTo)}. Connect it (top right) to see its likes here too.`, 'ppp-ok'));

@@ -2,7 +2,7 @@
 //  - a visitor with no Stacks wallet opens a gift link, taps once, and the gift is claimed for the new
 //    listening wallet automatically (gift endpoints and chain are mocked; nothing is signed by a treasury)
 //  - the gift code leaves the address bar at once
-//  - a connected wallet sees "Gift Stacks music" (slider, plays), and the admin also sees campaign links
+//  - a connected wallet sees "Send someone a wallet" (slider, plays), and the admin also sees campaign links
 // Usage: VITE_LISTENING_WALLET_PARENTS=https://radio.xtrata.test npm run build:listening-wallet && npm run build:radio-ppp
 //        node scripts/test-radio-gift-browser.mjs [screenshot-dir]
 import { chromium } from 'playwright';
@@ -174,6 +174,37 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   const overflow = await gp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 1, `no horizontal scroll at ${viewport.width}px (${overflow})`);
   await giver.close();
+}
+// ---- the same gift link opened inside Instagram's built-in browser: offer Safari first, carrying the code
+{
+  const ig = await browser.newContext({ viewport: { width: 390, height: 900 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 400.0.0.0 (iPhone17,2; iOS 26_0; en_GB)' });
+  await ig.route('**/*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.origin === WALLET) {
+      const path = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
+      try { return route.fulfill({ body: await readFile(new URL(path, dist)), headers: { 'content-type': type(path), 'content-security-policy': csp } }); }
+      catch { return route.fulfill({ status: 404, body: '' }); }
+    }
+    if (url.origin !== SITE) return route.abort();
+    if (url.pathname === '/radio/listening-wallet/config')
+      return json(route, { enabled: true, allowed: false, here: true, radioUrl: SITE + '/radio.html', canary: true, walletOrigin: WALLET, passkeyOnly: true, limits,
+        gifts: { enabled: true, treasury: TREASURY, turnstileSiteKey: null, admin: false, fee: '3000' } });
+    if (url.pathname === '/radio/gift/status') return json(route, { status: 'live', amount: '250000', source: 'friend', from: GIFTER, label: '', expires: Date.now() + 86400000 });
+    if (url.pathname.startsWith('/hiro/') || url.pathname.startsWith('/radio/counts') || url.pathname.startsWith('/radio/chain-likes') || url.pathname.startsWith('/radio/gift/')) return json(route, {}, 404);
+    try { const path = url.pathname.slice(1) || 'index.html'; return route.fulfill({ body: await readFile(new URL(path, pub)), headers: { 'content-type': type(path) } }); }
+    catch { return route.fulfill({ status: 404, body: '' }); }
+  });
+  const p = await ig.newPage();
+  p.on('pageerror', (e) => errors.push(e.message));
+  await p.goto(`${SITE}/radio.html#gift=${CODE}`);
+  const panel = p.locator('#ppp');
+  await panel.getByText(/You are in Instagram's built-in browser/).waitFor({ timeout: 15000 });
+  const open = panel.getByRole('link', { name: 'Open in Safari' });
+  assert.equal(await open.getAttribute('href'), `x-safari-${SITE}/radio.html#gift=${CODE}`, 'opens Safari on the same gift');
+  await panel.getByRole('button', { name: 'Copy link' }).waitFor();
+  await panel.getByRole('button', { name: 'Claim my gift · no wallet needed' }).waitFor(); // still offered: some apps do manage
+  if (shots) await p.screenshot({ path: `${shots}/gift-instagram-390.png`, fullPage: false });
+  await ig.close();
 }
 await browser.close();
 const relevant = errors.filter((e) => !/turnstile|ResizeObserver/i.test(e));

@@ -308,6 +308,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
   .ppp button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
   .ppp button.primary{background:var(--cyan);color:#04121a;border-color:var(--cyan);font-weight:700}
+  .ppp-open-row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .ppp a.ppp-open-in{display:inline-flex;align-items:center;font-size:13px;background:var(--cyan);color:#04121a;border:1px solid var(--cyan);border-radius:8px;padding:8px 12px;min-height:40px;font-weight:700;text-decoration:none}
   .ppp button.quiet{color:var(--mut)}
   .ppp button.tiny{min-height:0;padding:2px 8px;font-size:11px;color:var(--cyan)}
   .ppp button:disabled{opacity:.55;cursor:wait}
@@ -451,7 +453,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
         <details class="ppp-fold ppp-recent" hidden><summary>♪ Recently played</summary><ol class="ppp-recent-list"></ol><details class="ppp-history" hidden></details></details>
         <details class="ppp-fold ppp-wallets" hidden><summary>◎ Wallet</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
         <details class="ppp-fold ppp-more" hidden><summary>? How it works</summary><div class="ppp-body"></div></details>
-        <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Gift Stacks music</summary><div class="ppp-gift-body"></div></details>
+        <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Send someone a wallet</summary><div class="ppp-gift-body"></div></details>
       </div>
     </section>
     <details class="likes" id="likesBox" open>
@@ -819,7 +821,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=20bbc924d7c3')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=0e585dc3120d')}).catch(function(){});
 </script>
 </body>
 </html>

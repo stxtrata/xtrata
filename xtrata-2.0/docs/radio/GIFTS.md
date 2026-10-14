@@ -2,6 +2,8 @@
 
 Someone without a Stacks wallet gets a gift link. They open it on radio.xtrata.xyz and tap once to make a passkey listening wallet. The gift treasury then funds that wallet with 0.1 to 1 STX, and they start paying artists as they listen.
 
+**Status (14 Oct 2026): live.** The treasury is set up and switched on, and the first gifts have landed on chain (0.1 STX at 19:30 on 13 Oct; a 0.2 STX gift was claimed and played on an iPhone at 22:48). Recipients on iPhone and in Safari make their passkey in a new tab (below).
+
 Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts` (endpoints), `src/lib/listening-wallet/gifts.ts` (shared rules), `src/radio-ppp/gifts.ts` (panel). Plan: Xtrata Music project, `claude/radio-gift-wallets-plan.md`.
 
 ## Kinds of gift
@@ -9,10 +11,17 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 | Kind | Who makes it | Paid from | Returns and refunds go to |
 | --- | --- | --- | --- |
 | Campaign | the admin (`RADIO_GIFT_ADMIN`), signing a request in the panel | the treasury's campaign pool, capped per day | the treasury |
-| Friend | anyone with a Stacks wallet, in "🎁 Gift Stacks music" | the gifter, up front: amount + 0.003 STX, memo `gift <id>` | the gifter (an unclaimed gift is refunded after 30 days) |
+| Friend | anyone with a Stacks wallet, in "🎁 Send someone a wallet" | the gifter, up front: amount + 0.003 STX, memo `gift <id>` | the gifter (an unclaimed gift is refunded after 30 days) |
 
 - Links look like `https://radio.xtrata.xyz/radio.html#gift=<code>`. The code sits after `#`, so browsers never send it to a server, and the page moves it to the device and takes it out of the address bar at once.
 - Only the code's hash is stored.
+
+## The recipient's side
+
+- **One button:** "Claim my gift · no wallet needed" makes a passkey-only listening wallet; the claim is sent as soon as the new wallet exists and is empty, and the panel tracks the transfer like a deposit until it lands ("Gift on its way" clears when it has).
+- **iPhone, iPad and Safari:** the passkey is made on `wallet.xtrata.xyz/create` in a new tab, then the radio tab signs in with it (WebKit will not create a passkey inside the wallet frame). See PAY-PER-PLAY.md, "iPhone, iPad and Safari".
+- **Apps' built-in browsers** (Instagram, Facebook, X, TikTok, LinkedIn and others name themselves in the user agent): passkeys often fail there, so the panel first offers "Open in Safari" (or Chrome on Android) carrying the gift code, plus "Copy link". The normal buttons stay, since some apps do manage. Links opened from Messages, Mail and similar use Safari's own view and work as in Safari.
+- **Which wallet takes the gift:** only a brand-new one: made in this browser, or never used (confirmed balance 0 and nonce 0, e.g. made in another tab after the page reloaded). Someone who unlocks an older wallet keeps the link, shown as one quiet line with "Forget this gift link here"; "Not now" on the landing does the same. The server also refuses a second gift for one wallet.
 
 ## How the treasury never pays twice
 
