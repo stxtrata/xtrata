@@ -12,6 +12,7 @@ import { account, api, balance, broadcast, owner, transaction, validateSaved, ve
 import { createPppController, type GateConfig, type Snapshot } from './controller';
 import { showSteps, stagesFor, stageOf, type StageView } from './stages';
 import { findFunder } from '../lib/listening-wallet/funder';
+import { readHistory } from '../lib/listening-wallet/ledger';
 import { hasInstalledStacksWallet } from '../lib/wallet/installed';
 import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { createNameCache } from '../lib/bns/name-cache';
@@ -102,6 +103,15 @@ function start(root: HTMLElement) {
     changed: () => render(ppp.snapshot()),
     // A gifted wallet returns to whoever paid for the gift (the gift record), else to its first funder.
     funder: (listening) => gifts.funder(listening, () => findFunder(listening, api), !!ppp.snapshot().gate?.gifts?.enabled),
+    // Was this wallet gifted, and with which album? A failed request throws: it is never read as "not a gift".
+    giftInfo: async (listening) => {
+      const r = await json('/radio/gift/for?wallet=' + encodeURIComponent(listening));
+      const g = r?.gift;
+      if (!g) return null;
+      if (typeof g.returnTo !== 'string' || typeof g.treasury !== 'string') throw new Error('Unreadable gift record.');
+      return { returnTo: g.returnTo, from: typeof g.from === 'string' ? g.from : null, source: String(g.source ?? ''), amount: String(g.amount ?? '0'), treasury: g.treasury, state: g.state === 'sending' ? 'sending' : 'arrived', player: g.player ?? null };
+    },
+    history: (listening, withOutgoing) => readHistory(listening, (path) => api(path), withOutgoing),
     likesChanged: () => { void (window as any).XtrataRadio?.refreshLikes?.(); },
     likeState: async (main, song) => {
       const r = await json('/radio/chain-likes?' + new URLSearchParams({ wallet: main, ids: String(song) }));
@@ -153,6 +163,21 @@ function start(root: HTMLElement) {
     if (now === identityShown) return;
     identityShown = now;
     void (window as any).XtrataRadio?.refreshLikes?.();
+  };
+
+  // A gifted wallet's album becomes a band on the radio; when its paid plays run out the radio stops (no free mode).
+  let giftPushed = '', stopPushed: string | null = null;
+  const syncGift = (s: Snapshot) => {
+    const radio = (window as any).XtrataRadio;
+    if (!radio?.setGiftPlayer || !radio?.setGiftStop) return; // pushed again at the next render, once the radio is there
+    const p = s.step === 'off' || s.step === 'elsewhere' ? null : s.gift?.player ?? null;
+    const id = p ? p.id + ':' + p.tracks.map((t) => t.id).join(',') : '';
+    if (id !== giftPushed) {
+      radio.setGiftPlayer(p ? { id: p.id, title: p.title, subtitle: p.subtitle, tracks: p.tracks.map((t) => t.id) } : null);
+      giftPushed = id;
+    }
+    const stop = p ? s.giftStop?.text ?? null : null;
+    if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
   };
 
   const short = (a?: string) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');
@@ -367,6 +392,7 @@ function start(root: HTMLElement) {
 
   function render(s: Snapshot) {
     syncIdentity(s);
+    syncGift(s);
     syncHeader(s);
     renderTop(s);
     renderMode(s);
@@ -427,10 +453,11 @@ function start(root: HTMLElement) {
       } else if (s.solo) {
         if (s.creditedTo) rows.push(...fact('Credited to', `${who(s.creditedTo)} · plays and likes`, 'ppp-ok'));
         // Passkey-only: returns go back where the money came from, unless the listener chose another address.
-        const where = s.returnTo
+        const where = s.gift ? 'to whoever it came from: the unused gift to the sender, your own top-ups to you'
+          : s.returnTo
           ? `${who(s.returnTo)} · ${s.returnToKind === 'chosen' ? 'chosen by you' : 'sent the first funds'}`
           : s.funderState === 'failed' ? 'could not check who funded it right now' : 'set when it is funded';
-        rows.push(...fact('Returns go to', s.returnTo && !nameOf(s.returnTo) ? where.replace(short(s.returnTo), s.returnTo) : where, s.returnTo ? 'ppp-addr-full' : 'ppp-mute'));
+        rows.push(...fact('Returns go to', s.gift ? where : s.returnTo && !nameOf(s.returnTo) ? where.replace(short(s.returnTo), s.returnTo) : where, s.returnTo && !s.gift ? 'ppp-addr-full' : 'ppp-mute'));
       } else rows.push(...fact('Linked to', 'not linked yet', 'ppp-warn'));
     }
     if (s.linkedListening.length && s.gate?.here) {
@@ -535,9 +562,11 @@ function start(root: HTMLElement) {
         break;
       case 'fund': {
         if (s.depositPending) { /* the "on their way" line below says it all */ }
+        else if (s.gift?.player) key.push(el('p', 'Out of plays · add more to keep listening', 'ppp-bad'));
         else if (s.entries.length) key.push(el('p', 'Out of funds · top up to keep paying', 'ppp-bad'));
         else key.push(el('p', `Add funds · 1 STX ≈ ${Math.floor(Number(1_000_000n / cost)).toLocaleString()} songs`));
-        if (s.entries.length) lines.push(el('p', 'Songs play free until you top up. Paying carries on by itself once the top-up confirms.'));
+        if (s.gift?.player) lines.push(el('p', 'This player has no free mode: it carries on by itself once the plays arrive.'));
+        else if (s.entries.length) lines.push(el('p', 'Songs play free until you top up. Paying carries on by itself once the top-up confirms.'));
         if (s.payingOn && !s.entries.length) lines.push(el('p', 'Paying is switched on. Once funds arrive it starts with the next song you listen to for 30 seconds.', 'ppp-ok'));
         if (s.solo) {
           // No wallet to deposit from: the address is the whole interface. Anyone can send to it.
@@ -593,8 +622,8 @@ function start(root: HTMLElement) {
       actions.push(button('Clear stuck payments', () => void ppp.clearStuck()));
     }
     // Quieter actions live in the "Wallet & history" fold.
-    if (['ready', 'fund'].includes(s.step) && s.returnTo && (s.balance ?? 0n) > 0n)
-      more.push(button(s.linked ? 'Return all to my wallet' : `Return all to ${who(s.returnTo)}`, () => void ppp.returnFunds('all'), 'quiet'));
+    if (['ready', 'fund'].includes(s.step) && (s.returnTo || s.gift) && (s.balance ?? 0n) > 0n)
+      more.push(button(s.linked ? 'Return all to my wallet' : s.gift ? 'Return what is left…' : `Return all to ${who(s.returnTo)}`, () => void ppp.returnFunds('all'), 'quiet'));
     if (['ready', 'fund', 'link', 'over'].includes(s.step)) more.push(button('Lock', () => void ppp.lock(), 'quiet'));
     if (showFrame && !asking) more.push(button(walletShown ? 'Hide listening wallet box' : 'Show listening wallet box', () => { walletShown = !walletShown; render(ppp.snapshot()); }, 'quiet'));
 
@@ -602,11 +631,50 @@ function start(root: HTMLElement) {
     // While the wallet box is asking for a tap it is the only thing to press: page buttons step aside.
     if (busy) actions.length = 0;
     // The balance is the one wallet detail a listener needs at a glance: on the same line once set up.
-    if (s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step) && !(s.step === 'fund' && s.depositPending && s.balance === 0n)) {
+    if (s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step) && !(s.step === 'fund' && s.depositPending && s.balance === 0n) && !s.gift?.player) {
       const tone = s.balanceState === 'ok' ? 'ppp-ok' : s.balanceState === 'low' ? 'ppp-warn' : 'ppp-bad';
       const first = key.at(0);
       if (s.step === 'ready' && first) first.append(el('span', ` · ${stxShort(s.balance)} STX`, tone));
       else key.push(el('p', `Balance ${stxShort(s.balance)} STX`, tone));
+    }
+    // Gift edition: the interface speaks in plays, not STX. Whatever the radio is doing, the meter says how many are left.
+    if (s.gift?.player && ['fund', 'ready', 'over', 'locked', 'link', 'loading'].includes(s.step)) {
+      const head = el('p', '', 'ppp-gift');
+      head.append(`🎁 Gift Edition · ${s.gift.player.title}`);
+      if (s.gift.player.subtitle) head.append(' · ', s.gift.player.subtitle);
+      const meter = ['ready', 'fund', 'over'].includes(s.step) && s.balance !== undefined
+        ? el('span', s.giftPlays === 0 ? ' · no plays left' : ` · ${s.giftPlays.toLocaleString()} ${s.giftPlays === 1 ? 'play' : 'plays'} left`, s.giftPlays === 0 ? 'ppp-bad' : s.giftPlays <= 20 ? 'ppp-warn' : 'ppp-ok')
+        : null;
+      if (meter) head.append(meter);
+      // The STX line the ordinary panel adds is replaced by the meter above.
+      const stxSpan = key.at(0)?.querySelector(':scope > span.ppp-ok, :scope > span.ppp-warn, :scope > span.ppp-bad');
+      if (s.step === 'ready' && stxSpan && /STX/.test(stxSpan.textContent ?? '')) stxSpan.remove();
+      key.unshift(head);
+      // Running out is the moment a wallet of their own helps; quiet, never in the way, never a popup.
+      if (s.giftPlays <= 20 && ['ready', 'fund'].includes(s.step) && !s.depositPending) {
+        const tip = el('p', s.giftPlays === 0 ? 'Your gift plays are all used. ' : 'Running low. ', 'ppp-mute');
+        tip.append('To keep going, send STX to your listening address (shown below) from any Stacks wallet or an exchange. ');
+        tip.append(link('Xverse', 'https://www.xverse.app/download'), ' and ', link('Leather', 'https://leather.io/install-extension'), ' are free and make it one tap.');
+        key.splice(1, 0, tip);
+      }
+    }
+    // A gifted wallet returns each part to whoever it came from: show the split before anything is sent.
+    if (s.gift && !s.linked && ['fund', 'ready', 'over'].includes(s.step) && s.returnPlan.state === 'ready') {
+      const plan = s.returnPlan;
+      const box = el('div', '', 'ppp-pick');
+      box.append(el('p', plan.steps.length > 1 ? 'This goes back in parts, each to whoever it came from:' : 'This goes back to whoever it came from:', 'ppp-cyan'));
+      const list = el('ul', '', 'ppp-gift-list');
+      plan.steps.forEach((x, i) => {
+        const what = x.kind === 'gift' ? 'the unused gift' : x.kind === 'deposit' ? 'what was added to it' : 'the rest';
+        const li = el('li');
+        li.append(el('span', `${i + 1}. ${stx(BigInt(x.send))} STX · ${what}`, 't'), el('span', x.to ? ` → ${who(x.to)}` : ' → choose an address below', x.to ? 'ppp-mute' : 'ppp-warn'));
+        list.append(li);
+      });
+      box.append(list);
+      if (plan.kept) box.append(el('p', 'A very small part is not worth its network fee, so it stays in the wallet or travels with the last part.', 'ppp-mute'));
+      if (plan.steps.some((x) => !x.to)) box.append(returnPicker(s));
+      box.append(button(plan.steps.length > 1 ? `Confirm part 1 of ${plan.steps.length}` : 'Confirm and return', () => void ppp.returnFunds('all'), 'primary'));
+      key.push(box);
     }
     // A gift link in play goes first: it is why this visitor is here.
     key.unshift(...gifts.banner(s));

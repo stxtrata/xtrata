@@ -11,6 +11,7 @@
  * sender, so a friend's gift goes back to the friend.
  */
 import { CAMPAIGN_MAX_LINKS, campaignData, GIFT_FEE, GIFT_MAX, GIFT_MIN, giftLink, giftPlays, isGiftCode, type CampaignRequest, type GiftView } from '../lib/listening-wallet/gifts';
+import { amountForPlays, PLAY_PRESETS, playerData, playerHash, validatePlayer } from '../lib/listening-wallet/gift-players';
 import type { FunderResult } from '../lib/listening-wallet/funder';
 import { stx } from '../lib/listening-wallet/policy';
 import type { Snapshot } from './controller';
@@ -23,7 +24,7 @@ export interface GiftDeps {
   /** STX transfer from the connected wallet (one popup); resolves with the txid. */
   pay(main: string, recipient: string, amount: bigint, memo: string): Promise<string>;
   /** SIP-018 signature from the connected wallet (one popup). */
-  sign(main: string, data: ReturnType<typeof campaignData>): Promise<string>;
+  sign(main: string, data: ReturnType<typeof campaignData> | ReturnType<typeof playerData>): Promise<string>;
   giftSent(txid: string, amount: bigint): void;
   /** "jim.btc · SP12…AB" style label. */
   who(address?: string): string;
@@ -176,7 +177,10 @@ export function createGifts(deps: GiftDeps) {
     if (notNew)
       return [el('p', '🎁 A gift link is also waiting on this device. Gifts are for brand-new listening wallets, not this one: share the link with someone new.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet')];
     const amount = BigInt(v.amount);
-    const head = el('p', `🎁 ${fromLabel(v)} sent you ${stxNice(amount)} STX of on-chain music: about ${giftPlays(amount).toLocaleString()} paid plays.`, 'ppp-gift');
+    const plays = giftPlays(amount).toLocaleString();
+    const head = el('p', v.player
+      ? `🎁 ${fromLabel(v)} sent you “${v.player.title}”${v.player.subtitle ? ` by ${v.player.subtitle}` : ''}: ${v.player.tracks.length} ${v.player.tracks.length === 1 ? 'song' : 'songs'} and ${plays} plays of on-chain music.`
+      : `🎁 ${fromLabel(v)} sent you ${stxNice(amount)} STX of on-chain music: about ${plays} paid plays.`, 'ppp-gift');
     const out: HTMLElement[] = [head];
     // Only a brand-new, empty wallet with no main wallet linked takes a gift automatically. A listener who
     // unlocks a wallet they already had (e.g. one linked to their Stacks wallet) keeps the gift link for later.
@@ -256,11 +260,35 @@ export function createGifts(deps: GiftDeps) {
     } finally { working = ''; deps.changed(); }
   }
 
-  async function makeCampaign(main: string, count: number, each: bigint, label: string) {
+  // Gift players the admin made on this device (their ids are public; the server holds the definitions).
+  type MadePlayer = { id: string; title: string; tracks: number };
+  const playersKey = (main: string) => 'xtrata.radio.gift.players.v1:' + main;
+  const loadPlayers = (main: string): MadePlayer[] => { try { const v = JSON.parse(deps.store.get(playersKey(main)) || '[]'); return Array.isArray(v) ? v.filter((x) => x && /^[0-9a-f]{16}$/.test(x.id)) : []; } catch { return []; } };
+
+  async function makePlayer(main: string, def: { title: string; subtitle: string; tracks: string }) {
+    if (working) return;
+    working = 'Checking the player…'; note = ''; deps.changed();
+    try {
+      const tracks = def.tracks.split(/[\s,]+/).filter(Boolean).map((t) => Number(t.replace(/^#/, '')));
+      const definition = validatePlayer({ title: def.title.trim(), subtitle: def.subtitle.trim(), tracks, cover: null });
+      working = 'Sign in your wallet…'; deps.changed();
+      const request = { admin: main, hash: playerHash(definition), issued: deps.now() };
+      const signature = await deps.sign(main, playerData(request));
+      working = 'Making the player…'; deps.changed();
+      const r = await deps.json('/radio/gift/player', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ definition, request, signature }) });
+      const list = loadPlayers(main).filter((x) => x.id !== r.id);
+      list.unshift({ id: r.id, title: r.title, tracks: r.tracks });
+      deps.store.set(playersKey(main), JSON.stringify(list.slice(0, 30)));
+      note = `${r.existing ? 'That player already exists' : 'Player made'} ✓ “${r.title}” · ${r.tracks} songs. Pick it below for a campaign.`;
+    } catch (e) { note = (e as Error).message || 'Not made.'; }
+    finally { working = ''; deps.changed(); }
+  }
+
+  async function makeCampaign(main: string, count: number, each: bigint, label: string, player?: string) {
     if (working) return;
     working = 'Sign in your wallet…'; note = ''; campaign = null; deps.changed();
     try {
-      const request: CampaignRequest = { admin: main, count, amount: each.toString(), label, issued: deps.now() };
+      const request: CampaignRequest = { admin: main, count, amount: each.toString(), label, issued: deps.now(), ...(player ? { player } : {}) };
       const signature = await deps.sign(main, campaignData(request));
       working = 'Making links…'; deps.changed();
       const r = await deps.json('/radio/gift/campaign', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ request, signature }) });
@@ -283,7 +311,15 @@ export function createGifts(deps: GiftDeps) {
   const amountText = () => `${stxNice(amount)} STX · about ${giftPlays(amount).toLocaleString()} paid plays · you pay ${stxNice(amount + GIFT_FEE)} STX with the network fee`;
   syncAmount();
   const adminCount = el('input') as HTMLInputElement; adminCount.type = 'number'; adminCount.min = '1'; adminCount.max = String(CAMPAIGN_MAX_LINKS); adminCount.value = '10'; adminCount.setAttribute('aria-label', 'How many links');
-  const adminAmount = el('input') as HTMLInputElement; adminAmount.type = 'number'; adminAmount.min = '0.1'; adminAmount.max = '1'; adminAmount.step = '0.05'; adminAmount.value = '0.1'; adminAmount.setAttribute('aria-label', 'STX per link');
+  const adminAmount = el('input') as HTMLInputElement; adminAmount.type = 'number'; adminAmount.min = '0.1'; adminAmount.max = '1'; adminAmount.step = '0.05'; adminAmount.value = String(Number(amountForPlays(PLAY_PRESETS[0])) / 1e6); adminAmount.setAttribute('aria-label', 'STX per link');
+  const playerTitle = el('input') as HTMLInputElement; playerTitle.maxLength = 60; playerTitle.placeholder = 'Title, e.g. Proof of Sound'; playerTitle.setAttribute('aria-label', 'Player title');
+  const playerSubtitle = el('input') as HTMLInputElement; playerSubtitle.maxLength = 80; playerSubtitle.placeholder = 'Artist (optional)'; playerSubtitle.setAttribute('aria-label', 'Player subtitle');
+  const playerTracks = el('textarea') as HTMLTextAreaElement; playerTracks.rows = 3; playerTracks.placeholder = 'Radio song numbers in play order, e.g. 1021, 1022, 1023'; playerTracks.setAttribute('aria-label', 'Songs');
+  const adminPlayer = el('select') as HTMLSelectElement; adminPlayer.setAttribute('aria-label', 'Gift player');
+  const adminPreset = el('select') as HTMLSelectElement; adminPreset.setAttribute('aria-label', 'Plays per link');
+  for (const n of PLAY_PRESETS) adminPreset.append(new Option(`${n.toLocaleString()} plays`, String(amountForPlays(n))));
+  adminPreset.append(new Option('Max (1 STX)', String(GIFT_MAX)), new Option('Custom STX', ''));
+  adminPreset.onchange = () => { if (adminPreset.value) adminAmount.value = String(Number(adminPreset.value) / 1e6); };
   const adminLabel = el('input') as HTMLInputElement; adminLabel.maxLength = 40; adminLabel.placeholder = 'Label, e.g. Launch week'; adminLabel.setAttribute('aria-label', 'Campaign label');
 
   function renderFold(s: Snapshot): HTMLElement | null {
@@ -318,11 +354,21 @@ export function createGifts(deps: GiftDeps) {
       if (g.admin) {
         const make = button('Sign and make links', () => {
           const each = BigInt(Math.round(Number(adminAmount.value) * 1e6));
-          void makeCampaign(main, Number(adminCount.value), each, adminLabel.value.trim());
+          void makeCampaign(main, Number(adminCount.value), each, adminLabel.value.trim(), adminPlayer.value || undefined);
         });
         const box = el('div', '', 'ppp-gift-admin');
         const labelled = (text: string, input: HTMLElement) => { const l = el('label', text); l.append(input); return l; };
-        box.append(el('p', 'Campaign links (admin) · paid from the gift treasury', 'ppp-cyan'), labelled('Links ', adminCount), labelled('STX each ', adminAmount), adminLabel, make);
+        // Players first: a player is an album that comes with a gift and has no free mode.
+        const made = loadPlayers(main);
+        const keep = adminPlayer.value;
+        adminPlayer.replaceChildren(new Option('No player (plain gift)', ''), ...made.map((x) => new Option(`${x.title} · ${x.tracks} songs`, x.id)));
+        if (made.some((x) => x.id === keep)) adminPlayer.value = keep;
+        box.append(
+          el('p', 'Gift players (admin) · an album that comes with the gift', 'ppp-cyan'),
+          playerTitle, playerSubtitle, playerTracks,
+          button('Sign and make player', () => void makePlayer(main, { title: playerTitle.value, subtitle: playerSubtitle.value, tracks: playerTracks.value })),
+          el('p', 'Campaign links (admin) · paid from the gift treasury', 'ppp-cyan'),
+          labelled('Player ', adminPlayer), labelled('Plays each ', adminPreset), labelled('Links ', adminCount), labelled('STX each ', adminAmount), adminLabel, make);
         if (campaign) {
           const all = campaign.codes.map((c) => linkFor(s.gate?.radioUrl ?? null, c)).join('\n');
           const area = el('textarea') as HTMLTextAreaElement; area.readOnly = true; area.value = all; area.rows = Math.min(8, campaign.codes.length);
