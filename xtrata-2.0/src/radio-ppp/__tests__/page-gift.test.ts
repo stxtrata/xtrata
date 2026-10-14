@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * The panel for a gifted wallet, with the controller faked: it speaks in plays, hands the album to the radio,
  * tells the radio when to stop, and shows the split before a return.
  */
-const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: null as any, radio: null as any, session: { isConnected: false } as any, signed: [] as any[] }));
+const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: null as any, topUp: vi.fn(), radio: null as any, session: { isConnected: false } as any, signed: [] as any[] }));
 vi.mock('../controller', () => ({
   createPppController: (deps: any) => {
     h.changed = deps.changed;
-    return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), onListened: async () => {}, giftSent: () => {} }, {
+    return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), topUpLikes: () => h.topUp(), onListened: async () => {}, giftSent: () => {} }, {
       get: (t: any, k) => t[k] ?? (async () => {})
     });
   }
@@ -117,5 +117,40 @@ describe('Gift Edition panel', () => {
     [...fold.querySelectorAll('button')].find((b) => /Sign and make player/.test(b.textContent ?? ''))!.click();
     await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('appears twice'));
     expect(h.signed).toHaveLength(0);
+  });
+});
+
+describe('main listener wallet out of funds (an album wallet is open)', () => {
+  const ROOT = 'SP3X2F7FQH7GQS0YRBWH0H5W6RM2PB1B0WPD1XA2V';
+  const low = { address: ROOT, balance: 0n, low: true, album: true, pending: false, main: undefined as string | undefined };
+  const album = { gift: null, giftStop: null, giftPlays: 0 };
+
+  it('warns loudly with the address and a copy button, and no pay button without a main wallet', async () => {
+    const root = await open({ ...album, likeFunds: low });
+    const key = root.querySelector('.ppp-key')!;
+    expect(text(key)).toContain('YOUR MAIN LISTENER WALLET IS OUT OF FUNDS');
+    expect(text(key)).toContain(ROOT);
+    expect(key.querySelector('.ppp-lowbox')).not.toBeNull();
+    expect([...key.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Copy address']);
+  });
+
+  it('offers a one-tap top-up from the connected main wallet', async () => {
+    const root = await open({ ...album, solo: false, main: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', likeFunds: { ...low, main: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP' } });
+    const pay = [...root.querySelectorAll('.ppp-key button')].find((b) => /Pay 1.000000 STX from my wallet/.test(b.textContent ?? '')) as HTMLButtonElement;
+    expect([...root.querySelectorAll('.ppp-key button')].map((b) => b.textContent)).toContain('Pay 1.000000 STX from my wallet');
+    expect(pay).toBeTruthy();
+    pay.click();
+    expect(h.topUp).toHaveBeenCalledTimes(1);
+  });
+
+  it('goes quiet once the top-up is on its way, and shows nothing while funds are fine or no album is open', async () => {
+    const root = await open({ ...album, likeFunds: { ...low, low: false, pending: true, txid: '0x' + 'd'.repeat(64) } });
+    const key = root.querySelector('.ppp-key')!;
+    expect(text(key)).toContain('on its way');
+    expect(text(key)).not.toContain('OUT OF FUNDS');
+    h.snap = { ...h.snap, likeFunds: { ...low, low: false, balance: 500_000n } }; h.changed();
+    expect(key.querySelector('.ppp-lowbox')).toBeNull();
+    h.snap = { ...h.snap, likeFunds: { ...low, album: false } }; h.changed();
+    expect(key.querySelector('.ppp-lowbox')).toBeNull();
   });
 });

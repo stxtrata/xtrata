@@ -225,13 +225,26 @@ export async function readMusicStats(env: StatsEnv): Promise<MusicStats> {
   const db = env.DB;
   if (!db) throw Error('Missing D1 binding');
   // A pay-per-play listening wallet counts as the main wallet it is linked to (dual-signed link).
-  const linked = (sql: string, plain: string) => db.prepare(sql).first().catch(() => db.prepare(plain).first());
-  const linkedAll = (sql: string, plain: string) => db.prepare(sql).all().catch(() => db.prepare(plain).all());
+  // Each query is tried from the most informed form to the plainest, so a database that lacks a table still answers.
+  const firstOf = async (sqls: string[], method: 'first' | 'all'): Promise<any> => {
+    let last: unknown;
+    for (const sql of sqls) { try { return await db.prepare(sql)[method](); } catch (e) { last = e; } }
+    throw last;
+  };
+  // A numbered album wallet counts for the listener who owns it: its passkey's own wallet (root), and that wallet's linked main wallet.
+  const viaSlots = 'FROM music_paid_plays p LEFT JOIN radio_listening_slots s ON s.address = p.payer LEFT JOIN radio_listening_wallets l ON l.listening = COALESCE(s.root, p.payer)';
+  const viaLinks = 'FROM music_paid_plays p LEFT JOIN radio_listening_wallets l ON l.listening = p.payer';
   const [totals, latest, state] = await Promise.all([
-    linked('SELECT COUNT(*) AS plays, COUNT(DISTINCT COALESCE(l.main, p.payer)) AS supporters FROM music_paid_plays p LEFT JOIN radio_listening_wallets l ON l.listening = p.payer',
-      'SELECT COUNT(*) AS plays, COUNT(DISTINCT payer) AS supporters FROM music_paid_plays'),
-    linkedAll('SELECT p.txid, COALESCE(l.main, p.payer) AS payer, p.recipient, p.core, p.song_id, p.block_time FROM music_paid_plays p LEFT JOIN radio_listening_wallets l ON l.listening = p.payer ORDER BY p.pos DESC LIMIT 3',
-      'SELECT txid, payer, recipient, core, song_id, block_time FROM music_paid_plays ORDER BY pos DESC LIMIT 3'),
+    firstOf([
+      `SELECT COUNT(*) AS plays, COUNT(DISTINCT COALESCE(l.main, s.root, p.payer)) AS supporters ${viaSlots}`,
+      `SELECT COUNT(*) AS plays, COUNT(DISTINCT COALESCE(l.main, p.payer)) AS supporters ${viaLinks}`,
+      'SELECT COUNT(*) AS plays, COUNT(DISTINCT payer) AS supporters FROM music_paid_plays'
+    ], 'first'),
+    firstOf([
+      `SELECT p.txid, COALESCE(l.main, s.root, p.payer) AS payer, p.recipient, p.core, p.song_id, p.block_time ${viaSlots} ORDER BY p.pos DESC LIMIT 3`,
+      `SELECT p.txid, COALESCE(l.main, p.payer) AS payer, p.recipient, p.core, p.song_id, p.block_time ${viaLinks} ORDER BY p.pos DESC LIMIT 3`,
+      'SELECT txid, payer, recipient, core, song_id, block_time FROM music_paid_plays ORDER BY pos DESC LIMIT 3'
+    ], 'all'),
     readState(db)
   ]);
   const plays = Number(totals?.plays ?? 0);
