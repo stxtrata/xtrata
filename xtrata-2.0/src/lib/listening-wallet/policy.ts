@@ -60,7 +60,11 @@ export function balanceState(balance: bigint, fee = DEFAULT_PLAY_FEE): BalanceSt
   return 'ok';
 }
 
-export type ReturnMode = 'excess' | 'all';
+/**
+ * `amount` returns a chosen part of the balance (the radio page works out the split between
+ * the gift and what a listener added, and asks for each part in turn).
+ */
+export type ReturnMode = 'excess' | 'all' | 'amount';
 export interface ReturnPlan {
   mode: ReturnMode;
   amount: bigint;
@@ -69,11 +73,18 @@ export interface ReturnPlan {
 }
 
 /**
- * Return excess leaves exactly the target; Return all leaves zero (releasing the reserve).
+ * Return excess leaves exactly the target; Return all leaves zero (releasing the reserve);
+ * Return an amount sends exactly that much and leaves the rest.
  * Throws with a listener-facing reason when the transfer cannot proceed at this fee.
  */
-export function returnPlan(mode: ReturnMode, balance: bigint, fee = DEFAULT_RETURN_FEE): ReturnPlan {
+export function returnPlan(mode: ReturnMode, balance: bigint, fee = DEFAULT_RETURN_FEE, requested?: bigint): ReturnPlan {
   if (fee < 1n || fee > MAX_RETURN_FEE) throw new Error('Return fee is outside the allowed range.');
+  if (mode === 'amount') {
+    if (typeof requested !== 'bigint' || requested <= 0n) throw new Error('Choose an amount to return.');
+    // The fee comes out of what stays in the wallet, so the recipient gets exactly the amount shown.
+    if (requested + fee > balance) throw new Error('The balance cannot cover that amount and the network fee.');
+    return { mode, amount: requested, fee, remaining: balance - requested - fee };
+  }
   if (mode === 'excess') {
     const amount = balance - TARGET - fee;
     if (amount <= 0n) throw new Error('The excess cannot cover the network fee. Use Return all instead.');

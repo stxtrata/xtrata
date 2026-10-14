@@ -36,9 +36,10 @@ export interface StatusResult {
 /**
  * Features of the current wallet build: `cancel` (listening.cancel), `like` (listening.signLike at LIKE_FEE),
  * `standalone` (returns to a page-supplied destination and likes without a linked main wallet),
- * `multi` (one listening wallet per main-wallet address: status, unlock and create take the connected `main`).
+ * `multi` (one listening wallet per main-wallet address: status, unlock and create take the connected `main`),
+ * `partial` (listening.prepareReturn accepts mode `amount` with an `amount`, to return part of the balance).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {
@@ -109,7 +110,9 @@ export interface SignLikeParams {
 }
 
 export interface ReturnParams {
-  mode: 'excess' | 'all';
+  mode: 'excess' | 'all' | 'amount';
+  /** microSTX to send, as a decimal string. Required with mode `amount`, ignored otherwise. */
+  amount?: string;
   balance: string;
   nonce: string;
   fee: string;
@@ -130,5 +133,5 @@ export interface ReturnResult extends SignedResult {
   amount: string;
   fee: string;
   recipient: string;
-  mode: 'excess' | 'all';
+  mode: 'excess' | 'all' | 'amount';
 }
