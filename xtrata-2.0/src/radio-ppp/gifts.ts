@@ -40,6 +40,7 @@ type Mine = { id: string; code: string; amount: string; at: number; txid?: strin
 
 const el = (tag: string, text = '', cls = '') => { const n = document.createElement(tag); if (text) n.textContent = text; if (cls) n.className = cls; return n; };
 const button = (label: string, run: () => void, cls = '') => { const b = el('button', label, cls) as HTMLButtonElement; b.type = 'button'; b.onclick = run; return b; };
+const opt = (label: string, value: string) => { const o = document.createElement('option'); o.textContent = label; o.value = value; return o; };
 const stxNice = (v: bigint) => stx(v).replace(/\.?0+$/, '');
 
 export function createGifts(deps: GiftDeps) {
@@ -317,8 +318,8 @@ export function createGifts(deps: GiftDeps) {
   const playerTracks = el('textarea') as HTMLTextAreaElement; playerTracks.rows = 3; playerTracks.placeholder = 'Radio song numbers in play order, e.g. 1021, 1022, 1023'; playerTracks.setAttribute('aria-label', 'Songs');
   const adminPlayer = el('select') as HTMLSelectElement; adminPlayer.setAttribute('aria-label', 'Gift player');
   const adminPreset = el('select') as HTMLSelectElement; adminPreset.setAttribute('aria-label', 'Plays per link');
-  for (const n of PLAY_PRESETS) adminPreset.append(new Option(`${n.toLocaleString()} plays`, String(amountForPlays(n))));
-  adminPreset.append(new Option('Max (1 STX)', String(GIFT_MAX)), new Option('Custom STX', ''));
+  for (const n of PLAY_PRESETS) adminPreset.append(opt(`${n.toLocaleString()} plays`, String(amountForPlays(n))));
+  adminPreset.append(opt('Max (1 STX)', String(GIFT_MAX)), opt('Custom STX', ''));
   adminPreset.onchange = () => { if (adminPreset.value) adminAmount.value = String(Number(adminPreset.value) / 1e6); };
   const adminLabel = el('input') as HTMLInputElement; adminLabel.maxLength = 40; adminLabel.placeholder = 'Label, e.g. Launch week'; adminLabel.setAttribute('aria-label', 'Campaign label');
 
@@ -361,7 +362,7 @@ export function createGifts(deps: GiftDeps) {
         // Players first: a player is an album that comes with a gift and has no free mode.
         const made = loadPlayers(main);
         const keep = adminPlayer.value;
-        adminPlayer.replaceChildren(new Option('No player (plain gift)', ''), ...made.map((x) => new Option(`${x.title} · ${x.tracks} songs`, x.id)));
+        adminPlayer.replaceChildren(opt('No player (plain gift)', ''), ...made.map((x) => opt(`${x.title} · ${x.tracks} songs`, x.id)));
         if (made.some((x) => x.id === keep)) adminPlayer.value = keep;
         box.append(
           el('p', 'Gift players (admin) · an album that comes with the gift', 'ppp-cyan'),
