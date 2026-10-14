@@ -178,17 +178,11 @@ describe('radio gift wallets', () => {
   it('the send and its gift are written together: a gift that changed meanwhile leaves no send behind', async () => {
     const s = setup();
     const [code] = (await s.campaign(1)).codes;
-    const w = wallet();
-    await s.claim(code, w); await s.land();
-    // the same wallet racing a second code hits the one-gift-per-wallet rule inside the transaction
-    s.tick(1);
-    const [other] = (await s.campaign(1)).codes;
-    s.db.sql.prepare('UPDATE radio_gifts SET claimed_by=NULL WHERE claimed_by=?').run(w); // simulate the race passing the early check
-    s.db.sql.prepare("UPDATE radio_gifts SET claimed_by=? WHERE claim_txid IS NOT NULL").run(w);
-    const before = sends(s).length;
-    await expect(claimGift(s.env, { code: other, wallet: w }, s.deps(), null, s.request)).rejects.toMatchObject({ status: 409 });
-    expect(sends(s)).toHaveLength(before);
-    expect((await giftStatus(s.env, { code: other })).status).toBe('live');
+    // another request takes the gift after this one passed its early checks (the human check runs just before the send)
+    const racing = { ...s.deps(), human: async () => { s.db.sql.prepare("UPDATE radio_gifts SET status='claimed', claimed_by='x', recipient='x'").run(); return true; } };
+    await expect(claimGift(s.env, { code, wallet: wallet() }, racing, null, s.request)).rejects.toMatchObject({ status: 409 });
+    expect(sends(s)).toHaveLength(0);
+    expect(s.chain.sent).toHaveLength(0);
   });
 
   it('a stuck send is rebroadcast, then re-signed with the SAME nonce; whichever lands settles it', async () => {
@@ -223,11 +217,11 @@ describe('radio gift wallets', () => {
     expect((await giftStatus(s.env, { code })).status).toBe('live');
   });
 
-  it('refuses used wallets, failed checks, an empty treasury and over-limit claims, and leaves the gift claimable', async () => {
+  it('refuses full wallets, failed checks, an empty treasury and over-limit claims, and leaves the gift claimable', async () => {
     const s = setup({ RADIO_GIFT_DAILY_CAP: '250000' });
     const codes = (await s.campaign(4)).codes;
-    const used = wallet(); s.chain.activity.set(used, 1);
-    await expect(s.claim(codes[0], used)).rejects.toThrow(/brand-new/);
+    const full = wallet(); s.chain.balances.set(full, 950_000n); // 0.95 STX + a 0.1 STX gift is over the 1 STX a wallet holds
+    await expect(s.claim(codes[0], full)).rejects.toThrow(/plenty of plays/);
     await expect(claimGift(s.env, { code: codes[0], wallet: wallet() }, { ...s.deps(), human: async () => false }, null, s.request)).rejects.toThrow(/quick check/);
     s.chain.balances.set(s.treasury, 50_000n);
     await expect(s.claim(codes[0])).rejects.toThrow(/topping up/);
@@ -238,6 +232,43 @@ describe('radio gift wallets', () => {
     await expect(s.claim(codes[2])).rejects.toThrow(/still works tomorrow/);
     s.tick(86_400_001);
     await s.claim(codes[2]);
+  });
+
+  it('one wallet can take several gifts, each with its own album; the cap counts gifts still on their way', async () => {
+    const s = setup();
+    const codes = (await s.campaign(4, '300000')).codes;
+    const w = wallet();
+    const first = await s.claim(codes[0], w); await s.land();
+    s.tick(1_000);
+    s.chain.balances.set(w, 300_000n); // the first gift has arrived
+    const second = await s.claim(codes[1], w); // still on its way
+    expect(second.txid).not.toBe(first.txid);
+    s.chain.balances.set(w, 500_000n); // 0.5 held + 0.3 on the way + 0.3 more is over 1 STX
+    await expect(s.claim(codes[2], w)).rejects.toThrow(/plenty of plays/);
+    await s.land();
+    s.chain.balances.set(w, 600_000n); // both landed: 0.6 + 0.3 fits
+    await s.claim(codes[2], w);
+    expect((await giftStatus(s.env, { code: codes[2] })).status).toBe('claiming');
+  });
+
+  it('lists every gift a wallet has been given, oldest first, including rows from before wallets could take several', async () => {
+    const s = setup();
+    const codes = (await s.campaign(2)).codes;
+    const w = wallet();
+    await s.claim(codes[0], w); await s.land();
+    s.tick(5_000);
+    await s.claim(codes[1], w);
+    const mine = await giftForWallet(s.env, w);
+    expect(mine.gifts).toHaveLength(2);
+    expect(mine.gifts.map((g: any) => g.state)).toEqual(['arrived', 'sending']);
+    expect(mine.gift).toMatchObject({ txid: mine.gifts[0].txid });
+    // a row written by the first release only has claimed_by: it still belongs to that wallet
+    const legacy = wallet();
+    s.db.sql.prepare("UPDATE radio_gifts SET claimed_by=?, recipient=NULL WHERE id=(SELECT id FROM radio_gifts WHERE claim_txid=?)").run(legacy, mine.gifts[0].txid);
+    expect((await giftForWallet(s.env, legacy)).gifts).toHaveLength(1);
+    expect((await giftForWallet(s.env, w)).gifts).toHaveLength(1);
+    // claiming again with the same code and wallet stays idempotent for a legacy row
+    await expect(s.claim(codes[0], legacy)).resolves.toMatchObject({ already: true });
   });
 
   it('limits claims per IP', async () => {
