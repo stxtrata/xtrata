@@ -18,6 +18,7 @@ import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { createNameCache } from '../lib/bns/name-cache';
 import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
 import { createGifts } from './gifts';
+import { createShelf } from './shelf';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
 
@@ -136,6 +137,7 @@ function start(root: HTMLElement) {
     })),
     sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
     giftSent: (txid, amount) => ppp.giftSent(txid, amount),
+    album: { bind: (slot) => ppp.bindAlbum(slot), arrived: async (slot, address, txid, amount) => { shelf.invalidate(); await ppp.albumArriving(slot, address, txid, amount); } },
     who: (address) => who(address),
     changed: () => render(ppp.snapshot()),
     store: {
@@ -143,6 +145,17 @@ function start(root: HTMLElement) {
       set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* best effort */ } }
     },
     now: Date.now
+  });
+
+  const shelf = createShelf({
+    json,
+    open: (slot) => { void ppp.openAlbum(slot); },
+    store: {
+      get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+      set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* best effort */ } }
+    },
+    now: Date.now,
+    changed: () => render(ppp.snapshot())
   });
 
   // The radio's heart asks here first: the listening wallet signs the like when it can, for the main wallet.
@@ -167,7 +180,7 @@ function start(root: HTMLElement) {
   };
 
   // A gifted wallet's album becomes a band on the radio; when its paid plays run out the radio stops (no free mode).
-  let giftPushed = '', stopPushed: string | null = null;
+  let giftPushed = '', stopPushed: string | null = null, lockPushed = false;
   const syncGift = (s: Snapshot) => {
     const radio = (window as any).XtrataRadio;
     if (!radio?.setGiftPlayer || !radio?.setGiftStop) return; // pushed again at the next render, once the radio is there
@@ -179,6 +192,8 @@ function start(root: HTMLElement) {
     }
     const stop = p ? s.giftStop?.text ?? null : null;
     if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
+    const lock = !!p && !!s.albumLock?.locked;
+    if (lock !== lockPushed) { radio.setGiftLock?.(lock); lockPushed = lock; }
   };
 
   const short = (a?: string) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');
@@ -727,6 +742,15 @@ function start(root: HTMLElement) {
     if (s.solo && s.creditedTo && s.listening && !['intro', 'off', 'elsewhere', 'loading'].includes(s.step))
       key.unshift(el('p', `This is ${who(s.creditedTo)}'s listening wallet. Plays and likes count for ${who(s.creditedTo)}. Connect it (top right) to see its likes here too.`, 'ppp-ok'));
     $('.ppp-key').replaceChildren(...key);
+    const shelfBox = shelf.render(s);
+    const shelfFold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
+    if (shelfFold) {
+      shelfFold.hidden = !shelfBox;
+      const shelfSummary = shelfFold.querySelector('summary');
+      if (shelfSummary) shelfSummary.textContent = shelf.count() > 0 ? `♪ My albums (${shelf.count()})` : '♪ My albums';
+      const shelfBody = shelfFold.querySelector('.ppp-shelf-body');
+      if (shelfBox && shelfBody && !shelfBody.contains(shelfBox)) shelfBody.replaceChildren(shelfBox);
+    }
     const giftFold = gifts.renderFold(s);
     $('.ppp-gifts').hidden = !giftFold;
     if (giftFold && !$('.ppp-gift-body').contains(giftFold)) $('.ppp-gift-body').replaceChildren(giftFold);

@@ -26,6 +26,11 @@ export interface GiftDeps {
   /** SIP-018 signature from the connected wallet (one popup). */
   sign(main: string, data: ReturnType<typeof campaignData> | ReturnType<typeof playerData>): Promise<string>;
   giftSent(txid: string, amount: bigint): void;
+  /** Album wallets of the open passkey: prove a number is theirs, and track the album's gift once it is on its way. */
+  album: {
+    bind(slot: number): Promise<{ root: string; slot: number; address: string; issued: number; rootSignature: string; slotSignature: string }>;
+    arrived(slot: number, address: string, txid: string, amount: bigint): Promise<void>;
+  };
   /** "jim.btc · SP12…AB" style label. */
   who(address?: string): string;
   changed(): void;
@@ -107,15 +112,39 @@ export function createGifts(deps: GiftDeps) {
   };
 
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  /**
+   * Claim the open gift. A starter gift goes into this brand-new listening wallet. An album (a gift that comes with a
+   * player) goes into its own numbered wallet of the same passkey: the wallet box proves the number is theirs (no popup)
+   * and the server records it, so the album's plays and the likes all come back to this listener.
+   */
   async function claim(s: Snapshot) {
     if (!incoming || incoming.claiming || !s.listening) return;
+    const album = !!incoming.view?.player;
+    if (album && !s.root) return;
     incoming.claiming = true; incoming.error = undefined; deps.changed();
-    try {
+    const post = async (body: object) => {
       const res = await fetch('/radio/gift/claim', {
         method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(30_000),
-        body: JSON.stringify({ code: incoming.code, wallet: s.listening, turnstile: turnstile.token })
+        body: JSON.stringify({ code: incoming!.code, turnstile: turnstile.token, ...body })
       });
-      const r = await res.json().catch(() => ({}));
+      return { res, r: await res.json().catch(() => ({})) };
+    };
+    try {
+      let slot = 0, wallet = s.listening, answer: Awaited<ReturnType<typeof post>>;
+      if (album) {
+        const next = Number((await deps.json('/radio/gift/slots?root=' + encodeURIComponent(s.root!)))?.next);
+        if (!Number.isSafeInteger(next) || next < 1) throw new Error('Could not pick a wallet number for this album. Try again.');
+        slot = next;
+        for (let tries = 0; ; tries++) {
+          const binding = await deps.album.bind(slot); // a fresh proof each time: they expire after 15 minutes
+          wallet = binding.address;
+          answer = await post({ wallet, binding });
+          // Someone else's claim took that number a moment ago: the next one is free.
+          if (answer.res.status === 409 && /just taken/.test(answer.r?.error || '') && tries < 5) { slot += 1; continue; }
+          break;
+        }
+      } else answer = await post({ wallet });
+      const { res, r } = answer;
       if (res.status === 503 && /sending another gift/.test(r?.error || '')) {
         // The treasury sends one gift at a time: wait a moment and try again by itself.
         incoming.waiting = true;
@@ -132,7 +161,8 @@ export function createGifts(deps: GiftDeps) {
       }
       incoming.done = true;
       deps.store.set(INCOMING_KEY, null);
-      deps.giftSent(r.txid, BigInt(r.amount));
+      if (album) await deps.album.arrived(slot, wallet, r.txid, BigInt(r.amount));
+      else deps.giftSent(r.txid, BigInt(r.amount));
     } catch (e) {
       incoming.error = (e as Error).message;
       turnstile.token = undefined;
@@ -161,6 +191,24 @@ export function createGifts(deps: GiftDeps) {
       : [];
   }
 
+  function albumBanner(s: Snapshot, v: GiftView): HTMLElement[] {
+    const player = v.player!;
+    const amount = BigInt(v.amount);
+    const out: HTMLElement[] = [el('p', `🎁 ${fromLabel(v)} sent you “${player.title}”${player.subtitle ? ` by ${player.subtitle}` : ''}: ${player.tracks.length} ${player.tracks.length === 1 ? 'song' : 'songs'} and ${giftPlays(amount).toLocaleString()} plays of on-chain music.`, 'ppp-gift')];
+    const unlocked = !!s.root && ['fund', 'ready', 'over', 'link'].includes(s.step);
+    if (!unlocked) {
+      out.push(el('p', s.step === 'intro' ? 'Tap below: your passkey makes a listening wallet, and the album arrives in its own wallet. You can keep as many albums as you like.' : s.step === 'locked' ? 'Unlock your listening wallet and the album arrives in its own wallet.' : 'Open your listening wallet and the album arrives in its own wallet.', 'ppp-mute'));
+      return out;
+    }
+    if (s.walletCannotAlbums) { out.push(el('p', 'The listening wallet box is still updating. The album arrives as soon as it has: reload in a few minutes.', 'ppp-warn')); return out; }
+    const siteKey = s.gate?.gifts?.turnstileSiteKey;
+    if (siteKey && !turnstile.token) out.push(el('p', 'One quick check and it is yours:', 'ppp-mute'), turnstileBox(siteKey));
+    else if (!incoming!.claiming && !incoming!.error && !incoming!.waiting) void claim(s);
+    if (incoming!.claiming || incoming!.waiting) out.push(el('p', incoming!.waiting ? 'Another gift is on its way out first. Yours is next…' : 'Sending your album…', 'ppp-cyan'));
+    if (incoming!.error) out.push(el('p', incoming!.error, 'ppp-bad'), button('Try again', () => { incoming!.error = undefined; void claim(s); }));
+    return out;
+  }
+
   /** Lines for the top of the panel while a gift link is in play, or a gift is on its way. */
   function banner(s: Snapshot): HTMLElement[] {
     const status = watchSending(s);
@@ -172,6 +220,8 @@ export function createGifts(deps: GiftDeps) {
     if (v.status === 'claimed' || v.status === 'claiming') return [el('p', '🎁 This gift link has already been used.', 'ppp-mute')];
     if (['expired', 'refunding', 'refunded'].includes(v.status)) return [el('p', '🎁 This gift link has expired.', 'ppp-mute')];
     if (v.status === 'pending-deposit') return [el('p', `🎁 ${fromLabel(v)} is still sending this gift. Check back in a few minutes.`, 'ppp-warn')];
+    // An album goes into its own numbered wallet, so any unlocked passkey wallet may receive it, new or old.
+    if (v.player) return [...albumBanner(s, v), ...status];
     // An existing wallet is open (linked, funded or used before): the gift is not for it. One quiet line,
     // so it does not read as if this wallet were the gift.
     const notNew = !!s.listening && (!(s.createdHere || s.brandNew) || !!s.linked || !!s.creditedTo || (s.balance ?? 0n) > 0n || s.entries.length > 0);
@@ -179,9 +229,8 @@ export function createGifts(deps: GiftDeps) {
       return [el('p', '🎁 A gift link is also waiting on this device. Gifts are for brand-new listening wallets, not this one: share the link with someone new.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet')];
     const amount = BigInt(v.amount);
     const plays = giftPlays(amount).toLocaleString();
-    const head = el('p', v.player
-      ? `🎁 ${fromLabel(v)} sent you “${v.player.title}”${v.player.subtitle ? ` by ${v.player.subtitle}` : ''}: ${v.player.tracks.length} ${v.player.tracks.length === 1 ? 'song' : 'songs'} and ${plays} plays of on-chain music.`
-      : `🎁 ${fromLabel(v)} sent you ${stxNice(amount)} STX of on-chain music: about ${plays} paid plays.`, 'ppp-gift');
+    const head = el('p',
+      `🎁 ${fromLabel(v)} sent you ${stxNice(amount)} STX of on-chain music: about ${plays} paid plays.`, 'ppp-gift');
     const out: HTMLElement[] = [head];
     // Only a brand-new, empty wallet with no main wallet linked takes a gift automatically. A listener who
     // unlocks a wallet they already had (e.g. one linked to their Stacks wallet) keeps the gift link for later.

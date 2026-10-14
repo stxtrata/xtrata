@@ -303,6 +303,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-addr-full{font-family:var(--mono);font-size:12px;word-break:break-all;user-select:all}
   .ppp-pick{margin:6px 0}
   .ppp .ppp-lowbox{border:2px solid #ff8a8a;border-radius:8px;background:rgba(255,138,138,.09);padding:10px 12px;margin:8px 0}
+  .ppp-shelf-tools{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.ppp-shelf-tools input{flex:1 1 11em;min-width:0}
+  .ppp-shelf-list{list-style:none;margin:6px 0;padding:0}.ppp-shelf-list li{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line,rgba(255,255,255,.08))}.ppp-shelf-list li.now{color:var(--cyan)}.ppp-shelf-list .t{font-weight:600}.ppp-shelf-list li button:last-child{margin-left:auto}
   .ppp .ppp-lowtitle{font-weight:700;letter-spacing:.6px;margin:0 0 6px}
   .ppp-pick input{font-family:var(--mono);font-size:12px;width:min(100%,26em);padding:6px 8px;box-sizing:border-box}
   .ppp p{margin:6px 0;font-size:13px;line-height:1.45;color:var(--ink)}
@@ -455,6 +457,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
         <details class="ppp-fold ppp-recent" hidden><summary>♪ Recently played</summary><ol class="ppp-recent-list"></ol><details class="ppp-history" hidden></details></details>
         <details class="ppp-fold ppp-wallets" hidden><summary>◎ Wallet</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
         <details class="ppp-fold ppp-more" hidden><summary>? How it works</summary><div class="ppp-body"></div></details>
+        <details class="ppp-fold ppp-shelf" hidden><summary>♪ My albums</summary><div class="ppp-shelf-body"></div></details>
         <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Send someone a wallet</summary><div class="ppp-gift-body"></div></details>
       </div>
     </section>
@@ -807,7 +810,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=31f930a335b3" defer></script>
+<script src="/xtrata-radio.js?v=d2b3495b4277" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -823,7 +826,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=2bea69f71931')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=3d3354ad45c7')}).catch(function(){});
 </script>
 </body>
 </html>

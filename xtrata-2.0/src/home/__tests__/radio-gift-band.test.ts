@@ -57,3 +57,19 @@ it('removing the player returns to FM', () => {
   api.setGiftPlayer(null);
   expect(api.getState().band).toBe('fm');
 });
+
+it('a locked album is the only band until it is unlocked', () => {
+  const api = initXtrataRadio({ tokenIds: ['7777'] })!;
+  api.setGiftPlayer(album);
+  api.setBand('fm');
+  expect(api.getState().band).toBe('fm');
+  api.setGiftLock(true);
+  expect(api.getState().band).toBe('gift'); // pulled back to the album
+  api.setBand('liked'); api.setBand('chain'); api.setBand('fm');
+  expect(api.getState().band).toBe('gift');
+  api.cycleBand();
+  expect(api.getState().band).toBe('gift');
+  api.setGiftLock(false);
+  api.setBand('liked');
+  expect(api.getState().band).toBe('liked');
+});
