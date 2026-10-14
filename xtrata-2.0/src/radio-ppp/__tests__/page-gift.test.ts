@@ -5,11 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * The panel for a gifted wallet, with the controller faked: it speaks in plays, hands the album to the radio,
  * tells the radio when to stop, and shows the split before a return.
  */
-const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: null as any, topUp: vi.fn(), openAlbum: vi.fn(), bind: vi.fn(), arriving: vi.fn(), route: null as null | ((url: string, init?: any) => Response | undefined), radio: null as any, session: { isConnected: false } as any, signed: [] as any[] }));
+const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: null as any, topUp: vi.fn(), topUpAlbum: vi.fn(), openAlbum: vi.fn(), bind: vi.fn(), arriving: vi.fn(), route: null as null | ((url: string, init?: any) => Response | undefined), radio: null as any, session: { isConnected: false } as any, signed: [] as any[] }));
 vi.mock('../controller', () => ({
+  TOP_UP_CHOICES: [50_000n, 100_000n, 250_000n],
   createPppController: (deps: any) => {
     h.changed = deps.changed;
-    return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), topUpLikes: () => h.topUp(), openAlbum: (n: number) => h.openAlbum(n), bindAlbum: (n: number) => h.bind(n), albumArriving: (...a: unknown[]) => h.arriving(...a), onListened: async () => {}, giftSent: () => {} }, {
+    return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), topUpLikes: () => h.topUp(), topUpAlbum: (a: bigint) => h.topUpAlbum(a), openAlbum: (n: number) => h.openAlbum(n), bindAlbum: (n: number) => h.bind(n), albumArriving: (...a: unknown[]) => h.arriving(...a), onListened: async () => {}, giftSent: () => {} }, {
       get: (t: any, k) => t[k] ?? (async () => {})
     });
   }
@@ -55,7 +56,7 @@ describe('Gift Edition panel', () => {
     expect(text(root.querySelector('.ppp-key')!)).toContain('Album · Proof of Sound');
     expect(text(root.querySelector('.ppp-key')!)).toContain('277 plays left');
     expect(text(root.querySelector('.ppp-key')!)).not.toMatch(/STX/);
-    expect(h.radio.setGiftPlayer).toHaveBeenCalledWith({ id: PLAYER.id, title: 'Proof of Sound', subtitle: 'Someone', tracks: [11, 12] });
+    expect(h.radio.setGiftPlayer).toHaveBeenCalledWith({ id: PLAYER.id, title: 'Proof of Sound', subtitle: 'Someone', tracks: [11, 12], cover: null });
     h.changed(); h.changed();
     expect(h.radio.setGiftPlayer).toHaveBeenCalledTimes(1); // the same album is not pushed again
   });
@@ -233,6 +234,23 @@ describe('My albums (the shelf)', () => {
     expect(text(tabs[1])).toContain('Zero Hour');
     (tabs[1] as HTMLButtonElement).click();
     expect(h.openAlbum).toHaveBeenCalledWith(3);
+  });
+
+  it('an album running low offers to add plays from My player, greyed out when My player cannot cover it', async () => {
+    const root = await start({ slot: 2, giftPlays: 10, balance: 12_000n, gift: { player: PLAYER, from: null, source: 'campaign', amount: '100000' }, likeFunds: { address: ROOT, balance: 300_000n, low: false, album: true, pending: false } });
+    const row = document.querySelector('.ppp-key .ppp-topup')!;
+    const buttons = [...row.querySelectorAll('button')] as HTMLButtonElement[];
+    expect(buttons.map((b) => b.textContent)).toEqual(['+0.05 STX', '+0.10 STX', '+0.25 STX']);
+    expect(buttons.map((b) => b.disabled)).toEqual([false, false, false]);
+    h.topUpAlbum.mockClear();
+    buttons[1].click();
+    expect(h.topUpAlbum).toHaveBeenCalledWith(100_000n);
+    // My player holds 0.1 STX: it covers 0.05 STX only
+    h.snap = { ...h.snap, likeFunds: { ...h.snap.likeFunds, balance: 60_000n } };
+    h.changed();
+    const again = [...document.querySelector('.ppp-key .ppp-topup')!.querySelectorAll('button')] as HTMLButtonElement[];
+    expect(again.map((b) => b.disabled)).toEqual([false, true, true]);
+    expect(root).toBeTruthy();
   });
 
   it('there is no switcher when the listener has no albums', async () => {

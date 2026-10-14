@@ -564,7 +564,8 @@ export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefin
   try { def = validatePlayer(body?.definition); req = validatePlayerRequest(body?.request, def, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
   if (req.admin !== admin || !verifyPlayerSignature(req, body.signature, admin)) throw new GiftError('Only the gift admin can make gift players.', 403);
   await ensureGiftTables(env);
-  const wanted = [...new Set([...def.tracks, ...(def.cover ? [def.cover] : [])])];
+  // Only the songs must be ready songs. The cover is any inscription (an image, or a page with one): it need not be a song.
+  const wanted = [...new Set(def.tracks)];
   const songs = await catalogueSongs(env, wanted);
   const missing = wanted.find((n) => !songs.has(n));
   if (missing !== undefined) throw new GiftError(`Song #${missing} is not a ready song in the radio catalogue.`, 400);

@@ -450,7 +450,8 @@ describe('radio gift players', () => {
     await expect(make(s, definition({ tracks: [785, 2186], cover: null }))).rejects.toThrow(/Song #2186/);
     await expect(make(s, definition({ tracks: [785, 2187], cover: null }))).rejects.toThrow(/Song #2187/);
     await expect(make(s, definition({ tracks: [785, 99999], cover: null }))).rejects.toThrow(/Song #99999/);
-    await expect(make(s, definition({ tracks: [785], cover: 4242 }))).rejects.toThrow(/Song #4242/);
+    // the cover is any inscription, not necessarily a song
+    await expect(make(s, definition({ tracks: [785], cover: 4242 }))).resolves.toMatchObject({ tracks: 1 });
     await expect(make(s, definition({ tracks: [785], cover: null }))).resolves.toMatchObject({ tracks: 1 });
   });
 

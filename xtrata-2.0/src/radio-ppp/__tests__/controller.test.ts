@@ -605,11 +605,16 @@ describe('album wallets (numbered wallets of one passkey)', () => {
     const GIFTER = 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', FRIEND = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7', TREASURY = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
     const inbound = (sender: string, amount: string, i = 1) => ({ sender, amount, txId: '0x' + String(i).repeat(64), blockHeight: i, txIndex: 0 });
     const PLAYER = { id: '0123456789abcdef', title: 'Proof of Sound', subtitle: 'Someone', tracks: [{ id: 11, title: 'One', artist: 'X' }], cover: null, paidOnly: true as const };
-    const open = async () => {
+    const open = async (balances?: { album: bigint; root: bigint }) => {
       const s = setup({ gifts: { enabled: true, treasury: TREASURY, turnstileSiteKey: null, admin: false, fee: '3000' } });
       await ready(s);
+      if (balances) { // the first wallet's earlier top-up has confirmed; the balances are what the test wants
+        s.chain.mined.add('0x' + 'd'.repeat(64)); s.chain.mined.add('0x' + 'a'.repeat(64)); // earlier top-up and the gift's own send have landed
+        s.chain.balanceOf.set(LISTENING, balances.root);
+      }
       s.gift.info = { returnTo: GIFTER, from: GIFTER, source: 'friend', amount: '100000', treasury: TREASURY, state: 'arrived', player: PLAYER } as any;
       const { address } = await s.ppp.bindAlbum(2);
+      if (balances) s.chain.balanceOf.set(address, balances.album);
       await s.ppp.albumArriving(2, address, '0x' + 'a'.repeat(64), 100_000n);
       await s.ppp.forceRefresh();
       return s;
@@ -624,6 +629,66 @@ describe('album wallets (numbered wallets of one passkey)', () => {
       s.gift.historyFails = true;
       s.tick(10 * 60_000); await s.ppp.forceRefresh();
       expect(s.ppp.snapshot().albumLock).toEqual({ locked: true, known: true });
+    });
+
+    const recipientOf = (raw: string) => cvToJSON((deserializeTransaction(raw) as any).payload.recipient).value;
+    const amountOf = (raw: string) => String((deserializeTransaction(raw) as any).payload.amount);
+    const senderOf = (raw: string) => addressToString({ type: 0, version: 22, hash160: (deserializeTransaction(raw) as any).auth.spendingCondition.signer } as any);
+
+    it('a new album gives the first wallet a likes float from its own gift, once, with no panel', async () => {
+      const s = await open({ album: 100_000n, root: 0n });
+      const album = s.ppp.snapshot().listening!;
+      const panels = s.held.length;
+      await s.ppp.forceRefresh();
+      expect(s.chain.broadcasts).toHaveLength(1);
+      const raw = s.chain.broadcasts[0];
+      expect(senderOf(raw)).toBe(album);
+      expect(recipientOf(raw)).toBe(LISTENING);
+      expect(amountOf(raw)).toBe('15000');
+      expect(s.held).toHaveLength(panels);
+      // the float is on its way: the heart's banner says so, and nothing is sent twice
+      expect(s.ppp.snapshot().likeFunds).toMatchObject({ pending: true });
+      s.tick(10 * 60_000); await s.ppp.forceRefresh(); await s.ppp.forceRefresh();
+      expect(s.chain.broadcasts).toHaveLength(1);
+      s.mineAll(); s.chain.balanceOf.set(LISTENING, 15_000n);
+      s.tick(10 * 60_000); await s.ppp.forceRefresh(); await s.ppp.forceRefresh();
+      expect(s.chain.broadcasts).toHaveLength(1);
+    });
+
+    it('skips the float when the first wallet can already like, or the gift is too small to spare it', async () => {
+      const funded = await open({ album: 100_000n, root: 500_000n });
+      await funded.ppp.forceRefresh();
+      expect(funded.chain.broadcasts).toHaveLength(0);
+      const small = await open({ album: 40_000n, root: 0n });
+      await small.ppp.forceRefresh();
+      expect(small.chain.broadcasts).toHaveLength(0);
+    });
+
+    it('adds plays to the open album from My player, in the amounts offered', async () => {
+      const s = await open({ album: 20_000n, root: 500_000n }); // too small a gift to float: only the top-up moves money
+      const album = s.ppp.snapshot().listening!;
+      await s.ppp.topUpAlbum(12_345n);
+      expect(s.ppp.snapshot().error).toMatch(/amounts offered/);
+      await s.ppp.topUpAlbum(100_000n);
+      expect(s.ppp.snapshot().error).toBe('');
+      expect(s.chain.broadcasts).toHaveLength(1);
+      expect(senderOf(s.chain.broadcasts[0])).toBe(LISTENING);
+      expect(recipientOf(s.chain.broadcasts[0])).toBe(album);
+      expect(amountOf(s.chain.broadcasts[0])).toBe('100000');
+      expect(s.ppp.snapshot().depositPending).toBe(true); // the plays are on their way
+      await s.ppp.topUpAlbum(50_000n);
+      expect(s.ppp.snapshot().error).toMatch(/pending payment/);
+      expect(s.chain.broadcasts).toHaveLength(1);
+    });
+
+    it('refuses to add plays when My player cannot cover it, or no album is open', async () => {
+      const s = await open({ album: 20_000n, root: 10_000n });
+      await s.ppp.topUpAlbum(50_000n);
+      expect(s.ppp.snapshot().error).toMatch(/does not hold enough/);
+      expect(s.chain.broadcasts).toHaveLength(0);
+      await s.ppp.openAlbum(0);
+      await s.ppp.topUpAlbum(50_000n);
+      expect(s.ppp.snapshot().error).toMatch(/Open the album/);
     });
 
     it('never locks the listener\'s own wallet', async () => {

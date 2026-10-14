@@ -54,7 +54,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -77,7 +77,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move'] });
     expect(s.map.size).toBe(0);
   });
 
@@ -578,6 +578,47 @@ describe('one passkey, many wallets (slots)', () => {
     // the album wallet's own balance never matters: the page sends the main listener wallet's
     s.tick(MIN_LIKE_INTERVAL_MS);
     await expect(s.h['listening.signLike'](like(false, '1', '100'))).rejects.toThrow(/main listener wallet is out of funds/);
+  });
+
+  it('moves money only between wallets of the same passkey: the destination is a wallet number, nothing else can be aimed at', async () => {
+    const s = setup();
+    await expect(s.h['listening.signMove']({ to: 1, amount: '15000', fee: '3000', nonce: '0', balance: '500000' })).rejects.toThrow(/Unlock/);
+    await s.h['listening.unlock']({ mode: 'create' });
+    const before = s.evaluations(), panels = s.panels.length;
+    const move = (over: object = {}) => ({ to: 1, amount: '15000', fee: '3000', nonce: '4', balance: '500000', ...over });
+    const signer = (raw: string) => addressToString({ type: 0, version: 22, hash160: (deserializeTransaction(raw) as any).auth.spendingCondition.signer } as any);
+    // first wallet -> album wallet, from the open wallet by default
+    const r = await s.h['listening.signMove'](move());
+    expect(r).toMatchObject({ from: ADDRESS, to: SLOT1, amount: '15000', fee: '3000' });
+    const tx = deserializeTransaction(r.raw) as any;
+    expect(signer(r.raw)).toBe(ADDRESS);
+    expect(cvToJSON(tx.payload.recipient).value).toBe(SLOT1);
+    expect(String(tx.payload.amount)).toBe('15000');
+    assertNoSecrets(r);
+    // an album wallet is the open one: move from it to the first wallet, or from the first wallet while it is open
+    await s.h['listening.openSlot']({ slot: 1 });
+    const back = await s.h['listening.signMove'](move({ to: 0 }));
+    expect(signer(back.raw)).toBe(SLOT1);
+    expect(cvToJSON((deserializeTransaction(back.raw) as any).payload.recipient).value).toBe(ADDRESS);
+    const fromRoot = await s.h['listening.signMove'](move({ from: 0, to: 1 }));
+    expect(signer(fromRoot.raw)).toBe(ADDRESS);
+    // no passkey tap and no panel
+    expect(s.evaluations()).toBe(before);
+    expect(s.panels).toHaveLength(panels);
+  });
+
+  it('refuses moves that are the same wallet, a bad number, too small, a runaway fee, or leave no reserve', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create' });
+    const move = (over: object = {}) => ({ to: 1, amount: '15000', fee: '3000', nonce: '0', balance: '500000', ...over });
+    await expect(s.h['listening.signMove'](move({ to: 0 }))).rejects.toThrow(/two different wallets/);
+    for (const to of [-1, 1.5, 100_001, '1', undefined]) await expect(s.h['listening.signMove'](move({ to }))).rejects.toThrow(/two different wallets/);
+    await expect(s.h['listening.signMove'](move({ amount: '4999' }))).rejects.toThrow(/too small/);
+    await expect(s.h['listening.signMove'](move({ fee: '10001' }))).rejects.toThrow(/fee is not allowed/);
+    await expect(s.h['listening.signMove'](move({ fee: '0' }))).rejects.toThrow(/fee is not allowed/);
+    await expect(s.h['listening.signMove'](move({ balance: '20000' }))).rejects.toThrow(/reserve/);
+    await expect(s.h['listening.signMove'](move({ balance: '21000' }))).resolves.toBeDefined(); // 15000 + 3000 fee + 3000 reserve
+    await expect(s.h['listening.signMove'](move({ to: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP' }))).rejects.toThrow(/two different wallets/);
   });
 
   it('switching changes nothing about where returns go: a linked passkey sends every wallet to its main wallet', async () => {

@@ -315,12 +315,12 @@ export function createGifts(deps: GiftDeps) {
   const playersKey = (main: string) => 'xtrata.radio.gift.players.v1:' + main;
   const loadPlayers = (main: string): MadePlayer[] => { try { const v = JSON.parse(deps.store.get(playersKey(main)) || '[]'); return Array.isArray(v) ? v.filter((x) => x && /^[0-9a-f]{16}$/.test(x.id)) : []; } catch { return []; } };
 
-  async function makePlayer(main: string, def: { title: string; subtitle: string; tracks: string }) {
+  async function makePlayer(main: string, def: { title: string; subtitle: string; tracks: string; cover?: string }) {
     if (working) return;
     working = 'Checking the player…'; note = ''; deps.changed();
     try {
       const tracks = def.tracks.split(/[\s,]+/).filter(Boolean).map((t) => Number(t.replace(/^#/, '')));
-      const definition = validatePlayer({ title: def.title.trim(), subtitle: def.subtitle.trim(), tracks, cover: null });
+      const definition = validatePlayer({ title: def.title.trim(), subtitle: def.subtitle.trim(), tracks, cover: def.cover?.trim() ? Number(def.cover.trim().replace(/^#/, '')) : null });
       working = 'Sign in your wallet…'; deps.changed();
       const request = { admin: main, hash: playerHash(definition), issued: deps.now() };
       const signature = await deps.sign(main, playerData(request));
@@ -365,6 +365,7 @@ export function createGifts(deps: GiftDeps) {
   const playerTitle = el('input') as HTMLInputElement; playerTitle.maxLength = 60; playerTitle.placeholder = 'Title, e.g. Proof of Sound'; playerTitle.setAttribute('aria-label', 'Player title');
   const playerSubtitle = el('input') as HTMLInputElement; playerSubtitle.maxLength = 80; playerSubtitle.placeholder = 'Artist (optional)'; playerSubtitle.setAttribute('aria-label', 'Player subtitle');
   const playerTracks = el('textarea') as HTMLTextAreaElement; playerTracks.rows = 3; playerTracks.placeholder = 'Radio song numbers in play order, e.g. 1021, 1022, 1023'; playerTracks.setAttribute('aria-label', 'Songs');
+  const playerCover = el('input') as HTMLInputElement; playerCover.inputMode = 'numeric'; playerCover.placeholder = 'Cover inscription number (optional), shown when the album loads'; playerCover.setAttribute('aria-label', 'Cover inscription');
   const adminPlayer = el('select') as HTMLSelectElement; adminPlayer.setAttribute('aria-label', 'Gift player');
   const adminPreset = el('select') as HTMLSelectElement; adminPreset.setAttribute('aria-label', 'Plays per link');
   for (const n of PLAY_PRESETS) adminPreset.append(opt(`${n.toLocaleString()} plays`, String(amountForPlays(n))));
@@ -415,8 +416,8 @@ export function createGifts(deps: GiftDeps) {
         if (made.some((x) => x.id === keep)) adminPlayer.value = keep;
         box.append(
           el('p', 'Gift players (admin) · an album that comes with the gift', 'ppp-cyan'),
-          playerTitle, playerSubtitle, playerTracks,
-          button('Sign and make player', () => void makePlayer(main, { title: playerTitle.value, subtitle: playerSubtitle.value, tracks: playerTracks.value })),
+          playerTitle, playerSubtitle, playerTracks, playerCover,
+          button('Sign and make player', () => void makePlayer(main, { title: playerTitle.value, subtitle: playerSubtitle.value, tracks: playerTracks.value, cover: playerCover.value })),
           el('p', 'Campaign links (admin) · paid from the gift treasury', 'ppp-cyan'),
           labelled('Player ', adminPlayer), labelled('Plays each ', adminPreset), labelled('Links ', adminCount), labelled('STX each ', adminAmount), adminLabel, make);
         if (campaign) {

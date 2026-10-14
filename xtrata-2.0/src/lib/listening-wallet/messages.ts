@@ -43,9 +43,10 @@ export interface StatusResult {
  * `multi` (one listening wallet per main-wallet address: status, unlock and create take the connected `main`),
  * `partial` (listening.prepareReturn accepts mode `amount` with an `amount`, to return part of the balance),
  * `slots` (listening.slotAddress, listening.openSlot and listening.bindSlot: one passkey, many derived wallets),
- * `rootLike` (listening.signLike always signs with the passkey's own wallet, whichever album wallet is open, and status reports it as `root`).
+ * `rootLike` (listening.signLike always signs with the passkey's own wallet, whichever album wallet is open, and status reports it as `root`),
+ * `move` (listening.signMove: move STX between two wallets of the same passkey, no panel).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {
@@ -140,6 +141,27 @@ export interface ReturnResult extends SignedResult {
   fee: string;
   recipient: string;
   mode: 'excess' | 'all' | 'amount';
+}
+
+/**
+ * `listening.signMove`: sign a transfer between two wallets of the SAME passkey (e.g. from My player to an album wallet).
+ * The destination is a wallet NUMBER, derived in the box, so the page can never aim it at another address; the money
+ * stays with the listener, which is why no panel is shown. `from` defaults to the open wallet. The page supplies the
+ * source wallet's balance and nonce (the box cannot read the chain) and broadcasts the result.
+ */
+export interface MoveParams {
+  to: number;
+  from?: number;
+  amount: string;
+  fee: string;
+  nonce: string;
+  balance: string;
+}
+export interface MoveResult extends SignedResult {
+  from: string;
+  to: string;
+  amount: string;
+  fee: string;
 }
 
 /** `listening.slotAddress`: the address of one of this passkey's wallets. Needs an unlocked wallet; moves nothing. */
