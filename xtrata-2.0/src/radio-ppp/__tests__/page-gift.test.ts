@@ -35,7 +35,7 @@ const base = {
 async function open(over: object = {}) {
   vi.resetModules();
   document.body.innerHTML = `<section id="ppp" hidden><div class="ppp-head"><h3><span class="ppp-badge"></span></h3><span class="ppp-state"></span></div><ol class="ppp-steps"></ol><p class="ppp-stage"></p>
-    <div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
+    <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section>`;
   h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
@@ -52,7 +52,7 @@ beforeEach(() => { vi.unstubAllGlobals(); delete (window as any).XtrataRadio; h.
 describe('Gift Edition panel', () => {
   it('names the player, counts plays (not STX) and hands the album to the radio', async () => {
     const root = await open();
-    expect(text(root.querySelector('.ppp-key')!)).toContain('Gift Edition · Proof of Sound');
+    expect(text(root.querySelector('.ppp-key')!)).toContain('Album · Proof of Sound');
     expect(text(root.querySelector('.ppp-key')!)).toContain('277 plays left');
     expect(text(root.querySelector('.ppp-key')!)).not.toMatch(/STX/);
     expect(h.radio.setGiftPlayer).toHaveBeenCalledWith({ id: PLAYER.id, title: 'Proof of Sound', subtitle: 'Someone', tracks: [11, 12] });
@@ -195,9 +195,52 @@ describe('My albums (the shelf)', () => {
     const fold = await start({ slot: 2 });
     const rows = [...fold.querySelectorAll('.ppp-shelf-list li')];
     expect(text(rows.find((r) => r.classList.contains('now'))!)).toContain('Night Drive');
-    const back = [...fold.querySelectorAll('button')].find((b) => /Back to my own wallet/.test(b.textContent ?? ''))!;
+    const back = [...fold.querySelectorAll('button')].find((b) => /My player/.test(b.textContent ?? '') && /←/.test(b.textContent ?? ''))!;
     (back as HTMLButtonElement).click();
     expect(h.openAlbum).toHaveBeenCalledWith(0);
+  });
+
+  it('an empty first wallet stops the radio too: paid-only, no free mode', async () => {
+    await start({ giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } });
+    expect(h.radio.setGiftStop).toHaveBeenLastCalledWith('EMPTY — ADD STX TO PLAY');
+  });
+
+  it('shows two places: My player and the open album, and each tab opens its wallet', async () => {
+    await start({ slot: 2, balance: 107_300n, gift: { player: { ...PLAYER, title: 'Night Drive' }, from: null, source: 'campaign', amount: '100000' }, likeFunds: { address: ROOT, balance: 199_250n, low: false, album: true, pending: false } });
+    const sw = document.querySelector('.ppp-switch')!;
+    expect(sw.hasAttribute('hidden')).toBe(false);
+    const tabs = [...sw.querySelectorAll('button')];
+    expect(tabs.map((t) => t.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+    expect(text(tabs[0])).toContain('My player');
+    expect(text(tabs[0])).toContain('0.1993 STX');
+    expect(text(tabs[1])).toContain('Night Drive');
+    h.openAlbum.mockClear();
+    (tabs[0] as HTMLButtonElement).click();
+    expect(h.openAlbum).toHaveBeenCalledWith(0);
+  });
+
+  it('on My player the second tab is the album played last on this device (many albums never crowd it)', async () => {
+    localStorage.clear();
+    localStorage.setItem('xtrata.radio.shelf.recent.v1:' + ROOT, JSON.stringify({ 3: 5000 }));
+    h.openAlbum.mockClear();
+    h.route = (url) => (url.includes('/radio/gift/shelf') ? new Response(JSON.stringify({ total: 3, next: null, shelf })) : undefined);
+    const root = await open({ ...own });
+    await vi.waitFor(() => expect(root.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(false));
+    h.changed();
+    const sw = document.querySelector('.ppp-switch')!;
+    const tabs = [...sw.querySelectorAll('button')];
+    expect(tabs.map((t) => t.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+    expect(text(tabs[1])).toContain('Zero Hour');
+    (tabs[1] as HTMLButtonElement).click();
+    expect(h.openAlbum).toHaveBeenCalledWith(3);
+  });
+
+  it('there is no switcher when the listener has no albums', async () => {
+    localStorage.clear();
+    h.route = (url) => (url.includes('/radio/gift/shelf') ? new Response(JSON.stringify({ total: 0, next: null, shelf: [] })) : undefined);
+    await open({ ...own });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(document.querySelector('.ppp-switch')!.hasAttribute('hidden')).toBe(true);
   });
 
   it('stays out of the way with no albums, or when the wallet box cannot hold them', async () => {

@@ -8,7 +8,7 @@
  */
 import { deserializeTransaction, cvToJSON } from '@stacks/transactions';
 import { isMainnetStandardAddress, linkData, type LinkRequest } from '../lib/listening-wallet/link';
-import { MIN_FUNDING, type FunderResult } from '../lib/listening-wallet/funder';
+import { type FunderResult } from '../lib/listening-wallet/funder';
 import { buildLedger, excessTarget, planReturns, type History, type LedgerPart, type ReturnStep } from '../lib/listening-wallet/ledger';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import {
@@ -388,62 +388,39 @@ export function createPppController(deps: PppDeps) {
     return spendable > 0n ? playsCovered(spendable, fee()) : 0;
   }
   const OUT_TEXT = 'OUT OF PLAYS — ADD MORE TO KEEP LISTENING';
+  const WALLET_EMPTY_TEXT = 'EMPTY — ADD STX TO PLAY';
   /**
    * A gift player has no free mode: it plays only while paid plays are available. Anything that is merely
    * unknown (the balance is still loading, a read failed) is never a reason to stop.
    */
   function giftStop(): Snapshot['giftStop'] {
-    if (!giftNow()?.player) return null;
+    // Any passkey wallet (the first wallet too) is paid-only. A visitor with no wallet yet keeps the free radio.
+    const holder = status?.state === 'known' || status?.state === 'unlocked';
+    if (!giftNow()?.player && !holder) return null;
     const stop = (reason: GiftStopReason, text: string) => ({ reason, text });
     switch (step()) {
       case 'connect': case 'wrong-wallet': return stop('connect', 'CONNECT YOUR WALLET TO LISTEN');
       case 'locked': return stop('locked', 'UNLOCK TO LISTEN');
       case 'link': return stop('link', 'FINISH SETUP TO LISTEN');
       case 'over': return stop('over', 'OVER 1 STX — RETURN THE EXCESS');
-      case 'fund': return pendingDeposit() ? stop('arriving', 'YOUR PLAYS ARE ARRIVING') : stop('out', OUT_TEXT);
+      case 'fund': return pendingDeposit() ? stop('arriving', 'YOUR PLAYS ARE ARRIVING') : stop('out', albumOpen() ? OUT_TEXT : WALLET_EMPTY_TEXT);
       case 'ready':
         if (!payingOn() || !status?.session || status.session.playsLeft < 1) return stop('off', 'PAYING IS OFF — SWITCH ON TO LISTEN');
         if (!lockHeld) return stop('tab', 'PLAYING IN ANOTHER TAB');
-        return playsLeftNow() < 1 ? stop('out', OUT_TEXT) : null;
+        return playsLeftNow() < 1 ? stop('out', albumOpen() ? OUT_TEXT : WALLET_EMPTY_TEXT) : null;
       default: return null;
     }
   }
 
   // ---------------------------------------------------------------- the album lock
-  type Unlock = { for: string; ok: boolean; open: boolean; at: number };
-  let unlockRes: Unlock | null = null;
-  let unlockLooking = false;
-  // Per album wallet: the listener's own wallet history says nothing about whether THIS album was ever topped up.
-  const unlockKey = (album: string) => key('album-unlocked', album);
-  /** Only a curated album (an album wallet that was gifted with a player) is ever locked. */
+  /**
+   * A curated album (an album wallet that was gifted with a player) is an album for good: it plays only its own
+   * songs, funded or not. Funding it only buys more plays. The open world (FM, LIKED, CHAIN, search) lives in the
+   * listener's first wallet. Nothing here reads the chain: there is no unlock to wait for.
+   */
   const lockWanted = () => !!status?.address && albumOpen() && !!giftNow()?.player;
   function albumLock(): Snapshot['albumLock'] {
-    if (!lockWanted()) return null;
-    const album = status!.address!;
-    if (deps.store.get(unlockKey(album)) === '1') return { locked: false, known: true };
-    return unlockRes?.for === album && unlockRes.ok ? { locked: !unlockRes.open, known: true } : { locked: true, known: false };
-  }
-  /**
-   * Reads the inbound transfers of the album's own wallet. A deposit of at least 0.1 STX from anyone but the gifter and the
-   * gift treasury (the listener's own wallets count) opens it; a positive answer is remembered for good, an unreadable list
-   * keeps it locked and is tried again.
-   */
-  async function lookupUnlock() {
-    if (!lockWanted() || !deps.history || unlockLooking) return;
-    const info = giftNow()!, album = status!.address!;
-    if (deps.store.get(unlockKey(album)) === '1') return;
-    if (unlockRes?.for === album && deps.now() - unlockRes.at < (unlockRes.ok ? 2 * 60_000 : 60_000)) return;
-    unlockLooking = true;
-    try {
-      const h = await deps.history(album, false);
-      if (!h.ok) unlockRes = { for: album, ok: false, open: false, at: deps.now() };
-      else {
-        const open = h.inbound.some((t) => isMainnetStandardAddress(t.sender) && t.sender !== album && t.sender !== info.from && t.sender !== info.treasury && BigInt(t.amount) >= MIN_FUNDING);
-        unlockRes = { for: album, ok: true, open, at: deps.now() };
-        if (open) deps.store.set(unlockKey(album), '1');
-      }
-    } catch { unlockRes = { for: album, ok: false, open: false, at: deps.now() }; }
-    finally { unlockLooking = false; }
+    return lockWanted() ? { locked: true, known: true } : null;
   }
 
   // ---------------------------------------------------------------- returns that follow the money
@@ -724,7 +701,6 @@ export function createPppController(deps: PppDeps) {
       await lookupCredited();
       await lookupUnused();
       await lookupGift();
-      await lookupUnlock();
       // A payment that has just landed has changed the balance: read it again now, so plays-left is exact.
       if (await reconcile()) await refreshBalance(true);
       await refreshRootBalance(); // a confirmed top-up clears the cached one: read it again now
@@ -739,6 +715,24 @@ export function createPppController(deps: PppDeps) {
     if (queue.length && !draining) void drain();
   }
 
+  /**
+   * An unlock lands on the passkey's own first wallet (the plain player); albums are chosen from there. The one
+   * exception: a first wallet that cannot pay for a single play yet (a new listener who was only gifted an album)
+   * opens the album that was last open on this device, so the gift is what they see. Best effort.
+   */
+  async function landOnWallet(b: Bridge) {
+    const root = status?.root;
+    if (!root || status?.slot || !status?.address || walletLacks('slots')) return;
+    const n = Number(deps.store.get(key('slot', root)));
+    if (!Number.isSafeInteger(n) || n < 1) return;
+    try {
+      const { balance: own } = await deps.chain.account(status.address);
+      if (own >= RESERVE + costPerPlay(fee())) return; // it can play: stay on the first wallet
+      await b.request<OpenSlotResult>('listening.openSlot', { slot: n });
+      status = await readStatus(b); balance = undefined; balanceAt = -Infinity;
+    } catch { /* stays on the listener's own wallet */ }
+  }
+
   /** Unlock inside the frame, resuming paying unless this device switched it off. */
   async function unlockWith(b: Bridge, anyPasskey: boolean) {
     guardMatch();
@@ -751,7 +745,7 @@ export function createPppController(deps: PppDeps) {
       if (!payingOn(status.address)) await b.request('listening.stop');
       else await holdTab();
     }
-    // An unlock always lands on the passkey's own first wallet (the plain player); albums are chosen from there.
+    await landOnWallet(b);
     say(resume ? 'Unlocked ✓' : 'Unlocked ✓ Paying is off.');
     const queued = likeAfterUnlock;
     likeAfterUnlock = null;
@@ -953,7 +947,9 @@ export function createPppController(deps: PppDeps) {
       await bridge!.request<OpenSlotResult>('listening.openSlot', { slot });
       status = await readStatus(bridge!);
       balance = undefined; balanceAt = -Infinity; preview = null; previewFailed = false;
-      say(slot === 0 ? 'Back to your own wallet ✓' : 'Album opened ✓');
+      const root = status.root;
+      if (root && slot > 0) deps.store.set(key('slot', root), String(slot)); // the album a new listener lands on
+      say(slot === 0 ? 'My player ✓' : 'Album opened ✓');
     }),
 
     unlock: (anyPasskey = false): Promise<void> => {

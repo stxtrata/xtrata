@@ -798,7 +798,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const gated = () => !!giftPlayer && giftLock;
   const inAlbum = (id) => !!giftPlayer && giftPlayer.tracks.includes(String(id));
   const allowed = (id) => !gated() || inAlbum(id);
-  const LOCKED_TEXT = 'LOCKED TO THIS ALBUM — ADD FUNDS TO UNLOCK';
+  const LOCKED_TEXT = 'THIS ALBUM PLAYS ONLY ITS OWN SONGS';
   const setBand = (next) => {
     if (!bandList().includes(next)) return;
     band = next;
