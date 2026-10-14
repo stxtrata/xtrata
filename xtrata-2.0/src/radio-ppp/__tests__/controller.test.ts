@@ -589,6 +589,54 @@ describe('album wallets (numbered wallets of one passkey)', () => {
     expect(s.ppp.snapshot()).toMatchObject({ listening: address, slot: 4 });
   });
 
+  describe('the curated-album lock', () => {
+    const GIFTER = 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', FRIEND = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7', TREASURY = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+    const inbound = (sender: string, amount: string, i = 1) => ({ sender, amount, txId: '0x' + String(i).repeat(64), blockHeight: i, txIndex: 0 });
+    const PLAYER = { id: '0123456789abcdef', title: 'Proof of Sound', subtitle: 'Someone', tracks: [{ id: 11, title: 'One', artist: 'X' }], cover: null, paidOnly: true as const };
+    const open = async () => {
+      const s = setup({ gifts: { enabled: true, treasury: TREASURY, turnstileSiteKey: null, admin: false, fee: '3000' } });
+      await ready(s);
+      s.gift.info = { returnTo: GIFTER, from: GIFTER, source: 'friend', amount: '100000', treasury: TREASURY, state: 'arrived', player: PLAYER } as any;
+      const { address } = await s.ppp.bindAlbum(2);
+      await s.ppp.albumArriving(2, address, '0x' + 'a'.repeat(64), 100_000n);
+      await s.ppp.forceRefresh();
+      return s;
+    };
+
+    it('locks the radio to the album until a stranger funds a wallet of the listener with at least 0.1 STX', async () => {
+      const s = await open();
+      expect(s.ppp.snapshot().albumLock).toEqual({ locked: true, known: true });
+      // not enough, or from the gifter or the treasury: still locked
+      s.gift.inbound = [inbound(FRIEND, '99999', 1), inbound(GIFTER, '500000', 2), inbound(TREASURY, '500000', 3)];
+      s.tick(3 * 60_000); await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot().albumLock).toEqual({ locked: true, known: true });
+      s.gift.inbound.push(inbound(FRIEND, '100000', 4));
+      s.tick(3 * 60_000); await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot().albumLock).toEqual({ locked: false, known: true });
+      // remembered: it stays open even if the list cannot be read later
+      s.gift.historyFails = true;
+      s.tick(10 * 60_000); await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot().albumLock).toEqual({ locked: false, known: true });
+    });
+
+    it('does not treat an unreadable history as "no deposit"', async () => {
+      const s = setup({ gifts: { enabled: true, treasury: TREASURY, turnstileSiteKey: null, admin: false, fee: '3000' } });
+      await ready(s);
+      s.gift.info = { returnTo: GIFTER, from: GIFTER, source: 'friend', amount: '100000', treasury: TREASURY, state: 'arrived', player: PLAYER } as any;
+      s.gift.historyFails = true;
+      const { address } = await s.ppp.bindAlbum(2);
+      await s.ppp.albumArriving(2, address, '0x' + 'a'.repeat(64), 100_000n);
+      await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot().albumLock).toEqual({ locked: true, known: false });
+    });
+
+    it('never locks the listener\'s own wallet', async () => {
+      const s = await open();
+      await s.ppp.openAlbum(0);
+      expect(s.ppp.snapshot().albumLock).toBeNull();
+    });
+  });
+
   it('says the wallet box needs an update when it cannot hold albums', async () => {
     const s = setup({}, { oldWallet: true });
     await s.ppp.forceRefresh(); await s.ppp.create();

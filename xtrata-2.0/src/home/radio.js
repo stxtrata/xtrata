@@ -634,6 +634,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // A gift player (pay-per-play page): an album that loops as its own band, and a hard stop when the
   // paid plays are used up (the radio then goes quiet instead of carrying on for free).
   let giftPlayer = null;                   // {id,title,subtitle,tracks:[tokenId strings]}
+  let giftLock = false;                    // a curated album is the only band until the listener funds a wallet of their own
   let giftStop = null;                     // null, or the text to show when playback is refused
   let preset = 'all';                      // within FM: 'music' | 'all'
   // Shuffle is OFF by default: the dial plays in order (likes/curated/chain
@@ -791,7 +792,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   };
 
   const BANDS = ['fm', 'liked', 'chain'];
-  const bandList = () => (giftPlayer ? ['gift', ...BANDS] : BANDS);
+  const bandList = () => (giftPlayer ? (giftLock ? ['gift'] : ['gift', ...BANDS]) : BANDS);
   const setBand = (next) => {
     if (!bandList().includes(next)) return;
     band = next;
@@ -1676,6 +1677,13 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       const first = !giftPlayer || giftPlayer.id !== def.id;
       giftPlayer = { id: String(def.id || ''), title: String(def.title || '').slice(0, 60), subtitle: String(def.subtitle || '').slice(0, 80), tracks };
       if (first) setBand('gift'); else emit();
+    },
+    /** While locked, the loaded album is the only band: no FM, LIKED or CHAIN. A page default, not security. */
+    setGiftLock: (on) => {
+      const next = !!on;
+      if (next === giftLock) return;
+      giftLock = next;
+      if (giftLock && giftPlayer && band !== 'gift') setBand('gift'); else emit();
     },
     /** Refuse to start or advance (a gift player whose paid plays are used up). Pass null to allow playback again. */
     setGiftStop: (text) => {

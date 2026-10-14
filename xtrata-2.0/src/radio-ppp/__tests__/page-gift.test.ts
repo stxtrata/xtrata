@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * The panel for a gifted wallet, with the controller faked: it speaks in plays, hands the album to the radio,
  * tells the radio when to stop, and shows the split before a return.
  */
-const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: null as any, topUp: vi.fn(), radio: null as any, session: { isConnected: false } as any, signed: [] as any[] }));
+const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: null as any, topUp: vi.fn(), openAlbum: vi.fn(), bind: vi.fn(), arriving: vi.fn(), route: null as null | ((url: string, init?: any) => Response | undefined), radio: null as any, session: { isConnected: false } as any, signed: [] as any[] }));
 vi.mock('../controller', () => ({
   createPppController: (deps: any) => {
     h.changed = deps.changed;
-    return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), topUpLikes: () => h.topUp(), onListened: async () => {}, giftSent: () => {} }, {
+    return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), topUpLikes: () => h.topUp(), openAlbum: (n: number) => h.openAlbum(n), bindAlbum: (n: number) => h.bind(n), albumArriving: (...a: unknown[]) => h.arriving(...a), onListened: async () => {}, giftSent: () => {} }, {
       get: (t: any, k) => t[k] ?? (async () => {})
     });
   }
@@ -37,11 +37,11 @@ async function open(over: object = {}) {
   document.body.innerHTML = `<section id="ppp" hidden><div class="ppp-head"><h3><span class="ppp-badge"></span></h3><span class="ppp-state"></span></div><ol class="ppp-steps"></ol><p class="ppp-stage"></p>
     <div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
-    <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section>`;
+    <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section>`;
   h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
   (window as any).XtrataRadio = h.radio;
   h.snap = { ...base, ...over };
-  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: any) => new Response(String(url).endsWith('/radio/gift/player') ? JSON.stringify({ id: 'fedcba9876543210', title: 'Proof of Sound', tracks: 2, existing: false }) : '{}')));
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: any) => h.route?.(String(url), init) ?? new Response(String(url).endsWith('/radio/gift/player') ? JSON.stringify({ id: 'fedcba9876543210', title: 'Proof of Sound', tracks: 2, existing: false }) : '{}')));
   await import('../page');
   h.changed();
   return document.getElementById('ppp')!;
@@ -152,5 +152,106 @@ describe('main listener wallet out of funds (an album wallet is open)', () => {
     expect(key.querySelector('.ppp-lowbox')).toBeNull();
     h.snap = { ...h.snap, likeFunds: { ...low, album: false } }; h.changed();
     expect(key.querySelector('.ppp-lowbox')).toBeNull();
+  });
+});
+
+describe('My albums (the shelf)', () => {
+  const ROOT = 'SP3X2F7FQH7GQS0YRBWH0H5W6RM2PB1B0WPD1XA2V';
+  const mk = (slot: number, title: string, subtitle = 'Ada') => ({ slot, address: 'SPALBUM' + slot, state: 'arrived', amount: '100000', label: '', from: null, source: 'campaign', player: { ...PLAYER, id: String(slot).padStart(16, '0'), title, subtitle } });
+  const shelf = [mk(1, 'Proof of Sound'), mk(2, 'Night Drive', 'Bo'), mk(3, 'Zero Hour')];
+  const own = { step: 'ready', root: ROOT, slot: 0, walletCannotAlbums: false, gift: null, giftStop: null, giftPlays: 0, albumLock: null };
+  const start = async (over: object = {}) => {
+    localStorage.clear();
+    h.openAlbum.mockClear();
+    h.route = (url) => (url.includes('/radio/gift/shelf') ? new Response(JSON.stringify({ total: 3, next: null, shelf })) : undefined);
+    const root = await open({ ...own, ...over });
+    await vi.waitFor(() => expect(root.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(false));
+    return root.querySelector('.ppp-shelf')!;
+  };
+
+  it('lists every album with a count, searches them, and plays the one tapped', async () => {
+    const fold = await start();
+    expect(text(fold.querySelector('summary')!)).toBe('♪ My albums (3)');
+    expect([...fold.querySelectorAll('.ppp-shelf-list li .t')].map((x) => x.textContent)).toEqual(['Zero Hour', 'Night Drive', 'Proof of Sound']);
+    const search = fold.querySelector('input[type=search]') as HTMLInputElement;
+    search.value = 'night'; search.dispatchEvent(new Event('input'));
+    const rows = [...fold.querySelectorAll('.ppp-shelf-list li')];
+    expect(rows).toHaveLength(1);
+    expect(text(rows[0])).toContain('Night Drive');
+    [...rows[0].querySelectorAll('button')].find((b) => b.textContent === 'Play')!.click();
+    expect(h.openAlbum).toHaveBeenCalledWith(2);
+  });
+
+  it('pins an album (kept on this device) and moves it to the top', async () => {
+    const fold = await start();
+    const row = () => [...fold.querySelectorAll('.ppp-shelf-list li')];
+    const zero = row().find((r) => text(r).includes('Zero Hour'))!;
+    (zero.querySelector('button[aria-label="Pin Zero Hour"]') as HTMLButtonElement).click();
+    expect(JSON.parse(localStorage.getItem('xtrata.radio.shelf.pins.v1:' + ROOT)!)).toEqual([3]);
+    expect(text(row()[0])).toContain('Zero Hour');
+  });
+
+  it('marks the open album, and offers the way back to the listener\'s own wallet', async () => {
+    const fold = await start({ slot: 2 });
+    const rows = [...fold.querySelectorAll('.ppp-shelf-list li')];
+    expect(text(rows.find((r) => r.classList.contains('now'))!)).toContain('Night Drive');
+    const back = [...fold.querySelectorAll('button')].find((b) => /Back to my own wallet/.test(b.textContent ?? ''))!;
+    (back as HTMLButtonElement).click();
+    expect(h.openAlbum).toHaveBeenCalledWith(0);
+  });
+
+  it('stays out of the way with no albums, or when the wallet box cannot hold them', async () => {
+    localStorage.clear();
+    h.route = (url) => (url.includes('/radio/gift/shelf') ? new Response(JSON.stringify({ total: 0, next: null, shelf: [] })) : undefined);
+    const root = await open({ ...own });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(root.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(true);
+    const root2 = await open({ ...own, walletCannotAlbums: true });
+    expect(root2.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(true);
+  });
+});
+
+describe('claiming an album into its own numbered wallet', () => {
+  const ROOT = 'SP3X2F7FQH7GQS0YRBWH0H5W6RM2PB1B0WPD1XA2V';
+  const CODE = 'ABCDEFGHJKMNPQRSTVWXYZ';
+  const view = { status: 'live', amount: '100000', source: 'campaign', from: null, label: '', expires: 0, player: PLAYER };
+  const binding = (slot: number) => ({ root: ROOT, slot, address: 'SPALBUM' + slot, issued: 1, rootSignature: 'r', slotSignature: 's' });
+  const posts: any[] = [];
+  const route = (claims: Response[]) => (url: string, init?: any) => {
+    if (url.endsWith('/radio/gift/status')) return new Response(JSON.stringify(view));
+    if (url.includes('/radio/gift/slots')) return new Response(JSON.stringify({ next: 4 }));
+    if (url.endsWith('/radio/gift/claim')) { posts.push(JSON.parse(init.body)); return claims.shift(); }
+    return undefined;
+  };
+  const go = async () => {
+    const root = await open({ step: 'ready', root: ROOT, slot: 0, walletCannotAlbums: false, gift: null, giftStop: null, giftPlays: 0, solo: false, balance: 100_000n });
+    await vi.waitFor(() => expect(h.arriving).toHaveBeenCalled());
+    return root;
+  };
+  beforeEach(() => {
+    posts.length = 0; h.arriving = vi.fn(async () => {}); h.bind = vi.fn(async (n: number) => binding(n));
+    localStorage.clear();
+    localStorage.setItem('xtrata.radio.gift.incoming.v1', JSON.stringify({ code: CODE, at: Date.now() }));
+  });
+
+  it('proves the next free number is the listener\'s and sends the gift there, whatever the open wallet holds', async () => {
+    h.route = route([new Response(JSON.stringify({ txid: '0x' + 'e'.repeat(64), amount: '100000' }))]);
+    await go();
+    expect(h.bind).toHaveBeenCalledWith(4);
+    expect(posts).toHaveLength(1);
+    expect(posts[0]).toMatchObject({ code: CODE, wallet: 'SPALBUM4', binding: binding(4) });
+    expect(h.arriving).toHaveBeenCalledWith(4, 'SPALBUM4', '0x' + 'e'.repeat(64), 100_000n);
+    expect(localStorage.getItem('xtrata.radio.gift.incoming.v1')).toBeNull();
+  });
+
+  it('tries the next number, with a fresh proof, when another claim just took that one', async () => {
+    h.route = route([
+      new Response(JSON.stringify({ error: 'That wallet number was just taken by another gift. Trying the next one…' }), { status: 409 }),
+      new Response(JSON.stringify({ txid: '0x' + 'e'.repeat(64), amount: '100000' }))
+    ]);
+    await go();
+    expect(h.bind.mock.calls.map((c: unknown[]) => c[0])).toEqual([4, 5]);
+    expect(posts.map((p) => p.wallet)).toEqual(['SPALBUM4', 'SPALBUM5']);
+    expect(h.arriving).toHaveBeenCalledWith(5, 'SPALBUM5', '0x' + 'e'.repeat(64), 100_000n);
   });
 });
