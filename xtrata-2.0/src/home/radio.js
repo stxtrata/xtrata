@@ -630,7 +630,11 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // --- likes, bands, presets, events ---------------------------------------
   let likes = []; // Confirmed on-chain likes for the currently connected wallet only.
   let chainState;
-  let band = 'fm';                         // 'fm' | 'liked' | 'chain'
+  let band = 'fm';                         // 'fm' | 'liked' | 'chain' | 'gift' (only while a gift player is loaded)
+  // A gift player (pay-per-play page): an album that loops as its own band, and a hard stop when the
+  // paid plays are used up (the radio then goes quiet instead of carrying on for free).
+  let giftPlayer = null;                   // {id,title,subtitle,tracks:[tokenId strings]}
+  let giftStop = null;                     // null, or the text to show when playback is refused
   let preset = 'all';                      // within FM: 'music' | 'all'
   // Shuffle is OFF by default: the dial plays in order (likes/curated/chain
   // sequence per band). Neither shuffle nor loop persists across visits —
@@ -652,6 +656,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
+    gift: giftPlayer ? { id: giftPlayer.id, title: giftPlayer.title, subtitle: giftPlayer.subtitle, tracks: giftPlayer.tracks.length } : null, giftStop,
     likesStatus: chainState?.snapshot().status || 'disconnected', likesRetryAt: chainState?.snapshot().retryAt, likesCheckedAt: chainState?.snapshot().checkedAt, band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
     loop: player.loop,
@@ -786,19 +791,20 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   };
 
   const BANDS = ['fm', 'liked', 'chain'];
+  const bandList = () => (giftPlayer ? ['gift', ...BANDS] : BANDS);
   const setBand = (next) => {
-    if (!BANDS.includes(next)) return;
+    if (!bandList().includes(next)) return;
     band = next;
     persistExtras();
     if (on) {
-      writeScreen(band === 'fm' ? 'BAND: FM — CURATED + CHAIN' : band === 'liked' ? (likes.length ? 'BAND: LIKED — YOUR STATION' : 'BAND: LIKED — CONNECT WALLET / LIKE ON-CHAIN') : 'BAND: CHAIN — FULL EXPLORATION');
+      writeScreen(band === 'gift' ? 'BAND: GIFT — ' + String(giftPlayer?.title || '').toUpperCase().slice(0, 28) : band === 'fm' ? 'BAND: FM — CURATED + CHAIN' : band === 'liked' ? (likes.length ? 'BAND: LIKED — YOUR STATION' : 'BAND: LIKED — CONNECT WALLET / LIKE ON-CHAIN') : 'BAND: CHAIN — FULL EXPLORATION');
       sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
       // The current song keeps playing — only what's CUED changes.
       requeueForMode();
     }
     emit();
   };
-  const cycleBand = () => setBand(BANDS[(BANDS.indexOf(band) + 1) % BANDS.length]);
+  const cycleBand = () => { const list = bandList(); setBand(list[(list.indexOf(band) + 1) % list.length]); };
   const PRESETS = ['all', 'music'];
   const cyclePreset = () => {
     preset = PRESETS[(PRESETS.indexOf(preset) + 1) % PRESETS.length];
@@ -996,6 +1002,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // FM plays the curated order (then known chain songs ascending, preset ALL);
   // CHAIN walks every known song by ascending id.
   const sequentialPool = () => {
+    if (band === 'gift' && giftPlayer) return giftPlayer.tracks.slice();
     if (band === 'liked') return orderLiked(chainState.snapshot().likes.map((l) => String(l.tokenId)));
     const known = knownPool.slice().sort((a, b) => Number(a) - Number(b));
     if (band === 'chain') return known;
@@ -1021,7 +1028,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         // so walking from index 0 burned every tune attempt on duds; starting
         // anywhere keeps in-order behaviour (walk onward from the seed) while
         // giving each session a different playlist.
-        const start = cur ? pool.indexOf(cur) : Math.floor(Math.random() * pool.length) - 1;
+        const start = cur ? pool.indexOf(cur) : (band === 'gift' ? -1 : Math.floor(Math.random() * pool.length) - 1);
         const playableCount = pool.reduce((n, id) => n + (trackCache.get(id) === null ? 0 : 1), 0);
         const walk = (skipPlayed) => {
           for (let step = 1; step <= pool.length; step += 1) {
@@ -1056,6 +1063,13 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     // Band routing: LIKED = your station only; CHAIN = pure exploration;
     // FM = curated (+ discovery unless preset MUSIC).
     likes = chainState ? chainState.snapshot().likes.slice() : [];
+    if (band === 'gift' && giftPlayer) {
+      const pool = giftPlayer.tracks.filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
+      choice = (pool.length ? pool : giftPlayer.tracks)[Math.floor(Math.random() * (pool.length || giftPlayer.tracks.length))];
+      recent.push(choice);
+      if (recent.length > 8) recent.shift();
+      return choice;
+    }
     if (band === 'liked' && likes.length) {
       const pool = likes.map((l) => l.tokenId).filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
       choice = (pool.length ? pool : likes.map((l) => l.tokenId))[Math.floor(Math.random() * (pool.length || likes.length))];
@@ -1313,6 +1327,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
 
   const history = [];
   const tuneToNextTrack = async (trackOverride) => {
+    if (giftStop) { refuseForGift(); return; }
     const token = ++tuneToken;
     // What the listener actually ASKED for, captured before pickNext consumes it.
     // Without this, a requested song that fails to resolve fell through to attempt 2
@@ -1470,6 +1485,13 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   });
   player.addEventListener('play', () => { manualPause = false; });
 
+  // Used up: nothing starts and nothing advances. Whatever is playing is paused where it is.
+  const refuseForGift = () => {
+    manualPause = true;
+    pauseOwn();
+    writeScreen(giftStop || 'GIFT PLAYS FINISHED');
+    emit();
+  };
   const switchOn = () => {
     on = true;
     if (volumeStep < 1) volumeStep = 8; // knob was clicked off — restore default
@@ -1615,6 +1637,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     switchOn, switchOff,
     isOn: () => on,
     playPause: () => {
+      if (giftStop && (!on || player.paused)) { if (!on) switchOn(); else refuseForGift(); return; }
       if (!on) { switchOn(); }
       else if (player.paused) { manualPause = false; player.play().catch(() => { void tuneToNextTrack(); }); }
       else { manualPause = true; player.pause(); }
@@ -1639,6 +1662,28 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       if (!on) { switchOn(); } else { pauseOwn(); void tuneToNextTrack(); }
     },
     nudgeVolume,
+    /**
+     * A gift player's album as its own looping band (token ids in play order), or null to remove it.
+     * Loading one switches to it; removing it while it is the active band returns to FM.
+     */
+    setGiftPlayer: (def) => {
+      const tracks = def && Array.isArray(def.tracks) ? def.tracks.map(String).filter((id) => /^\d{1,9}$/.test(id)).slice(0, 40) : [];
+      if (!tracks.length) {
+        giftPlayer = null;
+        if (band === 'gift') setBand('fm'); else emit();
+        return;
+      }
+      const first = !giftPlayer || giftPlayer.id !== def.id;
+      giftPlayer = { id: String(def.id || ''), title: String(def.title || '').slice(0, 60), subtitle: String(def.subtitle || '').slice(0, 80), tracks };
+      if (first) setBand('gift'); else emit();
+    },
+    /** Refuse to start or advance (a gift player whose paid plays are used up). Pass null to allow playback again. */
+    setGiftStop: (text) => {
+      const next = typeof text === 'string' && text ? text.slice(0, 40) : null;
+      if (next === giftStop) return;
+      giftStop = next;
+      if (giftStop && on) refuseForGift(); else emit();
+    },
     /** The listener's order for the LIKED station: inscription ids, first plays first. */
     setLikedOrder: (ids) => { likedOrder = Array.isArray(ids) ? ids.map(String).slice(0, 5000) : []; },
     /**
@@ -1716,7 +1761,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const bandCore = root.querySelector('.xtrata-radio__pot--band .xtrata-radio__potcore');
   const presetCore = root.querySelector('.xtrata-radio__pot--preset .xtrata-radio__potcore');
   const renderPots = () => {
-    if (bandCore) bandCore.style.transform = 'rotate(' + ((BANDS.indexOf(band) - 1) * 45) + 'deg)';
+    if (bandCore) bandCore.style.transform = 'rotate(' + ((Math.max(0, bandList().indexOf(band)) - (giftPlayer ? 2 : 1)) * 45) + 'deg)';
     if (presetCore) presetCore.style.transform = 'rotate(' + (preset === 'music' ? 45 : -45) + 'deg)';
   };
   root.querySelector('.xtrata-radio__pot--band').addEventListener('click', (event) => { event.stopPropagation(); cycleBand(); });
