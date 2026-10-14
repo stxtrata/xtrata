@@ -100,6 +100,29 @@ describe('Music supporter statistics', () => {
     expect(stats.latest.every(p => p.payer !== wallet(5))).toBe(true);
   });
 
+  it('counts a numbered album wallet for the passkey wallet it is derived from, and that wallet\'s main wallet', async () => {
+    const log = Array.from({length: 137}, (_, i) => event(i + 1, 1 + (i * 7) % 23));
+    const db = database(), {transport} = hiro(log);
+    db.sql.exec(readFileSync('functions/migrations/026_radio_listening_wallets.sql', 'utf8'));
+    await refreshMusicStats({DB: db as any}, transport, T0);
+    // the slots table is not there yet (migration 029 not applied): totals still answer, as before
+    expect((await readMusicStats({DB: db as any})).supporters).toBe(23);
+    db.sql.exec(readFileSync('functions/migrations/029_radio_derived_wallets.sql', 'utf8').match(/CREATE TABLE IF NOT EXISTS radio_listening_slots[\s\S]*?\);/)![0]);
+    const bind = db.sql.prepare('INSERT INTO radio_listening_slots(address, root, slot, issued, root_signature, slot_signature, created_at) VALUES(?,?,?,?,?,?,?)');
+    // wallets 5 and 8 are album wallets of passkey wallet 12, which also paid directly: one listener, not three
+    bind.run(wallet(5), wallet(12), 1, 1, 'a', 'b', 1);
+    bind.run(wallet(8), wallet(12), 2, 1, 'a', 'b', 1);
+    let stats = await readMusicStats({DB: db as any});
+    expect(stats.supporters).toBe(21);
+    expect(stats.plays).toBe(137);
+    expect(stats.latest.every(p => p.payer !== wallet(5) && p.payer !== wallet(8))).toBe(true);
+    // the passkey wallet is linked to main wallet 14, which also paid directly: they all become one supporter
+    db.sql.prepare('INSERT INTO radio_listening_wallets(listening, main, issued, main_signature, listening_signature, created_at, updated_at) VALUES(?,?,?,?,?,?,?)').run(wallet(12), wallet(14), 1, 'a', 'b', 1, 1);
+    stats = await readMusicStats({DB: db as any});
+    expect(stats.supporters).toBe(20);
+    expect(stats.latest.every(p => ![5, 8, 12].some(n => p.payer === wallet(n)))).toBe(true);
+  });
+
   it('resumes a large first sync across refreshes without gaps', async () => {
     const size = MAX_PAGES_PER_REFRESH * PAGE_SIZE + 300;
     const log = Array.from({length: size}, (_, i) => event(i + 1, 1 + (i % 311)));
