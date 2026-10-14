@@ -151,6 +151,12 @@ export interface Snapshot {
    * a wallet takes a gift: gifts are for brand-new listening wallets.
    */
   createdHere: boolean;
+  /**
+   * The open wallet has never held or sent anything (confirmed balance 0 and confirmed nonce 0): brand-new
+   * whichever device made it, e.g. a passkey made in another tab after this page reloaded. Gifts may claim
+   * into it. Unknown (not yet read, or the read failed) counts as false.
+   */
+  brandNew: boolean;
 }
 
 const UNRESOLVED: Entry['status'][] = ['prepared', 'signed', 'unknown', 'pending'];
@@ -194,6 +200,7 @@ export function createPppController(deps: PppDeps) {
   let funderLooking = false;
   let funderFails = 0;
   let creditedRes: { for: string; main: string | null; ok: boolean; at: number } | null = null;
+  let unusedRes: { for: string; unused: boolean } | null = null;
   let creditedLooking = false;
   let verified = false;
   let lockHeld = false;
@@ -309,7 +316,8 @@ export function createPppController(deps: PppDeps) {
     walletCannotMulti: walletLacks('multi'),
     others: (status?.others ?? []).filter((a) => a !== deps.main() && a !== status?.linked),
     creditedTo: solo() && status?.address && creditedRes?.for === status.address && creditedRes.main ? creditedRes.main : undefined,
-    createdHere: !!status?.address && deps.store.get(key('created', status.address)) === '1'
+    createdHere: !!status?.address && deps.store.get(key('created', status.address)) === '1',
+    brandNew: !!status?.address && balance === 0n && unusedRes?.for === status.address && unusedRes.unused
   });
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
@@ -405,6 +413,18 @@ export function createPppController(deps: PppDeps) {
     finally { creditedLooking = false; }
   }
 
+  /**
+   * Whether an empty wallet has ever been used: its confirmed nonce is 0 only if it never sent anything, and a
+   * balance of 0 then means it never held anything either. Read once per wallet; a failed read is retried later.
+   */
+  async function lookupUnused() {
+    const listening = status?.address;
+    if (!listening || status?.state !== 'unlocked' || balance !== 0n || unusedRes?.for === listening) return;
+    if (deps.store.get(key('created', listening)) === '1') return; // made here: already known to be new
+    try { unusedRes = { for: listening, unused: (await deps.chain.confirmedNonce(listening)) === 0n }; }
+    catch { /* unknown: not brand-new for now; tried again on the next refresh */ }
+  }
+
   async function reconcile() {
     const listening = status?.address;
     if (!listening) return;
@@ -446,6 +466,8 @@ export function createPppController(deps: PppDeps) {
         if ((s === 'success' && tx.is_unanchored === false) || s.startsWith('abort_') || s.startsWith('dropped_') || (!tx && deps.now() - d.at > 2 * 3600_000)) {
           setPendingDeposit(null);
           balanceAt = -Infinity;
+          // "Gift on its way" / "deposit on its way" is over: say nothing rather than leave it up while paying.
+          if (/on its way/i.test(message)) message = '';
         }
       } catch { /* keep waiting */ }
     }
@@ -475,6 +497,7 @@ export function createPppController(deps: PppDeps) {
       await refreshBalance(force);
       await lookupFunder();
       await lookupCredited();
+      await lookupUnused();
       await reconcile();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Pay-per-play could not refresh. Listening stays free.';
