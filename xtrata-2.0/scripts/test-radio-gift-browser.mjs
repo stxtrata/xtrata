@@ -2,7 +2,7 @@
 //  - a visitor with no Stacks wallet opens a gift link, taps once, and the gift is claimed for the new
 //    listening wallet automatically (gift endpoints and chain are mocked; nothing is signed by a treasury)
 //  - the gift code leaves the address bar at once
-//  - a connected wallet sees "Gift Stacks music" (slider, plays), and the admin also sees campaign links
+//  - a connected wallet sees "Send someone a wallet" (slider, plays), and the admin also sees campaign links
 // Usage: VITE_LISTENING_WALLET_PARENTS=https://radio.xtrata.test npm run build:listening-wallet && npm run build:radio-ppp
 //        node scripts/test-radio-gift-browser.mjs [screenshot-dir]
 import { chromium } from 'playwright';

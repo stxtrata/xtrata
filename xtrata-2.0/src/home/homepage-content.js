@@ -84,9 +84,9 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   }),
   Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
-    title: 'New: send on-chain music to any phone.',
-    line: 'A gift link, Safari and Face ID. No app, no wallet, no STX of their own.',
-    cta: 'Gift Stacks music', href: 'https://radio.xtrata.xyz/radio#give', newTab: true
+    title: 'New: make a Stacks wallet with Face ID.',
+    line: 'Tap a link on your phone. No app, no seed phrase. Every song you hear pays its holder.',
+    cta: 'Try it on your phone', href: 'https://radio.xtrata.xyz/radio', newTab: true
   }),
   Object.freeze({
     id: 'chess', tag: 'Play', tone: 'amber',
@@ -334,8 +334,8 @@ export const HOMEPAGE_PLAY = Object.freeze([
 ]);
 
 export const HOMEPAGE_PROGRAMMES = Object.freeze([
-  { id: 'music-app', tone: 'violet', art: 'covers', tag: 'Radio · passkey wallet', title: 'Become a Music Hero', copy: 'New: set up your pay-per-play wallet in your browser with a passkey for 1 STX. Every like and every play is recorded on Stacks.',
-    actions: [{ label: 'Create your wallet', href: 'https://radio.xtrata.xyz/radio', primary: true }, { label: 'Put your music on', href: '/music/' }] },
+  { id: 'music-app', tone: 'violet', art: 'covers', tag: 'Radio · passkey wallet', title: 'A wallet from Face ID', copy: 'New: make a Stacks wallet on your phone with a passkey. No app, no seed phrase. Every song you hear pays its holder and every like is on-chain.',
+    actions: [{ label: 'Try it on your phone', href: 'https://radio.xtrata.xyz/radio', primary: true }, { label: 'Put your music on', href: '/music/' }] },
   { id: 'radio', tone: 'amber', image: '/radio-face.jpg', tag: 'Radio · in your browser', title: 'Xtrata Radio', copy: "Press play and hear what's on-chain. Embed it on your own site too.",
     actions: [{ label: 'Tune in', radio: true, primary: true }, { label: 'Embed', href: '/radio/share' }] },
   { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · new contracts', title: 'Forever Twins', copy: 'NYC Degens, Megapont Ape Club and Bitcoin Monkeys now have Forever Twin contracts. Holders can give their piece a self-contained, fully on-chain twin.',

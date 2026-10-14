@@ -168,7 +168,7 @@ function start(root: HTMLElement) {
   const link = (label: string, href: string) => { const a = el('a', label) as HTMLAnchorElement; a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
 
   let lastStage: StageView | null = null;
-  // radio.xtrata.xyz/radio#give (the homepage's "Gift Stacks music") opens the gift section once it is there.
+  // radio.xtrata.xyz/radio#give (the homepage's "Send someone a wallet") opens the gift section once it is there.
   let wantGive = location.hash === '#give';
   if (wantGive) history.replaceState(null, '', location.pathname + location.search);
   let walletShown = false; // the listener opened the resting wallet box
