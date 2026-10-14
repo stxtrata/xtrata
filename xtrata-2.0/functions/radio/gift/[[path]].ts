@@ -1,5 +1,5 @@
 import {
-  claimGift, confirmFriendGift, createCampaign, createFriendGift, GiftError, giftForWallet, giftStatus, hiroGiftChain,
+  claimGift, confirmFriendGift, createCampaign, createFriendGift, createPlayer, GiftError, giftForWallet, giftStatus, hiroGiftChain,
   sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
 } from '../../lib/radio-gifts';
 
@@ -11,7 +11,8 @@ import {
  *   POST /radio/gift/claim         {code, wallet, turnstile?}   fund a brand-new listening wallet
  *   POST /radio/gift/create        {gifter, amount}             start a friend gift
  *   POST /radio/gift/confirm       {id, txid?}                  the friend's deposit (found by its memo without a txid)
- *   POST /radio/gift/campaign      {request, signature}         admin: campaign links
+ *   POST /radio/gift/campaign      {request, signature}         admin: campaign links (request.player opens a gift player)
+ *   POST /radio/gift/player        {definition, request, signature}   admin: a gift player (title, songs, cover)
  * POSTs are same-origin only. Housekeeping (settling sends, expiry, refunds) runs after each request.
  */
 type Ctx = { request: Request; env: GiftEnv; params?: { path?: string[] }; waitUntil?: (p: Promise<unknown>) => void };
@@ -49,6 +50,7 @@ export async function onRequest(context: Ctx) {
     else if (action === 'create') out = await createFriendGift(env, body, deps(), ip, request);
     else if (action === 'confirm') out = await confirmFriendGift(env, body, deps(), request);
     else if (action === 'campaign') out = await createCampaign(env, body, deps(), request);
+    else if (action === 'player') out = await createPlayer(env, body, deps(), request);
     else return reply({ error: 'Not found' }, 404);
     later();
     return reply(out);
