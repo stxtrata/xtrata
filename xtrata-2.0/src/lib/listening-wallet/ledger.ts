@@ -128,12 +128,8 @@ export interface LedgerInput {
   balance: bigint;
   inbound: InboundTransfer[];
   outgoing: Outgoing[];
-  /**
-   * Transfers from `sender` (the gift treasury) are gifts. A wallet can hold several, each paid for by someone
-   * different, so each deposit is matched to its gift (`gifts`): by transaction id, then by equal amount in
-   * order. A deposit that matches none goes back to `payer`, the gifter of the first gift (the treasury for a campaign).
-   */
-  gift?: { sender: string; payer: string; gifts?: { txid: string; payer: string; amount: bigint }[] };
+  /** Transfers from `sender` (the gift treasury) are the gift; it goes back to `payer` (the gifter, or the treasury for a campaign). */
+  gift?: { sender: string; payer: string };
 }
 
 export type Ledger =
@@ -146,29 +142,12 @@ export function buildLedger(input: LedgerInput): Ledger {
   const { self, balance, gift } = input;
   if (typeof balance !== 'bigint' || balance < 0n) return { ok: false, reason: 'balance' };
 
-  const norm = (id: string) => String(id || '').replace(/^0x/i, '').toLowerCase();
-  const waiting = [...(gift?.gifts ?? [])];
-  // Ids are matched for every treasury deposit before any amount is, so an amount match never takes a gift another deposit owns by id.
-  const assigned = new Map<InboundTransfer, string>();
-  if (gift) {
-    const ours = [...input.inbound].filter((t) => t && t.sender === gift.sender).sort(order);
-    for (const t of ours) {
-      const i = waiting.findIndex((g) => g.txid && norm(g.txid) === norm(t.txId));
-      if (i >= 0) assigned.set(t, waiting.splice(i, 1)[0].payer);
-    }
-    for (const t of ours) {
-      if (assigned.has(t) || !/^\d+$/.test(t.amount)) continue;
-      const i = waiting.findIndex((g) => g.amount === BigInt(t.amount));
-      if (i >= 0) assigned.set(t, waiting.splice(i, 1)[0].payer);
-    }
-  }
-  const payerOf = (t: InboundTransfer): string => assigned.get(t) ?? gift!.payer;
   const entries: Entry[] = [...input.inbound]
     .filter((t) => t && typeof t.sender === 'string' && t.sender !== self && /^\d+$/.test(t.amount) && BigInt(t.amount) > 0n)
     .sort(order)
     .map((t, at) => {
       const amount = BigInt(t.amount);
-      if (gift && t.sender === gift.sender) return { sender: t.sender, left: amount, kind: 'gift' as const, to: payerOf(t), at };
+      if (gift && t.sender === gift.sender) return { sender: t.sender, left: amount, kind: 'gift' as const, to: gift.payer, at };
       if (isMainnetStandardAddress(t.sender) && amount >= MIN_FUNDING) return { sender: t.sender, left: amount, kind: 'deposit' as const, to: t.sender, at };
       return { sender: t.sender, left: amount, kind: 'dust' as const, to: null, at };
     });
@@ -244,26 +223,21 @@ export interface ReturnPlanResult {
  */
 export function planReturns(parts: LedgerPart[], fee: bigint): ReturnPlanResult {
   const deposits = parts.filter((p) => p.kind === 'deposit').sort((a, b) => a.newest - b.newest);
-  const gifts = parts.filter((p) => p.kind === 'gift').sort((a, b) => a.newest - b.newest);
+  const gift = parts.find((p) => p.kind === 'gift');
   const dust = parts.filter((p) => p.kind === 'dust');
-  // The last gift travels with the dust in the final `all` step; earlier gifts (other payers) are exact-amount steps.
-  const lastGift = gifts.at(-1);
-  const earlier = gifts.slice(0, -1);
-  const restAmount = (lastGift?.amount ?? 0n) + dust.reduce((s, p) => s + p.amount, 0n);
+  const restAmount = (gift?.amount ?? 0n) + dust.reduce((s, p) => s + p.amount, 0n);
 
   const steps: ReturnStep[] = [];
   const tooSmall: LedgerPart[] = [];
   const hasRest = restAmount > fee;
-  const lead = [...deposits.map((p) => ({ p, kind: 'deposit' as const })), ...earlier.map((p) => ({ p, kind: 'gift' as const }))];
-  const viable = lead.filter(({ p }) => p.amount > fee);
-  for (const { p } of lead) if (p.amount <= fee) tooSmall.push(p);
-  viable.forEach(({ p, kind }, i) => {
-    const last = i === viable.length - 1 && !hasRest;
-    steps.push({ to: p.to, kind, mode: last ? 'all' : 'amount', send: p.amount - fee });
+  deposits.forEach((p, i) => {
+    if (p.amount <= fee) { tooSmall.push(p); return; }
+    const last = i === deposits.length - 1 && !hasRest;
+    steps.push({ to: p.to, kind: 'deposit', mode: last ? 'all' : 'amount', send: p.amount - fee });
   });
-  if (hasRest) steps.push({ to: lastGift?.to ?? null, kind: lastGift ? 'gift' : 'rest', mode: 'all', send: restAmount - fee });
+  if (hasRest) steps.push({ to: gift?.to ?? null, kind: gift ? 'gift' : 'rest', mode: 'all', send: restAmount - fee });
   else {
-    if (lastGift) tooSmall.push(lastGift);
+    if (gift) tooSmall.push(gift);
     tooSmall.push(...dust);
   }
   return { steps, tooSmall };

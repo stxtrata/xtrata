@@ -94,27 +94,6 @@ describe('buildLedger', () => {
     expect(buildLedger({ self: SELF, balance: -1n, inbound: [], outgoing: [] })).toMatchObject({ ok: false });
   });
 
-  it('several gifts in one wallet each go back to the person who paid for them', () => {
-    const G2 = 'SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR';
-    const inbound = [inb(TREASURY, 100_000n, 10), inb(TREASURY, 300_000n, 20)];
-    const gift = { ...GIFT, gifts: [
-      { txid: inbound[1].txId.replace('0x', ''), payer: G2, amount: 300_000n }, // matched by id (any case, with or without 0x)
-      { txid: '0xnot-seen', payer: GIFTER, amount: 100_000n }
-    ] };
-    const l = buildLedger({ self: SELF, balance: 400_000n, inbound, outgoing: [], gift });
-    expect(partOf(l, 'gift', GIFTER)).toBe(100_000n);
-    expect(partOf(l, 'gift', G2)).toBe(300_000n);
-  });
-
-  it('falls back to equal amounts in order, then to the first payer, and spending takes the oldest gift first', () => {
-    const G2 = 'SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR';
-    const inbound = [inb(TREASURY, 100_000n, 10), inb(TREASURY, 300_000n, 20), inb(TREASURY, 50_000n, 30)];
-    const gift = { ...GIFT, gifts: [{ txid: '', payer: G2, amount: 300_000n }] };
-    const l = buildLedger({ self: SELF, balance: 400_000n, inbound, outgoing: [], gift }); // 0.05 spent: from the oldest gift
-    expect(partOf(l, 'gift', G2)).toBe(300_000n);
-    expect(partOf(l, 'gift', GIFTER)).toBe(100_000n); // 0.1 + 0.05 fell back to the first payer, 0.05 spent
-  });
-
   it('without gift details a treasury deposit is an ordinary deposit', () => {
     const l = buildLedger({ self: SELF, balance: 100_000n, inbound: [inb(TREASURY, 100_000n, 10)], outgoing: [] });
     expect(partOf(l, 'deposit', TREASURY)).toBe(100_000n);
@@ -123,17 +102,6 @@ describe('buildLedger', () => {
 
 describe('planReturns', () => {
   const part = (kind: LedgerPart['kind'], to: string | null, amount: bigint, newest: number): LedgerPart => ({ kind, to, amount, newest });
-
-  it('returns each gift to its own payer, exact amounts first, the last gift and dust in the final all', () => {
-    const G2 = 'SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR';
-    const r = planReturns([part('gift', GIFTER, 100_000n, 0), part('gift', G2, 300_000n, 1), part('deposit', A, 200_000n, 2), part('dust', null, 4_000n, 3)], FEE);
-    expect(r.steps).toEqual([
-      { to: A, kind: 'deposit', mode: 'amount', send: 197_000n },
-      { to: GIFTER, kind: 'gift', mode: 'amount', send: 97_000n },
-      { to: G2, kind: 'gift', mode: 'all', send: 301_000n }
-    ]);
-    expect(planReturns([part('gift', GIFTER, 100_000n, 0), part('gift', G2, 2_000n, 1)], FEE).steps).toEqual([{ to: GIFTER, kind: 'gift', mode: 'all', send: 97_000n }]);
-  });
 
   it('no top-up: one Return all to the gifter', () => {
     const r = planReturns([part('gift', GIFTER, 90_000n, 0)], FEE);
