@@ -10,7 +10,7 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 
 | Kind | Who makes it | Paid from | Returns and refunds go to |
 | --- | --- | --- | --- |
-| Campaign | the admin (`RADIO_GIFT_ADMIN`), signing a request in the panel | the treasury's campaign pool, capped per day | the treasury |
+| Campaign | the admin (`RADIO_GIFT_ADMIN`), signing a request in the panel | the treasury's campaign pool (whatever it holds) | the treasury |
 | Friend | anyone with a Stacks wallet, in "🎁 Send someone a wallet" | the gifter, up front: amount + 0.003 STX, memo `gift <id>` | the gifter (an unclaimed gift is refunded after 30 days) |
 
 - Links look like `https://radio.xtrata.xyz/radio.html#gift=<code>`. The code sits after `#`, so browsers never send it to a server, and the page moves it to the device and takes it out of the address bar at once.
@@ -37,8 +37,9 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 ## Limits
 
 - Claims go only to brand-new listening wallets (no history, no balance), one gift per wallet.
-- At most 3 claims per IP (salted hash) per day.
-- Campaign gifts are capped at `RADIO_GIFT_DAILY_CAP` per 24 h (default 2 STX).
+- Campaign links: at most 10 claims per connection (salted IP hash) per 24 h. Friend gifts are never limited this way: someone paid for each one.
+- There is no daily total for campaign gifts (removed 15 Oct 2026: it turned away people opening links the admin had made on purpose). What bounds them is the treasury balance, so keep only what you mean to give away in it. `RADIO_GIFT_DAILY_CAP` is no longer read.
+- While a gift is being claimed or sent, the panel never shows it as failed: slow or refused sends say "still sending" in amber and retry by themselves (5 s, 10 s, 20 s, 30 s, then every minute). Red is kept for real dead ends (link unknown, used or expired; wallet not new; the per-connection limit).
 - Friend money held at once is capped at `RADIO_GIFT_ESCROW_CAP` (default 25 STX).
 - Campaign gifts never spend money owed to friends or awaiting a refund.
 - Each signed campaign request works once, within 15 minutes of signing.
@@ -50,8 +51,8 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 2. Fund it with the float: 10 STX.
 3. Set secrets:
    - `RADIO_GIFT_TREASURY_KEY`: the treasury's private key (64 hex characters, optionally ending `01`).
-   - `RADIO_GIFT_ADMIN`: your own address. It only signs campaign and player requests and never holds gift money. Several admins: separate the addresses with commas, e.g. `SP…jim,SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX`. Every admin can make campaign links (paid from the treasury, within the daily cap) and albums from the songs it holds.
-   - Optional: `RADIO_GIFT_DAILY_CAP` and `RADIO_GIFT_ESCROW_CAP` (microSTX), and the two Turnstile keys.
+   - `RADIO_GIFT_ADMIN`: your own address. It only signs campaign and player requests and never holds gift money. Several admins: separate the addresses with commas, e.g. `SP…jim,SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX`. Every admin can make campaign links (paid from the treasury, up to what it holds) and albums from the songs it holds.
+   - Optional: `RADIO_GIFT_ESCROW_CAP` (microSTX) and the two Turnstile keys. (`RADIO_GIFT_DAILY_CAP` is no longer used and can be deleted.)
    - `RADIO_GIFT_ENABLED` = `1` last.
 4. Optionally apply `functions/migrations/027_radio_gifts.sql`. The tables are also created on first use.
 5. Redeploy `xtrata`. Secrets apply only to new deployments.

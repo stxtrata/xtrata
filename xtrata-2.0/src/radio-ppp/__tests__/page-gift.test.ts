@@ -316,3 +316,44 @@ describe('claiming an album into its own numbered wallet', () => {
     expect(h.arriving).toHaveBeenCalledWith(5, 'SPALBUM5', '0x' + 'e'.repeat(64), 100_000n);
   });
 });
+
+describe('a starter gift never looks failed while it is on its way', () => {
+  const CODE = 'ABCDEFGHJKMNPQRSTVWXYZ';
+  const view = { status: 'live', amount: '100000', source: 'campaign', from: null, label: '', expires: 0, player: null };
+  const posts: any[] = [];
+  const route = (claim: () => Response) => (url: string, init?: any) => {
+    if (url.endsWith('/radio/gift/status')) return new Response(JSON.stringify(view));
+    if (url.endsWith('/radio/gift/claim')) { posts.push(JSON.parse(init.body)); return claim(); }
+    return undefined;
+  };
+  // A brand-new passkey-only wallet, empty, nothing paid yet: exactly where a gift lands.
+  const empty = { step: 'fund', balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, payingOn: true, gift: null, giftStop: null, giftPlays: 0, returnTo: undefined, funderState: 'none', createdHere: true };
+  beforeEach(() => {
+    posts.length = 0;
+    localStorage.clear();
+    localStorage.setItem('xtrata.radio.gift.incoming.v1', JSON.stringify({ code: CODE, at: Date.now() }));
+    delete document.documentElement.dataset.ppp;
+  });
+
+  it('a slow or failing send is an amber "still sending", with no red, no "add funds" and no "artists unpaid"', async () => {
+    h.route = route(() => new Response(JSON.stringify({ error: 'Broadcast failed: ConflictingNonceInMempool' }), { status: 500 }));
+    const root = await open(empty);
+    await vi.waitFor(() => expect(posts).toHaveLength(1));
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-key')!)).toContain('Still sending your gift'));
+    const key = root.querySelector('.ppp-key')!;
+    expect([...key.querySelectorAll('p')].find((p) => /Still sending/.test(p.textContent ?? ''))!.className).toContain('ppp-warn');
+    expect(root.querySelector('.ppp-bad')).toBeNull();
+    expect(text(root)).not.toMatch(/Add funds|ConflictingNonce|Copy my address/);
+    expect(text(root.querySelector('.ppp-err')!)).toBe('');
+    expect(document.documentElement.dataset.ppp).toBeUndefined();
+    expect(text(root.querySelector('.ppp-stage')!)).toMatch(/on their way/);
+  });
+
+  it('a real stop (too many gifts on one connection) is said plainly, and the wallet is an ordinary empty one again', async () => {
+    h.route = route(() => new Response(JSON.stringify({ error: 'A lot of gifts have been opened on this connection today.' }), { status: 429 }));
+    const root = await open(empty);
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-key')!)).toContain('on this connection today'));
+    expect(root.querySelector('.ppp-key .ppp-bad')!.textContent).toMatch(/on this connection today/);
+    expect(text(root.querySelector('.ppp-key')!)).toContain('Add funds');
+  });
+});

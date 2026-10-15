@@ -24,7 +24,7 @@
  *   RADIO_GIFT_ENABLED = "1"            kill switch; anything else stops claims, new gifts and refunds
  *   RADIO_GIFT_TREASURY_KEY             the treasury's private key (secret)
  *   RADIO_GIFT_ADMIN = "SP…"            the addresses that may sign campaign and player requests (several: separate with commas)
- *   RADIO_GIFT_DAILY_CAP                campaign microSTX claimable per 24 h (default 2 STX)
+ *   RADIO_GIFT_DAILY_CAP                no longer used (campaign claims are bounded by the treasury balance)
  *   RADIO_GIFT_ESCROW_CAP               most friend-gift money held at once (default 25 STX)
  *   RADIO_GIFT_TURNSTILE_SITE_KEY / _SECRET   optional Cloudflare Turnstile check on claims
  *   TELEMETRY_SALT                      salts the IP hash used for per-IP limits (no IP is stored)
@@ -60,7 +60,7 @@ export type GiftEnv = PppEnv & {
 export const DEFAULT_DAILY_CAP = 2_000_000n;
 export const DEFAULT_ESCROW_CAP = 25_000_000n;
 /** Claims per IP (hashed) per 24 hours. */
-export const CLAIMS_PER_IP = 3;
+export const CLAIMS_PER_IP = 10;
 /** Friend gifts started per IP per hour (each needs a real deposit to go live). */
 export const CREATES_PER_IP = 10;
 /** A friend gift nobody paid for is dropped after this long (after one last look for its deposit). */
@@ -748,14 +748,13 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
   if (deps.human && !(await deps.human(body.turnstile, ip))) throw new GiftError('Please complete the quick check and try again.', 403);
   if (await one(env, 'SELECT id FROM radio_gifts WHERE claimed_by=?', [body.wallet])) throw new GiftError('This listening wallet has already had a gift.', 409);
   const h = ipHash(env, ip);
-  if (h && (await all(env, "SELECT id FROM radio_gifts WHERE ip_hash=? AND claimed_at>? AND status IN ('claiming','claimed')", [h, deps.now - 86_400_000])).length >= CLAIMS_PER_IP)
-    throw new GiftError('Too many gifts claimed from here today. Try again tomorrow.', 429);
+  // Per-IP limit for treasury-paid (campaign) links only: a friend's gift is paid by the friend and is single-use, so
+  // limiting it would only block a household or a venue sharing one connection. Campaign links an admin made on
+  // purpose are not held to a daily amount either (that cap made a link someone was handed fail "for today"); the
+  // treasury balance check below is what bounds them.
+  if (r.source === 'campaign' && h && (await all(env, "SELECT id FROM radio_gifts WHERE ip_hash=? AND source='campaign' AND claimed_at>? AND status IN ('claiming','claimed')", [h, deps.now - 86_400_000])).length >= CLAIMS_PER_IP)
+    throw new GiftError('A lot of gifts have been opened on this connection today. Try this one again tomorrow, or on another connection (for example mobile data).', 429);
   const amount = BigInt(r.amount);
-  if (r.source === 'campaign') {
-    const today = await one<{ amount: number }>(env, "SELECT COALESCE(SUM(amount),0) AS amount FROM radio_gifts WHERE source='campaign' AND status IN ('claiming','claimed') AND claimed_at>?", [deps.now - 86_400_000]);
-    if (BigInt(today?.amount ?? 0) + amount > micro(env.RADIO_GIFT_DAILY_CAP, DEFAULT_DAILY_CAP))
-      throw new GiftError("Today's free gifts have all been given. This link still works tomorrow.", 429);
-  }
   // Only a brand-new wallet: gifts are for getting started, not for topping up.
   if ((await deps.chain.activity(body.wallet)) > 0 || (await deps.chain.balance(body.wallet)) > 0n)
     throw new GiftError('Gifts are for brand-new listening wallets. This one has already been used.', 409);

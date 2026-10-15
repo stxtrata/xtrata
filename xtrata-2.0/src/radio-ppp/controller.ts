@@ -118,6 +118,11 @@ export interface Snapshot {
   busy: string | null;
   message: string;
   error: string;
+  /**
+   * The last check of the network or wallet box did not answer. Shown as a calm "still trying" update, never as an
+   * error: nothing has failed yet, and it clears by itself on the next good check.
+   */
+  notice: string;
   gate: GateConfig | null;
   main?: string;
   listening?: string;
@@ -246,6 +251,7 @@ export function createPppController(deps: PppDeps) {
   let likesConfirmed = false;
   let message = '';
   let error = '';
+  let refreshFails = 0; // consecutive refreshes that could not reach the network or the wallet box
   let depositTxid: string | undefined;
   let serverLink: StoredLink | null = null;
   let serverLinkFor: string | undefined;
@@ -470,7 +476,7 @@ export function createPppController(deps: PppDeps) {
   }
 
   const snapshot = (): Snapshot => ({
-    step: step(), busy, message, error, gate, main: deps.main(),
+    step: step(), busy, message, error, notice: noticeText(), gate, main: deps.main(),
     listening: status?.address, linked: status?.linked, balance,
     balanceState: balance === undefined ? undefined : balanceState(balance, fee()),
     playsLeft: balance === undefined ? 0 : playsCovered(balance, fee()),
@@ -507,6 +513,9 @@ export function createPppController(deps: PppDeps) {
       return { address, balance: b, low: likeLow(b), album: albumOpen(), pending: !!pendingDepositOf(address), txid: pendingDepositOf(address)?.txid, main: deps.main() };
     })()
   });
+
+  const noticeText = () =>
+    !refreshFails ? '' : refreshFails < 3 ? 'Checking the network…' : 'The network is slow to answer. Still trying: nothing is lost.';
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
 
@@ -708,8 +717,11 @@ export function createPppController(deps: PppDeps) {
       if (await reconcile()) await refreshBalance(true);
       await refreshRootBalance(); // a confirmed top-up clears the cached one: read it again now
       await ensureLikesFloat();
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Pay-per-play could not refresh. Listening stays free.';
+      refreshFails = 0;
+    } catch {
+      // A check that did not answer is not a failure: say we are still trying (amber), never show it as an error.
+      // It clears on the next good check. Real failures (a refused payment, a cancelled passkey) still set `error`.
+      refreshFails++;
     }
     if (step() === 'locked') arm();
     else if (armed) void disarm();

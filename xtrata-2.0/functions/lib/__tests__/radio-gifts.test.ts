@@ -232,8 +232,8 @@ describe('radio gift wallets', () => {
     expect((await giftStatus(s.env, { code })).status).toBe('live');
   });
 
-  it('refuses used wallets, failed checks, an empty treasury and over-limit claims, and leaves the gift claimable', async () => {
-    const s = setup({ RADIO_GIFT_DAILY_CAP: '250000' });
+  it('refuses used wallets, failed checks and an empty treasury, leaves the gift claimable, and has no daily cap', async () => {
+    const s = setup({ RADIO_GIFT_DAILY_CAP: '250000' }); // set, and ignored: links an admin made are not held back "for today"
     const codes = (await s.campaign(4)).codes;
     const used = wallet(); s.chain.activity.set(used, 1);
     await expect(s.claim(codes[0], used)).rejects.toThrow(/brand-new/);
@@ -244,16 +244,26 @@ describe('radio gift wallets', () => {
     expect((await giftStatus(s.env, { code: codes[0] })).status).toBe('live');
     await s.claim(codes[0]); await s.land();
     await s.claim(codes[1]); await s.land();
-    await expect(s.claim(codes[2])).rejects.toThrow(/still works tomorrow/);
-    s.tick(86_400_001);
-    await s.claim(codes[2]);
+    await s.claim(codes[2]); await s.land(); // past the old 0.25 STX daily cap: still fine
   });
 
   it('limits claims per IP', async () => {
     const s = setup();
     const codes = (await s.campaign(CLAIMS_PER_IP + 1)).codes;
     for (let i = 0; i < CLAIMS_PER_IP; i++) { await s.claim(codes[i], wallet(), '9.9.9.9'); await s.land(); }
-    await expect(s.claim(codes[CLAIMS_PER_IP], wallet(), '9.9.9.9')).rejects.toThrow(/Too many gifts/);
+    await expect(s.claim(codes[CLAIMS_PER_IP], wallet(), '9.9.9.9')).rejects.toThrow(/on this connection today/);
+  });
+
+  it('never limits a friend-paid gift by connection: a household or venue shares one IP', async () => {
+    const s = setup();
+    const codes = (await s.campaign(CLAIMS_PER_IP)).codes;
+    for (const c of codes) { await s.claim(c, wallet(), '9.9.9.9'); await s.land(); }
+    const gifter = wallet();
+    const g = await createFriendGift(s.env, { gifter, amount: '100000' }, s.deps(), null, s.request);
+    const txid = '0x' + 'f'.repeat(64);
+    s.chain.txs.set(txid, { status: 'success', sender: gifter, recipient: s.treasury, amount: 103_000n, memo: giftDepositMemo(g.id) });
+    await confirmFriendGift(s.env, { id: g.id, txid }, s.deps(), s.request);
+    await s.claim(g.code, wallet(), '9.9.9.9'); // same connection, already at the campaign limit
   });
 
   it('friend gifts: live only once the gifter’s own deposit, with this gift’s memo, confirms', async () => {

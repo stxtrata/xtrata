@@ -28,7 +28,7 @@ const errors = [];
 for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900 }]) {
   // ---- the recipient: no Stacks wallet at all
   const context = await browser.newContext({ viewport });
-  const state = { balance: 0n, claims: [], mined: false, claimed: null, leaked: false, busyOnce: viewport.width > 1000, busySeen: false };
+  const state = { balance: 0n, claims: [], mined: false, claimed: null, leaked: false, busyOnce: viewport.width > 1000, busySeen: false, slowOnce: viewport.width <= 1000, slowSeen: false };
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.origin === WALLET) {
@@ -50,6 +50,8 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
       const body = JSON.parse(route.request().postData());
       // The treasury is busy with someone else's gift once: the page waits and tries again by itself.
       if (state.busyOnce) { state.busyOnce = false; state.busySeen = true; return json(route, { error: 'The gift treasury is sending another gift. Trying again in a moment…' }, 503); }
+      // A send that fails on the network once: the page keeps going in amber and tries again by itself.
+      if (state.slowOnce) { state.slowOnce = false; state.slowSeen = true; return json(route, { error: 'Broadcast failed: ConflictingNonceInMempool' }, 500); }
       state.claims.push(body); state.claimed = body.wallet;
       return json(route, { txid: GIFT_TX, amount: '250000', already: false });
     }
@@ -89,6 +91,22 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   assert.ok(await page.evaluate(() => localStorage.getItem('xtrata.radio.gift.incoming.v1')), 'kept on this device until claimed');
   if (shots) await page.screenshot({ path: `${shots}/gift-landing-${viewport.width}.png`, fullPage: true });
 
+  // While the gift is being sent (or retried) nothing may look failed: no red line, no error, no "add funds", no
+  // "artists unpaid" on the radio. Recorded on every change of the panel.
+  await page.evaluate(() => {
+    const w = window;
+    w.__giftLooks = { retry: false, bad: [] };
+    const check = () => {
+      const key = document.querySelector('#ppp .ppp-key')?.textContent ?? '';
+      if (!/Sending your gift|Still sending your gift/.test(key)) return;
+      if (/Still sending your gift/.test(key)) w.__giftLooks.retry = true;
+      const red = [...document.querySelectorAll('#ppp .ppp-bad, #ppp .ppp-err')].map((e) => e.textContent?.trim()).filter(Boolean);
+      if (red.length) w.__giftLooks.bad.push('red: ' + red.join(' | '));
+      if (document.documentElement.dataset.ppp === 'off') w.__giftLooks.bad.push('radio says artists unpaid');
+      if (/Add funds|Copy my address/.test(document.querySelector('#ppp')?.textContent ?? '')) w.__giftLooks.bad.push('asks to add funds');
+    };
+    new MutationObserver(check).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['data-ppp'] });
+  });
   await panel.getByRole('button', { name: 'Claim my gift · no wallet needed' }).click();
   const frame = page.frameLocator('.ppp-frame iframe');
   const showConfirm = async () => {
@@ -106,6 +124,10 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   }
   await page.waitForFunction(() => document.querySelector('#ppp .ppp-key')?.textContent?.includes('Funds on their way'), null, { timeout: 30000 });
   assert.equal(state.busySeen, viewport.width > 1000, 'waited for the treasury and retried by itself');
+  assert.equal(state.slowSeen, viewport.width <= 1000, 'a failed send was retried by itself');
+  const looks = await page.evaluate(() => window.__giftLooks);
+  assert.equal(looks.retry, viewport.width <= 1000, 'said "still sending" in amber while retrying');
+  assert.deepEqual([...new Set(looks.bad)], [], 'nothing looked failed while the gift was on its way');
   assert.equal(state.leaked, false, 'the gift code never appeared in a request URL');
   assert.equal(state.claims.length, 1, 'claimed exactly once');
   assert.match(state.claims[0].wallet, /^SP[0-9A-Z]{30,40}$/);

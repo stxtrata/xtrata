@@ -36,7 +36,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 }, ...over
   };
   const server = { mains: new Map<string, string>(), mainOfFails: false, mainOfCalls: 0 };
-  const chain = { balanceOf: new Map<string, bigint>(), deposits: [] as [string, bigint][], balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, accountFails: false, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
+  const chain = { balanceOf: new Map<string, bigint>(), deposits: [] as [string, bigint][], balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, accountFails: false, balanceFails: false, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
   const gift = { inboundBy: new Map<string, InboundTransfer[]>(), info: null as GiftInfo | null, fails: false, calls: 0, inbound: [] as InboundTransfer[], outgoing: [] as Outgoing[], historyFails: false };
   const savedLinks: any[] = [];
   const store = new Map<string, string>();
@@ -86,7 +86,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     }),
     chain: {
       verify: async () => {},
-      balance: async (a) => chain.balanceOf.get(a) ?? chain.balance,
+      balance: async (a) => { if (chain.balanceFails) throw new Error('Node busy (503)'); return chain.balanceOf.get(a) ?? chain.balance; },
       account: async (a) => { if (chain.accountFails) throw new Error('Node busy (503)'); return { balance: chain.balanceOf.get(a) ?? chain.balance, nonce: chain.nonce }; },
       confirmedNonce: async () => chain.confirmed,
       owner: async () => chain.owner,
@@ -250,6 +250,23 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
     expect(s.ppp.snapshot()).toMatchObject({ linked: MAIN, step: 'fund' });
     expect(s.evaluations()).toBeGreaterThanOrEqual(5); // new-device unlock re-proved PRF stability
     expect(s.savedLinks).toHaveLength(1);
+  });
+
+  it('a check that does not answer is an amber "still trying" notice, never an error, and clears by itself', async () => {
+    const s = setup();
+    await s.ppp.forceRefresh();
+    await s.ppp.create();
+    await s.ppp.link();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', notice: '', error: '' });
+    s.chain.balanceFails = true;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ error: '', notice: 'Checking the network…' });
+    await s.ppp.forceRefresh(); await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().notice).toMatch(/slow to answer\. Still trying: nothing is lost/);
+    expect(s.ppp.snapshot().error).toBe('');
+    s.chain.balanceFails = false;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ notice: '', error: '' });
   });
 
   it('catches up on confirmations at the next song even when the tab was in the background', async () => {
