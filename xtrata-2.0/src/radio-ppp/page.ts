@@ -355,7 +355,9 @@ function start(root: HTMLElement) {
     if (s.step === 'loading') return; // keep the last look while it checks
     const left = s.session ? Math.min(s.session.playsLeft, s.playsLeft) : 0;
     const paying = s.step === 'ready' && s.payingOn && left > 0;
-    const warning = paying ? '' : NOT_PAYING[s.step] ?? '';
+    // Funds already on their way (a deposit or a gift): nothing has gone wrong, so no "artists unpaid" warning.
+    const waiting = s.step === 'fund' && s.depositPending;
+    const warning = paying || waiting ? '' : NOT_PAYING[s.step] ?? '';
     const mode = paying ? 'on' : warning ? 'off' : '';
     if (mode) document.documentElement.dataset.ppp = mode;
     else delete document.documentElement.dataset.ppp;
@@ -364,8 +366,7 @@ function start(root: HTMLElement) {
       onair.querySelector('.onair-sub')!.textContent = paying ? `Paying artists · ${left.toLocaleString()} plays left` : 'Not paying';
     }
     if (nudge) {
-      // Funds already on their way: nothing to nag about.
-      nudge.hidden = mode !== 'off' || (s.step === 'fund' && s.depositPending);
+      nudge.hidden = mode !== 'off';
       if (mode === 'off') {
         const perStx = Math.floor(Number(1_000_000n / costPerPlay(BigInt(s.gate?.limits.playFee ?? '300'))));
         nudge.querySelector('.nudge-t')!.textContent = '⚠ ' + warning;
@@ -463,9 +464,13 @@ function start(root: HTMLElement) {
     return [box];
   }
 
-  function render(s: Snapshot) {
+  function render(raw: Snapshot) {
+    // A gift being claimed or sent to this wallet is money on its way: the panel and the radio say "on its way",
+    // never "no funds · artists unpaid" (which reads as if something went wrong). The gift code sees the real state.
+    const giftWait = gifts.inProgress(raw);
+    const s: Snapshot = giftWait && raw.step === 'fund' ? { ...raw, depositPending: true } : raw;
     syncIdentity(s);
-    syncGift(s);
+    syncGift(raw);
     syncHeader(s);
     renderTop(s);
     renderMode(s);
@@ -538,7 +543,7 @@ function start(root: HTMLElement) {
       rows.push(...fact(s.linkedListening.length === 1 ? 'Listening wallet linked to you' : 'Listening wallets linked to you', list, 'ppp-addr-short'));
     }
     if (s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step)) {
-      const tone = s.balanceState === 'ok' ? 'ppp-ok' : s.balanceState === 'low' ? 'ppp-warn' : 'ppp-bad';
+      const tone = s.step === 'fund' && s.depositPending ? 'ppp-mute' : s.balanceState === 'ok' ? 'ppp-ok' : s.balanceState === 'low' ? 'ppp-warn' : 'ppp-bad';
       rows.push(...fact('Balance', `${stx(s.balance)} STX · about ${s.playsLeft.toLocaleString()} plays`, tone));
     }
     const last = (s.entries as Shown[]).find((e) => e.kind === 'play');
@@ -641,7 +646,8 @@ function start(root: HTMLElement) {
         if (s.gift?.player) lines.push(el('p', 'This player has no free mode: it carries on by itself once the plays arrive.'));
         else if (s.entries.length) lines.push(el('p', 'Songs play free until you top up. Paying carries on by itself once the top-up confirms.'));
         if (s.payingOn && !s.entries.length) lines.push(el('p', 'Paying is switched on. Once funds arrive it starts with the next song you listen to for 30 seconds.', 'ppp-ok'));
-        if (s.solo) {
+        if (giftWait) { /* the gift banner shows its progress: no "add funds" while a gift is on its way */ }
+        else if (s.solo) {
           // No wallet to deposit from: the address is the whole interface. Anyone can send to it.
           lines.push(el('p', 'Ask a friend, or send from an exchange or any Stacks wallet, to this address. About 1 STX is plenty. Whatever is left can be returned to whoever sent it.'));
           lines.push(el('p', s.listening || '', 'ppp-addr-full'));
@@ -717,7 +723,8 @@ function start(root: HTMLElement) {
       head.append(`💿 Album · ${s.gift.player.title}`);
       if (s.gift.player.subtitle) head.append(' · ', s.gift.player.subtitle);
       const meter = ['ready', 'fund', 'over'].includes(s.step) && s.balance !== undefined
-        ? el('span', s.giftPlays === 0 ? ' · no plays left' : ` · ${s.giftPlays.toLocaleString()} ${s.giftPlays === 1 ? 'play' : 'plays'} left`, s.giftPlays === 0 ? 'ppp-bad' : s.giftPlays <= 20 ? 'ppp-warn' : 'ppp-ok')
+        ? s.giftPlays === 0 && s.depositPending ? el('span', ' · plays on their way', 'ppp-warn')
+        : el('span', s.giftPlays === 0 ? ' · no plays left' : ` · ${s.giftPlays.toLocaleString()} ${s.giftPlays === 1 ? 'play' : 'plays'} left`, s.giftPlays === 0 ? 'ppp-bad' : s.giftPlays <= 20 ? 'ppp-warn' : 'ppp-ok')
         : null;
       if (meter) head.append(meter);
       // The STX line the ordinary panel adds is replaced by the meter above.
@@ -755,7 +762,7 @@ function start(root: HTMLElement) {
       key.push(box);
     }
     // A gift link in play goes first: it is why this visitor is here.
-    key.unshift(...gifts.banner(s));
+    key.unshift(...gifts.banner(raw));
     key.unshift(...likeFundsBanner(s));
     // Inside an app's own browser (Instagram, X, ...) passkeys often fail: before anything else, offer the real one.
     if (inApp && (gifts.pendingCode() || ['intro', 'locked', 'unsupported'].includes(s.step))) key.unshift(...openElsewhere(inApp, gifts.pendingCode()));
@@ -795,7 +802,7 @@ function start(root: HTMLElement) {
       const shelfBody = shelfFold.querySelector('.ppp-shelf-body');
       if (shelfBox && shelfBody && !shelfBody.contains(shelfBox)) shelfBody.replaceChildren(shelfBox);
     }
-    const giftFold = gifts.renderFold(s);
+    const giftFold = gifts.renderFold(raw);
     $('.ppp-gifts').hidden = !giftFold;
     if (giftFold && !$('.ppp-gift-body').contains(giftFold)) $('.ppp-gift-body').replaceChildren(giftFold);
     if (giftFold && wantGive) {
@@ -809,7 +816,12 @@ function start(root: HTMLElement) {
     $('.ppp-actions2').replaceChildren(...more);
     // Say it once: a message that repeats the line already shown stays quiet.
     const msg = s.busy || s.message || '';
-    $('.ppp-msg').textContent = msg && key.some((k) => (k.textContent ?? '').startsWith(msg.replace(/[.✓\s]+$/, ''))) ? '' : msg;
+    const msgEl = $('.ppp-msg');
+    const shownMsg = msg && key.some((k) => (k.textContent ?? '').startsWith(msg.replace(/[.✓\s]+$/, ''))) ? '' : msg;
+    // A check that has not answered yet is an amber "still trying", never an error, and only when nothing else is said.
+    const notice = !shownMsg && !s.error ? s.notice : '';
+    msgEl.textContent = shownMsg || notice;
+    msgEl.classList.toggle('is-warn', !!notice);
     $('.ppp-err').textContent = s.error;
 
     // Three small folds: recently played (with the full log inside), wallet, how it works.

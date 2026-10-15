@@ -50,7 +50,15 @@ const stxNice = (v: bigint) => stx(v).replace(/\.?0+$/, '');
 
 export function createGifts(deps: GiftDeps) {
   // ---------------------------------------------------------------- recipient
-  let incoming: { code: string; view?: GiftView; error?: string; claiming?: boolean; done?: boolean; waiting?: boolean } | null = null;
+  /**
+   * The gift link waiting on this device. `error` is only for a real dead end (used, expired, not for this wallet):
+   * shown red. Anything that can still work by itself (a slow network, the treasury busy or being topped up, a
+   * payment not confirmed yet) is `retry`: an amber progress line, and the claim is tried again on its own.
+   */
+  let incoming: { code: string; view?: GiftView; error?: string; claiming?: boolean; done?: boolean; waiting?: boolean;
+    retry?: { text: string }; tries?: number } | null = null;
+  /** Waits that grow (5 s, 10 s, 20 s, 30 s, then every minute), so a slow network is not hammered. */
+  const backoff = (tries: number) => [5_000, 10_000, 20_000, 30_000][tries] ?? 60_000;
   // Links carry the code after `#` (never sent to a server); radio.html usually moves it to storage
   // before this runs. An older `?gift=` link is accepted too. Either way it leaves the address bar.
   const fromUrl = (() => {
@@ -71,16 +79,25 @@ export function createGifts(deps: GiftDeps) {
     deps.store.set(INCOMING_KEY, JSON.stringify({ code, at: deps.now() }));
     // The code now lives only on this device: it is forgotten only when the server says the link can
     // never work (unknown, used, expired), never because of a network hiccup.
-    fetch('/radio/gift/status', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ code }), signal: AbortSignal.timeout(15_000) })
+    let lookups = 0;
+    const lookUp = () => fetch('/radio/gift/status', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ code }), signal: AbortSignal.timeout(15_000) })
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
-        if (!res.ok) { if (res.status === 404) deps.store.set(INCOMING_KEY, null); throw new Error(body?.error || 'Could not check your gift right now. Reload to try again.'); }
+        if (res.status === 404) { deps.store.set(INCOMING_KEY, null); incoming = { ...incoming!, error: body?.error || 'That gift link is not valid.' }; deps.changed(); return; }
+        if (!res.ok) throw new Error('busy');
         const v = body as GiftView;
-        incoming = { ...incoming!, view: v };
+        incoming = { ...incoming!, view: v, retry: undefined };
         if (['claimed', 'expired', 'refunding', 'refunded'].includes(v.status)) deps.store.set(INCOMING_KEY, null);
         deps.changed();
       })
-      .catch((e: Error) => { incoming = { ...incoming!, error: e.message }; deps.changed(); });
+      .catch(() => {
+        // A slow or busy network is not a broken gift: say we are still looking, and look again.
+        if (!incoming || incoming.view) return;
+        incoming = { ...incoming, retry: { text: 'Still looking up your gift… the network is slow, trying again.' } };
+        deps.changed();
+        setTimeout(() => void lookUp(), backoff(lookups++));
+      });
+    void lookUp();
   }
   const liveGift = () => !!incoming?.view && incoming.view.status === 'live' && !incoming.done;
   /**
@@ -153,18 +170,35 @@ export function createGifts(deps: GiftDeps) {
         return;
       }
       if (!res.ok) {
+        const said = String(r?.error || '');
         // Forgotten only when it can never work for this visitor: unknown, used up or expired, or a
         // wallet that is not new. "Not paid for yet" or "being sent" can still change.
-        const permanent = res.status === 404 || res.status === 410 || (res.status === 409 && /already had a gift|brand-new/.test(r?.error || ''));
-        if (permanent) deps.store.set(INCOMING_KEY, null);
-        throw new Error(r?.error || `Could not claim the gift (${res.status}).`);
+        const permanent = res.status === 404 || res.status === 410 || (res.status === 409 && /already had a gift|brand-new/.test(said));
+        if (permanent) { deps.store.set(INCOMING_KEY, null); throw new Error(said || 'This gift cannot be opened.'); }
+        // Real stops that do not fix themselves while the page is open: say so plainly, without alarm.
+        if (res.status === 429 || res.status === 403 || (res.status === 400 && !/wallet number/i.test(said))) throw new Error(said || `Could not open the gift (${res.status}).`);
+        // Everything else can still work: keep going by itself, with an amber line saying what is happening.
+        const text = /topping up/.test(said) ? 'Your gift is waiting for the gift fund to be topped up. It arrives by itself once it is: you can leave this page open.'
+          : /not paid for yet/.test(said) ? 'Your gift is waiting for its sender’s payment to confirm. It arrives by itself once it does.'
+          : /being sent to another wallet/.test(said) ? 'Your gift is busy for a moment. Checking again…'
+          : 'Still sending your gift… the network is slow, trying again.';
+        throw Object.assign(new Error(text), { retry: true, slow: /topping up|not paid for yet/.test(said) });
       }
       incoming.done = true;
       deps.store.set(INCOMING_KEY, null);
       if (album) await deps.album.arrived(slot, wallet, r.txid, BigInt(r.amount));
       else deps.giftSent(r.txid, BigInt(r.amount));
     } catch (e) {
-      incoming.error = (e as Error).message;
+      const err = e as Error & { retry?: boolean; slow?: boolean };
+      // A request that never got an answer (offline, timed out) is a slow network, not a failed gift.
+      const unanswered = err.name === 'TypeError' || err.name === 'AbortError' || err.name === 'TimeoutError' || /wallet number/i.test(err.message);
+      if (err.retry || unanswered) {
+        const tries = incoming.tries ?? 0;
+        incoming.tries = tries + 1;
+        incoming.retry = { text: err.retry ? err.message : 'Still sending your gift… the network is slow, trying again.' };
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(() => { if (incoming) { incoming.retry = undefined; deps.changed(); } }, err.slow ? 60_000 : backoff(tries));
+      } else incoming.error = err.message;
       turnstile.token = undefined;
       try { (window as any).turnstile?.reset?.(turnstile.box); } catch { /* fresh token on retry */ }
     } finally {
@@ -186,9 +220,11 @@ export function createGifts(deps: GiftDeps) {
         .then((r) => { if (sending?.wallet === wallet) { sending.state = r?.gift?.state; sending.problem = r?.gift?.problem ?? null; deps.changed(); } })
         .catch(() => { /* asked again in 30 s */ });
     }
-    return sending.state === 'sending' && sending.problem
-      ? [el('p', `🎁 Your gift is waiting to go out (${sending.problem}). It is retried automatically.`, 'ppp-warn')]
-      : [];
+    if (!(sending.state === 'sending' && sending.problem)) return [];
+    // The network's own words stay out of sight (a tooltip): they read like an error, and nothing has failed.
+    const line = el('p', '🎁 Your gift is taking a little longer than usual to go out. It is retried automatically: no need to do anything.', 'ppp-warn');
+    line.title = `Network reply: ${sending.problem}`;
+    return [line];
   }
 
   function albumBanner(s: Snapshot, v: GiftView): HTMLElement[] {
@@ -203,11 +239,27 @@ export function createGifts(deps: GiftDeps) {
     if (s.walletCannotAlbums) { out.push(el('p', 'The listening wallet box is still updating. The album arrives as soon as it has: reload in a few minutes.', 'ppp-warn')); return out; }
     const siteKey = s.gate?.gifts?.turnstileSiteKey;
     if (siteKey && !turnstile.token) out.push(el('p', 'One quick check and it is yours:', 'ppp-mute'), turnstileBox(siteKey));
-    else if (!incoming!.claiming && !incoming!.error && !incoming!.waiting) void claim(s);
-    if (incoming!.claiming || incoming!.waiting) out.push(el('p', incoming!.waiting ? 'Another gift is on its way out first. Yours is next…' : 'Sending your album…', 'ppp-cyan'));
+    else if (!incoming!.claiming && !incoming!.error && !incoming!.waiting && !incoming!.retry) void claim(s);
+    out.push(...claimLines(s, 'Sending your album…'));
+    return out;
+  }
+
+  /** How the claim is going: progress in cyan, a wait in amber (with "Try now"), red only for a real dead end. */
+  function claimLines(s: Snapshot, sending: string): HTMLElement[] {
+    const out: HTMLElement[] = [];
+    if (incoming!.claiming || incoming!.waiting) out.push(el('p', incoming!.waiting ? 'Another gift is on its way out first. Yours is next…' : sending, 'ppp-cyan'));
+    else if (incoming!.retry) out.push(el('p', incoming!.retry.text, 'ppp-warn'), button('Try now', () => { clearTimeout(retryTimer); incoming!.retry = undefined; void claim(s); }, 'quiet'));
     if (incoming!.error) out.push(el('p', incoming!.error, 'ppp-bad'), button('Try again', () => { incoming!.error = undefined; void claim(s); }));
     return out;
   }
+
+  /**
+   * A gift is on its way to this wallet, or about to be claimed into it: the page should look like it is waiting
+   * for the gift, not like an empty wallet (no "artists unpaid", no "add funds", no red zero balance).
+   */
+  const inProgress = (s: Snapshot) =>
+    !!incoming && !incoming.done && !incoming.error && liveGift() && !!s.listening && !s.linked && !s.creditedTo
+    && (s.createdHere || s.brandNew || !!incoming.view?.player) && (s.balance ?? 0n) === 0n && !s.entries.length;
 
   /** Lines for the top of the panel while a gift link is in play, or a gift is on its way. */
   function banner(s: Snapshot): HTMLElement[] {
@@ -215,7 +267,7 @@ export function createGifts(deps: GiftDeps) {
     if (!incoming || ['off', 'elsewhere'].includes(s.step)) return status;
     const v = incoming.view;
     if (incoming.error && !v) return [el('p', `🎁 ${incoming.error}`, 'ppp-warn')];
-    if (!v) return [el('p', '🎁 Checking your gift…', 'ppp-mute')];
+    if (!v) return [el('p', incoming.retry ? `🎁 ${incoming.retry.text}` : '🎁 Checking your gift…', incoming.retry ? 'ppp-warn' : 'ppp-mute')];
     if (incoming.done) return status;
     if (v.status === 'claimed' || v.status === 'claiming') return [el('p', '🎁 This gift link has already been used.', 'ppp-mute')];
     if (['expired', 'refunding', 'refunded'].includes(v.status)) return [el('p', '🎁 This gift link has expired.', 'ppp-mute')];
@@ -238,9 +290,8 @@ export function createGifts(deps: GiftDeps) {
     const siteKey = s.gate?.gifts?.turnstileSiteKey;
     if (ready) {
       if (siteKey && !turnstile.token) { out.push(el('p', 'One quick check and it is yours:', 'ppp-mute'), turnstileBox(siteKey)); }
-      else if (!incoming.claiming && !incoming.error && !incoming.waiting) void claim(s);
-      if (incoming.claiming || incoming.waiting) out.push(el('p', incoming.waiting ? 'Another gift is on its way out first. Yours is next…' : 'Sending your gift…', 'ppp-cyan'));
-      if (incoming.error) out.push(el('p', incoming.error, 'ppp-bad'), button('Try again', () => { incoming!.error = undefined; void claim(s); }));
+      else if (!incoming.claiming && !incoming.error && !incoming.waiting && !incoming.retry) void claim(s);
+      out.push(...claimLines(s, 'Sending your gift…'));
     } else if (s.step === 'intro') out.push(el('p', 'Tap below: your passkey makes a listening wallet, and the gift lands in it.', 'ppp-mute'));
     else if (s.listening && s.linked) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one is linked to a Stacks wallet. The link still works for someone new.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet'));
     else if (s.listening && (s.balance ?? 0n) > 0n) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one already has funds. Share the link with someone new instead.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet'));
@@ -436,5 +487,5 @@ export function createGifts(deps: GiftDeps) {
 
   /** The gift code still waiting on this device (to carry it to another browser), or null. */
   const pendingCode = () => (incoming && !incoming.done && (!incoming.view || incoming.view.status === 'live') ? incoming.code : null);
-  return { banner, funder, renderFold, liveGift, setAside, pendingCode };
+  return { banner, funder, renderFold, liveGift, setAside, pendingCode, inProgress };
 }

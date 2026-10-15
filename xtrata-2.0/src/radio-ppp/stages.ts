@@ -23,7 +23,7 @@ export interface StageView {
 }
 
 /** Where a listener stands. Returns null when the panel has nothing to show yet (loading). */
-export function stageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'entries' | 'gate'> & { solo?: boolean }): StageView | null {
+export function stageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'entries' | 'gate'> & { solo?: boolean; depositPending?: boolean }): StageView | null {
   if (s.solo) return soloStageOf(s);
   const n = STAGES.length;
   const view = (at: number, caption: string, blocked = false): StageView => ({ at, blocked, caption: at >= n ? caption : `Step ${at + 1} of ${n} · ${caption}` });
@@ -37,7 +37,7 @@ export function stageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'ent
     case 'intro': return view(1, 'create your passkey listening wallet');
     case 'locked': return view(1, 'unlock your passkey listening wallet');
     case 'link': return view(2, 'link to your main wallet');
-    case 'fund': return view(2, 'add up to 1 STX');
+    case 'fund': return view(2, s.depositPending ? 'funds on their way: nothing to do' : 'add up to 1 STX');
     case 'over': return view(2, 'over 1 STX: return the excess', true);
     case 'ready': {
       if (!s.payingOn || !s.session || s.session.playsLeft < 1) return view(3, 'switch paying on');
@@ -50,7 +50,7 @@ export function stageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'ent
   }
 }
 
-function soloStageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'entries'>): StageView | null {
+function soloStageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'entries'> & { depositPending?: boolean }): StageView | null {
   const n = SOLO_STAGES.length;
   const view = (at: number, caption: string, blocked = false): StageView => ({ at, blocked, caption: at >= n ? caption : `Step ${at + 1} of ${n} · ${caption}` });
   switch (s.step) {
@@ -59,7 +59,7 @@ function soloStageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'entrie
     case 'unsupported': return view(0, 'this browser cannot make a passkey wallet', true);
     case 'intro': return view(0, 'create your passkey listening wallet');
     case 'locked': return view(0, 'unlock your passkey listening wallet');
-    case 'fund': return view(1, 'add 1 STX: anyone can send it to your address');
+    case 'fund': return view(1, s.depositPending ? 'your funds are on their way: nothing to do' : 'add 1 STX: anyone can send it to your address');
     case 'over': return view(1, 'over 1 STX: return the excess', true);
     case 'ready': {
       if (!s.payingOn || !s.session || s.session.playsLeft < 1) return view(2, 'switch paying on');
