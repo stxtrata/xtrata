@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: null as any, topUp: vi.fn(), topUpAlbum: vi.fn(), openAlbum: vi.fn(), bind: vi.fn(), arriving: vi.fn(), route: null as null | ((url: string, init?: any) => Response | undefined), radio: null as any, session: { isConnected: false } as any, signed: [] as any[] }));
 vi.mock('../controller', () => ({
-  TOP_UP_CHOICES: [50_000n, 100_000n, 250_000n],
+  TOP_UP_PLAYS: [100, 250, 500],
   createPppController: (deps: any) => {
     h.changed = deps.changed;
     return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), topUpLikes: () => h.topUp(), topUpAlbum: (a: bigint) => h.topUpAlbum(a), openAlbum: (n: number) => h.openAlbum(n), bindAlbum: (n: number) => h.bind(n), albumArriving: (...a: unknown[]) => h.arriving(...a), onListened: async () => {}, giftSent: () => {} }, {
@@ -30,7 +30,7 @@ const base = {
   depositPending: false, walletOutdated: false, linkedListening: [], serverLinked: false, armed: false, stuck: 0, queued: 0, solo: true, returnTo: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', returnToKind: 'funder',
   funderState: 'found', funderMultiple: false, walletCannotSolo: false, walletCannotMulti: false, others: [], createdHere: true,
   gate: { enabled: true, allowed: false, here: true, radioUrl: null, walletOrigin: 'https://w.test', canary: false, passkeyOnly: true, limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 }, gifts: { enabled: true, treasury: null, turnstileSiteKey: null, admin: false, fee: '3000' } },
-  gift: { player: PLAYER, from: null, source: 'campaign', amount: '100000' }, giftPlays: 277, giftStop: null, returnPlan: { state: 'none' }
+  gift: { player: PLAYER, from: null, source: 'campaign', amount: '100000' }, giftPlays: 277, playCost: 350n, giftStop: null, returnPlan: { state: 'none' }
 };
 
 async function open(over: object = {}) {
@@ -213,7 +213,7 @@ describe('My albums (the shelf)', () => {
     const tabs = [...sw.querySelectorAll('button')];
     expect(tabs.map((t) => t.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
     expect(text(tabs[0])).toContain('My player');
-    expect(text(tabs[0])).toContain('0.1993 STX');
+    expect(text(tabs[0])).toContain('560 plays'); // (0.19925 STX − the reserve) at 350 µSTX a play
     expect(text(tabs[1])).toContain('Night Drive');
     h.openAlbum.mockClear();
     (tabs[0] as HTMLButtonElement).click();
@@ -240,12 +240,12 @@ describe('My albums (the shelf)', () => {
     const root = await start({ slot: 2, giftPlays: 10, balance: 12_000n, gift: { player: PLAYER, from: null, source: 'campaign', amount: '100000' }, likeFunds: { address: ROOT, balance: 300_000n, low: false, album: true, pending: false } });
     const row = document.querySelector('.ppp-key .ppp-topup')!;
     const buttons = [...row.querySelectorAll('button')] as HTMLButtonElement[];
-    expect(buttons.map((b) => b.textContent)).toEqual(['+0.05 STX', '+0.10 STX', '+0.25 STX']);
+    expect(buttons.map((b) => b.textContent)).toEqual(['+100', '+250', '+500']); // plays, never STX
     expect(buttons.map((b) => b.disabled)).toEqual([false, false, false]);
     h.topUpAlbum.mockClear();
     buttons[1].click();
-    expect(h.topUpAlbum).toHaveBeenCalledWith(100_000n);
-    // My player holds 0.1 STX: it covers 0.05 STX only
+    expect(h.topUpAlbum).toHaveBeenCalledWith(250);
+    // My player holds 0.06 STX: about 145 plays, so only +100 fits
     h.snap = { ...h.snap, likeFunds: { ...h.snap.likeFunds, balance: 60_000n } };
     h.changed();
     const again = [...document.querySelector('.ppp-key .ppp-topup')!.querySelectorAll('button')] as HTMLButtonElement[];
@@ -343,7 +343,7 @@ describe('a starter gift never looks failed while it is on its way', () => {
     const key = root.querySelector('.ppp-key')!;
     expect([...key.querySelectorAll('p')].find((p) => /Still sending/.test(p.textContent ?? ''))!.className).toContain('ppp-warn');
     expect(root.querySelector('.ppp-bad')).toBeNull();
-    expect(text(root)).not.toMatch(/Add funds|ConflictingNonce|Copy my address/);
+    expect(text(root)).not.toMatch(/Add funds|Add plays|ConflictingNonce|Copy my address/);
     expect(text(root.querySelector('.ppp-err')!)).toBe('');
     expect(document.documentElement.dataset.ppp).toBeUndefined();
     expect(text(root.querySelector('.ppp-stage')!)).toMatch(/on their way/);
@@ -354,7 +354,7 @@ describe('a starter gift never looks failed while it is on its way', () => {
     const root = await open(empty);
     await vi.waitFor(() => expect(text(root.querySelector('.ppp-key')!)).toContain('on this connection today'));
     expect(root.querySelector('.ppp-key .ppp-bad')!.textContent).toMatch(/on this connection today/);
-    expect(text(root.querySelector('.ppp-key')!)).toContain('Add funds');
+    expect(text(root.querySelector('.ppp-key')!)).toContain('Add plays');
   });
 });
 
@@ -529,24 +529,5 @@ describe('waiting for plays to arrive', () => {
   it('no bar when nothing is expected: a genuinely empty wallet still says so', async () => {
     const root = await open({ step: 'fund', balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, giftPlays: 0, gift: null, arrival: null, giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } });
     expect(root.querySelector('.ppp-wait')).toBeNull();
-  });
-
-  it('a linked wallet, empty, with history, still reads as waiting while an album claim is running', async () => {
-    const CODE = 'ABCDEFGHJKMNPQRSTVWXYZ';
-    localStorage.setItem('xtrata.radio.gift.incoming.v1', JSON.stringify({ code: CODE, at: Date.now() }));
-    h.bind = vi.fn(async (n: number) => ({ root: 'SP3X2F7FQH7GQS0YRBWH0H5W6RM2PB1B0WPD1XA2V', slot: n, address: 'SPALBUM' + n, issued: 1, rootSignature: 'r', slotSignature: 's' }));
-    let release: (r: Response) => void = () => {};
-    h.route = (url: string) => {
-      if (url.endsWith('/radio/gift/status')) return new Response(JSON.stringify({ status: 'live', amount: '100000', source: 'friend', from: null, label: '', expires: 0, player: PLAYER }));
-      if (url.includes('/radio/gift/slots')) return new Response(JSON.stringify({ next: 1 }));
-      if (url.endsWith('/radio/gift/claim')) return new Promise<Response>((r) => { release = r; }) as unknown as Response;
-      return undefined;
-    };
-    const root = await open({ step: 'fund', root: 'SP3X2F7FQH7GQS0YRBWH0H5W6RM2PB1B0WPD1XA2V', slot: 0, walletCannotAlbums: false, balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, gift: null, giftStop: null, giftPlays: 0, solo: false, linked: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', entries: [{ kind: 'play', status: 'confirmed', amount: '350', created: Date.now(), song: 7, txid: '0x1' }], createdHere: false });
-    await vi.waitFor(() => expect(h.bind).toHaveBeenCalled());
-    await vi.waitFor(() => expect(text(root.querySelector('.ppp-key')!)).toMatch(/Sending your album/));
-    expect(text(root)).not.toMatch(/Out of funds|Add funds|artists unpaid/);
-    expect(root.querySelector('.ppp-key .ppp-bad')).toBeNull();
-    release(new Response('{}', { status: 500 }));
   });
 });

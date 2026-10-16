@@ -337,7 +337,7 @@ describe('one-tap unlock', () => {
     await s.settle();
     expect(s.ppp.snapshot()).toMatchObject({ step: 'locked', armed: true, busy: null });
     expect(s.held).toHaveLength(1);
-    expect(s.held[0].panel).toMatchObject({ kind: 'unlock', confirmLabel: 'Unlock and keep paying' });
+    expect(s.held[0].panel).toMatchObject({ kind: 'unlock', confirmLabel: 'Unlock and keep listening' });
     expect(s.held[0].panel.lines.join(' ')).toMatch(/30 seconds/); // the paying terms are on that same panel
     const before = s.evaluations();
     s.tap(); // the listener's one tap inside the frame
@@ -681,30 +681,31 @@ describe('album wallets (numbered wallets of one passkey)', () => {
       expect(small.chain.broadcasts).toHaveLength(0);
     });
 
-    it('adds plays to the open album from My player, in the amounts offered', async () => {
+    it('adds plays to the open album from My player, counted in plays', async () => {
       const s = await open({ album: 20_000n, root: 500_000n }); // too small a gift to float: only the top-up moves money
       const album = s.ppp.snapshot().listening!;
-      await s.ppp.topUpAlbum(12_345n);
+      expect(s.ppp.snapshot().playCost).toBe(350n);
+      await s.ppp.topUpAlbum(123);
       expect(s.ppp.snapshot().error).toMatch(/amounts offered/);
-      await s.ppp.topUpAlbum(100_000n);
+      await s.ppp.topUpAlbum(250);
       expect(s.ppp.snapshot().error).toBe('');
       expect(s.chain.broadcasts).toHaveLength(1);
       expect(senderOf(s.chain.broadcasts[0])).toBe(LISTENING);
       expect(recipientOf(s.chain.broadcasts[0])).toBe(album);
-      expect(amountOf(s.chain.broadcasts[0])).toBe('100000');
+      expect(amountOf(s.chain.broadcasts[0])).toBe(String(250 * 350)); // exactly 250 plays at the play cost
       expect(s.ppp.snapshot().depositPending).toBe(true); // the plays are on their way
-      await s.ppp.topUpAlbum(50_000n);
+      await s.ppp.topUpAlbum(100);
       expect(s.ppp.snapshot().error).toMatch(/pending payment/);
       expect(s.chain.broadcasts).toHaveLength(1);
     });
 
     it('refuses to add plays when My player cannot cover it, or no album is open', async () => {
       const s = await open({ album: 20_000n, root: 10_000n });
-      await s.ppp.topUpAlbum(50_000n);
+      await s.ppp.topUpAlbum(100);
       expect(s.ppp.snapshot().error).toMatch(/does not hold enough/);
       expect(s.chain.broadcasts).toHaveLength(0);
       await s.ppp.openAlbum(0);
-      await s.ppp.topUpAlbum(50_000n);
+      await s.ppp.topUpAlbum(100);
       expect(s.ppp.snapshot().error).toMatch(/Open the album/);
     });
 

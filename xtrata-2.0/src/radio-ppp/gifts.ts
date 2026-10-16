@@ -110,6 +110,12 @@ export function createGifts(deps: GiftDeps) {
     void lookUp();
   }
   const liveGift = () => !!incoming?.view && incoming.view.status === 'live' && !incoming.done;
+  /** A live gift link that comes with an album: what the album view needs to show it before it is claimed. */
+  const incomingAlbum = () => {
+    const v = incoming?.view;
+    if (!v?.player || !liveGift()) return null;
+    return { player: v.player, from: fromLabel(v), plays: giftPlays(BigInt(v.amount)) };
+  };
   /**
    * "Not now": forget the link on this device without touching the gift itself. It stays unclaimed on the
    * server, so opening the same link again brings it back (until it is claimed or expires).
@@ -240,12 +246,13 @@ export function createGifts(deps: GiftDeps) {
     return [line];
   }
 
-  function albumBanner(s: Snapshot, v: GiftView): HTMLElement[] {
+  function albumBanner(s: Snapshot, v: GiftView, bare = false): HTMLElement[] {
     const player = v.player!;
     const amount = BigInt(v.amount);
-    const out: HTMLElement[] = [el('p', `🎁 ${fromLabel(v)} sent you “${player.title}”${player.subtitle ? ` by ${player.subtitle}` : ''}: ${listedTracks(player).length} ${listedTracks(player).length === 1 ? 'song' : 'songs'} and ${giftPlays(amount).toLocaleString()} plays of on-chain music.`, 'ppp-gift')];
+    const out: HTMLElement[] = bare ? [] : [el('p', `🎁 ${fromLabel(v)} sent you “${player.title}”${player.subtitle ? ` by ${player.subtitle}` : ''}: ${listedTracks(player).length} ${listedTracks(player).length === 1 ? 'song' : 'songs'} and ${giftPlays(amount).toLocaleString()} plays of on-chain music.`, 'ppp-gift')];
     const unlocked = !!s.root && ['fund', 'ready', 'over', 'link'].includes(s.step);
     if (!unlocked) {
+      if (bare) return out; // the album view says it with its own button
       out.push(el('p', s.step === 'intro' ? 'Tap below: your passkey makes a listening wallet, and the album arrives in its own wallet. You can keep as many albums as you like.' : s.step === 'locked' ? 'Unlock your listening wallet and the album arrives in its own wallet.' : 'Open your listening wallet and the album arrives in its own wallet.', 'ppp-mute'));
       return out;
     }
@@ -277,8 +284,11 @@ export function createGifts(deps: GiftDeps) {
       !!(incoming.claiming || incoming.waiting || incoming.retry)
       || (!s.linked && !s.creditedTo && (s.createdHere || s.brandNew || !!incoming.view?.player) && (s.balance ?? 0n) === 0n && !s.entries.length));
 
-  /** Lines for the top of the panel while a gift link is in play, or a gift is on its way. */
-  function banner(s: Snapshot): HTMLElement[] {
+  /**
+   * Lines for the top of the panel while a gift link is in play, or a gift is on its way. `bare`: for the album view,
+   * which shows the album itself: only progress, waits and real errors, no headline or "tap below" line.
+   */
+  function banner(s: Snapshot, opts: { bare?: boolean } = {}): HTMLElement[] {
     const status = watchSending(s);
     if (!incoming || ['off', 'elsewhere'].includes(s.step)) return status;
     const v = incoming.view;
@@ -289,7 +299,7 @@ export function createGifts(deps: GiftDeps) {
     if (['expired', 'refunding', 'refunded'].includes(v.status)) return [el('p', '🎁 This gift link has expired.', 'ppp-mute')];
     if (v.status === 'pending-deposit') return [el('p', `🎁 ${fromLabel(v)} is still sending this gift. Check back in a few minutes.`, 'ppp-warn')];
     // An album goes into its own numbered wallet, so any unlocked passkey wallet may receive it, new or old.
-    if (v.player) return [...albumBanner(s, v), ...status];
+    if (v.player) return [...albumBanner(s, v, !!opts.bare), ...status];
     // An existing wallet is open (linked, funded or used before): the gift is not for it. One quiet line,
     // so it does not read as if this wallet were the gift.
     const notNew = !!s.listening && (!(s.createdHere || s.brandNew) || !!s.linked || !!s.creditedTo || (s.balance ?? 0n) > 0n || s.entries.length > 0);
@@ -604,5 +614,5 @@ export function createGifts(deps: GiftDeps) {
 
   /** The gift code still waiting on this device (to carry it to another browser), or null. */
   const pendingCode = () => (incoming && !incoming.done && (!incoming.view || incoming.view.status === 'live') ? incoming.code : null);
-  return { banner, funder, renderFold, liveGift, setAside, pendingCode, inProgress };
+  return { banner, funder, renderFold, liveGift, incomingAlbum, setAside, pendingCode, inProgress };
 }

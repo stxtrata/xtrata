@@ -94,7 +94,7 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
     await frame.locator('#p-ok').evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
   };
   await frame.locator('#p-summary').waitFor();
-  assert.match(await frame.locator('#p-summary').innerText(), /Keep under 1 STX/); // the key warning stays visible
+  assert.match(await frame.locator('#p-summary').innerText(), /Kept on this device with your passkey/); // one glance, no prices (the 1 STX rule is under Details)
   assert.equal(await frame.locator('#p-more').getAttribute('open'), null); // the rest is folded under Details
   if (shots) await panel.screenshot({ path: `${shots}/ppp-create-${viewport.width}.png` });
   // Create, confirm and re-check the passkey: three confirms, each enabled only once steadily visible.
@@ -114,10 +114,10 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   if (shots) await panel.screenshot({ path: `${shots}/ppp-link-${viewport.width}.png` });
   // One-tap unlock: a returning listener's first tap in the frame goes straight to the passkey.
   await page.reload();
-  await frame.locator('#p-ok', { hasText: 'Unlock and keep paying' }).waitFor(); // armed: the first tap is the passkey
-  assert.match(await frame.locator('#p-summary').innerText(), /^SP\w+…\w{4} · 0\.00035 STX a song · up to 1 STX$/); // one glance, details folded
+  await frame.locator('#p-ok', { hasText: 'Unlock and keep listening' }).waitFor(); // armed: the first tap is the passkey
+  assert.match(await frame.locator('#p-summary').innerText(), /^SP\w+…\w{4} · One tap to carry on listening$/); // one glance, details folded
   assert.match(await panel.locator('.ppp-stage').innerText(), /^Step 2 of 4 · unlock/); // not linked yet in this test, so still first-time setup
-  assert.equal(await panel.getByRole('button', { name: 'Unlock and keep paying' }).count(), 0); // no page button to click first
+  assert.equal(await panel.getByRole('button', { name: 'Unlock and keep listening' }).count(), 0); // no page button to click first
   assert.equal(await page.locator('#ppp-top').innerText(), 'Unlock · keep paying');
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.locator('#ppp-top').click(); // brings the wallet box, unlock ready, into view
