@@ -10,11 +10,11 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 
 | Kind | Who makes it | Paid from | Returns and refunds go to |
 | --- | --- | --- | --- |
-| Campaign | the admin (`RADIO_GIFT_ADMIN`), signing a request in the panel | the treasury's campaign pool (whatever it holds) | the treasury |
+| Campaign (retired) | nobody: the route was removed. Links made earlier keep working until they expire | the treasury's own pool | the treasury |
 | Friend | anyone with a Stacks wallet, in "🎁 Send someone a wallet" | the gifter, up front: amount + 0.003 STX, memo `gift <id>` | the gifter (an unclaimed gift is refunded after 30 days) |
 | Prefunded batch | a gift admin (for now), in the admin box: "Prefunded batch" | the creator, up front, for the whole batch in ONE payment (below), memo `batch <id>` | the creator (unclaimed copies are refunded after 30 days) |
 
-Prefunded batches are the way to make albums and starter copies from now on. Campaign links still work until they expire, and are being removed.
+Prefunded batches are the only way to make albums and starter copies. Old campaign rows are still claimed, limited and expired exactly as before, then disappear on their own.
 
 - Links look like `https://radio.xtrata.xyz/radio.html#gift=<code>`. The code sits after `#`, so browsers never send it to a server, and the page moves it to the device and takes it out of the address bar at once.
 - Only the code's hash is stored.
@@ -40,12 +40,12 @@ Prefunded batches are the way to make albums and starter copies from now on. Cam
 ## Limits
 
 - Claims go only to brand-new listening wallets (no history, no balance), one gift per wallet.
-- Campaign links: at most 10 claims per connection (salted IP hash) per 24 h. Friend gifts are never limited this way: someone paid for each one.
-- There is no daily total for campaign gifts (removed 15 Oct 2026: it turned away people opening links the admin had made on purpose). What bounds them is the treasury balance, so keep only what you mean to give away in it. `RADIO_GIFT_DAILY_CAP` is no longer read.
+- Campaign links already out: at most 10 claims per connection (salted IP hash) per 24 h. Friend gifts are never limited this way: someone paid for each one.
+- Campaign links already out have no daily total (removed 15 Oct 2026). What bounds them is the treasury balance. `RADIO_GIFT_DAILY_CAP` is no longer read by anything.
 - While a gift is being claimed or sent, the panel never shows it as failed: slow or refused sends say "still sending" in amber and retry by themselves (5 s, 10 s, 20 s, 30 s, then every minute). Red is kept for real dead ends (link unknown, used or expired; wallet not new; the per-connection limit).
 - Money held for friends and batches at once (paid copies, plus batches waiting for their payment in the last 24 h) is capped at `RADIO_GIFT_ESCROW_CAP` (default 50 STX; `functions/lib/radio-gifts.ts`, `DEFAULT_ESCROW_CAP`).
-- Campaign gifts never spend money owed to friends or awaiting a refund.
-- Each signed campaign request works once, within 15 minutes of signing.
+- Campaign gifts already out never spend money owed to friends, creators or awaiting a refund.
+- Each signed batch or player request works once, within 15 minutes of signing.
 - Optional Cloudflare Turnstile on claims (`RADIO_GIFT_TURNSTILE_SITE_KEY` + `RADIO_GIFT_TURNSTILE_SECRET`).
 
 ## Prefunded batches
@@ -74,9 +74,9 @@ Known limits: batches are admin-only for now; the batch cap is 100 copies per re
 2. Fund it with the float: 10 STX.
 3. Set secrets:
    - `RADIO_GIFT_TREASURY_KEY`: the treasury's private key (64 hex characters, optionally ending `01`).
-   - `RADIO_GIFT_ADMIN`: your own address. It only signs campaign and player requests and never holds gift money. Several admins: separate the addresses with commas, e.g. `SP…jim,SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX`. Every admin can make campaign links (paid from the treasury, up to what it holds) and albums from the songs it holds.
+   - `RADIO_GIFT_ADMIN`: your own address. It only signs batch and player requests and never holds gift money. Several admins: separate the addresses with commas, e.g. `SP…jim,SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX`. Every admin can make albums from the songs it holds and fund prefunded batches of them (and of starter copies) from their own wallet.
    - `RADIO_GIFT_SWEEP_SECRET`: a long random string (24+ characters) shared with the sweep Worker (below).
-   - Optional: `RADIO_GIFT_ESCROW_CAP` (microSTX) and the two Turnstile keys. (`RADIO_GIFT_DAILY_CAP` is no longer used and can be deleted.)
+   - Optional: `RADIO_GIFT_ESCROW_CAP` (microSTX) and the two Turnstile keys. (`RADIO_GIFT_DAILY_CAP` is no longer used anywhere and can be deleted.)
    - `RADIO_GIFT_ENABLED` = `1` last.
 4. Optionally apply `functions/migrations/027_radio_gifts.sql`. The tables are also created on first use.
 5. Redeploy `xtrata`. Secrets apply only to new deployments.
@@ -107,7 +107,7 @@ Code: `src/lib/listening-wallet/gift-players.ts` (rules, signing), `functions/li
 ### Making one (admin, phase 1)
 
 1. Open the radio as the gift admin: **🎁 Gift Stacks music → Gift players**. Enter a title, an optional artist, and the radio song numbers in play order (1 to 40, ready songs in the radio catalogue). Sign once. The server stores the definition; titles and artists shown to listeners come from the catalogue, never from what was typed.
-2. Under **Campaign links** pick the player, a size (300 / 500 / 1,000 plays or Max = 1 STX), how many links, and sign. Links look like any other gift link.
+2. Under **Prefunded batch** pick the album (or starter copies), a size (300 / 500 / 1,000 plays or Max = 1 STX) and how many copies. The panel shows the whole bill; you sign once and pay once, and the links are yours to send. Links look like any other gift link. (See "Prefunded batches" above.)
 - **An album is made by the wallet that owns all of its songs.** When a player is created the server asks the core contract (`get-owner`) who holds each song, and every one must be the signing wallet. A song held by someone else, by a contract (for example listed for sale) or by no one refuses the player; a chain that cannot answer says "try again", never "allowed". The check runs at creation only: an album already made stays valid if a song is sold later. The core contract applies the same rule natively to an inscription minted with the songs as its **parents** (the minter must own every parent), which is the planned on-chain form of an album (see the Xtrata Music project doc `radio-editions-and-sales-plan.md`).
 - **An album never stops working.** Nothing deactivates a player or a link that has been made: selling a song afterwards, or a chain outage, changes nothing for existing albums, their links or recipients (tested). Only songs the radio catalogue cannot confirm are left out of the album view.
 - A player never changes. A new version is a new player, so a link already sent cannot become something its sender did not mean.
@@ -126,7 +126,7 @@ A gifted wallet returns each part of its balance to whoever it came from:
 
 | Part | Goes to |
 | --- | --- |
-| Unused gift | the gifter (friend gift) or the treasury (campaign) |
+| Unused gift | the gifter (a friend, or the creator of a batch), or the treasury (an older campaign link) |
 | What a listener added | the address that sent it |
 | Above 1 STX | the sender of the newest deposit |
 | Dust or a contract sender | an address the listener chooses |

@@ -7,16 +7,6 @@
  *   friend    paid up front by a listener (amount + GIFT_FEE) before the link goes live
  * Plan: Xtrata Music project, claude/radio-gift-wallets-plan.md.
  */
-import {
-  createMessageSignature,
-  encodeStructuredData,
-  getAddressFromPublicKey,
-  publicKeyFromSignatureRsv,
-  stringAsciiCV,
-  TransactionVersion,
-  tupleCV,
-  uintCV
-} from '@stacks/transactions';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import { costPerPlay, DEFAULT_PLAY_FEE, RESERVE } from './policy';
@@ -57,62 +47,11 @@ export function newGiftCode(): string {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// ---- admin campaign request (SIP-018 structured data, signed by the admin's own wallet) ----
+// ---- signing domain shared by the admin's SIP-018 requests (prefunded batches: batches.ts; gift players: gift-players.ts) ----
 export const CAMPAIGN_DOMAIN = 'xtrata.xyz/radio/gifts';
 export const CAMPAIGN_PURPOSE = 'Create Xtrata radio gift links paid from the gift treasury';
-/** A campaign signature is accepted for this long after it was issued. */
+/** A signed admin request is accepted for this long after it was issued. */
 export const CAMPAIGN_MAX_AGE_MS = 15 * 60 * 1000;
-
-export interface CampaignRequest {
-  admin: string;
-  count: number;
-  /** microSTX per link, decimal string. */
-  amount: string;
-  /** A short label shown to recipients, e.g. "Launch week". ASCII, up to 40 characters. */
-  label: string;
-  issued: number;
-  /**
-   * A gift player these links open (see gift-players.ts). Part of what the admin signs only when present,
-   * so a request without one is exactly what it always was.
-   */
-  player?: string;
-}
-
-export function validateCampaign(req: CampaignRequest, now = Date.now()): CampaignRequest {
-  if (!req || typeof req.admin !== 'string') throw new Error('Campaign needs the admin address.');
-  if (!Number.isSafeInteger(req.count) || req.count < 1 || req.count > CAMPAIGN_MAX_LINKS) throw new Error(`Make 1 to ${CAMPAIGN_MAX_LINKS} links at a time.`);
-  if (typeof req.amount !== 'string' || !/^\d{1,9}$/.test(req.amount) || !validGiftAmount(BigInt(req.amount))) throw new Error('Each gift must be 0.1 to 1 STX.');
-  if (typeof req.label !== 'string' || !/^[ -~]{0,40}$/.test(req.label)) throw new Error('Label: up to 40 plain characters.');
-  if (req.player !== undefined && !(typeof req.player === 'string' && /^[0-9a-f]{16}$/.test(req.player))) throw new Error('That is not a gift player id.');
-  if (!Number.isSafeInteger(req.issued) || req.issued > now + 60_000 || now - req.issued > CAMPAIGN_MAX_AGE_MS) throw new Error('Request expired. Sign again.');
-  return req;
-}
-
-export const campaignData = (req: CampaignRequest) => ({
-  domain: tupleCV({ name: stringAsciiCV(CAMPAIGN_DOMAIN), version: stringAsciiCV('1'), 'chain-id': uintCV(1) }),
-  message: tupleCV({
-    purpose: stringAsciiCV(CAMPAIGN_PURPOSE),
-    admin: stringAsciiCV(req.admin),
-    count: uintCV(req.count),
-    amount: uintCV(BigInt(req.amount)),
-    label: stringAsciiCV(req.label),
-    issued: uintCV(req.issued),
-    ...(req.player ? { player: stringAsciiCV(req.player) } : {})
-  })
-});
-
-/** True only when `signature` (65-byte RSV hex) was made by `address` over this request. */
-export function verifyCampaignSignature(req: CampaignRequest, signature: unknown, address: string): boolean {
-  try {
-    if (typeof signature !== 'string') return false;
-    const hex = signature.replace(/^0x/, '');
-    if (!/^[a-fA-F0-9]{130}$/.test(hex)) return false;
-    const hash = bytesToHex(sha256(encodeStructuredData(campaignData(req))));
-    return getAddressFromPublicKey(publicKeyFromSignatureRsv(hash, createMessageSignature(hex)), TransactionVersion.Mainnet) === address;
-  } catch {
-    return false;
-  }
-}
 
 /** What the page shows about a gift (no secrets). */
 export interface GiftView {

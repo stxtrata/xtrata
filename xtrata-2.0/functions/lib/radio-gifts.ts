@@ -27,7 +27,6 @@
  *   RADIO_GIFT_ENABLED = "1"            kill switch; anything else stops claims, new gifts and refunds
  *   RADIO_GIFT_TREASURY_KEY             the treasury's private key (secret)
  *   RADIO_GIFT_ADMIN = "SP…"            the addresses that may sign campaign and player requests (several: separate with commas)
- *   RADIO_GIFT_DAILY_CAP                no longer used (campaign claims are bounded by the treasury balance)
  *   RADIO_GIFT_ESCROW_CAP               most creator- and friend-funded money held at once, including batches still waiting for their payment (default 50 STX)
  *   RADIO_GIFT_TURNSTILE_SITE_KEY / _SECRET   optional Cloudflare Turnstile check on claims
  *   TELEMETRY_SALT                      salts the IP hash used for per-IP limits (no IP is stored)
@@ -49,15 +48,14 @@ import {
   batchDeposit, batchDepositMemo, batchRequestHash, BATCH_MEMO, isBatchId, validateBatch, verifyBatchSignature, type BatchRequest, type BatchView
 } from '../../src/lib/listening-wallet/batches';
 import {
-  campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_FEE_CAP, GIFT_MEMO, giftCodeHash, giftDepositMemo, isGiftCode, newGiftCode,
-  validateCampaign, validGiftAmount, verifyCampaignSignature, type CampaignRequest, type GiftView
+  GIFT_EXPIRY_MS, GIFT_FEE, GIFT_FEE_CAP, GIFT_MEMO, giftCodeHash, giftDepositMemo, isGiftCode, newGiftCode,
+  validGiftAmount, type GiftView
 } from '../../src/lib/listening-wallet/gifts';
 
 export type GiftEnv = PppEnv & {
   RADIO_GIFT_ENABLED?: string;
   RADIO_GIFT_TREASURY_KEY?: string;
   RADIO_GIFT_ADMIN?: string;
-  RADIO_GIFT_DAILY_CAP?: string;
   RADIO_GIFT_ESCROW_CAP?: string;
   /** Shared secret for the scheduled sweep (workers/radio-gift-sweep). Unset: the sweep endpoint does not exist. */
   RADIO_GIFT_SWEEP_SECRET?: string;
@@ -66,7 +64,6 @@ export type GiftEnv = PppEnv & {
   TELEMETRY_SALT?: string;
 };
 
-export const DEFAULT_DAILY_CAP = 2_000_000n;
 /** The most money held for creators and friends at once (a batch still waiting for its payment counts too). */
 export const DEFAULT_ESCROW_CAP = 50_000_000n;
 /** Unpaid batches one creator may have waiting at once (each is dropped after PENDING_DEPOSIT_MS). */
@@ -576,31 +573,6 @@ export async function shelfFor(env: GiftEnv, root: string, after = 0, limit = 50
       from: g.gifter, source: g.source, player: g.player_id ? await playerView(env, g.player_id) : null
     })))
   };
-}
-
-/** Admin: links paid from the campaign pool. Each signed request works once. The codes exist in clear only in this reply. */
-export async function createCampaign(env: GiftEnv, body: { request: CampaignRequest; signature: string }, deps: GiftDeps, request?: Request) {
-  requireEnabled(env, request);
-  if (!adminAddresses(env).length) throw new GiftError('No gift admin is set for this deployment.', 403);
-  let req: CampaignRequest;
-  try { req = validateCampaign(body?.request, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
-  if (!isAdmin(env, req.admin) || !verifyCampaignSignature(req, body.signature, req.admin)) throw new GiftError('Only the gift admin can make campaign links.', 403);
-  const admin = req.admin;
-  await ensureGiftTables(env);
-  // A link can only open a player that exists (the id is part of what the admin signed).
-  if (req.player && !(await one<{ id: string }>(env, "SELECT id FROM radio_gift_players WHERE id=? AND status='active'", [req.player])))
-    throw new GiftError('That gift player does not exist.', 400);
-  const hash = bytesToHex(sha256(encodeStructuredData(campaignData(req))));
-  try { await run(env, 'INSERT INTO radio_gift_campaigns(hash, admin, created_at) VALUES(?, ?, ?)', [hash, admin, deps.now]); }
-  catch (e) { if (isConstraint(e)) throw new GiftError('That request was already used. Sign a new one.', 409); throw e; }
-  const codes: string[] = [];
-  for (let i = 0; i < req.count; i++) {
-    const code = newGiftCode();
-    await run(env, `INSERT INTO radio_gifts(id, code_hash, amount, source, gifter, label, status, created_at, expires_at, updated_at, player_id)
-      VALUES(?, ?, ?, 'campaign', NULL, ?, 'live', ?, ?, ?, ?)`, [randomId(), giftCodeHash(code), Number(req.amount), req.label, deps.now, deps.now + GIFT_EXPIRY_MS, deps.now, req.player ?? null]);
-    codes.push(code);
-  }
-  return { codes, amount: req.amount, expires: deps.now + GIFT_EXPIRY_MS, ...(req.player ? { player: req.player } : {}) };
 }
 
 // ---------------------------------------------------------------------------- gift players
