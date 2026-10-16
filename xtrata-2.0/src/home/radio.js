@@ -2050,12 +2050,13 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   artEl.addEventListener('click', (event) => event.stopPropagation());
   const renderArt = (snap) => {
     const np = snap.nowPlaying;
-    // an album shows its own cover for every song; otherwise the playing song's
+    // an album shows its own cover until a song with artwork of its own plays; then that song's artwork
     const album = snap.albumCover;
-    const cover = album ? album.url : np && np.cover;
+    const own = np && np.cover ? np.cover : '';
+    const cover = own || (album ? album.url : '');
     if (cover) {
       if (artImg.getAttribute('src') !== cover) artImg.src = cover;
-      artEl.href = '/i/' + (album ? album.tokenId : np.tokenId);
+      artEl.href = '/i/' + (own ? np.tokenId : album.tokenId);
       artEl.classList.add('has-art');
     } else {
       artEl.classList.remove('has-art');

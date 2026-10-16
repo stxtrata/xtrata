@@ -104,6 +104,23 @@ describe('an open album is a player', () => {
     expect(text(album)).not.toContain("played this album out");
   });
 
+  it('shows the album cover until a song with its own artwork plays, then that artwork', async () => {
+    const withCover = { ...PLAYER, cover: 777 };
+    const album = await open({ gift: { player: withCover, from: null, source: 'batch', amount: '108000' } });
+    const push = (np: object | null) => {
+      const state = { playing: !!np, nowPlaying: np, heart: { liked: false }, albumCover: { url: '/inscription/777', tokenId: 777 } };
+      h.radio.getState = () => state; // the radio's resolved album cover is read from here
+      for (const [listener] of h.radio.subscribe.mock.calls) listener(state); // the page's title watcher and the album view both listen
+    };
+    const shown = () => album.querySelector('.al-cover img')!.getAttribute('src');
+    push(null);
+    expect(shown()).toBe('/inscription/777'); // nothing playing: the album cover
+    push({ tokenId: 319, title: 'Russian Rampage', artist: 'melophonic', cover: 'data:image/png;base64,U09ORw==' });
+    expect(shown()).toBe('data:image/png;base64,U09ORw=='); // that song's own artwork
+    push({ tokenId: 3567, title: 'SuperUser', artist: 'melophonic', cover: '' });
+    expect(shown()).toBe('/inscription/777'); // a song with none: the album cover again
+  });
+
   it('while plays arrive the controls rest (greyed out) and a calm countdown says to wait', async () => {
     const album = await open({ giftPlays: 0, balance: 0n, step: 'fund', depositPending: true, arrival: { since: Date.now() - 20_000, graceMs: 60_000 } });
     expect([...album.querySelectorAll<HTMLButtonElement>('.al-play, .al-icon--big, .al-track')].every((b) => b.disabled)).toBe(true);

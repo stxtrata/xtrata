@@ -230,3 +230,24 @@ it('an album can show its own cover: an image inscription as it is, or the image
   api.setGiftPlayer(null);
   expect(api.getState().albumCover).toBeNull();
 });
+
+it('the album cover shows until a song plays; then that song\'s own artwork, and the cover again for a song with none', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo) => {
+    const url = String(input);
+    const m = url.match(/runtime\/content\?.*tokenId=(\d+)/);
+    if (m && m[1] === '5000') return new Response('png', { headers: { 'content-type': 'image/png' } });
+    // song 11 carries its own artwork; song 12 has none
+    if (m && m[1] === '11') return new Response('<title>Song 11</title><img src="data:image/png;base64,U09ORzEx"><source src="data:audio/mpeg;base64,YQ==">', { headers: { 'content-type': 'text/html' } });
+    if (m) return new Response(`<title>Song ${m[1]}</title><source src="data:audio/mpeg;base64,YQ==">`, { headers: { 'content-type': 'text/html' } });
+    return new Response(JSON.stringify({ tracks: [] }));
+  }));
+  const api = initXtrataRadio({ tokenIds: ['7777'] })!;
+  const art = () => document.querySelector('.xtrata-radio__art img')?.getAttribute('src') ?? '';
+  api.setGiftPlayer({ ...album, cover: 5000 });
+  await vi.waitFor(() => expect(art()).toContain('tokenId=5000')); // before any song: the album cover
+  api.switchOn();
+  await vi.waitFor(() => expect(art()).toBe('data:image/png;base64,U09ORzEx')); // song 11 has artwork of its own
+  api.next();
+  await vi.waitFor(() => expect(String(api.getState().nowPlaying?.tokenId)).toBe('12'));
+  await vi.waitFor(() => expect(art()).toContain('tokenId=5000')); // song 12 has none: the album cover again
+});

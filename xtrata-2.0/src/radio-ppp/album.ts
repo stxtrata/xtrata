@@ -166,8 +166,9 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
   }, 500);
 
   // ---------------------------------------------------------------- pieces
-  function coverBox(p: PlayerView, big: boolean) {
-    const url = cover(p.cover);
+  /** The album's cover until a song with artwork of its own plays; then that song's. */
+  function coverBox(p: PlayerView, big: boolean, songCover = '') {
+    const url = songCover || cover(p.cover);
     return h('div', { class: 'al-cover' + (big ? '' : ' al-cover--small') },
       url ? h('img', { src: url, alt: `${p.title} cover` }) : h('div', { class: 'al-cover-fallback' }, h('b', {}, p.title), p.subtitle ? h('span', {}, p.subtitle) : null));
   }
@@ -210,7 +211,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
     const waiting = !!i.playsComing && !i.plays;
     const playing = !!st?.playing && !!current;
     const heart = st?.heart;
-    const nodes: Node[] = [coverBox(p, !out)];
+    const nodes: Node[] = [coverBox(p, !out, current ? String(np?.cover || '') : '')];
 
     nodes.push(h('div', { class: 'al-now' },
       h('div', { class: 'al-now-t' },
