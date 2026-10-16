@@ -10,8 +10,10 @@ export async function catalogueReport(env: Env, url: URL, waitUntil?: (promise: 
  const now=Date.now(), since=range==='all'?0:now-hours[range]*3600000;
  const state=await queryAll(env,'SELECT measured_since FROM radio_reporting_state WHERE id=1');
  const catalogue=await queryAll(env,`SELECT token_id,creator,mime,token_uri FROM inscription_index i
- WHERE contract=? AND sealed=1 AND (mime LIKE 'audio/%' OR mime LIKE 'text/html%')
- AND NOT EXISTS(SELECT 1 FROM radio_verdicts v WHERE v.contract=i.contract AND v.token_id=i.token_id AND v.verdict='dud') ORDER BY token_id`,[RADIO_CONTRACT]);
+ WHERE contract=? AND sealed=1 AND (mime LIKE 'audio/%' OR mime LIKE 'text/html%' OR mime LIKE 'video/%') ORDER BY token_id`,[RADIO_CONTRACT]);
+ // Community dud reports hide a song, unless the server verified it by reading the file (is_song below).
+ let duds=new Set<number>();
+ try {const result=await queryAll(env,"SELECT token_id FROM radio_verdicts WHERE contract=? AND verdict='dud'",[RADIO_CONTRACT]);duds=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* migration 008 optional */ }
  const metrics=range==='all' ? await queryAll(env,`SELECT token_id,SUM(starts) starts,SUM(plays) plays,SUM(completions) completions,SUM(seconds) seconds,MAX(last_play) last_play,NULL unique_browsers FROM radio_daily WHERE contract=? GROUP BY token_id`,[RADIO_CONTRACT]) : await queryAll(env,`SELECT token_id,SUM(seconds>=2) starts,SUM(qualified_at IS NOT NULL) plays,SUM(completed_at IS NOT NULL) completions,SUM(seconds) seconds,MAX(qualified_at) last_play,COUNT(DISTINCT CASE WHEN qualified_at IS NOT NULL THEN browser_hash END) unique_browsers FROM radio_plays WHERE contract=? AND created_at>=? GROUP BY token_id`,[RADIO_CONTRACT,since]);
  const active=await queryAll(env,`SELECT token_id,COUNT(*) active FROM radio_plays WHERE contract=? AND created_at>=? AND seconds>=2 AND qualified_at IS NULL AND closed=0 AND updated_at>=? GROUP BY token_id`,[RADIO_CONTRACT,since,now-1800000]);
  const durations=await queryAll(env,'SELECT token_id,MAX(duration) duration FROM radio_plays WHERE contract=? GROUP BY token_id',[RADIO_CONTRACT]);
@@ -31,7 +33,7 @@ export async function catalogueReport(env: Env, url: URL, waitUntil?: (promise: 
  try {const result=await queryAll(env,"SELECT token_id FROM radio_metadata WHERE cover!=''");covers=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* migration 014 optional */ }
  let verifiedSongs=new Set<number>();
  try {const result=await queryAll(env,'SELECT token_id FROM radio_metadata WHERE is_song=1');verifiedSongs=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* unverified HTML remains outside the catalogue */ }
- const tracks=(catalogue.results || []).filter((row:any)=>row.mime?.startsWith('audio/')||verifiedSongs.has(row.token_id)).map((row:any)=>{
+ const tracks=(catalogue.results || []).filter((row:any)=>verifiedSongs.has(row.token_id)||(row.mime?.startsWith('audio/')&&!duds.has(row.token_id))).map((row:any)=>{
   let meta:any={};
   // Decode indexed inline metadata only. Never fetch arbitrary token URLs.
   try { if(row.token_uri?.startsWith('data:application/json,')) meta=JSON.parse(decodeURIComponent(row.token_uri.slice(22))); } catch { /* absent metadata */ }
@@ -41,7 +43,7 @@ export async function catalogueReport(env: Env, url: URL, waitUntil?: (promise: 
   return {id:row.token_id,thumbnail:covers.has(row.token_id)?'/radio/artwork?id='+row.token_id:safeArtwork(meta.image?.url || meta.image || meta.artwork || meta.cover),current_likes:likesAvailable?(likeCounts.get(row.token_id)||0):null,title:radioTitle(row.token_id,cached?.title || (typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`)),
    album:albums.get(row.token_id) || (typeof meta.album==='string'?meta.album:typeof meta.album?.name==='string'?meta.album.name:typeof meta.inAlbum?.name==='string'?meta.inAlbum.name:'').slice(0,200),
    artist:radioArtist(row.token_id,cached?.artist || (typeof meta.artist==='string'?meta.artist.slice(0,200):'')),creator:row.creator,
-   status:row.mime?.startsWith('audio/')?'Audio':'Audio player',
+   status:row.mime?.startsWith('text/html')?'Audio player':'Audio',
    duration:durationById.get(row.token_id)||null,...m,in_progress:inProgress,
    partials:Math.max(0,m.starts-m.plays-inProgress),repeats:m.unique_browsers===null?null:Math.max(0,m.plays-m.unique_browsers),
    completion_rate:m.plays?100*m.completions/m.plays:null};
@@ -52,5 +54,5 @@ export async function catalogueReport(env: Env, url: URL, waitUntil?: (promise: 
  for(const track of tracks)Object.assign(track,{onchain_likes:likesFor(counts,track.id),paid_plays:paidPlaysFor(counts,track.id)});
  const chainLikesStatus=counts.likesStatus;
  return {range,since,until:now,onchain_likes_status:chainLikesStatus,paid_plays_status:counts.paidPlaysStatus,measured_since:(state.results?.[0] as any)?.measured_since,tracks,
- notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML entries are included only after embedded audio is verified. Titles/artists use inscription metadata and supplied artist-credit corrections. On-chain likes are confirmed wallet endorsements. Saved favourites are synced browser favourites, independent of the period. Neither proves unique people. Livestream listeners are not included.'};
+ notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML and video entries are included only after their audio is verified (embedded, linked, a hidden track, or an all-audio file). Titles/artists use inscription metadata and supplied artist-credit corrections. On-chain likes are confirmed wallet endorsements. Saved favourites are synced browser favourites, independent of the period. Neither proves unique people. Livestream listeners are not included.'};
 }

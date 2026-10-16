@@ -113,8 +113,11 @@ export interface PlayerView {
   id: string;
   title: string;
   subtitle: string;
-  /** Resolved from the catalogue by the server: titles and artists are never typed in by the creator. */
-  tracks: { id: number; title: string; artist: string }[];
+  /**
+   * Resolved from the catalogue by the server: titles and artists are never typed in by the creator. `hidden`: a
+   * hidden track, not listed, played only after a silence when the album ran start to finish without a skip.
+   */
+  tracks: { id: number; title: string; artist: string; hidden?: true }[];
   cover: number | null;
   /** True: when the paid plays run out the radio stops instead of carrying on for free. */
   paidOnly: true;
@@ -130,6 +133,11 @@ export const playsRemaining = (balance: bigint, fee = DEFAULT_PLAY_FEE): number 
   balance <= RESERVE ? 0 : Number((balance - RESERVE) / costPerPlay(fee));
 
 /** Presets offered to the admin. Max is the largest gift (1 STX). */
+/** The songs an album lists (its hidden track, if any, is not one of them). */
+export const listedTracks = (p: Pick<PlayerView, 'tracks'>) => p.tracks.filter((t) => !t.hidden);
+/** The album's hidden track: plays only after a silence when the album ran start to finish without a skip. */
+export const hiddenTrack = (p: Pick<PlayerView, 'tracks'>) => p.tracks.find((t) => t.hidden) ?? null;
+
 export const PLAY_PRESETS = [300, 500, 1000] as const;
 
 /** Of the gift: what goes to song holders and what is network fee, at `fee` per play. */
