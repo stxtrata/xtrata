@@ -11,7 +11,7 @@ import { bytesToHex } from '@noble/hashes/utils';
 import {
   BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
   adminAddresses, giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv,
-  batchesFor, batchStatus, confirmBatch, createBatch, ensureGiftTables, MAX_PENDING_BATCHES
+  batchesFor, batchStatus, confirmBatch, createBatch, ensureGiftTables, MAX_PENDING_BATCHES, REFUND_GROUP_MAX, runSweep, sweepAuthorised, SCAN_EVERY_MS, SCAN_WHILE_EXPECTING_MS
 } from '../radio-gifts';
 import { batchDeposit, batchRequestHash, type BatchRequest } from '../../../src/lib/listening-wallet/batches';
 import { deriveSlotIdentity, listeningBase } from '../../../src/lib/listening-wallet/derive';
@@ -24,6 +24,7 @@ function database() {
   const sql = new DatabaseSync(':memory:');
   sql.exec(readFileSync('functions/migrations/027_radio_gifts.sql', 'utf8'));
   const statement = (query: string) => {
+    db.onPrepare?.(query); // lets a test change the world between a read and the write that follows it
     let args: any[] = [];
     const s: any = {
       bind(...values: any[]) { args = values; return s; },
@@ -39,7 +40,8 @@ function database() {
     try { const out = []; for (const st of list) out.push(await st.run()); sql.exec('COMMIT'); return out; }
     catch (e) { sql.exec('ROLLBACK'); throw e; }
   };
-  return { sql, prepare: statement, batch };
+  const db: { sql: DatabaseSync; prepare: typeof statement; batch: typeof batch; onPrepare?: (query: string) => void } = { sql, prepare: statement, batch };
+  return db;
 }
 
 const key = () => privateKeyToString(makeRandomPrivKey()).slice(0, 64) + '01';
@@ -894,24 +896,117 @@ describe('radio gift players', () => {
       await s.claim(made.codes[0]); // the creator's copy is claimable
     });
 
-    it('unclaimed copies go back to the creator after 30 days, one refund each, and claimed copies are never refunded', async () => {
+    it('unclaimed copies go back to the creator after 30 days in ONE refund; claimed copies are never refunded', async () => {
       const s = setup();
       const made = await live(s, { count: 3 });
       await s.claim(made.codes[0]); await s.land();
       s.tick(GIFT_EXPIRY_MS + 1);
       await expect(s.claim(made.codes[1])).rejects.toMatchObject({ status: 410, message: expect.stringMatching(/expired/) });
       expect((await sweepGifts(s.env, s.deps())).did).toBe('deposits-scanned');
-      const refunded: string[] = [];
-      for (let i = 0; i < 2; i++) {
-        expect((await sweepGifts(s.env, s.deps())).did).toBe('refund-sent');
-        expect(decode(s.chain.sent.at(-1)!.raw)).toMatchObject({ recipient: s.admin, amount: 123000n });
-        refunded.push(s.chain.sent.at(-1)!.txid);
-        expect((await s.land()).did).toBe('settled');
-      }
-      expect(new Set(refunded).size).toBe(2);
+      const sent = await sweepGifts(s.env, s.deps());
+      expect(sent).toMatchObject({ did: 'refund-sent', copies: 2 });
+      // two copies back to the creator in one transfer: both amounts, plus the sending fee of the second copy (only ONE network fee is spent)
+      expect(decode(s.chain.sent.at(-1)!.raw)).toMatchObject({ recipient: s.admin, amount: 2n * 123000n + GIFT_FEE });
+      expect(s.chain.sent.filter((x) => decode(x.raw).amount > 200000n)).toHaveLength(1);
+      expect(rowsOf(s, made.id).map((r) => r.status).sort()).toEqual(['claimed', 'refunding', 'refunding']);
+      expect(await batchStatus(s.env, made.id)).toMatchObject({ copies: { waiting: 0, claimed: 1, refunding: 2, refunded: 0 } });
+      expect((await s.land()).did).toBe('settled');
       expect((await sweepGifts(s.env, s.deps())).did).toBe('nothing');
-      expect(await batchStatus(s.env, made.id)).toMatchObject({ copies: { waiting: 0, claimed: 1, refunded: 2 } });
-      expect(rowsOf(s, made.id).map((r) => r.status).sort()).toEqual(['claimed', 'refunded', 'refunded']);
+      expect(await batchStatus(s.env, made.id)).toMatchObject({ copies: { waiting: 0, claimed: 1, refunding: 0, refunded: 2 } });
+      const refundTx = s.chain.sent.at(-1)!.txid;
+      expect(s.db.sql.prepare("SELECT DISTINCT refund_txid FROM radio_gifts WHERE status='refunded'").all()).toEqual([{ refund_txid: refundTx }]);
+    });
+
+    it('the treasury keeps exactly what it owes: after a refund it holds no creator money, and it spent one network fee', async () => {
+      const s = setup();
+      const made = await live(s, { count: 4 });
+      const deposit = batchDeposit(4, 123000n);
+      s.tick(GIFT_EXPIRY_MS + 1);
+      await sweepGifts(s.env, s.deps()); // scan
+      await sweepGifts(s.env, s.deps()); // refund
+      const out = decode(s.chain.sent.at(-1)!.raw);
+      expect(out.amount + out.fee).toBe(deposit); // everything the creator paid comes back except the one network fee
+      expect(made.count).toBe(4);
+    });
+
+    it('one refund per gifter, and at most REFUND_GROUP_MAX copies in a transfer', async () => {
+      const s = setup();
+      const second = key();
+      s.env.RADIO_GIFT_ADMIN = `${s.admin}, ${addr(second)}`;
+      const a = await live(s, { count: REFUND_GROUP_MAX + 5, amount: '100000' });
+      const r2 = req(s, { creator: addr(second), count: 2, amount: '100000' });
+      const b = await createBatch(s.env, { request: r2, signature: sig(r2, second) }, s.deps(), s.request);
+      s.chain.txs.set('0x' + 'b'.repeat(64), { status: 'success', sender: addr(second), recipient: s.treasury, amount: BigInt(b.deposit), memo: b.memo });
+      await confirmBatch(s.env, { id: b.id, txid: '0x' + 'b'.repeat(64) }, s.deps(), s.request);
+      s.tick(GIFT_EXPIRY_MS + 1);
+      await sweepGifts(s.env, s.deps()); // scan
+      const seen: { to: string; amount: bigint }[] = [];
+      for (let i = 0; i < 6; i++) {
+        const r = await sweepGifts(s.env, s.deps());
+        if (r.did !== 'refund-sent') break;
+        const d = decode(s.chain.sent.at(-1)!.raw); seen.push({ to: d.recipient, amount: d.amount });
+        await s.land();
+      }
+      expect(seen).toHaveLength(3);
+      expect(seen.filter((x) => x.to === addr(second))).toEqual([{ to: addr(second), amount: 2n * 100000n + GIFT_FEE }]);
+      expect(seen.filter((x) => x.to === s.admin).map((x) => x.amount).sort()).toEqual([5n * 100000n + 4n * GIFT_FEE, BigInt(REFUND_GROUP_MAX) * 100000n + BigInt(REFUND_GROUP_MAX - 1) * GIFT_FEE].sort());
+      expect(rowsOf(s, a.id).every((r) => r.status === 'refunded')).toBe(true);
+    });
+
+    it('a stuck refund is re-signed with the same nonce and higher fee for EVERY copy it returns, and whichever lands settles all of them', async () => {
+      const s = setup();
+      const made = await live(s, { count: 3 });
+      s.tick(GIFT_EXPIRY_MS + 1);
+      await sweepGifts(s.env, s.deps());
+      await sweepGifts(s.env, s.deps());
+      const first = s.chain.sent.at(-1)!;
+      s.tick(BUMP_AFTER_MS + 1);
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('bumped');
+      const bumped = s.chain.sent.at(-1)!;
+      expect(bumped.txid).not.toBe(first.txid);
+      expect(decode(bumped.raw)).toMatchObject({ nonce: decode(first.raw).nonce, amount: decode(first.raw).amount, fee: GIFT_FEE * 2n });
+      expect(s.db.sql.prepare("SELECT DISTINCT refund_txid FROM radio_gifts WHERE batch_id=? AND status='refunding'").all(made.id)).toEqual([{ refund_txid: bumped.txid }]);
+      s.chain.txs.set(first.txid, { status: 'success', sender: s.treasury, recipient: s.admin, amount: decode(first.raw).amount, memo: '' }); // the first one lands after all
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('settled');
+      expect(rowsOf(s, made.id).every((r) => r.status === 'refunded')).toBe(true);
+      expect(s.db.sql.prepare('SELECT DISTINCT refund_txid FROM radio_gifts WHERE batch_id=?').all(made.id)).toEqual([{ refund_txid: first.txid }]);
+    });
+
+    it('a refund whose nonce is used without a payment puts EVERY copy back, and it is tried again', async () => {
+      const s = setup();
+      const made = await live(s, { count: 3 });
+      s.tick(GIFT_EXPIRY_MS + 1);
+      await sweepGifts(s.env, s.deps());
+      await sweepGifts(s.env, s.deps());
+      const lost = s.chain.sent.at(-1)!;
+      s.chain.txs.set(lost.txid, { status: 'dropped', sender: s.treasury, recipient: s.admin, amount: decode(lost.raw).amount, memo: '' });
+      s.chain.executed = decode(lost.raw).nonce;
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('nonce-used');
+      s.tick(NONCE_SETTLE_MS + 1);
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('released');
+      expect(rowsOf(s, made.id).map((r) => r.status)).toEqual(['live', 'live', 'live']);
+      expect(s.db.sql.prepare('SELECT COUNT(*) AS n FROM radio_gifts WHERE refund_txid IS NOT NULL').get()).toEqual({ n: 0 });
+      s.chain.mempoolNonce = decode(lost.raw).nonce + 1n; // and the next sweep sends them again
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('refund-sent');
+      expect(decode(s.chain.sent.at(-1)!.raw).amount).toBe(3n * 123000n + 2n * GIFT_FEE);
+    });
+
+    it('a refund is never recorded half-way: if one copy stopped being live, no copy is touched and no send exists', async () => {
+      const s = setup();
+      const made = await live(s, { count: 3 });
+      s.tick(GIFT_EXPIRY_MS + 1);
+      await sweepGifts(s.env, s.deps());
+      // The sweep reads the expired copies, then one of them is claimed by a racing request before the refund is written.
+      let raced = false;
+      s.db.onPrepare = (sql: string) => { if (!raced && /status='refunding', refund_txid/.test(sql)) { raced = true; s.db.sql.prepare("UPDATE radio_gifts SET status='claimed' WHERE batch_id=? AND id=(SELECT id FROM radio_gifts WHERE batch_id=? ORDER BY id LIMIT 1)").run(made.id, made.id); } };
+      const r = await sweepGifts(s.env, s.deps());
+      expect(r.did).toBe('refund-later');
+      expect(s.db.sql.prepare("SELECT COUNT(*) AS n FROM radio_gift_sends WHERE kind='refund'").get()).toEqual({ n: 0 });
+      expect(rowsOf(s, made.id).map((x) => x.status).sort()).toEqual(['claimed', 'live', 'live']);
+      s.db.onPrepare = undefined;
+      expect(s.db.sql.prepare("SELECT COUNT(*) AS n FROM radio_gifts WHERE status='refunding' OR refund_txid IS NOT NULL").get()).toEqual({ n: 0 });
+      // the next sweep returns the two that are still waiting
+      expect(await sweepGifts(s.env, s.deps())).toMatchObject({ did: 'refund-sent', copies: 2 });
     });
 
     it('shouts when the treasury holds less than it owes, and stays quiet when it holds enough', async () => {
@@ -966,6 +1061,57 @@ describe('radio gift players', () => {
       await s.claim(made.codes[0]); await s.land();
       const [code] = (await s.campaign(1)).codes;
       await s.claim(code);
+    });
+
+    describe('the scheduled sweep', () => {
+      const SECRET = 's3cret-'.repeat(5);
+      it('refunds an expired batch with nobody visiting any page, then idles', async () => {
+        const s = setup();
+        const made = await live(s, { count: 3 });
+        s.tick(GIFT_EXPIRY_MS + 1);
+        const first = await runSweep(s.env, s.deps());
+        expect(first.steps).toEqual(['deposits-scanned', 'refund-sent', 'pending']); // scan, one refund for all three, then wait for the chain
+        await s.land();
+        expect((await runSweep(s.env, s.deps())).steps).toEqual(['nothing']);
+        expect(rowsOf(s, made.id).every((r) => r.status === 'refunded')).toBe(true);
+      });
+
+      it('never loops forever: it stops after maxSteps even when every step does something', async () => {
+        const s = setup();
+        for (let i = 0; i < 3; i++) await fund(s, { count: 1, amount: '100000', label: 'b' + i });
+        s.tick(25 * 3600_000);
+        const r = await runSweep(s.env, s.deps(), 2);
+        expect(r.steps.length).toBeLessThanOrEqual(2);
+      });
+
+      it('does nothing at all while gifts are switched off', async () => {
+        const s = setup({ RADIO_GIFT_ENABLED: '0' });
+        expect((await runSweep(s.env, s.deps())).steps).toEqual(['off']);
+      });
+
+      it('looks for deposits every minute while a payment is expected, and every ten minutes otherwise', async () => {
+        const s = setup();
+        expect((await sweepGifts(s.env, s.deps())).did).toBe('deposits-scanned');
+        s.tick(SCAN_WHILE_EXPECTING_MS + 1);
+        expect((await sweepGifts(s.env, s.deps())).did).toBe('nothing'); // nobody is expected to pay: not yet
+        s.tick(SCAN_EVERY_MS);
+        expect((await sweepGifts(s.env, s.deps())).did).toBe('deposits-scanned');
+        const made = await fund(s); // now a creator has been asked to pay
+        s.tick(SCAN_WHILE_EXPECTING_MS + 1);
+        s.chain.inbound.push({ txid: '0x' + 'a'.repeat(64), status: 'success', sender: s.admin, recipient: s.treasury, amount: BigInt(made.deposit), memo: made.memo });
+        s.chain.txs.set('0x' + 'a'.repeat(64), s.chain.inbound[0]);
+        expect((await sweepGifts(s.env, s.deps())).did).toBe('deposits-scanned');
+        expect((await batchStatus(s.env, made.id)).status).toBe('live'); // found by the sweep within a minute, with no page open
+      });
+
+      it('accepts only the exact long secret', () => {
+        const env = { RADIO_GIFT_SWEEP_SECRET: SECRET } as GiftEnv;
+        expect(sweepAuthorised(env, `Bearer ${SECRET}`)).toBe(true);
+        expect(sweepAuthorised(env, SECRET)).toBe(true);
+        for (const bad of [null, '', 'Bearer', `Bearer ${SECRET}x`, `Bearer ${SECRET.slice(1)}`, 'Bearer wrong']) expect(sweepAuthorised(env, bad)).toBe(false);
+        expect(sweepAuthorised({} as GiftEnv, `Bearer ${SECRET}`)).toBe(false);
+        expect(sweepAuthorised({ RADIO_GIFT_SWEEP_SECRET: 'short' } as GiftEnv, 'Bearer short')).toBe(false); // too short to be a secret
+      });
     });
   });
   });
