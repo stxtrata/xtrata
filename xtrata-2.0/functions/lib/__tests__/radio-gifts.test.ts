@@ -17,6 +17,7 @@ import { batchDeposit, batchRequestHash, type BatchRequest } from '../../../src/
 import { deriveSlotIdentity, listeningBase } from '../../../src/lib/listening-wallet/derive';
 import { signSlotBinding } from '../../../src/lib/listening-wallet/slots';
 import { playerData, playerHash, type PlayerDefinition, type PlayerRequest } from '../../../src/lib/listening-wallet/gift-players';
+import { radioArtist, radioTitle } from '../../../src/lib/radio/artist-credits.mjs';
 import { GIFT_EXPIRY_MS, GIFT_FEE, GIFT_MEMO, giftCodeHash, giftDepositMemo, newGiftCode } from '../../../src/lib/listening-wallet/gifts';
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
 
@@ -471,7 +472,8 @@ describe('radio gift players', () => {
     const { playerView } = await import('../radio-gifts');
     expect(await playerView(s.env, out.id)).toEqual({
       id: out.id, title: 'Proof of Sound', subtitle: 'The Artist', cover: 785, paidOnly: true,
-      tracks: SONGS.map((id, i) => ({ id, title: `Song ${i + 1}`, artist: 'The Artist' }))
+      // the supplied credit corrections win, exactly as on the radio (2186–2189 are credited songs)
+      tracks: SONGS.map((id, i) => ({ id, title: radioTitle(id, `Song ${i + 1}`), artist: radioArtist(id, 'The Artist') }))
     });
   });
 
@@ -1161,5 +1163,41 @@ describe('radio gift players', () => {
       });
     });
   });
+  });
+
+  it('a plain audio inscription is an album song, and the credits give its title (#315 "Entertainment" by melophonic)', async () => {
+    const s = setup(); catalogue(s);
+    s.db.sql.exec('CREATE TABLE inscription_index (contract TEXT, token_id INTEGER, sealed INTEGER, mime TEXT)');
+    s.db.sql.prepare("INSERT INTO inscription_index VALUES('SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3', 315, 1, 'audio/webm')").run();
+    s.db.sql.prepare("INSERT INTO inscription_index VALUES('SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3', 316, 0, 'audio/webm')").run(); // not sealed
+    const out = await make(s, definition({ tracks: [315, 2186] }));
+    const { playerView } = await import('../radio-gifts');
+    expect((await playerView(s.env, out.id))!.tracks[0]).toEqual({ id: 315, title: 'Entertainment', artist: 'melophonic' });
+    await expect(make(s, definition({ tracks: [316, 2186] }))).rejects.toMatchObject({ status: 400, message: expect.stringContaining('#316') });
+  });
+
+  it('songs the catalogue has not reached yet are read on the spot, then the album is made', async () => {
+    const s = setup(); catalogue(s);
+    const def = definition({ tracks: [...SONGS, 319] });
+    await expect(make(s, def)).rejects.toMatchObject({ message: 'Song #319 is not a ready song in the radio catalogue.' });
+    const checkSongs = vi.fn(async (ids: number[]) => {
+      for (const id of ids) s.db.sql.prepare("INSERT OR REPLACE INTO radio_metadata VALUES(?, 'Russian Rampage', '', 1, 'ready')").run(id);
+    });
+    s.tick(1000);
+    const out = await createPlayer(s.env, signed(s, def), { ...s.deps(), checkSongs }, s.request);
+    expect(checkSongs).toHaveBeenCalledWith([319]);
+    expect(out).toMatchObject({ tracks: 5, existing: false });
+  });
+
+  it('a hidden track belongs to the album without being listed; an album of only hidden tracks is refused', async () => {
+    const s = setup();
+    catalogue(s, [...SONGS.map((n, i): [number, string, string, number, string] => [n, `Song ${i + 1}`, 'The Artist', 1, 'ready']), [139, '', '', 2, 'ready']]);
+    const out = await make(s, definition({ tracks: [...SONGS, 139] }));
+    const { playerView } = await import('../radio-gifts');
+    const view = (await playerView(s.env, out.id))!;
+    expect(view.tracks.at(-1)).toEqual({ id: 139, title: 'Subterranean (Extended Mix with Phil Hartnoll)', artist: 'melophonic', hidden: true });
+    expect(view.tracks.filter((t) => !t.hidden).map((t) => t.id)).toEqual(SONGS);
+    s.tick(1000);
+    await expect(make(s, definition({ tracks: [139], cover: null }))).rejects.toMatchObject({ status: 400, message: expect.stringContaining('hidden track') });
   });
 });

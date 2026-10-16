@@ -5,8 +5,9 @@ import type { RuntimeEnv } from '../runtime/lib';
 //
 // SONGS ONLY: returns sealed tokens whose mime is audio/* (mp3, opus, weba…)
 // plus text/html (candidate players; the client's probe remains the
-// gatekeeper). video/* is deliberately excluded — "film audio" was the main
-// source of silent/dud tunes. Community-reported duds (radio_verdicts, fed by
+// gatekeeper). video/* is excluded unless the server verified the file is a
+// song (a hidden track, or a WebM whose tracks are all audio) — plain "film
+// audio" was the main source of silent/dud tunes. Community-reported duds (radio_verdicts, fed by
 // POST /index/verdict) are subtracted server-side, so every listener benefits
 // from every other listener's failed tune attempts.
 //
@@ -56,7 +57,7 @@ export const onRequest = async (context: {
       env,
       `SELECT token_id, mime, total_size FROM inscription_index
         WHERE contract = ? AND sealed = 1
-          AND (mime LIKE 'audio/%' OR mime LIKE 'text/html%')
+          AND (mime LIKE 'audio/%' OR mime LIKE 'text/html%' OR mime LIKE 'video/%')
         ORDER BY token_id ASC`,
       [contractId]
     );
@@ -66,6 +67,15 @@ export const onRequest = async (context: {
       const dudRows = await queryAll(env, 'SELECT token_id FROM radio_verdicts WHERE contract = ? AND verdict = ?', [contractId, 'dud']);
       dudSet = new Set(((dudRows.results ?? []) as Array<{ token_id: number }>).map((r) => r.token_id));
     } catch { /* migration 008 not applied yet */ }
+    // Songs the server itself verified by reading the file (radio_metadata.is_song, see functions/lib/radio-metadata.ts):
+    // a video only joins the station this way (a hidden track, or a WebM that is all audio), and a verified song is
+    // never subtracted as a dud, whatever older reports said.
+    let verified = new Set<number>();
+    try {
+      const songRows = await queryAll(env, 'SELECT token_id FROM radio_metadata WHERE is_song = 1', []);
+      verified = new Set(((songRows.results ?? []) as Array<{ token_id: number }>).map((r) => r.token_id));
+    } catch { /* metadata tables not applied yet */ }
+    for (const id of verified) dudSet.delete(id);
     const stateRes = await queryAll(
       env,
       'SELECT minted_count, synced_count, updated_at FROM inscription_index_state WHERE contract = ?',
@@ -74,11 +84,13 @@ export const onRequest = async (context: {
     const state = (stateRes.results ?? [])[0] as { minted_count?: number; synced_count?: number; updated_at?: number } | undefined;
 
     const audio: number[] = [];
+    const video: number[] = [];
     const html: number[] = [];
     for (const r of (rows.results ?? []) as PlayableRow[]) {
       if (dudSet.has(r.token_id)) continue;
       const mime = (r.mime || '').toLowerCase();
       if (mime.startsWith('audio/')) audio.push(r.token_id);
+      else if (mime.startsWith('video/')) { if (verified.has(r.token_id)) video.push(r.token_id); }
       else html.push(r.token_id);
     }
 
@@ -94,6 +106,7 @@ export const onRequest = async (context: {
       {
         contract: contractId,
         audio,                       // audio/* only — songs and weba film-audio, playable as-is
+        video,                       // video/* the server verified as songs (hidden track, or all-audio WebM)
         html,                        // text/html — candidate players (client probes)
         duds: [...dudSet],           // community-reported unplayables (client pre-seeds its cache)
         mintedCount: state?.minted_count ?? 0,

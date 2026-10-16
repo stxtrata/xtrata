@@ -18,6 +18,7 @@ import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { createNameCache } from '../lib/bns/name-cache';
 import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
 import { createGifts } from './gifts';
+import { hiddenTrack, listedTracks } from '../lib/listening-wallet/gift-players';
 import { createShelf } from './shelf';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
@@ -187,7 +188,7 @@ function start(root: HTMLElement) {
     const p = s.step === 'off' || s.step === 'elsewhere' ? null : s.gift?.player ?? null;
     const id = p ? p.id + ':' + p.cover + ':' + p.tracks.map((t) => t.id).join(',') : '';
     if (id !== giftPushed) {
-      radio.setGiftPlayer(p ? { id: p.id, title: p.title, subtitle: p.subtitle, tracks: p.tracks.map((t) => t.id), cover: p.cover } : null);
+      radio.setGiftPlayer(p ? { id: p.id, title: p.title, subtitle: p.subtitle, tracks: listedTracks(p).map((t) => t.id), hidden: hiddenTrack(p)?.id ?? null, cover: p.cover } : null);
       giftPushed = id;
     }
     const stop = s.giftStop?.text ?? null; // any passkey wallet is paid-only, not just a gifted album

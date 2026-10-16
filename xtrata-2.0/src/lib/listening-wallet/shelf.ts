@@ -51,7 +51,7 @@ export function shelfItems(rows: unknown): ShelfItem[] {
 }
 
 const haystack = (a: ShelfItem) =>
-  [a.player?.title, a.player?.subtitle, a.label, `#${a.slot}`, ...(a.player?.tracks ?? []).flatMap((t) => [t.title, t.artist])]
+  [a.player?.title, a.player?.subtitle, a.label, `#${a.slot}`, ...(a.player?.tracks ?? []).filter((t) => !t.hidden).flatMap((t) => [t.title, t.artist])]
     .filter(Boolean).join(' ').toLowerCase();
 
 /** Pinned albums first, then the chosen order. Every word typed must appear somewhere in the album. */
