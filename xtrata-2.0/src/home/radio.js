@@ -717,6 +717,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // paid plays are used up (the radio then goes quiet instead of carrying on for free).
   let giftPlayer = null;                   // {id,title,subtitle,tracks:[tokenId strings],hidden:tokenId string|null,cover}
   let giftLock = false;                    // a curated album is the only band until the listener funds a wallet of their own
+  let giftWait = false;                    // plays are on their way: the controls rest, greyed out, until they land
   let giftStop = null;                     // null, or the text to show when playback is refused
   let preset = 'all';                      // within FM: 'music' | 'all'
   // Shuffle is OFF by default: the dial plays in order (likes/curated/chain
@@ -739,7 +740,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
-    gift: giftPlayer ? { id: giftPlayer.id, title: giftPlayer.title, subtitle: giftPlayer.subtitle, tracks: giftPlayer.tracks.length } : null, giftStop, giftLocked: gated(),
+    gift: giftPlayer ? { id: giftPlayer.id, title: giftPlayer.title, subtitle: giftPlayer.subtitle, tracks: giftPlayer.tracks.length } : null, giftStop, giftWait, giftLocked: gated(),
     albumCover: giftPlayer && albumCoverUrl ? { url: albumCoverUrl, tokenId: giftPlayer.cover } : null,
     likesStatus: chainState?.snapshot().status || 'disconnected', likesRetryAt: chainState?.snapshot().retryAt, likesCheckedAt: chainState?.snapshot().checkedAt, band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
@@ -1952,6 +1953,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       giftStop = next;
       if (giftStop && on) refuseForGift(); else emit();
     },
+    /** Plays are on their way (a gift is landing): the controls rest, greyed out, until they arrive. */
+    setGiftWait: (on) => {
+      const next = Boolean(on);
+      if (next === giftWait) return;
+      giftWait = next;
+      root.classList.toggle('is-gift-wait', giftWait);
+      emit();
+    },
     /** The listener's order for the LIKED station: inscription ids, first plays first. */
     setLikedOrder: (ids) => { likedOrder = Array.isArray(ids) ? ids.map(String).slice(0, 5000) : []; },
     /**
@@ -2109,6 +2118,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const renderPctl = (snap) => {
     ppBtn.textContent = snap.playing ? '\u23f8' : '\u25b6';
     pctl.querySelector('[data-p="power"]').classList.toggle('is-lit', Boolean(snap.on));
+    Array.prototype.forEach.call(pctl.querySelectorAll('button'), (b) => { b.disabled = Boolean(snap.giftWait); });
   };
 
 

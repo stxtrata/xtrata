@@ -639,3 +639,8 @@ img.xtrata-radio__rtile { object-fit: cover; }
 .xtrata-radio-likes-dialog a { display: block; color: #b8ed9c; padding: 8px 0; }
 .xtrata-radio-likes-dialog ul { max-height: 24vh; overflow: auto; padding-left: 24px; }
 .xtrata-radio-likes-dialog button { margin-top: 16px; padding: 10px 16px; cursor: pointer; }
+
+/* Plays on their way (a gift is landing): the controls rest, greyed out, until the plays arrive. */
+.xtrata-radio.is-gift-wait .xtrata-radio__btn,
+.xtrata-radio.is-gift-wait .xtrata-radio__pot,
+.xtrata-radio.is-gift-wait .xtrata-radio__pctl button { opacity: .38; pointer-events: none; cursor: progress; filter: grayscale(.6); }

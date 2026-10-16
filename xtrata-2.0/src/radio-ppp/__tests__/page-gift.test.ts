@@ -39,7 +39,7 @@ async function open(over: object = {}) {
     <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section>`;
-  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
+  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
   (window as any).XtrataRadio = h.radio;
   h.snap = { ...base, ...over };
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: any) => h.route?.(String(url), init) ?? new Response(String(url).endsWith('/radio/gift/player') ? JSON.stringify({ id: 'fedcba9876543210', title: 'Proof of Sound', tracks: 2, existing: false }) : '{}')));
@@ -491,5 +491,62 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
     const root = await admin();
     await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('links were made on another device'));
     expect(text(root.querySelector('.ppp-gift-body')!)).toContain('Elsewhere');
+  });
+});
+
+describe('waiting for plays to arrive', () => {
+  const arriving = { step: 'fund', balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, giftPlays: 0, depositPending: true, giftStop: { reason: 'arriving', text: 'YOUR PLAYS ARE ARRIVING' } };
+  beforeEach(() => { delete document.documentElement.dataset.ppp; localStorage.clear(); });
+
+  it('shows a calm countdown bar, no red, and no "artists unpaid", for the first minute', async () => {
+    const root = await open({ ...arriving, gift: null, arrival: { since: Date.now() - 12_000, graceMs: 60_000 } });
+    const bar = root.querySelector('.ppp-wait')!;
+    expect(bar).not.toBeNull();
+    expect(bar.getAttribute('role')).toBe('progressbar');
+    expect(text(bar)).toMatch(/Your plays are arriving.*usually about a minute · (4[6-9]|48)s/);
+    expect(bar.classList.contains('is-long')).toBe(false);
+    expect(root.querySelector('.ppp-bad')).toBeNull();
+    expect(text(root)).not.toMatch(/artists unpaid|Add funds|Out of plays|Out of funds/);
+    expect(document.documentElement.dataset.ppp).toBeUndefined(); // the radio is not dressed as "not paying"
+  });
+
+  it('past the first minute it keeps moving and stays calm: it never turns into an error', async () => {
+    const root = await open({ ...arriving, gift: null, arrival: { since: Date.now() - 95_000, graceMs: 60_000 } });
+    const bar = root.querySelector('.ppp-wait')!;
+    expect(bar.classList.contains('is-long')).toBe(true);
+    expect(text(bar)).toMatch(/Still arriving.*starts by itself/);
+    expect(root.querySelector('.ppp-bad')).toBeNull();
+  });
+
+  it('tells the radio to grey its controls while plays arrive, and to wake them once they have', async () => {
+    await open({ ...arriving, gift: null, arrival: { since: Date.now(), graceMs: 60_000 } });
+    expect(h.radio.setGiftWait).toHaveBeenLastCalledWith(true);
+    h.snap = { ...base, step: 'ready', depositPending: false, arrival: null, giftStop: null };
+    h.changed();
+    expect(h.radio.setGiftWait).toHaveBeenLastCalledWith(false);
+  });
+
+  it('no bar when nothing is expected: a genuinely empty wallet still says so', async () => {
+    const root = await open({ step: 'fund', balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, giftPlays: 0, gift: null, arrival: null, giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } });
+    expect(root.querySelector('.ppp-wait')).toBeNull();
+  });
+
+  it('a linked wallet, empty, with history, still reads as waiting while an album claim is running', async () => {
+    const CODE = 'ABCDEFGHJKMNPQRSTVWXYZ';
+    localStorage.setItem('xtrata.radio.gift.incoming.v1', JSON.stringify({ code: CODE, at: Date.now() }));
+    h.bind = vi.fn(async (n: number) => ({ root: 'SP3X2F7FQH7GQS0YRBWH0H5W6RM2PB1B0WPD1XA2V', slot: n, address: 'SPALBUM' + n, issued: 1, rootSignature: 'r', slotSignature: 's' }));
+    let release: (r: Response) => void = () => {};
+    h.route = (url: string) => {
+      if (url.endsWith('/radio/gift/status')) return new Response(JSON.stringify({ status: 'live', amount: '100000', source: 'friend', from: null, label: '', expires: 0, player: PLAYER }));
+      if (url.includes('/radio/gift/slots')) return new Response(JSON.stringify({ next: 1 }));
+      if (url.endsWith('/radio/gift/claim')) return new Promise<Response>((r) => { release = r; }) as unknown as Response;
+      return undefined;
+    };
+    const root = await open({ step: 'fund', root: 'SP3X2F7FQH7GQS0YRBWH0H5W6RM2PB1B0WPD1XA2V', slot: 0, walletCannotAlbums: false, balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, gift: null, giftStop: null, giftPlays: 0, solo: false, linked: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', entries: [{ kind: 'play', status: 'confirmed', amount: '350', created: Date.now(), song: 7, txid: '0x1' }], createdHere: false });
+    await vi.waitFor(() => expect(h.bind).toHaveBeenCalled());
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-key')!)).toMatch(/Sending your album/));
+    expect(text(root)).not.toMatch(/Out of funds|Add funds|artists unpaid/);
+    expect(root.querySelector('.ppp-key .ppp-bad')).toBeNull();
+    release(new Response('{}', { status: 500 }));
   });
 });
