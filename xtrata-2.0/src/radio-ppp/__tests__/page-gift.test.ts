@@ -392,6 +392,15 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
     expect(text(a.querySelector('.ppp-gift-body')!)).toContain('Prefunded batch (admin)');
   });
 
+  it('has no campaign box any more: batches are the only way to make links', async () => {
+    served();
+    const root = await admin();
+    const body = text(root.querySelector('.ppp-gift-body')!);
+    expect(body).not.toMatch(/Campaign links|paid from the gift treasury|Sign and make links/);
+    expect(body).toContain('Prefunded batch (admin)');
+    expect(body).toContain('Sign and make player');
+  });
+
   it('shows the whole bill before anything is signed: plays, reserve, likes float, sending fee, total', async () => {
     served();
     const root = await admin();
