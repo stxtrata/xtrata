@@ -138,6 +138,7 @@ function start(root: HTMLElement) {
     })),
     sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
     giftSent: (txid, amount) => ppp.giftSent(txid, amount),
+    claiming: (on) => ppp.giftClaiming(on),
     album: { bind: (slot) => ppp.bindAlbum(slot), arrived: async (slot, address, txid, amount) => { shelf.invalidate(); await ppp.albumArriving(slot, address, txid, amount); } },
     who: (address) => who(address),
     changed: () => render(ppp.snapshot()),
@@ -181,7 +182,7 @@ function start(root: HTMLElement) {
   };
 
   // A gifted wallet's album becomes a band on the radio; when its paid plays run out the radio stops (no free mode).
-  let giftPushed = '', stopPushed: string | null = null, lockPushed = false;
+  let giftPushed = '', stopPushed: string | null = null, lockPushed = false, waitPushed = false;
   const syncGift = (s: Snapshot) => {
     const radio = (window as any).XtrataRadio;
     if (!radio?.setGiftPlayer || !radio?.setGiftStop) return; // pushed again at the next render, once the radio is there
@@ -193,6 +194,9 @@ function start(root: HTMLElement) {
     }
     const stop = s.giftStop?.text ?? null; // any passkey wallet is paid-only, not just a gifted album
     if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
+    // Plays on their way: the radio greys its controls and says so, instead of looking broken.
+    const wait = s.giftStop?.reason === 'arriving';
+    if (wait !== waitPushed) { radio.setGiftWait?.(wait); waitPushed = wait; }
     const lock = !!p && !!s.albumLock?.locked;
     if (lock !== lockPushed) { radio.setGiftLock?.(lock); lockPushed = lock; }
     // Per-wallet song memory lasts only while this passkey stays unlocked on this page.
@@ -465,6 +469,48 @@ function start(root: HTMLElement) {
     return [box];
   }
 
+  /**
+   * "Something is happening, just wait": a progress bar over the usual minute, then a calm moving bar. Never red,
+   * never a warning. The bar and its seconds are kept fresh by `tickArrival` without redrawing the panel.
+   */
+  const arrivalBar = (a: NonNullable<Snapshot['arrival']>): HTMLElement => {
+    const box = el('div', '', 'ppp-wait');
+    box.dataset.since = String(a.since);
+    box.dataset.grace = String(a.graceMs);
+    box.setAttribute('role', 'progressbar');
+    box.setAttribute('aria-label', 'Your plays are arriving');
+    const text = el('p', '', 'ppp-wait-t'), track = el('div', '', 'ppp-wait-track');
+    track.append(el('div', '', 'ppp-wait-fill'));
+    box.append(text, track);
+    paintArrival(box);
+    return box;
+  };
+  function paintArrival(box: HTMLElement) {
+    const since = Number(box.dataset.since), grace = Number(box.dataset.grace) || 60_000;
+    const elapsed = Math.max(0, Date.now() - since);
+    const fill = box.querySelector('.ppp-wait-fill') as HTMLElement, text = box.querySelector('.ppp-wait-t') as HTMLElement;
+    if (elapsed < grace) {
+      const left = Math.ceil((grace - elapsed) / 1000);
+      fill.style.width = Math.max(4, Math.min(95, (elapsed / grace) * 100)).toFixed(0) + '%';
+      text.textContent = `Your plays are arriving… usually about a minute · ${left}s`;
+      box.classList.remove('is-long');
+      box.setAttribute('aria-valuenow', String(Math.round((elapsed / grace) * 100)));
+    } else {
+      fill.style.width = '';
+      text.textContent = 'Still arriving… this can take a few minutes. Nothing for you to do: it starts by itself.';
+      box.classList.add('is-long');
+      box.removeAttribute('aria-valuenow');
+    }
+  }
+  // Keeps the countdown moving, and re-reads the state now and then so the wait ends by itself once the plays land.
+  let arrivalTicks = 0;
+  setInterval(() => {
+    const bars = document.querySelectorAll<HTMLElement>('.ppp-wait');
+    if (!bars.length) { arrivalTicks = 0; return; }
+    bars.forEach(paintArrival);
+    if (++arrivalTicks % 10 === 0) render(ppp.snapshot());
+  }, 1000);
+
   function render(raw: Snapshot) {
     // A gift being claimed or sent to this wallet is money on its way: the panel and the radio say "on its way",
     // never "no funds · artists unpaid" (which reads as if something went wrong). The gift code sees the real state.
@@ -473,6 +519,9 @@ function start(root: HTMLElement) {
     syncIdentity(s);
     syncGift(raw);
     syncHeader(s);
+    // The gift banner can start the claim while it draws, and the claim redraws everything as "on its way". Stop here
+    // rather than paint this older, not-yet-waiting picture over it.
+    if (!giftWait && gifts.inProgress(raw)) return;
     renderTop(s);
     renderMode(s);
     root.hidden = s.step === 'off';
@@ -640,7 +689,7 @@ function start(root: HTMLElement) {
         key.push(el('p', 'Checking the listening wallet balance…', 'ppp-mute'));
         break;
       case 'fund': {
-        if (s.depositPending) { /* the "on their way" line below says it all */ }
+        if (s.depositPending) { if (s.arrival) key.push(arrivalBar(s.arrival)); /* the "on their way" line below says the rest */ }
         else if (s.gift?.player) key.push(el('p', 'Out of plays · add more to keep listening', 'ppp-bad'));
         else if (s.entries.length) key.push(el('p', 'Out of funds · top up to keep paying', 'ppp-bad'));
         else key.push(el('p', `Add funds · 1 STX ≈ ${Math.floor(Number(1_000_000n / cost)).toLocaleString()} songs`));

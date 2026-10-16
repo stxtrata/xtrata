@@ -139,6 +139,12 @@ export interface Snapshot {
   /** A deposit was sent and has not confirmed yet: no further deposit is offered. */
   depositPending: boolean;
   /**
+   * Plays are expected any moment (a gift is being claimed or is on its way, or has just landed and the balance
+   * has not caught up). `since` is when the wait began; nothing is shown as wrong while it lasts, and the page
+   * draws a progress bar from it. Null when nothing is expected.
+   */
+  arrival: { since: number; graceMs: number } | null;
+  /**
    * The wallet box (deployed separately, at wallet.xtrata.xyz) is an older build without like
    * signing: the heart falls back to the main-wallet page until it is updated.
    */
@@ -221,6 +227,8 @@ export type ReturnPlanView =
 
 const UNRESOLVED: Entry['status'][] = ['prepared', 'signed', 'unknown', 'pending'];
 const STUCK_AFTER_MS = 30 * 60_000;
+/** A gift claim is never called late, empty or wrong before this long: a minute is a normal wait, not a fault. */
+export const ARRIVAL_GRACE_MS = 60_000;
 
 /** The node refused the transaction outright, so it never entered the mempool and its nonce is unused. */
 export const definitelyRejected = (e: unknown) => {
@@ -307,6 +315,20 @@ export function createPppController(deps: PppDeps) {
     try { return JSON.parse(deps.store.get(key('deposit', listening)) || 'null'); } catch { return null; }
   };
   const setPendingDeposit = (d: PendingDeposit | null, listening = status?.address) => { if (listening) deps.store.set(key('deposit', listening), JSON.stringify(d)); };
+  /**
+   * Plays that are about to arrive but have no pending deposit to point at yet: the gift claim is in flight, or the
+   * deposit has just confirmed and the balance read has not caught up. Held for at least ARRIVAL_GRACE_MS from when
+   * the wait began, so a slow network or a lagging index never shows "no funds · artists unpaid" for a gift that
+   * is on its way. Kept in memory only: a reload re-reads the real state.
+   */
+  let arrival: { since: number; until: number } | null = null;
+  const expectArrival = (graceMs = ARRIVAL_GRACE_MS) => {
+    const now = deps.now();
+    arrival = { since: arrival && now < arrival.until ? arrival.since : now, until: Math.max(arrival?.until ?? 0, now + graceMs) };
+  };
+  const arrivalLive = () => !!arrival && deps.now() < arrival.until && (balance === undefined || balance < RESERVE + costPerPlay(fee()));
+  /** Funds are on their way in some form: a recorded deposit, or a gift being claimed or settling. */
+  const arrivalExpected = () => !!pendingDeposit() || arrivalLive();
   /** The wallet that signs likes: the passkey's own, even while an album wallet is open (boxes before `rootLike` sign with the open one). */
   const likeAddr = (): string | undefined => (walletLacks('rootLike') ? status?.address : status?.root ?? status?.address);
   const albumOpen = () => !!status?.address && likeAddr() !== status.address;
@@ -412,7 +434,7 @@ export function createPppController(deps: PppDeps) {
       case 'locked': return stop('locked', 'UNLOCK TO LISTEN');
       case 'link': return stop('link', 'FINISH SETUP TO LISTEN');
       case 'over': return stop('over', 'OVER 1 STX — RETURN THE EXCESS');
-      case 'fund': return pendingDeposit() ? stop('arriving', 'YOUR PLAYS ARE ARRIVING') : stop('out', albumOpen() ? OUT_TEXT : WALLET_EMPTY_TEXT);
+      case 'fund': return arrivalExpected() ? stop('arriving', 'YOUR PLAYS ARE ARRIVING') : stop('out', albumOpen() ? OUT_TEXT : WALLET_EMPTY_TEXT);
       case 'ready':
         if (!payingOn() || !status?.session || status.session.playsLeft < 1) return stop('off', 'PAYING IS OFF — SWITCH ON TO LISTEN');
         if (!lockHeld) return stop('tab', 'PLAYING IN ANOTHER TAB');
@@ -483,7 +505,8 @@ export function createPppController(deps: PppDeps) {
     allowance: balance === undefined ? TARGET : fundingAllowance(balance, BigInt(pendingDeposit()?.amount ?? '0')),
     session: status?.session ?? null,
     payingOn: payingOn(), entries: entries(), depositTxid: pendingDeposit()?.txid ?? depositTxid,
-    depositPending: !!pendingDeposit(),
+    depositPending: arrivalExpected(),
+    arrival: arrivalExpected() ? { since: pendingDeposit()?.at ?? arrival?.since ?? deps.now(), graceMs: ARRIVAL_GRACE_MS } : null,
     walletOutdated: walletLacks('like'),
     linkedListening: mainLinksFor && mainLinksFor === deps.main() ? mainLinks.map((l) => l.listening) : [],
     serverLinked: !!serverLink && serverLinkFor === `${deps.main()}:${status?.address}`,
@@ -677,6 +700,8 @@ export function createPppController(deps: PppDeps) {
         const s = String(tx?.tx_status ?? '');
         if ((s === 'success' && tx.is_unanchored === false) || s.startsWith('abort_') || s.startsWith('dropped_') || (!tx && deps.now() - d.at > 2 * 3600_000)) {
           setPendingDeposit(null, at);
+          // It confirmed (or was dropped): give the balance a moment to show it before anything reads as empty.
+          if (s === 'success') expectArrival(20_000);
           balanceAt = -Infinity;
           rootBalance = null;
           // "Gift on its way" / "deposit on its way" is over: say nothing rather than leave it up while paying.
@@ -990,6 +1015,12 @@ export function createPppController(deps: PppDeps) {
      * A gift funded this wallet (the server sent it from the gift treasury): tracked exactly like a
      * deposit, so the panel says it is on its way and paying starts by itself once it confirms.
      */
+    /** A gift claim started (true) or stopped for good (false): the plays are expected, so nothing reads as empty meanwhile. */
+    giftClaiming: (on: boolean) => {
+      if (on) expectArrival(); else arrival = null;
+      deps.changed();
+    },
+
     giftSent: (txid: string, amount: bigint) => {
       if (!status?.address || pendingDeposit()) return;
       setPendingDeposit({ txid, amount: amount.toString(), at: deps.now() });

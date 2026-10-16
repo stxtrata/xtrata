@@ -31,6 +31,8 @@ export interface GiftDeps {
   /** SIP-018 signature from the connected wallet (one popup). */
   sign(main: string, data: ReturnType<typeof campaignData> | ReturnType<typeof playerData> | ReturnType<typeof batchData>): Promise<string>;
   giftSent(txid: string, amount: bigint): void;
+  /** A claim started (true) or ended without a gift (false): the wallet should read as "plays on their way", never empty. */
+  claiming?(on: boolean): void;
   /** Album wallets of the open passkey: prove a number is theirs, and track the album's gift once it is on its way. */
   album: {
     bind(slot: number): Promise<{ root: string; slot: number; address: string; issued: number; rootSignature: string; slotSignature: string }>;
@@ -137,6 +139,8 @@ export function createGifts(deps: GiftDeps) {
     return box;
   };
 
+  /** Start the claim after the render that asked for it has finished: the claim redraws everything, and must not be painted over by the older draw. */
+  const later = (run: () => Promise<void>) => { queueMicrotask(() => void run()); };
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   /**
    * Claim the open gift. A starter gift goes into this brand-new listening wallet. An album (a gift that comes with a
@@ -147,7 +151,7 @@ export function createGifts(deps: GiftDeps) {
     if (!incoming || incoming.claiming || !s.listening) return;
     const album = !!incoming.view?.player;
     if (album && !s.root) return;
-    incoming.claiming = true; incoming.error = undefined; deps.changed();
+    incoming.claiming = true; incoming.error = undefined; deps.claiming?.(true); deps.changed();
     const post = async (body: object) => {
       const res = await fetch('/radio/gift/claim', {
         method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(30_000),
@@ -173,7 +177,7 @@ export function createGifts(deps: GiftDeps) {
       const { res, r } = answer;
       if (res.status === 503 && /sending another gift/.test(r?.error || '')) {
         // The treasury sends one gift at a time: wait a moment and try again by itself.
-        incoming.waiting = true;
+        incoming.waiting = true; deps.claiming?.(true);
         clearTimeout(retryTimer);
         retryTimer = setTimeout(() => { if (incoming) { incoming.waiting = false; deps.changed(); } }, 12_000);
         return;
@@ -205,9 +209,10 @@ export function createGifts(deps: GiftDeps) {
         const tries = incoming.tries ?? 0;
         incoming.tries = tries + 1;
         incoming.retry = { text: err.retry ? err.message : 'Still sending your gift… the network is slow, trying again.' };
+        deps.claiming?.(true); // still on its way: keep the calm "arriving" look going
         clearTimeout(retryTimer);
         retryTimer = setTimeout(() => { if (incoming) { incoming.retry = undefined; deps.changed(); } }, err.slow ? 60_000 : backoff(tries));
-      } else incoming.error = err.message;
+      } else { incoming.error = err.message; deps.claiming?.(false); }
       turnstile.token = undefined;
       try { (window as any).turnstile?.reset?.(turnstile.box); } catch { /* fresh token on retry */ }
     } finally {
@@ -248,7 +253,7 @@ export function createGifts(deps: GiftDeps) {
     if (s.walletCannotAlbums) { out.push(el('p', 'The listening wallet box is still updating. The album arrives as soon as it has: reload in a few minutes.', 'ppp-warn')); return out; }
     const siteKey = s.gate?.gifts?.turnstileSiteKey;
     if (siteKey && !turnstile.token) out.push(el('p', 'One quick check and it is yours:', 'ppp-mute'), turnstileBox(siteKey));
-    else if (!incoming!.claiming && !incoming!.error && !incoming!.waiting && !incoming!.retry) void claim(s);
+    else if (!incoming!.claiming && !incoming!.error && !incoming!.waiting && !incoming!.retry) later(() => claim(s));
     out.push(...claimLines(s, 'Sending your album…'));
     return out;
   }
@@ -267,8 +272,11 @@ export function createGifts(deps: GiftDeps) {
    * for the gift, not like an empty wallet (no "artists unpaid", no "add funds", no red zero balance).
    */
   const inProgress = (s: Snapshot) =>
-    !!incoming && !incoming.done && !incoming.error && liveGift() && !!s.listening && !s.linked && !s.creditedTo
-    && (s.createdHere || s.brandNew || !!incoming.view?.player) && (s.balance ?? 0n) === 0n && !s.entries.length;
+    !!incoming && !incoming.done && !incoming.error && liveGift() && !!s.listening && (
+      // A claim that is running (or waiting its turn, or retrying) is always a gift on its way, even for a wallet that
+      // is already linked or has history: it is receiving the gift right now, so it must not read as empty.
+      !!(incoming.claiming || incoming.waiting || incoming.retry)
+      || (!s.linked && !s.creditedTo && (s.createdHere || s.brandNew || !!incoming.view?.player) && (s.balance ?? 0n) === 0n && !s.entries.length));
 
   /** Lines for the top of the panel while a gift link is in play, or a gift is on its way. */
   function banner(s: Snapshot): HTMLElement[] {
@@ -299,7 +307,7 @@ export function createGifts(deps: GiftDeps) {
     const siteKey = s.gate?.gifts?.turnstileSiteKey;
     if (ready) {
       if (siteKey && !turnstile.token) { out.push(el('p', 'One quick check and it is yours:', 'ppp-mute'), turnstileBox(siteKey)); }
-      else if (!incoming.claiming && !incoming.error && !incoming.waiting && !incoming.retry) void claim(s);
+      else if (!incoming.claiming && !incoming.error && !incoming.waiting && !incoming.retry) later(() => claim(s));
       out.push(...claimLines(s, 'Sending your gift…'));
     } else if (s.step === 'intro') out.push(el('p', 'Tap below: your passkey makes a listening wallet, and the gift lands in it.', 'ppp-mute'));
     else if (s.listening && s.linked) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one is linked to a Stacks wallet. The link still works for someone new.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet'));
