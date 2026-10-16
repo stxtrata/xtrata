@@ -293,12 +293,12 @@ describe('listening wallet engine (wallet origin)', () => {
     const s = setup();
     const r = await s.h['listening.unlock']({ mode: 'create', terms: s.terms(3000) });
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
-    expect(s.panels[0].confirmLabel).toMatch(/pay as I listen/);
+    expect(s.panels[0].confirmLabel).toMatch(/start listening/);
     expect(s.panels[0].lines.join(' ')).toMatch(/until you switch it off or the wallet runs out/);
     expect(r.session).toMatchObject({ playsLeft: 2857 }); // 1 STX / 350 µSTX caps it before 3000 plays
     await s.h['listening.lock']();
     await s.h['listening.unlock']({ mode: 'unlock', terms: s.terms(3000) });
-    expect(s.panels.at(-1)).toMatchObject({ kind: 'unlock', confirmLabel: 'Unlock and keep paying' });
+    expect(s.panels.at(-1)).toMatchObject({ kind: 'unlock', confirmLabel: 'Unlock and keep listening' });
     expect((await s.h['listening.status']()).session).toMatchObject({ playsLeft: 2857 }); // 1 STX / 350 µSTX caps it before 3000 plays
   });
 

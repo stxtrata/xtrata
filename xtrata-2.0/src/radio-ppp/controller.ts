@@ -106,8 +106,13 @@ export interface PppDeps {
   history?(listening: string, withOutgoing: boolean): Promise<History>;
 }
 
-/** Album top-ups offered from My player (microSTX): 0.05 STX is roughly 140 plays. */
-export const TOP_UP_CHOICES = [50_000n, 100_000n, 250_000n];
+/**
+ * Album top-ups offered from My player, counted in plays: the listener only ever sees plays. The STX moved is
+ * worked out from the play cost of the day (`topUpCost`), so the album gets exactly that many plays.
+ */
+export const TOP_UP_PLAYS = [100, 250, 500] as const;
+/** What adding `plays` plays costs at this play fee (microSTX). */
+export const topUpCost = (plays: number, fee: bigint) => BigInt(plays) * costPerPlay(fee);
 
 export type Step =
   | 'off' | 'elsewhere' | 'connect' | 'not-invited' | 'unsupported' | 'intro' | 'locked' | 'link' | 'loading'
@@ -190,6 +195,8 @@ export interface Snapshot {
   gift: { player: PlayerView | null; from: string | null; source: string; amount: string } | null;
   /** Paid plays this gifted wallet still buys, counting payments in flight and songs waiting to be paid. */
   giftPlays: number;
+  /** What one play costs right now (microSTX): turns plays into STX for top-ups, never shown to the listener. */
+  playCost: bigint;
   /**
    * A curated album stays the only thing on the radio until its own wallet is topped up: a deposit of at least
    * 0.1 STX from an address that is neither the gifter nor the gift treasury (the listener's other wallets count).
@@ -500,6 +507,7 @@ export function createPppController(deps: PppDeps) {
     brandNew: !!status?.address && balance === 0n && unusedRes?.for === status.address && unusedRes.unused,
     gift: (() => { const g = giftNow(); return g ? { player: g.player, from: g.from, source: g.source, amount: g.amount } : null; })(),
     giftPlays: giftNow() ? playsLeftNow() : 0,
+    playCost: costPerPlay(fee()),
     giftStop: giftStop(),
     albumLock: albumLock(),
     returnPlan: returnPlanView(),
@@ -1091,11 +1099,12 @@ export function createPppController(deps: PppDeps) {
       say('Top-up sent ✓ Likes carry on once it confirms, usually a few minutes.');
     }),
 
-    /** Add plays to the open album from My player (the first wallet). One of `TOP_UP_CHOICES`. */
-    topUpAlbum: (amount: bigint): Promise<void> => task('Adding plays…', async () => {
+    /** Add plays to the open album from My player (the first wallet). One of `TOP_UP_PLAYS`. */
+    topUpAlbum: (plays: number): Promise<void> => task('Adding plays…', async () => {
       guardMatch();
       if (!albumOpen()) throw new Error('Open the album you want to add plays to first.');
-      if (!TOP_UP_CHOICES.includes(amount)) throw new Error('Choose one of the amounts offered.');
+      if (!(TOP_UP_PLAYS as readonly number[]).includes(plays)) throw new Error('Choose one of the amounts offered.');
+      const amount = topUpCost(plays, fee());
       if (paying || liking || checkingLike) throw new Error('Still sending a payment. Try again in a moment.');
       if (unresolvedAll().length || pendingDeposit()) throw new Error('Wait for the pending payment to confirm, then add more.');
       await sendMove(0, status!.slot ?? 0, amount);

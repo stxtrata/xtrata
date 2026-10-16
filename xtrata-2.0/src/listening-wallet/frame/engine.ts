@@ -111,7 +111,6 @@ const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
 /** STX without trailing zeros, for the one-line summaries (0.00035, 1). */
 const stxs = (v: bigint) => stx(v).replace(/\.?0+$/, '');
 /** The one-line terms: price per song and the cap before it asks again. */
-const termsLine = (t: SessionTerms) => `${stxs(costPerPlay(t.fee))} STX a song · up to ${stxs(t.budget)} STX`;
 const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 const equalBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
 
@@ -237,10 +236,9 @@ export function createListeningEngine(deps: {
     const name = main ? `Xtrata listening wallet · ${short(main)}` : undefined;
     const createPanel: Panel = {
       kind: 'create',
-      title: 'New listening wallet',
-      // One glance: the price, and the one rule that matters. Everything else is under Details.
-      summary: (terms ? termsLine(terms) + '. ' : '')
-        + 'Keep under 1 STX: lose the passkey, lose the funds.'
+      title: 'Make your player',
+      // One glance, in a listener's words: no prices or wallet talk. The costs and the 1 STX rule are under Details.
+      summary: 'Kept on this device with your passkey. No app or account needed.'
         + (existing.length ? (main ? ` (A separate wallet for ${short(main)}.)` : ' (A second wallet on this device.)') : ''),
       lines: [
         'A small spending wallet for paying artists as you listen. It is made from a passkey on this device, so there is nothing to install and no key is stored anywhere.',
@@ -255,7 +253,7 @@ export function createListeningEngine(deps: {
           ? [`This device already has a listening wallet (${existing.map((w) => short(w.address)).join(', ')}). A new one is a separate wallet${main ? ` for ${short(main)}: each address keeps its own plays, likes and funds. The old one is still there for the wallet it belongs to` : ': to reach the old one later, choose its passkey when unlocking'}.`]
           : [])
       ],
-      confirmLabel: terms ? 'Create and pay as I listen' : 'Create with passkey'
+      confirmLabel: terms ? 'Create and start listening' : 'Create with passkey'
     };
     let created: { credentialId: string; prf?: Uint8Array };
     if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
@@ -337,7 +335,7 @@ export function createListeningEngine(deps: {
     const r = await deps.ui.act({
       kind: 'unlock',
       title: who ? `Welcome back, ${who}` : 'Welcome back',
-      summary: [main ? (cleanLabel(label) ? short(main) : '') : last ? short(last.address) : '', terms ? termsLine(terms) : 'Unlock for this visit'].filter(Boolean).join(' · '),
+      summary: [main ? (cleanLabel(label) ? short(main) : '') : last ? short(last.address) : '', terms ? 'One tap to carry on listening' : 'Unlock for this visit'].filter(Boolean).join(' · '),
       // Kept short: on the radio this panel opens by itself and its button should sit in view.
       lines: terms
         ? [main ? `Plays and likes are credited to ${owner}. One passkey tap unlocks your listening wallet for this visit and carries on paying as you listen.`
@@ -346,7 +344,7 @@ export function createListeningEngine(deps: {
         : [main ? `Plays and likes are credited to ${owner}. Use your listening wallet's passkey to unlock it for this visit.`
             : last ? `Wallet ${short(last.address)}. Use its passkey to unlock it for this visit.` : 'Use your listening-wallet passkey to unlock it for this visit.',
           'The key is rebuilt from your passkey and forgotten when you lock or close this page.'],
-      confirmLabel: terms ? 'Unlock and keep paying' : 'Unlock with passkey'
+      confirmLabel: terms ? 'Unlock and keep listening' : 'Unlock with passkey'
     }, () => deps.passkey.evaluate(last?.credentialId));
     let second: Uint8Array | undefined;
     try {
