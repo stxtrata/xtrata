@@ -56,7 +56,7 @@ describe('Gift Edition panel', () => {
     expect(text(root.querySelector('.ppp-key')!)).toContain('Album · Proof of Sound');
     expect(text(root.querySelector('.ppp-key')!)).toContain('277 plays left');
     expect(text(root.querySelector('.ppp-key')!)).not.toMatch(/STX/);
-    expect(h.radio.setGiftPlayer).toHaveBeenCalledWith({ id: PLAYER.id, title: 'Proof of Sound', subtitle: 'Someone', tracks: [11, 12], cover: null });
+    expect(h.radio.setGiftPlayer).toHaveBeenCalledWith({ id: PLAYER.id, title: 'Proof of Sound', subtitle: 'Someone', tracks: [11, 12], hidden: null, cover: null });
     h.changed(); h.changed();
     expect(h.radio.setGiftPlayer).toHaveBeenCalledTimes(1); // the same album is not pushed again
   });

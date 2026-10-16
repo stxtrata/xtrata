@@ -11,7 +11,7 @@
  * sender, so a friend's gift goes back to the friend.
  */
 import { CAMPAIGN_MAX_LINKS, campaignData, GIFT_FEE, GIFT_MAX, GIFT_MIN, giftLink, giftPlays, isGiftCode, type CampaignRequest, type GiftView } from '../lib/listening-wallet/gifts';
-import { amountForPlays, PLAY_PRESETS, playerData, playerHash, validatePlayer } from '../lib/listening-wallet/gift-players';
+import { amountForPlays, listedTracks, PLAY_PRESETS, playerData, playerHash, validatePlayer } from '../lib/listening-wallet/gift-players';
 import type { FunderResult } from '../lib/listening-wallet/funder';
 import { stx } from '../lib/listening-wallet/policy';
 import type { Snapshot } from './controller';
@@ -230,7 +230,7 @@ export function createGifts(deps: GiftDeps) {
   function albumBanner(s: Snapshot, v: GiftView): HTMLElement[] {
     const player = v.player!;
     const amount = BigInt(v.amount);
-    const out: HTMLElement[] = [el('p', `🎁 ${fromLabel(v)} sent you “${player.title}”${player.subtitle ? ` by ${player.subtitle}` : ''}: ${player.tracks.length} ${player.tracks.length === 1 ? 'song' : 'songs'} and ${giftPlays(amount).toLocaleString()} plays of on-chain music.`, 'ppp-gift')];
+    const out: HTMLElement[] = [el('p', `🎁 ${fromLabel(v)} sent you “${player.title}”${player.subtitle ? ` by ${player.subtitle}` : ''}: ${listedTracks(player).length} ${listedTracks(player).length === 1 ? 'song' : 'songs'} and ${giftPlays(amount).toLocaleString()} plays of on-chain music.`, 'ppp-gift')];
     const unlocked = !!s.root && ['fund', 'ready', 'over', 'link'].includes(s.step);
     if (!unlocked) {
       out.push(el('p', s.step === 'intro' ? 'Tap below: your passkey makes a listening wallet, and the album arrives in its own wallet. You can keep as many albums as you like.' : s.step === 'locked' ? 'Unlock your listening wallet and the album arrives in its own wallet.' : 'Open your listening wallet and the album arrives in its own wallet.', 'ppp-mute'));

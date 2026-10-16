@@ -4,6 +4,7 @@
  * wallet; the radio then plays that album as the current looping playlist. Pins and recents are public, per-device
  * conveniences kept in local storage.
  */
+import { listedTracks } from '../lib/listening-wallet/gift-players';
 import { SHELF_SORTS, shelfItems, trimRecents, visibleAlbums, type ShelfItem, type ShelfSort } from '../lib/listening-wallet/shelf';
 import type { Snapshot } from './controller';
 
@@ -110,7 +111,7 @@ export function createShelf(deps: ShelfDeps) {
           deps.changed();
         }, 'tiny');
         pin.setAttribute('aria-label', pinned ? `Unpin ${a.player!.title}` : `Pin ${a.player!.title}`);
-        const sub = [a.player!.subtitle, `${a.player!.tracks.length} ${a.player!.tracks.length === 1 ? 'song' : 'songs'}`, a.state === 'sending' ? 'arriving…' : ''].filter(Boolean).join(' · ');
+        const sub = [a.player!.subtitle, `${listedTracks(a.player!).length} ${listedTracks(a.player!).length === 1 ? 'song' : 'songs'}`, a.state === 'sending' ? 'arriving…' : ''].filter(Boolean).join(' · ');
         const playing = a.slot === s.slot;
         const pick = button(playing ? 'Playing' : 'Play', () => {
           deps.store.set(recentKey(r), JSON.stringify(trimRecents({ ...recent, [a.slot]: deps.now() })));

@@ -2,6 +2,7 @@ import {
   claimGift, confirmFriendGift, createCampaign, createFriendGift, createPlayer, GiftError, giftForWallet, giftStatus, hiroGiftChain,
   nextSlot, shelfFor, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
 } from '../../lib/radio-gifts';
+import { checkSongsNow } from '../../lib/radio-metadata';
 
 /**
  * Radio gift wallets (functions/lib/radio-gifts.ts):
@@ -24,7 +25,7 @@ export async function onRequest(context: Ctx) {
   const { request, env } = context;
   const action = (context.params?.path ?? []).join('/');
   const ip = request.headers.get('cf-connecting-ip');
-  const deps = (): GiftDeps => ({ chain: hiroGiftChain(env), now: Date.now(), human: (token, from) => turnstilePasses(env, token, from) });
+  const deps = (): GiftDeps => ({ chain: hiroGiftChain(env), now: Date.now(), human: (token, from) => turnstilePasses(env, token, from), checkSongs: (ids) => checkSongsNow(env, ids) });
   const later = () => {
     // Through the context: detached from it the runtime refuses waitUntil ("Illegal invocation").
     const sweep = sweepGifts(env, deps()).catch(() => undefined);

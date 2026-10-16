@@ -38,6 +38,7 @@ import { queryAll, run } from './db';
 import { applyHiroApiKey, getHiroApiKeys, isTransientHiroStatus, shouldRetryWithNextHiroKey } from './hiro-keys';
 import { checkSlotBinding, ensureSlotTable, gate, type PppEnv, type SlotSubmission } from './radio-listening-wallet';
 import { isMainnetStandardAddress } from '../../src/lib/listening-wallet/link';
+import { radioArtist, radioTitle } from '../../src/lib/radio/artist-credits.mjs';
 import {
   isPlayerId, playerData, playerHash, validatePlayer, validatePlayerRequest, verifyPlayerSignature, type PlayerDefinition, type PlayerRequest, type PlayerView
 } from '../../src/lib/listening-wallet/gift-players';
@@ -457,6 +458,8 @@ export interface GiftDeps {
   now: number;
   /** Cloudflare Turnstile check; true when it passes or when Turnstile is not configured. */
   human?: (token: unknown, ip: string | null) => Promise<boolean>;
+  /** Read these inscriptions now and record whether each is a song (functions/lib/radio-metadata.ts checkSongsNow). */
+  checkSongs?: (ids: number[]) => Promise<void>;
 }
 
 export async function turnstilePasses(env: GiftEnv, token: unknown, ip: string | null): Promise<boolean> {
@@ -564,13 +567,26 @@ export async function createCampaign(env: GiftEnv, body: { request: CampaignRequ
 
 // ---------------------------------------------------------------------------- gift players
 
-/** The songs of a definition, as the catalogue knows them. Anything not a ready song is simply absent. */
+/**
+ * The songs of a definition, as the radio knows them: a plain audio inscription on the radio's contract, or any
+ * inscription the server verified as a song by reading it (an HTML player with embedded or linked audio, a video
+ * with a hidden track, an all-audio WebM). Titles and artists take the supplied credit corrections. A hidden track is
+ * marked `hidden`. Anything else is simply absent.
+ */
 async function catalogueSongs(env: GiftEnv, ids: number[]) {
-  const rows = ids.length
-    ? await all<{ token_id: number; title: string | null; artist: string | null }>(
-        env, `SELECT token_id, title, artist FROM radio_metadata WHERE status='ready' AND is_song=1 AND token_id IN (${ids.map(() => '?').join(',')})`, ids)
-    : [];
-  return new Map(rows.map((r) => [Number(r.token_id), { title: r.title ?? '', artist: r.artist ?? '' }]));
+  const out = new Map<number, { title: string; artist: string; hidden?: true }>();
+  if (!ids.length) return out;
+  const marks = ids.map(() => '?').join(',');
+  try {
+    const audio = await all<{ token_id: number }>(env,
+      `SELECT token_id FROM inscription_index WHERE contract=? AND sealed=1 AND mime LIKE 'audio/%' AND token_id IN (${marks})`, [SONG_CONTRACT, ...ids]);
+    for (const r of audio) out.set(Number(r.token_id), { title: radioTitle(r.token_id, ''), artist: radioArtist(r.token_id, '') });
+  } catch { /* no inscription index on this deployment */ }
+  // is_song 2: a hidden track (the file says so). It belongs to an album without being listed in it.
+  const rows = await all<{ token_id: number; title: string | null; artist: string | null; is_song: number }>(
+    env, `SELECT token_id, title, artist, is_song FROM radio_metadata WHERE status='ready' AND is_song IN (1,2) AND token_id IN (${marks})`, ids);
+  for (const r of rows) out.set(Number(r.token_id), { title: radioTitle(r.token_id, r.title ?? ''), artist: radioArtist(r.token_id, r.artist ?? ''), ...(Number(r.is_song) === 2 ? { hidden: true as const } : {}) });
+  return out;
 }
 
 /** A player as a recipient sees it. Titles and artists come from the catalogue, never from whoever made the player. */
@@ -610,9 +626,13 @@ export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefin
   await ensureGiftTables(env);
   // Only the songs must be ready songs. The cover is any inscription (an image, or a page with one): it need not be a song.
   const wanted = [...new Set(def.tracks)];
-  const songs = await catalogueSongs(env, wanted);
+  let songs = await catalogueSongs(env, wanted);
+  // Songs the catalogue has not reached yet are read now, so a new album need not wait for the background refresh.
+  const unseen = wanted.filter((n) => !songs.has(n));
+  if (unseen.length && deps.checkSongs) { await deps.checkSongs(unseen); songs = await catalogueSongs(env, wanted); }
   const missing = wanted.find((n) => !songs.has(n));
   if (missing !== undefined) throw new GiftError(`Song #${missing} is not a ready song in the radio catalogue.`, 400);
+  if (wanted.every((n) => songs.get(n)!.hidden)) throw new GiftError('An album needs at least one song that is not a hidden track.', 400);
   // An album is made by whoever owns all of its songs, and nobody else (the core contract applies the same rule to an
   // inscription whose parents are the songs). Checked here against the chain, for every song, at the moment of creation.
   await requireSongOwner(deps, req.admin, wanted);
