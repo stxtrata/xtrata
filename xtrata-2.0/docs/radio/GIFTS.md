@@ -12,6 +12,9 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 | --- | --- | --- | --- |
 | Campaign | the admin (`RADIO_GIFT_ADMIN`), signing a request in the panel | the treasury's campaign pool (whatever it holds) | the treasury |
 | Friend | anyone with a Stacks wallet, in "🎁 Send someone a wallet" | the gifter, up front: amount + 0.003 STX, memo `gift <id>` | the gifter (an unclaimed gift is refunded after 30 days) |
+| Prefunded batch | a gift admin (for now), in the admin box: "Prefunded batch" | the creator, up front, for the whole batch in ONE payment (below), memo `batch <id>` | the creator (unclaimed copies are refunded after 30 days) |
+
+Prefunded batches are the way to make albums and starter copies from now on. Campaign links still work until they expire, and are being removed.
 
 - Links look like `https://radio.xtrata.xyz/radio.html#gift=<code>`. The code sits after `#`, so browsers never send it to a server, and the page moves it to the device and takes it out of the address bar at once.
 - Only the code's hash is stored.
@@ -40,10 +43,28 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 - Campaign links: at most 10 claims per connection (salted IP hash) per 24 h. Friend gifts are never limited this way: someone paid for each one.
 - There is no daily total for campaign gifts (removed 15 Oct 2026: it turned away people opening links the admin had made on purpose). What bounds them is the treasury balance, so keep only what you mean to give away in it. `RADIO_GIFT_DAILY_CAP` is no longer read.
 - While a gift is being claimed or sent, the panel never shows it as failed: slow or refused sends say "still sending" in amber and retry by themselves (5 s, 10 s, 20 s, 30 s, then every minute). Red is kept for real dead ends (link unknown, used or expired; wallet not new; the per-connection limit).
-- Friend money held at once is capped at `RADIO_GIFT_ESCROW_CAP` (default 25 STX).
+- Money held for friends and batches at once (paid copies, plus batches waiting for their payment in the last 24 h) is capped at `RADIO_GIFT_ESCROW_CAP` (default 50 STX; `functions/lib/radio-gifts.ts`, `DEFAULT_ESCROW_CAP`).
 - Campaign gifts never spend money owed to friends or awaiting a refund.
 - Each signed campaign request works once, within 15 minutes of signing.
 - Optional Cloudflare Turnstile on claims (`RADIO_GIFT_TURNSTILE_SITE_KEY` + `RADIO_GIFT_TURNSTILE_SECRET`).
+
+## Prefunded batches
+
+The creator pays for every copy first; the treasury never pays a copy out of its own float. Code: `src/lib/listening-wallet/batches.ts` (rules, SIP-018 request, cost maths), `createBatch` / `confirmBatch` / `batchStatus` / `batchesFor` in `functions/lib/radio-gifts.ts`, the panel's admin box.
+
+1. **Sign.** The creator (a gift admin) signs one SIP-018 request: creator, count (1 to 100), amount landing in each new wallet (0.1 to 1 STX), label, and the album (gift player) if any. An album batch is only accepted from the wallet that owns the album. Each signed request works once, within 15 minutes.
+2. **Links.** The server makes N dormant gifts (`radio_gifts`, `source='friend'`, `gifter`=creator, `batch_id`) and a `radio_gift_batches` row in one D1 transaction (inserts are chunked: D1 allows 100 bound values per statement). The links are shown once and saved on the creator's device.
+3. **One payment.** The creator makes ONE transfer to the treasury of `count × (amount + 0.003 STX)` with memo `batch <16 hex>`. The server accepts only the exact sender, recipient, total and memo, and one payment can fund only one batch.
+4. **Live together.** When the payment confirms, the batch and all its copies go live in one transaction, for 30 days. A batch not paid within a day is set aside (`abandoned`) but a late payment still counts. Pending batches count against the escrow cap, and each creator may have 10 unpaid batches at once.
+5. **Claims** are sent exactly as friend gifts are: the leftover plays of a copy go back to the creator, who is recorded as the payer.
+6. **Refunds.** A copy unclaimed after 30 days is refunded to the creator by the existing sweep, one transfer per copy (the 0.003 STX in the deposit pays that transfer's network fee).
+7. **Safety net.** Every ten minutes of gift traffic the server compares the treasury balance with what it owes and logs `[radio:gifts] ALERT treasury under-collateralised` if it holds less.
+
+What a copy costs (default 300 µSTX fee per play): per paid play 0.00035 STX (0.0003 network fee, 0.00005 to the song's holder), plus 0.003 STX reserve a listener can return, plus 0.015 STX for an album's likes, plus 0.003 STX to send it. A 300-play album copy is 0.126 STX, so 100 copies are 12.6 STX.
+
+Endpoints: `POST /radio/gift/batch`, `POST /radio/gift/batch/confirm`, `GET /radio/gift/batch?id=`, `GET /radio/gift/batches?creator=`. Migration `functions/migrations/030_radio_gift_batches.sql` (also created on first use).
+
+Known limits: batches are admin-only for now; the batch cap is 100 copies per request (make several); refunds are one transfer per copy and run on gift traffic (a scheduled sweep comes later).
 
 ## Setup (Cloudflare Pages, project `xtrata`, Production)
 
@@ -70,7 +91,7 @@ Code: `functions/lib/radio-gifts.ts` (server), `functions/radio/gift/[[path]].ts
 
 ## Checks
 
-- `npx vitest run functions/lib/__tests__/radio-gifts.test.ts`: double-pay paths, caps, deposits, refunds, orphans.
+- `npx vitest run functions/lib/__tests__/radio-gifts.test.ts`: double-pay paths, caps, deposits, refunds, orphans, prefunded batches.
 - `node scripts/test-radio-gift-browser.mjs [shots]`: link → passkey → automatic claim (including a busy treasury), with the real wallet frame. Also the gift fold and admin box. Build the test wallet first (see the file header).
 
 ## Gift players (Gift Edition)

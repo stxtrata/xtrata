@@ -10,8 +10,10 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
   BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
-  adminAddresses, giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv
+  adminAddresses, giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv,
+  batchesFor, batchStatus, confirmBatch, createBatch, ensureGiftTables, MAX_PENDING_BATCHES
 } from '../radio-gifts';
+import { batchDeposit, batchRequestHash, type BatchRequest } from '../../../src/lib/listening-wallet/batches';
 import { deriveSlotIdentity, listeningBase } from '../../../src/lib/listening-wallet/derive';
 import { signSlotBinding } from '../../../src/lib/listening-wallet/slots';
 import { playerData, playerHash, type PlayerDefinition, type PlayerRequest } from '../../../src/lib/listening-wallet/gift-players';
@@ -710,5 +712,261 @@ describe('radio gift players', () => {
       const b = { root: root.address, slot: 1, address: id.address, issued: s.now() };
       await expect(claimInto(s, codes[1], { id, binding: { ...b, rootSignature: signSlotBinding(b, root.privateKey), slotSignature: signSlotBinding(b, id.privateKey) } })).resolves.toMatchObject({ already: false });
     });
+
+  describe('prefunded batches (the creator pays for every copy up front)', () => {
+    const PRF = Uint8Array.from({ length: 32 }, (_, i) => i + 11);
+    type S = ReturnType<typeof setup>;
+    const req = (s: S, over: Partial<BatchRequest> = {}): BatchRequest => ({ creator: s.admin, count: 3, amount: '123000', label: 'Opera launch', issued: s.now(), ...over });
+    const sig = (r: BatchRequest, k: string) => signMessageHashRsv({ messageHash: batchRequestHash(r), privateKey: createStacksPrivateKey(k) }).data;
+    const fund = (s: S, over: Partial<BatchRequest> = {}, k = s.adminKey) => { const r = req(s, over); return createBatch(s.env, { request: r, signature: sig(r, k) }, s.deps(), s.request); };
+    let n = 0;
+    /** The creator's deposit as the chain would show it. */
+    const pay = (s: S, made: { deposit: string; memo: string }, over: Partial<ChainTransfer> = {}) => {
+      const txid = '0x' + (++n).toString(16).padStart(64, 'e');
+      s.chain.txs.set(txid, { status: 'success', sender: s.admin, recipient: s.treasury, amount: BigInt(made.deposit), memo: made.memo, ...over });
+      return txid;
+    };
+    const live = async (s: S, over: Partial<BatchRequest> = {}) => {
+      const made = await fund(s, over);
+      await confirmBatch(s.env, { id: made.id, txid: pay(s, made) }, s.deps(), s.request);
+      return made;
+    };
+    const rowsOf = (s: S, id: string) => s.db.sql.prepare('SELECT status, gifter, amount, expires_at AS expires FROM radio_gifts WHERE batch_id=?').all(id) as { status: string; gifter: string; amount: number; expires: number }[];
+
+    it('a batch is dormant until its ONE deposit confirms, then every copy goes live together', async () => {
+      const s = setup();
+      const made = await fund(s);
+      expect(made).toMatchObject({ count: 3, amount: '123000', depositTo: s.treasury, deposit: String(batchDeposit(3, 123000n)), memo: `batch ${made.id}` });
+      expect(made.codes).toHaveLength(3);
+      expect(new Set(made.codes).size).toBe(3);
+      expect(rowsOf(s, made.id).map((r) => r.status)).toEqual(['pending-deposit', 'pending-deposit', 'pending-deposit']);
+      await expect(s.claim(made.codes[0])).rejects.toThrow(/not paid for yet/);
+      expect(await batchStatus(s.env, made.id)).toMatchObject({ status: 'pending-deposit', copies: { waiting: 0, claimed: 0 } });
+      s.tick(5_000);
+      const view = await confirmBatch(s.env, { id: made.id, txid: pay(s, made) }, s.deps(), s.request);
+      expect(view).toMatchObject({ status: 'live', copies: { waiting: 3, claiming: 0, claimed: 0 }, expires: s.now() + GIFT_EXPIRY_MS });
+      expect(rowsOf(s, made.id)).toEqual(Array(3).fill({ status: 'live', gifter: s.admin, amount: 123000, expires: s.now() + GIFT_EXPIRY_MS }));
+      // the recipient sees who paid
+      expect(await giftStatus(s.env, { code: made.codes[1] })).toMatchObject({ status: 'live', from: s.admin, source: 'friend', amount: '123000', label: 'Opera launch' });
+    });
+
+    it('only a gift admin can fund a batch, with their own signature, once per signed request', async () => {
+      const s = setup();
+      const stranger = key();
+      const mine = req(s);
+      await expect(createBatch(s.env, { request: mine, signature: sig(mine, stranger) }, s.deps(), s.request)).rejects.toMatchObject({ status: 403 });
+      const theirs = req(s, { creator: addr(stranger) });
+      await expect(createBatch(s.env, { request: theirs, signature: sig(theirs, stranger) }, s.deps(), s.request)).rejects.toMatchObject({ status: 403 }); // signed by themselves, but not an admin
+      const bad = { ...mine, count: 4 }; // signed for 3, asks for 4
+      await expect(createBatch(s.env, { request: bad, signature: sig(mine, s.adminKey) }, s.deps(), s.request)).rejects.toMatchObject({ status: 403 });
+      await expect(createBatch(s.env, { request: { ...mine, issued: s.now() - 16 * 60_000 }, signature: 'x' }, s.deps(), s.request)).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/expired/) });
+      await expect(createBatch(s.env, { request: req(s, { creator: s.treasury }), signature: 'x' }, s.deps(), s.request)).rejects.toMatchObject({ status: 400 });
+      await ensureGiftTables(s.env); // nothing has created the tables yet: every attempt above was refused first
+      expect(s.db.sql.prepare('SELECT COUNT(*) AS n FROM radio_gift_batches').get()).toEqual({ n: 0 });
+      const ok = await createBatch(s.env, { request: mine, signature: sig(mine, s.adminKey) }, s.deps(), s.request);
+      expect(ok.codes).toHaveLength(3);
+      await expect(createBatch(s.env, { request: mine, signature: sig(mine, s.adminKey) }, s.deps(), s.request)).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/already used/) });
+      expect(s.db.sql.prepare('SELECT COUNT(*) AS n FROM radio_gifts WHERE batch_id IS NOT NULL').get()).toEqual({ n: 3 }); // the replay left nothing behind
+    });
+
+    it('limits the size, the amount and the label of a batch', async () => {
+      const s = setup();
+      for (const over of [{ count: 0 }, { count: 101 }, { amount: '99999' }, { amount: '1000001' }, { label: 'é' }, { player: 'nope' }] as Partial<BatchRequest>[])
+        await expect(fund(s, over)).rejects.toMatchObject({ status: 400 });
+      await expect(fund(s, { count: 100, amount: '100000' })).resolves.toMatchObject({ count: 100 });
+      expect(s.db.sql.prepare('SELECT COUNT(*) AS n FROM radio_gifts WHERE batch_id IS NOT NULL').get()).toEqual({ n: 100 }); // 100 copies, one transaction
+    });
+
+    it('an album’s copies can only be funded by the wallet that made the album', async () => {
+      const s = setup(); catalogue(s);
+      const second = key();
+      s.env.RADIO_GIFT_ADMIN = `${s.admin}, ${addr(second)}`;
+      const { id } = await make(s);
+      await expect(fund(s, { creator: addr(second), player: id }, second)).rejects.toMatchObject({ status: 403, message: expect.stringMatching(/made an album/) });
+      await expect(fund(s, { player: '0'.repeat(16) })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/does not exist/) });
+      const made = await fund(s, { player: id });
+      expect(s.db.sql.prepare('SELECT DISTINCT player_id FROM radio_gifts WHERE batch_id=?').all(made.id)).toEqual([{ player_id: id }]);
+    });
+
+    it('the wrong sender, amount or memo never makes a batch live, and a payment cannot fund two batches', async () => {
+      const s = setup();
+      const a = await fund(s, { label: 'a' }), b = await fund(s, { label: 'b' });
+      const confirm = (id: string, txid: string) => confirmBatch(s.env, { id, txid }, s.deps(), s.request);
+      await expect(confirm(a.id, pay(s, a, { sender: wallet() }))).rejects.toMatchObject({ status: 400 });          // someone else paid
+      await expect(confirm(a.id, pay(s, a, { amount: BigInt(a.deposit) - 1n }))).rejects.toMatchObject({ status: 400 }); // one microSTX short
+      await expect(confirm(a.id, pay(s, a, { amount: BigInt(a.deposit) + 1n }))).rejects.toMatchObject({ status: 400 }); // or over
+      await expect(confirm(a.id, pay(s, a, { memo: 'batch ' + '0'.repeat(16) }))).rejects.toMatchObject({ status: 400 });  // another batch's memo
+      await expect(confirm(a.id, pay(s, a, { recipient: wallet() }))).rejects.toMatchObject({ status: 400 });      // not to the treasury
+      await expect(confirm(a.id, pay(s, a, { status: 'aborted' }))).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/did not go through/) });
+      expect(rowsOf(s, a.id).every((r) => r.status === 'pending-deposit')).toBe(true);
+      const good = pay(s, a);
+      await expect(confirm(b.id, good)).rejects.toMatchObject({ status: 400 }); // a's payment carries a's memo: b cannot use it
+      expect((await confirm(a.id, good)).status).toBe('live');
+      expect(rowsOf(s, b.id).every((r) => r.status === 'pending-deposit')).toBe(true);
+      await expect(confirm(a.id, 'nonsense')).rejects.toMatchObject({ status: 400 });
+      await expect(confirmBatch(s.env, { id: 'ffffffffffffffff' }, s.deps(), s.request)).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('a payment still confirming keeps the batch dormant, and counts once it lands', async () => {
+      const s = setup();
+      const made = await fund(s);
+      const txid = pay(s, made, { status: 'pending' });
+      expect((await confirmBatch(s.env, { id: made.id, txid }, s.deps(), s.request)).status).toBe('pending-deposit');
+      expect(rowsOf(s, made.id).every((r) => r.status === 'pending-deposit')).toBe(true);
+      s.chain.txs.set(txid, { ...s.chain.txs.get(txid)!, status: 'success' });
+      expect((await confirmBatch(s.env, { id: made.id }, s.deps(), s.request)).status).toBe('live'); // no txid needed once it is remembered
+    });
+
+    it('finds a deposit the wallet never reported, by its memo', async () => {
+      const s = setup();
+      const made = await fund(s);
+      s.chain.inbound.push({ txid: '0x' + 'a'.repeat(64), status: 'success', sender: s.admin, recipient: s.treasury, amount: BigInt(made.deposit), memo: made.memo });
+      expect((await confirmBatch(s.env, { id: made.id }, s.deps(), s.request)).status).toBe('live');
+    });
+
+    it('the periodic scan makes a paid batch live, and keeps a payment that belongs to no waiting batch for a refund', async () => {
+      const s = setup();
+      const made = await fund(s);
+      const stray = '0x' + 'b'.repeat(64), unknown = '0x' + 'c'.repeat(64), twice = '0x' + 'd'.repeat(64);
+      s.chain.inbound.push(
+        { txid: '0x' + 'a'.repeat(64), status: 'success', sender: s.admin, recipient: s.treasury, amount: BigInt(made.deposit), memo: made.memo },
+        { txid: stray, status: 'success', sender: s.admin, recipient: s.treasury, amount: 5n, memo: made.memo },                    // right memo, wrong amount
+        { txid: unknown, status: 'success', sender: s.admin, recipient: s.treasury, amount: 999n, memo: 'batch ' + '1'.repeat(16) }, // no such batch
+        { txid: twice, status: 'success', sender: s.admin, recipient: s.treasury, amount: BigInt(made.deposit), memo: made.memo }  // paid twice
+      );
+      for (const t of s.chain.inbound) s.chain.txs.set(t.txid, t); // the scan looks each deposit up by txid, as it would on the chain
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('deposits-scanned');
+      expect((await batchStatus(s.env, made.id)).status).toBe('live');
+      const orphans = s.db.sql.prepare("SELECT txid, status FROM radio_gift_orphans WHERE txid<>'scan' ORDER BY txid").all();
+      expect(orphans).toEqual([{ txid: stray, status: 'needs-refund' }, { txid: unknown, status: 'needs-refund' }, { txid: twice, status: 'needs-refund' }]);
+    });
+
+    it('an unpaid batch is set aside after a day, and a late payment still makes it live', async () => {
+      const s = setup();
+      const made = await fund(s);
+      s.tick(25 * 3600_000);
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('abandoned');
+      expect(s.db.sql.prepare('SELECT status FROM radio_gift_batches').get()).toEqual({ status: 'abandoned' });
+      await expect(s.claim(made.codes[0])).rejects.toThrow(/not paid for yet/); // still nothing to claim
+      expect((await confirmBatch(s.env, { id: made.id, txid: pay(s, made) }, s.deps(), s.request)).status).toBe('live');
+      expect(rowsOf(s, made.id).every((r) => r.status === 'live')).toBe(true);
+      await s.claim(made.codes[0]); // and now it can be claimed
+    });
+
+    it('the escrow cap counts live copies and unpaid batches, and an unpaid batch stops counting after a day', async () => {
+      const total = batchDeposit(3, 123000n);
+      const s = setup({ RADIO_GIFT_ESCROW_CAP: String(total + 1_000n) });
+      const first = await fund(s);
+      await expect(fund(s, { count: 1, amount: '100000', label: 'second' })).rejects.toMatchObject({ status: 503, message: expect.stringMatching(/full right now/) });
+      s.tick(25 * 3600_000);
+      await expect(fund(s, { count: 1, amount: '100000', label: 'second' })).resolves.toMatchObject({ count: 1 });
+      expect(first.count).toBe(3);
+      const t = setup({ RADIO_GIFT_ESCROW_CAP: String(total + 1_000n) });
+      await live(t);
+      await expect(fund(t, { count: 1, amount: '100000', label: 'second' })).rejects.toMatchObject({ status: 503 }); // paid copies count too
+    });
+
+    it('a creator cannot leave piles of unpaid batches waiting', async () => {
+      const s = setup();
+      for (let i = 0; i < MAX_PENDING_BATCHES; i++) await fund(s, { count: 1, amount: '100000', label: 'b' + i });
+      await expect(fund(s, { count: 1, amount: '100000', label: 'one more' })).rejects.toMatchObject({ status: 429 });
+    });
+
+    it('a claim is paid from the creator’s money: leftovers return to the creator, and no per-connection limit applies', async () => {
+      const s = setup();
+      const made = await live(s, { count: 12 });
+      for (const code of made.codes.slice(0, 11)) { await s.claim(code, wallet(), '203.0.113.9'); await s.land(); s.tick(1_000); }
+      const last = wallet();
+      await s.claim(made.codes[11], last, '203.0.113.9'); // a campaign link would have stopped at 10 from one connection
+      expect(decode(s.chain.sent.at(-1)!.raw)).toMatchObject({ recipient: last, amount: 123000n, memo: GIFT_MEMO });
+      expect((await giftForWallet(s.env, last)).gift).toMatchObject({ returnTo: s.admin, from: s.admin, source: 'friend', amount: '123000' });
+      await s.land();
+      expect(await batchStatus(s.env, made.id)).toMatchObject({ copies: { waiting: 0, claiming: 0, claimed: 12 } });
+    });
+
+    it('the treasury’s own float can no longer be spent by anything but a prefunded copy, and a promo link never spends a creator’s money', async () => {
+      const s = setup();
+      const made = await live(s, { count: 2 });
+      const owed = batchDeposit(2, 123000n);
+      s.chain.balances.set(s.treasury, owed + 50_000n); // the creator's money plus a little spare
+      const [promo] = (await s.campaign(1)).codes;
+      await expect(s.claim(promo)).rejects.toThrow(/topping up/);
+      await s.claim(made.codes[0]); // the creator's copy is claimable
+    });
+
+    it('unclaimed copies go back to the creator after 30 days, one refund each, and claimed copies are never refunded', async () => {
+      const s = setup();
+      const made = await live(s, { count: 3 });
+      await s.claim(made.codes[0]); await s.land();
+      s.tick(GIFT_EXPIRY_MS + 1);
+      await expect(s.claim(made.codes[1])).rejects.toMatchObject({ status: 410, message: expect.stringMatching(/expired/) });
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('deposits-scanned');
+      const refunded: string[] = [];
+      for (let i = 0; i < 2; i++) {
+        expect((await sweepGifts(s.env, s.deps())).did).toBe('refund-sent');
+        expect(decode(s.chain.sent.at(-1)!.raw)).toMatchObject({ recipient: s.admin, amount: 123000n });
+        refunded.push(s.chain.sent.at(-1)!.txid);
+        expect((await s.land()).did).toBe('settled');
+      }
+      expect(new Set(refunded).size).toBe(2);
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('nothing');
+      expect(await batchStatus(s.env, made.id)).toMatchObject({ copies: { waiting: 0, claimed: 1, refunded: 2 } });
+      expect(rowsOf(s, made.id).map((r) => r.status).sort()).toEqual(['claimed', 'refunded', 'refunded']);
+    });
+
+    it('shouts when the treasury holds less than it owes, and stays quiet when it holds enough', async () => {
+      const s = setup();
+      await live(s, { count: 2 });
+      const alarm = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      s.chain.balances.set(s.treasury, batchDeposit(2, 123000n) - 1n);
+      expect((await sweepGifts(s.env, s.deps())).did).toBe('deposits-scanned');
+      expect(alarm).toHaveBeenCalledWith(expect.stringContaining('under-collateralised'), expect.objectContaining({ owed: String(batchDeposit(2, 123000n)) }));
+      alarm.mockClear(); s.tick(11 * 60_000);
+      s.chain.balances.set(s.treasury, batchDeposit(2, 123000n));
+      await sweepGifts(s.env, s.deps());
+      expect(alarm).not.toHaveBeenCalled();
+      alarm.mockRestore();
+    });
+
+    it('lists a creator’s batches with where each copy stands, and never shows a code', async () => {
+      const s = setup();
+      const a = await live(s, { label: 'one' });
+      await fund(s, { label: 'two', count: 1 });
+      const { batches } = await batchesFor(s.env, s.admin);
+      expect(batches.map((b) => [b.label, b.status, b.count])).toEqual(expect.arrayContaining([['one', 'live', 3], ['two', 'pending-deposit', 1]]));
+      expect(JSON.stringify(batches)).not.toMatch(new RegExp(a.codes.join('|')));
+      expect(await batchesFor(s.env, wallet())).toEqual({ batches: [] });
+      await expect(batchesFor(s.env, 'nonsense')).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('an album copy goes into a numbered wallet, opens its album, and its leftovers return to the creator', async () => {
+      const s = setup(); catalogue(s);
+      const { id } = await make(s);
+      const made = await live(s, { player: id, amount: '123000' });
+      const base = await listeningBase(PRF);
+      const root = await deriveSlotIdentity(base, 0), slot = await deriveSlotIdentity(base, 1);
+      const b = { root: root.address, slot: 1, address: slot.address, issued: s.now() };
+      const binding = { ...b, rootSignature: signSlotBinding(b, root.privateKey), slotSignature: signSlotBinding(b, slot.privateKey) };
+      await claimGift(s.env, { code: made.codes[0], wallet: slot.address, binding }, s.deps(), null, s.request);
+      expect(decode(s.chain.sent.at(-1)!.raw)).toMatchObject({ recipient: slot.address, amount: 123000n });
+      await s.land();
+      expect((await giftForWallet(s.env, slot.address)).gift).toMatchObject({ returnTo: s.admin, player: { title: 'Proof of Sound' } });
+      expect((await shelfFor(s.env, root.address)).shelf[0]).toMatchObject({ slot: 1, address: slot.address, from: s.admin, state: 'arrived' });
+    });
+
+    it('everything the older routes did still works beside it: friend gifts and campaign links', async () => {
+      const s = setup();
+      const gifter = wallet();
+      const g = await createFriendGift(s.env, { gifter, amount: '200000' }, s.deps(), null, s.request);
+      const dep = '0x' + 'f'.repeat(64);
+      s.chain.txs.set(dep, { status: 'success', sender: gifter, recipient: s.treasury, amount: 203000n, memo: giftDepositMemo(g.id) });
+      await confirmFriendGift(s.env, { id: g.id, txid: dep }, s.deps(), s.request);
+      const made = await live(s);
+      await s.claim(g.code); await s.land();
+      await s.claim(made.codes[0]); await s.land();
+      const [code] = (await s.campaign(1)).codes;
+      await s.claim(code);
+    });
+  });
   });
 });
