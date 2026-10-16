@@ -57,14 +57,16 @@ The creator pays for every copy first; the treasury never pays a copy out of its
 3. **One payment.** The creator makes ONE transfer to the treasury of `count × (amount + 0.003 STX)` with memo `batch <16 hex>`. The server accepts only the exact sender, recipient, total and memo, and one payment can fund only one batch.
 4. **Live together.** When the payment confirms, the batch and all its copies go live in one transaction, for 30 days. A batch not paid within a day is set aside (`abandoned`) but a late payment still counts. Pending batches count against the escrow cap, and each creator may have 10 unpaid batches at once.
 5. **Claims** are sent exactly as friend gifts are: the leftover plays of a copy go back to the creator, who is recorded as the payer.
-6. **Refunds.** A copy unclaimed after 30 days is refunded to the creator by the existing sweep, one transfer per copy (the 0.003 STX in the deposit pays that transfer's network fee).
+6. **Refunds.** Copies unclaimed after 30 days go back to the creator in ONE transfer per gifter (up to 40 copies per transfer, so a 100-copy batch takes three). The creator gets everything they paid except the single network fee that transfer costs: the other copies' sending fees come back too. All the copies in a transfer share its transaction, so they settle, are re-signed with a higher fee, or are put back to be tried again, together; a refund is never recorded for only some of its copies.
 7. **Safety net.** Every ten minutes of gift traffic the server compares the treasury balance with what it owes and logs `[radio:gifts] ALERT treasury under-collateralised` if it holds less.
 
 What a copy costs (default 300 µSTX fee per play): per paid play 0.00035 STX (0.0003 network fee, 0.00005 to the song's holder), plus 0.003 STX reserve a listener can return, plus 0.015 STX for an album's likes, plus 0.003 STX to send it. A 300-play album copy is 0.126 STX, so 100 copies are 12.6 STX.
 
 Endpoints: `POST /radio/gift/batch`, `POST /radio/gift/batch/confirm`, `GET /radio/gift/batch?id=`, `GET /radio/gift/batches?creator=`. Migration `functions/migrations/030_radio_gift_batches.sql` (also created on first use).
 
-Known limits: batches are admin-only for now; the batch cap is 100 copies per request (make several); refunds are one transfer per copy and run on gift traffic (a scheduled sweep comes later).
+8. **Scheduled sweep.** `workers/radio-gift-sweep` (a Cloudflare Worker, cron every 5 minutes) calls `POST /radio/gift/sweep` with `Authorization: Bearer <RADIO_GIFT_SWEEP_SECRET>`. The endpoint runs the housekeeping (settle the open send, set aside unpaid batches, scan deposits, refund expired copies) for up to 8 steps and stops as soon as nothing can move. Without the right secret it answers 404. The Worker holds no treasury key and no database. While any payment is expected (an unpaid batch or friend gift from the last day) deposits are scanned every minute instead of every ten.
+
+Known limits: batches are admin-only for now; the batch cap is 100 copies per request (make several).
 
 ## Setup (Cloudflare Pages, project `xtrata`, Production)
 
@@ -73,11 +75,13 @@ Known limits: batches are admin-only for now; the batch cap is 100 copies per re
 3. Set secrets:
    - `RADIO_GIFT_TREASURY_KEY`: the treasury's private key (64 hex characters, optionally ending `01`).
    - `RADIO_GIFT_ADMIN`: your own address. It only signs campaign and player requests and never holds gift money. Several admins: separate the addresses with commas, e.g. `SP…jim,SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX`. Every admin can make campaign links (paid from the treasury, up to what it holds) and albums from the songs it holds.
+   - `RADIO_GIFT_SWEEP_SECRET`: a long random string (24+ characters) shared with the sweep Worker (below).
    - Optional: `RADIO_GIFT_ESCROW_CAP` (microSTX) and the two Turnstile keys. (`RADIO_GIFT_DAILY_CAP` is no longer used and can be deleted.)
    - `RADIO_GIFT_ENABLED` = `1` last.
 4. Optionally apply `functions/migrations/027_radio_gifts.sql`. The tables are also created on first use.
 5. Redeploy `xtrata`. Secrets apply only to new deployments.
-6. Kill switch: set `RADIO_GIFT_ENABLED` to anything but `1` and redeploy. Claims, new gifts and refunds all stop. Sends already made still settle on the chain.
+6. Scheduled sweep (optional but recommended): `npx wrangler secret put RADIO_GIFT_SWEEP_SECRET --config workers/radio-gift-sweep/wrangler.toml` (same value as on Pages), then `npx wrangler deploy --config workers/radio-gift-sweep/wrangler.toml`. Without it, refunds still run, but only when someone opens a gift page.
+7. Kill switch: set `RADIO_GIFT_ENABLED` to anything but `1` and redeploy. Claims, new gifts and refunds all stop. Sends already made still settle on the chain.
 
 ## Operating
 

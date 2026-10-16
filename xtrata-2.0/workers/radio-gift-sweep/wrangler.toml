@@ -1,0 +1,12 @@
+# Scheduled housekeeping for the radio gift treasury. It holds NO treasury key and NO database: it only asks the Pages
+# project to run its own sweep (POST /radio/gift/sweep), proving who it is with a shared secret.
+#   wrangler secret put RADIO_GIFT_SWEEP_SECRET --config workers/radio-gift-sweep/wrangler.toml     (same value as on the Pages project)
+#   wrangler deploy --config workers/radio-gift-sweep/wrangler.toml
+name = "xtrata-radio-gift-sweep"
+main = "index.ts"
+compatibility_date = "2026-10-12"
+workers_dev = false
+[triggers]
+crons = ["*/5 * * * *"]
+[vars]
+SWEEP_URL = "https://radio.xtrata.xyz/radio/gift/sweep"

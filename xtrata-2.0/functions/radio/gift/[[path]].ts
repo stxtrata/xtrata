@@ -1,6 +1,6 @@
 import {
   batchesFor, batchStatus, claimGift, confirmBatch, confirmFriendGift, createBatch, createCampaign, createFriendGift, createPlayer, GiftError,
-  giftForWallet, giftStatus, hiroGiftChain, nextSlot, shelfFor, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
+  giftForWallet, giftStatus, hiroGiftChain, nextSlot, runSweep, shelfFor, sweepAuthorised, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
 } from '../../lib/radio-gifts';
 import { checkSongsNow } from '../../lib/radio-metadata';
 
@@ -19,6 +19,7 @@ import { checkSongsNow } from '../../lib/radio-metadata';
  *   GET  /radio/gift/batches?creator=…   a creator's recent batches (public data, never a code)
  *   POST /radio/gift/batch         {request, signature}         admin: fund a batch (one deposit pays for every copy); codes shown once
  *   POST /radio/gift/batch/confirm {id, txid?}                  the creator's deposit (found by its memo without a txid)
+ *   POST /radio/gift/sweep         the scheduled housekeeping; needs `Authorization: Bearer <RADIO_GIFT_SWEEP_SECRET>` (anything else: 404)
  *   POST /radio/gift/player        {definition, request, signature}   admin: a gift player (title, songs, cover)
  * POSTs are same-origin only. Housekeeping (settling sends, expiry, refunds) runs after each request.
  */
@@ -48,6 +49,8 @@ export async function onRequest(context: Ctx) {
       return reply({ error: 'Not found' }, 404);
     }
     if (request.method !== 'POST') return reply({ error: 'GET or POST required' }, 405);
+    // The scheduled sweep is not a browser: it has no Origin, only the shared secret. Wrong or missing secret looks like no such page.
+    if (action === 'sweep') return sweepAuthorised(env, request.headers.get('authorization')) ? reply(await runSweep(env, deps())) : reply({ error: 'Not found' }, 404);
     const origin = request.headers.get('origin');
     if (!origin || origin !== new URL(request.url).origin || request.headers.get('sec-fetch-site') === 'cross-site') return reply({ error: 'Same origin required' }, 403);
     if (!request.headers.get('content-type')?.startsWith('application/json')) return reply({ error: 'JSON required' }, 415);

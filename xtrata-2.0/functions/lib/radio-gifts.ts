@@ -59,6 +59,8 @@ export type GiftEnv = PppEnv & {
   RADIO_GIFT_ADMIN?: string;
   RADIO_GIFT_DAILY_CAP?: string;
   RADIO_GIFT_ESCROW_CAP?: string;
+  /** Shared secret for the scheduled sweep (workers/radio-gift-sweep). Unset: the sweep endpoint does not exist. */
+  RADIO_GIFT_SWEEP_SECRET?: string;
   RADIO_GIFT_TURNSTILE_SITE_KEY?: string;
   RADIO_GIFT_TURNSTILE_SECRET?: string;
   TELEMETRY_SALT?: string;
@@ -81,6 +83,10 @@ export const REBROADCAST_MS = 2 * 60_000;
 export const RETRY_FAILED_MS = 20_000;
 /** A send still unconfirmed this long after its last signature is re-signed: same nonce, higher fee. */
 export const BUMP_AFTER_MS = 15 * 60_000;
+export const SCAN_EVERY_MS = 10 * 60_000;
+export const SCAN_WHILE_EXPECTING_MS = 60_000;
+/** Most expired copies one refund transfer returns (one gifter, one transfer, one network fee). */
+export const REFUND_GROUP_MAX = 40;
 /** A used nonce with no successful send must still be the case this much later before release. */
 export const NONCE_SETTLE_MS = 5 * 60_000;
 
@@ -359,26 +365,34 @@ async function sign(key: string, recipient: string, amount: bigint, nonce: bigin
  * another send is open, nothing is written and nothing is sent. After that, the send stays open
  * whatever the broadcast says; only the chain settles it.
  */
-async function startSend(env: GiftEnv, deps: GiftDeps, treasury: string, key: string, kind: 'claim' | 'refund', r: Row, recipient: string, ip: string | null = null, bind: SlotSubmission | null = null) {
+async function startSend(env: GiftEnv, deps: GiftDeps, treasury: string, key: string, kind: 'claim' | 'refund', r: Row, recipient: string, ip: string | null = null, bind: SlotSubmission | null = null, group: Row[] = [r]) {
   if (await one(env, "SELECT id FROM radio_gift_sends WHERE status='sent'")) throw new GiftError('The gift treasury is sending another gift. Trying again in a moment…', 503);
   const done = await one<{ n: number | null }>(env, "SELECT MAX(nonce) AS n FROM radio_gift_sends WHERE status='done'");
   const floor = done?.n === null || done?.n === undefined ? 0n : BigInt(done.n) + 1n;
   const fromChain = await deps.chain.nonce(treasury);
   const nonce = fromChain > floor ? fromChain : floor;
-  const amount = BigInt(r.amount);
+  // A refund may return several expired copies of one gifter in ONE transfer. The gifter paid a network fee with every
+  // copy and the treasury pays only one, so they get the other fees back too: they lose exactly one network fee.
+  if (kind === 'claim' && group.length !== 1) throw new GiftError('A claim sends exactly one gift.', 500);
+  const total = group.reduce((sum, g) => sum + BigInt(g.amount), 0n) + GIFT_FEE * BigInt(group.length - 1);
+  const amount = kind === 'refund' ? total : BigInt(r.amount);
   const tx = await sign(key, recipient, amount, nonce, GIFT_FEE);
   const id = randomId(), now = deps.now, db = d1(env);
+  const markGifts = kind === 'refund' ? group.map((g) => db.prepare(`UPDATE radio_gifts SET status='refunding', refund_txid=?, updated_at=? WHERE id=? AND status='live'`).bind(tx.txid, now, g.id)) : [];
   const markGift = kind === 'claim'
     ? db.prepare(`UPDATE radio_gifts SET status='claiming', claimed_by=?, claim_txid=?, claimed_at=?, ip_hash=COALESCE(?, ip_hash), root=?, slot=?, updated_at=? WHERE id=? AND status='live'`)
       .bind(recipient, tx.txid, now, ip, bind?.root ?? null, bind?.slot ?? null, now, r.id)
-    : db.prepare(`UPDATE radio_gifts SET status='refunding', refund_txid=?, updated_at=? WHERE id=? AND status='live'`).bind(tx.txid, now, r.id);
+    : null;
+  // The send is recorded only if EVERY copy it returns moved to `refunding` with this transaction; otherwise the copies
+  // that did move are put back in the same transaction, so a refund can never be half-recorded.
   const insertSend = db.prepare(`INSERT INTO radio_gift_sends(id, gift_id, kind, nonce, recipient, amount, fee, txids, raw, status, created_at, signed_at, broadcast_at, updated_at)
     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?, ?, ?
-    WHERE EXISTS (SELECT 1 FROM radio_gifts WHERE id=? AND ${kind === 'claim' ? "status='claiming' AND claim_txid=?" : "status='refunding' AND refund_txid=?"})`)
-    .bind(id, r.id, kind, Number(nonce), recipient, r.amount, Number(GIFT_FEE), JSON.stringify([tx.txid]), bytesToHex(tx.raw), now, now, now, now, r.id, tx.txid);
+    WHERE ${kind === 'claim' ? "EXISTS (SELECT 1 FROM radio_gifts WHERE id=? AND status='claiming' AND claim_txid=?)" : "(SELECT COUNT(*) FROM radio_gifts WHERE status='refunding' AND refund_txid=?) = ?"}`)
+    .bind(id, r.id, kind, Number(nonce), recipient, amount.toString(), Number(GIFT_FEE), JSON.stringify([tx.txid]), bytesToHex(tx.raw), now, now, now, now, ...(kind === 'claim' ? [r.id, tx.txid] : [tx.txid, group.length]));
   // The proof that this numbered wallet belongs to the passkey is kept with the gift, in the same transaction, so credit
   // for its plays can follow the passkey's link (INSERT OR IGNORE: a released claim leaves a still-true binding behind).
-  const writes = [markGift, insertSend];
+  const writes = [...(markGift ? [markGift] : markGifts), insertSend];
+  if (kind === 'refund') writes.push(db.prepare("UPDATE radio_gifts SET status='live', refund_txid=NULL, updated_at=? WHERE status='refunding' AND refund_txid=? AND NOT EXISTS (SELECT 1 FROM radio_gift_sends WHERE id=?)").bind(now, tx.txid, id));
   if (kind === 'claim' && bind) writes.push(db.prepare(`INSERT OR IGNORE INTO radio_listening_slots(address, root, slot, issued, root_signature, slot_signature, created_at)
     SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM radio_gifts WHERE id=? AND status='claiming' AND claim_txid=?)`)
     .bind(bind.address, bind.root, bind.slot, bind.issued, bind.rootSignature, bind.slotSignature, now, r.id, tx.txid));
@@ -414,7 +428,8 @@ async function sendBytes(env: GiftEnv, deps: GiftDeps, sendId: string, raw: Uint
 async function release(env: GiftEnv, kind: 'claim' | 'refund', giftId: string, txids: string[], now: number) {
   const list = txids.map(() => '?').join(',');
   if (kind === 'claim') await run(env, `UPDATE radio_gifts SET status='live', claimed_by=NULL, claim_txid=NULL, claimed_at=NULL, root=NULL, slot=NULL, updated_at=? WHERE id=? AND status='claiming' AND claim_txid IN (${list})`, [now, giftId, ...txids]);
-  else await run(env, `UPDATE radio_gifts SET status='live', refund_txid=NULL, updated_at=? WHERE id=? AND status='refunding' AND refund_txid IN (${list})`, [now, giftId, ...txids]);
+  // Every copy a refund returns shares its transaction, so they all go back together.
+  else await run(env, `UPDATE radio_gifts SET status='live', refund_txid=NULL, updated_at=? WHERE status='refunding' AND refund_txid IN (${list})`, [now, ...txids]);
 }
 
 /**
@@ -440,7 +455,7 @@ async function settleOpenSend(env: GiftEnv, deps: GiftDeps, key: string, treasur
   if (won) {
     if (!changed(await run(env, "UPDATE radio_gift_sends SET status='done', updated_at=? WHERE id=? AND status='sent'", [now, s.id]))) return 'raced';
     if (s.kind === 'claim') await run(env, `UPDATE radio_gifts SET status='claimed', claim_txid=?, updated_at=? WHERE id=? AND status='claiming'`, [won, now, s.gift_id]);
-    else await run(env, `UPDATE radio_gifts SET status='refunded', refund_txid=?, updated_at=? WHERE id=? AND status='refunding'`, [won, now, s.gift_id]);
+    else await run(env, `UPDATE radio_gifts SET status='refunded', refund_txid=?, updated_at=? WHERE status='refunding' AND refund_txid IN (${txids.map(() => '?').join(',')})`, [won, now, ...txids]);
     return 'settled';
   }
   const executed = await deps.chain.executedNonce(treasury);
@@ -461,7 +476,7 @@ async function settleOpenSend(env: GiftEnv, deps: GiftDeps, key: string, treasur
     if (!changed(await run(env, "UPDATE radio_gift_sends SET fee=?, txids=?, raw=?, signed_at=?, broadcast_at=?, updated_at=? WHERE id=? AND status='sent' AND txids=?",
       [Number(fee), JSON.stringify(next), bytesToHex(tx.raw), now, now, now, s.id, s.txids]))) return 'raced';
     if (s.kind === 'claim') await run(env, "UPDATE radio_gifts SET claim_txid=?, updated_at=? WHERE id=? AND status='claiming'", [tx.txid, now, s.gift_id]);
-    else await run(env, "UPDATE radio_gifts SET refund_txid=?, updated_at=? WHERE id=? AND status='refunding'", [tx.txid, now, s.gift_id]);
+    else await run(env, `UPDATE radio_gifts SET refund_txid=?, updated_at=? WHERE status='refunding' AND refund_txid IN (${txids.map(() => '?').join(',')})`, [tx.txid, now, ...txids]);
     await sendBytes(env, deps, s.id, tx.raw, tx.txid);
     return 'bumped';
   }
@@ -991,8 +1006,11 @@ export async function sweepGifts(env: GiftEnv, deps: GiftDeps) {
   if (setAside || setAsideBatches) return { did: 'abandoned' };
   // Every few minutes: memo'd deposits that belong to no waiting gift (paid twice, wrong amount, a
   // gift already live with another payment) are recorded for a refund. Friends' money is never lost.
+  // Every ten minutes, or every minute while a payment is expected (a creator or friend has just been asked to pay).
   const last = await one<{ value: number }>(env, "SELECT created_at AS value FROM radio_gift_orphans WHERE txid='scan'");
-  if (!last || deps.now - last.value > 10 * 60_000) {
+  const expecting = !!(await one(env, "SELECT id FROM radio_gift_batches WHERE status='pending-deposit' AND created_at>? LIMIT 1", [deps.now - PENDING_DEPOSIT_MS]))
+    || !!(await one(env, "SELECT id FROM radio_gifts WHERE status='pending-deposit' AND batch_id IS NULL AND created_at>? LIMIT 1", [deps.now - PENDING_DEPOSIT_MS]));
+  if (!last || deps.now - last.value > (expecting ? SCAN_WHILE_EXPECTING_MS : SCAN_EVERY_MS)) {
     await run(env, "INSERT INTO radio_gift_orphans(txid, gift_id, sender, amount, reason, status, created_at, updated_at) VALUES('scan', NULL, '', 0, 'scan marker', 'marker', ?, ?) ON CONFLICT(txid) DO UPDATE SET created_at=excluded.created_at", [deps.now, deps.now]);
     try { await scanDeposits(env, treasury, deps); } catch { /* could not read: try again later */ }
     await collateralAlarm(env, treasury, deps);
@@ -1000,8 +1018,41 @@ export async function sweepGifts(env: GiftEnv, deps: GiftDeps) {
   }
   const due = await one(env, "SELECT * FROM radio_gifts WHERE source='friend' AND status='live' AND expires_at<? ORDER BY expires_at LIMIT 1", [deps.now]);
   if (!due?.gifter) return { did: 'nothing' };
+  // All of that gifter's expired copies go back in one transfer (up to REFUND_GROUP_MAX), so a batch is refunded in one go.
+  const group = await all<Row>(env, "SELECT * FROM radio_gifts WHERE source='friend' AND status='live' AND expires_at<? AND gifter=? ORDER BY expires_at, id LIMIT ?", [deps.now, due.gifter, REFUND_GROUP_MAX]);
   try {
-    const txid = await startSend(env, deps, treasury, key, 'refund', due, due.gifter);
-    return { did: 'refund-sent', id: due.id, txid };
+    const txid = await startSend(env, deps, treasury, key, 'refund', group[0] ?? due, due.gifter, null, null, group.length ? group : [due]);
+    return { did: 'refund-sent', id: (group[0] ?? due).id, txid, copies: group.length || 1 };
   } catch { return { did: 'refund-later' }; }
+}
+
+// ---------------------------------------------------------------------------- scheduled sweep
+
+/** What a sweep step can answer when there is nothing more to do right now. */
+const SWEEP_IDLE = new Set(['off', 'nothing', 'pending', 'nonce-used', 'inconsistent', 'unreadable', 'refund-later', 'raced', 'rebroadcast']);
+
+/**
+ * The scheduled sweep (workers/radio-gift-sweep calls POST /radio/gift/sweep every 5 minutes): does the housekeeping
+ * that otherwise waits for someone to open a page (settle the open send, set aside unpaid batches, scan for deposits,
+ * refund expired copies). One step at a time as always, at most `maxSteps` of them, stopping as soon as nothing can move.
+ */
+export async function runSweep(env: GiftEnv, deps: GiftDeps, maxSteps = 8) {
+  const steps: string[] = [];
+  for (let i = 0; i < maxSteps; i++) {
+    const r = await sweepGifts(env, deps);
+    steps.push(r.did);
+    if (SWEEP_IDLE.has(r.did)) break;
+  }
+  return { steps };
+}
+
+/** True only for `Authorization: Bearer <RADIO_GIFT_SWEEP_SECRET>` (a long secret; compared without early exit). */
+export function sweepAuthorised(env: GiftEnv, header: string | null): boolean {
+  const secret = env.RADIO_GIFT_SWEEP_SECRET?.trim();
+  if (!secret || secret.length < 24 || !header) return false;
+  const given = header.replace(/^Bearer\s+/i, '');
+  const a = new TextEncoder().encode(given), b = new TextEncoder().encode(secret);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  return diff === 0;
 }
