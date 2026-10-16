@@ -1055,6 +1055,61 @@ describe('radio gift players', () => {
       await s.claim(code);
     });
 
+    it('whole life of a batch on the simulated chain: the treasury ends exactly where it started', async () => {
+      const s = setup(); catalogue(s);
+      const { id } = await make(s);
+      const COUNT = 5, AMOUNT = 123000n;
+      // 1. the creator signs and gets dormant links; nothing is claimable and nothing is owed yet
+      const made = await fund(s, { player: id, count: COUNT, amount: AMOUNT.toString(), label: 'Opera launch' });
+      const deposit = BigInt(made.deposit);
+      expect(deposit).toBe(batchDeposit(COUNT, AMOUNT));
+      await expect(s.claim(made.codes[0])).rejects.toThrow(/not paid for yet/);
+      // 2. the creator pays once; the treasury receives exactly that
+      const txid = pay(s, made);
+      s.chain.balances.set(s.treasury, deposit);
+      expect((await runSweep(s.env, s.deps())).steps[0]).toBe('deposits-scanned');
+      s.chain.inbound.push({ txid, ...s.chain.txs.get(txid)! });
+      s.tick(SCAN_WHILE_EXPECTING_MS + 1);
+      await runSweep(s.env, s.deps());
+      expect((await batchStatus(s.env, made.id)).status).toBe('live'); // found by the sweep, no page open
+      // 3. two listeners claim album copies into numbered wallets; the creator is their payer
+      const { root, proof } = await passkey();
+      const spent: bigint[] = [];
+      for (const slot of [1, 2]) {
+        const p = await proof(slot, s.now());
+        await claimInto(s, made.codes[slot - 1], p);
+        const d = decode(s.chain.sent.at(-1)!.raw);
+        expect(d).toMatchObject({ recipient: p.id.address, amount: AMOUNT });
+        spent.push(d.amount + d.fee);
+        expect((await s.land()).did).toBe('settled');
+        expect((await giftForWallet(s.env, p.id.address)).gift).toMatchObject({ returnTo: s.admin, from: s.admin, player: { title: 'Proof of Sound' } });
+        s.tick(1000);
+      }
+      expect((await shelfFor(s.env, root.address)).shelf.map((x) => x.slot)).toEqual([1, 2]);
+      // 4. a claimed copy cannot be claimed again, and a wallet that already had a gift cannot take another
+      await expect(s.claim(made.codes[0])).rejects.toMatchObject({ status: 410 });
+      // 5. thirty days pass; the sweep alone returns the three unclaimed copies in ONE transfer to the creator
+      s.tick(GIFT_EXPIRY_MS + 1);
+      const steps = (await runSweep(s.env, s.deps())).steps;
+      expect(steps).toContain('refund-sent');
+      const refund = decode(s.chain.sent.at(-1)!.raw);
+      expect(refund.recipient).toBe(s.admin);
+      expect(s.chain.sent.filter((x) => decode(x.raw).recipient === s.admin)).toHaveLength(1);
+      await s.land();
+      expect((await runSweep(s.env, s.deps())).steps).toEqual(['nothing']);
+      // 6. everything the creator paid is accounted for: sends + refund + every network fee = the one deposit
+      const out = spent.reduce((a, b) => a + b, 0n) + refund.amount + refund.fee;
+      expect(out).toBe(deposit);
+      expect(await batchStatus(s.env, made.id)).toMatchObject({ status: 'live', copies: { waiting: 0, claiming: 0, claimed: 2, refunding: 0, refunded: 3 } });
+      expect(s.db.sql.prepare("SELECT COUNT(*) AS n FROM radio_gift_sends WHERE status='sent'").get()).toEqual({ n: 0 });
+      // 7. nothing is owed any more
+      const alarm = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      s.chain.balances.set(s.treasury, 0n); s.tick(SCAN_EVERY_MS + 1);
+      await runSweep(s.env, s.deps());
+      expect(alarm).not.toHaveBeenCalledWith(expect.stringContaining('under-collateralised'), expect.anything());
+      alarm.mockRestore();
+    });
+
     describe('the scheduled sweep', () => {
       const SECRET = 's3cret-'.repeat(5);
       it('refunds an expired batch with nobody visiting any page, then idles', async () => {
