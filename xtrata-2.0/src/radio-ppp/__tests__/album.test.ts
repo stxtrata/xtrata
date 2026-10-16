@@ -104,6 +104,27 @@ describe('an open album is a player', () => {
     expect(text(album)).not.toContain("played this album out");
   });
 
+  it('while plays arrive the controls rest (greyed out) and a calm countdown says to wait', async () => {
+    const album = await open({ giftPlays: 0, balance: 0n, step: 'fund', depositPending: true, arrival: { since: Date.now() - 20_000, graceMs: 60_000 } });
+    expect([...album.querySelectorAll<HTMLButtonElement>('.al-play, .al-icon--big, .al-track')].every((b) => b.disabled)).toBe(true);
+    expect(album.querySelector('.al-ctl')!.classList.contains('is-off')).toBe(true);
+    const bar = album.querySelector('.ppp-wait')!;
+    expect(text(bar)).toMatch(/Your plays are arriving.*usually about a minute · (39|40|41)s/);
+    expect(album.querySelector('.ppp-bad')).toBeNull();
+    expect(text(album)).not.toMatch(/No plays left|played this album out|artists unpaid/);
+  });
+
+  it('once the plays land the controls wake up and the countdown goes', async () => {
+    const album = await open();
+    expect([...album.querySelectorAll<HTMLButtonElement>('.al-play, .al-track')].some((b) => b.disabled)).toBe(false);
+    expect(album.querySelector('.ppp-wait')).toBeNull();
+  });
+
+  it('a top-up on its way while plays remain does not lock the player', async () => {
+    const album = await open({ depositPending: true, arrival: { since: Date.now(), graceMs: 60_000 } });
+    expect((album.querySelector('.al-play') as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('More holds everything else: add plays, My music, the radio, sending music, this device', async () => {
     const album = await open();
     buttonNamed(album, /^More/).click();
@@ -148,6 +169,16 @@ describe('an album arriving by link', () => {
     expect(called('create')).toHaveLength(1);
     buttonNamed(album, /used Xtrata Music here before/).click();
     expect(called('unlock')).toEqual([[true]]);
+  });
+
+  it('an already-linked, empty wallet claiming an album reads as waiting, never as out of plays', async () => {
+    linkWith();
+    h.route = (url) => (url.endsWith('/radio/gift/status') ? new Response(JSON.stringify({ status: 'live', amount: '108000', source: 'batch', from: null, label: '', expires: 0, player: PLAYER })) : url.includes('/radio/gift/slots') ? new Response(JSON.stringify({ next: 1 })) : undefined);
+    const album = await open({ step: 'fund', slot: 0, gift: null, balance: 0n, giftPlays: 0, linked: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', createdHere: false,
+      entries: [{ kind: 'play', status: 'confirmed', amount: '350', created: Date.now(), song: 7, txid: '0x1' }] });
+    await vi.waitFor(() => expect(text(album)).toMatch(/Still sending your gift|Sending your album/));
+    expect(text(album)).not.toMatch(/No plays left|played this album out|Out of funds|Add funds|artists unpaid/);
+    expect(album.querySelector('.ppp-bad')).toBeNull();
   });
 
   it('while the wallet box asks for a tap, the view points to it and the box opens as a sheet', async () => {

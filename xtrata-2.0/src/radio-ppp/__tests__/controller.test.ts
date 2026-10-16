@@ -1383,6 +1383,60 @@ describe('gifted wallets and gift players', () => {
     expect(s.ppp.snapshot().giftStop).toMatchObject({ reason: 'arriving' });
   });
 
+  describe('while a gift is being claimed', () => {
+    it('reads as arriving from the first tap, even for an empty wallet with no deposit recorded yet', async () => {
+      const s = await gifted(0n, null);
+      expect(s.ppp.snapshot()).toMatchObject({ arrival: null, giftStop: { reason: 'out' } });
+      s.ppp.giftClaiming(true);
+      expect(s.ppp.snapshot()).toMatchObject({ depositPending: true, giftStop: { reason: 'arriving' }, arrival: { graceMs: 60_000 } });
+    });
+
+    it('is never called empty for at least a minute, and says so again as soon as the minute is up', async () => {
+      const s = await gifted(0n, null);
+      s.ppp.giftClaiming(true);
+      s.tick(59_000);
+      expect(s.ppp.snapshot()).toMatchObject({ depositPending: true, giftStop: { reason: 'arriving' } });
+      s.tick(2_000);
+      expect(s.ppp.snapshot()).toMatchObject({ depositPending: false, arrival: null, giftStop: { reason: 'out' } });
+    });
+
+    it('a claim that fails for good clears the wait at once', async () => {
+      const s = await gifted(0n, null);
+      s.ppp.giftClaiming(true);
+      s.ppp.giftClaiming(false);
+      expect(s.ppp.snapshot()).toMatchObject({ arrival: null, giftStop: { reason: 'out' } });
+    });
+
+    it('keeps waiting through the whole life of the deposit, counted from when the claim began', async () => {
+      const s = await gifted(0n, null);
+      s.ppp.giftClaiming(true);
+      const begun = s.ppp.snapshot().arrival!.since;
+      s.tick(5_000);
+      s.ppp.giftSent('0x' + 'f'.repeat(64), 250_000n);
+      s.tick(600_000); // far longer than a minute: a recorded deposit is still on its way
+      expect(s.ppp.snapshot()).toMatchObject({ depositPending: true, giftStop: { reason: 'arriving' } });
+      expect(s.ppp.snapshot().arrival!.since).toBeGreaterThanOrEqual(begun);
+    });
+
+    it('a deposit that confirmed before the balance shows it still reads as arriving, then plays start', async () => {
+      const s = await gifted(0n, null);
+      const gift = '0x' + 'a'.repeat(64);
+      s.ppp.giftSent(gift, 250_000n);
+      s.chain.mined.add(gift); // confirmed on-chain, balance read still lags at zero
+      await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', giftStop: { reason: 'arriving' } });
+      s.chain.balance = 250_000n;
+      await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', depositPending: false, arrival: null, giftStop: null });
+    });
+
+    it('a wallet that already has plays is not held back by a claim', async () => {
+      const s = await gifted(500_000n, null);
+      s.ppp.giftClaiming(true);
+      expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', depositPending: false, giftStop: null });
+    });
+  });
+
   it('a payment on its way is already spent: the last play stops the radio before it confirms', async () => {
     const s = await gifted(3_000n + 350n); // exactly one play
     expect(s.ppp.snapshot()).toMatchObject({ giftPlays: 1, giftStop: null });

@@ -206,6 +206,8 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
     const current = np && p.tracks.some((t) => String(t.id) === String(np.tokenId)) ? String(np.tokenId) : null;
     const song = current ? p.tracks.find((t) => String(t.id) === current) : null;
     const out = i.plays === 0 && !i.playsComing;
+    // Plays on their way and none to spend yet: the controls rest (greyed out) until they land. Nothing is wrong.
+    const waiting = !!i.playsComing && !i.plays;
     const playing = !!st?.playing && !!current;
     const heart = st?.heart;
     const nodes: Node[] = [coverBox(p, !out)];
@@ -214,7 +216,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
       h('div', { class: 'al-now-t' },
         h('div', { class: 'al-song' }, song ? (song.title || np?.title || `#${song.id}`) : p.title),
         h('div', { class: 'al-artist' }, song ? (song.artist || np?.artist || p.subtitle) : p.subtitle || 'Press play')),
-      current ? btn({ class: 'al-icon' + (heart?.liked ? ' is-on' : ''), 'aria-label': heart?.liked ? 'Unlike this song' : 'Like this song', 'aria-pressed': String(!!heart?.liked), disabled: !!heart?.pending || !!heart?.locked, onClick: () => r?.toggleLike?.(), html: heart?.liked ? ICON.heartOn : ICON.heart }) : null));
+      current ? btn({ class: 'al-icon' + (heart?.liked ? ' is-on' : ''), 'aria-label': heart?.liked ? 'Unlike this song' : 'Like this song', 'aria-pressed': String(!!heart?.liked), disabled: !!heart?.pending || !!heart?.locked || waiting, onClick: () => r?.toggleLike?.(), html: heart?.liked ? ICON.heartOn : ICON.heart }) : null));
 
     if (!out) {
       const pos = current ? r?.getPosition?.() : null;
@@ -228,16 +230,16 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
         h('p', { class: 'al-out-s' }, 'Add plays to keep listening.'),
         topUpButtons(i, true)));
     }
-    nodes.push(h('div', { class: 'al-ctl' + (out ? ' is-off' : '') },
-      btn({ class: 'al-icon al-icon--big', 'aria-label': 'Previous song', disabled: out, onClick: () => r?.prev?.(), html: ICON.prev }),
-      btn({ class: 'al-play', 'aria-label': playing ? 'Pause' : 'Play', disabled: out, onClick: () => r?.playPause?.(), html: playing ? ICON.pause : ICON.play }),
-      btn({ class: 'al-icon al-icon--big', 'aria-label': 'Next song', disabled: out, onClick: () => r?.next?.(), html: ICON.next })));
+    nodes.push(h('div', { class: 'al-ctl' + (out || waiting ? ' is-off' : '') },
+      btn({ class: 'al-icon al-icon--big', 'aria-label': 'Previous song', disabled: out || waiting, onClick: () => r?.prev?.(), html: ICON.prev }),
+      btn({ class: 'al-play', 'aria-label': playing ? 'Pause' : 'Play', disabled: out || waiting, onClick: () => r?.playPause?.(), html: playing ? ICON.pause : ICON.play }),
+      btn({ class: 'al-icon al-icon--big', 'aria-label': 'Next song', disabled: out || waiting, onClick: () => r?.next?.(), html: ICON.next })));
     if (i.status.length) nodes.push(h('div', { class: 'al-status', role: 'status' }, ...i.status));
 
     nodes.push(h('div', { class: 'al-listhead' }, h('span', {}, h('b', {}, p.title), ` · ${plural(songs.length, 'song', 'songs')}`), playsChip(i)));
     nodes.push(h('ol', { class: 'al-tracks' }, ...songs.map((t, n) => {
       const on = String(t.id) === current;
-      return h('li', {}, btn({ class: 'al-track' + (on ? ' is-on' : ''), 'aria-label': `Play ${t.title || '#' + t.id}`, 'aria-current': on ? 'true' : undefined, disabled: out, onClick: () => r?.playToken?.(t.id) },
+      return h('li', {}, btn({ class: 'al-track' + (on ? ' is-on' : ''), 'aria-label': `Play ${t.title || '#' + t.id}`, 'aria-current': on ? 'true' : undefined, disabled: out || waiting, onClick: () => r?.playToken?.(t.id) },
         h('span', { class: 'al-n' }, String(n + 1)),
         h('span', { class: 'al-tt' }, t.title || `#${t.id}`),
         on ? h('span', { class: 'al-eq', html: ICON.eq }) : null));
