@@ -1,5 +1,5 @@
 import {
-  batchesFor, batchStatus, claimGift, confirmBatch, confirmFriendGift, createBatch, createCampaign, createFriendGift, createPlayer, GiftError,
+  batchesFor, batchStatus, claimGift, confirmBatch, confirmFriendGift, createBatch, createFriendGift, createPlayer, GiftError,
   giftForWallet, giftStatus, hiroGiftChain, nextSlot, runSweep, shelfFor, sweepAuthorised, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
 } from '../../lib/radio-gifts';
 
@@ -13,7 +13,6 @@ import {
  *   POST /radio/gift/claim         {code, wallet, turnstile?, binding?}   fund a brand-new listening wallet (binding: an album into a numbered wallet)
  *   POST /radio/gift/create        {gifter, amount}             start a friend gift
  *   POST /radio/gift/confirm       {id, txid?}                  the friend's deposit (found by its memo without a txid)
- *   POST /radio/gift/campaign      {request, signature}         admin: campaign links (request.player opens a gift player)
  *   GET  /radio/gift/batch?id=…    a prefunded batch: its bill, memo and where each copy stands (the creator who paid for it)
  *   GET  /radio/gift/batches?creator=…   a creator's recent batches (public data, never a code)
  *   POST /radio/gift/batch         {request, signature}         admin: fund a batch (one deposit pays for every copy); codes shown once
@@ -62,7 +61,6 @@ export async function onRequest(context: Ctx) {
     else if (action === 'claim') out = await claimGift(env, body, deps(), ip, request);
     else if (action === 'create') out = await createFriendGift(env, body, deps(), ip, request);
     else if (action === 'confirm') out = await confirmFriendGift(env, body, deps(), request);
-    else if (action === 'campaign') out = await createCampaign(env, body, deps(), request);
     else if (action === 'batch') out = await createBatch(env, body, deps(), request);
     else if (action === 'batch/confirm') out = await confirmBatch(env, body, deps(), request);
     else if (action === 'player') out = await createPlayer(env, body, deps(), request);
