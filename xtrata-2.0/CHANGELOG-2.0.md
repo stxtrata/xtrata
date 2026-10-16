@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: Draw 2 recorded, earlier draws' winners shown (2026-10-16)
+- Draw 2 (cut-off 14 Oct 23:59 BST) had only ever been computed live in visitors' browsers. Its official record is now in `public/bounty/zdao/tracker/1/draws/draw2/` (`frozen.csv`, `meta.json`, `result.json`): 15 wallets / 281 tickets, list hash 135854cd…, seed Bitcoin block 971478. Winners: SP2Z2CBM… (28 tickets), SPZ2X7Q… (5), SP1RB1V6… (62); reserves SP1BP036… (82), SP38B5H0… (22). Reproduced offline with `freeze.mjs` + `draw.mjs`, and identical to what the live page computes.
+- `handles.json` `winners` now lists Draw 2's winners too (SP2Z2CBM… as `draws: [1, 2]`), so Draw 3 takes one ticket off each win.
+- `public/bounty/zdao/tracker/1/index.html`: the Live draw section lists the winners of every earlier draw by loading `draws/drawN/result.json` when this browser did not run that draw itself (before, only a draw computed in the same browser session was listed, so Draw 1's winners were missing once Draw 2 was showing). A wallet with several wins is labelled "Winner of draws 1 and 2" in the checker instead of showing only one draw.
+- **Verified:** in a browser, Draw 1's winners list under "Draw 1 winners", Draw 2 shows "Matches the official result", all five winners are marked with their used tickets in the leaderboard.
+
 ## Bounty tracker: wizard inscriptions count for the wallet that receives them (2026-10-12)
 - The inscription wizard mints from a throwaway wallet and then transfers the inscription to the person it was made for, so the ledger credited the throwaway wallet (and put it in the raffle pool) and the real recipient got nothing. Found on SP1BP036…, which received 13 wizard inscriptions and showed none.
 - `public/bounty/zdao/tracker/1/ledger-reader.js`: reads the NFT mint list to learn which token ids each mint call created, and the contract's direct `transfer` calls. A transfer made by the minter itself, within 6 hours of the mint, moves that inscription's ticket (count and size tickets) from the minter to the receiver, in the all-time counts and in every draw window the transfer fell inside (a hand-over after a cut-off counts from the next draw). Throwaway wallets end with no counts and no longer appear on the board. Gifts later than 6 hours, transfers by anyone else, and sales through a market do not move tickets.
