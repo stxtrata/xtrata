@@ -31,6 +31,11 @@ export const LIKE_FEE = 200n;
 /** Money moved between a passkey's own wallets: at least this much, and the network fee may not exceed the cap. */
 export const MOVE_MIN = 5_000n;
 export const MOVE_FEE_CAP = 10_000n;
+/**
+ * Likes float: the first wallet (it signs every like) gets this much from a new album's gift, once. About 60 likes.
+ * Whoever pays for an album copy adds it to the copy's amount, so the album keeps its full plays.
+ */
+export const LIKES_FLOAT = 15_000n;
 /** A session only lives in the wallet frame's memory, so it also ends when the page closes. */
 export const MAX_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_SESSION_PLAYS = 3_000;

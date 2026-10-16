@@ -12,7 +12,7 @@ import { type FunderResult } from '../lib/listening-wallet/funder';
 import { buildLedger, excessTarget, planReturns, type History, type LedgerPart, type ReturnStep } from '../lib/listening-wallet/ledger';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import {
-  balanceState, costPerPlay, DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, fundingAllowance, LIKE_FEE, playsCovered, RESERVE, TARGET,
+  balanceState, costPerPlay, DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, fundingAllowance, LIKE_FEE, LIKES_FLOAT, playsCovered, RESERVE, TARGET,
   type BalanceState, type ReturnMode
 } from '../lib/listening-wallet/policy';
 import { RADIO_CORE_INDEX } from '../lib/listening-wallet/tx';
@@ -864,7 +864,7 @@ export function createPppController(deps: PppDeps) {
 
   // ---------------------------------------------------------------- money between the passkey's own wallets
   /** Likes float: the first wallet (it signs every like) gets this much from a new album's gift. About 60 likes. */
-  const FLOAT = 15_000n;
+  const FLOAT = LIKES_FLOAT;
   const MOVE_FEE = DEFAULT_RETURN_FEE;
 
   /**

@@ -19,13 +19,16 @@
  *    one of its transactions can ever land.
  *  - A friend's deposit is never forgotten: unpaid gifts are kept (abandoned) and still matched by
  *    memo; a memo'd deposit that matches no gift is recorded for a refund (radio_gift_orphans).
+ *  - A prefunded BATCH is N gift rows (source 'friend', gifter = the creator) made dormant by one signed request and made
+ *    live together, in one transaction, by ONE deposit (memo `batch <id>`). The treasury therefore never pays a copy out
+ *    of its own money: every claimable copy is backed by a confirmed deposit, and an unclaimed copy goes back to the creator.
  *
  * Variables (Cloudflare Pages):
  *   RADIO_GIFT_ENABLED = "1"            kill switch; anything else stops claims, new gifts and refunds
  *   RADIO_GIFT_TREASURY_KEY             the treasury's private key (secret)
  *   RADIO_GIFT_ADMIN = "SP…"            the addresses that may sign campaign and player requests (several: separate with commas)
  *   RADIO_GIFT_DAILY_CAP                no longer used (campaign claims are bounded by the treasury balance)
- *   RADIO_GIFT_ESCROW_CAP               most friend-gift money held at once (default 25 STX)
+ *   RADIO_GIFT_ESCROW_CAP               most creator- and friend-funded money held at once, including batches still waiting for their payment (default 50 STX)
  *   RADIO_GIFT_TURNSTILE_SITE_KEY / _SECRET   optional Cloudflare Turnstile check on claims
  *   TELEMETRY_SALT                      salts the IP hash used for per-IP limits (no IP is stored)
  * Gifts also need pay-per-play to be on and the radio host (functions/lib/radio-listening-wallet.ts).
@@ -43,6 +46,9 @@ import {
   isPlayerId, playerData, playerHash, validatePlayer, validatePlayerRequest, verifyPlayerSignature, type PlayerDefinition, type PlayerRequest, type PlayerView
 } from '../../src/lib/listening-wallet/gift-players';
 import {
+  batchDeposit, batchDepositMemo, batchRequestHash, BATCH_MEMO, isBatchId, validateBatch, verifyBatchSignature, type BatchRequest, type BatchView
+} from '../../src/lib/listening-wallet/batches';
+import {
   campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_FEE_CAP, GIFT_MEMO, giftCodeHash, giftDepositMemo, isGiftCode, newGiftCode,
   validateCampaign, validGiftAmount, verifyCampaignSignature, type CampaignRequest, type GiftView
 } from '../../src/lib/listening-wallet/gifts';
@@ -59,7 +65,10 @@ export type GiftEnv = PppEnv & {
 };
 
 export const DEFAULT_DAILY_CAP = 2_000_000n;
-export const DEFAULT_ESCROW_CAP = 25_000_000n;
+/** The most money held for creators and friends at once (a batch still waiting for its payment counts too). */
+export const DEFAULT_ESCROW_CAP = 50_000_000n;
+/** Unpaid batches one creator may have waiting at once (each is dropped after PENDING_DEPOSIT_MS). */
+export const MAX_PENDING_BATCHES = 10;
 /** Claims per IP (hashed) per 24 hours. */
 export const CLAIMS_PER_IP = 10;
 /** Friend gifts started per IP per hour (each needs a real deposit to go live). */
@@ -289,12 +298,26 @@ export async function ensureGiftTables(env: GiftEnv) {
   await run(env, 'CREATE UNIQUE INDEX IF NOT EXISTS radio_gifts_root_slot ON radio_gifts(root, slot) WHERE root IS NOT NULL');
   await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_orphans(txid TEXT PRIMARY KEY, gift_id TEXT, sender TEXT NOT NULL, amount INTEGER NOT NULL,
     reason TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
+  // Added with prefunded batches: a creator pays for N copies in one deposit. The batch row holds the signed request's hash
+  // (each works once) and the one payment that made it live (unique: one payment can never fund two batches).
+  await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_batches(
+    id TEXT PRIMARY KEY, request_hash TEXT NOT NULL UNIQUE, creator TEXT NOT NULL, player_id TEXT, count INTEGER NOT NULL,
+    amount INTEGER NOT NULL, label TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, deposit_txid TEXT UNIQUE,
+    created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
+  await run(env, 'CREATE INDEX IF NOT EXISTS radio_gift_batches_creator ON radio_gift_batches(creator, created_at)');
+  await run(env, 'ALTER TABLE radio_gifts ADD COLUMN batch_id TEXT').catch(() => undefined);
+  await run(env, 'CREATE INDEX IF NOT EXISTS radio_gifts_batch ON radio_gifts(batch_id)');
 }
 
 type Row = {
   id: string; code_hash: string; amount: number; source: 'campaign' | 'friend'; gifter: string | null; label: string; status: string;
   deposit_txid: string | null; created_at: number; expires_at: number; claimed_by: string | null; claim_txid: string | null;
   claimed_at: number | null; ip_hash: string | null; refund_txid: string | null; updated_at: number; player_id?: string | null; root?: string | null; slot?: number | null;
+  batch_id?: string | null;
+};
+type BatchRow = {
+  id: string; request_hash: string; creator: string; player_id: string | null; count: number; amount: number; label: string;
+  status: 'pending-deposit' | 'live' | 'abandoned'; deposit_txid: string | null; created_at: number; expires_at: number; updated_at: number;
 };
 type Send = {
   id: string; gift_id: string; kind: 'claim' | 'refund'; nonce: number; recipient: string; amount: number; fee: number;
@@ -712,6 +735,144 @@ async function checkDeposit(env: GiftEnv, r: Row, txid: string | null, treasury:
   return view((await gift(env, r.id))!);
 }
 
+// ---------------------------------------------------------------------------- prefunded batches
+
+const batchRow = (env: GiftEnv, id: string) => one<BatchRow>(env, 'SELECT * FROM radio_gift_batches WHERE id=?', [id]);
+/** What the unpaid batches of the last day would add to escrow if they were all paid: counted against the cap up front. */
+const pendingBatchTotal = async (env: GiftEnv, now: number) => {
+  const rows = await all<{ count: number; amount: number }>(env, "SELECT count, amount FROM radio_gift_batches WHERE status='pending-deposit' AND created_at>?", [now - PENDING_DEPOSIT_MS]);
+  return rows.reduce((sum, b) => sum + batchDeposit(b.count, BigInt(b.amount)), 0n);
+};
+
+/** A batch as the creator's page sees it: the bill, the memo, and where each copy stands. No codes (they are shown once). */
+async function batchView(env: GiftEnv, b: BatchRow): Promise<BatchView> {
+  const rows = await all<{ status: string; n: number }>(env, 'SELECT status, COUNT(*) AS n FROM radio_gifts WHERE batch_id=? GROUP BY status', [b.id]);
+  const n = (...states: string[]) => rows.filter((r) => states.includes(r.status)).reduce((sum, r) => sum + r.n, 0);
+  return {
+    id: b.id, status: b.status === 'live' ? 'live' : 'pending-deposit', count: b.count, amount: String(b.amount), label: b.label, player: b.player_id,
+    deposit: batchDeposit(b.count, BigInt(b.amount)).toString(), memo: batchDepositMemo(b.id), expires: b.expires_at,
+    copies: { waiting: n('live'), claiming: n('claiming'), claimed: n('claimed'), refunding: n('refunding'), refunded: n('refunded') }
+  };
+}
+
+/**
+ * A gift admin funds a batch: N dormant gift links, paid for by ONE deposit from the creator to the treasury (memo
+ * `batch <id>`). Nothing can be claimed until that payment confirms, and then every copy goes live together. The
+ * creator is the gift's payer, so a copy nobody claims is refunded to them, and so are a listener's leftover plays.
+ * The codes exist in clear only in this reply. Gift admins only for now; later the same check can be the album's owner.
+ */
+export async function createBatch(env: GiftEnv, body: { request: BatchRequest; signature: string }, deps: GiftDeps, request?: Request) {
+  const { treasury } = requireEnabled(env, request);
+  if (!adminAddresses(env).length) throw new GiftError('No gift admin is set for this deployment.', 403);
+  let req: BatchRequest;
+  try { req = validateBatch(body?.request, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
+  if (req.creator === treasury) throw new GiftError('The gift treasury cannot fund its own batch.', 400);
+  if (!isAdmin(env, req.creator) || !verifyBatchSignature(req, body.signature, req.creator)) throw new GiftError('Only a gift admin can fund a batch.', 403);
+  await ensureGiftTables(env);
+  // An album's copies can only be funded by the wallet that made the album (and so held all its songs).
+  if (req.player) {
+    const p = await one<{ id: string; owner: string }>(env, "SELECT id, owner FROM radio_gift_players WHERE id=? AND status='active'", [req.player]);
+    if (!p) throw new GiftError('That gift player does not exist.', 400);
+    if (p.owner !== req.creator) throw new GiftError('Only the wallet that made an album can fund copies of it.', 403);
+  }
+  const total = batchDeposit(req.count, BigInt(req.amount));
+  const waiting = await one<{ n: number }>(env, "SELECT COUNT(*) AS n FROM radio_gift_batches WHERE creator=? AND status='pending-deposit' AND created_at>?", [req.creator, deps.now - PENDING_DEPOSIT_MS]);
+  if ((waiting?.n ?? 0) >= MAX_PENDING_BATCHES) throw new GiftError('Several batches are still waiting for their payment. Pay or wait for them first.', 429);
+  // Counted before anything is made, including batches not yet paid, so unpaid batches cannot add up past the cap once paid.
+  if ((await owedToFriends(env)) + (await pendingBatchTotal(env, deps.now)) + total > micro(env.RADIO_GIFT_ESCROW_CAP, DEFAULT_ESCROW_CAP))
+    throw new GiftError('The gift treasury is full right now. Try a smaller batch, or try again in a few days.', 503);
+  const id = randomId().slice(0, 16), db = d1(env), now = deps.now, amount = Number(req.amount);
+  const codes = Array.from({ length: req.count }, () => newGiftCode());
+  // One transaction: the batch and every copy, or nothing. Copies go in a few rows per statement (D1 allows 100 bound values).
+  const writes: any[] = [db.prepare(`INSERT INTO radio_gift_batches(id, request_hash, creator, player_id, count, amount, label, status, created_at, expires_at, updated_at)
+    VALUES(?, ?, ?, ?, ?, ?, ?, 'pending-deposit', ?, ?, ?)`).bind(id, batchRequestHash(req), req.creator, req.player ?? null, req.count, amount, req.label, now, now + GIFT_EXPIRY_MS, now)];
+  for (let i = 0; i < codes.length; i += 9) {
+    const part = codes.slice(i, i + 9);
+    writes.push(db.prepare(`INSERT INTO radio_gifts(id, code_hash, amount, source, gifter, label, status, created_at, expires_at, updated_at, player_id, batch_id)
+      VALUES ${part.map(() => "(?, ?, ?, 'friend', ?, ?, 'pending-deposit', ?, ?, ?, ?, ?)").join(', ')}`)
+      .bind(...part.flatMap((code) => [randomId(), giftCodeHash(code), amount, req.creator, req.label, now, now + GIFT_EXPIRY_MS, now, req.player ?? null, id])));
+  }
+  try { await db.batch(writes); }
+  catch (e) { if (isConstraint(e)) throw new GiftError('That request was already used. Sign a new one.', 409); throw e; }
+  return { id, codes, count: req.count, amount: req.amount, depositTo: treasury, deposit: total.toString(), memo: batchDepositMemo(id), links: GIFT_EXPIRY_MS };
+}
+
+/** The creator's deposit. With a txid it checks that transaction; without one it looks for the memo among the treasury's recent deposits. */
+export async function confirmBatch(env: GiftEnv, body: { id: string; txid?: string }, deps: GiftDeps, request?: Request) {
+  const { treasury } = requireEnabled(env, request);
+  if (!isBatchId(body?.id)) throw new GiftError('Unknown batch.', 404);
+  let txid: string | null = null;
+  if (body.txid !== undefined && body.txid !== null && body.txid !== '') {
+    txid = typeof body.txid === 'string' ? '0x' + body.txid.replace(/^0x/, '').toLowerCase() : '';
+    if (!/^0x[0-9a-f]{64}$/.test(txid)) throw new GiftError('Transaction id required.');
+  }
+  await ensureGiftTables(env);
+  const b = await batchRow(env, body.id);
+  if (!b) throw new GiftError('Unknown batch.', 404);
+  return checkBatchDeposit(env, b, txid, treasury, deps);
+}
+
+/** A batch by its id (the creator who paid for it). */
+export async function batchStatus(env: GiftEnv, id: string) {
+  if (!isBatchId(id)) throw new GiftError('Unknown batch.', 404);
+  await ensureGiftTables(env);
+  const b = await batchRow(env, id);
+  if (!b) throw new GiftError('Unknown batch.', 404);
+  return batchView(env, b);
+}
+
+/** A creator's recent batches, newest first (public data: addresses, counts and states; never a code). */
+export async function batchesFor(env: GiftEnv, creator: string) {
+  if (!isMainnetStandardAddress(creator)) throw new GiftError('Mainnet wallet address required.');
+  await ensureGiftTables(env);
+  const rows = await all<BatchRow>(env, 'SELECT * FROM radio_gift_batches WHERE creator=? ORDER BY created_at DESC LIMIT 30', [creator]);
+  return { batches: await Promise.all(rows.map((b) => batchView(env, b))) };
+}
+
+async function checkBatchDeposit(env: GiftEnv, b: BatchRow, txid: string | null, treasury: string, deps: GiftDeps): Promise<BatchView> {
+  if (b.status === 'live') return batchView(env, b);
+  const expected = batchDeposit(b.count, BigInt(b.amount)), memo = batchDepositMemo(b.id);
+  const matches = (t: ChainTransfer) => t.sender === b.creator && t.recipient === treasury && t.amount === expected && t.memo === memo;
+  let t: (ChainTransfer & { txid: string }) | null = null;
+  const known = txid ?? b.deposit_txid;
+  if (known) { const x = await deps.chain.transfer(known); t = x ? { ...x, txid: known } : null; }
+  else t = (await deps.chain.inbound(treasury)).find(matches) ?? null;
+  if (!t) return batchView(env, b); // not seen yet
+  if (!matches(t)) throw new GiftError('That transaction does not match this batch (it needs this batch’s memo, the exact total and your address).', 400);
+  if (t.status === 'aborted' || t.status === 'dropped') {
+    await run(env, "UPDATE radio_gift_batches SET deposit_txid=NULL, updated_at=? WHERE id=? AND status IN ('pending-deposit','abandoned') AND deposit_txid=?", [deps.now, b.id, t.txid]);
+    throw new GiftError('That payment did not go through. Nothing was taken; try again.', 400);
+  }
+  // Only a verified match is ever stored, so a made-up txid cannot hold a batch open (and one payment cannot fund two batches).
+  if (b.deposit_txid !== t.txid) {
+    try { await run(env, "UPDATE radio_gift_batches SET deposit_txid=?, updated_at=? WHERE id=? AND status IN ('pending-deposit','abandoned')", [t.txid, deps.now, b.id]); }
+    catch (e) { if (isConstraint(e)) throw new GiftError('That payment already paid for another batch.', 409); throw e; }
+  }
+  await run(env, "UPDATE radio_gift_orphans SET status='resolved', reason=reason || ' (paid for its batch)', updated_at=? WHERE txid=? AND status='needs-refund'", [deps.now, t.txid]);
+  if (t.status === 'pending') return batchView(env, (await batchRow(env, b.id))!);
+  // Confirmed (even long after it was set aside): the batch and every copy go live in ONE transaction, for 30 days.
+  const db = d1(env), expires = deps.now + GIFT_EXPIRY_MS;
+  await db.batch([
+    db.prepare("UPDATE radio_gift_batches SET status='live', expires_at=?, updated_at=? WHERE id=? AND status IN ('pending-deposit','abandoned')").bind(expires, deps.now, b.id),
+    db.prepare("UPDATE radio_gifts SET status='live', expires_at=?, updated_at=? WHERE batch_id=? AND status IN ('pending-deposit','abandoned')").bind(expires, deps.now, b.id)
+  ]);
+  return batchView(env, (await batchRow(env, b.id))!);
+}
+
+/** One batch-memo'd deposit seen by the scan: it makes its batch live, or (a definite mismatch) is kept for a refund. */
+async function scanBatchDeposit(env: GiftEnv, treasury: string, deps: GiftDeps, t: ChainTransfer & { txid: string }, id: string) {
+  const b = await batchRow(env, id);
+  if (b && b.status !== 'live' && (!b.deposit_txid || b.deposit_txid === t.txid)) {
+    // Only a definite mismatch (wrong sender or amount) makes an orphan; a failed read is retried on the next scan.
+    try { if ((await checkBatchDeposit(env, b, t.txid, treasury, deps)).status === 'live') return; }
+    catch (e) { if (!(e instanceof GiftError && e.status === 400)) return; }
+    if ((await batchRow(env, id))?.status === 'pending-deposit') return; // still confirming: not an orphan
+  }
+  if (b?.deposit_txid === t.txid) return; // this payment is the one that made its batch live
+  await run(env, `INSERT INTO radio_gift_orphans(txid, gift_id, sender, amount, reason, status, created_at, updated_at) VALUES(?, ?, ?, ?, ?, 'needs-refund', ?, ?)
+    ON CONFLICT(txid) DO NOTHING`, [t.txid, id, t.sender, Number(t.amount), b ? `batch ${b.status}` : 'unknown batch', deps.now, deps.now]);
+}
+
 /**
  * Matches every memo'd deposit the treasury can see: one for a waiting gift makes it live; one that
  * belongs to no waiting gift is recorded in radio_gift_orphans as `needs-refund` (and set aside from
@@ -719,6 +880,8 @@ async function checkDeposit(env: GiftEnv, r: Row, txid: string | null, treasury:
  */
 async function scanDeposits(env: GiftEnv, treasury: string, deps: GiftDeps) {
   for (const t of await deps.chain.inbound(treasury)) {
+    const bm = BATCH_MEMO.exec(t.memo);
+    if (bm && t.status === 'success') { await scanBatchDeposit(env, treasury, deps, t, bm[1]); continue; }
     const m = /^gift ([0-9a-f]{24})$/.exec(t.memo);
     if (!m || t.status !== 'success') continue;
     const r = await gift(env, m[1]);
@@ -757,10 +920,15 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
     if (taken) throw new GiftError('That wallet number was just taken by another gift. Trying the next one…', 409);
   }
   if (r.status === 'pending-deposit' || r.status === 'abandoned') {
-    try { await checkDeposit(env, r, null, treasury, deps); }
+    try {
+      // A copy in a batch is paid for by its batch's deposit; any other gift by its own.
+      const batch = r.batch_id ? await batchRow(env, r.batch_id) : null;
+      if (batch) await checkBatchDeposit(env, batch, null, treasury, deps);
+      else await checkDeposit(env, r, null, treasury, deps);
+    }
     catch { throw new GiftError('Could not check this gift’s payment right now. Try again shortly.', 503); }
     r = (await gift(env, r.id))!;
-    if (r.status === 'pending-deposit' || r.status === 'abandoned') throw new GiftError('This gift is not paid for yet. Ask your friend to finish sending it.', 409);
+    if (r.status === 'pending-deposit' || r.status === 'abandoned') throw new GiftError('This gift is not paid for yet. Ask whoever sent it to finish paying for it.', 409);
   }
   if (r.status === 'claiming') throw new GiftError('This gift is being sent to another wallet right now.', 409);
   if (r.status !== 'live') throw new GiftError(['expired', 'refunding', 'refunded'].includes(r.status) ? 'This gift has expired.' : 'This gift has already been claimed.', 410);
@@ -788,6 +956,19 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
 }
 
 /**
+ * The treasury must always hold at least what it owes to creators, friends and unrefunded deposits. Checked every scan
+ * and shouted about in the logs when it does not: that means money left that should not have, or a deposit was never seen.
+ * A balance that cannot be read is skipped (never turned into "fine" or "short").
+ */
+async function collateralAlarm(env: GiftEnv, treasury: string, deps: GiftDeps) {
+  try {
+    const [balance, owed] = [await deps.chain.balance(treasury), await owedToFriends(env)];
+    if (balance < owed) console.error('[radio:gifts] ALERT treasury under-collateralised', { balance: balance.toString(), owed: owed.toString() });
+    return balance >= owed;
+  } catch { return null; }
+}
+
+/**
  * Housekeeping (runs after gift requests, in the background). In order:
  *  1. the open send, settled from the chain (see settleOpenSend)
  *  2. campaign links past expiry become `expired` (their STX stays in the treasury)
@@ -805,14 +986,16 @@ export async function sweepGifts(env: GiftEnv, deps: GiftDeps) {
   if (changed(await run(env, "UPDATE radio_gifts SET status='expired', updated_at=? WHERE source='campaign' AND status='live' AND expires_at<?", [deps.now, deps.now]))) return { did: 'expired' };
   // A friend gift nobody paid for within a day is set aside (abandoned), never deleted: its memo is
   // still recognised if the payment turns up later.
-  if (changed(await run(env, "UPDATE radio_gifts SET status='abandoned', updated_at=? WHERE status='pending-deposit' AND deposit_txid IS NULL AND created_at<?", [deps.now, deps.now - PENDING_DEPOSIT_MS])))
-    return { did: 'abandoned' };
+  const setAside = changed(await run(env, "UPDATE radio_gifts SET status='abandoned', updated_at=? WHERE status='pending-deposit' AND deposit_txid IS NULL AND created_at<?", [deps.now, deps.now - PENDING_DEPOSIT_MS]));
+  const setAsideBatches = changed(await run(env, "UPDATE radio_gift_batches SET status='abandoned', updated_at=? WHERE status='pending-deposit' AND deposit_txid IS NULL AND created_at<?", [deps.now, deps.now - PENDING_DEPOSIT_MS]));
+  if (setAside || setAsideBatches) return { did: 'abandoned' };
   // Every few minutes: memo'd deposits that belong to no waiting gift (paid twice, wrong amount, a
   // gift already live with another payment) are recorded for a refund. Friends' money is never lost.
   const last = await one<{ value: number }>(env, "SELECT created_at AS value FROM radio_gift_orphans WHERE txid='scan'");
   if (!last || deps.now - last.value > 10 * 60_000) {
     await run(env, "INSERT INTO radio_gift_orphans(txid, gift_id, sender, amount, reason, status, created_at, updated_at) VALUES('scan', NULL, '', 0, 'scan marker', 'marker', ?, ?) ON CONFLICT(txid) DO UPDATE SET created_at=excluded.created_at", [deps.now, deps.now]);
     try { await scanDeposits(env, treasury, deps); } catch { /* could not read: try again later */ }
+    await collateralAlarm(env, treasury, deps);
     return { did: 'deposits-scanned' };
   }
   const due = await one(env, "SELECT * FROM radio_gifts WHERE source='friend' AND status='live' AND expires_at<? ORDER BY expires_at LIMIT 1", [deps.now]);

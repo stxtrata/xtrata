@@ -357,3 +357,130 @@ describe('a starter gift never looks failed while it is on its way', () => {
     expect(text(root.querySelector('.ppp-key')!)).toContain('Add funds');
   });
 });
+
+describe('prefunded batches (admin): the creator pays for every copy up front', () => {
+  const ADMIN = 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP';
+  const TREASURY = 'SP2TREASURYTREASURYTREASURYTREASURYAAA';
+  const ID = '0123456789abcdef';
+  const CODES = ['A'.repeat(22), 'B'.repeat(22)];
+  const live = { id: ID, status: 'live', count: 2, amount: '108000', label: 'Launch', player: null, deposit: '222000', memo: 'batch ' + ID, expires: 1, copies: { waiting: 2, claiming: 0, claimed: 0, refunding: 0, refunded: 0 } };
+  let calls: { url: string; body: any }[] = [];
+  const admin = (over: object = {}) => open({ gift: null, giftStop: null, giftPlays: 0, main: ADMIN, gate: { ...base.gate, gifts: { ...base.gate.gifts, admin: true, treasury: TREASURY } }, ...over });
+  const field = (root: Element, sel: string) => root.querySelector('.ppp-gift-body')!.querySelector(sel) as HTMLInputElement & HTMLSelectElement;
+  const click = (root: Element, label: RegExp) => [...root.querySelector('.ppp-gift-body')!.querySelectorAll('button')].find((b) => label.test(b.textContent ?? ''))!.click();
+  const served = (over: Record<string, () => Response> = {}) => {
+    calls = [];
+    h.route = (url, init) => {
+      calls.push({ url, body: init?.body ? JSON.parse(init.body) : null });
+      const path = url.replace(/\?.*/, '');
+      if (over[path]) return over[path]();
+      if (path.endsWith('/radio/gift/batch/confirm')) return new Response(JSON.stringify(live));
+      if (path.endsWith('/radio/gift/batch')) return init?.method === 'POST'
+        ? new Response(JSON.stringify({ id: ID, codes: CODES, count: 2, amount: '108000', depositTo: TREASURY, deposit: '222000', memo: 'batch ' + ID, links: [] }))
+        : new Response(JSON.stringify(live));
+      return undefined;
+    };
+  };
+  const payWith = async (impl: (o: any) => void) => { const m = await import('../../lib/wallet/connect'); (m.showStxTransfer as any).mockReset(); (m.showStxTransfer as any).mockImplementation(impl); return m.showStxTransfer as any; };
+  beforeEach(() => { localStorage.clear(); h.session = { isConnected: true, network: 'mainnet', address: ADMIN }; });
+
+  it('only a gift admin sees it', async () => {
+    h.session = { isConnected: true, network: 'mainnet', address: ADMIN };
+    const root = await open({ gift: null, giftStop: null, giftPlays: 0, main: ADMIN });
+    expect(text(root.querySelector('.ppp-gift-body')!)).not.toMatch(/Prefunded batch/);
+    const a = await admin();
+    expect(text(a.querySelector('.ppp-gift-body')!)).toContain('Prefunded batch (admin)');
+  });
+
+  it('shows the whole bill before anything is signed: plays, reserve, likes float, sending fee, total', async () => {
+    served();
+    const root = await admin();
+    field(root, 'input[aria-label="Copies"]').value = '100'; field(root, 'input[aria-label="Copies"]').dispatchEvent(new Event('input'));
+    expect(text(root.querySelector('.ppp-gift-body')!)).toMatch(/Each copy: 300 paid plays .*0\.003 kept.*= 0\.111 STX\. 100 copies = 11\.1 STX, paid now in one payment/);
+    expect(text(root.querySelector('.ppp-gift-body')!)).toContain('come back to you');
+    expect(h.signed).toHaveLength(0);
+    expect(calls.filter((c) => /batch/.test(c.url) && c.body)).toHaveLength(0);
+  });
+
+  it('signs one request, makes the links, saves them on this device, then asks for ONE payment with the batch memo', async () => {
+    served();
+    const pay = await payWith((o) => o.onFinish({ txId: '0x' + 'd'.repeat(64) }));
+    const root = await admin();
+    field(root, 'input[aria-label="Copies"]').value = '2'; field(root, 'input[aria-label="Batch label"]').value = 'Launch';
+    click(root, /Sign, pay and make links/);
+    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/radio/gift/batch/confirm'))).toBe(true));
+    expect(h.signed).toHaveLength(1);
+    expect(h.signed[0].message.data.purpose.data).toMatch(/prefunded/);
+    const made = calls.find((c) => c.url.endsWith('/radio/gift/batch') && c.body)!;
+    expect(made.body.request).toMatchObject({ creator: ADMIN, count: 2, amount: '108000', label: 'Launch' });
+    expect(made.body.request.player).toBeUndefined();
+    expect(made.body.signature).toBe('ab'.repeat(65));
+    expect(pay).toHaveBeenCalledTimes(1);
+    expect(pay.mock.calls[0][0]).toMatchObject({ recipient: TREASURY, amount: '222000', memo: 'batch ' + ID, stxAddress: ADMIN });
+    expect(calls.find((c) => c.url.endsWith('/radio/gift/batch/confirm'))!.body).toEqual({ id: ID, txid: '0x' + 'd'.repeat(64) });
+    const saved = JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!);
+    expect(saved[0]).toMatchObject({ id: ID, codes: CODES, txid: '0x' + 'd'.repeat(64) });
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('0 of 2 claimed'));
+    const body = root.querySelector('.ppp-gift-body')!;
+    expect([...body.querySelectorAll('button')].map((b) => b.textContent)).toEqual(expect.arrayContaining(['Copy all links', 'Copy as CSV']));
+    expect(text(body)).not.toContain('A'.repeat(22)); // the codes are never printed, only copied
+  });
+
+  it('an album batch carries the album id and the likes float', async () => {
+    served();
+    await payWith((o) => o.onFinish({ txId: '0x' + 'd'.repeat(64) }));
+    localStorage.setItem('xtrata.radio.gift.players.v1:' + ADMIN, JSON.stringify([{ id: 'fedcba9876543210', title: 'Proof of Sound', tracks: 2 }]));
+    const root = await admin();
+    h.changed();
+    field(root, 'select[aria-label="Batch album"]').value = 'fedcba9876543210'; field(root, 'select[aria-label="Batch album"]').dispatchEvent(new Event('change'));
+    field(root, 'input[aria-label="Copies"]').value = '2';
+    expect(text(root.querySelector('.ppp-gift-body')!)).toContain('for the album’s likes');
+    click(root, /Sign, pay and make links/);
+    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/radio/gift/batch') && c.body)).toBe(true));
+    expect(calls.find((c) => c.url.endsWith('/radio/gift/batch') && c.body)!.body.request).toMatchObject({ player: 'fedcba9876543210', amount: '123000', count: 2 });
+  });
+
+  it('a cancelled payment keeps the links and offers Pay now, which pays the same batch', async () => {
+    served();
+    let first = true;
+    const pay = await payWith((o) => { if (first) { first = false; o.onCancel(); } else o.onFinish({ txId: '0x' + 'c'.repeat(64) }); });
+    const root = await admin();
+    field(root, 'input[aria-label="Copies"]').value = '2';
+    click(root, /Sign, pay and make links/);
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('Payment cancelled. Your links are saved'));
+    expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!)[0]).toMatchObject({ id: ID, codes: CODES });
+    expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!)[0].txid).toBeUndefined();
+    expect(h.signed).toHaveLength(1);
+    click(root, /Pay now/);
+    await vi.waitFor(() => expect(pay).toHaveBeenCalledTimes(2));
+    expect(pay.mock.calls[1][0]).toMatchObject({ recipient: TREASURY, amount: '222000', memo: 'batch ' + ID });
+    expect(h.signed).toHaveLength(1); // no second signature, no second batch
+    await vi.waitFor(() => expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!)[0].txid).toBe('0x' + 'c'.repeat(64)));
+  });
+
+  it('a refusal from the server is shown, nothing is paid and nothing is saved', async () => {
+    served({ '/radio/gift/batch': () => new Response(JSON.stringify({ error: 'The gift treasury is full right now.' }), { status: 503 }) });
+    const pay = await payWith((o) => o.onFinish({ txId: '0x1' }));
+    const root = await admin();
+    click(root, /Sign, pay and make links/);
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('treasury is full'));
+    expect(pay).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN) || '[]')).toEqual([]);
+  });
+
+  it('refuses a bad number of copies before anything is signed', async () => {
+    served();
+    const root = await admin();
+    field(root, 'input[aria-label="Copies"]').value = '101';
+    click(root, /Sign, pay and make links/);
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('Make 1 to 100 copies at a time.'));
+    expect(h.signed).toHaveLength(0);
+  });
+
+  it('lists a batch made on another device without its links', async () => {
+    served({ '/radio/gift/batches': () => new Response(JSON.stringify({ batches: [{ ...live, label: 'Elsewhere' }] })) });
+    const root = await admin();
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('links were made on another device'));
+    expect(text(root.querySelector('.ppp-gift-body')!)).toContain('Elsewhere');
+  });
+});

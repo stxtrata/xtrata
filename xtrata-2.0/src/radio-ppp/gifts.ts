@@ -7,10 +7,15 @@
  *  - Friend gift: anyone with a Stacks wallet picks 0.1 to 1 STX, pays it (+ the network fee) into the
  *    gift treasury, and gets a link to share once that payment confirms.
  *  - Admin: campaign links paid from the treasury, made with a signature from the admin's wallet.
+ *  - Admin: prefunded batches. The creator signs one request, pays for every copy in ONE transfer to the treasury, and the
+ *    links go live when it confirms. Unclaimed copies go back to the creator after 30 days. The treasury pays nothing itself.
  * Where returns go for a gifted wallet comes from the gift record (`funder`), not the chain's first
  * sender, so a friend's gift goes back to the friend.
  */
 import { CAMPAIGN_MAX_LINKS, campaignData, GIFT_FEE, GIFT_MAX, GIFT_MIN, giftLink, giftPlays, isGiftCode, type CampaignRequest, type GiftView } from '../lib/listening-wallet/gifts';
+import {
+  BATCH_MAX_COPIES, batchBreakdown, batchData, copyAmountForPlays, maxCopyPlays, validBatchAmount, type BatchRequest, type BatchView
+} from '../lib/listening-wallet/batches';
 import { amountForPlays, listedTracks, PLAY_PRESETS, playerData, playerHash, validatePlayer } from '../lib/listening-wallet/gift-players';
 import type { FunderResult } from '../lib/listening-wallet/funder';
 import { stx } from '../lib/listening-wallet/policy';
@@ -24,7 +29,7 @@ export interface GiftDeps {
   /** STX transfer from the connected wallet (one popup); resolves with the txid. */
   pay(main: string, recipient: string, amount: bigint, memo: string): Promise<string>;
   /** SIP-018 signature from the connected wallet (one popup). */
-  sign(main: string, data: ReturnType<typeof campaignData> | ReturnType<typeof playerData>): Promise<string>;
+  sign(main: string, data: ReturnType<typeof campaignData> | ReturnType<typeof playerData> | ReturnType<typeof batchData>): Promise<string>;
   giftSent(txid: string, amount: bigint): void;
   /** Album wallets of the open passkey: prove a number is theirs, and track the album's gift once it is on its way. */
   album: {
@@ -41,6 +46,10 @@ export interface GiftDeps {
 /** Where public/radio.html puts a `#gift=` code the moment the page opens (and strips it from the URL). */
 export const INCOMING_KEY = 'xtrata.radio.gift.incoming.v1';
 const mineKey = (main: string) => 'xtrata.radio.gift.mine.v1:' + main;
+const batchesKey = (main: string) => 'xtrata.radio.gift.batches.v1:' + main;
+/** A prefunded batch as kept on this device. The links exist only here (the server keeps hashes), so they are saved the moment they are made. */
+type MyBatch = { id: string; codes: string[]; count: number; amount: string; label: string; player: string | null; depositTo: string; deposit: string; memo: string; at: number;
+  txid?: string; view?: BatchView; error?: string };
 type Mine = { id: string; code: string; amount: string; at: number; txid?: string; view?: GiftView; error?: string };
 
 const el = (tag: string, text = '', cls = '') => { const n = document.createElement(tag); if (text) n.textContent = text; if (cls) n.className = cls; return n; };
@@ -401,6 +410,100 @@ export function createGifts(deps: GiftDeps) {
   const linkFor = (radioUrl: string | null, code: string) => giftLink(radioUrl || location.origin + '/radio.html', code);
   const share = (url: string) => shareLink({ title: 'On-chain music for you', text: 'I sent you some on-chain music on Xtrata Radio 🎁', url });
 
+  // ---------------------------------------------------------------- prefunded batches
+  const loadBatches = (main: string): MyBatch[] => {
+    try { const v = JSON.parse(deps.store.get(batchesKey(main)) || '[]'); return Array.isArray(v) ? v.filter((x) => x && /^[0-9a-f]{16}$/.test(x.id) && Array.isArray(x.codes)) : []; } catch { return []; }
+  };
+  const saveBatches = (main: string, list: MyBatch[]) => deps.store.set(batchesKey(main), JSON.stringify(list.slice(0, 20)));
+  const batchDone = (b: MyBatch) => !!b.view && b.view.status === 'live' && b.view.copies.waiting + b.view.copies.claiming + b.view.copies.refunding === 0;
+  const postJson = (url: string, body: unknown) => deps.json(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  let checkedBatches = 0;
+
+  /** Brings every unfinished batch up to date; a payment the wallet never reported is found by the batch's memo. */
+  async function refreshBatches(main: string) {
+    const list = loadBatches(main);
+    for (const b of list) {
+      if (batchDone(b)) continue;
+      try {
+        b.view = !b.view || b.view.status === 'pending-deposit'
+          ? await postJson('/radio/gift/batch/confirm', { id: b.id, ...(b.txid ? { txid: b.txid } : {}) })
+          : await deps.json('/radio/gift/batch?id=' + b.id);
+        b.error = undefined;
+      } catch (e) { b.error = (e as Error).message; }
+    }
+    // Batches this creator made on another device: listed, but their links are not here.
+    try {
+      const r = await deps.json('/radio/gift/batches?creator=' + encodeURIComponent(main));
+      for (const v of (r?.batches ?? []) as BatchView[]) {
+        const mine = list.find((x) => x.id === v.id);
+        if (mine) { if (!mine.error) mine.view = v; continue; }
+        list.push({ id: v.id, codes: [], count: v.count, amount: v.amount, label: v.label, player: v.player, depositTo: '', deposit: v.deposit, memo: v.memo, at: 0, view: v });
+      }
+    } catch { /* the local list is still right; the server list is a bonus */ }
+    saveBatches(main, list);
+    deps.changed();
+  }
+
+  /** The creator's payment. Kept separate so a payment that was cancelled can be retried from the list. */
+  async function payBatch(main: string, id: string) {
+    const b = loadBatches(main).find((x) => x.id === id);
+    if (!b || !b.depositTo || working) return;
+    working = 'Approve the payment in your wallet…'; note = ''; deps.changed();
+    try {
+      const txid = await deps.pay(main, b.depositTo, BigInt(b.deposit), b.memo);
+      const after = loadBatches(main);
+      const x = after.find((y) => y.id === id);
+      if (x) x.txid = txid;
+      saveBatches(main, after);
+      note = 'Paid ✓ Your links work as soon as the payment confirms (a few minutes).';
+      working = ''; void refreshBatches(main);
+    } catch (e) {
+      // The links are already saved: a cancelled or failed payment can simply be retried from the list.
+      note = `${/cancel/i.test((e as Error).message) ? 'Payment cancelled.' : ((e as Error).message || 'Not paid.')} Your links are saved below. Tap Pay now when you are ready.`;
+    } finally { working = ''; deps.changed(); }
+  }
+
+  async function makeBatch(main: string, plan: ReturnType<typeof batchPlan>, label: string, player?: string) {
+    if (working) return;
+    if (!plan.ok) { note = plan.reason; deps.changed(); return; }
+    working = 'Sign in your wallet…'; note = ''; deps.changed();
+    let made: { id: string; codes: string[]; depositTo: string; deposit: string; memo: string; amount: string } | null = null;
+    try {
+      const request: BatchRequest = { creator: main, count: plan.count, amount: plan.amount.toString(), label, issued: deps.now(), ...(player ? { player } : {}) };
+      const signature = await deps.sign(main, batchData(request));
+      working = 'Making your links…'; deps.changed();
+      made = await postJson('/radio/gift/batch', { request, signature });
+      // The links are shown by the server once. Save them before anything else can go wrong.
+      const list = loadBatches(main);
+      list.unshift({ id: made!.id, codes: made!.codes, count: plan.count, amount: made!.amount, label, player: player ?? null, depositTo: made!.depositTo, deposit: made!.deposit, memo: made!.memo, at: deps.now() });
+      saveBatches(main, list);
+    } catch (e) { note = (e as Error).message || 'Not made.'; working = ''; deps.changed(); return; }
+    working = ''; deps.changed();
+    await payBatch(main, made!.id);
+  }
+
+  /** What the batch form would cost for the current choices (also used to explain it). */
+  function batchPlan() {
+    const album = !!batchPlayer.value;
+    const plays = batchPreset.value === 'max' ? maxCopyPlays(album) : Number(batchPreset.value);
+    const amount = copyAmountForPlays(plays, album);
+    const count = Number(batchCount.value);
+    if (!Number.isInteger(count) || count < 1 || count > BATCH_MAX_COPIES) return { ok: false as const, reason: `Make 1 to ${BATCH_MAX_COPIES} copies at a time.`, album, plays, amount, count };
+    if (!validBatchAmount(amount)) return { ok: false as const, reason: 'Each copy must be 0.1 to 1 STX.', album, plays, amount, count };
+    return { ok: true as const, reason: '', album, plays, amount, count, bill: batchBreakdown(count, amount, album) };
+  }
+  const billText = () => {
+    const p = batchPlan();
+    if (!p.ok) return p.reason;
+    const b = p.bill;
+    return `Each copy: ${p.plays.toLocaleString()} paid plays (${stxNice(b.holders)} to song holders, ${stxNice(b.fees)} network fees)`
+      + `${p.album ? `, ${stxNice(b.float)} for the album’s likes` : ''}, ${stxNice(b.reserve)} kept so a listener can return what is left, `
+      + `+ ${stxNice(b.sendFee)} to send it = ${stxNice(b.perCopy)} STX. ${p.count} copies = ${stxNice(b.total)} STX, paid now in one payment. `
+      + 'Copies nobody claims within 30 days come back to you.';
+  };
+
+  const batchLinks = (radioUrl: string | null, b: MyBatch) => b.codes.map((c) => linkFor(radioUrl, c));
+
   // Built once; only the moving parts are refreshed, so the slider keeps its place while the panel re-renders.
   const range = el('input') as HTMLInputElement;
   range.type = 'range'; range.min = String(GIFT_MIN); range.max = String(GIFT_MAX); range.step = '50000'; range.value = String(amount);
@@ -423,6 +526,17 @@ export function createGifts(deps: GiftDeps) {
   adminPreset.append(opt('Max (1 STX)', String(GIFT_MAX)), opt('Custom STX', ''));
   adminPreset.onchange = () => { if (adminPreset.value) adminAmount.value = String(Number(adminPreset.value) / 1e6); };
   const adminLabel = el('input') as HTMLInputElement; adminLabel.maxLength = 40; adminLabel.placeholder = 'Label, e.g. Launch week'; adminLabel.setAttribute('aria-label', 'Campaign label');
+
+  const batchPlayer = el('select') as HTMLSelectElement; batchPlayer.setAttribute('aria-label', 'Batch album');
+  const batchPreset = el('select') as HTMLSelectElement; batchPreset.setAttribute('aria-label', 'Plays per copy');
+  for (const n of PLAY_PRESETS) batchPreset.append(opt(`${n.toLocaleString()} plays`, String(n)));
+  batchPreset.append(opt('Max (1 STX)', 'max'));
+  const batchCount = el('input') as HTMLInputElement; batchCount.type = 'number'; batchCount.min = '1'; batchCount.max = String(BATCH_MAX_COPIES); batchCount.value = '10'; batchCount.setAttribute('aria-label', 'Copies');
+  const batchLabel = el('input') as HTMLInputElement; batchLabel.maxLength = 40; batchLabel.placeholder = 'Label, e.g. Opera launch'; batchLabel.setAttribute('aria-label', 'Batch label');
+  const batchBill = el('p', '', 'ppp-mute');
+  const syncBill = () => { batchBill.textContent = billText(); };
+  for (const x of [batchPlayer, batchPreset, batchCount]) { x.oninput = syncBill; x.onchange = syncBill; }
+  syncBill();
 
   function renderFold(s: Snapshot): HTMLElement | null {
     const g = s.gate?.gifts;
@@ -475,6 +589,37 @@ export function createGifts(deps: GiftDeps) {
           const all = campaign.codes.map((c) => linkFor(s.gate?.radioUrl ?? null, c)).join('\n');
           const area = el('textarea') as HTMLTextAreaElement; area.readOnly = true; area.value = all; area.rows = Math.min(8, campaign.codes.length);
           box.append(el('p', `${campaign.codes.length} links, ${stxNice(BigInt(campaign.amount))} STX each. Copy them now: they are not shown again.`, 'ppp-warn'), area, copyButton('campaign-copy', 'Copy all', () => all, 'tiny', deps.changed));
+        }
+        // Prefunded batches: the creator pays for every copy up front.
+        const gobtn = button('Sign, pay and make links', () => { void makeBatch(main, batchPlan(), batchLabel.value.trim(), batchPlayer.value || undefined); });
+        gobtn.disabled = !!working;
+        const keepB = batchPlayer.value;
+        batchPlayer.replaceChildren(opt('No album (starter copies)', ''), ...made.map((x) => opt(`${x.title} · ${x.tracks} songs`, x.id)));
+        if (made.some((x) => x.id === keepB)) batchPlayer.value = keepB;
+        syncBill();
+        box.append(
+          el('p', 'Prefunded batch (admin) · you pay up front, unclaimed copies come back to you after 30 days', 'ppp-cyan'),
+          labelled('Album ', batchPlayer), labelled('Plays each ', batchPreset), labelled('Copies ', batchCount), batchLabel, batchBill, gobtn);
+        if (deps.now() - checkedBatches > 30_000) { checkedBatches = deps.now(); void refreshBatches(main); }
+        const myBatches = loadBatches(main);
+        if (myBatches.length) {
+          const blist = el('ul', '', 'ppp-gift-list');
+          for (const b of myBatches.slice(0, 10)) {
+            const v = b.view, c = v?.copies;
+            const status = b.error ? b.error : !v || v.status === 'pending-deposit' ? (b.txid ? 'payment confirming…' : 'waiting for your payment')
+              : `${c!.claimed} of ${v.count} claimed${c!.refunding + c!.refunded ? ` · ${c!.refunded} refunded${c!.refunding ? `, ${c!.refunding} on their way` : ''}` : ''}`;
+            const li = el('li');
+            li.append(el('span', `${b.label || 'Batch'} · ${b.count} × ${stxNice(BigInt(b.amount))} STX`, 't'), el('span', status, 'ppp-mute'));
+            if (!b.txid && b.depositTo && (!v || v.status === 'pending-deposit')) li.append(button('Pay now', () => void payBatch(main, b.id), 'tiny'));
+            if (b.codes.length && v?.status === 'live') {
+              const links = batchLinks(s.gate?.radioUrl ?? null, b);
+              li.append(
+                copyButton('batch-copy:' + b.id, 'Copy all links', () => links.join('\n'), 'tiny', deps.changed),
+                copyButton('batch-csv:' + b.id, 'Copy as CSV', () => ['copy,link', ...links.map((u, n) => `${n + 1},${u}`)].join('\n'), 'tiny', deps.changed));
+            } else if (!b.codes.length) li.append(el('span', 'links were made on another device', 'ppp-mute'));
+            blist.append(li);
+          }
+          box.append(blist);
         }
         parts.push(box);
       }
