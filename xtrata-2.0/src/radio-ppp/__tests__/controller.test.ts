@@ -337,7 +337,7 @@ describe('one-tap unlock', () => {
     await s.settle();
     expect(s.ppp.snapshot()).toMatchObject({ step: 'locked', armed: true, busy: null });
     expect(s.held).toHaveLength(1);
-    expect(s.held[0].panel).toMatchObject({ kind: 'unlock', confirmLabel: 'Unlock and keep paying' });
+    expect(s.held[0].panel).toMatchObject({ kind: 'unlock', confirmLabel: 'Unlock and keep listening' });
     expect(s.held[0].panel.lines.join(' ')).toMatch(/30 seconds/); // the paying terms are on that same panel
     const before = s.evaluations();
     s.tap(); // the listener's one tap inside the frame
@@ -681,30 +681,31 @@ describe('album wallets (numbered wallets of one passkey)', () => {
       expect(small.chain.broadcasts).toHaveLength(0);
     });
 
-    it('adds plays to the open album from My player, in the amounts offered', async () => {
+    it('adds plays to the open album from My player, counted in plays', async () => {
       const s = await open({ album: 20_000n, root: 500_000n }); // too small a gift to float: only the top-up moves money
       const album = s.ppp.snapshot().listening!;
-      await s.ppp.topUpAlbum(12_345n);
+      expect(s.ppp.snapshot().playCost).toBe(350n);
+      await s.ppp.topUpAlbum(123);
       expect(s.ppp.snapshot().error).toMatch(/amounts offered/);
-      await s.ppp.topUpAlbum(100_000n);
+      await s.ppp.topUpAlbum(250);
       expect(s.ppp.snapshot().error).toBe('');
       expect(s.chain.broadcasts).toHaveLength(1);
       expect(senderOf(s.chain.broadcasts[0])).toBe(LISTENING);
       expect(recipientOf(s.chain.broadcasts[0])).toBe(album);
-      expect(amountOf(s.chain.broadcasts[0])).toBe('100000');
+      expect(amountOf(s.chain.broadcasts[0])).toBe(String(250 * 350)); // exactly 250 plays at the play cost
       expect(s.ppp.snapshot().depositPending).toBe(true); // the plays are on their way
-      await s.ppp.topUpAlbum(50_000n);
+      await s.ppp.topUpAlbum(100);
       expect(s.ppp.snapshot().error).toMatch(/pending payment/);
       expect(s.chain.broadcasts).toHaveLength(1);
     });
 
     it('refuses to add plays when My player cannot cover it, or no album is open', async () => {
       const s = await open({ album: 20_000n, root: 10_000n });
-      await s.ppp.topUpAlbum(50_000n);
+      await s.ppp.topUpAlbum(100);
       expect(s.ppp.snapshot().error).toMatch(/does not hold enough/);
       expect(s.chain.broadcasts).toHaveLength(0);
       await s.ppp.openAlbum(0);
-      await s.ppp.topUpAlbum(50_000n);
+      await s.ppp.topUpAlbum(100);
       expect(s.ppp.snapshot().error).toMatch(/Open the album/);
     });
 
@@ -1380,6 +1381,60 @@ describe('gifted wallets and gift players', () => {
     const s = await gifted(0n);
     s.ppp.giftSent('0x' + 'e'.repeat(64), 250_000n);
     expect(s.ppp.snapshot().giftStop).toMatchObject({ reason: 'arriving' });
+  });
+
+  describe('while a gift is being claimed', () => {
+    it('reads as arriving from the first tap, even for an empty wallet with no deposit recorded yet', async () => {
+      const s = await gifted(0n, null);
+      expect(s.ppp.snapshot()).toMatchObject({ arrival: null, giftStop: { reason: 'out' } });
+      s.ppp.giftClaiming(true);
+      expect(s.ppp.snapshot()).toMatchObject({ depositPending: true, giftStop: { reason: 'arriving' }, arrival: { graceMs: 60_000 } });
+    });
+
+    it('is never called empty for at least a minute, and says so again as soon as the minute is up', async () => {
+      const s = await gifted(0n, null);
+      s.ppp.giftClaiming(true);
+      s.tick(59_000);
+      expect(s.ppp.snapshot()).toMatchObject({ depositPending: true, giftStop: { reason: 'arriving' } });
+      s.tick(2_000);
+      expect(s.ppp.snapshot()).toMatchObject({ depositPending: false, arrival: null, giftStop: { reason: 'out' } });
+    });
+
+    it('a claim that fails for good clears the wait at once', async () => {
+      const s = await gifted(0n, null);
+      s.ppp.giftClaiming(true);
+      s.ppp.giftClaiming(false);
+      expect(s.ppp.snapshot()).toMatchObject({ arrival: null, giftStop: { reason: 'out' } });
+    });
+
+    it('keeps waiting through the whole life of the deposit, counted from when the claim began', async () => {
+      const s = await gifted(0n, null);
+      s.ppp.giftClaiming(true);
+      const begun = s.ppp.snapshot().arrival!.since;
+      s.tick(5_000);
+      s.ppp.giftSent('0x' + 'f'.repeat(64), 250_000n);
+      s.tick(600_000); // far longer than a minute: a recorded deposit is still on its way
+      expect(s.ppp.snapshot()).toMatchObject({ depositPending: true, giftStop: { reason: 'arriving' } });
+      expect(s.ppp.snapshot().arrival!.since).toBeGreaterThanOrEqual(begun);
+    });
+
+    it('a deposit that confirmed before the balance shows it still reads as arriving, then plays start', async () => {
+      const s = await gifted(0n, null);
+      const gift = '0x' + 'a'.repeat(64);
+      s.ppp.giftSent(gift, 250_000n);
+      s.chain.mined.add(gift); // confirmed on-chain, balance read still lags at zero
+      await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', giftStop: { reason: 'arriving' } });
+      s.chain.balance = 250_000n;
+      await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', depositPending: false, arrival: null, giftStop: null });
+    });
+
+    it('a wallet that already has plays is not held back by a claim', async () => {
+      const s = await gifted(500_000n, null);
+      s.ppp.giftClaiming(true);
+      expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', depositPending: false, giftStop: null });
+    });
   });
 
   it('a payment on its way is already spent: the last play stops the radio before it confirms', async () => {

@@ -90,6 +90,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ctl .grow{flex:1}
   .cbtn{width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:linear-gradient(180deg,#1a2334,#0e1522);
     color:var(--ink);font-size:19px;cursor:pointer;transition:border-color .12s,transform .06s}
+  .cbtn:disabled,.cbtn:disabled:hover,#presetBtn:disabled,#bands button:disabled{opacity:.35;cursor:progress;border-color:var(--line);filter:grayscale(.6)}
+  .tuner.waiting{opacity:.4;pointer-events:none}
   .cbtn:hover{border-color:var(--acc)} .cbtn:active{transform:scale(.94)}
   .cbtn.big{width:72px;height:72px;font-size:26px;border-color:#2b3a55}
   .cbtn.heart.on{color:var(--heart);border-color:var(--heart);box-shadow:0 0 18px rgba(255,93,125,.35)}
@@ -355,6 +357,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-err:empty,.ppp-msg:empty{display:none}
   .ppp-msg.is-warn{color:#ffcf8a!important}
   .ppp .ppp-gift{color:#ffd36e;font-weight:600}
+  .ppp .ppp-wait{margin:6px 0 8px}.ppp .ppp-wait-t{margin:0 0 5px;color:#ffcf8a;font-size:12px;font-weight:600}
+  .ppp .ppp-wait-track{height:6px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}
+  .ppp .ppp-wait-fill{height:100%;width:4%;border-radius:999px;background:linear-gradient(90deg,#ffb347,#ffd36e);transition:width .9s linear}
+  .ppp .ppp-wait.is-long .ppp-wait-fill{width:35%;animation:pppwait 1.6s ease-in-out infinite alternate}
+  @keyframes pppwait{from{margin-left:0}to{margin-left:65%}}
+  @media (prefers-reduced-motion:reduce){.ppp .ppp-wait.is-long .ppp-wait-fill{animation:none;width:100%;opacity:.6}}
   .ppp-gift-fold input[type=range]{width:100%;accent-color:#e9b949}
   .ppp-gift-amount{font-size:12px!important;color:var(--ink)!important}
   .ppp-gift-list{list-style:none;margin:8px 0;padding:0}
@@ -373,6 +381,107 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-song{color:var(--ink)}
   .ppp-status{display:inline-block;min-width:76px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .ppp-history a{color:var(--cyan)}
+
+  /* ---- Album First (src/radio-ppp/album.ts): a listener who was sent an album sees a player. Everything else stays
+     in the page, hidden, and opens as a sheet from "More" or "My music". Nothing moves in the DOM (the wallet box
+     would reload), only how it is shown. ---- */
+  .album{display:none}
+  html[data-view=album] body{background:#0b0d10}
+  html[data-view=album] .topbar,html[data-view=album] .rx,html[data-view=album] #likesBox,html[data-view=album] .strap{display:none!important}
+  html[data-view=album] main{display:block;max-width:560px;padding:0 20px 28px}
+  html[data-view=album] .album{display:block}
+  html[data-view=album] .side{display:none!important}
+  /* the existing panel, as a sheet: My music, This device, Send music, or the wallet box when it needs a tap */
+  html[data-view=album][data-sheet=music] .side,html[data-view=album][data-sheet=device] .side,html[data-view=album][data-sheet=gifts] .side,
+  html[data-view=album][data-asking] .side{display:flex!important;position:fixed;left:0;right:0;bottom:0;z-index:60;max-height:86vh;overflow:auto;
+    background:#15181d;border-radius:22px 22px 0 0;padding:10px 18px 28px;box-shadow:0 0 0 100vmax rgba(0,0,0,.55),0 -12px 40px rgba(0,0,0,.55);max-width:620px;margin:0 auto;gap:12px}
+  .sheet-bar,.sheet-extra{display:none}
+  html[data-view=album][data-sheet] .sheet-bar{display:flex;align-items:center;justify-content:space-between;position:sticky;top:-10px;background:#15181d;padding:6px 0;z-index:2}
+  html[data-view=album][data-sheet=music] .sheet-extra{display:block}
+  .sheet-bar b{font-size:20px}
+  .sheet-bar button{width:44px;height:44px;border:0;background:none;color:#c9ced6;font-size:24px;cursor:pointer;border-radius:12px}
+  html[data-view=album][data-sheet] .ppp,html[data-view=album][data-asking] .ppp{display:block!important;border:0;background:none;padding:0;box-shadow:none}
+  html[data-view=album][data-sheet] .ppp>*:not(.ppp-folds):not(.ppp-msg):not(.ppp-err),
+  html[data-view=album][data-asking] .ppp>*:not(.ppp-frame):not(.ppp-msg):not(.ppp-err){display:none!important}
+  html[data-view=album][data-sheet=device] .ppp>.ppp-frame:not([hidden]){display:block!important}
+  html[data-view=album][data-asking] .ppp-folds,html[data-view=album][data-asking] .sheet-bar{display:none!important}
+  html[data-view=album][data-sheet] .ppp-fold{display:none}
+  html[data-view=album][data-sheet=music] .ppp-shelf:not([hidden]),html[data-view=album][data-sheet=gifts] .ppp-gifts:not([hidden]),
+  html[data-view=album][data-sheet=device] .ppp-wallets:not([hidden]),html[data-view=album][data-sheet=device] .ppp-recent:not([hidden]),
+  html[data-view=album][data-sheet=device] .ppp-more:not([hidden]){display:block}
+  .album{color:#f2f0ea;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  .album button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+  .album button:disabled{cursor:default;opacity:.4}
+  .album button:focus-visible{outline:2px solid #7fe3f5;outline-offset:2px;border-radius:10px}
+  .al-top{height:56px;display:flex;align-items:center;justify-content:space-between}
+  .al-brand{font-weight:700;font-size:15px;letter-spacing:.02em;color:#f2f0ea;text-decoration:none}.al-brand b{color:#7fe3f5;font-weight:700}
+  .al-icon{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;color:#c9ced6;border-radius:12px}
+  .al-icon.is-on{color:#ff5d7d}
+  .al-icon--big{width:52px;height:52px;color:#f2f0ea}
+  .al-body{display:flex;flex-direction:column;min-height:calc(100vh - 84px)}
+  .al-from{display:flex;align-items:center;gap:8px;margin:14px 0 0;font-size:14px;color:#c9ced6}.al-from span:first-child{color:#f2b661;display:inline-flex}
+  .al-cover{width:min(100%,320px,40vh);aspect-ratio:1/1;margin:14px auto 0;border-radius:12px;overflow:hidden;background:#143a40;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+  .al-cover--small{width:min(70%,250px,30vh)}
+  .al-cover img{width:100%;height:100%;object-fit:cover;display:block}
+  .al-cover-fallback{height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:22px}
+  .al-cover-fallback b{font-size:clamp(34px,10vw,60px);line-height:.95;letter-spacing:-.03em;font-weight:800;color:#e9f6f4;overflow-wrap:anywhere}
+  .al-cover-fallback span{margin-top:8px;color:#a9d3cf}
+  .al-intro{text-align:center;margin-top:20px}
+  .al-intro h1{margin:0;font-size:28px;letter-spacing:-.02em;line-height:1.15}
+  .al-artist{margin:4px 0 0;color:#a3aab5;font-size:15px}
+  .al-songline{margin:12px 0 0;color:#8f97a3;font-size:13px;line-height:1.5}
+  .al-chip{display:inline-block;font-family:var(--mono);font-size:12px;color:#0b0d10;background:#ddf6fb;border-radius:999px;padding:4px 11px;white-space:nowrap}
+  .al-intro .al-chip{margin-top:14px}
+  .al-chip--low{background:#ffe2b3}.al-chip--out{background:#f2b661}.al-chip--quiet{background:#262b33;color:#c9ced6}
+  .al-status{margin-top:14px;font-size:14px;text-align:center}.al-status p{margin:6px 0}
+  .al-status .ppp-bad{color:#ff8a8a}.al-status .ppp-warn{color:#ffcf8a}.al-status .ppp-cyan,.al-status .ppp-ok{color:#7fe3f5}.al-status .ppp-mute{color:#8f97a3}
+  .al-status button{margin-top:6px;min-height:40px;padding:0 14px!important;border:1px solid #343b46!important;border-radius:10px}
+  .al-status a{color:#7fe3f5}
+  .al-grow{flex:1;min-height:16px}
+  .al-primary{width:100%;height:56px;border-radius:14px;background:#7fe3f5!important;color:#0b0d10!important;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;gap:10px}
+  .al-hint{margin:10px 0 0;font-size:12px;color:#8f97a3;text-align:center;line-height:1.5}
+  .al-hint--ask{font-size:15px;color:#7fe3f5}
+  .al-link{min-height:44px;margin:6px auto 0;display:block;font-size:13px;color:#c9ced6!important;text-decoration:underline;text-underline-offset:3px}
+  .al-now{display:flex;align-items:center;gap:12px;margin-top:20px}
+  .al-now-t{flex:1;min-width:0}
+  .al-song{font-weight:700;font-size:22px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .al-now .al-artist{margin-top:3px;font-size:14px}
+  .al-prog{margin-top:12px}
+  .al-bar{height:4px;border-radius:2px;background:#262b33;overflow:hidden}.al-bar i{display:block;height:4px;background:#f2f0ea;width:0}
+  .al-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:#8f97a3;margin-top:6px}
+  .al-ctl{display:flex;align-items:center;justify-content:center;gap:28px;margin-top:6px}
+  .al-ctl.is-off{opacity:.35}
+  .al-play{width:64px;height:64px;border-radius:32px;background:#7fe3f5!important;color:#0b0d10!important;display:inline-flex;align-items:center;justify-content:center}
+  .al-listhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;padding-bottom:8px;border-bottom:1px solid #1e232a;font-size:13px;color:#a3aab5}
+  .al-listhead b{color:#f2f0ea}
+  .al-tracks{list-style:none;margin:0;padding:0}
+  .al-track{width:100%;min-height:48px;display:flex;align-items:center;gap:14px;text-align:left;border-bottom:1px solid #15191f!important}
+  .al-n{width:20px;font-family:var(--mono);font-size:12px;color:#6f7783}
+  .al-tt{flex:1;font-size:15px;color:#e4e1da}
+  .al-track.is-on .al-n,.al-track.is-on .al-tt{color:#7fe3f5;font-weight:600}
+  .al-eq{color:#7fe3f5;display:inline-flex}
+  .al-more{height:48px;margin-top:14px;border:1px solid #262b33!important;border-radius:12px;display:flex;align-items:center;justify-content:space-between;padding:0 16px!important;color:#c9ced6;font-size:14px}
+  .al-mute{color:#8f97a3}.al-small{font-size:12px;margin:10px 0 0}.al-mono{font-family:var(--mono);font-size:12px;color:#a3aab5}
+  .al-out{margin-top:18px;background:#1e1a12;border:1px solid #4a3a1c;border-radius:16px;padding:18px;text-align:center}
+  .al-out p{margin:0}.al-out-k{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#f2b661}
+  .al-out-t{font-size:16px;font-weight:600;margin-top:6px!important}.al-out-s{font-size:13px;color:#b3ab9c;margin-top:4px!important}
+  .al-topups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+  .al-topups--primary{display:block}
+  .al-topup{height:46px;border-radius:12px;border:1px solid #343b46!important;font-weight:700;font-size:15px}
+  .al-topups--primary .al-topup{width:100%;height:50px;background:#f2b661!important;color:#0b0d10!important;border:0!important;font-size:16px}
+  .al-scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50}
+  .al-sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;max-width:620px;margin:0 auto;max-height:86vh;overflow:auto;background:#15181d;border-radius:22px 22px 0 0;padding:10px 18px 24px;box-shadow:0 -12px 40px rgba(0,0,0,.5)}
+  .al-sheet-h{display:flex;align-items:center;justify-content:space-between;padding:4px 0 6px}.al-sheet-h b{font-size:20px}
+  .al-card{background:#1c2027;border-radius:14px;padding:14px}
+  .al-card-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .al-rows{margin-top:6px}
+  .al-row{width:100%;min-height:58px;display:flex;align-items:center;gap:14px;text-align:left;border-bottom:1px solid #20252c!important}
+  .al-row-i{width:36px;height:36px;border-radius:10px;background:#1f242b;display:inline-flex;align-items:center;justify-content:center;color:#c9ced6;flex-shrink:0}
+  .al-row-t{flex:1;min-width:0;display:flex;flex-direction:column}.al-row-t b{font-size:15px;font-weight:500}.al-row-t small{font-size:12px;color:#8f97a3;margin-top:2px}
+  .al-row-go{color:#6f7783;display:inline-flex}
+  .al-how.is-open p{padding:0 4px 12px}
+  .sheet-extra .al-row{background:none;border:0;border-bottom:1px solid #20252c;color:#f2f0ea;font:inherit;cursor:pointer;padding:0}
+  @media(max-width:420px){html[data-view=album] main{padding:0 16px 24px}.al-ctl{gap:20px}}
 </style>
 </head>
 <body>
@@ -389,6 +498,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   </div>
 </header>
 <main class="paused" id="stage">
+  <!-- Album First (src/radio-ppp/album.ts): shown instead of the receiver and panel while an album is the music. -->
+  <section class="album" id="album" hidden aria-label="Album"></section>
   <section class="rx" aria-label="Receiver">
     <div class="receiver" id="receiver">
       <div class="art" id="art">
@@ -417,7 +528,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
         <canvas class="spectrum" id="spectrum" aria-hidden="true"></canvas>
       </div>
     </div>
-    <div class="nudge" id="pppNudge" role="note" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start paying</button></div>
+    <div class="nudge" id="pppNudge" role="note" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>
     <!-- The song's whole waveform: the played part lights up; tap or drag to jump. -->
     <div class="timeline" id="timeline" hidden>
       <span class="tl-t" id="tCur">0:00</span>
@@ -449,10 +560,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     </div>
   </section>
   <aside class="side">
+    <div class="sheet-bar"><b id="sheetTitle"></b><button type="button" id="sheetClose" aria-label="Close">×</button></div>
+    <div class="sheet-extra" id="sheetExtra"></div>
     <!-- Pay-per-play first: the wallet box (and its unlock) stays near the top, whatever the likes list holds. -->
-    <section class="ppp" id="ppp" hidden aria-label="Pay per play">
-      <div class="ppp-head"><h3>♪ PAY PER PLAY<span class="ppp-badge" hidden>SETUP HELPER</span></h3><span class="ppp-state" hidden></span></div>
-      <ol class="ppp-steps" hidden aria-label="Pay-per-play stages"></ol>
+    <section class="ppp" id="ppp" hidden aria-label="Xtrata Music">
+      <div class="ppp-head"><h3>♪ XTRATA MUSIC<span class="ppp-badge" hidden>SETUP</span></h3><span class="ppp-state" hidden></span></div>
+      <ol class="ppp-steps" hidden aria-label="Setup stages"></ol>
       <p class="ppp-stage" hidden></p>
       <!-- Top to bottom: what to do now, the wallet box when it needs a tap, buttons; details folded below. -->
       <div class="ppp-switch" hidden></div>
@@ -465,10 +578,10 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <!-- Nothing to read unless you want to: three small folds. -->
       <div class="ppp-folds">
         <details class="ppp-fold ppp-recent" hidden><summary>♪ Recently played</summary><ol class="ppp-recent-list"></ol><details class="ppp-history" hidden></details></details>
-        <details class="ppp-fold ppp-wallets" hidden><summary>◎ Wallet</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
-        <details class="ppp-fold ppp-more" hidden><summary>? How it works</summary><div class="ppp-body"></div></details>
+        <details class="ppp-fold ppp-wallets" hidden><summary>◎ This device</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
+        <details class="ppp-fold ppp-more" hidden><summary>? How plays work</summary><div class="ppp-body"></div></details>
         <details class="ppp-fold ppp-shelf" hidden><summary>♪ My albums</summary><div class="ppp-shelf-body"></div></details>
-        <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Send someone a wallet</summary><div class="ppp-gift-body"></div></details>
+        <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Send music to a friend</summary><div class="ppp-gift-body"></div></details>
       </div>
     </section>
     <details class="likes" id="likesBox" open>
@@ -647,6 +760,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   function render(s){
     state=s;
     var np=s.nowPlaying, stage=$('stage');
+    // Plays on their way: every control rests (greyed out, not clickable) until they land. Nothing is wrong.
+    var gw=!!s.giftWait;
+    ['power','prev','pp','next','heart','presetBtn'].forEach(function(id){var b=$(id);if(b)b.disabled=gw});
+    Array.prototype.forEach.call($('bands').children,function(b){b.disabled=gw});
+    $('tuner').classList.toggle('waiting',gw);
+    stage.classList.toggle('arriving',gw);
     $('tuner').classList.toggle('locked',!!s.giftLocked);
     $('tuner').title=s.giftLocked?'This album plays only its own songs':'';
     $('stn').textContent=(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
@@ -823,7 +942,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=e1ef808d7d65" defer></script>
+<script src="/xtrata-radio.js?v=e2b3581a60fe" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -839,7 +958,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=546a484c68ef')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=c8d000ae7d29')}).catch(function(){});
 </script>
 </body>
 </html>

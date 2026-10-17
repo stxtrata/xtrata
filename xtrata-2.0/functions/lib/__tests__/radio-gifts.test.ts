@@ -9,7 +9,7 @@ import {
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
-  BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createCampaign, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
+  BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
   adminAddresses, giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv,
   batchesFor, batchStatus, confirmBatch, createBatch, ensureGiftTables, MAX_PENDING_BATCHES, REFUND_GROUP_MAX, runSweep, sweepAuthorised, SCAN_EVERY_MS, SCAN_WHILE_EXPECTING_MS
 } from '../radio-gifts';
@@ -18,7 +18,7 @@ import { deriveSlotIdentity, listeningBase } from '../../../src/lib/listening-wa
 import { signSlotBinding } from '../../../src/lib/listening-wallet/slots';
 import { playerData, playerHash, type PlayerDefinition, type PlayerRequest } from '../../../src/lib/listening-wallet/gift-players';
 import { radioArtist, radioTitle } from '../../../src/lib/radio/artist-credits.mjs';
-import { campaignData, GIFT_EXPIRY_MS, GIFT_FEE, GIFT_MEMO, giftCodeHash, giftDepositMemo, type CampaignRequest } from '../../../src/lib/listening-wallet/gifts';
+import { GIFT_EXPIRY_MS, GIFT_FEE, GIFT_MEMO, giftCodeHash, giftDepositMemo, newGiftCode } from '../../../src/lib/listening-wallet/gifts';
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
 
 function database() {
@@ -94,10 +94,20 @@ function setup(over: Partial<GiftEnv> = {}) {
   };
   let now = T0;
   const deps = () => ({ chain: fake, now, human: async () => true });
-  const sign = (req: CampaignRequest, k = adminKey) => signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(campaignData(req)))), privateKey: createStacksPrivateKey(k) }).data;
-  const campaign = async (count = 2, amount = '100000', k = adminKey) => {
-    const req: CampaignRequest = { admin: addr(adminKey), count, amount, label: 'Launch week', issued: now };
-    return createCampaign(env, { request: req, signature: sign(req, k) }, deps(), request);
+  /**
+   * Campaign links made before that route was removed: rows inserted directly (the production database still holds some
+   * until they expire), so their claim, limit and expiry rules stay tested.
+   */
+  const campaign = async (count = 2, amount = '100000', opts: { player?: string; label?: string } = {}) => {
+    await ensureGiftTables(env);
+    const codes: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const code = newGiftCode();
+      db.sql.prepare("INSERT INTO radio_gifts(id, code_hash, amount, source, gifter, label, status, created_at, expires_at, updated_at, player_id) VALUES(?, ?, ?, 'campaign', NULL, ?, 'live', ?, ?, ?, ?)")
+        .run('legacy' + Math.random().toString(16).slice(2, 14) + i, giftCodeHash(code), Number(amount), opts.label ?? 'Launch week', now, now + GIFT_EXPIRY_MS, now, opts.player ?? null);
+      codes.push(code);
+    }
+    return { codes, amount, expires: now + GIFT_EXPIRY_MS };
   };
   const claim = (code: string, w = wallet(), ip: string | null = null) => claimGift(env, { code, wallet: w }, deps(), ip, request);
   /** The chain confirms the send that is open (the last transaction signed) and the sweep notices. */
@@ -107,7 +117,7 @@ function setup(over: Partial<GiftEnv> = {}) {
     chain.mempoolNonce = d.nonce + 1n; chain.executed = d.nonce;
     return sweepGifts(env, deps());
   };
-  return { env, db, request, chain, deps, campaign, claim, land, sign, treasury, admin: addr(adminKey), adminKey, tick: (ms: number) => { now += ms; }, now: () => now };
+  return { env, db, request, chain, deps, campaign, claim, land, treasury, admin: addr(adminKey), adminKey, tick: (ms: number) => { now += ms; }, now: () => now };
 }
 const decode = (raw: Uint8Array) => {
   const tx = deserializeTransaction(raw) as any;
@@ -125,21 +135,22 @@ describe('radio gift wallets', () => {
     expect(giftsConfig(setup({ RADIO_GIFT_TREASURY_KEY: 'nope' }).env, null, s.request).enabled).toBe(false);
   });
 
-  it('campaign links: only the admin’s signature makes them, each signed request works once, only hashes are stored', async () => {
+  it('campaign links already out: only their hashes are stored, and they still show as the treasury’s gift', async () => {
     const s = setup();
-    const req: CampaignRequest = { admin: s.admin, count: 3, amount: '250000', label: 'Launch week', issued: s.now() };
-    const body = { request: req, signature: s.sign(req) };
-    const { codes } = await createCampaign(s.env, body, s.deps(), s.request);
-    expect(codes).toHaveLength(3);
-    await expect(createCampaign(s.env, body, s.deps(), s.request)).rejects.toThrow(/already used/);
+    const { codes } = await s.campaign(3, '250000');
     const stored = s.db.sql.prepare('SELECT * FROM radio_gifts').all();
     expect(stored.map((r: any) => r.code_hash).sort()).toEqual(codes.map(giftCodeHash).sort());
     expect(JSON.stringify(stored)).not.toContain(codes[0]);
     expect(await giftStatus(s.env, { code: codes[0] })).toMatchObject({ status: 'live', amount: '250000', source: 'campaign', from: null });
-    await expect(s.campaign(1, '100000', key())).rejects.toThrow(/Only the gift admin/);
-    await expect(s.campaign(1, '99999')).rejects.toMatchObject({ status: 400 });
-    s.tick(16 * 60_000);
-    await expect(createCampaign(s.env, { request: { ...req, issued: T0 }, signature: s.sign({ ...req, issued: T0 }) }, s.deps(), s.request)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('there is no way left to make a campaign link', async () => {
+    const mod = await import('../radio-gifts');
+    expect((mod as Record<string, unknown>).createCampaign).toBeUndefined();
+    const { onRequest } = await import('../../radio/gift/[[path]]');
+    const s = setup();
+    const r = await onRequest({ request: new Request('https://radio.test/radio/gift/campaign', { method: 'POST', headers: { origin: 'https://radio.test', 'content-type': 'application/json' }, body: '{}' }), env: s.env, params: { path: ['campaign'] } });
+    expect(r.status).toBe(404);
   });
 
   it('a claim funds a brand-new wallet once, recorded before broadcast, and is claimed only when the chain confirms it', async () => {
@@ -238,7 +249,7 @@ describe('radio gift wallets', () => {
   });
 
   it('refuses used wallets, failed checks and an empty treasury, leaves the gift claimable, and has no daily cap', async () => {
-    const s = setup({ RADIO_GIFT_DAILY_CAP: '250000' }); // set, and ignored: links an admin made are not held back "for today"
+    const s = setup(); // no daily total: links an admin made are not held back "for today"
     const codes = (await s.campaign(4)).codes;
     const used = wallet(); s.chain.activity.set(used, 1);
     await expect(s.claim(codes[0], used)).rejects.toThrow(/brand-new/);
@@ -451,12 +462,6 @@ describe('radio gift players', () => {
     return { definition: def, request, signature };
   };
   const make = (s: ReturnType<typeof setup>, def = definition(), k = s.adminKey) => createPlayer(s.env, signed(s, def, k), s.deps(), s.request);
-  const campaignFor = (s: ReturnType<typeof setup>, player: string | undefined, k = s.adminKey) => {
-    const req: CampaignRequest = { admin: s.admin, count: 1, amount: '100000', label: 'Gift Edition', issued: s.now(), ...(player ? { player } : {}) };
-    const signature = signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(campaignData(req)))), privateKey: createStacksPrivateKey(k) }).data;
-    return { req, signature, run: () => createCampaign(s.env, { request: req, signature }, s.deps(), s.request) };
-  };
-
   it('the admin signs a definition once; only its hash is signed and the catalogue supplies every title and artist', async () => {
     const s = setup(); catalogue(s);
     const out = await make(s);
@@ -501,12 +506,12 @@ describe('radio gift players', () => {
   it('an album never stops working: selling a song afterwards changes nothing for the album or its links', async () => {
     const s = setup(); catalogue(s);
     const out = await make(s);
-    await campaignFor(s, out.id).run();
+    const { codes } = await s.campaign(1, '100000', { player: out.id });
     for (const id of SONGS) s.chain.owners.set(id, wallet()); // every song is sold to someone else
     const { playerView } = await import('../radio-gifts');
     expect((await playerView(s.env, out.id))?.tracks).toHaveLength(4);
     s.tick(1000);
-    await expect(campaignFor(s, out.id).run()).resolves.toMatchObject({ player: out.id });
+    expect(await giftStatus(s.env, { code: codes[0] })).toMatchObject({ status: 'live', player: { id: out.id } });
     s.chain.ownerError = true; // and a chain outage never touches an existing album
     expect((await playerView(s.env, out.id))?.tracks).toHaveLength(4);
   });
@@ -573,30 +578,19 @@ describe('radio gift players', () => {
     ]) await expect(make(s, bad)).rejects.toMatchObject({ status: 400 });
   });
 
-  it('a campaign link opens its player: the id is part of the signature, and it must exist', async () => {
+  it('a link opens its player, and a link without one is what it always was', async () => {
     const s = setup(); catalogue(s);
     const { id } = await make(s);
-    const withPlayer = campaignFor(s, id);
-    const { codes, player } = await withPlayer.run();
-    expect(player).toBe(id);
+    const { codes } = await s.campaign(1, '100000', { player: id });
     expect(await giftStatus(s.env, { code: codes[0] })).toMatchObject({ status: 'live', player: { id, title: 'Proof of Sound', paidOnly: true } });
-    // the signature does not cover a different player, and one that does not exist is refused
-    const other = campaignFor(s, id.replace(/./, (c) => (c === 'a' ? 'b' : 'a')));
-    await expect(createCampaign(s.env, { request: other.req, signature: withPlayer.signature }, s.deps(), s.request)).rejects.toMatchObject({ status: 403 });
-    s.tick(1);
-    await expect(campaignFor(s, 'f'.repeat(16)).run()).rejects.toThrow(/does not exist/);
-    // a campaign without a player is what it always was
-    const plain = campaignFor(s, undefined);
-    s.tick(1);
-    const plainOut = await campaignFor(s, undefined).run();
-    expect(plain.req.player).toBeUndefined();
-    expect((await giftStatus(s.env, { code: plainOut.codes[0] })).player).toBeUndefined();
+    const plain = await s.campaign(1);
+    expect((await giftStatus(s.env, { code: plain.codes[0] })).player).toBeUndefined();
   });
 
   it('a claimed gift tells the wallet its player and where the gift money came from', async () => {
     const s = setup(); catalogue(s);
     const { id } = await make(s);
-    const [code] = (await campaignFor(s, id).run()).codes;
+    const [code] = (await s.campaign(1, '100000', { player: id })).codes;
     const w = wallet();
     await s.claim(code, w);
     await s.land();
@@ -627,9 +621,7 @@ describe('radio gift players', () => {
     const album = async (s: ReturnType<typeof setup>, n = 1) => {
       catalogue(s);
       const { id } = await make(s);
-      const req: CampaignRequest = { admin: s.admin, count: n, amount: '100000', label: 'Gift Edition', issued: s.now(), player: id };
-      const signature = signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(campaignData(req)))), privateKey: createStacksPrivateKey(s.adminKey) }).data;
-      return (await createCampaign(s.env, { request: req, signature }, s.deps(), s.request)).codes;
+      return (await s.campaign(n, '100000', { player: id, label: 'Gift Edition' })).codes;
     };
     const claimInto = (s: ReturnType<typeof setup>, code: string, p: { id: { address: string }; binding: any }) =>
       claimGift(s.env, { code, wallet: p.id.address, binding: p.binding }, s.deps(), null, s.request);
@@ -1063,6 +1055,61 @@ describe('radio gift players', () => {
       await s.claim(made.codes[0]); await s.land();
       const [code] = (await s.campaign(1)).codes;
       await s.claim(code);
+    });
+
+    it('whole life of a batch on the simulated chain: the treasury ends exactly where it started', async () => {
+      const s = setup(); catalogue(s);
+      const { id } = await make(s);
+      const COUNT = 5, AMOUNT = 123000n;
+      // 1. the creator signs and gets dormant links; nothing is claimable and nothing is owed yet
+      const made = await fund(s, { player: id, count: COUNT, amount: AMOUNT.toString(), label: 'Opera launch' });
+      const deposit = BigInt(made.deposit);
+      expect(deposit).toBe(batchDeposit(COUNT, AMOUNT));
+      await expect(s.claim(made.codes[0])).rejects.toThrow(/not paid for yet/);
+      // 2. the creator pays once; the treasury receives exactly that
+      const txid = pay(s, made);
+      s.chain.balances.set(s.treasury, deposit);
+      expect((await runSweep(s.env, s.deps())).steps[0]).toBe('deposits-scanned');
+      s.chain.inbound.push({ txid, ...s.chain.txs.get(txid)! });
+      s.tick(SCAN_WHILE_EXPECTING_MS + 1);
+      await runSweep(s.env, s.deps());
+      expect((await batchStatus(s.env, made.id)).status).toBe('live'); // found by the sweep, no page open
+      // 3. two listeners claim album copies into numbered wallets; the creator is their payer
+      const { root, proof } = await passkey();
+      const spent: bigint[] = [];
+      for (const slot of [1, 2]) {
+        const p = await proof(slot, s.now());
+        await claimInto(s, made.codes[slot - 1], p);
+        const d = decode(s.chain.sent.at(-1)!.raw);
+        expect(d).toMatchObject({ recipient: p.id.address, amount: AMOUNT });
+        spent.push(d.amount + d.fee);
+        expect((await s.land()).did).toBe('settled');
+        expect((await giftForWallet(s.env, p.id.address)).gift).toMatchObject({ returnTo: s.admin, from: s.admin, player: { title: 'Proof of Sound' } });
+        s.tick(1000);
+      }
+      expect((await shelfFor(s.env, root.address)).shelf.map((x) => x.slot)).toEqual([1, 2]);
+      // 4. a claimed copy cannot be claimed again, and a wallet that already had a gift cannot take another
+      await expect(s.claim(made.codes[0])).rejects.toMatchObject({ status: 410 });
+      // 5. thirty days pass; the sweep alone returns the three unclaimed copies in ONE transfer to the creator
+      s.tick(GIFT_EXPIRY_MS + 1);
+      const steps = (await runSweep(s.env, s.deps())).steps;
+      expect(steps).toContain('refund-sent');
+      const refund = decode(s.chain.sent.at(-1)!.raw);
+      expect(refund.recipient).toBe(s.admin);
+      expect(s.chain.sent.filter((x) => decode(x.raw).recipient === s.admin)).toHaveLength(1);
+      await s.land();
+      expect((await runSweep(s.env, s.deps())).steps).toEqual(['nothing']);
+      // 6. everything the creator paid is accounted for: sends + refund + every network fee = the one deposit
+      const out = spent.reduce((a, b) => a + b, 0n) + refund.amount + refund.fee;
+      expect(out).toBe(deposit);
+      expect(await batchStatus(s.env, made.id)).toMatchObject({ status: 'live', copies: { waiting: 0, claiming: 0, claimed: 2, refunding: 0, refunded: 3 } });
+      expect(s.db.sql.prepare("SELECT COUNT(*) AS n FROM radio_gift_sends WHERE status='sent'").get()).toEqual({ n: 0 });
+      // 7. nothing is owed any more
+      const alarm = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      s.chain.balances.set(s.treasury, 0n); s.tick(SCAN_EVERY_MS + 1);
+      await runSweep(s.env, s.deps());
+      expect(alarm).not.toHaveBeenCalledWith(expect.stringContaining('under-collateralised'), expect.anything());
+      alarm.mockRestore();
     });
 
     describe('the scheduled sweep', () => {

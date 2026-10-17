@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: null as any, topUp: vi.fn(), topUpAlbum: vi.fn(), openAlbum: vi.fn(), bind: vi.fn(), arriving: vi.fn(), route: null as null | ((url: string, init?: any) => Response | undefined), radio: null as any, session: { isConnected: false } as any, signed: [] as any[] }));
 vi.mock('../controller', () => ({
-  TOP_UP_CHOICES: [50_000n, 100_000n, 250_000n],
+  TOP_UP_PLAYS: [100, 250, 500],
   createPppController: (deps: any) => {
     h.changed = deps.changed;
     return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), topUpLikes: () => h.topUp(), topUpAlbum: (a: bigint) => h.topUpAlbum(a), openAlbum: (n: number) => h.openAlbum(n), bindAlbum: (n: number) => h.bind(n), albumArriving: (...a: unknown[]) => h.arriving(...a), onListened: async () => {}, giftSent: () => {} }, {
@@ -30,7 +30,7 @@ const base = {
   depositPending: false, walletOutdated: false, linkedListening: [], serverLinked: false, armed: false, stuck: 0, queued: 0, solo: true, returnTo: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', returnToKind: 'funder',
   funderState: 'found', funderMultiple: false, walletCannotSolo: false, walletCannotMulti: false, others: [], createdHere: true,
   gate: { enabled: true, allowed: false, here: true, radioUrl: null, walletOrigin: 'https://w.test', canary: false, passkeyOnly: true, limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 }, gifts: { enabled: true, treasury: null, turnstileSiteKey: null, admin: false, fee: '3000' } },
-  gift: { player: PLAYER, from: null, source: 'campaign', amount: '100000' }, giftPlays: 277, giftStop: null, returnPlan: { state: 'none' }
+  gift: { player: PLAYER, from: null, source: 'campaign', amount: '100000' }, giftPlays: 277, playCost: 350n, giftStop: null, returnPlan: { state: 'none' }
 };
 
 async function open(over: object = {}) {
@@ -39,7 +39,7 @@ async function open(over: object = {}) {
     <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section>`;
-  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
+  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
   (window as any).XtrataRadio = h.radio;
   h.snap = { ...base, ...over };
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: any) => h.route?.(String(url), init) ?? new Response(String(url).endsWith('/radio/gift/player') ? JSON.stringify({ id: 'fedcba9876543210', title: 'Proof of Sound', tracks: 2, existing: false }) : '{}')));
@@ -213,7 +213,7 @@ describe('My albums (the shelf)', () => {
     const tabs = [...sw.querySelectorAll('button')];
     expect(tabs.map((t) => t.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
     expect(text(tabs[0])).toContain('My player');
-    expect(text(tabs[0])).toContain('0.1993 STX');
+    expect(text(tabs[0])).toContain('560 plays'); // (0.19925 STX − the reserve) at 350 µSTX a play
     expect(text(tabs[1])).toContain('Night Drive');
     h.openAlbum.mockClear();
     (tabs[0] as HTMLButtonElement).click();
@@ -240,12 +240,12 @@ describe('My albums (the shelf)', () => {
     const root = await start({ slot: 2, giftPlays: 10, balance: 12_000n, gift: { player: PLAYER, from: null, source: 'campaign', amount: '100000' }, likeFunds: { address: ROOT, balance: 300_000n, low: false, album: true, pending: false } });
     const row = document.querySelector('.ppp-key .ppp-topup')!;
     const buttons = [...row.querySelectorAll('button')] as HTMLButtonElement[];
-    expect(buttons.map((b) => b.textContent)).toEqual(['+0.05 STX', '+0.10 STX', '+0.25 STX']);
+    expect(buttons.map((b) => b.textContent)).toEqual(['+100', '+250', '+500']); // plays, never STX
     expect(buttons.map((b) => b.disabled)).toEqual([false, false, false]);
     h.topUpAlbum.mockClear();
     buttons[1].click();
-    expect(h.topUpAlbum).toHaveBeenCalledWith(100_000n);
-    // My player holds 0.1 STX: it covers 0.05 STX only
+    expect(h.topUpAlbum).toHaveBeenCalledWith(250);
+    // My player holds 0.06 STX: about 145 plays, so only +100 fits
     h.snap = { ...h.snap, likeFunds: { ...h.snap.likeFunds, balance: 60_000n } };
     h.changed();
     const again = [...document.querySelector('.ppp-key .ppp-topup')!.querySelectorAll('button')] as HTMLButtonElement[];
@@ -343,7 +343,7 @@ describe('a starter gift never looks failed while it is on its way', () => {
     const key = root.querySelector('.ppp-key')!;
     expect([...key.querySelectorAll('p')].find((p) => /Still sending/.test(p.textContent ?? ''))!.className).toContain('ppp-warn');
     expect(root.querySelector('.ppp-bad')).toBeNull();
-    expect(text(root)).not.toMatch(/Add funds|ConflictingNonce|Copy my address/);
+    expect(text(root)).not.toMatch(/Add funds|Add plays|ConflictingNonce|Copy my address/);
     expect(text(root.querySelector('.ppp-err')!)).toBe('');
     expect(document.documentElement.dataset.ppp).toBeUndefined();
     expect(text(root.querySelector('.ppp-stage')!)).toMatch(/on their way/);
@@ -354,7 +354,7 @@ describe('a starter gift never looks failed while it is on its way', () => {
     const root = await open(empty);
     await vi.waitFor(() => expect(text(root.querySelector('.ppp-key')!)).toContain('on this connection today'));
     expect(root.querySelector('.ppp-key .ppp-bad')!.textContent).toMatch(/on this connection today/);
-    expect(text(root.querySelector('.ppp-key')!)).toContain('Add funds');
+    expect(text(root.querySelector('.ppp-key')!)).toContain('Add plays');
   });
 });
 
@@ -390,6 +390,15 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
     expect(text(root.querySelector('.ppp-gift-body')!)).not.toMatch(/Prefunded batch/);
     const a = await admin();
     expect(text(a.querySelector('.ppp-gift-body')!)).toContain('Prefunded batch (admin)');
+  });
+
+  it('has no campaign box any more: batches are the only way to make links', async () => {
+    served();
+    const root = await admin();
+    const body = text(root.querySelector('.ppp-gift-body')!);
+    expect(body).not.toMatch(/Campaign links|paid from the gift treasury|Sign and make links/);
+    expect(body).toContain('Prefunded batch (admin)');
+    expect(body).toContain('Sign and make player');
   });
 
   it('shows the whole bill before anything is signed: plays, reserve, likes float, sending fee, total', async () => {
@@ -482,5 +491,43 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
     const root = await admin();
     await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('links were made on another device'));
     expect(text(root.querySelector('.ppp-gift-body')!)).toContain('Elsewhere');
+  });
+});
+
+describe('waiting for plays to arrive', () => {
+  const arriving = { step: 'fund', balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, giftPlays: 0, depositPending: true, giftStop: { reason: 'arriving', text: 'YOUR PLAYS ARE ARRIVING' } };
+  beforeEach(() => { delete document.documentElement.dataset.ppp; localStorage.clear(); });
+
+  it('shows a calm countdown bar, no red, and no "artists unpaid", for the first minute', async () => {
+    const root = await open({ ...arriving, gift: null, arrival: { since: Date.now() - 12_000, graceMs: 60_000 } });
+    const bar = root.querySelector('.ppp-wait')!;
+    expect(bar).not.toBeNull();
+    expect(bar.getAttribute('role')).toBe('progressbar');
+    expect(text(bar)).toMatch(/Your plays are arriving.*usually about a minute · (4[6-9]|48)s/);
+    expect(bar.classList.contains('is-long')).toBe(false);
+    expect(root.querySelector('.ppp-bad')).toBeNull();
+    expect(text(root)).not.toMatch(/artists unpaid|Add funds|Out of plays|Out of funds/);
+    expect(document.documentElement.dataset.ppp).toBeUndefined(); // the radio is not dressed as "not paying"
+  });
+
+  it('past the first minute it keeps moving and stays calm: it never turns into an error', async () => {
+    const root = await open({ ...arriving, gift: null, arrival: { since: Date.now() - 95_000, graceMs: 60_000 } });
+    const bar = root.querySelector('.ppp-wait')!;
+    expect(bar.classList.contains('is-long')).toBe(true);
+    expect(text(bar)).toMatch(/Still arriving.*starts by itself/);
+    expect(root.querySelector('.ppp-bad')).toBeNull();
+  });
+
+  it('tells the radio to grey its controls while plays arrive, and to wake them once they have', async () => {
+    await open({ ...arriving, gift: null, arrival: { since: Date.now(), graceMs: 60_000 } });
+    expect(h.radio.setGiftWait).toHaveBeenLastCalledWith(true);
+    h.snap = { ...base, step: 'ready', depositPending: false, arrival: null, giftStop: null };
+    h.changed();
+    expect(h.radio.setGiftWait).toHaveBeenLastCalledWith(false);
+  });
+
+  it('no bar when nothing is expected: a genuinely empty wallet still says so', async () => {
+    const root = await open({ step: 'fund', balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, giftPlays: 0, gift: null, arrival: null, giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } });
+    expect(root.querySelector('.ppp-wait')).toBeNull();
   });
 });

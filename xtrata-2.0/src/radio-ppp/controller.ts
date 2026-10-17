@@ -106,8 +106,13 @@ export interface PppDeps {
   history?(listening: string, withOutgoing: boolean): Promise<History>;
 }
 
-/** Album top-ups offered from My player (microSTX): 0.05 STX is roughly 140 plays. */
-export const TOP_UP_CHOICES = [50_000n, 100_000n, 250_000n];
+/**
+ * Album top-ups offered from My player, counted in plays: the listener only ever sees plays. The STX moved is
+ * worked out from the play cost of the day (`topUpCost`), so the album gets exactly that many plays.
+ */
+export const TOP_UP_PLAYS = [100, 250, 500] as const;
+/** What adding `plays` plays costs at this play fee (microSTX). */
+export const topUpCost = (plays: number, fee: bigint) => BigInt(plays) * costPerPlay(fee);
 
 export type Step =
   | 'off' | 'elsewhere' | 'connect' | 'not-invited' | 'unsupported' | 'intro' | 'locked' | 'link' | 'loading'
@@ -138,6 +143,12 @@ export interface Snapshot {
   depositTxid?: string;
   /** A deposit was sent and has not confirmed yet: no further deposit is offered. */
   depositPending: boolean;
+  /**
+   * Plays are expected any moment (a gift is being claimed or is on its way, or has just landed and the balance
+   * has not caught up). `since` is when the wait began; nothing is shown as wrong while it lasts, and the page
+   * draws a progress bar from it. Null when nothing is expected.
+   */
+  arrival: { since: number; graceMs: number } | null;
   /**
    * The wallet box (deployed separately, at wallet.xtrata.xyz) is an older build without like
    * signing: the heart falls back to the main-wallet page until it is updated.
@@ -190,6 +201,8 @@ export interface Snapshot {
   gift: { player: PlayerView | null; from: string | null; source: string; amount: string } | null;
   /** Paid plays this gifted wallet still buys, counting payments in flight and songs waiting to be paid. */
   giftPlays: number;
+  /** What one play costs right now (microSTX): turns plays into STX for top-ups, never shown to the listener. */
+  playCost: bigint;
   /**
    * A curated album stays the only thing on the radio until its own wallet is topped up: a deposit of at least
    * 0.1 STX from an address that is neither the gifter nor the gift treasury (the listener's other wallets count).
@@ -221,6 +234,8 @@ export type ReturnPlanView =
 
 const UNRESOLVED: Entry['status'][] = ['prepared', 'signed', 'unknown', 'pending'];
 const STUCK_AFTER_MS = 30 * 60_000;
+/** A gift claim is never called late, empty or wrong before this long: a minute is a normal wait, not a fault. */
+export const ARRIVAL_GRACE_MS = 60_000;
 
 /** The node refused the transaction outright, so it never entered the mempool and its nonce is unused. */
 export const definitelyRejected = (e: unknown) => {
@@ -307,6 +322,20 @@ export function createPppController(deps: PppDeps) {
     try { return JSON.parse(deps.store.get(key('deposit', listening)) || 'null'); } catch { return null; }
   };
   const setPendingDeposit = (d: PendingDeposit | null, listening = status?.address) => { if (listening) deps.store.set(key('deposit', listening), JSON.stringify(d)); };
+  /**
+   * Plays that are about to arrive but have no pending deposit to point at yet: the gift claim is in flight, or the
+   * deposit has just confirmed and the balance read has not caught up. Held for at least ARRIVAL_GRACE_MS from when
+   * the wait began, so a slow network or a lagging index never shows "no funds · artists unpaid" for a gift that
+   * is on its way. Kept in memory only: a reload re-reads the real state.
+   */
+  let arrival: { since: number; until: number } | null = null;
+  const expectArrival = (graceMs = ARRIVAL_GRACE_MS) => {
+    const now = deps.now();
+    arrival = { since: arrival && now < arrival.until ? arrival.since : now, until: Math.max(arrival?.until ?? 0, now + graceMs) };
+  };
+  const arrivalLive = () => !!arrival && deps.now() < arrival.until && (balance === undefined || balance < RESERVE + costPerPlay(fee()));
+  /** Funds are on their way in some form: a recorded deposit, or a gift being claimed or settling. */
+  const arrivalExpected = () => !!pendingDeposit() || arrivalLive();
   /** The wallet that signs likes: the passkey's own, even while an album wallet is open (boxes before `rootLike` sign with the open one). */
   const likeAddr = (): string | undefined => (walletLacks('rootLike') ? status?.address : status?.root ?? status?.address);
   const albumOpen = () => !!status?.address && likeAddr() !== status.address;
@@ -412,7 +441,7 @@ export function createPppController(deps: PppDeps) {
       case 'locked': return stop('locked', 'UNLOCK TO LISTEN');
       case 'link': return stop('link', 'FINISH SETUP TO LISTEN');
       case 'over': return stop('over', 'OVER 1 STX — RETURN THE EXCESS');
-      case 'fund': return pendingDeposit() ? stop('arriving', 'YOUR PLAYS ARE ARRIVING') : stop('out', albumOpen() ? OUT_TEXT : WALLET_EMPTY_TEXT);
+      case 'fund': return arrivalExpected() ? stop('arriving', 'YOUR PLAYS ARE ARRIVING') : stop('out', albumOpen() ? OUT_TEXT : WALLET_EMPTY_TEXT);
       case 'ready':
         if (!payingOn() || !status?.session || status.session.playsLeft < 1) return stop('off', 'PAYING IS OFF — SWITCH ON TO LISTEN');
         if (!lockHeld) return stop('tab', 'PLAYING IN ANOTHER TAB');
@@ -483,7 +512,8 @@ export function createPppController(deps: PppDeps) {
     allowance: balance === undefined ? TARGET : fundingAllowance(balance, BigInt(pendingDeposit()?.amount ?? '0')),
     session: status?.session ?? null,
     payingOn: payingOn(), entries: entries(), depositTxid: pendingDeposit()?.txid ?? depositTxid,
-    depositPending: !!pendingDeposit(),
+    depositPending: arrivalExpected(),
+    arrival: arrivalExpected() ? { since: pendingDeposit()?.at ?? arrival?.since ?? deps.now(), graceMs: ARRIVAL_GRACE_MS } : null,
     walletOutdated: walletLacks('like'),
     linkedListening: mainLinksFor && mainLinksFor === deps.main() ? mainLinks.map((l) => l.listening) : [],
     serverLinked: !!serverLink && serverLinkFor === `${deps.main()}:${status?.address}`,
@@ -500,6 +530,7 @@ export function createPppController(deps: PppDeps) {
     brandNew: !!status?.address && balance === 0n && unusedRes?.for === status.address && unusedRes.unused,
     gift: (() => { const g = giftNow(); return g ? { player: g.player, from: g.from, source: g.source, amount: g.amount } : null; })(),
     giftPlays: giftNow() ? playsLeftNow() : 0,
+    playCost: costPerPlay(fee()),
     giftStop: giftStop(),
     albumLock: albumLock(),
     returnPlan: returnPlanView(),
@@ -677,6 +708,8 @@ export function createPppController(deps: PppDeps) {
         const s = String(tx?.tx_status ?? '');
         if ((s === 'success' && tx.is_unanchored === false) || s.startsWith('abort_') || s.startsWith('dropped_') || (!tx && deps.now() - d.at > 2 * 3600_000)) {
           setPendingDeposit(null, at);
+          // It confirmed (or was dropped): give the balance a moment to show it before anything reads as empty.
+          if (s === 'success') expectArrival(20_000);
           balanceAt = -Infinity;
           rootBalance = null;
           // "Gift on its way" / "deposit on its way" is over: say nothing rather than leave it up while paying.
@@ -990,6 +1023,12 @@ export function createPppController(deps: PppDeps) {
      * A gift funded this wallet (the server sent it from the gift treasury): tracked exactly like a
      * deposit, so the panel says it is on its way and paying starts by itself once it confirms.
      */
+    /** A gift claim started (true) or stopped for good (false): the plays are expected, so nothing reads as empty meanwhile. */
+    giftClaiming: (on: boolean) => {
+      if (on) expectArrival(); else arrival = null;
+      deps.changed();
+    },
+
     giftSent: (txid: string, amount: bigint) => {
       if (!status?.address || pendingDeposit()) return;
       setPendingDeposit({ txid, amount: amount.toString(), at: deps.now() });
@@ -1091,11 +1130,12 @@ export function createPppController(deps: PppDeps) {
       say('Top-up sent ✓ Likes carry on once it confirms, usually a few minutes.');
     }),
 
-    /** Add plays to the open album from My player (the first wallet). One of `TOP_UP_CHOICES`. */
-    topUpAlbum: (amount: bigint): Promise<void> => task('Adding plays…', async () => {
+    /** Add plays to the open album from My player (the first wallet). One of `TOP_UP_PLAYS`. */
+    topUpAlbum: (plays: number): Promise<void> => task('Adding plays…', async () => {
       guardMatch();
       if (!albumOpen()) throw new Error('Open the album you want to add plays to first.');
-      if (!TOP_UP_CHOICES.includes(amount)) throw new Error('Choose one of the amounts offered.');
+      if (!(TOP_UP_PLAYS as readonly number[]).includes(plays)) throw new Error('Choose one of the amounts offered.');
+      const amount = topUpCost(plays, fee());
       if (paying || liking || checkingLike) throw new Error('Still sending a payment. Try again in a moment.');
       if (unresolvedAll().length || pendingDeposit()) throw new Error('Wait for the pending payment to confirm, then add more.');
       await sendMove(0, status!.slot ?? 0, amount);

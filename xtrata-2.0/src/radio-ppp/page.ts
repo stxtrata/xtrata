@@ -7,9 +7,9 @@ import { WalletBridgeClient } from '../lib/wallet/passkey/bridge/client';
 import { createWalletSessionStore } from '../lib/wallet/session';
 import { requestStructuredSignature } from '../lib/wallet/structured-sign';
 import { showStxTransfer } from '../lib/wallet/connect';
-import { costPerPlay, HOLDER_PAYMENT, stx, TARGET } from '../lib/listening-wallet/policy';
+import { costPerPlay, HOLDER_PAYMENT, RESERVE, stx, TARGET } from '../lib/listening-wallet/policy';
 import { account, api, balance, broadcast, owner, transaction, validateSaved, verify } from '../radio-test-wallet/chain';
-import { createPppController, TOP_UP_CHOICES, type GateConfig, type Snapshot } from './controller';
+import { createPppController, TOP_UP_PLAYS, type GateConfig, type Snapshot } from './controller';
 import { showSteps, stagesFor, stageOf, type StageView } from './stages';
 import { findFunder } from '../lib/listening-wallet/funder';
 import { readHistory } from '../lib/listening-wallet/ledger';
@@ -20,6 +20,8 @@ import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
 import { createGifts } from './gifts';
 import { hiddenTrack, listedTracks } from '../lib/listening-wallet/gift-players';
 import { createShelf } from './shelf';
+import { createAlbumView, type AlbumInput } from './album';
+import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
 
@@ -138,6 +140,7 @@ function start(root: HTMLElement) {
     })),
     sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
     giftSent: (txid, amount) => ppp.giftSent(txid, amount),
+    claiming: (on) => ppp.giftClaiming(on),
     album: { bind: (slot) => ppp.bindAlbum(slot), arrived: async (slot, address, txid, amount) => { shelf.invalidate(); await ppp.albumArriving(slot, address, txid, amount); } },
     who: (address) => who(address),
     changed: () => render(ppp.snapshot()),
@@ -158,6 +161,32 @@ function start(root: HTMLElement) {
     now: Date.now,
     changed: () => render(ppp.snapshot())
   });
+
+  // Album First (src/radio-ppp/album.ts): a listener who was sent an album sees a player, not this panel.
+  const albumMount = document.getElementById('album');
+  const albumView = albumMount ? createAlbumView(albumMount, {
+    radio: () => (window as any).XtrataRadio ?? null,
+    topUp: (plays) => void ppp.topUpAlbum(plays),
+    openPlayer: () => void ppp.openAlbum(0)
+  }) : null;
+  // The album this device last had open, so a locked page (a reload, a new visit) still opens on it.
+  const LAST_ALBUM_KEY = 'xtrata.radio.album.last.v1';
+  type LastAlbum = { root: string; slot: number; player: PlayerView };
+  const readLastAlbum = (): LastAlbum | null => {
+    try {
+      const v = JSON.parse(localStorage.getItem(LAST_ALBUM_KEY) || 'null');
+      return v && typeof v.root === 'string' && Number.isSafeInteger(v.slot) && v.slot > 0 && v.player && Array.isArray(v.player.tracks) ? v : null;
+    } catch { return null; }
+  };
+  let lastAlbumSaved = '';
+  const saveLastAlbum = (a: LastAlbum) => {
+    const text = JSON.stringify(a);
+    if (text === lastAlbumSaved) return;
+    lastAlbumSaved = text;
+    try { localStorage.setItem(LAST_ALBUM_KEY, text); } catch { /* a convenience */ }
+  };
+  /** "Continue listening" on a locked album: once unlocked (on the same passkey), go straight back into that album. */
+  let resumeAlbum: LastAlbum | null = null;
 
   // The radio's heart asks here first: the listening wallet signs the like when it can, for the main wallet.
   // Returns true when it takes the tap (any listener with a listening wallet here): it then toggles the
@@ -181,7 +210,7 @@ function start(root: HTMLElement) {
   };
 
   // A gifted wallet's album becomes a band on the radio; when its paid plays run out the radio stops (no free mode).
-  let giftPushed = '', stopPushed: string | null = null, lockPushed = false;
+  let giftPushed = '', stopPushed: string | null = null, lockPushed = false, waitPushed = false;
   const syncGift = (s: Snapshot) => {
     const radio = (window as any).XtrataRadio;
     if (!radio?.setGiftPlayer || !radio?.setGiftStop) return; // pushed again at the next render, once the radio is there
@@ -193,6 +222,9 @@ function start(root: HTMLElement) {
     }
     const stop = s.giftStop?.text ?? null; // any passkey wallet is paid-only, not just a gifted album
     if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
+    // Plays on their way: the radio greys its controls and says so, instead of looking broken.
+    const wait = s.giftStop?.reason === 'arriving';
+    if (wait !== waitPushed) { radio.setGiftWait?.(wait); waitPushed = wait; }
     const lock = !!p && !!s.albumLock?.locked;
     if (lock !== lockPushed) { radio.setGiftLock?.(lock); lockPushed = lock; }
     // Per-wallet song memory lasts only while this passkey stays unlocked on this page.
@@ -200,6 +232,8 @@ function start(root: HTMLElement) {
   };
 
   const short = (a?: string) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');
+  /** A balance as plays at today's play cost (after the return reserve). */
+  const playsOf = (bal: bigint) => { const c = ppp.snapshot().playCost || 350n; return bal > RESERVE ? Number((bal - RESERVE) / c) : 0; };
   // Balances at a glance: 4 decimals (0.9924 STX); tiny amounts keep all 6 (0.000350).
   const stxShort = (v: bigint) => (Number(v) / 1e6).toFixed(v < 1000n ? 6 : 4);
   const ago = (t: number) => {
@@ -273,11 +307,11 @@ function start(root: HTMLElement) {
   function statePill(s: Snapshot): [string, string] {
     if (['elsewhere', 'connect', 'not-invited', 'unsupported', 'loading'].includes(s.step)) return ['', ''];
     if (s.step === 'wrong-wallet') return ['WRONG WALLET', 'warn'];
-    if (s.step === 'over') return ['OVER 1 STX', 'bad'];
+    if (s.step === 'over') return ['TOO MUCH', 'bad'];
     if (s.step === 'locked') return ['LOCKED', 'mute'];
     if (s.step === 'intro' || s.step === 'link') return ['', '']; // the SETUP HELPER badge says it
-    if (s.step === 'fund') return s.depositPending ? ['ON ITS WAY', 'warn'] : s.entries.length ? ['OUT OF FUNDS', 'bad'] : ['ADD FUNDS', 'warn'];
-    return s.payingOn && s.session && s.session.playsLeft > 0 ? ['ON · PAYING', 'ok'] : ['OFF', 'mute'];
+    if (s.step === 'fund') return s.depositPending ? ['ON ITS WAY', 'warn'] : s.entries.length ? ['NO PLAYS', 'bad'] : ['ADD PLAYS', 'warn'];
+    return s.payingOn && s.session && s.session.playsLeft > 0 ? ['ON', 'ok'] : ['OFF', 'mute'];
   }
 
   function fact(label: string, value: string, cls = '', extra?: HTMLElement) {
@@ -315,20 +349,20 @@ function start(root: HTMLElement) {
     const left = s.session ? Math.min(s.session.playsLeft, s.playsLeft) : 0;
     switch (s.step) {
       case 'off': case 'not-invited': case 'unsupported': top.hidden = true; return;
-      case 'elsewhere': return set('Pay-per-play radio', 'quiet', 'Open the pay-per-play radio');
+      case 'elsewhere': return set('Xtrata Music', 'quiet', 'Open Xtrata Music');
       case 'connect': top.hidden = true; return; // "Connect wallet" sits right beside it
-      case 'intro': return set('Set up pay-per-play', '', 'Create your passkey listening wallet');
+      case 'intro': return set('Start listening', '', 'Make your player with a passkey: no app or account needed');
       case 'wrong-wallet': return set(`Connect ${who(s.linked)}`, 'warn', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`);
-      case 'locked': return set(s.payingOn ? 'Unlock · keep paying' : 'Unlock wallet', '', 'Opens the listening wallet: one tap there asks for your passkey');
+      case 'locked': return set('Unlock', '', 'One tap with your passkey');
       case 'link': return set('Finish setup', 'warn', 'Link the listening wallet to your main wallet');
-      case 'fund': return s.depositPending ? set('Funds on their way', 'quiet', 'Paying starts by itself when they land')
-        : set(s.entries.some((e) => e.kind === 'play') ? 'Out of funds · top up' : 'Add funds', 'warn', 'Add up to 1 STX to keep paying artists');
-      case 'over': return set('Over 1 STX', 'warn', 'Return the excess to keep paying');
-      case 'loading': return set('Pay-per-play', 'quiet', 'Checking the listening wallet');
+      case 'fund': return s.depositPending ? set('Plays on their way', 'quiet', 'Plays start by themselves when they land')
+        : set(s.entries.some((e) => e.kind === 'play') ? 'No plays left · add plays' : 'Add plays', 'warn', 'Add plays to keep listening');
+      case 'over': return set('Too much in your player', 'warn', 'Return the extra to keep counting plays');
+      case 'loading': return set('Xtrata Music', 'quiet', 'Checking your player');
       case 'ready':
         return s.payingOn && left > 0
-          ? set(`On · ${left.toLocaleString()} plays left`, 'on', 'Paying artists as you listen')
-          : set('Paying off · switch on', 'off', 'Pay-per-play is switched off');
+          ? set(`${left.toLocaleString()} plays left`, 'on', 'Every play counts for the song’s owner')
+          : set('Plays off · switch on', 'off', 'Plays are switched off');
     }
   }
 
@@ -338,19 +372,19 @@ function start(root: HTMLElement) {
   const onair = document.getElementById('onair');
   nudge?.querySelector('button')?.addEventListener('click', () => go());
   const NOT_PAYING: Partial<Record<Snapshot['step'], string>> = {
-    elsewhere: 'Listening free · artists get nothing',
-    connect: 'Not paying artists',
-    intro: 'Not paying artists',
-    locked: 'Locked · not paying artists',
-    'wrong-wallet': 'Wrong wallet connected · not paying artists',
-    link: 'Not paying artists yet',
-    fund: 'No funds yet · artists unpaid',
-    over: 'Paused · artists unpaid',
-    ready: 'Paying is off · artists get nothing'
+    elsewhere: 'Plays are not counted here',
+    connect: 'Plays are not counted',
+    intro: 'Plays are not counted',
+    locked: 'Locked · plays are not counted',
+    'wrong-wallet': 'Wrong wallet connected · plays are not counted',
+    link: 'Plays are not counted yet',
+    fund: 'No plays yet',
+    over: 'Paused · plays are not counted',
+    ready: 'Plays are off'
   };
   const NUDGE_ACTION: Partial<Record<Snapshot['step'], string>> = {
-    elsewhere: 'Pay as I listen', connect: 'Connect', 'wrong-wallet': 'Switch wallet', intro: 'Set up', locked: 'Unlock',
-    link: 'Finish setup', fund: 'Top up', over: 'Fix it', ready: 'Switch on'
+    elsewhere: 'Open', connect: 'Connect', 'wrong-wallet': 'Switch wallet', intro: 'Start', locked: 'Unlock',
+    link: 'Finish setup', fund: 'Add plays', over: 'Fix it', ready: 'Switch on'
   };
   function renderMode(s: Snapshot) {
     if (s.step === 'loading') return; // keep the last look while it checks
@@ -364,15 +398,14 @@ function start(root: HTMLElement) {
     else delete document.documentElement.dataset.ppp;
     if (onair) {
       onair.hidden = !mode;
-      onair.querySelector('.onair-sub')!.textContent = paying ? `Paying artists · ${left.toLocaleString()} plays left` : 'Not paying';
+      onair.querySelector('.onair-sub')!.textContent = paying ? `${left.toLocaleString()} plays left` : 'Plays off';
     }
     if (nudge) {
       nudge.hidden = mode !== 'off';
       if (mode === 'off') {
-        const perStx = Math.floor(Number(1_000_000n / costPerPlay(BigInt(s.gate?.limits.playFee ?? '300'))));
-        nudge.querySelector('.nudge-t')!.textContent = '⚠ ' + warning;
-        nudge.querySelector('.nudge-s')!.textContent = `1 STX (less than $1) pays for ${perStx.toLocaleString()} plays, on-chain, straight to the artists.`;
-        nudge.querySelector('button')!.textContent = NUDGE_ACTION[s.step] ?? 'Start paying';
+        nudge.querySelector('.nudge-t')!.textContent = warning;
+        nudge.querySelector('.nudge-s')!.textContent = 'Every play you count goes to the song’s owner, on-chain.';
+        nudge.querySelector('button')!.textContent = NUDGE_ACTION[s.step] ?? 'Start';
       }
     }
   }
@@ -430,16 +463,23 @@ function start(root: HTMLElement) {
   /** Add plays to the open album from My player: one tap per amount, greyed out when My player cannot cover it. */
   function topUpAlbumRow(s: Snapshot, cls = ''): HTMLElement {
     const box = el('div', '', 'ppp-topup');
-    const mine = s.likeFunds?.balance;
+    const mine = myPlays(s);
     box.append(el('span', 'Add plays from My player: ', 'ppp-mute'));
-    for (const amount of TOP_UP_CHOICES) {
-      const b = button(`+${(Number(amount) / 1e6).toFixed(2)} STX`, () => void ppp.topUpAlbum(amount), cls) as HTMLButtonElement;
-      b.disabled = mine === undefined || mine < amount + 6_000n || s.depositPending || !!s.busy;
+    for (const plays of TOP_UP_PLAYS) {
+      const b = button(`+${plays.toLocaleString()}`, () => void ppp.topUpAlbum(plays), cls) as HTMLButtonElement;
+      b.disabled = mine === undefined || mine < plays || s.depositPending || !!s.busy;
       box.append(b);
     }
-    if (mine !== undefined && mine < TOP_UP_CHOICES[0] + 6_000n) box.append(el('p', 'My player is nearly empty: add STX to it first (switch to My player above).', 'ppp-mute'));
+    if (mine !== undefined && mine < TOP_UP_PLAYS[0]) box.append(el('p', 'My player needs plays first (switch to My player above).', 'ppp-mute'));
     return box;
   }
+  /** Plays My player (the first wallet) can move into an album: it keeps its reserve and the move's network fee. */
+  const myPlays = (s: Snapshot): number | undefined => {
+    const bal = s.likeFunds?.balance;
+    if (bal === undefined || !s.playCost) return undefined;
+    const room = bal - RESERVE - 6_000n;
+    return room > 0n ? Number(room / s.playCost) : 0;
+  };
 
   function likeFundsBanner(s: Snapshot): HTMLElement[] {
     const f = s.likeFunds;
@@ -465,7 +505,55 @@ function start(root: HTMLElement) {
     return [box];
   }
 
+  /**
+   * "Something is happening, just wait": a progress bar over the usual minute, then a calm moving bar. Never red,
+   * never a warning. The bar and its seconds are kept fresh by `tickArrival` without redrawing the panel.
+   */
+  const arrivalBar = (a: NonNullable<Snapshot['arrival']>): HTMLElement => {
+    const box = el('div', '', 'ppp-wait');
+    box.dataset.since = String(a.since);
+    box.dataset.grace = String(a.graceMs);
+    box.setAttribute('role', 'progressbar');
+    box.setAttribute('aria-label', 'Your plays are arriving');
+    const text = el('p', '', 'ppp-wait-t'), track = el('div', '', 'ppp-wait-track');
+    track.append(el('div', '', 'ppp-wait-fill'));
+    box.append(text, track);
+    paintArrival(box);
+    return box;
+  };
+  function paintArrival(box: HTMLElement) {
+    const since = Number(box.dataset.since), grace = Number(box.dataset.grace) || 60_000;
+    const elapsed = Math.max(0, Date.now() - since);
+    const fill = box.querySelector('.ppp-wait-fill') as HTMLElement, text = box.querySelector('.ppp-wait-t') as HTMLElement;
+    if (elapsed < grace) {
+      const left = Math.ceil((grace - elapsed) / 1000);
+      fill.style.width = Math.max(4, Math.min(95, (elapsed / grace) * 100)).toFixed(0) + '%';
+      text.textContent = `Your plays are arriving… usually about a minute · ${left}s`;
+      box.classList.remove('is-long');
+      box.setAttribute('aria-valuenow', String(Math.round((elapsed / grace) * 100)));
+    } else {
+      fill.style.width = '';
+      text.textContent = 'Still arriving… this can take a few minutes. Nothing for you to do: it starts by itself.';
+      box.classList.add('is-long');
+      box.removeAttribute('aria-valuenow');
+    }
+  }
+  // Keeps the countdown moving, and re-reads the state now and then so the wait ends by itself once the plays land.
+  let arrivalTicks = 0;
+  setInterval(() => {
+    const bars = document.querySelectorAll<HTMLElement>('.ppp-wait');
+    if (!bars.length) { arrivalTicks = 0; return; }
+    bars.forEach(paintArrival);
+    if (++arrivalTicks % 10 === 0) render(ppp.snapshot());
+  }, 1000);
+
   function render(raw: Snapshot) {
+    // "Continue listening" unlocked the same passkey: go back into the album it had open. Another passkey: stay put.
+    if (resumeAlbum && ['ready', 'fund', 'over'].includes(raw.step) && !raw.busy) {
+      const back = resumeAlbum;
+      resumeAlbum = null;
+      if (raw.root === back.root && raw.slot !== back.slot) void ppp.openAlbum(back.slot);
+    }
     // A gift being claimed or sent to this wallet is money on its way: the panel and the radio say "on its way",
     // never "no funds · artists unpaid" (which reads as if something went wrong). The gift code sees the real state.
     const giftWait = gifts.inProgress(raw);
@@ -473,6 +561,9 @@ function start(root: HTMLElement) {
     syncIdentity(s);
     syncGift(raw);
     syncHeader(s);
+    // The gift banner can start the claim while it draws, and the claim redraws everything as "on its way". Stop here
+    // rather than paint this older, not-yet-waiting picture over it.
+    if (!giftWait && gifts.inProgress(raw)) return;
     renderTop(s);
     renderMode(s);
     root.hidden = s.step === 'off';
@@ -597,7 +688,7 @@ function start(root: HTMLElement) {
         key.push(el('p', 'Needs a passkey this browser cannot make. Try Chrome or Safari.', 'ppp-warn'));
         break;
       case 'intro':
-        key.push(el('p', `Pay artists ${stx(cost)} STX a song as you listen.`));
+        key.push(el('p', 'Every play counts for the song’s owner, on-chain.'));
         lines.push(el('p', payLine));
         lines.push(el('p', 'Once it has funds, every song you listen to for 30 seconds pays automatically until you switch it off or the wallet runs out. No popups while you listen.', 'ppp-ok'));
         lines.push(el('p', s.solo
@@ -614,7 +705,7 @@ function start(root: HTMLElement) {
         // A live gift link is for a brand-new wallet, so claiming it leads. Someone who already has a listening
         // wallet (e.g. synced from another device) can still unlock it, or put the gift aside for now.
         const gift = gifts.liveGift();
-        actions.push(button(gift ? 'Claim my gift · no wallet needed' : s.solo ? 'Turn on pay-per-play · no wallet needed' : s.others.length && s.main ? `Set up for ${who(s.main)}` : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
+        actions.push(button(gift ? 'Claim my gift · no wallet needed' : s.solo ? 'Start listening · no wallet needed' : s.others.length && s.main ? `Set up for ${who(s.main)}` : 'Start listening', () => void ppp.create(), 'primary'));
         if (!gift && !s.solo && s.main && s.others.length) actions.push(button('Switch wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
         if (!gift && s.solo) actions.push(button('I have a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
         actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
@@ -626,7 +717,7 @@ function start(root: HTMLElement) {
           // The unlock is waiting in the wallet box right below: nothing to read.
         } else {
           key.push(el('p', 'Locked.', 'ppp-mute'));
-          actions.push(button(s.payingOn ? 'Unlock and keep paying' : 'Unlock', () => void ppp.unlock(), 'primary'));
+          actions.push(button('Unlock', () => void ppp.unlock(), 'primary'));
         }
         more.push(button('Use a different listening wallet', () => void ppp.unlock(true), 'quiet'));
         break;
@@ -640,10 +731,10 @@ function start(root: HTMLElement) {
         key.push(el('p', 'Checking the listening wallet balance…', 'ppp-mute'));
         break;
       case 'fund': {
-        if (s.depositPending) { /* the "on their way" line below says it all */ }
+        if (s.depositPending) { if (s.arrival) key.push(arrivalBar(s.arrival)); /* the "on their way" line below says the rest */ }
         else if (s.gift?.player) key.push(el('p', 'Out of plays · add more to keep listening', 'ppp-bad'));
-        else if (s.entries.length) key.push(el('p', 'Out of funds · top up to keep paying', 'ppp-bad'));
-        else key.push(el('p', `Add funds · 1 STX ≈ ${Math.floor(Number(1_000_000n / cost)).toLocaleString()} songs`));
+        else if (s.entries.length) key.push(el('p', 'No plays left · add plays to keep counting', 'ppp-bad'));
+        else key.push(el('p', `Add plays · 1 STX ≈ ${Math.floor(Number(1_000_000n / cost)).toLocaleString()} plays`));
         if (s.gift?.player) lines.push(el('p', 'This player has no free mode: it carries on by itself once the plays arrive.'));
         else if (s.entries.length) lines.push(el('p', 'Songs play free until you top up. Paying carries on by itself once the top-up confirms.'));
         if (s.payingOn && !s.entries.length) lines.push(el('p', 'Paying is switched on. Once funds arrive it starts with the next song you listen to for 30 seconds.', 'ppp-ok'));
@@ -670,16 +761,16 @@ function start(root: HTMLElement) {
         if (s.payingOn && s.session && s.session.playsLeft > 0) {
           // Whichever runs out first: the approval or the balance. A new approval brings the same figures back.
           const left = Math.min(s.session.playsLeft, s.playsLeft);
-          key.push(el('p', `Paying as you listen · up to ${left.toLocaleString()} plays left`, 'ppp-ok'));
+          key.push(el('p', `${left.toLocaleString()} plays left`, 'ppp-ok'));
           lines.push(el('p', 'Each song pays its holder once you have heard 30 seconds of it. Skips stay free. The heart likes or unlikes from this wallet for 0.0002 STX.'));
           actions.push(button('Switch off', () => void ppp.switchOff()));
         } else {
-          key.push(el('p', 'Paying is off. Music stays free.', 'ppp-mute'));
-          actions.push(button('Switch on paying as I listen', () => void ppp.switchOn(), 'primary'));
+          key.push(el('p', 'Plays are off. Music stays free.', 'ppp-mute'));
+          actions.push(button('Switch plays on', () => void ppp.switchOn(), 'primary'));
         }
         if (s.queued) key.push(el('p', s.queued === 1 ? '1 song waiting to be paid · sends as soon as the last transaction confirms' : `${s.queued} songs waiting to be paid · sent one at a time as each transaction confirms`, 'ppp-warn'));
-        if (s.balanceState === 'low') key.push(el('p', 'Running low · top up', 'ppp-warn'));
-        if (s.depositPending) key.push(el('p', 'Top-up on its way…', 'ppp-warn'));
+        if (s.balanceState === 'low') key.push(el('p', 'Running low on plays', 'ppp-warn'));
+        if (s.depositPending) key.push(el('p', 'Plays on their way…', 'ppp-warn'));
         else if (s.allowance > 0n && s.balanceState !== 'ok' && !s.solo) actions.push(button(`Top up ${stx(s.allowance)} STX`, () => void ppp.deposit()));
         break;
     }
@@ -762,11 +853,18 @@ function start(root: HTMLElement) {
       box.append(button(plan.steps.length > 1 ? `Confirm part 1 of ${plan.steps.length}` : 'Confirm and return', () => void ppp.returnFunds('all'), 'primary'));
       key.push(box);
     }
-    // A gift link in play goes first: it is why this visitor is here.
-    key.unshift(...gifts.banner(raw));
-    key.unshift(...likeFundsBanner(s));
-    // Inside an app's own browser (Instagram, X, ...) passkeys often fail: before anything else, offer the real one.
-    if (inApp && (gifts.pendingCode() || ['intro', 'locked', 'unsupported'].includes(s.step))) key.unshift(...openElsewhere(inApp, gifts.pendingCode()));
+    // Album First: a listener with an album (arriving by link, open, or the one this device had open) sees the album
+    // view; this panel stays underneath, reached from its "More" and "My music" sheets.
+    const album = albumState(s);
+    // A gift link in play goes first: it is why this visitor is here. In the album view only its progress shows.
+    const giftLines = gifts.banner(raw, { bare: !!album });
+    const elsewhereLines = inApp && (gifts.pendingCode() || ['intro', 'locked', 'unsupported'].includes(s.step)) ? openElsewhere(inApp, gifts.pendingCode()) : [];
+    if (!album) {
+      key.unshift(...giftLines);
+      key.unshift(...likeFundsBanner(s));
+      // Inside an app's own browser (Instagram, X, ...) passkeys often fail: before anything else, offer the real one.
+      key.unshift(...elsewhereLines);
+    }
     // A passkey synced to this device opened someone's existing wallet: say whose, first.
     if (s.solo && s.creditedTo && s.listening && !['intro', 'off', 'elsewhere', 'loading'].includes(s.step))
       key.unshift(el('p', `This is ${who(s.creditedTo)}'s listening wallet. Plays and likes count for ${who(s.creditedTo)}. Connect it (top right) to see its likes here too.`, 'ppp-ok'));
@@ -783,7 +881,7 @@ function start(root: HTMLElement) {
         const tab = (title: string, bal: bigint | undefined, active: boolean, run: () => void) => {
           const b = button('', run, 'ppp-tab') as HTMLButtonElement;
           b.setAttribute('aria-pressed', String(active));
-          b.append(el('span', title, 'tt'), el('span', bal === undefined ? '…' : `${stxShort(bal)} STX`, 'ts'));
+          b.append(el('span', title, 'tt'), el('span', bal === undefined ? '…' : `${playsOf(bal).toLocaleString()} plays`, 'ts'));
           b.disabled = !!s.busy;
           return b;
         };
@@ -852,6 +950,56 @@ function start(root: HTMLElement) {
       if (e.txid) row.append(link('tx ↗', explorer(e.txid)));
       return row;
     }));
+    albumView?.render(album ? albumInput(s, album, [...elsewhereLines, ...giftLines]) : null);
+  }
+
+  type AlbumState = { mode: 'arrive' | 'locked' | 'open'; player: PlayerView; from?: string | null; offered?: number };
+  /** Which album view, if any: the open album wallet, a gift link with an album, or the album this device had open. */
+  function albumState(s: Snapshot): AlbumState | null {
+    if (['off', 'elsewhere', 'not-invited'].includes(s.step)) return null;
+    if (s.slot > 0 && s.gift?.player && ['fund', 'ready', 'over', 'link', 'loading'].includes(s.step)) {
+      if (s.root) saveLastAlbum({ root: s.root, slot: s.slot, player: s.gift.player });
+      return { mode: 'open', player: s.gift.player };
+    }
+    const incoming = gifts.incomingAlbum();
+    if (incoming) return { mode: 'arrive', player: incoming.player, from: incoming.from, offered: incoming.plays };
+    const last = readLastAlbum();
+    if (last && (s.step === 'locked' || (resumeAlbum && s.step === 'loading'))) return { mode: 'locked', player: last.player };
+    return null;
+  }
+
+  function albumInput(s: Snapshot, a: AlbumState, lines: HTMLElement[]): AlbumInput {
+    const asking = !!s.busy || s.armed;
+    const status: HTMLElement[] = [...lines];
+    // Plays on their way: a countdown that says "just wait", calm amber, never an error.
+    if (s.depositPending && s.arrival) status.push(arrivalBar(s.arrival));
+    if (s.error) status.push(el('p', s.error, 'ppp-bad'));
+    else if (s.message && !asking) status.push(el('p', s.message, 'ppp-cyan'));
+    else if (s.notice) status.push(el('p', s.notice, 'ppp-warn'));
+    if (a.mode === 'open' && s.likeFunds?.album && s.likeFunds.low && !s.likeFunds.pending)
+      status.push(el('p', 'Likes are paused: My player needs a few plays to sign them.', 'ppp-warn'));
+    const hint = 'Kept on this device with Face ID or your passkey. No app or account needed.';
+    let primary: AlbumInput['primary'] = null, secondary: AlbumInput['secondary'] = null;
+    if (a.mode === 'locked') {
+      primary = { label: 'Continue listening', run: () => { resumeAlbum = readLastAlbum(); void ppp.unlock(); } };
+      secondary = { label: 'Use a different passkey', run: () => { resumeAlbum = null; void ppp.unlock(true); } };
+    } else if (a.mode === 'arrive') {
+      if (s.step === 'intro') {
+        primary = { label: 'Open album', run: () => void ppp.create() };
+        secondary = { label: "I've used Xtrata Music here before", run: () => void ppp.unlock(true) };
+      } else if (s.step === 'locked') {
+        primary = { label: 'Open album', run: () => void ppp.unlock() };
+        secondary = { label: 'Use a different passkey', run: () => void ppp.unlock(true) };
+      } else if (s.step === 'unsupported') status.push(el('p', 'This browser cannot keep albums. Open the link in Safari or Chrome.', 'ppp-warn'));
+      else if (!status.length) status.push(el('p', 'Opening your album…', 'ppp-cyan'));
+    }
+    return {
+      mode: a.mode, player: a.player, from: a.from, offered: a.offered,
+      plays: a.mode === 'open' ? (s.balance === undefined ? null : s.giftPlays) : undefined,
+      playsComing: s.depositPending,
+      status, primary, secondary, hint: primary ? hint : undefined,
+      asking, busy: !!s.busy, myPlays: myPlays(s), topUps: TOP_UP_PLAYS
+    };
   }
 
   // Song titles and artists from the radio itself, for history and messages.
