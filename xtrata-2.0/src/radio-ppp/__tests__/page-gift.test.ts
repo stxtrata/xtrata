@@ -210,7 +210,7 @@ describe('My albums (the shelf)', () => {
     await start({ slot: 2, balance: 107_300n, gift: { player: { ...PLAYER, title: 'Night Drive' }, from: null, source: 'campaign', amount: '100000' }, likeFunds: { address: ROOT, balance: 199_250n, low: false, album: true, pending: false } });
     const sw = document.querySelector('.ppp-switch')!;
     expect(sw.hasAttribute('hidden')).toBe(false);
-    const tabs = [...sw.querySelectorAll('button')];
+    const tabs = [...sw.querySelectorAll('button.ppp-tab')];
     expect(tabs.map((t) => t.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
     expect(text(tabs[0])).toContain('My player');
     expect(text(tabs[0])).toContain('560 plays'); // (0.19925 STX − the reserve) at 350 µSTX a play
@@ -229,11 +229,36 @@ describe('My albums (the shelf)', () => {
     await vi.waitFor(() => expect(root.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(false));
     h.changed();
     const sw = document.querySelector('.ppp-switch')!;
-    const tabs = [...sw.querySelectorAll('button')];
+    const tabs = [...sw.querySelectorAll('button.ppp-tab')];
     expect(tabs.map((t) => t.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
     expect(text(tabs[1])).toContain('Zero Hour');
     (tabs[1] as HTMLButtonElement).click();
     expect(h.openAlbum).toHaveBeenCalledWith(3);
+  });
+
+  it('"View all albums" opens the My albums fold', async () => {
+    localStorage.clear();
+    h.route = (url) => (url.includes('/radio/gift/shelf') ? new Response(JSON.stringify({ total: 3, next: null, shelf })) : undefined);
+    const root = await open({ ...own });
+    await vi.waitFor(() => expect(root.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(false));
+    h.changed();
+    const link = document.querySelector('.ppp-switch .ppp-all-albums') as HTMLButtonElement;
+    expect(text(link)).toBe('View all albums (3)');
+    expect((root.querySelector('.ppp-shelf') as HTMLDetailsElement).open).toBe(false);
+    link.click();
+    expect((root.querySelector('.ppp-shelf') as HTMLDetailsElement).open).toBe(true);
+  });
+
+  it('a new album wallet on a device that has already played is not "setup": no steps, no SETUP badge', async () => {
+    localStorage.clear();
+    const first = { slot: 2, step: 'ready', balance: 107_300n, entries: [], gift: { player: PLAYER, from: null, source: 'campaign', amount: '100000' } };
+    h.route = (url) => (url.includes('/radio/gift/shelf') ? new Response(JSON.stringify({ total: 1, next: null, shelf: [shelf[0]] })) : undefined);
+    await open({ ...own, ...first, likeFunds: { address: ROOT, balance: 0n, low: false, album: true, pending: false } });
+    expect(document.querySelector('.ppp-steps')!.hasAttribute('hidden')).toBe(false); // a brand-new listener with one album: the steps help
+    await start({ ...first, likeFunds: { address: ROOT, balance: 199_250n, low: false, album: true, pending: false } });
+    expect(document.querySelector('.ppp-steps')!.hasAttribute('hidden')).toBe(true); // My player has plays: this is not first-time setup
+    expect(document.querySelector('.ppp-badge')!.hasAttribute('hidden')).toBe(true);
+    expect(text(document.querySelector('.ppp-stage')!)).not.toContain('Step 4 of 4');
   });
 
   it('an album running low offers to add plays from My player, greyed out when My player cannot cover it', async () => {
