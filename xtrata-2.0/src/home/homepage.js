@@ -14,6 +14,7 @@ import {
 } from './homepage-content.js';
 import { pickSwap as pickWallSwap, pickWall } from './wall-rotation.js';
 import { initMusicSupporters, stopMusicSupporters } from './music-supporters.js';
+import { initAudionautBanner, stopAudionautBanner } from './audionaut-banner.js';
 import { initArcadeChampion, stopArcadeChampion } from './arcade-champion.js';
 
 const HOME_ACTION_EVENT = 'xtrata:homepage-action';
@@ -1091,10 +1092,12 @@ export const initHomepage = () => {
     // issuing requests and polluting that page's browser diagnostics.
     clearHomepage();
     stopMusicSupporters();
+    stopAudionautBanner();
     stopArcadeChampion();
     return;
   }
   initMusicSupporters();
+  initAudionautBanner();
   initArcadeChampion();
   renderStrip();
   renderWall();

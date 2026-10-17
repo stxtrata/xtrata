@@ -9015,3 +9015,35 @@
       .hp-s2 .hp-tap { top: 176px; left: 84px; }
     }
 
+
+    /* The Audionaut banner: black stage, wordmark revealed by animation 35. */
+    .aud-banner {
+      display: grid;
+      justify-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 26px 24px 16px;
+      border: 1px solid var(--home-line);
+      border-radius: 14px;
+      background: #000;
+      color: #fff;
+      text-decoration: none;
+    }
+    .aud-banner:hover { border-color: rgba(255, 255, 255, 0.4); }
+    .aud-banner:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+    .aud-banner svg { display: block; width: min(100%, 960px); height: auto; overflow: visible; }
+    .aud-banner__sub {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px 18px;
+      font: 500 11px var(--home-mono);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--home-muted);
+    }
+    .aud-banner__sub b { color: #fff; font-weight: 700; }
+    @media (max-width: 640px) {
+      .aud-banner { padding: 18px 14px 12px; }
+      .aud-banner__sub span { display: none; }
+    }
