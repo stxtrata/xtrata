@@ -191,7 +191,7 @@ export function createGifts(deps: GiftDeps) {
         const said = String(r?.error || '');
         // Forgotten only when it can never work for this visitor: unknown, used up or expired, or a
         // wallet that is not new. "Not paid for yet" or "being sent" can still change.
-        const permanent = res.status === 404 || res.status === 410 || (res.status === 409 && /already had a gift|brand-new/.test(said));
+        const permanent = res.status === 404 || res.status === 410 || (res.status === 409 && /already had a gift|brand-new|already have this album/.test(said));
         if (permanent) { deps.store.set(INCOMING_KEY, null); throw new Error(said || 'This gift cannot be opened.'); }
         // Real stops that do not fix themselves while the page is open: say so plainly, without alarm.
         if (res.status === 429 || res.status === 403 || (res.status === 400 && !/wallet number/i.test(said))) throw new Error(said || `Could not open the gift (${res.status}).`);

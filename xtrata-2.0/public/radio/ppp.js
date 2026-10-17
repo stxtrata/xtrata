@@ -13000,7 +13000,7 @@ function s$(t) {
       }
       if (!ue.ok) {
         const h = String((ge == null ? void 0 : ge.error) || "");
-        if (ue.status === 404 || ue.status === 410 || ue.status === 409 && /already had a gift|brand-new/.test(h))
+        if (ue.status === 404 || ue.status === 410 || ue.status === 409 && /already had a gift|brand-new|already have this album/.test(h))
           throw t.store.set(ms, null), new Error(h || "This gift cannot be opened.");
         if (ue.status === 429 || ue.status === 403 || ue.status === 400 && !/wallet number/i.test(h)) throw new Error(h || `Could not open the gift (${ue.status}).`);
         const f = /topping up/.test(h) ? "Your gift is waiting for the gift fund to be topped up. It arrives by itself once it is: you can leave this page open." : /not paid for yet/.test(h) ? "Your gift is waiting for its sender’s payment to confirm. It arrives by itself once it does." : /being sent to another wallet/.test(h) ? "Your gift is busy for a moment. Checking again…" : "Still sending your gift… the network is slow, trying again.";

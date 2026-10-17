@@ -608,8 +608,8 @@ describe('radio gift players', () => {
   });
   describe('albums in numbered wallets (one passkey, many wallets)', () => {
     const PRF = Uint8Array.from({ length: 32 }, (_, i) => i + 7);
-    const passkey = async () => {
-      const base = await listeningBase(PRF);
+    const passkey = async (prf = PRF) => {
+      const base = await listeningBase(prf);
       const root = await deriveSlotIdentity(base, 0);
       const proof = async (slot: number, issued: number, over: Partial<{ root: string; address: string; signer: string }> = {}) => {
         const id = await deriveSlotIdentity(base, slot);
@@ -627,7 +627,10 @@ describe('radio gift players', () => {
       claimGift(s.env, { code, wallet: p.id.address, binding: p.binding }, s.deps(), null, s.request);
 
     it('an album goes into the next numbered wallet with a binding signed by both keys, and the shelf lists it', async () => {
-      const s = setup(); const codes = await album(s, 3);
+      const s = setup(); const first = await album(s, 1);
+      // a second, different album (other songs, other title) for the same passkey
+      const second = await make(s, definition({ title: 'Second Album', tracks: SONGS.slice(0, 3) }));
+      const codes = [first[0], (await s.campaign(1, '100000', { player: second.id, label: 'Gift Edition' })).codes[0]];
       const { root, proof } = await passkey();
       expect(await nextSlot(s.env, root.address)).toEqual({ next: 1 });
       const a = await proof(1, s.now());
@@ -643,12 +646,30 @@ describe('radio gift players', () => {
       expect(page).toMatchObject({ total: 2, next: null });
       expect(page.shelf.map((x) => [x.slot, x.address, x.state])).toEqual([[1, a.id.address, 'arrived'], [2, b.id.address, 'arrived']]);
       expect(page.shelf[0].player).toMatchObject({ title: 'Proof of Sound' });
+      expect(page.shelf[1].player).toMatchObject({ title: 'Second Album' });
       // each numbered wallet is its own gift record, and the binding is stored for credit
-      expect((await giftForWallet(s.env, b.id.address)).gift).toMatchObject({ player: { title: 'Proof of Sound' } });
+      expect((await giftForWallet(s.env, b.id.address)).gift).toMatchObject({ player: { title: 'Second Album' } });
       expect(s.db.sql.prepare('SELECT address, root, slot FROM radio_listening_slots ORDER BY slot').all()).toEqual([
         { address: a.id.address, root: root.address, slot: 1 }, { address: b.id.address, root: root.address, slot: 2 }]);
       // repeating the same claim is the same gift, not another
       expect(await claimInto(s, codes[0], a)).toMatchObject({ already: true });
+    });
+
+    it('one copy of an album per passkey: a second link for the same album is refused and stays unspent; another passkey can have it', async () => {
+      const s = setup(); const codes = await album(s, 3);
+      const { root, proof } = await passkey();
+      await claimInto(s, codes[0], await proof(1, s.now()));
+      await s.land();
+      s.tick(1_000);
+      const sent = s.chain.sent.length;
+      await expect(claimInto(s, codes[1], await proof(2, s.now()))).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/already have this album/) });
+      expect(s.chain.sent).toHaveLength(sent); // nothing was sent
+      expect((await shelfFor(s.env, root.address)).total).toBe(1);
+      // the refused link is still live: a different passkey can open it
+      const other = await passkey(Uint8Array.from({ length: 32 }, (_, i) => 90 + i));
+      await expect(claimInto(s, codes[1], await other.proof(1, s.now()))).resolves.toMatchObject({ already: false });
+      // the same songs under the same title count as the same album even when they are a separate definition
+      expect(sent).toBeGreaterThan(0);
     });
 
     it('pages the shelf for a large collection', async () => {
@@ -1075,10 +1096,10 @@ describe('radio gift players', () => {
       await runSweep(s.env, s.deps());
       expect((await batchStatus(s.env, made.id)).status).toBe('live'); // found by the sweep, no page open
       // 3. two listeners claim album copies into numbered wallets; the creator is their payer
-      const { root, proof } = await passkey();
+      const listeners = [await passkey(), await passkey(Uint8Array.from({ length: 32 }, (_, i) => 150 + i))]; // one album per passkey
       const spent: bigint[] = [];
       for (const slot of [1, 2]) {
-        const p = await proof(slot, s.now());
+        const p = await listeners[slot - 1].proof(1, s.now());
         await claimInto(s, made.codes[slot - 1], p);
         const d = decode(s.chain.sent.at(-1)!.raw);
         expect(d).toMatchObject({ recipient: p.id.address, amount: AMOUNT });
@@ -1087,7 +1108,7 @@ describe('radio gift players', () => {
         expect((await giftForWallet(s.env, p.id.address)).gift).toMatchObject({ returnTo: s.admin, from: s.admin, player: { title: 'Proof of Sound' } });
         s.tick(1000);
       }
-      expect((await shelfFor(s.env, root.address)).shelf.map((x) => x.slot)).toEqual([1, 2]);
+      for (const l of listeners) expect((await shelfFor(s.env, l.root.address)).shelf.map((x) => x.slot)).toEqual([1]);
       // 4. a claimed copy cannot be claimed again, and a wallet that already had a gift cannot take another
       await expect(s.claim(made.codes[0])).rejects.toMatchObject({ status: 410 });
       // 5. thirty days pass; the sweep alone returns the three unclaimed copies in ONE transfer to the creator
