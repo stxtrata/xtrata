@@ -14,7 +14,7 @@ const CENTER = 700;
 // Animation 35 timing. SPEED is the study's playback-speed setting (1 = as designed).
 const DURATION_MS = 3900;
 const STAGGER_MS = 260;
-const SPEED = 0.6;
+const SPEED = 0.18;
 const EASING = 'cubic-bezier(.22,1,.36,1)';
 
 const el = (tag, attrs, parent) => {
