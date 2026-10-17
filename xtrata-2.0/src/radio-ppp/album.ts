@@ -63,6 +63,7 @@ const ICON = {
   gift: svg('<rect x="3.5" y="9" width="17" height="11" rx="1.5"/><path d="M3.5 13h17M12 9v11M12 9c-1.5-3-5-3.5-5-1.2C7 9 9.5 9 12 9zM12 9c1.5-3 5-3.5 5-1.2C17 9 14.5 9 12 9z"/>', 18),
   radio: svg('<rect x="3" y="9" width="18" height="11" rx="2"/><path d="M7 9l10-5"/><circle cx="15.5" cy="14.5" r="2.5"/><path d="M6 13h4M6 16h4"/>', 18),
   device: svg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>', 18),
+  flip: svg('<path d="M7 7h11l-3-3M17 17H6l3 3"/>', 16),
   info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 12h1v5h1"/>', 18)
 };
 
@@ -121,6 +122,136 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
     return '';
   }
 
+  // ---------------------------------------------------------------- song thumbnails
+  // A song's artwork lives inside its own inscription (the audio too, so a song can be megabytes). The list therefore
+  // learns the artwork one song at a time, in the background, after the page has settled, never in parallel with
+  // itself. What is found is shrunk to a small square and remembered on this device, so the next visit costs nothing.
+  // The song that is playing hands over its artwork for free (the radio has it already).
+  const THUMB_KEY = 'xtrata:al-thumb:v1:';
+  const NONE = '-';
+  const THUMB_PX = 96;
+  const MAX_SCAN = 24 * 1024 * 1024;
+  const thumbs = new Map<string, string>(); // song id -> small image url; '' = this song has no artwork of its own
+  const tried = new Set<string>();
+  const queue: string[] = [];
+  let pumping = false;
+  let kick: ReturnType<typeof setTimeout> | undefined;
+
+  const store = (key: string, value?: string) => {
+    try { if (value === undefined) return window.localStorage.getItem(THUMB_KEY + key); window.localStorage.setItem(THUMB_KEY + key, value); } catch { /* storage blocked: memory only */ }
+    return null;
+  };
+
+  /** A square, small copy of an image; the original url when the browser cannot draw it (never worse than before). */
+  function shrink(url: string): Promise<string> {
+    return new Promise((resolve) => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext?.('2d');
+        if (!ctx) return resolve(url);
+        const img = new Image();
+        const timer = setTimeout(() => resolve(url), 8000);
+        img.onload = () => {
+          clearTimeout(timer);
+          try {
+            const side = Math.min(img.naturalWidth, img.naturalHeight);
+            if (!side) return resolve(url);
+            canvas.width = canvas.height = THUMB_PX;
+            ctx.fillStyle = '#143a40';
+            ctx.fillRect(0, 0, THUMB_PX, THUMB_PX);
+            ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, THUMB_PX, THUMB_PX);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          } catch { resolve(url); }
+        };
+        img.onerror = () => { clearTimeout(timer); resolve(url); };
+        img.src = url;
+      } catch { resolve(url); }
+    });
+  }
+
+  /**
+   * Reads a song's inscription as a stream and stops at the first image it embeds or links to. The page is scanned
+   * piece by piece and what has been looked at is dropped, so a long song never sits in memory.
+   * Returns the image url, '' (read to the end: no artwork) or null (could not tell: try again some other time).
+   */
+  async function findArt(id: string): Promise<string | null> {
+    const res = await fetch('/inscription/' + id, { signal: AbortSignal.timeout(60_000) });
+    const type = (res.headers.get('content-type') || '').toLowerCase();
+    if (!res.ok) { await res.body?.cancel(); return null; }
+    if (type.startsWith('image/')) { await res.body?.cancel(); return '/inscription/' + id; }
+    if (!type.includes('text/html')) { await res.body?.cancel(); return ''; }
+    let buf = '';
+    let seen = 0;
+    const look = (final: boolean): string | null => {
+      let from = 0;
+      for (;;) {
+        const rel = buf.slice(from).search(/<img\b/i);
+        if (rel < 0) { buf = final ? '' : buf.slice(Math.max(0, buf.length - 4)); return null; } // keep a few characters: a tag may be split
+        const open = from + rel;
+        const close = buf.indexOf('>', open);
+        if (close < 0) { buf = buf.slice(open); return null; }
+        const tag = buf.slice(open, close + 1);
+        const data = tag.match(/\bsrc="(data:image\/[^"]+)"/i);
+        if (data) return data[1].replace(/&amp;/g, '&');
+        const linked = tag.match(/\bsrc=["'](?:https?:\/\/(?:radio\.)?xtrata\.xyz)?\/inscription\/(\d{1,9})["']/i);
+        if (linked) return '/inscription/' + linked[1];
+        from = close + 1;
+      }
+    };
+    const reader = res.body?.getReader?.();
+    if (!reader) { buf = await res.text(); return look(true) ?? ''; }
+    const decoder = new TextDecoder();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      seen += value.byteLength;
+      buf += decoder.decode(value, { stream: true });
+      const found = look(false);
+      if (found) { await reader.cancel(); return found; }
+      if (seen > MAX_SCAN) { await reader.cancel(); return null; }
+    }
+    buf += decoder.decode();
+    return look(true) ?? '';
+  }
+
+  async function pump() {
+    if (pumping) return;
+    pumping = true;
+    try {
+      while (queue.length) {
+        const id = queue.shift()!;
+        if (thumbs.has(id)) continue;
+        try {
+          const art = await findArt(id);
+          if (art === null) continue; // could not tell: leave it be for this visit
+          if (!art) { thumbs.set(id, ''); store(id, NONE); paint(); continue; }
+          const small = await shrink(art);
+          thumbs.set(id, small);
+          if (small.startsWith('data:image/jpeg')) store(id, small);
+          paint();
+        } catch { /* a hiccup: it is asked again on the next visit */ }
+      }
+    } finally { pumping = false; }
+  }
+
+  /** The song's own small artwork, or '' (none known yet, or none exists). Asks for it later when not known. */
+  function thumb(id: string, known?: string): string {
+    // `known`: what the radio found for the song it is playing ('' = it has none): no need to fetch the song for that
+    if (known && !thumbs.get(id)) {
+      thumbs.set(id, known);
+      void shrink(known).then((small) => { if (small !== known) { thumbs.set(id, small); if (small.startsWith('data:image/jpeg')) store(id, small); paint(); } });
+    } else if (known === '' && !thumbs.has(id)) thumbs.set(id, '');
+    if (thumbs.has(id)) return thumbs.get(id)!;
+    const kept = store(id);
+    if (kept !== null && kept !== undefined) { const url = kept === NONE ? '' : kept; thumbs.set(id, url); return url; }
+    if (!tried.has(id)) {
+      tried.add(id);
+      queue.push(id);
+      if (!kick) kick = setTimeout(() => { kick = undefined; void pump(); }, 1200);
+    }
+    return '';
+  }
+
   // ---------------------------------------------------------------- sheets
   function setSheet(next: AlbumSheet) {
     sheet = next;
@@ -166,10 +297,21 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
   }, 500);
 
   // ---------------------------------------------------------------- pieces
-  function coverBox(p: PlayerView, big: boolean) {
-    const url = cover(p.cover);
-    return h('div', { class: 'al-cover' + (big ? '' : ' al-cover--small') },
-      url ? h('img', { src: url, alt: `${p.title} cover` }) : h('div', { class: 'al-cover-fallback' }, h('b', {}, p.title), p.subtitle ? h('span', {}, p.subtitle) : null));
+  // The big tile follows the song that is current, not whether it is playing: pausing changes nothing about the art,
+  // only dims it and says "Paused". Before anything has played it is the album's cover. A tap swaps a song's artwork
+  // for the album's cover and back; moving to another song puts the artwork back.
+  let startedFor = '';         // the album id once something of it has played (or been resumed part-way)
+  let albumFace: string | null = null; // the song id whose tile the listener flipped to the album cover
+
+  /** The album's cover until a song with artwork of its own plays; then that song's. */
+  function coverBox(p: PlayerView, big: boolean, o: { song?: string; paused?: boolean; flip?: () => void; flipped?: boolean } = {}) {
+    const url = o.song || cover(p.cover);
+    const face = url ? h('img', { src: url, alt: o.song ? 'Song artwork' : `${p.title} cover` }) : h('div', { class: 'al-cover-fallback' }, h('b', {}, p.title), p.subtitle ? h('span', {}, p.subtitle) : null);
+    const kids: Kids = [face, o.paused ? h('span', { class: 'al-paused' }, h('i', { html: ICON.pause.replace(/width="\d+" height="\d+"/, 'width="14" height="14"') }), 'Paused') : null];
+    const cls = 'al-cover' + (big ? '' : ' al-cover--small') + (o.paused ? ' is-paused' : '');
+    if (!o.flip) return h('div', { class: cls }, ...kids);
+    kids.push(h('span', { class: 'al-flip', 'aria-hidden': 'true', html: ICON.flip }));
+    return btn({ class: cls + ' is-flippable', 'aria-label': o.flipped ? 'Show this song’s artwork' : `Show the ${p.title} cover`, onClick: o.flip }, ...kids);
   }
 
   function playsChip(i: AlbumInput) {
@@ -210,7 +352,14 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
     const waiting = !!i.playsComing && !i.plays;
     const playing = !!st?.playing && !!current;
     const heart = st?.heart;
-    const nodes: Node[] = [coverBox(p, !out)];
+    const pos = current ? r?.getPosition?.() : null;
+    if (current && (playing || (pos?.current ?? 0) > 0.5)) startedFor = p.id;
+    const started = !!current && startedFor === p.id;
+    if (albumFace && albumFace !== current) albumFace = null;
+    const own = started ? String(np?.cover || '') : '';
+    const flipped = !!own && albumFace === current;
+    const toggle = own ? () => { albumFace = albumFace === current ? null : current; paint(); } : undefined;
+    const nodes: Node[] = [coverBox(p, !out, { song: flipped ? '' : own, paused: started && !playing, flip: toggle, flipped })];
 
     nodes.push(h('div', { class: 'al-now' },
       h('div', { class: 'al-now-t' },
@@ -219,8 +368,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
       current ? btn({ class: 'al-icon' + (heart?.liked ? ' is-on' : ''), 'aria-label': heart?.liked ? 'Unlike this song' : 'Like this song', 'aria-pressed': String(!!heart?.liked), disabled: !!heart?.pending || !!heart?.locked || waiting, onClick: () => r?.toggleLike?.(), html: heart?.liked ? ICON.heartOn : ICON.heart }) : null));
 
     if (!out) {
-      const pos = current ? r?.getPosition?.() : null;
-      const at = pos?.duration ? Math.min(100, (pos.current / pos.duration) * 100) : 0;
+      const at =pos?.duration ? Math.min(100, (pos.current / pos.duration) * 100) : 0;
       nodes.push(h('div', { class: 'al-prog' }, h('div', { class: 'al-bar' }, h('i', { style: `width: ${at}%` })),
         h('div', { class: 'al-times' }, h('span', {}, time(pos?.current || 0)), h('span', {}, pos?.duration ? time(pos.duration) : '–:––'))));
     } else {
@@ -237,12 +385,23 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
     if (i.status.length) nodes.push(h('div', { class: 'al-status', role: 'status' }, ...i.status));
 
     nodes.push(h('div', { class: 'al-listhead' }, h('span', {}, h('b', {}, p.title), ` · ${plural(songs.length, 'song', 'songs')}`), playsChip(i)));
+    // A small square of each song's own artwork; a song without one (or not found yet) shows its number on the album's cover.
+    const albumUrl = cover(p.cover);
+    const akey = 'album:' + p.cover;
+    if (albumUrl && !thumbs.has(akey)) {
+      thumbs.set(akey, albumUrl);
+      void shrink(albumUrl).then((small) => { if (small !== albumUrl) { thumbs.set(akey, small); paint(); } });
+    }
+    const albumThumb = albumUrl ? thumbs.get(akey) || albumUrl : '';
     nodes.push(h('ol', { class: 'al-tracks' }, ...songs.map((t, n) => {
       const on = String(t.id) === current;
+      const art = thumb(String(t.id), on && started ? own : undefined);
       return h('li', {}, btn({ class: 'al-track' + (on ? ' is-on' : ''), 'aria-label': `Play ${t.title || '#' + t.id}`, 'aria-current': on ? 'true' : undefined, disabled: out || waiting, onClick: () => r?.playToken?.(t.id) },
-        h('span', { class: 'al-n' }, String(n + 1)),
-        h('span', { class: 'al-tt' }, t.title || `#${t.id}`),
-        on ? h('span', { class: 'al-eq', html: ICON.eq }) : null));
+        h('span', { class: 'al-th' + (art ? '' : ' is-blank') },
+          art ? h('img', { src: art, alt: '', decoding: 'async' }) : albumThumb ? h('img', { src: albumThumb, alt: '', decoding: 'async' }) : null,
+          art ? null : h('span', { class: 'al-n' }, String(n + 1)),
+          on ? h('span', { class: 'al-eq', html: ICON.eq }) : null),
+        h('span', { class: 'al-tt' }, t.title || `#${t.id}`)));
     })));
     nodes.push(h('div', { class: 'al-grow' }));
     nodes.push(btn({ class: 'al-more', 'aria-expanded': String(sheet === 'more'), onClick: () => setSheet(sheet === 'more' ? '' : 'more') },

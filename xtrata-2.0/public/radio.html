@@ -422,6 +422,14 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .al-from{display:flex;align-items:center;gap:8px;margin:14px 0 0;font-size:14px;color:#c9ced6}.al-from span:first-child{color:#f2b661;display:inline-flex}
   .al-cover{width:min(100%,320px,40vh);aspect-ratio:1/1;margin:14px auto 0;border-radius:12px;overflow:hidden;background:#143a40;box-shadow:0 18px 40px rgba(0,0,0,.45)}
   .al-cover--small{width:min(70%,250px,30vh)}
+  .al-cover{position:relative;display:block}
+  .al-cover img,.al-cover .al-cover-fallback{transition:filter .25s}
+  .al-cover.is-paused img,.al-cover.is-paused .al-cover-fallback{filter:brightness(.55)}
+  .al-paused{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(8,12,14,.72);color:#f2f0ea;font-size:12px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;animation:al-fade .25s .5s both}
+  .al-paused i{display:inline-flex}
+  .al-flip{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:14px;background:rgba(8,12,14,.55);color:#f2f0ea;display:inline-flex;align-items:center;justify-content:center;opacity:.85}
+  @keyframes al-fade{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.al-paused{animation:none}.al-cover img,.al-cover .al-cover-fallback{transition:none}}
   .al-cover img{width:100%;height:100%;object-fit:cover;display:block}
   .al-cover-fallback{height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:22px}
   .al-cover-fallback b{font-size:clamp(34px,10vw,60px);line-height:.95;letter-spacing:-.03em;font-weight:800;color:#e9f6f4;overflow-wrap:anywhere}
@@ -455,10 +463,16 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .al-listhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;padding-bottom:8px;border-bottom:1px solid #1e232a;font-size:13px;color:#a3aab5}
   .al-listhead b{color:#f2f0ea}
   .al-tracks{list-style:none;margin:0;padding:0}
-  .al-track{width:100%;min-height:48px;display:flex;align-items:center;gap:14px;text-align:left;border-bottom:1px solid #15191f!important}
-  .al-n{width:20px;font-family:var(--mono);font-size:12px;color:#6f7783}
+  .al-track{width:100%;min-height:58px;display:flex;align-items:center;gap:12px;text-align:left;border-bottom:1px solid #15191f!important}
+  .al-th{position:relative;flex:none;width:42px;height:42px;border-radius:8px;overflow:hidden;background:#143a40;display:inline-flex;align-items:center;justify-content:center}
+  .al-th img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  .al-th.is-blank img{opacity:.3}
+  .al-th .al-n{position:relative;width:auto}
+  .al-th .al-eq{position:absolute;inset:0;align-items:center;justify-content:center;background:rgba(8,12,14,.6)}
+  .al-track.is-on .al-th{box-shadow:0 0 0 2px #7fe3f5}
+  .al-n{width:20px;font-family:var(--mono);font-size:12px;color:#cfe9ee}
   .al-tt{flex:1;font-size:15px;color:#e4e1da}
-  .al-track.is-on .al-n,.al-track.is-on .al-tt{color:#7fe3f5;font-weight:600}
+  .al-track.is-on .al-tt{color:#7fe3f5;font-weight:600}
   .al-eq{color:#7fe3f5;display:inline-flex}
   .al-more{height:48px;margin-top:14px;border:1px solid #262b33!important;border-radius:12px;display:flex;align-items:center;justify-content:space-between;padding:0 16px!important;color:#c9ced6;font-size:14px}
   .al-mute{color:#8f97a3}.al-small{font-size:12px;margin:10px 0 0}.al-mono{font-family:var(--mono);font-size:12px;color:#a3aab5}
@@ -781,7 +795,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     stage.classList.toggle('paused',!playing);
     $('fnote').textContent=s.on?(np?'NO ARTWORK':'TUNING…'):'PRESS POWER TO TUNE IN';
     var art=$('art');
-    var coverUrl=s.albumCover?s.albumCover.url:(np&&np.cover);
+    var coverUrl=(np&&np.cover)||(s.albumCover?s.albumCover.url:'');
     if(coverUrl){if($('cover').getAttribute('src')!==coverUrl)$('cover').src=coverUrl;art.classList.add('has-cover');}
     else{art.classList.remove('has-cover');$('cover').removeAttribute('src');document.documentElement.style.setProperty('--glow','94,233,255');}
     var pill=$('idpill'),vb=$('viewbtn'),al=$('artLink');
@@ -942,7 +956,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=e2b3581a60fe" defer></script>
+<script src="/xtrata-radio.js?v=6f5b58eedc83" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -958,7 +972,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=c8d000ae7d29')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=5705eccb55c3')}).catch(function(){});
 </script>
 </body>
 </html>
