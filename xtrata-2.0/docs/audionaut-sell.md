@@ -27,6 +27,14 @@ Open `/audionaut/?sell=tune`. Sliders move the start and trim the length, SNAP S
 the 115 bpm grid, LENGTH = 16 BARS resets, COPY SETTINGS gives `start=... length=... bpm=...`. Put the
 values into `LOOP`.
 
-## Not done yet
+## Synth and plugin faces
 
-The 14 synth faces are CSS drawings. Real captures (WebP stills from the DAW) are the next phase.
+`public/audionaut/sell/faces/` holds real captures of the sequencer's own front panels (WebP, about 1.6 MB
+in total, loaded lazily): 14 synths with 3 frames each (idle, a chord held, another preset) and 20 plugins
+with 2 frames each (default, knobs moved). The lit panel on each beat swaps to its next frame, so the
+panels read as animated. A fresh face is dealt into the grid once a bar.
+
+To recapture after a UI change: serve `public/` and open each synth with `open-synth-panel` (see
+`tools/audionaut-test.mjs --shots`), then screenshot the face host; plugins mount through
+`js/plugin-faces/runtime.js` `Kit.mount` with a stub link. Names: `s-<synthId>-<frame>.webp`,
+`p-<pluginType>-<frame>.webp`.
