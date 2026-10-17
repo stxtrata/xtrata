@@ -89,3 +89,7 @@ forever-twins/ft-harness/results/fork-*.json
 
 # Listening wallet origin build (separate Pages project)
 dist-listening-wallet
+
+# Audionaut gate sell layer: local audio only (never commit the full track or the test clip)
+/public/audionaut/sell/_local/
+/public/audionaut/sell/super-user-loop.mp3
