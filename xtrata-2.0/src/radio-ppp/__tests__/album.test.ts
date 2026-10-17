@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * price or "pay" wording. Everything else stays in the panel underneath and opens as a sheet. The controller and
  * the radio are faked; the view must only call the actions the panel already has.
  */
-const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, calls: [] as [string, unknown[]][], route: null as null | ((url: string, init?: any) => Response | undefined), radio: null as any }));
+const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, calls: [] as [string, unknown[]][], route: null as null | ((url: string, init?: any) => Response | undefined), radio: null as any, idle: false }));
 vi.mock('../controller', () => ({
   TOP_UP_PLAYS: [100, 250, 500],
   createPppController: (deps: any) => {
@@ -43,8 +43,8 @@ async function open(over: object = {}) {
     <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section></aside></main>`;
-  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftLock: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn(), forgetWallets: vi.fn(), getState: () => ({ playing: true, nowPlaying: { tokenId: 319, title: 'Russian Rampage', artist: 'melophonic' }, heart: { liked: false } }),
-    getPosition: () => ({ current: 32, duration: 318 }), playToken: vi.fn(), playPause: vi.fn(), next: vi.fn(), prev: vi.fn(), toggleLike: vi.fn() };
+  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftLock: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn(), forgetWallets: vi.fn(), getState: () => h.idle ? ({ playing: false, nowPlaying: null, heart: { liked: false } }) : ({ playing: true, nowPlaying: { tokenId: 319, title: 'Russian Rampage', artist: 'melophonic' }, heart: { liked: false } }),
+    getPosition: () => h.idle ? ({ current: 0, duration: 0 }) : ({ current: 32, duration: 318 }), playToken: vi.fn(), playPause: vi.fn(), next: vi.fn(), prev: vi.fn(), toggleLike: vi.fn() };
   (window as any).XtrataRadio = h.radio;
   h.snap = { ...base, ...over };
   h.calls = [];
@@ -58,7 +58,7 @@ const called = (name: string) => h.calls.filter(([n]) => n === name).map(([, a])
 const buttonNamed = (root: Element, name: RegExp) => [...root.querySelectorAll('button')].find((b) => name.test(b.getAttribute('aria-label') || '') || name.test(b.textContent || '')) as HTMLButtonElement;
 
 beforeEach(() => {
-  vi.unstubAllGlobals(); localStorage.clear(); h.route = null;
+  vi.unstubAllGlobals(); localStorage.clear(); h.route = null; h.idle = false;
   delete document.documentElement.dataset.view; delete document.documentElement.dataset.sheet; delete document.documentElement.dataset.asking;
 });
 
@@ -119,6 +119,89 @@ describe('an open album is a player', () => {
     expect(shown()).toBe('data:image/png;base64,U09ORw=='); // that song's own artwork
     push({ tokenId: 3567, title: 'SuperUser', artist: 'melophonic', cover: '' });
     expect(shown()).toBe('/inscription/777'); // a song with none: the album cover again
+  });
+
+  describe('the cover tile and the song thumbnails', () => {
+    const withCover = { ...PLAYER, cover: 777 };
+    const ART = 'data:image/png;base64,U09ORw==';
+    const drive = (album: Element, position = { current: 32, duration: 318 }) => (np: object | null, playing = !!np) => {
+      const state = { playing, nowPlaying: np, heart: { liked: false }, albumCover: { url: '/inscription/777', tokenId: 777 } };
+      h.radio.getState = () => state;
+      h.radio.getPosition = () => position;
+      for (const [listener] of h.radio.subscribe.mock.calls) listener(state);
+      return album.querySelector('.al-cover')!;
+    };
+    const opened = () => open({ gift: { player: withCover, from: null, source: 'batch', amount: '108000' } });
+    const song = { tokenId: 319, title: 'Russian Rampage', artist: 'melophonic', cover: ART };
+
+    it('keeps the song artwork and title when paused, and only dims it and says so', async () => {
+      const album = await opened();
+      const set = drive(album);
+      let tile = set(song, true);
+      expect(tile.classList.contains('is-paused')).toBe(false);
+      expect(tile.querySelector('.al-paused')).toBeNull();
+      tile = set(song, false);
+      expect(tile.classList.contains('is-paused')).toBe(true);
+      expect(text(tile.querySelector('.al-paused')!)).toBe('Paused');
+      expect(tile.querySelector('img')!.getAttribute('src')).toBe(ART); // still this song's artwork
+      expect(text(album.querySelector('.al-song')!)).toBe('Russian Rampage');
+      expect(album.querySelector('.al-track.is-on .al-tt')!.textContent).toBe('Russian Rampage');
+    });
+
+    it('shows the album cover, not "Paused", for a song that is only waiting to be played', async () => {
+      h.idle = true; // the radio has not played anything yet
+      const album = await opened();
+      const tile = drive(album, { current: 0, duration: 0 })(song, false); // cued: nothing has played yet
+      expect(tile.querySelector('img')!.getAttribute('src')).toBe('/inscription/777');
+      expect(tile.querySelector('.al-paused')).toBeNull();
+      expect(tile.tagName).toBe('DIV'); // nothing to flip to yet
+    });
+
+    it('a tap flips the tile between the song artwork and the album cover; the next song starts on its artwork', async () => {
+      const album = await opened();
+      const set = drive(album);
+      let tile = set(song, true);
+      expect(tile.tagName).toBe('BUTTON');
+      (tile as HTMLButtonElement).click();
+      tile = album.querySelector('.al-cover')!;
+      expect(tile.querySelector('img')!.getAttribute('src')).toBe('/inscription/777');
+      expect(tile.getAttribute('aria-label')).toMatch(/song’s artwork/);
+      set(song, true); // a repaint (the radio ticks) keeps the choice
+      expect(album.querySelector('.al-cover img')!.getAttribute('src')).toBe('/inscription/777');
+      (album.querySelector('.al-cover') as HTMLButtonElement).click();
+      expect(album.querySelector('.al-cover img')!.getAttribute('src')).toBe(ART);
+      (album.querySelector('.al-cover') as HTMLButtonElement).click(); // flipped to the album again...
+      tile = set({ ...song, tokenId: 315, title: 'Entertainment', cover: 'data:image/png;base64,RU5U' }, true); // ...then another song
+      expect(tile.querySelector('img')!.getAttribute('src')).toBe('data:image/png;base64,RU5U');
+    });
+
+    it('a song with no artwork of its own is not flippable and keeps the album cover', async () => {
+      const album = await opened();
+      const tile = drive(album)({ ...song, cover: '' }, true);
+      expect(tile.tagName).toBe('DIV');
+      expect(tile.querySelector('img')!.getAttribute('src')).toBe('/inscription/777');
+    });
+
+    it('lists a small thumbnail beside each song, found lazily one song at a time; songs without art show their number', async () => {
+      const seen: string[] = [];
+      const page = (html: string[]) => {
+        const enc = new TextEncoder();
+        return new Response(new ReadableStream({ start(c) { html.forEach((s) => c.enqueue(enc.encode(s))); c.close(); } }), { headers: { 'content-type': 'text/html' } });
+      };
+      h.route = (url) => {
+        if (url === '/inscription/315') { seen.push(url); return page(['<html><audio src="data:audio/mpeg;base64,', 'A'.repeat(5000), '"></audio><im', 'g class="c" src="data:image/png;base64,RU5U">']); }
+        if (url === '/inscription/3567') { seen.push(url); return page(['<html><audio src="data:audio/mpeg;base64,AAAA"></audio></html>']); }
+        return undefined;
+      };
+      const album = await opened();
+      const rows = () => [...album.querySelectorAll('.al-track')];
+      expect(rows().map((r) => r.querySelector('.al-th')!.classList.contains('is-blank'))).toEqual([true, true, true]); // nothing known yet
+      await vi.waitFor(() => expect(rows()[0].querySelector('.al-th')!.classList.contains('is-blank')).toBe(false), { timeout: 4000 });
+      expect(rows()[0].querySelector('.al-th img')!.getAttribute('src')).toBe('data:image/png;base64,RU5U'); // the tag split across pieces was still found
+      await vi.waitFor(() => expect(localStorage.getItem('xtrata:al-thumb:v1:3567')).toBe('-'), { timeout: 4000 });
+      expect(text(rows()[2].querySelector('.al-n')!)).toBe('3'); // no art: its number
+      expect([...new Set(seen)].sort()).toEqual(['/inscription/315', '/inscription/3567']); // the playing song (319) was never fetched
+    });
   });
 
   it('while plays arrive the controls rest (greyed out) and a calm countdown says to wait', async () => {
