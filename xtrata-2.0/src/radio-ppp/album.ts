@@ -89,7 +89,12 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} 
 const SHEET_TITLE: Record<Exclude<AlbumSheet, '' | 'more'>, string> = { music: 'My music', device: 'This device', gifts: 'Send music to a friend' };
 const SHEET_FOLDS: Record<Exclude<AlbumSheet, '' | 'more'>, string[]> = { music: ['.ppp-shelf'], device: ['.ppp-wallets', '.ppp-recent', '.ppp-more'], gifts: ['.ppp-gifts'] };
 
-export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
+/**
+ * `list: true` renders only the album's song list (head, thumbnails, plays left) for the panel beside the radio, where it
+ * takes the place of "Your Station" while an album is the music. Without it the view is the whole Album First page.
+ */
+export function createAlbumView(mount: HTMLElement, deps: AlbumDeps, opts: { list?: boolean } = {}) {
+  const listOnly = !!opts.list;
   let last: AlbumInput | null = null;
   let sheet: AlbumSheet = '';
   let howOpen = false;
@@ -267,9 +272,9 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
     }
     paint();
   }
-  const closeBtn = document.getElementById('sheetClose');
+  const closeBtn = listOnly ? null : document.getElementById('sheetClose');
   if (closeBtn) closeBtn.onclick = () => setSheet('');
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheet && root.dataset.view === 'album') setSheet(''); });
+  if (!listOnly) document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheet && root.dataset.view === 'album') setSheet(''); });
 
   const radioRow = () => btn({ class: 'al-row', onClick: () => { setSheet(''); deps.openPlayer(); } },
     h('span', { class: 'al-row-i', html: ICON.radio }),
@@ -286,7 +291,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
     r.subscribe((s: any) => { st = s; if (last?.mode === 'open') paint(); });
     st = r.getState?.() ?? null;
   };
-  setInterval(() => {
+  if (!listOnly) setInterval(() => {
     if (last?.mode !== 'open' || !st?.playing) return;
     const p = deps.radio()?.getPosition?.();
     const bar = mount.querySelector('.al-bar > i') as HTMLElement | null;
@@ -340,6 +345,34 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
     return out;
   }
 
+  /** The album's songs, each with a small square of its artwork, under a head that says how many plays are left. */
+  function trackList(i: AlbumInput, c: { songs: PlayerView['tracks']; current: string | null; started: boolean; own: string; out: boolean; waiting: boolean }): Node[] {
+    const { songs, current, started, own, out, waiting } = c;
+    const p = i.player;
+    const r = deps.radio();
+    const nodes: Node[] = [];
+    nodes.push(h('div', { class: 'al-listhead' }, h('span', {}, h('b', {}, p.title), ` · ${plural(songs.length, 'song', 'songs')}`), playsChip(i)));
+    // A small square of each song's own artwork; a song without one (or not found yet) shows its number on the album's cover.
+    const albumUrl = cover(p.cover);
+    const akey = 'album:' + p.cover;
+    if (albumUrl && !thumbs.has(akey)) {
+      thumbs.set(akey, albumUrl);
+      void shrink(albumUrl).then((small) => { if (small !== albumUrl) { thumbs.set(akey, small); paint(); } });
+    }
+    const albumThumb = albumUrl ? thumbs.get(akey) || albumUrl : '';
+    nodes.push(h('ol', { class: 'al-tracks' }, ...songs.map((t, n) => {
+      const on = String(t.id) === current;
+      const art = thumb(String(t.id), on && started ? own : undefined);
+      return h('li', {}, btn({ class: 'al-track' + (on ? ' is-on' : ''), 'aria-label': `Play ${t.title || '#' + t.id}`, 'aria-current': on ? 'true' : undefined, disabled: out || waiting, onClick: () => r?.playToken?.(t.id) },
+        h('span', { class: 'al-th' + (art ? '' : ' is-blank') },
+          art ? h('img', { src: art, alt: '', decoding: 'async' }) : albumThumb ? h('img', { src: albumThumb, alt: '', decoding: 'async' }) : null,
+          art ? null : h('span', { class: 'al-n' }, String(n + 1)),
+          on ? h('span', { class: 'al-eq', html: ICON.eq }) : null),
+        h('span', { class: 'al-tt' }, t.title || `#${t.id}`)));
+    })));
+    return nodes;
+  }
+
   function player(i: AlbumInput): Node[] {
     const p = i.player;
     const songs = p.tracks.filter((t) => !t.hidden);
@@ -368,7 +401,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
       current ? btn({ class: 'al-icon' + (heart?.liked ? ' is-on' : ''), 'aria-label': heart?.liked ? 'Unlike this song' : 'Like this song', 'aria-pressed': String(!!heart?.liked), disabled: !!heart?.pending || !!heart?.locked || waiting, onClick: () => r?.toggleLike?.(), html: heart?.liked ? ICON.heartOn : ICON.heart }) : null));
 
     if (!out) {
-      const at =pos?.duration ? Math.min(100, (pos.current / pos.duration) * 100) : 0;
+      const at = pos?.duration ? Math.min(100, (pos.current / pos.duration) * 100) : 0;
       nodes.push(h('div', { class: 'al-prog' }, h('div', { class: 'al-bar' }, h('i', { style: `width: ${at}%` })),
         h('div', { class: 'al-times' }, h('span', {}, time(pos?.current || 0)), h('span', {}, pos?.duration ? time(pos.duration) : '–:––'))));
     } else {
@@ -384,25 +417,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
       btn({ class: 'al-icon al-icon--big', 'aria-label': 'Next song', disabled: out || waiting, onClick: () => r?.next?.(), html: ICON.next })));
     if (i.status.length) nodes.push(h('div', { class: 'al-status', role: 'status' }, ...i.status));
 
-    nodes.push(h('div', { class: 'al-listhead' }, h('span', {}, h('b', {}, p.title), ` · ${plural(songs.length, 'song', 'songs')}`), playsChip(i)));
-    // A small square of each song's own artwork; a song without one (or not found yet) shows its number on the album's cover.
-    const albumUrl = cover(p.cover);
-    const akey = 'album:' + p.cover;
-    if (albumUrl && !thumbs.has(akey)) {
-      thumbs.set(akey, albumUrl);
-      void shrink(albumUrl).then((small) => { if (small !== albumUrl) { thumbs.set(akey, small); paint(); } });
-    }
-    const albumThumb = albumUrl ? thumbs.get(akey) || albumUrl : '';
-    nodes.push(h('ol', { class: 'al-tracks' }, ...songs.map((t, n) => {
-      const on = String(t.id) === current;
-      const art = thumb(String(t.id), on && started ? own : undefined);
-      return h('li', {}, btn({ class: 'al-track' + (on ? ' is-on' : ''), 'aria-label': `Play ${t.title || '#' + t.id}`, 'aria-current': on ? 'true' : undefined, disabled: out || waiting, onClick: () => r?.playToken?.(t.id) },
-        h('span', { class: 'al-th' + (art ? '' : ' is-blank') },
-          art ? h('img', { src: art, alt: '', decoding: 'async' }) : albumThumb ? h('img', { src: albumThumb, alt: '', decoding: 'async' }) : null,
-          art ? null : h('span', { class: 'al-n' }, String(n + 1)),
-          on ? h('span', { class: 'al-eq', html: ICON.eq }) : null),
-        h('span', { class: 'al-tt' }, t.title || `#${t.id}`)));
-    })));
+    nodes.push(...trackList(i, { songs, current, started, own, out, waiting }));
     nodes.push(h('div', { class: 'al-grow' }));
     nodes.push(btn({ class: 'al-more', 'aria-expanded': String(sheet === 'more'), onClick: () => setSheet(sheet === 'more' ? '' : 'more') },
       h('span', {}, 'More ', h('span', { class: 'al-mute' }, '· add plays, send, radio, settings')), h('span', { html: ICON.down })));
@@ -446,9 +461,32 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
         how));
   }
 
+  /** Just the song list, for the panel: the radio beside it already has the cover, the controls and the like button. */
+  function listFor(i: AlbumInput): Node[] {
+    const p = i.player;
+    const np = st?.nowPlaying;
+    const current = np && p.tracks.some((t) => String(t.id) === String(np.tokenId)) ? String(np.tokenId) : null;
+    const playing = !!st?.playing && !!current;
+    const pos = current ? deps.radio()?.getPosition?.() : null;
+    if (current && (playing || (pos?.current ?? 0) > 0.5)) startedFor = p.id;
+    const started = !!current && startedFor === p.id;
+    return trackList(i, {
+      songs: p.tracks.filter((t) => !t.hidden), current, started, own: started ? String(np?.cover || '') : '',
+      out: i.plays === 0 && !i.playsComing, waiting: !!i.playsComing && !i.plays
+    });
+  }
+
   // ---------------------------------------------------------------- paint
   function paint() {
     const i = last;
+    if (listOnly) {
+      if (!i || i.mode !== 'open') { mount.hidden = true; mount.replaceChildren(); delete root.dataset.albumlist; return; }
+      watch();
+      mount.hidden = false;
+      root.dataset.albumlist = '1'; // the page hides "Your Station" while this list stands in for it
+      mount.replaceChildren(...listFor(i));
+      return;
+    }
     if (!i) { mount.hidden = true; mount.replaceChildren(); return; }
     watch();
     mount.hidden = false;
@@ -461,6 +499,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps) {
 
   return {
     render(input: AlbumInput | null) {
+      if (listOnly) { last = input; paint(); return; }
       const wasOn = !!last;
       last = input;
       if (!input && (wasOn || sheet)) { sheet = ''; delete root.dataset.sheet; }
