@@ -35,9 +35,10 @@ const base = {
   likeFunds: { address: ROOT, balance: 300_000n, low: false, album: true, pending: false }, albumLock: { locked: true, known: true }
 };
 
-async function open(over: object = {}) {
+async function open(over: object = {}, { page = true }: { page?: boolean } = {}) {
   vi.resetModules();
-  document.body.innerHTML = `<header class="topbar"></header><main><section class="album" id="album" hidden></section><section class="rx"></section>
+  if (page) localStorage.setItem('xtrata.radio.albumpage', '1'); // the separate album page is an option, off by default
+  document.body.innerHTML = `<header class="topbar"></header><main><section class="album" id="album" hidden></section><section class="albumlist" id="albumList" hidden></section><section class="rx"></section>
     <aside class="side"><div class="sheet-bar"><b id="sheetTitle"></b><button id="sheetClose">×</button></div><div class="sheet-extra" id="sheetExtra"></div>
     <section id="ppp" hidden><div class="ppp-head"><h3><span class="ppp-badge"></span></h3><span class="ppp-state"></span></div><ol class="ppp-steps"></ol><p class="ppp-stage"></p>
     <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
@@ -51,7 +52,7 @@ async function open(over: object = {}) {
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: any) => h.route?.(String(url), init) ?? new Response('{}')));
   await import('../page');
   h.changed();
-  return document.getElementById('album')!;
+  return document.getElementById(page ? 'album' : 'albumList')!;
 }
 const text = (n: Element) => n.textContent ?? '';
 const called = (name: string) => h.calls.filter(([n]) => n === name).map(([, a]) => a);
@@ -59,7 +60,7 @@ const buttonNamed = (root: Element, name: RegExp) => [...root.querySelectorAll('
 
 beforeEach(() => {
   vi.unstubAllGlobals(); localStorage.clear(); h.route = null; h.idle = false;
-  delete document.documentElement.dataset.view; delete document.documentElement.dataset.sheet; delete document.documentElement.dataset.asking;
+  delete document.documentElement.dataset.view; delete document.documentElement.dataset.sheet; delete document.documentElement.dataset.asking; delete document.documentElement.dataset.albumlist;
 });
 
 describe('an open album is a player', () => {
@@ -323,5 +324,50 @@ describe('coming back to an album', () => {
     const album = await open({ slot: 0, gift: null, giftPlays: 0 });
     expect(document.documentElement.dataset.view).toBeUndefined();
     expect(album.hidden).toBe(true);
+  });
+});
+
+describe('an album opens inside the normal player (the separate page is off)', () => {
+  const html = document.documentElement;
+
+  it('keeps the page ordinary: no album page, the song list stands in for Your Station', async () => {
+    const list = await open({}, { page: false });
+    expect(html.dataset.view).toBeUndefined(); // the radio and the panel stay on screen
+    expect(document.getElementById('album')!.hidden).toBe(true);
+    expect(list.hidden).toBe(false);
+    expect(html.dataset.albumlist).toBe('1'); // CSS hides #likesBox while this is set
+    expect([...list.querySelectorAll('.al-tt')].map(text)).toEqual(['Entertainment', 'Russian Rampage', 'SuperUser']); // the hidden track is not listed
+    expect(list.querySelectorAll('.al-th').length).toBe(3);
+    expect(text(list.querySelector('.al-listhead')!)).toContain('2007 EP');
+    expect(text(list.querySelector('.al-chip')!)).toBe('277 plays left');
+    expect(list.querySelector('.al-cover, .al-play, .al-more')).toBeNull(); // the radio beside it has the cover and the controls
+    expect(list.querySelector('.al-track.is-on .al-tt')!.textContent).toBe('Russian Rampage');
+  });
+
+  it('a song in the list plays through the radio', async () => {
+    const list = await open({}, { page: false });
+    buttonNamed(list, /Play SuperUser/).click();
+    expect(h.radio.playToken).toHaveBeenCalledWith(3567);
+  });
+
+  it('the list rests while plays are on their way and shows the album’s plays left', async () => {
+    const list = await open({ giftPlays: 0, balance: 0n, step: 'fund', depositPending: true }, { page: false });
+    expect(text(list.querySelector('.al-chip')!)).toBe('Plays on their way…');
+    expect([...list.querySelectorAll<HTMLButtonElement>('.al-track')].every((b) => b.disabled)).toBe(true);
+  });
+
+  it('with no album open the list goes away and Your Station is back', async () => {
+    const list = await open({}, { page: false });
+    expect(html.dataset.albumlist).toBe('1');
+    h.snap = { ...h.snap, slot: 0, gift: null, giftPlays: 0 };
+    h.changed();
+    expect(list.hidden).toBe(true);
+    expect(html.dataset.albumlist).toBeUndefined();
+  });
+
+  it('a gift link shows its ordinary banner (not the album page) when the page is off', async () => {
+    const list = await open({ slot: 0, gift: null, giftPlays: 0, step: 'intro' }, { page: false });
+    expect(html.dataset.view).toBeUndefined();
+    expect(list.hidden).toBe(true);
   });
 });

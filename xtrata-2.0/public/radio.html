@@ -60,6 +60,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .art.has-cover img{display:block}
   .art .fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:10px}
   .art.has-cover .fallback{display:none}
+  .artflip{position:absolute;top:8px;right:8px;z-index:2;width:30px;height:30px;border-radius:15px;border:0;background:rgba(8,12,14,.55);color:#f2f0ea;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+  .artflip[hidden],.artpaused[hidden]{display:none}
+  .artpaused{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:2;padding:5px 12px;border-radius:999px;background:rgba(8,12,14,.72);color:#f2f0ea;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;pointer-events:none;animation:artfade .25s .5s both}
+  .art.is-paused img{filter:brightness(.55)}
+  @keyframes artfade{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.artpaused{animation:none}}
   .fallback img.mark{width:64px;height:64px;border-radius:16px;opacity:.9;position:static;display:block;object-fit:contain}
   .fallback .fnote{font-family:var(--mono);font-size:10.5px;color:var(--mut);letter-spacing:.12em}
   .chainlink{position:absolute;left:10px;bottom:10px;font-family:var(--mono);font-size:11px;background:rgba(7,9,15,.78);
@@ -409,10 +415,15 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   html[data-view=album][data-sheet=music] .ppp-shelf:not([hidden]),html[data-view=album][data-sheet=gifts] .ppp-gifts:not([hidden]),
   html[data-view=album][data-sheet=device] .ppp-wallets:not([hidden]),html[data-view=album][data-sheet=device] .ppp-recent:not([hidden]),
   html[data-view=album][data-sheet=device] .ppp-more:not([hidden]){display:block}
-  .album{color:#f2f0ea;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-  .album button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
-  .album button:disabled{cursor:default;opacity:.4}
-  .album button:focus-visible{outline:2px solid #7fe3f5;outline-offset:2px;border-radius:10px}
+  .album,.albumlist{color:#f2f0ea;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  .album button,.albumlist button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+  .album button:disabled,.albumlist button:disabled{cursor:default;opacity:.4}
+  .album button:focus-visible,.albumlist button:focus-visible{outline:2px solid #7fe3f5;outline-offset:2px;border-radius:10px}
+  /* an open album: its songs stand in for Your Station */
+  .albumlist{margin:0 0 14px;padding:12px 14px 4px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+  .albumlist[hidden]{display:none}
+  html[data-albumlist] #likesBox{display:none}
+  .albumlist .al-listhead{margin-top:0}
   .al-top{height:56px;display:flex;align-items:center;justify-content:space-between}
   .al-brand{font-weight:700;font-size:15px;letter-spacing:.02em;color:#f2f0ea;text-decoration:none}.al-brand b{color:#7fe3f5;font-weight:700}
   .al-icon{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;color:#c9ced6;border-radius:12px}
@@ -523,6 +534,9 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
           <span class="fnote" id="fnote">PRESS POWER TO TUNE IN</span>
         </div>
         <a class="chainlink" id="artLink" target="_blank" rel="noopener" style="display:none">VIEW ↗</a>
+        <!-- An album song with artwork of its own: tap to swap that artwork and the album's cover. -->
+        <button class="artflip" id="artFlip" type="button" hidden aria-label="Show the album cover"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></button>
+        <span class="artpaused" id="artPaused" hidden>Paused</span>
       </div>
       <div class="display">
         <div class="vfd">
@@ -531,7 +545,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
           <div class="stn" id="stn">XTRATA FM</div>
           <div class="ttl" id="ttl">— OFF AIR —</div>
           <div class="artst" id="artst"></div>
-          <div class="artst" id="album" hidden></div>
+          <div class="artst" id="albumName" hidden></div>
           <div class="idrow">
             <span class="idpill" id="idpill" style="display:none"></span>
             <!-- This song on-chain: likes on the likes contract, paid plays on the paid-plays contract. -->
@@ -598,6 +612,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
         <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Send music to a friend</summary><div class="ppp-gift-body"></div></details>
       </div>
     </section>
+    <!-- An open album's songs, with their artwork and plays left (src/radio-ppp/album.ts, list mode). Stands in for Your Station. -->
+    <section class="albumlist" id="albumList" hidden aria-label="Album songs"></section>
     <details class="likes" id="likesBox" open>
       <summary><span>♥ YOUR STATION</span><span class="count" id="likesCount"></span></summary>
       <div class="likesTools">
@@ -765,12 +781,14 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       row.append(grip,t,a,up,dn,rm);list.appendChild(row);
     });
   }
+  $('artFlip').addEventListener('click',function(){var np=state&&state.nowPlaying;albumFace=albumFace?'':(np?String(np.tokenId):'');render(state)});
   $('likesFilter').addEventListener('input',function(){lastLikesSig='';if(state)render(state)});
   $('likesReset').addEventListener('click',function(){var k=orderKey();if(k)try{localStorage.removeItem(k)}catch(e){}lastLikesSig='';if(api&&api.setLikedOrder)api.setLikedOrder([]);if(state)render(state)});
   $('likesPlay').addEventListener('click',function(){if(!api)return;api.setBand('liked');if(!api.isOn())api.switchOn()});
   if(store('xtrata.radio.likes.open')==='0')$('likesBox').open=false;
   $('likesBox').addEventListener('toggle',function(){store('xtrata.radio.likes.open',$('likesBox').open?'1':'0')});
 
+  var albumStarted={}, albumFace='';
   function render(s){
     state=s;
     var np=s.nowPlaying, stage=$('stage');
@@ -785,9 +803,9 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     $('stn').textContent=(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
     $('ttl').textContent=np?np.title:(s.on?'TUNING…':'— OFF AIR —');
     $('artst').textContent=np&&np.artist?np.artist:'';
-    $('album').textContent=np&&np.album?'Album: '+np.album:'';
-    $('album').title=np&&np.album?np.album:'';
-    $('album').hidden=!(np&&np.album);
+    $('albumName').textContent=np&&np.album?'Album: '+np.album:'';
+    $('albumName').title=np&&np.album?np.album:'';
+    $('albumName').hidden=!(np&&np.album);
     $('power').classList.toggle('on',!!s.on);
     var playing=(typeof s.playing==='boolean')?s.playing:s.on;
     $('pp').textContent=playing?'⏸':'▶';
@@ -795,7 +813,18 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     stage.classList.toggle('paused',!playing);
     $('fnote').textContent=s.on?(np?'NO ARTWORK':'TUNING…'):'PRESS POWER TO TUNE IN';
     var art=$('art');
-    var coverUrl=(np&&np.cover)||(s.albumCover?s.albumCover.url:'');
+    // An album: its cover until something has played, then each song's own artwork (kept while paused, so you can see
+    // which song you are on). A tap on the flip button swaps the song's artwork and the album cover; the next song puts it back.
+    var own=np&&np.cover||'', album=s.albumCover, gid=s.gift?s.gift.id:'';
+    if(gid&&np&&playing)albumStarted[gid]=1;
+    var started=!!(gid&&albumStarted[gid]&&np), flippable=started&&!!own&&!!album, tok=np?String(np.tokenId):'';
+    if(!flippable||albumFace!==tok)albumFace='';
+    var coverUrl=gid&&album&&(!started||albumFace===tok)?album.url:own||(album?album.url:'');
+    $('artFlip').hidden=!flippable;
+    $('artFlip').setAttribute('aria-label',albumFace?'Show this song’s artwork':'Show the album cover');
+    var paused=started&&!playing;
+    art.classList.toggle('is-paused',paused);
+    $('artPaused').hidden=!paused;
     if(coverUrl){if($('cover').getAttribute('src')!==coverUrl)$('cover').src=coverUrl;art.classList.add('has-cover');}
     else{art.classList.remove('has-cover');$('cover').removeAttribute('src');document.documentElement.style.setProperty('--glow','94,233,255');}
     var pill=$('idpill'),vb=$('viewbtn'),al=$('artLink');
@@ -972,7 +1001,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=5705eccb55c3')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=a0fd43bddee2')}).catch(function(){});
 </script>
 </body>
 </html>

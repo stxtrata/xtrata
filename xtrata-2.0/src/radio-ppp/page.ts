@@ -163,12 +163,20 @@ function start(root: HTMLElement) {
   });
 
   // Album First (src/radio-ppp/album.ts): a listener who was sent an album sees a player, not this panel.
-  const albumMount = document.getElementById('album');
-  const albumView = albumMount ? createAlbumView(albumMount, {
+  // Off by default: an album opens inside the normal player (its tab, its plays left, its song list where Your Station
+  // was). Switch the separate page on with `?albumpage=1` or localStorage `xtrata.radio.albumpage` = 1, to keep it
+  // available for albums that bring a player of their own.
+  const albumPage = (() => { try { return /[?&]albumpage=1\b/.test(location.search) || localStorage.getItem('xtrata.radio.albumpage') === '1'; } catch { return false; } })();
+  const albumMount = albumPage ? document.getElementById('album') : null;
+  const albumDeps = {
     radio: () => (window as any).XtrataRadio ?? null,
-    topUp: (plays) => void ppp.topUpAlbum(plays),
+    topUp: (plays: number) => void ppp.topUpAlbum(plays),
     openPlayer: () => void ppp.openAlbum(0)
-  }) : null;
+  };
+  const albumView = albumMount ? createAlbumView(albumMount, albumDeps) : null;
+  // The open album's songs, with their artwork and the plays left, in the panel where "Your Station" is.
+  const albumListMount = document.getElementById('albumList');
+  const albumList = albumListMount ? createAlbumView(albumListMount, albumDeps, { list: true }) : null;
   // The album this device last had open, so a locked page (a reload, a new visit) still opens on it.
   const LAST_ALBUM_KEY = 'xtrata.radio.album.last.v1';
   type LastAlbum = { root: string; slot: number; player: PlayerView };
@@ -855,7 +863,8 @@ function start(root: HTMLElement) {
     }
     // Album First: a listener with an album (arriving by link, open, or the one this device had open) sees the album
     // view; this panel stays underneath, reached from its "More" and "My music" sheets.
-    const album = albumState(s);
+    const albumNow = albumState(s);
+    const album = albumPage ? albumNow : null;
     // A gift link in play goes first: it is why this visitor is here. In the album view only its progress shows.
     const giftLines = gifts.banner(raw, { bare: !!album });
     const elsewhereLines = inApp && (gifts.pendingCode() || ['intro', 'locked', 'unsupported'].includes(s.step)) ? openElsewhere(inApp, gifts.pendingCode()) : [];
@@ -951,6 +960,7 @@ function start(root: HTMLElement) {
       return row;
     }));
     albumView?.render(album ? albumInput(s, album, [...elsewhereLines, ...giftLines]) : null);
+    albumList?.render(albumNow?.mode === 'open' ? albumInput(s, albumNow, []) : null);
   }
 
   type AlbumState = { mode: 'arrive' | 'locked' | 'open'; player: PlayerView; from?: string | null; offered?: number };
