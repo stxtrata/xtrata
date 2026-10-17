@@ -189,7 +189,15 @@
     audio.addEventListener('canplay', () => {
       if (audio.paused) report('Ready to play');
     });
-    audio.addEventListener('error', () => report('Audio unavailable. Try another browser.'));
+    audio.addEventListener('error', () => {
+      const linked =
+        manifest.assets && manifest.assets.audio && manifest.assets.audio.inscriptionId;
+      report(
+        linked
+          ? 'Audio unavailable. It plays from inscription #' + linked + '.'
+          : 'Audio unavailable. Try another browser.'
+      );
+    });
     document
       .querySelectorAll('[data-open]')
       .forEach((button) =>
@@ -248,15 +256,39 @@
       ? config.audioMimeType
       : 'audio/mpeg';
     const b64 = (v) => String(v || '').replace(/\s/g, '');
-    if (!/^[a-z\d+/]*={0,2}$/i.test(b64(config.audioBase64)))
+    // Existing inscriptions (plain audio or a raster image) can be linked instead of embedded.
+    // The link is the exact shape the radio follows: src="https://xtrata.xyz/inscription/<id>".
+    const refId = (r) => (r && /^[1-9]\d{0,8}$/.test(String(r.id)) ? String(r.id) : '');
+    const refUrl = (id) => `https://xtrata.xyz/inscription/${id}`;
+    const refHash = (r) =>
+      /^[0-9a-f]{64}$/.test(String((r && r.finalHash) || '')) ? r.finalHash : '';
+    const audioRefId = refId(config.audioInscription);
+    const imageRefId = refId(config.imageInscription);
+    // A link that was asked for but is malformed must fail, never fall back to an empty embedded asset.
+    if (config.audioInscription && !audioRefId) throw Error('Invalid linked audio.');
+    if (config.imageInscription && !imageRefId) throw Error('Invalid linked artwork.');
+    if (audioRefId && !/^audio\/[\w.+-]+(?:;\s*codecs=[\w-]+)?$/i.test(config.audioMimeType))
+      throw Error('Invalid linked audio type.');
+    if (
+      imageRefId &&
+      !['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'].includes(
+        config.imageInscription.mimeType
+      )
+    )
+      throw Error('Invalid linked artwork type.');
+    if (!audioRefId && !/^[a-z\d+/]*={0,2}$/i.test(b64(config.audioBase64)))
       throw Error('Invalid embedded audio.');
     const hasArt =
-      !!config.imageBase64 &&
-      ['image/png', 'image/jpeg', 'image/webp'].includes(config.imageMimeType);
-    if (hasArt && !/^[a-z\d+/]*={0,2}$/i.test(b64(config.imageBase64)))
+      !!imageRefId ||
+      (!!config.imageBase64 &&
+        ['image/png', 'image/jpeg', 'image/webp'].includes(config.imageMimeType));
+    if (hasArt && !imageRefId && !/^[a-z\d+/]*={0,2}$/i.test(b64(config.imageBase64)))
       throw Error('Invalid embedded artwork.');
+    const visualMime = imageRefId ? config.imageInscription.mimeType : config.imageMimeType;
     const art = hasArt
-      ? `<img id="coverArt" src="data:${config.imageMimeType};base64,${b64(config.imageBase64)}" alt="${esc(title)} artwork">`
+      ? imageRefId
+        ? `<img id="coverArt" src="${refUrl(imageRefId)}" alt="${esc(title)} artwork">`
+        : `<img id="coverArt" src="data:${config.imageMimeType};base64,${b64(config.imageBase64)}" alt="${esc(title)} artwork">`
       : `<div class="placeholder"><span>${
           a.placeholder === 'initials'
             ? esc(
@@ -302,18 +334,30 @@
     const hasLyrics = a.showLyrics && !!m.lyrics;
     const dialog = (id, heading, body) =>
       `<dialog id="${id}" aria-labelledby="${id}Title"><header><h2 id="${id}Title">${heading}</h2><button data-close aria-label="Close ${heading.toLowerCase()}">Close ×</button></header>${body}</dialog>`;
+    const dependencies = [...new Set([audioRefId, imageRefId].filter(Boolean))];
+    const linked = (id, mimeType, source) => ({
+      sourceKind: 'xtrata-inscription',
+      inscriptionId: id,
+      url: refUrl(id),
+      mimeType,
+      finalHash: refHash(source)
+    });
     const manifest = {
       template: VERSION,
-      mode: 'embedded',
-      sourceKind: 'embedded-base64',
+      mode: dependencies.length ? 'reference' : 'embedded',
+      sourceKind: audioRefId ? 'xtrata-inscription' : 'embedded-base64',
       audioMimeType: mime,
-      visualMimeType: hasArt ? config.imageMimeType : null,
+      visualMimeType: hasArt ? visualMime : null,
       appearance: a,
-      dependencies: [],
+      dependencies,
       assets: {
-        audio: { sourceKind: 'embedded-base64', mimeType: mime, inlinedIn: 'audio' },
+        audio: audioRefId
+          ? linked(audioRefId, mime, config.audioInscription)
+          : { sourceKind: 'embedded-base64', mimeType: mime, inlinedIn: 'audio' },
         visual: hasArt
-          ? { sourceKind: 'embedded-base64', mimeType: config.imageMimeType, inlinedIn: 'cover' }
+          ? imageRefId
+            ? linked(imageRefId, visualMime, config.imageInscription)
+            : { sourceKind: 'embedded-base64', mimeType: config.imageMimeType, inlinedIn: 'cover' }
           : null
       },
       metadata: m
@@ -337,7 +381,7 @@
 @container(max-width:340px){.art{height:30%}.body{height:70%;padding:3%}.album{display:none}.controls{gap:4px}.controls .secondary{display:none}.extras button{padding:0 8px}.body .timeline{height:24px!important}.body h1{font-size:17px}.body .artist{font-size:12px}.body #playerStatus{font-size:11px}${a.style === 'studio' ? '.art{height:25%;width:25%}.body{height:100%;padding:5%}.identity{top:7%;left:5%}' : ''}}
 @container(max-width:240px){.art{height:15%}.body{height:85%;padding:3%;gap:2px}.body h1{font-size:14px;-webkit-line-clamp:1}.artist,.album,.times{display:none}.body #playerStatus{font-size:10px}.extras{gap:4px}.extras button{width:36px;min-height:36px;font-size:0;padding:0}.extras button:after{font-size:15px;content:'i'}.extras button[data-open="lyricsDialog"]:after{content:'♫'}#playToggleButton{width:36px;height:36px;min-height:36px;font-size:20px}${a.style === 'studio' ? '.art{height:20%;width:20%;top:4%;right:4%}.body{height:100%;padding:4%}.identity{top:5%;left:4%;width:66%}' : ''}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
-</style></head><body><main id="xtrataPlayer" class="player" tabindex="0" aria-label="${esc(title)} music player" data-xtrata-template="${VERSION}" data-style="${a.style}"><div class="art">${art}</div><div class="body"><div class="identity"><h1>${esc(title)}</h1>${artist ? `<p class="artist">${esc(artist)}</p>` : ''}${a.showAlbum && m.album ? `<p class="album">${esc(m.album)}</p>` : ''}</div><div class="timeline" id="timeline">${wave}<div class="rail"></div><input id="seekRange" aria-label="Seek playback position" type="range" min="0" max="1000" value="0"></div><div class="times"><span id="currentTime">0:00</span><span id="durationTime">0:00</span></div><div class="controls"><button id="playToggleButton" aria-label="Play">▶</button><button class="secondary" id="restartButton">Restart</button><button class="secondary" id="muteButton" aria-pressed="false">Mute</button><div class="extras">${hasDetails ? '<button data-open="detailsDialog">Details</button>' : ''}${hasLyrics ? '<button data-open="lyricsDialog">Lyrics</button>' : ''}</div></div><p id="playerStatus" role="status">Loading audio…</p></div><audio id="xtrataAudio" preload="metadata" data-xtrata-asset="audio"><source src="data:${mime};base64,${b64(config.audioBase64)}" type="${mime}"></audio></main>${hasDetails ? dialog('detailsDialog', 'Track details', `${m.description ? `<p class="description">${esc(m.description)}</p>` : ''}<dl>${details.map(([k, v]) => `<div><dt>${esc(labels[k] || k.replace(/([A-Z])/g, ' $1'))}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`) : ''}${hasLyrics ? dialog('lyricsDialog', 'Lyrics', `<pre>${esc(m.lyrics)}</pre>`) : ''}<script type="application/json" id="xtrataPlayerManifest">${json(manifest)}</script><script type="application/json" id="xtrata-music-metadata">${json(m)}</script><script>(${runtime.toString()})();</script></body></html>`;
+</style></head><body><main id="xtrataPlayer" class="player" tabindex="0" aria-label="${esc(title)} music player" data-xtrata-template="${VERSION}" data-style="${a.style}"${dependencies.length ? ` data-xtrata-dependencies="${dependencies.join(',')}"` : ''}><div class="art">${art}</div><div class="body"><div class="identity"><h1>${esc(title)}</h1>${artist ? `<p class="artist">${esc(artist)}</p>` : ''}${a.showAlbum && m.album ? `<p class="album">${esc(m.album)}</p>` : ''}</div><div class="timeline" id="timeline">${wave}<div class="rail"></div><input id="seekRange" aria-label="Seek playback position" type="range" min="0" max="1000" value="0"></div><div class="times"><span id="currentTime">0:00</span><span id="durationTime">0:00</span></div><div class="controls"><button id="playToggleButton" aria-label="Play">▶</button><button class="secondary" id="restartButton">Restart</button><button class="secondary" id="muteButton" aria-pressed="false">Mute</button><div class="extras">${hasDetails ? '<button data-open="detailsDialog">Details</button>' : ''}${hasLyrics ? '<button data-open="lyricsDialog">Lyrics</button>' : ''}</div></div><p id="playerStatus" role="status">Loading audio…</p></div><audio id="xtrataAudio" preload="metadata" data-xtrata-asset="audio"><source src="${audioRefId ? refUrl(audioRefId) : `data:${mime};base64,${b64(config.audioBase64)}`}" type="${mime}"></audio></main>${hasDetails ? dialog('detailsDialog', 'Track details', `${m.description ? `<p class="description">${esc(m.description)}</p>` : ''}<dl>${details.map(([k, v]) => `<div><dt>${esc(labels[k] || k.replace(/([A-Z])/g, ' $1'))}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`) : ''}${hasLyrics ? dialog('lyricsDialog', 'Lyrics', `<pre>${esc(m.lyrics)}</pre>`) : ''}<script type="application/json" id="xtrataPlayerManifest">${json(manifest)}</script><script type="application/json" id="xtrata-music-metadata">${json(m)}</script><script>(${runtime.toString()})();</script></body></html>`;
   }
   window.XtrataMusicPlayer = {
     VERSION,

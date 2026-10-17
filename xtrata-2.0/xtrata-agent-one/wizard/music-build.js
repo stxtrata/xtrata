@@ -82,19 +82,38 @@
     )
       throw new Error('Choose a valid release format and audio quality.');
     if (!file.size) throw new Error('This audio file is empty.');
-    const ex = await window.XtrataAudioProcessing.extract(file, onStatus, o.quality);
-    const audioMime = o.quality === 'original' ? mimeFor(file) : 'audio/webm; codecs=opus';
+    // An existing audio inscription is linked, not embedded. The fetched copy of it is only used
+    // here to read tags, cover art and waveform, so it is always read at original quality.
+    const audioRef = o.audioInscription || null;
+    if (audioRef && o.format === 'audio')
+      throw new Error(
+        'A linked audio inscription needs a player. Choose "Audio + metadata" or "Audio + metadata + artwork".'
+      );
+    const quality = audioRef ? 'original' : o.quality;
+    const ex = await window.XtrataAudioProcessing.extract(file, onStatus, quality);
+    const audioMime = audioRef
+      ? audioRef.mimeType
+      : quality === 'original'
+        ? mimeFor(file)
+        : 'audio/webm; codecs=opus';
     const metadata = { schema: 'xtrata-music', schemaVersion: 1, assetType: 'song' };
     for (const field of FIELDS) metadata[field] = String(o[field] ?? ex.meta[field] ?? '').trim();
     metadata.title = metadata.title || file.name.replace(/\.[^.]+$/, '');
     metadata.lyrics = String(
       o.lyrics ?? ex.meta.lyrics ?? ex.meta['lyrics-eng'] ?? ex.meta.unsyncedlyrics ?? ''
     ).trim();
-    const coverB64 =
-      o.format === 'artwork' ? (o.coverB64 !== undefined ? o.coverB64 : ex.coverB64) : null;
+    const coverRef = o.format === 'artwork' ? o.coverInscription || null : null;
+    const coverB64 = coverRef
+      ? null
+      : o.format === 'artwork'
+        ? o.coverB64 !== undefined
+          ? o.coverB64
+          : ex.coverB64
+        : null;
     const coverMime = coverB64 ? o.coverMime || ex.coverMime || 'image/jpeg' : null;
-    const audioLabel =
-      o.quality === 'original'
+    const audioLabel = audioRef
+      ? 'Linked to inscription #' + audioRef.id
+      : o.quality === 'original'
         ? 'Original audio'
         : 'Opus ' +
           { compact: 48, optimised: 96, high: 128, premium: 160 }[o.quality] +
@@ -128,7 +147,9 @@
         o.appearance.timeline === 'waveform' ? await window.XtrataMusicPlayer.preparePeaks(ex) : [];
       html = window.XtrataMusicPlayer.build({
         audioMimeType: audioMime,
-        audioBase64: ex.audioB64,
+        audioBase64: audioRef ? '' : ex.audioB64,
+        audioInscription: audioRef,
+        imageInscription: coverRef,
         imageBase64: coverB64,
         imageMimeType: coverMime,
         metadata,
@@ -154,11 +175,15 @@
       coverB64,
       coverMime,
       artworkInfo,
-      hasCover: !!coverB64,
+      hasCover: !!coverB64 || !!coverRef,
+      audioRef,
+      coverRef,
+      coverUrl: coverRef ? window.XtrataMusicSources.canonicalUrl(coverRef.id) : null,
+      linkedIds: [...new Set([audioRef && audioRef.id, coverRef && coverRef.id].filter(Boolean))],
       hasLyrics: o.format !== 'audio' && !!metadata.lyrics,
       audioLabel,
       format: o.format,
-      quality: o.quality,
+      quality,
       opusBytes: ex.opusBytes,
       sourceBytes: file.size,
       playerBytes: playerFile.size
