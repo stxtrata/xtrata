@@ -126,6 +126,23 @@
       <div class="drop-main">Drop your music here</div>
       <div class="drop-sub">or <u>browse</u> — one song or several tracks · metadata and artwork are optional</div>
     </div>
+    <div id="refAudioWrap" style="margin-top:10px">
+      <button id="refAudioToggle" class="btn ghost" type="button" style="width:100%;text-align:center">🔗 Or use an audio inscription you already have ▾</button>
+      <div id="refAudioPanel" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 16px">
+        <div class="efield" style="margin-bottom:0">
+          <label for="refAudioId">Audio inscription number</label>
+          <div style="display:flex;gap:10px">
+            <input id="refAudioId" type="text" inputmode="numeric" placeholder="e.g. 8" style="flex:1" />
+            <button id="refAudioUse" class="btn ghost" type="button" style="width:auto;margin:0">Use this audio</button>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:5px">
+            Your player will <b>link</b> to that inscription instead of storing another copy of the audio, so it inscribes for a few cents.
+            Plain audio files only (MP3, WAV, FLAC, M4A, OGG, WebM) — not HTML players. The audio keeps playing from that inscription, so the player is only as permanent as the link.
+          </div>
+          <div id="refAudioStatus" style="margin-top:8px;font-size:12.5px"></div>
+        </div>
+      </div>
+    </div>
 
     <div class="music-fee-choice">
       <label for="musicFeeMode">Processing budget</label>
@@ -173,6 +190,12 @@
             <input id="eCoverPick" type="file" accept="image/png,image/jpeg,image/webp" hidden />
           </div>
           <div class="muted" style="font-size:11px;margin-top:4px">PNG / JPEG / WebP · embedded in the player, so smaller files inscribe cheaper.</div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <input id="eCoverInsc" type="text" inputmode="numeric" placeholder="or an image inscription number — e.g. 134" aria-label="Image inscription number" style="flex:1" />
+            <button id="eCoverInscBtn" class="btn ghost" type="button" style="width:auto;margin:0">Link image</button>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:4px">Links to an image already on-chain (PNG, JPEG, WebP, GIF or AVIF) instead of embedding a copy — zero extra bytes.</div>
+          <div id="eCoverInscStatus" style="margin-top:6px;font-size:12.5px"></div>
         </div>
         <button id="moreMetaToggle" class="btn ghost" type="button" style="width:100%;text-align:center;margin-top:4px">More metadata ▾</button>
         <div id="moreMetaPanel" style="display:none;margin-top:8px">
@@ -219,6 +242,7 @@
             A <b>reference</b> link — you do not need to own these, and anything can reference anything.
             Free: dependencies add nothing to your quote.
           </div>
+          <div id="sRefDepsNote" class="muted" style="font-size:11px;margin-top:5px"></div>
         </div>
         <div id="sRelBatchNote" class="muted" style="font-size:11px;margin-top:10px;display:none">
           In a batch these apply to <b>every</b> song — one parent, escrowed once, linked to all of them.
@@ -294,10 +318,11 @@
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-<script src="music-player.js?v=1"></script>
+<script src="music-player.js?v=2"></script>
 <script src="music-diagnostics.js?v=1"></script>
 <script src="audio-processing.js?v=3"></script>
-<script src="music-build.js?v=3"></script>
+<script src="music-sources.js?v=1"></script>
+<script src="music-build.js?v=4"></script>
 <script src="optimize-image.js?v=1"></script>
 <script src="agent-one.js?v=2026-09-12.1"></script>
 <script>
@@ -376,7 +401,7 @@ async function walletPillClick(){ if(!WALLET) return;
 function setWallet(a){ WALLET=a||null; WALLET_NAME=null; WALLET_REVEAL=false; const b=$('#connectBtn');
   if(WALLET){ b.textContent='Disconnect'; renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===a){ WALLET_NAME=n; renderWalletPill(); } }); }
   else { b.textContent='Connect wallet'; renderWalletPill(); }
-  try{ setTimeout(()=>{ Promise.resolve(checkParent()).catch(()=>{}); }, 0); }catch(_e){}
+  try{ setTimeout(()=>{ Promise.resolve(checkParent()).catch(()=>{}); Promise.resolve(refRecheck()).catch(()=>{}); }, 0); }catch(_e){}
   updateGo(); }
 async function connectWallet(){ const w=xw();
   if(!w||!w.connect){ alert('Wallet bundle not loaded. Open this from the Xtrata site so agent-one.js (wallet) is present.'); return; }
@@ -412,14 +437,17 @@ picker.onchange=()=>{ routeDrop(Array.from(picker.files||[])); picker.value=''; 
 ['dragleave','dragend','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
 drop.addEventListener('drop',e=>{ routeDrop(Array.from((e.dataTransfer&&e.dataTransfer.files)||[])); });
 
-async function pickFile(f){
+async function pickFile(f,ref){
+  REF_AUDIO=ref||null; if(!ref){ const st=$('#refAudioStatus'); if(st) st.innerHTML=''; }
   const verr=validateMusic(f);
   clearEditsDirty();
   if(verr){ rejectToWizard(verr); return; }
   FILE=f; PLAYER=null; META=null; EST=null; JOB=null; if(poll){clearInterval(poll);poll=null;}
   $('#result').className='result'; $('#prog').className='prog'; $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#editWrap').style.display='none';
   drop.classList.add('has');
-  drop.innerHTML='<div class="fname">🎵 '+esc(f.name)+'</div><div class="fmeta">'+(f.size/1048576).toFixed(2)+' MiB · click to choose a different file</div>';
+  drop.innerHTML=ref
+    ? '<div class="fname">🔗 Inscription #'+esc(ref.id)+'</div><div class="fmeta">Linked, not copied · '+(f.size/1048576).toFixed(2)+' MiB · click to choose a different file</div>'
+    : '<div class="fname">🎵 '+esc(f.name)+'</div><div class="fmeta">'+(f.size/1048576).toFixed(2)+' MiB · click to choose a different file</div>';
   building=true; musicBusy(true); updateGo();
   try{
     $('#hint').innerHTML='<span class="spin"></span>Checking your track…';
@@ -427,7 +455,7 @@ async function pickFile(f){
     NEEDS = [];
 
     $('#hint').innerHTML='<span class="spin"></span>Building your player in-browser…';
-    const r=await window.XtrataMusic.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
+    const r=await window.XtrataMusic.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); }, REF_AUDIO?{audioInscription:REF_AUDIO}:{});
     PLAYER=r.playerFile; META=r;
     showMusicPreview(r);
     EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()})});
@@ -480,7 +508,8 @@ function collectEdits(){
   const v=(id)=>$(id).value;
   const o={ title:v('#eTitle'), artist:v('#eArtist'), album:v('#eAlbum'), lyrics:v('#eLyrics'),
     bpm:v('#eBpm'), note:v('#eNote'), license:v('#eLicense'), description:v('#eDescription') };
-  if(COVER_OVERRIDE){ o.coverB64=COVER_OVERRIDE.b64; o.coverMime=COVER_OVERRIDE.mime; }
+  if(COVER_OVERRIDE){ if(COVER_OVERRIDE.inscription){ o.coverInscription=COVER_OVERRIDE.inscription; } else { o.coverB64=COVER_OVERRIDE.b64; o.coverMime=COVER_OVERRIDE.mime; } }
+  if(REF_AUDIO) o.audioInscription=REF_AUDIO;
   return o;
 }
 $('#applyEdits').onclick=async()=>{
@@ -540,6 +569,97 @@ function parentBlockingMessage(){
   if(PARENT_OK==='checking') return 'Checking the parent inscription…';
   return null;
 }
+/* ---- Existing inscriptions as sources: plain audio / images, LINKED not copied ----
+   The player points at https://xtrata.xyz/inscription/<id>, the shape the radio already follows.
+   Everything is checked in music-sources.js before it is allowed near the player. */
+const REF_BASE=/(^|\.)xtrata\.xyz$/i.test(location.hostname)?'':'https://xtrata.xyz';
+const REF_INFO={};        // inscription id -> what was checked, who holds it, whether the user confirmed
+let REF_AUDIO=null;       // { id, mimeType, finalHash } while the current file is a linked audio inscription
+let refBusy=false;
+const refErr=(m)=>'<span class="err">'+esc(m)+'</span>';
+async function refOwner(id){
+  const A=window.XtrataAgent;
+  if(SERVER.mock||!A||!A.ownerOfChecked) return {state:'unchecked',owner:null};
+  let r; try{ r=await A.ownerOfChecked(id); }catch{ return {state:'unchecked',owner:null}; }
+  if(!r||!r.ok||!r.owner) return {state:'unchecked',owner:null};   // a failed read says nothing about who holds it
+  if(WALLET&&r.owner===WALLET) return {state:'yours',owner:r.owner};
+  return {state:'other',owner:r.owner};
+}
+async function refRegister(res){
+  const prev=REF_INFO[res.id], o=await refOwner(res.id);
+  REF_INFO[res.id]={ kind:res.kind, size:res.size, mime:res.mime, hashChecked:res.hashChecked, warnings:res.warnings||[], ownerState:o.state, owner:o.owner, confirmed:!!(prev&&prev.confirmed) };
+}
+function refLine(id){
+  const i=REF_INFO[id]; if(!i) return '';
+  let h='<span class="ok">✓ #'+esc(id)+' will be linked, not copied</span><span class="muted"> · '+(i.size/1048576).toFixed(2)+' MiB · '+esc(String(i.mime).split(';')[0])+(i.hashChecked?' · hash verified':'')+'</span>';
+  for(const w of i.warnings) h+='<div style="margin-top:4px;color:var(--warn)">'+esc(w)+'</div>';
+  if(i.ownerState==='yours') h+='<div class="ok" style="margin-top:4px">In your connected wallet.</div>';
+  else {
+    h+='<div class="muted" style="margin-top:4px">'+(i.ownerState==='other'?('Held by '+esc(shortAddr(i.owner))+(WALLET?', not your connected wallet.':'. Connect your wallet to see whether it is yours.')):'Could not check who holds it right now.')+'</div>';
+    h+='<label style="display:flex;gap:8px;align-items:flex-start;margin-top:6px;cursor:pointer;text-transform:none;letter-spacing:normal;font-weight:400;font-size:12.5px;text-align:left;color:var(--ink)"><input type="checkbox" style="width:auto;flex:none;margin:2px 0 0"'+(i.confirmed?' checked':'')+' onchange="refConfirm(\''+esc(id)+'\',this.checked)" /><span>I own this, or I have permission to link to it in my release.</span></label>';
+  }
+  return h;
+}
+function refPaint(){
+  const a=$('#refAudioStatus'); if(a&&REF_AUDIO) a.innerHTML=refLine(REF_AUDIO.id);
+  const c=$('#eCoverInscStatus'); if(c&&COVER_OVERRIDE&&COVER_OVERRIDE.inscription) c.innerHTML=refLine(COVER_OVERRIDE.inscription.id);
+}
+function refConfirm(id,on){ if(REF_INFO[id]) REF_INFO[id].confirmed=!!on; updateGo(); }
+window.refConfirm=refConfirm;
+async function refRecheck(){
+  for(const id of Object.keys(REF_INFO)){ const o=await refOwner(id), i=REF_INFO[id]; if(i){ i.ownerState=o.state; i.owner=o.owner; } }
+  refPaint(); updateGo();
+}
+function refBlockingMessage(){
+  for(const id of ((META&&META.linkedIds)||[])){ const i=REF_INFO[id]; if(i&&i.ownerState!=='yours'&&!i.confirmed) return 'Confirm you may link inscription #'+id; }
+  return null;
+}
+function refRenderDeps(r){
+  const box=$('#sRefDepsNote'); if(!box) return;
+  const parts=[]; if(r&&r.audioRef) parts.push('#'+r.audioRef.id+' (audio)'); if(r&&r.coverRef) parts.push('#'+r.coverRef.id+' (artwork)');
+  box.textContent=parts.length?('Linked automatically from your sources: '+parts.join(', ')+'.'):'';
+}
+$('#refAudioToggle').onclick=()=>{ const p=$('#refAudioPanel'), open=p.style.display==='none'; p.style.display=open?'block':'none';
+  $('#refAudioToggle').textContent=open?'🔗 Use an audio inscription you already have ▴':'🔗 Or use an audio inscription you already have ▾'; };
+$('#refAudioId').addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); $('#refAudioUse').click(); } });
+$('#refAudioUse').onclick=async()=>{
+  if(refBusy||building||SB.busy||musicJobActive()) return;
+  const box=$('#refAudioStatus'), S=window.XtrataMusicSources;
+  if(!S){ box.innerHTML=refErr('The source checker did not load. Reload the page.'); return; }
+  if(SERVER.net==='testnet'){ box.innerHTML=refErr('Linking to existing inscriptions works on mainnet only.'); return; }
+  refBusy=true; $('#refAudioUse').disabled=true;
+  box.innerHTML='<span class="muted"><span class="spin"></span>Reading and verifying the inscription…</span>';
+  try{
+    const res=await S.inspect('audio',$('#refAudioId').value,{base:REF_BASE});
+    if(!res.ok){ box.innerHTML=refErr(res.message); return; }
+    await refRegister(res);
+    const file=new File([res.bytes],S.fileName(res),{type:String(res.mime).split(';')[0]});
+    if($('#musicFormat').value==='audio'){ $('#musicFormat').value='details'; musicFormatHelp(); }   // a link needs a player to hold it
+    box.innerHTML=refLine(res.id);
+    await pickFile(file,{id:res.id,mimeType:res.mime,finalHash:res.finalHash});
+    refPaint();
+  }catch(e){ box.innerHTML=refErr('Could not use that inscription: '+((e&&e.message)||e)); }
+  finally{ refBusy=false; $('#refAudioUse').disabled=false; }
+};
+$('#eCoverInsc').addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); $('#eCoverInscBtn').click(); } });
+$('#eCoverInscBtn').onclick=async()=>{
+  if(refBusy||!FILE||building||musicJobActive()) return;
+  const st=$('#eCoverInscStatus'), S=window.XtrataMusicSources;
+  if(!S){ st.innerHTML=refErr('The source checker did not load. Reload the page.'); return; }
+  if(SERVER.net==='testnet'){ st.innerHTML=refErr('Linking to existing inscriptions works on mainnet only.'); return; }
+  refBusy=true; $('#eCoverInscBtn').disabled=true;
+  st.innerHTML='<span class="muted"><span class="spin"></span>Reading and verifying the image…</span>';
+  try{
+    const res=await S.inspect('image',$('#eCoverInsc').value,{base:REF_BASE});
+    if(!res.ok){ st.innerHTML=refErr(res.message); return; }
+    await refRegister(res);
+    COVER_OVERRIDE={ inscription:{ id:res.id, mimeType:res.mime, finalHash:res.finalHash } };
+    $('#eCoverThumb').src=res.url; markEditsDirty();
+    st.innerHTML=refLine(res.id)+'<div style="margin-top:4px;color:var(--warn)">Press <b>Apply changes</b> to put it in the player.</div>';
+  }catch(e){ st.innerHTML=refErr('Could not use that image: '+((e&&e.message)||e)); }
+  finally{ refBusy=false; $('#eCoverInscBtn').disabled=false; }
+};
+
 let musicQuoteRun=0;
 async function quoteRefresh(){
   if(SB.active){ sbQuote(); return; }
@@ -568,7 +688,7 @@ function markEditsDirty(){
 function clearEditsDirty(){ EDITS_DIRTY=false; updateGo(); }
 const listOf=(a)=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
 function refreshNeeds(r){
-  NEEDS=[];
+  NEEDS=[]; refRenderDeps(r);
   if(PLAYER&&PLAYER.size>CHAIN_MAX_BYTES){
     $('#hint').innerHTML='<span class="err">This player is '+(PLAYER.size/1048576).toFixed(1)
       +' MiB once encoded, and the contract cannot hold more than '+CHAIN_MAX_MB
@@ -602,6 +722,8 @@ function updateGo(){
   if(!SERVER.mock && !WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
   const pb=parentBlockingMessage();
   if(pb){ b.disabled=true; b.textContent=pb; return; }
+  const rb=refBlockingMessage();
+  if(rb){ b.disabled=true; b.textContent=rb; return; }
   b.disabled=false;
   b.textContent = (EDITS_DIRTY?'Inscribe without your latest edits  ·  pay ':'Inscribe my track'+(EST?'  ·  pay ':''))
     + (EST? stx(EST.requiredUstx) : '');
@@ -622,7 +744,7 @@ $('#go').onclick=async()=>{
   try{
     PARENT_MSG=null; PARENT_OWNER={}; PARENT_ARRIVED={};
     setProg('Creating your one-shot deposit…', []);
-    const deps=depsList(), parents=parentList();
+    const deps=Array.from(new Set([...depsList(),...((META&&META.linkedIds)||[])])), parents=parentList();
     if(window.XtrataWizardFunding&&parents.length) throw new Error('Wizard funding currently supports songs without parent escrow');
     if(!deps.every(d=>/^\d+$/.test(d))){ throw new Error('Dependencies must be token-id uints.'); }
     if(!parents.every(d=>/^\d+$/.test(d))){ throw new Error('Parent must be a token-id uint.'); }
@@ -1005,13 +1127,13 @@ let sbArtTarget=-1;
 const sbReadB64=(file)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||null); r.onerror=()=>rej(r.error); r.readAsDataURL(file); });
 const sbMib=(n)=>(n/1048576).toFixed(2);
 const sbCostLabel=(ustx)=>stx(ustx)+(SB.stxUsd!=null?(' · ~$'+(Number(ustx)/1e6*Number(SB.stxUsd)).toFixed(2)):'');
-function sbEnterUI(){ SB.active=true;
+function sbEnterUI(){ SB.active=true; REF_AUDIO=null; COVER_OVERRIDE=undefined; $('#refAudioWrap').style.display='none';
   $('#quote').className='quote'; $('#preview').style.display='none'; $('#editWrap').style.display='none';
   $('#go').style.display='none'; $('#hint').textContent=''; $('#result').className='result'; $('#prog').className='prog';
   $('#musicBatch').style.display='block'; }
 function sbResetUI(){ musicUnlockJob(); FILE=null;PLAYER=null;META=null;EST=null;EDITS_DIRTY=false; SB.items.forEach(it=>{ if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} } });
   SB.items=[]; SB.dropped=[]; SB.active=false; SB.busy=false; SB.EST=null; SB.droppedNote=''; JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
-  $('#musicBatch').style.display='none'; $('#go').style.display='';
+  $('#musicBatch').style.display='none'; $('#go').style.display=''; $('#refAudioWrap').style.display=''; REF_AUDIO=null; $('#refAudioStatus').innerHTML='';
   drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
   $('#prog').className='prog'; $('#result').className='result'; $('#sbHint').textContent=''; $('#relWrap').style.display='none'; $('#receiptWrap').style.display='none'; hideEscrow(); updateGo(); }
 function enterMusicBatch(files){
