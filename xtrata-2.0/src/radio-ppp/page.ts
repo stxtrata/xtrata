@@ -596,7 +596,12 @@ function start(root: HTMLElement) {
     // Four steps, shown only during first-time setup. Once set up the panel is one line and a button.
     const stage = stageOf(s) ?? lastStage; // loading keeps the last known stage
     lastStage = stage;
-    const setup = showSteps(s, stage);
+    // Once any wallet on this device has played, a further one (an album) is not first-time setup: no steps.
+    const HEARD_KEY = 'xtrata.radio.ppp.heard.v1';
+    const deviceHeard = (() => { try { return localStorage.getItem(HEARD_KEY) === '1'; } catch { return false; } })();
+    if (!deviceHeard && s.entries.some((e) => e.kind === 'play')) { try { localStorage.setItem(HEARD_KEY, '1'); } catch { /* a convenience */ } }
+    const heard = deviceHeard || (s.slot > 0 && ((s.likeFunds?.balance ?? 0n) > 0n || shelf.count() > 1));
+    const setup = showSteps({ ...s, heard }, stage);
     $('.ppp-badge').hidden = !setup;
     const progress = $('.ppp-steps'), caption = $('.ppp-stage');
     progress.hidden = caption.hidden = !setup;
@@ -895,9 +900,18 @@ function start(root: HTMLElement) {
           return b;
         };
         const albumTitle = inAlbum ? s.gift?.player?.title ?? 'Album' : latestAlbum!.title;
+        // "View all albums" opens the "My albums" fold: every album on this device, one tap to open.
+        const all = button('View all albums' + (shelf.count() > 1 ? ` (${shelf.count()})` : ''), () => {
+          const fold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
+          if (!fold) return;
+          fold.hidden = false;
+          fold.open = true;
+          requestAnimationFrame(() => fold.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+        }, 'ppp-all-albums');
         switcher.replaceChildren(
           tab('🎧 My player', inAlbum ? s.likeFunds?.balance : s.balance, !inAlbum, () => { if (inAlbum) void ppp.openAlbum(0); }),
-          tab('💿 ' + albumTitle, inAlbum ? s.balance : undefined, inAlbum, () => { if (!inAlbum && latestAlbum) void ppp.openAlbum(latestAlbum.slot); })
+          tab('💿 ' + albumTitle, inAlbum ? s.balance : undefined, inAlbum, () => { if (!inAlbum && latestAlbum) void ppp.openAlbum(latestAlbum.slot); }),
+          all
         );
       }
     }
