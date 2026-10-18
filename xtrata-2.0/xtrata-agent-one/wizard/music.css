@@ -129,8 +129,8 @@ header {
 #trackEditor {
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 18px;
-  margin: 16px 0;
+  padding: 14px 16px;
+  margin: 0 0 10px;
   background: var(--panel2);
 }
 .metadata-grid {
@@ -683,3 +683,27 @@ main {
 .sb-linkrow input:focus{outline:none;border-color:var(--acc2)}
 .sb-linkmsg{margin-top:6px;font-size:12.5px}
 @media (max-width:560px){.sb-bulk-grid{grid-template-columns:1fr}.sb-move{margin-left:0}}
+
+/* Per-song quick boxes and the inline "All details" editor */
+.sb-quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.sb-q{display:block;min-width:0}
+.sb-q>span{display:block;font-size:10.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+.sb-q input{width:100%;box-sizing:border-box;background:#0b0e14;border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:7px 9px;font:inherit;font-size:13px}
+.sb-q input:focus{outline:none;border-color:var(--acc2)}
+.sbrow{scroll-margin-top:12px}
+.sbrow.editing{border-color:var(--acc2)!important;margin-bottom:0!important;border-bottom-left-radius:0!important;border-bottom-right-radius:0!important}
+#trackEditor.sb-ed{border-color:var(--acc2);border-top-left-radius:0;border-top-right-radius:0;margin-top:-1px}
+.sb-ed-head h3{margin:0 0 2px;font-size:14px}
+.sb-ed-head p{margin:0 0 10px;font-size:12px}
+.sb-ed-sec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.sb-ed-sec>summary{cursor:pointer;font-weight:700;font-size:13px}
+.sb-ed-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.sb-ed-grid.one{grid-template-columns:1fr}
+.sb-ed-grid .efield{margin-bottom:0}
+.sb-ed-sec .music-options{margin-top:12px}
+.sb-more{margin-top:10px}
+.sb-more>summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--mut)}
+@media (max-width:560px){.sb-quick,.sb-ed-grid{grid-template-columns:1fr}}
+#sbBulkArtThumb{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#10120f;flex:none}
+.sb-bulk-art{margin-top:12px}
+.sb-bulk-art .sb-linkrow input{max-width:260px}

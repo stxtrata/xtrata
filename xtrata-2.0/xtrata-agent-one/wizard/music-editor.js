@@ -49,6 +49,9 @@ function musicBusy(busy) {
     '#musicFeeMode,input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#refAudioPanel input,#refAudioPanel button,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button,#sbBulk input,#sbBulk button,#sbList .sb-link input,#sbList .sb-link button'
   ))
     el.disabled = busy || !!musicJobActive();
+  // Title and artist boxes on each song stay editable while other songs build; only a job locks them.
+  for (const el of document.querySelectorAll('#sbList .sb-quick input'))
+    el.disabled = !!musicJobActive();
 }
 function musicUnlockJob() {
   musicBusy(false);
@@ -58,6 +61,7 @@ function musicLockJob() {
     '#musicFeeMode,input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#refAudioPanel input,#refAudioPanel button,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button,#sbBulk input,#sbBulk button,#sbList .sb-link input,#sbList .sb-link button'
   ))
     el.disabled = true;
+  for (const el of document.querySelectorAll('#sbList .sb-quick input')) el.disabled = true;
   updateGo();
 }
 $('#drop').addEventListener('keydown', (e) => {
@@ -225,37 +229,190 @@ new MutationObserver(() => musicQuoteDetails(EST, quoteDetails)).observe($('#qPa
 new MutationObserver(() => musicQuoteDetails(SB.EST, batchDetails)).observe($('#sbPay'), {
   childList: true
 });
-// A real batch editor, with per-track settings and optional shared credits.
+// Per-song editor for the batch. It opens directly under the song being edited, in sections, and only
+// writes the details you actually changed — so it can never undo a bulk change made after it opened.
 const editor = document.createElement('section');
 editor.id = 'trackEditor';
+editor.className = 'sb-ed';
 editor.hidden = true;
 $('#musicBatch').prepend(editor);
+let editingItem = null,
+  editorInitial = {},
+  editorGather = null,
+  previewRun = 0;
+const FIELD_LABELS = {
+  featuredArtists: 'Featured artists',
+  songwriters: 'Songwriters',
+  performers: 'Performers',
+  releaseDate: 'Release date',
+  trackNumber: 'Track number',
+  musicalKey: 'Musical key',
+  rightsHolder: 'Rights holder',
+  isrc: 'ISRC',
+  bpm: 'BPM'
+};
+const EDITOR_SECTIONS = [
+  ['Song', ['title', 'artist', 'album', 'trackNumber', 'genre', 'releaseDate'], true],
+  [
+    'Credits and rights',
+    [
+      'featuredArtists',
+      'songwriters',
+      'performers',
+      'producer',
+      'engineer',
+      'rightsHolder',
+      'license',
+      'isrc',
+      'language'
+    ],
+    false
+  ],
+  ['Description and notes', ['description', 'version', 'bpm', 'musicalKey', 'note'], false],
+  ['Lyrics', ['lyrics'], false]
+];
+const fieldLabel = (key) =>
+  FIELD_LABELS[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+const parkEditor = () => {
+  ++previewRun;
+  const frame = editor.querySelector('.music-track-preview');
+  if (frame) frame.srcdoc = '';
+  editor.hidden = true;
+  $('#musicBatch').prepend(editor);
+};
+const editingIndex = () => (editingItem ? SB.items.indexOf(editingItem) : -1);
+window.musicEditingIndex = editingIndex;
+// Which details were changed in the open editor (field name → new value).
+const editorChanges = () => {
+  if (editor.hidden || !editorGather) return {};
+  const now = editorGather(),
+    out = {};
+  for (const k of Object.keys(now)) if (now[k] !== editorInitial[k]) out[k] = now[k];
+  return out;
+};
+window.musicEditorDirty = () => !editor.hidden && Object.keys(editorChanges()).length > 0;
+const editorSay = (msg) => {
+  const el = editor.querySelector('#trackStatus');
+  if (el) el.textContent = msg || '';
+};
+const closeEditor = () => {
+  editingItem = null;
+  parkEditor();
+  sbRender();
+};
+// Bring the editor's untouched fields up to date with the song (e.g. after "Apply to all").
+const syncEditor = () => {
+  if (editor.hidden || !editingItem || !editorGather) return;
+  const values = { ...editingItem.info, ...editingItem.overrides };
+  for (const key of window.XtrataMusic.FIELDS) {
+    const input = $('#track-' + key);
+    if (!input || input.value !== (editorInitial[key] ?? '')) continue; // the user is editing this one
+    const next = values[key] == null ? '' : String(values[key]);
+    input.value = next;
+    editorInitial[key] = next;
+  }
+};
+const renderBeforeEditor = sbRender;
+sbRender = function () {
+  const hadFocus = editor.contains(document.activeElement) ? document.activeElement : null,
+    at =
+      hadFocus && 'selectionStart' in hadFocus
+        ? [hadFocus.selectionStart, hadFocus.selectionEnd]
+        : null;
+  if (!editor.hidden) {
+    editor.remove(); // keep the open editor out of the list while it is rewritten
+    $('#musicBatch').prepend(editor);
+  }
+  renderBeforeEditor();
+  const index = editingIndex();
+  if (editingItem && index < 0) {
+    editingItem = null;
+    parkEditor();
+    return;
+  }
+  if (!editor.hidden) {
+    const row = $('#sbList').children[index];
+    if (row) row.after(editor);
+    syncEditor();
+    if (hadFocus && hadFocus.isConnected) {
+      hadFocus.focus();
+      try {
+        if (at) hadFocus.setSelectionRange(at[0], at[1]);
+      } catch (_e) {
+        /* not a text box */
+      }
+    }
+  }
+};
 window.musicEditTrack = (i) => {
-  if (SB.busy || musicJobActive()) return;
+  if (musicJobActive()) return;
   const it = SB.items[i];
-  if (!it) return;
+  if (!it || it.status !== 'ready') return;
+  if (editingItem === it) {
+    if (window.musicEditorDirty()) {
+      editorSay('You have unsaved changes — apply them or close to discard.');
+      return;
+    }
+    closeEditor();
+    return;
+  }
+  if (editingItem && window.musicEditorDirty()) {
+    editorSay('You have unsaved changes on this song — apply them or close first.');
+    editor.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return;
+  }
+  editingItem = it;
   musicTrackIndex = i;
-  editor.innerHTML =
-    '<h2>Edit track ' +
-    (i + 1) +
-    '</h2><div class="music-options"><label>Release format<select id="trackFormat"><option value="audio">Audio only</option><option value="details">Song with details</option><option value="artwork">Song with artwork</option></select></label><label>Audio quality<select id="trackQuality"><option value="original">Keep original file</option><option value="compact">Smallest · Opus 48 kbps VBR</option><option value="optimised" selected>Balanced · Opus 96 kbps VBR (default)</option><option value="high">High quality · Opus 128 kbps VBR</option><option value="premium">Extra quality · Opus 160 kbps VBR</option></select></label></div><div id="trackFields" class="metadata-grid"></div><div class="music-toolbar"><button class="btn" id="saveTrack">Apply track changes</button><button class="btn ghost" id="shareTrack">Apply artist, album and artwork to all tracks</button><button class="btn ghost" id="closeTrack">Close</button></div>';
+  ++previewRun;
   const values = { ...it.info, ...it.overrides };
+  editor.innerHTML =
+    '<div class="sb-ed-head"><h3>All details · song ' +
+    (i + 1) +
+    '</h3><p class="muted">Anything you change here applies to this song only.</p></div><div id="trackSections"></div><p id="trackStatus" class="muted" role="status"></p><div class="music-toolbar"><button class="btn" id="saveTrack">Apply changes to this song</button><button class="btn ghost" id="shareTrack" title="Copies this song’s artist and album — and its artwork, if it has any — to every song">Use this artist, album and artwork for all songs</button><button class="btn ghost" id="closeTrack">Close</button></div>';
+  const known = new Set(EDITOR_SECTIONS.flatMap(([, keys]) => keys));
+  const sections = EDITOR_SECTIONS.map(([name, keys, open]) => [name, keys, open]);
+  const leftovers = window.XtrataMusic.FIELDS.filter((k) => !known.has(k));
+  if (leftovers.length) sections.push(['More details', leftovers, false]);
+  const host = $('#trackSections');
+  for (const [name, keys, open] of sections) {
+    const d = document.createElement('details');
+    d.className = 'sb-ed-sec';
+    d.open = open;
+    const sum = document.createElement('summary');
+    sum.textContent = name;
+    const grid = document.createElement('div');
+    grid.className = keys.length === 1 ? 'sb-ed-grid one' : 'sb-ed-grid';
+    d.append(sum, grid);
+    for (const key of keys) {
+      if (!window.XtrataMusic.FIELDS.includes(key)) continue;
+      const g = document.createElement('div');
+      g.className = 'efield';
+      const l = document.createElement('label');
+      l.htmlFor = 'track-' + key;
+      l.textContent = fieldLabel(key);
+      const input = document.createElement(key === 'lyrics' ? 'textarea' : 'input');
+      input.id = l.htmlFor;
+      if (key === 'lyrics') input.rows = 8;
+      input.value = values[key] == null ? '' : String(values[key]);
+      g.append(l, input);
+      grid.append(g);
+    }
+    host.append(d);
+  }
+  const lead = host.querySelector('details');
+  if (lead && window.XtrataMusic.FIELDS.includes('title')) {
+    // keep the section order stable but open the first one
+    lead.open = true;
+  }
+  // Player and audio settings live in their own section, closed by default.
+  const player = document.createElement('details');
+  player.className = 'sb-ed-sec';
+  player.innerHTML =
+    '<summary>Player style and audio</summary><div class="music-options"><label>Release format<select id="trackFormat"><option value="audio">Audio only</option><option value="details">Song with details</option><option value="artwork">Song with artwork</option></select></label><label>Audio quality<select id="trackQuality"><option value="original">Keep original file</option><option value="compact">Smallest · Opus 48 kbps VBR</option><option value="optimised" selected>Balanced · Opus 96 kbps VBR (default)</option><option value="high">High quality · Opus 128 kbps VBR</option><option value="premium">Extra quality · Opus 160 kbps VBR</option></select></label></div><div id="trackStyleHost"></div>';
+  host.append(player);
   $('#trackFormat').value = values.format || $('#musicFormat').value;
   $('#trackQuality').value = values.quality || $('#musicQuality').value;
-  for (const key of window.XtrataMusic.FIELDS) {
-    const g = document.createElement('div');
-    g.className = 'efield';
-    const l = document.createElement('label');
-    l.htmlFor = 'track-' + key;
-    l.textContent = key.replace(/([A-Z])/g, ' $1');
-    const input = document.createElement(key === 'lyrics' ? 'textarea' : 'input');
-    input.id = l.htmlFor;
-    input.value = values[key] || '';
-    g.append(l, input);
-    $('#trackFields').append(g);
-  }
-  const styleHost = document.createElement('div');
-  $('#trackFields').before(styleHost);
+  const styleHost = $('#trackStyleHost');
   const preview = document.createElement('iframe');
   preview.className = 'music-track-preview';
   preview.title = 'Track style preview';
@@ -264,85 +421,103 @@ window.musicEditTrack = (i) => {
   const previewNote = document.createElement('p');
   previewNote.className = 'muted';
   preview.after(previewNote);
-  let previewRun = 0;
-  const trackAppearance = window.XtrataMusicAppearance.mount(
-    styleHost,
-    values.appearance,
-    async () => {
-      const run = ++previewRun;
-      previewNote.textContent = 'Updating preview…';
-      try {
-        const r = await window.XtrataMusic.build(it.file, () => {}, {
-          ...it.overrides,
-          ...gather(),
-          format: $('#trackFormat').value,
-          quality: $('#trackQuality').value,
-          appearance: trackAppearance.get(),
-          artFit: undefined
-        });
-        if (run !== previewRun || editor.hidden) return;
-        preview.hidden = !r.html;
-        preview.srcdoc = r.html || '';
-        previewNote.textContent = r.html
-          ? 'Style preview · Apply track changes to save and refresh the quote.'
-          : 'Audio only has no inscribed player style.';
-      } catch (error) {
-        if (run === previewRun) previewNote.textContent = error.message;
-      }
+  const gatherFields = () =>
+    Object.fromEntries(
+      window.XtrataMusic.FIELDS.filter((k) => $('#track-' + k)).map((k) => [
+        k,
+        $('#track-' + k).value
+      ])
+    );
+  const settings = () => ({
+    format: $('#trackFormat').value,
+    quality: $('#trackQuality').value,
+    appearance: JSON.stringify(trackAppearance.get())
+  });
+  let trackAppearance;
+  const previewBuild = async () => {
+    const run = ++previewRun;
+    previewNote.textContent = 'Updating preview…';
+    try {
+      const r = await window.XtrataMusic.build(it.file, () => {}, {
+        ...it.overrides,
+        ...editorChanges(),
+        format: $('#trackFormat').value,
+        quality: $('#trackQuality').value,
+        appearance: trackAppearance.get(),
+        artFit: undefined
+      });
+      if (run !== previewRun || editor.hidden) return;
+      preview.hidden = !r.html;
+      preview.srcdoc = r.html || '';
+      previewNote.textContent = r.html
+        ? 'Style preview · Apply changes to save and refresh the quote.'
+        : 'Audio only has no inscribed player style.';
+    } catch (error) {
+      if (run === previewRun) previewNote.textContent = error.message;
     }
-  );
+    sbUpdateGo();
+  };
+  trackAppearance = window.XtrataMusicAppearance.mount(styleHost, values.appearance, previewBuild);
   preview.hidden = !it.info?.html;
   preview.srcdoc = it.info?.html || '';
-  previewNote.textContent = 'Apply track changes to save the appearance and refresh the quote.';
-  const gather = () =>
-    Object.fromEntries(window.XtrataMusic.FIELDS.map((k) => [k, $('#track-' + k).value]));
+  previewNote.textContent = 'Apply changes to save the appearance and refresh the quote.';
+  // Dirty tracking: the editor only writes what differs from what it opened with.
+  const initialSettings = settings();
+  editorGather = () => ({ ...gatherFields(), ...settings() });
+  editorInitial = { ...gatherFields(), ...initialSettings };
   const save = async (shared) => {
-    if (SB.busy || musicJobActive()) return;
-    const edits = {
-      ...gather(),
-      format: $('#trackFormat').value,
-      quality: $('#trackQuality').value,
-      appearance: trackAppearance.get(),
-      artFit: undefined
-    };
-    it.overrides = { ...it.overrides, ...edits };
+    if (musicJobActive() || editingItem !== it) return;
+    if (it.status !== 'ready') {
+      editorSay('This song is still being prepared — try again in a moment.');
+      return;
+    }
+    const changes = editorChanges(),
+      all = gatherFields();
+    const edits = { ...changes };
+    if ('appearance' in changes) edits.appearance = trackAppearance.get();
+    else delete edits.appearance;
+    it.overrides = { ...it.overrides, ...edits, artFit: undefined };
     it.status = 'queued';
     if (shared)
       for (const row of SB.items) {
         row.overrides = {
           ...row.overrides,
-          artist: edits.artist,
-          album: edits.album,
+          artist: all.artist,
+          album: all.album,
           ...(it.info?.coverB64
             ? { format: 'artwork', coverB64: it.info.coverB64, coverMime: it.info.coverMime }
             : {})
         };
         row.status = 'queued';
       }
-    ++previewRun;
-    preview.srcdoc = '';
-    editor.hidden = true;
+    editingItem = null;
+    parkEditor();
     SB.EST = null;
     ++SB.quoteRun;
+    sbRender();
     await sbProcess();
   };
   $('#saveTrack').onclick = () => save(false);
   $('#shareTrack').onclick = () => save(true);
-  $('#closeTrack').onclick = () => {
-    ++previewRun;
-    preview.srcdoc = '';
-    editor.hidden = true;
+  $('#closeTrack').onclick = closeEditor;
+  editor.oninput = editor.onchange = () => {
+    editorSay('');
     sbUpdateGo();
   };
   editor.hidden = false;
+  sbRender();
+  const row = $('#sbList').children[i];
+  if (row) row.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  const first = $('#track-title');
+  if (first) first.focus({ preventScroll: true });
   sbUpdateGo();
 };
 const oldBatchGo = sbUpdateGo;
 sbUpdateGo = function () {
   oldBatchGo();
-  if (!editor.hidden) {
+  if (window.musicEditorDirty()) {
     $('#sbGo').disabled = true;
-    $('#sbGo').textContent = 'Apply or close the track editor before inscribing';
+    $('#sbGo').textContent = 'Apply or close the song editor before inscribing';
   }
 };
 // Draft storage deliberately excludes the agent's job records and funding material.

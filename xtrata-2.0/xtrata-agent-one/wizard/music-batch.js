@@ -102,9 +102,26 @@
     it.err = null;
   };
 
-  // Set the same artist and/or album on many songs. With onlyEmpty a song keeps what it already has.
+  // Details that make sense to set once for a whole release. Everything else is per song.
+  const SHARED_KEYS = [
+    'artist',
+    'album',
+    'featuredArtists',
+    'genre',
+    'releaseDate',
+    'language',
+    'songwriters',
+    'performers',
+    'producer',
+    'engineer',
+    'rightsHolder',
+    'license'
+  ];
+
+  // Set the same details on many songs. Boxes left empty change nothing. With onlyEmpty a song keeps
+  // anything it already has.
   function applyShared(items, values, onlyEmpty) {
-    const wanted = ['artist', 'album'].filter((k) => text(values && values[k]));
+    const wanted = SHARED_KEYS.filter((k) => text(values && values[k]));
     let changed = 0;
     for (const it of items) {
       const patch = {};
@@ -123,6 +140,60 @@
       changed++;
     }
     return changed;
+  }
+
+  // A title or artist typed into one song's row. Returns true when it differs from what the song has.
+  function applyQuick(it, drafts) {
+    const patch = {};
+    for (const key of ['title', 'artist']) {
+      if (!drafts || drafts[key] === undefined) continue;
+      const next = text(drafts[key]);
+      const current = text(
+        it.overrides && it.overrides[key] !== undefined
+          ? it.overrides[key]
+          : it.info && it.info[key]
+      );
+      if (next !== current) patch[key] = next;
+    }
+    if (!Object.keys(patch).length) return false;
+    it.overrides = { ...it.overrides, ...patch };
+    requeue(it);
+    return true;
+  }
+
+  // Put one image on many songs. art is either { coverB64, coverMime } (the image itself) or
+  // { coverInscription } (a verified link). With onlyEmpty a song that already shows artwork keeps it.
+  // Audio-only songs cannot show artwork and songs not built yet cannot be judged; both are counted.
+  function applyArt(items, art, onlyEmpty) {
+    const out = { changed: 0, audioOnly: 0, skipped: 0 };
+    const link = !!(art && art.coverInscription);
+    if (!art || (!link && !art.coverB64)) return out;
+    for (const it of items) {
+      const f = it.status === 'ready' ? facts(it) : null;
+      if (!f) {
+        out.skipped++;
+        continue;
+      }
+      if (f.art === 'n/a') {
+        out.audioOnly++;
+        continue;
+      }
+      if (onlyEmpty && HAS_ART.includes(f.art)) continue;
+      const o = { ...it.overrides, format: 'artwork' };
+      if (link) {
+        o.coverInscription = art.coverInscription;
+        delete o.coverB64;
+        delete o.coverMime;
+      } else {
+        o.coverB64 = art.coverB64;
+        o.coverMime = art.coverMime || 'image/png';
+        delete o.coverInscription;
+      }
+      it.overrides = o;
+      requeue(it);
+      out.changed++;
+    }
+    return out;
   }
 
   // 'off' leaves existing artwork out of every song that has some; 'on' brings back art that a song
@@ -194,7 +265,10 @@
     shrinkable,
     summary,
     summaryText,
+    SHARED_KEYS,
     applyShared,
+    applyQuick,
+    applyArt,
     setArt,
     leadingNumber,
     numberTracks,
