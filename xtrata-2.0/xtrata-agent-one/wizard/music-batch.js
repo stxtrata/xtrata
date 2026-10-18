@@ -161,6 +161,41 @@
     return true;
   }
 
+  // Put one image on many songs. art is either { coverB64, coverMime } (the image itself) or
+  // { coverInscription } (a verified link). With onlyEmpty a song that already shows artwork keeps it.
+  // Audio-only songs cannot show artwork and songs not built yet cannot be judged; both are counted.
+  function applyArt(items, art, onlyEmpty) {
+    const out = { changed: 0, audioOnly: 0, skipped: 0 };
+    const link = !!(art && art.coverInscription);
+    if (!art || (!link && !art.coverB64)) return out;
+    for (const it of items) {
+      const f = it.status === 'ready' ? facts(it) : null;
+      if (!f) {
+        out.skipped++;
+        continue;
+      }
+      if (f.art === 'n/a') {
+        out.audioOnly++;
+        continue;
+      }
+      if (onlyEmpty && HAS_ART.includes(f.art)) continue;
+      const o = { ...it.overrides, format: 'artwork' };
+      if (link) {
+        o.coverInscription = art.coverInscription;
+        delete o.coverB64;
+        delete o.coverMime;
+      } else {
+        o.coverB64 = art.coverB64;
+        o.coverMime = art.coverMime || 'image/png';
+        delete o.coverInscription;
+      }
+      it.overrides = o;
+      requeue(it);
+      out.changed++;
+    }
+    return out;
+  }
+
   // 'off' leaves existing artwork out of every song that has some; 'on' brings back art that a song
   // has in its file but is not using. Songs with no art at all are left alone.
   function setArt(items, mode) {
@@ -233,6 +268,7 @@
     SHARED_KEYS,
     applyShared,
     applyQuick,
+    applyArt,
     setArt,
     leadingNumber,
     numberTracks,

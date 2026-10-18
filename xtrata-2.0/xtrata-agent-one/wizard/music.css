@@ -704,3 +704,6 @@ main {
 .sb-more{margin-top:10px}
 .sb-more>summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--mut)}
 @media (max-width:560px){.sb-quick,.sb-ed-grid{grid-template-columns:1fr}}
+#sbBulkArtThumb{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#10120f;flex:none}
+.sb-bulk-art{margin-top:12px}
+.sb-bulk-art .sb-linkrow input{max-width:260px}
