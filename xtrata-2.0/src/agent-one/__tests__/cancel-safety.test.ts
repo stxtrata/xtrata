@@ -143,6 +143,51 @@ describe('Agent One cancel safety', () => {
     expect(agentSource).toContain('job.keepKey = true; job.keepKeyGrace = true;');
   });
 
+  it('sweeps money that arrives at a finished job after it closed', () => {
+    // Cancelling before the deposit confirmed leaves CANCELLED + a kept grace key. The watcher
+    // skipped CANCELLED, so a late payment sat at the deposit address while the page said
+    // "funds returned" (81.12 STX, 18 Oct 2026). A COMPLETE job whose parent could not be returned
+    // is the same shape (inscription #3049, 14 Sept 2026).
+    const at = agentSource.indexOf("['CANCELLED', 'COMPLETE', 'COMPLETE_WITH_SKIPS'].includes(j.status) && j.ephemeralMnemonic");
+    expect(at).toBeGreaterThan(-1);
+    const branch = agentSource.slice(at, agentSource.indexOf('continue;\n    }', at));
+    expect(branch).toContain('lateSweepCheck(j.jobId)');
+    const checkAt = agentSource.indexOf('async function lateSweepCheck');
+    const check = agentSource.slice(checkAt, agentSource.indexOf('async function watchTick', checkAt));
+    // a failed read is "don't know", never "empty"
+    expect(check).toContain('catch { return; }');
+    expect(check).toContain('stx > REFUND_TX_FEE');
+    expect(check).toContain('refundAndClose');
+    // an inscription it cannot afford to move is surfaced, not hidden
+    expect(check).toContain("j.status = 'NEEDS_RECOVERY'");
+    expect(check).toContain('delete j.keepKeyGrace');
+    // only verified-empty jobs go quiet, and the key is KEPT
+    expect(check).toContain('verified empty');
+    expect(check).not.toContain('delete j.ephemeralMnemonic');
+    // polled less and less often, a few per tick
+    expect(agentSource).toContain('const LATE_CHECKS_PER_TICK = 3');
+    expect(agentSource).toContain('age < 3600000 ? 30000');
+  });
+
+  it('never reads a failed ownership lookup as "the parent already left"', () => {
+    // ownerOf() returns null for "someone else owns it" AND "the API said 429". Using it to decide a
+    // parent had gone skipped the return, swept the STX, and stranded the inscription.
+    expect(agentSource).toContain("async function heldBy(");
+    expect(agentSource).toContain("return 'unknown';");
+    expect(agentSource).not.toMatch(/await ownerOf\(String\((pid|id)\)\)\) (===|!==) (dep\.address|fromAddr)/);
+    // anything that could not be sent home keeps the change in the wallet to pay for it
+    expect(agentSource.match(/let holdFunds = false;/g)?.length).toBe(2);
+    expect(agentSource.match(/if \(holdFunds\) notes\.push\(/g)?.length).toBe(2);
+  });
+
+  it('does not tell the user the key was discarded while it is still watching', () => {
+    expect(wizard).toContain('job.hasKey&&job.keepKeyGrace');
+    expect(wizard).toContain('keeps watching the deposit address');
+    // and offers no Delete while the job still controls a deposit wallet
+    expect(wizard).toContain('job.hasKey?');
+    expect(wizard).toContain('cannot be deleted');
+  });
+
   it('is reachable from both pages, and degrades honestly on an old bundle', () => {
     for (const page of [wizard, suno]) {
       expect(page).toContain('/cancel$/');
