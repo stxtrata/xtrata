@@ -180,6 +180,18 @@ describe('Agent One cancel safety', () => {
     expect(agentSource.match(/if \(holdFunds\) notes\.push\(/g)?.length).toBe(2);
   });
 
+  it('clears the "keep key" flags when it discards the key of a verified-empty wallet', () => {
+    // Leaving keepKey set after deleting the key made the unfinished-jobs reminder nag forever about a
+    // job with nothing left in it (#3049's job, 18 Oct 2026).
+    expect(agentSource).not.toMatch(/&& !holdsNft\) delete job\.ephemeralMnemonic;/);
+    expect(agentSource).toContain('async function staleFlagCheck');
+    const at = agentSource.indexOf('async function staleFlagCheck');
+    const check = agentSource.slice(at, agentSource.indexOf('async function watchTick', at));
+    // heals only after BOTH reads succeed and show nothing left
+    expect(check).toContain('catch { return; }');
+    expect(check).toContain('!nfts.length');
+  });
+
   it('does not tell the user the key was discarded while it is still watching', () => {
     expect(wizard).toContain('job.hasKey&&job.keepKeyGrace');
     expect(wizard).toContain('keeps watching the deposit address');

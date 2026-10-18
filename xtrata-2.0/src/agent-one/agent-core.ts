@@ -567,7 +567,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-18.1';
+export const AGENT_BUILD = '2026-10-18.2';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -1926,7 +1926,7 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
   let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
   let holdsNft = (job.parents || []).length > 0;
   try { holdsNft = (await heldInscriptions(job.depositAddress)).length > 0; } catch {}
-  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) { delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; }
   else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : holdsNft ? 'wallet still holds an inscription — return it via recovery' : `wallet still holds ${leftover} uSTX`; }
   job.status = doneStatus(); writeJob(job);
   job.items.forEach((_: any, i: number) => idbDeleteBytes(`${job.jobId}:${i}`));
@@ -2012,7 +2012,7 @@ async function deliver(job: any) {
   let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
   let holdsNft = (job.parents || []).length > 0;   // assume the worst until proven empty
   try { holdsNft = (await heldInscriptions(job.depositAddress)).length > 0; } catch {}
-  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) { delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; }
   else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : holdsNft ? 'wallet still holds an inscription — return it via recovery' : `wallet still holds ${leftover} uSTX — sweep with recover-all`; }
   job.status = 'COMPLETE'; writeJob(job); idbDeleteBytes(job.jobId); return { receipt };
 }
@@ -2037,7 +2037,7 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
       if (to) { try { const sw = await sweepStxTo(dep.key, dep.address, to); if (sw.sent) { job.refundTx = sw.tx; job.refundedUstx = sw.amount; } } catch {} }
       let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
       let holdsNft = true; try { holdsNft = (await heldInscriptions(job.depositAddress)).length > 0; } catch {}
-      if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+      if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) { delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; }
       else if (leftover != null) { job.keepKey = true; job.keepKeyReason = holdsNft ? 'wallet still holds an inscription — return it via recovery' : `~${leftover} uSTX leftover — sweep with recover-all`; }
     }
     job.status = 'COMPLETE'; writeJob(job); return { alreadyDelivered: true };
@@ -2098,7 +2098,7 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
   else if (leftover != null && leftover <= REFUND_TX_FEE) {
     // NEVER-STRAND GUARD: a never-funded job keeps its key (EXPIRED) — a slow payment confirming after
     // cancellation must never land at a keyless address.
-    if (job.depositReceivedUstx || leftover > 0n) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; }
+    if (job.depositReceivedUstx || leftover > 0n) { delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; job.status = 'CANCELLED'; }
     // An explicit cancel must REST as cancelled. Landing on EXPIRED left the job
     // re-runnable by the watcher and still offering its own Stop button, so the
     // thing the user just stopped looked like it had not stopped at all. The key is
@@ -2312,6 +2312,14 @@ async function lateSweepCheck(id: string) {
     j = readJob(id); j.keepKeyGrace = true; j.keepKeyReason = (j.keepKeyReason || '') + ' · verified empty — key kept so a late payment is never stranded'; writeJob(j);
   }
 }
+async function staleFlagCheck(id: string) {
+  lateDepositCheckedAt.set(id, Date.now());
+  let j: any; try { j = readJob(id); } catch { return; }
+  if (j.ephemeralMnemonic || !j.keepKey) return;
+  let stx: bigint; try { stx = await balance(j.depositAddress); } catch { return; }
+  let nfts: string[]; try { nfts = await heldInscriptions(j.depositAddress); } catch { return; }
+  if (stx <= REFUND_TX_FEE && !nfts.length) { j = readJob(id); delete j.keepKey; delete j.keepKeyGrace; delete j.keepKeyReason; writeJob(j); }
+}
 async function watchTick() {
   void syncWakeLock();
   lateChecksThisTick = 0;
@@ -2336,6 +2344,14 @@ async function watchTick() {
       if (lateChecksThisTick >= LATE_CHECKS_PER_TICK || !lateCheckDue(j)) continue;
       lateChecksThisTick++;
       await lateSweepCheck(j.jobId);
+      continue;
+    }
+    // Older builds deleted the key after a verified-empty sweep but left keepKey set, so the unfinished-jobs
+    // reminder kept nagging about a job with nothing left in it. Heal it — but only after looking at the chain.
+    if (['CANCELLED', 'COMPLETE', 'COMPLETE_WITH_SKIPS'].includes(j.status) && j.keepKey && !j.ephemeralMnemonic && !j.keepKeyGrace && j.depositAddress && !j.mock) {
+      if (lateChecksThisTick >= LATE_CHECKS_PER_TICK || !lateCheckDue(j)) continue;
+      lateChecksThisTick++;
+      await staleFlagCheck(j.jobId);
       continue;
     }
     // A page close/reload can interrupt the browser-held recovery between
