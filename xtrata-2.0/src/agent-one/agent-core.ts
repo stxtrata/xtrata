@@ -553,7 +553,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-09-12.1';
+export const AGENT_BUILD = '2026-10-18.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -2246,6 +2246,10 @@ function background(id: string, fn: () => Promise<any>) {
     PROCESSING.delete(id);
   });
 }
+// How often a cancelled job that kept its key is checked for a late payment. Slow on purpose: it is
+// insurance, and there can be many of these.
+const LATE_DEPOSIT_POLL_MS = 30000;
+const lateDepositCheckedAt = new Map<string, number>();
 async function watchTick() {
   void syncWakeLock();
   for (const j of listJobsRaw()) {
@@ -2258,6 +2262,21 @@ async function watchTick() {
     // logic below, or the watcher would happily restart the job we were asked to stop.
     if (j.cancelRequested && !['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(j.status)) {
       background(j.jobId, () => refundAndClose(readJob(j.jobId), 'cancelled by request — everything returned to the payer'));
+      continue;
+    }
+    // A cancel that landed BEFORE the payment confirmed leaves the job CANCELLED with its key kept as
+    // insurance ("so a late payment is never stranded"). Nothing used to watch that address, so a
+    // payment confirming a few seconds later just sat there while the page said "funds returned".
+    // Look at the address now and then and send anything that arrived straight back to the payer.
+    if (j.status === 'CANCELLED' && j.ephemeralMnemonic && j.depositAddress && (j.keepKeyGrace || j.cancelRequested)) {
+      if (Date.now() - (lateDepositCheckedAt.get(j.jobId) || 0) < LATE_DEPOSIT_POLL_MS) continue;
+      lateDepositCheckedAt.set(j.jobId, Date.now());
+      let held: bigint | null = null;
+      try { held = await balance(j.depositAddress); } catch { held = null; }
+      if (held != null && held > REFUND_TX_FEE) {
+        xaoLog(j.jobId, `late payment of ${held} uSTX found at a cancelled job's deposit address — returning it to the payer`);
+        background(j.jobId, () => refundAndClose(readJob(j.jobId), 'payment arrived after the job was cancelled — returned to the payer'));
+      }
       continue;
     }
     // A page close/reload can interrupt the browser-held recovery between

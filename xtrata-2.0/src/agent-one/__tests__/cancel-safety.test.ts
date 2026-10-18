@@ -143,6 +143,27 @@ describe('Agent One cancel safety', () => {
     expect(agentSource).toContain('job.keepKey = true; job.keepKeyGrace = true;');
   });
 
+  it('sweeps a payment that confirms after the job was cancelled', () => {
+    // Cancelling before the deposit confirmed leaves CANCELLED + a kept grace key. The watcher
+    // skipped CANCELLED, so a late payment sat at the deposit address while the page said
+    // "funds returned" (81.12 STX, 18 Oct 2026).
+    const at = agentSource.indexOf("j.status === 'CANCELLED' && j.ephemeralMnemonic");
+    expect(at).toBeGreaterThan(-1);
+    const branch = agentSource.slice(at, agentSource.indexOf('continue;\n    }', at));
+    expect(branch).toContain('keepKeyGrace');
+    expect(branch).toContain('balance(j.depositAddress)');
+    expect(branch).toContain('held > REFUND_TX_FEE');
+    expect(branch).toContain('refundAndClose');
+    // polled slowly, and a failed balance read is not treated as "empty" nor as "funded"
+    expect(agentSource).toContain('const LATE_DEPOSIT_POLL_MS = 30000');
+    expect(branch).toContain('held != null');
+  });
+
+  it('does not tell the user the key was discarded while it is still watching', () => {
+    expect(wizard).toContain('job.hasKey&&job.keepKeyGrace');
+    expect(wizard).toContain('keeps watching the deposit address');
+  });
+
   it('is reachable from both pages, and degrades honestly on an old bundle', () => {
     for (const page of [wizard, suno]) {
       expect(page).toContain('/cancel$/');
