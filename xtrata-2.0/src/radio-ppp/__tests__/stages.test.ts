@@ -35,6 +35,7 @@ describe('pay-per-play steps', () => {
     expect(showSteps({ step: 'ready', entries: [], linked: undefined, solo: true, creditedTo: 'SP1' }, stageOf({ step: 'ready', payingOn: false, session: null, entries: [], gate: null, solo: true } as any))).toBe(false); // an existing wallet on a new device
     expect(showSteps({ step: 'ready', entries: [{ kind: 'play' }] as any, linked: 'SP1' }, at('ready', { entries: [{ kind: 'play', status: 'confirmed' }] }))).toBe(false);
     expect(showSteps({ step: 'intro', entries: [], linked: undefined }, null)).toBe(false);
+    expect(showSteps({ step: 'ready', entries: [], linked: 'SP1', heard: true }, at('ready'))).toBe(false); // an album wallet on a device that has played before
   });
 
   it('a wrong wallet is a blocked step, shown without the setup track', () => {

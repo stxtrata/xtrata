@@ -41,6 +41,62 @@
   const mimeFor = (f) =>
     MIME[f.name.split('.').pop().toLowerCase()] ||
     (f.type.startsWith('audio/') ? f.type : 'application/octet-stream');
+  // Re-running the audio engine is the slow part of every change, so its result is kept per file and
+  // quality. A title, artist, artwork or link edit then rebuilds from memory instead of re-encoding.
+  // Bounded (about 200 MB of text) and least-recently-used, so a large batch cannot exhaust memory.
+  const CACHE_LIMIT = 200 * 1048576;
+  const cache = new Map(); // File -> { size, byQuality: { [quality]: extractResult } }
+  let cacheSize = 0;
+  const weigh = (ex) =>
+    (ex.audioB64 ? ex.audioB64.length : 0) +
+    (ex.audioBytes ? ex.audioBytes.length : 0) +
+    (ex.coverB64 ? ex.coverB64.length : 0);
+  function forget(file) {
+    const entry = cache.get(file);
+    if (!entry) return;
+    cacheSize -= entry.size;
+    cache.delete(file);
+  }
+  function remember(file, quality, ex) {
+    const size = weigh(ex);
+    if (size > CACHE_LIMIT) return;
+    const entry = cache.get(file) || { size: 0, byQuality: {} };
+    cacheSize -= entry.size;
+    entry.size += size - (entry.byQuality[quality] ? weigh(entry.byQuality[quality]) : 0);
+    entry.byQuality[quality] = ex;
+    cacheSize += entry.size;
+    cache.delete(file);
+    cache.set(file, entry); // most recently used goes last
+    for (const [key, stale] of cache) {
+      if (cacheSize <= CACHE_LIMIT || key === file) break;
+      cacheSize -= stale.size;
+      cache.delete(key);
+    }
+  }
+  async function extractCached(file, onStatus, quality) {
+    const entry = cache.get(file);
+    if (entry && entry.byQuality[quality]) {
+      cache.delete(file);
+      cache.set(file, entry);
+      return entry.byQuality[quality];
+    }
+    const ex = await window.XtrataAudioProcessing.extract(file, onStatus, quality);
+    remember(file, quality, ex);
+    return ex;
+  }
+  // What the file itself carried, whether or not the chosen release style uses it.
+  const NOT_A_TAG = /^(aoe-|encoder$|major_brand$|minor_version$|compatible_brands$|handler_name$)/;
+  function describeFile(meta) {
+    const m = meta || {};
+    const tags = Object.keys(m).filter((k) => String(m[k] ?? '').trim() && !NOT_A_TAG.test(k));
+    const comment = String(m.comment ?? m.description ?? '');
+    return {
+      tags: tags.length,
+      lyrics: !!String(m.lyrics ?? m['lyrics-eng'] ?? m.unsyncedlyrics ?? '').trim(),
+      suno:
+        /made with suno/i.test([comment, m.title, m.artist].join(' ')) || /\bsuno\b/i.test(comment)
+    };
+  }
   let serial = Promise.resolve();
   function build(file, onStatus, overrides = {}) {
     const o = { ...overrides };
@@ -82,19 +138,39 @@
     )
       throw new Error('Choose a valid release format and audio quality.');
     if (!file.size) throw new Error('This audio file is empty.');
-    const ex = await window.XtrataAudioProcessing.extract(file, onStatus, o.quality);
-    const audioMime = o.quality === 'original' ? mimeFor(file) : 'audio/webm; codecs=opus';
+    // An existing audio inscription is linked, not embedded. The fetched copy of it is only used
+    // here to read tags, cover art and waveform, so it is always read at original quality.
+    const audioRef = o.audioInscription || null;
+    if (audioRef && o.format === 'audio')
+      throw new Error(
+        'A linked audio inscription needs a player. Choose "Audio + metadata" or "Audio + metadata + artwork".'
+      );
+    const quality = audioRef ? 'original' : o.quality;
+    const ex = await extractCached(file, onStatus, quality);
+    const seen = describeFile(ex.meta);
+    const audioMime = audioRef
+      ? audioRef.mimeType
+      : quality === 'original'
+        ? mimeFor(file)
+        : 'audio/webm; codecs=opus';
     const metadata = { schema: 'xtrata-music', schemaVersion: 1, assetType: 'song' };
     for (const field of FIELDS) metadata[field] = String(o[field] ?? ex.meta[field] ?? '').trim();
     metadata.title = metadata.title || file.name.replace(/\.[^.]+$/, '');
     metadata.lyrics = String(
       o.lyrics ?? ex.meta.lyrics ?? ex.meta['lyrics-eng'] ?? ex.meta.unsyncedlyrics ?? ''
     ).trim();
-    const coverB64 =
-      o.format === 'artwork' ? (o.coverB64 !== undefined ? o.coverB64 : ex.coverB64) : null;
+    const coverRef = o.format === 'artwork' ? o.coverInscription || null : null;
+    const coverB64 = coverRef
+      ? null
+      : o.format === 'artwork'
+        ? o.coverB64 !== undefined
+          ? o.coverB64
+          : ex.coverB64
+        : null;
     const coverMime = coverB64 ? o.coverMime || ex.coverMime || 'image/jpeg' : null;
-    const audioLabel =
-      o.quality === 'original'
+    const audioLabel = audioRef
+      ? 'Linked to inscription #' + audioRef.id
+      : o.quality === 'original'
         ? 'Original audio'
         : 'Opus ' +
           { compact: 48, optimised: 96, high: 128, premium: 160 }[o.quality] +
@@ -128,7 +204,9 @@
         o.appearance.timeline === 'waveform' ? await window.XtrataMusicPlayer.preparePeaks(ex) : [];
       html = window.XtrataMusicPlayer.build({
         audioMimeType: audioMime,
-        audioBase64: ex.audioB64,
+        audioBase64: audioRef ? '' : ex.audioB64,
+        audioInscription: audioRef,
+        imageInscription: coverRef,
         imageBase64: coverB64,
         imageMimeType: coverMime,
         metadata,
@@ -154,15 +232,24 @@
       coverB64,
       coverMime,
       artworkInfo,
-      hasCover: !!coverB64,
+      hasCover: !!coverB64 || !!coverRef,
+      // 'file' = the song's own embedded art, 'upload' = chosen by the user, 'linked' = an existing
+      // inscription, 'none' = this release has no cover.
+      coverSource: coverRef ? 'linked' : coverB64 ? (o.coverB64 ? 'upload' : 'file') : 'none',
+      found: { cover: !!ex.coverB64, lyrics: seen.lyrics, tags: seen.tags },
+      isSuno: seen.suno,
+      audioRef,
+      coverRef,
+      coverUrl: coverRef ? window.XtrataMusicSources.canonicalUrl(coverRef.id) : null,
+      linkedIds: [...new Set([audioRef && audioRef.id, coverRef && coverRef.id].filter(Boolean))],
       hasLyrics: o.format !== 'audio' && !!metadata.lyrics,
       audioLabel,
       format: o.format,
-      quality: o.quality,
+      quality,
       opusBytes: ex.opusBytes,
       sourceBytes: file.size,
       playerBytes: playerFile.size
     };
   }
-  window.XtrataMusic = { build, FIELDS, mimeFor };
+  window.XtrataMusic = { build, FIELDS, mimeFor, forget };
 })();

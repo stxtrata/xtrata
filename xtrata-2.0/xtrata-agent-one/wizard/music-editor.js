@@ -46,7 +46,7 @@ function showMusicPreview(r) {
 }
 function musicBusy(busy) {
   for (const el of document.querySelectorAll(
-    '#musicFeeMode,input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
+    '#musicFeeMode,input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#refAudioPanel input,#refAudioPanel button,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button,#sbBulk input,#sbBulk button,#sbList .sb-link input,#sbList .sb-link button'
   ))
     el.disabled = busy || !!musicJobActive();
 }
@@ -55,7 +55,7 @@ function musicUnlockJob() {
 }
 function musicLockJob() {
   for (const el of document.querySelectorAll(
-    '#musicFeeMode,input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
+    '#musicFeeMode,input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#refAudioPanel input,#refAudioPanel button,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button,#sbBulk input,#sbBulk button,#sbList .sb-link input,#sbList .sb-link button'
   ))
     el.disabled = true;
   updateGo();
@@ -115,7 +115,7 @@ function musicFormatHelp() {
   if (window.musicAppearance) window.musicAppearance.visibility();
   const format = $('#musicFormat').value,
     quality = $('#musicQuality').value;
-  $('#musicLossyWarning').hidden = quality === 'original';
+  $('#musicLossyWarning').hidden = quality === 'original' || !!REF_AUDIO;
   document.querySelectorAll('input[name=musicReleaseFormat]').forEach((input) => {
     input.checked = input.value === format;
   });
@@ -132,19 +132,23 @@ function musicFormatHelp() {
     format === 'audio'
       ? 'Only the audio file is inscribed. Existing tags and embedded artwork remain inside original files; no additional metadata or player is added.'
       : format === 'details'
-        ? 'A playable release with optional details and lyrics. No separate cover image is added.'
-        : 'A playable release with optional cover artwork, lyrics and credits.';
+        ? 'A playable release with optional details and lyrics. No cover image is added, even if your file has artwork.'
+        : 'A playable release with your cover, lyrics and credits. Artwork inside your files is used automatically; you can replace or remove it.';
   $('#formatHelp').textContent +=
     ' ' +
-    (quality === 'original'
-      ? 'Original audio bytes are preserved.'
-      : quality === 'compact'
-        ? 'Audio is converted to Opus at 48 kbps VBR. Smaller files, with a greater loss of detail — audition before inscribing.'
-        : quality === 'high'
-          ? 'Audio is converted to Opus at 128 kbps VBR for high quality music.'
-          : quality === 'premium'
-            ? 'Audio is converted to Opus at 160 kbps VBR for extra detail, with larger files.'
-            : 'Audio is converted to Opus at 96 kbps VBR, balancing quality and file size.');
+    (REF_AUDIO
+      ? 'The audio plays from inscription #' +
+        REF_AUDIO.id +
+        ', so nothing is converted or stored again.'
+      : quality === 'original'
+        ? 'Original audio bytes are preserved.'
+        : quality === 'compact'
+          ? 'Audio is converted to Opus at 48 kbps VBR. Smaller files, with a greater loss of detail — audition before inscribing.'
+          : quality === 'high'
+            ? 'Audio is converted to Opus at 128 kbps VBR for high quality music.'
+            : quality === 'premium'
+              ? 'Audio is converted to Opus at 160 kbps VBR for extra detail, with larger files.'
+              : 'Audio is converted to Opus at 96 kbps VBR, balancing quality and file size.');
   $('#editWrap').style.display = FILE && format !== 'audio' && !SB.active ? 'block' : 'none';
   $('#eCoverBtn').closest('.efield').style.display = format === 'artwork' ? 'block' : 'none';
 }

@@ -905,6 +905,12 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
     await ensureSlotTable(env);
     const taken = await one<{ id: string }>(env, 'SELECT id FROM radio_gifts WHERE root=? AND slot=? AND id<>?', [bind.root, bind.slot, r.id]);
     if (taken) throw new GiftError('That wallet number was just taken by another gift. Trying the next one…', 409);
+    // One copy of an album per passkey: a second link for the same album (the same player, or the same songs under the
+    // same title) is refused, and stays unspent for someone else. The listener keeps the one they have and can add plays to it.
+    const duplicate = await one<{ id: string }>(env,
+      `SELECT g.id FROM radio_gifts g JOIN radio_gift_players a ON a.id=g.player_id JOIN radio_gift_players b ON b.id=?
+        WHERE g.root=? AND g.status IN ('claiming','claimed') AND g.id<>? AND (a.id=b.id OR (a.tracks=b.tracks AND a.title=b.title)) LIMIT 1`, [r.player_id, bind.root, r.id]);
+    if (duplicate) throw new GiftError('You already have this album on this passkey. Open it from My albums, or pass this link on to someone else.', 409);
   }
   if (r.status === 'pending-deposit' || r.status === 'abandoned') {
     try {

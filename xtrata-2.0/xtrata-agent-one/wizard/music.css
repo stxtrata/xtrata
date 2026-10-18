@@ -659,3 +659,27 @@ main {
 }
 
 .music-fee-choice{margin:20px 0;padding:18px;border:1px solid var(--line);border-radius:12px}.music-fee-choice label{display:block;font-weight:700;margin-bottom:8px}.music-fee-choice select{width:100%}.music-fee-choice p{margin-bottom:0;font-size:13px;line-height:1.5}.music-speed{margin-top:18px;padding:18px;border:1px solid var(--accent,#91ab70);border-radius:12px;text-align:left}.music-speed h3{margin:0 0 8px}.music-speed p{font-size:13px;line-height:1.5}.music-speed .kv{gap:16px;flex-wrap:wrap}.music-speed input{width:100%;box-sizing:border-box}.music-speed [hidden],.music-speed[hidden]{display:none!important}
+
+/* Batch list: what each song found in its file, per-song actions and the apply-to-all tools */
+.sb-bulk{margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.sb-bulk>summary{cursor:pointer;font-weight:700;font-size:13px}
+.sb-bulk-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.sb-bulk .efield{margin-bottom:0}
+.sb-bulk [hidden],.sb-actions [hidden]{display:none!important}
+.sb-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.btn.ghost.sb-btn{padding:5px 10px;font-size:11.5px;line-height:1.3}
+.sb-move{display:inline-flex;gap:4px;margin-left:auto}
+.sb-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.sb-chip{font-size:11px;line-height:1;padding:5px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.sb-chip.ok{color:var(--ok);border-color:#1f5a45}
+.sb-chip.warn{color:var(--warn);border-color:#5a4620}
+.sb-chip.accent{color:var(--acc);border-color:#2a4a6a}
+.sb-num{display:inline-block;min-width:1.7em;margin-right:4px;font-weight:400;color:var(--mut)}
+.sb-summary{margin-top:4px}
+.sb-link{margin-top:10px;padding:12px;border:1px dashed var(--line);border-radius:10px}
+.sb-link .efield{margin-bottom:10px}
+.sb-linkrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sb-linkrow input{flex:1;min-width:150px;background:#0b0e14;border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:9px 10px;font:inherit;font-size:13.5px}
+.sb-linkrow input:focus{outline:none;border-color:var(--acc2)}
+.sb-linkmsg{margin-top:6px;font-size:12.5px}
+@media (max-width:560px){.sb-bulk-grid{grid-template-columns:1fr}.sb-move{margin-left:0}}

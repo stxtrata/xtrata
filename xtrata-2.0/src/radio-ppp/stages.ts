@@ -73,11 +73,13 @@ function soloStageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'entrie
 }
 
 /**
- * The steps are for first-time setup only. Someone who has paid before (or whose wallet is already
- * linked) sees no track: unlocking, topping up or switching back on is just the one action.
+ * The steps are for first-time setup only. Someone who has paid before, on this wallet or any other on this
+ * device (`heard`), or whose wallet is already linked, sees no track: unlocking, topping up or switching back on is just the one action.
  */
-export function showSteps(s: Pick<Snapshot, 'step' | 'entries' | 'linked'> & { solo?: boolean; creditedTo?: string }, stage: StageView | null) {
+export function showSteps(s: Pick<Snapshot, 'step' | 'entries' | 'linked'> & { solo?: boolean; creditedTo?: string; heard?: boolean }, stage: StageView | null) {
   if (!stage || stage.at >= stagesFor(!!s.solo).length) return false;
+  if (s.heard) return false; // this device has played songs already (another wallet or album): a new album wallet is not "setup"
+
   if (s.step === 'wrong-wallet') return false; // not setup: this device already has a listening wallet, for another wallet
   if (s.entries.some((e) => e.kind === 'play')) return false; // has paid before: not first-time setup
   if (s.creditedTo) return false; // an existing wallet, reached on a new device: nothing to set up
