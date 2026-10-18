@@ -106,7 +106,14 @@ export const initAudionautBanner = () => {
   // Hold every letter hidden until the banner is on screen.
   play();
   animations.forEach((a) => a.pause());
-  const start = () => animations.forEach((a) => a.play());
+  // The caption under the wordmark waits until every letter has finished revealing.
+  banner.classList.add('aud-banner--reveal');
+  const start = () => {
+    animations.forEach((a) => a.play());
+    Promise.all(animations.map((a) => a.finished))
+      .then(() => banner.classList.add('aud-banner--done'))
+      .catch(() => {});
+  };
 
   if ('IntersectionObserver' in window) {
     const seen = new IntersectionObserver((entries) => {

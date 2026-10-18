@@ -9043,6 +9043,8 @@
       color: var(--home-muted);
     }
     .aud-banner__sub b { color: #fff; font-weight: 700; }
+    .aud-banner--reveal .aud-banner__sub { opacity: 0; transition: opacity 1.2s ease; }
+    .aud-banner--reveal.aud-banner--done .aud-banner__sub { opacity: 1; }
     @media (max-width: 640px) {
       .aud-banner { padding: 18px 14px 12px; }
       .aud-banner__sub span { display: none; }
