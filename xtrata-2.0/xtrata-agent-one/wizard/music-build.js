@@ -41,6 +41,62 @@
   const mimeFor = (f) =>
     MIME[f.name.split('.').pop().toLowerCase()] ||
     (f.type.startsWith('audio/') ? f.type : 'application/octet-stream');
+  // Re-running the audio engine is the slow part of every change, so its result is kept per file and
+  // quality. A title, artist, artwork or link edit then rebuilds from memory instead of re-encoding.
+  // Bounded (about 200 MB of text) and least-recently-used, so a large batch cannot exhaust memory.
+  const CACHE_LIMIT = 200 * 1048576;
+  const cache = new Map(); // File -> { size, byQuality: { [quality]: extractResult } }
+  let cacheSize = 0;
+  const weigh = (ex) =>
+    (ex.audioB64 ? ex.audioB64.length : 0) +
+    (ex.audioBytes ? ex.audioBytes.length : 0) +
+    (ex.coverB64 ? ex.coverB64.length : 0);
+  function forget(file) {
+    const entry = cache.get(file);
+    if (!entry) return;
+    cacheSize -= entry.size;
+    cache.delete(file);
+  }
+  function remember(file, quality, ex) {
+    const size = weigh(ex);
+    if (size > CACHE_LIMIT) return;
+    const entry = cache.get(file) || { size: 0, byQuality: {} };
+    cacheSize -= entry.size;
+    entry.size += size - (entry.byQuality[quality] ? weigh(entry.byQuality[quality]) : 0);
+    entry.byQuality[quality] = ex;
+    cacheSize += entry.size;
+    cache.delete(file);
+    cache.set(file, entry); // most recently used goes last
+    for (const [key, stale] of cache) {
+      if (cacheSize <= CACHE_LIMIT || key === file) break;
+      cacheSize -= stale.size;
+      cache.delete(key);
+    }
+  }
+  async function extractCached(file, onStatus, quality) {
+    const entry = cache.get(file);
+    if (entry && entry.byQuality[quality]) {
+      cache.delete(file);
+      cache.set(file, entry);
+      return entry.byQuality[quality];
+    }
+    const ex = await window.XtrataAudioProcessing.extract(file, onStatus, quality);
+    remember(file, quality, ex);
+    return ex;
+  }
+  // What the file itself carried, whether or not the chosen release style uses it.
+  const NOT_A_TAG = /^(aoe-|encoder$|major_brand$|minor_version$|compatible_brands$|handler_name$)/;
+  function describeFile(meta) {
+    const m = meta || {};
+    const tags = Object.keys(m).filter((k) => String(m[k] ?? '').trim() && !NOT_A_TAG.test(k));
+    const comment = String(m.comment ?? m.description ?? '');
+    return {
+      tags: tags.length,
+      lyrics: !!String(m.lyrics ?? m['lyrics-eng'] ?? m.unsyncedlyrics ?? '').trim(),
+      suno:
+        /made with suno/i.test([comment, m.title, m.artist].join(' ')) || /\bsuno\b/i.test(comment)
+    };
+  }
   let serial = Promise.resolve();
   function build(file, onStatus, overrides = {}) {
     const o = { ...overrides };
@@ -90,7 +146,8 @@
         'A linked audio inscription needs a player. Choose "Audio + metadata" or "Audio + metadata + artwork".'
       );
     const quality = audioRef ? 'original' : o.quality;
-    const ex = await window.XtrataAudioProcessing.extract(file, onStatus, quality);
+    const ex = await extractCached(file, onStatus, quality);
+    const seen = describeFile(ex.meta);
     const audioMime = audioRef
       ? audioRef.mimeType
       : quality === 'original'
@@ -176,6 +233,11 @@
       coverMime,
       artworkInfo,
       hasCover: !!coverB64 || !!coverRef,
+      // 'file' = the song's own embedded art, 'upload' = chosen by the user, 'linked' = an existing
+      // inscription, 'none' = this release has no cover.
+      coverSource: coverRef ? 'linked' : coverB64 ? (o.coverB64 ? 'upload' : 'file') : 'none',
+      found: { cover: !!ex.coverB64, lyrics: seen.lyrics, tags: seen.tags },
+      isSuno: seen.suno,
       audioRef,
       coverRef,
       coverUrl: coverRef ? window.XtrataMusicSources.canonicalUrl(coverRef.id) : null,
@@ -189,5 +251,5 @@
       playerBytes: playerFile.size
     };
   }
-  window.XtrataMusic = { build, FIELDS, mimeFor };
+  window.XtrataMusic = { build, FIELDS, mimeFor, forget };
 })();

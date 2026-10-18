@@ -26,6 +26,21 @@
       .replace(/^#/, '');
     return /^[1-9]\d{0,8}$/.test(text) ? text : '';
   };
+  // "8, 9 #12 8" -> { ids: ['8','9','12'], bad: [], overflow: 0 }. Order kept, repeats dropped,
+  // anything that is not a plain inscription number is reported instead of guessed at.
+  const parseIdList = (value, max) => {
+    const limit = max > 0 ? max : 40;
+    const ids = [];
+    const bad = [];
+    for (const part of String(value == null ? '' : value)
+      .split(/[\s,;]+/)
+      .filter(Boolean)) {
+      const id = parseId(part);
+      if (!id) bad.push(part);
+      else if (!ids.includes(id)) ids.push(id);
+    }
+    return { ids: ids.slice(0, limit), bad, overflow: Math.max(0, ids.length - limit) };
+  };
   const canonicalUrl = (id) => CANONICAL + '/inscription/' + id;
 
   const at = (head, i, s) =>
@@ -329,6 +344,7 @@
     MAX_BYTES,
     CANONICAL,
     parseId,
+    parseIdList,
     canonicalUrl,
     sniffAudio,
     sniffImage,

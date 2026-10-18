@@ -98,7 +98,7 @@ try {
   );
   await page.goto(base + '/music/');
   assert.equal(await page.locator('.music-format-card').count(), 3);
-  assert(await page.locator('input[name=musicReleaseFormat][value=details]').isChecked());
+  assert(await page.locator('input[name=musicReleaseFormat][value=artwork]').isChecked());
   await page.locator('input[name=musicReleaseFormat][value=audio]').check();
   assert(await page.locator('#musicAppearancePanel').isHidden());
   await page.locator('input[name=musicReleaseFormat][value=details]').check();
