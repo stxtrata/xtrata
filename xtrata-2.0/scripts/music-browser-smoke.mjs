@@ -284,9 +284,10 @@ try {
     'studio',
     'studio'
   ]);
-  await page.locator('.sbrow button[title="Edit this track"]').first().click();
-  assert(await page.locator('#sbGo').isDisabled());
+  await page.locator('.sbrow button[title^="Edit every detail"]').first().click();
+  await page.locator('#trackEditor summary', { hasText: 'Player style and audio' }).click();
   await page.locator('#trackEditor [data-style="sleeve"]').click();
+  assert(await page.locator('#sbGo').isDisabled());
   await page.locator('#track-artist').fill('Batch artist');
   await page.locator('#shareTrack').click();
   await page.waitForFunction(() => !document.querySelector('#sbGo').disabled);

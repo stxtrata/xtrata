@@ -102,9 +102,26 @@
     it.err = null;
   };
 
-  // Set the same artist and/or album on many songs. With onlyEmpty a song keeps what it already has.
+  // Details that make sense to set once for a whole release. Everything else is per song.
+  const SHARED_KEYS = [
+    'artist',
+    'album',
+    'featuredArtists',
+    'genre',
+    'releaseDate',
+    'language',
+    'songwriters',
+    'performers',
+    'producer',
+    'engineer',
+    'rightsHolder',
+    'license'
+  ];
+
+  // Set the same details on many songs. Boxes left empty change nothing. With onlyEmpty a song keeps
+  // anything it already has.
   function applyShared(items, values, onlyEmpty) {
-    const wanted = ['artist', 'album'].filter((k) => text(values && values[k]));
+    const wanted = SHARED_KEYS.filter((k) => text(values && values[k]));
     let changed = 0;
     for (const it of items) {
       const patch = {};
@@ -123,6 +140,25 @@
       changed++;
     }
     return changed;
+  }
+
+  // A title or artist typed into one song's row. Returns true when it differs from what the song has.
+  function applyQuick(it, drafts) {
+    const patch = {};
+    for (const key of ['title', 'artist']) {
+      if (!drafts || drafts[key] === undefined) continue;
+      const next = text(drafts[key]);
+      const current = text(
+        it.overrides && it.overrides[key] !== undefined
+          ? it.overrides[key]
+          : it.info && it.info[key]
+      );
+      if (next !== current) patch[key] = next;
+    }
+    if (!Object.keys(patch).length) return false;
+    it.overrides = { ...it.overrides, ...patch };
+    requeue(it);
+    return true;
   }
 
   // 'off' leaves existing artwork out of every song that has some; 'on' brings back art that a song
@@ -194,7 +230,9 @@
     shrinkable,
     summary,
     summaryText,
+    SHARED_KEYS,
     applyShared,
+    applyQuick,
     setArt,
     leadingNumber,
     numberTracks,

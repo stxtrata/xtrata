@@ -159,10 +159,58 @@ describe('apply to all', () => {
     expect(items[0].status).toBe('ready'); // untouched songs are not rebuilt
   });
 
+  it('sets any shared detail, not only artist and album', () => {
+    const items = [row('a.mp3', { genre: 'Pop' }), row('b.mp3')];
+    expect(
+      B.applyShared(
+        items,
+        { genre: 'Synth', license: 'CC BY 4.0', title: 'Nope', lyrics: 'No' },
+        false
+      )
+    ).toBe(2);
+    expect(items[0].overrides).toEqual({ genre: 'Synth', license: 'CC BY 4.0' }); // title and lyrics are never shared
+    expect(B.SHARED_KEYS).not.toContain('title');
+    expect(B.SHARED_KEYS).not.toContain('lyrics');
+    expect(B.SHARED_KEYS).not.toContain('trackNumber');
+  });
+
+  it('only fills a shared detail where it is empty, per detail', () => {
+    const items = [
+      row('a.mp3', { genre: 'Pop', producer: '' }),
+      row('b.mp3', { genre: '', producer: 'Me' })
+    ];
+    expect(B.applyShared(items, { genre: 'Synth', producer: 'Jim' }, true)).toBe(2);
+    expect(items[0].overrides).toEqual({ producer: 'Jim' });
+    expect(items[1].overrides).toEqual({ genre: 'Synth' });
+  });
+
   it('does nothing when both boxes are empty', () => {
     const items = [row('a.mp3')];
     expect(B.applyShared(items, { artist: '  ', album: '' }, false)).toBe(0);
     expect(items[0].status).toBe('ready');
+  });
+});
+
+describe('a title or artist typed into one song', () => {
+  it('changes only what differs and queues a rebuild', () => {
+    const r = row('a.mp3', { title: 'Old', artist: 'Jim' });
+    expect(B.applyQuick(r, { title: '  New name ', artist: 'Jim' })).toBe(true);
+    expect(r.overrides).toEqual({ title: 'New name' });
+    expect(r.status).toBe('queued');
+  });
+
+  it('ignores an untouched or identical value', () => {
+    const r = row('a.mp3', { title: 'Old', artist: 'Jim' });
+    expect(B.applyQuick(r, {})).toBe(false);
+    expect(B.applyQuick(r, { title: 'Old' })).toBe(false);
+    expect(r.status).toBe('ready');
+  });
+
+  it('compares with an earlier edit, and lets a name be cleared', () => {
+    const r = row('a.mp3', { title: 'From tag' }, { overrides: { title: 'Edited' } });
+    expect(B.applyQuick(r, { title: 'Edited' })).toBe(false);
+    expect(B.applyQuick(r, { title: '' })).toBe(true);
+    expect(r.overrides.title).toBe('');
   });
 });
 
