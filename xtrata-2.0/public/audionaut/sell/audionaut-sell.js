@@ -31,7 +31,7 @@ for (let i = 0; i < Math.max(SYNTHS.length, PLUGINS.length); i++) {
   if (SYNTHS[i]) DECK.push({ kind: 's', id: SYNTHS[i], frames: [0, 1, 3] });
 }
 const faceUrl = (f, k) => `${FACE_BASE}${f.kind}-${f.id}-${f.frames[k % f.frames.length]}.webp`;
-const CELLS = 15;
+const CELLS = 20;
 
 const CARDS = [
   ['01 · THE IDEA', 'Make music that cannot be taken down.',
@@ -49,13 +49,13 @@ const CARDS = [
 const css = `
 .sell-layer{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;opacity:0;transition:opacity .9s ease}
 .sell-layer[data-on="1"]{opacity:1}
-.sell-grid{position:absolute;inset:-60px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:22px;padding:60px;transform:rotate(-3deg) scale(1.08)}
+.sell-grid{position:absolute;inset:-60px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-content:start;gap:18px;padding:60px;transform:rotate(-3deg) scale(1.08)}
 .sell-layer[data-mode="guest"] .sell-grid{opacity:.45;filter:blur(1.5px)}
-.sell-tile{position:relative;border-radius:10px;border:1px solid #284246;background:#0b1417;opacity:.5;overflow:hidden;transition:opacity .25s,box-shadow .25s,border-color .25s}
+.sell-tile{position:relative;border-radius:10px;border:1px solid #284246;background:#0b1417;opacity:.62;aspect-ratio:1.71;overflow:hidden;transition:opacity .25s,box-shadow .25s,border-color .25s}
 .sell-tile[data-lit="1"]{opacity:1;border-color:#ffb04d;box-shadow:0 0 40px rgba(255,176,77,.35)}
-.sell-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .18s}
+.sell-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:0 0;opacity:0;transition:opacity .18s}
 .sell-tile img[data-on="1"]{opacity:1}
-.sell-vig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(9,14,16,.15) 0%,rgba(9,14,16,.82) 100%)}
+.sell-vig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(9,14,16,.1) 0%,rgba(9,14,16,.7) 100%)}
 .sell-card,.sell-music,.sell-tune{box-sizing:border-box}
 .sell-card,.sell-music{display:none}
 .sell-on .sell-card{display:block}
@@ -83,7 +83,7 @@ const css = `
 @media (max-width:820px){
   .sell-card{position:static;transform:none!important;width:100%;max-width:420px;margin:0 auto;left:auto;bottom:auto}
   .sell-music{position:static;margin:0 auto}
-  .sell-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr))}
+  .sell-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (prefers-reduced-motion:reduce){.sell-layer,.sell-tile{transition:none}}
 `;
