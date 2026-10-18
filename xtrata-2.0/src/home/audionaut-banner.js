@@ -106,13 +106,15 @@ export const initAudionautBanner = () => {
   // Hold every letter hidden until the banner is on screen.
   play();
   animations.forEach((a) => a.pause());
-  // The caption under the wordmark waits until every letter has finished revealing.
+  // The caption under the wordmark fades in slowly alongside the reveal: it starts once the
+  // letters are all showing (about a third of the way through) and finishes a little before the end.
   banner.classList.add('aud-banner--reveal');
+  const total = (DURATION_MS + STAGGER_MS) / SPEED;
+  banner.style.setProperty('--aud-cap-delay', `${Math.round(total * 0.3)}ms`);
+  banner.style.setProperty('--aud-cap-fade', `${Math.round(total * 0.6)}ms`);
   const start = () => {
     animations.forEach((a) => a.play());
-    Promise.all(animations.map((a) => a.finished))
-      .then(() => banner.classList.add('aud-banner--done'))
-      .catch(() => {});
+    banner.classList.add('aud-banner--done');
   };
 
   if ('IntersectionObserver' in window) {
