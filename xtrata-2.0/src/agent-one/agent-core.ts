@@ -160,6 +160,20 @@ async function ownerOfChecked(id: string): Promise<{ owner: string | null; ok: b
   } catch { return { owner: null, ok: false }; }
 }
 
+// Is this inscription in this wallet right now? 'unknown' when the read keeps failing.
+// ownerOf() returns null for BOTH "someone else owns it" and "the API said 429", and the escrow code
+// used that null to decide a parent had already left — so one rate-limited read skipped the parent's
+// return, the STX was swept away, and the wallet was left holding the parent with no fee to move it
+// (inscription #3049, 14 Sept 2026). A failed read must never be taken as "not here".
+async function heldBy(id: string, addr: string, tries = 5): Promise<'yes' | 'no' | 'unknown'> {
+  for (let i = 0; i < tries; i++) {
+    const r = await ownerOfChecked(id);
+    if (r.ok) return r.owner === addr ? 'yes' : 'no';
+    if (i < tries - 1) await sleep(3000 * (i + 1));
+  }
+  return 'unknown';
+}
+
 // ---- signed sends (browser) ----
 // FEE POLICY — never crash a job on a fee estimate. The node's estimator returns absurd one-off spikes
 // (observed: identical add-chunk-batch txs quoted 0.52 STX then 74–114 STX). Three stages:
@@ -1087,7 +1101,9 @@ async function returnAllHeldNfts(job: any, key: string, fromAddr: string, fallba
   const itemTokenIds = new Set(((job.items || []).map((i: any) => i.tokenId)).filter(Boolean).map(String));
   for (const id of ids) {
     try {
-      if ((await ownerOf(String(id))) !== fromAddr) continue;
+      const here = await heldBy(String(id), fromAddr);
+      if (here === 'no') continue;
+      if (here === 'unknown') throw new Error(`could not confirm whether #${id} is in this wallet (the API kept failing) — it is not being treated as gone; try again`);
       const isDeclared = (job.parents || []).map(String).includes(String(id)) || String(id) === String(job.tokenId) || String(id) === String(job.receiptTokenId) || itemTokenIds.has(String(id));
       const sender = await detectNftSender(fromAddr, String(id));
       const to = isDeclared ? (fallbackTo || sender) : (sender || fallbackTo);
@@ -1884,17 +1900,24 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
     }
   }
   const parentReturnTxs: any[] = [];
+  // If any parent (or stray) could not be sent home, the change STAYS in the wallet to pay for moving it later.
+  let holdFunds = false;
   for (const pid of (job.parents || [])) {
-    try { if ((await ownerOf(String(pid))) === dep.address) { const ptx = await sendNftRetry(dep.key, dep.address, String(pid), refundTo); parentReturnTxs.push({ id: String(pid), tx: ptx }); xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`); } }
-    catch (e) { notes.push(`parent #${pid} return pending (` + errMsg(e) + ')'); job.keepKey = true; }
+    try {
+      const here = await heldBy(String(pid), dep.address);
+      if (here === 'unknown') throw new Error('could not confirm whether it is still in the deposit wallet');
+      if (here === 'yes') { const ptx = await sendNftRetry(dep.key, dep.address, String(pid), refundTo); parentReturnTxs.push({ id: String(pid), tx: ptx }); xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`); }
+    }
+    catch (e) { notes.push(`parent #${pid} return pending (` + errMsg(e) + ')'); job.keepKey = true; holdFunds = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
-  await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes);
+  { const n0 = notes.length; await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes); if (notes.length > n0) holdFunds = true; }
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0';
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   prog('returning your change');
-  try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending (' + errMsg(e) + ')'); }
+  if (holdFunds) notes.push('change kept in the deposit wallet to pay for returning the inscription — the page will finish this automatically');
+  else try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending (' + errMsg(e) + ')'); }
   const note = notes.length ? notes.join('; ') : null;
   const finalD = batchReceiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), stxUsd, note });
   job.receiptHtml = buildBatchReceiptHtml(finalD);
@@ -1959,22 +1982,26 @@ async function deliver(job: any) {
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0'; const notes: string[] = [];
   // Parent(s) go home FIRST — the user's own inscription(s) are the most valuable thing in this wallet.
   const parentReturnTxs: any[] = [];
+  let holdFunds = false;   // a parent/stray that could not be sent home keeps the change in the wallet to pay for it
   for (const pid of (job.parents || [])) {
     try {
-      if ((await ownerOf(String(pid))) === dep.address) {
+      const here = await heldBy(String(pid), dep.address);
+      if (here === 'unknown') throw new Error('could not confirm whether it is still in the deposit wallet');
+      if (here === 'yes') {
         prog(`returning parent #${pid} to your wallet`);
         const ptx = await sendNftRetry(dep.key, dep.address, String(pid), refundTo);
         parentReturnTxs.push({ id: String(pid), tx: ptx });
         xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`);
       }
-    } catch (e) { notes.push(`parent #${pid} return pending — recovery will send it home (` + errMsg(e) + ')'); job.keepKey = true; }
+    } catch (e) { notes.push(`parent #${pid} return pending — recovery will send it home (` + errMsg(e) + ')'); job.keepKey = true; holdFunds = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
-  await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes);
+  { const n0 = notes.length; await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes); if (notes.length > n0) holdFunds = true; }
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
-  prog('returning your change');
-  try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); }
+  if (holdFunds) notes.push('change kept in the deposit wallet to pay for returning the inscription — the page will finish this automatically');
+  else { prog('returning your change');
+  try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); } }
   const note = notes.length ? notes.join('; ') : null;
   const finalD = receiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), mainMinerFee: mainMinerForReceipt.toString(), stxUsd, note });
   job.receiptHtml = buildReceiptHtml(finalD);
@@ -2246,12 +2273,48 @@ function background(id: string, fn: () => Promise<any>) {
     PROCESSING.delete(id);
   });
 }
-// How often a cancelled job that kept its key is checked for a late payment. Slow on purpose: it is
-// insurance, and there can be many of these.
-const LATE_DEPOSIT_POLL_MS = 30000;
+// Finished jobs that still hold their one-shot key are checked for late money. Often just after the job
+// closed, then ever more rarely: it is insurance, and there can be dozens of these.
 const lateDepositCheckedAt = new Map<string, number>();
+const LATE_CHECKS_PER_TICK = 3;
+let lateChecksThisTick = 0;
+function lateCheckDue(j: any): boolean {
+  const since = Date.parse(j.cancelledAt || j.progressAt || j.createdAt || '') || 0;
+  const age = Date.now() - since;
+  const every = age < 3600000 ? 30000 : age < 7 * 86400000 ? 300000 : 1800000;
+  return Date.now() - (lateDepositCheckedAt.get(j.jobId) || 0) >= every;
+}
+async function lateSweepCheck(id: string) {
+  lateDepositCheckedAt.set(id, Date.now());
+  let j: any; try { j = readJob(id); } catch { return; }
+  if (!j.ephemeralMnemonic || PROCESSING.has(id)) return;
+  let stx: bigint; try { stx = await balance(j.depositAddress); } catch { return; }   // a failed read is "don't know", never "empty"
+  let nfts: string[] | null = null; try { nfts = await heldInscriptions(j.depositAddress); } catch { nfts = null; }
+  if (stx > REFUND_TX_FEE) {
+    xaoLog(id, `${stx} uSTX found at a finished job's deposit address — returning it to the payer`);
+    background(id, () => refundAndClose(readJob(id), 'funds found after the job closed — returned to the payer'));
+    return;
+  }
+  if (nfts && nfts.length) {
+    if (stx >= TRANSFER_FEE_FLOOR) {
+      xaoLog(id, `inscription #${nfts.join(', #')} found at a finished job's deposit address — returning it to the payer`);
+      background(id, () => refundAndClose(readJob(id), 'inscription found after the job closed — returned to the payer'));
+    } else {
+      // Cannot pay the transfer fee: surface it (this clears the quiet grace flag so the banner shows it).
+      j = readJob(id); j.status = 'NEEDS_RECOVERY'; j.keepKey = true; delete j.keepKeyGrace;
+      j.keepKeyReason = `wallet still holds inscription #${nfts.join(', #')} and has no STX left to move it — send a little STX (0.1 is plenty) to ${j.depositAddress}, then run recovery`;
+      j.progress = j.keepKeyReason; j.progressAt = new Date().toISOString(); writeJob(j);
+    }
+    return;
+  }
+  if (nfts && !j.keepKeyGrace && ['COMPLETE', 'COMPLETE_WITH_SKIPS'].includes(j.status)) {
+    // Verified empty on both counts: keep the key quietly (nothing is at stake) so the reminder stops nagging.
+    j = readJob(id); j.keepKeyGrace = true; j.keepKeyReason = (j.keepKeyReason || '') + ' · verified empty — key kept so a late payment is never stranded'; writeJob(j);
+  }
+}
 async function watchTick() {
   void syncWakeLock();
+  lateChecksThisTick = 0;
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
     if (readMusicFees(j.jobId) && ['FEE_WAITING', 'INSCRIBING'].includes(j.status)) {
@@ -2264,19 +2327,15 @@ async function watchTick() {
       background(j.jobId, () => refundAndClose(readJob(j.jobId), 'cancelled by request — everything returned to the payer'));
       continue;
     }
-    // A cancel that landed BEFORE the payment confirmed leaves the job CANCELLED with its key kept as
-    // insurance ("so a late payment is never stranded"). Nothing used to watch that address, so a
-    // payment confirming a few seconds later just sat there while the page said "funds returned".
-    // Look at the address now and then and send anything that arrived straight back to the payer.
-    if (j.status === 'CANCELLED' && j.ephemeralMnemonic && j.depositAddress && (j.keepKeyGrace || j.cancelRequested)) {
-      if (Date.now() - (lateDepositCheckedAt.get(j.jobId) || 0) < LATE_DEPOSIT_POLL_MS) continue;
-      lateDepositCheckedAt.set(j.jobId, Date.now());
-      let held: bigint | null = null;
-      try { held = await balance(j.depositAddress); } catch { held = null; }
-      if (held != null && held > REFUND_TX_FEE) {
-        xaoLog(j.jobId, `late payment of ${held} uSTX found at a cancelled job's deposit address — returning it to the payer`);
-        background(j.jobId, () => refundAndClose(readJob(j.jobId), 'payment arrived after the job was cancelled — returned to the payer'));
-      }
+    // A finished job that still holds the one-shot key. Cancelling before the payment confirmed leaves a
+    // CANCELLED job with a grace key; a delivery that could not return a parent leaves a COMPLETE job
+    // holding it. Nothing used to watch those addresses again, so a payment confirming a few seconds
+    // after a cancel (81.12 STX, 18 Oct 2026) or an inscription left behind (#3049) just sat there while the
+    // page said "funds returned". Look now and then and send anything found straight back to the payer.
+    if (['CANCELLED', 'COMPLETE', 'COMPLETE_WITH_SKIPS'].includes(j.status) && j.ephemeralMnemonic && j.depositAddress && !j.mock) {
+      if (lateChecksThisTick >= LATE_CHECKS_PER_TICK || !lateCheckDue(j)) continue;
+      lateChecksThisTick++;
+      await lateSweepCheck(j.jobId);
       continue;
     }
     // A page close/reload can interrupt the browser-held recovery between
