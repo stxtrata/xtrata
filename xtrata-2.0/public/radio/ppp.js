@@ -13575,9 +13575,9 @@ function I$(t) {
           it ? ce.delete(A.slot) : ce.add(A.slot), t.store.set(y(C), JSON.stringify([...ce])), t.changed();
         }, "tiny");
         ot.setAttribute("aria-label", it ? `Unpin ${A.player.title}` : `Pin ${A.player.title}`);
-        const at = [A.player.subtitle, `${Bi(A.player).length} ${Bi(A.player).length === 1 ? "song" : "songs"}`, A.state === "sending" ? "arriving…" : ""].filter(Boolean).join(" · "), $t = A.slot === b.slot, ae = Ei($t ? "Playing" : "Play", () => {
+        const at = [A.player.subtitle, `${Bi(A.player).length} ${Bi(A.player).length === 1 ? "song" : "songs"}`, A.state === "sending" ? "arriving…" : ""].filter(Boolean).join(" · "), $t = A.slot === b.slot, ae = Ei($t ? "Playing" : "Select", () => {
           t.store.set(p(C), JSON.stringify(E$({ ...L, [A.slot]: t.now() }))), t.open(A.slot);
-        }, $t ? "tiny" : "tiny primary");
+        }, $t ? "tiny ppp-pick" : "tiny primary ppp-pick");
         ae.disabled = $t;
         const lt = Bi(A.player)[0], zt = A.player.cover ?? (lt == null ? void 0 : lt.id), Bt = zt ? iw(String(zt)) : "", Ut = qe("span", "", "ppp-shelf-art");
         if (Bt) {
