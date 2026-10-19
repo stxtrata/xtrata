@@ -8,6 +8,8 @@
 //   node ops/relay.mjs call    --execute --key-file K --nonce N --which world|posters --fn set-paused --arg bool:true [--owner ST...]
 //   node ops/relay.mjs revert  --execute --key-file K --nonce N --room arcade-hall --bay 0
 //   node ops/relay.mjs retract --execute --key-file K --nonce N --room arcade-hall --bay 0 --seqs 2
+//   node ops/relay.mjs room    --execute --key-file K --nonce N --id arcade-hall-4 --title "Xtrata Arcade (4 bays)" --bays 4
+//   (scenes/revert/retract for a room added this way also need --extra-room arcade-hall-4:4)
 //   node ops/relay.mjs fund    --execute --key-file K --nonce N --to ST... --stx 5
 // --owner is the address that deployed the contracts (defaults to the signing key's address).
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -25,9 +27,9 @@ import { compilePosters, posterBatches, todayOf } from './lib/posters.mjs';
 import { posterCv, sceneCv } from './lib/clar.mjs';
 import { postersScene } from './lib/revert.mjs';
 
-const args = parseArgs(process.argv.slice(2), { keyFile: 'value', nonce: 'value', publisher: 'value', file: 'value', height: 'value', owner: 'value', fee: 'value', callFee: 'value', which: 'value', fn: 'value', arg: 'value', label: 'value', out: 'value', role: 'value', to: 'value', stx: 'value', room: 'value', bay: 'value', seqs: 'value' });
+const args = parseArgs(process.argv.slice(2), { keyFile: 'value', nonce: 'value', publisher: 'value', file: 'value', height: 'value', owner: 'value', fee: 'value', callFee: 'value', which: 'value', fn: 'value', arg: 'value', label: 'value', out: 'value', role: 'value', to: 'value', stx: 'value', room: 'value', bay: 'value', seqs: 'value', id: 'value', title: 'value', bays: 'value', extraRoom: 'value' });
 const phase = args._[0];
-if (!phase || args.nonce == null) die('usage: node ops/relay.mjs <deploy|setup|scenes|posters|call|fund> --execute --key-file K --nonce N ...');
+if (!phase || args.nonce == null) die('usage: node ops/relay.mjs <deploy|setup|room|scenes|posters|call|revert|retract|fund> --execute --key-file K --nonce N ...');
 let auth;
 try { auth = authoriseBroadcast({ network: 'testnet', execute: !!args.execute, keyFile: args.keyFile }); } catch (e) { if (e instanceof Refused) die('REFUSED: ' + e.message, 2); throw e; }
 const key = auth.key, me = auth.sender, owner = args.owner || me;
@@ -35,6 +37,7 @@ const names = { world: `${owner}.xtrata-world-v1`, posters: `${owner}.xtrata-pos
 let nonce = Number(args.nonce);
 const callFee = Number(args.callFee || 30000), deployFee = Number(args.fee || 2000000);
 const items = [];
+const rooms = [...ROOMS, ...(args.extraRoom ? [{ id: String(args.extraRoom).split(':')[0], title: '', bays: Number(String(args.extraRoom).split(':')[1]) }] : [])];
 const call = async (which, fn, a, label) => items.push(await signCall({ names, which, fn, args: a, key, nonce: nonce++, fee: callFee, label }));
 
 if (phase === 'deploy') {
@@ -43,10 +46,13 @@ if (phase === 'deploy') {
   for (const l of lookRegistry()) await call('world', 'register-look', [Cl.uint(l.kind), Cl.stringAscii(l.name), Cl.uint(0), Cl.stringAscii(l.key), Cl.uint(0), Cl.buffer(new Uint8Array(0)), Cl.uint(0)], `register-look ${l.key}`);
   for (const r of ROOMS) await call('world', 'register-room', [Cl.stringAscii(r.id), Cl.stringAscii(r.title), Cl.principal(me), Cl.uint(r.bays)], `register-room ${r.id} (${r.bays} bays)`);
   if (args.publisher) for (const w of ['world', 'posters']) await call(w, 'set-publisher', [Cl.principal(args.publisher), Cl.bool(true)], `${w} set-publisher`);
+} else if (phase === 'room') {
+  if (!args.id || !args.bays) die('--id and --bays are needed');
+  await call('world', 'register-room', [Cl.stringAscii(args.id), Cl.stringAscii(args.title || args.id), Cl.principal(me), Cl.uint(Number(args.bays))], `register-room ${args.id} (${args.bays} bays)`);
 } else if (phase === 'scenes') {
   if (!args.file || args.height == null) die('--file and --height are needed');
   const doc = parseSceneFile(readFileSync(args.file, 'utf8'));
-  const { findings, scenes } = compileScenes(doc, { looks: defaultLookBook(), rooms: Object.fromEntries(ROOMS.map((r) => [r.id, { bays: r.bays }])), height: Number(args.height), timelineUsed: {} });
+  const { findings, scenes } = compileScenes(doc, { looks: defaultLookBook(), rooms: Object.fromEntries(rooms.map((r) => [r.id, { bays: r.bays }])), height: Number(args.height), timelineUsed: {} });
   findings.print(); if (!findings.ok) die('fix the errors first');
   for (const c of planSceneCalls(scenes)) await call('world', c.fn, c.args, `${c.fn} (${c.scenes.length})`);
 } else if (phase === 'posters') {
