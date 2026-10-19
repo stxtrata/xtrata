@@ -73,14 +73,14 @@ const render = (root, s) => {
   if (s.state === 'live') {
     const w = String(s.total).length;
     if (kicker) kicker.textContent = `Live now · Copy No. ${String(s.gone + 1).padStart(w, '0')} of ${s.total}`;
-    if (lead) lead.textContent = 'Tap the live copy first and it is yours to keep. Your face or fingerprint is the only sign-up.';
-    if (cta) { cta.textContent = 'Claim this copy →'; cta.href = DROP_HREF; cta.removeAttribute('target'); cta.removeAttribute('rel'); }
+    if (lead) lead.textContent = 'Be first to claim the live copy and it is yours to keep. Your face or fingerprint is the only sign-up.';
+    if (cta) { cta.textContent = 'See the live copy →'; cta.href = DROP_HREF; cta.removeAttribute('target'); cta.removeAttribute('rel'); }
   } else if (s.state === 'done') {
     if (kicker) kicker.textContent = 'Finished';
     if (lead) lead.textContent = 'Every copy has found a home. Come and see who got them.';
     if (cta) { cta.textContent = 'See the drop →'; cta.href = DROP_HREF; cta.removeAttribute('target'); }
   } else {
-    if (lead) lead.textContent = 'A new copy goes live here on a timer. Tap it first and it is yours to keep, with only your face or fingerprint to sign up.';
+    if (lead) lead.textContent = 'A new copy goes live here on a timer. Be first to claim it and it is yours to keep, with only your face or fingerprint to sign up.';
     if (cta) { cta.textContent = 'Watch the drop →'; cta.href = DROP_HREF; cta.removeAttribute('target'); }
     if (s.state !== 'taken' && s.state !== 'waiting' && kicker) kicker.textContent = 'Free album drop';
     paintClock(root);
