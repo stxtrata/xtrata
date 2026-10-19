@@ -78,7 +78,10 @@ describe('listening wallet engine (wallet origin)', () => {
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
     expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move'] });
-    expect(s.map.size).toBe(0);
+    // No wallet, and no half-made passkey kept either: an unstable passkey is dropped, not picked up again.
+    const kept = JSON.parse(s.map.get('xtrata.listening-wallet.v1') ?? '{"wallets":[]}');
+    expect(kept.wallets).toEqual([]);
+    expect(kept.pending).toBeUndefined();
   });
 
   it('unlocks a known wallet and rejects a passkey that now derives a different address', async () => {
