@@ -4,11 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Free Album Drop · Xtrata Music</title>
-<meta name="description" content="A link to a free album appears here every few minutes. Be quick: when it is claimed, the next one is on its way. No account, no app, no crypto needed." />
+<meta name="description" content="A link to a free album appears here every ten minutes. Be quick: one person gets each. No account, no app, no crypto needed." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="canonical" href="https://xtrata.xyz/giveaway" />
 <meta property="og:title" content="Free Album Drop · Xtrata Music" />
-<meta property="og:description" content="A link to a free album appears here every few minutes. Be quick." />
+<meta property="og:description" content="A link to a free album appears here every ten minutes. Be quick." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://xtrata.xyz/giveaway" />
 <meta name="twitter:card" content="summary" />
@@ -55,6 +55,10 @@
   .hurry{margin:10px 0 0;text-align:center;color:var(--amber);font-size:14px}
   .stats{display:flex;justify-content:center;gap:26px;flex-wrap:wrap;color:var(--mut);font-size:14px;margin:6px 0 4px}
   .stats b{color:var(--ink);font:800 20px var(--mono);margin-right:4px}
+  .who{color:var(--ink)!important}.who b{font-family:var(--mono);color:var(--cyan);letter-spacing:.02em}
+  .count{display:flex;flex-direction:column;align-items:center;gap:2px;margin:4px 0 2px}
+  .count-n{font:800 clamp(44px,12vw,64px)/1 var(--mono);color:var(--ink);letter-spacing:.02em;text-shadow:0 0 28px rgba(94,233,255,.35)}
+  .count-l{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
   .alert{display:flex;gap:10px;align-items:center;justify-content:center;margin:10px 0 0}
   .ghost{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 14px;font:600 14px system-ui;cursor:pointer;text-decoration:none}
   .ghost:hover{border-color:var(--cyan)}
@@ -88,8 +92,8 @@
 
 <main>
   <span class="kicker"><span class="dot"></span><span id="kicker">Free album drop</span></span>
-  <h1>A free album, <em>every few minutes.</em></h1>
-  <p class="lead">A link appears below. <strong>Tap it, and a whole album is yours to keep</strong>, with a stash of plays to enjoy it. One person gets each link, so be quick. When it is claimed, the next one is on its way.</p>
+  <h1>A free album, <em>every ten minutes.</em></h1>
+  <p class="lead">A link appears below. <strong>Tap it, and a whole album is yours to keep</strong>, with a stash of plays to enjoy it. One person gets each link, so be quick. When it is claimed, a ten-minute countdown starts for the next one.</p>
 
   <section class="drop" aria-live="polite" aria-atomic="true" id="drop">
     <div class="state" id="s-loading"><div class="bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div><p>Tuning in&hellip;</p></div>
@@ -107,17 +111,12 @@
       <p class="hurry">Live right now &mdash; the first person to tap it gets it.</p>
     </div>
 
-    <div class="state" id="s-taken" hidden>
+    <div class="state" id="s-between" hidden>
       <div class="bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-      <h2>Claimed!</h2>
-      <p>Somebody just got that one. The next link is on its way &mdash; keep this page open and it will appear here by itself.</p>
-      <a class="ghost" href="/radio">Listen on the free radio while you wait</a>
-    </div>
-
-    <div class="state" id="s-waiting" hidden>
-      <div class="bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-      <h2>Next drop coming&hellip;</h2>
-      <p>Keep this page open. A new link appears here by itself, usually within a few minutes.</p>
+      <h2 id="b-title">Next drop coming&hellip;</h2>
+      <p class="who" id="b-who" hidden>Congratulations to <b id="b-wallet"></b>, who just joined.</p>
+      <div class="count" id="b-count" hidden><span class="count-n" id="b-time" role="timer">10:00</span><span class="count-l" id="b-label">until the next album</span></div>
+      <p id="b-sub">Keep this page open. A new link appears here by itself.</p>
       <a class="ghost" href="/radio">Listen on the free radio while you wait</a>
     </div>
 
@@ -175,7 +174,7 @@
     <summary>Questions</summary>
     <p><strong>Is it really free?</strong> Yes. The album and its starter plays are a gift.</p>
     <p><strong>Do I need an account, an app or crypto?</strong> No. A modern phone or laptop is enough.</p>
-    <p><strong>I was too slow.</strong> Another link appears after each claim. Keep this page open, or tap &ldquo;Ping me&rdquo; to get an alert.</p>
+    <p><strong>I was too slow.</strong> Another link appears ten minutes after each claim. Keep this page open, or tap &ldquo;Ping me&rdquo; to get an alert.</p>
     <p><strong>Can I get more than one?</strong> One copy of each album per passkey.</p>
   </details>
 
@@ -187,10 +186,11 @@
   var RADIO='https://radio.xtrata.xyz/radio.html#gift=';
   var PAGE='https://xtrata.xyz/giveaway';
   var $=function(id){return document.getElementById(id);};
-  var panes=['loading','live','taken','waiting','paused','done','error'];
-  var last='', lastCode='', fails=0, timer=0, covers={};
+  var panes=['loading','live','between','paused','done','error'];
+  var last='', lastCode='', fails=0, timer=0, covers={}, nextAt=0, skew=0;
 
-  function show(name){panes.forEach(function(p){var el=$('s-'+p);if(el)el.hidden=(p!==name);});
+  function show(name){var pane=(name==='taken'||name==='waiting')?'between':name;
+    panes.forEach(function(p){var el=$('s-'+p);if(el)el.hidden=(p!==pane);});
     document.body.classList.toggle('is-live',name==='live');
     $('kicker').textContent=name==='live'?'Live now':'Free album drop';
     document.title=(name==='live'?'\u{1F534} LIVE · ':'')+'Free Album Drop · Xtrata Music';}
@@ -229,12 +229,33 @@
       if(code!==lastCode)announce(a.title);
       lastCode=code;
     }
+    if(state==='taken'||state==='waiting'){
+      var who=typeof v.wallet==='string'&&/^[A-Za-z0-9]{1,8}\u2026[A-Za-z0-9]{1,8}$/.test(v.wallet)?v.wallet:'';
+      $('b-who').hidden=!who; $('b-wallet').textContent=who;
+      $('b-title').textContent=who||state==='taken'?'Claimed! \u{1F389}':'Next drop coming\u2026';
+      $('b-sub').textContent=who||state==='taken'?'That album just found a new home. The next link appears here when the clock reaches zero, so keep this page open.':'Keep this page open. A new link appears here by itself.';
+      // The countdown runs on the server's clock, so a phone with the wrong time still counts correctly.
+      nextAt=typeof v.nextAt==='number'?v.nextAt:0;
+      skew=typeof v.now==='number'?v.now-Date.now():0;
+      tick();
+    }else nextAt=0;
     $('stats').hidden=false;
     $('n-claimed').textContent=Number(v.claimed||0).toLocaleString();
     $('n-left').textContent=Number(v.left||0).toLocaleString();
     $('alert').hidden=!(('Notification' in window)&&Notification.permission==='default'&&state!=='done');
     last=state;
   }
+
+  // mm:ss until the next link. At zero the page asks again straight away.
+  function tick(){
+    var box=$('b-count');
+    if(!nextAt){box.hidden=true;return;}
+    var left=Math.max(0,Math.ceil((nextAt-(Date.now()+skew))/1000));
+    box.hidden=false;
+    if(left>0){$('b-time').textContent=Math.floor(left/60)+':'+String(left%60).padStart(2,'0');$('b-label').textContent='until the next album';}
+    else{$('b-time').textContent='0:00';$('b-label').textContent='any second now\u2026';}
+  }
+  setInterval(tick,1000);
 
   function announce(title){
     try{
@@ -255,6 +276,7 @@
     }).then(function(){
       // Quicker while a link is on show or one is about to land; gentle when nothing can change soon.
       var wait=document.hidden?15000:(last==='live'||last==='taken'||last==='waiting'?5000:20000);
+      if(nextAt&&!document.hidden){var secs=(nextAt-(Date.now()+skew))/1000;wait=secs>30?15000:3000;} // far from zero: relax; near it: watch closely
       if(last==='done')wait=60000;
       timer=setTimeout(poll,wait);
     });
@@ -265,7 +287,7 @@
     try{Notification.requestPermission().then(function(){$('alert').hidden=Notification.permission!=='default';});}catch(e){}
   });
 
-  var text='There is a free album giveaway happening live: a new link drops every few minutes and one person gets each. Try it';
+  var text='There is a free album giveaway happening live: a new link drops every ten minutes and one person gets each. Try it';
   $('tweet').href='https://x.com/intent/post?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(PAGE);
   if(!navigator.share)$('share').hidden=true;
   $('share').addEventListener('click',function(){navigator.share({title:'Free Album Drop',text:text,url:PAGE}).catch(function(){});});
