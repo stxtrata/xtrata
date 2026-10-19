@@ -14,6 +14,7 @@ let drawn = 0;
 let nextAt = 0;
 let skew = 0;
 let state = 'loading';
+let last = null;
 
 const $ = (root, key) => root.querySelector(`[data-give="${key}"]`);
 
@@ -47,7 +48,28 @@ const drawDiscs = (root, s) => {
 
 const fmt = (secs) => `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
 
+const barText = () => {
+  const s = last;
+  if (!s || s.total < 1) return ['One copy every ten minutes, free to keep', 'See the drop →'];
+  if (state === 'live') return [`Live now: copy ${s.gone + 1} of ${s.total}`, 'See the live copy →'];
+  if (state === 'done') return [`All ${s.total} copies have found a home`, 'See the drop →'];
+  const secs = nextAt ? Math.max(0, Math.ceil((nextAt - (Date.now() + skew)) / 1000)) : 0;
+  return [nextAt ? `Next copy in ${fmt(secs)} · ${s.left} left` : `${s.left} copies still to come`, 'Watch the drop →'];
+};
+
+const paintBar = () => {
+  const bar = document.getElementById('giveBar');
+  if (!bar) return;
+  const [text, go] = barText();
+  bar.dataset.state = state;
+  const t = bar.querySelector('[data-givebar="text"]');
+  const g = bar.querySelector('[data-givebar="go"]');
+  if (t) t.textContent = text;
+  if (g) g.textContent = go;
+};
+
 const paintClock = (root) => {
+  paintBar();
   const kicker = $(root, 'kicker');
   if (!kicker || state === 'live' || !nextAt) return;
   const secs = Math.max(0, Math.ceil((nextAt - (Date.now() + skew)) / 1000));
@@ -56,6 +78,7 @@ const paintClock = (root) => {
 
 const render = (root, s) => {
   state = s.state;
+  last = s;
   nextAt = s.state === 'taken' || s.state === 'waiting' ? s.nextAt : 0;
   skew = s.now ? s.now - Date.now() : 0;
   root.dataset.state = s.state;
@@ -66,6 +89,7 @@ const render = (root, s) => {
   const kicker = $(root, 'kicker');
   if (s.total > 0 && title) title.textContent = `${s.total} copies.`;
   drawDiscs(root, s);
+  paintBar();
   if (status) {
     status.textContent = s.total > 0 ? `${s.gone} gone · ${s.left} still to come` : '';
     status.hidden = s.total < 1;

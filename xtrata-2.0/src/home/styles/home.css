@@ -9130,3 +9130,9 @@
       .give-hero__discs i { width: auto; aspect-ratio: 1; }
       .give-hero__cta { min-height: 48px; display: inline-flex; align-items: center; }
     }
+
+    /* Free album bar above the music supporters bar: same shape, teal dot while a copy is live. */
+    .home-supbar--give { margin-top: 10px; border-color: rgba(200, 182, 255, 0.4); }
+    .home-supbar--give[data-state="live"] { border-color: rgba(126, 226, 199, 0.55); }
+    .home-supbar--give[data-state="live"] .home-supbar__tag { color: #7ee2c7; }
+    .home-supbar--give .home-supbar__text { color: var(--home-ink); }

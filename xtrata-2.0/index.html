@@ -113,6 +113,13 @@
 
     <!-- One rotating strip replaces the Collections banner and the campaign cards.
          Slides live in HOMEPAGE_STRIP_SLIDES (src/home/homepage-content.js). -->
+    <!-- Free album drop bar: live count or countdown, filled by src/home/giveaway-hero.js from GET /radio/giveaway. -->
+    <a id="giveBar" class="home-supbar home-supbar--give home-only" href="/giveaway" data-home-action="giveaway:bar" data-state="loading">
+      <span class="home-supbar__tag"><span class="home-sup-dot" aria-hidden="true"></span><span class="home-supbar__tag-word">Free album</span></span>
+      <span class="home-supbar__text" data-givebar="text">One copy every ten minutes, free to keep</span>
+      <span class="home-supbar__go" data-givebar="go">See the drop &rarr;</span>
+    </a>
+
     <!-- Music Supporters banner. Filled by src/home/music-supporters.js from /api/music-stats.
          Hidden by the script when the totals cannot be read, so it never shows a false zero. -->
     <a class="home-supbar home-only" id="musicBanner" href="/music/heroes" target="_blank" rel="noopener" data-sup-root data-state="loading" data-home-action="supporters:banner">

@@ -3,10 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { twinEclipseFrames } from '../audionaut-banner.js';
 
 const indexHtml = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
-const banner = indexHtml.slice(
-  indexHtml.indexOf('id="audionautBanner"'),
-  indexHtml.indexOf('</a>', indexHtml.indexOf('id="audionautBanner"'))
-);
+const bannerAt = indexHtml.indexOf('id="audionautBanner"');
+const banner = indexHtml.slice(indexHtml.lastIndexOf('<a ', bannerAt), indexHtml.indexOf('</a>', bannerAt));
 
 describe('homepage Audionaut banner', () => {
   it('links to The Audionaut and is wired for the home page only', () => {

@@ -83,6 +83,12 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     cta: HOMEPAGE_BOUNTY.tracker.label, href: HOMEPAGE_BOUNTY.tracker.href
   }),
   Object.freeze({
+    id: 'giveaway', tag: 'Live', tone: 'violet',
+    title: 'Free album: one copy every ten minutes.',
+    line: 'Be first to claim the live copy and it is yours to keep. Your face or fingerprint is the only sign-up.',
+    cta: 'See the live copy', href: '/giveaway'
+  }),
+  Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
     title: 'New: make a Stacks wallet with Face ID.',
     line: 'Tap a link on your phone. No app, no seed phrase. Every song you hear pays its holder.',
@@ -183,6 +189,13 @@ const WALL_AUDIONAUTS = Object.freeze({
   // Once the mint is live every tile and banner goes to the collection page.
   href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
 });
+const WALL_GIVEAWAY = Object.freeze({
+  // The free album drop: one copy goes live every ten minutes. Leads to the page with the details and the claim.
+  id: 'giveaway', kind: 'image', tone: 'pink',
+  eyebrow: 'Free · limited edition', title: 'Free album drop', subtitle: 'One copy every ten minutes. Be first.',
+  image: '/home/wall/giveaway-drop.webp', position: 'center',
+  href: '/giveaway'
+});
 const WALL_FOREVER_TWINS = Object.freeze({
   // The Forever Twins campaign: one twin from each of the three newest collections.
   id: 'forever-twins', kind: 'twins', tone: 'orange',
@@ -236,6 +249,7 @@ export const HOMEPAGE_WALL_ROTATION = Object.freeze({
     Object.freeze({ tile: WALL_ASTRO, weights: Object.freeze({ big: 3 }) }),
     Object.freeze({ tile: WALL_KP_LOOPS, weights: Object.freeze({ big: 2, tall: 2 }) }),
     Object.freeze({ tile: WALL_AUDIONAUTS, weights: Object.freeze({ big: 2, wide: 3 }) }),
+    Object.freeze({ tile: WALL_GIVEAWAY, weights: Object.freeze({ big: 2, tall: 2, wide: 3 }) }),
     Object.freeze({ tile: WALL_FOREVER_TWINS, weights: Object.freeze({ big: 3, tall: 3, wide: 2 }) })
   ]),
   // Milliseconds between swaps (random in this range) and how long a crossfade takes.
