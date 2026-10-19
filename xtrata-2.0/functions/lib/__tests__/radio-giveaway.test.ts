@@ -41,7 +41,7 @@ function setup(over: Partial<GiveawayEnv> = {}) {
     return codes;
   };
   const setStatus = (code: string, status: string, extra: Record<string, unknown> = {}) => {
-    sql.prepare('UPDATE radio_gifts SET status=?, claimed_at=? WHERE code_hash=?').run(status, extra.claimed_at ?? null, giftCodeHash(code));
+    sql.prepare('UPDATE radio_gifts SET status=?, claimed_at=?, claimed_by=? WHERE code_hash=?').run(status, extra.claimed_at ?? null, extra.claimed_by ?? null, giftCodeHash(code));
   };
   const list = (codes: string[]) => codes.map((c) => `https://radio.xtrata.test/radio.html#gift=${c}`).join('\n');
   return { env, sql, gifts, setStatus, list };
@@ -60,32 +60,64 @@ describe('radio giveaway', () => {
     expect((await giveawayView(s.env, T0 + 60_000)).code).toBe(codes[0]); // still the same link while it is free
   });
 
-  it('a claim in flight shows as taken; once the funds have arrived the next link follows after a pause', async () => {
+  it('a claim starts a ten-minute countdown at once; the next link shows when it is over and the funds have arrived', async () => {
     const s = setup();
     const codes = await s.gifts(3);
+    const winner = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
     await giveawayAdmin(s.env, { action: 'add', text: s.list(codes) }, T0);
-    await giveawayAdmin(s.env, { action: 'gap', minSeconds: 60, maxSeconds: 120 }, T0);
     await giveawayView(s.env, T0);
-    s.setStatus(codes[0], 'claiming', { claimed_at: T0 + 1000 });
-    expect(await giveawayView(s.env, T0 + 2000)).toMatchObject({ state: 'taken', claimed: 1, left: 2 });
+    s.setStatus(codes[0], 'claiming', { claimed_at: T0 + 1000, claimed_by: winner });
+    const taken = await giveawayView(s.env, T0 + 2000);
+    expect(taken).toMatchObject({ state: 'taken', claimed: 1, left: 2, wallet: 'SP3JN…X743X', nextAt: T0 + 1000 + 600_000, now: T0 + 2000 });
+    expect(JSON.stringify(taken)).not.toContain(winner); // shortened: only the ends are shown
     expect((await giveawayView(s.env, T0 + 3000)).code).toBeUndefined(); // the next link is not shown early
-    s.setStatus(codes[0], 'claimed', { claimed_at: T0 + 1000 });
-    const t = T0 + 10_000;
-    expect(await giveawayView(s.env, t, fixed(0.5))).toMatchObject({ state: 'waiting', claimed: 1, left: 2 });
-    expect((await giveawayView(s.env, t + 89_000, fixed(0.5))).state).toBe('waiting'); // 60 + 0.5 * 60 = 90 s
-    expect(await giveawayView(s.env, t + 91_000, fixed(0.5))).toMatchObject({ state: 'live', code: codes[1], claimed: 1, left: 2 });
+    // The funds land (a few minutes later): still counting down, now between links.
+    s.setStatus(codes[0], 'claimed', { claimed_at: T0 + 1000, claimed_by: winner });
+    expect(await giveawayView(s.env, T0 + 200_000)).toMatchObject({ state: 'waiting', claimed: 1, left: 2, wallet: 'SP3JN…X743X', nextAt: T0 + 1000 + 600_000 });
+    expect((await giveawayView(s.env, T0 + 600_000)).state).toBe('waiting');
+    expect(await giveawayView(s.env, T0 + 601_001)).toMatchObject({ state: 'live', code: codes[1], claimed: 1, left: 2 });
   });
 
-  it('the pause is drawn between the operator’s limits', async () => {
+  it('the countdown is drawn once per claim: every reader sees the same time, and a slow sweep does not move it', async () => {
     const s = setup();
     const codes = await s.gifts(2);
     await giveawayAdmin(s.env, { action: 'add', text: s.list(codes) }, T0);
-    await giveawayAdmin(s.env, { action: 'gap', minSeconds: 30, maxSeconds: 30 }, T0);
+    await giveawayAdmin(s.env, { action: 'gap', minSeconds: 100, maxSeconds: 200 }, T0);
     await giveawayView(s.env, T0);
-    s.setStatus(codes[0], 'claimed', { claimed_at: T0 });
-    await giveawayView(s.env, T0 + 1000);
-    expect((await giveawayView(s.env, T0 + 1000 + 29_000)).state).toBe('waiting');
-    expect((await giveawayView(s.env, T0 + 1000 + 31_000)).code).toBe(codes[1]);
+    s.setStatus(codes[0], 'claiming', { claimed_at: T0 + 5000, claimed_by: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X' });
+    const a = await giveawayView(s.env, T0 + 6000, fixed(0.25));
+    const b = await giveawayView(s.env, T0 + 7000, fixed(0.9));
+    expect(a.nextAt).toBe(T0 + 5000 + 125_000);
+    expect(b.nextAt).toBe(a.nextAt);
+    // First seen already settled (the sweep was slow): the pause still counts from the claim, not from now.
+    const t = setup();
+    const more = await t.gifts(2);
+    await giveawayAdmin(t.env, { action: 'add', text: t.list(more) }, T0);
+    await giveawayAdmin(t.env, { action: 'gap', minSeconds: 100, maxSeconds: 100 }, T0);
+    await giveawayView(t.env, T0);
+    t.setStatus(more[0], 'claimed', { claimed_at: T0 + 5000, claimed_by: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X' });
+    expect(await giveawayView(t.env, T0 + 50_000)).toMatchObject({ state: 'waiting', nextAt: T0 + 105_000 });
+    expect((await giveawayView(t.env, T0 + 106_000)).code).toBe(more[1]);
+  });
+
+  it('the default pause is ten minutes', async () => {
+    const s = setup();
+    const codes = await s.gifts(2);
+    await giveawayAdmin(s.env, { action: 'add', text: s.list(codes) }, T0);
+    expect((await giveawayAdmin(s.env, { action: 'status' }, T0)).gap).toEqual({ minSeconds: 600, maxSeconds: 600 });
+  });
+
+  it('once the next link is on show there is no countdown and no winner line', async () => {
+    const s = setup();
+    const codes = await s.gifts(2);
+    await giveawayAdmin(s.env, { action: 'add', text: s.list(codes) }, T0);
+    await giveawayAdmin(s.env, { action: 'gap', minSeconds: 0, maxSeconds: 0 }, T0);
+    await giveawayView(s.env, T0);
+    s.setStatus(codes[0], 'claimed', { claimed_at: T0, claimed_by: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X' });
+    const v = await giveawayView(s.env, T0 + 1000);
+    expect(v).toMatchObject({ state: 'live', code: codes[1] });
+    expect(v.nextAt).toBeUndefined();
+    expect(v.wallet).toBeUndefined();
   });
 
   it('a claim that fails goes back to live and the same link is shown again', async () => {
@@ -127,7 +159,7 @@ describe('radio giveaway', () => {
     await giveawayView(s.env, T0);
     s.setStatus(codes[0], 'claimed', { claimed_at: T0 });
     await giveawayView(s.env, T0 + 1000);
-    expect(await giveawayView(s.env, T0 + 10 * 60_000)).toEqual({ state: 'done', claimed: 1, left: 0 });
+    expect(await giveawayView(s.env, T0 + 10 * 60_000)).toEqual({ state: 'done', claimed: 1, left: 0, now: T0 + 10 * 60_000 });
     expect(await giveawayView(setup().env, T0)).toMatchObject({ state: 'done', claimed: 0, left: 0 });
   });
 

@@ -22,14 +22,15 @@ import { listedTracks } from '../../src/lib/listening-wallet/gift-players';
 
 export type GiveawayEnv = GiftEnv & { RADIO_GIVEAWAY_SECRET?: string };
 
-export const DEFAULT_GAP_MIN_S = 60;
-export const DEFAULT_GAP_MAX_S = 240;
+/** Ten minutes from the moment a link is claimed to the next one appearing, so a crowd never turns into a rush. */
+export const DEFAULT_GAP_MIN_S = 600;
+export const DEFAULT_GAP_MAX_S = 600;
 /** Longest pause an operator can ask for between links: a day. */
 export const MAX_GAP_S = 24 * 60 * 60;
 
 type Link = { pos: number; code: string; code_hash: string; added_at: number; shown_at: number | null; ended_at: number | null; outcome: string | null };
 type State = { current: number | null; next_at: number; paused: number; gap_min: number; gap_max: number };
-type GiftRow = { status: string; expires_at: number; claimed_at: number | null; player_id: string | null };
+type GiftRow = { status: string; expires_at: number; claimed_at: number | null; claimed_by: string | null; player_id: string | null };
 
 const q = async <T,>(env: GiveawayEnv, sql: string, binds: unknown[] = []) => ((await env.DB.prepare(sql).bind(...binds).all()).results ?? []) as T[];
 const first = async <T,>(env: GiveawayEnv, sql: string, binds: unknown[] = []) => (await q<T>(env, sql, binds))[0] ?? null;
@@ -50,12 +51,15 @@ export async function ensureGiveawayTables(env: GiveawayEnv) {
 
 const readState = async (env: GiveawayEnv) => (await first<State>(env, 'SELECT current, next_at, paused, gap_min, gap_max FROM radio_giveaway_state WHERE id=1'))!;
 const giftOf = (env: GiveawayEnv, hash: string) =>
-  first<GiftRow>(env, 'SELECT status, expires_at, claimed_at, player_id FROM radio_gifts WHERE code_hash=?', [hash]);
+  first<GiftRow>(env, 'SELECT status, expires_at, claimed_at, claimed_by, player_id FROM radio_gifts WHERE code_hash=?', [hash]);
 
 /** A link someone can still claim: it exists, is live and has not expired. */
 const isFree = (g: GiftRow | null, now: number) => !!g && g.status === 'live' && g.expires_at > now;
 /** A link that will never be claimable: the gift is gone, expired, refunded or set aside. (`claiming`/`claimed` are not dead: someone has it.) */
 const isDead = (g: GiftRow | null, now: number) => !g || ['expired', 'refunding', 'refunded', 'abandoned', 'pending-deposit'].includes(g.status) || (g.status === 'live' && g.expires_at <= now);
+
+/** `SP3JNS…X743X`: enough to recognise, short enough to read. The address is public on the chain anyway. */
+export const shortAddress = (a: string | null | undefined) => (a ? `${a.slice(0, 5)}…${a.slice(-5)}` : '');
 
 /** A pause drawn between the operator's minimum and maximum: "every now and then", never on a rhythm. */
 const gapMs = (s: Pick<State, 'gap_min' | 'gap_max'>, rand: () => number) => Math.round((s.gap_min + rand() * Math.max(0, s.gap_max - s.gap_min)) * 1000);
@@ -67,16 +71,30 @@ const gapMs = (s: Pick<State, 'gap_min' | 'gap_max'>, rand: () => number) => Mat
 export async function advance(env: GiveawayEnv, now: number, rand: () => number = Math.random) {
   await ensureGiveawayTables(env);
   for (let pass = 0; pass < 12; pass++) {
-    const s = await readState(env);
+    let s = await readState(env);
     if (s.paused) return { s, link: s.current ? await first<Link>(env, 'SELECT * FROM radio_giveaway_links WHERE pos=?', [s.current]) : null, gift: null as GiftRow | null };
     if (s.current) {
       const link = await first<Link>(env, 'SELECT * FROM radio_giveaway_links WHERE pos=?', [s.current]);
       const gift = link ? await giftOf(env, link.code_hash) : null;
-      if (link && gift && ['live', 'claiming'].includes(gift.status) && !(gift.status === 'live' && gift.expires_at <= now)) return { s, link, gift };
-      // Claimed (funds sent), or dead: this link is finished. A claim earns the pause before the next; a dead link does not.
+      if (link && gift && ['live', 'claiming'].includes(gift.status) && !(gift.status === 'live' && gift.expires_at <= now)) {
+        // The pause before the next link runs from the moment this one was claimed, not from when its funds land (that
+        // can take a while on the chain). It is drawn once: a claim not yet counted for (`next_at` older than it) gets one.
+        if (gift.status === 'claiming') {
+          const at = gift.claimed_at ?? now;
+          if (s.next_at < at) {
+            const next = at + gapMs(s, rand);
+            if (await exec(env, 'UPDATE radio_giveaway_state SET next_at=?, updated_at=? WHERE id=1 AND current=? AND next_at=?', [next, now, s.current, s.next_at])) s = { ...s, next_at: next };
+            else s = await readState(env);
+          }
+        }
+        return { s, link, gift };
+      }
+      // Claimed (funds sent), or dead: this link is finished. A claim carries the pause that started when it was claimed
+      // (drawn here if a sweep first sees it already settled); a dead link carries none.
       const claimed = !!gift && gift.status === 'claimed';
+      const settledAt = gift?.claimed_at ?? now;
       const won = await exec(env, 'UPDATE radio_giveaway_state SET current=NULL, next_at=?, updated_at=? WHERE id=1 AND current=?',
-        [claimed ? now + gapMs(s, rand) : s.next_at, now, s.current]);
+        [claimed && s.next_at < settledAt ? settledAt + gapMs(s, rand) : s.next_at, now, s.current]);
       if (won) await exec(env, 'UPDATE radio_giveaway_links SET ended_at=?, outcome=? WHERE pos=? AND ended_at IS NULL', [now, claimed ? 'claimed' : 'lost', s.current]);
       continue;
     }
@@ -104,6 +122,11 @@ export type GiveawayView = {
   /** How many have been given away, and how many are still to come (including the one on show). */
   claimed: number;
   left: number;
+  /** While `taken` or `waiting` after a claim: who got it (shortened) and when the next link appears (ms). */
+  wallet?: string;
+  nextAt?: number;
+  /** The server's clock, so the page can count down correctly whatever its own clock says. */
+  now: number;
 };
 
 /** The public answer: counts, and the one link on show. Never the list, never an upcoming code, never a time. */
@@ -112,17 +135,24 @@ export async function giveawayView(env: GiveawayEnv, now: number, rand: () => nu
   const counts = await first<{ claimed: number; left: number }>(env,
     "SELECT SUM(CASE WHEN outcome='claimed' THEN 1 ELSE 0 END) AS claimed, SUM(CASE WHEN ended_at IS NULL THEN 1 ELSE 0 END) AS left FROM radio_giveaway_links");
   let claimed = Number(counts?.claimed ?? 0), left = Number(counts?.left ?? 0);
-  const base = { claimed, left };
+  const base = { claimed, left, now };
   if (s.paused) return { state: 'paused', ...base };
   if (link && gift) {
-    if (gift.status === 'claiming') { claimed += 1; left = Math.max(0, left - 1); return { state: 'taken', claimed, left }; }
+    if (gift.status === 'claiming') {
+      claimed += 1; left = Math.max(0, left - 1);
+      return { state: 'taken', claimed, left, now, wallet: shortAddress(gift.claimed_by), ...(s.next_at > now ? { nextAt: s.next_at } : {}) };
+    }
     const player = gift.player_id ? await playerView(env, gift.player_id).catch(() => null) : null;
     return {
       state: 'live', code: link.code, ...base,
       ...(player ? { album: { title: player.title, subtitle: player.subtitle, cover: player.cover, songs: listedTracks(player).map((t) => ({ title: t.title, artist: t.artist })) } } : {})
     };
   }
-  return { state: left > 0 ? 'waiting' : 'done', ...base };
+  if (left <= 0) return { state: 'done', ...base };
+  // Between links: congratulate the last winner and count down to the next.
+  const last = await first<{ claimed_by: string | null }>(env,
+    "SELECT g.claimed_by FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash WHERE l.outcome='claimed' AND g.claimed_by IS NOT NULL ORDER BY g.claimed_at DESC LIMIT 1");
+  return { state: 'waiting', ...base, ...(last?.claimed_by && s.next_at > now ? { wallet: shortAddress(last.claimed_by) } : {}), ...(s.next_at > now ? { nextAt: s.next_at } : {}) };
 }
 
 // ---------------------------------------------------------------------------- operator
