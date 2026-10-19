@@ -907,9 +907,11 @@ function start(root: HTMLElement) {
           const fold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
           if (!fold) return;
           fold.hidden = false;
-          fold.open = true;
-          requestAnimationFrame(() => fold.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+          fold.open = !fold.open; // the button is the toggle: the list opens right under it
+          all.setAttribute('aria-expanded', String(fold.open));
+          if (fold.open) requestAnimationFrame(() => fold.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
         }, 'ppp-all-albums');
+        all.setAttribute('aria-expanded', String(!!(document.querySelector('.ppp-shelf') as HTMLDetailsElement | null)?.open));
         switcher.replaceChildren(
           tab('🎧 My player', inAlbum ? s.likeFunds?.balance : s.balance, !inAlbum, () => { if (inAlbum) void ppp.openAlbum(0); }),
           tab('💿 ' + albumTitle, inAlbum ? s.balance : undefined, inAlbum, () => { if (!inAlbum && latestAlbum) void ppp.openAlbum(latestAlbum.slot); }),

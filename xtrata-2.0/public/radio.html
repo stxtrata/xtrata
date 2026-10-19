@@ -313,7 +313,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp .ppp-lowbox{border:2px solid #ff8a8a;border-radius:8px;background:rgba(255,138,138,.09);padding:10px 12px;margin:8px 0}
   #tuner.locked{opacity:.35;cursor:not-allowed}
   .ppp-shelf-tools{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.ppp-shelf-tools input{flex:1 1 11em;min-width:0}
-  .ppp-shelf-list{list-style:none;margin:6px 0;padding:0}.ppp-shelf-list li{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line,rgba(255,255,255,.08))}.ppp-shelf-list li.now{color:var(--cyan)}.ppp-shelf-list .t{font-weight:600}.ppp-shelf-list li button:last-child{margin-left:auto}
+  .ppp-shelf-list{list-style:none;margin:6px 0;padding:0}.ppp-shelf-list li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line,rgba(255,255,255,.08))}.ppp-shelf-list li.now{color:var(--cyan)}.ppp-shelf-list .t{font-weight:600}.ppp-shelf-list li button:last-child{margin-left:auto}.ppp-shelf-art{flex:0 0 52px;width:52px;height:52px;border-radius:8px;overflow:hidden;background:#143a40;display:grid;place-items:center;font-size:22px}.ppp-shelf-art img{width:100%;height:100%;object-fit:cover;display:block}.ppp-shelf-txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}.ppp-shelf-list .ppp-mute{font-size:11.5px}
   .ppp .ppp-lowtitle{font-weight:700;letter-spacing:.6px;margin:0 0 6px}
   .ppp-pick input{font-family:var(--mono);font-size:12px;width:min(100%,26em);padding:6px 8px;box-sizing:border-box}
   .ppp p{margin:6px 0;font-size:13px;line-height:1.45;color:var(--ink)}
@@ -327,7 +327,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp button.tiny{min-height:0;padding:2px 8px;font-size:11px;color:var(--cyan)}
   .ppp-topup{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
   .ppp-switch{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px}
-  .ppp-switch button.ppp-all-albums{flex:1 0 100%;background:none;border:0;padding:2px 2px 0;text-align:left;font-size:12px;color:var(--cyan);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+  .ppp-switch button.ppp-all-albums{flex:1 0 100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--cyan);border-radius:10px;background:rgba(34,211,238,.08);color:var(--cyan);font-size:13px;font-weight:700;text-align:left;cursor:pointer}
+  .ppp-switch button.ppp-all-albums::before{content:'💿'}
+  .ppp-switch button.ppp-all-albums::after{content:'▾';margin-left:auto;opacity:.8}
+  .ppp-switch button.ppp-all-albums[aria-expanded="true"]::after{content:'▴'}
+  .ppp-shelf{margin:0 0 10px}.ppp-shelf>summary{display:none}
+  html[data-view=album][data-sheet=music] .ppp-shelf>summary{display:list-item}
   .ppp-switch button.ppp-tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 10px;border-radius:10px}
   .ppp-switch button.ppp-tab .tt{font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ppp-switch button.ppp-tab .ts{font-size:11px;opacity:.75}
@@ -408,7 +413,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .sheet-bar b{font-size:20px}
   .sheet-bar button{width:44px;height:44px;border:0;background:none;color:#c9ced6;font-size:24px;cursor:pointer;border-radius:12px}
   html[data-view=album][data-sheet] .ppp,html[data-view=album][data-asking] .ppp{display:block!important;border:0;background:none;padding:0;box-shadow:none}
-  html[data-view=album][data-sheet] .ppp>*:not(.ppp-folds):not(.ppp-msg):not(.ppp-err),
+  html[data-view=album][data-sheet] .ppp>*:not(.ppp-folds):not(.ppp-shelf):not(.ppp-msg):not(.ppp-err),
   html[data-view=album][data-asking] .ppp>*:not(.ppp-frame):not(.ppp-msg):not(.ppp-err){display:none!important}
   html[data-view=album][data-sheet=device] .ppp>.ppp-frame:not([hidden]){display:block!important}
   html[data-view=album][data-asking] .ppp-folds,html[data-view=album][data-asking] .sheet-bar{display:none!important}
@@ -598,6 +603,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <p class="ppp-stage" hidden></p>
       <!-- Top to bottom: what to do now, the wallet box when it needs a tap, buttons; details folded below. -->
       <div class="ppp-switch" hidden></div>
+      <!-- My albums, right under the switcher: opened by the "View all albums" button (its own summary is hidden). -->
+      <details class="ppp-fold ppp-shelf" hidden><summary>♪ My albums</summary><div class="ppp-shelf-body"></div></details>
       <div class="ppp-key"></div>
       <p class="ppp-frame-label" hidden><span>Listening wallet · approvals happen in this box</span></p>
       <div class="ppp-frame" hidden></div>
@@ -609,7 +616,6 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
         <details class="ppp-fold ppp-recent" hidden><summary>♪ Recently played</summary><ol class="ppp-recent-list"></ol><details class="ppp-history" hidden></details></details>
         <details class="ppp-fold ppp-wallets" hidden><summary>◎ This device</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
         <details class="ppp-fold ppp-more" hidden><summary>? How plays work</summary><div class="ppp-body"></div></details>
-        <details class="ppp-fold ppp-shelf" hidden><summary>♪ My albums</summary><div class="ppp-shelf-body"></div></details>
         <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Albums (admin)</summary><div class="ppp-gift-body"></div></details>
       </div>
     </section>
@@ -1002,7 +1008,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=bb0b06f5d716')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=57aabf0397cc')}).catch(function(){});
 </script>
 </body>
 </html>
