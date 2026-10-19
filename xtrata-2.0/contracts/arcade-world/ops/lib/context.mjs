@@ -10,7 +10,8 @@ export function transportFromArgs(args, env = process.env) {
   if (!['testnet', 'mainnet', 'devnet'].includes(network)) throw new Error('--network must be testnet, mainnet or devnet (leave it out to work offline)');
   const world = args.world || env.XA_WORLD, posters = args.posters || env.XA_POSTERS;
   if (!world || !posters) throw new Error('--world and --posters (full contract ids) are needed with --network (or XA_WORLD / XA_POSTERS)');
-  return networkTransport({ network, names: { world, posters }, readSender: args.readSender || env.XA_READ_SENDER });
+  const skins = args.skins || env.XA_SKINS;     // optional: only the skins tool needs it
+  return networkTransport({ network, names: skins ? { world, posters, skins } : { world, posters }, readSender: args.readSender || env.XA_READ_SENDER });
 }
 
 // Returns { t, looks, rooms, height, timelineUsed, offline }

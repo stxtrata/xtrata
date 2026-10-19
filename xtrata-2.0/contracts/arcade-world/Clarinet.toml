@@ -1,6 +1,6 @@
 [project]
 name = 'xtrata-arcade-world'
-description = 'Xtrata Arcade: poster registry and world (rooms, bays, scenes, looks)'
+description = 'Xtrata Arcade: poster registry, world (rooms, bays, scenes, looks) and door skins'
 authors = []
 telemetry = false
 cache_dir = './.cache'
@@ -18,5 +18,10 @@ epoch = 'latest'
 
 [contracts.xtrata-world-v1]
 path = 'contracts/xtrata-world-v1.clar'
+clarity_version = 4
+epoch = 'latest'
+
+[contracts.xtrata-door-skins-v1]
+path = 'contracts/xtrata-door-skins-v1.clar'
 clarity_version = 4
 epoch = 'latest'

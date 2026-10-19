@@ -28,6 +28,7 @@
   function txt(v, max) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9 .,!?:'&\/-]/g, '').slice(0, max); }
   function hex(v, def) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : def; }
   var TONES = { blue: '#3d86ff', orange: '#ff8a2a', gold: '#ffc53d', white: '#e8ecff', red: '#ff4d4d', green: '#4dff9a' };
+  function slug(v, max) { return typeof v === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(v) && v.length >= 2 && v.length <= max ? v : ''; }
   function tone(v, def) { return Object.prototype.hasOwnProperty.call(TONES, v) ? v : def; }
   var WORK_SOUNDS = ['hammer', 'saw', 'drill', 'clatter'];
 
@@ -44,7 +45,10 @@
     'hum': { kind: 3, norm: function (p) { return { volume: num(p.volume, 0, 1, 0.4), radius: num(p.radius, 2, 12, 6), pitch: num(p.pitch, 40, 400, 110) }; } },
     'light-steady': { kind: 4, norm: function (p) { return { tone: tone(p.tone, 'white'), intensity: num(p.intensity, 0, 2, 0.8), rate: 1 }; } },
     'light-pulse': { kind: 4, norm: function (p) { return { tone: tone(p.tone, 'orange'), intensity: num(p.intensity, 0, 2, 0.9), rate: num(p.rate, 0.2, 8, 1) }; } },
-    'light-flicker': { kind: 4, norm: function (p) { return { tone: tone(p.tone, 'white'), intensity: num(p.intensity, 0, 2, 0.9), rate: num(p.rate, 0.2, 8, 1) }; } }
+    'light-flicker': { kind: 4, norm: function (p) { return { tone: tone(p.tone, 'white'), intensity: num(p.intensity, 0, 2, 0.9), rate: num(p.rate, 0.2, 8, 1) }; } },
+    // The finish of a door (xtrata-door-skins-v1). Keys only; door-skins.js looks them up in its fixed tables and the registry says which exist.
+    // Not drawn by the bay engine itself: the door port reads it from plan.overlays. '' means "the skin's own"; wear -1 likewise.
+    'door-skin': { kind: 2, norm: function (p) { return { skin: slug(p.skin, 24), frame: slug(p.frame, 16), hardware: slug(p.hardware, 16), tint: hex(p.tint, ''), wear: p.wear == null ? -1 : num(p.wear, 0, 100, -1) }; } }
   };
   var COVER_STATE = { open: 1, half: 0.5, closed: 0 };
   // The door looks the hall can draw: a kind 0 look whose built-in key is 'door-<style>' (styles live in doors.js).

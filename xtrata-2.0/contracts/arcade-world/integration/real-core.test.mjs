@@ -60,3 +60,18 @@ test('a world look can use a real sealed recipe inscription', () => {
     [Cl.uint(0), Cl.stringAscii('Wrong size'), Cl.uint(1), Cl.stringAscii(''), Cl.uint(id), Cl.buffer(rec.hash), Cl.uint(rec.size + 1)], deployer);
   assert.equal(pp(bad.result), '(err u206)');
 });
+
+test('a door skin recipe can be a real sealed inscription, and only its creator may register it', () => {
+  const rec = inscribe(deployer, Buffer.from('{"format":"door-skin-recipe/1","base":"#8a5a2b"}'));
+  assert.equal(rec.result.type, 'ok', pp(rec.result));
+  const id = Number(rec.result.value.value['token-id'].value);
+  const args = (key, o = {}) => [Cl.stringAscii(key), Cl.stringAscii('Recipe skin'), Cl.uint(0), Cl.uint(1), Cl.stringAscii(''),
+    Cl.uint(o.id ?? id), Cl.buffer(o.hash ?? rec.hash), Cl.uint(o.size ?? rec.size), Cl.uint(16383), Cl.uint(0), Cl.stringAscii('wood'), Cl.stringAscii('brass'), Cl.uint(0)];
+  const r = simnet.callPublicFn('xtrata-door-skins-v1', 'register-skin', args('recipe-oak'), deployer);
+  assert.match(pp(r.result), /^\(ok u\d+\)$/, pp(r.result));
+  assert.equal(pp(simnet.callPublicFn('xtrata-door-skins-v1', 'register-skin', args('recipe-bad-size', { size: rec.size + 1 }), deployer).result), '(err u305)');
+  assert.equal(pp(simnet.callPublicFn('xtrata-door-skins-v1', 'register-skin', args('recipe-bad-hash', { hash: Buffer.alloc(32, 7) }), deployer).result), '(err u305)');
+  assert.equal(pp(simnet.callPublicFn('xtrata-door-skins-v1', 'register-skin', args('recipe-no-such', { id: id + 80 }), deployer).result), '(err u305)');
+  simnet.callPublicFn('xtrata-door-skins-v1', 'set-publisher', [Cl.principal(other), Cl.bool(true)], deployer);
+  assert.equal(pp(simnet.callPublicFn('xtrata-door-skins-v1', 'register-skin', args('recipe-theft'), other).result), '(err u305)');
+});
