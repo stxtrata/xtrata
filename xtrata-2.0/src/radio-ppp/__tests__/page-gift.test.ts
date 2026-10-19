@@ -417,6 +417,18 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
     expect(text(a.querySelector('.ppp-gift-body')!)).toContain('Prefunded batch (admin)');
   });
 
+  it('the "send music to a friend" gift is gone for everyone: no section for a listener, albums only for an admin', async () => {
+    const root = await open({ gift: null, giftStop: null, giftPlays: 0, main: ADMIN });
+    expect((root.querySelector('.ppp-gifts') as HTMLElement).hidden).toBe(true);
+    expect(text(root.querySelector('.ppp-gift-body')!)).not.toMatch(/Give someone|Gift amount|Send a gift/i);
+    const a = await admin();
+    const body = a.querySelector('.ppp-gift-body')!;
+    expect((a.querySelector('.ppp-gifts') as HTMLElement).hidden).toBe(false);
+    expect(body.querySelector('input[type="range"]')).toBeNull(); // no friend-gift amount slider
+    expect(text(body)).not.toMatch(/Give someone|send a gift/i);
+    expect(text(body)).toContain('Gift players (admin)');
+  });
+
   it('has no campaign box any more: batches are the only way to make links', async () => {
     served();
     const root = await admin();
@@ -493,11 +505,11 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
   });
 
   it('a refusal from the server is shown, nothing is paid and nothing is saved', async () => {
-    served({ '/radio/gift/batch': () => new Response(JSON.stringify({ error: 'The gift treasury is full right now.' }), { status: 503 }) });
+    served({ '/radio/gift/batch': () => new Response(JSON.stringify({ error: 'Several batches are still waiting for their payment. Pay or wait for them first.' }), { status: 429 }) });
     const pay = await payWith((o) => o.onFinish({ txId: '0x1' }));
     const root = await admin();
     click(root, /Sign, pay and make links/);
-    await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('treasury is full'));
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('still waiting for their payment'));
     expect(pay).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN) || '[]')).toEqual([]);
   });

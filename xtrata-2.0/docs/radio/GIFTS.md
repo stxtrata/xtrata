@@ -43,7 +43,7 @@ Prefunded batches are the only way to make albums and starter copies. Old campai
 - Campaign links already out: at most 10 claims per connection (salted IP hash) per 24 h. Friend gifts are never limited this way: someone paid for each one.
 - Campaign links already out have no daily total (removed 15 Oct 2026). What bounds them is the treasury balance. `RADIO_GIFT_DAILY_CAP` is no longer read by anything.
 - While a gift is being claimed or sent, the panel never shows it as failed: slow or refused sends say "still sending" in amber and retry by themselves (5 s, 10 s, 20 s, 30 s, then every minute). Red is kept for real dead ends (link unknown, used or expired; wallet not new; the per-connection limit).
-- Money held for friends and batches at once (paid copies, plus batches waiting for their payment in the last 24 h) is capped at `RADIO_GIFT_ESCROW_CAP` (default 50 STX; `functions/lib/radio-gifts.ts`, `DEFAULT_ESCROW_CAP`).
+- Money held for friend gifts at once is capped at `RADIO_GIFT_ESCROW_CAP` (default 50 STX; `functions/lib/radio-gifts.ts`, `DEFAULT_ESCROW_CAP`). Prefunded album batches have no size cap (19 Oct 2026): only a gift admin can make one, the creator's own deposit pays for every copy before it goes live, and unclaimed copies are refunded. A creator may still have only a few unpaid batches waiting at once. The "send music to a friend" gift is no longer in the page; the server still honours old links.
 - Campaign gifts already out never spend money owed to friends, creators or awaiting a refund.
 - Each signed batch or player request works once, within 15 minutes of signing.
 - Optional Cloudflare Turnstile on claims (`RADIO_GIFT_TURNSTILE_SITE_KEY` + `RADIO_GIFT_TURNSTILE_SECRET`).

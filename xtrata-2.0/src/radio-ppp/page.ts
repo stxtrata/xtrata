@@ -1022,7 +1022,7 @@ function start(root: HTMLElement) {
       plays: a.mode === 'open' ? (s.balance === undefined ? null : s.giftPlays) : undefined,
       playsComing: s.depositPending,
       status, primary, secondary, hint: primary ? hint : undefined,
-      asking, busy: !!s.busy, myPlays: myPlays(s), topUps: TOP_UP_PLAYS
+      asking, busy: !!s.busy, myPlays: myPlays(s), topUps: TOP_UP_PLAYS, canMake: !!s.gate?.gifts?.admin
     };
   }
 
