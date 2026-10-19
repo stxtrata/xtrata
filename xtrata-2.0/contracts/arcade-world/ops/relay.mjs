@@ -7,6 +7,7 @@
 //   node ops/relay.mjs posters --execute --key-file K --nonce N --file poster.json --height H [--role admin|publisher] [--owner ST...]
 //   node ops/relay.mjs call    --execute --key-file K --nonce N --which world|posters --fn set-paused --arg bool:true [--owner ST...]
 //   node ops/relay.mjs revert  --execute --key-file K --nonce N --room arcade-hall --bay 0
+//   node ops/relay.mjs retract --execute --key-file K --nonce N --room arcade-hall --bay 0 --seqs 2
 //   node ops/relay.mjs fund    --execute --key-file K --nonce N --to ST... --stx 5
 // --owner is the address that deployed the contracts (defaults to the signing key's address).
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -24,7 +25,7 @@ import { compilePosters, posterBatches, todayOf } from './lib/posters.mjs';
 import { posterCv, sceneCv } from './lib/clar.mjs';
 import { postersScene } from './lib/revert.mjs';
 
-const args = parseArgs(process.argv.slice(2), { keyFile: 'value', nonce: 'value', publisher: 'value', file: 'value', height: 'value', owner: 'value', fee: 'value', callFee: 'value', which: 'value', fn: 'value', arg: 'value', label: 'value', out: 'value', role: 'value', to: 'value', stx: 'value', room: 'value', bay: 'value' });
+const args = parseArgs(process.argv.slice(2), { keyFile: 'value', nonce: 'value', publisher: 'value', file: 'value', height: 'value', owner: 'value', fee: 'value', callFee: 'value', which: 'value', fn: 'value', arg: 'value', label: 'value', out: 'value', role: 'value', to: 'value', stx: 'value', room: 'value', bay: 'value', seqs: 'value' });
 const phase = args._[0];
 if (!phase || args.nonce == null) die('usage: node ops/relay.mjs <deploy|setup|scenes|posters|call|fund> --execute --key-file K --nonce N ...');
 let auth;
@@ -59,6 +60,8 @@ if (phase === 'deploy') {
   await call(args.which, args.fn, a, args.label);
 } else if (phase === 'revert') {
   await call('world', 'add-scene', [sceneCv(postersScene(args.room, Number(args.bay)))], `revert ${args.room} bay ${args.bay} to posters`);
+} else if (phase === 'retract') {
+  for (const q of String(args.seqs).split(',')) await call('world', 'retract-scene', [Cl.stringAscii(args.room), Cl.uint(Number(args.bay)), Cl.uint(Number(q))], `retract ${args.room} bay ${args.bay} #${q}`);
 } else if (phase === 'fund') {
   items.push(await signTransfer({ to: args.to, ustx: BigInt(Math.round(Number(args.stx) * 1e6)), key, nonce: nonce++, fee: 2000 }));
 } else die('unknown phase ' + phase);
