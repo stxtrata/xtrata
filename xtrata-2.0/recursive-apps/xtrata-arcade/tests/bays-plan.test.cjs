@@ -197,3 +197,10 @@ test('the styles the plan accepts are exactly the styles doors.js can draw', () 
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'parts', 'doors.js'), 'utf8'), sb2);
   assert.deepEqual(Array.from(B.DOOR_STYLES).sort(), Array.from(sb2.module.exports.STYLE_NAMES).sort());
 });
+
+test('a sign is fixed to the wall behind the curtain unless the scene sets front:true', () => {
+  const sign = (params) => plain(B.planBay(bay([layer(2, 2, params)]), LOOKS)).overlays[0].p.front;
+  assert.equal(sign('{"text":"x"}'), false);
+  assert.equal(sign('{"text":"x","front":true}'), true);
+  assert.equal(sign('{"text":"x","front":"yes"}'), false, 'only a real true counts');
+});
