@@ -32,10 +32,10 @@
       'game-brick-breaker.js', 'game-rock-drift.js', 'game-stack-tower.js', 'game-road-hopper.js', 'game-tile-tap.js',
       'game-merge-2048.js', 'game-block-defence.js', 'game-maze-muncher.js', 'game-invader-wave.js', 'game-helix-drop.js',
       'game-bubble-pop.js', 'game-swerve.js', 'game-lunar-lander.js', 'game-reflex-tap.js', 'game-mine-sprint.js', 'game-pong-streak.js'],
-    hall: ['hall.css', 'hall-body.html', 'world.js', 'curtain.js', 'doors.js', 'bays.js', 'hall.js']
+    hall: ['hall.css', 'hall-body.html', 'world.js', 'curtain.js', 'doors.js', 'door-skins.js', 'bays.js', 'hall.js']
   };
   // Parts that older releases (v1.x single files) do not have. The hall runs without them.
-  var OPTIONAL = ['world.js', 'curtain.js', 'doors.js', 'bays.js'];
+  var OPTIONAL = ['world.js', 'curtain.js', 'doors.js', 'door-skins.js', 'bays.js'];
   var PACK_ORDER = ['assets', 'three', 'engine', 'games', 'hall'];
 
   // Load order. CSS goes to <head>, the markup to <body>, scripts run in this order.
@@ -43,7 +43,7 @@
     css: ['fonts.css', 'room.css', 'hall.css'],
     html: ['hall-body.html'],
     js: ['arcade-kit.js', 'arcade-music.js', 'score-client.js', 'arcade-replay.js', 'arcade-room.js']
-      .concat(PACKS.games, ['engine-boot.js', 'three.js', 'hall-assets.js', 'world.js', 'curtain.js', 'doors.js', 'bays.js', 'hall.js'])
+      .concat(PACKS.games, ['engine-boot.js', 'three.js', 'hall-assets.js', 'world.js', 'curtain.js', 'doors.js', 'door-skins.js', 'bays.js', 'hall.js'])
   };
 
   function packOf(part) {

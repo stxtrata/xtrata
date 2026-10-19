@@ -516,6 +516,7 @@
     var line = o.color || LINE_COLOR[S.sfx] || LINE_COLOR.wood, lw = 1.5;
     var ppu = Math.min(4, 1024 / Math.max(G.leafW, H, 1));
     var group = new T.Group(), disposables = [], pick = [];
+    var SK = o.skin && o.skin.kit && o.skin.rec ? o.skin : null;            // a lit, textured finish (door-skins.js); null = the neon Threshold look
     // A door set into the wall: the slab is thin and its front sits only a few centimetres off the wall face, so it reads as
     // part of the wall (and its foot lines up with the wall's foot) rather than as a board standing in the room.
     var zWall = 0.006, zFrame = 0.01, zLeaf = 0.012, th = Math.min(G.thick * s, 0.03);
@@ -526,6 +527,38 @@
     function basicMat(map, extra) { var mt = new T.MeshBasicMaterial(Object.assign({ map: map, transparent: true, depthWrite: false }, extra || {})); disposables.push(mt); return mt; }
     function shapeOf(pts, ox) { var sh = new T.Shape(); pts.forEach(function (p, i) { var x = (p[0] - ox) * s, y = (H - p[1]) * s; if (i) sh.lineTo(x, y); else sh.moveTo(x, y); }); sh.closePath(); return sh; }
 
+    /* a skin: the band is the frame finish; the leaves, the handle and the straps are lit and textured */
+    var skinTex = null;
+    function skinBand(x, shp, outerD) {
+      var fr = SK.frameRec, pat = null;
+      if (fr) {
+        var fm = SK.kit.render(fr, { w: 128, h: 128, seed: 99, wear: 0 }), fc = o.mkCanvas(128, 128), fx = fc.getContext('2d'), id = fx.createImageData(128, 128);
+        id.data.set(fm.albedo); fx.putImageData(id, 0, 0); pat = x.createPattern(fc, 'repeat');
+      }
+      x.save(); x.clip(new Path2D(outerD + G.shape.d), 'evenodd'); x.lineJoin = 'round';
+      x.strokeStyle = 'rgba(0,0,0,0.42)'; x.lineWidth = 2 * G.fw + 5; x.stroke(shp);                           // a soft shadow edge on the wall
+      if (pat) { x.strokeStyle = pat; x.lineWidth = 2 * G.fw; x.stroke(shp); }
+      if (pat) { x.strokeStyle = 'rgba(255,255,255,0.2)'; x.lineWidth = 3.5; x.stroke(shp); }                // a lit edge along the opening
+      x.restore();
+    }
+    function skinMaps() {                                                                           // one set of maps for the whole door; each leaf shows its strip
+      var KT = SK.kit, sc = 512 / Math.max(W, H), w = Math.max(16, Math.round(W * sc)), h = Math.max(16, Math.round(H * sc));
+      var ops = G.leaves.map(function (L) { return faceOps(G, L, 0); }).join('');
+      var rel = KT.relief(G.shape.pts, ops, W, H, w, h), L0 = G.leaves[0];
+      var mp = KT.render(SK.rec, { w: w, h: h, rel: rel, seed: 1234, wear: SK.wear, tint: SK.tint || null, handle: [L0.hx / W, G.hy / H] });
+      function cv(fill) { var c = o.mkCanvas(w, h), x = c.getContext('2d'), id = x.createImageData(w, h); fill(id.data); x.putImageData(id, 0, 0); return c; }
+      var n = w * h, glass = !!(SK.rec.pane || SK.rec.opacity < 1), em = SK.rec.emissive ? KT.hexToRgb(SK.rec.emissive.color) : null;
+      var albedo = cv(function (d) { for (var i = 0; i < n; i++) { d[i * 4] = mp.albedo[i * 4]; d[i * 4 + 1] = mp.albedo[i * 4 + 1]; d[i * 4 + 2] = mp.albedo[i * 4 + 2]; d[i * 4 + 3] = Math.min(mp.albedo[i * 4 + 3], rel.mask[i] * 255); } });
+      var orm = cv(function (d) { for (var i = 0; i < n; i++) { d[i * 4] = 255; d[i * 4 + 1] = mp.orm[i * 4]; d[i * 4 + 2] = mp.orm[i * 4 + 1]; d[i * 4 + 3] = 255; } });
+      var nrm = cv(function (d) { for (var i = 0; i < n; i++) { d[i * 4] = mp.normal[i * 4]; d[i * 4 + 1] = mp.normal[i * 4 + 1]; d[i * 4 + 2] = mp.normal[i * 4 + 2]; d[i * 4 + 3] = 255; } });
+      var emi = em ? cv(function (d) { var k = SK.rec.emissive.intensity * 1.1; for (var i = 0; i < n; i++) { var g = Math.min(1, mp.groove[i]) * k; d[i * 4] = em[0] * 255 * g; d[i * 4 + 1] = em[1] * 255 * g; d[i * 4 + 2] = em[2] * 255 * g; d[i * 4 + 3] = 255; } }) : null;
+      function lin(c) { var t = new T.CanvasTexture(c); t.anisotropy = 4; disposables.push(t); return t; }
+      var tA = o.tex(albedo); disposables.push(tA);
+      return { albedo: tA, orm: lin(orm), normal: lin(nrm), emissive: emi ? o.tex(emi) : null, glass: glass, base: SK.rec.base };
+    }
+    function hwMat() { var h = SK.hw || { color: '#c9a24a', rough: 0.3, metal: 1 }, mt = new T.MeshStandardMaterial({ color: new T.Color(h.color), roughness: h.rough, metalness: h.metal, envMap: SK.env || null, envMapIntensity: 1 }); disposables.push(mt); return mt; }
+    if (SK) skinTex = skinMaps();
+
     /* doorway: dark recess with depth lines, framed by a band (one plane behind the leaves) */
     var pad = G.fw + 4, doorW = (W + 2 * pad) * s, doorH = (H + 2 * pad) * s;
     var wayTex = canvasTex(W + 2 * pad, H + 2 * pad, function (x) {
@@ -533,9 +566,10 @@
       var shp = new Path2D(G.shape.d), outerD = 'M' + -pad + ' ' + -pad + 'H' + (W + pad) + 'V' + (H + pad) + 'H' + -pad + 'Z';
       x.save(); x.clip(shp);
       var gr = x.createRadialGradient(W / 2, H * 0.45, 4, W / 2, H * 0.5, Math.max(W, H) * 0.75); gr.addColorStop(0, '#1c3550'); gr.addColorStop(1, '#04070b'); x.fillStyle = gr; x.fillRect(-pad, -pad, W + 2 * pad, H + 2 * pad);
-      x.strokeStyle = line; x.globalAlpha = 0.22; x.lineJoin = 'round';
+      x.strokeStyle = line; x.globalAlpha = SK ? 0 : 0.22; x.lineJoin = 'round';
       for (var k = 0.84; k > 0.3; k -= 0.18) { x.save(); x.translate(W / 2, H / 2); x.scale(k, k); x.translate(-W / 2, -H / 2); x.lineWidth = lw / k; x.stroke(shp); x.restore(); }
       x.restore();
+      if (SK) { skinBand(x, shp, outerD); return; }
       x.save(); x.clip(new Path2D(outerD + G.shape.d), 'evenodd');     // the band lives outside the opening only
       x.lineJoin = 'round'; x.strokeStyle = FRAME; x.lineWidth = 2 * G.fw; x.stroke(shp);
       x.strokeStyle = line; x.globalAlpha = 0.35; x.lineWidth = G.fw * 1.1; x.stroke(shp);
@@ -546,31 +580,64 @@
     var padS = pad * s, wayGeo = new T.PlaneGeometry(doorW, doorH - padS), vmin = pad / (H + 2 * pad), wuv = wayGeo.attributes.uv;
     for (var ui = 0; ui < wuv.count; ui++) wuv.setY(ui, vmin + wuv.getY(ui) * (1 - vmin));
     disposables.push(wayGeo);
-    var way = new T.Mesh(wayGeo, basicMat(wayTex)); way.position.set(0, (doorH - padS) / 2, zWall); way.renderOrder = 0; group.add(way);
+    var way = new T.Mesh(wayGeo, SK ? (function () { var mt = new T.MeshStandardMaterial({ map: wayTex, transparent: true, depthWrite: false, roughness: 0.75, metalness: 0, envMap: SK.env || null, envMapIntensity: 0.4 }); disposables.push(mt); return mt; })() : basicMat(wayTex)); way.position.set(0, (doorH - padS) / 2, zWall); way.renderOrder = 0; group.add(way);
 
     /* leaves */
     var leafObjs = G.leaves.map(function (L) {
       var pivot = new T.Group(); pivot.position.set((L.axis - W / 2) * s, 0, zLeaf);
       // the slab: the outline clipped to this leaf's strip, extruded for thickness
       var clipped = clipStrip(G.shape.pts, L.x0, L.x1), body = new T.Mesh(new T.ExtrudeGeometry(shapeOf(clipped, L.axis), { depth: th, bevelEnabled: false }),
-        new T.MeshBasicMaterial({ color: 0x070b11 }));
+        SK ? new T.MeshStandardMaterial({ color: new T.Color(SK.rec.base).multiplyScalar(0.5), roughness: 0.7, metalness: SK.rec.metal * 0.6 }) : new T.MeshBasicMaterial({ color: 0x070b11 }));
       disposables.push(body.material, body.geometry); pivot.add(body); pick.push(body);
+      var cx = ((L.x0 + L.x1) / 2 - L.axis) * s, front, back, hands;
+      if (SK) {
+        // the leaf's strip of the door's maps, lit; the back shows the same strip mirrored so panels sit where they do on the front
+        var face = function (flip) {
+          var mt = new T.MeshStandardMaterial({ map: skinTex.albedo, normalMap: skinTex.normal, normalScale: new T.Vector2(1, -1), roughnessMap: skinTex.orm, metalnessMap: skinTex.orm, roughness: 1, metalness: 1,
+            envMap: SK.env || null, envMapIntensity: 1.5, transparent: skinTex.glass, depthWrite: !skinTex.glass, alphaTest: skinTex.glass ? 0 : 0.5, side: T.FrontSide });
+          if (skinTex.emissive) { mt.emissive = new T.Color(0xffffff); mt.emissiveMap = skinTex.emissive; mt.emissiveIntensity = 1; }
+          disposables.push(mt);
+          var g = new T.PlaneGeometry(L.w * s, H * s), uv = g.attributes.uv, u0 = L.x0 / W, u1 = L.x1 / W;
+          for (var ui = 0; ui < uv.count; ui++) uv.setX(ui, (flip ? u1 : u0) + (uv.getX(ui)) * ((flip ? u0 : u1) - (flip ? u1 : u0)));
+          disposables.push(g); return new T.Mesh(g, mt);
+        };
+        front = face(false); back = face(true);
+        front.position.set(cx, H * s / 2, th + 0.0015); back.position.set(cx, H * s / 2, -0.0015); back.rotation.y = Math.PI;
+        front.raycast = back.raycast = function () {}; front.renderOrder = back.renderOrder = 1; pivot.add(front, back);
+        // hinge straps and the lever with its rose: small lit metal parts, on both faces
+        var hm = hwMat(), strapG = new T.BoxGeometry(1, 1, 1); disposables.push(strapG);
+        S.hingeYs.forEach(function (f) {
+          var e = G.shape.edge(f * H), ax = L.hinge === 'R' ? e[1] : e[0], len2 = Math.max(14, S.strap * L.w), tk = S.strapTh;
+          [th + 0.003, -0.003].forEach(function (z) {
+            var sm = new T.Mesh(strapG, hm); sm.scale.set(len2 * s, tk * s, 0.006); sm.position.set((ax + (L.hinge === 'R' ? -len2 / 2 : len2 / 2) - L.axis) * s, (H - f * H) * s, z); sm.raycast = function () {}; pivot.add(sm);
+          });
+        });
+        var roseG = new T.CylinderGeometry(9 * s, 9 * s, 0.006, 20); roseG.rotateX(Math.PI / 2); var len = L.Lh * (S.handle === 'bar' ? 1.25 : 1), leverG = new T.BoxGeometry(len * s, 8 * s, 0.014), padG = new T.CylinderGeometry(4.6 * s, 4.6 * s, 0.014, 14); padG.rotateX(Math.PI / 2);
+        disposables.push(roseG, leverG, padG);
+        hands = [th + 0.004, -0.004].map(function (z, k) {
+          var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = L.dir;
+          var lv = new T.Group(), bar = new T.Mesh(leverG, hm), pad = new T.Mesh(padG, hm), rose = new T.Mesh(roseG, hm);
+          bar.position.set(len * s / 2, 0, 0.008); pad.position.set(len * s, 0, 0.008); rose.position.z = 0.0; bar.raycast = pad.raycast = rose.raycast = function () {};
+          lv.add(rose, bar, pad); hg.add(lv); pivot.add(hg); return { g: hg, lever: lv };
+        });
+      } else {
       var faceTex = [0, 1].map(function (sd) { return canvasTex(L.w, H, function (x) {
         x.translate(-L.x0, 0);
         if (G.nL > 1) { x.beginPath(); x.rect(L.hinge === 'R' ? L.x0 - 4 : L.x0 - 4, -6, L.w + 8, H + 12); x.clip(); }
         x.shadowColor = line; x.shadowBlur = 4; drawOps(x, faceOps(G, L, sd), { line: line, fill: FILL, lw: lw });
       }); });
-      var cx = ((L.x0 + L.x1) / 2 - L.axis) * s, front = new T.Mesh(new T.PlaneGeometry(L.w * s, H * s), basicMat(faceTex[0])), back = new T.Mesh(new T.PlaneGeometry(L.w * s, H * s), basicMat(faceTex[1]));
+      front = new T.Mesh(new T.PlaneGeometry(L.w * s, H * s), basicMat(faceTex[0])); back = new T.Mesh(new T.PlaneGeometry(L.w * s, H * s), basicMat(faceTex[1]));
       front.position.set(cx, H * s / 2, th + 0.0015); back.position.set(cx, H * s / 2, -0.0015); back.rotation.y = Math.PI;
       front.raycast = back.raycast = function () {}; front.renderOrder = back.renderOrder = 1; pivot.add(front, back);
       // the handle (a lever that turns with the physics), on both faces
       var bs = 2 * (L.Lh + 16), levTex = canvasTex(bs, bs, function (x) { x.translate(bs / 2, bs / 2); x.shadowColor = line; x.shadowBlur = 3; drawOps(x, leverArt(S.handle, L.Lh), { line: line, fill: FILL, lw: lw }); });
-      var hands = [th + 0.004, -0.004].map(function (z, k) {
+      hands = [th + 0.004, -0.004].map(function (z, k) {
         var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s * (k ? 1 : 1), (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = L.dir;
         var lm = new T.Mesh(new T.PlaneGeometry(bs * s, bs * s), basicMat(levTex)); lm.raycast = function () {}; lm.renderOrder = 2; hg.add(lm); pivot.add(hg); return { g: hg, lever: lm };
       });
+      }
       var led = new T.Mesh(new T.CircleGeometry(2.4 * s, 12), new T.MeshBasicMaterial({ color: 0xff6a6a })); led.position.set((L.hx - L.axis) * s, (H - G.hy - 16) * s, th + 0.005); led.raycast = function () {}; pivot.add(led); disposables.push(led.material, led.geometry);
-      var bolt = new T.Mesh(new T.BoxGeometry(14 * s, 9 * s, 0.012), new T.MeshBasicMaterial({ color: 0xc9d4de })); bolt.position.set((L.latch - L.axis) * s, (H - G.hy) * s, th * 0.5); bolt.raycast = function () {}; pivot.add(bolt); disposables.push(bolt.material, bolt.geometry);
+      var bolt = new T.Mesh(new T.BoxGeometry(14 * s, 9 * s, 0.012), SK ? hwMat() : new T.MeshBasicMaterial({ color: 0xc9d4de })); bolt.position.set((L.latch - L.axis) * s, (H - G.hy) * s, th * 0.5); bolt.raycast = function () {}; pivot.add(bolt); disposables.push(bolt.material, bolt.geometry);
       group.add(pivot);
       return { L: L, pivot: pivot, hands: hands, led: led, bolt: bolt, boltX: (L.latch - L.axis) * s };
     });
