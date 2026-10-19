@@ -100,6 +100,19 @@ describe('radio giveaway', () => {
     expect((await giveawayView(t.env, T0 + 106_000)).code).toBe(more[1]);
   });
 
+  it('held copies (the edition\u2019s size beyond this list) are reported, and set by the operator', async () => {
+    const s = setup();
+    const codes = await s.gifts(2);
+    await giveawayAdmin(s.env, { action: 'add', text: s.list(codes) }, T0);
+    expect(await giveawayView(s.env, T0)).not.toHaveProperty('held'); // none until set
+    const out = await giveawayAdmin(s.env, { action: 'held', count: 5 }, T0);
+    expect(out.held).toBe(5);
+    expect(await giveawayView(s.env, T0)).toMatchObject({ state: 'live', held: 5, claimed: 0, left: 2 });
+    await giveawayAdmin(s.env, { action: 'held', count: 0 }, T0);
+    expect(await giveawayView(s.env, T0)).not.toHaveProperty('held');
+    for (const bad of [-1, 1.5, 'x', 10_001]) await expect(giveawayAdmin(s.env, { action: 'held', count: bad }, T0)).rejects.toThrow(/count must be/);
+  });
+
   it('the default pause is ten minutes', async () => {
     const s = setup();
     const codes = await s.gifts(2);

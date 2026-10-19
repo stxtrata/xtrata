@@ -79,6 +79,7 @@
   .discs{display:flex;flex-wrap:wrap;gap:7px}
   .d{display:inline-block;width:20px;height:20px;border-radius:50%;border:2px solid rgba(242,240,255,.42);flex:none}
   .d.done{border-color:var(--stamp);background:radial-gradient(circle,var(--ultra-deep) 0 2.4px,var(--stamp) 3.4px)}
+  .d.held{border-color:rgba(242,240,255,.6);background:radial-gradient(circle,var(--ultra-deep) 0 2.4px,rgba(242,240,255,.6) 3.4px)}
   .d.now{border-color:var(--live);background:radial-gradient(circle,var(--ultra-deep) 0 2.4px,var(--live) 3.4px);box-shadow:0 0 0 4px rgba(94,233,255,.25),0 0 18px var(--live);animation:pulse 1.4s ease-in-out infinite}
   .discs.enter .d{animation:stamp .5s cubic-bezier(.2,1.4,.4,1) both;animation-delay:calc(var(--i)*9ms)}
   .legend{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0 0;font-size:14px;color:var(--chalk-2)}
@@ -202,7 +203,7 @@
     <div class="run" id="run" hidden>
       <div class="run-head"><h3>The run</h3><p id="run-text"></p></div>
       <div class="discs" id="discs" role="img" aria-label="Every copy in the edition"></div>
-      <div class="legend"><span><i class="d done"></i>Claimed</span><span><i class="d now"></i>Live now</span><span><i class="d"></i>Still to come</span></div>
+      <div class="legend"><span id="legend-held" hidden><i class="d held"></i>Set aside</span><span><i class="d done"></i>Claimed</span><span><i class="d now"></i>Live now</span><span><i class="d"></i>Still to come</span></div>
     </div>
 
     <p class="small">Works best on a phone or laptop with Face ID, Touch ID or a fingerprint reader. One copy of each album per person.</p>
@@ -302,8 +303,9 @@
   }
 
   // The run: one disc per copy in the edition. Claimed ones are stamped; the live one glows.
-  function run(state,claimed,left){
-    var total=claimed+left;
+  function run(state,claimed,left,held){
+    held=held>0?held:0;
+    var total=held+claimed+left;
     document.querySelectorAll('#total,.total-inline').forEach(function(e){e.textContent=total>0?total:95;});
     if(total<1){$('run').hidden=true;return;}
     $('run').hidden=false;
@@ -316,11 +318,12 @@
     }
     var nodes=box.children;
     for(var j=0;j<nodes.length;j++){
-      nodes[j].className='d'+(j<claimed?' done':(state==='live'&&j===claimed?' now':''));
+      nodes[j].className='d'+(j<held?' held':(j<held+claimed?' done':(state==='live'&&j===held+claimed?' now':'')));
     }
-    $('run-text').textContent=claimed+' of '+total+' claimed'+(left>0&&state!=='done'?', '+left+' still to come':'');
+    $('run-text').textContent=(held+claimed)+' of '+total+' gone'+(left>0&&state!=='done'?', '+left+' still to come':'');
+    $('legend-held').hidden=!(held>0);
     var no=$('copyno');
-    if(state==='live'){no.hidden=false;var w=String(total).length;no.textContent='Copy No. '+String(claimed+1).padStart(w,'0')+' of '+total;}
+    if(state==='live'){no.hidden=false;var w=String(total).length;no.textContent='Copy No. '+String(held+claimed+1).padStart(w,'0')+' of '+total;}
     else no.hidden=true;
   }
 
@@ -354,7 +357,7 @@
       skew=typeof v.now==='number'?v.now-Date.now():0;
       tick();
     }else nextAt=0;
-    run(state,Number(v.claimed||0),Number(v.left||0));
+    run(state,Number(v.claimed||0),Number(v.left||0),Number(v.held||0));
     $('alert').hidden=!(('Notification' in window)&&Notification.permission==='default'&&state!=='done');
     last=state;
     followCheck();
