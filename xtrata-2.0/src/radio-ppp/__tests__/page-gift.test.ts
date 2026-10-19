@@ -39,6 +39,8 @@ async function open(over: object = {}) {
     <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section>`;
+  // The radio's own hooks (public/radio.html): the ON AIR lamp and the note under the receiver.
+  document.body.insertAdjacentHTML('beforeend', '<div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>');
   h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
   (window as any).XtrataRadio = h.radio;
   h.snap = { ...base, ...over };
@@ -588,5 +590,23 @@ describe('waiting for plays to arrive', () => {
   it('no bar when nothing is expected: a genuinely empty wallet still says so', async () => {
     const root = await open({ step: 'fund', balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, giftPlays: 0, gift: null, arrival: null, giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } });
     expect(root.querySelector('.ppp-wait')).toBeNull();
+  });
+});
+
+describe('the free player (the main site)', () => {
+  beforeEach(() => { delete document.documentElement.dataset.ppp; localStorage.clear(); });
+
+  it('is a friendly note, not an "artists unpaid" warning: no drab look, no lamp, and a way to get a player', async () => {
+    await open({ step: 'elsewhere', gift: null, gate: { ...base.gate, here: false, radioUrl: 'https://radio.xtrata.test/radio.html' } });
+    const nudge = document.getElementById('pppNudge')!;
+    expect(nudge.hidden).toBe(false);
+    expect(nudge.classList.contains('is-free')).toBe(true);
+    expect(text(nudge)).toMatch(/free player/i);
+    expect(text(nudge)).toMatch(/doesn’t pay anyone/);
+    expect(text(nudge)).toMatch(/album player/);
+    expect(text(nudge)).not.toMatch(/not counted|locked|unpaid/i);
+    expect(nudge.querySelector('button')!.textContent).toBe('Get a player');
+    expect(document.documentElement.dataset.ppp).toBe('free'); // neither "on" (gold) nor "off" (drab and orange)
+    expect(document.getElementById('onair')!.hidden).toBe(true);
   });
 });

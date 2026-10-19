@@ -380,7 +380,6 @@ function start(root: HTMLElement) {
   const onair = document.getElementById('onair');
   nudge?.querySelector('button')?.addEventListener('click', () => go());
   const NOT_PAYING: Partial<Record<Snapshot['step'], string>> = {
-    elsewhere: 'Plays are not counted here',
     connect: 'Plays are not counted',
     intro: 'Plays are not counted',
     locked: 'Locked · plays are not counted',
@@ -400,17 +399,25 @@ function start(root: HTMLElement) {
     const paying = s.step === 'ready' && s.payingOn && left > 0;
     // Funds already on their way (a deposit or a gift): nothing has gone wrong, so no "artists unpaid" warning.
     const waiting = s.step === 'fund' && s.depositPending;
-    const warning = paying || waiting ? '' : NOT_PAYING[s.step] ?? '';
-    const mode = paying ? 'on' : warning ? 'off' : '';
+    // The free player (this page on the main site, where nothing is paid): not a warning, an invitation, so no drab
+    // "artists unpaid" look and no orange: the radio keeps its normal look and a friendly note says what this is.
+    const free = s.step === 'elsewhere';
+    const warning = paying || waiting || free ? '' : NOT_PAYING[s.step] ?? '';
+    const mode = paying ? 'on' : free ? 'free' : warning ? 'off' : '';
     if (mode) document.documentElement.dataset.ppp = mode;
     else delete document.documentElement.dataset.ppp;
     if (onair) {
-      onair.hidden = !mode;
+      onair.hidden = !mode || mode === 'free';
       onair.querySelector('.onair-sub')!.textContent = paying ? `${left.toLocaleString()} plays left` : 'Plays off';
     }
     if (nudge) {
-      nudge.hidden = mode !== 'off';
-      if (mode === 'off') {
+      nudge.hidden = mode !== 'off' && mode !== 'free';
+      nudge.classList.toggle('is-free', mode === 'free');
+      if (mode === 'free') {
+        nudge.querySelector('.nudge-t')!.textContent = 'You’re on the free player';
+        nudge.querySelector('.nudge-s')!.textContent = 'This one doesn’t pay anyone. To join the new music economy, where every play pays the artist on-chain, get yourself an album player.';
+        nudge.querySelector('button')!.textContent = 'Get a player';
+      } else if (mode === 'off') {
         nudge.querySelector('.nudge-t')!.textContent = warning;
         nudge.querySelector('.nudge-s')!.textContent = 'Every play you count goes to the song’s owner, on-chain.';
         nudge.querySelector('button')!.textContent = NUDGE_ACTION[s.step] ?? 'Start';
