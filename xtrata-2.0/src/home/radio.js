@@ -1249,8 +1249,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
           }
           return null;
         };
-        // Prefer the next song that has NOT yet aired this cycle.
-        choice = walk(true);
+        // Prefer the next song that has NOT yet aired this cycle. An album is the exception: it plays in its own
+        // running order whatever was heard before (a tapped song, an earlier visit), so skip is always the next track.
+        choice = band === 'gift' && giftPlayer ? walk(false) : walk(true);
         // Nothing left unaired → every other available song has played, so open
         // a fresh cycle and resume the running order (current still held to last).
         if (!choice && pool.some((id) => trackCache.get(id) !== null && played.has(id))) {

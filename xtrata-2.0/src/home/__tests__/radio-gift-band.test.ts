@@ -36,6 +36,20 @@ it('loading a player makes it the active band and the album plays in order, then
   expect(asked.filter((id) => !['11', '12', '13'].includes(id))).toEqual([]);
 });
 
+it('skip goes to the next song in the album\'s order, even when that song was heard earlier', async () => {
+  const api = initXtrataRadio({ tokenIds: ['7777'] })!;
+  const now = () => String(api.getState().nowPlaying?.tokenId ?? '');
+  api.setGiftPlayer({ ...album, tracks: [11, 12, 13, 14] });
+  api.switchOn();
+  await vi.waitFor(() => expect(now()).toBe('11'));
+  // song 12 is heard on its own (tapped in the list), then the listener goes back to the first song and skips
+  api.playToken('12'); await vi.waitFor(() => expect(now()).toBe('12'));
+  api.playToken('11'); await vi.waitFor(() => expect(now()).toBe('11'));
+  api.next();
+  await vi.waitFor(() => expect(now()).not.toBe('11'));
+  expect(now()).toBe('12'); // not 13: "already heard" must not skip a song in an album
+});
+
 it('once the plays are used up nothing starts or advances, until the stop is lifted', async () => {
   const api = initXtrataRadio({ tokenIds: ['7777'] })!;
   api.setGiftPlayer(album);

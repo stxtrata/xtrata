@@ -73,6 +73,16 @@ describe('Gift Edition panel', () => {
     expect(h.radio.setGiftStop).toHaveBeenLastCalledWith(null);
   });
 
+  it('no deposit button while plays are on their way (a gift or a deposit); it comes back once they are used up', async () => {
+    const funding = { step: 'fund', solo: false, linked: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', balance: 0n, giftPlays: 0, allowance: 1_000_000n, entries: [] };
+    const root = await open({ ...funding, depositPending: true, depositTxid: undefined, arrival: { since: 0, graceMs: 60_000 } });
+    expect([...root.querySelectorAll('button')].some((b) => /Deposit .* STX/.test(b.textContent ?? ''))).toBe(false);
+    expect(text(root)).toMatch(/nothing to add/i);
+    h.snap = { ...h.snap, depositPending: false, arrival: null };
+    h.changed();
+    expect([...root.querySelectorAll('button')].some((b) => /Deposit 1(\.0+)? STX from my wallet/.test(b.textContent ?? ''))).toBe(true);
+  });
+
   it('an ordinary wallet leaves the radio alone', async () => {
     await open({ gift: null, giftStop: null, giftPlays: 0 });
     expect(h.radio.setGiftPlayer).not.toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String) }));
