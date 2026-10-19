@@ -5,7 +5,7 @@
   dialog.id = 'musicArtworkDialog';
   dialog.setAttribute('aria-labelledby', 'artworkHeading');
   dialog.innerHTML =
-    '<h2 id="artworkHeading">Prepare player artwork</h2><p>Start with <b>512 × 512 px and 50–100 KB</b>. Non-square images keep their proportions. Smaller covers save more space but may lose fine text and detail.</p><p id="artworkSource"></p><p id="artworkWarning" role="status"></p><label for="artworkPreset">Size and quality</label><select id="artworkPreset"><option value="standard">Recommended · 512 px · target under 100 KB</option><option value="small">Smaller · 256 px · target under 30 KB</option><option value="tiny">Smallest · 128 px · target under 12 KB</option><option value="detailed">Detailed · 1024 px · target under 200 KB</option><option value="original">Keep original artwork</option></select><div class="artwork-comparison"><figure><img id="artworkBefore" alt="Original cover"/><figcaption>Original</figcaption></figure><figure><img id="artworkAfter" alt="Prepared cover"/><figcaption id="artworkResult">Preparing…</figcaption></figure></div><p id="artworkSavings" role="status"></p><p class="muted">Exports a still cover image. Compression is lossy; compare fine text and edges before applying. Transparency is preserved. Size targets are guidance, not guarantees. Keeping original audio also keeps any artwork embedded in that audio file; this editor changes the separate player cover.</p><div class="music-toolbar"><button type="button" class="btn" id="artworkApply" disabled>Use prepared artwork</button><button type="button" class="btn ghost" id="artworkCancel">Cancel</button></div>';
+    '<h2 id="artworkHeading">Prepare player artwork</h2><p>Start with <b>512 × 512 px and 50–100 KB</b>. Non-square images keep their proportions. Smaller covers save more space but may lose fine text and detail.</p><p id="artworkSource"></p><p id="artworkWarning" role="status"></p><label for="artworkPreset">Size and quality</label><select id="artworkPreset"><option value="standard">Recommended · 512 px · target under 100 KB</option><option value="small">Smaller · 256 px · target under 30 KB</option><option value="tiny">Smallest · 128 px · target under 12 KB</option><option value="detailed">Detailed · 1024 px · target under 200 KB</option><option value="original">Keep original artwork</option></select><div class="artwork-comparison"><figure><img id="artworkBefore" alt="Original cover"/><figcaption>Original</figcaption></figure><figure><img id="artworkAfter" alt="Prepared cover"/><figcaption id="artworkResult">Preparing…</figcaption></figure></div><p id="artworkSavings" role="status"></p><p class="muted">Compression is lossy (an animated GIF is the exception: it is kept exactly as uploaded so it keeps moving); compare fine text and edges before applying. Transparency is preserved. Size targets are guidance, not guarantees. Keeping original audio also keeps any artwork embedded in that audio file; this editor changes the separate player cover.</p><div class="music-toolbar"><button type="button" class="btn" id="artworkApply" disabled>Use prepared artwork</button><button type="button" class="btn ghost" id="artworkCancel">Cancel</button></div>';
   document.body.append(dialog);
   const el = (id) => dialog.querySelector('#' + id),
     kb = (n) => (n / 1024).toFixed(1) + ' KB';
@@ -32,6 +32,7 @@
       const next = await A.optimise(source, el('artworkPreset').value);
       if (generation !== run || !dialog.open) return;
       result = next;
+      el('artworkPreset').disabled = !!next.animated;
       const url = URL.createObjectURL(next.file);
       urls.push(url);
       el('artworkAfter').src = url;
@@ -57,8 +58,9 @@
         ' · ' +
         next.file.type.replace('image/', '');
       const saved = next.original.bytes - next.bytes;
-      el('artworkSavings').textContent =
-        saved > 0
+      el('artworkSavings').textContent = next.animated
+        ? 'Animated GIF kept exactly as uploaded.'
+        : saved > 0
           ? 'Saves ' + kb(saved) + ' (' + Math.round((saved / next.original.bytes) * 100) + '%).'
           : saved < 0
             ? 'This version is ' + kb(-saved) + ' larger. Try another preset or keep the original.'
@@ -85,6 +87,7 @@
     source = file;
     apply = callback;
     el('artworkPreset').value = 'standard';
+    el('artworkPreset').disabled = false;
     el('artworkWarning').textContent = '';
     el('artworkSource').textContent = '';
     const url = URL.createObjectURL(file);
@@ -142,7 +145,7 @@
     } catch {
       if (generation === adviceRun)
         advice.textContent =
-          'Could not inspect this artwork. Replace it with a valid still PNG, JPEG or WebP.';
+          'Could not inspect this artwork. Replace it with a valid PNG, JPEG, WebP or GIF.';
     }
   }
   optimise.onclick = () => {
