@@ -28,7 +28,7 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
     if(kind==='wall') return {base:'wall',baseId:1,interaction:0,doorLook:null,layers:[],link:null,fromHeight:0};
     if(kind==='story'){
       layers.push(L(1,1,'{"color":"#7a1020"}',curtain));
-      layers.push(L(2,2,'{"text":"coming soon","sub":"back in three days","tone":"gold","front":true}'));
+      layers.push(L(2,2,'{"text":"coming soon","sub":"back in three days","tone":"gold"}'));
       if(sound) layers.push(L(3,3,'{"kinds":"hammer,saw,drill,clatter","volume":0.6,"radius":7}'));
       if(lamp) layers.push(L(4,4,'{"tone":"orange","rate":2}'));
     } else if(kind==='workshop'){

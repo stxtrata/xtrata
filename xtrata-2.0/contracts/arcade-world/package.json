@@ -4,4 +4,4 @@
     "make-live": "node scripts/make-live.mjs",
     "test:integration": "node scripts/make-realcore.mjs && cd integration && node --test real-core.test.mjs"
   },
-  "dependencies": { "@stacks/clarinet-sdk": "^3.9.0", "@stacks/transactions": "^7.2.0" } }
+  "dependencies": { "@stacks/clarinet-sdk": "^3.9.0", "@stacks/transactions": "^7.2.0", "c32check": "^2.0.0" } }

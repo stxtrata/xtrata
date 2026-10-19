@@ -1,0 +1,5 @@
+[
+  { "head": "NEW GAME SOON", "sub": "Something is being built behind the curtain", "art": "launch", "colour": "gold" },
+  { "head": "BEAT THE TOP 10", "sub": "Your name on the board, on chain", "art": "trophy", "colour": "orange", "action": { "kind": "path", "path": "/arcade" } },
+  { "head": "PLAY ANYTHING", "sub": "Every game is on Bitcoin, via Stacks", "art": "btc", "colour": "blue" }
+]
