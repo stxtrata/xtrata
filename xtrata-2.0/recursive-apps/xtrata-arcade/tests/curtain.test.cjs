@@ -210,3 +210,30 @@ test('renderer draws through a 2D context stub without throwing, for every state
   }
   assert.ok(calls.fill > 100 && calls.clearRect === 6 && calls.fillRect > 6, JSON.stringify(calls));
 });
+
+test('renderer margin: the cloth is drawn offset into a wider picture and the whole picture is cleared', () => {
+  const log = [];
+  const grad = { addColorStop() { } };
+  const ctx = new Proxy({}, {
+    get(t, k) { if (k === 'createLinearGradient') return () => grad; return (...a) => { if (k === 'setTransform' || k === 'clearRect') log.push([k, ...a]); }; },
+    set() { return true; }
+  });
+  const sim = createCreatesim();
+  function createCreatesim() { return createCurtainSim({ width: W, height: H, openness: 1 }); }
+  createCurtainRenderer(sim, ctx, { margin: 100 }).draw();
+  assert.deepEqual(log.find((l) => l[0] === 'setTransform'), ['setTransform', 1, 0, 0, 1, 100, 0], 'shifted right by the margin');
+  assert.deepEqual(log.find((l) => l[0] === 'clearRect'), ['clearRect', -100, 0, W + 200, H], 'clears margin, cloth and margin');
+  log.length = 0; createCurtainRenderer(sim, ctx, {}).draw();
+  assert.deepEqual(log.find((l) => l[0] === 'setTransform'), ['setTransform', 1, 0, 0, 1, 0, 0], 'no margin: as before');
+});
+
+test('cloth held past a rail end hangs outside the cloth width (so a margin is needed) and stays within the reach of its threads', () => {
+  const sim = createCurtainSim({ width: W, height: H, openness: 1 });
+  sim.advance(1);
+  const q = sim.uvToPx(0.05, 0.8);
+  assert.ok(sim.grab(q.x, q.y), 'grabbed the open cloth near the left stack');
+  sim.moveGrabUV(-0.2); sim.advance(2);
+  const min = Math.min(...Array.from(sim.panels[0].x));
+  assert.ok(min < 0, 'some cloth is left of the rail end: ' + min.toFixed(1));
+  assert.ok(min > -0.5 * W, 'but not further than half the cloth width (' + (min / W).toFixed(2) + ' of the width)');
+});

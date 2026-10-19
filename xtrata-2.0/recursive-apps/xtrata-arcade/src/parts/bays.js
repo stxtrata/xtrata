@@ -247,12 +247,14 @@
     var T = env.THREE, scene = env.scene, audio = createAudio();
     var DOORS = root.XADoors || null;
     var doorSfx = DOORS ? DOORS.createSfx(function () { return audio.env(); }, function () { return env.listener(); }) : null;
-    // Layering, from the wall outwards (metres in front of the wall): the door (0 to about 0.15, its slab is up to 0.12 thick),
-    // tape across it, the curtain rail and cloth hung in front of all that, and last the sign board, which has to show when the curtain is shut.
+    // Layering, from the wall outwards (metres in front of the wall): the door, set into the wall (its slab front is at about 0.045),
+    // the tape stretched across it a few centimetres proud of it, the curtain rail and cloth hung in front of all that, and last the
+    // sign board, which has to show when the curtain is shut.
     // The cloth is see-through and does not write depth, so a see-through door face would draw over it whatever its distance:
     // the door's own pieces (doors.js) draw at render order 0 to 2, the curtain after them.
     var RO_CURTAIN = 5;
-    var Z_TAPE = 0.17, Z_RAIL = 0.2, Z_CURTAIN = 0.21, Z_SIGN = 0.25;
+    var Z_TAPE = 0.085, Z_RAIL = 0.2, Z_CURTAIN = 0.21, Z_SIGN = 0.25;
+    var CURTAIN_MARGIN_M = 0.8;                   // how far past each rail end the cloth can be pulled and still be seen
     var CW = 720;                                // curtain canvas width, px (its height follows the bay)
     var bays = env.bays.map(function (d, i) { return makeBay(d, i); });
     var rayc = new T.Raycaster(); rayc.far = 4;
@@ -269,23 +271,25 @@
     }
 
     /* ---- pieces ---- */
-    function disposeMesh(m) { if (!m) return; if (m.parent) m.parent.remove(m); if (m.material) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } if (m.geometry) m.geometry.dispose(); }
+    function disposeMesh(m) { if (!m) return; m.children.slice().forEach(function (c) { if (c.material) c.material.dispose(); if (c.geometry) c.geometry.dispose(); }); if (m.parent) m.parent.remove(m); if (m.material) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } if (m.geometry) m.geometry.dispose(); }
 
     function buildCurtain(bay, spec, instant) {
       var C = root.XACurtain; if (!C) return null;
       var openness = spec.p.openness;
       // the cloth hangs from the rail to just above the floor: the canvas keeps the cloth's proportions at any bay width
       var railY = Math.min(env.RH - 0.25, 2.95), ch = clamp(Math.round(CW * (railY - 0.04) / bay.width), 400, 1400);
-      var sim = C.createCurtainSim({ width: CW, height: ch, color: spec.p.color || undefined, trim: spec.p.trim || undefined, openness: openness, speed: spec.p.speed });
-      var cv = env.mkCanvas(CW, ch), r = C.createCurtainRenderer(sim, cv.getContext('2d'));
+      // room beside the rail ends so cloth pulled past them is drawn, not cut off at the edge of the picture
+      var mg = Math.round(CURTAIN_MARGIN_M * CW / bay.width), cwFull = CW + 2 * mg;
+      var sim = C.createCurtainSim({ width: CW, height: ch, reach: mg - 2, color: spec.p.color || undefined, trim: spec.p.trim || undefined, openness: openness, speed: spec.p.speed });
+      var cv = env.mkCanvas(cwFull, ch), r = C.createCurtainRenderer(sim, cv.getContext('2d'), { margin: mg });
       r.draw();
       var t = env.tex(cv); t.anisotropy = 4;
       var h = bay.width * ch / CW;
-      var mesh = new T.Mesh(new T.PlaneGeometry(bay.width, h), new T.MeshBasicMaterial({ map: t, transparent: true, color: 0xd2d2da, depthWrite: false }));
+      var mesh = new T.Mesh(new T.PlaneGeometry(bay.width * cwFull / CW, h), new T.MeshBasicMaterial({ map: t, transparent: true, color: 0xd2d2da, depthWrite: false }));
       mesh.position.set(0, railY - h / 2, Z_CURTAIN); mesh.renderOrder = RO_CURTAIN; bay.group.add(mesh);
       var rail = new T.Mesh(new T.BoxGeometry(bay.width + 0.24, 0.035, 0.06), new T.MeshStandardMaterial({ color: 0x2a2a33, metalness: 0.8, roughness: 0.3 }));
       rail.position.set(0, railY + 0.02, Z_RAIL); bay.group.add(rail);
-      return { sim: sim, r: r, cv: cv, tex: t, mesh: mesh, rail: rail, style: JSON.stringify([spec.p.color, spec.p.trim]), target: openness, h: h, railY: railY };
+      return { sim: sim, r: r, cv: cv, tex: t, mesh: mesh, rail: rail, style: JSON.stringify([spec.p.color, spec.p.trim]), target: openness, h: h, railY: railY, mg: mg, cwFull: cwFull };
     }
     function disposeCurtain(c) { if (!c) return; disposeMesh(c.mesh); disposeMesh(c.rail); }
 
@@ -313,7 +317,11 @@
       if (spec.key === 'caution-tape') {
         var tw = bay.width - 0.02, tt = env.tex(tapeTexture()); tt.wrapS = T.RepeatWrapping; tt.repeat.set(Math.round(tw * 2), 1);
         var tm = new T.Mesh(new T.PlaneGeometry(tw, 0.14), new T.MeshBasicMaterial({ map: tt, color: 0xdadada, side: T.DoubleSide }));
-        tm.position.set(0, spec.p.y, Z_TAPE); tm.rotation.z = 0.035; tm.renderOrder = 1; tm.userData.key = spec.key; bay.group.add(tm); return tm;
+        tm.position.set(0, spec.p.y, Z_TAPE); tm.rotation.z = 0.035; tm.renderOrder = 1; tm.userData.key = spec.key; bay.group.add(tm);
+        // a soft shadow just under the tape, on whatever is behind it, so it reads as stretched across the door and not painted on
+        var sh = new T.Mesh(new T.PlaneGeometry(tw, 0.17), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false }));
+        sh.position.set(0, -0.045, -0.02); sh.renderOrder = 1; sh.raycast = function () {}; tm.add(sh);   // a child: it tilts with the tape
+        return tm;
       }
       return null;
     }
@@ -485,7 +493,8 @@
       var hit = ch;
       if (!hit || !curtainGrabbable(hit.bay.plan)) return false;
       var uv = hit.h.uv; if (!uv) return false;
-      if (!hit.bay.curtain.sim.grabUV(uv.x, 1 - uv.y)) return false;
+      var cu = hit.bay.curtain, us = (uv.x * cu.cwFull - cu.mg) / CW;           // the plane is wider than the cloth: back to the cloth's own 0..1
+      if (!cu.sim.grabUV(us, 1 - uv.y)) return false;
       grab = { bay: hit.bay, ndc: ndc.clone() };
       audio.oneShot('swish', hit.bay.pos, env.listener(), 0.35, 8);
       return true;
@@ -494,7 +503,9 @@
     function grabMove(dx, dy) {   // dx, dy in NDC units
       if (!grab) return;
       grab.ndc.x = clamp(grab.ndc.x + dx, -1.5, 1.5); grab.ndc.y = clamp(grab.ndc.y + dy, -1.5, 1.5);
-      var u = uAlong(grab.bay, grab.ndc); if (u !== null) grab.bay.curtain.sim.moveGrabUV(u);
+      var u = uAlong(grab.bay, grab.ndc);
+      if (u !== null) { var mf = CURTAIN_MARGIN_M / grab.bay.width, lim = Math.max(0.5 * mf, mf - 0.1);   // the cloth hangs up to about 0.09 of its width past the hand
+        grab.bay.curtain.sim.moveGrabUV(clamp(u, -lim, 1 + lim)); }   // so the hand cannot take the cloth off the picture
     }
     function grabEnd() { if (!grab) return; grab.bay.curtain.sim.release(); grab = null; }
     function toggleFocused() {   // E on what you are looking at
@@ -513,6 +524,7 @@
     return {
       apply: apply, update: update, focus: focus, grabStart: grabStart, grabMove: grabMove, grabEnd: grabEnd, toggleFocused: toggleFocused,
       isGrabbing: function () { return !!grab; },
+      _curtain: function (i) { var c = bays[i] && bays[i].curtain; return c ? { sim: c.sim, mg: c.mg, w: bays[i].width } : null; },   // tests only
       _model: function (i) { var d = bays[i] && bays[i].door; return d && d.model ? d.model : null; },   // tests only
       showPosters: function (i) { var p = bays[i] && bays[i].plan; return !p || p.base === 'posters'; },
       audio: audio,
@@ -520,7 +532,7 @@
       debug: function () {
         return bays.map(function (b) {
           return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, doorState: b.door && b.door.model ? b.door.model.state() : null,
-            curtain: b.curtain ? { bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
+            curtain: b.curtain ? { margin: b.curtain.mg, planeW: b.curtain.mesh.geometry.parameters.width, bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
             light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity } : null };
         });
       }

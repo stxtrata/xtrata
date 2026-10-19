@@ -172,6 +172,7 @@ function buildRoom(){
   buildPosters();
   try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
+  if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
   XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
   if(window.XA_TEST) XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 };   // tests only: nothing sets XA_TEST in the shipped page
   XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests

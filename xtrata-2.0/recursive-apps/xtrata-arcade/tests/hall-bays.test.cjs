@@ -194,6 +194,29 @@ const story = (state, interaction) => bay(scene('door', [
     await ctx.close();
   }
 
+  /* ---- H: cloth pulled past the rail end stays visible ---- */
+  {
+    const { ctx, page, errors } = await open({ config: true, snap: snapshot([story('open', 2), bay(null)]) });
+    await walkIn(page);
+    await page.evaluate(() => { const p = window.XA.bayState().bays[0].pos; window.XA.pose(p.x + 3.2, p.z, Math.PI / 2, -0.05); });
+    await page.waitForTimeout(1500);
+    const info = await page.evaluate(() => window.XA.bayCurtain(0, (c) => {
+      const sim = c.sim, q = sim.uvToPx(0.05, 0.8), W = sim.width, ok = sim.grab(q.x, q.y);
+      const lim = Math.max(0.5 * 0.8 / c.w, 0.8 / c.w - 0.1);
+      sim.moveGrabUV(-lim);
+      return { ok, mg: c.mg, W, lim, w: c.w };
+    }));
+    check(info.ok, 'H: the open cloth can be grabbed near the stack');
+    await page.waitForTimeout(6000);
+    const after = await page.evaluate(() => window.XA.bayCurtain(0, (c) => ({ min: Math.min.apply(null, Array.from(c.sim.panels[0].x)), mg: c.mg })));
+    check(after.min < 0 && after.min > -after.mg, 'H: the cloth hangs past the rail end (' + after.min.toFixed(0) + ' px) but inside the picture margin (' + after.mg + ' px), so nothing is cut off');
+    const planeW = (await bays(page)).bays[0].curtain.planeW;
+    check(Math.abs(planeW - (info.w + 2 * after.mg * info.w / 720)) < 0.01, 'H: the picture is wider than the bay by the margin on both sides (' + planeW.toFixed(2) + ' m)');
+    await shot(page, 'bays-H-pulled-out');
+    check(!errors.length, 'H: no page errors ' + errors.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+
   await browser.close(); srv.close();
   console.log('hall bays tests passed: ' + passed);
 })().catch((e) => { console.error(e); process.exit(1); });

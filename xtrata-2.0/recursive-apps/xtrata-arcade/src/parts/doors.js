@@ -516,7 +516,9 @@
     var line = o.color || LINE_COLOR[S.sfx] || LINE_COLOR.wood, lw = 1.5;
     var ppu = Math.min(4, 1024 / Math.max(G.leafW, H, 1));
     var group = new T.Group(), disposables = [], pick = [];
-    var zWall = 0.012, zFrame = 0.02, zLeaf = 0.03, th = G.thick * s;
+    // A door set into the wall: the slab is thin and its front sits only a few centimetres off the wall face, so it reads as
+    // part of the wall (and its foot lines up with the wall's foot) rather than as a board standing in the room.
+    var zWall = 0.006, zFrame = 0.01, zLeaf = 0.012, th = Math.min(G.thick * s, 0.03);
     function canvasTex(w, h, paint) {
       var cv = o.mkCanvas(Math.ceil(w * ppu), Math.ceil(h * ppu)), x = cv.getContext('2d'); x.scale(ppu, ppu); paint(x);
       var t = o.tex(cv); t.anisotropy = 4; disposables.push(t); return t;
