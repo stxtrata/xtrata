@@ -191,8 +191,19 @@ describe('My albums (the shelf)', () => {
     const rows = [...fold.querySelectorAll('.ppp-shelf-list li')];
     expect(rows).toHaveLength(1);
     expect(text(rows[0])).toContain('Night Drive');
-    [...rows[0].querySelectorAll('button')].find((b) => b.textContent === 'Play')!.click();
+    [...rows[0].querySelectorAll('button')].find((b) => b.textContent === 'Select')!.click();
     expect(h.openAlbum).toHaveBeenCalledWith(2);
+  });
+
+  it('the whole row is the tap target: one stretched Select button, the pin stays its own control', async () => {
+    const fold = await start({ slot: 2 });
+    const rows = [...fold.querySelectorAll('.ppp-shelf-list li')];
+    for (const r of rows) expect(r.querySelectorAll('button.ppp-pick')).toHaveLength(1);
+    const now = rows.find((r) => r.classList.contains('now'))!;
+    expect((now.querySelector('.ppp-pick') as HTMLButtonElement).disabled).toBe(true);
+    expect(text(now.querySelector('.ppp-pick')!)).toBe('Playing');
+    expect(rows.filter((r) => !r.classList.contains('now')).every((r) => text(r.querySelector('.ppp-pick')!) === 'Select')).toBe(true);
+    expect(rows[0].querySelector('button[aria-label^="Pin"], button[aria-label^="Unpin"]')!.classList.contains('ppp-pick')).toBe(false);
   });
 
   it('every album row has a square for its artwork (a disc until the picture is found)', async () => {
