@@ -225,13 +225,33 @@
     var need = live.slice(0, CFG.maxLive); pins.forEach(function (p) { if (need.indexOf(p.poster) < 0) need.push(p.poster); });
     var recs = await readPosters(need);
     var bays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.roomId)])).value.map(toBay);
+    var looks = await readLooks(bays);
     var versions = await readVersions();
     var pinned = {}; pins.forEach(function (p) { if (recs[p.poster]) pinned[p.poster] = recs[p.poster]; });
     return {
       versions: versions, at: Date.now(),
       posters: live.map(function (id) { return recs[id]; }).filter(Boolean),
-      pins: pins, pinned: pinned, suppressed: suppressed, bays: bays
+      pins: pins, pinned: pinned, suppressed: suppressed, bays: bays, looks: looks
     };
+  }
+  // The looks the active scenes use (door look and every layer), in one or two reads. { id: { kind, name, tier, builtin, hidden, approved } }
+  async function readLooks(bays) {
+    var ids = [];
+    bays.forEach(function (b) {
+      var sc = b && b.scene; if (!sc) return;
+      if (sc.doorLook != null && ids.indexOf(sc.doorLook) < 0) ids.push(sc.doorLook);
+      (sc.layers || []).forEach(function (l) { if (ids.indexOf(l.look) < 0) ids.push(l.look); });
+    });
+    var out = {}, C = codec();
+    for (var i = 0; i < ids.length; i += 20) {
+      var chunk = ids.slice(i, i + 20);
+      var cv = await callRead(CFG.world, 'get-looks', [hexList(chunk.map(function (id) { return C.cvUint(id); }))]);
+      cv.value.forEach(function (row, k) {
+        var t = row.type === 'some' ? plain(row) : null;
+        if (t) out[chunk[k]] = { kind: t.kind, name: t.name, tier: t.tier, builtin: t.builtin, hidden: !!t.hidden, approved: !!t.approved };
+      });
+    }
+    return out;
   }
 
   /* ------------------------------------------------------------ last-good snapshot (localStorage, where it works) */
@@ -267,6 +287,19 @@
       return { ok: false, changed: false, error: (e && e.message) || String(e) };   // keep the last good snapshot
     } finally { state.busy = false; }
   }
+  // A scene can start at a block height with no write at all, so the version counters do not move. The hall tells us the
+  // chain height; when it passes the earliest scene start we know of, read again (at most once per 30 s).
+  function onHeight(h) {
+    if (!enabled() || !state.snap || !state.snap.bays || state.busy) return false;
+    var next = Infinity;
+    state.snap.bays.forEach(function (b) { if (b && b.nextHeight != null && b.nextHeight < next) next = b.nextHeight; });
+    if (!(h >= next)) return false;
+    var now = Date.now();
+    if (state.lastHeightRead && now - state.lastHeightRead < 30000) return false;
+    state.lastHeightRead = now;
+    refresh(true);
+    return true;
+  }
   // Starts reading. `fn(snapshot)` is called when a snapshot arrives or changes.
   function start(fn) {
     cfgFromHost();
@@ -288,11 +321,11 @@
 
   root.XAWorld = {
     configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled,
-    start: start, stop: stop, refresh: refresh, snapshot: function () { return state.snap; },
+    start: start, stop: stop, refresh: refresh, onHeight: onHeight, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
     composeWall: composeWall, isActive: isActive, loadImageBytes: loadImageBytes,
     // exposed for tests
-    _t: { plain: plain, toPoster: toPoster, toBay: toBay, hexList: hexList, normalizePoster: normalizePoster, rng: rng, hash32: hash32,
+    _t: { plain: plain, toPoster: toPoster, toBay: toBay, readLooks: readLooks, hexList: hexList, normalizePoster: normalizePoster, rng: rng, hash32: hash32,
       loadSnapshot: loadSnapshot, callRead: callRead, restore: restore, save: save, state: state }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

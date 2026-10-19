@@ -1,4 +1,4 @@
-// Tests for src/world/curtain.js (phase 3a: the house curtain). No browser and no canvas needed
+// Tests for src/parts/curtain.js (phase 3a: the house curtain). No browser and no canvas needed
 // for the cloth maths; the renderer is checked with a recording stub context.
 // Run: node --test tests/curtain.test.cjs
 const { test } = require('node:test');
@@ -9,7 +9,7 @@ const vm = require('vm');
 // Load curtain.js the way the hall does: as a plain script (the repo's package.json makes .js files ES modules,
 // so require() cannot be used). It exposes window.XACurtain, and module.exports when a CommonJS module exists.
 const sandbox = { module: { exports: {} }, Math, Float64Array, Int8Array, Number, Array, Object, isFinite };
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'world', 'curtain.js'), 'utf8'), sandbox);
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'parts', 'curtain.js'), 'utf8'), sandbox);
 const { CFG, createCurtainSim, createCurtainRenderer, readParams } = sandbox.module.exports;
 
 const W = 512, H = 580;

@@ -102,6 +102,7 @@ const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets 
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
 const machines = [], pickables = [], boxes = [];
+let bayEngine = null, bayHint = null;   // the bay engine (only when the world reader is on); what the player is looking at in a bay
 
 /* ================================================================
    ROOM
@@ -170,6 +171,8 @@ function buildRoom(){
   buildLogoSign();
   buildPosters();
   try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
+  XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
+  if(window.XA_TEST) XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 };   // tests only: nothing sets XA_TEST in the shipped page
   XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests
   buildDayBoard();
 
@@ -1286,10 +1289,12 @@ function paintWall(){
 /* Bays (the two wall areas at the far end). Posters mode, or any failure, shows the two posters as always.
    Other scenes are drawn by the bay engine; until then a bay with another scene shows plain wall. */
 function applyBays(snap){
+  if(bayEngine){ try{ bayEngine.apply(snap,{instant:state==='intro'}) }catch(e){ console.error(e) } }
   for(const s of posterSlots){
     if(!s.bay) continue;
-    const bay=snap && snap.bays ? snap.bays[s.bay==='L'?0:1] : null;
-    const show=!bay || !bay.scene || bay.scene.base==='posters';
+    const i=s.bay==='L'?0:1;
+    const bay=snap && snap.bays ? snap.bays[i] : null;
+    const show=bayEngine ? bayEngine.showPosters(i) : (!bay || !bay.scene || bay.scene.base==='posters');
     if(s.group && s.group.visible!==show) s.group.visible=show;
   }
 }
@@ -1340,13 +1345,14 @@ function buildPosters(){
   const frameMat=new THREE.MeshStandardMaterial({color:0x1b1b22, metalness:.7, roughness:.35});
   // a poster in every other gap between cabinets, alternating walls
   // one poster in every gap between machines, and two in the open wall at each end of each row
-  const spots=[];
+  const spots=[], bayDefs=[];
   for(const [side,n] of [[-1,NL],[1,NR]]){
     const zHi=cabZ(0,n)+.62, zLo=cabZ(n-1,n)-.62, wallEnd=RL/2-.35;
     const endPair=(a,b,bay)=>{ const mid=(a+b)/2; spots.push([side,mid+.52,bay],[side,mid-.52,bay]) };
     endPair(zHi, wallEnd);
     for(let k=0;k<n-1;k++) spots.push([side, cabZ(k,n)-GAP/2]);
     endPair(-wallEnd, zLo, side<0?'L':'R');   // far end: these four posters are the two bays' default scene
+    bayDefs[side<0?0:1]={side, z:(-wallEnd+zLo)/2, width:zLo+wallEnd};
   }
   spots.forEach(([side,z,bay])=>{
     const g=new THREE.Group(); g.position.set(side*(RW/2-.03),1.95,z); g.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
@@ -1355,6 +1361,11 @@ function buildPosters(){
     const p=new THREE.Mesh(new THREE.PlaneGeometry(.76,1.14), new THREE.MeshBasicMaterial({map:slot.tex, color:0xdadada}));
     p.position.z=.017; p.userData.slot=slot; posterMeshes.push(p); g.add(p); scene.add(g);
   });
+  try{
+    if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
+    if(window.XABays && window.XAWorld && XAWorld.enabled())
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, listener:()=>player});
+  }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
 }
 
@@ -1387,6 +1398,7 @@ async function fetchHeight(){
 }
 function setHeight(h, live){
   const prev=chain.height; chain.height=h; chain.live=live;
+  try{ if(window.XAWorld) XAWorld.onHeight(h) }catch(e){}   // a scene can start at this block
   const day=Math.floor(h/BLOCKS_PER_DAY);
   if(day!==chain.day){ const first=chain.day<0; chain.day=day; applyDay(day+devDayOffset); if(!first && state==='walk') sfx.coin() }
   else if(h!==prev) repaintLivePosters();
@@ -2002,6 +2014,7 @@ const Room = (() => {
     master.connect(door); door.connect(comp); comp.connect(XA.audio.bus());   // through the shared master, so Mute silences it
     const conv = ctx.createConvolver(); conv.buffer = impulse(1.8, 2.6);
     wet = ctx.createGain(); wet.gain.value = ROOM_AUDIO.reverb; wet.connect(conv); conv.connect(master);
+    if (bayEngine) bayEngine.audio.attach({ ctx, master, wet });   // bay sounds ride the same bus (and Mute)
     setInterval(tick, 25);
     return true;
   }
@@ -2036,11 +2049,12 @@ const Room = (() => {
   }
   function killAll(secs) { for (const i of [...voices.keys()]) killVoice(i, secs) }
   function update(dt) {
-    if (!running || !ctx) return;
+    if (!running || !ctx) { if (bayEngine) bayEngine.audio.hush(); return }
     const t = ctx.currentTime, L = ctx.listener, p = camera.position;
     F.set(0, 0, -1).applyQuaternion(camera.quaternion); U.set(0, 1, 0).applyQuaternion(camera.quaternion);
     if (!setXYZ(L, 'position', p.x, p.y, p.z, t)) L.setPosition(p.x, p.y, p.z);
     if (L.forwardX) { setXYZ(L, 'forward', F.x, F.y, F.z, t); setXYZ(L, 'up', U.x, U.y, U.z, t) } else L.setOrientation(F.x, F.y, F.z, U.x, U.y, U.z);
+    if (bayEngine) bayEngine.audio.update(dt, { x: p.x, z: p.z }, on && !XA.audio.isMuted());
     // which machines should be playing: the nearest few in reach (with a little slack so edges don't flicker)
     if ((lastPick -= dt) <= 0) {
       lastPick = .25;
@@ -2113,6 +2127,7 @@ addEventListener('keydown', e=>{
   const onBtn = e.target && e.target.tagName==='BUTTON';
   if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx>=0){ e.preventDefault(); startGame(focusIdx) }
   else if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx<0 && posterFocus){ e.preventDefault(); openChain(posterFocus.spec.play) }
+  else if(e.code==='KeyE' && focusIdx<0 && !posterFocus && bayEngine && bayHint){ e.preventDefault(); bayEngine.toggleFocused() }
   else if(e.code==='KeyQ' && focusIdx>=0 && GAMES[focusIdx].variants[0]){ startGame(focusIdx, GAMES[focusIdx].variants[0].key) }
   else if(e.code==='KeyT'){ openScores() }
   else if(e.code==='KeyM'){ toggleMute() }
@@ -2125,14 +2140,22 @@ const cvs=renderer.domElement;
 document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLockElement===cvs; updateHud() });
 function tryLock(){ if(isTouch) return; try{ const p=cvs.requestPointerLock(); if(p&&p.catch) p.catch(()=>{}) }catch(e){} }
 
-let drag=null;
-cvs.addEventListener('mousedown', e=>{ if(state!=='walk' || modalOpen()) return; initAudio(); drag={x:e.clientX,y:e.clientY,moved:0} });
+let drag=null, bayDrag=false, bayTouch=null, bayTouchPos={x:0,y:0};
+cvs.addEventListener('mousedown', e=>{
+  if(state!=='walk' || modalOpen()) return; initAudio();
+  if(bayEngine && focusIdx<0 && !posterFocus){   // grab a curtain you may pull
+    const nd = locked ? new THREE.Vector2(0,0) : new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+    if(bayEngine.grabStart(nd)){ bayDrag=true; drag=null; return }
+  }
+  drag={x:e.clientX,y:e.clientY,moved:0} });
 addEventListener('mousemove', e=>{
   if(state!=='walk') return;
+  if(bayDrag){ bayEngine.grabMove(e.movementX/(innerWidth/2), -e.movementY/(innerHeight/2)); return }
   if(locked){ look(e.movementX, e.movementY, .0022) }
   else if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy); drag.x=e.clientX; drag.y=e.clientY; look(dx,dy,.004) }
 });
 addEventListener('mouseup', e=>{
+  if(bayDrag){ bayDrag=false; bayEngine.grabEnd(); drag=null; return }
   if(!drag || state!=='walk'){ drag=null; return }
   const wasClick = drag.moved<5; drag=null; if(!wasClick) return;
   if(locked){ if(focusIdx>=0) startGame(focusIdx); else if(posterFocus) openChain(posterFocus.spec.play); return }
@@ -2154,6 +2177,7 @@ cvs.addEventListener('touchstart', e=>{
   if(state!=='walk') return; initAudio();
   for(const t of e.changedTouches){
     if(t.clientX<innerWidth*.45 && joy.id===null){ joy.id=t.identifier; joy.ox=t.clientX; joy.oy=t.clientY; stick.style.left=t.clientX+'px'; stick.style.top=t.clientY+'px'; stick.hidden=false }
+    else if(bayEngine && bayTouch===null && bayEngine.grabStart(new THREE.Vector2(t.clientX/innerWidth*2-1, -(t.clientY/innerHeight)*2+1))){ bayTouch=t.identifier; bayTouchPos={x:t.clientX,y:t.clientY} }
     else if(lk.id===null){ lk.id=t.identifier; lk.x=t.clientX; lk.y=t.clientY; lk.moved=0 }
   }
 },{passive:true});
@@ -2162,12 +2186,14 @@ cvs.addEventListener('touchmove', e=>{
   for(const t of e.changedTouches){
     if(t.identifier===joy.id){ let dx=t.clientX-joy.ox, dy=t.clientY-joy.oy; const d=Math.hypot(dx,dy), mx=50; if(d>mx){dx*=mx/d; dy*=mx/d}
       joy.vx=dx/mx; joy.vy=dy/mx; knob.style.transform=`translate(${dx}px,${dy}px)` }
+    else if(t.identifier===bayTouch){ bayEngine.grabMove((t.clientX-bayTouchPos.x)/(innerWidth/2), -(t.clientY-bayTouchPos.y)/(innerHeight/2)); bayTouchPos={x:t.clientX,y:t.clientY} }
     else if(t.identifier===lk.id){ const dx=t.clientX-lk.x, dy=t.clientY-lk.y; lk.moved+=Math.abs(dx)+Math.abs(dy); lk.x=t.clientX; lk.y=t.clientY; if(state==='walk') look(dx,dy,.005) }
   }
 },{passive:false});
 const endTouch=e=>{
   for(const t of e.changedTouches){
     if(t.identifier===joy.id){ joy.id=null; joy.vx=joy.vy=0; stick.hidden=true; knob.style.transform='' }
+    else if(t.identifier===bayTouch){ bayEngine.grabEnd(); bayTouch=null }
     else if(t.identifier===lk.id){ lk.id=null; if(lk.moved<10 && state==='walk'){ const h=pickAt(t.clientX,t.clientY); if(h>=0) startGame(h); else { const ps=posterAt(new THREE.Vector2(t.clientX/innerWidth*2-1, -(t.clientY/innerHeight)*2+1)); if(ps) openChain(ps.spec.play) } } }
   }
 };
@@ -2198,6 +2224,7 @@ function updateHud(){
   $('tapalt').hidden = !(walking && isTouch && v); if(v) $('tapalt').textContent = v.label.toUpperCase();
   $('hallbar').hidden = !(walking || state==='intro');
   $('pprompt').hidden = !(walking && focusIdx<0 && posterFocus && !chainOpen);
+  if(!walking && bayHint){ bayHint=null; paintBayHint() }
   if(posterFocus) $('pptitle').textContent = posterFocus.spec.play.title;
 }
 
@@ -2312,6 +2339,15 @@ function findFocus(){
   return best;
 }
 
+/* What the player is looking at in a bay (a curtain they may pull). Cabinets and playable posters come first. */
+function updateBayFocus(){
+  if(bayEngine.isGrabbing()) return;
+  let h=null;
+  if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ const f=bayEngine.focus(); h=f?f.hint:null }
+  if(h!==bayHint){ bayHint=h; paintBayHint() }
+}
+function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint) $('bptext').textContent=bayHint }
+
 let last=performance.now(), time=0;
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000); last=now; time+=dt;
@@ -2342,6 +2378,7 @@ function frame(now){
   }
 
   updateNeon(time,dt);
+  if(bayEngine){ bayEngine.update(dt,time); updateBayFocus() }
 
   updateScreens(dt);
   updateAnimPosters(time);

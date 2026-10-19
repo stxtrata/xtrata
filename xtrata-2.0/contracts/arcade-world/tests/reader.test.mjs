@@ -180,3 +180,87 @@ test('a new page picks the cached snapshot up at once, before any chain read', a
   assert.ok(seen.includes('cache'), 'listener was told about the cached snapshot');
   assert.ok(w2.XAWorld.snapshot() && w2.XAWorld.snapshot().posters.length >= 3);
 });
+
+test('looks: the reader gets every look a bay scene uses, and the hall plan resolves them (real contracts, real bays.js)', async () => {
+  const look = (kind, name, key) => pcall('xtrata-world-v1', 'register-look', [Cl.uint(kind), S(name), Cl.uint(0), S(key), Cl.uint(0), Cl.buffer(new Uint8Array(0)), Cl.uint(0)]);
+  const ids = {};
+  for (const [kind, name, key] of [[1, 'House curtain', 'curtain-house'], [2, 'Sign board', 'sign-board'], [3, 'Work site', 'work-site'], [4, 'Flicker', 'light-flicker'], [2, 'Retired sign', 'sign-board'], [0, 'Plain door', 'door-plain']]) {
+    const r = pp(look(kind, name, key).result); const m = /^\(ok u(\d+)\)$/.exec(r); assert.ok(m, r); ids[name] = Number(m[1]);
+  }
+  const layer = (slot, id, params, state = '') => Cl.tuple({ slot: Cl.uint(slot), look: Cl.uint(id), params: S(params), state: S(state) });
+  gap();
+  const sc = Cl.tuple({
+    room: S('arcade-hall'), bay: Cl.uint(0), 'from-height': Cl.uint(0), base: Cl.uint(2), 'door-look': Cl.some(Cl.uint(ids['Plain door'])),
+    layers: Cl.list([layer(1, ids['House curtain'], '{"color":"#7a1020"}', 'closed'), layer(2, ids['Sign board'], '{"text":"coming soon"}'),
+      layer(2, ids['Retired sign'], '{"text":"old"}'), layer(3, ids['Work site'], '{"kinds":"hammer"}'), layer(4, ids['Flicker'], '{"rate":2}')]),
+    interaction: Cl.uint(1), link: Cl.none(),
+  });
+  assert.match(pp(pcall('xtrata-world-v1', 'add-scene', [sc]).result), /^\(ok/);
+  // a look hidden after a scene used it stays on that scene; the hall must skip it
+  assert.equal(pp(pcall('xtrata-world-v1', 'set-look-hidden', [Cl.uint(ids['Retired sign']), Cl.bool(true)]).result), '(ok true)');
+
+  calls.length = 0;
+  const r = await win.XAWorld.refresh(false);
+  assert.equal(r.changed, true);
+  assert.equal(calls.filter((c) => c === 'get-looks').length, 1, 'all six looks (door and layers) came in one get-looks read');
+  const snap = win.XAWorld.snapshot();
+  assert.deepEqual(Object.keys(snap.looks).map(Number).sort((a, b) => a - b), Object.values(ids).sort((a, b) => a - b));
+  assert.deepEqual(JSON.parse(JSON.stringify(snap.looks[ids['House curtain']])), { kind: 1, name: 'House curtain', tier: 0, builtin: 'curtain-house', hidden: false, approved: true });
+  assert.equal(snap.looks[ids['Retired sign']].hidden, true);
+
+  // hand the snapshot (as JSON, the way the hall's cache holds it) to the hall's own bay planner
+  const sandbox = { module: { exports: {} }, console, Math, JSON, Object, Array, Number, String, Date, setTimeout, clearTimeout };
+  vm.runInNewContext(fs.readFileSync(path.join(PARTS, 'bays.js'), 'utf8'), sandbox);
+  const plan = JSON.parse(JSON.stringify(sandbox.module.exports.planBay(JSON.parse(JSON.stringify(snap.bays[0])), JSON.parse(JSON.stringify(snap.looks)))));
+  assert.equal(plan.base, 'door'); assert.equal(plan.interaction, 1);
+  assert.equal(plan.cover.key, 'curtain-house'); assert.equal(plan.cover.p.openness, 0); assert.equal(plan.cover.p.color, '#7a1020');
+  assert.equal(plan.overlays.length, 1, 'the hidden sign is skipped'); assert.equal(plan.overlays[0].p.text, 'COMING SOON');
+  assert.deepEqual(plan.sound.p.kinds, ['hammer']); assert.equal(plan.light.key, 'light-flicker'); assert.equal(plan.light.p.rate, 2);
+});
+
+test('looks: a scene with no layers needs no look read at all', async () => {
+  gap();
+  assert.match(pp(pcall('xtrata-world-v1', 'add-scene', [scene({ bay: 0, base: 0 })]).result), /^\(ok/);
+  calls.length = 0;
+  await win.XAWorld.refresh(false);
+  assert.equal(calls.includes('get-looks'), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(win.XAWorld.snapshot().looks)), {});
+});
+
+test('a scripted launch story: scenes start at block heights, the hall re-reads when the chain passes the next one', async () => {
+  const look = (kind, key) => Number(/u(\d+)/.exec(pp(pcall('xtrata-world-v1', 'register-look', [Cl.uint(kind), S('x ' + key), Cl.uint(0), S(key), Cl.uint(0), Cl.buffer(new Uint8Array(0)), Cl.uint(0)]).result))[1]);
+  const cover = look(1, 'curtain-house'), sign = look(2, 'sign-board');
+  const layer = (slot, id, params, state = '') => Cl.tuple({ slot: Cl.uint(slot), look: Cl.uint(id), params: S(params), state: S(state) });
+  const sc = (from, layers, base = 1) => Cl.tuple({ room: S('arcade-hall'), bay: Cl.uint(1), 'from-height': Cl.uint(from), base: Cl.uint(base), 'door-look': Cl.none(), layers: Cl.list(layers), interaction: Cl.uint(1), link: Cl.none() });
+  gap();
+  const h0 = simnet.burnBlockHeight, t1 = h0 + 20, t2 = h0 + 40;
+  const r = pp(pcall('xtrata-world-v1', 'add-scenes', [Cl.list([
+    sc(h0, [layer(1, cover, '{}', 'closed'), layer(2, sign, '{"text":"coming soon"}')]),
+    sc(t1, [layer(1, cover, '{}', 'open'), layer(2, sign, '{"text":"open day"}')]),
+    sc(t2, [], 0),
+  ])]).result);
+  assert.match(r, /^\(ok/, r);
+  await win.XAWorld.refresh(false);
+  const bayNow = () => win.XAWorld.snapshot().bays[1];
+  const coverState = () => (bayNow().scene.layers.find((l) => l.slot === 1) || {}).state;
+  assert.equal(coverState(), 'closed');
+  assert.equal(bayNow().nextHeight, t1, 'the reader knows when the next scene starts');
+
+  calls.length = 0;
+  assert.equal(win.XAWorld.onHeight(t1 - 1), false, 'before the start: no read');
+  assert.equal(calls.length, 0);
+
+  simnet.mineEmptyBurnBlocks(21);                       // the chain passes the first start, with no write at all
+  assert.equal(win.XAWorld.onHeight(simnet.burnBlockHeight), true, 'at the start height: read again');
+  await new Promise((res) => setTimeout(res, 150));
+  assert.equal(coverState(), 'open', 'the second scene is now the active one');
+  assert.equal(bayNow().nextHeight, t2);
+  assert.equal(win.XAWorld.onHeight(simnet.burnBlockHeight), false, 'a second trigger within 30 s does not read again');
+
+  simnet.mineEmptyBurnBlocks(21);
+  win.XAWorld._t.state.lastHeightRead = 0;              // (stands in for 30 s passing)
+  assert.equal(win.XAWorld.onHeight(simnet.burnBlockHeight), true);
+  await new Promise((res) => setTimeout(res, 150));
+  assert.equal(bayNow().scene.base, 'posters', 'the third scene (back to posters) is active');
+  assert.equal(bayNow().nextHeight, null, 'nothing further is scheduled');
+});

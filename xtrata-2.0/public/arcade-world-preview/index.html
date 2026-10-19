@@ -1,26 +1,73 @@
 <!doctype html>
 <html lang="en">
 <head><script>
-/* PREVIEW ONLY (phase 2 of the arcade world build). Nothing here is on chain: the contracts are not deployed.
-   It switches the hall's world reader on and feeds it a sample snapshot so the overlay and bay switch can be seen. */
+/* PREVIEW ONLY (phase 3 of the arcade world build). Nothing here is on chain: the contracts are not deployed.
+   It switches the hall's world reader on and feeds it sample data, so the poster overlay, the two far-end bays
+   (curtain, sign, door slab, lamp, work sounds) and their scene changes can be seen and heard. */
 window.XA_WORLD_CONFIG={posters:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-posters-v1',world:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-world-v1',roomId:'arcade-hall'};
+window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
 (function(){
-  var chain=true, bays=[false,false];
+  var chain=true, scene=['posters','posters'], curtain='closed', sound=true, lamp=true;
+  var LOOKS={
+    1:{kind:1,name:'House curtain',tier:0,builtin:'curtain-house',hidden:false,approved:true},
+    2:{kind:2,name:'Sign board',tier:0,builtin:'sign-board',hidden:false,approved:true},
+    3:{kind:3,name:'Work site',tier:0,builtin:'work-site',hidden:false,approved:true},
+    4:{kind:4,name:'Flicker',tier:0,builtin:'light-flicker',hidden:false,approved:true},
+    5:{kind:2,name:'Caution tape',tier:0,builtin:'caution-tape',hidden:false,approved:true},
+    6:{kind:0,name:'Plain door',tier:0,builtin:'door-plain',hidden:false,approved:true}
+  };
   function entry(id,head,sub,c,art){return {id:id,set:1,kind:0,head:head,sub:sub,foot:'SAMPLE · NOT ON CHAIN',c:c,art:art,imageId:0,imageHash:'',imageSize:0,cols:0,frames:0,fps:0,actKind:0,actId:0,actText:'',weight:40,start:0,end:0,evergreen:true,scope:[],hidden:false}}
   var posters=[entry(1,'NEW GAME SOON','Registry poster A','gold','star'),entry(2,'TOURNAMENT FRIDAY','Registry poster B','orange','star'),entry(3,'SEASON 2 OPENS','Registry poster C','blue','star'),entry(4,'HIGH SCORE WEEK','Registry poster D','white','star')];
   var pinned=entry(7,'PINNED BY ADMIN','Pin spot 2 · by the entrance','gold','star');
-  function bay(plain){return {scene:plain?{base:'wall',baseId:1,interaction:0,doorLook:null,layers:[],link:null,fromHeight:0}:null,nextHeight:null,height:0}}
-  function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(bays[0]),bay(bays[1])]}}
+  function L(slot,look,params,state){return {slot:slot,look:look,params:params||'{}',state:state||''}}
+  function sceneOf(kind){
+    if(kind==='posters') return null;
+    var layers=[], inter=2;
+    if(kind==='wall') return {base:'wall',baseId:1,interaction:0,doorLook:null,layers:[],link:null,fromHeight:0};
+    if(kind==='story'){
+      layers.push(L(1,1,'{"color":"#7a1020"}',curtain));
+      layers.push(L(2,2,'{"text":"coming soon","sub":"back in three days","tone":"gold"}'));
+      if(sound) layers.push(L(3,3,'{"kinds":"hammer,saw,drill,clatter","volume":0.6,"radius":7}'));
+      if(lamp) layers.push(L(4,4,'{"tone":"orange","rate":2}'));
+    } else if(kind==='workshop'){
+      layers.push(L(1,1,'{"color":"#1d3a6e","trim":"#c9a24b"}',curtain==='closed'?'half':curtain));
+      layers.push(L(2,2,'{"text":"workshop","sub":"hard hats on","tone":"blue"}'));
+      layers.push(L(2,5,'{"y":1.2}'));
+      if(sound) layers.push(L(3,3,'{"kinds":"drill,clatter","volume":0.5,"radius":7,"gap":2.5}'));
+      if(lamp) layers.push(L(4,4,'{"tone":"white","rate":1}'));
+    }
+    return kind==='story'
+      ? {base:'wall',baseId:1,interaction:inter,doorLook:null,layers:layers,link:null,fromHeight:0}      // the launch story: a plain wall behind the curtain
+      : {base:'door',baseId:2,interaction:inter,doorLook:6,layers:layers,link:null,fromHeight:0};
+  }
+  function bay(i){return {scene:sceneOf(scene[i]),nextHeight:null,height:0}}
+  function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1)],looks:LOOKS}}
   function apply(){var W=window.XAWorld; if(!W||!W._t) return; var st=W._t.state; st.snap=snap(); st.listeners.forEach(function(f){try{f(st.snap,'preview')}catch(e){}})}
+  var NAMES={posters:'posters (as #3111)',wall:'plain wall',story:'launch story',workshop:'workshop'};
+  var ORDER=['posters','wall','story','workshop'];
+  function goTo(i){
+    var intro=document.getElementById('intro'); if(intro&&!intro.hidden){var go=document.getElementById('go'); if(go) go.click()}
+    var s=window.XA&&window.XA.bayState&&window.XA.bayState(); if(!s||!window.XA.pose) return;
+    var p=s.bays[i].pos, side=p.x<0?-1:1; window.XA.pose(p.x-side*3.4,p.z,side<0?Math.PI/2:-Math.PI/2,0);
+  }
   function ui(){
     var d=document.createElement('div');
-    d.style.cssText='position:fixed;right:12px;bottom:12px;z-index:99999;background:rgba(10,12,24,.92);color:#dfe6ff;font:12px/1.4 ui-monospace,Menlo,monospace;padding:10px 12px;border:1px solid #3b4a8a;border-radius:6px;max-width:230px';
+    d.style.cssText='position:fixed;right:12px;bottom:12px;z-index:99999;background:rgba(10,12,24,.92);color:#dfe6ff;font:12px/1.4 ui-monospace,Menlo,monospace;padding:10px 12px;border:1px solid #3b4a8a;border-radius:6px;max-width:250px;max-height:92vh;overflow:auto';
     d.innerHTML='<div style="letter-spacing:.08em;color:#ffcc55;margin-bottom:6px">WORLD PREVIEW · SAMPLE DATA</div>';
-    function btn(label,get,flip){var b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;margin:3px 0;padding:6px 8px;background:#182049;color:#dfe6ff;border:1px solid #3b4a8a;border-radius:4px;font:inherit;cursor:pointer';function set(){b.textContent=label+': '+get()} b.onclick=function(e){e.stopPropagation();flip();set();apply();b.blur()};b.onkeydown=function(e){e.stopPropagation()};set();d.appendChild(b)}
+    function btn(label,get,flip,noapply){var b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;margin:3px 0;padding:6px 8px;background:#182049;color:#dfe6ff;border:1px solid #3b4a8a;border-radius:4px;font:inherit;cursor:pointer';function set(){b.textContent=get?label+': '+get():label} b.onclick=function(e){e.stopPropagation();flip();set();if(!noapply)apply();b.blur()};b.onkeydown=function(e){e.stopPropagation()};set();d.appendChild(b);return b}
+    function h(t){var n=document.createElement('div');n.style.cssText='margin-top:8px;color:#8a93c4';n.textContent=t;d.appendChild(n)}
     btn('Registry posters',function(){return chain?'ON':'OFF'},function(){chain=!chain});
-    btn('Left bay (far end)',function(){return bays[0]?'plain wall':'posters'},function(){bays[0]=!bays[0]});
-    btn('Right bay (far end)',function(){return bays[1]?'plain wall':'posters'},function(){bays[1]=!bays[1]});
-    var n=document.createElement('div');n.style.cssText='margin-top:6px;color:#8a93c4';n.textContent='Walk to the far end (W) to see the bays. Registry posters are laid over the normal wall; the bay switch never moves any other poster.';d.appendChild(n);
+    h('FAR-END BAYS · click to change the scene');
+    btn('Left bay',function(){return NAMES[scene[0]]},function(){scene[0]=ORDER[(ORDER.indexOf(scene[0])+1)%ORDER.length]});
+    btn('Right bay',function(){return NAMES[scene[1]]},function(){scene[1]=ORDER[(ORDER.indexOf(scene[1])+1)%ORDER.length]});
+    h('SCENE SETTINGS (story and workshop)');
+    btn('Curtain',function(){return curtain},function(){curtain={closed:'half',half:'open',open:'closed'}[curtain]});
+    btn('Work sounds',function(){return sound?'ON':'OFF'},function(){sound=!sound});
+    btn('Lamp',function(){return lamp?'ON':'OFF'},function(){lamp=!lamp});
+    h('GO TO');
+    btn('Left bay ›',null,function(){goTo(0)},true);
+    btn('Right bay ›',null,function(){goTo(1)},true);
+    var n=document.createElement('div');n.style.cssText='margin-top:6px;color:#8a93c4';n.textContent='Scenes here are sample data for the bay engine. With peeking allowed (story, workshop) you can pull a closed curtain: look at it and hold the mouse, or press E. Work sounds play when you are within about 7 m, after you press Walk in. Press Esc to free the mouse before clicking this panel.';d.appendChild(n);
     d.addEventListener('pointerdown',function(e){e.stopPropagation()});
     document.body.appendChild(d);
   }
@@ -370,11 +417,12 @@ body.flat #stage, body.flat #intro, body.flat .hud{display:none!important}
 body.touch #hallbar .wide{display:none}
 @media (max-width:560px){#hallbar .wide{display:none}}
 
-#pprompt{left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 16px 8px 8px;background:var(--panel);border:1px solid rgba(247,147,26,.6);border-radius:6px;font-size:24px;letter-spacing:.04em;white-space:nowrap;max-width:calc(100vw - 32px);box-sizing:border-box}
-#pprompt .key{font-family:var(--f-label);font-size:14px;color:#1a1204;background:#f7931a;padding:6px 9px;border-radius:4px;box-shadow:0 3px 0 #a85d08}
-#pprompt .t{overflow:hidden;text-overflow:ellipsis}
-#pprompt b{color:#f7931a;font-weight:400}
-body.touch #pprompt .key{display:none}
+#pprompt,#bprompt{left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 16px 8px 8px;background:var(--panel);border:1px solid rgba(247,147,26,.6);border-radius:6px;font-size:24px;letter-spacing:.04em;white-space:nowrap;max-width:calc(100vw - 32px);box-sizing:border-box}
+#pprompt .key,#bprompt .key{font-family:var(--f-label);font-size:14px;color:#1a1204;background:#f7931a;padding:6px 9px;border-radius:4px;box-shadow:0 3px 0 #a85d08}
+#pprompt .t,#bprompt .t{overflow:hidden;text-overflow:ellipsis}
+#pprompt b,#bprompt b{color:#f7931a;font-weight:400}
+body.touch #pprompt .key,body.touch #bprompt .key{display:none}
+#bprompt .alt{opacity:.65;font-size:.8em;margin-left:6px}
 #chainp{position:fixed;inset:0;z-index:40;background:rgba(3,3,10,.86);display:flex;align-items:center;justify-content:center;padding:max(12px,env(safe-area-inset-top,0px)) 12px 12px}
 #chainp[hidden]{display:none}
 #chainp .cp-box{width:min(1100px,100%);height:min(88vh,100%);display:flex;flex-direction:column;background:#0b0b10;border:2px solid #f7931a;border-radius:8px;overflow:hidden;box-shadow:0 0 40px rgba(247,147,26,.3)}
@@ -399,6 +447,7 @@ body.touch #pprompt .key{display:none}
 <div id="lockhint" class="hud" hidden>Click to look around, or drag</div>
 <div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b>START</b> <span id="ptitle"></span></span><span class="alt" id="palt" hidden><span class="key">Q</span><b id="pvar"></b></span></div>
 <div id="pprompt" class="hud" hidden><span class="key">E</span><span class="t"><b>PLAY ON-CHAIN</b> <span id="pptitle"></span></span></div>
+<div id="bprompt" class="hud" hidden><span class="key">E</span><span class="t"><b id="bptext"></b> <span class="alt">or hold click and drag</span></span></div>
 <button id="tapstart" class="hud" hidden aria-label="Start game">START</button>
 <button id="tapalt" class="hud" hidden aria-label="Start alternate mode"></button>
 <div id="hallbar" class="hud" hidden>
@@ -31267,13 +31316,33 @@ XARoom.boot(document.getElementById('xa-root'));
     var need = live.slice(0, CFG.maxLive); pins.forEach(function (p) { if (need.indexOf(p.poster) < 0) need.push(p.poster); });
     var recs = await readPosters(need);
     var bays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.roomId)])).value.map(toBay);
+    var looks = await readLooks(bays);
     var versions = await readVersions();
     var pinned = {}; pins.forEach(function (p) { if (recs[p.poster]) pinned[p.poster] = recs[p.poster]; });
     return {
       versions: versions, at: Date.now(),
       posters: live.map(function (id) { return recs[id]; }).filter(Boolean),
-      pins: pins, pinned: pinned, suppressed: suppressed, bays: bays
+      pins: pins, pinned: pinned, suppressed: suppressed, bays: bays, looks: looks
     };
+  }
+  // The looks the active scenes use (door look and every layer), in one or two reads. { id: { kind, name, tier, builtin, hidden, approved } }
+  async function readLooks(bays) {
+    var ids = [];
+    bays.forEach(function (b) {
+      var sc = b && b.scene; if (!sc) return;
+      if (sc.doorLook != null && ids.indexOf(sc.doorLook) < 0) ids.push(sc.doorLook);
+      (sc.layers || []).forEach(function (l) { if (ids.indexOf(l.look) < 0) ids.push(l.look); });
+    });
+    var out = {}, C = codec();
+    for (var i = 0; i < ids.length; i += 20) {
+      var chunk = ids.slice(i, i + 20);
+      var cv = await callRead(CFG.world, 'get-looks', [hexList(chunk.map(function (id) { return C.cvUint(id); }))]);
+      cv.value.forEach(function (row, k) {
+        var t = row.type === 'some' ? plain(row) : null;
+        if (t) out[chunk[k]] = { kind: t.kind, name: t.name, tier: t.tier, builtin: t.builtin, hidden: !!t.hidden, approved: !!t.approved };
+      });
+    }
+    return out;
   }
 
   /* ------------------------------------------------------------ last-good snapshot (localStorage, where it works) */
@@ -31309,6 +31378,19 @@ XARoom.boot(document.getElementById('xa-root'));
       return { ok: false, changed: false, error: (e && e.message) || String(e) };   // keep the last good snapshot
     } finally { state.busy = false; }
   }
+  // A scene can start at a block height with no write at all, so the version counters do not move. The hall tells us the
+  // chain height; when it passes the earliest scene start we know of, read again (at most once per 30 s).
+  function onHeight(h) {
+    if (!enabled() || !state.snap || !state.snap.bays || state.busy) return false;
+    var next = Infinity;
+    state.snap.bays.forEach(function (b) { if (b && b.nextHeight != null && b.nextHeight < next) next = b.nextHeight; });
+    if (!(h >= next)) return false;
+    var now = Date.now();
+    if (state.lastHeightRead && now - state.lastHeightRead < 30000) return false;
+    state.lastHeightRead = now;
+    refresh(true);
+    return true;
+  }
   // Starts reading. `fn(snapshot)` is called when a snapshot arrives or changes.
   function start(fn) {
     cfgFromHost();
@@ -31330,13 +31412,1084 @@ XARoom.boot(document.getElementById('xa-root'));
 
   root.XAWorld = {
     configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled,
-    start: start, stop: stop, refresh: refresh, snapshot: function () { return state.snap; },
+    start: start, stop: stop, refresh: refresh, onHeight: onHeight, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
     composeWall: composeWall, isActive: isActive, loadImageBytes: loadImageBytes,
     // exposed for tests
-    _t: { plain: plain, toPoster: toPoster, toBay: toBay, hexList: hexList, normalizePoster: normalizePoster, rng: rng, hash32: hash32,
+    _t: { plain: plain, toPoster: toPoster, toBay: toBay, readLooks: readLooks, hexList: hexList, normalizePoster: normalizePoster, rng: rng, hash32: hash32,
       loadSnapshot: loadSnapshot, callRead: callRead, restore: restore, save: save, state: state }
   };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* curtain.js */
+(() => {
+'use strict';
+/* ================================================================
+   CURTAIN — the house curtain for arcade bays (phase 3a).
+   Port of "Curtains 1.html" (Jim's draft). Two halves of hanging-chain cloth on a
+   passive rail, with a weight bar in the hem. The physics constants and the
+   step() maths are the draft's, unchanged.
+
+   Split in two so the cloth can be tested without a browser:
+     createCurtainSim(params)       pure maths, no DOM. Works in a W x H pixel space.
+     createCurtainRenderer(sim,ctx) draws the sim onto any 2D canvas context
+                                    (transparent background), so the hall can wrap
+                                    that canvas in a THREE.CanvasTexture.
+
+   Scene params (all optional, all clamped; bad values fall back to defaults):
+     width, height   pixel size of the cloth canvas          (64..4096, default 512 x 580)
+     color           cloth colour, '#rrggbb' or [r,g,b]       (default velvet red)
+     trim            gold trim colour, same formats           (default gold)
+     openness        0 = closed .. 1 = fully gathered         (default 0)
+     speed           open/close animation rate multiplier     (0.1..5, default 1)
+     ui              scale of the pixel-sized furniture: pelmet, rings, hem, fringe (0.25..4, default 1)
+
+   Loop for the hall:
+     const sim = XACurtain.createCurtainSim(params);
+     const r   = XACurtain.createCurtainRenderer(sim, canvas.getContext('2d'));
+     each frame:  if (sim.update(dt)) { r.draw(); texture.needsUpdate = true; }
+     ray hit on the plane, uv in 0..1 (u left to right, v top to bottom of the cloth):
+       sim.grabUV(u, v) -> bool;  sim.moveGrabUV(u);  sim.release();
+   ================================================================ */
+
+/* ---------------- the draft's constants (unchanged) ---------------- */
+const CFG = Object.freeze({
+  rows: 20,
+  fullness: 1.3,       // fabric width / rail spacing when fully closed (pleat depth)
+  gather: 0.075,       // tightest pleat spacing, as a fraction of fabric width
+  gravity: 3.2,        // x viewport height per second^2
+  damping: 2.5,        // 1/s, air drag on heavy cloth
+  linkDamping: 6,      // internal friction along a thread (no whip, no spring-back)
+  hemWeight: 2,        // weight bar in the hem, in units of one row of cloth
+  bend: 500,           // bending stiffness along a thread (1/s^2)
+  airDrag: 5,          // quadratic air drag, extra 1/s at one viewport height per second
+  dryFriction: 0.003,  // fabric friction, x viewport height per second^2
+  step: 1 / 240,
+  pleatIters: 4,
+  holdFriction: 0.11,  // a ring slides once the held point is dragged past this slope
+  railFollow: 0.5,     // how quickly a freed ring catches up (per step)
+  grab: 0.7,           // how tightly the pointer holds the fabric (per step)
+  reach: 0.985         // max sideways offset of a link, as a fraction of its length
+});
+const QUIET_MOTION = 0.003;   // px moved per step below which the cloth counts as still
+const QUIET_STEPS = 240;      // that many still steps in a row (1 s of sim time) = asleep
+const MAX_FRAME_STEPS = 24;   // the draft's per-frame step cap
+const MAX_FRAME_DT = 0.05;
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+function num(v, lo, hi, def) {
+  v = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+  return typeof v === 'number' && isFinite(v) ? clamp(v, lo, hi) : def;
+}
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const FROZEN = 0, DRAG = 1, AUTO = 2;
+
+/* ---------------- one curtain half (the draft's Panel) ---------------- */
+class Panel {
+  /* dir: +1 hangs from a left wall, -1 from a right wall.
+     closedEdge: x of the leading edge when fully closed. */
+  constructor(o) {
+    const N = this.N = o.cols, M = this.M = CFG.rows;
+    this.dir = o.dir; this.wall = o.wall;
+    this.railY = o.railY; this.hemY = o.hemY;
+    this.L = (o.hemY - o.railY) / (M - 1);
+    this.G = CFG.gravity * o.viewH; this.H = o.viewH;
+    // row masses (1 each, the hem row carries the weight bar) and the tension in the link above each row
+    this.T = new Float64Array(M + 1); this.im = new Float64Array(M);
+    for (let j = M - 1; j >= 0; j--) { const m = 1 + (j === M - 1 ? CFG.hemWeight : 0); this.im[j] = 1 / m; this.T[j] = this.T[j + 1] + m; }
+    this.kap = new Float64Array(M + 1);
+    this.mode = FROZEN; this.grab = null;
+
+    const rnd = mulberry32(o.seed);
+    const span = o.dir * (o.closedEdge - o.wall);
+    const raw = [], n1 = N - 1; let sum = 0;
+    for (let i = 0; i < n1; i++) { const r = 0.8 + 0.4 * rnd(); raw.push(r); sum += r; }
+    this.maxS = new Float64Array(n1); this.minS = new Float64Array(n1);
+    this.rest = new Float64Array(n1); this.sign = new Int8Array(n1);
+    this.cumMin = new Float64Array(N); this.cumMax = new Float64Array(N);
+    for (let i = 0; i < n1; i++) {
+      this.maxS[i] = span * raw[i] / sum;
+      this.rest[i] = this.maxS[i] * CFG.fullness;
+      this.minS[i] = this.rest[i] * CFG.gather;
+      this.sign[i] = i % 2 ? 1 : -1;
+      this.cumMin[i + 1] = this.cumMin[i] + this.minS[i];
+      this.cumMax[i + 1] = this.cumMax[i] + this.maxS[i];
+    }
+    const n = N * M;
+    this.x = new Float64Array(n); this.y = new Float64Array(n);
+    this.vx = new Float64Array(n); this.x0 = new Float64Array(n);
+    this.motion = 0;
+  }
+
+  /* rail ring positions for openness u (0 = closed, 1 = fully gathered) */
+  railAt(u) {
+    const r = new Float64Array(this.N); r[0] = this.wall;
+    for (let i = 1; i < this.N; i++) r[i] = this.wall + this.dir * lerp(this.cumMax[i], this.cumMin[i], u);
+    return r;
+  }
+  setOpenness(u) {
+    const r = this.railAt(u), N = this.N;
+    for (let j = 0; j < this.M; j++) for (let i = 0; i < N; i++) {
+      const k = j * N + i;
+      this.x[k] = this.x0[k] = r[i]; this.vx[k] = 0;
+      this.y[k] = this.railY + j * this.L;
+    }
+  }
+  openness() {
+    const N = this.N, D = this.dir * (this.x[N - 1] - this.wall);
+    return clamp((this.cumMax[N - 1] - D) / (this.cumMax[N - 1] - this.cumMin[N - 1]), 0, 1);
+  }
+
+  beginGrab(ptrX, ptrY) {
+    let best = -1, bd = Infinity;
+    for (let k = 0; k < this.x.length; k++) {
+      const dx = this.x[k] - ptrX, dy = this.y[k] - ptrY, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = k; }
+    }
+    this.grab = { k: best, ox: this.x[best] - ptrX, tx: this.x[best] };
+    this.mode = DRAG;
+    return best;
+  }
+  moveGrab(ptrX) { if (this.grab) this.grab.tx = ptrX + this.grab.ox; }
+  endGrab() { this.grab = null; this.mode = FROZEN; }
+
+  /* ---- one fixed physics step ---- */
+  step(dt) {
+    const N = this.N, M = this.M, x = this.x, y = this.y, vx = this.vx, x0 = this.x0;
+    const dir = this.dir, wall = this.wall, L = this.L, G = this.G, size = N * M;
+    const minS = this.minS, maxS = this.maxS;
+    const drag = this.mode === DRAG, gr = this.grab, gk = gr ? gr.k : -1;
+    const damp = Math.exp(-CFG.damping * dt), cs = CFG.linkDamping * dt, GL = G / L;
+
+    for (let k = 0; k < size; k++) x0[k] = x[k];
+
+    // 1. forces on every thread: gravity (pendulum chain, tension = weight below each link),
+    //    bending stiffness, internal friction, air drag, dry friction
+    const T = this.T, im = this.im, kap = this.kap, kb = CFG.bend;
+    const air = CFG.airDrag / this.H, fr = CFG.dryFriction * this.H * dt;
+    for (let i = 0; i < N; i++) {
+      // curvature of the thread; the ghost node above the ring hangs straight down (upright header)
+      for (let j = 0; j < M - 1; j++) kap[j] = (j ? x[(j - 1) * N + i] : x[i]) - 2 * x[j * N + i] + x[(j + 1) * N + i];
+      kap[M - 1] = 0; kap[M] = 0;
+      for (let j = 1; j < M; j++) {
+        const k = j * N + i, tu = T[j], td = T[j + 1], m1 = im[j];
+        let a = tu * (x[k - N] - x[k]), rel = tu * (vx[k - N] - vx[k]);
+        if (td > 0) { a += td * (x[k + N] - x[k]); rel += td * (vx[k + N] - vx[k]); }
+        const bend = kap[j - 1] - 2 * kap[j] + (j + 1 < M - 1 ? kap[j + 1] : 0);
+        const lc = Math.min(cs, 0.9 / (tu + td));
+        let v = (vx[k] + (a * m1 * GL - kb * bend) * dt + rel * m1 * lc) * damp;
+        const s = Math.abs(v);
+        v /= 1 + air * s * dt;
+        const s2 = s / (1 + air * s * dt);
+        vx[k] = s2 > fr ? (v > 0 ? v - fr : v + fr) : 0;
+      }
+    }
+    // 2. predict
+    for (let k = N; k < size; k++) x[k] += vx[k] * dt;
+
+    // 3. the pointer holds the fabric
+    if (gr) {
+      if (gk < N) {                                       // holding a ring itself
+        const nx = x[gk] + (gr.tx - x[gk]) * CFG.grab;
+        x[gk] = wall + dir * clamp(dir * (nx - wall), this.cumMin[gk], this.cumMax[gk]);
+      } else x[gk] += (gr.tx - x[gk]) * CFG.grab;
+    }
+
+    // 4. pleat spacing between neighbouring threads (1D per row, alternating sweeps)
+    for (let it = 0; it < CFG.pleatIters; it++) {
+      const fwd = (it & 1) === 0;
+      for (let j = 1; j < M; j++) {
+        const base = j * N;
+        for (let ii = 0; ii < N - 1; ii++) {
+          const i = fwd ? ii : N - 2 - ii, a = base + i, b = a + 1;
+          const d = dir * (x[b] - x[a]);
+          if (d >= minS[i] && d <= maxS[i]) continue;
+          const c = (d - (d > maxS[i] ? maxS[i] : minS[i])) * dir;
+          const wa = a === gk ? 0 : 1, wb = b === gk ? 0 : 1, s = c / (wa + wb);
+          x[a] += s * wa; x[b] -= s * wb;
+        }
+      }
+    }
+
+    // 5. rail rings: friction, then exact 1D ordering/spacing
+    const lim = CFG.reach * L, L2 = L * L;
+    if (drag && gr) {
+      let lead = gk;
+      if (gk >= N) {
+        lead = gk % N;
+        // the pull travels up the held thread (taut thread cannot be longer than it is)
+        for (let j = (gk / N) | 0; j >= 1; j--) {
+          const k = j * N + lead; const dx = x[k] - x[k - N];
+          if (dx > lim) x[k - N] = x[k] - lim; else if (dx < -lim) x[k - N] = x[k] + lim;
+        }
+        // The held thread's ring slides only when the HAND drags it past the friction angle.
+        // It depends on the hand position alone, so a still hand can never keep the rail creeping.
+        if (lead > 0) {
+          const h = Math.max(((gk / N) | 0) * L, 1), off = x[gk] - x[lead], free = CFG.holdFriction * h;
+          if (Math.abs(off) > free) x[lead] += (off - Math.sign(off) * free) * CFG.railFollow;
+        }
+      }
+      for (let i = lead - 1; i >= 1; i--) {
+        const D = dir * (x[i] - wall), Dn = dir * (x[i + 1] - wall);
+        x[i] = wall + dir * clamp(D, Dn - maxS[i], Dn - minS[i]);
+      }
+      for (let i = 1; i < N; i++) {
+        const Dp = dir * (x[i - 1] - wall), D = dir * (x[i] - wall);
+        x[i] = wall + dir * clamp(D, Dp + minS[i - 1], Dp + maxS[i - 1]);
+      }
+    }
+    for (let i = 1; i < N; i++) x[i] = wall + dir * clamp(dir * (x[i] - wall), this.cumMin[i], this.cumMax[i]);
+
+    // 6. links keep their length: limit sideways offset, then lift y accordingly
+    for (let i = 0; i < N; i++) {
+      y[i] = this.railY;
+      for (let j = 1; j < M; j++) {
+        const k = j * N + i; let dx = x[k] - x[k - N];
+        if (dx > lim) x[k] = x[k - N] + (dx = lim); else if (dx < -lim) x[k] = x[k - N] + (dx = -lim);
+        y[k] = y[k - N] + Math.sqrt(L2 - dx * dx);
+      }
+    }
+
+    // 7. velocities from what actually happened
+    let m = 0;
+    for (let k = N; k < size; k++) {
+      const d = x[k] - x0[k]; vx[k] = d / dt;
+      const a = Math.abs(d); if (a > m) m = a;
+    }
+    for (let i = 0; i < N; i++) { vx[i] = 0; const a = Math.abs(x[i] - x0[i]); if (a > m) m = a; }
+    this.motion = m;
+  }
+
+  sleep() { this.vx.fill(0); this.x0.set(this.x); this.motion = 0; }
+}
+
+/* ---------------- colour helpers ---------------- */
+const DEFAULT_COLOR = [150, 18, 40];       // velvet red (the draft's BASE)
+const DEFAULT_TRIM = [201, 154, 69];       // the draft's GOLD, #c99a45
+function parseColor(v, def) {
+  if (Array.isArray(v) && v.length >= 3) {
+    const a = v.slice(0, 3).map(Number);
+    if (a.every(isFinite)) return a.map(c => clamp(Math.round(c), 0, 255));
+    return def.slice();
+  }
+  if (typeof v === 'string') {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(v.trim());
+    if (m) {
+      let h = m[1]; if (h.length === 3) h = h.replace(/./g, '$&$&');
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    }
+  }
+  return def.slice();
+}
+const same = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+const rgb = c => 'rgb(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ')';
+const mix = (c, d, t) => [lerp(c[0], d[0], t), lerp(c[1], d[1], t), lerp(c[2], d[2], t)];
+const mul = (c, f) => [clamp(c[0] * f, 0, 255), clamp(c[1] * f, 0, 255), clamp(c[2] * f, 0, 255)];
+
+/* The default colours are the draft's literals, so the default look is the draft exactly.
+   A custom colour or trim derives the same roles from the given colour. */
+function makePalette(color, trim) {
+  const p = {
+    base: color,
+    pelmet: ['#2b0912', '#5c1527', '#3a0d1a'],
+    gold: '#c99a45', goldLight: '#f0cd82', goldDark: '#8a6425',
+    fringe: 'rgba(214,170,82,.9)', pelmetLine: 'rgba(240,205,130,.55)', ringEdge: '#6b4a14'
+  };
+  if (!same(color, DEFAULT_COLOR)) p.pelmet = [rgb(mul(color, 0.29)), rgb(mul(color, 0.62)), rgb(mul(color, 0.4))];
+  if (!same(trim, DEFAULT_TRIM)) {
+    const l = mix(trim, [255, 255, 255], 0.35);
+    p.gold = rgb(trim); p.goldLight = rgb(l); p.goldDark = rgb(mul(trim, 0.69));
+    p.fringe = 'rgba(' + (mix(trim, [255, 255, 255], 0.1).map(c => c | 0).join(',')) + ',.9)';
+    p.pelmetLine = 'rgba(' + (l.map(c => c | 0).join(',')) + ',.55)';
+    p.ringEdge = rgb(mul(trim, 0.53));
+  }
+  return p;
+}
+
+/* ---------------- clamp scene params ---------------- */
+function readParams(p) {
+  p = p && typeof p === 'object' ? p : {};
+  return {
+    width: Math.round(num(p.width, 64, 4096, 512)),
+    height: Math.round(num(p.height, 64, 4096, 580)),
+    color: parseColor(p.color, DEFAULT_COLOR),
+    trim: parseColor(p.trim, DEFAULT_TRIM),
+    openness: num(p.openness, 0, 1, 0),
+    speed: num(p.speed, 0.1, 5, 1),
+    ui: num(p.ui, 0.25, 4, 1)
+  };
+}
+
+/* ================================================================
+   THE SIM — no DOM, no canvas
+   ================================================================ */
+function createCurtainSim(params) {
+  const prm = readParams(params);
+  let W = 0, H = 0, pelmetH = 40, railY = 36, hemY = 0;
+  let panels = [];
+  let drag = null;        // active manual grab { p }
+  let anim = null;        // OPEN/CLOSE driver: a separate path, never mixed with dragging
+  let asleep = false, quiet = 0, acc = 0;
+
+  function build(w, h, openness) {
+    const prev = openness ? [openness, openness] : (panels.length ? panels.map(p => p.openness()) : [0, 0]);
+    W = w; H = h;
+    pelmetH = clamp(H * 0.06, 32 * prm.ui, 54 * prm.ui);
+    railY = pelmetH - 4 * prm.ui;
+    hemY = H - clamp(H * 0.035, 14 * prm.ui, 28 * prm.ui);
+    const cols = clamp(Math.round(W / 2 / 24), 9, 34);
+    const ov = Math.min(W * 0.015, 16);
+    panels = [
+      new Panel({ dir: 1, wall: 0, closedEdge: W / 2 + ov, railY, hemY, cols, seed: 11, viewH: H }),
+      new Panel({ dir: -1, wall: W, closedEdge: W / 2 - ov, railY, hemY, cols, seed: 23, viewH: H })
+    ];
+    panels.forEach((p, i) => p.setOpenness(prev[i]));
+    drag = null; anim = null; acc = 0;
+    wake();
+  }
+  const wake = () => { asleep = false; quiet = 0; };
+  const avgOpen = () => panels.reduce((s, p) => s + p.openness(), 0) / panels.length;
+
+  /* ---------- OPEN / CLOSE (automatic; entirely separate from dragging) ---------- */
+  function startAuto(target, speed) {
+    if (drag) return;
+    const du = Math.max(...panels.map(p => Math.abs(p.openness() - target)));
+    const sp = num(speed, 0.1, 5, prm.speed);
+    anim = {
+      t: 0, target, dur: (0.7 + 1.7 * du) / sp,
+      from: panels.map(p => Float64Array.from(p.x.subarray(0, p.N))),
+      to: panels.map(p => p.railAt(target))
+    };
+    panels.forEach(p => { p.grab = null; p.mode = AUTO; });
+    wake();
+  }
+  function driveAuto() {
+    anim.t += CFG.step;
+    const k = Math.min(1, anim.t / anim.dur);
+    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    panels.forEach((p, i) => {
+      const f = anim.from[i], t = anim.to[i];
+      for (let r = 1; r < p.N; r++) p.x[r] = f[r] + (t[r] - f[r]) * e;
+    });
+    if (k >= 1) { anim = null; panels.forEach(p => { p.mode = FROZEN; }); }
+  }
+
+  /* one fixed physics step (the draft's simStep) */
+  function simStep() {
+    if (anim) driveAuto();
+    let m = 0;
+    for (const p of panels) { p.step(CFG.step); if (p.motion > m) m = p.motion; }
+    if (!drag && !anim && m < QUIET_MOTION) {
+      if (++quiet > QUIET_STEPS) { panels.forEach(p => p.sleep()); asleep = true; }   // settled: freeze exactly
+    } else quiet = 0;
+  }
+
+  /* ---------- picking (the draft's hitPanel / pick; px,py in cloth pixels) ---------- */
+  function hitPanel(p, px, py) {
+    if (py < pelmetH * 0.85 || p.dir * (px - p.wall) < -4) return false;
+    const N = p.N, M = p.M;
+    for (let j = 0; j < M - 1; j++) {
+      const a = j * N + N - 1, b = a + N;
+      if (py >= p.y[a] && py <= p.y[b]) {
+        const t = (py - p.y[a]) / (p.y[b] - p.y[a] || 1);
+        return p.dir * (px - (p.x[a] + (p.x[b] - p.x[a]) * t)) <= 3;   // between the wall and the leading edge
+      }
+    }
+    return false;
+  }
+  const pick = (px, py) => (hitPanel(panels[1], px, py) ? panels[1] : hitPanel(panels[0], px, py) ? panels[0] : null);
+
+  build(prm.width, prm.height, prm.openness);
+
+  const sim = {
+    params: prm,
+    get width() { return W; },
+    get height() { return H; },
+    get pelmetH() { return pelmetH; },
+    get railY() { return railY; },
+    get panels() { return panels; },
+
+    /* Advance by dt seconds (frame time). Returns true if the cloth was simulated,
+       i.e. the canvas needs redrawing. Once asleep it does nothing and returns false. */
+    update(dt) {
+      if (asleep) return false;
+      dt = num(dt, 0, MAX_FRAME_DT, 0.016);       // the draft caps a frame at 50 ms
+      acc += dt; let n = 0;
+      while (acc >= CFG.step && n < MAX_FRAME_STEPS) { simStep(); acc -= CFG.step; n++; if (asleep) break; }
+      if (n === MAX_FRAME_STEPS) acc = 0;
+      return true;
+    },
+    /* One fixed 1/240 s step. Returns false if asleep. For tests and offline settling. */
+    stepFixed() { if (asleep) return false; simStep(); return true; },
+    /* Run for `seconds` of sim time (stops early when the cloth goes to sleep). */
+    advance(seconds) {
+      const n = Math.round(num(seconds, 0, 600, 0) / CFG.step);
+      for (let i = 0; i < n && !asleep; i++) simStep();
+      return this;
+    },
+    isAsleep() { return asleep; },
+    wake,
+
+    /* openness 0 (closed) .. 1 (fully gathered). With animate the rings glide there at the
+       draft's open/close pace (x speed); without, the cloth is placed there at rest. */
+    setOpenAmount(u, animate, speed) {
+      u = num(u, 0, 1, 0);
+      if (animate) { startAuto(u, speed); return sim; }
+      anim = null; drag = null;
+      panels.forEach(p => { p.grab = null; p.mode = FROZEN; p.setOpenness(u); });
+      wake();
+      return sim;
+    },
+    getOpenAmount() { return avgOpen(); },
+    open(speed) { return sim.setOpenAmount(1, true, speed); },
+    close(speed) { return sim.setOpenAmount(0, true, speed); },
+    toggle(speed) { return sim.setOpenAmount(anim ? (anim.target ? 0 : 1) : (avgOpen() > 0.5 ? 0 : 1), true, speed); },
+    isAnimating() { return !!anim; },
+    isDragging() { return !!drag; },
+
+    /* Grab by cloth pixel (the draft's pointerdown). Returns true if fabric was under the point. */
+    grab(px, py) {
+      if (drag) return false;
+      px = num(px, -1e6, 1e6, NaN); py = num(py, -1e6, 1e6, NaN);
+      if (px !== px || py !== py) return false;
+      const p = pick(px, py);
+      if (!p) return false;
+      anim = null;                                       // a manual grab always takes over from OPEN/CLOSE
+      panels.forEach(q => { q.mode = FROZEN; q.grab = null; });
+      p.beginGrab(px, py);
+      drag = { p };
+      wake();
+      return true;
+    },
+    moveGrab(px) {
+      if (!drag) return;
+      px = num(px, -1e6, 1e6, NaN); if (px !== px) return;
+      drag.p.moveGrab(px); wake();
+    },
+    release() {
+      if (!drag) return;
+      drag.p.endGrab();                                  // rail locks; nothing keeps moving it
+      drag = null; wake();
+    },
+
+    /* Ray-to-cloth helpers. A raycast against the plane that carries the canvas texture gives a
+       uv; u runs left to right and v TOP to bottom of the cloth (use 1 - uv.y for a Three.js
+       PlaneGeometry uv with flipY off, or uv.y as-is with the default texture flip). */
+    uvToPx(u, v) { return { x: num(u, -1e3, 1e3, 0) * W, y: num(v, -1e3, 1e3, 0) * H }; },
+    hitTestUV(u, v) { const q = sim.uvToPx(u, v); return !!pick(q.x, q.y); },
+    grabUV(u, v) { const q = sim.uvToPx(u, v); return sim.grab(q.x, q.y); },
+    moveGrabUV(u) { sim.moveGrab(num(u, -1e3, 1e3, 0) * W); },
+
+    /* Rebuild at a new canvas size, keeping how open each half is. */
+    resize(w, h) {
+      build(Math.round(num(w, 64, 4096, W)), Math.round(num(h, 64, 4096, H)), 0);
+      return sim;
+    },
+    /* Leading edge of each half in cloth px (x of the last thread, hem row removed). Handy for layout/tests. */
+    edges() { return panels.map(p => p.x[p.N - 1]); }
+  };
+  return sim;
+}
+
+/* ================================================================
+   THE RENDERER — draws the sim to a 2D context (transparent background)
+   ================================================================ */
+function createCurtainRenderer(sim, ctx, opts) {
+  opts = opts || {};
+  const pal = makePalette(sim.params.color, sim.params.trim), ui = sim.params.ui;
+  let dpr = num(opts.dpr, 0.25, 4, 1);
+  let overlay = null, overlayFor = '';
+  const PI = Math.PI;
+
+  /* light falloff over the whole cloth (draft: built once per size) */
+  function makeOverlay() {
+    const W = sim.width, H = sim.height, pelmetH = sim.pelmetH;
+    const key = W + 'x' + H + ':' + pelmetH;
+    if (overlay && overlayFor === key) return;
+    const hemY = H - clamp(H * 0.035, 14 * ui, 28 * ui);
+    overlay = ctx.createLinearGradient(0, 0, 0, H);
+    const f = v => clamp(v / H, 0, 1);
+    overlay.addColorStop(0, 'rgba(0,0,0,.78)');
+    overlay.addColorStop(f(pelmetH + 6), 'rgba(0,0,0,.62)');
+    overlay.addColorStop(f(pelmetH + H * 0.34), 'rgba(0,0,0,0)');
+    overlay.addColorStop(f(hemY - H * 0.12), 'rgba(0,0,0,0)');
+    overlay.addColorStop(1, 'rgba(0,0,0,.34)');
+    overlayFor = key;
+  }
+
+  function edgeShadow(p) {
+    const N = p.N, M = p.M, FAR = 6000;            // stroke far off-screen; only its shadow lands on the stage
+    ctx.save();
+    ctx.beginPath();
+    for (let j = 0; j < M; j++) { const k = j * N + N - 1; j ? ctx.lineTo(p.x[k] - FAR, p.y[k]) : ctx.moveTo(p.x[k] - FAR, p.y[k]); }
+    ctx.lineWidth = 6 * ui; ctx.lineJoin = 'round'; ctx.strokeStyle = '#000';
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 36 * ui * dpr; ctx.shadowOffsetX = (FAR + 12 * ui * p.dir) * dpr;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* brightness of the cloth averaged over [t0,t1] across a pleat (0 = left edge, 1 = right edge).
+     Using the exact average means any subdivision gives the same colours, so nothing steps. */
+  function foldF(w, rest, sg, wb, t0, t1) {
+    let cc = w / rest; cc = cc > 1 ? 1 : cc < 0.04 ? 0.04 : cc;           // how flat this pleat is pulled
+    const s = Math.sqrt(1 - cc * cc), dt = t1 - t0;                        // s = fold depth
+    const att = w < 1.5 ? 0.25 : w < 6 ? 0.25 + 0.75 * (w - 1.5) / 4.5 : 1;   // calm very thin pleats
+    const u0 = 1 - t0, u1 = 1 - t1;
+    const sinAvg = (Math.cos(PI * t0) - Math.cos(PI * t1)) / (PI * dt);
+    const edgeAvg = ((t1 * t1 * t1 * t1 - t0 * t0 * t0 * t0) + (u1 * u1 * u1 * u1 - u0 * u0 * u0 * u0)) / (4 * dt);
+    // rounded fold: tilt is strongest mid-pleat and neutral at crest/valley; valleys occlude, crests catch light
+    let lit = 0.8 * cc + s * wb * sg * (0.55 * sinAvg + 0.22 * edgeAvg);
+    lit = 0.62 + (lit - 0.62) * att;
+    const f = (0.3 + 0.95 * lit) * (0.72 + 0.28 * Math.min(cc / 0.5, 1));
+    return f < 0.1 ? 0.1 : f > 1.25 ? 1.25 : f;
+  }
+  const BASE = pal.base;
+  function setFill(f) {
+    const hl = f > 0.95 ? (f - 0.95) * 70 : 0;                              // velvet sheen
+    ctx.fillStyle = 'rgb(' + Math.min(255, BASE[0] * f + hl | 0) + ',' + Math.min(255, BASE[1] * f + hl * 0.35 | 0) + ',' + Math.min(255, BASE[2] * f + hl * 0.4 | 0) + ')';
+  }
+  function fabric(p) {
+    const { N, M, x, y, rest, sign, dir } = p, ex = 1.0 * dir, ey = 1.2;   // overlap hides anti-alias seams
+    for (let j = 0; j < M - 1; j++) {
+      const r0 = j * N, r1 = r0 + N;
+      for (let i = 0; i < N - 1; i++) {
+        const a = r0 + i, b = a + 1, c = r1 + i + 1, d = r1 + i;
+        const xa = x[a], ya = y[a], xb = x[b], yb = y[b], xc = x[c], yc = y[c], xd = x[d], yd = y[d];
+        const wt = dir * (xb - xa), wd = dir * (xc - xd), w = (wt + wd) * 0.5;
+        const sg = sign[i], rs = rest[i], wobA = 0.9 + 0.1 * Math.sin(j * 0.6 + i * 2.3), wobB = 0.9 + 0.1 * Math.sin((j + 1) * 0.6 + i * 2.3);
+        const K = w > 18 ? 5 : w > 9 ? 3 : 1;
+        for (let q = 0; q < K; q++) {
+          const t0 = q / K, t1 = (q + 1) / K;
+          const f0 = foldF(wt, rs, sg, wobA, t0, t1), f1 = foldF(wd, rs, sg, wobB, t0, t1);
+          const V = (f0 - f1 > 0.04 || f1 - f0 > 0.04) ? 4 : 1;               // blend between rows where it changes fast
+          const tlx = xa + (xb - xa) * t0, tly = ya + (yb - ya) * t0, trx = xa + (xb - xa) * t1, try_ = ya + (yb - ya) * t1;
+          const blx = xd + (xc - xd) * t0, bly = yd + (yc - yd) * t0, brx = xd + (xc - xd) * t1, bry = yd + (yc - yd) * t1;
+          for (let v = 0; v < V; v++) {
+            const v0 = v / V, v1 = (v + 1) / V, last = v === V - 1 ? ey : 0.6;
+            setFill(V === 1 ? (f0 + f1) * 0.5 : f0 + (f1 - f0) * (v0 + v1) * 0.5);
+            ctx.beginPath();
+            ctx.moveTo(tlx + (blx - tlx) * v0, tly + (bly - tly) * v0);
+            ctx.lineTo(trx + (brx - trx) * v0 + ex, try_ + (bry - try_) * v0);
+            ctx.lineTo(trx + (brx - trx) * v1 + ex, try_ + (bry - try_) * v1 + last);
+            ctx.lineTo(tlx + (blx - tlx) * v1, tly + (bly - tly) * v1 + last);
+            ctx.fill();
+          }
+        }
+      }
+    }
+  }
+
+  function hem(p) {
+    const { N, M, x, y } = p, base = (M - 1) * N;
+    ctx.save();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(x[base], y[base]);
+    for (let i = 1; i < N; i++) ctx.lineTo(x[base + i], y[base + i]);
+    ctx.strokeStyle = pal.gold; ctx.lineWidth = 5 * ui; ctx.stroke();
+    ctx.strokeStyle = pal.goldLight; ctx.lineWidth = 1.5 * ui; ctx.translate(0, -1 * ui); ctx.stroke(); ctx.translate(0, 1 * ui);
+    ctx.lineWidth = 1.2 * ui; ctx.strokeStyle = pal.fringe;   // fringe
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) { ctx.moveTo(x[base + i], y[base + i] + 2 * ui); ctx.lineTo(x[base + i], y[base + i] + 8 * ui); }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function pelmet() {
+    const W = sim.width, pelmetH = sim.pelmetH;
+    const g = ctx.createLinearGradient(0, 0, 0, pelmetH);
+    g.addColorStop(0, pal.pelmet[0]); g.addColorStop(0.55, pal.pelmet[1]); g.addColorStop(1, pal.pelmet[2]);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.65)'; ctx.shadowBlur = 18 * ui * dpr; ctx.shadowOffsetY = 5 * ui * dpr;
+    ctx.fillStyle = g; ctx.fillRect(-4, -4, W + 8, pelmetH + 4);
+    ctx.restore();
+    const t = ctx.createLinearGradient(0, pelmetH - 7 * ui, 0, pelmetH);
+    t.addColorStop(0, pal.goldLight); t.addColorStop(0.5, pal.gold); t.addColorStop(1, pal.goldDark);
+    ctx.fillStyle = t; ctx.fillRect(0, pelmetH - 7 * ui, W, 7 * ui);
+    ctx.fillStyle = pal.pelmetLine; ctx.fillRect(0, pelmetH - 14 * ui, W, 1.5 * ui);
+    ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fillRect(0, 0, W, 2 * ui);
+  }
+
+  function rings(p) {
+    ctx.fillStyle = pal.goldLight; ctx.strokeStyle = pal.ringEdge; ctx.lineWidth = 1 * ui;
+    for (let i = 0; i < p.N; i++) {
+      ctx.beginPath(); ctx.arc(p.x[i], sim.railY, 3.4 * ui, 0, 6.2832); ctx.fill(); ctx.stroke();
+    }
+  }
+
+  return {
+    /* Redraw the whole cloth. The canvas should be sim.width*dpr by sim.height*dpr pixels. */
+    draw() {
+      makeOverlay();
+      const W = sim.width, H = sim.height, panels = sim.panels;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      for (const p of panels) edgeShadow(p);
+      for (const p of panels) fabric(p);
+      ctx.globalCompositeOperation = 'source-atop';  // light falloff, only where there is cloth
+      ctx.fillStyle = overlay; ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'source-over';
+      for (const p of panels) hem(p);
+      pelmet();
+      for (const p of panels) rings(p);
+    },
+    setDpr(d) { dpr = num(d, 0.25, 4, dpr); overlay = null; }
+  };
+}
+
+const API = { CFG, createCurtainSim, createCurtainRenderer, readParams };
+if (typeof window !== 'undefined') window.XACurtain = API;
+if (typeof module !== 'undefined' && module.exports) module.exports = API;
+})();
+</script>
+<script>/* bays.js */
+/*
+ * Xtrata Arcade: the bay engine (hall pack part)
+ *
+ * A bay is a reserved wall area built into the hall (the two far-end spans). The world contract decides what is in
+ * it; this file turns that decision into something the hall can show and play. Three parts:
+ *
+ *   1. PLAN    pure functions (no THREE, no DOM). planBay() takes one bay as the reader read it plus the looks table
+ *              and returns a validated plan, or null for "show the posters as always". Only built-in looks (tier 0)
+ *              are drawn here; every param is clamped and every key is looked up in a fixed table, so chain data
+ *              can choose among prepared pieces and cannot run anything.
+ *   2. ENGINE  create(env) builds the pieces in the hall's THREE scene (curtain, sign board, caution tape, lights,
+ *              a plain door slab until the door port) and animates scene changes.
+ *   3. AUDIO   synthesised work and fabric sounds as positional voices on the hall's room audio bus.
+ *
+ * Off unless the hall creates it (which it does only when the world reader is enabled): the hall is #3111 otherwise.
+ * Doors (phase 3b) and recipes (3c) are not here yet: a door scene shows a plain slab.
+ */
+(function (root) {
+  'use strict';
+  if (root.XABays) return;
+
+  /* ================================================================ 1. PLAN (pure) */
+  var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+  function num(v, lo, hi, def) {
+    v = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+    return typeof v === 'number' && isFinite(v) ? clamp(v, lo, hi) : def;
+  }
+  function txt(v, max) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9 .,!?:'&\/-]/g, '').slice(0, max); }
+  function hex(v, def) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : def; }
+  var TONES = { blue: '#3d86ff', orange: '#ff8a2a', gold: '#ffc53d', white: '#e8ecff', red: '#ff4d4d', green: '#4dff9a' };
+  function tone(v, def) { return Object.prototype.hasOwnProperty.call(TONES, v) ? v : def; }
+  var WORK_SOUNDS = ['hammer', 'saw', 'drill', 'clatter'];
+
+  // The built-in looks. kind: 1 cover, 2 overlay, 3 sound, 4 light (the contract's look kinds). norm() returns clean params.
+  var BUILTIN = {
+    'curtain-house': { kind: 1, norm: function (p) { return { color: hex(p.color, null), trim: hex(p.trim, null), openness: num(p.openness, 0, 1, 0), speed: num(p.speed, 0.1, 5, 1) }; } },
+    'sign-board': { kind: 2, norm: function (p) { return { text: txt(p.text, 22), sub: txt(p.sub, 34), tone: tone(p.tone, 'orange'), y: num(p.y, 1.6, 2.9, 2.55) }; } },
+    'caution-tape': { kind: 2, norm: function (p) { return { y: num(p.y, 0.4, 2.6, 1.2) }; } },
+    'work-site': { kind: 3, norm: function (p) {
+      var kinds = (typeof p.kinds === 'string' ? p.kinds.split(',') : Array.isArray(p.kinds) ? p.kinds : WORK_SOUNDS)
+        .map(function (k) { return String(k).trim(); }).filter(function (k, i, a) { return WORK_SOUNDS.indexOf(k) >= 0 && a.indexOf(k) === i; });
+      return { kinds: kinds.length ? kinds : WORK_SOUNDS.slice(), volume: num(p.volume, 0, 1, 0.6), radius: num(p.radius, 2, 12, 7), gap: num(p.gap, 0.3, 8, 1.6) };
+    } },
+    'hum': { kind: 3, norm: function (p) { return { volume: num(p.volume, 0, 1, 0.4), radius: num(p.radius, 2, 12, 6), pitch: num(p.pitch, 40, 400, 110) }; } },
+    'light-steady': { kind: 4, norm: function (p) { return { tone: tone(p.tone, 'white'), intensity: num(p.intensity, 0, 2, 0.8), rate: 1 }; } },
+    'light-pulse': { kind: 4, norm: function (p) { return { tone: tone(p.tone, 'orange'), intensity: num(p.intensity, 0, 2, 0.9), rate: num(p.rate, 0.2, 8, 1) }; } },
+    'light-flicker': { kind: 4, norm: function (p) { return { tone: tone(p.tone, 'white'), intensity: num(p.intensity, 0, 2, 0.9), rate: num(p.rate, 0.2, 8, 1) }; } }
+  };
+  var COVER_STATE = { open: 1, half: 0.5, closed: 0 };
+  var MAX_OVERLAYS = 4;
+
+  function parseParams(s) {
+    if (typeof s !== 'string' || !s || s.length > 256) return {};
+    try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
+  }
+
+  // bay: one entry of snapshot.bays ({scene:{base,interaction,doorLook,layers,link}} or {scene:null}); looks: snapshot.looks.
+  // Returns null when the bay shows its posters with nothing added.
+  function planBay(bay, looks) {
+    var sc = bay && bay.scene;
+    if (!sc) return null;
+    var base = sc.base === 'wall' || sc.base === 'door' ? sc.base : 'posters';
+    var plan = { base: base, interaction: num(sc.interaction, 0, 3, 0) | 0, link: sc.link || null, cover: null, overlays: [], sound: null, light: null };
+    (Array.isArray(sc.layers) ? sc.layers : []).forEach(function (layer) {
+      var look = looks && looks[layer.look];
+      if (!look || look.hidden || !look.approved || look.tier !== 0) return;             // only hall built-ins are drawn
+      var def = Object.prototype.hasOwnProperty.call(BUILTIN, look.builtin) ? BUILTIN[look.builtin] : null;
+      if (!def || def.kind !== look.kind || layer.slot !== look.kind) return;
+      var p = def.norm(parseParams(layer.params)), state = String(layer.state || '');
+      if (look.kind === 1) {
+        if (Object.prototype.hasOwnProperty.call(COVER_STATE, state)) p.openness = COVER_STATE[state];
+        plan.cover = { key: look.builtin, p: p };
+      } else if (look.kind === 2) {
+        if (plan.overlays.length < MAX_OVERLAYS) plan.overlays.push({ key: look.builtin, p: p });
+      } else if (look.kind === 3) {
+        if (state !== 'off') plan.sound = { key: look.builtin, p: p };
+      } else if (look.kind === 4) {
+        if (state !== 'off') plan.light = { key: look.builtin, p: p };
+      }
+    });
+    return plan;
+  }
+  function planKey(plan) { return plan ? JSON.stringify(plan) : ''; }
+  // Can a visitor pull this bay's curtain with the mouse? Only when the scene lets them look behind it, or it is already open.
+  function curtainGrabbable(plan) { return !!(plan && plan.cover && (plan.interaction === 2 || plan.cover.p.openness >= 0.9)); }
+
+  /* ================================================================ 3. AUDIO (synthesised, positional) */
+  function createAudio() {
+    var env = null;                        // { ctx, master, wet } once the hall's room audio exists
+    var noiseBuf = null, voices = {};      // bay index -> voice
+    var specs = {};                        // bay index -> { pos, sound }
+    var log = [];                          // recent bursts, for tests
+
+    function attach(e) { env = e && e.ctx ? e : null; }
+    function noise(ctx) {
+      if (noiseBuf && noiseBuf.sampleRate === ctx.sampleRate) return noiseBuf;
+      var n = ctx.sampleRate, b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+      for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      return (noiseBuf = b);
+    }
+    function env2(g, t, a, d, peak) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+    function hit(ctx, out, t, peak, freq, q, dur) {   // a burst of band-passed noise
+      var s = ctx.createBufferSource(); s.buffer = noise(ctx); s.loop = true;
+      var f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+      var g = ctx.createGain(); env2(g, t, 0.003, dur, peak);
+      s.connect(f); f.connect(g); g.connect(out); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
+    }
+    function tonePulse(ctx, out, t, type, f0, f1, dur, peak) {
+      var o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+      var g = ctx.createGain(); env2(g, t, 0.004, dur, peak);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.05);
+    }
+    var SYN = {
+      hammer: function (ctx, out, t) {            // three or four knocks, wood on nail
+        var n = 3 + Math.floor(Math.random() * 2), gap = 0.26 + Math.random() * 0.08;
+        for (var i = 0; i < n; i++) { var tt = t + i * gap, v = 0.8 - i * 0.07; hit(ctx, out, tt, 0.55 * v, 2200, 1.4, 0.05); tonePulse(ctx, out, tt, 'sine', 170, 62, 0.11, 0.5 * v); }
+        return n * gap;
+      },
+      saw: function (ctx, out, t) {               // short strokes of a hand saw
+        var strokes = 3 + Math.floor(Math.random() * 2), len = 0.32;
+        for (var i = 0; i < strokes; i++) {
+          var tt = t + i * len, o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 200 + Math.random() * 40;
+          var f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(900, tt); f.frequency.linearRampToValueAtTime(1500, tt + len * 0.9); f.Q.value = 2.2;
+          var g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.linearRampToValueAtTime(0.28, tt + 0.04); g.gain.linearRampToValueAtTime(0.2, tt + len * 0.8); g.gain.linearRampToValueAtTime(0.0001, tt + len);
+          o.connect(f); f.connect(g); g.connect(out); o.start(tt); o.stop(tt + len + 0.02);
+        }
+        return strokes * len;
+      },
+      drill: function (ctx, out, t) {             // a cordless drill spinning up and holding
+        var dur = 0.6 + Math.random() * 0.5, o = ctx.createOscillator(); o.type = 'square';
+        o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(190, t + 0.18); o.frequency.setValueAtTime(190, t + dur - 0.1); o.frequency.exponentialRampToValueAtTime(90, t + dur);
+        var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1700;
+        var g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.22, t + 0.08); g.gain.setValueAtTime(0.2, t + dur - 0.1); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+        o.connect(lp); lp.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.02);
+        hit(ctx, out, t, 0.12, 3200, 1.1, dur);
+        return dur;
+      },
+      clatter: function (ctx, out, t) {           // something metal dropped and rolling
+        var n = 6 + Math.floor(Math.random() * 4), tt = t;
+        for (var i = 0; i < n; i++) { hit(ctx, out, tt, 0.4 * (1 - i / (n + 2)), 1500 + Math.random() * 3500, 3, 0.05); tt += 0.035 + Math.random() * 0.06 * (1 + i * 0.3); }
+        return tt - t;
+      },
+      swish: function (ctx, out, t, strength) {   // cloth on a rail: a breath of filtered noise and a few rings
+        var dur = 0.5 + strength * 0.5, s = ctx.createBufferSource(); s.buffer = noise(ctx); s.loop = true;
+        var f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(700, t); f.frequency.linearRampToValueAtTime(1800, t + dur * 0.5); f.frequency.linearRampToValueAtTime(900, t + dur); f.Q.value = 0.8;
+        var g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.22 * strength + 0.05, t + dur * 0.35); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+        s.connect(f); f.connect(g); g.connect(out); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
+        for (var i = 0; i < 4; i++) hit(ctx, out, t + Math.random() * dur, 0.08, 4200 + Math.random() * 1500, 6, 0.04);
+        return dur;
+      }
+    };
+
+    function makeVoice(i, spec) {
+      var ctx = env.ctx, g = ctx.createGain(); g.gain.value = 0.0001;
+      var pan = ctx.createPanner(); pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 1.4; pan.rolloffFactor = 1.3; pan.maxDistance = 40;
+      var p = spec.pos;
+      if (pan.positionX) { pan.positionX.value = p.x; pan.positionY.value = p.y; pan.positionZ.value = p.z; } else pan.setPosition(p.x, p.y, p.z);
+      var send = ctx.createGain(); send.gain.value = 0.22;
+      g.connect(pan); pan.connect(env.master); g.connect(send); send.connect(env.wet);
+      var v = { g: g, pan: pan, send: send, next: 0.15, hum: null, dying: false, kind: spec.sound.key };
+      if (spec.sound.key === 'hum') {
+        var o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600;
+        o1.type = 'sine'; o1.frequency.value = spec.sound.p.pitch; o2.type = 'triangle'; o2.frequency.value = spec.sound.p.pitch * 2.003;
+        var hg = ctx.createGain(); hg.gain.value = 0.5; o1.connect(lp); o2.connect(hg); hg.connect(lp); lp.connect(g); o1.start(); o2.start();
+        v.hum = [o1, o2];
+      }
+      return v;
+    }
+    function dropVoice(i) {
+      var v = voices[i]; if (!v) return; delete voices[i];
+      try { if (v.hum) v.hum.forEach(function (o) { try { o.stop(); } catch (e) {} }); v.g.disconnect(); v.pan.disconnect(); v.send.disconnect(); } catch (e) {}
+    }
+    function fadeOut(i, secs) {
+      var v = voices[i]; if (!v || v.dying || !env) return;
+      v.dying = true; var t = env.ctx.currentTime;
+      v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(Math.max(0.0001, v.g.gain.value), t); v.g.gain.exponentialRampToValueAtTime(0.0001, t + secs);
+      setTimeout(function () { if (voices[i] === v) dropVoice(i); }, secs * 1000 + 80);
+    }
+
+    // The scene for bay i changed (or was cleared). pos is where it sounds from, in hall coordinates.
+    function setBay(i, pos, sound) {
+      var old = specs[i];
+      specs[i] = sound ? { pos: pos, sound: sound } : null;
+      if (voices[i] && (!sound || !old || old.sound.key !== sound.key || JSON.stringify(old.sound.p) !== JSON.stringify(sound.p))) fadeOut(i, 0.6);
+    }
+    // Called every frame from the hall's room audio. gate: { active, listener:{x,z}, dt }.
+    function update(dt, listener, active) {
+      if (!env) return;
+      var ctx = env.ctx, now = ctx.currentTime;
+      Object.keys(specs).forEach(function (k) {
+        var spec = specs[k], i = +k, v = voices[i];
+        var near = !!spec && active && Math.hypot(spec.pos.x - listener.x, spec.pos.z - listener.z) < spec.sound.p.radius;
+        if (!near) { if (v && !v.dying) fadeOut(i, 0.5); return; }
+        if (v && v.dying) return;                           // let it finish fading, a new one starts after
+        if (!v) { v = voices[i] = makeVoice(i, spec); v.g.gain.setValueAtTime(0.0001, now); v.g.gain.exponentialRampToValueAtTime(Math.max(0.0002, spec.sound.p.volume * 0.9), now + 0.6); }
+        if (spec.sound.key === 'work-site') {
+          v.next -= dt;
+          if (v.next <= 0) {
+            var kinds = spec.sound.p.kinds, k2 = kinds[Math.floor(Math.random() * kinds.length)];
+            var len = SYN[k2](ctx, v.g, now + 0.02);
+            log.push({ bay: i, kind: k2, at: now }); if (log.length > 40) log.shift();
+            v.next = len + spec.sound.p.gap * (0.6 + Math.random() * 0.9);
+          }
+        }
+      });
+      Object.keys(voices).forEach(function (k) { if (!specs[k] && !voices[k].dying) fadeOut(+k, 0.5); });
+    }
+    // A one-off sound from a bay (cloth moving), only if the listener is inside `radius` metres.
+    function oneShot(name, pos, listener, strength, radius) {
+      if (!env || !SYN[name]) return false;
+      if (Math.hypot(pos.x - listener.x, pos.z - listener.z) > (radius || 7)) return false;
+      var ctx = env.ctx, g = ctx.createGain(); g.gain.value = 0.9;
+      var pan = ctx.createPanner(); pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 1.4; pan.rolloffFactor = 1.3; pan.maxDistance = 40;
+      if (pan.positionX) { pan.positionX.value = pos.x; pan.positionY.value = pos.y; pan.positionZ.value = pos.z; } else pan.setPosition(pos.x, pos.y, pos.z);
+      g.connect(pan); pan.connect(env.master);
+      var len = SYN[name](ctx, g, ctx.currentTime + 0.01, strength == null ? 0.7 : strength);
+      log.push({ bay: -1, kind: name, at: ctx.currentTime });
+      setTimeout(function () { try { g.disconnect(); pan.disconnect(); } catch (e) {} }, (len + 0.6) * 1000);
+      return true;
+    }
+    function hush() { Object.keys(voices).forEach(function (k) { if (!voices[k].dying) fadeOut(+k, 0.3); }); }
+    return {
+      attach: attach, setBay: setBay, update: update, oneShot: oneShot, hush: hush,
+      _log: function () { return log.slice(); },
+      _voices: function () { return Object.keys(voices).filter(function (k) { return !voices[k].dying; }).map(Number); },
+      _syn: SYN
+    };
+  }
+
+  /* ================================================================ 2. ENGINE (needs THREE and the hall) */
+  /*
+   * env: {
+   *   THREE, scene, camera, mkCanvas(w,h), tex(canvas),
+   *   RW, RH,                       room width and ceiling height
+   *   bays: [{ side:-1|1, z, width }],          one per bay, in contract order (0 = far left, 1 = far right)
+   *   prompt(hint|null),            shows a one-line hint ('PULL THE CURTAIN') in the hall's HUD
+   *   listener(): {x,z}             where the player stands
+   * }
+   */
+  function create(env) {
+    var T = env.THREE, scene = env.scene, audio = createAudio();
+    var CW = 720, CH = 680;                      // curtain canvas, px
+    var bays = env.bays.map(function (d, i) { return makeBay(d, i); });
+    var rayc = new T.Raycaster(); rayc.far = 4;
+    var grab = null;                              // { bay, ndc }
+    var firstApplied = false;
+
+    function makeBay(def, i) {
+      var g = new T.Group(); g.position.set(def.side * (env.RW / 2 - 0.02), 0, def.z); g.rotation.y = def.side < 0 ? Math.PI / 2 : -Math.PI / 2;
+      g.visible = false; scene.add(g);              // nothing is shown until a scene needs it
+      var light = new T.PointLight(0xffffff, 0, 7, 2); light.position.set(0, 2.1, 0.9); g.add(light);
+      var width = Math.min(2.8, Math.max(1.2, def.width - 0.2));
+      return { i: i, def: def, group: g, light: light, lightSpec: null, plan: null, key: '', width: width, curtain: null, overlays: [], door: null,
+        pos: { x: def.side * (env.RW / 2 - 0.4), y: 1.6, z: def.z } };
+    }
+
+    /* ---- pieces ---- */
+    function disposeMesh(m) { if (!m) return; if (m.parent) m.parent.remove(m); if (m.material) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } if (m.geometry) m.geometry.dispose(); }
+
+    function buildCurtain(bay, spec, instant) {
+      var C = root.XACurtain; if (!C) return null;
+      var openness = spec.p.openness;
+      var sim = C.createCurtainSim({ width: CW, height: CH, color: spec.p.color || undefined, trim: spec.p.trim || undefined, openness: openness, speed: spec.p.speed });
+      var cv = env.mkCanvas(CW, CH), r = C.createCurtainRenderer(sim, cv.getContext('2d'));
+      r.draw();
+      var t = env.tex(cv); t.anisotropy = 4;
+      var h = bay.width * CH / CW, railY = Math.min(env.RH - 0.25, 2.95);
+      var mesh = new T.Mesh(new T.PlaneGeometry(bay.width, h), new T.MeshBasicMaterial({ map: t, transparent: true, color: 0xd2d2da, depthWrite: false }));
+      mesh.position.set(0, railY - h / 2, 0.1); mesh.renderOrder = 2; bay.group.add(mesh);
+      var rail = new T.Mesh(new T.BoxGeometry(bay.width + 0.24, 0.035, 0.06), new T.MeshStandardMaterial({ color: 0x2a2a33, metalness: 0.8, roughness: 0.3 }));
+      rail.position.set(0, railY + 0.02, 0.08); bay.group.add(rail);
+      return { sim: sim, r: r, cv: cv, tex: t, mesh: mesh, rail: rail, style: JSON.stringify([spec.p.color, spec.p.trim]), target: openness, h: h, railY: railY };
+    }
+    function disposeCurtain(c) { if (!c) return; disposeMesh(c.mesh); disposeMesh(c.rail); }
+
+    function signTexture(p) {
+      var cv = env.mkCanvas(1024, 256), x = cv.getContext('2d'), col = TONES[p.tone];
+      x.fillStyle = '#0a0912'; x.fillRect(0, 0, 1024, 256);
+      x.strokeStyle = col; x.lineWidth = 8; x.strokeRect(14, 14, 996, 228);
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.shadowColor = col; x.shadowBlur = 18; x.fillStyle = col;
+      var size = p.text.length > 14 ? 78 : 104; x.font = size + 'px Bungee, Impact, sans-serif';
+      x.fillText(p.text, 512, p.sub ? 100 : 128, 940);
+      if (p.sub) { x.shadowBlur = 8; x.fillStyle = '#e8ecff'; x.font = '54px VT323, monospace'; x.fillText(p.sub, 512, 192, 940); }
+      return cv;
+    }
+    function tapeTexture() {
+      var cv = env.mkCanvas(512, 64), x = cv.getContext('2d');
+      x.fillStyle = '#f5c518'; x.fillRect(0, 0, 512, 64); x.fillStyle = '#16130a';
+      for (var s = -64; s < 576; s += 64) { x.beginPath(); x.moveTo(s, 64); x.lineTo(s + 32, 64); x.lineTo(s + 64, 0); x.lineTo(s + 32, 0); x.closePath(); x.fill(); }
+      return cv;
+    }
+    function buildOverlay(bay, spec) {
+      if (spec.key === 'sign-board') {
+        var w = Math.min(2.0, bay.width - 0.2), m = new T.Mesh(new T.PlaneGeometry(w, w / 4), new T.MeshBasicMaterial({ map: env.tex(signTexture(spec.p)), color: 0xdadada }));
+        m.position.set(0, spec.p.y, 0.14); m.renderOrder = 3; bay.group.add(m); return m;
+      }
+      if (spec.key === 'caution-tape') {
+        var tw = bay.width + 0.1, tt = env.tex(tapeTexture()); tt.wrapS = T.RepeatWrapping; tt.repeat.set(Math.round(tw * 2), 1);
+        var tm = new T.Mesh(new T.PlaneGeometry(tw, 0.14), new T.MeshBasicMaterial({ map: tt, color: 0xdadada, side: T.DoubleSide }));
+        tm.position.set(0, spec.p.y, 0.15); tm.rotation.z = 0.035; tm.renderOrder = 3; bay.group.add(tm); return tm;
+      }
+      return null;
+    }
+    function buildDoor(bay) {   // a plain slab until the door port (phase 3b)
+      var g = new T.Group(), w = Math.min(1.1, bay.width - 0.4);
+      var frame = new T.Mesh(new T.BoxGeometry(w + 0.16, 2.26, 0.05), new T.MeshStandardMaterial({ color: 0x1b1b22, metalness: 0.6, roughness: 0.4 }));
+      var leaf = new T.Mesh(new T.BoxGeometry(w, 2.1, 0.06), new T.MeshStandardMaterial({ color: 0x3a3f52, metalness: 0.5, roughness: 0.5 }));
+      var knob = new T.Mesh(new T.SphereGeometry(0.035, 10, 8), new T.MeshStandardMaterial({ color: 0xc99a45, metalness: 0.9, roughness: 0.3 }));
+      frame.position.set(0, 1.13, 0.03); leaf.position.set(0, 1.08, 0.065); knob.position.set(w / 2 - 0.12, 1.05, 0.12);
+      g.add(frame, leaf, knob); bay.group.add(g); return g;
+    }
+    function disposeGroup(g) { if (!g) return; g.traverse(function (o) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); if (g.parent) g.parent.remove(g); }
+
+    /* ---- applying a plan ---- */
+    function setPlan(bay, plan, instant) {
+      var old = bay.plan; bay.plan = plan;
+      bay.group.visible = !!plan;
+      // cover
+      var want = plan && plan.cover;
+      if (!want) { if (bay.curtain) { disposeCurtain(bay.curtain); bay.curtain = null; } }
+      else {
+        var style = JSON.stringify([want.p.color, want.p.trim]);
+        if (!bay.curtain || bay.curtain.style !== style) { disposeCurtain(bay.curtain); bay.curtain = buildCurtain(bay, want, instant); }
+        else if (Math.abs(bay.curtain.target - want.p.openness) > 0.001) {
+          bay.curtain.target = want.p.openness;
+          bay.curtain.sim.setOpenAmount(want.p.openness, !instant, want.p.speed);
+          if (!instant) audio.oneShot('swish', bay.pos, env.listener(), 0.5 + 0.5 * Math.abs(bay.curtain.sim.getOpenAmount() - want.p.openness), 9);
+        }
+      }
+      // overlays (rebuilt when they change)
+      var ok = JSON.stringify(old ? old.overlays : []), nk = JSON.stringify(plan ? plan.overlays : []);
+      if (ok !== nk) { bay.overlays.forEach(disposeMesh); bay.overlays = []; (plan ? plan.overlays : []).forEach(function (s) { var m = buildOverlay(bay, s); if (m) bay.overlays.push(m); }); }
+      // door slab
+      var wantDoor = !!(plan && plan.base === 'door');
+      if (wantDoor && !bay.door) bay.door = buildDoor(bay); else if (!wantDoor && bay.door) { disposeGroup(bay.door); bay.door = null; }
+      // light
+      bay.lightSpec = plan && plan.light ? plan.light : null;
+      if (!bay.lightSpec) bay.light.intensity = 0; else bay.light.color.set(TONES[bay.lightSpec.p.tone]);
+      // sound
+      audio.setBay(bay.i, bay.pos, plan && plan.sound ? plan.sound : null);
+    }
+
+    function apply(snap, opts) {
+      opts = opts || {};
+      var changed = false;
+      bays.forEach(function (bay) {
+        var plan = snap && snap.bays ? planBay(snap.bays[bay.i], snap.looks) : null, key = planKey(plan);
+        if (key === bay.key) return;
+        bay.key = key; changed = true;
+        setPlan(bay, plan, !!opts.instant || !firstApplied);
+      });
+      firstApplied = true;
+      return changed;
+    }
+
+    /* ---- per frame ---- */
+    function update(dt, time) {
+      for (var b = 0; b < bays.length; b++) {
+        var bay = bays[b], c = bay.curtain;
+        if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
+        var ls = bay.lightSpec;
+        if (ls) {
+          var k = ls.p.intensity * 1.6, m = ls.key;
+          if (m === 'light-pulse') k *= 0.55 + 0.45 * Math.sin(time * ls.p.rate * 2 * Math.PI);
+          else if (m === 'light-flicker') k *= (Math.sin(time * 31 * ls.p.rate) + Math.sin(time * 47.3 * ls.p.rate + 1.7) > 0.8 ? 0.15 : 1) * (0.85 + 0.15 * Math.sin(time * 5.1));
+          bay.light.intensity = k;
+        }
+      }
+    }
+
+    /* ---- the curtain as something to touch ---- */
+    function curtainHit(ndc, maxDist) {
+      rayc.far = maxDist || 3.6; rayc.setFromCamera(ndc, env.camera);
+      var best = null;
+      bays.forEach(function (bay) {
+        if (!bay.curtain || !bay.group.visible) return;
+        bay.curtain.mesh.updateMatrixWorld(true);
+        var h = rayc.intersectObject(bay.curtain.mesh, false)[0];
+        if (h && (!best || h.distance < best.h.distance)) best = { bay: bay, h: h };
+      });
+      return best;
+    }
+    function uAlong(bay, ndc) {   // where the ray crosses the cloth's plane, as 0..1 across it (may be outside 0..1)
+      rayc.setFromCamera(ndc, env.camera);
+      var m = bay.curtain.mesh, n = new T.Vector3(0, 0, 1).transformDirection(m.matrixWorld), p0 = new T.Vector3().setFromMatrixPosition(m.matrixWorld);
+      var pl = new T.Plane().setFromNormalAndCoplanarPoint(n, p0), pt = new T.Vector3();
+      if (!rayc.ray.intersectPlane(pl, pt)) return null;
+      m.worldToLocal(pt); return pt.x / bay.width + 0.5;
+    }
+    // What is the player looking at? Returns { bay, hint } or null. Used for the HUD line.
+    function focus(ndc) {
+      var hit = curtainHit(ndc || new T.Vector2(0, 0), 3.2);
+      if (!hit || !curtainGrabbable(hit.bay.plan)) return null;
+      var open = hit.bay.curtain.sim.getOpenAmount() > 0.5;
+      return { bay: hit.bay.i, hint: open ? 'CLOSE THE CURTAIN' : 'PULL THE CURTAIN', hold: true };
+    }
+    function grabStart(ndc) {
+      if (grab) return false;
+      var hit = curtainHit(ndc, 3.6);
+      if (!hit || !curtainGrabbable(hit.bay.plan)) return false;
+      var uv = hit.h.uv; if (!uv) return false;
+      if (!hit.bay.curtain.sim.grabUV(uv.x, 1 - uv.y)) return false;
+      grab = { bay: hit.bay, ndc: ndc.clone() };
+      audio.oneShot('swish', hit.bay.pos, env.listener(), 0.35, 8);
+      return true;
+    }
+    function grabMove(dx, dy) {   // dx, dy in NDC units
+      if (!grab) return;
+      grab.ndc.x = clamp(grab.ndc.x + dx, -1.5, 1.5); grab.ndc.y = clamp(grab.ndc.y + dy, -1.5, 1.5);
+      var u = uAlong(grab.bay, grab.ndc); if (u !== null) grab.bay.curtain.sim.moveGrabUV(u);
+    }
+    function grabEnd() { if (!grab) return; grab.bay.curtain.sim.release(); grab = null; }
+    function toggleFocused() {   // E on a curtain you may open
+      var f = focus(); if (!f) return false;
+      var bay = bays[f.bay], c = bay.curtain, now = c.sim.getOpenAmount() > 0.5;
+      c.target = now ? 0 : 1; c.sim.setOpenAmount(c.target, true, bay.plan.cover.p.speed);
+      audio.oneShot('swish', bay.pos, env.listener(), 0.8, 9);
+      return true;
+    }
+
+    return {
+      apply: apply, update: update, focus: focus, grabStart: grabStart, grabMove: grabMove, grabEnd: grabEnd, toggleFocused: toggleFocused,
+      isGrabbing: function () { return !!grab; },
+      showPosters: function (i) { var p = bays[i] && bays[i].plan; return !p || p.base === 'posters'; },
+      audio: audio,
+      // state for tests and the preview
+      debug: function () {
+        return bays.map(function (b) {
+          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, door: !!b.door,
+            curtain: b.curtain ? { openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
+            light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity } : null };
+        });
+      }
+    };
+  }
+
+  var API = { planBay: planBay, planKey: planKey, curtainGrabbable: curtainGrabbable, BUILTIN: BUILTIN, TONES: TONES, create: create, createAudio: createAudio, _num: num };
+  root.XABays = API;
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>
@@ -31443,6 +32596,7 @@ const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets 
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
 const machines = [], pickables = [], boxes = [];
+let bayEngine = null, bayHint = null;   // the bay engine (only when the world reader is on); what the player is looking at in a bay
 
 /* ================================================================
    ROOM
@@ -31511,6 +32665,8 @@ function buildRoom(){
   buildLogoSign();
   buildPosters();
   try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
+  XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
+  if(window.XA_TEST) XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 };   // tests only: nothing sets XA_TEST in the shipped page
   XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests
   buildDayBoard();
 
@@ -32627,10 +33783,12 @@ function paintWall(){
 /* Bays (the two wall areas at the far end). Posters mode, or any failure, shows the two posters as always.
    Other scenes are drawn by the bay engine; until then a bay with another scene shows plain wall. */
 function applyBays(snap){
+  if(bayEngine){ try{ bayEngine.apply(snap,{instant:state==='intro'}) }catch(e){ console.error(e) } }
   for(const s of posterSlots){
     if(!s.bay) continue;
-    const bay=snap && snap.bays ? snap.bays[s.bay==='L'?0:1] : null;
-    const show=!bay || !bay.scene || bay.scene.base==='posters';
+    const i=s.bay==='L'?0:1;
+    const bay=snap && snap.bays ? snap.bays[i] : null;
+    const show=bayEngine ? bayEngine.showPosters(i) : (!bay || !bay.scene || bay.scene.base==='posters');
     if(s.group && s.group.visible!==show) s.group.visible=show;
   }
 }
@@ -32681,13 +33839,14 @@ function buildPosters(){
   const frameMat=new THREE.MeshStandardMaterial({color:0x1b1b22, metalness:.7, roughness:.35});
   // a poster in every other gap between cabinets, alternating walls
   // one poster in every gap between machines, and two in the open wall at each end of each row
-  const spots=[];
+  const spots=[], bayDefs=[];
   for(const [side,n] of [[-1,NL],[1,NR]]){
     const zHi=cabZ(0,n)+.62, zLo=cabZ(n-1,n)-.62, wallEnd=RL/2-.35;
     const endPair=(a,b,bay)=>{ const mid=(a+b)/2; spots.push([side,mid+.52,bay],[side,mid-.52,bay]) };
     endPair(zHi, wallEnd);
     for(let k=0;k<n-1;k++) spots.push([side, cabZ(k,n)-GAP/2]);
     endPair(-wallEnd, zLo, side<0?'L':'R');   // far end: these four posters are the two bays' default scene
+    bayDefs[side<0?0:1]={side, z:(-wallEnd+zLo)/2, width:zLo+wallEnd};
   }
   spots.forEach(([side,z,bay])=>{
     const g=new THREE.Group(); g.position.set(side*(RW/2-.03),1.95,z); g.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
@@ -32696,6 +33855,11 @@ function buildPosters(){
     const p=new THREE.Mesh(new THREE.PlaneGeometry(.76,1.14), new THREE.MeshBasicMaterial({map:slot.tex, color:0xdadada}));
     p.position.z=.017; p.userData.slot=slot; posterMeshes.push(p); g.add(p); scene.add(g);
   });
+  try{
+    if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
+    if(window.XABays && window.XAWorld && XAWorld.enabled())
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, listener:()=>player});
+  }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
 }
 
@@ -32728,6 +33892,7 @@ async function fetchHeight(){
 }
 function setHeight(h, live){
   const prev=chain.height; chain.height=h; chain.live=live;
+  try{ if(window.XAWorld) XAWorld.onHeight(h) }catch(e){}   // a scene can start at this block
   const day=Math.floor(h/BLOCKS_PER_DAY);
   if(day!==chain.day){ const first=chain.day<0; chain.day=day; applyDay(day+devDayOffset); if(!first && state==='walk') sfx.coin() }
   else if(h!==prev) repaintLivePosters();
@@ -33343,6 +34508,7 @@ const Room = (() => {
     master.connect(door); door.connect(comp); comp.connect(XA.audio.bus());   // through the shared master, so Mute silences it
     const conv = ctx.createConvolver(); conv.buffer = impulse(1.8, 2.6);
     wet = ctx.createGain(); wet.gain.value = ROOM_AUDIO.reverb; wet.connect(conv); conv.connect(master);
+    if (bayEngine) bayEngine.audio.attach({ ctx, master, wet });   // bay sounds ride the same bus (and Mute)
     setInterval(tick, 25);
     return true;
   }
@@ -33377,11 +34543,12 @@ const Room = (() => {
   }
   function killAll(secs) { for (const i of [...voices.keys()]) killVoice(i, secs) }
   function update(dt) {
-    if (!running || !ctx) return;
+    if (!running || !ctx) { if (bayEngine) bayEngine.audio.hush(); return }
     const t = ctx.currentTime, L = ctx.listener, p = camera.position;
     F.set(0, 0, -1).applyQuaternion(camera.quaternion); U.set(0, 1, 0).applyQuaternion(camera.quaternion);
     if (!setXYZ(L, 'position', p.x, p.y, p.z, t)) L.setPosition(p.x, p.y, p.z);
     if (L.forwardX) { setXYZ(L, 'forward', F.x, F.y, F.z, t); setXYZ(L, 'up', U.x, U.y, U.z, t) } else L.setOrientation(F.x, F.y, F.z, U.x, U.y, U.z);
+    if (bayEngine) bayEngine.audio.update(dt, { x: p.x, z: p.z }, on && !XA.audio.isMuted());
     // which machines should be playing: the nearest few in reach (with a little slack so edges don't flicker)
     if ((lastPick -= dt) <= 0) {
       lastPick = .25;
@@ -33454,6 +34621,7 @@ addEventListener('keydown', e=>{
   const onBtn = e.target && e.target.tagName==='BUTTON';
   if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx>=0){ e.preventDefault(); startGame(focusIdx) }
   else if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx<0 && posterFocus){ e.preventDefault(); openChain(posterFocus.spec.play) }
+  else if(e.code==='KeyE' && focusIdx<0 && !posterFocus && bayEngine && bayHint){ e.preventDefault(); bayEngine.toggleFocused() }
   else if(e.code==='KeyQ' && focusIdx>=0 && GAMES[focusIdx].variants[0]){ startGame(focusIdx, GAMES[focusIdx].variants[0].key) }
   else if(e.code==='KeyT'){ openScores() }
   else if(e.code==='KeyM'){ toggleMute() }
@@ -33466,14 +34634,22 @@ const cvs=renderer.domElement;
 document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLockElement===cvs; updateHud() });
 function tryLock(){ if(isTouch) return; try{ const p=cvs.requestPointerLock(); if(p&&p.catch) p.catch(()=>{}) }catch(e){} }
 
-let drag=null;
-cvs.addEventListener('mousedown', e=>{ if(state!=='walk' || modalOpen()) return; initAudio(); drag={x:e.clientX,y:e.clientY,moved:0} });
+let drag=null, bayDrag=false, bayTouch=null, bayTouchPos={x:0,y:0};
+cvs.addEventListener('mousedown', e=>{
+  if(state!=='walk' || modalOpen()) return; initAudio();
+  if(bayEngine && focusIdx<0 && !posterFocus){   // grab a curtain you may pull
+    const nd = locked ? new THREE.Vector2(0,0) : new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+    if(bayEngine.grabStart(nd)){ bayDrag=true; drag=null; return }
+  }
+  drag={x:e.clientX,y:e.clientY,moved:0} });
 addEventListener('mousemove', e=>{
   if(state!=='walk') return;
+  if(bayDrag){ bayEngine.grabMove(e.movementX/(innerWidth/2), -e.movementY/(innerHeight/2)); return }
   if(locked){ look(e.movementX, e.movementY, .0022) }
   else if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy); drag.x=e.clientX; drag.y=e.clientY; look(dx,dy,.004) }
 });
 addEventListener('mouseup', e=>{
+  if(bayDrag){ bayDrag=false; bayEngine.grabEnd(); drag=null; return }
   if(!drag || state!=='walk'){ drag=null; return }
   const wasClick = drag.moved<5; drag=null; if(!wasClick) return;
   if(locked){ if(focusIdx>=0) startGame(focusIdx); else if(posterFocus) openChain(posterFocus.spec.play); return }
@@ -33495,6 +34671,7 @@ cvs.addEventListener('touchstart', e=>{
   if(state!=='walk') return; initAudio();
   for(const t of e.changedTouches){
     if(t.clientX<innerWidth*.45 && joy.id===null){ joy.id=t.identifier; joy.ox=t.clientX; joy.oy=t.clientY; stick.style.left=t.clientX+'px'; stick.style.top=t.clientY+'px'; stick.hidden=false }
+    else if(bayEngine && bayTouch===null && bayEngine.grabStart(new THREE.Vector2(t.clientX/innerWidth*2-1, -(t.clientY/innerHeight)*2+1))){ bayTouch=t.identifier; bayTouchPos={x:t.clientX,y:t.clientY} }
     else if(lk.id===null){ lk.id=t.identifier; lk.x=t.clientX; lk.y=t.clientY; lk.moved=0 }
   }
 },{passive:true});
@@ -33503,12 +34680,14 @@ cvs.addEventListener('touchmove', e=>{
   for(const t of e.changedTouches){
     if(t.identifier===joy.id){ let dx=t.clientX-joy.ox, dy=t.clientY-joy.oy; const d=Math.hypot(dx,dy), mx=50; if(d>mx){dx*=mx/d; dy*=mx/d}
       joy.vx=dx/mx; joy.vy=dy/mx; knob.style.transform=`translate(${dx}px,${dy}px)` }
+    else if(t.identifier===bayTouch){ bayEngine.grabMove((t.clientX-bayTouchPos.x)/(innerWidth/2), -(t.clientY-bayTouchPos.y)/(innerHeight/2)); bayTouchPos={x:t.clientX,y:t.clientY} }
     else if(t.identifier===lk.id){ const dx=t.clientX-lk.x, dy=t.clientY-lk.y; lk.moved+=Math.abs(dx)+Math.abs(dy); lk.x=t.clientX; lk.y=t.clientY; if(state==='walk') look(dx,dy,.005) }
   }
 },{passive:false});
 const endTouch=e=>{
   for(const t of e.changedTouches){
     if(t.identifier===joy.id){ joy.id=null; joy.vx=joy.vy=0; stick.hidden=true; knob.style.transform='' }
+    else if(t.identifier===bayTouch){ bayEngine.grabEnd(); bayTouch=null }
     else if(t.identifier===lk.id){ lk.id=null; if(lk.moved<10 && state==='walk'){ const h=pickAt(t.clientX,t.clientY); if(h>=0) startGame(h); else { const ps=posterAt(new THREE.Vector2(t.clientX/innerWidth*2-1, -(t.clientY/innerHeight)*2+1)); if(ps) openChain(ps.spec.play) } } }
   }
 };
@@ -33539,6 +34718,7 @@ function updateHud(){
   $('tapalt').hidden = !(walking && isTouch && v); if(v) $('tapalt').textContent = v.label.toUpperCase();
   $('hallbar').hidden = !(walking || state==='intro');
   $('pprompt').hidden = !(walking && focusIdx<0 && posterFocus && !chainOpen);
+  if(!walking && bayHint){ bayHint=null; paintBayHint() }
   if(posterFocus) $('pptitle').textContent = posterFocus.spec.play.title;
 }
 
@@ -33653,6 +34833,15 @@ function findFocus(){
   return best;
 }
 
+/* What the player is looking at in a bay (a curtain they may pull). Cabinets and playable posters come first. */
+function updateBayFocus(){
+  if(bayEngine.isGrabbing()) return;
+  let h=null;
+  if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ const f=bayEngine.focus(); h=f?f.hint:null }
+  if(h!==bayHint){ bayHint=h; paintBayHint() }
+}
+function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint) $('bptext').textContent=bayHint }
+
 let last=performance.now(), time=0;
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000); last=now; time+=dt;
@@ -33683,6 +34872,7 @@ function frame(now){
   }
 
   updateNeon(time,dt);
+  if(bayEngine){ bayEngine.update(dt,time); updateBayFocus() }
 
   updateScreens(dt);
   updateAnimPosters(time);
