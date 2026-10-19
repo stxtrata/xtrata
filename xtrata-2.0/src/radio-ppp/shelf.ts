@@ -7,6 +7,7 @@
 import { listedTracks } from '../lib/listening-wallet/gift-players';
 import { SHELF_SORTS, shelfItems, trimRecents, visibleAlbums, type ShelfItem, type ShelfSort } from '../lib/listening-wallet/shelf';
 import type { Snapshot } from './controller';
+import { onArt, thumb } from './art';
 
 export interface ShelfDeps {
   json(url: string): Promise<any>;
@@ -34,6 +35,8 @@ export function createShelf(deps: ShelfDeps) {
   let pinnedOnly = false;
   let shown = PAGE;
   const body = el('div', '', 'ppp-shelf-box');
+  // Artwork turns up one album at a time, in the background: draw again when it does.
+  onArt(() => deps.changed());
 
   const pinsKey = (r: string) => 'xtrata.radio.shelf.pins.v1:' + r;
   const recentKey = (r: string) => 'xtrata.radio.shelf.recent.v1:' + r;
@@ -118,7 +121,15 @@ export function createShelf(deps: ShelfDeps) {
           deps.open(a.slot);
         }, playing ? 'tiny' : 'tiny primary');
         pick.disabled = playing;
-        li.append(pin, el('span', a.player!.title, 't'), el('span', ' ' + sub, 'ppp-mute'), pick);
+        // The album's cover when it has one, else its first song's own artwork; a disc until it is found (or if there is none).
+        const first = listedTracks(a.player!)[0];
+        const artId = a.player!.cover ?? first?.id;
+        const url = artId ? thumb(String(artId)) : '';
+        const art = el('span', '', 'ppp-shelf-art');
+        if (url) { const img = document.createElement('img'); img.src = url; img.alt = ''; img.decoding = 'async'; art.append(img); } else art.textContent = '💿';
+        const txt = el('span', '', 'ppp-shelf-txt');
+        txt.append(el('span', a.player!.title, 't'), el('span', sub, 'ppp-mute'));
+        li.append(pin, art, txt, pick);
         ol.append(li);
       }
       parts.push(ol);

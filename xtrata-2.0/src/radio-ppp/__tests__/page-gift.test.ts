@@ -183,6 +183,14 @@ describe('My albums (the shelf)', () => {
     expect(h.openAlbum).toHaveBeenCalledWith(2);
   });
 
+  it('every album row has a square for its artwork (a disc until the picture is found)', async () => {
+    const fold = await start();
+    const rows = [...fold.querySelectorAll('.ppp-shelf-list li')];
+    expect(rows.length).toBe(3);
+    for (const r of rows) expect(r.querySelector('.ppp-shelf-art')).not.toBeNull();
+    expect(text(rows[0].querySelector('.ppp-shelf-art')!)).toBe('💿');
+  });
+
   it('pins an album (kept on this device) and moves it to the top', async () => {
     const fold = await start();
     const row = () => [...fold.querySelectorAll('.ppp-shelf-list li')];
@@ -247,6 +255,10 @@ describe('My albums (the shelf)', () => {
     expect((root.querySelector('.ppp-shelf') as HTMLDetailsElement).open).toBe(false);
     link.click();
     expect((root.querySelector('.ppp-shelf') as HTMLDetailsElement).open).toBe(true);
+    expect(link.getAttribute('aria-expanded')).toBe('true');
+    link.click(); // the button is the toggle
+    expect((root.querySelector('.ppp-shelf') as HTMLDetailsElement).open).toBe(false);
+    expect(link.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('a new album wallet on a device that has already played is not "setup": no steps, no SETUP badge', async () => {
