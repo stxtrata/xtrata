@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-19T15:42:07.604Z",
+  "updated": "2026-10-19T15:43:22.808108Z",
   "scenarios": {
     "first-claim": {
       "taps": 3,
@@ -22,19 +22,19 @@
     "reload-after-create": {
       "taps": 5,
       "prompts": 3,
-      "passkeys": 2,
-      "panels": 2,
+      "passkeys": 1,
+      "panels": 3,
       "jargon": 3,
-      "score": 21,
+      "score": 11,
       "playable": true
     },
     "close-panel-after-create": {
       "taps": 5,
       "prompts": 3,
-      "passkeys": 2,
-      "panels": 2,
+      "passkeys": 1,
+      "panels": 3,
       "jargon": 3,
-      "score": 21,
+      "score": 11,
       "playable": true
     },
     "prompt-fails-then-works": {
@@ -74,12 +74,12 @@
       "playable": true
     },
     "iphone-reload-while-in-new-tab": {
-      "taps": 10,
-      "prompts": 4,
-      "passkeys": 2,
+      "taps": 7,
+      "prompts": 3,
+      "passkeys": 1,
       "panels": 3,
       "jargon": 3,
-      "score": 27,
+      "score": 13,
       "playable": true
     }
   }

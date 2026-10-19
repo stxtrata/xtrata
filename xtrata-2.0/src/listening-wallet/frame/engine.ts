@@ -103,7 +103,17 @@ interface WalletRecord {
   address: string;
   link?: { main: string; issued: number; mainSignature: string };
 }
-interface Stored { version: 1; wallets: WalletRecord[]; last?: string }
+/**
+ * A passkey this device has made but not yet proven. Only public ids are kept (never a secret). If the page reloads,
+ * the panel is closed or the phone discards the tab before the check finishes, the next attempt picks this up instead
+ * of making a second passkey beside it. Nothing is ever funded against it: it becomes a wallet only through `remember`,
+ * after the PRF check (docs/PASSKEY-WALLET.md §3.1), and that clears it.
+ */
+interface PendingPasskey { at: number; tries: number; credentialId?: string; userId?: string; label?: string }
+interface Stored { version: 1; wallets: WalletRecord[]; last?: string; pending?: PendingPasskey }
+/** A half-made passkey is picked up for a day; after this many failed pick-ups it is dropped and a fresh one is made. */
+const PENDING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const PENDING_MAX_TRIES = 3;
 
 const STORE_KEY = 'xtrata.listening-wallet.v1';
 const MAX_WALLETS = 25;
@@ -173,7 +183,27 @@ export function createListeningEngine(deps: {
     // One listening wallet per main-wallet address, plus a passkey-only one: never silently forget a wallet that may hold funds.
     s.wallets = [rec, ...s.wallets.filter((w) => w.credentialId !== rec.credentialId)].slice(0, MAX_WALLETS);
     s.last = rec.credentialId;
+    delete s.pending; // a proven passkey is a wallet now
     save(s);
+  };
+  const pendingNow = (): PendingPasskey | undefined => {
+    const p = load().pending;
+    return p && now() - p.at < PENDING_MAX_AGE_MS && p.tries < PENDING_MAX_TRIES ? p : undefined;
+  };
+  const setPending = (p: PendingPasskey | undefined) => {
+    const s = load();
+    if (!p && !s.pending) return; // nothing to forget: write nothing
+    if (p) s.pending = p; else delete s.pending;
+    save(s);
+  };
+  /**
+   * After a failure while proving a passkey. A cancelled or retryable one (closed panel, cancelled prompt, wrong choice in the
+   * list) keeps the passkey for the next try. A definite one (an unstable PRF result) forgets it: start over, as §3.1 says.
+   */
+  const afterFailure = (resume: PendingPasskey | undefined, e: unknown) => {
+    const keep = e instanceof CancelledError || !!(e as { retryable?: boolean })?.retryable;
+    if (!keep) setPending(undefined);
+    else if (resume) setPending({ ...resume, tries: resume.tries + 1 });
   };
 
   const summary = (): SessionSummary | null => {
@@ -255,42 +285,63 @@ export function createListeningEngine(deps: {
       ],
       confirmLabel: terms ? 'Create and start listening' : 'Create with passkey'
     };
+    // A passkey made a moment ago that never got proven (reload, closed panel, discarded tab): finish that one.
+    const resume = pendingNow();
     let created: { credentialId: string; prf?: Uint8Array };
-    if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
-      created = await deps.ui.act(createPanel, () => deps.passkey.create(
-        // A wallet for a specific address is meant to be a NEW passkey beside the others. Excluding the existing
-        // credentials there makes the authenticator refuse ("already registered") on exactly the device that has them.
-        // Without an address the old guard stays: do not quietly make a duplicate of a wallet this device already has.
-        exclude, name));
-    } else {
-      // This browser will not make a passkey inside a frame: make it on wallet.xtrata.xyz in a new tab, then
-      // sign in with it here. Nothing secret crosses between the tabs: the frame picks a random public user id for
-      // the new passkey and only accepts a sign-in that comes back with it (an older passkey synced to this
-      // device cannot pass for the new one, even when this device has no record of it).
-      const idBytes = crypto.getRandomValues(new Uint8Array(16));
-      const userId = b64u(idBytes);
-      // Four characters to tell this passkey apart in the device's passkey list.
-      const tag = Array.from(idBytes.slice(0, 2), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-      const label = `${name ?? 'Xtrata listening wallet'} · ${tag}`;
-      await deps.ui.act({
-        ...createPanel,
-        lines: [...createPanel.lines, 'On this browser the passkey is made on a wallet.xtrata.xyz page that opens in a new tab. Make it there, then come back to this tab.'],
-        confirmLabel: 'Make my passkey (new tab)'
-      }, async () => { deps.passkey.openCreator!(exclude, label, userId); return true; });
-      created = await deps.ui.act({
-        kind: 'confirm-passkey',
-        title: 'Made your passkey?',
-        summary: `In the new tab, tap "Create passkey". Then come back here, tap below and choose "${label}".`,
-        lines: ['The wallet is ready as soon as that passkey is confirmed.'],
-        confirmLabel: 'I made it: use my passkey'
-      }, async () => {
-        const r = await deps.passkey.evaluate();
-        if (r.userHandle !== userId) {
-          r.prf.fill(0);
-          throw Object.assign(new Error(`That is a different passkey. Choose "${label}", the one you just made (or make it in the new tab first).`), { retryable: true });
+    try {
+      if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
+        if (resume?.credentialId) created = { credentialId: resume.credentialId };
+        else {
+          created = await deps.ui.act(createPanel, () => deps.passkey.create(
+            // A wallet for a specific address is meant to be a NEW passkey beside the others. Excluding the existing
+            // credentials there makes the authenticator refuse ("already registered") on exactly the device that has them.
+            // Without an address the old guard stays: do not quietly make a duplicate of a wallet this device already has.
+            exclude, name));
+          setPending({ at: now(), tries: 0, credentialId: created.credentialId });
         }
-        return r;
-      });
+      } else {
+        // This browser will not make a passkey inside a frame: make it on wallet.xtrata.xyz in a new tab, then
+        // sign in with it here. Nothing secret crosses between the tabs: the frame picks a random public user id for
+        // the new passkey and only accepts a sign-in that comes back with it (an older passkey synced to this
+        // device cannot pass for the new one, even when this device has no record of it).
+        let userId: string, label: string;
+        if (resume?.userId && resume.label) {
+          // The tab was opened before a reload: go straight back to "Made your passkey?" instead of opening a second one.
+          userId = resume.userId; label = resume.label;
+        } else {
+          const idBytes = crypto.getRandomValues(new Uint8Array(16));
+          userId = b64u(idBytes);
+          // Four characters to tell this passkey apart in the device's passkey list.
+          const tag = Array.from(idBytes.slice(0, 2), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+          label = `${name ?? 'Xtrata listening wallet'} · ${tag}`;
+          const [u, l] = [userId, label];
+          await deps.ui.act({
+            ...createPanel,
+            lines: [...createPanel.lines, 'On this browser the passkey is made on a wallet.xtrata.xyz page that opens in a new tab. Make it there, then come back to this tab.'],
+            confirmLabel: 'Make my passkey (new tab)'
+          }, async () => { setPending({ at: now(), tries: 0, userId: u, label: l }); deps.passkey.openCreator!(exclude, l, u); return true; });
+        }
+        const wanted = userId;
+        created = await deps.ui.act({
+          kind: 'confirm-passkey',
+          title: 'Made your passkey?',
+          summary: `In the new tab, tap "Create passkey". Then come back here, tap below and choose "${label}".`,
+          lines: ['The wallet is ready as soon as that passkey is confirmed.'],
+          confirmLabel: 'I made it: use my passkey'
+        }, async () => {
+          const r = await deps.passkey.evaluate();
+          if (r.userHandle !== wanted) {
+            r.prf.fill(0);
+            throw Object.assign(new Error(`That is a different passkey. Choose "${label}", the one you just made (or make it in the new tab first).`), { retryable: true });
+          }
+          return r;
+        });
+        setPending({ at: now(), tries: 0, credentialId: created.credentialId });
+      }
+    } catch (e) {
+      // A pick-up that fails or is cancelled counts; after a few, the half-made passkey is dropped and a fresh one is made.
+      afterFailure(resume, e);
+      throw e;
     }
 
     // Prove PRF is live AND stable before the address is ever shown for funding
@@ -317,6 +368,9 @@ export function createListeningEngine(deps: {
       credentialId = created.credentialId;
       remember({ credentialId: created.credentialId, address: id.address });
       return { id, base: key };
+    } catch (e) {
+      afterFailure(resume, e);
+      throw e;
     } finally {
       outputs.forEach((o) => o.fill(0));
     }
