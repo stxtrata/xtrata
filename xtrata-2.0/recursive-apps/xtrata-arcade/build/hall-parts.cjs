@@ -32,8 +32,10 @@
       'game-brick-breaker.js', 'game-rock-drift.js', 'game-stack-tower.js', 'game-road-hopper.js', 'game-tile-tap.js',
       'game-merge-2048.js', 'game-block-defence.js', 'game-maze-muncher.js', 'game-invader-wave.js', 'game-helix-drop.js',
       'game-bubble-pop.js', 'game-swerve.js', 'game-lunar-lander.js', 'game-reflex-tap.js', 'game-mine-sprint.js', 'game-pong-streak.js'],
-    hall: ['hall.css', 'hall-body.html', 'hall.js']
+    hall: ['hall.css', 'hall-body.html', 'world.js', 'hall.js']
   };
+  // Parts that older releases (v1.x single files) do not have. The hall runs without them.
+  var OPTIONAL = ['world.js'];
   var PACK_ORDER = ['assets', 'three', 'engine', 'games', 'hall'];
 
   // Load order. CSS goes to <head>, the markup to <body>, scripts run in this order.
@@ -41,7 +43,7 @@
     css: ['fonts.css', 'room.css', 'hall.css'],
     html: ['hall-body.html'],
     js: ['arcade-kit.js', 'arcade-music.js', 'score-client.js', 'arcade-replay.js', 'arcade-room.js']
-      .concat(PACKS.games, ['engine-boot.js', 'three.js', 'hall-assets.js', 'hall.js'])
+      .concat(PACKS.games, ['engine-boot.js', 'three.js', 'hall-assets.js', 'world.js', 'hall.js'])
   };
 
   function packOf(part) {
@@ -55,7 +57,10 @@
     var out = '/*@xa-pack ' + name + ' v1*/';
     PACKS[name].forEach(function (p) {
       var text = parts[p];
-      if (typeof text !== 'string') throw new Error('pack ' + name + ' is missing ' + p);
+      if (typeof text !== 'string') {
+        if (OPTIONAL.indexOf(p) >= 0) return;
+        throw new Error('pack ' + name + ' is missing ' + p);
+      }
       if (PART_MARK.test(text)) throw new Error(p + ' contains a part marker');
       out += '\n/*@xa-part ' + p + '*/\n' + text;
     });
@@ -136,7 +141,7 @@
       parts[name] = body;
       skeleton = skeleton.replace('\x3cscript>' + text + '<\/script>', function () { return '\x3cscript>' + prefix + '@@part:' + name + '@@<\/script>'; });
     });
-    var missing = ORDER.css.concat(ORDER.html, ORDER.js).filter(function (p) { return typeof parts[p] !== 'string'; });
+    var missing = ORDER.css.concat(ORDER.html, ORDER.js).filter(function (p) { return typeof parts[p] !== 'string' && OPTIONAL.indexOf(p) < 0; });
     if (missing.length) throw new Error('release is missing ' + missing.join(', '));
     return { parts: parts, skeleton: skeleton };
   }
@@ -151,7 +156,7 @@
   }
 
   var api = {
-    PACKS: PACKS, PACK_ORDER: PACK_ORDER, ORDER: ORDER, packOf: packOf,
+    PACKS: PACKS, PACK_ORDER: PACK_ORDER, ORDER: ORDER, OPTIONAL: OPTIONAL, packOf: packOf,
     makePack: makePack, parsePack: parsePack,
     splitRelease: splitRelease, assembleRelease: assembleRelease,
     splitAssets: splitAssets, inlineAssets: inlineAssets

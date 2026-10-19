@@ -24,7 +24,7 @@ function parentShell(template, lib) {
 function parentConfig(ids, packOrder) {
   var packs = {};
   packOrder.forEach(function (n) { packs[n] = Number((ids.packs || {})[n] || 0); });
-  return {
+  var cfg = {
     version: ids.version,
     bundleId: Number(ids.bundleId || 0),
     packs: packs,
@@ -34,6 +34,9 @@ function parentConfig(ids, packOrder) {
     // gateway (R2) only when it matches, and reads the chain otherwise.
     hashes: ids.hashes || {}
   };
+  // The world contracts (posters + world). Left out unless named, so the hall stays off and identical to v1.3.
+  if (ids.world && (ids.world.posters || ids.world.world)) cfg.world = ids.world;
+  return cfg;
 }
 
 function fillParent(shell, config) {
