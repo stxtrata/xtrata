@@ -19,15 +19,15 @@ test('the full launch rehearsal passes on a simulated chain', async () => {
   const logs = [];
   const r = await runRehearsal({ simnet, accounts: { deployer, publisher: W[0], newAdmin: W[5] }, log: (m) => logs.push(m) });
   assert.equal(r.ok, true, r.error || JSON.stringify(r.steps.filter((s) => !s.ok)));
-  assert.equal(r.steps.length, 14);
+  assert.equal(r.steps.length, 15);
   assert.ok(r.steps.every((s) => s.ok));
   const md = reportMarkdown(r);
-  assert.match(md, /Result: \*\*PASS\*\* \(14 of 14 steps\)/);
+  assert.match(md, /Result: \*\*PASS\*\* \(15 of 15 steps\)/);
   assert.match(md, /Nothing was sent to any network/);
 });
 
-test('deploy list: three contracts in dependency order, test-network sources are the simnet sources unchanged', () => {
-  assert.deepEqual(DEPLOY_ORDER, ['mock-xtrata-core', 'xtrata-posters-v1', 'xtrata-world-v1']);
+test('deploy list: four contracts in dependency order, test-network sources are the simnet sources unchanged', () => {
+  assert.deepEqual(DEPLOY_ORDER, ['mock-xtrata-core', 'xtrata-posters-v1', 'xtrata-world-v1', 'xtrata-door-skins-v1']);
   for (const s of deploySources()) {
     assert.equal(s.source, readFileSync(join(root, 'contracts', `${s.name}.clar`), 'utf8'));
     assert.equal(s.clarityVersion, 4);
@@ -42,6 +42,7 @@ const SENDING = [
   ['revert.mjs', ...NET, '--room', 'arcade-hall', '--bay', '0', '--sender', 'ST000000000000000000002AMW42H', '--execute'],
   ['review.mjs', ...NET, '--release', '1', '--execute'],
   ['bot.mjs', join(root, 'ops', 'examples', 'week.items.json'), ...NET, '--sender', 'ST000000000000000000002AMW42H', '--execute'],
+  ['skins.mjs', ...NET, '--skins', 'ST000000000000000000002AMW42H.xtrata-door-skins-v1', '--sender', 'ST000000000000000000002AMW42H', '--execute'],
   ['deploy.mjs', '--network', 'testnet', '--execute'],
 ];
 for (const cmd of SENDING) {

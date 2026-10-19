@@ -1,6 +1,6 @@
 // The deploy list for a test network, built from the simnet sources, unmodified. (Mainnet uses contracts/live, made by make-live.mjs,
 // and is NOT handled here: it is a separate decision.) On a test network the stand-in core is deployed first, by the same address,
-// because the other two call it as `.mock-xtrata-core`.
+// because the others call it as `.mock-xtrata-core`.
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
@@ -9,7 +9,7 @@ import { makeContractDeploy, broadcastTransaction, ClarityVersion, PostCondition
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const CONTRACT_DIR = join(here, '..', '..', 'contracts');
-export const DEPLOY_ORDER = ['mock-xtrata-core', 'xtrata-posters-v1', 'xtrata-world-v1'];
+export const DEPLOY_ORDER = ['mock-xtrata-core', 'xtrata-posters-v1', 'xtrata-world-v1', 'xtrata-door-skins-v1'];
 
 export function deploySources() {
   return DEPLOY_ORDER.map((name) => {
