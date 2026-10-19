@@ -36,6 +36,7 @@ Output files go to `ops/out/` (git-ignored); the bot's journal is `ops/.run-<fil
 | `view.mjs` | Builds a local page showing a test network's contracts in the real hall (read-only). |
 | `rehearsal.mjs` | The whole launch sequence on a simulated chain. Writes `out/rehearsal-report.md`. |
 | `keygen.mjs` | Makes a disposable test-network key file. |
+| `relay.mjs`, `relay-merge.mjs` | Sign testnet transactions offline and pack them for a browser to send (see below). |
 
 ## Scene file
 
@@ -65,3 +66,7 @@ Posters always start after today (a Bitcoin day is 144 blocks). Publishers add c
 ## Tests
 
 `npm test` runs the contract tests and the toolkit tests (`tests/ops-*.test.mjs`), including a check that the validator and the contracts agree on every rejection, and that no sending tool will send without its confirmations. The preview page is checked in a real browser by `recursive-apps/xtrata-arcade/tests/ops-preview.test.cjs`.
+
+## Sending through a browser (when this machine cannot reach the node)
+
+`relay.mjs` signs one phase OFFLINE (deploy, setup, scenes, posters, call, revert, fund) with explicit nonces and packs the signed transactions into a small gzip+base64 text. A browser that can reach the node then POSTs each signed transaction to `/v2/transactions` and waits for it to confirm. The browser only ever sees signed bytes, never a key. It is testnet only and passes through the same guard as the other sending tools (`--execute`, `XA_OPS_CONFIRM=broadcast-testnet`, a key file that is not the admin wallet, no KILL file). `relay-merge.mjs` joins several packs in order. Tested by `tests/ops-relay.test.mjs`.
