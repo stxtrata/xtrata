@@ -34,7 +34,7 @@
   // The built-in looks. kind: 1 cover, 2 overlay, 3 sound, 4 light (the contract's look kinds). norm() returns clean params.
   var BUILTIN = {
     'curtain-house': { kind: 1, norm: function (p) { return { color: hex(p.color, null), trim: hex(p.trim, null), openness: num(p.openness, 0, 1, 0), speed: num(p.speed, 0.1, 5, 1) }; } },
-    'sign-board': { kind: 2, norm: function (p) { return { text: txt(p.text, 22), sub: txt(p.sub, 34), tone: tone(p.tone, 'orange'), y: num(p.y, 1.6, 2.9, 2.55) }; } },
+    'sign-board': { kind: 2, norm: function (p) { return { text: txt(p.text, 22), sub: txt(p.sub, 34), tone: tone(p.tone, 'orange'), y: num(p.y, 1.6, 2.9, 2.55), front: p.front === true }; } },
     'caution-tape': { kind: 2, norm: function (p) { return { y: num(p.y, 0.4, 2.6, 1.2) }; } },
     'work-site': { kind: 3, norm: function (p) {
       var kinds = (typeof p.kinds === 'string' ? p.kinds.split(',') : Array.isArray(p.kinds) ? p.kinds : WORK_SOUNDS)
@@ -248,12 +248,13 @@
     var DOORS = root.XADoors || null;
     var doorSfx = DOORS ? DOORS.createSfx(function () { return audio.env(); }, function () { return env.listener(); }) : null;
     // Layering, from the wall outwards (metres in front of the wall): the door, set into the wall (its slab front is at about 0.045),
-    // the tape stretched across it a few centimetres proud of it, the curtain rail and cloth hung in front of all that, and last the
-    // sign board, which has to show when the curtain is shut.
+    // the tape stretched across it a few centimetres proud of it, and the curtain rail and cloth hung in front of all that. A sign board is
+    // fixed to the wall behind the curtain (Z_SIGN_WALL) unless its scene sets front:true, which hangs it on the cloth (Z_SIGN).
     // The cloth is see-through and does not write depth, so a see-through door face would draw over it whatever its distance:
     // the door's own pieces (doors.js) draw at render order 0 to 2, the curtain after them.
     var RO_CURTAIN = 5;
-    var Z_TAPE = 0.085, Z_RAIL = 0.2, Z_CURTAIN = 0.21, Z_SIGN = 0.25;
+    var Z_SIGN_WALL = 0.03, Z_TAPE = 0.085, Z_RAIL = 0.2, Z_CURTAIN = 0.21, Z_SIGN = 0.25;
+    var DOOR_SILL = 0.09;                         // the hall's skirting strip is a 3 cm bar centred at 7 cm: its top is at 8.5 cm
     var CURTAIN_MARGIN_M = 0.8;                   // how far past each rail end the cloth can be pulled and still be seen
     var CW = 720;                                // curtain canvas width, px (its height follows the bay)
     var bays = env.bays.map(function (d, i) { return makeBay(d, i); });
@@ -312,7 +313,7 @@
     function buildOverlay(bay, spec) {
       if (spec.key === 'sign-board') {
         var w = Math.min(2.0, bay.width - 0.2), m = new T.Mesh(new T.PlaneGeometry(w, w / 4), new T.MeshBasicMaterial({ map: env.tex(signTexture(spec.p)), color: 0xdadada }));
-        m.position.set(0, spec.p.y, Z_SIGN); m.renderOrder = 3; m.userData.key = spec.key; bay.group.add(m); return m;
+        m.position.set(0, spec.p.y, spec.p.front ? Z_SIGN : Z_SIGN_WALL); m.renderOrder = 3; m.userData.key = spec.key; bay.group.add(m); return m;
       }
       if (spec.key === 'caution-tape') {
         var tw = bay.width - 0.02, tt = env.tex(tapeTexture()); tt.wrapS = T.RepeatWrapping; tt.repeat.set(Math.round(tw * 2), 1);
@@ -329,8 +330,9 @@
     function buildDoor(bay, style, interaction) {
       if (DOORS) {
         var model = new DOORS.DoorModel({ style: style, locked: interaction < 2 }, doorSfx);
-        model.pos = { x: bay.pos.x, y: 1.2, z: bay.pos.z };
-        var mesh = DOORS.buildMesh({ THREE: T, mkCanvas: env.mkCanvas, tex: env.tex, model: model, maxW: bay.width - 0.4, maxH: 2.25 });
+        model.pos = { x: bay.pos.x, y: 1.2 + DOOR_SILL, z: bay.pos.z };
+        var mesh = DOORS.buildMesh({ THREE: T, mkCanvas: env.mkCanvas, tex: env.tex, model: model, maxW: bay.width - 0.4, maxH: 2.2 });
+        mesh.group.position.y = DOOR_SILL;                       // the door stands on the top of the orange skirting strip, not in front of it
         bay.group.add(mesh.group);
         return { style: style, model: model, mesh: mesh };
       }

@@ -73,8 +73,14 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
     await push(page, snapshot([bay(door(1, 20, [layer(1, 1, '{"color":"#7a1020"}', 'closed'), layer(2, 2, '{"text":"x"}'), layer(2, 5, '{"y":1.2}')])), bay(null)]));
     await page.waitForTimeout(400);
     const z = (await bays(page)).bays[0].layers;
-    check(z.door > 0 && z.door < z.tape && z.tape < z.rail && z.rail < z.curtain && z.curtain < z.sign,
-      'H: layers run wall, door (' + z.door.toFixed(3) + '), tape (' + z.tape + '), curtain rail (' + z.rail + '), curtain (' + z.curtain + '), sign (' + z.sign + ')');
+    check(z.sign > 0 && z.sign < z.door + 0.1 && z.door < z.tape && z.tape < z.rail && z.rail < z.curtain,
+      'H: layers run wall, sign on the wall ('+z.sign+'), door (' + z.door.toFixed(3) + '), tape (' + z.tape + '), curtain rail (' + z.rail + '), curtain (' + z.curtain + ')');
+    await push(page, snapshot([bay(door(1, 20, [layer(1, 1, '{"color":"#7a1020"}', 'closed'), layer(2, 2, '{"text":"x","front":true}')])), bay(null)]));
+    await page.waitForTimeout(300);
+    const zf = (await bays(page)).bays[0].layers;
+    check(zf.sign > zf.curtain, 'H: a sign with front:true hangs on the cloth (' + zf.sign + ' > ' + zf.curtain + ')');
+    await push(page, snapshot([bay(door(1, 20, [layer(1, 1, '{"color":"#7a1020"}', 'closed'), layer(2, 2, '{"text":"x"}'), layer(2, 5, '{"y":1.2}')])), bay(null)]));
+    await page.waitForTimeout(300);
     check(z.doorOrder < z.curtainOrder, 'H: the door pieces draw before the curtain (see-through faces cannot show over the cloth): ' + z.doorOrder + ' < ' + z.curtainOrder);
     await face(page, 2.4); await page.waitForTimeout(2500); await shot(page, 'doors-layers-closed');
     await push(page, snapshot([bay(door(1, 20, [layer(1, 1, '{"color":"#7a1020"}', 'half'), layer(2, 5, '{"y":1.2}')])), bay(null)]));
