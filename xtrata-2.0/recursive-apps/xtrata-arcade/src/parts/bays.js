@@ -47,6 +47,12 @@
     'light-flicker': { kind: 4, norm: function (p) { return { tone: tone(p.tone, 'white'), intensity: num(p.intensity, 0, 2, 0.9), rate: num(p.rate, 0.2, 8, 1) }; } }
   };
   var COVER_STATE = { open: 1, half: 0.5, closed: 0 };
+  // The door looks the hall can draw: a kind 0 look whose built-in key is 'door-<style>' (styles live in doors.js).
+  var DOOR_STYLES = ['rect', 'tall', 'wide', 'arch', 'gothic', 'double', 'cathedral', 'circle', 'oval', 'hexagon', 'octagon', 'industrial', 'vintage', 'scifi'];
+  function doorStyle(sc, looks) {
+    var dl = sc.doorLook != null && looks ? looks[sc.doorLook] : null, key = dl && !dl.hidden && dl.approved && dl.tier === 0 && dl.kind === 0 && typeof dl.builtin === 'string' ? dl.builtin : '';
+    return key.indexOf('door-') === 0 && DOOR_STYLES.indexOf(key.slice(5)) >= 0 ? key.slice(5) : 'rect';   // no (usable) look: the classic door
+  }
   var MAX_OVERLAYS = 4;
 
   function parseParams(s) {
@@ -60,7 +66,7 @@
     var sc = bay && bay.scene;
     if (!sc) return null;
     var base = sc.base === 'wall' || sc.base === 'door' ? sc.base : 'posters';
-    var plan = { base: base, interaction: num(sc.interaction, 0, 3, 0) | 0, link: sc.link || null, cover: null, overlays: [], sound: null, light: null };
+    var plan = { base: base, interaction: num(sc.interaction, 0, 3, 0) | 0, link: sc.link || null, door: base === 'door' ? { style: doorStyle(sc, looks) } : null, cover: null, overlays: [], sound: null, light: null };
     (Array.isArray(sc.layers) ? sc.layers : []).forEach(function (layer) {
       var look = looks && looks[layer.look];
       if (!look || look.hidden || !look.approved || look.tier !== 0) return;             // only hall built-ins are drawn
@@ -220,7 +226,7 @@
     }
     function hush() { Object.keys(voices).forEach(function (k) { if (!voices[k].dying) fadeOut(+k, 0.3); }); }
     return {
-      attach: attach, setBay: setBay, update: update, oneShot: oneShot, hush: hush,
+      env: function () { return env; }, attach: attach, setBay: setBay, update: update, oneShot: oneShot, hush: hush,
       _log: function () { return log.slice(); },
       _voices: function () { return Object.keys(voices).filter(function (k) { return !voices[k].dying; }).map(Number); },
       _syn: SYN
@@ -239,6 +245,8 @@
    */
   function create(env) {
     var T = env.THREE, scene = env.scene, audio = createAudio();
+    var DOORS = root.XADoors || null;
+    var doorSfx = DOORS ? DOORS.createSfx(function () { return audio.env(); }, function () { return env.listener(); }) : null;
     var CW = 720, CH = 680;                      // curtain canvas, px
     var bays = env.bays.map(function (d, i) { return makeBay(d, i); });
     var rayc = new T.Raycaster(); rayc.far = 4;
@@ -301,13 +309,32 @@
       }
       return null;
     }
-    function buildDoor(bay) {   // a plain slab until the door port (phase 3b)
+    // The real door when doors.js is loaded (the Threshold port), else a plain slab.
+    function buildDoor(bay, style, interaction) {
+      if (DOORS) {
+        var model = new DOORS.DoorModel({ style: style, locked: interaction < 2 }, doorSfx);
+        model.pos = { x: bay.pos.x, y: 1.2, z: bay.pos.z };
+        var mesh = DOORS.buildMesh({ THREE: T, mkCanvas: env.mkCanvas, tex: env.tex, model: model, maxW: bay.width - 0.4, maxH: 2.25 });
+        bay.group.add(mesh.group);
+        return { style: style, model: model, mesh: mesh };
+      }
       var g = new T.Group(), w = Math.min(1.1, bay.width - 0.4);
       var frame = new T.Mesh(new T.BoxGeometry(w + 0.16, 2.26, 0.05), new T.MeshStandardMaterial({ color: 0x1b1b22, metalness: 0.6, roughness: 0.4 }));
       var leaf = new T.Mesh(new T.BoxGeometry(w, 2.1, 0.06), new T.MeshStandardMaterial({ color: 0x3a3f52, metalness: 0.5, roughness: 0.5 }));
       var knob = new T.Mesh(new T.SphereGeometry(0.035, 10, 8), new T.MeshStandardMaterial({ color: 0xc99a45, metalness: 0.9, roughness: 0.3 }));
       frame.position.set(0, 1.13, 0.03); leaf.position.set(0, 1.08, 0.065); knob.position.set(w / 2 - 0.12, 1.05, 0.12);
-      g.add(frame, leaf, knob); bay.group.add(g); return g;
+      g.add(frame, leaf, knob); bay.group.add(g); return { style: style, group: g };
+    }
+    function disposeDoor(bay) {
+      var d = bay.door; if (!d) return; bay.door = null;
+      if (d.model) { try { d.model.sfx.kill(d.model); } catch (e) {} d.mesh.dispose(); } else disposeGroup(d.group);
+    }
+    // interaction 0 none, 1 knock (locked), 2 peek and 3 enter (unlocked, the visitor can open it)
+    function setDoorMode(bay, interaction, quiet) {
+      var m = bay.door && bay.door.model; if (!m) return;
+      var locked = interaction < 2;
+      if (m.cfg.locked && !locked) m.unlock(quiet);
+      else if (!m.cfg.locked && locked) { if (m.isOpen()) m.close(); m.lock(quiet); }
     }
     function disposeGroup(g) { if (!g) return; g.traverse(function (o) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); if (g.parent) g.parent.remove(g); }
 
@@ -331,8 +358,14 @@
       var ok = JSON.stringify(old ? old.overlays : []), nk = JSON.stringify(plan ? plan.overlays : []);
       if (ok !== nk) { bay.overlays.forEach(disposeMesh); bay.overlays = []; (plan ? plan.overlays : []).forEach(function (s) { var m = buildOverlay(bay, s); if (m) bay.overlays.push(m); }); }
       // door slab
-      var wantDoor = !!(plan && plan.base === 'door');
-      if (wantDoor && !bay.door) bay.door = buildDoor(bay); else if (!wantDoor && bay.door) { disposeGroup(bay.door); bay.door = null; }
+      var wantDoor = !!(plan && plan.base === 'door' && plan.door);
+      if (!wantDoor) disposeDoor(bay);
+      else {
+        if (bay.door && bay.door.style !== plan.door.style) disposeDoor(bay);
+        var fresh = !bay.door;
+        if (fresh) bay.door = buildDoor(bay, plan.door.style, plan.interaction);
+        else setDoorMode(bay, plan.interaction, instant);
+      }
       // light
       bay.lightSpec = plan && plan.light ? plan.light : null;
       if (!bay.lightSpec) bay.light.intensity = 0; else bay.light.color.set(TONES[bay.lightSpec.p.tone]);
@@ -358,6 +391,8 @@
       for (var b = 0; b < bays.length; b++) {
         var bay = bays[b], c = bay.curtain;
         if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
+        var dm = bay.door && bay.door.model;
+        if (dm && dm.awake) { dm.update(dt); bay.door.mesh.sync(); if (dm.settled()) { dm.awake = false; bay.door.mesh.sync(); } }
         var ls = bay.lightSpec;
         if (ls) {
           var k = ls.p.intensity * 1.6, m = ls.key;
@@ -387,16 +422,47 @@
       if (!rayc.ray.intersectPlane(pl, pt)) return null;
       m.worldToLocal(pt); return pt.x / bay.width + 0.5;
     }
-    // What is the player looking at? Returns { bay, hint } or null. Used for the HUD line.
+    /* ---- doors as something to touch ---- */
+    function doorUsable(bay) {
+      var p = bay.plan, d = bay.door; if (!p || p.base !== 'door' || !d || !d.model || !bay.group.visible || p.interaction === 0) return false;
+      return !bay.curtain || bay.curtain.sim.getOpenAmount() >= 0.6;      // a closed curtain hides the door
+    }
+    function doorHit(ndc, maxDist) {
+      rayc.far = maxDist || 3.6; rayc.setFromCamera(ndc, env.camera);
+      var best = null;
+      bays.forEach(function (bay) {
+        if (!doorUsable(bay)) return;
+        bay.door.mesh.group.updateMatrixWorld(true);
+        var h = rayc.intersectObjects(bay.door.mesh.pick, false)[0], kind = 'leaf';
+        if (!h && bay.door.model.angle > 50) { h = rayc.intersectObject(bay.door.mesh.way, false)[0]; kind = 'doorway'; }   // looking through the open door
+        if (h && (!best || h.distance < best.h.distance)) best = { bay: bay, h: h, kind: kind };
+      });
+      return best;
+    }
+    function doorHint(bay, kind) {
+      var p = bay.plan, m = bay.door.model;
+      if (p.interaction === 1) return 'KNOCK ON THE DOOR';
+      if (p.interaction === 3 && m.angle > 50 && kind === 'doorway') return 'ENTER';
+      return m.isOpen() ? 'CLOSE THE DOOR' : 'OPEN THE DOOR';
+    }
+    // What is the player looking at? Returns { bay, hint, kind } or null. Used for the HUD line.
     function focus(ndc) {
-      var hit = curtainHit(ndc || new T.Vector2(0, 0), 3.2);
-      if (!hit || !curtainGrabbable(hit.bay.plan)) return null;
-      var open = hit.bay.curtain.sim.getOpenAmount() > 0.5;
-      return { bay: hit.bay.i, hint: open ? 'CLOSE THE CURTAIN' : 'PULL THE CURTAIN', hold: true };
+      var c0 = ndc || new T.Vector2(0, 0), out = null, dist = Infinity;
+      var hit = curtainHit(c0, 3.2);
+      if (hit && curtainGrabbable(hit.bay.plan)) { dist = hit.h.distance; out = { bay: hit.bay.i, hint: hit.bay.curtain.sim.getOpenAmount() > 0.5 ? 'CLOSE THE CURTAIN' : 'PULL THE CURTAIN', kind: 'curtain', hold: true }; }
+      var dh = doorHit(c0, 3.2);
+      if (dh && dh.h.distance < dist) out = { bay: dh.bay.i, hint: doorHint(dh.bay, dh.kind), kind: dh.kind === 'doorway' ? 'doorway' : 'door' };
+      return out;
     }
     function grabStart(ndc) {
       if (grab) return false;
-      var hit = curtainHit(ndc, 3.6);
+      var ch = curtainHit(ndc, 3.6), dh = doorHit(ndc, 3.6);
+      if (dh && (!ch || dh.h.distance < ch.h.distance)) {       // a door: the click is the whole action
+        var bay = dh.bay, m = bay.door.model;
+        if (dh.kind === 'doorway' && bay.plan.interaction === 3) enterDoor(bay); else if (bay.plan.interaction === 1) m.open(); else m.toggle();
+        return true;
+      }
+      var hit = ch;
       if (!hit || !curtainGrabbable(hit.bay.plan)) return false;
       var uv = hit.h.uv; if (!uv) return false;
       if (!hit.bay.curtain.sim.grabUV(uv.x, 1 - uv.y)) return false;
@@ -404,15 +470,21 @@
       audio.oneShot('swish', hit.bay.pos, env.listener(), 0.35, 8);
       return true;
     }
+    function enterDoor(bay) { if (env.onEnter) env.onEnter(bay.plan.link, bay.i); }
     function grabMove(dx, dy) {   // dx, dy in NDC units
       if (!grab) return;
       grab.ndc.x = clamp(grab.ndc.x + dx, -1.5, 1.5); grab.ndc.y = clamp(grab.ndc.y + dy, -1.5, 1.5);
       var u = uAlong(grab.bay, grab.ndc); if (u !== null) grab.bay.curtain.sim.moveGrabUV(u);
     }
     function grabEnd() { if (!grab) return; grab.bay.curtain.sim.release(); grab = null; }
-    function toggleFocused() {   // E on a curtain you may open
+    function toggleFocused() {   // E on what you are looking at
       var f = focus(); if (!f) return false;
-      var bay = bays[f.bay], c = bay.curtain, now = c.sim.getOpenAmount() > 0.5;
+      var bay = bays[f.bay];
+      if (f.kind === 'door' || f.kind === 'doorway') {
+        if (f.hint === 'ENTER') enterDoor(bay); else if (bay.plan.interaction === 1) bay.door.model.knock(); else bay.door.model.toggle();
+        return true;
+      }
+      var c = bay.curtain, now = c.sim.getOpenAmount() > 0.5;
       c.target = now ? 0 : 1; c.sim.setOpenAmount(c.target, true, bay.plan.cover.p.speed);
       audio.oneShot('swish', bay.pos, env.listener(), 0.8, 9);
       return true;
@@ -421,12 +493,13 @@
     return {
       apply: apply, update: update, focus: focus, grabStart: grabStart, grabMove: grabMove, grabEnd: grabEnd, toggleFocused: toggleFocused,
       isGrabbing: function () { return !!grab; },
+      _model: function (i) { var d = bays[i] && bays[i].door; return d && d.model ? d.model : null; },   // tests only
       showPosters: function (i) { var p = bays[i] && bays[i].plan; return !p || p.base === 'posters'; },
       audio: audio,
       // state for tests and the preview
       debug: function () {
         return bays.map(function (b) {
-          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, door: !!b.door,
+          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, door: !!b.door, doorState: b.door && b.door.model ? b.door.model.state() : null,
             curtain: b.curtain ? { openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
             light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity } : null };
         });
@@ -434,7 +507,7 @@
     };
   }
 
-  var API = { planBay: planBay, planKey: planKey, curtainGrabbable: curtainGrabbable, BUILTIN: BUILTIN, TONES: TONES, create: create, createAudio: createAudio, _num: num };
+  var API = { DOOR_STYLES: DOOR_STYLES, planBay: planBay, planKey: planKey, curtainGrabbable: curtainGrabbable, BUILTIN: BUILTIN, TONES: TONES, create: create, createAudio: createAudio, _num: num };
   root.XABays = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);

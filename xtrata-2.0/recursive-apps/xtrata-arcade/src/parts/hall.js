@@ -102,7 +102,7 @@ const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets 
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
 const machines = [], pickables = [], boxes = [];
-let bayEngine = null, bayHint = null;   // the bay engine (only when the world reader is on); what the player is looking at in a bay
+let bayEngine = null, bayHint = null, bayHold = true, bayToast = null;   // the bay engine (only when the world reader is on); what the player is looking at in a bay
 
 /* ================================================================
    ROOM
@@ -171,6 +171,7 @@ function buildRoom(){
   buildLogoSign();
   buildPosters();
   try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
+  if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
   if(window.XA_TEST) XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 };   // tests only: nothing sets XA_TEST in the shipped page
   XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests
@@ -1364,7 +1365,7 @@ function buildPosters(){
   try{
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
-      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, listener:()=>player});
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, listener:()=>player, onEnter:bayEnter});
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
 }
@@ -2127,7 +2128,7 @@ addEventListener('keydown', e=>{
   const onBtn = e.target && e.target.tagName==='BUTTON';
   if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx>=0){ e.preventDefault(); startGame(focusIdx) }
   else if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx<0 && posterFocus){ e.preventDefault(); openChain(posterFocus.spec.play) }
-  else if(e.code==='KeyE' && focusIdx<0 && !posterFocus && bayEngine && bayHint){ e.preventDefault(); bayEngine.toggleFocused() }
+  else if(e.code==='KeyE' && focusIdx<0 && !posterFocus && bayEngine && bayHint && !(bayToast && performance.now()<bayToast.until)){ e.preventDefault(); bayEngine.toggleFocused() }
   else if(e.code==='KeyQ' && focusIdx>=0 && GAMES[focusIdx].variants[0]){ startGame(focusIdx, GAMES[focusIdx].variants[0].key) }
   else if(e.code==='KeyT'){ openScores() }
   else if(e.code==='KeyM'){ toggleMute() }
@@ -2342,11 +2343,17 @@ function findFocus(){
 /* What the player is looking at in a bay (a curtain they may pull). Cabinets and playable posters come first. */
 function updateBayFocus(){
   if(bayEngine.isGrabbing()) return;
-  let h=null;
-  if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ const f=bayEngine.focus(); h=f?f.hint:null }
-  if(h!==bayHint){ bayHint=h; paintBayHint() }
+  let h=null, hold=true;
+  if(bayToast && performance.now()<bayToast.until){ h=bayToast.text; hold=false }
+  else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }
+  if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
 }
-function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint) $('bptext').textContent=bayHint }
+// A door that leads somewhere: the link comes from the world contract. Rooms are not built yet, so say so.
+function bayEnter(link){
+  const room=link&&(link['target-room']||link.targetRoom||link.room); const name=room?String(room).replace(/[^A-Za-z0-9 _-]/g,' ').trim().toUpperCase():'';
+  bayToast={text:name?('THIS DOOR LEADS TO '+name+' · NOT OPEN YET'):'THIS DOOR IS NOT OPEN YET', until:performance.now()+3500};
+}
+function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint){ $('bptext').textContent=bayHint; const a=$('bpalt'); if(a) a.hidden=!bayHold } }
 
 let last=performance.now(), time=0;
 function frame(now){
