@@ -42,3 +42,20 @@ Run on the public Stacks testnet from disposable wallets only (admin wallet and 
 - Watch scene #1 (starts at burn block 29228) go live on its own.
 - View the testnet contracts inside the real hall (`view.mjs` page); the workspace browser cannot reach testnet.
 - Real-GPU frame rate, sounds, touch, and the admin wallet extension signing flow (all unchanged from before).
+
+## Four-bay room on testnet (2026-10-19)
+
+The first testnet room (`arcade-hall`) was registered with 2 bays, and a room's bay count cannot change, so a second room, `arcade-hall-4`, was registered with 4 bays to test the real hall layout. Same disposable admin wallet, same contracts.
+
+| Step | Result |
+| --- | --- |
+| `register-room arcade-hall-4` (4 bays) | `(ok true)`, tx `cc7ba26e839fd12d2447753e35e84fa5a4fbe968c69656e3645aaca6914a1e22`, burn block 29232 |
+| `add-scenes` with 4 scenes (one per bay) | `(ok u4)`, tx `38b20d6f4d7c2d0fefa0909be31337085d12f30fc617683b55c218016c851b6e`, burn block 29232 |
+| Right after confirming | `get-bays` showed nothing active, first start at 29234 |
+| At burn block 29240 | All four bays active with seq 0, no signing after the scheduling call |
+
+What each bay showed once live (read back from the contract): bay 0 far left a closed curtain with a "coming soon" sign (peek, from 29234); bay 1 far right an arch door, knock, "staff only" (29234); bay 2 near left a gothic door, enter, "lobby", linked to the lobby room (29237); bay 3 near right a wall, no interaction, "new room" sign with a pulsing light (29240).
+
+Also confirmed: scene seq 1 on `arcade-hall` bay 0 (knock door, scheduled for 29228) went live by itself and was the active scene at 29240.
+
+Not covered: seeing these in the real hall page (the hall cannot be pointed at testnet from the build sandbox).
