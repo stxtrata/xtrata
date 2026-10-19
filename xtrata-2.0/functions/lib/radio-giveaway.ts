@@ -29,7 +29,7 @@ export const DEFAULT_GAP_MAX_S = 600;
 export const MAX_GAP_S = 24 * 60 * 60;
 
 type Link = { pos: number; code: string; code_hash: string; added_at: number; shown_at: number | null; ended_at: number | null; outcome: string | null };
-type State = { current: number | null; next_at: number; paused: number; gap_min: number; gap_max: number };
+type State = { current: number | null; next_at: number; paused: number; gap_min: number; gap_max: number; held: number };
 type GiftRow = { status: string; expires_at: number; claimed_at: number | null; claimed_by: string | null; player_id: string | null };
 
 const q = async <T,>(env: GiveawayEnv, sql: string, binds: unknown[] = []) => ((await env.DB.prepare(sql).bind(...binds).all()).results ?? []) as T[];
@@ -46,10 +46,13 @@ export async function ensureGiveawayTables(env: GiveawayEnv) {
   await exec(env, `CREATE TABLE IF NOT EXISTS radio_giveaway_state(
     id INTEGER PRIMARY KEY CHECK (id = 1), current INTEGER, next_at INTEGER NOT NULL DEFAULT 0, paused INTEGER NOT NULL DEFAULT 0,
     gap_min INTEGER NOT NULL DEFAULT ${DEFAULT_GAP_MIN_S}, gap_max INTEGER NOT NULL DEFAULT ${DEFAULT_GAP_MAX_S}, updated_at INTEGER NOT NULL DEFAULT 0)`);
+  // Added later: copies of the edition that are not in this list (given out another way). They count in the edition's size
+  // and numbering, so the page says "Copy No. 6 of 100" when 5 are held and 95 are in the list.
+  await exec(env, 'ALTER TABLE radio_giveaway_state ADD COLUMN held INTEGER NOT NULL DEFAULT 0').catch(() => undefined);
   await exec(env, 'INSERT OR IGNORE INTO radio_giveaway_state(id) VALUES(1)');
 }
 
-const readState = async (env: GiveawayEnv) => (await first<State>(env, 'SELECT current, next_at, paused, gap_min, gap_max FROM radio_giveaway_state WHERE id=1'))!;
+const readState = async (env: GiveawayEnv) => (await first<State>(env, 'SELECT current, next_at, paused, gap_min, gap_max, held FROM radio_giveaway_state WHERE id=1'))!;
 const giftOf = (env: GiveawayEnv, hash: string) =>
   first<GiftRow>(env, 'SELECT status, expires_at, claimed_at, claimed_by, player_id FROM radio_gifts WHERE code_hash=?', [hash]);
 
@@ -127,11 +130,18 @@ export type GiveawayView = {
   nextAt?: number;
   /** The server's clock, so the page can count down correctly whatever its own clock says. */
   now: number;
+  /** Copies of the edition outside this list (set aside); they come first in the numbering. Omitted when none. */
+  held?: number;
 };
 
 /** The public answer: counts, and the one link on show. Never the list, never an upcoming code, never a time. */
 export async function giveawayView(env: GiveawayEnv, now: number, rand: () => number = Math.random): Promise<GiveawayView> {
   const { s, link, gift } = await advance(env, now, rand);
+  const v = await viewOf(env, now, s, link, gift);
+  return s.held > 0 ? { ...v, held: s.held } : v;
+}
+
+async function viewOf(env: GiveawayEnv, now: number, s: State, link: Link | null, gift: GiftRow | null): Promise<GiveawayView> {
   const counts = await first<{ claimed: number; left: number }>(env,
     "SELECT SUM(CASE WHEN outcome='claimed' THEN 1 ELSE 0 END) AS claimed, SUM(CASE WHEN ended_at IS NULL THEN 1 ELSE 0 END) AS left FROM radio_giveaway_links");
   let claimed = Number(counts?.claimed ?? 0), left = Number(counts?.left ?? 0);
@@ -182,7 +192,7 @@ export function giveawayAuthorised(env: GiveawayEnv, header: string | null): boo
  * Operator actions. `add` takes `text`, any blob with links or codes in it; only codes that are real, live gifts are
  * kept (a typo cannot sit in the list unnoticed) and the report says what was left out. No action ever returns a code.
  */
-export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; text?: unknown; minSeconds?: unknown; maxSeconds?: unknown }, now: number) {
+export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; text?: unknown; minSeconds?: unknown; maxSeconds?: unknown; count?: unknown }, now: number) {
   await ensureGiveawayTables(env);
   const act = String(body.action ?? 'status');
   if (act === 'add') {
@@ -213,6 +223,10 @@ export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; t
     if (s.current && await exec(env, 'UPDATE radio_giveaway_state SET current=NULL, next_at=?, updated_at=? WHERE id=1 AND current=?', [now + gapMs(s, Math.random), now, s.current])) {
       await exec(env, "UPDATE radio_giveaway_links SET ended_at=?, outcome='skipped' WHERE pos=?", [now, s.current]);
     }
+  } else if (act === 'held') {
+    const n = Number(body.count);
+    if (!Number.isInteger(n) || n < 0 || n > 10_000) throw new GiftError('count must be a whole number from 0 to 10000.');
+    await exec(env, 'UPDATE radio_giveaway_state SET held=?, updated_at=? WHERE id=1', [n, now]);
   } else if (act === 'now') {
     await exec(env, 'UPDATE radio_giveaway_state SET next_at=0, updated_at=? WHERE id=1', [now]); // show the next link without waiting out the pause
   } else if (act !== 'status') throw new GiftError('Unknown action.');
@@ -226,7 +240,7 @@ async function adminStatus(env: GiveawayEnv, now: number) {
             SUM(shown_at IS NULL AND ended_at IS NULL) AS unseen FROM radio_giveaway_links`);
   return {
     total: Number(c?.total ?? 0), claimed: Number(c?.claimed ?? 0), lost: Number(c?.lost ?? 0), skipped: Number(c?.skipped ?? 0), unseen: Number(c?.unseen ?? 0),
-    onShow: link && !link.ended_at ? link.pos : null, paused: !!s.paused, gap: { minSeconds: s.gap_min, maxSeconds: s.gap_max },
+    onShow: link && !link.ended_at ? link.pos : null, held: s.held, paused: !!s.paused, gap: { minSeconds: s.gap_min, maxSeconds: s.gap_max },
     nextInSeconds: s.current ? null : Math.max(0, Math.ceil((s.next_at - now) / 1000))
   };
 }
