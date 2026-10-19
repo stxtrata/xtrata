@@ -1,0 +1,86 @@
+{
+  "updated": "2026-10-19T15:42:07.604Z",
+  "scenarios": {
+    "first-claim": {
+      "taps": 3,
+      "prompts": 2,
+      "passkeys": 1,
+      "panels": 2,
+      "jargon": 3,
+      "score": 8,
+      "playable": true
+    },
+    "first-claim-albumpage": {
+      "taps": 3,
+      "prompts": 2,
+      "passkeys": 1,
+      "panels": 2,
+      "jargon": 2,
+      "score": 7,
+      "playable": true
+    },
+    "reload-after-create": {
+      "taps": 5,
+      "prompts": 3,
+      "passkeys": 2,
+      "panels": 2,
+      "jargon": 3,
+      "score": 21,
+      "playable": true
+    },
+    "close-panel-after-create": {
+      "taps": 5,
+      "prompts": 3,
+      "passkeys": 2,
+      "panels": 2,
+      "jargon": 3,
+      "score": 21,
+      "playable": true
+    },
+    "prompt-fails-then-works": {
+      "taps": 4,
+      "prompts": 2,
+      "passkeys": 1,
+      "panels": 2,
+      "jargon": 3,
+      "score": 9,
+      "playable": true
+    },
+    "second-album-same-device": {
+      "taps": 4,
+      "prompts": 3,
+      "passkeys": 1,
+      "panels": 3,
+      "jargon": 3,
+      "score": 10,
+      "playable": true
+    },
+    "storage-lost-then-second-album": {
+      "taps": 6,
+      "prompts": 4,
+      "passkeys": 2,
+      "panels": 2,
+      "jargon": 3,
+      "score": 23,
+      "playable": true
+    },
+    "iphone-first-claim": {
+      "taps": 6,
+      "prompts": 3,
+      "passkeys": 1,
+      "panels": 3,
+      "jargon": 3,
+      "score": 12,
+      "playable": true
+    },
+    "iphone-reload-while-in-new-tab": {
+      "taps": 10,
+      "prompts": 4,
+      "passkeys": 2,
+      "panels": 3,
+      "jargon": 3,
+      "score": 27,
+      "playable": true
+    }
+  }
+}

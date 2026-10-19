@@ -54,6 +54,7 @@
     "test:radio-wallet": "vitest run src/radio-test-wallet/__tests__/wallet.test.ts",
     "test:radio-wallet:browser": "node scripts/test-radio-wallet-browser.mjs",
     "test:radio-plays": "node scripts/test-radio-plays.mjs",
+    "claim-harness": "node scripts/claim-harness/run.mjs",
     "test:clarinet": "npm --prefix contracts/clarinet test",
     "test:report": "npm --prefix contracts/clarinet run test:report",
     "test:watch": "vitest",
