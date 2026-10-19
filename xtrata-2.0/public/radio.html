@@ -322,6 +322,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp .ppp-lowtitle{font-weight:700;letter-spacing:.6px;margin:0 0 6px}
   .ppp-pick input{font-family:var(--mono);font-size:12px;width:min(100%,26em);padding:6px 8px;box-sizing:border-box}
   .ppp p{margin:6px 0;font-size:13px;line-height:1.45;color:var(--ink)}
+  .ppp .ppp-how{margin:6px 0 0}.ppp .ppp-how summary{cursor:pointer;font-size:12.5px;color:var(--cyan)}.ppp .ppp-how p{margin:6px 0 0;font-size:12.5px}
   .ppp .ppp-ok{color:var(--ok)}.ppp .ppp-warn{color:#ffcf8a}.ppp .ppp-bad{color:#ff8a8a}.ppp .ppp-mute{color:var(--mut)}
   .ppp-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
   .ppp button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
@@ -1013,7 +1014,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=cd24f37c7746')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=5868d6beaaa2')}).catch(function(){});
 </script>
 </body>
 </html>

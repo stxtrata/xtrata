@@ -253,7 +253,16 @@ export function createGifts(deps: GiftDeps) {
     const unlocked = !!s.root && ['fund', 'ready', 'over', 'link'].includes(s.step);
     if (!unlocked) {
       if (bare) return out; // the album view says it with its own button
-      out.push(el('p', s.step === 'intro' ? 'Tap below: your passkey makes a listening wallet, and the album arrives in its own wallet. You can keep as many albums as you like.' : s.step === 'locked' ? 'Unlock your listening wallet and the album arrives in its own wallet.' : 'Open your listening wallet and the album arrives in its own wallet.', 'ppp-mute'));
+      out.push(el('p', s.step === 'intro' ? 'Tap below and use your face or fingerprint. Your album arrives in a few seconds.' : s.step === 'locked' ? 'Unlock your player and the album arrives.' : 'Open your player and the album arrives.', 'ppp-mute'));
+      // The detail is there for anyone who wants it, folded away for everyone else.
+      if (s.step === 'intro') {
+        const how = document.createElement('details');
+        how.className = 'ppp-how';
+        const sum = document.createElement('summary');
+        sum.textContent = 'How does this work?';
+        how.append(sum, el('p', 'Your device makes a passkey: a private key that never leaves it, and that works as your wallet on Stacks. Each album goes into its own numbered wallet under that passkey, so you can keep as many albums as you like.', 'ppp-mute'));
+        out.push(how);
+      }
       return out;
     }
     if (s.walletCannotAlbums) { out.push(el('p', 'The listening wallet box is still updating. The album arrives as soon as it has: reload in a few minutes.', 'ppp-warn')); return out; }
@@ -318,7 +327,7 @@ export function createGifts(deps: GiftDeps) {
       if (siteKey && !turnstile.token) { out.push(el('p', 'One quick check and it is yours:', 'ppp-mute'), turnstileBox(siteKey)); }
       else if (!incoming.claiming && !incoming.error && !incoming.waiting && !incoming.retry) later(() => claim(s));
       out.push(...claimLines(s, 'Sending your gift…'));
-    } else if (s.step === 'intro') out.push(el('p', 'Tap below: your passkey makes a listening wallet, and the gift lands in it.', 'ppp-mute'));
+    } else if (s.step === 'intro') out.push(el('p', 'Tap below and use your face or fingerprint. Your gift arrives in a few seconds.', 'ppp-mute'));
     else if (s.listening && s.linked) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one is linked to a Stacks wallet. The link still works for someone new.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet'));
     else if (s.listening && (s.balance ?? 0n) > 0n) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one already has funds. Share the link with someone new instead.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet'));
     return out;

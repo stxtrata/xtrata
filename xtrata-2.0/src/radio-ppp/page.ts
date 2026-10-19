@@ -359,9 +359,9 @@ function start(root: HTMLElement) {
       case 'off': case 'not-invited': case 'unsupported': top.hidden = true; return;
       case 'elsewhere': return set('Xtrata Music', 'quiet', 'Open Xtrata Music');
       case 'connect': top.hidden = true; return; // "Connect wallet" sits right beside it
-      case 'intro': return set('Start listening', '', 'Make your player with a passkey: no app or account needed');
+      case 'intro': return set('Start listening', '', 'Make your player with your face or fingerprint: no app or account needed');
       case 'wrong-wallet': return set(`Connect ${who(s.linked)}`, 'warn', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`);
-      case 'locked': return set('Unlock', '', 'One tap with your passkey');
+      case 'locked': return set('Unlock', '', 'One tap with your face or fingerprint');
       case 'link': return set('Finish setup', 'warn', 'Link the listening wallet to your main wallet');
       case 'fund': return s.depositPending ? set('Plays on their way', 'quiet', 'Plays start by themselves when they land')
         : set(s.entries.some((e) => e.kind === 'play') ? 'No plays left · add plays' : 'Add plays', 'warn', 'Add plays to keep listening');
