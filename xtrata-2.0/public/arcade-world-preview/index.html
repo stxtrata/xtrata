@@ -32943,6 +32943,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     // the door's own pieces (doors.js) draw at render order 0 to 2, the curtain after them.
     var RO_CURTAIN = 5;
     var Z_TAPE = 0.085, Z_RAIL = 0.2, Z_CURTAIN = 0.21, Z_SIGN = 0.25;
+    var DOOR_SILL = 0.09;                         // the hall's skirting strip is a 3 cm bar centred at 7 cm: its top is at 8.5 cm
     var CURTAIN_MARGIN_M = 0.8;                   // how far past each rail end the cloth can be pulled and still be seen
     var CW = 720;                                // curtain canvas width, px (its height follows the bay)
     var bays = env.bays.map(function (d, i) { return makeBay(d, i); });
@@ -33018,8 +33019,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     function buildDoor(bay, style, interaction) {
       if (DOORS) {
         var model = new DOORS.DoorModel({ style: style, locked: interaction < 2 }, doorSfx);
-        model.pos = { x: bay.pos.x, y: 1.2, z: bay.pos.z };
-        var mesh = DOORS.buildMesh({ THREE: T, mkCanvas: env.mkCanvas, tex: env.tex, model: model, maxW: bay.width - 0.4, maxH: 2.25 });
+        model.pos = { x: bay.pos.x, y: 1.2 + DOOR_SILL, z: bay.pos.z };
+        var mesh = DOORS.buildMesh({ THREE: T, mkCanvas: env.mkCanvas, tex: env.tex, model: model, maxW: bay.width - 0.4, maxH: 2.2 });
+        mesh.group.position.y = DOOR_SILL;                       // the door stands on the top of the orange skirting strip, not in front of it
         bay.group.add(mesh.group);
         return { style: style, model: model, mesh: mesh };
       }
