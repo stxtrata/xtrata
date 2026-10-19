@@ -487,7 +487,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
     <section class="hero">
       <div class="hero-copy">
         <p class="kicker">Free album drop &middot; limited edition</p>
-        <h1>A free album. Only <em><span id="total">95</span> copies</em> exist.</h1>
+        <h1>A free album. Only <em><span id="total">100</span> copies</em> exist.</h1>
         <p class="lead">It isn&rsquo;t on Spotify and it isn&rsquo;t in the shops. <strong>This is the only place to get it.</strong> A new copy goes live here every ten minutes: tap it first and it&rsquo;s yours to keep.</p>
         <ol class="pills" aria-label="How it works">
           <li><b>1</b>Tap the live copy</li>
@@ -564,7 +564,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
       <p class="sec-kicker">Why be quick</p>
       <h2 class="big">Why it&rsquo;s worth being quick</h2>
       <ul class="cards">
-        <li class="card"><strong>Not on Spotify. Not in the shops.</strong><span>This is a limited edition. There are only <span class="total-inline" style="display:inline">95</span> copies, and they&rsquo;re being given away here, one at a time.</span></li>
+        <li class="card"><strong>Not on Spotify. Not in the shops.</strong><span>This is a limited edition. There are only <span class="total-inline" style="display:inline">100</span> copies, and they&rsquo;re being given away here, one at a time.</span></li>
         <li class="card"><strong>A music player that pays as you listen.</strong><span>Every song you hear for 30 seconds sends a small payment straight to whoever owns it. You start with plays included, so the first ones are on us.</span></li>
         <li class="card"><strong>Nothing to buy, nothing to install.</strong><span>Your fingerprint or face is the only key. It takes about a minute.</span></li>
       </ul>
@@ -669,7 +669,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
   function run(state,claimed,left,held){
     held=held>0?held:0;
     var total=held+claimed+left;
-    document.querySelectorAll('#total,.total-inline').forEach(function(e){e.textContent=total>0?total:95;});
+    document.querySelectorAll('#total,.total-inline').forEach(function(e){e.textContent=total>0?total:100;});
     if(total<1){$('run').hidden=true;return;}
     $('run').hidden=false;
     var box=$('discs');
