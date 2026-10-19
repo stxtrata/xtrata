@@ -1,7 +1,7 @@
 /*
  * Xtrata Arcade: the bay engine (hall pack part)
  *
- * A bay is a reserved wall area built into the hall (the two far-end spans). The world contract decides what is in
+ * A bay is a reserved wall area built into the hall (the four spans at the ends of the rows). The world contract decides what is in
  * it; this file turns that decision into something the hall can show and play. Three parts:
  *
  *   1. PLAN    pure functions (no THREE, no DOM). planBay() takes one bay as the reader read it plus the looks table

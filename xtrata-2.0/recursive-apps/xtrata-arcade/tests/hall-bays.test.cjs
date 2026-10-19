@@ -82,7 +82,7 @@ const story = (state, interaction) => bay(scene('door', [
   {
     const { ctx, page, errors } = await open({ config: true });
     const s = await bays(page);
-    check(s && s.bays.length === 2 && s.bays.every((b) => !b.visible && b.plan === null && !b.curtain && !b.door && b.overlays === 0 && !b.light), 'A2: world on, chain down: both bays empty and hidden, posters as in #3111');
+    check(s && s.bays.length === 4 && s.bays.every((b) => !b.visible && b.plan === null && !b.curtain && !b.door && b.overlays === 0 && !b.light), 'A2: world on, chain down: all four bays empty and hidden, posters as in #3111');
     check((await page.evaluate(() => window.XA.wallState())).every((x) => x.shown), 'A2: all 27 posters shown');
     check(!errors.length, 'A2: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
@@ -138,7 +138,7 @@ const story = (state, interaction) => bay(scene('door', [
     const gone = (await bays(page)).bays[0];
     check(gone.plan === null || (gone.plan.base === 'posters' && !gone.plan.cover && !gone.plan.overlays.length), 'D: back to posters: no cover, no sign');
     check(!gone.curtain && !gone.door && gone.overlays === 0 && !gone.light, 'D: back to posters: every piece is removed');
-    check((await page.evaluate(() => window.XA.wallState())).every((x) => x.shown), 'D: back to posters: all four bay posters are back');
+    check((await page.evaluate(() => window.XA.wallState())).every((x) => x.shown), 'D: back to posters: all the bay posters are back');
     check(!errors.length, 'D: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
@@ -214,6 +214,33 @@ const story = (state, interaction) => bay(scene('door', [
     check(Math.abs(planeW - (info.w + 2 * after.mg * info.w / 720)) < 0.01, 'H: the picture is wider than the bay by the margin on both sides (' + planeW.toFixed(2) + ' m)');
     await shot(page, 'bays-H-pulled-out');
     check(!errors.length, 'H: no page errors ' + errors.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+
+  /* ---- I: four bays (far left/right = 0/1, near left/right at the entrance end = 2/3) ---- */
+  {
+    const nearDoor = bay(scene('door', [layer(2, 2, '{"text":"staff only","sub":"knock","tone":"orange"}')], 1));
+    const nearWall = bay(scene('wall', [layer(2, 2, '{"text":"under construction","sub":"","tone":"gold"}')], 0));
+    const { ctx, page, errors } = await open({ config: true, snap: snapshot([bay(null), bay(null), nearDoor, nearWall]) });
+    const s = await bays(page);
+    check(s.bays.length === 4, 'I: the hall has four bays');
+    const p = s.bays.map((b) => b.pos);
+    check(p[0].x < 0 && p[1].x > 0 && p[2].x < 0 && p[3].x > 0, 'I: bays 0 and 2 are on the left wall, 1 and 3 on the right');
+    check(p[0].z < 0 && p[1].z < 0 && p[2].z > 0 && p[3].z > 0, 'I: bays 0 and 1 are at the far end, 2 and 3 at the entrance end');
+    check(!s.bays[0].visible && !s.bays[1].visible, 'I: far bays on posters build nothing');
+    check(s.bays[2].visible && s.bays[2].door === true && s.bays[2].overlays === 1, 'I: bay 2 (near left) has a door slab and its sign');
+    check(s.bays[3].visible && !s.bays[3].door && s.bays[3].overlays === 1, 'I: bay 3 (near right) is plain wall with its sign');
+    const ws = await page.evaluate(() => window.XA.wallState());
+    check(!ws[0].shown && !ws[1].shown && !ws[14].shown && !ws[15].shown, 'I: the four entrance-end posters are covered by the two near bays');
+    check(ws[12].shown && ws[13].shown && ws[25].shown && ws[26].shown, 'I: the far bay posters stay');
+    check(ws.filter((x, i) => ![0, 1, 14, 15].includes(i)).every((x) => x.shown), 'I: every other poster stays');
+    await walkIn(page);
+    await page.evaluate(() => { const q = window.XA.bayState().bays[2].pos; window.XA.pose(q.x + 3.2, q.z, Math.PI / 2, -0.05); });
+    await page.waitForTimeout(1200);
+    await shot(page, 'bays-I-near-left');
+    const model = await page.evaluate(() => window.XA.bayDoor(2, (m) => ({ state: m.state(), has: true })));
+    check(model && model.has, 'I: the near-left door model exists and answers');
+    check(!errors.length, 'I: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
 

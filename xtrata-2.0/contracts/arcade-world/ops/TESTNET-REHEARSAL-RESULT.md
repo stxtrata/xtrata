@@ -17,7 +17,7 @@ Run on the public Stacks testnet from disposable wallets only (admin wallet and 
 | Deploy the three contracts (Clarity 4, one address, in order) | All `(ok true)`, same burn block |
 | Fund publisher with 20 test STX | ok |
 | Register 22 built-in looks | Ids u0..u21, identical to the hall's `defaultLookBook` |
-| Register rooms `arcade-hall` (2 bays) and `lobby` (2 bays) | ok |
+| Register rooms `arcade-hall` (2 bays) and `lobby` (2 bays) | ok. Note: the hall now has four bays, and a room's bay count cannot be changed after registration, so this testnet `arcade-hall` has only bays 0 and 1. Mainnet will register it with 4. |
 | `set-publisher` on both contracts | ok |
 | `add-scenes` with 4 scenes (curtain/sign/sounds/light, knock door, enter door linked to lobby, posters bay) | `(ok u4)`; timeline, `get-bay` and `get-scene` read back as submitted |
 | 3 admin posters (core) + 7 publisher posters (community) | `(ok u3)`, `(ok u7)`; all 10 in `get-live` |

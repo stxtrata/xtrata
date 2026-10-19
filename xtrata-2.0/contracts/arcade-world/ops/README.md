@@ -70,3 +70,7 @@ Posters always start after today (a Bitcoin day is 144 blocks). Publishers add c
 ## Sending through a browser (when this machine cannot reach the node)
 
 `relay.mjs` signs one phase OFFLINE (deploy, setup, scenes, posters, call, revert, fund) with explicit nonces and packs the signed transactions into a small gzip+base64 text. A browser that can reach the node then POSTs each signed transaction to `/v2/transactions` and waits for it to confirm. The browser only ever sees signed bytes, never a key. It is testnet only and passes through the same guard as the other sending tools (`--execute`, `XA_OPS_CONFIRM=broadcast-testnet`, a key file that is not the admin wallet, no KILL file). `relay-merge.mjs` joins several packs in order. Tested by `tests/ops-relay.test.mjs`.
+
+## The four bays
+
+The arcade hall has four contract-controlled wall areas, numbered in the contract's order: **0** far left, **1** far right, **2** near left and **3** near right (the entrance end). Each is a pair of posters by default and can instead be a door, a curtain, a sign board, a lamp or sounds. The hall room is registered with `bays: 4` (`ROOMS` in `lib/catalogue.mjs`); the lobby has 2. A room's bay count is fixed when it is registered (the contract allows up to 8). `examples/four-doorways.scene.json` uses all four. The four pinned poster spots (pins 1 to 4) now sit on the free poster slots nearest the entrance, beside the near bays.

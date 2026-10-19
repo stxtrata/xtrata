@@ -16,7 +16,7 @@ export function resolveScenes(scenes, bay, height) {
 }
 
 // bayCount bays. looks: the look book. Returns a snapshot in the hall's shape. Posters are optional (empty = the hall's own wall).
-export function snapshotAt({ scenes, looks, height, bayCount = 2, posters = [], versions = { posters: 1, world: 1 } }) {
+export function snapshotAt({ scenes, looks, height, bayCount = 4, posters = [], versions = { posters: 1, world: 1 } }) {
   const lookTable = {};
   for (const l of looks) lookTable[l.id] = { kind: l.kind, name: l.name, tier: l.tier, builtin: l.builtin, hidden: !!l.hidden, approved: !!l.approved };
   const bays = [];

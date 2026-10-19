@@ -18,7 +18,7 @@ import { parseArgs, die } from './lib/cli.mjs';
 import { authoriseBroadcast, Refused } from './lib/guard.mjs';
 import { signDeploy, signCall, signTransfer, pack } from './lib/relay.mjs';
 import { deploySources } from './lib/deploy.mjs';
-import { lookRegistry, defaultLookBook } from './lib/catalogue.mjs';
+import { lookRegistry, defaultLookBook, ROOMS } from './lib/catalogue.mjs';
 import { parseSceneFile, compileScenes } from './lib/scene.mjs';
 import { planSceneCalls } from './lib/submit.mjs';
 import { compilePosters, posterBatches, todayOf } from './lib/posters.mjs';
@@ -41,12 +41,12 @@ if (phase === 'deploy') {
   for (const s of deploySources()) items.push(await signDeploy({ name: s.name, source: s.source, key, nonce: nonce++, fee: deployFee }));
 } else if (phase === 'setup') {
   for (const l of lookRegistry()) await call('world', 'register-look', [Cl.uint(l.kind), Cl.stringAscii(l.name), Cl.uint(0), Cl.stringAscii(l.key), Cl.uint(0), Cl.buffer(new Uint8Array(0)), Cl.uint(0)], `register-look ${l.key}`);
-  for (const r of [{ id: 'arcade-hall', title: 'Xtrata Arcade' }, { id: 'lobby', title: 'Lobby' }]) await call('world', 'register-room', [Cl.stringAscii(r.id), Cl.stringAscii(r.title), Cl.principal(me), Cl.uint(2)], `register-room ${r.id}`);
+  for (const r of ROOMS) await call('world', 'register-room', [Cl.stringAscii(r.id), Cl.stringAscii(r.title), Cl.principal(me), Cl.uint(r.bays)], `register-room ${r.id} (${r.bays} bays)`);
   if (args.publisher) for (const w of ['world', 'posters']) await call(w, 'set-publisher', [Cl.principal(args.publisher), Cl.bool(true)], `${w} set-publisher`);
 } else if (phase === 'scenes') {
   if (!args.file || args.height == null) die('--file and --height are needed');
   const doc = parseSceneFile(readFileSync(args.file, 'utf8'));
-  const { findings, scenes } = compileScenes(doc, { looks: defaultLookBook(), rooms: { 'arcade-hall': { bays: 2 }, lobby: { bays: 2 } }, height: Number(args.height), timelineUsed: {} });
+  const { findings, scenes } = compileScenes(doc, { looks: defaultLookBook(), rooms: Object.fromEntries(ROOMS.map((r) => [r.id, { bays: r.bays }])), height: Number(args.height), timelineUsed: {} });
   findings.print(); if (!findings.ok) die('fix the errors first');
   for (const c of planSceneCalls(scenes)) await call('world', c.fn, c.args, `${c.fn} (${c.scenes.length})`);
 } else if (phase === 'posters') {
