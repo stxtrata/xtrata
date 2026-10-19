@@ -22,6 +22,7 @@ const LOOKS = {
   1: { kind: 1, name: 'House curtain', tier: 0, builtin: 'curtain-house', hidden: false, approved: true },
   2: { kind: 2, name: 'Sign', tier: 0, builtin: 'sign-board', hidden: false, approved: true },
   20: { kind: 0, name: 'Arch door', tier: 0, builtin: 'door-arch', hidden: false, approved: true },
+  5: { kind: 2, name: 'Tape', tier: 0, builtin: 'caution-tape', hidden: false, approved: true },
   21: { kind: 0, name: 'Gothic door', tier: 0, builtin: 'door-gothic', hidden: false, approved: true },
 };
 const layer = (slot, look, params, state) => ({ slot, look, params: params || '{}', state: state || '' });
@@ -69,6 +70,17 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
     const b0 = (await bays(page)).bays[0];
     check(b0.visible && b0.door === true && b0.doorState && b0.doorState.style === 'arch', 'H: bay 0 holds a real door in the arch style from its door look');
     check(b0.doorState.locked === true && b0.doorState.angle === 0, 'H: it is locked and closed');
+    await push(page, snapshot([bay(door(1, 20, [layer(1, 1, '{"color":"#7a1020"}', 'closed'), layer(2, 2, '{"text":"x"}'), layer(2, 5, '{"y":1.2}')])), bay(null)]));
+    await page.waitForTimeout(400);
+    const z = (await bays(page)).bays[0].layers;
+    check(z.door > 0 && z.door < z.tape && z.tape < z.rail && z.rail < z.curtain && z.curtain < z.sign,
+      'H: layers run wall, door (' + z.door.toFixed(3) + '), tape (' + z.tape + '), curtain rail (' + z.rail + '), curtain (' + z.curtain + '), sign (' + z.sign + ')');
+    check(z.doorOrder < z.curtainOrder, 'H: the door pieces draw before the curtain (see-through faces cannot show over the cloth): ' + z.doorOrder + ' < ' + z.curtainOrder);
+    await face(page, 2.4); await page.waitForTimeout(2500); await shot(page, 'doors-layers-closed');
+    await push(page, snapshot([bay(door(1, 20, [layer(1, 1, '{"color":"#7a1020"}', 'half'), layer(2, 5, '{"y":1.2}')])), bay(null)]));
+    await page.waitForTimeout(12000); await shot(page, 'doors-layers-half');
+    await push(page, snapshot([bay(door(1, 20)), bay(null)]));
+    await page.waitForTimeout(300);
     await face(page);
     await waitHint(page, /KNOCK ON THE DOOR/);
     check(true, 'H: looking at it shows KNOCK ON THE DOOR');
