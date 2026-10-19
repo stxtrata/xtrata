@@ -247,7 +247,13 @@
     var T = env.THREE, scene = env.scene, audio = createAudio();
     var DOORS = root.XADoors || null;
     var doorSfx = DOORS ? DOORS.createSfx(function () { return audio.env(); }, function () { return env.listener(); }) : null;
-    var CW = 720, CH = 680;                      // curtain canvas, px
+    // Layering, from the wall outwards (metres in front of the wall): the door (0 to about 0.15, its slab is up to 0.12 thick),
+    // tape across it, the curtain rail and cloth hung in front of all that, and last the sign board, which has to show when the curtain is shut.
+    // The cloth is see-through and does not write depth, so a see-through door face would draw over it whatever its distance:
+    // the door's own pieces (doors.js) draw at render order 0 to 2, the curtain after them.
+    var RO_CURTAIN = 5;
+    var Z_TAPE = 0.17, Z_RAIL = 0.2, Z_CURTAIN = 0.21, Z_SIGN = 0.25;
+    var CW = 720;                                // curtain canvas width, px (its height follows the bay)
     var bays = env.bays.map(function (d, i) { return makeBay(d, i); });
     var rayc = new T.Raycaster(); rayc.far = 4;
     var grab = null;                              // { bay, ndc }
@@ -268,15 +274,17 @@
     function buildCurtain(bay, spec, instant) {
       var C = root.XACurtain; if (!C) return null;
       var openness = spec.p.openness;
-      var sim = C.createCurtainSim({ width: CW, height: CH, color: spec.p.color || undefined, trim: spec.p.trim || undefined, openness: openness, speed: spec.p.speed });
-      var cv = env.mkCanvas(CW, CH), r = C.createCurtainRenderer(sim, cv.getContext('2d'));
+      // the cloth hangs from the rail to just above the floor: the canvas keeps the cloth's proportions at any bay width
+      var railY = Math.min(env.RH - 0.25, 2.95), ch = clamp(Math.round(CW * (railY - 0.04) / bay.width), 400, 1400);
+      var sim = C.createCurtainSim({ width: CW, height: ch, color: spec.p.color || undefined, trim: spec.p.trim || undefined, openness: openness, speed: spec.p.speed });
+      var cv = env.mkCanvas(CW, ch), r = C.createCurtainRenderer(sim, cv.getContext('2d'));
       r.draw();
       var t = env.tex(cv); t.anisotropy = 4;
-      var h = bay.width * CH / CW, railY = Math.min(env.RH - 0.25, 2.95);
+      var h = bay.width * ch / CW;
       var mesh = new T.Mesh(new T.PlaneGeometry(bay.width, h), new T.MeshBasicMaterial({ map: t, transparent: true, color: 0xd2d2da, depthWrite: false }));
-      mesh.position.set(0, railY - h / 2, 0.1); mesh.renderOrder = 2; bay.group.add(mesh);
+      mesh.position.set(0, railY - h / 2, Z_CURTAIN); mesh.renderOrder = RO_CURTAIN; bay.group.add(mesh);
       var rail = new T.Mesh(new T.BoxGeometry(bay.width + 0.24, 0.035, 0.06), new T.MeshStandardMaterial({ color: 0x2a2a33, metalness: 0.8, roughness: 0.3 }));
-      rail.position.set(0, railY + 0.02, 0.08); bay.group.add(rail);
+      rail.position.set(0, railY + 0.02, Z_RAIL); bay.group.add(rail);
       return { sim: sim, r: r, cv: cv, tex: t, mesh: mesh, rail: rail, style: JSON.stringify([spec.p.color, spec.p.trim]), target: openness, h: h, railY: railY };
     }
     function disposeCurtain(c) { if (!c) return; disposeMesh(c.mesh); disposeMesh(c.rail); }
@@ -300,12 +308,12 @@
     function buildOverlay(bay, spec) {
       if (spec.key === 'sign-board') {
         var w = Math.min(2.0, bay.width - 0.2), m = new T.Mesh(new T.PlaneGeometry(w, w / 4), new T.MeshBasicMaterial({ map: env.tex(signTexture(spec.p)), color: 0xdadada }));
-        m.position.set(0, spec.p.y, 0.14); m.renderOrder = 3; bay.group.add(m); return m;
+        m.position.set(0, spec.p.y, Z_SIGN); m.renderOrder = 3; m.userData.key = spec.key; bay.group.add(m); return m;
       }
       if (spec.key === 'caution-tape') {
-        var tw = bay.width + 0.1, tt = env.tex(tapeTexture()); tt.wrapS = T.RepeatWrapping; tt.repeat.set(Math.round(tw * 2), 1);
+        var tw = bay.width - 0.02, tt = env.tex(tapeTexture()); tt.wrapS = T.RepeatWrapping; tt.repeat.set(Math.round(tw * 2), 1);
         var tm = new T.Mesh(new T.PlaneGeometry(tw, 0.14), new T.MeshBasicMaterial({ map: tt, color: 0xdadada, side: T.DoubleSide }));
-        tm.position.set(0, spec.p.y, 0.15); tm.rotation.z = 0.035; tm.renderOrder = 3; bay.group.add(tm); return tm;
+        tm.position.set(0, spec.p.y, Z_TAPE); tm.rotation.z = 0.035; tm.renderOrder = 1; tm.userData.key = spec.key; bay.group.add(tm); return tm;
       }
       return null;
     }
@@ -422,6 +430,18 @@
       if (!rayc.ray.intersectPlane(pl, pt)) return null;
       m.worldToLocal(pt); return pt.x / bay.width + 0.5;
     }
+    // depth of each piece in front of the wall, for the layering test: door slab, tape, curtain, sign
+    function layersOf(b) {
+      var o = { door: null, doorOrder: null, curtainOrder: b.curtain ? b.curtain.mesh.renderOrder : null, tape: null, curtain: b.curtain ? b.curtain.mesh.position.z : null, rail: b.curtain ? b.curtain.rail.position.z : null, sign: null };
+      b.overlays.forEach(function (m) { if (m.userData.key === 'caution-tape') o.tape = m.position.z; else if (m.userData.key === 'sign-board') o.sign = m.position.z; });
+      if (b.door && b.door.mesh) {
+        b.group.updateMatrixWorld(true); b.door.mesh.group.updateMatrixWorld(true);
+        var bb = new T.Box3().setFromObject(b.door.mesh.group), a = b.group.worldToLocal(bb.min.clone()), c = b.group.worldToLocal(bb.max.clone());
+        var ro = 0; b.door.mesh.group.traverse(function (x) { if (x.renderOrder > ro) ro = x.renderOrder; }); o.doorOrder = ro;
+        o.door = Math.max(a.z, c.z);                                  // the front of the closed door
+      }
+      return o;
+    }
     /* ---- doors as something to touch ---- */
     function doorUsable(bay) {
       var p = bay.plan, d = bay.door; if (!p || p.base !== 'door' || !d || !d.model || !bay.group.visible || p.interaction === 0) return false;
@@ -499,8 +519,8 @@
       // state for tests and the preview
       debug: function () {
         return bays.map(function (b) {
-          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, door: !!b.door, doorState: b.door && b.door.model ? b.door.model.state() : null,
-            curtain: b.curtain ? { openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
+          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, doorState: b.door && b.door.model ? b.door.model.state() : null,
+            curtain: b.curtain ? { bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
             light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity } : null };
         });
       }

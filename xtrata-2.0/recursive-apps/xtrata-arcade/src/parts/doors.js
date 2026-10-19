@@ -540,7 +540,11 @@
       x.restore();
       x.save(); x.shadowColor = line; x.shadowBlur = 5; x.strokeStyle = line; x.lineWidth = lw; x.stroke(shp); x.restore();
     });
-    var way = new T.Mesh(new T.PlaneGeometry(doorW, doorH), basicMat(wayTex)); way.position.set(0, (H / 2) * s, zWall); way.renderOrder = 2; group.add(way);
+    // the frame band reaches below the opening by a margin; cut that off so the doorway stands on the floor, not in it
+    var padS = pad * s, wayGeo = new T.PlaneGeometry(doorW, doorH - padS), vmin = pad / (H + 2 * pad), wuv = wayGeo.attributes.uv;
+    for (var ui = 0; ui < wuv.count; ui++) wuv.setY(ui, vmin + wuv.getY(ui) * (1 - vmin));
+    disposables.push(wayGeo);
+    var way = new T.Mesh(wayGeo, basicMat(wayTex)); way.position.set(0, (doorH - padS) / 2, zWall); way.renderOrder = 0; group.add(way);
 
     /* leaves */
     var leafObjs = G.leaves.map(function (L) {
@@ -556,12 +560,12 @@
       }); });
       var cx = ((L.x0 + L.x1) / 2 - L.axis) * s, front = new T.Mesh(new T.PlaneGeometry(L.w * s, H * s), basicMat(faceTex[0])), back = new T.Mesh(new T.PlaneGeometry(L.w * s, H * s), basicMat(faceTex[1]));
       front.position.set(cx, H * s / 2, th + 0.0015); back.position.set(cx, H * s / 2, -0.0015); back.rotation.y = Math.PI;
-      front.raycast = back.raycast = function () {}; front.renderOrder = back.renderOrder = 3; pivot.add(front, back);
+      front.raycast = back.raycast = function () {}; front.renderOrder = back.renderOrder = 1; pivot.add(front, back);
       // the handle (a lever that turns with the physics), on both faces
       var bs = 2 * (L.Lh + 16), levTex = canvasTex(bs, bs, function (x) { x.translate(bs / 2, bs / 2); x.shadowColor = line; x.shadowBlur = 3; drawOps(x, leverArt(S.handle, L.Lh), { line: line, fill: FILL, lw: lw }); });
       var hands = [th + 0.004, -0.004].map(function (z, k) {
         var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s * (k ? 1 : 1), (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = L.dir;
-        var lm = new T.Mesh(new T.PlaneGeometry(bs * s, bs * s), basicMat(levTex)); lm.raycast = function () {}; lm.renderOrder = 4; hg.add(lm); pivot.add(hg); return { g: hg, lever: lm };
+        var lm = new T.Mesh(new T.PlaneGeometry(bs * s, bs * s), basicMat(levTex)); lm.raycast = function () {}; lm.renderOrder = 2; hg.add(lm); pivot.add(hg); return { g: hg, lever: lm };
       });
       var led = new T.Mesh(new T.CircleGeometry(2.4 * s, 12), new T.MeshBasicMaterial({ color: 0xff6a6a })); led.position.set((L.hx - L.axis) * s, (H - G.hy - 16) * s, th + 0.005); led.raycast = function () {}; pivot.add(led); disposables.push(led.material, led.geometry);
       var bolt = new T.Mesh(new T.BoxGeometry(14 * s, 9 * s, 0.012), new T.MeshBasicMaterial({ color: 0xc9d4de })); bolt.position.set((L.latch - L.axis) * s, (H - G.hy) * s, th * 0.5); bolt.raycast = function () {}; pivot.add(bolt); disposables.push(bolt.material, bolt.geometry);

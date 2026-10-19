@@ -93,6 +93,7 @@ const story = (state, interaction) => bay(scene('door', [
     const s = await bays(page), b0 = s.bays[0], b1 = s.bays[1];
     check(b0.visible && b0.curtain && b0.curtain.openness < 0.05, 'B: bay 0 draws a closed curtain (openness ' + (b0.curtain && b0.curtain.openness.toFixed(2)) + ')');
     check(b0.overlays === 1 && b0.door === true, 'B: bay 0 has its sign board and the door slab');
+    check(b0.curtain.bottom >= 0 && b0.curtain.bottom < 0.1, 'B: the curtain hangs to just above the floor (bottom at ' + b0.curtain.bottom.toFixed(3) + ' m)');
     check(b0.light && b0.light.key === 'light-flicker', 'B: bay 0 has its flickering lamp');
     check(!b1.visible && b1.plan === null && !b1.curtain && !b1.light, 'B: bay 1 builds nothing');
     const ws = await page.evaluate(() => window.XA.wallState());
