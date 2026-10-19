@@ -535,33 +535,14 @@ export function createGifts(deps: GiftDeps) {
 
   function renderFold(s: Snapshot): HTMLElement | null {
     const g = s.gate?.gifts;
-    if (!g?.enabled || ['off', 'elsewhere', 'unsupported'].includes(s.step)) return null;
+    // Albums only: the "send music to a friend" gift is retired from the page. The section is for gift admins, who make
+    // albums and fund batches of copies. (The server still honours old friend-gift links and refunds.)
+    if (!g?.enabled || !g.admin || ['off', 'elsewhere', 'unsupported'].includes(s.step)) return null;
     const main = deps.main();
-    const parts: HTMLElement[] = [el('p', 'Give someone on-chain music. They need no wallet: a passkey and your link is all it takes.', 'ppp-mute')];
+    const parts: HTMLElement[] = [el('p', 'Make an album and fund copies of it to give away.', 'ppp-mute')];
     if (!main) {
-      parts.push(el('p', 'Connect a Stacks wallet (top right) to send a gift.'));
+      parts.push(el('p', 'Connect a Stacks wallet (top right) to make albums.'));
     } else {
-      giftButton.disabled = !!working;
-      parts.push(range, amountLine, giftButton);
-      if (deps.now() - checked > 30_000) { checked = deps.now(); void refreshMine(main); }
-      const mine = loadMine(main);
-      if (mine.length) {
-        const list = el('ul', '', 'ppp-gift-list');
-        for (const x of mine.slice(0, 10)) {
-          const st = x.view?.status;
-          const status = x.error ? x.error : !st || st === 'pending-deposit' ? (x.txid ? 'payment confirming…' : 'waiting for your payment')
-            : st === 'live' ? 'ready to share' : st === 'claiming' || st === 'claimed' ? 'claimed ✓'
-            : st === 'refunding' ? 'expired · refund on its way' : st === 'refunded' ? 'expired · refunded to you' : st;
-          const li = el('li');
-          li.append(el('span', `${stxNice(BigInt(x.amount))} STX`, 't'), el('span', status, x.view?.status === 'claimed' ? 'ppp-ok' : 'ppp-mute'));
-          if (x.view?.status === 'live') {
-            const url = linkFor(s.gate?.radioUrl ?? null, x.code);
-            li.append(copyButton('gift-copy:' + x.id, 'Copy link', () => url, 'tiny', deps.changed), feedbackButton('gift-share:' + x.id, 'Share', () => share(url), 'tiny', deps.changed));
-          }
-          list.append(li);
-        }
-        parts.push(list);
-      }
       if (g.admin) {
         const box = el('div', '', 'ppp-gift-admin');
         const labelled = (text: string, input: HTMLElement) => { const l = el('label', text); l.append(input); return l; };

@@ -34,6 +34,8 @@ export interface AlbumInput {
   /** Plays My player could move into this album, when known. */
   myPlays?: number;
   topUps: readonly number[];
+  /** A gift admin: the More menu offers the album-making section. */
+  canMake?: boolean;
 }
 
 export interface AlbumDeps {
@@ -86,7 +88,7 @@ const time = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
 /** Where each "More" row leads: the existing panel folds, opened as a sheet. */
-const SHEET_TITLE: Record<Exclude<AlbumSheet, '' | 'more'>, string> = { music: 'My music', device: 'This device', gifts: 'Send music to a friend' };
+const SHEET_TITLE: Record<Exclude<AlbumSheet, '' | 'more'>, string> = { music: 'My music', device: 'This device', gifts: 'Albums (admin)' };
 const SHEET_FOLDS: Record<Exclude<AlbumSheet, '' | 'more'>, string[]> = { music: ['.ppp-shelf'], device: ['.ppp-wallets', '.ppp-recent', '.ppp-more'], gifts: ['.ppp-gifts'] };
 
 /**
@@ -456,7 +458,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps, opts: { lis
       h('div', { class: 'al-rows' },
         row(ICON.grid, 'My music', 'Your albums and the radio', () => setSheet('music')),
         row(ICON.radio, 'Xtrata Radio', 'FM · Liked · every song', () => { setSheet(''); deps.openPlayer(); }),
-        row(ICON.gift, 'Send music to a friend', 'They open it with a link', () => setSheet('gifts')),
+        i.canMake ? row(ICON.gift, 'Albums (admin)', 'Make an album and fund copies', () => setSheet('gifts')) : null,
         row(ICON.device, 'This device', 'Backup, history, Stacks wallet, returns', () => setSheet('device')),
         how));
   }

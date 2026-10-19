@@ -870,17 +870,14 @@ describe('radio gift players', () => {
       await s.claim(made.codes[0]); // and now it can be claimed
     });
 
-    it('the escrow cap counts live copies and unpaid batches, and an unpaid batch stops counting after a day', async () => {
+    it('an album batch is never held back by the escrow cap, however many copies are live or waiting', async () => {
       const total = batchDeposit(3, 123000n);
-      const s = setup({ RADIO_GIFT_ESCROW_CAP: String(total + 1_000n) });
-      const first = await fund(s);
-      await expect(fund(s, { count: 1, amount: '100000', label: 'second' })).rejects.toMatchObject({ status: 503, message: expect.stringMatching(/full right now/) });
-      s.tick(25 * 3600_000);
-      await expect(fund(s, { count: 1, amount: '100000', label: 'second' })).resolves.toMatchObject({ count: 1 });
-      expect(first.count).toBe(3);
+      const s = setup({ RADIO_GIFT_ESCROW_CAP: String(total + 1_000n) }); // a cap that would have refused the second batch
+      await fund(s);
+      await expect(fund(s, { count: 1, amount: '100000', label: 'second' })).resolves.toMatchObject({ count: 1 }); // an unpaid batch is waiting
       const t = setup({ RADIO_GIFT_ESCROW_CAP: String(total + 1_000n) });
-      await live(t);
-      await expect(fund(t, { count: 1, amount: '100000', label: 'second' })).rejects.toMatchObject({ status: 503 }); // paid copies count too
+      await live(t); // paid copies are live
+      await expect(fund(t, { count: 100, amount: '100000', label: 'big' })).resolves.toMatchObject({ count: 100 });
     });
 
     it('a creator cannot leave piles of unpaid batches waiting', async () => {

@@ -610,7 +610,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
         <details class="ppp-fold ppp-wallets" hidden><summary>◎ This device</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
         <details class="ppp-fold ppp-more" hidden><summary>? How plays work</summary><div class="ppp-body"></div></details>
         <details class="ppp-fold ppp-shelf" hidden><summary>♪ My albums</summary><div class="ppp-shelf-body"></div></details>
-        <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Send music to a friend</summary><div class="ppp-gift-body"></div></details>
+        <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Albums (admin)</summary><div class="ppp-gift-body"></div></details>
       </div>
     </section>
     <!-- An open album's songs, with their artwork and plays left (src/radio-ppp/album.ts, list mode). Stands in for Your Station. -->
@@ -1002,7 +1002,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=cecc59ad3393')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=17c0591ce76e')}).catch(function(){});
 </script>
 </body>
 </html>
