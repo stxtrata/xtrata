@@ -9049,3 +9049,84 @@
       .aud-banner { padding: 18px 14px 12px; }
       .aud-banner__sub span { display: none; }
     }
+
+    /* Free album drop hero: the live giveaway, replacing the passkey-wallet hero. Opaque violet card like the old one. */
+    .give-hero {
+      --gh-violet: #c8b6ff;
+      --gh-pink: #ffb3df;
+      --gh-teal: #7ee2c7;
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 32px;
+      margin: 18px 0;
+      padding: 30px 36px;
+      border: 1px solid rgba(200, 182, 255, 0.4);
+      border-radius: 18px;
+      background:
+        radial-gradient(120% 140% at 100% 0%, rgba(255, 179, 223, 0.16), transparent 55%),
+        linear-gradient(115deg, rgba(200, 182, 255, 0.2), rgba(10, 14, 22, 0) 60%),
+        #0c0b16;
+      box-shadow: 0 12px 48px -16px rgba(200, 182, 255, 0.4);
+      color: #fff;
+      overflow: hidden;
+    }
+    .give-hero__copy { display: grid; gap: 12px; min-width: 0; }
+    .give-hero__kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gh-violet); }
+    .give-hero[data-state="live"] .give-hero__kicker { color: var(--gh-teal); }
+    .give-hero__title { margin: 0; font-size: clamp(28px, 4vw, 46px); line-height: 1.04; letter-spacing: -0.02em; color: #fff; }
+    .give-hero__title em {
+      font-style: normal;
+      background: linear-gradient(90deg, var(--gh-violet), var(--gh-pink));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .give-hero__lead { margin: 0; max-width: 46ch; font-size: 16px; line-height: 1.5; color: rgba(255, 255, 255, 0.8); }
+    .give-hero__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 4px; }
+    .give-hero__cta {
+      display: inline-block;
+      padding: 12px 24px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--gh-violet), var(--gh-pink));
+      color: #1a1030;
+      font-size: 15px;
+      font-weight: 800;
+      text-decoration: none;
+      box-shadow: 0 8px 28px -8px rgba(200, 182, 255, 0.6);
+    }
+    .give-hero__cta:hover, .give-hero__cta:focus-visible { filter: brightness(1.08); }
+    .give-hero__cta:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+    .give-hero__status { font-size: 15px; color: rgba(255, 255, 255, 0.78); font-variant-numeric: tabular-nums; }
+    .give-hero__run { display: grid; gap: 12px; justify-items: start; }
+    .give-hero__discs { display: grid; grid-template-columns: repeat(20, 20px); gap: 8px; }
+    .give-hero__discs[hidden] { display: none; }
+    .give-hero__discs i, .give-hero__legend i {
+      display: block;
+      width: 20px;
+      height: 20px;
+      box-sizing: border-box;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+    }
+    .give-hero__discs i.is-done, .give-hero__legend i.is-done { border-color: var(--gh-pink); background: radial-gradient(circle, #0c0b16 0 2px, var(--gh-pink) 3px); }
+    .give-hero__discs i.is-held { border-color: rgba(255, 255, 255, 0.55); background: radial-gradient(circle, #0c0b16 0 2px, rgba(255, 255, 255, 0.55) 3px); }
+    .give-hero__discs i.is-now, .give-hero__legend i.is-now {
+      border-color: var(--gh-teal);
+      background: radial-gradient(circle, #0c0b16 0 2px, var(--gh-teal) 3px);
+      box-shadow: 0 0 0 4px rgba(126, 226, 199, 0.22), 0 0 16px var(--gh-teal);
+      animation: give-hero-pulse 1.4s ease-in-out infinite;
+    }
+    .give-hero__legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: rgba(255, 255, 255, 0.72); }
+    .give-hero__legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .give-hero__legend i { width: 12px; height: 12px; }
+    .give-hero[data-state="loading"] .give-hero__legend, .give-hero[data-state="error"] .give-hero__legend { display: none; }
+    @keyframes give-hero-pulse { 50% { opacity: 0.4; } }
+    @media (prefers-reduced-motion: reduce) { .give-hero__discs i.is-now { animation: none; } }
+    @media (max-width: 980px) {
+      .give-hero { grid-template-columns: minmax(0, 1fr); padding: 22px 18px; }
+      .give-hero__discs { grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 4px; width: 100%; max-width: 560px; }
+      .give-hero__discs i { width: auto; aspect-ratio: 1; }
+      .give-hero__cta { min-height: 48px; display: inline-flex; align-items: center; }
+    }

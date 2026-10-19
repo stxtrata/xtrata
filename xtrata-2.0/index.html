@@ -157,58 +157,23 @@
       <div class="living-hero__stage home-wall" id="featuredObjectStage" aria-label="Featured Xtrata objects"></div>
     </section>
 
-    <!-- Radio hero: a passkey Stacks wallet from a link and Face ID (no app, no seed phrase), then pay-per-play music. -->
-    <section class="hero-music hero-phone home-only" id="heroMusic" aria-labelledby="heroMusicTitle">
-      <div class="hero-phone__copy">
-        <span class="hero-music__kicker">New &middot; Passkey wallets on Stacks</span>
-        <h2 class="hero-music__title" id="heroMusicTitle">Make a wallet <em>with your face.</em></h2>
-        <p class="hero-music__lead">Tap a link on your phone and Face ID creates a real Stacks wallet. <strong>No app, no seed phrase, no crypto to buy first.</strong> Then every song you hear for 30 seconds pays its holder on-chain, and every like is a transaction anyone can verify.</p>
-        <ol class="hero-phone__steps">
-          <li><b>1</b><span>Tap the link</span></li>
-          <li><b>2</b><span>Face ID makes the wallet</span></li>
-          <li><b>3</b><span>Every song pays its holder</span></li>
-        </ol>
-        <div class="hero-music__actions">
-          <a class="hero-music__cta" href="https://radio.xtrata.xyz/radio" target="_blank" rel="noopener" data-home-action="hero:radio">Try it on your phone &rarr;</a>
-          <a class="hero-music__more" href="/giveaway" data-home-action="hero:giveaway">Free album drop</a>
-          <a class="hero-music__more" href="/music/heroes" target="_blank" rel="noopener" data-home-action="hero:radio-heroes">See the Music Heroes</a>
+    <!-- Free album drop: the live giveaway (GET /radio/giveaway). Discs, counts and the claim link are filled in by giveaway-hero.js. -->
+    <section class="give-hero home-only" id="giveawayHero" data-state="loading" aria-labelledby="giveHeroTitle">
+      <div class="give-hero__copy">
+        <span class="give-hero__kicker" data-give="kicker">Free album drop &middot; limited edition</span>
+        <h2 class="give-hero__title" id="giveHeroTitle"><span data-give="total">Limited edition.</span> Free. <em>Gone one every ten minutes.</em></h2>
+        <p class="give-hero__lead" data-give="lead">A new copy goes live here on a timer. Tap it first and it is yours to keep, with only your face or fingerprint to sign up.</p>
+        <div class="give-hero__actions">
+          <a class="give-hero__cta" data-give="cta" href="/giveaway" data-home-action="hero:giveaway">Watch the drop &rarr;</a>
+          <span class="give-hero__status" data-give="status" hidden></span>
         </div>
-        <p class="hero-phone__note">Already on Stacks? Connect Xverse or Leather on the radio and add up to 1 STX: your plays and likes count for your wallet. 0.1 STX &asymp; 277 paid plays.</p>
       </div>
-      <!-- The flow from a real iPhone run, drawn in CSS: message, gift, passkey, paid play. Decorative. -->
-      <div class="hero-phone__device" aria-hidden="true">
-        <div class="hp-phone">
-          <div class="hp-island"></div>
-          <div class="hp-screen hp-s1">
-            <p class="hp-from">Messages</p>
-            <div class="hp-bubble">Try this: on-chain music, no wallet needed 🎁</div>
-            <div class="hp-link"><b>Xtrata Radio</b><span>inscribed music, live from the chain</span><i>radio.xtrata.xyz</i></div>
-            <span class="hp-tap"></span>
-          </div>
-          <div class="hp-screen hp-s2">
-            <p class="hp-brand">XTRATA RADIO</p>
-            <p class="hp-gift">🎁 A friend sent you <b>0.2 STX</b> of on-chain music: about 562 paid plays.</p>
-            <p class="hp-mute">Tap below: your passkey makes a listening wallet, and the gift lands in it.</p>
-            <span class="hp-btn">Claim my gift &middot; no wallet needed</span>
-            <div class="hp-player"><span class="hp-art hp-art--off"></span><span><i>XTRATA FM</i><b>&mdash; off air &mdash;</b></span></div>
-            <span class="hp-tap"></span>
-          </div>
-          <div class="hp-screen hp-s3">
-            <div class="hp-sheet">
-              <span class="hp-face"><i></i><i></i><i></i><i></i></span>
-              <b>Save a passkey?</b>
-              <span>“Xtrata listening wallet” will be saved in Passwords.</span>
-              <em>Face ID</em>
-            </div>
-          </div>
-          <div class="hp-screen hp-s4">
-            <p class="hp-brand">XTRATA RADIO <span class="hp-on">On &middot; 561 plays left</span></p>
-            <div class="hp-track"><span class="hp-art"></span><span><b>Drop VST, Load BVST</b><i>Audionals</i></span></div>
-            <div class="hp-eq"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-            <div class="hp-bar"><i></i></div>
-            <p class="hp-paid">✓ Paid on-chain &middot; 0.00005 STX to the song’s holder</p>
-            <p class="hp-like">♥ Liked on-chain &middot; confirmed</p>
-          </div>
+      <div class="give-hero__run" aria-live="off">
+        <div class="give-hero__discs" data-give="discs" role="img" aria-label="Every copy in the edition" hidden></div>
+        <div class="give-hero__legend" aria-hidden="true">
+          <span><i class="is-done"></i>Claimed</span>
+          <span><i class="is-now"></i>Live now</span>
+          <span><i></i>Still to come</span>
         </div>
       </div>
     </section>

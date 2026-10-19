@@ -16,6 +16,7 @@ import { pickSwap as pickWallSwap, pickWall } from './wall-rotation.js';
 import { initMusicSupporters, stopMusicSupporters } from './music-supporters.js';
 import { initAudionautBanner, stopAudionautBanner } from './audionaut-banner.js';
 import { initArcadeChampion, stopArcadeChampion } from './arcade-champion.js';
+import { initGiveawayHero, stopGiveawayHero } from './giveaway-hero.js';
 
 const HOME_ACTION_EVENT = 'xtrata:homepage-action';
 const HOME_MOUNT_IDS = [
@@ -1094,11 +1095,13 @@ export const initHomepage = () => {
     stopMusicSupporters();
     stopAudionautBanner();
     stopArcadeChampion();
+    stopGiveawayHero();
     return;
   }
   initMusicSupporters();
   initAudionautBanner();
   initArcadeChampion();
+  initGiveawayHero();
   renderStrip();
   renderWall();
   renderNowPlaying();
