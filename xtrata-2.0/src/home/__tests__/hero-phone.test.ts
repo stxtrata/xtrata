@@ -9,7 +9,8 @@ const hero = indexHtml.slice(indexHtml.indexOf('id="heroMusic"'), indexHtml.inde
 describe('homepage radio hero: on-chain music on any phone', () => {
   it('leads with the passkey wallet and keeps a way in for people who already have a Stacks wallet', () => {
     expect(hero).toContain('Make a wallet <em>with your face.</em>');
-    expect(hero).toContain('href="https://radio.xtrata.xyz/radio#give"');
+    expect(hero).toContain('href="/giveaway"'); // the free album drop (the friend gift is retired)
+    expect(hero).not.toContain('radio#give');
     expect(hero).toContain('href="https://radio.xtrata.xyz/radio"');
     expect(hero).toContain('href="/music/heroes"');
     expect(hero).toMatch(/Connect Xverse or Leather/);
