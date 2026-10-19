@@ -75,7 +75,7 @@ class Panel {
      closedEdge: x of the leading edge when fully closed. */
   constructor(o) {
     const N = this.N = o.cols, M = this.M = CFG.rows;
-    this.dir = o.dir; this.wall = o.wall;
+    this.dir = o.dir; this.wall = o.wall; this.lo = o.lo; this.hi = o.hi;
     this.railY = o.railY; this.hemY = o.hemY;
     this.L = (o.hemY - o.railY) / (M - 1);
     this.G = CFG.gravity * o.viewH; this.H = o.viewH;
@@ -235,6 +235,9 @@ class Panel {
       }
     }
 
+    // the cloth never leaves the picture the hall draws it on (only matters when a reach limit is set)
+    if (this.lo > -Infinity) for (let k = N; k < size; k++) { if (x[k] < this.lo) x[k] = this.lo; else if (x[k] > this.hi) x[k] = this.hi; }
+
     // 7. velocities from what actually happened
     let m = 0;
     for (let k = N; k < size; k++) {
@@ -301,7 +304,8 @@ function readParams(p) {
     trim: parseColor(p.trim, DEFAULT_TRIM),
     openness: num(p.openness, 0, 1, 0),
     speed: num(p.speed, 0.1, 5, 1),
-    ui: num(p.ui, 0.25, 4, 1)
+    ui: num(p.ui, 0.25, 4, 1),
+    reach: num(p.reach, 0, 4096, 0)     // px the cloth may swing past each rail end (0 = no limit); the hall draws that much margin
   };
 }
 
@@ -325,8 +329,8 @@ function createCurtainSim(params) {
     const cols = clamp(Math.round(W / 2 / 24), 9, 34);
     const ov = Math.min(W * 0.015, 16);
     panels = [
-      new Panel({ dir: 1, wall: 0, closedEdge: W / 2 + ov, railY, hemY, cols, seed: 11, viewH: H }),
-      new Panel({ dir: -1, wall: W, closedEdge: W / 2 - ov, railY, hemY, cols, seed: 23, viewH: H })
+      new Panel({ dir: 1, wall: 0, closedEdge: W / 2 + ov, railY, hemY, cols, seed: 11, viewH: H, lo: prm.reach ? -prm.reach : -Infinity, hi: prm.reach ? W + prm.reach : Infinity }),
+      new Panel({ dir: -1, wall: W, closedEdge: W / 2 - ov, railY, hemY, cols, seed: 23, viewH: H, lo: prm.reach ? -prm.reach : -Infinity, hi: prm.reach ? W + prm.reach : Infinity })
     ];
     panels.forEach((p, i) => p.setOpenness(prev[i]));
     drag = null; anim = null; acc = 0;
@@ -483,6 +487,9 @@ function createCurtainRenderer(sim, ctx, opts) {
   opts = opts || {};
   const pal = makePalette(sim.params.color, sim.params.trim), ui = sim.params.ui;
   let dpr = num(opts.dpr, 0.25, 4, 1);
+  // margin: px of canvas on each side of the cloth's own width, so cloth pulled past the rail ends is still drawn
+  // (the canvas is then sim.width + 2 * margin wide and the cloth sits in the middle of it)
+  const margin = Math.round(num(opts.margin, 0, 4096, 0));
   let overlay = null, overlayFor = '';
   const PI = Math.PI;
 
@@ -602,16 +609,16 @@ function createCurtainRenderer(sim, ctx, opts) {
   }
 
   return {
-    /* Redraw the whole cloth. The canvas should be sim.width*dpr by sim.height*dpr pixels. */
+    /* Redraw the whole cloth. The canvas should be (sim.width + 2*margin)*dpr by sim.height*dpr pixels. */
     draw() {
       makeOverlay();
       const W = sim.width, H = sim.height, panels = sim.panels;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, W, H);
+      ctx.setTransform(dpr, 0, 0, dpr, margin * dpr, 0);
+      ctx.clearRect(-margin, 0, W + 2 * margin, H);
       for (const p of panels) edgeShadow(p);
       for (const p of panels) fabric(p);
       ctx.globalCompositeOperation = 'source-atop';  // light falloff, only where there is cloth
-      ctx.fillStyle = overlay; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = overlay; ctx.fillRect(-margin, 0, W + 2 * margin, H);
       ctx.globalCompositeOperation = 'source-over';
       for (const p of panels) hem(p);
       pelmet();
