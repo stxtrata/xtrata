@@ -163,3 +163,37 @@ test('audio: every work sound can be synthesised without throwing', () => {
   const a = B.createAudio(), f = fakeAudio();
   ['hammer', 'saw', 'drill', 'clatter', 'swish'].forEach((k) => { const len = a._syn[k](f.ctx, f.master, 10, 0.6); assert.ok(len > 0.1 && len < 3, k + ' lasts ' + len); });
 });
+
+/* ---- phase 3b: the door a scene asks for ---- */
+const DLOOKS = Object.assign({}, LOOKS, {
+  20: { kind: 0, name: 'Arch door', tier: 0, builtin: 'door-arch', hidden: false, approved: true },
+  21: { kind: 0, name: 'Hidden door', tier: 0, builtin: 'door-gothic', hidden: true, approved: true },
+  22: { kind: 0, name: 'Unapproved door', tier: 0, builtin: 'door-scifi', hidden: false, approved: false },
+  23: { kind: 0, name: 'Recipe door', tier: 1, builtin: 'door-circle', hidden: false, approved: true },
+  24: { kind: 0, name: 'Unknown style', tier: 0, builtin: 'door-lasergate', hidden: false, approved: true },
+  25: { kind: 1, name: 'Not a door', tier: 0, builtin: 'door-arch', hidden: false, approved: true },
+});
+
+test('a door scene resolves its door look to a style; anything unusable falls back to the classic door', () => {
+  const style = (doorLook) => plain(B.planBay(bay([], { doorLook }), DLOOKS)).door.style;
+  assert.equal(style(20), 'arch');
+  [null, 21, 22, 23, 24, 25, 999].forEach((id) => assert.equal(style(id), 'rect', 'look ' + id));
+});
+
+test('only a door base has a door; walls and posters have none', () => {
+  assert.equal(B.planBay(bay([], { base: 'wall' }), DLOOKS).door, null);
+  assert.equal(B.planBay(bay([], { base: 'posters' }), DLOOKS).door, null);
+});
+
+test('the plan key follows the door style and the interaction', () => {
+  const k = (o) => B.planKey(B.planBay(bay([], o), DLOOKS));
+  assert.notEqual(k({ doorLook: 20 }), k({ doorLook: null }));
+  assert.notEqual(k({ interaction: 1 }), k({ interaction: 2 }));
+  assert.equal(k({ doorLook: 20 }), k({ doorLook: 20 }));
+});
+
+test('the styles the plan accepts are exactly the styles doors.js can draw', () => {
+  const sb2 = { module: { exports: {} }, console, Math, JSON, Object, Array, Number, String, Date, setTimeout, clearTimeout };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'parts', 'doors.js'), 'utf8'), sb2);
+  assert.deepEqual(Array.from(B.DOOR_STYLES).sort(), Array.from(sb2.module.exports.STYLE_NAMES).sort());
+});
