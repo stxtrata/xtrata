@@ -26,12 +26,12 @@ Run on the public Stacks testnet from disposable wallets only (admin wallet and 
 | Pause the world contract | Publisher `add-scene` refused `u201`; admin `add-scene` still works (by design) |
 | Unpause; publisher `add-scene` | `u200` (publishers cannot write rooms they do not own: correct) |
 | Revert bay 0 to posters | `(ok u3)`; `get-bay` shows scene #3, base posters |
-| Retract a scheduled scene | `(ok true)`; stays in the timeline as history, ignored by resolution |
+| Retract a scheduled scene | `(ok true)`; it leaves the bay's timeline (so it can never start), and its record stays readable, marked retracted |
 | Kill switch (`ops/KILL`) | `REFUSED: kill switch is on`, exit 2, nothing signed |
 
 ## Things the rehearsal taught us
 
-1. **Posters min-gap is counted in burn blocks.** A publisher's second write inside the same burn block fails `u109`. A burn block is about 10 minutes, so a bot must leave at least one burn block between runs (it already sends one batch per run). Not a contract bug.
+1. **Posters min-gap is counted in burn blocks.** A publisher's second write inside the same burn block fails `u109` (the admin is exempt from this gap, publishers are not). A burn block is about 10 minutes, so a bot must leave at least one burn block between runs (it already sends one batch per run). Not a contract bug.
 2. **Revert does not cancel later scheduled scenes.** The revert scene starts "now", but a scene already scheduled for later still takes over when its time comes. To stop the story, retract the later scenes as well (the revert tool already prints this note). Verified: retract works.
 3. **Scene times are burn heights.** On testnet only two burn blocks passed in about 25 minutes; Stacks blocks (seconds) are not what the scene timeline counts. Rehearsal scene offsets should be a few burn blocks.
 4. **Pause stops publishers and room owners, not the admin.** So the admin can still revert or retract while paused, which is what you want in an emergency.
