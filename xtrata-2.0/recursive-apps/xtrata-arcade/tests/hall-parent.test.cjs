@@ -114,7 +114,8 @@ function top10Result(board, filled) {
     const gw = {};
     await ctx.route('https://xtrata.xyz/**', async (route) => {
       const m = /^\/i\/(\d+)$/.exec(new URL(route.request().url()).pathname);
-      const cors = { 'Access-Control-Allow-Origin': '*' };
+      // no-store: every scenario is a fresh visitor; a browser-cached (or half-cached) copy from an earlier scenario must not leak in
+      const cors = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' };
       if (!m || !opts.gateway) return route.abort('failed');
       const id = Number(m[1]);
       gw[id] = (gw[id] || 0) + 1;
@@ -264,15 +265,26 @@ function top10Result(board, filled) {
 
   /* 6. Inside a viewer: sandboxed srcdoc frame (opaque origin), as the xtrata.xyz grid and preview run it. */
   pages['/viewer.html'] = '<!doctype html><body style="margin:0"><iframe id="f" sandbox="allow-scripts allow-pointer-lock allow-downloads" allow="autoplay; fullscreen; encrypted-media" style="width:1200px;height:760px;border:0"></iframe></body>';
-  r = await open('/viewer.html', { gateway: 'serve' });
-  await r.page.$eval('#f', (f, html) => { f.srcdoc = html; }, pages['/released.html']);
-  const inner = () => r.page.frames().find((f) => f !== r.page.mainFrame());
-  let v = null;
-  for (let i = 0; i < 120 && !(v && v.games === 21); i++) {
-    await r.page.waitForTimeout(1000);
-    v = await inner().evaluate(() => ({ games: window.XA && window.XA.games ? window.XA.games.length : 0, origin: String(location.origin),
-      err: (document.getElementById('xa-load-err') || {}).hidden === false, bases: window.XA_CONFIG && window.XA_CONFIG.scores && window.XA_CONFIG.scores.apiBases })).catch(() => null);
-    if (v && v.err) break;
+  /* Playwright occasionally attaches its request routing to a sandboxed (opaque-origin) frame after the frame has
+     started fetching. The mock gateway is then never asked and the frame talks to the real network (so a changed pack
+     fails its hash against the real one). That is a harness race, not the hall: detect it (the mock saw no request)
+     and open the viewer again. */
+  let v = null, attempt = 0;
+  for (; attempt < 5; attempt++) {
+    if (attempt) await r.ctx.close();
+    r = await open('/viewer.html', { gateway: 'serve' });
+    await r.page.$eval('#f', (f, html) => { f.srcdoc = html; }, pages['/released.html']);
+    const inner = () => r.page.frames().find((f) => f !== r.page.mainFrame());
+    v = null;
+    for (let i = 0; i < 120 && !(v && v.games === 21); i++) {
+      await r.page.waitForTimeout(1000);
+      if (i === 15 && !r.gw[3078]) break;                       // routing missed the frame
+      v = await inner().evaluate(() => ({ games: window.XA && window.XA.games ? window.XA.games.length : 0, origin: String(location.origin),
+        err: (document.getElementById('xa-load-err') || {}).hidden === false, bases: window.XA_CONFIG && window.XA_CONFIG.scores && window.XA_CONFIG.scores.apiBases })).catch(() => null);
+      if (v && v.err) break;
+    }
+    if (r.gw[3078]) break;
+    console.log('  (harness: request routing missed the sandboxed frame; opening the viewer again)');
   }
   check(v && v.games === 21 && v.origin === 'null' && chainReads(r) === 0, 'boots inside a sandboxed srcdoc frame from the gateway (origin ' + (v && v.origin) + ')');
   check(v && Array.isArray(v.bases) && v.bases.length === 1 && v.bases[0] === 'https://api.mainnet.hiro.so',
