@@ -1,9 +1,9 @@
+// Every button here leads to /giveaway (the full page with the details and the claim); the banner never claims by itself.
 // Homepage giveaway hero: the free album drop, live. Reads the same endpoint as /giveaway
 // (GET /radio/giveaway) and draws one disc per copy: claimed ones stamped, the live one glowing.
 // Counts down against the server clock (`now`), so a phone with the wrong time still counts right.
 // Without data (offline, loading, error) the hero still reads well and links to /giveaway.
 const ENDPOINT = '/radio/giveaway';
-const CLAIM_BASE = 'https://radio.xtrata.xyz/radio.html#gift=';
 const DROP_HREF = '/giveaway';
 const CODE_RE = /^[A-Za-z0-9_-]{22}$/;
 
@@ -74,7 +74,7 @@ const render = (root, s) => {
     const w = String(s.total).length;
     if (kicker) kicker.textContent = `Live now · Copy No. ${String(s.gone + 1).padStart(w, '0')} of ${s.total}`;
     if (lead) lead.textContent = 'Tap the live copy first and it is yours to keep. Your face or fingerprint is the only sign-up.';
-    if (cta) { cta.textContent = 'Claim this copy →'; cta.href = CLAIM_BASE + s.code; cta.target = '_blank'; cta.rel = 'noopener'; }
+    if (cta) { cta.textContent = 'Claim this copy →'; cta.href = DROP_HREF; cta.removeAttribute('target'); cta.removeAttribute('rel'); }
   } else if (s.state === 'done') {
     if (kicker) kicker.textContent = 'Finished';
     if (lead) lead.textContent = 'Every copy has found a home. Come and see who got them.';
