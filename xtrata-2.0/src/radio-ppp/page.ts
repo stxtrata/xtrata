@@ -751,7 +751,8 @@ function start(root: HTMLElement) {
         if (s.gift?.player) lines.push(el('p', 'This player has no free mode: it carries on by itself once the plays arrive.'));
         else if (s.entries.length) lines.push(el('p', 'Songs play free until you top up. Paying carries on by itself once the top-up confirms.'));
         if (s.payingOn && !s.entries.length) lines.push(el('p', 'Paying is switched on. Once funds arrive it starts with the next song you listen to for 30 seconds.', 'ppp-ok'));
-        if (giftWait) { /* the gift banner shows its progress: no "add funds" while a gift is on its way */ }
+        if (giftWait) lines.push(el('p', 'Your gift is on its way, so there is nothing to add. STX is only needed once these plays are used up.', 'ppp-mute'));
+        else if (s.depositPending) lines.push(el('p', 'Nothing to add: your plays are on their way. Add STX only once they are used up.', 'ppp-mute'));
         else if (s.solo) {
           // No wallet to deposit from: the address is the whole interface. Anyone can send to it.
           lines.push(el('p', 'Ask a friend, or send from an exchange or any Stacks wallet, to this address. About 1 STX is plenty. Whatever is left can be returned to whoever sent it.'));
@@ -759,7 +760,8 @@ function start(root: HTMLElement) {
           if (s.listening && !s.depositPending) actions.push(copyButton('copy-address', 'Copy my address', () => s.listening || '', 'primary', () => render(ppp.snapshot())));
         } else lines.push(el('p', `Or send STX from an exchange to the listening wallet address (Copy above).`, 'ppp-mute'));
         if (s.depositPending && s.depositTxid) { const p = el('p', 'Funds on their way · paying starts by itself when they land. ', 'ppp-warn'); p.append(link('View', explorer(s.depositTxid))); key.push(p); }
-        else if (s.allowance > 0n && !s.solo) actions.push(button(`Deposit ${stx(s.allowance)} STX from my wallet`, () => void ppp.deposit(), 'primary'));
+        // No deposit button while plays (a gift, or a deposit) are on their way: a button that cannot be pressed only confuses, so there is none.
+        else if (s.allowance > 0n && !s.solo && !s.depositPending) actions.push(button(`Deposit ${stx(s.allowance)} STX from my wallet`, () => void ppp.deposit(), 'primary'));
         break;
       }
       case 'over':

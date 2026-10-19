@@ -1400,6 +1400,18 @@ describe('gifted wallets and gift players', () => {
       expect(s.ppp.snapshot()).toMatchObject({ depositPending: false, arrival: null, giftStop: { reason: 'out' } });
     });
 
+    it('refuses a deposit while the gift is arriving, and takes it again once the wait is over', async () => {
+      const s = await gifted(0n, null);
+      s.setMain(MAIN);
+      s.ppp.giftClaiming(true);
+      await s.ppp.deposit();
+      expect(s.ppp.snapshot().error).toMatch(/still arriving/);
+      expect(s.chain.deposits).toHaveLength(0);
+      s.ppp.giftClaiming(false);
+      await s.ppp.deposit();
+      expect(s.chain.deposits).toHaveLength(1);
+    });
+
     it('a claim that fails for good clears the wait at once', async () => {
       const s = await gifted(0n, null);
       s.ppp.giftClaiming(true);
