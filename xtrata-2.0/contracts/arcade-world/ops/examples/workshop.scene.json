@@ -1,0 +1,16 @@
+{
+  "format": "arcade-scene-file/1",
+  "room": "arcade-hall",
+  "scenes": [
+    {
+      "bay": 1, "at": "+30", "base": "door", "door": "door-arch", "interaction": "peek",
+      "layers": [
+        { "look": "curtain-house", "params": { "color": "#1d3a6e", "trim": "#c9a24b" }, "state": "half" },
+        { "look": "sign-board", "params": { "text": "workshop", "sub": "hard hats on", "tone": "blue" } },
+        { "look": "caution-tape", "params": { "y": 1.2 } },
+        { "look": "work-site", "params": { "kinds": "drill,clatter", "volume": 0.5, "gap": 2.5 } },
+        { "look": "light-steady", "params": { "tone": "white" } }
+      ]
+    }
+  ]
+}
