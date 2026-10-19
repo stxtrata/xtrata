@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Free Album Drop · Xtrata Music</title>
+<meta name="description" content="A link to a free album appears here every few minutes. Be quick: when it is claimed, the next one is on its way. No account, no app, no crypto needed." />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="canonical" href="https://xtrata.xyz/giveaway" />
+<meta property="og:title" content="Free Album Drop · Xtrata Music" />
+<meta property="og:description" content="A link to a free album appears here every few minutes. Be quick." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://xtrata.xyz/giveaway" />
+<meta name="twitter:card" content="summary" />
+<style>
+  :root{color-scheme:dark;--bg:#06080d;--panel:#0f1521;--panel2:#0b111b;--line:#223047;--ink:#e6edf6;--mut:#8b9bb4;
+    --acc:#3ea6ff;--acc2:#7c5cff;--cyan:#5ee9ff;--amber:#ffb547;--ok:#3ddc97;--heart:#ff5d7d;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:radial-gradient(1100px 650px at 25% -10%,rgba(94,233,255,.14),transparent 70%),
+      radial-gradient(900px 600px at 95% 110%,rgba(124,92,255,.14),transparent),var(--bg)}
+  a{color:var(--cyan)}
+  header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .logo{font-weight:800;letter-spacing:.4px;color:var(--ink);text-decoration:none}.logo b{color:var(--acc)}.logo i{color:var(--cyan);font-style:normal}
+  header nav{margin-left:auto;display:flex;gap:16px;font-size:14px}
+  header nav a{color:var(--mut);text-decoration:none}header nav a:hover{color:var(--ink)}
+  main{max-width:760px;margin:0 auto;padding:30px 16px 70px}
+  .kicker{display:inline-flex;align-items:center;gap:8px;font:700 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--cyan)}
+  .kicker .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}
+  body.is-live .kicker .dot{background:#ff4d4d;animation:pulse 1.2s ease-in-out infinite}
+  h1{font-size:clamp(30px,6.4vw,46px);line-height:1.08;margin:10px 0 12px;letter-spacing:-.01em}
+  h1 em{font-style:normal;background:linear-gradient(90deg,var(--cyan),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lead{color:var(--mut);font-size:18px;margin:0 0 22px}.lead strong{color:var(--ink)}
+  /* the drop */
+  .drop{position:relative;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:20px;padding:22px;margin:8px 0 14px;overflow:hidden}
+  body.is-live .drop{border-color:rgba(94,233,255,.55);box-shadow:0 0 0 1px rgba(94,233,255,.18),0 18px 60px rgba(94,233,255,.12);animation:arrive .5s ease-out}
+  .state{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:18px 6px}
+  .state h2{margin:0;font-size:24px}
+  .state p{margin:0;color:var(--mut);max-width:44ch}
+  .bars{display:flex;gap:5px;align-items:flex-end;height:46px;margin-bottom:6px}
+  .bars span{width:7px;border-radius:3px;background:linear-gradient(var(--cyan),var(--acc2));animation:eq 1.1s ease-in-out infinite}
+  .bars span:nth-child(2){animation-delay:.15s}.bars span:nth-child(3){animation-delay:.3s}.bars span:nth-child(4){animation-delay:.45s}.bars span:nth-child(5){animation-delay:.6s}.bars span:nth-child(6){animation-delay:.75s}
+  .album{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:center}
+  .cover{width:150px;aspect-ratio:1;border-radius:14px;background:linear-gradient(135deg,var(--acc2),var(--acc));display:grid;place-items:center;font-size:54px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .cover img{width:100%;height:100%;object-fit:cover;display:block}
+  .album h2{margin:2px 0 2px;font-size:26px;line-height:1.15}
+  .album .sub{color:var(--mut);margin:0 0 10px}
+  .songs{margin:0 0 14px;padding:0;list-style:none;color:var(--mut);font-size:14px;max-height:7.6em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+  .songs li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .songs b{color:var(--ink);font-weight:600}
+  .claim{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px 20px;border-radius:14px;border:0;cursor:pointer;text-decoration:none;
+    font:800 18px system-ui;color:#04101a;background:linear-gradient(90deg,var(--cyan),#8ad7ff);box-shadow:0 10px 30px rgba(94,233,255,.28)}
+  .claim:hover{filter:brightness(1.07)}
+  .hurry{margin:10px 0 0;text-align:center;color:var(--amber);font-size:14px}
+  .stats{display:flex;justify-content:center;gap:26px;flex-wrap:wrap;color:var(--mut);font-size:14px;margin:6px 0 4px}
+  .stats b{color:var(--ink);font:800 20px var(--mono);margin-right:4px}
+  .alert{display:flex;gap:10px;align-items:center;justify-content:center;margin:10px 0 0}
+  .ghost{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 14px;font:600 14px system-ui;cursor:pointer;text-decoration:none}
+  .ghost:hover{border-color:var(--cyan)}
+  .small{font-size:13px;color:var(--mut)}
+  /* sections */
+  h3{font-size:22px;margin:42px 0 12px}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;list-style:none;padding:0;margin:0}
+  .steps li{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .steps b{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:rgba(94,233,255,.14);color:var(--cyan);font:800 15px var(--mono);margin-bottom:8px}
+  .steps strong{display:block;margin-bottom:2px}
+  .steps span{color:var(--mut);font-size:14.5px}
+  .share{background:linear-gradient(135deg,rgba(124,92,255,.18),rgba(62,166,255,.10));border:1px solid var(--line);border-radius:16px;padding:20px}
+  .share h3{margin:0 0 6px;font-size:20px}.share p{margin:0 0 14px;color:var(--mut)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  details{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px 16px;margin:12px 0}
+  summary{cursor:pointer;font-weight:700;padding:12px 0}
+  details p,details li{color:var(--mut);font-size:15px}
+  footer{margin-top:44px;color:var(--mut);font-size:13px;text-align:center}
+  @keyframes pulse{50%{opacity:.25}}
+  @keyframes eq{0%,100%{height:8px}50%{height:44px}}
+  @keyframes arrive{from{transform:translateY(8px);opacity:.4}to{transform:none;opacity:1}}
+  @media (max-width:560px){.album{grid-template-columns:1fr;justify-items:center;text-align:center}.cover{width:min(240px,70vw)}.steps{grid-template-columns:1fr}.songs{-webkit-mask-image:none;mask-image:none}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="/">X<b>trata</b> <i>Music</i></a>
+  <nav><a href="https://radio.xtrata.xyz/radio.html">Radio</a><a href="/music/heroes">Music Heroes</a></nav>
+</header>
+
+<main>
+  <span class="kicker"><span class="dot"></span><span id="kicker">Free album drop</span></span>
+  <h1>A free album, <em>every few minutes.</em></h1>
+  <p class="lead">A link appears below. <strong>Tap it, and a whole album is yours to keep</strong>, with a stash of plays to enjoy it. One person gets each link, so be quick. When it is claimed, the next one is on its way.</p>
+
+  <section class="drop" aria-live="polite" aria-atomic="true" id="drop">
+    <div class="state" id="s-loading"><div class="bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div><p>Tuning in&hellip;</p></div>
+
+    <div id="s-live" hidden>
+      <div class="album">
+        <div class="cover" id="cover" aria-hidden="true">💿</div>
+        <div>
+          <h2 id="title">A free album</h2>
+          <p class="sub" id="subtitle"></p>
+          <ul class="songs" id="songs"></ul>
+        </div>
+      </div>
+      <a class="claim" id="claim" href="#" rel="noopener">Claim this album &rarr;</a>
+      <p class="hurry">Live right now &mdash; the first person to tap it gets it.</p>
+    </div>
+
+    <div class="state" id="s-taken" hidden>
+      <div class="bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <h2>Claimed!</h2>
+      <p>Somebody just got that one. The next link is on its way &mdash; keep this page open and it will appear here by itself.</p>
+    </div>
+
+    <div class="state" id="s-waiting" hidden>
+      <div class="bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <h2>Next drop coming&hellip;</h2>
+      <p>Keep this page open. A new link appears here by itself, usually within a few minutes.</p>
+    </div>
+
+    <div class="state" id="s-paused" hidden>
+      <h2>Taking a short break</h2>
+      <p>The drops are paused for a moment. Check back soon.</p>
+    </div>
+
+    <div class="state" id="s-done" hidden>
+      <h2>That&rsquo;s every one &mdash; thank you!</h2>
+      <p>All the free albums have found a home. Follow along on X for the next drop, and find more music on the radio.</p>
+      <a class="ghost" href="https://radio.xtrata.xyz/radio.html">Listen on the radio</a>
+    </div>
+
+    <div class="state" id="s-error" hidden>
+      <h2>Can&rsquo;t reach the drop right now</h2>
+      <p>Trying again&hellip; if this stays, refresh the page.</p>
+    </div>
+
+    <div class="stats" id="stats" hidden><span><b id="n-claimed">0</b>albums given away</span><span><b id="n-left">0</b>still to drop</span></div>
+    <div class="alert" id="alert" hidden><button class="ghost" id="notify" type="button">🔔 Ping me when a link drops</button></div>
+  </section>
+  <p class="small" style="text-align:center;margin:0">Works best on a phone or laptop with Face ID, Touch ID or a fingerprint reader. One copy of each album per person.</p>
+
+  <h3>How it works</h3>
+  <ol class="steps">
+    <li><b>1</b><strong>Tap the link</strong><span>When a drop is live, the button above opens the album player.</span></li>
+    <li><b>2</b><strong>Use your face or finger</strong><span>Your phone creates a private listening wallet on the spot. No sign-up, no app, no password.</span></li>
+    <li><b>3</b><strong>Press play</strong><span>The album is yours, with plays included. Every song you listen to also pays whoever holds that song a tiny amount.</span></li>
+  </ol>
+
+  <div class="share" style="margin-top:34px">
+    <h3>Know someone who has never touched crypto?</h3>
+    <p>Send them this page. They will not need to buy anything or learn anything: a link, a fingerprint, and music. If you are already into this stuff, this is the easiest way to show your friends and family what it feels like when it just works.</p>
+    <div class="row">
+      <button class="ghost" id="share" type="button">Share this page</button>
+      <a class="ghost" id="tweet" target="_blank" rel="noopener" href="#">Post on X</a>
+      <button class="ghost" id="copy" type="button">Copy link</button>
+    </div>
+  </div>
+
+  <h3>What is Xtrata Music?</h3>
+  <p class="lead" style="font-size:16px">Xtrata Music is a radio where the music belongs to the people who made and hold it. Listen for 30 seconds and the song pays its holder a small amount, straight away. Like a song and that is recorded too. Albums are sent as links, so a gift can be as simple as a text message.</p>
+
+  <details>
+    <summary>For the crypto-curious: what is actually happening</summary>
+    <ul>
+      <li>The songs are inscribed on Xtrata, on the Stacks network, and paid plays are small STX transfers to the song&rsquo;s holder.</li>
+      <li>Your listening wallet is a real Stacks wallet created from a passkey (Face ID, Touch ID, Windows Hello). The passkey never leaves your device, and there is no seed phrase.</li>
+      <li>Claiming a link sends a small starter balance to a brand-new wallet. Each album goes into its own numbered wallet under your passkey.</li>
+      <li>Already on Stacks? You can connect Xverse or Leather on the radio and listen with your own wallet.</li>
+    </ul>
+  </details>
+  <details>
+    <summary>Questions</summary>
+    <p><strong>Is it really free?</strong> Yes. The album and its starter plays are a gift.</p>
+    <p><strong>Do I need an account, an app or crypto?</strong> No. A modern phone or laptop is enough.</p>
+    <p><strong>I was too slow.</strong> Another link appears after each claim. Keep this page open, or tap &ldquo;Ping me&rdquo; to get an alert.</p>
+    <p><strong>Can I get more than one?</strong> One copy of each album per passkey.</p>
+  </details>
+
+  <footer>Xtrata Music &middot; <a href="https://radio.xtrata.xyz/radio.html">Radio</a> &middot; <a href="/">xtrata.xyz</a></footer>
+</main>
+
+<script>
+(function(){
+  var RADIO='https://radio.xtrata.xyz/radio.html#gift=';
+  var PAGE='https://xtrata.xyz/giveaway';
+  var $=function(id){return document.getElementById(id);};
+  var panes=['loading','live','taken','waiting','paused','done','error'];
+  var last='', lastCode='', fails=0, timer=0, covers={};
+
+  function show(name){panes.forEach(function(p){var el=$('s-'+p);if(el)el.hidden=(p!==name);});
+    document.body.classList.toggle('is-live',name==='live');
+    $('kicker').textContent=name==='live'?'Live now':'Free album drop';
+    document.title=(name==='live'?'\u{1F534} LIVE · ':'')+'Free Album Drop · Xtrata Music';}
+
+  // The album cover is an inscription: an image as it is, or a page with an image inside it.
+  function cover(id){
+    var box=$('cover');
+    box.textContent='\u{1F4BF}';
+    if(!id||!Number.isSafeInteger(id))return;
+    var put=function(url){if(url&&lastCover===id){var img=new Image();img.alt='';img.onload=function(){box.textContent='';box.appendChild(img);};img.src=url;}};
+    lastCover=id;
+    if(covers[id]!==undefined){put(covers[id]);return;}
+    fetch('/inscription/'+id).then(function(r){
+      var type=(r.headers.get('content-type')||'').toLowerCase();
+      if(!r.ok){return '';}
+      if(type.indexOf('image/')===0){if(r.body&&r.body.cancel)r.body.cancel();return '/inscription/'+id;}
+      if(type.indexOf('text/html')>=0)return r.text().then(function(t){var m=t.match(/<img[^>]+src="(data:image\/[^"]+)"/i);return m?m[1].replace(/&amp;/g,'&'):'';});
+      return '';
+    }).then(function(u){covers[id]=u;put(u);}).catch(function(){});
+  }
+  var lastCover=0;
+
+  function render(v){
+    var state=v.state;
+    var code=typeof v.code==='string'&&/^[A-Za-z0-9_-]{22}$/.test(v.code)?v.code:'';
+    if(state==='live'&&!code)state='waiting';
+    show(state);
+    if(state==='live'){
+      var a=v.album||{};
+      $('title').textContent=a.title||'A free album';
+      $('subtitle').textContent=a.subtitle||'';
+      var ul=$('songs');ul.textContent='';
+      (a.songs||[]).slice(0,10).forEach(function(s){var li=document.createElement('li');var b=document.createElement('b');b.textContent=s.title;li.appendChild(b);if(s.artist)li.appendChild(document.createTextNode(' · '+s.artist));ul.appendChild(li);});
+      $('claim').href=RADIO+code;
+      cover(a.cover);
+      if(code!==lastCode)announce(a.title);
+      lastCode=code;
+    }
+    $('stats').hidden=false;
+    $('n-claimed').textContent=Number(v.claimed||0).toLocaleString();
+    $('n-left').textContent=Number(v.left||0).toLocaleString();
+    $('alert').hidden=!(('Notification' in window)&&Notification.permission==='default'&&state!=='done');
+    last=state;
+  }
+
+  function announce(title){
+    try{
+      if(document.hidden&&'Notification' in window&&Notification.permission==='granted'){
+        new Notification('A free album just dropped',{body:(title?title+' — ':'')+'tap to claim it before it is gone.'});
+      }
+    }catch(e){}
+  }
+
+  function poll(){
+    clearTimeout(timer);
+    fetch('/radio/giveaway',{cache:'no-store'}).then(function(r){
+      if(!r.ok)throw new Error('http '+r.status);
+      return r.json();
+    }).then(function(v){fails=0;render(v);}).catch(function(){
+      fails++;
+      if(fails>=3||last==='')show('error');
+    }).then(function(){
+      // Quicker while a link is on show or one is about to land; gentle when nothing can change soon.
+      var wait=document.hidden?15000:(last==='live'||last==='taken'||last==='waiting'?5000:20000);
+      if(last==='done')wait=60000;
+      timer=setTimeout(poll,wait);
+    });
+  }
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)poll();});
+
+  $('notify').addEventListener('click',function(){
+    try{Notification.requestPermission().then(function(){$('alert').hidden=Notification.permission!=='default';});}catch(e){}
+  });
+
+  var text='There is a free album giveaway happening live: a new link drops every few minutes and one person gets each. Try it';
+  $('tweet').href='https://x.com/intent/post?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(PAGE);
+  if(!navigator.share)$('share').hidden=true;
+  $('share').addEventListener('click',function(){navigator.share({title:'Free Album Drop',text:text,url:PAGE}).catch(function(){});});
+  $('copy').addEventListener('click',function(){
+    var b=$('copy');
+    var done=function(){b.textContent='Copied ✓';setTimeout(function(){b.textContent='Copy link';},1800);};
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(PAGE).then(done,function(){});
+  });
+
+  poll();
+})();
+</script>
+</body>
+</html>
