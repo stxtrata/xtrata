@@ -225,7 +225,10 @@
   /* ------------------------------------------------------------ boot */
   async function boot() {
     var names = P.ORDER.css.concat(P.ORDER.html, P.ORDER.js);
-    var texts = await Promise.all(names.map(partText));
+    // Optional parts (the world reader) may be missing from an older bundle: the hall runs without them.
+    var texts = await Promise.all(names.map(function (n) {
+      return P.OPTIONAL.indexOf(n) >= 0 ? partText(n).catch(function () { return ''; }) : partText(n);
+    }));
     var byName = {};
     names.forEach(function (n, i) { byName[n] = texts[i]; });
     progress('Starting the hall…');
@@ -242,8 +245,10 @@
     var scores = { apiBases: apiBases() };
     if (Number(CONFIG.parentTokenId) > 0) scores.parentTokenId = Number(CONFIG.parentTokenId);
     window.XA_CONFIG.scores = Object.assign({}, window.XA_CONFIG.scores, scores);
+    if (CONFIG.world) window.XA_WORLD_CONFIG = CONFIG.world;   // contract ids for the world reader (absent = off)
     window.XA_BUILD = { version: CONFIG.version, bundleId: CONFIG.bundleId, packs: CONFIG.packs, parts: CONFIG.parts };
     P.ORDER.js.forEach(function (n) {
+      if (!byName[n]) return;                  // an optional part that was not found
       var s = document.createElement('script');
       s.setAttribute('data-xa-part', n);
       s.text = byName[n] + '\n//# sourceURL=xa-' + n;

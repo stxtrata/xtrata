@@ -169,6 +169,8 @@ function buildRoom(){
 
   buildLogoSign();
   buildPosters();
+  try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
+  XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests
   buildDayBoard();
 
   // inlaid logo in the carpet
@@ -1180,6 +1182,8 @@ let animImg=null; { const im=new Image(); im.onload=()=>{ animImg=im }; im.src=A
 function updateAnimPosters(t){
   const f=Math.floor(t*ANIM.fps)%ANIM.frames;
   for(const s of posterSlots) if(s.spec && s.spec.anim && (s.frame!==f || !s.drawn) && animImg){ s.frame=f; s.drawn=true; paintPoster(s,s.spec) }
+  for(const s of posterSlots) if(s.spec && s.spec.pic && s.spec.pic.sheet && s.spec.pic.img){
+    const e=s.spec.pic.entry, g=Math.floor(t*e.fps)%Math.max(1,e.frames); if(s.frame!==g){ s.frame=g; paintPoster(s,s.spec) } }
 }
 
 const posterSlots=[];
@@ -1205,6 +1209,14 @@ function paintPoster(slot, spec){
   y+=ss*.55; x.fillStyle=col; x.font=ss+'px VT323, monospace'; for(const l of sl){ x.fillText(l,W/2,y); y+=ss }
   if(spec.foot!==' ') x.fillRect(48,H-78,W-96,3);
   x.fillStyle='rgba(238,242,255,.75)'; fitFont(x,spec.foot||'XTRATA ARCADE',22,'Bungee, Impact, sans-serif',W-72); x.fillText(spec.foot||'XTRATA ARCADE',W/2,H-42);
+  if(spec.pic){
+    if(spec.pic.img){
+      const im=spec.pic.img;
+      if(spec.pic.sheet){ const e=spec.pic.entry, cw=Math.floor(im.width/Math.max(1,e.cols)), ch=cw>0 && e.frames>0 ? Math.floor(im.height/Math.ceil(e.frames/e.cols)) : 0, f=(slot.frame||0)%Math.max(1,e.frames);
+        if(cw>0 && ch>0) x.drawImage(im,(f%e.cols)*cw,Math.floor(f/e.cols)*ch,cw,ch,0,0,W,H) }
+      else x.drawImage(im,0,0,W,H);
+    } else ensurePic(spec);
+  }
   if(spec.play){   // playable: a PLAY tab in the top corner
     x.fillStyle=BTC_ORANGE; x.beginPath(); x.roundRect ? x.roundRect(W-120,30,88,30,15) : x.rect(W-120,30,88,30); x.fill();
     x.fillStyle='#0b0b10'; x.beginPath(); x.moveTo(W-106,38); x.lineTo(W-106,52); x.lineTo(W-94,45); x.closePath(); x.fill();
@@ -1249,7 +1261,77 @@ function wallForDay(day, nSlots){
 }
 function applyDay(day){
   const {wall, fresh}=wallForDay(day, posterSlots.length); chain.fresh=fresh;
-  posterSlots.forEach((s,i)=>{ const spec=ROTATION_POOL[wall[i]]; if(s.spec!==spec){ s.drawn=false; paintPoster(s,spec) } });
+  baseWall={day, wall};
+  paintWall();
+}
+/* The wall is the embedded rotation above (never changed). When the world contracts are on and have been read,
+   chain posters are laid over it (XAWorld.composeWall). With no contracts, or a failed read, the wall is the
+   embedded one exactly: that is the v1.3 hall. */
+let baseWall=null;
+const PIN_SLOTS=[null, 0, 14, 1, 15];   // pin spots 1-4 -> the four poster slots nearest the entrance
+function paintWall(){
+  if(!baseWall) return;
+  const W=window.XAWorld, snap=W && W.enabled() ? W.snapshot() : null;
+  let items=null;
+  if(snap){
+    try{ items=W.composeWall(baseWall.wall,{day:baseWall.day, nEmbedded:ROTATION_POOL.length, weights:ROTATION_W, snapshot:snap,
+      overlaySlots:posterSlots.map((s,i)=>s.bay?-1:i).filter(i=>i>=0), pinSlots:PIN_SLOTS}) }catch(e){ items=null }
+  }
+  posterSlots.forEach((s,i)=>{
+    const spec=items ? (items[i].src==='c' ? chainSpec(items[i].entry) : ROTATION_POOL[items[i].idx]) : ROTATION_POOL[baseWall.wall[i]];
+    if(s.spec!==spec){ s.drawn=false; paintPoster(s,spec) }
+  });
+  applyBays(snap);
+}
+/* Bays (the two wall areas at the far end). Posters mode, or any failure, shows the two posters as always.
+   Other scenes are drawn by the bay engine; until then a bay with another scene shows plain wall. */
+function applyBays(snap){
+  for(const s of posterSlots){
+    if(!s.bay) continue;
+    const bay=snap && snap.bays ? snap.bays[s.bay==='L'?0:1] : null;
+    const show=!bay || !bay.scene || bay.scene.base==='posters';
+    if(s.group && s.group.visible!==show) s.group.visible=show;
+  }
+}
+/* A chain poster as a hall poster spec. Cached by id and content, so an unchanged poster keeps its identity
+   (and is not repainted). Everything on it is text and numbers; pictures are checked against their chain hash. */
+const chainSpecs=new Map();
+function safePath(p){ return typeof p==='string' && /^\/[A-Za-z0-9._~\-][A-Za-z0-9._~\-\/?=&%#]*$/.test(p) && p.length<=64 }
+function chainSpec(e){
+  const key=e.id+'|'+e.kind+'|'+e.head+'|'+e.sub+'|'+e.foot+'|'+e.c+'|'+e.art+'|'+e.imageId+'|'+e.actKind+'|'+e.actId+'|'+e.actText;
+  const old=chainSpecs.get(e.id); if(old && old.key===key) return old.spec;
+  const spec={head:e.head, sub:e.sub, foot:e.foot||'XTRATA ARCADE', c:e.c, art:e.art, chainId:e.id};
+  if(e.kind===3 && e.art==='blocks'){ spec.live=true }        // live posters: the only binding so far is the Bitcoin day board
+  if((e.kind===1 || e.kind===2) && e.imageHash) spec.pic={entry:e, sheet:e.kind===2, img:null, state:0};
+  if(e.actKind===1 && e.actId>0) spec.play={id:e.actId, title:e.head, note:e.sub};
+  else if(e.actKind===2 && safePath(e.actText)) spec.play={path:e.actText, title:e.head, note:e.sub};
+  else if(e.actKind===3 && e.actId>0) spec.play={playlist:e.actId, title:e.head, note:e.sub};
+  chainSpecs.set(e.id,{key,spec});
+  return spec;
+}
+/* Poster pictures: one at a time, only for posters on the wall. PNG, WebP or JPEG only (checked by their first bytes). */
+const picQueue=[]; let picBusy=false;
+function picMime(b){
+  if(b.length>12 && b[0]===0x89 && b[1]===0x50 && b[2]===0x4e && b[3]===0x47) return 'image/png';
+  if(b.length>12 && b[0]===0x52 && b[1]===0x49 && b[2]===0x46 && b[3]===0x46 && b[8]===0x57 && b[9]===0x45 && b[10]===0x42 && b[11]===0x50) return 'image/webp';
+  if(b.length>3 && b[0]===0xff && b[1]===0xd8 && b[2]===0xff) return 'image/jpeg';
+  return null;
+}
+function ensurePic(spec){
+  const pic=spec.pic; if(!pic || pic.state!==0 || !window.XAWorld) return;
+  pic.state=1; picQueue.push(spec); if(!picBusy) nextPic();
+}
+function nextPic(){
+  const spec=picQueue.shift(); if(!spec){ picBusy=false; return }
+  picBusy=true;
+  XAWorld.loadImageBytes(spec.pic.entry).then(bytes=>{
+    const mime=picMime(bytes); if(!mime) throw new Error('not a picture');
+    const url=URL.createObjectURL(new Blob([bytes],{type:mime})), im=new Image();
+    return new Promise((ok,bad)=>{ im.onload=()=>{ URL.revokeObjectURL(url); ok(im) }; im.onerror=()=>{ URL.revokeObjectURL(url); bad(new Error('bad picture')) }; im.src=url });
+  }).then(im=>{
+    spec.pic.img=im; spec.pic.state=2;
+    for(const s of posterSlots) if(s.spec===spec){ s.drawn=false; paintPoster(s,spec) }
+  }).catch(()=>{ spec.pic.state=3 }).then(()=>setTimeout(nextPic,150));
 }
 function repaintLivePosters(){ for(const s of posterSlots) if(s.spec && s.spec.live) paintPoster(s,s.spec) }
 if(STACKS_LOGO){ const im=new Image(); im.onload=()=>{ stacksImg=im; for(const s of posterSlots) if(s.spec && s.spec.art==='stacks') paintPoster(s,s.spec) }; im.src=STACKS_LOGO }
@@ -1261,15 +1343,15 @@ function buildPosters(){
   const spots=[];
   for(const [side,n] of [[-1,NL],[1,NR]]){
     const zHi=cabZ(0,n)+.62, zLo=cabZ(n-1,n)-.62, wallEnd=RL/2-.35;
-    const endPair=(a,b)=>{ const mid=(a+b)/2; spots.push([side,mid+.52],[side,mid-.52]) };
+    const endPair=(a,b,bay)=>{ const mid=(a+b)/2; spots.push([side,mid+.52,bay],[side,mid-.52,bay]) };
     endPair(zHi, wallEnd);
     for(let k=0;k<n-1;k++) spots.push([side, cabZ(k,n)-GAP/2]);
-    endPair(-wallEnd, zLo);
+    endPair(-wallEnd, zLo, side<0?'L':'R');   // far end: these four posters are the two bays' default scene
   }
-  spots.forEach(([side,z])=>{
+  spots.forEach(([side,z,bay])=>{
     const g=new THREE.Group(); g.position.set(side*(RW/2-.03),1.95,z); g.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
     g.add(new THREE.Mesh(new THREE.BoxGeometry(.84,1.22,.03),frameMat));
-    const slot=makePosterSlot(); slot.pos={x:side*(RW/2-.03), z};
+    const slot=makePosterSlot(); slot.pos={x:side*(RW/2-.03), z}; slot.group=g; if(bay) slot.bay=bay;
     const p=new THREE.Mesh(new THREE.PlaneGeometry(.76,1.14), new THREE.MeshBasicMaterial({map:slot.tex, color:0xdadada}));
     p.position.z=.017; p.userData.slot=slot; posterMeshes.push(p); g.add(p); scene.add(g);
   });
@@ -1397,7 +1479,7 @@ const pray=new THREE.Raycaster(); pray.far=5;
 function posterAt(v){
   if(!posterMeshes.length) return null;
   pray.setFromCamera(v,camera);
-  const h=pray.intersectObjects(posterMeshes,false)[0];
+  const h=pray.intersectObjects(posterMeshes,false).find(x=>x.object.parent && x.object.parent.visible);
   const s=h && h.object.userData.slot;
   return s && s.spec && s.spec.play ? s : null;
 }
@@ -1409,6 +1491,14 @@ function chainUrl(id){ return XTRATA_BASE+'/i/'+id }
 function loadChainFrame(url){ const f=$('cpf'); f.src='about:blank'; setTimeout(()=>{ f.src=url }, 30); $('cpo').href=url }
 function openChain(play){
   if(!play || chainOpen || state!=='walk') return;
+  if(play.playlist && !play.tracks){   // a playlist poster: the track list is a small JSON inscription
+    const pl=play; fetch(XTRATA_BASE+'/i/'+pl.playlist+'?raw=1').then(r=>r.ok?r.json():Promise.reject()).then(j=>{
+      const t=Array.isArray(j.tracks) ? j.tracks.filter(x=>Array.isArray(x) && Number.isInteger(x[0]) && x[0]>0 && typeof x[1]==='string').slice(0,40).map(x=>[x[0],x[1].slice(0,60)]) : [];
+      if(t.length) pl.tracks=t;
+    }).catch(()=>{}).then(()=>{ if(pl.tracks) openChain(pl) });
+    return;
+  }
+  if(!play.tracks && !play.path && !play.id) return;
   chainOpen=true; if(document.pointerLockElement) document.exitPointerLock();
   try{ Room.pause() }catch(e){}
   $('cpt').textContent=play.title; $('cpn').textContent=play.note||'';

@@ -1,0 +1,39 @@
+# Integration project: the poster and world contracts against the REAL core source
+# (xtrata-v3.2.3, deployed on mainnet as xtrata-v3-2-3). Generated copies of the two
+# contracts live in contracts/ (see scripts/make-realcore.mjs).
+[project]
+name = 'xtrata-arcade-world-integration'
+authors = []
+telemetry = false
+cache_dir = './.cache'
+requirements = []
+
+[contracts.sip009-nft-trait]
+path = '../../clarinet/contracts/sip009-nft-trait.clar'
+clarity_version = 2
+epoch = 2.5
+
+[contracts.xtrata-v1-1-1]
+path = '../../clarinet/contracts/xtrata-v1.1.1.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.xtrata-v2-1-0]
+path = '../../clarinet/contracts/xtrata-v2.1.0.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.xtrata-v3-2-3]
+path = '../../clarinet/contracts/xtrata-v3.2.3.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.xtrata-posters-v1]
+path = 'contracts/xtrata-posters-v1.clar'
+clarity_version = 4
+epoch = 'latest'
+
+[contracts.xtrata-world-v1]
+path = 'contracts/xtrata-world-v1.clar'
+clarity_version = 4
+epoch = 'latest'

@@ -27,7 +27,7 @@
  *   RADIO_GIFT_ENABLED = "1"            kill switch; anything else stops claims, new gifts and refunds
  *   RADIO_GIFT_TREASURY_KEY             the treasury's private key (secret)
  *   RADIO_GIFT_ADMIN = "SP…"            the addresses that may sign campaign and player requests (several: separate with commas)
- *   RADIO_GIFT_ESCROW_CAP               most creator- and friend-funded money held at once, including batches still waiting for their payment (default 50 STX)
+ *   RADIO_GIFT_ESCROW_CAP               most friend-gift money held at once (default 50 STX); prefunded album batches are not capped
  *   RADIO_GIFT_TURNSTILE_SITE_KEY / _SECRET   optional Cloudflare Turnstile check on claims
  *   TELEMETRY_SALT                      salts the IP hash used for per-IP limits (no IP is stored)
  * Gifts also need pay-per-play to be on and the radio host (functions/lib/radio-listening-wallet.ts).
@@ -725,11 +725,6 @@ async function checkDeposit(env: GiftEnv, r: Row, txid: string | null, treasury:
 // ---------------------------------------------------------------------------- prefunded batches
 
 const batchRow = (env: GiftEnv, id: string) => one<BatchRow>(env, 'SELECT * FROM radio_gift_batches WHERE id=?', [id]);
-/** What the unpaid batches of the last day would add to escrow if they were all paid: counted against the cap up front. */
-const pendingBatchTotal = async (env: GiftEnv, now: number) => {
-  const rows = await all<{ count: number; amount: number }>(env, "SELECT count, amount FROM radio_gift_batches WHERE status='pending-deposit' AND created_at>?", [now - PENDING_DEPOSIT_MS]);
-  return rows.reduce((sum, b) => sum + batchDeposit(b.count, BigInt(b.amount)), 0n);
-};
 
 /** A batch as the creator's page sees it: the bill, the memo, and where each copy stands. No codes (they are shown once). */
 async function batchView(env: GiftEnv, b: BatchRow): Promise<BatchView> {
@@ -765,9 +760,8 @@ export async function createBatch(env: GiftEnv, body: { request: BatchRequest; s
   const total = batchDeposit(req.count, BigInt(req.amount));
   const waiting = await one<{ n: number }>(env, "SELECT COUNT(*) AS n FROM radio_gift_batches WHERE creator=? AND status='pending-deposit' AND created_at>?", [req.creator, deps.now - PENDING_DEPOSIT_MS]);
   if ((waiting?.n ?? 0) >= MAX_PENDING_BATCHES) throw new GiftError('Several batches are still waiting for their payment. Pay or wait for them first.', 429);
-  // Counted before anything is made, including batches not yet paid, so unpaid batches cannot add up past the cap once paid.
-  if ((await owedToFriends(env)) + (await pendingBatchTotal(env, deps.now)) + total > micro(env.RADIO_GIFT_ESCROW_CAP, DEFAULT_ESCROW_CAP))
-    throw new GiftError('The gift treasury is full right now. Try a smaller batch, or try again in a few days.', 503);
+  // No size cap: only a gift admin can get here, every copy is paid for up front by the creator's own deposit (nothing is
+  // made live until it confirms), and unclaimed copies go back to them. The escrow cap guards friend gifts only.
   const id = randomId().slice(0, 16), db = d1(env), now = deps.now, amount = Number(req.amount);
   const codes = Array.from({ length: req.count }, () => newGiftCode());
   // One transaction: the batch and every copy, or nothing. Copies go in a few rows per statement (D1 allows 100 bound values).

@@ -159,10 +159,105 @@ describe('apply to all', () => {
     expect(items[0].status).toBe('ready'); // untouched songs are not rebuilt
   });
 
+  it('sets any shared detail, not only artist and album', () => {
+    const items = [row('a.mp3', { genre: 'Pop' }), row('b.mp3')];
+    expect(
+      B.applyShared(
+        items,
+        { genre: 'Synth', license: 'CC BY 4.0', title: 'Nope', lyrics: 'No' },
+        false
+      )
+    ).toBe(2);
+    expect(items[0].overrides).toEqual({ genre: 'Synth', license: 'CC BY 4.0' }); // title and lyrics are never shared
+    expect(B.SHARED_KEYS).not.toContain('title');
+    expect(B.SHARED_KEYS).not.toContain('lyrics');
+    expect(B.SHARED_KEYS).not.toContain('trackNumber');
+  });
+
+  it('only fills a shared detail where it is empty, per detail', () => {
+    const items = [
+      row('a.mp3', { genre: 'Pop', producer: '' }),
+      row('b.mp3', { genre: '', producer: 'Me' })
+    ];
+    expect(B.applyShared(items, { genre: 'Synth', producer: 'Jim' }, true)).toBe(2);
+    expect(items[0].overrides).toEqual({ producer: 'Jim' });
+    expect(items[1].overrides).toEqual({ genre: 'Synth' });
+  });
+
   it('does nothing when both boxes are empty', () => {
     const items = [row('a.mp3')];
     expect(B.applyShared(items, { artist: '  ', album: '' }, false)).toBe(0);
     expect(items[0].status).toBe('ready');
+  });
+});
+
+describe('a title or artist typed into one song', () => {
+  it('changes only what differs and queues a rebuild', () => {
+    const r = row('a.mp3', { title: 'Old', artist: 'Jim' });
+    expect(B.applyQuick(r, { title: '  New name ', artist: 'Jim' })).toBe(true);
+    expect(r.overrides).toEqual({ title: 'New name' });
+    expect(r.status).toBe('queued');
+  });
+
+  it('ignores an untouched or identical value', () => {
+    const r = row('a.mp3', { title: 'Old', artist: 'Jim' });
+    expect(B.applyQuick(r, {})).toBe(false);
+    expect(B.applyQuick(r, { title: 'Old' })).toBe(false);
+    expect(r.status).toBe('ready');
+  });
+
+  it('compares with an earlier edit, and lets a name be cleared', () => {
+    const r = row('a.mp3', { title: 'From tag' }, { overrides: { title: 'Edited' } });
+    expect(B.applyQuick(r, { title: 'Edited' })).toBe(false);
+    expect(B.applyQuick(r, { title: '' })).toBe(true);
+    expect(r.overrides.title).toBe('');
+  });
+});
+
+describe('the same artwork on many songs', () => {
+  const withArt = (name: string) =>
+    row(name, { hasCover: true, coverSource: 'file', found: { cover: true } });
+  const noArt = (name: string) => row(name, { hasCover: false, found: {} });
+  const audioOnly = (name: string) => row(name, { format: 'audio' });
+  const img = { coverB64: 'AAAA', coverMime: 'image/png' };
+
+  it('sets one image on every song that can show artwork', () => {
+    const items = [withArt('a.mp3'), noArt('b.mp3'), audioOnly('c.mp3')];
+    expect(B.applyArt(items, img, false)).toEqual({ changed: 2, audioOnly: 1, skipped: 0 });
+    expect(items[0].overrides).toMatchObject({
+      format: 'artwork',
+      coverB64: 'AAAA',
+      coverMime: 'image/png'
+    });
+    expect(items[1].status).toBe('queued');
+    expect(items[2].overrides).toEqual({});
+  });
+
+  it('only fills songs without artwork when asked, and counts songs not built yet', () => {
+    const items = [withArt('a.mp3'), noArt('b.mp3'), row('c.mp3', {}, { status: 'building' })];
+    expect(B.applyArt(items, img, true)).toEqual({ changed: 1, audioOnly: 0, skipped: 1 });
+    expect(items[0].overrides).toEqual({});
+    expect(items[1].overrides?.coverB64).toBe('AAAA');
+  });
+
+  it('treats art left out of a song as empty', () => {
+    const left = row('a.mp3', { hasCover: false, found: { cover: true } });
+    expect(B.applyArt([left], img, true).changed).toBe(1);
+  });
+
+  it('links an inscription instead and drops any embedded image', () => {
+    const ref = { id: '134', mimeType: 'image/jpeg', finalHash: 'abc' };
+    const r = noArt('a.mp3');
+    r.overrides = { coverB64: 'OLD', coverMime: 'image/png', title: 'Keep' };
+    expect(B.applyArt([r], { coverInscription: ref }, false).changed).toBe(1);
+    expect(r.overrides).toEqual({ format: 'artwork', coverInscription: ref, title: 'Keep' });
+  });
+
+  it('does nothing without an image', () => {
+    const r = noArt('a.mp3');
+    expect(B.applyArt([r], {}, false).changed).toBe(0);
+    expect(B.applyArt([r], undefined as never, false).changed).toBe(0);
+    expect(r.status).toBe('ready');
   });
 });
 

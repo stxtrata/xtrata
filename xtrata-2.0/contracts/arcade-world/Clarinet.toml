@@ -1,0 +1,22 @@
+[project]
+name = 'xtrata-arcade-world'
+description = 'Xtrata Arcade: poster registry and world (rooms, bays, scenes, looks)'
+authors = []
+telemetry = false
+cache_dir = './.cache'
+requirements = []
+
+[contracts.mock-xtrata-core]
+path = 'contracts/mock-xtrata-core.clar'
+clarity_version = 4
+epoch = 'latest'
+
+[contracts.xtrata-posters-v1]
+path = 'contracts/xtrata-posters-v1.clar'
+clarity_version = 4
+epoch = 'latest'
+
+[contracts.xtrata-world-v1]
+path = 'contracts/xtrata-world-v1.clar'
+clarity_version = 4
+epoch = 'latest'

@@ -1,0 +1,7 @@
+{ "name": "xtrata-arcade-world", "private": true, "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "make-live": "node scripts/make-live.mjs",
+    "test:integration": "node scripts/make-realcore.mjs && cd integration && node --test real-core.test.mjs"
+  },
+  "dependencies": { "@stacks/clarinet-sdk": "^3.9.0", "@stacks/transactions": "^7.2.0" } }

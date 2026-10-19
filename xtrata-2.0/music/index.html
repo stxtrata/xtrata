@@ -69,7 +69,7 @@
   .efield input:focus,.efield textarea:focus{outline:none;border-color:var(--acc2)}
   footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
 </style>
-<link rel="stylesheet" href="music.css?v=5" />
+<link rel="stylesheet" href="music.css?v=7" />
 </head>
 <body>
 <header>
@@ -170,14 +170,39 @@
           <div class="efield"><label for="sbBulkArtist">Artist</label><input id="sbBulkArtist" type="text" maxlength="120" placeholder="Same artist for every song" /></div>
           <div class="efield"><label for="sbBulkAlbum">Album</label><input id="sbBulkAlbum" type="text" maxlength="120" placeholder="Same album for every song" /></div>
         </div>
+        <div class="efield sb-bulk-art">
+          <label for="sbBulkArtInsc">Artwork</label>
+          <div class="sb-linkrow">
+            <img id="sbBulkArtThumb" alt="Chosen artwork" hidden />
+            <button type="button" class="btn ghost sb-btn" id="sbBulkArtChoose">🖼 Choose an image…</button>
+            <span class="muted" style="font-size:12px">or</span>
+            <input id="sbBulkArtInsc" type="text" inputmode="numeric" placeholder="Inscription number — e.g. 134" aria-label="Artwork inscription number" />
+            <button type="button" class="btn ghost sb-btn" id="sbBulkArtClear" hidden>Remove</button>
+          </div>
+          <div id="sbBulkArtNote" class="muted" style="font-size:11.5px;margin-top:5px">Same cover on every song. A chosen image is resized and stored in each player; an inscription number links to that image instead, which is much cheaper.</div>
+        </div>
+        <details id="sbBulkMore" class="sb-more">
+          <summary>More shared details — genre, credits, rights…</summary>
+          <div class="sb-bulk-grid">
+          <div class="efield"><label for="sbBulk_featuredArtists">Featured artists</label><input id="sbBulk_featuredArtists" type="text" maxlength="200" /></div>
+          <div class="efield"><label for="sbBulk_genre">Genre</label><input id="sbBulk_genre" type="text" maxlength="200" /></div>
+          <div class="efield"><label for="sbBulk_releaseDate">Release date</label><input id="sbBulk_releaseDate" type="text" maxlength="200" /></div>
+          <div class="efield"><label for="sbBulk_language">Language</label><input id="sbBulk_language" type="text" maxlength="200" /></div>
+          <div class="efield"><label for="sbBulk_songwriters">Songwriters</label><input id="sbBulk_songwriters" type="text" maxlength="200" /></div>
+          <div class="efield"><label for="sbBulk_performers">Performers</label><input id="sbBulk_performers" type="text" maxlength="200" /></div>
+          <div class="efield"><label for="sbBulk_producer">Producer</label><input id="sbBulk_producer" type="text" maxlength="200" /></div>
+          <div class="efield"><label for="sbBulk_engineer">Engineer</label><input id="sbBulk_engineer" type="text" maxlength="200" /></div>
+          <div class="efield"><label for="sbBulk_rightsHolder">Rights holder</label><input id="sbBulk_rightsHolder" type="text" maxlength="200" /></div>
+          <div class="efield"><label for="sbBulk_license">License</label><input id="sbBulk_license" type="text" maxlength="200" /></div>
+          </div>
+        </details>
+        <div class="muted" style="font-size:11px;margin-top:8px">Boxes left empty change nothing, and “Only where empty” leaves any song that already has artwork alone. Titles, lyrics and track numbers stay per song — use the boxes on each song, or its “All details” editor. Applying clears the boxes so a later edit never gets overwritten by mistake.</div>
         <div class="sb-actions">
           <button type="button" class="btn ghost sb-btn" id="sbBulkApply">Apply to all</button>
-          <button type="button" class="btn ghost sb-btn" id="sbBulkFill" title="Leave songs that already have an artist or album alone">Only where empty</button>
+          <button type="button" class="btn ghost sb-btn" id="sbBulkFill" title="Leave songs that already have those details alone">Only where empty</button>
           <button type="button" class="btn ghost sb-btn" id="sbBulkNumber" title="Uses the numbers at the start of the file names, or the order shown">Number the tracks</button>
         </div>
         <div class="sb-actions">
-          <button type="button" class="btn ghost sb-btn" id="sbBulkArtMissing">🖼 Same image for songs without art…</button>
-          <button type="button" class="btn ghost sb-btn" id="sbBulkArtAll">🖼 Same image for every song…</button>
           <button type="button" class="btn ghost sb-btn" id="sbBulkNoArt">No art on any song</button>
           <button type="button" class="btn ghost sb-btn" id="sbBulkUseArt">Use the art in the files</button>
           <button type="button" class="btn ghost sb-btn" id="sbBulkShrink">Shrink large covers</button>
@@ -354,10 +379,10 @@
 <script src="music-diagnostics.js?v=1"></script>
 <script src="audio-processing.js?v=3"></script>
 <script src="music-sources.js?v=2"></script>
-<script src="music-batch.js?v=1"></script>
+<script src="music-batch.js?v=3"></script>
 <script src="music-build.js?v=5"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-09-12.1"></script>
+<script src="agent-one.js?v=2026-10-18.2"></script>
 <script>
 let musicSubmitting=false;
 function musicJobActive(){return musicSubmitting||(typeof JOB!=='undefined'&&JOB&&!['DONE','COMPLETE','COMPLETE_WITH_SKIPS','COMPLETED','REFUNDED','CANCELLED','FAILED'].includes(JOB.status));}
@@ -1213,6 +1238,7 @@ async function sbProcess(){
 }
 function sbPreviewUrl(it){ if(!it.player) return ''; if(!it.previewUrl){ try{ it.previewUrl=URL.createObjectURL(it.player); }catch(_e){ it.previewUrl=''; } } return it.previewUrl; }
 const sbLocked=()=>SB.busy||musicJobActive();
+const escAttr=(v)=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 function sbChips(it){
   const M=window.XtrataMusicBatch; if(!M) return '';
   const list=M.chips(it); if(!list.length) return '';
@@ -1236,6 +1262,11 @@ function sbLinkPanel(it,i){
 function sbRow(it,i){
   const M=window.XtrataMusicBatch;
   const title = it.info? (esc(it.info.title||it.file.name)+(it.info.artist?(' — '+esc(it.info.artist)):'')) : esc(it.file.name);
+  const editing=(typeof window.musicEditingIndex==='function')&&window.musicEditingIndex()===i;
+  const eff={...(it.info||{}),...(it.overrides||{})};
+  const jobLock=musicJobActive()?' disabled':'';
+  const qfield=(key,label,ph)=>'<label class="sb-q"><span>'+label+'</span><input type="text" maxlength="200" data-sbq="'+key+i+'" placeholder="'+ph+'" value="'+escAttr(it.draft&&it.draft[key]!==undefined?it.draft[key]:(eff[key]||''))+'" oninput="sbDraft('+i+',\''+key+'\',this.value)" onchange="sbQuick('+i+')" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'+jobLock+' /></label>';
+  const quick=(it.status==='ready')?('<div class="sb-quick">'+qfield('title','Title',escAttr(it.file.name))+qfield('artist','Artist','Artist')+'</div>'):'';
   const artSrc = it.info&&it.info.coverB64 ? ('data:'+(it.info.coverMime||'image/jpeg')+';base64,'+it.info.coverB64) : (it.info&&it.info.coverUrl?esc(it.info.coverUrl):'');
   let status;
   if(it.status==='ready'&&it.needs&&it.needs.length) status='<span style="color:var(--warn)">needs '+esc(listOf(it.needs))+'</span>';
@@ -1250,7 +1281,7 @@ function sbRow(it,i){
   let actions='';
   if(it.status==='ready'){
     actions+=btn('sbToggle',(it.show?'▾ Hide':'▸ Preview'),'Preview this player');
-    actions+=btn('musicEditTrack','Edit','Edit this track');
+    actions+=btn('musicEditTrack',editing?'▾ Close details':'▸ All details','Edit every detail of this song — title, credits, lyrics, player style',editing?' aria-expanded="true"':' aria-expanded="false"');
     if(f&&f.art==='off') actions+=btn('sbUseArt','Use file art','Put the artwork found in this file back in the player');
     if(f&&['file','upload','linked'].includes(f.art)) actions+=btn('sbNoArt','No art','Leave artwork out of this player');
     if(f&&f.art!=='n/a') actions+=btn('sbArt',(f.art==='file'||f.art==='upload')?'🖼 Change':'🖼 Add art','Choose artwork for this player');
@@ -1261,11 +1292,12 @@ function sbRow(it,i){
     actions+='<span class="sb-move">'+btn('sbMoveUp','↑','Move up',i===0?' disabled':'')+btn('sbMoveDown','↓','Move down',i===SB.items.length-1?' disabled':'')+'</span>';
   }
   actions+=btn('sbRemove','✕','Remove from batch');
-  return '<div class="sbrow" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px">'
+  return '<div class="sbrow'+(editing?' editing':'')+'" data-i="'+i+'" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px">'
     +'<div style="display:flex;gap:10px;align-items:center">'
       +'<img alt="" src="'+artSrc+'" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#10120f;flex:none"/>'
       +'<div style="flex:1;min-width:0"><div class="fname" style="font-size:14px;word-break:break-word"><span class="sb-num">'+(i+1)+'</span>'+title+'</div><div class="fmeta">'+status+'</div></div>'
     +'</div>'
+    +quick
     +sbChips(it)
     +'<div class="sb-actions">'+actions+'</div>'
     +sbLinkPanel(it,i)
@@ -1289,15 +1321,14 @@ function sbRender(){
   const show=(sel,on,label)=>{ const el=$(sel); el.hidden=!on; if(on&&label) el.textContent=label; };
   show('#sbBulkNoArt',!!S&&S.withArt>0);
   show('#sbBulkUseArt',!!S&&S.artLeftOut>0);
-  show('#sbBulkArtMissing',!!S&&S.withoutArt>0,S?('🖼 Same image for the '+S.withoutArt+' without art…'):'');
   show('#sbBulkShrink',!!S&&S.largeArt>0,S?('Shrink '+S.largeArt+' large cover'+(S.largeArt>1?'s':'')):'');
   // Keep the cursor in a link box while the list redraws under it.
-  const act=document.activeElement, keep=act&&act.dataset&&act.dataset.sbin?act.dataset.sbin:'', at=keep?act.selectionStart:0;
+  const act=document.activeElement, keepAttr=act&&act.dataset?(act.dataset.sbin?'sbin':(act.dataset.sbq?'sbq':'')):'', keep=keepAttr?act.dataset[keepAttr]:'', at=keep?act.selectionStart:0;
   $('#sbList').innerHTML = SB.items.map((it,i)=>sbRow(it,i)).join('');
-  if(keep){ const el=document.querySelector('[data-sbin="'+keep+'"]'); if(el){ el.focus(); try{ el.setSelectionRange(at,at); }catch(_e){} } }
+  if(keep){ const el=document.querySelector('[data-'+keepAttr+'="'+keep+'"]'); if(el){ el.focus(); try{ el.setSelectionRange(at,at); }catch(_e){} } }
   const needy=SB.items.filter(it=>it.status==='ready'&&it.needs&&it.needs.length).length;
   $('#sbDropped').textContent = needy
-    ? (needy+' song'+(needy>1?'s':'')+' need attention — open Edit on them and the button will unlock.')
+    ? (needy+' song'+(needy>1?'s':'')+' need attention — open “All details” on them and the button will unlock.')
     : (SB.droppedNote||'');
   const bytes=ready.reduce((s,it)=>s+it.player.size,0);
   $('#sbCount').textContent = ready.length+' / '+total+(ready.length?(' · '+sbMib(bytes)+' MiB total'):'');
@@ -1381,7 +1412,7 @@ $('#sbArtPick').onchange=async()=>{
   sbRender(); sbQuote();
 };
 /* ---- Batch tools: bulk actions, the per-song artwork switch, existing inscriptions as sources ---- */
-let sbBulkBusy=false, sbBulkArtMode='missing';
+let sbBulkBusy=false;
 const sbIdle=()=>!SB.busy&&!musicJobActive()&&!refBusy&&!sbBulkBusy;
 const sbBulkSay=(h)=>{ $('#sbBulkStatus').innerHTML=h; };
 const sbS=(n,w)=>n+' '+w+(n===1?'':'s');
@@ -1395,11 +1426,53 @@ window.sbMoveDown=(i)=>{ if(sbIdle()&&window.XtrataMusicBatch.move(SB.items,i,1)
 window.sbLinkToggle=(i)=>{ const it=SB.items[i]; if(it){ it.linkOpen=!it.linkOpen; sbRender(); } };
 window.sbLinkIn=(i,key,value)=>{ const it=SB.items[i]; if(it) it[key]=value; };
 
-function sbShare(onlyEmpty){
+// Title/artist typed straight into a song's row. The draft survives redraws; the change is applied
+// when the box loses focus, and waits if that song is in the middle of being built.
+window.sbDraft=(i,key,value)=>{ const it=SB.items[i]; if(it) it.draft={...it.draft,[key]:value}; };
+window.sbQuick=(i)=>{
+  const it=SB.items[i]; if(!it||!it.draft||musicJobActive()) return;
+  if(it.status==='probing'||it.status==='building'){ setTimeout(()=>{ if(SB.items[i]===it) window.sbQuick(i); },300); return; }
+  if(it.status!=='ready') return;
+  const draft=it.draft; it.draft=null;
+  if(window.XtrataMusicBatch.applyQuick(it,draft)) sbChanged(); else sbRender();
+};
+const sbBulkBox=(key)=>$(key==='artist'?'#sbBulkArtist':key==='album'?'#sbBulkAlbum':'#sbBulk_'+key);
+async function sbShare(onlyEmpty){
   if(!sbIdle()) return;
-  const n=window.XtrataMusicBatch.applyShared(SB.items,{artist:$('#sbBulkArtist').value,album:$('#sbBulkAlbum').value},onlyEmpty);
-  if(!n){ sbBulkSay(onlyEmpty?'Every song already has what you typed — or both boxes are empty.':'Type an artist or an album first.'); return; }
-  sbBulkSay('<span class="ok">✓ Set on '+sbS(n,'song')+'.</span>'); sbChanged();
+  const M=window.XtrataMusicBatch, values={};
+  for(const k of M.SHARED_KEYS){ const el=sbBulkBox(k); if(el) values[k]=el.value; }
+  const insc=$('#sbBulkArtInsc').value.trim();
+  const hasText=M.SHARED_KEYS.some(k=>String(values[k]||'').trim());
+  if(!hasText&&!sbBulkArt&&!insc){ sbBulkSay(onlyEmpty?'Every song already has what you typed — or the boxes are empty.':'Type something in one of the boxes, or choose artwork, first.'); return; }
+  // Work out the artwork first: a link has to be read and verified before anything is changed.
+  let art=null;
+  if(sbBulkArt) art={ coverB64:sbBulkArt.coverB64, coverMime:sbBulkArt.coverMime };
+  else if(insc){
+    const S=window.XtrataMusicSources;
+    if(!S){ sbBulkSay(refErr('The source checker did not load. Reload the page.')); return; }
+    if(SERVER.net==='testnet'){ sbBulkSay(refErr('Linking to existing inscriptions works on mainnet only.')); return; }
+    refBusy=true; sbBulkSay('<span class="spin"></span>Reading and verifying the image…');
+    try{
+      const res=await S.inspect('image',insc,{base:REF_BASE});
+      if(!res.ok){ sbBulkSay(refErr(res.message)); return; }
+      await refRegister(res);
+      art={ coverInscription:{ id:res.id, mimeType:res.mime, finalHash:res.finalHash } };
+    }catch(e){ sbBulkSay(refErr('Could not use that inscription: '+((e&&e.message)||e))); return; }
+    finally{ refBusy=false; }
+  }
+  // Artwork first: applying text queues the songs for a rebuild, and queued songs are not judged as ready.
+  const a=art?M.applyArt(SB.items,art,onlyEmpty):{changed:0,audioOnly:0,skipped:0};
+  const n=hasText?M.applyShared(SB.items,values,onlyEmpty):0;
+  if(!n&&!a.changed){ sbBulkSay(onlyEmpty?'Every song already has what you typed — or the boxes are empty.':'Nothing to change.'); return; }
+  for(const k of M.SHARED_KEYS){ const el=sbBulkBox(k); if(el) el.value=''; }
+  if(art) sbBulkArtReset();
+  const parts=[];
+  if(n) parts.push('details set on '+sbS(n,'song'));
+  if(a.changed) parts.push((art.coverInscription?'artwork #'+art.coverInscription.id+' linked on ':'artwork set on ')+sbS(a.changed,'song'));
+  const notes=[];
+  if(a.audioOnly) notes.push(sbS(a.audioOnly,'audio-only song')+' can’t show artwork');
+  if(a.skipped) notes.push(sbS(a.skipped,'song')+' not ready yet');
+  sbBulkSay('<span class="ok">✓ '+parts.join(' · ')+'.</span> The boxes are cleared — you can still change any song on its own.'+(notes.length?' <span class="muted">('+notes.join('; ')+'.)</span>':'')+(a.changed&&art.coverInscription?('<div style="margin-top:6px">'+refLine(art.coverInscription.id)+'</div>'):'')); sbChanged();
 }
 $('#sbBulkApply').onclick=()=>sbShare(false);
 $('#sbBulkFill').onclick=()=>sbShare(true);
@@ -1410,25 +1483,37 @@ $('#sbBulkNumber').onclick=()=>{
 };
 $('#sbBulkNoArt').onclick=()=>{ if(!sbIdle()) return; const n=window.XtrataMusicBatch.setArt(SB.items,'off'); if(!n) return; sbBulkSay('<span class="ok">✓ Artwork left out of '+sbS(n,'song')+'.</span>'); sbChanged(); };
 $('#sbBulkUseArt').onclick=()=>{ if(!sbIdle()) return; const n=window.XtrataMusicBatch.setArt(SB.items,'on'); if(!n) return; sbBulkSay('<span class="ok">✓ File artwork back on '+sbS(n,'song')+'.</span>'); sbChanged(); };
-$('#sbBulkArtMissing').onclick=()=>{ if(!sbIdle()) return; sbBulkArtMode='missing'; $('#sbBulkArtPick').click(); };
-$('#sbBulkArtAll').onclick=()=>{ if(!sbIdle()) return; sbBulkArtMode='all'; $('#sbBulkArtPick').click(); };
+// The artwork box in the bulk bar: an image (resized here) or an inscription number, applied with the
+// other shared details. Nothing is changed until Apply to all / Only where empty.
+let sbBulkArt=null; // { coverB64, coverMime, url, note } for a chosen image
+const sbArtNoteDefault=$('#sbBulkArtNote').innerHTML;
+function sbBulkArtReset(){
+  if(sbBulkArt&&sbBulkArt.url){ try{URL.revokeObjectURL(sbBulkArt.url);}catch(_e){} }
+  sbBulkArt=null; $('#sbBulkArtThumb').hidden=true; $('#sbBulkArtThumb').removeAttribute('src');
+  $('#sbBulkArtClear').hidden=true; $('#sbBulkArtInsc').value=''; $('#sbBulkArtNote').innerHTML=sbArtNoteDefault;
+}
+$('#sbBulkArtChoose').onclick=()=>{ if(sbIdle()) $('#sbBulkArtPick').click(); };
+$('#sbBulkArtClear').onclick=()=>sbBulkArtReset();
+$('#sbBulkArtInsc').addEventListener('input',()=>{
+  if(sbBulkArt){ const v=$('#sbBulkArtInsc').value; sbBulkArtReset(); $('#sbBulkArtInsc').value=v; }
+  $('#sbBulkArtClear').hidden=!$('#sbBulkArtInsc').value.trim();
+});
 $('#sbBulkArtPick').onchange=async()=>{
   const f=$('#sbBulkArtPick').files[0]; $('#sbBulkArtPick').value=''; if(!f||!sbIdle()) return;
   if(!/^image\/(png|jpeg|webp)$/.test(f.type)){ sbBulkSay('<span class="err">Artwork must be PNG, JPEG or WebP.</span>'); return; }
-  const M=window.XtrataMusicBatch;
-  const targets=SB.items.filter(it=>{ const x=it.status==='ready'?M.facts(it):null; return x&&x.art!=='n/a'&&(sbBulkArtMode==='all'||x.art==='none'); });
-  if(!targets.length){ sbBulkSay('No songs need that image.'); return; }
   sbBulkBusy=true; sbBulkSay('<span class="spin"></span>Preparing the image…');
   try{
     let cover=f, note='';
     if(window.XtrataMusicArtwork){ const r=await window.XtrataMusicArtwork.optimise(f,'standard'); cover=r.file; note=' — resized to '+Math.round(r.bytes/1024)+' KB'; }
     if(cover.size>4*1048576){ sbBulkSay('<span class="err">Artwork over 4 MiB would bloat every inscription — use a smaller image.</span>'); return; }
     const b64=await sbReadB64(cover);
-    for(const it of targets){ it.overrides={...it.overrides,format:'artwork',coverB64:b64,coverMime:cover.type||'image/png',coverInscription:undefined}; sbRequeue(it); }
-    sbBulkSay('<span class="ok">✓ Artwork set on '+sbS(targets.length,'song')+note+'.</span>');
-  }catch(e){ sbBulkSay('<span class="err">'+esc((e&&e.message)||'Could not use that image.')+'</span>'); return; }
+    sbBulkArtReset();
+    sbBulkArt={ coverB64:b64, coverMime:cover.type||'image/png', url:URL.createObjectURL(cover) };
+    $('#sbBulkArtThumb').src=sbBulkArt.url; $('#sbBulkArtThumb').hidden=false; $('#sbBulkArtClear').hidden=false;
+    $('#sbBulkArtNote').innerHTML='<span class="ok">✓ '+esc(f.name)+esc(note)+'.</span> Click Apply to all to use it on every song.';
+    sbBulkSay('');
+  }catch(e){ sbBulkSay('<span class="err">'+esc((e&&e.message)||'Could not use that image.')+'</span>'); }
   finally{ sbBulkBusy=false; }
-  sbChanged();
 };
 $('#sbBulkShrink').onclick=async()=>{
   const A=window.XtrataMusicArtwork, M=window.XtrataMusicBatch; if(!sbIdle()||!A) return;
@@ -1522,7 +1607,7 @@ window.sbUnlinkAudio=(i)=>{ const it=SB.items[i]; if(!it||!sbIdle()||!it.origFil
 window.sbUnlinkArt=(i)=>{ const it=SB.items[i]; if(!it||!sbIdle()) return; const o={...it.overrides}; delete o.coverInscription; it.overrides=o; it.linkArtMsg=''; sbRequeue(it); sbChanged(); };
 
 $('#sbGo').onclick=async()=>{
-  const ready=SB.items.filter(it=>it.status==='ready'); if(!document.querySelector('#trackEditor').hidden||!ready.length||!SB.EST||SB.busy||musicJobActive()||SB.items.some(it=>it.status!=='ready'||it.needs?.length)) return;
+  const ready=SB.items.filter(it=>it.status==='ready'); if((window.musicEditorDirty&&window.musicEditorDirty())||!ready.length||!SB.EST||SB.busy||musicJobActive()||SB.items.some(it=>it.status!=='ready'||it.needs?.length)) return;
   if(!SERVER.mock&&!WALLET){ connectWallet(); return; }
   const b=$('#sbGo'); b.disabled=true; $('#sbHint').textContent='';
   try{
@@ -1581,7 +1666,7 @@ function sbDone(job){
 }
 </script>
 <script src="music-appearance.js?v=2"></script>
-<script src="music-editor.js?v=8"></script>
+<script src="music-editor.js?v=9"></script>
 <script src="music-artwork.js?v=1"></script>
 <script src="music-artwork-editor.js?v=1"></script>
 </body>

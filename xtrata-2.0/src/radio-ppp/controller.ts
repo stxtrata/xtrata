@@ -1104,6 +1104,8 @@ export function createPppController(deps: PppDeps) {
       const main = deps.main();
       if (!main || !status?.address) throw new Error('Connect your main wallet first.');
       if (pendingDeposit()) throw new Error('A deposit is still confirming. Wait for it before adding more.');
+      // Safety: a gift is being claimed or has just been sent to this wallet. Those plays are free, so nothing is added yet.
+      if (arrivalLive()) throw new Error('Your plays are still arriving. There is nothing to add: wait for them, and add STX only once they are used up.');
       await refreshBalance(true);
       const amount = fundingAllowance(balance ?? 0n);
       if (amount <= 0n) throw new Error('This wallet already holds 1 STX. No deposit needed.');

@@ -3,6 +3,7 @@ import {
   giftForWallet, giftStatus, hiroGiftChain, nextSlot, runSweep, shelfFor, sweepAuthorised, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
 } from '../../lib/radio-gifts';
 import { checkSongsNow } from '../../lib/radio-metadata';
+import { advance } from '../../lib/radio-giveaway';
 
 /**
  * Radio gift wallets (functions/lib/radio-gifts.ts):
@@ -35,6 +36,12 @@ export async function onRequest(context: Ctx) {
     const sweep = sweepGifts(env, deps()).catch(() => undefined);
     if (context.waitUntil) context.waitUntil(sweep);
   };
+  // The giveaway (public/giveaway.html) moves on when a claimed link's funds have arrived: the sweep is what notices.
+  const sweepAndGiveaway = async () => {
+    const out = await runSweep(env, deps());
+    if (env.RADIO_GIFT_ENABLED === '1') await advance(env, Date.now()).catch(() => undefined);
+    return out;
+  };
   try {
     if (request.method === 'GET') {
       const q = new URL(request.url).searchParams;
@@ -49,7 +56,7 @@ export async function onRequest(context: Ctx) {
     }
     if (request.method !== 'POST') return reply({ error: 'GET or POST required' }, 405);
     // The scheduled sweep is not a browser: it has no Origin, only the shared secret. Wrong or missing secret looks like no such page.
-    if (action === 'sweep') return sweepAuthorised(env, request.headers.get('authorization')) ? reply(await runSweep(env, deps())) : reply({ error: 'Not found' }, 404);
+    if (action === 'sweep') return sweepAuthorised(env, request.headers.get('authorization')) ? reply(await sweepAndGiveaway()) : reply({ error: 'Not found' }, 404);
     const origin = request.headers.get('origin');
     if (!origin || origin !== new URL(request.url).origin || request.headers.get('sec-fetch-site') === 'cross-site') return reply({ error: 'Same origin required' }, 403);
     if (!request.headers.get('content-type')?.startsWith('application/json')) return reply({ error: 'JSON required' }, 415);

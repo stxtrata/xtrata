@@ -39,6 +39,8 @@ async function open(over: object = {}) {
     <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section>`;
+  // The radio's own hooks (public/radio.html): the ON AIR lamp and the note under the receiver.
+  document.body.insertAdjacentHTML('beforeend', '<div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>');
   h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
   (window as any).XtrataRadio = h.radio;
   h.snap = { ...base, ...over };
@@ -71,6 +73,16 @@ describe('Gift Edition panel', () => {
     h.snap = { ...h.snap, step: 'ready', giftPlays: 40, giftStop: null };
     h.changed();
     expect(h.radio.setGiftStop).toHaveBeenLastCalledWith(null);
+  });
+
+  it('no deposit button while plays are on their way (a gift or a deposit); it comes back once they are used up', async () => {
+    const funding = { step: 'fund', solo: false, linked: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', balance: 0n, giftPlays: 0, allowance: 1_000_000n, entries: [] };
+    const root = await open({ ...funding, depositPending: true, depositTxid: undefined, arrival: { since: 0, graceMs: 60_000 } });
+    expect([...root.querySelectorAll('button')].some((b) => /Deposit .* STX/.test(b.textContent ?? ''))).toBe(false);
+    expect(text(root)).toMatch(/nothing to add/i);
+    h.snap = { ...h.snap, depositPending: false, arrival: null };
+    h.changed();
+    expect([...root.querySelectorAll('button')].some((b) => /Deposit 1(\.0+)? STX from my wallet/.test(b.textContent ?? ''))).toBe(true);
   });
 
   it('an ordinary wallet leaves the radio alone', async () => {
@@ -183,6 +195,14 @@ describe('My albums (the shelf)', () => {
     expect(h.openAlbum).toHaveBeenCalledWith(2);
   });
 
+  it('every album row has a square for its artwork (a disc until the picture is found)', async () => {
+    const fold = await start();
+    const rows = [...fold.querySelectorAll('.ppp-shelf-list li')];
+    expect(rows.length).toBe(3);
+    for (const r of rows) expect(r.querySelector('.ppp-shelf-art')).not.toBeNull();
+    expect(text(rows[0].querySelector('.ppp-shelf-art')!)).toBe('💿');
+  });
+
   it('pins an album (kept on this device) and moves it to the top', async () => {
     const fold = await start();
     const row = () => [...fold.querySelectorAll('.ppp-shelf-list li')];
@@ -247,6 +267,10 @@ describe('My albums (the shelf)', () => {
     expect((root.querySelector('.ppp-shelf') as HTMLDetailsElement).open).toBe(false);
     link.click();
     expect((root.querySelector('.ppp-shelf') as HTMLDetailsElement).open).toBe(true);
+    expect(link.getAttribute('aria-expanded')).toBe('true');
+    link.click(); // the button is the toggle
+    expect((root.querySelector('.ppp-shelf') as HTMLDetailsElement).open).toBe(false);
+    expect(link.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('a new album wallet on a device that has already played is not "setup": no steps, no SETUP badge', async () => {
@@ -417,6 +441,18 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
     expect(text(a.querySelector('.ppp-gift-body')!)).toContain('Prefunded batch (admin)');
   });
 
+  it('the "send music to a friend" gift is gone for everyone: no section for a listener, albums only for an admin', async () => {
+    const root = await open({ gift: null, giftStop: null, giftPlays: 0, main: ADMIN });
+    expect((root.querySelector('.ppp-gifts') as HTMLElement).hidden).toBe(true);
+    expect(text(root.querySelector('.ppp-gift-body')!)).not.toMatch(/Give someone|Gift amount|Send a gift/i);
+    const a = await admin();
+    const body = a.querySelector('.ppp-gift-body')!;
+    expect((a.querySelector('.ppp-gifts') as HTMLElement).hidden).toBe(false);
+    expect(body.querySelector('input[type="range"]')).toBeNull(); // no friend-gift amount slider
+    expect(text(body)).not.toMatch(/Give someone|send a gift/i);
+    expect(text(body)).toContain('Gift players (admin)');
+  });
+
   it('has no campaign box any more: batches are the only way to make links', async () => {
     served();
     const root = await admin();
@@ -493,11 +529,11 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
   });
 
   it('a refusal from the server is shown, nothing is paid and nothing is saved', async () => {
-    served({ '/radio/gift/batch': () => new Response(JSON.stringify({ error: 'The gift treasury is full right now.' }), { status: 503 }) });
+    served({ '/radio/gift/batch': () => new Response(JSON.stringify({ error: 'Several batches are still waiting for their payment. Pay or wait for them first.' }), { status: 429 }) });
     const pay = await payWith((o) => o.onFinish({ txId: '0x1' }));
     const root = await admin();
     click(root, /Sign, pay and make links/);
-    await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('treasury is full'));
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-gift-body')!)).toContain('still waiting for their payment'));
     expect(pay).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN) || '[]')).toEqual([]);
   });
@@ -554,5 +590,23 @@ describe('waiting for plays to arrive', () => {
   it('no bar when nothing is expected: a genuinely empty wallet still says so', async () => {
     const root = await open({ step: 'fund', balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, giftPlays: 0, gift: null, arrival: null, giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } });
     expect(root.querySelector('.ppp-wait')).toBeNull();
+  });
+});
+
+describe('the free player (the main site)', () => {
+  beforeEach(() => { delete document.documentElement.dataset.ppp; localStorage.clear(); });
+
+  it('is a friendly note, not an "artists unpaid" warning: no drab look, no lamp, and a way to get a player', async () => {
+    await open({ step: 'elsewhere', gift: null, gate: { ...base.gate, here: false, radioUrl: 'https://radio.xtrata.test/radio.html' } });
+    const nudge = document.getElementById('pppNudge')!;
+    expect(nudge.hidden).toBe(false);
+    expect(nudge.classList.contains('is-free')).toBe(true);
+    expect(text(nudge)).toMatch(/free player/i);
+    expect(text(nudge)).toMatch(/doesn’t pay anyone/);
+    expect(text(nudge)).toMatch(/album player/);
+    expect(text(nudge)).not.toMatch(/not counted|locked|unpaid/i);
+    expect(nudge.querySelector('button')!.textContent).toBe('Get a player');
+    expect(document.documentElement.dataset.ppp).toBe('free'); // neither "on" (gold) nor "off" (drab and orange)
+    expect(document.getElementById('onair')!.hidden).toBe(true);
   });
 });

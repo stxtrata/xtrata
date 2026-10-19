@@ -380,7 +380,6 @@ function start(root: HTMLElement) {
   const onair = document.getElementById('onair');
   nudge?.querySelector('button')?.addEventListener('click', () => go());
   const NOT_PAYING: Partial<Record<Snapshot['step'], string>> = {
-    elsewhere: 'Plays are not counted here',
     connect: 'Plays are not counted',
     intro: 'Plays are not counted',
     locked: 'Locked · plays are not counted',
@@ -400,17 +399,25 @@ function start(root: HTMLElement) {
     const paying = s.step === 'ready' && s.payingOn && left > 0;
     // Funds already on their way (a deposit or a gift): nothing has gone wrong, so no "artists unpaid" warning.
     const waiting = s.step === 'fund' && s.depositPending;
-    const warning = paying || waiting ? '' : NOT_PAYING[s.step] ?? '';
-    const mode = paying ? 'on' : warning ? 'off' : '';
+    // The free player (this page on the main site, where nothing is paid): not a warning, an invitation, so no drab
+    // "artists unpaid" look and no orange: the radio keeps its normal look and a friendly note says what this is.
+    const free = s.step === 'elsewhere';
+    const warning = paying || waiting || free ? '' : NOT_PAYING[s.step] ?? '';
+    const mode = paying ? 'on' : free ? 'free' : warning ? 'off' : '';
     if (mode) document.documentElement.dataset.ppp = mode;
     else delete document.documentElement.dataset.ppp;
     if (onair) {
-      onair.hidden = !mode;
+      onair.hidden = !mode || mode === 'free';
       onair.querySelector('.onair-sub')!.textContent = paying ? `${left.toLocaleString()} plays left` : 'Plays off';
     }
     if (nudge) {
-      nudge.hidden = mode !== 'off';
-      if (mode === 'off') {
+      nudge.hidden = mode !== 'off' && mode !== 'free';
+      nudge.classList.toggle('is-free', mode === 'free');
+      if (mode === 'free') {
+        nudge.querySelector('.nudge-t')!.textContent = 'You’re on the free player';
+        nudge.querySelector('.nudge-s')!.textContent = 'This one doesn’t pay anyone. To join the new music economy, where every play pays the artist on-chain, get yourself an album player.';
+        nudge.querySelector('button')!.textContent = 'Get a player';
+      } else if (mode === 'off') {
         nudge.querySelector('.nudge-t')!.textContent = warning;
         nudge.querySelector('.nudge-s')!.textContent = 'Every play you count goes to the song’s owner, on-chain.';
         nudge.querySelector('button')!.textContent = NUDGE_ACTION[s.step] ?? 'Start';
@@ -751,7 +758,8 @@ function start(root: HTMLElement) {
         if (s.gift?.player) lines.push(el('p', 'This player has no free mode: it carries on by itself once the plays arrive.'));
         else if (s.entries.length) lines.push(el('p', 'Songs play free until you top up. Paying carries on by itself once the top-up confirms.'));
         if (s.payingOn && !s.entries.length) lines.push(el('p', 'Paying is switched on. Once funds arrive it starts with the next song you listen to for 30 seconds.', 'ppp-ok'));
-        if (giftWait) { /* the gift banner shows its progress: no "add funds" while a gift is on its way */ }
+        if (giftWait) lines.push(el('p', 'Your gift is on its way, so there is nothing to add. STX is only needed once these plays are used up.', 'ppp-mute'));
+        else if (s.depositPending) lines.push(el('p', 'Nothing to add: your plays are on their way. Add STX only once they are used up.', 'ppp-mute'));
         else if (s.solo) {
           // No wallet to deposit from: the address is the whole interface. Anyone can send to it.
           lines.push(el('p', 'Ask a friend, or send from an exchange or any Stacks wallet, to this address. About 1 STX is plenty. Whatever is left can be returned to whoever sent it.'));
@@ -759,7 +767,8 @@ function start(root: HTMLElement) {
           if (s.listening && !s.depositPending) actions.push(copyButton('copy-address', 'Copy my address', () => s.listening || '', 'primary', () => render(ppp.snapshot())));
         } else lines.push(el('p', `Or send STX from an exchange to the listening wallet address (Copy above).`, 'ppp-mute'));
         if (s.depositPending && s.depositTxid) { const p = el('p', 'Funds on their way · paying starts by itself when they land. ', 'ppp-warn'); p.append(link('View', explorer(s.depositTxid))); key.push(p); }
-        else if (s.allowance > 0n && !s.solo) actions.push(button(`Deposit ${stx(s.allowance)} STX from my wallet`, () => void ppp.deposit(), 'primary'));
+        // No deposit button while plays (a gift, or a deposit) are on their way: a button that cannot be pressed only confuses, so there is none.
+        else if (s.allowance > 0n && !s.solo && !s.depositPending) actions.push(button(`Deposit ${stx(s.allowance)} STX from my wallet`, () => void ppp.deposit(), 'primary'));
         break;
       }
       case 'over':
@@ -905,9 +914,11 @@ function start(root: HTMLElement) {
           const fold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
           if (!fold) return;
           fold.hidden = false;
-          fold.open = true;
-          requestAnimationFrame(() => fold.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+          fold.open = !fold.open; // the button is the toggle: the list opens right under it
+          all.setAttribute('aria-expanded', String(fold.open));
+          if (fold.open) requestAnimationFrame(() => fold.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
         }, 'ppp-all-albums');
+        all.setAttribute('aria-expanded', String(!!(document.querySelector('.ppp-shelf') as HTMLDetailsElement | null)?.open));
         switcher.replaceChildren(
           tab('🎧 My player', inAlbum ? s.likeFunds?.balance : s.balance, !inAlbum, () => { if (inAlbum) void ppp.openAlbum(0); }),
           tab('💿 ' + albumTitle, inAlbum ? s.balance : undefined, inAlbum, () => { if (!inAlbum && latestAlbum) void ppp.openAlbum(latestAlbum.slot); }),
@@ -1022,7 +1033,7 @@ function start(root: HTMLElement) {
       plays: a.mode === 'open' ? (s.balance === undefined ? null : s.giftPlays) : undefined,
       playsComing: s.depositPending,
       status, primary, secondary, hint: primary ? hint : undefined,
-      asking, busy: !!s.busy, myPlays: myPlays(s), topUps: TOP_UP_PLAYS
+      asking, busy: !!s.busy, myPlays: myPlays(s), topUps: TOP_UP_PLAYS, canMake: !!s.gate?.gifts?.admin
     };
   }
 
