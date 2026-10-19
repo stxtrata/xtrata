@@ -13,6 +13,12 @@ RUNTIME_CONTENT_CACHE_LIMIT_BYTES = "5368709120"
 # The same goes for the optional RADIO_PPP_PASSKEY_ONLY secret ("1" lets listeners without a Stacks wallet use a passkey wallet alone).
 RADIO_PPP_HOST = "radio.xtrata.xyz"
 RADIO_LISTENING_WALLET_ORIGIN = "https://wallet.xtrata.xyz"
+# Content isolation (functions/lib/content-isolation.ts, CONTENT-ORIGIN-SPLIT-PLAN.md).
+# Deliberately NOT defined here so it can be switched per environment from the dashboard without a push:
+#   INSCRIPTION_SANDBOX         "1" sandboxes direct loads of raw HTML/SVG at /i/, /inscription/ and
+#                               /runtime/content (CSP sandbox, opaque origin, no allow-same-origin).
+#   INSCRIPTION_SANDBOX_EXEMPT  token ids (or "<contractId>:<tokenId>") that must keep running as xtrata.xyz.
+# Unset = off. Enable on the Preview environment first and run the canary in the plan before Production.
 
 [limits]
 cpu_ms = 30000

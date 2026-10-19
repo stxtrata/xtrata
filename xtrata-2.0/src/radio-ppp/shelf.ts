@@ -116,10 +116,11 @@ export function createShelf(deps: ShelfDeps) {
         pin.setAttribute('aria-label', pinned ? `Unpin ${a.player!.title}` : `Pin ${a.player!.title}`);
         const sub = [a.player!.subtitle, `${listedTracks(a.player!).length} ${listedTracks(a.player!).length === 1 ? 'song' : 'songs'}`, a.state === 'sending' ? 'arriving…' : ''].filter(Boolean).join(' · ');
         const playing = a.slot === s.slot;
-        const pick = button(playing ? 'Playing' : 'Play', () => {
+        // The whole row is the tap target: this button is stretched over it by CSS (a plain click, so touch scrolling is untouched).
+        const pick = button(playing ? 'Playing' : 'Select', () => {
           deps.store.set(recentKey(r), JSON.stringify(trimRecents({ ...recent, [a.slot]: deps.now() })));
           deps.open(a.slot);
-        }, playing ? 'tiny' : 'tiny primary');
+        }, playing ? 'tiny ppp-pick' : 'tiny primary ppp-pick');
         pick.disabled = playing;
         // The album's cover when it has one, else its first song's own artwork; a disc until it is found (or if there is none).
         const first = listedTracks(a.player!)[0];

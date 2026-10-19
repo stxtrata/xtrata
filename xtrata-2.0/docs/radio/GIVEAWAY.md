@@ -2,7 +2,8 @@
 
 `https://xtrata.xyz/giveaway` (`public/giveaway.html`) shows ONE free-album gift link at a time. The links are held on the
 server, nobody can read the list, and when the link on show has been claimed and its funds have reached the new wallet, a
-pause follows (a random time between a minimum and maximum) and the next link appears. The page polls by itself.
+pause follows and the next link appears. The default pause is **ten minutes** so a crowd never turns into a rush. The page
+polls by itself and shows a countdown.
 
 The page is on the main site on purpose: the radio host (`radio.xtrata.xyz`) serves every static page sandboxed except the
 radio's own. The claim button opens `https://radio.xtrata.xyz/radio.html#gift=CODE`, the normal gift link.
@@ -19,7 +20,12 @@ radio's own. The claim button opens `https://radio.xtrata.xyz/radio.html#gift=CO
   It is safe under many readers: each change is a conditional update.
 - `GET /radio/giveaway` returns only: state (`live | taken | waiting | paused | done`), the one code on show, the album
   (title, listed songs, cover; never a hidden track), and the counts. The edge reuses an answer for 3 seconds.
-- A link counts as `taken` while its send is in flight, and the pause starts when the funds have arrived (`claimed`).
+- The pause runs **from the moment the link is claimed** (not from when its funds land, which can take a while on the
+  chain). The next link appears when BOTH the countdown is over AND the claim has settled. The pause is drawn once per claim
+  (between the minimum and maximum; both are 600 s by default, so it is exactly ten minutes), so every reader sees the same time.
+- While a claim is in flight (`taken`) and after it (`waiting`), the page congratulates the new wallet (its address
+  shortened to the first and last five characters; addresses are public on the chain anyway) and counts down to the next
+  link, on the server's clock (`now` and `nextAt` in the answer).
 
 ## Setup (once)
 
@@ -40,7 +46,7 @@ call() { curl -s -X POST https://xtrata.xyz/radio/giveaway/admin -H "Authorizati
 jq -Rs '{action:"add", text:.}' links.txt | curl -s -X POST https://xtrata.xyz/radio/giveaway/admin -H "Authorization: Bearer $SECRET" -H 'content-type: application/json' -d @-
 
 call '{"action":"status"}'                                  # counts, which link is on show (its number, never its code), pace
-call '{"action":"gap","minSeconds":60,"maxSeconds":240}'    # pause between links (default 60-240 s)
+call '{"action":"gap","minSeconds":600,"maxSeconds":600}'   # pause between links (default 600 s = ten minutes; a range gives a random pause)
 call '{"action":"pause"}'   ;   call '{"action":"resume"}'  # the page says "taking a short break"
 call '{"action":"skip"}'                                    # retire the link on show, never offer it again
 call '{"action":"now"}'                                     # show the next link without waiting out the pause
