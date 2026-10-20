@@ -1,0 +1,19 @@
+{
+  "format": "arcade-scene-file/1",
+  "room": "arcade-hall",
+  "scenes": [
+    {
+      "bay": 0, "at": "+10", "base": "door", "door": "door-arch", "interaction": "knock",
+      "layers": [
+        { "look": "door-skin", "params": { "skin": "oak", "hardware": "brass" } },
+        { "look": "light-steady", "params": { "tone": "orange" } }
+      ]
+    },
+    {
+      "bay": 1, "at": "+10", "base": "door", "door": "door-gothic", "interaction": "knock",
+      "layers": [
+        { "look": "door-skin", "params": { "skin": "stained", "frame": "stone", "wear": 20 } }
+      ]
+    }
+  ]
+}

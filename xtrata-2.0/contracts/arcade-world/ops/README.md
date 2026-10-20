@@ -31,8 +31,9 @@ Output files go to `ops/out/` (git-ignored); the bot's journal is `ops/.run-<fil
 | `campaign.mjs rotation\|calendar list.json` | Generates a poster file from a short list (a rotation over N days, or events with a lead time). |
 | `bot.mjs file.poster.json` | The publisher bot: sends posters in safe batches within the contract's caps, remembers what it sent, stops on the kill file, pause, lost whitelist or any cap error. |
 | `review.mjs` | Review lane: lists posters waiting hidden; releases chosen ones (admin only). |
-| `deploy.mjs` | Test network only. Deploys the stand-in core, the poster contract and the world contract in order. |
-| `setup-chain.mjs` | One-time: registers the 22 built-in looks, the rooms and the publishers. Skips what exists. |
+| `deploy.mjs` | Test network only. Deploys the stand-in core, the poster contract, the world contract and the door-skins contract in order. |
+| `setup-chain.mjs` | One-time: registers the 23 built-in looks, the rooms and the publishers. Skips what exists. |
+| `skins.mjs` | Registers the hall's 19 built-in door skins on `xtrata-door-skins-v1` (admin only). Dry run by default, skips skins already there, reports differences. Offline (no `--network`) it just lists them. Scene files that use the `door-skin` look are checked by `validate.mjs` (unknown skin, skin that does not suit the door, unknown frame or hardware). Needs `--skins <contract id>` or `XA_SKINS`. |
 | `view.mjs` | Builds a local page showing a test network's contracts in the real hall (read-only). |
 | `rehearsal.mjs` | The whole launch sequence on a simulated chain. Writes `out/rehearsal-report.md`. |
 | `keygen.mjs` | Makes a disposable test-network key file. |

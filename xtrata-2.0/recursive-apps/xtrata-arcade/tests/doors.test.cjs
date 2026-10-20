@@ -160,6 +160,23 @@ test('sounds: every door sound synthesises for every material without throwing',
   assert.ok(calls > 25);
 });
 
+test('sounds: a skin can choose the sound profile (wood, metal, tech, glass), whatever the style says', () => {
+  const near = { x: -2, z: -8 };
+  ['wood', 'metal', 'tech', 'glass'].forEach((kind) => {
+    const g = fakeEnv(), s = D.createSfx(() => g.env, () => near), m = new D.DoorModel({ style: 'rect', sound: kind }); m.pos = { x: -4.6, y: 1.2, z: -8 };
+    assert.equal(m.cfg.sound, kind);
+    ['handleDown', 'latchRetract', 'handleReturn', 'latch', 'rattle', 'thud', 'slam', 'stop', 'seal', 'knock'].forEach((k) => s[k](m, k === 'rattle' ? 1 : 0.7));
+    s.bolt(m, true); s.bolt(m, false);
+    assert.ok(s._log().length >= 10, kind);
+    m._snd = null; s.creak(m, 60); assert.ok(m._snd, kind + ' creak voice');
+  });
+  assert.equal(new D.DoorModel({ style: 'rect', sound: 'nonsense' }).cfg.sound, '', 'unknown sound names are ignored');
+  assert.equal(new D.DoorModel({ style: 'rect' }).cfg.sound, '', 'no sound set: the style decides');
+  // glass knocks make more sound sources than the same knock on wood (the chime)
+  const count = (kind) => { const g = fakeEnv(), s = D.createSfx(() => g.env, () => near), m = new D.DoorModel({ style: 'rect', sound: kind }); m.pos = { x: -4.6, y: 1.2, z: -8 }; s.knock(m); return g.made.sources; };
+  assert.ok(count('glass') > count('wood'), 'glass rings');
+});
+
 test('sounds: a burst of events is capped by the voice budget', () => {
   const g = fakeEnv(), s = D.createSfx(() => g.env, () => ({ x: -2, z: -8 })), d = dm(-4.6, -8);
   for (let i = 0; i < 60; i++) s.latch(d, 1);
