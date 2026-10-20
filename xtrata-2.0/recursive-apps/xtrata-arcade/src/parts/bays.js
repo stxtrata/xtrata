@@ -361,6 +361,19 @@
       });
       var t = new T.CanvasTexture(cv); t.mapping = T.EquirectangularReflectionMapping; t.encoding = T.sRGBEncoding; skinEnv = t; return t;
     }
+    // A second generated room for the door hardware: metal only shows its colour where it has something bright to reflect, so this one has a
+    // bright ceiling, warm walls at the horizon, a few soft windows and lamps, and a darker floor. One for the whole hall.
+    var hwEnv = null;
+    function getHwEnv() {
+      if (hwEnv) return hwEnv;
+      var cv = env.mkCanvas(256, 128), x = cv.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 128);
+      g.addColorStop(0, '#f2f4ff'); g.addColorStop(0.3, '#c8cadc'); g.addColorStop(0.44, '#dcd8d2'); g.addColorStop(0.53, '#c4c0ba'); g.addColorStop(0.64, '#6c6660'); g.addColorStop(1, '#241d1b'); x.fillStyle = g; x.fillRect(0, 0, 256, 128);
+      [[20, 52, 34, 14, '#fff4e0'], [86, 44, 40, 18, '#ffffff'], [150, 56, 30, 12, '#ffe2b8'], [206, 48, 38, 16, '#e8f0ff'], [128, 20, 70, 10, '#ffffff'], [52, 70, 24, 8, '#ffd9a0']].forEach(function (l) {
+        var r = x.createRadialGradient(l[0], l[1], 0, l[0], l[1], l[2]); r.addColorStop(0, l[4]); r.addColorStop(0.6, l[4]); r.addColorStop(1, 'rgba(255,255,255,0)');
+        x.save(); x.translate(l[0], l[1]); x.scale(1, l[3] / l[2]); x.translate(-l[0], -l[1]); x.fillStyle = r; x.fillRect(l[0] - l[2], l[1] - l[2], l[2] * 2, l[2] * 2); x.restore();
+      });
+      var t = new T.CanvasTexture(cv); t.mapping = T.EquirectangularReflectionMapping; t.encoding = T.sRGBEncoding; hwEnv = t; return t;
+    }
     // The finish the plan asks for (an overlay with the door-skin look), or null: the neon Threshold look as before.
     // Unknown skins, and skins that do not suit this door style, fall back to the neon look.
     function skinOf(plan, style) {
@@ -370,7 +383,7 @@
       var p = SKINS.normSkinParams(ov.p), def = SKINS.SKINS[p.skin];
       if (!def || p.skin === 'neon' || !SKINS.allowed(def.mask, style)) return null;
       var fk = p.frame || def.frame;
-      return { kit: SKINS, key: p.skin, sound: def.sound, rec: def.recipe, frameRec: SKINS.FRAMES[fk] || null, hw: SKINS.HARDWARE[p.hardware || def.hardware] || null, wear: (p.wear < 0 ? def.wear : p.wear) / 100, tint: p.tint || '', maxSide: root.XA_LOWFX || (root.navigator && root.navigator.hardwareConcurrency && root.navigator.hardwareConcurrency <= 2) ? 256 : 512, env: getSkinEnv(), sig: JSON.stringify([p.skin, fk, p.hardware || def.hardware, p.tint, p.wear]) };
+      return { kit: SKINS, key: p.skin, sound: def.sound, rec: def.recipe, frameRec: SKINS.FRAMES[fk] || null, hw: SKINS.HARDWARE[p.hardware || def.hardware] || null, wear: (p.wear < 0 ? def.wear : p.wear) / 100, tint: p.tint || '', maxSide: root.XA_LOWFX || (root.navigator && root.navigator.hardwareConcurrency && root.navigator.hardwareConcurrency <= 2) ? 256 : 512, env: getSkinEnv(), envHw: getHwEnv(), family: def.family || '', sig: JSON.stringify([p.skin, fk, p.hardware || def.hardware, p.tint, p.wear]) };
     }
     // The real door when doors.js is loaded (the Threshold port), else a plain slab.
     function buildDoor(bay, style, interaction, skin) {
@@ -584,6 +597,7 @@
       doorHalfWidth: function (i) { var b = bays[i]; return b && b.door && b.door.mesh && b.door.mesh.size ? b.door.mesh.size.w / 2 : 0.5; },
       doorOpen: function (i) { var b = bays[i], m = b && b.door && b.door.model; if (m && !m.isOpen()) m.open(); },
       _curtain: function (i) { var c = bays[i] && bays[i].curtain; return c ? { sim: c.sim, mg: c.mg, w: bays[i].width } : null; },   // tests only
+      _handle: function (i) { var d = bays[i] && bays[i].door; return d && d.mesh && d.mesh.handle ? d.mesh.handle() : null; },   // tests only
       _model: function (i) { var d = bays[i] && bays[i].door; return d && d.model ? d.model : null; },   // tests only
       showPosters: function (i) { var p = bays[i] && bays[i].plan; return !p || p.base === 'posters'; },
       audio: audio,

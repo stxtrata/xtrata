@@ -230,11 +230,11 @@
     return { S: S, W: W, H: H, nL: nL, leafW: leafW, shape: shape, hy: hy, thick: thick, fw: fw, leaves: leaves };
   }
   // The decoration ops for one face of one leaf (what drawFace paints), with the draft's context object.
-  function faceOps(G, L, side) {
+  function faceOps(G, L, side, noRose) {   // noRose: the lit skins draw a real handle, so the flat rose disc is left out of their relief
     var S = G.S, shape = G.shape;
     var c = { W: G.W, H: G.H, x0: L.x0, x1: L.x1, w: G.leafW, sW: L.sW, rail: Math.max(14, G.H * 0.055), shape: shape, edge: shape.edge, key: 'f' + L.i + side, leaf: L.i,
       inset: function (inn, cls) { var k = [(G.W - 2 * inn) / G.W, (G.H - 2 * inn) / G.H]; return poly(shape.pts.map(function (p) { return [inn + p[0] * k[0], inn + p[1] * k[1]]; }), cls || 'l'); } };
-    var s = poly(shape.pts, 'f') + S.decor(c) + hingeArt(c, S, L) + CI(L.hx, G.hy, 9, 'f') + CI(L.hx, G.hy, 3, 'l d');
+    var s = poly(shape.pts, 'f') + S.decor(c) + hingeArt(c, S, L) + (noRose ? '' : CI(L.hx, G.hy, 9, 'f') + CI(L.hx, G.hy, 3, 'l d'));
     if (G.nL > 1) s += LN(L.hinge === 'L' ? L.x1 : L.x0, 0, L.hinge === 'L' ? L.x1 : L.x0, G.H);
     return s;
   }
@@ -565,7 +565,7 @@
     }
     function skinMaps() {                                                                           // one set of maps for the whole door; each leaf shows its strip
       var KT = SK.kit, sc = (SK.maxSide || 512) / Math.max(W, H), w = Math.max(16, Math.round(W * sc)), h = Math.max(16, Math.round(H * sc));
-      var ops = G.leaves.map(function (L) { return faceOps(G, L, 0); }).join('');
+      var ops = G.leaves.map(function (L) { return faceOps(G, L, 0, true); }).join('');
       var rel = KT.relief(G.shape.pts, ops, W, H, w, h), L0 = G.leaves[0];
       var mp = KT.render(SK.rec, { w: w, h: h, rel: rel, seed: 1234, wear: SK.wear, tint: SK.tint || null, handle: [L0.hx / W, G.hy / H] });
       function cv(fill) { var c = o.mkCanvas(w, h), x = c.getContext('2d'), id = x.createImageData(w, h); fill(id.data); x.putImageData(id, 0, 0); return c; }
@@ -578,7 +578,21 @@
       var tA = o.tex(albedo); disposables.push(tA);
       return { albedo: tA, orm: lin(orm), normal: lin(nrm), emissive: emi ? o.tex(emi) : null, glass: glass, base: SK.rec.base };
     }
-    function hwMat() { var h = SK.hw || { color: '#c9a24a', rough: 0.3, metal: 1 }, mt = new T.MeshStandardMaterial({ color: new T.Color(h.color), roughness: h.rough, metalness: h.metal, envMap: SK.env || null, envMapIntensity: 1 }); disposables.push(mt); return mt; }
+    // the hardware finish: the skin's metal, aged by its wear (a little duller and browner), reflecting a brighter generated room than the doors do
+    function hwFinish(dim, extra) {
+      var h = SK.hw || { color: '#c9a24a', rough: 0.3, metal: 1 }, wr = clamp(SK.wear || 0, 0, 1), c = new T.Color(h.color);
+      c.lerp(new T.Color(h.color).multiplyScalar(0.4).lerp(new T.Color('#5a4630'), 0.4), wr * 0.5); if (dim) c.multiplyScalar(dim);
+      var mt = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: clamp(h.rough + wr * 0.3 + (dim ? 0.1 : 0), 0.05, 0.92), metalness: h.metal, envMap: SK.envHw || SK.env || null, envMapIntensity: 1.4, side: T.DoubleSide }, extra || {}));
+      disposables.push(mt); return mt;
+    }
+    function hwMat() { return hwFinish(0); }
+    function hwMats(type) {
+      var em = SK.rec && SK.rec.emissive ? SK.rec.emissive.color : '#3be6ff', env = SK.envHw || SK.env || null;
+      var porcelain = type === 'knob' && SK.family === 'painted';   // a painted door gets a porcelain knob, as an old painted door would
+      var knob = porcelain ? new T.MeshPhysicalMaterial({ color: new T.Color('#efe9dc'), roughness: 0.2, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.1, envMap: env, envMapIntensity: 1.1 }) : null;
+      var m = { fin: hwFinish(0), acc: hwFinish(0.62), dark: new T.MeshStandardMaterial({ color: 0x07080a, roughness: 0.92, metalness: 0, side: T.DoubleSide }), glow: new T.MeshBasicMaterial({ color: new T.Color(em) }) };
+      m.knob = knob || m.fin; disposables.push(m.dark, m.glow); if (knob) disposables.push(knob); return m;
+    }
     if (SK) skinTex = skinMaps();
 
     /* doorway: dark recess with depth lines, framed by a band (one plane behind the leaves) */
@@ -643,13 +657,14 @@
             var sm = new T.Mesh(strapG, hm); sm.scale.set(len2 * s, tk * s, 0.006); sm.position.set((ax + (L.hinge === 'R' ? -len2 / 2 : len2 / 2) - L.axis) * s, (H - f * H) * s, z); sm.raycast = function () {}; pivot.add(sm);
           });
         });
-        var roseG = new T.CylinderGeometry(9 * s, 9 * s, 0.006, 20); roseG.rotateX(Math.PI / 2); var len = L.Lh * (S.handle === 'bar' ? 1.25 : 1), leverG = new T.BoxGeometry(len * s, 8 * s, 0.014), padG = new T.CylinderGeometry(4.6 * s, 4.6 * s, 0.014, 14); padG.rotateX(Math.PI / 2);
-        disposables.push(roseG, leverG, padG);
+        // the handle: hardware chosen for this kind of door (section 5), the same on both faces; the parts that turn are in `lever`
+        var hwType = hardwareOf(S), HP = hwParts(T, hwType), HM = hwMats(hwType), hwS = s * hardwareScale(S);
+        disposables.push.apply(disposables, HP.geos);
         hands = [th + 0.004, -0.004].map(function (z, k) {
           var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = k ? -L.dir : L.dir;   // the back handle is the front one seen from the other side: same spindle, same direction (and it turns the same way)
-          var lv = new T.Group(), bar = new T.Mesh(leverG, hm), pad = new T.Mesh(padG, hm), rose = new T.Mesh(roseG, hm);
-          bar.position.set(len * s / 2, 0, 0.008); pad.position.set(len * s, 0, 0.008); rose.position.z = 0.0; bar.raycast = pad.raycast = rose.raycast = function () {};
-          lv.add(rose, bar, pad); hg.add(lv); pivot.add(hg); return { g: hg, lever: lv };
+          var lv = new T.Group(), st = new T.Group(); lv.scale.setScalar(hwS); st.scale.setScalar(hwS);
+          HP.parts.forEach(function (p) { var mesh = new T.Mesh(p.g, HM[p.m] || HM.fin); mesh.position.set(p.x, p.y, p.z); mesh.raycast = function () {}; (p.rot ? lv : st).add(mesh); });
+          hg.add(st, lv); pivot.add(hg); return { g: hg, lever: lv, type: hwType, porcelain: HM.knob !== HM.fin };
         });
       } else {
       var faceTex = [0, 1].map(function (sd) { return canvasTex(L.w, H, function (x) {
@@ -753,7 +768,10 @@
       }
     }
     sync();
-    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, latch: latch, scale: s, size: { w: W * s, h: H * s }, layout: G };
+    function handle() {   // where the first leaf's handle is in the world, and which kind it is (for tests and previews)
+      var h = leafObjs[0].hands[0], v = new T.Vector3(); group.updateMatrixWorld(true); h.g.getWorldPosition(v); return { x: v.x, y: v.y, z: v.z, type: h.type || 'canvas', turn: h.lever.rotation.z, porcelain: !!h.porcelain };
+    }
+    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, latch: latch, handle: handle, scale: s, size: { w: W * s, h: H * s }, layout: G };
   }
 
   // Sutherland-Hodgman: the part of a convex polygon between two vertical lines
@@ -771,9 +789,94 @@
     return clipHalf(p, x1, function (q) { return q[0] <= x1 + 1e-9; });
   }
 
+
+  /* ================================================================ 5. HARDWARE (the handle on a skinned door) */
+  // One handle TYPE per door style, so each door carries the hardware its kind of door would really have: a lever on a rose
+  // for a panelled door, a long backplate for a tall narrow one, a forged thumb-latch bar on a barn door, a cranked lever on an
+  // oval plate for the arch, an iron ring on a rosette for the gothic doors, a wheel for a vault or a hatch, a T-bar for the
+  // porthole, a heavy forged lever for the industrial door, a knob with its keyhole plate for the vintage door and a lit
+  // paddle for the airlock. The finish (brass, chrome, bronze, black iron) comes from the skin; its wear dulls and ages it.
+  // All sizes are in centimetres (1 design unit at the standard scale), the spindle is the origin, +x points toward the hinge
+  // and +z out of the door face. Parts marked rot turn with the handle; the rest (plates, roses, keyhole) stay on the door.
+  var HANDLE_OF = { rect: 'lever', tall: 'plate', wide: 'barn', arch: 'cranked', gothic: 'ring', double: 'lever', cathedral: 'ring', circle: 'wheel', oval: 'tee', hexagon: 'tee', octagon: 'wheel', industrial: 'heavy', vintage: 'knob', scifi: 'touch' };
+  var HANDLE_SCALE = { double: 1.2, cathedral: 1.2, circle: 1.5, octagon: 1.1, hexagon: 1.0, oval: 1.2, industrial: 1.15 };
+  // extent of each type from the spindle, before scaling: [toward the latch edge, toward the hinge, below, above]
+  var HW_EXTENT = { lever: [3.6, 17, 12.2, 3.6], plate: [3.2, 16, 15.9, 8.9], barn: [3, 25.7, 15.4, 11.4], cranked: [3.4, 16.1, 13.2, 4.8], ring: [5.4, 14.2, 7.4, 7.4],
+    wheel: [11.5, 11.5, 11.5, 11.5], tee: [7.9, 7.9, 4.8, 4.8], heavy: [6.9, 25, 6.9, 6.9], knob: [3.9, 3.9, 14.6, 3.9], touch: [3.6, 14.2, 14.4, 8.4] };   // measured from the geometry, rounded up
+  function hardwareOf(S) { var t = S && (S.hw || HANDLE_OF[S.name]); return HW_EXTENT[t] ? t : 'lever'; }
+  function hardwareScale(S) { return (S && (S.hwScale || HANDLE_SCALE[S.name])) || 1; }
+  // the parts of one handle: [{ g: geometry, m: material key, rot, x, y, z }]; geometry is built once and shared by both faces
+  function hwParts(T, type) {
+    var parts = [], geos = [], PI = Math.PI;
+    function add(g, m, rot, x, y, z) { geos.push(g); parts.push({ g: g, m: m, rot: !!rot, x: x || 0, y: y || 0, z: z || 0 }); return g; }
+    function lathe(prof, seg) { var g = new T.LatheGeometry(prof.map(function (p) { return new T.Vector2(p[0], p[1]); }), seg || 32); g.rotateX(PI / 2); return g; }
+    function rose(r, h) { return lathe([[0, 0], [r, 0], [r, h * 0.32], [r * 0.9, h * 0.62], [r * 0.66, h * 0.92], [r * 0.34, h], [0, h]]); }
+    function tube(pts, r, flat) { var g = new T.TubeGeometry(new T.CatmullRomCurve3(pts.map(function (p) { return new T.Vector3(p[0], p[1], p[2]); }), false, 'catmullrom', 0.5), 36, r, 14, false); if (flat) g.scale(1, flat, 1); return g; }
+    function ball(r) { return new T.SphereGeometry(r, 18, 14); }
+    function cyl(r, h, seg) { var g = new T.CylinderGeometry(r, r, h, seg || 20); g.rotateX(PI / 2); return g; }
+    function roundShape(w, h, r) {
+      var sh = new T.Shape(), x = -w / 2, y = -h / 2; r = Math.min(r, w / 2, h / 2);
+      sh.moveTo(x + r, y); sh.lineTo(x + w - r, y); sh.absarc(x + w - r, y + r, r, -PI / 2, 0, false); sh.lineTo(x + w, y + h - r); sh.absarc(x + w - r, y + h - r, r, 0, PI / 2, false);
+      sh.lineTo(x + r, y + h); sh.absarc(x + r, y + h - r, r, PI / 2, PI, false); sh.lineTo(x, y + r); sh.absarc(x + r, y + r, r, PI, PI * 1.5, false); return sh;
+    }
+    function slab(shape, depth, bev) { var g = new T.ExtrudeGeometry(shape, { depth: depth, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 14 }); g.translate(0, 0, bev); return g; }
+    var TOP = 0;   // the height of the last plate's face, so screws and keyholes sit on it
+    function plate(w, h, r, depth, x, y) { var bv = Math.min(0.22, depth * 0.5); TOP = depth + 2 * bv; add(slab(roundShape(w, h, r), depth, bv), 'fin', false, x, y, 0); return TOP; }
+    function screws(list, r) { list.forEach(function (p) { add(new T.CylinderGeometry(r, r * 0.85, 0.3, 14).rotateX(PI / 2), 'acc', false, p[0], p[1], TOP + 0.1); }); }
+    function keyhole(x, y) { add(new T.CircleGeometry(0.58, 18), 'dark', false, x, y + 0.5, TOP + 0.03); add(new T.PlaneGeometry(0.55, 1.6), 'dark', false, x, y - 0.55, TOP + 0.03); }
+    function bar(len, w, depth, tail) {   // a flat forged bar along +x that widens into a spade at its end
+      var sh = new T.Shape(), h = w / 2, t = tail || h * 1.6;
+      sh.moveTo(0, -h); sh.lineTo(len - 7, -h); sh.lineTo(len - 4.6, -t); sh.lineTo(len - 0.8, -t); sh.absarc(len - 0.8, 0, t, -PI / 2, PI / 2, false); sh.lineTo(len - 4.6, t); sh.lineTo(len - 7, h); sh.lineTo(0, h); sh.closePath();
+      var g = new T.ExtrudeGeometry(sh, { depth: depth, bevelEnabled: true, bevelThickness: 0.22, bevelSize: 0.22, bevelSegments: 3, curveSegments: 14 }); g.translate(0, 0, 0.22); return g;
+    }
+    if (type === 'lever') {
+      add(rose(3.4, 1.3), 'fin'); plate(3.4, 7.2, 1.1, 0.4, 0, -8.2); keyhole(0, -8.2);
+      add(lathe([[0, 0], [1.9, 0], [1.9, 0.5], [1.4, 0.95], [0, 0.95]]), 'fin', true, 0, 0, 1.2); add(cyl(1.0, 3.2), 'fin', true, 0, 0, 1.9);
+      add(tube([[0, 0, 3.3], [2.2, 0, 3.55], [6.5, 0, 3.55], [11, 0, 3.4], [14, 0, 2.8], [15.8, 0, 1.7]], 0.95, 0.82), 'fin', true); add(ball(0.95), 'fin', true, 0, 0, 3.3); add(ball(0.96), 'fin', true, 15.8, 0, 1.7);
+    } else if (type === 'plate') {
+      plate(5.6, 24, 1.2, 0.45, 0, -3.5); screws([[0, 7.4], [0, -14.4]], 0.5); keyhole(0, -8.4); add(rose(2.5, 1.2), 'fin', false, 0, 0, 0.5);
+      add(cyl(0.9, 3.0), 'fin', true, 0, 0, 1.9); add(tube([[0, 0, 3.0], [2, 0, 3.2], [12, 0, 3.2], [14.2, 0, 2.5], [15, 0, 1.6]], 0.78, 0.82), 'fin', true); add(ball(0.78), 'fin', true, 15, 0, 1.6);
+    } else if (type === 'barn') {
+      plate(5, 26, 0.8, 0.35, 0, -2); screws([[0, 9], [0, 4.5], [0, -8.5], [0, -13]], 0.6);
+      add(rose(2.7, 1.5), 'fin', false, 0, 0, 0.45); add(bar(24, 2.5, 0.9, 2.1), 'fin', true, 0, 0, 2.0); add(cyl(1.15, 1.2), 'acc', true, 0, 0, 3.2);
+    } else if (type === 'cranked') {
+      var oval = new T.Shape(); oval.absellipse(0, -4.2, 3.0, 8.6, 0, PI * 2, false, 0);
+      TOP = 0.85; add(slab(oval, 0.45, 0.2), 'fin', false, 0, 0, 0); screws([[0, 2.6], [0, -11]], 0.45); keyhole(0, -8.6); add(rose(2.3, 1.5), 'fin', false, 0, 0, 0.5);
+      add(cyl(0.95, 3.0), 'fin', true, 0, 0, 1.9); add(tube([[0, 0, 3.3], [2.5, 0, 3.6], [6, -1.6, 3.5], [9.5, -2.5, 3.4], [13, -2.5, 2.9], [15, -2.5, 1.8]], 0.9, 0.85), 'fin', true);
+      add(ball(0.95), 'fin', true, 0, 0, 3.3); add(ball(0.95), 'fin', true, 15, -2.5, 1.8);
+    } else if (type === 'ring') {
+      add(cyl(5.2, 0.4, 40), 'fin', false, 0, 0, 0.2); for (var i = 0; i < 8; i++) { var a = i / 8 * PI * 2; add(ball(0.42), 'acc', false, Math.cos(a) * 4.2, Math.sin(a) * 4.2, 0.55); }
+      add(lathe([[0, 0], [3.0, 0], [3.0, 0.5], [2.4, 1.2], [1.2, 1.7], [0, 1.8]]), 'fin', false, 0, 0, 0.4);
+      add(tube([[0, 0, 1.8], [0.2, 0, 3.2], [0.9, 0, 4.0]], 0.7), 'acc', true); add(new T.TorusGeometry(6.2, 0.95, 14, 44), 'fin', true, 6.8, 0, 4.0);
+    } else if (type === 'wheel') {
+      add(rose(4.4, 2.2), 'fin'); add(cyl(1.3, 3.4), 'fin', true, 0, 0, 2.7);
+      add(new T.TorusGeometry(10.2, 1.1, 14, 56), 'fin', true, 0, 0, 5.4);
+      for (var k = 0; k < 4; k++) { var sg = new T.CylinderGeometry(0.75, 0.75, 10.2, 12); sg.translate(0, 5.1, 0); sg.rotateZ(k * PI / 2 + PI / 4); add(sg, 'fin', true, 0, 0, 5.4); }
+      add(lathe([[0, 0], [2.3, 0], [2.3, 0.7], [1.5, 1.5], [0, 1.6]]), 'fin', true, 0, 0, 5.4);
+    } else if (type === 'tee') {
+      plate(8.8, 8.8, 4.3, 0.5, 0, 0); screws([[3.4, 0], [-3.4, 0], [0, 3.4], [0, -3.4]], 0.4); add(rose(2.7, 1.5), 'fin', false, 0, 0, 0.5);
+      add(cyl(1.1, 3.4), 'fin', true, 0, 0, 2.4); add(tube([[-6.2, 0, 4.7], [0, 0, 4.7], [6.2, 0, 4.7]], 0.95), 'fin', true); add(ball(1.5), 'fin', true, -6.2, 0, 4.7); add(ball(1.5), 'fin', true, 6.2, 0, 4.7);
+    } else if (type === 'heavy') {
+      plate(13, 13, 1.2, 0.5, 0, 0); [[4.8, 4.8], [-4.8, 4.8], [4.8, -4.8], [-4.8, -4.8]].forEach(function (p) { add(new T.CylinderGeometry(0.95, 0.95, 0.6, 6).rotateX(PI / 2), 'acc', false, p[0], p[1], 0.8); });
+      add(lathe([[0, 0], [3.4, 0], [3.4, 2.2], [2.6, 3.0], [0, 3.1]]), 'fin', true, 0, 0, 0.5);
+      add(slab(roundShape(24, 3.4, 1.5), 1.6, 0.3), 'fin', true, 10.4, 0, 2.6);
+      for (var r = 0; r < 6; r++) add(new T.BoxGeometry(0.5, 3.9, 2.2), 'acc', true, 11.6 + r * 1.9, 0, 3.0);
+      add(ball(2.0), 'fin', true, 22.8, 0, 3.4);
+    } else if (type === 'knob') {
+      add(rose(3.7, 1.0), 'fin'); plate(3.6, 9.2, 1.4, 0.42, 0, -9.6); keyhole(0, -9.6); screws([[0, -13.4], [0, -5.8]], 0.4);
+      add(cyl(1.15, 3.2), 'fin', true, 0, 0, 2.2);
+      add(lathe([[0, 3.4], [2.0, 3.4], [2.1, 3.9], [1.2, 4.4], [2.4, 5.2], [2.8, 6.6], [2.4, 7.9], [1.4, 8.6], [0, 8.8]]), 'knob', true);
+    } else {   // touch: a lit paddle on a dark glass bezel
+      plate(6.4, 22, 2.2, 0.6, 0, -3); add(new T.PlaneGeometry(4.2, 19.4), 'dark', false, 0, -3, 0.9); add(new T.PlaneGeometry(0.5, 16.6), 'glow', false, -1.4, -3, 0.95);
+      add(cyl(2.0, 2.8, 24), 'fin', true, 0, 0, 1.6);
+      add(slab(roundShape(15, 3.3, 1.5), 1.2, 0.3), 'fin', true, 6.2, 0, 2.7); add(new T.BoxGeometry(13, 0.45, 0.2), 'glow', true, 7.0, 0, 4.5);
+    }
+    return { parts: parts, geos: geos };
+  }
+
   root.XADoors = {
     STYLES: STYLES, STYLE_NAMES: STYLE_NAMES, DoorModel: DoorModel, createSfx: createSfx, buildMesh: buildMesh,
-    layoutOf: layoutOf, faceOps: faceOps, leverArt: leverArt, drawOps: drawOps, clipStrip: clipStrip, rattleProfile: rattleProfile,
+    layoutOf: layoutOf, faceOps: faceOps, leverArt: leverArt, HW: { HANDLE_OF: HANDLE_OF, SCALE: HANDLE_SCALE, EXTENT: HW_EXTENT, TYPES: Object.keys(HW_EXTENT), of: hardwareOf, scale: hardwareScale, parts: hwParts }, drawOps: drawOps, clipStrip: clipStrip, rattleProfile: rattleProfile,
     CONST: { HMAX: HMAX, MAXA: MAXA, DEF_OPEN: DEF_OPEN, KH: KH, CH: CH, KD: KD, CD: CD }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.XADoors;
