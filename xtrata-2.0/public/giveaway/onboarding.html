@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Onboard a Non-Crypto Friend · Xtrata Music</title>
+<meta name="description" content="A challenge for crypto people: send one music-loving friend who has never owned crypto a link, say nothing else, and watch them end up with a limited-edition album and a player that pays artists as it plays." />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicons/xtrata-favicon-32.png" />
+<link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
+<link rel="canonical" href="https://xtrata.xyz/giveaway/onboarding" />
+<meta property="og:title" content="The no-explainer onboarding challenge · Xtrata Music" />
+<meta property="og:description" content="Send a non-crypto friend one link. They use their fingerprint and end up with a limited-edition album and a player that pays artists as it plays. Then tell us how it went." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://xtrata.xyz/giveaway/onboarding" />
+<meta name="twitter:card" content="summary" />
+<style>
+/* Theme tokens: the same ones the Xtrata home page uses, so this page follows the visitor's chosen style. */
+:root {
+color-scheme: light;
+--bg: #f6f8f5;
+--panel: #ffffff;
+--ink: #151a17;
+--muted: #617067;
+--line: #d2ddd6;
+--line-strong: #9caf9f;
+--green: #245f45;
+--green-soft: #e6f1ea;
+--blue: #214f73;
+--blue-soft: #e5eef5;
+--rose: #a43f58;
+--rose-soft: #f7e6eb;
+--amber: #84601b;
+--amber-soft: #f7edd7;
+--shadow: 0 18px 50px rgba(19, 31, 25, 0.08);
+--radius: 8px;
+--control: #ffffff;
+--surface-soft: #fbfdfb;
+--thumb: #f1f5f2;
+--button-hover: #27302b;
+--ghost-hover: rgba(21, 26, 23, 0.06);
+--focus-ring: rgba(36, 95, 69, 0.12);
+--topbar-accent: transparent;
+--button-bg: var(--ink);
+--button-ink: var(--bg);
+--button-border: var(--ink);
+--secondary-bg: transparent;
+--secondary-ink: var(--ink);
+/* Tooltips must stay legible independently of the selected visual theme. */
+--tooltip-bg: #090b0a;
+--tooltip-ink: #ffffff;
+--tooltip-border: rgba(255, 255, 255, 0.82);
+--tooltip-shadow: 0 14px 38px rgba(0, 0, 0, 0.72);
+}
+body[data-theme="classic"] {
+--bg: #f6f8f5;
+--panel: #ffffff;
+--ink: #151a17;
+--muted: #617067;
+--line: #d2ddd6;
+--line-strong: #9caf9f;
+--green: #245f45;
+--green-soft: #e6f1ea;
+--blue: #214f73;
+--blue-soft: #e5eef5;
+--rose: #a43f58;
+--rose-soft: #f7e6eb;
+--amber: #84601b;
+--amber-soft: #f7edd7;
+--shadow: 0 18px 50px rgba(19, 31, 25, 0.08);
+--control: #ffffff;
+--surface-soft: #fbfdfb;
+--thumb: #f1f5f2;
+--button-hover: #27302b;
+--ghost-hover: rgba(21, 26, 23, 0.06);
+--focus-ring: rgba(36, 95, 69, 0.12);
+--topbar-accent: transparent;
+}
+body[data-theme="terminal"] {
+color-scheme: dark;
+--bg: #0d120f;
+--panel: #101813;
+--ink: #e7f5ec;
+--muted: #8fa498;
+--line: #26362d;
+--line-strong: #4a715a;
+--green: #70d18d;
+--green-soft: #14281c;
+--blue: #8fc7ff;
+--blue-soft: #122235;
+--rose: #ff8da8;
+--rose-soft: #351823;
+--amber: #f0be63;
+--amber-soft: #302411;
+--shadow: 0 20px 58px rgba(0, 0, 0, 0.42);
+--control: #0c1510;
+--surface-soft: #0c1510;
+--thumb: #0a100d;
+--button-hover: #c8ead4;
+--ghost-hover: rgba(112, 209, 141, 0.10);
+--focus-ring: rgba(112, 209, 141, 0.18);
+--topbar-accent: rgba(112, 209, 141, 0.16);
+}
+body[data-theme="midnight"] {
+color-scheme: dark;
+--bg: #101521;
+--panel: #161d2b;
+--ink: #f3f7ff;
+--muted: #9ba8bb;
+--line: #2b3649;
+--line-strong: #556a8c;
+--green: #76d6c2;
+--green-soft: #12302d;
+--blue: #9fc3ff;
+--blue-soft: #172945;
+--rose: #ff9ab0;
+--rose-soft: #3a1d2a;
+--amber: #ffd27a;
+--amber-soft: #332713;
+--shadow: 0 20px 62px rgba(0, 0, 0, 0.36);
+--control: #101827;
+--surface-soft: #111a29;
+--thumb: #0f1724;
+--button-hover: #d8e6ff;
+--ghost-hover: rgba(159, 195, 255, 0.10);
+--focus-ring: rgba(159, 195, 255, 0.18);
+--topbar-accent: rgba(159, 195, 255, 0.16);
+}
+body[data-theme="neon"] {
+color-scheme: dark;
+--bg: #05020b;
+--panel: #0c0715;
+--ink: #f8f4ff;
+--muted: #b79fd2;
+--line: #3b1859;
+--line-strong: #ff36d7;
+--green: #00ff9c;
+--green-soft: #06251c;
+--blue: #00d9ff;
+--blue-soft: #051c2a;
+--rose: #ff36d7;
+--rose-soft: #2a0724;
+--amber: #ffe66d;
+--amber-soft: #251f05;
+--shadow: 0 0 34px rgba(255, 54, 215, 0.20), 0 0 68px rgba(0, 217, 255, 0.12);
+--control: #10071b;
+--surface-soft: #0a0611;
+--thumb: #09040f;
+--button-hover: #d9b8ff;
+--ghost-hover: rgba(0, 217, 255, 0.13);
+--focus-ring: rgba(255, 54, 215, 0.28);
+--topbar-accent: rgba(0, 255, 156, 0.28);
+}
+body[data-theme="monochrome"] {
+color-scheme: dark;
+--bg: #050505;
+--panel: #111111;
+--ink: #f7f7f7;
+--muted: #c9c9c9;
+--line: #303030;
+--line-strong: #d8d8d8;
+--green: #ffffff;
+--green-soft: #1d1d1d;
+--blue: #e7e7e7;
+--blue-soft: #181818;
+--rose: #ffffff;
+--rose-soft: #1f1f1f;
+--amber: #d4d4d4;
+--amber-soft: #202020;
+--shadow: 0 24px 70px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+--control: #0b0b0b;
+--surface-soft: #151515;
+--thumb: #0d0d0d;
+--button-hover: #d8d8d8;
+--ghost-hover: rgba(255, 255, 255, 0.08);
+--focus-ring: rgba(255, 255, 255, 0.18);
+--topbar-accent: rgba(255, 255, 255, 0.20);
+--button-bg: #f7f7f7;
+--button-ink: #050505;
+--button-border: #f7f7f7;
+--secondary-bg: transparent;
+--secondary-ink: #f7f7f7;
+}
+body[data-theme="obsidian"] {
+color-scheme: dark;
+--bg: #070b10;
+--panel: #0e141b;
+--ink: #eef6ff;
+--muted: #8fa2b6;
+--line: #253241;
+--line-strong: #50677d;
+--green: #7ee2c7;
+--green-soft: #102a27;
+--blue: #86b7ff;
+--blue-soft: #111f32;
+--rose: #ff8fb3;
+--rose-soft: #311522;
+--amber: #ffcc78;
+--amber-soft: #2a2010;
+--shadow: 0 26px 76px rgba(0, 0, 0, 0.54);
+--control: #0a1118;
+--surface-soft: #0b1219;
+--thumb: #060b10;
+--button-hover: #d6e9ff;
+--ghost-hover: rgba(134, 183, 255, 0.10);
+--focus-ring: rgba(126, 226, 199, 0.20);
+--topbar-accent: rgba(126, 226, 199, 0.16);
+}
+body[data-theme="ember"] {
+color-scheme: dark;
+--bg: #130905;
+--panel: #1b0f0a;
+--ink: #fff5ee;
+--muted: #c09b85;
+--line: #3b2116;
+--line-strong: #a64f26;
+--green: #f0a35b;
+--green-soft: #331a0d;
+--blue: #ffc36f;
+--blue-soft: #2b1d0e;
+--rose: #ff6d4d;
+--rose-soft: #35120c;
+--amber: #ffd27f;
+--amber-soft: #30200d;
+--shadow: 0 24px 68px rgba(0, 0, 0, 0.50), 0 0 42px rgba(255, 109, 77, 0.10);
+--control: #170b07;
+--surface-soft: #160c08;
+--thumb: #110704;
+--button-hover: #ffd3b0;
+--ghost-hover: rgba(255, 195, 111, 0.10);
+--focus-ring: rgba(255, 109, 77, 0.20);
+--topbar-accent: rgba(255, 109, 77, 0.18);
+}
+body[data-theme="ultraviolet"] {
+color-scheme: dark;
+--bg: #10071f;
+--panel: #170d2a;
+--ink: #fbf7ff;
+--muted: #b5a2d2;
+--line: #33204e;
+--line-strong: #8257d6;
+--green: #c7ff7a;
+--green-soft: #1f2b10;
+--blue: #b08cff;
+--blue-soft: #211338;
+--rose: #ff91d6;
+--rose-soft: #35142d;
+--amber: #f4d27c;
+--amber-soft: #2d230d;
+--shadow: 0 24px 72px rgba(0, 0, 0, 0.46), 0 0 46px rgba(130, 87, 214, 0.16);
+--control: #120820;
+--surface-soft: #130a22;
+--thumb: #0e0619;
+--button-hover: #dac7ff;
+--ghost-hover: rgba(176, 140, 255, 0.12);
+--focus-ring: rgba(176, 140, 255, 0.20);
+--topbar-accent: rgba(199, 255, 122, 0.18);
+}
+body[data-theme="arctic"] {
+color-scheme: dark;
+--bg: #061018;
+--panel: #0c1a25;
+--ink: #f0fbff;
+--muted: #91aec0;
+--line: #213a4a;
+--line-strong: #63c6e8;
+--green: #9df7ff;
+--green-soft: #0c2b32;
+--blue: #72b7ff;
+--blue-soft: #0d2438;
+--rose: #ff9fc8;
+--rose-soft: #321827;
+--amber: #f4dc95;
+--amber-soft: #2a2412;
+--shadow: 0 24px 72px rgba(0, 0, 0, 0.48), 0 0 38px rgba(114, 183, 255, 0.12);
+--control: #07131d;
+--surface-soft: #081722;
+--thumb: #05101a;
+--button-hover: #c6f4ff;
+--ghost-hover: rgba(157, 247, 255, 0.12);
+--focus-ring: rgba(157, 247, 255, 0.20);
+--topbar-accent: rgba(99, 198, 232, 0.18);
+}
+body[data-theme="ruby"] {
+color-scheme: dark;
+--bg: #120611;
+--panel: #1d0b1a;
+--ink: #fff3fb;
+--muted: #c39ab9;
+--line: #3e1c37;
+--line-strong: #b84d94;
+--green: #ffb3df;
+--green-soft: #331429;
+--blue: #d9a8ff;
+--blue-soft: #271633;
+--rose: #ff6fbd;
+--rose-soft: #3a1130;
+--amber: #ffd18d;
+--amber-soft: #2d2110;
+--shadow: 0 24px 72px rgba(0, 0, 0, 0.50), 0 0 42px rgba(255, 111, 189, 0.14);
+--control: #150713;
+--surface-soft: #160914;
+--thumb: #10050f;
+--button-hover: #ffd0ef;
+--ghost-hover: rgba(255, 111, 189, 0.11);
+--focus-ring: rgba(255, 111, 189, 0.22);
+--topbar-accent: rgba(255, 179, 223, 0.18);
+}
+
+/* ---- base: same as the home page ---- */
+:root{--hm-violet:#c8b6ff;--hm-pink:#ffb3df;--hm-teal:#7ee2c7;--radius:8px;--sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth;scrollbar-gutter:stable}
+/* button tokens resolve against the active theme (the :root copies above would read the light theme's ink) */
+body{--button-bg:var(--ink);--button-ink:var(--bg);--button-border:var(--ink);--secondary-bg:transparent;--secondary-ink:var(--ink)}
+body{margin:0;min-width:320px;background:var(--bg);color:var(--ink);font:400 16px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+body[data-theme]{background:radial-gradient(circle at 18% 10%,var(--topbar-accent),transparent 30%),radial-gradient(circle at 82% 0%,rgba(255,255,255,.035),transparent 26%),var(--bg)}
+button,input,select{font:inherit}
+button{border:0}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:4px}
+.shell{width:min(1240px,calc(100vw - 32px));margin:0 auto;padding:20px 0 40px}
+
+/* top bar: logo, wordmark, tagline (as on the home page) */
+.topbar{display:flex;align-items:center;gap:16px;min-height:96px;border-bottom:1px solid var(--line-strong)}
+.brand{display:inline-flex;align-items:center;gap:14px;color:var(--ink);text-decoration:none;font-weight:800;font-size:22px;line-height:1;text-transform:uppercase;white-space:nowrap}
+.brand-logo{width:64px;height:64px;object-fit:contain;display:block;flex:none}
+.brand-name{display:flex;flex-direction:column;gap:6px;min-width:0}
+.brand-tagline{color:var(--muted);font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;white-space:normal;max-width:32ch;line-height:1.3}
+.top-actions{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+
+/* buttons: the home page's .btn */
+.btn{min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--radius);border:1px solid var(--button-border,var(--ink));background:var(--button-bg,var(--ink));color:var(--button-ink,var(--bg));padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--button-hover);color:var(--button-ink,var(--bg))}
+.btn.secondary{border-color:var(--line-strong);background:var(--secondary-bg,transparent);color:var(--secondary-ink,var(--ink))}
+.btn.secondary:hover{background:var(--ghost-hover);color:var(--ink)}
+
+/* hero: copy on the left, the live drop on the right (like the music hero on the home page) */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,520px);gap:34px;align-items:center;padding:34px 0 10px}
+.kicker{margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h1{margin:0 0 14px;font-size:clamp(34px,5.2vw,62px);line-height:1.02;font-weight:800;letter-spacing:-.025em;text-wrap:balance}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--hm-violet),var(--hm-pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{margin:0 0 18px;max-width:52ch;font-size:17px;line-height:1.5;color:var(--muted)}
+.lead strong{color:var(--ink)}
+.pills{display:flex;flex-wrap:wrap;gap:8px 10px;margin:0 0 16px;padding:0;list-style:none}
+.pills li{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:999px;border:1px solid var(--line);background:var(--surface-soft);font-size:13px;font-weight:600}
+.pills b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--hm-violet),var(--hm-pink));color:#1a1030;font-size:12px}
+.note{margin:0;max-width:56ch;font-size:13px;color:var(--muted)}
+
+.drop{position:relative;background:radial-gradient(120% 140% at 100% 0%,rgba(255,179,223,.16),transparent 55%),linear-gradient(115deg,rgba(200,182,255,.2),rgba(10,14,22,0) 60%),#0c0b16;color:#fff;border:1px solid rgba(200,182,255,.4);border-radius:18px;padding:20px 20px 22px;box-shadow:0 12px 48px -16px rgba(200,182,255,.4);overflow:hidden}
+body.is-live .drop{border-color:var(--hm-teal);box-shadow:0 0 0 1px rgba(126,226,199,.35),0 12px 56px -12px rgba(126,226,199,.45);animation:arrive .55s cubic-bezier(.2,1.3,.4,1)}
+.drop-head{display:flex;align-items:center;gap:10px;margin:0 0 16px;font-size:13px;color:rgba(255,255,255,.62)}
+.chip{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.08);border-radius:999px;padding:6px 12px 6px 10px}
+.chip i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.5)}
+body.is-live .chip{background:rgba(126,226,199,.16);color:var(--hm-teal)}
+body.is-live .chip i{background:#ff4d4d;animation:pulse 1.2s ease-in-out infinite}
+.copyno{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700;color:#fff}
+.state{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:8px 2px 4px}
+.state h2{margin:0;font-size:clamp(24px,3.6vw,34px);line-height:1.08;font-weight:800;letter-spacing:-.02em}
+.state p{margin:0;color:rgba(255,255,255,.78);max-width:40em}
+.drop .btn.secondary{border-color:rgba(255,255,255,.4);color:#fff}
+.drop .btn.secondary:hover{background:rgba(255,255,255,.1);color:#fff}
+/* the run: every copy in the edition */
+.run{margin:22px 0 0;padding:18px 20px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+.run-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;margin:0 0 12px}
+.run-head h3{margin:0;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.run-head p{margin:0;font-size:15px;font-weight:600}
+.discs{display:flex;flex-wrap:wrap;gap:7px}
+.d{display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid var(--line-strong);flex:none;opacity:.55}
+.d.done{opacity:1;border-color:var(--hm-pink);background:radial-gradient(circle,var(--panel) 0 2.2px,var(--hm-pink) 3.2px)}
+.d.held{opacity:1;border-color:var(--muted);background:radial-gradient(circle,var(--panel) 0 2.2px,var(--muted) 3.2px)}
+.d.now{opacity:1;border-color:var(--hm-teal);background:radial-gradient(circle,var(--panel) 0 2.2px,var(--hm-teal) 3.2px);box-shadow:0 0 0 4px rgba(126,226,199,.22),0 0 16px var(--hm-teal);animation:pulse 1.4s ease-in-out infinite}
+.discs.enter .d{animation:stamp .5s cubic-bezier(.2,1.4,.4,1) both;animation-delay:calc(var(--i)*9ms)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0 0;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend .d{width:12px;height:12px}
+/* sections below */
+section.block{padding:52px 0 0}
+.sec-kicker{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h2.big{margin:0 0 20px;font-size:clamp(24px,3.4vw,36px);line-height:1.1;font-weight:800;letter-spacing:-.02em;max-width:22ch;text-wrap:balance}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0;padding:0;list-style:none}
+.card{position:relative;padding:20px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+.card b.n{display:grid;place-items:center;width:30px;height:30px;margin-bottom:12px;border-radius:50%;background:linear-gradient(135deg,var(--hm-violet),var(--hm-pink));color:#1a1030;font-size:14px}
+.card strong{display:block;margin:0 0 6px;font-size:18px;line-height:1.2;font-weight:800;letter-spacing:-.01em}
+.card span{display:block;color:var(--muted);font-size:15px}
+.share{margin-top:26px;display:flex;gap:10px 12px;align-items:center;flex-wrap:wrap}
+.share p{margin:0 6px 0 0;font-weight:700}
+
+/* footer, as on the home page */
+.site-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-top:56px;padding:18px 0 0;border-top:1px solid var(--line)}
+.footer-links{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.footer-links a{color:var(--muted);font-size:13px;font-weight:800;text-decoration:none}
+.footer-links a:hover{color:var(--ink);text-decoration:underline}
+.footer-theme{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:900;text-transform:uppercase}
+.select{min-height:36px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control);color:var(--ink);padding:6px 10px;font-weight:700;font-size:13px;text-transform:none;width:min(220px,100%)}
+
+
+/* ---- onboarding page ---- */
+.hero .btn.big{min-height:50px;padding:0 22px;font-size:16px}
+.cta{display:flex;gap:10px 12px;flex-wrap:wrap;margin:0 0 18px}
+.bignum{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:2px 0}
+.bignum b{font-size:clamp(52px,9vw,80px);line-height:1;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;background:linear-gradient(90deg,var(--hm-violet),var(--hm-pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+.bignum span{font-size:16px;color:rgba(255,255,255,.78)}
+.drop .btn{margin-top:6px}
+.nots{display:flex;flex-wrap:wrap;gap:8px 10px;margin:22px 0 0;padding:0;list-style:none}
+.nots li{padding:8px 14px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface-soft);font-size:14px;font-weight:700}
+.nots li s{text-decoration-thickness:2px;text-decoration-color:var(--hm-pink);color:var(--muted);font-weight:600}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0;padding:0;list-style:none}
+.prose p{margin:0 0 12px;color:var(--muted);max-width:60ch;font-size:17px;line-height:1.5}
+.prose p strong{color:var(--ink)}
+.steps{display:grid;gap:14px;margin:0;padding:0;list-style:none;counter-reset:s}
+.step{position:relative;padding:20px 20px 20px 66px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow);counter-increment:s}
+.step::before{content:counter(s);position:absolute;left:18px;top:18px;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--hm-violet),var(--hm-pink));color:#1a1030;font-weight:800}
+.step h3{margin:0 0 6px;font-size:19px;line-height:1.2;font-weight:800;letter-spacing:-.01em}
+.step p{margin:0 0 10px;color:var(--muted);max-width:62ch}
+.step p:last-child{margin-bottom:0}
+.msg{margin:12px 0 12px;padding:14px 16px;border:1px dashed var(--line-strong);border-radius:var(--radius);background:var(--surface-soft);color:var(--ink);font-size:15px;line-height:1.5;max-width:62ch;white-space:pre-wrap;overflow-wrap:anywhere}
+.step .share{margin-top:12px}
+.tips{margin:0;padding-left:20px;color:var(--muted);max-width:64ch}
+.tips li{margin:0 0 10px}
+.tips strong{color:var(--ink)}
+.tips a,.prose a{color:var(--ink)}
+.final{margin-top:52px;padding:28px 24px;border:1px solid var(--line-strong);border-radius:var(--radius);background:linear-gradient(115deg,rgba(200,182,255,.16),transparent 60%),var(--panel);box-shadow:var(--shadow)}
+.final h2{margin:0 0 8px;font-size:clamp(24px,3.4vw,36px);line-height:1.1;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+.final p{margin:0 0 4px;color:var(--muted);max-width:60ch}
+@media (max-width:900px){.two{grid-template-columns:1fr}.step{padding:18px 16px 18px 58px}.step::before{left:14px;top:16px}}
+
+@keyframes pulse{50%{opacity:.35}}
+@keyframes eq{0%,100%{height:8px}50%{height:36px}}
+@keyframes arrive{from{transform:translateY(10px) scale(.985);opacity:.4}to{transform:none;opacity:1}}
+@keyframes stamp{from{transform:scale(2.4);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr;gap:24px;padding-top:24px}
+  .cards{grid-template-columns:1fr}
+  .brand-tagline{display:none}
+}
+@media (max-width:600px){
+  .topbar{min-height:76px}.brand-logo{width:48px;height:48px}.brand{font-size:18px}
+  .top-actions .btn:nth-child(n+2){display:none}
+  .d{width:16px;height:16px}.discs{gap:6px}
+  .drop{padding:16px 16px 18px}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<script>
+// Follow the style chosen on the Xtrata home page (same saved setting; Monochrome by default).
+(function(){var ids=['classic','terminal','midnight','neon','monochrome','obsidian','ember','ultraviolet','arctic','ruby'],t='monochrome';
+try{var s=localStorage.getItem('xtrata.simple-homepage.theme');if(ids.indexOf(s)>=0)t=s;}catch(e){}
+document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
+</script>
+
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Xtrata home">
+      <img class="brand-logo" src="/favicon.svg" alt="" />
+      <span class="brand-name"><span>Xtrata Music</span><span class="brand-tagline">Songs that live on-chain and pay the artist every play</span></span>
+    </a>
+    <nav class="top-actions" aria-label="Site">
+      <a class="btn secondary" href="/giveaway">Free album drop</a>
+      <a class="btn secondary" href="/radio">Free radio</a>
+      <a class="btn secondary" href="/music/heroes">Music Heroes</a>
+      <a class="btn secondary" href="/">Xtrata home</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="kicker">A challenge for crypto people</p>
+        <h1>Onboard one person who&rsquo;s never owned crypto. <em>Without explaining a thing.</em></h1>
+        <p class="lead">You&rsquo;ve tried to get a music-loving friend into a wallet before. This is the version that works. They tap a link and use their fingerprint or face, and they&rsquo;re holding a limited-edition album with a player that <strong>pays the artist every time they listen</strong>. Your whole job is to send the link and keep quiet.</p>
+        <div class="cta">
+          <a class="btn big" href="#challenge">Take the challenge</a>
+          <a class="btn big secondary" href="/giveaway">See the live drop</a>
+        </div>
+        <ol class="pills" aria-label="The challenge in three steps">
+          <li><b>1</b>Pick a music friend</li>
+          <li><b>2</b>Send the link, say nothing</li>
+          <li><b>3</b>Tell us how it went</li>
+        </ol>
+        <p class="note">Free to claim. There are only <span class="total-inline">95</span> copies, one goes live every ten minutes.</p>
+      </div>
+
+      <section class="drop" aria-live="polite" aria-atomic="true">
+        <div class="drop-head"><span class="chip"><i></i><span id="chip">Free album drop</span></span></div>
+        <div class="state" id="plain-pane">
+          <h2>Free limited-edition album</h2>
+          <p>A new copy goes live every ten minutes and one person gets each. No account, no app, nothing to buy.</p>
+        </div>
+        <div class="state" id="live-pane" hidden>
+          <div class="bignum"><b id="gone">0</b><span id="gone-of">copies have found a home</span></div>
+          <p>A new copy goes live every ten minutes and one person gets each. Their wallet is made on the spot, from their fingerprint.</p>
+        </div>
+        <a class="btn secondary" id="drop-cta" href="/giveaway">Open the live drop</a>
+      </section>
+    </section>
+
+    <div class="run" id="run" hidden>
+      <div class="run-head"><h3>The run</h3><p id="run-text"></p></div>
+      <div class="discs" id="discs" role="img" aria-label="Every copy in the edition"></div>
+      <div class="legend"><span id="legend-held" hidden><i class="d held"></i>Set aside</span><span><i class="d done"></i>Claimed</span><span><i class="d now"></i>Live now</span><span><i class="d"></i>Still to come</span></div>
+    </div>
+
+    <section class="block">
+      <p class="sec-kicker">What your friend goes through</p>
+      <h2 class="big">One tap, then a face</h2>
+      <ol class="cards">
+        <li class="card"><b class="n">1</b><strong>They tap the link</strong><span>It opens a player with a limited-edition album waiting for them. Nothing to install and nothing to sign up for.</span></li>
+        <li class="card"><b class="n">2</b><strong>They use Face ID or a fingerprint</strong><span>That&rsquo;s the whole sign-up. A real Stacks wallet is made from their passkey in a few seconds, and the album is sent into it.</span></li>
+        <li class="card"><b class="n">3</b><strong>They press play</strong><span>The player pays micro-amounts of STX to the rights holder from the very first listen. They start with plays included.</span></li>
+      </ol>
+      <ul class="nots" aria-label="What they never need">
+        <li><s>Seed phrase</s></li>
+        <li><s>Browser extension</s></li>
+        <li><s>Exchange account</s></li>
+        <li><s>Explainer thread</s></li>
+      </ul>
+    </section>
+
+    <section class="block">
+      <p class="sec-kicker">Why this matters</p>
+      <h2 class="big">The thing people have been trying to ship for years</h2>
+      <div class="two">
+        <div class="prose">
+          <p><strong>Web3 music assets, handed to people who don&rsquo;t know or care what a wallet is.</strong> Most of the industry&rsquo;s attempts stop at a wallet-connect button. This one starts from a link in a message.</p>
+          <p>And a player that pays artists as it plays: every song heard for 30 seconds sends a small payment straight to the holder of the song.</p>
+          <p>It&rsquo;s live, and it only gets proven one way. Put it in front of a real person who has never done any of this, and see if they get stuck.</p>
+        </div>
+        <ul class="cards" style="grid-template-columns:1fr">
+          <li class="card"><strong>A real wallet</strong><span>A Stacks wallet derived from a passkey. The key never leaves their device.</span></li>
+          <li class="card"><strong>An album held on-chain</strong><span>Limited edition, inscribed on Xtrata on Stacks, and sent to them at claim.</span></li>
+          <li class="card"><strong>Artists paid from play one</strong><span>Each paid play is a small STX transfer to the song&rsquo;s holder.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="block" id="challenge">
+      <p class="sec-kicker">Your part</p>
+      <h2 class="big">The challenge, in four steps</h2>
+      <ol class="steps">
+        <li class="step">
+          <h3>Pick your person</h3>
+          <p>Someone who loves music and has never owned crypto: a parent, a bandmate, the friend who still buys vinyl. Best on their own phone or laptop with Face ID, Touch ID or a fingerprint reader.</p>
+        </li>
+        <li class="step">
+          <h3>Send them the link, and nothing else</h3>
+          <p>Here&rsquo;s a message with no crypto words in it. Change it however you like.</p>
+          <div class="msg" id="msg">I&rsquo;ve got a free limited-edition album for you. They&rsquo;re giving out one copy every ten minutes, and whoever taps the live one first keeps it. It takes about a minute and you just use your fingerprint or Face ID. Try it: https://xtrata.xyz/giveaway</div>
+          <div class="share">
+            <button class="btn" id="copy-msg" type="button">Copy the message</button>
+            <button class="btn secondary" id="share-msg" type="button">Share it</button>
+            <button class="btn secondary" id="copy-friend" type="button">Copy friend link</button>
+          </div>
+        </li>
+        <li class="step">
+          <h3>Don&rsquo;t explain. Really.</h3>
+          <p>No wallet talk, no &ldquo;it&rsquo;s kind of like&hellip;&rdquo;. If they get stuck, that&rsquo;s exactly what we want to know. Note where.</p>
+        </li>
+        <li class="step">
+          <h3>Tell us how it went</h3>
+          <p>Did they get to music? How long did it take? Where did they hesitate? Post it and tag <a href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">@XtrataLayers</a>, good or bad.</p>
+          <div class="share">
+            <a class="btn" id="report" target="_blank" rel="noopener" href="#">Post how it went on X</a>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="block">
+      <p class="sec-kicker">A clean test</p>
+      <h2 class="big">So the test is fair</h2>
+      <ul class="tips">
+        <li><strong>Copies go one at a time.</strong> If the live copy has just been claimed, the drop page counts down to the next one. Tell them to keep it open.</li>
+        <li><strong>One copy of each album per person.</strong> It&rsquo;s tied to their passkey, so it&rsquo;s their copy, not one you can claim on their behalf.</li>
+        <li><strong>If it looks stuck,</strong> open the link in Safari or Chrome rather than inside a chat app&rsquo;s built-in browser.</li>
+        <li><strong>You can go first.</strong> Already on Stacks? You can also connect Xverse or Leather on the <a href="/radio">radio</a> and listen with your own wallet.</li>
+      </ul>
+    </section>
+
+    <section class="block">
+      <p class="sec-kicker">Under the hood</p>
+      <h2 class="big">What actually happens</h2>
+      <ul class="tips">
+        <li>Songs are inscribed on Xtrata on Stacks. Each paid play is a small STX transfer to the song&rsquo;s holder, with the network fee on top.</li>
+        <li>The listening wallet is a Stacks wallet derived from a passkey (Face ID, Touch ID, Windows Hello). The key never leaves the device.</li>
+        <li>Claiming a link sends a starter balance to a brand-new wallet. Each album goes into its own numbered wallet under the same passkey, and only one copy of an album per passkey.</li>
+        <li>The giveaway hands out one link at a time, with a ten minute pause between copies so a crowd never turns into a rush.</li>
+      </ul>
+    </section>
+
+    <section class="final">
+      <h2>Know other crypto people who&rsquo;d take this on?</h2>
+      <p>Send them this page. The more real first-timers it meets, the sooner we find out where it still breaks.</p>
+      <div class="share">
+        <a class="btn" id="tweet" target="_blank" rel="noopener" href="#">Post this challenge on X</a>
+        <button class="btn secondary" id="copy-page" type="button">Copy this page link</button>
+      </div>
+    </section>
+  </main>
+
+
+<footer class="site-footer">
+    <nav class="footer-links" aria-label="Footer links">
+      <a href="/">Xtrata</a>
+      <a href="/giveaway">Free album drop</a>
+      <a href="/radio">Free radio</a>
+      <a href="/music/heroes">Music Heroes</a>
+      <a href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">Xtrata on X</a>
+    </nav>
+    <label class="footer-theme"><span>Style</span>
+      <select class="select" id="themeSelect" aria-label="Theme">
+        <option value="classic">Classic infrastructure</option>
+        <option value="terminal">Terminal green</option>
+        <option value="midnight">Midnight node</option>
+        <option value="neon">Full neon</option>
+        <option value="monochrome">Monochrome luxe</option>
+        <option value="obsidian">Obsidian steel</option>
+        <option value="ember">Ember archive</option>
+        <option value="ultraviolet">Ultraviolet vault</option>
+        <option value="arctic">Arctic dark</option>
+        <option value="ruby">Ruby night</option>
+      </select>
+    </label>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var FRIEND='https://xtrata.xyz/giveaway';          // what a non-crypto friend is sent
+  var PAGE='https://xtrata.xyz/giveaway/onboarding'; // what other crypto people are sent
+  var $=function(id){return document.getElementById(id);};
+
+  // Sharing. The friend message has no crypto words in it on purpose.
+  var friendMsg=$('msg').textContent;
+  var challengeText='Challenge for crypto people: onboard someone who has never owned crypto, with zero explaining. Send them one link. They use their fingerprint and end up with a limited-edition album and a player that pays artists as it plays. Try it on someone';
+  var reportText='I tried the Xtrata challenge on someone who has never owned crypto. Here is how it went:';
+  var x=function(t,u){return 'https://x.com/intent/post?text='+encodeURIComponent(t)+'&url='+encodeURIComponent(u);};
+  $('tweet').href=x(challengeText,PAGE);
+  $('report').href=x(reportText,PAGE);
+
+  function copier(btn,getText,label){
+    btn.addEventListener('click',function(){
+      var done=function(){btn.textContent='Copied ✓';setTimeout(function(){btn.textContent=label;},1800);};
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(getText()).then(done,function(){});
+    });
+  }
+  copier($('copy-msg'),function(){return friendMsg;},'Copy the message');
+  copier($('copy-friend'),function(){return FRIEND;},'Copy friend link');
+  copier($('copy-page'),function(){return PAGE;},'Copy this page link');
+  if(!navigator.share)$('share-msg').hidden=true;
+  $('share-msg').addEventListener('click',function(){navigator.share({text:friendMsg}).catch(function(){});});
+
+  // The live count of copies, from the same feed as the drop page. If it cannot be reached the card just shows the plain facts.
+  var STATUS={live:'A copy is live now',taken:'Just claimed',waiting:'Next copy soon',paused:'Taking a short break',done:'Finished'};
+  var drawn=0,timer=0,fails=0;
+  function render(v){
+    var claimed=Number(v.claimed||0),left=Number(v.left||0),held=Math.max(0,Number(v.held||0));
+    var total=held+claimed+left,gone=held+claimed,state=v.state;
+    if(total<1)return;
+    document.querySelectorAll('.total-inline').forEach(function(e){e.textContent=total;});
+    $('gone').textContent=gone;
+    $('gone-of').textContent='of '+total+' copies have found a home';
+    $('chip').textContent=STATUS[state]||'Free album drop';
+    document.body.classList.toggle('is-live',state==='live');
+    $('drop-cta').textContent=state==='live'?'A copy is live: see it':'Open the live drop';
+    $('run').hidden=false;
+    var box=$('discs');
+    if(drawn!==total){box.textContent='';for(var i=0;i<total;i++){var d=document.createElement('i');d.className='d';d.style.setProperty('--i',i);box.appendChild(d);}drawn=total;}
+    var nodes=box.children;
+    for(var j=0;j<nodes.length;j++){nodes[j].className='d'+(j<held?' held':(j<gone?' done':(state==='live'&&j===gone?' now':'')));}
+    $('run-text').textContent=gone+' of '+total+' gone'+(left>0&&state!=='done'?', '+left+' still to come':'');
+    $('legend-held').hidden=!(held>0);
+    $('live-pane').hidden=false;$('plain-pane').hidden=true;
+  }
+  function poll(){
+    clearTimeout(timer);
+    fetch('/radio/giveaway',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
+      .then(function(v){fails=0;render(v);})
+      .catch(function(){fails++;})
+      .then(function(){timer=setTimeout(poll,document.hidden?60000:(fails>=3?120000:20000));});
+  }
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)poll();});
+  poll();
+})();
+</script>
+<script>
+(function(){var sel=document.getElementById('themeSelect');sel.value=document.body.dataset.theme;
+sel.addEventListener('change',function(){document.body.dataset.theme=sel.value;try{localStorage.setItem('xtrata.simple-homepage.theme',sel.value);}catch(e){}});})();
+</script>
+</body>
+</html>
