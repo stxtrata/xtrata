@@ -32134,6 +32134,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
 
   var DEG = Math.PI / 180, HMAX = 22, MAXA = 108, DEF_OPEN = 105;
   var KH = 900, CH = 37, KD = 150, CD = 17.6, RAT_LEN = 0.8, RAT_STOP = 13;
+  var BOLT = { l: 0.03, d: 0.018, h: 0.03, throw: 0.018, gap: 0.008 };   // metres: the latch bolt (length, depth, height), how far it throws, the gap between the leaf edge and the keep
   var LATCH_ZONE = 4, LATCH_HOME = 0.4, CATCH = 45;   // degrees: where the strike takes the bolt, where the leaf counts as home; the catch spring
   var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
   var r2 = function (n) { return Math.round(n * 100) / 100; };
@@ -32725,6 +32726,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     }
 
     /* leaves */
+    var strikes = {};
     var leafObjs = G.leaves.map(function (L) {
       var pivot = new T.Group(); pivot.position.set((L.axis - W / 2) * s, 0, zLeaf);
       // the slab: the outline clipped to this leaf's strip, extruded for thickness
@@ -32780,7 +32782,28 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       });
       }
       var led = new T.Mesh(new T.CircleGeometry(2.4 * s, 12), new T.MeshBasicMaterial({ color: 0xff6a6a })); led.position.set((L.hx - L.axis) * s, (H - G.hy - 16) * s, th + 0.005); led.raycast = function () {}; pivot.add(led); disposables.push(led.material, led.geometry);
-      var bolt = new T.Mesh(new T.BoxGeometry(14 * s, 9 * s, 0.012), SK ? hwMat() : new T.MeshBasicMaterial({ color: 0xc9d4de })); bolt.position.set((L.latch - L.axis) * s, (H - G.hy) * s, th * 0.5); bolt.raycast = function () {}; pivot.add(bolt); disposables.push(bolt.material, bolt.geometry);
+      /* The latch: a real bolt (about 3 cm long, 1.8 cm deep, bevelled at the tip) that slides out of a faceplate on the leaf's edge, and a
+         strike set into the frame: a keep (a block of the frame finish beside the leaf) with a metal strike plate and a dark mortise the
+         bolt goes into. Pulled in, the bolt sits inside the leaf; let go, it throws out through the faceplate and into the keep (the part
+         inside the keep is hidden by it, so it reads as going into the frame). Double doors meet in the middle and have no keep. */
+      var yB = (H - G.hy) * s, zB = th * 0.5, out = -L.inw, bd = Math.min(BOLT.d, th * 0.8), bev = 0.006, bh = BOLT.h;
+      var bshape = new T.Shape(); bshape.moveTo(-BOLT.l / 2, -bd / 2); bshape.lineTo(BOLT.l / 2 - bev, -bd / 2); bshape.lineTo(BOLT.l / 2, -bd / 2 + bev);
+      bshape.lineTo(BOLT.l / 2, bd / 2 - bev); bshape.lineTo(BOLT.l / 2 - bev, bd / 2); bshape.lineTo(-BOLT.l / 2, bd / 2); bshape.closePath();
+      var bgeo = new T.ExtrudeGeometry(bshape, { depth: bh, bevelEnabled: false }); bgeo.rotateX(Math.PI / 2); bgeo.center();
+      var metal = function () { var mt = SK ? hwMat() : new T.MeshBasicMaterial({ color: 0xc9d4de }); if (!SK) disposables.push(mt); return mt; };
+      var bolt = new T.Mesh(bgeo, metal()); bolt.scale.x = out; bolt.position.set((L.latch - L.axis) * s - L.inw * (BOLT.throw - (BOLT.l / 2 + 0.002)), yB, zB);   // the tip points out of the leaf
+      bolt.raycast = function () {}; pivot.add(bolt); disposables.push(bgeo);
+      if (G.nL === 1) {
+        var fpG = new T.BoxGeometry(0.003, 0.17, Math.min(0.024, th * 0.95)), fp = new T.Mesh(fpG, metal()); fp.position.set((L.latch - L.axis) * s + out * 0.0015, yB, zB); fp.raycast = function () {}; pivot.add(fp); disposables.push(fpG);
+        var gx = (L.latch - W / 2) * s, zc = zLeaf + zB, keepMat = SK && SK.frameRec
+          ? new T.MeshStandardMaterial({ color: new T.Color(SK.frameRec.base).multiplyScalar(0.85), roughness: SK.frameRec.rough, metalness: SK.frameRec.metal, envMap: SK.env || null, envMapIntensity: 1 })
+          : new T.MeshBasicMaterial({ color: 0x0f1722 });
+        var keepG = new T.BoxGeometry(0.05, 0.28, zc + BOLT.d / 2 + 0.012), keep = new T.Mesh(keepG, keepMat); keep.position.set(gx + out * (BOLT.gap + 0.025), yB, (zc + BOLT.d / 2 + 0.012) / 2); keep.raycast = function () {};
+        var stG = new T.BoxGeometry(0.003, 0.14, 0.032), st = new T.Mesh(stG, metal()); st.position.set(gx + out * (BOLT.gap - 0.0015), yB, zc); st.raycast = function () {};
+        var moG = new T.PlaneGeometry(0.022, 0.034), mo = new T.Mesh(moG, new T.MeshBasicMaterial({ color: 0x020305 })); mo.position.set(gx + out * (BOLT.gap - 0.0031), yB, zc); mo.rotation.y = L.inw * Math.PI / 2; mo.raycast = function () {};
+        group.add(keep, st, mo); disposables.push(keepMat, keepG, stG, moG, mo.material);
+        strikes[L.i] = { out: out, edge: gx, face: BOLT.gap, keepEnd: BOLT.gap + 0.05 };
+      }
       group.add(pivot);
       return { L: L, pivot: pivot, hands: hands, led: led, bolt: bolt, boltX: (L.latch - L.axis) * s };
     });
@@ -32791,7 +32814,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         var L = lo.L; lo.pivot.rotation.y = (L.hinge === 'R' ? 1 : -1) * (a + m.shakeR) * DEG; lo.pivot.position.x = (L.axis - W / 2) * s + m.shakeX * s;
         lo.hands.forEach(function (h) { h.lever.rotation.z = -hA * DEG; });
         var rr = r;   // the bolt follows the handle: held in while the door closes, out once the leaf is home
-        lo.bolt.position.x = lo.boltX + L.inw * 7 * rr * s; lo.led.material.color.setHex(m.cfg.locked ? 0xff6a6a : 0x5dffa6);
+        lo.bolt.position.x = lo.boltX - L.inw * (BOLT.throw * (1 - rr) - (BOLT.l / 2 + 0.002)); lo.led.material.color.setHex(m.cfg.locked ? 0xff6a6a : 0x5dffa6);
+      });
+    }
+    // where the bolt is, in metres beyond the leaf's edge (negative: inside the leaf), and where the strike's face and the back of the keep are (for tests)
+    function latch() {
+      return leafObjs.map(function (lo) {
+        var L = lo.L, st = strikes[L.i], out = -L.inw, tip = (lo.bolt.position.x - lo.boltX) * out + BOLT.l / 2;
+        return { tip: tip, face: st ? st.face : null, keepEnd: st ? st.keepEnd : null, hasKeep: !!st };
       });
     }
     function dispose() {
@@ -32837,7 +32867,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       }
     }
     sync();
-    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, scale: s, size: { w: W * s, h: H * s }, layout: G };
+    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, latch: latch, scale: s, size: { w: W * s, h: H * s }, layout: G };
   }
 
   // Sutherland-Hodgman: the part of a convex polygon between two vertical lines
@@ -34006,7 +34036,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       // state for tests and the preview
       debug: function () {
         return bays.map(function (b) {
-          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, portal: !!b.portalOn, doorSkin: b.door ? (b.door.skin || '') : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
+          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, portal: !!b.portalOn, doorSkin: b.door ? (b.door.skin || '') : null, latch: b.door && b.door.mesh && b.door.mesh.latch ? b.door.mesh.latch() : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
             curtain: b.curtain ? { margin: b.curtain.mg, planeW: b.curtain.mesh.geometry.parameters.width, bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
             light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity, fixture: b.fixture.visible } : null };
         });
