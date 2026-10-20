@@ -218,6 +218,9 @@
       var x0 = i * leafW, x1 = x0 + leafW, hinge = nL === 1 ? 'R' : (i === 0 ? 'L' : 'R'), sW = Math.max(24, 0.2 * leafW), off = Math.max(S.hOff || 0, sW / 2, 22);
       var L = { i: i, x0: x0, x1: x1, w: leafW, hinge: hinge, hy: hy, dir: hinge === 'R' ? 1 : -1, inw: hinge === 'R' ? 1 : -1, Lh: clamp(0.22 * leafW, 22, 44), sW: sW };
       L.hx = hinge === 'R' ? x0 + off : x1 - off;
+      // the lever lies from the rose toward the hinge: keep rose and arm (and the pad at its end) inside the leaf, never over its edge
+      var room = hinge === 'R' ? x1 - L.hx : L.hx - x0, mult = S.handle === 'bar' ? 1.25 : 1;
+      L.Lh = clamp(Math.min(L.Lh, (room - 12) / mult), 8, 44);
       L.latch = hinge === 'R' ? (nL === 1 ? shape.edge(hy)[0] : x0) : (nL === 2 ? x1 : shape.edge(hy)[1]);
       L.axis = hinge === 'R' ? (nL === 1 ? W : x1) : x0;       // the hinge line, where the leaf is pivoted
       leaves.push(L);
@@ -627,7 +630,7 @@
         var roseG = new T.CylinderGeometry(9 * s, 9 * s, 0.006, 20); roseG.rotateX(Math.PI / 2); var len = L.Lh * (S.handle === 'bar' ? 1.25 : 1), leverG = new T.BoxGeometry(len * s, 8 * s, 0.014), padG = new T.CylinderGeometry(4.6 * s, 4.6 * s, 0.014, 14); padG.rotateX(Math.PI / 2);
         disposables.push(roseG, leverG, padG);
         hands = [th + 0.004, -0.004].map(function (z, k) {
-          var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = L.dir;
+          var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = k ? -L.dir : L.dir;   // the back handle is the front one seen from the other side: same spindle, same direction (and it turns the same way)
           var lv = new T.Group(), bar = new T.Mesh(leverG, hm), pad = new T.Mesh(padG, hm), rose = new T.Mesh(roseG, hm);
           bar.position.set(len * s / 2, 0, 0.008); pad.position.set(len * s, 0, 0.008); rose.position.z = 0.0; bar.raycast = pad.raycast = rose.raycast = function () {};
           lv.add(rose, bar, pad); hg.add(lv); pivot.add(hg); return { g: hg, lever: lv };
@@ -644,7 +647,7 @@
       // the handle (a lever that turns with the physics), on both faces
       var bs = 2 * (L.Lh + 16), levTex = canvasTex(bs, bs, function (x) { x.translate(bs / 2, bs / 2); x.shadowColor = line; x.shadowBlur = 3; drawOps(x, leverArt(S.handle, L.Lh), { line: line, fill: FILL, lw: lw }); });
       hands = [th + 0.004, -0.004].map(function (z, k) {
-        var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s * (k ? 1 : 1), (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = L.dir;
+        var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = k ? -L.dir : L.dir;   // as above: mirrored on the back so both levers point and turn the same way
         var lm = new T.Mesh(new T.PlaneGeometry(bs * s, bs * s), basicMat(levTex)); lm.raycast = function () {}; lm.renderOrder = 2; hg.add(lm); pivot.add(hg); return { g: hg, lever: lm };
       });
       }
@@ -668,27 +671,41 @@
       group.traverse(function (ob) { if (ob.geometry && disposables.indexOf(ob.geometry) < 0) ob.geometry.dispose(); });
       disposables.forEach(function (d) { if (d.dispose) d.dispose(); });
     }
-    /* Portal mode, for a door that opens onto a real room built behind the wall: the doorway stops being a painted recess. The opening is
-       cut out of the doorway picture (the frame band stays), and an invisible copy of the opening writes the stencil, which the wall
-       materials on both sides test, so the wall is not drawn there and the room behind shows through. */
-    var portalParts = null, portalOn = false;
-    function portal(on) {
+    /* Portal mode, for a door that opens onto a real room built behind the wall. The wall has a thickness (depth metres, a drywall
+       cavity): the doorway becomes a short tunnel lined with a reveal. The opening is cut out of the doorway picture (the frame band stays),
+       and two invisible copies of the opening write the stencil, one at each wall face (bit 1 for the wall on this side, bit 2 for the wall
+       of the room behind), which the wall materials test, so neither wall is drawn over its opening and the room behind shows through. */
+    var portalParts = null, portalOn = false, Z_WALL = -0.02;   // the wall's face is 2 cm behind the bay's origin
+    function portal(on, depth) {
       on = !!on; if (on === portalOn) return; portalOn = on;
       if (on) {
         if (!portalParts) {
+          depth = depth > 0 ? depth : 0.2;
           var src = wayTex.image, shp2 = new Path2D(G.shape.d);
           var bc = o.mkCanvas(src.width, src.height), bx = bc.getContext('2d'); bx.drawImage(src, 0, 0);
           bx.save(); bx.scale(ppu, ppu); bx.translate(pad, pad); bx.globalCompositeOperation = 'destination-out'; bx.fill(shp2); bx.restore();
           var hc = o.mkCanvas(src.width, src.height), hx = hc.getContext('2d'); hx.scale(ppu, ppu); hx.translate(pad, pad); hx.fillStyle = '#fff'; hx.fill(shp2);
           var bandTex = o.tex(bc), holeTex = o.tex(hc); bandTex.anisotropy = 4; disposables.push(bandTex, holeTex);
-          var mm = new T.MeshBasicMaterial({ map: holeTex, alphaTest: 0.5, colorWrite: false, depthWrite: false, depthTest: false, side: T.DoubleSide, fog: false });
-          mm.stencilWrite = true; mm.stencilRef = 1; mm.stencilFunc = T.AlwaysStencilFunc; mm.stencilZPass = T.ReplaceStencilOp; disposables.push(mm);
-          var mask = new T.Mesh(wayGeo, mm); mask.position.copy(way.position); mask.renderOrder = -100; mask.raycast = function () {};
-          portalParts = { band: bandTex, mask: mask, plain: way.material.map };
+          var maskOf = function (bit, z) {
+            var mm = new T.MeshBasicMaterial({ map: holeTex, alphaTest: 0.5, colorWrite: false, depthWrite: false, depthTest: false, side: T.DoubleSide, fog: false });
+            mm.stencilWrite = true; mm.stencilRef = bit; mm.stencilWriteMask = bit; mm.stencilFunc = T.AlwaysStencilFunc; mm.stencilZPass = T.ReplaceStencilOp; disposables.push(mm);
+            var mk = new T.Mesh(wayGeo, mm); mk.position.set(way.position.x, way.position.y, z); mk.renderOrder = -100; mk.raycast = function () {}; return mk;
+          };
+          // the reveal: the opening's outline carried back through the wall, so the thickness of the wall can be seen from the doorway
+          var pts = G.shape.pts, pos = [], idx = [], z1 = Z_WALL - depth;
+          for (var pi = 0; pi < pts.length; pi++) {
+            var pa = pts[pi], pb = pts[(pi + 1) % pts.length]; if (pa[0] === pb[0] && pa[1] === pb[1]) continue;
+            var ax = (pa[0] - W / 2) * s, ay = (H - pa[1]) * s, bx2 = (pb[0] - W / 2) * s, by2 = (H - pb[1]) * s, k0 = pos.length / 3;
+            pos.push(ax, ay, Z_WALL, bx2, by2, Z_WALL, bx2, by2, z1, ax, ay, z1); idx.push(k0, k0 + 1, k0 + 2, k0, k0 + 2, k0 + 3);
+          }
+          var rg = new T.BufferGeometry(); rg.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); rg.setIndex(idx); rg.computeVertexNormals();
+          var rm = new T.MeshStandardMaterial({ color: 0x2b2538, emissive: 0x0b0914, roughness: 0.95, metalness: 0, side: T.DoubleSide }); disposables.push(rg, rm);
+          var reveal = new T.Mesh(rg, rm); reveal.raycast = function () {};
+          portalParts = { band: bandTex, near: maskOf(1, Z_WALL), far: maskOf(2, Z_WALL - depth), reveal: reveal, plain: way.material.map };
         }
-        way.material.map = portalParts.band; way.material.needsUpdate = true; group.add(portalParts.mask);
+        way.material.map = portalParts.band; way.material.needsUpdate = true; group.add(portalParts.near, portalParts.far, portalParts.reveal);
       } else if (portalParts) {
-        way.material.map = portalParts.plain; way.material.needsUpdate = true; group.remove(portalParts.mask);
+        way.material.map = portalParts.plain; way.material.needsUpdate = true; group.remove(portalParts.near, portalParts.far, portalParts.reveal);
       }
     }
     sync();

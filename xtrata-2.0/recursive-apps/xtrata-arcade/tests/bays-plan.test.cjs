@@ -198,6 +198,16 @@ test('the styles the plan accepts are exactly the styles doors.js can draw', () 
   assert.deepEqual(Array.from(B.DOOR_STYLES).sort(), Array.from(sb2.module.exports.STYLE_NAMES).sort());
 });
 
+test('a sign is placed on its own: x, y and width are params, clamped, and independent of the door and the curtain', () => {
+  const sign = (params, extra) => plain(B.planBay(bay([layer(2, 2, params)].concat(extra || [])), LOOKS)).overlays.find((o) => o.key === 'sign-board').p;
+  const d = sign('{"text":"x"}');
+  assert.deepEqual([d.x, d.y, d.w], [0, 2.55, 2], 'the defaults are the old placement');
+  const p = sign('{"text":"x","x":-1.2,"y":0.9,"w":1.1}');
+  assert.deepEqual([p.x, p.y, p.w], [-1.2, 0.9, 1.1]);
+  const c = sign('{"text":"x","x":99,"y":-5,"w":50}');
+  assert.deepEqual([c.x, c.y, c.w], [3, 0.4, 3], 'out of range values are clamped');
+});
+
 test('a sign is fixed to the wall behind the curtain unless the scene sets front:true', () => {
   const sign = (params) => plain(B.planBay(bay([layer(2, 2, params)]), LOOKS)).overlays[0].p.front;
   assert.equal(sign('{"text":"x"}'), false);

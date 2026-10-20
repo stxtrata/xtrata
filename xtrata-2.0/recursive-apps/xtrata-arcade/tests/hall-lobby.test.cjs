@@ -87,9 +87,9 @@ const LOBBY = { 'target-room': 'lobby', 'arrival-bay': 0, path: '' };
     await shot(page, 'lobby-inside');
     // walls hold you in the lobby
     await page.evaluate(() => window.XA.pose(-40, -13.1, -Math.PI / 2, 0));
-    await page.waitForFunction(() => window.XA.where().x > -14.8, null, { timeout: 120000 });
+    await page.waitForFunction(() => window.XA.where().x > -15.0, null, { timeout: 120000 });
     const far = await page.evaluate(() => window.XA.where());
-    check(far.x >= -14.7 && far.x <= -14.6, 'C: the far lobby wall stops the player (x ' + far.x.toFixed(2) + ')');
+    check(far.x >= -14.9 && far.x <= -14.8, 'C: the far lobby wall stops the player (x ' + far.x.toFixed(2) + ')');
     await page.evaluate(() => window.XA.pose(-9, -30, 0, 0));
     await page.waitForFunction(() => window.XA.where().z > -17.2, null, { timeout: 120000 });
     check((await page.evaluate(() => window.XA.where().z)) <= -9.0, 'C: the lobby side wall stops the player');

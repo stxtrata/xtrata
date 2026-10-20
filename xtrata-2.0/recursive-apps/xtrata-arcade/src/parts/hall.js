@@ -108,7 +108,8 @@ const machines = [], pickables = [], boxes = [];
    hall wall at that bay, so it is the same room whichever bay holds the door; only one bay at a time can lead to it. */
 const LW = 8, LD = 10;                      // lobby width (along the hall wall) and depth (away from it), metres
 let lobbyG = null, lobbyBay = -1, lobbyPass = null, autoWalk = null, bayDefsAll = [];   // lobbyPass: {side, wallX, z}
-function holeWall(m){ m.stencilWrite=true; m.stencilRef=1; m.stencilFunc=THREE.NotEqualStencilFunc; m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp; return m }
+const WALL_T = 0.2;                         // the thickness of the wall between the rooms (a drywall cavity you see as the reveal of the doorway)
+function holeWall(m,bit){ m.stencilWrite=true; m.stencilRef=bit; m.stencilFuncMask=bit; m.stencilWriteMask=0; m.stencilFunc=THREE.NotEqualStencilFunc; m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp; return m }   // bit 1: this room's wall, bit 2: the lobby's
 const lobbyOpen = () => lobbyBay>=0 && !!bayEngine && bayEngine.portalOpen(lobbyBay);
 const inLobbyZone = () => !!lobbyPass && (lobbyPass.side<0 ? player.x < lobbyPass.wallX-.05 : player.x > lobbyPass.wallX+.05);
 let bayEngine = null, bayHint = null, bayHold = true, bayToast = null;   // the bay engine (only when the world reader is on); what the player is looking at in a bay
@@ -159,7 +160,7 @@ function buildRoom(){
 
   const wt=wallTexture();
   const wall=(w,pos,ry)=>{const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), holeWall(new THREE.MeshStandardMaterial({map:t, roughness:.9})));
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), holeWall(new THREE.MeshStandardMaterial({map:t, roughness:.9}),1));
     m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m)};
   wall(RL,[-RW/2,0],Math.PI/2); wall(RL,[RW/2,0],-Math.PI/2); wall(RW,[0,-RL/2],0); wall(RW,[0,RL/2],Math.PI);
 
@@ -216,7 +217,7 @@ function buildLobby(){
   face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}), 0,RH,LD/2, Math.PI/2,0);
   const wt=wallTexture();
   const wall=(w,x,z,ry,hole)=>{ const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
-    const m=new THREE.MeshStandardMaterial({map:t, roughness:.9}); face(new THREE.PlaneGeometry(w,RH), hole?holeWall(m):m, x,RH/2,z, 0,ry) };
+    const m=new THREE.MeshStandardMaterial({map:t, roughness:.9}); face(new THREE.PlaneGeometry(w,RH), hole?holeWall(m,2):m, x,RH/2,z, 0,ry) };
   wall(LW,0,0,0,true);                 // the wall with the opening: skips the pixels the door's opening has marked
   wall(LW,0,LD,Math.PI); wall(LD,-LW/2,LD/2,Math.PI/2); wall(LD,LW/2,LD/2,-Math.PI/2);
   const neon=(col)=>new THREE.MeshBasicMaterial({color:col, toneMapped:false}), pink=neon(0x3d86ff), cyan=neon(0xff8a2a);
@@ -242,7 +243,7 @@ function setLobbyBay(i){
   lobbyBay=i; autoWalk=null;
   if(i<0){ lobbyPass=null; if(lobbyG) lobbyG.visible=false; return }
   lobbyPass={side:d.side, wallX:d.side*RW/2, z:d.z};
-  lobbyG.position.set(lobbyPass.wallX,0,d.z); lobbyG.rotation.y=d.side<0?-Math.PI/2:Math.PI/2; lobbyG.visible=true;
+  lobbyG.position.set(lobbyPass.wallX+d.side*WALL_T,0,d.z); lobbyG.rotation.y=d.side<0?-Math.PI/2:Math.PI/2; lobbyG.visible=true;
 }
 const linksToLobby=(sc)=>{ const lk=sc&&sc.link; return !!(sc && sc.base==='door' && Number(sc.interaction)===3 && lk && String(lk['target-room']||lk.targetRoom||lk.room||'').toLowerCase()==='lobby') };
 // Where the player may stand while the lobby door is open: the hall, the doorway and the lobby, as rectangles [x0,x1,z0,z1].
@@ -250,8 +251,8 @@ function lobbyRects(r){
   const p=lobbyPass, sd=p.side, hw=Math.max(.3, bayEngine.doorHalfWidth(lobbyBay)-.1), wx=p.wallX;
   return [
     [-RW/2+r, RW/2-r, -RL/2+r, RL/2-r],
-    sd<0 ? [wx-LD+r, wx-r, p.z-LW/2+r, p.z+LW/2-r] : [wx+r, wx+LD-r, p.z-LW/2+r, p.z+LW/2-r],
-    [wx-r, wx+r, p.z-hw, p.z+hw]
+    sd<0 ? [wx-WALL_T-LD+r, wx-WALL_T-r, p.z-LW/2+r, p.z+LW/2-r] : [wx+WALL_T+r, wx+WALL_T+LD-r, p.z-LW/2+r, p.z+LW/2-r],
+    sd<0 ? [wx-WALL_T-r, wx+r, p.z-hw, p.z+hw] : [wx-r, wx+WALL_T+r, p.z-hw, p.z+hw]   // the doorway, through the thickness of the wall
   ];
 }
 
@@ -1430,7 +1431,7 @@ function buildPosters(){
   try{
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
-      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, listener:()=>player, onEnter:bayEnter});
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, onEnter:bayEnter});
     if(bayEngine) buildLobby();
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
@@ -2437,7 +2438,7 @@ function bayEnter(link){
   const room=link&&(link['target-room']||link.targetRoom||link.room); const name=room?String(room).replace(/[^A-Za-z0-9 _-]/g,' ').trim().toUpperCase():'';
   if(String(room||'').toLowerCase()==='lobby' && lobbyPass && lobbyOpen()){   // the lobby is already there: E just walks you through the doorway
     const p=lobbyPass, sd=p.side;   // into the doorway (from the hall side), then 2.4 m into the room
-    autoWalk=[{x:p.wallX-sd*.9, z:p.z}, {x:p.wallX+sd*2.4, z:p.z}]; return
+    autoWalk=[{x:p.wallX-sd*.9, z:p.z}, {x:p.wallX+sd*(WALL_T+2.4), z:p.z}]; return
   }
   bayToast={text:name?('THIS DOOR LEADS TO '+name+' · NOT OPEN YET'):'THIS DOOR IS NOT OPEN YET', until:performance.now()+3500};
 }
