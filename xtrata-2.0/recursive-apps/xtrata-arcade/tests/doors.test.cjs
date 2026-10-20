@@ -96,6 +96,55 @@ test('closing: it swings back, slams against the stop, the latch clicks, and it 
   run(m, 1); assert.equal(m.settled(), true);
 });
 
+// the latch: while a door is being closed the handle stays down (the latch bolt is pulled in) until the leaf is home, and then it is let go
+// so the bolt snaps into the frame. It never lets the bolt hit the frame and leave the door ajar.
+test('closing: the handle is held down until the leaf is home, then released so the latch snaps in', () => {
+  const r = rec(), m = new D.DoorModel({ style: 'rect', locked: false }, r.sfx);
+  m.open(); run(m, 3.5); r.ev.length = 0; m.close();
+  let heldWhileSwinging = true, homeAt = -1, releasedAt = -1;
+  for (let i = 0; i < 60 * 4; i++) {
+    m.update(1 / 60);
+    if (m.angle > 0.6 && i > 6 && m.handle.a < 22 * 0.8) heldWhileSwinging = false;
+    if (homeAt < 0 && m.angle <= 0.4) homeAt = i;
+    if (releasedAt < 0 && i > 6 && m.handle.a < 22 * 0.5) releasedAt = i;
+  }
+  assert.ok(heldWhileSwinging, 'the latch stayed pulled in the whole way round');
+  assert.ok(homeAt >= 0 && releasedAt >= homeAt - 1, 'the handle was let go only once the leaf was home (home ' + homeAt + ', let go ' + releasedAt + ')');
+  assert.ok(m.angle < 0.3 && m.handle.a < 1 && !m.handle.carry, 'shut with the latch out: leaf ' + m.angle.toFixed(2) + ', handle ' + m.handle.a.toFixed(2));
+  assert.ok(r.ev.includes('handleReturn'), 'the handle springs back: ' + r.ev.join(','));
+});
+
+test('closing always ends shut and latched: any start angle, any style, pushed or driven, no ajar rest', () => {
+  Object.keys(D.STYLES).forEach((style) => {
+    [4, 9, 25, 60, 105].forEach((from) => {
+      const m = new D.DoorModel({ style, locked: false }, rec().sfx);
+      m.angle = from; m.mode = 'free'; m.wake(); m.close(); let peakAfter = 0, shutAt = -1;
+      for (let i = 0; i < 60 * 5; i++) { m.update(1 / 60); if (shutAt < 0 && m.angle <= 0.4) shutAt = i; if (shutAt >= 0) peakAfter = Math.max(peakAfter, m.angle); }
+      assert.ok(m.angle < 0.3, style + ' from ' + from + ' shut (' + m.angle.toFixed(2) + ')');
+      assert.ok(peakAfter < 2.5, style + ' from ' + from + ' does not bounce back open (peak ' + peakAfter.toFixed(2) + ')');
+      assert.ok(m.handle.a < 1, style + ' from ' + from + ' latch out again (' + m.handle.a.toFixed(2) + ')');
+    });
+  });
+});
+
+test('a door pushed shut by hand: the strike pulls the latch in on the way and it catches, never resting ajar', () => {
+  [3.9, 3.2, 2.2, 1.2].forEach((from) => [-3, -12, -40, -90].forEach((v) => {
+    const m = new D.DoorModel({ style: 'rect', locked: false }, rec().sfx);
+    m.angle = from; m.vel = v; m.mode = 'free'; m.wake(); let pulledIn = false;
+    for (let i = 0; i < 60 * 4; i++) { m.update(1 / 60); if (m.angle > 0.6 && m.handle.a > 22 * 0.8) pulledIn = true; }
+    assert.ok(m.angle < 0.3, 'from ' + from + ' at ' + v + ': shut (' + m.angle.toFixed(2) + ')');
+    assert.ok(m.handle.a < 1, 'latch out (' + m.handle.a.toFixed(2) + ')');
+    if (from > 1.5 && v >= -12) assert.ok(pulledIn, 'from ' + from + ' at ' + v + ': the latch was pulled in while the leaf swung through the strike');
+  }));
+});
+
+test('a door opened again while it is closing lets go of the close: it opens, the handle is not stuck down', () => {
+  const m = new D.DoorModel({ style: 'rect', locked: false }, rec().sfx);
+  m.open(); run(m, 3.5); m.close(); run(m, 0.35); m.open(); run(m, 3);
+  assert.ok(Math.abs(m.angle - 105) < 0.8, 'opened again (' + m.angle.toFixed(1) + ')');
+  assert.ok(m.handle.a < 1 && !m.handle.carry && !m.handle.hold, 'handle let go (' + m.handle.a.toFixed(2) + ')');
+});
+
 test('a locked door rattles at the handle stop, trembles, never opens, and settles', () => {
   const r = rec(), m = new D.DoorModel({ style: 'rect' }, r.sfx);
   assert.equal(m.cfg.locked, true, 'doors are locked unless told otherwise');
