@@ -119,6 +119,10 @@ CHROME_PATH=/path/to/chromium node tests/hall-parent.test.cjs [shotsDir]
 
 Edit `build/preview-head.html` to change the sample scenes or the button panel.
 
+### The door latch
+
+Closing a door holds the handle down (the latch bolt stays pulled in) until the leaf is home, then lets it go so the bolt snaps into the frame. A leaf pushed into the last 4 degrees has its bolt pushed in by the strike the same way, and a catch spring pulls it shut, so a door never rests ajar with the bolt against the frame. The slam bounce is capped so it cannot leave that zone. Tests: `tests/doors.test.cjs`.
+
 ### Elements are separate layers
 
 A bay is made of independent elements, each its own layer in the world contract: the base (wall or door), a curtain (cover, kind 1) in front of it, signs and tape (overlays, kind 2), the lamp (kind 4) and work sounds (kind 3). Any curtain can hang in front of any door and any sign can go on any wall. A `sign-board` takes `x` (across the bay, in metres from its centre), `y` (height), `w` (width) and `front` (in front of the curtain, or on the wall behind it); they are clamped to the bay's wall. In the preview, "COMPOSE A BAY" picks each of these on its own.

@@ -32134,6 +32134,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
 
   var DEG = Math.PI / 180, HMAX = 22, MAXA = 108, DEF_OPEN = 105;
   var KH = 900, CH = 37, KD = 150, CD = 17.6, RAT_LEN = 0.8, RAT_STOP = 13;
+  var LATCH_ZONE = 4, LATCH_HOME = 0.4, CATCH = 45;   // degrees: where the strike takes the bolt, where the leaf counts as home; the catch spring
   var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
   var r2 = function (n) { return Math.round(n * 100) / 100; };
   var ease = function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
@@ -32396,7 +32397,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     this.sfx = Object.assign({}, NULL_SFX, sfx || {});
     this.pos = { x: 0, y: 1.2, z: 0 };
     this.angle = 0; this.vel = 0; this.mode = 'free'; this.drive = null; this.pendingOpen = false;
-    this.handle = { a: 0, v: 0, hold: false, holdT: 0 }; this.rattle = { active: false, t: 0, amp: 1 };
+    this.handle = { a: 0, v: 0, hold: false, holdT: 0, carry: false }; this.rattle = { active: false, t: 0, amp: 1 };
     this.shakeX = 0; this.shakeR = 0; this.awake = false; this.dragging = false;
   }
   var DM = DoorModel.prototype;
@@ -32410,7 +32411,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   DM.startRattle = function (amp) {
     amp = amp == null ? 1 : amp; var r = this.rattle;
     r.amp = amp; r.t = (r.active && this.handle.a > 6) ? 0.07 : 0; r.active = true;
-    this.handle.hold = false; this.pendingOpen = false; this.sfx.rattle(this, amp); this.wake();
+    this.handle.hold = false; this.handle.carry = false; this.pendingOpen = false; this.sfx.rattle(this, amp); this.wake();
   };
   DM.latchHit = function (imp) { this.handle.v += clamp(imp * 0.9, 25, 130); };
   DM.step = function (h) {
@@ -32421,8 +32422,19 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       else { var p = rattleProfile(R.t, R.amp); H.a = p.h; H.v = 0; this.shakeX = p.sx; this.shakeR = p.sr; }
     }
     if (!R.active && this.shakeX) { this.shakeX *= Math.exp(-18 * h); if (Math.abs(this.shakeX) < 0.01) this.shakeX = 0; }   // a knock's tremble dies away
+    /* The latch. Closing a door, the handle is held down (the bolt stays pulled in) until the leaf is home; only then is it let go and the
+       bolt snaps into the frame. A leaf that swings into the strike zone on its own (pushed shut) has its bolt pushed in by the strike's
+       ramp the same way, so the bolt never hits the frame and leaves the door resting ajar. */
     if (!R.active) {
-      if (H.hold && !this.dragging && !this.pendingOpen) { H.holdT += h; if (this.angle > 2.5 || H.holdT > 0.35) H.hold = false; }
+      if (!H.carry && !this.pendingOpen && this.mode !== 'drive' && this.angle > LATCH_HOME && this.angle < LATCH_ZONE && this.vel < -1) H.carry = true;
+      if (H.carry) {
+        var opening = this.mode === 'drive' ? this.drive.to > 0 : this.vel > 2;
+        if (this.angle <= LATCH_HOME || this.pendingOpen || opening) { H.carry = false; H.hold = false; }
+        else { H.hold = true; H.holdT = 0; }
+      }
+    }
+    if (!R.active) {
+      if (H.hold && !H.carry && !this.dragging && !this.pendingOpen) { H.holdT += h; if (this.angle > 2.5 || H.holdT > 0.35) H.hold = false; }
       H.v += (KH * ((H.hold ? HMAX : 0) - H.a) - CH * H.v) * h; H.a += H.v * h;
       if (H.a < -1.5) { H.a = -1.5; H.v = Math.abs(H.v) * 0.25; } else if (H.a > HMAX + 3) { H.a = HMAX + 3; H.v = -Math.abs(H.v) * 0.25; }
     }
@@ -32438,14 +32450,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       if (u >= 1 && D.to > 0 && Math.abs(this.angle - D.to) < 0.25 && Math.abs(this.vel) < 2) { this.angle = D.to; this.vel = 0; this.mode = 'free'; }
     } else {
       var a = this.angle, acc = 0;
-      if (this.cfg.locked && a < 3) acc = -420 * a - 26 * this.vel; else if (a < 3) acc = -20 * a;
+      if (this.cfg.locked && a < 3) acc = -420 * a - 26 * this.vel; else if (a < LATCH_ZONE) acc = -CATCH * a;   // the latch's spring pulls the last few degrees home
       this.vel += acc * h; this.vel *= Math.exp(-1.9 * h);
-      if (Math.abs(this.vel) < 3 && a > 3) this.vel *= Math.exp(-10 * h);   // hinge friction: the door stays where it is left
+      if (Math.abs(this.vel) < 3 && a > LATCH_ZONE) this.vel *= Math.exp(-10 * h);   // hinge friction: the door stays where it is left
       this.angle += this.vel * h;
     }
     if (this.angle < 0) {            // closed against the stop: a small bounce and the latch clicks
-      var imp = -this.vel; this.angle = 0;
-      if (imp > 10) { this.vel = imp * 0.16; this.latchHit(imp); sfx.slam(this, imp); }
+      var imp = -this.vel, held = this.handle.carry; this.angle = 0; this.handle.carry = false; this.handle.hold = false;   // home: let the handle go, the bolt snaps in
+      if (imp > 10) { this.vel = Math.min(imp * 0.08, 4); if (!held) this.latchHit(imp); sfx.slam(this, imp); }   // a small bounce, never enough to leave the strike zone
       else { this.vel = 0; if (imp > 2) sfx.latch(this, 0.55); }
       if (this.mode === 'drive' && this.drive.to <= 0) this.mode = 'free';
     }
@@ -32464,6 +32476,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   // visitor operations
   DM.open = function (force) {
     if (this.cfg.locked && !force) { this.startRattle(1); return false; }
+    this.handle.carry = false;
     if (this.angle >= this.cfg.openAngle - 1 || (this.mode === 'drive' && this.drive.to > 0)) return true;
     if (this.angle < 1) { this.handle.hold = true; this.handle.holdT = 0; this.pendingOpen = true; this.wake(); }
     else this.startDrive(this.cfg.openAngle);
@@ -32471,7 +32484,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   };
   DM.close = function () {
     this.pendingOpen = false; this.handle.hold = false;
-    if (this.angle < 0.3 && this.mode !== 'drive') { this.mode = 'free'; this.wake(); return true; }
+    if (this.angle < 0.3 && this.mode !== 'drive') { this.mode = 'free'; this.handle.carry = false; this.wake(); return true; }
+    this.handle.carry = true; this.handle.hold = true; this.handle.holdT = 0;   // hold the handle down (latch pulled in) until the leaf is home
     this.startDrive(-12); return true;
   };
   DM.toggle = function () { return this.isOpen() ? this.close() : this.open(); };
@@ -32776,7 +32790,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       leafObjs.forEach(function (lo) {
         var L = lo.L; lo.pivot.rotation.y = (L.hinge === 'R' ? 1 : -1) * (a + m.shakeR) * DEG; lo.pivot.position.x = (L.axis - W / 2) * s + m.shakeX * s;
         lo.hands.forEach(function (h) { h.lever.rotation.z = -hA * DEG; });
-        var rr = r; if (m.vel < -5 && a < 3) rr = Math.max(rr, (a > 1 ? (3 - a) / 2 : a) * 0.85);
+        var rr = r;   // the bolt follows the handle: held in while the door closes, out once the leaf is home
         lo.bolt.position.x = lo.boltX + L.inw * 7 * rr * s; lo.led.material.color.setHex(m.cfg.locked ? 0xff6a6a : 0x5dffa6);
       });
     }
