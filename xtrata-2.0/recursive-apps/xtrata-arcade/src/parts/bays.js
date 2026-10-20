@@ -249,7 +249,7 @@
    */
   function create(env) {
     var T = env.THREE, scene = env.scene, audio = createAudio();
-    var DOORS = root.XADoors || null;
+    var DOORS = root.XADoors || null, SKINS = root.XADoorSkins || null;
     var doorSfx = DOORS ? DOORS.createSfx(function () { return audio.env(); }, function () { return env.listener(); }) : null;
     // Layering, from the wall outwards (metres in front of the wall): the door, set into the wall (its slab front is at about 0.045),
     // the tape stretched across it a few centimetres proud of it, and the curtain rail and cloth hung in front of all that. A sign board is
@@ -330,22 +330,44 @@
       }
       return null;
     }
+    // A small generated environment for metal and gloss to reflect: a dim room with a few soft lights. One for the whole hall.
+    var skinEnv = null;
+    function getSkinEnv() {
+      if (skinEnv) return skinEnv;
+      var cv = env.mkCanvas(256, 128), x = cv.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 128);
+      g.addColorStop(0, '#9aa6d8'); g.addColorStop(0.45, '#6b5f8c'); g.addColorStop(0.5, '#3a2f4a'); g.addColorStop(1, '#120c18'); x.fillStyle = g; x.fillRect(0, 0, 256, 128);
+      [[40, 36, 26, '#fff3dd'], [128, 30, 34, '#ffffff'], [210, 40, 24, '#ffd9a8'], [90, 58, 18, '#b8c8ff']].forEach(function (l) {
+        var r = x.createRadialGradient(l[0], l[1], 0, l[0], l[1], l[2]); r.addColorStop(0, l[3]); r.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = r; x.fillRect(l[0] - l[2], l[1] - l[2], l[2] * 2, l[2] * 2);
+      });
+      var t = new T.CanvasTexture(cv); t.mapping = T.EquirectangularReflectionMapping; t.encoding = T.sRGBEncoding; skinEnv = t; return t;
+    }
+    // The finish the plan asks for (an overlay with the door-skin look), or null: the neon Threshold look as before.
+    // Unknown skins, and skins that do not suit this door style, fall back to the neon look.
+    function skinOf(plan, style) {
+      if (!SKINS || !plan) return null;
+      var ov = null; (plan.overlays || []).forEach(function (s) { if (s.key === 'door-skin') ov = s; });
+      if (!ov) return null;
+      var p = SKINS.normSkinParams(ov.p), def = SKINS.SKINS[p.skin];
+      if (!def || p.skin === 'neon' || !SKINS.allowed(def.mask, style)) return null;
+      var fk = p.frame || def.frame;
+      return { kit: SKINS, key: p.skin, sound: def.sound, rec: def.recipe, frameRec: SKINS.FRAMES[fk] || null, hw: SKINS.HARDWARE[p.hardware || def.hardware] || null, wear: (p.wear < 0 ? def.wear : p.wear) / 100, tint: p.tint || '', maxSide: root.XA_LOWFX || (root.navigator && root.navigator.hardwareConcurrency && root.navigator.hardwareConcurrency <= 2) ? 256 : 512, env: getSkinEnv(), sig: JSON.stringify([p.skin, fk, p.hardware || def.hardware, p.tint, p.wear]) };
+    }
     // The real door when doors.js is loaded (the Threshold port), else a plain slab.
-    function buildDoor(bay, style, interaction) {
+    function buildDoor(bay, style, interaction, skin) {
       if (DOORS) {
-        var model = new DOORS.DoorModel({ style: style, locked: interaction < 2 }, doorSfx);
+        var model = new DOORS.DoorModel({ style: style, locked: interaction < 2, sound: skin ? skin.sound : '' }, doorSfx);
         model.pos = { x: bay.pos.x, y: 1.2 + DOOR_SILL, z: bay.pos.z };
-        var mesh = DOORS.buildMesh({ THREE: T, mkCanvas: env.mkCanvas, tex: env.tex, model: model, maxW: bay.width - 0.4, maxH: 2.2 });
+        var mesh = DOORS.buildMesh({ THREE: T, mkCanvas: env.mkCanvas, tex: env.tex, model: model, maxW: bay.width - 0.4, maxH: 2.2, skin: skin || null });
         mesh.group.position.y = DOOR_SILL;                       // the door stands on the top of the orange skirting strip, not in front of it
         bay.group.add(mesh.group);
-        return { style: style, model: model, mesh: mesh };
+        return { style: style, skin: skin ? skin.sig : '', model: model, mesh: mesh };
       }
       var g = new T.Group(), w = Math.min(1.1, bay.width - 0.4);
       var frame = new T.Mesh(new T.BoxGeometry(w + 0.16, 2.26, 0.05), new T.MeshStandardMaterial({ color: 0x1b1b22, metalness: 0.6, roughness: 0.4 }));
       var leaf = new T.Mesh(new T.BoxGeometry(w, 2.1, 0.06), new T.MeshStandardMaterial({ color: 0x3a3f52, metalness: 0.5, roughness: 0.5 }));
       var knob = new T.Mesh(new T.SphereGeometry(0.035, 10, 8), new T.MeshStandardMaterial({ color: 0xc99a45, metalness: 0.9, roughness: 0.3 }));
       frame.position.set(0, 1.13, 0.03); leaf.position.set(0, 1.08, 0.065); knob.position.set(w / 2 - 0.12, 1.05, 0.12);
-      g.add(frame, leaf, knob); bay.group.add(g); return { style: style, group: g };
+      g.add(frame, leaf, knob); bay.group.add(g); return { style: style, skin: '', group: g };
     }
     function disposeDoor(bay) {
       var d = bay.door; if (!d) return; bay.door = null;
@@ -383,9 +405,10 @@
       var wantDoor = !!(plan && plan.base === 'door' && plan.door);
       if (!wantDoor) disposeDoor(bay);
       else {
-        if (bay.door && bay.door.style !== plan.door.style) disposeDoor(bay);
+        var skin = skinOf(plan, plan.door.style);
+        if (bay.door && (bay.door.style !== plan.door.style || bay.door.skin !== (skin ? skin.sig : ''))) disposeDoor(bay);
         var fresh = !bay.door;
-        if (fresh) bay.door = buildDoor(bay, plan.door.style, plan.interaction);
+        if (fresh) bay.door = buildDoor(bay, plan.door.style, plan.interaction, skin);
         else setDoorMode(bay, plan.interaction, instant);
       }
       // light
@@ -537,7 +560,7 @@
       // state for tests and the preview
       debug: function () {
         return bays.map(function (b) {
-          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, doorState: b.door && b.door.model ? b.door.model.state() : null,
+          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, doorSkin: b.door ? (b.door.skin || '') : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
             curtain: b.curtain ? { margin: b.curtain.mg, planeW: b.curtain.mesh.geometry.parameters.width, bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
             light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity } : null };
         });

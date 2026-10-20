@@ -393,8 +393,14 @@
         chip = clamp(chip, 0, 1) * inside; if (chip > 0.5) { paint(b, i, col, 0.9); b.rough[i] = clamp(b.rough[i] + 0.25, 0, 1); b.height[i] -= 0.02; b.metal[i] = mix(b.metal[i], 0, 0.5); }
       }
       if (mode === 'rust') {
-        var r = smooth(0.62 - wear * 0.3, 0.74 - wear * 0.3, fbm(x / h * 6, v * 6, seed + 61, 4) * (0.6 + 0.8 * v)) * Math.min(1, wear * 1.6);
-        if (r > 0) { paint(b, i, col, r * 0.9); shade(b, i, 1 - 0.2 * nz * r); b.rough[i] = clamp(b.rough[i] + r * 0.35, 0, 1); b.metal[i] = mix(b.metal[i], 0, r * 0.7); b.height[i] += r * 0.02 * nz; }
+        // bloom from the edges, seams and the foot of the door; fine mottling and vertical drips break the patches up
+        var coarse = fbm(x / h * 4, v * 4, seed + 61, 3), fine = fbm(x / h * 26, v * 26, seed + 71, 4), drip = fbm(x / h * 34, v * 3, seed + 81, 3);
+        var edgeK = rel ? smooth(20, 2, rel.dist[i]) : 0, base = coarse * 0.5 + fine * 0.26 + drip * 0.2 + edgeK * 0.3 + Math.min(1, b.groove[i]) * 0.2 + v * 0.18 - 0.2;
+        var r = smooth(0.5 - wear * 0.3, 0.6 - wear * 0.3, base) * Math.min(1, wear * 1.6);
+        if (r > 0) {
+          var cv = fbm(x / h * 20, v * 20, seed + 91, 2), tone = mix(1.1, 0.5, cv), rc = [clamp(col[0] * tone, 0, 1), clamp(col[1] * tone, 0, 1), clamp(col[2] * tone, 0, 1)];
+          paint(b, i, rc, r * 0.93); b.rough[i] = clamp(b.rough[i] + r * 0.35, 0, 1); b.metal[i] = mix(b.metal[i], 0, r * 0.7); b.height[i] += r * (0.02 * nz - 0.025 * fine);
+        }
       }
     }
   }
