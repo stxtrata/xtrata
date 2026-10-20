@@ -53,6 +53,16 @@ The contract verifies the inscription against core (sealed, hash, size, creator)
 
 `styles` is a bit mask in this fixed order: rect0 tall1 wide2 arch3 gothic4 double5 cathedral6 circle7 oval8 hexagon9 octagon10 industrial11 vintage12 scifi13. Admin can change it later with `set-skin-styles`.
 
+## What a skin controls in the hall
+
+- **Leaf**: the recipe, lit (albedo, roughness, metal, normal from the door style's own panel lines). `pane` areas glow softly, so stained glass reads as lit from behind.
+- **Frame**: the frame finish paints the band round the opening and a threshold sill.
+- **Hardware**: lever, rose, hinge straps and latch bolt are small lit metal parts in the hardware finish.
+- **Sound**: the skin's sound (wood, metal, tech, glass) replaces the door style's, whatever the shape. Glass adds a chime on knocks and a shimmer on rattles.
+- **Wear**: scuffs and chips, or rust and verdigris that bloom from edges, seams and the foot of the door. 0 = clean.
+- **Lamp**: the bay's lamp lights the door like anything else in the hall.
+- Low-end devices (2 cores or fewer, or `window.XA_LOWFX`) render the maps at 256 px instead of 512.
+
 ## Frames and hardware
 
 Frames: `none, wood, painted, stone, steel, brass, iron`. Hardware: `brass, chrome, bronze, black-iron`. These are hall-side tables; adding one is a hall release.

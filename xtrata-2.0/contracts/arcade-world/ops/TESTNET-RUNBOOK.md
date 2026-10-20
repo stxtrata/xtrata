@@ -6,7 +6,7 @@ Purpose: prove on a public test network, with test coins, that the same order of
 
 ## What this proves, and what it does not
 
-Proves: the three contracts deploy and link on a real network; the tools' calls are accepted by the live node; the hall (pointed at the test contracts) reads them; timings in real blocks.
+Proves: the four contracts deploy and link on a real network; the tools' calls are accepted by the live node; the hall (pointed at the test contracts) reads them; timings in real blocks.
 Does not prove: anything about the real Xtrata core (testnet uses a stand-in; the real core is covered by `npm run test:integration`), mainnet fees, or wallet-extension signing (these tools use a key file; the admin wallet flow is a separate manual check at release).
 
 ## Before you start (you)
@@ -31,11 +31,11 @@ Each step: dry run first, read it, then run with `--execute`. Stop at the first 
 
 | # | Command | Expect |
 |---|---|---|
-| 0 | `node ops/rehearsal.mjs` | `PASS`, 14 of 14 steps. If not, stop. |
-| 1 | `node ops/deploy.mjs --network testnet --sender $ADMIN` | Lists 3 contracts in order with hashes. Nothing sent. |
-| 2 | same with `--execute` | `mock-xtrata-core`, `xtrata-posters-v1`, `xtrata-world-v1` each confirmed. Takes a few blocks each. A re-run skips what exists. |
-| 3 | `node ops/setup-chain.mjs --network testnet --sender $ADMIN --publisher <publisher address>` | "to do: 22 look(s), 2 room(s), 2 publisher grant(s)". |
-| 4 | same with `--execute` | 22 looks, 2 rooms, 2 grants. Re-run: nothing to do. |
+| 0 | `node ops/rehearsal.mjs` | `PASS`, 15 of 15 steps. If not, stop. |
+| 1 | `node ops/deploy.mjs --network testnet --sender $ADMIN` | Lists 4 contracts in order with hashes. Nothing sent. |
+| 2 | same with `--execute` | `mock-xtrata-core`, `xtrata-posters-v1`, `xtrata-world-v1`, `xtrata-door-skins-v1` each confirmed. Takes a few blocks each. A re-run skips what exists. |
+| 3 | `node ops/setup-chain.mjs --network testnet --sender $ADMIN --publisher <publisher address>` | "to do: 23 look(s), 2 room(s), 2 publisher grant(s)". |
+| 4 | same with `--execute` | 23 looks, 2 rooms, 2 grants. Re-run: nothing to do. |
 | 5 | `node ops/validate.mjs ops/examples/launch-story.scene.json --network testnet` | Valid, no warnings, real look ids. |
 | 6 | `node ops/preview.mjs ops/examples/launch-story.scene.json --network testnet` and open the page | The story in the hall, block by block. |
 | 7 | `node ops/submit.mjs ops/examples/launch-story.scene.json --network testnet` | Dry run, writes calls to `ops/out/`. |
@@ -46,6 +46,7 @@ Each step: dry run first, read it, then run with `--execute`. Stop at the first 
 | 12 | `node ops/bot.mjs ops/out/week.poster.json --network testnet --sender <publisher>` | Dry run: "dry run: add-posters with 7 poster(s)". |
 | 13 | same with `--execute --key-file ~/xa-publisher.key` | `sent 7`. Re-run: `nothing-to-do`. |
 | 14 | Turn the review lane on (admin), run the bot with new posters, `node ops/review.mjs ...` lists them, release one with `--release ID --execute` | Waiting posters are hidden until released. |
+| 15 | `node ops/skins.mjs --network testnet --world $WORLD --posters $POSTERS --skins $SKINS --sender $ADMIN`, then the same with `--execute --key-file ~/xa-admin.key` | "to do: 19 skin(s) to register", then 19 registered. Re-run: "to do: 0". |
 | 15 | Drills: `touch ops/KILL` and run the bot with `--execute` | `REFUSED: kill switch is on`. Then `rm ops/KILL`. |
 | 16 | `node ops/revert.mjs --network testnet --room arcade-hall --bay 0 --sender $ADMIN` then with `--execute` | Bay 0 shows posters again. |
 

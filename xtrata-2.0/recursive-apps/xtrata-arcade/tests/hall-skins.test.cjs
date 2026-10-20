@@ -21,6 +21,7 @@ const LOOKS = {
   21: { kind: 0, name: 'Gothic door', tier: 0, builtin: 'door-gothic', hidden: false, approved: true },
   22: { kind: 0, name: 'Rect door', tier: 0, builtin: 'door-rect', hidden: false, approved: true },
   30: { kind: 2, name: 'Door skin', tier: 0, builtin: 'door-skin', hidden: false, approved: true },
+  40: { kind: 4, name: 'Flicker', tier: 0, builtin: 'light-flicker', hidden: false, approved: true },
 };
 const skin = (p) => ({ slot: 2, look: 30, params: JSON.stringify(p), state: '' });
 const door = (interaction, doorLook, layers) => ({ base: 'door', baseId: 2, interaction, doorLook, layers: layers || [], link: null, fromHeight: 0 });
@@ -62,6 +63,7 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
     await page.waitForTimeout(1500);
     let st = await bays(page);
     check(st.bays[0].door && /^\["oak"/.test(sig(st.bays[0])), 'S1: bay 0 is an arch door with the oak skin (' + sig(st.bays[0]) + ')');
+    check(st.bays[0].doorSound === 'wood', 'S1: an oak door sounds like wood');
     check(st.bays[1].door && /^\["racing-green"/.test(sig(st.bays[1])), 'S1: bay 1 is a rect door in racing green (' + sig(st.bays[1]) + ')');
     await face(page, 0); await page.waitForTimeout(6000); await shot(page, 'skins-S1-oak-arch');
     await face(page, 1); await page.waitForTimeout(2500); await shot(page, 'skins-S1-green-rect');
@@ -72,8 +74,13 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
     st = await bays(page);
     check(/^\["brushed-steel"/.test(sig(st.bays[0])) && /^\["stained"/.test(sig(st.bays[1])), 'S2: both doors changed finish live (' + sig(st.bays[0]) + ' / ' + sig(st.bays[1]) + ')');
     check(st.bays[0].doorState.style === 'gothic', 'S2: the door model is still the gothic style');
+    check(st.bays[0].doorSound === 'metal' && st.bays[1].doorSound === 'glass', 'S2: steel sounds like metal, stained glass like glass');
     await face(page, 0); await page.waitForTimeout(2500); await shot(page, 'skins-S2-steel-gothic');
     await face(page, 1); await page.waitForTimeout(2500); await shot(page, 'skins-S2-stained-gothic');
+    // the bay lamp lights a skinned door: the same oak door without and with an orange lamp
+    await push(page, snapshot([bay(door(1, 20, [skin({ skin: 'oak' })])), bay(null)])); await page.waitForTimeout(1500); await face(page, 0); await page.waitForTimeout(2500); await shot(page, 'skins-lamp-off');
+    await push(page, snapshot([bay(door(1, 20, [skin({ skin: 'oak' }), { slot: 4, look: 40, params: '{"tone":"orange","intensity":2,"rate":0.2}', state: '' }])), bay(null)])); await page.waitForTimeout(3000); await shot(page, 'skins-lamp-on');
+    check(!errors.length, 'S2: lamp on a skinned door, no page errors ' + errors.slice(0, 2).join(' | '));
     // brass hardware and a tint, and the door still opens
     await push(page, snapshot([bay(door(2, 20, [skin({ skin: 'racing-green', frame: 'brass', hardware: 'brass', tint: '#2a4aa0', wear: 60 })])), bay(null)]));
     await page.waitForTimeout(1200); await face(page, 0); await page.waitForTimeout(2000); await shot(page, 'skins-S2-tinted-worn');
@@ -89,6 +96,7 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
     const { ctx, page, errors } = await open(snapshot([bay(door(1, 20)), bay(null)]));
     check(sig((await bays(page)).bays[0]) === '', 'S3: no overlay -> the neon door');
     const tryIt = async (layers, style, name) => { await push(page, snapshot([bay(door(1, style || 20, layers)), bay(null)])); await page.waitForTimeout(700); const b = (await bays(page)).bays[0]; check(b.door && sig(b) === '', 'S3: ' + name + ' -> the neon door'); };
+    check((await bays(page)).bays[0].doorSound === '', 'S3: the neon door sound is chosen by its style');
     await tryIt([skin({ skin: 'neon' })], 20, 'the neon skin');
     await tryIt([skin({ skin: 'no-such-skin' })], 20, 'an unknown skin');
     await tryIt([skin({ skin: 'stained' })], 22, 'a skin that does not suit the style (stained on rect)');

@@ -274,7 +274,7 @@
   // cfg: { style, locked, openAngle }. sfx: an object with the NULL_SFX methods (all optional).
   function DoorModel(cfg, sfx) {
     var name = STYLES[cfg && cfg.style] ? cfg.style : 'rect';
-    this.cfg = { style: name, locked: !(cfg && cfg.locked === false), openAngle: clamp(cfg && cfg.openAngle != null ? cfg.openAngle : DEF_OPEN, 20, MAXA - 3) };
+    this.cfg = { style: name, locked: !(cfg && cfg.locked === false), openAngle: clamp(cfg && cfg.openAngle != null ? cfg.openAngle : DEF_OPEN, 20, MAXA - 3), sound: cfg && PROF[cfg.sound] ? cfg.sound : '' };
     this.style = STYLES[name];
     this.sfx = Object.assign({}, NULL_SFX, sfx || {});
     this.pos = { x: 0, y: 1.2, z: 0 };
@@ -364,7 +364,8 @@
   DM.state = function () { return { style: this.cfg.style, locked: this.cfg.locked, angle: this.angle, open: this.isOpen(), mode: this.mode, handle: this.handle.a, rattling: this.rattle.active, awake: this.awake }; };
 
   /* ================================================================ 3. SFX (synthesised, positional on the room audio bus) */
-  var PROF = { wood: { kind: 'wood', pitch: 1, ring: 0.3, thud: 78 }, metal: { kind: 'metal', pitch: 0.78, ring: 1, thud: 56 }, tech: { kind: 'tech', pitch: 1.25, ring: 0.1, thud: 84 } };
+  var PROF = { wood: { kind: 'wood', pitch: 1, ring: 0.3, thud: 78 }, metal: { kind: 'metal', pitch: 0.78, ring: 1, thud: 56 }, tech: { kind: 'tech', pitch: 1.25, ring: 0.1, thud: 84 },
+    glass: { kind: 'glass', pitch: 1.4, ring: 0.8, thud: 70 } };                                // a skin can pick any of these (door-skins.js sound), whatever the style says
   var REACH = 10;
   // getEnv(): { ctx, master, wet } or null. getListener(): { x, z }.
   function createSfx(getEnv, getListener) {
@@ -381,7 +382,7 @@
       return pan;
     }
     function ready() { var e = getEnv(); return e && e.ctx && e.ctx.state === 'running' ? e : null; }
-    function profOf(d) { return PROF[d.style.sfx || 'wood']; }
+    function profOf(d) { return PROF[d.cfg && d.cfg.sound && PROF[d.cfg.sound] ? d.cfg.sound : d.style.sfx || 'wood']; }
     function gate(d, v, name) {
       var e = ready(); if (!e) return null;
       var now = Date.now(); if (now - winT > 100) { winT = now; winN = 0; } if (++winN > 16) return null;
@@ -429,7 +430,8 @@
         nz(G, 0, 0.07, 'bandpass', 900 * k.pitch, 2.5, 0.14); click(G, 0.01, 0.7, k.pitch);
         if (k.kind === 'tech') { tn(G, 0.07, 170, 170, 0.1, 'square', 0.07 * amp); tn(G, 0.2, 170, 170, 0.1, 'square', 0.06 * amp); }
         for (var i = 0; i < 14; i++) { var u = i / 21, v = amp * Math.exp(-6 * u); if (v < 0.07) break; knk(G, 0.07 + u, v * 0.75); }
-        nz(G, 0.07, 0.45, 'bandpass', 650 * k.pitch, 1.2, 0.06 * amp, 0.01); },
+        nz(G, 0.07, 0.45, 'bandpass', 650 * k.pitch, 1.2, 0.06 * amp, 0.01);
+        if (k.kind === 'glass') for (var j = 0; j < 4; j++) tn(G, 0.05 + j * 0.06, 2400 + j * 310, 2380 + j * 300, 0.12, 'sine', 0.035 * amp); },
       bolt: function (d, locking) { var G = gate(d, 0.9, locking ? 'lock' : 'unlock'); if (!G) return; var k = G.p;
         if (k.kind === 'tech') {
           if (locking) { tn(G, 0, 880, 880, 0.07, 'sine', 0.2); tn(G, 0.09, 620, 620, 0.1, 'sine', 0.2); } else { tn(G, 0, 620, 620, 0.07, 'sine', 0.2); tn(G, 0.09, 990, 990, 0.12, 'sine', 0.2); }
@@ -446,6 +448,7 @@
         tn(G, 0, k.thud * 1.25, k.thud * 0.5, 0.28, 'sine', 0.8); nz(G, 0, 0.2, 'lowpass', 240, 0.8, 0.5);
         if (k.kind === 'wood') nz(G, 0, 0.07, 'bandpass', 420, 1.2, 0.35);
         else if (k.kind === 'metal') { nz(G, 0, 0.05, 'bandpass', 2200, 2, 0.25); tn(G, 0, 330, 320, 0.5, 'sine', 0.12); tn(G, 0, 740, 730, 0.35, 'triangle', 0.06); }
+        else if (k.kind === 'glass') { nz(G, 0, 0.04, 'bandpass', 3000, 2, 0.2); tn(G, 0, 1760, 1750, 0.45, 'sine', 0.1); tn(G, 0.01, 2640, 2630, 0.3, 'sine', 0.06); }
         else nz(G, 0, 0.28, 'bandpass', 3800, 0.9, 0.18, 0.01); },
       slam: function (d, imp) { var v = clamp(imp / 150, 0.12, 1); S.thud(d, v); S.latch(d, 0.5 + 0.5 * v, 0.025); },
       stop: function (d, v) { S.thud(d, v * 0.6); },
@@ -457,6 +460,7 @@
         for (var i = 0; i < 3; i++) {
           var f = k.thud * (1.6 + Math.random() * 0.3); tn(G, t, f, f * 0.5, 0.09, 'sine', 0.55 - i * 0.06); nz(G, t, 0.04, 'bandpass', k.kind === 'metal' ? 2200 : 900, 1.4, 0.35 - i * 0.05);
           if (k.kind === 'metal') tn(G, t, 640, 630, 0.25, 'sine', 0.08);
+          if (k.kind === 'glass') tn(G, t, 1900, 1880, 0.3, 'sine', 0.06);
           t += 0.17 + Math.random() * 0.07;
         } }
     };
@@ -542,7 +546,7 @@
       x.restore();
     }
     function skinMaps() {                                                                           // one set of maps for the whole door; each leaf shows its strip
-      var KT = SK.kit, sc = 512 / Math.max(W, H), w = Math.max(16, Math.round(W * sc)), h = Math.max(16, Math.round(H * sc));
+      var KT = SK.kit, sc = (SK.maxSide || 512) / Math.max(W, H), w = Math.max(16, Math.round(W * sc)), h = Math.max(16, Math.round(H * sc));
       var ops = G.leaves.map(function (L) { return faceOps(G, L, 0); }).join('');
       var rel = KT.relief(G.shape.pts, ops, W, H, w, h), L0 = G.leaves[0];
       var mp = KT.render(SK.rec, { w: w, h: h, rel: rel, seed: 1234, wear: SK.wear, tint: SK.tint || null, handle: [L0.hx / W, G.hy / H] });
@@ -551,7 +555,7 @@
       var albedo = cv(function (d) { for (var i = 0; i < n; i++) { d[i * 4] = mp.albedo[i * 4]; d[i * 4 + 1] = mp.albedo[i * 4 + 1]; d[i * 4 + 2] = mp.albedo[i * 4 + 2]; d[i * 4 + 3] = Math.min(mp.albedo[i * 4 + 3], rel.mask[i] * 255); } });
       var orm = cv(function (d) { for (var i = 0; i < n; i++) { d[i * 4] = 255; d[i * 4 + 1] = mp.orm[i * 4]; d[i * 4 + 2] = mp.orm[i * 4 + 1]; d[i * 4 + 3] = 255; } });
       var nrm = cv(function (d) { for (var i = 0; i < n; i++) { d[i * 4] = mp.normal[i * 4]; d[i * 4 + 1] = mp.normal[i * 4 + 1]; d[i * 4 + 2] = mp.normal[i * 4 + 2]; d[i * 4 + 3] = 255; } });
-      var emi = em ? cv(function (d) { var k = SK.rec.emissive.intensity * 1.1; for (var i = 0; i < n; i++) { var g = Math.min(1, mp.groove[i]) * k; d[i * 4] = em[0] * 255 * g; d[i * 4 + 1] = em[1] * 255 * g; d[i * 4 + 2] = em[2] * 255 * g; d[i * 4 + 3] = 255; } }) : null;
+      var emi = em ? cv(function (d) { var k = SK.rec.emissive.intensity * 1.1; for (var i = 0; i < n; i++) { var g = Math.min(1, mp.groove[i]) * k; d[i * 4] = em[0] * 255 * g; d[i * 4 + 1] = em[1] * 255 * g; d[i * 4 + 2] = em[2] * 255 * g; d[i * 4 + 3] = 255; } }) : null
       function lin(c) { var t = new T.CanvasTexture(c); t.anisotropy = 4; disposables.push(t); return t; }
       var tA = o.tex(albedo); disposables.push(tA);
       return { albedo: tA, orm: lin(orm), normal: lin(nrm), emissive: emi ? o.tex(emi) : null, glass: glass, base: SK.rec.base };
@@ -582,6 +586,13 @@
     disposables.push(wayGeo);
     var way = new T.Mesh(wayGeo, SK ? (function () { var mt = new T.MeshStandardMaterial({ map: wayTex, transparent: true, depthWrite: false, roughness: 0.75, metalness: 0, envMap: SK.env || null, envMapIntensity: 0.4 }); disposables.push(mt); return mt; })() : basicMat(wayTex)); way.position.set(0, (doorH - padS) / 2, zWall); way.renderOrder = 0; group.add(way);
 
+    /* a threshold sill in the frame finish: a low block the door stands on, so the doorway has some depth */
+    if (SK && SK.frameRec) {
+      var fr = SK.frameRec, sillMat = new T.MeshStandardMaterial({ color: new T.Color(fr.base).multiplyScalar(0.85), roughness: fr.rough, metalness: fr.metal, envMap: SK.env || null, envMapIntensity: 1 });
+      var sillGeo = new T.BoxGeometry((W + 2 * G.fw + 6) * s, 0.032, 0.09); disposables.push(sillMat, sillGeo);
+      var sill = new T.Mesh(sillGeo, sillMat); sill.position.set(0, 0.016, 0.045); sill.raycast = function () {}; sill.renderOrder = 1; group.add(sill);
+    }
+
     /* leaves */
     var leafObjs = G.leaves.map(function (L) {
       var pivot = new T.Group(); pivot.position.set((L.axis - W / 2) * s, 0, zLeaf);
@@ -596,6 +607,7 @@
           var mt = new T.MeshStandardMaterial({ map: skinTex.albedo, normalMap: skinTex.normal, normalScale: new T.Vector2(1, -1), roughnessMap: skinTex.orm, metalnessMap: skinTex.orm, roughness: 1, metalness: 1,
             envMap: SK.env || null, envMapIntensity: 1.5, transparent: skinTex.glass, depthWrite: !skinTex.glass, alphaTest: skinTex.glass ? 0 : 0.5, side: T.FrontSide });
           if (skinTex.emissive) { mt.emissive = new T.Color(0xffffff); mt.emissiveMap = skinTex.emissive; mt.emissiveIntensity = 1; }
+          else if (!skinTex.glass) { mt.emissive = new T.Color(0xffffff); mt.emissiveMap = skinTex.albedo; mt.emissiveIntensity = 0.13; }   // the hall is dim: a doorway should never go pitch dark
           disposables.push(mt);
           var g = new T.PlaneGeometry(L.w * s, H * s), uv = g.attributes.uv, u0 = L.x0 / W, u1 = L.x1 / W;
           for (var ui = 0; ui < uv.count; ui++) uv.setX(ui, (flip ? u1 : u0) + (uv.getX(ui)) * ((flip ? u0 : u1) - (flip ? u1 : u0)));

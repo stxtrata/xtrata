@@ -350,12 +350,12 @@
       var p = SKINS.normSkinParams(ov.p), def = SKINS.SKINS[p.skin];
       if (!def || p.skin === 'neon' || !SKINS.allowed(def.mask, style)) return null;
       var fk = p.frame || def.frame;
-      return { kit: SKINS, key: p.skin, rec: def.recipe, frameRec: SKINS.FRAMES[fk] || null, hw: SKINS.HARDWARE[p.hardware || def.hardware] || null, wear: (p.wear < 0 ? def.wear : p.wear) / 100, tint: p.tint || '', env: getSkinEnv(), sig: JSON.stringify([p.skin, fk, p.hardware || def.hardware, p.tint, p.wear]) };
+      return { kit: SKINS, key: p.skin, sound: def.sound, rec: def.recipe, frameRec: SKINS.FRAMES[fk] || null, hw: SKINS.HARDWARE[p.hardware || def.hardware] || null, wear: (p.wear < 0 ? def.wear : p.wear) / 100, tint: p.tint || '', maxSide: root.XA_LOWFX || (root.navigator && root.navigator.hardwareConcurrency && root.navigator.hardwareConcurrency <= 2) ? 256 : 512, env: getSkinEnv(), sig: JSON.stringify([p.skin, fk, p.hardware || def.hardware, p.tint, p.wear]) };
     }
     // The real door when doors.js is loaded (the Threshold port), else a plain slab.
     function buildDoor(bay, style, interaction, skin) {
       if (DOORS) {
-        var model = new DOORS.DoorModel({ style: style, locked: interaction < 2 }, doorSfx);
+        var model = new DOORS.DoorModel({ style: style, locked: interaction < 2, sound: skin ? skin.sound : '' }, doorSfx);
         model.pos = { x: bay.pos.x, y: 1.2 + DOOR_SILL, z: bay.pos.z };
         var mesh = DOORS.buildMesh({ THREE: T, mkCanvas: env.mkCanvas, tex: env.tex, model: model, maxW: bay.width - 0.4, maxH: 2.2, skin: skin || null });
         mesh.group.position.y = DOOR_SILL;                       // the door stands on the top of the orange skirting strip, not in front of it
@@ -560,7 +560,7 @@
       // state for tests and the preview
       debug: function () {
         return bays.map(function (b) {
-          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, doorSkin: b.door ? (b.door.skin || '') : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
+          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, doorSkin: b.door ? (b.door.skin || '') : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
             curtain: b.curtain ? { margin: b.curtain.mg, planeW: b.curtain.mesh.geometry.parameters.width, bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
             light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity } : null };
         });

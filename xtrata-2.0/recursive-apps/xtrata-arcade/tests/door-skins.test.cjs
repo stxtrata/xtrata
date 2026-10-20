@@ -128,3 +128,14 @@ test('a render of a whole skin sheet fits a time budget', () => {
   K.SKIN_KEYS.forEach((k) => K.render(K.SKINS[k].recipe, { w: 128, h: 256, seed: 1 }));
   assert.ok(Date.now() - t < 20000, 'took ' + (Date.now() - t) + ' ms');
 });
+
+test('size guard: the kit stays small enough for the hall pack (budget 64 KB for door-skins.js)', () => {
+  const size = fs.statSync(path.join(__dirname, '..', 'src', 'parts', 'door-skins.js')).size;
+  assert.ok(size < 64 * 1024, 'door-skins.js is ' + size + ' bytes');
+});
+
+test('rust and chip wear: patches grow with the wear value and stay deterministic', () => {
+  const rec = K.SKINS.iron.recipe, count = (wear) => { const r = K.render(rec, { w: 96, h: 192, seed: 5, wear }); let n = 0; for (let i = 0; i < r.albedo.length; i += 4) if (r.albedo[i] > r.albedo[i + 2] + 40) n++; return n; };
+  assert.ok(count(0.8) > count(0.2) && count(0.2) >= count(0), 'more wear, more rust: ' + [0, 0.2, 0.8].map(count));
+  assert.equal(count(0.5), count(0.5));
+});
