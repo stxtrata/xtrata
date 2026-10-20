@@ -668,8 +668,31 @@
       group.traverse(function (ob) { if (ob.geometry && disposables.indexOf(ob.geometry) < 0) ob.geometry.dispose(); });
       disposables.forEach(function (d) { if (d.dispose) d.dispose(); });
     }
+    /* Portal mode, for a door that opens onto a real room built behind the wall: the doorway stops being a painted recess. The opening is
+       cut out of the doorway picture (the frame band stays), and an invisible copy of the opening writes the stencil, which the wall
+       materials on both sides test, so the wall is not drawn there and the room behind shows through. */
+    var portalParts = null, portalOn = false;
+    function portal(on) {
+      on = !!on; if (on === portalOn) return; portalOn = on;
+      if (on) {
+        if (!portalParts) {
+          var src = wayTex.image, shp2 = new Path2D(G.shape.d);
+          var bc = o.mkCanvas(src.width, src.height), bx = bc.getContext('2d'); bx.drawImage(src, 0, 0);
+          bx.save(); bx.scale(ppu, ppu); bx.translate(pad, pad); bx.globalCompositeOperation = 'destination-out'; bx.fill(shp2); bx.restore();
+          var hc = o.mkCanvas(src.width, src.height), hx = hc.getContext('2d'); hx.scale(ppu, ppu); hx.translate(pad, pad); hx.fillStyle = '#fff'; hx.fill(shp2);
+          var bandTex = o.tex(bc), holeTex = o.tex(hc); bandTex.anisotropy = 4; disposables.push(bandTex, holeTex);
+          var mm = new T.MeshBasicMaterial({ map: holeTex, alphaTest: 0.5, colorWrite: false, depthWrite: false, depthTest: false, side: T.DoubleSide, fog: false });
+          mm.stencilWrite = true; mm.stencilRef = 1; mm.stencilFunc = T.AlwaysStencilFunc; mm.stencilZPass = T.ReplaceStencilOp; disposables.push(mm);
+          var mask = new T.Mesh(wayGeo, mm); mask.position.copy(way.position); mask.renderOrder = -100; mask.raycast = function () {};
+          portalParts = { band: bandTex, mask: mask, plain: way.material.map };
+        }
+        way.material.map = portalParts.band; way.material.needsUpdate = true; group.add(portalParts.mask);
+      } else if (portalParts) {
+        way.material.map = portalParts.plain; way.material.needsUpdate = true; group.remove(portalParts.mask);
+      }
+    }
     sync();
-    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, scale: s, size: { w: W * s, h: H * s }, layout: G };
+    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, scale: s, size: { w: W * s, h: H * s }, layout: G };
   }
 
   // Sutherland-Hodgman: the part of a convex polygon between two vertical lines

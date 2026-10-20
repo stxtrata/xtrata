@@ -3,7 +3,7 @@
 //   H  a locked door (interaction 1)    a real door is built in the bay (style from the door look), KNOCK ON THE DOOR, E knocks
 //   I  an unlocked door (interaction 2) OPEN THE DOOR, E starts it opening, then CLOSE THE DOOR; a hidden curtain stops it being usable
 //   J  going live                        locked -> unlocked on a push (the lock sound plays), unlocked -> locked closes it again
-//   K  a door that leads somewhere       looking through an open door shows ENTER; E shows "THIS DOOR LEADS TO <ROOM> · NOT OPEN YET"
+//   K  a door that leads somewhere       looking through an open door shows ENTER; E to a room that does not exist shows "THIS DOOR LEADS TO <ROOM> · NOT OPEN YET" (the lobby is tested in hall-lobby)
 //   L  door styles and clean-up          a different door look rebuilds the door; back to posters removes it, no errors
 // Run: NODE_PATH=<playwright> CHROME_PATH=... [SHOTS=<dir>] node tests/hall-doors.test.cjs
 const { chromium } = require('playwright');
@@ -135,15 +135,16 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
 
   /* ---- K: a door that leads somewhere ---- */
   {
-    const link = { 'target-room': 'lobby', 'arrival-bay': 0, path: '' };
+    const link = { 'target-room': 'vault', 'arrival-bay': 0, path: '' };
     const { ctx, page, errors } = await open(snapshot([bay(door(3, 21, [], link)), bay(null)]));
     await face(page, 1.5);
     await page.evaluate(() => window.XA.bayDoor(0, (m) => { m.cfg.locked = false; m.angle = m.cfg.openAngle; m.vel = 0; m.mode = 'free'; m.wake(); }));
+    for (let k = 0; k < 40 && !/ENTER/.test(await hint(page)); k++) { await face(page, 1.5); await page.waitForTimeout(1200); }   // the headless browser nudges the view: stand in place again
     await waitHint(page, /ENTER/);
     check(true, 'K: looking through the open door of an enter scene shows ENTER');
     await shot(page, 'doors-K-enter');
     await page.keyboard.press('KeyE');
-    await waitHint(page, /THIS DOOR LEADS TO LOBBY . NOT OPEN YET/);
+    await waitHint(page, /THIS DOOR LEADS TO VAULT . NOT OPEN YET/);
     check(true, 'K: E says where the door leads and that it is not open yet');
     check(!errors.length, 'K: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();

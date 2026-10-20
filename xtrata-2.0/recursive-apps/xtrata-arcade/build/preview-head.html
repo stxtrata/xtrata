@@ -57,7 +57,7 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
   }
   function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1),bay(2),bay(3)],looks:LOOKS}}
   function apply(){var W=window.XAWorld; if(!W||!W._t) return; var st=W._t.state; st.snap=snap(); st.listeners.forEach(function(f){try{f(st.snap,'preview')}catch(e){}})}
-  var NAMES={posters:'posters (as #3111)',wall:'plain wall',story:'launch story',workshop:'workshop (door, curtain)',knock:'locked door (knock)',open:'unlocked door (open it)',enter:'door that leads to the lobby'};
+  var NAMES={posters:'posters (as #3111)',wall:'plain wall',story:'launch story',workshop:'workshop (door, curtain)',knock:'locked door (knock)',open:'unlocked door (open it)',enter:'door that leads to the lobby (walk in)'};
   var ORDER=['posters','wall','story','workshop','knock','open','enter'];
   function goTo(i){
     var intro=document.getElementById('intro'); if(intro&&!intro.hidden){var go=document.getElementById('go'); if(go) go.click()}
@@ -89,7 +89,7 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
     btn('Lamp',function(){return lamp?'ON':'OFF'},function(){lamp=!lamp});
     h('GO TO');
     [0,1,2,3].forEach(function(i){btn(BN[i]+' ›',null,function(){goTo(i)},true)});
-    var n=document.createElement('div');n.style.cssText='margin-top:6px;color:#8a93c4';n.textContent='Scenes here are sample data for the bay engine. With peeking allowed (story, workshop) you can pull a closed curtain: look at it and hold the mouse, or press E. Doors: a locked door rattles and you can knock (E); an unlocked one opens with E or a click; the lobby door shows ENTER when open. Switch a scene from locked to unlocked while you watch. Sounds play when you are within about 7 m, after you press Walk in. Press Esc to free the mouse before clicking this panel.';d.appendChild(n);
+    var n=document.createElement('div');n.style.cssText='margin-top:6px;color:#8a93c4';n.textContent='Scenes here are sample data for the bay engine. With peeking allowed (story, workshop) you can pull a closed curtain: look at it and hold the mouse, or press E. Doors: a locked door rattles and you can knock (E); an unlocked one opens with E or a click; the lobby door, once open, shows the bare lobby room right behind it: walk in (or press E at the doorway) and walk back out, no loading. Switch a scene from locked to unlocked while you watch. Sounds play when you are within about 7 m, after you press Walk in. Press Esc to free the mouse before clicking this panel.';d.appendChild(n);
     d.addEventListener('pointerdown',function(e){e.stopPropagation()});
     document.body.appendChild(d);
   }

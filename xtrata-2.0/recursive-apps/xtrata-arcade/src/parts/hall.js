@@ -83,7 +83,7 @@ function tone(f,t0,d,type='square',vol=.05){ try{ XA.audio.tone(f,d,{delay:t0,ty
 const sfx = { coin(){tone(988,0,.08);tone(1319,.08,.4)}, click(){tone(160,0,.06,'triangle',.09)}, back(){tone(660,0,.07);tone(440,.07,.2)} };
 
 /* ---------- renderer / scene ---------- */
-const renderer = new THREE.WebGLRenderer({antialias:true});
+const renderer = new THREE.WebGLRenderer({antialias:true, stencil:true});   // the stencil is how a door's opening shows the room behind it
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputEncoding = THREE.sRGBEncoding;
@@ -102,6 +102,15 @@ const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets 
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
 const machines = [], pickables = [], boxes = [];
+/* The lobby: a bare room built for real behind the wall of a door that links to it (a bay scene with interaction 3 and target-room 'lobby').
+   It is always there, so when that door opens you see straight into it and walk in: no loading, no fade, no teleport. The door's opening
+   writes the stencil, and the walls on both sides skip those pixels (see portal() in doors.js). The lobby sits on the far side of the
+   hall wall at that bay, so it is the same room whichever bay holds the door; only one bay at a time can lead to it. */
+const LW = 8, LD = 10;                      // lobby width (along the hall wall) and depth (away from it), metres
+let lobbyG = null, lobbyBay = -1, lobbyPass = null, autoWalk = null, bayDefsAll = [];   // lobbyPass: {side, wallX, z}
+function holeWall(m){ m.stencilWrite=true; m.stencilRef=1; m.stencilFunc=THREE.NotEqualStencilFunc; m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp; return m }
+const lobbyOpen = () => lobbyBay>=0 && !!bayEngine && bayEngine.portalOpen(lobbyBay);
+const inLobbyZone = () => !!lobbyPass && (lobbyPass.side<0 ? player.x < lobbyPass.wallX-.05 : player.x > lobbyPass.wallX+.05);
 let bayEngine = null, bayHint = null, bayHold = true, bayToast = null;   // the bay engine (only when the world reader is on); what the player is looking at in a bay
 
 /* ================================================================
@@ -150,7 +159,7 @@ function buildRoom(){
 
   const wt=wallTexture();
   const wall=(w,pos,ry)=>{const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), new THREE.MeshStandardMaterial({map:t, roughness:.9}));
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), holeWall(new THREE.MeshStandardMaterial({map:t, roughness:.9})));
     m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m)};
   wall(RL,[-RW/2,0],Math.PI/2); wall(RL,[RW/2,0],-Math.PI/2); wall(RW,[0,-RL/2],0); wall(RW,[0,RL/2],Math.PI);
 
@@ -173,6 +182,8 @@ function buildRoom(){
   try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
+  XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw});   // read-only, for tests
+  XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
   XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
   if(window.XA_TEST) XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 };   // tests only: nothing sets XA_TEST in the shipped page
   XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests
@@ -194,6 +205,54 @@ function buildRoom(){
     const l=new THREE.PointLight(0xcfc4ff,.55,10,2); l.position.set(0,RH-.3,z); scene.add(l);
   }
   scene.add(new THREE.HemisphereLight(0x6a5cff,0x1a0a20,.45));
+}
+
+/* ---------- the lobby (bare) ---------- */
+// Built in its own frame: the wall with the opening is the plane z=0 facing +z, the room runs away from it along +z.
+function buildLobby(){
+  const g=new THREE.Group(); g.visible=false; scene.add(g); lobbyG=g;
+  const face=(geo,mat,x,y,z,rx,ry)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.rotation.set(rx||0,ry||0,0); g.add(m); return m };
+  face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({map:carpetTexture(), roughness:.95}), 0,0,LD/2, -Math.PI/2,0);
+  face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}), 0,RH,LD/2, Math.PI/2,0);
+  const wt=wallTexture();
+  const wall=(w,x,z,ry,hole)=>{ const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
+    const m=new THREE.MeshStandardMaterial({map:t, roughness:.9}); face(new THREE.PlaneGeometry(w,RH), hole?holeWall(m):m, x,RH/2,z, 0,ry) };
+  wall(LW,0,0,0,true);                 // the wall with the opening: skips the pixels the door's opening has marked
+  wall(LW,0,LD,Math.PI); wall(LD,-LW/2,LD/2,Math.PI/2); wall(LD,LW/2,LD/2,-Math.PI/2);
+  const neon=(col)=>new THREE.MeshBasicMaterial({color:col, toneMapped:false}), pink=neon(0x3d86ff), cyan=neon(0xff8a2a);
+  for(const sd of [-1,1]){
+    face(new THREE.BoxGeometry(.04,.04,LD),pink, sd*(LW/2-.02),2.62,LD/2);
+    face(new THREE.BoxGeometry(.03,.03,LD),cyan, sd*(LW/2-.02),.07,LD/2);
+  }
+  face(new THREE.BoxGeometry(LW,.03,.03),cyan, 0,.07,LD-.02);
+  for(const z of [LD*.3,LD*.7]){
+    face(new THREE.PlaneGeometry(1.3,.5), new THREE.MeshBasicMaterial({color:0xe8e2ff, toneMapped:false}), 0,RH-.01,z, Math.PI/2,0);
+    const l=new THREE.PointLight(0xcfc4ff,.75,11,2); l.position.set(0,RH-.3,z); g.add(l);
+  }
+  const sign=(text,w,h,x,y,z,ry)=>face(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:signTexture(text,'72px Bungee',BRAND.orange,1024,Math.round(1024*h/w)), transparent:true, toneMapped:false}), x,y,z, 0,ry);
+  sign('LOBBY',3.6,.5,0,2.3,LD-.03,Math.PI);
+  sign('BACK TO THE ARCADE',3,.4,0,2.8,.03,0);
+}
+// Put the lobby behind the wall of bay i (or take it away with -1). Only a bay whose door links to it counts.
+function setLobbyBay(i){
+  const d=i>=0 ? bayDefsAll[i] : null;
+  if(!d || !lobbyG){ i=-1 }
+  if(i===lobbyBay) return;
+  if(bayEngine){ if(lobbyBay>=0) bayEngine.setPortal(lobbyBay,false); if(i>=0) bayEngine.setPortal(i,true) }
+  lobbyBay=i; autoWalk=null;
+  if(i<0){ lobbyPass=null; if(lobbyG) lobbyG.visible=false; return }
+  lobbyPass={side:d.side, wallX:d.side*RW/2, z:d.z};
+  lobbyG.position.set(lobbyPass.wallX,0,d.z); lobbyG.rotation.y=d.side<0?-Math.PI/2:Math.PI/2; lobbyG.visible=true;
+}
+const linksToLobby=(sc)=>{ const lk=sc&&sc.link; return !!(sc && sc.base==='door' && Number(sc.interaction)===3 && lk && String(lk['target-room']||lk.targetRoom||lk.room||'').toLowerCase()==='lobby') };
+// Where the player may stand while the lobby door is open: the hall, the doorway and the lobby, as rectangles [x0,x1,z0,z1].
+function lobbyRects(r){
+  const p=lobbyPass, sd=p.side, hw=Math.max(.3, bayEngine.doorHalfWidth(lobbyBay)-.1), wx=p.wallX;
+  return [
+    [-RW/2+r, RW/2-r, -RL/2+r, RL/2-r],
+    sd<0 ? [wx-LD+r, wx-r, p.z-LW/2+r, p.z+LW/2-r] : [wx+r, wx+LD-r, p.z-LW/2+r, p.z+LW/2-r],
+    [wx-r, wx+r, p.z-hw, p.z+hw]
+  ];
 }
 
 /* ---------- the big flickering neon logo on the end wall ---------- */
@@ -1294,6 +1353,7 @@ function paintWall(){
 const BAY_INDEX={L:0, R:1, NL:2, NR:3};
 function applyBays(snap){
   if(bayEngine){ try{ bayEngine.apply(snap,{instant:state==='intro'}) }catch(e){ console.error(e) } }
+  { let lb=-1; if(snap && snap.bays) for(let i=0;i<snap.bays.length && lb<0;i++) if(linksToLobby(snap.bays[i] && snap.bays[i].scene)) lb=i; setLobbyBay(lb) }
   for(const s of posterSlots){
     if(!s.bay) continue;
     const i=BAY_INDEX[s.bay];
@@ -1359,6 +1419,7 @@ function buildPosters(){
     endPair(-wallEnd, zLo, side<0?'L':'R');   // far end (bays 0, 1)
     bayDefs[side<0?0:1]={side, z:(-wallEnd+zLo)/2, width:zLo+wallEnd};
   }
+  bayDefsAll=bayDefs;
   spots.forEach(([side,z,bay])=>{
     const g=new THREE.Group(); g.position.set(side*(RW/2-.03),1.95,z); g.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
     g.add(new THREE.Mesh(new THREE.BoxGeometry(.84,1.22,.03),frameMat));
@@ -1370,6 +1431,7 @@ function buildPosters(){
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
       bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, listener:()=>player, onEnter:bayEnter});
+    if(bayEngine) buildLobby();
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
 }
@@ -2317,12 +2379,30 @@ function move(dt){
   let s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0) + joy.vx;
   const len=Math.hypot(f,s); if(len>1){f/=len; s/=len}
   const sp=(keys.ShiftLeft?4.6:3)*dt, sy=Math.sin(player.yaw), cy=Math.cos(player.yaw);
-  player.x += (-sy*f + cy*s)*sp; player.z += (-cy*f - sy*s)*sp;
-  if(len>.05) player.bob+=dt*9*Math.min(1,len);
+  const px=player.x, pz=player.z;
+  if(len>.05) autoWalk=null;
+  if(autoWalk){   // E on the open lobby door: walk through it (doorway, then a little way in)
+    const w=autoWalk[0], dx=w.x-player.x, dz=w.z-player.z, d=Math.hypot(dx,dz), st=2.4*dt;
+    if(d<=st){ player.x=w.x; player.z=w.z; autoWalk.shift(); if(!autoWalk.length) autoWalk=null } else { player.x+=dx/d*st; player.z+=dz/d*st }
+    player.bob+=dt*7;
+  } else {
+    player.x += (-sy*f + cy*s)*sp; player.z += (-cy*f - sy*s)*sp;
+    if(len>.05) player.bob+=dt*9*Math.min(1,len);
+  }
   // collision
   const r=.32;
-  player.x=clamp(player.x,-RW/2+r,RW/2-r); player.z=clamp(player.z,-RL/2+r,RL/2-r);
-  for(const b of boxes){
+  if(lobbyPass && lobbyOpen()){   // the door is open onto the lobby: the hall, the doorway and the lobby are one space
+    const R=lobbyRects(r), ok=(x,z)=>R.some(a=>x>=a[0]&&x<=a[1]&&z>=a[2]&&z<=a[3]);
+    if(!ok(player.x,player.z)){
+      const nx=player.x, nz=player.z;
+      if(ok(nx,pz)) player.z=pz; else if(ok(px,nz)) player.x=px; else if(ok(px,pz)){ player.x=px; player.z=pz }
+      else { let bd=1e9; for(const a of R){ const cx=clamp(nx,a[0],a[1]), cz=clamp(nz,a[2],a[3]), d=(cx-nx)**2+(cz-nz)**2; if(d<bd){ bd=d; player.x=cx; player.z=cz } } }   // put somewhere (a jump): the nearest allowed spot
+    }
+  } else {
+    if(inLobbyZone()){ player.x=px; player.z=pz }   // (cannot happen: the door is held open while you are inside)
+    player.x=clamp(player.x,-RW/2+r,RW/2-r); player.z=clamp(player.z,-RL/2+r,RL/2-r);
+  }
+  if(Math.abs(player.x)<=RW/2) for(const b of boxes){
     const nx=clamp(player.x,b.min.x,b.max.x), nz=clamp(player.z,b.min.z,b.max.z);
     const dx=player.x-nx, dz=player.z-nz, d2=dx*dx+dz*dz;
     if(d2<r*r){ if(d2<1e-8){ player.x = player.x<(b.min.x+b.max.x)/2 ? b.min.x-r : b.max.x+r }
@@ -2349,12 +2429,16 @@ function updateBayFocus(){
   if(bayEngine.isGrabbing()) return;
   let h=null, hold=true;
   if(bayToast && performance.now()<bayToast.until){ h=bayToast.text; hold=false }
-  else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }
+  else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus && !inLobbyZone()){ const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }
   if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
 }
-// A door that leads somewhere: the link comes from the world contract. Rooms are not built yet, so say so.
+// A door that leads somewhere: the link comes from the world contract. The lobby is the one room there is; any other target says it is not open yet.
 function bayEnter(link){
   const room=link&&(link['target-room']||link.targetRoom||link.room); const name=room?String(room).replace(/[^A-Za-z0-9 _-]/g,' ').trim().toUpperCase():'';
+  if(String(room||'').toLowerCase()==='lobby' && lobbyPass && lobbyOpen()){   // the lobby is already there: E just walks you through the doorway
+    const p=lobbyPass, sd=p.side;   // into the doorway (from the hall side), then 2.4 m into the room
+    autoWalk=[{x:p.wallX-sd*.9, z:p.z}, {x:p.wallX+sd*2.4, z:p.z}]; return
+  }
   bayToast={text:name?('THIS DOOR LEADS TO '+name+' · NOT OPEN YET'):'THIS DOOR IS NOT OPEN YET', until:performance.now()+3500};
 }
 function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint){ $('bptext').textContent=bayHint; const a=$('bpalt'); if(a) a.hidden=!bayHold } }
@@ -2389,7 +2473,7 @@ function frame(now){
   }
 
   updateNeon(time,dt);
-  if(bayEngine){ bayEngine.update(dt,time); updateBayFocus() }
+  if(bayEngine){ if(lobbyBay>=0 && inLobbyZone()) bayEngine.doorOpen(lobbyBay); bayEngine.update(dt,time); updateBayFocus() }
 
   updateScreens(dt);
   updateAnimPosters(time);
