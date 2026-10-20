@@ -182,3 +182,19 @@ test('sounds: a burst of events is capped by the voice budget', () => {
   for (let i = 0; i < 60; i++) s.latch(d, 1);
   assert.ok(s._log().length <= 16, 'at most 16 in a hundred milliseconds, got ' + s._log().length);
 });
+
+test('every handle lies inside its leaf: rose, lever and pad never reach the leaf edge, for every style at several sizes', () => {
+  for (const n of D.STYLE_NAMES) {
+    for (const [w, h] of [[undefined, undefined], [60, 140], [90, 200], [200, 260], [320, 360]]) {
+      const G = D.layoutOf(n, w, h);
+      if (G.nL > 1 && G.W < 120) continue;   // a pair of leaves under 60 units each is not a door anyone builds
+      for (const L of G.leaves) {
+        const mult = G.S.handle === 'bar' ? 1.25 : 1, len = L.Lh * mult;
+        // the lever runs from the rose toward the hinge; the rose has radius 9 and the pad radius about 5
+        const a = L.hx, b = L.hinge === 'R' ? L.hx + len : L.hx - len;
+        const lo = Math.min(a, b) - 9, hi = Math.max(a, b) + 9;
+        assert.ok(lo >= L.x0 + 3 && hi <= L.x1 - 3, `${n} ${w}x${h} leaf ${L.i}: handle spans ${lo.toFixed(1)}..${hi.toFixed(1)} but the leaf is ${L.x0.toFixed(1)}..${L.x1.toFixed(1)}`);
+      }
+    }
+  }
+});

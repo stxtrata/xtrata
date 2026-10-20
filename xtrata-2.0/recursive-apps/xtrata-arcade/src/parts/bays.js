@@ -27,6 +27,7 @@
   }
   function txt(v, max) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9 .,!?:'&\/-]/g, '').slice(0, max); }
   function hex(v, def) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : def; }
+  var WHITE = null;   // set once THREE is known (create)
   var TONES = { blue: '#3d86ff', orange: '#ff8a2a', gold: '#ffc53d', white: '#e8ecff', red: '#ff4d4d', green: '#4dff9a' };
   function slug(v, max) { return typeof v === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(v) && v.length >= 2 && v.length <= max ? v : ''; }
   function tone(v, def) { return Object.prototype.hasOwnProperty.call(TONES, v) ? v : def; }
@@ -35,7 +36,8 @@
   // The built-in looks. kind: 1 cover, 2 overlay, 3 sound, 4 light (the contract's look kinds). norm() returns clean params.
   var BUILTIN = {
     'curtain-house': { kind: 1, norm: function (p) { return { color: hex(p.color, null), trim: hex(p.trim, null), openness: num(p.openness, 0, 1, 0), speed: num(p.speed, 0.1, 5, 1) }; } },
-    'sign-board': { kind: 2, norm: function (p) { return { text: txt(p.text, 22), sub: txt(p.sub, 34), tone: tone(p.tone, 'orange'), y: num(p.y, 1.6, 2.9, 2.55), front: p.front === true }; } },
+    // the sign's x, y and w place it on its own, whatever door or curtain is in the bay
+    'sign-board': { kind: 2, norm: function (p) { return { text: txt(p.text, 22), sub: txt(p.sub, 34), tone: tone(p.tone, 'orange'), y: num(p.y, 0.4, 2.9, 2.55), x: num(p.x, -3, 3, 0), w: num(p.w, 0.4, 3, 2), front: p.front === true }; } },
     'caution-tape': { kind: 2, norm: function (p) { return { y: num(p.y, 0.4, 2.6, 1.2) }; } },
     'work-site': { kind: 3, norm: function (p) {
       var kinds = (typeof p.kinds === 'string' ? p.kinds.split(',') : Array.isArray(p.kinds) ? p.kinds : WORK_SOUNDS)
@@ -249,6 +251,7 @@
    */
   function create(env) {
     var T = env.THREE, scene = env.scene, audio = createAudio();
+    WHITE = new T.Color(0xffffff);
     var DOORS = root.XADoors || null, SKINS = root.XADoorSkins || null;
     var doorSfx = DOORS ? DOORS.createSfx(function () { return audio.env(); }, function () { return env.listener(); }) : null;
     // Layering, from the wall outwards (metres in front of the wall): the door, set into the wall (its slab front is at about 0.045),
@@ -269,9 +272,25 @@
     function makeBay(def, i) {
       var g = new T.Group(); g.position.set(def.side * (env.RW / 2 - 0.02), 0, def.z); g.rotation.y = def.side < 0 ? Math.PI / 2 : -Math.PI / 2;
       g.visible = false; scene.add(g);              // nothing is shown until a scene needs it
-      var light = new T.PointLight(0xffffff, 0, 7, 2); light.position.set(0, 2.1, 0.9); g.add(light);
+      // The lamp: a real fixture you can see, a work lamp on a short arm above the door with a bare bulb under its shade, and the light comes from the bulb.
+      // (It used to be an invisible point light in the air in front of the wall: you saw the glow on things and could not tell where it came from.)
+      var light = new T.PointLight(0xffffff, 0, 7, 2); light.position.set(0, 2.96, 0.42); g.add(light);
+      var fix = new T.Group(); fix.visible = false; g.add(fix);
+      var metal = new T.MeshStandardMaterial({ color: 0x23232b, metalness: 0.7, roughness: 0.45 });
+      var arm = new T.Mesh(new T.BoxGeometry(0.035, 0.035, 0.38), metal); arm.position.set(0, 3.1, 0.19);
+      var plate = new T.Mesh(new T.BoxGeometry(0.1, 0.1, 0.02), metal); plate.position.set(0, 3.1, 0.01);
+      var shade = new T.Mesh(new T.CylinderGeometry(0.05, 0.15, 0.13, 20, 1, true), new T.MeshStandardMaterial({ color: 0x2c2c36, metalness: 0.7, roughness: 0.4, side: T.DoubleSide })); shade.position.set(0, 3.07, 0.42);
+      var bulbMat = new T.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, fog: false });
+      var bulb = new T.Mesh(new T.SphereGeometry(0.045, 14, 10), bulbMat); bulb.position.set(0, 2.98, 0.42);
+      var cage = new T.Mesh(new T.CylinderGeometry(0.062, 0.062, 0.1, 8, 1, true), new T.MeshBasicMaterial({ color: 0x15151a, wireframe: true })); cage.position.set(0, 2.98, 0.42);
+      var gcv = env.mkCanvas(64, 64), gx = gcv.getContext('2d'), gg = gx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gg.addColorStop(0, 'rgba(255,255,255,1)'); gg.addColorStop(0.25, 'rgba(255,255,255,0.45)'); gg.addColorStop(1, 'rgba(255,255,255,0)'); gx.fillStyle = gg; gx.fillRect(0, 0, 64, 64);
+      var glowMat = new T.SpriteMaterial({ map: env.tex(gcv), color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, fog: false });
+      var glow = new T.Sprite(glowMat); glow.scale.set(0.7, 0.7, 1); glow.position.set(0, 2.98, 0.42);
+      arm.raycast = plate.raycast = shade.raycast = bulb.raycast = cage.raycast = glow.raycast = function () {};
+      fix.add(arm, plate, shade, bulb, cage, glow);
       var width = Math.min(2.8, Math.max(1.2, def.width - 0.2));
-      return { i: i, def: def, group: g, light: light, lightSpec: null, plan: null, key: '', width: width, curtain: null, overlays: [], door: null,
+      return { i: i, def: def, group: g, light: light, fixture: fix, bulbMat: bulbMat, glowMat: glowMat, lightSpec: null, plan: null, key: '', width: width, curtain: null, overlays: [], door: null,
         pos: { x: def.side * (env.RW / 2 - 0.4), y: 1.6, z: def.z } };
     }
 
@@ -316,8 +335,9 @@
     }
     function buildOverlay(bay, spec) {
       if (spec.key === 'sign-board') {
-        var w = Math.min(2.0, bay.width - 0.2), m = new T.Mesh(new T.PlaneGeometry(w, w / 4), new T.MeshBasicMaterial({ map: env.tex(signTexture(spec.p)), color: 0xdadada }));
-        m.position.set(0, spec.p.y, spec.p.front ? Z_SIGN : Z_SIGN_WALL); m.renderOrder = 3; m.userData.key = spec.key; bay.group.add(m); return m;
+        var w = Math.min(spec.p.w, bay.width - 0.2), m = new T.Mesh(new T.PlaneGeometry(w, w / 4), new T.MeshBasicMaterial({ map: env.tex(signTexture(spec.p)), color: 0xdadada })),
+            sx = Math.max(-(bay.width / 2 - w / 2 - 0.05), Math.min(bay.width / 2 - w / 2 - 0.05, spec.p.x));   // kept on the wall of this bay
+        m.position.set(sx, spec.p.y, spec.p.front ? Z_SIGN : Z_SIGN_WALL); m.renderOrder = 3; m.userData.key = spec.key; bay.group.add(m); return m;
       }
       if (spec.key === 'caution-tape') {
         var tw = bay.width - 0.02, tt = env.tex(tapeTexture()); tt.wrapS = T.RepeatWrapping; tt.repeat.set(Math.round(tw * 2), 1);
@@ -415,6 +435,7 @@
       // light
       bay.lightSpec = plan && plan.light ? plan.light : null;
       if (!bay.lightSpec) bay.light.intensity = 0; else bay.light.color.set(TONES[bay.lightSpec.p.tone]);
+      bay.fixture.visible = !!bay.lightSpec;
       // sound
       audio.setBay(bay.i, bay.pos, plan && plan.sound ? plan.sound : null);
     }
@@ -438,7 +459,7 @@
         var bay = bays[b], c = bay.curtain;
         if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
         var dm = bay.door && bay.door.model;
-        if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po); } }   // a door onto a real room: the doorway is open while the door is
+        if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
         if (dm && dm.awake) { dm.update(dt); bay.door.mesh.sync(); if (dm.settled()) { dm.awake = false; bay.door.mesh.sync(); } }
         var ls = bay.lightSpec;
         if (ls) {
@@ -446,6 +467,8 @@
           if (m === 'light-pulse') k *= 0.55 + 0.45 * Math.sin(time * ls.p.rate * 2 * Math.PI);
           else if (m === 'light-flicker') k *= (Math.sin(time * 31 * ls.p.rate) + Math.sin(time * 47.3 * ls.p.rate + 1.7) > 0.8 ? 0.15 : 1) * (0.85 + 0.15 * Math.sin(time * 5.1));
           bay.light.intensity = k;
+          var br = Math.max(0, Math.min(1.2, k / (ls.p.intensity * 1.6 || 1)));    // 0..1: how bright the bulb is right now, so it flickers with the light it gives
+          bay.bulbMat.color.set(TONES[ls.p.tone]).lerp(WHITE, 0.55).multiplyScalar(0.2 + 0.8 * br); bay.glowMat.color.set(TONES[ls.p.tone]); bay.glowMat.opacity = 0.85 * br;
         }
       }
     }
@@ -569,7 +592,7 @@
         return bays.map(function (b) {
           return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, portal: !!b.portalOn, doorSkin: b.door ? (b.door.skin || '') : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
             curtain: b.curtain ? { margin: b.curtain.mg, planeW: b.curtain.mesh.geometry.parameters.width, bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
-            light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity } : null };
+            light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity, fixture: b.fixture.visible } : null };
         });
       }
     };

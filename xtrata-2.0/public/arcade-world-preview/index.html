@@ -25,8 +25,22 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
   var posters=[entry(1,'NEW GAME SOON','Registry poster A','gold','star'),entry(2,'TOURNAMENT FRIDAY','Registry poster B','orange','star'),entry(3,'SEASON 2 OPENS','Registry poster C','blue','star'),entry(4,'HIGH SCORE WEEK','Registry poster D','white','star')];
   var pinned=entry(7,'PINNED BY ADMIN','Pin spot 2 · by the entrance','gold','star');
   function L(slot,look,params,state){return {slot:slot,look:look,params:params||'{}',state:state||''}}
-  function sceneOf(kind){
+  /* COMPOSE: every element of a bay is chosen on its own: the wall or door, the curtain in front of it, a sign (anywhere on the wall),
+     caution tape, the lamp and the work sounds. They are separate layers in the world contract, so any of them can sit on any door. */
+  var comp=[0,1,2,3].map(function(){return {door:true,inter:2,curtain:'off',cc:0,sign:true,txt:0,sx:0,sy:2.55,sw:2,front:false,tape:false,lamp:false,snd:false}});
+  var CCOL=['#7a1020','#1d3a6e','#1c5a3a','#4a2a6a'], CTXT=[['coming soon','back in three days','gold'],['staff only','knock and wait','orange'],['come in','mind the step','blue'],['lobby','through the door','gold']];
+  function custom(i){
+    var c=comp[i], ly=[];
+    if(c.curtain!=='off') ly.push(L(1,1,JSON.stringify({color:CCOL[c.cc]}),c.curtain));
+    if(c.sign){var t=CTXT[c.txt]; ly.push(L(2,2,JSON.stringify({text:t[0],sub:t[1],tone:t[2],x:c.sx,y:c.sy,w:c.sw,front:c.front})))}
+    if(c.tape) ly.push(L(2,5,'{"y":1.2}'));
+    if(c.snd) ly.push(L(3,3,'{"kinds":"hammer,clatter","volume":0.5,"radius":6,"gap":3}'));
+    if(c.lamp) ly.push(L(4,4,'{"tone":"white","rate":1}'));
+    return c.door?{base:'door',baseId:2,interaction:c.inter,doorLook:20+style,layers:ly,link:null,fromHeight:0}:{base:'wall',baseId:1,interaction:c.curtain==='off'?0:2,doorLook:null,layers:ly,link:null,fromHeight:0};
+  }
+  function sceneOf(kind,bi){
     if(kind==='posters') return null;
+    if(kind==='custom') return custom(bi);
     var layers=[], inter=2;
     if(kind==='wall') return {base:'wall',baseId:1,interaction:0,doorLook:null,layers:[],link:null,fromHeight:0};
     if(kind==='story'){
@@ -53,14 +67,14 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
   }
   function skinsOk(k,st){var D=window.XADoorSkins; return !k||!D||!D.SKINS[k]||D.SKINS[k].styles.indexOf(STYLES[st])>=0}
   function bay(i){
-    var sc=sceneOf(scene[i]);
+    var sc=sceneOf(scene[i],i);
     if(sc&&sc.base==='door'&&skinKey[i]) sc.layers.push(L(2,50,JSON.stringify({skin:skinKey[i],frame:frame,hardware:hw,wear:wear})));
     return {scene:sc,nextHeight:null,height:0}
   }
   function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1),bay(2),bay(3)],looks:LOOKS}}
   function apply(){var W=window.XAWorld; if(!W||!W._t) return; var st=W._t.state; st.snap=snap(); st.listeners.forEach(function(f){try{f(st.snap,'preview')}catch(e){}})}
-  var NAMES={posters:'posters (as #3111)',wall:'plain wall',story:'launch story',workshop:'workshop (door, curtain)',knock:'locked door (knock)',open:'unlocked door (open it)',enter:'door that leads to the lobby (walk in)'};
-  var ORDER=['posters','wall','story','workshop','knock','open','enter'];
+  var NAMES={posters:'posters (as #3111)',wall:'plain wall',story:'launch story',workshop:'workshop (door, curtain)',knock:'locked door (knock)',open:'unlocked door (open it)',enter:'door that leads to the lobby (walk in)',custom:'composed below'};
+  var ORDER=['posters','wall','story','workshop','knock','open','enter','custom'];
   function goTo(i){
     var intro=document.getElementById('intro'); if(intro&&!intro.hidden){var go=document.getElementById('go'); if(go) go.click()}
     var s=window.XA&&window.XA.bayState&&window.XA.bayState(); if(!s||!window.XA.pose) return;
@@ -70,12 +84,28 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
     var d=document.createElement('div');
     d.style.cssText='position:fixed;right:12px;bottom:12px;z-index:99999;background:rgba(10,12,24,.92);color:#dfe6ff;font:12px/1.4 ui-monospace,Menlo,monospace;padding:10px 12px;border:1px solid #3b4a8a;border-radius:6px;max-width:250px;max-height:92vh;overflow:auto';
     d.innerHTML='<div style="letter-spacing:.08em;color:#ffcc55;margin-bottom:6px">WORLD PREVIEW · SAMPLE DATA</div>';
-    function btn(label,get,flip,noapply){var b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;margin:3px 0;padding:6px 8px;background:#182049;color:#dfe6ff;border:1px solid #3b4a8a;border-radius:4px;font:inherit;cursor:pointer';function set(){b.textContent=get?label+': '+get():label} b.onclick=function(e){e.stopPropagation();flip();set();if(!noapply)apply();b.blur()};b.onkeydown=function(e){e.stopPropagation()};set();d.appendChild(b);return b}
+    var sets=[];
+    function btn(label,get,flip,noapply){var b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;margin:3px 0;padding:6px 8px;background:#182049;color:#dfe6ff;border:1px solid #3b4a8a;border-radius:4px;font:inherit;cursor:pointer';function set(){b.textContent=get?label+': '+get():label} b.onclick=function(e){e.stopPropagation();flip();sets.forEach(function(f){f()});if(!noapply)apply();b.blur()};b.onkeydown=function(e){e.stopPropagation()};sets.push(set);set();d.appendChild(b);return b}
     function h(t){var n=document.createElement('div');n.style.cssText='margin-top:8px;color:#8a93c4';n.textContent=t;d.appendChild(n)}
     btn('Registry posters',function(){return chain?'ON':'OFF'},function(){chain=!chain});
     var BN=['Far left bay','Far right bay','Near left bay (entrance)','Near right bay (entrance)'];
     h('THE FOUR BAYS · click to change the scene');
     [0,1,2,3].forEach(function(i){btn(BN[i],function(){return NAMES[scene[i]]},function(){scene[i]=ORDER[(ORDER.indexOf(scene[i])+1)%ORDER.length]})});
+    h('COMPOSE A BAY · each element on its own');
+    var cb=0, STEPX=[-1.2,-0.6,0,0.6,1.2], STEPY=[0.9,1.6,2.55], STEPW=[1,1.5,2];
+    function nx(a,v){return a[(a.indexOf(v)+1)%a.length]}
+    function cp(f){return function(){scene[cb]='custom';f(comp[cb])}}
+    btn('Compose bay',function(){return BN[cb]},function(){cb=(cb+1)%4;scene[cb]='custom'},false);
+    btn('· Wall or door',function(){return comp[cb].door?(comp[cb].inter===1?'door (locked)':'door (unlocked)'):'plain wall'},cp(function(c){if(!c.door){c.door=true;c.inter=1}else if(c.inter===1) c.inter=2; else c.door=false}));
+    btn('· Curtain in front',function(){return comp[cb].curtain==='off'?'none':comp[cb].curtain+' · '+CCOL[comp[cb].cc]},cp(function(c){if(c.curtain==='off') c.curtain='closed'; else if(c.curtain==='closed') c.curtain='half'; else if(c.curtain==='half') c.curtain='open'; else {c.curtain='off';c.cc=(c.cc+1)%CCOL.length}}));
+    btn('· Sign',function(){return comp[cb].sign?'"'+CTXT[comp[cb].txt][0]+'"':'none'},cp(function(c){if(!c.sign){c.sign=true;c.txt=0}else if(c.txt<CTXT.length-1) c.txt++; else c.sign=false}));
+    btn('· Sign across',function(){return comp[cb].sx},cp(function(c){c.sx=nx(STEPX,c.sx)}));
+    btn('· Sign height',function(){return comp[cb].sy},cp(function(c){c.sy=nx(STEPY,c.sy)}));
+    btn('· Sign width',function(){return comp[cb].sw},cp(function(c){c.sw=nx(STEPW,c.sw)}));
+    btn('· Sign sits',function(){return comp[cb].front?'in front of the curtain':'on the wall, behind it'},cp(function(c){c.front=!c.front}));
+    btn('· Caution tape',function(){return comp[cb].tape?'ON':'OFF'},cp(function(c){c.tape=!c.tape}));
+    btn('· Lamp',function(){return comp[cb].lamp?'ON':'OFF'},cp(function(c){c.lamp=!c.lamp}));
+    btn('· Work sounds',function(){return comp[cb].snd?'ON':'OFF'},cp(function(c){c.snd=!c.snd}));
     h('SCENE SETTINGS');
     btn('Door style',function(){return STYLES[style]},function(){style=(style+1)%STYLES.length;for(var i=0;i<4;i++) if(!skinsOk(skinKey[i],style)) skinKey[i]=''});
     var D=window.XADoorSkins, KEYS=D?[''].concat(D.SKIN_KEYS):[''];
@@ -32302,6 +32332,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       var x0 = i * leafW, x1 = x0 + leafW, hinge = nL === 1 ? 'R' : (i === 0 ? 'L' : 'R'), sW = Math.max(24, 0.2 * leafW), off = Math.max(S.hOff || 0, sW / 2, 22);
       var L = { i: i, x0: x0, x1: x1, w: leafW, hinge: hinge, hy: hy, dir: hinge === 'R' ? 1 : -1, inw: hinge === 'R' ? 1 : -1, Lh: clamp(0.22 * leafW, 22, 44), sW: sW };
       L.hx = hinge === 'R' ? x0 + off : x1 - off;
+      // the lever lies from the rose toward the hinge: keep rose and arm (and the pad at its end) inside the leaf, never over its edge
+      var room = hinge === 'R' ? x1 - L.hx : L.hx - x0, mult = S.handle === 'bar' ? 1.25 : 1;
+      L.Lh = clamp(Math.min(L.Lh, (room - 12) / mult), 8, 44);
       L.latch = hinge === 'R' ? (nL === 1 ? shape.edge(hy)[0] : x0) : (nL === 2 ? x1 : shape.edge(hy)[1]);
       L.axis = hinge === 'R' ? (nL === 1 ? W : x1) : x0;       // the hinge line, where the leaf is pivoted
       leaves.push(L);
@@ -32711,7 +32744,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         var roseG = new T.CylinderGeometry(9 * s, 9 * s, 0.006, 20); roseG.rotateX(Math.PI / 2); var len = L.Lh * (S.handle === 'bar' ? 1.25 : 1), leverG = new T.BoxGeometry(len * s, 8 * s, 0.014), padG = new T.CylinderGeometry(4.6 * s, 4.6 * s, 0.014, 14); padG.rotateX(Math.PI / 2);
         disposables.push(roseG, leverG, padG);
         hands = [th + 0.004, -0.004].map(function (z, k) {
-          var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = L.dir;
+          var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = k ? -L.dir : L.dir;   // the back handle is the front one seen from the other side: same spindle, same direction (and it turns the same way)
           var lv = new T.Group(), bar = new T.Mesh(leverG, hm), pad = new T.Mesh(padG, hm), rose = new T.Mesh(roseG, hm);
           bar.position.set(len * s / 2, 0, 0.008); pad.position.set(len * s, 0, 0.008); rose.position.z = 0.0; bar.raycast = pad.raycast = rose.raycast = function () {};
           lv.add(rose, bar, pad); hg.add(lv); pivot.add(hg); return { g: hg, lever: lv };
@@ -32728,7 +32761,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       // the handle (a lever that turns with the physics), on both faces
       var bs = 2 * (L.Lh + 16), levTex = canvasTex(bs, bs, function (x) { x.translate(bs / 2, bs / 2); x.shadowColor = line; x.shadowBlur = 3; drawOps(x, leverArt(S.handle, L.Lh), { line: line, fill: FILL, lw: lw }); });
       hands = [th + 0.004, -0.004].map(function (z, k) {
-        var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s * (k ? 1 : 1), (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = L.dir;
+        var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = k ? -L.dir : L.dir;   // as above: mirrored on the back so both levers point and turn the same way
         var lm = new T.Mesh(new T.PlaneGeometry(bs * s, bs * s), basicMat(levTex)); lm.raycast = function () {}; lm.renderOrder = 2; hg.add(lm); pivot.add(hg); return { g: hg, lever: lm };
       });
       }
@@ -32752,27 +32785,41 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       group.traverse(function (ob) { if (ob.geometry && disposables.indexOf(ob.geometry) < 0) ob.geometry.dispose(); });
       disposables.forEach(function (d) { if (d.dispose) d.dispose(); });
     }
-    /* Portal mode, for a door that opens onto a real room built behind the wall: the doorway stops being a painted recess. The opening is
-       cut out of the doorway picture (the frame band stays), and an invisible copy of the opening writes the stencil, which the wall
-       materials on both sides test, so the wall is not drawn there and the room behind shows through. */
-    var portalParts = null, portalOn = false;
-    function portal(on) {
+    /* Portal mode, for a door that opens onto a real room built behind the wall. The wall has a thickness (depth metres, a drywall
+       cavity): the doorway becomes a short tunnel lined with a reveal. The opening is cut out of the doorway picture (the frame band stays),
+       and two invisible copies of the opening write the stencil, one at each wall face (bit 1 for the wall on this side, bit 2 for the wall
+       of the room behind), which the wall materials test, so neither wall is drawn over its opening and the room behind shows through. */
+    var portalParts = null, portalOn = false, Z_WALL = -0.02;   // the wall's face is 2 cm behind the bay's origin
+    function portal(on, depth) {
       on = !!on; if (on === portalOn) return; portalOn = on;
       if (on) {
         if (!portalParts) {
+          depth = depth > 0 ? depth : 0.2;
           var src = wayTex.image, shp2 = new Path2D(G.shape.d);
           var bc = o.mkCanvas(src.width, src.height), bx = bc.getContext('2d'); bx.drawImage(src, 0, 0);
           bx.save(); bx.scale(ppu, ppu); bx.translate(pad, pad); bx.globalCompositeOperation = 'destination-out'; bx.fill(shp2); bx.restore();
           var hc = o.mkCanvas(src.width, src.height), hx = hc.getContext('2d'); hx.scale(ppu, ppu); hx.translate(pad, pad); hx.fillStyle = '#fff'; hx.fill(shp2);
           var bandTex = o.tex(bc), holeTex = o.tex(hc); bandTex.anisotropy = 4; disposables.push(bandTex, holeTex);
-          var mm = new T.MeshBasicMaterial({ map: holeTex, alphaTest: 0.5, colorWrite: false, depthWrite: false, depthTest: false, side: T.DoubleSide, fog: false });
-          mm.stencilWrite = true; mm.stencilRef = 1; mm.stencilFunc = T.AlwaysStencilFunc; mm.stencilZPass = T.ReplaceStencilOp; disposables.push(mm);
-          var mask = new T.Mesh(wayGeo, mm); mask.position.copy(way.position); mask.renderOrder = -100; mask.raycast = function () {};
-          portalParts = { band: bandTex, mask: mask, plain: way.material.map };
+          var maskOf = function (bit, z) {
+            var mm = new T.MeshBasicMaterial({ map: holeTex, alphaTest: 0.5, colorWrite: false, depthWrite: false, depthTest: false, side: T.DoubleSide, fog: false });
+            mm.stencilWrite = true; mm.stencilRef = bit; mm.stencilWriteMask = bit; mm.stencilFunc = T.AlwaysStencilFunc; mm.stencilZPass = T.ReplaceStencilOp; disposables.push(mm);
+            var mk = new T.Mesh(wayGeo, mm); mk.position.set(way.position.x, way.position.y, z); mk.renderOrder = -100; mk.raycast = function () {}; return mk;
+          };
+          // the reveal: the opening's outline carried back through the wall, so the thickness of the wall can be seen from the doorway
+          var pts = G.shape.pts, pos = [], idx = [], z1 = Z_WALL - depth;
+          for (var pi = 0; pi < pts.length; pi++) {
+            var pa = pts[pi], pb = pts[(pi + 1) % pts.length]; if (pa[0] === pb[0] && pa[1] === pb[1]) continue;
+            var ax = (pa[0] - W / 2) * s, ay = (H - pa[1]) * s, bx2 = (pb[0] - W / 2) * s, by2 = (H - pb[1]) * s, k0 = pos.length / 3;
+            pos.push(ax, ay, Z_WALL, bx2, by2, Z_WALL, bx2, by2, z1, ax, ay, z1); idx.push(k0, k0 + 1, k0 + 2, k0, k0 + 2, k0 + 3);
+          }
+          var rg = new T.BufferGeometry(); rg.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); rg.setIndex(idx); rg.computeVertexNormals();
+          var rm = new T.MeshStandardMaterial({ color: 0x2b2538, emissive: 0x0b0914, roughness: 0.95, metalness: 0, side: T.DoubleSide }); disposables.push(rg, rm);
+          var reveal = new T.Mesh(rg, rm); reveal.raycast = function () {};
+          portalParts = { band: bandTex, near: maskOf(1, Z_WALL), far: maskOf(2, Z_WALL - depth), reveal: reveal, plain: way.material.map };
         }
-        way.material.map = portalParts.band; way.material.needsUpdate = true; group.add(portalParts.mask);
+        way.material.map = portalParts.band; way.material.needsUpdate = true; group.add(portalParts.near, portalParts.far, portalParts.reveal);
       } else if (portalParts) {
-        way.material.map = portalParts.plain; way.material.needsUpdate = true; group.remove(portalParts.mask);
+        way.material.map = portalParts.plain; way.material.needsUpdate = true; group.remove(portalParts.near, portalParts.far, portalParts.reveal);
       }
     }
     sync();
@@ -33382,6 +33429,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   }
   function txt(v, max) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9 .,!?:'&\/-]/g, '').slice(0, max); }
   function hex(v, def) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : def; }
+  var WHITE = null;   // set once THREE is known (create)
   var TONES = { blue: '#3d86ff', orange: '#ff8a2a', gold: '#ffc53d', white: '#e8ecff', red: '#ff4d4d', green: '#4dff9a' };
   function slug(v, max) { return typeof v === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(v) && v.length >= 2 && v.length <= max ? v : ''; }
   function tone(v, def) { return Object.prototype.hasOwnProperty.call(TONES, v) ? v : def; }
@@ -33390,7 +33438,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   // The built-in looks. kind: 1 cover, 2 overlay, 3 sound, 4 light (the contract's look kinds). norm() returns clean params.
   var BUILTIN = {
     'curtain-house': { kind: 1, norm: function (p) { return { color: hex(p.color, null), trim: hex(p.trim, null), openness: num(p.openness, 0, 1, 0), speed: num(p.speed, 0.1, 5, 1) }; } },
-    'sign-board': { kind: 2, norm: function (p) { return { text: txt(p.text, 22), sub: txt(p.sub, 34), tone: tone(p.tone, 'orange'), y: num(p.y, 1.6, 2.9, 2.55), front: p.front === true }; } },
+    // the sign's x, y and w place it on its own, whatever door or curtain is in the bay
+    'sign-board': { kind: 2, norm: function (p) { return { text: txt(p.text, 22), sub: txt(p.sub, 34), tone: tone(p.tone, 'orange'), y: num(p.y, 0.4, 2.9, 2.55), x: num(p.x, -3, 3, 0), w: num(p.w, 0.4, 3, 2), front: p.front === true }; } },
     'caution-tape': { kind: 2, norm: function (p) { return { y: num(p.y, 0.4, 2.6, 1.2) }; } },
     'work-site': { kind: 3, norm: function (p) {
       var kinds = (typeof p.kinds === 'string' ? p.kinds.split(',') : Array.isArray(p.kinds) ? p.kinds : WORK_SOUNDS)
@@ -33604,6 +33653,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
    */
   function create(env) {
     var T = env.THREE, scene = env.scene, audio = createAudio();
+    WHITE = new T.Color(0xffffff);
     var DOORS = root.XADoors || null, SKINS = root.XADoorSkins || null;
     var doorSfx = DOORS ? DOORS.createSfx(function () { return audio.env(); }, function () { return env.listener(); }) : null;
     // Layering, from the wall outwards (metres in front of the wall): the door, set into the wall (its slab front is at about 0.045),
@@ -33624,9 +33674,25 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     function makeBay(def, i) {
       var g = new T.Group(); g.position.set(def.side * (env.RW / 2 - 0.02), 0, def.z); g.rotation.y = def.side < 0 ? Math.PI / 2 : -Math.PI / 2;
       g.visible = false; scene.add(g);              // nothing is shown until a scene needs it
-      var light = new T.PointLight(0xffffff, 0, 7, 2); light.position.set(0, 2.1, 0.9); g.add(light);
+      // The lamp: a real fixture you can see, a work lamp on a short arm above the door with a bare bulb under its shade, and the light comes from the bulb.
+      // (It used to be an invisible point light in the air in front of the wall: you saw the glow on things and could not tell where it came from.)
+      var light = new T.PointLight(0xffffff, 0, 7, 2); light.position.set(0, 2.96, 0.42); g.add(light);
+      var fix = new T.Group(); fix.visible = false; g.add(fix);
+      var metal = new T.MeshStandardMaterial({ color: 0x23232b, metalness: 0.7, roughness: 0.45 });
+      var arm = new T.Mesh(new T.BoxGeometry(0.035, 0.035, 0.38), metal); arm.position.set(0, 3.1, 0.19);
+      var plate = new T.Mesh(new T.BoxGeometry(0.1, 0.1, 0.02), metal); plate.position.set(0, 3.1, 0.01);
+      var shade = new T.Mesh(new T.CylinderGeometry(0.05, 0.15, 0.13, 20, 1, true), new T.MeshStandardMaterial({ color: 0x2c2c36, metalness: 0.7, roughness: 0.4, side: T.DoubleSide })); shade.position.set(0, 3.07, 0.42);
+      var bulbMat = new T.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, fog: false });
+      var bulb = new T.Mesh(new T.SphereGeometry(0.045, 14, 10), bulbMat); bulb.position.set(0, 2.98, 0.42);
+      var cage = new T.Mesh(new T.CylinderGeometry(0.062, 0.062, 0.1, 8, 1, true), new T.MeshBasicMaterial({ color: 0x15151a, wireframe: true })); cage.position.set(0, 2.98, 0.42);
+      var gcv = env.mkCanvas(64, 64), gx = gcv.getContext('2d'), gg = gx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gg.addColorStop(0, 'rgba(255,255,255,1)'); gg.addColorStop(0.25, 'rgba(255,255,255,0.45)'); gg.addColorStop(1, 'rgba(255,255,255,0)'); gx.fillStyle = gg; gx.fillRect(0, 0, 64, 64);
+      var glowMat = new T.SpriteMaterial({ map: env.tex(gcv), color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, fog: false });
+      var glow = new T.Sprite(glowMat); glow.scale.set(0.7, 0.7, 1); glow.position.set(0, 2.98, 0.42);
+      arm.raycast = plate.raycast = shade.raycast = bulb.raycast = cage.raycast = glow.raycast = function () {};
+      fix.add(arm, plate, shade, bulb, cage, glow);
       var width = Math.min(2.8, Math.max(1.2, def.width - 0.2));
-      return { i: i, def: def, group: g, light: light, lightSpec: null, plan: null, key: '', width: width, curtain: null, overlays: [], door: null,
+      return { i: i, def: def, group: g, light: light, fixture: fix, bulbMat: bulbMat, glowMat: glowMat, lightSpec: null, plan: null, key: '', width: width, curtain: null, overlays: [], door: null,
         pos: { x: def.side * (env.RW / 2 - 0.4), y: 1.6, z: def.z } };
     }
 
@@ -33671,8 +33737,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     }
     function buildOverlay(bay, spec) {
       if (spec.key === 'sign-board') {
-        var w = Math.min(2.0, bay.width - 0.2), m = new T.Mesh(new T.PlaneGeometry(w, w / 4), new T.MeshBasicMaterial({ map: env.tex(signTexture(spec.p)), color: 0xdadada }));
-        m.position.set(0, spec.p.y, spec.p.front ? Z_SIGN : Z_SIGN_WALL); m.renderOrder = 3; m.userData.key = spec.key; bay.group.add(m); return m;
+        var w = Math.min(spec.p.w, bay.width - 0.2), m = new T.Mesh(new T.PlaneGeometry(w, w / 4), new T.MeshBasicMaterial({ map: env.tex(signTexture(spec.p)), color: 0xdadada })),
+            sx = Math.max(-(bay.width / 2 - w / 2 - 0.05), Math.min(bay.width / 2 - w / 2 - 0.05, spec.p.x));   // kept on the wall of this bay
+        m.position.set(sx, spec.p.y, spec.p.front ? Z_SIGN : Z_SIGN_WALL); m.renderOrder = 3; m.userData.key = spec.key; bay.group.add(m); return m;
       }
       if (spec.key === 'caution-tape') {
         var tw = bay.width - 0.02, tt = env.tex(tapeTexture()); tt.wrapS = T.RepeatWrapping; tt.repeat.set(Math.round(tw * 2), 1);
@@ -33770,6 +33837,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       // light
       bay.lightSpec = plan && plan.light ? plan.light : null;
       if (!bay.lightSpec) bay.light.intensity = 0; else bay.light.color.set(TONES[bay.lightSpec.p.tone]);
+      bay.fixture.visible = !!bay.lightSpec;
       // sound
       audio.setBay(bay.i, bay.pos, plan && plan.sound ? plan.sound : null);
     }
@@ -33793,7 +33861,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         var bay = bays[b], c = bay.curtain;
         if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
         var dm = bay.door && bay.door.model;
-        if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po); } }   // a door onto a real room: the doorway is open while the door is
+        if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
         if (dm && dm.awake) { dm.update(dt); bay.door.mesh.sync(); if (dm.settled()) { dm.awake = false; bay.door.mesh.sync(); } }
         var ls = bay.lightSpec;
         if (ls) {
@@ -33801,6 +33869,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
           if (m === 'light-pulse') k *= 0.55 + 0.45 * Math.sin(time * ls.p.rate * 2 * Math.PI);
           else if (m === 'light-flicker') k *= (Math.sin(time * 31 * ls.p.rate) + Math.sin(time * 47.3 * ls.p.rate + 1.7) > 0.8 ? 0.15 : 1) * (0.85 + 0.15 * Math.sin(time * 5.1));
           bay.light.intensity = k;
+          var br = Math.max(0, Math.min(1.2, k / (ls.p.intensity * 1.6 || 1)));    // 0..1: how bright the bulb is right now, so it flickers with the light it gives
+          bay.bulbMat.color.set(TONES[ls.p.tone]).lerp(WHITE, 0.55).multiplyScalar(0.2 + 0.8 * br); bay.glowMat.color.set(TONES[ls.p.tone]); bay.glowMat.opacity = 0.85 * br;
         }
       }
     }
@@ -33924,7 +33994,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         return bays.map(function (b) {
           return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, portal: !!b.portalOn, doorSkin: b.door ? (b.door.skin || '') : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
             curtain: b.curtain ? { margin: b.curtain.mg, planeW: b.curtain.mesh.geometry.parameters.width, bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
-            light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity } : null };
+            light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity, fixture: b.fixture.visible } : null };
         });
       }
     };
@@ -34045,7 +34115,8 @@ const machines = [], pickables = [], boxes = [];
    hall wall at that bay, so it is the same room whichever bay holds the door; only one bay at a time can lead to it. */
 const LW = 8, LD = 10;                      // lobby width (along the hall wall) and depth (away from it), metres
 let lobbyG = null, lobbyBay = -1, lobbyPass = null, autoWalk = null, bayDefsAll = [];   // lobbyPass: {side, wallX, z}
-function holeWall(m){ m.stencilWrite=true; m.stencilRef=1; m.stencilFunc=THREE.NotEqualStencilFunc; m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp; return m }
+const WALL_T = 0.2;                         // the thickness of the wall between the rooms (a drywall cavity you see as the reveal of the doorway)
+function holeWall(m,bit){ m.stencilWrite=true; m.stencilRef=bit; m.stencilFuncMask=bit; m.stencilWriteMask=0; m.stencilFunc=THREE.NotEqualStencilFunc; m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp; return m }   // bit 1: this room's wall, bit 2: the lobby's
 const lobbyOpen = () => lobbyBay>=0 && !!bayEngine && bayEngine.portalOpen(lobbyBay);
 const inLobbyZone = () => !!lobbyPass && (lobbyPass.side<0 ? player.x < lobbyPass.wallX-.05 : player.x > lobbyPass.wallX+.05);
 let bayEngine = null, bayHint = null, bayHold = true, bayToast = null;   // the bay engine (only when the world reader is on); what the player is looking at in a bay
@@ -34096,7 +34167,7 @@ function buildRoom(){
 
   const wt=wallTexture();
   const wall=(w,pos,ry)=>{const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), holeWall(new THREE.MeshStandardMaterial({map:t, roughness:.9})));
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), holeWall(new THREE.MeshStandardMaterial({map:t, roughness:.9}),1));
     m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m)};
   wall(RL,[-RW/2,0],Math.PI/2); wall(RL,[RW/2,0],-Math.PI/2); wall(RW,[0,-RL/2],0); wall(RW,[0,RL/2],Math.PI);
 
@@ -34153,7 +34224,7 @@ function buildLobby(){
   face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}), 0,RH,LD/2, Math.PI/2,0);
   const wt=wallTexture();
   const wall=(w,x,z,ry,hole)=>{ const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
-    const m=new THREE.MeshStandardMaterial({map:t, roughness:.9}); face(new THREE.PlaneGeometry(w,RH), hole?holeWall(m):m, x,RH/2,z, 0,ry) };
+    const m=new THREE.MeshStandardMaterial({map:t, roughness:.9}); face(new THREE.PlaneGeometry(w,RH), hole?holeWall(m,2):m, x,RH/2,z, 0,ry) };
   wall(LW,0,0,0,true);                 // the wall with the opening: skips the pixels the door's opening has marked
   wall(LW,0,LD,Math.PI); wall(LD,-LW/2,LD/2,Math.PI/2); wall(LD,LW/2,LD/2,-Math.PI/2);
   const neon=(col)=>new THREE.MeshBasicMaterial({color:col, toneMapped:false}), pink=neon(0x3d86ff), cyan=neon(0xff8a2a);
@@ -34179,7 +34250,7 @@ function setLobbyBay(i){
   lobbyBay=i; autoWalk=null;
   if(i<0){ lobbyPass=null; if(lobbyG) lobbyG.visible=false; return }
   lobbyPass={side:d.side, wallX:d.side*RW/2, z:d.z};
-  lobbyG.position.set(lobbyPass.wallX,0,d.z); lobbyG.rotation.y=d.side<0?-Math.PI/2:Math.PI/2; lobbyG.visible=true;
+  lobbyG.position.set(lobbyPass.wallX+d.side*WALL_T,0,d.z); lobbyG.rotation.y=d.side<0?-Math.PI/2:Math.PI/2; lobbyG.visible=true;
 }
 const linksToLobby=(sc)=>{ const lk=sc&&sc.link; return !!(sc && sc.base==='door' && Number(sc.interaction)===3 && lk && String(lk['target-room']||lk.targetRoom||lk.room||'').toLowerCase()==='lobby') };
 // Where the player may stand while the lobby door is open: the hall, the doorway and the lobby, as rectangles [x0,x1,z0,z1].
@@ -34187,8 +34258,8 @@ function lobbyRects(r){
   const p=lobbyPass, sd=p.side, hw=Math.max(.3, bayEngine.doorHalfWidth(lobbyBay)-.1), wx=p.wallX;
   return [
     [-RW/2+r, RW/2-r, -RL/2+r, RL/2-r],
-    sd<0 ? [wx-LD+r, wx-r, p.z-LW/2+r, p.z+LW/2-r] : [wx+r, wx+LD-r, p.z-LW/2+r, p.z+LW/2-r],
-    [wx-r, wx+r, p.z-hw, p.z+hw]
+    sd<0 ? [wx-WALL_T-LD+r, wx-WALL_T-r, p.z-LW/2+r, p.z+LW/2-r] : [wx+WALL_T+r, wx+WALL_T+LD-r, p.z-LW/2+r, p.z+LW/2-r],
+    sd<0 ? [wx-WALL_T-r, wx+r, p.z-hw, p.z+hw] : [wx-r, wx+WALL_T+r, p.z-hw, p.z+hw]   // the doorway, through the thickness of the wall
   ];
 }
 
@@ -35367,7 +35438,7 @@ function buildPosters(){
   try{
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
-      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, listener:()=>player, onEnter:bayEnter});
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, onEnter:bayEnter});
     if(bayEngine) buildLobby();
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
@@ -36374,7 +36445,7 @@ function bayEnter(link){
   const room=link&&(link['target-room']||link.targetRoom||link.room); const name=room?String(room).replace(/[^A-Za-z0-9 _-]/g,' ').trim().toUpperCase():'';
   if(String(room||'').toLowerCase()==='lobby' && lobbyPass && lobbyOpen()){   // the lobby is already there: E just walks you through the doorway
     const p=lobbyPass, sd=p.side;   // into the doorway (from the hall side), then 2.4 m into the room
-    autoWalk=[{x:p.wallX-sd*.9, z:p.z}, {x:p.wallX+sd*2.4, z:p.z}]; return
+    autoWalk=[{x:p.wallX-sd*.9, z:p.z}, {x:p.wallX+sd*(WALL_T+2.4), z:p.z}]; return
   }
   bayToast={text:name?('THIS DOOR LEADS TO '+name+' · NOT OPEN YET'):'THIS DOOR IS NOT OPEN YET', until:performance.now()+3500};
 }
