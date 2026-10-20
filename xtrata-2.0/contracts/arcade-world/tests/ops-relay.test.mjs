@@ -28,10 +28,10 @@ test('relay signs offline, with explicit nonces, and packs signed hex only (no k
   const out = join(dir, 'setup.txt');
   const r = run(['setup', '--execute', '--nonce', '5', '--key-file', keyFile, '--out', out], { XA_OPS_CONFIRM: 'broadcast-testnet' });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /24 transaction\(s\) signed offline .* nonces 5\.\.28/);
+  assert.match(r.stdout, /25 transaction\(s\) signed offline .* nonces 5\.\.29/);
   const packed = readFileSync(out, 'utf8');
   const items = JSON.parse(gunzipSync(Buffer.from(packed, 'base64')).toString('utf8'));
-  assert.equal(items.length, 24);
+  assert.equal(items.length, 25);
   assert.ok(items.every((i) => /^[0-9a-f]+$/.test(i.hex) && i.label));
   assert.ok(!packed.includes(readFileSync(keyFile, 'utf8').trim()) && !JSON.stringify(items).includes(readFileSync(keyFile, 'utf8').trim()));
 });

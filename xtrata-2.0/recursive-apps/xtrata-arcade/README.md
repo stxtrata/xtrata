@@ -108,3 +108,13 @@ node build/modular.mjs check
 node build/modular.mjs build
 CHROME_PATH=/path/to/chromium node tests/hall-parent.test.cjs [shotsDir]
 ```
+
+## The world preview page
+
+`public/arcade-world-preview/index.html` (live at `/arcade-world-preview/`) is the real hall plus a small head script of sample data, so the four bays and their skinned doors can be seen without any contract. It is a static file: it only changes when regenerated and merged.
+
+    node build/modular.mjs build     # src/ -> dist/
+    node build/preview.mjs           # dist + build/preview-head.html -> public/arcade-world-preview/index.html
+    node build/preview.mjs --check   # fails if the committed page is out of date
+
+Edit `build/preview-head.html` to change the sample scenes or the button panel.
