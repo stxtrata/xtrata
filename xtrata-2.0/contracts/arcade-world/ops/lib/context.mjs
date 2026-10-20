@@ -1,6 +1,6 @@
 // Builds the facts the validator needs (look book, rooms, current height, timeline use) either from a chain or offline.
 import { readFileSync } from 'node:fs';
-import { defaultLookBook } from './catalogue.mjs';
+import { defaultLookBook, ROOMS } from './catalogue.mjs';
 import { networkTransport } from './transport.mjs';
 import { readLookBook, readRooms, readTimelineCounts } from './readback.mjs';
 
@@ -26,6 +26,6 @@ export async function loadContext(args, doc, t = undefined) {
   }
   const looks = args.looks ? JSON.parse(readFileSync(args.looks, 'utf8')) : defaultLookBook();
   const height = args.height != null ? Number(args.height) : null;
-  const rooms = doc && doc.room ? { [doc.room]: { bays: 2, hidden: false }, ...(args.rooms ? JSON.parse(readFileSync(args.rooms, 'utf8')) : { lobby: { bays: 2, hidden: false } }) } : {};
+  const rooms = doc && doc.room ? { [doc.room]: { bays: (ROOMS.find((r) => r.id === doc.room) || { bays: 2 }).bays, hidden: false }, ...(args.rooms ? JSON.parse(readFileSync(args.rooms, 'utf8')) : { lobby: { bays: 2, hidden: false } }) } : {};
   return { t: null, looks, rooms, height, timelineUsed: {}, offline: true };
 }

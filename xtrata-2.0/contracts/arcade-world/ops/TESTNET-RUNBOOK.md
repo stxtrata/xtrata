@@ -68,3 +68,7 @@ The rehearsal report (`ops/out/rehearsal-report.md`), the contract ids, the tran
 ## Not in this runbook (separate decisions)
 
 Mainnet deployment, inscribing the new hall, pointing `/arcade` at it, and the admin-wallet signing flow. Each needs your explicit instruction.
+
+## Relay through a browser
+
+If the machine running the tools cannot reach the test network, sign here and send from a browser: `node ops/relay.mjs deploy --execute --key-file K --nonce 0`, paste the packed text into a browser page that can reach `api.testnet.hiro.so`, and run the small relay function over it (it POSTs each signed transaction and polls `/extended/v1/tx/{txid}`). Order and nonces: deploy 0..2, fund the publisher, setup, scenes, posters. Nothing in a pack can be changed after signing; a rejected transaction still uses its nonce, so continue from the next one.

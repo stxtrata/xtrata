@@ -2,12 +2,12 @@
 <html lang="en">
 <head><script>
 /* PREVIEW ONLY (phase 3 of the arcade world build). Nothing here is on chain: the contracts are not deployed.
-   It switches the hall's world reader on and feeds it sample data, so the poster overlay, the two far-end bays
+   It switches the hall's world reader on and feeds it sample data, so the poster overlay, the four bays
    (curtain, sign, door slab, lamp, work sounds) and their scene changes can be seen and heard. */
 window.XA_WORLD_CONFIG={posters:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-posters-v1',world:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-world-v1',roomId:'arcade-hall'};
 window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
 (function(){
-  var chain=true, scene=['posters','posters'], curtain='closed', sound=true, lamp=true;
+  var chain=true, scene=['posters','posters','posters','posters'], curtain='closed', sound=true, lamp=true;
   var LOOKS={
     1:{kind:1,name:'House curtain',tier:0,builtin:'curtain-house',hidden:false,approved:true},
     2:{kind:2,name:'Sign board',tier:0,builtin:'sign-board',hidden:false,approved:true},
@@ -49,7 +49,7 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
       : {base:'door',baseId:2,interaction:inter,doorLook:20+style,layers:layers,link:null,fromHeight:0};
   }
   function bay(i){return {scene:sceneOf(scene[i]),nextHeight:null,height:0}}
-  function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1)],looks:LOOKS}}
+  function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1),bay(2),bay(3)],looks:LOOKS}}
   function apply(){var W=window.XAWorld; if(!W||!W._t) return; var st=W._t.state; st.snap=snap(); st.listeners.forEach(function(f){try{f(st.snap,'preview')}catch(e){}})}
   var NAMES={posters:'posters (as #3111)',wall:'plain wall',story:'launch story',workshop:'workshop (door, curtain)',knock:'locked door (knock)',open:'unlocked door (open it)',enter:'door that leads to the lobby'};
   var ORDER=['posters','wall','story','workshop','knock','open','enter'];
@@ -65,17 +65,16 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
     function btn(label,get,flip,noapply){var b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;margin:3px 0;padding:6px 8px;background:#182049;color:#dfe6ff;border:1px solid #3b4a8a;border-radius:4px;font:inherit;cursor:pointer';function set(){b.textContent=get?label+': '+get():label} b.onclick=function(e){e.stopPropagation();flip();set();if(!noapply)apply();b.blur()};b.onkeydown=function(e){e.stopPropagation()};set();d.appendChild(b);return b}
     function h(t){var n=document.createElement('div');n.style.cssText='margin-top:8px;color:#8a93c4';n.textContent=t;d.appendChild(n)}
     btn('Registry posters',function(){return chain?'ON':'OFF'},function(){chain=!chain});
-    h('FAR-END BAYS · click to change the scene');
-    btn('Left bay',function(){return NAMES[scene[0]]},function(){scene[0]=ORDER[(ORDER.indexOf(scene[0])+1)%ORDER.length]});
-    btn('Right bay',function(){return NAMES[scene[1]]},function(){scene[1]=ORDER[(ORDER.indexOf(scene[1])+1)%ORDER.length]});
+    var BN=['Far left bay','Far right bay','Near left bay (entrance)','Near right bay (entrance)'];
+    h('THE FOUR BAYS · click to change the scene');
+    [0,1,2,3].forEach(function(i){btn(BN[i],function(){return NAMES[scene[i]]},function(){scene[i]=ORDER[(ORDER.indexOf(scene[i])+1)%ORDER.length]})});
     h('SCENE SETTINGS');
     btn('Door style',function(){return STYLES[style]},function(){style=(style+1)%STYLES.length});
     btn('Curtain',function(){return curtain},function(){curtain={closed:'half',half:'open',open:'closed'}[curtain]});
     btn('Work sounds',function(){return sound?'ON':'OFF'},function(){sound=!sound});
     btn('Lamp',function(){return lamp?'ON':'OFF'},function(){lamp=!lamp});
     h('GO TO');
-    btn('Left bay ›',null,function(){goTo(0)},true);
-    btn('Right bay ›',null,function(){goTo(1)},true);
+    [0,1,2,3].forEach(function(i){btn(BN[i]+' ›',null,function(){goTo(i)},true)});
     var n=document.createElement('div');n.style.cssText='margin-top:6px;color:#8a93c4';n.textContent='Scenes here are sample data for the bay engine. With peeking allowed (story, workshop) you can pull a closed curtain: look at it and hold the mouse, or press E. Doors: a locked door rattles and you can knock (E); an unlocked one opens with E or a click; the lobby door shows ENTER when open. Switch a scene from locked to unlocked while you watch. Sounds play when you are within about 7 m, after you press Walk in. Press Esc to free the mouse before clicking this panel.';d.appendChild(n);
     d.addEventListener('pointerdown',function(e){e.stopPropagation()});
     document.body.appendChild(d);
@@ -84,7 +83,6 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
 })();
 
 </script>
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Xtrata Arcade Hall</title>
@@ -32690,7 +32688,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
 /*
  * Xtrata Arcade: the bay engine (hall pack part)
  *
- * A bay is a reserved wall area built into the hall (the two far-end spans). The world contract decides what is in
+ * A bay is a reserved wall area built into the hall (the four spans at the ends of the rows). The world contract decides what is in
  * it; this file turns that decision into something the hall can show and play. Three parts:
  *
  *   1. PLAN    pure functions (no THREE, no DOM). planBay() takes one bay as the reader read it plus the looks table
@@ -34510,7 +34508,7 @@ function applyDay(day){
    chain posters are laid over it (XAWorld.composeWall). With no contracts, or a failed read, the wall is the
    embedded one exactly: that is the v1.3 hall. */
 let baseWall=null;
-const PIN_SLOTS=[null, 0, 14, 1, 15];   // pin spots 1-4 -> the four poster slots nearest the entrance
+const PIN_SLOTS=[null, 2, 16, 3, 17];   // pin spots 1-4 -> the four free poster slots nearest the entrance (the end pairs are bays)
 function paintWall(){
   if(!baseWall) return;
   const W=window.XAWorld, snap=W && W.enabled() ? W.snapshot() : null;
@@ -34525,13 +34523,15 @@ function paintWall(){
   });
   applyBays(snap);
 }
-/* Bays (the two wall areas at the far end). Posters mode, or any failure, shows the two posters as always.
+/* Bays (the four wall areas at the ends of the rows: 0 far left, 1 far right, 2 near left, 3 near right, the contract's order).
+   Posters mode, or any failure, shows the bay's two posters as always.
    Other scenes are drawn by the bay engine; until then a bay with another scene shows plain wall. */
+const BAY_INDEX={L:0, R:1, NL:2, NR:3};
 function applyBays(snap){
   if(bayEngine){ try{ bayEngine.apply(snap,{instant:state==='intro'}) }catch(e){ console.error(e) } }
   for(const s of posterSlots){
     if(!s.bay) continue;
-    const i=s.bay==='L'?0:1;
+    const i=BAY_INDEX[s.bay];
     const bay=snap && snap.bays ? snap.bays[i] : null;
     const show=bayEngine ? bayEngine.showPosters(i) : (!bay || !bay.scene || bay.scene.base==='posters');
     if(s.group && s.group.visible!==show) s.group.visible=show;
@@ -34588,9 +34588,10 @@ function buildPosters(){
   for(const [side,n] of [[-1,NL],[1,NR]]){
     const zHi=cabZ(0,n)+.62, zLo=cabZ(n-1,n)-.62, wallEnd=RL/2-.35;
     const endPair=(a,b,bay)=>{ const mid=(a+b)/2; spots.push([side,mid+.52,bay],[side,mid-.52,bay]) };
-    endPair(zHi, wallEnd);
+    endPair(zHi, wallEnd, side<0?'NL':'NR');   // entrance end: also a bay (2, 3)
+    bayDefs[side<0?2:3]={side, z:(zHi+wallEnd)/2, width:wallEnd-zHi};
     for(let k=0;k<n-1;k++) spots.push([side, cabZ(k,n)-GAP/2]);
-    endPair(-wallEnd, zLo, side<0?'L':'R');   // far end: these four posters are the two bays' default scene
+    endPair(-wallEnd, zLo, side<0?'L':'R');   // far end (bays 0, 1)
     bayDefs[side<0?0:1]={side, z:(-wallEnd+zLo)/2, width:zLo+wallEnd};
   }
   spots.forEach(([side,z,bay])=>{

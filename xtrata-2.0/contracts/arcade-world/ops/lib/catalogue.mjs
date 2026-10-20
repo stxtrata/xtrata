@@ -38,6 +38,12 @@ export function posterArtKeys() {
 }
 export const POSTER_COLOURS = ['blue', 'orange', 'audio', 'stacks', 'white', 'fun', 'gold'];
 
+// The rooms the hall uses, with their bay counts. The arcade hall has four contract-controlled wall areas, in the contract's order:
+// 0 far left, 1 far right, 2 near left (entrance end), 3 near right. (The contract allows up to 8 bays per room, fixed when the room is registered.)
+export const BAY_NAMES = ['far left', 'far right', 'near left', 'near right'];
+export const ROOMS = [{ id: 'arcade-hall', title: 'Xtrata Arcade', bays: BAY_NAMES.length }, { id: 'lobby', title: 'Lobby', bays: 2 }];
+export const HALL_BAYS = BAY_NAMES.length;
+
 // Kind names used in the tools' files.
 export const BASES = { posters: 0, wall: 1, door: 2 };
 export const INTERACTIONS = { none: 0, knock: 1, peek: 2, enter: 3 };

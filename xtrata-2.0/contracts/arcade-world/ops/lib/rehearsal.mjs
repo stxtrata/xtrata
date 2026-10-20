@@ -71,8 +71,8 @@ export async function runRehearsal({ simnet, accounts, log = () => {} }) {
     });
     let ctx;
     const mkCtx = async () => ({ looks: await readLookBook(t), rooms: await readRooms(t, ['arcade-hall', 'lobby']), height: await t.height(), timelineUsed: {} });
-    await step('5. at launch both bays show posters, exactly as #3111', async () => {
-      for (const b of [0, 1]) { const v = await readBayView(t, 'arcade-hall', b); must(v && v.active === null, `bay ${b} should have no scene`); }
+    await step('5. at launch all four bays show posters, exactly as #3111', async () => {
+      for (const b of [0, 1, 2, 3]) { const v = await readBayView(t, 'arcade-hall', b); must(v && v.active === null, `bay ${b} should have no scene`); }
     });
     await step('6. the launch story validates against the chain and goes in as one batch', async () => {
       ctx = await mkCtx();

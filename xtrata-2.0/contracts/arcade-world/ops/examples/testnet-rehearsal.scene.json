@@ -1,0 +1,28 @@
+{
+  "format": "arcade-scene-file/1",
+  "room": "arcade-hall",
+  "scenes": [
+    {
+      "bay": 0, "at": "+2", "base": "wall", "interaction": "peek",
+      "layers": [
+        { "look": "curtain-house", "params": { "color": "#7a1020" }, "state": "closed" },
+        { "look": "sign-board", "params": { "text": "coming soon", "sub": "testnet rehearsal", "tone": "gold" } },
+        { "look": "work-site", "params": { "kinds": "hammer,saw,drill,clatter", "volume": 0.6, "radius": 7 } },
+        { "look": "light-pulse", "params": { "tone": "orange", "rate": 2 } }
+      ]
+    },
+    {
+      "bay": 0, "at": "+6", "base": "door", "door": "door-gothic", "interaction": "knock",
+      "layers": [
+        { "look": "sign-board", "params": { "text": "staff only", "sub": "knock and wait", "tone": "orange" } },
+        { "look": "light-steady", "params": { "tone": "orange" } }
+      ]
+    },
+    {
+      "bay": 0, "at": "+10", "base": "door", "door": "door-gothic", "interaction": "enter",
+      "layers": [ { "look": "sign-board", "params": { "text": "lobby", "sub": "through the door", "tone": "gold" } } ],
+      "link": { "room": "lobby", "arrivalBay": 0 }
+    },
+    { "bay": 1, "at": "+2", "base": "posters" }
+  ]
+}

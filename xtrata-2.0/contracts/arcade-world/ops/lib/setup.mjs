@@ -1,7 +1,7 @@
 // One-time chain set-up steps, as plain functions over a transport. Used by the dress rehearsal and the tests;
 // the same calls are listed in TESTNET-RUNBOOK.md for the real thing.
 import { Cl } from '@stacks/transactions';
-import { lookRegistry } from './catalogue.mjs';
+import { lookRegistry, ROOMS } from './catalogue.mjs';
 
 const must = (r, what) => { if (!r.ok) throw new Error(`${what} failed: err ${JSON.stringify(r.value)}`); return r.value; };
 
@@ -29,7 +29,7 @@ import { readLookBook, readRooms } from './readback.mjs';
 export async function planSetup(t, { owner, publishers = [], withLobby = true, extraRooms = [] }) {
   const have = await readLookBook(t);
   const looks = lookRegistry().filter((l) => !have.some((h) => h.tier === 0 && h.builtin === l.key));
-  const wanted = [{ id: 'arcade-hall', title: 'Xtrata Arcade', owner, bays: 2 }, ...(withLobby ? [{ id: 'lobby', title: 'Lobby', owner, bays: 2 }] : []), ...extraRooms];
+  const wanted = [...ROOMS.filter((r) => withLobby || r.id !== 'lobby').map((r) => ({ ...r, owner })), ...extraRooms];
   const existing = await readRooms(t, wanted.map((r) => r.id));
   const rooms = wanted.filter((r) => !existing[r.id]);
   const pubs = [];

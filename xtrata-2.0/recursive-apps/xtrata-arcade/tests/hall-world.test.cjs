@@ -15,7 +15,7 @@ const assert = require('assert');
 const DIST = path.join(__dirname, '..', 'dist');
 const manifest = JSON.parse(fs.readFileSync(path.join(DIST, 'manifest.json'), 'utf8'));
 const HTML = fs.readFileSync(path.join(DIST, fs.readdirSync(DIST).find((f) => /^xtrata-arcade-v[\d.]+\.html$/.test(f))), 'utf8');
-const BAY_SLOTS = { L: [12, 13], R: [25, 26] };
+const BAY_SLOTS = { L: [12, 13], R: [25, 26], NL: [0, 1], NR: [14, 15] };   // far left/right = bays 0/1, near (entrance end) left/right = bays 2/3
 
 let passed = 0;
 function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' + name); }
@@ -60,7 +60,8 @@ function snapshot(bays, extra) {
   const heads = (s) => s.map((x) => x.head + '|' + x.chain);
   const same = (a, b, slots) => slots.every((i) => a[i].head === b[i].head && a[i].chain === b[i].chain);
   const all = Array.from({ length: 27 }, (_, i) => i);
-  const nonBay = all.filter((i) => !BAY_SLOTS.L.concat(BAY_SLOTS.R).includes(i));
+  const ALL_BAY = BAY_SLOTS.L.concat(BAY_SLOTS.R, BAY_SLOTS.NL, BAY_SLOTS.NR);
+  const nonBay = all.filter((i) => !ALL_BAY.includes(i));
 
   const A = await wall({ shot: 'world-A' });
   check(A.state.length === 27 && A.state.every((s) => s.chain === 0 && s.shown), 'A: 27 embedded posters, all shown (' + A.state.length + ')');
@@ -76,17 +77,17 @@ function snapshot(bays, extra) {
   const C = await wall({ config: true, snap: snapshot([bay('wall'), bay(null)]), shot: 'world-C' });
   const chainSlots = all.filter((i) => C.state[i].chain > 0);
   check(chainSlots.length >= 2 && chainSlots.length <= 9, 'C: chain posters are on the wall (' + chainSlots.map((i) => i + ':' + C.state[i].head).join(', ') + ')');
-  check(C.state[14].chain === 7 && C.state[14].head === 'PINNED', 'C: the pin holds slot 14');
+  check(C.state[16].chain === 7 && C.state[16].head === 'PINNED', 'C: the pin holds slot 16 (pin spot 2: the free slot nearest the entrance on the right; the end pairs are bays)');
   check(chainSlots.every((i) => nonBay.includes(i)), 'C: no chain poster sits in a bay');
-  check(BAY_SLOTS.L.every((i) => !C.state[i].shown) && BAY_SLOTS.R.every((i) => C.state[i].shown), 'C: bay 0 (plain wall) hides its posters, bay 1 keeps them');
+  check(BAY_SLOTS.L.every((i) => !C.state[i].shown) && BAY_SLOTS.R.concat(BAY_SLOTS.NL, BAY_SLOTS.NR).every((i) => C.state[i].shown), 'C: bay 0 (plain wall) hides its posters, the other three bays keep them');
   const moved = all.filter((i) => !same(A.state, C.state, [i]));
   check(moved.every((i) => C.state[i].chain > 0), 'C: only the overlay changed the wall (' + moved.length + ' slots differ from A, all chain posters)');
   check(!C.errors.length, 'C: no page errors ' + C.errors.slice(0, 2).join(' | '));
 
   const D = await wall({ config: true, snap: snapshot([bay(null), bay(null)]) });
-  check(same(C.state, D.state, nonBay), 'D: bays back on posters, the other 25 slots are exactly as in C');
-  check(D.state.every((s) => s.shown), 'D: all four bay posters are back');
-  check(same(A.state, D.state, BAY_SLOTS.L.concat(BAY_SLOTS.R)), 'D: the bay posters are the same ones #3111 shows');
+  check(same(C.state, D.state, nonBay), 'D: bays back on posters, the other 23 slots are exactly as in C');
+  check(D.state.every((s) => s.shown), 'D: all the bay posters are back');
+  check(same(A.state, D.state, ALL_BAY), 'D: the bay posters are the same ones #3111 shows');
   check(!D.errors.length, 'D: no page errors ' + D.errors.slice(0, 2).join(' | '));
 
   const E = await wall({ config: true, snap: snapshot([bay(null), bay(null)], { suppressed: [3, 40, 90, 120] }) });

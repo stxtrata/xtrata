@@ -1273,7 +1273,7 @@ function applyDay(day){
    chain posters are laid over it (XAWorld.composeWall). With no contracts, or a failed read, the wall is the
    embedded one exactly: that is the v1.3 hall. */
 let baseWall=null;
-const PIN_SLOTS=[null, 0, 14, 1, 15];   // pin spots 1-4 -> the four poster slots nearest the entrance
+const PIN_SLOTS=[null, 2, 16, 3, 17];   // pin spots 1-4 -> the four free poster slots nearest the entrance (the end pairs are bays)
 function paintWall(){
   if(!baseWall) return;
   const W=window.XAWorld, snap=W && W.enabled() ? W.snapshot() : null;
@@ -1288,13 +1288,15 @@ function paintWall(){
   });
   applyBays(snap);
 }
-/* Bays (the two wall areas at the far end). Posters mode, or any failure, shows the two posters as always.
+/* Bays (the four wall areas at the ends of the rows: 0 far left, 1 far right, 2 near left, 3 near right, the contract's order).
+   Posters mode, or any failure, shows the bay's two posters as always.
    Other scenes are drawn by the bay engine; until then a bay with another scene shows plain wall. */
+const BAY_INDEX={L:0, R:1, NL:2, NR:3};
 function applyBays(snap){
   if(bayEngine){ try{ bayEngine.apply(snap,{instant:state==='intro'}) }catch(e){ console.error(e) } }
   for(const s of posterSlots){
     if(!s.bay) continue;
-    const i=s.bay==='L'?0:1;
+    const i=BAY_INDEX[s.bay];
     const bay=snap && snap.bays ? snap.bays[i] : null;
     const show=bayEngine ? bayEngine.showPosters(i) : (!bay || !bay.scene || bay.scene.base==='posters');
     if(s.group && s.group.visible!==show) s.group.visible=show;
@@ -1351,9 +1353,10 @@ function buildPosters(){
   for(const [side,n] of [[-1,NL],[1,NR]]){
     const zHi=cabZ(0,n)+.62, zLo=cabZ(n-1,n)-.62, wallEnd=RL/2-.35;
     const endPair=(a,b,bay)=>{ const mid=(a+b)/2; spots.push([side,mid+.52,bay],[side,mid-.52,bay]) };
-    endPair(zHi, wallEnd);
+    endPair(zHi, wallEnd, side<0?'NL':'NR');   // entrance end: also a bay (2, 3)
+    bayDefs[side<0?2:3]={side, z:(zHi+wallEnd)/2, width:wallEnd-zHi};
     for(let k=0;k<n-1;k++) spots.push([side, cabZ(k,n)-GAP/2]);
-    endPair(-wallEnd, zLo, side<0?'L':'R');   // far end: these four posters are the two bays' default scene
+    endPair(-wallEnd, zLo, side<0?'L':'R');   // far end (bays 0, 1)
     bayDefs[side<0?0:1]={side, z:(-wallEnd+zLo)/2, width:zLo+wallEnd};
   }
   spots.forEach(([side,z,bay])=>{

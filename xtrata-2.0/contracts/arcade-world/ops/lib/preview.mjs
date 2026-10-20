@@ -17,7 +17,7 @@ export function keyframes(scenes, height) {
   return hs.sort((a, b) => a.h - b.h);
 }
 
-export function previewData({ scenes, looks, bayCount = 2, posters = [], height = null, title = 'scene file' }) {
+export function previewData({ scenes, looks, bayCount = 4, posters = [], height = null, title = 'scene file' }) {
   const frames = keyframes(scenes, height).map((k) => ({ ...k, snap: snapshotAt({ scenes, looks, height: k.h, bayCount, posters }) }));
   return { title, frames, bayCount };
 }
