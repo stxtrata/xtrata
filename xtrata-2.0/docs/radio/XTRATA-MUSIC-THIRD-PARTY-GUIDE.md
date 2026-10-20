@@ -56,7 +56,7 @@ A song is identified by a core number and an inscription id, and every paid play
 | --- | --- |
 | Inscription | A file stored permanently on Stacks through an Xtrata core contract. Songs, artwork and players are all inscriptions. |
 | Core | One of three Xtrata contract versions the paid-play contract understands: core 1 is `xtrata-v1-1-1`, core 2 is `xtrata-v2-1-0`, core 3 is `xtrata-v3-2-3`. The same id in two cores is two different songs. |
-| Song holder | The current owner of the song inscription, read live from the core with `get-owner`. The holder receives the payment, so selling the inscription moves future income with it. |
+| Song holder | The current owner of the song's audio master, read live from the core with `get-owner`. The holder receives the payment, so selling the master moves future income with it. For a self-contained player the player is the master; for a player that links to an existing audio inscription, the linked audio is the master. |
 | Player | A song inscribed as a self-contained playable page with cover art, credits and lyrics. Linked players point at an existing audio inscription instead of storing a second copy. |
 | Paid play | One `play` transaction that pays the holder 50 microSTX and records a receipt. Listening itself is always free. |
 | Receipt | A 16-byte value chosen by the payer, unique per payer. It makes a paid play idempotent: the same receipt can never pay twice. |
@@ -124,7 +124,7 @@ The network fee never increases automatically. The web radio uses the same defau
 ### How a paid play works
 
 1. The listener presses play. Free playback always starts first.
-2. The player decides the play is eligible (see the rules below) and picks the song's core number and inscription id. The web radio always uses core 3 and the id of the song in its catalogue.
+2. The player decides the play is eligible (see the rules below) and picks the core number and inscription id of the song's audio master (see Recursion and who gets paid). Today the web radio uses core 3 and the id of the song in its catalogue.
 3. The player checks the holder with the read-only `get-owner`. If the holder is the listener's own wallet or a contract address, the play stays free.
 4. The player generates 16 random bytes as the receipt and signs a `play` call with the listening wallet.
 5. The contract pays 50 microSTX from the listener to the holder, stores the receipt, adds one to the song's total and prints a `radio-paid-play` event.
@@ -260,7 +260,7 @@ A video with picture and sound is not a song. A hidden track is not one of an al
 
 ### Third-party players and albums
 
-- Read an album as an ordered list of song references. Use the core number and inscription id of each song for every paid play so the right holder is paid.
+- Read an album as an ordered list of song references. For every paid play, pay the holder of each song's audio master (resolve linked audio first), so the right holder is paid.
 - Do not let a listener add other music to a gifted album wallet's album view.
 - Respect the ownership gate if you build your own album tool, and check holdings on-chain at creation time, not from a cached list.
 - A public read API for albums is not documented yet (see the open questions).
@@ -377,7 +377,16 @@ The Inscription Wizard also has a dependency graph composer. It lays out existin
 
 The paid-play contract pays exactly one holder: the owner of the `(core, id)` pair that the player passes in. It has no split built in.
 
-Xtrata's radio pays the holder of the song as listed in its catalogue, which is the player inscription, always on core 3. So when a player such as #319 links to the audio inscription #8, the holder of #319 is paid, and the holder of #8 is not. The linked audio's holder is paid only if a player also calls `play` for that inscription. Third-party players should follow the same rule so that one song is never paid twice or paid to the wrong party, and publish which inscription counts as the song. Whether linked audio should earn a share is a product decision, listed as an open question.
+**The rule: the holder of the audio master is always the recipient.** The audio itself is the master, so the inscription that holds the audio is the one to pay:
+
+- A self-contained player (audio embedded in the player, a hidden track inside a file, or an all-audio WebM) is its own master. Pay that inscription.
+- A player that links to an existing audio inscription (for example #319 linking to #8) is not the master. Pay the linked audio's holder (#8), not the holder of the player (#319).
+- Resolve the link at the moment of payment, with the same core and id that the player uses to fetch the audio, and call `get-owner` on that pair. Links are followed one level, to a plain-audio inscription.
+- If the master is held by a contract, or by the listener, the play stays free as usual (errors 106 and 105).
+
+Third-party players must follow this rule so that income always reaches the person who owns the music. Your own player should not pay the holder of a wrapper that only links to someone else's audio.
+
+Alignment note: as of 20 October 2026, Xtrata's web radio pays the id of the song in its catalogue, which for a linked player is the player itself. Making the radio resolve linked audio before it calls `play` follows from this rule and is listed under the open questions.
 
 ### Practical advice for artists
 
@@ -406,7 +415,7 @@ Each list is the shortest route to a working setup for one kind of third party.
 2. Add the free player first. Add the embed (`/radio/embed.html`) if you only need playback.
 3. Add the listening wallet: create, fund, and switch on, as separate steps. Xtrata's wallet frame can be embedded only by `radio.xtrata.xyz`; for your own page, link to the radio, support the desktop app, or run your own wallet origin from the open code.
 4. Implement the 30-second rule and the pre-flight checks. Detect passkey support, PRF, WebKit and in-app browsers as described above.
-5. Generate a unique 16-byte receipt per paid play and sign a direct `play` call. Pay the holder of the song as listed, not the holder of linked audio.
+5. Generate a unique 16-byte receipt per paid play and sign a direct `play` call. Pay the holder of the audio master: for a player that links to existing audio, resolve the link and pay the linked audio's holder, not the player's.
 6. Keep music playing through every payment failure.
 7. Read `get-total` and the `radio-paid-play` events to show confirmed plays.
 8. Add a way to return or sweep the wallet balance.
@@ -568,7 +577,7 @@ The paid-play contract holds no funds and has no administrator, so the main risk
 
 **Is listening free?** Yes. Free listening is always available, and paid plays are optional.
 
-**Who gets paid?** The current holder of the song inscription, read from the core contract at the moment of the play. If the song is sold, later plays pay the new holder.
+**Who gets paid?** The current holder of the song's audio master, read from the core contract at the moment of the play. If the master is sold, later plays pay the new holder.
 
 **Does Xtrata take a cut?** No. The cost per paid play is the 50 microSTX holder payment plus the network fee.
 
@@ -584,7 +593,7 @@ The paid-play contract holds no funds and has no administrator, so the main risk
 
 **What if a listener loses their passkey?** The balance is lost, because there is no backup and no password fallback. That is why the wallet is limited to 1 STX and the page says so before funding.
 
-**Which song is paid when a player links to another song's audio?** The song as listed, which is the player inscription. The holder of the linked audio is not paid unless a player calls `play` for it too.
+**Who is paid when a player links to another inscription's audio?** The holder of the audio, which is the master. A player that links to #8 pays the holder of #8, not the holder of the player. A self-contained player is its own master.
 
 **Is the 30-second rule on-chain?** No. It is enforced only in the front end. The contract accepts a `play` at any time.
 
@@ -595,6 +604,7 @@ The paid-play contract holds no funds and has no administrator, so the main risk
 ### Decisions recorded on 20 October 2026
 
 - The 30-second rule is front end only; the contract has no matching limit.
+- The holder of the audio master is always the recipient of payment, including when a player links to someone else's audio.
 - Claim links are plain URLs that can be sent as text, email or in a post.
 - Passkey wallets hold no backup. Operational funds are limited to 1 STX so that is the most that can be lost.
 - The gift admins are jim.btc, xtrata.btc and audionals.btc.
@@ -605,7 +615,7 @@ The paid-play contract holds no funds and has no administrator, so the main risk
 
 - [ ] Can third-party players offer paid plays through Xtrata's wallet, for example by being permitted as parents of `wallet.xtrata.xyz`, or should they run their own wallet origin?
 - [ ] Is a public read endpoint for albums and their song lists planned, so third-party players can show them without scraping?
-- [ ] Should a song that links to another inscription's audio also pay that audio's holder, and how would a split work?
+- [ ] When will the web radio resolve linked audio and pay the master's holder? Today it passes the catalogue id, which for a linked player is the player. The change is to resolve `linkedAudioId` before calling `play`, and to decide how the radio's play counts and the per-song totals should be keyed.
 - [ ] When should artist pay-per-play reporting in the portal be built? It reads the contract's events, which the lounge feed already indexes, and is expected to be simple.
 - [ ] What limits and anti-abuse rules should the listener-to-friend 1 STX gift have?
 - [ ] Should prefunded batches open to creators who are not gift admins, and under what limits?
