@@ -118,3 +118,7 @@ CHROME_PATH=/path/to/chromium node tests/hall-parent.test.cjs [shotsDir]
     node build/preview.mjs --check   # fails if the committed page is out of date
 
 Edit `build/preview-head.html` to change the sample scenes or the button panel.
+
+## The lobby (a room behind a door)
+
+A bay door whose scene has `interaction: 3` and a link to `target-room: "lobby"` has a real, bare room built behind its wall (`buildLobby` in `src/parts/hall.js`). When the door opens its doorway is see-through (`portal()` in `doors.js`: the opening is cut out of the doorway picture and an invisible copy of it writes the stencil, which the wall materials on both sides skip), so you see the room and walk in with no loading, fade or teleport; E at the doorway walks you through. While you are inside the door is held open, and looking back shows the hall through the same opening. Only one bay at a time can lead to the lobby. Any other target still says "THIS DOOR LEADS TO <ROOM> · NOT OPEN YET". Test: `tests/hall-lobby.test.cjs`.
