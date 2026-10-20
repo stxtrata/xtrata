@@ -1,12 +1,12 @@
 # Xtrata Music Documentation
 
-_Last updated: 20 October 2026._
+_Last updated: 20 October 2026. Written for third parties; the repository guides it draws on are listed under Sources._
 
 How a third party inscribes music, builds albums, runs a pay-per-play player and supports paid plays on passkey devices with Xtrata Music. Open questions are listed near the end.
 
 ## Overview
 
-Xtrata Music is an on-chain music system on Stacks: every song is an inscription, listening is always free, and a listener can optionally pay the current song holder a few microSTX each time a song starts. Xtrata takes no platform fee.
+Xtrata Music is an on-chain music system on Stacks: every song is an inscription, listening is always free, and a listener can optionally pay the current song holder a few microSTX each time a song has been played long enough to count. Xtrata takes no platform fee.
 
 This document is for four kinds of third party:
 
@@ -15,20 +15,26 @@ This document is for four kinds of third party:
 - **Inscription providers** who offer to inscribe audio and artwork for others through Xtrata.
 - **Operators** who fund albums, run gift campaigns or support listeners.
 
-Sections marked **Live** describe behaviour confirmed on the public site or contract on 20 October 2026. Sections marked **Specified** describe the agreed design that is still in review and may change before release.
+Sections marked **Live** describe behaviour that is running on mainnet or the public site as of 20 October 2026, taken from the public pages, the contract and the repository guides. Sections marked **Planned** describe agreed work that is not built yet.
 
 | Component | Status | Where |
 | --- | --- | --- |
 | Free web radio (FM, Liked, Chain bands) | Live | [radio.xtrata.xyz/radio](https://radio.xtrata.xyz/radio) |
 | Embeddable player (compact and minimal) | Live | [Embed page](https://radio.xtrata.xyz/radio/share.html) |
 | On-chain likes | Live | [Endorse page](https://radio.xtrata.xyz/radio/endorse) |
-| Paid-play contract (50 microSTX to the holder per paid start) | Live | `xtrata-radio-plays-v1-0` |
+| Paid-play contract (50 microSTX to the holder per paid play) | Live | `xtrata-radio-plays-v1-0` |
+| Browser passkey listening wallets (key derived from the passkey, 1 STX limit, one wallet per main address, iPhone and Safari support) | Live, switched on by feature flags | radio.xtrata.xyz and wallet.xtrata.xyz |
+| Pay-per-play from the web radio (after 30 seconds of audible listening) | Live, switched on by feature flags | radio.xtrata.xyz |
 | Desktop app with a local support wallet (Mac 1.0.6, Windows 1.0.9, beta) | Live, beta | [Music lounge](https://xtrata.xyz/music/lounge) |
-| Public feed of confirmed paid starts | Live | Music lounge, refreshed every 15 seconds |
-| Artist portal (wallet sign-in; pay-per-play reporting coming) | Live, reporting pending | [Artist portal](https://xtrata.xyz/music/artist/) |
-| Browser passkey listening wallets, numbered wallets | Specified | radio.xtrata.xyz |
-| Album players with ownership checks, likes, cover art | Specified | radio.xtrata.xyz |
-| Prefunded album batches, claim links, 30-day refunds | Specified | radio.xtrata.xyz |
+| Public feed of confirmed paid plays | Live | Music lounge, refreshed every 15 seconds |
+| Album players made by the wallet that holds every song (Album First view, likes, cover art, hidden tracks) | Live, made by gift admins | radio.xtrata.xyz |
+| Prefunded album batches, claim links, 30-day refunds | Live, admin-only for now | radio.xtrata.xyz |
+| Free album drop (one claim link at a time) | Live | [Giveaway](https://xtrata.xyz/giveaway) |
+| Inscription SDK (`@xtrata/sdk`, `@xtrata/reconstruction`, 0.2.0, MIT) | Live | npm and the `stxtrata/xtrata` repository |
+| Artist portal (wallet sign-in) | Live | [Artist portal](https://xtrata.xyz/music/artist/) |
+| Artist pay-per-play reporting in the portal | Planned | Artist portal |
+| Listener-to-friend gift of a prepaid player (1 STX at most) | Planned | radio.xtrata.xyz |
+| Album as an on-chain inscription with its songs as parents | Planned | Core contracts |
 
 ```mermaid
 flowchart LR
@@ -50,7 +56,7 @@ A song is identified by a core number and an inscription id, and every paid play
 | --- | --- |
 | Inscription | A file stored permanently on Stacks through an Xtrata core contract. Songs, artwork and players are all inscriptions. |
 | Core | One of three Xtrata contract versions the paid-play contract understands: core 1 is `xtrata-v1-1-1`, core 2 is `xtrata-v2-1-0`, core 3 is `xtrata-v3-2-3`. The same id in two cores is two different songs. |
-| Song holder | The current owner of the song inscription, read live from the core with `get-owner`. The holder receives the payment, so selling the inscription moves future income with it. |
+| Song holder | The current owner of the song's audio master, read live from the core with `get-owner`. The holder receives the payment, so selling the master moves future income with it. For a self-contained player the player is the master; for a player that links to an existing audio inscription, the linked audio is the master. |
 | Player | A song inscribed as a self-contained playable page with cover art, credits and lyrics. Linked players point at an existing audio inscription instead of storing a second copy. |
 | Paid play | One `play` transaction that pays the holder 50 microSTX and records a receipt. Listening itself is always free. |
 | Receipt | A 16-byte value chosen by the payer, unique per payer. It makes a paid play idempotent: the same receipt can never pay twice. |
@@ -58,12 +64,13 @@ A song is identified by a core number and an inscription id, and every paid play
 | Supporter tier | A recognition level from a wallet's lifetime confirmed paid plays: 1 (First Supporter), 100, 1,000, 10,000, 100,000 and 1,000,000. Shown on [Music Heroes](https://xtrata.xyz/music/heroes). |
 | Parent | A recursion link that means ownership: the new inscription becomes a child of an inscription you hold. |
 | Dependency | A recursion link that means reference: the new inscription uses another inscription's content, and you do not need to own it. |
-| Album (Specified) | An ordered set of songs with a title and a cover, built as one player. Only a wallet that holds every song can create it. |
-| Claim link (Specified) | A link that gives a listener a funded passkey listening wallet and a copy of an album, with no seed phrase. |
+| Album | An ordered set of songs with a title and a cover, built as one player. Only a wallet that holds every song can create it. Today the album's definition is stored by Xtrata's server and each song stays its own inscription; an on-chain form that uses the songs as parents is planned. |
+| Claim link | A URL of the form `https://radio.xtrata.xyz/radio.html#gift=<code>` that anyone can send as text, email or a post. Opening it gives a listener a funded passkey listening wallet and a copy of an album, with no seed phrase. |
+| Treasury | A wallet that Xtrata operates to send claims and refunds. It holds other people's money for each batch and is not a smart contract (see Distribution). |
 
 ## Listening wallets and passkeys
 
-A listening wallet is a small, separate wallet that holds a few STX so plays can be paid without touching the listener's main wallet. Two forms exist: the desktop app wallet (Live) and the browser passkey wallet (Specified).
+A listening wallet is a small, separate wallet that holds a few STX so plays can be paid without touching the listener's main wallet. Two forms exist: the desktop app wallet and the browser passkey wallet. Both are Live.
 
 ### Desktop app wallet (Live, beta)
 
@@ -74,14 +81,21 @@ A listening wallet is a small, separate wallet that holds a few STX so plays can
 - The listener can return the balance to their own address, less one network fee, after pending payments are checked.
 - It is a different wallet from the developer wizard wallet. Never delete a wallet folder that may hold funds.
 
-### Browser passkey wallet (Specified)
+### Browser passkey wallet (Live)
 
-- **Where it lives.** On its own origin, `radio.xtrata.xyz`, so the wallet is isolated from `xtrata.xyz`. No installation is needed.
-- **Setup.** A listener creates a passkey, which creates a wallet, then sends it a small amount of STX. The target is 1 STX. The page warns above that and offers to sweep the excess or everything.
-- **Many wallets, one passkey.** One passkey can hold several numbered wallets. After a fresh unlock, such as a page refresh, the player always opens on the first wallet, the plain player. Switching wallets inside an unlocked session resumes each wallet's last song and position.
-- **Attribution.** The wallet is linked to the listener's main wallet. Likes and paid plays made from it are recorded against that main wallet, so liked playlists and supporter tier follow the listener when they log in.
+- **No key is stored.** The wallet key is derived from the passkey's PRF output every time the listener unlocks. It lives in memory in the wallet frame and is dropped on lock or when the page closes. Storage on the wallet origin holds only credential ids, addresses and the public link signature.
+- **No backup, by design.** If the passkey is lost, the balance is lost. Passkeys that sync (for example through iCloud Keychain or a password manager) can open the same wallet on another device. There is deliberately no password fallback, because the address is public and a password-derived key could be brute-forced offline.
+- **A 1 STX limit.** The target balance is 1 STX, and that is all that can be lost. Above 1 STX new paid plays pause and the panel offers **Return excess** and **Return all**. Nothing is ever swept automatically. Below 0.05 STX the radio asks for a top-up. At the default fee, 1 STX covers about 2,850 paid plays.
+- **Where it lives.** The wallet runs in its own page, `wallet.xtrata.xyz`, embedded as a frame inside `radio.xtrata.xyz`. A strict content policy means only `radio.xtrata.xyz` may embed it, and script on any other origin cannot reach the key. Passkeys bind to the wallet hostname, so it is permanent. The radio page can ask the frame to do something but cannot approve it: creating, unlocking, setting a return address, approving spending and confirming a return are all buttons inside the frame.
+- **Setup.** The listener creates a passkey, which creates the wallet, then sends it a small amount of STX to the address shown. The panel never turns paid plays on by itself.
+- **One approval, bounded.** One approval covers up to 1 STX of plays, or seven days in one open tab, whichever ends first. Closing the page drops the key, and the next visit is one passkey tap.
+- **Optional main wallet.** A listener with Xverse or Leather can link it: the main wallet signs one SIP-018 message, the listener confirms the full address inside the frame, and the listening wallet countersigns. There is no fee and no spending permission. Likes and paid plays are then credited to the main wallet, so liked playlists and supporter tier follow the listener.
+- **No Stacks wallet at all.** A passkey-only listener can create a wallet, receive about 1 STX from anyone, and start paying artists. Returns go to the linked main wallet if there is one, otherwise to an address the listener types, otherwise to the funder: the sender of the first deposit of at least 0.1 STX from a standard address. The listener always confirms the full destination inside the frame.
+- **Many wallets, one device.** The device keeps up to 25 wallets and gives each connected main address its own listening wallet. After a fresh unlock, such as a page refresh, the player opens on the first wallet, the plain player. Switching wallets inside an unlocked session resumes each wallet's last song and position.
+- **iPhone, iPad and Safari.** WebKit refuses to create a passkey inside a cross-origin frame. On those browsers the passkey is made in a new tab on `wallet.xtrata.xyz/create`, and the radio tab then signs in with it. Signing in, including PRF, works inside the frame.
+- **Apps' built-in browsers.** Instagram, Facebook, X, TikTok, LinkedIn and similar apps open links in their own web view, where passkeys are unreliable. The panel detects these from the user agent and offers "Open in Safari" (or Chrome on Android) plus "Copy link".
+- **One tab at a time.** The wallet runs in one tab per browser. A second tab plays free.
 - **Optional.** Listening stays free. Listeners turn paid plays on to leave on-chain proof that they paid the artist.
-- **No seed phrase.** Recovery depends on the passkey, so the page must say plainly that a lost passkey with a funded balance can mean a lost balance.
 
 ### Wallet lifecycle
 
@@ -94,7 +108,7 @@ A listening wallet is a small, separate wallet that holds a few STX so plays can
 
 ## Pay-per-play
 
-A paid play is one direct call to the `play` function of `xtrata-radio-plays-v1-0`, which pays the current song holder 50 microSTX and records a receipt in the same transaction. The contract has no custody, treasury, administrator or automatic wallet access.
+A paid play is one direct call to the `play` function of `xtrata-radio-plays-v1-0`, which pays the current song holder 50 microSTX and records a receipt in the same transaction. The contract has no custody, treasury, administrator or automatic wallet access. It also has no minimum listening time: anyone can call it for any song at any moment, and all it proves is the payment and the receipt.
 
 ### What a listener pays
 
@@ -102,15 +116,15 @@ A paid play is one direct call to the `play` function of `xtrata-radio-plays-v1-
 | --- | --- |
 | Holder payment (fixed in the contract) | 0.000050 STX (50 microSTX) |
 | Default network fee (set by the app; shown before support is enabled) | 0.000300 STX |
-| Total per paid start | 0.000350 STX |
+| Total per paid play | 0.000350 STX |
 | Xtrata platform fee | None |
 
-The network fee never increases automatically. Source: [Music lounge](https://xtrata.xyz/music/lounge).
+The network fee never increases automatically. The web radio uses the same default fee. Source: [Music lounge](https://xtrata.xyz/music/lounge) and the radio repository guide.
 
 ### How a paid play works
 
 1. The listener presses play. Free playback always starts first.
-2. The player decides the play is eligible (see the rules below) and picks the song's core number and inscription id.
+2. The player decides the play is eligible (see the rules below) and picks the core number and inscription id of the song's audio master (see Recursion and who gets paid). Today the web radio uses core 3 and the id of the song in its catalogue.
 3. The player checks the holder with the read-only `get-owner`. If the holder is the listener's own wallet or a contract address, the play stays free.
 4. The player generates 16 random bytes as the receipt and signs a `play` call with the listening wallet.
 5. The contract pays 50 microSTX from the listener to the holder, stores the receipt, adds one to the song's total and prints a `radio-paid-play` event.
@@ -135,27 +149,33 @@ flowchart TD
 
 | Surface | When a play is paid | Status |
 | --- | --- | --- |
-| Desktop app | When an eligible new song starts while support is on. A paid start records a start, not a completed listen. Tracks under one minute are skipped. | Live, beta |
-| Web radio with passkey wallet | After 30 seconds of listening. Skips do not pay. | Specified |
+| Desktop app | After an audible listening threshold of up to 30 seconds in current builds (receipt format 1: macOS 1.0.4 and Windows 1.0.7 onwards). Older clients recorded a payment at song start, so the contract's totals mix both. | Live, beta |
+| Web radio with passkey wallet | After 30 seconds of continuous audible playback. Paused, muted, volume-zero, buffering and seeked-over time does not count, so skips stay free. A song shorter than a minute counts at half its length; if the length is unknown it needs the full 30 seconds. | Live |
 
-The contract cannot tell a skip from a full listen. That decision lives in the player, which is why the timer must be implemented by every third-party player that wants to pay fairly.
+The contract cannot tell a skip from a full listen, and the 30-second rule is enforced only in the front end: the contract has no such limit. That decision lives in the player, which is why the timer must be implemented by every third-party player that wants to pay fairly. Audible seconds are reported by the client and are not verified on-chain, so a paid play is not proof that a person listened.
 
 ### Failure behaviour
 
 - **Delayed or failed payment.** Music carries on. The start stays free, and there are no catch-up charges. New eligible starts can pay once the outstanding transaction resolves.
 - **Repeated receipt.** If a retry reuses the receipt of a play that already confirmed, the contract refuses it with error 103, so a double payment is impossible.
-- **One pending payment at a time** is the safe default for a listening wallet, because a stuck transaction blocks every later one from the same wallet.
+- **One pending payment at a time** is the safe default for a listening wallet, because a stuck transaction blocks every later one from the same wallet. The web radio allows one payment in flight, at most one paid play every 20 seconds, and queues up to 10 plays (for 30 minutes) while a like or payment is in flight.
+- **A payment that was signed but may not have reached the network** is re-broadcast with the same signed bytes, never replaced with a new payment. After 30 minutes unseen, the listener can clear it.
+- **Kill switch.** Xtrata can switch web paid plays off. Open radios stop new payments at their next check. Transactions already broadcast cannot be recalled.
 
 ## Supporting paid plays on passkey devices
 
-When a listener has a working passkey wallet that is unlocked, funded and switched on, the player should pay for every eligible play; in every other state it must keep the music free and nudge toward the next step without ever blocking playback. This section is the recommended integration pattern, built from the contract's rules and the agreed wallet design.
+When a listener has a working passkey wallet that is unlocked, funded and switched on, the player should pay for every eligible play; in every other state it must keep the music free and nudge toward the next step without ever blocking playback. This section is the recommended integration pattern, built from the contract's rules and the way Xtrata's own radio detects and handles passkey devices.
 
 ### Detect the device
 
+A browser that supports passkeys is not enough: the wallet key comes from the passkey's PRF extension, so PRF is the real test.
+
 1. Check that the browser supports WebAuthn (`window.PublicKeyCredential` exists).
 2. Ask `PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()` to learn whether the device can verify the user with a fingerprint, face or screen lock.
-3. Look for an existing Xtrata listening wallet for this origin. A wallet is a stored credential plus its linked main wallet.
-4. Read the wallet's confirmed STX balance and whether paid plays are switched on.
+3. Prove PRF works. Xtrata's wallet requires two matching PRF results before it shows an address for funding, and again the first time a synced passkey is used on a new device. Devices without PRF get "paid plays aren't available here; listening stays free".
+4. Identify the browser. On WebKit (Safari, and every iPhone and iPad browser) create the passkey in a top-level page on the wallet origin, not inside a frame. Sign-in inside the frame works. In an app's built-in browser (named in the user agent), lead with "Open in Safari" or Chrome and a "Copy link" option.
+5. Look for an existing listening wallet for this device. A wallet is a stored credential plus its linked main wallet, if any. If the wallet is linked to a different address than the one connected, keep it locked.
+6. Read the wallet's confirmed STX balance and whether paid plays are switched on.
 
 ### Choose the play mode
 
@@ -164,90 +184,131 @@ When a listener has a working passkey wallet that is unlocked, funded and switch
 | Wallet unlocked, funded, paid plays on | Pay each eligible play after the 30-second rule. This is the default whenever it is possible. |
 | Wallet exists but is locked | Keep playing free. Show one unlock prompt, which needs a tap or click because passkeys require a user gesture. After unlock, open the first wallet. |
 | Wallet unlocked and funded, paid plays off | Keep playing free. Offer the switch once, with the cost shown. Funding alone never turns payments on. |
-| Wallet balance low | Keep paying while funds last. Warn before the balance can no longer cover a play. |
+| Wallet balance low | Keep paying while funds last. Warn before the balance can no longer cover a play (Xtrata warns below 0.05 STX). |
+| Wallet over 1 STX | Pause new paid plays and offer **Return excess** or **Return all**. |
 | Wallet empty, or gifted plays used up | Play free. Show the deposit prompt now, and not before. |
 | Passkeys supported, no wallet yet | Play free. Offer to set up a listening wallet. |
-| Passkeys unsupported, or no platform authenticator | Play free. Offer the desktop app or a connected wallet instead. |
-| Payment pending, delayed or failed | Play free. Do not queue catch-up payments. |
+| Passkeys unsupported, no platform authenticator, or no stable PRF | Play free. Offer the desktop app or a connected wallet instead. |
+| Another tab is already running the wallet | Play free in this tab. |
+| Payment pending, delayed or failed | Play free. Do not queue catch-up payments for songs that were not queued while the wallet was ready. |
 
 ### Pre-flight checks before each paid play
 
 - **Direct caller.** The contract requires that the transaction sender is also the direct caller (error 100). A passkey wallet must sign as a normal Stacks address. A smart-contract account that forwards the call cannot pay plays.
 - **Holder is readable.** Call `get-owner(core, id)`. An error means the core is unknown.
-- **Holder is not the payer.** A wallet cannot pay itself (error 105).
+- **Holder is not the payer or the linked main wallet.** A wallet cannot pay itself (error 105), and Xtrata's radio also treats a song held by the listener's linked main wallet as a free play.
 - **Holder is a normal address.** Songs held by an escrow or marketplace contract cannot be paid yet (error 106). Treat these as free plays.
 - **Fresh receipt.** Use 16 new random bytes for every paid play, and keep the receipt with the pending transaction so a retry cannot pay twice.
+- **Nothing else in flight.** Wait until the previous transaction from this wallet has resolved, so two transactions never race for a nonce.
 
 ### Keeping paid plays in use
 
-- Remember the listener's choice. Ask once to switch paid plays on, then keep it on for that wallet instead of asking each session.
+- Remember the listener's choice. Ask once to switch paid plays on, then keep it on for that wallet until the listener switches it off. Xtrata's radio remembers this on the device.
+- On a locked wallet that has paid plays switched on, open the unlock prompt as soon as the page loads, so the listener's first tap goes straight to the passkey.
 - Show the remaining plays or balance quietly, as the only number on screen. Keep crypto wording out of the listener view of an album player.
 - Offer a top-up when the balance falls low, and a gift or claim link where the artist has funded plays.
-- Keep playback unbroken when payment is slow, and report the payment state in plain words.
+- Keep playback unbroken when payment is slow, and report the payment state in plain words. In a gifted album, say "gift on its way" while funds land, never an error.
 - Show supporter progress (First Supporter at 1 paid play, then tiers at 100, 1,000, 10,000 and above) as a reason to keep the wallet funded.
 
 ### What never to do
 
 - Never spend from a wallet the listener has not switched on.
 - Never ask for, log or transmit a seed phrase, private key or passkey material.
+- Never offer a password fallback for the wallet key.
 - Never present paid plays as required. Free listening must stay available.
 
-## Albums and players (Specified)
+### If you are not Xtrata's own radio
 
-An album is a player with a title, an ordered list of songs and a cover, and only the wallet that holds every song in it can create it. This section is the agreed design, in review as of 20 October 2026; the contract and page names are not final.
+Xtrata's wallet frame can only be embedded by `radio.xtrata.xyz`, so a third-party player cannot embed it. To offer paid plays from your own page you can link listeners to the radio, support the desktop app, or run your own wallet origin from the open-source code under `xtrata-2.0/src/listening-wallet`. A passkey is bound to its wallet hostname, so wallets made on your origin are separate from Xtrata's. Whether other players can be permitted as parents of Xtrata's wallet is listed as an open question below.
+
+## Albums and players (Live)
+
+An album is a player with a title, an ordered list of songs and a cover, and only the wallet that holds every song in it can create it. Albums are created today by gift admins; a public self-serve album maker is not part of the release.
 
 ### Rules
 
-- **Ownership gate.** The creating wallet must hold all the songs. This stops anyone from packaging music they do not control.
-- **Stays an album.** A gifted album remains an album player. It does not turn into a general player with other playlists.
-- **No duplicates.** A wallet or passkey can never own the same album twice.
-- **No free play on a given-out wallet.** Wallets handed to new listeners do not allow free play of other music. The first, default wallet can still play other music once the listener funds it.
-- **Listener view.** Artwork, artist and song titles up front, with plays remaining as the only value shown. No pay, STX or crypto wording; everything else is collapsed away. The listener-facing player is branded Xtrata Music.
+- **Ownership gate.** When an album is created, the server asks the core contract (`get-owner`) who holds each song. Every song must be held by the signing wallet. A song held by someone else, by a contract (for example one listed for sale) or by no one refuses the album. If the chain cannot answer, the answer is "try again", never "allowed". The check runs at creation only.
+- **An album never stops working.** Selling a song afterwards, or a chain outage, changes nothing for existing albums, their links or their recipients. Only songs the radio catalogue cannot confirm are left out of the album view.
+- **A player never changes.** A new version is a new player, so a link already sent cannot become something its sender did not mean.
+- **Stays an album.** A gifted album remains an album player, looping its own songs in order. It does not turn into a general player. When the paid plays run out, the radio stops until the listener adds more.
+- **No duplicates.** A wallet or passkey can never receive the same album twice.
+- **Listener view ("Album First").** Cover, artist, songs and plays left. No pay, STX or crypto wording: top-ups are counted in plays, and everything else (add plays, My music, Xtrata Radio, This device, How plays work) sits in a "More" sheet. The listener-facing player is branded Xtrata Music.
+- **Stop rules.** The radio stops, and says why, when the wallet is locked, paying is switched off, no paid plays are left (counting payments in flight and songs waiting to be paid), or the wallet is over 1 STX. A slow or failed read of the chain is not a reason to stop, and a payment that could not be made stays queued and counts against the plays; it never turns into a free song.
 - **Likes and cover art** are part of the player and are recorded against the linked main wallet.
+- **Titles and artists** shown to listeners come from the radio catalogue and its artist-credit registry, never from what an admin typed.
 
-### Creating an album
+### What can be a song
+
+The rules live in one shared module, so the station, the catalogue and the album maker agree.
+
+| Shape | How it plays |
+| --- | --- |
+| Plain audio inscription (`audio/*`) | Played directly. |
+| HTML player with its audio embedded as `data:audio` | Played as the player. |
+| HTML player that links its audio, for example `<source src="https://xtrata.xyz/inscription/8">` | The linked inscription is resolved (one level) and played with the player's own title and cover. |
+| All-audio WebM minted as `video/webm` | Played as an audio blob. |
+| Hidden track: an audio file appended to another file, then `XTRATA-HIDDEN-TRACK-v1` and the hidden file's length (8 bytes, big-endian) | The radio reads the last 30 bytes, fetches the hidden byte range and plays it as audio. |
+
+A video with picture and sound is not a song. A hidden track is not one of an album's listed songs: it is not counted or searchable, and it plays only after 60 seconds of silence at the end of the last song, when the album ran from first to last with nothing skipped or picked by hand. An album must have at least one song that is not hidden.
+
+### How an admin creates an album
 
 1. Inscribe each song with the [Music wizard](https://xtrata.xyz/music/), as a player with artwork, credits and lyrics. Use **Number the tracks** so the order is stored.
-2. Check that one wallet holds every song inscription.
-3. Choose a title, the song order and a cover. A cover can be uploaded or linked from an existing image inscription.
-4. Create the album player from that wallet. The tool refuses if any song is missing.
-5. Fund the album through the prefunded route (next section) and create claim links.
+2. Check that one wallet holds every song inscription, and that the songs are ready in the radio catalogue.
+3. In the radio's admin box (Gift Stacks music, then Gift players) enter a title, an optional artist and the radio song numbers in play order (1 to 40), then sign once with the holding wallet (SIP-018). A cover can be uploaded or linked from an existing image inscription.
+4. Fund copies through the prefunded route (next section).
 
 ### Third-party players and albums
 
-- Read an album as an ordered list of song references, each a core number plus an inscription id. Use those pairs for every paid play so the right holder is paid.
+- Read an album as an ordered list of song references. For every paid play, pay the holder of each song's audio master (resolve linked audio first), so the right holder is paid.
 - Do not let a listener add other music to a gifted album wallet's album view.
-- Respect the ownership gate when you build your own album tool. Check holdings on-chain at creation time, not from a cached list.
+- Respect the ownership gate if you build your own album tool, and check holdings on-chain at creation time, not from a cached list.
+- A public read API for albums is not documented yet (see the open questions).
 
-## Distribution and gift links (Specified)
+## Distribution and gift links (Live, admin-only)
 
-Every creator, Xtrata included, distributes albums and EPs through one prefunded route: the creator stocks the funds up front, the funds are locked, and anything unclaimed returns to the creator after 30 days. There is no treasury-paid route.
+Albums and starter copies are distributed through one prefunded route: the creator pays for the whole batch up front, in one transfer, and anything unclaimed returns to the creator after 30 days. The treasury never pays for a copy out of its own money. Only gift admins can make batches today.
 
 ### How it works
 
-1. The creator decides how many copies to release and how many plays each copy carries.
-2. The creator funds the batch. The funds are locked for plays and network fees, so the listener never needs STX to start.
-3. The system creates one claim link per copy.
-4. A listener opens a link and receives a passkey listening wallet that already holds the album and its plays, with no seed phrase.
-5. Each play from that wallet pays the song holders as normal. Plays remaining is the number the listener sees.
-6. Links that are still unclaimed after 30 days expire, and their funds are refunded to the creator.
+1. **Sign.** An admin signs one SIP-018 request with the creator wallet: number of copies (1 to 100 per request), the amount that lands in each new wallet (0.1 to 1 STX), a label, and the album if there is one. An album batch is accepted only from the wallet that owns the album. Each signed request works once, within 15 minutes.
+2. **Links.** The server makes one dormant claim link per copy. They are shown once and saved on the creator's device.
+3. **Pay once.** The creator sends one transfer to the treasury of `copies x (amount + 0.003 STX)`, with the memo `batch <id>`. The server accepts only the exact sender, recipient, total and memo.
+4. **Live together.** When the payment confirms, every copy goes live for 30 days. Claims are sent from the creator's money.
+5. **Claim.** A listener opens a link and receives a passkey listening wallet that already holds the plays and, for an album, the album. There is no seed phrase. Plays remaining is the number the listener sees.
+6. **Refund.** Copies still unclaimed after 30 days go back to the creator in one transfer per 40 copies. The creator gets everything paid except the single network fee of each refund transfer.
 
-### Rules for claim links
+A 300-play album copy costs 0.126 STX in total (0.105 for plays, 0.003 returnable reserve, 0.015 likes float and 0.003 sending fee), so 100 copies are 12.6 STX. What is left in a claimed wallet can be returned: unused gift money goes back to the gifter, and anything the listener added goes back to the address that sent it.
 
-- A link can be claimed once. A wallet or passkey can never receive the same album twice.
+### Trust: the treasury is a wallet, not a contract
+
+The paid-play contract holds no funds, but batch money does pass through a treasury wallet that Xtrata operates, with its key held as a server secret. Funds are tracked per batch, one send is in flight at a time, each send is recorded before it is broadcast, and a failed broadcast never releases a gift. The server logs an alert if the treasury ever holds less than it owes. Refunds run from a scheduled job every five minutes. Third parties should describe this honestly to their audience: batch money relies on Xtrata's operation, not on a contract.
+
+### The claim link
+
+- The link is an ordinary URL (`https://radio.xtrata.xyz/radio.html#gift=<code>`), so it can be sent by text, email or a post. The code sits after the `#`, so it is never sent to a server, and the page moves it out of the address bar at once. Only the code's hash is stored.
+- A link can be claimed once. A gift lands only in a brand-new wallet (made in this browser, or never used), and one gift per wallet is allowed. A person who unlocks an older wallet keeps the link and can forget it.
+- On iPhone and Safari the passkey is made in a new tab; in app browsers the page offers "Open in Safari".
 - STX deposit prompts appear only after the listener has used up their free gifted plays, never while gifted plays are still arriving.
-- Gift and batch tooling is for administrators and creators. The listener-facing "send music to a friend" gift is removed for now.
-- Gift administration is controlled by a small set of admin wallets (`RADIO_GIFT_ADMIN`): jim.btc, xtrata.btc and audionals.btc. Their addresses will be published with the release.
+- A claim from a busy treasury shows "gift on its way" in amber, never red, and retries by itself.
 
-### Campaign pattern: one link at a time
+### Free album drop (the giveaway page)
 
-A public page can release about 100 prepaid album links one at a time: the next link appears only after the previous one is claimed. This shows non-crypto audiences how simple the player is, and it keeps each link scarce. Third parties can copy the pattern by funding their own batch and publishing links in sequence.
+[xtrata.xyz/giveaway](https://xtrata.xyz/giveaway) shows one free-album claim link at a time. When the link on show has been claimed and its funds have landed, a ten-minute pause follows (adjustable) and the next link appears, so a crowd never becomes a rush. Links are held on the server and nobody can read the list. The claim checks still apply, but it is a first-come giveaway by design, and the link on show is public. Third parties can copy the pattern by funding their own batch and publishing links in sequence.
+
+### Gift administration
+
+- Gift admins are set by configuration: jim.btc, xtrata.btc and audionals.btc. The Audionals wallet is `SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX`; the other two resolve through their BNS names.
+- Admins only sign batch and album requests. They never hold gift money, and each admin funds batches from their own wallet.
+- A listener-to-friend gift, where a user sends a prepaid player of at most 1 STX to a friend, is planned. The earlier friend-gift button is no longer in the page; the server still honours old friend links.
 
 ### Caveats for integrators
 
 - Do not promise listeners specific play counts before the batch is funded.
 - Treat a claim link as a bearer link. Anyone with it can claim, so share it only where the creator is happy for that to happen.
 - Show the expiry date to the creator when the batch is created.
+- Copies in a batch cannot be called back one by one; they expire together. A lost link list cannot be re-issued yet.
+- A creator can have only a few unpaid batches waiting at once.
 
 ## Inscription services
 
@@ -281,7 +342,8 @@ Optimising audio is lossy, so the interface tells users to keep their original m
 - **Route people to the hosted wizards.** The simplest option. The wizard is backendless: it runs in the browser, and `?mock=1` rehearses a job offline.
 - **Build your own front end** around the same one-shot wallet pattern. Quote on finished size, over-collect for fees, refund the rest, and never route user funds through your own wallet.
 - **Use the helper tools** that ship beside the wizard: SUNO fast-track, Manifest Studio, the simple on-site inscriber and the Xtrata Xplorer.
-- **Contract and SDK details** for building your own tool are in the `stxtrata/xtrata` repository under `xtrata-2.0`. They were not reviewed for this document.
+- **Use the SDK** to build your own tool. `@xtrata/sdk` and `@xtrata/reconstruction` are published on npm (0.2.0, MIT): `npm install @xtrata/sdk @xtrata/reconstruction`. Start with `xtrata-2.0/docs/sdk/quickstart-first-30-minutes.md`, which reads live protocol state, builds a safe mint plan and adds wallet-failure recovery guidance. The default path is `createSimpleSdk` and `createXtrataReadClient`; write transactions use `buildCoreMintWorkflowPlan` and the `workflows` helpers, and `@xtrata/reconstruction` rebuilds inscription bytes from public chain data.
+- **Fees and limits.** A mint is three steps (`begin`, one or more `add-chunk-batch`, then `seal`). The protocol fee is read from the core contract (`get-fee-unit`), and the SDK's `safe` helpers compute deterministic spend caps and post-conditions. The SDK's planners use a hard ceiling of 30 chunks per upload transaction. Quote users from the live fee unit and the finished size, as the wizard does, and do not hard-code figures.
 
 ### Obligations for anyone offering inscription
 
@@ -313,7 +375,18 @@ The Inscription Wizard also has a dependency graph composer. It lays out existin
 
 ### Recursion and who gets paid
 
-The paid-play contract pays exactly one holder: the owner of the `(core, id)` pair that the player passes in. It has no split built in, so a song that links to someone else's audio does not pay that audio's holder unless the player calls `play` for that inscription as well. Integrators should decide and publish which inscription counts as the song, and keep that rule the same across their player.
+The paid-play contract pays exactly one holder: the owner of the `(core, id)` pair that the player passes in. It has no split built in.
+
+**The rule: the holder of the audio master is always the recipient.** The audio itself is the master, so the inscription that holds the audio is the one to pay:
+
+- A self-contained player (audio embedded in the player, a hidden track inside a file, or an all-audio WebM) is its own master. Pay that inscription.
+- A player that links to an existing audio inscription (for example #319 linking to #8) is not the master. Pay the linked audio's holder (#8), not the holder of the player (#319).
+- Resolve the link at the moment of payment, with the same core and id that the player uses to fetch the audio, and call `get-owner` on that pair. Links are followed one level, to a plain-audio inscription.
+- If the master is held by a contract, or by the listener, the play stays free as usual (errors 106 and 105).
+
+Third-party players must follow this rule so that income always reaches the person who owns the music. Your own player should not pay the holder of a wrapper that only links to someone else's audio.
+
+Alignment note: as of 20 October 2026, Xtrata's web radio pays the id of the song in its catalogue, which for a linked player is the player itself. Making the radio resolve linked audio before it calls `play` follows from this rule and is listed under the open questions.
 
 ### Practical advice for artists
 
@@ -334,15 +407,15 @@ Each list is the shortest route to a working setup for one kind of third party.
 5. Open the [artist portal](https://xtrata.xyz/music/artist/) and sign in by signing a free message with your receiving wallet.
 6. Watch confirmed plays in the public feed on the [Music lounge](https://xtrata.xyz/music/lounge). Personal pay-per-play reporting in the portal is still being prepared.
 7. Keep the holding wallet as a standard address. Songs held by a contract cannot receive paid plays yet.
-8. To release an album, follow the album and distribution sections above once they are live.
+8. To release an album, ask a gift admin to make it from your songs (you must hold every song) and to fund copies for you, or fund a batch from your own wallet once you are an admin. See the albums and distribution sections.
 
 ### Player builder
 
 1. Load songs from Xtrata's hosted inscription services, which the radio and catalogue use, or from your own indexer, and resolve every linked audio and artwork inscription.
 2. Add the free player first. Add the embed (`/radio/embed.html`) if you only need playback.
-3. Add the listening wallet: create, fund, and switch on, as separate steps.
-4. Implement the 30-second rule and the pre-flight checks.
-5. Generate a unique 16-byte receipt per paid play and sign a direct `play` call.
+3. Add the listening wallet: create, fund, and switch on, as separate steps. Xtrata's wallet frame can be embedded only by `radio.xtrata.xyz`; for your own page, link to the radio, support the desktop app, or run your own wallet origin from the open code.
+4. Implement the 30-second rule and the pre-flight checks. Detect passkey support, PRF, WebKit and in-app browsers as described above.
+5. Generate a unique 16-byte receipt per paid play and sign a direct `play` call. Pay the holder of the audio master: for a player that links to existing audio, resolve the link and pay the linked audio's holder, not the player's.
 6. Keep music playing through every payment failure.
 7. Read `get-total` and the `radio-paid-play` events to show confirmed plays.
 8. Add a way to return or sweep the wallet balance.
@@ -358,9 +431,9 @@ Each list is the shortest route to a working setup for one kind of third party.
 
 ### Operator or campaign runner
 
-1. Decide the number of copies and the plays per copy.
-2. Fund the batch through the prefunded route, and note the 30-day expiry.
-3. Publish claim links one at a time or in bulk, as your campaign needs.
+1. Decide the number of copies (up to 100 per request) and the plays per copy.
+2. Fund the batch through the prefunded route, which is admin-only today, and note the 30-day expiry.
+3. Publish claim links one at a time (the giveaway page does this) or in bulk, as your campaign needs. A claim link is just a URL.
 4. Watch claims and refunds. Expect unclaimed funds to return after 30 days.
 5. Keep deposit prompts for after gifted plays are used.
 
@@ -421,6 +494,23 @@ A standard transaction needs a post-condition for the 50 microSTX transfer from 
 - Post-condition: the payer sends exactly 50 microSTX.
 - Fee: your choice; the desktop app defaults to 0.000300 STX.
 
+### Receipt format (desktop app)
+
+Current desktop builds encode useful facts in the 16-byte receipt. The decoder is shared by public activity and read-only reports, and non-matching receipts are labelled legacy starts.
+
+| Bytes | Meaning |
+| --- | --- |
+| 0 to 1 | `58 4d` ("XM") |
+| 2 | Format version, `01` |
+| 3 | Platform: 1 macOS, 2 Windows, 3 Linux, 4 local or development |
+| 4 to 5 | App version: major x 10000 + minor x 100 + patch |
+| 6 | Flags: bit 0 threshold listen, bit 1 unknown duration, bit 2 threshold under 30 seconds |
+| 7 to 8 | Reported audible seconds, capped at 65535 |
+| 9 | Threshold in seconds, 1 to 30 |
+| 10 to 15 | Six random bytes |
+
+Audible seconds are reported by the client and are not verified on-chain. A random legacy receipt can match the XM prefix by chance (about 1 in 16.7 million). The web radio generates its own receipts; any 16 unique bytes are valid for the contract.
+
 ### Other public endpoints
 
 | Item | Where |
@@ -429,10 +519,13 @@ A standard transaction needs a post-condition for the 50 microSTX transfer from 
 | Embed (compact) | `https://xtrata.xyz/radio/embed.html` |
 | Embed (minimal) | `https://xtrata.xyz/radio/embed.html?mode=minimal` (height 72) |
 | On-chain likes | `https://xtrata.xyz/radio/endorse` |
-| Song statistics | `https://radio.xtrata.xyz/radio/catalogue` |
+| Song statistics and catalogue | `https://radio.xtrata.xyz/radio/catalogue` |
 | Live paid plays | `https://xtrata.xyz/music/lounge#live-payments` |
 | Music Heroes leaderboard | `https://xtrata.xyz/music/heroes` |
 | Desktop app downloads | `https://xtrata.xyz/music/lounge#downloads` |
+| Free album drop | `https://xtrata.xyz/giveaway` |
+| Wallet frame (embeddable only by the radio) | `https://wallet.xtrata.xyz` |
+| Claim link | `https://radio.xtrata.xyz/radio.html#gift=<code>` |
 
 ### Embed details
 
@@ -448,7 +541,9 @@ The paid-play contract holds no funds and has no administrator, so the main risk
 - Never request, display, copy, log or transmit a seed phrase, private key, vault file, unlock file or raw signed transaction.
 - Never use a personal, deployer, sponsor or already-connected wallet for tests.
 - Never send STX, create a return, switch on paid plays or sign a transaction unless the listener has asked for that exact action and seen the destination and amount.
-- Keep the wallet on its own origin (`radio.xtrata.xyz` for passkey wallets) so another page cannot read it.
+- Keep the wallet on its own origin (`wallet.xtrata.xyz` for Xtrata's passkey wallets, embedded only by `radio.xtrata.xyz`) so another page cannot read it.
+- Keep the 1 STX limit. There is no backup for a passkey wallet, so the limit is the most that can be lost.
+- Treat the web radio's origin as sensitive: nothing but the radio may run as that origin. Xtrata redirects its executable runtime and gallery to `xtrata.xyz` and serves inscription content on the radio host in a sandbox.
 - Do not delete a wallet folder or credential that may hold funds. Return the balance first and wait for confirmation.
 
 ### Installing the desktop app
@@ -460,8 +555,10 @@ The paid-play contract holds no funds and has no administrator, so the main risk
 ### Operating a campaign or gift service
 
 - Limit gift administration to the named admin wallets.
-- Lock batch funds up front and honour the 30-day refund.
-- Track claims, expiries and refunds for every batch.
+- Take batch funds up front in one payment per batch, and honour the 30-day refund. Refunds run from a scheduled job; check that it is healthy.
+- Track claims, expiries and refunds for every batch, and watch for the treasury under-collateralised alert.
+- Use a treasury wallet made only for this purpose, never a personal, deployer or sponsor wallet.
+- Keep a kill switch: setting the gift flag to anything but on stops claims, new gifts and refunds, while sends already made still settle.
 
 ### Monitoring
 
@@ -480,9 +577,9 @@ The paid-play contract holds no funds and has no administrator, so the main risk
 
 **Is listening free?** Yes. Free listening is always available, and paid plays are optional.
 
-**Who gets paid?** The current holder of the song inscription, read from the core contract at the moment of the play. If the song is sold, later plays pay the new holder.
+**Who gets paid?** The current holder of the song's audio master, read from the core contract at the moment of the play. If the master is sold, later plays pay the new holder.
 
-**Does Xtrata take a cut?** No. The cost per paid start is the 50 microSTX holder payment plus the network fee.
+**Does Xtrata take a cut?** No. The cost per paid play is the 50 microSTX holder payment plus the network fee.
 
 **Can a listener pay for a song they own?** No. The contract refuses it (error 105), so the player should treat it as a free play.
 
@@ -492,31 +589,49 @@ The paid-play contract holds no funds and has no administrator, so the main risk
 
 **What happens to the music when a payment is slow?** It keeps playing. The start stays free, and nothing is charged later to catch up.
 
-**Does a paid play prove someone listened?** No. Paid starts record a start, and a wallet is not necessarily a person.
+**Does a paid play prove someone listened?** No. The contract proves a payment and a receipt. Audible seconds are reported by the client, and a wallet is not necessarily a person.
+
+**What if a listener loses their passkey?** The balance is lost, because there is no backup and no password fallback. That is why the wallet is limited to 1 STX and the page says so before funding.
+
+**Who is paid when a player links to another inscription's audio?** The holder of the audio, which is the master. A player that links to #8 pays the holder of #8, not the holder of the player. A self-contained player is its own master.
+
+**Is the 30-second rule on-chain?** No. It is enforced only in the front end. The contract accepts a `play` at any time.
+
+**Does an album have a contract?** No. An album is a player whose definition Xtrata stores; each song is still its own inscription, and an on-chain album form is planned.
 
 **Can I embed the radio on my site?** Yes, with the iframe described in the reference section. The embed plays music but has no wallet and does not pay.
 
-### Open questions to confirm before release
+### Decisions recorded on 20 October 2026
 
-- [ ] Which inscription id does a player pass for a song that links to another inscription's audio: the player or the audio?
-- [ ] Where is the 30-second rule enforced for the web radio, in the client only or with an on-chain check?
-- [ ] What is the album contract or registry name, and does it keep ownership checks on-chain?
-- [ ] What is the claim-link format, and which contract holds locked batch funds and returns them after 30 days?
-- [ ] Which public addresses belong to the three `RADIO_GIFT_ADMIN` wallets?
-- [ ] How is the passkey wallet key derived and stored, and what does recovery look like when a device is lost?
-- [ ] Is there a documented SDK or API for third parties who want to host inscription, and what are the current inscription fees?
-- [ ] When will artist pay-per-play reporting in the portal go live?
-- [ ] Should gift tooling for listeners return, and under what limits?
+- The 30-second rule is front end only; the contract has no matching limit.
+- The holder of the audio master is always the recipient of payment, including when a player links to someone else's audio.
+- Claim links are plain URLs that can be sent as text, email or in a post.
+- Passkey wallets hold no backup. Operational funds are limited to 1 STX so that is the most that can be lost.
+- The gift admins are jim.btc, xtrata.btc and audionals.btc.
+- The inscription SDK is published and documented (see Inscription services).
+- A listener-to-friend gift may return, limited to a prepaid player of at most 1 STX.
+
+### Open questions
+
+- [ ] Can third-party players offer paid plays through Xtrata's wallet, for example by being permitted as parents of `wallet.xtrata.xyz`, or should they run their own wallet origin?
+- [ ] Is a public read endpoint for albums and their song lists planned, so third-party players can show them without scraping?
+- [ ] When will the web radio resolve linked audio and pay the master's holder? Today it passes the catalogue id, which for a linked player is the player. The change is to resolve `linkedAudioId` before calling `play`, and to decide how the radio's play counts and the per-song totals should be keyed.
+- [ ] When should artist pay-per-play reporting in the portal be built? It reads the contract's events, which the lounge feed already indexes, and is expected to be simple.
+- [ ] What limits and anti-abuse rules should the listener-to-friend 1 STX gift have?
+- [ ] Should prefunded batches open to creators who are not gift admins, and under what limits?
+- [ ] Which current inscription fees should be published, given that they are read from the core's fee unit?
 
 ## Sources
 
-Pages and files opened on 20 October 2026. Sections marked Specified also draw on the project owner's own design decisions, which are not yet public.
+Pages and files opened on 20 October 2026. Repository paths are under `xtrata-2.0/docs/` in [stxtrata/xtrata](https://github.com/stxtrata/xtrata). Details about rollout status also draw on the Xtrata Music project's own implementation notes.
 
 - [Xtrata Music Listening Room](https://xtrata.xyz/music/lounge): costs, desktop app, support flow, downloads and checksums.
 - [Xtrata Radio](https://radio.xtrata.xyz/radio) and its [listening guide](https://radio.xtrata.xyz/radio/guide.html): bands, likes, statistics, privacy.
 - [Embed Xtrata Radio](https://radio.xtrata.xyz/radio/share.html) and the [embedding guide](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio-embed.md): iframe options and limits.
+- Repository guides: [pay-per-play with a passkey wallet](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio/PAY-PER-PLAY.md), [gift wallets and prefunded batches](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio/GIFTS.md), [Album First](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio/ALBUM-FIRST.md), [where a song can live](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio/SONG-SOURCES.md), [paid listen receipt format](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio/RECEIPT-FORMAT.md), [on-chain counts](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio/ONCHAIN-COUNTS.md) and the [free album drop](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio/GIVEAWAY.md).
 - [Xtrata Music AI install guide](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio/AI-MUSIC-SUPPORT-INSTALL.md): wallet safety, install routes, validation.
 - [Listener guide source](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/radio-listener-guide.md).
+- [SDK docs](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/sdk/README.md): `@xtrata/sdk` and `@xtrata/reconstruction`, quickstarts and API overview.
 - [Music wizard](https://xtrata.xyz/music/) and [Inscription Wizard](https://radio.xtrata.xyz/wizard/): inscription flow, options, relationships.
 - [Artist portal](https://xtrata.xyz/music/artist/) and [pay-per-play page](https://xtrata.xyz/music/artist/royalties/plays/).
 - [Music Heroes](https://xtrata.xyz/music/heroes): supporter tiers.
