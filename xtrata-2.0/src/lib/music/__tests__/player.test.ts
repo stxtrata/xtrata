@@ -79,3 +79,17 @@ describe('independent music player', () => {
     expect(Buffer.byteLength(html)).toBeLessThan(24000);
   });
 });
+
+describe('GIF artwork', () => {
+  const gif =
+    'R0lGODlhBAAEAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAABAAEAAAICQABCBxIsCCAgAAh+QQBCgABACwAAAAABAAEAIEAAP8AAAAAAAAAAAAICQABCBxIsCCAgAA7';
+  it('embeds an uploaded GIF as the cover, unchanged, and records its type', () => {
+    const html = player.build({ ...config, imageBase64: gif, imageMimeType: 'image/gif' });
+    expect(html).toContain(`<img id="coverArt" src="data:image/gif;base64,${gif}"`);
+    expect(html).toContain('"visualMimeType":"image/gif"');
+  });
+  it('still refuses embedded image types it does not know', () => {
+    const html = player.build({ ...config, imageBase64: gif, imageMimeType: 'image/svg+xml' });
+    expect(html).not.toContain('id="coverArt"');
+  });
+});

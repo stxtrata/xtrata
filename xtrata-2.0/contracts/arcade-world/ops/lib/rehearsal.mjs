@@ -16,6 +16,7 @@ import { runBot, newJournal, botContext } from './bot.mjs';
 import { waitingPosters, releasePosters } from './review.mjs';
 import { revertBay } from './revert.mjs';
 import { deploySources } from './deploy.mjs';
+import { builtinSkins, planSkins, runSkins, readSkin } from './skins.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const example = (n) => parseSceneFile(readFileSync(join(here, '..', 'examples', n), 'utf8'));
@@ -33,9 +34,9 @@ export async function runRehearsal({ simnet, accounts, log = () => {} }) {
   let admin = deployer;
 
   try {
-    await step('1. deploy order is known and the three contracts are live', async () => {
+    await step('1. deploy order is known and the contracts are live', async () => {
       const src = deploySources();
-      must(src.map((s) => s.name).join() === 'mock-xtrata-core,xtrata-posters-v1,xtrata-world-v1', 'deploy order changed');
+      must(src.map((s) => s.name).join() === 'mock-xtrata-core,xtrata-posters-v1,xtrata-world-v1,xtrata-door-skins-v1', 'deploy order changed');
       must((await t.ro('world', 'get-version')) === 0 && (await t.ro('posters', 'get-version')) === 0, 'contracts should start at version 0');
       return src.map((s) => `${s.name} ${s.bytes}B`).join(', ');
     });
@@ -59,9 +60,9 @@ export async function runRehearsal({ simnet, accounts, log = () => {} }) {
       return `admin is now ${newAdmin}`;
     });
     let setup;
-    await step('4. one-time set-up: 22 looks, 2 rooms, the publisher on both contracts', async () => {
+    await step('4. one-time set-up: 23 looks, 2 rooms, the publisher on both contracts', async () => {
       const plan = await planSetup(t, { owner: admin, publishers: [publisher] });
-      must(plan.looks.length === 22 && plan.rooms.length === 2 && plan.publishers.length === 2, `unexpected plan ${plan.looks.length}/${plan.rooms.length}/${plan.publishers.length}`);
+      must(plan.looks.length === 23 && plan.rooms.length === 2 && plan.publishers.length === 2, `unexpected plan ${plan.looks.length}/${plan.rooms.length}/${plan.publishers.length}`);
       setup = await runSetup(t, plan, { execute: true, from: admin });
       must(!setup.failed, setup.failed);
       const again = await planSetup(t, { owner: admin, publishers: [publisher] });
@@ -183,6 +184,24 @@ export async function runRehearsal({ simnet, accounts, log = () => {} }) {
       must(v.ok, 'read-back should match');
       const res = await resolveAt(t, 'arcade-hall', 1, [scenes[0].from - 1, scenes[0].from]);
       must(res[0].seq !== res[1].seq, 'the workshop must start at its block');
+    });
+    await step('15. door skins: hand-over, then the built-in set registers once, a second run does nothing, publishers cannot add built-ins', async () => {
+      must((await t.send('skins', 'propose-admin', [Cl.principal(newAdmin)], deployer)).ok && (await t.send('skins', 'accept-admin', [], newAdmin)).ok, 'skins hand-over');
+      const plan = await planSkins(t);
+      const all = builtinSkins();
+      must(plan.todo.length === all.length && plan.drift.length === 0, `unexpected skins plan ${plan.todo.length}/${plan.drift.length}`);
+      const dry = await runSkins(t, plan, { execute: false });
+      must(!dry.failed && Number(await t.ro('skins', 'get-skin-count')) === 0, 'a dry run must send nothing');
+      const r = await runSkins(t, plan, { execute: true, from: newAdmin });
+      must(!r.failed && r.registered === all.length, r.failed || `registered ${r.registered}`);
+      const again = await planSkins(t);
+      must(!again.todo.length && !again.drift.length, 'running it again must find nothing to do');
+      const oak = await readSkin(t, 'oak');
+      must(oak && oak.tier === 0 && oak.approved && !oak.hidden, 'oak should be a usable built-in');
+      await t.send('skins', 'set-publisher', [Cl.principal(publisher), Cl.bool(true)], newAdmin);
+      const bad = await t.send('skins', 'register-skin', (await import('./skins.mjs')).skinArgs({ key: 'sneaky', name: 'Sneaky', family: 0, builtin: 'sneaky', styles: 1, sound: 0, frame: 'wood', hardware: 'brass', wear: 0 }), publisher);
+      must(!bad.ok && Number(bad.value) === 300, 'a publisher must not be able to name a built-in (u300)');
+      return `${r.registered} skins registered; a second run does nothing`;
     });
   } catch (e) { return { ok: false, steps, error: e.message }; }
   return { ok: true, steps };

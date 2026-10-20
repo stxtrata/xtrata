@@ -590,6 +590,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
           <div class="share">
             <a class="btn" id="tweet2" target="_blank" rel="noopener" href="#">Post this challenge on X</a>
             <button class="btn secondary" id="copy2" type="button">Copy link</button>
+            <a class="btn secondary" href="/giveaway/onboarding">Read the full challenge</a>
           </div>
         </div>
         <div>
@@ -776,9 +777,9 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
 
   // Sharing: one message for everyone, one aimed at people already on-chain.
   var text='A limited edition album is being given away free, one copy every ten minutes. Tap the live one first and it’s yours. Try it';
-  var text2='Test this on a non-crypto friend: send them this page. They tap a link, use their fingerprint, and end up with a limited-edition album and a player that pays artists as they listen. No wallet, no seed phrase. Tell me how it goes';
+  var text2='Challenge for crypto people: onboard someone who has never owned crypto, with zero explaining. Send them one link. They use their fingerprint and end up with a limited-edition album and a player that pays artists as it plays. Try it on someone';
   $('tweet').href='https://x.com/intent/post?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(PAGE);
-  $('tweet2').href='https://x.com/intent/post?text='+encodeURIComponent(text2)+'&url='+encodeURIComponent(PAGE);
+  $('tweet2').href='https://x.com/intent/post?text='+encodeURIComponent(text2)+'&url='+encodeURIComponent('https://xtrata.xyz/giveaway/onboarding');
   if(!navigator.share)$('share').hidden=true;
   $('share').addEventListener('click',function(){navigator.share({title:'Free Album Drop',text:text,url:PAGE}).catch(function(){});});
   ['copy','copy2'].forEach(function(id){

@@ -281,7 +281,7 @@
     const hasArt =
       !!imageRefId ||
       (!!config.imageBase64 &&
-        ['image/png', 'image/jpeg', 'image/webp'].includes(config.imageMimeType));
+        ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(config.imageMimeType));
     if (hasArt && !imageRefId && !/^[a-z\d+/]*={0,2}$/i.test(b64(config.imageBase64)))
       throw Error('Invalid embedded artwork.');
     const visualMime = imageRefId ? config.imageInscription.mimeType : config.imageMimeType;

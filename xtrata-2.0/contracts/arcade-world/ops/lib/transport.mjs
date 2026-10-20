@@ -4,12 +4,12 @@
 //   signer            attached only after guard.authoriseBroadcast() passed; signs and broadcasts one call at a time.
 //
 // transport = { kind, names, height(), ro(which, fn, args), send(which, fn, args, from) , mine?(n) }
-//   which: 'world' | 'posters'
+//   which: 'world' | 'posters' | 'skins'
 import { cvToHex, hexToCV, makeContractCall, broadcastTransaction, PostConditionMode } from '@stacks/transactions';
 import { toJs } from './util.mjs';
 
-export function simnetTransport(simnet, { deployer, world = 'xtrata-world-v1', posters = 'xtrata-posters-v1' }) {
-  const names = { world, posters };
+export function simnetTransport(simnet, { deployer, world = 'xtrata-world-v1', posters = 'xtrata-posters-v1', skins = 'xtrata-door-skins-v1' }) {
+  const names = { world, posters, skins };
   const t = {
     kind: 'simnet', names, deployer, simnet,
     async height() { return simnet.burnBlockHeight; },
@@ -29,7 +29,7 @@ export function simnetTransport(simnet, { deployer, world = 'xtrata-world-v1', p
 
 export const API_BASE = { testnet: 'https://api.testnet.hiro.so', mainnet: 'https://api.hiro.so' };
 
-// names: { world: 'ST....xtrata-world-v1', posters: 'ST....xtrata-posters-v1' } (full contract identifiers)
+// names: { world: 'ST....xtrata-world-v1', posters: 'ST....xtrata-posters-v1', skins?: 'ST....xtrata-door-skins-v1' } (full contract identifiers)
 export function networkTransport({ network, names, readSender, apiBase, fetchImpl = globalThis.fetch, signer = null }) {
   if (network !== 'testnet' && network !== 'mainnet' && network !== 'devnet') throw new Error('network must be testnet, mainnet or devnet');
   const base = (apiBase || API_BASE[network] || 'http://localhost:3999').replace(/\/+$/, '');

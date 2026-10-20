@@ -259,3 +259,28 @@ test('network transport: reads are plain read-only POSTs, sends are refused with
   assert.equal(tx.payload.functionName.content, 'set-paused');
   assert.equal(seen.length, 1, 'building and signing a call does not touch the network');
 });
+
+test('door-skin params: the validator says what the hall will do with them', async () => {
+  const warnsOf = async (params, door = 'door-arch', base = 'door') => {
+    const sc = { bay: 0, at: '+10', base, interaction: 'knock', layers: [{ look: 'door-skin', params }] }; if (base === 'door') sc.door = door;
+    const r = compileScenes(file([sc]), await ctxOf());
+    assert.equal(r.findings.errors.length, 0, JSON.stringify(r.findings.errors));
+    return r.findings.warnings.map((w) => w.msg).join(' | ');
+  };
+  assert.equal(await warnsOf({ skin: 'oak', frame: 'wood', hardware: 'brass', tint: '#aa8844', wear: 30 }), '', 'a good skin: no warnings');
+  assert.match(await warnsOf({ skin: 'no-such' }), /not one of the hall's built-in skins/);
+  assert.match(await warnsOf({ skin: 'stained' }, 'door-rect'), /does not suit the rect door/);
+  assert.match(await warnsOf({ skin: 'oak', frame: 'gold' }), /frame "gold" is not known/);
+  assert.match(await warnsOf({ skin: 'oak', hardware: 'plastic' }), /hardware "plastic" is not known/);
+  assert.match(await warnsOf({}), /no "skin"/);
+  assert.match(await warnsOf({ skin: 'neon' }), /changes nothing/);
+  assert.match(await warnsOf({ skin: 'oak' }, null, 'wall'), /does nothing without base "door"/);
+  assert.match(await warnsOf({ skin: 'oak', wear: 400 }), /"wear": 400 will be drawn as 100/);
+});
+
+test('the door-skins example validates clean against the chain look book', async () => {
+  const r = compileScenes(ex('door-skins.scene.json'), await ctxOf());
+  assert.equal(r.findings.errors.length, 0, JSON.stringify(r.findings.errors));
+  assert.equal(r.findings.warnings.length, 0, JSON.stringify(r.findings.warnings));
+  assert.equal(r.scenes.length, 2);
+});

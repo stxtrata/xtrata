@@ -54,6 +54,7 @@
       it.info.coverB64 &&
       !it.info.coverRef &&
       it.info.artworkInfo &&
+      !it.info.artworkInfo.animated &&
       it.info.artworkInfo.bytes > LARGE_ART_BYTES
     );
 

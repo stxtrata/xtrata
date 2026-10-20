@@ -14,6 +14,7 @@
 // `at` is an absolute burn-block height or "+N" blocks / "+Nm" / "+Nh" / "+Nd" from the base height.
 import { Findings, isAscii, parseWhen } from './util.mjs';
 import { hallBays, BASES, INTERACTIONS } from './catalogue.mjs';
+import { skinKit } from './skins.mjs';
 
 export const SCENE_FORMAT = 'arcade-scene-file/1';
 export const LIMITS = { layers: 8, params: 256, state: 24, room: 24, path: 64, timeline: 48, batch: 8 };
@@ -53,6 +54,19 @@ function paramWarnings(key, params, f, where) {
   }
 }
 
+// door-skin params, beyond clamping: does the hall know the skin, does it suit this door, are frame and hardware real?
+function skinWarnings(params, base, doorStyle, f, where) {
+  const K = skinKit();
+  if (base !== BASES.door) { f.warn(where, 'a door-skin does nothing without base "door"'); return; }
+  const def = typeof params.skin === 'string' && Object.prototype.hasOwnProperty.call(K.SKINS, params.skin) ? K.SKINS[params.skin] : null;
+  if (params.skin == null) f.warn(where, 'no "skin": the door keeps its neon Threshold look');
+  else if (!def) f.warn(where, `skin ${JSON.stringify(params.skin)} is not one of the hall's built-in skins (${K.SKIN_KEYS.join(', ')}); the door keeps its neon look unless the registry supplies it`);
+  else if (params.skin === 'neon') f.warn(where, 'the neon skin is the plain Threshold door; this layer changes nothing');
+  else if (!K.allowed(def.mask, doorStyle)) f.warn(where, `skin "${params.skin}" does not suit the ${doorStyle} door (it suits ${K.stylesOf(def.mask).join(', ')}); the door keeps its neon look`);
+  if (params.frame != null && params.frame !== '' && !Object.prototype.hasOwnProperty.call(K.FRAMES, params.frame)) f.warn(where, `frame ${JSON.stringify(params.frame)} is not known (${Object.keys(K.FRAMES).join(', ')}); the skin's own frame is used`);
+  if (params.hardware != null && params.hardware !== '' && !Object.prototype.hasOwnProperty.call(K.HARDWARE, params.hardware)) f.warn(where, `hardware ${JSON.stringify(params.hardware)} is not known (${Object.keys(K.HARDWARE).join(', ')}); the skin's own hardware is used`);
+}
+
 // Validate and compile a scene file.
 //   ctx: { looks: look book, height: base height for relative times, rooms?: { id: {bays, hidden} }, timelineUsed?: { "<room>#<bay>": n } }
 // Returns { findings, scenes } where scenes are compiled objects (see clar.mjs) sorted by start height (stable).
@@ -87,13 +101,14 @@ export function compileScenes(doc, ctx) {
     if (!(iName in INTERACTIONS)) f.error(w, `"interaction" must be one of ${INTERACTION_NAMES.join(', ')}`); else sc.interaction = INTERACTIONS[iName];
 
     // door look
+    let doorStyle = 'rect';
     if (sc.base === BASES.door) {
       const ref = s.door == null ? 'door-rect' : s.door;
       const dl = resolveLook(ref, ctx.looks, 0);
       if (!dl) f.error(w, `door look ${JSON.stringify(ref)} is not a usable door look on this world contract (u205)`);
       else if (dl.kind !== 0) f.error(w, `look ${JSON.stringify(ref)} is not a door (kind ${dl.kind}) (u205)`);
       else if (dl.hidden || !dl.approved) f.error(w, `door look ${JSON.stringify(ref)} is hidden or not approved (u205)`);
-      else sc.doorLook = dl.id;
+      else { sc.doorLook = dl.id; doorStyle = String(dl.builtin || 'door-rect').replace(/^door-/, ''); }
     } else if (s.door != null) f.error(w, '"door" is only valid with base "door" (u205)');
 
     // layers
@@ -116,6 +131,7 @@ export function compileScenes(doc, ctx) {
       if (typeof state !== 'string' || state.length > LIMITS.state || !isAscii(state)) f.error(lw, `"state" must be ASCII text of at most ${LIMITS.state} characters`);
       if (look.tier === 0) {
         paramWarnings(look.builtin, params, f, lw);
+        if (look.builtin === 'door-skin') skinWarnings(params, sc.base, doorStyle, f, lw);
         if (look.kind === 1 && state && !['open', 'half', 'closed'].includes(state)) f.warn(lw, `cover state "${state}" is not open/half/closed; the openness param is used instead`);
         if ((look.kind === 3 || look.kind === 4) && state && state !== 'off') f.warn(lw, `state "${state}" has no meaning for a sound or light; only "off" does`);
       } else f.warn(lw, `look "${look.name}" is tier ${look.tier}; this hall draws only built-in (tier 0) looks, so it will not appear until the hall supports it`);

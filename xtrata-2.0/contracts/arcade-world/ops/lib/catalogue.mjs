@@ -55,7 +55,7 @@ export const ACTIONS = { none: 0, play: 1, path: 2, playlist: 3 };
 // every non-door look, then the door styles. [{ key, kind, name }]
 const NICE = {
   'curtain-house': 'House curtain', 'sign-board': 'Sign board', 'caution-tape': 'Caution tape', 'work-site': 'Work site sounds',
-  'hum': 'Room hum', 'light-steady': 'Steady light', 'light-pulse': 'Pulsing light', 'light-flicker': 'Flickering light',
+  'door-skin': 'Door skin', 'hum': 'Room hum', 'light-steady': 'Steady light', 'light-pulse': 'Pulsing light', 'light-flicker': 'Flickering light',
 };
 export function lookRegistry() {
   const B = hallBays(), out = [];
