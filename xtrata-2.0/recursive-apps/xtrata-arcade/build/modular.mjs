@@ -93,6 +93,19 @@ function build() {
   if (Number(ids.bundleId) > 0 && existsSync(V13)) hashes[ids.bundleId] = sha(readFileSync(V13));
   for (const name of P.PACK_ORDER) if (Number(ids.packs?.[name]) > 0) hashes[ids.packs[name]] = manifest.packs[name].sha256;
   for (const [name, id] of Object.entries(ids.parts || {})) if (Number(id) > 0) hashes[id] = sha(parts[name]);
+  // Rooms that are their own inscription: build/rooms/<name>-room.html is inscribed as it is; the parent pins its id and hash.
+  const roomsDir = join(here, 'rooms'), roomsOut = {};
+  for (const name of Object.keys(ids.rooms || {})) {
+    const file = join(roomsDir, `${name}-room.html`);
+    if (!existsSync(file)) throw new Error(`ids.rooms.${name}: no ${name}-room.html under build/rooms`);
+    const bytes = readFileSync(file);
+    mkdirSync(join(DIST, 'rooms'), { recursive: true });
+    writeFileSync(join(DIST, 'rooms', `${name}-room.html`), bytes);
+    const id = Number(typeof ids.rooms[name] === 'object' ? ids.rooms[name].id : ids.rooms[name]);
+    roomsOut[name] = { file: `rooms/${name}-room.html`, bytes: bytes.length, sha256: sha(bytes), id };
+    if (id > 0) hashes[id] = sha(bytes);
+  }
+  manifest.rooms = roomsOut;
   const config = R.parentConfig({ ...ids, hashes }, P.PACK_ORDER);
   const parent = R.fillParent(shell, config);
   writeFileSync(join(DIST, 'xtrata-arcade-parent.html'), parent);
@@ -107,6 +120,7 @@ function build() {
     const note = m.changedSinceBundle ? (m.changedSinceBundle.length ? 'CHANGED: ' + m.changedSinceBundle.join(', ') : 'same as #' + ids.bundleId) : '';
     console.log(`  ${name.padEnd(7)} ${kb(m.bytes).padStart(10)}  id ${String(m.id).padEnd(6)} ${note}`);
   }
+  for (const [n, r] of Object.entries(manifest.rooms || {})) console.log(`  room ${n.padEnd(6)}${kb(r.bytes).padStart(10)}  id ${r.id || 0}${r.id ? '' : '  (not inscribed: its door stays closed)'}`);
   console.log(`  parent  ${kb(manifest.parent.bytes).padStart(10)}   single file ${kb(single.length)}`);
 }
 

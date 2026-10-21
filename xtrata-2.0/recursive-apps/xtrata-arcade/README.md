@@ -166,3 +166,26 @@ The two-approval long-run (inscribe) flow shows a warning without a fixed figure
 big transaction legitimately grows with its size. `networkFeePerByteUstx` (default 0, off) can scale the figure
 if measurement shows larger posts need it. The fee is not yet passed to the wallet: that is a separate wallet
 change (see `docs/WALLET-PLAYBOOK.md`). Test: `tests/long-replay.test.cjs` (needs `@stacks/transactions` v6).
+
+## The casino as its own inscription (rooms)
+
+A room that is its own page (the casino) is inscribed on its own and the parent pins it, so the casino is on chain
+like everything else and is reached only through the world contract's lobby door.
+
+- `build/rooms/casino-room.html` is inscribed as it is (about 231 KB). `parent/ids.json` has `"rooms": { "casino": 0 }`:
+  put the inscription id there. With id 0 the parent has no casino, and the lobby door says "not open yet".
+- `node build/modular.mjs build` copies the room to `dist/rooms/`, writes its hash into the parent's `hashes`, and adds
+  `rooms: { casino: { id, title } }` to the parent's CONFIG.
+- The parent sets `window.XA_ROOMS.casino = { title, load }`. `load()` reads the room by id (gateway first, only if the
+  SHA-256 matches; otherwise from the chain), then frames it as `srcdoc`. Nothing is read until the door opens it.
+- **three.js is not fetched from a CDN.** The standalone room file has a cdnjs `<script>` for three.js r128 (so it
+  still opens on its own and in the preview); `load()` swaps that tag for the arcade's own three.js, which is the
+  `three` pack read from #3078. Both are r128. The room runs in its own frame with its own copy of the library.
+- The hall adds `window.__XA_FROM_ARCADE = 1` to the room, so it starts walking just inside its door (a srcdoc page
+  has no `?from=arcade`). A room that cannot be loaded shows "THE ROOM COULD NOT BE LOADED" and BACK TO THE LOBBY works.
+- **The contract is the switch.** The door, its sign and its link (`target-room: casino`) come from the world contract's
+  lobby room. Write the scene to turn the casino on; retract it (or revert the bay to a wall) to turn it off. The page
+  is only ever loaded through that door.
+
+Tests: `tests/hall-parent.test.cjs` (scenario 7: the real casino runs inside its frame on the arcade's three.js; tampered
+gateway copy refused) and `tests/hall-room.test.cjs` (F, G: a room from a loader, and one that fails).

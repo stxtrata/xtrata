@@ -21,6 +21,8 @@ function parentShell(template, lib) {
   return template.replace(LIB_SLOT, function () { return lib; });
 }
 
+var ROOM_TITLES = { casino: 'ROYAL FLUSH CASINO' };
+
 function parentConfig(ids, packOrder) {
   var packs = {};
   packOrder.forEach(function (n) { packs[n] = Number((ids.packs || {})[n] || 0); });
@@ -36,6 +38,13 @@ function parentConfig(ids, packOrder) {
   };
   // The world contracts (posters + world). Left out unless named, so the hall stays off and identical to v1.3.
   if (ids.world && (ids.world.posters || ids.world.world)) cfg.world = ids.world;
+  // Rooms that are their own inscription (the casino): only those with an id. A room with id 0 is simply not there, so its door says "not open yet".
+  var rooms = {};
+  Object.keys(ids.rooms || {}).forEach(function (n) {
+    var r = ids.rooms[n], id = Number(r && typeof r === 'object' ? r.id : r);
+    if (id > 0) rooms[n] = { id: id, title: (r && r.title) || ROOM_TITLES[n] || n };
+  });
+  if (Object.keys(rooms).length) cfg.rooms = rooms;
   return cfg;
 }
 

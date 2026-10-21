@@ -6,6 +6,8 @@
 //   C  going back              BACK TO THE LOBBY removes the page; you come out of the door, a step in front of it, and walk again
 //   D  the room can leave too  the page posts {xa:'leave-room'} and the hall takes you back the same way
 //   E  not configured          without XA_ROOMS the door says it is not open yet, and no page opens
+//   F  a room from the chain   XA_ROOMS with a `load` function (how the inscribed arcade opens a room that is its own inscription): framed as srcdoc, told it came from the arcade, back door works
+//   G  a room that will not load  the loading screen says so and BACK TO THE LOBBY still works
 // The real casino page needs three.js from a CDN, which the test browser cannot reach: a stub page stands in for it.
 // Run: NODE_PATH=<playwright> CHROME_PATH=... [SHOTS=<dir>] node tests/hall-room.test.cjs
 const { chromium } = require('playwright');
@@ -17,6 +19,9 @@ const assert = require('assert');
 const DIST = path.join(__dirname, '..', 'dist');
 const HTML = fs.readFileSync(path.join(DIST, fs.readdirSync(DIST).find((f) => /^xtrata-arcade-v[\d.]+\.html$/.test(f))), 'utf8');
 const STUB = '<!doctype html><title>stub casino</title><body style="background:#123;color:#fff"><h1 id="hi">CASINO STUB</h1><button id="leave" onclick="parent.postMessage({xa:\'leave-room\'},\'*\')">leave</button></body>';
+
+// A room page with no <head> and no src: it says whether the hall told it that it came from the arcade.
+const STUB_DOC = '<!doctype html><title>stub casino</title><body style="background:#123;color:#fff"><h1 id="hi">CASINO FROM CHAIN</h1><b id="from"></b><button id="leave" onclick="parent.postMessage({xa:\'leave-room\'},\'*\')">leave</button><script>document.getElementById("from").textContent=String(window.__XA_FROM_ARCADE)</script></body>';
 
 let passed = 0;
 function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' + name); }
@@ -50,10 +55,12 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     await ctx.addInitScript((a) => {
       window.XA_TEST = 1;
       Element.prototype.requestPointerLock = function () {};   // (the headless browser grants the lock and reports a mouse jump when it does; these tests are about walking, not the mouse)
-      if (a.rooms) window.XA_ROOMS = { casino: { src: 'casino-room.html', title: 'Royal Flush Casino' } };
+      if (a.rooms === true) window.XA_ROOMS = { casino: { src: 'casino-room.html', title: 'Royal Flush Casino' } };
+      if (a.rooms === 'load') window.XA_ROOMS = { casino: { title: 'Royal Flush Casino', load: () => new Promise((r) => setTimeout(() => r(a.stub), 300)) } };
+      if (a.rooms === 'fail') window.XA_ROOMS = { casino: { title: 'Royal Flush Casino', load: () => Promise.reject(new Error('read failed')) } };
       window.XA_WORLD_CONFIG = { posters: 'SP000000000000000000002Q6VF78.xtrata-posters-v1', world: 'SP000000000000000000002Q6VF78.xtrata-world-v1' };
       try { localStorage.setItem('xa-world-snap-v1', JSON.stringify(a.snap)); } catch (e) {}
-    }, { rooms, snap: snapshot() });
+    }, { rooms, snap: snapshot(), stub: STUB_DOC });
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
@@ -156,6 +163,44 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     check(await page.evaluate(() => window.__toast === true), 'E: walking into the casino door says it is not open yet');
     check((await rs(page)).state === 'walk' && !(await rs(page)).frame, 'E: with no XA_ROOMS the casino door opens no page and loads nothing');
     check(!errors.length, 'E: no page errors ' + errors.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+  {
+    /* ---- F ---- */
+    const { ctx, page, errors } = await open('load');
+    await intoLobby(page);
+    await face(page, 4); await page.waitForTimeout(800);
+    await openDoor(page, 4);
+    await page.waitForFunction(() => window.XA.roomState().frame === true, null, { timeout: 120000 });
+    check((await rs(page)).state === 'walk' && (await rs(page)).frameSrc === null, 'F: opening the door starts loading the room (no URL: its page comes from the loader)');
+    await page.waitForFunction(() => { const f = document.querySelector('iframe[title="Royal Flush Casino"]'); return f && f.dataset.loaded === '1'; }, null, { timeout: 120000 });
+    check((await rs(page)).frameDoc === true, 'F: the loaded page is framed as srcdoc');
+    await face(page, 4);
+    await walkInto(page, () => window.XA.roomState().state === 'room');
+    await page.waitForFunction(() => window.XA.roomState().state === 'room' && window.XA.roomState().back && !window.XA.roomState().loading, null, { timeout: 120000 });
+    const f1 = await (await page.$('iframe[title="Royal Flush Casino"]')).contentFrame();
+    check(!!f1 && (await f1.textContent('#hi')) === 'CASINO FROM CHAIN', 'F: the page inside the frame is the one the loader returned');
+    check((await f1.textContent('#from')) === '1', 'F: the room is told it came from the arcade (it starts walking just inside its door)');
+    await f1.click('#leave');
+    await page.waitForFunction(() => window.XA.roomState().state === 'walk', null, { timeout: 120000 });
+    check((await rs(page)).room === '' && !(await rs(page)).frame, 'F: the room\'s own back door returns you to the lobby');
+    check(!errors.length, 'F: no page errors ' + errors.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+  {
+    /* ---- G ---- */
+    const { ctx, page, errors } = await open('fail');
+    await intoLobby(page);
+    await face(page, 4); await page.waitForTimeout(800);
+    await openDoor(page, 4);
+    await face(page, 4);
+    await walkInto(page, () => window.XA.roomState().state === 'room');
+    await page.waitForFunction(() => /COULD NOT BE LOADED/.test(document.body.innerText), null, { timeout: 120000 });
+    check((await rs(page)).back === true, 'G: a room that cannot be loaded says so, and the back button is there');
+    await page.click('text=BACK TO THE LOBBY');
+    await page.waitForFunction(() => window.XA.roomState().state === 'walk', null, { timeout: 120000 });
+    check(!(await rs(page)).frame, 'G: going back leaves nothing behind');
+    check(!errors.length, 'G: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
   await browser.close(); srv.close();

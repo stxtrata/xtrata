@@ -2219,7 +2219,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   // tests/casino-walk.test.cjs in the arcade repo checks that they agree.
   const WALK = { fov: 68, eye: 1.6, speed: 3, sprint: 4.6, bobRate: 9, bobAmp: 0.025, look: 0.0022, drag: 0.004, touchLook: 0.005, pitch: 1.2 };
   const RW = 26, RD = 22, EYE = WALK.eye, PR = 0.32;
-  const FROM_ARCADE = /[?&]from=arcade\b/.test(location.search);   // opened from the arcade's lobby door: start walking, just inside the door
+  const FROM_ARCADE = /[?&]from=arcade\b/.test(location.search) || window.__XA_FROM_ARCADE === 1;   // opened from the arcade's lobby door: start walking, just inside the door
   const player = { x: 0, z: 6.2, yaw: 0, pitch: -0.08, bob: 0 };
   let mode = 'overview', returning = false, curSeat = null, cand = null;
   const keys = {}, joy = { id: null, ox: 0, oy: 0, vx: 0, vy: 0 }, lk = { id: null, x: 0, y: 0, moved: 0 };

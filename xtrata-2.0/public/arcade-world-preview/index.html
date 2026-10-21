@@ -362,6 +362,20 @@ button { font: inherit; color: inherit; }
 .xa-submit .xa-btn { width: 100%; margin-top: 10px; }
 .xa-note { margin: 8px 0 0; font-size: 12px; color: var(--xa-faint); }
 .xa-msg { margin: 10px 0 0; font-size: 13px; }
+.xa-feewarn { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--xa-red); background: rgba(255, 70, 90, .12); color: #fff; font-size: 13px; line-height: 1.4; }
+.xa-feewarn p { margin: 6px 0 0; }
+.xa-feewarn-t { display: block; font: 800 12px/1.2 var(--xa-mono); letter-spacing: .06em; color: var(--xa-red); }
+.xa-feewarn b { color: var(--xa-gold); }
+.xa-feehow { margin-top: 8px; font-size: 12px; }
+.xa-feehow summary { cursor: pointer; color: var(--xa-cyan); }
+.xa-feesteps { margin: 6px 0 0; padding-left: 20px; }
+.xa-feesteps li { margin: 4px 0; }
+.xa-feeremind { color: var(--xa-gold); }
+.xa-feemodal { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(3, 4, 12, .88); }
+.xa-feemodal-card { max-width: 440px; width: 100%; max-height: 92vh; overflow: auto; padding: 18px; border-radius: 14px; border: 2px solid var(--xa-red); background: #0b0e24; color: #fff; text-align: left; }
+.xa-feemodal-card h3 { margin: 0 0 8px; color: var(--xa-red); }
+.xa-feebig { margin: 0; font-size: 18px; line-height: 1.35; font-weight: 700; }
+.xa-feebig b { color: var(--xa-gold); }
 .xa-msg.is-ok { color: var(--xa-green); }
 .xa-msg.is-err { color: var(--xa-red); }
 .xa-msg a { color: var(--xa-cyan); }
@@ -1535,7 +1549,11 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     boardTtlMs: 45000,
     bridgeTimeoutMs: 170000,
     appName: 'xtrata-arcade',
-    inlineMax: 60000              // replays larger than this are stored as their own inscription
+    inlineMax: 60000,             // replays larger than this are stored as their own inscription
+    // The network (miner) fee players are told to set on a score post. Wallets estimate their own and have
+    // suggested 0.5 STX. One number, here only: the warning copy and the fee we pass (when a wallet takes it) read it.
+    networkFeeHintUstx: 3000,     // 0.003 STX
+    networkFeePerByteUstx: 0      // raise (e.g. 1) only if measured: tx larger than hint/perByte bytes then scale up
   };
 
   var HEX = '0123456789abcdef';
@@ -1775,6 +1793,12 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
       } catch (e) { last = e; }
     }
     throw last || err('read-only call failed');
+  }
+
+  // Network fee (micro-STX) to recommend for a transaction of about `txBytes` bytes.
+  function networkFeeHint(txBytes) {
+    var f = CFG.networkFeeHintUstx, per = CFG.networkFeePerByteUstx;
+    return per > 0 && txBytes > 0 ? Math.max(f, Math.ceil(txBytes * per)) : f;
   }
 
   var boardCache = {};
@@ -2371,6 +2395,7 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
       emit();
     },
     config: function () { return Object.assign({}, CFG); },
+    networkFeeHint: networkFeeHint,
     getTop10: getTop10,
     qualifies: qualifies,
     getFee: getFee,
@@ -3772,6 +3797,67 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     }
     postCard(box, { game: g, mode: s.mode, score: score, bytesP: s.replayP, pilot: s.pilot });
   }
+  /* ------------------------------------------------ network-fee warning */
+  // Wallets estimate their own network fee for a score post and have suggested 0.5 STX. Players should set the
+  // small figure in score-client's config (networkFeeHintUstx). Three places: a banner on the post panel, a notice
+  // the first time in each session, and a reminder line while the wallet is open.
+  var feeNoticeSeen = false;
+  function feeStx(txBytes) { return String(Number(S.networkFeeHint(txBytes)) / 1e6); }
+  function feeSeenStored() { try { return root.sessionStorage.getItem('xa:feeNotice') === '1'; } catch (e) { return false; } }
+  function feeMarkSeen() { feeNoticeSeen = true; try { root.sessionStorage.setItem('xa:feeNotice', '1'); } catch (e) { /* in-memory flag still holds for this page */ } }
+  // fee = the figure to enter (STX string), or null for the long-run flow where the right fee depends on the replay's size.
+  function feeHowSteps(fee) {
+    return h('ol', { class: 'xa-feesteps' }, [
+      h('li', { text: 'On your wallet’s confirm screen find the line called “Fee” or “Network fee”. It usually has an Edit, pencil or Advanced control next to it.' }),
+      h('li', { text: 'Choose “Custom”, or type into the fee box.' + (fee ? ' If the wallet shows micro-STX (µSTX), the amount is ' + Math.round(Number(fee) * 1e6) + '.' : '') }),
+      h('li', { text: fee ? 'Enter ' + fee + ' STX and save it.' : 'Lower it well below what the wallet suggested, then save it.' }),
+      h('li', { text: fee ? 'Check that the Fee line now says ' + fee + ' STX before you press Confirm. If it still shows 0.5 STX, cancel (this costs nothing) and try again.'
+        : 'Check the Fee line before you press Confirm. If it is still around 0.5 STX, cancel (this costs nothing) and choose “Seal it” instead.' }),
+      h('li', { text: 'The board fee shown on its own line is separate and correct. Only the network fee needs changing.' })
+    ]);
+  }
+  // `inscribe` = the two-approval long-run flow, where the network fee grows with the replay's size, so no fixed figure.
+  function feeBanner(inscribe, txBytes) {
+    var fee = feeStx(txBytes);
+    var box = h('div', { class: 'xa-feewarn', role: 'note' });
+    box.append(h('b', { class: 'xa-feewarn-t', text: 'BEFORE YOU APPROVE: CHECK THE NETWORK FEE' }));
+    if (inscribe) {
+      box.append(h('p', { text: 'Your wallet sets the network fee for each approval, and for a big replay it can be high. If it suggests something like 0.5 STX, cancel and choose “Seal it” instead.' }));
+    } else {
+      box.append(h('p', {}, ['Set the network fee to ', h('b', { text: fee + ' STX' }), '. Your wallet may suggest ', h('b', { text: '0.5 STX' }), ': ', h('b', { text: 'do NOT pay that' }), '. You can cancel at no cost.']));
+    }
+    var d = h('details', { class: 'xa-feehow' });
+    d.append(h('summary', { text: 'How do I change the fee?' }), feeHowSteps(inscribe ? null : fee), h('p', { class: 'xa-note', text: 'The wording differs between Xverse, Leather and other wallets, but every one of them lets you edit the fee before you confirm.' }));
+    box.append(d);
+    return box;
+  }
+  // Resolves true to carry on to the wallet, false if the player backs out. Once per session.
+  function feeNoticeOnce(inscribe, txBytes) {
+    if (feeNoticeSeen || feeSeenStored()) { feeNoticeSeen = true; return Promise.resolve(true); }
+    return new Promise(function (resolve) {
+      var fee = feeStx(txBytes);
+      var ok = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: inscribe ? 'OK, I’ll check the fee' : 'OK, I’ll set ' + fee + ' STX' });
+      var no = h('button', { class: 'xa-btn', type: 'button', text: 'Not now' });
+      var wrap = h('div', { class: 'xa-feemodal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Before your wallet opens' }, [
+        h('div', { class: 'xa-feemodal-card' }, [
+          h('h3', { text: 'Before your wallet opens' }),
+          inscribe
+            ? h('p', { class: 'xa-feebig', text: 'Check the network fee on every approval. If your wallet suggests something like 0.5 STX, cancel.' })
+            : h('p', { class: 'xa-feebig' }, ['Set the NETWORK FEE to ', h('b', { text: fee + ' STX' }), '.', h('br'), 'Your wallet may suggest ', h('b', { text: '0.5 STX' }), '. ', h('b', { text: 'Do NOT pay that.' })]),
+          h('details', { class: 'xa-feehow', open: '' }, [h('summary', { text: 'How do I change the fee?' }), feeHowSteps(inscribe ? null : fee)]),
+          h('div', { class: 'xa-over-actions' }, [no, ok])
+        ])
+      ]);
+      function done(v) { wrap.remove(); root.removeEventListener('keydown', onKey, true); if (v) feeMarkSeen(); resolve(v); }
+      function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } }
+      ok.addEventListener('click', function () { done(true); });
+      no.addEventListener('click', function () { done(false); });
+      root.addEventListener('keydown', onKey, true);
+      root.document.body.appendChild(wrap);
+      ok.focus();
+    });
+  }
+
   // The name / cost / post box for a ranked run: at game over, or later from a saved replay.
   // opts: { game, mode, score, pilot:{address, hash160}, bytes | bytesP, checked }
   function postCard(box, opts) {
@@ -3789,10 +3875,18 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     var boardId = boardOf(g, mode), replayBytes = null;
     var longNote = h('div', { class: 'xa-note xa-long', style: 'display:none;color:var(--xa-gold)' });
     var how = 'inline';     // inline | inscribe | seal
+    var feeBox = h('div', { class: 'xa-feebox' });
+    function txBytesNow() { return how === 'seal' ? 400 : (replayBytes ? replayBytes.length + 350 : 0); }
+    function paintFee() { feeBox.replaceChildren(feeBanner(how === 'inscribe', txBytesNow())); }
+    function walletMsg(t) {
+      var inscribe = how === 'inscribe';
+      msg.replaceChildren(t, h('br'), h('b', { class: 'xa-feeremind', text: inscribe ? 'Check the network fee before you approve.' : 'Network fee: set ' + feeStx(txBytesNow()) + ' STX, not 0.5.' }));
+    }
+    paintFee();
     function choice(val, title, text, on) {
       var r = h('input', { type: 'radio', name: 'xa-how', value: val });
       r.checked = !!on;
-      r.addEventListener('change', function () { if (r.checked) { how = val; btn.textContent = val === 'seal' ? 'Save replay & post sealed score' : 'Post score on-chain'; } });
+      r.addEventListener('change', function () { if (r.checked) { how = val; btn.textContent = val === 'seal' ? 'Save replay & post sealed score' : 'Post score on-chain'; paintFee(); } });
       return h('label', { class: 'xa-how', style: 'display:flex;gap:8px;align-items:flex-start;margin:6px 0;cursor:pointer;color:var(--xa-ink,#e8eef7)' },
         [r, h('span', {}, [h('b', { text: title }), h('br'), h('span', { style: 'opacity:.85', text: text })])]);
     }
@@ -3801,14 +3895,14 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     S.getFee(boardId).then(function (f) {
       if (!f.ok) return;
       if (!f.registered) { feeNote.textContent = 'This board is not open for scores yet.'; return; }
-      feeNote.textContent = '3–12 letters or numbers. Fee ' + (Number(f.value) / 1e6) + ' STX plus network fee, capped by a post-condition.';
+      feeNote.textContent = '3–12 letters or numbers. Board fee ' + (Number(f.value) / 1e6) + ' STX (capped by a post-condition), plus the network fee you set in your wallet.';
     });
     (async function () {
       replayBytes = opts.bytes || await opts.bytesP;
       if (!replayBytes) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run is longer than 4 hours and cannot be recorded.'; return; }
       var long = S.needsInscription(replayBytes), kb = Math.max(1, Math.round(replayBytes.length / 1024));
       if (long) {
-        how = 'inscribe';
+        how = 'inscribe'; paintFee();
         longNote.style.display = '';
         longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than a score entry holds. Working out the cost…' }));
         var tooBig = Math.ceil(replayBytes.length / XA.replay.CHUNK) > XA.replay.MAX_INSCRIBE_CHUNKS;
@@ -3817,7 +3911,7 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
         var render = function (q) {
           if (!longNote.isConnected) return;
           if (tooBig) {
-            how = 'seal'; btn.textContent = 'Save replay & post sealed score';
+            how = 'seal'; btn.textContent = 'Save replay & post sealed score'; paintFee();
             longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than the 512 KB one inscription holds, so this score is posted sealed.' }),
               choice('seal', 'Seal it', sealText, true));
             return;
@@ -3844,13 +3938,14 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
       if (n.length < 3) { msg.className = 'xa-msg is-err'; msg.textContent = 'Name needs at least 3 characters.'; name.focus(); return; }
       U.store('name', n);
       var sealIt = how === 'seal';
+      if (!(await feeNoticeOnce(how === 'inscribe', txBytesNow()))) return;
       btn.disabled = true; name.disabled = true;
       longNote.querySelectorAll('input').forEach(function (r) { r.disabled = true; });
-      msg.className = 'xa-msg'; msg.textContent = 'Check your wallet to confirm…';
+      msg.className = 'xa-msg'; walletMsg('Check your wallet to confirm…');
       if (sealIt) { keepSealed(replayBytes); saveReplay(replayBytes, boardId + '-' + n + '-' + score + '-sealed'); }
       try {
         var r = await S.submit({ board: boardId, score: score, name: n, replay: replayBytes, seal: sealIt, pilotHash: S._codec.bytesToHex(s.pilot.hash160),
-          onProgress: function (t) { if (msg.isConnected) { msg.className = 'xa-msg'; msg.textContent = t; } } });
+          onProgress: function (t) { if (msg.isConnected) { msg.className = 'xa-msg'; if (/wallet|approve/i.test(t)) walletMsg(t); else msg.textContent = t; } } });
         if (r.ok) {
           dropUnposted(replayBytes);
           var tx = r.txid ? (/^0x/.test(r.txid) ? r.txid : '0x' + r.txid) : '';
@@ -3874,7 +3969,7 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
         longNote.querySelectorAll('input').forEach(function (r) { r.disabled = false; });
       }
     });
-    box.replaceChildren(h('label', { for: 'xa-name', text: 'NAME ON THE BOARD' }), name, feeNote, longNote, btn, msg);
+    box.replaceChildren(h('label', { for: 'xa-name', text: 'NAME ON THE BOARD' }), name, feeNote, longNote, feeBox, btn, msg);
   }
 
   /* ---------------------------------------------------------- loop */
@@ -34389,7 +34484,7 @@ function buildRoom(){
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
-  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, back:!!(roomUI&&roomUI.back.style.display==='block')});   // read-only, for tests
+  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block')});   // read-only, for tests
   if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
   XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;   // read-only, for tests: where you are in bay i's open doorway
   XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
@@ -36648,10 +36743,11 @@ function updateBayFocus(){
 }
 /* ---------- other rooms that take the whole screen (the casino) ----------
    A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO' } } names
-   them (src is a URL the hall may frame: a file beside the hall, or an inscription's content path). Going in: a short loading screen over the hall,
+   them. A room is either `src` (a URL the hall may frame: a file beside the hall) or `load` (a function the host gives, returning the room's page as text,
+   which is framed as srcdoc: this is how the inscribed arcade opens a room that is its own inscription, hash-checked, see parent.template.html). Going in: a short loading screen over the hall,
    the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
    Going back: the frame is removed (it frees everything the room built) and you are where you were, in front of the door. */
-const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && typeof r.src==='string' && r.src ? r : null };
+const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && ((typeof r.src==='string' && r.src) || typeof r.load==='function') ? r : null };
 let roomUI=null, roomId='', roomBay=-1, roomT0=0, roomTimer=0;
 function roomEls(){
   if(roomUI) return roomUI;
@@ -36675,8 +36771,23 @@ function roomPrep(id){
   roomDrop();
   const f=document.createElement('iframe'); f.title=cfg.title||id; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
   f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden;pointer-events:none';
-  f.dataset.loaded=''; f.addEventListener('load',()=>{ f.dataset.loaded='1' });
-  U.frame=f; U.frameId=id; f.src=roomSrc(cfg); document.body.appendChild(f); return f;   // (src first: an empty frame fires a load of its own on insert)
+  f.dataset.loaded='';
+  U.frame=f; U.frameId=id;
+  if(typeof cfg.load==='function'){
+    // The page is not a URL: the host fetches it (from its inscription) and it is framed as srcdoc. Insert first, then listen, so the empty frame's own load is not mistaken for the room.
+    document.body.appendChild(f);
+    const fail=()=>{ f.dataset.failed='1'; f.dispatchEvent(new Event('xa-room-failed')) };
+    Promise.resolve().then(()=>cfg.load()).then(html=>{
+      if(typeof html!=='string' || !html){ fail(); return }
+      if(roomUI.frame!==f) return;                       // dropped while it was loading
+      f.addEventListener('load',()=>{ f.dataset.loaded='1' });
+      const flag='<script>window.__XA_FROM_ARCADE=1<\/script>';   // the room starts walking, just inside its door (the backslash keeps this from ending the page's own script)
+      f.srcdoc=/<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i,m=>m+flag) : flag+html;
+    }).catch(fail);
+    return f;
+  }
+  f.addEventListener('load',()=>{ f.dataset.loaded='1' });
+  f.src=roomSrc(cfg); document.body.appendChild(f); return f;   // (src first: an empty frame fires a load of its own on insert)
 }
 function roomDrop(){
   if(!roomUI || !roomUI.frame || state==='room') return;
@@ -36696,6 +36807,8 @@ function enterRoom(id, bayIdx){
   f.style.pointerEvents='auto';
   const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,minWait-(performance.now()-roomT0));
     setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room') U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
+  const failed=()=>{ clearTimeout(roomTimer); U.sub.textContent='THE ROOM COULD NOT BE LOADED. YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 };
+  if(f.dataset.failed) failed(); else f.addEventListener('xa-room-failed',failed,{once:true});
   if(ready) done(); else f.addEventListener('load',done,{once:true});
   roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
 }
