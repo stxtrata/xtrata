@@ -13,6 +13,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const crypto = require('crypto');
 
 const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
@@ -25,6 +26,7 @@ const CONTENT = {
   9100: fs.readFileSync(path.join(ROOT, 'src', 'parts', 'game-cave-diver.js'))
 };
 for (const [name, id] of Object.entries(PACK_IDS)) CONTENT[id] = fs.readFileSync(path.join(DIST, manifest.packs[name].file));
+CONTENT[9200] = fs.readFileSync(path.join(DIST, 'rooms', 'casino-room.html'));   // a room that is its own inscription
 // The released ids (parent/ids.json): engine #3079, hall #3080 over the bundle #3078.
 const RELEASED = manifest.parent.config;
 for (const [name, id] of Object.entries(RELEASED.packs)) if (id > 0) CONTENT[id] = CONTENT[PACK_IDS[name]];
@@ -120,7 +122,7 @@ function top10Result(board, filled) {
       const id = Number(m[1]);
       gw[id] = (gw[id] || 0) + 1;
       if (!CONTENT[id]) return route.fulfill({ status: 404, headers: cors, body: '' });
-      const body = opts.gateway === 'tamper' && id === 3078 ? Buffer.concat([CONTENT[id], Buffer.from('<!-- x -->')]) : CONTENT[id];
+      const body = (opts.gateway === 'tamper' && id === 3078) || (opts.gateway === 'tamper-room' && id === 9200) ? Buffer.concat([CONTENT[id], Buffer.from('<!-- x -->')]) : CONTENT[id];
       return route.fulfill({ status: 200, headers: { ...cors, 'Content-Type': 'text/plain' }, body });
     });
     const page = await ctx.newPage();
@@ -293,6 +295,46 @@ function top10Result(board, filled) {
   const viewerErrors = r.errors.filter((e) => !/permissions policy/i.test(e));
   check(!viewerErrors.length, 'no page errors (viewer) ' + viewerErrors.slice(0, 2).join(' | '));
   if (SHOTS) await r.page.screenshot({ path: path.join(SHOTS, '15-viewer-srcdoc.png') });
+  await r.ctx.close();
+
+  /* 7. A room that is its own inscription (the casino): read by id, hash-checked, three.js swapped for the arcade's own copy, then it runs. */
+  const roomSha = crypto.createHash('sha256').update(CONTENT[9200]).digest('hex');
+  const roomParent = parentWith({ bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: { 9200: roomSha }, rooms: { casino: { id: 9200, title: 'ROYAL FLUSH CASINO' } } });
+  pages['/room.html'] = roomParent;
+  r = await open('/room.html');
+  check(!r.loadErr && await r.page.evaluate(() => !!(window.XA_ROOMS && typeof window.XA_ROOMS.casino.load === 'function' && window.XA_ROOMS.casino.title === 'ROYAL FLUSH CASINO')), 'a configured room becomes window.XA_ROOMS.casino with a loader (nothing fetched until a door opens it)');
+  check(!r.reads[9200], 'the room is not read at boot');
+  const roomHtml = await r.page.evaluate(() => window.XA_ROOMS.casino.load());
+  check(r.reads[9200] > 0 && !r.gw[9200], 'with no gateway the room is read from the chain by its id (' + r.reads[9200] + ' chunks)');
+  check(typeof roomHtml === 'string' && !/cdnjs\.cloudflare/.test(roomHtml) && roomHtml.length > CONTENT[9200].length + 400000 && /REVISION/.test(roomHtml), 'the room\'s cdnjs three.js tag is replaced by the arcade\'s own copy (' + Math.round(roomHtml.length / 1024) + ' KB page, no CDN)');
+  const before9200 = r.reads[9200];
+  await r.page.evaluate(() => window.XA_ROOMS.casino.load());
+  check(r.reads[9200] === before9200, 'a second load is remembered (no second read)');
+  const ran = await r.page.evaluate(async (doc) => {
+    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:99999;border:0';
+    document.body.appendChild(f);
+    await new Promise((res) => { f.addEventListener('load', res, { once: true }); f.srcdoc = doc; });
+    for (let i = 0; i < 160 && !(f.contentWindow.__casino); i++) await new Promise((res) => setTimeout(res, 500));
+    const w = f.contentWindow;
+    return { casino: !!w.__casino, three: !!(w.THREE && w.THREE.REVISION), rev: w.THREE && w.THREE.REVISION, ownRealm: w.THREE !== window.THREE, canvas: !!w.document.querySelector('canvas') };
+  }, roomHtml);
+  check(ran.casino && ran.three && ran.canvas && ran.rev === '128', 'the casino runs inside the frame on the arcade\'s three.js r' + ran.rev + ' (own copy inside the frame: ' + ran.ownRealm + ')');
+  check(!r.errors.filter((e) => !/permissions policy/i.test(e)).length, 'no page errors with the room running ' + r.errors.slice(0, 2).join(' | '));
+  await r.ctx.close();
+  // via the gateway, and a tampered gateway copy is refused (chain read instead)
+  pages['/room-gw.html'] = roomParent;
+  r = await open('/room-gw.html', { gateway: 'tamper-room' });
+  const html2 = await r.page.evaluate(() => window.XA_ROOMS.casino.load());
+  check(r.gw[9200] > 0 && r.reads[9200] > 0 && html2 === roomHtml, 'a tampered gateway copy of the room is refused: it is read from the chain and is identical');
+  await r.ctx.close();
+  r = await open('/room-gw.html', { gateway: 'serve' });
+  const html3 = await r.page.evaluate(() => window.XA_ROOMS.casino.load());
+  check(r.gw[9200] > 0 && !r.reads[9200] && html3 === roomHtml, 'from the gateway, the room is taken whole once its hash matches');
+  await r.ctx.close();
+  // a room with id 0 is simply not there
+  pages['/room-0.html'] = parentWith({ bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {}, rooms: {} });
+  r = await open('/room-0.html');
+  check(await r.page.evaluate(() => !window.XA_ROOMS), 'with no room id in the parent there is no XA_ROOMS: the casino door stays closed');
   await r.ctx.close();
 
   await browser.close();

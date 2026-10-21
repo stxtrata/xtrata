@@ -188,7 +188,7 @@ function buildRoom(){
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
-  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, back:!!(roomUI&&roomUI.back.style.display==='block')});   // read-only, for tests
+  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block')});   // read-only, for tests
   if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
   XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;   // read-only, for tests: where you are in bay i's open doorway
   XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
@@ -2447,10 +2447,11 @@ function updateBayFocus(){
 }
 /* ---------- other rooms that take the whole screen (the casino) ----------
    A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO' } } names
-   them (src is a URL the hall may frame: a file beside the hall, or an inscription's content path). Going in: a short loading screen over the hall,
+   them. A room is either `src` (a URL the hall may frame: a file beside the hall) or `load` (a function the host gives, returning the room's page as text,
+   which is framed as srcdoc: this is how the inscribed arcade opens a room that is its own inscription, hash-checked, see parent.template.html). Going in: a short loading screen over the hall,
    the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
    Going back: the frame is removed (it frees everything the room built) and you are where you were, in front of the door. */
-const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && typeof r.src==='string' && r.src ? r : null };
+const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && ((typeof r.src==='string' && r.src) || typeof r.load==='function') ? r : null };
 let roomUI=null, roomId='', roomBay=-1, roomT0=0, roomTimer=0;
 function roomEls(){
   if(roomUI) return roomUI;
@@ -2474,8 +2475,23 @@ function roomPrep(id){
   roomDrop();
   const f=document.createElement('iframe'); f.title=cfg.title||id; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
   f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden;pointer-events:none';
-  f.dataset.loaded=''; f.addEventListener('load',()=>{ f.dataset.loaded='1' });
-  U.frame=f; U.frameId=id; f.src=roomSrc(cfg); document.body.appendChild(f); return f;   // (src first: an empty frame fires a load of its own on insert)
+  f.dataset.loaded='';
+  U.frame=f; U.frameId=id;
+  if(typeof cfg.load==='function'){
+    // The page is not a URL: the host fetches it (from its inscription) and it is framed as srcdoc. Insert first, then listen, so the empty frame's own load is not mistaken for the room.
+    document.body.appendChild(f);
+    const fail=()=>{ f.dataset.failed='1'; f.dispatchEvent(new Event('xa-room-failed')) };
+    Promise.resolve().then(()=>cfg.load()).then(html=>{
+      if(typeof html!=='string' || !html){ fail(); return }
+      if(roomUI.frame!==f) return;                       // dropped while it was loading
+      f.addEventListener('load',()=>{ f.dataset.loaded='1' });
+      const flag='<script>window.__XA_FROM_ARCADE=1<\/script>';   // the room starts walking, just inside its door (the backslash keeps this from ending the page's own script)
+      f.srcdoc=/<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i,m=>m+flag) : flag+html;
+    }).catch(fail);
+    return f;
+  }
+  f.addEventListener('load',()=>{ f.dataset.loaded='1' });
+  f.src=roomSrc(cfg); document.body.appendChild(f); return f;   // (src first: an empty frame fires a load of its own on insert)
 }
 function roomDrop(){
   if(!roomUI || !roomUI.frame || state==='room') return;
@@ -2495,6 +2511,8 @@ function enterRoom(id, bayIdx){
   f.style.pointerEvents='auto';
   const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,minWait-(performance.now()-roomT0));
     setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room') U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
+  const failed=()=>{ clearTimeout(roomTimer); U.sub.textContent='THE ROOM COULD NOT BE LOADED. YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 };
+  if(f.dataset.failed) failed(); else f.addEventListener('xa-room-failed',failed,{once:true});
   if(ready) done(); else f.addEventListener('load',done,{once:true});
   roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
 }
