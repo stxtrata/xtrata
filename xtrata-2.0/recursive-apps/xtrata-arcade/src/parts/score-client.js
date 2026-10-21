@@ -32,7 +32,11 @@
     boardTtlMs: 45000,
     bridgeTimeoutMs: 170000,
     appName: 'xtrata-arcade',
-    inlineMax: 60000              // replays larger than this are stored as their own inscription
+    inlineMax: 60000,             // replays larger than this are stored as their own inscription
+    // The network (miner) fee players are told to set on a score post. Wallets estimate their own and have
+    // suggested 0.5 STX. One number, here only: the warning copy and the fee we pass (when a wallet takes it) read it.
+    networkFeeHintUstx: 3000,     // 0.003 STX
+    networkFeePerByteUstx: 0      // raise (e.g. 1) only if measured: tx larger than hint/perByte bytes then scale up
   };
 
   var HEX = '0123456789abcdef';
@@ -272,6 +276,12 @@
       } catch (e) { last = e; }
     }
     throw last || err('read-only call failed');
+  }
+
+  // Network fee (micro-STX) to recommend for a transaction of about `txBytes` bytes.
+  function networkFeeHint(txBytes) {
+    var f = CFG.networkFeeHintUstx, per = CFG.networkFeePerByteUstx;
+    return per > 0 && txBytes > 0 ? Math.max(f, Math.ceil(txBytes * per)) : f;
   }
 
   var boardCache = {};
@@ -868,6 +878,7 @@
       emit();
     },
     config: function () { return Object.assign({}, CFG); },
+    networkFeeHint: networkFeeHint,
     getTop10: getTop10,
     qualifies: qualifies,
     getFee: getFee,
