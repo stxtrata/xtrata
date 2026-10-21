@@ -138,10 +138,12 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     await intoLobby(page);
     await openDoor(page, 4);
     await until(page, () => face(page, 4), /ENTER/);
-    await page.keyboard.press('KeyE');
-    await page.waitForTimeout(1500);
+    // the toast only shows for a few seconds and the headless frames are slow, so watch for it rather than poll
+    await page.evaluate(() => { window.__toast = false; new MutationObserver(() => { const e = document.getElementById('bprompt'); if (e && !e.hidden && /NOT OPEN YET/.test(e.textContent)) window.__toast = true; }).observe(document.getElementById('bprompt'), { subtree: true, childList: true, characterData: true, attributes: true }); });
+    // (the headless view drifts, so face the door again before each press)
+    for (let k = 0; k < 20 && !(await page.evaluate(() => window.__toast)); k++) { await face(page, 4); await page.waitForTimeout(900); await page.keyboard.press('KeyE'); await page.waitForTimeout(1500); }
+    check(await page.evaluate(() => window.__toast === true), 'E: pressing E at the casino door shows a message');
     check((await rs(page)).state === 'walk' && !(await rs(page)).frame, 'E: with no XA_ROOMS the casino door opens no page');
-    await until(page, () => face(page, 4), /NOT OPEN YET/);
     check(true, 'E: and it says it is not open yet');
     check(!errors.length, 'E: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
