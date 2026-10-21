@@ -4,6 +4,7 @@
    (curtain, sign, door with its skin, lamp, work sounds) and their scene changes can be seen and heard.
    This head is the source: build/preview.mjs puts it on top of the current hall build to make public/arcade-world-preview/index.html. */
 window.XA_WORLD_CONFIG={posters:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-posters-v1',world:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-world-v1',roomId:'arcade-hall'};
+window.XA_ROOMS={casino:{src:'casino-room.html',title:'Royal Flush Casino'}};   // rooms that take the whole screen: the lobby's CASINO door opens this page (it sits beside this one)
 window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
 (function(){
   var chain=true, scene=['knock','open','enter','workshop'], curtain='closed', sound=true, lamp=true;
@@ -15,6 +16,7 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
     4:{kind:4,name:'Flicker',tier:0,builtin:'light-flicker',hidden:false,approved:true},
     5:{kind:2,name:'Caution tape',tier:0,builtin:'caution-tape',hidden:false,approved:true},
     50:{kind:2,name:'Door skin',tier:0,builtin:'door-skin',hidden:false,approved:true},
+    6:{kind:4,name:'Steady',tier:0,builtin:'light-steady',hidden:false,approved:true},
   };
   var STYLES=['rect','tall','wide','arch','gothic','double','cathedral','circle','oval','hexagon','octagon','industrial','vintage','scifi'];
   STYLES.forEach(function(n,i){LOOKS[20+i]={kind:0,name:n+' door',tier:0,builtin:'door-'+n,hidden:false,approved:true}});
@@ -69,7 +71,14 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
     if(sc&&sc.base==='door'&&skinKey[i]) sc.layers.push(L(2,50,JSON.stringify({skin:skinKey[i],frame:frame,hardware:hw,wear:wear})));
     return {scene:sc,nextHeight:null,height:0}
   }
-  function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1),bay(2),bay(3)],looks:LOOKS}}
+  // the lobby's own two doorways (its back wall): CASINO, which opens the casino room, and a locked staff door
+  function lobbyBays(){
+    var casino={base:'door',baseId:2,interaction:3,doorLook:20+style,link:{'target-room':'casino','arrival-bay':0,path:''},fromHeight:0,
+      layers:[L(2,2,'{"text":"casino","sub":"royal flush","tone":"gold"}'),L(4,6,'{"tone":"gold","intensity":0.7}')].concat(skinsOk('oak',style)?[L(2,50,JSON.stringify({skin:'oak',hardware:'brass'}))]:[])};
+    var staff=sceneOf('knock',1);
+    return [{scene:casino,nextHeight:null,height:0},{scene:staff,nextHeight:null,height:0}];
+  }
+  function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1),bay(2),bay(3)],rooms:{lobby:{bays:lobbyBays()}},looks:LOOKS}}
   function apply(){var W=window.XAWorld; if(!W||!W._t) return; var st=W._t.state; st.snap=snap(); st.listeners.forEach(function(f){try{f(st.snap,'preview')}catch(e){}})}
   var NAMES={posters:'posters (as #3111)',wall:'plain wall',story:'launch story',workshop:'workshop (door, curtain)',knock:'locked door (knock)',open:'unlocked door (open it)',enter:'door that leads to the lobby (walk in)',custom:'composed below'};
   var ORDER=['posters','wall','story','workshop','knock','open','enter','custom'];

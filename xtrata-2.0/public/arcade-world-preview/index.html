@@ -6,6 +6,7 @@
    (curtain, sign, door with its skin, lamp, work sounds) and their scene changes can be seen and heard.
    This head is the source: build/preview.mjs puts it on top of the current hall build to make public/arcade-world-preview/index.html. */
 window.XA_WORLD_CONFIG={posters:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-posters-v1',world:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-world-v1',roomId:'arcade-hall'};
+window.XA_ROOMS={casino:{src:'casino-room.html',title:'Royal Flush Casino'}};   // rooms that take the whole screen: the lobby's CASINO door opens this page (it sits beside this one)
 window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
 (function(){
   var chain=true, scene=['knock','open','enter','workshop'], curtain='closed', sound=true, lamp=true;
@@ -17,6 +18,7 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
     4:{kind:4,name:'Flicker',tier:0,builtin:'light-flicker',hidden:false,approved:true},
     5:{kind:2,name:'Caution tape',tier:0,builtin:'caution-tape',hidden:false,approved:true},
     50:{kind:2,name:'Door skin',tier:0,builtin:'door-skin',hidden:false,approved:true},
+    6:{kind:4,name:'Steady',tier:0,builtin:'light-steady',hidden:false,approved:true},
   };
   var STYLES=['rect','tall','wide','arch','gothic','double','cathedral','circle','oval','hexagon','octagon','industrial','vintage','scifi'];
   STYLES.forEach(function(n,i){LOOKS[20+i]={kind:0,name:n+' door',tier:0,builtin:'door-'+n,hidden:false,approved:true}});
@@ -71,7 +73,14 @@ window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
     if(sc&&sc.base==='door'&&skinKey[i]) sc.layers.push(L(2,50,JSON.stringify({skin:skinKey[i],frame:frame,hardware:hw,wear:wear})));
     return {scene:sc,nextHeight:null,height:0}
   }
-  function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1),bay(2),bay(3)],looks:LOOKS}}
+  // the lobby's own two doorways (its back wall): CASINO, which opens the casino room, and a locked staff door
+  function lobbyBays(){
+    var casino={base:'door',baseId:2,interaction:3,doorLook:20+style,link:{'target-room':'casino','arrival-bay':0,path:''},fromHeight:0,
+      layers:[L(2,2,'{"text":"casino","sub":"royal flush","tone":"gold"}'),L(4,6,'{"tone":"gold","intensity":0.7}')].concat(skinsOk('oak',style)?[L(2,50,JSON.stringify({skin:'oak',hardware:'brass'}))]:[])};
+    var staff=sceneOf('knock',1);
+    return [{scene:casino,nextHeight:null,height:0},{scene:staff,nextHeight:null,height:0}];
+  }
+  function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1),bay(2),bay(3)],rooms:{lobby:{bays:lobbyBays()}},looks:LOOKS}}
   function apply(){var W=window.XAWorld; if(!W||!W._t) return; var st=W._t.state; st.snap=snap(); st.listeners.forEach(function(f){try{f(st.snap,'preview')}catch(e){}})}
   var NAMES={posters:'posters (as #3111)',wall:'plain wall',story:'launch story',workshop:'workshop (door, curtain)',knock:'locked door (knock)',open:'unlocked door (open it)',enter:'door that leads to the lobby (walk in)',custom:'composed below'};
   var ORDER=['posters','wall','story','workshop','knock','open','enter','custom'];
@@ -31170,6 +31179,7 @@ XARoom.boot(document.getElementById('xa-root'));
 
   var CFG = {
     roomId: 'arcade-hall',
+    lobbyId: 'lobby',
     posters: '',                 // 'SP….xtrata-posters-v1'  (empty = off)
     world: '',                   // 'SP….xtrata-world-v1'    (empty = off)
     pollMs: 240000,              // how often to check the two version counters
@@ -31370,13 +31380,17 @@ XARoom.boot(document.getElementById('xa-root'));
     var need = live.slice(0, CFG.maxLive); pins.forEach(function (p) { if (need.indexOf(p.poster) < 0) need.push(p.poster); });
     var recs = await readPosters(need);
     var bays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.roomId)])).value.map(toBay);
-    var looks = await readLooks(bays);
+    // The lobby is its own room on the contract (its two back-wall doors). A contract with nothing for it, or a read that fails,
+    // leaves those doors as plain walls: it never takes the hall down.
+    var lobbyBays = [];
+    try { lobbyBays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.lobbyId)])).value.map(toBay); } catch (e) { lobbyBays = []; }
+    var looks = await readLooks(bays.concat(lobbyBays));
     var versions = await readVersions();
     var pinned = {}; pins.forEach(function (p) { if (recs[p.poster]) pinned[p.poster] = recs[p.poster]; });
     return {
       versions: versions, at: Date.now(),
       posters: live.map(function (id) { return recs[id]; }).filter(Boolean),
-      pins: pins, pinned: pinned, suppressed: suppressed, bays: bays, looks: looks
+      pins: pins, pinned: pinned, suppressed: suppressed, bays: bays, rooms: { lobby: { bays: lobbyBays } }, looks: looks
     };
   }
   // The looks the active scenes use (door look and every layer), in one or two reads. { id: { kind, name, tier, builtin, hidden, approved } }
@@ -31437,7 +31451,8 @@ XARoom.boot(document.getElementById('xa-root'));
   function onHeight(h) {
     if (!enabled() || !state.snap || !state.snap.bays || state.busy) return false;
     var next = Infinity;
-    state.snap.bays.forEach(function (b) { if (b && b.nextHeight != null && b.nextHeight < next) next = b.nextHeight; });
+    var all = state.snap.bays.concat(state.snap.rooms && state.snap.rooms.lobby ? state.snap.rooms.lobby.bays : []);
+    all.forEach(function (b) { if (b && b.nextHeight != null && b.nextHeight < next) next = b.nextHeight; });
     if (!(h >= next)) return false;
     var now = Date.now();
     if (state.lastHeightRead && now - state.lastHeightRead < 30000) return false;
@@ -32344,11 +32359,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     return { S: S, W: W, H: H, nL: nL, leafW: leafW, shape: shape, hy: hy, thick: thick, fw: fw, leaves: leaves };
   }
   // The decoration ops for one face of one leaf (what drawFace paints), with the draft's context object.
-  function faceOps(G, L, side) {
+  function faceOps(G, L, side, noRose) {   // noRose: the lit skins draw a real handle, so the flat rose disc is left out of their relief
     var S = G.S, shape = G.shape;
     var c = { W: G.W, H: G.H, x0: L.x0, x1: L.x1, w: G.leafW, sW: L.sW, rail: Math.max(14, G.H * 0.055), shape: shape, edge: shape.edge, key: 'f' + L.i + side, leaf: L.i,
       inset: function (inn, cls) { var k = [(G.W - 2 * inn) / G.W, (G.H - 2 * inn) / G.H]; return poly(shape.pts.map(function (p) { return [inn + p[0] * k[0], inn + p[1] * k[1]]; }), cls || 'l'); } };
-    var s = poly(shape.pts, 'f') + S.decor(c) + hingeArt(c, S, L) + CI(L.hx, G.hy, 9, 'f') + CI(L.hx, G.hy, 3, 'l d');
+    var s = poly(shape.pts, 'f') + S.decor(c) + hingeArt(c, S, L) + (noRose ? '' : CI(L.hx, G.hy, 9, 'f') + CI(L.hx, G.hy, 3, 'l d'));
     if (G.nL > 1) s += LN(L.hinge === 'L' ? L.x1 : L.x0, 0, L.hinge === 'L' ? L.x1 : L.x0, G.H);
     return s;
   }
@@ -32679,7 +32694,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     }
     function skinMaps() {                                                                           // one set of maps for the whole door; each leaf shows its strip
       var KT = SK.kit, sc = (SK.maxSide || 512) / Math.max(W, H), w = Math.max(16, Math.round(W * sc)), h = Math.max(16, Math.round(H * sc));
-      var ops = G.leaves.map(function (L) { return faceOps(G, L, 0); }).join('');
+      var ops = G.leaves.map(function (L) { return faceOps(G, L, 0, true); }).join('');
       var rel = KT.relief(G.shape.pts, ops, W, H, w, h), L0 = G.leaves[0];
       var mp = KT.render(SK.rec, { w: w, h: h, rel: rel, seed: 1234, wear: SK.wear, tint: SK.tint || null, handle: [L0.hx / W, G.hy / H] });
       function cv(fill) { var c = o.mkCanvas(w, h), x = c.getContext('2d'), id = x.createImageData(w, h); fill(id.data); x.putImageData(id, 0, 0); return c; }
@@ -32692,7 +32707,21 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       var tA = o.tex(albedo); disposables.push(tA);
       return { albedo: tA, orm: lin(orm), normal: lin(nrm), emissive: emi ? o.tex(emi) : null, glass: glass, base: SK.rec.base };
     }
-    function hwMat() { var h = SK.hw || { color: '#c9a24a', rough: 0.3, metal: 1 }, mt = new T.MeshStandardMaterial({ color: new T.Color(h.color), roughness: h.rough, metalness: h.metal, envMap: SK.env || null, envMapIntensity: 1 }); disposables.push(mt); return mt; }
+    // the hardware finish: the skin's metal, aged by its wear (a little duller and browner), reflecting a brighter generated room than the doors do
+    function hwFinish(dim, extra) {
+      var h = SK.hw || { color: '#c9a24a', rough: 0.3, metal: 1 }, wr = clamp(SK.wear || 0, 0, 1), c = new T.Color(h.color);
+      c.lerp(new T.Color(h.color).multiplyScalar(0.4).lerp(new T.Color('#5a4630'), 0.4), wr * 0.5); if (dim) c.multiplyScalar(dim);
+      var mt = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: clamp(h.rough + wr * 0.3 + (dim ? 0.1 : 0), 0.05, 0.92), metalness: h.metal, envMap: SK.envHw || SK.env || null, envMapIntensity: 1.4, side: T.DoubleSide }, extra || {}));
+      disposables.push(mt); return mt;
+    }
+    function hwMat() { return hwFinish(0); }
+    function hwMats(type) {
+      var em = SK.rec && SK.rec.emissive ? SK.rec.emissive.color : '#3be6ff', env = SK.envHw || SK.env || null;
+      var porcelain = type === 'knob' && SK.family === 'painted';   // a painted door gets a porcelain knob, as an old painted door would
+      var knob = porcelain ? new T.MeshPhysicalMaterial({ color: new T.Color('#efe9dc'), roughness: 0.2, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.1, envMap: env, envMapIntensity: 1.1 }) : null;
+      var m = { fin: hwFinish(0), acc: hwFinish(0.62), dark: new T.MeshStandardMaterial({ color: 0x07080a, roughness: 0.92, metalness: 0, side: T.DoubleSide }), glow: new T.MeshBasicMaterial({ color: new T.Color(em) }) };
+      m.knob = knob || m.fin; disposables.push(m.dark, m.glow); if (knob) disposables.push(knob); return m;
+    }
     if (SK) skinTex = skinMaps();
 
     /* doorway: dark recess with depth lines, framed by a band (one plane behind the leaves) */
@@ -32757,13 +32786,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
             var sm = new T.Mesh(strapG, hm); sm.scale.set(len2 * s, tk * s, 0.006); sm.position.set((ax + (L.hinge === 'R' ? -len2 / 2 : len2 / 2) - L.axis) * s, (H - f * H) * s, z); sm.raycast = function () {}; pivot.add(sm);
           });
         });
-        var roseG = new T.CylinderGeometry(9 * s, 9 * s, 0.006, 20); roseG.rotateX(Math.PI / 2); var len = L.Lh * (S.handle === 'bar' ? 1.25 : 1), leverG = new T.BoxGeometry(len * s, 8 * s, 0.014), padG = new T.CylinderGeometry(4.6 * s, 4.6 * s, 0.014, 14); padG.rotateX(Math.PI / 2);
-        disposables.push(roseG, leverG, padG);
+        // the handle: hardware chosen for this kind of door (section 5), the same on both faces; the parts that turn are in `lever`
+        var hwType = hardwareOf(S), HP = hwParts(T, hwType), HM = hwMats(hwType), hwS = s * hardwareScale(S);
+        disposables.push.apply(disposables, HP.geos);
         hands = [th + 0.004, -0.004].map(function (z, k) {
           var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = k ? -L.dir : L.dir;   // the back handle is the front one seen from the other side: same spindle, same direction (and it turns the same way)
-          var lv = new T.Group(), bar = new T.Mesh(leverG, hm), pad = new T.Mesh(padG, hm), rose = new T.Mesh(roseG, hm);
-          bar.position.set(len * s / 2, 0, 0.008); pad.position.set(len * s, 0, 0.008); rose.position.z = 0.0; bar.raycast = pad.raycast = rose.raycast = function () {};
-          lv.add(rose, bar, pad); hg.add(lv); pivot.add(hg); return { g: hg, lever: lv };
+          var lv = new T.Group(), st = new T.Group(); lv.scale.setScalar(hwS); st.scale.setScalar(hwS);
+          HP.parts.forEach(function (p) { var mesh = new T.Mesh(p.g, HM[p.m] || HM.fin); mesh.position.set(p.x, p.y, p.z); mesh.raycast = function () {}; (p.rot ? lv : st).add(mesh); });
+          hg.add(st, lv); pivot.add(hg); return { g: hg, lever: lv, type: hwType, porcelain: HM.knob !== HM.fin };
         });
       } else {
       var faceTex = [0, 1].map(function (sd) { return canvasTex(L.w, H, function (x) {
@@ -32867,7 +32897,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       }
     }
     sync();
-    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, latch: latch, scale: s, size: { w: W * s, h: H * s }, layout: G };
+    function handle() {   // where the first leaf's handle is in the world, and which kind it is (for tests and previews)
+      var h = leafObjs[0].hands[0], v = new T.Vector3(); group.updateMatrixWorld(true); h.g.getWorldPosition(v); return { x: v.x, y: v.y, z: v.z, type: h.type || 'canvas', turn: h.lever.rotation.z, porcelain: !!h.porcelain };
+    }
+    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, latch: latch, handle: handle, scale: s, size: { w: W * s, h: H * s }, layout: G };
   }
 
   // Sutherland-Hodgman: the part of a convex polygon between two vertical lines
@@ -32885,9 +32918,94 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     return clipHalf(p, x1, function (q) { return q[0] <= x1 + 1e-9; });
   }
 
+
+  /* ================================================================ 5. HARDWARE (the handle on a skinned door) */
+  // One handle TYPE per door style, so each door carries the hardware its kind of door would really have: a lever on a rose
+  // for a panelled door, a long backplate for a tall narrow one, a forged thumb-latch bar on a barn door, a cranked lever on an
+  // oval plate for the arch, an iron ring on a rosette for the gothic doors, a wheel for a vault or a hatch, a T-bar for the
+  // porthole, a heavy forged lever for the industrial door, a knob with its keyhole plate for the vintage door and a lit
+  // paddle for the airlock. The finish (brass, chrome, bronze, black iron) comes from the skin; its wear dulls and ages it.
+  // All sizes are in centimetres (1 design unit at the standard scale), the spindle is the origin, +x points toward the hinge
+  // and +z out of the door face. Parts marked rot turn with the handle; the rest (plates, roses, keyhole) stay on the door.
+  var HANDLE_OF = { rect: 'lever', tall: 'plate', wide: 'barn', arch: 'cranked', gothic: 'ring', double: 'lever', cathedral: 'ring', circle: 'wheel', oval: 'tee', hexagon: 'tee', octagon: 'wheel', industrial: 'heavy', vintage: 'knob', scifi: 'touch' };
+  var HANDLE_SCALE = { double: 1.2, cathedral: 1.2, circle: 1.5, octagon: 1.1, hexagon: 1.0, oval: 1.2, industrial: 1.15 };
+  // extent of each type from the spindle, before scaling: [toward the latch edge, toward the hinge, below, above]
+  var HW_EXTENT = { lever: [3.6, 17, 12.2, 3.6], plate: [3.2, 16, 15.9, 8.9], barn: [3, 25.7, 15.4, 11.4], cranked: [3.4, 16.1, 13.2, 4.8], ring: [5.4, 14.2, 7.4, 7.4],
+    wheel: [11.5, 11.5, 11.5, 11.5], tee: [7.9, 7.9, 4.8, 4.8], heavy: [6.9, 25, 6.9, 6.9], knob: [3.9, 3.9, 14.6, 3.9], touch: [3.6, 14.2, 14.4, 8.4] };   // measured from the geometry, rounded up
+  function hardwareOf(S) { var t = S && (S.hw || HANDLE_OF[S.name]); return HW_EXTENT[t] ? t : 'lever'; }
+  function hardwareScale(S) { return (S && (S.hwScale || HANDLE_SCALE[S.name])) || 1; }
+  // the parts of one handle: [{ g: geometry, m: material key, rot, x, y, z }]; geometry is built once and shared by both faces
+  function hwParts(T, type) {
+    var parts = [], geos = [], PI = Math.PI;
+    function add(g, m, rot, x, y, z) { geos.push(g); parts.push({ g: g, m: m, rot: !!rot, x: x || 0, y: y || 0, z: z || 0 }); return g; }
+    function lathe(prof, seg) { var g = new T.LatheGeometry(prof.map(function (p) { return new T.Vector2(p[0], p[1]); }), seg || 32); g.rotateX(PI / 2); return g; }
+    function rose(r, h) { return lathe([[0, 0], [r, 0], [r, h * 0.32], [r * 0.9, h * 0.62], [r * 0.66, h * 0.92], [r * 0.34, h], [0, h]]); }
+    function tube(pts, r, flat) { var g = new T.TubeGeometry(new T.CatmullRomCurve3(pts.map(function (p) { return new T.Vector3(p[0], p[1], p[2]); }), false, 'catmullrom', 0.5), 36, r, 14, false); if (flat) g.scale(1, flat, 1); return g; }
+    function ball(r) { return new T.SphereGeometry(r, 18, 14); }
+    function cyl(r, h, seg) { var g = new T.CylinderGeometry(r, r, h, seg || 20); g.rotateX(PI / 2); return g; }
+    function roundShape(w, h, r) {
+      var sh = new T.Shape(), x = -w / 2, y = -h / 2; r = Math.min(r, w / 2, h / 2);
+      sh.moveTo(x + r, y); sh.lineTo(x + w - r, y); sh.absarc(x + w - r, y + r, r, -PI / 2, 0, false); sh.lineTo(x + w, y + h - r); sh.absarc(x + w - r, y + h - r, r, 0, PI / 2, false);
+      sh.lineTo(x + r, y + h); sh.absarc(x + r, y + h - r, r, PI / 2, PI, false); sh.lineTo(x, y + r); sh.absarc(x + r, y + r, r, PI, PI * 1.5, false); return sh;
+    }
+    function slab(shape, depth, bev) { var g = new T.ExtrudeGeometry(shape, { depth: depth, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 14 }); g.translate(0, 0, bev); return g; }
+    var TOP = 0;   // the height of the last plate's face, so screws and keyholes sit on it
+    function plate(w, h, r, depth, x, y) { var bv = Math.min(0.22, depth * 0.5); TOP = depth + 2 * bv; add(slab(roundShape(w, h, r), depth, bv), 'fin', false, x, y, 0); return TOP; }
+    function screws(list, r) { list.forEach(function (p) { add(new T.CylinderGeometry(r, r * 0.85, 0.3, 14).rotateX(PI / 2), 'acc', false, p[0], p[1], TOP + 0.1); }); }
+    function keyhole(x, y) { add(new T.CircleGeometry(0.58, 18), 'dark', false, x, y + 0.5, TOP + 0.03); add(new T.PlaneGeometry(0.55, 1.6), 'dark', false, x, y - 0.55, TOP + 0.03); }
+    function bar(len, w, depth, tail) {   // a flat forged bar along +x that widens into a spade at its end
+      var sh = new T.Shape(), h = w / 2, t = tail || h * 1.6;
+      sh.moveTo(0, -h); sh.lineTo(len - 7, -h); sh.lineTo(len - 4.6, -t); sh.lineTo(len - 0.8, -t); sh.absarc(len - 0.8, 0, t, -PI / 2, PI / 2, false); sh.lineTo(len - 4.6, t); sh.lineTo(len - 7, h); sh.lineTo(0, h); sh.closePath();
+      var g = new T.ExtrudeGeometry(sh, { depth: depth, bevelEnabled: true, bevelThickness: 0.22, bevelSize: 0.22, bevelSegments: 3, curveSegments: 14 }); g.translate(0, 0, 0.22); return g;
+    }
+    if (type === 'lever') {
+      add(rose(3.4, 1.3), 'fin'); plate(3.4, 7.2, 1.1, 0.4, 0, -8.2); keyhole(0, -8.2);
+      add(lathe([[0, 0], [1.9, 0], [1.9, 0.5], [1.4, 0.95], [0, 0.95]]), 'fin', true, 0, 0, 1.2); add(cyl(1.0, 3.2), 'fin', true, 0, 0, 1.9);
+      add(tube([[0, 0, 3.3], [2.2, 0, 3.55], [6.5, 0, 3.55], [11, 0, 3.4], [14, 0, 2.8], [15.8, 0, 1.7]], 0.95, 0.82), 'fin', true); add(ball(0.95), 'fin', true, 0, 0, 3.3); add(ball(0.96), 'fin', true, 15.8, 0, 1.7);
+    } else if (type === 'plate') {
+      plate(5.6, 24, 1.2, 0.45, 0, -3.5); screws([[0, 7.4], [0, -14.4]], 0.5); keyhole(0, -8.4); add(rose(2.5, 1.2), 'fin', false, 0, 0, 0.5);
+      add(cyl(0.9, 3.0), 'fin', true, 0, 0, 1.9); add(tube([[0, 0, 3.0], [2, 0, 3.2], [12, 0, 3.2], [14.2, 0, 2.5], [15, 0, 1.6]], 0.78, 0.82), 'fin', true); add(ball(0.78), 'fin', true, 15, 0, 1.6);
+    } else if (type === 'barn') {
+      plate(5, 26, 0.8, 0.35, 0, -2); screws([[0, 9], [0, 4.5], [0, -8.5], [0, -13]], 0.6);
+      add(rose(2.7, 1.5), 'fin', false, 0, 0, 0.45); add(bar(24, 2.5, 0.9, 2.1), 'fin', true, 0, 0, 2.0); add(cyl(1.15, 1.2), 'acc', true, 0, 0, 3.2);
+    } else if (type === 'cranked') {
+      var oval = new T.Shape(); oval.absellipse(0, -4.2, 3.0, 8.6, 0, PI * 2, false, 0);
+      TOP = 0.85; add(slab(oval, 0.45, 0.2), 'fin', false, 0, 0, 0); screws([[0, 2.6], [0, -11]], 0.45); keyhole(0, -8.6); add(rose(2.3, 1.5), 'fin', false, 0, 0, 0.5);
+      add(cyl(0.95, 3.0), 'fin', true, 0, 0, 1.9); add(tube([[0, 0, 3.3], [2.5, 0, 3.6], [6, -1.6, 3.5], [9.5, -2.5, 3.4], [13, -2.5, 2.9], [15, -2.5, 1.8]], 0.9, 0.85), 'fin', true);
+      add(ball(0.95), 'fin', true, 0, 0, 3.3); add(ball(0.95), 'fin', true, 15, -2.5, 1.8);
+    } else if (type === 'ring') {
+      add(cyl(5.2, 0.4, 40), 'fin', false, 0, 0, 0.2); for (var i = 0; i < 8; i++) { var a = i / 8 * PI * 2; add(ball(0.42), 'acc', false, Math.cos(a) * 4.2, Math.sin(a) * 4.2, 0.55); }
+      add(lathe([[0, 0], [3.0, 0], [3.0, 0.5], [2.4, 1.2], [1.2, 1.7], [0, 1.8]]), 'fin', false, 0, 0, 0.4);
+      add(tube([[0, 0, 1.8], [0.2, 0, 3.2], [0.9, 0, 4.0]], 0.7), 'acc', true); add(new T.TorusGeometry(6.2, 0.95, 14, 44), 'fin', true, 6.8, 0, 4.0);
+    } else if (type === 'wheel') {
+      add(rose(4.4, 2.2), 'fin'); add(cyl(1.3, 3.4), 'fin', true, 0, 0, 2.7);
+      add(new T.TorusGeometry(10.2, 1.1, 14, 56), 'fin', true, 0, 0, 5.4);
+      for (var k = 0; k < 4; k++) { var sg = new T.CylinderGeometry(0.75, 0.75, 10.2, 12); sg.translate(0, 5.1, 0); sg.rotateZ(k * PI / 2 + PI / 4); add(sg, 'fin', true, 0, 0, 5.4); }
+      add(lathe([[0, 0], [2.3, 0], [2.3, 0.7], [1.5, 1.5], [0, 1.6]]), 'fin', true, 0, 0, 5.4);
+    } else if (type === 'tee') {
+      plate(8.8, 8.8, 4.3, 0.5, 0, 0); screws([[3.4, 0], [-3.4, 0], [0, 3.4], [0, -3.4]], 0.4); add(rose(2.7, 1.5), 'fin', false, 0, 0, 0.5);
+      add(cyl(1.1, 3.4), 'fin', true, 0, 0, 2.4); add(tube([[-6.2, 0, 4.7], [0, 0, 4.7], [6.2, 0, 4.7]], 0.95), 'fin', true); add(ball(1.5), 'fin', true, -6.2, 0, 4.7); add(ball(1.5), 'fin', true, 6.2, 0, 4.7);
+    } else if (type === 'heavy') {
+      plate(13, 13, 1.2, 0.5, 0, 0); [[4.8, 4.8], [-4.8, 4.8], [4.8, -4.8], [-4.8, -4.8]].forEach(function (p) { add(new T.CylinderGeometry(0.95, 0.95, 0.6, 6).rotateX(PI / 2), 'acc', false, p[0], p[1], 0.8); });
+      add(lathe([[0, 0], [3.4, 0], [3.4, 2.2], [2.6, 3.0], [0, 3.1]]), 'fin', true, 0, 0, 0.5);
+      add(slab(roundShape(24, 3.4, 1.5), 1.6, 0.3), 'fin', true, 10.4, 0, 2.6);
+      for (var r = 0; r < 6; r++) add(new T.BoxGeometry(0.5, 3.9, 2.2), 'acc', true, 11.6 + r * 1.9, 0, 3.0);
+      add(ball(2.0), 'fin', true, 22.8, 0, 3.4);
+    } else if (type === 'knob') {
+      add(rose(3.7, 1.0), 'fin'); plate(3.6, 9.2, 1.4, 0.42, 0, -9.6); keyhole(0, -9.6); screws([[0, -13.4], [0, -5.8]], 0.4);
+      add(cyl(1.15, 3.2), 'fin', true, 0, 0, 2.2);
+      add(lathe([[0, 3.4], [2.0, 3.4], [2.1, 3.9], [1.2, 4.4], [2.4, 5.2], [2.8, 6.6], [2.4, 7.9], [1.4, 8.6], [0, 8.8]]), 'knob', true);
+    } else {   // touch: a lit paddle on a dark glass bezel
+      plate(6.4, 22, 2.2, 0.6, 0, -3); add(new T.PlaneGeometry(4.2, 19.4), 'dark', false, 0, -3, 0.9); add(new T.PlaneGeometry(0.5, 16.6), 'glow', false, -1.4, -3, 0.95);
+      add(cyl(2.0, 2.8, 24), 'fin', true, 0, 0, 1.6);
+      add(slab(roundShape(15, 3.3, 1.5), 1.2, 0.3), 'fin', true, 6.2, 0, 2.7); add(new T.BoxGeometry(13, 0.45, 0.2), 'glow', true, 7.0, 0, 4.5);
+    }
+    return { parts: parts, geos: geos };
+  }
+
   root.XADoors = {
     STYLES: STYLES, STYLE_NAMES: STYLE_NAMES, DoorModel: DoorModel, createSfx: createSfx, buildMesh: buildMesh,
-    layoutOf: layoutOf, faceOps: faceOps, leverArt: leverArt, drawOps: drawOps, clipStrip: clipStrip, rattleProfile: rattleProfile,
+    layoutOf: layoutOf, faceOps: faceOps, leverArt: leverArt, HW: { HANDLE_OF: HANDLE_OF, SCALE: HANDLE_SCALE, EXTENT: HW_EXTENT, TYPES: Object.keys(HW_EXTENT), of: hardwareOf, scale: hardwareScale, parts: hwParts }, drawOps: drawOps, clipStrip: clipStrip, rattleProfile: rattleProfile,
     CONST: { HMAX: HMAX, MAXA: MAXA, DEF_OPEN: DEF_OPEN, KH: KH, CH: CH, KD: KD, CD: CD }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.XADoors;
@@ -33281,8 +33399,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       var grime = smooth(0.6, 1, v) * smooth(0.35, 0.8, nz2) * wear * 0.55;                       // dirt gathers low down
       if (grime > 0) { shade(b, i, 1 - grime * 0.55); b.rough[i] = clamp(b.rough[i] + grime * 0.3, 0, 1); }
       if (mode === 'scuff' || mode === 'chip') {
-        var hd = handle ? Math.sqrt(Math.pow(u - handle[0], 2) + Math.pow((v - handle[1]) * 1.6, 2)) : 9, scuff = smooth(0.2, 0.02, hd) * smooth(0.35, 0.7, nz) * wear;
-        if (scuff > 0) { shade(b, i, 1 + scuff * 0.18); b.rough[i] = clamp(b.rough[i] - scuff * 0.1, 0, 1); }
+        var hd = handle ? Math.sqrt(Math.pow(u - handle[0], 2) + Math.pow((v - handle[1]) * 1.6, 2)) : 9, scuff = Math.pow(smooth(0.26, 0.0, hd), 2) * (0.45 + 0.55 * smooth(0.25, 0.8, nz)) * wear;   // a soft smudge of hand wear around the handle, no hard edge
+        if (scuff > 0) { shade(b, i, 1 + scuff * 0.14); b.rough[i] = clamp(b.rough[i] - scuff * 0.1, 0, 1); }
       }
       if (mode === 'chip' && rel) {
         var e = rel.dist[i], chip = smooth(0.62 - wear * 0.45, 0.75 - wear * 0.45, nz) * smooth(14, 1, e) * wear * 1.8, inside = rel.mask[i] > 0.5 ? 1 : 0;
@@ -33714,10 +33832,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     var rayc = new T.Raycaster(); rayc.far = 4;
     var grab = null;                              // { bay, ndc }
     var firstApplied = false;
+    var scope = null;                             // (bay index) -> true: only these bays can be looked at, grabbed or used (the hall's, or the lobby's)
 
     function makeBay(def, i) {
-      var g = new T.Group(); g.position.set(def.side * (env.RW / 2 - 0.02), 0, def.z); g.rotation.y = def.side < 0 ? Math.PI / 2 : -Math.PI / 2;
-      g.visible = false; scene.add(g);              // nothing is shown until a scene needs it
+      // A bay is on a side wall of the hall, or (def.parent) on the wall of a room built in the parent group: placed there in that group's own frame.
+      var g = new T.Group();
+      if (def.parent) { g.position.set(def.x || 0, 0, def.z || 0); g.rotation.y = def.rot || 0; } else { g.position.set(def.side * (env.RW / 2 - 0.02), 0, def.z); g.rotation.y = def.side < 0 ? Math.PI / 2 : -Math.PI / 2; }
+      g.visible = false; (def.parent || scene).add(g);              // nothing is shown until a scene needs it
       // The lamp: a real fixture you can see, a work lamp on a short arm above the door with a bare bulb under its shade, and the light comes from the bulb.
       // (It used to be an invisible point light in the air in front of the wall: you saw the glow on things and could not tell where it came from.)
       var light = new T.PointLight(0xffffff, 0, 7, 2); light.position.set(0, 2.96, 0.42); g.add(light);
@@ -33737,7 +33858,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       fix.add(arm, plate, shade, bulb, cage, glow);
       var width = Math.min(2.8, Math.max(1.2, def.width - 0.2));
       return { i: i, def: def, group: g, light: light, fixture: fix, bulbMat: bulbMat, glowMat: glowMat, lightSpec: null, plan: null, key: '', width: width, curtain: null, overlays: [], door: null,
-        pos: { x: def.side * (env.RW / 2 - 0.4), y: 1.6, z: def.z } };
+        pos: def.parent ? { x: 0, y: 1.6, z: 0 } : { x: def.side * (env.RW / 2 - 0.4), y: 1.6, z: def.z } };
+    }
+    // A bay in a room that can move (the lobby is put behind whichever wall holds its door): its place in the world, for sounds and the door's own sounds.
+    var _wp = null;
+    function refreshPos(bay) {
+      if (!bay.def.parent) return;
+      _wp = _wp || new T.Vector3(); bay.group.updateWorldMatrix(true, false); _wp.set(0, 1.6, 0.4); bay.group.localToWorld(_wp);
+      bay.pos.x = _wp.x; bay.pos.z = _wp.z; var dm0 = bay.door && bay.door.model; if (dm0) { dm0.pos.x = _wp.x; dm0.pos.z = _wp.z; }
     }
 
     /* ---- pieces ---- */
@@ -33807,6 +33935,19 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       });
       var t = new T.CanvasTexture(cv); t.mapping = T.EquirectangularReflectionMapping; t.encoding = T.sRGBEncoding; skinEnv = t; return t;
     }
+    // A second generated room for the door hardware: metal only shows its colour where it has something bright to reflect, so this one has a
+    // bright ceiling, warm walls at the horizon, a few soft windows and lamps, and a darker floor. One for the whole hall.
+    var hwEnv = null;
+    function getHwEnv() {
+      if (hwEnv) return hwEnv;
+      var cv = env.mkCanvas(256, 128), x = cv.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 128);
+      g.addColorStop(0, '#f2f4ff'); g.addColorStop(0.3, '#c8cadc'); g.addColorStop(0.44, '#dcd8d2'); g.addColorStop(0.53, '#c4c0ba'); g.addColorStop(0.64, '#6c6660'); g.addColorStop(1, '#241d1b'); x.fillStyle = g; x.fillRect(0, 0, 256, 128);
+      [[20, 52, 34, 14, '#fff4e0'], [86, 44, 40, 18, '#ffffff'], [150, 56, 30, 12, '#ffe2b8'], [206, 48, 38, 16, '#e8f0ff'], [128, 20, 70, 10, '#ffffff'], [52, 70, 24, 8, '#ffd9a0']].forEach(function (l) {
+        var r = x.createRadialGradient(l[0], l[1], 0, l[0], l[1], l[2]); r.addColorStop(0, l[4]); r.addColorStop(0.6, l[4]); r.addColorStop(1, 'rgba(255,255,255,0)');
+        x.save(); x.translate(l[0], l[1]); x.scale(1, l[3] / l[2]); x.translate(-l[0], -l[1]); x.fillStyle = r; x.fillRect(l[0] - l[2], l[1] - l[2], l[2] * 2, l[2] * 2); x.restore();
+      });
+      var t = new T.CanvasTexture(cv); t.mapping = T.EquirectangularReflectionMapping; t.encoding = T.sRGBEncoding; hwEnv = t; return t;
+    }
     // The finish the plan asks for (an overlay with the door-skin look), or null: the neon Threshold look as before.
     // Unknown skins, and skins that do not suit this door style, fall back to the neon look.
     function skinOf(plan, style) {
@@ -33816,7 +33957,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       var p = SKINS.normSkinParams(ov.p), def = SKINS.SKINS[p.skin];
       if (!def || p.skin === 'neon' || !SKINS.allowed(def.mask, style)) return null;
       var fk = p.frame || def.frame;
-      return { kit: SKINS, key: p.skin, sound: def.sound, rec: def.recipe, frameRec: SKINS.FRAMES[fk] || null, hw: SKINS.HARDWARE[p.hardware || def.hardware] || null, wear: (p.wear < 0 ? def.wear : p.wear) / 100, tint: p.tint || '', maxSide: root.XA_LOWFX || (root.navigator && root.navigator.hardwareConcurrency && root.navigator.hardwareConcurrency <= 2) ? 256 : 512, env: getSkinEnv(), sig: JSON.stringify([p.skin, fk, p.hardware || def.hardware, p.tint, p.wear]) };
+      return { kit: SKINS, key: p.skin, sound: def.sound, rec: def.recipe, frameRec: SKINS.FRAMES[fk] || null, hw: SKINS.HARDWARE[p.hardware || def.hardware] || null, wear: (p.wear < 0 ? def.wear : p.wear) / 100, tint: p.tint || '', maxSide: root.XA_LOWFX || (root.navigator && root.navigator.hardwareConcurrency && root.navigator.hardwareConcurrency <= 2) ? 256 : 512, env: getSkinEnv(), envHw: getHwEnv(), family: def.family || '', sig: JSON.stringify([p.skin, fk, p.hardware || def.hardware, p.tint, p.wear]) };
     }
     // The real door when doors.js is loaded (the Threshold port), else a plain slab.
     function buildDoor(bay, style, interaction, skin) {
@@ -33903,6 +34044,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     function update(dt, time) {
       for (var b = 0; b < bays.length; b++) {
         var bay = bays[b], c = bay.curtain;
+        if (bay.def.parent && bay.group.visible) refreshPos(bay);
         if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
         var dm = bay.door && bay.door.model;
         if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
@@ -33924,7 +34066,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       rayc.far = maxDist || 3.6; rayc.setFromCamera(ndc, env.camera);
       var best = null;
       bays.forEach(function (bay) {
-        if (!bay.curtain || !bay.group.visible) return;
+        if (!bay.curtain || !bay.group.visible || (scope && !scope(bay.i))) return;
         bay.curtain.mesh.updateMatrixWorld(true);
         var h = rayc.intersectObject(bay.curtain.mesh, false)[0];
         if (h && (!best || h.distance < best.h.distance)) best = { bay: bay, h: h };
@@ -33959,7 +34101,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       rayc.far = maxDist || 3.6; rayc.setFromCamera(ndc, env.camera);
       var best = null;
       bays.forEach(function (bay) {
-        if (!doorUsable(bay)) return;
+        if (!doorUsable(bay) || (scope && !scope(bay.i))) return;
         bay.door.mesh.group.updateMatrixWorld(true);
         var h = rayc.intersectObjects(bay.door.mesh.pick, false)[0], kind = 'leaf';
         if (!h && bay.door.model.angle > 50) { h = rayc.intersectObject(bay.door.mesh.way, false)[0]; kind = 'doorway'; }   // looking through the open door
@@ -34024,12 +34166,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     return {
       apply: apply, update: update, focus: focus, grabStart: grabStart, grabMove: grabMove, grabEnd: grabEnd, toggleFocused: toggleFocused,
       isGrabbing: function () { return !!grab; },
+      setScope: function (fn) { scope = typeof fn === 'function' ? fn : null; },
       // A bay whose door opens onto a room built behind the wall: while the door is open its doorway is see-through (the hall owns the room).
       setPortal: function (i, on) { var b = bays[i]; if (!b) return; b.portal = !!on; if (!on && b.portalOn) { b.portalOn = false; if (b.door && b.door.mesh.portal) b.door.mesh.portal(false); } },
       portalOpen: function (i) { var b = bays[i]; return !!(b && b.portalOn); },
       doorHalfWidth: function (i) { var b = bays[i]; return b && b.door && b.door.mesh && b.door.mesh.size ? b.door.mesh.size.w / 2 : 0.5; },
       doorOpen: function (i) { var b = bays[i], m = b && b.door && b.door.model; if (m && !m.isOpen()) m.open(); },
       _curtain: function (i) { var c = bays[i] && bays[i].curtain; return c ? { sim: c.sim, mg: c.mg, w: bays[i].width } : null; },   // tests only
+      _handle: function (i) { var d = bays[i] && bays[i].door; return d && d.mesh && d.mesh.handle ? d.mesh.handle() : null; },   // tests only
       _model: function (i) { var d = bays[i] && bays[i].door; return d && d.model ? d.model : null; },   // tests only
       showPosters: function (i) { var p = bays[i] && bays[i].plan; return !p || p.base === 'posters'; },
       audio: audio,
@@ -34158,6 +34302,7 @@ const machines = [], pickables = [], boxes = [];
    writes the stencil, and the walls on both sides skip those pixels (see portal() in doors.js). The lobby sits on the far side of the
    hall wall at that bay, so it is the same room whichever bay holds the door; only one bay at a time can lead to it. */
 const LW = 8, LD = 10;                      // lobby width (along the hall wall) and depth (away from it), metres
+let HALL_BAYS = 4;                           // how many bays the hall itself has; the lobby's two come after them
 let lobbyG = null, lobbyBay = -1, lobbyPass = null, autoWalk = null, bayDefsAll = [];   // lobbyPass: {side, wallX, z}
 const WALL_T = 0.2;                         // the thickness of the wall between the rooms (a drywall cavity you see as the reveal of the doorway)
 function holeWall(m,bit){ m.stencilWrite=true; m.stencilRef=bit; m.stencilFuncMask=bit; m.stencilWriteMask=0; m.stencilFunc=THREE.NotEqualStencilFunc; m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp; return m }   // bit 1: this room's wall, bit 2: the lobby's
@@ -34233,7 +34378,10 @@ function buildRoom(){
   buildPosters();
   try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
+  if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
+  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, back:!!(roomUI&&roomUI.back.style.display==='block')});   // read-only, for tests
+  if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
   XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw});   // read-only, for tests
   XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
   XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
@@ -34262,7 +34410,7 @@ function buildRoom(){
 /* ---------- the lobby (bare) ---------- */
 // Built in its own frame: the wall with the opening is the plane z=0 facing +z, the room runs away from it along +z.
 function buildLobby(){
-  const g=new THREE.Group(); g.visible=false; scene.add(g); lobbyG=g;
+  const g=lobbyG;
   const face=(geo,mat,x,y,z,rx,ry)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.rotation.set(rx||0,ry||0,0); g.add(m); return m };
   face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({map:carpetTexture(), roughness:.95}), 0,0,LD/2, -Math.PI/2,0);
   face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}), 0,RH,LD/2, Math.PI/2,0);
@@ -34282,7 +34430,7 @@ function buildLobby(){
     const l=new THREE.PointLight(0xcfc4ff,.75,11,2); l.position.set(0,RH-.3,z); g.add(l);
   }
   const sign=(text,w,h,x,y,z,ry)=>face(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:signTexture(text,'72px Bungee',BRAND.orange,1024,Math.round(1024*h/w)), transparent:true, toneMapped:false}), x,y,z, 0,ry);
-  sign('LOBBY',3.6,.5,0,2.3,LD-.03,Math.PI);
+  sign('LOBBY',3.6,.5,-LW/2+.03,2.3,LD/2,Math.PI/2);   // on the left wall: the back wall carries the lobby's doors
   sign('BACK TO THE ARCADE',3,.4,0,2.8,.03,0);
 }
 // Put the lobby behind the wall of bay i (or take it away with -1). Only a bay whose door links to it counts.
@@ -35404,7 +35552,12 @@ function paintWall(){
    Other scenes are drawn by the bay engine; until then a bay with another scene shows plain wall. */
 const BAY_INDEX={L:0, R:1, NL:2, NR:3};
 function applyBays(snap){
-  if(bayEngine){ try{ bayEngine.apply(snap,{instant:state==='intro'}) }catch(e){ console.error(e) } }
+  if(bayEngine){ try{
+    // the hall's bays, then the lobby's (snap.rooms.lobby.bays), in the engine's order
+    const lb=snap && snap.rooms && snap.rooms.lobby && snap.rooms.lobby.bays;
+    const all=lb && snap.bays ? Object.assign({}, snap, {bays:snap.bays.slice(0,HALL_BAYS).concat([lb[0]||null, lb[1]||null])}) : snap;
+    bayEngine.apply(all,{instant:state==='intro'})
+  }catch(e){ console.error(e) } }
   { let lb=-1; if(snap && snap.bays) for(let i=0;i<snap.bays.length && lb<0;i++) if(linksToLobby(snap.bays[i] && snap.bays[i].scene)) lb=i; setLobbyBay(lb) }
   for(const s of posterSlots){
     if(!s.bay) continue;
@@ -35472,6 +35625,11 @@ function buildPosters(){
     bayDefs[side<0?0:1]={side, z:(-wallEnd+zLo)/2, width:zLo+wallEnd};
   }
   bayDefsAll=bayDefs;
+  // the lobby has two doorways of its own, on its back wall (the hall's four come first, so the lobby's are bays 4 and 5). The lobby group exists
+  // from the start so they can hang in it; it is moved behind the right wall when a door links to the lobby.
+  lobbyG=new THREE.Group(); lobbyG.visible=false; scene.add(lobbyG);
+  HALL_BAYS=bayDefs.length;
+  bayDefs.push({parent:lobbyG, x:-2.2, z:LD-.02, rot:Math.PI, width:3.4, side:0}, {parent:lobbyG, x:2.2, z:LD-.02, rot:Math.PI, width:3.4, side:0});
   spots.forEach(([side,z,bay])=>{
     const g=new THREE.Group(); g.position.set(side*(RW/2-.03),1.95,z); g.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
     g.add(new THREE.Mesh(new THREE.BoxGeometry(.84,1.22,.03),frameMat));
@@ -36481,8 +36639,55 @@ function updateBayFocus(){
   if(bayEngine.isGrabbing()) return;
   let h=null, hold=true;
   if(bayToast && performance.now()<bayToast.until){ h=bayToast.text; hold=false }
-  else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus && !inLobbyZone()){ const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }
+  else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ bayEngine.setScope(inLobbyZone() ? (i=>i>=HALL_BAYS) : (i=>i<HALL_BAYS)); const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }
   if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
+}
+/* ---------- other rooms that take the whole screen (the casino) ----------
+   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO' } } names
+   them (src is a URL the hall may frame: a file beside the hall, or an inscription's content path). Going in: a short loading screen over the hall,
+   the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
+   Going back: the frame is removed (it frees everything the room built) and you are where you were, in front of the door. */
+const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && typeof r.src==='string' && r.src ? r : null };
+let roomUI=null, roomId='', roomT0=0, roomTimer=0;
+function roomEls(){
+  if(roomUI) return roomUI;
+  const mk=(css,html)=>{ const e=document.createElement('div'); e.style.cssText=css; if(html!=null) e.innerHTML=html; return e };
+  const load=mk('position:fixed;inset:0;z-index:9000;background:radial-gradient(ellipse at 50% 40%,#1b1233,#05040a 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#e8e2ff;text-align:center;opacity:0;transition:opacity .25s',
+    '<div class="rl-t" style="font:34px Bungee,Impact,sans-serif;letter-spacing:.08em;color:#ffb347;text-shadow:0 0 18px rgba(255,150,40,.55)"></div><div class="rl-s" style="font:16px VT323,monospace;letter-spacing:.14em;opacity:.8">OPENING THE ROOM…</div><div style="width:min(60vw,320px);height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden"><i class="rl-b" style="display:block;height:100%;width:35%;background:linear-gradient(90deg,#3d86ff,#ff8a2a);animation:rlbar 1.1s ease-in-out infinite alternate"></i></div>');
+  const st=document.createElement('style'); st.textContent='@keyframes rlbar{from{transform:translateX(-30%)}to{transform:translateX(190%)}}'; document.head.appendChild(st);
+  const back=document.createElement('button'); back.type='button'; back.textContent='← BACK TO THE LOBBY';
+  back.style.cssText='position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9500;display:none;padding:9px 16px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer';
+  back.addEventListener('click',e=>{ e.stopPropagation(); leaveRoom() });
+  document.body.append(load,back); roomUI={load,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
+  window.addEventListener('message',e=>{ if(state==='room' && roomUI && roomUI.frame && e.source===roomUI.frame.contentWindow && e.data && e.data.xa==='leave-room') leaveRoom() });
+  return roomUI;
+}
+function enterRoom(id){
+  const cfg=roomCfg(id); if(!cfg || state!=='walk') return;
+  const U=roomEls(); state='room'; roomId=id; roomT0=performance.now(); sfx.coin();
+  if(document.pointerLockElement) document.exitPointerLock();
+  for(const k in keys) keys[k]=false; autoWalk=null;
+  $('cross').hidden=true; $('prompt').hidden=true; $('tapstart').hidden=true; $('lockhint').hidden=true; $('hint').hidden=true; if($('bprompt')) $('bprompt').hidden=true;
+  try{ Room.enterGame() }catch(e){}                   // the hall's own sound closes behind you
+  U.title.textContent=String(cfg.title||id).toUpperCase(); U.sub.textContent='OPENING THE ROOM…';
+  U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1;
+  const f=document.createElement('iframe'); f.title=cfg.title||id; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
+  f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden';
+  const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,700-(performance.now()-roomT0));   // a short loading screen, never a flash
+    setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room') U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
+  f.addEventListener('load',done);
+  roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
+  U.frame=f; document.body.appendChild(f); f.src=cfg.src;
+}
+function leaveRoom(){
+  if(state!=='room' || !roomUI) return;
+  const U=roomUI; clearTimeout(roomTimer);
+  if(U.frame){ try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null }
+  U.load.style.opacity=0; U.load.style.display='none'; U.back.style.display='none';
+  state='out'; sfx.back(); try{ Room.exitGame() }catch(e){}
+  const fl=$('flash'); fl.style.transition='none'; fl.style.opacity=1; void fl.offsetWidth; fl.style.transition=''; requestAnimationFrame(()=>{ fl.style.opacity=0 });
+  for(const k in keys) keys[k]=false; roomId='';
+  setTimeout(()=>{ if(state==='out'){ state='walk'; updateHud() } },120); tryLock();
 }
 // A door that leads somewhere: the link comes from the world contract. The lobby is the one room there is; any other target says it is not open yet.
 function bayEnter(link){
@@ -36491,6 +36696,7 @@ function bayEnter(link){
     const p=lobbyPass, sd=p.side;   // into the doorway (from the hall side), then 2.4 m into the room
     autoWalk=[{x:p.wallX-sd*.9, z:p.z}, {x:p.wallX+sd*(WALL_T+2.4), z:p.z}]; return
   }
+  if(room && roomCfg(room)){ enterRoom(String(room).toLowerCase()); return }
   bayToast={text:name?('THIS DOOR LEADS TO '+name+' · NOT OPEN YET'):'THIS DOOR IS NOT OPEN YET', until:performance.now()+3500};
 }
 function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint){ $('bptext').textContent=bayHint; const a=$('bpalt'); if(a) a.hidden=!bayHold } }
@@ -36499,7 +36705,7 @@ let last=performance.now(), time=0;
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000); last=now; time+=dt;
   requestAnimationFrame(frame);
-  if(state==='play') return;                       // game has the screen; the hall sleeps
+  if(state==='play' || state==='room') return;     // a game or a room (the casino) has the screen; the hall sleeps
 
   if(state==='walk' && !modalOpen()){ move(dt) }
   if(state==='walk' || state==='intro'){

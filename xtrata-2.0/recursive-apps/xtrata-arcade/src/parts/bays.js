@@ -268,10 +268,13 @@
     var rayc = new T.Raycaster(); rayc.far = 4;
     var grab = null;                              // { bay, ndc }
     var firstApplied = false;
+    var scope = null;                             // (bay index) -> true: only these bays can be looked at, grabbed or used (the hall's, or the lobby's)
 
     function makeBay(def, i) {
-      var g = new T.Group(); g.position.set(def.side * (env.RW / 2 - 0.02), 0, def.z); g.rotation.y = def.side < 0 ? Math.PI / 2 : -Math.PI / 2;
-      g.visible = false; scene.add(g);              // nothing is shown until a scene needs it
+      // A bay is on a side wall of the hall, or (def.parent) on the wall of a room built in the parent group: placed there in that group's own frame.
+      var g = new T.Group();
+      if (def.parent) { g.position.set(def.x || 0, 0, def.z || 0); g.rotation.y = def.rot || 0; } else { g.position.set(def.side * (env.RW / 2 - 0.02), 0, def.z); g.rotation.y = def.side < 0 ? Math.PI / 2 : -Math.PI / 2; }
+      g.visible = false; (def.parent || scene).add(g);              // nothing is shown until a scene needs it
       // The lamp: a real fixture you can see, a work lamp on a short arm above the door with a bare bulb under its shade, and the light comes from the bulb.
       // (It used to be an invisible point light in the air in front of the wall: you saw the glow on things and could not tell where it came from.)
       var light = new T.PointLight(0xffffff, 0, 7, 2); light.position.set(0, 2.96, 0.42); g.add(light);
@@ -291,7 +294,14 @@
       fix.add(arm, plate, shade, bulb, cage, glow);
       var width = Math.min(2.8, Math.max(1.2, def.width - 0.2));
       return { i: i, def: def, group: g, light: light, fixture: fix, bulbMat: bulbMat, glowMat: glowMat, lightSpec: null, plan: null, key: '', width: width, curtain: null, overlays: [], door: null,
-        pos: { x: def.side * (env.RW / 2 - 0.4), y: 1.6, z: def.z } };
+        pos: def.parent ? { x: 0, y: 1.6, z: 0 } : { x: def.side * (env.RW / 2 - 0.4), y: 1.6, z: def.z } };
+    }
+    // A bay in a room that can move (the lobby is put behind whichever wall holds its door): its place in the world, for sounds and the door's own sounds.
+    var _wp = null;
+    function refreshPos(bay) {
+      if (!bay.def.parent) return;
+      _wp = _wp || new T.Vector3(); bay.group.updateWorldMatrix(true, false); _wp.set(0, 1.6, 0.4); bay.group.localToWorld(_wp);
+      bay.pos.x = _wp.x; bay.pos.z = _wp.z; var dm0 = bay.door && bay.door.model; if (dm0) { dm0.pos.x = _wp.x; dm0.pos.z = _wp.z; }
     }
 
     /* ---- pieces ---- */
@@ -470,6 +480,7 @@
     function update(dt, time) {
       for (var b = 0; b < bays.length; b++) {
         var bay = bays[b], c = bay.curtain;
+        if (bay.def.parent && bay.group.visible) refreshPos(bay);
         if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
         var dm = bay.door && bay.door.model;
         if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
@@ -491,7 +502,7 @@
       rayc.far = maxDist || 3.6; rayc.setFromCamera(ndc, env.camera);
       var best = null;
       bays.forEach(function (bay) {
-        if (!bay.curtain || !bay.group.visible) return;
+        if (!bay.curtain || !bay.group.visible || (scope && !scope(bay.i))) return;
         bay.curtain.mesh.updateMatrixWorld(true);
         var h = rayc.intersectObject(bay.curtain.mesh, false)[0];
         if (h && (!best || h.distance < best.h.distance)) best = { bay: bay, h: h };
@@ -526,7 +537,7 @@
       rayc.far = maxDist || 3.6; rayc.setFromCamera(ndc, env.camera);
       var best = null;
       bays.forEach(function (bay) {
-        if (!doorUsable(bay)) return;
+        if (!doorUsable(bay) || (scope && !scope(bay.i))) return;
         bay.door.mesh.group.updateMatrixWorld(true);
         var h = rayc.intersectObjects(bay.door.mesh.pick, false)[0], kind = 'leaf';
         if (!h && bay.door.model.angle > 50) { h = rayc.intersectObject(bay.door.mesh.way, false)[0]; kind = 'doorway'; }   // looking through the open door
@@ -591,6 +602,7 @@
     return {
       apply: apply, update: update, focus: focus, grabStart: grabStart, grabMove: grabMove, grabEnd: grabEnd, toggleFocused: toggleFocused,
       isGrabbing: function () { return !!grab; },
+      setScope: function (fn) { scope = typeof fn === 'function' ? fn : null; },
       // A bay whose door opens onto a room built behind the wall: while the door is open its doorway is see-through (the hall owns the room).
       setPortal: function (i, on) { var b = bays[i]; if (!b) return; b.portal = !!on; if (!on && b.portalOn) { b.portalOn = false; if (b.door && b.door.mesh.portal) b.door.mesh.portal(false); } },
       portalOpen: function (i) { var b = bays[i]; return !!(b && b.portalOn); },

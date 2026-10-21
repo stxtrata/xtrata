@@ -25,6 +25,7 @@
 
   var CFG = {
     roomId: 'arcade-hall',
+    lobbyId: 'lobby',
     posters: '',                 // 'SP….xtrata-posters-v1'  (empty = off)
     world: '',                   // 'SP….xtrata-world-v1'    (empty = off)
     pollMs: 240000,              // how often to check the two version counters
@@ -225,13 +226,17 @@
     var need = live.slice(0, CFG.maxLive); pins.forEach(function (p) { if (need.indexOf(p.poster) < 0) need.push(p.poster); });
     var recs = await readPosters(need);
     var bays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.roomId)])).value.map(toBay);
-    var looks = await readLooks(bays);
+    // The lobby is its own room on the contract (its two back-wall doors). A contract with nothing for it, or a read that fails,
+    // leaves those doors as plain walls: it never takes the hall down.
+    var lobbyBays = [];
+    try { lobbyBays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.lobbyId)])).value.map(toBay); } catch (e) { lobbyBays = []; }
+    var looks = await readLooks(bays.concat(lobbyBays));
     var versions = await readVersions();
     var pinned = {}; pins.forEach(function (p) { if (recs[p.poster]) pinned[p.poster] = recs[p.poster]; });
     return {
       versions: versions, at: Date.now(),
       posters: live.map(function (id) { return recs[id]; }).filter(Boolean),
-      pins: pins, pinned: pinned, suppressed: suppressed, bays: bays, looks: looks
+      pins: pins, pinned: pinned, suppressed: suppressed, bays: bays, rooms: { lobby: { bays: lobbyBays } }, looks: looks
     };
   }
   // The looks the active scenes use (door look and every layer), in one or two reads. { id: { kind, name, tier, builtin, hidden, approved } }
@@ -292,7 +297,8 @@
   function onHeight(h) {
     if (!enabled() || !state.snap || !state.snap.bays || state.busy) return false;
     var next = Infinity;
-    state.snap.bays.forEach(function (b) { if (b && b.nextHeight != null && b.nextHeight < next) next = b.nextHeight; });
+    var all = state.snap.bays.concat(state.snap.rooms && state.snap.rooms.lobby ? state.snap.rooms.lobby.bays : []);
+    all.forEach(function (b) { if (b && b.nextHeight != null && b.nextHeight < next) next = b.nextHeight; });
     if (!(h >= next)) return false;
     var now = Date.now();
     if (state.lastHeightRead && now - state.lastHeightRead < 30000) return false;
