@@ -833,7 +833,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0c0609); scene.fog = new THREE.Fog(0x0c0609, 24, 52);
-  const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 80);
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 80); camera.rotation.order = 'YXZ';   // (as in the arcade hall: yaw, then pitch)
   const HOME = { pos: V3(0, 6.6, 13.6), look: V3(0, 0.5, -1.2) };
   const camPos = HOME.pos.clone(), look = HOME.look.clone(), tgtPos = HOME.pos.clone(), tgtLook = HOME.look.clone();
   camera.position.copy(camPos);
@@ -982,7 +982,8 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       scene.add(g);
     });
     scene.add(new THREE.HemisphereLight(0xffe6c8, 0x28101a, 0.8));
-    for (let i = -2; i <= 2; i++) { cyl(0.04, 0.05, 0.9, gold, i * 1.6, 0.45, 7.2, scene); const k = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 10), gold); k.position.set(i * 1.6, 0.93, 7.2); scene.add(k); if (i < 2) { const rope = cyl(0.025, 0.025, 1.6, M(0x8c1420, { roughness: 0.8 }), i * 1.6 + 0.8, 0.78, 7.2, scene, 8); rope.rotation.z = Math.PI / 2; } }
+    for (let i = -2; i <= 2; i++) { if (i === 0) continue;   // the rope is open in the middle: the way to the door
+      cyl(0.04, 0.05, 0.9, gold, i * 1.6, 0.45, 7.2, scene); const k = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 10), gold); k.position.set(i * 1.6, 0.93, 7.2); scene.add(k); if (i < 2 && i !== -1) { const rope = cyl(0.025, 0.025, 1.6, M(0x8c1420, { roughness: 0.8 }), i * 1.6 + 0.8, 0.78, 7.2, scene, 8); rope.rotation.z = Math.PI / 2; } }
     // marquee bulbs around the neon sign
     room.bulbs = [];
     const bm = () => new THREE.MeshBasicMaterial({ color: 0x332200 });
@@ -1054,8 +1055,14 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     {
       const dz = D / 2 - 0.12, drape = canvasTex(128, 256, (c, w, h) => { for (let i = 0; i < 16; i++) { const g = c.createLinearGradient(i * 8, 0, i * 8 + 8, 0); g.addColorStop(0, '#5a0614'); g.addColorStop(0.5, '#a01326'); g.addColorStop(1, '#4a0510'); c.fillStyle = g; c.fillRect(i * 8, 0, 8, h); } });
       [-1, 1].forEach((s) => { const d = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 3.6), new THREE.MeshStandardMaterial({ map: drape, roughness: 0.9, side: THREE.DoubleSide })); d.position.set(s * 2.0, 2.2, dz); d.rotation.y = Math.PI; scene.add(d); d.userData.noShadow = true; });
-      box(1.45, 2.7, 0.08, M(0x1d0d08, { roughness: 0.4 }), -0.0, 1.35, dz + 0.04, scene);
-      [-1, 1].forEach((s) => { box(0.22, 2.9, 0.2, wood, s * 0.85, 1.45, dz, scene); const dh = cyl(0.015, 0.015, 0.25, gold, s * 0.08, 1.2, dz - 0.07, scene, 8); });
+      // the door itself, on a hinge at its left edge, swinging out into the lobby; behind it, the lobby's warm light
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(1.45, 2.7), new THREE.MeshBasicMaterial({ map: canvasTex(64, 128, (c, w, h) => { const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#ffcf8a'); g.addColorStop(1, '#8a5a2a'); c.fillStyle = g; c.fillRect(0, 0, w, h); }) }));
+      back.position.set(0, 1.35, dz + 0.05); back.rotation.y = Math.PI; back.userData.noShadow = true; scene.add(back);
+      const hinge = new THREE.Group(); hinge.position.set(-0.725, 0, dz + 0.04); scene.add(hinge);
+      const slab = box(1.45, 2.7, 0.08, M(0x1d0d08, { roughness: 0.4 }), 0.725, 1.35, 0, hinge);
+      cyl(0.018, 0.018, 0.22, gold, 1.3, 1.1, -0.07, hinge, 8);   // the handle, on the room side
+      room.exitDoor = { hinge, open: 1, z: dz };
+      [-1, 1].forEach((s) => { box(0.22, 2.9, 0.2, wood, s * 0.85, 1.45, dz, scene); });
       box(2.1, 0.3, 0.2, wood, 0, 2.95, dz, scene); box(2.2, 0.06, 0.24, gold, 0, 3.12, dz, scene);
       const ex = canvasTex(256, 96, (c, w, h) => { c.fillStyle = '#04140a'; c.fillRect(0, 0, w, h); c.fillStyle = '#3dff8c'; c.shadowColor = '#3dff8c'; c.shadowBlur = 16; c.font = '900 66px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('EXIT', w / 2, h / 2 + 3); });
       const exs = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.3), new THREE.MeshBasicMaterial({ map: ex })); exs.position.set(0, 3.5, dz - 0.04); exs.rotation.y = Math.PI; scene.add(exs); exs.userData.noShadow = true; glowSprite(0, 3.5, dz - 0.3, 1.4, 0x3dff8c, 0.35);
@@ -1479,7 +1486,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   function updateCoins(dt) {
     coins.forEach((c) => { if (!c.m.visible) return; c.life -= dt; if (c.life <= 0 || c.m.position.y < 0.05) { c.m.visible = false; return; } c.v.y -= 9 * dt; c.m.position.addScaledVector(c.v, dt); c.m.rotation.x += c.spin.x * dt; c.m.rotation.z += c.spin.z * dt; });
   }
-  let kick = 0, baseFov = 55;
+  let kick = 0, baseFov = 55, fovBase = 55;
   function banner(text, cls) { const b = $('banner'); b.textContent = text; b.className = ''; void b.offsetWidth; b.className = 'on ' + (cls || ''); clearTimeout(banner.h); banner.h = setTimeout(() => (b.className = ''), 2000); }
   function outcome(st, net, stake) {
     if (net > 0) {
@@ -2208,7 +2215,11 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
 
 
   // ---------------- walking the floor (first-person, same scheme as the Xtrata Arcade hall) ----------------
-  const RW = 26, RD = 22, EYE = 1.62, PR = 0.32;
+  // How you walk and look: exactly the Xtrata Arcade hall's numbers (hall.js WALK), so the two rooms feel the same under the hand.
+  // tests/casino-walk.test.cjs in the arcade repo checks that they agree.
+  const WALK = { fov: 68, eye: 1.6, speed: 3, sprint: 4.6, bobRate: 9, bobAmp: 0.025, look: 0.0022, drag: 0.004, touchLook: 0.005, pitch: 1.2 };
+  const RW = 26, RD = 22, EYE = WALK.eye, PR = 0.32;
+  const FROM_ARCADE = /[?&]from=arcade\b/.test(location.search);   // opened from the arcade's lobby door: start walking, just inside the door
   const player = { x: 0, z: 6.2, yaw: 0, pitch: -0.08, bob: 0 };
   let mode = 'overview', returning = false, curSeat = null, cand = null;
   const keys = {}, joy = { id: null, ox: 0, oy: 0, vx: 0, vy: 0 }, lk = { id: null, x: 0, y: 0, moved: 0 };
@@ -2226,8 +2237,8 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   // colliders: circles, boxes (world axis) and ellipses (table-local)
   const solids = [];
   [-9, -3, 3, 9].forEach((x) => solids.push({ k: 'c', x, z: -RD / 2 + 0.3, r: 0.4 }));
-  for (let i = -2; i <= 2; i++) solids.push({ k: 'c', x: i * 1.6, z: 7.2, r: 0.1 });
-  for (let i = -2; i < 2; i++) solids.push({ k: 'b', x0: i * 1.6 + 0.1, x1: (i + 1) * 1.6 - 0.1, z0: 7.17, z1: 7.23 });
+  for (let i = -2; i <= 2; i++) if (i !== 0) solids.push({ k: 'c', x: i * 1.6, z: 7.2, r: 0.1 });
+  for (let i = -2; i < 2; i++) if (i === -2 || i === 1) solids.push({ k: 'b', x0: i * 1.6 + 0.1, x1: (i + 1) * 1.6 - 0.1, z0: 7.17, z1: 7.23 });
   stations.forEach((s) => {
     const a = s.group.rotation.y, px = s.group.position.x, pz = s.group.position.z;
     const ell = (a1, b1) => solids.push({ k: 'e', cx: px, cz: pz, a: a1, b: b1, rot: a });
@@ -2250,15 +2261,15 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
         else { const hx = o.hx + PR, hz = o.hz + PR, oz = o.oz || 0, zz = lz - oz; if (Math.abs(lx) < hx && Math.abs(zz) < hz) { let nx = lx, nz = lz; if (hx - Math.abs(lx) < hz - Math.abs(zz)) nx = Math.sign(lx || 1) * hx; else nz = oz + Math.sign(zz || 1) * hz; player.x = o.cx + c * nx + sn * nz; player.z = o.cz - sn * nx + c * nz; } } }
     }
   }
-  const eyePos = () => V3(player.x, EYE + Math.sin(player.bob) * 0.02, player.z);
+  const eyePos = () => V3(player.x, EYE + Math.sin(player.bob) * WALK.bobAmp, player.z);
   const aimDir = () => V3(-Math.sin(player.yaw) * Math.cos(player.pitch), Math.sin(player.pitch), -Math.cos(player.yaw) * Math.cos(player.pitch));
   let stepT = 0;
   function walkMove(dt) {
     let f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) - joy.vy, s = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joy.vx;
     const len = Math.hypot(f, s); if (len > 1) { f /= len; s /= len; }
-    const sp = (keys.ShiftLeft || keys.ShiftRight ? 4.6 : 2.9) * dt, sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
+    const sp = (keys.ShiftLeft || keys.ShiftRight ? WALK.sprint : WALK.speed) * dt, sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
     player.x += (-sy * f + cy * s) * sp; player.z += (-cy * f - sy * s) * sp;
-    if (len > 0.05) { player.bob += dt * 8 * Math.min(1, len); stepT -= dt * Math.min(1, len); if (stepT < 0) { stepT = 0.46; if (sfx.step) sfx.step(); } }
+    if (len > 0.05) { player.bob += dt * WALK.bobRate * Math.min(1, len); stepT -= dt * Math.min(1, len); if (stepT < 0) { stepT = 0.46; if (sfx.step) sfx.step(); } }
     collide();
   }
   const seatWorld = (s, seat) => toWorld(s, seat.x, seat.z), standWorld = (s, seat) => toWorld(s, seat.stand.x, seat.stand.z);
@@ -2296,19 +2307,42 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     player.x = 0; player.z = 6.2; player.yaw = 0; player.pitch = -0.08;
     const e = eyePos(), d = aimDir(); tgtPos.copy(e); tgtLook.copy(e).add(d.multiplyScalar(3)); paintWalkHud(); tryLock();
   }
+  // ---- the way out: a door on the entrance wall. Walk up to it and it opens; walk through and you are back in the arcade's lobby (no button).
+  let leaving = false;
+  const fadeEl = document.createElement('div'); fadeEl.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .3s;z-index:60'; document.body.appendChild(fadeEl);
+  if (room.exitDoor) room.exitDoor.open = FROM_ARCADE ? 1 : 0;
+  function updateExit(dt) {
+    const ed = room.exitDoor; if (!ed) return;
+    const near = mode === 'walk' && !focus && Math.abs(player.x) < 1.1 && player.z > 9.0;
+    ed.open += ((near ? 1 : 0) - ed.open) * Math.min(1, dt * 4); ed.hinge.rotation.y = -ed.open * 1.7;
+    if (near && !leaving && !returning && ed.open > 0.75 && player.z > 9.9 && Math.abs(player.x) < 0.65) leaveToLobby();
+  }
+  function leaveToLobby() {
+    leaving = true;
+    if (window.parent === window) { toast('The way out: this room is entered from the Xtrata Arcade lobby'); player.z = 9.2; setTimeout(() => { leaving = false; }, 2500); return; }   // opened on its own: nowhere to go
+    fadeEl.style.opacity = 1; setTimeout(() => { try { parent.postMessage({ xa: 'leave-room' }, '*'); } catch (e) { } }, 350);
+    setTimeout(() => { leaving = false; fadeEl.style.opacity = 0; }, 3000);   // (if nothing is listening you are not stuck in the dark)
+  }
+  // opened from the arcade: start walking just inside the door, facing the room, with no overview and no wait
+  function startAtDoor() {
+    mode = 'walk'; returning = false; $('intro').classList.remove('on');
+    player.x = 0; player.z = 9.4; player.yaw = 0; player.pitch = -0.08;
+    const e = eyePos(), d = aimDir(); camPos.copy(e); look.copy(e).add(d); tgtPos.copy(camPos); tgtLook.copy(look); fovBase = WALK.fov; paintWalkHud();
+  }
   function exitWalk() { mode = 'overview'; returning = false; tgtPos.copy(HOME.pos); tgtLook.copy(HOME.look); $('intro').classList.add('on'); freeMouse(); paintWalkHud(); }
   const canvasEl = canvas;
   function tryLock() { if (isTouch) return; try { const p = canvasEl.requestPointerLock(); if (p && p.catch) p.catch(() => { }); } catch (e) { } }
   function freeMouse() { if (document.pointerLockElement) document.exitPointerLock(); }
-  const lookBy = (dx, dy, k) => { player.yaw -= dx * k; player.pitch = clamp(player.pitch - dy * k, -1.2, 1.2); };
+  const lookBy = (dx, dy, k) => { player.yaw -= dx * k; player.pitch = clamp(player.pitch - dy * k, -WALK.pitch, WALK.pitch); };
   let locked = false, drag = null;
   document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === canvasEl; paintWalkHud(); });
   const walkLive = () => mode === 'walk' && !focus && !returning;
-  canvasEl.addEventListener('mousedown', () => { if (!walkLive()) return; audio(); drag = { x: 0, y: 0, moved: 0, px: undefined }; });
+  const lookLive = () => mode === 'walk' && !focus;                 // the mouse looks as soon as you are walking, even while the camera is settling
+  canvasEl.addEventListener('mousedown', (e) => { if (!lookLive()) return; audio(); drag = { moved: 0, px: e.clientX, py: e.clientY }; });   // (the drag turns you from the first pixel, as in the hall)
   window.addEventListener('mousemove', (e) => {
-    if (!walkLive()) return;
-    if (locked) lookBy(e.movementX, e.movementY, 0.0022);
-    else if (drag) { if (drag.px !== undefined) { const dx = e.clientX - drag.px, dy = e.clientY - drag.py; drag.moved += Math.abs(dx) + Math.abs(dy); lookBy(dx, dy, 0.004); } drag.px = e.clientX; drag.py = e.clientY; }
+    if (!lookLive()) return;
+    if (locked) lookBy(e.movementX, e.movementY, WALK.look);
+    else if (drag) { if (drag.px !== undefined) { const dx = e.clientX - drag.px, dy = e.clientY - drag.py; drag.moved += Math.abs(dx) + Math.abs(dy); lookBy(dx, dy, WALK.drag); } drag.px = e.clientX; drag.py = e.clientY; }
   });
   window.addEventListener('mouseup', (e) => {
     if (!drag) return; const click = drag.moved < 5; drag = null; if (!click || !walkLive()) return;
@@ -2333,7 +2367,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     if (!walkLive() && joy.id === null && lk.id === null) return; e.preventDefault();
     for (const t of e.changedTouches) {
       if (t.identifier === joy.id) { let dx = t.clientX - joy.ox, dy = t.clientY - joy.oy; const d = Math.hypot(dx, dy), mx = 50; if (d > mx) { dx *= mx / d; dy *= mx / d; } joy.vx = dx / mx; joy.vy = dy / mx; knobEl.style.transform = `translate(${dx}px,${dy}px)`; }
-      else if (t.identifier === lk.id) { const dx = t.clientX - lk.x, dy = t.clientY - lk.y; lk.moved += Math.abs(dx) + Math.abs(dy); lk.x = t.clientX; lk.y = t.clientY; if (walkLive()) lookBy(dx, dy, 0.005); }
+      else if (t.identifier === lk.id) { const dx = t.clientX - lk.x, dy = t.clientY - lk.y; lk.moved += Math.abs(dx) + Math.abs(dy); lk.x = t.clientX; lk.y = t.clientY; if (lookLive()) lookBy(dx, dy, WALK.touchLook); }
     }
   }, { passive: false });
   const endTouch = (e) => {
@@ -2415,7 +2449,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     for (let i = tweens.length - 1; i >= 0; i--) { const w = tweens[i]; w.t += dt; const u = Math.min(1, w.t / w.dur); w.fn(u); if (u >= 1) { tweens.splice(i, 1); w.res(); } }
     stations.forEach((s) => s.update && s.update(t, dt));
     updateCoins(dt); updateGlows(t); figures.forEach((f) => f.update(t));
-    kick *= Math.exp(-dt * 4); camera.fov = baseFov + kick * 5; camera.updateProjectionMatrix();
+    kick *= Math.exp(-dt * 4); fovBase += (((mode === 'walk' && !focus) ? WALK.fov : baseFov) - fovBase) * Math.min(1, dt * 5); camera.fov = fovBase + kick * 5; camera.updateProjectionMatrix();   // walking: the arcade's field of view
     signA += ((focus ? 0 : 1) - signA) * Math.min(1, dt * 5); stations.forEach((s) => { s.sign.material.opacity = signA; s.sign.visible = signA > 0.02; });
     room.neon.material.color.setScalar(0.85 + 0.15 * Math.sin(t * 2.4));
     room.bulbs.forEach((b, i) => { const on = ((Math.floor(t * 6) + i) % 4) === 0; b.material.color.setHex(on ? 0xffd86b : 0x4a3208); });
@@ -2423,21 +2457,22 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     const dpos = room.dust.geometry.attributes.position.array; for (let i = 0; i < dpos.length; i += 3) { dpos[i + 1] += dt * 0.05; dpos[i] += Math.sin(t * 0.3 + i) * dt * 0.03; if (dpos[i + 1] > 5) dpos[i + 1] = 0.5; } room.dust.geometry.attributes.position.needsUpdate = true;
     if (walkLive()) {
       walkMove(dt); const e = eyePos(); camPos.copy(e); look.copy(e).add(aimDir()); tgtPos.copy(camPos); tgtLook.copy(look);
-      camera.position.copy(camPos); camera.lookAt(look);
+      camera.position.copy(camPos); camera.rotation.set(player.pitch, player.yaw, 0);   // set straight from the mouse, as in the arcade hall
       const c = findCand(); if (c !== cand && (!c || !cand || c.seat !== cand.seat)) { cand = c; paintWalkHud(); } else cand = c;
     } else {
+      if (mode === 'walk' && !focus) { const e = eyePos(); tgtPos.copy(e); tgtLook.copy(e).add(aimDir().multiplyScalar(3)); }   // settling after standing up: the mouse still steers
       const k = 1 - Math.exp(-dt * (returning ? 4.2 : 3.2)); camPos.lerp(tgtPos, k); look.lerp(tgtLook, k);
       if (returning && camPos.distanceTo(tgtPos) < 0.06 && look.distanceTo(tgtLook) < 0.25) { returning = false; cand = null; paintWalkHud(); }
       const par = !focus && mode === 'overview';
       camera.position.set(camPos.x + (par ? px * 0.9 : 0), camPos.y + (par ? -py * 0.3 : 0), camPos.z); camera.lookAt(look);
       if (focus) cand = null;
     }
-    updateRings(t, dt); updatePatrons(t);
+    updateExit(dt); updateRings(t, dt); updatePatrons(t);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
-  $('intro').classList.add('on'); render(); paintWalkHud(); frame();
-  window.__casino = { stations, figures, player, enterWalk, exitWalk, sit, get cand() { return cand; }, get mode() { return mode; }, get returning() { return returning; }, solids, setFocus, setBank, stats, audioStats, sfx, audio, setCam(p, l) { tgtPos.set(p[0], p[1], p[2]); tgtLook.set(l[0], l[1], l[2]); camPos.copy(tgtPos); look.copy(tgtLook); }, get bank() { return bank; }, get pixelRatio() { return pr; } };
+  $('intro').classList.add('on'); render(); paintWalkHud(); if (FROM_ARCADE) startAtDoor(); frame();
+  window.__casino = { walkCfg: WALK, startAtDoor, lookBy, get leaving() { return leaving; }, get fov() { return camera.fov; }, get exitOpen() { return room.exitDoor ? room.exitDoor.open : null; }, stations, figures, player, enterWalk, exitWalk, sit, get cand() { return cand; }, get mode() { return mode; }, get returning() { return returning; }, solids, setFocus, setBank, stats, audioStats, sfx, audio, setCam(p, l) { tgtPos.set(p[0], p[1], p[2]); tgtLook.set(l[0], l[1], l[2]); camPos.copy(tgtPos); look.copy(tgtLook); }, get bank() { return bank; }, get pixelRatio() { return pr; } };
 })();
 </script>
 

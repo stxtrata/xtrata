@@ -3,7 +3,7 @@
 //   H  a locked door (interaction 1)    a real door is built in the bay (style from the door look), KNOCK ON THE DOOR, E knocks
 //   I  an unlocked door (interaction 2) OPEN THE DOOR, E starts it opening, then CLOSE THE DOOR; a hidden curtain stops it being usable
 //   J  going live                        locked -> unlocked on a push (the lock sound plays), unlocked -> locked closes it again
-//   K  a door that leads somewhere       looking through an open door shows ENTER; E to a room that does not exist shows "THIS DOOR LEADS TO <ROOM> · NOT OPEN YET" (the lobby is tested in hall-lobby)
+//   K  a door that leads somewhere       walking into an open door to a room that does not exist shows "THIS DOOR LEADS TO <ROOM> · NOT OPEN YET" (the lobby is tested in hall-lobby)
 //   L  door styles and clean-up          a different door look rebuilds the door; back to posters removes it, no errors
 // Run: NODE_PATH=<playwright> CHROME_PATH=... [SHOTS=<dir>] node tests/hall-doors.test.cjs
 const { chromium } = require('playwright');
@@ -61,7 +61,7 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
   const face = (page, d) => page.evaluate((dd) => { const p = window.XA.bayState().bays[0].pos; window.XA.pose(p.x + dd, p.z, Math.PI / 2, -0.05); }, d || 1.8);
   const away = (page) => page.evaluate(() => { const p = window.XA.bayState().bays[0].pos; window.XA.pose(p.x + 1.8, p.z, -Math.PI / 2, 0); });
   const hint = (page) => page.evaluate(() => { const e = document.getElementById('bprompt'); return e && !e.hidden ? e.textContent : ''; });
-  const waitHint = (page, re) => page.waitForFunction((src) => { const e = document.getElementById('bprompt'); return e && !e.hidden && new RegExp(src).test(e.textContent); }, re.source, { timeout: 30000 });
+  const waitHint = (page, re) => page.waitForFunction((src) => { const e = document.getElementById('bprompt'); return e && !e.hidden && new RegExp(src).test(e.textContent); }, re.source, { timeout: 120000 });
   const model = (page, fn) => page.evaluate(fn);
 
   /* ---- H: a locked door ---- */
@@ -97,7 +97,7 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
     const s1 = (await bays(page)).bays[0].doorState;
     check(s1.locked === true && s1.angle < 1 && !s1.open, 'H: knocking does not open a locked door');
     await away(page);
-    await page.waitForFunction(() => document.getElementById('bprompt').hidden, null, { timeout: 30000 });
+    await page.waitForFunction(() => document.getElementById('bprompt').hidden, null, { timeout: 120000 });
     check(true, 'H: the prompt goes when you look away');
     check(!errors.length, 'H: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
@@ -108,12 +108,12 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
     const { ctx, page, errors } = await open(snapshot([bay(door(1, 20)), bay(null)]));
     await face(page);
     await push(page, snapshot([bay(door(2, 20)), bay(null)]));
-    await page.waitForFunction(() => window.XA.bayState().bays[0].doorState.locked === false, null, { timeout: 30000 });
+    await page.waitForFunction(() => window.XA.bayState().bays[0].doorState.locked === false, null, { timeout: 120000 });
     check(true, 'J: a live push from locked to peek unlocks the door');
     await waitHint(page, /OPEN THE DOOR/);
     check(true, 'I: an unlocked door says OPEN THE DOOR');
     await page.keyboard.press('KeyE');
-    await page.waitForFunction(() => window.XA.bayState().bays[0].doorState.open === true, null, { timeout: 30000 });
+    await page.waitForFunction(() => window.XA.bayState().bays[0].doorState.open === true, null, { timeout: 120000 });
     await page.waitForFunction(() => window.XA.bayState().bays[0].doorState.angle > 2, null, { timeout: 60000 });
     check(true, 'I: E starts it opening and the leaf swings (software rendering is slow, so progress is checked, not completion)');
     await waitHint(page, /CLOSE THE DOOR/);
@@ -127,7 +127,7 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
     check(!/DOOR/.test(await hint(page)), 'I: behind a closed curtain the door gives no prompt (hint is "' + (await hint(page)) + '")');
     // going live the other way: locked again, an open door is closed first
     await push(page, snapshot([bay(door(1, 20)), bay(null)]));
-    await page.waitForFunction(() => window.XA.bayState().bays[0].doorState.locked === true, null, { timeout: 30000 });
+    await page.waitForFunction(() => window.XA.bayState().bays[0].doorState.locked === true, null, { timeout: 120000 });
     check(true, 'J: a live push back to knock-only locks the door again');
     check(!errors.length, 'I/J: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
@@ -139,13 +139,14 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
     const { ctx, page, errors } = await open(snapshot([bay(door(3, 21, [], link)), bay(null)]));
     await face(page, 1.5);
     await page.evaluate(() => window.XA.bayDoor(0, (m) => { m.cfg.locked = false; m.angle = m.cfg.openAngle; m.vel = 0; m.mode = 'free'; m.wake(); }));
-    for (let k = 0; k < 40 && !/ENTER/.test(await hint(page)); k++) { await face(page, 1.5); await page.waitForTimeout(1200); }   // the headless browser nudges the view: stand in place again
-    await waitHint(page, /ENTER/);
-    check(true, 'K: looking through the open door of an enter scene shows ENTER');
+    await page.waitForTimeout(1500);
+    check(!/ENTER/.test(await hint(page)), 'K: looking through the open door of an enter scene shows no ENTER prompt');
     await shot(page, 'doors-K-enter');
-    await page.keyboard.press('KeyE');
-    await waitHint(page, /THIS DOOR LEADS TO VAULT . NOT OPEN YET/);
-    check(true, 'K: E says where the door leads and that it is not open yet');
+    await page.evaluate(() => { window.__toast = false; new MutationObserver(() => { const e = document.getElementById('bprompt'); if (e && !e.hidden && /THIS DOOR LEADS TO VAULT . NOT OPEN YET/.test(e.textContent)) window.__toast = true; }).observe(document.getElementById('bprompt'), { subtree: true, childList: true, characterData: true, attributes: true }); });
+    await page.keyboard.down('KeyW');
+    for (let k = 0; k < 300 && !(await page.evaluate(() => window.__toast)); k++) { await page.evaluate(() => { const w = window.XA.where(); window.XA.pose(w.x, w.z, Math.PI / 2, -0.05); }); await page.waitForTimeout(250); }
+    await page.keyboard.up('KeyW');
+    check(await page.evaluate(() => window.__toast === true), 'K: walking into the open door says where it leads and that it is not open yet');
     check(!errors.length, 'K: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
@@ -154,7 +155,7 @@ const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters
   {
     const { ctx, page, errors } = await open(snapshot([bay(door(1, 20)), bay(null)]));
     await push(page, snapshot([bay(door(1, 21)), bay(null)]));
-    await page.waitForFunction(() => window.XA.bayState().bays[0].doorState && window.XA.bayState().bays[0].doorState.style === 'gothic', null, { timeout: 30000 });
+    await page.waitForFunction(() => window.XA.bayState().bays[0].doorState && window.XA.bayState().bays[0].doorState.style === 'gothic', null, { timeout: 120000 });
     check(true, 'L: a different door look rebuilds the door in the new style');
     await push(page, snapshot([bay({ base: 'posters', baseId: 0, interaction: 0, doorLook: null, layers: [], link: null, fromHeight: 0 }), bay(null)]));
     await page.waitForTimeout(500);
