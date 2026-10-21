@@ -150,3 +150,19 @@ The casino is a page of its own, but it uses the hall's walking and looking numb
 The casino's entrance wall has a real door with a velvet rope that is open in the middle (the way to the carpet). Walk up to it and it opens, walk through and the page tells the hall to leave; on its own (no parent page) it just says where the way out is.
 
 In the preview the lobby's first door is CASINO (gold sign, skinned door, `link: casino`) and the page is `build/rooms/casino-room.html`, copied beside the preview by `build/preview.mjs` (also checked by `--check`). That page loads three.js from a CDN. Tests: `tests/hall-room.test.cjs` (a stub page stands in for the casino) and `tests/casino-walk.test.cjs`, which runs the real casino page and needs a local three.js r128 (`THREE_JS=<three.min.js>`, see its header; it skips without it).
+
+## Network-fee warning on score posts
+
+Wallets estimate their own network (miner) fee for a score post and have suggested 0.5 STX. The post panel
+(`arcade-room.js`) now tells players to set the small figure from `networkFeeHintUstx` in `score-client.js`
+(3000 µSTX = 0.003 STX; one number, used by all the copy):
+
+- a red banner above the Post button, with "How do I change the fee?" steps for a custom fee;
+- a "Before your wallet opens" notice the first time in each session (`sessionStorage` flag `xa:feeNotice`,
+  plus an in-memory flag when storage is blocked); "Not now" backs out without opening the wallet;
+- a reminder line under the wallet message while the wallet is open.
+
+The two-approval long-run (inscribe) flow shows a warning without a fixed figure, because the network fee for a
+big transaction legitimately grows with its size. `networkFeePerByteUstx` (default 0, off) can scale the figure
+if measurement shows larger posts need it. The fee is not yet passed to the wallet: that is a separate wallet
+change (see `docs/WALLET-PLAYBOOK.md`). Test: `tests/long-replay.test.cjs` (needs `@stacks/transactions` v6).
