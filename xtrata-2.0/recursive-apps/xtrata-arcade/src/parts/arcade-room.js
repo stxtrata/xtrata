@@ -899,6 +899,67 @@
     }
     postCard(box, { game: g, mode: s.mode, score: score, bytesP: s.replayP, pilot: s.pilot });
   }
+  /* ------------------------------------------------ network-fee warning */
+  // Wallets estimate their own network fee for a score post and have suggested 0.5 STX. Players should set the
+  // small figure in score-client's config (networkFeeHintUstx). Three places: a banner on the post panel, a notice
+  // the first time in each session, and a reminder line while the wallet is open.
+  var feeNoticeSeen = false;
+  function feeStx(txBytes) { return String(Number(S.networkFeeHint(txBytes)) / 1e6); }
+  function feeSeenStored() { try { return root.sessionStorage.getItem('xa:feeNotice') === '1'; } catch (e) { return false; } }
+  function feeMarkSeen() { feeNoticeSeen = true; try { root.sessionStorage.setItem('xa:feeNotice', '1'); } catch (e) { /* in-memory flag still holds for this page */ } }
+  // fee = the figure to enter (STX string), or null for the long-run flow where the right fee depends on the replay's size.
+  function feeHowSteps(fee) {
+    return h('ol', { class: 'xa-feesteps' }, [
+      h('li', { text: 'On your wallet’s confirm screen find the line called “Fee” or “Network fee”. It usually has an Edit, pencil or Advanced control next to it.' }),
+      h('li', { text: 'Choose “Custom”, or type into the fee box.' + (fee ? ' If the wallet shows micro-STX (µSTX), the amount is ' + Math.round(Number(fee) * 1e6) + '.' : '') }),
+      h('li', { text: fee ? 'Enter ' + fee + ' STX and save it.' : 'Lower it well below what the wallet suggested, then save it.' }),
+      h('li', { text: fee ? 'Check that the Fee line now says ' + fee + ' STX before you press Confirm. If it still shows 0.5 STX, cancel (this costs nothing) and try again.'
+        : 'Check the Fee line before you press Confirm. If it is still around 0.5 STX, cancel (this costs nothing) and choose “Seal it” instead.' }),
+      h('li', { text: 'The board fee shown on its own line is separate and correct. Only the network fee needs changing.' })
+    ]);
+  }
+  // `inscribe` = the two-approval long-run flow, where the network fee grows with the replay's size, so no fixed figure.
+  function feeBanner(inscribe, txBytes) {
+    var fee = feeStx(txBytes);
+    var box = h('div', { class: 'xa-feewarn', role: 'note' });
+    box.append(h('b', { class: 'xa-feewarn-t', text: 'BEFORE YOU APPROVE: CHECK THE NETWORK FEE' }));
+    if (inscribe) {
+      box.append(h('p', { text: 'Your wallet sets the network fee for each approval, and for a big replay it can be high. If it suggests something like 0.5 STX, cancel and choose “Seal it” instead.' }));
+    } else {
+      box.append(h('p', {}, ['Set the network fee to ', h('b', { text: fee + ' STX' }), '. Your wallet may suggest ', h('b', { text: '0.5 STX' }), ': ', h('b', { text: 'do NOT pay that' }), '. You can cancel at no cost.']));
+    }
+    var d = h('details', { class: 'xa-feehow' });
+    d.append(h('summary', { text: 'How do I change the fee?' }), feeHowSteps(inscribe ? null : fee), h('p', { class: 'xa-note', text: 'The wording differs between Xverse, Leather and other wallets, but every one of them lets you edit the fee before you confirm.' }));
+    box.append(d);
+    return box;
+  }
+  // Resolves true to carry on to the wallet, false if the player backs out. Once per session.
+  function feeNoticeOnce(inscribe, txBytes) {
+    if (feeNoticeSeen || feeSeenStored()) { feeNoticeSeen = true; return Promise.resolve(true); }
+    return new Promise(function (resolve) {
+      var fee = feeStx(txBytes);
+      var ok = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: inscribe ? 'OK, I’ll check the fee' : 'OK, I’ll set ' + fee + ' STX' });
+      var no = h('button', { class: 'xa-btn', type: 'button', text: 'Not now' });
+      var wrap = h('div', { class: 'xa-feemodal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Before your wallet opens' }, [
+        h('div', { class: 'xa-feemodal-card' }, [
+          h('h3', { text: 'Before your wallet opens' }),
+          inscribe
+            ? h('p', { class: 'xa-feebig', text: 'Check the network fee on every approval. If your wallet suggests something like 0.5 STX, cancel.' })
+            : h('p', { class: 'xa-feebig' }, ['Set the NETWORK FEE to ', h('b', { text: fee + ' STX' }), '.', h('br'), 'Your wallet may suggest ', h('b', { text: '0.5 STX' }), '. ', h('b', { text: 'Do NOT pay that.' })]),
+          h('details', { class: 'xa-feehow', open: '' }, [h('summary', { text: 'How do I change the fee?' }), feeHowSteps(inscribe ? null : fee)]),
+          h('div', { class: 'xa-over-actions' }, [no, ok])
+        ])
+      ]);
+      function done(v) { wrap.remove(); root.removeEventListener('keydown', onKey, true); if (v) feeMarkSeen(); resolve(v); }
+      function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } }
+      ok.addEventListener('click', function () { done(true); });
+      no.addEventListener('click', function () { done(false); });
+      root.addEventListener('keydown', onKey, true);
+      root.document.body.appendChild(wrap);
+      ok.focus();
+    });
+  }
+
   // The name / cost / post box for a ranked run: at game over, or later from a saved replay.
   // opts: { game, mode, score, pilot:{address, hash160}, bytes | bytesP, checked }
   function postCard(box, opts) {
@@ -916,10 +977,18 @@
     var boardId = boardOf(g, mode), replayBytes = null;
     var longNote = h('div', { class: 'xa-note xa-long', style: 'display:none;color:var(--xa-gold)' });
     var how = 'inline';     // inline | inscribe | seal
+    var feeBox = h('div', { class: 'xa-feebox' });
+    function txBytesNow() { return how === 'seal' ? 400 : (replayBytes ? replayBytes.length + 350 : 0); }
+    function paintFee() { feeBox.replaceChildren(feeBanner(how === 'inscribe', txBytesNow())); }
+    function walletMsg(t) {
+      var inscribe = how === 'inscribe';
+      msg.replaceChildren(t, h('br'), h('b', { class: 'xa-feeremind', text: inscribe ? 'Check the network fee before you approve.' : 'Network fee: set ' + feeStx(txBytesNow()) + ' STX, not 0.5.' }));
+    }
+    paintFee();
     function choice(val, title, text, on) {
       var r = h('input', { type: 'radio', name: 'xa-how', value: val });
       r.checked = !!on;
-      r.addEventListener('change', function () { if (r.checked) { how = val; btn.textContent = val === 'seal' ? 'Save replay & post sealed score' : 'Post score on-chain'; } });
+      r.addEventListener('change', function () { if (r.checked) { how = val; btn.textContent = val === 'seal' ? 'Save replay & post sealed score' : 'Post score on-chain'; paintFee(); } });
       return h('label', { class: 'xa-how', style: 'display:flex;gap:8px;align-items:flex-start;margin:6px 0;cursor:pointer;color:var(--xa-ink,#e8eef7)' },
         [r, h('span', {}, [h('b', { text: title }), h('br'), h('span', { style: 'opacity:.85', text: text })])]);
     }
@@ -928,14 +997,14 @@
     S.getFee(boardId).then(function (f) {
       if (!f.ok) return;
       if (!f.registered) { feeNote.textContent = 'This board is not open for scores yet.'; return; }
-      feeNote.textContent = '3–12 letters or numbers. Fee ' + (Number(f.value) / 1e6) + ' STX plus network fee, capped by a post-condition.';
+      feeNote.textContent = '3–12 letters or numbers. Board fee ' + (Number(f.value) / 1e6) + ' STX (capped by a post-condition), plus the network fee you set in your wallet.';
     });
     (async function () {
       replayBytes = opts.bytes || await opts.bytesP;
       if (!replayBytes) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run is longer than 4 hours and cannot be recorded.'; return; }
       var long = S.needsInscription(replayBytes), kb = Math.max(1, Math.round(replayBytes.length / 1024));
       if (long) {
-        how = 'inscribe';
+        how = 'inscribe'; paintFee();
         longNote.style.display = '';
         longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than a score entry holds. Working out the cost…' }));
         var tooBig = Math.ceil(replayBytes.length / XA.replay.CHUNK) > XA.replay.MAX_INSCRIBE_CHUNKS;
@@ -944,7 +1013,7 @@
         var render = function (q) {
           if (!longNote.isConnected) return;
           if (tooBig) {
-            how = 'seal'; btn.textContent = 'Save replay & post sealed score';
+            how = 'seal'; btn.textContent = 'Save replay & post sealed score'; paintFee();
             longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than the 512 KB one inscription holds, so this score is posted sealed.' }),
               choice('seal', 'Seal it', sealText, true));
             return;
@@ -971,13 +1040,14 @@
       if (n.length < 3) { msg.className = 'xa-msg is-err'; msg.textContent = 'Name needs at least 3 characters.'; name.focus(); return; }
       U.store('name', n);
       var sealIt = how === 'seal';
+      if (!(await feeNoticeOnce(how === 'inscribe', txBytesNow()))) return;
       btn.disabled = true; name.disabled = true;
       longNote.querySelectorAll('input').forEach(function (r) { r.disabled = true; });
-      msg.className = 'xa-msg'; msg.textContent = 'Check your wallet to confirm…';
+      msg.className = 'xa-msg'; walletMsg('Check your wallet to confirm…');
       if (sealIt) { keepSealed(replayBytes); saveReplay(replayBytes, boardId + '-' + n + '-' + score + '-sealed'); }
       try {
         var r = await S.submit({ board: boardId, score: score, name: n, replay: replayBytes, seal: sealIt, pilotHash: S._codec.bytesToHex(s.pilot.hash160),
-          onProgress: function (t) { if (msg.isConnected) { msg.className = 'xa-msg'; msg.textContent = t; } } });
+          onProgress: function (t) { if (msg.isConnected) { msg.className = 'xa-msg'; if (/wallet|approve/i.test(t)) walletMsg(t); else msg.textContent = t; } } });
         if (r.ok) {
           dropUnposted(replayBytes);
           var tx = r.txid ? (/^0x/.test(r.txid) ? r.txid : '0x' + r.txid) : '';
@@ -1001,7 +1071,7 @@
         longNote.querySelectorAll('input').forEach(function (r) { r.disabled = false; });
       }
     });
-    box.replaceChildren(h('label', { for: 'xa-name', text: 'NAME ON THE BOARD' }), name, feeNote, longNote, btn, msg);
+    box.replaceChildren(h('label', { for: 'xa-name', text: 'NAME ON THE BOARD' }), name, feeNote, longNote, feeBox, btn, msg);
   }
 
   /* ---------------------------------------------------------- loop */
