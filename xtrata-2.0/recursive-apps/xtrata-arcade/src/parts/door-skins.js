@@ -385,8 +385,8 @@
       var grime = smooth(0.6, 1, v) * smooth(0.35, 0.8, nz2) * wear * 0.55;                       // dirt gathers low down
       if (grime > 0) { shade(b, i, 1 - grime * 0.55); b.rough[i] = clamp(b.rough[i] + grime * 0.3, 0, 1); }
       if (mode === 'scuff' || mode === 'chip') {
-        var hd = handle ? Math.sqrt(Math.pow(u - handle[0], 2) + Math.pow((v - handle[1]) * 1.6, 2)) : 9, scuff = smooth(0.2, 0.02, hd) * smooth(0.35, 0.7, nz) * wear;
-        if (scuff > 0) { shade(b, i, 1 + scuff * 0.18); b.rough[i] = clamp(b.rough[i] - scuff * 0.1, 0, 1); }
+        var hd = handle ? Math.sqrt(Math.pow(u - handle[0], 2) + Math.pow((v - handle[1]) * 1.6, 2)) : 9, scuff = Math.pow(smooth(0.26, 0.0, hd), 2) * (0.45 + 0.55 * smooth(0.25, 0.8, nz)) * wear;   // a soft smudge of hand wear around the handle, no hard edge
+        if (scuff > 0) { shade(b, i, 1 + scuff * 0.14); b.rough[i] = clamp(b.rough[i] - scuff * 0.1, 0, 1); }
       }
       if (mode === 'chip' && rel) {
         var e = rel.dist[i], chip = smooth(0.62 - wear * 0.45, 0.75 - wear * 0.45, nz) * smooth(14, 1, e) * wear * 1.8, inside = rel.mask[i] > 0.5 ? 1 : 0;
