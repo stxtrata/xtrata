@@ -1,6 +1,9 @@
 # CONTENT-ORIGIN-SPLIT-PLAN
 
-Status: Phase 1 implemented on branch `fix/content-origin-isolation`, OFF by default (2026-10-19). Phases 2 to 4 not started.
+Status (2026-10-21): Phase 1 merged and ON in production, exempt list `3111,3075,3072,394,3047`. Security contact
+files (`/abuse`, `security.txt`) merged. Vendor flags cleared. Phases 2 to 4 not started; detailed plans:
+`docs/plans/STEP-3-CONTENT-HOST-PLAN.md` (Phases 2 and 3) and `docs/plans/STEP-4-BLOCKLIST-AND-ABUSE-PLAN.md`
+(Phase 4). Incident record and ongoing admin: `docs/security/`.
 
 ## Why
 
@@ -114,4 +117,4 @@ Rollout checklist:
 
 ## Branch
 
-Work on `fix/content-origin-isolation`. Do not mix with other working-tree changes.
+Phase 1 shipped via `fix/content-origin-isolation`. Later phases get their own branches.
