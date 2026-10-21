@@ -82,7 +82,7 @@ const story = (state, interaction) => bay(scene('door', [
   {
     const { ctx, page, errors } = await open({ config: true });
     const s = await bays(page);
-    check(s && s.bays.length === 4 && s.bays.every((b) => !b.visible && b.plan === null && !b.curtain && !b.door && b.overlays === 0 && !b.light), 'A2: world on, chain down: all four bays empty and hidden, posters as in #3111');
+    check(s && s.bays.length === 6 && s.bays.every((b) => !b.visible && b.plan === null && !b.curtain && !b.door && b.overlays === 0 && !b.light), 'A2: world on, chain down: all six bays (hall four, lobby two) empty and hidden, posters as in #3111');
     check((await page.evaluate(() => window.XA.wallState())).every((x) => x.shown), 'A2: all 27 posters shown');
     check(!errors.length, 'A2: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
@@ -123,7 +123,7 @@ const story = (state, interaction) => bay(scene('door', [
     const mid = (await bays(page)).bays[0].curtain;
     check(mid.target === 1 && mid.openness < 0.95, 'D: a live change animates the curtain towards open (target ' + mid.target + ', now ' + mid.openness.toFixed(2) + ')');
     // swiftshader renders about one frame a second and the cloth advances per frame, so check progress, not completion
-    await page.waitForFunction((o) => window.XA.bayState().bays[0].curtain.openness > o, mid.openness, { timeout: 30000 });
+    await page.waitForFunction((o) => window.XA.bayState().bays[0].curtain.openness > o, mid.openness, { timeout: 120000 });
     const later = (await bays(page)).bays[0].curtain;
     check(later.openness > mid.openness && later.animating && later.target === 1, 'D: and keeps opening, frame by frame (' + mid.openness.toFixed(4) + ' -> ' + later.openness.toFixed(4) + ')');
     await shot(page, 'bays-D-open');
@@ -176,7 +176,8 @@ const story = (state, interaction) => bay(scene('door', [
     await walkIn(page);
     const face = (yaw) => page.evaluate((y) => { const p = window.XA.bayState().bays[0].pos; window.XA.pose(p.x + 2.2, p.z, y, -0.05); }, yaw);
     await face(Math.PI / 2);                                     // two metres from the cloth, looking at it
-    await page.waitForFunction(() => { const e = document.getElementById('bprompt'); return e && !e.hidden; }, null, { timeout: 30000 });
+    // (the headless view drifts a little each frame, so face the cloth again on every try)
+    for (let k = 0; k < 40 && await page.evaluate(() => { const e = document.getElementById('bprompt'); return !e || e.hidden; }); k++) { await face(Math.PI / 2); await page.waitForTimeout(500); }
     check(/PULL THE CURTAIN/.test(await page.textContent('#bprompt')), 'G: looking at a curtain you may pull shows PULL THE CURTAIN');
     await page.keyboard.press('KeyE');
     await page.waitForTimeout(300);
@@ -223,8 +224,8 @@ const story = (state, interaction) => bay(scene('door', [
     const nearWall = bay(scene('wall', [layer(2, 2, '{"text":"under construction","sub":"","tone":"gold"}')], 0));
     const { ctx, page, errors } = await open({ config: true, snap: snapshot([bay(null), bay(null), nearDoor, nearWall]) });
     const s = await bays(page);
-    check(s.bays.length === 4, 'I: the hall has four bays');
-    const p = s.bays.map((b) => b.pos);
+    check(s.bays.length === 6, 'I: the hall has four bays and the lobby two');
+    const p = s.bays.slice(0, 4).map((b) => b.pos);
     check(p[0].x < 0 && p[1].x > 0 && p[2].x < 0 && p[3].x > 0, 'I: bays 0 and 2 are on the left wall, 1 and 3 on the right');
     check(p[0].z < 0 && p[1].z < 0 && p[2].z > 0 && p[3].z > 0, 'I: bays 0 and 1 are at the far end, 2 and 3 at the entrance end');
     check(!s.bays[0].visible && !s.bays[1].visible, 'I: far bays on posters build nothing');

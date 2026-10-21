@@ -107,6 +107,7 @@ const machines = [], pickables = [], boxes = [];
    writes the stencil, and the walls on both sides skip those pixels (see portal() in doors.js). The lobby sits on the far side of the
    hall wall at that bay, so it is the same room whichever bay holds the door; only one bay at a time can lead to it. */
 const LW = 8, LD = 10;                      // lobby width (along the hall wall) and depth (away from it), metres
+let HALL_BAYS = 4;                           // how many bays the hall itself has; the lobby's two come after them
 let lobbyG = null, lobbyBay = -1, lobbyPass = null, autoWalk = null, bayDefsAll = [];   // lobbyPass: {side, wallX, z}
 const WALL_T = 0.2;                         // the thickness of the wall between the rooms (a drywall cavity you see as the reveal of the doorway)
 function holeWall(m,bit){ m.stencilWrite=true; m.stencilRef=bit; m.stencilFuncMask=bit; m.stencilWriteMask=0; m.stencilFunc=THREE.NotEqualStencilFunc; m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp; return m }   // bit 1: this room's wall, bit 2: the lobby's
@@ -184,6 +185,8 @@ function buildRoom(){
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
+  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, back:!!(roomUI&&roomUI.back.style.display==='block')});   // read-only, for tests
+  if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
   XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw});   // read-only, for tests
   XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
   XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
@@ -212,7 +215,7 @@ function buildRoom(){
 /* ---------- the lobby (bare) ---------- */
 // Built in its own frame: the wall with the opening is the plane z=0 facing +z, the room runs away from it along +z.
 function buildLobby(){
-  const g=new THREE.Group(); g.visible=false; scene.add(g); lobbyG=g;
+  const g=lobbyG;
   const face=(geo,mat,x,y,z,rx,ry)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.rotation.set(rx||0,ry||0,0); g.add(m); return m };
   face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({map:carpetTexture(), roughness:.95}), 0,0,LD/2, -Math.PI/2,0);
   face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}), 0,RH,LD/2, Math.PI/2,0);
@@ -232,7 +235,7 @@ function buildLobby(){
     const l=new THREE.PointLight(0xcfc4ff,.75,11,2); l.position.set(0,RH-.3,z); g.add(l);
   }
   const sign=(text,w,h,x,y,z,ry)=>face(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:signTexture(text,'72px Bungee',BRAND.orange,1024,Math.round(1024*h/w)), transparent:true, toneMapped:false}), x,y,z, 0,ry);
-  sign('LOBBY',3.6,.5,0,2.3,LD-.03,Math.PI);
+  sign('LOBBY',3.6,.5,-LW/2+.03,2.3,LD/2,Math.PI/2);   // on the left wall: the back wall carries the lobby's doors
   sign('BACK TO THE ARCADE',3,.4,0,2.8,.03,0);
 }
 // Put the lobby behind the wall of bay i (or take it away with -1). Only a bay whose door links to it counts.
@@ -1354,7 +1357,12 @@ function paintWall(){
    Other scenes are drawn by the bay engine; until then a bay with another scene shows plain wall. */
 const BAY_INDEX={L:0, R:1, NL:2, NR:3};
 function applyBays(snap){
-  if(bayEngine){ try{ bayEngine.apply(snap,{instant:state==='intro'}) }catch(e){ console.error(e) } }
+  if(bayEngine){ try{
+    // the hall's bays, then the lobby's (snap.rooms.lobby.bays), in the engine's order
+    const lb=snap && snap.rooms && snap.rooms.lobby && snap.rooms.lobby.bays;
+    const all=lb && snap.bays ? Object.assign({}, snap, {bays:snap.bays.slice(0,HALL_BAYS).concat([lb[0]||null, lb[1]||null])}) : snap;
+    bayEngine.apply(all,{instant:state==='intro'})
+  }catch(e){ console.error(e) } }
   { let lb=-1; if(snap && snap.bays) for(let i=0;i<snap.bays.length && lb<0;i++) if(linksToLobby(snap.bays[i] && snap.bays[i].scene)) lb=i; setLobbyBay(lb) }
   for(const s of posterSlots){
     if(!s.bay) continue;
@@ -1422,6 +1430,11 @@ function buildPosters(){
     bayDefs[side<0?0:1]={side, z:(-wallEnd+zLo)/2, width:zLo+wallEnd};
   }
   bayDefsAll=bayDefs;
+  // the lobby has two doorways of its own, on its back wall (the hall's four come first, so the lobby's are bays 4 and 5). The lobby group exists
+  // from the start so they can hang in it; it is moved behind the right wall when a door links to the lobby.
+  lobbyG=new THREE.Group(); lobbyG.visible=false; scene.add(lobbyG);
+  HALL_BAYS=bayDefs.length;
+  bayDefs.push({parent:lobbyG, x:-2.2, z:LD-.02, rot:Math.PI, width:3.4, side:0}, {parent:lobbyG, x:2.2, z:LD-.02, rot:Math.PI, width:3.4, side:0});
   spots.forEach(([side,z,bay])=>{
     const g=new THREE.Group(); g.position.set(side*(RW/2-.03),1.95,z); g.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
     g.add(new THREE.Mesh(new THREE.BoxGeometry(.84,1.22,.03),frameMat));
@@ -2431,8 +2444,55 @@ function updateBayFocus(){
   if(bayEngine.isGrabbing()) return;
   let h=null, hold=true;
   if(bayToast && performance.now()<bayToast.until){ h=bayToast.text; hold=false }
-  else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus && !inLobbyZone()){ const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }
+  else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ bayEngine.setScope(inLobbyZone() ? (i=>i>=HALL_BAYS) : (i=>i<HALL_BAYS)); const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }
   if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
+}
+/* ---------- other rooms that take the whole screen (the casino) ----------
+   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO' } } names
+   them (src is a URL the hall may frame: a file beside the hall, or an inscription's content path). Going in: a short loading screen over the hall,
+   the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
+   Going back: the frame is removed (it frees everything the room built) and you are where you were, in front of the door. */
+const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && typeof r.src==='string' && r.src ? r : null };
+let roomUI=null, roomId='', roomT0=0, roomTimer=0;
+function roomEls(){
+  if(roomUI) return roomUI;
+  const mk=(css,html)=>{ const e=document.createElement('div'); e.style.cssText=css; if(html!=null) e.innerHTML=html; return e };
+  const load=mk('position:fixed;inset:0;z-index:9000;background:radial-gradient(ellipse at 50% 40%,#1b1233,#05040a 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#e8e2ff;text-align:center;opacity:0;transition:opacity .25s',
+    '<div class="rl-t" style="font:34px Bungee,Impact,sans-serif;letter-spacing:.08em;color:#ffb347;text-shadow:0 0 18px rgba(255,150,40,.55)"></div><div class="rl-s" style="font:16px VT323,monospace;letter-spacing:.14em;opacity:.8">OPENING THE ROOM…</div><div style="width:min(60vw,320px);height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden"><i class="rl-b" style="display:block;height:100%;width:35%;background:linear-gradient(90deg,#3d86ff,#ff8a2a);animation:rlbar 1.1s ease-in-out infinite alternate"></i></div>');
+  const st=document.createElement('style'); st.textContent='@keyframes rlbar{from{transform:translateX(-30%)}to{transform:translateX(190%)}}'; document.head.appendChild(st);
+  const back=document.createElement('button'); back.type='button'; back.textContent='← BACK TO THE LOBBY';
+  back.style.cssText='position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9500;display:none;padding:9px 16px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer';
+  back.addEventListener('click',e=>{ e.stopPropagation(); leaveRoom() });
+  document.body.append(load,back); roomUI={load,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
+  window.addEventListener('message',e=>{ if(state==='room' && roomUI && roomUI.frame && e.source===roomUI.frame.contentWindow && e.data && e.data.xa==='leave-room') leaveRoom() });
+  return roomUI;
+}
+function enterRoom(id){
+  const cfg=roomCfg(id); if(!cfg || state!=='walk') return;
+  const U=roomEls(); state='room'; roomId=id; roomT0=performance.now(); sfx.coin();
+  if(document.pointerLockElement) document.exitPointerLock();
+  for(const k in keys) keys[k]=false; autoWalk=null;
+  $('cross').hidden=true; $('prompt').hidden=true; $('tapstart').hidden=true; $('lockhint').hidden=true; $('hint').hidden=true; if($('bprompt')) $('bprompt').hidden=true;
+  try{ Room.enterGame() }catch(e){}                   // the hall's own sound closes behind you
+  U.title.textContent=String(cfg.title||id).toUpperCase(); U.sub.textContent='OPENING THE ROOM…';
+  U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1;
+  const f=document.createElement('iframe'); f.title=cfg.title||id; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
+  f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden';
+  const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,700-(performance.now()-roomT0));   // a short loading screen, never a flash
+    setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room') U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
+  f.addEventListener('load',done);
+  roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
+  U.frame=f; document.body.appendChild(f); f.src=cfg.src;
+}
+function leaveRoom(){
+  if(state!=='room' || !roomUI) return;
+  const U=roomUI; clearTimeout(roomTimer);
+  if(U.frame){ try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null }
+  U.load.style.opacity=0; U.load.style.display='none'; U.back.style.display='none';
+  state='out'; sfx.back(); try{ Room.exitGame() }catch(e){}
+  const fl=$('flash'); fl.style.transition='none'; fl.style.opacity=1; void fl.offsetWidth; fl.style.transition=''; requestAnimationFrame(()=>{ fl.style.opacity=0 });
+  for(const k in keys) keys[k]=false; roomId='';
+  setTimeout(()=>{ if(state==='out'){ state='walk'; updateHud() } },120); tryLock();
 }
 // A door that leads somewhere: the link comes from the world contract. The lobby is the one room there is; any other target says it is not open yet.
 function bayEnter(link){
@@ -2441,6 +2501,7 @@ function bayEnter(link){
     const p=lobbyPass, sd=p.side;   // into the doorway (from the hall side), then 2.4 m into the room
     autoWalk=[{x:p.wallX-sd*.9, z:p.z}, {x:p.wallX+sd*(WALL_T+2.4), z:p.z}]; return
   }
+  if(room && roomCfg(room)){ enterRoom(String(room).toLowerCase()); return }
   bayToast={text:name?('THIS DOOR LEADS TO '+name+' · NOT OPEN YET'):'THIS DOOR IS NOT OPEN YET', until:performance.now()+3500};
 }
 function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint){ $('bptext').textContent=bayHint; const a=$('bpalt'); if(a) a.hidden=!bayHold } }
@@ -2449,7 +2510,7 @@ let last=performance.now(), time=0;
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000); last=now; time+=dt;
   requestAnimationFrame(frame);
-  if(state==='play') return;                       // game has the screen; the hall sleeps
+  if(state==='play' || state==='room') return;     // a game or a room (the casino) has the screen; the hall sleeps
 
   if(state==='walk' && !modalOpen()){ move(dt) }
   if(state==='walk' || state==='intro'){

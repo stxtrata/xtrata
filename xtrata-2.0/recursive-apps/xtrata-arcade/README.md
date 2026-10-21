@@ -132,3 +132,15 @@ A bay is made of independent elements, each its own layer in the world contract:
 ## The lobby (a room behind a door)
 
 A bay door whose scene has `interaction: 3` and a link to `target-room: "lobby"` has a real, bare room built behind its wall (`buildLobby` in `src/parts/hall.js`). When the door opens its doorway is see-through (`portal()` in `doors.js`: the opening is cut out of the doorway picture and an invisible copy of it writes the stencil, which the wall materials on both sides skip), so you see the room and walk in with no loading, fade or teleport; E at the doorway walks you through. While you are inside the door is held open, and looking back shows the hall through the same opening. The wall between the rooms has a thickness (`WALL_T`, 20 cm: a drywall cavity), so the doorway is a short tunnel; its sides are a plaster-coloured reveal built from the opening's outline. The two walls write separate stencil bits (1 for the hall's wall, 2 for the lobby's), so each skips only its own opening. Only one bay at a time can lead to the lobby. Any other target still says "THIS DOOR LEADS TO <ROOM> · NOT OPEN YET". Test: `tests/hall-lobby.test.cjs`.
+
+### Doors inside the lobby, and rooms that take the whole screen
+
+The lobby has two doorways of its own on its back wall. They are bays 4 and 5 of the same bay engine (the hall's four come first); the engine places them in the lobby's own frame (`def.parent`) so they move with it, and `setScope` limits what you can look at and use to the hall's bays or the lobby's, depending on which side of the wall you are. They are read from the world contract as the room `lobby` (`snap.rooms.lobby.bays`: `get-bays "lobby"` in `src/parts/world.js`; if the contract has nothing for it or the read fails, they are plain walls and the hall is untouched).
+
+A door whose link names a room listed in `window.XA_ROOMS` opens that room's page over the whole screen instead of building it behind the wall:
+
+    window.XA_ROOMS = { casino: { src: 'casino-room.html', title: 'Royal Flush Casino' } };
+
+E at the open door: a short loading screen (at least 0.7 s, so it never flashes), then the page in a full-screen frame with a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in the room. Going back removes the frame (the room frees what it built) and you are where you were, in front of the door. A room can also leave on its own with `parent.postMessage({xa:'leave-room'}, '*')`. A target not listed in `XA_ROOMS` still says "NOT OPEN YET". `src` is any URL the hall may frame: a file beside the hall, or an inscription's content path.
+
+In the preview the lobby's first door is CASINO (gold sign, skinned door, `link: casino`) and the page is `build/rooms/casino-room.html`, copied beside the preview by `build/preview.mjs` (also checked by `--check`). That page loads three.js from a CDN. Test: `tests/hall-room.test.cjs` (a stub page stands in for the casino).
