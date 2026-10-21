@@ -548,7 +548,6 @@
     function doorHint(bay, kind) {
       var p = bay.plan, m = bay.door.model;
       if (p.interaction === 1) return 'KNOCK ON THE DOOR';
-      if (p.interaction === 3 && m.angle > 50 && kind === 'doorway') return 'ENTER';
       return m.isOpen() ? 'CLOSE THE DOOR' : 'OPEN THE DOOR';
     }
     // What is the player looking at? Returns { bay, hint, kind } or null. Used for the HUD line.
@@ -557,15 +556,15 @@
       var hit = curtainHit(c0, 3.2);
       if (hit && curtainGrabbable(hit.bay.plan)) { dist = hit.h.distance; out = { bay: hit.bay.i, hint: hit.bay.curtain.sim.getOpenAmount() > 0.5 ? 'CLOSE THE CURTAIN' : 'PULL THE CURTAIN', kind: 'curtain', hold: true }; }
       var dh = doorHit(c0, 3.2);
-      if (dh && dh.h.distance < dist) out = { bay: dh.bay.i, hint: doorHint(dh.bay, dh.kind), kind: dh.kind === 'doorway' ? 'doorway' : 'door' };
+      if (dh && dh.kind !== 'doorway' && dh.h.distance < dist) out = { bay: dh.bay.i, hint: doorHint(dh.bay, dh.kind), kind: 'door' };   // (looking through an open doorway is not an action: you walk through it)
       return out;
     }
     function grabStart(ndc) {
       if (grab) return false;
       var ch = curtainHit(ndc, 3.6), dh = doorHit(ndc, 3.6);
-      if (dh && (!ch || dh.h.distance < ch.h.distance)) {       // a door: the click is the whole action
+      if (dh && dh.kind !== 'doorway' && (!ch || dh.h.distance < ch.h.distance)) {       // a door: the click is the whole action
         var bay = dh.bay, m = bay.door.model;
-        if (dh.kind === 'doorway' && bay.plan.interaction === 3) enterDoor(bay); else if (bay.plan.interaction === 1) m.open(); else m.toggle();
+        if (bay.plan.interaction === 1) m.open(); else m.toggle();
         return true;
       }
       var hit = ch;
@@ -577,7 +576,6 @@
       audio.oneShot('swish', hit.bay.pos, env.listener(), 0.35, 8);
       return true;
     }
-    function enterDoor(bay) { if (env.onEnter) env.onEnter(bay.plan.link, bay.i); }
     function grabMove(dx, dy) {   // dx, dy in NDC units
       if (!grab) return;
       grab.ndc.x = clamp(grab.ndc.x + dx, -1.5, 1.5); grab.ndc.y = clamp(grab.ndc.y + dy, -1.5, 1.5);
@@ -589,8 +587,8 @@
     function toggleFocused() {   // E on what you are looking at
       var f = focus(); if (!f) return false;
       var bay = bays[f.bay];
-      if (f.kind === 'door' || f.kind === 'doorway') {
-        if (f.hint === 'ENTER') enterDoor(bay); else if (bay.plan.interaction === 1) bay.door.model.knock(); else bay.door.model.toggle();
+      if (f.kind === 'door') {
+        if (bay.plan.interaction === 1) bay.door.model.knock(); else bay.door.model.toggle();
         return true;
       }
       var c = bay.curtain, now = c.sim.getOpenAmount() > 0.5;
@@ -606,6 +604,14 @@
       // A bay whose door opens onto a room built behind the wall: while the door is open its doorway is see-through (the hall owns the room).
       setPortal: function (i, on) { var b = bays[i]; if (!b) return; b.portal = !!on; if (!on && b.portalOn) { b.portalOn = false; if (b.door && b.door.mesh.portal) b.door.mesh.portal(false); } },
       portalOpen: function (i) { var b = bays[i]; return !!(b && b.portalOn); },
+      // Where a point of the world is, in the frame of bay i's door (x along the wall, z out from it into the room), when the door is open enough to
+      // walk through; null otherwise. The hall uses it to let you simply walk into an open doorway. link: where that door leads.
+      doorwayAt: function (i, x, z) {
+        var b = bays[i], m = b && b.door && b.door.model; if (!b || !m || !doorUsable(b) || !(m.angle > 50)) return null;
+        var v = new T.Vector3(x, 0, z); b.group.updateWorldMatrix(true, false); b.group.worldToLocal(v);
+        return { x: v.x, z: v.z, half: b.door.mesh && b.door.mesh.size ? b.door.mesh.size.w / 2 : 0.5, link: b.plan.link, interaction: b.plan.interaction };
+      },
+      posOf: function (i) { var b = bays[i]; return b ? { x: b.pos.x, z: b.pos.z } : null; },
       doorHalfWidth: function (i) { var b = bays[i]; return b && b.door && b.door.mesh && b.door.mesh.size ? b.door.mesh.size.w / 2 : 0.5; },
       doorOpen: function (i) { var b = bays[i], m = b && b.door && b.door.model; if (m && !m.isOpen()) m.open(); },
       _curtain: function (i) { var c = bays[i] && bays[i].curtain; return c ? { sim: c.sim, mg: c.mg, w: bays[i].width } : null; },   // tests only

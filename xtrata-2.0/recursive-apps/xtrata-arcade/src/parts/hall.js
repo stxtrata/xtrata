@@ -94,10 +94,13 @@ $('stage').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x07060c);
 scene.fog = new THREE.Fog(0x07060c, 9, 34);
-const camera = new THREE.PerspectiveCamera(68, innerWidth/innerHeight, 0.04, 60);
+// How you walk and look. The casino room (a page of its own) uses exactly these numbers, so the two rooms feel the same under the hand;
+// tests/casino-walk.test.cjs checks that they agree. Touch: left thumb walks, right thumb looks at .005.
+const WALK = { fov:68, eye:1.6, speed:3, sprint:4.6, bobRate:9, bobAmp:.025, look:.0022, drag:.004, touchLook:.005, pitch:1.2 };
+const camera = new THREE.PerspectiveCamera(WALK.fov, innerWidth/innerHeight, 0.04, 60);
 camera.rotation.order = 'YXZ';
 
-const RW = 10, RH = 3.2, EYE = 1.6, GAP = 2.2;
+const RW = 10, RH = 3.2, EYE = WALK.eye, GAP = 2.2;
 const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets down the left / right walls
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
@@ -108,7 +111,7 @@ const machines = [], pickables = [], boxes = [];
    hall wall at that bay, so it is the same room whichever bay holds the door; only one bay at a time can lead to it. */
 const LW = 8, LD = 10;                      // lobby width (along the hall wall) and depth (away from it), metres
 let HALL_BAYS = 4;                           // how many bays the hall itself has; the lobby's two come after them
-let lobbyG = null, lobbyBay = -1, lobbyPass = null, autoWalk = null, bayDefsAll = [];   // lobbyPass: {side, wallX, z}
+let lobbyG = null, lobbyBay = -1, lobbyPass = null, bayDefsAll = [];   // lobbyPass: {side, wallX, z}
 const WALL_T = 0.2;                         // the thickness of the wall between the rooms (a drywall cavity you see as the reveal of the doorway)
 function holeWall(m,bit){ m.stencilWrite=true; m.stencilRef=bit; m.stencilFuncMask=bit; m.stencilWriteMask=0; m.stencilFunc=THREE.NotEqualStencilFunc; m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp; return m }   // bit 1: this room's wall, bit 2: the lobby's
 const lobbyOpen = () => lobbyBay>=0 && !!bayEngine && bayEngine.portalOpen(lobbyBay);
@@ -187,7 +190,9 @@ function buildRoom(){
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
   XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, back:!!(roomUI&&roomUI.back.style.display==='block')});   // read-only, for tests
   if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
-  XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw});   // read-only, for tests
+  XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;   // read-only, for tests: where you are in bay i's open doorway
+  XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
+  XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw, pitch:player.pitch});   // read-only, for tests
   XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
   XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
   if(window.XA_TEST) XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 };   // tests only: nothing sets XA_TEST in the shipped page
@@ -244,7 +249,7 @@ function setLobbyBay(i){
   if(!d || !lobbyG){ i=-1 }
   if(i===lobbyBay) return;
   if(bayEngine){ if(lobbyBay>=0) bayEngine.setPortal(lobbyBay,false); if(i>=0) bayEngine.setPortal(i,true) }
-  lobbyBay=i; autoWalk=null;
+  lobbyBay=i;
   if(i<0){ lobbyPass=null; if(lobbyG) lobbyG.visible=false; return }
   lobbyPass={side:d.side, wallX:d.side*RW/2, z:d.z};
   lobbyG.position.set(lobbyPass.wallX+d.side*WALL_T,0,d.z); lobbyG.rotation.y=d.side<0?-Math.PI/2:Math.PI/2; lobbyG.visible=true;
@@ -1445,7 +1450,7 @@ function buildPosters(){
   try{
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
-      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, onEnter:bayEnter});
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player});
     if(bayEngine) buildLobby();
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
@@ -2233,8 +2238,8 @@ cvs.addEventListener('mousedown', e=>{
 addEventListener('mousemove', e=>{
   if(state!=='walk') return;
   if(bayDrag){ bayEngine.grabMove(e.movementX/(innerWidth/2), -e.movementY/(innerHeight/2)); return }
-  if(locked){ look(e.movementX, e.movementY, .0022) }
-  else if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy); drag.x=e.clientX; drag.y=e.clientY; look(dx,dy,.004) }
+  if(locked){ look(e.movementX, e.movementY, WALK.look) }
+  else if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy); drag.x=e.clientX; drag.y=e.clientY; look(dx,dy,WALK.drag) }
 });
 addEventListener('mouseup', e=>{
   if(bayDrag){ bayDrag=false; bayEngine.grabEnd(); drag=null; return }
@@ -2245,7 +2250,7 @@ addEventListener('mouseup', e=>{
   if(hit>=0) startGame(hit);
   else { const ps=posterAt(new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1)); if(ps) openChain(ps.spec.play); else tryLock() }
 });
-function look(dx,dy,k){ player.yaw-=dx*k; player.pitch=clamp(player.pitch-dy*k,-1.2,1.2) }
+function look(dx,dy,k){ player.yaw-=dx*k; player.pitch=clamp(player.pitch-dy*k,-WALK.pitch,WALK.pitch) }
 function pickAt(cx,cy){
   const v=new THREE.Vector2(cx/innerWidth*2-1, -(cy/innerHeight)*2+1);
   ray.setFromCamera(v,camera); const h=ray.intersectObjects(pickables,false)[0];
@@ -2269,7 +2274,7 @@ cvs.addEventListener('touchmove', e=>{
     if(t.identifier===joy.id){ let dx=t.clientX-joy.ox, dy=t.clientY-joy.oy; const d=Math.hypot(dx,dy), mx=50; if(d>mx){dx*=mx/d; dy*=mx/d}
       joy.vx=dx/mx; joy.vy=dy/mx; knob.style.transform=`translate(${dx}px,${dy}px)` }
     else if(t.identifier===bayTouch){ bayEngine.grabMove((t.clientX-bayTouchPos.x)/(innerWidth/2), -(t.clientY-bayTouchPos.y)/(innerHeight/2)); bayTouchPos={x:t.clientX,y:t.clientY} }
-    else if(t.identifier===lk.id){ const dx=t.clientX-lk.x, dy=t.clientY-lk.y; lk.moved+=Math.abs(dx)+Math.abs(dy); lk.x=t.clientX; lk.y=t.clientY; if(state==='walk') look(dx,dy,.005) }
+    else if(t.identifier===lk.id){ const dx=t.clientX-lk.x, dy=t.clientY-lk.y; lk.moved+=Math.abs(dx)+Math.abs(dy); lk.x=t.clientX; lk.y=t.clientY; if(state==='walk') look(dx,dy,WALK.touchLook) }
   }
 },{passive:false});
 const endTouch=e=>{
@@ -2393,17 +2398,10 @@ function move(dt){
   let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0) - joy.vy;
   let s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0) + joy.vx;
   const len=Math.hypot(f,s); if(len>1){f/=len; s/=len}
-  const sp=(keys.ShiftLeft?4.6:3)*dt, sy=Math.sin(player.yaw), cy=Math.cos(player.yaw);
+  const sp=(keys.ShiftLeft?WALK.sprint:WALK.speed)*dt, sy=Math.sin(player.yaw), cy=Math.cos(player.yaw);
   const px=player.x, pz=player.z;
-  if(len>.05) autoWalk=null;
-  if(autoWalk){   // E on the open lobby door: walk through it (doorway, then a little way in)
-    const w=autoWalk[0], dx=w.x-player.x, dz=w.z-player.z, d=Math.hypot(dx,dz), st=2.4*dt;
-    if(d<=st){ player.x=w.x; player.z=w.z; autoWalk.shift(); if(!autoWalk.length) autoWalk=null } else { player.x+=dx/d*st; player.z+=dz/d*st }
-    player.bob+=dt*7;
-  } else {
-    player.x += (-sy*f + cy*s)*sp; player.z += (-cy*f - sy*s)*sp;
-    if(len>.05) player.bob+=dt*9*Math.min(1,len);
-  }
+  player.x += (-sy*f + cy*s)*sp; player.z += (-cy*f - sy*s)*sp;
+  if(len>.05) player.bob+=dt*WALK.bobRate*Math.min(1,len);
   // collision
   const r=.32;
   if(lobbyPass && lobbyOpen()){   // the door is open onto the lobby: the hall, the doorway and the lobby are one space
@@ -2453,7 +2451,7 @@ function updateBayFocus(){
    the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
    Going back: the frame is removed (it frees everything the room built) and you are where you were, in front of the door. */
 const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && typeof r.src==='string' && r.src ? r : null };
-let roomUI=null, roomId='', roomT0=0, roomTimer=0;
+let roomUI=null, roomId='', roomBay=-1, roomT0=0, roomTimer=0;
 function roomEls(){
   if(roomUI) return roomUI;
   const mk=(css,html)=>{ const e=document.createElement('div'); e.style.cssText=css; if(html!=null) e.innerHTML=html; return e };
@@ -2467,42 +2465,82 @@ function roomEls(){
   window.addEventListener('message',e=>{ if(state==='room' && roomUI && roomUI.frame && e.source===roomUI.frame.contentWindow && e.data && e.data.xa==='leave-room') leaveRoom() });
   return roomUI;
 }
-function enterRoom(id){
+// The room's page is loaded quietly as soon as its door is opened (hidden, behind the hall), so by the time you walk in there is little or nothing to wait for.
+// roomPrep makes it; enterRoom uses it (or makes it, if you got there first); roomDrop throws it away (the door shut, or you left the lobby).
+const roomSrc=(cfg)=>cfg.src+(cfg.src.indexOf('?')<0?'?':'&')+'from=arcade';   // tells the room it was entered from the arcade: it starts walking, just inside its door
+function roomPrep(id){
+  const cfg=roomCfg(id); if(!cfg) return null;
+  const U=roomEls(); if(U.frame && U.frameId===id) return U.frame;
+  roomDrop();
+  const f=document.createElement('iframe'); f.title=cfg.title||id; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
+  f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden;pointer-events:none';
+  f.dataset.loaded=''; f.addEventListener('load',()=>{ f.dataset.loaded='1' });
+  U.frame=f; U.frameId=id; f.src=roomSrc(cfg); document.body.appendChild(f); return f;   // (src first: an empty frame fires a load of its own on insert)
+}
+function roomDrop(){
+  if(!roomUI || !roomUI.frame || state==='room') return;
+  try{ roomUI.frame.src='about:blank' }catch(e){} roomUI.frame.remove(); roomUI.frame=null; roomUI.frameId='';
+}
+function enterRoom(id, bayIdx){
   const cfg=roomCfg(id); if(!cfg || state!=='walk') return;
-  const U=roomEls(); state='room'; roomId=id; roomT0=performance.now(); sfx.coin();
+  roomBay=bayIdx==null?-1:bayIdx;
+  const U=roomEls(); const f=roomPrep(id); state='room'; roomId=id; roomT0=performance.now(); sfx.coin();
   if(document.pointerLockElement) document.exitPointerLock();
-  for(const k in keys) keys[k]=false; autoWalk=null;
+  for(const k in keys) keys[k]=false;
   $('cross').hidden=true; $('prompt').hidden=true; $('tapstart').hidden=true; $('lockhint').hidden=true; $('hint').hidden=true; if($('bprompt')) $('bprompt').hidden=true;
   try{ Room.enterGame() }catch(e){}                   // the hall's own sound closes behind you
+  const ready=!!f.dataset.loaded, minWait=ready?250:700;   // a page that is already there still gets a beat of loading screen, never a flash
   U.title.textContent=String(cfg.title||id).toUpperCase(); U.sub.textContent='OPENING THE ROOM…';
   U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1;
-  const f=document.createElement('iframe'); f.title=cfg.title||id; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
-  f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden';
-  const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,700-(performance.now()-roomT0));   // a short loading screen, never a flash
+  f.style.pointerEvents='auto';
+  const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,minWait-(performance.now()-roomT0));
     setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room') U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
-  f.addEventListener('load',done);
+  if(ready) done(); else f.addEventListener('load',done,{once:true});
   roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
-  U.frame=f; document.body.appendChild(f); f.src=cfg.src;
 }
 function leaveRoom(){
   if(state!=='room' || !roomUI) return;
   const U=roomUI; clearTimeout(roomTimer);
-  if(U.frame){ try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null }
+  if(U.frame){ try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null; U.frameId='' }
   U.load.style.opacity=0; U.load.style.display='none'; U.back.style.display='none';
   state='out'; sfx.back(); try{ Room.exitGame() }catch(e){}
   const fl=$('flash'); fl.style.transition='none'; fl.style.opacity=1; void fl.offsetWidth; fl.style.transition=''; requestAnimationFrame(()=>{ fl.style.opacity=0 });
   for(const k in keys) keys[k]=false; roomId='';
+  if(roomBay>=0 && lobbyPass && bayEngine && bayEngine.posOf){   // you come out of the door: a step in front of it, facing into the room
+    const q=bayEngine.posOf(roomBay); if(q){ player.x=q.x-lobbyPass.side*1.2; player.z=q.z; player.yaw=lobbyPass.side*Math.PI/2; player.pitch=0 }
+  }
+  roomBay=-1; inDoorway=-1; roomRested=true;
   setTimeout(()=>{ if(state==='out'){ state='walk'; updateHud() } },120); tryLock();
 }
-// A door that leads somewhere: the link comes from the world contract. The lobby is the one room there is; any other target says it is not open yet.
-function bayEnter(link){
+// A door that leads somewhere: the link comes from the world contract. You walk into an open doorway to go through it (there is no button).
+// The lobby is already there, behind its wall, so walking in needs nothing; a room in window.XA_ROOMS takes the screen; any other target is not open yet.
+function bayEnter(link, bayIdx){
   const room=link&&(link['target-room']||link.targetRoom||link.room); const name=room?String(room).replace(/[^A-Za-z0-9 _-]/g,' ').trim().toUpperCase():'';
-  if(String(room||'').toLowerCase()==='lobby' && lobbyPass && lobbyOpen()){   // the lobby is already there: E just walks you through the doorway
-    const p=lobbyPass, sd=p.side;   // into the doorway (from the hall side), then 2.4 m into the room
-    autoWalk=[{x:p.wallX-sd*.9, z:p.z}, {x:p.wallX+sd*(WALL_T+2.4), z:p.z}]; return
-  }
-  if(room && roomCfg(room)){ enterRoom(String(room).toLowerCase()); return }
+  if(String(room||'').toLowerCase()==='lobby' && lobbyPass) return;
+  if(room && roomCfg(room)){ enterRoom(String(room).toLowerCase(), bayIdx); return }
   bayToast={text:name?('THIS DOOR LEADS TO '+name+' · NOT OPEN YET'):'THIS DOOR IS NOT OPEN YET', until:performance.now()+3500};
+  updateBayFocus();   // show it now, not on the next frame
+}
+// Walking into an open doorway (the door's own width, up against the wall) goes through it. It fires once per arrival, not every frame.
+let inDoorway=-1, roomWantT=0, roomRested=false;   // roomRested: you have just come out of a room, so it is not loaded again until you have moved away or shut the door
+function checkDoorways(){
+  if(!bayEngine || !bayDefsAll.length) return;
+  const lob=inLobbyZone(); let hit=-1, link=null;
+  for(let i=0;i<bayDefsAll.length;i++){
+    if(lob ? i<HALL_BAYS : i>=HALL_BAYS) continue;
+    const d=bayEngine.doorwayAt(i,player.x,player.z);
+    if(d && d.interaction===3 && d.z<.6 && Math.abs(d.x)<d.half-.08){ hit=i; link=d.link; break }
+  }
+  if(hit!==inDoorway){ inDoorway=hit; if(hit>=0) bayEnter(link,hit) }
+  // a door to a room is open: start loading the room. It is dropped again when the door has been shut (or you have left) for a while.
+  const now=performance.now(); let want=null;
+  for(let i=lob?HALL_BAYS:0;i<(lob?bayDefsAll.length:HALL_BAYS) && !want;i++){
+    const d=bayEngine.doorwayAt(i,player.x,player.z), l=d&&d.link, r=l&&String(l['target-room']||l.targetRoom||l.room||'').toLowerCase();
+    if(r && r!=='lobby' && roomCfg(r) && d.z<6 && Math.abs(d.x)<4) want=r;   // an open door to a room, and you are within a few steps of it
+  }
+  if(!want) roomRested=false;
+  else if(!roomRested){ roomWantT=now; if(!roomUI||!roomUI.frame||roomUI.frameId!==want) roomPrep(want) }
+  if(!want && roomUI && roomUI.frame && now-roomWantT>8000) roomDrop();
 }
 function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint){ $('bptext').textContent=bayHint; const a=$('bpalt'); if(a) a.hidden=!bayHold } }
 
@@ -2514,7 +2552,7 @@ function frame(now){
 
   if(state==='walk' && !modalOpen()){ move(dt) }
   if(state==='walk' || state==='intro'){
-    camera.position.set(player.x, EYE+Math.sin(player.bob)*.025, player.z);
+    camera.position.set(player.x, EYE+Math.sin(player.bob)*WALK.bobAmp, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0);
     if(state==='intro') player.yaw = Math.sin(time*.15)*.18;
   }
@@ -2536,7 +2574,7 @@ function frame(now){
   }
 
   updateNeon(time,dt);
-  if(bayEngine){ if(lobbyBay>=0 && inLobbyZone()) bayEngine.doorOpen(lobbyBay); bayEngine.update(dt,time); updateBayFocus() }
+  if(bayEngine){ if(lobbyBay>=0 && inLobbyZone()) bayEngine.doorOpen(lobbyBay); bayEngine.update(dt,time); updateBayFocus(); if(state==='walk') checkDoorways() }
 
   updateScreens(dt);
   updateAnimPosters(time);

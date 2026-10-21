@@ -1,9 +1,9 @@
-// The lobby's CASINO door and the full-screen takeover. The lobby has two doorways of its own on its back wall (bays 4 and 5, read from the
+// The lobby's CASINO door and the full-screen takeover (no button anywhere: you walk through the open door). The lobby has two doorways of its own on its back wall (bays 4 and 5, read from the
 // world contract's 'lobby' room). A door linking to a room named in window.XA_ROOMS opens that room's page over the whole screen after a short
 // loading screen; the hall sleeps, and BACK TO THE LOBBY (or the room telling the hall it is done) puts you back in front of the door.
 //   A  the lobby's doors       bays 4 and 5 exist, the casino door has a door and its sign, the staff door is a plain knock door
-//   B  going in                E at the open casino door: loading screen, then the room's page full screen, hall asleep, back button
-//   C  going back              BACK TO THE LOBBY removes the page and the player walks again, in front of the door
+//   B  going in                the open door starts loading the page quietly; walking into it: loading screen, then the page full screen, hall asleep, back button
+//   C  going back              BACK TO THE LOBBY removes the page; you come out of the door, a step in front of it, and walk again
 //   D  the room can leave too  the page posts {xa:'leave-room'} and the hall takes you back the same way
 //   E  not configured          without XA_ROOMS the door says it is not open yet, and no page opens
 // The real casino page needs three.js from a CDN, which the test browser cannot reach: a stub page stands in for it.
@@ -49,6 +49,7 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort('failed'));
     await ctx.addInitScript((a) => {
       window.XA_TEST = 1;
+      Element.prototype.requestPointerLock = function () {};   // (the headless browser grants the lock and reports a mouse jump when it does; these tests are about walking, not the mouse)
       if (a.rooms) window.XA_ROOMS = { casino: { src: 'casino-room.html', title: 'Royal Flush Casino' } };
       window.XA_WORLD_CONFIG = { posters: 'SP000000000000000000002Q6VF78.xtrata-posters-v1', world: 'SP000000000000000000002Q6VF78.xtrata-world-v1' };
       try { localStorage.setItem('xa-world-snap-v1', JSON.stringify(a.snap)); } catch (e) {}
@@ -72,6 +73,12 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
   const until = async (page, pose, re) => { for (let i = 0; i < 40; i++) { await pose(); await page.waitForTimeout(1200); if (re.test(await hint(page))) return; } throw new Error('the prompt never showed: ' + re + ' (last: ' + (await hint(page)) + ')'); };
   // stand 1.6 m in front of lobby bay n, looking at its door (the lobby is behind the left wall: its back wall faces the hall, towards +x)
   const face = (page, n) => page.evaluate((i) => { const p = window.XA.bayState().bays[i].pos; window.XA.pose(p.x + 1.6, p.z, Math.PI / 2, -0.05); }, n);
+  // hold W towards the door (the headless view drifts a little, so steer back on every try) until done() is true
+  const steer = (page) => page.evaluate(() => { const w = window.XA.where(); window.XA.pose(w.x, w.z, Math.PI / 2, -0.05); });
+  async function walkInto(page, done) {
+    await page.keyboard.down('KeyW');
+    try { for (let i = 0; i < 400 && !(await page.evaluate(done)); i++) { await steer(page); await page.waitForTimeout(250); } } finally { await page.keyboard.up('KeyW'); }
+  }
   async function intoLobby(page) {
     await openDoor(page, 0);
     await page.waitForFunction(() => window.XA.lobbyState().open === true, null, { timeout: 120000 });
@@ -92,13 +99,18 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     await face(page, 4); await page.waitForTimeout(1500);
     await shot(page, 'room-casino-door');
     /* ---- B ---- */
+    await face(page, 4); await page.waitForTimeout(800);
+    check((await rs(page)).state === 'walk' && !(await rs(page)).frame, 'B: with the casino door shut nothing is loading');
     await openDoor(page, 4);
-    await until(page, () => face(page, 4), /ENTER/);
-    check(true, 'B: looking at the open CASINO door shows ENTER');
-    await page.keyboard.press('KeyE');
-    await page.waitForFunction(() => window.XA.roomState().state === 'room', null, { timeout: 120000 });
+    await page.waitForFunction(() => window.XA.roomState().frame === true, null, { timeout: 120000 });
+    check((await rs(page)).state === 'walk', 'B: opening the door starts loading the casino page quietly (you are still walking)');
+    await page.waitForFunction(() => { const f = document.querySelector('iframe[title="Royal Flush Casino"]'); return f && f.dataset.loaded === '1'; }, null, { timeout: 120000 });
+    await face(page, 4);
+    check(!/ENTER/.test(await hint(page)), 'B: there is no ENTER prompt at the open door: you just walk in');
+    await shot(page, 'room-open-door');
+    await walkInto(page, () => window.XA.roomState().state === 'room');
     let r = await rs(page);
-    check(r.room === 'casino' && r.frame && r.frameSrc === 'casino-room.html', 'B: E takes the screen: the casino page is framed (' + r.frameSrc + ')');
+    check(r.state === 'room' && r.room === 'casino' && r.frame && /^casino-room\.html\?from=arcade$/.test(r.frameSrc), 'B: walking into the open doorway takes the screen: the casino page is framed (' + r.frameSrc + ')');
     await shot(page, 'room-loading');
     await page.waitForFunction(() => window.XA.roomState().back === true && !window.XA.roomState().loading, null, { timeout: 120000 });
     r = await rs(page);
@@ -115,20 +127,20 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     check(!r.frame && !r.back && !r.loading && r.room === '', 'C: BACK TO THE LOBBY removes the page and the player walks again');
     check((await page.evaluate(() => document.querySelectorAll('iframe[title="Royal Flush Casino"]').length)) === 0, 'C: no frame is left behind');
     const w = await page.evaluate(() => window.XA.where());
-    check(w.x < -12 && (await page.evaluate(() => window.XA.lobbyState().inside)), 'C: you are still in the lobby, in front of the door (x ' + w.x.toFixed(1) + ')');
+    check(Math.abs(w.x - (c.pos.x + 1.2)) < 0.05 && Math.abs(w.z - c.pos.z) < 0.05 && (await page.evaluate(() => window.XA.lobbyState().inside)), 'C: you come back out of the door, a step in front of it and in the lobby (x ' + w.x.toFixed(2) + ', z ' + w.z.toFixed(2) + ')');
+    check(Math.abs(Math.sin(w.yaw) + 1) < 0.05, 'C: facing away from the door, into the lobby (yaw ' + w.yaw.toFixed(2) + ')');
     /* ---- D ---- */
-    await face(page, 4);
-    await until(page, () => face(page, 4), /ENTER/);
-    await page.keyboard.press('KeyE');
+    await walkInto(page, () => window.XA.roomState().state === 'room');
     await page.waitForFunction(() => window.XA.roomState().state === 'room' && window.XA.roomState().back, null, { timeout: 120000 });
     const fr2 = page.frames().find((f) => /casino-room\.html/.test(f.url()));
     await fr2.click('#leave');
     await page.waitForFunction(() => window.XA.roomState().state === 'walk', null, { timeout: 120000 });
-    check(!(await rs(page)).frame, 'D: the room telling the hall it is done brings you back the same way');
+    check(true, 'D: the room telling the hall it is done brings you back the same way');
     // the staff door is not a room
-    await face(page, 5); await openDoor(page, 5);
-    await until(page, () => face(page, 5), /ENTER|OPEN|KNOCK/).catch(() => {});
-    check((await rs(page)).state === 'walk', 'D: the other lobby door does not open a room');
+    await face(page, 5); await openDoor(page, 5); await page.waitForTimeout(800);
+    await walkInto(page, () => { const w = window.XA.where(), p = window.XA.bayState().bays[5].pos; return w.x - p.x < 0.7; });
+    await page.waitForTimeout(800);
+    check((await rs(page)).state === 'walk', 'D: walking into the other lobby door does not open a room');
     check(!errors.length, 'A-D: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
@@ -137,14 +149,12 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     const { ctx, page, errors } = await open(false);
     await intoLobby(page);
     await openDoor(page, 4);
-    await until(page, () => face(page, 4), /ENTER/);
+    await face(page, 4); await page.waitForTimeout(800);
     // the toast only shows for a few seconds and the headless frames are slow, so watch for it rather than poll
     await page.evaluate(() => { window.__toast = false; new MutationObserver(() => { const e = document.getElementById('bprompt'); if (e && !e.hidden && /NOT OPEN YET/.test(e.textContent)) window.__toast = true; }).observe(document.getElementById('bprompt'), { subtree: true, childList: true, characterData: true, attributes: true }); });
-    // (the headless view drifts, so face the door again before each press)
-    for (let k = 0; k < 20 && !(await page.evaluate(() => window.__toast)); k++) { await face(page, 4); await page.waitForTimeout(900); await page.keyboard.press('KeyE'); await page.waitForTimeout(1500); }
-    check(await page.evaluate(() => window.__toast === true), 'E: pressing E at the casino door shows a message');
-    check((await rs(page)).state === 'walk' && !(await rs(page)).frame, 'E: with no XA_ROOMS the casino door opens no page');
-    check(true, 'E: and it says it is not open yet');
+    await walkInto(page, () => window.__toast === true);
+    check(await page.evaluate(() => window.__toast === true), 'E: walking into the casino door says it is not open yet');
+    check((await rs(page)).state === 'walk' && !(await rs(page)).frame, 'E: with no XA_ROOMS the casino door opens no page and loads nothing');
     check(!errors.length, 'E: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
