@@ -1310,17 +1310,22 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 <script>
-/* Adrian, the casino's human host (the Xtrata character atelier model, build 2).
+/* The Adrian family: every person in the casino, grown from one model.
  * One 1.8 m GLB (adrian.glb, beside this page) carries the mesh, 163 bones and 15 baked clips; this script reads it with a
- * small GLB parser (the asset is plain glTF 2.0: no extensions, LINEAR keys only), clones it per host, and drives each clone
- * with the atelier's PoseRig/HostController (ported to the room's three r128): baked clips for presence, live IK for hands,
- * eyes that blink and follow you, and a smile that comes and goes. The room asks for hosts through window.XA_HOSTS:
- *   XA_HOSTS.add({ parent, group, x, z, yaw, look, fig?, role? })   a host at a table (local coords; fig = the woodcut
- *                                                                   figure he replaces: it is hidden and its greet/deal
- *                                                                   re-aimed at him)
- *   XA_HOSTS.cue(group, kind)       'greet' | 'deal' | 'reveal' | 'win' | 'lose'  (the stations' moments)
- *   XA_HOSTS.update(dt, camPos, t)  once per frame from the room loop (far hosts update at a lower rate)
- * If adrian.glb cannot be fetched (opened as a bare file, or the asset is missing) nothing changes: the woodcut figures stay.
+ * small GLB parser (the asset is plain glTF 2.0: no extensions, LINEAR keys only) and clones it into SIX PEOPLE - three men
+ * and three women - by reshaping the shared skeleton (height, shoulder breadth, hip set, bust, neck; translations are
+ * re-applied after every mixer step because the baked clips key bone positions, scales are safe to set once), tinting skin,
+ * hair and brows, adding a bun or ponytail to the women, and dressing each for the job: house livery (waistcoat recoloured)
+ * or their own clothes (the waistcoat, buttons and badge hidden, shirt and trousers tinted). The atelier's PoseRig and
+ * HostController (ported to the room's three r128) drive each one: baked clips for presence, live IK for hands, a one-shot
+ * seated pose for the players on stools, eyes that blink and follow you, a nod, and a smile that comes and goes.
+ * The room asks for people through window.XA_HOSTS:
+ *   XA_HOSTS.add({ group, x, z, yaw, person, livery?|wear?, seat?, fig?, role? })
+ *       person 'm1'|'m2'|'m3'|'f1'|'f2'|'f3'; livery names a house waistcoat; wear = {shirt,trousers} own clothes;
+ *       seat = {h} sits them on a stool that high; fig = the woodcut figure they replace (hidden, verbs re-aimed).
+ *   XA_HOSTS.cue(group, kind)       'greet'|'deal'|'reveal'|'win'|'lose'|'nod' (the stations' moments)
+ *   XA_HOSTS.update(dt, camPos, t)  once per frame from the room loop (far people animate at a lower rate)
+ * If adrian.glb cannot be fetched (opened as a bare file, or the asset is missing) nothing changes: the woodcut cast stays.
  */
 (function () {
   'use strict';
@@ -1383,8 +1388,10 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
         const g = new THREE.BufferGeometry();
         for (const k in p.attributes) { const a = j.accessors[p.attributes[k]]; g.setAttribute(SA[k], new THREE.BufferAttribute(acc(p.attributes[k]), NC[a.type])); }
         if (p.indices !== undefined) g.setIndex(new THREE.BufferAttribute(acc(p.indices), 1));
+        // a generous fixed bound: skinned vertices stay within reach of the hips, so off-screen people stop costing the GPU
+        g.boundingSphere = new THREE.Sphere(V(0, 0.95, 0), 1.45);
         const mesh = n.skin !== undefined ? new THREE.SkinnedMesh(g, mats[p.material]) : new THREE.Mesh(g, mats[p.material]);
-        mesh.name = j.meshes[n.mesh].name || nodes[i].name; mesh.frustumCulled = false; mesh.castShadow = true; mesh.receiveShadow = true;
+        mesh.name = j.meshes[n.mesh].name || nodes[i].name; mesh.castShadow = true; mesh.receiveShadow = true;
         nodes[i].add(mesh);
         if (n.skin !== undefined) { nodes[i].updateMatrixWorld(true); mesh.bind(skels[n.skin], mesh.matrixWorld); }
       });
@@ -1568,18 +1575,41 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     return { wrist, forward: V(0, 0, 1), phase, orientationWeight: t < 1 ? smooth(t) : t > 3.55 ? 1 - smooth((t - 3.55) / 1.25) : 1 };
   }
 
-  // ---------------- HostController: the atelier's host, as shipped, minus the module loader and the skeleton helper ----------------
+  // ---------------- HostController: the atelier's host, with a body shape, a seat and a nod on top ----------------
   class HostController {
-    constructor(asset) {
+    constructor(asset, persona) {
+      persona = persona || {};
       this.object = new THREE.Group(); this.object.name = 'AdrianHost'; this.model = cloneSkinned(asset.scene); this.object.add(this.model);
+      // the once-only part of the shape: scales (the baked clips never key scale)
+      const boneOf = (n) => { let r = null; this.model.traverse((b) => { if (b.isBone && b.name === n) r = b; }); return r; };
+      const sh = persona.shape || {};
+      if (sh.breast) ['breast_L', 'breast_R'].forEach((n) => { const b = boneOf(n); if (b) b.scale.setScalar(sh.breast); });
+      if (sh.neck) { const b = boneOf('neck01'); if (b) b.scale.setScalar(sh.neck); }
+      if (sh.head) { const b = boneOf('head'); if (b) b.scale.multiplyScalar(sh.head); }
+      this.model.updateMatrixWorld(true);
       this.rig = new PoseRig(this.model); this.bones = this.rig.bones;
+      // the every-frame part: bone translations (the clips key positions, so these are re-added after each mixer step)
+      this.shapeDeltas = [];
+      const pairDelta = (nL, nR, outward) => {
+        const L = this.bones[nL], R = this.bones[nR]; if (!L || !R) return;
+        const wL = L.getWorldPosition(V()), wR = R.getWorldPosition(V());
+        const across = wR.clone().sub(wL).normalize();   // from left to right in world
+        [[L, -1], [R, 1]].forEach(([b, s]) => {
+          const d = across.clone().multiplyScalar(s * outward);
+          const pq = b.parent.getWorldQuaternion(Q()).invert();
+          this.shapeDeltas.push({ bone: b, delta: d.applyQuaternion(pq) });
+        });
+      };
+      if (sh.shoulders) pairDelta('clavicle_L', 'clavicle_R', sh.shoulders);
+      if (sh.hips) pairDelta('upperleg01_L', 'upperleg01_R', sh.hips);
       this.mixer = new THREE.AnimationMixer(this.model); this.actions = {}; for (const c of asset.animations) this.actions[c.name] = this.mixer.clipAction(c);
-      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
-      this.state = 'hosting'; this.current = 'Idle'; this.time = 0; this.expression = 'neutral'; this.expressionValue = 0; this.targetSmile = 0; this.lookTarget = null; this.lookAngles = V(); this.blinkClock = 0; this.nextBlink = 3.2 + Math.random() * 1.5; this.disposed = false; this.held = {}; this.handOverrides = {}; this.sequence = null; this.deckHold = null; this.walk = null; this.turn = null;
+      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      this.state = 'hosting'; this.current = 'Idle'; this.time = 0; this.expression = 'neutral'; this.expressionValue = 0; this.targetSmile = 0; this.lookTarget = null; this.lookAngles = V(); this.blinkClock = 0; this.nextBlink = 3.2 + Math.random() * 1.5; this.disposed = false; this.held = {}; this.handOverrides = {}; this.sequence = null; this.deckHold = null; this.walk = null; this.turn = null; this.seat = null; this.nodT = 9; this.rest = null; this.restW = 0;
       this.sockets = { L: this.model.getObjectByName('HandSocket_L'), R: this.model.getObjectByName('HandSocket_R') };
       this.mixerPose = this.capturePose(); this.corePose = this.capturePose(); this.transition = null; this.finishedAction = null;
       this.mixer.addEventListener('finished', (e) => { if (e.action === this.active) this.finishedAction = e.action; });
       this.playAnimation('Idle', 0);
+      if (persona.s) this.object.scale.setScalar(persona.s);
     }
     setPosition(x, y, z) { if (x && x.isVector3) this.object.position.copy(x); else this.object.position.set(x, y, z); return this; }
     setOrientation(yaw) { this.object.rotation.set(0, yaw, 0); return this; }
@@ -1598,6 +1628,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     lookAt(target) { this.lookTarget = target ? target.clone() : null; return this; }
     setExpression(name) { if (!['neutral', 'smile', 'pleased'].includes(name)) return this; this.expression = name; this.targetSmile = { neutral: 0, smile: .7, pleased: 1 }[name]; return this; }
     setHandPose(side, pose = null) { this.handOverrides[side] = pose; return this; }
+    nod() { this.nodT = 0; return this; }
     attachProp(prop, side = 'R', { preserveWorld = true, position, quaternion } = {}) { const socket = this.sockets[side]; if (!socket || this.held[side]) return prop; this.object.updateMatrixWorld(true); if (preserveWorld) socket.attach(prop); else socket.add(prop); if (position) prop.position.copy(position); if (quaternion) prop.quaternion.copy(quaternion); this.held[side] = prop; return prop; }
     releaseProp(side = 'R', parent = this.object.parent) { const prop = this.held[side]; if (!prop || !parent) return null; parent.attach(prop); delete this.held[side]; return prop; }
     holdDeck(prop, { count = 52, cardPitch = .00032 } = {}) {
@@ -1606,8 +1637,49 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       this.deckHold = { prop, count, cardPitch, age: 0 }; this.playAnimation('HoldDeck', .45); return this;
     }
     releaseDeck(parent = this.object.parent) { if (this.sequence || !this.deckHold) return null; const prop = this.releaseProp('L', parent); this.deckHold = null; this.playAnimation('Idle', .4); return prop; }
+    /** One-shot arm rest: palms on the table rail, hands clasped behind the back, or resting on the knees when seated.
+     *  Captured once, then blended back in whenever the host is idle - so greetings and deals still play freely
+     *  and the hands never sink into the felt while he stands at his table. */
+    restPose(kind, opt) {
+      opt = opt || {};
+      const s = this.object.scale.x || 1, rig = this.rig;
+      rig.reset();
+      if (this.seat) { this.bones.Hips.position.y -= this.seat.drop; for (const [n, q] of Object.entries(this.seat.quats)) this.bones[n].quaternion.copy(q); }
+      this.model.updateMatrixWorld(true);
+      if (kind === 'table') {
+        const y = (opt.y || 0.975) / s, fwd = (opt.fwd || 0.30) / s;
+        [['L', 1], ['R', -1]].forEach(([side, sx]) => { rig.arm(side, V(sx * 0.19, y, fwd), { palm: 'down', forward: V(sx * 0.18, 0, 1).normalize() }); rig.hand(side, 'relaxed'); });
+      } else if (kind === 'back') {
+        [['L', 1], ['R', -1]].forEach(([side, sx]) => { rig.arm(side, V(sx * 0.085, 0.95, -0.17)); rig.hand(side, 'relaxed'); });
+      } else if (kind === 'lap') {
+        [['L', 1], ['R', -1]].forEach(([side, sx]) => {
+          const knee = this.model.worldToLocal(this.bones['lowerleg01_' + side].getWorldPosition(V()));
+          rig.arm(side, knee.add(V(sx * 0.02, 0.055, 0.02)), { palm: 'down' }); rig.hand(side, 'relaxed');
+        });
+      }
+      const quats = {};
+      ['upperarm01_L', 'lowerarm01_L', 'lowerarm02_L', 'wrist_L', 'upperarm01_R', 'lowerarm01_R', 'lowerarm02_R', 'wrist_R'].forEach((n) => { if (this.bones[n]) quats[n] = this.bones[n].quaternion.clone(); });
+      rig.reset(); this.model.updateMatrixWorld(true);
+      this.rest = { quats }; this.restW = 0;
+      this.mixerPose = this.capturePose(); this.corePose = this.capturePose();
+      return this;
+    }
+    /** One-shot seated pose: the hips drop to the stool and the legs are solved once, then re-applied after every mixer step. */
+    sitOn(stoolHeight) {
+      const s = this.object.scale.x || 1;
+      const drop = Math.max(0, 0.958 - (stoolHeight + 0.075) / s);
+      const rig = this.rig, hips = this.bones.Hips;
+      rig.reset(); hips.position.y -= drop; this.model.updateMatrixWorld(true);
+      [['L', 1], ['R', -1]].forEach(([side, sx]) => rig.leg(side, V(sx * 0.125, 0.075, 0.31)));
+      const quats = {};
+      ['upperleg01_L', 'lowerleg01_L', 'foot_L', 'upperleg01_R', 'lowerleg01_R', 'foot_R'].forEach((n) => { if (this.bones[n]) quats[n] = this.bones[n].quaternion.clone(); });
+      rig.reset(); this.model.updateMatrixWorld(true);
+      this.seat = { drop, quats };
+      this.mixerPose = this.capturePose(); this.corePose = this.capturePose();
+      return this;
+    }
     walkTo(target, { speed = .38 } = {}) {
-      if (this.deckHold || this.sequence || this.walk || this.turn) return Promise.resolve();
+      if (this.deckHold || this.sequence || this.walk || this.turn || this.seat) return Promise.resolve();
       const start = this.object.position.clone(), end = target.clone(); end.y = start.y; const distance = start.distanceTo(end); if (distance < .01) return Promise.resolve();
       this.object.rotation.y = Math.atan2(end.x - start.x, end.z - start.z); this.playAnimation('Walk'); this.active.setEffectiveTimeScale(speed / .38);
       return new Promise((resolve) => (this.walk = { start, end, distance, speed, t: 0, resolve, locks: { L: this.bones.foot_L.getWorldPosition(V()), R: this.bones.foot_R.getWorldPosition(V()) } }));
@@ -1628,6 +1700,15 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       for (const [side, pose] of Object.entries(this.handOverrides)) if (pose && !(this.deckHold && side === 'L')) this.rig.hand(side, pose);
       this.corePose = this.capturePose();
       if (this.current !== 'Neutral') this.updateFace(dt);
+      // the body: shape translations, the seat and the nod, re-applied over whatever the clips wrote
+      for (const d of this.shapeDeltas) d.bone.position.add(d.delta);
+      if (this.seat) { this.bones.Hips.position.y -= this.seat.drop; for (const [n, q] of Object.entries(this.seat.quats)) this.bones[n].quaternion.copy(q); }
+      if (this.rest) {   // hands come to rest on the rail (or behind the back, or on the knees) whenever he is idle
+        const want = this.current === 'Idle' && !this.transition && !this.sequence && !this.walk && !this.turn ? 1 : 0;
+        this.restW += (want - this.restW) * Math.min(1, dt * (want ? 2.5 : 6));
+        if (this.restW > 0.012) for (const [n, q] of Object.entries(this.rest.quats)) this.bones[n].quaternion.slerp(q, this.restW);
+      }
+      if (this.nodT < .8) { this.nodT += dt; const a = .22 * Math.sin(Math.PI * clamp(this.nodT / .8, 0, 1)) * Math.sin(Math.PI * 2.5 * this.nodT); this.bones.head.quaternion.multiply(Q().setFromAxisAngle(V(1, 0, 0), a)); }
       this.object.updateMatrixWorld(true);
       if (this.finishedAction) { const ended = this.finishedAction; this.finishedAction = null; if (ended === this.active && !this.walk && !this.turn && this.current !== 'Neutral') this.playAnimation('Idle'); }
     }
@@ -1643,43 +1724,93 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     }
   }
 
-  // ---------------- the room's hosts: one Adrian each, in the house's different liveries ----------------
-  // material name -> colour: a plain colour is SET (those materials are untextured); on a textured material it acts as a tint.
-  const LOOKS = {
-    greeter: {},   // the door host wears the midnight original
-    blackjack: { 'Midnight waistcoat': 0x12422c, 'Satin piping': 0xd8b25c, 'Chestnut swept hair': 0x8a6a4a, 'Natural eyebrows': 0x8a6a4a },
-    roulette: { 'Midnight waistcoat': 0x4a0d18, 'Satin piping': 0xe8c87a, 'Chestnut swept hair': 0xb07a44, 'Natural eyebrows': 0xb07a44 },
-    baccarat: { 'Midnight waistcoat': 0x2a1034, 'Satin piping': 0xcfc4ae, 'Chestnut swept hair': 0xd8d2c6, 'Natural eyebrows': 0xbfb8aa },
-    salonHoldem: { 'Midnight waistcoat': 0x0a0d13, 'Satin piping': 0x2fa06a, 'Warm natural skin': 0xc99f7e, 'Chestnut swept hair': 0x5a4330, 'Natural eyebrows': 0x5a4330 },
-    salonDice: { 'Midnight waistcoat': 0x0c3034, 'Satin piping': 0x3fe094, 'Chestnut swept hair': 0x3a2c20, 'Natural eyebrows': 0x3a2c20 },
+  // ---------------- the six people, and how each is dressed ----------------
+  // material name -> colour: SET on the untextured cloth, a tint on textured skin and hair.
+  const F_SHAPE = { shoulders: -0.016, hips: 0.008, breast: 1.5, neck: 0.95 };
+  const PEOPLE = {
+    m1: { s: 0.945, shape: {}, look: {} },   // Adrian himself
+    m2: { s: 0.975, shape: { shoulders: 0.008 }, look: { 'Warm natural skin': 0xbd8a60, 'Chestnut swept hair': 0x191310, 'Natural eyebrows': 0x191310 } },
+    m3: { s: 0.92, shape: { shoulders: -0.006 }, look: { 'Warm natural skin': 0xf2e0d0, 'Chestnut swept hair': 0xb0783f, 'Natural eyebrows': 0xa06a35 } },
+    f1: { s: 0.895, shape: F_SHAPE, hairDo: 'bun', hairColor: 0x241a14, look: { 'Warm natural skin': 0xeccfb5, 'Chestnut swept hair': 0x201613, 'Natural eyebrows': 0x201613 } },
+    f2: { s: 0.91, shape: F_SHAPE, hairDo: 'highbun', hairColor: 0x15100c, look: { 'Warm natural skin': 0xa26b48, 'Chestnut swept hair': 0x120d0a, 'Natural eyebrows': 0x120d0a } },
+    f3: { s: 0.88, shape: { shoulders: -0.017, hips: 0.009, breast: 1.55, neck: 0.94 }, hairDo: 'ponytail', hairColor: 0xa8824e, look: { 'Warm natural skin': 0xf6e4d2, 'Chestnut swept hair': 0xd8b06a, 'Natural eyebrows': 0xb8904a } },
+  };
+  const LIVERY = {
+    midnight: {},
+    emerald: { 'Midnight waistcoat': 0x12422c, 'Satin piping': 0xd8b25c },
+    burgundy: { 'Midnight waistcoat': 0x4a0d18, 'Satin piping': 0xe8c87a },
+    plum: { 'Midnight waistcoat': 0x2a1034, 'Satin piping': 0xcfc4ae },
+    ink: { 'Midnight waistcoat': 0x0a0d13, 'Satin piping': 0x2fa06a },
+    teal: { 'Midnight waistcoat': 0x0c3034, 'Satin piping': 0x3fe094 },
   };
   function applyLook(model, look) {
-    if (!look) return;
+    const cloned = {};
     model.traverse((o) => {
       if (!o.isMesh || !o.material) return;
       const c = look[o.material.name];
-      if (c !== undefined) { const m = o.material.clone(); m.color = new THREE.Color(c); o.material = m; }
+      if (c !== undefined) { const key = o.material.name; if (!cloned[key]) { cloned[key] = o.material.clone(); cloned[key].color = new THREE.Color(c); } o.material = cloned[key]; }
     });
+  }
+  function dressCivilian(model, wear) {
+    // own clothes: no waistcoat, no buttons, no badge, no bridge panels; the shirt and trousers take their colours
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      if ((o.material && o.material.name === 'Midnight waistcoat') || /^Waistcoat_button|^Xtrata_uniform/.test(o.name)) o.visible = false;
+    });
+    applyLook(model, { 'Ivory cotton': wear.shirt || 0xd8d2c2, 'Midnight wool': wear.trousers || 0x23262c });
+  }
+  function addHairDo(ctrl, kind, color) {
+    if (!kind) return;
+    const head = ctrl.bones.head; if (!head) return;
+    ctrl.model.updateMatrixWorld(true);
+    const hw = head.getWorldPosition(V());
+    const eL = ctrl.bones.eye_L, eR = ctrl.bones.eye_R;
+    const eyes = eL && eR ? eL.getWorldPosition(V()).add(eR.getWorldPosition(V())).multiplyScalar(0.5) : hw.clone().add(V(0, 0.05, 0.09));
+    const fwd = eyes.clone().sub(hw); fwd.y = 0; fwd.normalize();
+    const place = (dy, dback) => hw.clone().add(V(0, dy, 0)).addScaledVector(fwd, -dback);
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.55 });
+    const band = new THREE.MeshStandardMaterial({ color: 0xd8b25c, roughness: 0.3, metalness: 0.7 });
+    const g = new THREE.Group();
+    const ball = (r, p, sy) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 11), mat); m.position.copy(p); m.scale.y = sy || 1; m.castShadow = true; g.add(m); return m; };
+    const ring = (r, p) => { const t = new THREE.Mesh(new THREE.TorusGeometry(r, 0.0055, 6, 20), band); t.position.copy(p); t.lookAt(p.clone().addScaledVector(fwd, -1)); g.add(t); return t; };
+    if (kind === 'bun') { ball(0.049, place(0.065, 0.085), 0.85); ring(0.035, place(0.065, 0.082)); }
+    else if (kind === 'highbun') { ball(0.046, place(0.115, 0.055), 0.9); ring(0.033, place(0.102, 0.062)); }
+    else if (kind === 'ponytail') { ball(0.042, place(0.06, 0.09)); ball(0.036, place(-0.015, 0.115)); ball(0.030, place(-0.085, 0.125)); ring(0.028, place(0.06, 0.088)); }
+    // the pieces were placed in model space; re-express every child in head-bone space so the do follows each head turn
+    const inv = new THREE.Matrix4().copy(head.matrixWorld).invert(), rot = new THREE.Matrix4().extractRotation(inv);
+    g.children.forEach((m) => { m.position.applyMatrix4(inv); m.quaternion.premultiply(Q().setFromRotationMatrix(rot)); });
+    head.add(g);
   }
 
   const hosts = []; let asset = null;
   function gesture(h, kind, t) {
-    const c = h.ctrl; if (!c) { return; }
+    const c = h.ctrl; if (!c) return;
     if (kind === 'greet') { c.setExpression('smile'); c.playAnimation('Welcome'); h.plainFace = (t || 0) + 4; }
     else if (kind === 'deal') c.playAnimation('PokerDeal');
-    else if (kind === 'reveal') c.playAnimation('Present');
-    else if (kind === 'win') { c.setExpression('pleased'); c.playAnimation('Celebrate'); h.plainFace = (t || 0) + 5; }
-    else if (kind === 'lose') c.playAnimation('Result');
+    else if (kind === 'reveal' || kind === 'raise') c.playAnimation('Present');
+    else if (kind === 'win' || kind === 'fistPump') { c.setExpression('pleased'); c.playAnimation('Celebrate'); h.plainFace = (t || 0) + 5; }
+    else if (kind === 'lose' || kind === 'fold' || kind === 'groan') c.playAnimation('Result');
+    else if (kind === 'nod') c.nod();
+    else if (kind === 'check' || kind === 'look') c.playAnimation('Look');
+    else if (kind === 'think' || kind === 'explain') c.playAnimation('Explain');
+    else if (kind === 'shrug') c.playAnimation('Gesture');
   }
   function build(h) {
-    const c = new HostController(asset);
-    c.object.scale.setScalar(0.94);   // Adrian is 1.80 m; at .94 he stands with the room's own people
+    const person = PEOPLE[h.person] || PEOPLE.m1;
+    const c = new HostController(asset, person);
     c.object.position.set(h.x, 0, h.z); c.object.rotation.y = h.yaw || 0;
-    applyLook(c.model, LOOKS[h.look]);
+    applyLook(c.model, person.look || {});
+    if (h.wear) dressCivilian(c.model, h.wear);
+    else applyLook(c.model, LIVERY[h.livery] || {});
+    addHairDo(c, person.hairDo, person.hairColor || 0x442c16);
     (h.parent || h.group).add(c.object);
-    if (h.fig) {   // the woodcut dealer steps aside and his cues come to Adrian
+    if (h.seat) { c.sitOn(h.seat.h || 0.57); c.restPose('lap'); }
+    else if (h.rest) c.restPose(typeof h.rest === 'string' ? h.rest : h.rest.kind, typeof h.rest === 'string' ? {} : h.rest);
+    if (h.fig) {   // the woodcut figure steps aside and every verb of theirs comes here
       h.fig.group.visible = false;
-      h.fig.greet = () => gesture(h, 'greet', lastT); h.fig.deal = () => gesture(h, 'deal', lastT); h.fig.nod = () => { };
+      const F = (k) => () => gesture(h, k, lastT);
+      h.fig.greet = F('greet'); h.fig.deal = F('deal'); h.fig.nod = F('nod'); h.fig.raise = F('raise'); h.fig.fold = F('fold');
+      h.fig.check = F('check'); h.fig.think = F('think'); h.fig.shrug = F('shrug'); h.fig.groan = F('groan'); h.fig.fistPump = F('fistPump');
     }
     h.ctrl = c; h.acc = 0; h.skip = 0; h.wp = new THREE.Vector3();
   }
@@ -1689,14 +1820,14 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     get ready() { return !!asset; },
     failed: false,
     add(spec) { hosts.push(spec); if (asset) build(spec); return spec; },
-    cue(group, kind) { const h = hosts.find((x) => x.group === group); if (h && h.ctrl) gesture(h, kind, lastT); },
+    cue(group, kind) { const h = hosts.find((x) => x.group === group && !x.wear); if (h && h.ctrl) gesture(h, kind, lastT); },
     update(dt, camPos, t) {
       lastT = t;
       for (const h of hosts) {
         const c = h.ctrl; if (!c) continue;
         h.acc += dt;
         const d = c.object.getWorldPosition(h.wp).distanceTo(camPos);
-        if (h.skip > 0 && h.acc < 0.2) { h.skip--; continue; }   // far hosts animate at a lower rate
+        if (h.skip > 0 && h.acc < 0.2) { h.skip--; continue; }   // far people animate at a lower rate
         h.skip = d < 8 ? 0 : d < 14 ? 1 : 3;
         c.lookAt(d < 4.2 && !h.noLook ? camPos : null);
         if (h.plainFace && t > h.plainFace) { c.setExpression('neutral'); h.plainFace = 0; }
@@ -3788,18 +3919,6 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     }
   };
   stations.forEach((s) => { try { dressers[s.id](s); } catch (e) { console.error(e); } });
-  // ---------------- Adrian, the house's hosts (adrian.glb beside this page; the woodcut dealers stand in if he cannot load) ----------------
-  if (window.XA_HOSTS) {
-    const byId = {}; stations.forEach((s) => (byId[s.id] = s));
-    XA_HOSTS.add({ group: byId.blackjack.group, x: 0, z: -0.98, yaw: 0, look: 'blackjack', fig: figOf.get(byId.blackjack.group) });
-    XA_HOSTS.add({ group: byId.roulette.group, x: -0.3, z: -1.02, yaw: 0, look: 'roulette', fig: figOf.get(byId.roulette.group) });
-    XA_HOSTS.add({ group: byId.baccarat.group, x: 0, z: -1.0, yaw: 0, look: 'baccarat', fig: figOf.get(byId.baccarat.group) });
-    XA_HOSTS.add({ group: byId.pvpholdem.group, x: -1.65, z: -0.95, yaw: Math.atan2(1.65, 0.95), look: 'salonHoldem' });
-    XA_HOSTS.add({ group: byId.liars.group, x: 1.45, z: -0.9, yaw: Math.atan2(-1.45, 0.9), look: 'salonDice' });
-    XA_HOSTS.add({ group: scene, x: 2.5, z: 7.9, yaw: Math.atan2(-2.5, 3.0), look: 'greeter', role: 'greeter' });
-    solidsExtra.push({ k: 'c', x: 2.5, z: 7.9, r: 0.36 });
-    ['pvpholdem', 'liars'].forEach((id) => { const s = byId[id], old = greetOf.get(s.group); greetOf.set(s.group, () => { if (old) old(); XA_HOSTS.cue(s.group, 'greet'); }); });
-  }
   // patrons at the slot machines and a bartender
   const patrons = [];
   [[-1, -3.5, { skin: SKIN[1], style: 'jacket', jacket: 0x2a3a52, shirt: 0xe8e0cc, hair: 0x2a1a10, hairStyle: 'short', beard: 'stubble', pants: 0x26262e }],
@@ -3812,6 +3931,31 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   });
   const bartender = addFigure(scene, room.barPos.x, room.barPos.z - 0.35, 0, { standing: true, skin: SKIN[1], style: 'vest', vest: 0x14141c, tie: 0x8c1420, hair: 0x141414, hairStyle: 'slick', beard: 'stubble', watch: true, handY: 1.15, reach: 0.5, spread: 0.2 });
   solidsExtra.push({ k: 'c', x: room.barPos.x, z: room.barPos.z - 0.35, r: 0.42 }); let barGreet = 0;
+  // ---------------- the people: every figure in the room becomes one of the six Adrian personas (the woodcut cast retires when he loads) ----------------
+  if (window.XA_HOSTS) {
+    const byId = {}; stations.forEach((s) => (byId[s.id] = s));
+    const figsAt = (g) => figures.filter((f) => f.group.parent === g);
+    // the staff, in the house liveries
+    XA_HOSTS.add({ group: byId.blackjack.group, x: 0, z: -0.98, yaw: 0, person: 'f1', livery: 'emerald', rest: { kind: 'table', y: 0.975, fwd: 0.30 }, fig: figOf.get(byId.blackjack.group) });
+    XA_HOSTS.add({ group: byId.roulette.group, x: -0.3, z: -1.02, yaw: 0, person: 'm2', livery: 'burgundy', rest: { kind: 'table', y: 0.95, fwd: 0.27 }, fig: figOf.get(byId.roulette.group) });
+    XA_HOSTS.add({ group: byId.baccarat.group, x: 0, z: -1.0, yaw: 0, person: 'f2', livery: 'plum', rest: { kind: 'table', y: 0.975, fwd: 0.30 }, fig: figOf.get(byId.baccarat.group) });
+    XA_HOSTS.add({ group: byId.pvpholdem.group, x: -1.65, z: -0.95, yaw: Math.atan2(1.65, 0.95), person: 'm3', livery: 'ink', rest: { kind: 'table', y: 0.975, fwd: 0.33 } });
+    XA_HOSTS.add({ group: byId.liars.group, x: 1.45, z: -0.9, yaw: Math.atan2(-1.45, 0.9), person: 'f3', livery: 'teal', rest: { kind: 'table', y: 0.975, fwd: 0.33 } });
+    XA_HOSTS.add({ group: scene, x: 2.5, z: 7.9, yaw: Math.atan2(-2.5, 3.0), person: 'm1', livery: 'midnight', role: 'greeter', rest: 'back' });
+    solidsExtra.push({ k: 'c', x: 2.5, z: 7.9, r: 0.36 });
+    XA_HOSTS.add({ group: scene, x: room.barPos.x, z: room.barPos.z - 0.35, yaw: 0, person: 'm3', livery: 'midnight', rest: 'back', fig: bartender });
+    // the players and regulars, in their own clothes
+    const hb = figsAt(byId.holdem.group);   // the bot table's three, in creation order: left, facing, right
+    if (hb[0]) XA_HOSTS.add({ group: byId.holdem.group, x: -2.15, z: 0, yaw: Math.PI / 2, person: 'f2', wear: { shirt: 0x6a8a74, trousers: 0x2a2d33 }, seat: { h: 0.57 }, fig: hb[0] });
+    if (hb[1]) XA_HOSTS.add({ group: byId.holdem.group, x: 0, z: -1.32, yaw: 0, person: 'm1', wear: { shirt: 0x3a4454, trousers: 0x23262c }, seat: { h: 0.57 }, fig: hb[1] });
+    if (hb[2]) XA_HOSTS.add({ group: byId.holdem.group, x: 2.15, z: 0, yaw: -Math.PI / 2, person: 'm2', wear: { shirt: 0x8a3a34, trousers: 0x1e2026 }, seat: { h: 0.57 }, fig: hb[2] });
+    XA_HOSTS.add({ group: byId.pvpholdem.group, x: 0, z: -1.32, yaw: 0, person: 'f3', wear: { shirt: 0x7a4a68, trousers: 0x23262c }, seat: { h: 0.57 }, fig: figOf.get(byId.pvpholdem.group) });
+    XA_HOSTS.add({ group: byId.liars.group, x: 0, z: -1.28, yaw: 0, person: 'm2', wear: { shirt: 0x2c2c34, trousers: 0x191b20 }, seat: { h: 0.57 }, fig: figOf.get(byId.liars.group) });
+    const PWEAR = [{ shirt: 0x3a5a8a, trousers: 0x2a2d33 }, { shirt: 0xd8d0b8, trousers: 0x3a3028 }, { shirt: 0x8a2a2a, trousers: 0x20222a }, { shirt: 0xe0c8c0, trousers: 0x1c1c26 }];
+    const PCAST = ['m3', 'm1', 'f1', 'f3'];
+    patrons.forEach((p, i) => { const px = p.fig.group.position.x; XA_HOSTS.add({ group: scene, x: px - Math.sign(px) * 0.45, z: p.fig.group.position.z, yaw: p.fig.group.rotation.y, person: PCAST[i % 4], wear: PWEAR[i % 4], fig: p.fig }); });   // half a step back from the machines: these six stand straighter than the woodcuts did
+    ['pvpholdem', 'liars'].forEach((id) => { const s = byId[id], old = greetOf.get(s.group); greetOf.set(s.group, () => { if (old) old(); XA_HOSTS.cue(s.group, 'greet'); }); });
+  }
   function updatePatrons(t) {
     patrons.forEach((p) => { if (t > p.next) { p.next = t + 4 + Math.random() * 9; const r = Math.random(); if (r < 0.62) p.fig.check(); else if (r < 0.74) p.fig.think(0.5); else if (r < 0.84) p.fig.shrug(); else if (r < 0.92) p.fig.groan(); else p.fig.fistPump(); } });
     if (mode === 'walk' && t > barGreet && Math.hypot(player.x - room.barPos.x, player.z - room.barPos.z) < 5) { barGreet = t + 45; bartender.greet(); }
@@ -4076,7 +4220,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     }
     for (let i = tweens.length - 1; i >= 0; i--) { const w = tweens[i]; w.t += dt; const u = Math.min(1, w.t / w.dur); w.fn(u); if (u >= 1) { tweens.splice(i, 1); w.res(); } }
     stations.forEach((s) => s.update && s.update(t, dt));
-    updateCoins(dt); updateGlows(t); figures.forEach((f) => f.update(t));
+    updateCoins(dt); updateGlows(t); figures.forEach((f) => { if (f.group.visible) f.update(t); });
     if (window.XA_HOSTS) XA_HOSTS.update(dt, camera.position, t);
     kick *= Math.exp(-dt * 4); fovBase += (((mode === 'walk' && !focus) ? WALK.fov : baseFov) - fovBase) * Math.min(1, dt * 5); camera.fov = fovBase + kick * 5; camera.updateProjectionMatrix();   // walking: the arcade's field of view
     signA += ((focus ? 0 : 1) - signA) * Math.min(1, dt * 5); stations.forEach((s) => { s.sign.material.opacity = signA; s.sign.visible = signA > 0.02; });

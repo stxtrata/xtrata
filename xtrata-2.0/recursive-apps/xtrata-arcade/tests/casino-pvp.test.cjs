@@ -46,18 +46,32 @@ ok('A: the preview copies .glb files', fs.readFileSync(path.join(ROOT, 'build', 
   const hostState = await page.waitForFunction(() => {
     const H = window.XA_HOSTS; if (!H) return 'missing';
     return H.failed ? 'failed' : H.ready && H.hosts.every((h) => h.ctrl) ? 'ready:' + H.hosts.length : false;
-  }, null, { timeout: 180000 }).then((h) => h.jsonValue()).catch(() => 'timeout');
-  ok('C: six hosts stand ready (five tables and the door)', hostState === 'ready:6', hostState);
-  if (hostState === 'ready:6') {
-    ok('C: the woodcut dealers stepped aside', await page.evaluate(() => XA_HOSTS.hosts.filter((h) => h.fig).length === 3 && XA_HOSTS.hosts.filter((h) => h.fig).every((h) => !h.fig.group.visible)));
+  }, null, { timeout: 240000 }).then((h) => h.jsonValue()).catch(() => 'timeout');
+  ok('C: the whole cast of sixteen stands ready', hostState === 'ready:16', hostState);
+  if (hostState === 'ready:16') {
+    ok('C: every woodcut figure stepped aside (dealers, bartender, players, patrons)', await page.evaluate(() => {
+      const withFig = XA_HOSTS.hosts.filter((h) => h.fig);
+      return withFig.length === 13 && withFig.every((h) => !h.fig.group.visible);
+    }));
+    ok('C: all six personas are on the floor, and the women wear their dos', await page.evaluate(() => {
+      const people = new Set(XA_HOSTS.hosts.map((h) => h.person));
+      const dos = ['f1', 'f2', 'f3'].every((p) => { const h = XA_HOSTS.hosts.find((x) => x.person === p); return h && h.ctrl.bones.head.children.some((c) => c.type === 'Group' && c.children.length); });
+      return people.size === 6 && dos;
+    }));
+    ok('C: the five players sit on their stools (hips dropped, legs solved)', await page.evaluate(() => {
+      const seated = XA_HOSTS.hosts.filter((h) => h.seat);
+      return seated.length === 5 && seated.every((h) => h.ctrl.seat && h.ctrl.seat.drop > 0.1);
+    }));
     const moved = await page.evaluate(() => new Promise((res) => {
       const h = XA_HOSTS.hosts[5].ctrl, q0 = h.bones.head.quaternion.toArray().join(',');
       let n = 0; const tick = () => { if (h.bones.head.quaternion.toArray().join(',') !== q0) return res(true); if (++n > 12) return res(false); requestAnimationFrame(() => setTimeout(tick, 400)); }; tick();
     }));
     ok('C: the clips breathe (a head bone moves between frames)', moved);
-    ok('C: each host wears his own waistcoat', await page.evaluate(() => {
+    ok('C: the staff wear different waistcoats and the players their own clothes', await page.evaluate(() => {
       const coat = (i) => { let c = null; XA_HOSTS.hosts[i].ctrl.model.traverse((o) => { if (o.isMesh && o.material.name === 'Midnight waistcoat') c = o.material.color.getHexString(); }); return c; };
-      return coat(0) !== coat(1) && coat(1) !== coat(3) && coat(3) !== coat(4);
+      const civvy = XA_HOSTS.hosts.find((h) => h.wear);
+      let coatHidden = false; civvy.ctrl.model.traverse((o) => { if (o.isMesh && o.material.name === 'Midnight waistcoat' && !o.visible) coatHidden = true; });
+      return coat(0) !== coat(1) && coat(1) !== coat(3) && coat(3) !== coat(4) && coatHidden;
     }));
   }
 
