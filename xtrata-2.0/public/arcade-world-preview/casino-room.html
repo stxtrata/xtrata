@@ -72,13 +72,23 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
 #stick{position:fixed;width:100px;height:100px;margin:-50px 0 0 -50px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(255,255,255,.06);pointer-events:none}
 #knob{position:absolute;left:30px;top:30px;width:40px;height:40px;border-radius:50%;background:rgba(227,184,74,.55)}
 #modebtn{background:var(--panel)}
+
+#scov{position:fixed;inset:0;z-index:70;background:#06140f;display:none;flex-direction:column}
+#scov.on{display:flex}
+#scbar{display:flex;gap:8px;align-items:center;padding:max(8px,env(safe-area-inset-top)) 10px 8px;background:var(--panel);border-bottom:1px solid rgba(212,175,55,.35)}
+#scbar b{color:var(--gold);letter-spacing:.06em;margin-right:auto;font-size:14px}
+#scbar button{font:inherit;font-size:13px;padding:7px 12px;border-radius:9px;border:1px solid rgba(212,175,55,.4);background:transparent;color:#f4ecd6;cursor:pointer}
+#scbar button[aria-pressed="true"]{background:rgba(212,175,55,.18);border-color:var(--gold)}
+#scframe{flex:1;width:100%;border:0;background:#06140f}
 </style>
 <canvas id="gl"></canvas>
-<div id="tools"><button id="back" aria-label="Back to the floor">← Floor</button><div id="bankpill"><span>BANKROLL</span><b id="bank">$1000</b><em id="sess"></em></div><div class="rt"><button id="modebtn" aria-label="Switch between walking and overview">🚶 Walk</button><button id="music" aria-label="Toggle music" title="Music">🎵</button><button id="mute" aria-label="Toggle sound">🔊</button></div></div>
+<div id="tools"><button id="back" aria-label="Back to the floor">← Floor</button><div id="bankpill"><span>BANKROLL</span><b id="bank">$1000</b><em id="sess"></em></div><div class="rt"><button id="scbtn" aria-label="Open the Strata Club tables (testnet rules)" title="Strata Club tables">⛓ Strata Club</button><button id="modebtn" aria-label="Switch between walking and overview">🚶 Walk</button><button id="music" aria-label="Toggle music" title="Music">🎵</button><button id="mute" aria-label="Toggle sound">🔊</button></div></div>
 <div id="cross" class="hud" hidden></div><div id="hint" class="hud" hidden>WASD walk · mouse look · Shift run · E sit / play · Tab overview</div><div id="lockhint" class="hud" hidden>Click to look around, or drag</div><div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b id="pverb">SIT</b> <span id="ptitle"></span></span></div><button id="tapsit" class="hud" hidden></button><div id="stick" class="hud" hidden><div id="knob"></div></div>
-<div id="toast"></div><div id="banner" aria-hidden="true"></div>
+<div id="toast"></div>
+<div id="scov" role="dialog" aria-label="The Strata Club tables"><div id="scbar"><b>THE STRATA CLUB · TESTNET TABLES</b><button id="sc-th" aria-pressed="true">Hold'em</button><button id="sc-td" aria-pressed="false">Liar's Dice</button><button id="scclose">← Back to the floor</button></div><iframe id="scframe" title="Strata Club table" allow="clipboard-write"></iframe></div><div id="banner" aria-hidden="true"></div>
 <div id="intro"><h1>ROYAL FLUSH CASINO</h1><p>Five tables, one bankroll (saved on this device). Walk the floor and sit where you like, or jump straight to a table. Keys 1 to 5.</p><button id="walkin" class="primary" style="width:100%;margin-bottom:10px;padding:13px;font-weight:700;font-size:16px;background:linear-gradient(#e3b84a,#b98a22);color:#1a1006;border-color:#ffe08a">🚶 Walk the floor</button>
-<div class="btns"><button>🂡 Blackjack<small>split · double</small></button><button>🎡 Roulette<small>combo bets</small></button><button>♠ Hold'em<small>smart bots</small></button><button>♦ Baccarat<small>pairs · road</small></button><button>🎰 Video Poker<small>hint · double up</small></button></div></div>
+<div class="btns"><button>🂡 Blackjack<small>split · double</small></button><button>🎡 Roulette<small>combo bets</small></button><button>♠ Hold'em<small>smart bots</small></button><button>♦ Baccarat<small>pairs · road</small></button><button>🎰 Video Poker<small>hint · double up</small></button></div>
+<div class="btns" style="margin-top:10px"><button id="sc-h">⛓ Strata Club Hold'em<small>testnet rules</small></button><button id="sc-d">⛓ Strata Club Liar's Dice<small>testnet rules</small></button></div></div>
 <div id="panel"><span id="pTitle"></span><div id="pMsg" aria-live="polite"></div><div id="pHint" style="display:none"></div><div id="pGame"></div><div id="pChips"></div><div id="pActions"></div><button id="broke">Broke? Claim $1,000 more play money</button></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>/* Casino rules engine. Pure logic, no rendering. */
@@ -2411,10 +2421,27 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   $('back').onclick = () => setFocus(null);
   $('mute').onclick = () => { audio(); setMuted(!muted); $('mute').textContent = muted ? '🔇' : '🔊'; };
   $('music').onclick = () => { audio(); setMusic(!musicOn); $('music').textContent = musicOn ? '🎵' : '🎵̸'; $('music').style.opacity = musicOn ? 1 : 0.45; };
-  $('intro').querySelectorAll('.btns button').forEach((b, i) => (b.onclick = () => { audio(); setFocus(stations[i]); }));
+  $('intro').querySelectorAll('.btns button:not([id^="sc-"])').forEach((b, i) => (b.onclick = () => { audio(); setFocus(stations[i]); }));
   $('walkin').onclick = enterWalk; $('modebtn').onclick = () => { audio(); if (mode === 'walk') exitWalk(); else enterWalk(); };
+  // ---- The Strata Club: the two player-versus-player tables (Hold'em, Liar's Dice) that run the testnet contracts' exact rules, framed over the floor.
+  //      Each page has a practice table (simulated chain + bot) and a "Watch a testnet game" tab that replays real games from Hiro's testnet API.
+  const SC = { 'sc-th': 'strata-holdem.html', 'sc-td': 'strata-liars-dice.html' };
+  let scOpen = false, scWas = null;
+  function openClub(which) {
+    audio(); freeMouse(); for (const k in keys) keys[k] = false; joy.vx = joy.vy = 0;
+    if (!scOpen) scWas = { walk: mode === 'walk' && !focus };
+    scOpen = true; $('scov').classList.add('on');
+    const id = which === 'sc-td' ? 'sc-td' : 'sc-th';
+    Object.keys(SC).forEach((k) => $(k).setAttribute('aria-pressed', String(k === id)));
+    const f = $('scframe'), want = SC[id]; if (f.getAttribute('src') !== want) f.setAttribute('src', want);
+  }
+  function closeClub() { if (!scOpen) return; scOpen = false; $('scov').classList.remove('on'); if (scWas && scWas.walk) tryLock(); }
+  $('scbtn').onclick = () => openClub('sc-th'); $('sc-h').onclick = () => openClub('sc-th'); $('sc-d').onclick = () => openClub('sc-td');
+  $('sc-th').onclick = () => openClub('sc-th'); $('sc-td').onclick = () => openClub('sc-td'); $('scclose').onclick = closeClub;
+  window.XA_STRATA = { open: openClub, close: closeClub, get isOpen() { return scOpen; } };
   window.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (scOpen) { if (e.code === 'Escape') closeClub(); return; }
     if (e.code === 'Escape') { if (focus) setFocus(null); return; }
     if (!focus) {
       if (/^Digit[1-5]$/.test(e.code)) { setFocus(stations[+e.code.slice(-1) - 1]); return; }
@@ -2441,6 +2468,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   const clock = new THREE.Clock(); let px = 0, py = 0, avg = 1 / 60, nFrames = 0, signA = 1;
   window.addEventListener('pointermove', (e) => { px = e.clientX / window.innerWidth - 0.5; py = e.clientY / window.innerHeight - 0.5; });
   function frame() {
+    if (scOpen) { clock.getDelta(); requestAnimationFrame(frame); return; }   // the Strata Club tables are over the floor: do not draw it
     const raw = clock.getDelta(), dt = Math.min(0.05, raw), t = clock.elapsedTime;
     avg = avg * 0.94 + Math.min(raw, 0.25) * 0.06; if (++nFrames % 45 === 0) {
       if (avg > 0.03 && pr > 0.75) { pr = Math.max(0.75, pr - 0.25); resize(); avg = 1 / 40; }
