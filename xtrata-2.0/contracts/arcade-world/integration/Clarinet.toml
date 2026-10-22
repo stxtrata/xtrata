@@ -42,3 +42,8 @@ epoch = 'latest'
 path = 'contracts/xtrata-door-skins-v1.clar'
 clarity_version = 4
 epoch = 'latest'
+
+[contracts.xtrata-world-v2]
+path = 'contracts/xtrata-world-v2.clar'
+clarity_version = 4
+epoch = 'latest'

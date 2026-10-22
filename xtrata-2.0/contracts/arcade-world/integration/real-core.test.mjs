@@ -75,3 +75,25 @@ test('a door skin recipe can be a real sealed inscription, and only its creator 
   simnet.callPublicFn('xtrata-door-skins-v1', 'set-publisher', [Cl.principal(other), Cl.bool(true)], deployer);
   assert.equal(pp(simnet.callPublicFn('xtrata-door-skins-v1', 'register-skin', args('recipe-theft'), other).result), '(err u305)');
 });
+
+test('world-v2: kinds and space entries accept only real, sealed inscriptions with matching hash and size', () => {
+  const W2 = 'xtrata-world-v2';
+  const rec = inscribe(deployer, Buffer.from('{"shape":"door","panels":6}'));
+  assert.equal(rec.result.type, 'ok', pp(rec.result));
+  const id = Number(rec.result.value.value['token-id'].value);
+  const kind = (o = {}, who = deployer) => simnet.callPublicFn(W2, 'register-kind',
+    [Cl.uint(1), Cl.uint(7), Cl.stringAscii('Recipe door'), Cl.uint(1), Cl.stringAscii(''),
+     Cl.uint(o.id ?? id), Cl.buffer(o.hash ?? rec.hash), Cl.uint(o.size ?? rec.size)], who);
+  assert.match(pp(kind().result), /^\(ok u\d+\)$/, pp(kind().result));
+  assert.equal(pp(kind({ size: rec.size + 1 }).result), '(err u314)');
+  assert.equal(pp(kind({ hash: Buffer.alloc(32, 7) }).result), '(err u314)');
+  assert.equal(pp(kind({ id: id + 90 }).result), '(err u314)');
+  // only the creator of the inscription may register it as a kind
+  simnet.callPublicFn(W2, 'set-admin', [Cl.principal(other), Cl.uint(2)], deployer);
+  assert.equal(pp(kind({}, other).result), '(err u314)');
+  // a space entry: the world root can carry a real page inscription (hash and size must match)
+  const entry = (o = {}) => Cl.some(Cl.tuple({ id: Cl.uint(o.id ?? id), hash: Cl.buffer(o.hash ?? rec.hash), size: Cl.uint(o.size ?? rec.size) }));
+  assert.equal(pp(simnet.callPublicFn(W2, 'set-space-entry', [Cl.uint(1), entry()], deployer).result), '(ok true)');
+  assert.equal(pp(simnet.callPublicFn(W2, 'set-space-entry', [Cl.uint(1), entry({ size: rec.size + 1 })], deployer).result), '(err u314)');
+  assert.equal(pp(simnet.callPublicFn(W2, 'set-space-entry', [Cl.uint(1), entry({ id: id + 90 })], deployer).result), '(err u314)');
+});
