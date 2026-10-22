@@ -51,7 +51,7 @@ export interface BatchRequest {
 export function validateBatch(req: BatchRequest, now = Date.now()): BatchRequest {
   if (!req || typeof req.creator !== 'string' || !isMainnetStandardAddress(req.creator)) throw new Error('A batch needs the creator’s Stacks address.');
   if (!Number.isSafeInteger(req.count) || req.count < 1 || req.count > BATCH_MAX_COPIES) throw new Error(`Make 1 to ${BATCH_MAX_COPIES} copies at a time.`);
-  if (typeof req.amount !== 'string' || !/^\d{1,9}$/.test(req.amount) || !validGiftAmount(BigInt(req.amount))) throw new Error('Each copy must be 0.1 to 1 STX.');
+  if (typeof req.amount !== 'string' || !/^\d{1,9}$/.test(req.amount) || !validGiftAmount(BigInt(req.amount))) throw new Error('Each copy must be 0.01 to 1 STX.');
   if (typeof req.label !== 'string' || !/^[ -~]{0,40}$/.test(req.label)) throw new Error('Label: up to 40 plain characters.');
   if (req.player !== undefined && !(typeof req.player === 'string' && /^[0-9a-f]{16}$/.test(req.player))) throw new Error('That is not a gift player id.');
   if (!Number.isSafeInteger(req.issued) || req.issued > now + 60_000 || now - req.issued > CAMPAIGN_MAX_AGE_MS) throw new Error('Request expired. Sign again.');

@@ -19,7 +19,7 @@ describe('prefunded batch rules', () => {
     expect(validateBatch(request(), NOW)).toEqual(request());
     expect(() => validateBatch(request({ creator: 'nope' }), NOW)).toThrow(/Stacks address/);
     for (const count of [0, -1, 1.5, BATCH_MAX_COPIES + 1]) expect(() => validateBatch(request({ count }), NOW)).toThrow(/copies at a time/);
-    for (const amount of ['99999', '1000001', '12.5', '', '-1', '1e5']) expect(() => validateBatch(request({ amount }), NOW)).toThrow(/0\.1 to 1 STX/);
+    for (const amount of ['9999', '1000001', '12.5', '', '-1', '1e5']) expect(() => validateBatch(request({ amount }), NOW)).toThrow(/0\.01 to 1 STX/);
     expect(() => validateBatch(request({ label: 'é' }), NOW)).toThrow(/Label/);
     expect(() => validateBatch(request({ label: 'x'.repeat(41) }), NOW)).toThrow(/Label/);
     expect(() => validateBatch(request({ player: 'xyz' }), NOW)).toThrow(/gift player/);

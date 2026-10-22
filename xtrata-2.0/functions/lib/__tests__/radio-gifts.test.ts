@@ -11,7 +11,7 @@ import { bytesToHex } from '@noble/hashes/utils';
 import {
   BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
   adminAddresses, giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv,
-  batchesFor, batchStatus, confirmBatch, createBatch, ensureGiftTables, MAX_PENDING_BATCHES, REFUND_GROUP_MAX, runSweep, sweepAuthorised, SCAN_EVERY_MS, SCAN_WHILE_EXPECTING_MS
+  batchesFor, batchStatus, confirmBatch, createBatch, MAX_PENDING_BATCHES, REFUND_GROUP_MAX, runSweep, sweepAuthorised, SCAN_EVERY_MS, SCAN_WHILE_EXPECTING_MS
 } from '../radio-gifts';
 import { batchDeposit, batchRequestHash, type BatchRequest } from '../../../src/lib/listening-wallet/batches';
 import { deriveSlotIdentity, listeningBase } from '../../../src/lib/listening-wallet/derive';
@@ -788,7 +788,7 @@ describe('radio gift players', () => {
 
     it('limits the size, the amount and the label of a batch', async () => {
       const s = setup();
-      for (const over of [{ count: 0 }, { count: 101 }, { amount: '99999' }, { amount: '1000001' }, { label: 'é' }, { player: 'nope' }] as Partial<BatchRequest>[])
+      for (const over of [{ count: 0 }, { count: 101 }, { amount: '9999' }, { amount: '1000001' }, { label: 'é' }, { player: 'nope' }] as Partial<BatchRequest>[])
         await expect(fund(s, over)).rejects.toMatchObject({ status: 400 });
       await expect(fund(s, { count: 100, amount: '100000' })).resolves.toMatchObject({ count: 100 });
       expect(s.db.sql.prepare('SELECT COUNT(*) AS n FROM radio_gifts WHERE batch_id IS NOT NULL').get()).toEqual({ n: 100 }); // 100 copies, one transaction

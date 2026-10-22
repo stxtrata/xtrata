@@ -1,6 +1,6 @@
 # Radio gift wallets
 
-Someone without a Stacks wallet gets a gift link. They open it on radio.xtrata.xyz and tap once to make a passkey listening wallet. The gift treasury then funds that wallet with 0.1 to 1 STX, and they start paying artists as they listen.
+Someone without a Stacks wallet gets a gift link. They open it on radio.xtrata.xyz and tap once to make a passkey listening wallet. The gift treasury then funds that wallet with 0.01 to 1 STX, and they start paying artists as they listen.
 
 **Status (14 Oct 2026): live.** The treasury is set up and switched on, and the first gifts have landed on chain (0.1 STX at 19:30 on 13 Oct; a 0.2 STX gift was claimed and played on an iPhone at 22:48). Recipients on iPhone and in Safari make their passkey in a new tab (below).
 
@@ -52,7 +52,7 @@ Prefunded batches are the only way to make albums and starter copies. Old campai
 
 The creator pays for every copy first; the treasury never pays a copy out of its own float. Code: `src/lib/listening-wallet/batches.ts` (rules, SIP-018 request, cost maths), `createBatch` / `confirmBatch` / `batchStatus` / `batchesFor` in `functions/lib/radio-gifts.ts`, the panel's admin box.
 
-1. **Sign.** The creator (a gift admin) signs one SIP-018 request: creator, count (1 to 100), amount landing in each new wallet (0.1 to 1 STX), label, and the album (gift player) if any. An album batch is only accepted from the wallet that owns the album. Each signed request works once, within 15 minutes.
+1. **Sign.** The creator (a gift admin) signs one SIP-018 request: creator, count (1 to 100), amount landing in each new wallet (0.01 to 1 STX), label, and the album (gift player) if any. An album batch is only accepted from the wallet that owns the album. Each signed request works once, within 15 minutes.
 2. **Links.** The server makes N dormant gifts (`radio_gifts`, `source='friend'`, `gifter`=creator, `batch_id`) and a `radio_gift_batches` row in one D1 transaction (inserts are chunked: D1 allows 100 bound values per statement). The links are shown once and saved on the creator's device.
 3. **One payment.** The creator makes ONE transfer to the treasury of `count × (amount + 0.003 STX)` with memo `batch <16 hex>`. The server accepts only the exact sender, recipient, total and memo, and one payment can fund only one batch.
 4. **Live together.** When the payment confirms, the batch and all its copies go live in one transaction, for 30 days. A batch not paid within a day is set aside (`abandoned`) but a late payment still counts. Pending batches count against the escrow cap, and each creator may have 10 unpaid batches at once.
