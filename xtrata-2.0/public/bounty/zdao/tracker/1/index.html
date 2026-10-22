@@ -502,6 +502,8 @@ tr:last-child td { border-bottom: 0; }
     KINDS.forEach(function (x) { total += earned(x, n[x.k] || 0, n); });
     return { valid: valid, total: total, tickets: valid ? total : 0 };
   }
+  function drawsWon(wn) { return !wn ? [] : wn.draws || (wn.draw ? [wn.draw] : []); }
+  function drawsText(wn) { var d = drawsWon(wn); return d.length > 1 ? 'draws ' + d.slice(0, -1).join(', ') + ' and ' + d[d.length - 1] : 'draw ' + (d[0] || ''); }
   var START = loadState(), HANDLES = {}, TEAMW = {}, LINKED = {}, WINNERS = {}, DATA = listFromState(START), AT = START ? START.at : '', rows = [], live = false, offline = false, ME = '';
   function rebuild() {
     rows = DATA.map(function (a) { var c = calc(a); var team = HANDLES[a.a] || '', self = !team && LINKED[a.a] ? LINKED[a.a].h : ''; var tm = !!TEAM[a.a], wn = WINNERS[a.a], nw = wn ? (wn.draws ? wn.draws.length : 1) : 0; return { a: a, valid: c.valid && !tm, team: tm, held: c.total, tickets: tm ? 0 : Math.max(0, c.tickets - nw), handle: team || self, self: !!self, won: wn, used: nw }; });
@@ -609,10 +611,10 @@ tr:last-child td { border-bottom: 0; }
     var a = r ? r.a : { a: addr, n: {} }, c = r || { valid: false, held: 0, tickets: 0, handle: '', won: null };
     var who = el('div', 'who');
     var l = el('div'); l.appendChild(el('div', 'addr', a.a)); if (c.handle) l.appendChild(el('div', 'hint', c.handle)); who.appendChild(l);
-    who.appendChild(el('span', 'pill ' + (c.won ? 'win' : c.valid ? 'ok' : 'wait'), c.team ? 'Xtrata team · not in the draws' : c.won ? 'Winner of draw ' + c.won.draw + (c.valid ? ' · still in the draws' : '') : c.valid ? 'In the draw' : 'Waiting for a first inscription'));
+    who.appendChild(el('span', 'pill ' + (c.won ? 'win' : c.valid ? 'ok' : 'wait'), c.team ? 'Xtrata team · not in the draws' : c.won ? 'Winner of ' + drawsText(c.won) + (c.valid ? ' · still in the draws' : '') : c.valid ? 'In the draw' : 'Waiting for a first inscription'));
     out.appendChild(who);
     var sc = el('div', 'score'); sc.appendChild(el('b', c.valid ? 'ok' : 'wait', String(c.tickets)));
-    sc.appendChild(el('p', '', c.valid ? (c.won ? 'tickets in the next draws. This wallet won draw ' + c.won.draw + ' and used up ' + c.used + ' ticket' + (c.used === 1 ? '' : 's') + '. Everything else carries forward, and new tickets count in full.' : 'tickets in every draw from week 1. They carry forward until this wallet is picked.') : (c.held ? c.held + ' ticket' + (c.held === 1 ? ' is' : 's are') + ' held. They switch on the moment this wallet inscribes or collects an Audionaut.' : 'No Xtrata activity found for this wallet since 1 October.')));
+    sc.appendChild(el('p', '', c.valid ? (c.won ? 'tickets in the next draws. This wallet won ' + drawsText(c.won) + ' and used up ' + c.used + ' ticket' + (c.used === 1 ? '' : 's') + '. Everything else carries forward, and new tickets count in full.' : 'tickets in every draw from week 1. They carry forward until this wallet is picked.') : (c.held ? c.held + ' ticket' + (c.held === 1 ? ' is' : 's are') + ' held. They switch on the moment this wallet inscribes or collects an Audionaut.' : 'No Xtrata activity found for this wallet since 1 October.')));
     out.appendChild(sc);
 
     // where you stand: three things that must be true
@@ -954,6 +956,7 @@ tr:last-child td { border-bottom: 0; }
     if (after && i < 2 && (S.done || S.official === 'only')) box.appendChild(el('p', 'hint', 'Next: Draw ' + (i + 2) + ' closes ' + when(cutOf(i + 1), true) + ' (' + hms(cutOf(i + 1) - now) + ' to go).'));
     // finished earlier draws, compact
     var prev = el('div', 'lprev');
+    for (var q = 0; q < i; q++) if (!LV[q].picks) loadOfficialOnly(q);   // a draw this browser did not run itself: show the published result
     for (var q = 0; q < i; q++) if (LV[q].done && LV[q].picks) {
       var dd = el('details'); dd.appendChild(el('summary', '', 'Draw ' + (q + 1) + ' winners'));
       LV[q].picks.filter(function (p) { return !p.reserve; }).forEach(function (p) { dd.appendChild(el('p', 'mono', p.place + ': ' + short(p.wallet) + (handleOf(p.wallet) ? '  ' + handleOf(p.wallet) : '') + '  (' + p.tickets + ' tickets)')); });

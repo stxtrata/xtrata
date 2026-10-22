@@ -14,10 +14,19 @@
       "draw": 1
     },
     "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9": {
-      "draw": 1
+      "draws": [
+        1,
+        2
+      ]
     },
     "SPV00QHST52GD7D0SEWV3R5N04RD4Q1PMA3TE2MP": {
       "draw": 1
+    },
+    "SPZ2X7Q0Z69KTN7SZF90MR9AZGZ2ETXFGMFXKKN8": {
+      "draw": 2
+    },
+    "SP1RB1V65A1PAAXYT8PVFFFC6T1FN9E8RQX7HMDKC": {
+      "draw": 2
     }
   }
 }
