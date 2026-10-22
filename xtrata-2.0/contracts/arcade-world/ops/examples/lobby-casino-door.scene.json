@@ -1,0 +1,18 @@
+{
+ "format": "arcade-scene-file/1",
+ "room": "lobby",
+ "scenes": [
+  {
+   "bay": 0,
+   "at": 0,
+   "base": "door",
+   "door": "door-double",
+   "interaction": "enter",
+   "layers": [
+    { "look": "sign-board", "params": { "text": "casino", "sub": "royal flush", "tone": "gold" } },
+    { "look": "light-pulse", "params": { "tone": "gold", "rate": 1.5 } }
+   ],
+   "link": { "room": "casino", "arrivalBay": 0 }
+  }
+ ]
+}

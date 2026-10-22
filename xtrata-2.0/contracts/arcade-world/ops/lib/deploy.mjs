@@ -9,7 +9,7 @@ import { makeContractDeploy, broadcastTransaction, ClarityVersion, PostCondition
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const CONTRACT_DIR = join(here, '..', '..', 'contracts');
-export const DEPLOY_ORDER = ['mock-xtrata-core', 'xtrata-posters-v1', 'xtrata-world-v1', 'xtrata-door-skins-v1'];
+export const DEPLOY_ORDER = ['mock-xtrata-core', 'xtrata-posters-v1', 'xtrata-world-v1', 'xtrata-door-skins-v1', 'xtrata-screen-v1'];
 
 export function deploySources() {
   return DEPLOY_ORDER.map((name) => {

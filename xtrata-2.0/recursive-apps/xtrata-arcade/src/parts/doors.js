@@ -767,11 +767,49 @@
         way.material.map = portalParts.plain; way.material.needsUpdate = true; group.remove(portalParts.near, portalParts.far, portalParts.reveal);
       }
     }
+    /* a window onto the room behind the door: the room's "entry still" (a picture of what you see the moment you walk in) shown in the open doorway.
+       Interior mapping: for every pixel of the opening, a ray from your eye through it is carried on to a flat picture standing WIN.dist behind the doorway, so the
+       picture slides as you move (the right parallax for a picture that far away) and only what the opening lets you see is drawn. The picture is sized and aimed so
+       that from the doorway, where the room takes over, it is exactly the room's own first view (WIN mirrors the casino's startAtDoor: eye 1.6 m, pitch -0.08, fov 68).
+       The picture is drawn as it is (it is already a finished screen shot, so no tone mapping, no second colour conversion). */
+    var WIN = { dist: 6.5, camZ: 0.45, eye: 1.6, pitch: -0.08, fov: 68 }, win = null, winUrl = '';
+    function windowTo(url) {
+      url = url || ''; if (url === winUrl) return; winUrl = url;
+      if (win) { group.remove(win.mesh); win.mat.dispose(); if (win.map) win.map.dispose(); win = null; }
+      if (!url) return;
+      var maskTex = canvasTex(W + 2 * pad, H + 2 * pad, function (x) { x.translate(pad, pad); x.fillStyle = '#fff'; x.fill(new Path2D(G.shape.d)); });
+      var cp = Math.cos(WIN.pitch), sp = Math.sin(WIN.pitch), reach = (WIN.dist + WIN.camZ) / cp, half = Math.tan(WIN.fov * Math.PI / 360) * reach, mine = { url: url, map: null, mesh: null, mat: null, ready: false };
+      group.updateWorldMatrix(true, false);   // the door's own space starts a few cm above the floor: the eye is measured from the floor
+      var dir = new T.Vector3(0, sp, -cp), cam0 = new T.Vector3(0, WIN.eye - group.matrixWorld.elements[13], WIN.camZ), p0 = cam0.clone().addScaledVector(dir, reach);
+      var mat = new T.ShaderMaterial({
+        uniforms: { uMap: { value: null }, uMask: { value: maskTex }, uCam: { value: new T.Vector3(0, 1.6, 3) }, uP0: { value: p0 }, uN: { value: dir }, uUp: { value: new T.Vector3(0, cp, sp) },
+          uHalf: { value: new T.Vector2(half * 2.3, half) }, uPos: { value: new T.Vector3(0, 0, 0.008) } },
+        vertexShader: 'varying vec2 vUv; varying vec3 vL; uniform vec3 uPos; void main(){ vUv = uv; vL = position + uPos; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform sampler2D uMap; uniform sampler2D uMask; uniform vec3 uCam; uniform vec3 uP0; uniform vec3 uN; uniform vec3 uUp; uniform vec2 uHalf; varying vec2 vUv; varying vec3 vL;\n' +
+          'void main(){ if (texture2D(uMask, vUv).a < 0.5) discard; vec3 d = vL - uCam; float dn = dot(d, uN); if (dn <= 0.0001) discard; float t = dot(uP0 - uCam, uN) / dn; if (t <= 0.0) discard;\n' +
+          ' vec3 q = uCam + d * t - uP0; vec2 uv = vec2(0.5 + q.x / (2.0 * uHalf.x), 0.5 + dot(q, uUp) / (2.0 * uHalf.y));\n' +
+          ' if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.02, 0.015, 0.03, 1.0); return; } gl_FragColor = vec4(texture2D(uMap, uv).rgb, 1.0); }',
+        side: T.FrontSide
+      });
+      var mesh = new T.Mesh(wayGeo, mat); mesh.position.set(way.position.x, way.position.y, 0.008); mat.uniforms.uPos.value.set(way.position.x, way.position.y, 0.008);
+      mesh.raycast = function () {}; mesh.visible = false; mesh.frustumCulled = false; group.add(mesh);
+      mine.mesh = mesh; mine.mat = mat; win = mine;
+      new T.TextureLoader().load(url, function (t) {
+        if (win !== mine) { t.dispose(); return; }
+        t.anisotropy = 4; mine.map = t; mat.uniforms.uMap.value = t; mat.uniforms.uHalf.value.x = half * (t.image.width / t.image.height); mine.ready = true;
+      }, undefined, function () { /* no picture: the doorway stays the dark recess */ });
+    }
+    // each frame: where the viewer's eye is in the door's own space, and whether the door is open enough to look through
+    function windowInfo() { return win ? { url: win.url, ready: win.ready, visible: win.mesh.visible, cam: win.mat.uniforms.uCam.value.toArray() } : null; }
+    function windowView(cam, open) {
+      if (!win) return; var show = !!open && win.ready; if (win.mesh.visible !== show) win.mesh.visible = show;
+      if (show) win.mat.uniforms.uCam.value.copy(cam);
+    }
     sync();
     function handle() {   // where the first leaf's handle is in the world, and which kind it is (for tests and previews)
       var h = leafObjs[0].hands[0], v = new T.Vector3(); group.updateMatrixWorld(true); h.g.getWorldPosition(v); return { x: v.x, y: v.y, z: v.z, type: h.type || 'canvas', turn: h.lever.rotation.z, porcelain: !!h.porcelain };
     }
-    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, latch: latch, handle: handle, scale: s, size: { w: W * s, h: H * s }, layout: G };
+    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, window: windowTo, windowView: windowView, windowInfo: windowInfo, WIN: WIN, latch: latch, handle: handle, scale: s, size: { w: W * s, h: H * s }, layout: G };
   }
 
   // Sutherland-Hodgman: the part of a convex polygon between two vertical lines

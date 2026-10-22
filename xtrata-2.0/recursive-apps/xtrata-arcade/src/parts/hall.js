@@ -100,7 +100,7 @@ const WALK = { fov:68, eye:1.6, speed:3, sprint:4.6, bobRate:9, bobAmp:.025, loo
 const camera = new THREE.PerspectiveCamera(WALK.fov, innerWidth/innerHeight, 0.04, 60);
 camera.rotation.order = 'YXZ';
 
-const RW = 10, RH = 3.2, EYE = WALK.eye, GAP = 2.2;
+const RW = 10, RH = 3.2, HH = 4.2, EYE = WALK.eye, GAP = 2.2;
 const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets down the left / right walls
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
@@ -160,12 +160,15 @@ function buildRoom(){
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(RW,RL), new THREE.MeshStandardMaterial({map:carpetTexture(), roughness:.95}));
   floor.rotation.x=-Math.PI/2; scene.add(floor);
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(RW,RL), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}));
-  ceil.rotation.x=Math.PI/2; ceil.position.y=RH; scene.add(ceil);
+  ceil.rotation.x=Math.PI/2; ceil.position.y=HH; scene.add(ceil);
 
   const wt=wallTexture();
   const wall=(w,pos,ry)=>{const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
     const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), holeWall(new THREE.MeshStandardMaterial({map:t, roughness:.9}),1));
-    m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m)};
+    m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m);
+    // above the doors and bays (RH) the wall is plain, up to the hall's higher ceiling (HH)
+    const up=new THREE.Mesh(new THREE.PlaneGeometry(w,HH-RH), new THREE.MeshStandardMaterial({color:0x17132a, roughness:.9}));
+    up.position.set(pos[0],(RH+HH)/2,pos[1]); up.rotation.y=ry; scene.add(up)};
   wall(RL,[-RW/2,0],Math.PI/2); wall(RL,[RW/2,0],-Math.PI/2); wall(RW,[0,-RL/2],0); wall(RW,[0,RL/2],Math.PI);
 
   // neon strips: pink high along the long walls, cyan skirting all round
@@ -189,7 +192,7 @@ function buildRoom(){
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
-  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block')});   // read-only, for tests
+  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
   if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
   XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;   // read-only, for tests: where you are in bay i's open doorway
   XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
@@ -212,8 +215,8 @@ function buildRoom(){
   const panelMat=new THREE.MeshBasicMaterial({color:0xe8e2ff, toneMapped:false});
   const lz=[]; for(let z=-Math.floor((RL/2-3)/5)*5; z<=RL/2-3; z+=5) lz.push(z);
   for(const z of lz){
-    const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.5),panelMat); p.rotation.x=Math.PI/2; p.position.set(0,RH-.01,z); scene.add(p);
-    const l=new THREE.PointLight(0xcfc4ff,.55,10,2); l.position.set(0,RH-.3,z); scene.add(l);
+    const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.5),panelMat); p.rotation.x=Math.PI/2; p.position.set(0,HH-.01,z); scene.add(p);
+    const l=new THREE.PointLight(0xcfc4ff,.55,10,2); l.position.set(0,HH-.3,z); scene.add(l);
   }
   scene.add(new THREE.HemisphereLight(0x6a5cff,0x1a0a20,.45));
 }
@@ -1343,14 +1346,21 @@ function applyDay(day){
    chain posters are laid over it (XAWorld.composeWall). With no contracts, or a failed read, the wall is the
    embedded one exactly: that is the v1.3 hall. */
 let baseWall=null;
-const PIN_SLOTS=[null, 2, 16, 3, 17];   // pin spots 1-4 -> the four free poster slots nearest the entrance (the end pairs are bays)
+/* Pin spots (the posters contract's set-pin `spot`) cover EVERY poster slot on the wall, 1 to the number of slots:
+   spots 1-4 are the four free slots nearest the entrance, 5-12 are the bays' posters (bay 0: 5,6  bay 1: 7,8  bay 2: 9,10  bay 3: 11,12),
+   then the rest in wall order. A bay whose scene is not "posters" hides its pinned posters (the scene wins; see applyBays). */
+function pinSlots(){
+  const first=[2,16,3,17];
+  for(const code of ['L','R','NL','NR']) posterSlots.forEach((s,i)=>{ if(s.bay===code) first.push(i) });
+  return window.XAWorld.pinSlotMap(posterSlots.length, first);
+}
 function paintWall(){
   if(!baseWall) return;
   const W=window.XAWorld, snap=W && W.enabled() ? W.snapshot() : null;
   let items=null;
   if(snap){
     try{ items=W.composeWall(baseWall.wall,{day:baseWall.day, nEmbedded:ROTATION_POOL.length, weights:ROTATION_W, snapshot:snap,
-      overlaySlots:posterSlots.map((s,i)=>s.bay?-1:i).filter(i=>i>=0), pinSlots:PIN_SLOTS}) }catch(e){ items=null }
+      overlaySlots:posterSlots.map((s,i)=>s.bay?-1:i).filter(i=>i>=0), pinSlots:pinSlots()}) }catch(e){ items=null }
   }
   posterSlots.forEach((s,i)=>{
     const spec=items ? (items[i].src==='c' ? chainSpec(items[i].entry) : ROTATION_POOL[items[i].idx]) : ROTATION_POOL[baseWall.wall[i]];
@@ -1451,7 +1461,7 @@ function buildPosters(){
   try{
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
-      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player});
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, stillFor:(slug)=>{ const r=roomCfg(slug); return r&&typeof r.still==='string'?r.still:'' }});
     if(bayEngine) buildLobby();
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
@@ -1501,7 +1511,7 @@ function startChainClock(){ setHeight(estHeight(),false); pollChain(); setInterv
    contract reader live in screen.js; this part only builds the panel, feeds it and repaints it. With no screen contract it is the
    clock plus the latest scorers. It replaces the old Bitcoin Day board in the same spot. */
 let dayBoard=null;
-const CENTRE_SCREEN={W:3.2, H:1.8, cy:2.05, z:RL/2-6, px:1280, py:720, gapMs:120};
+const CENTRE_SCREEN={W:3.2, H:1.8, cy:3.15, z:RL/2-6, px:1280, py:720, gapMs:120};
 function buildDayBoard(){
   const S=CENTRE_SCREEN, cv=mkCanvas(S.px,S.py), t=tex(cv), mat=new THREE.MeshBasicMaterial({map:t, toneMapped:false});
   const g=new THREE.Group(); g.position.set(0,S.cy,S.z); scene.add(g);
@@ -1510,10 +1520,9 @@ function buildDayBoard(){
   const front=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); front.position.z=.052; g.add(front);
   const back=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); back.position.z=-.052; back.rotation.y=Math.PI; g.add(back);
   const rodMat=new THREE.MeshStandardMaterial({color:0x2a2a33, metalness:.8, roughness:.3});
-  for(const sx of [-1,1]){ const len=RH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
+  for(const sx of [-1,1]){ const len=HH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
   const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.14,.025,.12), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.07); g.add(edge);
-  // you cannot walk through it: its bottom edge is below eye height
-  boxes.push(new THREE.Box3(new THREE.Vector3(-W/2-.06,0,S.z-.1), new THREE.Vector3(W/2+.06,RH,S.z+.1)));
+  // no collider: its bottom edge (2.25 m) is above head height, so you walk under it
   dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], scorersAt:-1e9};
   paintDayBoard(true);
 }
@@ -1529,7 +1538,7 @@ function paintDayBoard(force){
   dayBoard.last=now;
   if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } }
   const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers,
-           items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.live?chain.height:0) : []};
+           items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.height)   /* estimated height when the node is down, so a cached snapshot still expires */ : []};
   if(window.XAScreen) XAScreen.paint(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);
   else paintPlainClock(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);   // a release without screen.js: just the day clock
   dayBoard.tex.needsUpdate=true;
@@ -2465,24 +2474,30 @@ function updateBayFocus(){
   if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
 }
 /* ---------- other rooms that take the whole screen (the casino) ----------
-   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO' } } names
+   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO', still:'casino-entry.jpg' } } names
    them. A room is either `src` (a URL the hall may frame: a file beside the hall) or `load` (a function the host gives, returning the room's page as text,
    which is framed as srcdoc: this is how the inscribed arcade opens a room that is its own inscription, hash-checked, see parent.template.html). Going in: a short loading screen over the hall,
    the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
+   `still` (optional) is a picture of the room's entry view (build/snap-room.cjs takes it): the door's open doorway shows it, as a window with the right parallax (doors.js windowTo),
+   and it fills the screen, moving in a little, from the moment you cross the threshold until the room posts {xa:'room-ready'} (a room that never does is shown 2.5 s after it loads); only a slow room gets the loading screen.
    Going back: the frame is removed (it frees everything the room built) and you are where you were, in front of the door. */
 const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && ((typeof r.src==='string' && r.src) || typeof r.load==='function') ? r : null };
-let roomUI=null, roomId='', roomBay=-1, roomT0=0, roomTimer=0;
+let roomUI=null, roomId='', roomBay=-1, roomT0=0, roomTimer=0, roomSlow=0;
 function roomEls(){
   if(roomUI) return roomUI;
   const mk=(css,html)=>{ const e=document.createElement('div'); e.style.cssText=css; if(html!=null) e.innerHTML=html; return e };
   const load=mk('position:fixed;inset:0;z-index:9000;background:radial-gradient(ellipse at 50% 40%,#1b1233,#05040a 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#e8e2ff;text-align:center;opacity:0;transition:opacity .25s',
     '<div class="rl-t" style="font:34px Bungee,Impact,sans-serif;letter-spacing:.08em;color:#ffb347;text-shadow:0 0 18px rgba(255,150,40,.55)"></div><div class="rl-s" style="font:16px VT323,monospace;letter-spacing:.14em;opacity:.8">OPENING THE ROOM…</div><div style="width:min(60vw,320px);height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden"><i class="rl-b" style="display:block;height:100%;width:35%;background:linear-gradient(90deg,#3d86ff,#ff8a2a);animation:rlbar 1.1s ease-in-out infinite alternate"></i></div>');
+  // the room's entry still (XA_ROOMS[id].still): shown full screen from the moment you cross the threshold until the live room has drawn its first frames, so the doorway you were looking into simply becomes the room
+  const still=mk('position:fixed;inset:0;z-index:8900;background:#05040a center/cover no-repeat;display:none;opacity:0;transform:scale(1);will-change:transform,opacity');
   const st=document.createElement('style'); st.textContent='@keyframes rlbar{from{transform:translateX(-30%)}to{transform:translateX(190%)}}'; document.head.appendChild(st);
   const back=document.createElement('button'); back.type='button'; back.textContent='← BACK TO THE LOBBY';
   back.style.cssText='position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9500;display:none;padding:9px 16px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer';
   back.addEventListener('click',e=>{ e.stopPropagation(); leaveRoom() });
-  document.body.append(load,back); roomUI={load,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
+  document.body.append(still,load,back); roomUI={load,still,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
   window.addEventListener('message',e=>{ if(state==='room' && roomUI && roomUI.frame && e.source===roomUI.frame.contentWindow && e.data && e.data.xa==='leave-room') leaveRoom() });
+  // the room says it has drawn its first frames ({xa:'room-ready'}), at any time after it loads, even while it is still hidden behind the hall
+  window.addEventListener('message',e=>{ const f=roomUI&&roomUI.frame; if(f && e.source===f.contentWindow && e.data && e.data.xa==='room-ready'){ f.dataset.ready='1'; f.dispatchEvent(new Event('xa-room-ready')) } });
   return roomUI;
 }
 // The room's page is loaded quietly as soon as its door is opened (hidden, behind the hall), so by the time you walk in there is little or nothing to wait for.
@@ -2490,7 +2505,8 @@ function roomEls(){
 const roomSrc=(cfg)=>cfg.src+(cfg.src.indexOf('?')<0?'?':'&')+'from=arcade';   // tells the room it was entered from the arcade: it starts walking, just inside its door
 function roomPrep(id){
   const cfg=roomCfg(id); if(!cfg) return null;
-  const U=roomEls(); if(U.frame && U.frameId===id) return U.frame;
+  const U=roomEls(); if(typeof cfg.still==='string' && cfg.still){ if(!roomPrep.im||roomPrep.im.u!==cfg.still){ const im=new Image(); im.src=cfg.still; roomPrep.im={u:cfg.still,im} } }   // the still is fetched and decoded before it is needed
+  if(U.frame && U.frameId===id) return U.frame;
   roomDrop();
   const f=document.createElement('iframe'); f.title=cfg.title||id; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
   f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden;pointer-events:none';
@@ -2524,20 +2540,35 @@ function enterRoom(id, bayIdx){
   for(const k in keys) keys[k]=false;
   $('cross').hidden=true; $('prompt').hidden=true; $('tapstart').hidden=true; $('lockhint').hidden=true; $('hint').hidden=true; if($('bprompt')) $('bprompt').hidden=true;
   try{ Room.enterGame() }catch(e){}                   // the hall's own sound closes behind you
+  const hb=$('hallbar'); if(hb) hb.style.visibility='hidden';   // and its buttons (scores, wallet, sound) stay out of the room's picture
   const ready=!!f.dataset.loaded, minWait=ready?250:700;   // a page that is already there still gets a beat of loading screen, never a flash
   U.title.textContent=String(cfg.title||id).toUpperCase(); U.sub.textContent='OPENING THE ROOM…';
-  U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1;
+  const still=typeof cfg.still==='string' && cfg.still;
+  const showLoad=()=>{ U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1 };
+  if(still){   // the doorway you were looking into fills the screen and moves in a little, as a step forward would; the loading screen only comes if the room is slow
+    const S=U.still; S.style.transition='none'; S.style.backgroundImage='url("'+still.replace(/"/g,'%22')+'")'; S.style.transform='scale(1)'; S.style.opacity=0; S.style.display='block'; void S.offsetWidth;
+    S.style.transition='opacity .25s,transform 2.6s cubic-bezier(.25,.6,.35,1)'; S.style.opacity=1; S.style.transform='scale(1.035)';
+  } else showLoad();
   f.style.pointerEvents='auto';
   const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,minWait-(performance.now()-roomT0));
     setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room') U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
-  const failed=()=>{ clearTimeout(roomTimer); U.sub.textContent='THE ROOM COULD NOT BE LOADED. YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 };
+  const failed=()=>{ clearTimeout(roomTimer); clearTimeout(roomSlow); if(still) showLoad(); U.sub.textContent='THE ROOM COULD NOT BE LOADED. YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 };
   if(f.dataset.failed) failed(); else f.addEventListener('xa-room-failed',failed,{once:true});
-  if(ready) done(); else f.addEventListener('load',done,{once:true});
-  roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
+  if(still){
+    // Ready = the room has said so ({xa:'room-ready'}, after its first frames), and the still has been up for a beat. A room that never says it is ready is shown 2.5 s after it loads.
+    let shown=false; clearTimeout(roomSlow);
+    const reveal=()=>{ if(shown || state!=='room' || roomUI.frame!==f) return; shown=true; clearTimeout(roomSlow); clearTimeout(roomTimer);
+      f.style.visibility='visible'; U.still.style.opacity=0; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room'){ U.still.style.display='none'; U.load.style.display='none' } },450); U.back.style.display='block'; try{ f.focus() }catch(e){} };
+    const when=(ms)=>setTimeout(reveal,Math.max(0,ms-(performance.now()-roomT0)));
+    if(f.dataset.ready) when(900); else f.addEventListener('xa-room-ready',()=>when(900),{once:true});
+    const late=()=>setTimeout(()=>when(900),2500); if(f.dataset.loaded) late(); else f.addEventListener('load',late,{once:true});
+    roomSlow=setTimeout(()=>{ if(!shown && state==='room' && roomUI.frame===f) showLoad() },3500);
+  } else if(ready) done(); else f.addEventListener('load',done,{once:true});
+  roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ if(still) showLoad(); U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
 }
 function leaveRoom(){
   if(state!=='room' || !roomUI) return;
-  const U=roomUI; clearTimeout(roomTimer);
+  const U=roomUI; clearTimeout(roomTimer); clearTimeout(roomSlow); const hb=$('hallbar'); if(hb) hb.style.visibility=''; U.still.style.display='none'; U.still.style.opacity=0;
   if(U.frame){ try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null; U.frameId='' }
   U.load.style.opacity=0; U.load.style.display='none'; U.back.style.display='none';
   state='out'; sfx.back(); try{ Room.exitGame() }catch(e){}

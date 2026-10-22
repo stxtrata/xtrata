@@ -6,7 +6,7 @@
    (curtain, sign, door with its skin, lamp, work sounds) and their scene changes can be seen and heard.
    This head is the source: build/preview.mjs puts it on top of the current hall build to make public/arcade-world-preview/index.html. */
 window.XA_WORLD_CONFIG={posters:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-posters-v1',world:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-world-v1',roomId:'arcade-hall'};
-window.XA_ROOMS={casino:{src:'casino-room.html',title:'Royal Flush Casino'}};   // rooms that take the whole screen: the lobby's CASINO door opens this page (it sits beside this one)
+window.XA_ROOMS={casino:{src:'casino-room.html',title:'Royal Flush Casino',still:'casino-entry.jpg'}};   // rooms that take the whole screen: the lobby's CASINO door opens this page (it sits beside this one)
 window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
 (function(){
   var chain=true, scene=['knock','open','enter','workshop'], curtain='closed', sound=true, lamp=true;
@@ -31277,6 +31277,9 @@ XARoom.boot(document.getElementById('xa-root'));
     lobbyId: 'lobby',
     posters: '',                 // 'SP….xtrata-posters-v1'  (empty = off)
     world: '',                   // 'SP….xtrata-world-v1'    (empty = off)
+    registry: '',                // 'SP….xtrata-world-v2'    the object registry; when set it replaces `world` for the bays (world2.js)
+    path: ['arcade', 'hall'],    // the hall's space in the registry (its lobby is the sibling 'lobby' unless lobbyPath says otherwise)
+    lobbyPath: null,
     pollMs: 240000,              // how often to check the two version counters
     overlayMax: 8,               // at most this many chain posters on the wall at once
     maxLive: 64,                 // the contract's live-set bound
@@ -31291,7 +31294,10 @@ XARoom.boot(document.getElementById('xa-root'));
   function configure(patch) {
     Object.keys(patch || {}).forEach(function (k) { if (k in CFG) CFG[k] = patch[k]; });
   }
-  function enabled() { return !!(CFG.posters && CFG.world && codec()); }
+  // 2: bays from the object registry (xtrata-world-v2, read by world2.js); 1: from the scene contract (xtrata-world-v1); 0: off
+  function mode() { return CFG.registry && root.XAWorld2 ? 2 : (CFG.world ? 1 : 0); }
+  function enabled() { return !!(CFG.posters && mode() && codec()); }
+  function host() { return { read: callRead, plain: plain, hexList: hexList, codec: codec(), registry: CFG.registry, path: CFG.path, lobbyPath: CFG.lobbyPath }; }
 
   /* ------------------------------------------------------------ pure helpers (rotation side) */
   function rng(s) { return function () { s |= 0; s = s + 0x6D2B79F5 | 0; var t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -31383,6 +31389,18 @@ XARoom.boot(document.getElementById('xa-root'));
     return out;
   }
 
+  /*
+   * pinSlotMap: which wall slot each pin spot means. Spot numbers start at 1 and cover EVERY slot (n of them), so any poster on the
+   * wall can be pinned. `first` lists the slots that take spots 1, 2, 3 ... in that order (the hall puts the four free slots nearest the
+   * entrance first, then each bay's two posters, bay 0 to bay 3); every slot not listed follows in wall order.
+   */
+  function pinSlotMap(n, first) {
+    var map = [null], seen = {};
+    (first || []).forEach(function (s) { if (typeof s === 'number' && s >= 0 && s < n && !seen[s]) { seen[s] = true; map.push(s); } });
+    for (var i = 0; i < n; i++) if (!seen[i]) map.push(i);
+    return map;
+  }
+
   /* ------------------------------------------------------------ reading */
   function hasRealOrigin() { try { return /^https?:$/.test(root.location.protocol) && root.location.origin !== 'null'; } catch (e) { return false; } }
   function apiBases() {
@@ -31462,8 +31480,8 @@ XARoom.boot(document.getElementById('xa-root'));
     };
   }
   async function readVersions() {
-    var a = await callRead(CFG.posters, 'get-version', []), b = await callRead(CFG.world, 'get-version', []);
-    return { posters: plain(a), world: plain(b) };
+    var a = await callRead(CFG.posters, 'get-version', []), b = mode() === 2 ? await root.XAWorld2.probe(host()) : plain(await callRead(CFG.world, 'get-version', []));
+    return { posters: plain(a), world: b };
   }
   async function loadSnapshot() {
     var C = codec();
@@ -31474,19 +31492,29 @@ XARoom.boot(document.getElementById('xa-root'));
     var suppressed = plain(await callRead(CFG.posters, 'get-suppressed', [])) || [];
     var need = live.slice(0, CFG.maxLive); pins.forEach(function (p) { if (need.indexOf(p.poster) < 0) need.push(p.poster); });
     var recs = await readPosters(need);
-    var bays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.roomId)])).value.map(toBay);
-    // The lobby is its own room on the contract (its two back-wall doors). A contract with nothing for it, or a read that fails,
-    // leaves those doors as plain walls: it never takes the hall down.
-    var lobbyBays = [];
-    try { lobbyBays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.lobbyId)])).value.map(toBay); } catch (e) { lobbyBays = []; }
-    var looks = await readLooks(bays.concat(lobbyBays));
-    var versions = await readVersions();
+    var bays, lobbyBays = [], looks, versions, w2 = null;
+    if (mode() === 2) {
+      // The bays come from the object registry: world2.js turns its objects into the same bay shape. A failed read throws (the last
+      // good snapshot stays); a registry with nothing for the hall gives four null bays, which is the posters.
+      w2 = await root.XAWorld2.load(host());
+      bays = w2.bays; lobbyBays = w2.lobbyBays; looks = w2.looks;
+      versions = { posters: plain(await callRead(CFG.posters, 'get-version', [])), world: w2.sig };
+    } else {
+      bays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.roomId)])).value.map(toBay);
+      // The lobby is its own room on the contract (its two back-wall doors). A contract with nothing for it, or a read that fails,
+      // leaves those doors as plain walls: it never takes the hall down.
+      try { lobbyBays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.lobbyId)])).value.map(toBay); } catch (e) { lobbyBays = []; }
+      looks = await readLooks(bays.concat(lobbyBays));
+      versions = await readVersions();
+    }
     var pinned = {}; pins.forEach(function (p) { if (recs[p.poster]) pinned[p.poster] = recs[p.poster]; });
-    return {
+    var snap = {
       versions: versions, at: Date.now(),
       posters: live.map(function (id) { return recs[id]; }).filter(Boolean),
       pins: pins, pinned: pinned, suppressed: suppressed, bays: bays, rooms: { lobby: { bays: lobbyBays } }, looks: looks
     };
+    if (w2) { snap.src = CFG.registry; snap.v2 = w2.meta; }     // v1 snapshots stay exactly as they were
+    return snap;
   }
   // The looks the active scenes use (door look and every layer), in one or two reads. { id: { kind, name, tier, builtin, hidden, approved } }
   async function readLooks(bays) {
@@ -31520,7 +31548,9 @@ XARoom.boot(document.getElementById('xa-root'));
     try {
       var s = root.localStorage.getItem(CFG.snapKey);
       if (!s) return null;
-      return JSON.parse(s, function (k, v) { return v && typeof v === 'object' && typeof v.$hex === 'string' ? root.XAScores._codec.hexToBytes(v.$hex) : v; });
+      var snap = JSON.parse(s, function (k, v) { return v && typeof v === 'object' && typeof v.$hex === 'string' ? root.XAScores._codec.hexToBytes(v.$hex) : v; });
+      // a snapshot from the other bay source (v1 scenes vs the v2 registry, or another registry) is not shown while the reader catches up
+      return snap && (snap.src || '') === (mode() === 2 ? CFG.registry : '') ? snap : null;
     } catch (e) { return null; }
   }
 
@@ -31529,7 +31559,7 @@ XARoom.boot(document.getElementById('xa-root'));
   function emit(why) { state.listeners.forEach(function (fn) { try { fn(state.snap, why); } catch (e) {} }); }
   // One refresh: only reloads when either version counter moved. Returns { ok, changed }.
   async function refresh(force) {
-    if (!enabled() || state.busy) return { ok: false, changed: false, error: 'off' };
+    if (!enabled() || state.busy) return { ok: false, changed: false, error: enabled() ? 'busy' : 'off' };
     state.busy = true;
     try {
       var v = await readVersions();
@@ -31575,14 +31605,334 @@ XARoom.boot(document.getElementById('xa-root'));
   }
 
   root.XAWorld = {
-    configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled,
+    configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled, mode: mode,
     start: start, stop: stop, refresh: refresh, onHeight: onHeight, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
-    composeWall: composeWall, isActive: isActive, loadImageBytes: loadImageBytes,
+    composeWall: composeWall, pinSlotMap: pinSlotMap, isActive: isActive, loadImageBytes: loadImageBytes,
+    // read helpers for sibling modules (the centre screen reads its own contract through these)
+    read: callRead, plain: plain, hexList: hexList,
     // exposed for tests
     _t: { plain: plain, toPoster: toPoster, toBay: toBay, readLooks: readLooks, hexList: hexList, normalizePoster: normalizePoster, rng: rng, hash32: hash32,
       loadSnapshot: loadSnapshot, callRead: callRead, restore: restore, save: save, state: state }
   };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* world2.js */
+/*
+ * Xtrata Arcade: world reader for xtrata-world-v2 (leaf module, part of the hall pack)
+ *
+ * The first-generation world contract (xtrata-world-v1) stored a bay as one scene: a base, a door look and up to eight layers,
+ * all replaced together. The registry (xtrata-world-v2, "XWS v1") stores every sign, door, lamp, curtain and sound as its OWN object
+ * with its own timeline of states, so one sign can change while everything else stays put, and new objects can be added at any time.
+ *
+ * This module reads the hall's two spaces ("arcade/hall": the four wall bays, "arcade/lobby": the two doorways) and turns the
+ * objects into exactly the bay snapshot world.js (v1) produced, so the bay engine (bays.js) and the hall need no changes:
+ *
+ *   bays[i]  = { scene: { base, baseId, interaction, doorLook, layers[], link, fromHeight } | null, nextHeight, height } | null
+ *   looks    = { <kind id>: { kind: <engine slot>, name, tier, builtin, hidden, approved } }
+ *
+ * The exact object / state / params schema is in contracts/arcade-world/docs/HALL-V2-SCHEMA.md. In short:
+ *   bay-0..bay-3   objects of the built-in kind "bay" in the hall space (bay-0, bay-1 in the lobby space): their active state carries
+ *                  the base ({"base":"posters"|"wall"|"door"}), the visibility and the interaction; a portal gives scene.link.
+ *   children       objects whose parent is the bay: door-<style>, door-skin, curtain-house, sign-board, caution-tape, lamps, sounds.
+ *                  Each one's params are the object's own params merged with its active state's patch; hidden ones are left out.
+ *
+ * Safety rules (same as world.js):
+ *   - Off unless XA_WORLD_CONFIG.registry is set (world.js decides). Any failed read throws, and world.js keeps the last good
+ *     snapshot; with nothing cached the hall shows the posters, exactly as #3111.
+ *   - Nothing read is ever executed. Chain data is text and numbers, looked up in the bay engine's fixed tables. Malformed, oversized
+ *     or unknown objects are ignored; JSON is parsed in try/catch; only the built-in (tier 0) kinds are drawn.
+ *   - Bounded: at most 32 children per bay and 128 objects per space are read; 8 pages of get-objects at most.
+ *
+ * The host (world.js, or a test) passes everything this module needs, so it has no dependencies of its own:
+ *   host = { read(contractId, fn, argHexList) -> decoded Clarity value, plain(cv), hexList(hexItems), codec: { cvUint, cvAscii },
+ *            registry: 'SP….xtrata-world-v2', path: ['arcade','hall'], lobbyPath: ['arcade','lobby'] }
+ */
+(function (root) {
+  'use strict';
+  if (root.XAWorld2) return;
+
+  var LIMITS = { hallBays: 4, lobbyBays: 2, children: 32, objects: 128, pages: 8, kindsPerCall: 20, params: 512, patch: 256, keys: 16, text: 160, concurrency: 4 };
+
+  // The bay engine's slot for each built-in key (bays.js BUILTIN[key].kind; a test keeps the two tables equal).
+  // 0 door, 1 cover, 2 overlay, 3 sound, 4 light. Door looks are "door-<style>" (any style; the engine falls back to the classic door).
+  var SLOT = {
+    'curtain-house': 1, 'sign-board': 2, 'caution-tape': 2, 'door-skin': 2,
+    'work-site': 3, 'hum': 3, 'light-steady': 4, 'light-pulse': 4, 'light-flicker': 4
+  };
+  var BAY_KEY = 'bay', SKIN_KEY = 'door-skin', SKIN_LOOK = 'v2:door-skin';   // SKIN_LOOK: the look key of a skin given in a door's own params
+  var BASES = { posters: 0, wall: 1, door: 2 };
+  var BANNED = { '__proto__': 1, constructor: 1, prototype: 1 };
+
+  function hasOwn(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+  function num(v, d) { v = Number(v); return isFinite(v) ? v : d; }
+  function slotOf(builtin) {
+    if (typeof builtin !== 'string') return -1;
+    if (hasOwn(SLOT, builtin)) return SLOT[builtin];
+    return /^door-[a-z0-9]{2,16}$/.test(builtin) ? 0 : -1;
+  }
+
+  /* ------------------------------------------------------------ params (pure) */
+  // Chain text is parsed in try/catch and reduced to a flat object of short strings, numbers, booleans and short string lists.
+  function parseJson(s, max) {
+    if (typeof s !== 'string' || !s || s.length > max) return {};
+    try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
+  }
+  function clean(o) {
+    var out = {}, n = 0;
+    Object.keys(o).forEach(function (k) {
+      if (n >= LIMITS.keys || BANNED[k] || !/^[A-Za-z][A-Za-z0-9_-]{0,23}$/.test(k)) return;
+      var v = o[k];
+      if (typeof v === 'string') out[k] = v.replace(/[^\x20-\x7e]/g, '').slice(0, LIMITS.text);
+      else if (typeof v === 'number') { if (!isFinite(v)) return; out[k] = v; }
+      else if (typeof v === 'boolean') out[k] = v;
+      else if (Array.isArray(v)) out[k] = v.slice(0, 8).filter(function (x) { return typeof x === 'string'; }).map(function (x) { return x.replace(/[^\x20-\x7e]/g, '').slice(0, 24); });
+      else return;
+      n++;
+    });
+    return out;
+  }
+  // The object's own params, then its active state's patch on top (a patch key replaces the same key; a null removes it).
+  function mergeParams(objParams, patch) {
+    var a = clean(parseJson(objParams, LIMITS.params)), raw = parseJson(patch, LIMITS.patch), b = clean(raw);
+    Object.keys(raw).forEach(function (k) { if (raw[k] === null && hasOwn(a, k)) delete a[k]; });
+    Object.keys(b).forEach(function (k) { a[k] = b[k]; });
+    return a;
+  }
+  // The engine's parseParams takes a string of at most 256 characters; a longer merge goes as an object (bays.js accepts both).
+  function forEngine(p) { var s = JSON.stringify(p); return s.length <= 256 ? s : p; }
+
+  /* ------------------------------------------------------------ assembling (pure) */
+  function minOf(a, b) { return a == null ? b : (b == null ? a : Math.min(a, b)); }
+
+  function linkOf(portal, slugOf) {
+    if (!portal) return null;
+    var to = num(portal['to-space'], 0);
+    if (to > 0) {
+      var slug = slugOf(to);
+      return slug ? { 'target-room': slug, 'arrival-bay': 0, path: '' } : null;
+    }
+    var p = String(portal.path || '');
+    return /^\/[A-Za-z0-9._~\-][A-Za-z0-9._~\-\/?=&%#]*$/.test(p) && p.length <= 64 ? { 'target-room': '', 'arrival-bay': 0, path: p } : null;
+  }
+  function looksOfKind(id, k) {
+    return { kind: slotOf(k.builtin), name: String(k.name || ''), tier: k.tier, builtin: k.builtin, hidden: !!k.hidden, approved: !!k.approved };
+  }
+  // Is this kind one the hall draws? Built-in (tier 0), approved, not hidden, a key the engine has.
+  function kindUsable(k, want) {
+    if (!k || k.tier !== 0 || !k.approved || k.hidden || typeof k.builtin !== 'string') return false;
+    return want === BAY_KEY ? k.builtin === BAY_KEY : slotOf(k.builtin) >= 0;
+  }
+
+  /*
+   * One bay. sel = { id, children: [{ id, kind }] } (children in id order), views = { id: get-object-view result }, kinds = { id: kind }.
+   * Returns the bay as the engine reads it, or null when the bay's own view is missing.
+   */
+  function assembleBay(sel, views, kinds, slugOf) {
+    var bv = views[sel.id];
+    if (!bv || !bv.object) return null;
+    var next = bv['next-height'] == null ? null : bv['next-height'], height = bv.height == null ? null : bv.height;
+    var kids = [];
+    sel.children.forEach(function (c) {
+      var v = views[c.id];
+      if (!v || !v.object || v.object.state !== 0) return;
+      next = minOf(next, v['next-height'] == null ? null : v['next-height']);
+      kids.push({ id: c.id, kind: c.kind, v: v });
+    });
+    var a = bv.active;
+    if (!a || a.retracted || a.visibility !== 0) return { scene: null, nextHeight: next, height: height };
+
+    var bp = mergeParams(bv.object.params, a.patch);
+    var base = hasOwn(BASES, bp.base) ? bp.base : 'posters';
+    var link = linkOf(bv.object.portal, slugOf);
+    var interaction = Math.max(0, Math.min(3, num(a.interaction, 0) | 0));
+    if (interaction === 3 && !link) interaction = base === 'door' ? 1 : 0;       // "enter" needs a door that leads somewhere
+
+    var doorKid = null, layers = [], looks = {};
+    kids.forEach(function (c) {
+      var k = kinds[c.kind], p, hidden = c.v.active && c.v.active.visibility === 1;
+      if (hidden || !kindUsable(k)) return;
+      var slot = slotOf(k.builtin);
+      p = mergeParams(c.v.object.params, c.v.active ? c.v.active.patch : '');
+      var state = typeof p.state === 'string' ? p.state.slice(0, 24) : '';
+      delete p.state;
+      if (slot === 0) { doorKid = { id: c.id, kind: c.kind, p: p }; return; }              // the newest visible door wins
+      layers.push({ slot: slot, look: c.kind, params: forEngine(p), state: state, obj: c.id });
+    });
+    var doorLook = null;
+    if (base === 'door' && doorKid) {
+      doorLook = doorKid.kind;
+      // a door's own skin keys (skin, frame, hardware, tint, wear) are a door-skin layer in front of any skin objects
+      if (typeof doorKid.p.skin === 'string' && doorKid.p.skin) {
+        var sp = {}; ['skin', 'frame', 'hardware', 'tint', 'wear'].forEach(function (key) { if (hasOwn(doorKid.p, key)) sp[key] = doorKid.p[key]; });
+        layers.unshift({ slot: 2, look: SKIN_LOOK, params: forEngine(sp), state: '', obj: doorKid.id });
+      }
+    }
+    return {
+      scene: { base: base, baseId: BASES[base], interaction: interaction, doorLook: doorLook, layers: layers, link: link,
+        fromHeight: num(a['from-height'], 0), params: bp },
+      nextHeight: next, height: height
+    };
+  }
+
+  // Choose the bays and their children from a room's object list. items = [{ id, o }] sorted by id.
+  function selectBays(items, kinds, expected) {
+    var tops = {}, kids = {};
+    items.forEach(function (it) {
+      var o = it.o, m;
+      if (o.parent === 0) {
+        m = /^bay-([0-9])$/.exec(String(o.name));
+        if (m && Number(m[1]) < expected && kindUsable(kinds[o.kind], BAY_KEY) && !tops[m[1]]) tops[m[1]] = { id: it.id, children: [] };
+      } else (kids[o.parent] = kids[o.parent] || []).push({ id: it.id, kind: o.kind });
+    });
+    var out = [];
+    for (var i = 0; i < expected; i++) {
+      var t = tops[i];
+      if (t) t.children = (kids[t.id] || []).filter(function (c) { return kindUsable(kinds[c.kind]); }).slice(0, LIMITS.children);
+      out.push(t || null);
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------ reading */
+  async function pmap(items, limit, fn) {
+    var out = new Array(items.length), next = 0;
+    async function worker() { while (next < items.length) { var i = next++; out[i] = await fn(items[i], i); } }
+    var ws = []; for (var w = 0; w < Math.min(limit, items.length); w++) ws.push(worker());
+    await Promise.all(ws);
+    return out;
+  }
+  function validPath(p) {
+    return Array.isArray(p) && p.length >= 1 && p.length <= 6 && p.every(function (s) { return typeof s === 'string' && /^[a-z0-9-]{1,24}$/.test(s); });
+  }
+  function paths(host) {
+    var hall = host.path || ['arcade', 'hall'];
+    var lobby = host.lobbyPath || (Array.isArray(hall) && hall.length ? hall.slice(0, -1).concat('lobby') : ['arcade', 'lobby']);
+    return { hall: hall, lobby: lobby };
+  }
+  function rd(host, fn, args) { return host.read(host.registry, fn, args || []); }
+  async function rp(host, fn, args) { return host.plain(await rd(host, fn, args)); }
+  var U = function (host, n) { return host.codec.cvUint(n); };
+
+  async function resolvePath(host, slugs) {
+    if (!validPath(slugs)) return null;
+    var id = await rp(host, 'resolve-path', [host.hexList(slugs.map(function (s) { return host.codec.cvAscii(s); }))]);
+    return typeof id === 'number' && id > 1 ? id : null;     // the world root (1) is never a room
+  }
+  async function getSpace(host, id) { return id ? await rp(host, 'get-space', [U(host, id)]) : null; }
+  function spaceSig(sp) { return sp ? [sp.version, sp.state, sp['object-slots'], sp.objects].join('.') : 'x'; }
+  function roomOpen(sp) { return !!sp && (sp.state === 0 || sp.state === 1); }
+
+  async function spaces(host) {
+    var P = paths(host);
+    var ids = await Promise.all([resolvePath(host, P.hall), resolvePath(host, P.lobby)]);
+    var sps = await Promise.all([getSpace(host, ids[0]), getSpace(host, ids[1])]);
+    return { hallId: ids[0], lobbyId: ids[1], hall: sps[0], lobby: sps[1], sig: spaceSig(sps[0]) + '/' + spaceSig(sps[1]) + '@' + ids[0] + ',' + ids[1] };
+  }
+  async function listObjects(host, id, sp) {
+    if (!id || !roomOpen(sp)) return [];
+    var slots = Math.min(num(sp['object-slots'], 0), LIMITS.pages * 16), pages = [];
+    for (var p = 0; p * 16 < slots; p++) pages.push(p);
+    var rows = await pmap(pages, LIMITS.concurrency, function (pg) { return rp(host, 'get-objects', [U(host, id), U(host, pg)]); });
+    var seen = {}, out = [];
+    rows.forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (r) {
+        var o = r && r.object;
+        if (!o || typeof r.id !== 'number' || seen[r.id] || o.space !== id || o.state !== 0) return;
+        seen[r.id] = true; out.push({ id: r.id, o: o });
+      });
+    });
+    out.sort(function (a, b) { return a.id - b.id; });
+    return out.slice(0, LIMITS.objects);
+  }
+  async function readKinds(host, ids) {
+    var out = {};
+    var chunks = [];
+    for (var i = 0; i < ids.length; i += LIMITS.kindsPerCall) chunks.push(ids.slice(i, i + LIMITS.kindsPerCall));
+    var rows = await pmap(chunks, LIMITS.concurrency, function (chunk) { return rp(host, 'get-kinds', [host.hexList(chunk.map(function (id) { return U(host, id); }))]); });
+    chunks.forEach(function (chunk, c) {
+      (rows[c] || []).forEach(function (k, j) { if (k && typeof k === 'object') out[chunk[j]] = k; });
+    });
+    return out;
+  }
+  function kindFingerprint(ids, kinds) {
+    return ids.map(function (id) { var k = kinds[id]; return id + ':' + (k ? (k.hidden ? 1 : 0) + '' + (k.approved ? 1 : 0) + k.tier : 'x'); }).join(',');
+  }
+
+  var S = { registry: '', kindIds: [], probeGlobal: null, probeSig: null };
+  function forget() { S = { registry: '', kindIds: [], probeGlobal: null, probeSig: null }; }
+  function own(host) { if (S.registry !== host.registry) { forget(); S.registry = host.registry; } }
+
+  /*
+   * Cheap change detector. Returns a string that changes when something the hall draws may have changed.
+   * One read (get-version) while the registry has not changed at all; when it has (any write anywhere in the world), a few more reads
+   * check just the hall and lobby spaces and the kinds in use, so unrelated activity elsewhere does not cause a full re-read.
+   */
+  async function probe(host) {
+    own(host);
+    var g = num(await rp(host, 'get-version', []), -1);
+    if (S.probeSig !== null && S.probeGlobal === g) return S.probeSig;
+    var sp = await spaces(host);
+    var kinds = S.kindIds.length ? await readKinds(host, S.kindIds) : {};
+    var sig = sp.sig + '|' + kindFingerprint(S.kindIds, kinds);
+    S.probeGlobal = g; S.probeSig = sig;
+    return sig;
+  }
+
+  /*
+   * Read the hall and the lobby. Throws when a needed read fails (the caller keeps its last good snapshot).
+   * Returns { bays: [4], lobbyBays: [2], looks, sig, meta }.  An absent or unusable room gives all-null bays: posters.
+   */
+  async function load(host) {
+    own(host);
+    var g = num(await rp(host, 'get-version', []), -1);          // read first: a write during the load shows up at the next probe
+    var sp = await spaces(host);
+    var rooms = await Promise.all([listObjects(host, sp.hallId, sp.hall), listObjects(host, sp.lobbyId, sp.lobby)]);
+
+    // kinds of every bay candidate and child, read once
+    var kindIds = [];
+    rooms.forEach(function (items) { items.forEach(function (it) { if (kindIds.indexOf(it.o.kind) < 0) kindIds.push(it.o.kind); }); });
+    kindIds.sort(function (a, b) { return a - b; });
+    var kinds = await readKinds(host, kindIds.slice(0, 80));
+
+    var selHall = selectBays(rooms[0], kinds, LIMITS.hallBays), selLobby = selectBays(rooms[1], kinds, LIMITS.lobbyBays);
+    var wanted = [];
+    selHall.concat(selLobby).forEach(function (s) { if (s) { wanted.push(s.id); s.children.forEach(function (c) { wanted.push(c.id); }); } });
+    var views = {};
+    await pmap(wanted, LIMITS.concurrency, async function (id) { var v = await rp(host, 'get-object-view', [U(host, id)]); if (v) views[id] = v; });
+
+    // portal targets: the slug of each destination space (the hall sends 'lobby' to its own lobby, anything else to a room it knows)
+    var slugs = {}, want = [];
+    Object.keys(views).forEach(function (id) {
+      var p = views[id].object && views[id].object.portal, to = p && num(p['to-space'], 0);
+      if (to > 0 && want.indexOf(to) < 0) want.push(to);
+    });
+    await pmap(want, LIMITS.concurrency, async function (to) { var s = await getSpace(host, to); if (s && typeof s.slug === 'string' && /^[a-z0-9-]{1,24}$/.test(s.slug)) slugs[to] = s.slug; });
+    var slugOf = function (to) { return slugs[to] || ''; };
+
+    var bays = selHall.map(function (s) { return s ? assembleBay(s, views, kinds, slugOf) : null; });
+    var lobbyBays = selLobby.map(function (s) { return s ? assembleBay(s, views, kinds, slugOf) : null; });
+
+    // the looks table the engine reads: every kind a drawn object uses
+    var looks = {};
+    kindIds.forEach(function (id) { var k = kinds[id]; if (k && k.tier === 0 && slotOf(k.builtin) >= 0) looks[id] = looksOfKind(id, k); });
+    looks[SKIN_LOOK] = { kind: SLOT[SKIN_KEY], name: 'Door skin', tier: 0, builtin: SKIN_KEY, hidden: false, approved: true };
+
+    var sig = sp.sig + '|' + kindFingerprint(kindIds, kinds);
+    S.kindIds = kindIds; S.probeGlobal = g; S.probeSig = sig;
+    return {
+      bays: bays, lobbyBays: lobbyBays, looks: looks, sig: sig,
+      meta: { hall: sp.hallId, lobby: sp.lobbyId, objects: rooms[0].length + rooms[1].length, kinds: kindIds.length, global: g }
+    };
+  }
+
+  root.XAWorld2 = {
+    load: load, probe: probe, forget: forget,
+    LIMITS: LIMITS, SLOT: SLOT,
+    _t: { assembleBay: assembleBay, selectBays: selectBays, mergeParams: mergeParams, clean: clean, parseJson: parseJson, linkOf: linkOf,
+      slotOf: slotOf, kindUsable: kindUsable, spaceSig: spaceSig, kindFingerprint: kindFingerprint, SKIN_LOOK: SKIN_LOOK }
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = root.XAWorld2;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>/* curtain.js */
@@ -32991,11 +33341,49 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         way.material.map = portalParts.plain; way.material.needsUpdate = true; group.remove(portalParts.near, portalParts.far, portalParts.reveal);
       }
     }
+    /* a window onto the room behind the door: the room's "entry still" (a picture of what you see the moment you walk in) shown in the open doorway.
+       Interior mapping: for every pixel of the opening, a ray from your eye through it is carried on to a flat picture standing WIN.dist behind the doorway, so the
+       picture slides as you move (the right parallax for a picture that far away) and only what the opening lets you see is drawn. The picture is sized and aimed so
+       that from the doorway, where the room takes over, it is exactly the room's own first view (WIN mirrors the casino's startAtDoor: eye 1.6 m, pitch -0.08, fov 68).
+       The picture is drawn as it is (it is already a finished screen shot, so no tone mapping, no second colour conversion). */
+    var WIN = { dist: 6.5, camZ: 0.45, eye: 1.6, pitch: -0.08, fov: 68 }, win = null, winUrl = '';
+    function windowTo(url) {
+      url = url || ''; if (url === winUrl) return; winUrl = url;
+      if (win) { group.remove(win.mesh); win.mat.dispose(); if (win.map) win.map.dispose(); win = null; }
+      if (!url) return;
+      var maskTex = canvasTex(W + 2 * pad, H + 2 * pad, function (x) { x.translate(pad, pad); x.fillStyle = '#fff'; x.fill(new Path2D(G.shape.d)); });
+      var cp = Math.cos(WIN.pitch), sp = Math.sin(WIN.pitch), reach = (WIN.dist + WIN.camZ) / cp, half = Math.tan(WIN.fov * Math.PI / 360) * reach, mine = { url: url, map: null, mesh: null, mat: null, ready: false };
+      group.updateWorldMatrix(true, false);   // the door's own space starts a few cm above the floor: the eye is measured from the floor
+      var dir = new T.Vector3(0, sp, -cp), cam0 = new T.Vector3(0, WIN.eye - group.matrixWorld.elements[13], WIN.camZ), p0 = cam0.clone().addScaledVector(dir, reach);
+      var mat = new T.ShaderMaterial({
+        uniforms: { uMap: { value: null }, uMask: { value: maskTex }, uCam: { value: new T.Vector3(0, 1.6, 3) }, uP0: { value: p0 }, uN: { value: dir }, uUp: { value: new T.Vector3(0, cp, sp) },
+          uHalf: { value: new T.Vector2(half * 2.3, half) }, uPos: { value: new T.Vector3(0, 0, 0.008) } },
+        vertexShader: 'varying vec2 vUv; varying vec3 vL; uniform vec3 uPos; void main(){ vUv = uv; vL = position + uPos; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform sampler2D uMap; uniform sampler2D uMask; uniform vec3 uCam; uniform vec3 uP0; uniform vec3 uN; uniform vec3 uUp; uniform vec2 uHalf; varying vec2 vUv; varying vec3 vL;\n' +
+          'void main(){ if (texture2D(uMask, vUv).a < 0.5) discard; vec3 d = vL - uCam; float dn = dot(d, uN); if (dn <= 0.0001) discard; float t = dot(uP0 - uCam, uN) / dn; if (t <= 0.0) discard;\n' +
+          ' vec3 q = uCam + d * t - uP0; vec2 uv = vec2(0.5 + q.x / (2.0 * uHalf.x), 0.5 + dot(q, uUp) / (2.0 * uHalf.y));\n' +
+          ' if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.02, 0.015, 0.03, 1.0); return; } gl_FragColor = vec4(texture2D(uMap, uv).rgb, 1.0); }',
+        side: T.FrontSide
+      });
+      var mesh = new T.Mesh(wayGeo, mat); mesh.position.set(way.position.x, way.position.y, 0.008); mat.uniforms.uPos.value.set(way.position.x, way.position.y, 0.008);
+      mesh.raycast = function () {}; mesh.visible = false; mesh.frustumCulled = false; group.add(mesh);
+      mine.mesh = mesh; mine.mat = mat; win = mine;
+      new T.TextureLoader().load(url, function (t) {
+        if (win !== mine) { t.dispose(); return; }
+        t.anisotropy = 4; mine.map = t; mat.uniforms.uMap.value = t; mat.uniforms.uHalf.value.x = half * (t.image.width / t.image.height); mine.ready = true;
+      }, undefined, function () { /* no picture: the doorway stays the dark recess */ });
+    }
+    // each frame: where the viewer's eye is in the door's own space, and whether the door is open enough to look through
+    function windowInfo() { return win ? { url: win.url, ready: win.ready, visible: win.mesh.visible, cam: win.mat.uniforms.uCam.value.toArray() } : null; }
+    function windowView(cam, open) {
+      if (!win) return; var show = !!open && win.ready; if (win.mesh.visible !== show) win.mesh.visible = show;
+      if (show) win.mat.uniforms.uCam.value.copy(cam);
+    }
     sync();
     function handle() {   // where the first leaf's handle is in the world, and which kind it is (for tests and previews)
       var h = leafObjs[0].hands[0], v = new T.Vector3(); group.updateMatrixWorld(true); h.g.getWorldPosition(v); return { x: v.x, y: v.y, z: v.z, type: h.type || 'canvas', turn: h.lever.rotation.z, porcelain: !!h.porcelain };
     }
-    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, latch: latch, handle: handle, scale: s, size: { w: W * s, h: H * s }, layout: G };
+    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, window: windowTo, windowView: windowView, windowInfo: windowInfo, WIN: WIN, latch: latch, handle: handle, scale: s, size: { w: W * s, h: H * s }, layout: G };
   }
 
   // Sutherland-Hodgman: the part of a convex polygon between two vertical lines
@@ -33721,6 +34109,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   var MAX_OVERLAYS = 4;
 
   function parseParams(s) {
+    if (s && typeof s === 'object' && !Array.isArray(s)) return s;            // the v2 reader hands over a merged object when it is longer than 256 characters
     if (typeof s !== 'string' || !s || s.length > 256) return {};
     try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
   }
@@ -33909,7 +34298,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
    * }
    */
   function create(env) {
-    var T = env.THREE, scene = env.scene, audio = createAudio();
+    var T = env.THREE, scene = env.scene, audio = createAudio(), winEye = new T.Vector3();
     WHITE = new T.Color(0xffffff);
     var DOORS = root.XADoors || null, SKINS = root.XADoorSkins || null;
     var doorSfx = DOORS ? DOORS.createSfx(function () { return audio.env(); }, function () { return env.listener(); }) : null;
@@ -34143,6 +34532,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
         var dm = bay.door && bay.door.model;
         if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
+        if (dm && bay.door.mesh.window && bay.group.visible) {   // a door to a room that has an entry still: the open doorway shows it (doors.js, windowTo)
+          var dl = bay.plan && bay.plan.link, rs = dl ? String(dl['target-room'] || dl.targetRoom || dl.room || '').toLowerCase() : '', st = rs && rs !== 'lobby' && env.stillFor ? env.stillFor(rs) : '';
+          if ((st || '') !== (bay.door.stillUrl || '')) { bay.door.stillUrl = st || ''; bay.door.mesh.window(st || ''); }
+          if (st) { bay.door.mesh.group.worldToLocal(winEye.copy(env.camera.position)); bay.door.mesh.windowView(winEye, dm.angle > 2); }
+        }
         if (dm && dm.awake) { dm.update(dt); bay.door.mesh.sync(); if (dm.settled()) { dm.awake = false; bay.door.mesh.sync(); } }
         var ls = bay.lightSpec;
         if (ls) {
@@ -34281,7 +34675,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       // state for tests and the preview
       debug: function () {
         return bays.map(function (b) {
-          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, portal: !!b.portalOn, doorSkin: b.door ? (b.door.skin || '') : null, latch: b.door && b.door.mesh && b.door.mesh.latch ? b.door.mesh.latch() : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
+          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, portal: !!b.portalOn, window: b.door && b.door.mesh && b.door.mesh.windowInfo ? b.door.mesh.windowInfo() : null, doorSkin: b.door ? (b.door.skin || '') : null, latch: b.door && b.door.mesh && b.door.mesh.latch ? b.door.mesh.latch() : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
             curtain: b.curtain ? { margin: b.curtain.mg, planeW: b.curtain.mesh.geometry.parameters.width, bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
             light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity, fixture: b.fixture.visible } : null };
         });
@@ -34292,6 +34686,321 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   var API = { DOOR_STYLES: DOOR_STYLES, planBay: planBay, planKey: planKey, curtainGrabbable: curtainGrabbable, BUILTIN: BUILTIN, TONES: TONES, create: create, createAudio: createAudio, _num: num };
   root.XABays = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* screen.js */
+/*
+ * Xtrata Arcade: centre screen (leaf module, part of the hall pack)
+ *
+ * The big screen in the middle of the hall. It shows, on one 16:9 canvas:
+ *   - the Bitcoin Day clock along the top (what the old day board showed, kept intact)
+ *   - LATEST SCORERS on the left (fed by the hall's own score boards, no extra reads)
+ *   - a rotating FEATURE panel on the right (news, ads and messages from xtrata-screen-v1)
+ *   - a scrolling TICKER along the bottom (short messages and news headlines)
+ *
+ * Reads one contract: xtrata-screen-v1 (get-version, get-live, get-items). Everything it reads is
+ * text and numbers; a picture is fetched through XAWorld.loadImageBytes, which checks it against
+ * its chain hash before it is used. Nothing it reads is ever executed.
+ *
+ * Safety rules (same as world.js, see xtrata-world-standard.md):
+ *   - Off by default. With no contract configured, or any read failing, the screen is the Bitcoin Day
+ *     clock plus latest scorers, exactly what the hall shows without a contract.
+ *   - A read that FAILED keeps the last good snapshot. It is never shown as "no news".
+ *   - Expiry is decided here from the chain height, because the contract only prunes on writes.
+ *
+ * Depends on XAWorld (world.js) for the Clarity read helper. Config: XA_WORLD_CONFIG.screen or
+ * XAScreen.configure({ contract }). Tests load it in a vm with a fake window, like world.js.
+ */
+(function (root) {
+  'use strict';
+  if (root.XAScreen) return;
+
+  var CFG = {
+    contract: '',                // 'SP….xtrata-screen-v1'  (empty = off)
+    pollMs: 180000,              // how often to check the version counter
+    rotateSecs: 12,              // one feature item at a time
+    tickerPxPerSec: 80,
+    maxLive: 32,                 // the contract's live-set bound
+    snapKey: 'xa-screen-snap-v1'
+  };
+  var KINDS = { 0: 'MESSAGE', 1: 'NEWS', 2: 'AD' };
+  var KIND_COLOUR = { 0: '#8fd3ff', 1: '#ffc53d', 2: '#ff6bd5' };
+  var ORANGE = '#f7931a';
+
+  function configure(patch) {
+    Object.keys(patch || {}).forEach(function (k) { if (k in CFG) CFG[k] = patch[k]; });
+  }
+  function enabled() { return !!(CFG.contract && root.XAWorld && root.XAWorld.read); }
+
+  /* ------------------------------------------------------------ pure helpers */
+  function normalizeItem(id, t) {
+    t = t || {};
+    var kind = Number(t.kind);
+    return {
+      id: Number(id), kind: kind in KINDS ? kind : 0,
+      head: String(t.head || '').slice(0, 80), body: String(t.body || '').slice(0, 240),
+      imageId: Number(t['image-id'] || 0), imageHash: t['image-hash'] || null, imageSize: Number(t['image-size'] || 0),
+      weight: Math.max(1, Math.min(10, Number(t.weight) || 1)),
+      paid: !!t.paid, status: Number(t.status), hidden: !!t.hidden,
+      startsAt: Number(t['starts-at'] || 0), endsAt: Number(t['ends-at'] || 0)
+    };
+  }
+  // The contract only prunes the live list when somebody writes, so an item can still be listed after it ended.
+  function isActive(it, height) {
+    if (!it || it.status !== 1 || it.hidden) return false;
+    var h = Number(height);
+    if (!isFinite(h) || h <= 0) return true;                // height unknown: trust the contract's own list
+    return h >= it.startsAt && h < it.endsAt;
+  }
+  function activeItems(items, height) { return (items || []).filter(function (it) { return isActive(it, height); }); }
+  function hasPicture(it) { return !!(it && it.imageSize > 0 && it.imageHash && it.imageId > 0); }
+
+  // Which feature item is up at time t (seconds). Weighted by `weight`, one slot per rotateSecs, the order is a
+  // fixed shuffle of the live ids so two people in the hall see the same item at the same moment.
+  function featureAt(items, t, secs) {
+    var list = (items || []).filter(function (it) { return it.kind !== 0 || it.body || it.head; });
+    if (!list.length) return null;
+    // weight w = the item appears in the first w layers of the round-robin, so heavier items come round more often
+    var layers = [], max = 0; list.forEach(function (it) { if (it.weight > max) max = it.weight; });
+    for (var w = 1; w <= max; w++) layers.push(list.filter(function (it) { return it.weight >= w; }).sort(function (a, b) { return a.id - b.id; }));
+    var order = []; layers.forEach(function (l) { order = order.concat(l); });
+    var n = order.length, k = Math.floor(Math.max(0, t) / Math.max(2, secs || CFG.rotateSecs));
+    return order[((k % n) + n) % n];
+  }
+  function wrapText(measure, text, maxW, maxLines) {
+    var words = String(text || '').split(/\s+/).filter(Boolean), lines = [], cur = '';
+    for (var i = 0; i < words.length; i++) {
+      var tryLine = cur ? cur + ' ' + words[i] : words[i];
+      if (measure(tryLine) <= maxW || !cur) { cur = tryLine; }
+      else { lines.push(cur); cur = words[i]; if (lines.length >= maxLines) break; }
+    }
+    if (cur && lines.length < maxLines) lines.push(cur);
+    if (words.length && lines.length === maxLines) {
+      var used = lines.join(' ').split(/\s+/).length;
+      if (used < words.length) {
+        // cut at a word boundary: drop whole words until the ellipsis fits; only a lone long word is cut by character
+        var last = lines[maxLines - 1];
+        while (measure(last + '…') > maxW && last.indexOf(' ') > 0) last = last.slice(0, last.lastIndexOf(' '));
+        while (last.length > 1 && measure(last + '…') > maxW) last = last.slice(0, -1);
+        lines[maxLines - 1] = last.replace(/[ ,.;:]+$/, '') + '…';
+      }
+    }
+    return lines;
+  }
+  // Ticker text: short messages and news headlines, in a stable order.
+  function tickerText(items) {
+    var parts = (items || []).filter(function (it) { return it.kind === 0 || it.kind === 1; })
+      .sort(function (a, b) { return a.id - b.id; })
+      .map(function (it) { return (it.kind === 1 ? it.head : (it.head || it.body)).toUpperCase(); }).filter(Boolean);
+    return parts.join('   ◆   ');
+  }
+  function ago(blocks) {
+    var m = Math.max(0, Number(blocks) || 0) * 10;
+    if (m < 60) return Math.max(1, Math.round(m)) + 'M';
+    if (m < 1440) return Math.round(m / 60) + 'H';
+    return Math.round(m / 1440) + 'D';
+  }
+
+  /* ------------------------------------------------------------ the reader */
+  var state = { snap: null, version: null, timer: null, busy: false, listeners: [], pics: {} };
+  function emit(why) { state.listeners.forEach(function (fn) { try { fn(state.snap, why); } catch (e) {} }); }
+
+  async function load() {
+    var W = root.XAWorld, C = root.XAScores._codec;
+    var ver = W.plain(await W.read(CFG.contract, 'get-version', []));
+    var ids = (W.plain(await W.read(CFG.contract, 'get-live', [])) || []).slice(0, CFG.maxLive);
+    var items = [];
+    for (var i = 0; i < ids.length; i += 10) {
+      var chunk = ids.slice(i, i + 10);
+      var cv = await W.read(CFG.contract, 'get-items', [W.hexList(chunk.map(function (id) { return C.cvUint(id); }))]);
+      cv.value.forEach(function (row, k) {
+        var t = row.type === 'some' ? W.plain(row) : null;
+        if (t) items.push(normalizeItem(chunk[k], t));
+      });
+    }
+    var height = null;
+    try { height = Number(W.plain(await W.read(CFG.contract, 'get-height', []))) || null; } catch (e) { height = null; }
+    return { version: ver, at: Date.now(), height: height, items: items };
+  }
+  // One refresh. Returns { ok, changed }. A failure keeps the last good snapshot.
+  async function refresh(force) {
+    if (!enabled() || state.busy) return { ok: false, changed: false, error: enabled() ? 'busy' : 'off' };
+    state.busy = true;
+    try {
+      var W = root.XAWorld;
+      var v = W.plain(await W.read(CFG.contract, 'get-version', []));
+      if (!force && state.version != null && state.version === v) return { ok: true, changed: false };
+      var snap = await load();
+      state.snap = snap; state.version = snap.version; save(snap); emit('chain');
+      return { ok: true, changed: true };
+    } catch (e) {
+      return { ok: false, changed: false, error: (e && e.message) || String(e) };
+    } finally { state.busy = false; }
+  }
+  function save(snap) {
+    try {
+      root.localStorage.setItem(CFG.snapKey, JSON.stringify(snap, function (k, v) {
+        return v instanceof Uint8Array ? { $hex: root.XAScores._codec.bytesToHex(v) } : v;
+      }));
+    } catch (e) {}
+  }
+  function restore() {
+    try {
+      var s = root.localStorage.getItem(CFG.snapKey);
+      if (!s) return null;
+      return JSON.parse(s, function (k, v) { return v && typeof v === 'object' && typeof v.$hex === 'string' ? root.XAScores._codec.hexToBytes(v.$hex) : v; });
+    } catch (e) { return null; }
+  }
+  function start(fn) {
+    try { if (root.XA_WORLD_CONFIG && root.XA_WORLD_CONFIG.screen) configure({ contract: root.XA_WORLD_CONFIG.screen }); } catch (e) {}
+    if (fn) state.listeners.push(fn);
+    if (!enabled()) return false;
+    var old = restore();
+    if (old && !state.snap) { state.snap = old; emit('cache'); }
+    refresh(true);
+    if (!state.timer) state.timer = setInterval(function () { refresh(false); }, Math.max(30000, Number(CFG.pollMs) || 180000));
+    return true;
+  }
+  function stop() { if (state.timer) clearInterval(state.timer); state.timer = null; }
+
+  // A feature picture, decoded once. Returns the drawable when ready, else null (and starts loading it).
+  function pictureFor(it) {
+    if (!hasPicture(it) || !root.XAWorld || !root.XAWorld.loadImageBytes || typeof Image === 'undefined') return null;
+    var rec = state.pics[it.id];
+    if (rec) return rec.img || null;
+    rec = state.pics[it.id] = { img: null, failed: false };
+    root.XAWorld.loadImageBytes({ imageId: it.imageId, imageHash: it.imageHash }).then(function (bytes) {
+      var blob = new Blob([bytes]), url = URL.createObjectURL(blob), img = new Image();
+      img.onload = function () { rec.img = img; emit('picture'); };
+      img.onerror = function () { rec.failed = true; };
+      img.src = url;
+    }).catch(function () { rec.failed = true; });
+    return null;
+  }
+
+  /* ------------------------------------------------------------ the painter */
+  // Draws one frame. `d` = { height, day, blocksPerDay, live, items, scorers:[{game,name,score,age,colour}], t }.
+  // `ctx` is a 2D context sized W x H (16:9). Pure apart from picture loading, so it runs with a fake context in Node.
+  function paint(ctx, W, H, d) {
+    var x = ctx, bpd = d.blocksPerDay || 144, h = d.height || 0, done = h % bpd, left = bpd - done;
+    var u = H / 720;
+    x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1;
+    x.fillStyle = '#050408'; x.fillRect(0, 0, W, H);
+    x.textBaseline = 'alphabetic'; x.textAlign = 'left'; x.shadowBlur = 0;
+
+    // --- header: Bitcoin Day clock
+    x.font = Math.round(34 * u) + 'px Bungee, Impact, sans-serif'; x.fillStyle = ORANGE; x.shadowColor = ORANGE; x.shadowBlur = 12;
+    x.fillText('BITCOIN DAY', 28 * u, 52 * u);
+    var lw0 = x.measureText('BITCOIN DAY').width;
+    x.font = Math.round(78 * u) + 'px VT323, monospace'; x.fillStyle = '#ffc53d'; x.shadowColor = '#ffb000'; x.shadowBlur = 22;
+    x.fillText(String(d.day), 28 * u + lw0 + 20 * u, 62 * u);
+    x.shadowBlur = 0; x.textAlign = 'right'; x.font = Math.round(32 * u) + 'px VT323, monospace';
+    var approx = d.live ? '' : '≈';
+    x.fillStyle = '#eef2ff'; x.fillText('BLOCK ' + approx + h.toLocaleString('en-US'), W - 28 * u, 36 * u);
+    x.fillStyle = '#8fd3ff'; x.fillText(approx + 'NEXT DAY IN ' + left + ' BLOCK' + (left === 1 ? '' : 'S'), W - 28 * u, 66 * u);
+    var segW = (W - 56 * u) / bpd;
+    for (var i = 0; i < bpd; i++) { x.fillStyle = i < done ? ORANGE : i === done ? '#ffffff' : '#1d1a24'; x.fillRect(28 * u + i * segW, 80 * u, Math.max(1, segW - 1), 10 * u); }
+
+    // --- left: latest scorers
+    var lx = 28 * u, lw = 400 * u, top = 112 * u, bottom = H - 120 * u;
+    x.textAlign = 'left'; x.font = Math.round(28 * u) + 'px Bungee, Impact, sans-serif'; x.fillStyle = '#3be4ff'; x.shadowColor = '#3be4ff'; x.shadowBlur = 8;
+    x.fillText('LATEST SCORERS', lx, top + 24 * u); x.shadowBlur = 0;
+    x.fillStyle = '#3be4ff'; x.fillRect(lx, top + 36 * u, lw, 2 * u);
+    var rows = (d.scorers || []).slice(0, 8), rh = (bottom - (top + 48 * u)) / 8;
+    x.font = Math.round(26 * u) + 'px VT323, monospace';
+    if (!rows.length) {
+      x.fillStyle = '#6f6a8f'; x.fillText('NO SCORES YET TODAY', lx, top + 48 * u + rh);
+    }
+    rows.forEach(function (r, k) {
+      var y = top + 48 * u + rh * k + rh * .72;
+      x.textAlign = 'left'; x.fillStyle = r.colour || '#3be4ff'; x.fillText(String(r.game).toUpperCase().slice(0, 13), lx, y);
+      x.fillStyle = '#ffffff'; x.fillText(String(r.name).slice(0, 10), lx + 172 * u, y);
+      x.textAlign = 'right'; x.fillStyle = '#ffc53d'; x.fillText(String(r.score), lx + lw - 56 * u, y);
+      x.fillStyle = '#6f6a8f'; x.fillText(r.age == null ? '' : ago(r.age), lx + lw, y);
+    });
+
+    // --- right: feature panel
+    var px = 460 * u, pw = W - px - 28 * u, py = top, ph = bottom - top;
+    x.fillStyle = '#0d0b16'; x.fillRect(px, py, pw, ph);
+    var it = featureAt(d.items, d.t || 0, d.rotateSecs || CFG.rotateSecs);
+    if (it) paintFeature(x, it, px, py, pw, ph, u);
+    else paintIdle(x, d, px, py, pw, ph, u);
+
+    // --- bottom: ticker
+    var ty = H - 100 * u, th = 100 * u;
+    x.fillStyle = '#0a0812'; x.fillRect(0, ty, W, th);
+    x.fillStyle = ORANGE; x.fillRect(0, ty, W, 3 * u);
+    var text = tickerText(d.items) || 'EVERY TOP SCORE LIVES ON BITCOIN';
+    x.font = Math.round(44 * u) + 'px VT323, monospace'; x.textAlign = 'left'; x.fillStyle = '#eef2ff';
+    var gap = 120 * u, tw = Math.max(1, x.measureText(text).width), cycle = tw + gap;
+    var off = ((d.t || 0) * CFG.tickerPxPerSec * u) % cycle;
+    x.save(); x.beginPath(); x.rect(0, ty + 3 * u, W, th - 3 * u); x.clip();
+    for (var n = -1; n * cycle - off < W; n++) x.fillText(text, n * cycle - off, ty + 66 * u);
+    x.restore();
+
+    // --- scanlines
+    x.fillStyle = 'rgba(0,0,0,.30)'; for (var yy = 0; yy < H; yy += 4) x.fillRect(0, yy, W, 1.4);
+    x.restore();
+  }
+  function paintFeature(x, it, px, py, pw, ph, u) {
+    var col = KIND_COLOUR[it.kind] || '#8fd3ff', pic = pictureFor(it), pad = 28 * u;
+    x.fillStyle = col; x.fillRect(px, py, 6 * u, ph);
+    x.textAlign = 'left'; x.font = Math.round(24 * u) + 'px Bungee, Impact, sans-serif'; x.shadowColor = col; x.shadowBlur = 8; x.fillStyle = col;
+    x.fillText(KINDS[it.kind] + (it.paid && it.kind === 2 ? ' · PAID' : ''), px + pad, py + 40 * u); x.shadowBlur = 0;
+    var textW = pw - pad * 2, imgW = 0;
+    if (pic) {
+      imgW = Math.min(ph * .62, pw * .36);
+      var ix = px + pw - pad - imgW, iy = py + 60 * u, ih = imgW * (pic.naturalHeight / Math.max(1, pic.naturalWidth));
+      ih = Math.min(ih, ph - 80 * u);
+      try { x.drawImage(pic, ix, iy, imgW, ih); } catch (e) {}
+      x.strokeStyle = col; x.lineWidth = 2 * u; x.strokeRect(ix, iy, imgW, ih);
+      textW = pw - pad * 3 - imgW;
+    }
+    x.fillStyle = '#ffffff'; x.font = Math.round(52 * u) + 'px VT323, monospace';
+    var head = wrapText(function (s) { return x.measureText(s).width; }, it.head.toUpperCase(), textW, 3), y = py + 100 * u;
+    head.forEach(function (l) { x.fillText(l, px + pad, y); y += 54 * u; });
+    x.fillStyle = '#c9c4ee'; x.font = Math.round(36 * u) + 'px VT323, monospace';
+    var body = wrapText(function (s) { return x.measureText(s).width; }, it.body, textW, Math.max(1, Math.floor((py + ph - y - 24 * u) / (38 * u))));
+    y += 8 * u; body.forEach(function (l) { x.fillText(l, px + pad, y); y += 38 * u; });
+  }
+  function paintIdle(x, d, px, py, pw, ph, u) {
+    x.textAlign = 'center'; x.fillStyle = '#ffc53d'; x.shadowColor = '#ffb000'; x.shadowBlur = 20;
+    x.font = Math.round(150 * u) + 'px VT323, monospace'; x.fillText(String(d.day), px + pw / 2, py + ph * .58); x.shadowBlur = 0;
+    x.fillStyle = ORANGE; x.font = Math.round(30 * u) + 'px Bungee, Impact, sans-serif'; x.fillText('BITCOIN DAY', px + pw / 2, py + ph * .30);
+    x.fillStyle = '#8fd3ff'; x.font = Math.round(34 * u) + 'px VT323, monospace'; x.fillText('EVERY TOP SCORE LIVES ON BITCOIN', px + pw / 2, py + ph * .82);
+  }
+
+  /* ------------------------------------------------------------ latest scorers (pure) */
+  // Builds the scorers list from the hall's board cache. `boards` = [{ game, colour, mode, entries:[{name,score,burn}] }].
+  // Newest first; entries older than `windowBlocks` burn blocks are left out. `fmt(mode, score)` formats a score.
+  function latestScorers(boards, height, windowBlocks, fmt, limit) {
+    var out = [], win = windowBlocks || 288, h = Number(height) || 0;
+    (boards || []).forEach(function (b) {
+      (b.entries || []).forEach(function (e) {
+        var burn = Number(e.burn);
+        if (!isFinite(burn) || burn <= 0) return;
+        var age = h ? h - burn : 0;
+        if (h && (age < 0 || age > win)) return;
+        out.push({ game: b.game, colour: b.colour, name: String(e.name || ''), score: fmt ? fmt(b.mode, e.score) : String(e.score), age: age, burn: burn });
+      });
+    });
+    out.sort(function (a, b) { return b.burn - a.burn; });
+    var seen = {}, uniq = [];
+    out.forEach(function (r) { var k = r.game + '|' + r.name + '|' + r.score; if (!seen[k]) { seen[k] = 1; uniq.push(r); } });
+    return uniq.slice(0, limit || 8);
+  }
+
+  var api = {
+    configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled,
+    start: start, stop: stop, refresh: refresh, snapshot: function () { return state.snap; },
+    onChange: function (fn) { state.listeners.push(fn); },
+    items: function () { return state.snap ? state.snap.items : []; },
+    paint: paint, latestScorers: latestScorers,
+    normalizeItem: normalizeItem, isActive: isActive, activeItems: activeItems, featureAt: featureAt,
+    wrapText: wrapText, tickerText: tickerText, ago: ago, hasPicture: hasPicture,
+    _t: { state: state, load: load, restore: restore, save: save }
+  };
+  root.XAScreen = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>
@@ -34396,7 +35105,7 @@ const WALK = { fov:68, eye:1.6, speed:3, sprint:4.6, bobRate:9, bobAmp:.025, loo
 const camera = new THREE.PerspectiveCamera(WALK.fov, innerWidth/innerHeight, 0.04, 60);
 camera.rotation.order = 'YXZ';
 
-const RW = 10, RH = 3.2, EYE = WALK.eye, GAP = 2.2;
+const RW = 10, RH = 3.2, HH = 4.2, EYE = WALK.eye, GAP = 2.2;
 const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets down the left / right walls
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
@@ -34456,12 +35165,15 @@ function buildRoom(){
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(RW,RL), new THREE.MeshStandardMaterial({map:carpetTexture(), roughness:.95}));
   floor.rotation.x=-Math.PI/2; scene.add(floor);
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(RW,RL), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}));
-  ceil.rotation.x=Math.PI/2; ceil.position.y=RH; scene.add(ceil);
+  ceil.rotation.x=Math.PI/2; ceil.position.y=HH; scene.add(ceil);
 
   const wt=wallTexture();
   const wall=(w,pos,ry)=>{const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
     const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), holeWall(new THREE.MeshStandardMaterial({map:t, roughness:.9}),1));
-    m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m)};
+    m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m);
+    // above the doors and bays (RH) the wall is plain, up to the hall's higher ceiling (HH)
+    const up=new THREE.Mesh(new THREE.PlaneGeometry(w,HH-RH), new THREE.MeshStandardMaterial({color:0x17132a, roughness:.9}));
+    up.position.set(pos[0],(RH+HH)/2,pos[1]); up.rotation.y=ry; scene.add(up)};
   wall(RL,[-RW/2,0],Math.PI/2); wall(RL,[RW/2,0],-Math.PI/2); wall(RW,[0,-RL/2],0); wall(RW,[0,RL/2],Math.PI);
 
   // neon strips: pink high along the long walls, cyan skirting all round
@@ -34481,10 +35193,11 @@ function buildRoom(){
   buildLogoSign();
   buildPosters();
   try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
+  try{ if(window.XAScreen) XAScreen.start(()=>paintDayBoard(true)) }catch(e){}   // the centre screen's contract: off unless configured
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
-  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block')});   // read-only, for tests
+  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
   if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
   XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;   // read-only, for tests: where you are in bay i's open doorway
   XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
@@ -34507,8 +35220,8 @@ function buildRoom(){
   const panelMat=new THREE.MeshBasicMaterial({color:0xe8e2ff, toneMapped:false});
   const lz=[]; for(let z=-Math.floor((RL/2-3)/5)*5; z<=RL/2-3; z+=5) lz.push(z);
   for(const z of lz){
-    const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.5),panelMat); p.rotation.x=Math.PI/2; p.position.set(0,RH-.01,z); scene.add(p);
-    const l=new THREE.PointLight(0xcfc4ff,.55,10,2); l.position.set(0,RH-.3,z); scene.add(l);
+    const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.5),panelMat); p.rotation.x=Math.PI/2; p.position.set(0,HH-.01,z); scene.add(p);
+    const l=new THREE.PointLight(0xcfc4ff,.55,10,2); l.position.set(0,HH-.3,z); scene.add(l);
   }
   scene.add(new THREE.HemisphereLight(0x6a5cff,0x1a0a20,.45));
 }
@@ -35638,14 +36351,21 @@ function applyDay(day){
    chain posters are laid over it (XAWorld.composeWall). With no contracts, or a failed read, the wall is the
    embedded one exactly: that is the v1.3 hall. */
 let baseWall=null;
-const PIN_SLOTS=[null, 2, 16, 3, 17];   // pin spots 1-4 -> the four free poster slots nearest the entrance (the end pairs are bays)
+/* Pin spots (the posters contract's set-pin `spot`) cover EVERY poster slot on the wall, 1 to the number of slots:
+   spots 1-4 are the four free slots nearest the entrance, 5-12 are the bays' posters (bay 0: 5,6  bay 1: 7,8  bay 2: 9,10  bay 3: 11,12),
+   then the rest in wall order. A bay whose scene is not "posters" hides its pinned posters (the scene wins; see applyBays). */
+function pinSlots(){
+  const first=[2,16,3,17];
+  for(const code of ['L','R','NL','NR']) posterSlots.forEach((s,i)=>{ if(s.bay===code) first.push(i) });
+  return window.XAWorld.pinSlotMap(posterSlots.length, first);
+}
 function paintWall(){
   if(!baseWall) return;
   const W=window.XAWorld, snap=W && W.enabled() ? W.snapshot() : null;
   let items=null;
   if(snap){
     try{ items=W.composeWall(baseWall.wall,{day:baseWall.day, nEmbedded:ROTATION_POOL.length, weights:ROTATION_W, snapshot:snap,
-      overlaySlots:posterSlots.map((s,i)=>s.bay?-1:i).filter(i=>i>=0), pinSlots:PIN_SLOTS}) }catch(e){ items=null }
+      overlaySlots:posterSlots.map((s,i)=>s.bay?-1:i).filter(i=>i>=0), pinSlots:pinSlots()}) }catch(e){ items=null }
   }
   posterSlots.forEach((s,i)=>{
     const spec=items ? (items[i].src==='c' ? chainSpec(items[i].entry) : ROTATION_POOL[items[i].idx]) : ROTATION_POOL[baseWall.wall[i]];
@@ -35746,7 +36466,7 @@ function buildPosters(){
   try{
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
-      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player});
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, stillFor:(slug)=>{ const r=roomCfg(slug); return r&&typeof r.still==='string'?r.still:'' }});
     if(bayEngine) buildLobby();
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
@@ -35790,37 +36510,54 @@ function setHeight(h, live){
 async function pollChain(){ const h=await fetchHeight(); if(h) setHeight(h,true); else if(!chain.live) setHeight(estHeight(),false) }
 function startChainClock(){ setHeight(estHeight(),false); pollChain(); setInterval(pollChain,60000) }
 
+/* ---------- the centre screen ----------
+   One 16:9 screen hung in the middle of the hall: the Bitcoin Day clock along the top, LATEST SCORERS from the score boards the
+   hall already reads, a rotating feature (news / ads / messages from xtrata-screen-v1) and a ticker. All the drawing and the
+   contract reader live in screen.js; this part only builds the panel, feeds it and repaints it. With no screen contract it is the
+   clock plus the latest scorers. It replaces the old Bitcoin Day board in the same spot. */
 let dayBoard=null;
+const CENTRE_SCREEN={W:3.2, H:1.8, cy:3.15, z:RL/2-6, px:1280, py:720, gapMs:120};
 function buildDayBoard(){
-  const cv=mkCanvas(1024,256), t=tex(cv), mat=new THREE.MeshBasicMaterial({map:t, toneMapped:false});
-  const g=new THREE.Group(); g.position.set(0,2.46,RL/2-6); scene.add(g);
-  const W=2.6, H=.65;
-  g.add(new THREE.Mesh(new THREE.BoxGeometry(W+.1,H+.1,.08), new THREE.MeshStandardMaterial({color:0x121118, metalness:.6, roughness:.4})));
-  const front=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); front.position.z=.042; g.add(front);
-  const back=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); back.position.z=-.042; back.rotation.y=Math.PI; g.add(back);
+  const S=CENTRE_SCREEN, cv=mkCanvas(S.px,S.py), t=tex(cv), mat=new THREE.MeshBasicMaterial({map:t, toneMapped:false});
+  const g=new THREE.Group(); g.position.set(0,S.cy,S.z); scene.add(g);
+  const W=S.W, H=S.H;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(W+.12,H+.12,.1), new THREE.MeshStandardMaterial({color:0x121118, metalness:.6, roughness:.4})));
+  const front=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); front.position.z=.052; g.add(front);
+  const back=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); back.position.z=-.052; back.rotation.y=Math.PI; g.add(back);
   const rodMat=new THREE.MeshStandardMaterial({color:0x2a2a33, metalness:.8, roughness:.3});
-  for(const sx of [-1,1]){ const len=RH-(2.46+H/2+.05); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,len,6),rodMat); rod.position.set(sx*(W/2-.2),H/2+.05+len/2,0); g.add(rod) }
-  const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.12,.02,.1), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.06); g.add(edge);
-  dayBoard={cv, x:cv.getContext('2d'), tex:t};
-  paintDayBoard();
+  for(const sx of [-1,1]){ const len=HH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
+  const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.14,.025,.12), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.07); g.add(edge);
+  // no collider: its bottom edge (2.25 m) is above head height, so you walk under it
+  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], scorersAt:-1e9};
+  paintDayBoard(true);
 }
-function paintDayBoard(){
+// Latest scorers: every cached board entry that burned in the last two Bitcoin days, newest first (no extra reads).
+function screenScorers(){
+  const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; if(t && t.entries && t.entries.length) boards.push({game:g.title, colour:g.color, mode:b.mode, entries:t.entries}) }));
+  return window.XAScreen ? XAScreen.latestScorers(boards, chain.height, 288, fmtBoard, 8) : [];
+}
+function paintDayBoard(force){
   if(!dayBoard || chain.day<0) return;
-  const x=dayBoard.x, W=1024, H=256, h=chain.height, done=h%BLOCKS_PER_DAY, left=BLOCKS_PER_DAY-done;
-  x.save(); x.setTransform(1,0,0,1,0,0); x.globalAlpha=1;
-  x.fillStyle='#050408'; x.fillRect(0,0,W,H);
-  x.textBaseline='alphabetic'; x.textAlign='left';
-  x.font='30px Bungee, Impact, sans-serif'; x.fillStyle=BTC_ORANGE; x.shadowColor=BTC_ORANGE; x.shadowBlur=12; x.fillText('BITCOIN DAY',40,60);
-  x.font='150px VT323, monospace'; x.fillStyle='#ffc53d'; x.shadowColor='#ffb000'; x.shadowBlur=26; x.fillText(String(chain.day),34,186);
-  x.shadowBlur=0; x.textAlign='right'; x.font='40px VT323, monospace';
-  x.fillStyle='#eef2ff'; x.fillText('BLOCK '+(chain.live?'':'≈')+h.toLocaleString('en-US'),W-40,96);
-  x.fillStyle='#8fd3ff'; x.fillText((chain.live?'':'≈')+'NEXT DAY IN '+left+' BLOCK'+(left===1?'':'S'),W-40,158);
-  const segW=944/BLOCKS_PER_DAY;
-  for(let i=0;i<BLOCKS_PER_DAY;i++){ x.fillStyle=i<done?BTC_ORANGE:i===done?'#ffffff':'#1d1a24'; x.fillRect(40+i*segW,208,segW-1.6,24) }
-  x.fillStyle='rgba(0,0,0,.34)'; for(let yy=0;yy<H;yy+=4) x.fillRect(0,yy,W,1.4); for(let xx=0;xx<W;xx+=4) x.fillRect(xx,0,1.4,H);
-  x.restore();
+  const now=performance.now();
+  if(!force && now-dayBoard.last<CENTRE_SCREEN.gapMs) return;
+  dayBoard.last=now;
+  if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } }
+  const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers,
+           items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.height)   /* estimated height when the node is down, so a cached snapshot still expires */ : []};
+  if(window.XAScreen) XAScreen.paint(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);
+  else paintPlainClock(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);   // a release without screen.js: just the day clock
   dayBoard.tex.needsUpdate=true;
 }
+function paintPlainClock(x,W,H,d){
+  const left=d.blocksPerDay-(d.height%d.blocksPerDay);
+  x.save(); x.setTransform(1,0,0,1,0,0); x.fillStyle='#050408'; x.fillRect(0,0,W,H); x.textAlign='center'; x.textBaseline='alphabetic';
+  x.font='60px Bungee, Impact, sans-serif'; x.fillStyle=BTC_ORANGE; x.fillText('BITCOIN DAY',W/2,H*.3);
+  x.font='320px VT323, monospace'; x.fillStyle='#ffc53d'; x.fillText(String(d.day),W/2,H*.7);
+  x.font='64px VT323, monospace'; x.fillStyle='#8fd3ff'; x.fillText((d.live?'':'≈')+'NEXT DAY IN '+left+' BLOCK'+(left===1?'':'S'),W/2,H*.9);
+  x.restore();
+}
+// Per frame: the ticker and the rotation move, so repaint a few times a second while the screen is within sight.
+function tickCentreScreen(){ if(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11) paintDayBoard() }
 
 
 /* ==================== TEMPORARY DEV OVERRIDE — REMOVE BEFORE RELEASE ====================
@@ -36742,24 +37479,30 @@ function updateBayFocus(){
   if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
 }
 /* ---------- other rooms that take the whole screen (the casino) ----------
-   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO' } } names
+   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO', still:'casino-entry.jpg' } } names
    them. A room is either `src` (a URL the hall may frame: a file beside the hall) or `load` (a function the host gives, returning the room's page as text,
    which is framed as srcdoc: this is how the inscribed arcade opens a room that is its own inscription, hash-checked, see parent.template.html). Going in: a short loading screen over the hall,
    the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
+   `still` (optional) is a picture of the room's entry view (build/snap-room.cjs takes it): the door's open doorway shows it, as a window with the right parallax (doors.js windowTo),
+   and it fills the screen, moving in a little, from the moment you cross the threshold until the room posts {xa:'room-ready'} (a room that never does is shown 2.5 s after it loads); only a slow room gets the loading screen.
    Going back: the frame is removed (it frees everything the room built) and you are where you were, in front of the door. */
 const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && ((typeof r.src==='string' && r.src) || typeof r.load==='function') ? r : null };
-let roomUI=null, roomId='', roomBay=-1, roomT0=0, roomTimer=0;
+let roomUI=null, roomId='', roomBay=-1, roomT0=0, roomTimer=0, roomSlow=0;
 function roomEls(){
   if(roomUI) return roomUI;
   const mk=(css,html)=>{ const e=document.createElement('div'); e.style.cssText=css; if(html!=null) e.innerHTML=html; return e };
   const load=mk('position:fixed;inset:0;z-index:9000;background:radial-gradient(ellipse at 50% 40%,#1b1233,#05040a 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#e8e2ff;text-align:center;opacity:0;transition:opacity .25s',
     '<div class="rl-t" style="font:34px Bungee,Impact,sans-serif;letter-spacing:.08em;color:#ffb347;text-shadow:0 0 18px rgba(255,150,40,.55)"></div><div class="rl-s" style="font:16px VT323,monospace;letter-spacing:.14em;opacity:.8">OPENING THE ROOM…</div><div style="width:min(60vw,320px);height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden"><i class="rl-b" style="display:block;height:100%;width:35%;background:linear-gradient(90deg,#3d86ff,#ff8a2a);animation:rlbar 1.1s ease-in-out infinite alternate"></i></div>');
+  // the room's entry still (XA_ROOMS[id].still): shown full screen from the moment you cross the threshold until the live room has drawn its first frames, so the doorway you were looking into simply becomes the room
+  const still=mk('position:fixed;inset:0;z-index:8900;background:#05040a center/cover no-repeat;display:none;opacity:0;transform:scale(1);will-change:transform,opacity');
   const st=document.createElement('style'); st.textContent='@keyframes rlbar{from{transform:translateX(-30%)}to{transform:translateX(190%)}}'; document.head.appendChild(st);
   const back=document.createElement('button'); back.type='button'; back.textContent='← BACK TO THE LOBBY';
   back.style.cssText='position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9500;display:none;padding:9px 16px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer';
   back.addEventListener('click',e=>{ e.stopPropagation(); leaveRoom() });
-  document.body.append(load,back); roomUI={load,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
+  document.body.append(still,load,back); roomUI={load,still,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
   window.addEventListener('message',e=>{ if(state==='room' && roomUI && roomUI.frame && e.source===roomUI.frame.contentWindow && e.data && e.data.xa==='leave-room') leaveRoom() });
+  // the room says it has drawn its first frames ({xa:'room-ready'}), at any time after it loads, even while it is still hidden behind the hall
+  window.addEventListener('message',e=>{ const f=roomUI&&roomUI.frame; if(f && e.source===f.contentWindow && e.data && e.data.xa==='room-ready'){ f.dataset.ready='1'; f.dispatchEvent(new Event('xa-room-ready')) } });
   return roomUI;
 }
 // The room's page is loaded quietly as soon as its door is opened (hidden, behind the hall), so by the time you walk in there is little or nothing to wait for.
@@ -36767,7 +37510,8 @@ function roomEls(){
 const roomSrc=(cfg)=>cfg.src+(cfg.src.indexOf('?')<0?'?':'&')+'from=arcade';   // tells the room it was entered from the arcade: it starts walking, just inside its door
 function roomPrep(id){
   const cfg=roomCfg(id); if(!cfg) return null;
-  const U=roomEls(); if(U.frame && U.frameId===id) return U.frame;
+  const U=roomEls(); if(typeof cfg.still==='string' && cfg.still){ if(!roomPrep.im||roomPrep.im.u!==cfg.still){ const im=new Image(); im.src=cfg.still; roomPrep.im={u:cfg.still,im} } }   // the still is fetched and decoded before it is needed
+  if(U.frame && U.frameId===id) return U.frame;
   roomDrop();
   const f=document.createElement('iframe'); f.title=cfg.title||id; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
   f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden;pointer-events:none';
@@ -36801,20 +37545,35 @@ function enterRoom(id, bayIdx){
   for(const k in keys) keys[k]=false;
   $('cross').hidden=true; $('prompt').hidden=true; $('tapstart').hidden=true; $('lockhint').hidden=true; $('hint').hidden=true; if($('bprompt')) $('bprompt').hidden=true;
   try{ Room.enterGame() }catch(e){}                   // the hall's own sound closes behind you
+  const hb=$('hallbar'); if(hb) hb.style.visibility='hidden';   // and its buttons (scores, wallet, sound) stay out of the room's picture
   const ready=!!f.dataset.loaded, minWait=ready?250:700;   // a page that is already there still gets a beat of loading screen, never a flash
   U.title.textContent=String(cfg.title||id).toUpperCase(); U.sub.textContent='OPENING THE ROOM…';
-  U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1;
+  const still=typeof cfg.still==='string' && cfg.still;
+  const showLoad=()=>{ U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1 };
+  if(still){   // the doorway you were looking into fills the screen and moves in a little, as a step forward would; the loading screen only comes if the room is slow
+    const S=U.still; S.style.transition='none'; S.style.backgroundImage='url("'+still.replace(/"/g,'%22')+'")'; S.style.transform='scale(1)'; S.style.opacity=0; S.style.display='block'; void S.offsetWidth;
+    S.style.transition='opacity .25s,transform 2.6s cubic-bezier(.25,.6,.35,1)'; S.style.opacity=1; S.style.transform='scale(1.035)';
+  } else showLoad();
   f.style.pointerEvents='auto';
   const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,minWait-(performance.now()-roomT0));
     setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room') U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
-  const failed=()=>{ clearTimeout(roomTimer); U.sub.textContent='THE ROOM COULD NOT BE LOADED. YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 };
+  const failed=()=>{ clearTimeout(roomTimer); clearTimeout(roomSlow); if(still) showLoad(); U.sub.textContent='THE ROOM COULD NOT BE LOADED. YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 };
   if(f.dataset.failed) failed(); else f.addEventListener('xa-room-failed',failed,{once:true});
-  if(ready) done(); else f.addEventListener('load',done,{once:true});
-  roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
+  if(still){
+    // Ready = the room has said so ({xa:'room-ready'}, after its first frames), and the still has been up for a beat. A room that never says it is ready is shown 2.5 s after it loads.
+    let shown=false; clearTimeout(roomSlow);
+    const reveal=()=>{ if(shown || state!=='room' || roomUI.frame!==f) return; shown=true; clearTimeout(roomSlow); clearTimeout(roomTimer);
+      f.style.visibility='visible'; U.still.style.opacity=0; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room'){ U.still.style.display='none'; U.load.style.display='none' } },450); U.back.style.display='block'; try{ f.focus() }catch(e){} };
+    const when=(ms)=>setTimeout(reveal,Math.max(0,ms-(performance.now()-roomT0)));
+    if(f.dataset.ready) when(900); else f.addEventListener('xa-room-ready',()=>when(900),{once:true});
+    const late=()=>setTimeout(()=>when(900),2500); if(f.dataset.loaded) late(); else f.addEventListener('load',late,{once:true});
+    roomSlow=setTimeout(()=>{ if(!shown && state==='room' && roomUI.frame===f) showLoad() },3500);
+  } else if(ready) done(); else f.addEventListener('load',done,{once:true});
+  roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ if(still) showLoad(); U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
 }
 function leaveRoom(){
   if(state!=='room' || !roomUI) return;
-  const U=roomUI; clearTimeout(roomTimer);
+  const U=roomUI; clearTimeout(roomTimer); clearTimeout(roomSlow); const hb=$('hallbar'); if(hb) hb.style.visibility=''; U.still.style.display='none'; U.still.style.opacity=0;
   if(U.frame){ try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null; U.frameId='' }
   U.load.style.opacity=0; U.load.style.display='none'; U.back.style.display='none';
   state='out'; sfx.back(); try{ Room.exitGame() }catch(e){}
@@ -36871,6 +37630,7 @@ function frame(now){
     if(state==='intro') player.yaw = Math.sin(time*.15)*.18;
   }
   if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud() } updatePosterFocus() }
+  if(state==='walk' || state==='intro') tickCentreScreen();
 
   if(tween){
     tween.t+=dt; const k=clamp(tween.t/tween.dur,0,1), e=easeIO(k);

@@ -28,6 +28,9 @@
     lobbyId: 'lobby',
     posters: '',                 // 'SP….xtrata-posters-v1'  (empty = off)
     world: '',                   // 'SP….xtrata-world-v1'    (empty = off)
+    registry: '',                // 'SP….xtrata-world-v2'    the object registry; when set it replaces `world` for the bays (world2.js)
+    path: ['arcade', 'hall'],    // the hall's space in the registry (its lobby is the sibling 'lobby' unless lobbyPath says otherwise)
+    lobbyPath: null,
     pollMs: 240000,              // how often to check the two version counters
     overlayMax: 8,               // at most this many chain posters on the wall at once
     maxLive: 64,                 // the contract's live-set bound
@@ -42,7 +45,10 @@
   function configure(patch) {
     Object.keys(patch || {}).forEach(function (k) { if (k in CFG) CFG[k] = patch[k]; });
   }
-  function enabled() { return !!(CFG.posters && CFG.world && codec()); }
+  // 2: bays from the object registry (xtrata-world-v2, read by world2.js); 1: from the scene contract (xtrata-world-v1); 0: off
+  function mode() { return CFG.registry && root.XAWorld2 ? 2 : (CFG.world ? 1 : 0); }
+  function enabled() { return !!(CFG.posters && mode() && codec()); }
+  function host() { return { read: callRead, plain: plain, hexList: hexList, codec: codec(), registry: CFG.registry, path: CFG.path, lobbyPath: CFG.lobbyPath }; }
 
   /* ------------------------------------------------------------ pure helpers (rotation side) */
   function rng(s) { return function () { s |= 0; s = s + 0x6D2B79F5 | 0; var t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -134,6 +140,18 @@
     return out;
   }
 
+  /*
+   * pinSlotMap: which wall slot each pin spot means. Spot numbers start at 1 and cover EVERY slot (n of them), so any poster on the
+   * wall can be pinned. `first` lists the slots that take spots 1, 2, 3 ... in that order (the hall puts the four free slots nearest the
+   * entrance first, then each bay's two posters, bay 0 to bay 3); every slot not listed follows in wall order.
+   */
+  function pinSlotMap(n, first) {
+    var map = [null], seen = {};
+    (first || []).forEach(function (s) { if (typeof s === 'number' && s >= 0 && s < n && !seen[s]) { seen[s] = true; map.push(s); } });
+    for (var i = 0; i < n; i++) if (!seen[i]) map.push(i);
+    return map;
+  }
+
   /* ------------------------------------------------------------ reading */
   function hasRealOrigin() { try { return /^https?:$/.test(root.location.protocol) && root.location.origin !== 'null'; } catch (e) { return false; } }
   function apiBases() {
@@ -213,8 +231,8 @@
     };
   }
   async function readVersions() {
-    var a = await callRead(CFG.posters, 'get-version', []), b = await callRead(CFG.world, 'get-version', []);
-    return { posters: plain(a), world: plain(b) };
+    var a = await callRead(CFG.posters, 'get-version', []), b = mode() === 2 ? await root.XAWorld2.probe(host()) : plain(await callRead(CFG.world, 'get-version', []));
+    return { posters: plain(a), world: b };
   }
   async function loadSnapshot() {
     var C = codec();
@@ -225,19 +243,29 @@
     var suppressed = plain(await callRead(CFG.posters, 'get-suppressed', [])) || [];
     var need = live.slice(0, CFG.maxLive); pins.forEach(function (p) { if (need.indexOf(p.poster) < 0) need.push(p.poster); });
     var recs = await readPosters(need);
-    var bays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.roomId)])).value.map(toBay);
-    // The lobby is its own room on the contract (its two back-wall doors). A contract with nothing for it, or a read that fails,
-    // leaves those doors as plain walls: it never takes the hall down.
-    var lobbyBays = [];
-    try { lobbyBays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.lobbyId)])).value.map(toBay); } catch (e) { lobbyBays = []; }
-    var looks = await readLooks(bays.concat(lobbyBays));
-    var versions = await readVersions();
+    var bays, lobbyBays = [], looks, versions, w2 = null;
+    if (mode() === 2) {
+      // The bays come from the object registry: world2.js turns its objects into the same bay shape. A failed read throws (the last
+      // good snapshot stays); a registry with nothing for the hall gives four null bays, which is the posters.
+      w2 = await root.XAWorld2.load(host());
+      bays = w2.bays; lobbyBays = w2.lobbyBays; looks = w2.looks;
+      versions = { posters: plain(await callRead(CFG.posters, 'get-version', [])), world: w2.sig };
+    } else {
+      bays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.roomId)])).value.map(toBay);
+      // The lobby is its own room on the contract (its two back-wall doors). A contract with nothing for it, or a read that fails,
+      // leaves those doors as plain walls: it never takes the hall down.
+      try { lobbyBays = (await callRead(CFG.world, 'get-bays', [C.cvAscii(CFG.lobbyId)])).value.map(toBay); } catch (e) { lobbyBays = []; }
+      looks = await readLooks(bays.concat(lobbyBays));
+      versions = await readVersions();
+    }
     var pinned = {}; pins.forEach(function (p) { if (recs[p.poster]) pinned[p.poster] = recs[p.poster]; });
-    return {
+    var snap = {
       versions: versions, at: Date.now(),
       posters: live.map(function (id) { return recs[id]; }).filter(Boolean),
       pins: pins, pinned: pinned, suppressed: suppressed, bays: bays, rooms: { lobby: { bays: lobbyBays } }, looks: looks
     };
+    if (w2) { snap.src = CFG.registry; snap.v2 = w2.meta; }     // v1 snapshots stay exactly as they were
+    return snap;
   }
   // The looks the active scenes use (door look and every layer), in one or two reads. { id: { kind, name, tier, builtin, hidden, approved } }
   async function readLooks(bays) {
@@ -271,7 +299,9 @@
     try {
       var s = root.localStorage.getItem(CFG.snapKey);
       if (!s) return null;
-      return JSON.parse(s, function (k, v) { return v && typeof v === 'object' && typeof v.$hex === 'string' ? root.XAScores._codec.hexToBytes(v.$hex) : v; });
+      var snap = JSON.parse(s, function (k, v) { return v && typeof v === 'object' && typeof v.$hex === 'string' ? root.XAScores._codec.hexToBytes(v.$hex) : v; });
+      // a snapshot from the other bay source (v1 scenes vs the v2 registry, or another registry) is not shown while the reader catches up
+      return snap && (snap.src || '') === (mode() === 2 ? CFG.registry : '') ? snap : null;
     } catch (e) { return null; }
   }
 
@@ -280,7 +310,7 @@
   function emit(why) { state.listeners.forEach(function (fn) { try { fn(state.snap, why); } catch (e) {} }); }
   // One refresh: only reloads when either version counter moved. Returns { ok, changed }.
   async function refresh(force) {
-    if (!enabled() || state.busy) return { ok: false, changed: false, error: 'off' };
+    if (!enabled() || state.busy) return { ok: false, changed: false, error: enabled() ? 'busy' : 'off' };
     state.busy = true;
     try {
       var v = await readVersions();
@@ -326,10 +356,10 @@
   }
 
   root.XAWorld = {
-    configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled,
+    configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled, mode: mode,
     start: start, stop: stop, refresh: refresh, onHeight: onHeight, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
-    composeWall: composeWall, isActive: isActive, loadImageBytes: loadImageBytes,
+    composeWall: composeWall, pinSlotMap: pinSlotMap, isActive: isActive, loadImageBytes: loadImageBytes,
     // read helpers for sibling modules (the centre screen reads its own contract through these)
     read: callRead, plain: plain, hexList: hexList,
     // exposed for tests

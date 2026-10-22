@@ -263,8 +263,8 @@ test('pins: admin only, replace by spot, expire, clear', () => {
   call('clear-pin', [Cl.stringAscii('arcade-hall'), Cl.uint(2)], deployer);
   assert.equal(ro('get-pins', [Cl.stringAscii('arcade-hall')]).value.length, 1);
   assert.equal(ro('get-pins', [Cl.stringAscii('lobby')]).value.length, 0);   // per room
-  // 16 spots max
-  for (let s = 10; s < 25; s++) pin('arcade-hall', s, id, d, d + 2);
+  // 32 pins max
+  for (let s = 10; s < 41; s++) pin('arcade-hall', s, id, d, d + 2);   // 1 + 31 = 32 pins: enough for every one of the hall's 27 wall slots
   assert.equal(pp(pin('arcade-hall', 99, id, d, d + 2).result), errU(113));
 });
 

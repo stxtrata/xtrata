@@ -62,6 +62,7 @@
   var MAX_OVERLAYS = 4;
 
   function parseParams(s) {
+    if (s && typeof s === 'object' && !Array.isArray(s)) return s;            // the v2 reader hands over a merged object when it is longer than 256 characters
     if (typeof s !== 'string' || !s || s.length > 256) return {};
     try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
   }
@@ -250,7 +251,7 @@
    * }
    */
   function create(env) {
-    var T = env.THREE, scene = env.scene, audio = createAudio();
+    var T = env.THREE, scene = env.scene, audio = createAudio(), winEye = new T.Vector3();
     WHITE = new T.Color(0xffffff);
     var DOORS = root.XADoors || null, SKINS = root.XADoorSkins || null;
     var doorSfx = DOORS ? DOORS.createSfx(function () { return audio.env(); }, function () { return env.listener(); }) : null;
@@ -484,6 +485,11 @@
         if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
         var dm = bay.door && bay.door.model;
         if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
+        if (dm && bay.door.mesh.window && bay.group.visible) {   // a door to a room that has an entry still: the open doorway shows it (doors.js, windowTo)
+          var dl = bay.plan && bay.plan.link, rs = dl ? String(dl['target-room'] || dl.targetRoom || dl.room || '').toLowerCase() : '', st = rs && rs !== 'lobby' && env.stillFor ? env.stillFor(rs) : '';
+          if ((st || '') !== (bay.door.stillUrl || '')) { bay.door.stillUrl = st || ''; bay.door.mesh.window(st || ''); }
+          if (st) { bay.door.mesh.group.worldToLocal(winEye.copy(env.camera.position)); bay.door.mesh.windowView(winEye, dm.angle > 2); }
+        }
         if (dm && dm.awake) { dm.update(dt); bay.door.mesh.sync(); if (dm.settled()) { dm.awake = false; bay.door.mesh.sync(); } }
         var ls = bay.lightSpec;
         if (ls) {
@@ -622,7 +628,7 @@
       // state for tests and the preview
       debug: function () {
         return bays.map(function (b) {
-          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, portal: !!b.portalOn, doorSkin: b.door ? (b.door.skin || '') : null, latch: b.door && b.door.mesh && b.door.mesh.latch ? b.door.mesh.latch() : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
+          return { plan: b.plan, visible: b.group.visible, pos: b.pos, overlays: b.overlays.length, layers: layersOf(b), door: !!b.door, portal: !!b.portalOn, window: b.door && b.door.mesh && b.door.mesh.windowInfo ? b.door.mesh.windowInfo() : null, doorSkin: b.door ? (b.door.skin || '') : null, latch: b.door && b.door.mesh && b.door.mesh.latch ? b.door.mesh.latch() : null, doorSound: b.door && b.door.model ? b.door.model.cfg.sound : null, doorState: b.door && b.door.model ? b.door.model.state() : null,
             curtain: b.curtain ? { margin: b.curtain.mg, planeW: b.curtain.mesh.geometry.parameters.width, bottom: b.curtain.railY - b.curtain.h, openness: b.curtain.sim.getOpenAmount(), asleep: b.curtain.sim.isAsleep(), animating: b.curtain.sim.isAnimating(), target: b.curtain.target } : null,
             light: b.lightSpec ? { key: b.lightSpec.key, intensity: b.light.intensity, fixture: b.fixture.visible } : null };
         });

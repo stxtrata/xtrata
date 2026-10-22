@@ -99,7 +99,7 @@
   })
 
 (define-map Pins (string-ascii 24)
-  (list 16 { spot: uint, poster: uint, from-day: uint, to-day: uint }))
+  (list 32 { spot: uint, poster: uint, from-day: uint, to-day: uint }))   ;; 32 pins: more than the hall has wall slots (27), so every poster can be programmed
 
 ;; ---------------------------------------------------------------------------
 ;; Helpers
@@ -388,7 +388,7 @@
     (asserts! (is-some (map-get? Posters poster)) ERR-NOT-FOUND)
     (asserts! (and (>= to-day from-day) (>= to-day (today))) ERR-WINDOW)
     (map-set Pins room
-      (unwrap! (as-max-len? (append kept { spot: spot, poster: poster, from-day: from-day, to-day: to-day }) u16)
+      (unwrap! (as-max-len? (append kept { spot: spot, poster: poster, from-day: from-day, to-day: to-day }) u32)
                ERR-PIN-FULL))
     (print { event: "pin-set", room: room, spot: spot, poster: poster, from-day: from-day, to-day: to-day, version: (bump) })
     (ok true)))

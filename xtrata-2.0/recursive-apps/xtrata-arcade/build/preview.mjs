@@ -7,7 +7,7 @@
  *   node build/preview.mjs --check   exit 1 if the committed page is not what this would write
  *
  * The preview is the real hall with a small head script on top (sample data for the world reader, panel of buttons).
- * build/rooms/*.html (the casino room) are copied beside it. Nothing in it is on chain. It is a static file served from public/, so it only changes when this is re-run and the
+ * build/rooms/* (.html, .css, .js: the casino room and the Strata Club table pages) are copied beside it. Nothing in it is on chain. It is a static file served from public/, so it only changes when this is re-run and the
  * result is committed and merged. Re-run it whenever the hall (src/) or build/preview-head.html changes.
  */
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
@@ -26,7 +26,7 @@ if (at < 0) throw new Error('the hall has no <head>');
 const page = hall.slice(0, at) + head + hall.slice(at + '<head>'.length).replace(/^\n/, '');
 // Rooms that are their own page (build/rooms/*.html) sit beside the preview, so the hall can frame them (the lobby's CASINO door).
 const roomsDir = join(here, 'rooms'), outDir = dirname(OUT);
-const rooms = existsSync(roomsDir) ? readdirSync(roomsDir).filter((f) => /\.html$/.test(f)).sort() : [];
+const rooms = existsSync(roomsDir) ? readdirSync(roomsDir).filter((f) => /\.(html|css|js|jpg)$/.test(f)).sort() : [];
 if (process.argv.includes('--check')) {
   let cur = ''; try { cur = readFileSync(OUT, 'utf8'); } catch (e) {}
   const stale = rooms.filter((f) => { try { return readFileSync(join(outDir, f), 'utf8') !== readFileSync(join(roomsDir, f), 'utf8'); } catch (e) { return true; } });
