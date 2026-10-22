@@ -117,6 +117,29 @@ test('a pin takes its slot inside its window and releases it outside', () => {
   assert.equal(dup[0].src, 'c');
 });
 
+test('pin spots cover every wall slot, bay posters included, each slot once', () => {
+  // the hall's own order: the four free slots nearest the entrance, then bay 0..3's two posters (hall layout: bays at 12,13 25,26 0,1 14,15)
+  const first = [2, 16, 3, 17, 12, 13, 25, 26, 0, 1, 14, 15];
+  const map = plain(W.pinSlotMap(27, first));
+  assert.equal(map[0], null);
+  assert.equal(map.length, 28, 'spots 1..27');
+  assert.deepEqual(map.slice(1, 13), first);
+  assert.deepEqual([...map.slice(1)].sort((a, b) => a - b), Array.from({ length: 27 }, (_, i) => i), 'every slot has exactly one spot');
+  assert.deepEqual(plain(W.pinSlotMap(5, [9, -1, 2, 2])), [null, 2, 0, 1, 3, 4], 'bad or repeated slots in the list are ignored');
+  // and a pin on a bay's poster spot lands on that bay's slot; every other slot keeps the embedded poster
+  const base = rot.wallForDay(7000, 27).wall, pinned = entry(9, { head: 'BAY2' });
+  const out = plain(W.composeWall(base, { day: 7000, nEmbedded: 142, weights: rot.ROTATION_W, overlaySlots: OVERLAY, pinSlots: map,
+    snapshot: { posters: [], pins: [{ spot: 9, poster: 9, from: 6999, to: 7003 }, { spot: 10, poster: 10, from: 6999, to: 7003 }], pinned: { 9: pinned, 10: entry(10, { head: 'BAY2B' }) }, suppressed: [] } }));
+  assert.equal(out[0].entry.head, 'BAY2'); assert.equal(out[1].entry.head, 'BAY2B');
+  out.forEach((x, i) => { if (i > 1) assert.equal(x.src, 'e'); });
+  assert.deepEqual(out.slice(2).map((x) => x.idx), base.slice(2), 'all other posters are exactly the embedded wall');
+  // all 27 slots can be pinned at once
+  const many = {}, pins = [];
+  for (let i = 1; i <= 27; i++) { many[i] = entry(i, { head: 'S' + i }); pins.push({ spot: i, poster: i, from: 6999, to: 7003 }); }
+  const all = plain(W.composeWall(base, { day: 7000, nEmbedded: 142, weights: rot.ROTATION_W, overlaySlots: OVERLAY, pinSlots: map, snapshot: { posters: [], pins, pinned: many, suppressed: [] } }));
+  assert.equal(all.filter((x) => x.src === 'c').length, 27);
+});
+
 test('off by default: no contract ids means disabled, even with a codec present', () => {
   assert.equal(W.enabled(), false);
   W.configure({ posters: 'SP1.a', world: 'SP1.b' });

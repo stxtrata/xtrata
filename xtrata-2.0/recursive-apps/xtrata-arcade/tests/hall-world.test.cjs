@@ -95,6 +95,19 @@ function snapshot(bays, extra) {
   check(swapped.length <= 4 && swapped.every((i) => E.state[i].chain === 0), 'E: suppressing four embedded posters swaps at most those slots, for other embedded posters (' + swapped.length + ' differ from D)');
   check(!E.errors.length, 'E: no page errors ' + E.errors.slice(0, 2).join(' | '));
 
+  // F/G: every poster is programmable, the bays' two posters included, and a bay's scene wins over its pins
+  const pe = (id, head) => entry(id, { head, evergreen: true });
+  const pinsF = [{ spot: 9, poster: 21, from: 0, to: 1e9 }, { spot: 10, poster: 22, from: 0, to: 1e9 }, { spot: 5, poster: 23, from: 0, to: 1e9 }, { spot: 27, poster: 24, from: 0, to: 1e9 }];
+  const pinnedF = { 21: pe(21, 'BAY2 LEFT'), 22: pe(22, 'BAY2 RIGHT'), 23: pe(23, 'BAY0 LEFT'), 24: pe(24, 'LAST SLOT') };
+  const G = await wall({ config: true, snap: snapshot([bay(null), bay(null)], { pins: [], pinned: {} }) });
+  const F = await wall({ config: true, snap: snapshot([bay('wall'), bay(null)], { pins: pinsF, pinned: pinnedF }), shot: 'world-F' });
+  check(F.state[0].chain === 21 && F.state[1].chain === 22 && F.state[0].shown && F.state[1].shown, 'F: the two posters in bay 2 (left of the start) are pinned posters 21 and 22 (pin spots 9, 10) and are shown');
+  check(F.state[12].chain === 23 && !F.state[12].shown, 'F: bay 0 is a plain-wall scene, so its pinned poster (spot 5) is hidden: the scene wins');
+  check(F.state[24].chain === 24, 'F: the last pin spot (27) is the last slot in wall order after the bay pairs (slot 24) and can be pinned too');
+  const diffF = all.filter((i) => !same(G.state, F.state, [i]));
+  check(diffF.every((i) => [0, 1, 12, 24].includes(i)), 'F: every other poster on the wall is untouched (' + diffF.join(',') + ' differ from the same wall without pins)');
+  check(!F.errors.length && !G.errors.length, 'F/G: no page errors');
+
   await browser.close(); srv.close();
   console.log('hall world tests passed: ' + passed);
 })().catch((e) => { console.error(e); process.exit(1); });

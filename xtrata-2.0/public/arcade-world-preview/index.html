@@ -31383,6 +31383,18 @@ XARoom.boot(document.getElementById('xa-root'));
     return out;
   }
 
+  /*
+   * pinSlotMap: which wall slot each pin spot means. Spot numbers start at 1 and cover EVERY slot (n of them), so any poster on the
+   * wall can be pinned. `first` lists the slots that take spots 1, 2, 3 ... in that order (the hall puts the four free slots nearest the
+   * entrance first, then each bay's two posters, bay 0 to bay 3); every slot not listed follows in wall order.
+   */
+  function pinSlotMap(n, first) {
+    var map = [null], seen = {};
+    (first || []).forEach(function (s) { if (typeof s === 'number' && s >= 0 && s < n && !seen[s]) { seen[s] = true; map.push(s); } });
+    for (var i = 0; i < n; i++) if (!seen[i]) map.push(i);
+    return map;
+  }
+
   /* ------------------------------------------------------------ reading */
   function hasRealOrigin() { try { return /^https?:$/.test(root.location.protocol) && root.location.origin !== 'null'; } catch (e) { return false; } }
   function apiBases() {
@@ -31578,7 +31590,7 @@ XARoom.boot(document.getElementById('xa-root'));
     configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled,
     start: start, stop: stop, refresh: refresh, onHeight: onHeight, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
-    composeWall: composeWall, isActive: isActive, loadImageBytes: loadImageBytes,
+    composeWall: composeWall, pinSlotMap: pinSlotMap, isActive: isActive, loadImageBytes: loadImageBytes,
     // read helpers for sibling modules (the centre screen reads its own contract through these)
     read: callRead, plain: plain, hexList: hexList,
     // exposed for tests
@@ -35953,14 +35965,21 @@ function applyDay(day){
    chain posters are laid over it (XAWorld.composeWall). With no contracts, or a failed read, the wall is the
    embedded one exactly: that is the v1.3 hall. */
 let baseWall=null;
-const PIN_SLOTS=[null, 2, 16, 3, 17];   // pin spots 1-4 -> the four free poster slots nearest the entrance (the end pairs are bays)
+/* Pin spots (the posters contract's set-pin `spot`) cover EVERY poster slot on the wall, 1 to the number of slots:
+   spots 1-4 are the four free slots nearest the entrance, 5-12 are the bays' posters (bay 0: 5,6  bay 1: 7,8  bay 2: 9,10  bay 3: 11,12),
+   then the rest in wall order. A bay whose scene is not "posters" hides its pinned posters (the scene wins; see applyBays). */
+function pinSlots(){
+  const first=[2,16,3,17];
+  for(const code of ['L','R','NL','NR']) posterSlots.forEach((s,i)=>{ if(s.bay===code) first.push(i) });
+  return window.XAWorld.pinSlotMap(posterSlots.length, first);
+}
 function paintWall(){
   if(!baseWall) return;
   const W=window.XAWorld, snap=W && W.enabled() ? W.snapshot() : null;
   let items=null;
   if(snap){
     try{ items=W.composeWall(baseWall.wall,{day:baseWall.day, nEmbedded:ROTATION_POOL.length, weights:ROTATION_W, snapshot:snap,
-      overlaySlots:posterSlots.map((s,i)=>s.bay?-1:i).filter(i=>i>=0), pinSlots:PIN_SLOTS}) }catch(e){ items=null }
+      overlaySlots:posterSlots.map((s,i)=>s.bay?-1:i).filter(i=>i>=0), pinSlots:pinSlots()}) }catch(e){ items=null }
   }
   posterSlots.forEach((s,i)=>{
     const spec=items ? (items[i].src==='c' ? chainSpec(items[i].entry) : ROTATION_POOL[items[i].idx]) : ROTATION_POOL[baseWall.wall[i]];

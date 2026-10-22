@@ -134,6 +134,18 @@
     return out;
   }
 
+  /*
+   * pinSlotMap: which wall slot each pin spot means. Spot numbers start at 1 and cover EVERY slot (n of them), so any poster on the
+   * wall can be pinned. `first` lists the slots that take spots 1, 2, 3 ... in that order (the hall puts the four free slots nearest the
+   * entrance first, then each bay's two posters, bay 0 to bay 3); every slot not listed follows in wall order.
+   */
+  function pinSlotMap(n, first) {
+    var map = [null], seen = {};
+    (first || []).forEach(function (s) { if (typeof s === 'number' && s >= 0 && s < n && !seen[s]) { seen[s] = true; map.push(s); } });
+    for (var i = 0; i < n; i++) if (!seen[i]) map.push(i);
+    return map;
+  }
+
   /* ------------------------------------------------------------ reading */
   function hasRealOrigin() { try { return /^https?:$/.test(root.location.protocol) && root.location.origin !== 'null'; } catch (e) { return false; } }
   function apiBases() {
@@ -329,7 +341,7 @@
     configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled,
     start: start, stop: stop, refresh: refresh, onHeight: onHeight, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
-    composeWall: composeWall, isActive: isActive, loadImageBytes: loadImageBytes,
+    composeWall: composeWall, pinSlotMap: pinSlotMap, isActive: isActive, loadImageBytes: loadImageBytes,
     // read helpers for sibling modules (the centre screen reads its own contract through these)
     read: callRead, plain: plain, hexList: hexList,
     // exposed for tests
