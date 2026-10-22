@@ -1,0 +1,457 @@
+// The hall's centre screen client (src/parts/screen.js) in a vm, with a fake node and a recording canvas. No browser, no network.
+// The "node" answers xtrata-screen-v1 read-only calls (get-version, get-live, get-items, get-height) with real Clarity-serialized values,
+// built with score-client.js's own encoders plus a few local ones for tuples / optionals / lists, and decoded by the file's own codec.
+//   1  off by default, and idle when the chain is unreachable (no throw, idle panel, clock + "no scores" + default ticker)
+//   2  live items come back in the contract's live order, chunked 10 at a time, capped at maxLive, missing rows skipped
+//   3  what is shown: paid ad vs free message, kinds, ticker, rotation order and weights
+//   4  review lane / hidden / ended / not-yet-started items are never shown; approval makes them appear; a paused contract is not special
+//   5  latest scorers from a canned get-top10 response (through XAScores.getTop10), window, order, dedupe, limit
+//   6  pictures: a mock inscription id goes through XAWorld.loadImageBytes once, drawn when decoded, never retried after a failure
+//   7  a failed read keeps the last good snapshot; the cache restores it when the chain is down
+//   8  polling: only the version is read until it changes; force; busy; timer interval
+// Run: node tests/screen.test.cjs
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const SRC = path.join(__dirname, '..', 'src', 'parts');
+const ADDR = 'ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E';
+const SCREEN = ADDR + '.xtrata-screen-v1';
+const SCORES = ADDR + '.xtrata-arcade-scores-v2';
+
+let checks = 0;
+const eq = (a, b, m) => { checks++; assert.deepStrictEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)), m); };
+const ok = (c, m) => { checks++; assert.ok(c, m); };
+process.on('exit', () => console.log('screen.test.cjs: ' + checks + ' checks'));
+
+/* ------------------------------------------------------------ harness */
+function load() {
+  const timers = [];
+  const win = { console: { log() {}, warn() {}, error: console.error }, Math, Date, JSON, Object, Array, Number, String, Uint8Array, BigInt, TextDecoder, TextEncoder, Promise,
+    setTimeout, clearTimeout, addEventListener() {}, removeEventListener() {}, postMessage() {}, location: { search: '', protocol: 'about:', origin: 'null', hostname: '' }, navigator: {},
+    setInterval(fn, ms) { const t = { fn, ms, cleared: false }; timers.push(t); return t; }, clearInterval(t) { if (t) t.cleared = true; } };
+  win.window = win; win.globalThis = win; win.parent = win; win.timers = timers;
+  const store = {};
+  win.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+  win._store = store;
+  vm.createContext(win);
+  for (const f of ['score-client.js', 'world.js', 'screen.js']) vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), win, { filename: f });
+  return win;
+}
+
+// Clarity values, serialized (the decoder does not care about key order, the chain sorts them; we do too).
+function encoders(C) {
+  const u32 = (n) => n.toString(16).padStart(8, '0');
+  const strip = (h) => h.replace(/^0x/, '');
+  const E = {
+    uint: (n) => C.cvUint(n),
+    ascii: (s) => C.cvAscii(s),
+    buff: (bytes) => C.cvBuff(bytes),
+    bool: (b) => (b ? '0x03' : '0x04'),
+    none: () => '0x09',
+    some: (v) => '0x0a' + strip(v),
+    list: (vs) => '0x0b' + u32(vs.length) + vs.map(strip).join(''),
+    principal: (a) => C.cvPrincipal(a),
+    tuple: (o) => {
+      const keys = Object.keys(o).sort();
+      return '0x0c' + u32(keys.length) + keys.map((k) => k.length.toString(16).padStart(2, '0') + Buffer.from(k).toString('hex') + strip(o[k])).join('');
+    },
+  };
+  // one xtrata-screen-v1 Items row (all 19 fields, as the map defines them)
+  E.item = (o = {}) => E.tuple({
+    kind: E.uint(o.kind ?? 0), head: E.ascii(o.head ?? 'HELLO'), body: E.ascii(o.body ?? ''),
+    'image-id': E.uint(o.imageId ?? 0), 'image-hash': E.buff(o.imageHash ?? new Uint8Array(0)), 'image-size': E.uint(o.imageSize ?? 0),
+    weight: E.uint(o.weight ?? 1), publisher: E.principal(ADDR), paid: E.bool(!!o.paid),
+    buyer: o.paid ? E.some(E.principal(ADDR)) : E.none(), days: E.uint(o.days ?? 0), price: E.uint(o.price ?? 0), escrow: E.uint(0),
+    status: E.uint(o.status ?? 1), hidden: E.bool(!!o.hidden), 'starts-at': E.uint(o.startsAt ?? 0), 'ends-at': E.uint(o.endsAt ?? 1000000),
+    'added-at': E.uint(0), 'closed-reason': E.uint(0),
+  });
+  return E;
+}
+
+// A fake node. `chain` is mutable between refreshes: { version, live:[ids], items:{id: itemOpts}, height, scores:{board:[entries]} }.
+// `down` fails every request (503); `failFn` is a Set of function names that fail; `net` makes fetch itself reject.
+function boot(chainInit) {
+  const win = load(), C = win.XAScores._codec, E = encoders(C);
+  win.timers.length = 0;                          // score-client's own boot timers are not ours
+  win.XAScores.configure({ network: 'testnet', apiBases: ['http://node.test'], contractAddress: ADDR, contractName: 'xtrata-arcade-scores-v2', readSender: ADDR });
+  const n = { chain: Object.assign({ version: 1, live: [], items: {}, height: 5000, scores: {} }, chainInit), down: false, net: false, failFn: new Set(), log: [] };
+  win.fetch = async (url, init) => {
+    const m = /\/call-read\/([^/]+)\/([^/]+)\/([^/?]+)/.exec(url);
+    const fn = m[3], body = JSON.parse(init.body), arg0 = (body.arguments || [])[0] || '';
+    n.log.push({ contract: m[2], fn, arg0 });
+    if (n.net) throw new Error('network down');
+    if (n.down || n.failFn.has(fn)) return { ok: false, status: 503, json: async () => ({}) };
+    const ch = n.chain; let hex;
+    if (m[2] === 'xtrata-screen-v1') {
+      if (fn === 'get-version') hex = E.uint(ch.version);
+      else if (fn === 'get-live') hex = E.list(ch.live.map(E.uint));
+      else if (fn === 'get-height') hex = E.uint(ch.height);
+      else if (fn === 'get-items') {
+        const raw = arg0.replace(/^0x0b/, ''), count = parseInt(raw.slice(0, 8), 16), ids = [];
+        for (let i = 0; i < count; i++) ids.push(Number(BigInt('0x' + raw.slice(8 + i * 34 + 2, 8 + (i + 1) * 34))));
+        n.lastItemsIds = ids;
+        hex = E.list(ids.map((id) => (ch.items[id] ? E.some(E.item(ch.items[id])) : E.none())));
+      }
+    } else if (fn === 'get-top10') {
+      const board = Buffer.from(arg0.replace(/^0x0d/, '').slice(8), 'hex').toString();
+      hex = E.list((ch.scores[board] || []).map((s) => E.some(E.tuple({ name: E.ascii(s.name), player: E.principal(ADDR), score: E.uint(s.score), 'burn-height': E.uint(s.burn),
+        'engine-id': E.uint(1), 'replay-hash': E.buff(new Uint8Array(32)) }))));
+    }
+    if (hex === undefined) return { ok: true, status: 200, json: async () => ({ okay: false, cause: 'no such read ' + fn }) };
+    return { ok: true, status: 200, json: async () => ({ okay: true, result: hex }) };
+  };
+  n.win = win; n.S = win.XAScreen; n.E = E; n.C = C;
+  n.calls = (name) => n.log.filter((l) => l.contract === 'xtrata-screen-v1' && (!name || l.fn === name)).length;
+  n.reset = () => { n.log.length = 0; };
+  return n;
+}
+const settle = async (n) => { for (let i = 0; i < 20; i++) { await new Promise((r) => setImmediate(r)); if (!n.S._t.state.busy) break; } await new Promise((r) => setImmediate(r)); };
+const on = (n, patch) => { n.S.configure(Object.assign({ contract: SCREEN }, patch || {})); return n; };
+
+// A recording 2D context: every fillText / drawImage is kept. measureText is 10 px per character.
+function ctx() {
+  const c = { texts: [], images: [], rects: 0, saves: 0, restores: 0 };
+  for (const k of ['setTransform', 'beginPath', 'rect', 'clip', 'strokeRect']) c[k] = () => {};
+  c.save = () => { c.saves++; }; c.restore = () => { c.restores++; };
+  c.fillRect = () => { c.rects++; };
+  c.fillText = (t, x, y) => { c.texts.push(String(t)); };
+  c.measureText = (t) => ({ width: String(t).length * 10 });
+  c.drawImage = (img) => { c.images.push(img); };
+  return c;
+}
+const draw = (S, d) => { const x = ctx(); S.paint(x, 1280, 720, Object.assign({ height: 1000, day: 7, live: true, blocksPerDay: 144, scorers: [], items: [], t: 0 }, d)); return x; };
+const has = (x, t) => x.texts.includes(t);
+const IDLE = 'EVERY TOP SCORE LIVES ON BITCOIN';
+
+/* ------------------------------------------------------------ 1  off / unreachable */
+test('1a off by default: no contract, no reads, refresh says off, paint is the idle panel', async () => {
+  const n = boot();
+  eq(n.S.enabled(), false);
+  eq(n.S.start(), false);
+  eq(await n.S.refresh(true), { ok: false, changed: false, error: 'off' });
+  eq(n.log.length, 0, 'no read was made');
+  eq(n.S.snapshot(), null); eq(n.S.items(), []);
+  eq(n.win.timers.length, 0, 'no poll timer');
+  const x = draw(n.S, { items: n.S.activeItems(n.S.items(), 1000) });
+  ok(has(x, 'BITCOIN DAY') && has(x, '7') && has(x, 'LATEST SCORERS'));
+  ok(x.texts.filter((t) => t === IDLE).length >= 2, 'idle line in the panel and in the default ticker');
+  ok(has(x, 'NO SCORES YET TODAY'));
+  eq(x.saves, x.restores, 'paint balances save/restore');
+});
+
+test('1b chain unreachable (HTTP 503, or fetch rejecting): start does not throw, nothing cached, idle panel', async () => {
+  for (const mode of ['down', 'net']) {
+    const n = on(boot()); n[mode] = true;
+    eq(n.S.start(), true, 'enabled and polling');
+    await settle(n);
+    eq(n.S.snapshot(), null, mode); eq(n.S.items(), []);
+    const r = await n.S.refresh(true);
+    eq(r.ok, false); eq(r.changed, false); ok(/HTTP 503|network down/.test(r.error), r.error);
+    const x = draw(n.S, { items: n.S.activeItems(n.S.items(), 1000) });
+    ok(x.texts.filter((t) => t === IDLE).length >= 2); ok(has(x, 'BITCOIN DAY'));
+    eq(n.S._t.state.busy, false, 'busy flag released after a failure');
+  }
+});
+
+test('1c a contract that answers an error (okay:false) is a failed read, not an empty screen', async () => {
+  const n = on(boot()); n.failFn = new Set();
+  n.win.fetch = async () => ({ ok: true, status: 200, json: async () => ({ okay: false, cause: 'runtime error' }) });
+  const r = await n.S.refresh(true);
+  eq(r, { ok: false, changed: false, error: 'runtime error' });
+  eq(n.S.snapshot(), null);
+});
+
+/* ------------------------------------------------------------ 2  live items */
+test('2a live items are read in the contract\'s live order, with every field mapped and clamped', async () => {
+  const n = on(boot({ version: 4, live: [9, 3, 5], items: {
+    9: { kind: 1, head: 'NEWS HEAD', body: 'news body', weight: 3, startsAt: 100, endsAt: 9000 },
+    3: { kind: 0, head: 'hi', body: '', weight: 99 },
+    5: { kind: 2, head: 'BUY', body: 'ad body', paid: true, weight: 0, days: 3, price: 10 } } }));
+  n.S.start(); await settle(n);
+  const snap = n.S.snapshot();
+  eq(snap.items.map((i) => i.id), [9, 3, 5], 'live order kept');
+  eq(snap.version, 4); eq(snap.height, 5000); ok(snap.at > 0);
+  const [news, msg, ad] = snap.items;
+  eq([news.kind, news.head, news.body, news.weight, news.startsAt, news.endsAt, news.status, news.hidden, news.paid], [1, 'NEWS HEAD', 'news body', 3, 100, 9000, 1, false, false]);
+  eq(msg.weight, 10, 'weight clamps to 10'); eq(ad.weight, 1, 'weight 0 clamps up to 1');
+  eq([ad.kind, ad.paid], [2, true]);
+  eq(n.S.items().map((i) => i.id), [9, 3, 5], 'items() is the snapshot');
+});
+
+test('2b ids are fetched 10 at a time, capped at maxLive (32), and a missing row (none) is skipped without shifting the others', async () => {
+  const live = [], items = {};
+  for (let i = 1; i <= 40; i++) { live.push(i); items[i] = { head: 'M' + i }; }
+  delete items[12];                                   // row 12 comes back as none
+  const n = on(boot({ live, items }));
+  eq(n.S.config().maxLive, 32);
+  await n.S.refresh(true);
+  eq(n.calls('get-items'), 4, '32 ids = chunks of 10,10,10,2');
+  const ids = n.S.items().map((i) => i.id);
+  eq(ids.length, 31); ok(!ids.includes(12) && !ids.includes(33) && ids[0] === 1 && ids[ids.length - 1] === 32);
+  eq(n.S.items().find((i) => i.id === 13).head, 'M13', 'head matches its own id after the skipped row');
+});
+
+test('2c head and body are cut to the contract\'s 80 / 240, unknown kinds fall back to MESSAGE', () => {
+  const S = boot().S;
+  const it = S.normalizeItem(5, { kind: 7, head: 'h'.repeat(120), body: 'b'.repeat(400), status: 1 });
+  eq([it.head.length, it.body.length, it.kind], [80, 240, 0]);
+  eq(S.normalizeItem(2, null).head, '', 'null row is safe');
+});
+
+/* ------------------------------------------------------------ 3  what is shown */
+test('3a a paid ad is labelled AD · PAID, a free ad AD, a paid message just MESSAGE; news is NEWS', async () => {
+  const S = boot().S, mk = (kind, paid) => S.normalizeItem(1, { kind, head: 'H', body: 'B', status: 1, paid });
+  eq(has(draw(S, { items: [mk(2, true)] }), 'AD · PAID'), true);
+  eq(has(draw(S, { items: [mk(2, false)] }), 'AD'), true);
+  eq(has(draw(S, { items: [mk(2, false)] }), 'AD · PAID'), false);
+  const m = draw(S, { items: [mk(0, true)] });
+  ok(has(m, 'MESSAGE') && !has(m, 'MESSAGE · PAID'), 'a paid message carries no PAID tag');
+  ok(has(draw(S, { items: [mk(1, false)] }), 'NEWS'));
+});
+
+test('3b the feature panel shows the head upper-cased and the body wrapped; an empty list is the idle panel', () => {
+  const S = boot().S;
+  const x = draw(S, { items: [S.normalizeItem(1, { kind: 1, head: 'Big news', body: 'one two three', status: 1 })] });
+  ok(has(x, 'BIG NEWS') && has(x, 'one two three'));
+  eq(x.texts.filter((t) => t === IDLE).length, 0, 'no idle panel and no default ticker while a feature is up');
+  ok(draw(S, { items: [] }).texts.filter((t) => t === IDLE).length >= 2);
+  eq(draw(S, { items: [S.normalizeItem(1, { kind: 0, head: '', body: '', status: 1 })] }).texts.filter((t) => t === IDLE).length >= 2, true, 'an empty message is not featured');
+});
+
+test('3c ticker: messages and news only, by id, news by headline, upper-case; the default line when empty', () => {
+  const S = boot().S, mk = (id, kind, head, body) => S.normalizeItem(id, { kind, head, body, status: 1 });
+  eq(S.tickerText([mk(8, 0, 'last', ''), mk(2, 1, 'Headline', 'ignored body'), mk(5, 2, 'AD HEAD', 'x'), mk(3, 0, '', 'body only')]), 'HEADLINE   ◆   BODY ONLY   ◆   LAST');
+  eq(S.tickerText([]), '');
+  ok(has(draw(S, { items: [mk(1, 1, 'Scrolling', '')] }), 'SCROLLING'));
+  ok(has(draw(S, { items: [] }), IDLE));
+});
+
+test('3d rotation: one item per rotateSecs, same for everyone at the same t, heavier items come round more often', () => {
+  const S = boot().S, mk = (id, w) => S.normalizeItem(id, { kind: 1, head: 'H' + id, status: 1, weight: w });
+  const items = [mk(3, 1), mk(1, 3), mk(2, 1)];
+  const seq = [];
+  for (let k = 0; k < 6; k++) seq.push(S.featureAt(items, k * 12, 12).id);
+  eq(seq, [1, 2, 3, 1, 1, 1], 'layer 1 = all by id, layers 2-3 = the weight-3 item');
+  eq(S.featureAt(items, 12 * 5, 12).id, 1, 'wraps round after 5 slots (3 + 1 + 1)');
+  eq(S.featureAt(items, 5, 12).id, S.featureAt(items, 0, 12).id, 'stable inside a slot');
+  eq(S.featureAt(items.slice().reverse(), 0, 12).id, 1, 'input order does not matter');
+  eq(S.featureAt([], 0, 12), null);
+  eq(S.featureAt(items, -50, 12).id, 1, 'negative time is clamped');
+});
+
+test('3e wrapText wraps at the width, stops at maxLines with an ellipsis, and ago() formats block ages', () => {
+  const S = boot().S, m = (s) => s.length;
+  eq(S.wrapText(m, 'aa bb cc dd', 5, 5), ['aa bb', 'cc dd']);
+  eq(S.wrapText(m, 'aa bb cc dd ee', 5, 2), ['aa bb', 'cc d…']);
+  eq(S.wrapText(m, '', 5, 2), []);
+  eq(S.wrapText(m, 'unbreakable', 3, 2), ['unbreakable'], 'a single long word is kept whole');
+  eq([0, 1, 5, 6, 143, 144, 300].map(S.ago), ['1M', '10M', '50M', '1H', '24H', '1D', '2D']);
+});
+
+/* ------------------------------------------------------------ 4  review lane / expiry / paused */
+test('4a review-lane (status 0), rejected/retired and hidden items are never active; approval makes one appear', async () => {
+  const n = on(boot({ version: 1, live: [1, 2, 3, 4, 5], height: 5000, items: {
+    1: { head: 'LIVE', status: 1 }, 2: { head: 'PENDING', status: 0, paid: true }, 3: { head: 'REJECTED', status: 2 },
+    4: { head: 'HIDDEN', status: 1, hidden: true }, 5: { head: 'RETIRED', status: 3 } } }));
+  await n.S.refresh(true);
+  eq(n.S.items().length, 5, 'the snapshot is a faithful copy of what the contract lists');
+  const active = () => n.S.activeItems(n.S.items(), 5000).map((i) => i.head);
+  eq(active(), ['LIVE']);
+  const x = draw(n.S, { items: n.S.activeItems(n.S.items(), 5000) });
+  ok(!has(x, 'PENDING') && !has(x, 'HIDDEN') && !has(x, 'REJECTED'));
+  // a pending item the contract does not list is not even read
+  n.chain.items[7] = { head: 'NOT LISTED', status: 0 }; n.reset(); await n.S.refresh(true);
+  ok(!n.S.items().some((i) => i.id === 7), 'ids come only from get-live');
+  // approve 2 (status 1) and unhide 4: the version bumps, the screen follows
+  n.chain.items[2].status = 1; n.chain.items[4].hidden = false; n.chain.version = 2;
+  eq(await n.S.refresh(false), { ok: true, changed: true });
+  eq(active(), ['LIVE', 'PENDING', 'HIDDEN']);
+});
+
+test('4b expiry is decided here from the chain height: start inclusive, end exclusive; unknown height trusts the list', async () => {
+  const n = on(boot({ live: [1, 2, 3], height: 5000, items: {
+    1: { head: 'ENDED', startsAt: 100, endsAt: 4999 }, 2: { head: 'EDGE', startsAt: 5000, endsAt: 5001 }, 3: { head: 'FUTURE', startsAt: 5001, endsAt: 6000 } } }));
+  await n.S.refresh(true);
+  const heads = (h) => n.S.activeItems(n.S.items(), h).map((i) => i.head);
+  eq(heads(5000), ['EDGE']); eq(heads(4999), [], 'ends-at is exclusive'); eq(heads(5001), ['FUTURE']); eq(heads(4998), ['ENDED']);
+  eq(heads(0), ['ENDED', 'EDGE', 'FUTURE'], 'height 0 (not live) trusts the contract list');
+  eq(heads(null), ['ENDED', 'EDGE', 'FUTURE']);
+  eq(n.S.isActive(null, 5), false);
+});
+
+test('4c get-height failing is not fatal: the snapshot still loads with height null', async () => {
+  const n = on(boot({ live: [1], items: { 1: { head: 'X' } } })); n.failFn.add('get-height');
+  eq(await n.S.refresh(true), { ok: true, changed: true });
+  eq(n.S.snapshot().height, null); eq(n.S.items().length, 1);
+});
+
+test('4d a paused contract is not special to the client: it never reads is-paused and keeps showing what the contract lists', async () => {
+  const n = on(boot({ live: [1], items: { 1: { head: 'STILL UP' } } }));
+  await n.S.refresh(true);
+  ok(!n.log.some((l) => l.fn === 'is-paused'), 'no pause read');
+  eq(new Set(n.log.map((l) => l.fn)), new Set(['get-version', 'get-live', 'get-items', 'get-height']));
+  ok(has(draw(n.S, { items: n.S.activeItems(n.S.items(), 5000) }), 'STILL UP'));
+});
+
+test('4e the pending-per-buyer cap is contract-only: the client has no cap on pending items, only the live-set bound (maxLive)', () => {
+  const S = boot().S;
+  eq(S.config().maxLive, 32, 'matches MAX-LIVE u32 in xtrata-screen-v1.clar');
+  eq(typeof S.config().maxPending, 'undefined');
+});
+
+/* ------------------------------------------------------------ 5  latest scorers */
+test('5 latest scorers from a canned get-top10 response: window, newest first, dedupe, limit, formatting, drawn rows', async () => {
+  const n = on(boot({ scores: {
+    A: [{ name: 'AAA', score: 500, burn: 4990 }, { name: 'OLD', score: 900, burn: 4000 }, { name: 'FUT', score: 1, burn: 5100 }],
+    B: [{ name: 'BOB', score: 70, burn: 4995 }, { name: 'AAA', score: 500, burn: 4980 }, { name: 'ZED', score: 3, burn: 0 }] } }));
+  const boards = [];
+  for (const [b, game, colour] of [['A', 'Star Patrol', '#f00'], ['B', 'Block Breaker Deluxe', '#0f0']]) {
+    const r = await n.win.XAScores.getTop10(b, 0, true);
+    eq(r.ok, true); boards.push({ game, colour, mode: 'score', entries: r.entries });
+  }
+  eq(boards[0].entries.map((e) => e.name), ['AAA', 'OLD', 'FUT'], 'decoded by the score client');
+  const fmt = (mode, s) => mode + ':' + s;
+  const rows = n.S.latestScorers(boards, 5000, 288, fmt, 8);
+  eq(rows.map((r) => r.name + '@' + r.age), ['BOB@5', 'AAA@10', 'AAA@20'], 'newest first; OLD (age 1000), FUT (negative) and burn 0 dropped');
+  eq(rows[0], { game: 'Block Breaker Deluxe', colour: '#0f0', name: 'BOB', score: 'score:70', age: 5, burn: 4995 });
+  // same game+name+score twice is one row; same name on another board is kept
+  const dup = n.S.latestScorers([{ game: 'G', mode: 'm', entries: [{ name: 'X', score: 1, burn: 90 }, { name: 'X', score: 1, burn: 80 }, { name: 'X', score: 2, burn: 70 }] }], 100, 288, null, 8);
+  eq(dup.map((r) => r.score), ['1', '2'], 'without fmt the score is a string');
+  const many = [{ game: 'G', mode: 'm', entries: Array.from({ length: 12 }, (_, i) => ({ name: 'P' + i, score: i, burn: 100 + i })) }];
+  eq(n.S.latestScorers(many, 200, 288, null, 8).length, 8, 'limit 8'); eq(n.S.latestScorers(many, 200, 288, null, 3).length, 3);
+  eq(n.S.latestScorers(many, 0, 288, null, 8).length, 8, 'no height known: no window, age 0');
+  eq(n.S.latestScorers(null, 5, 288), []);
+  const x = draw(n.S, { scorers: rows });
+  ok(has(x, 'BLOCK BREAKER') && has(x, 'STAR PATROL') && has(x, 'BOB') && has(x, 'score:70'), 'game cut to 13 chars upper-case');
+  ok(has(x, '50M') && !has(x, 'NO SCORES YET TODAY'));
+});
+
+/* ------------------------------------------------------------ 6  pictures */
+function pictureHarness(n, mode) {
+  const win = n.win, st = { loads: [], imgs: [], blobs: 0 };
+  win.Blob = class { constructor(p) { st.blobs++; this.p = p; } };
+  win.URL = { createObjectURL: () => 'blob:mock' };
+  win.Image = class { constructor() { this.naturalWidth = 200; this.naturalHeight = 100; st.imgs.push(this); } set src(v) { this._src = v; } };
+  win.XAWorld.loadImageBytes = (e) => { st.loads.push(e); return mode === 'fail' ? Promise.reject(new Error('hash mismatch')) : Promise.resolve(new Uint8Array([1, 2, 3])); };
+  return st;
+}
+test('6a a picture slot: the mock inscription id + hash go to loadImageBytes once; drawn only after it decodes; picture event fires', async () => {
+  const hash = new Uint8Array(32).fill(7);
+  const n = on(boot({ live: [1, 2], items: { 1: { kind: 2, head: 'PIC', body: 'b', imageId: 777, imageHash: hash, imageSize: 4096, paid: true }, 2: { kind: 1, head: 'PLAIN' } } }));
+  const st = pictureHarness(n, 'ok'), events = [];
+  await n.S.refresh(true);
+  const [pic, plain] = n.S.items();
+  eq([pic.imageId, pic.imageSize], [777, 4096]); eq(Array.from(pic.imageHash), Array.from(hash)); ok(n.S.hasPicture(pic)); ok(!n.S.hasPicture(plain));
+  n.S.onChange((s, why) => events.push(why));
+  let x = draw(n.S, { items: [pic] });
+  eq(st.loads.length, 1); eq([st.loads[0].imageId, Array.from(st.loads[0].imageHash).length], [777, 32]);
+  eq(x.images.length, 0, 'not drawn before it is decoded');
+  await settle(n); st.imgs[0].onload();
+  eq(events, ['picture'], 'listeners are told so the hall repaints');
+  x = draw(n.S, { items: [pic] });
+  eq(x.images.length, 1, 'drawn once decoded'); eq(st.loads.length, 1, 'loaded once only'); eq(st.blobs, 1);
+  draw(n.S, { items: [plain] }); eq(st.loads.length, 1, 'a no-picture item loads nothing');
+});
+
+test('6b hasPicture needs a size, a hash and an id; a failed picture is never drawn and never retried', async () => {
+  const S = boot().S, h = new Uint8Array(32);
+  const base = { kind: 2, head: 'P', status: 1, 'image-id': 5, 'image-hash': h, 'image-size': 10 };
+  ok(S.hasPicture(S.normalizeItem(1, base)));
+  for (const bad of [{ 'image-id': 0 }, { 'image-size': 0 }, { 'image-hash': null }]) ok(!S.hasPicture(S.normalizeItem(1, Object.assign({}, base, bad))), JSON.stringify(Object.keys(bad)));
+  ok(!S.hasPicture(null));
+  const n = boot(); const st = pictureHarness(n, 'fail');
+  const it = n.S.normalizeItem(9, base);
+  for (let i = 0; i < 3; i++) { await settle(n); eq(draw(n.S, { items: [it] }).images.length, 0); }
+  eq(st.loads.length, 1, 'one attempt only');
+});
+
+/* ------------------------------------------------------------ 7  failed read keeps last good state */
+test('7a a failed read keeps the last good snapshot (and its version), at every step of the load', async () => {
+  const n = on(boot({ version: 3, live: [1, 2], items: { 1: { head: 'ONE' }, 2: { head: 'TWO' } } }));
+  eq(await n.S.refresh(true), { ok: true, changed: true });
+  const good = JSON.stringify(n.S.snapshot());
+  n.chain.version = 4; n.chain.items[2].head = 'TWO v4';
+  for (const fn of ['get-version', 'get-live', 'get-items']) {
+    n.failFn = new Set([fn]);
+    const r = await n.S.refresh(false);
+    eq([r.ok, r.changed], [false, false], fn);
+    eq(JSON.stringify(n.S.snapshot()), good, fn + ' failure leaves the snapshot alone');
+    eq(n.S.items().map((i) => i.head), ['ONE', 'TWO']);
+    eq(n.S._t.state.version, 3, 'version not advanced by a failed load, so the next poll retries');
+    ok(has(draw(n.S, { items: n.S.activeItems(n.S.items(), 5000) }), 'ONE'), 'still drawn from the old snapshot');
+  }
+  n.failFn = new Set(); n.down = true; ok(!(await n.S.refresh(true)).ok); eq(JSON.stringify(n.S.snapshot()), good, 'whole node down');
+  n.down = false;
+  eq(await n.S.refresh(false), { ok: true, changed: true }, 'recovery picks up the new version');
+  eq(n.S.items().map((i) => i.head), ['ONE', 'TWO v4']);
+});
+
+test('7b an empty live list from a healthy node IS "no news" (and replaces the old snapshot); a failed read is not', async () => {
+  const n = on(boot({ version: 1, live: [1], items: { 1: { head: 'ONE' } } }));
+  await n.S.refresh(true); eq(n.S.items().length, 1);
+  n.chain.live = []; n.chain.version = 2;
+  eq(await n.S.refresh(false), { ok: true, changed: true }); eq(n.S.items(), []);
+});
+
+test('7c the last good snapshot is cached; a visitor whose node is down gets it back, hash bytes intact, via the cache event', async () => {
+  const hash = new Uint8Array(32).fill(9);
+  const a = on(boot({ version: 2, live: [1], items: { 1: { kind: 2, head: 'CACHED', imageId: 5, imageHash: hash, imageSize: 9 } } }));
+  await a.S.refresh(true);
+  const stored = a.win._store['xa-screen-snap-v1']; ok(stored && stored.includes('$hex'), 'Uint8Array stored as $hex');
+  const b = on(boot()); b.down = true; b.win._store['xa-screen-snap-v1'] = stored;
+  const why = []; b.S.onChange((s, w) => why.push(w));
+  eq(b.S.start(), true); await settle(b);
+  eq(why, ['cache'], 'cache announced, the failed refresh announces nothing');
+  eq(b.S.items().map((i) => i.head), ['CACHED']);
+  ok(b.S.items()[0].imageHash instanceof b.win.Uint8Array); eq(Array.from(b.S.items()[0].imageHash), Array.from(hash));
+  const bad = on(boot()); bad.down = true; bad.win._store['xa-screen-snap-v1'] = '{not json';
+  eq(bad.S.start(), true); await settle(bad); eq(bad.S.snapshot(), null, 'a corrupt cache is ignored');
+});
+
+/* ------------------------------------------------------------ 8  polling */
+test('8a polling reads only get-version until it changes; force reloads; a version bump reloads everything', async () => {
+  const n = on(boot({ version: 1, live: [1, 2], items: { 1: { head: 'A' }, 2: { head: 'B' } } }));
+  eq(await n.S.refresh(false), { ok: true, changed: true }, 'first load (no version yet)');
+  eq([n.calls('get-version'), n.calls('get-live'), n.calls('get-items'), n.calls('get-height')], [2, 1, 1, 1], 'one cheap check, then the load re-reads the version');
+  let events = 0; n.S.onChange(() => events++);
+  n.reset();
+  for (let i = 0; i < 3; i++) eq(await n.S.refresh(false), { ok: true, changed: false });
+  eq(n.calls(), 3); eq(n.calls('get-version'), 3, 'three polls = three version reads and nothing else'); eq(events, 0, 'no repaint trigger');
+  n.reset(); eq(await n.S.refresh(true), { ok: true, changed: true }); ok(n.calls('get-items') === 1 && n.calls('get-live') === 1, 'force reloads at the same version');
+  eq(events, 1);
+  n.chain.version = 2; n.chain.live = [2]; n.reset();
+  eq(await n.S.refresh(false), { ok: true, changed: true }); eq(n.S.items().map((i) => i.id), [2]); eq(events, 2);
+  eq(n.S.snapshot().version, 2);
+});
+
+test('8b start(): one poll timer however often it is called, never faster than every 30 s', async () => {
+  const n = on(boot({ version: 1, live: [1], items: { 1: { head: 'A' } } }), { pollMs: 1000 });
+  eq(n.S.start(), true); eq(n.S.start(), true);
+  await settle(n);
+  eq(n.win.timers.length, 1, 'a second start() adds no second timer'); eq(n.win.timers[0].ms, 30000, 'pollMs is floored at 30 s');
+  eq(n.calls('get-live'), 1, 'the second start() found the first still loading and skipped its forced refresh');
+});
+
+test('8c the poll timer only checks the version; stop() clears it; the default is 3 minutes; start reads XA_WORLD_CONFIG.screen', async () => {
+  const n = boot({ version: 1, live: [1], items: { 1: { head: 'A' } } });
+  n.win.XA_WORLD_CONFIG = { screen: SCREEN };
+  eq(n.S.config().pollMs, 180000);
+  eq(n.S.start(), true); await settle(n);
+  eq(n.S.config().contract, SCREEN);
+  eq(n.win.timers[0].ms, 180000);
+  n.reset(); n.win.timers[0].fn(); await settle(n);
+  eq(n.calls(), 1, 'a timer tick at an unchanged version is one read'); eq(n.calls('get-version'), 1);
+  n.chain.version = 5; n.chain.items[1].head = 'B'; n.reset(); n.win.timers[0].fn(); await settle(n);
+  eq(n.S.items()[0].head, 'B');
+  n.S.stop(); eq(n.win.timers[0].cleared, true); eq(n.S._t.state.timer, null);
+});
+
+test('8d a refresh while one is in flight is refused (reported as error "off")', async () => {
+  const n = on(boot({ version: 1, live: [1], items: { 1: { head: 'A' } } }));
+  const first = n.S.refresh(true), second = await n.S.refresh(true);
+  eq(second, { ok: false, changed: false, error: 'off' });
+  eq(await first, { ok: true, changed: true });
+});

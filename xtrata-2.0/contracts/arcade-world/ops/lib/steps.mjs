@@ -62,7 +62,12 @@ export async function signSteps(doc, opts) {
     if (nonce[s.as] == null) throw new Error(`no starting nonce for ${s.as}; pass --nonces ${s.as}=N`);
     if (s.deploy) {
       if (!/^[a-z0-9-]{3,40}$/.test(s.deploy)) throw new Error('bad contract name ' + s.deploy);
-      const source = readFileSync(join(CONTRACT_DIR, s.deploy + '.clar'), 'utf8');
+      let source = readFileSync(join(CONTRACT_DIR, s.deploy + '.clar'), 'utf8');
+      // `core`: a stand-in core's full id; used when the deployer is not the address that holds mock-xtrata-core (lines tagged ";; @principal core")
+      if (s.core) {
+        if (!/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(s.core)) throw new Error('bad core id ' + s.core);
+        source = source.split('\n').map((l) => (l.includes(';; @principal core') ? l.replace('.mock-xtrata-core', "'" + s.core) : l)).join('\n');
+      }
       const tx = await makeContractDeploy({ contractName: s.deploy, codeBody: source, senderKey: k.key, network: 'testnet',
         clarityVersion: ClarityVersion.Clarity4, postConditionMode: PostConditionMode.Deny, fee: s.fee || opts.deployFee || 2500000, nonce: nonce[s.as]++ });
       items.push({ label: `${i + 1}. ${s.as}: deploy ${s.deploy}`, hex: tx.serialize() });

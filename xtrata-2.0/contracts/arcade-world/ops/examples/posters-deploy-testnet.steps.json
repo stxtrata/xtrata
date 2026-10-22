@@ -1,0 +1,12 @@
+{
+ "owner": "ST9CFVFH8K05X0SN7YR5F1D8QZ128KYP4PJ928YS",
+ "contracts": {},
+ "steps": [
+  {
+   "as": "fees",
+   "deploy": "xtrata-posters-v1",
+   "note": "32-pin posters contract, deployed from the fees wizard because the deployer wizard already holds the older 16-pin copy under this name; the stand-in core is the deployer's",
+   "core": "ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.mock-xtrata-core"
+  }
+ ]
+}
