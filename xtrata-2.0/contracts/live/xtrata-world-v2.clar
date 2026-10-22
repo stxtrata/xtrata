@@ -66,6 +66,10 @@
 (define-constant MAX-CHILDREN u64)
 (define-constant MAX-OBJECTS u256)
 (define-constant MAX-NEST u4)
+(define-constant MAX-OBJECT-SLOTS u1024)
+(define-constant MAX-CHILD-SLOTS u256)
+(define-constant MAX-KINDS-PER-SPACE u16)
+(define-constant SLUG-CHARS "abcdefghijklmnopqrstuvwxyz0123456789-")
 (define-constant MAX-OBJECT-CHILDREN u32)
 (define-constant MAX-DESCENDANTS u10000)
 (define-constant MAX-BPS u2500)
@@ -133,6 +137,7 @@
     created-at: uint, updated-at: uint, version: uint
   })
 
+(define-map KindCounts uint uint)
 (define-map Slugs { parent: uint, slug: (string-ascii 24) } uint)
 (define-map Children { parent: uint, idx: uint } uint)
 (define-map Grants { space: uint, who: principal }
@@ -351,6 +356,38 @@
        (>= (get portals-out c) (get portals-out p))
        (or (not (get review p)) (get review c))))
 
+;; Effective policy: what actually applies in a space is the intersection of its own policy
+;; and every ancestor's, so tightening a parent tightens everything below it at once.
+(define-private (eff-step (i uint)
+  (ctx { cur: uint, runtimes: uint, tiers: uint, interfaces: uint, approved-only: bool,
+         portals-in: uint, portals-out: uint, review: bool, objects: uint, ceiling: uint }))
+  (if (is-eq (get cur ctx) u0)
+    ctx
+    (match (map-get? Spaces (get cur ctx))
+      s (let ((p (get policy s)))
+          { cur: (get parent s),
+            runtimes: (bit-and (get runtimes ctx) (get runtimes p)),
+            tiers: (bit-and (get tiers ctx) (get tiers p)),
+            interfaces: (bit-and (get interfaces ctx) (get interfaces p)),
+            approved-only: (or (get approved-only ctx) (get approved-only p)),
+            portals-in: (umax (get portals-in ctx) (get portals-in p)),
+            portals-out: (umax (get portals-out ctx) (get portals-out p)),
+            review: (or (get review ctx) (get review p)),
+            objects: (umin (get objects ctx) (get max-objects p)),
+            ceiling: (umin (get ceiling ctx) (+ (get depth s) (get max-depth p))) })
+      ctx)))
+
+(define-private (eff-policy (space uint))
+  (fold eff-step STEPS
+    { cur: space, runtimes: u15, tiers: u15, interfaces: u15, approved-only: false,
+      portals-in: u0, portals-out: u0, review: false, objects: MAX-OBJECTS, ceiling: MAX-DEPTH }))
+
+;; Slugs are path pieces: lowercase letters, digits and "-".
+(define-private (slug-char-ok (ch (string-ascii 1)) (acc bool))
+  (and acc (is-some (index-of? SLUG-CHARS ch))))
+(define-private (slug-ok? (slug (string-ascii 24)))
+  (and (> (len slug) u0) (fold slug-char-ok slug true)))
+
 ;; ---------------------------------------------------------------------------
 ;; Fees: this contract never holds money. Payer -> treasury and payer -> recipient.
 
@@ -372,7 +409,9 @@
     (proto (umax pct flat))
     (to-recipient (if (> eff proto) (- eff proto) u0)))
     (begin
-      (if (> proto u0) (try! (stx-transfer? proto tx-sender (var-get treasury))) true)
+      (if (and (> proto u0) (not (is-eq tx-sender (var-get treasury))))
+        (try! (stx-transfer? proto tx-sender (var-get treasury)))
+        true)
       (if (> to-recipient u0) (try! (stx-transfer? to-recipient tx-sender recipient)) true)
       (if (or (> proto u0) (> to-recipient u0))
         (begin
@@ -500,20 +539,21 @@
     (pp (get policy p))
     (id (var-get next-id))
     (depth (+ (get depth p) u1))
+    (eff (eff-policy parent))
     (root? (is-root-owner)))
     (asserts! (writable? parent) ERR-PAUSED)
     (asserts! (has-cap? parent CAP-CHILD) ERR-NOT-AUTHORIZED)
     (asserts! (<= kind u2) ERR-INVALID)
-    (asserts! (and (> (len slug) u0) (> (len title) u0)) ERR-INVALID)
+    (asserts! (and (slug-ok? slug) (> (len title) u0)) ERR-INVALID)
     (asserts! (<= runtime u3) ERR-INVALID)
     (asserts! (is-none (map-get? Slugs { parent: parent, slug: slug })) ERR-EXISTS)
     (asserts! (<= depth MAX-DEPTH) ERR-DEPTH)
-    (asserts! (<= depth (+ (get depth p) (get max-depth pp))) ERR-DEPTH)
+    (asserts! (<= depth (get ceiling eff)) ERR-DEPTH)
     (asserts! (< (get children p) (get max-children pp)) ERR-QUOTA)
-    (asserts! (< (get child-slots p) MAX-CHILDREN) ERR-QUOTA)
+    (asserts! (< (get child-slots p) MAX-CHILD-SLOTS) ERR-QUOTA)
     ;; native and hosted spaces run hall-level code: root owner only
     (asserts! (or root? (is-eq runtime u1) (is-eq runtime u2)) ERR-NOT-AUTHORIZED)
-    (asserts! (> (bit-and (get runtimes pp) (runtime-bit runtime)) u0) ERR-POLICY)
+    (asserts! (> (bit-and (get runtimes eff) (runtime-bit runtime)) u0) ERR-POLICY)
     (asserts! (policy-valid? policy) ERR-INVALID)
     (asserts! (policy-within? policy pp depth (get depth p)) ERR-POLICY)
     ;; descendants quota up the chain
@@ -559,8 +599,7 @@
     (asserts! (caller-is (space-owner id)) ERR-NOT-AUTHORIZED)
     (asserts! (<= runtime u3) ERR-INVALID)
     (asserts! (or (is-root-owner) (is-eq runtime u1) (is-eq runtime u2)) ERR-NOT-AUTHORIZED)
-    (asserts! (> (bit-and (get runtimes (get policy (unwrap! (map-get? Spaces (get parent s)) ERR-NOT-FOUND)))
-                          (runtime-bit runtime)) u0) ERR-POLICY)
+    (asserts! (> (bit-and (get runtimes (eff-policy (get parent s))) (runtime-bit runtime)) u0) ERR-POLICY)
     (map-set Spaces id (merge s { runtime: runtime, updated-at: stacks-block-height, version: (+ (get version s) u1) }))
     (print { event: "space-runtime", space: id, runtime: runtime, actor: contract-caller, version: (bump) })
     (ok true)))
@@ -707,7 +746,9 @@
     (asserts! (caller-is pending) ERR-NOT-AUTHORIZED)
     (asserts! (get transferable s) ERR-NOT-TRANSFERABLE)
     (let ((flat (get transfer-flat (fees-now))))
-      (if (> flat u0) (try! (stx-transfer? flat tx-sender (var-get treasury))) true)
+      (if (and (> flat u0) (not (is-eq tx-sender (var-get treasury))))
+        (try! (stx-transfer? flat tx-sender (var-get treasury)))
+        true)
       (if (> flat u0)
         (begin
           (print { event: "fee-paid", kind: "transfer", payer: tx-sender, recipient: (var-get treasury),
@@ -789,6 +830,8 @@
   (let (
     (id (var-get kind-count))
     (s (unwrap! (map-get? Spaces space) ERR-NOT-FOUND))
+    (eff (eff-policy space))
+    (made (default-to u0 (map-get? KindCounts space)))
     (admin? (or (is-root-owner) (admin-has? A-KINDS))))
     (asserts! (writable? space) ERR-PAUSED)
     (asserts! (or admin? (has-cap? space CAP-KIND)) ERR-NOT-AUTHORIZED)
@@ -796,7 +839,8 @@
     (asserts! (<= tier u3) ERR-INVALID)
     (asserts! (> (len name) u0) ERR-INVALID)
     (asserts! (or admin? (and (>= tier u1) (<= tier u2))) ERR-NOT-AUTHORIZED)
-    (asserts! (or admin? (> (bit-and (get tiers (get policy s)) (bit-shift-left u1 tier)) u0)) ERR-POLICY)
+    (asserts! (or admin? (> (bit-and (get tiers eff) (bit-shift-left u1 tier)) u0)) ERR-POLICY)
+    (asserts! (or admin? (< made MAX-KINDS-PER-SPACE)) ERR-QUOTA)
     (if (is-eq tier u0)
       (asserts! (> (len builtin) u0) ERR-INVALID)
       (begin
@@ -809,6 +853,7 @@
       by-space: space, hidden: false, approved: (<= tier u1), owner: tx-sender,
       added-at: stacks-block-height })
     (var-set kind-count (+ id u1))
+    (map-set KindCounts space (+ made u1))
     (print { event: "kind-registered", kind: id, category: category, tier: tier, space: space,
              actor: contract-caller, version: (bump) })
     (ok id)))
@@ -843,7 +888,7 @@
   (params (string-ascii 512)))
   (let (
     (s (unwrap! (map-get? Spaces space) ERR-NOT-FOUND))
-    (pol (get policy s))
+    (pol (eff-policy space))
     (id (var-get next-id))
     (po (if (is-eq parent-obj u0) none (map-get? Objects parent-obj)))
     (pd (match po p (get depth p) u0))
@@ -853,8 +898,8 @@
     (asserts! (> (len name) u0) ERR-INVALID)
     (asserts! (transform-ok? transform) ERR-INVALID)
     (asserts! (kind-ok? kind (get tiers pol)) ERR-BAD-KIND)
-    (asserts! (< (get objects s) (get max-objects pol)) ERR-QUOTA)
-    (asserts! (< (get object-slots s) MAX-OBJECTS) ERR-QUOTA)
+    (asserts! (< (get objects s) (get objects pol)) ERR-QUOTA)
+    (asserts! (< (get object-slots s) MAX-OBJECT-SLOTS) ERR-QUOTA)
     (asserts! (or (is-eq parent-obj u0)
                   (match po p (and (is-eq (get space p) space) (< pd MAX-NEST)
                                    (< (get children p) MAX-OBJECT-CHILDREN)
@@ -906,7 +951,7 @@
                 (has-cap? space CAP-OBJECT))
               ERR-NOT-AUTHORIZED)
     ;; where a review lane applies, only the owner or a moderator can make hidden content visible
-    (asserts! (or (not (get review (get policy s))) (not (is-eq state u0))
+    (asserts! (or (not (get review (eff-policy space))) (not (is-eq state u0))
                   (caller-is (space-owner space)) (has-cap? space CAP-MOD))
               ERR-NOT-AUTHORIZED)
     (if (is-eq state u2)
@@ -944,8 +989,7 @@
   (let (
     (o (unwrap! (map-get? Objects id) ERR-NOT-FOUND))
     (space (get space o))
-    (s (unwrap! (map-get? Spaces space) ERR-NOT-FOUND))
-    (pol (get policy s)))
+    (pol (eff-policy space)))
     (asserts! (writable? space) ERR-PAUSED)
     (asserts! (has-cap? space CAP-LINK) ERR-NOT-AUTHORIZED)
     (asserts! (< (get state o) u2) ERR-STATE)
@@ -968,15 +1012,14 @@
 
 (define-private (portal-ok? (src uint) (pt { to-space: uint, arrival: uint, path: (string-ascii 64) }))
   (let (
-    (ss (unwrap! (map-get? Spaces src) false))
-    (sp (get policy ss)))
+    (sp (eff-policy src)))
     (if (is-eq (get to-space pt) u0)
       ;; a site path: only spaces with unrestricted outbound doors
       (and (is-eq (get portals-out sp) u0) (path-ok? (get path pt)))
       (match (map-get? Spaces (get to-space pt))
         ts
           (let (
-            (tp (get policy ts))
+            (tp (eff-policy (get to-space pt)))
             (same-anchor (is-eq (anchor-of src) (anchor-of (get to-space pt))))
             (consented (is-eq (map-get? Consents { to: (get to-space pt), from: src }) (some (get epoch ts)))))
             (and

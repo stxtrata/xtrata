@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   world, standardWorld, S, U, P, ok, err, OK, CAP, ADM, POL, PLOT, idOf, good, pp, addr, Cl,
+  bindingsArg, hash32, mockInscription,
 } from './world2-helpers.mjs';
 
 test('root owner: two-step hand-over; only the owner changes things; admins have narrow caps', async () => {
@@ -420,4 +421,63 @@ test('every write bumps the version and prints an event', async () => {
   const r = call('set-treasury', [P(W[1])]);
   assert.equal(ro('get-version').value, v0 + 1n);
   assert.ok(r.events.some((e) => e.event === 'print_event' && pp(e.data.value).includes('treasury-set')));
+});
+
+test('slugs are path pieces: lowercase letters, digits and dashes only', async () => {
+  const w = await standardWorld();
+  const { deployer, ids } = w;
+  for (const bad of ['Hall', 'a b', 'a/b', 'a.b', 'café'.replace('é', 'e!'), 'UP']) {
+    assert.equal(pp(w.space(deployer, { parent: ids.arcade, slug: bad }).result), err(303), bad);
+  }
+  for (const good of ['a', 'room-2', '0', 'x-y-z-1']) {
+    assert.equal(w.space(deployer, { parent: ids.arcade, slug: good }).result.type, 'ok', good);
+  }
+});
+
+test('tightening a parent tightens everything below it at once (effective policy)', async () => {
+  const w = await standardWorld();
+  const { deployer, W, ids } = w;
+  const feed = `${deployer}.mock-xtrata-core`;
+  w.call('set-approved', [P(feed), Cl.bool(true)]);
+  const room = idOf(w.space(W[0], { parent: ids.alice, slug: 'room', policy: PLOT({ depth: 1 }) }));
+  w.setState(W[0], room, 1);
+  const sign = idOf(w.object(W[0], room, w.kinds.sign));
+  assert.equal(pp(w.call('set-bindings', [U(sign), bindingsArg([['feed', feed, 1]])], W[0]).result), OK);
+  // the plots domain stops allowing display bindings and recipes and composed rooms: alice's stored policy is untouched,
+  // but nothing below plots can use them any more
+  assert.equal(pp(w.call('set-policy', [U(ids.plots), w.polOf(ids.plots, { interfaces: 2, tiers: 1 })]).result), OK);
+  assert.equal(w.get(ids.alice).policy.value.interfaces.value, 3n);                 // stored value unchanged
+  assert.equal(pp(w.call('set-bindings', [U(sign), bindingsArg([['feed', feed, 1]])], W[0]).result), err(317));
+  assert.equal(pp(w.call('set-bindings', [U(sign), bindingsArg([['state', feed, 2]])], W[0]).result), OK);
+  assert.equal(pp(w.kind(W[0], { space: ids.alice, tier: 1, srcId: 1, hash: hash32(1), size: 10 }).result), err(307));
+  // object quota: plots now allows only 2 objects anywhere beneath it
+  w.call('set-policy', [U(ids.plots), w.polOf(ids.plots, { objects: 2 })]);
+  assert.equal(pp(w.object(W[0], room, w.kinds.stool).result.type), 'ok');             // second object in the room
+  assert.equal(pp(w.object(W[0], room, w.kinds.stool).result), err(305));              // third refused
+  // doors: closing doors in at the plots level shuts every space below it
+  const door = idOf(w.object(deployer, ids.lobby, w.kinds.door));
+  w.call('set-policy', [U(ids.plots), w.polOf(ids.plots, { pin: 2 })]);
+  assert.equal(pp(w.portal(deployer, door, room).result), err(316));
+  // child spaces cannot be deeper than any ancestor's ceiling
+  w.call('set-policy', [U(ids.plots), w.polOf(ids.plots, { depth: 2 })]);                // plots depth 1 + 2 = 3: alice (2) can hold rooms (3) only
+  assert.equal(pp(w.space(W[0], { parent: room, slug: 'attic', policy: PLOT({ depth: 0 }) }).result), err(306));
+});
+
+test('a kind registrar is limited per space, admins are not; the treasury wallet can still pay fees', async () => {
+  const w = await standardWorld();
+  const { deployer, W, ids, simnet } = w;
+  for (let i = 0; i < 16; i++) mockInscription(simnet, deployer, 900 + i, { hash: hash32(i), size: 100, creator: W[0] });
+  for (let i = 0; i < 16; i++) {
+    assert.equal(w.kind(W[0], { space: ids.alice, tier: 1, srcId: 900 + i, hash: hash32(i), size: 100, name: `k${i}` }).result.type, 'ok', `kind ${i}`);
+  }
+  assert.equal(pp(w.kind(W[0], { space: ids.alice, tier: 1, srcId: 900, hash: hash32(0), size: 100 }).result), err(305));
+  assert.equal(w.kind(deployer, { space: ids.alice, name: 'admin one' }).result.type, 'ok');
+  // a payer who is also the treasury pays nothing to itself and the action still works
+  w.call('set-treasury', [P(W[2])]);
+  w.call('set-fees', [U(0), U(100_000), U(0)]);
+  simnet.mineEmptyBurnBlocks(144);
+  w.grant(W[0], ids.alice, W[2], CAP.CHILD);
+  const before = w.bal(W[2]);
+  assert.equal(pp(w.space(W[2], { parent: ids.alice, slug: 'mine', owner: W[2], policy: PLOT({ depth: 1 }) }).result.type), 'ok');
+  assert.equal(w.bal(W[2]), before);
 });
