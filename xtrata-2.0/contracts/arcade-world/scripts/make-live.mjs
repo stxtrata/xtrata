@@ -9,7 +9,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const liveDir = join(root, '..', 'live');
 export const CORE = "'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3";
-export const NAMES = ['xtrata-posters-v1', 'xtrata-world-v1', 'xtrata-door-skins-v1', 'xtrata-world-v2'];
+export const NAMES = ['xtrata-posters-v1', 'xtrata-world-v1', 'xtrata-door-skins-v1', 'xtrata-world-v2', 'xtrata-screen-v1'];
 
 export function toLive(src) {
   return src.split('\n').map((line) =>
