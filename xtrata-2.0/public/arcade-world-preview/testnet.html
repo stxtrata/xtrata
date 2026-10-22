@@ -32975,6 +32975,87 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   var FILL = 'rgba(7,11,17,0.975)', FRAME = '#0f1722';
 
   // opts: { THREE, mkCanvas(w,h), tex(canvas), model, maxW, maxH (metres), color }
+  /* ---- looking into a room from its doorway ----
+     ROOM describes the room's "entry view" (build/snap-room.cjs takes it, and checks it matches this): a colour picture and a depth map, drawn from where a visitor stands the
+     moment they walk in (k: eye height and pitch, as in the casino's startAtDoor; z: how far inside the doorway, in the door's own space, -z being into the room), with a wider
+     lens (vfov) than the room uses, so there is a little picture to spare round the edges. The depth map holds the distance along the view axis in 12 bits over 0..zmax metres.
+     roomRay() follows a ray from anywhere into that picture and says what it sees: the first place it passes behind something in the depth map. It is used twice: by the doorway
+     window below, and by walkIn() for the glide you take when you step through. WIN is the older, flat version (a picture hung behind the doorway) for a room that has no depth map. */
+  var ROOM = { vfov: 80, aspect: 16 / 9, zmax: 32, k: { z: -1.48, eye: 1.6, pitch: -0.08 }, glide: 1500 };
+  var WIN = { dist: 6.5, camZ: 0.45, eye: 1.6, pitch: -0.08, fov: 68 };
+  var ROOM_GLSL = [
+    'uniform sampler2D uMap; uniform sampler2D uDepth; uniform vec3 uK; uniform vec3 uKf; uniform vec3 uKr; uniform vec3 uKu; uniform vec2 uTan; uniform float uZmax; uniform vec2 uFloor;',
+    'float roomZ(vec2 uv){ vec4 d = texture2D(uDepth, uv); return (floor(d.r * 255.0 + 0.5) * 16.0 + floor(floor(d.g * 255.0 + 0.5) / 16.0)) / 4095.0 * uZmax; }',
+    'vec2 roomUv(vec3 P, out float zc){ vec3 q = P - uK; zc = dot(q, uKf); float iz = 1.0 / max(zc, 0.001); return vec2(0.5 + 0.5 * dot(q, uKr) * iz / uTan.x, 0.5 + 0.5 * dot(q, uKu) * iz / uTan.y); }',
+    // what lies beyond the picture's edge: the floor just inside the doorway is below and behind the eye the picture was taken from, so it is not in it; the carpet is carried on, straight, from the picture's bottom edge
+    'vec4 roomBeyond(vec3 O, vec3 D){',
+    '  if (D.y > -0.02) return vec4(0.05, 0.02, 0.03, 0.0);',
+    '  float tf = (uFloor.x - O.y) / D.y; float xf = dot(O + D * tf - uK, uKr);',
+    '  float ext = max(0.0, uFloor.y - dot(O + D * tf - uK, uKf));',   // how far beyond the picture's bottom edge: the carpet darkens a little as it goes
+    '  return vec4(texture2D(uMap, vec2(clamp(0.5 + 0.5 * xf / uFloor.y / uTan.x, 0.002, 0.998), 0.012)).rgb * (0.95 - 0.25 * smoothstep(0.0, 2.5, ext)), 1.0);',
+    '}',
+    'vec4 roomRay(vec3 O, vec3 D){',
+    '  float df = dot(D, uKf), of = dot(O - uK, uKf), s0 = 0.0;',
+    '  if (of < 0.06) { if (df < 0.02) return vec4(0.0); s0 = (0.06 - of) / df; }',   // the picture starts where the ray reaches the eye it was taken from
+    '  float s1 = min((uZmax * 0.98 - of) / max(df, 0.02), s0 + 60.0), prev = s0, zc = 0.0, sh = s1; bool seen = false, hit = false;',
+    '  for (int i = 1; i <= 96; i++) {',
+    '    float t = float(i) / 96.0, s = s0 + (s1 - s0) * t * t; vec2 uv = roomUv(O + D * s, zc);',   // steps are finer near the viewer
+    '    if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) { seen = true; if (zc >= roomZ(uv)) { hit = true; sh = s; break; } } else if (seen) break;',
+    '    prev = s;',
+    '  }',
+    '  if (!hit) return roomBeyond(O, D);',
+    '  float a = prev, b = sh;',
+    '  for (int j = 0; j < 7; j++) { float m = 0.5 * (a + b); vec2 um = roomUv(O + D * m, zc); if (zc >= roomZ(um)) b = m; else a = m; }',
+    '  vec2 uv = clamp(roomUv(O + D * b, zc), 0.001, 0.999);',
+    '  float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));',
+    '  return vec4(mix(roomBeyond(O, D).rgb, texture2D(uMap, uv).rgb, smoothstep(0.0, 0.03, edge)), 1.0);',
+    '}'
+  ].join('\n');
+  function roomUniforms(T) {
+    var cp = Math.cos(ROOM.k.pitch), sp = Math.sin(ROOM.k.pitch), th = Math.tan(ROOM.vfov * Math.PI / 360);
+    return { uMap: { value: null }, uDepth: { value: null }, uK: { value: new T.Vector3(0, ROOM.k.eye, ROOM.k.z) }, uKf: { value: new T.Vector3(0, sp, -cp) }, uKr: { value: new T.Vector3(1, 0, 0) },
+      uKu: { value: new T.Vector3(0, cp, sp) }, uTan: { value: new T.Vector2(th * ROOM.aspect, th) }, uZmax: { value: ROOM.zmax }, uFloor: { value: new T.Vector2(0, 1.6) } };
+  }
+  // the eye's height above the door's own floor (floorY below the door's origin) fixes where the floor is, and how far ahead the picture's bottom row reaches it
+  function roomFloor(T, u, floorY) {
+    var cp = Math.cos(ROOM.k.pitch), sp = Math.sin(ROOM.k.pitch), th = Math.tan(ROOM.vfov * Math.PI / 360), yc = (2 * 0.012 - 1) * th;
+    u.uK.value.y = ROOM.k.eye - floorY; u.uFloor.value.set(-floorY, -ROOM.k.eye / (sp + cp * yc));   // (the bottom-row ray: forward + up * yc; its slope is sp + cp * yc, negative)
+  }
+  // The glide: a full-screen view of the room, from where the visitor's eye is now to where the room's own first view is, in ROOM.glide ms. It draws on a canvas of its own
+  // (a second small WebGL context, thrown away afterwards) that the caller places over the hall; when it arrives the picture is the room's first view, so the live room can take over.
+  function walkIn(T, group, win, camera, opts) {
+    var w = opts.width || window.innerWidth, h = opts.height || window.innerHeight, fov = opts.fov || camera.fov || 68, ms = opts.ms || ROOM.glide;
+    var renderer = new T.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(opts.pixelRatio || Math.min(1, 0.9 * (window.devicePixelRatio || 1))); renderer.setSize(w, h, false);
+    var dom = renderer.domElement; dom.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;z-index:8900;opacity:0;pointer-events:none';
+    var u = roomUniforms(T); u.uMap.value = win.map; u.uDepth.value = win.depth; u.uK.value.copy(win.uniforms.uK.value); u.uFloor.value.copy(win.uniforms.uFloor.value);
+    u.uO = { value: new T.Vector3() }; u.uF = { value: new T.Vector3(0, 0, -1) }; u.uR = { value: new T.Vector3(1, 0, 0) }; u.uU = { value: new T.Vector3(0, 1, 0) }; u.uCamTan = { value: new T.Vector2(1, 1) };
+    var mat = new T.ShaderMaterial({ uniforms: u, depthTest: false, depthWrite: false,
+      vertexShader: 'varying vec2 vN; void main(){ vN = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: 'varying vec2 vN; uniform vec3 uO; uniform vec3 uF; uniform vec3 uR; uniform vec3 uU; uniform vec2 uCamTan;\n' + ROOM_GLSL + '\n' +
+        'void main(){ vec3 D = normalize(uF + vN.x * uCamTan.x * uR + vN.y * uCamTan.y * uU); vec4 r = roomRay(uO, D); gl_FragColor = vec4(r.rgb + (1.0 - r.a) * vec3(0.05, 0.02, 0.03), 1.0); }' });
+    var geo = new T.PlaneGeometry(2, 2), mesh = new T.Mesh(geo, mat), scene = new T.Scene(), cam = new T.Camera(); mesh.frustumCulled = false; scene.add(mesh);
+    // from the eye as it is now (in the door's own space) to the room's first view
+    group.updateWorldMatrix(true, false); camera.updateMatrixWorld();
+    var cm = new T.Matrix4().multiplyMatrices(new T.Matrix4().copy(group.matrixWorld).invert(), camera.matrixWorld), p0 = new T.Vector3(), q0 = new T.Quaternion(), sc = new T.Vector3();
+    cm.decompose(p0, q0, sc);
+    var p1 = new T.Vector3(0, u.uK.value.y, ROOM.k.z), q1 = new T.Quaternion().setFromEuler(new T.Euler(ROOM.k.pitch, 0, 0, 'YXZ')), q = new T.Quaternion(), t0 = 0;
+    var tv = Math.tan(fov * Math.PI / 360); u.uCamTan.value.set(tv * w / h, tv);
+    function pose(e) {
+      u.uO.value.lerpVectors(p0, p1, e); q.copy(q0).slerp(q1, Math.min(1, e * 1.25));
+      u.uF.value.set(0, 0, -1).applyQuaternion(q); u.uR.value.set(1, 0, 0).applyQuaternion(q); u.uU.value.set(0, 1, 0).applyQuaternion(q);
+    }
+    pose(0);
+    return {
+      dom: dom, ms: ms, done: false,
+      render: function (now) {   // now: a clock in ms (performance.now())
+        if (!t0) t0 = now; var t = Math.min(1, (now - t0) / ms); this.done = t >= 1; this.t = t; pose(1 - Math.pow(1 - t, 2.2)); renderer.render(scene, cam);
+      },
+      resize: function (nw, nh) { renderer.setSize(nw, nh, false); u.uCamTan.value.set(tv * nw / nh, tv); },
+      dispose: function () { try { geo.dispose(); mat.dispose(); renderer.dispose(); renderer.forceContextLoss(); } catch (e) { } if (dom.parentNode) dom.parentNode.removeChild(dom); }
+    };
+  }
+
   function buildMesh(o) {
     var T = o.THREE, m = o.model, G = layoutOf(m.cfg.style, o.w, o.h), S = G.S, W = G.W, H = G.H;
     var s = Math.min((o.maxH || 2.25) / H, (o.maxW || 2.4) / W, 0.0105);       // metres per design unit
@@ -33210,49 +33291,77 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         way.material.map = portalParts.plain; way.material.needsUpdate = true; group.remove(portalParts.near, portalParts.far, portalParts.reveal);
       }
     }
-    /* a window onto the room behind the door: the room's "entry still" (a picture of what you see the moment you walk in) shown in the open doorway.
-       Interior mapping: for every pixel of the opening, a ray from your eye through it is carried on to a flat picture standing WIN.dist behind the doorway, so the
-       picture slides as you move (the right parallax for a picture that far away) and only what the opening lets you see is drawn. The picture is sized and aimed so
-       that from the doorway, where the room takes over, it is exactly the room's own first view (WIN mirrors the casino's startAtDoor: eye 1.6 m, pitch -0.08, fov 68).
-       The picture is drawn as it is (it is already a finished screen shot, so no tone mapping, no second colour conversion). */
-    var WIN = { dist: 6.5, camZ: 0.45, eye: 1.6, pitch: -0.08, fov: 68 }, win = null, winUrl = '';
-    function windowTo(url) {
-      url = url || ''; if (url === winUrl) return; winUrl = url;
-      if (win) { group.remove(win.mesh); win.mat.dispose(); if (win.map) win.map.dispose(); win = null; }
+    /* a window onto the room behind the door, made from the room's "entry view": a colour picture and a depth map of what you see the moment you walk in
+       (build/snap-room.cjs takes them; ROOM says how). For every pixel of the opening, a ray from your eye is followed on into that picture, found where it first goes
+       behind something in the depth map, and the colour there is drawn: so the ropes, the tables and the far wall slide past each other as you move, as they would
+       through a real doorway. A room with only a picture (no depth map) gets a flat picture hung 6.5 m behind the doorway instead (WIN): right from the doorway, less so beside it.
+       Both are drawn as they are (the pictures are finished screen shots: no tone mapping, no second colour conversion). Also here: the doorway's own soft shading, and the
+       warm light the open door lets out across the floor. */
+    var win = null, winKey = '', spill = null;
+    function spillTex() {
+      var c = o.mkCanvas(128, 128), x = c.getContext('2d'), g; x.scale(1, 2); g = x.createRadialGradient(64, 0, 2, 64, 0, 64);   // (an ellipse: fades out before the edge of the patch on every side)
+      g.addColorStop(0, 'rgba(255,196,120,0.55)'); g.addColorStop(0.35, 'rgba(255,170,90,0.22)'); g.addColorStop(1, 'rgba(255,150,70,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 64);
+      var t = new T.CanvasTexture(c); disposables.push(t); return t;
+    }
+    function windowTo(url, depthUrl) {
+      url = url || ''; depthUrl = depthUrl || ''; var key = url + '|' + depthUrl; if (key === winKey) return; winKey = key;
+      if (win) { group.remove(win.mesh); win.mat.dispose(); [win.map, win.depth].forEach(function (t) { if (t) t.dispose(); }); win = null; }
+      if (spill) { group.remove(spill); spill.material.dispose(); spill.geometry.dispose(); spill = null; }
       if (!url) return;
-      var maskTex = canvasTex(W + 2 * pad, H + 2 * pad, function (x) { x.translate(pad, pad); x.fillStyle = '#fff'; x.fill(new Path2D(G.shape.d)); });
-      var cp = Math.cos(WIN.pitch), sp = Math.sin(WIN.pitch), reach = (WIN.dist + WIN.camZ) / cp, half = Math.tan(WIN.fov * Math.PI / 360) * reach, mine = { url: url, map: null, mesh: null, mat: null, ready: false };
       group.updateWorldMatrix(true, false);   // the door's own space starts a few cm above the floor: the eye is measured from the floor
-      var dir = new T.Vector3(0, sp, -cp), cam0 = new T.Vector3(0, WIN.eye - group.matrixWorld.elements[13], WIN.camZ), p0 = cam0.clone().addScaledVector(dir, reach);
-      var mat = new T.ShaderMaterial({
-        uniforms: { uMap: { value: null }, uMask: { value: maskTex }, uCam: { value: new T.Vector3(0, 1.6, 3) }, uP0: { value: p0 }, uN: { value: dir }, uUp: { value: new T.Vector3(0, cp, sp) },
-          uHalf: { value: new T.Vector2(half * 2.3, half) }, uPos: { value: new T.Vector3(0, 0, 0.008) } },
-        vertexShader: 'varying vec2 vUv; varying vec3 vL; uniform vec3 uPos; void main(){ vUv = uv; vL = position + uPos; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-        fragmentShader: 'uniform sampler2D uMap; uniform sampler2D uMask; uniform vec3 uCam; uniform vec3 uP0; uniform vec3 uN; uniform vec3 uUp; uniform vec2 uHalf; varying vec2 vUv; varying vec3 vL;\n' +
+      var floorY = group.matrixWorld.elements[13];
+      var maskTex = canvasTex(W + 2 * pad, H + 2 * pad, function (x) { x.translate(pad, pad); x.fillStyle = '#fff'; x.fill(new Path2D(G.shape.d)); });
+      var mine = { url: url, depthUrl: depthUrl, map: null, depth: null, mesh: null, mat: null, ready: false, deep: !!depthUrl, uniforms: null }, u;
+      var shade = 'uniform sampler2D uMask; uniform vec3 uCam; varying vec2 vUv; varying vec3 vL;\n' +
+        'float openness(){ float m = 0.0; for (int i = 0; i < 8; i++) { float a = float(i) * 0.785398; m += texture2D(uMask, vUv + vec2(cos(a), sin(a)) * 0.05).a; } return m / 8.0; }\n';   // 1 well inside the opening, less near its edge
+      var vert = 'varying vec2 vUv; varying vec3 vL; uniform vec3 uPos; void main(){ vUv = uv; vL = position + uPos; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+      if (depthUrl) {
+        u = roomUniforms(T); roomFloor(T, u, floorY); u.uMask = { value: maskTex }; u.uCam = { value: new T.Vector3(0, 1.6, 3) }; u.uPos = { value: new T.Vector3(way.position.x, way.position.y, 0.008) };
+        mine.mat = new T.ShaderMaterial({ uniforms: u, vertexShader: vert, fragmentShader: shade + ROOM_GLSL + '\n' +
+          'void main(){ if (texture2D(uMask, vUv).a < 0.5) discard; vec4 r = roomRay(vL, normalize(vL - uCam)); vec3 c = r.rgb * mix(0.5, 1.0, smoothstep(0.55, 1.0, openness())); gl_FragColor = vec4(c, 1.0); }' });
+      } else {
+        var cp = Math.cos(WIN.pitch), sp = Math.sin(WIN.pitch), reach = (WIN.dist + WIN.camZ) / cp, half = Math.tan(ROOM.vfov * Math.PI / 360) * reach;   // (the picture is the wide one: the room's own 68 degrees are its middle)
+        var dir = new T.Vector3(0, sp, -cp), cam0 = new T.Vector3(0, WIN.eye - floorY, WIN.camZ), p0 = cam0.clone().addScaledVector(dir, reach);
+        u = { uMap: { value: null }, uMask: { value: maskTex }, uCam: { value: new T.Vector3(0, 1.6, 3) }, uP0: { value: p0 }, uN: { value: dir }, uUp: { value: new T.Vector3(0, cp, sp) },
+          uHalf: { value: new T.Vector2(half * 2.3, half) }, uPos: { value: new T.Vector3(way.position.x, way.position.y, 0.008) } };
+        mine.mat = new T.ShaderMaterial({ uniforms: u, vertexShader: vert, fragmentShader: shade + 'uniform sampler2D uMap; uniform vec3 uP0; uniform vec3 uN; uniform vec3 uUp; uniform vec2 uHalf;\n' +
           'void main(){ if (texture2D(uMask, vUv).a < 0.5) discard; vec3 d = vL - uCam; float dn = dot(d, uN); if (dn <= 0.0001) discard; float t = dot(uP0 - uCam, uN) / dn; if (t <= 0.0) discard;\n' +
           ' vec3 q = uCam + d * t - uP0; vec2 uv = vec2(0.5 + q.x / (2.0 * uHalf.x), 0.5 + dot(q, uUp) / (2.0 * uHalf.y));\n' +
-          ' if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.02, 0.015, 0.03, 1.0); return; } gl_FragColor = vec4(texture2D(uMap, uv).rgb, 1.0); }',
-        side: T.FrontSide
-      });
-      var mesh = new T.Mesh(wayGeo, mat); mesh.position.set(way.position.x, way.position.y, 0.008); mat.uniforms.uPos.value.set(way.position.x, way.position.y, 0.008);
-      mesh.raycast = function () {}; mesh.visible = false; mesh.frustumCulled = false; group.add(mesh);
-      mine.mesh = mesh; mine.mat = mat; win = mine;
-      new T.TextureLoader().load(url, function (t) {
+          ' if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.02, 0.015, 0.03, 1.0); return; }\n' +
+          ' gl_FragColor = vec4(texture2D(uMap, uv).rgb * mix(0.5, 1.0, smoothstep(0.55, 1.0, openness())), 1.0); }' });
+      }
+      mine.uniforms = u;
+      var mesh = new T.Mesh(wayGeo, mine.mat); mesh.position.set(way.position.x, way.position.y, 0.008);
+      mesh.raycast = function () {}; mesh.visible = false; mesh.frustumCulled = false; group.add(mesh); mine.mesh = mesh; win = mine;
+      var need = depthUrl ? 2 : 1, got = function () { if (--need > 0 || win !== mine) return; mine.ready = true; };
+      var loader = new T.TextureLoader(), fail = function () { /* no picture: the doorway stays the dark recess */ };
+      loader.load(url, function (t) {
         if (win !== mine) { t.dispose(); return; }
-        t.anisotropy = 4; mine.map = t; mat.uniforms.uMap.value = t; mat.uniforms.uHalf.value.x = half * (t.image.width / t.image.height); mine.ready = true;
-      }, undefined, function () { /* no picture: the doorway stays the dark recess */ });
+        t.anisotropy = 4; mine.map = t; u.uMap.value = t; if (!depthUrl) u.uHalf.value.x = u.uHalf.value.y * (t.image.width / t.image.height); got();
+      }, undefined, fail);
+      if (depthUrl) loader.load(depthUrl, function (t) {
+        if (win !== mine) { t.dispose(); return; }
+        t.minFilter = t.magFilter = T.NearestFilter; t.generateMipmaps = false; mine.depth = t; u.uDepth.value = t; got();
+      }, undefined, fail);
+      // the light that falls out of an open door across the floor
+      var sm = new T.MeshBasicMaterial({ map: spillTex(), transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: 0, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      var sg = new T.PlaneGeometry(3.6, 3.4); sg.rotateX(-Math.PI / 2);
+      spill = new T.Mesh(sg, sm); spill.position.set(0, 0.004 - floorY, 1.7 + 0.03); spill.visible = false; spill.raycast = function () {}; spill.renderOrder = 3; group.add(spill);
     }
-    // each frame: where the viewer's eye is in the door's own space, and whether the door is open enough to look through
-    function windowInfo() { return win ? { url: win.url, ready: win.ready, visible: win.mesh.visible, cam: win.mat.uniforms.uCam.value.toArray() } : null; }
-    function windowView(cam, open) {
-      if (!win) return; var show = !!open && win.ready; if (win.mesh.visible !== show) win.mesh.visible = show;
-      if (show) win.mat.uniforms.uCam.value.copy(cam);
+    function windowInfo() { return win ? { url: win.url, depth: win.depthUrl, deep: win.deep, ready: win.ready, visible: win.mesh.visible, spill: spill ? spill.material.opacity : 0, cam: win.uniforms.uCam.value.toArray() } : null; }
+    // each frame: where the viewer's eye is in the door's own space, and how far open the door is (0 shut .. 1 wide)
+    function windowView(cam, open, time) {
+      if (!win) return; var show = open > 0.02 && win.ready; if (win.mesh.visible !== show) win.mesh.visible = show;
+      if (spill) { var sv = open > 0.02; if (spill.visible !== sv) spill.visible = sv; if (sv) spill.material.opacity = Math.min(1, open * 1.3) * (0.94 + 0.06 * Math.sin((time || 0) * 2.3)); }
+      if (show) win.uniforms.uCam.value.copy(cam);
     }
+    // the glide you take when you walk in: see walkIn() below
+    function glide(camera, opts) { return win && win.ready && win.deep ? walkIn(T, group, win, camera, opts || {}) : null; }
     sync();
     function handle() {   // where the first leaf's handle is in the world, and which kind it is (for tests and previews)
       var h = leafObjs[0].hands[0], v = new T.Vector3(); group.updateMatrixWorld(true); h.g.getWorldPosition(v); return { x: v.x, y: v.y, z: v.z, type: h.type || 'canvas', turn: h.lever.rotation.z, porcelain: !!h.porcelain };
     }
-    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, window: windowTo, windowView: windowView, windowInfo: windowInfo, WIN: WIN, latch: latch, handle: handle, scale: s, size: { w: W * s, h: H * s }, layout: G };
+    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, window: windowTo, windowView: windowView, windowInfo: windowInfo, glide: glide, WIN: WIN, latch: latch, handle: handle, scale: s, size: { w: W * s, h: H * s }, layout: G };
   }
 
   // Sutherland-Hodgman: the part of a convex polygon between two vertical lines
@@ -33358,6 +33467,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.XADoors = {
     STYLES: STYLES, STYLE_NAMES: STYLE_NAMES, DoorModel: DoorModel, createSfx: createSfx, buildMesh: buildMesh,
     layoutOf: layoutOf, faceOps: faceOps, leverArt: leverArt, HW: { HANDLE_OF: HANDLE_OF, SCALE: HANDLE_SCALE, EXTENT: HW_EXTENT, TYPES: Object.keys(HW_EXTENT), of: hardwareOf, scale: hardwareScale, parts: hwParts }, drawOps: drawOps, clipStrip: clipStrip, rattleProfile: rattleProfile,
+    ROOM: ROOM, WIN: WIN, ROOM_GLSL: ROOM_GLSL, roomUniforms: roomUniforms, roomFloor: roomFloor,
     CONST: { HMAX: HMAX, MAXA: MAXA, DEF_OPEN: DEF_OPEN, KH: KH, CH: CH, KD: KD, CD: CD }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.XADoors;
@@ -34401,10 +34511,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
         var dm = bay.door && bay.door.model;
         if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
-        if (dm && bay.door.mesh.window && bay.group.visible) {   // a door to a room that has an entry still: the open doorway shows it (doors.js, windowTo)
-          var dl = bay.plan && bay.plan.link, rs = dl ? String(dl['target-room'] || dl.targetRoom || dl.room || '').toLowerCase() : '', st = rs && rs !== 'lobby' && env.stillFor ? env.stillFor(rs) : '';
-          if ((st || '') !== (bay.door.stillUrl || '')) { bay.door.stillUrl = st || ''; bay.door.mesh.window(st || ''); }
-          if (st) { bay.door.mesh.group.worldToLocal(winEye.copy(env.camera.position)); bay.door.mesh.windowView(winEye, dm.angle > 2); }
+        if (dm && bay.door.mesh.window && bay.group.visible) {   // a door to a room that has an entry view (a picture, and a depth map if it has one): the open doorway shows it (doors.js)
+          var dl = bay.plan && bay.plan.link, rs = dl ? String(dl['target-room'] || dl.targetRoom || dl.room || '').toLowerCase() : '', st = rs && rs !== 'lobby' && env.stillFor ? env.stillFor(rs) : null;
+          var sk = st && st.still ? st.still + '|' + (st.depth || '') : '';
+          if (sk !== (bay.door.stillKey || '')) { bay.door.stillKey = sk; bay.door.mesh.window(st && st.still, st && st.depth); }
+          if (sk) { bay.door.mesh.group.worldToLocal(winEye.copy(env.camera.position)); bay.door.mesh.windowView(winEye, Math.min(1, Math.abs(dm.angle) / ((dm.cfg && dm.cfg.openAngle) || 90)), time); }
         }
         if (dm && dm.awake) { dm.update(dt); bay.door.mesh.sync(); if (dm.settled()) { dm.awake = false; bay.door.mesh.sync(); } }
         var ls = bay.lightSpec;
@@ -34524,6 +34635,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       isGrabbing: function () { return !!grab; },
       setScope: function (fn) { scope = typeof fn === 'function' ? fn : null; },
       // A bay whose door opens onto a room built behind the wall: while the door is open its doorway is see-through (the hall owns the room).
+      // the glide into a room whose door has a depth map (null if there is none, or it has not loaded): a controller from doors.js walkIn; the hall puts its canvas over the screen
+      glideInto: function (i, opts) { var b = bays[i], m = b && b.door && b.door.mesh; return m && m.glide ? m.glide(env.camera, opts) : null; },
       setPortal: function (i, on) { var b = bays[i]; if (!b) return; b.portal = !!on; if (!on && b.portalOn) { b.portalOn = false; if (b.door && b.door.mesh.portal) b.door.mesh.portal(false); } },
       portalOpen: function (i) { var b = bays[i]; return !!(b && b.portalOn); },
       // Where a point of the world is, in the frame of bay i's door (x along the wall, z out from it into the room), when the door is open enough to
@@ -35066,7 +35179,7 @@ function buildRoom(){
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
-  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
+  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), glide:!!(roomUI&&roomUI.glide), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
   if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
   XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;   // read-only, for tests: where you are in bay i's open doorway
   XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
@@ -36335,7 +36448,7 @@ function buildPosters(){
   try{
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
-      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, stillFor:(slug)=>{ const r=roomCfg(slug); return r&&typeof r.still==='string'?r.still:'' }});
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, stillFor:(slug)=>{ const r=roomCfg(slug); return r&&typeof r.still==='string'&&r.still?{still:r.still,depth:typeof r.depth==='string'?r.depth:''}:null }});
     if(bayEngine) buildLobby();
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
@@ -37348,7 +37461,7 @@ function updateBayFocus(){
   if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
 }
 /* ---------- other rooms that take the whole screen (the casino) ----------
-   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO', still:'casino-entry.jpg' } } names
+   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO', still:'casino-entry.jpg', depth:'casino-entry-depth.png' } } names
    them. A room is either `src` (a URL the hall may frame: a file beside the hall) or `load` (a function the host gives, returning the room's page as text,
    which is framed as srcdoc: this is how the inscribed arcade opens a room that is its own inscription, hash-checked, see parent.template.html). Going in: a short loading screen over the hall,
    the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
@@ -37368,7 +37481,7 @@ function roomEls(){
   const back=document.createElement('button'); back.type='button'; back.textContent='← BACK TO THE LOBBY';
   back.style.cssText='position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9500;display:none;padding:9px 16px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer';
   back.addEventListener('click',e=>{ e.stopPropagation(); leaveRoom() });
-  document.body.append(still,load,back); roomUI={load,still,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
+  document.body.append(still,load,back); roomUI={load,still,glide:null,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
   window.addEventListener('message',e=>{ if(state==='room' && roomUI && roomUI.frame && e.source===roomUI.frame.contentWindow && e.data && e.data.xa==='leave-room') leaveRoom() });
   // the room says it has drawn its first frames ({xa:'room-ready'}), at any time after it loads, even while it is still hidden behind the hall
   window.addEventListener('message',e=>{ const f=roomUI&&roomUI.frame; if(f && e.source===f.contentWindow && e.data && e.data.xa==='room-ready'){ f.dataset.ready='1'; f.dispatchEvent(new Event('xa-room-ready')) } });
@@ -37419,8 +37532,17 @@ function enterRoom(id, bayIdx){
   U.title.textContent=String(cfg.title||id).toUpperCase(); U.sub.textContent='OPENING THE ROOM…';
   const still=typeof cfg.still==='string' && cfg.still;
   const showLoad=()=>{ U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1 };
-  if(still){   // the doorway you were looking into fills the screen and moves in a little, as a step forward would; the loading screen only comes if the room is slow
-    const S=U.still; S.style.transition='none'; S.style.backgroundImage='url("'+still.replace(/"/g,'%22')+'")'; S.style.transform='scale(1)'; S.style.opacity=0; S.style.display='block'; void S.offsetWidth;
+  // Best: the room has a depth map, so you glide forward from where you stand to where the room starts you, through the same view the doorway showed (a canvas of its own over the hall).
+  let glide=null;
+  if(still && cfg.depth && roomBay>=0 && bayEngine && bayEngine.glideInto){ try{ glide=bayEngine.glideInto(roomBay,{fov:camera.fov}) }catch(e){ glide=null; console.warn('room glide not available:',e) } }
+  if(glide){
+    U.glide=glide; document.body.appendChild(glide.dom); glide.render(performance.now()); void glide.dom.offsetWidth; glide.dom.style.transition='opacity .22s'; glide.dom.style.opacity=1;
+    let gw=innerWidth, gh=innerHeight;
+    const tick=(now)=>{ if(U.glide!==glide) return; if(innerWidth!==gw||innerHeight!==gh){ gw=innerWidth; gh=innerHeight; glide.resize(gw,gh) } glide.render(now); if(!glide.done) requestAnimationFrame(tick) };
+    requestAnimationFrame(tick);
+  } else if(still){   // else the doorway you were looking into fills the screen and moves in a little, as a step forward would; the loading screen only comes if the room is slow
+    const S=U.still; S.style.transition='none';   // (the picture is wider than the room's own view, 80 degrees up and down against 68, so it is shown at its middle)
+     S.style.backgroundImage='url("'+still.replace(/"/g,'%22')+'")'; S.style.backgroundSize='auto '+(100*Math.max(Math.tan(40*Math.PI/180)/Math.tan(34*Math.PI/180),(innerWidth/innerHeight)/(16/9))).toFixed(1)+'%';; S.style.transform='scale(1)'; S.style.opacity=0; S.style.display='block'; void S.offsetWidth;
     S.style.transition='opacity .25s,transform 2.6s cubic-bezier(.25,.6,.35,1)'; S.style.opacity=1; S.style.transform='scale(1.035)';
   } else showLoad();
   f.style.pointerEvents='auto';
@@ -37432,17 +37554,18 @@ function enterRoom(id, bayIdx){
     // Ready = the room has said so ({xa:'room-ready'}, after its first frames), and the still has been up for a beat. A room that never says it is ready is shown 2.5 s after it loads.
     let shown=false; clearTimeout(roomSlow);
     const reveal=()=>{ if(shown || state!=='room' || roomUI.frame!==f) return; shown=true; clearTimeout(roomSlow); clearTimeout(roomTimer);
-      f.style.visibility='visible'; U.still.style.opacity=0; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room'){ U.still.style.display='none'; U.load.style.display='none' } },450); U.back.style.display='block'; try{ f.focus() }catch(e){} };
+      f.style.visibility='visible'; U.still.style.opacity=0; U.load.style.opacity=0; if(U.glide){ const g=U.glide; U.glide=null; g.dom.style.transition='opacity .45s'; g.dom.style.opacity=0; setTimeout(()=>g.dispose(),520) } setTimeout(()=>{ if(state==='room'){ U.still.style.display='none'; U.load.style.display='none' } },450); U.back.style.display='block'; try{ f.focus() }catch(e){} };
     const when=(ms)=>setTimeout(reveal,Math.max(0,ms-(performance.now()-roomT0)));
-    if(f.dataset.ready) when(900); else f.addEventListener('xa-room-ready',()=>when(900),{once:true});
-    const late=()=>setTimeout(()=>when(900),2500); if(f.dataset.loaded) late(); else f.addEventListener('load',late,{once:true});
+    const MIN=glide?glide.ms+150:900;   // (a glide has to arrive before the live room, which starts where it ends, takes over)
+    if(f.dataset.ready) when(MIN); else f.addEventListener('xa-room-ready',()=>when(MIN),{once:true});
+    const late=()=>setTimeout(()=>when(MIN),2500); if(f.dataset.loaded) late(); else f.addEventListener('load',late,{once:true});
     roomSlow=setTimeout(()=>{ if(!shown && state==='room' && roomUI.frame===f) showLoad() },3500);
   } else if(ready) done(); else f.addEventListener('load',done,{once:true});
   roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ if(still) showLoad(); U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
 }
 function leaveRoom(){
   if(state!=='room' || !roomUI) return;
-  const U=roomUI; clearTimeout(roomTimer); clearTimeout(roomSlow); const hb=$('hallbar'); if(hb) hb.style.visibility=''; U.still.style.display='none'; U.still.style.opacity=0;
+  const U=roomUI; clearTimeout(roomTimer); clearTimeout(roomSlow); const hb=$('hallbar'); if(hb) hb.style.visibility=''; U.still.style.display='none'; U.still.style.opacity=0; if(U.glide){ U.glide.dispose(); U.glide=null }
   if(U.frame){ try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null; U.frameId='' }
   U.load.style.opacity=0; U.load.style.display='none'; U.back.style.display='none';
   state='out'; sfx.back(); try{ Room.exitGame() }catch(e){}

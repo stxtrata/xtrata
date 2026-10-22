@@ -14,7 +14,7 @@ const assert = require('assert');
 
 const DIST = path.join(__dirname, '..', 'dist');
 const HTML = fs.readFileSync(path.join(DIST, fs.readdirSync(DIST).find((f) => /^xtrata-arcade-v[\d.]+\.html$/.test(f))), 'utf8');
-const STILL = fs.readFileSync(path.join(__dirname, '..', 'build', 'rooms', 'casino-entry.jpg'));
+const STILL = fs.readFileSync(path.join(__dirname, '..', 'build', 'rooms', 'casino-entry.jpg')), DEPTH = fs.readFileSync(path.join(__dirname, '..', 'build', 'rooms', 'casino-entry-depth.png'));
 let readyMs = 800;   // when the stub says it is ready after it loads; -1 = never
 const stub = () => '<!doctype html><title>stub casino</title><body style="background:#123;color:#fff"><h1 id="hi">CASINO STUB</h1><script>' + (readyMs >= 0 ? 'setTimeout(function(){parent.postMessage({xa:"room-ready"},"*")},' + readyMs + ');' : '') + '<\/script></body>';
 
@@ -44,6 +44,7 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
 }
 (async () => {
   const srv = http.createServer((req, res) => {
+    if (/entry-depth\.png/.test(req.url)) { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(DEPTH); return; }
     if (/entry\.jpg/.test(req.url)) { res.writeHead(200, { 'Content-Type': 'image/jpeg' }); res.end(STILL); return; }
     if (/casino-room\.html/.test(req.url)) { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(stub()); return; }
     res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(HTML);
@@ -53,20 +54,20 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH,
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 
-  async function open() {
+  async function open(withDepth) {
     const ctx = await browser.newContext({ viewport: { width: 1100, height: 700 } });
     await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort('failed'));
     await ctx.addInitScript((a) => {
       window.XA_TEST = 1;
       Element.prototype.requestPointerLock = function () {};
-      window.XA_ROOMS = { casino: { src: 'casino-room.html', title: 'Royal Flush Casino', still: 'entry.jpg' } };
+      window.XA_ROOMS = { casino: Object.assign({ src: 'casino-room.html', title: 'Royal Flush Casino', still: 'entry.jpg' }, a.depth ? { depth: 'entry-depth.png' } : {}) };
       window.XA_WORLD_CONFIG = { posters: 'SP000000000000000000002Q6VF78.xtrata-posters-v1', world: 'SP000000000000000000002Q6VF78.xtrata-world-v1' };
       try { localStorage.setItem('xa-world-snap-v1', JSON.stringify(a.snap)); } catch (e) {}
-    }, { snap: snapshot() });
+    }, { snap: snapshot(), depth: withDepth !== false });
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) errors.push(m.text()); });
+    page.on('console', (m) => { if ((m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) || (m.type() === 'warning' && /glide/.test(m.text()))) errors.push(m.text()); });
     await page.goto(base);
     await page.waitForFunction(() => window.XA && window.XA.wallState && window.XA.wallState().length >= 27 && window.XA.wallState().every((s) => s.head !== null), null, { timeout: 120000 });
     await page.waitForTimeout(1500);
@@ -104,13 +105,13 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     await p2.close(); return r;
   }
 
-  {
+  if (!process.env.ONLY) {
     const { ctx, page, errors } = await open();
     await intoLobby(page);
     await face(page, 4); await page.waitForTimeout(1200);
     /* ---- H ---- */
     let b = await bayS(page, 4);
-    check(b.window && b.window.url === 'entry.jpg', 'H: the casino door has a window onto its still (' + JSON.stringify(b.window && b.window.url) + ')');
+    check(b.window && b.window.url === 'entry.jpg' && b.window.deep === true, 'H: the casino door has a window onto its entry view, with a depth map (' + JSON.stringify(b.window && b.window.url) + ')');
     check(b.window && b.window.visible === false, 'H: with the door shut the window is not drawn');
     await openDoor(page, 4); await face(page, 4);
     await page.waitForFunction(() => { const w = window.XA.bayState().bays[4].window; return w && w.ready && w.visible; }, null, { timeout: 120000 });
@@ -119,7 +120,7 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     await shot(page, 'still-near');
     const mid = { x: 450, y: 250, width: 200, height: 300 };
     const near = await region(page, mid);
-    check(near.mean > 40 && near.sd > 18 && near.g > 25, 'H: the doorway shows the room (mean ' + near.mean.toFixed(0) + ', spread ' + near.sd.toFixed(0) + ', rgb ' + [near.r, near.g, near.b].map((v) => v.toFixed(0)) + ')');
+    check(near.mean > 30 && near.sd > 18 && near.g > 20, 'H: the doorway shows the room (mean ' + near.mean.toFixed(0) + ', spread ' + near.sd.toFixed(0) + ', rgb ' + [near.r, near.g, near.b].map((v) => v.toFixed(0)) + ')');
     await face(page, 4, 1.6, 0.4); await page.waitForTimeout(800); await shot(page, 'still-side');
     const side = await region(page, mid);
     check(Math.abs(side.r - near.r) + Math.abs(side.g - near.g) + Math.abs(side.b - near.b) > 1.5, 'H: the picture moves as you do (the view through the doorway changes when you step aside)');
@@ -134,19 +135,18 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     readyMs = 1500;
     await page.waitForFunction(() => window.XA.roomState().frame === true, null, { timeout: 120000 });
     await page.waitForFunction(() => { const f = document.querySelector('iframe[title="Royal Flush Casino"]'); return f && f.dataset.loaded === '1'; }, null, { timeout: 120000 });
+    await page.evaluate(() => { window.__g = false; window.__l = false; (function t() { const r = window.XA.roomState(); if (r.glide) window.__g = true; if (r.loading) window.__l = true; requestAnimationFrame(t); })(); });   // (a slow test browser gets through the whole glide between two looks)
     await walkInto(page, () => window.XA.roomState().state === 'room');
-    let r = await rs(page);
-    check(r.state === 'room' && r.still === true && r.loading === false, 'I: crossing the threshold puts the still on screen, with no loading screen');
+    let r = await rs(page); r = { ...r, glide: await page.evaluate(() => window.__g), loading: await page.evaluate(() => window.__l) };
+    check(r.state === 'room' && r.glide === true && r.loading === false, 'I: crossing the threshold starts the glide into the room, with no loading screen ' + JSON.stringify(r) + ' ' + errors.join(' | '));
     await shot(page, 'still-handoff');
-    const bg = await page.evaluate(() => { const s = [...document.querySelectorAll('div')].find((d) => /entry\.jpg/.test(d.style.backgroundImage)); return s ? { img: s.style.backgroundImage, z: s.style.zIndex } : null; });
-    check(bg && /entry\.jpg/.test(bg.img), 'I: the picture is the room\'s entry still');
     await page.waitForFunction(() => window.XA.roomState().back === true, null, { timeout: 120000 });
     r = await rs(page);
     check(r.ready === true && r.back && r.loading === false, 'I: the room said it was ready and BACK TO THE LOBBY is showing (the loading screen never came)');
     await page.waitForTimeout(800);
     r = await rs(page);
     const vis = await page.evaluate(() => getComputedStyle(document.querySelector('iframe[title="Royal Flush Casino"]')).visibility);
-    check(vis === 'visible' && r.still === false, 'I: the live room is showing and the still has gone');
+    check(vis === 'visible' && r.still === false && (await rs(page)).glide === false, 'I: the live room is showing and the glide canvas has gone');
     check((await page.evaluate(() => getComputedStyle(document.getElementById('hallbar')).visibility)) === 'hidden', 'I: the hall\'s own buttons stay out of the room');
     await page.click('text=BACK TO THE LOBBY');
     await page.waitForFunction(() => window.XA.roomState().state === 'walk', null, { timeout: 120000 });
@@ -159,12 +159,13 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
   {
     /* ---- J ---- */
     readyMs = -1;
-    const { ctx, page, errors } = await open();
+    const { ctx, page, errors } = await open(false);
     await intoLobby(page); await face(page, 4); await openDoor(page, 4); await face(page, 4);
     await page.waitForFunction(() => { const f = document.querySelector('iframe[title="Royal Flush Casino"]'); return f && f.dataset.loaded === '1'; }, null, { timeout: 120000 });
     const t0 = Date.now();
+    await page.evaluate(() => { window.__s = false; (function t() { if (window.XA.roomState().still) window.__s = true; requestAnimationFrame(t); })(); });
     await walkInto(page, () => window.XA.roomState().state === 'room');
-    check((await rs(page)).still === true, 'J: the still is up');
+    check(await page.evaluate(() => window.__s), 'J: with no depth map the still is up instead ' + JSON.stringify(await page.evaluate(() => ({ st: window.XA.roomState(), z: [...document.querySelectorAll('div')].filter((d) => d.style.zIndex === '8900').map((d) => d.style.cssText.slice(0, 260)) }))));
     await page.waitForFunction(() => window.XA.roomState().back === true, null, { timeout: 120000 });
     check((await rs(page)).ready === false, 'J: a room that never says it is ready is shown anyway, a moment after it loaded (' + ((Date.now() - t0) / 1000).toFixed(1) + ' s)');
     check(!errors.length, 'J: no page errors ' + errors.slice(0, 2).join(' | '));

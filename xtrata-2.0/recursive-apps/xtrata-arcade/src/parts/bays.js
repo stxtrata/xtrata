@@ -485,10 +485,11 @@
         if (c && c.sim.update(dt)) { c.r.draw(); c.tex.needsUpdate = true; }
         var dm = bay.door && bay.door.model;
         if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
-        if (dm && bay.door.mesh.window && bay.group.visible) {   // a door to a room that has an entry still: the open doorway shows it (doors.js, windowTo)
-          var dl = bay.plan && bay.plan.link, rs = dl ? String(dl['target-room'] || dl.targetRoom || dl.room || '').toLowerCase() : '', st = rs && rs !== 'lobby' && env.stillFor ? env.stillFor(rs) : '';
-          if ((st || '') !== (bay.door.stillUrl || '')) { bay.door.stillUrl = st || ''; bay.door.mesh.window(st || ''); }
-          if (st) { bay.door.mesh.group.worldToLocal(winEye.copy(env.camera.position)); bay.door.mesh.windowView(winEye, dm.angle > 2); }
+        if (dm && bay.door.mesh.window && bay.group.visible) {   // a door to a room that has an entry view (a picture, and a depth map if it has one): the open doorway shows it (doors.js)
+          var dl = bay.plan && bay.plan.link, rs = dl ? String(dl['target-room'] || dl.targetRoom || dl.room || '').toLowerCase() : '', st = rs && rs !== 'lobby' && env.stillFor ? env.stillFor(rs) : null;
+          var sk = st && st.still ? st.still + '|' + (st.depth || '') : '';
+          if (sk !== (bay.door.stillKey || '')) { bay.door.stillKey = sk; bay.door.mesh.window(st && st.still, st && st.depth); }
+          if (sk) { bay.door.mesh.group.worldToLocal(winEye.copy(env.camera.position)); bay.door.mesh.windowView(winEye, Math.min(1, Math.abs(dm.angle) / ((dm.cfg && dm.cfg.openAngle) || 90)), time); }
         }
         if (dm && dm.awake) { dm.update(dt); bay.door.mesh.sync(); if (dm.settled()) { dm.awake = false; bay.door.mesh.sync(); } }
         var ls = bay.lightSpec;
@@ -608,6 +609,8 @@
       isGrabbing: function () { return !!grab; },
       setScope: function (fn) { scope = typeof fn === 'function' ? fn : null; },
       // A bay whose door opens onto a room built behind the wall: while the door is open its doorway is see-through (the hall owns the room).
+      // the glide into a room whose door has a depth map (null if there is none, or it has not loaded): a controller from doors.js walkIn; the hall puts its canvas over the screen
+      glideInto: function (i, opts) { var b = bays[i], m = b && b.door && b.door.mesh; return m && m.glide ? m.glide(env.camera, opts) : null; },
       setPortal: function (i, on) { var b = bays[i]; if (!b) return; b.portal = !!on; if (!on && b.portalOn) { b.portalOn = false; if (b.door && b.door.mesh.portal) b.door.mesh.portal(false); } },
       portalOpen: function (i) { var b = bays[i]; return !!(b && b.portalOn); },
       // Where a point of the world is, in the frame of bay i's door (x along the wall, z out from it into the room), when the door is open enough to

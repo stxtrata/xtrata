@@ -69,7 +69,7 @@ export function buildTestnetViewHtml({ world, posters, screen = '', scores = '',
   if (screen && !/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(screen)) throw new Error('screen must be a testnet contract id (ST...name)');
   if (scores && !/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(scores)) throw new Error('scores must be a testnet contract id (ST...name)');
   if (registry && !/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(registry)) throw new Error('registry must be a testnet contract id (ST...name)');
-  // rooms: { slug: { src: 'casino-room.html', title: 'ROYAL FLUSH CASINO', still: 'casino-entry.jpg' } }, the pages a lobby door can lead to (window.XA_ROOMS); each page sits beside this one
+  // rooms: { slug: { src: 'casino-room.html', title: 'ROYAL FLUSH CASINO', still: 'casino-entry.jpg', depth: 'casino-entry-depth.png' } }, the pages a lobby door can lead to (window.XA_ROOMS); each page sits beside this one
   const roomMap = {};
   for (const [slug, r] of Object.entries(rooms || {})) {
     if (!/^[a-z][a-z0-9-]{1,23}$/.test(slug)) throw new Error('room slug "' + slug + '": lowercase letters, digits, dashes');
@@ -77,7 +77,9 @@ export function buildTestnetViewHtml({ world, posters, screen = '', scores = '',
     if (r.title && !/^[\x20-\x7e]{1,48}$/.test(r.title)) throw new Error('room "' + slug + '": title must be 1 to 48 printable ASCII characters');
     // still: a picture of the room's entry view (a file beside the page, .jpg/.png/.webp); the hall shows it in the open doorway and while the room loads
     if (r.still && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\.(jpg|png|webp)$/.test(r.still)) throw new Error('room "' + slug + '": still must be a file name ending in .jpg, .png or .webp, beside the page');
-    roomMap[slug] = { src: r.src, title: r.title || slug.toUpperCase(), ...(r.still ? { still: r.still } : {}) };
+    // depth: the room's depth map (a .png beside the page; snap-room.cjs takes it with the still): the doorway then has real parallax and walking in is a glide. Needs a still.
+    if (r.depth && (!r.still || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\.png$/.test(r.depth))) throw new Error('room "' + slug + '": depth must be a file name ending in .png, beside the page, and needs a still');
+    roomMap[slug] = { src: r.src, title: r.title || slug.toUpperCase(), ...(r.still ? { still: r.still } : {}), ...(r.depth ? { depth: r.depth } : {}) };
   }
   const sc = scores ? scores.split('.') : null;
   const html = hallHtml || readFileSync(HALL_FILE, 'utf8');

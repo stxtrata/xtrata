@@ -192,7 +192,7 @@ function buildRoom(){
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
-  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
+  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), glide:!!(roomUI&&roomUI.glide), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
   if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
   XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;   // read-only, for tests: where you are in bay i's open doorway
   XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
@@ -1461,7 +1461,7 @@ function buildPosters(){
   try{
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
-      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, stillFor:(slug)=>{ const r=roomCfg(slug); return r&&typeof r.still==='string'?r.still:'' }});
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, stillFor:(slug)=>{ const r=roomCfg(slug); return r&&typeof r.still==='string'&&r.still?{still:r.still,depth:typeof r.depth==='string'?r.depth:''}:null }});
     if(bayEngine) buildLobby();
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
@@ -2474,7 +2474,7 @@ function updateBayFocus(){
   if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
 }
 /* ---------- other rooms that take the whole screen (the casino) ----------
-   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO', still:'casino-entry.jpg' } } names
+   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO', still:'casino-entry.jpg', depth:'casino-entry-depth.png' } } names
    them. A room is either `src` (a URL the hall may frame: a file beside the hall) or `load` (a function the host gives, returning the room's page as text,
    which is framed as srcdoc: this is how the inscribed arcade opens a room that is its own inscription, hash-checked, see parent.template.html). Going in: a short loading screen over the hall,
    the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
@@ -2494,7 +2494,7 @@ function roomEls(){
   const back=document.createElement('button'); back.type='button'; back.textContent='← BACK TO THE LOBBY';
   back.style.cssText='position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9500;display:none;padding:9px 16px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer';
   back.addEventListener('click',e=>{ e.stopPropagation(); leaveRoom() });
-  document.body.append(still,load,back); roomUI={load,still,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
+  document.body.append(still,load,back); roomUI={load,still,glide:null,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
   window.addEventListener('message',e=>{ if(state==='room' && roomUI && roomUI.frame && e.source===roomUI.frame.contentWindow && e.data && e.data.xa==='leave-room') leaveRoom() });
   // the room says it has drawn its first frames ({xa:'room-ready'}), at any time after it loads, even while it is still hidden behind the hall
   window.addEventListener('message',e=>{ const f=roomUI&&roomUI.frame; if(f && e.source===f.contentWindow && e.data && e.data.xa==='room-ready'){ f.dataset.ready='1'; f.dispatchEvent(new Event('xa-room-ready')) } });
@@ -2545,8 +2545,17 @@ function enterRoom(id, bayIdx){
   U.title.textContent=String(cfg.title||id).toUpperCase(); U.sub.textContent='OPENING THE ROOM…';
   const still=typeof cfg.still==='string' && cfg.still;
   const showLoad=()=>{ U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1 };
-  if(still){   // the doorway you were looking into fills the screen and moves in a little, as a step forward would; the loading screen only comes if the room is slow
-    const S=U.still; S.style.transition='none'; S.style.backgroundImage='url("'+still.replace(/"/g,'%22')+'")'; S.style.transform='scale(1)'; S.style.opacity=0; S.style.display='block'; void S.offsetWidth;
+  // Best: the room has a depth map, so you glide forward from where you stand to where the room starts you, through the same view the doorway showed (a canvas of its own over the hall).
+  let glide=null;
+  if(still && cfg.depth && roomBay>=0 && bayEngine && bayEngine.glideInto){ try{ glide=bayEngine.glideInto(roomBay,{fov:camera.fov}) }catch(e){ glide=null; console.warn('room glide not available:',e) } }
+  if(glide){
+    U.glide=glide; document.body.appendChild(glide.dom); glide.render(performance.now()); void glide.dom.offsetWidth; glide.dom.style.transition='opacity .22s'; glide.dom.style.opacity=1;
+    let gw=innerWidth, gh=innerHeight;
+    const tick=(now)=>{ if(U.glide!==glide) return; if(innerWidth!==gw||innerHeight!==gh){ gw=innerWidth; gh=innerHeight; glide.resize(gw,gh) } glide.render(now); if(!glide.done) requestAnimationFrame(tick) };
+    requestAnimationFrame(tick);
+  } else if(still){   // else the doorway you were looking into fills the screen and moves in a little, as a step forward would; the loading screen only comes if the room is slow
+    const S=U.still; S.style.transition='none';   // (the picture is wider than the room's own view, 80 degrees up and down against 68, so it is shown at its middle)
+     S.style.backgroundImage='url("'+still.replace(/"/g,'%22')+'")'; S.style.backgroundSize='auto '+(100*Math.max(Math.tan(40*Math.PI/180)/Math.tan(34*Math.PI/180),(innerWidth/innerHeight)/(16/9))).toFixed(1)+'%';; S.style.transform='scale(1)'; S.style.opacity=0; S.style.display='block'; void S.offsetWidth;
     S.style.transition='opacity .25s,transform 2.6s cubic-bezier(.25,.6,.35,1)'; S.style.opacity=1; S.style.transform='scale(1.035)';
   } else showLoad();
   f.style.pointerEvents='auto';
@@ -2558,17 +2567,18 @@ function enterRoom(id, bayIdx){
     // Ready = the room has said so ({xa:'room-ready'}, after its first frames), and the still has been up for a beat. A room that never says it is ready is shown 2.5 s after it loads.
     let shown=false; clearTimeout(roomSlow);
     const reveal=()=>{ if(shown || state!=='room' || roomUI.frame!==f) return; shown=true; clearTimeout(roomSlow); clearTimeout(roomTimer);
-      f.style.visibility='visible'; U.still.style.opacity=0; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room'){ U.still.style.display='none'; U.load.style.display='none' } },450); U.back.style.display='block'; try{ f.focus() }catch(e){} };
+      f.style.visibility='visible'; U.still.style.opacity=0; U.load.style.opacity=0; if(U.glide){ const g=U.glide; U.glide=null; g.dom.style.transition='opacity .45s'; g.dom.style.opacity=0; setTimeout(()=>g.dispose(),520) } setTimeout(()=>{ if(state==='room'){ U.still.style.display='none'; U.load.style.display='none' } },450); U.back.style.display='block'; try{ f.focus() }catch(e){} };
     const when=(ms)=>setTimeout(reveal,Math.max(0,ms-(performance.now()-roomT0)));
-    if(f.dataset.ready) when(900); else f.addEventListener('xa-room-ready',()=>when(900),{once:true});
-    const late=()=>setTimeout(()=>when(900),2500); if(f.dataset.loaded) late(); else f.addEventListener('load',late,{once:true});
+    const MIN=glide?glide.ms+150:900;   // (a glide has to arrive before the live room, which starts where it ends, takes over)
+    if(f.dataset.ready) when(MIN); else f.addEventListener('xa-room-ready',()=>when(MIN),{once:true});
+    const late=()=>setTimeout(()=>when(MIN),2500); if(f.dataset.loaded) late(); else f.addEventListener('load',late,{once:true});
     roomSlow=setTimeout(()=>{ if(!shown && state==='room' && roomUI.frame===f) showLoad() },3500);
   } else if(ready) done(); else f.addEventListener('load',done,{once:true});
   roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ if(still) showLoad(); U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
 }
 function leaveRoom(){
   if(state!=='room' || !roomUI) return;
-  const U=roomUI; clearTimeout(roomTimer); clearTimeout(roomSlow); const hb=$('hallbar'); if(hb) hb.style.visibility=''; U.still.style.display='none'; U.still.style.opacity=0;
+  const U=roomUI; clearTimeout(roomTimer); clearTimeout(roomSlow); const hb=$('hallbar'); if(hb) hb.style.visibility=''; U.still.style.display='none'; U.still.style.opacity=0; if(U.glide){ U.glide.dispose(); U.glide=null }
   if(U.frame){ try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null; U.frameId='' }
   U.load.style.opacity=0; U.load.style.display='none'; U.back.style.display='none';
   state='out'; sfx.back(); try{ Room.exitGame() }catch(e){}
