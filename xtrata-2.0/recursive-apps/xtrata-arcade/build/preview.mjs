@@ -26,7 +26,7 @@ if (at < 0) throw new Error('the hall has no <head>');
 const page = hall.slice(0, at) + head + hall.slice(at + '<head>'.length).replace(/^\n/, '');
 // Rooms that are their own page (build/rooms/*.html) sit beside the preview, so the hall can frame them (the lobby's CASINO door).
 const roomsDir = join(here, 'rooms'), outDir = dirname(OUT);
-const rooms = existsSync(roomsDir) ? readdirSync(roomsDir).filter((f) => /\.(html|css|js|jpg)$/.test(f)).sort() : [];
+const rooms = existsSync(roomsDir) ? readdirSync(roomsDir).filter((f) => /\.(html|css|js|jpg|png)$/.test(f)).sort() : [];
 if (process.argv.includes('--check')) {
   let cur = ''; try { cur = readFileSync(OUT, 'utf8'); } catch (e) {}
   const stale = rooms.filter((f) => { try { return readFileSync(join(outDir, f), 'utf8') !== readFileSync(join(roomsDir, f), 'utf8'); } catch (e) { return true; } });

@@ -27,3 +27,10 @@ test('a room may carry an entry still: a plain image file name beside the page',
   for (const still of ['../x.jpg', 'http://a/x.jpg', 'x.html', '/x.jpg', 'x y.jpg', 'x.jpg?a=1'])
     assert.throws(() => buildTestnetViewHtml({ ...base, rooms: { casino: { src: 'casino-room.html', still } } }), /still must be a file name/, still);
 });
+test('a still may come with a depth map: a .png beside the page, and only with a still', () => {
+  const rooms = { casino: { src: 'casino-room.html', still: 'casino-entry.jpg', depth: 'casino-entry-depth.png' } };
+  assert.match(buildTestnetViewHtml({ ...base, rooms }), /"depth":"casino-entry-depth\.png"/);
+  for (const depth of ['../d.png', 'd.jpg', 'http://a/d.png', 'd.html'])
+    assert.throws(() => buildTestnetViewHtml({ ...base, rooms: { casino: { ...rooms.casino, depth } } }), /depth must be a file name/, depth);
+  assert.throws(() => buildTestnetViewHtml({ ...base, rooms: { casino: { src: 'casino-room.html', depth: 'd.png' } } }), /needs a still/);
+});
