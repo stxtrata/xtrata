@@ -64,10 +64,11 @@ export { resolveScenes };
 
 // A local page that shows a TEST NETWORK's world and poster contracts in the real hall (reads only). The hall's reader takes its network
 // from the score client's config, so the page sets that before the reader's first read (a setter on window.XAScores catches it the moment it exists).
-export function buildTestnetViewHtml({ world, posters, roomId = 'arcade-hall', hallHtml = null, apiBase = 'https://api.testnet.hiro.so' }) {
+export function buildTestnetViewHtml({ world, posters, screen = '', roomId = 'arcade-hall', hallHtml = null, apiBase = 'https://api.testnet.hiro.so' }) {
   if (!/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(world) || !/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(posters)) throw new Error('world and posters must be testnet contract ids (ST...name)');
+  if (screen && !/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(screen)) throw new Error('screen must be a testnet contract id (ST...name)');
   const html = hallHtml || readFileSync(HALL_FILE, 'utf8');
-  const script = `window.XA_WORLD_CONFIG=${JSON.stringify({ world, posters, roomId })};
+  const script = `window.XA_WORLD_CONFIG=${JSON.stringify({ world, posters, roomId, ...(screen ? { screen } : {}) })};
 (function(){var cur;try{Object.defineProperty(window,'XAScores',{configurable:true,get:function(){return cur},set:function(v){cur=v;try{v.configure({network:'testnet',apiBases:[${JSON.stringify(apiBase)}],readSender:${JSON.stringify(world.split('.')[0])}})}catch(e){}}})}catch(e){}})();
 (function(){var d;function ui(){d=document.createElement('div');d.style.cssText='position:fixed;left:12px;bottom:12px;z-index:99999;background:rgba(10,12,24,.92);color:#dfe6ff;font:12px/1.4 ui-monospace,Menlo,monospace;padding:8px 10px;border:1px solid #3b4a8a;border-radius:6px;max-width:300px';d.innerHTML='<div style="letter-spacing:.08em;color:#ffcc55">TESTNET VIEW \\u00b7 READ ONLY</div>';var n=document.createElement('div');n.style.color='#8a93c4';n.textContent=${JSON.stringify(world)};d.appendChild(n);document.body.appendChild(d)}
 document.addEventListener('DOMContentLoaded',ui)})();`;
