@@ -31428,7 +31428,7 @@ XARoom.boot(document.getElementById('xa-root'));
   function emit(why) { state.listeners.forEach(function (fn) { try { fn(state.snap, why); } catch (e) {} }); }
   // One refresh: only reloads when either version counter moved. Returns { ok, changed }.
   async function refresh(force) {
-    if (!enabled() || state.busy) return { ok: false, changed: false, error: 'off' };
+    if (!enabled() || state.busy) return { ok: false, changed: false, error: enabled() ? 'busy' : 'off' };
     state.busy = true;
     try {
       var v = await readVersions();
@@ -34603,7 +34603,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     if (cur && lines.length < maxLines) lines.push(cur);
     if (words.length && lines.length === maxLines) {
       var used = lines.join(' ').split(/\s+/).length;
-      if (used < words.length) { var last = lines[maxLines - 1]; while (last.length > 1 && measure(last + '…') > maxW) last = last.slice(0, -1); lines[maxLines - 1] = last.replace(/[ ,.;:]+$/, '') + '…'; }
+      if (used < words.length) {
+        // cut at a word boundary: drop whole words until the ellipsis fits; only a lone long word is cut by character
+        var last = lines[maxLines - 1];
+        while (measure(last + '…') > maxW && last.indexOf(' ') > 0) last = last.slice(0, last.lastIndexOf(' '));
+        while (last.length > 1 && measure(last + '…') > maxW) last = last.slice(0, -1);
+        lines[maxLines - 1] = last.replace(/[ ,.;:]+$/, '') + '…';
+      }
     }
     return lines;
   }
@@ -34644,7 +34650,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   }
   // One refresh. Returns { ok, changed }. A failure keeps the last good snapshot.
   async function refresh(force) {
-    if (!enabled() || state.busy) return { ok: false, changed: false, error: 'off' };
+    if (!enabled() || state.busy) return { ok: false, changed: false, error: enabled() ? 'busy' : 'off' };
     state.busy = true;
     try {
       var W = root.XAWorld;
@@ -36363,7 +36369,7 @@ function paintDayBoard(force){
   dayBoard.last=now;
   if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } }
   const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers,
-           items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.live?chain.height:0) : []};
+           items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.height)   /* estimated height when the node is down, so a cached snapshot still expires */ : []};
   if(window.XAScreen) XAScreen.paint(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);
   else paintPlainClock(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);   // a release without screen.js: just the day clock
   dayBoard.tex.needsUpdate=true;
