@@ -26,8 +26,8 @@ test('the full launch rehearsal passes on a simulated chain', async () => {
   assert.match(md, /Nothing was sent to any network/);
 });
 
-test('deploy list: four contracts in dependency order, test-network sources are the simnet sources unchanged', () => {
-  assert.deepEqual(DEPLOY_ORDER, ['mock-xtrata-core', 'xtrata-posters-v1', 'xtrata-world-v1', 'xtrata-door-skins-v1']);
+test('deploy list: five contracts in dependency order, test-network sources are the simnet sources unchanged', () => {
+  assert.deepEqual(DEPLOY_ORDER, ['mock-xtrata-core', 'xtrata-posters-v1', 'xtrata-world-v1', 'xtrata-door-skins-v1', 'xtrata-screen-v1']);
   for (const s of deploySources()) {
     assert.equal(s.source, readFileSync(join(root, 'contracts', `${s.name}.clar`), 'utf8'));
     assert.equal(s.clarityVersion, 4);

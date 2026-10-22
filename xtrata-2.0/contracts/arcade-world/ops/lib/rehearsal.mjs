@@ -36,7 +36,7 @@ export async function runRehearsal({ simnet, accounts, log = () => {} }) {
   try {
     await step('1. deploy order is known and the contracts are live', async () => {
       const src = deploySources();
-      must(src.map((s) => s.name).join() === 'mock-xtrata-core,xtrata-posters-v1,xtrata-world-v1,xtrata-door-skins-v1', 'deploy order changed');
+      must(src.map((s) => s.name).join() === 'mock-xtrata-core,xtrata-posters-v1,xtrata-world-v1,xtrata-door-skins-v1,xtrata-screen-v1', 'deploy order changed');
       must((await t.ro('world', 'get-version')) === 0 && (await t.ro('posters', 'get-version')) === 0, 'contracts should start at version 0');
       return src.map((s) => `${s.name} ${s.bytes}B`).join(', ');
     });

@@ -1,0 +1,103 @@
+{
+ "owner": "ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E",
+ "contracts": {
+  "screen": "xtrata-screen-v1"
+ },
+ "steps": [
+  {
+   "as": "publisher",
+   "contract": "screen",
+   "fn": "post-item",
+   "note": "publisher news",
+   "args": [
+    {
+     "uint": 1
+    },
+    {
+     "ascii": "NEW BAYS OPEN SOON"
+    },
+    {
+     "ascii": "Posted by the publisher wizard. Bay doors on the arcade floor are managed by smart contracts."
+    },
+    {
+     "uint": 0
+    },
+    {
+     "hex": ""
+    },
+    {
+     "uint": 0
+    },
+    {
+     "uint": 2
+    },
+    {
+     "uint": 0
+    },
+    {
+     "uint": 31300
+    }
+   ]
+  },
+  {
+   "as": "buyer",
+   "contract": "screen",
+   "fn": "buy-slot",
+   "note": "paid ad, 1 day, 10 STX",
+   "pay": 10000000,
+   "args": [
+    {
+     "uint": 2
+    },
+    {
+     "ascii": "VISIT THE BAZAAR"
+    },
+    {
+     "ascii": "A paid ad slot, bought on testnet with testnet STX."
+    },
+    {
+     "uint": 0
+    },
+    {
+     "hex": ""
+    },
+    {
+     "uint": 0
+    },
+    {
+     "uint": 1
+    }
+   ]
+  },
+  {
+   "as": "buyer",
+   "contract": "screen",
+   "fn": "buy-slot",
+   "note": "paid news, 1 day, 5 STX",
+   "pay": 5000000,
+   "args": [
+    {
+     "uint": 1
+    },
+    {
+     "ascii": "PLAYER NEWS"
+    },
+    {
+     "ascii": "This one will be rejected to prove the refund."
+    },
+    {
+     "uint": 0
+    },
+    {
+     "hex": ""
+    },
+    {
+     "uint": 0
+    },
+    {
+     "uint": 1
+    }
+   ]
+  }
+ ]
+}
