@@ -31,7 +31,7 @@ for (const [key, name] of Object.entries(COLL)) {
     const o = t.original;
     for (const [kind, uri, sha] of [['art', o.mediaUris?.[0], o.mediaSha256?.[0]], ['meta', o.metadataUri, o.metadataSha256]]) {
       if (!uri || !sha) continue;
-      const [cid, ...p] = uri.replace('ipfs://', '').split('/');
+      const [cid, ...p] = uri.replace(/^ipfs:\/\/(ipfs\/)?/, '').split('/');
       sample.push({ coll: name, kind, id: t.id, cid, path: p.join('/'), sha });
     }
   }

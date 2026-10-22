@@ -99,7 +99,7 @@
         ],
         "risk": {
           "level": "medium",
-          "headline": "Our 24 Sep scan found PNG art behind Pinata metadata links. We have not checked whether those links can be changed.",
+          "headline": "Our 24 Sep scan found PNG art behind Pinata metadata links. Public gateways serve it, but only Pinata was found storing it, and we have not checked whether the links can be changed.",
           "points": [
             [
               "Art lives at",
@@ -111,10 +111,10 @@
             ],
             [
               "How widely hosted?",
-              "Not measured."
+              "Checked 22 Oct 2026: 5 sampled art files and 4 metadata files were served by gateway.pinata.cloud, ipfs.filebase.io and stxnft.mypinata.cloud. They could not be hash-checked because there is no manifest for this collection. A 13 Oct lookup on the IPFS network found only Pinata storing the folders; the other gateways fetch from there."
             ]
           ],
-          "asOf": "24 Sep 2026",
+          "asOf": "24 Sep 2026; hosting checked 22 Oct 2026",
           "caveat": "Provisional: from a single early scan."
         }
       },
@@ -252,7 +252,7 @@
         ],
         "risk": {
           "level": "medium",
-          "headline": "The art is on IPFS. We have not re-checked whether the pointer can change. Public gateways serve it, but only one storage provider (Pinata) was found holding it.",
+          "headline": "The art is on IPFS and the original deployer can change the pointer. Public gateways serve it, but only one storage provider (Pinata) was found holding it.",
           "points": [
             [
               "Art lives at",
@@ -264,14 +264,14 @@
             ],
             [
               "Can the pointer change?",
-              "Not re-checked."
+              "Yes. The original deployer\u2019s address can call set-ipfs-root at any time, and the contract has no freeze (read from the live contract source on 22 Oct 2026)."
             ],
             [
               "How widely hosted?",
               "Checked 22 Oct 2026: 6 of 6 sampled art files and 6 of 6 metadata files matched the manifest hashes through gateway.pinata.cloud, ipfs.filebase.io and stxnft.mypinata.cloud (a dedicated Pinata gateway). A 13 Oct lookup on the IPFS network found only Pinata storing the folders; the other gateways fetch from there."
             ]
           ],
-          "asOf": "25 Sep 2026; hosting checked 22 Oct 2026"
+          "asOf": "25 Sep 2026; hosting and pointer checked 22 Oct 2026"
         }
       }
     },
@@ -443,7 +443,7 @@
         ],
         "risk": {
           "level": "medium",
-          "headline": "The art is on IPFS and the pointer is not frozen. We have not measured how widely it is hosted.",
+          "headline": "The art is on IPFS and the pointer is not frozen. Public gateways serve it with matching hashes. Which providers store it was not looked up.",
           "points": [
             [
               "Art lives at",
@@ -455,10 +455,10 @@
             ],
             [
               "How widely hosted?",
-              "Not measured."
+              "Checked 22 Oct 2026: 6 of 6 sampled art files and 6 of 6 metadata files matched the manifest hashes through gateway.pinata.cloud, ipfs.filebase.io and stxnft.mypinata.cloud. The collection uses one shared art file, so the art result covers that one file. Which providers store the folders was not looked up."
             ]
           ],
-          "asOf": "6 Oct 2026"
+          "asOf": "6 Oct 2026; hosting checked 22 Oct 2026"
         }
       }
     },
@@ -493,7 +493,7 @@
         ],
         "risk": {
           "level": "medium",
-          "headline": "IPFS only, not frozen, and the art is designed to change.",
+          "headline": "IPFS only, not frozen, and the art is designed to change. Public gateways serve it, but only Pinata was found storing it.",
           "points": [
             [
               "Art lives at",
@@ -505,10 +505,10 @@
             ],
             [
               "How widely hosted?",
-              "Not measured."
+              "Checked 22 Oct 2026: 7 of 7 sampled art files and 7 of 7 metadata files matched the manifest hashes through gateway.pinata.cloud, ipfs.filebase.io and stxnft.mypinata.cloud (one Filebase art request timed out at first and matched on a slow retest). A 13 Oct lookup on the IPFS network found only Pinata storing the folders."
             ]
           ],
-          "asOf": "5 Oct 2026"
+          "asOf": "5 Oct 2026; hosting checked 22 Oct 2026"
         }
       }
     },

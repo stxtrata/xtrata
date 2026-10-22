@@ -57,5 +57,26 @@ The 250-collection census tested up to 4 tokens per collection through Filebase 
 
 ## Follow-up changes made after this run
 
-- `xtrata-2.0/forever-twins/data/registry.v2.json`: the "How widely hosted?" lines for NYC Degens, Megapont Ape Club, Bitcoin Monkeys and Bitcoin Birds now carry these results (registry-v2 suite: 76 passed, 0 failed).
+- `xtrata-2.0/forever-twins/data/registry.v2.json`: the "How widely hosted?" lines for NYC Degens, Megapont Ape Club, Bitcoin Monkeys and Bitcoin Birds now carry these results; the second pass added Bitcoin Pepes, Ordinal Pepe and See Yourself Out, and NYC Degens' pointer line was updated (registry-v2 suite: 76 passed, 0 failed; homepage test 34 of 34 in a clean Linux install).
 - `xtrata-2.0/forever-twins/guides/what-is-forever-twins.html`: NYC Degens fee corrected from 0.1 STX to 1 STX.
+
+## Second pass (same day): the other three registry collections
+
+Same method, three gateways (gateway.pinata.cloud, ipfs.filebase.io, stxnft.mypinata.cloud), 1.5 s spacing, 90 s timeout, bytes hashed in the browser and compared with the manifest sha256 where a manifest exists. 105 requests, no hash mismatches.
+
+| Collection | Art | Metadata | Notes |
+|---|---|---|---|
+| Ordinal Pepe | 6 of 6 matched on each of the 3 gateways | 6 of 6 matched on each | All tokens share one art file, so the art result covers one file. Not in the 13 Oct provider lookup. |
+| See Yourself Out | 7 of 7 matched on each of the 3 gateways | 7 of 7 matched on each | One Filebase art request returned a 504 after 55 s, then matched on a slow retest (5,631,531 bytes in 4.3 s). 13 Oct lookup: Pinata only. |
+| Bitcoin Pepes | 5 of 5 served on each of the 3 gateways | 4 of 4 served on each | No manifest, so the bytes could not be hash-checked ("served", not "matched"). 13 Oct lookup: Pinata only. |
+
+## NYC Degens: can the pointer change? (read from the live contract, 22 Oct 2026)
+
+- The base URI is stored in a data variable (`ipfs-root`), not a constant.
+- `set-ipfs-root` exists and only works when the caller is `commission-address-master`, which was set to the deployer (`SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ`) at deploy time. There is no freeze function.
+- So the original deployer address can change where NYC Degens points, at any time. The registry line now says this.
+- Side finding: the 13 Oct census has NYC Degens as `uri_changeable: False`. Its setter detection missed `set-ipfs-root`, so that field is wrong for NYC Degens. Other collections using the same pattern may be affected; not re-run.
+
+## Still not measured
+
+ipfs.io, dweb.link and w3s.link fail within about 100 ms from the machine used for these runs (including for a control CID), so they are not counted either way. `gateway-check.mjs` in this folder re-runs the check from another network.
