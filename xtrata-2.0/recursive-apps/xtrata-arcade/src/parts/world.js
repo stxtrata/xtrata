@@ -310,7 +310,7 @@
   function emit(why) { state.listeners.forEach(function (fn) { try { fn(state.snap, why); } catch (e) {} }); }
   // One refresh: only reloads when either version counter moved. Returns { ok, changed }.
   async function refresh(force) {
-    if (!enabled() || state.busy) return { ok: false, changed: false, error: 'off' };
+    if (!enabled() || state.busy) return { ok: false, changed: false, error: enabled() ? 'busy' : 'off' };
     state.busy = true;
     try {
       var v = await readVersions();

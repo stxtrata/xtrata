@@ -245,7 +245,8 @@ test('3d rotation: one item per rotateSecs, same for everyone at the same t, hea
 test('3e wrapText wraps at the width, stops at maxLines with an ellipsis, and ago() formats block ages', () => {
   const S = boot().S, m = (s) => s.length;
   eq(S.wrapText(m, 'aa bb cc dd', 5, 5), ['aa bb', 'cc dd']);
-  eq(S.wrapText(m, 'aa bb cc dd ee', 5, 2), ['aa bb', 'cc d…']);
+  eq(S.wrapText(m, 'aa bb cc dd ee', 5, 2), ['aa bb', 'cc…'], 'the ellipsis cuts at a word boundary');
+  eq(S.wrapText(m, 'aa bb cccccccc dd', 5, 2), ['aa bb', 'cccc…'], 'a lone word too long for the line is cut by character');
   eq(S.wrapText(m, '', 5, 2), []);
   eq(S.wrapText(m, 'unbreakable', 3, 2), ['unbreakable'], 'a single long word is kept whole');
   eq([0, 1, 5, 6, 143, 144, 300].map(S.ago), ['1M', '10M', '50M', '1H', '24H', '1D', '2D']);
@@ -449,9 +450,9 @@ test('8c the poll timer only checks the version; stop() clears it; the default i
   n.S.stop(); eq(n.win.timers[0].cleared, true); eq(n.S._t.state.timer, null);
 });
 
-test('8d a refresh while one is in flight is refused (reported as error "off")', async () => {
+test('8d a refresh while one is in flight is refused (reported as error "busy", not "off")', async () => {
   const n = on(boot({ version: 1, live: [1], items: { 1: { head: 'A' } } }));
   const first = n.S.refresh(true), second = await n.S.refresh(true);
-  eq(second, { ok: false, changed: false, error: 'off' });
+  eq(second, { ok: false, changed: false, error: 'busy' });
   eq(await first, { ok: true, changed: true });
 });

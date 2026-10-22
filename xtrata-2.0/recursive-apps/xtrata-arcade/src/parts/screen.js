@@ -86,7 +86,13 @@
     if (cur && lines.length < maxLines) lines.push(cur);
     if (words.length && lines.length === maxLines) {
       var used = lines.join(' ').split(/\s+/).length;
-      if (used < words.length) { var last = lines[maxLines - 1]; while (last.length > 1 && measure(last + '…') > maxW) last = last.slice(0, -1); lines[maxLines - 1] = last.replace(/[ ,.;:]+$/, '') + '…'; }
+      if (used < words.length) {
+        // cut at a word boundary: drop whole words until the ellipsis fits; only a lone long word is cut by character
+        var last = lines[maxLines - 1];
+        while (measure(last + '…') > maxW && last.indexOf(' ') > 0) last = last.slice(0, last.lastIndexOf(' '));
+        while (last.length > 1 && measure(last + '…') > maxW) last = last.slice(0, -1);
+        lines[maxLines - 1] = last.replace(/[ ,.;:]+$/, '') + '…';
+      }
     }
     return lines;
   }
@@ -127,7 +133,7 @@
   }
   // One refresh. Returns { ok, changed }. A failure keeps the last good snapshot.
   async function refresh(force) {
-    if (!enabled() || state.busy) return { ok: false, changed: false, error: 'off' };
+    if (!enabled() || state.busy) return { ok: false, changed: false, error: enabled() ? 'busy' : 'off' };
     state.busy = true;
     try {
       var W = root.XAWorld;
