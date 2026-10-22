@@ -11,8 +11,8 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import { costPerPlay, DEFAULT_PLAY_FEE, RESERVE } from './policy';
 
-/** Smallest gift: about 277 paid plays. */
-export const GIFT_MIN = 100_000n;
+/** Smallest gift: 0.01 STX, about 20 paid plays (was 0.1 STX, about 277, until 22 Oct 2026). */
+export const GIFT_MIN = 10_000n;
 /** Largest gift: the listening wallet's own cap. */
 export const GIFT_MAX = 1_000_000n;
 /** Network fee for the treasury's transfer to the new wallet (and for a refund); a friend gifter pays it up front. */

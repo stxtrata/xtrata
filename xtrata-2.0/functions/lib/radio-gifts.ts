@@ -663,7 +663,7 @@ export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefin
 export async function createFriendGift(env: GiftEnv, body: { gifter: string; amount: string }, deps: GiftDeps, ip: string | null, request?: Request) {
   const { treasury } = requireEnabled(env, request);
   if (!isMainnetStandardAddress(body?.gifter) || body.gifter === treasury) throw new GiftError('Connect a Stacks wallet to give a gift.');
-  if (typeof body.amount !== 'string' || !/^\d{1,9}$/.test(body.amount) || !validGiftAmount(BigInt(body.amount))) throw new GiftError('A gift is 0.1 to 1 STX.');
+  if (typeof body.amount !== 'string' || !/^\d{1,9}$/.test(body.amount) || !validGiftAmount(BigInt(body.amount))) throw new GiftError('A gift is 0.01 to 1 STX.');
   await ensureGiftTables(env);
   const h = ipHash(env, ip);
   if (h && (await all(env, "SELECT id FROM radio_gifts WHERE ip_hash=? AND source='friend' AND created_at>?", [h, deps.now - 3600_000])).length >= CREATES_PER_IP)

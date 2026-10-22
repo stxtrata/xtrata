@@ -271,7 +271,7 @@ Albums and starter copies are distributed through one prefunded route: the creat
 
 ### How it works
 
-1. **Sign.** An admin signs one SIP-018 request with the creator wallet: number of copies (1 to 100 per request), the amount that lands in each new wallet (0.1 to 1 STX), a label, and the album if there is one. An album batch is accepted only from the wallet that owns the album. Each signed request works once, within 15 minutes.
+1. **Sign.** An admin signs one SIP-018 request with the creator wallet: number of copies (1 to 100 per request), the amount that lands in each new wallet (0.01 to 1 STX), a label, and the album if there is one. An album batch is accepted only from the wallet that owns the album. Each signed request works once, within 15 minutes.
 2. **Links.** The server makes one dormant claim link per copy. They are shown once and saved on the creator's device.
 3. **Pay once.** The creator sends one transfer to the treasury of `copies x (amount + 0.003 STX)`, with the memo `batch <id>`. The server accepts only the exact sender, recipient, total and memo.
 4. **Live together.** When the payment confirms, every copy goes live for 30 days. Claims are sent from the creator's money.

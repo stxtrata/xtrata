@@ -4,7 +4,7 @@
  *  - Recipient: a `?gift=` link is kept on this device until it is claimed. Once their brand-new
  *    listening wallet exists (and is empty) the gift is claimed automatically: the treasury sends it,
  *    and the panel tracks it like a deposit.
- *  - Friend gift: anyone with a Stacks wallet picks 0.1 to 1 STX, pays it (+ the network fee) into the
+ *  - Friend gift: anyone with a Stacks wallet picks 0.01 to 1 STX, pays it (+ the network fee) into the
  *    gift treasury, and gets a link to share once that payment confirms.
  *  - Admin: prefunded batches. The creator signs one request, pays for every copy in ONE transfer to the treasury, and the
  *    links go live when it confirms. Unclaimed copies go back to the creator after 30 days. The treasury pays nothing itself.
@@ -501,7 +501,7 @@ export function createGifts(deps: GiftDeps) {
     const amount = copyAmountForPlays(plays, album);
     const count = Number(batchCount.value);
     if (!Number.isInteger(count) || count < 1 || count > BATCH_MAX_COPIES) return { ok: false as const, reason: `Make 1 to ${BATCH_MAX_COPIES} copies at a time.`, album, plays, amount, count };
-    if (!validBatchAmount(amount)) return { ok: false as const, reason: 'Each copy must be 0.1 to 1 STX.', album, plays, amount, count };
+    if (!validBatchAmount(amount)) return { ok: false as const, reason: 'Each copy must be 0.01 to 1 STX.', album, plays, amount, count };
     return { ok: true as const, reason: '', album, plays, amount, count, bill: batchBreakdown(count, amount, album) };
   }
   const billText = () => {
@@ -518,7 +518,7 @@ export function createGifts(deps: GiftDeps) {
 
   // Built once; only the moving parts are refreshed, so the slider keeps its place while the panel re-renders.
   const range = el('input') as HTMLInputElement;
-  range.type = 'range'; range.min = String(GIFT_MIN); range.max = String(GIFT_MAX); range.step = '50000'; range.value = String(amount);
+  range.type = 'range'; range.min = String(GIFT_MIN); range.max = String(GIFT_MAX); range.step = '10000'; range.value = String(amount);
   range.setAttribute('aria-label', 'Gift amount');
   const amountLine = el('p', '', 'ppp-gift-amount');
   const giftButton = button('', () => { const m = deps.main(); if (m) void give(m); }, 'primary');
