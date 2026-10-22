@@ -38,6 +38,7 @@ Output files go to `ops/out/` (git-ignored); the bot's journal is `ops/.run-<fil
 | `rehearsal.mjs` | The whole launch sequence on a simulated chain. Writes `out/rehearsal-report.md`. |
 | `keygen.mjs` | Makes a disposable test-network key file. |
 | `relay.mjs`, `relay-merge.mjs` | Sign testnet transactions offline and pack them for a browser to send (see below). |
+| `v2.mjs` | The hall on `xtrata-world-v2` (the object registry): `deploy`, `seed` a scene file into spaces/kinds/bay objects/layer objects, `patch` ONE object, `add` ONE object, `bay`, `reset`, `read` (the hall's own reader). Dry run by default; offline signing only. See `docs/HALL-V2-SCHEMA.md`. |
 
 ## Scene file
 
@@ -75,3 +76,22 @@ Posters always start after today (a Bitcoin day is 144 blocks). Publishers add c
 ## The four bays
 
 The arcade hall has four contract-controlled wall areas, numbered in the contract's order: **0** far left, **1** far right, **2** near left and **3** near right (the entrance end). Each is a pair of posters by default and can instead be a door, a curtain, a sign board, a lamp or sounds. The hall room is registered with `bays: 4` (`ROOMS` in `lib/catalogue.mjs`); the lobby has 2. A room's bay count is fixed when it is registered (the contract allows up to 8). `examples/four-doorways.scene.json` uses all four. The four pinned poster spots (pins 1 to 4) now sit on the free poster slots nearest the entrance, beside the near bays.
+
+## The hall on the object registry (xtrata-world-v2)
+
+`v2.mjs` plans calls for `xtrata-world-v2` (every sign, door, lamp, curtain and sound is its own object with its own timeline). It writes
+a steps file (`ops/out/v2/<cmd>.steps.json`, the `relay-steps.mjs` format, which now also takes `list`, `tuple`, `int` and `deploy`),
+and with `--execute` (same guard as the other tools) signs it offline and packs it in files of at most 24 transactions.
+`ops/out/v2/hall-v2.manifest.json` records the ids the plan assumes (they are predicted: relay the packs in order, each after the
+previous one confirmed) and what each object shows, so `patch` can change one sign with one small call. The schema is in
+`docs/HALL-V2-SCHEMA.md`; the hall reads it when `XA_WORLD_CONFIG.registry` is set.
+
+```
+node ops/v2.mjs deploy                                                        # dry run; add --execute --nonces deployer=N
+node ops/v2.mjs seed ops/examples/four-doorways-testnet-hall.scene.json --height H --delegate publisher
+node ops/v2.mjs patch --object hall/bay-1/sign --set text="STAFF ONLY" --set tone=gold
+node ops/v2.mjs add   --bay hall/bay-3 --kind sign-board --params '{"text":"HI"}' --at +1h --height H
+node ops/v2.mjs bay   --bay hall/bay-0 --base posters
+node ops/v2.mjs reset --bay hall/bay-0
+node ops/v2.mjs read  --registry ST....xtrata-world-v2
+```

@@ -12,7 +12,10 @@ import { Cl, cvToJSON, deserializeTransaction, randomPrivateKey, privateKeyToAdd
 import { boot, pp } from './helpers.mjs';
 import { argCv, signSteps } from '../ops/lib/steps.mjs';
 import * as V2 from '../ops/lib/v2.mjs';
-import { readHall, simnetRead, describeHall } from '../ops/lib/hallread.mjs';
+import { readHall, simnetRead, networkRead, describeHall } from '../ops/lib/hallread.mjs';
+import { compileScenes } from '../ops/lib/scene.mjs';
+import { snapshotAt } from '../ops/lib/snapshot.mjs';
+import { hallBays } from '../ops/lib/catalogue.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const demo = JSON.parse(readFileSync(join(root, 'ops', 'examples', 'four-doorways-testnet-hall.scene.json'), 'utf8'));
@@ -40,6 +43,14 @@ async function hall() {
   h.apply = (planner, a) => { const p = planner(h.m, { height: simnet.burnBlockHeight, ...a }); assert.deepEqual(p.errors, [], p.errors.join('; ')); run(p); h.m = p.manifest; return p; };
   return h;
 }
+// What the bay engine draws from a v1-style snapshot (scene contract) of the same scene file, at `height`, as plan keys: the parity yardstick.
+const v1Plans = (doc, height, ctxHeight) => {
+  const B = hallBays();
+  const { scenes } = compileScenes(doc, { looks: V2.PLAN_BOOK, rooms: { 'arcade-hall': { bays: 4 }, lobby: { bays: 2 } }, height: ctxHeight, timelineUsed: {} });
+  const snap = snapshotAt({ scenes, looks: V2.PLAN_BOOK, height, bayCount: 4 });
+  return snap.bays.map((b) => B.planKey(B.planBay(b, snap.looks)));
+};
+const v2Plans = (r) => { const B = hallBays(); return r.bays.map((b) => B.planKey(B.planBay(b, r.looks))); };
 const sign = (bay) => (bay.scene.layers.filter((l) => l.slot === 2));
 const text = (l) => JSON.parse(l.params).text;
 
@@ -95,6 +106,16 @@ test('read back: before the scenes start the hall shows posters; after, the demo
   assert.equal(r.lobbyBays.length, 2); r.lobbyBays.forEach((b) => assert.equal(b.scene, null));
   assert.equal(b0.nextHeight, null);
   assert.match(describeHall(r), /bay 2: door door-gothic, enter, leads to lobby/);
+});
+
+test('parity: the bay engine draws exactly the same plan from the v2 objects as from the v1 scenes of the same file', async () => {
+  const h = await hall();
+  const t0 = h.simnet.burnBlockHeight;
+  h.seed(); h.simnet.mineEmptyBurnBlocks(10);
+  const r = await h.read();
+  const want = v1Plans(demo, h.simnet.burnBlockHeight, t0);
+  assert.deepEqual(v2Plans(r), want);
+  assert.ok(want.every((k) => k !== ''), 'all four demo bays are drawn');
 });
 
 test('independent updates: change one sign (nothing else moves), add a new sign, hide one, schedule one', async () => {
@@ -229,13 +250,15 @@ test('a story with several scenes on one bay: objects appear and disappear on th
     { bay: 0, at: t + 20, base: 'posters', interaction: 'none' },
   ] };
   const plan = h.seed([story]);
-  assert.ok(plan.steps.filter((s) => s.fn === 'create-object' && /bay-0\//.test(s.note)).length === 4 - 0 + 0 || true);
+  // one object per identity (sign, lamp, door), not one per scene
+  assert.deepEqual(plan.steps.filter((s) => s.fn === 'create-object' && /bay-0\//.test(s.note)).map((s) => s.note), ['hall/bay-0/sign (sign-board)', 'hall/bay-0/lamp (light-pulse)', 'hall/bay-0/door (door-gothic)']);
   const at = async (n) => { h.simnet.mineEmptyBurnBlocks(Math.max(0, t + n - h.simnet.burnBlockHeight)); return (await h.read()).bays[0].scene; };
-  let s = await at(1); assert.equal(s, null);
-  s = await at(6); assert.equal(s.base, 'wall'); assert.deepEqual(s.layers.map((l) => JSON.parse(l.params).text), ['one']);
-  s = await at(11); assert.deepEqual(s.layers.map((l) => l.slot), [2, 4]); assert.equal(JSON.parse(s.layers[0].params).text, 'two'); assert.equal(JSON.parse(s.layers[0].params).tone, 'gold');
-  s = await at(16); assert.equal(s.base, 'door'); assert.equal(s.interaction, 1); assert.deepEqual(s.layers.map((l) => l.slot), [2]); assert.equal(JSON.parse(s.layers[0].params).tone, undefined);
-  s = await at(21); assert.equal(s.base, 'posters'); assert.deepEqual(s.layers, []);
+  const parity = async (n) => assert.deepEqual(v2Plans(await h.read()), v1Plans(story, h.simnet.burnBlockHeight, t), `parity at +${n}`);
+  let s = await at(1); await parity(1); assert.equal(s, null);
+  s = await at(6); await parity(6); assert.equal(s.base, 'wall'); assert.deepEqual(s.layers.map((l) => JSON.parse(l.params).text), ['one']);
+  s = await at(11); await parity(11); assert.deepEqual(s.layers.map((l) => l.slot), [2, 4]); assert.equal(JSON.parse(s.layers[0].params).text, 'two'); assert.equal(JSON.parse(s.layers[0].params).tone, 'gold');
+  s = await at(16); await parity(16); assert.equal(s.base, 'door'); assert.equal(s.interaction, 1); assert.deepEqual(s.layers.map((l) => l.slot), [2]); assert.equal(JSON.parse(s.layers[0].params).tone, undefined);
+  s = await at(21); await parity(21); assert.equal(s.base, 'posters'); assert.deepEqual(s.layers, []);
 });
 
 test('the lobby: its two doorways are objects in the lobby space and read as bays 4 and 5 for the engine', async () => {
@@ -310,7 +333,7 @@ test('signing is offline, needs the guard, and the signed transaction carries th
   assert.equal(String(tx(space).auth.spendingCondition.nonce), String(7 + space));
   const last = tx(items.length - 1);
   assert.equal(last.payload.functionName.content, 'add-states');
-  assert.equal(last.payload.functionArgs[0].type, 11);   // a list
+  assert.equal(last.payload.functionArgs[0].type, 'list');
   assert.ok(!items.map((i) => i.hex).join().includes(Buffer.from(key).toString('hex')));
 });
 
@@ -351,4 +374,29 @@ test('unpacked relay files hold signed hex only (no key) and the planned labels'
   const packed = pack(items);
   const back = JSON.parse(gunzipSync(Buffer.from(packed, 'base64')).toString('utf8'));
   assert.equal(back.length, 1); assert.match(back[0].label, /add-state \(hall\/bay-1\/sign change text\)/);
+});
+
+test('the hall fixtures (recursive-apps/xtrata-arcade/tests/fixtures/hall-v2-demo.json) still match what the contract and toolkit produce', async () => {
+  const { buildFixture, FIXTURE } = await import('../scripts/make-hall-v2-fixture.mjs');
+  const fresh = await buildFixture();
+  const saved = JSON.parse(readFileSync(FIXTURE, 'utf8'));
+  assert.deepEqual(JSON.parse(JSON.stringify(fresh)), saved, 'run: node scripts/make-hall-v2-fixture.mjs');
+});
+
+test('the read tool over HTTP: networkRead speaks the node\'s call-read API and the hall reader makes the same hall of it', async () => {
+  const { FIXTURE } = await import('../scripts/make-hall-v2-fixture.mjs');
+  const fx = JSON.parse(readFileSync(FIXTURE, 'utf8')), sc = fx.scenarios.active, urls = [];
+  const fetchImpl = async (url, init) => {
+    const fn = url.split('/').pop(), body = JSON.parse(init.body);
+    urls.push(url);
+    const i = sc.calls[fn + '|' + body.arguments.join(',')];
+    return { ok: i !== undefined, status: i !== undefined ? 200 : 404, json: async () => ({ okay: true, result: fx.blobs[i] }) };
+  };
+  const [addr, name] = fx.registry.split('.');
+  const r = await readHall({ read: networkRead({ apiBase: 'https://node.example/', fetchImpl }), registry: fx.registry });
+  assert.deepEqual(r, sc.expect);
+  assert.ok(urls.every((u) => u.startsWith(`https://node.example/v2/contracts/call-read/${addr}/${name}/`)));
+  assert.match(describeHall(r), /bay 1: door door-arch, knock/);
+  // a node that fails makes the read throw: the tool says so instead of printing an empty hall
+  await assert.rejects(readHall({ read: networkRead({ fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({}) }) }), registry: fx.registry }), /HTTP 503/);
 });
