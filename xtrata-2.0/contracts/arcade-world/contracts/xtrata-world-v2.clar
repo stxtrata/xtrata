@@ -20,11 +20,22 @@
 ;; - Root owner (two-step hand-over, may be a contract) and admins with narrow caps.
 ;; - Successor pointer with a one-way lock. The read interface is frozen at "xws-1".
 ;;
+;; Notes for clients (things this contract deliberately does not do)
+;;   - Bindings, portals and consents made by a previous owner persist across a sale; a buyer
+;;     should read them (buy-space pins price and space version). Scheduled states do not persist.
+;;   - Tier-1 (data) kinds are approved on registration and carry the category their author chose;
+;;     a client should trust a kind's category only for kinds it has seen approved or built-in.
+;;   - Reads such as get-grant return the stored row, which may be expired or from an old epoch;
+;;     use is-writable / the caps checks, not the raw row, to decide what someone may do.
+;;   - Fees are paid by tx-sender while authority is checked on contract-caller: wallets should set
+;;     post-conditions / max payment on every paid call.
+
 ;; Codes
 ;;   space kind:   0 domain (container only)  1 room  2 plot
 ;;   space state:  0 draft  1 live  2 suspended  3 retired
 ;;   runtime:      0 native  1 composed  2 page  3 hosted      (policy bit = 1 << code)
-;;   object state: 0 visible  1 hidden  2 retired
+;;   object state: 0 visible  1 hidden  2 retired  3 moderated (set and cleared only by a moderator)
+;;   space paused: 0 running  1 paused by its own side  2 paused from above (lifted only from above)
 ;;   interface:    1 display-v1  2 state-v1  3 gate-v1  4 action-v1 (policy bit = 1 << (code-1))
 ;;   kind category: 0 shell 1 material 2 shape 3 prop 4 light 5 audio 6 display 7 door
 ;;                  8 cover 9 interactive 10 container
@@ -75,6 +86,9 @@
 (define-constant MAX-BPS u2500)
 (define-constant MAX-FLAT u50000000)
 (define-constant FEE-DELAY u144)
+(define-constant MAX-PRICE u1000000000000000)
+(define-constant MAX-GRANT-BLOCKS u1008)
+(define-constant PATH-CHARS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~/?=&%#")
 (define-constant MAX-RECIPE-BYTES u8192)
 (define-constant MAX-MODULE-BYTES u262144)
 
@@ -117,6 +131,7 @@
 ;; scratch values used by filter/fold helpers (always set just before use)
 (define-data-var scratch-seq uint u0)
 (define-data-var scratch-now uint u0)
+(define-data-var scratch-epoch uint u0)
 
 (define-map Admins principal uint)
 (define-map Approved principal bool)
@@ -125,7 +140,7 @@
   {
     parent: uint, slug: (string-ascii 24), title: (string-ascii 48), kind: uint,
     owner: principal, pending-owner: (optional principal),
-    transferable: bool, epoch: uint, state: uint, paused: bool, runtime: uint,
+    transferable: bool, epoch: uint, state: uint, paused: uint, runtime: uint,
     entry: (optional { id: uint, hash: (buff 32), size: uint }),
     policy: {
       max-children: uint, max-descendants: uint, max-objects: uint, max-depth: uint,
@@ -133,7 +148,7 @@
       portals-in: uint, portals-out: uint, review: bool, create-fee: uint
     },
     depth: uint, children: uint, child-slots: uint, descendants: uint,
-    objects: uint, object-slots: uint,
+    objects: uint, object-slots: uint, idx: uint,
     created-at: uint, updated-at: uint, version: uint
   })
 
@@ -141,7 +156,7 @@
 (define-map Slugs { parent: uint, slug: (string-ascii 24) } uint)
 (define-map Children { parent: uint, idx: uint } uint)
 (define-map Grants { space: uint, who: principal }
-  { caps: uint, inherit: bool, expires: uint, epoch: uint })
+  { caps: uint, inherit: bool, expires: uint, epoch: uint, by: principal })
 (define-map Listings uint { price: uint, buyer: (optional principal), epoch: uint })
 
 (define-map Kinds uint
@@ -158,7 +173,7 @@
     params: (string-ascii 512),
     bindings: (list 4 { role: (string-ascii 16), contract: principal, interface: uint }),
     portal: (optional { to-space: uint, arrival: uint, path: (string-ascii 64) }),
-    state: uint, depth: uint, children: uint,
+    state: uint, idx: uint, depth: uint, children: uint,
     author: principal, created-at: uint, updated-at: uint
   })
 (define-map SpaceObjects { space: uint, idx: uint } uint)
@@ -169,7 +184,7 @@
     visibility: uint, interaction: uint, author: principal, added-at: uint
   })
 (define-map StateCount uint uint)
-(define-map Timeline uint (list 8 { seq: uint, from: uint }))
+(define-map Timeline uint (list 8 { seq: uint, from: uint, epoch: uint }))
 
 ;; inbound portal consents: target space + source space, valid for the target's epoch
 (define-map Consents { to: uint, from: uint } uint)
@@ -181,7 +196,7 @@
   {
     parent: u0, slug: "", title: "Xtrata World", kind: u0,
     owner: tx-sender, pending-owner: none,
-    transferable: false, epoch: u0, state: u1, paused: false, runtime: u0,
+    transferable: false, epoch: u0, state: u1, paused: u0, runtime: u0,
     entry: none,
     policy: {
       max-children: MAX-CHILDREN, max-descendants: MAX-DESCENDANTS, max-objects: u128, max-depth: MAX-DEPTH,
@@ -189,7 +204,7 @@
       portals-in: u0, portals-out: u0, review: false, create-fee: u0
     },
     depth: u0, children: u0, child-slots: u0, descendants: u0,
-    objects: u0, object-slots: u0,
+    objects: u0, object-slots: u0, idx: u0,
     created-at: stacks-block-height, updated-at: stacks-block-height, version: u0
   })
 
@@ -237,7 +252,7 @@
 ;; Capabilities and chain checks (every walk is bounded by MAX-DEPTH)
 
 (define-private (caps-step (i uint)
-  (ctx { cur: uint, caps: uint, who: principal, first: bool }))
+  (ctx { cur: uint, caps: uint, who: principal, first: bool, town: principal }))
   (if (is-eq (get cur ctx) u0)
     ctx
     (match (map-get? Spaces (get cur ctx))
@@ -249,25 +264,29 @@
           (g-caps (match (map-get? Grants { space: (get cur ctx), who: (get who ctx) })
                     gr (if (and (is-eq (get epoch gr) (get epoch s))
                                 (or (is-eq (get expires gr) u0) (< burn-block-height (get expires gr)))
-                                (or (get first ctx) (get inherit gr)))
+                                ;; an inherited grant reaches only spaces still held by the
+                                ;; granting ancestor's own owner (never a space since sold on)
+                                (or (get first ctx)
+                                    (and (get inherit gr)
+                                         (is-eq (space-owner (get cur ctx)) (get town ctx)))))
                          (get caps gr)
                          u0)
                     u0)))
           { cur: (get parent s), caps: (bit-or (get caps ctx) (bit-or own-caps g-caps)),
-            who: (get who ctx), first: false })
-      { cur: u0, caps: (get caps ctx), who: (get who ctx), first: false })))
+            who: (get who ctx), first: false, town: (get town ctx) })
+      { cur: u0, caps: (get caps ctx), who: (get who ctx), first: false, town: (get town ctx) })))
 
 (define-private (admin-caps)
   (bit-or
     (if (admin-has? A-MOD) CAP-OVERSIGHT u0)
     (if (admin-has? A-PAUSE) CAP-PAUSE u0)))
 
-(define-private (caps-from (start uint) (first bool))
+(define-private (caps-from (start uint) (first bool) (town principal))
   (bit-or
-    (get caps (fold caps-step STEPS { cur: start, caps: u0, who: contract-caller, first: first }))
+    (get caps (fold caps-step STEPS { cur: start, caps: u0, who: contract-caller, first: first, town: town }))
     (admin-caps)))
 
-(define-private (caps-of (space uint)) (caps-from space true))
+(define-private (caps-of (space uint)) (caps-from space true (space-owner space)))
 
 (define-private (has-cap? (space uint) (cap uint))
   (> (bit-and (caps-of space) cap) u0))
@@ -275,16 +294,20 @@
 ;; Oversight from strictly above the space (ancestor owners, inheriting grants, admins).
 (define-private (oversight-above? (space uint))
   (match (map-get? Spaces space)
-    s (or (is-eq space ROOT)
-          (> (bit-and (caps-from (get parent s) false) CAP-MOD) u0))
+    s (and (not (is-eq space ROOT))
+           (> (bit-and (caps-from (get parent s) false (get owner s)) CAP-MOD) u0))
     false))
+
+;; Moderators: the root owner, MOD admins, and the owners of ancestors. Never the space's own owner.
+(define-private (moderator? (space uint))
+  (or (is-root-owner) (oversight-above? space)))
 
 (define-private (chain-write-step (i uint) (ctx { cur: uint, ok: bool }))
   (if (is-eq (get cur ctx) u0)
     ctx
     (match (map-get? Spaces (get cur ctx))
       s { cur: (get parent s),
-          ok: (and (get ok ctx) (<= (get state s) u1) (not (get paused s))) }
+          ok: (and (get ok ctx) (<= (get state s) u1) (is-eq (get paused s) u0)) }
       { cur: u0, ok: false })))
 
 ;; Writable: no global pause, and no suspended/retired/paused space on the way to the root.
@@ -333,7 +356,8 @@
        (<= (get tiers p) u15)
        (<= (get interfaces p) u15)
        (<= (get portals-in p) u2)
-       (<= (get portals-out p) u2)))
+       (<= (get portals-out p) u2)
+       (<= (get create-fee p) MAX-PRICE)))
 
 ;; A child policy must sit inside its parent's (ceilings only narrow).
 (define-private (policy-within?
@@ -432,9 +456,14 @@
     (ok true)))
 
 (define-public (accept-root-owner)
-  (let ((pending (unwrap! (var-get pending-root-owner) ERR-NO-PENDING)))
+  (let (
+    (pending (unwrap! (var-get pending-root-owner) ERR-NO-PENDING))
+    (r (unwrap! (map-get? Spaces ROOT) ERR-NOT-FOUND)))
     (asserts! (caller-is pending) ERR-NOT-AUTHORIZED)
     (var-set root-owner pending)
+    ;; a new root owner starts a new epoch: every grant and consent made under the old one lapses
+    (map-set Spaces ROOT (merge r { owner: pending, epoch: (+ (get epoch r) u1),
+      updated-at: stacks-block-height, version: (+ (get version r) u1) }))
     (var-set pending-root-owner none)
     (print { event: "root-owner-set", who: pending, version: (bump) })
     (ok true)))
@@ -567,10 +596,10 @@
       owner: owner, pending-owner: none,
       ;; only the root owner may create a space with a chosen lock; others get the default
       transferable: (if root? transferable (not (is-eq kind u0))),
-      epoch: u0, state: u0, paused: false, runtime: runtime,
+      epoch: u0, state: u0, paused: u0, runtime: runtime,
       entry: none, policy: policy,
       depth: depth, children: u0, child-slots: u0, descendants: u0,
-      objects: u0, object-slots: u0,
+      objects: u0, object-slots: u0, idx: (get child-slots p),
       created-at: stacks-block-height, updated-at: stacks-block-height, version: u0 })
     (map-set Slugs { parent: parent, slug: slug } id)
     (map-set Children { parent: parent, idx: (get child-slots p) } id)
@@ -626,6 +655,28 @@
 
 ;; draft/live: the owner. Suspend and unsuspend: oversight from above only (so an owner
 ;; cannot undo moderation). Retire: the owner, once no live children remain.
+;; Retiring a child frees its slot (the last child moves into the gap) and its slug.
+(define-private (detach-child (id uint))
+  (let (
+    (s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND))
+    (pid (get parent s))
+    (ps (unwrap! (map-get? Spaces pid) ERR-NOT-FOUND))
+    (last (if (> (get child-slots ps) u0) (- (get child-slots ps) u1) u0))
+    (i (get idx s)))
+    (if (is-eq i last)
+      true
+      (match (map-get? Children { parent: pid, idx: last })
+        moved (begin
+                (map-set Children { parent: pid, idx: i } moved)
+                (match (map-get? Spaces moved) ms (map-set Spaces moved (merge ms { idx: i })) false))
+        false))
+    (map-delete Children { parent: pid, idx: last })
+    (map-delete Slugs { parent: pid, slug: (get slug s) })
+    (map-set Spaces pid (merge ps {
+      children: (if (> (get children ps) u0) (- (get children ps) u1) u0),
+      child-slots: last }))
+    (ok true)))
+
 (define-public (set-space-state (id uint) (state uint))
   (let ((s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND)))
     (asserts! (not (is-eq id ROOT)) ERR-STATE)
@@ -639,9 +690,7 @@
     (if (is-eq state u3)
       (begin
         (asserts! (is-eq (get children s) u0) ERR-STATE)
-        (map-set Spaces (get parent s)
-          (let ((ps (unwrap! (map-get? Spaces (get parent s)) ERR-NOT-FOUND)))
-            (merge ps { children: (if (> (get children ps) u0) (- (get children ps) u1) u0) })))
+        (try! (detach-child id))
         (fold desc-down-step STEPS { cur: (get parent s), ok: true })
         true)
       true)
@@ -650,15 +699,22 @@
     (print { event: "space-state", space: id, state: state, actor: contract-caller, version: (bump) })
     (ok true)))
 
+;; 0 running, 1 paused by the space's own side, 2 paused from above. A pause from above can
+;; only be lifted from above, so an owner cannot undo moderation.
 (define-public (set-space-paused (id uint) (value bool))
-  (let ((s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND)))
+  (let (
+    (s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND))
+    (mod? (moderator? id)))
     (asserts! (has-cap? id CAP-PAUSE) ERR-NOT-AUTHORIZED)
-    (map-set Spaces id (merge s { paused: value, updated-at: stacks-block-height, version: (+ (get version s) u1) }))
+    (asserts! (or mod? (not (is-eq (get paused s) u2))) ERR-NOT-AUTHORIZED)
+    (map-set Spaces id (merge s {
+      paused: (if value (if mod? u2 u1) u0),
+      updated-at: stacks-block-height, version: (+ (get version s) u1) }))
     (print { event: "space-paused", space: id, value: value, actor: contract-caller, version: (bump) })
     (ok true)))
 
-;; Policy: an owner can only narrow; an ancestor with oversight can set anything that
-;; still fits inside the parent's policy. Existing children keep their own policies.
+;; Policy: owners and ancestors with oversight can only narrow; the root owner can widen
+;; (within the parent's policy). The creation fee is changed by the owner or the root owner.
 (define-public (set-policy (id uint)
   (policy { max-children: uint, max-descendants: uint, max-objects: uint, max-depth: uint,
             runtimes: uint, tiers: uint, interfaces: uint, approved-only: bool,
@@ -673,10 +729,14 @@
       (asserts! (is-root-owner) ERR-NOT-AUTHORIZED)
       (let ((ps (unwrap! (map-get? Spaces (get parent s)) ERR-NOT-FOUND)))
         (asserts! (policy-within? policy (get policy ps) (get depth s) (get depth ps)) ERR-POLICY)))
-    ;; an owner narrows only (the create-fee is the owner's to set)
-    (asserts! (or above?
+    ;; only the root owner may widen; everyone else narrows
+    (asserts! (or (is-root-owner)
                   (policy-within? policy (get policy s) (get depth s) (get depth s)))
               ERR-POLICY)
+    ;; the creation fee is the owner's (or the root owner's) to set
+    (asserts! (or (is-eq (get create-fee policy) (get create-fee (get policy s)))
+                  (is-root-owner) (caller-is (space-owner id)))
+              ERR-NOT-AUTHORIZED)
     (map-set Spaces id (merge s { policy: policy, updated-at: stacks-block-height, version: (+ (get version s) u1) }))
     (print { event: "policy-set", space: id, actor: contract-caller, version: (bump) })
     (ok true)))
@@ -687,15 +747,27 @@
 (define-public (grant (space uint) (who principal) (caps uint) (inherit bool) (expires uint))
   (let (
     (s (unwrap! (map-get? Spaces space) ERR-NOT-FOUND))
-    (mine (bit-and (caps-of space) (bit-not CAP-MOD))))
+    (mine (bit-and (caps-of space) (bit-not CAP-MOD)))
+    (owner? (caller-is (space-owner space)))
+    (old (map-get? Grants { space: space, who: who })))
     (asserts! (writable? space) ERR-PAUSED)
     (asserts! (> (bit-and (caps-of space) CAP-GRANT) u0) ERR-NOT-AUTHORIZED)
     (asserts! (and (> caps u0) (<= caps CAP-ALL)) ERR-INVALID)
     (asserts! (is-eq (bit-and caps CAP-MOD) u0) ERR-CAPS)
     (asserts! (is-eq (bit-and caps (bit-not mine)) u0) ERR-CAPS)
     (asserts! (or (is-eq expires u0) (> expires burn-block-height)) ERR-INVALID)
+    ;; delegates issue short, non-inheriting grants that cannot pass on the right to grant
+    (asserts! (or owner?
+                  (and (not inherit) (is-eq (bit-and caps CAP-GRANT) u0) (> expires u0)
+                       (<= expires (+ burn-block-height MAX-GRANT-BLOCKS))))
+              ERR-CAPS)
+    ;; a live grant is changed only by the owner, a moderator or whoever issued it
+    (asserts! (match old g (or owner? (not (is-eq (get epoch g) (get epoch s)))
+                               (caller-is (get by g)) (has-cap? space CAP-MOD))
+                true)
+              ERR-NOT-AUTHORIZED)
     (map-set Grants { space: space, who: who }
-      { caps: caps, inherit: inherit, expires: expires, epoch: (get epoch s) })
+      { caps: caps, inherit: inherit, expires: expires, epoch: (get epoch s), by: contract-caller })
     (print { event: "grant", space: space, who: who, caps: caps, inherit: inherit, expires: expires,
              actor: contract-caller, version: (bump) })
     (ok true)))
@@ -703,7 +775,9 @@
 (define-public (revoke (space uint) (who principal))
   (begin
     (asserts! (is-some (map-get? Spaces space)) ERR-NOT-FOUND)
-    (asserts! (or (has-cap? space CAP-GRANT) (has-cap? space CAP-MOD) (caller-is who)) ERR-NOT-AUTHORIZED)
+    (asserts! (or (caller-is (space-owner space)) (has-cap? space CAP-MOD) (caller-is who)
+                  (match (map-get? Grants { space: space, who: who }) g (caller-is (get by g)) false))
+              ERR-NOT-AUTHORIZED)
     (map-delete Grants { space: space, who: who })
     (print { event: "revoke", space: space, who: who, actor: contract-caller, version: (bump) })
     (ok true)))
@@ -773,6 +847,7 @@
     (asserts! (writable? id) ERR-PAUSED)
     (asserts! (caller-is (get owner s)) ERR-NOT-AUTHORIZED)
     (asserts! (get transferable s) ERR-NOT-TRANSFERABLE)
+    (asserts! (<= price MAX-PRICE) ERR-INVALID)
     (map-set Listings id { price: price, buyer: buyer, epoch: (get epoch s) })
     (print { event: "space-listed", space: id, price: price, buyer: buyer, version: (bump) })
     (ok true)))
@@ -784,17 +859,21 @@
     (print { event: "space-delisted", space: id, version: (bump) })
     (ok true)))
 
-(define-public (buy-space (id uint))
+;; The buyer names the price and the space version they looked at, so a seller cannot change
+;; the price or the content between the buyer reading and the sale landing.
+(define-public (buy-space (id uint) (expected-price uint) (expected-version uint))
   (let (
     (s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND))
     (l (unwrap! (map-get? Listings id) ERR-NOT-LISTED)))
     (asserts! (writable? id) ERR-PAUSED)
     (asserts! (get transferable s) ERR-NOT-TRANSFERABLE)
     (asserts! (is-eq (get epoch l) (get epoch s)) ERR-NOT-LISTED)
+    (asserts! (is-eq (get price l) expected-price) ERR-INVALID)
+    (asserts! (is-eq (get version s) expected-version) ERR-STATE)
     (asserts! (caller-is tx-sender) ERR-NOT-AUTHORIZED)
     (asserts! (not (is-eq tx-sender (get owner s))) ERR-INVALID)
     (asserts! (match (get buyer l) b (is-eq b tx-sender) true) ERR-NOT-AUTHORIZED)
-    (try! (pay-split (get price l) (get owner s) u0 "sale"))
+    (try! (pay-split (get price l) (get owner s) (get transfer-flat (fees-now)) "sale"))
     (print { event: "sale", space: id, price: (get price l), buyer: tx-sender, seller: (get owner s) })
     (hand-over id tx-sender)
     (ok true)))
@@ -910,7 +989,7 @@
       space: space, parent: parent-obj, kind: kind, name: name, transform: transform, params: params,
       bindings: (list), portal: none,
       state: (if (and (not owner?) (get review pol)) u1 u0),
-      depth: (+ pd u1), children: u0,
+      idx: (get object-slots s), depth: (+ pd u1), children: u0,
       author: contract-caller, created-at: stacks-block-height, updated-at: stacks-block-height })
     (map-set SpaceObjects { space: space, idx: (get object-slots s) } id)
     (map-set Spaces space (merge s {
@@ -921,6 +1000,19 @@
     (print { event: "object-set", object: id, space: space, parent: parent-obj, kind: kind,
              actor: contract-caller, version: (bump) })
     (ok id)))
+
+;; Where a review lane applies, an edit by anyone but the owner or a moderator sends a visible
+;; object back to hidden until the owner (or a moderator) shows it again.
+(define-private (review-state (o { space: uint, parent: uint, kind: uint, name: (string-ascii 24),
+    transform: { x: int, y: int, z: int, yaw: uint, scale: uint }, params: (string-ascii 512),
+    bindings: (list 4 { role: (string-ascii 16), contract: principal, interface: uint }),
+    portal: (optional { to-space: uint, arrival: uint, path: (string-ascii 64) }),
+    state: uint, idx: uint, depth: uint, children: uint,
+    author: principal, created-at: uint, updated-at: uint }) (space uint))
+  (if (and (is-eq (get state o) u0) (get review (eff-policy space))
+           (not (caller-is (space-owner space))) (not (moderator? space)))
+    u1
+    (get state o)))
 
 (define-public (set-object
   (id uint) (name (string-ascii 24))
@@ -933,42 +1025,74 @@
     (asserts! (> (len name) u0) ERR-INVALID)
     (asserts! (transform-ok? transform) ERR-INVALID)
     (map-set Objects id (merge o { name: name, transform: transform, params: params,
+                                   state: (review-state o (get space o)),
                                    updated-at: stacks-block-height }))
+    (touch (get space o))
     (print { event: "object-set", object: id, space: (get space o), actor: contract-caller, version: (bump) })
     (ok true)))
 
-;; visible / hidden / retired. Moderation (MOD) may hide; it works even while the space is
-;; suspended or paused, because hiding is an escape hatch. Retiring needs no live parts.
+;; Object states: 0 visible, 1 hidden, 2 retired, 3 moderated.
+;; Hiding is an escape hatch: it works even while the space is suspended or paused.
+;; Moderated (3) is set and cleared only by a moderator (root owner, MOD admin, or an ancestor's
+;; owner); the space's own side can only retire a moderated object. Moderators may also retire.
+;; Everything else needs the space to be writable. Retiring frees the object's slot.
 (define-public (set-object-state (id uint) (state uint))
   (let (
     (o (unwrap! (map-get? Objects id) ERR-NOT-FOUND))
     (space (get space o))
-    (s (unwrap! (map-get? Spaces space) ERR-NOT-FOUND)))
-    (asserts! (<= state u2) ERR-INVALID)
-    (asserts! (< (get state o) u2) ERR-STATE)
-    (asserts! (if (is-eq state u1)
-                (or (has-cap? space CAP-OBJECT) (has-cap? space CAP-MOD))
-                (has-cap? space CAP-OBJECT))
+    (s (unwrap! (map-get? Spaces space) ERR-NOT-FOUND))
+    (cur (get state o))
+    (mod? (moderator? space)))
+    (asserts! (<= state u3) ERR-INVALID)
+    (asserts! (not (is-eq cur u2)) ERR-STATE)
+    (asserts! (or mod? (not (is-eq state u3))) ERR-NOT-AUTHORIZED)
+    (asserts! (or mod? (not (is-eq cur u3)) (is-eq state u2)) ERR-NOT-AUTHORIZED)
+    (asserts! (or mod?
+                  (if (is-eq state u1)
+                    (or (has-cap? space CAP-OBJECT) (has-cap? space CAP-MOD))
+                    (has-cap? space CAP-OBJECT)))
               ERR-NOT-AUTHORIZED)
+    (asserts! (or mod? (is-eq state u1) (writable? space)) ERR-PAUSED)
     ;; where a review lane applies, only the owner or a moderator can make hidden content visible
     (asserts! (or (not (get review (eff-policy space))) (not (is-eq state u0))
-                  (caller-is (space-owner space)) (has-cap? space CAP-MOD))
+                  (caller-is (space-owner space)) mod?)
               ERR-NOT-AUTHORIZED)
     (if (is-eq state u2)
       (begin
         (asserts! (is-eq (get children o) u0) ERR-STATE)
-        (map-set Spaces space (merge s {
-          objects: (if (> (get objects s) u0) (- (get objects s) u1) u0),
-          updated-at: stacks-block-height, version: (+ (get version s) u1) }))
+        (detach-object id)
         (match (map-get? Objects (get parent o))
           p (map-set Objects (get parent o)
               (merge p { children: (if (> (get children p) u0) (- (get children p) u1) u0) }))
           false)
         true)
       true)
-    (map-set Objects id (merge o { state: state, updated-at: stacks-block-height }))
+    (map-set Objects id (merge (unwrap! (map-get? Objects id) ERR-NOT-FOUND)
+      { state: state, updated-at: stacks-block-height }))
+    (touch space)
     (print { event: "object-state", object: id, space: space, state: state, actor: contract-caller, version: (bump) })
     (ok true)))
+
+;; Retiring an object frees its slot: the last object in the space moves into the gap.
+(define-private (detach-object (id uint))
+  (let (
+    (o (unwrap-panic (map-get? Objects id)))
+    (sp (get space o))
+    (s (unwrap-panic (map-get? Spaces sp)))
+    (last (if (> (get object-slots s) u0) (- (get object-slots s) u1) u0))
+    (i (get idx o)))
+    (if (is-eq i last)
+      true
+      (match (map-get? SpaceObjects { space: sp, idx: last })
+        moved (begin
+                (map-set SpaceObjects { space: sp, idx: i } moved)
+                (match (map-get? Objects moved) mo (map-set Objects moved (merge mo { idx: i })) false))
+        false))
+    (map-delete SpaceObjects { space: sp, idx: last })
+    (map-set Spaces sp (merge s {
+      objects: (if (> (get objects s) u0) (- (get objects s) u1) u0),
+      object-slots: last,
+      updated-at: stacks-block-height, version: (+ (get version s) u1) }))))
 
 ;; ---------------------------------------------------------------------------
 ;; Bindings: behaviour contracts attached to an object
@@ -996,7 +1120,9 @@
     (asserts! (get ok (fold binding-step bindings
                 {ok: true, mask: (get interfaces pol), approved-only: (get approved-only pol)}))
               ERR-BAD-BINDING)
-    (map-set Objects id (merge o { bindings: bindings, updated-at: stacks-block-height }))
+    (map-set Objects id (merge o { bindings: bindings, state: (review-state o space),
+                                   updated-at: stacks-block-height }))
+    (touch space)
     (print { event: "binding-set", object: id, space: space, count: (len bindings),
              actor: contract-caller, version: (bump) })
     (ok true)))
@@ -1004,18 +1130,21 @@
 ;; ---------------------------------------------------------------------------
 ;; Portals (doors)
 
-;; An external path must be a site path: starts with "/", not "//" or "/\".
+;; An external path is a plain site path: starts with "/", not "//", and only URL-safe characters
+;; (no backslash, whitespace, control characters or quotes).
+(define-private (path-char-ok (ch (string-ascii 1)) (acc bool))
+  (and acc (is-some (index-of? PATH-CHARS ch))))
 (define-private (path-ok? (path (string-ascii 64)))
   (and (is-eq (element-at? path u0) (some "/"))
        (not (is-eq (element-at? path u1) (some "/")))
-       (not (is-eq (element-at? path u1) (some "\\")))))
+       (fold path-char-ok path true)))
 
 (define-private (portal-ok? (src uint) (pt { to-space: uint, arrival: uint, path: (string-ascii 64) }))
   (let (
     (sp (eff-policy src)))
     (if (is-eq (get to-space pt) u0)
       ;; a site path: only spaces with unrestricted outbound doors
-      (and (is-eq (get portals-out sp) u0) (path-ok? (get path pt)))
+      (and (is-eq (get portals-out sp) u0) (is-eq (get arrival pt) u0) (path-ok? (get path pt)))
       (match (map-get? Spaces (get to-space pt))
         ts
           (let (
@@ -1023,6 +1152,7 @@
             (same-anchor (is-eq (anchor-of src) (anchor-of (get to-space pt))))
             (consented (is-eq (map-get? Consents { to: (get to-space pt), from: src }) (some (get epoch ts)))))
             (and
+              (is-eq (len (get path pt)) u0)
               (open? (get to-space pt))
               ;; arrival: the target's entrance (0) or one of its own live objects
               (or (is-eq (get arrival pt) u0)
@@ -1050,7 +1180,9 @@
     (asserts! (< (get state o) u2) ERR-STATE)
     (asserts! (is-eq (kind-category (get kind o)) u7) ERR-BAD-LINK)
     (match portal pt (asserts! (portal-ok? space pt) ERR-BAD-LINK) true)
-    (map-set Objects id (merge o { portal: portal, updated-at: stacks-block-height }))
+    (map-set Objects id (merge o { portal: portal, state: (review-state o space),
+                                   updated-at: stacks-block-height }))
+    (touch space)
     (print { event: "portal-set", object: id, space: space, portal: portal,
              actor: contract-caller, version: (bump) })
     (ok true)))
@@ -1087,6 +1219,7 @@
         (space (get space o))
         (seq (default-to u0 (map-get? StateCount id)))
         (from (umax (get from st) burn-block-height))
+        (ep (match (map-get? Spaces space) sp (get epoch sp) u0))
         (timeline (default-to (list) (map-get? Timeline id))))
         (asserts! (writable? space) ERR-PAUSED)
         (asserts! (has-cap? space CAP-STATE) ERR-NOT-AUTHORIZED)
@@ -1101,7 +1234,8 @@
           author: contract-caller, added-at: stacks-block-height })
         (map-set StateCount id (+ seq u1))
         (map-set Timeline id
-          (unwrap! (as-max-len? (append timeline { seq: seq, from: from }) u8) ERR-TIMELINE-FULL))
+          (unwrap! (as-max-len? (append timeline { seq: seq, from: from, epoch: ep }) u8) ERR-TIMELINE-FULL))
+        (touch space)
         (print { event: "state-added", object: id, space: space, seq: seq, from-height: from, version: (bump) })
         (ok (+ n u1)))
     e (err e)))
@@ -1117,7 +1251,7 @@
   (sts (list 8 { obj: uint, from: uint, patch: (string-ascii 256), visibility: uint, interaction: uint })))
   (fold put-state sts (ok u0)))
 
-(define-private (not-seq? (e { seq: uint, from: uint })) (not (is-eq (get seq e) (var-get scratch-seq))))
+(define-private (not-seq? (e { seq: uint, from: uint, epoch: uint })) (not (is-eq (get seq e) (var-get scratch-seq))))
 
 ;; Retract hides a state from resolution; history stays readable. Works while paused or
 ;; suspended (escape hatch), for the space's STATE holders and for moderators.
@@ -1127,46 +1261,59 @@
     (space (get space o))
     (st (unwrap! (map-get? States { obj: obj, seq: seq }) ERR-NOT-FOUND)))
     (asserts! (or (has-cap? space CAP-STATE) (has-cap? space CAP-MOD)) ERR-NOT-AUTHORIZED)
+    (touch space)
     (map-set States { obj: obj, seq: seq } (merge st { retracted: true }))
     (var-set scratch-seq seq)
     (map-set Timeline obj (filter not-seq? (default-to (list) (map-get? Timeline obj))))
     (print { event: "state-retracted", object: obj, space: space, seq: seq, version: (bump) })
     (ok true)))
 
-(define-private (keep-state? (e { seq: uint, from: uint }))
-  (or (is-eq (get seq e) (var-get scratch-seq)) (> (get from e) (var-get scratch-now))))
+(define-private (keep-state? (e { seq: uint, from: uint, epoch: uint }))
+  (and (is-eq (get epoch e) (var-get scratch-epoch))
+       (or (is-eq (get seq e) (var-get scratch-seq)) (> (get from e) (var-get scratch-now)))))
 
-;; Frees timeline space: keeps the active state and everything still to come.
+;; Frees timeline space: keeps the active state and everything still to come, and drops
+;; entries scheduled under a previous owner.
 (define-public (compact-object (obj uint))
   (let (
     (o (unwrap! (map-get? Objects obj) ERR-NOT-FOUND))
     (view (resolve obj)))
     (asserts! (has-cap? (get space o) CAP-STATE) ERR-NOT-AUTHORIZED)
+    (asserts! (or (moderator? (get space o)) (writable? (get space o))) ERR-PAUSED)
+    (var-set scratch-epoch (obj-epoch obj))
     (var-set scratch-now burn-block-height)
     (var-set scratch-seq (get active-seq view))
     (map-set Timeline obj (filter keep-state? (default-to (list) (map-get? Timeline obj))))
     (print { event: "object-compacted", object: obj, space: (get space o), version: (bump) })
     (ok true)))
 
+(define-private (obj-epoch (obj uint))
+  (match (map-get? Objects obj)
+    o (match (map-get? Spaces (get space o)) s (get epoch s) u0)
+    u0))
+
 (define-private (resolve-step
-  (e { seq: uint, from: uint })
+  (e { seq: uint, from: uint, epoch: uint })
   (ctx { now: uint, found: bool, active-seq: uint, active-height: uint,
-         next-found: bool, next-height: uint }))
-  ;; Retracted states are removed from the timeline, so every entry here counts.
+         next-found: bool, next-height: uint, epoch: uint }))
+  ;; Retracted states are removed from the timeline. Entries from an earlier owner's epoch
+  ;; (before a sale) are ignored.
+  (if (not (is-eq (get epoch e) (get epoch ctx)))
+    ctx
   (if (<= (get from e) (get now ctx))
     (if (or (not (get found ctx)) (>= (get from e) (get active-height ctx)))
       (merge ctx { found: true, active-seq: (get seq e), active-height: (get from e) })
       ctx)
     (if (or (not (get next-found ctx)) (< (get from e) (get next-height ctx)))
       (merge ctx { next-found: true, next-height: (get from e) })
-      ctx)))
+      ctx))))
 
 (define-private (resolve (obj uint))
   (fold resolve-step
     (default-to (list) (map-get? Timeline obj))
     { now: burn-block-height,
       found: false, active-seq: u0, active-height: u0,
-      next-found: false, next-height: u0 }))
+      next-found: false, next-height: u0, epoch: (obj-epoch obj) }))
 
 ;; ---------------------------------------------------------------------------
 ;; Paged reads
@@ -1234,7 +1381,12 @@
 (define-read-only (is-approved (who principal)) (default-to false (map-get? Approved who)))
 (define-read-only (get-fees)
   { active: (fees-now), pending: (var-get fees-pending), caps: { bps: MAX-BPS, flat: MAX-FLAT, delay: FEE-DELAY } })
-(define-read-only (get-listing (id uint)) (map-get? Listings id))
+(define-read-only (get-listing (id uint))
+  (match (map-get? Listings id)
+    l (match (map-get? Spaces id)
+        s (if (is-eq (get epoch l) (get epoch s)) (some l) none)
+        none)
+    none))
 (define-read-only (get-grant (space uint) (who principal)) (map-get? Grants { space: space, who: who }))
 (define-read-only (get-successor) { successor: (var-get successor), locked: (var-get successor-locked) })
 (define-read-only (is-open (space uint)) (open? space))

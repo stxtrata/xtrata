@@ -77,6 +77,14 @@ export async function world() {
         U(o.runtime ?? 1), Cl.bool(o.transferable ?? true), policy,
       ], sender);
     },
+    // buy a listed space: names the listed price and the space version just read
+    buy: (sender, id, price) => {
+      const sp = ro('get-space', [U(id)]);
+      const ver = sp.type === 'some' ? sp.value.value.version : U(0);
+      let pr = price;
+      if (pr === undefined) { const l = ro('get-listing', [U(id)]); pr = l.type === 'some' ? Number(l.value.value.price.value) : 0; }
+      return call('buy-space', [U(id), U(pr), ver], sender);
+    },
     setState: (sender, id, state) => call('set-space-state', [U(id), U(state)], sender),
     grant: (sender, space, who, caps, inherit = false, expires = 0) =>
       call('grant', [U(space), P(who), U(caps), Cl.bool(inherit), U(expires)], sender),

@@ -111,7 +111,8 @@ test('objects: created within quotas, nesting and kinds; edited, hidden and reti
   assert.equal(pp(w.call('set-object-state', [U(floor), U(1)], W[3]).result), err(300));
   assert.equal(pp(w.call('set-object-state', [U(floor), U(1)], W[0]).result), OK);
   assert.equal(w.getObj(floor).state.value, 1n);
-  assert.equal(pp(w.call('set-object-state', [U(floor), U(3)], W[0]).result), err(303));
+  assert.equal(pp(w.call('set-object-state', [U(floor), U(3)], W[0]).result), err(300)); // moderated: moderators only
+  assert.equal(pp(w.call('set-object-state', [U(floor), U(4)], W[0]).result), err(303));
   assert.equal(pp(w.call('set-object-state', [U(floor), U(0)], W[0]).result), OK);
 });
 
@@ -359,11 +360,13 @@ test('paged reads: objects and children, 16 per page, with the live view', async
   assert.equal(p1.filter((x) => x.type === 'some').length, 4);
   assert.equal(p1[3].value.value.object.value.value.name.value, 's19');
   assert.equal(p1[4].type, 'none');
-  // a retired object keeps its slot (indexes never shift) but reports its state
+  // retiring frees the slot: the last object moves into the gap and the index stays dense
   const first = p0[0].value.value.id.value;
   w.call('set-object-state', [U(first), U(2)]);
   const again = w.ro('get-objects', [U(ids.hall), U(0)]).value;
-  assert.equal(again[0].value.value.object.value.value.state.value, 2n);
+  assert.equal(again[0].value.value.object.value.value.name.value, 's19');
+  assert.equal(w.ro('get-objects', [U(ids.hall), U(1)]).value.filter((x) => x.type === 'some').length, 3);
+  assert.equal(w.get(ids.hall)['object-slots'].value, 19n);
   // children of the arcade, and unknown parents are empty
   const kids = w.ro('get-children', [U(ids.arcade), U(0)]).value;
   assert.equal(kids.filter((x) => x.type === 'some').length, 3);

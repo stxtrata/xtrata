@@ -104,14 +104,15 @@ test('policy ceilings only narrow: depth, children, runtimes, tiers, bindings, d
   assert.equal(pp(sp({ slug: 'studio', owner: W[1], policy: PLOT({ depth: 1, children: 2, objects: 5 }) }).result), ok(8));
   assert.equal(pp(w.space(W[1], { parent: 8, slug: 'attic', policy: PLOT({ depth: 0, children: 0, objects: 2 }) }).result), ok(9));
   assert.equal(pp(w.space(W[1], { parent: 9, slug: 'cellar', policy: PLOT({ depth: 0, children: 0, objects: 1 }) }).result), err(306));
-  // set-policy: the owner can only narrow; an ancestor's owner may set anything inside the parent's policy
+  // set-policy: the owner can only narrow; only the root owner may widen (inside the parent's policy)
   const studio = 8;
   assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 3, objects: 5 })], W[1]).result), err(307)); // wider
   assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 1, objects: 4 })], W[1]).result), OK);
   assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 1, objects: 4 })], W[2]).result), err(300));
-  assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 8, objects: 40 })], W[0]).result), OK); // above may widen
-  assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 9, objects: 40 })], W[0]).result), err(307)); // not past the parent
-  assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 8, objects: 40 })], deployer).result), OK);
+  assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 8, objects: 40 })], W[0]).result), err(307)); // an ancestor narrows only
+  assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 1, objects: 3 })], W[0]).result), OK);       // narrowing is fine
+  assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 9, objects: 40 })], deployer).result), err(307)); // root: not past the parent
+  assert.equal(pp(w.call('set-policy', [U(studio), PLOT({ depth: 1, children: 8, objects: 40 })], deployer).result), OK);       // only the root owner widens
   // the root can set root policy
   assert.equal(pp(w.call('set-policy', [U(1), POL({ children: 10 })]).result), OK);
 });
@@ -124,13 +125,13 @@ test('descendant quotas run up the chain and are freed by retiring', async () =>
   assert.equal(pp(w.space(deployer, { parent: ids.arcade, slug: 'b' }).result.type), 'ok');
   assert.equal(pp(w.space(deployer, { parent: ids.arcade, slug: 'c' }).result), err(305));
   assert.equal(w.get(ids.arcade).descendants.value, 5n);
-  // retiring a room frees a slot (slug stays reserved)
+  // retiring a room frees a slot and its slug
   const a = w.path(['arcade', 'a']);
   assert.equal(pp(w.setState(deployer, a, 3).result), OK);
   assert.equal(w.get(ids.arcade).descendants.value, 4n);
   assert.equal(w.get(ids.arcade).children.value, 4n);
-  assert.equal(pp(w.space(deployer, { parent: ids.arcade, slug: 'a' }).result), err(304));
   assert.equal(pp(w.space(deployer, { parent: ids.arcade, slug: 'c' }).result.type), 'ok');
+  assert.equal(pp(w.space(deployer, { parent: ids.arcade, slug: 'a' }).result), err(305)); // full again; the slug itself is free
   // a space with live children cannot be retired
   assert.equal(pp(w.space(deployer, { parent: ids.plots, slug: 'bob', kind: 2, owner: w.W[1], policy: PLOT() }).result.type), 'ok');
   const bob = w.path(['plots', 'bob']);
@@ -154,7 +155,10 @@ test('grants: delegates build within their caps; never more than the grantor hol
   // a GRANT holder can only pass on caps they hold, and never MOD
   assert.equal(pp(w.grant(W[0], alice, W[3], CAP.GRANT | CAP.CHILD).result), OK);
   assert.equal(pp(w.grant(W[3], alice, W[4], CAP.OBJECT).result), err(319));
-  assert.equal(pp(w.grant(W[3], alice, W[4], CAP.CHILD).result), OK);
+  assert.equal(pp(w.grant(W[3], alice, W[4], CAP.CHILD).result), err(319));                       // a delegate's grants must expire
+  assert.equal(pp(w.grant(W[3], alice, W[4], CAP.CHILD, true, w.h() + 100).result), err(319));    // ... and cannot inherit
+  assert.equal(pp(w.grant(W[3], alice, W[4], CAP.CHILD, false, w.h() + 5000).result), err(319));  // ... and are short
+  assert.equal(pp(w.grant(W[3], alice, W[4], CAP.CHILD, false, w.h() + 100).result), OK);
   assert.equal(pp(w.grant(W[0], alice, W[4], CAP.MOD).result), err(319));
   assert.equal(pp(w.grant(W[0], alice, W[4], 0).result), err(303));
   assert.equal(pp(w.grant(W[0], alice, W[4], 512).result), err(303));
@@ -283,35 +287,35 @@ test('sale: price split with Xtrata, buyer-restricted listings, epoch invalidate
   // only the owner lists; a locked space cannot be listed
   assert.equal(pp(w.call('list-space', [U(alice), U(1_000_000), Cl.none()], W[2]).result), err(300));
   assert.equal(pp(w.call('list-space', [U(ids.casino), U(1), Cl.none()]).result), err(312));
-  assert.equal(pp(w.call('buy-space', [U(alice)], W[2]).result), err(318)); // not listed
+  assert.equal(pp(w.buy(W[2], alice).result), err(318)); // not listed
   // a listing for one buyer only
   w.call('list-space', [U(alice), U(1_000_000), Cl.some(P(W[3]))], W[0]);
-  assert.equal(pp(w.call('buy-space', [U(alice)], W[2]).result), err(300));
-  assert.equal(pp(w.call('buy-space', [U(alice)], W[0]).result), err(303)); // not your own
+  assert.equal(pp(w.buy(W[2], alice).result), err(300));
+  assert.equal(pp(w.buy(W[0], alice).result), err(303)); // not your own
   const before = { seller: w.bal(W[0]), buyer: w.bal(W[3]), treasury: w.bal(W[5]) };
-  assert.equal(pp(w.call('buy-space', [U(alice)], W[3]).result), OK);
+  assert.equal(pp(w.buy(W[3], alice).result), OK);
   assert.equal(w.bal(W[3]), before.buyer - 1_000_000n);
   assert.equal(w.bal(W[5]), before.treasury + 100_000n);   // 10% to Xtrata
   assert.equal(w.bal(W[0]), before.seller + 900_000n);     // the rest to the seller
   assert.equal(addr(w.get(alice).owner), W[3]);
   assert.equal(w.ro('get-listing', [U(alice)]).type, 'none');
-  assert.equal(pp(w.call('buy-space', [U(alice)], W[2]).result), err(318));
+  assert.equal(pp(w.buy(W[2], alice).result), err(318));
   // a stale listing dies with an ownership change by another route
   w.call('list-space', [U(alice), U(5), Cl.none()], W[3]);
   w.call('propose-space-transfer', [U(alice), P(W[4])], W[3]);
   w.call('accept-space-transfer', [U(alice)], W[4]);
-  assert.equal(pp(w.call('buy-space', [U(alice)], W[2]).result), err(318));
+  assert.equal(pp(w.buy(W[2], alice).result), err(318));
   // delist
   w.call('list-space', [U(alice), U(5), Cl.none()], W[4]);
   assert.equal(pp(w.call('delist-space', [U(alice)], W[2]).result), err(300));
   assert.equal(pp(w.call('delist-space', [U(alice)], W[4]).result), OK);
-  assert.equal(pp(w.call('buy-space', [U(alice)], W[2]).result), err(318));
+  assert.equal(pp(w.buy(W[2], alice).result), err(318));
   // free at the protocol level: with no fee set, the seller gets everything
   w.call('set-fees', [U(0), U(0), U(0)]);
   w.call('list-space', [U(alice), U(2_000_000), Cl.none()], W[4]);
   const s2 = w.bal(W[4]);
   const t2 = w.bal(W[5]);
-  w.call('buy-space', [U(alice)], W[2]);
+  w.buy(W[2], alice);
   assert.equal(w.bal(W[4]), s2 + 2_000_000n);
   assert.equal(w.bal(W[5]), t2);
   void deployer;
