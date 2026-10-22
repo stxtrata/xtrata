@@ -1,0 +1,14 @@
+{
+  "note": "Disposable TESTNET wallets for the Xtrata arcade / world / casino. Addresses only; the keys live outside the repo in ~/.xa-testnet-wizards/<name>.key (mode 600). Never use these on mainnet.",
+  "network": "testnet",
+  "wizards": {
+    "deployer":  { "address": "ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E", "role": "deploys the contracts and is their admin" },
+    "reviewer":  { "address": "ST9MP6RRS479FSZZKQPW8D62XZWRBKN1PXPF9QZB", "role": "screen / poster reviewer (level 2 publisher)" },
+    "publisher": { "address": "ST1MBNXTWXD159AW8WV1PXJBZADEWVXT5NVCA0N7V", "role": "posts news and messages (level 1 publisher)" },
+    "buyer":     { "address": "ST1YVE37M86T90S9N72ZBPW1TT78TWV6FPAHAECTQ", "role": "buys paid screen slots" },
+    "fees":      { "address": "ST9CFVFH8K05X0SN7YR5F1D8QZ128KYP4PJ928YS", "role": "fee recipient for paid slots" },
+    "player1":   { "address": "ST365NGRB4SPR6Z3ZZDQD6HMTW0APCNYAVXTECMYK", "role": "posts arcade scores" },
+    "player2":   { "address": "ST2PPRGREQFYZTX9Y2HJTR2D42DEJJX8V62DZP9QY", "role": "posts arcade scores" },
+    "casino":    { "address": "ST1JZYCCHB8WNMDBG6GGQAFHXXE379FGG74AB5K0D", "role": "casino room tests" }
+  }
+}
