@@ -96,7 +96,10 @@ const H = load('strata-holdem-model.js', { DiceModel: DM });
 // E
 {
   const room = fs.readFileSync(path.join(src, 'casino-room.html'), 'utf8');
-  ok(/id="scbtn"/.test(room) && /id="sc-h"/.test(room) && /id="sc-d"/.test(room) && /id="scov"/.test(room) && /id="scframe"/.test(room), 'E: room has the button, the intro buttons and the overlay');
+  // since the Strata Salon, the intro's second row walks you to the in-room PvP tables; the overlay lives on the top-bar button alone
+  ok(/id="scbtn"/.test(room) && /id="scov"/.test(room) && /id="scframe"/.test(room), 'E: room has the button and the overlay');
+  ok(!/id="sc-h"/.test(room) && !/id="sc-d"/.test(room), 'E: the old intro overlay buttons are gone (their handlers went with them)');
+  ok(/Salon Hold'em/.test(room) && /Salon Liar's Dice/.test(room), 'E: the intro offers the salon tables instead');
   ok(/'sc-th': 'strata-holdem\.html'/.test(room) && /'sc-td': 'strata-liars-dice\.html'/.test(room), 'E: room frames the two table pages');
   ok(/\.btns button:not\(\[id\^="sc-"\]\)/.test(room), 'E: the five station buttons must not capture the Strata Club buttons');
 }

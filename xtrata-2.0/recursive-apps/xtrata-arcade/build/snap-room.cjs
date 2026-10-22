@@ -36,6 +36,8 @@ const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/ja
   await page.route(/cdnjs\.cloudflare\.com.*three/, (r) => r.fulfill({ contentType: 'application/javascript', body: THREE + '\n' + HOOK }));
   await page.goto('http://127.0.0.1:' + srv.address().port + '/' + page0 + '?from=arcade');
   await page.waitForFunction(() => window.__casino && window.__h, null, { timeout: 90000 });
+  // if the room has human hosts, wait for them, so they are in the picture (or let the woodcut figures stand in)
+  await page.waitForFunction(() => !window.XA_HOSTS || XA_HOSTS.failed || (XA_HOSTS.ready && XA_HOSTS.hosts.every((h) => h.ctrl)), null, { timeout: 150000 }).catch(() => {});
   await page.waitForTimeout(4000);
   const shot = await page.evaluate(({ VFOV, W, H, DW, DH, ZMAX }) => {
     const { r, s, c } = window.__h, T = THREE;
@@ -49,8 +51,9 @@ const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/ja
       if (o.visible && (o.isPoints || o.isSprite || o.isLine || o.isInstancedMesh || (mm && (mm.blending === T.AdditiveBlending || (mm.transparent && !mm.alphaTest))))) { hid.push(o); o.visible = false; }
     });
     const rt = new T.WebGLRenderTarget(DW, DH, { minFilter: T.NearestFilter, magFilter: T.NearestFilter, format: T.RGBAFormat, type: T.UnsignedByteType });
-    const mat = new T.ShaderMaterial({ side: T.DoubleSide,
-      vertexShader: 'varying float vZ; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vZ = -mv.z; gl_Position = projectionMatrix * mv; }',
+    // skinning-aware, so a posed character (the Adrian hosts) writes the depth of his pose, not his bind pose
+    const mat = new T.ShaderMaterial({ side: T.DoubleSide, skinning: true,
+      vertexShader: 'varying float vZ;\n#include <skinning_pars_vertex>\nvoid main(){\n#include <skinbase_vertex>\nvec3 transformed = vec3(position);\n#include <skinning_vertex>\nvec4 mv = modelViewMatrix * vec4(transformed, 1.0); vZ = -mv.z; gl_Position = projectionMatrix * mv; }',
       fragmentShader: 'varying float vZ; void main(){ float q = floor(clamp(vZ / ' + ZMAX.toFixed(1) + ', 0.0, 1.0) * 4095.0 + 0.5); float hi = floor(q / 16.0); float lo = q - hi * 16.0; gl_FragColor = vec4(hi / 255.0, lo * 16.0 / 255.0, 0.0, 1.0); }' });
     const bg = s.background, fog = s.fog, cc = new T.Color(), ca = r.getClearAlpha(); r.getClearColor(cc);
     s.background = null; s.fog = null; s.overrideMaterial = mat; r.setClearColor(0xffffff, 1); r.setRenderTarget(rt); r.render(s, c);

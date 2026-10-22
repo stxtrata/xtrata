@@ -86,9 +86,9 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
 <div id="cross" class="hud" hidden></div><div id="hint" class="hud" hidden>WASD walk · mouse look · Shift run · E sit / play · Tab overview</div><div id="lockhint" class="hud" hidden>Click to look around, or drag</div><div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b id="pverb">SIT</b> <span id="ptitle"></span></span></div><button id="tapsit" class="hud" hidden></button><div id="stick" class="hud" hidden><div id="knob"></div></div>
 <div id="toast"></div>
 <div id="scov" role="dialog" aria-label="The Strata Club tables"><div id="scbar"><b>THE STRATA CLUB · TESTNET TABLES</b><button id="sc-th" aria-pressed="true">Hold'em</button><button id="sc-td" aria-pressed="false">Liar's Dice</button><button id="scclose">← Back to the floor</button></div><iframe id="scframe" title="Strata Club table" allow="clipboard-write"></iframe></div><div id="banner" aria-hidden="true"></div>
-<div id="intro"><h1>ROYAL FLUSH CASINO</h1><p>Five tables, one bankroll (saved on this device). Walk the floor and sit where you like, or jump straight to a table. Keys 1 to 5.</p><button id="walkin" class="primary" style="width:100%;margin-bottom:10px;padding:13px;font-weight:700;font-size:16px;background:linear-gradient(#e3b84a,#b98a22);color:#1a1006;border-color:#ffe08a">🚶 Walk the floor</button>
+<div id="intro"><h1>ROYAL FLUSH CASINO</h1><p>Seven tables, one bankroll (saved on this device). Hold'em and Liar's Dice in the STRATA SALON, through the arch by the bar, are player versus player. Walk the floor and sit where you like, or jump straight to a table. Keys 1 to 7.</p><button id="walkin" class="primary" style="width:100%;margin-bottom:10px;padding:13px;font-weight:700;font-size:16px;background:linear-gradient(#e3b84a,#b98a22);color:#1a1006;border-color:#ffe08a">🚶 Walk the floor</button>
 <div class="btns"><button>🂡 Blackjack<small>split · double</small></button><button>🎡 Roulette<small>combo bets</small></button><button>♠ Hold'em<small>smart bots</small></button><button>♦ Baccarat<small>pairs · road</small></button><button>🎰 Video Poker<small>hint · double up</small></button></div>
-<div class="btns" style="margin-top:10px"><button id="sc-h">⛓ Strata Club Hold'em<small>testnet rules</small></button><button id="sc-d">⛓ Strata Club Liar's Dice<small>testnet rules</small></button></div></div>
+<div class="btns" style="margin-top:10px;grid-template-columns:repeat(2,1fr)"><button style="border-color:#2fa06a">♠ Salon Hold'em<small>heads-up · vs a player</small></button><button style="border-color:#2fa06a">🎲 Salon Liar's Dice<small>vs a player</small></button></div></div>
 <div id="panel"><span id="pTitle"></span><div id="pMsg" aria-live="polite"></div><div id="pHint" style="display:none"></div><div id="pGame"></div><div id="pChips"></div><div id="pActions"></div><button id="broke">Broke? Claim $1,000 more play money</button></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>/* Casino rules engine. Pure logic, no rendering. */
@@ -570,6 +570,1147 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   else root.CasinoEngine = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
+<script>
+// Pure JS model of casino-liars-dice-v1. Same rules, same error codes, same order of checks as the contract.
+// Used by the table UI (demo mode, move validation, replay) and proven equal to the contract by test-diff.mjs.
+// No dependencies; runs in the browser and in node. UMD-ish: exposes DiceModel.
+(function (root) {
+  'use strict';
+
+  // ---- sha256 (sync, so the UI can derive dice without awaiting SubtleCrypto) ----
+  const K = new Uint32Array([
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+  function sha256(bytes) {
+    const l = bytes.length, bitLen = l * 8;
+    const padded = new Uint8Array(((l + 9 + 63) >> 6) << 6);
+    padded.set(bytes); padded[l] = 0x80;
+    const dv = new DataView(padded.buffer);
+    dv.setUint32(padded.length - 8, Math.floor(bitLen / 0x100000000)); dv.setUint32(padded.length - 4, bitLen >>> 0);
+    const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+    const w = new Uint32Array(64);
+    const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+    for (let off = 0; off < padded.length; off += 64) {
+      for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4);
+      for (let i = 16; i < 64; i++) {
+        const s0 = rotr(w[i-15], 7) ^ rotr(w[i-15], 18) ^ (w[i-15] >>> 3);
+        const s1 = rotr(w[i-2], 17) ^ rotr(w[i-2], 19) ^ (w[i-2] >>> 10);
+        w[i] = (w[i-16] + s0 + w[i-7] + s1) >>> 0;
+      }
+      let [a, b, c, d, e, f, g, h] = H;
+      for (let i = 0; i < 64; i++) {
+        const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25), ch = (e & f) ^ (~e & g);
+        const t1 = (h + S1 + ch + K[i] + w[i]) >>> 0;
+        const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22), maj = (a & b) ^ (a & c) ^ (b & c);
+        const t2 = (S0 + maj) >>> 0;
+        h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+      }
+      H[0] += a; H[1] += b; H[2] += c; H[3] += d; H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+    }
+    const out = new Uint8Array(32), odv = new DataView(out.buffer);
+    for (let i = 0; i < 8; i++) odv.setUint32(i * 4, H[i]);
+    return out;
+  }
+  const toHex = (u8) => Array.from(u8, (x) => x.toString(16).padStart(2, '0')).join('');
+  const fromHex = (h) => { h = h.replace(/^0x/, ''); const o = new Uint8Array(h.length / 2); for (let i = 0; i < o.length; i++) o[i] = parseInt(h.substr(i * 2, 2), 16); return o; };
+  const concat = (a, b) => { const o = new Uint8Array(a.length + b.length); o.set(a); o.set(b, a.length); return o; };
+
+  // dice = five dice from sha256(seed || H), 4 bytes each, mod 6, plus 1
+  function deriveDice(seed, h) {
+    const hash = sha256(concat(seed, h)), dv = new DataView(hash.buffer);
+    return [0, 1, 2, 3, 4].map((k) => (dv.getUint32(k * 4) % 6) + 1);
+  }
+  const countFace = (dice, f) => dice.filter((d) => d === f).length;
+
+  const LIMITS = { MAX_RAKE_BPS: 500, MIN_TURN: 30, MAX_TURN: 3600, MIN_OPEN: 60, MAX_OPEN: 86400, REVEAL_SECS: 300, DEAL_GRACE: 60, MAX_QTY: 10 };
+  const S = { OPEN: 0, BIDDING: 1, REVEAL: 2, DONE: 3, CANCELLED: 4 };
+  const ERR = { DIRECT: 106, GAME: 200, STATE: 201, PLAYER: 202, TURN: 203, BID: 204, NO_BID: 205, NOT_DUE: 206, LATE: 207, COMMIT: 208, REVEALED: 209, PARAMS: 210, SELF_JOIN: 212, NOT_DEALT: 213, FT_INSUFFICIENT: 1 };
+
+  // A table: games plus a chip ledger. ctx = { time, height, hashAt(height) } is supplied per call, exactly as the chain supplies it.
+  function createTable({ rakeBps = 0, rakeTo = 'RAKE', balances = {} } = {}) {
+    const games = new Map();
+    const bal = Object.assign({ ESCROW: 0 }, balances);
+    let next = 1;
+    const log = []; // event log, same shape as the contract's print events
+    const err = (code) => ({ err: code });
+    const ok = (value = true) => ({ ok: value });
+    const move = (from, to, n) => { if ((bal[from] || 0) < n) return false; bal[from] -= n; bal[to] = (bal[to] || 0) + n; return true; };
+    const emit = (e) => log.push(e);
+
+    function payout(id, winner) {
+      const g = games.get(id), pot = 2 * g.stake, rake = Math.floor((pot * g.rbps) / 10000);
+      g.state = S.DONE; g.winner = winner; g.rake = rake;
+      emit({ event: 'settled', id, winner, pot, rake });
+      move('ESCROW', winner, pot - rake); move('ESCROW', rakeTo, rake);
+      return ok();
+    }
+    function create(ctx, sender, { stake, turn, open, commit }) {
+      if (!(stake > 0 && turn >= LIMITS.MIN_TURN && turn <= LIMITS.MAX_TURN && open >= LIMITS.MIN_OPEN && open <= LIMITS.MAX_OPEN)) return err(ERR.PARAMS);
+      if (!move(sender, 'ESCROW', stake)) return err(ERR.FT_INSUFFICIENT);
+      const id = next++;
+      games.set(id, { a: sender, b: null, stake, turn, state: S.OPEN, commitA: commit, commitB: null, expiresAt: ctx.time + open, dealHeight: 0, aToAct: true,
+        qty: 0, face: 0, bidderA: true, deadline: 0, challengerA: false, diceA: null, diceB: null, rbps: 0, winner: null, rake: 0 });
+      emit({ event: 'created', id, a: sender, stake, turn, expiresAt: ctx.time + open });
+      return ok(id);
+    }
+    function join(ctx, sender, id, commit) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (g.state !== S.OPEN) return err(ERR.STATE);
+      if (!(ctx.time < g.expiresAt)) return err(ERR.LATE);
+      if (sender === g.a) return err(ERR.SELF_JOIN);
+      if (toHex(commit) === toHex(g.commitA)) return err(ERR.COMMIT);
+      if (!move(sender, 'ESCROW', g.stake)) return err(ERR.FT_INSUFFICIENT);
+      Object.assign(g, { b: sender, commitB: commit, state: S.BIDDING, dealHeight: ctx.height + 1, aToAct: true, deadline: ctx.time + g.turn + LIMITS.DEAL_GRACE, rbps: rakeBps });
+      emit({ event: 'joined', id, b: sender, dealHeight: ctx.height + 1 });
+      return ok(ctx.height + 1);
+    }
+    const isPlayer = (g, who) => who === g.a || who === g.b;
+    const actor = (g) => (g.aToAct ? g.a : g.b);
+    function bid(ctx, sender, id, qty, face) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (g.state !== S.BIDDING) return err(ERR.STATE);
+      if (!isPlayer(g, sender)) return err(ERR.PLAYER);
+      if (!(ctx.height > g.dealHeight)) return err(ERR.NOT_DEALT);
+      if (sender !== actor(g)) return err(ERR.TURN);
+      if (!(ctx.time < g.deadline)) return err(ERR.LATE);
+      if (!(qty >= 1 && qty <= LIMITS.MAX_QTY && face >= 1 && face <= 6)) return err(ERR.BID);
+      if (!(g.qty === 0 || qty > g.qty || (qty === g.qty && face > g.face))) return err(ERR.BID);
+      Object.assign(g, { qty, face, bidderA: g.aToAct, aToAct: !g.aToAct, deadline: ctx.time + g.turn });
+      emit({ event: 'bid', id, by: sender, qty, face });
+      return ok();
+    }
+    function challenge(ctx, sender, id) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (g.state !== S.BIDDING) return err(ERR.STATE);
+      if (!isPlayer(g, sender)) return err(ERR.PLAYER);
+      if (sender !== actor(g)) return err(ERR.TURN);
+      if (!(g.qty > 0)) return err(ERR.NO_BID);
+      if (!(ctx.time < g.deadline)) return err(ERR.LATE);
+      Object.assign(g, { state: S.REVEAL, challengerA: g.aToAct, deadline: ctx.time + LIMITS.REVEAL_SECS });
+      emit({ event: 'challenged', id, by: sender });
+      return ok();
+    }
+    function reveal(ctx, sender, id, seed) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      const isA = sender === g.a;
+      if (g.state !== S.REVEAL) return err(ERR.STATE);
+      if (!(isA || sender === g.b)) return err(ERR.PLAYER);
+      if (!(ctx.time < g.deadline)) return err(ERR.LATE);
+      if (toHex(sha256(seed)) !== toHex(isA ? g.commitA : g.commitB)) return err(ERR.COMMIT);
+      if ((isA ? g.diceA : g.diceB) !== null) return err(ERR.REVEALED);
+      const h = ctx.hashAt(g.dealHeight); if (!h) return err(ERR.NOT_DEALT);
+      const dice = deriveDice(seed, h);
+      if (isA) g.diceA = dice; else g.diceB = dice;
+      emit({ event: 'revealed', id, by: sender, dice });
+      if (g.diceA && g.diceB) {
+        const total = countFace(g.diceA, g.face) + countFace(g.diceB, g.face);
+        const bidder = g.bidderA ? g.a : g.b, challenger = g.challengerA ? g.a : g.b;
+        return payout(id, total >= g.qty ? bidder : challenger);
+      }
+      return ok();
+    }
+    function claimTimeout(ctx, id) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (g.state !== S.BIDDING && g.state !== S.REVEAL) return err(ERR.STATE);
+      if (!(ctx.time >= g.deadline)) return err(ERR.NOT_DUE);
+      if (g.state === S.BIDDING) { emit({ event: 'timeout', id, state: S.BIDDING }); return payout(id, g.aToAct ? g.b : g.a); }
+      emit({ event: 'timeout', id, state: S.REVEAL });
+      if (g.diceA) return payout(id, g.a);
+      if (g.diceB) return payout(id, g.b);
+      g.state = S.CANCELLED; emit({ event: 'refunded', id });
+      move('ESCROW', g.a, g.stake); move('ESCROW', g.b, g.stake);
+      return ok();
+    }
+    function cancelOpen(ctx, sender, id) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (g.state !== S.OPEN) return err(ERR.STATE);
+      if (!(sender === g.a || ctx.time >= g.expiresAt)) return err(ERR.PLAYER);
+      g.state = S.CANCELLED; emit({ event: 'cancelled', id });
+      move('ESCROW', g.a, g.stake);
+      return ok();
+    }
+    return { games, bal, log, create, join, bid, challenge, reveal, claimTimeout, cancelOpen };
+  }
+
+  // Who is it to act on, what can they do, and by when? Drives the UI's buttons and clocks.
+  function view(g, ctx, me) {
+    if (!g) return null;
+    const state = g.state, mine = me === g.a ? 'a' : me === g.b ? 'b' : null;
+    const toAct = state === S.BIDDING ? (g.aToAct ? g.a : g.b) : null;
+    const secsLeft = g.deadline ? g.deadline - ctx.time : null;
+    const dealt = state >= S.BIDDING && ctx.height > g.dealHeight;
+    return { state, mine, toAct, secsLeft, dealt, myTurn: !!mine && toAct === me, expired: !!(g.deadline && ctx.time >= g.deadline) };
+  }
+  // The smallest legal raises over the current bid, for the bid picker.
+  function nextBids(g) {
+    const out = [];
+    for (let q = 1; q <= LIMITS.MAX_QTY; q++) for (let f = 1; f <= 6; f++) if (g.qty === 0 || q > g.qty || (q === g.qty && f > g.face)) out.push([q, f]);
+    return out;
+  }
+  // Probability that the bid is true from one player's point of view: they hold `mine` (known) and the other 5 dice are random.
+  function oddsBidTrue(mine, qty, face) {
+    const need = Math.max(0, qty - countFace(mine, face));
+    if (need <= 0) return 1;
+    if (need > 5) return 0;
+    let p = 0; const C = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return r; };
+    for (let k = need; k <= 5; k++) p += C(5, k) * Math.pow(1 / 6, k) * Math.pow(5 / 6, 5 - k);
+    return p;
+  }
+
+  root.DiceModel = { sha256, toHex, fromHex, concat, deriveDice, countFace, LIMITS, S, ERR, createTable, view, nextBids, oddsBidTrue };
+  if (typeof module !== 'undefined' && module.exports) module.exports = root.DiceModel;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>
+// Pure JS model of casino-holdem-v1 (heads-up no-limit Hold'em, one hand per match, independent decks).
+// Same rules, same error codes and the same order of checks as the contract. The hand evaluator here is an independent
+// brute-force implementation (best five of seven), used to prove the contract's evaluator. Needs dice-model.js (sha256).
+(function (root) {
+  'use strict';
+  const D = root.DiceModel || (typeof require !== 'undefined' ? require('./dice-model.js') : null);
+  const { sha256, toHex, concat } = D;
+
+  const LIM = { MAX_RAKE_BPS: 500, MIN_TURN: 30, MAX_TURN: 3600, MIN_OPEN: 60, MAX_OPEN: 86400, REVEAL_SECS: 300, STREET_GRACE: 60, MIN_BB: 2, MIN_BUYIN_BBS: 10, MAX_BUYIN_BBS: 1000 };
+  const S = { OPEN: 0, DEALING: 1, PLAYING: 2, SHOWDOWN: 3, DONE: 4, CANCELLED: 5, RUNOUT: 6 };
+  const ERR = { GAME: 200, STATE: 201, PLAYER: 202, TURN: 203, ACTION: 204, NOT_DUE: 206, LATE: 207, COMMIT: 208, REVEALED: 209, PARAMS: 210, SELF_JOIN: 212, NOT_DEALT: 213, PAY: 299, FT_INSUFFICIENT: 1 };
+  const RANK_NAMES = '23456789TJQKA', SUIT_NAMES = '♣♦♥♠';
+  const rankOf = (c) => c % 13, suitOf = (c) => Math.floor(c / 13);
+  const cardName = (c) => RANK_NAMES[rankOf(c)] + SUIT_NAMES[suitOf(c)];
+  const CAT_NAMES = ['High card', 'Pair', 'Two pair', 'Three of a kind', 'Straight', 'Flush', 'Full house', 'Four of a kind', 'Straight flush'];
+
+  // ---------------- evaluator (brute force, independent of the contract's algorithm) ----------------
+  function eval5(cards) {
+    const rs = cards.map(rankOf).sort((a, b) => b - a), ss = cards.map(suitOf);
+    const flush = ss.every((x) => x === ss[0]);
+    const uniq = [...new Set(rs)];
+    let top = -1;
+    if (uniq.length === 5) { if (rs[0] - rs[4] === 4) top = rs[0]; else if (rs[0] === 12 && rs[1] === 3 && rs[4] === 0) top = 3; }
+    const cnt = {}; rs.forEach((r) => (cnt[r] = (cnt[r] || 0) + 1));
+    const groups = Object.entries(cnt).map(([r, n]) => [Number(r), n]).sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+    let cat, digits;
+    if (flush && top >= 0) { cat = 8; digits = [top]; }
+    else if (groups[0][1] === 4) { cat = 7; digits = [groups[0][0], groups[1][0]]; }
+    else if (groups[0][1] === 3 && groups[1][1] === 2) { cat = 6; digits = [groups[0][0], groups[1][0]]; }
+    else if (flush) { cat = 5; digits = rs; }
+    else if (top >= 0) { cat = 4; digits = [top]; }
+    else if (groups[0][1] === 3) { cat = 3; digits = groups.map((g) => g[0]); }
+    else if (groups[0][1] === 2 && groups[1][1] === 2) { cat = 2; digits = groups.map((g) => g[0]); }
+    else if (groups[0][1] === 2) { cat = 1; digits = groups.map((g) => g[0]); }
+    else { cat = 0; digits = rs; }
+    let score = cat * 371293; digits.forEach((d, i) => (score += d * Math.pow(13, 4 - i)));
+    return score;
+  }
+  function score7(cards) {
+    let best = -1;
+    const n = cards.length;
+    for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) { // leave out two cards
+      const five = cards.filter((_, i) => i !== a && i !== b);
+      if (five.length === 5) best = Math.max(best, eval5(five));
+    }
+    return best;
+  }
+  const category = (score) => Math.floor(score / 371293);
+
+  // ---------------- dealing ----------------
+  const word = (h, i) => ((h[i * 4] << 24) >>> 0) + (h[i * 4 + 1] << 16) + (h[i * 4 + 2] << 8) + h[i * 4 + 3];
+  function nthFree(used, n) { let left = n; for (let c = 0; c < 52; c++) { if (used.includes(c)) continue; if (left === 0) return c; left--; } return 0; }
+  function drawCards(board, h, n) { const cards = board.slice(); for (let i = 0; i < n; i++) cards.push(nthFree(cards, word(h, i) % (52 - cards.length))); return cards; }
+  const uintBuff = (n) => { const b = new Uint8Array(17); b[0] = 1; let x = BigInt(n); for (let i = 16; i >= 1; i--) { b[i] = Number(x & 0xffn); x >>= 8n; } return b; };
+  const streetHash = (id, headerHash, tag) => (headerHash ? sha256(concat(headerHash, uintBuff(id * 100 + tag))) : null);
+  function holeCards(seed, h, board) {
+    const ha = sha256(concat(seed, h)), hb = sha256(ha);
+    let h1 = 99, h2 = 99;
+    for (let i = 0; i < 24 && h2 === 99; i++) {
+      const cand = i < 8 ? word(ha, i) % 52 : i < 16 ? word(hb, i - 8) % 52 : i - 16;
+      if (board.includes(cand) || cand === h1) continue;
+      if (h1 === 99) h1 = cand; else h2 = cand;
+    }
+    return [h1, h2];
+  }
+
+  // ---------------- table ----------------
+  // ctx = { time, height, hashAt(height) -> Uint8Array | null }
+  function createTable({ rakeBps = 0, rakeTo = 'RAKE', balances = {} } = {}) {
+    const games = new Map(), bal = Object.assign({ ESCROW: 0 }, balances), log = [];
+    let next = 1;
+    const err = (code) => ({ err: code }), ok = (value = true) => ({ ok: value });
+    const move = (from, to, n) => { if ((bal[from] || 0) < n) return false; bal[from] -= n; bal[to] = (bal[to] || 0) + n; return true; };
+    const emit = (e) => log.push(e);
+    const isPlayer = (g, w) => w === g.a || w === g.b;
+
+    function finish(id, amtA, amtB, rake, winner) {
+      const g = games.get(id);
+      if (amtA + amtB + rake !== 2 * g.buyin) return err(ERR.PAY);
+      g.state = S.DONE; g.winner = winner; g.rake = rake;
+      emit({ event: 'settled', id, winner, toA: amtA, toB: amtB, rake });
+      move('ESCROW', g.a, amtA); move('ESCROW', g.b, amtB); move('ESCROW', rakeTo, rake);
+      return ok();
+    }
+    function settleFold(id, winnerIsA) {
+      const g = games.get(id), ca = g.buyin - g.stackA, cb = g.buyin - g.stackB, matched = 2 * Math.min(ca, cb);
+      const rake = Math.floor((matched * g.rbps) / 10000), win = ca + cb - rake;
+      return winnerIsA ? finish(id, win + g.stackA, g.stackB, rake, g.a) : finish(id, g.stackA, win + g.stackB, rake, g.b);
+    }
+    function settleShowdown(id, aWins) { // true, false or null (split)
+      const g = games.get(id), c = g.buyin - g.stackA, pot = 2 * c, rake = Math.floor((pot * g.rbps) / 10000), net = pot - rake;
+      if (aWins === true) return finish(id, net + g.stackA, g.stackB, rake, g.a);
+      if (aWins === false) return finish(id, g.stackA, net + g.stackB, rake, g.b);
+      const half = Math.floor(net / 2);
+      return finish(id, half + g.stackA, half + g.stackB, rake + (net - 2 * half), null);
+    }
+    function create(ctx, sender, { buyin, bb, turn, open, commit }) {
+      if (!(bb >= LIM.MIN_BB && bb % 2 === 0 && buyin >= bb * LIM.MIN_BUYIN_BBS && buyin <= bb * LIM.MAX_BUYIN_BBS && turn >= LIM.MIN_TURN && turn <= LIM.MAX_TURN && open >= LIM.MIN_OPEN && open <= LIM.MAX_OPEN)) return err(ERR.PARAMS);
+      if (!move(sender, 'ESCROW', buyin)) return err(ERR.FT_INSUFFICIENT);
+      const id = next++;
+      games.set(id, { a: sender, b: null, buyin, bb, turn, state: S.OPEN, commitA: commit, commitB: null, expiresAt: ctx.time + open, dealHeight: 0, rbps: 0, buttonA: true, street: 0, nextStreetAt: 0, board: [],
+        stackA: buyin, stackB: buyin, betA: 0, betB: 0, lastRaise: bb, acts: 0, aToAct: true, deadline: 0, holeA: null, holeB: null, winner: null, rake: 0 });
+      emit({ event: 'created', id, a: sender, buyin, bb, turn, expiresAt: ctx.time + open });
+      return ok(id);
+    }
+    function join(ctx, sender, id, commit) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (g.state !== S.OPEN) return err(ERR.STATE);
+      if (!(ctx.time < g.expiresAt)) return err(ERR.LATE);
+      if (sender === g.a) return err(ERR.SELF_JOIN);
+      if (toHex(commit) === toHex(g.commitA)) return err(ERR.COMMIT);
+      if (!move(sender, 'ESCROW', g.buyin)) return err(ERR.FT_INSUFFICIENT);
+      Object.assign(g, { b: sender, commitB: commit, state: S.DEALING, dealHeight: ctx.height + 1, rbps: rakeBps });
+      emit({ event: 'joined', id, b: sender, dealHeight: ctx.height + 1 });
+      return ok(ctx.height + 1);
+    }
+    function startHand(ctx, id) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (g.state !== S.DEALING) return err(ERR.STATE);
+      if (!(ctx.height > g.dealHeight)) return err(ERR.NOT_DEALT);
+      const h = ctx.hashAt(g.dealHeight); if (!h) return err(ERR.NOT_DEALT);
+      const buttonA = h[0] % 2 === 0, sb = g.bb / 2;
+      Object.assign(g, { state: S.PLAYING, buttonA, street: 0, acts: 0, lastRaise: g.bb, betA: buttonA ? sb : g.bb, betB: buttonA ? g.bb : sb,
+        stackA: g.buyin - (buttonA ? sb : g.bb), stackB: g.buyin - (buttonA ? g.bb : sb), aToAct: buttonA, deadline: ctx.time + g.turn });
+      emit({ event: 'hand', id, buttonA });
+      return ok(buttonA);
+    }
+    function dealPending(ctx, id) {
+      const g = games.get(id);
+      if (g.nextStreetAt === 0) return ok();
+      const street = g.street + 1;
+      const hash = streetHash(id, ctx.hashAt(g.nextStreetAt), street); if (!hash) return err(ERR.NOT_DEALT);
+      if (!(ctx.height > g.nextStreetAt)) return err(ERR.NOT_DEALT);
+      g.board = drawCards(g.board, hash, street === 1 ? 3 : 1);
+      Object.assign(g, { street, nextStreetAt: 0, betA: 0, betB: 0, acts: 0, lastRaise: g.bb });
+      emit({ event: 'street', id, street, board: g.board.slice() });
+      return ok();
+    }
+    function closeStreet(ctx, id) {
+      const g = games.get(id);
+      if (g.street === 3) { emit({ event: 'showdown', id }); Object.assign(g, { state: S.SHOWDOWN, deadline: ctx.time + LIM.REVEAL_SECS }); }
+      else if (g.stackA === 0 && g.stackB === 0) { emit({ event: 'all-in', id }); Object.assign(g, { state: S.RUNOUT, nextStreetAt: ctx.height + 1, deadline: 0 }); }
+      else Object.assign(g, { nextStreetAt: ctx.height + 1, aToAct: !g.buttonA, deadline: ctx.time + g.turn + LIM.STREET_GRACE });
+    }
+    // The contract rolls back everything when a call returns an error, so the model snapshots and restores on error.
+    function act(ctx, sender, id, action, amount) {
+      const g0 = games.get(id); if (!g0) return err(ERR.GAME);
+      const isA = sender === g0.a;
+      if (g0.state !== S.PLAYING) return err(ERR.STATE);
+      if (!(isA || sender === g0.b)) return err(ERR.PLAYER);
+      if (isA !== g0.aToAct) return err(ERR.TURN);
+      if (!(ctx.time < g0.deadline)) return err(ERR.LATE);
+      const snap = structuredClone(g0), logLen = log.length;
+      const rollback = () => { games.set(id, structuredClone(snap)); log.length = logLen; };
+      const dp = dealPending(ctx, id); if (dp.err) { rollback(); return dp; }
+      const g = games.get(id);
+      const myBet = isA ? g.betA : g.betB, oppBet = isA ? g.betB : g.betA, myStack = isA ? g.stackA : g.stackB;
+      if (action === 0) { emit({ event: 'fold', id, by: sender }); const r = settleFold(id, !isA); if (r.err) rollback(); return r; }
+      if (action === 1) {
+        const toCall = oppBet >= myBet ? oppBet - myBet : 0, acts = g.acts + 1;
+        if (!(oppBet >= myBet)) { rollback(); return err(ERR.ACTION); }
+        if (!(toCall <= myStack)) { rollback(); return err(ERR.ACTION); }
+        emit({ event: toCall === 0 ? 'check' : 'call', id, by: sender, amount: toCall });
+        Object.assign(g, isA ? { betA: oppBet, stackA: myStack - toCall } : { betB: oppBet, stackB: myStack - toCall });
+        Object.assign(g, { acts, aToAct: !isA, deadline: ctx.time + g.turn });
+        if (acts >= 2) closeStreet(ctx, id);
+        return ok();
+      }
+      if (action === 2) {
+        const cap = myBet + myStack, raiseBy = amount > oppBet ? amount - oppBet : 0, paid = amount > myBet ? amount - myBet : 0;
+        if (!(amount > oppBet) || !(amount <= cap) || !(raiseBy >= g.lastRaise || amount === cap)) { rollback(); return err(ERR.ACTION); }
+        emit({ event: 'raise', id, by: sender, to: amount });
+        Object.assign(g, isA ? { betA: amount, stackA: myStack - paid } : { betB: amount, stackB: myStack - paid });
+        Object.assign(g, { lastRaise: raiseBy >= g.lastRaise ? raiseBy : g.lastRaise, acts: g.acts + 1, aToAct: !isA, deadline: ctx.time + g.turn });
+        return ok();
+      }
+      rollback(); return err(ERR.ACTION);
+    }
+    function advance(ctx, id) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (g.state !== S.RUNOUT) return err(ERR.STATE);
+      if (!(ctx.height > g.nextStreetAt)) return err(ERR.NOT_DEALT);
+      const hash = streetHash(id, ctx.hashAt(g.nextStreetAt), 9); if (!hash) return err(ERR.NOT_DEALT);
+      g.board = drawCards(g.board, hash, 5 - g.board.length);
+      emit({ event: 'street', id, street: 9, board: g.board.slice() });
+      Object.assign(g, { street: 3, nextStreetAt: 0, state: S.SHOWDOWN, deadline: ctx.time + LIM.REVEAL_SECS });
+      return ok(g.board.slice());
+    }
+    function reveal(ctx, sender, id, seed) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      const isA = sender === g.a;
+      if (g.state !== S.SHOWDOWN) return err(ERR.STATE);
+      if (!(isA || sender === g.b)) return err(ERR.PLAYER);
+      if (!(ctx.time < g.deadline)) return err(ERR.LATE);
+      if (toHex(sha256(seed)) !== toHex(isA ? g.commitA : g.commitB)) return err(ERR.COMMIT);
+      if ((isA ? g.holeA : g.holeB) !== null) return err(ERR.REVEALED);
+      const h = ctx.hashAt(g.dealHeight); if (!h) return err(ERR.NOT_DEALT);
+      const hole = holeCards(seed, h, g.board);
+      if (isA) g.holeA = hole; else g.holeB = hole;
+      emit({ event: 'revealed', id, by: sender, hole });
+      if (g.holeA && g.holeB) {
+        const sa = score7(g.holeA.concat(g.board)), sb = score7(g.holeB.concat(g.board));
+        return settleShowdown(id, sa > sb ? true : sb > sa ? false : null);
+      }
+      return ok();
+    }
+    function claimTimeout(ctx, id) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (!(ctx.time >= g.deadline)) return err(ERR.NOT_DUE);
+      if (!(g.deadline > 0)) return err(ERR.NOT_DUE);
+      if (g.state === S.PLAYING) { emit({ event: 'timeout', id, state: S.PLAYING }); return settleFold(id, !g.aToAct); }
+      if (g.state === S.SHOWDOWN) {
+        emit({ event: 'timeout', id, state: S.SHOWDOWN });
+        if (g.holeA) return settleShowdown(id, true);
+        if (g.holeB) return settleShowdown(id, false);
+        return finish(id, g.buyin, g.buyin, 0, null);
+      }
+      return err(ERR.STATE);
+    }
+    function cancelOpen(ctx, sender, id) {
+      const g = games.get(id); if (!g) return err(ERR.GAME);
+      if (g.state !== S.OPEN) return err(ERR.STATE);
+      if (!(sender === g.a || ctx.time >= g.expiresAt)) return err(ERR.PLAYER);
+      g.state = S.CANCELLED; emit({ event: 'cancelled', id });
+      move('ESCROW', g.a, g.buyin);
+      return ok();
+    }
+    return { games, bal, log, create, join, startHand, act, advance, reveal, claimTimeout, cancelOpen };
+  }
+
+  // What can this player do right now? Drives the UI.
+  function options(g, me) {
+    if (!g || g.state !== S.PLAYING) return null;
+    const isA = me === g.a; if (isA !== g.aToAct) return null;
+    const pending = g.nextStreetAt > 0;
+    const myBet = pending ? 0 : isA ? g.betA : g.betB, oppBet = pending ? 0 : isA ? g.betB : g.betA, myStack = isA ? g.stackA : g.stackB;
+    const lastRaise = pending ? g.bb : g.lastRaise;
+    const toCall = oppBet - myBet, cap = myBet + myStack, minRaiseTo = Math.min(cap, oppBet + lastRaise);
+    return { toCall, canCheck: toCall === 0, canRaise: cap > oppBet, minRaiseTo, maxRaiseTo: cap, myBet, oppBet, myStack };
+  }
+
+  root.HoldemModel = { LIM, S, ERR, cardName, rankOf, suitOf, CAT_NAMES, category, eval5, score7, drawCards, streetHash, holeCards, nthFree, createTable, options };
+  if (typeof module !== 'undefined' && module.exports) module.exports = root.HoldemModel;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>
+/* PvP core for the casino room: a simulated chain (3 s blocks, calls confirm in the next block) and two sessions, heads-up Hold'em and liar's dice,
+   each running the exact contract rules (HoldemModel / DiceModel) against a bot. Nothing here draws anything. The chain object is the only thing that
+   would change when the tables are pointed at the real contracts: submit(label, fn) becomes a wallet call. Needs DiceModel and HoldemModel. */
+(function (root) {
+  'use strict';
+  const H = root.HoldemModel, DM = root.DiceModel, S = H.S, DS = DM.S;
+  const rand32 = () => crypto.getRandomValues(new Uint8Array(32));
+  const hex = (u8) => DM.toHex(u8);
+
+  // ---------------- simulated chain ----------------
+  function makeChain(blockMs) {
+    const c = { height: 1000, hashes: {}, queue: [], listeners: [], blockMs: blockMs || 3000 };
+    c.hashes[c.height] = rand32();
+    c.ctx = () => ({ time: Math.floor(Date.now() / 1000), height: c.height, hashAt: (h) => c.hashes[h] || null });
+    c.submit = (label, fn) => new Promise((resolve) => c.queue.push({ label, fn, resolve }));
+    c.tick = () => {
+      c.height++; c.hashes[c.height] = rand32();
+      const q = c.queue; c.queue = [];
+      for (const it of q) it.resolve(it.fn(c.ctx()));
+      c.listeners.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+    };
+    c.timer = setInterval(c.tick, c.blockMs);
+    return c;
+  }
+  const clock = (s) => { s = Math.max(0, s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+  // ---------------- hand helpers (any 5 to 7 cards) ----------------
+  const RANK_LABEL = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const RANK_WORD = ['twos', 'threes', 'fours', 'fives', 'sixes', 'sevens', 'eights', 'nines', 'tens', 'jacks', 'queens', 'kings', 'aces'];
+  function bestScore(cards) {
+    const n = cards.length; if (n < 5) return -1;
+    if (n === 5) return H.eval5(cards);
+    let best = -1;
+    const pick = (start, chosen) => {
+      if (chosen.length === 5) { best = Math.max(best, H.eval5(chosen)); return; }
+      for (let i = start; i < n; i++) { chosen.push(cards[i]); pick(i + 1, chosen); chosen.pop(); }
+    };
+    pick(0, []); return best;
+  }
+  const digit = (score, i) => Math.floor(score / Math.pow(13, 4 - i)) % 13;
+  function describe(score) {
+    const cat = H.category(score), d0 = digit(score, 0), d1 = digit(score, 1), L = (d) => RANK_LABEL[d];
+    switch (cat) {
+      case 0: return `${L(d0)} high`;
+      case 1: return `Pair of ${RANK_WORD[d0]}`;
+      case 2: return `Two pair, ${RANK_WORD[d0]} and ${RANK_WORD[d1]}`;
+      case 3: return `Three ${RANK_WORD[d0]}`;
+      case 4: return d0 === 3 ? 'Straight, five high' : `Straight, ${L(d0)} high`;
+      case 5: return `Flush, ${L(d0)} high`;
+      case 6: return `Full house, ${RANK_WORD[d0]} full of ${RANK_WORD[d1]}`;
+      case 7: return `Four ${RANK_WORD[d0]}`;
+      default: return d0 === 12 ? 'Royal flush' : d0 === 3 ? 'Steel wheel, straight flush' : `Straight flush, ${L(d0)} high`;
+    }
+  }
+  function strength(hole, board) {
+    if (!hole || board.length < 3) return 0;
+    const all = hole.concat(board), sc = bestScore(all), cat = H.category(sc);
+    if (board.length >= 5 && sc === bestScore(board)) return 0.3; // plays the board
+    const ranks = all.map(H.rankOf), brank = board.map(H.rankOf), hr = hole.map(H.rankOf);
+    if (cat >= 6) return 0.97; if (cat === 5) return 0.93; if (cat === 4) return 0.92;
+    if (cat === 3) return hr.includes(digit(sc, 0)) ? 0.88 : 0.55;
+    if (cat === 2) return hr.includes(digit(sc, 0)) && hr.includes(digit(sc, 1)) ? 0.82 : 0.7;
+    if (cat === 1) { const pr = digit(sc, 0), mine = hr.includes(pr); return mine ? (pr >= Math.max(...brank) ? 0.62 : 0.42) : (Math.max(...hr) >= 9 ? 0.28 : 0.2); }
+    const suits = [0, 0, 0, 0]; all.forEach((c) => suits[H.suitOf(c)]++); const fd = suits.some((n, s) => n >= 4 && hole.some((c) => H.suitOf(c) === s));
+    const set = new Set(ranks); if (set.has(12)) set.add(-1);
+    let oe = false; for (let lo = -1; lo <= 8; lo++) { let n = 0; for (let k = 0; k < 5; k++) if (set.has(lo + k)) n++; if (n >= 4 && hr.some((r) => r >= lo && r < lo + 5)) oe = true; }
+    return fd ? 0.4 : oe ? 0.34 : 0.1 + (Math.max(...hr) >= 10 ? 0.04 : 0);
+  }
+  function chen(hole) {
+    const v = (r) => (r === 12 ? 10 : r === 11 ? 8 : r === 10 ? 7 : r === 9 ? 6 : (r + 2) / 2);
+    const [a, b] = hole.map(H.rankOf).sort((x, y) => y - x); let s = v(a);
+    if (a === b) return Math.max(5, s * 2);
+    if (H.suitOf(hole[0]) === H.suitOf(hole[1])) s += 2;
+    const gap = a - b - 1; s -= gap === 0 ? 0 : gap === 1 ? 1 : gap === 2 ? 2 : gap === 3 ? 4 : 5;
+    if (gap <= 1 && a < 10) s += 1;
+    return Math.ceil(s);
+  }
+
+  // ================= heads-up Hold'em =================
+  function HoldemSession(chain) {
+    const me = 'YOU', bot = 'BOT';
+    const table = H.createTable({ rakeBps: 200, rakeTo: 'HOUSE', balances: { YOU: 0, BOT: 0, HOUSE: 0 } });
+    const st = { id: null, mySeed: null, botSeed: null, once: {}, busy: false, holeNote: '', lastHole: '', mode: '' };
+    const G = () => (st.id ? table.games.get(st.id) : null);
+    const isA = (g) => g.a === me;
+    const pot = (g) => 2 * g.buyin - g.stackA - g.stackB;
+    const pending = (g) => g.state === S.PLAYING && g.nextStreetAt > 0;
+    const streetReady = (g, c) => c.height >= g.nextStreetAt && !!chain.hashes[g.nextStreetAt];
+
+    function dispBoard(g) {
+      let b = g.board.slice(); const c = chain.ctx();
+      if ((g.state === S.PLAYING || g.state === S.RUNOUT) && g.nextStreetAt > 0 && streetReady(g, c)) {
+        const h = chain.hashes[g.nextStreetAt];
+        if (g.state === S.RUNOUT) b = H.drawCards(b, H.streetHash(st.id, h, 9), 5 - b.length);
+        else { const s = g.street + 1; b = H.drawCards(b, H.streetHash(st.id, h, s), s === 1 ? 3 : 1); }
+      }
+      return b;
+    }
+    function holeFor(seed, g, board) { const h = chain.hashes[g.dealHeight]; return h && g.state >= S.PLAYING ? H.holeCards(seed, h, board) : null; }
+
+    // ----- bot -----
+    function botDecide(g) {
+      const o = H.options(g, bot); if (!o) return null;
+      const board = dispBoard(g), hole = holeFor(st.botSeed, g, board); if (!hole) return null;
+      if (st.mode === 'jam') return o.canRaise ? { a: 2, amt: o.maxRaiseTo } : { a: 1 };
+      if (st.mode === 'station') return { a: 1 };
+      const potTot = pot(g), bb = g.bb, r = Math.random(), facing = o.toCall > 0, potOdds = facing ? o.toCall / (potTot + o.toCall) : 0;
+      const sizeTo = (frac) => { let to = Math.round(o.oppBet + frac * (potTot + o.toCall)); to = Math.max(o.minRaiseTo, Math.min(o.maxRaiseTo, to)); if (to >= o.maxRaiseTo * 0.7) to = o.maxRaiseTo; return to; };
+      const raise = (frac) => (o.canRaise ? { a: 2, amt: sizeTo(frac) } : { a: 1 });
+      const fold = () => (o.canCheck ? { a: 1 } : { a: 0 });
+      if (board.length === 0) {
+        const ch = chen(hole) + (Math.random() * 2 - 1);
+        if (facing) {
+          const big = o.toCall > 3 * bb;
+          if (ch >= 12) return r < 0.7 ? raise(0.9 + Math.random() * 0.6) : { a: 1 };
+          if (ch >= 8) return big && ch < 9 && r < 0.5 ? fold() : r < 0.22 ? raise(0.8) : { a: 1 };
+          if (ch >= 5) return o.toCall <= 3 * bb && !(o.toCall > bb * 2 && ch < 6) ? { a: 1 } : fold();
+          return o.toCall <= bb / 2 + 0.1 && r < 0.6 ? { a: 1 } : fold();
+        }
+        if (ch >= 8 && r < 0.6) return raise(0.8); if (r < 0.1) return raise(0.7); return { a: 1 };
+      }
+      const s = Math.max(0, Math.min(1, strength(hole, board) + (Math.random() * 0.16 - 0.08)));
+      if (facing) {
+        if (s > 0.8) return r < 0.5 ? raise(0.8 + Math.random() * 0.5) : { a: 1 };
+        if (s > potOdds + 0.12 || (s >= 0.33 && potOdds < 0.3)) return r < 0.06 ? raise(0.7) : { a: 1 };
+        return r < 0.05 ? raise(0.7) : fold();
+      }
+      if (s > 0.55) return r < 0.78 ? raise(0.5 + Math.random() * 0.3) : { a: 1 };
+      if (s > 0.3) return r < 0.25 ? raise(0.4) : { a: 1 };
+      return r < 0.12 ? raise(0.55) : { a: 1 };
+    }
+    function botAct() {
+      const g = G(); if (!g || g.state !== S.PLAYING || (g.aToAct ? g.a : g.b) !== bot) return;
+      const d = botDecide(g); if (!d) return;
+      chain.submit('bot acts', (c) => {
+        let r = table.act(c, bot, st.id, d.a, d.amt || 0);
+        if (r.err && d.a !== 1) r = table.act(c, bot, st.id, 1, 0);
+        if (r.err) r = table.act(c, bot, st.id, 0, 0);
+        return r;
+      });
+    }
+    function once(key, fn) { if (st.once[key]) return; st.once[key] = true; Promise.resolve(fn()).then((r) => { if (r && r.err) setTimeout(() => delete st.once[key], 1200); }); }
+
+    // everything the table does without being asked
+    function autopilot() {
+      const g = G(); if (!g) return; const c = chain.ctx(), id = st.id;
+      if (g.state === S.OPEN) once(`join:${id}`, () => new Promise((res) => setTimeout(() => { st.botSeed = rand32(); chain.submit('bot joins', (cc) => table.join(cc, bot, id, DM.sha256(st.botSeed))).then(res); }, 1500 + Math.random() * 1500)));
+      if (g.state === S.DEALING && c.height > g.dealHeight) once(`start:${id}`, () => chain.submit('start hand', (cc) => table.startHand(cc, id)));
+      if (g.state === S.RUNOUT && streetReady(g, c)) once(`adv:${id}:${g.nextStreetAt}`, () => chain.submit('advance', (cc) => table.advance(cc, id)));
+      if (g.state === S.PLAYING && (g.aToAct ? g.a : g.b) === bot && (!pending(g) || streetReady(g, c))) {
+        const key = `bot:${id}:${g.street}:${g.acts}:${g.betA}:${g.betB}:${g.aToAct}:${g.nextStreetAt}`;
+        once(key, () => new Promise((res) => setTimeout(() => { botAct(); res(); }, 1300 + Math.random() * 1800)));
+      }
+      if (g.state === S.SHOWDOWN) {
+        const botIsA = g.a === bot;
+        if (!(botIsA ? g.holeA : g.holeB)) once(`brev:${id}`, () => new Promise((res) => setTimeout(() => { chain.submit('bot reveals', (cc) => table.reveal(cc, bot, id, st.botSeed)).then(res); }, 900 + Math.random() * 1600)));
+        if (!(botIsA ? g.holeB : g.holeA) && !st.busy) once(`mrev:${id}`, () => chain.submit('auto reveal', (cc) => table.reveal(cc, me, id, st.mySeed)));
+      }
+      if ((g.state === S.PLAYING || g.state === S.SHOWDOWN) && g.deadline && c.time >= g.deadline + 1 && (g.state === S.SHOWDOWN || (g.aToAct ? g.a : g.b) === me))
+        once(`claim:${id}:${g.deadline}`, () => chain.submit('bot claims timeout', (cc) => table.claimTimeout(cc, id)));
+    }
+    chain.listeners.push(autopilot); setInterval(autopilot, 700);
+
+    // ----- player actions -----
+    async function open({ bb, bbs, turn, buyin }) {
+      st.mySeed = rand32(); st.botSeed = rand32(); st.once = {}; st.holeNote = ''; st.lastHole = ''; st.id = null; st.collected = false;
+      buyin = buyin || bb * bbs; table.bal.YOU += buyin; table.bal.BOT += buyin;
+      const r = await chain.submit('create', (c) => table.create(c, me, { buyin, bb, turn, open: 600, commit: DM.sha256(st.mySeed) }));
+      if (r.err) { table.bal.YOU -= buyin; table.bal.BOT -= buyin; return r; }
+      st.id = r.ok; return r;
+    }
+    async function act(a, amt) { st.busy = true; const r = await chain.submit('act', (c) => table.act(c, me, st.id, a, amt || 0)); st.busy = false; return r; }
+    async function claim() { st.busy = true; const r = await chain.submit('claim', (c) => table.claimTimeout(c, st.id)); st.busy = false; return r; }
+    async function cancel() { st.busy = true; const r = await chain.submit('cancel', (c) => table.cancelOpen(c, me, st.id)); st.busy = false; return r; }
+    async function reveal() { st.busy = true; const r = await chain.submit('reveal', (c) => table.reveal(c, me, st.id, st.mySeed)); st.busy = false; return r; }
+    // takes whatever the game paid me out of the session (once), returns chips to the caller's bank
+    function collect() { const p = table.bal.YOU; table.bal.YOU = 0; table.bal.BOT = 0; st.collected = true; return p; }
+
+    function view() {
+      const g = G(), c = chain.ctx(); if (!g) return null;
+      const iA = isA(g), done = g.state === S.DONE || g.state === S.CANCELLED, board = dispBoard(g);
+      const rev = iA ? g.holeA : g.holeB, myHole = rev || (g.state >= S.PLAYING ? holeFor(st.mySeed, g, board) : null);
+      const oppRev = iA ? g.holeB : g.holeA, shown = g.state === S.DONE && g.holeA && g.holeB;
+      const settled = g.state === S.DONE ? table.log.find((e) => e.id === st.id && e.event === 'settled') : null;
+      let myBet = iA ? g.betA : g.betB, oppBet = iA ? g.betB : g.betA, myStack = iA ? g.stackA : g.stackB, oppStack = iA ? g.stackB : g.stackA;
+      if (settled) { myStack = iA ? settled.toA : settled.toB; oppStack = iA ? settled.toB : settled.toA; myBet = oppBet = 0; }
+      const myTurn = g.state === S.PLAYING && (g.aToAct ? g.a : g.b) === me, ready = !pending(g) || streetReady(g, c);
+      const o = H.options(g, me), holeKey = myHole ? myHole.join(',') : '';
+      if (myHole && st.lastHole && st.lastHole !== holeKey && !rev) st.holeNote = 'A board card landed on one of your cards, so it was replaced from your own card stream. Your cards are final at the showdown.';
+      if (holeKey) st.lastHole = holeKey;
+      const secs = g.deadline ? g.deadline - c.time : 0, total = g.state === S.SHOWDOWN ? H.LIM.REVEAL_SECS : g.turn + (pending(g) ? H.LIM.STREET_GRACE : 0);
+      const potNow = g.state >= S.PLAYING ? pot(g) : g.state === S.OPEN ? g.buyin : 0;
+      const handName = myHole && board.length >= 3 ? describe(bestScore(myHole.concat(board))) : myHole && board.length === 0 && g.state >= S.PLAYING ? `Pre-flop strength ${chen(myHole)}/20` : '';
+      return { g, id: st.id, state: g.state, iA, done, board, myHole, oppHole: shown ? oppRev : null, hidden: g.state >= S.PLAYING && g.state < S.DONE, shown, settled,
+        myBet, oppBet, myStack, oppStack, myBtn: g.state >= S.PLAYING && g.buttonA === iA, myTurn, ready, canAct: myTurn && ready && !st.busy, opt: o, pot: potNow,
+        secs, total, timer: (g.state === S.PLAYING || g.state === S.SHOWDOWN) && g.deadline ? clock(secs) : '', expired: (g.state === S.PLAYING || g.state === S.SHOWDOWN) && g.deadline && c.time >= g.deadline,
+        pending: pending(g), street: pending(g) ? g.street + 1 : g.street, handName, need: o && o.toCall > 0 ? Math.round((o.toCall / (potNow + o.toCall)) * 100) : null,
+        holeNote: st.holeNote, busy: st.busy, buyin: g.buyin, bb: g.bb };
+    }
+    function result() {
+      const g = G(); if (!g || !(g.state === S.DONE || g.state === S.CANCELLED)) return null;
+      if (g.state === S.CANCELLED) return { cancelled: true, net: 0, how: 'Table closed. Buy-in returned.' };
+      const ev = table.log.filter((e) => e.id === st.id), set = ev.find((e) => e.event === 'settled'); if (!set) return null;
+      const mine = isA(g) ? set.toA : set.toB, net = mine - g.buyin, folded = ev.find((e) => e.event === 'fold'), to = ev.find((e) => e.event === 'timeout');
+      let how = '', meName = '', botName = '';
+      if (folded) how = folded.by === me ? 'You folded.' : 'Bot folded.';
+      else if (to) how = to.state === S.PLAYING ? 'A player ran out of time and folded.' : 'The reveal window closed.';
+      else if (g.holeA && g.holeB) {
+        const sa = bestScore(g.holeA.concat(g.board)), sb = bestScore(g.holeB.concat(g.board));
+        meName = describe(isA(g) ? sa : sb); botName = describe(isA(g) ? sb : sa); how = `You had ${meName}. Bot had ${botName}.`;
+        if (sa === sb) how += ' The pot is split.';
+      }
+      return { cancelled: false, net, mine, how, rake: set.rake, meName, botName, showdown: !!(g.holeA && g.holeB), winners: set };
+    }
+    return { st, chain, table, G, view, result, open, act, claim, cancel, reveal, collect, botAct, pot, autopilot,
+      events: () => table.log.filter((e) => e.id === st.id), setMode: (m) => (st.mode = m), me, bot, helpers: { bestScore, describe, chen, strength } };
+  }
+
+  // ================= liar's dice =================
+  function DiceSession(chain) {
+    const me = 'YOU', bot = 'BOT';
+    const table = DM.createTable({ rakeBps: 200, rakeTo: 'HOUSE', balances: { YOU: 0, BOT: 0, HOUSE: 0 } });
+    const st = { id: null, mySeed: null, botSeed: null, once: {}, busy: false, myDice: null, botDice: null, mode: '' };
+    const G = () => (st.id ? table.games.get(st.id) : null);
+    const isA = (g) => g.a === me;
+    function diceFor(seed, g) { const h = chain.hashes[g.dealHeight]; return h && chain.height > g.dealHeight ? DM.deriveDice(seed, h) : null; }
+    function botAct() {
+      const g = G(); if (!g || g.state !== DS.BIDDING || (g.aToAct ? g.a : g.b) !== bot) return;
+      const dice = diceFor(st.botSeed, g); if (!dice) return;
+      const opts = DM.nextBids(g);
+      if (g.qty > 0) {
+        const p = DM.oddsBidTrue(dice, g.qty, g.face), thr = 0.22 + Math.random() * 0.12;
+        if (p < thr || !opts.length) { chain.submit('bot challenges', (c) => table.challenge(c, bot, st.id)); return; }
+      }
+      const scored = opts.map(([q, f]) => ({ q, f, p: DM.oddsBidTrue(dice, q, f) })).sort((a, b) => b.p - a.p || a.q - b.q);
+      let pick = scored[0];
+      if (Math.random() < 0.18) pick = scored[Math.min(scored.length - 1, 2 + Math.floor(Math.random() * 3))];
+      if (g.qty === 0) { const best = scored.filter((x) => x.q <= 4); pick = best[Math.floor(Math.random() * Math.min(3, best.length))] || scored[0]; }
+      chain.submit('bot bids', (c) => table.bid(c, bot, st.id, pick.q, pick.f));
+    }
+    function once(key, fn) { if (st.once[key]) return; st.once[key] = true; Promise.resolve(fn()).then((r) => { if (r && r.err) setTimeout(() => delete st.once[key], 1200); }); }
+    function autopilot() {
+      const g = G(); if (!g) return; const c = chain.ctx(), id = st.id;
+      if (g.state === DS.OPEN) once(`join:${id}`, () => new Promise((res) => setTimeout(() => { st.botSeed = rand32(); chain.submit('bot joins', (cc) => table.join(cc, bot, id, DM.sha256(st.botSeed))).then(res); }, 1500 + Math.random() * 1500)));
+      if (g.state === DS.BIDDING && c.height > g.dealHeight && (g.aToAct ? g.a : g.b) === bot) {
+        const key = `bot:${id}:${g.qty}:${g.face}:${g.aToAct}`; once(key, () => new Promise((res) => setTimeout(() => { botAct(); res(); }, 1800 + Math.random() * 2600)));
+      }
+      if (g.state === DS.REVEAL) {
+        const botIsA = g.a === bot;
+        if (!(botIsA ? g.diceA : g.diceB)) once(`brev:${id}`, () => new Promise((res) => setTimeout(() => { chain.submit('bot reveals', (cc) => table.reveal(cc, bot, id, st.botSeed)).then(res); }, 900 + Math.random() * 1600)));
+        if (!(botIsA ? g.diceB : g.diceA) && !st.busy) once(`mrev:${id}`, () => chain.submit('auto reveal', (cc) => table.reveal(cc, me, id, st.mySeed)));
+      }
+      if ((g.state === DS.BIDDING || g.state === DS.REVEAL) && g.deadline && c.time >= g.deadline + 1 && (g.state === DS.REVEAL || (g.aToAct ? g.a : g.b) === me))
+        once(`claim:${id}:${g.deadline}`, () => chain.submit('bot claims timeout', (cc) => table.claimTimeout(cc, id)));
+    }
+    chain.listeners.push(autopilot); setInterval(autopilot, 700);
+
+    async function open({ stake, turn }) {
+      st.mySeed = rand32(); st.botSeed = rand32(); st.once = {}; st.id = null; st.collected = false; st.myDice = null;
+      table.bal.YOU += stake; table.bal.BOT += stake;
+      const r = await chain.submit('create', (c) => table.create(c, me, { stake, turn, open: 600, commit: DM.sha256(st.mySeed) }));
+      if (r.err) { table.bal.YOU -= stake; table.bal.BOT -= stake; return r; }
+      st.id = r.ok; return r;
+    }
+    async function bid(q, f) { st.busy = true; const r = await chain.submit('bid', (c) => table.bid(c, me, st.id, q, f)); st.busy = false; return r; }
+    async function challenge() { st.busy = true; const r = await chain.submit('challenge', (c) => table.challenge(c, me, st.id)); st.busy = false; return r; }
+    async function reveal() { st.busy = true; const r = await chain.submit('reveal', (c) => table.reveal(c, me, st.id, st.mySeed)); st.busy = false; return r; }
+    async function claim() { st.busy = true; const r = await chain.submit('claim', (c) => table.claimTimeout(c, st.id)); st.busy = false; return r; }
+    async function cancel() { st.busy = true; const r = await chain.submit('cancel', (c) => table.cancelOpen(c, me, st.id)); st.busy = false; return r; }
+    function collect() { const p = table.bal.YOU; table.bal.YOU = 0; table.bal.BOT = 0; st.collected = true; return p; }
+    function view() {
+      const g = G(), c = chain.ctx(); if (!g) return null;
+      const iA = isA(g), done = g.state === DS.DONE || g.state === DS.CANCELLED;
+      const dealt = g.dealHeight && c.height > g.dealHeight && !!chain.hashes[g.dealHeight];
+      if (!st.myDice && dealt && g.state >= DS.BIDDING) st.myDice = diceFor(st.mySeed, g);
+      const myRev = iA ? g.diceA : g.diceB, oppRev = iA ? g.diceB : g.diceA;
+      const myTurn = g.state === DS.BIDDING && (g.aToAct ? g.a : g.b) === me && dealt;
+      const secs = g.deadline ? g.deadline - c.time : 0, total = g.state === DS.REVEAL ? DM.LIMITS.REVEAL_SECS : g.turn + (g.qty === 0 ? DM.LIMITS.DEAL_GRACE : 0);
+      const bids = table.log.filter((e) => e.event === 'bid' && e.id === st.id);
+      return { g, id: st.id, state: g.state, iA, done, dealt, myDice: myRev || st.myDice, oppDice: g.state === DS.DONE && myRev && oppRev ? oppRev : null, myRev, oppRev, bids,
+        myTurn, canAct: myTurn && !st.busy, secs, total, timer: (g.state === DS.BIDDING || g.state === DS.REVEAL) && g.deadline ? clock(secs) : '',
+        expired: (g.state === DS.BIDDING || g.state === DS.REVEAL) && g.deadline && c.time >= g.deadline, stake: g.stake, qty: g.qty, face: g.face, busy: st.busy,
+        next: myTurn ? DM.nextBids(g) : [], odds: (qty, face) => (st.myDice ? DM.oddsBidTrue(st.myDice, qty, face) : null) };
+    }
+    function result() {
+      const g = G(); if (!g || !(g.state === DS.DONE || g.state === DS.CANCELLED)) return null;
+      if (g.state === DS.CANCELLED) return { cancelled: true, net: 0, how: 'Table closed. Stake returned.' };
+      const youWon = g.winner === me, take = g.stake * 2 - g.rake, net = youWon ? take - g.stake : -g.stake;
+      let how;
+      if (g.diceA && g.diceB) { const n = DM.countFace(g.diceA, g.face) + DM.countFace(g.diceB, g.face); const fn = ['', 'ones', 'twos', 'threes', 'fours', 'fives', 'sixes'][g.face]; how = `The bid was ${g.qty} ${fn}; there ${n === 1 ? 'was' : 'were'} ${n} on the table. ${n >= g.qty ? 'The bid stands.' : 'The bid fell short.'}`; }
+      else how = 'The other player did not reveal in time.';
+      return { cancelled: false, net, take, how, rake: g.rake, youWon };
+    }
+    return { st, chain, table, G, view, result, open, bid, challenge, reveal, claim, cancel, collect, botAct, autopilot, events: () => table.log.filter((e) => e.id === st.id), setMode: (m) => (st.mode = m), me, bot };
+  }
+
+  root.PvpCore = { makeChain, HoldemSession, DiceSession, helpers: { bestScore, describe, chen, strength, clock } };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>
+/* Adrian, the casino's human host (the Xtrata character atelier model, build 2).
+ * One 1.8 m GLB (adrian.glb, beside this page) carries the mesh, 163 bones and 15 baked clips; this script reads it with a
+ * small GLB parser (the asset is plain glTF 2.0: no extensions, LINEAR keys only), clones it per host, and drives each clone
+ * with the atelier's PoseRig/HostController (ported to the room's three r128): baked clips for presence, live IK for hands,
+ * eyes that blink and follow you, and a smile that comes and goes. The room asks for hosts through window.XA_HOSTS:
+ *   XA_HOSTS.add({ parent, group, x, z, yaw, look, fig?, role? })   a host at a table (local coords; fig = the woodcut
+ *                                                                   figure he replaces: it is hidden and its greet/deal
+ *                                                                   re-aimed at him)
+ *   XA_HOSTS.cue(group, kind)       'greet' | 'deal' | 'reveal' | 'win' | 'lose'  (the stations' moments)
+ *   XA_HOSTS.update(dt, camPos, t)  once per frame from the room loop (far hosts update at a lower rate)
+ * If adrian.glb cannot be fetched (opened as a bare file, or the asset is missing) nothing changes: the woodcut figures stay.
+ */
+(function () {
+  'use strict';
+  if (!window.THREE) return;
+  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0), Q = () => new THREE.Quaternion();
+  const clamp = THREE.MathUtils.clamp, damp = THREE.MathUtils.damp;
+  const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+
+  // ---------------- a small GLB reader (exactly the subset adrian.glb uses) ----------------
+  async function parseGLB(buf) {
+    const dv = new DataView(buf);
+    if (dv.getUint32(0, true) !== 0x46546c67) throw new Error('not a GLB');
+    let o = 12, j = null, bin = null;
+    while (o < buf.byteLength) {
+      const len = dv.getUint32(o, true), type = dv.getUint32(o + 4, true);
+      if (type === 0x4e4f534a) j = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, o + 8, len)));
+      else if (type === 0x004e4942) bin = buf.slice(o + 8, o + 8 + len);
+      o += 8 + len;
+    }
+    const views = (j.bufferViews || []).map((v) => bin.slice(v.byteOffset || 0, (v.byteOffset || 0) + v.byteLength));
+    const CT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array };
+    const NC = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+    const acc = (i) => { const a = j.accessors[i]; return new CT[a.componentType](views[a.bufferView], a.byteOffset || 0, a.count * NC[a.type]); };
+    const texes = await Promise.all((j.textures || []).map(async (t) => {
+      const im = j.images[t.source];
+      const bmp = await createImageBitmap(new Blob([views[im.bufferView]], { type: im.mimeType }));
+      const tx = new THREE.Texture(bmp); tx.flipY = false; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 4; tx.needsUpdate = true; return tx;
+    }));
+    // the factors are linear; the room draws textures raw (no sRGB pass), so lift them to screen space
+    const lift = (c) => Math.pow(c, 1 / 2.2);
+    const mats = (j.materials || []).map((m) => {
+      const p = m.pbrMetallicRoughness || {}, f = p.baseColorFactor || [1, 1, 1, 1];
+      const mat = new THREE.MeshStandardMaterial({
+        name: m.name || '', color: new THREE.Color(lift(f[0]), lift(f[1]), lift(f[2])),
+        roughness: p.roughnessFactor !== undefined ? p.roughnessFactor : 1, metalness: p.metallicFactor !== undefined ? p.metallicFactor : 1,
+        map: p.baseColorTexture ? texes[p.baseColorTexture.index] : null,
+        skinning: true, side: m.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+      });
+      if (m.alphaMode === 'MASK') mat.alphaTest = m.alphaCutoff !== undefined ? m.alphaCutoff : 0.5;
+      return mat;
+    });
+    const joints = new Set(); (j.skins || []).forEach((s) => s.joints.forEach((x) => joints.add(x)));
+    const nodes = j.nodes.map((n, i) => {
+      const nd = joints.has(i) ? new THREE.Bone() : new THREE.Object3D(); nd.name = n.name || 'n' + i;
+      if (n.translation) nd.position.fromArray(n.translation); if (n.rotation) nd.quaternion.fromArray(n.rotation); if (n.scale) nd.scale.fromArray(n.scale);
+      if (n.extras) Object.assign(nd.userData, n.extras);   // the finger rest directions the IK reads
+      return nd;
+    });
+    j.nodes.forEach((n, i) => (n.children || []).forEach((c) => nodes[i].add(nodes[c])));
+    const root = new THREE.Group(); root.name = 'Adrian'; (j.scenes[j.scene || 0].nodes || []).forEach((i) => root.add(nodes[i]));
+    const skels = (j.skins || []).map((s) => {
+      const ib = acc(s.inverseBindMatrices), bones = s.joints.map((x) => nodes[x]);
+      return new THREE.Skeleton(bones, bones.map((b, k) => new THREE.Matrix4().fromArray(ib, k * 16)));
+    });
+    root.updateMatrixWorld(true);
+    const SA = { POSITION: 'position', NORMAL: 'normal', TEXCOORD_0: 'uv', JOINTS_0: 'skinIndex', WEIGHTS_0: 'skinWeight' };
+    j.nodes.forEach((n, i) => {
+      if (n.mesh === undefined) return;
+      j.meshes[n.mesh].primitives.forEach((p) => {
+        const g = new THREE.BufferGeometry();
+        for (const k in p.attributes) { const a = j.accessors[p.attributes[k]]; g.setAttribute(SA[k], new THREE.BufferAttribute(acc(p.attributes[k]), NC[a.type])); }
+        if (p.indices !== undefined) g.setIndex(new THREE.BufferAttribute(acc(p.indices), 1));
+        const mesh = n.skin !== undefined ? new THREE.SkinnedMesh(g, mats[p.material]) : new THREE.Mesh(g, mats[p.material]);
+        mesh.name = j.meshes[n.mesh].name || nodes[i].name; mesh.frustumCulled = false; mesh.castShadow = true; mesh.receiveShadow = true;
+        nodes[i].add(mesh);
+        if (n.skin !== undefined) { nodes[i].updateMatrixWorld(true); mesh.bind(skels[n.skin], mesh.matrixWorld); }
+      });
+    });
+    const anims = (j.animations || []).map((a) => new THREE.AnimationClip(a.name || 'clip', -1, a.channels.map((ch) => {
+      const s = a.samplers[ch.sampler], nd = nodes[ch.target.node], T = ch.target.path === 'rotation' ? THREE.QuaternionKeyframeTrack : THREE.VectorKeyframeTrack;
+      return new T(nd.name + (ch.target.path === 'rotation' ? '.quaternion' : ch.target.path === 'translation' ? '.position' : '.scale'), acc(s.input), acc(s.output));
+    })));
+    return { scene: root, animations: anims };
+  }
+
+  // skeleton-aware clone (SkeletonUtils.clone, trimmed): shared geometry and materials, bones of their own
+  function cloneSkinned(source) {
+    const srcOf = new Map(), cloneOf = new Map();
+    const walk = (a, b) => { srcOf.set(b, a); cloneOf.set(a, b); for (let i = 0; i < a.children.length; i++) walk(a.children[i], b.children[i]); };
+    const out = source.clone(); walk(source, out);
+    out.traverse((node) => {
+      if (!node.isSkinnedMesh) return;
+      const src = srcOf.get(node);
+      node.skeleton = new THREE.Skeleton(src.skeleton.bones.map((b) => cloneOf.get(b)), src.skeleton.boneInverses);
+      node.bindMatrix.copy(src.bindMatrix); node.bind(node.skeleton, node.bindMatrix);
+    });
+    return out;
+  }
+
+  // ---------------- PoseRig: the atelier's live pose/IK engine, as shipped (ported to the global THREE) ----------------
+  const CLIPS = { Idle: 5, Welcome: 3.2, Look: 3, Gesture: 3.4, Explain: 5, Reach: 3, Present: 4, Deal: 4.8, Result: 3, Celebrate: 3.5, Walk: 1.2, Turn: 2, HoldDeck: 4, PokerDeal: .95, Neutral: 1 };
+  class PoseRig {
+    constructor(root) {
+      this.root = root; this.bones = {}; this.rest = {};
+      root.traverse((b) => { if (b.isBone) { this.bones[b.name] = b; this.rest[b.name] = { p: b.position.clone(), q: b.quaternion.clone() }; } });
+      this.heads = {}; this.root.updateMatrixWorld(true);
+      for (const [n, b] of Object.entries(this.bones)) this.heads[n] = this.localPosition(b);
+      this.fingerAxes = {};
+      for (const side of ['L', 'R']) {
+        const kn = (i) => this.heads['finger' + i + '_1_' + side], wrist = this.heads['wrist_' + side];
+        const forward = kn(3).clone().sub(wrist).normalize(), across = kn(2).clone().sub(kn(5)).normalize();
+        across.addScaledVector(forward, -across.dot(forward)).normalize();
+        this.fingerAxes[side] = { forward, across, normal: across.clone().cross(forward).normalize() };
+      }
+    }
+    localPosition(b) { return this.root.worldToLocal(b.getWorldPosition(V())); }
+    reset() { for (const [n, b] of Object.entries(this.bones)) { b.position.copy(this.rest[n].p); b.quaternion.copy(this.rest[n].q); } }
+    arm(side, target, { forward = null, palm = 'neutral', orientationWeight = 1, weight = 1 } = {}) {
+      const b = this.bones, u = b['upperarm01_' + side], el = b['lowerarm01_' + side], w = b['wrist_' + side]; if (!u) return false;
+      this.bones['lowerarm02_' + side].quaternion.identity(); w.quaternion.identity();
+      this.root.updateMatrixWorld(true);
+      const sh = this.localPosition(u), ep = this.heads[el.name], wp = this.heads[w.name], up = this.heads[u.name];
+      const l1 = ep.distanceTo(up), l2 = wp.distanceTo(ep), dir = target.clone().sub(sh), raw = dir.length(), d = clamp(raw, Math.abs(l1 - l2) + .015, l1 + l2 - .008); dir.normalize();
+      const sign = side === 'L' ? 1 : -1, pole = V(sign * .55, -.6, -.20); pole.addScaledVector(dir, -pole.dot(dir)).normalize();
+      const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+      const elbow = sh.clone().addScaledVector(dir, a).addScaledVector(pole, h), end = sh.clone().addScaledVector(dir, d);
+      this.aim(u, ep.clone().sub(up), elbow.clone().sub(sh), weight);
+      this.root.updateMatrixWorld(true);
+      this.aim(el, wp.clone().sub(ep), end.clone().sub(elbow), weight);
+      this.root.updateMatrixWorld(true);
+      const fa = this.fingerAxes[side], rootQ = this.root.getWorldQuaternion(Q());
+      const base = rootQ.clone().invert().multiply(el.getWorldQuaternion(Q()));
+      let desired = base.clone();
+      if (forward || palm !== 'neutral') {
+        const f = (forward ? forward.clone() : fa.forward.clone().applyQuaternion(base)).normalize();
+        let n = palm && palm.isVector3 ? palm.clone() : palm === 'up' ? V(0, 1, 0) : palm === 'down' ? V(0, -1, 0) : fa.normal.clone().multiplyScalar(side === 'R' ? 1 : -1).applyQuaternion(base);
+        n.addScaledVector(f, -n.dot(f)); if (n.lengthSq() < .001) n = V(0, 0, 1).addScaledVector(f, -f.z); n.normalize().multiplyScalar(side === 'R' ? 1 : -1);
+        const across = f.clone().cross(n).normalize(), basis = new THREE.Matrix4().makeBasis(across, f, n);
+        const rest = new THREE.Matrix4().makeBasis(fa.across, fa.forward, fa.normal);
+        desired.setFromRotationMatrix(basis.multiply(rest.invert()));
+        desired = base.clone().slerp(desired, orientationWeight);
+      }
+      const delta = base.clone().invert().multiply(desired).normalize(); if (delta.w < 0) delta.set(-delta.x, -delta.y, -delta.z, -delta.w);
+      const axis = wp.clone().sub(ep).normalize(), dot = V(delta.x, delta.y, delta.z).dot(axis);
+      const twist = Q().set(axis.x * dot, axis.y * dot, axis.z * dot, delta.w).normalize();
+      let angle = 2 * Math.atan2(V(twist.x, twist.y, twist.z).dot(axis), twist.w);
+      angle = clamp(angle, -1.65, 1.65);
+      const flex = twist.clone().invert().multiply(delta).normalize(), bend = 2 * Math.acos(clamp(Math.abs(flex.w), 0, 1));
+      if (bend > .52) flex.slerp(Q(), 1 - .52 / bend);
+      el.quaternion.multiply(Q().setFromAxisAngle(axis, angle * .35));
+      this.bones['lowerarm02_' + side].quaternion.setFromAxisAngle(axis, angle * .65);
+      w.quaternion.copy(flex); this.root.updateMatrixWorld(true);
+      return raw <= l1 + l2 - .008;
+    }
+    dealArm(path) {
+      const fa = this.fingerAxes.R, anchor = fa.forward.clone().multiplyScalar(.105).addScaledVector(fa.normal, .032);
+      const desired = path.wrist.clone().add(V(0, -.032, .105)), target = path.wrist.clone();
+      for (let i = 0; i < 5; i++) {
+        this.arm('R', target, { forward: path.forward, palm: 'down', orientationWeight: path.orientationWeight });
+        const actual = this.root.worldToLocal(this.bones.wrist_R.localToWorld(anchor.clone()));
+        target.add(desired.clone().sub(actual).multiplyScalar(path.orientationWeight));
+      }
+    }
+    aim(b, restDir, desired, weight = 1) { const rot = Q().setFromUnitVectors(restDir.normalize(), desired.normalize()); rot.premultiply(this.root.getWorldQuaternion(Q())); const parent = b.parent.getWorldQuaternion(Q()).invert(); rot.premultiply(parent); b.quaternion.slerp(rot, weight); }
+    leg(side, target) {
+      this.root.updateMatrixWorld(true); const u = this.bones['upperleg01_' + side], k = this.bones['lowerleg01_' + side], f = this.bones['foot_' + side];
+      const hip = this.localPosition(u), rh = this.heads[u.name], rk = this.heads[k.name], rf = this.heads[f.name], a = rh.distanceTo(rk), b = rk.distanceTo(rf), dir = target.clone().sub(hip), d = clamp(dir.length(), .05, a + b - .002); dir.normalize();
+      const pole = V(0, 0, 1); pole.addScaledVector(dir, -pole.dot(dir)).normalize(); const along = (a * a - b * b + d * d) / (2 * d), height = Math.sqrt(Math.max(0, a * a - along * along)); const knee = hip.clone().addScaledVector(dir, along).addScaledVector(pole, height);
+      this.aim(u, rk.clone().sub(rh), knee.clone().sub(hip)); this.root.updateMatrixWorld(true); this.aim(k, rf.clone().sub(rk), target.clone().sub(knee)); this.root.updateMatrixWorld(true);
+      f.quaternion.copy(f.parent.getWorldQuaternion(Q()).invert().multiply(this.root.getWorldQuaternion(Q())));
+    }
+    hand(side, pose = 'relaxed', amount = 1) {
+      const fa = this.fingerAxes[side], sgn = side === 'R' ? 1 : -1; const curls = { open: [0, .04, .04], relaxed: [.16, .22, .16], point: [.65, .8, .5], deck: [.22, .46, .38], card: [.32, .60, .40] };
+      for (let f = 2; f <= 5; f++) for (let jj = 1; jj <= 3; jj++) { const b = this.bones['finger' + f + '_' + jj + '_' + side]; if (!b) continue; let c = (curls[pose] || [0, 0, 0])[jj - 1] || 0; if (pose === 'point' && f === 2) c = .03; if (pose === 'card' && f >= 4) c = .65; b.quaternion.setFromAxisAngle(fa.across, sgn * (curls.relaxed[jj - 1] + (c - curls.relaxed[jj - 1]) * amount)); }
+      for (let jj = 1; jj <= 3; jj++) { const b = this.bones['finger1_' + jj + '_' + side]; if (!b) continue; const a = pose === 'card' ? [.45, .4, .3][jj - 1] : pose === 'open' ? .02 : .12; b.quaternion.setFromAxisAngle(fa.forward, -sgn * (.12 + (a - .12) * amount)); }
+      if (pose === 'card' && amount > 0) {
+        const wrist = this.bones['wrist_' + side], fx = this.fingerAxes[side];
+        const contacts = { 1: [.010, .101, .039], 2: [.009, .112, .026], 3: [-.010, .111, .027] };
+        for (const [finger, c] of Object.entries(contacts)) {
+          const local = fx.across.clone().multiplyScalar(c[0]).addScaledVector(fx.forward, c[1]).addScaledVector(fx.normal, c[2]);
+          this.root.updateMatrixWorld(true); const target = wrist.localToWorld(local.clone());
+          const chain = [1, 2, 3].map((jj) => this.bones['finger' + finger + '_' + jj + '_' + side]); const tipBone = chain[2]; const before = chain.map((b) => b.quaternion.clone());
+          const tipDir = new THREE.Vector3().fromArray(tipBone.userData.restDirection || [0, 0, .018]);
+          for (let it = 0; it < 9; it++) for (let jj = 2; jj >= 0; jj--) {
+            this.root.updateMatrixWorld(true); const b = chain[jj], pivot = b.getWorldPosition(V()), tip = tipBone.localToWorld(tipDir.clone()), from = tip.sub(pivot).normalize(), to = target.clone().sub(pivot).normalize();
+            let delta = Q().setFromUnitVectors(from, to); delta.slerp(Q(), .55); const world = b.getWorldQuaternion(Q()); world.premultiply(delta); const parent = b.parent.getWorldQuaternion(Q()).invert(); b.quaternion.copy(parent.multiply(world));
+          }
+          chain.forEach((b, i) => b.quaternion.slerpQuaternions(before[i], b.quaternion.clone(), amount));
+        }
+      }
+    }
+    deckOffset() { const f = this.fingerAxes.L; return f.forward.clone().multiplyScalar(.085).addScaledVector(f.normal, -.038); }
+    deckRotation() { const f = this.fingerAxes.L; return Q().setFromRotationMatrix(new THREE.Matrix4().makeBasis(f.across, f.normal.clone().negate(), f.forward)); }
+    pokerArm(contact, forward, up) {
+      const fa = this.fingerAxes.R, anchor = fa.forward.clone().multiplyScalar(.137).addScaledVector(fa.normal, .035).addScaledVector(fa.across, .025);
+      const normal = up.clone().cross(forward).normalize(), target = contact.clone().addScaledVector(forward, -.137).addScaledVector(normal, -.035).addScaledVector(up, -.025);
+      for (let i = 0; i < 6; i++) { this.arm('R', target, { forward, palm: normal }); const actual = this.root.worldToLocal(this.bones.wrist_R.localToWorld(anchor.clone())); target.add(contact.clone().sub(actual)); }
+    }
+    pokerHand(contact, up, amount = 1, heldContacts = null, releaseBlend = 0) {
+      this.hand('R', 'relaxed'); const fa = this.fingerAxes.R, wrist = this.bones.wrist_R;
+      for (let f = 3; f <= 5; f++) for (let jj = 1; jj <= 3; jj++) this.bones['finger' + f + '_' + jj + '_R'].quaternion.setFromAxisAngle(fa.across, [.65 + .05 * (f - 3), 1.05 + .05 * (f - 3), .7 + .025 * (f - 3)][jj - 1]);
+      this.root.updateMatrixWorld(true);
+      const targetLocal = [.0065, -.0075].map((d) => wrist.worldToLocal(this.root.localToWorld(contact.clone().addScaledVector(up, d))));
+      const local = heldContacts ? heldContacts.map((p, i) => p.clone().lerp(targetLocal[i], releaseBlend)) : targetLocal;
+      for (let finger = 1; finger <= 2; finger++) {
+        const target = wrist.localToWorld(local[finger - 1].clone()), chain = [1, 2, 3].map((jj) => this.bones['finger' + finger + '_' + jj + '_R']), tipBone = chain[2], start = chain.map((b) => b.quaternion.clone()), tipDir = V().fromArray(tipBone.userData.restDirection);
+        for (let it = 0; it < 14; it++) for (let jj = 2; jj >= 0; jj--) { this.root.updateMatrixWorld(true); const b = chain[jj], pivot = b.getWorldPosition(V()), from = tipBone.localToWorld(tipDir.clone()).sub(pivot).normalize(), to = target.clone().sub(pivot).normalize(); const delta = Q().setFromUnitVectors(from, to).slerp(Q(), .48), world = b.getWorldQuaternion(Q()).premultiply(delta); b.quaternion.copy(b.parent.getWorldQuaternion(Q()).invert().multiply(world)); }
+        chain.forEach((b, i) => b.quaternion.slerpQuaternions(start[i], b.quaternion.clone(), amount));
+      }
+      return local;
+    }
+    pokerPose(phase = 0, { deckHeight = .01664, release = V(-.12, 1.13, .42), gripContacts = null } = {}) {
+      phase = clamp(phase, 0, 1);
+      this.arm('L', V(.17, 1.18, .20), { forward: V(-.12, 0, 1), palm: 'up' }); this.hand('L', 'deck');
+      const fa = this.fingerAxes.L, thumb = this.bones.finger1_1_L;
+      thumb.quaternion.setFromAxisAngle(fa.forward, .38 + .06 * Math.sin(Math.PI * clamp(phase / .18, 0, 1)));
+      this.root.updateMatrixWorld(true);
+      const wrist = this.bones.wrist_L, base = this.root.worldToLocal(wrist.localToWorld(this.deckOffset())), q = this.root.getWorldQuaternion(Q()).invert().multiply(wrist.getWorldQuaternion(Q())).multiply(this.deckRotation());
+      const up = V(0, 1, 0).applyQuaternion(q), across = V(1, 0, 0).applyQuaternion(q), forward = V(.76, 0, .65).normalize().applyQuaternion(q);
+      const top = base.clone().addScaledVector(up, deckHeight + .0008);
+      const push = smooth(Math.min(phase / .18, 1)) * .014;
+      const pickup = top.clone().addScaledVector(across, -push), ready = top.clone().addScaledVector(across, -.065).addScaledVector(up, .022);
+      let centre;
+      if (phase < .18) centre = ready.clone().lerp(pickup, smooth(phase / .18));
+      else if (phase < .58) { const u = (phase - .18) / .40; centre = pickup.clone().lerp(release, smooth(u)); centre.y += .028 * Math.sin(Math.PI * u); }
+      else centre = release.clone().lerp(ready, smooth((phase - .58) / .42));
+      const contact = centre.clone().addScaledVector(across, -.026);
+      this.pokerArm(contact, forward, up);
+      const grip = phase < .18 ? .6 + .4 * smooth(phase / .18) : phase < .58 ? 1 : 1 - .4 * smooth((phase - .58) / .22);
+      const contacts = this.pokerHand(contact, up, grip, gripContacts, smooth((phase - .58) / .42));
+      return { base, quaternion: q, top, push, centre, contacts, contact, up };
+    }
+    dealHand(t) {
+      let from, to, f;
+      if (t < .9) { from = 'relaxed'; to = 'open'; f = smooth(t / .9); }
+      else if (t < 1.4) { from = 'open'; to = 'card'; f = smooth((t - .9) / .5); }
+      else if (t < 3.35) { this.hand('R', 'card'); return; }
+      else if (t < 3.65) { from = 'card'; to = 'open'; f = smooth((t - 3.35) / .3); }
+      else { from = 'open'; to = 'relaxed'; f = smooth((t - 3.65) / 1.15); }
+      const chain = Object.values(this.bones).filter((b) => b.name.startsWith('finger') && b.name.endsWith('_R'));
+      this.hand('R', from); const start = chain.map((b) => b.quaternion.clone()); this.hand('R', to);
+      chain.forEach((b, i) => b.quaternion.slerpQuaternions(start[i], b.quaternion.clone(), f));
+    }
+  }
+  function dealPath(t, deck, dest) {
+    deck = deck || V(-.25, 1.04, .35); dest = dest || V(-.08, 1.024, .38);
+    const lerp3 = (a, b, u) => a.clone().lerp(b, smooth(u));
+    const idle = V(-.235, .98, .10), pickup = deck.clone().add(V(0, .032, -.105)), lift = deck.clone().add(V(0, .22, -.105)), place = dest.clone().add(V(0, .035, -.105)); let wrist, phase;
+    if (t < 1) { wrist = lerp3(idle, pickup, t); phase = 'reach'; }
+    else if (t < 1.4) { wrist = pickup; phase = 'grip'; }
+    else if (t < 2.1) { wrist = lerp3(pickup, lift, (t - 1.4) / .7); phase = 'lift'; }
+    else if (t < 3.3) { wrist = lerp3(lift, place, (t - 2.1) / 1.2); wrist.y += .055 * Math.sin((t - 2.1) / 1.2 * Math.PI); phase = 'move'; }
+    else if (t < 3.55) { wrist = place; phase = 'release'; }
+    else { wrist = lerp3(place, idle, (t - 3.55) / 1.25); phase = 'return'; }
+    return { wrist, forward: V(0, 0, 1), phase, orientationWeight: t < 1 ? smooth(t) : t > 3.55 ? 1 - smooth((t - 3.55) / 1.25) : 1 };
+  }
+
+  // ---------------- HostController: the atelier's host, as shipped, minus the module loader and the skeleton helper ----------------
+  class HostController {
+    constructor(asset) {
+      this.object = new THREE.Group(); this.object.name = 'AdrianHost'; this.model = cloneSkinned(asset.scene); this.object.add(this.model);
+      this.rig = new PoseRig(this.model); this.bones = this.rig.bones;
+      this.mixer = new THREE.AnimationMixer(this.model); this.actions = {}; for (const c of asset.animations) this.actions[c.name] = this.mixer.clipAction(c);
+      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
+      this.state = 'hosting'; this.current = 'Idle'; this.time = 0; this.expression = 'neutral'; this.expressionValue = 0; this.targetSmile = 0; this.lookTarget = null; this.lookAngles = V(); this.blinkClock = 0; this.nextBlink = 3.2 + Math.random() * 1.5; this.disposed = false; this.held = {}; this.handOverrides = {}; this.sequence = null; this.deckHold = null; this.walk = null; this.turn = null;
+      this.sockets = { L: this.model.getObjectByName('HandSocket_L'), R: this.model.getObjectByName('HandSocket_R') };
+      this.mixerPose = this.capturePose(); this.corePose = this.capturePose(); this.transition = null; this.finishedAction = null;
+      this.mixer.addEventListener('finished', (e) => { if (e.action === this.active) this.finishedAction = e.action; });
+      this.playAnimation('Idle', 0);
+    }
+    setPosition(x, y, z) { if (x && x.isVector3) this.object.position.copy(x); else this.object.position.set(x, y, z); return this; }
+    setOrientation(yaw) { this.object.rotation.set(0, yaw, 0); return this; }
+    capturePose() { const pose = {}; for (const [n, b] of Object.entries(this.bones)) pose[n] = { p: b.position.clone(), q: b.quaternion.clone() }; return pose; }
+    restorePose(pose) { for (const [n, b] of Object.entries(this.bones)) { b.position.copy(pose[n].p); b.quaternion.copy(pose[n].q); } }
+    playAnimation(name, fade = .35) {
+      if (this.deckHold && !['Idle', 'HoldDeck', 'PokerDeal'].includes(name)) return false; if (this.deckHold && name === 'Idle') name = 'HoldDeck';
+      if (!this.actions[name]) return false; if (this.sequence) return false;
+      const next = this.actions[name]; if (this.current === name && next.isRunning()) return this;
+      const from = this.corePose || this.capturePose();
+      for (const action of Object.values(this.actions)) { action.stopFading().setEffectiveWeight(0); action.stop(); }
+      this.rig.reset(); this.mixerPose = this.capturePose(); this.finishedAction = null;
+      next.reset().setEffectiveTimeScale(1).setEffectiveWeight(1); next.setLoop(['Idle', 'Walk', 'Neutral', 'HoldDeck'].includes(name) ? THREE.LoopRepeat : THREE.LoopOnce, Infinity); next.clampWhenFinished = true; next.play(); this.active = next; this.current = name;
+      this.transition = fade > 0 ? { from, t: 0, duration: fade } : null; this.restorePose(from); return this;
+    }
+    lookAt(target) { this.lookTarget = target ? target.clone() : null; return this; }
+    setExpression(name) { if (!['neutral', 'smile', 'pleased'].includes(name)) return this; this.expression = name; this.targetSmile = { neutral: 0, smile: .7, pleased: 1 }[name]; return this; }
+    setHandPose(side, pose = null) { this.handOverrides[side] = pose; return this; }
+    attachProp(prop, side = 'R', { preserveWorld = true, position, quaternion } = {}) { const socket = this.sockets[side]; if (!socket || this.held[side]) return prop; this.object.updateMatrixWorld(true); if (preserveWorld) socket.attach(prop); else socket.add(prop); if (position) prop.position.copy(position); if (quaternion) prop.quaternion.copy(quaternion); this.held[side] = prop; return prop; }
+    releaseProp(side = 'R', parent = this.object.parent) { const prop = this.held[side]; if (!prop || !parent) return null; parent.attach(prop); delete this.held[side]; return prop; }
+    holdDeck(prop, { count = 52, cardPitch = .00032 } = {}) {
+      if (this.sequence || this.walk || this.turn || this.held.L || this.held.R) return this;
+      this.handOverrides = {}; this.attachProp(prop, 'L', { preserveWorld: false, position: this.rig.deckOffset(), quaternion: this.rig.deckRotation() });
+      this.deckHold = { prop, count, cardPitch, age: 0 }; this.playAnimation('HoldDeck', .45); return this;
+    }
+    releaseDeck(parent = this.object.parent) { if (this.sequence || !this.deckHold) return null; const prop = this.releaseProp('L', parent); this.deckHold = null; this.playAnimation('Idle', .4); return prop; }
+    walkTo(target, { speed = .38 } = {}) {
+      if (this.deckHold || this.sequence || this.walk || this.turn) return Promise.resolve();
+      const start = this.object.position.clone(), end = target.clone(); end.y = start.y; const distance = start.distanceTo(end); if (distance < .01) return Promise.resolve();
+      this.object.rotation.y = Math.atan2(end.x - start.x, end.z - start.z); this.playAnimation('Walk'); this.active.setEffectiveTimeScale(speed / .38);
+      return new Promise((resolve) => (this.walk = { start, end, distance, speed, t: 0, resolve, locks: { L: this.bones.foot_L.getWorldPosition(V()), R: this.bones.foot_R.getWorldPosition(V()) } }));
+    }
+    turnTo(yaw, duration = 2) {
+      if (this.deckHold || this.sequence || this.walk || this.turn) return Promise.resolve();
+      const from = this.object.rotation.y, diff = Math.atan2(Math.sin(yaw - from), Math.cos(yaw - from)); this.playAnimation('Turn');
+      return new Promise((resolve) => (this.turn = { from, diff, duration, t: 0, resolve }));
+    }
+    update(dt) {
+      if (this.disposed) return; dt = clamp(dt, 0, .05); this.time += dt;
+      // Restore the previous mixer sample, not the rest pose: three.js skips writing unchanged tracks.
+      this.restorePose(this.mixerPose); this.mixer.update(dt); this.mixerPose = this.capturePose();
+      if (this.transition) { const a = this.transition; a.t += dt; let f = clamp(a.t / a.duration, 0, 1); f = f * f * (3 - 2 * f); for (const [n, b] of Object.entries(this.bones)) { b.position.lerpVectors(a.from[n].p, this.mixerPose[n].p, f); b.quaternion.slerpQuaternions(a.from[n].q, this.mixerPose[n].q, f); } if (a.t >= a.duration) this.transition = null; }
+      if (this.walk) { const w = this.walk; w.t += dt; const f = Math.min(1, w.t * w.speed / w.distance); this.object.position.lerpVectors(w.start, w.end, f); this.object.updateMatrixWorld(true); for (const side of ['L', 'R']) { const phase = (this.active.time / 1.2 + (side === 'L' ? 0 : .5)) % 1; if (phase < .5) { if (!w.locks[side]) w.locks[side] = this.bones['foot_' + side].getWorldPosition(V()); this.rig.leg(side, this.model.worldToLocal(w.locks[side].clone())); } else w.locks[side] = null; } if (f === 1) { this.walk = null; this.playAnimation('Idle'); w.resolve(); } }
+      if (this.turn) { const a = this.turn; a.t += dt; const f = clamp(a.t / a.duration, 0, 1); this.object.rotation.y = a.from + a.diff * (f * f * (3 - 2 * f)); if (f === 1) { this.turn = null; this.playAnimation('Idle'); a.resolve(); } }
+      if (this.deckHold && !this.sequence && !this.transition) this.rig.pokerPose(0, { deckHeight: this.deckHold.count * this.deckHold.cardPitch });
+      for (const [side, pose] of Object.entries(this.handOverrides)) if (pose && !(this.deckHold && side === 'L')) this.rig.hand(side, pose);
+      this.corePose = this.capturePose();
+      if (this.current !== 'Neutral') this.updateFace(dt);
+      this.object.updateMatrixWorld(true);
+      if (this.finishedAction) { const ended = this.finishedAction; this.finishedAction = null; if (ended === this.active && !this.walk && !this.turn && this.current !== 'Neutral') this.playAnimation('Idle'); }
+    }
+    updateFace(dt) {
+      const b = this.bones; this.expressionValue = damp(this.expressionValue, this.targetSmile, 7, dt); const a = this.expressionValue;
+      for (const side of ['L', 'R']) { const sign = side === 'L' ? 1 : -1; for (const name of ['levator04_', 'levator05_']) { const bone = b[name + side]; if (bone) bone.position.add(V(sign * .0017 * a, .0038 * a, .0003 * a)); } const mouth = b['oris03_' + side]; if (mouth) mouth.position.add(V(sign * .0015 * a, .002 * a, 0)); }
+      this.blinkClock += dt; let blink = 0; if (this.blinkClock > this.nextBlink) { const t = this.blinkClock - this.nextBlink; blink = t < .09 ? t / .09 : t < .12 ? 1 : Math.max(0, 1 - (t - .12) / .14); if (t > .26) { this.blinkClock = 0; this.nextBlink = 3 + Math.random() * 3; } }
+      for (const side of ['L', 'R']) { const upper = b['orbicularis03_' + side], lower = b['orbicularis04_' + side]; if (upper) upper.quaternion.setFromAxisAngle(V(1, 0, 0), .38 * blink); if (lower) lower.quaternion.setFromAxisAngle(V(1, 0, 0), -.10 * blink); }
+      let yaw = 0, pitch = 0;
+      if (this.lookTarget) { this.object.updateMatrixWorld(true); const target = this.model.worldToLocal(this.lookTarget.clone()), d = target.sub(this.rig.heads.head); yaw = clamp(Math.atan2(d.x, d.z), -.65, .65); pitch = clamp(-Math.atan2(d.y, Math.hypot(d.x, d.z)), -.30, .38); }
+      this.lookAngles.x = damp(this.lookAngles.x, pitch, 6, dt); this.lookAngles.y = damp(this.lookAngles.y, yaw, 6, dt);
+      if (this.lookTarget || this.lookAngles.lengthSq() > 1e-7) { b.head.quaternion.multiply(Q().setFromEuler(new THREE.Euler(this.lookAngles.x * .72, this.lookAngles.y * .75, 0))); for (const side of ['L', 'R']) { const e = b['eye_' + side]; if (e) e.quaternion.setFromEuler(new THREE.Euler(this.lookAngles.x * .28, this.lookAngles.y * .25, 0)); } }
+    }
+  }
+
+  // ---------------- the room's hosts: one Adrian each, in the house's different liveries ----------------
+  // material name -> colour: a plain colour is SET (those materials are untextured); on a textured material it acts as a tint.
+  const LOOKS = {
+    greeter: {},   // the door host wears the midnight original
+    blackjack: { 'Midnight waistcoat': 0x12422c, 'Satin piping': 0xd8b25c, 'Chestnut swept hair': 0x8a6a4a, 'Natural eyebrows': 0x8a6a4a },
+    roulette: { 'Midnight waistcoat': 0x4a0d18, 'Satin piping': 0xe8c87a, 'Chestnut swept hair': 0xb07a44, 'Natural eyebrows': 0xb07a44 },
+    baccarat: { 'Midnight waistcoat': 0x2a1034, 'Satin piping': 0xcfc4ae, 'Chestnut swept hair': 0xd8d2c6, 'Natural eyebrows': 0xbfb8aa },
+    salonHoldem: { 'Midnight waistcoat': 0x0a0d13, 'Satin piping': 0x2fa06a, 'Warm natural skin': 0xc99f7e, 'Chestnut swept hair': 0x5a4330, 'Natural eyebrows': 0x5a4330 },
+    salonDice: { 'Midnight waistcoat': 0x0c3034, 'Satin piping': 0x3fe094, 'Chestnut swept hair': 0x3a2c20, 'Natural eyebrows': 0x3a2c20 },
+  };
+  function applyLook(model, look) {
+    if (!look) return;
+    model.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const c = look[o.material.name];
+      if (c !== undefined) { const m = o.material.clone(); m.color = new THREE.Color(c); o.material = m; }
+    });
+  }
+
+  const hosts = []; let asset = null;
+  function gesture(h, kind, t) {
+    const c = h.ctrl; if (!c) { return; }
+    if (kind === 'greet') { c.setExpression('smile'); c.playAnimation('Welcome'); h.plainFace = (t || 0) + 4; }
+    else if (kind === 'deal') c.playAnimation('PokerDeal');
+    else if (kind === 'reveal') c.playAnimation('Present');
+    else if (kind === 'win') { c.setExpression('pleased'); c.playAnimation('Celebrate'); h.plainFace = (t || 0) + 5; }
+    else if (kind === 'lose') c.playAnimation('Result');
+  }
+  function build(h) {
+    const c = new HostController(asset);
+    c.object.scale.setScalar(0.94);   // Adrian is 1.80 m; at .94 he stands with the room's own people
+    c.object.position.set(h.x, 0, h.z); c.object.rotation.y = h.yaw || 0;
+    applyLook(c.model, LOOKS[h.look]);
+    (h.parent || h.group).add(c.object);
+    if (h.fig) {   // the woodcut dealer steps aside and his cues come to Adrian
+      h.fig.group.visible = false;
+      h.fig.greet = () => gesture(h, 'greet', lastT); h.fig.deal = () => gesture(h, 'deal', lastT); h.fig.nod = () => { };
+    }
+    h.ctrl = c; h.acc = 0; h.skip = 0; h.wp = new THREE.Vector3();
+  }
+  let lastT = 0;
+  window.XA_HOSTS = {
+    hosts,
+    get ready() { return !!asset; },
+    failed: false,
+    add(spec) { hosts.push(spec); if (asset) build(spec); return spec; },
+    cue(group, kind) { const h = hosts.find((x) => x.group === group); if (h && h.ctrl) gesture(h, kind, lastT); },
+    update(dt, camPos, t) {
+      lastT = t;
+      for (const h of hosts) {
+        const c = h.ctrl; if (!c) continue;
+        h.acc += dt;
+        const d = c.object.getWorldPosition(h.wp).distanceTo(camPos);
+        if (h.skip > 0 && h.acc < 0.2) { h.skip--; continue; }   // far hosts animate at a lower rate
+        h.skip = d < 8 ? 0 : d < 14 ? 1 : 3;
+        c.lookAt(d < 4.2 && !h.noLook ? camPos : null);
+        if (h.plainFace && t > h.plainFace) { c.setExpression('neutral'); h.plainFace = 0; }
+        if (h.role === 'greeter' && d < 4.5 && t > (h.nextGreet || 0)) { h.nextGreet = t + 45; gesture(h, 'greet', t); }
+        c.update(h.acc); h.acc = 0;
+      }
+    },
+  };
+  fetch('adrian.glb').then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+    .then(parseGLB)
+    .then((a) => { asset = a; hosts.forEach(build); })
+    .catch((e) => { window.XA_HOSTS.failed = true; console.warn('Adrian could not be fetched; the woodcut figures stay.', e && e.message); });
+})();
+</script>
 <script>/* Casino Room: Three.js tables on top of CasinoEngine (v2: split/insurance, combo bets, equity bots, pair bets, hints, double-up) */
 (function () {
   'use strict';
@@ -966,12 +2107,14 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       [[192, 64], [64, 192]].forEach(([x, y]) => { motif(x, y, 22, 'rgba(214,168,58,.2)', 0); });
     });
     const wallMat = (rx) => { const t = wp.clone(); t.needsUpdate = true; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, 3.2); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }); };
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(W, H), wallMat(W / 2)); back.position.set(0, H / 2, -D / 2); scene.add(back);
+    // the back wall parts around the Strata Salon arch (centre -6, clear 2.3 wide x 3.35 high)
+    [[-W / 2, -7.15], [-4.85, W / 2]].forEach(([x0, x1]) => { const wd = x1 - x0, m2 = new THREE.Mesh(new THREE.PlaneGeometry(wd, H), wallMat(wd / 2)); m2.position.set((x0 + x1) / 2, H / 2, -D / 2); scene.add(m2); });
+    { const m2 = new THREE.Mesh(new THREE.PlaneGeometry(2.3, H - 3.35), wallMat(1.15)); m2.position.set(-6, 3.35 + (H - 3.35) / 2, -D / 2); scene.add(m2); }
     const front = new THREE.Mesh(new THREE.PlaneGeometry(W, H), wallMat(W / 2)); front.rotation.y = Math.PI; front.position.set(0, H / 2, D / 2); scene.add(front);
     [-1, 1].forEach((s) => { const w = new THREE.Mesh(new THREE.PlaneGeometry(D, H), wallMat(D / 2)); w.rotation.y = -s * Math.PI / 2; w.position.set(s * W / 2, H / 2, 0); scene.add(w); });
     const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, D), M(0x1a0d12, { roughness: 1 })); ceil.rotation.x = Math.PI / 2; ceil.position.y = H; scene.add(ceil);
     const gold = M(GOLD, { metalness: 0.8, roughness: 0.3 });
-    box(W, 1.1, 0.06, M(0x2a130c), 0, 0.55, -D / 2 + 0.03, scene); box(W, 0.08, 0.1, gold, 0, 1.12, -D / 2 + 0.05, scene); box(W, 0.14, 0.12, gold, 0, H - 0.07, -D / 2 + 0.06, scene);
+    [[-W / 2, -7.15], [-4.85, W / 2]].forEach(([x0, x1]) => { const wd = x1 - x0, cx = (x0 + x1) / 2; box(wd, 1.1, 0.06, M(0x2a130c), cx, 0.55, -D / 2 + 0.03, scene); box(wd, 0.08, 0.1, gold, cx, 1.12, -D / 2 + 0.05, scene); }); box(W, 0.14, 0.12, gold, 0, H - 0.07, -D / 2 + 0.06, scene);
     [-1, 1].forEach((s) => { box(0.06, 1.1, D, M(0x2a130c), s * (W / 2 - 0.03), 0.55, 0, scene); box(0.1, 0.08, D, gold, s * (W / 2 - 0.05), 1.12, 0, scene); });
     [-9, -3, 3, 9].forEach((x) => { cyl(0.28, 0.32, H, M(0x2c0a12, { roughness: 0.4 }), x, H / 2, -D / 2 + 0.3, scene, 20); cyl(0.36, 0.36, 0.2, gold, x, 0.1, -D / 2 + 0.3, scene, 20); cyl(0.36, 0.36, 0.2, gold, x, H - 0.1, -D / 2 + 0.3, scene, 20); });
     const neon = canvasTex(1024, 256, (ctx, w, h) => {
@@ -1021,7 +2164,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     });
     wains.wrapS = THREE.RepeatWrapping; wains.repeat.set(W / 4.1, 1);
     const wm = new THREE.MeshStandardMaterial({ map: wains, roughness: 0.4, metalness: 0.1, bumpMap: wains, bumpScale: 1.4 }); if (envTex) { wm.envMap = envTex; wm.envMapIntensity = 0.25; }
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(W, 1.1), wm); back.position.set(0, 0.55, -D / 2 + 0.075); scene.add(back);
+    [[-W / 2, -7.15], [-4.85, W / 2]].forEach(([x0, x1]) => { const wd = x1 - x0, m2 = wm.clone(); m2.map = wains.clone(); m2.map.needsUpdate = true; m2.map.wrapS = THREE.RepeatWrapping; m2.map.repeat.set(wd / 4.1, 1); m2.bumpMap = m2.map; const seg = new THREE.Mesh(new THREE.PlaneGeometry(wd, 1.1), m2); seg.position.set((x0 + x1) / 2, 0.55, -D / 2 + 0.075); scene.add(seg); });
     const frontW = new THREE.Mesh(new THREE.PlaneGeometry(W, 1.1), wm); frontW.rotation.y = Math.PI; frontW.position.set(0, 0.55, D / 2 - 0.02); scene.add(frontW);
     [-1, 1].forEach((s) => { const m2 = wm.clone(); m2.map = wains.clone(); m2.map.needsUpdate = true; m2.map.wrapS = THREE.RepeatWrapping; m2.map.repeat.set(D / 4.1, 1); m2.bumpMap = m2.map; const w = new THREE.Mesh(new THREE.PlaneGeometry(D, 1.1), m2); w.rotation.y = -s * Math.PI / 2; w.position.set(s * (W / 2 - 0.075), 0.55, 0); scene.add(w); });
     // --- crown moulding and cove light
@@ -1113,6 +2256,71 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     // --- warm glow around the main sign and chandeliers
     glowSprite(0, 4.4, -D / 2 + 0.6, 9, 0xffb43a, 0.35); glowSprite(0, 4.4, -D / 2 + 0.9, 5, 0xff7aa2, 0.14);
     [-5.5, 5.5].forEach((x) => { glowSprite(x, 4.8, -1, 4.2, 0xffd27a, 0.55); glowSprite(x, 4.8, -1, 1.6, 0xffffff, 0.35); });
+    // --- THE STRATA SALON: the private player-versus-player room through the arch in the back wall ---
+    // Main-room clothing for the opening (the base wall plane is already split in buildRoom): frame, header, curtains.
+    {
+      const AX = -6, AW = 2.3, AH = 3.35, zw = -D / 2;                       // the arch: centre, clear width, clear height
+      const SX0 = -10.5, SX1 = -1.5, SZ0 = -18.4, SH = 4.05;                 // the salon's inner box and its lower ceiling
+      // the two 1.1 m strips (dado and wainscot) stop at the opening; small jambs finish their cut ends
+      [-1, 1].forEach((s) => box(0.16, AH + 0.25, 0.3, wood, AX + s * (AW / 2 + 0.08), (AH + 0.25) / 2, zw + 0.08, scene));
+      box(AW + 0.8, 0.34, 0.32, wood, AX, AH + 0.15, zw + 0.08, scene); box(AW + 0.9, 0.07, 0.36, gold, AX, AH + 0.36, zw + 0.08, scene);
+      [-1, 1].forEach((s) => cyl(0.045, 0.055, AH + 0.2, gold, AX + s * (AW / 2 + 0.22), (AH + 0.2) / 2, zw + 0.16, scene, 14));
+      const hdr = canvasTex(512, 128, (c, w, h) => {
+        c.fillStyle = '#071410'; c.fillRect(0, 0, w, h); c.strokeStyle = '#3fe094'; c.lineWidth = 5; c.strokeRect(8, 8, w - 16, h - 16);
+        c.textAlign = 'center'; c.textBaseline = 'middle'; c.shadowColor = '#3fe094'; c.shadowBlur = 22;
+        c.fillStyle = '#9af2c6'; c.font = '900 44px Georgia,serif'; c.fillText('THE STRATA SALON', w / 2, 48);
+        c.shadowBlur = 10; c.fillStyle = '#d8c070'; c.font = '600 21px Georgia,serif'; c.fillText('PLAYER VS PLAYER · HOLD’EM & LIAR’S DICE', w / 2, 98);
+      });
+      const hs = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.65), new THREE.MeshBasicMaterial({ map: hdr })); hs.position.set(AX, AH + 0.78, zw + 0.17); hs.userData.noShadow = true; scene.add(hs);
+      glowSprite(AX, AH + 0.78, zw + 0.5, 3.4, 0x3fe094, 0.30); glowSprite(AX, 1.7, zw + 0.55, 2.6, 0x2fd184, 0.18);
+      const drape2 = canvasTex(128, 256, (c, w, h) => { for (let i = 0; i < 16; i++) { const g2 = c.createLinearGradient(i * 8, 0, i * 8 + 8, 0); g2.addColorStop(0, '#06281c'); g2.addColorStop(0.5, '#0f5a3c'); g2.addColorStop(1, '#052116'); c.fillStyle = g2; c.fillRect(i * 8, 0, 8, h); } });
+      [-1, 1].forEach((s) => { const d2 = new THREE.Mesh(new THREE.PlaneGeometry(0.62, AH + 0.1), new THREE.MeshStandardMaterial({ map: drape2, roughness: 0.9, side: THREE.DoubleSide })); d2.position.set(AX + s * (AW / 2 - 0.22), (AH + 0.1) / 2, zw - 0.06); d2.userData.noShadow = true; scene.add(d2); });
+      // ------- the salon itself: ink and emerald, a lower coffered ceiling, the club's mark on the far wall -------
+      const scp = canvasTex(512, 512, (c, w, h) => {
+        const g2 = c.createRadialGradient(w / 2, h / 2, 30, w / 2, h / 2, w * 0.72); g2.addColorStop(0, '#0a1f17'); g2.addColorStop(1, '#060f0b'); c.fillStyle = g2; c.fillRect(0, 0, w, h);
+        c.strokeStyle = 'rgba(63,224,148,.16)'; c.lineWidth = 2.5;
+        for (let i = 0; i < 4; i++) { const o = 46 + i * 34; c.strokeRect(o, o, w - 2 * o, h - 2 * o); }   // layered squares: the Xtrata layers
+        c.strokeStyle = 'rgba(216,192,112,.28)'; c.lineWidth = 4; c.strokeRect(14, 14, w - 28, h - 28);
+        for (let i = 0; i < 6000; i++) { c.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,.028)' : 'rgba(0,0,0,.08)'; c.fillRect(Math.random() * w, Math.random() * h, 2, 1); }
+      });
+      scp.wrapS = scp.wrapT = THREE.RepeatWrapping; scp.repeat.set(3, 2.5); scp.anisotropy = 4;
+      const sw = SX1 - SX0, sd = zw - SZ0, scx = (SX0 + SX1) / 2, scz = (SZ0 + zw) / 2;
+      const sf = new THREE.Mesh(new THREE.PlaneGeometry(sw, sd), new THREE.MeshStandardMaterial({ map: scp, roughness: 1, bumpMap: noiseTex('pile3', 128, 5, false), bumpScale: 0.2 }));
+      sf.rotation.x = -Math.PI / 2; sf.position.set(scx, 0.005, scz); sf.receiveShadow = true; scene.add(sf);
+      const swp = canvasTex(256, 256, (c, w, h) => {
+        const g2 = c.createLinearGradient(0, 0, 0, h); g2.addColorStop(0, '#0a1a14'); g2.addColorStop(0.5, '#0e241b'); g2.addColorStop(1, '#0a1a14'); c.fillStyle = g2; c.fillRect(0, 0, w, h);
+        for (let x = 0; x < w; x += 16) { c.fillStyle = 'rgba(0,0,0,.10)'; c.fillRect(x, 0, 6, h); }
+        c.strokeStyle = 'rgba(63,224,148,.10)'; c.lineWidth = 2; [[64, 64], [192, 192]].forEach(([x, y]) => { for (let r = 10; r <= 40; r += 10) c.strokeRect(x - r, y - r, 2 * r, 2 * r); });
+      });
+      const swall = (wd) => { const t2 = swp.clone(); t2.needsUpdate = true; t2.wrapS = t2.wrapT = THREE.RepeatWrapping; t2.repeat.set(wd / 2, SH / 2); return new THREE.MeshStandardMaterial({ map: t2, roughness: 0.9 }); };
+      const mkw = (wd, x, z, ry) => { const m2 = new THREE.Mesh(new THREE.PlaneGeometry(wd, SH), swall(wd)); m2.position.set(x, SH / 2, z); m2.rotation.y = ry; scene.add(m2); return m2; };
+      mkw(sd, SX0 + 0.02, scz, Math.PI / 2); mkw(sd, SX1 - 0.02, scz, -Math.PI / 2); mkw(sw, scx, SZ0 + 0.02, 0);
+      // the salon side of the shared wall, either side of and above the opening
+      mkw(AX - AW / 2 - SX0, (SX0 + AX - AW / 2) / 2, zw - 0.02, Math.PI); mkw(SX1 - AX - AW / 2, (AX + AW / 2 + SX1) / 2, zw - 0.02, Math.PI);
+      const lint = new THREE.Mesh(new THREE.PlaneGeometry(AW, SH - AH), swall(AW)); lint.position.set(AX, AH + (SH - AH) / 2, zw - 0.02); lint.rotation.y = Math.PI; scene.add(lint);
+      const sceil = new THREE.Mesh(new THREE.PlaneGeometry(sw, sd), M(0x07120d, { roughness: 1 })); sceil.rotation.x = Math.PI / 2; sceil.position.set(scx, SH, scz); scene.add(sceil);
+      [-1, 1].forEach((s) => { const b2 = box(0.14, 0.05, sd - 0.3, new THREE.MeshBasicMaterial({ color: 0x4fe8a4 }), s < 0 ? SX0 + 0.1 : SX1 - 0.1, SH - 0.22, scz, scene); b2.userData.noShadow = true; });
+      glowSprite(scx, SH - 0.5, scz, 7, 0x1fae74, 0.22);
+      [-8.15, -3.85].forEach((x) => { glowSprite(x, 3.4, -15.2, 3.4, 0xd8f2c0, 0.30); });
+      // the club's mark: a LAYR chip over layered squares, on the far wall
+      const emb = canvasTex(256, 256, (c, w, h) => {
+        c.fillStyle = '#06100b'; c.fillRect(0, 0, w, h);
+        c.strokeStyle = 'rgba(63,224,148,.5)'; c.lineWidth = 3; for (let r = 36; r <= 96; r += 20) c.strokeRect(w / 2 - r, h / 2 - r, 2 * r, 2 * r);
+        c.fillStyle = '#0c2f1f'; c.beginPath(); c.arc(w / 2, h / 2, 58, 0, 7); c.fill(); c.strokeStyle = '#d8c070'; c.lineWidth = 5; c.stroke();
+        c.setLineDash([9, 7]); c.strokeStyle = '#9af2c6'; c.lineWidth = 4; c.beginPath(); c.arc(w / 2, h / 2, 48, 0, 7); c.stroke(); c.setLineDash([]);
+        c.fillStyle = '#9af2c6'; c.font = '900 40px Georgia,serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('LAYR', w / 2, h / 2 + 2);
+      });
+      const em = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), new THREE.MeshBasicMaterial({ map: emb })); em.position.set(scx, 2.15, SZ0 + 0.04); em.userData.noShadow = true; scene.add(em);
+      glowSprite(scx, 2.15, SZ0 + 0.5, 3, 0x3fe094, 0.3);
+      box(sw, 1.0, 0.05, wm, scx, 0.5, SZ0 + 0.05, scene); box(sw, 0.06, 0.08, gold, scx, 1.03, SZ0 + 0.07, scene);
+      // what keeps you on the carpet: the shared wall either side of the arch, and the salon's own three walls
+      solidsExtra.push({ k: 'b', x0: -W / 2, x1: AX - AW / 2, z0: zw - 0.45, z1: zw + 0.12 });
+      solidsExtra.push({ k: 'b', x0: AX + AW / 2, x1: W / 2, z0: zw - 0.45, z1: zw + 0.12 });
+      solidsExtra.push({ k: 'b', x0: SX0 - 0.5, x1: SX0, z0: SZ0 - 0.5, z1: zw + 0.1 });
+      solidsExtra.push({ k: 'b', x0: SX1, x1: SX1 + 0.5, z0: SZ0 - 0.5, z1: zw + 0.1 });
+      solidsExtra.push({ k: 'b', x0: SX0, x1: SX1, z0: SZ0 - 0.5, z1: SZ0 });
+      room.salon = { AX, AW, AH, SX0, SX1, SZ0, SH };
+    }
     const vig = document.createElement('div'); vig.style.cssText = 'position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(8,2,5,.55) 100%)'; canvas.after(vig);
   }
   upgradeRoom();
@@ -1467,6 +2675,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     setHTML('pActions', (v.actions || []).map((a) => `<button data-a="${a.id}" class="${a.kind || ''}" ${a.dis ? 'disabled' : ''}>${a.label}${a.key ? ` <kbd>${a.key}</kbd>` : ''}</button>`).join(''));
     $('broke').style.display = bank < 5 && v.canTopUp ? '' : 'none';
   }
+  $('panel').addEventListener('input', (e) => { if (focus && focus.input) focus.input(e); });
   $('panel').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b || !focus || b.disabled) return; audio(); if (!b.dataset.chip) sfx.click();
     if (b.dataset.chip) {
@@ -2027,6 +3236,371 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   }
 
   // ====================================================================
+  //  STATION: HEADS-UP HOLD'EM (Strata Salon)  (player versus player, one hand per match, independent decks)
+  //  Runs the casino-holdem-v1 rules in the browser against a practice opponent on a simulated chain. The same view model
+  //  (PvpCore.HoldemSession) is what the wallet-backed table will use, so only the chain object changes.
+  // ====================================================================
+  const PVP_CHAIN = PvpCore.makeChain(3000);
+  const hostCue = (g, k) => { if (window.XA_HOSTS) XA_HOSTS.cue(g, k); };   // the table's Adrian, when he is on duty
+  const cardOf = (n) => ({ r: (n % 13) + 2, s: 'CDHS'[Math.floor(n / 13)] });
+  const BACK_CARD = { r: 2, s: 'C' };
+  function makePvpHoldem() {
+    const HS = PvpCore.HoldemSession(PVP_CHAIN), HM = window.HoldemModel, SS = HM.S;
+    const g = ovalTable(1.75, 1.1, (ctx, w, h) => {
+      feltBase(ctx, w, h, '#1d5a8a', '#0c2c4a');
+      ctx.save(); ctx.translate(w / 2, h / 2); ctx.scale(1 / 1.75, 1 / 1.1); ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.font = '700 64px Georgia,serif'; ctx.fillText("TEXAS HOLD'EM", 0, -150);
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 4; rr(ctx, -300, -100, 600, 200, 100); ctx.stroke(); ctx.font = '28px Georgia,serif'; ctx.fillText('HEADS-UP · NO LIMIT', 0, 170); ctx.restore();
+    }, 0x2a1408);
+    tableLight(g, 3.9, 0);
+    const shoe = V3(0, 0.98, -0.1);
+    const holeMe = new Hand(g, 0, 0.55, 0.22, shoe), holeOpp = new Hand(g, 0, -0.55, 0.22, shoe), comm = new Hand(g, 0, 0.0, 0.28, shoe);
+    const potG = stackAt(g, 0, 0.87, 0.26);
+    const btn = cyl(0.04, 0.04, 0.012, M(0xffffff), 0, 0.875, 0, g, 20);
+    const opp = addFigure(g, 0, -1.32, 0, { skin: SKIN[0], style: 'jacket', jacket: 0x3a2a48, shirt: 0xd86aa0, hair: 0x8a4a1a, hairStyle: 'long', lashes: true, thinBrows: true, earrings: true, eyes: 0x3a7a5a, baseFace: { smile: 0.22 }, pants: 0x1c1c26 });
+    figOf.set(g, opp); greetOf.set(g, () => opp.greet());
+    makeStool(g, 0, -1.32, 0, { h: 0.57 });
+    const plateAt = [V3(-0.62, 1.02, 0.78), V3(0, 1.08, -0.9)];
+    const plates = plateAt.map((p) => { const sp = textSprite(256, 96, 0.62, 0.23, () => { }); sp.position.copy(p); sp.visible = false; g.add(sp); sp.userData.key = ''; return sp; });
+    function setPlate(i, name, stack, last, turn, out, dealer) {
+      const sp = plates[i], key = [name, stack, last, turn, out, dealer].join('|'); if (sp.userData.key === key) return; sp.userData.key = key;
+      const ctx = sp.userData.tex.userData.ctx, w = 256, h = 96; ctx.clearRect(0, 0, w, h);
+      ctx.globalAlpha = out ? 0.5 : 1; ctx.fillStyle = 'rgba(10,6,8,.85)'; rr(ctx, 3, 3, w - 6, h - 6, 16); ctx.fill(); ctx.lineWidth = turn ? 5 : 2; ctx.strokeStyle = turn ? '#ffd86b' : 'rgba(227,184,74,.45)'; ctx.stroke();
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillStyle = '#f6ead0'; ctx.font = '700 28px Georgia,serif'; ctx.fillText(name + (dealer ? '  ●' : ''), 16, 28);
+      ctx.textAlign = 'right'; ctx.fillStyle = '#e3b84a'; ctx.font = '700 28px Arial'; ctx.fillText('$' + stack, w - 16, 28);
+      ctx.textAlign = 'left'; ctx.fillStyle = last === 'Fold' ? '#ff9aa8' : '#b7a587'; ctx.font = '22px Arial'; ctx.fillText(last || '', 16, 68);
+      sp.userData.tex.needsUpdate = true;
+    }
+
+    // ----- cached view (the model does some hashing; do it a few times a second, not every frame) -----
+    let cache = null, cacheAt = 0, dirty = true;
+    const cview = () => { const now = performance.now(); if (dirty || now - cacheAt > 150) { cache = HS.view(); cacheAt = now; dirty = false; } return cache; };
+    PVP_CHAIN.listeners.push(() => (dirty = true));
+
+    // ----- 3D sync -----
+    let curId = null, dealt = false, dealing = false, commShown = 0, commBusy = false, myKey = '', oppFlipped = false, flipping = false, potShown = -1, evSeen = 0, collected = false, glowDone = false, resultInfo = null;
+    const mkCards = (arr) => arr.map(cardOf);
+    function placeButton(V) { const mine = V.myBtn, z = mine ? 0.55 : -0.55, x = 0.28; btn.position.set(x, 0.875, mine ? z + 0.12 : z - 0.12); }
+    function resetVisuals() {
+      holeMe.clear(); holeOpp.clear(); comm.clear(); rebuildStack(potG, 0); dealt = false; dealing = false; commShown = 0; myKey = ''; oppFlipped = false; potShown = -1; evSeen = 0; glowDone = false; resultInfo = null; collected = false;
+      raise.key = ''; plates.forEach((p) => { p.visible = false; p.userData.key = ''; });
+    }
+    async function dealIn(V) {
+      dealing = true; hostCue(g, 'deal');
+      const mine = mkCards(V.myHole);
+      for (let k = 0; k < 2; k++) { await holeMe.add(mine[k], true); await holeOpp.add(BACK_CARD, false); }
+      myKey = V.myHole.join(','); dealt = true; dealing = false;
+    }
+    async function syncCommunity() {
+      if (commBusy) return; commBusy = true;
+      try { while (cache && commShown < cache.board.length) { const n = cache.board[commShown++]; hostCue(g, 'deal'); await comm.add(cardOf(n), true); } } finally { commBusy = false; }
+    }
+    async function swapMine(V) { myKey = V.myHole.join(','); holeMe.clear(); const mine = mkCards(V.myHole); for (let k = 0; k < 2; k++) await holeMe.add(mine[k], true); }
+    async function showOpp(V) {
+      flipping = true; oppFlipped = true; hostCue(g, 'reveal'); const theirs = mkCards(V.oppHole); holeOpp.clear();
+      for (let k = 0; k < 2; k++) await holeOpp.add(theirs[k], false);
+      await holeOpp.flip(0, true); await holeOpp.flip(1, true); flipping = false;
+    }
+    function lastActions(evs) {
+      const out = { me: '', opp: '' };
+      for (const e of evs) {
+        if (e.event === 'street' || e.event === 'hand') { out.me = out.opp = ''; continue; }
+        const k = e.by === 'YOU' ? 'me' : e.by === 'BOT' ? 'opp' : null; if (!k) continue;
+        out[k] = e.event === 'check' ? 'Check' : e.event === 'call' ? 'Call ' + e.amount : e.event === 'raise' ? 'Raise ' + e.to : e.event === 'fold' ? 'Fold' : out[k];
+      }
+      return out;
+    }
+    function reactions(evs) {
+      for (; evSeen < evs.length; evSeen++) {
+        const e = evs[evSeen];
+        if (e.by === 'BOT') { if (e.event === 'fold') opp.fold(); else if (e.event === 'raise') opp.raise(); else if (e.event === 'check' || e.event === 'call') opp.nod(); }
+        if (e.event === 'street' && e.board) sfx.card && sfx.card();
+      }
+    }
+    function endOfHand(V) {
+      if (collected) return; collected = true;
+      const r = HS.result(), payout = HS.collect(); resultInfo = r;
+      setBank(bank + payout);
+      if (r && !r.cancelled) { record(r.net); outcome(station, r.net, Math.max(2, V.buyin / 5)); hostCue(g, r.net > 0 ? 'win' : r.net < 0 ? 'lose' : 'reveal'); } else if (r) record(0, false);
+      if (V.shown && r && !glowDone) { glowDone = true; const meWins = r.net > 0, tie = r.net === 0; if (meWins || tie) { holeMe.glow(); comm.glow(); } if (!meWins || tie) holeOpp.glow(); }
+      dirty = true; render();
+    }
+
+    const raise = { to: 0, key: '' };
+    const station = {
+      id: 'pvpholdem', name: "Hold'em · Heads-Up PvP", group: g, chips: null,
+      cam: { off: V3(0, 2.6, 2.75), look: V3(0, 0.3, 0.05) },
+      held() { const V = cache; return V && !V.done && HS.st.id ? V.buyin : 0; },
+      canLeave() { const V = cview(); return !V || V.done; },
+      leaveCash() { const V0 = cview(); if (V0 && V0.done && !collected) endOfHand(V0); resetVisuals(); curId = null; HS.st.id = null; cache = null; dirty = true; },
+      update(t, dt) {
+        const V = cview(); if (!V) return;
+        if (V.id !== curId) { resetVisuals(); curId = V.id; }
+        if (focus === station && V.timer) { const ck = document.querySelector('#pGame .pvpclk'); if (ck && ck.textContent !== V.timer) ck.textContent = V.timer; }
+        if (V.state >= SS.PLAYING && V.myHole && !dealt && !dealing && V.state !== SS.CANCELLED) dealIn(V);
+        if (dealt) {
+          syncCommunity();
+          if (V.myHole && V.myHole.join(',') !== myKey && !commBusy && !dealing && !(V.iA ? V.g.holeA : V.g.holeB)) swapMine(V);
+          if (V.myHole && V.hidden === false && V.shown && !oppFlipped && !flipping && !commBusy) showOpp(V);
+        }
+        if (V.pot !== potShown) { if (potShown >= 0 && V.pot > potShown) sfx.chip(1); potShown = V.pot; rebuildStack(potG, V.pot, 6); }
+        if (V.state >= SS.PLAYING) placeButton(V);
+        if (V.state >= SS.PLAYING) {
+          const la = lastActions(HS.events()); reactions(HS.events());
+          plates.forEach((p) => (p.visible = true));
+          setPlate(0, 'You', V.myStack, la.me, V.myTurn, false, V.myBtn);
+          setPlate(1, 'Opponent', V.oppStack, la.opp, V.state === SS.PLAYING && !V.myTurn, la.opp === 'Fold', !V.myBtn);
+        }
+        if (V.done && !collected && (dealt || V.state === SS.CANCELLED) && !commBusy && !flipping && !dealing && (!V.shown || oppFlipped)) endOfHand(V);
+        if (focus === station && performance.now() - (station._r || 0) > 500) { station._r = performance.now(); render(); }
+      },
+      key() { return false; },
+      input(e) { if (e.target.id !== 'pvpRaise') return; raise.to = +e.target.value; const v = station.view(); last.pGame = v.game; render(); },
+      view() {
+        const V = cview(), a = []; let msg = '', tone = '', strip = '';
+        if (!V) {
+          msg = 'Heads-up, one hand per match. Put your buy-in down, a player sits, and the winner takes the pot (2% rake). Cards come from each player\'s own secret seed and the block hash.';
+          [[100, 'b'], [200, 'n'], [500, 'm']].forEach(([n, k]) => a.push({ id: 'buy' + n, label: 'Buy in ' + money(n), kind: n === 200 ? 'primary' : '', key: k, dis: bank < n }));
+          return { msg, tone, game: '', actions: a, chips: null, lock: false, canTopUp: true };
+        }
+        const o = V.opt, seat = (nm, stack, bet, dealer, turn) => `<div class="seat ${turn ? 'turn' : ''}"><b>${nm}${dealer ? ' <em>D</em>' : ''}</b><span>${money(stack)}</span><small>${bet ? 'bet ' + money(bet) : ''}</small></div>`;
+        if (V.state >= SS.PLAYING && !V.done || V.done) {
+          strip = '<div class="seats" style="grid-template-columns:repeat(2,1fr)">' + seat('You', V.myStack, V.myBet, V.myBtn, V.myTurn) + seat('Opponent', V.oppStack, V.oppBet, !V.myBtn, V.state === SS.PLAYING && !V.myTurn) + '</div>';
+          const mine = V.myHole ? V.myHole.map((c) => `<u class="${HM.suitOf(c) === 1 || HM.suitOf(c) === 2 ? 'r' : ''}">${['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'][HM.rankOf(c)]}${'♣♦♥♠'[HM.suitOf(c)]}</u>`).join(' ') : '';
+          strip += `<div class="tot">Pot <b>${money(V.pot)}</b> · Your cards ${mine}${V.handName ? ' · ' + V.handName : ''}${V.timer && !V.done ? ` · Clock <b class="pvpclk"></b>` : ''}</div>`;
+          if (V.state === SS.PLAYING && o && o.canRaise) {
+            if (!raise.key || raise.key !== V.id + ':' + V.street + ':' + V.g.acts) { raise.key = V.id + ':' + V.street + ':' + V.g.acts; raise.to = o.minRaiseTo; }
+            raise.to = Math.max(o.minRaiseTo, Math.min(o.maxRaiseTo, raise.to));
+            strip += `<div class="calls"><input type="range" id="pvpRaise" min="${o.minRaiseTo}" max="${o.maxRaiseTo}" step="1" value="${raise.to}" ${V.canAct ? '' : 'disabled'} aria-label="Raise to"><button class="ghost" data-a="pre" data-v="min" ${V.canAct ? '' : 'disabled'}>Min</button><button class="ghost" data-a="pre" data-v="0.5" ${V.canAct ? '' : 'disabled'}>½ pot</button><button class="ghost" data-a="pre" data-v="1" ${V.canAct ? '' : 'disabled'}>Pot</button><button class="ghost" data-a="pre" data-v="max" ${V.canAct ? '' : 'disabled'}>All-in</button></div>`;
+          }
+          if (V.holeNote && !V.done) strip += `<div class="tot" style="color:#e8b64a">${V.holeNote}</div>`;
+        }
+        if (V.state === SS.OPEN) msg = 'Your buy-in is down. Waiting for a player to sit.';
+        else if (V.state === SS.DEALING) msg = 'Both seeds are locked in. The cards are dealt from the next block.';
+        else if (V.state === SS.PLAYING) msg = V.pending && !V.ready ? ['', 'The flop', 'The turn', 'The river'][V.street] + ' is dealt from the next block. Betting reopens in a moment.' : V.myTurn ? 'Your move.' : 'Your opponent is thinking.';
+        else if (V.state === SS.RUNOUT) msg = 'All-in. The rest of the board comes from the next block.';
+        else if (V.state === SS.SHOWDOWN) msg = 'Showdown. Both players reveal their seeds so the cards can be ranked.';
+        if (V.done && resultInfo) {
+          const r = resultInfo; tone = r.net > 0 ? 'win' : r.net < 0 ? 'lose' : '';
+          msg = (r.cancelled ? '' : r.net > 0 ? `You win ${money(r.net)}. ` : r.net < 0 ? `You lose ${money(-r.net)}. ` : 'Split pot. ') + r.how + (r.rake ? ` Rake ${money(r.rake)}.` : '');
+        }
+        const lock = V.busy;
+        if (V.state === SS.OPEN) a.push({ id: 'cancel', label: 'Cancel table', key: 'x', dis: lock });
+        else if (V.state === SS.PLAYING) {
+          a.push({ id: 'fold', label: 'Fold', kind: 'danger', key: 'x', dis: !V.canAct });
+          a.push({ id: 'call', label: o && o.toCall > 0 ? 'Call ' + money(o.toCall) : 'Check', kind: 'primary', key: 'c', dis: !V.canAct });
+          if (!(o && !o.canRaise && V.myTurn)) a.push({ id: 'raise', label: !o ? 'Raise' : raise.to === o.maxRaiseTo ? 'All-in ' + money(raise.to) : (o.oppBet === 0 ? 'Bet ' : 'Raise to ') + money(raise.to), key: 'r', dis: !V.canAct || !o || !o.canRaise });
+          if (V.expired && !V.myTurn) a.push({ id: 'claim', label: 'Claim timeout', dis: lock });
+        } else if (V.done) {
+          [V.buyin].forEach((n) => a.push({ id: 'buy' + n, label: 'Another hand · ' + money(n), kind: 'primary', key: 'd', dis: bank < n || !collected }));
+        }
+        return { msg, tone, game: strip, actions: a, chips: null, lock, canTopUp: false };
+      },
+      async act(id, data) {
+        const V = cview();
+        if (/^buy\d+$/.test(id)) {
+          const n = +id.slice(3), bb = 10; if (bank < n) { toast('Not enough chips'); return; }
+          setBank(bank - n); collected = false; dirty = true;
+          const r = await HS.open({ bb, bbs: n / bb, turn: 60 }); if (r.err) { setBank(bank + n); toast('Could not open the table'); }
+          dirty = true; render(); return;
+        }
+        if (id === 'pre') { const o = V && V.opt; if (!o) return; const p = data.v; raise.to = p === 'min' ? o.minRaiseTo : p === 'max' ? o.maxRaiseTo : Math.round(o.oppBet + Number(p) * (V.pot + o.toCall)); raise.to = Math.max(o.minRaiseTo, Math.min(o.maxRaiseTo, raise.to)); return; }
+        if (id === 'fold') await HS.act(0); else if (id === 'call') await HS.act(1); else if (id === 'raise') await HS.act(2, raise.to);
+        else if (id === 'cancel') await HS.cancel(); else if (id === 'claim') await HS.claim();
+        dirty = true; render();
+      },
+      session: HS, debug: () => ({ curId, dealt, dealing, commShown, commBusy, oppFlipped, flipping, collected, hasResult: !!resultInfo }),
+    };
+    station.payFrom = V3(0, 0.87, -0.2); station.payTo = V3(0, 0.87, 0.7);
+    return station;
+  }
+
+  // ====================================================================
+  //  STATION: LIAR'S DICE  (player versus player, five dice each, committed seeds, casino-liars-dice-v1 rules)
+  // ====================================================================
+  const PIP_POS = { 1: [[.5, .5]], 2: [[.27, .27], [.73, .73]], 3: [[.27, .27], [.5, .5], [.73, .73]], 4: [[.27, .27], [.73, .27], [.27, .73], [.73, .73]], 5: [[.27, .27], [.73, .27], [.5, .5], [.27, .73], [.73, .73]], 6: [[.27, .25], [.73, .25], [.27, .5], [.73, .5], [.27, .75], [.73, .75]] };
+  const dieFaceCache = {};
+  function dieFaceMat(n) {
+    if (dieFaceCache[n]) return dieFaceCache[n];
+    const t = canvasTex(128, 128, (ctx, w, h) => {
+      ctx.fillStyle = '#f6efdc'; rr(ctx, 2, 2, w - 4, h - 4, 22); ctx.fill(); ctx.strokeStyle = '#c8b98f'; ctx.lineWidth = 3; ctx.stroke();
+      PIP_POS[n].forEach(([x, y]) => { ctx.fillStyle = n === 1 ? '#b3122b' : '#15151c'; ctx.beginPath(); ctx.arc(x * w, y * h, n === 1 ? 17 : 11.5, 0, 7); ctx.fill(); });
+    });
+    return (dieFaceCache[n] = new THREE.MeshStandardMaterial({ map: t, roughness: 0.4, metalness: 0.05 }));
+  }
+  const DIE_SZ = 0.078, DIE_GEO = new THREE.BoxGeometry(DIE_SZ, DIE_SZ, DIE_SZ);
+  const DIE_MATS = () => [3, 4, 1, 6, 2, 5].map(dieFaceMat);   // +x, -x, +y, -y, +z, -z (opposite faces add to seven)
+  const qFor = (v, yaw) => { // orientation with face v up, then a turn about the vertical
+    const e = { 1: [0, 0, 0], 6: [Math.PI, 0, 0], 3: [0, 0, Math.PI / 2], 4: [0, 0, -Math.PI / 2], 2: [-Math.PI / 2, 0, 0], 5: [Math.PI / 2, 0, 0] }[v];
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(e[0], e[1], e[2], 'XYZ'));
+    return new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), yaw).multiply(q);
+  };
+  function makeDie(v, yaw) { const m = new THREE.Mesh(DIE_GEO, DIE_MATS()); m.castShadow = true; m.quaternion.copy(qFor(v, yaw || 0)); m.userData.v = v; return m; }
+  function cupMesh(scale) {
+    const pts = [[0.07, 0], [0.075, 0.005], [0.066, 0.16], [0.07, 0.165], [0.06, 0.166], [0.058, 0.158]].map(([x, y]) => new THREE.Vector2(x * (scale || 1), y * (scale || 1)));
+    const g = new THREE.Group(), body = new THREE.Mesh(new THREE.LatheGeometry(pts, 28), leatherMat(0x7a1222, 1, true)); body.castShadow = true; g.add(body);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.07 * (scale || 1), 0.006, 6, 28), GOLDM()); band.rotation.x = Math.PI / 2; band.position.y = 0.012; g.add(band);
+    return g;
+  }
+  function makeLiarsDice() {
+    const DS = PvpCore.DiceSession(PVP_CHAIN), DMo = window.DiceModel, SS = DMo.S, FACE_CH = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+    const g = ovalTable(1.55, 0.95, (ctx, w, h) => {
+      feltBase(ctx, w, h, '#6a1226', '#2c0610');
+      ctx.save(); ctx.translate(w / 2, h / 2); ctx.scale(1 / 1.55, 1); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(255,215,120,.9)'; ctx.font = '700 66px Georgia,serif'; ctx.fillText("LIAR'S DICE", 0, -215);
+      ctx.strokeStyle = 'rgba(255,215,120,.55)'; ctx.lineWidth = 4; rr(ctx, -330, -120, 660, 240, 40); ctx.stroke(); ctx.font = '26px Georgia,serif'; ctx.fillStyle = 'rgba(255,215,120,.7)'; ctx.fillText('FIVE DICE EACH · BID, RAISE OR CALL', 0, 175);
+      ctx.restore();
+    }, 0x2a1408);
+    tableLight(g);
+    const opp = addFigure(g, 0, -1.28, 0, { skin: SKIN[1], style: 'vest', vest: 0x14141c, tie: 0x8c1420, hair: 0x141414, hairStyle: 'slick', beard: 'stubble', watch: true, eyes: 0x3a2412 });
+    figOf.set(g, opp); greetOf.set(g, () => opp.greet()); makeStool(g, 0, -1.28, 0, { h: 0.57 });
+    const potG = stackAt(g, -0.62, 0.87, 0.02);
+    const rowY = 0.87 + DIE_SZ / 2 + 0.002, myRowZ = 0.5, oppRowZ = -0.5, sp = 0.115;
+    const myCup = cupMesh(), oppCup = cupMesh(); myCup.position.set(0.52, 0.866, 0.56); g.add(myCup); oppCup.position.set(0, 0.866 + 0.168, -0.5); oppCup.rotation.x = Math.PI; g.add(oppCup);
+    // the bid, floating above the table
+    const board = textSprite(512, 168, 0.95, 0.31, () => { }); board.position.set(-1.28, 1.0, -0.3); board.visible = false; g.add(board); board.userData.key = '';
+    function drawBoard(qty, face, who) {
+      const key = qty + ':' + face + ':' + who; if (board.userData.key === key) return; board.userData.key = key;
+      const ctx = board.userData.tex.userData.ctx, w = 512, h = 168; ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(10,6,8,.86)'; rr(ctx, 4, 4, w - 8, h - 8, 26); ctx.fill(); ctx.strokeStyle = '#d4a83a'; ctx.lineWidth = 4; ctx.stroke();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (!qty) { ctx.fillStyle = '#b7a587'; ctx.font = '700 40px Georgia,serif'; ctx.fillText('NO BID YET', w / 2, h / 2); }
+      else {
+        ctx.fillStyle = '#b7a587'; ctx.font = '22px Georgia,serif'; ctx.fillText(who ? who + ' BID' : 'CURRENT BID', w / 2, 30);
+        ctx.fillStyle = '#ffd86b'; ctx.font = '700 80px Georgia,serif'; ctx.fillText(String(qty), w / 2 - 70, 96); ctx.fillStyle = '#b7a587'; ctx.font = '44px Georgia,serif'; ctx.fillText('×', w / 2 - 6, 98);
+        const x0 = w / 2 + 28, y0 = 56, s = 74; ctx.fillStyle = '#f6efdc'; rr(ctx, x0, y0, s, s, 14); ctx.fill();
+        PIP_POS[face].forEach(([x, y]) => { ctx.fillStyle = face === 1 ? '#b3122b' : '#15151c'; ctx.beginPath(); ctx.arc(x0 + x * s, y0 + y * s, face === 1 ? 10 : 7, 0, 7); ctx.fill(); });
+      }
+      board.userData.tex.needsUpdate = true;
+    }
+
+    // ----- cached view -----
+    let cache = null, cacheAt = 0, dirty = true;
+    const cview = () => { const now = performance.now(); if (dirty || now - cacheAt > 150) { cache = DS.view(); cacheAt = now; dirty = false; } return cache; };
+    PVP_CHAIN.listeners.push(() => (dirty = true));
+
+    // ----- 3D sync -----
+    let curId = null, rolled = false, rolling = false, revealed = false, revealing = false, potShown = -1, collected = false, resultInfo = null, evSeen = 0;
+    const myDiceM = [], oppDiceM = [], hitMarks = [];
+    const rowPos = (i, z) => V3((i - 2) * sp, rowY, z);
+    function resetVisuals() {
+      [...myDiceM, ...oppDiceM].forEach((m) => g.remove(m)); myDiceM.length = oppDiceM.length = 0; hitMarks.forEach((m) => g.remove(m)); hitMarks.length = 0;
+      oppCup.position.set(0, 0.866 + 0.168, -0.5); oppCup.rotation.set(Math.PI, 0, 0); myCup.position.set(0.52, 0.866, 0.56);
+      rolled = rolling = revealed = revealing = false; potShown = -1; rebuildStack(potG, 0); collected = false; resultInfo = null; evSeen = 0; board.visible = false; board.userData.key = '';
+    }
+    async function rollMine(vals) {
+      rolling = true; hostCue(g, 'deal'); const from = V3(0.52, 1.0, 0.56);
+      const ps = vals.map((v, i) => {
+        const m = makeDie(v, Math.random() * 6.28); m.position.copy(from); g.add(m); myDiceM.push(m);
+        const q0 = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)), q1 = m.quaternion.clone(), to = rowPos(i, myRowZ);
+        sfx.chip && setTimeout(() => sfx.chip(1), 400 + i * 90);
+        return tween(0.75 + i * 0.07, (u) => { const e = ease(u); m.position.lerpVectors(from, to, e); m.position.y += 0.26 * Math.sin(e * Math.PI) * (1 - e * 0.4); m.quaternion.slerpQuaternions(q0, q1, Math.min(1, e * 1.15)); }, m);
+      });
+      await Promise.all(ps); rolled = true; rolling = false;
+    }
+    async function revealOpp(vals, hitFace) {
+      revealing = true; revealed = true; hostCue(g, 'reveal'); sfx.flip && sfx.flip();
+      await Promise.all([moveObj(oppCup, V3(0.7, 0.866 + 0.168 + 0.16, -0.5), 0.55, 0.18)]);
+      const ps = vals.map((v, i) => { const m = makeDie(v, Math.random() * 6.28); const to = rowPos(i, oppRowZ); m.position.set(to.x, to.y + 0.3, to.z); g.add(m); oppDiceM.push(m); const y0 = to.y + 0.3; return tween(0.45 + i * 0.05, (u) => { m.position.y = to.y + (y0 - to.y) * (1 - bounceOut(u)); }, m); });
+      await Promise.all(ps); revealing = false;
+      if (hitFace) markHits(hitFace);
+    }
+    const moveObj = (o, pos, dur, lift) => { const p0 = o.position.clone(); return tween(dur, (u) => { const e = ease(u); o.position.lerpVectors(p0, pos, e); o.position.y += (lift || 0) * Math.sin(e * Math.PI); }, o); };
+    function markHits(face) {
+      [...myDiceM, ...oppDiceM].forEach((m) => { if (m.userData.v !== face) return; const gm = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xffd040, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+        gm.rotation.x = -Math.PI / 2; gm.position.set(m.position.x, 0.8725, m.position.z); gm.userData.noShadow = true; g.add(gm); hitMarks.push(gm); m.position.y += 0.012; });
+    }
+    function reactions(evs) {
+      for (; evSeen < evs.length; evSeen++) {
+        const e = evs[evSeen]; if (e.by === 'BOT' && (e.event === 'bid')) opp.nod(); if (e.by === 'BOT' && e.event === 'challenged') opp.raise && opp.raise();
+      }
+    }
+    function endOfHand(V) {
+      if (collected) return; collected = true;
+      const r = DS.result(), payout = DS.collect(); resultInfo = r;
+      setBank(bank + payout);
+      if (r && !r.cancelled) { record(r.net); outcome(station, r.net, Math.max(2, V.stake)); hostCue(g, r.net > 0 ? 'win' : r.net < 0 ? 'lose' : 'reveal'); } else if (r) record(0, false);
+      dirty = true; render();
+    }
+
+    const pick = { q: 1, f: 2 };
+    function valid(g0, q, f) { return q >= 1 && q <= 10 && f >= 1 && f <= 6 && (g0.qty === 0 || q > g0.qty || (q === g0.qty && f > g0.face)); }
+    function nudge(V) {
+      if (!V || !V.myTurn) return; if (valid(V.g, pick.q, pick.f)) return;
+      const nx = V.next.find(([q, f]) => q === Math.max(V.g.qty, 1) && f >= pick.f) || V.next[0]; if (nx) { pick.q = nx[0]; pick.f = nx[1]; }
+    }
+    const station = {
+      id: 'liars', name: "Liar's Dice · PvP", group: g, chips: null,
+      cam: { off: V3(0, 2.45, 2.55), look: V3(0, 0.3, 0.0) },
+      held() { const V = cache; return V && !V.done && DS.st.id ? V.stake : 0; },
+      canLeave() { const V = cview(); return !V || V.done; },
+      leaveCash() { const V0 = cview(); if (V0 && V0.done && !collected) endOfHand(V0); resetVisuals(); curId = null; DS.st.id = null; cache = null; dirty = true; },
+      update(t, dt) {
+        const V = cview(); if (!V) return;
+        if (V.id !== curId) { resetVisuals(); curId = V.id; }
+        if (focus === station && V.timer) { const ck = document.querySelector('#pGame .pvpclk'); if (ck && ck.textContent !== V.timer) ck.textContent = V.timer; }
+        if (V.state >= SS.BIDDING) { board.visible = true; const last = V.bids[V.bids.length - 1]; drawBoard(V.qty, V.face, last ? (last.by === 'YOU' ? 'YOUR' : 'THEIR') : ''); }
+        if (V.myDice && V.dealt && !rolled && !rolling) rollMine(V.myDice);
+        if (V.oppDice && rolled && !revealed && !revealing) revealOpp(V.oppDice, V.face);
+        const stakeNow = V.state >= SS.BIDDING ? V.stake * 2 : V.state === SS.OPEN ? V.stake : 0; if (stakeNow !== potShown) { if (potShown >= 0 && stakeNow > potShown) sfx.chip(1); potShown = stakeNow; rebuildStack(potG, stakeNow, 6); }
+        reactions(DS.events());
+        if (V.done && !collected && (V.state === SS.CANCELLED || (rolled && !rolling && (!V.oppDice || (revealed && !revealing))) || (!V.myDice))) endOfHand(V);
+        if (focus === station && performance.now() - (station._r || 0) > 500) { station._r = performance.now(); render(); }
+      },
+      key() { return false; },
+      view() {
+        const V = cview(), a = []; let msg = '', tone = '', strip = '';
+        if (!V) {
+          msg = "Each player has five dice under a cup and a secret seed. Bid how many of one face are on the table in total (yours and theirs together), or call the last bid a lie. The winner takes the pot (2% rake).";
+          [[10, 'b'], [25, 'n'], [50, 'm'], [100, 'v']].forEach(([n, k]) => a.push({ id: 'stake' + n, label: 'Stake ' + money(n), kind: n === 25 ? 'primary' : '', key: k, dis: bank < n }));
+          return { msg, tone, game: '', actions: a, chips: null, lock: false, canTopUp: true };
+        }
+        nudge(V);
+        const dice = V.myDice ? V.myDice.map((d) => `<span style="font-size:22px;color:${d === V.face && V.done ? '#ffd86b' : '#f6ead0'}">${FACE_CH[d]}</span>`).join(' ') : '';
+        if (V.state >= SS.BIDDING) {
+          const hist = V.bids.slice(-5).map((b) => `<span class="dim">${b.by === 'YOU' ? 'You' : 'Opponent'}</span> <b>${b.qty} × ${FACE_CH[b.face]}</b>`).join(' &nbsp;›&nbsp; ');
+          strip = `<div class="tot">Pot <b>${money(V.stake * 2)}</b> · Your dice ${dice || '(dealing…)'}${V.timer && !V.done ? ` · Clock <b class="pvpclk"></b>` : ''}</div>`;
+          if (hist) strip += `<div class="tot">${hist}</div>`;
+          if (V.state === SS.BIDDING && V.myTurn) {
+            const od = V.odds(pick.q, pick.f);
+            strip += `<div class="calls"><button class="ghost" data-a="q" data-v="-1" ${V.canAct && pick.q > 1 ? '' : 'disabled'}>−</button><b style="min-width:26px;text-align:center">${pick.q}</b><button class="ghost" data-a="q" data-v="1" ${V.canAct && pick.q < 10 ? '' : 'disabled'}>+</button> ` +
+              [1, 2, 3, 4, 5, 6].map((f) => `<button class="ghost" data-a="f" data-v="${f}" style="font-size:20px;${pick.f === f ? 'border-color:#e3b84a;background:rgba(227,184,74,.2)' : ''}" ${V.canAct ? '' : 'disabled'}>${FACE_CH[f]}</button>`).join('') +
+              (od !== null ? ` <span class="dim">Chance it holds, from your dice: <b>${Math.round(od * 100)}%</b></span>` : '') + '</div>';
+          }
+        }
+        if (V.state === SS.OPEN) msg = 'Your stake is down. Waiting for a player to sit.';
+        else if (V.state === SS.BIDDING) msg = !V.dealt ? 'Both seeds are locked in. The dice are dealt from the next block.' : V.g.qty === 0 ? (V.myTurn ? 'Your dice are in. Make the opening bid.' : 'Your opponent is studying their dice.') : V.myTurn ? 'Your turn. Raise the bid, or call liar.' : 'Your opponent is thinking.';
+        else if (V.state === SS.REVEAL) msg = V.g.diceA && V.g.diceB ? 'Settling.' : 'Liar called. Both players reveal their seeds so the dice can be counted.';
+        if (V.done && resultInfo) { const r = resultInfo; tone = r.net > 0 ? 'win' : r.net < 0 ? 'lose' : ''; msg = (r.cancelled ? '' : r.net > 0 ? `You win ${money(r.net)}. ` : `You lose ${money(-r.net)}. `) + r.how + (r.rake ? ` Rake ${money(r.rake)}.` : ''); }
+        const lock = V.busy;
+        if (V.state === SS.OPEN) a.push({ id: 'cancel', label: 'Cancel table', key: 'x', dis: lock });
+        else if (V.state === SS.BIDDING) {
+          a.push({ id: 'bid', label: V.myTurn ? `Bid ${pick.q} × ${FACE_CH[pick.f]}` : 'Bid', kind: 'primary', key: 'b', dis: !V.canAct || !valid(V.g, pick.q, pick.f) });
+          a.push({ id: 'liar', label: 'Liar!', kind: 'danger', key: 'l', dis: !V.canAct || V.g.qty === 0 });
+          if (V.expired && !V.myTurn) a.push({ id: 'claim', label: 'Claim timeout', dis: lock });
+        } else if (V.state === SS.REVEAL && V.expired) a.push({ id: 'claim', label: 'Claim timeout', dis: lock });
+        else if (V.done) a.push({ id: 'stake' + V.stake, label: 'Another game · ' + money(V.stake), kind: 'primary', key: 'd', dis: bank < V.stake || !collected });
+        return { msg, tone, game: strip, actions: a, chips: null, lock, canTopUp: false };
+      },
+      async act(id, data) {
+        const V = cview();
+        if (/^stake\d+$/.test(id)) {
+          const n = +id.slice(5); if (bank < n) { toast('Not enough chips'); return; }
+          setBank(bank - n); collected = false; pick.q = 1; pick.f = 2; dirty = true;
+          const r = await DS.open({ stake: n, turn: 60 }); if (r.err) { setBank(bank + n); toast('Could not open the table'); }
+          dirty = true; render(); return;
+        }
+        if (id === 'q') { pick.q = Math.max(1, Math.min(10, pick.q + Number(data.v))); if (V && V.myTurn && !valid(V.g, pick.q, pick.f)) { const o = V.next.find(([q, f]) => q >= pick.q && f === pick.f) || V.next.find(([q]) => q >= pick.q); if (o) { pick.q = o[0]; pick.f = o[1]; } } return; }
+        if (id === 'f') { pick.f = Number(data.v); if (V && V.myTurn && !valid(V.g, pick.q, pick.f)) { const o = V.next.find(([q, f]) => f === pick.f && q >= pick.q); if (o) pick.q = o[0]; } return; }
+        if (id === 'bid') await DS.bid(pick.q, pick.f); else if (id === 'liar') await DS.challenge();
+        else if (id === 'cancel') await DS.cancel(); else if (id === 'claim') await DS.claim();
+        dirty = true; render();
+      },
+      session: DS, debug: () => ({ curId, rolled, rolling, revealed, revealing, collected, hasResult: !!resultInfo }),
+    };
+    station.payFrom = V3(0, 0.87, -0.2); station.payTo = V3(0, 0.87, 0.7);
+    return station;
+  }
+
+  // ====================================================================
   //  STATION: VIDEO POKER  (hint / auto-hold, animated draw, double-up)
   // ====================================================================
   function makeVideoPoker() {
@@ -2147,9 +3721,9 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   }
 
   // ---------------- place stations ----------------
-  stations = [makeBlackjack(), makeRoulette(), makeHoldem(), makeBaccarat(), makeVideoPoker()];
-  const placement = { blackjack: [-6.6, -2.6, 0.45], roulette: [0, -5.6, 0], holdem: [6.6, -2.6, -0.45], baccarat: [-6.2, 3.2, 0.7], videopoker: [6.2, 3.2, -0.7] };
-  const TAGS = { blackjack: ['BLACKJACK', 'split · double · insurance'], roulette: ['ROULETTE', 'European · single zero'], holdem: ["TEXAS HOLD'EM", 'you vs three players'], baccarat: ['BACCARAT', 'player · banker · tie'], videopoker: ['VIDEO POKER', 'jacks or better'] };
+  stations = [makeBlackjack(), makeRoulette(), makeHoldem(), makeBaccarat(), makeVideoPoker(), makePvpHoldem(), makeLiarsDice()];
+  const placement = { blackjack: [-6.6, -2.6, 0.45], roulette: [0, -5.6, 0], holdem: [6.6, -2.6, -0.45], baccarat: [-6.2, 3.2, 0.7], videopoker: [6.2, 3.2, -0.7], pvpholdem: [-8.15, -15.2, -0.5], liars: [-3.85, -15.2, 0.5] };
+  const TAGS = { blackjack: ['BLACKJACK', 'split · double · insurance'], roulette: ['ROULETTE', 'European · single zero'], holdem: ["TEXAS HOLD'EM", 'you vs three players'], baccarat: ['BACCARAT', 'player · banker · tie'], videopoker: ['VIDEO POKER', 'jacks or better'], pvpholdem: ["HOLD'EM · PvP", 'heads-up · no limit'], liars: ["LIAR'S DICE", 'player vs player'] };
   stations.forEach((s) => {
     const p = placement[s.id]; s.group.position.set(p[0], 0, p[1]); s.group.rotation.y = p[2]; scene.add(s.group);
     const sign = textSprite(512, 128, 1.7, 0.425, (ctx, w, h) => {
@@ -2178,6 +3752,16 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       for (let i = 0; i < 6; i++) { const c2 = box(0.1, 0.004, 0.16, M(0xf4f0e2), -0.95, 0.875 + i * 0.012, -0.42, g); c2.rotation.y = (i % 3 - 1) * 0.04; }
       plaque(g, -1.05, 0.93, 0.5, 0.26, 0.1, ['BLACKJACK', 'MIN $5 · MAX $500'], 0.0, 0.5);
     },
+    pvpholdem(s) {
+      const g = s.group;
+      plaque(g, 0.0, 0.93, 1.02, 0.3, 0.1, ["HOLD'EM", 'NO LIMIT · BLINDS $5 / $10'], 0.0, 0.5);
+      chipColumns(g, -1.25, 0.866, 0.08, [100, 25], [3, 5], 0.1);
+    },
+    liars(s) {
+      const g = s.group; const tray = new THREE.Group(); tray.position.set(0.95, 0.866, -0.5); g.add(tray);
+      box(0.3, 0.02, 0.2, M(0x0c0c10, { roughness: 0.35, metalness: 0.4 }), 0, 0.01, 0, tray); box(0.31, 0.006, 0.21, GOLDM(), 0, 0.001, 0, tray); chipColumns(tray, -0.09, 0.02, 0, [5, 25, 100], [6, 8, 4], 0.09);
+      plaque(g, -1.05, 0.93, 0.5, 0.26, 0.1, ["LIAR'S DICE", 'PLAYER VS PLAYER'], 0.0, 0.5);
+    },
     baccarat(s) {
       const g = s.group; const cb = box(0.3, 0.07, 0.2, M(0x0b0b10, { roughness: 0.2, metalness: 0.5 }), 0.95, 0.9, -0.52, g); box(0.31, 0.012, 0.21, GOLDM(), 0.95, 0.94, -0.52, g);
       for (let i = 0; i < 6; i++) { const nn = cyl(0.014, 0.014, 0.006, GOLDM(), 0.85 + (i % 3) * 0.1, 0.946, -0.57 + Math.floor(i / 3) * 0.1, g, 10); nn.userData.noShadow = true; }
@@ -2204,6 +3788,18 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     }
   };
   stations.forEach((s) => { try { dressers[s.id](s); } catch (e) { console.error(e); } });
+  // ---------------- Adrian, the house's hosts (adrian.glb beside this page; the woodcut dealers stand in if he cannot load) ----------------
+  if (window.XA_HOSTS) {
+    const byId = {}; stations.forEach((s) => (byId[s.id] = s));
+    XA_HOSTS.add({ group: byId.blackjack.group, x: 0, z: -0.98, yaw: 0, look: 'blackjack', fig: figOf.get(byId.blackjack.group) });
+    XA_HOSTS.add({ group: byId.roulette.group, x: -0.3, z: -1.02, yaw: 0, look: 'roulette', fig: figOf.get(byId.roulette.group) });
+    XA_HOSTS.add({ group: byId.baccarat.group, x: 0, z: -1.0, yaw: 0, look: 'baccarat', fig: figOf.get(byId.baccarat.group) });
+    XA_HOSTS.add({ group: byId.pvpholdem.group, x: -1.65, z: -0.95, yaw: Math.atan2(1.65, 0.95), look: 'salonHoldem' });
+    XA_HOSTS.add({ group: byId.liars.group, x: 1.45, z: -0.9, yaw: Math.atan2(-1.45, 0.9), look: 'salonDice' });
+    XA_HOSTS.add({ group: scene, x: 2.5, z: 7.9, yaw: Math.atan2(-2.5, 3.0), look: 'greeter', role: 'greeter' });
+    solidsExtra.push({ k: 'c', x: 2.5, z: 7.9, r: 0.36 });
+    ['pvpholdem', 'liars'].forEach((id) => { const s = byId[id], old = greetOf.get(s.group); greetOf.set(s.group, () => { if (old) old(); XA_HOSTS.cue(s.group, 'greet'); }); });
+  }
   // patrons at the slot machines and a bartender
   const patrons = [];
   [[-1, -3.5, { skin: SKIN[1], style: 'jacket', jacket: 0x2a3a52, shirt: 0xe8e0cc, hair: 0x2a1a10, hairStyle: 'short', beard: 'stubble', pants: 0x26262e }],
@@ -2240,9 +3836,11 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     baccarat: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.25 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.25 } }],
     holdem: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.35 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.35 } }],
     roulette: [{ x: 0, z: 1.6, pad: true, stand: { x: 0, z: 1.6 } }],
-    videopoker: [{ x: 0, z: 1.55, pad: true, stand: { x: 0, z: 1.55 } }]
+    videopoker: [{ x: 0, z: 1.55, pad: true, stand: { x: 0, z: 1.55 } }],
+    pvpholdem: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.35 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.35 } }],
+    liars: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.25 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.25 } }]
   };
-  const VERB = { blackjack: 'SIT', baccarat: 'SIT', holdem: 'SIT', roulette: 'PLAY', videopoker: 'PLAY' };
+  const VERB = { blackjack: 'SIT', baccarat: 'SIT', holdem: 'SIT', roulette: 'PLAY', videopoker: 'PLAY', pvpholdem: 'SIT', liars: 'SIT' };
   const toWorld = (s, x, z) => { const a = s.group.rotation.y; return { x: s.group.position.x + Math.cos(a) * x + Math.sin(a) * z, z: s.group.position.z - Math.sin(a) * x + Math.cos(a) * z }; };
   // colliders: circles, boxes (world axis) and ellipses (table-local)
   const solids = [];
@@ -2257,12 +3855,14 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     else if (s.id === 'baccarat') { ell(1.58, 1.02); circ(0, -1.0, 0.42); }
     else if (s.id === 'holdem') { ell(1.78, 1.15); [[-2.15, 0], [0, -1.32], [2.15, 0]].forEach(([x, z]) => circ(x, z, 0.42)); }
     else if (s.id === 'roulette') { solids.push({ k: 'r', cx: px, cz: pz, hx: 1.8, hz: 0.85, rot: a }); circ(-0.3, -1.02, 0.42); }
+    else if (s.id === 'pvpholdem') { ell(1.78, 1.15); circ(0, -1.32, 0.42); circ(-1.65, -0.95, 0.36); }
+    else if (s.id === 'liars') { ell(1.58, 1.02); circ(0, -1.28, 0.42); circ(1.45, -0.9, 0.36); }
     else if (s.id === 'videopoker') { solids.push({ k: 'r', cx: px, cz: pz, hx: 0.72, hz: 0.58, rot: a, oz: 0.05 }); }
     (SEATS[s.id] || []).forEach((seat) => { if (!seat.pad) circ(seat.x, seat.z, 0.24); });
   });
   solidsExtra.forEach((o) => solids.push(o));
   function collide() {
-    player.x = clamp(player.x, -RW / 2 + 1.2, RW / 2 - 1.2); player.z = clamp(player.z, -RD / 2 + 0.7, RD / 2 - 0.7);
+    player.x = clamp(player.x, -RW / 2 + 1.2, RW / 2 - 1.2); player.z = clamp(player.z, room.salon ? room.salon.SZ0 + 0.62 : -RD / 2 + 0.7, RD / 2 - 0.7);
     for (let it = 0; it < 2; it++) for (const o of solids) {
       if (o.k === 'c') { const dx = player.x - o.x, dz = player.z - o.z, d = Math.hypot(dx, dz), m = o.r + PR; if (d < m) { const k = d < 1e-6 ? 1 : m / d; player.x = o.x + (d < 1e-6 ? m : dx * k); player.z = o.z + (d < 1e-6 ? 0 : dz * k); } }
       else if (o.k === 'b') { const nx = clamp(player.x, o.x0, o.x1), nz = clamp(player.z, o.z0, o.z1), dx = player.x - nx, dz = player.z - nz, d = Math.hypot(dx, dz); if (d < PR) { if (d < 1e-6) player.z = o.z1 + PR; else { player.x = nx + dx / d * PR; player.z = nz + dz / d * PR; } } }
@@ -2436,7 +4036,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     const f = $('scframe'), want = SC[id]; if (f.getAttribute('src') !== want) f.setAttribute('src', want);
   }
   function closeClub() { if (!scOpen) return; scOpen = false; $('scov').classList.remove('on'); if (scWas && scWas.walk) tryLock(); }
-  $('scbtn').onclick = () => openClub('sc-th'); $('sc-h').onclick = () => openClub('sc-th'); $('sc-d').onclick = () => openClub('sc-td');
+  $('scbtn').onclick = () => openClub('sc-th');
   $('sc-th').onclick = () => openClub('sc-th'); $('sc-td').onclick = () => openClub('sc-td'); $('scclose').onclick = closeClub;
   window.XA_STRATA = { open: openClub, close: closeClub, get isOpen() { return scOpen; } };
   window.addEventListener('keydown', (e) => {
@@ -2444,7 +4044,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     if (scOpen) { if (e.code === 'Escape') closeClub(); return; }
     if (e.code === 'Escape') { if (focus) setFocus(null); return; }
     if (!focus) {
-      if (/^Digit[1-5]$/.test(e.code)) { setFocus(stations[+e.code.slice(-1) - 1]); return; }
+      if (/^Digit[1-7]$/.test(e.code)) { const st = stations[+e.code.slice(-1) - 1]; if (st) setFocus(st); return; }
       if (mode === 'walk') { keys[e.code] = true; if (e.repeat || returning) return; if ((e.code === 'KeyE' || e.code === 'Enter' || e.code === 'Space') && cand) { e.preventDefault(); sit(cand); } else if (e.code === 'Tab') { e.preventDefault(); exitWalk(); } else if (/^Arrow|Space/.test(e.code)) e.preventDefault(); }
       return;
     }
@@ -2477,6 +4077,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     for (let i = tweens.length - 1; i >= 0; i--) { const w = tweens[i]; w.t += dt; const u = Math.min(1, w.t / w.dur); w.fn(u); if (u >= 1) { tweens.splice(i, 1); w.res(); } }
     stations.forEach((s) => s.update && s.update(t, dt));
     updateCoins(dt); updateGlows(t); figures.forEach((f) => f.update(t));
+    if (window.XA_HOSTS) XA_HOSTS.update(dt, camera.position, t);
     kick *= Math.exp(-dt * 4); fovBase += (((mode === 'walk' && !focus) ? WALK.fov : baseFov) - fovBase) * Math.min(1, dt * 5); camera.fov = fovBase + kick * 5; camera.updateProjectionMatrix();   // walking: the arcade's field of view
     signA += ((focus ? 0 : 1) - signA) * Math.min(1, dt * 5); stations.forEach((s) => { s.sign.material.opacity = signA; s.sign.visible = signA > 0.02; });
     room.neon.material.color.setScalar(0.85 + 0.15 * Math.sin(t * 2.4));
