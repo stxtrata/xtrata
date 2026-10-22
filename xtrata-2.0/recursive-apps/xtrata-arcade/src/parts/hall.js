@@ -185,6 +185,7 @@ function buildRoom(){
   buildLogoSign();
   buildPosters();
   try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
+  try{ if(window.XAScreen) XAScreen.start(()=>paintDayBoard(true)) }catch(e){}   // the centre screen's contract: off unless configured
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
@@ -1494,37 +1495,55 @@ function setHeight(h, live){
 async function pollChain(){ const h=await fetchHeight(); if(h) setHeight(h,true); else if(!chain.live) setHeight(estHeight(),false) }
 function startChainClock(){ setHeight(estHeight(),false); pollChain(); setInterval(pollChain,60000) }
 
+/* ---------- the centre screen ----------
+   One 16:9 screen hung in the middle of the hall: the Bitcoin Day clock along the top, LATEST SCORERS from the score boards the
+   hall already reads, a rotating feature (news / ads / messages from xtrata-screen-v1) and a ticker. All the drawing and the
+   contract reader live in screen.js; this part only builds the panel, feeds it and repaints it. With no screen contract it is the
+   clock plus the latest scorers. It replaces the old Bitcoin Day board in the same spot. */
 let dayBoard=null;
+const CENTRE_SCREEN={W:3.2, H:1.8, cy:2.05, z:RL/2-6, px:1280, py:720, gapMs:120};
 function buildDayBoard(){
-  const cv=mkCanvas(1024,256), t=tex(cv), mat=new THREE.MeshBasicMaterial({map:t, toneMapped:false});
-  const g=new THREE.Group(); g.position.set(0,2.46,RL/2-6); scene.add(g);
-  const W=2.6, H=.65;
-  g.add(new THREE.Mesh(new THREE.BoxGeometry(W+.1,H+.1,.08), new THREE.MeshStandardMaterial({color:0x121118, metalness:.6, roughness:.4})));
-  const front=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); front.position.z=.042; g.add(front);
-  const back=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); back.position.z=-.042; back.rotation.y=Math.PI; g.add(back);
+  const S=CENTRE_SCREEN, cv=mkCanvas(S.px,S.py), t=tex(cv), mat=new THREE.MeshBasicMaterial({map:t, toneMapped:false});
+  const g=new THREE.Group(); g.position.set(0,S.cy,S.z); scene.add(g);
+  const W=S.W, H=S.H;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(W+.12,H+.12,.1), new THREE.MeshStandardMaterial({color:0x121118, metalness:.6, roughness:.4})));
+  const front=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); front.position.z=.052; g.add(front);
+  const back=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); back.position.z=-.052; back.rotation.y=Math.PI; g.add(back);
   const rodMat=new THREE.MeshStandardMaterial({color:0x2a2a33, metalness:.8, roughness:.3});
-  for(const sx of [-1,1]){ const len=RH-(2.46+H/2+.05); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,len,6),rodMat); rod.position.set(sx*(W/2-.2),H/2+.05+len/2,0); g.add(rod) }
-  const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.12,.02,.1), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.06); g.add(edge);
-  dayBoard={cv, x:cv.getContext('2d'), tex:t};
-  paintDayBoard();
+  for(const sx of [-1,1]){ const len=RH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
+  const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.14,.025,.12), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.07); g.add(edge);
+  // you cannot walk through it: its bottom edge is below eye height
+  boxes.push(new THREE.Box3(new THREE.Vector3(-W/2-.06,0,S.z-.1), new THREE.Vector3(W/2+.06,RH,S.z+.1)));
+  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], scorersAt:-1e9};
+  paintDayBoard(true);
 }
-function paintDayBoard(){
+// Latest scorers: every cached board entry that burned in the last two Bitcoin days, newest first (no extra reads).
+function screenScorers(){
+  const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; if(t && t.entries && t.entries.length) boards.push({game:g.title, colour:g.color, mode:b.mode, entries:t.entries}) }));
+  return window.XAScreen ? XAScreen.latestScorers(boards, chain.height, 288, fmtBoard, 8) : [];
+}
+function paintDayBoard(force){
   if(!dayBoard || chain.day<0) return;
-  const x=dayBoard.x, W=1024, H=256, h=chain.height, done=h%BLOCKS_PER_DAY, left=BLOCKS_PER_DAY-done;
-  x.save(); x.setTransform(1,0,0,1,0,0); x.globalAlpha=1;
-  x.fillStyle='#050408'; x.fillRect(0,0,W,H);
-  x.textBaseline='alphabetic'; x.textAlign='left';
-  x.font='30px Bungee, Impact, sans-serif'; x.fillStyle=BTC_ORANGE; x.shadowColor=BTC_ORANGE; x.shadowBlur=12; x.fillText('BITCOIN DAY',40,60);
-  x.font='150px VT323, monospace'; x.fillStyle='#ffc53d'; x.shadowColor='#ffb000'; x.shadowBlur=26; x.fillText(String(chain.day),34,186);
-  x.shadowBlur=0; x.textAlign='right'; x.font='40px VT323, monospace';
-  x.fillStyle='#eef2ff'; x.fillText('BLOCK '+(chain.live?'':'≈')+h.toLocaleString('en-US'),W-40,96);
-  x.fillStyle='#8fd3ff'; x.fillText((chain.live?'':'≈')+'NEXT DAY IN '+left+' BLOCK'+(left===1?'':'S'),W-40,158);
-  const segW=944/BLOCKS_PER_DAY;
-  for(let i=0;i<BLOCKS_PER_DAY;i++){ x.fillStyle=i<done?BTC_ORANGE:i===done?'#ffffff':'#1d1a24'; x.fillRect(40+i*segW,208,segW-1.6,24) }
-  x.fillStyle='rgba(0,0,0,.34)'; for(let yy=0;yy<H;yy+=4) x.fillRect(0,yy,W,1.4); for(let xx=0;xx<W;xx+=4) x.fillRect(xx,0,1.4,H);
-  x.restore();
+  const now=performance.now();
+  if(!force && now-dayBoard.last<CENTRE_SCREEN.gapMs) return;
+  dayBoard.last=now;
+  if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } }
+  const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers,
+           items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.live?chain.height:0) : []};
+  if(window.XAScreen) XAScreen.paint(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);
+  else paintPlainClock(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);   // a release without screen.js: just the day clock
   dayBoard.tex.needsUpdate=true;
 }
+function paintPlainClock(x,W,H,d){
+  const left=d.blocksPerDay-(d.height%d.blocksPerDay);
+  x.save(); x.setTransform(1,0,0,1,0,0); x.fillStyle='#050408'; x.fillRect(0,0,W,H); x.textAlign='center'; x.textBaseline='alphabetic';
+  x.font='60px Bungee, Impact, sans-serif'; x.fillStyle=BTC_ORANGE; x.fillText('BITCOIN DAY',W/2,H*.3);
+  x.font='320px VT323, monospace'; x.fillStyle='#ffc53d'; x.fillText(String(d.day),W/2,H*.7);
+  x.font='64px VT323, monospace'; x.fillStyle='#8fd3ff'; x.fillText((d.live?'':'≈')+'NEXT DAY IN '+left+' BLOCK'+(left===1?'':'S'),W/2,H*.9);
+  x.restore();
+}
+// Per frame: the ticker and the rotation move, so repaint a few times a second while the screen is within sight.
+function tickCentreScreen(){ if(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11) paintDayBoard() }
 
 
 /* ==================== TEMPORARY DEV OVERRIDE — REMOVE BEFORE RELEASE ====================
@@ -2575,6 +2594,7 @@ function frame(now){
     if(state==='intro') player.yaw = Math.sin(time*.15)*.18;
   }
   if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud() } updatePosterFocus() }
+  if(state==='walk' || state==='intro') tickCentreScreen();
 
   if(tween){
     tween.t+=dt; const k=clamp(tween.t/tween.dur,0,1), e=easeIO(k);

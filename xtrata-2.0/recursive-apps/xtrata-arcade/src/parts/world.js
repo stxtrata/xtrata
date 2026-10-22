@@ -330,6 +330,8 @@
     start: start, stop: stop, refresh: refresh, onHeight: onHeight, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
     composeWall: composeWall, isActive: isActive, loadImageBytes: loadImageBytes,
+    // read helpers for sibling modules (the centre screen reads its own contract through these)
+    read: callRead, plain: plain, hexList: hexList,
     // exposed for tests
     _t: { plain: plain, toPoster: toPoster, toBay: toBay, readLooks: readLooks, hexList: hexList, normalizePoster: normalizePoster, rng: rng, hash32: hash32,
       loadSnapshot: loadSnapshot, callRead: callRead, restore: restore, save: save, state: state }
