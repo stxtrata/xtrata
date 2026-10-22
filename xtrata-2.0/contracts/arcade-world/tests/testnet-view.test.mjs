@@ -20,3 +20,10 @@ test('a room source must be a plain .html file name beside the page', () => {
     assert.throws(() => buildTestnetViewHtml({ ...base, rooms: { casino: { src } } }), /src must be a file name/, src);
   assert.throws(() => buildTestnetViewHtml({ ...base, rooms: { 'Bad Slug': { src: 'x.html' } } }), /slug/);
 });
+test('a room may carry an entry still: a plain image file name beside the page', () => {
+  const html = buildTestnetViewHtml({ ...base, rooms: { casino: { src: 'casino-room.html', title: 'ROYAL FLUSH CASINO', still: 'casino-entry.jpg' } } });
+  assert.match(html, /"still":"casino-entry\.jpg"/);
+  assert.ok(!buildTestnetViewHtml({ ...base, rooms: { casino: { src: 'casino-room.html' } } }).includes('"still"'));
+  for (const still of ['../x.jpg', 'http://a/x.jpg', 'x.html', '/x.jpg', 'x y.jpg', 'x.jpg?a=1'])
+    assert.throws(() => buildTestnetViewHtml({ ...base, rooms: { casino: { src: 'casino-room.html', still } } }), /still must be a file name/, still);
+});

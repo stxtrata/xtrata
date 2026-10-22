@@ -2497,8 +2497,10 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     }
     updateExit(dt); updateRings(t, dt); updatePatrons(t);
     renderer.render(scene, camera);
+    if (!readySent && ++drawn >= 3) { readySent = true; try { if (window.parent !== window) parent.postMessage({ xa: 'room-ready' }, '*'); } catch (e) { } }   // tells the arcade the room has drawn its first frames, so it can take the entry still away
     requestAnimationFrame(frame);
   }
+  let readySent = false, drawn = 0;
   $('intro').classList.add('on'); render(); paintWalkHud(); if (FROM_ARCADE) startAtDoor(); frame();
   window.__casino = { walkCfg: WALK, startAtDoor, lookBy, get leaving() { return leaving; }, get fov() { return camera.fov; }, get exitOpen() { return room.exitDoor ? room.exitDoor.open : null; }, stations, figures, player, enterWalk, exitWalk, sit, get cand() { return cand; }, get mode() { return mode; }, get returning() { return returning; }, solids, setFocus, setBank, stats, audioStats, sfx, audio, setCam(p, l) { tgtPos.set(p[0], p[1], p[2]); tgtLook.set(l[0], l[1], l[2]); camPos.copy(tgtPos); look.copy(tgtLook); }, get bank() { return bank; }, get pixelRatio() { return pr; } };
 })();
