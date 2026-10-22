@@ -252,7 +252,7 @@
         ],
         "risk": {
           "level": "medium",
-          "headline": "The art is on IPFS. We have not re-checked whether the pointer can change or how widely it is hosted.",
+          "headline": "The art is on IPFS. We have not re-checked whether the pointer can change. Public gateways serve it, but only one storage provider (Pinata) was found holding it.",
           "points": [
             [
               "Art lives at",
@@ -268,10 +268,10 @@
             ],
             [
               "How widely hosted?",
-              "Not measured."
+              "Checked 22 Oct 2026: 6 of 6 sampled art files and 6 of 6 metadata files matched the manifest hashes through gateway.pinata.cloud, ipfs.filebase.io and stxnft.mypinata.cloud (a dedicated Pinata gateway). A 13 Oct lookup on the IPFS network found only Pinata storing the folders; the other gateways fetch from there."
             ]
           ],
-          "asOf": "25 Sep 2026 (re-check pending)"
+          "asOf": "25 Sep 2026; hosting checked 22 Oct 2026"
         }
       }
     },
@@ -320,7 +320,7 @@
         ],
         "risk": {
           "level": "medium",
-          "headline": "The art is on IPFS, but the metadata is not frozen and we have not measured how many hosts keep it.",
+          "headline": "The art is on IPFS and the metadata is not frozen. Public gateways serve it and several storage providers hold it.",
           "points": [
             [
               "Art lives at",
@@ -336,10 +336,10 @@
             ],
             [
               "How widely hosted?",
-              "Not measured."
+              "Checked 22 Oct 2026: 6 of 6 sampled art files and 6 of 6 metadata files matched the manifest hashes through gateway.pinata.cloud, ipfs.filebase.io and stxnft.mypinata.cloud; 4everland.io served 4 of 6 and 2 of 6. A 13 Oct lookup on the IPFS network found the art held by Filebase, Pinata and others (8 provider records) and the metadata by Filebase and Pinata."
             ]
           ],
-          "asOf": "5 Oct 2026"
+          "asOf": "5 Oct 2026; hosting checked 22 Oct 2026"
         }
       }
     },
@@ -389,7 +389,7 @@
         ],
         "risk": {
           "level": "medium",
-          "headline": "The art is on IPFS, but the contract’s metadata is not frozen and we have not measured how many hosts keep it.",
+          "headline": "The art is on IPFS and the contract’s metadata is not frozen. Public gateways serve it; Pinata holds it and at least one other provider holds the art.",
           "points": [
             [
               "Art lives at",
@@ -405,10 +405,10 @@
             ],
             [
               "How widely hosted?",
-              "Not measured. We fetched all 2,500 files through our own IPFS node."
+              "Checked 22 Oct 2026: 7 of 7 sampled art files (including the 1.4 MB #1 and large-file token #378) and 7 of 7 metadata files matched the manifest hashes through gateway.pinata.cloud, ipfs.filebase.io and stxnft.mypinata.cloud. Large files were slow on Filebase (up to 37 s). A 13 Oct lookup found the art held by Pinata and others (3 provider records), the metadata by Pinata only. We also fetched all 2,500 files through our own IPFS node."
             ]
           ],
-          "asOf": "6 Oct 2026"
+          "asOf": "6 Oct 2026; hosting checked 22 Oct 2026"
         }
       }
     },
@@ -589,10 +589,10 @@
             ],
             [
               "How widely hosted?",
-              "Not known. We could not show who besides the original Pinata account holds that folder."
+              "Checked 22 Oct 2026: 6 of 6 sampled files matched the manifest hashes through gateway.pinata.cloud (throttled at first, passed on a slow re-test), ipfs.filebase.io and stxnft.mypinata.cloud. A 13 Oct lookup on the IPFS network found only Pinata storing the folder, which is why all 400 twins matter."
             ]
           ],
-          "asOf": "7–8 Oct 2026",
+          "asOf": "7–8 Oct 2026; hosting checked 22 Oct 2026",
           "caveat": "We have not confirmed that this folder is the artist’s original set; Gamma’s index is the only evidence that ties it to the collection. The twins preserve exactly what that folder served on 8 Oct 2026, hashed and recorded in the public manifest."
         }
       }
