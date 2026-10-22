@@ -11,7 +11,10 @@
   },
   "winners": {
     "SP3WAAYXPC6WZNEC7SHGR36D32RJPZVXRR1BG0QSY": {
-      "draw": 1
+      "draws": [
+        1,
+        3
+      ]
     },
     "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9": {
       "draws": [
@@ -26,7 +29,16 @@
       "draw": 2
     },
     "SP1RB1V65A1PAAXYT8PVFFFC6T1FN9E8RQX7HMDKC": {
-      "draw": 2
+      "draws": [
+        2,
+        3
+      ]
+    },
+    "SP3AJC728JY0Y43E8RT6K4VDWPT265RDMXJ8M0VH0": {
+      "draw": 3
+    },
+    "SP38B5H07H1XJ756EEPMS8VBJE9HPGH03C50VPNAJ": {
+      "draw": 3
     }
   }
 }

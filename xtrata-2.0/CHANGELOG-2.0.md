@@ -2,6 +2,13 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: Draw 3 recorded as the official result (2026-10-22)
+- Draw 3 (cut-off 21 Oct 23:59 BST) ran live on the page and the result was published in a clip, so it is now the official record: `public/bounty/zdao/tracker/1/draws/draw3/` (`frozen.csv`, `meta.json`, `result.json`), 17 wallets / 354 tickets, list hash 625c94f3…, seed Bitcoin block 972545. Winners: SP1RB1V6… (@cryptose, 70 tickets), SP3WAAYX… (4), SP3AJC72… (25), SP38B5H0… (@moofv_, 22); reserves SP219RBW… (59), SP1BP036… (87).
+- That pool is 3 tickets larger than the "a win uses up one ticket" rule gives (351): the live page did not take the Draw 2 winners' used ticket off their totals, because the Draw 2 record had not been merged yet. The result was published and announced as it ran, so it stands; `meta.json` notes this. `draw.mjs draws/draw3` reproduces it from the files.
+- `handles.json` `winners` now includes Draw 3's winners.
+- `index.html`: once a draw's `result.json` is published, the Live draw section shows that result instead of re-running the draw in the visitor's browser, so the page cannot disagree with what was announced.
+- **Verified:** in a browser, Draw 3 shows "Official result published by the team" with the six wallets above and Draw 1 and Draw 2 listed under their winners.
+
 ## Bounty tracker: Draw 2 recorded, earlier draws' winners shown (2026-10-16)
 - Draw 2 (cut-off 14 Oct 23:59 BST) had only ever been computed live in visitors' browsers. Its official record is now in `public/bounty/zdao/tracker/1/draws/draw2/` (`frozen.csv`, `meta.json`, `result.json`): 15 wallets / 281 tickets, list hash 135854cd…, seed Bitcoin block 971478. Winners: SP2Z2CBM… (28 tickets), SPZ2X7Q… (5), SP1RB1V6… (62); reserves SP1BP036… (82), SP38B5H0… (22). Reproduced offline with `freeze.mjs` + `draw.mjs`, and identical to what the live page computes.
 - `handles.json` `winners` now lists Draw 2's winners too (SP2Z2CBM… as `draws: [1, 2]`), so Draw 3 takes one ticket off each win.

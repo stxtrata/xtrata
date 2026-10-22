@@ -842,6 +842,12 @@ tr:last-child td { border-bottom: 0; }
   function refreshNow() { return new Promise(function (res) { (function go() { if (busy) return setTimeout(go, 300); refresh(true).then(res, res); })(); }); }
   function handleOf(w) { return HANDLES[w] || (LINKED[w] && LINKED[w].h) || ''; }
 
+  // Once the team has published a draw's result file, that file is the result. Do not re-run the draw in the visitor's browser.
+  async function beginDraw(i) {
+    var S = LV[i]; S.started = true;
+    await loadOfficialOnly(i);
+    if (S.official !== 'only') runDraw(i);
+  }
   async function runDraw(i) {
     var S = LV[i]; S.started = true; S.step = 2; liveRender();
     var seed;
@@ -967,7 +973,7 @@ tr:last-child td { border-bottom: 0; }
   function liveTick() {
     var now = Date.now(), i = liveIndex(), cd = $('liveCd');
     if (cd) cd.textContent = hms(cutOf(i) - now);
-    if (now >= cutOf(i) && ENGINE[i] && !LV[i].started) { runDraw(i); }
+    if (now >= cutOf(i) && ENGINE[i] && !LV[i].started) { beginDraw(i); }
     else if (now >= cutOf(i) && !LV[i].started && !LV[i].tried) { LV[i].started = true; liveRender(); }
     if (cd && now >= cutOf(i)) liveRender();
   }
