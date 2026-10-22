@@ -62,6 +62,7 @@
   var MAX_OVERLAYS = 4;
 
   function parseParams(s) {
+    if (s && typeof s === 'object' && !Array.isArray(s)) return s;            // the v2 reader hands over a merged object when it is longer than 256 characters
     if (typeof s !== 'string' || !s || s.length > 256) return {};
     try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
   }
