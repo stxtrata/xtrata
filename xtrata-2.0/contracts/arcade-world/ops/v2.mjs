@@ -11,6 +11,7 @@
 //   node ops/v2.mjs add   --bay hall/bay-1 --kind sign-board [--name sign-2] --params '{"text":"HI"}' [--at +1h]
 //   node ops/v2.mjs bay   --bay hall/bay-0 [--base wall|door|posters] [--interaction none|knock|peek|enter] [--hide] [--at +1h]
 //   node ops/v2.mjs reset --bay hall/bay-0 [--soft]
+//   node ops/v2.mjs room  --slug casino --title "Royal Flush Casino"     (a destination room for a portal; then seed a lobby scene with --link-room casino=ID)
 //   node ops/v2.mjs read  --registry ST….xtrata-world-v2 [--network testnet] [--json] [--out snapshot.json]
 //
 // Shared options: --manifest FILE (default ops/out/v2/hall-v2.manifest.json: the record of ids and what each object shows now; seed writes
@@ -37,11 +38,11 @@ const rest = [];
 for (let i = 0; i < argv.length; i++) { if (argv[i] === '--set') sets.push(argv[++i]); else if (argv[i].startsWith('--set=')) sets.push(argv[i].slice(6)); else rest.push(argv[i]); }
 const args = parseArgs(rest, { manifest: 'value', outDir: 'value', keys: 'value', nonces: 'value', fee: 'value', chunk: 'value', owner: 'value', as: 'value', height: 'value',
   delegate: 'value', linkRoom: 'value', object: 'value', params: 'value', at: 'value', bay: 'value', kind: 'value', name: 'value', base: 'value', interaction: 'value',
-  registry: 'value', network: 'value', apiBase: 'value', out: 'value', path: 'value', lobbyPath: 'value', seqs: 'value', deployFee: 'value' });
+  registry: 'value', slug: 'value', title: 'value', network: 'value', apiBase: 'value', out: 'value', path: 'value', lobbyPath: 'value', seqs: 'value', deployFee: 'value' });
 const cmd = args._[0];
 const outDir = args.outDir || join(here, 'out', 'v2');
 const manifestPath = args.manifest || join(outDir, 'hall-v2.manifest.json');
-if (!cmd) die('usage: node ops/v2.mjs <deploy|seed|patch|add|bay|reset|read> [options]   (see the header of ops/v2.mjs)');
+if (!cmd) die('usage: node ops/v2.mjs <deploy|seed|room|patch|add|bay|reset|read> [options]   (see the header of ops/v2.mjs)');
 
 const loadManifest = () => { if (!existsSync(manifestPath)) die(`no manifest at ${manifestPath}: run seed first (or pass --manifest)`); return JSON.parse(readFileSync(manifestPath, 'utf8')); };
 const height = args.height != null ? Number(args.height) : undefined;
@@ -94,6 +95,9 @@ try {
       manifest: existsSync(manifestPath) && !args.fresh ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null, ownerAddress: args.owner,
     });
     await finish('seed', plan);
+  } else if (cmd === 'room') {
+    if (!args.slug || !args.title) die('room needs --slug <casino> and --title "Royal Flush Casino"');
+    await finish('room-' + args.slug, V2.planRoom(loadManifest(), { slug: args.slug, title: args.title, as: args.as }));
   } else if (cmd === 'patch') {
     if (!args.object) die('patch needs --object <hall/bay-0/sign>');
     const params = args.params ? JSON.parse(args.params) : {};

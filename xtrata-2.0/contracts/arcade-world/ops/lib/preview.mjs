@@ -64,14 +64,22 @@ export { resolveScenes };
 
 // A local page that shows a TEST NETWORK's world and poster contracts in the real hall (reads only). The hall's reader takes its network
 // from the score client's config, so the page sets that before the reader's first read (a setter on window.XAScores catches it the moment it exists).
-export function buildTestnetViewHtml({ world, posters, screen = '', scores = '', registry = '', roomId = 'arcade-hall', hallHtml = null, apiBase = 'https://api.testnet.hiro.so' }) {
+export function buildTestnetViewHtml({ world, posters, screen = '', scores = '', registry = '', rooms = {}, roomId = 'arcade-hall', hallHtml = null, apiBase = 'https://api.testnet.hiro.so' }) {
   if (!/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(world) || !/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(posters)) throw new Error('world and posters must be testnet contract ids (ST...name)');
   if (screen && !/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(screen)) throw new Error('screen must be a testnet contract id (ST...name)');
   if (scores && !/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(scores)) throw new Error('scores must be a testnet contract id (ST...name)');
   if (registry && !/^ST[0-9A-Z]+\.[a-z][a-z0-9-]*$/.test(registry)) throw new Error('registry must be a testnet contract id (ST...name)');
+  // rooms: { slug: { src: 'casino-room.html', title: 'ROYAL FLUSH CASINO' } }, the pages a lobby door can lead to (window.XA_ROOMS); each page sits beside this one
+  const roomMap = {};
+  for (const [slug, r] of Object.entries(rooms || {})) {
+    if (!/^[a-z][a-z0-9-]{1,23}$/.test(slug)) throw new Error('room slug "' + slug + '": lowercase letters, digits, dashes');
+    if (!r || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\.html$/.test(r.src || '')) throw new Error('room "' + slug + '": src must be a file name ending in .html, beside the page');
+    if (r.title && !/^[\x20-\x7e]{1,48}$/.test(r.title)) throw new Error('room "' + slug + '": title must be 1 to 48 printable ASCII characters');
+    roomMap[slug] = { src: r.src, title: r.title || slug.toUpperCase() };
+  }
   const sc = scores ? scores.split('.') : null;
   const html = hallHtml || readFileSync(HALL_FILE, 'utf8');
-  const script = `window.XA_WORLD_CONFIG=${JSON.stringify({ world, posters, roomId, ...(screen ? { screen } : {}), ...(registry ? { registry } : {}) })};
+  const script = `${Object.keys(roomMap).length ? 'window.XA_ROOMS=' + JSON.stringify(roomMap) + ';\n' : ''}window.XA_WORLD_CONFIG=${JSON.stringify({ world, posters, roomId, ...(screen ? { screen } : {}), ...(registry ? { registry } : {}) })};
 (function(){var cur;try{Object.defineProperty(window,'XAScores',{configurable:true,get:function(){return cur},set:function(v){cur=v;try{v.configure({network:'testnet',apiBases:[${JSON.stringify(apiBase)}],readSender:${JSON.stringify(world.split('.')[0])}${sc ? `,contractAddress:${JSON.stringify(sc[0])},contractName:${JSON.stringify(sc[1])}` : ''}})}catch(e){}}})}catch(e){}})();
 (function(){var d;function ui(){d=document.createElement('div');d.style.cssText='position:fixed;left:12px;bottom:12px;z-index:99999;background:rgba(10,12,24,.92);color:#dfe6ff;font:12px/1.4 ui-monospace,Menlo,monospace;padding:8px 10px;border:1px solid #3b4a8a;border-radius:6px;max-width:300px';d.innerHTML='<div style="letter-spacing:.08em;color:#ffcc55">TESTNET VIEW \\u00b7 READ ONLY</div>';var n=document.createElement('div');n.style.color='#8a93c4';n.textContent=${JSON.stringify(world)};d.appendChild(n);document.body.appendChild(d)}
 document.addEventListener('DOMContentLoaded',ui)})();`;

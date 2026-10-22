@@ -391,6 +391,26 @@ export function planReset(manifest, a) {
   return P.result();
 }
 
+/* ------------------------------------------------------------------ a new room (a space a portal can lead to) */
+// A leaf room under the arcade, set live, recorded in the manifest. A room whose page is its own app (the casino) is only a destination:
+// the lobby door's portal leads to it and the hall opens the page listed under that slug in window.XA_ROOMS.
+//   { slug, title, objects?, as? }
+export function planRoom(manifest, a) {
+  const P = new Planner(manifest, { as: a.as });
+  const slug = String(a.slug || ''), title = String(a.title || '');
+  if (!/^[a-z][a-z0-9-]{1,23}$/.test(slug)) P.err(`room slug "${slug}": lowercase letters, digits and dashes, 2 to 24 characters`);
+  if (!isAscii(title) || !title || title.length > 48) P.err('room title: 1 to 48 printable ASCII characters');
+  if (P.m.spaces[slug]) P.err(`space "${slug}" already exists (id ${P.m.spaces[slug]})`);
+  if (!P.m.spaces.arcade) P.err('the manifest has no arcade space: seed the hall first');
+  if (P.errors.length) return P.result();
+  P.call('create-space', [U(P.m.spaces.arcade), ASCII(slug), ASCII(title), U(1), { principal: P.m.owner }, U(0), { bool: false }, policyArg({ ...POLICY.lobby, objects: a.objects || POLICY.lobby.objects })], `space ${slug}`);
+  P.m.spaces[slug] = P.newId();
+  P.call('set-space-state', [U(P.m.spaces[slug]), U(1)], `${slug} live`);
+  (P.m.live || (P.m.live = {}))[slug] = true;
+  P.notes.push(`space ${slug} = id ${P.m.spaces[slug]}: link a door to it with: seed <lobby scene file> --link-room ${slug}=${P.m.spaces[slug]}`);
+  return P.result();
+}
+
 /* ------------------------------------------------------------------ packing */
 // Split a steps document into documents of at most `size` steps (a node keeps 25 unconfirmed transactions per sender).
 export function chunkSteps(doc, size = 24) {

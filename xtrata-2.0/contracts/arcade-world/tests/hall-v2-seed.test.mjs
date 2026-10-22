@@ -400,3 +400,22 @@ test('the read tool over HTTP: networkRead speaks the node\'s call-read API and 
   // a node that fails makes the read throw: the tool says so instead of printing an empty hall
   await assert.rejects(readHall({ read: networkRead({ fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({}) }) }), registry: fx.registry }), /HTTP 503/);
 });
+
+test('a destination room: planRoom makes a live space, a lobby door links to it, and the hall reader reads that door as a link to the room', async () => {
+  const h = await hall();
+  h.seed([demo]);
+  const room = h.apply(V2.planRoom, { slug: 'casino', title: 'Royal Flush Casino' });
+  const id = room.manifest.spaces.casino;
+  assert.equal(room.steps.length, 2);
+  assert.equal(room.manifest.nextId, id + 1);
+  assert.deepEqual(V2.planRoom(h.m, { slug: 'casino', title: 'Again' }).errors.length, 1, 'a second room with the same slug is refused');
+  assert.ok(V2.planRoom(h.m, { slug: 'Bad Slug', title: 'x' }).errors.length >= 1);
+  const lobby = JSON.parse(readFileSync(join(root, 'ops', 'examples', 'lobby-casino-door.scene.json'), 'utf8'));
+  h.seed([lobby], { linkRooms: { casino: id }, manifest: h.m }); h.simnet.mineEmptyBurnBlocks(10);
+  const r = await h.read();
+  const b = r.lobbyBays[0].scene;
+  assert.equal(b.base, 'door'); assert.equal(b.interaction, 3);
+  assert.equal(b.link['target-room'], 'casino', 'the lobby door leads to the casino room');
+  assert.match(describeHall(r), /leads to casino/);
+  assert.equal(r.lobbyBays[1].scene, null);
+});
