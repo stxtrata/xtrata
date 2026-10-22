@@ -34576,7 +34576,7 @@ const WALK = { fov:68, eye:1.6, speed:3, sprint:4.6, bobRate:9, bobAmp:.025, loo
 const camera = new THREE.PerspectiveCamera(WALK.fov, innerWidth/innerHeight, 0.04, 60);
 camera.rotation.order = 'YXZ';
 
-const RW = 10, RH = 3.2, EYE = WALK.eye, GAP = 2.2;
+const RW = 10, RH = 3.2, HH = 4.2, EYE = WALK.eye, GAP = 2.2;
 const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets down the left / right walls
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
@@ -34636,12 +34636,15 @@ function buildRoom(){
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(RW,RL), new THREE.MeshStandardMaterial({map:carpetTexture(), roughness:.95}));
   floor.rotation.x=-Math.PI/2; scene.add(floor);
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(RW,RL), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}));
-  ceil.rotation.x=Math.PI/2; ceil.position.y=RH; scene.add(ceil);
+  ceil.rotation.x=Math.PI/2; ceil.position.y=HH; scene.add(ceil);
 
   const wt=wallTexture();
   const wall=(w,pos,ry)=>{const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
     const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), holeWall(new THREE.MeshStandardMaterial({map:t, roughness:.9}),1));
-    m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m)};
+    m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m);
+    // above the doors and bays (RH) the wall is plain, up to the hall's higher ceiling (HH)
+    const up=new THREE.Mesh(new THREE.PlaneGeometry(w,HH-RH), new THREE.MeshStandardMaterial({color:0x17132a, roughness:.9}));
+    up.position.set(pos[0],(RH+HH)/2,pos[1]); up.rotation.y=ry; scene.add(up)};
   wall(RL,[-RW/2,0],Math.PI/2); wall(RL,[RW/2,0],-Math.PI/2); wall(RW,[0,-RL/2],0); wall(RW,[0,RL/2],Math.PI);
 
   // neon strips: pink high along the long walls, cyan skirting all round
@@ -34688,8 +34691,8 @@ function buildRoom(){
   const panelMat=new THREE.MeshBasicMaterial({color:0xe8e2ff, toneMapped:false});
   const lz=[]; for(let z=-Math.floor((RL/2-3)/5)*5; z<=RL/2-3; z+=5) lz.push(z);
   for(const z of lz){
-    const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.5),panelMat); p.rotation.x=Math.PI/2; p.position.set(0,RH-.01,z); scene.add(p);
-    const l=new THREE.PointLight(0xcfc4ff,.55,10,2); l.position.set(0,RH-.3,z); scene.add(l);
+    const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.5),panelMat); p.rotation.x=Math.PI/2; p.position.set(0,HH-.01,z); scene.add(p);
+    const l=new THREE.PointLight(0xcfc4ff,.55,10,2); l.position.set(0,HH-.3,z); scene.add(l);
   }
   scene.add(new THREE.HemisphereLight(0x6a5cff,0x1a0a20,.45));
 }
@@ -35977,7 +35980,7 @@ function startChainClock(){ setHeight(estHeight(),false); pollChain(); setInterv
    contract reader live in screen.js; this part only builds the panel, feeds it and repaints it. With no screen contract it is the
    clock plus the latest scorers. It replaces the old Bitcoin Day board in the same spot. */
 let dayBoard=null;
-const CENTRE_SCREEN={W:3.2, H:1.8, cy:2.05, z:RL/2-6, px:1280, py:720, gapMs:120};
+const CENTRE_SCREEN={W:3.2, H:1.8, cy:3.15, z:RL/2-6, px:1280, py:720, gapMs:120};
 function buildDayBoard(){
   const S=CENTRE_SCREEN, cv=mkCanvas(S.px,S.py), t=tex(cv), mat=new THREE.MeshBasicMaterial({map:t, toneMapped:false});
   const g=new THREE.Group(); g.position.set(0,S.cy,S.z); scene.add(g);
@@ -35986,10 +35989,9 @@ function buildDayBoard(){
   const front=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); front.position.z=.052; g.add(front);
   const back=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); back.position.z=-.052; back.rotation.y=Math.PI; g.add(back);
   const rodMat=new THREE.MeshStandardMaterial({color:0x2a2a33, metalness:.8, roughness:.3});
-  for(const sx of [-1,1]){ const len=RH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
+  for(const sx of [-1,1]){ const len=HH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
   const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.14,.025,.12), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.07); g.add(edge);
-  // you cannot walk through it: its bottom edge is below eye height
-  boxes.push(new THREE.Box3(new THREE.Vector3(-W/2-.06,0,S.z-.1), new THREE.Vector3(W/2+.06,RH,S.z+.1)));
+  // no collider: its bottom edge (2.25 m) is above head height, so you walk under it
   dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], scorersAt:-1e9};
   paintDayBoard(true);
 }
