@@ -19,6 +19,7 @@ ok('A: seats, verbs and signs know the pair', room.includes("pvpholdem: 'SIT', l
 ok('A: keys 1 to 7', room.includes('/^Digit[1-7]$/'));
 ok('A: the raise slider gets input events', room.includes("addEventListener('input', (e) => { if (focus && focus.input) focus.input(e); })"));
 ok('A: the salon is built and the hosts are asked for', room.includes('STRATA SALON') && room.includes("fetch('adrian.glb')") && room.includes("XA_HOSTS.add({ group: byId.pvpholdem.group"));
+ok('A: the salon tables carry no stray name plaques (the signs overhead name them)', !room.includes("NO LIMIT · BLINDS $5 / $10") && !/plaque\(g, [^\n]*PLAYER VS PLAYER/.test(room));
 ok('A: adrian.glb is beside the room', fs.existsSync(path.join(roomsDir, 'adrian.glb')) && fs.statSync(path.join(roomsDir, 'adrian.glb')).size > 4e6);
 ok('A: the preview copies .glb files', fs.readFileSync(path.join(ROOT, 'build', 'preview.mjs'), 'utf8').includes('html|css|js|jpg|png|glb'));
 
@@ -53,25 +54,20 @@ ok('A: the preview copies .glb files', fs.readFileSync(path.join(ROOT, 'build', 
       const withFig = XA_HOSTS.hosts.filter((h) => h.fig);
       return withFig.length === 13 && withFig.every((h) => !h.fig.group.visible);
     }));
-    ok('C: all six personas are on the floor, and the women wear their dos', await page.evaluate(() => {
-      const people = new Set(XA_HOSTS.hosts.map((h) => h.person));
-      const dos = ['f1', 'f2', 'f3'].every((p) => { const h = XA_HOSTS.hosts.find((x) => x.person === p); return h && h.ctrl.bones.head.children.some((c) => c.type === 'Group' && c.children.length); });
-      return people.size === 6 && dos;
-    }));
-    ok('C: the five players sit on their stools (hips dropped, legs solved)', await page.evaluate(() => {
-      const seated = XA_HOSTS.hosts.filter((h) => h.seat);
-      return seated.length === 5 && seated.every((h) => h.ctrl.seat && h.ctrl.seat.drop > 0.1);
+    ok('C: for now everyone is the one original character (no reshaping, no hair-dos, one height)', await page.evaluate(() => {
+      const H = XA_HOSTS.hosts, s0 = H[0].ctrl.object.scale.x;
+      return XA_HOSTS.oneCharacter === 'm1' && H.every((h) => h.ctrl.shapeDeltas.length === 0 && Math.abs(h.ctrl.object.scale.x - s0) < 1e-6 && !h.ctrl.bones.head.children.some((c) => c.type === 'Group' && c.children.length));
     }));
     const moved = await page.evaluate(() => new Promise((res) => {
       const h = XA_HOSTS.hosts[5].ctrl, q0 = h.bones.head.quaternion.toArray().join(',');
       let n = 0; const tick = () => { if (h.bones.head.quaternion.toArray().join(',') !== q0) return res(true); if (++n > 12) return res(false); requestAnimationFrame(() => setTimeout(tick, 400)); }; tick();
     }));
     ok('C: the clips breathe (a head bone moves between frames)', moved);
-    ok('C: the staff wear different waistcoats and the players their own clothes', await page.evaluate(() => {
-      const coat = (i) => { let c = null; XA_HOSTS.hosts[i].ctrl.model.traverse((o) => { if (o.isMesh && o.material.name === 'Midnight waistcoat') c = o.material.color.getHexString(); }); return c; };
-      const civvy = XA_HOSTS.hosts.find((h) => h.wear);
-      let coatHidden = false; civvy.ctrl.model.traverse((o) => { if (o.isMesh && o.material.name === 'Midnight waistcoat' && !o.visible) coatHidden = true; });
-      return coat(0) !== coat(1) && coat(1) !== coat(3) && coat(3) !== coat(4) && coatHidden;
+    ok('C: the staff wear different waistcoats and the players are in plain shirts with the waist covered', await page.evaluate(() => {
+      const mat = (i, name) => { let c = null; XA_HOSTS.hosts[i].ctrl.model.traverse((o) => { if (o.isMesh && o.material.name === name) c = o.material.color.getHexString(); }); return c; };
+      const civvy = XA_HOSTS.hosts.filter((h) => h.wear);
+      const plain = civvy.every((h) => { const i = XA_HOSTS.hosts.indexOf(h); let vestShown = false, hasButtons = false; h.ctrl.model.traverse((o) => { if (o.isMesh && o.material.name === 'Midnight waistcoat' && o.visible) vestShown = true; if (o.isMesh && /^Waistcoat_button|^Xtrata_uniform/.test(o.name) && o.visible) hasButtons = true; }); return vestShown && !hasButtons && mat(i, 'Midnight waistcoat') === mat(i, 'Ivory cotton'); });
+      return mat(0, 'Midnight waistcoat') !== mat(1, 'Midnight waistcoat') && mat(1, 'Midnight waistcoat') !== mat(3, 'Midnight waistcoat') && mat(3, 'Midnight waistcoat') !== mat(4, 'Midnight waistcoat') && civvy.length === 9 && plain;
     }));
     // the dealers' hands lie ON the table, not in it: with the rest pose fully blended in, the lowest point of each hand is at (or a hair above) the surface beneath it
     const hands = await page.evaluate(() => XA_HOSTS.hosts.filter((h) => h.rest && h.rest.kind === 'table').map((h) => {

@@ -1808,6 +1808,8 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   // ---------------- the six people, and how each is dressed ----------------
   // material name -> colour: SET on the untextured cloth, a tint on textured skin and hair.
   const F_SHAPE = { shoulders: -0.016, hips: 0.008, breast: 1.5, neck: 0.95 };
+  // For now everyone in the room is the one original character (Adrian as modelled); only the livery or the clothes differ. Set to null to bring the six people back.
+  const ONE_CHARACTER = 'm1';
   const PEOPLE = {
     m1: { s: 0.945, shape: {}, look: {} },   // Adrian himself
     m2: { s: 0.975, shape: { shoulders: 0.008 }, look: { 'Warm natural skin': 0xbd8a60, 'Chestnut swept hair': 0x191310, 'Natural eyebrows': 0x191310 } },
@@ -1833,12 +1835,14 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     });
   }
   function dressCivilian(model, wear) {
-    // own clothes: no waistcoat, no buttons, no badge, no bridge panels; the shirt and trousers take their colours
+    // own clothes: no buttons and no badge. The waistcoat layer stays but takes the shirt's colour, so it reads as one plain shirt and covers the midriff
+    // (the shirt itself ends above the trousers: hiding the waistcoat left a see-through band at the waist)
     model.traverse((o) => {
       if (!o.isMesh) return;
-      if ((o.material && o.material.name === 'Midnight waistcoat') || /^Waistcoat_button|^Xtrata_uniform/.test(o.name)) o.visible = false;
+      if (/^Waistcoat_button|^Xtrata_uniform/.test(o.name)) o.visible = false;
     });
-    applyLook(model, { 'Ivory cotton': wear.shirt || 0xd8d2c2, 'Midnight wool': wear.trousers || 0x23262c });
+    const shirt = wear.shirt || 0xd8d2c2;
+    applyLook(model, { 'Ivory cotton': shirt, 'Midnight waistcoat': shirt, 'Satin piping': shirt, 'Midnight wool': wear.trousers || 0x23262c });
   }
   function addHairDo(ctrl, kind, color) {
     if (!kind) return;
@@ -1881,7 +1885,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     else if (kind === 'shrug') c.playAnimation('Gesture');
   }
   function build(h) {
-    const person = PEOPLE[h.person] || PEOPLE.m1;
+    const person = PEOPLE[ONE_CHARACTER || h.person] || PEOPLE.m1;
     const c = new HostController(asset, person);
     c.object.position.set(h.x, 0, h.z); c.object.rotation.y = h.yaw || 0;
     c.object.userData.xaHost = true;
@@ -1904,6 +1908,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
   window.XA_HOSTS = {
     hosts,
     get ready() { return !!asset; },
+    oneCharacter: ONE_CHARACTER,
     failed: false,
     add(spec) { hosts.push(spec); if (asset) build(spec); return spec; },
     cue(group, kind) { const h = hosts.find((x) => x.group === group && !x.wear); if (h && h.ctrl) gesture(h, kind, lastT); },
@@ -3976,14 +3981,12 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     },
     pvpholdem(s) {
       const g = s.group;
-      plaque(g, -1.5, 0.93, 0.6, 0.3, 0.1, ["HOLD'EM", 'NO LIMIT · BLINDS $5 / $10'], 0.3, 0.5);
       chipColumns(g, -0.35, 0.866, -0.62, [100, 25], [3, 5], 0.12);
       [[-1.15, 1.05], [-0.4, 1.42], [0.4, 1.42], [1.15, 1.05]].forEach(([x, z]) => makeStool(g, x, z, Math.atan2(x, z) + Math.PI, { h: 0.57 }));
     },
     liars(s) {
       const g = s.group; const tray = new THREE.Group(); tray.position.set(0.95, 0.866, -0.5); g.add(tray);
       box(0.3, 0.02, 0.2, M(0x0c0c10, { roughness: 0.35, metalness: 0.4 }), 0, 0.01, 0, tray); box(0.31, 0.006, 0.21, GOLDM(), 0, 0.001, 0, tray); chipColumns(tray, -0.09, 0.02, 0, [5, 25, 100], [6, 8, 4], 0.09);
-      plaque(g, -1.35, 0.93, 0.55, 0.26, 0.1, ["LIAR'S DICE", 'PLAYER VS PLAYER'], 0.3, 0.5);
       [[-1.0, 0.95], [-0.35, 1.28], [0.35, 1.28], [1.0, 0.95]].forEach(([x, z]) => makeStool(g, x, z, Math.atan2(x, z) + Math.PI, { h: 0.57 }));
     },
     baccarat(s) {
