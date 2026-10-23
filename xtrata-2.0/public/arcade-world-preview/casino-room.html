@@ -1396,6 +1396,23 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
         if (n.skin !== undefined) { nodes[i].updateMatrixWorld(true); mesh.bind(skels[n.skin], mesh.matrixWorld); }
       });
     });
+    // the waistcoat is a separate layer over the shirt; on skin weights of its own it slides off the shirt when the shoulders and arms move, and the shirt shows through in white tears.
+    // It borrows the shirt's weights vertex by vertex (buttons and badge take one set each), so the two layers can never part.
+    (() => {
+      const geo = {}; root.traverse((o) => { if (o.isSkinnedMesh) geo[o.name] = o.geometry; });
+      const shirt = geo.Tailored_shirt; if (!shirt) return;
+      const sp = shirt.attributes.position.array, si = shirt.attributes.skinIndex.array, sw = shirt.attributes.skinWeight.array, n = sp.length / 3;
+      const nearest = (x, y, z) => { let best = 0, bd = 1e9; for (let k = 0; k < n; k++) { const dx = sp[3 * k] - x, dy = sp[3 * k + 1] - y, dz = sp[3 * k + 2] - z, d = dx * dx + dy * dy + dz * dz; if (d < bd) { bd = d; best = k; } } return [best, bd]; };
+      const take = (g, k, v) => { for (let c = 0; c < 4; c++) { g.attributes.skinIndex.array[v * 4 + c] = si[k * 4 + c]; g.attributes.skinWeight.array[v * 4 + c] = sw[k * 4 + c]; } };
+      for (const name of Object.keys(geo)) {
+        const rigid = /^Waistcoat_button|^Xtrata_uniform/.test(name);
+        if (!rigid && !/waistcoat|^Shoulder_bridge/.test(name)) continue;
+        const g = geo[name], p = g.attributes.position.array, cnt = p.length / 3;
+        if (rigid) { let cx = 0, cy = 0, cz = 0; for (let v = 0; v < cnt; v++) { cx += p[3 * v]; cy += p[3 * v + 1]; cz += p[3 * v + 2]; } const k = nearest(cx / cnt, cy / cnt, cz / cnt)[0]; for (let v = 0; v < cnt; v++) take(g, k, v); }
+        else for (let v = 0; v < cnt; v++) { const r = nearest(p[3 * v], p[3 * v + 1], p[3 * v + 2]); if (r[1] < 0.0036) take(g, r[0], v); }
+        g.attributes.skinIndex.needsUpdate = true; g.attributes.skinWeight.needsUpdate = true;
+      }
+    })();
     const anims = (j.animations || []).map((a) => new THREE.AnimationClip(a.name || 'clip', -1, a.channels.map((ch) => {
       const s = a.samplers[ch.sampler], nd = nodes[ch.target.node], T = ch.target.path === 'rotation' ? THREE.QuaternionKeyframeTrack : THREE.VectorKeyframeTrack;
       return new T(nd.name + (ch.target.path === 'rotation' ? '.quaternion' : ch.target.path === 'translation' ? '.position' : '.scale'), acc(s.input), acc(s.output));
@@ -1839,7 +1856,11 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     const ring = (r, p) => { const t = new THREE.Mesh(new THREE.TorusGeometry(r, 0.0055, 6, 20), band); t.position.copy(p); t.lookAt(p.clone().addScaledVector(fwd, -1)); g.add(t); return t; };
     if (kind === 'bun') { ball(0.049, place(0.065, 0.085), 0.85); ring(0.035, place(0.065, 0.082)); }
     else if (kind === 'highbun') { ball(0.046, place(0.115, 0.055), 0.9); ring(0.033, place(0.102, 0.062)); }
-    else if (kind === 'ponytail') { ball(0.042, place(0.06, 0.09)); ball(0.036, place(-0.015, 0.115)); ball(0.030, place(-0.085, 0.125)); ring(0.028, place(0.06, 0.088)); }
+    else if (kind === 'ponytail') {   // one smooth tapering tail (a lathe), not a string of beads: gathered at a gold band, falling down the back of the head
+      const prof = [[0.004, 0.0], [0.026, -0.006], [0.034, -0.03], [0.036, -0.07], [0.031, -0.12], [0.022, -0.17], [0.011, -0.215], [0.0, -0.235]].map((q) => new THREE.Vector2(q[0], q[1]));
+      const tail = new THREE.Mesh(new THREE.LatheGeometry(prof, 16), mat); tail.position.copy(place(0.058, 0.098)); tail.rotation.x = 0.3;   // the tip swings out behind, clear of the shoulders tail.castShadow = true;
+      tail.userData.tail = true; g.add(tail); ring(0.03, place(0.058, 0.094));
+    }
     // the pieces were placed in model space; re-express every child in head-bone space so the do follows each head turn
     const inv = new THREE.Matrix4().copy(head.matrixWorld).invert(), rot = new THREE.Matrix4().extractRotation(inv);
     g.children.forEach((m) => { m.position.applyMatrix4(inv); m.quaternion.premultiply(Q().setFromRotationMatrix(rot)); });
@@ -4008,11 +4029,11 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     const byId = {}; stations.forEach((s) => (byId[s.id] = s));
     const figsAt = (g) => figures.filter((f) => f.group.parent === g);
     // the staff, in the house liveries
-    XA_HOSTS.add({ group: byId.blackjack.group, x: 0, z: -0.98, yaw: 0, person: 'f1', livery: 'emerald', rest: { kind: 'table', y: 0.975, fwd: 0.30 }, fig: figOf.get(byId.blackjack.group) });
+    XA_HOSTS.add({ group: byId.blackjack.group, x: 0, z: -1.17, yaw: 0, person: 'f1', livery: 'emerald', rest: { kind: 'table', y: 0.975, fwd: 0.31 }, fig: figOf.get(byId.blackjack.group) });
     XA_HOSTS.add({ group: byId.roulette.group, x: -0.3, z: -1.02, yaw: 0, person: 'm2', livery: 'burgundy', rest: { kind: 'table', y: 0.95, fwd: 0.27 }, fig: figOf.get(byId.roulette.group) });
-    XA_HOSTS.add({ group: byId.baccarat.group, x: 0, z: -1.0, yaw: 0, person: 'f2', livery: 'plum', rest: { kind: 'table', y: 0.975, fwd: 0.30 }, fig: figOf.get(byId.baccarat.group) });
-    XA_HOSTS.add({ group: byId.pvpholdem.group, x: 0, z: -1.05, yaw: 0, person: 'm3', livery: 'ink', rest: { kind: 'table', y: 0.975, fwd: 0.30 } });
-    XA_HOSTS.add({ group: byId.liars.group, x: 0, z: -1.05, yaw: 0, person: 'f3', livery: 'teal', rest: { kind: 'table', y: 0.975, fwd: 0.30 } });
+    XA_HOSTS.add({ group: byId.baccarat.group, x: 0, z: -1.17, yaw: 0, person: 'f2', livery: 'plum', rest: { kind: 'table', y: 0.975, fwd: 0.31 }, fig: figOf.get(byId.baccarat.group) });
+    XA_HOSTS.add({ group: byId.pvpholdem.group, x: 0, z: -1.33, yaw: 0, person: 'm3', livery: 'ink', rest: { kind: 'table', y: 0.975, fwd: 0.35 } });
+    XA_HOSTS.add({ group: byId.liars.group, x: 0, z: -1.17, yaw: 0, person: 'f3', livery: 'teal', rest: { kind: 'table', y: 0.975, fwd: 0.31 } });
     XA_HOSTS.add({ group: scene, x: 2.5, z: 7.9, yaw: Math.atan2(-2.5, 3.0), person: 'm1', livery: 'midnight', role: 'greeter', rest: 'back' });
     solidsExtra.push({ k: 'c', x: 2.5, z: 7.9, r: 0.36 });
     XA_HOSTS.add({ group: scene, x: room.barPos.x, z: room.barPos.z - 0.35, yaw: 0, person: 'm3', livery: 'midnight', rest: 'back', fig: bartender });

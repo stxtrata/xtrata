@@ -80,6 +80,30 @@ ok('A: the preview copies .glb files', fs.readFileSync(path.join(ROOT, 'build', 
     }));
     ok('C: five dealers, and no dealer\'s hand sinks into the table', hands.length === 5 && hands.every(([, l, r]) => l !== null && r !== null && l > -0.012 && r > -0.012), hands);
     ok('C: and none hovers over it either', hands.every(([, l, r]) => l < 0.04 && r < 0.04), hands);
+    // ...and the dealers stand BEHIND the rim, not in it: below the rim's top edge, no part of the waistcoat or trousers is inside the table (the belly may lean over it above)
+    const rims = await page.evaluate(() => XA_HOSTS.hosts.filter((h) => h.rest && h.rest.kind === 'table').map((h) => {
+      const g = h.group; g.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(g.matrixWorld).invert(); let R = 0;
+      g.traverse((o) => {
+        if (!o.isMesh || o.isSkinnedMesh) return; for (let q = o; q; q = q.parent) if (q.userData && q.userData.xaHost) return;
+        o.geometry.computeBoundingBox(); const bb = o.geometry.boundingBox, m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), b2 = new THREE.Box3();
+        for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) b2.expandByPoint(new THREE.Vector3(x, y, z).applyMatrix4(m));
+        if (b2.max.y > 0.9 && b2.max.y < 1.0 && b2.max.x - b2.min.x >= 1.2 && b2.min.z < -0.4) R = Math.max(R, -b2.min.z);
+      });
+      let near = -1e9; const v = new THREE.Vector3(), acc = new THREE.Vector3(), tmp = new THREE.Vector3(), mm = new THREE.Matrix4();
+      h.ctrl.model.traverse((o) => {
+        if (!o.isSkinnedMesh || !/waistcoat|trousers/.test(o.name)) return; o.skeleton.update();
+        const pos = o.geometry.attributes.position, si = o.geometry.attributes.skinIndex.array, sw = o.geometry.attributes.skinWeight.array, bm = o.skeleton.boneMatrices;
+        for (let i = 0; i < pos.count; i += 3) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(o.bindMatrix); acc.set(0, 0, 0);
+          for (let k = 0; k < 4; k++) { const w = sw[i * 4 + k]; if (!w) continue; mm.fromArray(bm, si[i * 4 + k] * 16); acc.add(tmp.copy(v).applyMatrix4(mm).multiplyScalar(w)); }
+          const l = acc.applyMatrix4(o.bindMatrixInverse).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
+          if (l.y > 0.6 && l.y < 0.95 && l.z < 0 && l.z > near) near = l.z;   // below the rim's top: nothing of the body may be inside the table
+        }
+      });
+      return [h.person, +R.toFixed(3), +near.toFixed(3)];
+    }));
+    ok('C: every dealer stands behind the rim of the table (nothing below the rim top inside it)', rims.length === 5 && rims.every(([, R, n]) => R > 0.5 && n < -R + 0.005), rims);
+    ok('C: the waistcoat borrows the shirt\'s skin weights (no shirt poking through) and the ponytail is one smooth shape', room.includes('borrows the shirt') && room.includes('LatheGeometry(prof, 16)'));
   }
 
   // ---------- D. the arch is a doorway and the salon has walls ----------
