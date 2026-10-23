@@ -94,6 +94,11 @@ ok('A: the preview copies .glb files', fs.readFileSync(path.join(ROOT, 'build', 
   await page.evaluate(() => { __casino.exitWalk(); });
 
   // ---------- E. a Hold’em match: open, clock ticks without rebuilding the strip, fold, settle ----------
+  // the PvP chairs are empty until a player sits
+  ok('E: both PvP tables stand empty but for the dealer before anyone sits', await page.evaluate(() => {
+    const opp = (i) => XA_HOSTS.hosts.find((h) => h.group === __casino.stations[i].group && h.wear);
+    return !opp(5).ctrl.object.visible && !opp(6).ctrl.object.visible;
+  }));
   const bank0 = await page.evaluate(() => __casino.bank);
   await page.evaluate(() => { __casino.setFocus(__casino.stations[5]); });
   await page.evaluate(() => __casino.stations[5].act('buy100'));
@@ -102,6 +107,10 @@ ok('A: the preview copies .glb files', fs.readFileSync(path.join(ROOT, 'build', 
   }, null, { timeout: 120000 }).then(() => true).catch(() => false);
   ok('E: the table opens, a player sits, the hand reaches betting', playing);
   if (playing) {
+    ok('E: the opponent appears in the chair once they have sat', await page.evaluate(() => new Promise((res) => {
+      let n = 0; const opp = XA_HOSTS.hosts.find((h) => h.group === __casino.stations[5].group && h.wear);
+      const tick = () => { if (opp.ctrl.object.visible) return res(true); if (++n > 10) return res(false); requestAnimationFrame(tick); }; tick();
+    })));
     // the panel-rebuild rule: the running clock is NEVER part of the game HTML string — it lives in an empty
     // <b class="pvpclk"> that update() fills, so a tick cannot rebuild the strip under a click
     const clock = await page.evaluate(() => {
@@ -117,6 +126,10 @@ ok('A: the preview copies .glb files', fs.readFileSync(path.join(ROOT, 'build', 
       ok('E: the bankroll moves by exactly the result and nothing stays held', after.bank === bank0 + after.net && after.held === 0, { bank0, after });
     }
     await page.evaluate(() => { __casino.setFocus(null); });
+    ok('E: standing up clears the table - the chair empties again', await page.evaluate(() => new Promise((res) => {
+      let n = 0; const opp = XA_HOSTS.hosts.find((h) => h.group === __casino.stations[5].group && h.wear);
+      const tick = () => { if (!opp.ctrl.object.visible) return res(true); if (++n > 10) return res(false); requestAnimationFrame(tick); }; tick();
+    })));
   }
 
   // ---------- F. a Liar’s Dice match, played to the end ----------

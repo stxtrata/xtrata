@@ -1825,6 +1825,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       lastT = t;
       for (const h of hosts) {
         const c = h.ctrl; if (!c) continue;
+        if (h.showWhen) { const vis = !!h.showWhen(); if (c.object.visible !== vis) c.object.visible = vis; if (!vis) { h.acc = 0; continue; } }
         h.acc += dt;
         const d = c.object.getWorldPosition(h.wp).distanceTo(camPos);
         if (h.skip > 0 && h.acc < 0.2) { h.skip--; continue; }   // far people animate at a lower rate
@@ -3464,7 +3465,9 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       canLeave() { const V = cview(); return !V || V.done; },
       leaveCash() { const V0 = cview(); if (V0 && V0.done && !collected) endOfHand(V0); resetVisuals(); curId = null; HS.st.id = null; cache = null; dirty = true; },
       update(t, dt) {
-        const V = cview(); if (!V) return;
+        const V = cview();
+        g.userData.oppSeated = !!(V && V.state >= SS.DEALING && V.state !== SS.CANCELLED);   // the other chair fills only when a player has sat
+        if (!V) return;
         if (V.id !== curId) { resetVisuals(); curId = V.id; }
         if (focus === station && V.timer) { const ck = document.querySelector('#pGame .pvpclk'); if (ck && ck.textContent !== V.timer) ck.textContent = V.timer; }
         if (V.state >= SS.PLAYING && V.myHole && !dealt && !dealing && V.state !== SS.CANCELLED) dealIn(V);
@@ -3665,7 +3668,9 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       canLeave() { const V = cview(); return !V || V.done; },
       leaveCash() { const V0 = cview(); if (V0 && V0.done && !collected) endOfHand(V0); resetVisuals(); curId = null; DS.st.id = null; cache = null; dirty = true; },
       update(t, dt) {
-        const V = cview(); if (!V) return;
+        const V = cview();
+        g.userData.oppSeated = !!(V && V.state >= SS.BIDDING && V.state !== SS.CANCELLED);   // the other chair fills only when a player has sat
+        if (!V) return;
         if (V.id !== curId) { resetVisuals(); curId = V.id; }
         if (focus === station && V.timer) { const ck = document.querySelector('#pGame .pvpclk'); if (ck && ck.textContent !== V.timer) ck.textContent = V.timer; }
         if (V.state >= SS.BIDDING) { board.visible = true; const last = V.bids[V.bids.length - 1]; drawBoard(V.qty, V.face, last ? (last.by === 'YOU' ? 'YOUR' : 'THEIR') : ''); }
@@ -3949,8 +3954,8 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     if (hb[0]) XA_HOSTS.add({ group: byId.holdem.group, x: -2.15, z: 0, yaw: Math.PI / 2, person: 'f2', wear: { shirt: 0x6a8a74, trousers: 0x2a2d33 }, seat: { h: 0.57 }, fig: hb[0] });
     if (hb[1]) XA_HOSTS.add({ group: byId.holdem.group, x: 0, z: -1.32, yaw: 0, person: 'm1', wear: { shirt: 0x3a4454, trousers: 0x23262c }, seat: { h: 0.57 }, fig: hb[1] });
     if (hb[2]) XA_HOSTS.add({ group: byId.holdem.group, x: 2.15, z: 0, yaw: -Math.PI / 2, person: 'm2', wear: { shirt: 0x8a3a34, trousers: 0x1e2026 }, seat: { h: 0.57 }, fig: hb[2] });
-    XA_HOSTS.add({ group: byId.pvpholdem.group, x: 0, z: -1.32, yaw: 0, person: 'f3', wear: { shirt: 0x7a4a68, trousers: 0x23262c }, seat: { h: 0.57 }, fig: figOf.get(byId.pvpholdem.group) });
-    XA_HOSTS.add({ group: byId.liars.group, x: 0, z: -1.28, yaw: 0, person: 'm2', wear: { shirt: 0x2c2c34, trousers: 0x191b20 }, seat: { h: 0.57 }, fig: figOf.get(byId.liars.group) });
+    XA_HOSTS.add({ group: byId.pvpholdem.group, x: 0, z: -1.32, yaw: 0, person: 'f3', wear: { shirt: 0x7a4a68, trousers: 0x23262c }, seat: { h: 0.57 }, fig: figOf.get(byId.pvpholdem.group), showWhen: () => !!byId.pvpholdem.group.userData.oppSeated });
+    XA_HOSTS.add({ group: byId.liars.group, x: 0, z: -1.28, yaw: 0, person: 'm2', wear: { shirt: 0x2c2c34, trousers: 0x191b20 }, seat: { h: 0.57 }, fig: figOf.get(byId.liars.group), showWhen: () => !!byId.liars.group.userData.oppSeated });
     const PWEAR = [{ shirt: 0x3a5a8a, trousers: 0x2a2d33 }, { shirt: 0xd8d0b8, trousers: 0x3a3028 }, { shirt: 0x8a2a2a, trousers: 0x20222a }, { shirt: 0xe0c8c0, trousers: 0x1c1c26 }];
     const PCAST = ['m3', 'm1', 'f1', 'f3'];
     patrons.forEach((p, i) => { const px = p.fig.group.position.x; XA_HOSTS.add({ group: scene, x: px - Math.sign(px) * 0.45, z: p.fig.group.position.z, yaw: p.fig.group.rotation.y, person: PCAST[i % 4], wear: PWEAR[i % 4], fig: p.fig }); });   // half a step back from the machines: these six stand straighter than the woodcuts did
