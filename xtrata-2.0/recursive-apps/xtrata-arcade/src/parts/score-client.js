@@ -844,6 +844,53 @@
     return { ok: true, txid: txidOf(r), route: 'direct:' + d.kind, replayId: replayId, sealed: seal };
   }
 
+  /*
+   * callContract({ contract, fn, args, maxUstx, expectAddress? }) -> { ok:true, txid, route }
+   * A contract call asked for by a hosted room (the hall's room bridge has already checked that the room is hosted, that the contract is
+   * approved on the world registry, and that the player said yes). Signed through the same routes as a score post, with the same rules
+   * (docs/WALLET-PLAYBOOK.md): never send `sender`; post-condition mode deny with exactly one STX post-condition, "the connected account
+   * sends at most maxUstx", so the call can move nothing else; bare hex to wallets; an account other than the one the player confirmed
+   * aborts the call (never re-targeted). Throws on cancel and on wallet errors.
+   */
+  var CLARITY_NAME = /^[a-zA-Z][a-zA-Z0-9!?_-]{0,127}$/;
+  async function callContract(input) {
+    input = input || {};
+    var contract = String(input.contract || ''), fn = String(input.fn || '');
+    if (!/^S[0-9A-Z]{25,41}\.[a-zA-Z][a-zA-Z0-9-]{0,39}$/.test(contract)) throw err('Invalid contract.');
+    if (!CLARITY_NAME.test(fn)) throw err('Invalid function name.');
+    var args = Array.isArray(input.args) ? input.args.map(function (a) { return String(a).replace(/^0x/i, ''); }) : null;
+    if (!args || args.length > 32 || !args.every(function (a) { return /^([0-9a-fA-F]{2})+$/.test(a) && a.length <= 131072; })) throw err('Invalid arguments.');
+    var cap;
+    try { cap = BigInt(String(input.maxUstx)); } catch (e) { throw err('Invalid spending limit.'); }
+    if (cap < 0n) throw err('Invalid spending limit.');
+    var s = status();
+    if (s.route === 'none') throw err('No wallet is reachable from here. Open the arcade on xtrata.xyz.', 4900);
+    if (!state.address) await connect();
+    var address = state.address;
+    if (input.expectAddress && input.expectAddress !== address) {
+      throw err('Your wallet is now connected as ' + address + ', not the account you confirmed. Nothing was signed.', 'WALLET_ADDRESS_MISMATCH');
+    }
+    if ((CFG.network === 'mainnet') !== /^S[PM]/.test(address)) throw err('Switch your wallet to Stacks ' + CFG.network + ' and connect again.');
+    var parts = contract.split('.'), r;
+    if (s.route === 'host') {
+      r = await bridgeRequest('stx_callContract', {
+        contract: contract, contractAddress: parts[0], contractName: parts[1], functionName: fn,
+        functionArgs: args.map(function (a) { return '0x' + a; }), network: CFG.network, postConditionMode: 'deny',
+        postConditions: [{ type: 'stx', principal: address, amount: cap.toString(), conditionCode: 'lte' }]
+      });
+      return { ok: true, txid: txidOf(r), route: 'host:contract-call' };
+    }
+    // Direct provider (top-level page). Never send `sender` (wallet playbook §2).
+    var d = directProvider();
+    var params = { contract: contract, functionName: fn, functionArgs: args, arguments: args, postConditionMode: 'deny',
+      postConditions: [stxPostConditionHex(address, cap.toString())] };
+    if (d.kind === 'leather') params.network = CFG.network;
+    r = unwrap(await d.p.request('stx_callContract', params));
+    var txid = txidOf(r);
+    if (!txid) throw err('The wallet did not return a transaction id.');
+    return { ok: true, txid: txid, route: 'direct:' + d.kind };
+  }
+
   /* ------------------------------------------------------ local PBs */
   function localBest(gameId) {
     var v = root.XA && root.XA.util.store('pb:' + gameId);
@@ -894,6 +941,7 @@
     connect: connect,
     disconnect: disconnect,
     submit: submit,
+    callContract: callContract,
     runtimeUrl: runtimeUrl,
     openRuntime: openRuntime,
     cleanName: cleanName,

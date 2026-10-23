@@ -1204,7 +1204,40 @@
     raf = root.requestAnimationFrame(frame);
   }
 
+  /*
+   * A hosted room (the hall's room bridge, XA_ROOM.call) asks the player to sign a contract call. The same dialog as the fee notice:
+   * which room asks, the contract and function, the most it can spend (the call's only post-condition) and the network-fee warning.
+   * Resolves true to open the wallet, false if the player backs out. Everything shown is text (the room title is already plain ASCII).
+   */
+  function ustxToStx(u) { var s = String(u).replace(/^0+(?=\d)/, ''); while (s.length < 7) s = '0' + s; var w = s.slice(0, -6), f = s.slice(-6).replace(/0+$/, ''); return w + (f ? '.' + f : ''); }
+  function confirmCall(o) {
+    o = o || {};
+    return new Promise(function (resolve) {
+      var ok = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: 'Open my wallet' });
+      var no = h('button', { class: 'xa-btn', type: 'button', text: 'Not now' });
+      var wrap = h('div', { class: 'xa-feemodal xa-callmodal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'A room asks you to sign' }, [
+        h('div', { class: 'xa-feemodal-card' }, [
+          h('h3', { text: String(o.room || 'This room') + ' asks you to sign' }),
+          h('p', { class: 'xa-feebig' }, ['It can spend at most ', h('b', { text: ustxToStx(o.maxUstx || 0) + ' STX' }), ' from your wallet. If the call would move anything more, it fails and nothing is spent.']),
+          h('p', { class: 'xa-note', text: 'Contract: ' + String(o.contract || '') }),
+          h('p', { class: 'xa-note', text: 'Function: ' + String(o.fn || '') }),
+          h('p', { class: 'xa-note', text: o.address ? 'Signing as ' + S.shortAddress(o.address) + '.' : 'Your wallet will ask you to connect first.' }),
+          feeBanner(false, 0),
+          h('div', { class: 'xa-over-actions' }, [no, ok])
+        ])
+      ]);
+      function done(v) { wrap.remove(); root.removeEventListener('keydown', onKey, true); resolve(v); }
+      function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } }
+      ok.addEventListener('click', function () { done(true); });
+      no.addEventListener('click', function () { done(false); });
+      root.addEventListener('keydown', onKey, true);
+      root.document.body.appendChild(wrap);
+      ok.focus();
+    });
+  }
+
   root.XARoom = {
+    confirmCall: confirmCall,
     boot: boot,
     start: startGame,
     back: endSession,

@@ -11,7 +11,7 @@ const path = require('path');
 const assert = require('assert');
 
 const DIST = path.join(__dirname, '..', 'dist');
-const HTML = fs.readFileSync(path.join(DIST, fs.readdirSync(DIST).find((f) => /^xtrata-arcade-v[\d.]+\.html$/.test(f))), 'utf8');
+const HTML = fs.readFileSync(path.join(DIST, fs.readdirSync(DIST).filter((f) => /^xtrata-arcade-v[\d.]+\.html$/.test(f)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).pop()), 'utf8');
 const SCREEN = 'ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.xtrata-screen-v1';
 const IDLE = 'EVERY TOP SCORE LIVES ON BITCOIN';
 
@@ -53,7 +53,7 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
   const A = await hall(false);
   check(A.info.enabled === false && A.info.snap === null, 'A: no screen configured, the reader is off');
   check(A.seen.texts.includes('BITCOIN DAY') && A.seen.texts.filter((t) => t === IDLE).length >= 2, 'A: the screen draws its idle panel and default ticker');
-  check(A.seen.items === 0 && A.seen.texts.includes('NO SCORES YET TODAY'), 'A: no items, no scorers');
+  check(A.seen.items === 0 && A.seen.texts.includes('NO SCORES YET'), 'A: no items, no scorers');
   check(!A.reads.some((u) => /xtrata-screen-v1/.test(u)), 'A: the screen contract is never read');
   check(!A.errors.length, 'A: no page errors ' + A.errors.slice(0, 2).join(' | '));
 

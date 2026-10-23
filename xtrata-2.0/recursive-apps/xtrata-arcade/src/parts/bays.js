@@ -464,6 +464,21 @@
       audio.setBay(bay.i, bay.pos, plan && plan.sound ? plan.sound : null);
     }
 
+    // Lay bay i out on `def` (a doorway of a room built in its own frame: the lobby has one to six of them). i === the number of bays adds
+    // one. A bay whose place or width changes is emptied; the next apply builds its pieces again at the new size.
+    function layout(i, def) {
+      if (i === bays.length) { bays.push(makeBay(def, i)); return true; }
+      var b = bays[i]; if (!b || !def) return false;
+      var d = b.def;
+      if (d.parent === def.parent && d.x === def.x && d.z === def.z && d.rot === def.rot && d.width === def.width) return false;
+      setPlan(b, null, true); b.key = '';
+      b.def = def;
+      if (def.parent && b.group.parent !== def.parent) def.parent.add(b.group);
+      b.group.position.set(def.x || 0, 0, def.z || 0); b.group.rotation.y = def.rot || 0;
+      b.width = Math.min(2.8, Math.max(1.2, def.width - 0.2));
+      return true;
+    }
+
     function apply(snap, opts) {
       opts = opts || {};
       var changed = false;
@@ -486,7 +501,7 @@
         var dm = bay.door && bay.door.model;
         if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
         if (dm && bay.door.mesh.window && bay.group.visible) {   // a door to a room that has an entry view (a picture, and a depth map if it has one): the open doorway shows it (doors.js)
-          var dl = bay.plan && bay.plan.link, rs = dl ? String(dl['target-room'] || dl.targetRoom || dl.room || '').toLowerCase() : '', st = rs && rs !== 'lobby' && env.stillFor ? env.stillFor(rs) : null;
+          var dl = bay.plan && bay.plan.link, st = dl && env.stillFor ? env.stillFor(dl) : null;   // the hall says which picture (none for its own lobby)
           var sk = st && st.still ? st.still + '|' + (st.depth || '') : '';
           if (sk !== (bay.door.stillKey || '')) { bay.door.stillKey = sk; bay.door.mesh.window(st && st.still, st && st.depth); }
           if (sk) { bay.door.mesh.group.worldToLocal(winEye.copy(env.camera.position)); bay.door.mesh.windowView(winEye, Math.min(1, Math.abs(dm.angle) / ((dm.cfg && dm.cfg.openAngle) || 90)), time); }
@@ -555,7 +570,9 @@
     function doorHint(bay, kind) {
       var p = bay.plan, m = bay.door.model;
       if (p.interaction === 1) return 'KNOCK ON THE DOOR';
-      return m.isOpen() ? 'CLOSE THE DOOR' : 'OPEN THE DOOR';
+      // a door that leads somewhere names it: the destination's title from the registry, reduced to the sign alphabet (plain text, never HTML)
+      var t = p.interaction === 3 && p.link && typeof p.link.title === 'string' ? txt(p.link.title, 32).trim() : '';
+      return (m.isOpen() ? 'CLOSE THE DOOR' : 'OPEN THE DOOR') + (t ? ' · ' + t : '');
     }
     // What is the player looking at? Returns { bay, hint, kind } or null. Used for the HUD line.
     function focus(ndc) {
@@ -621,6 +638,15 @@
         return { x: v.x, z: v.z, half: b.door.mesh && b.door.mesh.size ? b.door.mesh.size.w / 2 : 0.5, link: b.plan.link, interaction: b.plan.interaction };
       },
       posOf: function (i) { var b = bays[i]; return b ? { x: b.pos.x, z: b.pos.z } : null; },
+      // where bay i's wall is and which way it faces (the outward normal, into the room in front of it), in world coordinates
+      frameOf: function (i) {
+        var b = bays[i]; if (!b) return null;
+        b.group.updateWorldMatrix(true, false);
+        var p = new T.Vector3(0, 0, 0).applyMatrix4(b.group.matrixWorld), n = new T.Vector3(0, 0, 1).transformDirection(b.group.matrixWorld);
+        return { x: p.x, z: p.z, nx: n.x, nz: n.z };
+      },
+      layout: layout,
+      count: function () { return bays.length; },
       doorHalfWidth: function (i) { var b = bays[i]; return b && b.door && b.door.mesh && b.door.mesh.size ? b.door.mesh.size.w / 2 : 0.5; },
       doorOpen: function (i) { var b = bays[i], m = b && b.door && b.door.model; if (m && !m.isOpen()) m.open(); },
       _curtain: function (i) { var c = bays[i] && bays[i].curtain; return c ? { sim: c.sim, mg: c.mg, w: bays[i].width } : null; },   // tests only

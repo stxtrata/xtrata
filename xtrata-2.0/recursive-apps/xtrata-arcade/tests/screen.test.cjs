@@ -62,7 +62,7 @@ function encoders(C) {
   // one xtrata-screen-v1 Items row (all 19 fields, as the map defines them)
   E.item = (o = {}) => E.tuple({
     kind: E.uint(o.kind ?? 0), head: E.ascii(o.head ?? 'HELLO'), body: E.ascii(o.body ?? ''),
-    'image-id': E.uint(o.imageId ?? 0), 'image-hash': E.buff(o.imageHash ?? new Uint8Array(0)), 'image-size': E.uint(o.imageSize ?? 0),
+    'image-id': E.uint(o.imageId ?? 0), 'image-hash': E.buff(o.imageHash ?? new Uint8Array(0)), 'image-size': E.uint(o.imageSize ?? 0), layout: E.uint(o.layout ?? 0),
     weight: E.uint(o.weight ?? 1), publisher: E.principal(ADDR), paid: E.bool(!!o.paid),
     buyer: o.paid ? E.some(E.principal(ADDR)) : E.none(), days: E.uint(o.days ?? 0), price: E.uint(o.price ?? 0), escrow: E.uint(0),
     status: E.uint(o.status ?? 1), hidden: E.bool(!!o.hidden), 'starts-at': E.uint(o.startsAt ?? 0), 'ends-at': E.uint(o.endsAt ?? 1000000),
@@ -119,7 +119,7 @@ function ctx() {
   c.fillRect = () => { c.rects++; };
   c.fillText = (t, x, y) => { c.texts.push(String(t)); };
   c.measureText = (t) => ({ width: String(t).length * 10 });
-  c.drawImage = (img) => { c.images.push(img); };
+  c.drawn = []; c.drawImage = (img, ...a) => { c.images.push(img); c.drawn.push(a); };
   return c;
 }
 const draw = (S, d) => { const x = ctx(); S.paint(x, 1280, 720, Object.assign({ height: 1000, day: 7, live: true, blocksPerDay: 144, scorers: [], items: [], t: 0 }, d)); return x; };
@@ -138,7 +138,7 @@ test('1a off by default: no contract, no reads, refresh says off, paint is the i
   const x = draw(n.S, { items: n.S.activeItems(n.S.items(), 1000) });
   ok(has(x, 'BITCOIN DAY') && has(x, '7') && has(x, 'LATEST SCORERS'));
   ok(x.texts.filter((t) => t === IDLE).length >= 2, 'idle line in the panel and in the default ticker');
-  ok(has(x, 'NO SCORES YET TODAY'));
+  ok(has(x, 'NO SCORES YET'));
   eq(x.saves, x.restores, 'paint balances save/restore');
 });
 
@@ -318,6 +318,12 @@ test('5 latest scorers from a canned get-top10 response: window, newest first, d
   const rows = n.S.latestScorers(boards, 5000, 288, fmt, 8);
   eq(rows.map((r) => r.name + '@' + r.age), ['BOB@5', 'AAA@10', 'AAA@20'], 'newest first; OLD (age 1000), FUT (negative) and burn 0 dropped');
   eq(rows[0], { game: 'Block Breaker Deluxe', colour: '#0f0', name: 'BOB', score: 'score:70', age: 5, burn: 4995 });
+  // no window (0): the newest top scores whatever their age; an entry just ahead of our height counts as brand new
+  for (const w of [0]) {
+    const all = n.S.latestScorers(boards, 5000, w, fmt, 8);
+    eq(all.map((r) => r.name + '@' + r.age), ['FUT@0', 'BOB@5', 'AAA@10', 'AAA@20', 'OLD@1000'], 'window ' + w + ': nothing is too old; burn 0 (unknown) still dropped');
+  }
+  eq(n.S.latestScorers(boards, 5000, 288, fmt, 8).length, 3, 'a window can still be asked for');
   // same game+name+score twice is one row; same name on another board is kept
   const dup = n.S.latestScorers([{ game: 'G', mode: 'm', entries: [{ name: 'X', score: 1, burn: 90 }, { name: 'X', score: 1, burn: 80 }, { name: 'X', score: 2, burn: 70 }] }], 100, 288, null, 8);
   eq(dup.map((r) => r.score), ['1', '2'], 'without fmt the score is a string');
@@ -327,16 +333,22 @@ test('5 latest scorers from a canned get-top10 response: window, newest first, d
   eq(n.S.latestScorers(null, 5, 288), []);
   const x = draw(n.S, { scorers: rows });
   ok(has(x, 'BLOCK BREAKER') && has(x, 'STAR PATROL') && has(x, 'BOB') && has(x, 'score:70'), 'game cut to 13 chars upper-case');
-  ok(has(x, '50M') && !has(x, 'NO SCORES YET TODAY'));
+  ok(has(x, '50M') && !has(x, 'NO SCORES YET'));
 });
 
 /* ------------------------------------------------------------ 6  pictures */
+// the first bytes of each format we accept (the sniffer only needs the header)
+const pad = (a) => { const u = new Uint8Array(32); u.set(a); return u; };
+const MEDIA = {
+  png: pad([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), jpeg: pad([0xff, 0xd8, 0xff, 0xe0]), gif: pad([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]),
+  webp: pad([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]), mp4: pad([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]), webm: pad([0x1a, 0x45, 0xdf, 0xa3]),
+};
 function pictureHarness(n, mode) {
   const win = n.win, st = { loads: [], imgs: [], blobs: 0 };
   win.Blob = class { constructor(p) { st.blobs++; this.p = p; } };
   win.URL = { createObjectURL: () => 'blob:mock' };
   win.Image = class { constructor() { this.naturalWidth = 200; this.naturalHeight = 100; st.imgs.push(this); } set src(v) { this._src = v; } };
-  win.XAWorld.loadImageBytes = (e) => { st.loads.push(e); return mode === 'fail' ? Promise.reject(new Error('hash mismatch')) : Promise.resolve(new Uint8Array([1, 2, 3])); };
+  win.XAWorld.loadImageBytes = (e) => { st.loads.push(e); return mode === 'fail' ? Promise.reject(new Error('hash mismatch')) : Promise.resolve(mode === 'html' ? new TextEncoder().encode('<html><script>alert(1)</script></html>') : mode === 'svg' ? new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>') : MEDIA[mode === 'ok' || !mode ? 'png' : mode]); };
   return st;
 }
 test('6a a picture slot: the mock inscription id + hash go to loadImageBytes once; drawn only after it decodes; picture event fires', async () => {
@@ -367,6 +379,101 @@ test('6b hasPicture needs a size, a hash and an id; a failed picture is never dr
   const it = n.S.normalizeItem(9, base);
   for (let i = 0; i < 3; i++) { await settle(n); eq(draw(n.S, { items: [it] }).images.length, 0); }
   eq(st.loads.length, 1, 'one attempt only');
+});
+
+test('6c what a picture slot may hold: PNG, JPEG, GIF, WebP, MP4, WebM by their bytes; SVG, HTML and unknown bytes are refused and never drawn', async () => {
+  const S = boot().S;
+  for (const [k, kind, vid] of [['png', 'png', false], ['jpeg', 'jpeg', false], ['gif', 'gif', false], ['webp', 'webp', false], ['mp4', 'mp4', true], ['webm', 'webm', true]]) {
+    const m = S.sniffMedia(MEDIA[k]); eq([m.kind, m.video], [kind, vid], k);
+  }
+  eq(S.sniffMedia(new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>')), null);
+  eq(S.sniffMedia(new TextEncoder().encode('<!doctype html><html></html>')), null);
+  eq(S.sniffMedia(new Uint8Array(3)), null, 'too short'); eq(S.sniffMedia(null), null);
+  eq(S.sniffMedia(pad([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45])), null, 'a RIFF WAV is not a WebP');
+  for (const mode of ['html', 'svg']) {
+    const hash = new Uint8Array(32).fill(7);
+    const n = on(boot({ live: [1], items: { 1: { kind: 2, head: 'BAD', imageId: 5, imageHash: hash, imageSize: 4096, paid: true } } }));
+    const st = pictureHarness(n, mode);
+    await n.S.refresh(true);
+    const it = n.S.items()[0];
+    for (let i = 0; i < 3; i++) { await settle(n); eq(draw(n.S, { items: [it] }).images.length, 0, mode + ' is never drawn'); }
+    eq(st.imgs.length, 0, mode + ' is never handed to an Image'); eq(st.loads.length, 1, 'one attempt only');
+  }
+});
+
+test('6d an animated GIF asks for fast repaints only while it is the item on screen; a clip plays on screen and pauses off it', async () => {
+  const hash = new Uint8Array(32).fill(3);
+  const mk = (id, mode) => { const n = on(boot({ live: [id], items: { [id]: { kind: 2, head: 'ANIM', imageId: id, imageHash: hash, imageSize: 9999, paid: true } } })); return n; };
+  // GIF
+  const g = mk(1, 'gif'); const gs = pictureHarness(g, 'gif'); await g.S.refresh(true); const gi = g.S.items()[0];
+  eq(g.S.animating(), false); draw(g.S, { items: [gi] }); await settle(g); gs.imgs[0].onload();
+  draw(g.S, { items: [gi] }); eq(g.S.animating(), true, 'a GIF on screen wants about 25 fps');
+  draw(g.S, { items: [] }); eq(g.S.animating(), false, 'nothing animated on screen: back to the slow repaint');
+  // a still PNG never asks
+  const p = mk(2, 'png'); const ps = pictureHarness(p, 'png'); await p.S.refresh(true); const pi = p.S.items()[0];
+  draw(p.S, { items: [pi] }); await settle(p); ps.imgs[0].onload(); draw(p.S, { items: [pi] }); eq(p.S.animating(), false, 'a still picture does not');
+  // MP4: a muted looping video element, never attached to the page
+  const v = mk(3, 'mp4'); const vs = pictureHarness(v, 'mp4');
+  const clips = [];
+  v.win.document = { createElement: (t) => { const c = { t, paused: true, attrs: {}, playCalls: 0, pauseCalls: 0, videoWidth: 640, videoHeight: 360,
+    setAttribute(k, val) { this.attrs[k] = val; }, play() { this.paused = false; this.playCalls++; return Promise.resolve(); }, pause() { this.paused = true; this.pauseCalls++; } }; clips.push(c); return c; } };
+  await v.S.refresh(true); const vi = v.S.items()[0];
+  draw(v.S, { items: [vi] }); await settle(v);
+  eq(clips.length, 1); eq([clips[0].t, clips[0].muted, clips[0].loop, clips[0].playsInline], ['video', true, true, true], 'muted, looping, inline'); eq(vs.imgs.length, 0, 'no Image for a clip');
+  clips[0].onloadeddata();
+  let x = draw(v.S, { items: [vi] }); eq(x.images.length, 1, 'the clip is drawn once its first frame is ready'); eq(clips[0].playCalls, 1, 'it plays while on screen'); eq(v.S.animating(), true);
+  draw(v.S, { items: [vi] }); eq(clips[0].playCalls, 1, 'not restarted every frame');
+  draw(v.S, { items: [] }); eq(clips[0].pauseCalls, 1, 'paused as soon as it is not the item on show'); eq(v.S.animating(), false);
+  draw(v.S, { items: [vi] }); eq(clips[0].playCalls, 2, 'and plays again when its turn comes round');
+  v.S.idle(); eq(clips[0].paused, true, 'idle() (player far from the screen) pauses clips');
+});
+
+test('6e two rotations: standard items take the panel, every 3rd slot is full-screen for every item with a picture; premium (layout 1) is full-screen only and comes round twice as often', async () => {
+  const S0 = boot().S, hash = new Uint8Array(32).fill(5);
+  eq([S0.normalizeItem(1, {}).layout, S0.normalizeItem(1, { layout: 1 }).layout, S0.normalizeItem(1, { layout: 2 }).layout, S0.normalizeItem(1, { layout: -3 }).layout], [0, 1, 0, 0], 'only 1 means full-screen only; old items are standard');
+  const mk = (id, extra) => S0.normalizeItem(id, Object.assign({ kind: 1, head: 'H' + id, status: 1, weight: 1 }, extra));
+  const pic = { 'image-id': 50, 'image-size': 9999, 'image-hash': hash };
+  const A = mk(1, {}), B = mk(2, Object.assign({ kind: 2 }, pic)), P = mk(3, Object.assign({ kind: 2, layout: 1, weight: 2 }, pic)), C = mk(4, {});
+  const seq = (items, from, to) => { const o = []; for (let k = from; k < to; k++) { const r = S0.slotAt(items, k * 12, 12, 3); o.push((r.item ? r.item.id : 0) + (r.full ? 'F' : 'p')); } return o; };
+  eq(seq([A, B, P, C], 0, 12), ['1p', '2p', '2F', '4p', '1p', '3F', '2p', '4p', '3F', '1p', '2p', '2F'], 'panel: 1,2,4 in turn; full-screen slot every 3rd: B, P, P, B, ... (premium weight 2)');
+  const long = seq([A, B, P, C], 0, 297);   // 99 whole cycles
+  ok(!long.includes('3p'), 'a full-screen-only item is never in the panel'); ok(long.filter((x) => x === '2F').length > 0, 'a standard item with a picture does get the whole screen');
+  eq(long.filter((x) => x === '3F').length, 2 * long.filter((x) => x === '2F').length, 'premium gets twice the full-screen turns');
+  ok(!long.includes('1F') && !long.includes('4F'), 'no picture, no full-screen turn');
+  eq(seq([A, C], 0, 6), ['1p', '4p', '1p', '4p', '1p', '4p'], 'nothing has a picture: all panel');
+  eq(seq([P], 0, 4), ['3F', '3F', '3F', '3F'], 'only full-screen items: every slot is full-screen');
+  eq(seq([], 0, 2), ['0p', '0p']); eq(S0.slotAt([], 5).item, null);
+  eq(S0.featureAt([A, B, P, C], 24, 12).id, 2, 'featureAt still answers "which item"');
+  eq(S0.slotAt([A, P], 0, 12, 2).full, false, 'every=2: slot 0 panel'); eq(S0.slotAt([A, P], 12, 12, 2).full, true, 'every=2: slot 1 full-screen'); eq(S0.slotAt([A, P], 12, 12, 1).full, true, 'every is at least 2 (1 would leave no panel slot)');
+
+  // drawing: a full-screen slot paints the picture over the whole screen above the ticker; a panel slot paints the thumbnail
+  const n = on(boot({ live: [1], items: { 1: { kind: 2, head: 'BIG AD', body: 'body text', imageId: 50, imageHash: hash, imageSize: 9999, paid: true } } }));
+  const st = pictureHarness(n, 'png');
+  await n.S.refresh(true); const it = n.S.items()[0];
+  let x = draw(n.S, { items: [it], t: 24 });   // single item with a picture: slot 2 is the full-screen slot
+  eq(x.images.length, 0, 'nothing drawn before the picture is ready'); ok(has(x, 'BIG AD') && has(x, 'body text'), 'the item shows in the panel meanwhile');
+  await settle(n); st.imgs[0].naturalWidth = 800; st.imgs[0].naturalHeight = 400; st.imgs[0].onload();
+  x = draw(n.S, { items: [it], t: 24 });
+  eq(x.images.length, 1, 'one picture per frame'); eq(x.drawn[0].map(Math.round), [20, 0, 1240, 620], 'an 800x400 picture fitted into 1280 x 620, above the 100 px ticker, centred');
+  ok(has(x, 'BIG AD') && has(x, 'AD · PAID'), 'label and headline strip kept');
+  x = draw(n.S, { items: [it], t: 0 });
+  eq(x.images.length, 1); ok(x.drawn[0][2] < 400, 'a panel slot: the thumbnail beside the text'); ok(has(x, 'body text'));
+  // a tall picture is pillar-boxed, never stretched
+  const n2 = on(boot({ live: [1], items: { 1: { kind: 2, head: 'TALL', imageId: 51, imageHash: hash, imageSize: 9999, paid: true, layout: 1 } } }));
+  const st2 = pictureHarness(n2, 'png'); await n2.S.refresh(true); const it2 = n2.S.items()[0]; eq(it2.layout, 1);
+  draw(n2.S, { items: [it2] }); await settle(n2); st2.imgs[0].naturalWidth = 300; st2.imgs[0].naturalHeight = 600; st2.imgs[0].onload();
+  x = draw(n2.S, { items: [it2] }); const [dx, dy, dw, dh] = x.drawn[0];
+  eq([Math.round(dh), Math.round(dw)], [620, 310]); ok(Math.abs(dx - 485) < 0.01, 'centred');
+  // a premium picture that fails (bad hash) leaves the rotation: nothing is ever shown for it in the panel
+  const n3 = on(boot({ live: [1], items: { 1: { kind: 2, head: 'GONE', imageId: 52, imageHash: hash, imageSize: 9999, paid: true, layout: 1 } } }));
+  pictureHarness(n3, 'fail'); await n3.S.refresh(true); const it3 = n3.S.items()[0];
+  draw(n3.S, { items: [it3] }); await settle(n3);
+  eq(n3.S.slotAt([it3], 0, 12).item, null, 'a full-screen-only item whose picture failed is dropped, not shown as text');
+  // look-ahead: the picture for the next (full-screen) slot is requested one slot early
+  const n4 = on(boot({ live: [1, 2], items: { 1: { kind: 1, head: 'TEXT', body: 'b' }, 2: { kind: 2, head: 'PREMIUM', imageId: 53, imageHash: hash, imageSize: 9999, paid: true, layout: 1, weight: 2 } } }));
+  const st4 = pictureHarness(n4, 'png'); await n4.S.refresh(true); const [t1, p2] = n4.S.items();
+  draw(n4.S, { items: [t1, p2], t: 0 }); eq(st4.loads.length, 0, 'slot 0 -> next is a panel slot: nothing fetched yet');
+  draw(n4.S, { items: [t1, p2], t: 12 }); eq(st4.loads.map((l) => l.imageId), [53], 'slot 1 -> next is the full-screen slot: its picture is fetched now');
 });
 
 /* ------------------------------------------------------------ 7  failed read keeps last good state */

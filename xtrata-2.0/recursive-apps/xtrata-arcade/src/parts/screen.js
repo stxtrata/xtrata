@@ -28,6 +28,7 @@
     contract: '',                // 'SP….xtrata-screen-v1'  (empty = off)
     pollMs: 180000,              // how often to check the version counter
     rotateSecs: 12,              // one feature item at a time
+    fullEvery: 3,                // every 3rd slot is a full-screen slot (when something has a picture to show)
     tickerPxPerSec: 80,
     maxLive: 32,                 // the contract's live-set bound
     snapKey: 'xa-screen-snap-v1'
@@ -49,6 +50,7 @@
       id: Number(id), kind: kind in KINDS ? kind : 0,
       head: String(t.head || '').slice(0, 80), body: String(t.body || '').slice(0, 240),
       imageId: Number(t['image-id'] || 0), imageHash: t['image-hash'] || null, imageSize: Number(t['image-size'] || 0),
+      layout: Number(t.layout) === 1 ? 1 : 0,     // 0 standard, 1 full-screen only (premium)
       weight: Math.max(1, Math.min(10, Number(t.weight) || 1)),
       paid: !!t.paid, status: Number(t.status), hidden: !!t.hidden,
       startsAt: Number(t['starts-at'] || 0), endsAt: Number(t['ends-at'] || 0)
@@ -64,18 +66,37 @@
   function activeItems(items, height) { return (items || []).filter(function (it) { return isActive(it, height); }); }
   function hasPicture(it) { return !!(it && it.imageSize > 0 && it.imageHash && it.imageId > 0); }
 
-  // Which feature item is up at time t (seconds). Weighted by `weight`, one slot per rotateSecs, the order is a
-  // fixed shuffle of the live ids so two people in the hall see the same item at the same moment.
-  function featureAt(items, t, secs) {
-    var list = (items || []).filter(function (it) { return it.kind !== 0 || it.body || it.head; });
+  // Weighted round-robin over a list: weight w = the item appears in the first w layers, so heavier items come round more often.
+  function pick(list, k) {
     if (!list.length) return null;
-    // weight w = the item appears in the first w layers of the round-robin, so heavier items come round more often
     var layers = [], max = 0; list.forEach(function (it) { if (it.weight > max) max = it.weight; });
     for (var w = 1; w <= max; w++) layers.push(list.filter(function (it) { return it.weight >= w; }).sort(function (a, b) { return a.id - b.id; }));
     var order = []; layers.forEach(function (l) { order = order.concat(l); });
-    var n = order.length, k = Math.floor(Math.max(0, t) / Math.max(2, secs || CFG.rotateSecs));
+    var n = order.length;
     return order[((k % n) + n) % n];
   }
+  // What is on the feature panel / screen at time t (seconds): { item, full }.
+  // Two rotations share the clock, one slot per rotateSecs, the same for everyone in the hall at the same moment:
+  //   panel rotation       standard items (layout 0), weighted, shown in the feature panel
+  //   full-screen rotation every item with a picture (standard ones and the full-screen-only premium ones), shown on the whole screen
+  // Every fullEvery-th slot is a full-screen slot, so everything with a picture gets the whole screen now and then, while a
+  // full-screen-only item is never shown in the panel. With nothing to put full-screen it is all panel; with only full-screen items, all full.
+  function slotAt(items, t, secs, every) {
+    var panel = (items || []).filter(function (it) { return it.layout !== 1 && (it.kind !== 0 || it.body || it.head); });
+    var full = (items || []).filter(function (it) {
+      var rec = state.pics[it.id];
+      return hasPicture(it) && !(rec && rec.failed);
+    });
+    var secs2 = Math.max(2, secs || CFG.rotateSecs), n = Math.max(2, Math.floor(every || CFG.fullEvery) || 3);
+    var k = Math.floor(Math.max(0, t) / secs2);
+    if (!panel.length && !full.length) return { item: null, full: false };
+    if (!full.length) return { item: pick(panel, k), full: false };
+    if (!panel.length) return { item: pick(full, k), full: true };
+    var cycle = Math.floor(k / n), r = k % n;
+    if (r === n - 1) return { item: pick(full, cycle), full: true };
+    return { item: pick(panel, cycle * (n - 1) + r), full: false };
+  }
+  function featureAt(items, t, secs) { return slotAt(items, t, secs).item; }
   function wrapText(measure, text, maxW, maxLines) {
     var words = String(text || '').split(/\s+/).filter(Boolean), lines = [], cur = '';
     for (var i = 0; i < words.length; i++) {
@@ -111,7 +132,7 @@
   }
 
   /* ------------------------------------------------------------ the reader */
-  var state = { snap: null, version: null, timer: null, busy: false, listeners: [], pics: {} };
+  var state = { snap: null, version: null, timer: null, busy: false, listeners: [], pics: {}, animating: false };
   function emit(why) { state.listeners.forEach(function (fn) { try { fn(state.snap, why); } catch (e) {} }); }
 
   async function load() {
@@ -172,19 +193,62 @@
   }
   function stop() { if (state.timer) clearInterval(state.timer); state.timer = null; }
 
-  // A feature picture, decoded once. Returns the drawable when ready, else null (and starts loading it).
+  // What kind of media are these bytes? Decided from the bytes themselves (the contract only stores an id, a hash and a size),
+  // never from a name or a type somebody claims. Anything not on this list is refused: no SVG, no HTML, nothing that can run.
+  function sniffMedia(b) {
+    if (!b || b.length < 12) return null;
+    if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { kind: 'png', mime: 'image/png', video: false, animated: false };
+    if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { kind: 'jpeg', mime: 'image/jpeg', video: false, animated: false };
+    if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return { kind: 'gif', mime: 'image/gif', video: false, animated: true };
+    if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return { kind: 'webp', mime: 'image/webp', video: false, animated: true };
+    if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) return { kind: 'mp4', mime: 'video/mp4', video: true, animated: true };
+    if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return { kind: 'webm', mime: 'video/webm', video: true, animated: true };
+    return null;
+  }
+  function dims(m) {
+    if (!m) return { w: 1, h: 1 };
+    return { w: Math.max(1, m.videoWidth || m.naturalWidth || m.width || 1), h: Math.max(1, m.videoHeight || m.naturalHeight || m.height || 1) };
+  }
+  // A feature picture (or short clip), decoded once. Returns the drawable when ready, else null (and starts loading it).
+  // Pictures and animated GIF / WebP are an Image; MP4 / WebM are a muted, looping video element that is never put on the page.
+  // The painter pauses every clip that is not the one on screen.
   function pictureFor(it) {
     if (!hasPicture(it) || !root.XAWorld || !root.XAWorld.loadImageBytes || typeof Image === 'undefined') return null;
     var rec = state.pics[it.id];
     if (rec) return rec.img || null;
-    rec = state.pics[it.id] = { img: null, failed: false };
+    rec = state.pics[it.id] = { img: null, failed: false, video: null, animated: false };
     root.XAWorld.loadImageBytes({ imageId: it.imageId, imageHash: it.imageHash }).then(function (bytes) {
-      var blob = new Blob([bytes]), url = URL.createObjectURL(blob), img = new Image();
-      img.onload = function () { rec.img = img; emit('picture'); };
-      img.onerror = function () { rec.failed = true; };
-      img.src = url;
+      var media = sniffMedia(bytes);
+      if (!media) { rec.failed = true; return; }
+      var url = URL.createObjectURL(new Blob([bytes], { type: media.mime }));
+      rec.animated = media.animated;
+      if (media.video) {
+        if (typeof document === 'undefined') { rec.failed = true; return; }
+        var v = document.createElement('video');
+        v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v.setAttribute('muted', '');
+        v.onloadeddata = function () { rec.video = v; rec.img = v; emit('picture'); };
+        v.onerror = function () { rec.failed = true; };
+        v.src = url;
+      } else {
+        var img = new Image();
+        img.onload = function () { rec.img = img; emit('picture'); };
+        img.onerror = function () { rec.failed = true; };
+        img.src = url;
+      }
     }).catch(function () { rec.failed = true; });
     return null;
+  }
+  // Called once per frame with the item on screen: play its clip, pause the others, say whether the screen needs a fast repaint.
+  function tendMedia(current) {
+    var animating = false;
+    Object.keys(state.pics).forEach(function (k) {
+      var rec = state.pics[k], on = current && String(current.id) === k;
+      if (rec.video) {
+        try { if (on) { if (rec.video.paused) { var p = rec.video.play(); if (p && p.catch) p.catch(function () {}); } } else if (!rec.video.paused) rec.video.pause(); } catch (e) {}
+      }
+      if (on && rec.img && rec.animated) animating = true;
+    });
+    state.animating = animating;
   }
 
   /* ------------------------------------------------------------ the painter */
@@ -218,7 +282,7 @@
     var rows = (d.scorers || []).slice(0, 8), rh = (bottom - (top + 48 * u)) / 8;
     x.font = Math.round(26 * u) + 'px VT323, monospace';
     if (!rows.length) {
-      x.fillStyle = '#6f6a8f'; x.fillText('NO SCORES YET TODAY', lx, top + 48 * u + rh);
+      x.fillStyle = '#6f6a8f'; x.fillText('NO SCORES YET', lx, top + 48 * u + rh);
     }
     rows.forEach(function (r, k) {
       var y = top + 48 * u + rh * k + rh * .72;
@@ -231,12 +295,19 @@
     // --- right: feature panel
     var px = 460 * u, pw = W - px - 28 * u, py = top, ph = bottom - top;
     x.fillStyle = '#0d0b16'; x.fillRect(px, py, pw, ph);
-    var it = featureAt(d.items, d.t || 0, d.rotateSecs || CFG.rotateSecs);
-    if (it) paintFeature(x, it, px, py, pw, ph, u);
+    var slot = slotAt(d.items, d.t || 0, d.rotateSecs || CFG.rotateSecs, d.fullEvery), it = slot.item;
+    tendMedia(it);
+    // look one slot ahead: if the next slot is a full-screen one, start fetching its picture now so it is ready when its turn comes
+    var nx = slotAt(d.items, (d.t || 0) + (d.rotateSecs || CFG.rotateSecs), d.rotateSecs || CFG.rotateSecs, d.fullEvery);
+    if (nx.item && nx.full && nx.item !== it) pictureFor(nx.item);
+    if (it) paintFeature(x, it, px, py, pw, ph, u, slot.full);
     else paintIdle(x, d, px, py, pw, ph, u);
 
     // --- bottom: ticker
     var ty = H - 100 * u, th = 100 * u;
+    // a full-screen slot takes over everything above the ticker, but only once its picture is ready (until then the item shows in the panel)
+    var bigPic = it && slot.full ? pictureFor(it) : null;
+    if (bigPic) paintFill(x, it, bigPic, 0, 0, W, ty, u);
     x.fillStyle = '#0a0812'; x.fillRect(0, ty, W, th);
     x.fillStyle = ORANGE; x.fillRect(0, ty, W, 3 * u);
     var text = tickerText(d.items) || 'EVERY TOP SCORE LIVES ON BITCOIN';
@@ -251,16 +322,17 @@
     x.fillStyle = 'rgba(0,0,0,.30)'; for (var yy = 0; yy < H; yy += 4) x.fillRect(0, yy, W, 1.4);
     x.restore();
   }
-  function paintFeature(x, it, px, py, pw, ph, u) {
+  function paintFeature(x, it, px, py, pw, ph, u, full) {
     var col = KIND_COLOUR[it.kind] || '#8fd3ff', pic = pictureFor(it), pad = 28 * u;
+    if (full && pic) return;                              // a full-screen slot with its picture ready: paint() draws it over the whole screen
     x.fillStyle = col; x.fillRect(px, py, 6 * u, ph);
     x.textAlign = 'left'; x.font = Math.round(24 * u) + 'px Bungee, Impact, sans-serif'; x.shadowColor = col; x.shadowBlur = 8; x.fillStyle = col;
     x.fillText(KINDS[it.kind] + (it.paid && it.kind === 2 ? ' · PAID' : ''), px + pad, py + 40 * u); x.shadowBlur = 0;
     var textW = pw - pad * 2, imgW = 0;
     if (pic) {
-      imgW = Math.min(ph * .62, pw * .36);
-      var ix = px + pw - pad - imgW, iy = py + 60 * u, ih = imgW * (pic.naturalHeight / Math.max(1, pic.naturalWidth));
-      ih = Math.min(ih, ph - 80 * u);
+      imgW = Math.min(ph * .8, pw * .5);   // a big picture: half the panel
+      var ix = px + pw - pad - imgW, iy = py + 60 * u, pd = dims(pic), ih = imgW * (pd.h / pd.w);
+      ih = Math.min(ih, ph - 80 * u); iy = py + 56 * u + Math.max(0, (ph - 56 * u - ih) / 2);   // centred in the space under the label
       try { x.drawImage(pic, ix, iy, imgW, ih); } catch (e) {}
       x.strokeStyle = col; x.lineWidth = 2 * u; x.strokeRect(ix, iy, imgW, ih);
       textW = pw - pad * 3 - imgW;
@@ -272,6 +344,26 @@
     var body = wrapText(function (s) { return x.measureText(s).width; }, it.body, textW, Math.max(1, Math.floor((py + ph - y - 24 * u) / (38 * u))));
     y += 8 * u; body.forEach(function (l) { x.fillText(l, px + pad, y); y += 38 * u; });
   }
+  // The picture fills a rectangle (the whole screen face above the ticker): fitted whole, never cropped or stretched, with a small
+  // label top-left and the headline along the bottom edge so an ad is always attributable and readable.
+  function paintFill(x, it, pic, rx, ry, rw, rh, u) {
+    var col = KIND_COLOUR[it.kind] || '#8fd3ff', pd = dims(pic), sc = Math.min(rw / pd.w, rh / pd.h), dw = pd.w * sc, dh = pd.h * sc;
+    x.fillStyle = '#000000'; x.fillRect(rx, ry, rw, rh);
+    try { x.drawImage(pic, rx + (rw - dw) / 2, ry + (rh - dh) / 2, dw, dh); } catch (e) {}
+    x.textAlign = 'left';
+    var label = KINDS[it.kind] + (it.paid && it.kind === 2 ? ' · PAID' : '');
+    x.font = Math.round(24 * u) + 'px Bungee, Impact, sans-serif';
+    var lw = x.measureText(label).width + 28 * u;
+    x.fillStyle = 'rgba(0,0,0,.62)'; x.fillRect(rx + 16 * u, ry + 16 * u, lw, 42 * u);
+    x.fillStyle = col; x.shadowColor = col; x.shadowBlur = 8; x.fillText(label, rx + 30 * u, ry + 46 * u); x.shadowBlur = 0;
+    if (it.head) {
+      x.font = Math.round(44 * u) + 'px VT323, monospace';
+      var line = wrapText(function (s) { return x.measureText(s).width; }, it.head.toUpperCase(), rw - 64 * u, 1)[0] || '';
+      x.fillStyle = 'rgba(0,0,0,.66)'; x.fillRect(rx, ry + rh - 62 * u, rw, 62 * u);
+      x.fillStyle = col; x.fillRect(rx, ry + rh - 62 * u, rw, 3 * u);
+      x.fillStyle = '#ffffff'; x.fillText(line, rx + 32 * u, ry + rh - 18 * u);
+    }
+  }
   function paintIdle(x, d, px, py, pw, ph, u) {
     x.textAlign = 'center'; x.fillStyle = '#ffc53d'; x.shadowColor = '#ffb000'; x.shadowBlur = 20;
     x.font = Math.round(150 * u) + 'px VT323, monospace'; x.fillText(String(d.day), px + pw / 2, py + ph * .58); x.shadowBlur = 0;
@@ -281,15 +373,17 @@
 
   /* ------------------------------------------------------------ latest scorers (pure) */
   // Builds the scorers list from the hall's board cache. `boards` = [{ game, colour, mode, entries:[{name,score,burn}] }].
-  // Newest first; entries older than `windowBlocks` burn blocks are left out. `fmt(mode, score)` formats a score.
+  // Newest first. With a window (burn blocks, default 288 when omitted) entries older than it are left out; with no window (0) the newest
+  // top scores are shown whatever their age, and the age on each row says how old. `fmt(mode, score)` formats a score.
   function latestScorers(boards, height, windowBlocks, fmt, limit) {
-    var out = [], win = windowBlocks || 288, h = Number(height) || 0;
+    var out = [], win = windowBlocks == null ? 288 : Number(windowBlocks), h = Number(height) || 0;
     (boards || []).forEach(function (b) {
       (b.entries || []).forEach(function (e) {
         var burn = Number(e.burn);
         if (!isFinite(burn) || burn <= 0) return;
         var age = h ? h - burn : 0;
-        if (h && (age < 0 || age > win)) return;
+        if (win > 0 && h && (age < 0 || age > win)) return;
+        if (age < 0) age = 0;
         out.push({ game: b.game, colour: b.colour, name: String(e.name || ''), score: fmt ? fmt(b.mode, e.score) : String(e.score), age: age, burn: burn });
       });
     });
@@ -304,7 +398,7 @@
     start: start, stop: stop, refresh: refresh, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
     items: function () { return state.snap ? state.snap.items : []; },
-    paint: paint, latestScorers: latestScorers,
+    paint: paint, latestScorers: latestScorers, slotAt: slotAt, sniffMedia: sniffMedia, idle: function () { tendMedia(null); }, animating: function () { return !!state.animating; },
     normalizeItem: normalizeItem, isActive: isActive, activeItems: activeItems, featureAt: featureAt,
     wrapText: wrapText, tickerText: tickerText, ago: ago, hasPicture: hasPicture,
     _t: { state: state, load: load, restore: restore, save: save }
