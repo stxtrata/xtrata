@@ -402,7 +402,7 @@ const findSealedBy = async (hash: Uint8Array, size: number) => {
 const findSealed = (f: Upload) => findSealedBy(f.hash, f.bytes.length);
 const readChunks = async (id: string, total: number, label: string, via: { chain: Chain; core: string } = { chain, core: state.core }) => {
   const out: Uint8Array[] = [];
-  const per = 10;
+  const per = 6;   // a 16 KB chunk costs ~20 KB of read_length; testnet caps a read-only call at 200,000 (10 chunks measured 200,316 and failed)
   for (let i = 0; i < total; i += per) {
     status(`Reading ${label} (#${id}) back… ${Math.min(i + per, total)} of ${total} chunks`);
     const idxs = Array.from({ length: Math.min(per, total - i) }, (_, k) => uintCV(BigInt(i + k)));

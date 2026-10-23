@@ -67825,7 +67825,7 @@ var findSealedBy = async (hash, size) => {
 var findSealed = (f) => findSealedBy(f.hash, f.bytes.length);
 var readChunks = async (id, total, label, via = { chain, core: state.core }) => {
   const out = [];
-  const per = 10;
+  const per = 6;
   for (let i = 0; i < total; i += per) {
     status(`Reading ${label} (#${id}) back\u2026 ${Math.min(i + per, total)} of ${total} chunks`);
     const idxs = Array.from({ length: Math.min(per, total - i) }, (_, k) => (0, import_transactions2.uintCV)(BigInt(i + k)));
