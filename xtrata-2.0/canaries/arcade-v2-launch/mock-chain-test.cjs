@@ -19,183 +19,35 @@
 //   3. the parent it inscribed boots from the mock chain with the registry config and shows four poster bays;
 //   4. a re-run after "Forget local progress" sends nothing and pays nothing.
 'use strict';
-const fs = require('fs'), path = require('path'), crypto = require('crypto');
+const fs = require('fs'), path = require('path');
 const { createRequire } = require('module');
-
-const ROOTDIR = path.resolve(__dirname, '../..');
-const AW = path.join(ROOTDIR, 'contracts/arcade-world');
-const rqRoot = createRequire(path.join(ROOTDIR, 'package.json'));
-const rqAW = createRequire(path.join(AW, 'package.json'));
-const T = rqRoot('@stacks/transactions');            // v6, as the canary
-const V7 = rqAW('@stacks/transactions');             // v7, as the simnet
-const { initSimnet } = rqAW('@stacks/clarinet-sdk');
+const { createMockChain } = require('./mock-chain.cjs');
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { ({ chromium } = createRequire('/opt/npm-tools/node_modules/')('playwright')); }
-const { Cl } = V7;
 
+const ROOTDIR = path.resolve(__dirname, '../..');
 const HTML = path.resolve(process.argv[2] || path.join(ROOTDIR, 'canaries/build/arcade-v2-launch-canary.html'));
-const XA = path.join(ROOTDIR, 'recursive-apps/xtrata-arcade');
-const BUNDLE = fs.readFileSync(path.join(XA, 'release/xtrata-arcade.html'));
-const BOARDS = JSON.parse(fs.readFileSync(path.join(XA, 'boards.json'), 'utf8'));
-const LIVE = (f) => fs.readFileSync(path.join(ROOTDIR, 'contracts/live', f), 'utf8');
 // TESTNET=1: the rehearsal. The chain holds only the testnet SIP-009 trait: the canary deploys the core itself (step 1b),
 // inscribes the bundle (read from the mainnet gateway, hash-checked) and a stand-in for #55, deploys the leaderboard with the
 // other contracts, and boots its mainnet-shaped parent with the reads pointed at the testnet core.
 const TESTNET = !!process.env.TESTNET;
 const NET = TESTNET ? 'testnet' : 'mainnet';
-const ROOT = TESTNET ? 'ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J' : 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
-const ROYALTY = 'SP1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2XG1V316';   // the core's fee recipient here, so "pay at most" post-conditions see real STX
-const WRONG = 'SP2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CH94GRJ';      // any other wallet
-const TRAIT = TESTNET ? 'ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT' : 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9';
-const CORE = ROOT + '.xtrata-v3-2-3';
-const SCORES = ROOT + '.xtrata-arcade-scores-v2';
+const C = createMockChain({ testnet: TESTNET });
+const { S, exec, deploy, readOnly, ROOT, WRONG, SCORES, BUNDLE, BOARDS, chunksOf, sha, pp, hex0, muted, T, V7, Cl } = C;
 const NEW = ['xtrata-world-v2', 'xtrata-posters-v1', 'xtrata-screen-v1'];
-const CHUNK = 16384;
-const sha = (b) => crypto.createHash('sha256').update(b).digest();
-const chunksOf = (buf) => { const out = []; for (let i = 0; i < buf.length; i += CHUNK) out.push(buf.subarray(i, i + CHUNK)); return out; };
-const runHash = (chunks) => chunks.reduce((h, c) => sha(Buffer.concat([h, c])), Buffer.alloc(32));
-const hex0 = (h) => (h.startsWith('0x') ? h : '0x' + h);
-const pp = (cv) => Cl.prettyPrint(cv);
-
 let simnet;
-// The simnet prints every Clarity `print` to stdout; keep the test output readable.
-const muted = (fn) => { const a = console.log, b = process.stdout.write, c = console.error; console.log = () => {}; console.error = () => {}; process.stdout.write = () => true; try { return fn(); } finally { console.log = a; console.error = c; process.stdout.write = b; } };
-const S = {
-  sources: new Map(), tx: new Map(), events: new Map(), nonce: 7, txn: 0,
-  sigs: {}, current: '', readFails: [], walletCalls: 0, raw: 0, deploys: [], calls: [], violations: [], gateway: 0, reads: [],
-  address: ROOT
-};
-const newTx = (status, repr) => { const id = '0x' + sha('tx' + (++S.txn)).toString('hex'); S.tx.set(id, { tx_status: status, tx_result: { repr }, block_height: simnet.blockHeight }); return id; };
-const stxSent = (events, who) => events.filter((e) => e.event === 'stx_transfer_event' && e.data.sender === who).reduce((n, e) => n + BigInt(e.data.amount), 0n);
-const recordEvents = (events) => {
-  for (const e of events) if (e.event === 'print_event') {
-    const id = e.data.contract_identifier;
-    if (!S.events.has(id)) S.events.set(id, []);
-    S.events.get(id).unshift({ event_type: 'smart_contract_log', contract_log: { contract_id: id, topic: 'print', value: { hex: e.data.raw_value, repr: '' } } });
-  }
-};
-// Deny mode: every STX the sender moves must be covered by a "send at most" post-condition (the canary uses no others).
-function checkPcs(label, events, sender, pcs) {
-  const sent = stxSent(events, sender);
-  const cap = pcs.filter((p) => p.conditionCode === T.FungibleConditionCode.LessEqual).reduce((n, p) => n + BigInt(p.amount), 0n);
-  if (sent > 0n && (!pcs.length || sent > cap)) S.violations.push(`${label}: sent ${sent} µSTX, post-conditions allow ${pcs.length ? cap : 'nothing'}`);
-}
-function exec(contract, fn, argsV7, sender, pcs, label) {
-  S.calls.push({ step: S.current, sender, fn: `${contract.split('.')[1]}.${fn}` });
-  let r;
-  try { r = muted(() => simnet.callPublicFn(contract, fn, argsV7, sender)); } catch (e) { return newTx('abort_by_response', `(runtime ${String(e.message || e).slice(0, 80)})`); }
-  recordEvents(r.events);
-  checkPcs(label || fn, r.events, sender, pcs);
-  return newTx(r.result.type === 'ok' ? 'success' : 'abort_by_response', pp(r.result));
-}
-function deploy(name, code, version, sender) {
-  const r = muted(() => simnet.deployContract(name, code, { clarityVersion: version }, sender));
-  S.sources.set(`${sender}.${name}`, code);
-  return r;
-}
-const readOnly = (contract, fn, args, sender = ROOT) => muted(() => simnet.callReadOnlyFn(contract, fn, args, sender)).result;
-const call = (contract, fn, args, sender = ROOT) => { const r = muted(() => simnet.callPublicFn(contract, fn, args, sender)); if (r.result.type !== 'ok') throw new Error(`${fn}: ${pp(r.result)}`); return r.result; };
-const bytesCache = new Map();
-function inscriptionBytes(id) {
-  if (bytesCache.has(id)) return bytesCache.get(id);
-  const meta = readOnly(CORE, 'get-inscription-meta', [Cl.uint(id)]);
-  if (meta.type !== 'some') return null;
-  const n = Number(meta.value.value['total-chunks'].value), out = [];
-  for (let i = 0; i < n; i++) out.push(Buffer.from(V7.hexToCV(V7.cvToHex(readOnly(CORE, 'get-chunk', [Cl.uint(id), Cl.uint(i)]))).value.value, 'hex'));
-  const b = Buffer.concat(out); bytesCache.set(id, b); return b;
-}
-const mint = (bytes, mime, sender = ROOT, deps = [], parents = []) => {
-  const ch = chunksOf(bytes);
-  const r = call(CORE, 'mint-single-tx-with-relationships', [Cl.buffer(runHash(ch)), Cl.stringAscii(mime), Cl.uint(bytes.length), Cl.list(ch.map((c) => Cl.buffer(c))), Cl.stringAscii('data:x'), Cl.list(deps.map((d) => Cl.uint(d))), Cl.list(parents.map((p) => Cl.uint(p)))], sender);
-  return Number(r.value.value['token-id'].value);
-};
-
-async function setupChain() {
-  const t0 = Date.now();
-  simnet = await initSimnet(path.join(__dirname, 'simnet/Clarinet.toml'));
-  const dep = simnet.getAccounts().get('deployer');
-  muted(() => { simnet.transferSTX(10_000_000_000_000n, ROOT, dep); simnet.transferSTX(1_000_000n, TRAIT, dep); simnet.transferSTX(1_000_000_000n, WRONG, dep); });
-  deploy('nft-trait', fs.readFileSync(path.join(ROOTDIR, 'contracts/clarinet/contracts/sip009-nft-trait.clar'), 'utf8'), 2, TRAIT);
-  if (TESTNET) { console.log(`simnet ready in ${((Date.now() - t0) / 1000).toFixed(1)}s: testnet, only the SIP-009 trait at ${TRAIT}; root ${ROOT} funded`); return; }
-  deploy('xtrata-v1-1-1', LIVE('xtrata-v1.1.1.clar'), 3, ROOT);
-  deploy('xtrata-v2-1-0', LIVE('xtrata-v2.1.0.clar'), 3, ROOT);
-  deploy('xtrata-v3-2-3', LIVE('xtrata-v3.2.3.clar'), 3, ROOT);
-  call(CORE, 'set-paused', [Cl.bool(false)]);
-  call(CORE, 'set-royalty-recipient', [Cl.principal(ROYALTY)]);
-  call(CORE, 'set-next-id', [Cl.uint(55)]);
-  if (mint(Buffer.from('<p>#55</p>'), 'text/html') !== 55) throw new Error('#55');
-  for (let i = 56; i < 3078; i++) mint(Buffer.from(`filler ${i}`), 'text/plain');
-  // #3078: the v1.3 bundle, staged as it was on mainnet
-  const ch = chunksOf(BUNDLE), h = runHash(ch);
-  call(CORE, 'begin-or-get', [Cl.buffer(h), Cl.stringAscii('text/html'), Cl.uint(BUNDLE.length), Cl.uint(ch.length)]);
-  for (let i = 0; i < ch.length; i += 30) call(CORE, 'add-chunk-batch', [Cl.buffer(h), Cl.list(ch.slice(i, i + 30).map((c) => Cl.buffer(c)))]);
-  const sealed = call(CORE, 'seal-inscription', [Cl.buffer(h), Cl.stringAscii('data:x')]);
-  if (Number(sealed.value.value ?? sealed.value) !== 3078 && pp(sealed) !== '(ok u3078)') throw new Error('bundle id ' + pp(sealed));
-  for (let i = 3079; i < 3110; i++) mint(Buffer.from(`filler ${i}`), 'text/plain');
-  if (mint(Buffer.from('/*@xa-pack engine v1*/ an earlier engine'), 'text/plain', ROOT, [], [55]) !== 3110) throw new Error('#3110');
-  if (mint(Buffer.from('<!doctype html><title>arcade v1.5 parent</title>'), 'text/html', ROOT, [3078, 3110], [55]) !== 3111) throw new Error('#3111');
-  // the leaderboard, live since v1.0, every board on #3111
-  deploy('xtrata-arcade-scores-v2', fs.readFileSync(path.join(ROOTDIR, 'contracts/arcade-scores-v2/contracts/xtrata-arcade-scores-v2.clar'), 'utf8'), 4, ROOT);
-  for (const b of BOARDS) call(SCORES, 'set-board', [Cl.stringAscii(b.id), Cl.uint(b.mode), Cl.uint(b.max), Cl.uint(0), Cl.uint(3111), Cl.bool(false), Cl.bool(true)]);
-  console.log(`simnet ready in ${((Date.now() - t0) / 1000).toFixed(1)}s: core ${CORE} (next id ${pp(readOnly(CORE, 'get-next-token-id', []))}), #3078 = the v1.3 bundle, 26 boards on #3111, burn height ${simnet.burnBlockHeight}`);
-}
-
-// ---------- the Hiro API and the gateway, answered from the simnet ----------
+const newTx = (status, repr) => { const id = '0x' + sha('wallet' + (++S.txn)).toString('hex'); S.tx.set(id, { tx_status: status, tx_result: { repr }, block_height: simnet.blockHeight }); return id; };
 async function route(r) {
-  const u = new URL(r.request().url()), p = u.pathname;
-  const json = (o, status = 200) => r.fulfill({ status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(o) });
-  if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' } });
-  if (/xtrata\.xyz$/.test(u.hostname) && p.startsWith('/i/')) {
-    const id = Number(p.slice(3)); S.gateway++;
-    // the testnet rehearsal reads mainnet's #3078 through the gateway (the canary checks its hash)
-    if (TESTNET) return id === 3078 ? r.fulfill({ contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: BUNDLE }) : r.fulfill({ status: 404, body: '' });
-    const b = inscriptionBytes(id);
-    return b ? r.fulfill({ contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: b }) : r.fulfill({ status: 404, body: '' });
-  }
-  if (!/\/hiro\//.test(p) && !/api\.(mainnet\.|testnet\.)?hiro\.so/.test(u.hostname)) return r.abort();
-  const q = p.replace(/^\/hiro\/(mainnet|testnet)/, '');
-  let m;
-  if ((m = q.match(/^\/v2\/contracts\/call-read\/([^/]+)\/([^/]+)\/([^/]+)$/))) {
-    const body = JSON.parse(r.request().postData());
-    S.reads.push({ fn: `${m[2]}.${m[3]}`, step: S.current });
-    try {
-      const res = readOnly(`${m[1]}.${m[2]}`, m[3], body.arguments.map((h) => V7.hexToCV(hex0(h))), body.sender);
-      return json({ okay: true, result: V7.cvToHex(res) });
-    } catch (e) { S.readFails.push(`${m[2]}.${m[3]}: ${String(e.message || e).slice(0, 160)}`); return json({ okay: false, cause: String(e.message || e).slice(0, 200) }); }
-  }
-  if (q === '/v2/info') return json({ burn_block_height: simnet.burnBlockHeight, stacks_tip_height: simnet.blockHeight });
-  if ((m = q.match(/^\/v2\/contracts\/source\/([^/]+)\/([^/]+)/))) { const s = S.sources.get(`${m[1]}.${m[2]}`); return s ? json({ source: s, publish_height: 1 }) : json({}, 404); }
-  if ((m = q.match(/^\/extended\/v1\/address\/([^/]+)\/stx$/))) return json({ balance: String(simnet.getAssetsMap().get('STX')?.get(m[1]) ?? 0n) });
-  if ((m = q.match(/^\/extended\/v1\/address\/([^/]+)\/nonces$/))) return json({ possible_next_nonce: S.nonce++ });
-  if ((m = q.match(/^\/extended\/v1\/address\/([^/]+)\/mempool/))) return json({ total: 0, results: [] });
-  if ((m = q.match(/^\/extended\/v1\/tx\/(0x[0-9a-f]+)$/))) { const t = S.tx.get(m[1]); return t ? json(t) : json({}, 404); }
-  if ((m = q.match(/^\/extended\/v1\/contract\/([^/]+)\/events$/))) {
-    const all = S.events.get(m[1]) || [], off = Number(u.searchParams.get('offset') || 0), lim = Number(u.searchParams.get('limit') || 20);
-    return json({ limit: lim, offset: off, results: all.slice(off, off + lim) });
-  }
-  if (q === '/v2/transactions') {
-    const tx = T.deserializeTransaction(r.request().postDataBuffer().toString('hex'));
-    const ver = tx.version === T.TransactionVersion.Mainnet ? 22 : 26;
-    const sender = T.addressToString(T.addressFromVersionHash(ver, tx.auth.spendingCondition.signer));
-    S.raw++;
-    let id;
-    if (tx.payload.payloadType === T.PayloadType.ContractCall) {
-      const contract = T.addressToString(tx.payload.contractAddress) + '.' + tx.payload.contractName.content;
-      const args = tx.payload.functionArgs.map((a) => V7.hexToCV(T.cvToHex(a)));
-      id = exec(contract, tx.payload.functionName.content, args, sender, tx.postConditions.values, `${sender.slice(0, 6)} ${tx.payload.functionName.content}`);
-    } else {
-      const to = T.cvToString(tx.payload.recipient), amt = BigInt(tx.payload.amount);
-      const res = muted(() => simnet.transferSTX(amt, to, sender));
-      id = newTx(res.result.type === 'ok' ? 'success' : 'abort_by_response', pp(res.result));
-    }
-    return json(id.slice(2));
-  }
-  return json({}, 404);
+  const rq = r.request();
+  const out = C.handle({ url: rq.url(), method: rq.method(), body: rq.postDataBuffer() });
+  if (out.abort) return r.abort();
+  return r.fulfill({ status: out.status, headers: out.headers, body: out.body });
 }
 
 (async () => {
   if (!fs.existsSync(HTML)) throw new Error(`${HTML} not found: run npm run build:canary:arcade-v2-launch first`);
-  await setupChain();
+  console.log(await C.setup());
+  simnet = C.sim();
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1000, height: 900 }, acceptDownloads: true });

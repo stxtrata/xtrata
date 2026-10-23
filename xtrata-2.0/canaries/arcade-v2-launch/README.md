@@ -132,6 +132,30 @@ kinds (removed straight after; "Remove the temporary KINDS admin" does it at any
 (handed back straight after; "Return leaderboard ownership to my wallet"). Every role is read from the chain, so any step resumes.
 Each kind records the temporary wallet in its `owner` field; neither the contract nor the hall uses that field.
 
+## The headless runner (testnet only)
+
+The build also writes `canaries/build/arcade-v2-launch-runner.mjs`: the same steps (`engine.ts`) for Node, signed with a key file,
+for a machine that can reach the Hiro testnet API. It refuses mainnet outright, before anything is read, and every send goes
+through the arcade-world ops guard (`contracts/arcade-world/ops/lib/guard.mjs`): `--execute`, `XA_OPS_CONFIRM=broadcast-testnet`,
+a key file that is not the mainnet admin wallet's key, and no `ops/KILL` file (checked again before every transaction).
+
+```bash
+# the key's address must be the testnet root the canary is built for
+XA_TESTNET_ROOT=ST… npm run build:canary:arcade-v2-launch
+node canaries/build/arcade-v2-launch-runner.mjs --network testnet --address ST… --list     # the steps
+node canaries/build/arcade-v2-launch-runner.mjs --network testnet --address ST…            # dry run: reads, sends nothing
+XA_OPS_CONFIRM=broadcast-testnet node canaries/build/arcade-v2-launch-runner.mjs \
+  --network testnet --execute --key-file ./testnet-root.key [--yes] [--steps a,b] [--forget]
+```
+
+It runs connect, preflight, the testnet core and fixtures, the deploys, the registry (kinds through the temporary KINDS admin,
+the hall, setup, the read-back with `ops/lib/hallread.mjs`, the hall's own reader in a vm), the packs, the parent, the release
+check (without the boot, which needs a browser) and the ownership check: 32 transactions from the root key on a fresh testnet.
+The run proof, the board moves and the audit need the embedded arcade and stay in the page; the runner refuses them. Progress and
+the temporary wallet's key live in `~/.xtrata-arcade-v2-launch/testnet.json` (mode 600; `--state-dir` to move it). The default
+testnet root is the mainnet admin's own key, which the guard never accepts, so build with `XA_TESTNET_ROOT` set to a disposable
+key's address.
+
 ## After a launch
 
 The audit step prints the ids. Then, in one commit:
@@ -147,7 +171,14 @@ The audit step prints the ids. Then, in one commit:
 npm run build:canary:arcade-v2-launch
 NODE_PATH=<dir with playwright> CHROME_PATH=<chromium> node canaries/arcade-v2-launch/mock-chain-test.cjs
 TESTNET=1 NODE_PATH=... CHROME_PATH=... node canaries/arcade-v2-launch/mock-chain-test.cjs
+node canaries/arcade-v2-launch/runner-test.cjs     # the headless runner, no browser
 ```
+
+`mock-chain.cjs` is the chain both use; `handle()` answers one HTTP request from the simnet, so the page test puts it behind a
+Playwright route and the runner test behind a `fetch` stub. The runner test builds a copy of the canary for a disposable testnet
+key (in a temporary folder) and proves: mainnet refused before any read; no `XA_OPS_CONFIRM`, or a KILL file, refused with nothing
+sent; a key that is not the root, and a page-only step, refused; a dry run reads and stops at the first send; `--execute` runs the
+whole testnet launch (32 root transactions, kinds by the temporary admin, read back by the hall's reader); a re-run sends nothing.
 
 The chain is a clarinet-sdk simnet (`simnet/Clarinet.toml`, no contracts of its own). Every contract runs there as real Clarity at
 the address the canary expects: the mainnet core with the two contracts it reads and its SIP-009 trait, the leaderboard, and the

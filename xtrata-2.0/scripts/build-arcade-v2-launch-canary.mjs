@@ -251,7 +251,7 @@ const launchPlugin = {
 };
 const dir = resolve(root, 'canaries/arcade-v2-launch');
 const builtAt = new Date();
-const stamp = `v2-${ids.version}-${builtAt.toISOString().slice(0, 10)}-${sha(readFileSync(resolve(dir, 'main.ts')) + readFileSync(resolve(dir, 'engine.ts')) + readFileSync(resolve(AW, 'ops/lib/v2-plan.mjs')) + readFileSync(resolve(root, 'canaries/collection-v17/wallet.ts'), 'utf8') + releaseSha).slice(0, 8)}`;
+const stamp = `v2-${ids.version}-${builtAt.toISOString().slice(0, 10)}-${sha(readFileSync(resolve(dir, 'main.ts')) + readFileSync(resolve(dir, 'engine.ts')) + readFileSync(resolve(dir, 'runner.ts')) + readFileSync(resolve(AW, 'ops/lib/v2-plan.mjs')) + readFileSync(resolve(root, 'canaries/collection-v17/wallet.ts'), 'utf8') + releaseSha).slice(0, 8)}`;
 const result = await build({
   entryPoints: [resolve(dir, 'main.ts')],
   bundle: true, format: 'iife', platform: 'browser', target: 'es2020', minify: true, write: false,
@@ -266,11 +266,25 @@ const result = await build({
 // Inline-script safety: the embedded arcade holds both "</script" and "<!--" inside JS strings.
 const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--');
 const html = readFileSync(resolve(dir, 'template.html'), 'utf8').replace('/*BUNDLE*/', () => js);
-mkdirSync(resolve(root, 'canaries/build'), { recursive: true });
-const out = resolve(root, 'canaries/build/arcade-v2-launch-canary.html');
+// XA_CANARY_OUT_DIR: write somewhere else (the runner test builds a copy for a disposable testnet root there).
+const outDir = process.env.XA_CANARY_OUT_DIR ? resolve(process.env.XA_CANARY_OUT_DIR) : resolve(root, 'canaries/build');
+mkdirSync(outDir, { recursive: true });
+const out = resolve(outDir, 'arcade-v2-launch-canary.html');
 writeFileSync(out, html);
+// The headless runner (testnet only): the same engine, a key-file signer behind the ops guard, for Node.
+const runner = await build({
+  entryPoints: [resolve(dir, 'runner.ts')],
+  bundle: true, format: 'esm', platform: 'node', target: 'node20', write: false,
+  plugins: [launchPlugin],
+  banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
+  define: { __BUILD__: JSON.stringify(stamp), __BUILT_AT__: JSON.stringify(builtAt.toISOString()) },
+  legalComments: 'none'
+});
+const runnerOut = resolve(outDir, 'arcade-v2-launch-runner.mjs');
+writeFileSync(runnerOut, runner.outputFiles[0].text);
 const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
 console.log(`built ${out} (${(html.length / 1024).toFixed(0)} KB) build ${stamp}`);
+console.log(`built ${runnerOut} (the testnet-only headless runner)`);
 console.log(`Xtrata Arcade ${ids.version} (v2 world) · release sha256 ${releaseSha}`);
 for (const n of inscribe) console.log(`  inscribes pack ${n.padEnd(7)} ${kb(Buffer.byteLength(packs[n])).padStart(10)} · ${Math.ceil(Buffer.byteLength(packs[n]) / CHUNK)} chunks · sha256 ${release.packSha[n]}`);
 console.log(`  from bundle #${BUNDLE_ID}: ${release.fromBundle.join(', ')}`);

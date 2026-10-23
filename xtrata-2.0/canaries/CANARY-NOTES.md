@@ -168,3 +168,14 @@ A throwaway wallet cannot sign owner-only calls, so hand it ownership for the ru
   read from mainnet's own copy and used only if it hashes to the pin, and a stand-in for the parent inscription), find each by
   its chain hash on a re-run, and never offer those steps on mainnet. The core itself needs the testnet SIP-009 trait and the
   two older contracts it reads, deployed first, at Clarity 3 (`as-contract` is gone in Clarity 4).
+
+### A headless runner shares the engine, not the page
+
+- Keep the steps in a module with no DOM and pass the page's abilities in (wallet, file save, confirm, the browser-only checks).
+  A Node runner then supplies a key-file signer and runs the same steps; steps that need the page (anything that flies a run in
+  the embedded arcade, and everything gated on it) are marked and refused by the runner.
+- Testnet only, behind the ops guard (`--execute`, `XA_OPS_CONFIRM`, a key that is not the admin's, no KILL file), checked
+  again before every transaction. Refuse mainnet before reading anything.
+- `@stacks/transactions` v6 cannot build a Clarity 4 deploy ("Cannot recognize ClarityVersion: 4"); a wallet does it for the
+  page, but a key-file signer must use v7 (as the ops tools do). The runner test found this; test the runner too, with `fetch`
+  answered by the same mock chain.

@@ -930,11 +930,12 @@ export const STEPS: Step[] = [
       // boards
       need += FUND_AMOUNT + boardFloat(PRODUCTION.length) + 8n * FEE_EST.call;
       save();
-      if (!state.run) { state.run = await makeRun(w.address); save(); }
+      // The run proof needs the embedded arcade (the page). A host without it (the Node runner) stops before the score steps.
+      if (!state.run && host.withArcade) { state.run = await makeRun(w.address); save(); }
       const balance = await chain.balance(w.address);
       if (balance < need) throw new Error(`The root wallet holds ${stx(balance)}, below the ~${stx(need)} this run may need (deploys estimated at ${FEE_EST.deployPerByte} µSTX per byte, about ${stx(FEE_EST.call)} per call, inscription fees as quoted, the temporary wallet's floats, and a ${stx(FEE_EST.buffer)} buffer). Top it up and run preflight again.`);
       step('preflight').data = { coreMissing };
-      return `${network} · root wallet ${short(w.address)} confirmed · ${notes.join(' · ')} · to do: ${plan.join(', ')} · real run flown: ${state.run.game} scored ${state.run.score} and verified · balance ${stx(balance)} covers the ~${stx(need)} estimated`;
+      return `${network} · root wallet ${short(w.address)} confirmed · ${notes.join(' · ')} · to do: ${plan.join(', ')} · ${state.run ? `real run flown: ${state.run.game} scored ${state.run.score} and verified` : 'no run flown (this host has no arcade: the score steps need the page)'} · balance ${stx(balance)} covers the ~${stx(need)} estimated`;
     }
   },
   {
@@ -1471,6 +1472,11 @@ export const STEPS: Step[] = [
   }
 ];
 export const steps = () => STEPS.filter((s) => !s.testnetOnly || network === 'testnet');
+/**
+ * Steps only the page can run: the run proof (flying and re-playing a run needs the embedded arcade) and everything gated on it
+ * (the production boards move only after the canary board has proven the release), and the audit, which checks the boards.
+ */
+export const BROWSER_ONLY = new Set(['board', 'submit', 'fund', 'copy', 'sweep', 'close', 'boardwallet', 'handover', 'production', 'handback', 'audit']);
 
 /** Every address an `admin-set` print event of `contractId` named (Hiro's contract events, newest first, at most 20 pages). */
 const adminEvents = async (contractId: string) => {
