@@ -3,7 +3,8 @@
 //   T2  the 21 built-in games are unchanged: same order, replay numbers
 //   T3  Sat Catcher (score board, higher wins) and Arrow Sprint (time board, lower wins): a ranked run is recorded, finishes, and is verified
 //       by replaying it; the same replay is refused on the other game's board
-//   T4  pictures of both games are saved to $XA_SHOTS (default tests/out) for a look
+//   T4  the testnet view page (ops/view.mjs --games --core) shows the same two games: it holds back the hall until the games contract is read
+//   T5  pictures of both games are saved to $XA_SHOTS (default tests/out) for a look
 // Run: NODE_PATH=<playwright + @stacks/transactions> CHROME_PATH=... node tests/hall-testgames.test.cjs
 const { chromium } = require('playwright');
 const T = require('@stacks/transactions');
@@ -12,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 const crypto = require('crypto');
+const { pathToFileURL } = require('url');
 const MC = require('./lib/mock-chain.cjs');
 
 const ROOT = path.join(__dirname, '..');
@@ -61,7 +63,7 @@ const chainWith = (items, extra) => MC.createChain(Object.assign({ games: { heig
     const chain = opts.chain || null;
     const ctx = await browser.newContext({ viewport: { width: 1100, height: 700 } });
     const reads = {};
-    await ctx.route('https://api.mainnet.hiro.so/**', async (route) => {
+    await ctx.route((opts.host || 'https://api.mainnet.hiro.so') + '/**', async (route) => {
       const req = route.request();
       const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' };
       if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
@@ -99,7 +101,7 @@ const chainWith = (items, extra) => MC.createChain(Object.assign({ games: { heig
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|WebGL|GPU|404|ERR_FAILED|503/.test(m.text())) errors.push(m.text()); });
-    await page.goto(base + file);
+    await page.goto(base + file, { timeout: 120000 });
     await page.waitForFunction(() => !document.getElementById('xa-load') || document.getElementById('xa-load').classList.contains('done') ||
       !document.getElementById('xa-load-err').hidden, null, { timeout: 180000 });
     const loadErr = await page.evaluate(() => { const e = document.getElementById('xa-load-err'); return e && !e.hidden ? e.textContent : ''; });
@@ -196,6 +198,24 @@ const chainWith = (items, extra) => MC.createChain(Object.assign({ games: { heig
   }, spr.hex);
   check(!tamper.ok, 'T3: a tampered replay is refused (' + tamper.reason + ')');
 
+  /* ------------------------------------------------ the testnet view page */
+  const PV = await import(pathToFileURL(path.join(ROOT, '..', '..', 'contracts', 'arcade-world', 'ops', 'lib', 'preview.mjs')).href);
+  const TN = 'ST2J1GW1WDZ5ZZ0M37FRD17EHP602TVDVY1HME6XJ';
+  pages['/view.html'] = PV.buildTestnetViewHtml({ world: TN + '.xtrata-world-v1', posters: TN + '.xtrata-posters-v1', screen: TN + '.xtrata-screen-v1', scores: TN + '.xtrata-arcade-scores-v2',
+    registry: TN + '.xtrata-world-v2', games: TN + '.xtrata-games-v1', core: TN + '.xtrata-v3-2-3', hallHtml: fs.readFileSync(path.join(DIST, 'xtrata-arcade-v2.0.0.html'), 'utf8') });
+  const rv = await open('/view.html', { chain: chainWith(items), gateway: 'serve', host: 'https://api.testnet.hiro.so' });
+  await rv.page.waitForFunction(() => window.XAHall && window.XAHall.layout && window.XAGamesRegistry && window.XAGamesRegistry.status().done, null, { timeout: 90000 });
+  const gv = await rv.page.evaluate(() => ({ ids: window.XA.games.map((x) => x.id), st: window.XAGamesRegistry.status(), cfg: window.XAScores.config().contentContractId, cabs: window.XAHall.layout().cabinets.length }));
+  check(!rv.loadErr && gv.st.ok && gv.st.loaded.join() === 'xa_test_catcher,xa_test_sprint', 'T4: the testnet view page read the games contract and loaded both games (' + gv.st.loaded.join(', ') + (gv.st.error ? ', error ' + gv.st.error : '') + ')');
+  check(gv.ids.length === 23 && gv.cabs === 23 && gv.cfg === TN + '.xtrata-v3-2-3', 'T4: so the testnet view page has 23 games and 23 cabinets, and reads cartridges from the testnet core');
+  check(!rv.errors.length, 'T4: no page errors in the view page ' + rv.errors.slice(0, 2).join(' | '));
+  await rv.ctx.close();
+  pages['/view-off.html'] = PV.buildTestnetViewHtml({ world: TN + '.xtrata-world-v1', posters: TN + '.xtrata-posters-v1', hallHtml: fs.readFileSync(path.join(DIST, 'xtrata-arcade-v2.0.0.html'), 'utf8') });
+  const rvo = await open('/view-off.html', { chain: chainWith(items), gateway: 'serve', host: 'https://api.testnet.hiro.so' });
+  await rvo.page.waitForFunction(() => window.XAHall && window.XAHall.layout, null, { timeout: 90000 });
+  check(await rvo.page.evaluate(() => window.XA.games.length) === 21, 'T4: a view page built without --games is the plain 21 games');
+  await rvo.ctx.close();
+
   /* ------------------------------------------------ pictures */
   const shots = process.env.XA_SHOTS || path.join(__dirname, 'out');
   fs.mkdirSync(shots, { recursive: true });
@@ -225,8 +245,8 @@ const chainWith = (items, extra) => MC.createChain(Object.assign({ games: { heig
     }, [id, drv, steps]);
     fs.writeFileSync(path.join(shots, id + '.png'), Buffer.from(png.split(',')[1], 'base64'));
   }
-  check(fs.statSync(path.join(shots, 'xa_test_catcher.png')).size > 3000 && fs.statSync(path.join(shots, 'xa_test_sprint.png')).size > 3000, 'T4: pictures of both games saved to ' + shots);
-  check(!r.errors.length, 'T4: no page errors in the hall ' + r.errors.slice(0, 2).join(' | '));
+  check(fs.statSync(path.join(shots, 'xa_test_catcher.png')).size > 3000 && fs.statSync(path.join(shots, 'xa_test_sprint.png')).size > 3000, 'T5: pictures of both games saved to ' + shots);
+  check(!r.errors.length, 'T5: no page errors in the hall ' + r.errors.slice(0, 2).join(' | '));
   await r.ctx.close();
   await browser.close();
   srv.close();
