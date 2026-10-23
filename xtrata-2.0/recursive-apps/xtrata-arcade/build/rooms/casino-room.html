@@ -1637,18 +1637,81 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       this.deckHold = { prop, count, cardPitch, age: 0 }; this.playAnimation('HoldDeck', .45); return this;
     }
     releaseDeck(parent = this.object.parent) { if (this.sequence || !this.deckHold) return null; const prop = this.releaseProp('L', parent); this.deckHold = null; this.playAnimation('Idle', .4); return prop; }
+    /** The skinned world positions of every vertex that belongs (mostly) to one hand: wrist, palm and fingers. */
+    handPoints(side, step) {
+      step = step || 4;
+      const rx = new RegExp('(wrist|hand|finger|thumb|index|middle|ring|pinky)[^ ]*_' + side + '$');
+      if (!this._hv) this._hv = {};
+      if (!this._hv[side]) {
+        this._hv[side] = [];
+        this.model.traverse((o) => {
+          if (!o.isSkinnedMesh) return;
+          const si = o.geometry.attributes.skinIndex.array, sw = o.geometry.attributes.skinWeight.array, bones = o.skeleton.bones, idx = [];
+          for (let i = 0; i < o.geometry.attributes.position.count; i += step) { let w = 0; for (let k = 0; k < 4; k++) if (sw[i * 4 + k] > 0 && rx.test(bones[si[i * 4 + k]].name)) w += sw[i * 4 + k]; if (w >= 0.6) idx.push(i); }
+          if (idx.length) this._hv[side].push({ o, idx });
+        });
+      }
+      const out = [], v = V(), acc = V(), tmp = V(), m = new THREE.Matrix4();
+      for (const { o, idx } of this._hv[side]) {
+        o.skeleton.update(); const pos = o.geometry.attributes.position, si = o.geometry.attributes.skinIndex.array, sw = o.geometry.attributes.skinWeight.array, bm = o.skeleton.boneMatrices;
+        for (const i of idx) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(o.bindMatrix); acc.set(0, 0, 0);
+          for (let k = 0; k < 4; k++) { const wk = sw[i * 4 + k]; if (!wk) continue; m.fromArray(bm, si[i * 4 + k] * 16); acc.add(tmp.copy(v).applyMatrix4(m).multiplyScalar(wk)); }
+          out.push(acc.clone().applyMatrix4(o.bindMatrixInverse).applyMatrix4(o.matrixWorld));
+        }
+      }
+      return out;
+    }
+    /** The table parts of a station (felt, rail, rim): big and fixed. People, glows, sprites and the small things that come and go are left out. */
+    surfaceMeshes(group) {
+      const out = [], up = (o) => { for (; o; o = o.parent) { if (!o.visible || (o.userData && o.userData.xaHost)) return false; } return true; };
+      group.updateMatrixWorld(true);
+      group.traverse((o) => {
+        if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || !up(o)) return;
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        if (m && (m.transparent || m.blending === THREE.AdditiveBlending || m.depthWrite === false)) return;
+        const bb = new THREE.Box3().setFromObject(o); if (Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) < 0.5) return;   // only the table itself: cards, chips and trays come and go, and a hand must not rest on them
+        out.push(o);
+      });
+      return out;
+    }
+    /** How far the lowest point of a hand is above the table under it (negative = sunk in); null when nothing is beneath the hand. */
+    handClearance(side, targets, margin) {
+      const ray = new THREE.Raycaster(); ray.near = 0; ray.far = 0.8;
+      let worst = null;
+      for (const p of this.handPoints(side, 5)) {
+        ray.set(V(p.x, p.y + 0.4, p.z), V(0, -1, 0));
+        const hit = ray.intersectObjects(targets, false)[0]; if (!hit) continue;
+        const c = p.y - hit.point.y; if (worst === null || c < worst) { worst = c; this.lastHit = hit.object; }
+      }
+      return worst === null ? null : worst - (margin || 0);
+    }
     /** One-shot arm rest: palms on the table rail, hands clasped behind the back, or resting on the knees when seated.
      *  Captured once, then blended back in whenever the host is idle - so greetings and deals still play freely
      *  and the hands never sink into the felt while he stands at his table. */
     restPose(kind, opt) {
       opt = opt || {};
       const s = this.object.scale.x || 1, rig = this.rig;
-      rig.reset();
-      if (this.seat) { this.bones.Hips.position.y -= this.seat.drop; for (const [n, q] of Object.entries(this.seat.quats)) this.bones[n].quaternion.copy(q); }
-      this.model.updateMatrixWorld(true);
+      // the arms are solved on top of the body exactly as the Idle clip leaves it (spine, shoulders and all), because that is the body they will be blended back onto every frame
+      rig.reset(); this.mixer.update(0); const clipPose = this.capturePose();
+      const body = () => { this.restorePose(clipPose); for (const d of this.shapeDeltas) d.bone.position.add(d.delta); if (this.seat) { this.bones.Hips.position.y -= this.seat.drop; for (const [n, q] of Object.entries(this.seat.quats)) this.bones[n].quaternion.copy(q); } this.model.updateMatrixWorld(true); };
+      body();
       if (kind === 'table') {
-        const y = (opt.y || 0.975) / s, fwd = (opt.fwd || 0.30) / s;
-        [['L', 1], ['R', -1]].forEach(([side, sx]) => { rig.arm(side, V(sx * 0.19, y, fwd), { palm: 'down', forward: V(sx * 0.18, 0, 1).normalize() }); rig.hand(side, 'relaxed'); });
+        // the wrists start at the rail height and are then nudged up (or down) until the lowest point of each flat hand just touches whatever the table is under it
+        const fwd = (opt.fwd || 0.30) / s, margin = opt.margin == null ? 0.008 : opt.margin, targets = opt.surface ? this.surfaceMeshes(opt.surface) : null;
+        const ty = { L: (opt.y || 0.975) / s, R: (opt.y || 0.975) / s }, done = { L: !targets, R: !targets }; this.restClear = {};
+        for (let it = 0; it < 7; it++) {
+          body();
+          [['L', 1], ['R', -1]].forEach(([side, sx]) => { rig.arm(side, V(sx * 0.19, ty[side], fwd), { palm: 'down', forward: V(sx * 0.18, 0, 1).normalize() }); rig.hand(side, 'open', 0.7); });
+          this.model.updateMatrixWorld(true);
+          if (!targets) break;
+          for (const side of ['L', 'R']) {
+            if (done[side]) continue;
+            const need = this.handClearance(side, targets, margin); this.restClear[side] = need; (this.restHit = this.restHit || {})[side] = this.lastHit;
+            if (need === null || Math.abs(need) < 0.002) done[side] = true; else ty[side] -= Math.max(-0.12, Math.min(0.12, need)) / s;
+          }
+          if (done.L && done.R) break;
+        }
       } else if (kind === 'back') {
         [['L', 1], ['R', -1]].forEach(([side, sx]) => { rig.arm(side, V(sx * 0.085, 0.95, -0.17)); rig.hand(side, 'relaxed'); });
       } else if (kind === 'lap') {
@@ -1659,7 +1722,8 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       }
       const quats = {};
       ['upperarm01_L', 'lowerarm01_L', 'lowerarm02_L', 'wrist_L', 'upperarm01_R', 'lowerarm01_R', 'lowerarm02_R', 'wrist_R'].forEach((n) => { if (this.bones[n]) quats[n] = this.bones[n].quaternion.clone(); });
-      rig.reset(); this.model.updateMatrixWorld(true);
+      for (const side of ['L', 'R']) for (let f = 2; f <= 5; f++) for (let j = 1; j <= 3; j++) { const n = 'finger' + f + '_' + j + '_' + side; if (this.bones[n]) quats[n] = this.bones[n].quaternion.clone(); }   // the fingers lie as flat as they were solved
+      this.restorePose(clipPose); this.model.updateMatrixWorld(true);
       this.rest = { quats }; this.restW = 0;
       this.mixerPose = this.capturePose(); this.corePose = this.capturePose();
       return this;
@@ -1799,13 +1863,14 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     const person = PEOPLE[h.person] || PEOPLE.m1;
     const c = new HostController(asset, person);
     c.object.position.set(h.x, 0, h.z); c.object.rotation.y = h.yaw || 0;
+    c.object.userData.xaHost = true;
     applyLook(c.model, person.look || {});
     if (h.wear) dressCivilian(c.model, h.wear);
     else applyLook(c.model, LIVERY[h.livery] || {});
     addHairDo(c, person.hairDo, person.hairColor || 0x442c16);
     (h.parent || h.group).add(c.object);
     if (h.seat) { c.sitOn(h.seat.h || 0.57); c.restPose('lap'); }
-    else if (h.rest) c.restPose(typeof h.rest === 'string' ? h.rest : h.rest.kind, typeof h.rest === 'string' ? {} : h.rest);
+    else if (h.rest) c.restPose(typeof h.rest === 'string' ? h.rest : h.rest.kind, typeof h.rest === 'string' ? {} : Object.assign({ surface: h.group }, h.rest));
     if (h.fig) {   // the woodcut figure steps aside and every verb of theirs comes here
       h.fig.group.visible = false;
       const F = (k) => () => gesture(h, k, lastT);

@@ -73,6 +73,13 @@ ok('A: the preview copies .glb files', fs.readFileSync(path.join(ROOT, 'build', 
       let coatHidden = false; civvy.ctrl.model.traverse((o) => { if (o.isMesh && o.material.name === 'Midnight waistcoat' && !o.visible) coatHidden = true; });
       return coat(0) !== coat(1) && coat(1) !== coat(3) && coat(3) !== coat(4) && coatHidden;
     }));
+    // the dealers' hands lie ON the table, not in it: with the rest pose fully blended in, the lowest point of each hand is at (or a hair above) the surface beneath it
+    const hands = await page.evaluate(() => XA_HOSTS.hosts.filter((h) => h.rest && h.rest.kind === 'table').map((h) => {
+      const c = h.ctrl, t = c.surfaceMeshes(h.group); c.restW = 1; c.update(0.001);
+      return [h.person, c.handClearance('L', t, 0), c.handClearance('R', t, 0)];
+    }));
+    ok('C: five dealers, and no dealer\'s hand sinks into the table', hands.length === 5 && hands.every(([, l, r]) => l !== null && r !== null && l > -0.012 && r > -0.012), hands);
+    ok('C: and none hovers over it either', hands.every(([, l, r]) => l < 0.04 && r < 0.04), hands);
   }
 
   // ---------- D. the arch is a doorway and the salon has walls ----------
