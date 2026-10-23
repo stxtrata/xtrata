@@ -5,6 +5,8 @@
 //   C  walking in             W walks through the doorway into the room, the view never jumps (x changes smoothly), walls stop you inside
 //   D  held open              inside, the door stays open; walking back out works
 //   E  other links            a door to some other room still says "not open yet", and without a lobby door there is no lobby
+//   F  two doorways           the lobby's two doorways stand exactly where they always did (BASELINE=<older dist html> also compares the picture)
+//   G  six doorways           two on the back wall, two on each side wall: all drawn, none overlapping, each one walked through and back
 // Run: NODE_PATH=<playwright> CHROME_PATH=... [SHOTS=<dir>] node tests/hall-lobby.test.cjs
 const { chromium } = require('playwright');
 const http = require('http');
@@ -22,13 +24,14 @@ const LOOKS = {
   2: { kind: 2, name: 'Sign', tier: 0, builtin: 'sign-board', hidden: false, approved: true },
   20: { kind: 0, name: 'Arch door', tier: 0, builtin: 'door-arch', hidden: false, approved: true },
 };
-const door = (interaction, link) => ({ base: 'door', baseId: 2, interaction, doorLook: 20, layers: [], link: link || null, fromHeight: 0 });
+const door = (interaction, link, layers) => ({ base: 'door', baseId: 2, interaction, doorLook: 20, layers: layers || [], link: link || null, fromHeight: 0 });
 const bay = (sc) => ({ scene: sc || null, nextHeight: null, height: 0 });
 const snapshot = (bays) => ({ versions: { posters: 1, world: 1 }, at: 0, posters: [], pins: [], pinned: {}, suppressed: [], bays, looks: LOOKS });
 const LOBBY = { 'target-room': 'lobby', 'arrival-bay': 0, path: '' };
 
 (async () => {
-  const srv = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(HTML); });
+  const STUB = '<!doctype html><title>stub room</title><body style="background:#123;color:#fff"><h1>ROOM</h1></body>';
+  const srv = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(/casino-room\.html/.test(req.url) ? STUB : HTML); });
   await new Promise((r) => srv.listen(0, r));
   const base = 'http://127.0.0.1:' + srv.address().port + '/';
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH,
@@ -121,6 +124,100 @@ const LOBBY = { 'target-room': 'lobby', 'arrival-bay': 0, path: '' };
     assert(await page.evaluate(() => window.__toast === true), 'the not-open-yet line never showed');
     check(true, 'E: walking into it says the door leads to VAULT and is not open yet');
     check(!errors.length, 'E: no page errors ' + errors.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+  /* ---- F, G: the lobby's doorways come from how many it has ---- */
+  const lobbyDoor = (i) => bay(door(3, { 'target-room': 'casino', 'arrival-bay': 0, path: '' }, [{ slot: 2, look: 2, params: JSON.stringify({ text: 'door ' + i }), state: '' }]));
+  const lobbySnap = (n) => Object.assign(snapshot([bay(door(3, LOBBY)), bay(null), bay(null), bay(null)]), { rooms: { lobby: { bays: Array.from({ length: n }, (_, i) => lobbyDoor(i)) } } });
+  const geometry = (page) => page.evaluate(() => { const s = window.XA.bayState(); return s.bays.slice(4).map((b, k) => ({ visible: b.visible, door: b.door, pos: b.pos, frame: window.XA.doorFrame(4 + k) })); });
+  // where the two lobby doorways always were (hall.js before the count: x -2.2 / 2.2 on the back wall, facing the way in), in world space
+  // for a lobby behind bay 0: the lobby's frame is rotated -90 degrees about y and stands at the hall's left wall
+  async function walkThrough(page, i) {
+    await openDoor(page, i); await page.waitForTimeout(500);
+    const pose = () => page.evaluate((n) => { const p = window.XA.bayState().bays[n].pos, f = window.XA.doorFrame(n); window.XA.pose(p.x + f.nx * 1.6, p.z + f.nz * 1.6, Math.atan2(f.nx, f.nz), -0.05); }, i);
+    await pose(); await page.waitForTimeout(600);
+    await page.keyboard.down('KeyW');
+    try {
+      for (let k = 0; k < 300 && (await page.evaluate(() => window.XA.roomState().state)) !== 'room'; k++) {
+        await page.evaluate((n) => { const w = window.XA.where(), f = window.XA.doorFrame(n); window.XA.pose(w.x, w.z, Math.atan2(f.nx, f.nz), -0.05); }, i);
+        await page.waitForTimeout(250);
+      }
+    } finally { await page.keyboard.up('KeyW'); }
+    await page.waitForFunction(() => window.XA.roomState().state === 'room' && window.XA.roomState().back, null, { timeout: 120000 });
+    await page.click('#xa-room-back');
+    await page.waitForFunction(() => window.XA.roomState().state === 'walk', null, { timeout: 120000 });
+    return page.evaluate((n) => { const w = window.XA.where(), p = window.XA.bayState().bays[n].pos, f = window.XA.doorFrame(n); return { d: Math.hypot(w.x - (p.x + f.nx * 1.2), w.z - (p.z + f.nz * 1.2)), inside: window.XA.lobbyState().inside }; }, i);
+  }
+  {
+    /* ---- F: two doorways, exactly as before ---- */
+    const { ctx, page, errors } = await open(lobbySnap(2));
+    await page.evaluate(() => { window.XA_ROOMS = { casino: { src: 'casino-room.html', title: 'Casino' } }; });
+    const g = await geometry(page);
+    check(g.length === 2, 'F: with two lobby bays the engine still has six bays (the hall four, the lobby two)');
+    // the old constants: the lobby frame is at (wallX - WALL_T, 0, z) rotated by -PI/2 (lobby behind the left wall); a back-wall door at (x, LD - .02)
+    const ls0 = await ls(page), LD = 10, WT = 0.2;
+    const old = [-2.2, 2.2].map((x) => ({ x: ls0.pass.wallX - WT - (LD - 0.02), z: ls0.pass.z + x }));
+    check(g.every((b, k) => b.visible && b.door && Math.abs(b.frame.x - old[k].x) < 1e-6 && Math.abs(b.frame.z - old[k].z) < 1e-6 && Math.abs(b.frame.nx - 1) < 1e-6 && Math.abs(b.frame.nz) < 1e-6),
+      'F: the two doorways stand exactly where they always did, on the back wall facing the way in (' + g.map((b) => b.frame.x.toFixed(3) + ',' + b.frame.z.toFixed(3)).join(' / ') + ')');
+    if (process.env.BASELINE) {
+      // optional: the same view in an older build (BASELINE=<a dist/xtrata-arcade-v*.html from before this change>) is the same picture
+      await openDoor(page, 0);
+      await page.waitForFunction(() => window.XA.lobbyState().open === true, null, { timeout: 120000 });
+      await page.evaluate(() => window.XA.pose(-6.5, -13.135, -Math.PI / 2, -0.02)); await page.waitForTimeout(2500);
+      const a = await page.screenshot({ clip: { x: 150, y: 100, width: 800, height: 500 } });
+      await page.close();   // (one WebGL hall at a time: two software-rendered halls side by side starve each other)
+      const bsrv = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(fs.readFileSync(process.env.BASELINE)); });
+      await new Promise((r) => bsrv.listen(0, r));
+      const c2 = await browser.newContext({ viewport: { width: 1100, height: 700 } });
+      await c2.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort('failed'));
+      await c2.addInitScript((s) => { window.XA_TEST = 1; window.XA_WORLD_CONFIG = { posters: 'SP000000000000000000002Q6VF78.xtrata-posters-v1', world: 'SP000000000000000000002Q6VF78.xtrata-world-v1' }; try { localStorage.setItem('xa-world-snap-v1', JSON.stringify(s)); } catch (e) {} }, lobbySnap(2));
+      const p2 = await c2.newPage();
+      await p2.goto('http://127.0.0.1:' + bsrv.address().port + '/', { timeout: 180000, waitUntil: 'domcontentloaded' });
+      await p2.waitForFunction(() => window.XA && window.XA.wallState && window.XA.wallState().length >= 27 && window.XA.wallState().every((s) => s.head !== null), null, { timeout: 120000 });
+      await p2.waitForTimeout(1500); await p2.click('#go'); await p2.waitForTimeout(600);
+      await p2.evaluate(() => window.XA.bayDoor(0, (m) => { m.cfg.locked = false; m.angle = m.cfg.openAngle; m.vel = 0; m.mode = 'free'; m.wake(); }));
+      await p2.waitForFunction(() => window.XA.lobbyState().open === true, null, { timeout: 120000 });
+      await p2.evaluate(() => window.XA.pose(-6.5, -13.135, -Math.PI / 2, -0.02)); await p2.waitForTimeout(2500);
+      const b = await p2.screenshot({ clip: { x: 150, y: 100, width: 800, height: 500 } });
+      // decode both screenshots in the browser and count the pixels that differ visibly
+      const frac = await p2.evaluate(async ([x, y]) => {
+        const px = async (b64) => { const im = await createImageBitmap(await (await fetch('data:image/png;base64,' + b64)).blob()); const c = new OffscreenCanvas(im.width, im.height), g = c.getContext('2d'); g.drawImage(im, 0, 0); return g.getImageData(0, 0, im.width, im.height).data; };
+        const A = await px(x), B = await px(y); let d = 0;
+        for (let k = 0; k < A.length; k += 4) if (Math.abs(A[k] - B[k]) + Math.abs(A[k + 1] - B[k + 1]) + Math.abs(A[k + 2] - B[k + 2]) > 24) d++;
+        return d / (A.length / 4);
+      }, [a.toString('base64'), b.toString('base64')]);
+      check(frac < 0.01, 'F: the same view in the older build is the same picture (' + (100 * frac).toFixed(3) + '% of pixels differ visibly)');
+      await c2.close(); bsrv.close();
+    }
+    check(!errors.length, 'F: no page errors ' + errors.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+  {
+    /* ---- G: six doorways: two on the back wall, two on each side wall; every one is drawn and can be walked through ---- */
+    const { ctx, page, errors } = await open(lobbySnap(6));
+    await page.evaluate(() => { window.XA_ROOMS = { casino: { src: 'casino-room.html', title: 'Casino' } }; });
+    await openDoor(page, 0);
+    await page.waitForFunction(() => window.XA.lobbyState().open === true, null, { timeout: 120000 });
+    await page.evaluate(() => window.XA.pose(-8, -13.1, -Math.PI / 2, -0.05));
+    await page.waitForFunction(() => window.XA.lobbyState().inside === true, null, { timeout: 120000 });
+    const g = await geometry(page);
+    check(g.length === 6 && g.every((b) => b.visible && b.door), 'G: six lobby doorways, each with its door (' + g.length + ')');
+    const nrm = g.map((b) => [Math.round(b.frame.nx), Math.round(b.frame.nz)].join(','));
+    check(nrm[0] === '1,0' && nrm[1] === '1,0' && nrm[2] === nrm[4] && nrm[3] === nrm[5] && nrm[2] !== nrm[3] && nrm[2] !== '1,0', 'G: two face the way in from the back wall, two face each other from each side wall (' + nrm.join(' | ') + ')');
+    let apart = true; for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) if (Math.hypot(g[a].frame.x - g[b].frame.x, g[a].frame.z - g[b].frame.z) < 2.3) apart = false;
+    check(apart, 'G: no two doorways overlap (all at least 2.3 m apart)');
+    await page.evaluate(() => window.XA.pose(-12, -13.1, -Math.PI / 2, -0.1)); await page.waitForTimeout(1200);
+    await shot(page, 'lobby-six');
+    for (let i = 4; i < 10; i++) {
+      const r = await walkThrough(page, i);
+      check(r.d < 0.05 && r.inside, 'G: doorway ' + (i - 3) + ' can be walked through, and BACK puts you a step in front of it, in the lobby');
+    }
+    // back to two: the side doorways go, the back two are where they always were
+    await page.evaluate((s) => { const st = window.XAWorld._t.state; st.snap = s; st.listeners.forEach((f) => f(s, 'test')); }, lobbySnap(2));
+    await page.waitForTimeout(800);
+    const g2 = await geometry(page);
+    check(g2.slice(0, 2).every((b) => b.visible) && g2.slice(2).every((b) => !b.visible), 'G: going back to two lobby bays leaves only the two back-wall doorways');
+    check(!errors.length, 'G: no page errors ' + errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
   await browser.close(); srv.close();

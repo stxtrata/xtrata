@@ -194,7 +194,8 @@ function buildRoom(){
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
   XA.roomState=()=>({state, room:roomId(), title:roomCur?roomCur.title:'', depth:roomStack.length, backLabel:roomUI?roomUI.back.textContent:'', sandbox:roomUI&&roomUI.frame?roomUI.frame.getAttribute('sandbox'):null, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), glide:!!(roomUI&&roomUI.glide), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
   if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
-  XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;   // read-only, for tests: where you are in bay i's open doorway
+  XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;
+  XA.doorFrame=(i)=>bayEngine&&bayEngine.frameOf?bayEngine.frameOf(i):null;   // read-only, for tests: where bay i's wall is and which way it faces   // read-only, for tests: where you are in bay i's open doorway
   XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
   XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw, pitch:player.pitch});   // read-only, for tests
   XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
@@ -244,8 +245,29 @@ function buildLobby(){
     const l=new THREE.PointLight(0xcfc4ff,.75,11,2); l.position.set(0,RH-.3,z); g.add(l);
   }
   const sign=(text,w,h,x,y,z,ry)=>face(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:signTexture(text,'72px Bungee',BRAND.orange,1024,Math.round(1024*h/w)), transparent:true, toneMapped:false}), x,y,z, 0,ry);
-  sign('LOBBY',3.6,.5,-LW/2+.03,2.3,LD/2,Math.PI/2);   // on the left wall: the back wall carries the lobby's doors
+  lobbySign=sign('LOBBY',3.6,.5,-LW/2+.03,2.3,LD/2,Math.PI/2);   // on the left wall: the back wall carries the lobby's doors (with doorways on the side walls too, it moves over the way in: lobbyLayout)
   sign('BACK TO THE ARCADE',3,.4,0,2.8,.03,0);
+}
+/* The lobby's doorways, from how many it has (1 to 6, LIMITS.lobbyBays in world2.js): two on the back wall first, exactly where the two
+   always were (so a lobby with two looks as it always did), then the side walls, one on each in turn (left far, right far, left near, right
+   near). One doorway on its own sits in the middle of the back wall. The geometry follows the count; the bay engine moves its bays to it. */
+const LOBBY_MAX=6;
+function lobbyDefs(n){
+  n=Math.max(1,Math.min(LOBBY_MAX,n|0));
+  const back=(x)=>({parent:lobbyG, x, z:LD-.02, rot:Math.PI, width:3.4, side:0});
+  const out=n===1?[back(0)]:[back(-2.2),back(2.2)];
+  for(let k=2;k<n;k++){ const left=k%2===0, z=k<4?LD*.73:LD*.3; out.push({parent:lobbyG, x:left?-LW/2+.02:LW/2-.02, z, rot:left?Math.PI/2:-Math.PI/2, width:2.4, side:0}) }
+  return out;
+}
+let lobbyCount=2, lobbySign=null;
+function lobbyLayout(n){
+  n=n>=1?Math.min(LOBBY_MAX,n):2;               // no doorways at all: the two places stay as they were (empty)
+  if(!bayEngine || !bayEngine.layout) return;
+  if(n!==lobbyCount){
+    lobbyDefs(n).forEach((d,k)=>{ bayEngine.layout(HALL_BAYS+k,d); bayDefsAll[HALL_BAYS+k]=d });
+    lobbyCount=n;
+  }
+  if(lobbySign){ const side=n>=3; lobbySign.position.set(side?-2.75:-LW/2+.03, 2.3, side?.03:LD/2); lobbySign.rotation.set(0, side?0:Math.PI/2, 0); lobbySign.scale.setScalar(side?.6:1) }
 }
 // Put the lobby behind the wall of bay i (or take it away with -1). Only a bay whose door links to it counts.
 function setLobbyBay(i){
@@ -1378,7 +1400,10 @@ function applyBays(snap){
   if(bayEngine){ try{
     // the hall's bays, then the lobby's (snap.rooms.lobby.bays), in the engine's order
     const lb=snap && snap.rooms && snap.rooms.lobby && snap.rooms.lobby.bays;
-    const all=lb && snap.bays ? Object.assign({}, snap, {bays:snap.bays.slice(0,HALL_BAYS).concat([lb[0]||null, lb[1]||null])}) : snap;
+    let n=0; if(Array.isArray(lb)) lb.slice(0,LOBBY_MAX).forEach((b,k)=>{ if(b) n=k+1 });   // as many doorways as the lobby's highest bay object
+    lobbyLayout(n);
+    const room=[]; for(let k=0;k<bayEngine.count()-HALL_BAYS;k++) room.push(k<lobbyCount && lb ? lb[k]||null : null);
+    const all=lb && snap.bays ? Object.assign({}, snap, {bays:snap.bays.slice(0,HALL_BAYS).concat(room)}) : snap;
     bayEngine.apply(all,{instant:state==='intro'})
   }catch(e){ console.error(e) } }
   { let lb=-1; if(snap && snap.bays) for(let i=0;i<snap.bays.length && lb<0;i++) if(linksToLobby(snap.bays[i] && snap.bays[i].scene)) lb=i; setLobbyBay(lb) }
@@ -1452,7 +1477,7 @@ function buildPosters(){
   // from the start so they can hang in it; it is moved behind the right wall when a door links to the lobby.
   lobbyG=new THREE.Group(); lobbyG.visible=false; scene.add(lobbyG);
   HALL_BAYS=bayDefs.length;
-  bayDefs.push({parent:lobbyG, x:-2.2, z:LD-.02, rot:Math.PI, width:3.4, side:0}, {parent:lobbyG, x:2.2, z:LD-.02, rot:Math.PI, width:3.4, side:0});
+  bayDefs.push(...lobbyDefs(2));
   spots.forEach(([side,z,bay])=>{
     const g=new THREE.Group(); g.position.set(side*(RW/2-.03),1.95,z); g.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
     g.add(new THREE.Mesh(new THREE.BoxGeometry(.84,1.22,.03),frameMat));
