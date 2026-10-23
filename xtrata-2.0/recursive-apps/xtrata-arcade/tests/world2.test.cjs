@@ -16,6 +16,11 @@ const FIX = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'hall-v2
 const REG = 'ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.xtrata-world-v2';
 const POSTERS = 'ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.xtrata-posters-v1';
 const plain = (x) => JSON.parse(JSON.stringify(x));
+const MC = require('./lib/mock-chain.cjs');
+// The recorded `expect` predates the destination fields a link now carries (to, arrival, title, lobby, still, depth): compare
+// without them (they are checked on their own below).
+const NEW_LINK = ['to', 'arrival', 'title', 'lobby', 'still', 'depth'];
+const oldShape = (bays) => plain(bays).map((b) => { if (b && b.scene && b.scene.link) NEW_LINK.forEach((k) => delete b.scene.link[k]); return b; });
 
 function load(parts) {
   const win = { console, Math, Date, JSON, Object, Array, Number, String, Uint8Array, BigInt, TextDecoder, TextEncoder, Promise, setTimeout, clearTimeout,
@@ -31,6 +36,13 @@ function load(parts) {
 }
 const ALL = ['score-client.js', 'world.js', 'world2.js', 'bays.js'];
 
+// The recording predates get-object-ids (the light page the contract is adding: ids only, 16 a page). Until the fixture is
+// re-recorded against a contract that has it (scripts/make-hall-v2-fixture.mjs records whatever the reader reads), a get-object-ids
+// page is derived from the recorded get-objects page with the same arguments: the same slots, ids only.
+function derivedIds(C, calls, key) {
+  const i = calls['get-objects|' + key.slice('get-object-ids|'.length)];
+  return i === undefined ? null : MC.idsFromObjectsPage(FIX.blobs[i]);
+}
 // A fake node. `scenario` picks the recorded results; `over(fn, argsKey)` may replace one; `fail` makes every read fail.
 function node(win, scenario, opts = {}) {
   const C = win.XAScores._codec, log = [];
@@ -48,6 +60,7 @@ function node(win, scenario, opts = {}) {
         const cur = FIX.scenarios[api.scenario];
         const i = cur.calls[key];
         if (api.over) hex = api.over(fn, key, cur.calls, FIX.blobs);
+        if (hex == null && i === undefined && fn === 'get-object-ids') hex = derivedIds(C, cur.calls, key);
         if (hex == null) { if (i === undefined) return { ok: true, status: 200, json: async () => ({ okay: false, cause: 'no recorded result for ' + key }) }; hex = FIX.blobs[i]; }
       }
       return { ok: true, status: 200, json: async () => ({ okay: true, result: hex }) };
@@ -70,8 +83,10 @@ test('through XAWorld: the registry is read into the bay snapshot the engine exp
   assert.deepEqual(plain(r), { ok: true, changed: true });
   const snap = plain(W.snapshot());
   const want = FIX.scenarios.active.expect;
-  assert.deepEqual(snap.bays, want.bays);
-  assert.deepEqual(snap.rooms.lobby.bays, want.lobbyBays);
+  assert.deepEqual(oldShape(snap.bays), want.bays);
+  assert.deepEqual(oldShape(snap.rooms.lobby.bays), want.lobbyBays);
+  // the lobby door's link names its destination: the hall's own lobby (live, native), by id
+  assert.deepEqual(snap.bays[2].scene.link, { 'target-room': 'lobby', 'arrival-bay': 0, path: '', to: want.meta.lobby, arrival: 0, title: 'Lobby', lobby: true, still: null, depth: null });
   assert.deepEqual(snap.looks, want.looks);
   assert.equal(snap.src, REG);
   assert.equal(snap.versions.world, want.sig);
@@ -119,7 +134,7 @@ test('polling: one cheap read while nothing moved; a change elsewhere in the wor
   r = plain(await W.refresh(false));
   assert.deepEqual(r, { ok: true, changed: false });
   assert.ok(n.log.length <= 9, 'checked with ' + n.log.length + ' reads');
-  assert.ok(!n.log.some((l) => l.fn === 'get-object-view' || l.fn === 'get-objects'));
+  assert.ok(!n.log.some((l) => l.fn === 'get-object-view' || l.fn === 'get-objects' || l.fn === 'get-object-ids'));
   // the hall itself changed (the recorded "updated" moment): reload
   n.over = null; n.scenario = 'updated';
   r = plain(await W.refresh(false));
@@ -198,7 +213,7 @@ test('an empty registry (the hall path does not resolve) gives four posters bays
   const { W, n } = configured('active', { over: (fn) => (fn === 'resolve-path' ? '0x09' : null) });
   await W.refresh(true);
   let s = plain(W.snapshot());
-  assert.deepEqual(s.bays, [null, null, null, null]); assert.deepEqual(s.rooms.lobby.bays, [null, null]);
+  assert.deepEqual(s.bays, [null, null, null, null]); assert.deepEqual(s.rooms.lobby.bays, []);
   assert.ok(n.log.every((l) => l.fn !== 'get-object-view'));
 });
 
@@ -320,7 +335,7 @@ test('the slot table matches the bay engine and every door style is a door', () 
 test('limits: a hall space claiming a huge number of object slots is read in at most 8 pages', async () => {
   // rewrite get-space for the hall to claim 5000 object slots: the reader must not ask for 313 pages
   const none16 = '0x0b00000010' + '09'.repeat(16);
-  const { win, W, n } = configured('active', { over: (fn, key, calls) => (fn === 'get-objects' && !(key in calls) ? none16 : null) });
+  const { win, W, n } = configured('active', { over: (fn, key, calls) => (fn === 'get-object-ids' && !(('get-objects|' + key.split('|')[1]) in calls) ? none16 : null) });
   const codec = win.XAScores._codec, real = n.fetch;
   win.fetch = async (url, init) => {
     const res = await real(url, init), body = await res.json();
@@ -334,7 +349,158 @@ test('limits: a hall space claiming a huge number of object slots is read in at 
   };
   n.log.length = 0;
   await W.refresh(true);
-  const pages = n.log.filter((l) => l.fn === 'get-objects' && l.key.includes(codec.cvUint(FIX.scenarios.active.expect.meta.hall).slice(2)));
+  const pages = n.log.filter((l) => l.fn === 'get-object-ids' && l.key.includes(codec.cvUint(FIX.scenarios.active.expect.meta.hall).slice(2)));
   assert.equal(pages.length, LIM.pages);
   assert.ok(W.snapshot().bays[0].scene, 'and the hall still reads');
+});
+
+/* ---------------------------------------------------------------- destinations, doors and the lobby's doorways (an in-memory registry) */
+// tests/lib/mock-chain.cjs answers with the registry's real Clarity shapes, including the two light reads being added to the contract
+// (get-object-ids, get-objects-8). Space codes: state 0 draft, 1 live, 2 suspended, 3 retired; runtime 0 native .. 3 hosted.
+const HASH = 'ab'.repeat(32);
+function demoWorld(extra = {}) {
+  const spaces = {
+    1: { parent: 0, slug: '', title: 'Xtrata World', kind: 0 },
+    2: { parent: 1, slug: 'arcade', title: 'Arcade', kind: 0 },
+    3: { parent: 2, slug: 'hall', title: 'Hall' },
+    4: { parent: 2, slug: 'lobby', title: 'Lobby' },
+    10: { parent: 2, slug: 'casino', title: 'Royal Flush Casino', runtime: 2, entry: { id: 9200, hash: HASH, size: 1234 } },
+    11: { parent: 2, slug: 'vault', title: 'The Vault', runtime: 2, state: 2, entry: { id: 9201, hash: HASH, size: 10 } },
+    12: { parent: 2, slug: 'workshop', title: 'Workshop', runtime: 2, state: 0 },
+    13: { parent: 2, slug: 'gallery', title: 'Gallery', runtime: 3 },
+    ...(extra.spaces || {}),
+  };
+  const door = (space, name, to, o = {}) => ({ space, parent: 0, kind: 0, name, params: o.params || '{}', portal: to ? { to, arrival: o.arrival || 0, path: '' } : null, active: { patch: '{"base":"door"}', interaction: to ? 3 : 1 } });
+  const objects = {
+    20: door(3, 'bay-2', 4),
+    30: door(4, 'bay-0', 10, { arrival: 77, params: JSON.stringify({ still: 9300, stillHash: 'cd'.repeat(32), depth: 9301, depthHash: 'ef'.repeat(32) }) }),
+    31: door(4, 'bay-1', 11), 32: door(4, 'bay-2', 12), 33: door(4, 'bay-3', 13),
+    40: { space: 10, parent: 0, kind: 0, name: 'back-door', portal: { to: 4, arrival: 0, path: '' }, active: null },
+    41: { space: 10, parent: 0, kind: 0, name: 'to-gallery', portal: { to: 13, arrival: 0, path: '' }, active: null },
+    42: { space: 10, parent: 0, kind: 0, name: 'hidden-door', portal: { to: 13, arrival: 0, path: '' }, active: { visibility: 1 } },
+    43: { space: 10, parent: 0, kind: 1, name: 'sign', portal: null, active: null },
+    ...(extra.objects || {}),
+  };
+  return MC.createChain({ spaces, objects, kinds: MC.KINDS, approved: ['ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.casino-holdem-v1'], ...(extra.world || {}) });
+}
+function onChain(chain, opts = {}) {
+  const win = load(ALL);
+  win.fetch = async (url, init) => {
+    const m = /\/call-read\/([^/]+)\/([^/]+)\/([^/?]+)/.exec(url);
+    const body = JSON.parse(init.body);
+    if (opts.fail && opts.fail(m[3], body.arguments)) return { ok: false, status: 503, json: async () => ({}) };
+    const hex = chain.call(m[1] + '.' + m[2], m[3], body.arguments);
+    return { ok: true, status: 200, json: async () => (hex ? { okay: true, result: hex } : { okay: false, cause: 'no such function' }) };
+  };
+  win.XAWorld.configure({ posters: POSTERS, registry: REG });
+  return { win, W: win.XAWorld, chain };
+}
+
+test('links carry the destination: id, title, arrival, lobby only for the live native lobby; a door picture from still/stillHash params', async () => {
+  const { W } = onChain(demoWorld());
+  assert.deepEqual(plain(await W.refresh(true)), { ok: true, changed: true });
+  const s = plain(W.snapshot()), lb = s.rooms.lobby.bays;
+  assert.equal(s.bays[2].scene.link.lobby, true); assert.equal(s.bays[2].scene.link.to, 4);
+  assert.equal(lb.length, 4, 'four lobby bay objects: four doorways');
+  const c = lb[0].scene.link;
+  assert.deepEqual(c, { 'target-room': 'casino', 'arrival-bay': 0, path: '', to: 10, arrival: 77, title: 'Royal Flush Casino', lobby: false,
+    still: { id: 9300, hash: 'cd'.repeat(32) }, depth: { id: 9301, hash: 'ef'.repeat(32) } });
+  // closed and not-yet-open destinations still have a link (walking in says so); the hall decides when the door is used
+  assert.equal(lb[1].scene.link.to, 11); assert.equal(lb[2].scene.link.to, 12); assert.equal(lb[1].scene.interaction, 3);
+});
+
+test('destination(): a live page with an entry, a suspended one, a draft one (closed, never open), a hosted one, a failed read, no such space', async () => {
+  const { W, win } = onChain(demoWorld(), { fail: (fn, args) => fn === 'get-space' && args[0] === '0x01' + (99).toString(16).padStart(32, '0') });
+  await W.refresh(true);
+  const R = W.registry();
+  assert.equal(R.lobby, 4); assert.equal(R.hall, 3);
+  const live = plain(await R.destination(10));
+  assert.deepEqual(live, { ok: true, value: { id: 10, slug: 'casino', title: 'Royal Flush Casino', state: 1, runtime: 2, entry: { id: 9200, hash: HASH, size: 1234 }, parent: 2, open: true, lobby: false } });
+  const sus = plain(await R.destination(11));
+  assert.equal(sus.ok, true); assert.equal(sus.value.state, 2); assert.equal(sus.value.open, false);
+  const draft = plain(await R.destination(12));
+  assert.equal(draft.ok, true); assert.equal(draft.value.state, 0); assert.equal(draft.value.open, false, 'a draft space is closed, not open');
+  assert.equal(draft.value.entry, null);
+  assert.equal(plain(await R.destination(13)).value.runtime, 3);
+  assert.equal(plain(await R.destination(4)).value.lobby, true);
+  const failed = plain(await R.destination(99));
+  assert.equal(failed.ok, false, 'a read that failed is ok:false'); assert.equal(failed.value, null); assert.ok(failed.error);
+  const none = plain(await R.destination(55));
+  assert.deepEqual(none, { ok: true, value: null }, 'no such space: ok, nothing');
+  assert.deepEqual(plain(await R.destination(1)), { ok: true, value: null }, 'the world root is never a destination');
+  assert.equal(win.XAWorld2.STATE.live, 1); assert.equal(win.XAWorld2.RUNTIME.hosted, 3);
+});
+
+test('door(): a named door in a room\'s own space, read with get-objects-8; hidden, unknown and portal-less names are no door; a failed read is ok:false', async () => {
+  const chain = demoWorld();
+  const { W } = onChain(chain);
+  await W.refresh(true);
+  const R = W.registry();
+  chain.log.length = 0;
+  assert.deepEqual(plain(await R.door(10, 'to-gallery')), { ok: true, value: { id: 41, name: 'to-gallery', portal: { to: 13, arrival: 0, path: '' } } });
+  assert.ok(chain.log.some((l) => l.fn === 'get-objects-8') && !chain.log.some((l) => l.fn === 'get-objects'), 'light pages only');
+  assert.deepEqual(plain(await R.door(10, 'hidden-door')), { ok: true, value: null });
+  assert.deepEqual(plain(await R.door(10, 'sign')), { ok: true, value: null });
+  assert.deepEqual(plain(await R.door(10, 'nope')), { ok: true, value: null });
+  assert.deepEqual(plain(await R.door(10, '<script>')), { ok: true, value: null });
+  assert.deepEqual(plain(await R.door(3, 'to-gallery')), { ok: true, value: null }, 'only the room\'s own space');
+  assert.deepEqual(plain(await R.door(12, 'x')), { ok: true, value: null }, 'a closed room has no usable doors');
+  const f = onChain(demoWorld(), { fail: (fn) => fn === 'get-objects-8' });
+  await f.W.refresh(true);
+  const r = plain(await f.W.registry().door(10, 'to-gallery'));
+  assert.equal(r.ok, false); assert.equal(r.value, null);
+});
+
+test('approved(): read from is-approved at call time; a failed read is ok:false; a malformed id is simply not approved', async () => {
+  const { W } = onChain(demoWorld());
+  await W.refresh(true);
+  const R = W.registry();
+  assert.deepEqual(plain(await R.approved('ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.casino-holdem-v1')), { ok: true, value: true });
+  assert.deepEqual(plain(await R.approved('ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.casino-liars-dice-v1')), { ok: true, value: false });
+  assert.deepEqual(plain(await R.approved('not a contract')), { ok: true, value: false });
+  const f = onChain(demoWorld(), { fail: (fn) => fn === 'is-approved' });
+  await f.W.refresh(true);
+  assert.equal(plain(await f.W.registry().approved('ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.casino-holdem-v1')).ok, false);
+});
+
+test('a draft or suspended hall space is closed: its bays are posters and no object is read', async () => {
+  for (const state of [0, 2, 3]) {
+    const chain = demoWorld({ spaces: { 3: { parent: 2, slug: 'hall', title: 'Hall', state } } });
+    const { W } = onChain(chain);
+    await W.refresh(true);
+    const s = plain(W.snapshot());
+    assert.deepEqual(s.bays, [null, null, null, null], 'state ' + state);
+    assert.ok(!chain.log.some((l) => (l.fn === 'get-object-ids') && l.args[0] === MC.cv.uint(3).replace(/^/, '0x')), 'state ' + state + ': no object pages read for the hall');
+  }
+});
+
+test('the lobby has as many doorways as its highest bay-N object: 1 to 6; bay-6 and beyond are ignored', async () => {
+  const bayObj = (i) => ({ space: 4, parent: 0, kind: 0, name: 'bay-' + i, portal: null, active: { patch: '{"base":"door"}', interaction: 1 } });
+  for (const n of [1, 2, 3, 4, 5, 6]) {
+    const objects = {}; for (let i = 0; i < n; i++) objects[100 + i] = bayObj(i);
+    // only the given ones (the demo's own lobby doors are replaced)
+    const chain = demoWorld({ objects: { 30: null, 31: null, 32: null, 33: null } });
+    [30, 31, 32, 33].forEach((k) => delete chain.world.objects[k]);
+    Object.assign(chain.world.objects, objects, { 120: bayObj(6), 121: bayObj(9) });
+    const { W } = onChain(chain);
+    await W.refresh(true);
+    const lb = plain(W.snapshot()).rooms.lobby.bays;
+    assert.equal(lb.length, n, n + ' bays');
+    assert.ok(lb.every((b) => b && b.scene && b.scene.base === 'door'), n + ': every doorway has its door');
+  }
+  // a gap: bay-0 and bay-4 give five doorways, three of them plain walls (null)
+  const chain = demoWorld();
+  [30, 31, 32, 33].forEach((k) => delete chain.world.objects[k]);
+  Object.assign(chain.world.objects, { 100: bayObj(0), 104: bayObj(4) });
+  const { W } = onChain(chain);
+  await W.refresh(true);
+  assert.deepEqual(plain(W.snapshot()).rooms.lobby.bays.map((b) => !!b), [true, false, false, false, true]);
+});
+
+test('every object list is read in light pages: get-object-ids (16 ids) then get-object-view per id, never get-objects', async () => {
+  const chain = demoWorld();
+  const { W } = onChain(chain);
+  await W.refresh(true);
+  const fns = new Set(chain.log.map((l) => l.fn));
+  assert.ok(fns.has('get-object-ids') && fns.has('get-object-view') && !fns.has('get-objects'), [...fns].join(','));
 });
