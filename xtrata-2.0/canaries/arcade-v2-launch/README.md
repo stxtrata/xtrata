@@ -193,10 +193,10 @@ starts from an empty chain and runs the whole rehearsal, core and fixtures inclu
 ## What this cannot cover
 
 - Real wallet signing (extensions need a real browser session), and Leather or Xverse handling a 492 KB single transaction.
-- Real network fees and Hiro's read limits. The simnet has no 30-read cap; the canary's own registry reads use `get-objects-8`,
-  but the hall's reader (`world2.js`, owned by the hall) still calls `get-objects`, which the contract notes exceed a node's
-  30-read limit. Fix that in the hall before launch, or the hall may fall back to posters (which is the launch state, but it
-  would hide later bay changes).
+- Real network fees and Hiro's read limits. The simnet has no 30-read cap. The canary's own registry reads use `get-objects-8`
+  and the hall's reader uses `get-object-ids` + `get-object-view`; every read either makes stays within 24 reads in the worst case
+  (`node contracts/arcade-world/tests/world2-costs.mjs`), so a stock node's 30-read limit is not a risk, but it has not been
+  measured against Hiro's API.
 - The run is flown by a bot pilot, not a human.
 - On testnet the inscribed parent is a mainnet artifact (it reads the mainnet core and Hiro's mainnet API): the canary boots it
   with those reads pointed at the testnet core and API, but opened directly on testnet it will not load. Runs on testnet are flown

@@ -29,8 +29,8 @@ root (1)
     └── lobby  room (kind 1)    same, objects <= 64
 ```
 Owner on testnet: the deployer wizard (root owner). All three are set live (state 1) after creation (a portal target must be live).
-The reader resolves `path` with `resolve-path` and reads that space's objects; a space that is not draft/live (suspended, retired),
-or a path that does not resolve, is an empty room: its bays show posters.
+The reader resolves `path` with `resolve-path` and reads that space's objects; a space that is not live (draft, suspended, retired),
+or a path that does not resolve, is an empty room: its bays show posters. Only a live space is open, as a door destination too.
 
 **Hall only first.** `node ops/v2.mjs seed <hall file> --hall-only` builds the arcade and the hall and nothing of the lobby (no lobby
 space, no lobby bay objects): the reader's `lobbyPath` then does not resolve and the lobby reads as an empty room. `node ops/v2.mjs lobby

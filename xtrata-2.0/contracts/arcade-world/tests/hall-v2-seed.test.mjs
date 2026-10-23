@@ -50,7 +50,16 @@ const v1Plans = (doc, height, ctxHeight) => {
   const snap = snapshotAt({ scenes, looks: V2.PLAN_BOOK, height, bayCount: 4 });
   return snap.bays.map((b) => B.planKey(B.planBay(b, snap.looks)));
 };
-const v2Plans = (r) => { const B = hallBays(); return r.bays.map((b) => B.planKey(B.planBay(b, r.looks))); };
+// v2 links carry extra fields (to, arrival, title, lobby, still, depth) that v1 scenes never had; the drawing plan is compared on
+// the three fields both share.
+const v1Link = (l) => (l ? { 'target-room': l['target-room'], 'arrival-bay': l['arrival-bay'], path: l.path } : l);
+const v2Plans = (r) => {
+  const B = hallBays();
+  return r.bays.map((b) => {
+    const bay = b && b.scene ? { ...b, scene: { ...b.scene, link: v1Link(b.scene.link) } } : b;
+    return B.planKey(B.planBay(bay, r.looks));
+  });
+};
 const sign = (bay) => (bay.scene.layers.filter((l) => l.slot === 2));
 const text = (l) => JSON.parse(l.params).text;
 
