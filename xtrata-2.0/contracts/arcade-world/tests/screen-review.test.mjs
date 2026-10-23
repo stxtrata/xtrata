@@ -48,10 +48,13 @@ test('R1: STX sent straight to the contract is not escrow; it is reported as una
   assert.equal(s.ro('get-unaccounted').value, 5_000_000n);
   s.call('cancel', [U(id)], W[1]);
   assert.equal(s.ro('get-escrow-total').value, 0n);
-  // approving releases only the item's escrow, never the gift
+  // settling releases only the item's escrow, never the gift (approving releases nothing: the run is earned day by day)
   const id2 = s.idOf(s.buy(W[1], { days: 1 }));
   const fee = s.bal(s.deployer);
   assert.equal(R(s.call('approve', [U(id2)])), OK);
+  assert.equal(s.bal(s.deployer), fee);
+  simnet.mineEmptyBurnBlocks(1);
+  assert.equal(R(s.call('settle', [U(id2)], W[3])), '(ok u0)');
   assert.equal(s.bal(s.deployer) - fee, 2_000_000n);
   assert.equal(s.ro('get-unaccounted').value, 5_000_000n);
   assert.equal(s.bal(s.me), 5_000_000n);

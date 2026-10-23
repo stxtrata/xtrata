@@ -28,7 +28,18 @@
 ;;   - Reads such as get-grant return the stored row, which may be expired or from an old epoch;
 ;;     use is-writable / the caps checks, not the raw row, to decide what someone may do.
 ;;   - Fees are paid by tx-sender while authority is checked on contract-caller: wallets should set
-;;     post-conditions / max payment on every paid call.
+;;     post-conditions / max payment on every paid call. buy-space also takes max-total.
+;;   - Doors, consents, approvals and kinds are checked only when set; the hall re-checks at use
+;;     time (target live, consent still in the target's epoch, binding still approved, kind shown).
+;;   - A CHILD holder may create a space owned by anyone, itself included (how plots are claimed);
+;;     it keeps that space after its grant ends. Grant CHILD only on land, never on a system domain.
+;;   - Moderation is sticky: suspend, pause-from-above and "moderated" are lifted only at the level
+;;     that set them or higher (3 root owner, 2 MOD/PAUSE admin, 1 ancestor owner), never by the
+;;     space's own owner (unless root owner). See get-moderation.
+;;   - Review lane: where it applies, states, title and entry from anyone but the owner, the root
+;;     owner or a moderator are refused (u320); objects, bindings and doors go back to hidden.
+;;   - A grant issued by a delegate holds only while the issuer's own grant here holds GRANT.
+;;   - Light reads for the hall: get-object-ids, get-objects-8, get-child-ids, get-children-8.
 
 ;; Codes
 ;;   space kind:   0 domain (container only)  1 room  2 plot
@@ -68,6 +79,8 @@
 (define-constant ERR-BAD-BINDING    (err u317))
 (define-constant ERR-NOT-LISTED     (err u318))
 (define-constant ERR-CAPS           (err u319))
+(define-constant ERR-REVIEW         (err u320))
+(define-constant ERR-MAX-TOTAL      (err u321))
 
 ;; ---------------------------------------------------------------------------
 ;; Constants
@@ -189,6 +202,10 @@
 ;; inbound portal consents: target space + source space, valid for the target's epoch
 (define-map Consents { to: uint, from: uint } uint)
 
+;; who placed moderation (3 root owner, 2 admin, 1 ancestor owner); 0 or missing = none
+(define-map SpaceMod uint { state: uint, pause: uint })
+(define-map ObjectMod uint uint)
+
 ;; ---------------------------------------------------------------------------
 ;; The root space exists from deployment. Its owner is the root owner.
 
@@ -258,7 +275,8 @@
     (match (map-get? Spaces (get cur ctx))
       s
         (let (
-          (own-caps (if (caller-is (space-owner (get cur ctx)))
+          (own (if (is-eq (get cur ctx) ROOT) (var-get root-owner) (get owner s)))
+          (own-caps (if (caller-is own)
                       (if (get first ctx) CAP-ALL CAP-OVERSIGHT)
                       u0))
           (g-caps (match (map-get? Grants { space: (get cur ctx), who: (get who ctx) })
@@ -267,14 +285,25 @@
                                 ;; an inherited grant reaches only spaces still held by the
                                 ;; granting ancestor's own owner (never a space since sold on)
                                 (or (get first ctx)
-                                    (and (get inherit gr)
-                                         (is-eq (space-owner (get cur ctx)) (get town ctx)))))
+                                    (and (get inherit gr) (is-eq own (get town ctx))))
+                                ;; issued by a delegate: holds only while the issuer still holds GRANT here
+                                (or (is-eq (get by gr) own)
+                                    (granter-live? (get cur ctx) (get epoch s) (get by gr))))
                          (get caps gr)
                          u0)
                     u0)))
           { cur: (get parent s), caps: (bit-or (get caps ctx) (bit-or own-caps g-caps)),
             who: (get who ctx), first: false, town: (get town ctx) })
       { cur: u0, caps: (get caps ctx), who: (get who ctx), first: false, town: (get town ctx) })))
+
+;; A delegate's own grant row on this space, live and holding GRANT (only an owner can issue GRANT,
+;; so this never recurses).
+(define-private (granter-live? (space uint) (epoch uint) (who principal))
+  (match (map-get? Grants { space: space, who: who })
+    g (and (is-eq (get epoch g) epoch)
+           (or (is-eq (get expires g) u0) (< burn-block-height (get expires g)))
+           (> (bit-and (get caps g) CAP-GRANT) u0))
+    false))
 
 (define-private (admin-caps)
   (bit-or
@@ -298,9 +327,25 @@
            (> (bit-and (caps-from (get parent s) false (get owner s)) CAP-MOD) u0))
     false))
 
-;; Moderators: the root owner, MOD admins, and the owners of ancestors. Never the space's own owner.
-(define-private (moderator? (space uint))
-  (or (is-root-owner) (oversight-above? space)))
+;; Moderation level of the caller over a space: 3 the root owner, 2 a MOD admin, 1 the owner of an
+;; ancestor, 0 none. Never the space's own owner (unless they are the root owner).
+(define-private (mod-level (space uint))
+  (if (is-root-owner) u3
+    (if (caller-is (space-owner space)) u0
+      (if (admin-has? A-MOD) u2
+        (if (oversight-above? space) u1 u0)))))
+
+;; For pausing, a PAUSE admin also acts from above (level 2).
+(define-private (pause-level (space uint))
+  (let ((l (mod-level space)))
+    (if (and (is-eq l u0) (admin-has? A-PAUSE) (not (caller-is (space-owner space)))) u2 l)))
+
+(define-private (moderator? (space uint)) (> (mod-level space) u0))
+
+;; Review lane: states, title and entry go live at once, so where a review lane applies only the
+;; owner, the root owner or a moderator may set them (others: ERR-REVIEW).
+(define-private (review-ok? (space uint))
+  (or (caller-is (space-owner space)) (not (get review (eff-policy space))) (moderator? space)))
 
 (define-private (chain-write-step (i uint) (ctx { cur: uint, ok: bool }))
   (if (is-eq (get cur ctx) u0)
@@ -471,6 +516,8 @@
 (define-public (set-treasury (who principal))
   (begin
     (asserts! (is-root-owner) ERR-NOT-AUTHORIZED)
+    ;; this contract has no way to spend: fees sent to it would be lost
+    (asserts! (not (is-eq who current-contract)) ERR-INVALID)
     (var-set treasury who)
     (print { event: "treasury-set", who: who, version: (bump) })
     (ok true)))
@@ -617,6 +664,7 @@
   (let ((s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND)))
     (asserts! (writable? id) ERR-PAUSED)
     (asserts! (has-cap? id CAP-ENTRY) ERR-NOT-AUTHORIZED)
+    (asserts! (review-ok? id) ERR-REVIEW)
     (asserts! (> (len title) u0) ERR-INVALID)
     (map-set Spaces id (merge s { title: title, updated-at: stacks-block-height, version: (+ (get version s) u1) }))
     (print { event: "space-title", space: id, actor: contract-caller, version: (bump) })
@@ -638,6 +686,7 @@
   (let ((s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND)))
     (asserts! (writable? id) ERR-PAUSED)
     (asserts! (has-cap? id CAP-ENTRY) ERR-NOT-AUTHORIZED)
+    (asserts! (review-ok? id) ERR-REVIEW)
     (match entry
       e (asserts! (entry-ok? (get id e) (get hash e) (get size e)) ERR-INSCRIPTION)
       true)
@@ -678,12 +727,17 @@
     (ok true)))
 
 (define-public (set-space-state (id uint) (state uint))
-  (let ((s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND)))
+  (let (
+    (s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND))
+    (m (default-to { state: u0, pause: u0 } (map-get? SpaceMod id))))
     (asserts! (not (is-eq id ROOT)) ERR-STATE)
     (asserts! (<= state u3) ERR-INVALID)
     (asserts! (not (is-eq (get state s) u3)) ERR-STATE)
     (if (or (is-eq state u2) (is-eq (get state s) u2))
-      (asserts! (or (is-root-owner) (oversight-above? id)) ERR-NOT-AUTHORIZED)
+      (let ((lvl (mod-level id)))
+        ;; a suspension is lifted (or changed) only at the level that placed it or higher
+        (asserts! (and (> lvl u0) (or (not (is-eq (get state s) u2)) (>= lvl (get state m)))) ERR-NOT-AUTHORIZED)
+        (map-set SpaceMod id (merge m { state: (if (is-eq state u2) lvl u0) })))
       (begin
         (asserts! (writable? id) ERR-PAUSED)
         (asserts! (caller-is (space-owner id)) ERR-NOT-AUTHORIZED)))
@@ -700,15 +754,17 @@
     (ok true)))
 
 ;; 0 running, 1 paused by the space's own side, 2 paused from above. A pause from above can
-;; only be lifted from above, so an owner cannot undo moderation.
+;; only be lifted from above, at the level that placed it or higher.
 (define-public (set-space-paused (id uint) (value bool))
   (let (
     (s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND))
-    (mod? (moderator? id)))
+    (m (default-to { state: u0, pause: u0 } (map-get? SpaceMod id)))
+    (lvl (pause-level id)))
     (asserts! (has-cap? id CAP-PAUSE) ERR-NOT-AUTHORIZED)
-    (asserts! (or mod? (not (is-eq (get paused s) u2))) ERR-NOT-AUTHORIZED)
+    (asserts! (or (not (is-eq (get paused s) u2)) (and (> lvl u0) (>= lvl (get pause m)))) ERR-NOT-AUTHORIZED)
+    (map-set SpaceMod id (merge m { pause: (if (and value (> lvl u0)) lvl u0) }))
     (map-set Spaces id (merge s {
-      paused: (if value (if mod? u2 u1) u0),
+      paused: (if value (if (> lvl u0) u2 u1) u0),
       updated-at: stacks-block-height, version: (+ (get version s) u1) }))
     (print { event: "space-paused", space: id, value: value, actor: contract-caller, version: (bump) })
     (ok true)))
@@ -756,10 +812,12 @@
     (asserts! (is-eq (bit-and caps CAP-MOD) u0) ERR-CAPS)
     (asserts! (is-eq (bit-and caps (bit-not mine)) u0) ERR-CAPS)
     (asserts! (or (is-eq expires u0) (> expires burn-block-height)) ERR-INVALID)
-    ;; delegates issue short, non-inheriting grants that cannot pass on the right to grant
+    ;; delegates issue short, non-inheriting grants that cannot pass on the right to grant, and only
+    ;; where they hold GRANT through their own grant on this space (what they issue lapses with it)
     (asserts! (or owner?
                   (and (not inherit) (is-eq (bit-and caps CAP-GRANT) u0) (> expires u0)
-                       (<= expires (+ burn-block-height MAX-GRANT-BLOCKS))))
+                       (<= expires (+ burn-block-height MAX-GRANT-BLOCKS))
+                       (granter-live? space (get epoch s) contract-caller)))
               ERR-CAPS)
     ;; a live grant is changed only by the owner, a moderator or whoever issued it
     (asserts! (match old g (or owner? (not (is-eq (get epoch g) (get epoch s)))
@@ -860,11 +918,15 @@
     (ok true)))
 
 ;; The buyer names the price and the space version they looked at, so a seller cannot change
-;; the price or the content between the buyer reading and the sale landing.
-(define-public (buy-space (id uint) (expected-price uint) (expected-version uint))
+;; the price or the content between the buyer reading and the sale landing, and the most they
+;; will pay in all: max(price, Xtrata's share), which exceeds the price when the flat fee does.
+(define-public (buy-space (id uint) (expected-price uint) (expected-version uint) (max-total uint))
   (let (
     (s (unwrap! (map-get? Spaces id) ERR-NOT-FOUND))
-    (l (unwrap! (map-get? Listings id) ERR-NOT-LISTED)))
+    (l (unwrap! (map-get? Listings id) ERR-NOT-LISTED))
+    (f (fees-now)))
+    (asserts! (<= (umax (get price l) (umax (/ (* (get price l) (get bps f)) u10000) (get transfer-flat f))) max-total)
+              ERR-MAX-TOTAL)
     (asserts! (writable? id) ERR-PAUSED)
     (asserts! (get transferable s) ERR-NOT-TRANSFERABLE)
     (asserts! (is-eq (get epoch l) (get epoch s)) ERR-NOT-LISTED)
@@ -1042,11 +1104,16 @@
     (space (get space o))
     (s (unwrap! (map-get? Spaces space) ERR-NOT-FOUND))
     (cur (get state o))
-    (mod? (moderator? space)))
+    (lvl (mod-level space))
+    (mod? (> lvl u0)))
     (asserts! (<= state u3) ERR-INVALID)
     (asserts! (not (is-eq cur u2)) ERR-STATE)
     (asserts! (or mod? (not (is-eq state u3))) ERR-NOT-AUTHORIZED)
-    (asserts! (or mod? (not (is-eq cur u3)) (is-eq state u2)) ERR-NOT-AUTHORIZED)
+    ;; "moderated" is lifted (or changed) only at the level that set it or higher; anyone entitled may retire
+    (asserts! (or (not (is-eq cur u3)) (is-eq state u2)
+                  (and mod? (>= lvl (default-to u0 (map-get? ObjectMod id)))))
+              ERR-NOT-AUTHORIZED)
+    (if (is-eq state u3) (map-set ObjectMod id lvl) (map-delete ObjectMod id))
     (asserts! (or mod?
                   (if (is-eq state u1)
                     (or (has-cap? space CAP-OBJECT) (has-cap? space CAP-MOD))
@@ -1223,6 +1290,7 @@
         (timeline (default-to (list) (map-get? Timeline id))))
         (asserts! (writable? space) ERR-PAUSED)
         (asserts! (has-cap? space CAP-STATE) ERR-NOT-AUTHORIZED)
+        (asserts! (review-ok? space) ERR-REVIEW)
         (asserts! (< (get state o) u2) ERR-STATE)
         (asserts! (<= (get visibility st) u1) ERR-INVALID)
         (asserts! (<= (get interaction st) u3) ERR-INVALID)
@@ -1336,6 +1404,31 @@
 
 (define-read-only (get-children (parent uint) (page uint))
   (map child-at (rep16 parent) (map + IDX16 (rep16 (* page u16)))))
+
+;; Light pages for nodes that cap reads per call (a full get-objects / get-children page is 32
+;; map reads): ids only (16 reads), or 8 full rows (16 reads).
+(define-constant IDX8 (list u0 u1 u2 u3 u4 u5 u6 u7))
+(define-private (rep8 (x uint)) (list x x x x x x x x))
+(define-private (object-id-at (space uint) (idx uint)) (map-get? SpaceObjects { space: space, idx: idx }))
+(define-private (child-id-at (parent uint) (idx uint)) (map-get? Children { parent: parent, idx: idx }))
+
+(define-read-only (get-object-ids (space uint) (page uint))
+  (map object-id-at (rep16 space) (map + IDX16 (rep16 (* page u16)))))
+
+(define-read-only (get-objects-8 (space uint) (page uint))
+  (map object-at (rep8 space) (map + IDX8 (rep8 (* page u8)))))
+
+(define-read-only (get-child-ids (parent uint) (page uint))
+  (map child-id-at (rep16 parent) (map + IDX16 (rep16 (* page u16)))))
+
+(define-read-only (get-children-8 (parent uint) (page uint))
+  (map child-at (rep8 parent) (map + IDX8 (rep8 (* page u8)))))
+
+;; Who placed the moderation on a space (suspension, pause from above) or an object: 0 none,
+;; 1 an ancestor owner, 2 an admin, 3 the root owner.
+(define-read-only (get-moderation (id uint))
+  { space: (default-to { state: u0, pause: u0 } (map-get? SpaceMod id)),
+    object: (default-to u0 (map-get? ObjectMod id)) })
 
 (define-private (path-step (slug (string-ascii 24)) (cur (optional uint)))
   (match cur c (map-get? Slugs { parent: c, slug: slug }) none))
