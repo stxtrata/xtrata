@@ -81,7 +81,10 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   if (r.code !== 0) console.log(r.out.split('\n').filter((l) => /FAIL|!!/.test(l)).join('\n').slice(0, 1500));
   check(r.code === 0 && passes.length === R.DEFAULT_STEPS.length, `--execute runs all ${R.DEFAULT_STEPS.length} steps of the testnet launch`);
   const byRoot = C.S.rawBySender[addr] || 0;
-  check(byRoot === 3 + 11 + 4 + 3 + 8 + 3, `the root key signed ${byRoot} transactions (core 3, fixtures 11, deploys 4, kinds 3, hall 8, packs and parent 3 = 32)`);
+  // a pack within the one-transaction limit (32 chunks) is one transaction; beyond it: begin + chunk batches of 30 + seal
+  const packTxs = (name) => { const n = Math.ceil(fs.readFileSync(path.join(ROOTDIR, 'recursive-apps/xtrata-arcade/dist/packs/xtrata-arcade-' + name + '.txt')).length / 16384); return n <= 32 ? 1 : 2 + Math.ceil(n / 30); };
+  const packsAndParent = packTxs('engine') + packTxs('hall') + 1;
+  check(byRoot === 3 + 11 + 4 + 3 + 8 + packsAndParent, `the root key signed ${byRoot} transactions (core 3, fixtures 11, deploys 4, kinds 3, hall 8, packs and parent ${packsAndParent} = ${3 + 11 + 4 + 3 + 8 + packsAndParent})`);
   const kinds = C.S.calls.filter((c) => c.fn === 'xtrata-world-v2.register-kind');
   const hot = (kinds[0] && kinds[0].sender) || addr;
   check(kinds.length === 24 && hot !== addr && kinds.every((c) => c.sender === hot), `the 24 kinds were signed by the temporary KINDS admin ${hot}`);

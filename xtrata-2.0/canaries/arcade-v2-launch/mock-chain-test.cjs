@@ -133,9 +133,11 @@ async function route(r) {
   const parentId = await page.evaluate((net) => { for (const k of Object.keys(localStorage)) if (k.startsWith(`xtrata-arcade-v2-launch:v1:${net}:`)) return JSON.parse(localStorage.getItem(k)).inscriptionId || null; return null; }, NET);
   const hot = await page.evaluate(() => document.querySelector('#hot').textContent.split(' ')[0]);
   if (!fresh.failed) {
+    // one signature for a pack within the one-transaction limit (32 chunks); begin + chunk batches of 30 + seal beyond it
+    const packSigs = (name) => { const n = Math.ceil(fs.readFileSync(path.join(ROOTDIR, 'recursive-apps/xtrata-arcade/dist/packs/xtrata-arcade-' + name + '.txt')).length / 16384); return n <= 32 ? 1 : 2 + Math.ceil(n / 30); };
     const expected = TESTNET
-      ? { connect: 0, preflight: 0, core: 3, fixtures: 1 + 2 + Math.ceil(chunksOf(BUNDLE).length / 30), deploy: 4, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': 1, 'pack-hall': 1, parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 }
-      : { connect: 0, preflight: 0, deploy: 3, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': 1, 'pack-hall': 1, parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 };
+      ? { connect: 0, preflight: 0, core: 3, fixtures: 1 + 2 + Math.ceil(chunksOf(BUNDLE).length / 30), deploy: 4, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': packSigs('engine'), 'pack-hall': packSigs('hall'), parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 }
+      : { connect: 0, preflight: 0, deploy: 3, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': packSigs('engine'), 'pack-hall': packSigs('hall'), parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 };
     const got = Object.fromEntries(ids.map((i) => [i, S.sigs[i] || 0]));
     console.log('  wallet signatures per step: ' + ids.map((i) => `${i} ${got[i]}`).join(', ') + ` · total ${S.walletCalls}`);
     check(JSON.stringify(got) === JSON.stringify(expected), `signatures per step match the README (${Object.values(expected).reduce((a, b) => a + b, 0)} in all)`);

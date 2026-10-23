@@ -38,7 +38,7 @@ states and grants. So the canary:
 | `xtrata-screen-v1` | 27.0 KB | deploy, Clarity 4 |
 | registry seed | 32 calls | `launchCalls()` from `contracts/arcade-world/ops/lib/v2-plan.mjs`: 24 `register-kind`, `create-space` arcade and hall, both set live, four bay objects (a bay with no state shows posters) |
 | `engine` pack | 195 KB, 13 chunks | `mint-single-tx-with-relationships`, child of #55 |
-| `hall` pack | 492 KB, 31 chunks | same |
+| `hall` pack | 523 KB, 33 chunks | staged route (over the 32-chunk one-transaction limit): `begin-or-get`, two `add-chunk-batch`, `seal-with-relationships`, child of #55 |
 | parent (text/html) | ~24 KB, 2 chunks | child of #55, depends on #3078 and both packs; `CONFIG.world = { posters, registry, screen }` |
 
 `assets`, `three` and `games` come from the v1.3 bundle #3078. The parent is written by `build/parent-render.cjs`, the renderer
@@ -97,14 +97,14 @@ Signatures are the root wallet's prompts on mainnet for a fresh launch (the mock
 | # | Step | Signs | What it proves |
 |---|------|-------|----------------|
 | 0 | Connect | none (the wallet's connect approval) | Which account; the chooser opens every time |
-| 1 | Preflight | none | Pins; connected wallet = root owner (hard stop otherwise); core live; bundle #3078 and #55 checked; fees quoted; balance covers the estimate; what already exists; a real run flown in the v1.5 arcade |
+| 1 | Preflight | none | Pins; connected wallet = root owner (hard stop otherwise); core live; bundle #3078 and #55 checked; fees quoted; balance covers the estimate; what already exists; a real run flown in the v2.0.0 arcade |
 | 2 | Deploy | 3 | `xtrata-world-v2`, `xtrata-posters-v1`, `xtrata-screen-v1` at Clarity 4 (each skipped when already there with the pinned source; refused when the name holds other source); sources read back; root owner, treasury and admins are the root wallet |
 | 3a | Kinds | 3 | Fund the temporary wallet, make it a KINDS-only admin, remove it again; it signs the 24 `register-kind` itself, each checked to get the planned id |
 | 3b | Hall | 8 | `create-space` arcade and hall (owner = root wallet), both live, the four bays; then `verifyManifest()` reads the plan back |
 | 3c | Setup | 0 | Treasury, screen fee recipient and poster publishers already at the launch settings (the deployer holds them) |
 | 3d | Registry read-back | none | The hall's own reader (world.js + world2.js) finds the hall live and four bays that resolve to posters |
 | 4 | Engine pack | 1 (0 if already inscribed) | One transaction, child of #55, fee capped by a post-condition |
-| 4 | Hall pack | 1 (0 if already inscribed) | same |
+| 4 | Hall pack | 4 (0 if already inscribed) | Staged route: begin, 2 chunk batches, seal; each fee capped by a post-condition |
 | 5 | Parent | 1 (0 if already inscribed) | `CONFIG.world` = the three contracts at the root address |
 | 6 | Verify release | none | Every inscription read back (type, size, hash, parents, dependencies); all 41 parts resolve; the parent boots in a hidden frame with the world reader on the registry, posters and screen; xtrata.xyz serves it |
 | 7 | Canary board, submit, copycat, close | 1 + 1 + 1 + 1 | As the v1 canary: a real run stored and re-played from chain bytes; a copied run refused with `(err u113)`; the test board closed |
@@ -112,7 +112,7 @@ Signatures are the root wallet's prompts on mainnet for a fresh launch (the mock
 | 8 | Ownership | none | Root owner, treasury, no admins, screen and posters roles, leaderboard owner; explorer links |
 | 9 | Audit | none | Everything re-read; the repo and site changes to make |
 
-**24 signatures in all on mainnet** (25 if a hall publisher grant is configured: `NETWORKS.mainnet.hallPublisher`). Tick "sign the
+**27 signatures in all on mainnet** (28 if a hall publisher grant is configured: `NETWORKS.mainnet.hallPublisher`). Tick "sign the
 24 kinds with my wallet" to sign the kinds yourself (24 prompts instead of 3).
 
 On a fresh testnet the rehearsal adds step 1b, deploy the core (3: `xtrata-v1-1-1`, `xtrata-v2-1-0`, `xtrata-v3-2-3` at
@@ -192,7 +192,7 @@ starts from an empty chain and runs the whole rehearsal, core and fixtures inclu
 
 ## What this cannot cover
 
-- Real wallet signing (extensions need a real browser session), and Leather or Xverse handling a 492 KB single transaction.
+- Real wallet signing (extensions need a real browser session), and Leather or Xverse handling a 200 KB single transaction (the hall pack goes by the staged route).
 - Real network fees and Hiro's read limits. The simnet has no 30-read cap. The canary's own registry reads use `get-objects-8`
   and the hall's reader uses `get-object-ids` + `get-object-view`; every read either makes stays within 24 reads in the worst case
   (`node contracts/arcade-world/tests/world2-costs.mjs`), so a stock node's 30-read limit is not a risk, but it has not been
