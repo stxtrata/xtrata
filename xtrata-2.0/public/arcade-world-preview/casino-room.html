@@ -2392,7 +2392,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     // Main-room clothing for the opening (the base wall plane is already split in buildRoom): frame, header, curtains.
     {
       const AX = -6, AW = 2.3, AH = 3.35, zw = -D / 2;                       // the arch: centre, clear width, clear height
-      const SX0 = -10.5, SX1 = -1.5, SZ0 = -18.4, SH = 4.05;                 // the salon's inner box and its lower ceiling
+      const SX0 = -11.2, SX1 = -0.8, SZ0 = -20.0, SH = 4.05;                 // the salon's inner box and its lower ceiling
       // the two 1.1 m strips (dado and wainscot) stop at the opening; small jambs finish their cut ends
       [-1, 1].forEach((s) => box(0.16, AH + 0.25, 0.3, wood, AX + s * (AW / 2 + 0.08), (AH + 0.25) / 2, zw + 0.08, scene));
       box(AW + 0.8, 0.34, 0.32, wood, AX, AH + 0.15, zw + 0.08, scene); box(AW + 0.9, 0.07, 0.36, gold, AX, AH + 0.36, zw + 0.08, scene);
@@ -2433,7 +2433,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       const sceil = new THREE.Mesh(new THREE.PlaneGeometry(sw, sd), M(0x07120d, { roughness: 1 })); sceil.rotation.x = Math.PI / 2; sceil.position.set(scx, SH, scz); scene.add(sceil);
       [-1, 1].forEach((s) => { const b2 = box(0.14, 0.05, sd - 0.3, new THREE.MeshBasicMaterial({ color: 0x4fe8a4 }), s < 0 ? SX0 + 0.1 : SX1 - 0.1, SH - 0.22, scz, scene); b2.userData.noShadow = true; });
       glowSprite(scx, SH - 0.5, scz, 7, 0x1fae74, 0.22);
-      [-8.15, -3.85].forEach((x) => { glowSprite(x, 3.4, -15.2, 3.4, 0xd8f2c0, 0.30); });
+      [-8.6, -3.5].forEach((x) => { glowSprite(x, 3.4, -16.0, 3.4, 0xd8f2c0, 0.30); });
       // the club's mark: a LAYR chip over layered squares, on the far wall
       const emb = canvasTex(256, 256, (c, w, h) => {
         c.fillStyle = '#06100b'; c.fillRect(0, 0, w, h);
@@ -3384,14 +3384,14 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
       ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 4; rr(ctx, -300, -100, 600, 200, 100); ctx.stroke(); ctx.font = '28px Georgia,serif'; ctx.fillText('HEADS-UP · NO LIMIT', 0, 170); ctx.restore();
     }, 0x2a1408);
     tableLight(g, 3.9, 0);
-    const shoe = V3(0, 0.98, -0.1);
-    const holeMe = new Hand(g, 0, 0.55, 0.22, shoe), holeOpp = new Hand(g, 0, -0.55, 0.22, shoe), comm = new Hand(g, 0, 0.0, 0.28, shoe);
-    const potG = stackAt(g, 0, 0.87, 0.26);
+    const shoe = V3(0, 0.98, -0.55);
+    const holeMe = new Hand(g, -0.55, 0.62, 0.22, shoe), holeOpp = new Hand(g, 0.55, 0.62, 0.22, shoe), comm = new Hand(g, 0, -0.02, 0.28, shoe);
+    const potG = stackAt(g, 0, 0.87, -0.42);
     const btn = cyl(0.04, 0.04, 0.012, M(0xffffff), 0, 0.875, 0, g, 20);
     const opp = addFigure(g, 0, -1.32, 0, { skin: SKIN[0], style: 'jacket', jacket: 0x3a2a48, shirt: 0xd86aa0, hair: 0x8a4a1a, hairStyle: 'long', lashes: true, thinBrows: true, earrings: true, eyes: 0x3a7a5a, baseFace: { smile: 0.22 }, pants: 0x1c1c26 });
     figOf.set(g, opp); greetOf.set(g, () => opp.greet());
     makeStool(g, 0, -1.32, 0, { h: 0.57 });
-    const plateAt = [V3(-0.62, 1.02, 0.78), V3(0, 1.08, -0.9)];
+    const plateAt = [V3(-0.62, 1.05, 1.0), V3(0.62, 1.05, 1.0)];
     const plates = plateAt.map((p) => { const sp = textSprite(256, 96, 0.62, 0.23, () => { }); sp.position.copy(p); sp.visible = false; g.add(sp); sp.userData.key = ''; return sp; });
     function setPlate(i, name, stack, last, turn, out, dealer) {
       const sp = plates[i], key = [name, stack, last, turn, out, dealer].join('|'); if (sp.userData.key === key) return; sp.userData.key = key;
@@ -3411,7 +3411,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     // ----- 3D sync -----
     let curId = null, dealt = false, dealing = false, commShown = 0, commBusy = false, myKey = '', oppFlipped = false, flipping = false, potShown = -1, evSeen = 0, collected = false, glowDone = false, resultInfo = null;
     const mkCards = (arr) => arr.map(cardOf);
-    function placeButton(V) { const mine = V.myBtn, z = mine ? 0.55 : -0.55, x = 0.28; btn.position.set(x, 0.875, mine ? z + 0.12 : z - 0.12); }
+    function placeButton(V) { btn.position.set(V.myBtn ? -0.88 : 0.88, 0.875, 0.62); }
     function resetVisuals() {
       holeMe.clear(); holeOpp.clear(); comm.clear(); rebuildStack(potG, 0); dealt = false; dealing = false; commShown = 0; myKey = ''; oppFlipped = false; potShown = -1; evSeen = 0; glowDone = false; resultInfo = null; collected = false;
       raise.key = ''; plates.forEach((p) => { p.visible = false; p.userData.key = ''; });
@@ -3586,11 +3586,11 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     tableLight(g);
     const opp = addFigure(g, 0, -1.28, 0, { skin: SKIN[1], style: 'vest', vest: 0x14141c, tie: 0x8c1420, hair: 0x141414, hairStyle: 'slick', beard: 'stubble', watch: true, eyes: 0x3a2412 });
     figOf.set(g, opp); greetOf.set(g, () => opp.greet()); makeStool(g, 0, -1.28, 0, { h: 0.57 });
-    const potG = stackAt(g, -0.62, 0.87, 0.02);
-    const rowY = 0.87 + DIE_SZ / 2 + 0.002, myRowZ = 0.5, oppRowZ = -0.5, sp = 0.115;
-    const myCup = cupMesh(), oppCup = cupMesh(); myCup.position.set(0.52, 0.866, 0.56); g.add(myCup); oppCup.position.set(0, 0.866 + 0.168, -0.5); oppCup.rotation.x = Math.PI; g.add(oppCup);
+    const potG = stackAt(g, 0, 0.87, -0.38);
+    const rowY = 0.87 + DIE_SZ / 2 + 0.002, myRowZ = -0.48, oppRowZ = 0.48, sp = 0.115;   // the two rows sit side by side on the players' side
+    const myCup = cupMesh(), oppCup = cupMesh(); myCup.position.set(-1.02, 0.866, 0.42); g.add(myCup); oppCup.position.set(1.02, 0.866 + 0.168, 0.42); oppCup.rotation.x = Math.PI; g.add(oppCup);
     // the bid, floating above the table
-    const board = textSprite(512, 168, 0.95, 0.31, () => { }); board.position.set(-1.28, 1.0, -0.3); board.visible = false; g.add(board); board.userData.key = '';
+    const board = textSprite(512, 168, 0.95, 0.31, () => { }); board.position.set(-1.45, 1.15, -0.55); board.visible = false; g.add(board); board.userData.key = '';
     function drawBoard(qty, face, who) {
       const key = qty + ':' + face + ':' + who; if (board.userData.key === key) return; board.userData.key = key;
       const ctx = board.userData.tex.userData.ctx, w = 512, h = 168; ctx.clearRect(0, 0, w, h);
@@ -3614,14 +3614,14 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     // ----- 3D sync -----
     let curId = null, rolled = false, rolling = false, revealed = false, revealing = false, potShown = -1, collected = false, resultInfo = null, evSeen = 0;
     const myDiceM = [], oppDiceM = [], hitMarks = [];
-    const rowPos = (i, z) => V3((i - 2) * sp, rowY, z);
+    const rowPos = (i, c) => V3(c + (i - 2) * sp * 0.85, rowY, 0.42);
     function resetVisuals() {
       [...myDiceM, ...oppDiceM].forEach((m) => g.remove(m)); myDiceM.length = oppDiceM.length = 0; hitMarks.forEach((m) => g.remove(m)); hitMarks.length = 0;
-      oppCup.position.set(0, 0.866 + 0.168, -0.5); oppCup.rotation.set(Math.PI, 0, 0); myCup.position.set(0.52, 0.866, 0.56);
+      oppCup.position.set(1.02, 0.866 + 0.168, 0.42); oppCup.rotation.set(Math.PI, 0, 0); myCup.position.set(-1.02, 0.866, 0.42);
       rolled = rolling = revealed = revealing = false; potShown = -1; rebuildStack(potG, 0); collected = false; resultInfo = null; evSeen = 0; board.visible = false; board.userData.key = '';
     }
     async function rollMine(vals) {
-      rolling = true; hostCue(g, 'deal'); const from = V3(0.52, 1.0, 0.56);
+      rolling = true; hostCue(g, 'deal'); const from = V3(-1.02, 1.0, 0.42);
       const ps = vals.map((v, i) => {
         const m = makeDie(v, Math.random() * 6.28); m.position.copy(from); g.add(m); myDiceM.push(m);
         const q0 = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)), q1 = m.quaternion.clone(), to = rowPos(i, myRowZ);
@@ -3632,7 +3632,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     }
     async function revealOpp(vals, hitFace) {
       revealing = true; revealed = true; hostCue(g, 'reveal'); sfx.flip && sfx.flip();
-      await Promise.all([moveObj(oppCup, V3(0.7, 0.866 + 0.168 + 0.16, -0.5), 0.55, 0.18)]);
+      await Promise.all([moveObj(oppCup, V3(1.38, 0.866 + 0.168 + 0.16, 0.6), 0.55, 0.18)]);
       const ps = vals.map((v, i) => { const m = makeDie(v, Math.random() * 6.28); const to = rowPos(i, oppRowZ); m.position.set(to.x, to.y + 0.3, to.z); g.add(m); oppDiceM.push(m); const y0 = to.y + 0.3; return tween(0.45 + i * 0.05, (u) => { m.position.y = to.y + (y0 - to.y) * (1 - bounceOut(u)); }, m); });
       await Promise.all(ps); revealing = false;
       if (hitFace) markHits(hitFace);
@@ -3858,7 +3858,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
 
   // ---------------- place stations ----------------
   stations = [makeBlackjack(), makeRoulette(), makeHoldem(), makeBaccarat(), makeVideoPoker(), makePvpHoldem(), makeLiarsDice()];
-  const placement = { blackjack: [-6.6, -2.6, 0.45], roulette: [0, -5.6, 0], holdem: [6.6, -2.6, -0.45], baccarat: [-6.2, 3.2, 0.7], videopoker: [6.2, 3.2, -0.7], pvpholdem: [-8.15, -15.2, -0.5], liars: [-3.85, -15.2, 0.5] };
+  const placement = { blackjack: [-6.6, -2.6, 0.45], roulette: [0, -5.6, 0], holdem: [6.6, -2.6, -0.45], baccarat: [-6.2, 3.2, 0.7], videopoker: [6.2, 3.2, -0.7], pvpholdem: [-8.6, -16.0, -0.35], liars: [-3.5, -16.0, 0.35] };
   const TAGS = { blackjack: ['BLACKJACK', 'split · double · insurance'], roulette: ['ROULETTE', 'European · single zero'], holdem: ["TEXAS HOLD'EM", 'you vs three players'], baccarat: ['BACCARAT', 'player · banker · tie'], videopoker: ['VIDEO POKER', 'jacks or better'], pvpholdem: ["HOLD'EM · PvP", 'heads-up · no limit'], liars: ["LIAR'S DICE", 'player vs player'] };
   stations.forEach((s) => {
     const p = placement[s.id]; s.group.position.set(p[0], 0, p[1]); s.group.rotation.y = p[2]; scene.add(s.group);
@@ -3868,7 +3868,7 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     });
     sign.position.set(0, s.id === 'videopoker' ? 3.1 : s.id === 'roulette' ? 2.2 : 2.25, 0); s.group.add(sign); s.sign = sign;
   });
-  stations.forEach((s) => { if (s.id === 'roulette' || s.id === 'videopoker') return; const a = s.group.rotation.y; [-0.7, 0.7].forEach((dx) => { const x = s.group.position.x + Math.cos(a) * dx + Math.sin(a) * 1.35, z = s.group.position.z - Math.sin(a) * dx + Math.cos(a) * 1.35; makeStool(scene, x, z, a + Math.PI, { h: 0.62 }); }); });
+  stations.forEach((s) => { if (['roulette', 'videopoker', 'pvpholdem', 'liars'].includes(s.id)) return; const a = s.group.rotation.y; [-0.7, 0.7].forEach((dx) => { const x = s.group.position.x + Math.cos(a) * dx + Math.sin(a) * 1.35, z = s.group.position.z - Math.sin(a) * dx + Math.cos(a) * 1.35; makeStool(scene, x, z, a + Math.PI, { h: 0.62 }); }); });
 
   // ---------------- table dressing, patrons and the bartender ----------------
   function plaqueTex(lines) { return canvasTex(256, 128, (c, w, h) => { c.fillStyle = '#17090c'; c.fillRect(0, 0, w, h); c.strokeStyle = '#d4a83a'; c.lineWidth = 5; c.strokeRect(4, 4, w - 8, h - 8); c.textAlign = 'center'; c.textBaseline = 'middle'; lines.forEach((l, i) => { c.fillStyle = i ? '#f1e3b8' : '#ffd86b'; c.font = (i ? '600 24px' : '800 30px') + ' Georgia,serif'; c.fillText(l, w / 2, 32 + i * 34); }); }); }
@@ -3890,13 +3890,15 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     },
     pvpholdem(s) {
       const g = s.group;
-      plaque(g, 0.0, 0.93, 1.02, 0.3, 0.1, ["HOLD'EM", 'NO LIMIT · BLINDS $5 / $10'], 0.0, 0.5);
-      chipColumns(g, -1.25, 0.866, 0.08, [100, 25], [3, 5], 0.1);
+      plaque(g, -1.5, 0.93, 0.6, 0.3, 0.1, ["HOLD'EM", 'NO LIMIT · BLINDS $5 / $10'], 0.3, 0.5);
+      chipColumns(g, -0.35, 0.866, -0.62, [100, 25], [3, 5], 0.12);
+      [[-1.15, 1.05], [-0.4, 1.42], [0.4, 1.42], [1.15, 1.05]].forEach(([x, z]) => makeStool(g, x, z, Math.atan2(x, z) + Math.PI, { h: 0.57 }));
     },
     liars(s) {
       const g = s.group; const tray = new THREE.Group(); tray.position.set(0.95, 0.866, -0.5); g.add(tray);
       box(0.3, 0.02, 0.2, M(0x0c0c10, { roughness: 0.35, metalness: 0.4 }), 0, 0.01, 0, tray); box(0.31, 0.006, 0.21, GOLDM(), 0, 0.001, 0, tray); chipColumns(tray, -0.09, 0.02, 0, [5, 25, 100], [6, 8, 4], 0.09);
-      plaque(g, -1.05, 0.93, 0.5, 0.26, 0.1, ["LIAR'S DICE", 'PLAYER VS PLAYER'], 0.0, 0.5);
+      plaque(g, -1.35, 0.93, 0.55, 0.26, 0.1, ["LIAR'S DICE", 'PLAYER VS PLAYER'], 0.3, 0.5);
+      [[-1.0, 0.95], [-0.35, 1.28], [0.35, 1.28], [1.0, 0.95]].forEach(([x, z]) => makeStool(g, x, z, Math.atan2(x, z) + Math.PI, { h: 0.57 }));
     },
     baccarat(s) {
       const g = s.group; const cb = box(0.3, 0.07, 0.2, M(0x0b0b10, { roughness: 0.2, metalness: 0.5 }), 0.95, 0.9, -0.52, g); box(0.31, 0.012, 0.21, GOLDM(), 0.95, 0.94, -0.52, g);
@@ -3944,8 +3946,8 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     XA_HOSTS.add({ group: byId.blackjack.group, x: 0, z: -0.98, yaw: 0, person: 'f1', livery: 'emerald', rest: { kind: 'table', y: 0.975, fwd: 0.30 }, fig: figOf.get(byId.blackjack.group) });
     XA_HOSTS.add({ group: byId.roulette.group, x: -0.3, z: -1.02, yaw: 0, person: 'm2', livery: 'burgundy', rest: { kind: 'table', y: 0.95, fwd: 0.27 }, fig: figOf.get(byId.roulette.group) });
     XA_HOSTS.add({ group: byId.baccarat.group, x: 0, z: -1.0, yaw: 0, person: 'f2', livery: 'plum', rest: { kind: 'table', y: 0.975, fwd: 0.30 }, fig: figOf.get(byId.baccarat.group) });
-    XA_HOSTS.add({ group: byId.pvpholdem.group, x: -1.65, z: -0.95, yaw: Math.atan2(1.65, 0.95), person: 'm3', livery: 'ink', rest: { kind: 'table', y: 0.975, fwd: 0.33 } });
-    XA_HOSTS.add({ group: byId.liars.group, x: 1.45, z: -0.9, yaw: Math.atan2(-1.45, 0.9), person: 'f3', livery: 'teal', rest: { kind: 'table', y: 0.975, fwd: 0.33 } });
+    XA_HOSTS.add({ group: byId.pvpholdem.group, x: 0, z: -1.05, yaw: 0, person: 'm3', livery: 'ink', rest: { kind: 'table', y: 0.975, fwd: 0.30 } });
+    XA_HOSTS.add({ group: byId.liars.group, x: 0, z: -1.05, yaw: 0, person: 'f3', livery: 'teal', rest: { kind: 'table', y: 0.975, fwd: 0.30 } });
     XA_HOSTS.add({ group: scene, x: 2.5, z: 7.9, yaw: Math.atan2(-2.5, 3.0), person: 'm1', livery: 'midnight', role: 'greeter', rest: 'back' });
     solidsExtra.push({ k: 'c', x: 2.5, z: 7.9, r: 0.36 });
     XA_HOSTS.add({ group: scene, x: room.barPos.x, z: room.barPos.z - 0.35, yaw: 0, person: 'm3', livery: 'midnight', rest: 'back', fig: bartender });
@@ -3954,8 +3956,8 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     if (hb[0]) XA_HOSTS.add({ group: byId.holdem.group, x: -2.15, z: 0, yaw: Math.PI / 2, person: 'f2', wear: { shirt: 0x6a8a74, trousers: 0x2a2d33 }, seat: { h: 0.57 }, fig: hb[0] });
     if (hb[1]) XA_HOSTS.add({ group: byId.holdem.group, x: 0, z: -1.32, yaw: 0, person: 'm1', wear: { shirt: 0x3a4454, trousers: 0x23262c }, seat: { h: 0.57 }, fig: hb[1] });
     if (hb[2]) XA_HOSTS.add({ group: byId.holdem.group, x: 2.15, z: 0, yaw: -Math.PI / 2, person: 'm2', wear: { shirt: 0x8a3a34, trousers: 0x1e2026 }, seat: { h: 0.57 }, fig: hb[2] });
-    XA_HOSTS.add({ group: byId.pvpholdem.group, x: 0, z: -1.32, yaw: 0, person: 'f3', wear: { shirt: 0x7a4a68, trousers: 0x23262c }, seat: { h: 0.57 }, fig: figOf.get(byId.pvpholdem.group), showWhen: () => !!byId.pvpholdem.group.userData.oppSeated });
-    XA_HOSTS.add({ group: byId.liars.group, x: 0, z: -1.28, yaw: 0, person: 'm2', wear: { shirt: 0x2c2c34, trousers: 0x191b20 }, seat: { h: 0.57 }, fig: figOf.get(byId.liars.group), showWhen: () => !!byId.liars.group.userData.oppSeated });
+    XA_HOSTS.add({ group: byId.pvpholdem.group, x: 1.15, z: 1.05, yaw: Math.atan2(-1.15, -1.05), person: 'f3', wear: { shirt: 0x7a4a68, trousers: 0x23262c }, seat: { h: 0.57 }, fig: figOf.get(byId.pvpholdem.group), showWhen: () => !!byId.pvpholdem.group.userData.oppSeated });
+    XA_HOSTS.add({ group: byId.liars.group, x: 1.0, z: 0.95, yaw: Math.atan2(-1.0, -0.95), person: 'm2', wear: { shirt: 0x2c2c34, trousers: 0x191b20 }, seat: { h: 0.57 }, fig: figOf.get(byId.liars.group), showWhen: () => !!byId.liars.group.userData.oppSeated });
     const PWEAR = [{ shirt: 0x3a5a8a, trousers: 0x2a2d33 }, { shirt: 0xd8d0b8, trousers: 0x3a3028 }, { shirt: 0x8a2a2a, trousers: 0x20222a }, { shirt: 0xe0c8c0, trousers: 0x1c1c26 }];
     const PCAST = ['m3', 'm1', 'f1', 'f3'];
     patrons.forEach((p, i) => { const px = p.fig.group.position.x; XA_HOSTS.add({ group: scene, x: px - Math.sign(px) * 0.45, z: p.fig.group.position.z, yaw: p.fig.group.rotation.y, person: PCAST[i % 4], wear: PWEAR[i % 4], fig: p.fig }); });   // half a step back from the machines: these six stand straighter than the woodcuts did
@@ -3986,8 +3988,8 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     holdem: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.35 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.35 } }],
     roulette: [{ x: 0, z: 1.6, pad: true, stand: { x: 0, z: 1.6 } }],
     videopoker: [{ x: 0, z: 1.55, pad: true, stand: { x: 0, z: 1.55 } }],
-    pvpholdem: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.35 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.35 } }],
-    liars: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.25 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.25 } }]
+    pvpholdem: [{ x: -1.15, z: 1.05, stand: { x: -1.75, z: 1.75 } }, { x: -0.4, z: 1.42, stand: { x: -0.5, z: 2.35 } }, { x: 0.4, z: 1.42, stand: { x: 0.5, z: 2.35 } }],
+    liars: [{ x: -1.0, z: 0.95, stand: { x: -1.6, z: 1.6 } }, { x: -0.35, z: 1.28, stand: { x: -0.45, z: 2.2 } }, { x: 0.35, z: 1.28, stand: { x: 0.45, z: 2.2 } }]
   };
   const VERB = { blackjack: 'SIT', baccarat: 'SIT', holdem: 'SIT', roulette: 'PLAY', videopoker: 'PLAY', pvpholdem: 'SIT', liars: 'SIT' };
   const toWorld = (s, x, z) => { const a = s.group.rotation.y; return { x: s.group.position.x + Math.cos(a) * x + Math.sin(a) * z, z: s.group.position.z - Math.sin(a) * x + Math.cos(a) * z }; };
@@ -4004,8 +4006,8 @@ button{transition:background .15s,transform .08s}button:active:not(:disabled){tr
     else if (s.id === 'baccarat') { ell(1.58, 1.02); circ(0, -1.0, 0.42); }
     else if (s.id === 'holdem') { ell(1.78, 1.15); [[-2.15, 0], [0, -1.32], [2.15, 0]].forEach(([x, z]) => circ(x, z, 0.42)); }
     else if (s.id === 'roulette') { solids.push({ k: 'r', cx: px, cz: pz, hx: 1.8, hz: 0.85, rot: a }); circ(-0.3, -1.02, 0.42); }
-    else if (s.id === 'pvpholdem') { ell(1.78, 1.15); circ(0, -1.32, 0.42); circ(-1.65, -0.95, 0.36); }
-    else if (s.id === 'liars') { ell(1.58, 1.02); circ(0, -1.28, 0.42); circ(1.45, -0.9, 0.36); }
+    else if (s.id === 'pvpholdem') { ell(1.78, 1.15); circ(0, -1.05, 0.4); circ(1.15, 1.05, 0.28); }
+    else if (s.id === 'liars') { ell(1.58, 1.02); circ(0, -1.05, 0.4); circ(1.0, 0.95, 0.28); }
     else if (s.id === 'videopoker') { solids.push({ k: 'r', cx: px, cz: pz, hx: 0.72, hz: 0.58, rot: a, oz: 0.05 }); }
     (SEATS[s.id] || []).forEach((seat) => { if (!seat.pad) circ(seat.x, seat.z, 0.24); });
   });

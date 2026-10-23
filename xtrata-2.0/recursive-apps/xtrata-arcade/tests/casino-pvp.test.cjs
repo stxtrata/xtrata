@@ -14,8 +14,8 @@ const ok = (name, cond, extra) => { if (cond) { passed++; console.log('  ✓ ' +
 
 // ---------- A. the wiring is in the file ----------
 ok('A: seven stations in the array', room.includes('makeVideoPoker(), makePvpHoldem(), makeLiarsDice()'));
-ok('A: the salon pair are placed in the salon', room.includes("pvpholdem: [-8.15, -15.2, -0.5], liars: [-3.85, -15.2, 0.5]"));
-ok('A: seats, verbs and signs know the pair', room.includes("pvpholdem: 'SIT', liars: 'SIT'") && room.includes('"HOLD\'EM · PvP"') && /pvpholdem: \[\{ x: -0\.7/.test(room));
+ok('A: the salon pair are placed in the salon', room.includes("pvpholdem: [-8.6, -16.0, -0.35], liars: [-3.5, -16.0, 0.35]"));
+ok('A: seats, verbs and signs know the pair', room.includes("pvpholdem: 'SIT', liars: 'SIT'") && room.includes('"HOLD\'EM · PvP"') && /pvpholdem: \[\{ x: -1\.15/.test(room));
 ok('A: keys 1 to 7', room.includes('/^Digit[1-7]$/'));
 ok('A: the raise slider gets input events', room.includes("addEventListener('input', (e) => { if (focus && focus.input) focus.input(e); })"));
 ok('A: the salon is built and the hosts are asked for', room.includes('STRATA SALON') && room.includes("fetch('adrian.glb')") && room.includes("XA_HOSTS.add({ group: byId.pvpholdem.group"));
@@ -87,10 +87,10 @@ ok('A: the preview copies .glb files', fs.readFileSync(path.join(ROOT, 'build', 
   ok('D: the arch lets you through (x -6 stays put in the wall band)', Math.abs(gap.x + 6) < 0.05 && Math.abs(gap.z + 11.1) < 0.35, gap);
   const wall = await probe(-9, -11.05);
   ok('D: beside the arch the wall pushes you back', wall.z > -10.75, wall);
-  const deep = await probe(-6, -19.5);
-  ok('D: the salon\'s far wall holds', deep.z > -18.1, deep);
-  const west = await probe(-10.45, -14.5);   // grazing the west wall (deep inside a wall you are ejected north, by design)
-  ok('D: the salon\'s side wall holds', west.x > -10.3, west);
+  const deep = await probe(-6, -21);
+  ok('D: the salon\'s far wall holds', deep.z > -19.6, deep);
+  const west = await probe(-11.15, -15);   // grazing the west wall (deep inside a wall you are ejected north, by design)
+  ok('D: the salon\'s side wall holds', west.x > -11.0, west);
   await page.evaluate(() => { __casino.exitWalk(); });
 
   // ---------- E. a Hold’em match: open, clock ticks without rebuilding the strip, fold, settle ----------
