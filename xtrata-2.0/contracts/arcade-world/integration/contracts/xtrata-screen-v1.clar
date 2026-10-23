@@ -4,6 +4,8 @@
 ;;
 ;; - Items are short messages, news or ads (text, optional picture by inscription id + hash).
 ;;   The hall reads `get-version`, then `get-live` and `get-items`, and paints them.
+;; - The "picture" is any sealed Xtrata inscription up to 2 MB that the hall can play from its own bytes: PNG, JPEG, GIF, WebP,
+;;   or a short MP4 / WebM clip. Nothing else is ever shown (the hall decides by the bytes, never by a name).
 ;; - Append-only records: an item is retired or hidden, never edited. History stays readable.
 ;; - Bounded live set: at most 32 live ids, so the hall's load cost does not grow with history.
 ;;   Expired, hidden and retired items drop out when anything is added, or when anyone calls `prune`.
@@ -23,6 +25,7 @@
 ;;   buying and approving, never refunds, settling or retiring.
 ;; - Successor pointer with a one-way lock; the read interface is frozen at v1.
 ;;
+;; Layout values: 0 standard, 1 picture fills the feature panel, 2 picture fills the whole screen (needs a picture)
 ;; Kind values:   0 message, 1 news, 2 ad
 ;; Status values: 0 pending (awaiting review), 1 approved (live or scheduled), 2 closed
 ;; Closed reasons: 1 rejected, 2 cancelled, 3 swept (review window passed), 4 retired,
@@ -46,7 +49,7 @@
 
 (define-constant DAY-BLOCKS u144)
 (define-constant MAX-LIVE u32)
-(define-constant MAX-IMAGE-BYTES u131072)
+(define-constant MAX-IMAGE-BYTES u2097152)
 (define-constant MAX-SPAN u52560)               ;; one year of burn blocks
 (define-constant MAX-PRICE-PER-DAY u1000000000) ;; 1000 STX
 (define-constant MAX-DAYS-LIMIT u90)
@@ -69,7 +72,7 @@
 
 ;; paid-slot settings (slots are off until the admin switches them on)
 (define-data-var slots-enabled bool false)
-(define-data-var prices { message: uint, news: uint, ad: uint } { message: u2000000, news: u5000000, ad: u10000000 })
+(define-data-var prices { message: uint, news: uint, ad: uint } { message: u1000000, news: u2000000, ad: u5000000 })
 (define-data-var min-days uint u1)
 (define-data-var max-days uint u14)
 (define-data-var max-paid-live uint u8)
@@ -99,6 +102,7 @@
     image-id: uint,
     image-hash: (buff 32),
     image-size: uint,
+    layout: uint,
     weight: uint,
     publisher: principal,
     paid: bool,
@@ -152,6 +156,11 @@
   (if (is-eq size u0)
     (and (is-eq id u0) (is-eq (len hash) u0))
     (and (<= size MAX-IMAGE-BYTES) (inscription-ok? id hash size who))))
+
+;; How the picture is laid out: 0 standard (text with the picture beside it), 1 the picture fills the whole feature panel,
+;; 2 the picture fills the whole screen face. Only a picture can fill anything: layout 1 or 2 needs one.
+(define-private (layout-ok? (layout uint) (image-size uint))
+  (and (<= layout u2) (or (is-eq layout u0) (> image-size u0))))
 
 (define-private (price-of (kind uint))
   (let ((p (var-get prices)))
@@ -217,7 +226,7 @@
 ;; used = ceil(ran / DAY-BLOCKS): a day is charged once its first block has passed (the approval
 ;; block itself charges nothing), so any rounding goes the buyer's way and no uSTX is lost.
 (define-private (unearned (it { kind: uint, head: (string-ascii 80), body: (string-ascii 240), image-id: uint,
-    image-hash: (buff 32), image-size: uint, weight: uint, publisher: principal, paid: bool,
+    image-hash: (buff 32), image-size: uint, layout: uint, weight: uint, publisher: principal, paid: bool,
     buyer: (optional principal), days: uint, price: uint, escrow: uint, status: uint, hidden: bool,
     starts-at: uint, ends-at: uint, added-at: uint, closed-reason: uint }))
   (let (
@@ -252,7 +261,7 @@
 (define-public (post-item
   (kind uint) (head (string-ascii 80)) (body (string-ascii 240))
   (image-id uint) (image-hash (buff 32)) (image-size uint)
-  (weight uint) (starts-at uint) (ends-at uint))
+  (weight uint) (starts-at uint) (ends-at uint) (layout uint))
   (let (
     (id (var-get count))
     (admin? (is-admin))
@@ -265,9 +274,10 @@
     (asserts! (and (>= weight u1) (<= weight u10)) ERR-INVALID)
     (asserts! (and (> ends-at from) (<= (- ends-at from) MAX-SPAN)) ERR-WINDOW)
     (asserts! (image-valid? image-id image-hash image-size tx-sender) ERR-INSCRIPTION)
+    (asserts! (layout-ok? layout image-size) ERR-INVALID)
     (map-set Items id {
       kind: kind, head: head, body: body,
-      image-id: image-id, image-hash: image-hash, image-size: image-size,
+      image-id: image-id, image-hash: image-hash, image-size: image-size, layout: layout,
       weight: weight, publisher: tx-sender, paid: false, buyer: none, days: u0, price: u0, escrow: u0,
       status: status, hidden: false, starts-at: from, ends-at: ends-at,
       added-at: burn-block-height, closed-reason: u0 })
@@ -325,7 +335,7 @@
 
 (define-public (buy-slot
   (kind uint) (head (string-ascii 80)) (body (string-ascii 240))
-  (image-id uint) (image-hash (buff 32)) (image-size uint) (days uint))
+  (image-id uint) (image-hash (buff 32)) (image-size uint) (days uint) (layout uint))
   (let (
     (buyer tx-sender)
     (id (var-get count))
@@ -340,12 +350,13 @@
     (asserts! (> price u0) ERR-PRICE)
     (asserts! (< pend (var-get max-pending-per-buyer)) ERR-CAP-PENDING)
     (asserts! (image-valid? image-id image-hash image-size buyer) ERR-INSCRIPTION)
+    (asserts! (layout-ok? layout image-size) ERR-INVALID)
     (asserts! (has-room? kind) ERR-CAP-LIVE)
     (try! (stx-transfer? price buyer current-contract))
     (var-set total-escrow (+ (var-get total-escrow) price))
     (map-set Items id {
       kind: kind, head: head, body: body,
-      image-id: image-id, image-hash: image-hash, image-size: image-size,
+      image-id: image-id, image-hash: image-hash, image-size: image-size, layout: layout,
       weight: u1, publisher: buyer, paid: true, buyer: (some buyer), days: days, price: price, escrow: price,
       status: u0, hidden: false, starts-at: u0, ends-at: u0,
       added-at: burn-block-height, closed-reason: u0 })
@@ -425,7 +436,7 @@
     (settle-run id false)))
 
 (define-private (deadline-of (id uint) (it { kind: uint, head: (string-ascii 80), body: (string-ascii 240), image-id: uint,
-    image-hash: (buff 32), image-size: uint, weight: uint, publisher: principal, paid: bool,
+    image-hash: (buff 32), image-size: uint, layout: uint, weight: uint, publisher: principal, paid: bool,
     buyer: (optional principal), days: uint, price: uint, escrow: uint, status: uint, hidden: bool,
     starts-at: uint, ends-at: uint, added-at: uint, closed-reason: uint }))
   (default-to (+ (get added-at it) (var-get review-window)) (map-get? Deadlines id)))

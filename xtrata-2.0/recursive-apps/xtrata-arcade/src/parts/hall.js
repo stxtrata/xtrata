@@ -1538,7 +1538,7 @@ function startChainClock(){ setHeight(estHeight(),false); pollChain(); setInterv
    contract reader live in screen.js; this part only builds the panel, feeds it and repaints it. With no screen contract it is the
    clock plus the latest scorers. It replaces the old Bitcoin Day board in the same spot. */
 let dayBoard=null;
-const CENTRE_SCREEN={W:3.2, H:1.8, cy:3.15, z:RL/2-6, px:1280, py:720, gapMs:120};
+const CENTRE_SCREEN={W:3.2, H:1.8, cy:3.15, z:RL/2-6, px:1280, py:720, gapMs:120, animGapMs:40};
 function buildDayBoard(){
   const S=CENTRE_SCREEN, cv=mkCanvas(S.px,S.py), t=tex(cv), mat=new THREE.MeshBasicMaterial({map:t, toneMapped:false});
   const g=new THREE.Group(); g.position.set(0,S.cy,S.z); scene.add(g);
@@ -1553,15 +1553,16 @@ function buildDayBoard(){
   dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], scorersAt:-1e9};
   paintDayBoard(true);
 }
-// Latest scorers: every cached board entry that burned in the last two Bitcoin days, newest first (no extra reads).
+// Latest scorers: the newest top-10 entries across every board the hall has cached, whatever their age (the row shows how old), no extra reads.
 function screenScorers(){
   const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; if(t && t.entries && t.entries.length) boards.push({game:g.title, colour:g.color, mode:b.mode, entries:t.entries}) }));
-  return window.XAScreen ? XAScreen.latestScorers(boards, chain.height, 288, fmtBoard, 8) : [];
+  return window.XAScreen ? XAScreen.latestScorers(boards, chain.height, 0, fmtBoard, 8) : [];
 }
 function paintDayBoard(force){
   if(!dayBoard || chain.day<0) return;
   const now=performance.now();
-  if(!force && now-dayBoard.last<CENTRE_SCREEN.gapMs) return;
+  const gap=(window.XAScreen && XAScreen.animating && XAScreen.animating()) ? CENTRE_SCREEN.animGapMs : CENTRE_SCREEN.gapMs;   // a GIF or clip on show repaints at about 25 fps
+  if(!force && now-dayBoard.last<gap) return;
   dayBoard.last=now;
   if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } }
   const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers,
@@ -1579,7 +1580,7 @@ function paintPlainClock(x,W,H,d){
   x.restore();
 }
 // Per frame: the ticker and the rotation move, so repaint a few times a second while the screen is within sight.
-function tickCentreScreen(){ if(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11) paintDayBoard() }
+function tickCentreScreen(){ if(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11) paintDayBoard(); else if(window.XAScreen && XAScreen.idle) XAScreen.idle() }   // far from the screen: clips pause
 
 
 /* ==================== TEMPORARY DEV OVERRIDE — REMOVE BEFORE RELEASE ====================

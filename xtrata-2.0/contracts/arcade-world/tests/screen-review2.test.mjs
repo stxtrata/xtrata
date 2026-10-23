@@ -19,7 +19,7 @@ async function screen() {
   const bal = (who) => simnet.getAssetsMap().get('STX').get(who) ?? 0n;
   const me = `${deployer}.xtrata-screen-v1`;
   const buy = (sender, o = {}) => call('buy-slot', [
-    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(''), U(0), Cl.buffer(new Uint8Array(0)), U(0), U(o.days ?? 1),
+    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(''), U(0), Cl.buffer(new Uint8Array(0)), U(0), U(o.days ?? 1), U(0),
   ], sender);
   const item = (id) => ro('get-item', [U(id)]).value.value;
   const idOf = (r) => Number(r.result.value.value);
@@ -32,6 +32,7 @@ async function screen() {
     assert.ok(bal(me) >= sum);
   };
   call('set-slots-enabled', [Cl.bool(true)]);
+  call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // this file's arithmetic uses 2/5/10 STX
   call('set-publisher', [P(W[1]), U(2)]);           // W1 reviews
   call('set-fee-recipient', [P(W[5])]);
   return { simnet, deployer, W, call, ro, bal, me, buy, item, idOf, paid, solvent };

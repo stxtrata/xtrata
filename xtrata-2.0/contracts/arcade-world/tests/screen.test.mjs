@@ -22,10 +22,10 @@ async function screen() {
   const h = () => simnet.burnBlockHeight;
   const post = (sender, o = {}) => call('post-item', [
     U(o.kind ?? 0), S(o.head ?? 'HELLO'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size),
-    U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100),
+    U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100), U(o.layout ?? 0),
   ], sender);
   const buy = (sender, o = {}) => call('buy-slot', [
-    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1),
+    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0),
   ], sender);
   const live = () => ro('get-live').value.map((x) => Number(x.value));
   const item = (id) => ro('get-item', [U(id)]).value.value;
@@ -163,17 +163,48 @@ test('pictures: sealed, the right size and hash, made by the poster, within the 
   const img = { id: 7, hash: hash32(7), size: 5000 };
   mockInscription(simnet, deployer, 7, { hash: img.hash, size: 5000, creator: W[0] });
   mockInscription(simnet, deployer, 8, { hash: hash32(8), size: 5000, creator: W[0], sealed: false });
-  mockInscription(simnet, deployer, 9, { hash: hash32(9), size: 200000, creator: W[0] });
+  mockInscription(simnet, deployer, 9, { hash: hash32(9), size: 2097153, creator: W[0] });
+  mockInscription(simnet, deployer, 10, { hash: hash32(10), size: 2097152, creator: W[0] });
   assert.equal(R(s.post(W[0], { img })).startsWith('(ok u'), true);
   assert.equal(R(s.post(deployer, { img })), err(405));                                   // not the creator
   assert.equal(R(s.post(W[0], { img: { id: 7, hash: hash32(7), size: 5001 } })), err(405)); // wrong size
   assert.equal(R(s.post(W[0], { img: { id: 7, hash: hash32(8), size: 5000 } })), err(405)); // wrong hash
   assert.equal(R(s.post(W[0], { img: { id: 8, hash: hash32(8), size: 5000 } })), err(405)); // unsealed
-  assert.equal(R(s.post(W[0], { img: { id: 9, hash: hash32(9), size: 200000 } })), err(405)); // over 128 KB
+  assert.equal(R(s.post(W[0], { img: { id: 9, hash: hash32(9), size: 2097153 } })), err(405)); // one byte over 2 MB
+  assert.equal(R(s.post(W[0], { img: { id: 10, hash: hash32(10), size: 2097152 } })).startsWith('(ok u'), true); // exactly 2 MB is fine (room for a GIF or a short clip)
   assert.equal(R(s.post(W[0], { img: { id: 99, hash: hash32(9), size: 10 } })), err(405));   // missing
   // "no picture" means all zero
   assert.equal(R(s.post(W[0], { img: { id: 3, hash: new Uint8Array(0), size: 0 } })), err(405));
   assert.equal(R(s.post(W[0], { img: { id: 0, hash: hash32(1), size: 0 } })), err(405));
+});
+
+test('layout: 0 standard, 1 fills the feature panel, 2 fills the whole screen; 1 and 2 need a picture; stored and read back; paid slots too', async () => {
+  const s = await screen();
+  const { deployer, W, simnet } = s;
+  s.call('set-publisher', [P(W[0]), U(1)]);
+  const img = { id: 21, hash: hash32(21), size: 300000 };
+  mockInscription(simnet, deployer, 21, { hash: img.hash, size: 300000, creator: W[0] });
+  mockInscription(simnet, deployer, 22, { hash: hash32(22), size: 300000, creator: W[1] });
+  const lay = (id) => Number(s.item(id).layout.value);
+  assert.equal(lay(s.idOf(s.post(W[0], { img }))), 0, 'default is the standard layout');
+  assert.equal(lay(s.idOf(s.post(W[0], { img, layout: 1 }))), 1);
+  assert.equal(lay(s.idOf(s.post(W[0], { img, layout: 2 }))), 2);
+  assert.equal(R(s.post(W[0], { img, layout: 3 })), err(403), 'only 0, 1 or 2');
+  assert.equal(R(s.post(W[0], { layout: 1 })), err(403), 'nothing to fill the panel with: refused');
+  assert.equal(R(s.post(W[0], { layout: 2 })), err(403));
+  assert.equal(R(s.post(W[0], { layout: 0 })).startsWith('(ok u'), true, 'a text-only item is still fine');
+  // the same rules for a bought slot, and the layout is kept through approval
+  s.call('set-slots-enabled', [Cl.bool(true)]);
+  const img2 = { id: 22, hash: hash32(22), size: 300000 };
+  assert.equal(R(s.buy(W[1], { kind: 2, layout: 2 })), err(403), 'a full-screen ad needs a picture');
+  assert.equal(R(s.buy(W[1], { kind: 2, img: img2, layout: 4 })), err(403));
+  const b0 = s.bal(W[1]);
+  const id = s.idOf(s.buy(W[1], { kind: 2, img: img2, layout: 2, days: 2 }));
+  assert.equal(b0 - s.bal(W[1]), 10_000_000n, 'a full-screen ad costs the ad price, 5 STX a day');
+  assert.equal(lay(id), 2);
+  assert.equal(R(s.call('approve', [U(id)])), OK);
+  assert.equal(lay(id), 2, 'approval does not touch the layout');
+  assert.ok(s.live().includes(id));
 });
 
 test('expiry: ended items drop out of the live set on the next write or prune', async () => {
@@ -218,6 +249,19 @@ test('paid slots: off by default; price, caps and ranges', async () => {
   const { deployer, W } = s;
   assert.equal(R(s.buy(W[0])), err(408));
   assert.equal(R(s.call('set-slots-enabled', [Cl.bool(true)])), OK);
+  // the defaults: 1 STX a day for a message, 2 for news, 5 for an ad
+  { const p = s.ro('get-config').value.prices.value; assert.deepEqual([p.message.value, p.news.value, p.ad.value], [1_000_000n, 2_000_000n, 5_000_000n]); }
+  {
+    const d0 = s.bal(W[2]);
+    const m = s.idOf(s.buy(W[2], { kind: 0, days: 2 })), n = s.idOf(s.buy(W[2], { kind: 1, days: 1 }));
+    assert.equal(d0 - s.bal(W[2]), 4_000_000n, 'a 2-day message (2 STX) plus a 1-day news item (2 STX)');
+    assert.equal(R(s.call('cancel', [U(m)], W[2])), OK); assert.equal(R(s.call('cancel', [U(n)], W[2])), OK);
+    assert.equal(s.bal(W[2]), d0, 'cancelled: refunded in full');
+    const a = s.idOf(s.buy(W[2], { kind: 2, days: 3 }));
+    assert.equal(d0 - s.bal(W[2]), 15_000_000n, 'a 3-day ad is 15 STX');
+    assert.equal(R(s.call('cancel', [U(a)], W[2])), OK);
+  }
+  s.call('set-prices', [U(2_000_000), U(5_000_000), U(10_000_000)]);  // the rest of this test uses 2/5/10
   assert.equal(R(s.buy(W[0], { days: 0 })), err(404));
   assert.equal(R(s.buy(W[0], { days: 15 })), err(404));
   assert.equal(R(s.buy(W[0], { kind: 3 })), err(403));
@@ -254,6 +298,7 @@ test('paid slots: approve starts the run; the escrow is earned day by day and se
   const s = await screen();
   const { deployer, W, h } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   s.call('set-publisher', [P(W[1]), U(2)]);
   s.call('set-fee-recipient', [P(W[5])]);
   const id = s.idOf(s.buy(W[0], { kind: 2, days: 2 }));
@@ -297,6 +342,7 @@ test('paid slots: reject, cancel and sweep refund in full; each only once', asyn
   const s = await screen();
   const { deployer, W, h } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   const a = s.idOf(s.buy(W[0], { days: 2 }));         // 4 STX
   const b = s.idOf(s.buy(W[0], { days: 1 }));         // 2 STX
   const b0 = s.bal(W[0]);
@@ -332,6 +378,7 @@ test('paid slots: pause blocks buying and approving, never refunds or retiring',
   const s = await screen();
   const { deployer, W } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   const a = s.idOf(s.buy(W[0]));
   const b = s.idOf(s.buy(W[0]));
   const c = s.idOf(s.buy(W[1]));
@@ -357,6 +404,7 @@ test('paid slots: the paid-live cap, free-item caps do not apply, fee recipient 
   const s = await screen();
   const { deployer, W } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   s.call('set-limits', [U(1), U(14), U(1), U(4), U(432)]);       // one paid item live at a time
   s.call('set-fee-recipient', [P(W[4])]);
   const a = s.idOf(s.buy(W[0]));
@@ -385,6 +433,7 @@ test('paid slots: pictures must be the buyer\'s own sealed inscriptions', async 
   const s = await screen();
   const { deployer, W, simnet } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   mockInscription(simnet, deployer, 21, { hash: hash32(21), size: 9000, creator: W[0] });
   const img = { id: 21, hash: hash32(21), size: 9000 };
   assert.equal(R(s.buy(W[1], { img })), err(405));               // someone else's picture
@@ -397,6 +446,7 @@ test('escrow invariant: after any mix of paid actions the contract holds exactly
   const s = await screen();
   const { W } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   s.call('set-publisher', [P(W[5]), U(2)]);
   s.call('set-limits', [U(1), U(14), U(16), U(8), U(432)]);
   const ids = [];

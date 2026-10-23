@@ -22,10 +22,10 @@ async function screen() {
   const h = () => simnet.burnBlockHeight;
   const post = (sender, o = {}) => call('post-item', [
     U(o.kind ?? 0), S(o.head ?? 'HELLO'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size),
-    U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100),
+    U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100), U(o.layout ?? 0),
   ], sender);
   const buy = (sender, o = {}) => call('buy-slot', [
-    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1),
+    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0),
   ], sender);
   const live = () => ro('get-live').value.map((x) => Number(x.value));
   const item = (id) => ro('get-item', [U(id)]).value.value;
@@ -40,6 +40,7 @@ test('R1: STX sent straight to the contract is not escrow; it is reported as una
   const s = await screen();
   const { simnet, W } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   simnet.transferSTX(5_000_000n, s.me, W[0]);
   assert.equal(s.ro('get-escrow-total').value, 0n);
   assert.equal(s.ro('get-unaccounted').value, 5_000_000n);
@@ -85,6 +86,7 @@ test('R5: a slot cannot be bought when the kind cap or the paid-live cap is alre
   const s = await screen();
   const { deployer, W } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   s.call('set-caps', [U(8), U(8), U(2), U(8)]);                  // two ads at most
   s.post(deployer, { kind: 2, head: 'A1' });
   s.post(deployer, { kind: 2, head: 'A2' });
@@ -104,6 +106,7 @@ test('R5b: a bought slot does not use up the buyer\'s free-post cap as a publish
   const s = await screen();
   const { deployer, W } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   s.call('set-publisher', [P(W[0]), U(1)]);
   s.call('set-caps', [U(8), U(8), U(8), U(1)]);                  // one live free item per publisher
   const p = s.idOf(s.buy(W[0], { kind: 1 }));
@@ -116,6 +119,7 @@ test('R5b: a bought slot does not use up the buyer\'s free-post cap as a publish
 test('R6: an absurd number of days is a window error, not an overflow', async () => {
   const s = await screen();
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [Cl.uint(2_000_000), Cl.uint(5_000_000), Cl.uint(10_000_000)]);  // these tests' arithmetic uses 2/5/10 STX
   assert.equal(R(s.buy(s.W[0], { days: 2n ** 100n })), err(404));
 });
 
