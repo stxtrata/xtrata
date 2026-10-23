@@ -23,7 +23,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import T from '@stacks/transactions';
-import { hallOnlyPlan, kindList } from '../canaries/arcade-v2-launch/plan.mjs';
 
 const require = createRequire(import.meta.url);
 const root = resolve(import.meta.dirname, '..');
@@ -77,8 +76,8 @@ const NETWORKS = {
 // sha256 of contracts/live/<name>.clar (the mainnet variants). Earlier: none (first launch of these three).
 const PINNED_CONTRACTS = {
   'xtrata-posters-v1': '3e9bdfc500c97a166804e15bda29df852e7f0dbea2fe2ebe97048f67399618fb',
-  'xtrata-world-v2': '9d1397cccbc34c7f36b76aeeea5a5b7389b3a93b889df9d405e7e666ac4de5f8',
-  'xtrata-screen-v1': '86b2df342242692f9c2485f5611c659976eaac42e4440d46f88f0e6a46c2b112'
+  'xtrata-world-v2': '54ec301553d5a0ecb18724a6003b56b4abc6c8c16b7835e092772ae2efce3ecc',
+  'xtrata-screen-v1': '255d1c0f37912f0a3a7fdac7caf91b5ac370bf3d50520c41abf6df6590da25cf'
 };
 const PINNED_SCORES = 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5';
 // The core and the two contracts it reads from, contracts/live (mainnet variants; the testnet variants switch the SIP-009 trait).
@@ -204,31 +203,21 @@ const releaseSha = sha(JSON.stringify({ packSha: release.packSha, shellSha: rele
 pin('release', releaseSha, PINNED_RELEASE, 'PINNED_RELEASE');
 
 // ---------------------------------------------------------------- the registry plan
-const kinds = kindList(lookRegistry());
-if (kinds.length !== 24) fail(`expected 24 built-in kinds (the bay and 23 looks), got ${kinds.length}`);
-// Cross-check the local planner against the ops planner (dry run of a hall-only seed, lobby calls removed).
-const local = hallOnlyPlan({ owner: MAINNET_ROOT, kinds });
-let crossCheck = 'skipped (run npm install in contracts/arcade-world to compare with ops/lib/v2.mjs)';
-if (existsSync(resolve(AW, 'node_modules/@stacks/transactions'))) {
-  const V2 = await import(pathToFileURL(resolve(AW, 'ops/lib/v2.mjs')).href);
-  const doc = { format: 'arcade-scene-file/1', room: 'arcade-hall', scenes: [0, 1, 2, 3].map((bay) => ({ bay, at: 0, base: 'posters' })) };
-  const ops = V2.planSeed([doc], { owner: MAINNET_ROOT, ownerAddress: MAINNET_ROOT, height: 100 });
-  if (ops.errors.length) fail(`ops planner: ${ops.errors.join('; ')}`);
-  // Remove the lobby: its space, its live call, its two bays (the ops planner always plans one).
-  const lobbyId = ops.manifest.spaces.lobby;
-  const keep = ops.steps.filter((s) => !/\blobby\b/.test(s.note || ''));
-  // Ids come from one counter shared by spaces and objects, so without the lobby space every object id after it is one lower.
-  // Only the object ids in state tuples are renumbered; kinds, the arcade and hall ids and every other number stay as planned.
-  const renumber = (x) => JSON.parse(JSON.stringify(x, (k, v) => (k === 'obj' && v && typeof v.uint === 'number' && v.uint > lobbyId ? { uint: v.uint - 1 } : v)));
-  const opsCalls = keep.map((s) => renumber({ fn: s.fn, args: s.args }));
-  const mine = local.steps.map((s) => ({ fn: s.fn, args: s.args }));
-  const a = JSON.stringify(opsCalls), b = JSON.stringify(mine);
-  if (a !== b) {
-    const i = mine.findIndex((m, j) => JSON.stringify(m) !== JSON.stringify(opsCalls[j]));
-    fail(`plan.mjs differs from ops/lib/v2.mjs at call ${i + 1}:\n  ops   ${JSON.stringify(opsCalls[i])}\n  local ${JSON.stringify(mine[i])}`);
-  }
-  crossCheck = `matches ops/lib/v2.mjs planSeed (${ops.steps.length} calls with the lobby, ${mine.length} without)`;
+// The canary replays contracts/arcade-world/ops/lib/v2-plan.mjs launchCalls() (pure, no imports, bundled into the page). Check here
+// that it plans the hall-only launch for both roots and that its built-in kinds are exactly the hall's look vocabulary.
+const V2 = await import(pathToFileURL(resolve(AW, 'ops/lib/v2-plan.mjs')).href);
+const looks = lookRegistry();
+const wantKinds = [{ key: 'bay', category: 7, name: 'Bay' }, ...looks.map((l) => ({ key: l.key, category: V2.categoryOf(l.key), name: l.name }))];
+if (JSON.stringify(V2.HALL_KINDS.map((k) => ({ ...k }))) !== JSON.stringify(wantKinds)) fail('ops/lib/v2-plan.mjs HALL_KINDS differs from the hall\'s look vocabulary (catalogue.mjs lookRegistry())');
+const planned = {};
+for (const net of ['mainnet', 'testnet']) {
+  const r = V2.launchCalls({ network: net, owner: NETWORKS[net].root, publisher: NETWORKS[net].hallPublisher || undefined });
+  if (r.errors.length) fail(`launchCalls (${net}): ${r.errors.join('; ')}`);
+  if (r.manifest.spaces.lobby) fail('launchCalls planned a lobby: this launch is hall-only');
+  for (const f of new Set(r.calls.map((c) => c.fn))) if (!['register-kind', 'create-space', 'set-space-state', 'grant', 'create-object'].includes(f)) fail(`launchCalls plans ${f}, which the canary does not know how to check on chain`);
+  planned[net] = r.calls.length;
 }
+const crossCheck = `ops/lib/v2-plan.mjs launchCalls: ${planned.mainnet} calls on mainnet (${V2.HALL_KINDS.length} kinds), ${planned.testnet} on testnet`;
 
 if (pinErrors.length) {
   console.error(pinErrors.join('\n'));
@@ -244,8 +233,6 @@ const launch = {
   contractSha: Object.fromEntries(['mainnet', 'testnet'].map((n) => [n, Object.fromEntries(Object.entries(contracts[n]).map(([k, v]) => [k, sha(v)]))])),
   coreTestnet,
   coreTestnetSha: Object.fromEntries(Object.entries(coreTestnet).map(([k, v]) => [k, sha(v)])),
-  kinds,
-  planCalls: local.steps.length,
   boards,
   // the hall's own registry reader, run by the canary against the registry before anything is inscribed
   reader: Object.fromEntries(['score-client.js', 'world.js', 'world2.js'].map((n) => [n, parts[n]]))
@@ -259,7 +246,7 @@ const launchPlugin = {
 };
 const dir = resolve(root, 'canaries/arcade-v2-launch');
 const builtAt = new Date();
-const stamp = `v2-${ids.version}-${builtAt.toISOString().slice(0, 10)}-${sha(readFileSync(resolve(dir, 'main.ts')) + readFileSync(resolve(dir, 'engine.ts')) + readFileSync(resolve(dir, 'plan.mjs')) + readFileSync(resolve(root, 'canaries/collection-v17/wallet.ts'), 'utf8') + releaseSha).slice(0, 8)}`;
+const stamp = `v2-${ids.version}-${builtAt.toISOString().slice(0, 10)}-${sha(readFileSync(resolve(dir, 'main.ts')) + readFileSync(resolve(dir, 'engine.ts')) + readFileSync(resolve(AW, 'ops/lib/v2-plan.mjs')) + readFileSync(resolve(root, 'canaries/collection-v17/wallet.ts'), 'utf8') + releaseSha).slice(0, 8)}`;
 const result = await build({
   entryPoints: [resolve(dir, 'main.ts')],
   bundle: true, format: 'iife', platform: 'browser', target: 'es2020', minify: true, write: false,
@@ -284,5 +271,5 @@ for (const n of inscribe) console.log(`  inscribes pack ${n.padEnd(7)} ${kb(Buff
 console.log(`  from bundle #${BUNDLE_ID}: ${release.fromBundle.join(', ')}`);
 console.log(`  then the parent (${kb(Buffer.byteLength(shell))} + its ids) · shell sha256 ${release.shellSha}`);
 for (const [n, s] of Object.entries(launch.contractSha.mainnet)) console.log(`  contract ${n.padEnd(24)} ${kb(Buffer.byteLength(contracts.mainnet[n])).padStart(9)} · mainnet sha256 ${s} · testnet ${launch.contractSha.testnet[n]}`);
-console.log(`  registry plan: ${local.steps.length} calls (${kinds.length} kinds, ${local.steps.length - kinds.length} hall) · ${crossCheck}`);
+console.log(`  registry plan: ${crossCheck}`);
 console.log(`  root owner: mainnet ${NETWORKS.mainnet.root} · testnet ${NETWORKS.testnet.root} (core ${NETWORKS.testnet.core}${NETWORKS.testnet.canDeployCore ? ', the canary can deploy it' : ''})`);

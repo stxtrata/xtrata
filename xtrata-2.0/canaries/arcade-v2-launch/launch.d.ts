@@ -1,5 +1,5 @@
 declare module "*.cjs" { const api: any; export default api; }
-declare module "./plan.mjs" { const plan: any; export = plan; }
+declare module "*/v2-plan.mjs" { const plan: any; export = plan; }
 /** Built by scripts/build-arcade-v2-launch-canary.mjs (checked and pinned there). */
 declare module "xa:launch" {
   type Net = 'mainnet' | 'testnet';
@@ -29,8 +29,6 @@ declare module "xa:launch" {
     contractSha: Record<Net, Record<string, string>>;
     coreTestnet: Record<string, string>;
     coreTestnetSha: Record<string, string>;
-    kinds: { key: string; category: number; name: string }[];
-    planCalls: number;
     boards: { id: string; game: string; mode: number; max: number }[];
     /** score-client.js, world.js and world2.js: the hall's own registry reader */
     reader: Record<string, string>;

@@ -18,7 +18,7 @@
  */
 import { sha256 } from '@noble/hashes/sha256';
 import {
-  AnchorMode, boolCV, bufferCV, ClarityType, cvToString, FungibleConditionCode, getAddressFromPrivateKey, hexToCV,
+  AnchorMode, boolCV, Cl, bufferCV, ClarityType, cvToString, FungibleConditionCode, getAddressFromPrivateKey, hexToCV,
   intCV, listCV, makeContractCall, makeRandomPrivKey, makeSTXTokenTransfer, makeStandardSTXPostCondition,
   PostConditionMode, principalCV, privateKeyToString, someCV, stringAsciiCV, TransactionVersion, tupleCV, uintCV,
   type ClarityValue, type PostCondition
@@ -26,7 +26,7 @@ import {
 import LAUNCH from 'xa:launch';
 import HallParts from '../../recursive-apps/xtrata-arcade/build/hall-parts.cjs';
 import ParentRender from '../../recursive-apps/xtrata-arcade/build/parent-render.cjs';
-import * as Plan from './plan.mjs';
+import * as V2 from '../../contracts/arcade-world/ops/lib/v2-plan.mjs';
 import { Chain, toHex } from '../collection-v17/chain';
 import type { Net } from '../collection-v17/wallet';
 
@@ -51,6 +51,9 @@ const FUND_AMOUNT = 60_000n;
 const TEMP_TX_FEE = 20_000n;
 /** Estimates for the balance check only; the wallet sets the real network fee of every transaction it signs. */
 export const FEE_EST = { deployPerByte: 30n, call: 20_000n, inscribePerByte: 1n, buffer: 3_000_000n };
+/** xtrata-world-v2 admin caps: 1 PAUSE, 2 KINDS, 4 TRUST, 8 MOD. */
+const ADMIN_KINDS = 2;
+const HALL_BAYS = 4;
 const STAND_IN_TEXT = 'Xtrata Arcade testnet rehearsal: this inscription stands in for #55, the parent of every arcade inscription on mainnet.';
 
 type Board = { id: string; game: string; mode: number; max: number };
@@ -522,82 +525,124 @@ type Kind = { id: number; category: number; name: string; tier: number; builtin:
 const readKinds = async (): Promise<Kind[]> => {
   const count = Number(await wread('get-kind-count'));
   const out: Kind[] = [];
-  for (let i = 0; i < count; i += Plan.LIMITS.kindsPerRead) {
-    const ids = Array.from({ length: Math.min(Plan.LIMITS.kindsPerRead, count - i) }, (_, k) => i + k);
+  for (let i = 0; i < count; i += 20) {
+    const ids = Array.from({ length: Math.min(20, count - i) }, (_, k) => i + k);
     const rows = await wread('get-kinds', [listCV(ids.map((x) => uintCV(x)))]);
     rows.forEach((k: any, j: number) => { if (k) out.push({ id: ids[j], ...k }); });
   }
   return out;
 };
-/** The built-in kinds by key, and the kinds of the schema still missing. A key that exists but is hidden, unapproved or not built-in is a problem, not "missing". */
+/** The built-in kinds by key. A planned key that exists but is hidden, unapproved or of another category is a problem, not "done". */
 const kindPlan = async () => {
   const have = await readKinds();
   const byKey: Record<string, Kind> = {};
   for (const k of have) if (k.tier === 0 && !byKey[k.builtin]) byKey[k.builtin] = k;
   const problems: string[] = [];
-  const missing = (LAUNCH.kinds as { key: string; category: number; name: string }[]).filter((k) => {
+  for (const k of V2.HALL_KINDS as { key: string; category: number }[]) {
     const got = byKey[k.key];
-    if (!got) return true;
+    if (!got) continue;
     if (got.hidden || !got.approved) problems.push(`kind ${k.key} (#${got.id}) is ${got.hidden ? 'hidden' : 'not approved'}`);
     if (got.category !== k.category) problems.push(`kind ${k.key} (#${got.id}) has category ${got.category}, the schema says ${k.category}`);
-    return false;
-  });
-  return { have, byKey, missing, problems };
+  }
+  return { have, byKey, count: have.length, problems };
 };
 const resolvePath = async (slugs: string[]): Promise<number | null> => {
   const id = await wread('resolve-path', [listCV(slugs.map((s) => stringAsciiCV(s)))]);
   return typeof id === 'number' && id > 1 ? id : null;
 };
 const getSpace = async (id: number) => wread('get-space', [uintCV(id)]);
-const pathOf = (slug: string): string[] => { const sp = Plan.SPACES.find((s) => s.slug === slug)!; return sp.parent ? [...pathOf(sp.parent), slug] : [slug]; };
-/** Objects of a space by id, read page by page up to its object slots. */
+const pathOf = (slug: string): string[] => (slug === 'arcade' ? ['arcade'] : ['arcade', slug]);
+/** Objects of a space, read with the light page (get-objects-8: 8 rows, 16 map reads) up to its object slots. */
 const spaceObjects = async (spaceId: number) => {
   const sp = await getSpace(spaceId);
   const slots = Number(sp?.['object-slots'] ?? 0);
   const out: { id: number; object: any }[] = [];
-  for (let p = 0; p * Plan.LIMITS.objectsPerPage < slots; p++) {
-    const rows = await wread('get-objects', [uintCV(spaceId), uintCV(p)]);
+  for (let p = 0; p * 8 < slots; p++) {
+    const rows = await wread('get-objects-8', [uintCV(spaceId), uintCV(p)]);
     for (const r of rows) if (r && r.object) out.push({ id: r.id, object: r.object });
   }
   return out;
-};
-const bayObjects = async (hallId: number, bayKind: number) => {
-  const objs = await spaceObjects(hallId);
-  const bays: Record<number, number> = {};
-  const problems: string[] = [];
-  for (let i = 0; i < Plan.HALL_BAYS; i++) {
-    const o = objs.find((x) => x.object.name === `bay-${i}` && x.object.parent === 0);
-    if (!o) continue;
-    if (o.object.kind !== bayKind) problems.push(`hall/bay-${i} (#${o.id}) is kind #${o.object.kind}, not the bay kind #${bayKind}`);
-    else if (o.object.state >= 2) problems.push(`hall/bay-${i} (#${o.id}) is retired or moderated (state ${o.object.state})`);
-    bays[i] = o.id;
-  }
-  return { bays, problems, count: objs.length };
 };
 const stateCount = async (obj: number) => Number(await wread('get-state-count', [uintCV(obj)]));
 const worldRoot = async () => wread('get-root');
 const worldAdmin = async (who: string) => Number(await wread('get-admin', [principalCV(who)]));
 
-/** Where the registry stands, read from the chain: what the hall-only seed still needs. */
-const registryPlan = async () => {
+// ---------- the registry plan: contracts/arcade-world/ops/lib/v2-plan.mjs launchCalls(), replayed against the chain ----------
+type Call = { fn: string; args: any[]; note: string };
+/** The full ordered hall-only launch for the root wallet (24 kinds, arcade + hall, live, the publisher grant if configured, 4 bays). */
+export const launchPlan = () => {
+  const r = V2.launchCalls({ network, owner: rootAddr(), publisher: NET().hallPublisher || undefined });
+  if (r.errors.length) throw new Error(`The registry planner refused: ${r.errors.join('; ')}`);
+  return r as { contract: string; calls: Call[]; manifest: any };
+};
+const cvArg = (a: any) => V2.clarityArg(a, Cl) as ClarityValue;
+/** A read in the planner's form (relay-steps args in, plain JS out), for verifyManifest(). */
+const planRead = async (fn: string, args: any[]) => plain(await chain.read(cid(NAMES.world), fn, args.map(cvArg)));
+type Ctx = { k: Awaited<ReturnType<typeof kindPlan>>; spaces: Record<string, { id: number | null; sp: any }>; objs: Record<number, { id: number; object: any }[]> };
+const readCtx = async (m: any): Promise<Ctx> => {
   const k = await kindPlan();
-  const ids: Record<string, number | null> = {};
-  const spaces: Record<string, any> = {};
-  for (const sp of Plan.SPACES) { ids[sp.slug] = await resolvePath(pathOf(sp.slug)); spaces[sp.slug] = ids[sp.slug] ? await getSpace(ids[sp.slug]!) : null; }
-  const bayKind = k.byKey[Plan.BAY_KEY]?.id;
-  const bays = ids.hall && bayKind !== undefined ? await bayObjects(ids.hall, bayKind) : { bays: {} as Record<number, number>, problems: [] as string[], count: 0 };
-  const noState: number[] = [];
-  for (const [i, obj] of Object.entries(bays.bays)) if ((await stateCount(obj)) === 0) noState.push(Number(i));
-  const missingBays = Array.from({ length: Plan.HALL_BAYS }, (_, i) => i).filter((i) => bays.bays[i] === undefined);
-  const notLive = Plan.SPACES.filter((sp) => !spaces[sp.slug] || spaces[sp.slug].state === 0).map((sp) => sp.slug);
-  const pub = NET().hallPublisher as string | null;
-  let grant = false;
-  if (pub && ids.hall) {
-    const g = await wread('get-grant', [uintCV(ids.hall), principalCV(pub)]);
-    grant = !(g && g.caps === Plan.CAP.STATE && g.epoch === spaces.hall.epoch && g.expires === 0);
-  } else if (pub) grant = true;
-  const calls = k.missing.length + Plan.SPACES.filter((sp) => !ids[sp.slug]).length + notLive.length + missingBays.length + (missingBays.length + noState.length ? 1 : 0) + (grant ? 1 : 0);
-  return { k, ids, spaces, bayKind, bays, noState, missingBays, notLive, grant, calls };
+  const spaces: Ctx['spaces'] = {};
+  for (const slug of Object.keys(m.spaces)) { const id = await resolvePath(pathOf(slug)); spaces[slug] = { id, sp: id ? await getSpace(id) : null }; }
+  const objs: Ctx['objs'] = {};
+  for (const s of Object.values(spaces)) if (s.id) objs[s.id] = await spaceObjects(s.id);
+  return { k, spaces, objs };
+};
+/**
+ * Is this planned call already on chain? The planner PREDICTS ids (spaces and objects share next-id, kinds count from 0), so a
+ * call that is done with a different id than planned is a problem: something else wrote to the registry, and the plan's later
+ * arguments would point at the wrong ids. The canary stops there instead of guessing.
+ */
+const judge = async (c: Call, m: any, x: Ctx): Promise<{ done: boolean; problem?: string }> => {
+  const me = rootAddr();
+  switch (c.fn) {
+    case 'register-kind': {
+      const key = c.args[4].ascii, got = x.k.byKey[key];
+      if (!got) return { done: false };
+      return got.id === m.kinds[key] ? { done: true } : { done: true, problem: `kind ${key} is #${got.id}; the plan expects #${m.kinds[key]}` };
+    }
+    case 'create-space': {
+      const slug = c.args[1].ascii, s = x.spaces[slug];
+      if (!s?.id) return { done: false };
+      if (s.id !== m.spaces[slug]) return { done: true, problem: `space ${pathOf(slug).join('/')} is #${s.id}; the plan expects #${m.spaces[slug]}` };
+      if (s.sp.owner !== me) return { done: true, problem: `space ${pathOf(slug).join('/')} (#${s.id}) is owned by ${s.sp.owner}, not the root wallet. ${H1()}` };
+      return { done: true };
+    }
+    case 'set-space-state': {
+      const id = c.args[0].uint, s = Object.values(x.spaces).find((v) => v.id === id);
+      if (!s?.sp) return { done: false };
+      if (s.sp.state === 1) return { done: true };
+      if (s.sp.state === 0) return { done: false };
+      return { done: true, problem: `space #${id} is ${['draft', 'live', 'suspended', 'retired'][s.sp.state]}; only its moderators can change that` };
+    }
+    case 'grant': {
+      const space = c.args[0].uint, who = c.args[1].principal;
+      const s = Object.values(x.spaces).find((v) => v.id === space);
+      if (!s?.sp) return { done: false };
+      const g = await wread('get-grant', [uintCV(space), principalCV(who)]);
+      return { done: !!g && g.caps === c.args[2].uint && g.epoch === s.sp.epoch && g.expires === c.args[4].uint };
+    }
+    case 'create-object': {
+      const space = c.args[0].uint, name = c.args[3].ascii;
+      const slug = Object.keys(m.spaces).find((k) => m.spaces[k] === space)!;
+      const want = m.objects[`${slug}/${name}`];
+      const o = (x.objs[space] || []).find((r) => r.object.name === name && r.object.parent === c.args[1].uint);
+      if (!o) return { done: false };
+      if (o.id !== want.id) return { done: true, problem: `${slug}/${name} is #${o.id}; the plan expects #${want.id}` };
+      if (o.object.kind !== c.args[2].uint) return { done: true, problem: `${slug}/${name} (#${o.id}) is kind #${o.object.kind}, not #${c.args[2].uint}` };
+      if (o.object.state >= 2) return { done: true, problem: `${slug}/${name} (#${o.id}) is retired or moderated (state ${o.object.state})` };
+      return { done: true };
+    }
+    default: return { done: false, problem: `the plan has a call this canary does not know how to check: ${c.fn}` };
+  }
+};
+/** Where the registry stands against the plan: the calls still to make, and anything the canary must not paper over. */
+const registryStatus = async () => {
+  const plan = launchPlan(), m = plan.manifest;
+  const x = await readCtx(m);
+  const todo: Call[] = [];
+  const problems = [...x.k.problems];
+  for (const c of plan.calls) { const j = await judge(c, m, x); if (j.problem) problems.push(j.problem); if (!j.done) todo.push(c); }
+  return { plan, m, x, todo, problems };
 };
 
 // ---------- the leaderboard (the v1 launch canary's code, with the parent as engine id) ----------
@@ -839,16 +884,18 @@ export const STEPS: Step[] = [
         notes.push(b ? `boards currently on engine #${b.engineId}` : 'no production boards yet');
       }
       // the registry
-      let reg = `registry: ${LAUNCH.planCalls} calls to make (fresh)`;
+      const fullPlan = launchPlan();
+      const kindCalls = fullPlan.calls.filter((c) => c.fn === 'register-kind').length;
+      let reg = `registry: ${fullPlan.calls.length} calls to make (fresh; planned by ops/lib/v2-plan.mjs launchCalls)`;
       if ((await chain.contractSource(cid(NAMES.world))) !== null) {
         const root = await worldRoot();
         if (root.owner !== w.address) throw new Error(`${cid(NAMES.world)} has root owner ${root.owner}, not the root wallet. ${H1()}`);
-        const r = await registryPlan();
-        if (r.k.problems.length || r.bays.problems.length) throw new Error(`The registry holds things this launch cannot fix: ${[...r.k.problems, ...r.bays.problems].join('; ')}.`);
-        for (const sp of Plan.SPACES) if (r.spaces[sp.slug] && r.spaces[sp.slug].owner !== w.address) throw new Error(`Space ${pathOf(sp.slug).join('/')} (#${r.ids[sp.slug]}) is owned by ${r.spaces[sp.slug].owner}, not the root wallet. ${H1()}`);
-        reg = `registry: ${r.calls} of ${LAUNCH.planCalls} calls still to make (${r.k.missing.length} kinds missing, spaces ${Plan.SPACES.map((sp) => `${sp.slug} ${r.ids[sp.slug] ? `#${r.ids[sp.slug]}` : 'missing'}`).join(', ')}, ${Plan.HALL_BAYS - r.missingBays.length} of ${Plan.HALL_BAYS} bays)`;
-        need += BigInt(r.calls) * FEE_EST.call;
-      } else need += BigInt(LAUNCH.planCalls - LAUNCH.kinds.length + 3) * FEE_EST.call + boardFloat(LAUNCH.kinds.length);
+        const r = await registryStatus();
+        if (r.problems.length) throw new Error(`The registry holds things this launch cannot fix: ${r.problems.join('; ')}.`);
+        const k = r.todo.filter((c) => c.fn === 'register-kind').length;
+        reg = `registry: ${r.todo.length} of ${fullPlan.calls.length} planned calls still to make (${k} kinds, ${r.todo.length - k} hall calls)`;
+        need += BigInt(r.todo.length - k) * FEE_EST.call + (k ? boardFloat(k) + 3n * FEE_EST.call : 0n);
+      } else need += BigInt(fullPlan.calls.length - kindCalls + 3) * FEE_EST.call + boardFloat(kindCalls);
       plan.push(reg);
       // inscriptions
       const known: Record<string, string> = { ...(state.packIds || {}) };
@@ -943,122 +990,95 @@ export const STEPS: Step[] = [
   },
   {
     id: 'kinds', title: 'Registry: the 24 built-in kinds', who: 'Web wallet · 3 signatures (fund, add and remove a temporary KINDS admin); the kinds are signed by the temporary wallet',
-    intro: `Registers the tier-0 kinds the hall draws (the bay, the curtain, signs, tape, sounds, lamps, the door skin and the 14 door styles), in the schema's order, skipping any already registered (looked up by their built-in key with get-kind-count / get-kinds). Rather than 24 wallet prompts, the root wallet makes the canary's temporary wallet a KINDS-only admin (set-admin … u2), the temporary wallet registers the kinds one after another, then the root wallet removes it (set-admin … u0) and its leftover funds are swept back. While it is an admin it can only register, hide or approve kinds; the root wallet can remove it at any point ("Remove the temporary KINDS admin" below). Its key is saved to a file first. Each kind records the temporary wallet as its "owner" field; the hall and the contract do not use that field. Tick "sign the kinds with my wallet" to sign all of them yourself instead. With 3 or fewer missing, the root wallet signs them itself.`,
+    intro: `Registers the tier-0 kinds the hall draws (the bay, the curtain, signs, tape, sounds, lamps, the door skin and the 14 door styles), the first 24 calls of the launch plan (contracts/arcade-world/ops/lib/v2-plan.mjs launchCalls), in its order, skipping any already registered. The plan predicts every id, so before each kind the canary checks the next kind id is the one planned and stops otherwise. Rather than 24 wallet prompts, the root wallet makes the canary's temporary wallet a KINDS-only admin (set-admin … u2), the temporary wallet registers the kinds one after another, then the root wallet removes it (set-admin … u0) and its leftover funds are swept back. While it is an admin it can only register, hide or approve kinds; the root wallet can remove it at any point ("Remove the temporary KINDS admin" below). Its key is saved to a file first. Each kind records the temporary wallet in its "owner" field; neither the hall nor the contract uses that field. Tick "sign the kinds with my wallet" to sign all of them yourself instead. With 3 or fewer missing, the root wallet signs them itself.`,
     action: 'Register kinds',
     run: async () => {
       const w = requireRoot();
       const world = cid(NAMES.world);
-      let k = await kindPlan();
-      if (k.problems.length) throw new Error(`Kinds this launch cannot fix: ${k.problems.join('; ')}.`);
       const hot = hotAddress();
+      const { calls, manifest: m } = launchPlan();
+      const kinds = calls.filter((c) => c.fn === 'register-kind');
+      const status0 = await registryStatus();
+      if (status0.problems.length) throw new Error(`The registry holds things this launch cannot fix: ${status0.problems.join('; ')}.`);
+      const missing = () => kinds.filter((c) => !status0.x.k.byKey[c.args[4].ascii]);
       const removed = async () => { const r = await revokeHotAdmin('kinds'); const left = await sweepHot('kinds'); return `${r ? 'temporary KINDS admin removed · ' : ''}temporary wallet holds ${stx(left)}`; };
-      if (!k.missing.length) return `all ${LAUNCH.kinds.length} kinds registered (ids ${Object.values(k.byKey).map((x) => x.id).sort((a, b) => a - b).join(', ')}): nothing sent · ${await removed()}`;
-      const selfSign = state.kindsSelf || k.missing.length <= 3;
+      if (!missing().length) return `all ${kinds.length} kinds registered with the planned ids 0..${kinds.length - 1}: nothing sent · ${await removed()}`;
+      /** Sends one planned register-kind, but only if the next kind id on chain is the one the plan gives it. */
+      const registerNext = async (signedBy: 'root' | 'hot') => {
+        const k = await kindPlan();
+        const next = kinds.find((c) => !k.byKey[c.args[4].ascii]);
+        if (!next) return false;
+        const key = next.args[4].ascii;
+        if (k.count !== m.kinds[key]) throw new Error(`The registry holds ${k.count} kinds, so ${key} would get id ${k.count}, but the plan gives it ${m.kinds[key]}. Something else registered kinds; nothing was sent.`);
+        status(`Registering kind ${key} (${m.kinds[key] + 1} of ${kinds.length})…`);
+        if (signedBy === 'root') await runTx('kinds', `register-kind ${key}`, () => rootCall(world, next.fn, next.args.map(cvArg)));
+        else await hotCall('kinds', `register-kind ${key}`, world, next.fn, next.args.map(cvArg));
+        await eventually(`kind ${key}`, async () => { const got = (await kindPlan()).byKey[key]; return got ? (got.id === m.kinds[key] ? null : `id ${got.id}`) : 'not registered yet'; });
+        return true;
+      };
+      const selfSign = state.kindsSelf || missing().length <= 3;
       if (selfSign) {
         await quiet(w.address);
-        k = await kindPlan();
-        for (const kind of k.missing) {
-          const c = Plan.registerKind(kind);
-          await runTx('kinds', `register-kind ${kind.key}`, () => rootCall(world, c.fn, c.args.map(toCV)));
-        }
+        while (await registerNext('root')) { /* one at a time */ }
       } else {
-        if (((await worldAdmin(hot)) & Plan.ADMIN_CAP.KINDS) === 0) {
+        const n = missing().length;
+        const float = boardFloat(n, { propose: false, accept: false });
+        if (((await worldAdmin(hot)) & ADMIN_KINDS) === 0) {
           host.saveFile(`xtrata-arcade-v2-temp-wallet-${hot.slice(0, 8)}.json`, hotKeyFile('KINDS admin for the 24 built-in kinds'));
-          if (!(await host.confirm(`${k.missing.length} kinds to register.\n\nThe temporary wallet ${hot} will sign them as a KINDS-only admin of ${NAMES.world}. Its key has just been saved to a file: keep it until this step reports the admin role removed.\n\nYour wallet will: send it about ${stx(boardFloat(k.missing.length, { propose: false, accept: false }))} for fees, make it a KINDS admin, and remove it again at the end. Continue?`))) throw new Error('Cancelled before anything was sent.');
+          if (!(await host.confirm(`${n} kinds to register.\n\nThe temporary wallet ${hot} will sign them as a KINDS-only admin of ${NAMES.world}. Its key has just been saved to a file: keep it until this step reports the admin role removed.\n\nYour wallet will: send it about ${stx(float)} for fees, make it a KINDS admin, and remove it again at the end. Continue?`))) throw new Error('Cancelled before anything was sent.');
         }
-        await ensureHotFunds('kinds', boardFloat(k.missing.length, { propose: false, accept: false }), 'kinds');
-        if (((await worldAdmin(hot)) & Plan.ADMIN_CAP.KINDS) === 0) {
-          await runTx('kinds', uniq('kinds', `make ${short(hot)} a KINDS admin`), () => rootCall(world, 'set-admin', [principalCV(hot), uintCV(Plan.ADMIN_CAP.KINDS)]));
-          await eventually('KINDS admin', async () => (((await worldAdmin(hot)) & Plan.ADMIN_CAP.KINDS) ? null : 'not an admin yet'));
+        await ensureHotFunds('kinds', float, 'kinds');
+        if (((await worldAdmin(hot)) & ADMIN_KINDS) === 0) {
+          await runTx('kinds', uniq('kinds', `make ${short(hot)} a KINDS admin`), () => rootCall(world, 'set-admin', [principalCV(hot), uintCV(ADMIN_KINDS)]));
+          await eventually('KINDS admin', async () => (((await worldAdmin(hot)) & ADMIN_KINDS) ? null : 'not an admin yet'));
         }
         await quiet(hot);
         try {
-          for (;;) {
-            k = await kindPlan();
-            const next = k.missing[0];
-            if (!next) break;
-            status(`Registering kind ${next.key} (${LAUNCH.kinds.length - k.missing.length + 1} of ${LAUNCH.kinds.length})…`);
-            const c = Plan.registerKind(next);
-            await hotCall('kinds', `register-kind ${next.key}`, world, c.fn, c.args.map(toCV));
-            await eventually(`kind ${next.key}`, async () => ((await kindPlan()).byKey[next.key] ? null : 'not registered yet'));
-          }
+          while (await registerNext('hot')) { /* one at a time, each confirmed */ }
         } catch (error) {
           throw new Error(`${errText(error)} — The temporary wallet is still a KINDS admin. Press this step's button again to continue, or "Remove the temporary KINDS admin" below.`);
         }
       }
-      k = await kindPlan();
-      if (k.missing.length || k.problems.length) throw new Error(`Kinds still missing or wrong: ${[...k.missing.map((x) => x.key), ...k.problems].join(', ')}.`);
-      return `all ${LAUNCH.kinds.length} kinds registered (${selfSign ? 'signed by your wallet' : 'signed by the temporary KINDS admin'}) · ${await removed()}`;
+      const after = await registryStatus();
+      const left = after.todo.filter((c) => c.fn === 'register-kind');
+      if (left.length || after.problems.length) throw new Error(`Kinds still missing or wrong: ${[...left.map((c) => c.args[4].ascii), ...after.problems].join(', ')}.`);
+      return `all ${kinds.length} kinds registered with the planned ids (${selfSign ? 'signed by your wallet' : 'signed by the temporary KINDS admin'}) · ${await removed()}`;
     }
   },
   {
-    id: 'hall', title: 'Registry: the arcade and hall spaces, four bays on posters', who: 'Web wallet · 9 signatures on a fresh registry (2 spaces, 2 set live, 4 bays, 1 add-states)',
-    intro: `Creates the arcade domain and the hall room (owner = the root wallet, native runtime, the schema's policies) unless resolve-path already finds them, sets both live, creates the four bay objects (bay-0 far left, bay-1 far right, bay-2 near left, bay-3 near right) unless the hall already has them, and puts every bay that has no state yet on posters in one add-states call. No lobby, no doors, no casino: those come later by contract writes. A bay that already has states (changed after an earlier launch) is left alone. ${NET().hallPublisher ? `Then grants ${NET().hallPublisher} STATE only on the hall.` : 'No publisher grant is configured.'} Before each call it waits for the wallet's pending transactions to clear, then re-reads the chain.`,
+    id: 'hall', title: 'Registry: the arcade and hall spaces, four bays', who: `Web wallet · ${NET().hallPublisher ? 9 : 8} signatures on a fresh registry (2 spaces, 2 set live, ${NET().hallPublisher ? '1 grant, ' : ''}4 bays)`,
+    intro: `Replays the rest of the launch plan (ops/lib/v2-plan.mjs launchCalls, hall only) in its order: creates the arcade domain and the hall room with owner = the root wallet (native runtime, the schema's policies), sets both live, ${NET().hallPublisher ? `grants ${NET().hallPublisher} STATE only on the hall, ` : ''}and creates the four bay objects (bay-0 far left, bay-1 far right, bay-2 near left, bay-3 near right). A bay with no state shows its posters, so nothing more is written: no lobby, no doors, no casino (those come later by contract writes). Before each call it waits for the wallet's pending transactions to clear and re-reads the chain; a call already on chain is skipped, and one on chain with an id the plan did not predict stops the step. At the end the planner's verifyManifest() reads everything back in plan order.`,
     action: 'Build the hall',
     run: async () => {
       const w = requireRoot();
       const world = cid(NAMES.world);
-      const send = async (label: string, c: { fn: string; args: any[] }) => { await quiet(w.address); await runTx('hall', label, () => rootCall(world, c.fn, c.args.map(toCV))); };
-      const k = await kindPlan();
-      const bayKind = k.byKey[Plan.BAY_KEY]?.id;
-      if (bayKind === undefined) throw new Error('The bay kind is not registered. Run the kinds step first.');
+      const { calls, manifest: m } = launchPlan();
+      const rest = calls.filter((c) => c.fn !== 'register-kind');
       const done: string[] = [];
-      const ids: Record<string, number> = {};
-      for (const sp of Plan.SPACES) {
+      let x = await readCtx(m);
+      if (x.k.problems.length) throw new Error(x.k.problems.join('; '));
+      for (const c of calls.filter((k) => k.fn === 'register-kind')) if (!(await judge(c, m, x)).done) throw new Error('Not every kind is registered yet. Run the kinds step first.');
+      for (const c of rest) {
+        let j = await judge(c, m, x);
+        if (j.problem) throw new Error(`${j.problem}. Nothing more was sent.`);
+        if (j.done) continue;
         await quiet(w.address);
-        let id = await resolvePath(pathOf(sp.slug));
-        if (!id) {
-          const parentId = sp.parent ? ids[sp.parent] : Plan.ROOT_SPACE;
-          await send(`create-space ${pathOf(sp.slug).join('/')}`, Plan.createSpace(sp, parentId, w.address));
-          await eventually(`space ${sp.slug}`, async () => ((await resolvePath(pathOf(sp.slug))) ? null : 'not created yet'));
-          id = (await resolvePath(pathOf(sp.slug)))!;
-          done.push(`created ${sp.slug} #${id}`);
-        }
-        const s = await getSpace(id);
-        if (s.owner !== w.address) throw new Error(`Space ${pathOf(sp.slug).join('/')} (#${id}) is owned by ${s.owner}, not the root wallet. ${H1()}`);
-        if (s.kind !== sp.kind) throw new Error(`Space ${pathOf(sp.slug).join('/')} (#${id}) is kind ${s.kind}, expected ${sp.kind}.`);
-        ids[sp.slug] = id;
+        x = await readCtx(m);
+        j = await judge(c, m, x);
+        if (j.problem) throw new Error(`${j.problem}. Nothing more was sent.`);
+        if (j.done) continue;
+        await runTx('hall', c.note, () => rootCall(world, c.fn, c.args.map(cvArg)));
+        await eventually(c.note, async () => { x = await readCtx(m); const r = await judge(c, m, x); return r.problem ? `${r.problem} (stop and check)` : r.done ? null : 'not on chain yet'; });
+        const r = await judge(c, m, x);
+        if (r.problem) throw new Error(`${r.problem}. Nothing more was sent.`);
+        done.push(c.note);
       }
-      for (const sp of Plan.SPACES) {
-        const s = await getSpace(ids[sp.slug]);
-        if (s.state === 1) continue;
-        if (s.state !== 0) throw new Error(`Space ${sp.slug} (#${ids[sp.slug]}) is ${['draft', 'live', 'suspended', 'retired'][s.state]}; only its moderators can change that.`);
-        await send(`set ${sp.slug} live`, Plan.setLive(sp.slug, ids[sp.slug]));
-        await eventually(`${sp.slug} live`, async () => ((await getSpace(ids[sp.slug])).state === 1 ? null : 'not live yet'));
-        done.push(`${sp.slug} set live`);
-      }
-      let bays = await bayObjects(ids.hall, bayKind);
-      if (bays.problems.length) throw new Error(bays.problems.join('; '));
-      for (let i = 0; i < Plan.HALL_BAYS; i++) {
-        if (bays.bays[i] !== undefined) continue;
-        await quiet(w.address);
-        bays = await bayObjects(ids.hall, bayKind);
-        if (bays.bays[i] !== undefined) continue;
-        await send(`create-object hall/bay-${i}`, Plan.createBay(ids.hall, bayKind, i));
-        await eventually(`hall/bay-${i}`, async () => ((await bayObjects(ids.hall, bayKind)).bays[i] !== undefined ? null : 'not created yet'));
-        bays = await bayObjects(ids.hall, bayKind);
-        done.push(`bay-${i} #${bays.bays[i]}`);
-      }
-      await quiet(w.address);
-      const bare: { id: number; bay: number }[] = [];
+      const v = await V2.verifyManifest(m, planRead);
+      if (!v.ok) throw new Error(`verifyManifest stopped at ${v.what}: expected ${JSON.stringify(v.expected)}, the chain has ${JSON.stringify(v.got)}.`);
       const changed: string[] = [];
-      for (let i = 0; i < Plan.HALL_BAYS; i++) {
-        const n = await stateCount(bays.bays[i]);
-        if (n === 0) bare.push({ id: bays.bays[i], bay: i });
-        else if (n > 1) changed.push(`bay-${i} has ${n} states`);
-      }
-      if (bare.length) {
-        await send(`posters on ${bare.map((b) => `bay-${b.bay}`).join(', ')}`, Plan.postersStates(bare));
-        await eventually('bay states', async () => { for (const b of bare) if ((await stateCount(b.id)) === 0) return `bay-${b.bay} has no state`; return null; });
-        done.push(`posters state on ${bare.length} bay${bare.length > 1 ? 's' : ''}`);
-      }
-      const pub = NET().hallPublisher as string | null;
-      if (pub) {
-        const r = await registryPlan();
-        if (r.grant) { await send(`grant STATE on hall to ${short(pub)}`, Plan.stateGrant(ids.hall, pub)); done.push(`STATE grant to ${short(pub)}`); }
-      }
-      step('hall').data = { ids, bays: bays.bays };
-      return `${done.length ? done.join(' · ') : 'everything was already on chain: nothing sent'} · arcade #${ids.arcade}, hall #${ids.hall} owned by the root wallet and live · bays ${Object.entries(bays.bays).map(([i, id]) => `${i}=#${id}`).join(', ')}${changed.length ? ` · changed after launch (left alone): ${changed.join(', ')}` : ''}`;
+      for (let i = 0; i < HALL_BAYS; i++) { const n = await stateCount(m.objects[`hall/bay-${i}`].id); if (n) changed.push(`bay-${i} has ${n} state${n > 1 ? 's' : ''}`); }
+      step('hall').data = { spaces: m.spaces, bays: Array.from({ length: HALL_BAYS }, (_, i) => m.objects[`hall/bay-${i}`].id) };
+      return `${done.length ? `${done.length} call${done.length > 1 ? 's' : ''} sent (${done.join(', ')})` : 'everything was already on chain: nothing sent'} · verifyManifest: ${v.checked} items match the plan · arcade #${m.spaces.arcade}, hall #${m.spaces.hall} owned by the root wallet and live · bays ${Array.from({ length: HALL_BAYS }, (_, i) => `${i}=#${m.objects[`hall/bay-${i}`].id}`).join(', ')}${changed.length ? ` · changed after launch by contract writes (left alone): ${changed.join(', ')}` : ' · no bay has a state: all four show posters'}`;
     }
   },
   {
@@ -1095,11 +1115,12 @@ export const STEPS: Step[] = [
     action: 'Read the hall',
     run: async () => {
       if (!host.readHall) throw new Error('This host cannot run the hall reader.');
-      const r = await registryPlan();
-      if (r.calls) throw new Error(`The registry still needs ${r.calls} call(s). Run the kinds and hall steps first.`);
+      const r = await registryStatus();
+      if (r.problems.length) throw new Error(r.problems.join('; '));
+      if (r.todo.length) throw new Error(`The registry still needs ${r.todo.length} planned call(s). Run the kinds and hall steps first.`);
       const got = await host.readHall(cid(NAMES.world));
-      if (got.meta.hall !== r.ids.hall) throw new Error(`The hall reader resolved arcade/hall to ${got.meta.hall}, expected #${r.ids.hall}.`);
-      if (!Array.isArray(got.bays) || got.bays.length !== Plan.HALL_BAYS) throw new Error(`The hall reader returned ${got.bays?.length} bays, expected ${Plan.HALL_BAYS}.`);
+      if (got.meta.hall !== r.m.spaces.hall) throw new Error(`The hall reader resolved arcade/hall to ${got.meta.hall}, expected #${r.m.spaces.hall}.`);
+      if (!Array.isArray(got.bays) || got.bays.length !== HALL_BAYS) throw new Error(`The hall reader returned ${got.bays?.length} bays, expected ${HALL_BAYS}.`);
       const bad: string[] = [];
       got.bays.forEach((b: any, i: number) => {
         if (!b) bad.push(`bay-${i} has no usable bay object`);
@@ -1433,11 +1454,13 @@ export const STEPS: Step[] = [
         const meta = await inscriptionMeta(fid);
         if (!meta || !meta.sealed || meta.hash !== toHex(f.hash)) throw new Error(`${f.label} #${fid} no longer matches.`);
       }
-      const r = await registryPlan();
-      if (r.calls) throw new Error(`The registry is missing ${r.calls} launch call(s) again.`);
+      const r = await registryStatus();
+      if (r.todo.length || r.problems.length) throw new Error(`The registry no longer matches the launch plan: ${r.todo.length} call(s) missing${r.problems.length ? `; ${r.problems.join('; ')}` : ''}.`);
+      const vm = await V2.verifyManifest(r.m, planRead);
+      if (!vm.ok) throw new Error(`verifyManifest stopped at ${vm.what}.`);
       const packIds = RELEASE.inscribe.map((n) => `"${n}": ${state.packIds![n]}`).join(', ');
       const w = worldIds();
-      return `contracts, ${PACKS.length + 1} inscriptions, the registry (arcade #${r.ids.arcade}, hall #${r.ids.hall}) and all ${PRODUCTION.length} boards re-read and match · Next, in one commit: recursive-apps/xtrata-arcade/parent/ids.json: packs {${packIds}} and "world": {"posters": "${w.posters}", "registry": "${w.registry}", "screen": "${w.screen}"}; public/_redirects: /arcade → /i/${id}; the homepage arcade tile → #${id}; src/arcade-submit/arcade-boards.ts: add ${id} to ARCADE_INSCRIPTION_IDS. Then open https://xtrata.xyz/x/${id} and play one run.`;
+      return `contracts, ${PACKS.length + 1} inscriptions, the registry (arcade #${r.m.spaces.arcade}, hall #${r.m.spaces.hall}, verifyManifest ${vm.checked} items) and all ${PRODUCTION.length} boards re-read and match · Next, in one commit: recursive-apps/xtrata-arcade/parent/ids.json: packs {${packIds}} and "world": {"posters": "${w.posters}", "registry": "${w.registry}", "screen": "${w.screen}"}; public/_redirects: /arcade → /i/${id}; the homepage arcade tile → #${id}; src/arcade-submit/arcade-boards.ts: add ${id} to ARCADE_INSCRIPTION_IDS. Then open https://xtrata.xyz/x/${id} and play one run.`;
     }
   }
 ];

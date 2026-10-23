@@ -14,7 +14,8 @@
 // parent #3111, the 26 boards on #3111, and none of the three new contracts. The web wallet is a stub Leather provider that
 // refuses `0x` post-conditions and `sender`. Scenarios:
 //   1. a wrong wallet is refused at preflight and nothing is sent;
-//   2. a fresh run passes every step; the wallet signatures per step are counted and compared with the README;
+//   2. a fresh run passes every step; the wallet signatures per step are counted and compared with the README; the registry
+//      holds exactly the launch plan (ops/lib/v2-plan.mjs launchCalls) and the canary's own reads avoid get-objects;
 //   3. the parent it inscribed boots from the mock chain with the registry config and shows four poster bays;
 //   4. a re-run after "Forget local progress" sends nothing and pays nothing.
 'use strict';
@@ -148,7 +149,7 @@ async function route(r) {
   let m;
   if ((m = q.match(/^\/v2\/contracts\/call-read\/([^/]+)\/([^/]+)\/([^/]+)$/))) {
     const body = JSON.parse(r.request().postData());
-    S.reads.push(`${m[2]}.${m[3]}`);
+    S.reads.push({ fn: `${m[2]}.${m[3]}`, step: S.current });
     try {
       const res = readOnly(`${m[1]}.${m[2]}`, m[3], body.arguments.map((h) => V7.hexToCV(hex0(h))), body.sender);
       return json({ okay: true, result: V7.cvToHex(res) });
@@ -268,7 +269,7 @@ async function route(r) {
   const parentId = await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/^xtrata-arcade-v2-launch:v1:mainnet:/.test(k)) return JSON.parse(localStorage.getItem(k)).inscriptionId || null; return null; });
   const hot = await page.evaluate(() => document.querySelector('#hot').textContent.split(' ')[0]);
   if (!fresh.failed) {
-    const expected = { connect: 0, preflight: 0, deploy: 3, kinds: 3, hall: 9, setup: 0, registry: 0, 'pack-engine': 1, 'pack-hall': 1, parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 };
+    const expected = { connect: 0, preflight: 0, deploy: 3, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': 1, 'pack-hall': 1, parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 };
     const got = Object.fromEntries(ids.map((i) => [i, S.sigs[i] || 0]));
     console.log('  wallet signatures per step: ' + ids.map((i) => `${i} ${got[i]}`).join(', ') + ` · total ${S.walletCalls}`);
     check(JSON.stringify(got) === JSON.stringify(expected), `signatures per step match the README (${Object.values(expected).reduce((a, b) => a + b, 0)} in all)`);
@@ -287,7 +288,11 @@ async function route(r) {
     const sp = readOnly(W2, 'get-space', [Cl.uint(3)]).value.value;
     check(pp(sp.owner) === `'${ROOT}` && pp(sp.state) === 'u1' && pp(sp.objects) === 'u4', `the hall is owned by the root wallet, live, with 4 objects (${pp(sp.owner)}, state ${pp(sp.state)}, ${pp(sp.objects)})`);
     const bays = [4, 5, 6, 7].map((id) => readOnly(W2, 'get-object-view', [Cl.uint(id)]).value.value);
-    check(bays.every((b, i) => b.object.value.name.value === `bay-${i}` && pp(b.active).includes('patch: "{\\"base\\":\\"posters\\"}"')), 'bay-0..bay-3 are objects 4..7, each with an active posters state');
+    check(bays.every((b, i) => b.object.value.name.value === `bay-${i}` && pp(b.active) === 'none') && [4, 5, 6, 7].every((id) => pp(readOnly(W2, 'get-state-count', [Cl.uint(id)])) === 'u0'), 'bay-0..bay-3 are objects 4..7 with no states (a bay with no state shows its posters)');
+    const heavy = S.reads.filter((r) => /^xtrata-world-v2\.(get-objects|get-children)$/.test(r.fn) && r.step !== 'registry' && r.step !== 'release');
+    check(heavy.length === 0, `the canary's own registry reads use the light pages, never get-objects / get-children${heavy.length ? ` (${heavy.length} in ${[...new Set(heavy.map((r) => r.step))].join(', ')})` : ''}`);
+    const hallHeavy = S.reads.filter((r) => /^xtrata-world-v2\.get-objects$/.test(r.fn)).length;
+    console.log(`  note: the hall's own reader (world2.js, run in the registry and release steps) made ${hallHeavy} get-objects reads`);
     check(S.violations.length === 0, `every STX movement was covered by a deny-mode post-condition${S.violations.length ? ': ' + S.violations.join('; ') : ''}`);
     check(pp(readOnly(SCORES, 'get-owner', [])) === `'${ROOT}` && BOARDS.every((b) => pp(readOnly(SCORES, 'get-board', [Cl.stringAscii(b.id)])).includes(`engine-id: u${parentId}`)), `the leaderboard is back with the root wallet and all 26 boards are on #${parentId}`);
     const hotBal = simnet.getAssetsMap().get('STX')?.get(hot) ?? 0n;
@@ -311,7 +316,7 @@ async function route(r) {
       bays: window.XA.bayState && window.XA.bayState() ? window.XA.bayState().bays.slice(0, 4).map((b) => (b && b.plan ? { base: b.plan.base, layers: (b.plan.overlays || []).length + (b.plan.cover ? 1 : 0) } : null)) : null,
       snap: window.XAWorld.snapshot() ? { src: window.XAWorld.snapshot().src, bays: (window.XAWorld.snapshot().bays || []).length } : null
     }));
-    const reads = S.reads.slice(readsBefore);
+    const reads = S.reads.slice(readsBefore).map((r) => r.fn);
     const want = { posters: ROOT + '.xtrata-posters-v1', registry: ROOT + '.xtrata-world-v2', screen: ROOT + '.xtrata-screen-v1' };
     check(JSON.stringify(info.world) === JSON.stringify(want), `the parent hands the hall XA_WORLD_CONFIG = ${JSON.stringify(info.world)}`);
     check(info.mode === 2 && info.enabled && info.cfg.registry === want.registry, 'the hall\'s world reader is on the registry (mode 2)');

@@ -257,7 +257,7 @@ const renderInscribing = () => {
   const st = E.state;
   const rows: [string, string][] = [
     ['Contracts', `${E.NAMES.world} · ${E.NAMES.posters} · ${E.NAMES.screen} at ${E.short(E.rootAddr())} (Clarity 4)`],
-    ['Registry', `${LAUNCH.planCalls} calls on a fresh registry: ${LAUNCH.kinds.length} kinds, arcade + hall live, 4 bays on posters (no lobby)`],
+    ['Registry', (() => { try { const c = E.launchPlan().calls; return `${c.length} planned calls (ops/lib/v2-plan.mjs launchCalls): ${c.filter((x) => x.fn === 'register-kind').length} kinds, arcade + hall live, 4 bays that show posters (no lobby)`; } catch (e) { return errText(e); } })()],
     ...E.PACKS.map((f): [string, string] => [`${f.label[0].toUpperCase()}${f.label.slice(1)}`,
       `${f.bytes.length.toLocaleString()} bytes · ${f.chunks.length} chunks · sha256 ${f.sha}${st?.packIds?.[f.key] ? ` · #${st.packIds[f.key]}` : ''}`]),
     ['Parent', `${E.kb(E.parentEstimate())} text/html · CONFIG.world = { posters, registry, screen }${st?.inscriptionId ? ` · #${st.inscriptionId}` : ''}`],
