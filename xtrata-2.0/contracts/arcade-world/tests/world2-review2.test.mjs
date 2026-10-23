@@ -230,6 +230,23 @@ test('L1 a delegate issues grants only where it holds GRANT through its own gran
   assert.equal(pp(w.grant(W[3], ids.alice, W[4], CAP.OBJECT, false, w.h() + 100).result), OK); // where its row is: yes
 });
 
+test('L1 (third review P2) a grant a delegate issued never carries a power its issuer has since lost', async () => {
+  const w = await standardWorld();
+  const { W, ids } = w;
+  const bay = idOf(w.object(W[0], ids.alice, w.kinds.carpet, { name: 'bay' }));
+  assert.equal(pp(w.grant(W[0], ids.alice, W[3], CAP.GRANT | CAP.OBJECT | CAP.STATE).result), OK);
+  assert.equal(pp(w.grant(W[3], ids.alice, W[4], CAP.OBJECT | CAP.STATE, false, w.h() + 1000).result), OK);
+  assert.equal(w.object(W[4], ids.alice, w.kinds.carpet).result.type, 'ok');
+  assert.equal(w.addState(W[4], bay, {}).result.type, 'ok');
+  // the owner cuts the issuer down to GRANT|STATE: the issued OBJECT power goes with it, STATE stays
+  assert.equal(pp(w.grant(W[0], ids.alice, W[3], CAP.GRANT | CAP.STATE).result), OK);
+  assert.equal(pp(w.object(W[4], ids.alice, w.kinds.carpet).result), err(300));
+  assert.equal(w.addState(W[4], bay, {}).result.type, 'ok');
+  // the issuer's own powers are unchanged by this rule
+  assert.equal(pp(w.object(W[3], ids.alice, w.kinds.carpet).result), err(300));
+  assert.equal(w.addState(W[3], bay, {}).result.type, 'ok');
+});
+
 /* ------------------------------------------------------------------ L2 sale total */
 
 test('L2 (review D1) buy-space refuses when price plus Xtrata\'s share exceeds the buyer\'s max-total', async () => {
