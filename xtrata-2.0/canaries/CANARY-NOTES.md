@@ -114,3 +114,57 @@ A throwaway wallet cannot sign owner-only calls, so hand it ownership for the ru
   route changes.
 - End the canary with an "audit" step that lists the repo and site edits still to make (redirects,
   tiles, id lists) so nothing is forgotten after the launch.
+
+## Learned on the arcade v2 launch (`arcade-v2-launch`)
+
+### Deploy and build from the wallet that will own it
+
+- Read the contract's ownership model before choosing who deploys. `xtrata-world-v2` makes the deployer the root owner and
+  the treasury, and a space belongs to whoever is named at creation; handing root over later leaves the new owner unable to
+  build in the deployer's spaces, and moving a space bumps its epoch (scheduled states and grants drop). So the canary pins the
+  final owner per network, refuses any other wallet at preflight (and in every sending step), and explains why in the UI.
+- End with an ownership step that reads every role back: owner, pending owner, treasury, admins, fee recipients, publishers.
+  An admin map cannot be listed; check every address the contract's `admin-set` events ever named (Hiro's
+  `/extended/v1/contract/<id>/events`) plus the addresses the canary itself used.
+
+### A temporary admin instead of 24 prompts
+
+- When the owner-only calls have a narrow admin role (here `set-admin … u2`, KINDS only), give the temporary wallet that role
+  instead of the whole contract: fund it, `set-admin`, it signs, `set-admin … u0`, sweep. Three owner signatures instead of 24,
+  and the owner can remove the role at any time without the temporary key. Say what the role can do while it is held, and what
+  it leaves behind (each kind records the temporary wallet in its `owner` field).
+
+### Replay a planner, do not re-derive it
+
+- When the ops tools already plan the calls, bundle their pure planner into the page (`ops/lib/v2-plan.mjs` has no imports)
+  and replay its list. A local copy drifts. If the planner predicts ids (a shared `next-id` counter), judge every planned call
+  against the chain before sending, and stop if something is on chain under an id the plan did not predict: the later
+  arguments would point at the wrong objects. Before each id-taking call check the counter is where the plan expects it
+  (`get-kind-count` for kinds). Finish with the planner's own read-back (`verifyManifest`).
+- Use the contract's light reads. A node caps a read-only call at about 30 map reads; a full `get-objects` page is 32.
+
+### Pins that are a one-line update
+
+- Keep every pin in one table, one line per pin, and make the build print the exact replacement lines when a pin is stale (and
+  all of them with `--print-pins`). A contract change is then: rebuild, paste, rebuild.
+
+### Test against the real contracts
+
+- `@stacks/clarinet-sdk` simnet deploys contracts at any address, mainnet ones included (`deployContract(name, src,
+  { clarityVersion }, 'SP…')`), so the mock chain can run the real core, the leaderboard and the new contracts at the exact
+  ids the canary uses. Use an empty Clarinet project and deploy everything from the test. Mute `console.log` / `stdout` around
+  simnet calls: it prints every Clarity `print`. Ids are whatever the chain hands out, so recreate mainnet ids with the core's
+  one-time `set-next-id` and filler inscriptions (3,000 mints take a few seconds).
+- Make the core's fee recipient someone other than the signer in the mock, or "send at most" post-conditions never see STX.
+  Check every call's STX events against its post-conditions in deny mode.
+- Run the testnet rehearsal in the mock too, from an empty chain. It found that the arcade engine only pilots mainnet-form
+  addresses (a testnet run must be flown as the key's mainnet form; the leaderboard checks only the hash160), and that the
+  recursive parent is a mainnet artifact (it hard-codes the mainnet core and API), so a testnet boot check must point those
+  reads at the testnet core.
+
+### Testnet needs its own fixtures
+
+- A fresh testnet core has none of mainnet's inscriptions. Make the canary create what the release depends on (the bundle,
+  read from mainnet's own copy and used only if it hashes to the pin, and a stand-in for the parent inscription), find each by
+  its chain hash on a re-run, and never offer those steps on mainnet. The core itself needs the testnet SIP-009 trait and the
+  two older contracts it reads, deployed first, at Clarity 3 (`as-contract` is gone in Clarity 4).

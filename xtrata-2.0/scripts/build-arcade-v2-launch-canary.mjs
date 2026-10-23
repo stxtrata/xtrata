@@ -72,38 +72,43 @@ const NETWORKS = {
   }
 };
 
-// ---------------------------------------------------------------- contracts
-// sha256 of contracts/live/<name>.clar (the mainnet variants). Earlier: none (first launch of these three).
-const PINNED_CONTRACTS = {
+// ---------------------------------------------------------------- pins
+// Every sha256 the page is allowed to send, one line each. When a source changes on purpose, the build stops and prints the
+// replacement line(s) to paste here (node scripts/build-arcade-v2-launch-canary.mjs --print-pins prints them all).
+//   contracts: sha256 of contracts/live/<file>.clar (mainnet variants; the testnet variants are derived and printed)
+//   release:   sha256 over the packs to inscribe, the parent shell, the part list, the bundle and the ids
+const PINS = {
   'xtrata-posters-v1': '3e9bdfc500c97a166804e15bda29df852e7f0dbea2fe2ebe97048f67399618fb',
-  'xtrata-world-v2': '54ec301553d5a0ecb18724a6003b56b4abc6c8c16b7835e092772ae2efce3ecc',
-  'xtrata-screen-v1': '255d1c0f37912f0a3a7fdac7caf91b5ac370bf3d50520c41abf6df6590da25cf'
+  'xtrata-world-v2': 'a72774e95967b81d33c339779e49a7313d864382caed9fe0f08b3761ed9cbc39',
+  'xtrata-screen-v1': 'f3638af6b8edf167baf16e4ce44aafcc466034dfbf5b792fd8ca6c2a79b7ed84',
+  'xtrata-arcade-scores-v2': 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5',
+  'xtrata-v1-1-1': '1f9ee448262d982017f69479718628689af4a660c28905492b4bad84096d74fd',
+  'xtrata-v2-1-0': '3f632b0adc44788366c1cce87a497e0dc789bc99fdd7fd9024a5c47b7df05e2c',
+  'xtrata-v3-2-3': '4d5ed9db022bb345d712ceadbd75d8d9540bd0a5b4d9122017c770b8d00a8ac7',
+  release: '10c7b47abe7cde3f9910ed9c4e8e1bdbfd8c51f8be992b4f89bc2930e62f97f0'
 };
-const PINNED_SCORES = 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5';
-// The core and the two contracts it reads from, contracts/live (mainnet variants; the testnet variants switch the SIP-009 trait).
-const PINNED_CORE = {
-  'xtrata-v1-1-1': { file: 'xtrata-v1.1.1.clar', sha: '1f9ee448262d982017f69479718628689af4a660c28905492b4bad84096d74fd' },
-  'xtrata-v2-1-0': { file: 'xtrata-v2.1.0.clar', sha: '3f632b0adc44788366c1cce87a497e0dc789bc99fdd7fd9024a5c47b7df05e2c' },
-  'xtrata-v3-2-3': { file: 'xtrata-v3.2.3.clar', sha: '4d5ed9db022bb345d712ceadbd75d8d9540bd0a5b4d9122017c770b8d00a8ac7' }
-};
-const pinErrors = [];
-const pin = (label, got, want, where) => { if (got !== want) pinErrors.push(`${label}: sha256 ${got} is not the pinned ${want}. If intended, set it in ${where}.`); };
+const NEW_CONTRACTS = ['xtrata-posters-v1', 'xtrata-world-v2', 'xtrata-screen-v1'];
+// The core and the two contracts it reads from (deployed by the canary on testnet only, with the testnet SIP-009 trait).
+const CORE_FILES = { 'xtrata-v1-1-1': 'xtrata-v1.1.1.clar', 'xtrata-v2-1-0': 'xtrata-v2.1.0.clar', 'xtrata-v3-2-3': 'xtrata-v3.2.3.clar' };
+const actual = {};
+const pinLine = (k, v) => `  ${/^[a-z]+$/.test(k) ? k : `'${k}'`}: '${v}',`;
+const pin = (label, got) => { actual[label] = got; };
 
 const withCore = (live, core) => live.split('\n').map((line) => (line.includes(';; @principal core') ? line.replace(LIVE_CORE, `'${core}`) : line)).join('\n');
 const contracts = { mainnet: {}, testnet: {} };
-for (const name of Object.keys(PINNED_CONTRACTS)) {
+for (const name of NEW_CONTRACTS) {
   const sim = readFileSync(resolve(AW, 'contracts', `${name}.clar`), 'utf8');
   const live = readFileSync(resolve(root, 'contracts/live', `${name}.clar`), 'utf8');
   if (toLive(sim) !== live) fail(`contracts/live/${name}.clar is stale: run node contracts/arcade-world/scripts/make-live.mjs`);
   if (!live.includes(LIVE_CORE)) fail(`${name}: expected the mainnet core ${LIVE_CORE} on its @principal core lines`);
-  pin(name, sha(live), PINNED_CONTRACTS[name], 'PINNED_CONTRACTS');
+  pin(name, sha(live));
   const test = withCore(live, NETWORKS.testnet.core);
   if (test.includes(LIVE_CORE)) fail(`${name}: the testnet variant still names the mainnet core`);
   contracts.mainnet[name] = live;
   contracts.testnet[name] = test;
 }
 const scores = readFileSync(resolve(root, 'contracts/arcade-scores-v2/contracts/xtrata-arcade-scores-v2.clar'), 'utf8');
-pin('xtrata-arcade-scores-v2', sha(scores), PINNED_SCORES, 'PINNED_SCORES');
+pin('xtrata-arcade-scores-v2', sha(scores));
 contracts.mainnet['xtrata-arcade-scores-v2'] = scores;
 contracts.testnet['xtrata-arcade-scores-v2'] = scores;
 
@@ -121,18 +126,15 @@ const testnetTrait = (src, name) => {
   return out;
 };
 const coreTestnet = {};
-for (const [name, c] of Object.entries(PINNED_CORE)) {
-  const live = readFileSync(resolve(root, 'contracts/live', c.file), 'utf8');
-  pin(name, sha(live), c.sha, 'PINNED_CORE');
+for (const [name, file] of Object.entries(CORE_FILES)) {
+  const live = readFileSync(resolve(root, 'contracts/live', file), 'utf8');
+  pin(name, sha(live));
   coreTestnet[name] = testnetTrait(live, name);
 }
 
 // ---------------------------------------------------------------- the release (as the v1 launch canary)
 const BUNDLE_ID = 3078;
 const BUNDLE_SHA = 'd9fa6b2085d64c1e5cb63682bbc278e1fe83a335d8dda914d657d9ba675bd62c';
-// sha256 over the packs to inscribe, the parent shell, the part list, the bundle and the ids (printed by this script).
-// v2.0 launch: the hall reads xtrata-world-v2 (bays), xtrata-posters-v1 and xtrata-screen-v1 (CONFIG.world).
-const PINNED_RELEASE = '10c7b47abe7cde3f9910ed9c4e8e1bdbfd8c51f8be992b4f89bc2930e62f97f0';
 const bundle = readFileSync(resolve(XA, 'release/xtrata-arcade.html'));
 if (sha(bundle) !== BUNDLE_SHA) fail(`release/xtrata-arcade.html is ${sha(bundle)}, not the pinned bundle #${BUNDLE_ID} ${BUNDLE_SHA}`);
 let h = Buffer.alloc(32);
@@ -200,7 +202,7 @@ const release = {
   equivalentParents: []
 };
 const releaseSha = sha(JSON.stringify({ packSha: release.packSha, shellSha: release.shellSha, partSha, bundle: BUNDLE_SHA, ids: release.ids, equivalentParents: [] }));
-pin('release', releaseSha, PINNED_RELEASE, 'PINNED_RELEASE');
+pin('release', releaseSha);
 
 // ---------------------------------------------------------------- the registry plan
 // The canary replays contracts/arcade-world/ops/lib/v2-plan.mjs launchCalls() (pure, no imports, bundled into the page). Check here
@@ -219,9 +221,12 @@ for (const net of ['mainnet', 'testnet']) {
 }
 const crossCheck = `ops/lib/v2-plan.mjs launchCalls: ${planned.mainnet} calls on mainnet (${V2.HALL_KINDS.length} kinds), ${planned.testnet} on testnet`;
 
-if (pinErrors.length) {
-  console.error(pinErrors.join('\n'));
-  fail('\nPins do not match (see above). For an intended change, set the printed values in scripts/build-arcade-v2-launch-canary.mjs.');
+const stale = Object.keys(PINS).filter((k) => actual[k] !== PINS[k]);
+if (process.argv.includes('--print-pins') || stale.length) {
+  if (stale.length) console.error(`\nPins do not match: ${stale.join(', ')}. If the change is intended, replace these lines in PINS in scripts/build-arcade-v2-launch-canary.mjs:\n`);
+  else console.log('\nPINS (all current):');
+  for (const k of (stale.length ? stale : Object.keys(PINS))) (stale.length ? console.error : console.log)(pinLine(k, actual[k]));
+  if (stale.length) fail('\nThen rebuild. (Nothing was written.)');
 }
 
 // ---------------------------------------------------------------- bundle the page

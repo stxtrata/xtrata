@@ -62,7 +62,7 @@ let simnet;
 const muted = (fn) => { const a = console.log, b = process.stdout.write, c = console.error; console.log = () => {}; console.error = () => {}; process.stdout.write = () => true; try { return fn(); } finally { console.log = a; console.error = c; process.stdout.write = b; } };
 const S = {
   sources: new Map(), tx: new Map(), events: new Map(), nonce: 7, txn: 0,
-  sigs: {}, current: '', walletCalls: 0, raw: 0, deploys: [], calls: [], violations: [], gateway: 0, reads: [],
+  sigs: {}, current: '', readFails: [], walletCalls: 0, raw: 0, deploys: [], calls: [], violations: [], gateway: 0, reads: [],
   address: ROOT
 };
 const newTx = (status, repr) => { const id = '0x' + sha('tx' + (++S.txn)).toString('hex'); S.tx.set(id, { tx_status: status, tx_result: { repr }, block_height: simnet.blockHeight }); return id; };
@@ -161,7 +161,7 @@ async function route(r) {
     try {
       const res = readOnly(`${m[1]}.${m[2]}`, m[3], body.arguments.map((h) => V7.hexToCV(hex0(h))), body.sender);
       return json({ okay: true, result: V7.cvToHex(res) });
-    } catch (e) { return json({ okay: false, cause: String(e.message || e).slice(0, 200) }); }
+    } catch (e) { S.readFails.push(`${m[2]}.${m[3]}: ${String(e.message || e).slice(0, 160)}`); return json({ okay: false, cause: String(e.message || e).slice(0, 200) }); }
   }
   if (q === '/v2/info') return json({ burn_block_height: simnet.burnBlockHeight, stacks_tip_height: simnet.blockHeight });
   if ((m = q.match(/^\/v2\/contracts\/source\/([^/]+)\/([^/]+)/))) { const s = S.sources.get(`${m[1]}.${m[2]}`); return s ? json({ source: s, publish_height: 1 }) : json({}, 404); }
@@ -321,11 +321,14 @@ async function route(r) {
     console.log(`-- 3. boot parent #${parentId} from the mock chain`);
     const boot = await ctx.newPage();
     const berrs = [];
-    boot.on('pageerror', (e) => berrs.push(e.message));
+    boot.on('pageerror', (e) => berrs.push(e.message)); boot.on('console', (m) => { if (/world|xa:/i.test(m.text())) console.log('  [hall console] ' + m.text().slice(0, 300)); });
     const readsBefore = S.reads.length;
     await boot.goto(`https://xtrata.xyz/i/${parentId}`);
     await boot.waitForFunction(() => window.XA && window.XA.games && window.XA.games.length === 21 && window.XA.wallState && window.XA.wallState().length >= 27 && window.XA.wallState().every((s) => s.head !== null) && !document.getElementById('xa-load'), null, { timeout: 240000 });
     await boot.waitForTimeout(3000);
+    // the world reader loads after the hall starts: give it time, then report any read the chain refused
+    await boot.waitForFunction(() => window.XAWorld && window.XAWorld.snapshot(), null, { timeout: 90000 }).catch(() => {});
+    if (S.readFails.length) console.log(`  refused reads so far: ${S.readFails.length}, last: ${JSON.stringify(S.readFails.slice(-4))}`);
     const info = await boot.evaluate(() => ({
       world: window.XA_WORLD_CONFIG, mode: window.XAWorld.mode(), enabled: window.XAWorld.enabled(), cfg: window.XAWorld.config(),
       wall: window.XA.wallState().map((s) => ({ head: s.head, shown: s.shown, chain: s.chain })),
