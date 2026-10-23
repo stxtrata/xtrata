@@ -115,7 +115,7 @@ test('F5 sales name the price and the version; the buyer pays the flat transfer 
   w.call('list-space', [U(alice), U(1_000_000), Cl.none()], W[0]);
   const ver = () => w.get(alice).version;
   // the price the buyer saw must be the price on the listing
-  assert.equal(pp(w.call('buy-space', [U(alice), U(900_000), ver()], W[2]).result), err(303));
+  assert.equal(pp(w.call('buy-space', [U(alice), U(900_000), ver(), U(1_000_000)], W[2]).result), err(303));
   // the seller edits the content: the version moves and the old sale no longer lands
   const seen = ver();
   const obj = idOf(w.object(W[0], alice, w.kinds.carpet));
@@ -126,10 +126,10 @@ test('F5 sales name the price and the version; the buyer pays the flat transfer 
   const v2 = ver();
   w.addState(W[0], obj);
   assert.notEqual(v2.value, ver().value);
-  assert.equal(pp(w.call('buy-space', [U(alice), U(1_000_000), seen], W[2]).result), err(308));
+  assert.equal(pp(w.call('buy-space', [U(alice), U(1_000_000), seen, U(1_000_000)], W[2]).result), err(308));
   // the right price and version succeed; the buyer pays price (the flat comes out of it)
   const before = { s: w.bal(W[0]), b: w.bal(W[2]), t: w.bal(W[5]) };
-  assert.equal(pp(w.call('buy-space', [U(alice), U(1_000_000), ver()], W[2]).result), OK);
+  assert.equal(pp(w.call('buy-space', [U(alice), U(1_000_000), ver(), U(1_000_000)], W[2]).result), OK);
   assert.equal(w.bal(W[2]), before.b - 1_000_000n);
   assert.equal(w.bal(W[5]), before.t + 500_000n);
   assert.equal(w.bal(W[0]), before.s + 500_000n);

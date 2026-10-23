@@ -52,6 +52,20 @@ Design: Project doc `claude/xtrata-world-standard.md`. **Not deployed. Replaces 
   There is no on-chain traits contract: the hall reads bindings by function name, and a traits contract can be added later without touching this one.
 - Kinds with inscriptions (recipes and modules) and space entries are checked against the core (sealed, hash and size match; kinds also need the creator).
 
-Codes are listed at the top of `contracts/xtrata-world-v2.clar`. Tests: `tests/world2-spaces.test.mjs`, `tests/world2-objects.test.mjs`
+- **Moderation sticks by level** (second review): suspend, pause from above and "moderated" record who placed them (3 root owner,
+  2 admin, 1 ancestor owner) and are lifted only at that level or higher, never by the space's own owner (unless root owner).
+  `get-moderation(id)` reads the level. A PAUSE admin's pause is a pause from above (level 2).
+- **Review lane**: states, title and entry from anyone but the owner, the root owner or a moderator are refused (`u320`).
+- **Delegate-issued grants** hold only while the issuer's own grant on that space still carries GRANT.
+- **Sales**: `buy-space(id, expected-price, expected-version, max-total)` refuses (`u321`) when `max(price, Xtrata's share)` exceeds
+  `max-total`. The treasury can never be the registry itself.
+- **A CHILD holder may create a space it owns** (how plots are claimed) and keeps it; grant CHILD only on land, never on a system domain.
+- **Doors, consents, approvals and kinds are checked when set**; the hall re-checks at use time.
+- **Light reads** for nodes that cap reads per call (30): `get-object-ids` / `get-child-ids` (16 ids per page, no rows) and
+  `get-objects-8` / `get-children-8` (8 rows per page). A full 16-row `get-objects` / `get-children` page is 35 reads: compatibility only.
+  Every read the hall makes is held to <= 24 reads and <= 90,000 read_length in the worst case (test H2; `node tests/world2-costs.mjs`).
+  The contract source (74.5 KB, was 68.8 KB) counts towards read_length on every read.
+
+Codes are listed at the top of `contracts/xtrata-world-v2.clar`. Second-review fixes, finding by finding: `docs/REVIEW-2-FIXES.md`. Tests: `tests/world2-spaces.test.mjs`, `tests/world2-objects.test.mjs`
 (each test boots its own simnet), `integration/real-core.test.mjs` for the real core. `mock-world-owner-v2` is a simnet-only contract that
 acts as a contract-based root owner.

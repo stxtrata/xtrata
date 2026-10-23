@@ -32,6 +32,35 @@ Owner on testnet: the deployer wizard (root owner). All three are set live (stat
 The reader resolves `path` with `resolve-path` and reads that space's objects; a space that is not draft/live (suspended, retired),
 or a path that does not resolve, is an empty room: its bays show posters.
 
+**Hall only first.** `node ops/v2.mjs seed <hall file> --hall-only` builds the arcade and the hall and nothing of the lobby (no lobby
+space, no lobby bay objects): the reader's `lobbyPath` then does not resolve and the lobby reads as an empty room. `node ops/v2.mjs lobby
+[lobby file]` adds the lobby later (space, live, its two bays, the delegates' grants there, any lobby scenes). A hall-only seed refuses a
+hall scene that links to the lobby: leave that bay out, plan the lobby, then seed that bay.
+
+**Rooms that open from an entry.** `node ops/v2.mjs room --slug casino --title "…" --entry <inscription id>` plans `create-space`,
+`set-space-entry` (id, hash and size read from the core: `get-inscription-hash`, `get-inscription-size`, refused unless
+`is-inscription-sealed`) and `set-space-state` live, in that order. The hall reads `get-space(id).entry` and opens the room from that
+inscription. `--entry` on a room that exists plans only `set-space-entry`.
+
+## Contract rules the hall and tools rely on (second review, 23 Oct 2026)
+
+* **Moderation is sticky by level.** Suspending a space (state 2), pausing it from above (paused 2) and moderating an object (state 3)
+  record who did it: **3** the root owner, **2** an admin (MOD; PAUSE for pauses), **1** the owner of an ancestor space. Only that level
+  or higher lifts or changes it, and never the space's own owner (unless they are the root owner): a plot owner cannot lift what the root
+  placed on a room inside her plot. Read it with `get-moderation(id)` → `{ space: { state, pause }, object }` (0 = none). `get-space` and
+  `get-object` are unchanged. The reader treats a suspended space or a moderated object as before (posters / left out).
+* **Review lane.** Where a space's effective policy has `review` on, `add-state`, `add-states`, `set-space-title` and `set-space-entry`
+  from anyone but the space's owner, the root owner or a moderator fail with **u320** (`ERR-REVIEW`); objects, bindings and doors from
+  delegates still go in hidden until the owner shows them. The hall's spaces have no review lane; the reader is unchanged.
+* **Delegate-issued grants** hold only while the issuer still holds GRANT through its own grant on that space (revoked, expired or
+  downgraded issuer: everything it issued stops). Delegates issue only where they hold such a grant (not through an inherited one).
+* **Publisher / bot grants are STATE only** (`--delegate publisher [--delegate-expires +30d]`): they change what existing objects show
+  and never add objects, bindings or doors.
+* **A CHILD holder** may create a space owned by itself (how plots are claimed) and keeps it after its grant ends. Never grant CHILD on
+  the arcade domain or any system space; moderation from above still applies to such a space.
+* **Doors, consents, approvals and kinds are checked when they are set.** The hall re-checks at use time: the target is live (`is-open`),
+  a consent is still in the target's epoch, a binding's contract is still approved, a kind is still approved and not hidden.
+
 ## Kinds (registered once, tier 0 = built-in, by the root owner or a KINDS admin)
 
 `register-kind(space=1, category, name, tier=0, builtin=<key>, src-id=0, src-hash=0x, src-size=0)`. The reader never relies on
@@ -133,8 +162,22 @@ src     = <registry id>          (the snapshot cache is only reused for the same
 
 ## Reading, polling and failure
 
-* Full read (about 20 read-only calls for the demo; concurrency 4): `get-version`; `resolve-path` x2; `get-space` x2; `get-objects`
-  pages (16 per page, at most 8 pages per space, only up to the space's `object-slots`); `get-kinds` (<= 20 ids per call);
+* **Read budget.** A stock node allows 30 map reads per read-only call (and caps read_length). A full 16-row page of `get-objects` or
+  `get-children` is 35 reads: those two stay for compatibility only. The hall uses the light pages below; every read it makes is held
+  to **<= 24 reads and <= 90,000 read_length** in the worst case the contract accepts (`tests/world2-review2.test.mjs`, H2; print the
+  table with `node tests/world2-costs.mjs`). The contract source (~74.5 KB) counts towards read_length on every call.
+
+  | read | returns | worst case |
+  |---|---|---|
+  | `get-object-ids(space, page)` | `(list 16 (optional uint))`: the object ids at slots page*16 .. +15 (no object rows) | 19 reads, ~75.6 K |
+  | `get-objects-8(space, page)` | the `get-objects` row shape, 8 per page (slots page*8 .. +7) | 19 reads, ~88 K |
+  | `get-child-ids(parent, page)` | `(list 16 (optional uint))`: child space ids at slots page*16 .. +15 | 19 reads, ~75.6 K |
+  | `get-children-8(parent, page)` | the `get-children` row shape, 8 per page | 19 reads, ~82 K |
+  | `get-kinds` (20 ids), `get-object-view` (8 states), `get-space`, `resolve-path` (6), `get-timeline`, `get-version` | as before | <= 23 reads, <= 81 K |
+
+  Either read objects with `get-objects-8` pages up to the space's `object-slots`, or `get-object-ids` and then only the rows needed.
+* Full read (about 20 read-only calls for the demo; concurrency 4): `get-version`; `resolve-path` x2; `get-space` x2; object pages
+  (`get-objects-8`, 8 per page, only up to the space's `object-slots`; older halls used `get-objects`); `get-kinds` (<= 20 ids per call);
   `get-object-view` for each bay and each child; `get-space` for each portal destination (slug).
 * Poll every 240 s (`pollMs`): `get-version` of the posters and the registry. If the registry's global version is unchanged:
   nothing else. If it moved (any write anywhere in the world): `resolve-path` x2, `get-space` x2 and `get-kinds` for the kinds in
@@ -147,8 +190,13 @@ src     = <registry id>          (the snapshot cache is only reused for the same
 ## Tool conventions (`ops/v2.mjs`)
 
 * A **manifest** (`ops/out/v2/hall-v2.manifest.json`) records ids, each object's base params, the patch it shows now, and the
-  state counts. Object ids come from one counter shared by spaces and objects (`next-id`, starts at 2); the tools predict them,
-  so the relay packs must land in order and in full. Verify with `node ops/v2.mjs read`.
+  state counts. Object ids come from one counter shared by spaces and objects (`next-id`, starts at 2); the tools **predict** them,
+  so the relay packs must land in order and in full. `node ops/v2.mjs verify` (or `read --verify`) reads the chain back in plan order
+  (kinds, spaces and entries, objects, grants) and **stops at the first mismatch**: everything after it in the manifest is wrong.
+* **For a browser.** `ops/lib/v2-plan.mjs` has no imports at all. `launchCalls({ network, owner, publisher?, publisherExpires?, rooms? })`
+  returns `{ contract, calls: [{ fn, args, note }], manifest }`, the whole hall-only launch in order; `clarityArg(arg, Cl)` turns each
+  argument into a Clarity value with the page's own `@stacks/transactions`; `verifyManifest(manifest, read)` checks the result.
+  `HALL_KINDS` there is a frozen copy of the kind list the Node tools read from the hall's source (a test keeps them equal).
 * The timeline holds **8 live states per object**; `--compact` prepends `compact-object` (drops past states). `retract-state` also frees a slot.
 * A scene file (`arcade-scene-file/1`) becomes: the bay's states (one per scene), one child object per element identity (kind +
   occurrence in the scene), created with the params of its first appearance, plus hide/show/patch states where a later scene
