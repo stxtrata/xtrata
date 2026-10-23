@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lease contract, live testnet test</title>
+<style>
+body{font:14px/1.45 ui-monospace,Menlo,monospace;background:#0b0e1a;color:#dfe6ff;margin:0;padding:16px;max-width:980px}
+h1{font-size:16px;letter-spacing:.06em;color:#ffcc55;margin:0 0 4px}
+.note{color:#8a93c4;margin:0 0 12px}
+button{background:#2a3a8a;color:#fff;border:0;border-radius:6px;padding:8px 14px;font:inherit;cursor:pointer;margin-right:8px}
+pre{white-space:pre-wrap;word-break:break-word;background:#10142a;border:1px solid #2a3470;border-radius:6px;padding:10px;min-height:200px}
+.pass{color:#6be28a}.fail{color:#ff7a7a}.dim{color:#8a93c4}
+</style></head><body>
+<h1>XTRATA LEASE CONTRACT · LIVE TESTNET TEST</h1>
+<p class="note">TESTNET ONLY. Makes three throwaway wallets in this browser (kept in this browser's local storage, worth nothing), funds the first from the Hiro faucet, deploys a fresh copy of xtrata-world-v2 and the draft lease contract from it, and proves a rental: before renting nothing works, after renting the tenant can change the room, at expiry it stops by itself, the next tenant can rent, and pulling the lease contract's grant ends every tenant. About 25 transactions and one wait for Bitcoin blocks (10 to 30 minutes). Safe to reload: it resumes.</p>
+<button id="run">Run / resume</button><button id="reset">Forget progress and wallets</button>
+<pre id="log"></pre>
+<script type="module">
+import * as T from 'https://cdn.jsdelivr.net/npm/@stacks/transactions@7.6.0/+esm';
+const { Cl, Pc, makeContractCall, makeContractDeploy, makeSTXTokenTransfer, broadcastTransaction, PostConditionMode, randomPrivateKey, privateKeyToAddress } = T;
+const API = 'https://api.testnet.hiro.so';
+const SOURCE_REGISTRY = 'STS5F6J6HDWHBN6581ZJ7EA2SD4K7MG97QV33Z5G.xtrata-world-v2';   // the rehearsal's registry: the pinned launch source, copied under a fresh wallet
+const LEASE_SRC = ";; xtrata-lease-v1 (DRAFT. Not part of the arcade launch.)\n;;\n;; Rent the right to change one space of xtrata-world-v2 for a number of burn blocks.\n;;\n;; The registry never holds money and has no notion of rent. What it does have is time-limited grants, and a rule for\n;; delegates: whoever holds GRANT on a space (through a grant from the owner) may issue non-inheriting grants of the\n;; rights it holds itself, never GRANT, always expiring, at most MAX-GRANT-BLOCKS ahead (1,008 burn blocks, about a\n;; week), and what it issued lapses the moment its own grant does. This contract is that delegate. The tenant pays here,\n;; this contract tells the registry, and the registry does the enforcing: a tenant can never change anything outside\n;; the rights offered, can never pass them on, and loses them at expiry without anyone sending a transaction.\n;;\n;; How a lease is set up (the lessor is the owner of the space):\n;;   1. registry.grant(space, <this contract>, caps-to-rent-out | GRANT, inherit=false, expires=0)\n;;   2. lease.offer(space, caps, price-per-block, min-blocks, max-blocks)\n;; A tenant then calls lease.rent(space, blocks, price-per-block). One tenant at a time; the same tenant may extend.\n;;\n;; What this draft does NOT do (decide before it is used for real money):\n;;   - The owner can still revoke the tenant in the registry at any time (the owner always can), with no refund.\n;;     Protecting a tenant from that means the space is owned by a contract, not by the lessor: a later version.\n;;   - A sale or transfer of the space (the registry bumps the epoch) lapses every grant at once, this contract's\n;;     included, so the tenant loses the rest of the term. The offer is then stale and rent() refuses it; the new owner\n;;     starts again. No pro-rata refund.\n;;   - The tenant is a wallet (tx-sender is contract-caller). A contract cannot rent.\n;; The registry address is fixed at deploy (replace .xtrata-world-v2 with the full principal when deploying).\n\n(define-constant ERR-NOT-AUTHORIZED (err u400))\n(define-constant ERR-NO-OFFER (err u401))\n(define-constant ERR-INVALID (err u402))\n(define-constant ERR-TAKEN (err u403))\n(define-constant ERR-TOO-LONG (err u404))\n(define-constant ERR-PRICE (err u405))\n(define-constant ERR-STALE (err u406))\n(define-constant ERR-NO-LEASE (err u407))\n(define-constant ERR-OWN-SPACE (err u408))\n\n(define-constant MAX-RENT-BLOCKS u1008)      ;; the registry's MAX-GRANT-BLOCKS\n(define-constant CAP-GRANT u64)\n(define-constant CAP-MOD u128)\n(define-constant CAP-ALL u511)\n(define-constant MAX-PRICE u1000000000)      ;; microSTX per block\n(define-constant MAX-FEE-BPS u1000)          ;; the operator's cut is at most 10%\n\n(define-data-var operator principal tx-sender)\n(define-data-var fee-bps uint u0)\n(define-data-var fee-to principal tx-sender)\n\n;; space -> the standing offer: who made it, which rights, the price, the shortest and longest rental, the registry epoch it was made in\n(define-map Offers uint { lessor: principal, caps: uint, price: uint, min-blocks: uint, max-blocks: uint, epoch: uint })\n;; space -> the current or last tenant\n(define-map Leases uint { tenant: principal, expires: uint, epoch: uint })\n\n(define-read-only (get-version) \"xtrata-lease-v1 draft\")\n(define-read-only (get-offer (space uint)) (map-get? Offers space))\n(define-read-only (get-lease (space uint)) (map-get? Leases space))\n(define-read-only (get-fee) { bps: (var-get fee-bps), to: (var-get fee-to) })\n\n;; Is `who` holding a live grant on the space in its current epoch? Read from the registry, which is the truth: a sale, a\n;; revoke by the owner or the end of the term all show up here without anyone telling this contract.\n(define-private (grant-live? (space uint) (who principal) (epoch uint))\n  (match (contract-call? .xtrata-world-v2 get-grant space who)\n    g (and (is-eq (get epoch g) epoch)\n           (or (is-eq (get expires g) u0) (> (get expires g) burn-block-height)))\n    false))\n\n;; the lease is live while the tenant's grant is, and this contract's own grant (which that one hangs from) is\n(define-private (lease-live? (space uint) (epoch uint) (tenant principal))\n  (and (grant-live? space tenant epoch) (grant-live? space current-contract epoch)))\n\n;; who may change the space right now by lease, if anyone\n(define-read-only (active-tenant (space uint))\n  (match (map-get? Leases space)\n    l (match (contract-call? .xtrata-world-v2 get-space space)\n        s (if (and (is-eq (get epoch l) (get epoch s)) (lease-live? space (get epoch s) (get tenant l))) (some (get tenant l)) none)\n        none)\n    none))\n\n(define-read-only (quote (space uint) (blocks uint))\n  (match (map-get? Offers space)\n    o (let ((cost (* (get price o) blocks)) (fee (/ (* cost (var-get fee-bps)) u10000)))\n        (some { cost: cost, fee: fee, to-lessor: (- cost fee) }))\n    none))\n\n(define-public (offer (space uint) (caps uint) (price uint) (min-blocks uint) (max-blocks uint))\n  (let ((s (unwrap! (contract-call? .xtrata-world-v2 get-space space) ERR-NO-OFFER)))\n    (asserts! (is-eq contract-caller (get owner s)) ERR-NOT-AUTHORIZED)\n    (asserts! (and (> caps u0) (<= caps CAP-ALL) (is-eq (bit-and caps (+ CAP-GRANT CAP-MOD)) u0)) ERR-INVALID)\n    (asserts! (<= price MAX-PRICE) ERR-INVALID)\n    (asserts! (and (>= min-blocks u1) (>= max-blocks min-blocks) (<= max-blocks MAX-RENT-BLOCKS)) ERR-INVALID)\n    (map-set Offers space { lessor: (get owner s), caps: caps, price: price, min-blocks: min-blocks, max-blocks: max-blocks, epoch: (get epoch s) })\n    (print { event: \"lease-offer\", space: space, lessor: (get owner s), caps: caps, price: price, min-blocks: min-blocks, max-blocks: max-blocks })\n    (ok true)))\n\n;; The lessor withdraws the offer; a tenant already in keeps the rest of the term (the lessor can still revoke in the registry).\n(define-public (cancel-offer (space uint))\n  (let ((o (unwrap! (map-get? Offers space) ERR-NO-OFFER)))\n    (asserts! (is-eq contract-caller (get lessor o)) ERR-NOT-AUTHORIZED)\n    (map-delete Offers space)\n    (print { event: \"lease-offer-cancelled\", space: space })\n    (ok true)))\n\n(define-public (rent (space uint) (blocks uint) (expected-price uint))\n  (let (\n    (o (unwrap! (map-get? Offers space) ERR-NO-OFFER))\n    (s (unwrap! (contract-call? .xtrata-world-v2 get-space space) ERR-NO-OFFER))\n    (now burn-block-height)\n    (old (map-get? Leases space))\n    (live (match old l (and (is-eq (get epoch l) (get epoch s)) (lease-live? space (get epoch s) (get tenant l))) false))\n    (same (and live (match old l (is-eq (get tenant l) tx-sender) false)))\n    (base (match old l (if same (get expires l) now) now))\n    (expires (+ base blocks))\n    (cost (* (get price o) blocks))\n    (fee (/ (* cost (var-get fee-bps)) u10000)))\n    (asserts! (is-eq tx-sender contract-caller) ERR-NOT-AUTHORIZED)\n    ;; the offer must still describe this owner and this owner's epoch (a sale or transfer makes it stale)\n    (asserts! (and (is-eq (get owner s) (get lessor o)) (is-eq (get epoch s) (get epoch o))) ERR-STALE)\n    (asserts! (not (is-eq tx-sender (get lessor o))) ERR-OWN-SPACE)\n    (asserts! (is-eq expected-price (get price o)) ERR-PRICE)\n    (asserts! (and (>= blocks (get min-blocks o)) (<= blocks (get max-blocks o))) ERR-INVALID)\n    (asserts! (or (not live) same) ERR-TAKEN)\n    (asserts! (<= expires (+ now MAX-RENT-BLOCKS)) ERR-TOO-LONG)\n    ;; the registry checks the rest: this contract's own grant is live, holds these rights, and may issue this long\n    (try! (contract-call? .xtrata-world-v2 grant space tx-sender (get caps o) false expires))\n    (if (> (- cost fee) u0) (try! (stx-transfer? (- cost fee) tx-sender (get lessor o))) true)\n    (if (> fee u0) (try! (stx-transfer? fee tx-sender (var-get fee-to))) true)\n    (map-set Leases space { tenant: tx-sender, expires: expires, epoch: (get epoch s) })\n    (print { event: \"lease\", space: space, tenant: tx-sender, expires: expires, cost: cost, fee: fee })\n    (ok expires)))\n\n;; The tenant gives the space back early (no refund).\n(define-public (surrender (space uint))\n  (let ((l (unwrap! (map-get? Leases space) ERR-NO-LEASE)))\n    (asserts! (is-eq contract-caller (get tenant l)) ERR-NOT-AUTHORIZED)\n    (try! (contract-call? .xtrata-world-v2 revoke space (get tenant l)))\n    (map-set Leases space (merge l { expires: burn-block-height }))\n    (print { event: \"lease-surrendered\", space: space, tenant: (get tenant l) })\n    (ok true)))\n\n(define-public (set-fee (bps uint) (to principal))\n  (begin\n    (asserts! (is-eq tx-sender (var-get operator)) ERR-NOT-AUTHORIZED)\n    (asserts! (<= bps MAX-FEE-BPS) ERR-INVALID)\n    (var-set fee-bps bps)\n    (var-set fee-to to)\n    (ok true)))\n";
+const KEY = 'xa-lease-test-v1';
+const CAP = { STATE: 1, OBJECT: 2, GRANT: 64 };
+const logEl = document.getElementById('log');
+let S = {}; try { S = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+S.done = S.done || {}; S.checks = S.checks || [];
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const log = (m, cls = '') => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = m; logEl.appendChild(d); window.scrollTo(0, document.body.scrollHeight); };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const J = async (path, opt) => { const r = await fetch(API + path, opt); const t = await r.text(); try { return JSON.parse(t); } catch (e) { return { error: t.slice(0, 200), status: r.status }; } };
+const U = (n) => Cl.uint(n), A = (s) => Cl.stringAscii(s), P = (s) => Cl.principal(s);
+
+if (!S.keys) { S.keys = { lessor: randomPrivateKey(), tenant: randomPrivateKey(), other: randomPrivateKey() }; save(); }
+const addr = Object.fromEntries(Object.entries(S.keys).map(([k, v]) => [k, privateKeyToAddress(v, 'testnet')]));
+const REG = `${addr.lessor}.xtrata-world-v2`, LEASE = `${addr.lessor}.xtrata-lease-v1`;
+const split = (id) => id.split('.');
+
+async function txWait(id) {
+  for (let i = 0; i < 360; i++) {
+    const t = await J('/extended/v1/tx/' + id);
+    if (t.tx_status && t.tx_status !== 'pending') return { status: t.tx_status, result: t.tx_result && t.tx_result.repr, block: t.block_height, id };
+    await sleep(5000);
+  }
+  throw new Error('transaction ' + id + ' still pending after 30 minutes');
+}
+const nonceOf = async (a) => BigInt((await J(`/extended/v1/address/${a}/nonces`)).possible_next_nonce);
+async function send(name, who, build) {
+  const nonce = await nonceOf(addr[who]);
+  const tx = await build(S.keys[who], nonce);
+  const r = await broadcastTransaction({ transaction: tx, network: 'testnet' });
+  if (r.error) throw new Error(`${name}: broadcast refused: ${r.error} ${r.reason || ''}`);
+  const out = await txWait(r.txid);
+  log(`   ${name}: ${out.status} ${out.result || ''}`, out.status === 'success' ? 'dim' : '');
+  return out;
+}
+const call = (name, who, target, fn, args, pcs = []) => send(name, who, (key, nonce) => {
+  const [contractAddress, contractName] = split(target);
+  return makeContractCall({ contractAddress, contractName, functionName: fn, functionArgs: args, senderKey: key, network: 'testnet', nonce, fee: 40000n, postConditions: pcs, postConditionMode: PostConditionMode.Deny });
+});
+const deploy = (name, who, cname, code) => send(name, who, (key, nonce) =>
+  makeContractDeploy({ contractName: cname, codeBody: code, senderKey: key, network: 'testnet', clarityVersion: 4, nonce, fee: BigInt(new TextEncoder().encode(code).length) * 32n + 20000n, postConditionMode: PostConditionMode.Deny }));
+const step = async (name, fn) => { if (S.done[name]) return S.done[name]; log('> ' + name); const r = await fn(); S.done[name] = r; save(); return r; };
+const check = (name, ok, detail = '') => { S.checks.push({ name, ok: !!ok, detail }); save(); log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  (' + detail + ')' : ''}`, ok ? 'pass' : 'fail'); return !!ok; };
+const resultIs = (o, repr) => o.result === repr;
+const okU = (o) => { const m = /^\(ok u(\d+)\)$/.exec(o.result || ''); return m ? Number(m[1]) : null; };
+const burnHeight = async () => (await J('/v2/info')).burn_block_height;
+
+const POL = Cl.tuple({ 'max-children': U(64), 'max-descendants': U(1000), 'max-objects': U(128), 'max-depth': U(5), runtimes: U(15), tiers: U(15), interfaces: U(15), 'approved-only': Cl.bool(false), 'portals-in': U(0), 'portals-out': U(0), review: Cl.bool(false), 'create-fee': U(0) });
+const TF = Cl.tuple({ x: Cl.int(0), y: Cl.int(0), z: Cl.int(0), yaw: U(0), scale: U(100) });
+const addState = (who, obj, text) => call('add-state ' + who + ' "' + text + '"', who, REG, 'add-state', [Cl.tuple({ obj: U(obj), from: U(0), patch: A(JSON.stringify({ text })), visibility: U(0), interaction: U(0) })]);
+
+async function run() {
+  log(`lessor ${addr.lessor}\ntenant ${addr.tenant}\nother  ${addr.other}`, 'dim');
+  await step('faucet lessor', async () => {
+    const bal = async () => Number((await J(`/extended/v1/address/${addr.lessor}/balances`)).stx?.balance || 0);
+    if ((await bal()) < 50_000_000) {
+      const f = await J(`/extended/v1/faucets/stx?address=${addr.lessor}`, { method: 'POST' });
+      if (!f.success && !f.txId) throw new Error('the faucet refused: ' + JSON.stringify(f).slice(0, 200) + '. Try again in a few minutes.');
+      for (let i = 0; i < 60 && (await bal()) < 50_000_000; i++) await sleep(5000);
+    }
+    return { balance: await bal() };
+  });
+  await step('fund tenant and other (30 STX each, from the lessor)', async () => {
+    for (const w of ['tenant', 'other']) {
+      const o = await send('fund ' + w, 'lessor', (key, nonce) => makeSTXTokenTransfer({ recipient: addr[w], amount: 30_000_000n, senderKey: key, network: 'testnet', nonce, fee: 5000n }));
+      if (o.status !== 'success') throw new Error('funding ' + w + ' failed');
+    }
+    return true;
+  });
+  await step('deploy the registry (a fresh xtrata-world-v2, pinned launch source)', async () => {
+    const src = await J(`/v2/contracts/source/${SOURCE_REGISTRY.replace('.', '/')}?proof=0`);
+    if (!src.source) throw new Error('could not read the registry source: ' + JSON.stringify(src).slice(0, 150));
+    const o = await deploy('deploy xtrata-world-v2', 'lessor', 'xtrata-world-v2', src.source);
+    if (o.status !== 'success') throw new Error('registry deploy failed: ' + o.status);
+    return o;
+  });
+  await step('deploy xtrata-lease-v1', async () => {
+    const o = await deploy('deploy xtrata-lease-v1', 'lessor', 'xtrata-lease-v1', LEASE_SRC);
+    if (o.status !== 'success') throw new Error('lease deploy failed: ' + o.status);
+    return o;
+  });
+  const setup = async (n, who, target, fn, args) => step(n, async () => { const o = await call(n, who, target, fn, args); if (o.status !== 'success') throw new Error(n + ' failed: ' + o.result); return o; });
+  await setup('register the sign kind', 'lessor', REG, 'register-kind', [U(1), U(6), A('Sign'), U(0), A('sign'), U(0), Cl.buffer(new Uint8Array(0)), U(0)]);
+  const shop = await step('create the rented room', async () => {
+    const o = await call('create-space shop', 'lessor', REG, 'create-space', [U(1), A('shop'), A('Rented shop'), U(1), P(addr.lessor), U(1), Cl.bool(true), POL]);
+    const id = okU(o); if (id === null) throw new Error('create-space failed: ' + o.result); return id;
+  });
+  await setup('room goes live', 'lessor', REG, 'set-space-state', [U(shop), U(1)]);
+  const sign = await step('create a sign in the room', async () => {
+    const o = await call('create-object sign', 'lessor', REG, 'create-object', [U(shop), U(0), U(0), A('sign'), TF, A('{}')]);
+    const id = okU(o); if (id === null) throw new Error('create-object failed: ' + o.result); return id;
+  });
+  await setup('lessor delegates to the lease contract (state, object and the right to grant)', 'lessor', REG, 'grant', [U(shop), P(LEASE), U(CAP.STATE | CAP.OBJECT | CAP.GRANT), Cl.bool(false), U(0)]);
+  await setup('lessor offers the rights state+object at 1000 uSTX per block, 1 to 100 blocks', 'lessor', LEASE, 'offer', [U(shop), U(CAP.STATE | CAP.OBJECT), U(1000), U(1), U(100)]);
+
+  // the proof
+  const c1 = await step('tenant tries to change the sign BEFORE renting', async () => addState('tenant', sign, 'before'));
+  check('before renting the tenant cannot change the room (registry err u300)', resultIs(c1, '(err u300)'), c1.result);
+  const rent = await step('tenant rents for 2 burn blocks (pays exactly 2000 uSTX)', async () =>
+    call('rent 2 blocks', 'tenant', LEASE, 'rent', [U(shop), U(2), U(1000)], [Pc.principal(addr.tenant).willSendEq(2000).ustx()]));
+  const exp = okU(rent);
+  check('the rental succeeded and names an expiry height', exp !== null, rent.result);
+  const c2 = await step('tenant changes the sign while renting', async () => addState('tenant', sign, 'tenant was here'));
+  check('while renting the tenant can change the sign', c2.status === 'success', c2.result);
+  const c3 = await step('a stranger tries to change the sign', async () => addState('other', sign, 'stranger'));
+  check('a stranger cannot (registry err u300)', resultIs(c3, '(err u300)'), c3.result);
+  const c4 = await step('a second renter tries while the lease is live', async () => call('rent while taken', 'other', LEASE, 'rent', [U(shop), U(2), U(1000)], [Pc.principal(addr.other).willSendEq(2000).ustx()]));
+  check('a second renter is refused while the lease is live (lease err u403)', resultIs(c4, '(err u403)'), c4.result);
+  if (exp !== null) {
+    await step('wait for the lease to end', async () => {
+      for (;;) { const h = await burnHeight(); if (h >= exp) return { burn: h }; log(`   burn height ${h}, the lease ends at ${exp}; waiting`, 'dim'); await sleep(30000); }
+    });
+  }
+  const c5 = await step('tenant tries again after the term', async () => addState('tenant', sign, 'late'));
+  check('after the term the right is gone by itself (registry err u300)', resultIs(c5, '(err u300)'), c5.result);
+  const r2 = await step('the other wallet rents for 50 blocks', async () => call('rent 50 blocks', 'other', LEASE, 'rent', [U(shop), U(50), U(1000)], [Pc.principal(addr.other).willSendEq(50000).ustx()]));
+  check('the next tenant can rent after expiry', okU(r2) !== null, r2.result);
+  const c6 = await step('the new tenant changes the sign', async () => addState('other', sign, 'new tenant'));
+  check('the new tenant can change the sign', c6.status === 'success', c6.result);
+  const c7 = await step('the old tenant tries once more', async () => addState('tenant', sign, 'old tenant'));
+  check('the old tenant stays out', resultIs(c7, '(err u300)'), c7.result);
+  await setup('the lessor pulls the lease contract\'s grant', 'lessor', REG, 'revoke', [U(shop), P(LEASE)]);
+  const c8 = await step('the tenant tries after the pull', async () => addState('other', sign, 'after pull'));
+  check('pulling the lease contract\'s grant ends every tenant at once', resultIs(c8, '(err u300)'), c8.result);
+  const ok = S.checks.every((c) => c.ok);
+  log(`\n${S.checks.filter((c) => c.ok).length} of ${S.checks.length} checks passed${ok ? ': ALL GOOD' : ': SOMETHING FAILED'}`, ok ? 'pass' : 'fail');
+  log(`registry ${REG}\nlease    ${LEASE}`, 'dim');
+  S.finished = true; save();
+  window.__leaseDone = { ok, checks: S.checks, registry: REG, lease: LEASE };
+}
+window.__leaseRun = () => run().catch((e) => { log('STOPPED: ' + (e && e.message || e), 'fail'); window.__leaseError = String(e && e.message || e); });
+document.getElementById('run').onclick = window.__leaseRun;
+document.getElementById('reset').onclick = () => { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); };
+log('ready. Press Run / resume.', 'dim');
+</script></body></html>
