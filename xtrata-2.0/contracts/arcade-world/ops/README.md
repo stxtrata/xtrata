@@ -38,7 +38,7 @@ Output files go to `ops/out/` (git-ignored); the bot's journal is `ops/.run-<fil
 | `rehearsal.mjs` | The whole launch sequence on a simulated chain. Writes `out/rehearsal-report.md`. |
 | `keygen.mjs` | Makes a disposable test-network key file. |
 | `relay.mjs`, `relay-merge.mjs` | Sign testnet transactions offline and pack them for a browser to send (see below). |
-| `v2.mjs` | The hall on `xtrata-world-v2` (the object registry): `deploy`, `seed` a scene file into spaces/kinds/bay objects/layer objects, `patch` ONE object, `add` ONE object, `bay`, `reset`, `read` (the hall's own reader). Dry run by default; offline signing only. See `docs/HALL-V2-SCHEMA.md`. |
+| `v2.mjs` | The hall on `xtrata-world-v2` (the object registry): `deploy`, `seed` a scene file into spaces/kinds/bay objects/layer objects (`--hall-only`), `lobby`, `room` (`--entry`), `patch` ONE object, `add` ONE object, `bay`, `reset`, `verify` (manifest vs chain), `read` (the hall's own reader). Dry run by default; offline signing only. See `docs/HALL-V2-SCHEMA.md` and `docs/REVIEW-2-FIXES.md`. |
 
 ## Scene file
 
@@ -88,10 +88,26 @@ previous one confirmed) and what each object shows, so `patch` can change one si
 
 ```
 node ops/v2.mjs deploy                                                        # dry run; add --execute --nonces deployer=N
-node ops/v2.mjs seed ops/examples/four-doorways-testnet-hall.scene.json --height H --delegate publisher
+node ops/v2.mjs seed ops/examples/four-doorways-testnet-hall.scene.json --height H --delegate publisher --delegate-expires +30d
+node ops/v2.mjs seed hall.scene.json --height H --hall-only                   # the hall alone: no lobby space, no lobby bays
+node ops/v2.mjs lobby [lobby.scene.json]                                      # ... and the lobby later
+node ops/v2.mjs room  --slug casino --title "Royal Flush Casino" --entry 1234  # opens from inscription 1234 (hash, size read from the core)
 node ops/v2.mjs patch --object hall/bay-1/sign --set text="STAFF ONLY" --set tone=gold
 node ops/v2.mjs add   --bay hall/bay-3 --kind sign-board --params '{"text":"HI"}' --at +1h --height H
 node ops/v2.mjs bay   --bay hall/bay-0 --base posters
 node ops/v2.mjs reset --bay hall/bay-0
-node ops/v2.mjs read  --registry ST....xtrata-world-v2
+node ops/v2.mjs verify                                                        # chain vs the manifest's predicted ids; stops at the first mismatch
+node ops/v2.mjs read  --registry ST....xtrata-world-v2 [--verify]
 ```
+
+- **Delegates** (`--delegate publisher`, the bot) get a **STATE-only** grant in each room the plan builds: they change what existing
+  objects show and cannot add objects, bindings or doors. `--delegate-expires` (a height or `+N`/`+Nh`/`+Nd` from `--height`) makes it lapse.
+- **Hall only**: `seed --hall-only` refuses a hall scene that links to the lobby (leave that bay out, run `lobby`, then seed that bay).
+- **Entry**: `room --entry N` reads `get-inscription-hash`, `get-inscription-size` and `is-inscription-sealed` from the core
+  (`--core`, default `<owner>.mock-xtrata-core` on testnet, via `--api-base`), then plans `create-space`, `set-space-entry`, live. A room
+  that already exists gets only `set-space-entry`. Offline: `--entry-hash HEX --entry-size N` (the contract still checks them against the core).
+- **Ids are predicted.** Spaces and objects share the registry's id counter, so the packs must land in order and in full. Run `verify`
+  after each pack: it reads kinds, spaces (and entries), objects and grants in plan order and stops at the first one that differs.
+- **For a browser page with a wallet**: `ops/lib/v2-plan.mjs` imports nothing. `launchCalls({ network, owner, publisher, publisherExpires, rooms })`
+  is the full ordered call list of a hall-only launch (`clarityArg(arg, Cl)` makes each argument a Clarity value; `verifyManifest` checks
+  the result). `ops/lib/v2.mjs` re-exports all of it (its API is unchanged) and adds the scene-file planners.

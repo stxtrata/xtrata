@@ -6,13 +6,19 @@
 // `read`, which only makes read-only calls.
 //
 //   node ops/v2.mjs deploy                                   [--execute --nonces deployer=N]
-//   node ops/v2.mjs seed hall.scene.json [lobby.scene.json]  --height H [--delegate publisher] [--link-room casino=ID] [--execute --nonces deployer=N]
+//   node ops/v2.mjs seed hall.scene.json [lobby.scene.json]  --height H [--delegate publisher [--delegate-expires +30d]] [--link-room casino=ID]
+//                                                            [--hall-only] [--execute --nonces deployer=N]
+//   node ops/v2.mjs lobby [lobby.scene.json]                 (after seed --hall-only: the lobby space, its two bays, the delegates' grants there)
 //   node ops/v2.mjs patch --object hall/bay-0/sign --set text=NEW --set tone=gold [--hide] [--at +6h] [--compact] [--as publisher]
 //   node ops/v2.mjs add   --bay hall/bay-1 --kind sign-board [--name sign-2] --params '{"text":"HI"}' [--at +1h]
 //   node ops/v2.mjs bay   --bay hall/bay-0 [--base wall|door|posters] [--interaction none|knock|peek|enter] [--hide] [--at +1h]
 //   node ops/v2.mjs reset --bay hall/bay-0 [--soft]
-//   node ops/v2.mjs room  --slug casino --title "Royal Flush Casino"     (a destination room for a portal; then seed a lobby scene with --link-room casino=ID)
-//   node ops/v2.mjs read  --registry ST….xtrata-world-v2 [--network testnet] [--json] [--out snapshot.json]
+//   node ops/v2.mjs room  --slug casino --title "Royal Flush Casino" [--entry <inscription id> [--core ST….mock-xtrata-core]]
+//                         (a destination room for a portal; then seed a lobby scene with --link-room casino=ID. --entry plans set-space-entry
+//                          with the hash and size READ FROM THE CORE (testnet API); --entry-hash/--entry-size skip the read. An existing
+//                          room with --entry only gets its entry set.)
+//   node ops/v2.mjs read  --registry ST….xtrata-world-v2 [--network testnet] [--json] [--out snapshot.json] [--verify]
+//   node ops/v2.mjs verify [--registry ST….xtrata-world-v2]   (reads the chain back against the manifest's predicted ids; stops at the first mismatch)
 //
 // Shared options: --manifest FILE (default ops/out/v2/hall-v2.manifest.json: the record of ids and what each object shows now; seed writes
 // it, the other commands read and update it), --out-dir DIR, --keys DIR (default ~/.xa-testnet-wizards), --nonces name=N, --fee uSTX per call,
@@ -29,6 +35,7 @@ import { signSteps, parseNonces } from './lib/steps.mjs';
 import { parseSceneFile } from './lib/scene.mjs';
 import * as V2 from './lib/v2.mjs';
 import { readHall, describeHall, networkRead } from './lib/hallread.mjs';
+import { httpReader, readEntry } from './lib/v2read.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -37,15 +44,32 @@ const sets = [];
 const rest = [];
 for (let i = 0; i < argv.length; i++) { if (argv[i] === '--set') sets.push(argv[++i]); else if (argv[i].startsWith('--set=')) sets.push(argv[i].slice(6)); else rest.push(argv[i]); }
 const args = parseArgs(rest, { manifest: 'value', outDir: 'value', keys: 'value', nonces: 'value', fee: 'value', chunk: 'value', owner: 'value', as: 'value', height: 'value',
-  delegate: 'value', linkRoom: 'value', object: 'value', params: 'value', at: 'value', bay: 'value', kind: 'value', name: 'value', base: 'value', interaction: 'value',
-  registry: 'value', slug: 'value', title: 'value', network: 'value', apiBase: 'value', out: 'value', path: 'value', lobbyPath: 'value', seqs: 'value', deployFee: 'value' });
+  delegate: 'value', delegateExpires: 'value', linkRoom: 'value', object: 'value', params: 'value', at: 'value', bay: 'value', kind: 'value', name: 'value', base: 'value', interaction: 'value',
+  registry: 'value', slug: 'value', title: 'value', network: 'value', apiBase: 'value', out: 'value', path: 'value', lobbyPath: 'value', seqs: 'value', deployFee: 'value',
+  entry: 'value', entryHash: 'value', entrySize: 'value', core: 'value' });
 const cmd = args._[0];
 const outDir = args.outDir || join(here, 'out', 'v2');
 const manifestPath = args.manifest || join(outDir, 'hall-v2.manifest.json');
-if (!cmd) die('usage: node ops/v2.mjs <deploy|seed|room|patch|add|bay|reset|read> [options]   (see the header of ops/v2.mjs)');
+if (!cmd) die('usage: node ops/v2.mjs <deploy|seed|lobby|room|patch|add|bay|reset|read|verify> [options]   (see the header of ops/v2.mjs)');
 
 const loadManifest = () => { if (!existsSync(manifestPath)) die(`no manifest at ${manifestPath}: run seed first (or pass --manifest)`); return JSON.parse(readFileSync(manifestPath, 'utf8')); };
 const height = args.height != null ? Number(args.height) : undefined;
+const apiBase = args.apiBase || 'https://api.testnet.hiro.so';
+const linkRooms = () => (args.linkRoom ? Object.fromEntries(String(args.linkRoom).split(',').map((p) => { const [k, v] = p.split('='); return [k, Number(v)]; })) : {});
+const delegateOpts = () => ({ delegates: args.delegate ? String(args.delegate).split(',') : [], delegateExpires: args.delegateExpires ? V2.whenOf(args.delegateExpires, height) : 0 });
+const registryOf = (m) => args.registry || (m ? `${m.owner}.${m.contract}` : null);
+
+// Read the chain back against the manifest (stops at the first id that is not what the plan predicted).
+async function verify(m) {
+  const registry = registryOf(m);
+  if (!registry) die('verify needs --registry ST….xtrata-world-v2 (or a manifest)');
+  if ((args.network || 'testnet') !== 'testnet') die('verify handles testnet only');
+  const r = await V2.verifyManifest(m, httpReader({ apiBase })(registry));
+  if (r.ok) { console.log(`verify: OK, ${r.checked} checks against ${registry}`); return true; }
+  console.error(`verify: MISMATCH after ${r.checked} good checks at ${r.what}\n  expected ${JSON.stringify(r.expected)}\n  on chain ${JSON.stringify(r.got)}`);
+  console.error('Stop here: the ids after this point in the manifest are wrong. Find the call that failed or landed out of order before sending more.');
+  return false;
+}
 
 // Print the plan, write the steps file, and (with --execute) sign + pack + write the manifest.
 async function finish(name, plan, { manifestOut = true } = {}) {
@@ -89,15 +113,29 @@ try {
     const files = args._.slice(1);
     if (!files.length) die('seed needs at least one scene file (room "arcade-hall" and/or "lobby")');
     const docs = files.map((f) => parseSceneFile(readFileSync(f, 'utf8')));
-    const linkRooms = args.linkRoom ? Object.fromEntries(String(args.linkRoom).split(',').map((p) => { const [k, v] = p.split('='); return [k, Number(v)]; })) : {};
     const plan = V2.planSeed(docs, {
-      height, delegates: args.delegate ? String(args.delegate).split(',') : [], linkRooms, as: args.as,
+      height, ...delegateOpts(), linkRooms: linkRooms(), as: args.as, hallOnly: !!args.hallOnly,
       manifest: existsSync(manifestPath) && !args.fresh ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null, ownerAddress: args.owner,
     });
+    if (args.hallOnly) plan.notes.push('hall only: no lobby space and no lobby bays. Add them later with: node ops/v2.mjs lobby [lobby.scene.json]');
     await finish('seed', plan);
+  } else if (cmd === 'lobby') {
+    const docs = args._.slice(1).map((f) => parseSceneFile(readFileSync(f, 'utf8')));
+    await finish('lobby', V2.planLobby(loadManifest(), docs, { height, ...delegateOpts(), linkRooms: linkRooms(), as: args.as }));
   } else if (cmd === 'room') {
-    if (!args.slug || !args.title) die('room needs --slug <casino> and --title "Royal Flush Casino"');
-    await finish('room-' + args.slug, V2.planRoom(loadManifest(), { slug: args.slug, title: args.title, as: args.as }));
+    const m = loadManifest();
+    if (!args.slug || (!args.title && !(args.entry != null && m.spaces[args.slug]))) die('room needs --slug <casino> and --title "Royal Flush Casino" (or --entry N for a room that exists)');
+    let entry = null;
+    if (args.entry != null) {
+      if (args.entryHash || args.entrySize) entry = { id: Number(args.entry), hash: String(args.entryHash || ''), size: Number(args.entrySize) };
+      else {
+        if ((args.network || 'testnet') !== 'testnet') die('room --entry reads the core on testnet only; pass --entry-hash and --entry-size otherwise');
+        const core = args.core || `${m.owner}.mock-xtrata-core`;
+        entry = await readEntry(httpReader({ apiBase })(core), args.entry);
+        console.log(`entry: inscription #${entry.id} in ${core}: ${entry.size} bytes, hash ${entry.hash}`);
+      }
+    }
+    await finish('room-' + args.slug, V2.planRoom(m, { slug: args.slug, title: args.title, entry, as: args.as }));
   } else if (cmd === 'patch') {
     if (!args.object) die('patch needs --object <hall/bay-0/sign>');
     const params = args.params ? JSON.parse(args.params) : {};
@@ -112,13 +150,16 @@ try {
   } else if (cmd === 'reset') {
     if (!args.bay) die('reset needs --bay <hall/bay-0>');
     await finish('reset', V2.planReset(loadManifest(), { bay: args.bay, soft: !!args.soft, seqs: args.seqs ? String(args.seqs).split(',').map(Number) : null, as: args.as, compact: !!args.compact }));
+  } else if (cmd === 'verify') {
+    if (!(await verify(loadManifest()))) process.exit(1);
   } else if (cmd === 'read') {
-    let registry = args.registry;
-    if (!registry) { const m = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null; if (m) registry = `${m.owner}.${m.contract}`; }
+    const m = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null;
+    const registry = registryOf(m);
     if (!registry) die('read needs --registry ST….xtrata-world-v2 (or a manifest)');
+    if (args.verify && !(await verify(m || die('read --verify needs a manifest')))) process.exit(1);
     const net = args.network || 'testnet';
     if (net !== 'testnet') die('read handles testnet only');
-    const read = networkRead({ apiBase: args.apiBase || 'https://api.testnet.hiro.so' });
+    const read = networkRead({ apiBase });
     const r = await readHall({ read, registry, path: args.path ? String(args.path).split('/') : ['arcade', 'hall'], lobbyPath: args.lobbyPath ? String(args.lobbyPath).split('/') : null });
     if (args.out) { writeFileSync(args.out, JSON.stringify(r, null, 1) + '\n'); console.log('snapshot -> ' + args.out); }
     console.log(args.json ? JSON.stringify(r, null, 1) : describeHall(r));

@@ -5,8 +5,9 @@ export const pp = (cv) => Cl.prettyPrint(cv);
 export const okU = (n) => `(ok u${n})`;
 export const errU = (n) => `(err u${n})`;
 
-export async function boot() {
-  const simnet = await initSimnet('./Clarinet.toml');
+// boot({ costs: true }) records execution costs on every call (r.costs.total / r.costs.limit).
+export async function boot(opts = {}) {
+  const simnet = await initSimnet('./Clarinet.toml', false, { trackCosts: !!opts.costs });
   const A = simnet.getAccounts();
   const deployer = A.get('deployer');
   const W = [1, 2, 3, 4, 5, 6].map((i) => A.get(`wallet_${i}`));
