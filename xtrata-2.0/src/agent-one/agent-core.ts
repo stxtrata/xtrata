@@ -184,6 +184,17 @@ async function heldBy(id: string, addr: string, tries = 5): Promise<'yes' | 'no'
 const lastGoodFee = new Map<string, bigint>();
 
 /**
+ * The node's fee endpoint takes the whole transaction as hex in a JSON body, and Hiro
+ * rejects any request body over 1 MiB with a 413 (FST_ERR_CTP_BODY_TOO_LARGE). Hex is
+ * two characters per byte, so a transaction over ~512 KB can never be estimated — and a
+ * full 32-chunk add-chunk-batch is 524,661 bytes. Above this size we do not ask: the
+ * low estimate on a full batch is the 1 uSTX/byte relay floor anyway (see above), so
+ * the byte length IS the quote. Kept well under the limit to leave room for the wrapper.
+ */
+export const MAX_ESTIMATE_TX_BYTES = 400000;
+export const floorFeeFor = (byteLength: number): bigint => BigInt(Math.max(1, Math.ceil(byteLength)));
+
+/**
  * Build the transaction at the node's LOW fee estimate rather than the middle one.
  *
  * @stacks/transactions defaults to `estimations[1]` — the middle of the node's
@@ -204,13 +215,20 @@ const lastGoodFee = new Map<string, bigint>();
  */
 async function quoteLowFee(opts: any) {
   if (opts.fee != null) return makeContractCall(opts);
+  let len: number | null = null;
   try {
     // fee: 1 keeps this local — no estimate request is made while building.
     const draft: any = await makeContractCall({ ...opts, fee: 1n });
-    const est: any = await estimateTransaction(draft.payload, estimateTransactionByteLength(draft), network);
+    len = estimateTransactionByteLength(draft);
+    // Too big to estimate: price it at the floor and never make the request.
+    if (len > MAX_ESTIMATE_TX_BYTES) return makeContractCall({ ...opts, fee: floorFeeFor(len) });
+    const est: any = await estimateTransaction(draft.payload, len, network);
     const low = est && est[0] && est[0].fee != null ? BigInt(est[0].fee) : null;
     if (low != null && low > 0n) return makeContractCall({ ...opts, fee: low });
-  } catch { /* estimator unavailable → fall back to the library's own default */ }
+  } catch { /* estimator unavailable → fall back below */ }
+  // The library's own default fee makes a SECOND estimate request with the same body, so
+  // for an oversized transaction it must never be reached — it threw an uncaught 413.
+  if (len != null && len > MAX_ESTIMATE_TX_BYTES) return makeContractCall({ ...opts, fee: floorFeeFor(len) });
   return makeContractCall(opts);
 }
 async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null, feeCeiling: bigint | null = null) {
@@ -392,7 +410,9 @@ async function sendNft(key: string, from: string, id: string, to: string) {
 async function transferFee(opts: any): Promise<bigint> {
   try {
     const draft: any = await makeContractCall({ ...opts, fee: 1n });
-    const est: any = await estimateTransaction(draft.payload, estimateTransactionByteLength(draft), network);
+    const len = estimateTransactionByteLength(draft);
+    if (len > MAX_ESTIMATE_TX_BYTES) return floorFeeFor(len) > TRANSFER_FEE_FLOOR ? floorFeeFor(len) : TRANSFER_FEE_FLOOR;
+    const est: any = await estimateTransaction(draft.payload, len, network);
     const low = est && est[0] && est[0].fee != null ? BigInt(est[0].fee) : 0n;
     return low > TRANSFER_FEE_FLOOR ? low : TRANSFER_FEE_FLOOR;
   } catch { return TRANSFER_FEE_FLOOR; }
@@ -494,7 +514,15 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
 // final artifact), so there is no server-side ffmpeg step here.
 // ============================================================================
 const ustxToStx = (u: any) => (Number(u) / 1e6).toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
-const errMsg = (e: any) => String((e && e.message) || e);
+const errMsg = (e: any) => {
+  if (e && e.message) return String(e.message);
+  // A thrown fetch Response (or any plain object) used to print as "[object Object]".
+  if (e && typeof e === 'object') {
+    if (e.status != null) return `HTTP ${e.status}${e.statusText ? ' ' + e.statusText : ''}`;
+    try { const j = JSON.stringify(e); if (j && j !== '{}') return j; } catch { /* fall through */ }
+  }
+  return String(e);
+};
 const addrEq = (a: any, b: any) => !!a && !!b && String(a).trim() === String(b).trim();
 const TRANSIENT_TX = /NotEnoughFunds|ConflictingNonceInMempool|TooMuchChaining|too much chaining|bad nonce|NoSuchAccount/i;
 let _stxUsd: { v: number | null; t: number } = { v: null, t: 0 };
@@ -567,7 +595,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-18.2';
+export const AGENT_BUILD = '2026-10-23.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
