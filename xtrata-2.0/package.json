@@ -103,6 +103,7 @@
     "build:audionaut-royalties": "vite build -c vite.audionaut-royalties.config.ts",
     "build:canary:arcade-scores-v2": "node scripts/build-arcade-scores-v2-canary.mjs",
     "build:canary:arcade-launch": "node scripts/build-arcade-launch-canary.mjs",
+    "build:canary:arcade-v2-launch": "node scripts/build-arcade-v2-launch-canary.mjs",
     "build:canary:forever-twins": "node scripts/build-forever-twins-launch-canary.mjs",
     "test:live-frames": "node scripts/test-live-frame-manager.mjs"
   },
