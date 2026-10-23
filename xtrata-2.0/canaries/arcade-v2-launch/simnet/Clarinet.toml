@@ -1,0 +1,10 @@
+# Simnet for the arcade v2 launch canary's mock-chain test (mock-chain-test.cjs).
+# It declares no contracts: the test deploys every contract itself, at the addresses the canary
+# expects (the mainnet core and the trait it implements, then whatever the canary deploys from the
+# stub wallet), so the registry, posters, screen, scores and core calls run on real Clarity.
+[project]
+name = 'xtrata-arcade-v2-launch-canary-simnet'
+authors = []
+telemetry = false
+cache_dir = './.cache'
+requirements = []
