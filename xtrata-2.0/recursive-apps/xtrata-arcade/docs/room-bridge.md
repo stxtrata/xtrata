@@ -197,7 +197,8 @@ live. A door anywhere in the world that portals to the space now opens it.
 - **Only a live space is open.** Draft, suspended and retired spaces: their bays show posters and a door to them says CLOSED (the schema
   doc's "a space that is not draft/live" becomes "a space that is not live").
 - **Lobby doorways:** the lobby space holds `bay-0` … `bay-5`; the hall shows as many doorways as the highest present index + 1 (two on the
-  back wall first, then the side walls). The hall's bays stay `bay-0` … `bay-3`.
+  back wall first, then the side walls). `rooms.lobby.bays` is never shorter than two entries (the two old places; `null` where there
+  is no object), up to six. The hall's bays stay `bay-0` … `bay-3`.
 - **Destination fields** read from `get-space`: `slug`, `title`, `state`, `runtime`, `entry {id, hash (chain hash), size}`, `parent`.
   `scene.link` from the reader: `{ 'target-room': <slug>, 'arrival-bay': 0, path: '', to, arrival, title, lobby, still, depth }`;
   `lobby` is true only for the hall's own lobby space when it is live and native.

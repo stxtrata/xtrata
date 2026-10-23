@@ -201,7 +201,7 @@ test('an empty registry (the hall path does not resolve) gives four posters bays
   const { W, n } = configured('active', { over: (fn) => (fn === 'resolve-path' ? '0x09' : null) });
   await W.refresh(true);
   let s = plain(W.snapshot());
-  assert.deepEqual(s.bays, [null, null, null, null]); assert.deepEqual(s.rooms.lobby.bays, []);
+  assert.deepEqual(s.bays, [null, null, null, null]); assert.deepEqual(s.rooms.lobby.bays, [null, null]);
   assert.ok(n.log.every((l) => l.fn !== 'get-object-view'));
 });
 
@@ -462,7 +462,7 @@ test('a draft or suspended hall space is closed: its bays are posters and no obj
   }
 });
 
-test('the lobby has as many doorways as its highest bay-N object: 1 to 6; bay-6 and beyond are ignored', async () => {
+test('the lobby has as many doorways as its highest bay-N object: 1 to 6 (the list is at least two long); bay-6 and beyond are ignored', async () => {
   const bayObj = (i) => ({ space: 4, parent: 0, kind: 0, name: 'bay-' + i, portal: null, active: { patch: '{"base":"door"}', interaction: 1 } });
   for (const n of [1, 2, 3, 4, 5, 6]) {
     const objects = {}; for (let i = 0; i < n; i++) objects[100 + i] = bayObj(i);
@@ -473,8 +473,8 @@ test('the lobby has as many doorways as its highest bay-N object: 1 to 6; bay-6 
     const { W } = onChain(chain);
     await W.refresh(true);
     const lb = plain(W.snapshot()).rooms.lobby.bays;
-    assert.equal(lb.length, n, n + ' bays');
-    assert.ok(lb.every((b) => b && b.scene && b.scene.base === 'door'), n + ': every doorway has its door');
+    assert.equal(lb.length, Math.max(2, n), n + ' bays (never fewer than the two old places)');
+    assert.ok(lb.slice(0, n).every((b) => b && b.scene && b.scene.base === 'door') && lb.slice(n).every((b) => b === null), n + ': every doorway has its door');
   }
   // a gap: bay-0 and bay-4 give five doorways, three of them plain walls (null)
   const chain = demoWorld();

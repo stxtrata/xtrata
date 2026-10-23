@@ -32094,12 +32094,13 @@ XARoom.boot(document.getElementById('xa-root'));
     return sig;
   }
 
-  // The lobby's doorways: as many as its highest bay-N object says (0..6), so two objects are the two back-wall doors as before.
-  function trimBays(list) { var n = 0; list.forEach(function (s, i) { if (s) n = i + 1; }); return list.slice(0, n); }
+  // The lobby's doorways: as many as its highest bay-N object says (1..6; the hall lays them out from the last non-null entry). The list
+  // is never shorter than two, the two back-wall places it has always had, so readers that expect [lobby bay 0, lobby bay 1] keep working.
+  function trimBays(list) { var n = 2; list.forEach(function (s, i) { if (s) n = Math.max(n, i + 1); }); return list.slice(0, n); }
 
   /*
    * Read the hall and the lobby. Throws when a needed read fails (the caller keeps its last good snapshot).
-   * Returns { bays: [4], lobbyBays: [0..6], looks, sig, meta }.  An absent or unusable room gives all-null bays: posters.
+   * Returns { bays: [4], lobbyBays: [2..6], looks, sig, meta }.  An absent or unusable room gives all-null bays: posters.
    */
   async function load(host) {
     own(host);
