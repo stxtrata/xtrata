@@ -33,8 +33,8 @@ import type { Net } from '../collection-v17/wallet';
 export const RELEASE = LAUNCH.release;
 export const RELEASE_SHA = LAUNCH.releaseSha;
 export const VERSION = RELEASE.version;
-export const NAMES = { posters: 'xtrata-posters-v1', world: 'xtrata-world-v2', screen: 'xtrata-screen-v1', scores: 'xtrata-arcade-scores-v2' } as const;
-const NEW_CONTRACTS = [NAMES.world, NAMES.posters, NAMES.screen];
+export const NAMES = { posters: 'xtrata-posters-v1', world: 'xtrata-world-v2', screen: 'xtrata-screen-v1', games: 'xtrata-games-v1', scores: 'xtrata-arcade-scores-v2' } as const;
+const NEW_CONTRACTS = [NAMES.world, NAMES.posters, NAMES.screen, NAMES.games];
 const CORE_TRIO = ['nft-trait', 'xtrata-v1-1-1', 'xtrata-v2-1-0', 'xtrata-v3-2-3'];
 /** Xtrata's standard token URI (same value the app and SDK use). */
 const TOKEN_URI = 'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
@@ -174,7 +174,7 @@ export type Signer = {
   balanceNote?: string;
 };
 export type HallRead = { bays: any[]; lobbyBays: any[]; looks: any; meta: { hall: number | null; lobby: number | null; objects: number; kinds: number } };
-export type BootInfo = { worldConfig: any; mode: number; enabled: boolean; registry: string; posters: string; screen: string; wall: { head: any; shown: boolean }[]; bays: any[] | null; errors: string[] };
+export type BootInfo = { worldConfig: any; gamesConfig: any; games: any; mode: number; enabled: boolean; registry: string; posters: string; screen: string; wall: { head: any; shown: boolean }[]; bays: any[] | null; errors: string[] };
 export type Host = {
   log(level: 'info' | 'ok' | 'warn' | 'error', msg: string, txid?: string): void;
   status(text: string, tone?: 'info' | 'ok' | 'warn' | 'error'): void;
@@ -488,11 +488,13 @@ const sigs = (chunks: number) => (chunks <= SINGLE_MAX_CHUNKS ? 1 : 2 + Math.cei
 // ---------- the parent ----------
 /** The world block the parent hands the hall (window.XA_WORLD_CONFIG). */
 export const worldIds = () => ({ posters: cid(NAMES.posters), registry: cid(NAMES.world), screen: cid(NAMES.screen) });
+/** The games block the parent hands the hall (window.XA_GAMES_CONFIG): the contract it reads the extra games from. */
+export const gamesIds = () => ({ contract: cid(NAMES.games) });
 const parentConfig = (packIds: Record<string, string>) => {
   const bid = Number(bundleId());
   const hashes: Record<string, string> = { [String(bid)]: RELEASE.bundle.sha256 };
   for (const n of RELEASE.inscribe) if (packIds[n]) hashes[String(packIds[n])] = RELEASE.packSha[n];
-  return ParentRender.parentConfig({ ...RELEASE.ids, bundleId: bid, packs: Object.fromEntries(RELEASE.inscribe.map((n) => [n, Number(packIds[n] || 0)])), hashes, world: worldIds() }, RELEASE.packOrder);
+  return ParentRender.parentConfig({ ...RELEASE.ids, bundleId: bid, packs: Object.fromEntries(RELEASE.inscribe.map((n) => [n, Number(packIds[n] || 0)])), hashes, world: worldIds(), games: gamesIds() }, RELEASE.packOrder);
 };
 let parentCache: { key: string; upload: Upload } | null = null;
 export const parentUpload = (): Upload => {
@@ -503,6 +505,7 @@ export const parentUpload = (): Upload => {
   if (parentCache?.key !== key) {
     const cfg = parentConfig(ids);
     if (JSON.stringify(cfg.world) !== JSON.stringify(worldIds())) throw new Error('The parent renderer did not carry the world block through. Rebuild the canary.');
+    if (JSON.stringify(cfg.games) !== JSON.stringify(gamesIds())) throw new Error('The parent renderer did not carry the games block through. Rebuild the canary.');
     parentCache = { key, upload: makeUpload('parent', 'parent', 'text/html', ParentRender.fillParent(RELEASE.shell, cfg)) };
   }
   return parentCache.upload;
@@ -511,7 +514,7 @@ export const parentEstimate = () => {
   try {
     const bid = network === 'mainnet' ? RELEASE.bundle.id : 9999999;
     const cfg = ParentRender.parentConfig({ ...RELEASE.ids, bundleId: bid, packs: Object.fromEntries(RELEASE.inscribe.map((n) => [n, 9999999])),
-      hashes: { [String(bid)]: RELEASE.bundle.sha256, ...Object.fromEntries(RELEASE.inscribe.map((n, i) => [String(9999990 + i), RELEASE.packSha[n]])) }, world: worldIds() }, RELEASE.packOrder);
+      hashes: { [String(bid)]: RELEASE.bundle.sha256, ...Object.fromEntries(RELEASE.inscribe.map((n, i) => [String(9999990 + i), RELEASE.packSha[n]])) }, world: worldIds(), games: gamesIds() }, RELEASE.packOrder);
     return new TextEncoder().encode(ParentRender.fillParent(RELEASE.shell, cfg)).length;
   } catch { return RELEASE.shell.length + 2000; }
 };
@@ -521,6 +524,7 @@ const parentDeps = (): bigint[] => [bundleId(), ...RELEASE.inscribe.map((n) => B
 const wread = async (fn: string, args: ClarityValue[] = []) => plain(await chain.read(cid(NAMES.world), fn, args));
 const pread = async (fn: string, args: ClarityValue[] = []) => plain(await chain.read(cid(NAMES.posters), fn, args));
 const sread = async (fn: string, args: ClarityValue[] = []) => plain(await chain.read(cid(NAMES.screen), fn, args));
+const gread = async (fn: string, args: ClarityValue[] = []) => plain(await chain.read(cid(NAMES.games), fn, args));
 type Kind = { id: number; category: number; name: string; tier: number; builtin: string; hidden: boolean; approved: boolean; owner: string };
 const readKinds = async (): Promise<Kind[]> => {
   const count = Number(await wread('get-kind-count'));
@@ -977,8 +981,8 @@ export const STEPS: Step[] = [
     }
   },
   {
-    id: 'deploy', title: 'Deploy xtrata-world-v2, xtrata-posters-v1, xtrata-screen-v1', who: 'Web wallet · 3 signatures (fewer when some are already deployed)',
-    intro: `Deploys the three contracts at Clarity 4 from the root wallet, so it becomes the registry's root owner and treasury and the posters and screen admin. Each is skipped when it is already on chain with the pinned source, and refused when the name exists with any other source. On testnet the leaderboard (xtrata-arcade-scores-v2) is deployed too if it is missing; on mainnet it is already live. Then every source is read back and compared with its pin.`,
+    id: 'deploy', title: 'Deploy xtrata-world-v2, xtrata-posters-v1, xtrata-screen-v1, xtrata-games-v1', who: 'Web wallet · 4 signatures (fewer when some are already deployed)',
+    intro: `Deploys the four contracts at Clarity 4 from the root wallet, so it becomes the registry's root owner and treasury and the posters, screen and games admin. Each is skipped when it is already on chain with the pinned source, and refused when the name exists with any other source. On testnet the leaderboard (xtrata-arcade-scores-v2) is deployed too if it is missing; on mainnet it is already live. Then every source is read back and compared with its pin.`,
     action: 'Deploy contracts',
     run: async () => {
       const w = requireRoot();
@@ -992,7 +996,9 @@ export const STEPS: Step[] = [
       if (pc.admin !== w.address) throw new Error(`${NAMES.posters} admin is ${pc.admin}, not the root wallet.`);
       const sa = await sread('get-admin');
       if (sa !== w.address) throw new Error(`${NAMES.screen} admin is ${sa}, not the root wallet.`);
-      return `${out.join(' · ')} · all sources match their pins · registry root owner ${short(root.owner)}, treasury ${short(root.treasury)} · posters and screen admin ${short(w.address)}`;
+      const ga = await gread('get-admin');
+      if (ga !== w.address) throw new Error(`${NAMES.games} admin is ${ga}, not the root wallet.`);
+      return `${out.join(' · ')} · all sources match their pins · registry root owner ${short(root.owner)}, treasury ${short(root.treasury)} · posters, screen and games admin ${short(w.address)}`;
     }
   },
   {
@@ -1113,7 +1119,19 @@ export const STEPS: Step[] = [
         await runTx('setup', `screen set-fee-recipient ${short(NET().screenFeeRecipient)}`, () => rootCall(cid(NAMES.screen), 'set-fee-recipient', [principalCV(NET().screenFeeRecipient)]));
         out.push(`screen fee recipient ${short(NET().screenFeeRecipient)}`);
       }
-      return `${out.length ? out.join(' · ') : 'all at the launch settings: nothing sent'} · registry treasury ${short(NET().treasury)} · screen fee recipient ${short(NET().screenFeeRecipient)} · paid screen slots ${sc['slots-enabled'] ? 'ON' : 'off'} · posters review lane ${(await pread('get-config'))['review-lane'] ? 'on' : 'off'}`;
+      // The games contract: the wait before a new game goes live, and (mainnet) the one-way lock on it.
+      let gc = await gread('get-config');
+      if (!gc['delay-locked'] && Number(gc.delay) !== NET().gamesDelay) {
+        await runTx('setup', `games set-delay ${NET().gamesDelay}`, () => rootCall(cid(NAMES.games), 'set-delay', [uintCV(NET().gamesDelay)]));
+        out.push(`games delay ${NET().gamesDelay} blocks`);
+        gc = await gread('get-config');
+      }
+      if (Number(gc.delay) !== NET().gamesDelay) throw new Error(`${NAMES.games} delay is ${gc.delay} blocks and is locked; the launch wants ${NET().gamesDelay}.`);
+      if (NET().lockGamesDelay && !gc['delay-locked']) {
+        await runTx('setup', 'games lock-delay', () => rootCall(cid(NAMES.games), 'lock-delay', []));
+        out.push('games delay locked for ever');
+      }
+      return `${out.length ? out.join(' · ') : 'all at the launch settings: nothing sent'} · games delay ${NET().gamesDelay} blocks${NET().lockGamesDelay ? ' (locked)' : ''} · registry treasury ${short(NET().treasury)} · screen fee recipient ${short(NET().screenFeeRecipient)} · paid screen slots ${sc['slots-enabled'] ? 'ON' : 'off'} · posters review lane ${(await pread('get-config'))['review-lane'] ? 'on' : 'off'}`;
     }
   },
   {
@@ -1139,14 +1157,14 @@ export const STEPS: Step[] = [
   },
   ...PACKS.map(packStep),
   {
-    id: 'parent', title: 'Inscribe the parent with the world contracts', who: 'Web wallet · 1 signature (none if already inscribed)',
-    intro: `Writes the pack ids and CONFIG.world = { posters, registry, screen } (the three contracts at the root address) into the parent with the same renderer as modular.mjs build, and inscribes it as text/html, a child of ${parentList()} that depends on the bundle and the packs. This inscription is the arcade people open, and every board's engine id.`,
+    id: 'parent', title: 'Inscribe the parent with the world and games contracts', who: 'Web wallet · 1 signature (none if already inscribed)',
+    intro: `Writes the pack ids, CONFIG.world = { posters, registry, screen } and CONFIG.games = { contract } (the four contracts at the root address) into the parent with the same renderer as modular.mjs build, and inscribes it as text/html, a child of ${parentList()} that depends on the bundle and the packs. This inscription is the arcade people open, and every board's engine id.`,
     action: 'Inscribe parent',
     run: async () => {
       const f = parentUpload();
       const r = await inscribe('parent', f, parentDeps(), parentIds());
       state.inscriptionId = r.id; save();
-      return `Xtrata Arcade ${VERSION} parent: ${r.note} · ${f.bytes.length.toLocaleString()} bytes, sha256 ${short(f.sha)} · world ${JSON.stringify(worldIds())}`;
+      return `Xtrata Arcade ${VERSION} parent: ${r.note} · ${f.bytes.length.toLocaleString()} bytes, sha256 ${short(f.sha)} · world ${JSON.stringify(worldIds())} · games ${JSON.stringify(gamesIds())}`;
     }
   },
   {
@@ -1204,7 +1222,9 @@ export const STEPS: Step[] = [
         if (JSON.stringify(info.worldConfig) !== JSON.stringify(want)) throw new Error(`The booted hall got XA_WORLD_CONFIG ${JSON.stringify(info.worldConfig)}, expected ${JSON.stringify(want)}.`);
         if (info.mode !== 2 || !info.enabled || info.registry !== want.registry || info.posters !== want.posters) throw new Error(`The hall's world reader is not on the registry (mode ${info.mode}, enabled ${info.enabled}, registry ${info.registry}).`);
         if (info.screen !== want.screen) throw new Error(`The hall's screen reads ${info.screen || 'nothing'}, expected ${want.screen}.`);
-        boot = `booted in a hidden frame: world reader on (mode 2) with posters ${short(want.posters)}, registry ${short(want.registry)}, screen ${short(want.screen)}${network === 'testnet' ? ' (testnet: run with its mainnet reads pointed at the testnet core and API, see the README)' : ''}`;
+        if (JSON.stringify(info.gamesConfig) !== JSON.stringify(gamesIds())) throw new Error(`The booted hall got XA_GAMES_CONFIG ${JSON.stringify(info.gamesConfig)}, expected ${JSON.stringify(gamesIds())}.`);
+        if (!info.games || info.games.ok !== true) throw new Error(`The hall could not read the games contract: ${(info.games && info.games.error) || 'no reader'}.`);
+        boot = `booted in a hidden frame: world reader on (mode 2) with posters ${short(want.posters)}, registry ${short(want.registry)}, screen ${short(want.screen)}, games ${short(gamesIds().contract)} (read ok: ${info.games.count} added so far, ${info.games.loaded.length} loaded)${network === 'testnet' ? ' (testnet: run with its mainnet reads pointed at the testnet core and API, see the README)' : ''}`;
       }
       let served = 'site check skipped (testnet)';
       if (network === 'mainnet') {
@@ -1433,6 +1453,12 @@ export const STEPS: Step[] = [
       if (sAdmin !== me) bad.push(`screen admin is ${sAdmin}`);
       if (sc['pending-admin']) bad.push(`screen has a pending admin ${sc['pending-admin']}`);
       if (sc['fee-recipient'] !== NET().screenFeeRecipient) bad.push(`screen fee recipient is ${sc['fee-recipient']}`);
+      const gc = await gread('get-config');
+      if (gc.admin !== me) bad.push(`games admin is ${gc.admin}`);
+      if (Number(gc.delay) !== NET().gamesDelay) bad.push(`games delay is ${gc.delay}, configured ${NET().gamesDelay}`);
+      if (NET().lockGamesDelay && !gc['delay-locked']) bad.push('the games delay is not locked');
+      if (gc.paused) bad.push('the games contract is paused');
+      if (await gread('get-successor').then((x: any) => x && x.successor)) bad.push('the games contract has a successor set');
       const pc = await pread('get-config');
       if (pc.admin !== me) bad.push(`posters admin is ${pc.admin}`);
       if (pc['pending-admin']) bad.push(`posters has a pending admin ${pc['pending-admin']}`);
@@ -1467,7 +1493,7 @@ export const STEPS: Step[] = [
       if (!vm.ok) throw new Error(`verifyManifest stopped at ${vm.what}.`);
       const packIds = RELEASE.inscribe.map((n) => `"${n}": ${state.packIds![n]}`).join(', ');
       const w = worldIds();
-      return `contracts, ${PACKS.length + 1} inscriptions, the registry (arcade #${r.m.spaces.arcade}, hall #${r.m.spaces.hall}, verifyManifest ${vm.checked} items) and all ${PRODUCTION.length} boards re-read and match · Next, in one commit: recursive-apps/xtrata-arcade/parent/ids.json: packs {${packIds}} and "world": {"posters": "${w.posters}", "registry": "${w.registry}", "screen": "${w.screen}"}; public/_redirects: /arcade → /i/${id}; the homepage arcade tile → #${id}; src/arcade-submit/arcade-boards.ts: add ${id} to ARCADE_INSCRIPTION_IDS. Then open https://xtrata.xyz/x/${id} and play one run.`;
+      return `contracts, ${PACKS.length + 1} inscriptions, the registry (arcade #${r.m.spaces.arcade}, hall #${r.m.spaces.hall}, verifyManifest ${vm.checked} items) and all ${PRODUCTION.length} boards re-read and match · Next, in one commit: recursive-apps/xtrata-arcade/parent/ids.json: packs {${packIds}} and "world": {"posters": "${w.posters}", "registry": "${w.registry}", "screen": "${w.screen}"} and "games": {"contract": "${gamesIds().contract}"}; public/_redirects: /arcade → /i/${id}; the homepage arcade tile → #${id}; src/arcade-submit/arcade-boards.ts: add ${id} to ARCADE_INSCRIPTION_IDS. Then open https://xtrata.xyz/x/${id} and play one run.`;
     }
   }
 ];

@@ -23,7 +23,7 @@ declare module "xa:launch" {
     releaseSha: string;
     networks: Record<Net, {
       root: string; treasury: string; core: string; posterPublishers: string[]; hallPublisher: string | null;
-      screenFeeRecipient: string; parents: number[] | string; bundleId: number | string; canDeployCore: boolean;
+      screenFeeRecipient: string; gamesDelay: number; lockGamesDelay: boolean; parents: number[] | string; bundleId: number | string; canDeployCore: boolean;
     }>;
     contracts: Record<Net, Record<string, string>>;
     contractSha: Record<Net, Record<string, string>>;

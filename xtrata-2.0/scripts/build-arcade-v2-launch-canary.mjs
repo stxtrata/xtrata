@@ -55,6 +55,9 @@ const NETWORKS = {
     posterPublishers: [],
     hallPublisher: null,
     screenFeeRecipient: MAINNET_ROOT,
+    // the games contract's wait before a new game goes live (burn blocks; 144 = about a day) and whether the canary locks it for ever
+    gamesDelay: 144,
+    lockGamesDelay: true,
     parents: [55],
     bundleId: 3078,
     canDeployCore: false
@@ -66,6 +69,8 @@ const NETWORKS = {
     posterPublishers: [],
     hallPublisher: null,
     screenFeeRecipient: process.env.XA_TESTNET_TREASURY || TESTNET_ROOT,
+    gamesDelay: 6,
+    lockGamesDelay: false,
     parents: 'stand-in',     // a small inscription the canary makes on the testnet core in place of #55
     bundleId: 'by-hash',     // the bundle is inscribed on the testnet core by the canary; its id is found by its chain hash
     canDeployCore: TESTNET_CORE.split('.')[0] === TESTNET_ROOT && TESTNET_CORE.split('.')[1] === 'xtrata-v3-2-3'
@@ -81,13 +86,14 @@ const PINS = {
   'xtrata-posters-v1': '3e9bdfc500c97a166804e15bda29df852e7f0dbea2fe2ebe97048f67399618fb',
   'xtrata-world-v2': 'a72774e95967b81d33c339779e49a7313d864382caed9fe0f08b3761ed9cbc39',
   'xtrata-screen-v1': '0039464e5225edee74e3aa8d02699b8effe7cc67360cfcb511eb02a02fe47dc1',
+  'xtrata-games-v1': '0350fa02097f0bd55a7dab9d52da1649a30caddd49771f7237c9f0bafbd84cae',
   'xtrata-arcade-scores-v2': 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5',
   'xtrata-v1-1-1': '1f9ee448262d982017f69479718628689af4a660c28905492b4bad84096d74fd',
   'xtrata-v2-1-0': '3f632b0adc44788366c1cce87a497e0dc789bc99fdd7fd9024a5c47b7df05e2c',
   'xtrata-v3-2-3': '4d5ed9db022bb345d712ceadbd75d8d9540bd0a5b4d9122017c770b8d00a8ac7',
-  release: '76b9119c8a9ec85e46d6bea604ea0119d77062639e835e7f35d5dc26625be252'
+  release: 'a5739c666a686b86b4ce595265fb26af834f8aa930d600f7bf70c435811306e5'
 };
-const NEW_CONTRACTS = ['xtrata-posters-v1', 'xtrata-world-v2', 'xtrata-screen-v1'];
+const NEW_CONTRACTS = ['xtrata-posters-v1', 'xtrata-world-v2', 'xtrata-screen-v1', 'xtrata-games-v1'];
 // The core and the two contracts it reads from (deployed by the canary on testnet only, with the testnet SIP-009 trait).
 const CORE_FILES = { 'xtrata-v1-1-1': 'xtrata-v1.1.1.clar', 'xtrata-v2-1-0': 'xtrata-v2.1.0.clar', 'xtrata-v3-2-3': 'xtrata-v3.2.3.clar' };
 const actual = {};

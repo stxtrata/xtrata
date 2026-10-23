@@ -101,7 +101,15 @@ const camera = new THREE.PerspectiveCamera(WALK.fov, innerWidth/innerHeight, 0.0
 camera.rotation.order = 'YXZ';
 
 const RW = 10, RH = 3.2, HH = 4.2, EYE = WALK.eye, GAP = 2.2;
-const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets down the left / right walls
+/* Which wall each cabinet stands on, and where along it (0 = nearest the entrance). With 21 games or fewer this is the original split (left gets the
+   extra one). The 21 built-in games never move to the other wall: games added later (from the games contract) take the right wall first, then the
+   left, alternately, at the far end of each row, so the room grows at the back and every built-in game keeps its wall and its place in the row. */
+const BUILT_IN_GAMES = 21, BUILT_IN_LEFT = 11;
+const SIDE_OF = GAMES.map((_,i)=> GAMES.length<=BUILT_IN_GAMES ? (i<Math.ceil(GAMES.length/2) ? -1 : 1)
+  : i<BUILT_IN_GAMES ? (i<BUILT_IN_LEFT ? -1 : 1) : ((i-BUILT_IN_GAMES)%2===0 ? 1 : -1));
+const ROW = {'-1':[], '1':[]}; SIDE_OF.forEach((sd,i)=>ROW[sd].push(i));
+const SLOT_OF = GAMES.map((_,i)=>ROW[SIDE_OF[i]].indexOf(i));
+const NL = ROW['-1'].length, NR = ROW['1'].length;                   // cabinets down the left / right walls
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
 const machines = [], pickables = [], boxes = [];
@@ -1468,9 +1476,20 @@ function buildPosters(){
     const endPair=(a,b,bay)=>{ const mid=(a+b)/2; spots.push([side,mid+.52,bay],[side,mid-.52,bay]) };
     endPair(zHi, wallEnd, side<0?'NL':'NR');   // entrance end: also a bay (2, 3)
     bayDefs[side<0?2:3]={side, z:(zHi+wallEnd)/2, width:wallEnd-zHi};
-    for(let k=0;k<n-1;k++) spots.push([side, cabZ(k,n)-GAP/2]);
+    for(let k=0;k<n-1;k++) spots.push([side, cabZ(k,n)-GAP/2, undefined, {gap:k, birth:ROW[side][k+1]}]);
     endPair(-wallEnd, zLo, side<0?'L':'R');   // far end (bays 0, 1)
     bayDefs[side<0?0:1]={side, z:(-wallEnd+zLo)/2, width:zLo+wallEnd};
+  }
+  /* Poster slot numbers are permanent: pinned posters and the day's wall are keyed by slot index. With the built-in 21 games the slots are the
+     original 27, in the original order. When more games add more gaps between cabinets, those new slots go AFTER the original ones, in the order
+     the games were added, so no existing slot changes number. */
+  if(GAMES.length>BUILT_IN_GAMES){
+    const baseGap={'-1':BUILT_IN_LEFT-1, '1':BUILT_IN_GAMES-BUILT_IN_LEFT-1};
+    const isNew=(sp,side)=>sp[3] && sp[3].gap>=baseGap[side];
+    const keep=[], extra=[];
+    spots.forEach(sp=>{ (isNew(sp,sp[0]) ? extra : keep).push(sp) });
+    extra.sort((a,b)=>a[3].birth-b[3].birth);
+    spots.length=0; spots.push(...keep, ...extra);
   }
   bayDefsAll=bayDefs;
   // the lobby has two doorways of its own, on its back wall (the hall's four come first, so the lobby's are bays 4 and 5). The lobby group exists
@@ -1885,7 +1904,7 @@ function glowTex(){ if(_glow) return _glow; const c=mkCanvas(128,128), x=c.getCo
   x.fillStyle=g; x.fillRect(0,0,128,128); return _glow=new THREE.CanvasTexture(c) }
 function placeCabinets(){
   GAMES.forEach((g,i)=>{
-    const m=buildCabinet(g,i), left=i<NL, z=left ? cabZ(i,NL) : cabZ(i-NL,NR);
+    const m=buildCabinet(g,i), left=SIDE_OF[i]<0, z=cabZ(SLOT_OF[i], left?NL:NR);
     m.group.position.set(left ? -RW/2+.16 : RW/2-.16, 0, z);
     m.group.rotation.y = left ? Math.PI/2 : -Math.PI/2;
     scene.add(m.group); m.group.updateMatrixWorld(true);
@@ -2374,6 +2393,7 @@ function updateHud(){
 /* Read-only look at the cabinet screens (tests and debugging). */
 window.XAHall = Object.freeze({
   screens: () => machines.map(m => ({ id: m.game.id, phase: m.phase || null, board: m.phaseBoard || null })),
+  layout: () => ({ room: { w: RW, l: RL }, left: NL, right: NR, cabinets: GAMES.map((g,i)=>({ id: g.id, side: SIDE_OF[i], slot: SLOT_OF[i], z: cabZ(SLOT_OF[i], SIDE_OF[i]<0?NL:NR) })), posterSlots: posterSlots.length, posterTags: posterSlots.map(sl=>(sl.pos.x<0?'L':'R')+(sl.bay||'-')) }),
   boards: () => Object.keys(TOP).map(k => ({ board: k, entries: TOP[k].entries.length })),
   screenImage: i => machines[i] && machines[i].sctx ? machines[i].sctx.canvas.toDataURL('image/png') : null
 });

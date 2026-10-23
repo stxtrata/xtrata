@@ -932,6 +932,7 @@
     getBoardInfo: getBoardInfo,
     getReplay: getReplay,
     getInscription: getInscription,
+    read: callRead,
     inscriptionIdByHash: inscriptionIdByHash,
     quoteReplay: quoteReplay,
     needsInscription: needsInscription,
@@ -949,7 +950,7 @@
     recordLocal: recordLocal,
     shortAddress: function (a) { a = String(a || ''); return a.length > 12 ? a.slice(0, 5) + '…' + a.slice(-4) : a; },
     // exposed for tests
-    _codec: { cvUint: cvUint, cvAscii: cvAscii, cvBuff: cvBuff, cvPrincipal: cvPrincipal, decodeCV: decodeCV, c32address: c32address,
+    _codec: { cvList: cvList, cvUint: cvUint, cvAscii: cvAscii, cvBuff: cvBuff, cvPrincipal: cvPrincipal, decodeCV: decodeCV, c32address: c32address,
       c32decodeAddress: c32decodeAddress, stxPostConditionHex: stxPostConditionHex, sha256: sha256,
       bytesToHex: bytesToHex, hexToBytes: hexToBytes, isMainnetAddress: isMainnetAddress }
   };
