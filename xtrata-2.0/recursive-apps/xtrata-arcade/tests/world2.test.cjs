@@ -17,10 +17,6 @@ const REG = 'ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.xtrata-world-v2';
 const POSTERS = 'ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.xtrata-posters-v1';
 const plain = (x) => JSON.parse(JSON.stringify(x));
 const MC = require('./lib/mock-chain.cjs');
-// The recorded `expect` predates the destination fields a link now carries (to, arrival, title, lobby, still, depth): compare
-// without them (they are checked on their own below).
-const NEW_LINK = ['to', 'arrival', 'title', 'lobby', 'still', 'depth'];
-const oldShape = (bays) => plain(bays).map((b) => { if (b && b.scene && b.scene.link) NEW_LINK.forEach((k) => delete b.scene.link[k]); return b; });
 
 function load(parts) {
   const win = { console, Math, Date, JSON, Object, Array, Number, String, Uint8Array, BigInt, TextDecoder, TextEncoder, Promise, setTimeout, clearTimeout,
@@ -36,13 +32,6 @@ function load(parts) {
 }
 const ALL = ['score-client.js', 'world.js', 'world2.js', 'bays.js'];
 
-// The recording predates get-object-ids (the light page the contract is adding: ids only, 16 a page). Until the fixture is
-// re-recorded against a contract that has it (scripts/make-hall-v2-fixture.mjs records whatever the reader reads), a get-object-ids
-// page is derived from the recorded get-objects page with the same arguments: the same slots, ids only.
-function derivedIds(C, calls, key) {
-  const i = calls['get-objects|' + key.slice('get-object-ids|'.length)];
-  return i === undefined ? null : MC.idsFromObjectsPage(FIX.blobs[i]);
-}
 // A fake node. `scenario` picks the recorded results; `over(fn, argsKey)` may replace one; `fail` makes every read fail.
 function node(win, scenario, opts = {}) {
   const C = win.XAScores._codec, log = [];
@@ -60,7 +49,6 @@ function node(win, scenario, opts = {}) {
         const cur = FIX.scenarios[api.scenario];
         const i = cur.calls[key];
         if (api.over) hex = api.over(fn, key, cur.calls, FIX.blobs);
-        if (hex == null && i === undefined && fn === 'get-object-ids') hex = derivedIds(C, cur.calls, key);
         if (hex == null) { if (i === undefined) return { ok: true, status: 200, json: async () => ({ okay: false, cause: 'no recorded result for ' + key }) }; hex = FIX.blobs[i]; }
       }
       return { ok: true, status: 200, json: async () => ({ okay: true, result: hex }) };
@@ -83,8 +71,8 @@ test('through XAWorld: the registry is read into the bay snapshot the engine exp
   assert.deepEqual(plain(r), { ok: true, changed: true });
   const snap = plain(W.snapshot());
   const want = FIX.scenarios.active.expect;
-  assert.deepEqual(oldShape(snap.bays), want.bays);
-  assert.deepEqual(oldShape(snap.rooms.lobby.bays), want.lobbyBays);
+  assert.deepEqual(snap.bays, want.bays);
+  assert.deepEqual(snap.rooms.lobby.bays, want.lobbyBays);
   // the lobby door's link names its destination: the hall's own lobby (live, native), by id
   assert.deepEqual(snap.bays[2].scene.link, { 'target-room': 'lobby', 'arrival-bay': 0, path: '', to: want.meta.lobby, arrival: 0, title: 'Lobby', lobby: true, still: null, depth: null });
   assert.deepEqual(snap.looks, want.looks);
@@ -335,7 +323,7 @@ test('the slot table matches the bay engine and every door style is a door', () 
 test('limits: a hall space claiming a huge number of object slots is read in at most 8 pages', async () => {
   // rewrite get-space for the hall to claim 5000 object slots: the reader must not ask for 313 pages
   const none16 = '0x0b00000010' + '09'.repeat(16);
-  const { win, W, n } = configured('active', { over: (fn, key, calls) => (fn === 'get-object-ids' && !(('get-objects|' + key.split('|')[1]) in calls) ? none16 : null) });
+  const { win, W, n } = configured('active', { over: (fn, key, calls) => (fn === 'get-object-ids' && !(key in calls) ? none16 : null) });
   const codec = win.XAScores._codec, real = n.fetch;
   win.fetch = async (url, init) => {
     const res = await real(url, init), body = await res.json();

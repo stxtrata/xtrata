@@ -16,7 +16,6 @@ const assert = require('assert');
 
 const DIST = path.join(__dirname, '..', 'dist');
 const HTML = fs.readFileSync(path.join(DIST, fs.readdirSync(DIST).find((f) => /^xtrata-arcade-v[\d.]+\.html$/.test(f))), 'utf8');
-const MC = require('./lib/mock-chain.cjs');
 const FIX = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'hall-v2-demo.json'), 'utf8'));
 const REG = FIX.registry, POSTERS = 'ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.xtrata-posters-v1';
 const BAY_SLOTS = { L: [12, 13], R: [25, 26], NL: [0, 1], NR: [14, 15] };
@@ -47,13 +46,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
       if (opts.node !== 'up') return route.abort('failed');
       let hex;
       if (m[2] === 'xtrata-posters-v1') hex = fn === 'get-version' ? uint(1) : '0x0b00000000';
-      else {
-        const calls = FIX.scenarios[opts.scenario].calls, i = calls[key];
-        hex = i === undefined ? null : FIX.blobs[i];
-        // the recording predates get-object-ids: derive the page from the recorded get-objects page (same slots, ids only)
-        const j = calls['get-objects|' + key.slice(fn.length + 1)];
-        if (hex === null && fn === 'get-object-ids' && j !== undefined) hex = MC.idsFromObjectsPage(FIX.blobs[j]);
-      }
+      else { const i = FIX.scenarios[opts.scenario].calls[key]; hex = i === undefined ? null : FIX.blobs[i]; }
       const out = hex ? { okay: true, result: hex } : { okay: false, cause: 'unrecorded ' + key };
       return route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify(out) });
     });

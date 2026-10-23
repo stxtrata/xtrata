@@ -8,8 +8,8 @@
 //   chain.gateway(id)                        -> Buffer | null
 //   chain.log                                -> [{ contract, fn, args }]
 //
-// get-object-ids and get-objects-8 are the light reads being added to xtrata-world-v2 (see HALL-V2-SCHEMA / docs/room-bridge.md);
-// they are modelled here with the contract's exact signatures so the hall can be tested before the contract lands.
+// get-object-ids and get-objects-8 are the registry's light reads (16 ids, or 8 rows, a page), modelled with the contract's exact
+// signatures; get-objects is answered too, though the hall never calls it.
 'use strict';
 const crypto = require('crypto');
 
@@ -60,11 +60,7 @@ function decode(h) {
   };
   return rd();
 }
-// The recorded fixture (hall-v2-demo.json) predates get-object-ids: a get-object-ids page derived from the recorded get-objects page
-// with the same arguments (same slots, ids only). Used until the fixture is re-recorded against the contract that has the light reads.
-function idsFromObjectsPage(objectsHex) {
-  return '0x' + cv.list(decode(objectsHex).map((r) => (r ? cv.some(cv.uint(r.v.id)) : cv.none())));
-}
+
 
 /* ------------------------------------------------------------ the Xtrata core's chained hash */
 const CHUNK = 16384;
@@ -185,4 +181,4 @@ function routeFor(chain, opts = {}) {
 // The demo world the room tests use: arcade/hall (one door to the lobby), arcade/lobby (doors to rooms), rooms as pages.
 const KINDS = { 0: { builtin: 'bay', category: 7 }, 1: { builtin: 'sign-board', category: 6 }, 2: { builtin: 'door-arch', category: 7 }, 3: { builtin: 'door-gothic', category: 7 } };
 
-module.exports = { createChain, routeFor, cv, decode, c32decode, chainHash, idsFromObjectsPage, KINDS, CHUNK };
+module.exports = { createChain, routeFor, cv, decode, c32decode, chainHash, KINDS, CHUNK };
