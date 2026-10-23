@@ -114,18 +114,22 @@ contracts.testnet['xtrata-arcade-scores-v2'] = scores;
 
 // The testnet core: the [MAINNET] SIP-009 trait lines become comments and the [TESTNET] ones are switched on.
 const TRAIT_MAIN = "'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait";
-const TRAIT_TEST = "'ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.nft-trait.nft-trait";
+// The docs' testnet trait address (ST1NXBK3K5YY…) no longer exists on testnet (the 2026-10-23 rehearsal's first deploy was rejected
+// with "use of unresolved contract"). The canary deploys the standard SIP-009 trait itself, as <testnet root>.nft-trait, and the
+// testnet core variants point at that.
+const TRAIT_TEST_DOC = "'ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.nft-trait.nft-trait";
+const TRAIT_TEST = `'${NETWORKS.testnet.root}.nft-trait.nft-trait`;
 const testnetTrait = (src, name) => {
   let on = 0, off = 0;
   const out = src.split('\n').map((line) => {
     if (/^\((impl|use)-trait /.test(line) && line.includes(TRAIT_MAIN)) { off++; return `;; ${line}`; }
-    if (/^;; \((impl|use)-trait /.test(line) && line.includes(TRAIT_TEST)) { on++; return line.slice(3); }
+    if (/^;; \((impl|use)-trait /.test(line) && line.includes(TRAIT_TEST_DOC)) { on++; return line.slice(3).replace(TRAIT_TEST_DOC, TRAIT_TEST); }
     return line;
   }).join('\n');
   if (on !== 2 || off !== 2) fail(`${name}: expected one impl-trait and one use-trait line for each network (switched ${on} on, ${off} off)`);
   return out;
 };
-const coreTestnet = {};
+const coreTestnet = { 'nft-trait': readFileSync(resolve(root, 'contracts/clarinet/contracts/sip009-nft-trait.clar'), 'utf8') };
 for (const [name, file] of Object.entries(CORE_FILES)) {
   const live = readFileSync(resolve(root, 'contracts/live', file), 'utf8');
   pin(name, sha(live));

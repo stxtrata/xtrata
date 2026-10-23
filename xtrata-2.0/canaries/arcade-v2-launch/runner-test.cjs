@@ -84,7 +84,7 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   // a pack within the one-transaction limit (32 chunks) is one transaction; beyond it: begin + chunk batches of 30 + seal
   const packTxs = (name) => { const n = Math.ceil(fs.readFileSync(path.join(ROOTDIR, 'recursive-apps/xtrata-arcade/dist/packs/xtrata-arcade-' + name + '.txt')).length / 16384); return n <= 32 ? 1 : 2 + Math.ceil(n / 30); };
   const packsAndParent = packTxs('engine') + packTxs('hall') + 1;
-  check(byRoot === 3 + 11 + 4 + 3 + 8 + packsAndParent, `the root key signed ${byRoot} transactions (core 3, fixtures 11, deploys 4, kinds 3, hall 8, packs and parent ${packsAndParent} = ${3 + 11 + 4 + 3 + 8 + packsAndParent})`);
+  check(byRoot === 4 + 11 + 4 + 3 + 8 + packsAndParent, `the root key signed ${byRoot} transactions (trait + core trio 4, fixtures 11, deploys 4, kinds 3, hall 8, packs and parent ${packsAndParent} = ${4 + 11 + 4 + 3 + 8 + packsAndParent})`);
   const kinds = C.S.calls.filter((c) => c.fn === 'xtrata-world-v2.register-kind');
   const hot = (kinds[0] && kinds[0].sender) || addr;
   check(kinds.length === 24 && hot !== addr && kinds.every((c) => c.sender === hot), `the 24 kinds were signed by the temporary KINDS admin ${hot}`);
@@ -92,7 +92,7 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   check(C.pp(C.readOnly(W2, 'get-admin', [C.Cl.principal(hot)])) === 'u0', 'the temporary wallet is no longer a registry admin');
   check(C.pp(C.readOnly(W2, 'get-root', [])) === `{ owner: '${addr}, paused: false, pending: none, treasury: '${addr} }`, 'registry root owner and treasury are the root key');
   check(/PASS registry: hall space #3 live/.test(r.out) && /all four bays resolve to posters/.test(r.out), 'the hall\'s own reader (hallread.mjs) read the hall back: four bays on posters');
-  check(C.S.deploys.filter((d) => d.raw).map((d) => `${d.name}@${d.version}`).join() === 'xtrata-v1-1-1@3,xtrata-v2-1-0@3,xtrata-v3-2-3@3,xtrata-world-v2@4,xtrata-posters-v1@4,xtrata-screen-v1@4,xtrata-arcade-scores-v2@4', 'the runner deployed the core trio at Clarity 3, then the four contracts at Clarity 4');
+  check(C.S.deploys.filter((d) => d.raw).map((d) => `${d.name}@${d.version}`).join() === 'nft-trait@3,xtrata-v1-1-1@3,xtrata-v2-1-0@3,xtrata-v3-2-3@3,xtrata-world-v2@4,xtrata-posters-v1@4,xtrata-screen-v1@4,xtrata-arcade-scores-v2@4', 'the runner deployed the SIP-009 trait and the core trio at Clarity 3, then the four contracts at Clarity 4');
   check(C.S.violations.length === 0, `every STX movement was covered by a deny-mode post-condition${C.S.violations.length ? ': ' + C.S.violations.join('; ') : ''}`);
 
   const before = sent();

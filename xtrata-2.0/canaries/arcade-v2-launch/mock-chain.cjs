@@ -99,8 +99,9 @@ function createMockChain(opts = {}) {
     simnet = await initSimnet(path.join(__dirname, 'simnet/Clarinet.toml'));
     const dep = simnet.getAccounts().get('deployer');
     muted(() => { simnet.transferSTX(10_000_000_000_000n, ROOT, dep); simnet.transferSTX(1_000_000n, TRAIT, dep); simnet.transferSTX(1_000_000_000n, WRONG, dep); });
+    // Testnet: the canary deploys the SIP-009 trait itself (as <root>.nft-trait, its first core step), so nothing is pre-deployed.
+    if (TESTNET) return `simnet ready in ${((Date.now() - t0) / 1000).toFixed(1)}s: testnet, empty chain (the canary deploys the trait and the core); root ${ROOT} funded`;
     deploy('nft-trait', fs.readFileSync(path.join(ROOTDIR, 'contracts/clarinet/contracts/sip009-nft-trait.clar'), 'utf8'), 2, TRAIT);
-    if (TESTNET) return `simnet ready in ${((Date.now() - t0) / 1000).toFixed(1)}s: testnet, only the SIP-009 trait at ${TRAIT}; root ${ROOT} funded`;
     deploy('xtrata-v1-1-1', LIVE('xtrata-v1.1.1.clar'), 3, ROOT);
     deploy('xtrata-v2-1-0', LIVE('xtrata-v2.1.0.clar'), 3, ROOT);
     deploy('xtrata-v3-2-3', LIVE('xtrata-v3.2.3.clar'), 3, ROOT);

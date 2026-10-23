@@ -35,7 +35,7 @@ export const RELEASE_SHA = LAUNCH.releaseSha;
 export const VERSION = RELEASE.version;
 export const NAMES = { posters: 'xtrata-posters-v1', world: 'xtrata-world-v2', screen: 'xtrata-screen-v1', scores: 'xtrata-arcade-scores-v2' } as const;
 const NEW_CONTRACTS = [NAMES.world, NAMES.posters, NAMES.screen];
-const CORE_TRIO = ['xtrata-v1-1-1', 'xtrata-v2-1-0', 'xtrata-v3-2-3'];
+const CORE_TRIO = ['nft-trait', 'xtrata-v1-1-1', 'xtrata-v2-1-0', 'xtrata-v3-2-3'];
 /** Xtrata's standard token URI (same value the app and SDK use). */
 const TOKEN_URI = 'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
 const CHUNK = 16384;
@@ -939,8 +939,8 @@ export const STEPS: Step[] = [
     }
   },
   {
-    id: 'core', title: 'Testnet only: deploy the Xtrata core if missing', who: 'Web wallet · 3 signatures on a fresh testnet', testnetOnly: true,
-    intro: `Deploys xtrata-v1-1-1, xtrata-v2-1-0 and xtrata-v3-2-3 (contracts/live, with the testnet SIP-009 trait) at Clarity 3 from the root wallet, in that order (the core reads the two older contracts), so a full rehearsal with inscriptions is possible on testnet. Each is skipped when it is already there with the pinned source. Never on mainnet.`,
+    id: 'core', title: 'Testnet only: deploy the Xtrata core if missing', who: 'Web wallet · 4 signatures on a fresh testnet', testnetOnly: true,
+    intro: `Deploys the standard SIP-009 trait (nft-trait; the old testnet trait address is gone), then xtrata-v1-1-1, xtrata-v2-1-0 and xtrata-v3-2-3 (contracts/live, pointed at that trait) at Clarity 3 from the root wallet, in that order (the core reads the two older contracts), so a full rehearsal with inscriptions is possible on testnet. Each is skipped when it is already there with the pinned source. Never on mainnet.`,
     action: 'Deploy the testnet core',
     run: async () => {
       if (network !== 'testnet') throw new Error('The core is never deployed on mainnet.');
