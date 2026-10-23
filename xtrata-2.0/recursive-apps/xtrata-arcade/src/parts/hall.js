@@ -2777,7 +2777,45 @@ function roomAsk(f,d){
     });
   });
 }
-function roomCall(f,id,d,t){ roomReply(f,id,{ok:false, error:'not-available'}) }   // call(): not in this hall yet
+// call({contract, fn, args, postConditions, maxStx}): only from a HOSTED room (runtime 3), only to a contract the registry approves at the
+// moment of the call (is-approved), only after the player says yes in the hall's own dialog, and signed through the hall's wallet path
+// (XAScores.callContract: deny mode, one STX post-condition capped at maxStx, no `sender`, an account mismatch aborts).
+// maxStx is STX as a decimal (up to 6 places). postConditions may only repeat that cap ({type:'stx', amount: micro-STX <= maxStx}).
+function cleanCall(d){
+  const contract=String(d.contract||''), fn=String(d.fn||'');
+  if(!/^S[0-9A-Z]{25,41}\.[a-zA-Z][a-zA-Z0-9-]{0,39}$/.test(contract)) return {why:'contract'};
+  if(!/^[a-zA-Z][a-zA-Z0-9!?_-]{0,127}$/.test(fn)) return {why:'fn'};
+  const args=d.args==null?[]:d.args;
+  if(!Array.isArray(args) || args.length>32 || !args.every(a=>typeof a==='string' && /^(0x)?([0-9a-fA-F]{2})+$/.test(a) && a.length<=131074)) return {why:'args'};
+  const m=/^([0-9]{1,9})(?:\.([0-9]{1,6}))?$/.exec(typeof d.maxStx==='number' && isFinite(d.maxStx) && d.maxStx>=0 ? d.maxStx.toFixed(6).replace(/\.?0+$/,'') : String(d.maxStx==null?'':d.maxStx));
+  if(!m) return {why:'maxStx'};
+  const maxUstx=BigInt(m[1])*1000000n+BigInt((m[2]||'').padEnd(6,'0')||'0');
+  const pcs=d.postConditions==null?[]:d.postConditions;
+  if(!Array.isArray(pcs) || pcs.length>4 || !pcs.every(p=>p && typeof p==='object' && p.type==='stx' && /^[0-9]{1,16}$/.test(String(p.amount)) && BigInt(String(p.amount))<=maxUstx)) return {why:'postConditions'};
+  return {ok:true, contract, fn, args, maxUstx:maxUstx.toString()};
+}
+async function roomCall(f,id,d,t){
+  if(!t || t.kind!=='page' || t.runtime!==3) return roomReply(f,id,{ok:false, error:'not-hosted'});
+  const c=cleanCall(d); if(!c.ok) return roomReply(f,id,{ok:false, error:'bad-request:'+c.why});
+  if(callBusy) return roomReply(f,id,{ok:false, error:'busy'});
+  const R=window.XAWorld && XAWorld.registry && XAWorld.registry(), S=window.XAScores;
+  if(!R || !S || !S.callContract || !window.XARoom || !XARoom.confirmCall) return roomReply(f,id,{ok:false, error:'not-available'});
+  callBusy=true;
+  try{
+    const ap=await R.approved(c.contract);
+    if(!ap.ok) return roomReply(f,id,{ok:false, error:'could-not-check'});
+    if(!ap.value) return roomReply(f,id,{ok:false, error:'not-approved'});
+    if(state!=='room' || roomCur!==t) return;
+    const who=(S.status()||{}).address||'';
+    if(document.pointerLockElement) document.exitPointerLock();
+    const yes=await XARoom.confirmCall({room:t.title, contract:c.contract, fn:c.fn, maxUstx:c.maxUstx, address:who});
+    if(!yes) return roomReply(f,id,{ok:false, error:'cancelled'});
+    if(state!=='room' || roomCur!==t) return;
+    const r=await S.callContract({contract:c.contract, fn:c.fn, args:c.args, maxUstx:c.maxUstx, expectAddress:who});
+    roomReply(f,id,{ok:true, txid:r.txid});
+  }catch(e){ roomReply(f,id,{ok:false, error:String((e&&e.code===4001)?'cancelled':(e&&e.message)||e).slice(0,200)}) }
+  finally{ callBusy=false }
+}
 // A door that leads somewhere: you walk into an open doorway to go through it (there is no button). The lobby is already there, behind its wall,
 // so walking in needs nothing; any other door is read from the chain (or a preview room in XA_ROOMS) and either opens its room or says why not.
 function toast(text,ms){ bayToast={text, until:performance.now()+(ms||3500)}; updateBayFocus() }
