@@ -349,6 +349,24 @@
   }
   function stop() { if (state.timer) clearInterval(state.timer); state.timer = null; }
 
+  /*
+   * Live reads for doors (the registry only; null when it is not configured). Each returns { ok, value } and never throws, so the
+   * hall can tell "could not check" from "not open":
+   *   destination(spaceId)       the space a portal leads to: { id, slug, title, state, runtime, entry, open, lobby } | null
+   *   door(spaceId, name)        a named door in a room's own space: { id, name, portal: { to, arrival, path } } | null
+   *   approved('S….contract')    is the contract on the registry's approved list (read at call time)
+   */
+  function registry() {
+    if (mode() !== 2 || !codec()) return null;
+    var h = host(), W2 = root.XAWorld2, meta = (state.snap && state.snap.v2) || {};
+    return {
+      hall: meta.hall || 0, lobby: meta.lobby || 0,
+      destination: function (id) { return W2.destination(h, id, meta.lobby || 0); },
+      door: function (spaceId, name) { return W2.door(h, spaceId, name); },
+      approved: function (contract) { return W2.approved(h, contract); }
+    };
+  }
+
   // Bytes of a poster's picture, hash-checked (gateway first, chain as fallback).
   function loadImageBytes(entry) {
     if (!entry || !entry.imageHash || !root.XAScores) return Promise.reject(new Error('no image'));
@@ -361,7 +379,7 @@
     onChange: function (fn) { state.listeners.push(fn); },
     composeWall: composeWall, pinSlotMap: pinSlotMap, isActive: isActive, loadImageBytes: loadImageBytes,
     // read helpers for sibling modules (the centre screen reads its own contract through these)
-    read: callRead, plain: plain, hexList: hexList,
+    read: callRead, plain: plain, hexList: hexList, apiBases: apiBases, registry: registry,
     // exposed for tests
     _t: { plain: plain, toPoster: toPoster, toBay: toBay, readLooks: readLooks, hexList: hexList, normalizePoster: normalizePoster, rng: rng, hash32: hash32,
       loadSnapshot: loadSnapshot, callRead: callRead, restore: restore, save: save, state: state }
