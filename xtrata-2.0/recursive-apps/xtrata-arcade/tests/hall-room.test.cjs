@@ -269,7 +269,8 @@ const snapshot = () => ({ versions: { posters: 1, world: 1 }, at: 0, posters: []
     check((await f1.evaluate(() => window.__go('to-vault'))) === 'err:closed' && (await rs(page)).room === 'casino', 'I: go() to a suspended room says closed, and you stay');
     for (let lap = 1; lap <= 2; lap++) {
       const f = await roomFrame(page);
-      check((await f.evaluate(() => window.__go('to-gallery'))) === 'ok', 'I' + lap + ': go("to-gallery") is accepted');
+      // (an accepted go() replaces this page, so its promise may never be seen from here: start it, then watch the hall)
+      await f.evaluate(() => { window.__go('to-gallery'); return 1; });
       await roomUp(page, /GALLERY/);
       r = await rs(page);
       const ig = await info(page);

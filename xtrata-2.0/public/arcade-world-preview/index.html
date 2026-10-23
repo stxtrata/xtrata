@@ -2361,6 +2361,53 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     return { ok: true, txid: txidOf(r), route: 'direct:' + d.kind, replayId: replayId, sealed: seal };
   }
 
+  /*
+   * callContract({ contract, fn, args, maxUstx, expectAddress? }) -> { ok:true, txid, route }
+   * A contract call asked for by a hosted room (the hall's room bridge has already checked that the room is hosted, that the contract is
+   * approved on the world registry, and that the player said yes). Signed through the same routes as a score post, with the same rules
+   * (docs/WALLET-PLAYBOOK.md): never send `sender`; post-condition mode deny with exactly one STX post-condition, "the connected account
+   * sends at most maxUstx", so the call can move nothing else; bare hex to wallets; an account other than the one the player confirmed
+   * aborts the call (never re-targeted). Throws on cancel and on wallet errors.
+   */
+  var CLARITY_NAME = /^[a-zA-Z][a-zA-Z0-9!?_-]{0,127}$/;
+  async function callContract(input) {
+    input = input || {};
+    var contract = String(input.contract || ''), fn = String(input.fn || '');
+    if (!/^S[0-9A-Z]{25,41}\.[a-zA-Z][a-zA-Z0-9-]{0,39}$/.test(contract)) throw err('Invalid contract.');
+    if (!CLARITY_NAME.test(fn)) throw err('Invalid function name.');
+    var args = Array.isArray(input.args) ? input.args.map(function (a) { return String(a).replace(/^0x/i, ''); }) : null;
+    if (!args || args.length > 32 || !args.every(function (a) { return /^([0-9a-fA-F]{2})+$/.test(a) && a.length <= 131072; })) throw err('Invalid arguments.');
+    var cap;
+    try { cap = BigInt(String(input.maxUstx)); } catch (e) { throw err('Invalid spending limit.'); }
+    if (cap < 0n) throw err('Invalid spending limit.');
+    var s = status();
+    if (s.route === 'none') throw err('No wallet is reachable from here. Open the arcade on xtrata.xyz.', 4900);
+    if (!state.address) await connect();
+    var address = state.address;
+    if (input.expectAddress && input.expectAddress !== address) {
+      throw err('Your wallet is now connected as ' + address + ', not the account you confirmed. Nothing was signed.', 'WALLET_ADDRESS_MISMATCH');
+    }
+    if ((CFG.network === 'mainnet') !== /^S[PM]/.test(address)) throw err('Switch your wallet to Stacks ' + CFG.network + ' and connect again.');
+    var parts = contract.split('.'), r;
+    if (s.route === 'host') {
+      r = await bridgeRequest('stx_callContract', {
+        contract: contract, contractAddress: parts[0], contractName: parts[1], functionName: fn,
+        functionArgs: args.map(function (a) { return '0x' + a; }), network: CFG.network, postConditionMode: 'deny',
+        postConditions: [{ type: 'stx', principal: address, amount: cap.toString(), conditionCode: 'lte' }]
+      });
+      return { ok: true, txid: txidOf(r), route: 'host:contract-call' };
+    }
+    // Direct provider (top-level page). Never send `sender` (wallet playbook §2).
+    var d = directProvider();
+    var params = { contract: contract, functionName: fn, functionArgs: args, arguments: args, postConditionMode: 'deny',
+      postConditions: [stxPostConditionHex(address, cap.toString())] };
+    if (d.kind === 'leather') params.network = CFG.network;
+    r = unwrap(await d.p.request('stx_callContract', params));
+    var txid = txidOf(r);
+    if (!txid) throw err('The wallet did not return a transaction id.');
+    return { ok: true, txid: txid, route: 'direct:' + d.kind };
+  }
+
   /* ------------------------------------------------------ local PBs */
   function localBest(gameId) {
     var v = root.XA && root.XA.util.store('pb:' + gameId);
@@ -2411,6 +2458,7 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     connect: connect,
     disconnect: disconnect,
     submit: submit,
+    callContract: callContract,
     runtimeUrl: runtimeUrl,
     openRuntime: openRuntime,
     cleanName: cleanName,
@@ -4102,7 +4150,40 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     raf = root.requestAnimationFrame(frame);
   }
 
+  /*
+   * A hosted room (the hall's room bridge, XA_ROOM.call) asks the player to sign a contract call. The same dialog as the fee notice:
+   * which room asks, the contract and function, the most it can spend (the call's only post-condition) and the network-fee warning.
+   * Resolves true to open the wallet, false if the player backs out. Everything shown is text (the room title is already plain ASCII).
+   */
+  function ustxToStx(u) { var s = String(u).replace(/^0+(?=\d)/, ''); while (s.length < 7) s = '0' + s; var w = s.slice(0, -6), f = s.slice(-6).replace(/0+$/, ''); return w + (f ? '.' + f : ''); }
+  function confirmCall(o) {
+    o = o || {};
+    return new Promise(function (resolve) {
+      var ok = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: 'Open my wallet' });
+      var no = h('button', { class: 'xa-btn', type: 'button', text: 'Not now' });
+      var wrap = h('div', { class: 'xa-feemodal xa-callmodal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'A room asks you to sign' }, [
+        h('div', { class: 'xa-feemodal-card' }, [
+          h('h3', { text: String(o.room || 'This room') + ' asks you to sign' }),
+          h('p', { class: 'xa-feebig' }, ['It can spend at most ', h('b', { text: ustxToStx(o.maxUstx || 0) + ' STX' }), ' from your wallet. If the call would move anything more, it fails and nothing is spent.']),
+          h('p', { class: 'xa-note', text: 'Contract: ' + String(o.contract || '') }),
+          h('p', { class: 'xa-note', text: 'Function: ' + String(o.fn || '') }),
+          h('p', { class: 'xa-note', text: o.address ? 'Signing as ' + S.shortAddress(o.address) + '.' : 'Your wallet will ask you to connect first.' }),
+          feeBanner(false, 0),
+          h('div', { class: 'xa-over-actions' }, [no, ok])
+        ])
+      ]);
+      function done(v) { wrap.remove(); root.removeEventListener('keydown', onKey, true); resolve(v); }
+      function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } }
+      ok.addEventListener('click', function () { done(true); });
+      no.addEventListener('click', function () { done(false); });
+      root.addEventListener('keydown', onKey, true);
+      root.document.body.appendChild(wrap);
+      ok.focus();
+    });
+  }
+
   root.XARoom = {
+    confirmCall: confirmCall,
     boot: boot,
     start: startGame,
     back: endSession,
@@ -31598,6 +31679,24 @@ XARoom.boot(document.getElementById('xa-root'));
   }
   function stop() { if (state.timer) clearInterval(state.timer); state.timer = null; }
 
+  /*
+   * Live reads for doors (the registry only; null when it is not configured). Each returns { ok, value } and never throws, so the
+   * hall can tell "could not check" from "not open":
+   *   destination(spaceId)       the space a portal leads to: { id, slug, title, state, runtime, entry, open, lobby } | null
+   *   door(spaceId, name)        a named door in a room's own space: { id, name, portal: { to, arrival, path } } | null
+   *   approved('S….contract')    is the contract on the registry's approved list (read at call time)
+   */
+  function registry() {
+    if (mode() !== 2 || !codec()) return null;
+    var h = host(), W2 = root.XAWorld2, meta = (state.snap && state.snap.v2) || {};
+    return {
+      hall: meta.hall || 0, lobby: meta.lobby || 0,
+      destination: function (id) { return W2.destination(h, id, meta.lobby || 0); },
+      door: function (spaceId, name) { return W2.door(h, spaceId, name); },
+      approved: function (contract) { return W2.approved(h, contract); }
+    };
+  }
+
   // Bytes of a poster's picture, hash-checked (gateway first, chain as fallback).
   function loadImageBytes(entry) {
     if (!entry || !entry.imageHash || !root.XAScores) return Promise.reject(new Error('no image'));
@@ -31610,7 +31709,7 @@ XARoom.boot(document.getElementById('xa-root'));
     onChange: function (fn) { state.listeners.push(fn); },
     composeWall: composeWall, pinSlotMap: pinSlotMap, isActive: isActive, loadImageBytes: loadImageBytes,
     // read helpers for sibling modules (the centre screen reads its own contract through these)
-    read: callRead, plain: plain, hexList: hexList,
+    read: callRead, plain: plain, hexList: hexList, apiBases: apiBases, registry: registry,
     // exposed for tests
     _t: { plain: plain, toPoster: toPoster, toBay: toBay, readLooks: readLooks, hexList: hexList, normalizePoster: normalizePoster, rng: rng, hash32: hash32,
       loadSnapshot: loadSnapshot, callRead: callRead, restore: restore, save: save, state: state }
@@ -31625,24 +31724,35 @@ XARoom.boot(document.getElementById('xa-root'));
  * all replaced together. The registry (xtrata-world-v2, "XWS v1") stores every sign, door, lamp, curtain and sound as its OWN object
  * with its own timeline of states, so one sign can change while everything else stays put, and new objects can be added at any time.
  *
- * This module reads the hall's two spaces ("arcade/hall": the four wall bays, "arcade/lobby": the two doorways) and turns the
+ * This module reads the hall's two spaces ("arcade/hall": the four wall bays, "arcade/lobby": its doorways, one to six) and turns the
  * objects into exactly the bay snapshot world.js (v1) produced, so the bay engine (bays.js) and the hall need no changes:
  *
  *   bays[i]  = { scene: { base, baseId, interaction, doorLook, layers[], link, fromHeight } | null, nextHeight, height } | null
  *   looks    = { <kind id>: { kind: <engine slot>, name, tier, builtin, hidden, approved } }
  *
- * The exact object / state / params schema is in contracts/arcade-world/docs/HALL-V2-SCHEMA.md. In short:
- *   bay-0..bay-3   objects of the built-in kind "bay" in the hall space (bay-0, bay-1 in the lobby space): their active state carries
+ * The exact object / state / params schema is in contracts/arcade-world/docs/HALL-V2-SCHEMA.md (and, for portals, rooms and the
+ * room bridge, recursive-apps/xtrata-arcade/docs/room-bridge.md). In short:
+ *   bay-0..bay-3   objects of the built-in kind "bay" in the hall space (bay-0..bay-5 in the lobby space): their active state carries
  *                  the base ({"base":"posters"|"wall"|"door"}), the visibility and the interaction; a portal gives scene.link.
  *   children       objects whose parent is the bay: door-<style>, door-skin, curtain-house, sign-board, caution-tape, lamps, sounds.
  *                  Each one's params are the object's own params merged with its active state's patch; hidden ones are left out.
+ *   link           { 'target-room': <destination slug>, 'arrival-bay': 0, path: '', to: <space id>, arrival: <object id or 0>,
+ *                    title: <destination title, printable ASCII>, lobby: <true only for the hall's own live, native lobby>,
+ *                    still: { id, hash } | null, depth: { id, hash } | null }   (the door's entry picture, from its params)
+ *
+ * Doors are resolved again when they are used: destination(host, spaceId) reads the space (slug, title, state, runtime, entry) and
+ * door(host, spaceId, name) finds a named door in a room's own space. Both return { ok, value } and never throw: a read that FAILED
+ * ({ ok: false }) is never reported as "nothing there" (value null).
  *
  * Safety rules (same as world.js):
- *   - Off unless XA_WORLD_CONFIG.registry is set (world.js decides). Any failed read throws, and world.js keeps the last good
- *     snapshot; with nothing cached the hall shows the posters, exactly as #3111.
+ *   - Off unless XA_WORLD_CONFIG.registry is set (world.js decides). Any failed read in load() throws, and world.js keeps the last
+ *     good snapshot; with nothing cached the hall shows the posters, exactly as #3111.
  *   - Nothing read is ever executed. Chain data is text and numbers, looked up in the bay engine's fixed tables. Malformed, oversized
  *     or unknown objects are ignored; JSON is parsed in try/catch; only the built-in (tier 0) kinds are drawn.
- *   - Bounded: at most 32 children per bay and 128 objects per space are read; 8 pages of get-objects at most.
+ *   - Bounded: at most 32 children per bay and 128 objects per space are read; 8 pages of get-object-ids at most (16 ids a page),
+ *     then get-object-view per id. No single call the hall makes costs more than about 24 storage reads on the node.
+ *   - Only a LIVE space (state 1) is open. Draft (0), suspended (2) and retired (3) spaces are closed: their bays show posters and a
+ *     door to them says CLOSED.
  *
  * The host (world.js, or a test) passes everything this module needs, so it has no dependencies of its own:
  *   host = { read(contractId, fn, argHexList) -> decoded Clarity value, plain(cv), hexList(hexItems), codec: { cvUint, cvAscii },
@@ -31652,7 +31762,9 @@ XARoom.boot(document.getElementById('xa-root'));
   'use strict';
   if (root.XAWorld2) return;
 
-  var LIMITS = { hallBays: 4, lobbyBays: 2, children: 32, objects: 128, pages: 8, kindsPerCall: 20, params: 512, patch: 256, keys: 16, text: 160, concurrency: 4 };
+  var LIMITS = { hallBays: 4, lobbyBays: 6, children: 32, objects: 128, pages: 8, doorPages: 16, kindsPerCall: 20, params: 512, patch: 256, keys: 16, text: 160, title: 48, concurrency: 4 };
+  // space codes (xtrata-world-v2 header): state 0 draft, 1 live, 2 suspended, 3 retired; runtime 0 native, 1 composed, 2 page, 3 hosted
+  var STATE = { draft: 0, live: 1, suspended: 2, retired: 3 }, RUNTIME = { native: 0, composed: 1, page: 2, hosted: 3 };
 
   // The bay engine's slot for each built-in key (bays.js BUILTIN[key].kind; a test keeps the two tables equal).
   // 0 door, 1 cover, 2 overlay, 3 sound, 4 light. Door looks are "door-<style>" (any style; the engine falls back to the classic door).
@@ -31705,12 +31817,31 @@ XARoom.boot(document.getElementById('xa-root'));
   /* ------------------------------------------------------------ assembling (pure) */
   function minOf(a, b) { return a == null ? b : (b == null ? a : Math.min(a, b)); }
 
-  function linkOf(portal, slugOf) {
+  // Printable ASCII only (it is shown in the hall's prompts and loading screen as text, never as HTML), at most 48 characters.
+  function asciiTitle(s, fallback) {
+    var t = typeof s === 'string' ? s.replace(/[^\x20-\x7e]/g, '').replace(/\s+/g, ' ').trim().slice(0, LIMITS.title) : '';
+    return t || fallback || '';
+  }
+  // A door's picture of where it leads: an inscription id and its Xtrata chain hash (64 hex), from params "still"/"stillHash"
+  // (colour) and "depth"/"depthHash" (depth map). Anything else is no picture.
+  function idHash(id, h) {
+    id = typeof id === 'string' && /^[0-9]{1,15}$/.test(id) ? Number(id) : id;
+    if (typeof id !== 'number' || !isFinite(id) || id < 0 || Math.floor(id) !== id) return null;
+    if (typeof h !== 'string' || !/^(0x)?[0-9a-fA-F]{64}$/.test(h)) return null;
+    return { id: id, hash: h.replace(/^0x/i, '').toLowerCase() };
+  }
+  // destOf(spaceId) -> { slug, title, lobby } | slug string (older callers) | null when the space is unknown.
+  function linkOf(portal, destOf, view) {
     if (!portal) return null;
     var to = num(portal['to-space'], 0);
     if (to > 0) {
-      var slug = slugOf(to);
-      return slug ? { 'target-room': slug, 'arrival-bay': 0, path: '' } : null;
+      var d = destOf(to);
+      if (typeof d === 'string') d = d ? { slug: d, title: d, lobby: d === 'lobby' } : null;
+      if (!d || !d.slug) return null;
+      var arrival = num(portal.arrival, 0);
+      var still = view ? idHash(view.still, view.stillHash) : null;
+      return { 'target-room': d.slug, 'arrival-bay': 0, path: '', to: to, arrival: arrival >= 0 && Math.floor(arrival) === arrival ? arrival : 0,
+        title: asciiTitle(d.title, d.slug), lobby: !!d.lobby, still: still, depth: still ? idHash(view.depth, view.depthHash) : null };
     }
     var p = String(portal.path || '');
     return /^\/[A-Za-z0-9._~\-][A-Za-z0-9._~\-\/?=&%#]*$/.test(p) && p.length <= 64 ? { 'target-room': '', 'arrival-bay': 0, path: p } : null;
@@ -31744,9 +31875,6 @@ XARoom.boot(document.getElementById('xa-root'));
 
     var bp = mergeParams(bv.object.params, a.patch);
     var base = hasOwn(BASES, bp.base) ? bp.base : 'posters';
-    var link = linkOf(bv.object.portal, slugOf);
-    var interaction = Math.max(0, Math.min(3, num(a.interaction, 0) | 0));
-    if (interaction === 3 && !link) interaction = base === 'door' ? 1 : 0;       // "enter" needs a door that leads somewhere
 
     var doorKid = null, layers = [], looks = {};
     kids.forEach(function (c) {
@@ -31759,6 +31887,11 @@ XARoom.boot(document.getElementById('xa-root'));
       if (slot === 0) { doorKid = { id: c.id, kind: c.kind, p: p }; return; }              // the newest visible door wins
       layers.push({ slot: slot, look: c.kind, params: forEngine(p), state: state, obj: c.id });
     });
+    // the door's entry picture: the bay's own params, else the door object's
+    var view = idHash(bp.still, bp.stillHash) ? bp : (doorKid && idHash(doorKid.p.still, doorKid.p.stillHash) ? doorKid.p : null);
+    var link = linkOf(bv.object.portal, slugOf, view);
+    var interaction = Math.max(0, Math.min(3, num(a.interaction, 0) | 0));
+    if (interaction === 3 && !link) interaction = base === 'door' ? 1 : 0;       // "enter" needs a door that leads somewhere
     var doorLook = null;
     if (base === 'door' && doorKid) {
       doorLook = doorKid.kind;
@@ -31821,7 +31954,8 @@ XARoom.boot(document.getElementById('xa-root'));
   }
   async function getSpace(host, id) { return id ? await rp(host, 'get-space', [U(host, id)]) : null; }
   function spaceSig(sp) { return sp ? [sp.version, sp.state, sp['object-slots'], sp.objects].join('.') : 'x'; }
-  function roomOpen(sp) { return !!sp && (sp.state === 0 || sp.state === 1); }
+  // Only a live space is open. Draft (0) is not open yet, suspended (2) and retired (3) are closed.
+  function roomOpen(sp) { return !!sp && sp.state === STATE.live; }
 
   async function spaces(host) {
     var P = paths(host);
@@ -31829,21 +31963,29 @@ XARoom.boot(document.getElementById('xa-root'));
     var sps = await Promise.all([getSpace(host, ids[0]), getSpace(host, ids[1])]);
     return { hallId: ids[0], lobbyId: ids[1], hall: sps[0], lobby: sps[1], sig: spaceSig(sps[0]) + '/' + spaceSig(sps[1]) + '@' + ids[0] + ',' + ids[1] };
   }
+  /*
+   * A space's objects: get-object-ids pages (16 ids a page, only up to the space's object-slots, at most 8 pages), then
+   * get-object-view for each id (the object and the state showing now). Returns { items: [{ id, o }] by id, views: { id: view } }.
+   */
   async function listObjects(host, id, sp) {
-    if (!id || !roomOpen(sp)) return [];
+    if (!id || !roomOpen(sp)) return { items: [], views: {} };
     var slots = Math.min(num(sp['object-slots'], 0), LIMITS.pages * 16), pages = [];
     for (var p = 0; p * 16 < slots; p++) pages.push(p);
-    var rows = await pmap(pages, LIMITS.concurrency, function (pg) { return rp(host, 'get-objects', [U(host, id), U(host, pg)]); });
-    var seen = {}, out = [];
+    var rows = await pmap(pages, LIMITS.concurrency, function (pg) { return rp(host, 'get-object-ids', [U(host, id), U(host, pg)]); });
+    var seen = {}, ids = [];
     rows.forEach(function (list) {
-      (Array.isArray(list) ? list : []).forEach(function (r) {
-        var o = r && r.object;
-        if (!o || typeof r.id !== 'number' || seen[r.id] || o.space !== id || o.state !== 0) return;
-        seen[r.id] = true; out.push({ id: r.id, o: o });
+      (Array.isArray(list) ? list : []).forEach(function (oid) {
+        if (typeof oid !== 'number' || !(oid > 1) || seen[oid]) return;
+        seen[oid] = true; ids.push(oid);
       });
     });
-    out.sort(function (a, b) { return a.id - b.id; });
-    return out.slice(0, LIMITS.objects);
+    ids.sort(function (a, b) { return a - b; });
+    ids = ids.slice(0, LIMITS.objects);
+    var views = {};
+    await pmap(ids, LIMITS.concurrency, async function (oid) { var v = await rp(host, 'get-object-view', [U(host, oid)]); if (v && v.object) views[oid] = v; });
+    var items = [];
+    ids.forEach(function (oid) { var o = views[oid] && views[oid].object; if (o && o.space === id && o.state === 0) items.push({ id: oid, o: o }); });
+    return { items: items, views: views };
   }
   async function readKinds(host, ids) {
     var out = {};
@@ -31857,6 +31999,79 @@ XARoom.boot(document.getElementById('xa-root'));
   }
   function kindFingerprint(ids, kinds) {
     return ids.map(function (id) { var k = kinds[id]; return id + ':' + (k ? (k.hidden ? 1 : 0) + '' + (k.approved ? 1 : 0) + k.tier : 'x'); }).join(',');
+  }
+
+  /* ------------------------------------------------------------ destinations (read when a door is used) */
+  function entryOf(e) {
+    if (!e || typeof e !== 'object') return null;
+    var id = num(e.id, -1), size = num(e.size, -1), h = e.hash;
+    if (!(id >= 0) || !(size >= 0) || !(h && typeof h.length === 'number' && h.length === 32)) return null;
+    var hex = ''; for (var i = 0; i < 32; i++) hex += (h[i] < 16 ? '0' : '') + (h[i] & 255).toString(16);
+    return { id: id, hash: hex, size: size };
+  }
+  // The space as a door needs it. null when there is no such space (or it has no usable slug).
+  function spaceView(id, sp, lobbyId) {
+    if (!sp || typeof sp !== 'object' || typeof sp.slug !== 'string' || !/^[a-z0-9-]{1,24}$/.test(sp.slug)) return null;
+    var state = num(sp.state, -1), runtime = num(sp.runtime, -1);
+    return { id: id, slug: sp.slug, title: asciiTitle(sp.title, sp.slug), state: state, runtime: runtime, entry: entryOf(sp.entry), parent: num(sp.parent, 0),
+      open: state === STATE.live, lobby: !!lobbyId && id === lobbyId && sp.slug === 'lobby' && runtime === RUNTIME.native && state === STATE.live };
+  }
+  function errText(e) { return (e && e.message) || String(e || 'read failed'); }
+  /*
+   * destination(host, spaceId, lobbyId?) -> { ok: true, value: spaceView | null } | { ok: false, value: null, error }
+   * Never throws. A failed read is { ok: false }: the hall says it could not check, never that the door is not open.
+   */
+  async function destination(host, id, lobbyId) {
+    id = Number(id);
+    if (!(id > 1) || Math.floor(id) !== id) return { ok: true, value: null };
+    try { return { ok: true, value: spaceView(id, await getSpace(host, id), lobbyId) }; }
+    catch (e) { return { ok: false, value: null, error: errText(e) }; }
+  }
+  function validName(n) { return typeof n === 'string' && /^[A-Za-z0-9._-]{1,24}$/.test(n); }
+  /*
+   * door(host, spaceId, name) -> { ok: true, value: { id, name, portal: { to, arrival, path } } | null } | { ok: false, error }
+   * The visible object called `name` in the space (the lowest id if several), with a portal. A room page asks for its doors by name
+   * (XA_ROOM.go): only objects in its own space can be used, read through get-objects-8 (8 rows a page, at most 16 pages).
+   */
+  async function door(host, spaceId, name) {
+    spaceId = Number(spaceId);
+    if (!(spaceId > 1) || !validName(name)) return { ok: true, value: null };
+    try {
+      var sp = await getSpace(host, spaceId);
+      if (!roomOpen(sp)) return { ok: true, value: null };
+      var slots = Math.min(num(sp['object-slots'], 0), LIMITS.doorPages * 8), pages = [];
+      for (var p = 0; p * 8 < slots; p++) pages.push(p);
+      var rows = await pmap(pages, LIMITS.concurrency, function (pg) { return rp(host, 'get-objects-8', [U(host, spaceId), U(host, pg)]); });
+      var best = null;
+      rows.forEach(function (list) {
+        (Array.isArray(list) ? list : []).forEach(function (r) {
+          var o = r && r.object;
+          if (!o || typeof r.id !== 'number' || o.space !== spaceId || o.state !== 0 || o.name !== name || !o.portal) return;
+          if (!best || r.id < best.id) best = { id: r.id, o: o };
+        });
+      });
+      if (!best) return { ok: true, value: null };
+      var v = await rp(host, 'get-object-view', [U(host, best.id)]);
+      if (!v || !v.object || v.object.state !== 0 || (v.active && (v.active.retracted || v.active.visibility === 1))) return { ok: true, value: null };   // hidden now
+      var pt = v.object.portal || best.o.portal, to = num(pt['to-space'], 0), ar = num(pt.arrival, 0);
+      return { ok: true, value: { id: best.id, name: name, portal: { to: to > 0 ? to : 0, arrival: ar >= 0 && Math.floor(ar) === ar ? ar : 0, path: String(pt.path || '') } } };
+    } catch (e) { return { ok: false, value: null, error: errText(e) }; }
+  }
+  // A contract principal 'S….name' as a Clarity value (0x06 version hash160 length name).
+  function cvContract(host, id) {
+    var m = /^(S[0-9A-Z]{25,41})\.([a-zA-Z][a-zA-Z0-9-]{0,39})$/.exec(String(id || ''));
+    if (!m) return null;
+    var d = host.codec.c32decodeAddress(m[1]), hex = '';
+    for (var i = 0; i < d.hash160.length; i++) hex += (d.hash160[i] < 16 ? '0' : '') + d.hash160[i].toString(16);
+    var nm = ''; for (var j = 0; j < m[2].length; j++) nm += m[2].charCodeAt(j).toString(16).padStart(2, '0');
+    return '0x06' + d.version.toString(16).padStart(2, '0') + hex + m[2].length.toString(16).padStart(2, '0') + nm;
+  }
+  // approved(host, 'S….contract') -> { ok, value: bool }. The registry's trusted-contract list (is-approved), read at call time.
+  async function approved(host, contract) {
+    var cv; try { cv = cvContract(host, contract); } catch (e) { cv = null; }
+    if (!cv) return { ok: true, value: false };
+    try { return { ok: true, value: (await rp(host, 'is-approved', [cv])) === true }; }
+    catch (e) { return { ok: false, value: false, error: errText(e) }; }
   }
 
   var S = { registry: '', kindIds: [], probeGlobal: null, probeSig: null };
@@ -31879,15 +32094,20 @@ XARoom.boot(document.getElementById('xa-root'));
     return sig;
   }
 
+  // The lobby's doorways: as many as its highest bay-N object says (0..6), so two objects are the two back-wall doors as before.
+  function trimBays(list) { var n = 0; list.forEach(function (s, i) { if (s) n = i + 1; }); return list.slice(0, n); }
+
   /*
    * Read the hall and the lobby. Throws when a needed read fails (the caller keeps its last good snapshot).
-   * Returns { bays: [4], lobbyBays: [2], looks, sig, meta }.  An absent or unusable room gives all-null bays: posters.
+   * Returns { bays: [4], lobbyBays: [0..6], looks, sig, meta }.  An absent or unusable room gives all-null bays: posters.
    */
   async function load(host) {
     own(host);
     var g = num(await rp(host, 'get-version', []), -1);          // read first: a write during the load shows up at the next probe
     var sp = await spaces(host);
-    var rooms = await Promise.all([listObjects(host, sp.hallId, sp.hall), listObjects(host, sp.lobbyId, sp.lobby)]);
+    var lists = await Promise.all([listObjects(host, sp.hallId, sp.hall), listObjects(host, sp.lobbyId, sp.lobby)]);
+    var rooms = [lists[0].items, lists[1].items], views = {};
+    lists.forEach(function (l) { Object.keys(l.views).forEach(function (k) { views[k] = l.views[k]; }); });
 
     // kinds of every bay candidate and child, read once
     var kindIds = [];
@@ -31895,23 +32115,19 @@ XARoom.boot(document.getElementById('xa-root'));
     kindIds.sort(function (a, b) { return a - b; });
     var kinds = await readKinds(host, kindIds.slice(0, 80));
 
-    var selHall = selectBays(rooms[0], kinds, LIMITS.hallBays), selLobby = selectBays(rooms[1], kinds, LIMITS.lobbyBays);
-    var wanted = [];
-    selHall.concat(selLobby).forEach(function (s) { if (s) { wanted.push(s.id); s.children.forEach(function (c) { wanted.push(c.id); }); } });
-    var views = {};
-    await pmap(wanted, LIMITS.concurrency, async function (id) { var v = await rp(host, 'get-object-view', [U(host, id)]); if (v) views[id] = v; });
+    var selHall = selectBays(rooms[0], kinds, LIMITS.hallBays), selLobby = trimBays(selectBays(rooms[1], kinds, LIMITS.lobbyBays));
 
-    // portal targets: the slug of each destination space (the hall sends 'lobby' to its own lobby, anything else to a room it knows)
-    var slugs = {}, want = [];
-    Object.keys(views).forEach(function (id) {
-      var p = views[id].object && views[id].object.portal, to = p && num(p['to-space'], 0);
+    // portal targets: each destination space once (slug, title; the hall's own live native lobby is built behind its door)
+    var dests = {}, want = [];
+    selHall.concat(selLobby).forEach(function (s) {
+      var v = s && views[s.id], p = v && v.object && v.object.portal, to = p && num(p['to-space'], 0);
       if (to > 0 && want.indexOf(to) < 0) want.push(to);
     });
-    await pmap(want, LIMITS.concurrency, async function (to) { var s = await getSpace(host, to); if (s && typeof s.slug === 'string' && /^[a-z0-9-]{1,24}$/.test(s.slug)) slugs[to] = s.slug; });
-    var slugOf = function (to) { return slugs[to] || ''; };
+    await pmap(want, LIMITS.concurrency, async function (to) { var d = spaceView(to, await getSpace(host, to), sp.lobbyId); if (d) dests[to] = d; });
+    var destOf = function (to) { return dests[to] || null; };
 
-    var bays = selHall.map(function (s) { return s ? assembleBay(s, views, kinds, slugOf) : null; });
-    var lobbyBays = selLobby.map(function (s) { return s ? assembleBay(s, views, kinds, slugOf) : null; });
+    var bays = selHall.map(function (s) { return s ? assembleBay(s, views, kinds, destOf) : null; });
+    var lobbyBays = selLobby.map(function (s) { return s ? assembleBay(s, views, kinds, destOf) : null; });
 
     // the looks table the engine reads: every kind a drawn object uses
     var looks = {};
@@ -31927,10 +32143,11 @@ XARoom.boot(document.getElementById('xa-root'));
   }
 
   root.XAWorld2 = {
-    load: load, probe: probe, forget: forget,
-    LIMITS: LIMITS, SLOT: SLOT,
+    load: load, probe: probe, forget: forget, destination: destination, door: door, approved: approved,
+    LIMITS: LIMITS, SLOT: SLOT, STATE: STATE, RUNTIME: RUNTIME,
     _t: { assembleBay: assembleBay, selectBays: selectBays, mergeParams: mergeParams, clean: clean, parseJson: parseJson, linkOf: linkOf,
-      slotOf: slotOf, kindUsable: kindUsable, spaceSig: spaceSig, kindFingerprint: kindFingerprint, SKIN_LOOK: SKIN_LOOK }
+      slotOf: slotOf, kindUsable: kindUsable, spaceSig: spaceSig, kindFingerprint: kindFingerprint, SKIN_LOOK: SKIN_LOOK, roomOpen: roomOpen,
+      spaceView: spaceView, entryOf: entryOf, idHash: idHash, asciiTitle: asciiTitle, cvContract: cvContract, trimBays: trimBays }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.XAWorld2;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -34621,6 +34838,21 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       audio.setBay(bay.i, bay.pos, plan && plan.sound ? plan.sound : null);
     }
 
+    // Lay bay i out on `def` (a doorway of a room built in its own frame: the lobby has one to six of them). i === the number of bays adds
+    // one. A bay whose place or width changes is emptied; the next apply builds its pieces again at the new size.
+    function layout(i, def) {
+      if (i === bays.length) { bays.push(makeBay(def, i)); return true; }
+      var b = bays[i]; if (!b || !def) return false;
+      var d = b.def;
+      if (d.parent === def.parent && d.x === def.x && d.z === def.z && d.rot === def.rot && d.width === def.width) return false;
+      setPlan(b, null, true); b.key = '';
+      b.def = def;
+      if (def.parent && b.group.parent !== def.parent) def.parent.add(b.group);
+      b.group.position.set(def.x || 0, 0, def.z || 0); b.group.rotation.y = def.rot || 0;
+      b.width = Math.min(2.8, Math.max(1.2, def.width - 0.2));
+      return true;
+    }
+
     function apply(snap, opts) {
       opts = opts || {};
       var changed = false;
@@ -34643,7 +34875,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         var dm = bay.door && bay.door.model;
         if (bay.portal && dm && bay.door.mesh.portal) { var po = dm.angle > 6; if (po !== !!bay.portalOn) { bay.portalOn = po; bay.door.mesh.portal(po, env.wallT); } }   // a door onto a real room: the doorway is open while the door is
         if (dm && bay.door.mesh.window && bay.group.visible) {   // a door to a room that has an entry view (a picture, and a depth map if it has one): the open doorway shows it (doors.js)
-          var dl = bay.plan && bay.plan.link, rs = dl ? String(dl['target-room'] || dl.targetRoom || dl.room || '').toLowerCase() : '', st = rs && rs !== 'lobby' && env.stillFor ? env.stillFor(rs) : null;
+          var dl = bay.plan && bay.plan.link, st = dl && env.stillFor ? env.stillFor(dl) : null;   // the hall says which picture (none for its own lobby)
           var sk = st && st.still ? st.still + '|' + (st.depth || '') : '';
           if (sk !== (bay.door.stillKey || '')) { bay.door.stillKey = sk; bay.door.mesh.window(st && st.still, st && st.depth); }
           if (sk) { bay.door.mesh.group.worldToLocal(winEye.copy(env.camera.position)); bay.door.mesh.windowView(winEye, Math.min(1, Math.abs(dm.angle) / ((dm.cfg && dm.cfg.openAngle) || 90)), time); }
@@ -34712,7 +34944,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     function doorHint(bay, kind) {
       var p = bay.plan, m = bay.door.model;
       if (p.interaction === 1) return 'KNOCK ON THE DOOR';
-      return m.isOpen() ? 'CLOSE THE DOOR' : 'OPEN THE DOOR';
+      // a door that leads somewhere names it: the destination's title from the registry, reduced to the sign alphabet (plain text, never HTML)
+      var t = p.interaction === 3 && p.link && typeof p.link.title === 'string' ? txt(p.link.title, 32).trim() : '';
+      return (m.isOpen() ? 'CLOSE THE DOOR' : 'OPEN THE DOOR') + (t ? ' · ' + t : '');
     }
     // What is the player looking at? Returns { bay, hint, kind } or null. Used for the HUD line.
     function focus(ndc) {
@@ -34778,6 +35012,15 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
         return { x: v.x, z: v.z, half: b.door.mesh && b.door.mesh.size ? b.door.mesh.size.w / 2 : 0.5, link: b.plan.link, interaction: b.plan.interaction };
       },
       posOf: function (i) { var b = bays[i]; return b ? { x: b.pos.x, z: b.pos.z } : null; },
+      // where bay i's wall is and which way it faces (the outward normal, into the room in front of it), in world coordinates
+      frameOf: function (i) {
+        var b = bays[i]; if (!b) return null;
+        b.group.updateWorldMatrix(true, false);
+        var p = new T.Vector3(0, 0, 0).applyMatrix4(b.group.matrixWorld), n = new T.Vector3(0, 0, 1).transformDirection(b.group.matrixWorld);
+        return { x: p.x, z: p.z, nx: n.x, nz: n.z };
+      },
+      layout: layout,
+      count: function () { return bays.length; },
       doorHalfWidth: function (i) { var b = bays[i]; return b && b.door && b.door.mesh && b.door.mesh.size ? b.door.mesh.size.w / 2 : 0.5; },
       doorOpen: function (i) { var b = bays[i], m = b && b.door && b.door.model; if (m && !m.isOpen()) m.open(); },
       _curtain: function (i) { var c = bays[i] && bays[i].curtain; return c ? { sim: c.sim, mg: c.mg, w: bays[i].width } : null; },   // tests only
@@ -35310,9 +35553,10 @@ function buildRoom(){
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
   if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
-  XA.roomState=()=>({state, room:roomId, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), glide:!!(roomUI&&roomUI.glide), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
+  XA.roomState=()=>({state, room:roomId(), title:roomCur?roomCur.title:'', depth:roomStack.length, backLabel:roomUI?roomUI.back.textContent:'', sandbox:roomUI&&roomUI.frame?roomUI.frame.getAttribute('sandbox'):null, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), glide:!!(roomUI&&roomUI.glide), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
   if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
-  XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;   // read-only, for tests: where you are in bay i's open doorway
+  XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;
+  XA.doorFrame=(i)=>bayEngine&&bayEngine.frameOf?bayEngine.frameOf(i):null;   // read-only, for tests: where bay i's wall is and which way it faces   // read-only, for tests: where you are in bay i's open doorway
   XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
   XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw, pitch:player.pitch});   // read-only, for tests
   XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
@@ -35362,8 +35606,29 @@ function buildLobby(){
     const l=new THREE.PointLight(0xcfc4ff,.75,11,2); l.position.set(0,RH-.3,z); g.add(l);
   }
   const sign=(text,w,h,x,y,z,ry)=>face(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:signTexture(text,'72px Bungee',BRAND.orange,1024,Math.round(1024*h/w)), transparent:true, toneMapped:false}), x,y,z, 0,ry);
-  sign('LOBBY',3.6,.5,-LW/2+.03,2.3,LD/2,Math.PI/2);   // on the left wall: the back wall carries the lobby's doors
+  lobbySign=sign('LOBBY',3.6,.5,-LW/2+.03,2.3,LD/2,Math.PI/2);   // on the left wall: the back wall carries the lobby's doors (with doorways on the side walls too, it moves over the way in: lobbyLayout)
   sign('BACK TO THE ARCADE',3,.4,0,2.8,.03,0);
+}
+/* The lobby's doorways, from how many it has (1 to 6, LIMITS.lobbyBays in world2.js): two on the back wall first, exactly where the two
+   always were (so a lobby with two looks as it always did), then the side walls, one on each in turn (left far, right far, left near, right
+   near). One doorway on its own sits in the middle of the back wall. The geometry follows the count; the bay engine moves its bays to it. */
+const LOBBY_MAX=6;
+function lobbyDefs(n){
+  n=Math.max(1,Math.min(LOBBY_MAX,n|0));
+  const back=(x)=>({parent:lobbyG, x, z:LD-.02, rot:Math.PI, width:3.4, side:0});
+  const out=n===1?[back(0)]:[back(-2.2),back(2.2)];
+  for(let k=2;k<n;k++){ const left=k%2===0, z=k<4?LD*.73:LD*.3; out.push({parent:lobbyG, x:left?-LW/2+.02:LW/2-.02, z, rot:left?Math.PI/2:-Math.PI/2, width:2.4, side:0}) }
+  return out;
+}
+let lobbyCount=2, lobbySign=null;
+function lobbyLayout(n){
+  n=n>=1?Math.min(LOBBY_MAX,n):2;               // no doorways at all: the two places stay as they were (empty)
+  if(!bayEngine || !bayEngine.layout) return;
+  if(n!==lobbyCount){
+    lobbyDefs(n).forEach((d,k)=>{ bayEngine.layout(HALL_BAYS+k,d); bayDefsAll[HALL_BAYS+k]=d });
+    lobbyCount=n;
+  }
+  if(lobbySign){ const side=n>=3; lobbySign.position.set(side?-2.75:-LW/2+.03, 2.3, side?.03:LD/2); lobbySign.rotation.set(0, side?0:Math.PI/2, 0); lobbySign.scale.setScalar(side?.6:1) }
 }
 // Put the lobby behind the wall of bay i (or take it away with -1). Only a bay whose door links to it counts.
 function setLobbyBay(i){
@@ -35376,7 +35641,9 @@ function setLobbyBay(i){
   lobbyPass={side:d.side, wallX:d.side*RW/2, z:d.z};
   lobbyG.position.set(lobbyPass.wallX+d.side*WALL_T,0,d.z); lobbyG.rotation.y=d.side<0?-Math.PI/2:Math.PI/2; lobbyG.visible=true;
 }
-const linksToLobby=(sc)=>{ const lk=sc&&sc.link; return !!(sc && sc.base==='door' && Number(sc.interaction)===3 && lk && String(lk['target-room']||lk.targetRoom||lk.room||'').toLowerCase()==='lobby') };
+// A link to the hall's own lobby: from the registry, only the hall's live native lobby space (link.lobby); a scene without a space id (v1, the preview) names it 'lobby'.
+const isLobbyLink=(lk)=>!!lk && (lk.to ? lk.lobby===true : String(lk['target-room']||lk.targetRoom||lk.room||'').toLowerCase()==='lobby');
+const linksToLobby=(sc)=>!!(sc && sc.base==='door' && Number(sc.interaction)===3 && isLobbyLink(sc.link));
 // Where the player may stand while the lobby door is open: the hall, the doorway and the lobby, as rectangles [x0,x1,z0,z1].
 function lobbyRects(r){
   const p=lobbyPass, sd=p.side, hw=Math.max(.3, bayEngine.doorHalfWidth(lobbyBay)-.1), wx=p.wallX;
@@ -36494,7 +36761,10 @@ function applyBays(snap){
   if(bayEngine){ try{
     // the hall's bays, then the lobby's (snap.rooms.lobby.bays), in the engine's order
     const lb=snap && snap.rooms && snap.rooms.lobby && snap.rooms.lobby.bays;
-    const all=lb && snap.bays ? Object.assign({}, snap, {bays:snap.bays.slice(0,HALL_BAYS).concat([lb[0]||null, lb[1]||null])}) : snap;
+    let n=0; if(Array.isArray(lb)) lb.slice(0,LOBBY_MAX).forEach((b,k)=>{ if(b) n=k+1 });   // as many doorways as the lobby's highest bay object
+    lobbyLayout(n);
+    const room=[]; for(let k=0;k<bayEngine.count()-HALL_BAYS;k++) room.push(k<lobbyCount && lb ? lb[k]||null : null);
+    const all=lb && snap.bays ? Object.assign({}, snap, {bays:snap.bays.slice(0,HALL_BAYS).concat(room)}) : snap;
     bayEngine.apply(all,{instant:state==='intro'})
   }catch(e){ console.error(e) } }
   { let lb=-1; if(snap && snap.bays) for(let i=0;i<snap.bays.length && lb<0;i++) if(linksToLobby(snap.bays[i] && snap.bays[i].scene)) lb=i; setLobbyBay(lb) }
@@ -36568,7 +36838,7 @@ function buildPosters(){
   // from the start so they can hang in it; it is moved behind the right wall when a door links to the lobby.
   lobbyG=new THREE.Group(); lobbyG.visible=false; scene.add(lobbyG);
   HALL_BAYS=bayDefs.length;
-  bayDefs.push({parent:lobbyG, x:-2.2, z:LD-.02, rot:Math.PI, width:3.4, side:0}, {parent:lobbyG, x:2.2, z:LD-.02, rot:Math.PI, width:3.4, side:0});
+  bayDefs.push(...lobbyDefs(2));
   spots.forEach(([side,z,bay])=>{
     const g=new THREE.Group(); g.position.set(side*(RW/2-.03),1.95,z); g.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
     g.add(new THREE.Mesh(new THREE.BoxGeometry(.84,1.22,.03),frameMat));
@@ -36579,7 +36849,7 @@ function buildPosters(){
   try{
     if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
     if(window.XABays && window.XAWorld && XAWorld.enabled())
-      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, stillFor:(slug)=>{ const r=roomCfg(slug); return r&&typeof r.still==='string'&&r.still?{still:r.still,depth:typeof r.depth==='string'?r.depth:''}:null }});
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, stillFor:(lk)=>stillFor(lk)});
     if(bayEngine) buildLobby();
   }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
@@ -37591,81 +37861,216 @@ function updateBayFocus(){
   else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ bayEngine.setScope(inLobbyZone() ? (i=>i>=HALL_BAYS) : (i=>i<HALL_BAYS)); const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }
   if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
 }
-/* ---------- other rooms that take the whole screen (the casino) ----------
-   A door in the lobby can lead to a room that is its own page. window.XA_ROOMS = { casino:{ src:'casino-room.html', title:'ROYAL FLUSH CASINO', still:'casino-entry.jpg', depth:'casino-entry-depth.png' } } names
-   them. A room is either `src` (a URL the hall may frame: a file beside the hall) or `load` (a function the host gives, returning the room's page as text,
-   which is framed as srcdoc: this is how the inscribed arcade opens a room that is its own inscription, hash-checked, see parent.template.html). Going in: a short loading screen over the hall,
-   the room's page in a full-screen frame, and a BACK TO THE LOBBY button above it. The hall sleeps and its sound is shut away while you are in there.
-   `still` (optional) is a picture of the room's entry view (build/snap-room.cjs takes it): the door's open doorway shows it, as a window with the right parallax (doors.js windowTo),
-   and it fills the screen, moving in a little, from the moment you cross the threshold until the room posts {xa:'room-ready'} (a room that never does is shown 2.5 s after it loads); only a slow room gets the loading screen.
-   Going back: the frame is removed (it frees everything the room built) and you are where you were, in front of the door. */
-const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && ((typeof r.src==='string' && r.src) || typeof r.load==='function') ? r : null };
-let roomUI=null, roomId='', roomBay=-1, roomT0=0, roomTimer=0, roomSlow=0;
+/* ---------- rooms that take the whole screen (the casino, and any room in the world registry) ----------
+   A door leads to a SPACE in the world registry (scene.link.to). Where it goes is read from the chain when the door is used: the space's
+   slug, title, state, runtime and entry (XAWorld.registry().destination). The hall's own live, native lobby is built behind its door (above);
+   everything else is a PAGE: the space's entry inscription, fetched by id and checked against its Xtrata chain hash and size
+   (XAScores.getInscription: gateway first, the chain as fallback), and framed as srcdoc. No list of rooms lives in the hall or its parent.
+     live + entry        the room opens (a short loading screen, the page full screen, BACK above it)
+     live, no entry      THIS DOOR LEADS TO <TITLE> · NOT OPEN YET
+     draft / suspended / retired   THIS DOOR LEADS TO <TITLE> · CLOSED
+     the read failed     COULD NOT CHECK THE DOOR · TRY AGAIN   (never "not open": a failed read is not an answer)
+   Every room runs in a sandboxed frame (allow-scripts allow-pointer-lock allow-downloads, never allow-same-origin), whatever its runtime: it
+   cannot touch the hall's page, wallet or storage. It talks to the hall only through window.XA_ROOM, a small script the hall puts at the top
+   of the page (docs/room-bridge.md, protocol version 1): ready(), leave(), go(door), and for a HOSTED room (runtime 3) only, call() and account().
+   window.XA_ROOMS = { casino:{ src:'casino-room.html', title, still, depth } } is for the local preview only (a page beside the hall), never for
+   an inscribed room. A door's entry picture comes from the door's params (still/stillHash, depth/depthHash: inscription ids and chain hashes),
+   or for a preview room from XA_ROOMS: the open doorway shows it with parallax (doors.js windowTo) and walking in glides into it.
+   BACK works at any depth: the hall keeps where you came from; BACK re-opens the room before (read again: rooms are torn down when you leave
+   them) at the door you went through, or takes you back to the doorway in the hall. A destination whose entry or state changes while you are
+   inside changes nothing until you leave. */
+const ROOM_CAP=16*1024*1024;                          // a room page bigger than this is not opened here (it would not fit a viewer's frame well)
+const ROOM_SANDBOX='allow-scripts allow-pointer-lock allow-downloads';
+const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && typeof r.src==='string' && r.src ? r : null };   // local preview pages only
+const linkSlug=(lk)=>String((lk && (lk['target-room']||lk.targetRoom||lk.room))||'').toLowerCase();
+const signText=(s,max)=>String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9 .,!?:'&\/-]/g,' ').replace(/\s+/g,' ').trim().slice(0,max||32);   // what the hall shows of a chain title: the sign alphabet, as text
+const kb=(n)=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+let roomUI=null, roomBay=-1, roomT0=0, roomTimer=0, roomSlow=0, roomCur=null, roomStack=[], roomBusy=false, callBusy=false, enterSeq=0;
+const roomId=()=>roomCur?(roomCur.slug||''):'';
+
+/* where a door goes: read once per space for a short while (a failed read is never kept, so the next try reads again) */
+const destCache=new Map();
+function resolveDest(id,fresh){
+  const R=window.XAWorld && XAWorld.registry && XAWorld.registry();
+  if(!R) return Promise.resolve({ok:false, value:null, error:'no registry'});
+  const now=performance.now(), c=destCache.get(id);
+  if(!fresh && c && now-c.t<15000) return c.p;
+  const p=Promise.resolve().then(()=>R.destination(id)).catch(e=>({ok:false, value:null, error:String(e&&e.message||e)})).then(r=>{ if(!r.ok && destCache.get(id) && destCache.get(id).p===p) destCache.delete(id); return r });
+  destCache.set(id,{t:now,p}); return p;
+}
+// A resolved destination as the hall acts on it. kind: page | lobby | closed | soon | nowhere | unknown (the read failed) | big
+function targetOf(r){
+  if(!r || !r.ok) return {kind:'unknown', title:''};
+  const d=r.value; if(!d) return {kind:'nowhere', title:''};
+  const title=signText(d.title||d.slug,32);
+  if(d.lobby) return {kind:'lobby', title};
+  if(!d.open) return {kind:'closed', title};
+  if(!d.entry) return {kind:'soon', title};
+  if(d.entry.size>ROOM_CAP) return {kind:'big', title, size:d.entry.size};
+  return {kind:'page', title, space:d.id, slug:d.slug, runtime:d.runtime, entry:d.entry};
+}
+function doorSays(t){
+  if(t.kind==='unknown') return 'COULD NOT CHECK THE DOOR · TRY AGAIN';
+  const to=t.title?'THIS DOOR LEADS TO '+t.title+' · ':'';
+  if(t.kind==='closed') return (to||'THIS DOOR IS ')+'CLOSED';
+  if(t.kind==='big') return (to||'')+'TOO BIG TO OPEN HERE ('+kb(t.size)+', THE LIMIT IS 16 MB)';
+  return to?to+'NOT OPEN YET':'THIS DOOR IS NOT OPEN YET';
+}
+const hallSlug=()=>{ try{ const p=window.XAWorld && XAWorld.config().path; return Array.isArray(p)&&p.length?String(p[p.length-1]):'hall' }catch(e){ return 'hall' } };
+// what the room is told about how you came in (window.XA_ENTRY): the space you came from, the door you came through, where to put you
+function entryFrom(bay,lk){ const lob=bay>=HALL_BAYS; return {from:lob?'lobby':hallSlug(), door:'bay-'+(lob?bay-HALL_BAYS:bay), arrival:Number(lk&&lk.arrival)||0} }
+function withEntry(t,e){ t.xaEntry={from:String(e.from||''), door:String(e.door||''), arrival:Number(e.arrival)||0}; t.key=t.kind==='src'?'src:'+t.slug:'e:'+t.entry.id+':'+t.entry.hash+'|'+t.xaEntry.from+'|'+t.xaEntry.door+'|'+t.xaEntry.arrival; return t }
+// door link -> Promise<target>
+function doorTarget(lk,bay){
+  if(lk && lk.to) return resolveDest(lk.to).then(r=>{ const t=targetOf(r); if(t.kind==='page'){ withEntry(t,entryFrom(bay,lk)); t.view=stillFor(lk) } return t });
+  const slug=linkSlug(lk), cfg=roomCfg(slug);
+  if(cfg) return Promise.resolve(withEntry({kind:'src', title:signText(cfg.title||slug,32), label:String(cfg.title||slug), slug, cfg, runtime:2, view:stillFor(lk)}, entryFrom(bay,lk)));
+  return Promise.resolve({kind:'soon', title:signText(slug,32)});
+}
+
+/* a door's entry picture: from the chain (hash-checked, like a poster's), or a preview room's file */
+const picCache=new Map();
+function chainPic(p){
+  if(!p || !window.XAScores) return null;
+  const k=p.id+':'+p.hash; let c=picCache.get(k);
+  if(!c){ c={state:0,url:''}; picCache.set(k,c);
+    XAScores.getInscription(p.id, XAScores._codec.hexToBytes(p.hash)).then(b=>{ const mime=picMime(b); if(!mime) throw new Error('not a picture'); c.url=URL.createObjectURL(new Blob([b],{type:mime})); c.state=1 }).catch(()=>{ c.state=2 }) }
+  return c.state===1?c.url:null;
+}
+function stillFor(lk){
+  if(!lk || isLobbyLink(lk)) return null;
+  if(lk.to){ const s=lk.still?chainPic(lk.still):null; return s?{still:s, depth:(lk.depth&&chainPic(lk.depth))||''}:null }
+  const r=roomCfg(linkSlug(lk)); return r&&typeof r.still==='string'&&r.still?{still:r.still, depth:typeof r.depth==='string'?r.depth:''}:null;
+}
+
+/* three.js for a room: the arcade's own copy (r128) instead of a CDN. The room page asks with the cdnjs r128 tag (so it also opens on its own)
+   or with an empty <script data-xa-part="three.js"><\/script>. The text comes from the parent (window.XA_PARTS.threeText), or from the hall's own page. */
+const THREE_SLOT=/<script[^>]*\bdata-xa-part=["']three\.js["'][^>]*>\s*<\/script>/i, THREE_TAG=/<script[^>]*\bsrc="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/[^"]*"[^>]*><\/script>/i;
+function threeText(){
+  try{ if(window.XA_PARTS && typeof XA_PARTS.threeText==='function'){ const t=XA_PARTS.threeText(); if(typeof t==='string' && t) return t } }catch(e){}
+  const banner=/^\s*\/\*\*[\s\S]{0,40}@license[\s\S]{0,60}Three\.js Authors/;
+  for(const s of document.scripts){ const t=s.text||''; if(t.length>100000 && banner.test(t.slice(0,200))) return t.replace(/\n\/\/# sourceURL=[^\n]*\s*$/,'') }
+  return '';
+}
+function withThree(html){
+  const at=THREE_SLOT.test(html)?THREE_SLOT:THREE_TAG.test(html)?THREE_TAG:null; if(!at) return html;
+  const t=threeText(); if(!t) return html;
+  return html.replace(at,()=>'<script>'+t.replace(/<\/script/gi,'<\\/script')+'<\/script>');
+}
+/* window.XA_ROOM (protocol version 1, frozen: docs/room-bridge.md), put at the top of every room page the hall frames from the chain */
+function bridgeScript(t){
+  const sc=(window.XAScores && XAScores.config && XAScores.config())||{};
+  const info={v:1, title:t.title, slug:t.slug||'', runtime:t.runtime, network:sc.network==='testnet'?'testnet':'mainnet',
+    apiBases:(window.XAWorld && XAWorld.apiBases ? XAWorld.apiBases() : []).filter(b=>typeof b==='string'), entry:t.xaEntry};
+  const j=JSON.stringify(info).replace(/</g,'\\u003c').replace(/[\u2028\u2029]/g,c=>'\\u'+c.charCodeAt(0).toString(16));
+  return '<script>(function(I){"use strict";var P=window.parent,n=0,wait={};'
+    +'window.__XA_FROM_ARCADE=1;window.XA_ENTRY=Object.freeze({from:I.entry.from,door:I.entry.door,arrival:I.entry.arrival});'
+    +'function send(m){try{P.postMessage(m,"*")}catch(e){}}'
+    +'function ask(m){return new Promise(function(ok,no){var id="r"+(++n)+"-"+Date.now().toString(36);wait[id]={ok:ok,no:no};m.id=id;send(m)})}'
+    +'window.addEventListener("message",function(e){var d=e.data;if(e.source!==P||!d||d.xa!=="result"||typeof d.id!=="string"||!wait[d.id])return;var w=wait[d.id];delete wait[d.id];if(d.ok)w.ok(d);else{var x=new Error(String(d.error||"refused"));x.code=String(d.error||"refused");w.no(x)}});'
+    +'window.XA_ROOM=Object.freeze({version:1,title:I.title,slug:I.slug,runtime:I.runtime,network:I.network,apiBases:Object.freeze(I.apiBases.slice()),'
+    +'ready:function(){send({xa:"room-ready"})},leave:function(){send({xa:"leave-room"})},'
+    +'go:function(door){return ask({xa:"go",door:String(door==null?"":door)}).then(function(){return true})},'
+    +'call:function(o){o=o||{};return ask({xa:"call",contract:o.contract,fn:o.fn,args:o.args,postConditions:o.postConditions,maxStx:o.maxStx}).then(function(r){return r.txid})},'
+    +'account:function(){return ask({xa:"account"}).then(function(r){return r.address||null})}})'
+    +'})('+j+')<\/script>';
+}
+function withBridge(html,t){ const s=bridgeScript(t); return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i,m=>m+s) : s+html }
+// the room's page, ready to frame: its inscription, checked (chain hash, then size), three.js swapped, the bridge on top
+async function roomHtml(t){
+  const S=window.XAScores; if(!S || !S.getInscription) throw new Error('no reader');
+  const bytes=await S.getInscription(t.entry.id, S._codec.hexToBytes(t.entry.hash));
+  if(!bytes || bytes.length!==t.entry.size) throw new Error('the room is not the size its space says');
+  return withBridge(withThree(new TextDecoder('utf-8').decode(bytes)), t);
+}
+
 function roomEls(){
   if(roomUI) return roomUI;
   const mk=(css,html)=>{ const e=document.createElement('div'); e.style.cssText=css; if(html!=null) e.innerHTML=html; return e };
   const load=mk('position:fixed;inset:0;z-index:9000;background:radial-gradient(ellipse at 50% 40%,#1b1233,#05040a 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#e8e2ff;text-align:center;opacity:0;transition:opacity .25s',
     '<div class="rl-t" style="font:34px Bungee,Impact,sans-serif;letter-spacing:.08em;color:#ffb347;text-shadow:0 0 18px rgba(255,150,40,.55)"></div><div class="rl-s" style="font:16px VT323,monospace;letter-spacing:.14em;opacity:.8">OPENING THE ROOM…</div><div style="width:min(60vw,320px);height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden"><i class="rl-b" style="display:block;height:100%;width:35%;background:linear-gradient(90deg,#3d86ff,#ff8a2a);animation:rlbar 1.1s ease-in-out infinite alternate"></i></div>');
-  // the room's entry still (XA_ROOMS[id].still): shown full screen from the moment you cross the threshold until the live room has drawn its first frames, so the doorway you were looking into simply becomes the room
+  // the room's entry still: shown full screen from the moment you cross the threshold until the live room has drawn its first frames, so the doorway you were looking into simply becomes the room
   const still=mk('position:fixed;inset:0;z-index:8900;background:#05040a center/cover no-repeat;display:none;opacity:0;transform:scale(1);will-change:transform,opacity');
   const st=document.createElement('style'); st.textContent='@keyframes rlbar{from{transform:translateX(-30%)}to{transform:translateX(190%)}}'; document.head.appendChild(st);
-  const back=document.createElement('button'); back.type='button'; back.textContent='← BACK TO THE LOBBY';
+  const back=document.createElement('button'); back.type='button'; back.id='xa-room-back'; back.textContent='← BACK TO THE LOBBY';
   back.style.cssText='position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9500;display:none;padding:9px 16px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer';
-  back.addEventListener('click',e=>{ e.stopPropagation(); leaveRoom() });
-  document.body.append(still,load,back); roomUI={load,still,glide:null,back,frame:null,title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
-  window.addEventListener('message',e=>{ if(state==='room' && roomUI && roomUI.frame && e.source===roomUI.frame.contentWindow && e.data && e.data.xa==='leave-room') leaveRoom() });
-  // the room says it has drawn its first frames ({xa:'room-ready'}), at any time after it loads, even while it is still hidden behind the hall
-  window.addEventListener('message',e=>{ const f=roomUI&&roomUI.frame; if(f && e.source===f.contentWindow && e.data && e.data.xa==='room-ready'){ f.dataset.ready='1'; f.dispatchEvent(new Event('xa-room-ready')) } });
+  back.addEventListener('click',e=>{ e.stopPropagation(); roomBack() });
+  // a line over the room (a door the room asked for that is closed, or could not be checked)
+  const note=mk('position:fixed;top:calc(max(10px,env(safe-area-inset-top)) + 46px);left:50%;transform:translateX(-50%);z-index:9500;display:none;max-width:min(92vw,560px);padding:8px 14px;font:15px VT323,monospace;letter-spacing:.1em;color:#ffd7a0;background:rgba(10,12,24,.92);border:1px solid #8a5a3b;border-radius:8px;text-align:center');
+  document.body.append(still,load,back,note); roomUI={load,still,glide:null,back,note,frame:null,frameId:'',title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
+  // Only the current room's frame is listened to, and only its own window.
+  window.addEventListener('message',e=>{
+    const f=roomUI&&roomUI.frame, d=e.data;
+    if(window.XA_TEST && d && typeof d==='object' && d.xa) (XA._msgs=XA._msgs||[]).push({xa:String(d.xa), mine:!!f && e.source===f.contentWindow, state, cur:!!roomCur});   // tests only
+    if(!f || e.source!==f.contentWindow || !d || typeof d!=='object') return;
+    if(d.xa==='room-ready'){ f.dataset.ready='1'; f.dispatchEvent(new Event('xa-room-ready')); return }   // at any time after it loads, even while it is still hidden behind the hall
+    if(state!=='room' || !roomCur) return;
+    if(d.xa==='leave-room'){ roomBack(); return }
+    if(d.xa==='go' || d.xa==='call' || d.xa==='account') roomAsk(f,d);
+  });
   return roomUI;
 }
+function roomNote(text,ms){ const U=roomEls(); U.note.textContent=text; U.note.style.display='block'; clearTimeout(roomNote.t); roomNote.t=setTimeout(()=>{ U.note.style.display='none' },ms||4000) }
+function dropFrame(){ const U=roomUI; if(!U || !U.frame) return; try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null; U.frameId='' }
 // The room's page is loaded quietly as soon as its door is opened (hidden, behind the hall), so by the time you walk in there is little or nothing to wait for.
-// roomPrep makes it; enterRoom uses it (or makes it, if you got there first); roomDrop throws it away (the door shut, or you left the lobby).
-const roomSrc=(cfg)=>cfg.src+(cfg.src.indexOf('?')<0?'?':'&')+'from=arcade';   // tells the room it was entered from the arcade: it starts walking, just inside its door
-function roomPrep(id){
-  const cfg=roomCfg(id); if(!cfg) return null;
-  const U=roomEls(); if(typeof cfg.still==='string' && cfg.still){ if(!roomPrep.im||roomPrep.im.u!==cfg.still){ const im=new Image(); im.src=cfg.still; roomPrep.im={u:cfg.still,im} } }   // the still is fetched and decoded before it is needed
-  if(U.frame && U.frameId===id) return U.frame;
-  roomDrop();
-  const f=document.createElement('iframe'); f.title=cfg.title||id; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
+// roomPrep makes it (keyed by the entry's id and hash, and how you come in); showRoom uses it (or makes it, if you got there first); roomDrop throws it away (the door shut, or you left the lobby).
+const roomSrc=(cfg)=>cfg.src+(cfg.src.indexOf('?')<0?'?':'&')+'from=arcade';   // a preview room: told it was entered from the arcade, it starts walking just inside its door
+function roomPrep(t){
+  const U=roomEls(), v=t.view;
+  if(v && v.still){ if(!roomPrep.im||roomPrep.im.u!==v.still){ const im=new Image(); im.src=v.still; roomPrep.im={u:v.still,im} } }   // the still is decoded before it is needed
+  if(U.frame && U.frameId===t.key) return U.frame;
+  dropFrame();
+  const f=document.createElement('iframe'); f.title=t.label||t.title||t.slug||'room'; f.setAttribute('sandbox',ROOM_SANDBOX); f.dataset.xaRoom='1'; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
   f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden;pointer-events:none';
   f.dataset.loaded='';
-  U.frame=f; U.frameId=id;
-  if(typeof cfg.load==='function'){
-    // The page is not a URL: the host fetches it (from its inscription) and it is framed as srcdoc. Insert first, then listen, so the empty frame's own load is not mistaken for the room.
+  U.frame=f; U.frameId=t.key;
+  if(t.kind==='page'){
+    // Insert first, then listen, so the empty frame's own load is not mistaken for the room.
     document.body.appendChild(f);
-    const fail=()=>{ f.dataset.failed='1'; f.dispatchEvent(new Event('xa-room-failed')) };
-    Promise.resolve().then(()=>cfg.load()).then(html=>{
-      if(typeof html!=='string' || !html){ fail(); return }
+    const fail=(e)=>{ f.dataset.failed='1'; f.dataset.why=String(e&&e.message||e||''); f.dispatchEvent(new Event('xa-room-failed')) };
+    roomHtml(t).then(html=>{
       if(roomUI.frame!==f) return;                       // dropped while it was loading
       f.addEventListener('load',()=>{ f.dataset.loaded='1' });
-      const flag='<script>window.__XA_FROM_ARCADE=1<\/script>';   // the room starts walking, just inside its door (the backslash keeps this from ending the page's own script)
-      f.srcdoc=/<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i,m=>m+flag) : flag+html;
+      f.srcdoc=html;
     }).catch(fail);
     return f;
   }
   f.addEventListener('load',()=>{ f.dataset.loaded='1' });
-  f.src=roomSrc(cfg); document.body.appendChild(f); return f;   // (src first: an empty frame fires a load of its own on insert)
+  f.src=roomSrc(t.cfg); document.body.appendChild(f); return f;   // (src first: an empty frame fires a load of its own on insert)
 }
-function roomDrop(){
-  if(!roomUI || !roomUI.frame || state==='room') return;
-  try{ roomUI.frame.src='about:blank' }catch(e){} roomUI.frame.remove(); roomUI.frame=null; roomUI.frameId='';
+function roomDrop(){ if(!roomUI || !roomUI.frame || state==='room') return; dropFrame() }
+function backLabel(){
+  const top=roomStack[roomStack.length-1];
+  if(!top || top.kind==='hall') return '← BACK TO '+(top && top.bay>=HALL_BAYS ? 'THE LOBBY' : 'THE HALL');
+  return '← BACK TO '+(top.t.title||'THE ROOM');
 }
-function enterRoom(id, bayIdx){
-  const cfg=roomCfg(id); if(!cfg || state!=='walk') return;
-  roomBay=bayIdx==null?-1:bayIdx;
-  const U=roomEls(); const f=roomPrep(id); state='room'; roomId=id; roomT0=performance.now(); sfx.coin();
+// Walking through a door into a room: from the hall (or the lobby).
+function enterRoom(t, bayIdx){
+  if(state!=='walk' || !t || (t.kind!=='page' && t.kind!=='src')) return;
+  roomBay=bayIdx==null?-1:bayIdx; roomStack=[{kind:'hall', bay:roomBay}];
+  roomEls(); state='room'; sfx.coin();
   if(document.pointerLockElement) document.exitPointerLock();
   for(const k in keys) keys[k]=false;
   $('cross').hidden=true; $('prompt').hidden=true; $('tapstart').hidden=true; $('lockhint').hidden=true; $('hint').hidden=true; if($('bprompt')) $('bprompt').hidden=true;
   try{ Room.enterGame() }catch(e){}                   // the hall's own sound closes behind you
   const hb=$('hallbar'); if(hb) hb.style.visibility='hidden';   // and its buttons (scores, wallet, sound) stay out of the room's picture
+  showRoom(t,{door:true});
+}
+// Show room t full screen. opts.door: you walked in through a door of the hall (the entry still and the glide can play); otherwise a room
+// is replacing another (a door inside a room, or BACK): the loading screen covers the change.
+function showRoom(t, opts){
+  opts=opts||{};
+  const U=roomEls(); clearTimeout(roomTimer); clearTimeout(roomSlow); U.note.style.display='none';
+  if(!opts.door){ U.still.style.display='none'; U.still.style.opacity=0; if(U.glide){ U.glide.dispose(); U.glide=null } if(U.frameId!==t.key) dropFrame() }
+  const f=roomPrep(t); roomCur=t; roomT0=performance.now(); roomBusy=false;
+  U.back.textContent=backLabel(); U.back.style.zIndex='9500';
   const ready=!!f.dataset.loaded, minWait=ready?250:700;   // a page that is already there still gets a beat of loading screen, never a flash
-  U.title.textContent=String(cfg.title||id).toUpperCase(); U.sub.textContent='OPENING THE ROOM…';
-  const still=typeof cfg.still==='string' && cfg.still;
+  U.title.textContent=String(t.title||t.slug||'ROOM').toUpperCase(); U.sub.textContent='OPENING THE ROOM…'+(t.entry?' '+kb(t.entry.size):'');
+  const still=opts.door && t.view && t.view.still, depth=still && t.view.depth;
   const showLoad=()=>{ U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1 };
   // Best: the room has a depth map, so you glide forward from where you stand to where the room starts you, through the same view the doorway showed (a canvas of its own over the hall).
   let glide=null;
-  if(still && cfg.depth && roomBay>=0 && bayEngine && bayEngine.glideInto){ try{ glide=bayEngine.glideInto(roomBay,{fov:camera.fov}) }catch(e){ glide=null; console.warn('room glide not available:',e) } }
+  if(still && depth && roomBay>=0 && bayEngine && bayEngine.glideInto){ try{ glide=bayEngine.glideInto(roomBay,{fov:camera.fov}) }catch(e){ glide=null; console.warn('room glide not available:',e) } }
   if(glide){
     U.glide=glide; document.body.appendChild(glide.dom); glide.render(performance.now()); void glide.dom.offsetWidth; glide.dom.style.transition='opacity .22s'; glide.dom.style.opacity=1;
     let gw=innerWidth, gh=innerHeight;
@@ -37673,56 +38078,151 @@ function enterRoom(id, bayIdx){
     requestAnimationFrame(tick);
   } else if(still){   // else the doorway you were looking into fills the screen and moves in a little, as a step forward would; the loading screen only comes if the room is slow
     const S=U.still; S.style.transition='none';   // (the picture is wider than the room's own view, 80 degrees up and down against 68, so it is shown at its middle)
-     S.style.backgroundImage='url("'+still.replace(/"/g,'%22')+'")'; S.style.backgroundSize='auto '+(100*Math.max(Math.tan(40*Math.PI/180)/Math.tan(34*Math.PI/180),(innerWidth/innerHeight)/(16/9))).toFixed(1)+'%';; S.style.transform='scale(1)'; S.style.opacity=0; S.style.display='block'; void S.offsetWidth;
+    S.style.backgroundImage='url("'+String(still).replace(/"/g,'%22')+'")'; S.style.backgroundSize='auto '+(100*Math.max(Math.tan(40*Math.PI/180)/Math.tan(34*Math.PI/180),(innerWidth/innerHeight)/(16/9))).toFixed(1)+'%'; S.style.transform='scale(1)'; S.style.opacity=0; S.style.display='block'; void S.offsetWidth;
     S.style.transition='opacity .25s,transform 2.6s cubic-bezier(.25,.6,.35,1)'; S.style.opacity=1; S.style.transform='scale(1.035)';
   } else showLoad();
   f.style.pointerEvents='auto';
   const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,minWait-(performance.now()-roomT0));
-    setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room') U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
-  const failed=()=>{ clearTimeout(roomTimer); clearTimeout(roomSlow); if(still) showLoad(); U.sub.textContent='THE ROOM COULD NOT BE LOADED. YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 };
+    setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room' && roomUI.frame===f) U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
+  const failed=()=>{ if(roomUI.frame!==f) return; clearTimeout(roomTimer); clearTimeout(roomSlow); if(still) showLoad(); U.sub.textContent='THE ROOM COULD NOT BE LOADED. YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 };
   if(f.dataset.failed) failed(); else f.addEventListener('xa-room-failed',failed,{once:true});
   if(still){
     // Ready = the room has said so ({xa:'room-ready'}, after its first frames), and the still has been up for a beat. A room that never says it is ready is shown 2.5 s after it loads.
-    let shown=false; clearTimeout(roomSlow);
+    let shown=false;
     const reveal=()=>{ if(shown || state!=='room' || roomUI.frame!==f) return; shown=true; clearTimeout(roomSlow); clearTimeout(roomTimer);
-      f.style.visibility='visible'; U.still.style.opacity=0; U.load.style.opacity=0; if(U.glide){ const g=U.glide; U.glide=null; g.dom.style.transition='opacity .45s'; g.dom.style.opacity=0; setTimeout(()=>g.dispose(),520) } setTimeout(()=>{ if(state==='room'){ U.still.style.display='none'; U.load.style.display='none' } },450); U.back.style.display='block'; try{ f.focus() }catch(e){} };
+      f.style.visibility='visible'; U.still.style.opacity=0; U.load.style.opacity=0; if(U.glide){ const g=U.glide; U.glide=null; g.dom.style.transition='opacity .45s'; g.dom.style.opacity=0; setTimeout(()=>g.dispose(),520) } setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ U.still.style.display='none'; U.load.style.display='none' } },450); U.back.style.display='block'; try{ f.focus() }catch(e){} };
     const when=(ms)=>setTimeout(reveal,Math.max(0,ms-(performance.now()-roomT0)));
     const MIN=glide?glide.ms+150:900;   // (a glide has to arrive before the live room, which starts where it ends, takes over)
     if(f.dataset.ready) when(MIN); else f.addEventListener('xa-room-ready',()=>when(MIN),{once:true});
     const late=()=>setTimeout(()=>when(MIN),2500); if(f.dataset.loaded) late(); else f.addEventListener('load',late,{once:true});
     roomSlow=setTimeout(()=>{ if(!shown && state==='room' && roomUI.frame===f) showLoad() },3500);
   } else if(ready) done(); else f.addEventListener('load',done,{once:true});
-  roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ if(still) showLoad(); U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
+  roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f && f.style.visibility!=='visible'){ if(still) showLoad(); U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
+}
+// BACK (the button, or the room's own leave()): one step back. The room before is read again and re-opened at the door you went through;
+// at the bottom of the stack you are back in the hall, in front of the door you came in by.
+function roomBack(){
+  if(state!=='room') return;
+  const top=roomStack[roomStack.length-1];
+  if(!top || top.kind==='hall' || roomBusy){ if(!roomBusy) leaveRoom(); return }
+  roomBusy=true;
+  const cur=roomCur;
+  resolveDest(top.t.space,true).then(r=>{
+    if(state!=='room' || roomCur!==cur) return;
+    const t=targetOf(r);
+    roomStack.pop();
+    if(t.kind!=='page'){ roomBusy=false; leaveRoom(); bayToast={text:doorSays(t), until:performance.now()+4000}; updateBayFocus(); return }
+    withEntry(t,{from:cur.slug||'', door:top.door.name, arrival:top.door.id});
+    showRoom(t);
+  });
 }
 function leaveRoom(){
   if(state!=='room' || !roomUI) return;
   const U=roomUI; clearTimeout(roomTimer); clearTimeout(roomSlow); const hb=$('hallbar'); if(hb) hb.style.visibility=''; U.still.style.display='none'; U.still.style.opacity=0; if(U.glide){ U.glide.dispose(); U.glide=null }
-  if(U.frame){ try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null; U.frameId='' }
+  dropFrame(); U.note.style.display='none';
   U.load.style.opacity=0; U.load.style.display='none'; U.back.style.display='none';
   state='out'; sfx.back(); try{ Room.exitGame() }catch(e){}
   const fl=$('flash'); fl.style.transition='none'; fl.style.opacity=1; void fl.offsetWidth; fl.style.transition=''; requestAnimationFrame(()=>{ fl.style.opacity=0 });
-  for(const k in keys) keys[k]=false; roomId='';
-  if(roomBay>=0 && lobbyPass && bayEngine && bayEngine.posOf){   // you come out of the door: a step in front of it, facing into the room
-    const q=bayEngine.posOf(roomBay); if(q){ player.x=q.x-lobbyPass.side*1.2; player.z=q.z; player.yaw=lobbyPass.side*Math.PI/2; player.pitch=0 }
+  for(const k in keys) keys[k]=false;
+  const b=roomStack.length && roomStack[0].kind==='hall' ? roomStack[0].bay : roomBay;
+  if(b>=0 && bayEngine && bayEngine.posOf && bayEngine.frameOf){   // you come out of the door: a step in front of it, facing away from it
+    const q=bayEngine.posOf(b), fr=bayEngine.frameOf(b);
+    if(q && fr){ player.x=q.x+fr.nx*1.2; player.z=q.z+fr.nz*1.2; player.yaw=Math.atan2(-fr.nx,-fr.nz); player.pitch=0 }
   }
-  roomBay=-1; inDoorway=-1; roomRested=true;
+  roomBay=-1; roomCur=null; roomStack=[]; roomBusy=false; inDoorway=-1; roomRested=true;
   setTimeout(()=>{ if(state==='out'){ state='walk'; updateHud() } },120); tryLock();
 }
-// A door that leads somewhere: the link comes from the world contract. You walk into an open doorway to go through it (there is no button).
-// The lobby is already there, behind its wall, so walking in needs nothing; a room in window.XA_ROOMS takes the screen; any other target is not open yet.
+/* ---------- the room bridge (hall side). Messages come only from the current room frame; each ask is answered {xa:'result', id, ok, …} ---------- */
+function roomReply(f,id,o){ if(roomUI && roomUI.frame===f && typeof id==='string') try{ f.contentWindow.postMessage(Object.assign({xa:'result', id}, o),'*') }catch(e){} }
+function roomAsk(f,d){
+  const id=typeof d.id==='string' && d.id.length<=64 ? d.id : null; if(!id) return;
+  const t=roomCur, hosted=!!t && t.kind==='page' && t.runtime===3;
+  if(d.xa==='account'){ const st=window.XAScores && XAScores.status ? XAScores.status() : {}; return roomReply(f,id, hosted?{ok:true, address:st.address||null}:{ok:false, error:'not-hosted'}) }
+  if(d.xa==='call') return roomCall(f,id,d,t);
+  // go(door): the door must be an object of this room's own space, with a portal; its destination follows the same rules as a hall door
+  if(!t || t.kind!=='page' || !t.space) return roomReply(f,id,{ok:false, error:'not-available'});
+  if(roomBusy) return roomReply(f,id,{ok:false, error:'busy'});
+  const R=window.XAWorld && XAWorld.registry && XAWorld.registry(); if(!R) return roomReply(f,id,{ok:false, error:'not-available'});
+  roomBusy=true;
+  const name=String(d.door||'');
+  R.door(t.space,name).then(r=>{
+    if(state!=='room' || roomCur!==t){ roomBusy=false; return null }
+    if(!r.ok){ roomBusy=false; roomNote('COULD NOT CHECK THE DOOR · TRY AGAIN'); roomReply(f,id,{ok:false, error:'could-not-check'}); return null }
+    const pt=r.value && r.value.portal;
+    if(!pt || !(pt.to>0)){ roomBusy=false; roomReply(f,id,{ok:false, error:'unknown-door'}); return null }
+    return resolveDest(pt.to,true).then(dr=>{
+      roomBusy=false;
+      if(state!=='room' || roomCur!==t) return;
+      const nt=targetOf(dr);
+      if(nt.kind==='lobby'){ roomReply(f,id,{ok:true}); leaveRoom(); return }   // the hall's own lobby: back into the 3D world
+      if(nt.kind!=='page'){ roomNote(doorSays(nt)); roomReply(f,id,{ok:false, error:nt.kind==='unknown'?'could-not-check':nt.kind==='closed'?'closed':nt.kind==='big'?'too-big':'not-open'}); return }
+      roomReply(f,id,{ok:true});
+      roomStack.push({kind:'room', t, door:{name, id:r.value.id}});
+      if(roomStack.length>16) roomStack.splice(1,1);           // a long walk forgets its oldest rooms, never the way back to the hall
+      showRoom(withEntry(nt,{from:t.slug||'', door:name, arrival:pt.arrival}));
+    });
+  });
+}
+// call({contract, fn, args, postConditions, maxStx}): only from a HOSTED room (runtime 3), only to a contract the registry approves at the
+// moment of the call (is-approved), only after the player says yes in the hall's own dialog, and signed through the hall's wallet path
+// (XAScores.callContract: deny mode, one STX post-condition capped at maxStx, no `sender`, an account mismatch aborts).
+// maxStx is STX as a decimal (up to 6 places). postConditions may only repeat that cap ({type:'stx', amount: micro-STX <= maxStx}).
+function cleanCall(d){
+  const contract=String(d.contract||''), fn=String(d.fn||'');
+  if(!/^S[0-9A-Z]{25,41}\.[a-zA-Z][a-zA-Z0-9-]{0,39}$/.test(contract)) return {why:'contract'};
+  if(!/^[a-zA-Z][a-zA-Z0-9!?_-]{0,127}$/.test(fn)) return {why:'fn'};
+  const args=d.args==null?[]:d.args;
+  if(!Array.isArray(args) || args.length>32 || !args.every(a=>typeof a==='string' && /^(0x)?([0-9a-fA-F]{2})+$/.test(a) && a.length<=131074)) return {why:'args'};
+  const m=/^([0-9]{1,9})(?:\.([0-9]{1,6}))?$/.exec(typeof d.maxStx==='number' && isFinite(d.maxStx) && d.maxStx>=0 ? d.maxStx.toFixed(6).replace(/\.?0+$/,'') : String(d.maxStx==null?'':d.maxStx));
+  if(!m) return {why:'maxStx'};
+  const maxUstx=BigInt(m[1])*1000000n+BigInt((m[2]||'').padEnd(6,'0')||'0');
+  const pcs=d.postConditions==null?[]:d.postConditions;
+  if(!Array.isArray(pcs) || pcs.length>4 || !pcs.every(p=>p && typeof p==='object' && p.type==='stx' && /^[0-9]{1,16}$/.test(String(p.amount)) && BigInt(String(p.amount))<=maxUstx)) return {why:'postConditions'};
+  return {ok:true, contract, fn, args, maxUstx:maxUstx.toString()};
+}
+async function roomCall(f,id,d,t){
+  if(!t || t.kind!=='page' || t.runtime!==3) return roomReply(f,id,{ok:false, error:'not-hosted'});
+  const c=cleanCall(d); if(!c.ok) return roomReply(f,id,{ok:false, error:'bad-request:'+c.why});
+  if(callBusy) return roomReply(f,id,{ok:false, error:'busy'});
+  const R=window.XAWorld && XAWorld.registry && XAWorld.registry(), S=window.XAScores;
+  if(!R || !S || !S.callContract || !window.XARoom || !XARoom.confirmCall) return roomReply(f,id,{ok:false, error:'not-available'});
+  callBusy=true;
+  try{
+    const ap=await R.approved(c.contract);
+    if(!ap.ok) return roomReply(f,id,{ok:false, error:'could-not-check'});
+    if(!ap.value) return roomReply(f,id,{ok:false, error:'not-approved'});
+    if(state!=='room' || roomCur!==t) return;
+    const who=(S.status()||{}).address||'';
+    if(document.pointerLockElement) document.exitPointerLock();
+    const yes=await XARoom.confirmCall({room:t.title, contract:c.contract, fn:c.fn, maxUstx:c.maxUstx, address:who});
+    if(!yes) return roomReply(f,id,{ok:false, error:'cancelled'});
+    if(state!=='room' || roomCur!==t) return;
+    const r=await S.callContract({contract:c.contract, fn:c.fn, args:c.args, maxUstx:c.maxUstx, expectAddress:who});
+    roomReply(f,id,{ok:true, txid:r.txid});
+  }catch(e){ roomReply(f,id,{ok:false, error:String((e&&e.code===4001)?'cancelled':(e&&e.message)||e).slice(0,200)}) }
+  finally{ callBusy=false }
+}
+// A door that leads somewhere: you walk into an open doorway to go through it (there is no button). The lobby is already there, behind its wall,
+// so walking in needs nothing; any other door is read from the chain (or a preview room in XA_ROOMS) and either opens its room or says why not.
+function toast(text,ms){ bayToast={text, until:performance.now()+(ms||3500)}; updateBayFocus() }
 function bayEnter(link, bayIdx){
-  const room=link&&(link['target-room']||link.targetRoom||link.room); const name=room?String(room).replace(/[^A-Za-z0-9 _-]/g,' ').trim().toUpperCase():'';
-  if(String(room||'').toLowerCase()==='lobby' && lobbyPass) return;
-  if(room && roomCfg(room)){ enterRoom(String(room).toLowerCase(), bayIdx); return }
-  bayToast={text:name?('THIS DOOR LEADS TO '+name+' · NOT OPEN YET'):'THIS DOOR IS NOT OPEN YET', until:performance.now()+3500};
-  updateBayFocus();   // show it now, not on the next frame
+  if(isLobbyLink(link) && lobbyPass) return;
+  const seq=++enterSeq;
+  const slow=setTimeout(()=>{ if(seq===enterSeq && state==='walk') toast('CHECKING THE DOOR…',8000) },300);
+  doorTarget(link,bayIdx).then(t=>{
+    clearTimeout(slow);
+    if(seq!==enterSeq || state!=='walk') return;
+    if(t.kind==='page' || t.kind==='src'){ bayToast=null; enterRoom(t,bayIdx); return }
+    if(t.kind==='lobby') return;
+    toast(doorSays(t), t.kind==='unknown'?4500:3500);
+  });
 }
 // Walking into an open doorway (the door's own width, up against the wall) goes through it. It fires once per arrival, not every frame.
-let inDoorway=-1, roomWantT=0, roomRested=false;   // roomRested: you have just come out of a room, so it is not loaded again until you have moved away or shut the door
+let inDoorway=-1, roomWantT=0, roomRested=false, prepAt=0;   // roomRested: you have just come out of a room, so it is not loaded again until you have moved away or shut the door
 function checkDoorways(){
   if(!bayEngine || !bayDefsAll.length) return;
-  const lob=inLobbyZone(); let hit=-1, link=null;
-  for(let i=0;i<bayDefsAll.length;i++){
+  const lob=inLobbyZone(), n=bayEngine.count?bayEngine.count():bayDefsAll.length; let hit=-1, link=null;
+  for(let i=0;i<n;i++){
     if(lob ? i<HALL_BAYS : i>=HALL_BAYS) continue;
     const d=bayEngine.doorwayAt(i,player.x,player.z);
     if(d && d.interaction===3 && d.z<.6 && Math.abs(d.x)<d.half-.08){ hit=i; link=d.link; break }
@@ -37730,12 +38230,13 @@ function checkDoorways(){
   if(hit!==inDoorway){ inDoorway=hit; if(hit>=0) bayEnter(link,hit) }
   // a door to a room is open: start loading the room. It is dropped again when the door has been shut (or you have left) for a while.
   const now=performance.now(); let want=null;
-  for(let i=lob?HALL_BAYS:0;i<(lob?bayDefsAll.length:HALL_BAYS) && !want;i++){
-    const d=bayEngine.doorwayAt(i,player.x,player.z), l=d&&d.link, r=l&&String(l['target-room']||l.targetRoom||l.room||'').toLowerCase();
-    if(r && r!=='lobby' && roomCfg(r) && d.z<6 && Math.abs(d.x)<4) want=r;   // an open door to a room, and you are within a few steps of it
+  for(let i=lob?HALL_BAYS:0;i<(lob?n:HALL_BAYS) && !want;i++){
+    const d=bayEngine.doorwayAt(i,player.x,player.z), l=d&&d.link;
+    if(l && !isLobbyLink(l) && (l.to || roomCfg(linkSlug(l))) && d.z<6 && Math.abs(d.x)<4) want={bay:i, link:l};   // an open door to a room, and you are within a few steps of it
   }
   if(!want) roomRested=false;
-  else if(!roomRested){ roomWantT=now; if(!roomUI||!roomUI.frame||roomUI.frameId!==want) roomPrep(want) }
+  else if(!roomRested){ roomWantT=now;
+    if(now-prepAt>500){ prepAt=now; doorTarget(want.link,want.bay).then(t=>{ if(state==='walk' && !roomRested && (t.kind==='page'||t.kind==='src') && (!roomUI||!roomUI.frame||roomUI.frameId!==t.key)) roomPrep(t) }) } }
   if(!want && roomUI && roomUI.frame && now-roomWantT>8000) roomDrop();
 }
 function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint){ $('bptext').textContent=bayHint; const a=$('bpalt'); if(a) a.hidden=!bayHold } }

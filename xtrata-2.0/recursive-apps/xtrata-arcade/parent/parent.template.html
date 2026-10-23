@@ -245,25 +245,9 @@
     var scores = { apiBases: apiBases() };
     if (Number(CONFIG.parentTokenId) > 0) scores.parentTokenId = Number(CONFIG.parentTokenId);
     window.XA_CONFIG.scores = Object.assign({}, window.XA_CONFIG.scores, scores);
-    // Rooms that are their own inscription (the casino). Each is read whole by id, hash-checked like everything else here, and framed by the hall as srcdoc.
-    // The standalone room file loads three.js from cdnjs; inside the arcade that tag is swapped for the copy the arcade already carries, so nothing is fetched from a CDN.
-    var roomCfg = {};
-    Object.keys(CONFIG.rooms || {}).forEach(function (name) {
-      var r = CONFIG.rooms[name];
-      if (!r || !(Number(r.id) > 0)) return;
-      roomCfg[name] = { title: r.title || name, load: function () {
-        var key = 'room:' + name;
-        return once(key, function () {
-          return inscriptionText(Number(r.id), r.title || name).then(function (html) {
-            var tag = /<script[^>]*src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/[^"]*"[^>]*><\/script>/i;
-            var three = byName['three.js'];
-            if (!tag.test(html) || !three) return html;
-            return html.replace(tag, function () { return '<script>' + three.replace(/<\/script/gi, '<\\/script') + '<\/script>'; });
-          });
-        }).catch(function (e) { delete cache[key]; throw e; });   // a failed read is tried again next time, not remembered
-      } };
-    });
-    if (Object.keys(roomCfg).length) window.XA_ROOMS = Object.assign({}, window.XA_ROOMS, roomCfg);
+    // Rooms are not listed here: a door's destination, and the room's page, are read from the world registry by the hall itself
+    // (hash-checked). The hall gives a room page its own copy of three.js, which is this text (the `three` pack, or #3078's).
+    window.XA_PARTS = { threeText: function () { return byName['three.js'] || ''; } };
     if (CONFIG.world) window.XA_WORLD_CONFIG = CONFIG.world;   // contract ids for the world reader (absent = off)
     window.XA_BUILD = { version: CONFIG.version, bundleId: CONFIG.bundleId, packs: CONFIG.packs, parts: CONFIG.parts };
     P.ORDER.js.forEach(function (n) {

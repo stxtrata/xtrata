@@ -9,8 +9,5 @@
     "hall": 3080
   },
   "parts": {},
-  "parentTokenId": 0,
-  "rooms": {
-    "casino": 0
-  }
+  "parentTokenId": 0
 }

@@ -4,7 +4,8 @@
 //   9100         = src/parts/game-cave-diver.js (a single-part override)
 // Scenarios: bundle only; changed packs over the bundle; one part override; Leather shim;
 // idle cabinet screens showing the Top 10; the gateway (R2) fast path, a tampered gateway,
-// and the parent inside a viewer-style sandboxed srcdoc frame.
+// the parent inside a viewer-style sandboxed srcdoc frame, and (7) the casino opened through the
+// world registry's lobby door (no room listed in the parent), on the arcade's own three.js.
 // https://xtrata.xyz/i/<id> is mocked per test (`gateway`): 'serve', 'tamper', or down.
 // Run: NODE_PATH=<playwright + @stacks/transactions> CHROME_PATH=... node tests/hall-parent.test.cjs [shotsDir]
 const { chromium } = require('playwright');
@@ -14,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 const crypto = require('crypto');
+const MC = require('./lib/mock-chain.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
@@ -26,7 +28,7 @@ const CONTENT = {
   9100: fs.readFileSync(path.join(ROOT, 'src', 'parts', 'game-cave-diver.js'))
 };
 for (const [name, id] of Object.entries(PACK_IDS)) CONTENT[id] = fs.readFileSync(path.join(DIST, manifest.packs[name].file));
-CONTENT[9200] = fs.readFileSync(path.join(DIST, 'rooms', 'casino-room.html'));   // a room that is its own inscription
+CONTENT[9200] = fs.readFileSync(path.join(ROOT, 'build', 'rooms', 'casino-room.html'));   // a room: the entry inscription of its space in the registry
 // The released ids (parent/ids.json): engine #3079, hall #3080 over the bundle #3078.
 const RELEASED = manifest.parent.config;
 for (const [name, id] of Object.entries(RELEASED.packs)) if (id > 0) CONTENT[id] = CONTENT[PACK_IDS[name]];
@@ -98,6 +100,9 @@ function top10Result(board, filled) {
         return ok(top10Result(board, filled));
       }
       if (url.endsWith('/get-fee-unit')) return ok(T.cvToHex(T.responseOkCV(T.uintCV(30000))));
+      // the world registry, the poster registry and the core's inscription reads, from the in-memory chain (scenario 7)
+      const cm = /\/call-read\/([^/]+)\/([^/]+)\/([^/?]+)/.exec(url);
+      if (opts.chain && cm) { const h = opts.chain.call(cm[1] + '.' + cm[2], cm[3], args); if (h) return ok(h); }
       return route.fulfill({ status: 404, headers: cors, body: '' });
     });
     if (opts.leather) {
@@ -125,6 +130,7 @@ function top10Result(board, filled) {
       const body = (opts.gateway === 'tamper' && id === 3078) || (opts.gateway === 'tamper-room' && id === 9200) ? Buffer.concat([CONTENT[id], Buffer.from('<!-- x -->')]) : CONTENT[id];
       return route.fulfill({ status: 200, headers: { ...cors, 'Content-Type': 'text/plain' }, body });
     });
+    if (opts.test) await ctx.addInitScript(() => { window.XA_TEST = 1; Element.prototype.requestPointerLock = function () {}; });
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
@@ -297,44 +303,57 @@ function top10Result(board, filled) {
   if (SHOTS) await r.page.screenshot({ path: path.join(SHOTS, '15-viewer-srcdoc.png') });
   await r.ctx.close();
 
-  /* 7. A room that is its own inscription (the casino): read by id, hash-checked, three.js swapped for the arcade's own copy, then it runs. */
-  const roomSha = crypto.createHash('sha256').update(CONTENT[9200]).digest('hex');
-  const roomParent = parentWith({ bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: { 9200: roomSha }, rooms: { casino: { id: 9200, title: 'ROYAL FLUSH CASINO' } } });
+  /* 7. The casino as a room of the world registry: no room is listed in the parent. The lobby's door leads to the space "casino"
+     (a mocked xtrata-world-v2, tests/lib/mock-chain.cjs); its entry is the casino page's inscription (#9200), read by id and checked
+     against its chain hash and size, framed in a sandbox, with its cdnjs three.js tag swapped for the arcade's own copy (window.XA_PARTS). */
+  const REG = 'SP000000000000000000002Q6VF78.xtrata-world-v2', POST = 'SP000000000000000000002Q6VF78.xtrata-posters-v1';
+  const roomChain = () => {
+    const door = (space, name, to) => ({ space, parent: 0, kind: 0, name, params: '{}', portal: { to, arrival: 0, path: '' }, active: { patch: '{"base":"door"}', interaction: 3 } });
+    return MC.createChain({
+      spaces: { 1: { parent: 0, slug: '', kind: 0 }, 2: { parent: 1, slug: 'arcade', kind: 0 }, 3: { parent: 2, slug: 'hall', title: 'Hall' }, 4: { parent: 2, slug: 'lobby', title: 'Lobby' },
+        10: { parent: 2, slug: 'casino', title: 'Royal Flush Casino', runtime: 2, entry: { id: 9200, hash: MC.chainHash(CONTENT[9200]).toString('hex'), size: CONTENT[9200].length } } },
+      objects: { 20: door(3, 'bay-0', 4), 30: door(4, 'bay-0', 10) }, kinds: MC.KINDS, inscriptions: { 9200: CONTENT[9200] },
+    });
+  };
+  const roomParent = parentWith({ bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {}, world: { posters: POST, registry: REG } });
+  check(!/"rooms"/.test(roomParent) && !/XA_ROOMS/.test(roomParent) && !('rooms' in RELEASED), 'the parent lists no rooms (no CONFIG.rooms, no XA_ROOMS)');
   pages['/room.html'] = roomParent;
-  r = await open('/room.html');
-  check(!r.loadErr && await r.page.evaluate(() => !!(window.XA_ROOMS && typeof window.XA_ROOMS.casino.load === 'function' && window.XA_ROOMS.casino.title === 'ROYAL FLUSH CASINO')), 'a configured room becomes window.XA_ROOMS.casino with a loader (nothing fetched until a door opens it)');
-  check(!r.reads[9200], 'the room is not read at boot');
-  const roomHtml = await r.page.evaluate(() => window.XA_ROOMS.casino.load());
-  check(r.reads[9200] > 0 && !r.gw[9200], 'with no gateway the room is read from the chain by its id (' + r.reads[9200] + ' chunks)');
-  check(typeof roomHtml === 'string' && !/cdnjs\.cloudflare/.test(roomHtml) && roomHtml.length > CONTENT[9200].length + 400000 && /REVISION/.test(roomHtml), 'the room\'s cdnjs three.js tag is replaced by the arcade\'s own copy (' + Math.round(roomHtml.length / 1024) + ' KB page, no CDN)');
-  const before9200 = r.reads[9200];
-  await r.page.evaluate(() => window.XA_ROOMS.casino.load());
-  check(r.reads[9200] === before9200, 'a second load is remembered (no second read)');
-  const ran = await r.page.evaluate(async (doc) => {
-    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:99999;border:0';
-    document.body.appendChild(f);
-    await new Promise((res) => { f.addEventListener('load', res, { once: true }); f.srcdoc = doc; });
-    for (let i = 0; i < 160 && !(f.contentWindow.__casino); i++) await new Promise((res) => setTimeout(res, 500));
-    const w = f.contentWindow;
-    return { casino: !!w.__casino, three: !!(w.THREE && w.THREE.REVISION), rev: w.THREE && w.THREE.REVISION, ownRealm: w.THREE !== window.THREE, canvas: !!w.document.querySelector('canvas') };
-  }, roomHtml);
-  check(ran.casino && ran.three && ran.canvas && ran.rev === '128', 'the casino runs inside the frame on the arcade\'s three.js r' + ran.rev + ' (own copy inside the frame: ' + ran.ownRealm + ')');
+  async function walkIntoCasino(r) {
+    const page = r.page;
+    await page.waitForFunction(() => window.XA && window.XA.bayState && window.XA.bayState() && window.XA.bayState().bays[4] && window.XA.bayState().bays[4].plan && window.XA.lobbyState().bay === 0, null, { timeout: 180000 });
+    await page.click('#go'); await page.waitForTimeout(600);
+    const openDoor = (i) => page.evaluate((n) => window.XA.bayDoor(n, (m) => { m.cfg.locked = false; m.angle = m.cfg.openAngle; m.vel = 0; m.mode = 'free'; m.wake(); }), i);
+    await openDoor(0);
+    await page.waitForFunction(() => window.XA.lobbyState().open === true, null, { timeout: 120000 });
+    await page.evaluate(() => window.XA.pose(-8, -13.1, -Math.PI / 2, -0.05));
+    await page.waitForFunction(() => window.XA.lobbyState().inside === true, null, { timeout: 120000 });
+    await openDoor(4);
+    await page.evaluate(() => { const p = window.XA.bayState().bays[4].pos; window.XA.pose(p.x + 1.6, p.z, Math.PI / 2, -0.05); });
+    await page.keyboard.down('KeyW');
+    try { for (let i = 0; i < 400 && (await page.evaluate(() => window.XA.roomState().state)) !== 'room'; i++) { await page.evaluate(() => { const w = window.XA.where(); window.XA.pose(w.x, w.z, Math.PI / 2, -0.05); }); await page.waitForTimeout(250); } } finally { await page.keyboard.up('KeyW'); }
+    const fh = await page.waitForSelector('iframe[data-xa-room][srcdoc]', { state: 'attached', timeout: 180000 });
+    const f = await fh.contentFrame();
+    let ran = null;
+    for (let i = 0; i < 240 && !(ran && ran.casino); i++) { await page.waitForTimeout(500); ran = await f.evaluate(() => ({ casino: !!window.__casino, rev: window.THREE && window.THREE.REVISION, canvas: !!document.querySelector('canvas'), origin: String(window.origin), from: window.__XA_FROM_ARCADE, entry: window.XA_ENTRY, bridge: !!window.XA_ROOM })).catch(() => null); }
+    const doc = await page.evaluate(() => { const fr = document.querySelector('iframe[data-xa-room]'); return { sandbox: fr.getAttribute('sandbox'), len: fr.getAttribute('srcdoc').length, cdn: /cdnjs\.cloudflare/.test(fr.getAttribute('srcdoc')) }; });
+    return { ran, doc };
+  }
+  let chain7 = roomChain();
+  r = await open('/room.html', { chain: chain7, gateway: 'tamper-room', test: true });
+  check(!r.loadErr && await r.page.evaluate(() => !window.XA_ROOMS && typeof window.XA_PARTS.threeText === 'function' && window.XA_PARTS.threeText().length > 500000), 'the parent hands the hall its three.js (XA_PARTS.threeText) and sets no XA_ROOMS');
+  check(!r.reads[9200] && !chain7.log.some((l) => l.fn === 'get-chunk-batch'), 'the room is not read at boot');
+  let w7 = await walkIntoCasino(r);
+  check(w7.ran && w7.ran.casino && w7.ran.rev === '128' && w7.ran.canvas, 'walking through the lobby door opens the real casino, running in its frame on the arcade\'s three.js r' + (w7.ran && w7.ran.rev));
+  check(w7.doc.sandbox === 'allow-scripts allow-pointer-lock allow-downloads' && w7.ran.origin === 'null', 'the casino runs sandboxed, with an opaque origin (no allow-same-origin)');
+  check(!w7.doc.cdn && w7.doc.len > CONTENT[9200].length + 400000, 'its cdnjs three.js tag is replaced by the arcade\'s own copy (' + Math.round(w7.doc.len / 1024) + ' KB page, no CDN)');
+  check(w7.ran.from === 1 && w7.ran.bridge && JSON.stringify(w7.ran.entry) === JSON.stringify({ from: 'lobby', door: 'bay-0', arrival: 0 }), 'the casino is told it came from the arcade (XA_ROOM, XA_ENTRY ' + JSON.stringify(w7.ran.entry) + ')');
+  check(r.gw[9200] > 0 && chain7.log.some((l) => l.fn === 'get-chunk-batch'), 'a tampered gateway copy of the room is refused: it is read from the chain instead');
   check(!r.errors.filter((e) => !/permissions policy/i.test(e)).length, 'no page errors with the room running ' + r.errors.slice(0, 2).join(' | '));
   await r.ctx.close();
-  // via the gateway, and a tampered gateway copy is refused (chain read instead)
-  pages['/room-gw.html'] = roomParent;
-  r = await open('/room-gw.html', { gateway: 'tamper-room' });
-  const html2 = await r.page.evaluate(() => window.XA_ROOMS.casino.load());
-  check(r.gw[9200] > 0 && r.reads[9200] > 0 && html2 === roomHtml, 'a tampered gateway copy of the room is refused: it is read from the chain and is identical');
-  await r.ctx.close();
-  r = await open('/room-gw.html', { gateway: 'serve' });
-  const html3 = await r.page.evaluate(() => window.XA_ROOMS.casino.load());
-  check(r.gw[9200] > 0 && !r.reads[9200] && html3 === roomHtml, 'from the gateway, the room is taken whole once its hash matches');
-  await r.ctx.close();
-  // a room with id 0 is simply not there
-  pages['/room-0.html'] = parentWith({ bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {}, rooms: {} });
-  r = await open('/room-0.html');
-  check(await r.page.evaluate(() => !window.XA_ROOMS), 'with no room id in the parent there is no XA_ROOMS: the casino door stays closed');
+  chain7 = roomChain();
+  r = await open('/room.html', { chain: chain7, gateway: 'serve', test: true });
+  w7 = await walkIntoCasino(r);
+  check(w7.ran && w7.ran.casino && r.gw[9200] > 0 && !chain7.log.some((l) => l.fn === 'get-chunk-batch'), 'from the gateway, the room is taken whole once its chain hash matches (no chain reads)');
   await r.ctx.close();
 
   await browser.close();
