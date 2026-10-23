@@ -37,8 +37,8 @@ export const addr = (cv) => pp(cv).replace(/^'/, '');
 export const idOf = (r) => Number(r.result.value.value);
 export const good = (r) => r.result.type === 'ok';
 
-export async function world() {
-  const { simnet, deployer, W } = await boot();
+export async function world(opts = {}) {
+  const { simnet, deployer, W } = await boot(opts);
   const call = (fn, args = [], sender = deployer) => simnet.callPublicFn('xtrata-world-v2', fn, args, sender);
   const ro = (fn, args = []) => simnet.callReadOnlyFn('xtrata-world-v2', fn, args, deployer).result;
   const h = () => simnet.burnBlockHeight;
@@ -77,13 +77,14 @@ export async function world() {
         U(o.runtime ?? 1), Cl.bool(o.transferable ?? true), policy,
       ], sender);
     },
-    // buy a listed space: names the listed price and the space version just read
-    buy: (sender, id, price) => {
+    // buy a listed space: names the listed price, the space version just read and the most the buyer will pay
+    // in all (default: no limit beyond MAX-PRICE + MAX-FLAT)
+    buy: (sender, id, price, max = 1_000_000_050_000_000) => {
       const sp = ro('get-space', [U(id)]);
       const ver = sp.type === 'some' ? sp.value.value.version : U(0);
       let pr = price;
       if (pr === undefined) { const l = ro('get-listing', [U(id)]); pr = l.type === 'some' ? Number(l.value.value.price.value) : 0; }
-      return call('buy-space', [U(id), U(pr), ver], sender);
+      return call('buy-space', [U(id), U(pr), ver, U(max)], sender);
     },
     setState: (sender, id, state) => call('set-space-state', [U(id), U(state)], sender),
     grant: (sender, space, who, caps, inherit = false, expires = 0) =>
@@ -118,8 +119,8 @@ export const bindingsArg = (list) => Cl.list(list.map(([role, contract, iface]) 
 //   2 arcade (domain)  3 lobby (room)  4 casino (room)  5 hall (room)    all root-owned, system-locked
 //   6 plots (domain)   7 alice (plot, W[0])
 // and built-in kinds: 0 carpet (material), 1 door (door), 2 sign (display), 3 stool (prop)
-export async function standardWorld() {
-  const w = await world();
+export async function standardWorld(opts = {}) {
+  const w = await world(opts);
   const { deployer, W } = w;
   const sys = (parent, slug, kind) => w.space(deployer, { parent, slug, kind, runtime: 0, transferable: false });
   const must = (r, what) => { if (!good(r)) throw new Error(`${what}: ${pp(r.result)}`); return idOf(r); };
