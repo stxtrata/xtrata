@@ -25,7 +25,7 @@
 ;;   buying and approving, never refunds, settling or retiring.
 ;; - Successor pointer with a one-way lock; the read interface is frozen at v1.
 ;;
-;; Layout values: 0 standard, 1 picture fills the feature panel, 2 picture fills the whole screen (needs a picture)
+;; Layout values: 0 standard (panel, plus its turn in the full-screen rotation if it has a picture), 1 full-screen only (premium, needs a picture)
 ;; Kind values:   0 message, 1 news, 2 ad
 ;; Status values: 0 pending (awaiting review), 1 approved (live or scheduled), 2 closed
 ;; Closed reasons: 1 rejected, 2 cancelled, 3 swept (review window passed), 4 retired,
@@ -52,6 +52,9 @@
 (define-constant MAX-IMAGE-BYTES u2097152)
 (define-constant MAX-SPAN u52560)               ;; one year of burn blocks
 (define-constant MAX-PRICE-PER-DAY u1000000000) ;; 1000 STX
+(define-constant PREMIUM-WEIGHT u2)             ;; a bought full-screen-only slot comes round twice as often in the full-screen rotation
+(define-constant MIN-PREMIUM-PERCENT u100)
+(define-constant MAX-PREMIUM-PERCENT u1000)
 (define-constant MAX-DAYS-LIMIT u90)
 (define-constant MAX-PAID-LIVE-LIMIT u16)
 (define-constant MAX-PENDING-LIMIT u8)
@@ -73,6 +76,7 @@
 ;; paid-slot settings (slots are off until the admin switches them on)
 (define-data-var slots-enabled bool false)
 (define-data-var prices { message: uint, news: uint, ad: uint } { message: u1000000, news: u2000000, ad: u5000000 })
+(define-data-var premium-percent uint u200)   ;; a full-screen-only slot costs this % of the kind's price (100 = no premium)
 (define-data-var min-days uint u1)
 (define-data-var max-days uint u14)
 (define-data-var max-paid-live uint u8)
@@ -157,10 +161,12 @@
     (and (is-eq id u0) (is-eq (len hash) u0))
     (and (<= size MAX-IMAGE-BYTES) (inscription-ok? id hash size who))))
 
-;; How the picture is laid out: 0 standard (text with the picture beside it), 1 the picture fills the whole feature panel,
-;; 2 the picture fills the whole screen face. Only a picture can fill anything: layout 1 or 2 needs one.
+;; How an item is shown: 0 standard, 1 FULL-SCREEN ONLY (a premium slot). A standard item with a picture is shown in the feature panel
+;; and also takes its turn in the hall's full-screen rotation, so everything with a picture gets the whole screen now and then.
+;; A full-screen-only item is never shown in the panel, only in that rotation, and the hall gives it a larger share of it.
+;; Only a picture can fill the screen: layout 1 needs one.
 (define-private (layout-ok? (layout uint) (image-size uint))
-  (and (<= layout u2) (or (is-eq layout u0) (> image-size u0))))
+  (and (<= layout u1) (or (is-eq layout u0) (> image-size u0))))
 
 (define-private (price-of (kind uint))
   (let ((p (var-get prices)))
@@ -339,7 +345,8 @@
   (let (
     (buyer tx-sender)
     (id (var-get count))
-    (price (if (and (>= days (var-get min-days)) (<= days (var-get max-days))) (* (price-of kind) days) u0))
+    (per-day (if (is-eq layout u1) (/ (* (price-of kind) (var-get premium-percent)) u100) (price-of kind)))
+    (price (if (and (>= days (var-get min-days)) (<= days (var-get max-days))) (* per-day days) u0))
     (pend (default-to u0 (map-get? PendingCount tx-sender))))
     (asserts! (not (var-get paused)) ERR-PAUSED)
     (asserts! (var-get slots-enabled) ERR-SLOTS-OFF)
@@ -357,7 +364,7 @@
     (map-set Items id {
       kind: kind, head: head, body: body,
       image-id: image-id, image-hash: image-hash, image-size: image-size, layout: layout,
-      weight: u1, publisher: buyer, paid: true, buyer: (some buyer), days: days, price: price, escrow: price,
+      weight: (if (is-eq layout u1) PREMIUM-WEIGHT u1), publisher: buyer, paid: true, buyer: (some buyer), days: days, price: price, escrow: price,
       status: u0, hidden: false, starts-at: u0, ends-at: u0,
       added-at: burn-block-height, closed-reason: u0 })
     (map-set PendingCount buyer (+ pend u1))
@@ -474,6 +481,14 @@
     (note "prices" u0)
     (ok true)))
 
+(define-public (set-premium-percent (pct uint))
+  (begin
+    (asserts! (is-admin) ERR-NOT-AUTHORIZED)
+    (asserts! (and (>= pct MIN-PREMIUM-PERCENT) (<= pct MAX-PREMIUM-PERCENT)) ERR-INVALID)
+    (var-set premium-percent pct)
+    (note "premium" pct)
+    (ok true)))
+
 (define-public (set-limits (min-d uint) (max-d uint) (paid-live uint) (pending uint) (window uint))
   (begin
     (asserts! (is-admin) ERR-NOT-AUTHORIZED)
@@ -562,7 +577,7 @@
 (define-read-only (get-config)
   {
     paused: (var-get paused), review-lane: (var-get review-lane), slots-enabled: (var-get slots-enabled),
-    prices: (var-get prices), min-days: (var-get min-days), max-days: (var-get max-days),
+    prices: (var-get prices), premium-percent: (var-get premium-percent), min-days: (var-get min-days), max-days: (var-get max-days),
     max-paid-live: (var-get max-paid-live), max-pending-per-buyer: (var-get max-pending-per-buyer),
     review-window: (var-get review-window), fee-recipient: (var-get fee-recipient),
     kind-caps: (var-get kind-caps), cap-live-per-publisher: (var-get cap-live-per-publisher),

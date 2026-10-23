@@ -178,33 +178,52 @@ test('pictures: sealed, the right size and hash, made by the poster, within the 
   assert.equal(R(s.post(W[0], { img: { id: 0, hash: hash32(1), size: 0 } })), err(405));
 });
 
-test('layout: 0 standard, 1 fills the feature panel, 2 fills the whole screen; 1 and 2 need a picture; stored and read back; paid slots too', async () => {
+test('layout: 0 standard (panel + its turn full-screen), 1 full-screen only (premium); 1 needs a picture; premium price and weight', async () => {
   const s = await screen();
   const { deployer, W, simnet } = s;
   s.call('set-publisher', [P(W[0]), U(1)]);
   const img = { id: 21, hash: hash32(21), size: 300000 };
   mockInscription(simnet, deployer, 21, { hash: img.hash, size: 300000, creator: W[0] });
   mockInscription(simnet, deployer, 22, { hash: hash32(22), size: 300000, creator: W[1] });
+  mockInscription(simnet, deployer, 23, { hash: hash32(23), size: 300000, creator: W[1] });
   const lay = (id) => Number(s.item(id).layout.value);
   assert.equal(lay(s.idOf(s.post(W[0], { img }))), 0, 'default is the standard layout');
-  assert.equal(lay(s.idOf(s.post(W[0], { img, layout: 1 }))), 1);
-  assert.equal(lay(s.idOf(s.post(W[0], { img, layout: 2 }))), 2);
-  assert.equal(R(s.post(W[0], { img, layout: 3 })), err(403), 'only 0, 1 or 2');
-  assert.equal(R(s.post(W[0], { layout: 1 })), err(403), 'nothing to fill the panel with: refused');
-  assert.equal(R(s.post(W[0], { layout: 2 })), err(403));
+  assert.equal(lay(s.idOf(s.post(W[0], { img, layout: 1 }))), 1, 'a publisher may post a full-screen-only item (free, weight is its own)');
+  assert.equal(R(s.post(W[0], { img, layout: 2 })), err(403), 'only 0 or 1');
+  assert.equal(R(s.post(W[0], { layout: 1 })), err(403), 'nothing to fill the screen with: refused');
   assert.equal(R(s.post(W[0], { layout: 0 })).startsWith('(ok u'), true, 'a text-only item is still fine');
-  // the same rules for a bought slot, and the layout is kept through approval
+  // premium price: default 200% of the kind's price, whole numbers per day, set by the admin only
   s.call('set-slots-enabled', [Cl.bool(true)]);
+  const cfg = () => s.ro('get-config').value;
+  assert.equal(cfg()['premium-percent'].value, 200n, 'default premium is double');
   const img2 = { id: 22, hash: hash32(22), size: 300000 };
-  assert.equal(R(s.buy(W[1], { kind: 2, layout: 2 })), err(403), 'a full-screen ad needs a picture');
-  assert.equal(R(s.buy(W[1], { kind: 2, img: img2, layout: 4 })), err(403));
+  assert.equal(R(s.buy(W[1], { kind: 2, layout: 1 })), err(403), 'full-screen only needs a picture');
+  assert.equal(R(s.buy(W[1], { kind: 2, img: img2, layout: 2 })), err(403));
   const b0 = s.bal(W[1]);
-  const id = s.idOf(s.buy(W[1], { kind: 2, img: img2, layout: 2, days: 2 }));
-  assert.equal(b0 - s.bal(W[1]), 10_000_000n, 'a full-screen ad costs the ad price, 5 STX a day');
-  assert.equal(lay(id), 2);
+  const id = s.idOf(s.buy(W[1], { kind: 2, img: img2, layout: 1, days: 2 }));
+  assert.equal(b0 - s.bal(W[1]), 20_000_000n, 'a 2-day full-screen-only ad: 5 STX x 2 (premium) x 2 days');
+  assert.equal(lay(id), 1); assert.equal(s.item(id).weight.value, 2n, 'premium comes round twice as often in the full-screen rotation');
   assert.equal(R(s.call('approve', [U(id)])), OK);
-  assert.equal(lay(id), 2, 'approval does not touch the layout');
-  assert.ok(s.live().includes(id));
+  assert.equal(lay(id), 1, 'approval does not touch the layout'); assert.ok(s.live().includes(id));
+  simnet.mineEmptyBurnBlocks(100);
+  assert.equal(R(s.call('settle', [U(id)], W[3])), '(ok u10000000)', 'a premium slot is earned a day at a time like any other (10 STX a day)');
+  const std = s.idOf(s.buy(W[1], { kind: 2, img: { id: 23, hash: hash32(23), size: 300000 }, layout: 0, days: 2 }));
+  assert.equal(s.item(std).weight.value, 1n); assert.equal(s.item(std).price.value, 10_000_000n, 'standard stays at 5 STX a day');
+  // premium setting: admin only, 100..1000, applies to new purchases only
+  assert.equal(R(s.call('set-premium-percent', [U(150)], W[1])), err(400));
+  assert.equal(R(s.call('set-premium-percent', [U(99)])), err(403)); assert.equal(R(s.call('set-premium-percent', [U(1001)])), err(403));
+  assert.equal(R(s.call('set-premium-percent', [U(150)])), OK);
+  assert.equal(s.item(id).price.value, 20_000_000n, 'a running premium slot keeps the price it was bought at');
+  const b1 = s.bal(W[2] ?? W[1]);
+  mockInscription(simnet, deployer, 24, { hash: hash32(24), size: 1000, creator: W[2] });
+  const r = s.idOf(s.buy(W[2], { kind: 1, img: { id: 24, hash: hash32(24), size: 1000 }, layout: 1, days: 3 }));
+  assert.equal(s.item(r).price.value, 9_000_000n, '2 STX x 150% x 3 days');
+  assert.equal(R(s.call('set-premium-percent', [U(100)])), OK);
+  assert.equal(s.item(s.idOf(s.buy(W[3], { kind: 0, layout: 0, days: 1 }))).price.value, 1_000_000n);
+  void b1;
+  // the earned/refund arithmetic is the same for a premium slot: cancel before review refunds everything
+  const b2 = s.bal(W[1]); const id2 = s.idOf(s.buy(W[1], { kind: 2, img: { id: 23, hash: hash32(23), size: 300000 }, layout: 1, days: 1 }));
+  assert.equal(R(s.call('cancel', [U(id2)], W[1])), OK); assert.equal(s.bal(W[1]), b2, 'refunded in full');
 });
 
 test('expiry: ended items drop out of the live set on the next write or prune', async () => {

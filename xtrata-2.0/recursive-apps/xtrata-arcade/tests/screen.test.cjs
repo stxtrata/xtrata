@@ -428,37 +428,52 @@ test('6d an animated GIF asks for fast repaints only while it is the item on scr
   v.S.idle(); eq(clips[0].paused, true, 'idle() (player far from the screen) pauses clips');
 });
 
-test('6e layouts: 0 standard, 1 fills the feature panel, 2 fills the whole screen above the ticker; both fall back to standard until the picture is decoded', async () => {
-  const hash = new Uint8Array(32).fill(5);
-  const S0 = boot().S;
-  eq(S0.normalizeItem(1, { kind: 2, head: 'A' }).layout, 0, 'an old item with no layout field is standard');
-  eq([S0.normalizeItem(1, { layout: 1 }).layout, S0.normalizeItem(1, { layout: 2 }).layout, S0.normalizeItem(1, { layout: 9 }).layout, S0.normalizeItem(1, { layout: -3 }).layout], [1, 2, 2, 0]);
-  for (const layout of [0, 1, 2]) {
-    const n = on(boot({ live: [1], items: { 1: { kind: 2, head: 'BIG AD', body: 'body text', imageId: 50, imageHash: hash, imageSize: 9999, paid: true, layout } } }));
-    const st = pictureHarness(n, 'png'); st.dim = [800, 400];
-    await n.S.refresh(true); const it = n.S.items()[0]; eq(it.layout, layout);
-    let x = draw(n.S, { items: [it], scorers: [{ game: 'G', name: 'N', score: '1', age: 1 }] });
-    eq(x.images.length, 0, 'layout ' + layout + ': nothing drawn before the picture is ready'); ok(has(x, 'LATEST SCORERS') && has(x, 'BIG AD'), 'the standard panel shows meanwhile');
-    await settle(n); st.imgs[0].naturalWidth = 800; st.imgs[0].naturalHeight = 400; st.imgs[0].onload();
-    x = draw(n.S, { items: [it], scorers: [{ game: 'G', name: 'N', score: '1', age: 1 }] });
-    eq(x.images.length, 1, 'layout ' + layout + ': exactly one picture drawn per frame');
-    const [dx, dy, dw, dh] = x.drawn[0];
-    if (layout === 0) { ok(dw < 400, 'standard: a thumbnail beside the text'); ok(has(x, 'body text')); }
-    if (layout === 1) {
-      ok(dw > 700 && dw <= 792, 'panel fill: nearly the whole panel width (' + dw + ')'); eq(dw / dh, 2, 'aspect kept (800x400)');
-      ok(dx >= 460, 'inside the panel, right of the scorers'); ok(has(x, 'LATEST SCORERS'), 'scorers and clock stay'); ok(!has(x, 'body text'), 'body text is not drawn over the picture'); ok(has(x, 'BIG AD'), 'headline strip kept');
-    }
-    if (layout === 2) {
-      eq([dw, dh], [1240, 620], 'screen fill: an 800x400 picture fitted into 1280 x 620 (everything above the 100 px ticker)'); eq(dx, 20, 'centred'); eq(dy, 0);
-      ok(has(x, 'BIG AD') && has(x, 'AD · PAID'), 'label and headline kept'); ok(has(x, IDLE) || x.texts.some((t) => /SCORE|BITCOIN/.test(t)), 'the ticker stays');
-    }
-  }
-  // fit, never crop or stretch: a tall picture is pillar-boxed
-  const n = on(boot({ live: [1], items: { 1: { kind: 2, head: 'TALL', imageId: 51, imageHash: hash, imageSize: 9999, paid: true, layout: 2 } } }));
-  const st = pictureHarness(n, 'png'); await n.S.refresh(true); const it = n.S.items()[0];
-  draw(n.S, { items: [it] }); await settle(n); st.imgs[0].naturalWidth = 300; st.imgs[0].naturalHeight = 600; st.imgs[0].onload();
-  const x = draw(n.S, { items: [it] }); const [dx, dy, dw, dh] = x.drawn[0];
+test('6e two rotations: standard items take the panel, every 3rd slot is full-screen for every item with a picture; premium (layout 1) is full-screen only and comes round twice as often', async () => {
+  const S0 = boot().S, hash = new Uint8Array(32).fill(5);
+  eq([S0.normalizeItem(1, {}).layout, S0.normalizeItem(1, { layout: 1 }).layout, S0.normalizeItem(1, { layout: 2 }).layout, S0.normalizeItem(1, { layout: -3 }).layout], [0, 1, 0, 0], 'only 1 means full-screen only; old items are standard');
+  const mk = (id, extra) => S0.normalizeItem(id, Object.assign({ kind: 1, head: 'H' + id, status: 1, weight: 1 }, extra));
+  const pic = { 'image-id': 50, 'image-size': 9999, 'image-hash': hash };
+  const A = mk(1, {}), B = mk(2, Object.assign({ kind: 2 }, pic)), P = mk(3, Object.assign({ kind: 2, layout: 1, weight: 2 }, pic)), C = mk(4, {});
+  const seq = (items, from, to) => { const o = []; for (let k = from; k < to; k++) { const r = S0.slotAt(items, k * 12, 12, 3); o.push((r.item ? r.item.id : 0) + (r.full ? 'F' : 'p')); } return o; };
+  eq(seq([A, B, P, C], 0, 12), ['1p', '2p', '2F', '4p', '1p', '3F', '2p', '4p', '3F', '1p', '2p', '2F'], 'panel: 1,2,4 in turn; full-screen slot every 3rd: B, P, P, B, ... (premium weight 2)');
+  const long = seq([A, B, P, C], 0, 297);   // 99 whole cycles
+  ok(!long.includes('3p'), 'a full-screen-only item is never in the panel'); ok(long.filter((x) => x === '2F').length > 0, 'a standard item with a picture does get the whole screen');
+  eq(long.filter((x) => x === '3F').length, 2 * long.filter((x) => x === '2F').length, 'premium gets twice the full-screen turns');
+  ok(!long.includes('1F') && !long.includes('4F'), 'no picture, no full-screen turn');
+  eq(seq([A, C], 0, 6), ['1p', '4p', '1p', '4p', '1p', '4p'], 'nothing has a picture: all panel');
+  eq(seq([P], 0, 4), ['3F', '3F', '3F', '3F'], 'only full-screen items: every slot is full-screen');
+  eq(seq([], 0, 2), ['0p', '0p']); eq(S0.slotAt([], 5).item, null);
+  eq(S0.featureAt([A, B, P, C], 24, 12).id, 2, 'featureAt still answers "which item"');
+  eq(S0.slotAt([A, P], 0, 12, 2).full, false, 'every=2: slot 0 panel'); eq(S0.slotAt([A, P], 12, 12, 2).full, true, 'every=2: slot 1 full-screen'); eq(S0.slotAt([A, P], 12, 12, 1).full, true, 'every is at least 2 (1 would leave no panel slot)');
+
+  // drawing: a full-screen slot paints the picture over the whole screen above the ticker; a panel slot paints the thumbnail
+  const n = on(boot({ live: [1], items: { 1: { kind: 2, head: 'BIG AD', body: 'body text', imageId: 50, imageHash: hash, imageSize: 9999, paid: true } } }));
+  const st = pictureHarness(n, 'png');
+  await n.S.refresh(true); const it = n.S.items()[0];
+  let x = draw(n.S, { items: [it], t: 24 });   // single item with a picture: slot 2 is the full-screen slot
+  eq(x.images.length, 0, 'nothing drawn before the picture is ready'); ok(has(x, 'BIG AD') && has(x, 'body text'), 'the item shows in the panel meanwhile');
+  await settle(n); st.imgs[0].naturalWidth = 800; st.imgs[0].naturalHeight = 400; st.imgs[0].onload();
+  x = draw(n.S, { items: [it], t: 24 });
+  eq(x.images.length, 1, 'one picture per frame'); eq(x.drawn[0].map(Math.round), [20, 0, 1240, 620], 'an 800x400 picture fitted into 1280 x 620, above the 100 px ticker, centred');
+  ok(has(x, 'BIG AD') && has(x, 'AD · PAID'), 'label and headline strip kept');
+  x = draw(n.S, { items: [it], t: 0 });
+  eq(x.images.length, 1); ok(x.drawn[0][2] < 400, 'a panel slot: the thumbnail beside the text'); ok(has(x, 'body text'));
+  // a tall picture is pillar-boxed, never stretched
+  const n2 = on(boot({ live: [1], items: { 1: { kind: 2, head: 'TALL', imageId: 51, imageHash: hash, imageSize: 9999, paid: true, layout: 1 } } }));
+  const st2 = pictureHarness(n2, 'png'); await n2.S.refresh(true); const it2 = n2.S.items()[0]; eq(it2.layout, 1);
+  draw(n2.S, { items: [it2] }); await settle(n2); st2.imgs[0].naturalWidth = 300; st2.imgs[0].naturalHeight = 600; st2.imgs[0].onload();
+  x = draw(n2.S, { items: [it2] }); const [dx, dy, dw, dh] = x.drawn[0];
   eq([Math.round(dh), Math.round(dw)], [620, 310]); ok(Math.abs(dx - 485) < 0.01, 'centred');
+  // a premium picture that fails (bad hash) leaves the rotation: nothing is ever shown for it in the panel
+  const n3 = on(boot({ live: [1], items: { 1: { kind: 2, head: 'GONE', imageId: 52, imageHash: hash, imageSize: 9999, paid: true, layout: 1 } } }));
+  pictureHarness(n3, 'fail'); await n3.S.refresh(true); const it3 = n3.S.items()[0];
+  draw(n3.S, { items: [it3] }); await settle(n3);
+  eq(n3.S.slotAt([it3], 0, 12).item, null, 'a full-screen-only item whose picture failed is dropped, not shown as text');
+  // look-ahead: the picture for the next (full-screen) slot is requested one slot early
+  const n4 = on(boot({ live: [1, 2], items: { 1: { kind: 1, head: 'TEXT', body: 'b' }, 2: { kind: 2, head: 'PREMIUM', imageId: 53, imageHash: hash, imageSize: 9999, paid: true, layout: 1, weight: 2 } } }));
+  const st4 = pictureHarness(n4, 'png'); await n4.S.refresh(true); const [t1, p2] = n4.S.items();
+  draw(n4.S, { items: [t1, p2], t: 0 }); eq(st4.loads.length, 0, 'slot 0 -> next is a panel slot: nothing fetched yet');
+  draw(n4.S, { items: [t1, p2], t: 12 }); eq(st4.loads.map((l) => l.imageId), [53], 'slot 1 -> next is the full-screen slot: its picture is fetched now');
 });
 
 /* ------------------------------------------------------------ 7  failed read keeps last good state */
