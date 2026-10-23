@@ -1495,6 +1495,64 @@ export const STEPS: Step[] = [
       const w = worldIds();
       return `contracts, ${PACKS.length + 1} inscriptions, the registry (arcade #${r.m.spaces.arcade}, hall #${r.m.spaces.hall}, verifyManifest ${vm.checked} items) and all ${PRODUCTION.length} boards re-read and match · Next, in one commit: recursive-apps/xtrata-arcade/parent/ids.json: packs {${packIds}} and "world": {"posters": "${w.posters}", "registry": "${w.registry}", "screen": "${w.screen}"} and "games": {"contract": "${gamesIds().contract}"}; public/_redirects: /arcade → /i/${id}; the homepage arcade tile → #${id}; src/arcade-submit/arcade-boards.ts: add ${id} to ARCADE_INSCRIPTION_IDS. Then open https://xtrata.xyz/x/${id} and play one run.`;
     }
+  },
+  {
+    id: 'boards26', testnetOnly: true, title: `Register all ${PRODUCTION.length} arcade boards on the leaderboard (testnet)`, who: `Web wallet · up to ${PRODUCTION.length} signatures (none for boards already set)`,
+    intro: `Testnet only. On mainnet the ${PRODUCTION.length} boards are moved by a temporary wallet (the production step) so you are not prompted ${PRODUCTION.length} times; on testnet the root key signs each \`set-board\` itself: the parent as engine id, no entry fee, enabled, one after another, each confirmed before the next. Boards that already match are skipped. This gives the testnet leaderboard the same boards the mainnet one will have.`,
+    action: 'Register the boards',
+    run: async () => {
+      const w = requireRoot(), id = state.inscriptionId;
+      if (!id) throw new Error('The parent is not inscribed yet: run the parent step first (the boards name it as their engine).');
+      const { todo, owner } = await boardPlan();
+      if (!todo.length) return `${PRODUCTION.length} boards already on engine inscription #${id} · nothing sent`;
+      if (owner !== w.address) throw new Error(`The leaderboard is owned by ${owner}, not the root wallet.`);
+      let n = 0;
+      for (const b of todo) {
+        status(`Registering ${b.id} (${n + 1} of ${todo.length})…`);
+        await runTx('boards26', `set-board ${b.id} → #${id}`, () => rootCall(scoresId(), 'set-board',
+          [stringAsciiCV(b.id), uintCV(b.mode), uintCV(b.max), uintCV(0), uintCV(BigInt(id)), boolCV(false), boolCV(true)]));
+        await eventually(b.id, async () => (boardMatches(await readBoard(b.id), b) ? null : 'not set yet'));
+        n++;
+      }
+      return `${PRODUCTION.length} boards on engine inscription #${id} · ${n} registered by the root key`;
+    }
+  },
+  {
+    id: 'testgames', testnetOnly: true, title: `Add the ${LAUNCH.testGames.length} test games to the games contract`, who: `Web wallet · ${LAUNCH.testGames.length * 3} signatures (fewer for what is already done)`,
+    intro: `Testnet only, for watching how the hall reacts to new games. For each of ${LAUNCH.testGames.map((g) => `"${g.title}" (${g.id})`).join(' and ')}: inscribes its cartridge script (re-used when the same bytes are already inscribed), registers its score board on the leaderboard (the parent as engine id; ${LAUNCH.testGames.map((g) => `${g.id} ${g.mode ? 'lowest wins' : 'highest wins'}`).join(', ')}), then calls add-game on the games contract. Each is skipped when it is already done, so a re-run resumes. The game goes live after the contract's delay (${NET().gamesDelay} blocks on testnet); the hall then shows it without any change to the hall.`,
+    action: 'Add the test games',
+    run: async () => {
+      const w = requireRoot(), parent = state.inscriptionId;
+      if (!parent) throw new Error('The parent is not inscribed yet: run the parent step first (the boards name it as their engine).');
+      if ((await ownerOf()) !== w.address) throw new Error(`The leaderboard is owned by ${await ownerOf()}, not the root wallet. Hand it back first (the handback step), then run this.`);
+      const ga = await gread('get-admin');
+      if (ga !== w.address) throw new Error(`${NAMES.games} admin is ${ga}, not the root wallet.`);
+      const lines: string[] = [];
+      for (const g of LAUNCH.testGames) {
+        const up = makeUpload(`game-${g.id}`, g.title, 'text/plain', g.source);
+        const ins = await inscribe('testgames', up, [], []);
+        const id = BigInt(ins.id);
+        const wantBoard = (b: Awaited<ReturnType<typeof readBoard>>) => !!b && b.enabled === 'true' && b.engineId === String(parent) && b.mode === String(g.mode);
+        if (!wantBoard(await readBoard(g.id))) {
+          await runTx('testgames', `set-board ${g.id} → #${parent}`, () => rootCall(scoresId(), 'set-board',
+            [stringAsciiCV(g.id), uintCV(g.mode), uintCV(g.max), uintCV(0), uintCV(BigInt(parent)), boolCV(false), boolCV(true)]));
+          await eventually(`${g.id} board`, async () => (wantBoard(await readBoard(g.id)) ? null : 'board not set yet'));
+        }
+        let n = await gread('get-game-number', [stringAsciiCV(g.id)]);
+        if (n === null) {
+          await runTx('testgames', `add-game ${g.id}`, () => rootCall(cid(NAMES.games), 'add-game',
+            [stringAsciiCV(g.id), stringAsciiCV(g.title), uintCV(id), bufferCV(up.hash), uintCV(up.bytes.length), uintCV(1), uintCV(1)]));
+          n = await eventually(`${g.id} on the games contract`, async () => ((await gread('get-game-number', [stringAsciiCV(g.id)])) === null ? 'not listed yet' : null)).then(() => gread('get-game-number', [stringAsciiCV(g.id)]));
+        }
+        const rec: any = await gread('get-game', [uintCV(BigInt(String(n).replace(/^u/, '')))]);
+        if (!rec || String(rec['code-id']).replace(/^u/, '') !== id.toString() || String(rec['code-hash']).replace(/^0x/, '') !== toHex(up.hash)) {
+          throw new Error(`${g.id} is on the games contract with a different cartridge than ${ins.note}; use a new id for a changed game.`);
+        }
+        lines.push(`${g.id}: game ${String(n).replace(/^u/, '')}, replay number ${String(rec.index).replace(/^u/, '')}, cartridge #${id}, live at burn block ${String(rec['live-at']).replace(/^u/, '')}`);
+      }
+      const h = await gread('get-height');
+      return `${lines.join(' · ')} · burn height now ${String(h).replace(/^u/, '')}: a game shows in the hall once its live-at block has passed (delay ${NET().gamesDelay} blocks); reload the hall then`;
+    }
   }
 ];
 export const steps = () => STEPS.filter((s) => !s.testnetOnly || network === 'testnet');

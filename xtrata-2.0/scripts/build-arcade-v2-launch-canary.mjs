@@ -249,6 +249,11 @@ const launch = {
   coreTestnet,
   coreTestnetSha: Object.fromEntries(Object.entries(coreTestnet).map(([k, v]) => [k, sha(v)])),
   boards,
+  // two small test games for the games contract (testnet only: the `testgames` step); the sources are the files in recursive-apps/xtrata-arcade/games-extra
+  testGames: [
+    { id: 'xa_test_catcher', title: 'Sat Catcher', file: 'test-catcher.js', mode: 0, max: 100000 },
+    { id: 'xa_test_sprint', title: 'Arrow Sprint', file: 'test-sprint.js', mode: 1, max: 360000 }
+  ].map((g) => ({ ...g, source: readFileSync(resolve(XA, 'games-extra', g.file), 'utf8') })),
   // the hall's own registry reader, run by the canary against the registry before anything is inscribed
   reader: Object.fromEntries(['score-client.js', 'world.js', 'world2.js'].map((n) => [n, parts[n]]))
 };

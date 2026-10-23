@@ -96,14 +96,32 @@ if (g) {
   boards.push({ id: g.id, mode: modeNum(g.mode), label: g.title });
   for (const v of g.variants || []) boards.push({ id: `${g.id}_${v.key}`, mode: modeNum(v.mode), label: `${g.title} · ${v.label}` });
   for (const b of boards) if (b.id.length > 24) bad(`the board id "${b.id}" is ${b.id.length} characters; the scores contract allows at most 24. Shorten the game id or the variant key.`);
-  // A quick smoke run: create() and a few updates, to catch an immediate crash. (Full replay checks are the hall's test-suite's job.)
+  // A smoke run: create(), then 1800 steps (30 s) of update() and render() with a few button presses, to catch an immediate crash.
+  // (The full replay checks are the hall's own test-suite's job: see tests/hall-games.test.cjs.)
   try {
+    const ctx2d = new Proxy({}, { get: (t, k) => (k === 'createLinearGradient' || k === 'createRadialGradient' ? () => ({ addColorStop() {} }) : k === 'measureText' ? () => ({ width: 10 }) : () => {}), set: () => true });
+    let held = {}, hitQ = {}, score = 0, over = false;
     const api = {
-      rng: () => 0.5, input: { hit: () => false, down: () => false, pressed: () => false, axis: () => 0 }, addScore: () => {}, gameOver: () => {}, audio: new Proxy({}, { get: () => () => {} }),
-      fx: new Proxy({}, { get: () => () => {} }), util: XA.util, width: g.size && g.size.w, height: g.size && g.size.h, seed: 1, variant: null, mode: g.mode
+      W: g.size.w, H: g.size.h, rng: XA.util.rng(12345), seed: 12345, ranked: false, mode: g.mode, variant: null,
+      input: { held: (n) => !!held[n], hit: (n) => !!hitQ[n], takeSwipes: () => [], pointer: { down: false, x: 0, y: 0, moved: 0 }, press() {}, release() {} },
+      audio: new Proxy({}, { get: () => () => {} }), fx: new Proxy({}, { get: () => () => {} }),
+      shake() {}, addScore: (n) => { score += Math.max(0, Math.floor(n)); }, setScore: (n) => { score = Math.max(0, Math.floor(n)); }, getScore: () => score,
+      setStatus() {}, gameOver: () => { over = true; }, finish: () => { over = true; }, pointer: () => ({ x: 100, y: 100, down: false, moved: 0 })
     };
     const inst = g.create(api);
     if (!inst || typeof inst.update !== 'function' || typeof inst.render !== 'function') bad('create() must return { update, render }');
+    else {
+      const names = ['left', 'right', 'up', 'down', 'a'];
+      for (let i = 0; i < 1800 && !over; i++) {
+        held = {}; hitQ = {};
+        if (i % 7 < 3) held[names[(i >> 3) % names.length]] = true;
+        if (i % 11 === 0) hitQ[names[(i >> 2) % names.length]] = true;
+        inst.update(1 / 60);
+        if (i % 30 === 0) inst.render(ctx2d);
+      }
+      inst.render(ctx2d);
+      notes.push(`smoke run: ${over ? 'ended itself' : 'ran 30 s'} without an error, score ${score}`);
+    }
   } catch (e) { notes.push(`create() could not be smoke-tested in the empty sandbox (${e.message}); it may need the real hall. Check it in the hall's own test run.`); }
 }
 

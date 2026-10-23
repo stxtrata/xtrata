@@ -7,7 +7,9 @@
  *
  *   node canaries/build/arcade-v2-launch-runner.mjs --network testnet --address ST…            # dry run: reads only, sends nothing
  *   XA_OPS_CONFIRM=broadcast-testnet node canaries/build/arcade-v2-launch-runner.mjs \
- *     --network testnet --execute --key-file ./testnet-root.key [--steps a,b] [--yes]
+ *     --network testnet --execute --key-file ./testnet-root.key [--steps a,b] [--full] [--yes]
+ *   --full also registers all the arcade boards and adds the two test games (the steps boards26 and testgames), so the testnet
+ *   leaderboard and games contract look like the mainnet ones.
  *
  * A real send needs everything the guard asks for: --execute, XA_OPS_CONFIRM=broadcast-testnet, a key file holding one hex key
  * that is not the mainnet admin wallet's, and no ops/KILL file (checked again before every transaction). Mainnet is refused
@@ -29,11 +31,13 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as E from './engine';
 
+// --full adds what makes the testnet leaderboard and games contract look like the mainnet ones: every arcade board, and two test games
+export const FULL_EXTRA_STEPS = ['boards26', 'testgames'];
 export const DEFAULT_STEPS = ['connect', 'preflight', 'core', 'fixtures', 'deploy', 'kinds', 'hall', 'setup', 'registry', 'pack-engine', 'pack-hall', 'parent', 'release', 'ownership'];
 
-type Args = { network: string; execute: boolean; keyFile: string | null; address: string | null; steps: string[] | null; stateDir: string; yes: boolean; forget: boolean; list: boolean };
+type Args = { network: string; execute: boolean; keyFile: string | null; address: string | null; steps: string[] | null; stateDir: string; yes: boolean; forget: boolean; list: boolean; full: boolean };
 const parse = (argv: string[]): Args => {
-  const a: Args = { network: '', execute: false, keyFile: null, address: null, steps: null, stateDir: join(homedir(), '.xtrata-arcade-v2-launch'), yes: false, forget: false, list: false };
+  const a: Args = { network: '', execute: false, keyFile: null, address: null, steps: null, stateDir: join(homedir(), '.xtrata-arcade-v2-launch'), yes: false, forget: false, list: false, full: false };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i], v = () => { const x = argv[++i]; if (x === undefined) throw new Error(`${k} needs a value`); return x; };
     if (k === '--network') a.network = v();
@@ -45,6 +49,7 @@ const parse = (argv: string[]): Args => {
     else if (k === '--yes') a.yes = true;
     else if (k === '--forget') a.forget = true;
     else if (k === '--list') a.list = true;
+    else if (k === '--full') a.full = true;
     else throw new Error(`unknown option ${k}`);
   }
   return a;
@@ -145,7 +150,7 @@ export async function main(argv: string[]): Promise<number> {
     }
     const all = E.steps();
     if (a.list) { for (const s of all) console.log(`${s.id.padEnd(12)} ${E.BROWSER_ONLY.has(s.id) ? '(page only) ' : ''}${s.title} · ${s.who}`); return 0; }
-    const want = a.steps || DEFAULT_STEPS;
+    const want = a.steps || (a.full ? [...DEFAULT_STEPS, ...FULL_EXTRA_STEPS] : DEFAULT_STEPS);
     for (const id of want) {
       if (!all.some((s) => s.id === id)) { console.error(`REFUSED: no step "${id}" on testnet (use --list)`); return 2; }
       if (E.BROWSER_ONLY.has(id)) { console.error(`REFUSED: "${id}" needs the page (the run proof and the board moves fly and re-play a run in the embedded arcade)`); return 2; }

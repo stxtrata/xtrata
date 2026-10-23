@@ -145,8 +145,13 @@ XA_TESTNET_ROOT=ST… npm run build:canary:arcade-v2-launch
 node canaries/build/arcade-v2-launch-runner.mjs --network testnet --address ST… --list     # the steps
 node canaries/build/arcade-v2-launch-runner.mjs --network testnet --address ST…            # dry run: reads, sends nothing
 XA_OPS_CONFIRM=broadcast-testnet node canaries/build/arcade-v2-launch-runner.mjs \
-  --network testnet --execute --key-file ./testnet-root.key [--yes] [--steps a,b] [--forget]
+  --network testnet --execute --key-file ./testnet-root.key [--yes] [--steps a,b] [--forget] [--full]
 ```
+
+`--full` adds two testnet-only steps after the launch: `boards26` (the root key registers all 26 arcade boards on the leaderboard, as the
+mainnet boards will be) and `testgames` (inscribes the two test games in `recursive-apps/xtrata-arcade/games-extra`, registers their score
+boards and adds them to the games contract: 32 more transactions), so the testnet clone looks like the mainnet launch with two extra games.
+Both can also be run alone (`--steps connect,boards26,testgames`) and resume from the chain.
 
 It runs connect, preflight, the testnet core and fixtures, the deploys, the registry (kinds through the temporary KINDS admin,
 the hall, setup, the read-back with `ops/lib/hallread.mjs`, the hall's own reader in a vm), the packs, the parent, the release

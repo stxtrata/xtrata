@@ -100,6 +100,30 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   check(r.code === 0 && sent() === before, `a re-run after --forget passes and sends nothing (${sent() - before} sent)`);
   if (r.code !== 0) console.log(r.out.split('\n').filter((l) => /FAIL|!!/.test(l)).join('\n').slice(0, 1500));
 
+  // the two test games: inscribed, boards registered, listed on the games contract (testnet only, run on request: not one of the default steps)
+  check(!R.DEFAULT_STEPS.includes('testgames'), 'the test-games step is not part of the default launch steps');
+  check(R.FULL_EXTRA_STEPS.join() === 'boards26,testgames', '--full adds boards26 and testgames');
+  const txBefore = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,boards26,testgames']);
+  if (r.code !== 0) console.log(r.out.split('\n').filter((l) => /FAIL|!!/.test(l)).join('\n').slice(0, 1500));
+  check(r.code === 0 && /PASS testgames/.test(r.out), 'the testgames step passes');
+  check((C.S.rawBySender[addr] || 0) - txBefore === 32, `it sent 32 transactions: 26 boards, then 2 cartridge inscriptions, 2 set-board and 2 add-game (${(C.S.rawBySender[addr] || 0) - txBefore})`);
+  const G = `${addr}.xtrata-games-v1`, SC = `${addr}.xtrata-arcade-scores-v2`;
+  check(C.pp(C.readOnly(G, 'get-count', [])) === 'u2', 'the games contract lists 2 games');
+  const g0 = C.pp(C.readOnly(G, 'get-game', [C.Cl.uint(0)])), g1 = C.pp(C.readOnly(G, 'get-game', [C.Cl.uint(1)]));
+  check(/id: "xa_test_catcher"/.test(g0) && /index: u21/.test(g0) && /id: "xa_test_sprint"/.test(g1) && /index: u22/.test(g1) && /kind: u1/.test(g0), 'game 0 is xa_test_catcher (replay number 21) and game 1 is xa_test_sprint (22)');
+  const allBoards = JSON.parse(fs.readFileSync(path.join(ROOTDIR, 'recursive-apps/xtrata-arcade/boards.json'), 'utf8'));
+  let boardsOk = 0;
+  for (const b of allBoards) { const t = C.pp(C.readOnly(SC, 'get-board', [C.Cl.stringAscii(b.id)])); if (new RegExp('mode: u' + b.mode).test(t) && /enabled: true/.test(t) && /engine-id: u\d+/.test(t)) boardsOk++; }
+  check(boardsOk === allBoards.length, `all ${allBoards.length} arcade boards exist on the leaderboard, enabled, with the right mode (${boardsOk})`);
+  const b0 = C.pp(C.readOnly(SC, 'get-board', [C.Cl.stringAscii('xa_test_catcher')])), b1 = C.pp(C.readOnly(SC, 'get-board', [C.Cl.stringAscii('xa_test_sprint')]));
+  check(/mode: u0/.test(b0) && /mode: u1/.test(b1) && /enabled: true/.test(b0) && /enabled: true/.test(b1), 'both score boards exist and are enabled: Sat Catcher highest wins, Arrow Sprint lowest wins');
+  check(/live at burn block/.test(r.out) && /replay number 21/.test(r.out), 'the step says when each game goes live');
+  const txMid = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,boards26,testgames']);
+  check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txMid, 'running it again sends nothing');
+  check(C.S.violations.length === 0, 'every STX movement was still covered by a deny-mode post-condition');
+
   fs.rmSync(tmp, { recursive: true, force: true });
   if (failed) { console.log(`FAILED: ${failed} (${passed} checks passed)`); process.exit(1); }
   console.log(`arcade v2 launch runner test passed: ${passed} checks`);
