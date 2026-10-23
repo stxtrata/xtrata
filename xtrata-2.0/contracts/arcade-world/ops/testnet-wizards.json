@@ -9,6 +9,19 @@
     "fees":      { "address": "ST9CFVFH8K05X0SN7YR5F1D8QZ128KYP4PJ928YS", "role": "fee recipient for paid slots" },
     "player1":   { "address": "ST365NGRB4SPR6Z3ZZDQD6HMTW0APCNYAVXTECMYK", "role": "posts arcade scores" },
     "player2":   { "address": "ST2PPRGREQFYZTX9Y2HJTR2D42DEJJX8V62DZP9QY", "role": "posts arcade scores" },
-    "casino":    { "address": "ST1JZYCCHB8WNMDBG6GGQAFHXXE379FGG74AB5K0D", "role": "casino room tests" }
+    "casino":    { "address": "ST1JZYCCHB8WNMDBG6GGQAFHXXE379FGG74AB5K0D", "role": "casino room tests" },
+    "clone-player1": { "address": "ST3Y2KRENGMZQFXZ4ZJB0SZS4AGQEZ3ADZ2NERVNH", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player2": { "address": "ST3VSN67H5ZGA5RWR27CH0AJT0HQEQMVD8WWYQTGF", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player3": { "address": "ST30H04S3XFVGM4RAKWH8Z43SJRVP8081JS8N2TR", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player4": { "address": "ST2A1CWCCE2N08JAPXE13ZRQ6TJ0J2BG7S4YKS4FJ", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player5": { "address": "ST9DBSCGB4C6H5NNXT8508SBJSDB1AD2MH7VY0H4", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player6": { "address": "ST2NZNNKGVMC81Y8963A7NA164NSS8Q7TZE00R4VD", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player7": { "address": "ST1DZCWS8QDGXSHQGMK3GPX6EMBP5SPVV8XG8R884", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player8": { "address": "ST2X4SCBQ8GBZ8AV18CB8X2EMFVBP56975QGDP530", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player9": { "address": "ST1TPXWMCBZJKA2FTF4YZ1DDSF7HYJ21GNZ1T5076", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player10": { "address": "STRSNHXRCQ7V6MB5HN1C78WKX6HGDVRBARQ7GVTS", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player11": { "address": "ST3E9EJ32N37CKKXD746TCB7A7H4JSD4VP05QV9B0", "role": "clone test player (posts scores on the testnet clone root)" },
+    "clone-player12": { "address": "STHKNFMTDMG2NKFHZBEEZT7W23S93CPEH6477ZCJ", "role": "clone test player (posts scores on the testnet clone root)" },
+    "root-v3": { "address": "ST2J1GW1WDZ5ZZ0M37FRD17EHP602TVDVY1HME6XJ", "role": "testnet clone root: owns the clone contracts (scores owner)" }
   }
 }
