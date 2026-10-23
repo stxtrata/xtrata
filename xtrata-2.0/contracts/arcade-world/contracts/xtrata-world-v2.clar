@@ -285,11 +285,12 @@
                                 ;; an inherited grant reaches only spaces still held by the
                                 ;; granting ancestor's own owner (never a space since sold on)
                                 (or (get first ctx)
-                                    (and (get inherit gr) (is-eq own (get town ctx))))
-                                ;; issued by a delegate: holds only while the issuer still holds GRANT here
-                                (or (is-eq (get by gr) own)
-                                    (granter-live? (get cur ctx) (get epoch s) (get by gr))))
-                         (get caps gr)
+                                    (and (get inherit gr) (is-eq own (get town ctx)))))
+                         ;; issued by a delegate: holds only while the issuer still holds GRANT here,
+                         ;; and never carries a power the issuer has since lost
+                         (if (is-eq (get by gr) own)
+                           (get caps gr)
+                           (bit-and (get caps gr) (granter-caps (get cur ctx) (get epoch s) (get by gr))))
                          u0)
                     u0)))
           { cur: (get parent s), caps: (bit-or (get caps ctx) (bit-or own-caps g-caps)),
@@ -298,12 +299,16 @@
 
 ;; A delegate's own grant row on this space, live and holding GRANT (only an owner can issue GRANT,
 ;; so this never recurses).
-(define-private (granter-live? (space uint) (epoch uint) (who principal))
+(define-private (granter-caps (space uint) (epoch uint) (who principal))
   (match (map-get? Grants { space: space, who: who })
-    g (and (is-eq (get epoch g) epoch)
-           (or (is-eq (get expires g) u0) (< burn-block-height (get expires g)))
-           (> (bit-and (get caps g) CAP-GRANT) u0))
-    false))
+    g (if (and (is-eq (get epoch g) epoch)
+               (or (is-eq (get expires g) u0) (< burn-block-height (get expires g)))
+               (> (bit-and (get caps g) CAP-GRANT) u0))
+        (get caps g)
+        u0)
+    u0))
+(define-private (granter-live? (space uint) (epoch uint) (who principal))
+  (> (granter-caps space epoch who) u0))
 
 (define-private (admin-caps)
   (bit-or

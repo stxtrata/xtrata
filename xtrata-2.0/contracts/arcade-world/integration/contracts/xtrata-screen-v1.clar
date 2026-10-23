@@ -14,7 +14,8 @@
 ;;   escrow held by this contract and the item waits as `pending`. The review window is fixed per
 ;;   item when it is bought (a later set-limits does not move it). Reject, cancel and sweep refund
 ;;   the buyer in full. Approve starts the run; the escrow stays here and is earned a day at a time
-;;   (a day counts once it has started). `settle` (anyone) pays what has been earned to the fee
+;;   (a day is charged once its first block has passed; the approval block itself is free, which
+;;   always favours the buyer). `settle` (anyone) pays what has been earned to the fee
 ;;   recipient of that moment. A reviewer who hides or retires a paid item during its run ends it:
 ;;   the earned days go to the fee recipient and the unused days back to the buyer (all of it if
 ;;   it never ran), and the item closes (reason 5). Nothing but those paths can move escrow: there
@@ -213,6 +214,8 @@
          (< (len (filter is-paid? l)) (var-get max-paid-live)))))
 
 ;; The part of a running paid item's price not yet earned: whole unstarted days x price per day.
+;; used = ceil(ran / DAY-BLOCKS): a day is charged once its first block has passed (the approval
+;; block itself charges nothing), so any rounding goes the buyer's way and no uSTX is lost.
 (define-private (unearned (it { kind: uint, head: (string-ascii 80), body: (string-ascii 240), image-id: uint,
     image-hash: (buff 32), image-size: uint, weight: uint, publisher: principal, paid: bool,
     buyer: (optional principal), days: uint, price: uint, escrow: uint, status: uint, hidden: bool,
@@ -484,11 +487,12 @@
     (note "caps" u0)
     (ok true)))
 
-;; Escrow released at approval goes to whoever is the recipient at that moment.
+;; Earned escrow is paid at settlement to whoever is the recipient at that moment, so call
+;; `settle` on every running paid item before changing the recipient.
 (define-public (set-fee-recipient (who principal))
   (begin
     (asserts! (is-admin) ERR-NOT-AUTHORIZED)
-    (asserts! (not (is-eq who current-contract)) ERR-INVALID)   ;; a transfer to itself would make every paid approval fail
+    (asserts! (not (is-eq who current-contract)) ERR-INVALID)   ;; a transfer to itself would make every settlement fail
     (var-set fee-recipient who)
     (print { event: "fee-recipient", who: who, version: (bump) })
     (ok true)))
