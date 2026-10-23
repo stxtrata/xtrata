@@ -38,10 +38,15 @@ const XA = path.join(ROOTDIR, 'recursive-apps/xtrata-arcade');
 const BUNDLE = fs.readFileSync(path.join(XA, 'release/xtrata-arcade.html'));
 const BOARDS = JSON.parse(fs.readFileSync(path.join(XA, 'boards.json'), 'utf8'));
 const LIVE = (f) => fs.readFileSync(path.join(ROOTDIR, 'contracts/live', f), 'utf8');
-const ROOT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+// TESTNET=1: the rehearsal. The chain holds only the testnet SIP-009 trait: the canary deploys the core itself (step 1b),
+// inscribes the bundle (read from the mainnet gateway, hash-checked) and a stand-in for #55, deploys the leaderboard with the
+// other contracts, and boots its mainnet-shaped parent with the reads pointed at the testnet core.
+const TESTNET = !!process.env.TESTNET;
+const NET = TESTNET ? 'testnet' : 'mainnet';
+const ROOT = TESTNET ? 'ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J' : 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const ROYALTY = 'SP1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2XG1V316';   // the core's fee recipient here, so "pay at most" post-conditions see real STX
 const WRONG = 'SP2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CH94GRJ';      // any other wallet
-const TRAIT = 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9';
+const TRAIT = TESTNET ? 'ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT' : 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9';
 const CORE = ROOT + '.xtrata-v3-2-3';
 const SCORES = ROOT + '.xtrata-arcade-scores-v2';
 const NEW = ['xtrata-world-v2', 'xtrata-posters-v1', 'xtrata-screen-v1'];
@@ -54,7 +59,7 @@ const pp = (cv) => Cl.prettyPrint(cv);
 
 let simnet;
 // The simnet prints every Clarity `print` to stdout; keep the test output readable.
-const muted = (fn) => { const a = console.log, b = process.stdout.write; console.log = () => {}; process.stdout.write = () => true; try { return fn(); } finally { console.log = a; process.stdout.write = b; } };
+const muted = (fn) => { const a = console.log, b = process.stdout.write, c = console.error; console.log = () => {}; console.error = () => {}; process.stdout.write = () => true; try { return fn(); } finally { console.log = a; console.error = c; process.stdout.write = b; } };
 const S = {
   sources: new Map(), tx: new Map(), events: new Map(), nonce: 7, txn: 0,
   sigs: {}, current: '', walletCalls: 0, raw: 0, deploys: [], calls: [], violations: [], gateway: 0, reads: [],
@@ -111,6 +116,7 @@ async function setupChain() {
   const dep = simnet.getAccounts().get('deployer');
   muted(() => { simnet.transferSTX(10_000_000_000_000n, ROOT, dep); simnet.transferSTX(1_000_000n, TRAIT, dep); simnet.transferSTX(1_000_000_000n, WRONG, dep); });
   deploy('nft-trait', fs.readFileSync(path.join(ROOTDIR, 'contracts/clarinet/contracts/sip009-nft-trait.clar'), 'utf8'), 2, TRAIT);
+  if (TESTNET) { console.log(`simnet ready in ${((Date.now() - t0) / 1000).toFixed(1)}s: testnet, only the SIP-009 trait at ${TRAIT}; root ${ROOT} funded`); return; }
   deploy('xtrata-v1-1-1', LIVE('xtrata-v1.1.1.clar'), 3, ROOT);
   deploy('xtrata-v2-1-0', LIVE('xtrata-v2.1.0.clar'), 3, ROOT);
   deploy('xtrata-v3-2-3', LIVE('xtrata-v3.2.3.clar'), 3, ROOT);
@@ -141,6 +147,8 @@ async function route(r) {
   if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' } });
   if (/xtrata\.xyz$/.test(u.hostname) && p.startsWith('/i/')) {
     const id = Number(p.slice(3)); S.gateway++;
+    // the testnet rehearsal reads mainnet's #3078 through the gateway (the canary checks its hash)
+    if (TESTNET) return id === 3078 ? r.fulfill({ contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: BUNDLE }) : r.fulfill({ status: 404, body: '' });
     const b = inscriptionBytes(id);
     return b ? r.fulfill({ contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: b }) : r.fulfill({ status: 404, body: '' });
   }
@@ -213,8 +221,9 @@ async function route(r) {
     if (method === 'stx_deployContract') {
       S.walletCalls++; S.sigs[S.current] = (S.sigs[S.current] || 0) + 1;
       S.deploys.push({ name: params.name, version: params.clarityVersion, sha: sha(params.clarityCode).toString('hex') });
-      const res = deploy(params.name, params.clarityCode, params.clarityVersion, S.address);
-      return { result: { txid: newTx(res.result ? 'success' : 'abort_by_response', '(ok true)') } };
+      let ok = true;
+      try { deploy(params.name, params.clarityCode, params.clarityVersion, S.address); } catch (e) { ok = false; console.log(`  deploy ${params.name} failed: ${String(e.message || e).slice(0, 300)}`); }
+      return { result: { txid: newTx(ok ? 'success' : 'abort_by_response', ok ? '(ok true)' : '(err none)') } };
     }
     if (method === 'stx_transferStx') {
       S.walletCalls++; S.sigs[S.current] = (S.sigs[S.current] || 0) + 1;
@@ -226,6 +235,7 @@ async function route(r) {
   await page.addInitScript(() => { window.LeatherProvider = { request: async (m, pr) => window.__wallet(m, pr) }; });
   await page.goto('file://' + HTML);
   await page.waitForTimeout(800);
+  if (TESTNET) { await page.selectOption('#network', 'testnet'); await page.waitForTimeout(500); }
 
   const noteOf = (id) => page.evaluate((i) => { const b = document.querySelector(`[data-step="${i}"]`).closest('section'); return b.querySelector('.badge').textContent + '|' + (b.querySelector('.note') || { textContent: '' }).textContent; }, id);
   const runSteps = async (list, { quietLog = false } = {}) => {
@@ -249,6 +259,7 @@ async function route(r) {
   console.log(`steps (${ids.length}): ${ids.join(', ')}`);
 
   // ---- 1. the wrong wallet is refused at preflight ----
+  if (!TESTNET) {
   console.log('-- 1. a wallet that is not the root owner');
   S.address = WRONG;
   const w = await runSteps(['connect', 'preflight']);
@@ -260,20 +271,25 @@ async function route(r) {
   S.address = ROOT;
   await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/^xtrata-arcade-v2-launch:v1:/.test(k)) localStorage.removeItem(k); });
   await page.reload(); await page.waitForTimeout(800);
+  }
 
   // ---- 2. a fresh run ----
   console.log('-- 2. a fresh run from the root wallet');
   const t2 = Date.now();
   const fresh = await runSteps(ids);
   check(!fresh.failed, `every step passed (${((Date.now() - t2) / 1000).toFixed(0)}s)${fresh.failed ? `: stopped at ${fresh.failed}: ${fresh.badge.slice(0, 300)}` : ''}`);
-  const parentId = await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/^xtrata-arcade-v2-launch:v1:mainnet:/.test(k)) return JSON.parse(localStorage.getItem(k)).inscriptionId || null; return null; });
+  const parentId = await page.evaluate((net) => { for (const k of Object.keys(localStorage)) if (k.startsWith(`xtrata-arcade-v2-launch:v1:${net}:`)) return JSON.parse(localStorage.getItem(k)).inscriptionId || null; return null; }, NET);
   const hot = await page.evaluate(() => document.querySelector('#hot').textContent.split(' ')[0]);
   if (!fresh.failed) {
-    const expected = { connect: 0, preflight: 0, deploy: 3, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': 1, 'pack-hall': 1, parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 };
+    const expected = TESTNET
+      ? { connect: 0, preflight: 0, core: 3, fixtures: 1 + 2 + Math.ceil(chunksOf(BUNDLE).length / 30), deploy: 4, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': 1, 'pack-hall': 1, parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 }
+      : { connect: 0, preflight: 0, deploy: 3, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': 1, 'pack-hall': 1, parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 };
     const got = Object.fromEntries(ids.map((i) => [i, S.sigs[i] || 0]));
     console.log('  wallet signatures per step: ' + ids.map((i) => `${i} ${got[i]}`).join(', ') + ` · total ${S.walletCalls}`);
     check(JSON.stringify(got) === JSON.stringify(expected), `signatures per step match the README (${Object.values(expected).reduce((a, b) => a + b, 0)} in all)`);
-    check(S.deploys.length === 3 && S.deploys.every((d) => d.version === 4) && NEW.every((n) => S.deploys.some((d) => d.name === n)), 'the three contracts were deployed at Clarity 4 from the root wallet');
+    if (TESTNET) check(['xtrata-v1-1-1', 'xtrata-v2-1-0', 'xtrata-v3-2-3'].every((n, i) => S.deploys[i] && S.deploys[i].name === n && S.deploys[i].version === 3), 'testnet: the canary deployed the core trio first, in order, at Clarity 3');
+    const fresh3 = S.deploys.filter((d) => NEW.includes(d.name) || d.name === 'xtrata-arcade-scores-v2');
+    check(fresh3.length === (TESTNET ? 4 : 3) && fresh3.every((d) => d.version === 4) && NEW.every((n) => fresh3.some((d) => d.name === n)), `the three contracts${TESTNET ? ' and the leaderboard' : ''} were deployed at Clarity 4 from the root wallet`);
     const W2 = ROOT + '.xtrata-world-v2';
     const v = (fn, args = []) => V7.cvToValue(readOnly(W2, fn, args), true);
     const root = readOnly(W2, 'get-root', []);
@@ -301,7 +317,7 @@ async function route(r) {
   console.log(`  page errors: ${JSON.stringify(errs.slice(0, 4))}`);
 
   // ---- 3. boot the parent the canary inscribed, from the mock chain only ----
-  if (!results.failed && parentId) {
+  if (!results.failed && parentId && !TESTNET) {
     console.log(`-- 3. boot parent #${parentId} from the mock chain`);
     const boot = await ctx.newPage();
     const berrs = [];
@@ -339,14 +355,14 @@ async function route(r) {
     const again = await runSteps(ids);
     check(!again.failed, `every step passed again${again.failed ? `: stopped at ${again.failed}: ${again.badge.slice(0, 300)}` : ''}`);
     check(S.walletCalls === wc && S.raw === raw && S.calls.length === calls && S.deploys.length === deploys, `the re-run signed and sent nothing (wallet ${S.walletCalls - wc}, raw ${S.raw - raw}, calls ${S.calls.length - calls}, deploys ${S.deploys.length - deploys})`);
-    const reused = await page.evaluate(() => [...document.querySelectorAll('.note')].filter((n) => /re-used, nothing sent/.test(n.textContent)).length);
+    const reused = await page.evaluate(() => [...document.querySelectorAll('.note')].reduce((k, n) => k + (n.textContent.match(/re-used, nothing sent/g) || []).length, 0));
     const caught = await page.evaluate(() => [...document.querySelectorAll('.note')].filter((n) => /nothing sent|nothing to send|already deployed|already closed|already ran|already refused|earlier session/.test(n.textContent)).length);
-    check(reused === 3, `the packs and the parent were found on chain by hash and re-used (${reused})`);
+    check(reused === (TESTNET ? 5 : 3), `the ${TESTNET ? 'fixtures, the ' : ''}packs and the parent were found on chain by hash and re-used (${reused})`);
     console.log(`  ${caught} step notes say the work was already done`);
   }
   console.log(`  page errors: ${JSON.stringify(errs.slice(0, 4))}`);
   check(errs.length === 0, 'no page errors in the canary');
   await browser.close();
   if (results.failed) { console.log(`FAILED: ${results.failed} (${results.checks} checks passed before it)`); process.exit(1); }
-  console.log(`arcade v2 launch canary mock run passed: ${results.checks} checks`);
+  console.log(`arcade v2 launch canary mock run (${NET}) passed: ${results.checks} checks`);
 })().catch((e) => { console.error(e); process.exit(1); });

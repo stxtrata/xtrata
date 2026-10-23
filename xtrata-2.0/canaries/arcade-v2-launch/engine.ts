@@ -18,7 +18,7 @@
  */
 import { sha256 } from '@noble/hashes/sha256';
 import {
-  AnchorMode, boolCV, Cl, bufferCV, ClarityType, cvToString, FungibleConditionCode, getAddressFromPrivateKey, hexToCV,
+  addressFromVersionHash, AddressVersion, addressToString, AnchorMode, boolCV, Cl, createAddress, bufferCV, ClarityType, cvToString, FungibleConditionCode, getAddressFromPrivateKey, hexToCV,
   intCV, listCV, makeContractCall, makeRandomPrivKey, makeSTXTokenTransfer, makeStandardSTXPostCondition,
   PostConditionMode, principalCV, privateKeyToString, someCV, stringAsciiCV, TransactionVersion, tupleCV, uintCV,
   type ClarityValue, type PostCondition
@@ -741,7 +741,13 @@ const withArcade = <T,>(fn: (win: any) => Promise<T>) => {
   if (!host.withArcade) throw new Error('Flying and re-playing a run needs the embedded arcade, which only the browser page has.');
   return host.withArcade(fn);
 };
-const makeRun = async (address: string) => withArcade(async (win) => {
+/**
+ * The address the arcade flies a run as. The engine only pilots mainnet-form addresses (arcade-replay.js pilotFor), while the
+ * leaderboard checks only the replay's hash160 (bytes 4..24) against the sender, which is the same key on both networks. So on
+ * testnet the run is flown, and re-played, as the root key's mainnet form, and the testnet leaderboard accepts it from the ST address.
+ */
+const pilotAddress = (address: string) => (network === 'testnet' ? addressToString(addressFromVersionHash(AddressVersion.MainnetSingleSig, createAddress(address).hash160)) : address);
+const makeRun = async (signer: string) => { const address = pilotAddress(signer); return withArcade(async (win) => {
   for (let seed = 1; seed <= 24; seed++) {
     status(`Flying a canary run in the arcade engine… attempt ${seed}`);
     await sleep(0);
@@ -754,7 +760,7 @@ const makeRun = async (address: string) => withArcade(async (win) => {
     return { replay: b64(new Uint8Array(bytes)), score: st.score, game: PROOF_GAME };
   }
   throw new Error('Could not fly a scoring run in 24 attempts.');
-});
+}); };
 
 // ---------- contracts on chain ----------
 type Presence = 'free' | 'ours' | 'other';
@@ -1264,7 +1270,7 @@ export const STEPS: Step[] = [
       const chainBytes = bufOf(await readScores('get-replay', [stringAsciiCV(CANARY_BOARD), uintCV(0), principalCV(me)]));
       const entry = (await topEntries(CANARY_BOARD)).find((x) => x.player === me)!;
       if (toHex(sha256(chainBytes)) !== entry.hash) throw new Error('Stored replay does not hash to the recorded replay hash.');
-      const v: any = await withArcade<any>((win) => win.XA.replay.verify(new Uint8Array(chainBytes), { address: me, score: Number(entry.score) }));
+      const v: any = await withArcade<any>((win) => win.XA.replay.verify(new Uint8Array(chainBytes), { address: pilotAddress(me), score: Number(entry.score) }));
       if (!v.ok) throw new Error(`The replay stored on chain did not verify in the ${VERSION} arcade: ${v.reason}.`);
       return `${earlier ? 'your entry from an earlier launch stands (nothing sent) · ' : ''}${run.game} score ${entry.score.toLocaleString()} · ${chainBytes.length}-byte replay stored, hash matches, re-played from chain bytes in ${VERSION}: Verified`;
     }
