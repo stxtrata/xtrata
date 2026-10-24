@@ -25,7 +25,7 @@ async function screen() {
     U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100), U(o.layout ?? 0),
   ], sender);
   const buy = (sender, o = {}) => call('buy-slot', [
-    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0),
+    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0), U(o.max ?? 1000000000000),
   ], sender);
   const live = () => ro('get-live').value.map((x) => Number(x.value));
   const item = (id) => ro('get-item', [U(id)]).value.value;
@@ -206,7 +206,7 @@ test('layout: 0 standard (panel + its turn full-screen), 1 full-screen only (pre
   assert.equal(R(s.call('approve', [U(id)])), OK);
   assert.equal(lay(id), 1, 'approval does not touch the layout'); assert.ok(s.live().includes(id));
   simnet.mineEmptyBurnBlocks(100);
-  assert.equal(R(s.call('settle', [U(id)], W[3])), '(ok u10000000)', 'a premium slot is earned a day at a time like any other (10 STX a day)');
+  assert.equal(R(s.call('settle', [U(id)], W[3])), `(ok u${20_000_000n - (20_000_000n * 100n) / 288n})`, 'a premium slot is earned block by block like any other (20 STX over 288 blocks)');
   const std = s.idOf(s.buy(W[1], { kind: 2, img: { id: 23, hash: hash32(23), size: 300000 }, layout: 0, days: 2 }));
   assert.equal(s.item(std).weight.value, 1n); assert.equal(s.item(std).price.value, 10_000_000n, 'standard stays at 5 STX a day');
   // premium setting: admin only, 100..1000, applies to new purchases only
@@ -313,7 +313,7 @@ test('paid slots: off by default; price, caps and ranges', async () => {
   void deployer;
 });
 
-test('paid slots: approve starts the run; the escrow is earned day by day and settled to the fee recipient', async () => {
+test('paid slots: approve starts the run; the escrow is earned block by block and settled to the fee recipient', async () => {
   const s = await screen();
   const { deployer, W, h } = s;
   s.call('set-slots-enabled', [Cl.bool(true)]);
@@ -334,14 +334,15 @@ test('paid slots: approve starts the run; the escrow is earned day by day and se
   assert.equal(it['ends-at'].value, BigInt(h() + 288));
   assert.deepEqual(s.live(), [id]);
   assert.equal(s.ro('get-pending-count', [P(W[0])]).value, 0n);
-  // a day is earned once it has started: nothing in the approval block, one day after it, everything after the run
+  // earned in proportion to the blocks run (20 STX over 288 blocks): nothing in the approval block, a block's share one block after, everything after the run
   assert.equal(R(s.call('settle', [U(id)], W[3])), '(ok u20000000)');
   assert.equal(s.bal(W[5]), r0);
   s.simnet.mineEmptyBurnBlocks(1);
-  assert.equal(R(s.call('settle', [U(id)], W[3])), '(ok u10000000)');
-  assert.equal(s.bal(W[5]), r0 + 10_000_000n);
-  assert.equal(R(s.call('settle', [U(id)], W[3])), '(ok u10000000)');      // settling twice pays nothing more
-  assert.equal(s.bal(W[5]), r0 + 10_000_000n);
+  const e1 = 20_000_000n / 288n;
+  assert.equal(R(s.call('settle', [U(id)], W[3])), `(ok u${20_000_000n - e1})`);
+  assert.equal(s.bal(W[5]), r0 + e1);
+  assert.equal(R(s.call('settle', [U(id)], W[3])), `(ok u${20_000_000n - e1})`);      // settling twice pays nothing more
+  assert.equal(s.bal(W[5]), r0 + e1);
   s.simnet.mineEmptyBurnBlocks(288);
   assert.equal(R(s.call('settle', [U(id)], W[3])), '(ok u0)');
   assert.equal(s.bal(W[5]), r0 + 20_000_000n);
@@ -432,15 +433,15 @@ test('paid slots: the paid-live cap, free-item caps do not apply, fee recipient 
   assert.equal(R(s.call('approve', [U(a)])), OK);
   assert.equal(R(s.call('approve', [U(b)])), err(406));          // the cap: b stays pending, nothing moved
   assert.equal(s.item(b).status.value, 0n);
-  s.simnet.mineEmptyBurnBlocks(1);
-  assert.equal(R(s.call('settle', [U(a)])), '(ok u0)');           // a's one day has started: all earned
+  s.simnet.mineEmptyBurnBlocks(144);
+  assert.equal(R(s.call('settle', [U(a)])), '(ok u0)');           // a's one day has run: all earned
   assert.equal(s.bal(W[4]), r4 + 2_000_000n);
   assert.equal(s.ro('get-escrow-total').value, 2_000_000n);
   // the recipient changes while b waits: b's escrow goes to whoever is recipient when it is settled
   s.call('set-fee-recipient', [P(W[5])]);
   s.call('retire', [U(a)]);                                      // frees the paid slot
   assert.equal(R(s.call('approve', [U(b)])), OK);
-  s.simnet.mineEmptyBurnBlocks(1);
+  s.simnet.mineEmptyBurnBlocks(144);
   assert.equal(R(s.call('settle', [U(b)])), '(ok u0)');
   assert.equal(s.bal(W[5]), r5 + 2_000_000n);
   assert.equal(s.bal(W[4]), r4 + 2_000_000n);

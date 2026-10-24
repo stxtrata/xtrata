@@ -19,12 +19,15 @@
 ;;   `lock-delay` (one-way), which the launch procedure does straight after deployment.
 ;; - The score board for a game is created separately on the scores contract by its owner. Do that first;
 ;;   the delay gives time for it.
-;; - Ids: 3 to 24 characters of a-z, 0-9 and _, and never one of the built-in ids.
+;; - Ids: 3 to 24 characters of a-z, 0-9 and _. An id may not BEGIN with a built-in id: that would be the
+;;   built-in itself, or a name that could be confused with one of its extra score boards (a built-in's
+;;   variant boards are named `<built-in id>_<key>`).
 ;; - Kind: 1 = a cartridge script that calls XA.registerGame. Other kinds are reserved: the hall ignores a
 ;;   kind it does not know. `engine-min` is the lowest replay engine version the game needs; the hall skips
 ;;   a game that needs a newer engine than it has.
 ;; - Roles: admin only (two-step hand-over), pause (blocks adding), successor pointer with a one-way lock.
-;; - Reads are frozen at v1: add new reads as new functions, never change these.
+;; - This contract is immutable once deployed. Its reads keep their shape for good; if the design ever has to
+;;   change, a new contract is deployed and the successor pointer says where it is.
 
 (define-constant ERR-NOT-AUTHORIZED (err u500))
 (define-constant ERR-PAUSED         (err u501))
@@ -111,7 +114,7 @@
 (define-data-var scratch-id (string-ascii 24) "")
 
 (define-private (same-id? (built-in-id (string-ascii 16)) (found bool))
-  (or found (is-eq (var-get scratch-id) built-in-id)))
+  (or found (is-eq (slice? (var-get scratch-id) u0 (len built-in-id)) (some built-in-id))))
 
 (define-private (built-in? (id (string-ascii 24)))
   (begin (var-set scratch-id id) (fold same-id? BUILT-IN false)))
@@ -177,9 +180,11 @@
     (note "delay" blocks)
     (ok true)))
 
-(define-public (lock-delay)
+;; Freezes the delay for good. `expected` must equal the current delay, so a wrong value is never locked in by mistake.
+(define-public (lock-delay (expected uint))
   (begin
     (asserts! (is-admin) ERR-NOT-AUTHORIZED)
+    (asserts! (is-eq expected (var-get delay)) ERR-INVALID)
     (var-set delay-locked true)
     (note "delay-locked" (var-get delay))
     (ok true)))
@@ -189,6 +194,15 @@
     (asserts! (is-admin) ERR-NOT-AUTHORIZED)
     (var-set pending-admin (some who))
     (print { event: "admin-proposed", who: who, version: (bump) })
+    (ok true)))
+
+;; Withdraws a hand-over that was proposed by mistake (or to the wrong address).
+(define-public (cancel-admin-proposal)
+  (begin
+    (asserts! (is-admin) ERR-NOT-AUTHORIZED)
+    (asserts! (is-some (var-get pending-admin)) ERR-NO-PENDING)
+    (var-set pending-admin none)
+    (note "admin-proposal-cancelled" u0)
     (ok true)))
 
 (define-public (accept-admin)
@@ -215,11 +229,12 @@
     (ok true)))
 
 ;; ---------------------------------------------------------------------------
-;; Reads (frozen at v1)
+;; Reads
 
 (define-read-only (get-version) (var-get version))
 (define-read-only (get-count) (var-get count))
 (define-read-only (get-admin) (var-get admin))
+(define-read-only (get-pending-admin) (var-get pending-admin))
 (define-read-only (get-game (n uint)) (map-get? Games n))
 (define-read-only (get-games (ns (list 10 uint))) (map get-game ns))
 (define-read-only (get-game-number (id (string-ascii 24))) (map-get? ById id))

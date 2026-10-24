@@ -75,7 +75,7 @@
     if (!address) return null;
     try {
       var d = C.c32decodeAddress(address);
-      if (!/^S[PM]/.test(String(address).toUpperCase())) return null;
+      if (!/^S[PMTN]/.test(String(address).toUpperCase())) return null;
       return { address: address, version: d.version, hash160: d.hash160 };
     } catch (e) { return null; }
   }

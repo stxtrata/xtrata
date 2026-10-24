@@ -8,7 +8,7 @@
 //
 // The steps file:
 //   { "owner": "ST…deployer address", "contracts": { "screen": "xtrata-screen-v1", … },
-//     "steps": [ { "as": "buyer", "contract": "screen", "fn": "buy-slot", "args": [ {"uint":2}, {"ascii":"HEAD"}, … ],
+//     "steps": [ { "as": "buyer", "contract": "screen", "fn": "buy-slot", "args": [ {"uint":2}, {"ascii":"HEAD"}, … , {"uint":<the most the buyer will pay>} ],
 //                  "pay": 10000000,               // optional: this wizard sends exactly this many uSTX (post-condition)
 //                  "release": 10000000 } ] }     // optional: the contract sends exactly this many uSTX (post-condition)
 // Argument forms: {uint}, {int}, {ascii}, {bool}, {principal} (a wizard name or an address), {hex} (a buffer), {none}, {some:<arg>},

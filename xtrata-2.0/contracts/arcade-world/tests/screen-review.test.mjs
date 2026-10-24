@@ -25,7 +25,7 @@ async function screen() {
     U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100), U(o.layout ?? 0),
   ], sender);
   const buy = (sender, o = {}) => call('buy-slot', [
-    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0),
+    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0), U(o.max ?? 1000000000000),
   ], sender);
   const live = () => ro('get-live').value.map((x) => Number(x.value));
   const item = (id) => ro('get-item', [U(id)]).value.value;
@@ -54,7 +54,7 @@ test('R1: STX sent straight to the contract is not escrow; it is reported as una
   const fee = s.bal(s.deployer);
   assert.equal(R(s.call('approve', [U(id2)])), OK);
   assert.equal(s.bal(s.deployer), fee);
-  simnet.mineEmptyBurnBlocks(1);
+  simnet.mineEmptyBurnBlocks(144);                         // the whole day has run
   assert.equal(R(s.call('settle', [U(id2)], W[3])), '(ok u0)');
   assert.equal(s.bal(s.deployer) - fee, 2_000_000n);
   assert.equal(s.ro('get-unaccounted').value, 5_000_000n);

@@ -93,6 +93,27 @@ test('the 21 built-in games can never be registered, replaced or shadowed', asyn
   assert.equal(pp(s.ro('get-config').value.genesis), 'u21');
 });
 
+test('no new id may begin with a built-in id: it could be mistaken for that game or its extra score boards', async () => {
+  const s = await games();
+  const i = s.insc(1);
+  for (const b of ['xa_tile_tap_rush', 'xa_tile_tap2', 'xa_swerve_x', 'xa_block_drop_hard']) assert.equal(R(s.add(b, i)), err(507), b);
+  // names that merely look similar are fine: the test games and anything not starting with a built-in id
+  for (const [n, ok_] of [['xa_test_catcher', 'u0'], ['xa_tile', 'u1'], ['my_xa_swerve', 'u2'], ['xa_swerv', 'u3']]) assert.equal(R(s.add(n, i)), ok(ok_), n);
+});
+
+test('a hand-over proposed by mistake can be cancelled; the pending admin can be read', async () => {
+  const s = await games();
+  const { W } = s;
+  assert.equal(pp(s.ro('get-pending-admin')), 'none');
+  assert.equal(R(s.call('cancel-admin-proposal')), err(509));              // nothing pending
+  assert.equal(R(s.call('propose-admin', [P(W[2])])), OK);
+  assert.equal(pp(s.ro('get-pending-admin')), `(some '${W[2]})`);
+  assert.equal(R(s.call('cancel-admin-proposal', [], W[0])), err(500));    // only the admin
+  assert.equal(R(s.call('cancel-admin-proposal')), OK);
+  assert.equal(pp(s.ro('get-pending-admin')), 'none');
+  assert.equal(R(s.call('accept-admin', [], W[2])), err(509));             // the cancelled wallet can no longer take over
+});
+
 test('ids: 3 to 24 characters of a-z 0-9 _ and unique', async () => {
   const s = await games();
   const i = s.insc(1);
@@ -161,10 +182,11 @@ test('the delay: default 144, tunable until locked, then fixed for ever', async 
   s.add('quick_one', s.insc(1));
   const g = s.game(0).value.value;
   assert.equal(Number(pp(g['live-at']).slice(1)) - Number(pp(g['added-at']).slice(1)), 6);
-  assert.equal(R(s.call('lock-delay')), OK);
+  assert.equal(R(s.call('lock-delay', [U(144)])), err(503));   // the expected value must match the current delay
+  assert.equal(R(s.call('lock-delay', [U(6)])), OK);
   assert.equal(R(s.call('set-delay', [U(0)])), err(508));
   assert.equal(pp(s.ro('get-config').value['delay-locked']), 'true');
-  assert.equal(R(s.call('lock-delay', [], s.W[0])), err(500));
+  assert.equal(R(s.call('lock-delay', [U(6)], s.W[0])), err(500));
 });
 
 test('pause blocks adding only; hiding still works', async () => {

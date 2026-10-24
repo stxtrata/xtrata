@@ -136,12 +136,12 @@ async function route(r) {
     // one signature for a pack within the one-transaction limit (32 chunks); begin + chunk batches of 30 + seal beyond it
     const packSigs = (name) => { const n = Math.ceil(fs.readFileSync(path.join(ROOTDIR, 'recursive-apps/xtrata-arcade/dist/packs/xtrata-arcade-' + name + '.txt')).length / 16384); return n <= 32 ? 1 : 2 + Math.ceil(n / 30); };
     const expected = TESTNET
-      ? { connect: 0, preflight: 0, core: 3, fixtures: 1 + 2 + Math.ceil(chunksOf(BUNDLE).length / 30), deploy: 5, kinds: 3, hall: 8, setup: 1, registry: 0, 'pack-engine': packSigs('engine'), 'pack-hall': packSigs('hall'), parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 }
+      ? { connect: 0, preflight: 0, core: 4, fixtures: 1 + 2 + Math.ceil(chunksOf(BUNDLE).length / 30), deploy: 5, kinds: 3, hall: 8, setup: 1, registry: 0, 'pack-engine': packSigs('engine'), 'pack-hall': packSigs('hall'), parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0, boards26: 0, testgames: 6 }
       : { connect: 0, preflight: 0, deploy: 4, kinds: 3, hall: 8, setup: 1, registry: 0, 'pack-engine': packSigs('engine'), 'pack-hall': packSigs('hall'), parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 };
     const got = Object.fromEntries(ids.map((i) => [i, S.sigs[i] || 0]));
     console.log('  wallet signatures per step: ' + ids.map((i) => `${i} ${got[i]}`).join(', ') + ` · total ${S.walletCalls}`);
     check(JSON.stringify(got) === JSON.stringify(expected), `signatures per step match the README (${Object.values(expected).reduce((a, b) => a + b, 0)} in all)`);
-    if (TESTNET) check(['xtrata-v1-1-1', 'xtrata-v2-1-0', 'xtrata-v3-2-3'].every((n, i) => S.deploys[i] && S.deploys[i].name === n && S.deploys[i].version === 3), 'testnet: the canary deployed the core trio first, in order, at Clarity 3');
+    if (TESTNET) check(['nft-trait', 'xtrata-v1-1-1', 'xtrata-v2-1-0', 'xtrata-v3-2-3'].every((n, i) => S.deploys[i] && S.deploys[i].name === n) && S.deploys.slice(1, 4).every((d) => d.version === 3), 'testnet: the canary deployed the SIP-009 trait, then the core trio, first and in order, the trio at Clarity 3');
     const fresh3 = S.deploys.filter((d) => NEW.includes(d.name) || d.name === 'xtrata-arcade-scores-v2');
     check(fresh3.length === (TESTNET ? 5 : 4) && fresh3.every((d) => d.version === 4) && NEW.every((n) => fresh3.some((d) => d.name === n)), `the four contracts${TESTNET ? ' and the leaderboard' : ''} were deployed at Clarity 4 from the root wallet`);
     const W2 = ROOT + '.xtrata-world-v2';

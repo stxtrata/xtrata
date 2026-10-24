@@ -1128,7 +1128,7 @@ export const STEPS: Step[] = [
       }
       if (Number(gc.delay) !== NET().gamesDelay) throw new Error(`${NAMES.games} delay is ${gc.delay} blocks and is locked; the launch wants ${NET().gamesDelay}.`);
       if (NET().lockGamesDelay && !gc['delay-locked']) {
-        await runTx('setup', 'games lock-delay', () => rootCall(cid(NAMES.games), 'lock-delay', []));
+        await runTx('setup', 'games lock-delay', () => rootCall(cid(NAMES.games), 'lock-delay', [uintCV(NET().gamesDelay)]));
         out.push('games delay locked for ever');
       }
       return `${out.length ? out.join(' · ') : 'all at the launch settings: nothing sent'} · games delay ${NET().gamesDelay} blocks${NET().lockGamesDelay ? ' (locked)' : ''} · registry treasury ${short(NET().treasury)} · screen fee recipient ${short(NET().screenFeeRecipient)} · paid screen slots ${sc['slots-enabled'] ? 'ON' : 'off'} · posters review lane ${(await pread('get-config'))['review-lane'] ? 'on' : 'off'}`;

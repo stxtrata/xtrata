@@ -85,7 +85,8 @@ const g = registered[0];
 let boards = [];
 if (g) {
   if (!ID_OK.test(g.id)) bad(`the game id "${g.id}" must be 3-24 characters of a-z, 0-9 and _ (the contract and the score boards allow no more)`);
-  if (BUILT_IN.includes(g.id)) bad(`the game id "${g.id}" is a built-in game's id`);
+  const clash = BUILT_IN.find((b) => g.id.startsWith(b));
+  if (clash) bad(`the game id "${g.id}" ${g.id === clash ? 'is' : 'begins with'} the built-in id "${clash}" (the games contract refuses any id that begins with a built-in id)`);
   for (const f of ['title', 'tagline', 'color', 'size', 'create', 'attract']) if (!g[f]) bad(`the game has no "${f}"`);
   if (g.title && String(g.title).length > 32) bad(`the title is ${String(g.title).length} characters; add-game takes at most 32`);
   if (g.size && !(g.size.w > 0 && g.size.h > 0)) bad('size must be { w, h } with positive numbers');
