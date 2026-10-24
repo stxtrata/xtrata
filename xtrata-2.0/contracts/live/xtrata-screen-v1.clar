@@ -35,7 +35,7 @@
 ;; Kind values:   0 message, 1 news, 2 ad
 ;; Status values: 0 pending (awaiting review), 1 approved (live or scheduled), 2 closed
 ;; Closed reasons: 1 rejected, 2 cancelled, 3 swept (review window passed), 4 retired,
-;;                 5 a paid run ended early by a reviewer (unused days refunded)
+;;                 5 a paid run ended early by a reviewer (the unused part refunded)
 ;; Publisher levels: 1 publisher, 2 reviewer
 
 (define-constant ERR-NOT-AUTHORIZED (err u400))
@@ -304,7 +304,7 @@
     (ok id)))
 
 ;; Retire an item: the admin, a reviewer, or the publisher of a free item. Works while paused.
-;; A running paid item is settled: earned days to the fee recipient, unused days back to the buyer.
+;; A running paid item is settled: the part earned so far to the fee recipient, the unearned rest back to the buyer.
 (define-public (retire (id uint))
   (let ((it (unwrap! (map-get? Items id) ERR-NOT-FOUND)))
     (asserts! (< (get status it) u2) ERR-STATUS)
@@ -321,8 +321,8 @@
     (ok true)))
 
 ;; Hide or unhide an item (admin or reviewer). Unhiding puts it back in the live set if it is still running.
-;; Hiding a paid item ends its run for good (closed, reason 5): earned days to the fee recipient,
-;; unused days back to the buyer.
+;; Hiding a paid item ends its run for good (closed, reason 5): the part earned so far to the fee recipient,
+;; the unearned rest back to the buyer.
 (define-public (set-hidden (id uint) (hidden bool))
   (let ((it (unwrap! (map-get? Items id) ERR-NOT-FOUND)))
     (asserts! (is-reviewer) ERR-NOT-AUTHORIZED)
@@ -386,7 +386,7 @@
     (ok id)))
 
 ;; Approve a pending item (admin or reviewer). A paid item's run starts now (its escrow stays here
-;; and is earned day by day, see settle); a free item from the review lane goes live in its own window.
+;; and is earned block by block, see settle); a free item from the review lane goes live in its own window.
 (define-public (approve (id uint))
   (let (
     (it (unwrap! (map-get? Items id) ERR-NOT-FOUND))
@@ -447,8 +447,8 @@
     (quiet "item-swept" id)
     (ok true)))
 
-;; Pay what a running paid item has earned so far to the fee recipient (anyone may call; a day
-;; counts once started, so after the run everything is earned). Works while paused.
+;; Pay what a running paid item has earned so far to the fee recipient (anyone may call; it is earned
+;; in proportion to the blocks run, so after the run everything is earned). Works while paused.
 (define-public (settle (id uint))
   (let ((it (unwrap! (map-get? Items id) ERR-NOT-FOUND)))
     (asserts! (and (get paid it) (is-eq (get status it) u1)) ERR-STATUS)

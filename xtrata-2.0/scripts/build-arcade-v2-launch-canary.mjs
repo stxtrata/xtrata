@@ -85,7 +85,7 @@ const NETWORKS = {
 const PINS = {
   'xtrata-posters-v1': '3e9bdfc500c97a166804e15bda29df852e7f0dbea2fe2ebe97048f67399618fb',
   'xtrata-world-v2': 'a72774e95967b81d33c339779e49a7313d864382caed9fe0f08b3761ed9cbc39',
-  'xtrata-screen-v1': '2806c06026aaef2e8d1b97dbfa1e1a4311dbced240bed58e4b190e5adf6b8a2d',
+  'xtrata-screen-v1': '80dda1331f3d42ba6b0fb24d01cc146963ba256abec98f7c32cb0b24ab3c34e7',
   'xtrata-games-v1': '0768b467c33d7384236aaaafeda3de7beee866119269f808c6292c27684aa53e',
   'xtrata-arcade-scores-v2': 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5',
   'xtrata-v1-1-1': '1f9ee448262d982017f69479718628689af4a660c28905492b4bad84096d74fd',
