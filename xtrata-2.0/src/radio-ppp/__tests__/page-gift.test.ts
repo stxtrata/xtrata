@@ -317,18 +317,16 @@ describe('My albums (the shelf)', () => {
     localStorage.clear();
     h.route = (url) => (url.includes('/radio/gift/shelf') ? new Response(JSON.stringify({ total: 0, next: null, shelf: [] })) : undefined);
     await open({ ...own });
-    await new Promise((r) => setTimeout(r, 20));
-    expect(document.querySelector('.ppp-switch')!.hasAttribute('hidden')).toBe(true);
+    await vi.waitFor(() => expect(document.querySelector('.ppp-switch')!.hasAttribute('hidden')).toBe(true), { timeout: 5000 });
   });
 
   it('stays out of the way with no albums, or when the wallet box cannot hold them', async () => {
     localStorage.clear();
     h.route = (url) => (url.includes('/radio/gift/shelf') ? new Response(JSON.stringify({ total: 0, next: null, shelf: [] })) : undefined);
     const root = await open({ ...own });
-    await new Promise((r) => setTimeout(r, 20));
-    expect(root.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(true);
+    await vi.waitFor(() => expect(root.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(true), { timeout: 5000 });
     const root2 = await open({ ...own, walletCannotAlbums: true });
-    expect(root2.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(true);
+    await vi.waitFor(() => expect(root2.querySelector('.ppp-shelf')!.hasAttribute('hidden')).toBe(true), { timeout: 5000 });
   });
 });
 
@@ -405,7 +403,10 @@ describe('a starter gift never looks failed while it is on its way', () => {
     expect(root.querySelector('.ppp-bad')).toBeNull();
     expect(text(root)).not.toMatch(/Add funds|Add plays|ConflictingNonce|Copy my address/);
     expect(text(root.querySelector('.ppp-err')!)).toBe('');
-    expect(document.documentElement.dataset.ppp).toBeUndefined();
+    // This instance's own look, not the shared <html data-ppp>: earlier tests leave page instances with live timers
+    // that write that global later. "Not off" shows here as the red-note nudge and the ON AIR lamp staying hidden.
+    expect((document.getElementById('pppNudge') as HTMLElement).hidden).toBe(true);
+    expect((document.getElementById('onair') as HTMLElement).hidden).toBe(true);
     expect(text(root.querySelector('.ppp-stage')!)).toMatch(/on their way/);
   });
 
