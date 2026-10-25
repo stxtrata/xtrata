@@ -27,7 +27,7 @@ Bitcoin Birds has no metadata CID: the contract points at a Stacks Art web URL t
 
 ## Gateways that gave no usable result
 
-- **ipfs.io, dweb.link, w3s.link:** every request failed within about 100 ms, for every CID, in the Claude browser pane and in Chrome on the same machine, including a control request for an unrelated well-known IPFS file. The sites' home pages answered. This looks like something on the test machine or its network, not a finding about the gateways. Not counted either way. Re-run `gateway-check.mjs` from a different network to fill these in.
+- **ipfs.io, dweb.link, w3s.link: not serving files over HTTP any more (confirmed 24 Oct 2026).** From a Mac on home Wi-Fi, `curl` to `/ipfs/<cid>/<file>` on ipfs.io and dweb.link returned HTTP 429 with the body "This IPFS gateway is switching to a service worker gateway only", a `Sunset: 21 Sep 2026` header and a link to gatewaychanges.ipfs.io, which says the public gateway stopped fetching content over HTTP and retired on 21 Sep 2026. w3s.link answered with a 301 redirect to dweb.link and so got the same 429. The fast failures on 22 Oct were most likely this too (the browser reported only a generic network error, so that link is inferred, not shown); it was not a problem with the test machine or network, because the same hosts return the 429 from a terminal on home Wi-Fi. These three therefore cannot be used to show availability either way.
 - **trustless-gateway.link:** answered some requests without CORS headers (so the bytes could not be read) and failed or timed out on the rest. Not counted.
 - **4everland.io:** worked on some Megapont Ape Club files and failed outright on the other collections. Inconsistent; shown above as measured.
 
@@ -53,7 +53,7 @@ The 250-collection census tested up to 4 tokens per collection through Filebase 
 
 ## Fee correction (same day)
 
-`get-fee` on `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens` returns u1000000 (1 STX) at block 9,279,798. The other helpers: Megapont Ape Club u1000000, Bitcoin Monkeys u1000000, Bitcoin Birds u0.
+`get-fee` on `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens` returns u1000000 (1 STX) at block 9,279,798. The other helpers: Megapont Ape Club u1000000, Bitcoin Monkeys u1000000, Bitcoin Birds u0. Re-read on 24 Oct 2026 at block 9,301,562: unchanged (NYC Degens, Megapont Ape Club and Bitcoin Monkeys u1000000; Bitcoin Birds u0).
 
 ## Follow-up changes made after this run
 
@@ -79,4 +79,4 @@ Same method, three gateways (gateway.pinata.cloud, ipfs.filebase.io, stxnft.mypi
 
 ## Still not measured
 
-ipfs.io, dweb.link and w3s.link fail within about 100 ms from the machine used for these runs (including for a control CID), so they are not counted either way. `gateway-check.mjs` in this folder re-runs the check from another network.
+ipfs.io, dweb.link and w3s.link no longer serve files over HTTP (see above), so there is nothing to measure through them. Gateways that still serve files are the ones tested above.
