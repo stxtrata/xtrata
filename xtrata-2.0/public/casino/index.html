@@ -320,6 +320,10 @@ background:linear-gradient(90deg,transparent,rgba(255,227,166,.95),transparent) 
 .ex-det b.ok{color:#6dffb8}
 .ex-det b.no{color:#ff8a8a}
 
+.mx-ex .mx-bal .mx-link{align-self:flex-start;margin:2px 0 0;padding:6px 0 2px;min-height:0;background:none;border:0;box-shadow:none;color:var(--gold-hi);font-size:11px;font-weight:700;letter-spacing:.16em;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.mx-ex .mx-bal .mx-link:hover,.mx-ex .mx-bal .mx-link:focus-visible{color:#fff}
+.mx-ex .mx-bal .mx-link[hidden]{display:none}
+
 </style>
 <canvas id="gl"></canvas>
 <div id="tools"><button id="back" aria-label="Back to the floor">← Floor</button><div id="bankpill"><span>BANKROLL</span><b id="bank">1,000 <i>LAYR</i></b><em id="sess"></em></div><div class="rt"><button id="scbtn" aria-label="Open the Strata Club tables (testnet rules)" title="Strata Club tables">⛓ Strata Club</button><button id="modebtn" aria-label="Switch between walking and overview">🚶 Walk</button><button id="music" aria-label="Toggle music" title="Music">🎵</button><button id="mute" aria-label="Toggle sound">🔊</button></div></div>
@@ -4654,7 +4658,15 @@ background:linear-gradient(90deg,transparent,rgba(255,227,166,.95),transparent) 
         if (other) throw new Error('Switch your wallet to ' + SHOP.network + ', then connect again.');
         throw new Error(lastErr ? msgOf(lastErr) : 'The wallet did not share a Stacks address.');
       }
-      function disconnect() { S.prov = null; S.addr = ''; emit('wallet'); }
+      // Forget the wallet here at once, then ask it (best effort) to drop this site's permission, so the next connect shows its chooser again.
+      // Xverse: wallet_disconnect. Leather: the first of the older names it understands. Awaiting it matters only when a connect follows.
+      async function disconnect() {
+        const pv = S.prov; S.prov = null; S.addr = ''; emit('wallet');
+        if (!pv) return;
+        for (const m of pv.kind === 'xverse' ? ['wallet_disconnect'] : ['stx_disconnect', 'wallet_disconnect', 'disconnect', 'deactivate']) {
+          try { await call(pv.rpc, m); return; } catch (e) { if (!unsupported(e)) return; }
+        }
+      }
 
       // ---- paying: the wallet shows its own confirmation; we only learn the transaction ID ----
       const mismatch = (e) => /network mismatch|mismatch.*network|network.*mismatch/i.test(msgOf(e));
@@ -4734,7 +4746,7 @@ background:linear-gradient(90deg,transparent,rgba(255,227,166,.95),transparent) 
       setInterval(tick, 7000); window.addEventListener('focus', tick); setTimeout(tick, 1200);
       return {
         SHOP, RATE, MIN, MAX, UNIT, short, txOf, providers, detect, wallets, connect, disconnect, pay, claim, remove, tick,
-        get ready() { return ready(); }, get net() { return SHOP.network; }, get addr() { return S.addr; }, get pending() { return D.pending; }, get hist() { return D.hist; },
+        get ready() { return ready(); }, get net() { return SHOP.network; }, get addr() { return S.addr; }, get wallet() { return S.prov ? S.prov.name : ''; }, get pending() { return D.pending; }, get hist() { return D.hist; },
         on(f) { subs.push(f); }, bind(f) { bankCredit = f; },
       };
     })();
@@ -6432,8 +6444,8 @@ return {
           $('exStx').textContent = stx; $('exGet').textContent = fmtN(stx * LX.RATE);
           $('minus').disabled = stx <= LX.MIN; $('plus').disabled = stx >= LX.MAX;
           root().querySelectorAll('[data-stx]').forEach((b) => b.classList.toggle('active', +b.dataset.stx === stx));
-          $('cashout').textContent = LX.pending.length ? 'PENDING (' + LX.pending.length + ')' : 'RECEIPTS'; $('spin').disabled = !LX.ready || busyWallet; $('topup').title = LX.addr ? 'Wallet connected' : 'Connect wallet';
-          $('exNet').textContent = NETNAME;
+          $('cashout').textContent = LX.pending.length ? 'PENDING (' + LX.pending.length + ')' : 'RECEIPTS'; $('spin').disabled = !LX.ready || busyWallet;
+          $('exNet').textContent = NETNAME; $('exOut').hidden = !LX.addr; $('topup').title = LX.addr ? 'Wallet options: switch or disconnect' : 'Connect wallet'; $('topup').setAttribute('aria-label', $('topup').title);
           dirty = true;
         }
         function setStx(n) { stx = Math.max(LX.MIN, Math.min(LX.MAX, Math.round(n))); host.sfx.click(); msg = ''; tone = ''; sync(); if (!busyWallet && !disp) status(idle()); }
@@ -6472,6 +6484,13 @@ return {
         <div class="amts"><button class="cta" data-ex="retry">RETRY</button><button class="cta" data-ex="manual">Pay another way</button></div>`);
           bind();
         }
+        function openWallet() {
+          show('WALLET', `<h2>${esc(LX.wallet || 'Wallet')} connected.</h2>
+        <div class="ex-addr"><code>${esc(LX.addr)}</code><button class="mx-b" data-ex="copyaddr">COPY</button></div>
+        <p class="fine">${NETNAME}. Disconnecting does not touch your LAYR or a payment that is still being checked. To use another account, switch wallet.</p>
+        <div class="amts"><button class="cta" data-ex="switch">SWITCH WALLET OR ACCOUNT</button><button class="cta" data-ex="disconnect">DISCONNECT</button></div>`);
+          bind();
+        }
         function openReceipts() {
           const pend = LX.pending.map((p) => `<li><code>${esc(LX.short(p.tx))}</code><span>${esc(p.note || 'CHECKING…')}</span><button class="mx-b" data-ex="drop" data-tx="${esc(p.tx)}">REMOVE</button></li>`).join('');
           const hist = LX.hist.map((h) => `<li><code>${esc(LX.short(h.tx))}</code><span>+${fmtN(h.layr)} LAYR</span><span>${esc(new Date(h.t).toLocaleString())}</span></li>`).join('');
@@ -6486,6 +6505,9 @@ return {
             host.sfx.click(); const a = b.dataset.ex;
             if (a === 'manual') openManual();
             else if (a === 'retry') { modal.close(); connect(); }
+            else if (a === 'copyaddr') copy(LX.addr, b);
+            else if (a === 'disconnect') { closeModal(); disconnectNow(); }
+            else if (a === 'switch') { closeModal(); switchWallet(); }
             else if (a === 'copy') copy(LX.SHOP.address, b);
             else if (a === 'drop') { LX.remove(b.dataset.tx); openReceipts(); }
             else if (a === 'pick') { const w = pickWait; pickWait = null; modal.close(); if (w) w(b.dataset.id); }
@@ -6498,13 +6520,24 @@ return {
 
         // ---- actions ----
         function notOpen() { say('THE EXCHANGE OPENS SOON', 'bad'); }
+        // the coin slot, the + button and the wallet strip: connect when nothing is connected, otherwise the wallet options
+        function walletButton() { if (LX.addr) openWallet(); else connect(); }
+        function disconnectNow() {
+          if (!LX.addr) return;
+          if (busyWallet) return say('FINISH OR CANCEL THE PAYMENT IN YOUR WALLET FIRST', 'bad');
+          LX.disconnect(); host.sfx.click(); say('WALLET DISCONNECTED · PRESS + TO CONNECT AGAIN'); sync();
+        }
+        async function switchWallet() {
+          if (busyWallet) return say('FINISH OR CANCEL THE PAYMENT IN YOUR WALLET FIRST', 'bad');
+          await LX.disconnect(); sync(); connect();
+        }
         async function connect() {
           if (!LX.ready) return notOpen();
           say('LOOKING FOR YOUR WALLET…');
           const list = await LX.detect(1500);
           if (!list.length) { say('NO LEATHER OR XVERSE WALLET FOUND ON THIS PAGE', 'bad'); return openNoWallet(); }
           let id = list[0].id; if (list.length > 1) { id = await pickWallet(list); if (!id) return status(idle()); }
-          if (LX.addr) LX.disconnect();   // pressing connect again is how you switch wallet
+          if (LX.addr) await LX.disconnect();
           say('APPROVE THE CONNECTION IN YOUR WALLET…');
           try { await LX.connect(id); say('WALLET CONNECTED · ' + LX.short(LX.addr)); host.sfx.chip(); } catch (e) { say(e.message.toUpperCase(), 'bad'); }
           sync();
@@ -6526,7 +6559,7 @@ return {
         });
         root().querySelectorAll('[data-stx]').forEach((b) => (b.onclick = () => setStx(+b.dataset.stx)));
         $('minus').onclick = () => setStx(stx - 1); $('plus').onclick = () => setStx(stx + 1);
-        $('topup').onclick = connect; $('spin').onclick = buy; $('rules').onclick = openInfo; $('cashout').onclick = openReceipts;
+        $('topup').onclick = walletButton; $('exOut').onclick = disconnectNow; $('spin').onclick = buy; $('rules').onclick = openInfo; $('cashout').onclick = openReceipts;
 
         // ---- the screen ----
         const T = (s, x, y, size, col, align, wt, glow) => { g.font = (wt || 700) + ' ' + size + 'px ' + FONT; g.textAlign = align || 'left'; g.textBaseline = 'middle'; if (glow) { g.shadowColor = glow; g.shadowBlur = 18; } g.fillStyle = col; g.fillText(s, x, y); g.shadowBlur = 0; };
@@ -6564,7 +6597,7 @@ return {
           // wallet strip
           R(104, 566, 1192, 70, 14, 'rgba(255,255,255,.04)', LX.addr ? MINT : 'rgba(228,180,87,.5)', 2.5);
           spaced(true); T('WALLET', 138, 601, 24, DIM, 'left', 600); spaced(false);
-          if (LX.addr) { g.fillStyle = MINT; g.beginPath(); g.arc(380, 601, 9, 0, 7); g.fill(); T(LX.short(LX.addr), 404, 601, 40, '#fff', 'left', 700); T('CONNECTED', 1262, 601, 26, MINT, 'right', 600); }
+          if (LX.addr) { g.fillStyle = MINT; g.beginPath(); g.arc(380, 601, 9, 0, 7); g.fill(); T(LX.short(LX.addr), 404, 601, 40, '#fff', 'left', 700); T('CONNECTED · TAP TO MANAGE', 1262, 601, 24, MINT, 'right', 600); spot(104, 566, 1192, 70, openWallet); }
           else { T('NOT CONNECTED', 340, 601, 38, '#aaa', 'left', 700); T('TAP TO CONNECT ›', 1262, 601, 28, GOLDHI, 'right', 700); spot(104, 566, 1192, 70, connect); }
           // status panel
           R(104, 656, 1192, 158, 16, 'rgba(0,0,0,.35)', 'rgba(228,180,87,.25)', 2);
@@ -6605,7 +6638,7 @@ return {
           isLit() { return !!disp || busyWallet || LX.pending.length > 0; },
           get spinning() { return false; }, get busy() { return false; }, get balance() { return 0; }, get bet() { return 0; }, get stake() { return 0; }, get hasFeature() { return false; }, get modalOpen() { return !!modal.open; },
           tap(x, y) { for (let i = spots.length - 1; i >= 0; i--) { const s = spots[i]; if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) { host.sfx.click(); s.act(); return; } } },
-          press(id) { host.sfx.click(); ({ topup: connect, cashout: openReceipts, rules: openInfo, minus: () => setStx(stx - 1), plus: () => setStx(stx + 1), auto: () => setStx(LX.MAX), spin: buy })[id](); },
+          press(id) { host.sfx.click(); ({ topup: walletButton, cashout: openReceipts, rules: openInfo, minus: () => setStx(stx - 1), plus: () => setStx(stx + 1), auto: () => setStx(LX.MAX), spin: buy })[id](); },
           esc() { if (modal.open) { closeModal(); return true; } return false; },
         };
       }
@@ -6615,7 +6648,7 @@ return {
     const exDock = (d) => `<div class="mx-game mx-ex" data-g="${d.id}" style="--acc:${d.color}" hidden>
 <div class="mx-top"><b class="mx-name">${d.title}</b><span id="status" class="mx-status" role="status"></span><button class="mx-b" data-mx="zoom" title="Zoom in on the screen (F)">ZOOM IN</button></div>
 <div class="mx-dock">
-<div class="mx-bal"><label>WALLET <button id="topup" title="Connect wallet" aria-label="Connect wallet">+</button></label><strong id="exAddr">NOT CONNECTED</strong><small id="exNet"></small></div>
+<div class="mx-bal"><label>WALLET <button id="topup" title="Connect wallet" aria-label="Connect wallet">+</button></label><strong id="exAddr">NOT CONNECTED</strong><small id="exNet"></small><button id="exOut" class="mx-link" hidden aria-label="Disconnect wallet">DISCONNECT</button></div>
 <div class="mx-bet"><label>PAY · STX</label><div class="stepper"><button id="minus" aria-label="Pay 1 STX less">−</button><strong id="exStx">1</strong><button id="plus" aria-label="Pay 1 STX more">+</button></div></div>
 <div class="mx-win"><label>YOU GET</label><strong id="exGet">100,000</strong><small>LAYR</small></div>
 <div class="mx-act"><button data-stx="1" title="1 STX">1 STX</button><button data-stx="5" title="5 STX">5 STX</button><button data-stx="10" title="10 STX">10 STX</button><button id="spin" class="spin"><span id="spinText">BUY LAYR</span> <span class="spin-icon">${d.icon}</span></button></div>
