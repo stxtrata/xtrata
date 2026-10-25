@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## ParallaX Casino B: the alternate GPT v0.8 build at /casino-b (2026-10-25)
+- New standalone page `public/casino-b/index.html` (served at `/casino-b/`): the supplied "ParallaX Casino GPT v0.8" file, added byte for byte (23,872,035 bytes, under the 25 MiB per-file limit for Pages assets). It is a separate build for side-by-side testing; `/casino/` is unchanged.
+- It sells LAYR for STX the same way: testnet, 100,000 LAYR per STX, 1 to 10 STX per purchase, paid to the Xtrata core wallet `ST10W2EEM757922QTVDZZ5CSEW55JEFNN33V2E7YA` (the recipient and price were read out of the file before it was added). Its wallet layer is different from `/casino/`'s: it bundles WalletConnect / Reown AppKit code alongside references to the injected Leather and Xverse providers, so a wallet connection from this page may reach WalletConnect services that `/casino/` never contacts.
+- `public/_headers`: `/casino-b` is served `no-cache`, as `/casino` is.
+- **Verified:** the file in the repo is byte-identical to the one supplied. In a headless browser it loads, draws its 3D room, raises no console errors and requests nothing from outside hosts at load. No wallet was connected and no payment was made as part of this change.
+
 ## ParallaX Casino: 3D casino with a LAYR Exchange paid in STX (2026-10-25)
 - New standalone page `public/casino/index.html` (served at `/casino/`): a single-file 3D casino (Three.js, no build step, no external dependencies) with seven tables, five fruit machines and two LAYR Exchange machines. LAYR is the play currency; it is held in the visitor's browser (`localStorage`), cannot be withdrawn and is lost if site data is cleared.
 - The LAYR Exchange sells 100,000 LAYR per STX, 1 to 10 STX per purchase. The wallet sends a plain STX transfer to the Xtrata core wallet `ST10W2EEM757922QTVDZZ5CSEW55JEFNN33V2E7YA`; the page then reads the transaction from the Hiro API and credits the LAYR only once it is `success`, a `token_transfer` to that address of at least 1 STX. A transaction is credited once (the ledger remembers it), pending payments survive a reload, and a payment can also be claimed by pasting its transaction ID. There is no smart contract: the only on-chain step is the transfer. **Testnet for now:** the network and address are the `SHOP` constant at the top of the exchange code; the page refuses to open if the address does not match the network.

@@ -150,6 +150,15 @@
 /casino/*
   Cache-Control: no-cache
 
+# ParallaX Casino B (/casino-b): the alternate "GPT v0.8" build of the casino, one self-contained page.
+# Same rule as /casino: always revalidate so a redeploy is never served from a stale cache.
+/casino-b
+  Cache-Control: no-cache
+/casino-b/
+  Cache-Control: no-cache
+/casino-b/*
+  Cache-Control: no-cache
+
 # Pay-per-play radio host (functions/lib/radio-host.ts, docs/radio/PAY-PER-PLAY.md).
 # The listening wallet trusts this origin, so nothing except the radio's own pages may run here:
 # every other static page is served sandboxed (opaque origin, no scripts). Function routes that
