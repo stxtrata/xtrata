@@ -141,6 +141,15 @@
 /audionaut/daw/js/*
   Cache-Control: no-cache
 
+# ParallaX Casino (/casino): one self-contained page under a stable filename. Force revalidation so a
+# redeploy is never served from a stale CDN/browser cache.
+/casino
+  Cache-Control: no-cache
+/casino/
+  Cache-Control: no-cache
+/casino/*
+  Cache-Control: no-cache
+
 # Pay-per-play radio host (functions/lib/radio-host.ts, docs/radio/PAY-PER-PLAY.md).
 # The listening wallet trusts this origin, so nothing except the radio's own pages may run here:
 # every other static page is served sandboxed (opaque origin, no scripts). Function routes that
