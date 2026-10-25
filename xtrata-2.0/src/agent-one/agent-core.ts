@@ -597,7 +597,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-25.3';
+export const AGENT_BUILD = '2026-10-25.5';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -846,9 +846,9 @@ function referralRowHtml(d: any, row: (k: string, v: string) => string, stxr: (u
   const r: ReferralView | undefined = d && d.referral;
   if (!r) return '';
   const who = escHtml(r.name);
-  if (r.kind === 'rebate') return row('↳ Referral rebate (' + who + ' link)', stxr(r.amountUstx) + ' · returned in your change');
-  if (r.kind === 'pending') return row('↳ Referral share (' + who + ')', 'to be settled by Xtrata');
-  return row('↳ Referral share to ' + who, stxr(r.amountUstx) + ' · from the wizard fee, not added to your price');
+  if (r.kind === 'rebate') return row('↳ Referral rebate · ' + who, stxr(r.amountUstx) + ' back in your change');
+  if (r.kind === 'pending') return row('↳ Referral · ' + who, 'to be settled by Xtrata');
+  return row('↳ Referral · ' + who, stxr(r.amountUstx) + ' of the wizard fee');
 }
 /** What to show for a referred job: `final` false = the split agreed before payout (on-chain receipt), true = what happened. */
 function referralView(job: any, agentFee: bigint, payer: string | null, final: boolean): ReferralView | null {
@@ -2018,7 +2018,7 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
     mockReferral(job, agentFee);
     const d = batchReceiptData(job, { received, agentFee, receiptTokenId, change: change > 0n ? change : 0n, stxUsd, referral: referralView(job, agentFee, job.funder || job.expectedFunder || job.user || null, true) });
     job.receiptHtml = buildBatchReceiptHtml(d);
-    const receipt: any = { ...d, deliverTxs: minted.map((i: any) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    const receipt: any = { ...d, deliverTxs: minted.map((i: any) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND', ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: null } : {}) };
     if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p: string) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
     Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
     delete job.ephemeralMnemonic; job.status = doneStatus(); writeJob(job);
@@ -2107,7 +2107,7 @@ async function deliver(job: any) {
     mockReferral(job, agentFee);
     const d = receiptData(job, { received, agentFee, receiptTokenId, stxUsd, referral: referralView(job, agentFee, job.funder || job.expectedFunder || job.user || null, true) });
     job.receiptHtml = buildReceiptHtml(d);
-    const receipt: any = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    const receipt: any = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND', ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: null } : {}) };
     if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p: string) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
     Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
     delete job.ephemeralMnemonic; job.status = 'COMPLETE'; writeJob(job); return { receipt };

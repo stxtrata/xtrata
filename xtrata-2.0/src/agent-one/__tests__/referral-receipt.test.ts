@@ -38,19 +38,19 @@ describe('receipt HTML', () => {
   });
   it('a referred receipt shows one line under the wizard fee, in both receipt types', () => {
     for (const html of [agent.buildReceiptHtml(single({ referral: ref('paid') })), agent.buildBatchReceiptHtml(batch({ referral: ref('paid') }))]) {
-      expect(html).toContain('Referral share to fak.fun');
+      expect(html).toContain('Referral · fak.fun');
       expect(html).toContain('0.25 STX');
-      expect(html.indexOf('Wizard fee')).toBeLessThan(html.indexOf('Referral share to fak.fun'));
-      expect(html.indexOf('Referral share to fak.fun')).toBeLessThan(html.indexOf('Change returned'));
-      expect((html.match(/Referral share/g) || []).length).toBe(1);
+      expect(html.indexOf('Wizard fee')).toBeLessThan(html.indexOf('Referral · fak.fun'));
+      expect(html.indexOf('Referral · fak.fun')).toBeLessThan(html.indexOf('Change returned'));
+      expect((html.match(/Referral ·/g) || []).length).toBe(1);
     }
   });
   it('shows the planned share on the on-chain receipt, a settle-later note when unpaid, and a rebate line for self-referral', () => {
-    expect(agent.buildReceiptHtml(single({ referral: ref('planned') }))).toContain('Referral share to fak.fun');
+    expect(agent.buildReceiptHtml(single({ referral: ref('planned') }))).toContain('Referral · fak.fun');
     const pending = agent.buildReceiptHtml(single({ referral: ref('pending') }));
     expect(pending).toContain('to be settled by Xtrata'); expect(pending).not.toContain('0.25 STX');
     const rebate = agent.buildBatchReceiptHtml(batch({ referral: ref('rebate') }));
-    expect(rebate).toContain('Referral rebate (fak.fun link)'); expect(rebate).toContain('returned in your change');
+    expect(rebate).toContain('Referral rebate · fak.fun'); expect(rebate).toContain('back in your change');
   });
   it('escapes the partner name', () => {
     for (const html of [agent.buildReceiptHtml(single({ referral: ref('paid', '1', '<img src=x onerror=1>') })), agent.buildBatchReceiptHtml(batch({ referral: ref('pending', '1', '<script>x</script>') }))]) {
@@ -113,7 +113,7 @@ describe('receipts produced by a real delivery', () => {
       const paid = chain.stxTransfers.find((t) => t.to === PARTNER)!;
       expect(r.receipt.referral).toMatchObject({ slug: SLUG, name: 'fak.fun', kind: 'paid', amountUstx: (r.fee / 2n).toString() });
       expect(r.receipt.referralTx).toBe(paid.txid.replace(/^0x/, ''));
-      expect(r.job.receiptHtml).toContain('Referral share to fak.fun');
+      expect(r.job.receiptHtml).toContain('Referral · fak.fun');
       expect(r.receipt.agentFee).toBe(r.fee.toString());          // the user's fee line is unchanged by the referral
       expect(adds(r.receipt)).toBe(r.required);                    // and the books still balance
       networkIsReal(r.receipt, r.tailFees);                        // incl. the extra partner transfer fee
@@ -134,7 +134,7 @@ describe('receipts produced by a real delivery', () => {
     const rebate = r.fee / 2n;
     expect(r.receipt.referral).toMatchObject({ kind: 'rebate', amountUstx: rebate.toString() });
     expect(r.receipt.agentFee).toBe((r.fee - rebate).toString());
-    expect(r.job.receiptHtml).toContain('Referral rebate (fak.fun link)');
+    expect(r.job.receiptHtml).toContain('Referral rebate · fak.fun');
     expect(adds(r.receipt)).toBe(r.required);
     networkIsReal(r.receipt, r.tailFees);
     expect(chain.stxTransfers.find((t) => t.to === XTRATA_FEE_ADDRESS)!.amount).toBe(r.fee - rebate);
