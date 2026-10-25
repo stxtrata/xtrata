@@ -382,7 +382,7 @@
 <script src="music-batch.js?v=4"></script>
 <script src="music-build.js?v=5"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-10-23.1"></script>
+<script src="agent-one.js?v=2026-10-25.1"></script>
 <script>
 let musicSubmitting=false;
 function musicJobActive(){return musicSubmitting||(typeof JOB!=='undefined'&&JOB&&!['DONE','COMPLETE','COMPLETE_WITH_SKIPS','COMPLETED','REFUNDED','CANCELLED','FAILED'].includes(JOB.status));}
@@ -429,12 +429,22 @@ function rejectToWizard(msg){
   building=false; $('#go').disabled=true; $('#go').textContent='Drop a track to begin';
 }
 function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
+// REFERRAL: `?ref=<slug>` is remembered for this tab only (sessionStorage) and sent as a plain slug.
+// The agent looks the slug up in the partner registry; nothing here can name an address or a share.
+function referralSlug(){
+  const ok=v=>typeof v==='string'&&/^[a-z0-9](?:[a-z0-9-]{0,21}[a-z0-9])?$/.test(v.trim().toLowerCase())?v.trim().toLowerCase():null;
+  let fromUrl=null; try{ fromUrl=ok(new URLSearchParams(location.search).get('ref')); }catch(e){}
+  try{ if(fromUrl) sessionStorage.setItem('xtrata-music-ref',fromUrl); }catch(e){}
+  if(fromUrl) return fromUrl;
+  try{ return ok(sessionStorage.getItem('xtrata-music-ref')); }catch(e){ return null; }
+}
+referralSlug();
 async function api(path, opts){
   const A=xa(); const m=(opts&&opts.method)||'GET';
   let body={}; if(opts&&opts.body){ body = (typeof opts.body==='string') ? JSON.parse(opts.body) : opts.body; }
   if(path==='/api/health') return A.health();
   if(path==='/api/estimate'){window.XtrataMusicDiagnostics?.log('quote','Requesting quote for '+body.bytes+' bytes.');try{const result=await A.estimate({...body,feeMode:musicFeeMode()});window.XtrataMusicDiagnostics?.log('quote-ready','Quote received.');return result;}catch(e){window.XtrataMusicDiagnostics?.log('quote-error','Quote request failed; no payment was requested.');throw e;}}
-  if(path==='/api/jobs' && m==='POST') return { job: await A.createJob(body) };
+  if(path==='/api/jobs' && m==='POST') return { job: await A.createJob({...body,referral:referralSlug()}) };
   let mm;
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/cancel$/))) { if(!A.cancelJob) throw new Error('this agent bundle has no cancel — redeploy agent-one.js'); return A.cancelJob(mm[1]); }
   if((mm=path.match(/^\/api\/jobs\/([^/]+)$/))) return A.getJob(mm[1]);

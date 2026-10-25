@@ -11,6 +11,7 @@
 //
 // UNTESTED IN THIS ENV — validate with XAO_CONFIG.mock=true in a browser first, then a small live job.
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { freezeReferral } from './referral-registry';
 import { generateMnemonic, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { HDKey } from '@scure/bip32';
@@ -595,7 +596,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-23.1';
+export const AGENT_BUILD = '2026-10-25.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -1569,6 +1570,8 @@ async function createJob(opts: any) {
   if (parentIds.some((p) => !/^\d+$/.test(p))) throw new Error('parents must be token-id uints');
   if (new Set(parentIds).size !== parentIds.length) throw new Error('duplicate parent token ids');
   if (parentIds.length > 50) throw new Error('at most 50 parents');
+  // REFERRAL: resolved before any file is read or wallet made, so a registry outage creates no job.
+  const referral = await freezeReferral(opts.referral, origin, { sleep });
   const data = new Uint8Array(await (file as File).arrayBuffer());
   // DUPLICATE-HASH GUARD: the contract rejects re-inscribing an identical hash — refuse BEFORE creating
   // a job or taking payment, so identical content is never paid for twice.
@@ -1596,6 +1599,7 @@ async function createJob(opts: any) {
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
     status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin, sunoPlayer,
+    ...(referral ? { referral } : {}),
   };
   initialiseMusicFees(job, est);
   writeJob(job); return publicJob(job);
@@ -1615,6 +1619,7 @@ async function createBatchJob(opts: any) {
   if (!Array.isArray(items) || !items.length) throw new Error('items required');
   if (items.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${items.length} items (max ${MAX_BATCH_ITEMS})`);
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
+  const referral = await freezeReferral(opts.referral, origin, { sleep });
   const validIds = (list: any[], what: string) => {
     const ids = (list || []).map((p: any) => String(p).trim()).filter(Boolean);
     if (ids.some((p) => !/^\d+$/.test(p))) throw new Error(`${what} must be token-id uints`);
@@ -1672,6 +1677,7 @@ async function createBatchJob(opts: any) {
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
     status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin,
+    ...(referral ? { referral } : {}),
   };
   initialiseMusicFees(job, est);
   writeJob(job); return publicJob(job);
