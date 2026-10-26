@@ -7394,24 +7394,71 @@ function verifyTransfer(tx,expected){
 }
 function create(options){
  const account=options.account,storage=options.storage||localStorage,fetcher=options.fetch||window.fetch;
- let address=null,busy=false,pending=null,status='',error='',lastCheck=0,checking=false;
+ let address=null,busy=false,pending=null,status='',error='',lastCheck=0,checking=false,busyKind='',cancelWallet=null;
  const listeners=new Set(),emit=()=>{for(const f of listeners)f(snapshot());};
+ const log=(...a)=>{try{console.log('[casino-b:wallet]',...a);}catch(_){}};
+ const closeChooser=()=>{try{document.querySelectorAll('connect-modal').forEach(m=>m.remove());document.body.style.overflow='';}catch(_){}};
+ // Every wallet request runs under a watchdog. A wallet that never answers used to leave the page on
+ // "Wallet request in progress" for good: no chooser, no error, a disabled button and nothing in the console.
+ // force: always open the wallet chooser instead of silently reusing the wallet remembered from another page on this site.
+ function ask(method,params,o){
+  o=o||{};
+  return new Promise((resolve,reject)=>{
+   let done=false,timer=null;const t0=Date.now();
+   const finish=(fn,v)=>{if(done)return false;done=true;clearTimeout(timer);cancelWallet=null;fn(v);return true;};
+   cancelWallet=()=>{log('cancelled by the user:',method);closeChooser();finish(reject,Object.assign(new Error('Wallet request cancelled. Nothing was sent.'),{code:'cancelled-here'}));};
+   timer=setTimeout(()=>{log('no answer from the wallet:',method,Math.round((Date.now()-t0)/1000)+'s');closeChooser();finish(reject,Object.assign(new Error('Your wallet did not answer within '+Math.round((o.timeoutMs||120000)/1000)+' seconds. Open the wallet extension, look for a waiting request, then try again.'),{code:'wallet-timeout'}));},o.timeoutMs||120000);
+   log('request:',method,JSON.stringify(params),o.force?'(chooser forced)':'','remembered wallet:',(()=>{try{return localStorage.getItem('STX_PROVIDER');}catch(_){return null;}})());
+   let p;try{p=o.run?o.run():o.force?sdk().request({forceWalletSelect:true},method,params):sdk().request(method,params);}catch(e){p=Promise.reject(e);}
+   Promise.resolve(p).then(v=>{if(finish(resolve,v))log('answered:',method,(Date.now()-t0)+'ms');else{log('late answer after the watchdog:',method);if(o.late)try{o.late(v);}catch(_){}}},
+    e=>{if(finish(reject,e))log('failed:',method,e&&e.code,e&&e.message);});
+  });
+ }
+ // Xverse only shows its account picker on a fresh wallet_connect, so end any old session first (wallet playbook, rule 4). Best effort, never blocks for long.
+ async function releaseXverse(){
+  try{const p=window.XverseProviders&&window.XverseProviders.BitcoinProvider;if(p&&typeof p.request==='function'){log('Xverse: ending the old session');await Promise.race([Promise.resolve(p.request('wallet_disconnect')).catch(()=>{}),new Promise(r=>setTimeout(r,3000))]);}}catch(_){}
+ }
+ // Paying goes to the wallet the way the Xtrata wizard calls it (docs/WALLET-PLAYBOOK.md): Leather takes the full parameter set;
+ // Xverse takes it on its Stacks provider, and only if that is missing the minimal set on its Bitcoin provider. The bare library call
+ // sent the minimal set to both: Leather answers "Invalid params", Xverse answers "Network mismatch".
+ const usable=p=>!!p&&typeof p.request==='function';
+ const rpc=(p,m,a)=>Promise.resolve(a===undefined?p.request(m):p.request(m,a)).then(r=>{
+  if(r&&typeof r==='object'){const er=r.error||(r.status==='error'?r:null);if(er)throw Object.assign(new Error(er.message||'The wallet refused the request.'),{code:er.code});if('result' in r)return r.result;}
+  return r;});
+ const unsupported=e=>!!e&&(e.code===-32601||e.code===-32001||/not (?:supported|found|implemented|available)|unknown method|unsupported|invalid method|no such method/i.test(String(e.message||'')));
+ const mismatch=e=>/network mismatch|mismatch.*network|network.*mismatch/i.test(String(e&&e.message||''));
+ async function payViaWallet(base){
+  let sel=null;try{sel=localStorage.getItem('STX_PROVIDER');}catch(_){}
+  const full={recipient:base.recipient,amount:base.amount,memo:base.memo,network:'testnet',address,sponsored:false};
+  if(sel==='LeatherProvider'&&usable(window.LeatherProvider)){log('pay: Leather, full parameter set');return rpc(window.LeatherProvider,'stx_transferStx',full);}
+  const X=window.XverseProviders;
+  if(sel==='XverseProviders.BitcoinProvider'&&X){
+   const st=usable(X.StacksProvider)?X.StacksProvider:null,bt=usable(X.BitcoinProvider)?X.BitcoinProvider:null;
+   if(st){try{log('pay: Xverse Stacks provider, full parameter set');return await rpc(st,'stx_transferStx',full);}catch(e){if(!unsupported(e))throw e;log('pay: the Stacks provider cannot do it, using the Bitcoin provider');}}
+   if(!bt)throw new Error('Xverse has no payment route on this page.');
+   const min={recipient:base.recipient,amount:base.amount,memo:base.memo};
+   try{log('pay: Xverse Bitcoin provider, minimal parameter set');return await rpc(bt,'stx_transferStx',min);}
+   catch(e){if(!mismatch(e))throw e;log('pay: Xverse kept a session on another network; reconnecting once');try{await rpc(bt,'wallet_disconnect');}catch(_){}
+    const again=await rpc(bt,'wallet_connect');if(!(JSON.stringify(again)||'').includes(address))throw new Error('The wallet account changed. Connect again.');return rpc(bt,'stx_transferStx',min);}
+  }
+  log('pay: another wallet, the library route');return sdk().request('stx_transferStx',{recipient:base.recipient,amount:base.amount,memo:base.memo,network:'testnet'});
+ }
  try{pending=JSON.parse(storage.getItem(PENDING)||'null');if(pending&&pending.contract){pending=null;storage.removeItem(PENDING);}if(pending?.txId)pending.txId=normalizeId(pending.txId);}catch(_){error='The saved pending transfer could not be read.';pending=null;}
  const validAddress=a=>/^S[NT]/.test(a)&&sdk().validateStacksAddress(a);
- async function connect(){if(busy)return;busy=true;error='';status='Choose your Stacks testnet wallet…';emit();
-  try{const r=await sdk().request('getAddresses',{network:'testnet'}),list=r.addresses||r.result?.addresses||[],a=list.find(a=>a.symbol==='STX'&&validAddress(a.address))||list.find(a=>validAddress(a.address));if(!a)throw Error('Switch your wallet to Stacks testnet and reconnect.');
+ async function connect(){if(busy)return;busy=true;busyKind='connect';error='';status='Choose your Stacks testnet wallet…';emit();
+  try{await releaseXverse();const r=await ask('getAddresses',{network:'testnet'},{force:true,timeoutMs:180000}),list=r.addresses||r.result?.addresses||[],a=list.find(a=>a.symbol==='STX'&&validAddress(a.address))||list.find(a=>validAddress(a.address));if(!a)throw Error('Switch your wallet to Stacks testnet and reconnect.');
    if(pending&&pending.address!==a.address)throw Error('Reconnect the wallet used for the pending transfer: '+pending.address);
    address=a.address;status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
  }
  async function purchase(stx){if(busy||pending)throw Error('Resolve the pending wallet transfer before sending another payment.');if(!Number.isInteger(stx)||stx<1||stx>10)throw Error('Choose a whole amount from 1 to 10 STX.');if(!address)throw Error('Connect your testnet wallet first.');
-  busy=true;error='';
+  busy=true;busyKind='purchase';error='';
   try{if(!account.ready()&&!await account.acquire())throw Error(account.error()||'Close other casino tabs, then reconnect.');
    // Save before asking the wallet; an ambiguous response never triggers a
    // second payment automatically. The bank and processed tx ID are atomic.
    pending={address,recipient:RECIPIENT,stx,created:Date.now(),txId:null,state:'wallet-request'};storage.setItem(PENDING,JSON.stringify(pending));status='Confirm '+stx+' testnet STX in your wallet. Fees are additional.';emit();
-   let r;try{r=await sdk().request('stx_transferStx',{recipient:RECIPIENT,amount:String(stx*1000000),memo:'ParallaX LAYR',network:'testnet'});}
-   catch(e){if(e.code===4001||e.code===-32000&&/reject|cancel|denied/i.test(e.message)||/user (rejected|cancelled|canceled|denied)/i.test(e.message)){storage.removeItem(PENDING);pending=null;status='Wallet request cancelled. No LAYR was added.';}else{pending.state='check-wallet';storage.setItem(PENDING,JSON.stringify(pending));status='Check your wallet for the transaction ID before sending again.';}throw e;}
+   let r;try{r=await ask('stx_transferStx',{recipient:RECIPIENT,amount:String(stx*1000000),memo:'ParallaX LAYR',network:'testnet'},{timeoutMs:180000,run:()=>payViaWallet({recipient:RECIPIENT,amount:String(stx*1000000),memo:'ParallaX LAYR'}),late:v=>{const id=normalizeId(v.txid||v.txId||v.result?.txid||v.result?.txId);if(pending&&!pending.txId){pending.txId=id;pending.state='pending';storage.setItem(PENDING,JSON.stringify(pending));status='Transfer broadcast on testnet. Waiting for confirmation…';emit();}}});}
+   catch(e){if(e.code===4001||e.code===-32000&&/reject|cancel|denied/i.test(e.message)||/user (rejected|cancelled|canceled|denied)/i.test(e.message)){storage.removeItem(PENDING);pending=null;status='Wallet request cancelled. No LAYR was added.';}else if(e&&(e.code===-32602||e.code===-32601)){storage.removeItem(PENDING);pending=null;status='The wallet could not process the request. Nothing was sent.';}else{pending.state='check-wallet';storage.setItem(PENDING,JSON.stringify(pending));status='Check your wallet for the transaction ID before sending again.';}throw e;}
    try{pending.txId=normalizeId(r.txid||r.txId||r.result?.txid||r.result?.txId);}catch(_){pending.state='check-wallet';storage.setItem(PENDING,JSON.stringify(pending));throw Error('No transaction ID was returned. Recover it from your wallet before sending again.');}
    pending.state='pending';storage.setItem(PENDING,JSON.stringify(pending));status='Transfer broadcast on testnet. Waiting for confirmation…';return pending.txId;
   }catch(e){error=e.message;throw e;}finally{busy=false;emit();}
@@ -7430,8 +7477,9 @@ function create(options){
   pending={...(pending||{address,recipient:RECIPIENT,stx:null,created:Date.now()}),txId:id,state:'recovery'};storage.setItem(PENDING,JSON.stringify(pending));emit();return check();
  }
  function clearUnsigned(){if(busy||checking)throw Error('Wait for the wallet request to finish before clearing it.');if(!pending||pending.txId)throw Error('A broadcast transfer must be checked, not discarded.');storage.removeItem(PENDING);pending=null;status='Unsigned request cleared. Confirm in your wallet that no transfer was broadcast.';error='';emit();}
- function snapshot(){return{address,busy,pending:pending?{...pending}:null,status,error,recipient:RECIPIENT,network:'testnet'};}
- return{connect,purchase,check,recover,clearUnsigned,snapshot,subscribe(f){listeners.add(f);return()=>listeners.delete(f);},tick(now){if(address&&pending?.txId&&now-lastCheck>12000){lastCheck=now;check();}}};
+ function snapshot(){return{address,busy,busyKind:busy?busyKind:'',pending:pending?{...pending}:null,status,error,recipient:RECIPIENT,network:'testnet'};}
+ function cancel(){if(busy&&busyKind==='connect'&&cancelWallet){cancelWallet();return;}if(busy&&busyKind==='purchase')throw Error('A payment request is open in your wallet. Approve or reject it there; this page cannot cancel it safely.');}
+ return{connect,cancel,purchase,check,recover,clearUnsigned,snapshot,subscribe(f){listeners.add(f);return()=>listeners.delete(f);},tick(now){if(address&&pending?.txId&&now-lastCheck>12000){lastCheck=now;check();}}};
 }
 window.ParallaxTestnetLAYR=Object.freeze({create,verifyTransfer,normalizeId,recipient:RECIPIENT,network:'testnet',version:'2.0.0'});
 })();
@@ -10353,7 +10401,7 @@ function applyTestnetFunding(proof){
     for(const b of document.querySelectorAll('[data-layr-amount]')){b.setAttribute('aria-pressed',String(+b.dataset.layrAmount===q.stx));b.disabled=st.busy||!!st.pending;}
     $('layrAmountRange').disabled=st.busy||!!st.pending;$('layrDispenseButton').disabled=!st.address||st.busy||!!st.pending;
     $('layrDispenseButton').textContent=st.pending?'Awaiting testnet confirmation…':st.busy?'Wallet request in progress…':!st.address?'Connect your testnet wallet':'Pay '+q.stx+' testnet STX → '+fmt(q.layr)+' LAYR';
-    $('layrConnectWallet').textContent=st.address?'Reconnect testnet wallet':'Connect testnet wallet';$('layrConnectWallet').disabled=st.busy;
+    $('layrConnectWallet').textContent=st.busy&&st.busyKind==='connect'?'Cancel wallet request':st.address?'Reconnect testnet wallet':'Connect testnet wallet';$('layrConnectWallet').disabled=st.busy&&st.busyKind!=='connect';
     $('layrWalletAddress').textContent=st.address||'No testnet wallet connected';$('layrSyncFunding').disabled=!st.address||!st.pending?.txId||st.busy;
     $('layrDispenserStatus').textContent=st.status||'1 testnet STX = 100,000 LAYR. Connect your wallet to purchase.';$('layrTestnetError').textContent=st.error;
     $('layrTransactionLink').hidden=!st.pending?.txId;if(st.pending?.txId)$('layrTransactionLink').href='https://explorer.hiro.so/txid/'+st.pending.txId+'?chain=testnet';
@@ -10387,7 +10435,7 @@ function applyTestnetFunding(proof){
     $('layrDispenserButton').onclick=()=>openLAYRDispenser(0);$('layrDispenserIntro').onclick=()=>openLAYRDispenser(0);$('layrCloseDispenser').onclick=closeLAYRDispenser;
     $('layrAmountRange').oninput=e=>selectDispenserAmount(Number(e.target.value));for(const b of document.querySelectorAll('[data-layr-amount]'))b.onclick=()=>selectDispenserAmount(Number(b.dataset.layrAmount));
     $('layrDispenserSelect').onchange=e=>{activeDispenser=room.dispensers[Number(e.target.value)];paintDispenserPanel();};
-    $('layrConnectWallet').onclick=act(()=>testnetLAYR.connect());$('layrDispenseButton').onclick=act(()=>testnetLAYR.purchase(dispenserAmount));$('layrSyncFunding').onclick=act(()=>testnetLAYR.check());$('layrCheckTransaction').onclick=act(()=>testnetLAYR.check());
+    $('layrConnectWallet').onclick=act(()=>testnetLAYR.snapshot().busy?testnetLAYR.cancel():testnetLAYR.connect());$('layrDispenseButton').onclick=act(()=>testnetLAYR.purchase(dispenserAmount));$('layrSyncFunding').onclick=act(()=>testnetLAYR.check());$('layrCheckTransaction').onclick=act(()=>testnetLAYR.check());
     $('layrRecoverTransaction').onclick=act(()=>testnetLAYR.recover($('layrRecoveryTx').value.trim()));
     $('layrClearUnsigned').onclick=act(()=>{if(!$('layrNoBroadcast').checked)throw Error('Check your wallet and confirm that no transaction was broadcast first.');testnetLAYR.clearUnsigned();$('layrNoBroadcast').checked=false;});
     testnetLAYR.subscribe(paintDispenserPanel);layrAccount.subscribe(()=>{if(dispenserOpen)paintDispenserPanel();});
