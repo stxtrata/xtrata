@@ -407,8 +407,9 @@ describe('/checker/lookup: a wallet', () => {
       hiro(() => json({}, 400))
     ]) {
       const { res, body } = await ask(envOf(), WALLET, { fetcher: bad.fetcher, sleeps: [] });
-      expect(res.status).toBe(502);
+      expect(res.status).toBe(503); // never 502/504: Cloudflare swaps those for its own page on the live domain
       expect(body).toMatchObject({ ok: false, error: 'holdings_unavailable' });
+      expect(body.reason).toMatch(/^(HTTP \d{3}|network|timed out|unreadable answer|unexpected answer|inconsistent answer|no answer)$/);
       expect(body.message).toMatch(/does not mean it is empty/);
       expect(body.results).toBeUndefined();
     }

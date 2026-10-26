@@ -414,7 +414,9 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
     if (walletCount !== null && walletCount > WALLETS_PER_HOUR) return fail(429, 'rate_limited', 'Too many wallet lookups from here. Try again in an hour.');
     const holdings = await readHoldings(parsed.address, env, fetcher, sleep);
     if (!holdings.ok) {
-      return fail(502, 'holdings_unavailable', 'We could not read that wallet\'s NFT list right now. That does not mean it is empty. Please try again in a minute.');
+      // 503, not 502: Cloudflare replaces a 502 or 504 from the site with its own plain error page on the live domain, which hides this message.
+      // The reason is only ever one of our short codes ("HTTP 401", "timed out", "unexpected answer"), never upstream text.
+      return fail(503, 'holdings_unavailable', 'We could not read that wallet\'s NFT list right now. That does not mean it is empty. Please try again in a minute.', { reason: holdings.error });
     }
 
     const covered: Array<ReturnType<typeof card>> = [];

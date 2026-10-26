@@ -434,7 +434,7 @@
       not_switched_on: 'The checker is not switched on yet',
       rate_limited: 'Slow down a moment'
     }[d && d.error];
-    return errorBox(title, [message]);
+    return errorBox(title, [message].concat(d && d.reason ? ['Reason: ' + d.reason] : []));
   }
 
   // ---------- the form ----------
