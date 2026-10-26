@@ -159,6 +159,10 @@
 /casino-b/*
   Cache-Control: no-cache
 
+# The casino's shutdown switch + TESTNET notice (public/casino-status.json): the casino pages re-read it every minute, so it must never be cached.
+/casino-status.json
+  Cache-Control: no-store
+
 # Pay-per-play radio host (functions/lib/radio-host.ts, docs/radio/PAY-PER-PLAY.md).
 # The listening wallet trusts this origin, so nothing except the radio's own pages may run here:
 # every other static page is served sandboxed (opaque origin, no scripts). Function routes that

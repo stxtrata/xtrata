@@ -7379,7 +7379,8 @@ lit-html/directives/ref.js:
 /* The only on-chain action is a plain testnet STX transfer. LAYR is credited
    in the existing browser account after the testnet API confirms the transfer. */
 (function(){'use strict';
-const RECIPIENT='ST10W2EEM757922QTVDZZ5CSEW55JEFNN33V2E7YA',PENDING='xtrata.parallax.layr.testnet.pending.v1',API='https://api.testnet.hiro.so',sdk=()=>window.ParallaxStacksSDK;
+const exchangeShut=()=>{const c=window.CasinoStatus;return !!(c&&c.get().state!=='open');},SHUT_MSG='The LAYR exchange is closed for now.',
+ RECIPIENT='ST10W2EEM757922QTVDZZ5CSEW55JEFNN33V2E7YA',PENDING='xtrata.parallax.layr.testnet.pending.v1',API='https://api.testnet.hiro.so',sdk=()=>window.ParallaxStacksSDK;
 function normalizeId(id){const s=String(id||'').trim().replace(/^0x/i,'');if(!/^[a-f0-9]{64}$/i.test(s))throw Error('Paste the full testnet transaction ID.');return'0x'+s.toLowerCase();}
 function verifyTransfer(tx,expected){
  const id=normalizeId(tx.tx_id),sender=tx.sender?.address||tx.sender_address,type=tx.type||tx.tx_type,state=tx.status||tx.tx_status,transfer=tx.token_transfer,recipient=transfer?.recipient||transfer?.recipient_address;
@@ -7445,13 +7446,13 @@ function create(options){
  }
  try{pending=JSON.parse(storage.getItem(PENDING)||'null');if(pending&&pending.contract){pending=null;storage.removeItem(PENDING);}if(pending?.txId)pending.txId=normalizeId(pending.txId);}catch(_){error='The saved pending transfer could not be read.';pending=null;}
  const validAddress=a=>/^S[NT]/.test(a)&&sdk().validateStacksAddress(a);
- async function connect(){if(busy)return;busy=true;busyKind='connect';error='';status='Choose your Stacks testnet wallet…';emit();
+ async function connect(){if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status='Choose your Stacks testnet wallet…';emit();
   try{await releaseXverse();const r=await ask('getAddresses',{network:'testnet'},{force:true,timeoutMs:180000}),list=r.addresses||r.result?.addresses||[],a=list.find(a=>a.symbol==='STX'&&validAddress(a.address))||list.find(a=>validAddress(a.address));if(!a)throw Error('Switch your wallet to Stacks testnet and reconnect.');
    if(pending&&pending.address!==a.address)throw Error('Reconnect the wallet used for the pending transfer: '+pending.address);
    address=a.address;status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
  }
- async function purchase(stx){if(busy||pending)throw Error('Resolve the pending wallet transfer before sending another payment.');if(!Number.isInteger(stx)||stx<1||stx>10)throw Error('Choose a whole amount from 1 to 10 STX.');if(!address)throw Error('Connect your testnet wallet first.');
+ async function purchase(stx){if(exchangeShut())throw Error(SHUT_MSG);if(busy||pending)throw Error('Resolve the pending wallet transfer before sending another payment.');if(!Number.isInteger(stx)||stx<1||stx>10)throw Error('Choose a whole amount from 1 to 10 STX.');if(!address)throw Error('Connect your testnet wallet first.');
   busy=true;busyKind='purchase';error='';
   try{if(!account.ready()&&!await account.acquire())throw Error(account.error()||'Close other casino tabs, then reconnect.');
    // Save before asking the wallet; an ambiguous response never triggers a
@@ -10312,6 +10313,7 @@ function applyTestnetFunding(proof){
     const mat=new THREE.MeshBasicMaterial({map:texture}),mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
     mesh.position.set(x,y,z);parent.add(mesh);return mesh;
   }
+  const exchangeShut=()=>{const c=window.CasinoStatus;return !!(c&&c.get().state!=='open');};
   function drawDispenserScreen(d){
     const c=d.screen.image.getContext('2d'),w=d.screen.image.width,h=d.screen.image.height;
     const gradient=c.createLinearGradient(0,0,w,h);gradient.addColorStop(0,'#10213a');gradient.addColorStop(1,'#050b13');c.fillStyle=gradient;c.fillRect(0,0,w,h);
@@ -10324,9 +10326,9 @@ function applyTestnetFunding(proof){
     c.fillStyle='#9eafc5';c.font='27px Arial';c.fillText('FOR EVERY 1 STX',w/2,457);
     const processing=!!testnetLAYR.snapshot().pending,selected=activeDispenser===d,amount=selected?dispenserAmount:1;
     c.fillStyle=processing?'#a9e4da':'#d3b47f';c.font='26px Arial';
-    c.fillText(processing?'LAYR EXCHANGE':selected?amount+' STX  →  '+(amount*100000).toLocaleString('en-GB')+' LAYR':'CHOOSE 1–10 STX',w/2,568);
+    c.fillText(exchangeShut()?'EXCHANGE CLOSED FOR NOW':processing?'LAYR EXCHANGE':selected?amount+' STX  →  '+(amount*100000).toLocaleString('en-GB')+' LAYR':'CHOOSE 1–10 STX',w/2,568);
     c.fillStyle='#0e243e';c.fillRect(78,622,w-156,84);c.strokeStyle='#9a7b4b';c.strokeRect(78,622,w-156,84);
-    c.fillStyle='#f3d6a6';c.font='29px Arial';c.fillText('TOUCH TO EXCHANGE',w/2,664);
+    c.fillStyle='#f3d6a6';c.font='29px Arial';c.fillText(exchangeShut()?'CLOSED':'TOUCH TO EXCHANGE',w/2,664);
     c.fillStyle='#8a9cb6';c.font='18px Arial';c.fillText('STACKS TESTNET · BROWSER LAYR',w/2,768);
     c.fillStyle='#62748c';c.font='17px Arial';c.fillText(d.label.toUpperCase()+'  /  '+d.id,w/2,817);
     d.screen.needsUpdate=true;
@@ -10395,15 +10397,15 @@ function applyTestnetFunding(proof){
     return Object.freeze({stx,microStx:stx*1000000,layr:stx*100000,rate:100000,network:'testnet',mode:'testnet',onChainConnected:!!testnetLAYR.snapshot().address});
   }
   function paintDispenserPanel(){
-    const q=layrQuote(dispenserAmount),st=testnetLAYR.snapshot(),fmt=n=>n.toLocaleString('en-GB');
+    const q=layrQuote(dispenserAmount),st=testnetLAYR.snapshot(),fmt=n=>n.toLocaleString('en-GB'),shut=exchangeShut();
     $('layrDispenserTitle').textContent=activeDispenser?activeDispenser.label+' · '+activeDispenser.id:'LAYR exchange';
     $('layrStxAmount').textContent=String(q.stx);$('layrReceiveAmount').textContent=fmt(q.layr);$('layrRoomBalance').textContent=fmt(bank);$('layrAmountRange').value=String(q.stx);
-    for(const b of document.querySelectorAll('[data-layr-amount]')){b.setAttribute('aria-pressed',String(+b.dataset.layrAmount===q.stx));b.disabled=st.busy||!!st.pending;}
-    $('layrAmountRange').disabled=st.busy||!!st.pending;$('layrDispenseButton').disabled=!st.address||st.busy||!!st.pending;
-    $('layrDispenseButton').textContent=st.pending?'Awaiting testnet confirmation…':st.busy?'Wallet request in progress…':!st.address?'Connect your testnet wallet':'Pay '+q.stx+' testnet STX → '+fmt(q.layr)+' LAYR';
-    $('layrConnectWallet').textContent=st.busy&&st.busyKind==='connect'?'Cancel wallet request':st.address?'Reconnect testnet wallet':'Connect testnet wallet';$('layrConnectWallet').disabled=st.busy&&st.busyKind!=='connect';
+    for(const b of document.querySelectorAll('[data-layr-amount]')){b.setAttribute('aria-pressed',String(+b.dataset.layrAmount===q.stx));b.disabled=st.busy||!!st.pending||shut;}
+    $('layrAmountRange').disabled=st.busy||!!st.pending||shut;$('layrDispenseButton').disabled=!st.address||st.busy||!!st.pending||shut;
+    $('layrDispenseButton').textContent=shut&&!st.pending?'Exchange closed for now':st.pending?'Awaiting testnet confirmation…':st.busy?'Wallet request in progress…':!st.address?'Connect your testnet wallet':'Pay '+q.stx+' testnet STX → '+fmt(q.layr)+' LAYR';
+    $('layrConnectWallet').textContent=st.busy&&st.busyKind==='connect'?'Cancel wallet request':st.address?'Reconnect testnet wallet':'Connect testnet wallet';$('layrConnectWallet').disabled=(st.busy&&st.busyKind!=='connect')||(shut&&!st.pending&&!(st.busy&&st.busyKind==='connect'));
     $('layrWalletAddress').textContent=st.address||'No testnet wallet connected';$('layrSyncFunding').disabled=!st.address||!st.pending?.txId||st.busy;
-    $('layrDispenserStatus').textContent=st.status||'1 testnet STX = 100,000 LAYR. Connect your wallet to purchase.';$('layrTestnetError').textContent=st.error;
+    $('layrDispenserStatus').textContent=shut&&!st.busy&&!st.pending?'The LAYR exchange is closed for now. Payments you already sent are still credited.':st.status||'1 testnet STX = 100,000 LAYR. Connect your wallet to purchase.';$('layrTestnetError').textContent=st.error;
     $('layrTransactionLink').hidden=!st.pending?.txId;if(st.pending?.txId)$('layrTransactionLink').href='https://explorer.hiro.so/txid/'+st.pending.txId+'?chain=testnet';
     $('layrCheckTransaction').hidden=!st.pending?.txId;$('layrRecovery').hidden=false;$('layrUnsignedRecovery').hidden=!st.pending||!!st.pending.txId;$('layrClearUnsigned').disabled=st.busy;
     for(const d of room.dispensers||[])drawDispenserScreen(d);
@@ -10439,6 +10441,7 @@ function applyTestnetFunding(proof){
     $('layrRecoverTransaction').onclick=act(()=>testnetLAYR.recover($('layrRecoveryTx').value.trim()));
     $('layrClearUnsigned').onclick=act(()=>{if(!$('layrNoBroadcast').checked)throw Error('Check your wallet and confirm that no transaction was broadcast first.');testnetLAYR.clearUnsigned();$('layrNoBroadcast').checked=false;});
     testnetLAYR.subscribe(paintDispenserPanel);layrAccount.subscribe(()=>{if(dispenserOpen)paintDispenserPanel();});
+    window.addEventListener('casino-status',()=>{if(dispenserOpen)paintDispenserPanel();else for(const d of room.dispensers||[])drawDispenserScreen(d);});   // the status file opened or closed the exchange
     window.ParallaxLAYRExchange=Object.freeze({version:'3.0.0',mode:'testnet',get onChainConnected(){return !!testnetLAYR.snapshot().address;},rate:100000,minStx:1,maxStx:10,quote:layrQuote,open:index=>openLAYRDispenser(index??0),client:testnetLAYR,
       liveRequest(stx,index=0){const q=layrQuote(stx),d=room.dispensers[index];if(!d)throw new RangeError('Unknown dispenser.');return Object.freeze({action:'purchase-layr',dispenserId:d.id,stx:q.stx,microStx:q.microStx,layr:q.layr,network:'testnet',requiresWallet:true,liveConnected:!!testnetLAYR.snapshot().address,recipient:window.ParallaxTestnetLAYR.recipient});}});
   }
@@ -10558,5 +10561,198 @@ function applyTestnetFunding(proof){
 })().catch(e=>{console.error('ParallaX room initialization:',e.stack||e);const p=document.createElement('p');p.style.cssText='position:fixed;top:110px;left:24px;z-index:999;color:#e4c99d';p.textContent='The room could not open. '+e.message;document.body.appendChild(p);});
 </script>
 
+<script>
+/* TESTNET badge + shutdown switch: reads /casino-status.json (see public/casino-status.json) */
+window.CASINO_STATUS_OPTS = { badge: 'tab', bannerTop: 150 };
+(function () {
+  // ====================================================================
+  //  CASINO STATUS: the TESTNET badge and the shutdown switch.
+  //  The page reads /casino-status.json (one small file in the repo, served with Cache-Control: no-store) every minute and when the tab
+  //  comes back into view. To change what visitors see, edit that file and push:
+  //    { "state": "open" | "exchange-closed" | "closed", "message": "text shown to visitors", "moved": "https://where-it-went" }
+  //  open             play as normal. A message (if any) shows as a dismissable note.
+  //  exchange-closed  nobody can start a new STX payment. Games keep working. Payments already sent are still credited.
+  //  closed           a full-screen notice covers the casino (with a link to "moved", if set) and the sound is switched off.
+  //  If the file is missing, unreadable or says something unexpected, the last good state stays (the first time: open).
+  //  This is a courtesy switch, not a lock: the pages are static files and the payment address is public, so it can stop the page
+  //  from asking for payments, but it cannot stop a determined visitor from keeping an old copy of the page.
+  //  Test builds opened from a file (or localhost) can preview each state with  ?status=closed  (also &msg=text and &moved=https://...).
+  // ====================================================================
+  const CasinoStatus = (() => {
+    if (window.CasinoStatus) return window.CasinoStatus;
+    const O = window.CASINO_STATUS_OPTS || {};
+    const FILE = O.url || '/casino-status.json', POLL = O.pollMs || 60000;
+    const STATES = { 'open': 1, 'exchange-closed': 1, 'closed': 1 };
+    const local = location.protocol === 'file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+    let cur = { state: 'open', message: '', moved: '' }, subs = [], seen = false, last = 0, forced = false;
+    let host = null, root = null, ui = {}, dismissed = '', noteOpen = false, silenced = false, inerted = [];
+
+    // ---- sound: the status page cannot see the casino's audio, so keep track of every AudioContext created from here on ----
+    const ctxs = [];
+    try {
+      const Base = window.AudioContext || window.webkitAudioContext;
+      if (Base && !Base.__castat) {
+        const W = function (a) {
+          const c = a === undefined ? new Base() : new Base(a); ctxs.push(c);
+          const res = c.resume; c.resume = function () { return silenced ? Promise.resolve() : res.apply(c, arguments); };
+          if (silenced) { try { c.suspend(); } catch (e) { /* ignore */ } }
+          return c;
+        };
+        W.prototype = Base.prototype; W.__castat = true;
+        if (window.AudioContext) window.AudioContext = W; else window.webkitAudioContext = W;
+      }
+    } catch (e) { /* ignore */ }
+    const hush = (on) => { silenced = on; ctxs.forEach((c) => { try { if (on) c.suspend(); else c.resume(); } catch (e) { /* ignore */ } }); };
+
+    // ---- what the file is allowed to say ----
+    function clean(j) {
+      if (!j || typeof j !== 'object' || Array.isArray(j)) return null;
+      const s = typeof j.state === 'string' ? j.state.trim().toLowerCase() : '';
+      if (!Object.prototype.hasOwnProperty.call(STATES, s)) return null;
+      const m = typeof j.message === 'string' ? j.message.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400) : '';
+      let mv = '';
+      if (typeof j.moved === 'string' && j.moved.trim()) { try { const u = new URL(j.moved.trim()); if (u.protocol === 'https:' && !u.username && !u.password) mv = u.href; } catch (e) { /* not a link */ } }
+      return { state: s, message: m, moved: mv };
+    }
+
+    // ---- the screen bits (in a shadow root, so the page's own styles can't touch them) ----
+    const CSS = `
+:host{all:initial}
+*{box-sizing:border-box}
+.w{position:fixed;inset:0;pointer-events:none;font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#f3e7c4}
+button{font:inherit;color:inherit;cursor:pointer}
+#pill{position:fixed;pointer-events:auto;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;border:1px solid rgba(255,190,70,.75);background:rgba(18,12,2,.82);color:#ffd76a;font-weight:800;font-size:11px;letter-spacing:.09em;white-space:nowrap;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.45)}
+#pill:hover,#pill:focus-visible{background:rgba(40,28,4,.92);outline:2px solid #ffd76a;outline-offset:2px}
+#pill i{width:7px;height:7px;border-radius:50%;background:#ffb020;box-shadow:0 0 6px #ffb020;flex:none}
+#pill.closedx i{background:#ff6a5a;box-shadow:0 0 6px #ff6a5a}
+.pos-top #pill{top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%)}
+.pos-top-left #pill{top:max(8px,env(safe-area-inset-top));left:10px}
+.pos-top-right #pill{top:max(8px,env(safe-area-inset-top));right:10px}
+.pos-bottom-left #pill{bottom:max(8px,env(safe-area-inset-bottom));left:10px}
+.pos-bottom-right #pill{bottom:max(8px,env(safe-area-inset-bottom));right:10px}
+.pos-bottom #pill{bottom:max(8px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%)}
+.pos-under-left #pill{top:calc(max(10px,env(safe-area-inset-top)) + 78px);left:10px}
+.pos-tab #pill{top:env(safe-area-inset-top,0px);left:50%;transform:translateX(-50%);padding:1px 10px 2px;line-height:12px;font-size:10px;border-top:0;border-radius:0 0 9px 9px}
+.pos-tab #pill i{width:6px;height:6px}
+.pos-tab #note{top:calc(env(safe-area-inset-top,0px) + 22px);left:50%;transform:translateX(-50%)}
+#note{position:fixed;pointer-events:auto;width:min(300px,calc(100vw - 20px));padding:12px 14px;border-radius:12px;border:1px solid rgba(255,190,70,.6);background:rgba(14,10,2,.96);box-shadow:0 8px 28px rgba(0,0,0,.6);display:none}
+#note[data-open="1"]{display:block}
+#note b{display:block;color:#ffd76a;letter-spacing:.06em;margin-bottom:4px}
+#note p{margin:0 0 6px}#note p:last-child{margin:0}
+#note .st{color:#ff9d8a}
+.pos-top #note,.pos-top-left #note,.pos-top-right #note{top:calc(max(8px,env(safe-area-inset-top)) + 34px)}
+.pos-top #note{left:50%;transform:translateX(-50%)}.pos-top-left #note{left:10px}.pos-top-right #note{right:10px}
+.pos-under-left #note{top:calc(max(10px,env(safe-area-inset-top)) + 112px);left:10px}
+.pos-bottom-left #note,.pos-bottom-right #note,.pos-bottom #note{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 34px)}
+.pos-bottom-left #note{left:10px}.pos-bottom-right #note{right:10px}.pos-bottom #note{left:50%;transform:translateX(-50%)}
+#bar{position:fixed;left:50%;transform:translateX(-50%);pointer-events:auto;display:none;align-items:flex-start;gap:10px;width:min(520px,calc(100vw - 20px));padding:9px 10px 9px 14px;border-radius:12px;border:1px solid rgba(255,190,70,.7);background:rgba(34,22,2,.94);box-shadow:0 6px 22px rgba(0,0,0,.55)}
+#bar[data-open="1"]{display:flex}
+#bar span{flex:1;overflow-wrap:anywhere}
+#bar button{flex:none;border:0;background:transparent;font-size:20px;line-height:1;padding:0 4px;color:#ffd76a}
+#over{position:fixed;inset:0;pointer-events:auto;display:none;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at 50% 30%,#1c1608 0,#080806 70%);overflow:auto}
+#over[data-open="1"]{display:flex}
+#card{width:min(460px,100%);padding:28px 24px;border-radius:18px;border:1px solid rgba(227,184,74,.7);background:rgba(10,8,3,.88);text-align:center;box-shadow:0 0 60px rgba(227,184,74,.12)}
+#card h1{margin:0 0 12px;font:800 24px/1.2 Georgia,"Times New Roman",serif;color:#ffd76a;letter-spacing:.03em}
+#card p{margin:0 0 14px;font-size:15px;overflow-wrap:anywhere}
+#card a{display:inline-block;margin:4px 0 14px;padding:11px 20px;border-radius:12px;background:linear-gradient(#e3b84a,#b98a22);color:#1a1006;font-weight:800;text-decoration:none;font-size:15px}
+#card a:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#card small{display:block;color:#a99a72;font-size:12px}
+@media (max-width:640px){.pos-under-left #pill{top:calc(max(10px,env(safe-area-inset-top)) + 62px);left:6px}.pos-under-left #note{top:calc(max(10px,env(safe-area-inset-top)) + 96px);left:6px}}
+@media (max-width:520px){.long{display:none}}
+#card a[hidden]{display:none}
+`;
+    function build() {
+      if (host || !document.body) return;
+      host = document.createElement('div'); host.id = 'casino-status-host';
+      host.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483000;pointer-events:none';
+      root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+      const pos = ['top', 'top-left', 'top-right', 'bottom', 'bottom-left', 'bottom-right', 'under-left', 'tab'].indexOf(O.badge) >= 0 ? O.badge : 'top';
+      root.innerHTML = '<style>' + CSS + '</style><div class="w pos-' + pos + '">' +
+        '<button id="pill" type="button" aria-expanded="false" aria-controls="note"><i></i><span>TESTNET<span class="long"> · PLAY MONEY</span></span></button>' +
+        '<div id="note" role="note"><b>TESTNET · PLAY MONEY</b><p>This casino runs on the Stacks testnet. Test STX has no real value.</p><p>LAYR is play money: it can\'t be withdrawn or turned back into STX.</p><p class="st" id="nst"></p></div>' +
+        '<div id="bar" role="status"><span id="btxt"></span><button id="bx" type="button" aria-label="Dismiss this note">×</button></div>' +
+        '<div id="over" role="dialog" aria-modal="true" aria-labelledby="oh"><div id="card" tabindex="-1"><h1 id="oh"></h1><p id="om"></p><a id="ol" hidden rel="noopener noreferrer"></a><small>This was a testnet game: no real funds were involved.</small></div></div></div>';
+      ['pill', 'note', 'nst', 'bar', 'btxt', 'bx', 'over', 'card', 'oh', 'om', 'ol'].forEach((id) => { ui[id] = root.getElementById ? root.getElementById(id) : root.querySelector('#' + id); });
+      ui.bar.style.top = (O.bannerTop || 58) + 'px';
+      ui.pill.onclick = (e) => { e.stopPropagation(); setNote(!noteOpen); };
+      ui.bx.onclick = () => { dismissed = cur.message || DEFAULT_MSG[cur.state] || ''; paint(); };
+      document.addEventListener('pointerdown', (e) => { if (noteOpen && !(e.composedPath && e.composedPath().indexOf(host) >= 0)) setNote(false); }, true);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && noteOpen) setNote(false);
+        if (e.key === 'Tab' && cur.state === 'closed') { e.preventDefault(); try { (cur.moved ? ui.ol : ui.card).focus(); } catch (x) { /* ignore */ } }   // keep keyboard focus on the notice
+      }, true);
+      document.body.appendChild(host);
+      paint();
+    }
+    const DEFAULT_MSG = { 'exchange-closed': 'The LAYR Exchange is closed for now, so LAYR can\'t be bought. Payments you already sent are still credited.' };
+    function setNote(on) { noteOpen = !!on; if (!ui.note) return; ui.note.setAttribute('data-open', noteOpen ? '1' : '0'); ui.pill.setAttribute('aria-expanded', String(noteOpen)); }
+    function lock(on) {   // while closed, nothing behind the notice can be clicked, tabbed to or heard
+      if (on) {
+        if (!inerted.length) Array.prototype.forEach.call(document.body.children, (el) => { if (el !== host && !el.inert) { try { el.inert = true; inerted.push(el); } catch (e) { /* ignore */ } } });
+        try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ }
+        try { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); } catch (e) { /* ignore */ }
+        hush(true);
+      } else { inerted.forEach((el) => { try { el.inert = false; } catch (e) { /* ignore */ } }); inerted = []; hush(false); }
+    }
+    function paint() {
+      if (!host) return;
+      const s = cur.state, closed = s === 'closed';
+      ui.pill.classList.toggle('closedx', s !== 'open');
+      ui.nst.textContent = s === 'exchange-closed' ? 'The LAYR Exchange is closed for now.' : closed ? 'The casino is closed.' : '';
+      // the note bar: a message while open, or the exchange-closed wording
+      const txt = closed ? '' : (cur.message || DEFAULT_MSG[s] || '');
+      ui.btxt.textContent = txt; ui.bar.setAttribute('data-open', txt && txt !== dismissed ? '1' : '0');
+      // the full-screen notice
+      ui.oh.textContent = cur.moved ? 'The casino has moved' : 'The casino is closed';
+      ui.om.textContent = cur.message || (cur.moved ? 'ParallaX Casino now lives at a new address.' : 'ParallaX Casino is closed for now. Thanks for playing.');
+      if (cur.moved) { ui.ol.hidden = false; ui.ol.href = cur.moved; ui.ol.textContent = 'Go to ' + new URL(cur.moved).host + ' ›'; } else { ui.ol.hidden = true; ui.ol.removeAttribute('href'); ui.ol.textContent = ''; }
+      const was = ui.over.getAttribute('data-open') === '1';
+      ui.over.setAttribute('data-open', closed ? '1' : '0');
+      if (closed) { setNote(false); if (!was) { lock(true); try { (cur.moved ? ui.ol : ui.card).focus(); } catch (e) { /* ignore */ } } } else if (was) lock(false);
+    }
+    function apply(n) {
+      const changed = !seen || n.state !== cur.state || n.message !== cur.message || n.moved !== cur.moved;
+      seen = true; cur = n;
+      if (!changed) return;
+      if (host) paint(); else build();
+      notify();
+    }
+    function notify() {
+      subs.slice().forEach((f) => { try { f(get()); } catch (e) { console.error(e); } });
+      try { window.dispatchEvent(new CustomEvent('casino-status', { detail: get() })); } catch (e) { /* ignore */ }   // for pages that listen instead of subscribing
+    }
+    function get() { return { state: cur.state, message: cur.message, moved: cur.moved }; }
+    function poll() {
+      if (forced || location.protocol === 'file:') return;
+      const now = Date.now(); if (now - last < 4000) return; last = now;
+      const sep = FILE.indexOf('?') < 0 ? '?' : '&';
+      fetch(FILE + sep + 't=' + now, { cache: 'no-store', credentials: 'omit' })
+        .then((r) => (r.ok ? r.text() : Promise.reject(new Error('status ' + r.status))))
+        .then((t) => { const j = clean(JSON.parse(t)); if (j) apply(j); else console.warn('casino-status: unusable file; keeping "' + cur.state + '"'); })
+        .catch((e) => { console.warn('casino-status: not read (' + (e && e.message || e) + '); keeping "' + cur.state + '"'); });
+    }
+
+    // ---- start ----
+    if (local) {   // a way to look at each state from a test file; never honoured on the real site (a crafted link could otherwise show visitors a fake notice)
+      try {
+        const q = new URLSearchParams(location.search), s = clean({ state: q.get('status'), message: q.get('msg') || '', moved: q.get('moved') || '' });
+        if (s) { forced = true; cur = s; }
+      } catch (e) { /* ignore */ }
+    }
+    const start = () => { build(); if (forced) { seen = true; paint(); notify(); } else poll(); };
+    if (document.body) start(); else document.addEventListener('DOMContentLoaded', start, { once: true });
+    setInterval(poll, POLL);
+    window.addEventListener('focus', poll);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+    return Object.freeze({
+      get: get, refresh() { last = 0; poll(); },
+      onChange(f) { if (typeof f === 'function') { subs.push(f); if (seen) { try { f(get()); } catch (e) { console.error(e); } } } },
+      get exchangeOpen() { return cur.state === 'open'; },
+      get closed() { return cur.state === 'closed'; },
+    });
+  })();
+  try { window.CasinoStatus = CasinoStatus; } catch (e) { /* ignore */ }
+})();
+</script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>

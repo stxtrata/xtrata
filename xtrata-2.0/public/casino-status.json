@@ -1,0 +1,6 @@
+{
+  "state": "open",
+  "message": "",
+  "moved": "",
+  "help": "state: open | exchange-closed | closed.  message: text shown to visitors (optional).  moved: an https:// link shown on the closed screen (optional).  Edit this file and push; open pages notice within a minute. A missing or unreadable file leaves the casino as it was."
+}
