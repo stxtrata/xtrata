@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Preservation checker · Xtrata</title>
+<meta name="description" content="Paste a link, a contract address or a wallet address and see what we know about where the art of your Stacks NFTs is stored." />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<style>
+  :root{color-scheme:dark;--bg:#06080d;--panel:#0f1521;--panel2:#141d2d;--line:#223047;--ink:#e6edf6;--mut:#9aa9bf;--acc:#3ea6ff;--cyan:#5ee9ff;
+    --good:#3ddc97;--warn:#f5c451;--orange:#ff9f43;--bad:#ff6b6b;--neutral:#8b9bb4;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg)}
+  a{color:var(--cyan)}
+  header.top{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .logo{font-weight:800;letter-spacing:.4px;color:var(--ink);text-decoration:none}.logo b{color:var(--acc)}
+  header.top .sub{color:var(--mut);font-size:14px}
+  main{max-width:760px;margin:0 auto;padding:28px 16px 80px}
+  h1{font-size:28px;line-height:1.2;margin:0 0 8px}
+  h2{font-size:20px;line-height:1.25;margin:0}
+  h3{font-size:14px;margin:0 0 6px;letter-spacing:.02em}
+  .mut{color:var(--mut)}
+  .small{font-size:14px}
+  code,.mono{font:13px var(--mono)}
+  code{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+  form.find{margin:20px 0 6px;display:flex;gap:8px;flex-wrap:wrap}
+  form.find input[type=text]{flex:1 1 280px;min-width:0;min-height:48px;padding:10px 14px;font:16px system-ui,sans-serif;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  button{font:600 16px system-ui,sans-serif;min-height:48px;padding:10px 20px;border-radius:10px;border:1px solid var(--acc);background:var(--acc);color:#04101c;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  button.quiet{background:transparent;color:var(--ink);border-color:var(--line);min-height:40px;padding:6px 14px;font-weight:500;font-size:15px}
+  .hint{margin:6px 0 0}
+
+  .box{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px 16px;margin:16px 0}
+  .box.info{border-color:#2c4a6e}
+  .box.warn{border-color:#7a6320;background:#17140a}
+  .box.error{border-color:#7a2d2d;background:#190d0d}
+  .box p{margin:0}.box p+p{margin-top:8px}
+
+  .results{margin-top:22px}
+  .results:focus{outline:none}
+  .card{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--neutral);border-radius:12px;padding:16px 18px;margin:16px 0}
+  .card.s-on_chain,.card.s-solid{border-left-color:var(--good)}
+  .card.s-one_host{border-left-color:var(--warn)}
+  .card.s-marketplace_broken{border-left-color:var(--orange)}
+  .card.s-marketplace_only,.card.s-not_found{border-left-color:var(--bad)}
+  .card.uncovered{border-left-color:var(--neutral)}
+  .badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:3px 10px 3px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);margin-bottom:8px}
+  .badge i{width:10px;height:10px;border-radius:50%;background:var(--neutral);display:inline-block}
+  .s-on_chain .badge i,.s-solid .badge i{background:var(--good)}
+  .s-one_host .badge i{background:var(--warn)}
+  .s-marketplace_broken .badge i{background:var(--orange)}
+  .s-marketplace_only .badge i,.s-not_found .badge i{background:var(--bad)}
+  .meta{margin:2px 0 0;color:var(--mut);font-size:14px}
+  .headline{margin:12px 0 0;font-weight:600}
+  .summary{margin:8px 0 0;color:var(--ink)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  @media (max-width:640px){.cols{grid-template-columns:1fr}}
+  .cols section{background:var(--panel2);border-radius:10px;padding:10px 14px}
+  .cols ul{margin:0;padding-left:18px}
+  .cols li{margin:4px 0;font-size:15px}
+  .cols .none{margin:0;color:var(--mut);font-size:15px}
+  .evidence{margin:14px 0 0;color:var(--mut);font-size:13px}
+  .helper{margin:12px 0 0;font-size:15px}
+
+  details.ask{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+  details summary{cursor:pointer;color:var(--cyan);font-size:15px;min-height:32px;display:flex;align-items:center;gap:8px;list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:"\25B8";font-size:12px;flex:none}
+  details[open]>summary::before{content:"\25BE"}
+  details.plain summary{color:var(--ink)}
+  .ask form{display:grid;gap:10px;margin-top:10px}
+  .ask fieldset{border:0;margin:0;padding:0;display:grid;gap:6px}
+  .ask legend{padding:0;margin-bottom:4px;font-size:14px;color:var(--mut)}
+  .ask label.opt{display:flex;gap:10px;align-items:flex-start;font-size:15px}
+  .ask label.opt input{margin-top:5px}
+  .ask label.field{display:grid;gap:4px;font-size:14px;color:var(--mut)}
+  .ask input[type=text],.ask select,.ask textarea{width:100%;font:16px system-ui,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:42px}
+  .ask textarea{min-height:76px;resize:vertical}
+  .ask .hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+  .ask .status{font-size:15px;margin:0}
+  .ask .status.ok{color:var(--good)}
+  .ask .status.bad{color:var(--bad)}
+
+  ul.others{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+  ul.others li{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel2);border-radius:8px;padding:8px 12px}
+  ul.others .id{word-break:break-all}
+  footer.foot{margin-top:40px;border-top:1px solid var(--line);padding-top:16px}
+  footer.foot ul{padding-left:20px;margin:8px 0}
+  footer.foot li{margin:4px 0}
+</style>
+</head>
+<body>
+<header class="top"><a class="logo" href="/">X<b>trata</b></a><span class="sub">Preservation checker</span></header>
+<main>
+  <h1>Where does your NFT's art actually live?</h1>
+  <p class="mut">Paste a link, a contract address or a wallet address. We'll tell you what we know about where the art is stored, what looks good and what worries us.</p>
+
+  <form class="find" id="find" novalidate>
+    <label for="q" class="sr" style="position:absolute;left:-10000px">Link, contract address or wallet address</label>
+    <input type="text" id="q" name="q" maxlength="2000" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Gamma link, contract (SP…name) or wallet address (SP…)" />
+    <button type="submit" id="go">Check</button>
+  </form>
+  <p class="hint mut small">A wallet address is public, so there is nothing to connect or sign. We don't keep what you paste. Names ending in <code>.btc</code> aren't supported yet; use the address that starts with <code>SP</code>.</p>
+
+  <noscript><div class="box error"><p>This page needs JavaScript to look things up.</p></div></noscript>
+  <div id="out" class="results" aria-live="polite" tabindex="-1"></div>
+
+  <footer class="foot">
+    <details class="plain">
+      <summary>What this does and doesn't tell you</summary>
+      <ul id="caveats">
+        <li>This is about whether the <em>art and its description</em> can still be found. It is not about the safety, price or custody of the token itself.</li>
+        <li>Our checks are samples, run on the dates shown on each card. A collection can change after that date.</li>
+        <li>Collections we haven't tested aren't "fine". They're just not covered yet.</li>
+      </ul>
+    </details>
+    <p class="mut small">Part of <a href="/forever-twins/">Forever Twins</a>, which gives NFTs a permanent on-chain twin. Funded by a DeGrants grant.</p>
+  </footer>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var out = document.getElementById('out');
+  var form = document.getElementById('find');
+  var input = document.getElementById('q');
+  var go = document.getElementById('go');
+  var serial = 0;
+
+  // ---------- small helpers ----------
+  // Everything from the server goes in through textContent, never innerHTML.
+  function el(tag, attrs) {
+    var node = document.createElement(tag);
+    var a = attrs || {};
+    Object.keys(a).forEach(function (k) {
+      var v = a[k];
+      if (v === false || v == null) return;
+      if (k === 'class') node.className = v;
+      else if (k === 'text') node.textContent = v;
+      else if (k.slice(0, 2) === 'on') node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? '' : String(v));
+    });
+    for (var i = 2; i < arguments.length; i += 1) {
+      var kids = [].concat(arguments[i]);
+      for (var j = 0; j < kids.length; j += 1) {
+        var kid = kids[j];
+        if (kid == null || kid === false) continue;
+        node.appendChild(kid.nodeType ? kid : document.createTextNode(String(kid)));
+      }
+    }
+    return node;
+  }
+  function day(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+    return m ? Number(m[3]) + ' ' + MONTHS[Number(m[2]) - 1] + ' ' + m[1] : null;
+  }
+  function short(id) { return id.length > 44 ? id.slice(0, 12) + '…' + id.slice(-28) : id; }
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+  function num(n) { return Number(n).toLocaleString('en'); }
+
+  // ---------- Forever Twins registry (for the "a helper is open" link) ----------
+  var registryPromise = null;
+  function loadRegistry() {
+    if (!registryPromise) {
+      var load = fetch('/forever-twins/data/registry.v2.json', { cache: 'no-cache' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j || !Array.isArray(j.collections)) return null;
+          var map = {};
+          j.collections.forEach(function (c) { if (c && c.source) map[c.source] = { key: c.key, status: c.status }; });
+          return map;
+        })
+        .catch(function () { return null; });
+      var timeout = new Promise(function (resolve) { setTimeout(function () { resolve(null); }, 2500); });
+      registryPromise = Promise.race([load, timeout]);
+    }
+    return registryPromise;
+  }
+
+  // ---------- talking to the server ----------
+  function post(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' })
+      .then(function (res) {
+        return res.text().then(function (text) {
+          var data = null;
+          try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+          return { status: res.status, data: data };
+        });
+      });
+  }
+
+  // ---------- pieces of the page ----------
+  function box(kind, paragraphs, role) {
+    return el.apply(null, ['div', { class: 'box ' + kind, role: role || null }].concat([].concat(paragraphs).map(function (p) { return el('p', { text: p }); })));
+  }
+
+  function errorBox(title, paragraphs) {
+    var node = box('error', paragraphs, 'alert');
+    if (title) node.insertBefore(el('p', {}, el('strong', { text: title })), node.firstChild);
+    return node;
+  }
+
+  function evidenceLine(card) {
+    var parts = [];
+    var level = { hand_checked: 'Includes a hand check.', sampled: 'Automated sample only.', by_design: 'By design, not sampled.' }[card.evidence_level];
+    var c = card.checked || {};
+    var contract = day(c.contract);
+    var market = day(c.marketplace);
+    if (contract && market && contract === market) parts.push('Checked ' + contract + '.');
+    else {
+      if (contract) parts.push('Contract checked ' + contract + '.');
+      if (market) parts.push('Marketplace images checked ' + market + '.');
+    }
+    if (level) parts.push(level);
+    if (card.evidence) parts.push(card.evidence);
+    return parts.join(' ');
+  }
+
+  function list(title, items, emptyText) {
+    var body = items && items.length
+      ? el.apply(null, ['ul', {}].concat(items.map(function (t) { return el('li', { text: t }); })))
+      : el('p', { class: 'none', text: emptyText });
+    return el('section', {}, el('h3', { text: title }), body);
+  }
+
+  var KIND_TEXT = {
+    retest: ['Test this collection again', 'Run our checks again, for example if you think something has changed.'],
+    helper: ['Open a Forever Twins helper for it', 'A helper lets holders give each piece a permanent on-chain twin.'],
+    assess: ['Assess this collection', "We haven't tested it yet."]
+  };
+
+  function requestBox(info) {
+    var kinds = info.kinds;
+    var details = el('details', { class: 'ask' });
+    details.appendChild(el('summary', { text: info.summary || 'Ask us for something' }));
+    var f = el('form', { novalidate: true });
+    var group = el('fieldset', {}, el('legend', { text: 'What would you like?' }));
+    var name = 'kind-' + Math.random().toString(36).slice(2);
+    kinds.forEach(function (kind, i) {
+      var t = KIND_TEXT[kind];
+      group.appendChild(el('label', { class: 'opt' },
+        el('input', { type: 'radio', name: name, value: kind, checked: i === 0 ? true : false }),
+        el('span', {}, el('strong', { text: t[0] }), ' ', el('span', { class: 'mut', text: t[1] }))));
+    });
+    f.appendChild(group);
+    var role = el('select', { 'aria-label': 'Who are you?' },
+      el('option', { value: '', text: 'I am… (optional)' }),
+      el('option', { value: 'holder', text: 'A holder' }),
+      el('option', { value: 'creator', text: 'The creator or team' }),
+      el('option', { value: 'other', text: 'Someone else' }));
+    var note = el('textarea', { maxlength: 500, placeholder: 'Anything we should know? (optional)', 'aria-label': 'Note' });
+    var contact = el('input', { type: 'text', maxlength: 200, autocomplete: 'off', placeholder: 'Email or X handle if you want a reply (optional)', 'aria-label': 'Contact' });
+    var trap = el('div', { class: 'hp', 'aria-hidden': 'true' }, el('input', { type: 'text', name: 'website', tabindex: '-1', autocomplete: 'off' }));
+    var status = el('p', { class: 'status', role: 'status' });
+    var send = el('button', { type: 'submit', class: 'quiet', text: 'Send request' });
+    f.appendChild(role); f.appendChild(note); f.appendChild(contact); f.appendChild(trap);
+    f.appendChild(el('p', { class: 'mut small', text: 'We keep the collection, your choice, your note and your contact. Not your wallet address, and not where you are. Leave the contact blank if you would rather not be reached.' }));
+    f.appendChild(send); f.appendChild(status);
+    f.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var chosen = f.querySelector('input[type=radio]:checked');
+      send.disabled = true;
+      status.className = 'status'; status.textContent = 'Sending…';
+      post('/checker/requests', {
+        kind: chosen ? chosen.value : kinds[0],
+        contract: info.id,
+        name: info.name || '',
+        note: note.value,
+        contact: contact.value,
+        role: role.value,
+        website: trap.firstChild.value
+      }).then(function (res) {
+        var d = res.data;
+        if (res.status === 200 && d && d.ok) {
+          status.className = 'status ok';
+          status.textContent = d.duplicate ? "You already sent this one in the last day, so we've kept the first." : "Thanks, we've got it.";
+          return;
+        }
+        send.disabled = false;
+        status.className = 'status bad';
+        status.textContent = (d && d.error) ? d.error : "That didn't go through, and we can't tell whether it was saved. Please try again in a minute.";
+      }).catch(function () {
+        send.disabled = false;
+        status.className = 'status bad';
+        status.textContent = "We couldn't reach the server, so we can't confirm that was sent. Please try again.";
+      });
+    });
+    details.appendChild(f);
+    return details;
+  }
+
+  function reportCard(card, registry) {
+    var live = registry && registry[card.id] && registry[card.id].status === 'live' ? registry[card.id] : null;
+    var meta = [];
+    if (typeof card.held === 'number') meta.push('You hold ' + num(card.held));
+    if (card.tokens_approx) meta.push('about ' + num(card.tokens_approx) + ' pieces in the collection');
+    var d = day(card.deployed);
+    if (d) meta.push('deployed ' + d);
+
+    // The badge already says the status; don't repeat it as the first sentence of the headline.
+    var headline = card.headline && card.label && card.headline.indexOf(card.label + '. ') === 0 ? card.headline.slice(card.label.length + 2) : card.headline;
+    var bare = card.status === 'not_art' && !(card.good && card.good.length) && !(card.worry && card.worry.length);
+
+    var article = el('article', { class: 'card s-' + card.status, 'data-id': card.id },
+      el('span', { class: 'badge' }, el('i'), card.label),
+      el('h2', { text: card.name }),
+      meta.length ? el('p', { class: 'meta', text: meta.join(' · ') }) : null,
+      headline ? el('p', { class: 'headline', text: headline }) : null,
+      card.summary ? el('p', { class: 'summary', text: card.summary }) : null,
+      bare ? null : el('div', { class: 'cols' },
+        list("What's good", card.good, 'Nothing we could confirm yet.'),
+        list('What worries us', card.worry, 'Nothing found in our checks.')),
+      el('p', { class: 'evidence', text: evidenceLine(card) }));
+
+    if (live) {
+      article.appendChild(el('p', { class: 'helper' }, 'A Forever Twins helper is open for this collection: ',
+        el('a', { href: '/forever-twins/collection/' + encodeURIComponent(live.key), text: 'give a piece a permanent on-chain twin' }), '.'));
+    }
+    if (!card.special && card.status !== 'not_art') {
+      var kinds = live ? ['retest'] : ['retest', 'helper'];
+      article.appendChild(requestBox({ id: card.id, name: card.name, kinds: kinds, summary: 'Ask us to re-test this' + (live ? '' : ' or to open a helper for it') }));
+    }
+    return article;
+  }
+
+  function uncoveredCard(id) {
+    return el('article', { class: 'card uncovered', 'data-id': id },
+      el('span', { class: 'badge' }, el('i'), 'Not in our research'),
+      el('h2', { class: 'mono', text: short(id) }),
+      el('p', { class: 'headline', text: "We haven't tested this contract, so we can't say anything about it, good or bad." }),
+      el('p', { class: 'summary mut', text: 'That is not the same as "fine". If you hold it or made it, you can ask us to look.' }),
+      requestBox({ id: id, name: '', kinds: ['assess'], summary: 'Ask us to assess this collection' }));
+  }
+
+  function othersBlock(others, total) {
+    var wrap = el('details', { class: 'plain' });
+    wrap.appendChild(el('summary', { text: 'Also in this wallet, not in our research (' + plural(total, 'collection', 'collections') + ')' }));
+    var ul = el('ul', { class: 'others' });
+    others.forEach(function (o) {
+      var li = el('li', {}, el('span', {}, el('span', { class: 'mono id', text: o.id }), ' ', el('span', { class: 'mut', text: '× ' + num(o.held) })));
+      var holder = el('div', {});
+      var btn = el('button', { type: 'button', class: 'quiet', text: 'Ask us to assess' });
+      btn.addEventListener('click', function () {
+        btn.remove();
+        holder.appendChild(requestBox({ id: o.id, name: '', kinds: ['assess'], summary: 'Ask us to assess this collection' }));
+        holder.firstChild.open = true;
+      });
+      holder.appendChild(btn);
+      li.appendChild(holder);
+      ul.appendChild(li);
+    });
+    wrap.appendChild(ul);
+    if (total > others.length) wrap.appendChild(el('p', { class: 'mut small', text: 'Showing the ' + others.length + ' you hold most of.' }));
+    return wrap;
+  }
+
+  function walletSummary(w, shown) {
+    var lines = [];
+    if (w.items_total === 0) {
+      return box('info', [
+        'The data service shows no NFTs at this address right now.',
+        'Its index can lag a little behind the chain, and this only works for the address that holds them. If you expect some, check the address and try again later.'
+      ]);
+    }
+    lines.push('We read ' + plural(w.items_read, 'NFT', 'NFTs') + ' in ' + plural(w.collections_held, 'collection', 'collections') + '. We have a report on ' + w.collections_covered + ' of them' + (shown ? ', worst first.' : '.'));
+    var kind = 'info';
+    if (w.stopped === 'cap') {
+      kind = 'warn';
+      lines.push('This wallet holds more than we read: ' + num(w.items_read) + ' of ' + num(w.items_total) + ' items. Collections held only in the rest are not shown, so a missing collection does not mean it is fine.');
+    } else if (w.stopped === 'read_failed' || !w.complete) {
+      kind = 'warn';
+      lines.push('We could only read part of this wallet (' + num(w.items_read) + ' of ' + num(w.items_total) + ' items) because the data service stopped answering. Try again for the rest.');
+    }
+    return box(kind, lines);
+  }
+
+  function datasetNote(info) {
+    if (!info) return null;
+    var bits = [];
+    var census = day(info.census_date);
+    var retest = day(info.retest_date);
+    if (census) bits.push('census run ' + census);
+    if (retest) bits.push('collections whose art we could not reach re-tested ' + retest);
+    if (!bits.length) return null;
+    return el('p', { class: 'mut small', text: 'Our research: ' + bits.join('; ') + '. Each card shows its own dates.' });
+  }
+
+  // ---------- rendering an answer ----------
+  function render(data, registry) {
+    out.textContent = '';
+    var results = Array.isArray(data.results) ? data.results : [];
+
+    if (data.kind === 'notice') { out.appendChild(box('info', data.message)); return; }
+
+    if (data.kind === 'wallet') {
+      out.appendChild(walletSummary(data.wallet, results.length > 1));
+    } else if (data.kind === 'collection') {
+      if (!results.length) { out.appendChild(box('info', data.message)); return; }
+      var what = (data.tried || []).filter(Boolean)[0];
+      out.appendChild(box('info', data.matched_from === 'link'
+        ? 'We matched this link to ' + (results.length === 1 ? 'a collection' : 'collections') + ' by name' + (what ? ' ("' + what + '")' : '') + '. Links often leave out the contract address, so check it is the one you meant.'
+        : 'We matched what you typed to ' + (results.length === 1 ? 'a collection' : 'collections') + ' by name. Check it is the one you meant.'));
+    }
+
+    results.forEach(function (card) {
+      out.appendChild(card.covered ? reportCard(card, registry) : uncoveredCard(card.id));
+    });
+
+    if (data.kind === 'wallet' && data.others_total > 0) out.appendChild(othersBlock(data.others || [], data.others_total));
+
+    var note = datasetNote(data.dataset);
+    if (note) out.appendChild(note);
+    var caveats = document.getElementById('caveats');
+    if (Array.isArray(data.caveats) && data.caveats.length && caveats) {
+      caveats.textContent = '';
+      caveats.appendChild(el('li', { text: "This is about whether the art and its description can still be found. It is not about the safety, price or custody of the token itself." }));
+      data.caveats.forEach(function (c) { caveats.appendChild(el('li', { text: c })); });
+    }
+  }
+
+  function failure(res) {
+    var d = res && res.data;
+    var message = d && d.message ? d.message : "The checker didn't give a usable answer. This is not a result about your NFTs; please try again in a minute.";
+    var title = {
+      holdings_unavailable: "We couldn't read that wallet",
+      data_not_loaded: 'The research data is not loaded yet',
+      data_unavailable: "We couldn't read our research data",
+      data_unreadable: "We couldn't read our research data",
+      not_switched_on: 'The checker is not switched on yet',
+      rate_limited: 'Slow down a moment'
+    }[d && d.error];
+    return errorBox(title, [message]);
+  }
+
+  // ---------- the form ----------
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var q = input.value.trim();
+    if (!q) { out.textContent = ''; out.appendChild(box('info', 'Paste a link, a contract address or a wallet address first.')); return; }
+    var mine = ++serial;
+    go.disabled = true;
+    out.textContent = '';
+    out.appendChild(box('info', 'Looking…'));
+    post('/checker/lookup', { q: q }).then(function (res) {
+      if (mine !== serial) return null;
+      var d = res.data;
+      if (res.status === 200 && d && d.ok) {
+        var needsRegistry = Array.isArray(d.results) && d.results.some(function (r) { return r.covered && r.name && !r.special; });
+        return (needsRegistry ? loadRegistry() : Promise.resolve(null)).then(function (registry) {
+          if (mine !== serial) return;
+          render(d, registry);
+        });
+      }
+      out.textContent = '';
+      out.appendChild(failure(res));
+    }).catch(function () {
+      if (mine !== serial) return;
+      out.textContent = '';
+      out.appendChild(errorBox("We couldn't reach the checker", ['Check your connection and try again. This is not a result about your NFTs.']));
+    }).then(function () {
+      if (mine !== serial) return;
+      go.disabled = false;
+      out.focus({ preventScroll: true });
+      var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      out.scrollIntoView({ block: 'start', behavior: calm ? 'auto' : 'smooth' });
+    });
+  });
+})();
+</script>
+</body>
+</html>

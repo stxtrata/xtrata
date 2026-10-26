@@ -1,8 +1,9 @@
-# Preservation checker: data and tools (Phase 0)
+# Preservation checker: data and tools
 
-Behind the planned "paste your NFT link, contract or wallet and see where it stands" page. The page itself is not built yet; this
-folder holds what it will stand on. Design decision (26 Oct 2026): a **softer version**. The page tells people honestly about what
-they look up or hold, with no public, browsable list of collections, and every report card has a request button.
+Behind the "paste your NFT link, contract or wallet and see where it stands" page at `/checker/` (`public/checker/index.html`, lookup in
+`functions/checker/lookup.ts`). This folder holds the data it stands on and the tools that build it. Design decision (26 Oct 2026): a
+**softer version**. The page tells people honestly about what they look up or hold, with no public, browsable list of collections, and every
+report card has a request button.
 
 ## Files
 
@@ -14,7 +15,30 @@ they look up or hold, with no public, browsable list of collections, and every r
 | `ft-frozen-flags.test.cjs` | `node --test ft-frozen-flags.test.cjs` (14 tests against a fake Hiro). |
 | `out/` | Generated: `checker-data.json` and `frozen-read-list.json`. Git-ignored on purpose (see "Public repo" below). |
 
-The request store lives with the site code, not here: `functions/migrations/031_checker_requests.sql`, `functions/checker/requests.ts`.
+The page, the lookup and the request store live with the site code, not here: `public/checker/index.html`, `functions/checker/lookup.ts`,
+`functions/checker/requests.ts`, `functions/migrations/031_checker_requests.sql`.
+
+## Switching the page on (testing)
+
+Nothing works until both steps are done; until then the page says "the research data is not loaded yet" and the request form says "not switched on yet"
+(they never show "no results"). Run from `xtrata-2.0/`:
+
+```bash
+# 1. the request store (D1, once)
+npx wrangler d1 execute xtrata-manage --remote --file functions/migrations/031_checker_requests.sql
+
+# 2. build the dataset and upload it to the private R2 bucket (repeat whenever the research changes)
+python3 -I forever-twins/ft-harness/checker/export_checker_data.py
+npx wrangler r2 object put xtrata-manage-assets/_system/checker/checker-data.json \
+  --file forever-twins/ft-harness/checker/out/checker-data.json --content-type application/json --remote
+```
+
+The upload can be repeated at any time; the lookup picks up a new file within five minutes. The object sits under `_system/`, which no route reads
+(every route that reads this bucket takes its keys from database rows or from a collection-id prefix, and collection ids cannot start with an underscore),
+so the dataset is not served publicly. Branch preview builds share the production D1 and R2 (see `wrangler.toml`), so steps 1 and 2 are the same for a preview.
+Optional secrets: `HIRO_API_KEY` (higher wallet-read limits) and `TELEMETRY_SALT` (used to hash the IP for rate limits).
+
+Reading requests: see the queries at the top of the migration file.
 
 ## The one public scale
 
