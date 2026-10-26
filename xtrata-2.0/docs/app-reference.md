@@ -229,6 +229,13 @@ To onboard a new collection — and keep the standalone viewer in sync — do al
    `docs/contract-inventory.md` for provenance.
 5. Add/extend tests in `src/lib/twins/__tests__/resolver.test.ts`.
 
+### Preservation checker (groundwork only, not live)
+
+Planned page where someone pastes an NFT link, a contract or a wallet and sees how well the art behind it is preserved. No page exists yet. Design decision (26 Oct 2026): only tell people about what they look up or hold, no public browsable list of collections, and a request button on every report card.
+
+- `functions/checker/requests.ts` (`POST /checker/requests`, D1 tables from `functions/migrations/031_checker_requests.sql`) stores requests to re-test a collection, add an open helper for it, or assess one the census has not covered. It stores no wallet and no IP, has no public read (triage queries are in the migration), and rate limits by a salted hash of the IP. Tests: `functions/checker/__tests__/requests.test.ts`.
+- `forever-twins/ft-harness/checker/` builds the dataset the page will read: `export_checker_data.py` folds the census buckets and the older risk ratings into one public scale, `checker-verdicts.json` holds the hand-checked layer, and `ft-frozen-flags.cjs` reads each collection's "frozen" flag from chain. Its README explains the scale, the cautions (detection is by name; sample-based) and how to rebuild. The generated `out/` folder is git-ignored.
+
 ## Protocol, chunking, and viewer data
 
 - `src/lib/protocol/types.ts` defines protocol types for inscriptions.

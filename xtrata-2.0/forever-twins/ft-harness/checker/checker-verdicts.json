@@ -1,0 +1,163 @@
+{
+  "_about": "Hand-checked layer on top of the census. Keys are contract ids. Every entry comes from the preservation-risk write-up (13 Oct 2026, updated late evening) or the 16 Oct re-test notes; nothing here is new evidence. 'status' overrides the census bucket only where the hand check says the bucket misleads. 'helper' is a hint as of its date: the page must read live twin counts from chain (Phase 2).",
+  "retest": {
+    "date": "2026-10-16",
+    "scope": "Every collection the census put in Lost, Failing or Walking dead (34) was re-tested through its own contract on 16 Oct 2026 and still failed. Marketplace results matched 13 Oct except the two below.",
+    "marketplace_overrides": {
+      "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.thisisnumberone-v2": {
+        "loaded": 0,
+        "sampled": 16
+      },
+      "SPNWZ5V2TPWGQGVDR6T7B6RQ4XMGZ4PXTEE0VQ0S.crypto-graffiti": {
+        "loaded": 0,
+        "sampled": 16
+      }
+    }
+  },
+  "collections": {
+    "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-nft": {
+      "name": "Megapont Robots",
+      "summary": "The contract points to Megapont's own API. The API still answers, but it no longer serves metadata or images, and the marketplace tiles are blank. We haven't found a public copy of the art.",
+      "evidence": "Checked 13 Oct 2026 through the contract and through Gamma's image copy (0 of 16 loaded), and by eye on Gamma's collection page."
+    },
+    "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-component-nft": {
+      "name": "Megapont Robot Components",
+      "summary": "The contract points to Megapont's own API. It still answers, but it no longer serves metadata or images, and none of the 16 sampled marketplace images loaded. We haven't found a public copy of the art.",
+      "evidence": "Checked 13 Oct 2026 through the contract and through Gamma's image copy (0 of 16 loaded)."
+    },
+    "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-expansion-nft": {
+      "name": "Megapont Robots (expansion)",
+      "summary": "The contract points to Megapont's own API. It still answers, but it no longer serves metadata or images, and none of the 16 sampled marketplace images loaded. We haven't found a public copy of the art.",
+      "evidence": "Checked 13 Oct 2026 through the contract and through Gamma's image copy (0 of 16 loaded)."
+    },
+    "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-component-expansion-nft": {
+      "name": "Megapont Robot Components (expansion)",
+      "summary": "The contract points to Megapont's own API. It still answers, but it no longer serves metadata or images, and none of the 16 sampled marketplace images loaded. We haven't found a public copy of the art.",
+      "evidence": "Checked 13 Oct 2026 through the contract and through Gamma's image copy (0 of 16 loaded)."
+    },
+    "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-space-agency": {
+      "name": "Megapont Space Agency (MSA)",
+      "summary": "The contract points to a Megapont API on a hosting service. It still answers, but it no longer serves metadata or images, and none of the 16 sampled marketplace images loaded. We haven't found a public copy of the art.",
+      "evidence": "Checked 13 Oct 2026 through the contract and through Gamma's image copy (0 of 16 loaded)."
+    },
+    "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.citadels": {
+      "name": "Citadels",
+      "summary": "Every token points at one stacksart.com file, which is now the Stacks Art web page. The marketplace's own copies (Stacks Art's storage bucket) also fail.",
+      "evidence": "Contract confirmed on chain; 0 of 16 sampled marketplace images loaded after a slow re-test (13 Oct 2026)."
+    },
+    "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.zombie-wabbits": {
+      "name": "Zombie Wabbits",
+      "summary": "Every token points at one stacksart.com file, which is now the Stacks Art web page. The marketplace's copies fail too; the one image that loaded was a single surviving file, and other ids at the same path do not load.",
+      "evidence": "Contract confirmed on chain (45 tokens); 1 of 16 sampled marketplace images loaded, and a path check on ids 1, 23 and 100 failed (13 Oct 2026)."
+    },
+    "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.blocks": {
+      "name": "Blocks",
+      "status": "marketplace_only",
+      "headline": "The contract's link is dead and most marketplace tiles are blank, but the full set of images still sits in one Pinata IPFS folder.",
+      "summary": "The contract points at one stacksart.com file that no longer works. Gamma's index sends most tokens to a dead storage bucket, but 249 records point at an IPFS folder that appears to hold all 2,500 images. Only Pinata answered for that folder.",
+      "evidence": "Gateway fetches, Gamma's full index and the 13 Oct census. We have not confirmed the folder is the artist's original set.",
+      "helper": {
+        "state": "none",
+        "note": "Helper type decided (large files, on demand); not built.",
+        "as_of": "2026-10-13"
+      }
+    },
+    "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.funky-donuts": {
+      "name": "Funky Donuts",
+      "summary": "The contract's link is dead. The marketplace's copy, a Pinata IPFS folder, still loads (16 of 16 sampled), and only Pinata answered for it.",
+      "evidence": "13 Oct 2026 census. We have not confirmed the folder is the artist's original set.",
+      "helper": {
+        "state": "none",
+        "as_of": "2026-10-13"
+      }
+    },
+    "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds": {
+      "name": "Bitcoin Birds",
+      "summary": "The contract points every token at one stacksart.com file that is now a web page. The marketplace shows the art from a Pinata IPFS folder that the contract never names.",
+      "evidence": "13 Oct 2026 census; manifest built through a local IPFS node on 8 Oct (400 of 400 fetched).",
+      "helper": {
+        "state": "live",
+        "twins": 400,
+        "of": 400,
+        "note": "All 400 pieces were twinned on chain.",
+        "as_of": "2026-10-13"
+      }
+    },
+    "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3": {
+      "name": "Stacks Punks V3",
+      "summary": "Every token points at one collection-level file with no per-token art. Marketplace images come from a Pinata IPFS folder, which is the only place we found the art.",
+      "evidence": "13 Oct 2026 census (16 of 16 marketplace images loaded)."
+    },
+    "SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles": {
+      "name": "Satoshibles",
+      "summary": "Art and metadata are served by the creator's own servers. They work today; they depend on those servers staying up.",
+      "evidence": "13 Oct 2026 census (16 of 16 marketplace images loaded)."
+    },
+    "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.thisisnumberone-v2": {
+      "name": "ThisIsNumberOne (V2)",
+      "status": "not_found",
+      "summary": "The marketplace's images were stored on a Cloudinary account that has since been disabled, and on Gaia links (Hiro's hosted Gaia hub, which went offline on 16 June 2025).",
+      "evidence": "Re-tested 16 Oct 2026: 0 of 16 marketplace images loaded; Cloudinary returns HTTP 401 'cloud_name chemical-x is disabled'; Gaia links fail with a network error."
+    },
+    "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys": {
+      "name": "Bitcoin Monkeys",
+      "helper": {
+        "state": "live",
+        "twins": 6,
+        "of": 2500,
+        "note": "Includes one file over 512 KB, inscribed through the large-file route.",
+        "as_of": "2026-10-13"
+      }
+    },
+    "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft": {
+      "name": "Megapont Ape Club",
+      "helper": {
+        "state": "live",
+        "twins": 6,
+        "of": 2500,
+        "as_of": "2026-10-13"
+      }
+    },
+    "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens": {
+      "name": "NYC Degens",
+      "helper": {
+        "state": "live",
+        "twins": 2,
+        "of": 420,
+        "as_of": "2026-10-13"
+      }
+    },
+    "SP3M05ETW09E98NNFMFHT1WND3ZRX9DV31TFC6DFW.see-yourself-out": {
+      "name": "See Yourself Out",
+      "helper": {
+        "state": "on_hold",
+        "note": "On hold while we talk to the artist: the art is an evolving experiment, so a twin would freeze one moment of it.",
+        "as_of": "2026-10-13"
+      }
+    },
+    "SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe": {
+      "name": "Bitcoin PEPE",
+      "helper": {
+        "state": "live",
+        "note": "One of the three collections that were live before the grant.",
+        "as_of": "2026-10-13"
+      }
+    },
+    "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats": {
+      "name": "Leo Cats",
+      "helper": {
+        "state": "live",
+        "note": "One of the three collections that were live before the grant.",
+        "as_of": "2026-10-13"
+      }
+    },
+    "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens": {
+      "name": "Miami Degens",
+      "helper": {
+        "state": "live",
+        "note": "One of the three collections that were live before the grant.",
+        "as_of": "2026-10-13"
+      }
+    }
+  }
+}
