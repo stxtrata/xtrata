@@ -86,16 +86,22 @@
 ;; Constants
 
 (define-constant ROOT u1)
+;; Depth is the only structural limit: every write walks the ancestor chain (a fixed list, since
+;; Clarity has no unbounded loops), so each extra level multiplies the cost of every write.
+;; Width has no limit. Counts of spaces, children, objects, nesting, parts and kinds are plain
+;; counters whose cost does not grow with their size, so they are capped only by what the root
+;; (and each owner, within the parent's policy) chooses to set in a space's policy.
 (define-constant MAX-DEPTH u6)
-(define-constant MAX-CHILDREN u64)
-(define-constant MAX-OBJECTS u256)
-(define-constant MAX-NEST u4)
-(define-constant MAX-OBJECT-SLOTS u1024)
-(define-constant MAX-CHILD-SLOTS u256)
-(define-constant MAX-KINDS-PER-SPACE u16)
+(define-constant UNLIMITED u340282366920938463463374607431768211455)
+(define-constant MAX-CHILDREN UNLIMITED)
+(define-constant MAX-OBJECTS UNLIMITED)
+(define-constant MAX-NEST UNLIMITED)
+(define-constant MAX-OBJECT-SLOTS UNLIMITED)
+(define-constant MAX-CHILD-SLOTS UNLIMITED)
+(define-constant MAX-KINDS-PER-SPACE UNLIMITED)
 (define-constant SLUG-CHARS "abcdefghijklmnopqrstuvwxyz0123456789-")
-(define-constant MAX-OBJECT-CHILDREN u32)
-(define-constant MAX-DESCENDANTS u10000)
+(define-constant MAX-OBJECT-CHILDREN UNLIMITED)
+(define-constant MAX-DESCENDANTS UNLIMITED)
 (define-constant MAX-BPS u2500)
 (define-constant MAX-FLAT u50000000)
 (define-constant FEE-DELAY u144)
@@ -216,7 +222,7 @@
     transferable: false, epoch: u0, state: u1, paused: u0, runtime: u0,
     entry: none,
     policy: {
-      max-children: MAX-CHILDREN, max-descendants: MAX-DESCENDANTS, max-objects: u128, max-depth: MAX-DEPTH,
+      max-children: MAX-CHILDREN, max-descendants: MAX-DESCENDANTS, max-objects: MAX-OBJECTS, max-depth: MAX-DEPTH,
       runtimes: u15, tiers: u15, interfaces: u15, approved-only: false,
       portals-in: u0, portals-out: u0, review: false, create-fee: u0
     },

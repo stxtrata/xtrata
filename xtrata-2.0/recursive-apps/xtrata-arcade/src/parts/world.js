@@ -48,7 +48,44 @@
   // 2: bays from the object registry (xtrata-world-v2, read by world2.js); 1: from the scene contract (xtrata-world-v1); 0: off
   function mode() { return CFG.registry && root.XAWorld2 ? 2 : (CFG.world ? 1 : 0); }
   function enabled() { return !!(CFG.posters && mode() && codec()); }
-  function host() { return { read: callRead, plain: plain, hexList: hexList, codec: codec(), registry: CFG.registry, path: CFG.path, lobbyPath: CFG.lobbyPath }; }
+  function host() { return { read: callRead, plain: plain, hexList: hexList, codec: codec(), registry: registryId(), path: CFG.path, lobbyPath: CFG.lobbyPath }; }
+
+  /* ------------------------------------------------------------ successor: following a registry that has moved
+   * A Clarity contract cannot be upgraded in place, so a better registry is a new contract and the old one names it (set-successor)
+   * and then locks that choice for good (lock-successor). The hall is inscribed once, so it reads CFG.registry first and asks it
+   * who its locked successor is. Rules, each one a safety rule:
+   *   - only a LOCKED successor is followed (an unlocked pointer is a draft; the lock cannot be undone);
+   *   - at most 3 hops, no loops, same network as the configured registry, and the id must look like a contract id;
+   *   - a read that fails is not an answer: keep what was resolved before (or the configured registry) and ask again soon;
+   *   - the answer is cached and asked again at most every 10 minutes, so polling stays one cheap read.
+   * Nothing else about the registry is trusted any more or less because it was reached this way. */
+  var SUCC = { maxHops: 3, recheckMs: 600000, retryMs: 60000 };
+  var succ = { base: '', registry: '', hops: [], next: 0 };
+  function registryId() { return succ.base === CFG.registry && succ.registry ? succ.registry : CFG.registry; }
+  function registryLooksValid(id, like) {
+    return typeof id === 'string' && id.length < 100 && /^S[PT][0-9A-Z]{20,60}\.[a-zA-Z][a-zA-Z0-9-]{0,39}$/.test(id) && id.slice(0, 2) === String(like).slice(0, 2);
+  }
+  async function resolveSuccessor() {
+    if (!CFG.registry || !root.XAWorld2) return;
+    var now = Date.now();
+    if (succ.base !== CFG.registry) succ = { base: CFG.registry, registry: '', hops: [], next: 0 };
+    if (now < succ.next) return;
+    var cur = CFG.registry, seen = {}, hops = [];
+    seen[cur] = 1;
+    try {
+      for (var i = 0; i < SUCC.maxHops; i++) {
+        var t = plain(await callRead(cur, 'get-successor', []));
+        if (!t || !t.successor || t.locked !== true) break;
+        if (!registryLooksValid(t.successor, CFG.registry) || seen[t.successor]) break;
+        seen[t.successor] = 1; hops.push(t.successor); cur = t.successor;
+      }
+      succ = { base: CFG.registry, registry: cur === CFG.registry ? '' : cur, hops: hops, next: now + SUCC.recheckMs };
+    } catch (e) {
+      succ.next = now + SUCC.retryMs;   // keep what was resolved before; ask again in a minute
+    }
+  }
+  // null while the configured registry is the one being read; otherwise { from, to, hops } for the notice.
+  function moved() { return succ.base === CFG.registry && succ.registry ? { from: CFG.registry, to: succ.registry, hops: succ.hops.slice() } : null; }
 
   /* ------------------------------------------------------------ pure helpers (rotation side) */
   function rng(s) { return function () { s |= 0; s = s + 0x6D2B79F5 | 0; var t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -264,7 +301,7 @@
       posters: live.map(function (id) { return recs[id]; }).filter(Boolean),
       pins: pins, pinned: pinned, suppressed: suppressed, bays: bays, rooms: { lobby: { bays: lobbyBays } }, looks: looks
     };
-    if (w2) { snap.src = CFG.registry; snap.v2 = w2.meta; }     // v1 snapshots stay exactly as they were
+    if (w2) { snap.src = registryId(); snap.v2 = w2.meta; }     // v1 snapshots stay exactly as they were
     return snap;
   }
   // The looks the active scenes use (door look and every layer), in one or two reads. { id: { kind, name, tier, builtin, hidden, approved } }
@@ -301,7 +338,7 @@
       if (!s) return null;
       var snap = JSON.parse(s, function (k, v) { return v && typeof v === 'object' && typeof v.$hex === 'string' ? root.XAScores._codec.hexToBytes(v.$hex) : v; });
       // a snapshot from the other bay source (v1 scenes vs the v2 registry, or another registry) is not shown while the reader catches up
-      return snap && (snap.src || '') === (mode() === 2 ? CFG.registry : '') ? snap : null;
+      return snap && (snap.src || '') === (mode() === 2 ? registryId() : '') ? snap : null;
     } catch (e) { return null; }
   }
 
@@ -313,8 +350,10 @@
     if (!enabled() || state.busy) return { ok: false, changed: false, error: enabled() ? 'busy' : 'off' };
     state.busy = true;
     try {
+      await resolveSuccessor();   // never throws; one read at most every 10 minutes (a minute after a failed one)
       var v = await readVersions();
-      if (!force && state.versions && state.versions.posters === v.posters && state.versions.world === v.world) return { ok: true, changed: false };
+      var sameRegistry = !state.snap || !state.snap.src || state.snap.src === registryId();
+      if (!force && sameRegistry && state.versions && state.versions.posters === v.posters && state.versions.world === v.world) return { ok: true, changed: false };
       var snap = await loadSnapshot();
       state.snap = snap; state.versions = snap.versions; save(snap); emit('chain');
       return { ok: true, changed: true };
@@ -375,7 +414,7 @@
 
   root.XAWorld = {
     configure: configure, config: function () { return Object.assign({}, CFG); }, enabled: enabled, mode: mode,
-    start: start, stop: stop, refresh: refresh, onHeight: onHeight, snapshot: function () { return state.snap; },
+    start: start, stop: stop, refresh: refresh, onHeight: onHeight, snapshot: function () { return state.snap; }, moved: moved,
     onChange: function (fn) { state.listeners.push(fn); },
     composeWall: composeWall, pinSlotMap: pinSlotMap, isActive: isActive, loadImageBytes: loadImageBytes,
     // read helpers for sibling modules (the centre screen reads its own contract through these)

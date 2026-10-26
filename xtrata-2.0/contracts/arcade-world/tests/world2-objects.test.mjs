@@ -89,13 +89,19 @@ test('objects: created within quotas, nesting and kinds; edited, hidden and reti
   assert.equal(pp(w.call('set-object', [U(floor), S('rug'), TF(1, 2, 3), S('{"colour":"#000"}')], W[0]).result), OK);
   assert.equal(w.getObj(floor).name.value, 'rug');
   assert.equal(pp(w.call('set-object', [U(999), S('x'), TF(), S('{}')], W[0]).result), err(302));
-  // nesting: four levels, no more; parents must be live parts of the same space
+  // nesting has no fixed limit (it costs nothing on chain to go deeper); parents must be live parts of the same space
   const a1 = idOf(w.object(W[0], alice, w.kinds.stool, { name: 'a1' }));
   const a2 = idOf(w.object(W[0], alice, w.kinds.stool, { name: 'a2', parent: a1 }));
   const a3 = idOf(w.object(W[0], alice, w.kinds.stool, { name: 'a3', parent: a2 }));
   const a4 = idOf(w.object(W[0], alice, w.kinds.stool, { name: 'a4', parent: a3 }));
   assert.equal(w.getObj(a4).depth.value, 4n);
-  assert.equal(pp(w.object(W[0], alice, w.kinds.stool, { name: 'a5', parent: a4 }).result), err(306));
+  const a5 = idOf(w.object(W[0], alice, w.kinds.stool, { name: 'a5', parent: a4 }));
+  const a6 = idOf(w.object(W[0], alice, w.kinds.stool, { name: 'a6', parent: a5 }));
+  assert.equal(w.getObj(a6).depth.value, 6n);
+  // bottom up again: the two extra levels go first so the checks below still see a4 as a leaf
+  assert.equal(pp(w.call('set-object-state', [U(a5), U(2)], W[0]).result), err(308)); // a5 still has a6
+  assert.equal(pp(w.call('set-object-state', [U(a6), U(2)], W[0]).result), OK);
+  assert.equal(pp(w.call('set-object-state', [U(a5), U(2)], W[0]).result), OK);
   const other = idOf(w.object(deployer, ids.lobby, w.kinds.stool));
   assert.equal(pp(w.object(W[0], alice, w.kinds.stool, { parent: other }).result), err(306)); // another space's object
   assert.equal(pp(w.object(W[0], alice, w.kinds.stool, { parent: 999 }).result), err(306));
@@ -125,10 +131,10 @@ test('objects: per-space quota, per-part limit, and the review lane', async () =
   assert.equal(pp(w.object(W[0], room, w.kinds.stool).result), err(305));
   w.call('set-object-state', [U(ids3[2]), U(2)], W[0]);
   assert.equal(pp(w.object(W[0], room, w.kinds.stool).result.type), 'ok');
-  // a part holds at most 32 parts
+  // a part has no fixed limit on its parts (33 here, one past the old limit of 32)
   const parent = idOf(w.object(w.deployer, ids.hall, w.kinds.stool, { name: 'rack' }));
-  for (let i = 0; i < 32; i++) assert.equal(w.object(w.deployer, ids.hall, w.kinds.stool, { name: `p${i}`, parent: i < 3 ? parent : parent }).result.type, 'ok', `part ${i}`);
-  assert.equal(pp(w.object(w.deployer, ids.hall, w.kinds.stool, { name: 'p32', parent }).result), err(306));
+  for (let i = 0; i < 33; i++) assert.equal(w.object(w.deployer, ids.hall, w.kinds.stool, { name: `p${i}`, parent }).result.type, 'ok', `part ${i}`);
+  assert.equal(w.getObj(parent).children.value, 33n);
   // review lane: a delegate's objects start hidden; only the owner or a moderator shows them
   const rv = idOf(w.space(W[0], { parent: ids.alice, slug: 'review', policy: PLOT({ depth: 1, review: true }) }));
   w.grant(W[0], rv, W[2], CAP.OBJECT);

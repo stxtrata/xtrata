@@ -467,14 +467,13 @@ test('tightening a parent tightens everything below it at once (effective policy
   assert.equal(pp(w.space(W[0], { parent: room, slug: 'attic', policy: PLOT({ depth: 0 }) }).result), err(306));
 });
 
-test('a kind registrar is limited per space, admins are not; the treasury wallet can still pay fees', async () => {
+test('a kind registrar has no fixed per-space limit (the space policy and hiding are the controls); the treasury wallet can still pay fees', async () => {
   const w = await standardWorld();
   const { deployer, W, ids, simnet } = w;
-  for (let i = 0; i < 16; i++) mockInscription(simnet, deployer, 900 + i, { hash: hash32(i), size: 100, creator: W[0] });
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 17; i++) mockInscription(simnet, deployer, 900 + i, { hash: hash32(i), size: 100, creator: W[0] });
+  for (let i = 0; i < 17; i++) {
     assert.equal(w.kind(W[0], { space: ids.alice, tier: 1, srcId: 900 + i, hash: hash32(i), size: 100, name: `k${i}` }).result.type, 'ok', `kind ${i}`);
   }
-  assert.equal(pp(w.kind(W[0], { space: ids.alice, tier: 1, srcId: 900, hash: hash32(0), size: 100 }).result), err(305));
   assert.equal(w.kind(deployer, { space: ids.alice, name: 'admin one' }).result.type, 'ok');
   // a payer who is also the treasury pays nothing to itself and the action still works
   w.call('set-treasury', [P(W[2])]);
@@ -484,4 +483,21 @@ test('a kind registrar is limited per space, admins are not; the treasury wallet
   const before = w.bal(W[2]);
   assert.equal(pp(w.space(W[2], { parent: ids.alice, slug: 'mine', owner: W[2], policy: PLOT({ depth: 1 }) }).result.type), 'ok');
   assert.equal(w.bal(W[2]), before);
+});
+
+test('width has no fixed limit: the root starts unlimited and a domain can hold more than the old 64 children', async () => {
+  const w = await world();
+  const { deployer } = w;
+  const UNLIMITED = 340282366920938463463374607431768211455n;
+  const root = w.ro('get-space', [U(1)]).value.value.policy.value;
+  for (const k of ['max-children', 'max-descendants', 'max-objects']) assert.equal(root[k].value, UNLIMITED, k);
+  assert.equal(root['max-depth'].value, 6n); // depth is the one structural limit: every write walks it
+  // a child with no policy of its own inherits the unlimited root policy
+  const wide = idOf(w.space(deployer, { parent: 1, slug: 'wide', kind: 0, runtime: 0, transferable: false }));
+  for (let i = 0; i < 70; i++) assert.equal(w.space(deployer, { parent: wide, slug: `r${i}`, kind: 1 }).result.type, 'ok', `child ${i}`);
+  assert.equal(w.get(wide).children.value, 70n);
+  assert.equal(w.get(wide).descendants.value, 70n);
+  // the policy is still the way to set a limit: a narrower policy on a space is enforced
+  assert.equal(pp(w.call('set-policy', [U(wide), w.polOf(wide, { children: 70 })]).result), OK);
+  assert.equal(pp(w.space(deployer, { parent: wide, slug: 'one-more', kind: 1 }).result), err(305));
 });

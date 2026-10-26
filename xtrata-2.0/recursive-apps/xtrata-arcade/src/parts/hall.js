@@ -195,7 +195,7 @@ function buildRoom(){
 
   buildLogoSign();
   buildPosters();
-  try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
+  try{ if(window.XAWorld) XAWorld.start(()=>{ paintWall(); noteMoved() }) }catch(e){}   // off unless the contracts are configured
   try{ if(window.XAScreen) XAScreen.start(()=>paintDayBoard(true)) }catch(e){}   // the centre screen's contract: off unless configured
   if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
   if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
@@ -2865,6 +2865,9 @@ async function roomCall(f,id,d,t){
 // A door that leads somewhere: you walk into an open doorway to go through it (there is no button). The lobby is already there, behind its wall,
 // so walking in needs nothing; any other door is read from the chain (or a preview room in XA_ROOMS) and either opens its room or says why not.
 function toast(text,ms){ bayToast={text, until:performance.now()+(ms||3500)}; updateBayFocus() }
+// The registry this hall was inscribed with has a locked successor and the hall is reading that one now: say so once.
+let movedNoted=false;
+function noteMoved(){ try{ if(!movedNoted && window.XAWorld && XAWorld.moved && XAWorld.moved()){ movedNoted=true; toast('THIS WORLD HAS MOVED · READING ITS NEW REGISTRY',8000) } }catch(e){} }
 function bayEnter(link, bayIdx){
   if(isLobbyLink(link) && lobbyPass) return;
   const seq=++enterSeq;

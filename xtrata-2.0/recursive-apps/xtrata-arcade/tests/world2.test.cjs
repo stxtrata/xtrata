@@ -492,3 +492,97 @@ test('every object list is read in light pages: get-object-ids (16 ids) then get
   const fns = new Set(chain.log.map((l) => l.fn));
   assert.ok(fns.has('get-object-ids') && fns.has('get-object-view') && !fns.has('get-objects'), [...fns].join(','));
 });
+
+/* ------------------------------------------------------------ successor: a registry that has moved */
+// The registry names a successor (set-successor) and locks that choice (lock-successor). The hall follows a LOCKED successor only,
+// at most 3 hops, never in a loop, never across networks, and a failed read is not an answer.
+const ADDR = 'ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E';
+const V = (n) => ADDR + '.xtrata-world-v' + n;
+function successors(win, n, table) {
+  // table: { '<contract name>': { to: 'S….name' | null, locked: bool } | 'fail' }; anything else goes to the recorded node
+  const C = win.XAScores._codec, hx = (s) => Buffer.from(s, 'latin1').toString('hex');
+  const principal = (id) => { const [a, name] = id.split('.'); const d = C.c32decodeAddress(a);
+    return '06' + d.version.toString(16).padStart(2, '0') + C.bytesToHex(d.hash160) + name.length.toString(16).padStart(2, '0') + hx(name); };
+  const tuple = (to, locked) => '0x0c00000002' + '06' + hx('locked') + (locked ? '03' : '04') + '09' + hx('successor') + (to ? '0a' + principal(to) : '09');
+  const inner = win.fetch, log = [];
+  win.fetch = async (url, init) => {
+    const m = /\/call-read\/([^/]+)\/([^/]+)\/([^/?]+)/.exec(url);
+    if (m && m[3] === 'get-successor') {
+      log.push(m[2]);
+      const row = table[m[2]];
+      if (row === 'fail') return { ok: false, status: 503, json: async () => ({}) };
+      if (row) return { ok: true, status: 200, json: async () => ({ okay: true, result: tuple(row.to, row.locked) }) };
+      return { ok: true, status: 200, json: async () => ({ okay: false, cause: 'no such function' }) };
+    }
+    return inner(url, init);
+  };
+  return log;
+}
+
+test('successor: a locked successor is followed; the snapshot comes from it and says so', async () => {
+  const { win, W, n } = configured('active');
+  const asked = successors(win, n, { 'xtrata-world-v2': { to: V(3), locked: true }, 'xtrata-world-v3': { to: null, locked: true } });
+  assert.deepEqual(plain(await W.refresh(true)), { ok: true, changed: true });
+  assert.deepEqual(asked, ['xtrata-world-v2', 'xtrata-world-v3']);
+  assert.equal(W.snapshot().src, V(3));
+  assert.deepEqual(plain(W.moved()), { from: REG, to: V(3), hops: [V(3)] });
+  assert.ok(n.log.some((l) => l.contract === 'xtrata-world-v3' && l.fn === 'resolve-path'), 'the new registry is the one read');
+  assert.ok(!n.log.some((l) => l.contract === 'xtrata-world-v2' && l.fn !== 'get-successor'), 'the old registry is only asked who succeeded it');
+  assert.equal(W.snapshot().bays.length, 4);
+});
+
+test('successor: an unlocked successor is only a draft and is ignored', async () => {
+  const { win, W, n } = configured('active');
+  successors(win, n, { 'xtrata-world-v2': { to: V(3), locked: false } });
+  await W.refresh(true);
+  assert.equal(W.snapshot().src, REG); assert.equal(W.moved(), null);
+  assert.ok(!n.log.some((l) => l.contract === 'xtrata-world-v3'));
+});
+
+test('successor: at most three hops, and a loop stops at the first repeat', async () => {
+  let t = configured('active');
+  successors(t.win, t.n, Object.fromEntries([2, 3, 4, 5].map((i) => ['xtrata-world-v' + i, { to: V(i + 1), locked: true }])));
+  await t.W.refresh(true);
+  assert.equal(t.W.snapshot().src, V(5)); assert.deepEqual(plain(t.W.moved().hops), [V(3), V(4), V(5)]);
+  t = configured('active');
+  successors(t.win, t.n, { 'xtrata-world-v2': { to: V(3), locked: true }, 'xtrata-world-v3': { to: V(2), locked: true } });
+  await t.W.refresh(true);
+  assert.equal(t.W.snapshot().src, V(3));
+});
+
+test('successor: another network, a malformed id, or the registry itself is never followed', async () => {
+  for (const to of ['SP16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E.xtrata-world-v3', ADDR + '.', ADDR, ADDR + '.xtrata world', REG]) {
+    const { win, W, n } = configured('active');
+    successors(win, n, { 'xtrata-world-v2': { to, locked: true } });
+    await W.refresh(true);
+    assert.equal(W.snapshot().src, REG, 'not followed: ' + to); assert.equal(W.moved(), null);
+  }
+});
+
+test('successor: a failed read is not an answer: the configured registry is read, and the question is asked again soon, not on every poll', async () => {
+  const { win, W, n } = configured('active');
+  const asked = successors(win, n, { 'xtrata-world-v2': 'fail' });
+  assert.deepEqual(plain(await W.refresh(true)), { ok: true, changed: true });
+  assert.equal(W.snapshot().src, REG); assert.equal(W.moved(), null);
+  await W.refresh(false); await W.refresh(false);
+  assert.equal(asked.length, 1, 'one failed question, then a minute of quiet');
+});
+
+test('successor: asked once, then not on every poll; polling stays two cheap reads', async () => {
+  const { win, W, n } = configured('active');
+  const asked = successors(win, n, { 'xtrata-world-v2': { to: V(3), locked: true }, 'xtrata-world-v3': { to: null, locked: true } });
+  await W.refresh(true);
+  n.log.length = 0; asked.length = 0;
+  const r = plain(await W.refresh(false));
+  assert.deepEqual(r, { ok: true, changed: false });
+  assert.equal(asked.length, 0);
+  assert.deepEqual(n.log.map((l) => l.contract + '.' + l.fn), ['xtrata-posters-v1.get-version', 'xtrata-world-v3.get-version']);
+});
+
+test('successor: a registry that has not moved changes nothing for the hall', async () => {
+  const { win, W, n } = configured('active');
+  const asked = successors(win, n, { 'xtrata-world-v2': { to: null, locked: false } });
+  await W.refresh(true);
+  assert.equal(W.snapshot().src, REG); assert.equal(W.moved(), null); assert.equal(asked.length, 1);
+  assert.deepEqual(plain(W.snapshot().bays), FIX.scenarios.active.expect.bays);
+});
