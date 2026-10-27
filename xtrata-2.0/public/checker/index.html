@@ -78,7 +78,7 @@
   .countline button{min-height:34px;padding:2px 12px;font-size:14px}
 
   /* rows */
-  .rows{display:grid;gap:6px}
+  .rows{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
   .row{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--neutral);border-radius:10px}
   .row.s-on_chain,.row.s-solid{border-left-color:var(--good)}
   .row.s-one_host{border-left-color:var(--warn)}
@@ -86,7 +86,7 @@
   .row.s-marketplace_only{border-left-color:var(--bad)}
   .row.s-not_found{border-left-color:var(--dead);box-shadow:-1px 0 0 0 #c9d4e5}
   .row[hidden],.empty[hidden]{display:none !important}
-  .rowsum{display:grid;grid-template-columns:1fr auto;grid-template-areas:"nm hd" "mt mt";gap:4px 10px;padding:9px 12px;cursor:pointer;list-style:none;align-items:center}
+  .rowsum{display:grid;grid-template-columns:1fr auto;grid-template-areas:"nm hd" "mt act";gap:4px 10px;padding:9px 12px;cursor:pointer;list-style:none;align-items:center}
   .rowsum::-webkit-details-marker{display:none}
   .rowsum .nm{grid-area:nm;min-width:0;font-weight:650;overflow-wrap:anywhere}
   .rowsum .hd{grid-area:hd;font-variant-numeric:tabular-nums;color:var(--ink);font-size:15px;white-space:nowrap}
@@ -97,9 +97,21 @@
   .gm{display:inline-block;margin-left:8px;font-size:12px;font-weight:500;color:var(--cyan);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:0 6px;white-space:nowrap;vertical-align:1px}
   .gm:hover{border-color:var(--cyan)}
   .row.other .nm .gm{display:inline-block}
+  .hbtn{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:3px 12px;border-radius:999px;border:1px solid var(--acc);background:transparent;color:var(--acc);font:600 13px system-ui,sans-serif;cursor:pointer;text-decoration:none;white-space:nowrap}
+  .hbtn:hover{background:#0c2230}
+  .hbtn.done{border-color:var(--good);color:var(--good);cursor:default;background:transparent}
+  .hbtn.open{border-color:var(--cyan);color:var(--cyan)}
+  .hbtn.big{min-height:44px;padding:8px 18px;font-size:15px;background:var(--acc);color:#04101c}
+  .hbtn.big.done{background:transparent;color:var(--good)}
+  .hbtn.big.open{background:transparent}
+  .helperbox{margin-top:14px;padding:12px 14px;border:1px solid #1f5568;background:#0a1a24;border-radius:10px}
+  .helperq{margin:0 0 10px;font-size:15px}
+  .helperrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .hmsg{font-size:13px;color:var(--bad)}
+  .rowsum .act{grid-area:act;justify-self:end}
   .chev{display:none}
   @media (min-width:820px){
-    .rowsum{grid-template-columns:200px minmax(0,1.1fr) minmax(0,2fr) 70px 14px;grid-template-areas:"chip nm tg hd chev";padding:8px 12px}
+    .rowsum{grid-template-columns:200px minmax(0,1.1fr) minmax(0,2fr) 170px 70px 14px;grid-template-areas:"chip nm tg act hd chev";padding:8px 12px}
     .rowsum .mt{display:contents}
     .rowsum .chip{grid-area:chip;justify-self:start}
     .rowsum .tags{grid-area:tg;display:flex;flex-wrap:wrap;gap:4px 6px}
@@ -134,7 +146,8 @@
   .row.other .act{grid-area:act;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .row.other .act .err{font-size:13px;color:var(--bad)}
   @media (min-width:820px){
-    .row.other{grid-template-columns:200px minmax(0,1.1fr) minmax(0,2fr) 70px auto;grid-template-areas:"mt nm sp hd act"}
+    .row.other{grid-template-columns:200px minmax(0,1.1fr) minmax(0,2fr) 170px 70px 14px;grid-template-areas:"mt nm sp act hd ."}
+    .row.other .act{justify-content:flex-end}
     .row.other .hd{text-align:right}
   }
 
@@ -382,6 +395,46 @@
     return details;
   }
 
+  // ---------- one-click "request a helper" ----------
+  // One state shared by every button for the same collection (the row's summary and its expanded body), so they never disagree.
+  function helperControl(card, live) {
+    if (card.special || card.status === 'not_art') return null;
+    var buttons = []; var state = 'idle'; var problem = '';
+    var TIP = 'Ask us to open a Forever Twins helper so holders can give each piece a permanent on-chain twin';
+    function paint() {
+      buttons.forEach(function (b) {
+        b.disabled = state === 'sending' || state === 'done';
+        b.className = 'hbtn ' + b.getAttribute('data-size') + (state === 'done' ? ' done' : '');
+        b.textContent = state === 'sending' ? 'Sending…' : state === 'done' ? 'Helper requested ✓' : state === 'failed' ? 'Try again' : (b.getAttribute('data-size') === 'big' ? 'Request a Forever Twins helper' : 'Request helper');
+        b.title = state === 'failed' ? problem : TIP;
+      });
+      document.querySelectorAll('[data-hmsg="' + card.id + '"]').forEach(function (m) { m.textContent = state === 'failed' ? problem : ''; });
+    }
+    function send(event) {
+      event.preventDefault(); event.stopPropagation(); // inside a <summary>: do not toggle the row
+      if (state === 'sending' || state === 'done') return;
+      state = 'sending'; problem = ''; paint();
+      // role is left blank: whoever looked may not be a holder or the creator.
+      post('/checker/requests', { kind: 'helper', contract: card.id, name: (card.name || '').slice(0, 120), role: '', website: '' }).then(function (res) {
+        if (res.status === 200 && res.data && res.data.ok) { state = 'done'; }
+        else { state = 'failed'; problem = (res.data && res.data.error) ? res.data.error : "That didn't go through, and we can't tell whether it was saved."; }
+        paint();
+      }).catch(function () { state = 'failed'; problem = "We couldn't reach the server."; paint(); });
+    }
+    return {
+      make: function (size) {
+        if (live) {
+          return el('a', { class: 'hbtn open ' + size, href: '/forever-twins/collection/' + encodeURIComponent(live.key), title: 'A Forever Twins helper is open for this collection',
+            onclick: function (e) { e.stopPropagation(); }, text: size === 'big' ? 'Open the Forever Twins helper' : 'Open helper →' });
+        }
+        var b = el('button', { type: 'button', 'data-size': size, onclick: send });
+        buttons.push(b); paint();
+        return b;
+      },
+      message: function () { return el('span', { class: 'hmsg', role: 'status', 'data-hmsg': card.id }); }
+    };
+  }
+
   // ---------- one collection we have a report on ----------
   // open: whether the row starts expanded. Returns { node, sort, text } so the list can reorder and filter without rebuilding.
   function reportRow(card, registry, open) {
@@ -400,6 +453,7 @@
     var headline = card.headline && card.label && card.headline.indexOf(card.label + '. ') === 0 ? card.headline.slice(card.label.length + 2) : card.headline;
     var bare = card.status === 'not_art' && !(card.good && card.good.length) && !(card.worry && card.worry.length);
 
+    var helper = helperControl(card, live);
     var node = el('details', { class: 'row s-' + card.status, 'data-id': card.id });
     if (open) node.open = true;
     node.appendChild(el('summary', { class: 'rowsum' },
@@ -408,6 +462,7 @@
       el('span', { class: 'mt' },
         el('span', { class: 'chip s-' + card.status, title: card.label }, el('i'), SHORT[card.status] || card.label),
         el('span', { class: 'tags' }, tagEls)),
+      el('span', { class: 'act' }, helper ? helper.make('small') : null),
       el('span', { class: 'chev', 'aria-hidden': 'true' })));
 
     var body = el('div', { class: 'rowbody' },
@@ -418,13 +473,13 @@
         list("What's good", card.good, 'Nothing we could confirm yet.'),
         list('What worries us', card.worry, 'Nothing found in our checks.')),
       el('p', { class: 'evidence', text: evidenceLine(card) }));
-    if (live) {
-      body.appendChild(el('p', { class: 'helper' }, 'A Forever Twins helper is open for this collection: ',
-        el('a', { href: '/forever-twins/collection/' + encodeURIComponent(live.key), text: 'give a piece a permanent on-chain twin' }), '.'));
+    if (helper) {
+      body.appendChild(el('div', { class: 'helperbox' },
+        el('p', { class: 'helperq' }, live ? 'A Forever Twins helper is open for this collection. Holders can give each piece a permanent on-chain twin.' : 'Want a permanent on-chain twin for this collection? One tap tells us you want a Forever Twins helper for it.'),
+        el('div', { class: 'helperrow' }, helper.make('big'), helper.message())));
     }
     if (!card.special && card.status !== 'not_art') {
-      var kinds = live ? ['retest'] : ['retest', 'helper'];
-      body.appendChild(requestBox({ id: card.id, name: card.name, kinds: kinds, summary: 'Ask us to re-test this' + (live ? '' : ' or to open a helper for it') }));
+      body.appendChild(requestBox({ id: card.id, name: card.name, kinds: ['retest'], summary: 'Ask us to re-test this collection' }));
     }
     node.appendChild(body);
 
