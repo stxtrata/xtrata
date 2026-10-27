@@ -23,6 +23,7 @@ export const DATASET_KEY = '_system/checker/checker-data.json';
 
 const NO_STORE = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' };
 const MAX_BODY = 4096;
+const MAX_TWINS = 40;
 const MAX_QUERY = 2000;
 const HOUR_MS = 3600_000;
 const LOOKUPS_PER_HOUR = 120;
@@ -419,7 +420,22 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
 
   try {
     const body = await readBody(request);
-    const q = body && typeof body === 'object' && !Array.isArray(body) ? body.q : undefined;
+    const isObject = body && typeof body === 'object' && !Array.isArray(body);
+    const twins: unknown = isObject ? body.twins : undefined;
+    const q = isObject ? body.q : undefined;
+    // Reports for a list of contract ids (the page's "has a Forever Twin" filter asks for the collections that have a helper).
+    // Public contract ids in, cards out. Nothing is recorded: these are not lookups anyone made.
+    if (Array.isArray(twins)) {
+      const ids = Array.from(new Set(twins.filter((v): v is string => typeof v === 'string' && DEMAND_CONTRACT.test(v)))).slice(0, MAX_TWINS);
+      const tip = request.headers.get('CF-Connecting-IP') || 'local';
+      const tsalt = typeof env?.TELEMETRY_SALT === 'string' ? env.TELEMETRY_SALT : '';
+      const tcount = await bump(env?.DB, 'lookup:', tip, tsalt, now);
+      if (tcount !== null && tcount > LOOKUPS_PER_HOUR) return fail(429, 'rate_limited', 'Too many lookups from here. Try again in an hour.');
+      const tloaded = await loadDataset(env, now);
+      if (!tloaded.ok) return fail(tloaded.status, tloaded.error, tloaded.message);
+      const results = ids.map((id) => tloaded.dataset.byId.get(id)).filter((rec): rec is Rec => Boolean(rec)).map((rec) => card(rec, tloaded.dataset));
+      return jsonResponse({ ok: true, dataset: datasetInfo(tloaded.dataset), caveats: tloaded.dataset.caveats, kind: 'twins', results }, 200, NO_STORE);
+    }
     if (typeof q !== 'string' || q.trim() === '') throw new BadRequest('Paste a link, a contract address or a wallet address.');
     if (q.length > MAX_QUERY) throw new BadRequest('That is too long to be a link or an address.');
 

@@ -568,6 +568,38 @@ describe('/checker/lookup: tags for the compact view', () => {
   });
 });
 
+describe('/checker/lookup: reports for a list of contracts (the Forever Twin filter)', () => {
+  const twins = async (env: any, list: unknown, o: Options = {}) => ask(env, undefined, { ...o, raw: JSON.stringify({ twins: list }) });
+
+  it('returns a report card for each known contract, and says nothing about unknown ones', async () => {
+    const env = { ...envOf(), DB: database() };
+    const { res, body } = await twins(env, [BIRDS, UNKNOWN]);
+    expect(res.status).toBe(200);
+    expect(body.kind).toBe('twins');
+    expect(body.results.map((r: any) => r.id)).toEqual([BIRDS]);
+    expect(body.results[0].covered).toBe(true);
+    expect(body.dataset.census_date).toBeTruthy();
+  });
+
+  it('drops anything that is not a contract id and caps the list', async () => {
+    const env = { ...envOf(), DB: database() };
+    const { body } = await twins(env, [BIRDS, BIRDS, 42, null, "'; DROP TABLE x;--", ...Array.from({ length: 60 }, (_, i) => `SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.nope-${i}`)]);
+    expect(body.results.map((r: any) => r.id)).toEqual([BIRDS]);
+  });
+
+  it('records no demand (nobody looked these up) but still counts against the rate limit', async () => {
+    const env = { ...envOf(), DB: database() };
+    await twins(env, [BIRDS]);
+    expect(env.DB.sql.prepare('SELECT COUNT(*) AS n FROM checker_demand').get().n).toBe(0);
+    expect(env.DB.sql.prepare("SELECT COUNT(*) AS n FROM checker_request_rate WHERE key LIKE 'lookup:%' OR 1=1").get().n).toBeGreaterThan(0);
+  });
+
+  it('a request with neither q nor twins is still refused', async () => {
+    const { res } = await ask(envOf(), undefined, { raw: JSON.stringify({}) });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('/checker/lookup: anonymous demand counters', () => {
   const today = new Date(now).toISOString().slice(0, 10);
   const demand = (env: any) => env.DB.sql.prepare('SELECT * FROM checker_demand ORDER BY contract_id, source').all() as any[];

@@ -487,7 +487,7 @@
 
     var c = card.checked || {};
     return {
-      node: node, group: card.status, twin: !!live, held: held || 0, name: card.name.toLowerCase(), size: card.tokens_approx || 0,
+      node: node, id: card.id, group: card.status, twin: !!live, held: held || 0, name: card.name.toLowerCase(), size: card.tokens_approx || 0,
       checked: [c.contract, c.marketplace].filter(Boolean).sort().pop() || '', rank: rank(card.status),
       text: (card.name + ' ' + card.id).toLowerCase()
     };
@@ -518,7 +518,7 @@
       fromWallet ? el('span', { class: 'hd', text: '×' + num(o.held), title: 'You hold ' + num(o.held) }) : null,
       el('span', { class: 'mt' }, el('span', { class: 'chip' }, el('i'), 'Not in research'), el('span', { class: 'tag', text: 'No information yet' })),
       act);
-    return { node: node, group: 'other', twin: !!live, held: o.held, name: label.toLowerCase(), size: 0, checked: '', rank: 99, text: (label + ' ' + o.id).toLowerCase() };
+    return { node: node, id: o.id, group: 'other', twin: !!live, held: o.held, name: label.toLowerCase(), size: 0, checked: '', rank: 99, text: (label + ' ' + o.id).toLowerCase() };
   }
 
   // ---------- totals and the list ----------
@@ -576,12 +576,18 @@
       chipBar.appendChild(b);
     });
 
-    var twinCount = rows.filter(function (r) { return r.twin; }).length;
-    var twinChip = null;
-    if (twinCount) {
-      twinChip = el('button', { type: 'button', class: 'chip-btn twin', 'aria-pressed': 'false', title: 'Collections that already have a Forever Twins helper' }, el('i'), 'Has a Forever Twin', el('span', { class: 'c', text: String(twinCount) }));
-      twinChip.addEventListener('click', function () { twinOnly = !twinOnly; twinChip.setAttribute('aria-pressed', twinOnly ? 'true' : 'false'); apply(); });
-      chipBar.appendChild(twinChip);
+    // "Has a Forever Twin" shows every collection that has a helper, including ones this wallet does not hold (added later by addRows).
+    var twinChip = null; var twinNum = null;
+    function refreshTwin() {
+      var n = rows.filter(function (r) { return r.twin; }).length;
+      if (!n) return;
+      if (!twinChip) {
+        twinNum = el('span', { class: 'c' });
+        twinChip = el('button', { type: 'button', class: 'chip-btn twin', 'aria-pressed': 'false', title: 'Every collection that already has a Forever Twins helper, including ones this wallet does not hold' }, el('i'), 'Has a Forever Twin', twinNum);
+        twinChip.addEventListener('click', function () { twinOnly = !twinOnly; twinChip.setAttribute('aria-pressed', twinOnly ? 'true' : 'false'); apply(); });
+        chipBar.appendChild(twinChip);
+      }
+      twinNum.textContent = String(n);
     }
 
     var select = el('select', { 'aria-label': 'Sort by' },
@@ -620,18 +626,42 @@
       var any = Object.keys(chosen).length > 0;
       var shown = 0;
       rows.slice().sort(compare).forEach(function (r) {
-        var ok = (!any || chosen[r.group]) && (!twinOnly || r.twin) && (!query || r.text.indexOf(query) !== -1);
+        var ok = (!r.extra || twinOnly) && (!any || chosen[r.group]) && (!twinOnly || r.twin) && (!query || r.text.indexOf(query) !== -1);
         r.node.hidden = !ok;
         if (ok) shown += 1;
         list.appendChild(r.node);
       });
       empty.hidden = shown !== 0;
-      countText.textContent = 'Showing ' + num(shown) + ' of ' + num(rows.length) + (any || query || twinOnly ? ' (filtered)' : '');
+      var mine = rows.filter(function (r) { return !r.extra; }).length;
+      var away = twinOnly ? rows.filter(function (r) { return r.extra && !r.node.hidden; }).length : 0;
+      countText.textContent = 'Showing ' + num(shown) + ' of ' + num(mine) + (any || query || twinOnly ? ' (filtered)' : '') + (away ? ', ' + num(away) + ' not in this wallet' : '');
     }
 
     var wrap = el('section', { 'aria-label': 'Collections' }, controls, chipBar, el('div', { class: 'countline' }, countText), list, empty);
+    wrap.addRows = function (more) { more.forEach(function (r) { rows.push(r); }); refreshTwin(); apply(); };
+    refreshTwin();
     apply();
     return wrap;
+  }
+
+  // Collections with a Forever Twins helper that this wallet does not hold: fetched once, kept out of the list until the
+  // "Has a Forever Twin" filter is on. They are not lookups anyone made, so the server records nothing for them.
+  function addTwinsNotHeld(listEl, rows, registry) {
+    if (!registry) return;
+    var have = {}; rows.forEach(function (r) { have[r.id] = true; });
+    var missing = Object.keys(registry).filter(function (src) { return registry[src].status === 'live' && !have[src]; });
+    if (!missing.length) return;
+    post('/checker/lookup', { twins: missing }).then(function (res) {
+      if (!listEl.isConnected || !(res.status === 200 && res.data && res.data.ok && Array.isArray(res.data.results))) return;
+      var extra = res.data.results.filter(function (c) { return c.covered; }).map(function (c) {
+        var r = reportRow(c, registry, false);
+        r.extra = true; r.held = 0;
+        var tags = r.node.querySelector('.tags');
+        if (tags) tags.insertBefore(el('span', { class: 'tag', text: 'Not in this wallet' }), tags.firstChild);
+        return r;
+      });
+      if (extra.length) listEl.addRows(extra);
+    }).catch(function () { /* the filter just shows the ones this wallet holds */ });
   }
 
   function walletEmpty() {
@@ -677,7 +707,9 @@
       out.appendChild(totalsPanel(w, results));
       var rows = results.map(function (card) { return reportRow(card, registry, false); })
         .concat((data.others || []).map(function (o) { return otherRow(o, true, registry); }));
-      out.appendChild(buildList(rows, results));
+      var listEl = buildList(rows, results);
+      out.appendChild(listEl);
+      addTwinsNotHeld(listEl, rows, registry);
       if (data.others_total > (data.others || []).length) {
         out.appendChild(el('p', { class: 'mut small', text: 'Showing the ' + num((data.others || []).length) + ' collections without a report that you hold most of (of ' + num(data.others_total) + ').' }));
       }
