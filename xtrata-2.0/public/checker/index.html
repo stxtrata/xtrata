@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <style>
   :root{color-scheme:dark;--bg:#06080d;--panel:#0f1521;--panel2:#141d2d;--line:#223047;--ink:#e6edf6;--mut:#9aa9bf;--acc:#3ea6ff;--cyan:#5ee9ff;
-    --good:#3ddc97;--warn:#f5c451;--orange:#ff9f43;--bad:#ff6b6b;--neutral:#8b9bb4;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+    --good:#3ddc97;--warn:#f5c451;--orange:#ff9f43;--bad:#ff6b6b;--dead:#9b1c31;--neutral:#8b9bb4;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg)}
   a{color:var(--cyan)}
@@ -72,7 +72,8 @@
   .s-on_chain i,.s-solid i{background:var(--good)}
   .s-one_host i{background:var(--warn)}
   .s-marketplace_broken i{background:var(--orange)}
-  .s-marketplace_only i,.s-not_found i{background:var(--bad)}
+  .s-marketplace_only i{background:var(--bad)}
+  .s-not_found i{background:var(--dead)}
   .countline{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:2px 0 8px;color:var(--mut);font-size:14px}
   .countline button{min-height:34px;padding:2px 12px;font-size:14px}
 
@@ -82,7 +83,8 @@
   .row.s-on_chain,.row.s-solid{border-left-color:var(--good)}
   .row.s-one_host{border-left-color:var(--warn)}
   .row.s-marketplace_broken{border-left-color:var(--orange)}
-  .row.s-marketplace_only,.row.s-not_found{border-left-color:var(--bad)}
+  .row.s-marketplace_only{border-left-color:var(--bad)}
+  .row.s-not_found{border-left-color:var(--dead)}
   .row[hidden]{display:none}
   .rowsum{display:grid;grid-template-columns:1fr auto;grid-template-areas:"nm hd" "mt mt";gap:4px 10px;padding:9px 12px;cursor:pointer;list-style:none;align-items:center}
   .rowsum::-webkit-details-marker{display:none}
