@@ -27,6 +27,9 @@ Nothing works until both steps are done; until then the page says "the research 
 # 1. the request store (D1, once)
 npx wrangler d1 execute xtrata-manage --remote --file functions/migrations/031_checker_requests.sql
 
+# 1b. anonymous demand counters (D1, once; optional, the checker works without it)
+npx wrangler d1 execute xtrata-manage --remote --file functions/migrations/032_checker_demand.sql
+
 # 2. build the dataset and upload it to the private R2 bucket (repeat whenever the research changes)
 python3 -I forever-twins/ft-harness/checker/export_checker_data.py
 npx wrangler r2 object put xtrata-manage-assets/_system/checker/checker-data.json \
