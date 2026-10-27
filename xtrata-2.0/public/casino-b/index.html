@@ -8133,6 +8133,54 @@ function applyTestnetFunding(proof){
   // One renderer, one casino. Embedded game logic supplies only live canvas pixels and controls.
   let machineOpen=false,machineLoading=false,machineType=-1,activeCabinet=null,machineCloseup=false,machineReturn=null,machineHere=true,machineSession=0,machineConnectedAt=0,machineOutOfRange=false;
   const machineEngines=new Map(),machineEngineLoads=new Map(),hiddenMachinePeople=[];let machineLastUI=0,machineLastRevision=-1,machinePorts={modal:'',feature:''};
+  // The NPC uses an independent, in-memory practice engine, never the player's account.
+  let npcMachineEngine=null,npcPressStarted=0,npcPressFired=false,npcNextAction=0,npcNextPoll=0,npcPressAmount=0;
+  const npcAccountSource=`window.ParallaxLAYRAccount=(()=>{const games=new Map();return Object.freeze({
+    acquire:async()=>true,ready:()=>true,error:()=>'',machine:(id,engine)=>engine,
+    openGame(id,engine){if(!games.has(id)){const state=engine.fresh();state.balance=1000000000;state.muted=true;state.sound=false;state.ambient=false;state.volume=0;games.set(id,state);}return games.get(id);},
+    saveGame:()=>true,balance:()=>1000000000,subscribe:()=>()=>{}
+  });})();`;
+  function npcGameDocument(html){
+    const begin=html.indexOf('<script>/* One existing LAYR account'),endTag='<'+ '/script>',end=html.indexOf(endTag,begin);
+    if(begin<0||end<0)throw Error('Could not isolate the NPC account.');
+    return html.slice(0,begin)+'<script>'+npcAccountSource+endTag+html.slice(end+endTag.length);
+  }
+  async function startNpcMachine(machine){
+    let frame;
+    try{
+      const html=npcGameDocument(await decodePXGzip(window.PX_MACHINE_PACKS[machine.type].game));
+      frame=document.createElement('iframe');frame.className='pxLogicFrame';frame.title='Casino guest practice machine';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
+      const api=await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('NPC machine did not become ready')),20000);frame.onload=()=>{clearTimeout(timeout);const api=frame.contentWindow.PX_CASINO_ENGINE;api?resolve(api):reject(Error('NPC machine engine unavailable'));};frame.srcdoc=html;});
+      await api.activate();
+      const screen=machine.model.getObjectByName('px-screenMesh');if(!screen)throw Error('NPC machine screen unavailable');
+      const texture=new THREE.CanvasTexture(api.screen);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=false;texture.anisotropy=16;
+      screen.material=screen.material.clone();screen.material.map=texture;screen.material.color.setHex(0xffffff);screen.material.needsUpdate=true;
+      npcMachineEngine={api,frame,texture,machine,revision:-1};npcNextAction=performance.now()+1100;
+    }catch(e){frame?.remove();console.warn('The guest machine could not start:',e);}
+  }
+  function npcAvailableAction(engine){
+    const doc=engine.frame.contentDocument,ui=engine.api.ui();if(ui.spinning)return null;
+    const modal=doc.getElementById('modal');
+    if(modal?.open){
+      const button=modal.querySelector('[data-vault]:not(:disabled),#bonusDone:not(:disabled),#freeStart:not(:disabled),#featureContinue:not(:disabled)');
+      return button?()=>button.click():()=>engine.api.closeModal();
+    }
+    const bar=doc.getElementById('featureBar');
+    if(bar&&!bar.hidden){const button=bar.querySelector('[data-pick]:not(:disabled),#fbGo:not(:disabled)');return button?()=>button.click():null;}
+    return ui.spinDisabled?null:()=>engine.api.action('spin');
+  }
+  function updateNpcMachine(now){
+    const engine=npcMachineEngine;npcPressAmount=0;if(!engine||document.hidden)return;
+    const revision=engine.api.revision();if(revision!==engine.revision){engine.revision=revision;engine.texture.needsUpdate=true;}
+    if(npcPressStarted){
+      const elapsed=now-npcPressStarted;npcPressAmount=Math.max(0,1-Math.abs(elapsed-500)/350);
+      if(elapsed>=500&&!npcPressFired){npcPressFired=true;try{npcAvailableAction(engine)?.();}catch(e){console.warn('Guest machine action failed:',e);}}
+      if(elapsed>=1000){npcPressStarted=0;npcNextAction=now+1400+Math.random()*1600;}
+      return;
+    }
+    if(now<npcNextAction||now<npcNextPoll)return;npcNextPoll=now+300;
+    try{if(npcAvailableAction(engine)){npcPressStarted=now;npcPressFired=false;}}catch(e){npcNextAction=now+3000;console.warn('Guest machine is waiting:',e);}
+  }
   const machineUI={};
   function updateCasinoMachines(t){
     const now=performance.now(),motion=machineOpen&&!machineLoading?getActiveEngine()?.api.mechanics?.():null;
@@ -8147,7 +8195,7 @@ function applyTestnetFunding(proof){
           const pull=m.leverPull,u=pull?Math.max(0,Math.min(1,(now-pull.start)/pull.duration)):1;
           a.o.rotation.x=a.base.x+(pull&&u<1?Math.sin(u*Math.PI)*pull.angle:0);
           if(u>=1)m.leverPull=null;
-        }else if(a.role==='spinPhysical'){const p=m.occupied?Math.max(0,1-Math.abs((t%5.6)-1)/.35):0;a.o.position.z=live?.spinZ??(a.homePosition.z-.025*p);}
+        }else if(a.role==='spinPhysical'){const p=m.occupied?npcPressAmount:0;a.o.position.z=live?.spinZ??(a.homePosition.z-.025*p);}
         else if(a.role==='armPivot'){
           const dt=Math.max(0,Math.min(.1,(now-(m.lastMechanicalFrame??now))/1000));
           a.o.rotation.z+=((live?.armZ??a.base.z)-a.o.rotation.z)*(1-Math.exp(-dt*12));
@@ -8235,7 +8283,7 @@ function applyTestnetFunding(proof){
     const html=await decodePXGzip(window.PX_MACHINE_PACKS[type].game),frame=document.createElement('iframe');frame.className='pxLogicFrame';frame.title=window.PX_MACHINE_PACKS[type].name+' game logic';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
     const api=await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Machine did not become ready')),20000);frame.onload=()=>{const api=frame.contentWindow.PX_CASINO_ENGINE;if(!api){clearTimeout(timeout);reject(new Error('Game engine API missing'));return;}clearTimeout(timeout);resolve(api);};frame.srcdoc=html;});
     const texture=new THREE.CanvasTexture(api.screen);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=false;texture.anisotropy=16;
-    for(const m of room.machines.filter(m=>m.type===type)){const screen=m.model.getObjectByName('px-screenMesh');if(screen){screen.material=screen.material.clone();screen.material.map=texture;screen.material.color.setHex(0xffffff);screen.material.needsUpdate=true;}}
+    for(const m of room.machines.filter(m=>m.type===type&&!m.occupied)){const screen=m.model.getObjectByName('px-screenMesh');if(screen){screen.material=screen.material.clone();screen.material.map=texture;screen.material.color.setHex(0xffffff);screen.material.needsUpdate=true;}}
     const engine={api,frame,texture,revision:-1,css:window.PX_MACHINE_PACKS[type].css};machineEngines.set(type,engine);return engine;
   }
   async function openCasinoMachine(selection,view='here'){
@@ -10038,6 +10086,7 @@ function applyTestnetFunding(proof){
   const guestMachine=room.machines.find(m=>m.occupied),guestMachineSpot=guestMachine.group.localToWorld(V3(.4,0,.98));
   const guestButton=guestMachine.model.getObjectByName('px-spinPhysical');
   const guestButtonWorld=guestButton?new THREE.Box3().setFromObject(guestButton).getCenter(V3(0,0,0)):guestMachine.group.localToWorld(V3(.4,1,.38));
+  startNpcMachine(guestMachine);
   [
    {x:guestMachineSpot.x,z:guestMachineSpot.z,yaw:guestMachine.group.rotation.y+Math.PI,role:'machine',look:{skin:SKIN[1],style:'jacket',jacket:0x2a3a52,shirt:0xe8e0cc,hair:0x2a1a10,hairStyle:'short',beard:'stubble',pants:0x26262e}},
    {x:8.8,z:-7.0,yaw:Math.atan2(-2.8,-2.2),role:'bar',look:{skin:SKIN[0],style:'jacket',jacket:0x4a2a3a,shirt:0xf0e8e0,hair:0x7a3a1a,hairStyle:'long',lashes:true,thinBrows:true,earrings:true,pants:0x1c1c26}}
@@ -10086,7 +10135,7 @@ function applyTestnetFunding(proof){
       if (p.role === 'machine') {
         // A slow, repeated reach and button press; the skinned character's head
         // stays directed at the cabinet instead of following the passing camera.
-        const c=p.host?.ctrl,cycle=t%5.6,press=Math.max(0,1-Math.abs(cycle-1)/.35);
+        const c=p.host?.ctrl,press=npcPressAmount;
         if(c?.bones?.wrist_R){
           const reach=guestButtonWorld.clone(),toward=reach.clone().sub(c.object.position);toward.y=0;toward.normalize();
           // Keep the index finger just short of the button, then press in.
@@ -10094,7 +10143,8 @@ function applyTestnetFunding(proof){
           const rest=c.object.localToWorld(V3(-.18,1.05,.24));rest.lerp(reach,.45+.55*press);
           const target=c.model.worldToLocal(rest);
           c.rig.arm('R',target,{forward:V3(0,0,1),palm:'down'});c.rig.hand('R','point',1);c.model.updateMatrixWorld(true);
-        }else if(t>p.next){p.next=t+5.6;p.fig.deal();}
+        }else if(press>.8&&!p.lastPressed){p.fig.deal();}
+        p.lastPressed=press>.8;
         return;
       }
       if (p.role === 'barseat') { if(t>p.next){p.next=t+7+Math.random()*7;p.fig.nod();} return; }
@@ -10643,7 +10693,7 @@ function applyTestnetFunding(proof){
     // The active controller reveals its own result in time with its animation.
     for(const engine of machineEngines.values())if(!machineOpen||engine!==getActiveEngine())engine.api.refreshAccount?.();
     for(const m of room.machines){
-      if(machineEngines.has(m.type))continue;
+      if(m.occupied||machineEngines.has(m.type))continue;
       const mesh=m.model.getObjectByName('px-screenMesh');if(!mesh?.material?.map?.image)continue;
       let idle=idleLAYRScreens.get(m.type);
       if(!idle){
@@ -10724,7 +10774,7 @@ function applyTestnetFunding(proof){
     signA += ((focus ? 0 : 1) - signA) * Math.min(1, dt * 5); stations.forEach((s) => { s.sign.material.opacity = signA; s.sign.visible = signA > 0.02; });
     room.neon.material.color.setScalar(0.85 + 0.15 * Math.sin(t * 2.4));
     room.bulbs.forEach((b, i) => { const on = ((Math.floor(t * 6) + i) % 4) === 0; b.material.color.setHex(on ? 0xffd86b : 0x4a3208); });
-    updateCasinoMachines(t);updateConnectedMachine(t);updateLAYRDispensers();barUI?.tick(performance.now(),dt);testnetLAYR.tick(performance.now());
+    updateNpcMachine(performance.now());updateCasinoMachines(t);updateConnectedMachine(t);updateLAYRDispensers();barUI?.tick(performance.now(),dt);testnetLAYR.tick(performance.now());
     const dpos = room.dust.geometry.attributes.position.array; for (let i = 0; i < dpos.length; i += 3) { dpos[i + 1] += dt * 0.05; dpos[i] += Math.sin(t * 0.3 + i) * dt * 0.03; if (dpos[i + 1] > 5) dpos[i + 1] = 0.5; } room.dust.geometry.attributes.position.needsUpdate = true;
     if (walkLive()) {
       walkMove(dt); const e = eyePos(); camPos.copy(e); look.copy(e).add(aimDir()); tgtPos.copy(camPos); tgtLook.copy(look);
