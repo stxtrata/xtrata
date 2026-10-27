@@ -82,3 +82,13 @@
 /radio/lounge /music/lounge 301
 /radio/lounge.html /music/lounge 301
 /music/lounge.html /music/lounge 301
+
+# NFT preservation checker: the page lives at /nft-checker/. Older and easier-to-guess spellings go there.
+# (The page's own data calls go to /checker/lookup and /checker/requests, which are Pages Functions and are not redirected.)
+/checker /nft-checker/ 302
+/checker/ /nft-checker/ 302
+/nftchecker /nft-checker/ 302
+/nftchecker/ /nft-checker/ 302
+/nft-check /nft-checker/ 302
+/nft-check/ /nft-checker/ 302
+/nft-checker /nft-checker/ 301

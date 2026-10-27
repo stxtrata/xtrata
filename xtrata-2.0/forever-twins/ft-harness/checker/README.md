@@ -1,6 +1,6 @@
 # Preservation checker: data and tools
 
-Behind the "paste your NFT link, contract or wallet and see where it stands" page at `/checker/` (`public/checker/index.html`, lookup in
+Behind the "paste your NFT link, contract or wallet and see where it stands" page at `/nft-checker/` (`public/nft-checker/index.html`, lookup in
 `functions/checker/lookup.ts`). This folder holds the data it stands on and the tools that build it. Design decision (26 Oct 2026): a
 **softer version**. The page tells people honestly about what they look up or hold, with no public, browsable list of collections, and every
 report card has a request button.
