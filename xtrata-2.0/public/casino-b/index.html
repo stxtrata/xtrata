@@ -8874,7 +8874,7 @@ function applyTestnetFunding(proof){
     if(persist)save();
   }
   function record(net, count) { if (count !== false) stats.hands++; stats.net += net; save(); $('bankpill').title = 'Lifetime: ' + stats.hands + ' hands, net ' + money(stats.net); }
-  layrAccount.bindRoom({available:()=>bank,held:heldTotal,changed:(value,event)=>{if(event?.kind==='purchase')barVenueSpend+=event.amount;if(event?.kind==='funding')testnetSessionFunding+=event.amount;setBank(value,false);}});
+  layrAccount.bindRoom({available:()=>bank,held:heldTotal,changed:(value,event)=>{if(event?.kind==='purchase')barVenueSpend+=event.amount;if(event?.kind==='funding'){testnetSessionFunding+=event.amount;try{sfx.big();}catch(e){console.warn('Funding fanfare could not play.',e);}}setBank(value,false);}});
   setBank(bank); $('bankpill').title = 'Lifetime: ' + stats.hands + ' hands, net ' + money(stats.net);
   window.addEventListener('pagehide', save);
   const last = {};

@@ -2,6 +2,11 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## ParallaX Casino B: victory fanfare when an exchange payment confirms (2026-10-27)
+- `public/casino-b/index.html`: one line changed. When the LAYR Exchange credits a confirmed testnet payment, the page now plays the same big-win fanfare as `/casino` (`sfx.big()`). It rides on the room's existing "funding" callback, which `applyTestnetFunding` only calls for a new credit, so it plays once per payment, never for an already-credited transfer, and the mute button and the shutdown switch's silence both still apply.
+- Applied on top of the latest `main` (including the 2026-10-27 casino-b edits), which still carry the wallet fix and the shutdown switch and TESTNET badge.
+- **Verified:** with a simulated Leather wallet and testnet API, the fanfare's sweep was heard exactly once after the credit (and not on a second check), and not at all on the page without the change; the page boots with no console errors and every script passes a syntax check. The sound itself was not listened to, and no real wallet or network was used.
+
 ## ParallaX Casino B: updated to the GPT v0.81 build (2026-10-27)
 - `public/casino-b/index.html`: the supplied "ParallaX Casino GPT v0.81" page, with the Xtrata changes put back on top of it. v0.81 differs from v0.8 only in the bar (new three-dimensional drink and snack models, the menu board moved along the bar) and one click-ray filter that ignores point clouds. It does not touch the wallet or exchange code, so the wallet fix (2026-10-26) and the shutdown switch and TESTNET badge (`public/casino-status.json`) were reapplied unchanged: every patch matched exactly, and the new page differs from the previous one by exactly those eleven v0.81 edits.
 - **Verified:** boots headless with no console errors and no outside requests at load; the simulated Leather and Xverse wallets still connect through the chooser, pay with the right parameter shapes and credit 100,000 LAYR for 1 STX; the TESTNET tab loads and sits clear of the page's own controls. The exchange-closed and closed screens were not rerun on this file (that code is byte-identical to what passed on 2026-10-26). The new drink models were not looked at. No real wallet or network was used.
