@@ -14,7 +14,7 @@
   body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg)}
   a{color:var(--cyan)}
   header.top{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
-  .logo{font-weight:800;letter-spacing:.4px;color:var(--ink);text-decoration:none}.logo b{color:var(--acc)}
+  .logo{display:inline-flex;align-items:center;font-weight:800;font-size:20px;letter-spacing:.4px;color:var(--ink);text-decoration:none}.logo img{display:block;border-radius:4px;margin-right:1px}
   header.top .sub{color:var(--mut);font-size:14px}
   main{max-width:980px;margin:0 auto;padding:26px 16px 80px}
   .lead{max-width:760px}
@@ -158,7 +158,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a class="logo" href="/">X<b>trata</b></a><span class="sub">Preservation checker</span></header>
+<header class="top"><a class="logo" href="/" aria-label="Xtrata"><img src="/checker/xtrata-x.webp" alt="" width="28" height="28" /><span aria-hidden="true">trata</span></a><span class="sub">Preservation checker</span></header>
 <main>
   <div class="lead">
     <h1>Where does your NFT's art actually live?</h1>
