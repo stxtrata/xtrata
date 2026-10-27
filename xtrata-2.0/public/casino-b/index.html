@@ -8874,7 +8874,7 @@ function applyTestnetFunding(proof){
     if(persist)save();
   }
   function record(net, count) { if (count !== false) stats.hands++; stats.net += net; save(); $('bankpill').title = 'Lifetime: ' + stats.hands + ' hands, net ' + money(stats.net); }
-  layrAccount.bindRoom({available:()=>bank,held:heldTotal,changed:(value,event)=>{if(event?.kind==='purchase')barVenueSpend+=event.amount;if(event?.kind==='funding'){testnetSessionFunding+=event.amount;try{sfx.big();}catch(e){console.warn('Funding fanfare could not play.',e);}}setBank(value,false);}});
+  layrAccount.bindRoom({available:()=>bank,held:heldTotal,changed:(value,event)=>{if(event?.kind==='purchase')barVenueSpend+=event.amount;if(event?.kind==='funding'){testnetSessionFunding+=event.amount;try{sfx.big();}catch(e){console.warn('Funding fanfare could not play.',e);}try{window.dispatchEvent(new CustomEvent('layr-credited',{detail:{layr:event.amount,txId:event.txId}}));}catch(e){console.warn('Funding celebration could not start.',e);}}setBank(value,false);}});
   setBank(bank); $('bankpill').title = 'Lifetime: ' + stats.hands + ' hands, net ' + money(stats.net);
   window.addEventListener('pagehide', save);
   const last = {};
@@ -10993,6 +10993,220 @@ button{font:inherit;color:inherit;cursor:pointer}
   })();
   try { window.CasinoStatus = CasinoStatus; } catch (e) { /* ignore */ }
 })();
+</script>
+<script>
+  // ====================================================================
+  //  LAYR CELEBRATION: what the screen does when an exchange payment confirms and the LAYR lands.
+  //  The page fires a "layr-credited" event ({ detail: { layr } }) once per newly credited payment. This script listens for it and shows
+  //  the amount counting up over a burst of fireworks, falling coins and confetti, and sparkles around the total (about six seconds).
+  //  It draws on its own canvases in a shadow root, never blocks clicks, ends early on Escape, and with "reduce motion" switched on it shows
+  //  just the card. Test files opened from disk or localhost can preview it with  ?celebrate=100000  (add &at=1.8 to freeze it at 1.8 s).
+  // ====================================================================
+  (function () {
+    'use strict';
+    if (window.LayrCelebrate) return;
+    var DUR = 6.2, EXIT = 5.3, DUR_REDUCED = 4.2;
+    var PAL = ['#ffd76a', '#ff9d52', '#ff4fa3', '#a66bff', '#4fe3d2', '#6dffb8', '#5cc8ff', '#fff4c2'];
+    var local = location.protocol === 'file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+    var reduce = false; try { reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { /* ignore */ }
+    var host = null, root = null, el = {}, fx = null, cf = null, run = null, raf = 0, dpr = 1;
+
+    var CSS = ':host{all:initial}*{box-sizing:border-box}' +
+      '.w{position:fixed;inset:0;pointer-events:none;overflow:hidden;font-family:Georgia,"Times New Roman",serif;color:#fff6dc;display:none}.w[data-on="1"]{display:block}' +
+      'canvas{position:absolute;inset:0;width:100%;height:100%}' +
+      '.dim{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 44%,rgba(24,12,0,.72),rgba(0,0,0,.8) 80%);opacity:0}' +
+      '.card{position:absolute;left:50%;top:44%;width:min(94vw,760px);padding:10px 0;transform:translate(-50%,-50%);text-align:center;opacity:0}' +
+      '.halo,.rays{position:absolute;left:50%;top:50%;width:min(130vw,980px);height:min(130vw,980px);transform:translate(-50%,-50%)}' +
+      '.halo{background:radial-gradient(circle,rgba(255,206,90,.62) 0,rgba(255,150,40,.2) 36%,rgba(255,120,20,0) 68%)}' +
+      '.rays{background:repeating-conic-gradient(rgba(255,226,130,.34) 0 5deg,rgba(255,226,130,0) 5deg 15deg);-webkit-mask-image:radial-gradient(circle,#000 0,#000 18%,transparent 66%);mask-image:radial-gradient(circle,#000 0,#000 18%,transparent 66%)}' +
+      '.in{position:relative}' +
+      '.ok{font:800 clamp(12px,3.1vw,19px)/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.22em;color:#7dffc2;text-shadow:0 0 12px rgba(109,255,184,.7),0 1px 3px #000;margin:0 0 8px;text-indent:.22em}' +
+      '.chk{display:inline-grid;place-items:center;width:1.55em;height:1.55em;border-radius:50%;background:#6dffb8;color:#06231a;margin-right:.7em;letter-spacing:0;text-indent:0;box-shadow:0 0 14px rgba(109,255,184,.8)}' +
+      '.amt{font:900 clamp(50px,14vw,138px)/1.02 Georgia,"Times New Roman",serif;letter-spacing:.01em;background:linear-gradient(180deg,#fffbe0 0%,#ffe27a 34%,#ffa62e 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 16px rgba(255,170,40,.9)) drop-shadow(0 4px 0 rgba(96,42,0,.85));white-space:nowrap}' +
+      '.unit{font:800 clamp(18px,5vw,34px)/1.1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.5em;text-indent:.5em;color:#ffe9a8;text-shadow:0 0 14px rgba(255,190,60,.8),0 2px 4px #000;margin-top:2px}' +
+      '.sub{font:700 clamp(10px,2.7vw,14px)/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.16em;text-indent:.16em;color:#ead9a3;text-shadow:0 1px 3px #000,0 0 8px #000;margin-top:12px}' +
+      '.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}';
+
+    function build() {
+      if (host || !document.body) return;
+      host = document.createElement('div'); host.id = 'layr-celebrate-host';
+      host.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147482000;pointer-events:none';
+      root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+      root.innerHTML = '<style>' + CSS + '</style><div class="w" id="w"><div class="dim" id="dim"></div><canvas id="fx"></canvas>' +
+        '<div class="card" id="card"><div class="rays" id="rays"></div><div class="halo" id="halo"></div><div class="in"><div class="ok" id="ok"><span class="chk">✓</span>PAYMENT CONFIRMED</div><div class="amt" id="amt">+0</div><div class="unit">LAYR</div><div class="sub" id="sub"></div></div></div>' +
+        '<canvas id="cf"></canvas><div class="sr" id="sr" role="status" aria-live="polite"></div></div>';
+      ['w', 'dim', 'fx', 'card', 'rays', 'halo', 'amt', 'sub', 'cf', 'sr'].forEach(function (id) { el[id] = root.getElementById ? root.getElementById(id) : root.querySelector('#' + id); });
+      fx = el.fx.getContext('2d'); cf = el.cf.getContext('2d');
+      document.body.appendChild(host);
+    }
+
+    // ---- a small seeded random generator (a fixed seed makes the preview repeatable) ----
+    function rng(seed) { var a = seed >>> 0; return function () { a += 0x6D2B79F5; var t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+    var ease = { out3: function (x) { x = Math.min(1, Math.max(0, x)); return 1 - Math.pow(1 - x, 3); }, back: function (x) { x = Math.min(1, Math.max(0, x)); var c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); } };
+
+    // ---- what happens when ----
+    function plan(R) {
+      var p = [{ t: 0.02, k: 'pop', x: 0.2, y: 0.4 }, { t: 0.05, k: 'pop', x: 0.8, y: 0.4 }];
+      [[0, 0.3, 0.26], [0.1, 0.7, 0.28], [0.2, 0.13, 0.46], [0.3, 0.87, 0.42]].forEach(function (d, i) { p.push({ t: d[0], k: 'rocket', rise: 0.42 + i * 0.06, x: d[1], y: d[2] }); });   // four bursts, one per chord of the fanfare
+      for (var t = 0.75; t < 4.1; t += 0.2 + R() * 0.2) p.push({ t: t, k: 'rocket', rise: 0.5 + R() * 0.3, x: 0.08 + R() * 0.84, y: 0.12 + R() * 0.42 });
+      [0, 1, 2, 3, 4].forEach(function (i) { p.push({ t: 4.0 + i * 0.12, k: 'rocket', rise: 0.5, x: 0.12 + i * 0.19, y: 0.18 + (i % 2) * 0.16, big: true }); });   // the finale
+      p.sort(function (a, b) { return a.t - b.t; });
+      return p;
+    }
+    function pick(R, a) { return a[Math.floor(R() * a.length)]; }
+    function palette(R) { var a = pick(R, PAL), b = pick(R, PAL), m = R(); return m < 0.35 ? [a] : m < 0.75 ? [a, b] : PAL; }
+
+    function spark(r, x, y, vx, vy, life, c, size, g, d) { r.sparks.push({ x: x, y: y, vx: vx, vy: vy, l: life, m: life, c: c, s: size, g: g, d: d }); }
+    function explode(r, x, y, big) {
+      var R = r.R, k = r.k, cols = palette(R), n, kind = R(), sp = (big ? 1.25 : 1) * k;
+      r.flash.push({ x: x, y: y, l: 0.28, m: 0.28, c: cols[0], r: (big ? 190 : 140) * k });
+      r.rings.push({ x: x, y: y, r: 6 * k, vr: (big ? 520 : 400) * k, l: 0.55, m: 0.55, c: cols[0] });
+      if (kind < 0.42) {   // a round burst
+        n = big ? 120 : 84; for (var i = 0; i < n; i++) { var a = R() * 6.2832, v = (60 + R() * 230) * sp; spark(r, x, y, Math.cos(a) * v, Math.sin(a) * v, 0.9 + R() * 0.8, pick(R, cols), (1.5 + R() * 1.5) * k, 130 * k, 1.3); }
+      } else if (kind < 0.64) {   // a ring
+        n = big ? 90 : 64; for (var j = 0; j < n; j++) { var b = j / n * 6.2832, w = (210 + R() * 20) * sp; spark(r, x, y, Math.cos(b) * w, Math.sin(b) * w, 1.1 + R() * 0.3, cols[j % cols.length], 2.4 * k, 90 * k, 1.5); }
+      } else if (kind < 0.84) {   // a willow: slow gold that hangs and falls
+        n = big ? 80 : 56; for (var q = 0; q < n; q++) { var c = R() * 6.2832, u = (40 + R() * 150) * sp; spark(r, x, y, Math.cos(c) * u, Math.sin(c) * u, 2.0 + R() * 0.9, R() < 0.8 ? '#ffd76a' : '#fff4c2', (1.4 + R() * 1.2) * k, 70 * k, 0.9); }
+      } else {   // a double burst: a ring inside a round burst
+        n = 64; for (var e = 0; e < n; e++) { var f = R() * 6.2832, h = (70 + R() * 210) * sp; spark(r, x, y, Math.cos(f) * h, Math.sin(f) * h, 0.9 + R() * 0.7, cols[0], (1.5 + R() * 1.3) * k, 120 * k, 1.3); }
+        for (var o = 0; o < 40; o++) { var z = o / 40 * 6.2832, s2 = 120 * sp; spark(r, x, y, Math.cos(z) * s2, Math.sin(z) * s2, 1.0, pick(R, PAL), 2.2 * k, 100 * k, 1.4); }
+      }
+    }
+    function fire(r, ev) {
+      var W = r.W, H = r.H;
+      if (r.sparks.length > 1500) return;
+      if (ev.k === 'pop') explode(r, ev.x * W, ev.y * H, false);
+      else r.rockets.push({ x: ev.x * W + (r.R() - 0.5) * 30, y: H + 12, tx: ev.x * W, ty: ev.y * H, age: 0, rise: ev.rise, big: !!ev.big });
+    }
+    function confetti(r) {
+      var R = r.R, W = r.W, coin = R() < 0.16;
+      r.conf.push({ x: R() * W, y: -24, vx: (R() - 0.5) * 60, vy: (coin ? 150 : 120) + R() * 120, ph: R() * 6.28, vph: 5 + R() * 7, rot: R() * 6.28, vr: (R() - 0.5) * 8, w: coin ? 0 : 7 + R() * 7, h: coin ? 0 : 4 + R() * 5, r: coin ? (8 + R() * 5) * r.k : 0, c: pick(R, PAL), coin: coin, sw: R() * 6.28 });
+    }
+
+    function step(r, dt) {
+      r.t += dt; var R = r.R;
+      if (!r.reduced) {
+        while (r.pi < r.plan.length && r.plan[r.pi].t <= r.t) fire(r, r.plan[r.pi++]);
+        for (var i = r.rockets.length - 1; i >= 0; i--) {
+          var k = r.rockets[i]; k.age += dt; var u = Math.min(1, k.age / k.rise), e = 1 - Math.pow(1 - u, 1.6);
+          var px = k.x + (k.tx - k.x) * e, py = k.y + (k.ty - k.y) * e;
+          spark(r, px + (R() - 0.5) * 3, py, (R() - 0.5) * 24, 30 + R() * 40, 0.35, '#ffe9a8', 1.6 * r.k, 0, 1);
+          if (u >= 1) { r.rockets.splice(i, 1); explode(r, k.tx, k.ty, k.big); }
+        }
+        for (var j = r.sparks.length - 1; j >= 0; j--) {
+          var s = r.sparks[j]; s.l -= dt; if (s.l <= 0) { r.sparks.splice(j, 1); continue; }
+          var d = 1 - s.d * dt; s.vx *= d; s.vy = s.vy * d + s.g * dt; s.x += s.vx * dt; s.y += s.vy * dt;
+        }
+        for (var m = r.flash.length - 1; m >= 0; m--) { r.flash[m].l -= dt; if (r.flash[m].l <= 0) r.flash.splice(m, 1); }
+        for (var n = r.rings.length - 1; n >= 0; n--) { var g = r.rings[n]; g.l -= dt; g.r += g.vr * dt; g.vr *= 1 - 2.4 * dt; if (g.l <= 0) r.rings.splice(n, 1); }
+        if (r.t < 3.7) { r.acc += dt * 34; while (r.acc >= 1) { r.acc -= 1; confetti(r); } }
+        for (var q = r.conf.length - 1; q >= 0; q--) {
+          var c = r.conf[q]; c.ph += c.vph * dt; c.rot += c.vr * dt; c.sw += 2 * dt; c.x += (c.vx + Math.sin(c.sw) * 40) * dt; c.y += c.vy * dt; if (c.y > r.H + 30) r.conf.splice(q, 1);
+        }
+      }
+    }
+
+    function star(ctx, x, y, rad) { ctx.beginPath(); ctx.moveTo(x, y - rad); ctx.quadraticCurveTo(x, y, x + rad, y); ctx.quadraticCurveTo(x, y, x, y + rad); ctx.quadraticCurveTo(x, y, x - rad, y); ctx.quadraticCurveTo(x, y, x, y - rad); ctx.fill(); }
+
+    function drawFx(r, dt) {
+      var W = r.W, H = r.H;
+      fx.globalCompositeOperation = 'destination-out'; fx.globalAlpha = 1; fx.fillStyle = 'rgba(0,0,0,' + (1 - Math.pow(0.78, dt * 60)).toFixed(3) + ')'; fx.fillRect(0, 0, W, H);   // fade the old frame: this leaves the trails
+      fx.globalCompositeOperation = 'lighter';
+      for (var m = 0; m < r.flash.length; m++) { var f = r.flash[m], a = f.l / f.m, gr = fx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r * (1.1 - a * 0.4)); gr.addColorStop(0, f.c); gr.addColorStop(1, 'rgba(0,0,0,0)'); fx.globalAlpha = a * 0.55; fx.fillStyle = gr; fx.fillRect(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2); }
+      for (var n = 0; n < r.rings.length; n++) { var g = r.rings[n]; fx.globalAlpha = Math.max(0, g.l / g.m) * 0.75; fx.strokeStyle = g.c; fx.lineWidth = 2.5 * r.k; fx.beginPath(); fx.arc(g.x, g.y, Math.max(1, g.r), 0, 6.2832); fx.stroke(); }
+      for (var i = 0; i < r.sparks.length; i++) {
+        var s = r.sparks[i], al = Math.max(0, s.l / s.m); fx.globalAlpha = Math.min(1, al * 1.5); fx.fillStyle = s.c; fx.beginPath(); fx.arc(s.x, s.y, s.s * (0.45 + al * 0.75), 0, 6.2832); fx.fill();
+      }
+      fx.globalAlpha = 1;
+    }
+
+    function drawTop(r, T) {   // coins, confetti and the sparkles around the total (cleared every frame)
+      var W = r.W, H = r.H; cf.clearRect(0, 0, W, H);
+      for (var i = 0; i < r.conf.length; i++) {
+        var c = r.conf[i]; cf.save(); cf.translate(c.x, c.y); cf.rotate(c.rot);
+        if (c.coin) {
+          var rx = Math.abs(Math.cos(c.ph)) * c.r + 1.2; cf.fillStyle = '#ffd76a'; cf.strokeStyle = '#b97a14'; cf.lineWidth = 1.6; cf.beginPath(); cf.ellipse(0, 0, rx, c.r, 0, 0, 6.2832); cf.fill(); cf.stroke();
+          cf.fillStyle = 'rgba(255,246,180,.75)'; cf.beginPath(); cf.ellipse(-rx * 0.15, -c.r * 0.2, rx * 0.55, c.r * 0.55, 0, 0, 6.2832); cf.fill();
+        } else { cf.fillStyle = c.c; cf.globalAlpha = 0.92; cf.fillRect(-c.w / 2, -c.h * Math.abs(Math.cos(c.ph)) / 2, c.w, Math.max(1, c.h * Math.abs(Math.cos(c.ph)))); }
+        cf.restore();
+      }
+      if (!r.reduced) {
+        var live = Math.min(1, T / 0.4) * (1 - Math.min(1, Math.max(0, (T - EXIT) / 0.8)));
+        if (live > 0) for (var j = 0; j < r.stars.length; j++) {
+          var s = r.stars[j], tw = Math.pow(Math.max(0, Math.sin(T * s.sp + s.ph)), 2), a = s.a0 + T * s.va;
+          cf.globalAlpha = live * (0.25 + 0.75 * tw); cf.fillStyle = s.c; star(cf, r.cx + Math.cos(a) * r.rx * s.fx, r.cy + Math.sin(a) * r.ry * s.fy, s.sz * (0.5 + tw) * r.k);
+        }
+        cf.globalAlpha = 1;
+      }
+    }
+
+    function fmt(n) { return Math.round(n).toLocaleString('en-GB'); }
+    function paintCard(r, T) {
+      var enter = r.reduced ? Math.min(1, T / 0.35) : ease.back(T / 0.5), fade = Math.min(1, T / 0.3), out = Math.min(1, Math.max(0, (T - (r.dur - 0.9)) / 0.9));
+      var op = fade * (1 - out), sc = (r.reduced ? 1 : 0.55 + 0.45 * enter) * (1 + 0.08 * out);
+      var prog = r.reduced ? 1 : ease.out3((T - 0.2) / 1.5), pop = (!r.reduced && T > 1.7 && T < 2.0) ? 1 + 0.07 * Math.sin((T - 1.7) / 0.3 * Math.PI) : 1;
+      el.card.style.opacity = op.toFixed(3); el.card.style.transform = 'translate(-50%,-50%) scale(' + (sc * pop).toFixed(3) + ')';
+      el.amt.textContent = '+' + fmt(prog >= 1 ? r.amount : r.amount * prog);
+      el.dim.style.opacity = (0.9 * fade * (1 - out)).toFixed(3);
+      el.rays.style.transform = 'translate(-50%,-50%) rotate(' + (r.reduced ? 0 : T * 12).toFixed(2) + 'deg)'; el.rays.style.opacity = (0.8 * op).toFixed(3);
+      el.halo.style.transform = 'translate(-50%,-50%) scale(' + (1 + (r.reduced ? 0 : 0.06 * Math.sin(T * 5))).toFixed(3) + ')'; el.halo.style.opacity = op.toFixed(3);
+    }
+
+    function measure(r) {
+      r.W = innerWidth; r.H = innerHeight; r.k = Math.max(0.6, Math.min(1.3, Math.min(r.W, r.H) / 700));
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      [el.fx, el.cf].forEach(function (cv) { cv.width = Math.round(r.W * dpr); cv.height = Math.round(r.H * dpr); });
+      fx.setTransform(dpr, 0, 0, dpr, 0, 0); cf.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var b = el.card.getBoundingClientRect(); r.cx = b.left + b.width / 2; r.cy = b.top + b.height / 2;
+      var wide = el.amt.getBoundingClientRect().width; r.rx = Math.max(130, wide / 2 + 30); r.ry = Math.max(80, b.height / 2 + 14);
+    }
+
+    function end() {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      document.removeEventListener('keydown', onKey, true);
+      run = null; if (el.w) { el.w.setAttribute('data-on', '0'); if (fx) fx.clearRect(0, 0, innerWidth, innerHeight); if (cf) cf.clearRect(0, 0, innerWidth, innerHeight); }
+    }
+    function onKey(e) { if (e.key === 'Escape') end(); }
+
+    function loop(now) {
+      var r = run; if (!r) return;
+      if (!r.t0) r.t0 = now;
+      var T = (now - r.t0) / 1000;
+      if (T >= r.dur) return end();
+      var dt = Math.max(0, T - r.t), last = dt; while (dt > 0) { var s = Math.min(dt, 1 / 30); step(r, s); dt -= s; }
+      if (!r.reduced) drawFx(r, Math.max(1 / 120, Math.min(last, 0.1)));
+      drawTop(r, T); paintCard(r, T); raf = requestAnimationFrame(loop);
+    }
+
+    function show(amount, o) {
+      o = o || {}; amount = Math.round(+amount); if (!(amount > 0) || amount > 1e12) return;
+      var st = window.CasinoStatus; if (st && st.get().state === 'closed') return;
+      build(); if (!host) return; end();
+      var r = run = { amount: amount, t: 0, t0: 0, pi: 0, reduced: reduce, dur: reduce ? DUR_REDUCED : DUR, rockets: [], sparks: [], flash: [], rings: [], conf: [], acc: 0 };
+      r.R = rng(o.seed || (Date.now() ^ 0x9e3779b9)); r.plan = plan(r.R);
+      var stx = amount / 100000; el.sub.textContent = (stx === Math.round(stx) ? stx : stx.toFixed(2)) + ' TESTNET STX  ·  ADDED TO YOUR BALANCE';
+      el.sr.textContent = ''; setTimeout(function () { if (el.sr) el.sr.textContent = fmt(amount) + ' LAYR credited to your balance.'; }, 60);
+      el.w.setAttribute('data-on', '1'); measure(r);
+      r.stars = []; for (var i = 0; i < 18; i++) r.stars.push({ a0: r.R() * 6.28, va: (r.R() < 0.5 ? -1 : 1) * (0.15 + r.R() * 0.3), fx: 0.75 + r.R() * 0.5, fy: 0.7 + r.R() * 0.6, sp: 3 + r.R() * 5, ph: r.R() * 6.28, sz: 7 + r.R() * 9, c: pick(r.R, PAL) });
+      document.addEventListener('keydown', onKey, true);
+      if (typeof o.at === 'number') {   // frozen at one moment (the preview)
+        var at = Math.min(Math.max(0, o.at), r.dur), n = Math.round(at * 60);
+        for (var k = 0; k < n; k++) { step(r, 1 / 60); if (!r.reduced) drawFx(r, 1 / 60); }
+        drawTop(r, at); paintCard(r, at); return;
+      }
+      raf = requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('layr-credited', function (e) { try { show(e && e.detail && e.detail.layr); } catch (err) { console.warn('LAYR celebration failed', err); } });
+    window.addEventListener('resize', function () { if (run) { measure(run); } });
+    window.LayrCelebrate = Object.freeze({ show: show, active: function () { return !!run; }, stop: end });
+    if (local) {   // preview from a test file; never honoured on the real site
+      try {
+        var q = new URLSearchParams(location.search), a = parseInt(q.get('celebrate'), 10), at = parseFloat(q.get('at'));
+        if (a > 0) setTimeout(function () { show(a, isFinite(at) ? { at: at, seed: 7 } : {}); }, 600);
+      } catch (e) { /* ignore */ }
+    }
+  })();
 </script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>
