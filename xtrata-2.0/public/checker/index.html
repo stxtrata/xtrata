@@ -94,6 +94,9 @@
   .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:2px 9px 2px 7px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
   .tag{font-size:12px;color:var(--mut);background:transparent;border:1px solid var(--line);border-radius:6px;padding:1px 7px;white-space:nowrap}
   .tag.live{color:var(--cyan);border-color:#1f5568}
+  .gm{display:inline-block;margin-left:8px;font-size:12px;font-weight:500;color:var(--cyan);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:0 6px;white-space:nowrap;vertical-align:1px}
+  .gm:hover{border-color:var(--cyan)}
+  .row.other .nm .gm{display:inline-block}
   .chev{display:none}
   @media (min-width:820px){
     .rowsum{grid-template-columns:200px minmax(0,1.1fr) minmax(0,2fr) 70px 14px;grid-template-areas:"chip nm tg hd chev";padding:8px 12px}
@@ -238,6 +241,14 @@
   function short(id) { return id.length > 44 ? id.slice(0, 12) + '…' + id.slice(-28) : id; }
   function plural(n, one, many) { return num(n) + ' ' + (n === 1 ? one : many); }
   function num(n) { return Number(n).toLocaleString('en'); }
+  // Gamma's collection pages are /stacks/collections/<slug>/items and the slug matches the contract name for the ones we have
+  // seen (satoshibles, bitcoin-birds, spacepepesbtc, thisisnumberone). It is an inference, so the link is for checking, not proof.
+  function gammaLink(id) {
+    var name = String(id).split('.')[1];
+    if (!name || !/^[A-Za-z0-9_-]+$/.test(name)) return null;
+    return el('a', { class: 'gm', href: 'https://gamma.io/stacks/collections/' + encodeURIComponent(name.toLowerCase()) + '/items', target: '_blank', rel: 'noopener noreferrer',
+      title: 'Open this collection on Gamma to check for yourself', text: 'Gamma ↗' });
+  }
   function rank(status) { var i = ORDER.indexOf(status); return i < 0 ? ORDER.length : i; }
 
   // ---------- Forever Twins registry (for the "a helper is open" link) ----------
@@ -392,7 +403,7 @@
     var node = el('details', { class: 'row s-' + card.status, 'data-id': card.id });
     if (open) node.open = true;
     node.appendChild(el('summary', { class: 'rowsum' },
-      el('span', { class: 'nm', text: card.name }),
+      el('span', { class: 'nm' }, card.name, card.special ? null : gammaLink(card.id)),
       held !== null ? el('span', { class: 'hd', text: '×' + num(held), title: 'You hold ' + num(held) }) : (card.tokens_approx ? el('span', { class: 'hd mut small', text: '~' + num(card.tokens_approx) }) : null),
       el('span', { class: 'mt' },
         el('span', { class: 'chip s-' + card.status, title: card.label }, el('i'), SHORT[card.status] || card.label),
@@ -445,7 +456,7 @@
     });
     act.appendChild(btn); act.appendChild(err);
     var node = el('div', { class: 'row other', 'data-id': o.id },
-      el('span', { class: 'nm' }, label, el('span', { class: 'mono sub', text: short(o.id) })),
+      el('span', { class: 'nm' }, label, gammaLink(o.id), el('span', { class: 'mono sub', text: short(o.id) })),
       fromWallet ? el('span', { class: 'hd', text: '×' + num(o.held), title: 'You hold ' + num(o.held) }) : null,
       el('span', { class: 'mt' }, el('span', { class: 'chip' }, el('i'), 'Not in research'), el('span', { class: 'tag', text: 'No information yet' })),
       act);
