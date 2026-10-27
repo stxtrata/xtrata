@@ -68,6 +68,8 @@
   .chip-btn{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 14px system-ui,sans-serif;cursor:pointer}
   .chip-btn[aria-pressed=true]{border-color:var(--cyan);background:#0c2230}
   .chip-btn i,.chip i{width:9px;height:9px;border-radius:50%;background:var(--neutral);display:inline-block;flex:none}
+  .chip-btn.twin i{background:var(--cyan)}
+  .chip-btn.twin[aria-pressed=true]{border-color:var(--cyan)}
   .chip-btn .c{color:var(--mut);font-variant-numeric:tabular-nums}
   .s-on_chain i,.s-solid i{background:var(--good)}
   .s-one_host i{background:var(--warn)}
@@ -485,14 +487,15 @@
 
     var c = card.checked || {};
     return {
-      node: node, group: card.status, held: held || 0, name: card.name.toLowerCase(), size: card.tokens_approx || 0,
+      node: node, group: card.status, twin: !!live, held: held || 0, name: card.name.toLowerCase(), size: card.tokens_approx || 0,
       checked: [c.contract, c.marketplace].filter(Boolean).sort().pop() || '', rank: rank(card.status),
       text: (card.name + ' ' + card.id).toLowerCase()
     };
   }
 
   // ---------- one collection we have NO report on, with a one-tap "count me in" ----------
-  function otherRow(o, fromWallet) {
+  function otherRow(o, fromWallet, registry) {
+    var live = registry && registry[o.id] && registry[o.id].status === 'live' ? registry[o.id] : null;
     var label = o.asset && o.asset !== 'nft' ? o.asset : o.id.split('.').slice(1).join('.') || o.id;
     var act = el('div', { class: 'act' });
     var btn = el('button', { type: 'button', class: 'quiet', text: 'Ask us to check this' });
@@ -515,7 +518,7 @@
       fromWallet ? el('span', { class: 'hd', text: '×' + num(o.held), title: 'You hold ' + num(o.held) }) : null,
       el('span', { class: 'mt' }, el('span', { class: 'chip' }, el('i'), 'Not in research'), el('span', { class: 'tag', text: 'No information yet' })),
       act);
-    return { node: node, group: 'other', held: o.held, name: label.toLowerCase(), size: 0, checked: '', rank: 99, text: (label + ' ' + o.id).toLowerCase() };
+    return { node: node, group: 'other', twin: !!live, held: o.held, name: label.toLowerCase(), size: 0, checked: '', rank: 99, text: (label + ' ' + o.id).toLowerCase() };
   }
 
   // ---------- totals and the list ----------
@@ -547,6 +550,7 @@
   function buildList(rows, results) {
     var sort = 'worst';
     var chosen = {};
+    var twinOnly = false;
     var query = '';
     var allOpen = false;
 
@@ -572,6 +576,14 @@
       chipBar.appendChild(b);
     });
 
+    var twinCount = rows.filter(function (r) { return r.twin; }).length;
+    var twinChip = null;
+    if (twinCount) {
+      twinChip = el('button', { type: 'button', class: 'chip-btn twin', 'aria-pressed': 'false', title: 'Collections that already have a Forever Twins helper' }, el('i'), 'Has a Forever Twin', el('span', { class: 'c', text: String(twinCount) }));
+      twinChip.addEventListener('click', function () { twinOnly = !twinOnly; twinChip.setAttribute('aria-pressed', twinOnly ? 'true' : 'false'); apply(); });
+      chipBar.appendChild(twinChip);
+    }
+
     var select = el('select', { 'aria-label': 'Sort by' },
       el('option', { value: 'worst', text: 'Sort: worst first' }),
       el('option', { value: 'held', text: 'Sort: most held' }),
@@ -583,6 +595,7 @@
 
     function clear() {
       Object.keys(chosen).forEach(function (g) { delete chosen[g]; chipEls[g].setAttribute('aria-pressed', 'false'); });
+      twinOnly = false; if (twinChip) twinChip.setAttribute('aria-pressed', 'false');
       query = ''; search.value = '';
       apply();
     }
@@ -607,13 +620,13 @@
       var any = Object.keys(chosen).length > 0;
       var shown = 0;
       rows.slice().sort(compare).forEach(function (r) {
-        var ok = (!any || chosen[r.group]) && (!query || r.text.indexOf(query) !== -1);
+        var ok = (!any || chosen[r.group]) && (!twinOnly || r.twin) && (!query || r.text.indexOf(query) !== -1);
         r.node.hidden = !ok;
         if (ok) shown += 1;
         list.appendChild(r.node);
       });
       empty.hidden = shown !== 0;
-      countText.textContent = 'Showing ' + num(shown) + ' of ' + num(rows.length) + (any || query ? ' (filtered)' : '');
+      countText.textContent = 'Showing ' + num(shown) + ' of ' + num(rows.length) + (any || query || twinOnly ? ' (filtered)' : '');
     }
 
     var wrap = el('section', { 'aria-label': 'Collections' }, controls, chipBar, el('div', { class: 'countline' }, countText), list, empty);
@@ -663,7 +676,7 @@
       if (warning) out.appendChild(warning);
       out.appendChild(totalsPanel(w, results));
       var rows = results.map(function (card) { return reportRow(card, registry, false); })
-        .concat((data.others || []).map(function (o) { return otherRow(o, true); }));
+        .concat((data.others || []).map(function (o) { return otherRow(o, true, registry); }));
       out.appendChild(buildList(rows, results));
       if (data.others_total > (data.others || []).length) {
         out.appendChild(el('p', { class: 'mut small', text: 'Showing the ' + num((data.others || []).length) + ' collections without a report that you hold most of (of ' + num(data.others_total) + ').' }));
@@ -727,7 +740,7 @@
       if (mine !== serial) return null;
       var d = res.data;
       if (res.status === 200 && d && d.ok) {
-        var needsRegistry = Array.isArray(d.results) && d.results.some(function (r) { return r.covered && r.name && !r.special; });
+        var needsRegistry = d.kind === 'wallet' || (Array.isArray(d.results) && d.results.some(function (r) { return r.covered && r.name && !r.special; }));
         return (needsRegistry ? loadRegistry() : Promise.resolve(null)).then(function (registry) {
           if (mine !== serial) return;
           render(d, registry);
