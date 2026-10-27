@@ -8393,10 +8393,115 @@ function applyTestnetFunding(proof){
     $('pxMachineTurbo').setAttribute('aria-pressed',String(ui.turbo));$('pxMachineAuto').setAttribute('aria-pressed',String(ui.auto));$('pxMachineSound').textContent=ui.muted?'Sound off':'Sound on';
     portMachineUI('modal',ui.modal,e.css);portMachineUI('feature',ui.feature,e.css);
   }
+  // ---------- on-screen buttons: turbo, gamble and bonus-round buttons drawn on the cabinet's own screen ----------
+  // They press the very same controls as the HUD (so the two can never disagree) and let the crosshair reach them without freeing the mouse.
+  // ---------- on-screen buttons: turbo, gamble and bonus-round buttons drawn on a machine's own screen, so the crosshair can press them without freeing the mouse ----------
+  // A see-through second layer laid over the live screen (the screen is 1400 x 960 canvas units). It does not run any game logic: the page tells it what the machine's own HUD is offering
+  // (collect) and what pressing a button means (click), so the screen and the HUD cannot disagree. It repaints only when something changed.
+  function createScreenButtons(cfg) {
+    const W = cfg.w || 1400, H = cfg.h || 960, THREE = cfg.THREE, screen = cfg.screenMesh;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+    const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter; tex.anisotropy = 4;
+    const mesh = new THREE.Mesh(screen.geometry, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    mesh.userData.noShadow = true; mesh.castShadow = false; mesh.receiveShadow = false; mesh.visible = false; mesh.renderOrder = 2; screen.add(mesh);
+    const acc = cfg.color || '#e4b457', FONT = '"Josefin Sans",Arial,sans-serif', FLASH = 220;
+    let btns = [], panel = null, sig = '', hov = '', flashId = '', flashT = 0;
+    const rrect = (x, y, w, h, r) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
+    function fit(str, maxW, size, weight) {
+      let s = size; c.font = (weight || 700) + ' ' + s + 'px ' + FONT;
+      while (c.measureText(str).width > maxW && s > 14) { s -= 2; c.font = (weight || 700) + ' ' + s + 'px ' + FONT; }
+      if (c.measureText(str).width > maxW) { while (str.length > 3 && c.measureText(str + '…').width > maxW) str = str.slice(0, -1); str += '…'; }
+      return str;
+    }
+    function layout(items) {
+      btns = []; panel = null;
+      for (const it of items) {
+        if (it.kind === 'turbo') btns.push({ id: 'turbo', x: 262, y: 890, w: 270, h: 54, label: it.label + (it.on ? '  ·  ON' : '  ·  OFF'), on: it.on, ref: it.ref });
+        else if (it.kind === 'gamble') btns.push({ id: 'gamble', x: 840, y: 890, w: 360, h: 54, label: it.label, ref: it.ref, gold: true });
+        else if (it.kind === 'bonus') {   // the bonus strip sits where the printed caption is, so it never covers the reels
+          panel = { x: 150, y: 780, w: 1100, h: 92, tag: it.tag, title: it.title, info: it.info };
+          c.font = '800 26px ' + FONT; let rx = panel.x + panel.w - 18;
+          for (let i = it.items.length - 1; i >= 0; i--) { const b = it.items[i], w = Math.min(430, Math.max(200, c.measureText(b.label).width + 76)); rx -= w; btns.push({ id: 'bonus' + i, x: rx, y: panel.y + 16, w, h: 60, label: b.label, ref: b.ref, cta: true }); rx -= 14; }
+          panel.textW = Math.max(120, rx - panel.x - 30);
+        }
+      }
+    }
+    function paint(now) {
+      c.clearRect(0, 0, W, H);
+      if (panel) {
+        c.save(); c.shadowColor = acc; c.shadowBlur = 24; c.fillStyle = 'rgba(5,7,13,.92)'; rrect(panel.x, panel.y, panel.w, panel.h, 22); c.fill(); c.shadowBlur = 0; c.lineWidth = 3; c.strokeStyle = acc; c.stroke(); c.restore();
+        c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = acc; c.fillText(fit(panel.tag + (panel.title ? '  ·  ' + panel.title : ''), panel.textW, 24, 800), panel.x + 28, panel.y + 30);
+        c.fillStyle = '#d8dbe6'; c.fillText(fit(panel.info, panel.textW, 20, 600), panel.x + 28, panel.y + 62);
+      }
+      for (const b of btns) {
+        const hot = hov === b.id, flash = flashId === b.id && now - flashT < FLASH, fill = b.on || b.cta || flash;
+        c.save(); c.shadowColor = b.gold ? '#ffd76a' : acc; c.shadowBlur = fill || hot ? 26 : 8;
+        c.fillStyle = flash ? '#ffffff' : fill ? (b.gold ? '#ffd76a' : acc) : b.gold ? 'rgba(46,34,8,.92)' : 'rgba(6,8,14,.9)'; rrect(b.x, b.y, b.w, b.h, b.h / 2); c.fill(); c.shadowBlur = 0;
+        c.lineWidth = hot ? 5 : 3; c.strokeStyle = hot ? '#ffffff' : b.gold ? '#ffd76a' : acc; c.stroke(); c.restore();
+        c.fillStyle = fill ? '#06080e' : b.gold ? '#ffe9a8' : '#f4f1e6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(fit(b.label, b.w - 36, b.cta ? 28 : 24, 800), b.x + b.w / 2, b.y + b.h / 2 + 1);
+      }
+    }
+    return {
+      mesh,
+      // called every frame while the machine is live; repaints only when what is offered (or the hover or flash) changed
+      sync(active, now) {
+        if (mesh.visible !== !!active) mesh.visible = !!active;
+        if (!active) { if (hov || btns.length || panel) { hov = ''; sig = ''; btns = []; panel = null; } return; }
+        const items = cfg.collect() || [], fl = flashId && now - flashT < FLASH ? flashId : '';
+        const s2 = JSON.stringify(items.map((i) => [i.kind, i.label, i.on, i.tag, i.title, i.info, i.items && i.items.map((x) => x.label)])) + '|' + hov + '|' + fl;
+        if (s2 === sig) return; sig = s2; layout(items); paint(now); tex.needsUpdate = true;
+      },
+      at(x, y) { if (!mesh.visible) return null; for (const b of btns) if (x >= b.x - 10 && x <= b.x + b.w + 10 && y >= b.y - 10 && y <= b.y + b.h + 10) return b; return null; },
+      hover(b) { const id = b ? b.id : ''; if (id !== hov) { hov = id; sig = ''; } },
+      click(b) { flashId = b.id; flashT = performance.now(); sig = ''; try { if (cfg.sfx) cfg.sfx(); } catch (e) { /* ignore */ } try { cfg.click(b); } catch (e) { console.warn('machine button failed', e); } },
+      get buttons() { return btns.map((b) => ({ id: b.id, label: b.label, x: b.x, y: b.y, w: b.w, h: b.h })); },
+    };
+  }
+  const pxScreenOv = new WeakMap(), pxOvRay = new THREE.Raycaster(), pxOvV = new THREE.Vector2(), pxPtr = { x: 0, y: 0, on: false };
+  let pxOvLast = null, pxOvBound = false, pxOvAt = 0;
+  function pxOvOffers() {
+    const out = []; if (!machineOpen || machineLoading || machineOutOfRange || !getActiveEngine()) return out;
+    if (!$('pxMachineModal').hidden) return out;   // a dialog frees the mouse by itself
+    const txt = (el) => (el ? el.textContent : '').replace(/\s+/g, ' ').trim(), fh = $('pxMachineFeature'), fr = fh.shadowRoot;
+    if (!fh.hidden && fr) {
+      const fb = fr.querySelector('#featureBar');
+      if (fb && !fb.hidden) {
+        const items = [...fr.querySelectorAll('#fbBody button')].filter((b) => !b.disabled && !b.classList.contains('pick') && !b.hasAttribute('data-pick'));   // the numbered picks are pressed by tapping the screen itself
+        if (items.length) out.push({ kind: 'bonus', tag: txt(fr.querySelector('#fbTag')), title: txt(fr.querySelector('#fbTitle')), info: txt(fr.querySelector('#fbInfo')), items: items.map((b) => ({ label: txt(b).toUpperCase() || 'GO', ref: b })) });
+      }
+    }
+    const gb = $('pxMachineGamble'); if (gb && !gb.hidden && !gb.disabled) out.push({ kind: 'gamble', label: txt(gb), ref: gb });
+    const tb = $('pxMachineTurbo'); if (tb) out.push({ kind: 'turbo', label: 'TURBO', on: tb.getAttribute('aria-pressed') === 'true', ref: tb });
+    return out;
+  }
+  function pxOvFor(m) {
+    let o = pxScreenOv.get(m);
+    if (!o) {
+      const screen = m.model.getObjectByName('px-screenMesh'); if (!screen || !screen.geometry) return null;
+      o = createScreenButtons({ THREE, screenMesh: screen, color: window.PX_MACHINE_PACKS[m.type].accent || '#e4b457', collect: pxOvOffers, click: (b) => b.ref.click() });
+      pxScreenOv.set(m, o);
+    }
+    return o;
+  }
+  function pxOvHit(o, m) {   // which on-screen button the crosshair (or the mouse, when it is free) is resting on
+    const r = canvas.getBoundingClientRect(), cx = locked ? r.left + r.width / 2 : pxPtr.x, cy = locked ? r.top + r.height / 2 : pxPtr.y;
+    pxOvV.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1); pxOvRay.setFromCamera(pxOvV, camera);
+    const screen = m.model.getObjectByName('px-screenMesh'), h = screen && pxOvRay.intersectObject(screen, false)[0];
+    return h && h.uv ? o.at(h.uv.x * 1400, (1 - h.uv.y) * 960) : null;
+  }
+  function pxOvFrame() {
+    const m = machineOpen && !machineLoading && !machineOutOfRange ? activeCabinet : null;
+    if (pxOvLast && (!m || pxOvLast.cab !== m)) { pxOvLast.o.sync(false, 0); pxOvLast = null; }
+    if (!m) return; const o = pxOvFor(m); if (!o) return; pxOvLast = { o, cab: m };
+    if (!pxOvBound) { pxOvBound = true; canvas.addEventListener('pointermove', (e) => { pxPtr.x = e.clientX; pxPtr.y = e.clientY; pxPtr.on = true; }); canvas.addEventListener('pointerleave', () => { pxPtr.on = false; }); }
+    const now = performance.now(); if (now - pxOvAt < 40) return; pxOvAt = now;
+    o.sync(true, now);
+    if (o.buttons.length) { o.hover(locked || pxPtr.on ? pxOvHit(o, m) : null); o.sync(true, now); } else o.hover(null);
+  }
   function machineSurfaceClick(ev){
     if(!activeCabinet||machineLoading||machineOutOfRange||performance.now()-machineConnectedAt<300||performance.now()-lastRoomDragAt<100)return;const r=canvas.getBoundingClientRect();const cx=locked?r.left+r.width/2:ev.clientX,cy=locked?r.top+r.height/2:ev.clientY;ptr.set(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1);ray.setFromCamera(ptr,camera);
     const hit=ray.intersectObject(activeCabinet.model,true).find(h=>h.object.visible&&(h.object.name==='px-screenMesh'||h.object.userData.pxMachineAction));if(!hit)return;
-    if(hit.object.userData.pxMachineAction)cabinetAction(hit.object.userData.pxMachineAction);else if(hit.uv)getActiveEngine()?.api.tap(hit.uv.x*1400,(1-hit.uv.y)*960);
+    if(hit.object.userData.pxMachineAction)cabinetAction(hit.object.userData.pxMachineAction);else if(hit.uv){const sx=hit.uv.x*1400,sy=(1-hit.uv.y)*960,ov=pxScreenOv.get(activeCabinet),bx=ov&&ov.at(sx,sy);if(bx){ov.click(bx);updateConnectedMachine(0,true);return;}getActiveEngine()?.api.tap(sx,sy);}
   }
   function bindConnectedCabinets(){
     $('pxMachineLeave').onclick=returnFromMachine;$('pxMachineHere').onclick=()=>chooseMachineView('here');$('pxMachineView').onclick=()=>chooseMachineView(machineHere||machineCloseup?'cabinet':'screen');
@@ -10933,7 +11038,7 @@ function applyTestnetFunding(proof){
     signA += ((focus ? 0 : 1) - signA) * Math.min(1, dt * 5); stations.forEach((s) => { s.sign.material.opacity = signA; s.sign.visible = signA > 0.02; });
     room.neon.material.color.setScalar(0.85 + 0.15 * Math.sin(t * 2.4));
     room.bulbs.forEach((b, i) => { const on = ((Math.floor(t * 6) + i) % 4) === 0; b.material.color.setHex(on ? 0xffd86b : 0x4a3208); });
-    updateNpcMachine(performance.now());updateCasinoMachines(t);updateConnectedMachine(t);updateLAYRDispensers();barUI?.tick(performance.now(),dt);testnetLAYR.tick(performance.now());
+    updateNpcMachine(performance.now());updateCasinoMachines(t);updateConnectedMachine(t);pxOvFrame();updateLAYRDispensers();barUI?.tick(performance.now(),dt);testnetLAYR.tick(performance.now());
     const dpos = room.dust.geometry.attributes.position.array; for (let i = 0; i < dpos.length; i += 3) { dpos[i + 1] += dt * 0.05; dpos[i] += Math.sin(t * 0.3 + i) * dt * 0.03; if (dpos[i + 1] > 5) dpos[i + 1] = 0.5; } room.dust.geometry.attributes.position.needsUpdate = true;
     if (walkLive()) {
       walkMove(dt); const e = eyePos(); camPos.copy(e); look.copy(e).add(aimDir()); tgtPos.copy(camPos); tgtLook.copy(look);
