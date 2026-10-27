@@ -136,14 +136,14 @@ describe('/checker/requests: spam controls', () => {
     expect(rows(env)).toHaveLength(0);
   });
 
-  it('allows 5 an hour per visitor, counts bad attempts too, and starts again next hour', async () => {
+  it('allows 15 an hour per visitor, counts bad attempts too, and starts again next hour', async () => {
     const env = { DB: database() };
-    for (let i = 0; i < 4; i++) expect((await post(env, valid)).status).toBe(200);
-    expect((await post(env, { kind: 'nope', contract })).status).toBe(400); // 5th attempt, malformed, still counts
+    for (let i = 0; i < 14; i++) expect((await post(env, valid)).status).toBe(200);
+    expect((await post(env, { kind: 'nope', contract })).status).toBe(400); // 15th attempt, malformed, still counts
     expect((await post(env, valid)).status).toBe(429);
     expect((await post(env, valid, { ip: '198.51.100.9' })).status).toBe(200); // someone else
     expect((await post(env, valid, { time: now + HOUR })).status).toBe(200); // next hour
-    expect(rows(env)).toHaveLength(6);
+    expect(rows(env)).toHaveLength(16);
   });
 
   it('forgets rate-limit keys after two hours', async () => {

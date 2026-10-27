@@ -9,14 +9,15 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <style>
   :root{color-scheme:dark;--bg:#06080d;--panel:#0f1521;--panel2:#141d2d;--line:#223047;--ink:#e6edf6;--mut:#9aa9bf;--acc:#3ea6ff;--cyan:#5ee9ff;
-    --good:#3ddc97;--warn:#f5c451;--orange:#ff9f43;--bad:#ff6b6b;--neutral:#8b9bb4;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+    --good:#3ddc97;--warn:#f5c451;--orange:#ff9f43;--bad:#ff6b6b;--dead:#000;--neutral:#8b9bb4;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg)}
+  body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg)}
   a{color:var(--cyan)}
   header.top{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
-  .logo{font-weight:800;letter-spacing:.4px;color:var(--ink);text-decoration:none}.logo b{color:var(--acc)}
+  .logo{display:inline-flex;align-items:center;font-weight:800;font-size:20px;letter-spacing:.4px;color:var(--ink);text-decoration:none}.logo img{display:block;border-radius:4px;margin-right:1px}
   header.top .sub{color:var(--mut);font-size:14px}
-  main{max-width:760px;margin:0 auto;padding:28px 16px 80px}
+  main{max-width:980px;margin:0 auto;padding:26px 16px 80px}
+  .lead{max-width:760px}
   h1{font-size:28px;line-height:1.2;margin:0 0 8px}
   h2{font-size:20px;line-height:1.25;margin:0}
   h3{font-size:14px;margin:0 0 6px;letter-spacing:.02em}
@@ -26,57 +27,125 @@
   code{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
   :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 
-  form.find{margin:20px 0 6px;display:flex;gap:8px;flex-wrap:wrap}
+  form.find{margin:18px 0 6px;display:flex;gap:8px;flex-wrap:wrap;max-width:760px}
   form.find input[type=text]{flex:1 1 280px;min-width:0;min-height:48px;padding:10px 14px;font:16px system-ui,sans-serif;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px}
   button{font:600 16px system-ui,sans-serif;min-height:48px;padding:10px 20px;border-radius:10px;border:1px solid var(--acc);background:var(--acc);color:#04101c;cursor:pointer}
   button:disabled{opacity:.6;cursor:default}
   button.quiet{background:transparent;color:var(--ink);border-color:var(--line);min-height:40px;padding:6px 14px;font-weight:500;font-size:15px}
-  .hint{margin:6px 0 0}
+  button.done{border-color:var(--good);color:var(--good)}
+  .hint{margin:6px 0 0;max-width:760px}
 
-  .box{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px 16px;margin:16px 0}
+  .box{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px 16px;margin:16px 0;max-width:760px}
   .box.info{border-color:#2c4a6e}
   .box.warn{border-color:#7a6320;background:#17140a}
   .box.error{border-color:#7a2d2d;background:#190d0d}
   .box p{margin:0}.box p+p{margin-top:8px}
 
-  .results{margin-top:22px}
+  .results{margin-top:20px}
   .results:focus{outline:none}
-  .card{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--neutral);border-radius:12px;padding:16px 18px;margin:16px 0}
-  .card.s-on_chain,.card.s-solid{border-left-color:var(--good)}
-  .card.s-one_host{border-left-color:var(--warn)}
-  .card.s-marketplace_broken{border-left-color:var(--orange)}
-  .card.s-marketplace_only,.card.s-not_found{border-left-color:var(--bad)}
-  .card.uncovered{border-left-color:var(--neutral)}
-  .badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:3px 10px 3px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);margin-bottom:8px}
-  .badge i{width:10px;height:10px;border-radius:50%;background:var(--neutral);display:inline-block}
-  .s-on_chain .badge i,.s-solid .badge i{background:var(--good)}
-  .s-one_host .badge i{background:var(--warn)}
-  .s-marketplace_broken .badge i{background:var(--orange)}
-  .s-marketplace_only .badge i,.s-not_found .badge i{background:var(--bad)}
-  .meta{margin:2px 0 0;color:var(--mut);font-size:14px}
-  .headline{margin:12px 0 0;font-weight:600}
-  .summary{margin:8px 0 0;color:var(--ink)}
-  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+
+  /* totals */
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 8px}
+  @media (max-width:700px){.tiles{grid-template-columns:repeat(2,1fr)}}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+  .tile .n{font-size:26px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+  .tile .l{font-size:13px;color:var(--mut)}
+  .tile.t-attn{border-color:#7a2d2d}.tile.t-attn .n{color:var(--bad)}
+  .tile.t-none .n{color:var(--mut)}
+  .bar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--panel2);margin:8px 0 4px}
+  .bar span{display:block;height:100%}
+  .bar .b-attn{background:var(--bad)}.bar .b-rep{background:var(--acc)}.bar .b-none{background:var(--neutral);opacity:.6}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:0 0 6px}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+
+  /* controls */
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 8px}
+  @media (min-width:760px){.controls{grid-template-columns:200px 1fr auto}}
+  .controls select,.controls input[type=search]{width:100%;min-height:42px;font:16px system-ui,sans-serif;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+  .controls .search{grid-column:1 / -1;order:3}
+  @media (min-width:760px){.controls .search{grid-column:auto;order:0}}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
+  .chip-btn{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 14px system-ui,sans-serif;cursor:pointer}
+  .chip-btn[aria-pressed=true]{border-color:var(--cyan);background:#0c2230}
+  .chip-btn i,.chip i{width:9px;height:9px;border-radius:50%;background:var(--neutral);display:inline-block;flex:none}
+  .chip-btn .c{color:var(--mut);font-variant-numeric:tabular-nums}
+  .s-on_chain i,.s-solid i{background:var(--good)}
+  .s-one_host i{background:var(--warn)}
+  .s-marketplace_broken i{background:var(--orange)}
+  .s-marketplace_only i{background:var(--bad)}
+  .s-not_found i{background:var(--dead);box-shadow:0 0 0 1.5px #c9d4e5}
+  .countline{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:2px 0 8px;color:var(--mut);font-size:14px}
+  .countline button{min-height:34px;padding:2px 12px;font-size:14px}
+
+  /* rows */
+  .rows{display:grid;gap:6px}
+  .row{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--neutral);border-radius:10px}
+  .row.s-on_chain,.row.s-solid{border-left-color:var(--good)}
+  .row.s-one_host{border-left-color:var(--warn)}
+  .row.s-marketplace_broken{border-left-color:var(--orange)}
+  .row.s-marketplace_only{border-left-color:var(--bad)}
+  .row.s-not_found{border-left-color:var(--dead);box-shadow:-1px 0 0 0 #c9d4e5}
+  .row[hidden],.empty[hidden]{display:none !important}
+  .rowsum{display:grid;grid-template-columns:1fr auto;grid-template-areas:"nm hd" "mt mt";gap:4px 10px;padding:9px 12px;cursor:pointer;list-style:none;align-items:center}
+  .rowsum::-webkit-details-marker{display:none}
+  .rowsum .nm{grid-area:nm;min-width:0;font-weight:650;overflow-wrap:anywhere}
+  .rowsum .hd{grid-area:hd;font-variant-numeric:tabular-nums;color:var(--ink);font-size:15px;white-space:nowrap}
+  .rowsum .mt{grid-area:mt;display:flex;flex-wrap:wrap;gap:5px 6px;align-items:center}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:2px 9px 2px 7px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
+  .tag{font-size:12px;color:var(--mut);background:transparent;border:1px solid var(--line);border-radius:6px;padding:1px 7px;white-space:nowrap}
+  .tag.live{color:var(--cyan);border-color:#1f5568}
+  .chev{display:none}
+  @media (min-width:820px){
+    .rowsum{grid-template-columns:200px minmax(0,1.1fr) minmax(0,2fr) 70px 14px;grid-template-areas:"chip nm tg hd chev";padding:8px 12px}
+    .rowsum .mt{display:contents}
+    .rowsum .chip{grid-area:chip;justify-self:start}
+    .rowsum .tags{grid-area:tg;display:flex;flex-wrap:wrap;gap:4px 6px}
+    .rowsum .hd{text-align:right}
+    .chev{display:block;grid-area:chev;color:var(--mut)}
+  }
+  .rowsum .tags{display:contents}
+  @media (min-width:820px){.rowsum .tags{display:flex}}
+  .chev::before{content:"\25B8";font-size:12px}
+  .row[open]>.rowsum .chev::before{content:"\25BE"}
+  .rowsum:hover{background:#111a29;border-radius:9px}
+
+  .rowbody{padding:2px 14px 14px 14px;border-top:1px solid var(--line)}
+  .rowbody .meta{margin:10px 0 0;color:var(--mut);font-size:14px}
+  .headline{margin:10px 0 0;font-weight:600}
+  .summary{margin:8px 0 0}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
   @media (max-width:640px){.cols{grid-template-columns:1fr}}
   .cols section{background:var(--panel2);border-radius:10px;padding:10px 14px}
   .cols ul{margin:0;padding-left:18px}
   .cols li{margin:4px 0;font-size:15px}
   .cols .none{margin:0;color:var(--mut);font-size:15px}
-  .evidence{margin:14px 0 0;color:var(--mut);font-size:13px}
-  .helper{margin:12px 0 0;font-size:15px}
+  .evidence{margin:12px 0 0;color:var(--mut);font-size:13px}
+  .helper{margin:10px 0 0;font-size:15px}
 
-  details.ask{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
-  details summary{cursor:pointer;color:var(--cyan);font-size:15px;min-height:32px;display:flex;align-items:center;gap:8px;list-style:none}
-  details summary::-webkit-details-marker{display:none}
-  details summary::before{content:"\25B8";font-size:12px;flex:none}
-  details[open]>summary::before{content:"\25BE"}
+  /* rows we have no report on */
+  .row.other{padding:9px 12px;display:grid;grid-template-columns:1fr auto;grid-template-areas:"nm hd" "mt mt" "act act";gap:4px 10px;align-items:center}
+  .row.other .nm{grid-area:nm;min-width:0;font-weight:650;overflow-wrap:anywhere}
+  .row.other .nm .sub{display:block;font-weight:400;color:var(--mut)}
+  .row.other .hd{grid-area:hd;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .row.other .mt{grid-area:mt}
+  .row.other .act{grid-area:act;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .row.other .act .err{font-size:13px;color:var(--bad)}
+  @media (min-width:820px){
+    .row.other{grid-template-columns:200px minmax(0,1.1fr) minmax(0,2fr) 70px auto;grid-template-areas:"mt nm sp hd act"}
+    .row.other .hd{text-align:right}
+  }
+
+  details.ask{margin-top:12px;border-top:1px solid var(--line);padding-top:8px}
+  details.ask summary,details.plain summary{cursor:pointer;color:var(--cyan);font-size:15px;min-height:32px;display:flex;align-items:center;gap:8px;list-style:none}
   details.plain summary{color:var(--ink)}
-  .ask form{display:grid;gap:10px;margin-top:10px}
+  details.ask summary::-webkit-details-marker,details.plain summary::-webkit-details-marker{display:none}
+  details.ask summary::before,details.plain summary::before{content:"\25B8";font-size:12px;flex:none}
+  details.ask[open]>summary::before,details.plain[open]>summary::before{content:"\25BE"}
+  .ask form{display:grid;gap:10px;margin-top:10px;max-width:640px}
   .ask fieldset{border:0;margin:0;padding:0;display:grid;gap:6px}
   .ask legend{padding:0;margin-bottom:4px;font-size:14px;color:var(--mut)}
   .ask label.opt{display:flex;gap:10px;align-items:flex-start;font-size:15px}
   .ask label.opt input{margin-top:5px}
-  .ask label.field{display:grid;gap:4px;font-size:14px;color:var(--mut)}
   .ask input[type=text],.ask select,.ask textarea{width:100%;font:16px system-ui,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:42px}
   .ask textarea{min-height:76px;resize:vertical}
   .ask .hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
@@ -84,26 +153,26 @@
   .ask .status.ok{color:var(--good)}
   .ask .status.bad{color:var(--bad)}
 
-  ul.others{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
-  ul.others li{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel2);border-radius:8px;padding:8px 12px}
-  ul.others .id{word-break:break-all}
-  footer.foot{margin-top:40px;border-top:1px solid var(--line);padding-top:16px}
+  .empty{padding:18px;text-align:center;color:var(--mut);border:1px dashed var(--line);border-radius:10px}
+  footer.foot{margin-top:40px;border-top:1px solid var(--line);padding-top:16px;max-width:760px}
   footer.foot ul{padding-left:20px;margin:8px 0}
   footer.foot li{margin:4px 0}
 </style>
 </head>
 <body>
-<header class="top"><a class="logo" href="/">X<b>trata</b></a><span class="sub">Preservation checker</span></header>
+<header class="top"><a class="logo" href="/" aria-label="Xtrata"><img src="/checker/xtrata-x.webp" alt="" width="28" height="28" /><span aria-hidden="true">trata</span></a><span class="sub">Preservation checker</span></header>
 <main>
-  <h1>Where does your NFT's art actually live?</h1>
-  <p class="mut">Paste a link, a contract address or a wallet address. We'll tell you what we know about where the art is stored, what looks good and what worries us.</p>
+  <div class="lead">
+    <h1>Where does your NFT's art actually live?</h1>
+    <p class="mut">Paste a link, a contract address or a wallet address. We'll tell you what we know about where the art is stored, what looks good and what worries us.</p>
+  </div>
 
   <form class="find" id="find" novalidate>
-    <label for="q" class="sr" style="position:absolute;left:-10000px">Link, contract address or wallet address</label>
+    <label for="q" style="position:absolute;left:-10000px">Link, contract address or wallet address</label>
     <input type="text" id="q" name="q" maxlength="2000" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Gamma link, contract (SP…name) or wallet address (SP…)" />
     <button type="submit" id="go">Check</button>
   </form>
-  <p class="hint mut small">A wallet address is public, so there is nothing to connect or sign. We don't keep what you paste. Names ending in <code>.btc</code> aren't supported yet; use the address that starts with <code>SP</code>.</p>
+  <p class="hint mut small">A wallet address is public, so there is nothing to connect or sign. We don't keep your address or what you paste; we only keep anonymous daily counts of which collections get looked up. Names ending in <code>.btc</code> aren't supported yet; use the address that starts with <code>SP</code>.</p>
 
   <noscript><div class="box error"><p>This page needs JavaScript to look things up.</p></div></noscript>
   <div id="out" class="results" aria-live="polite" tabindex="-1"></div>
@@ -126,6 +195,13 @@
   'use strict';
 
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  // Worst first. unclear and not_art sort last: nothing to act on.
+  var ORDER = ['not_found', 'marketplace_only', 'marketplace_broken', 'one_host', 'unclear', 'solid', 'on_chain', 'not_art'];
+  var SHORT = {
+    not_found: 'Art not found', marketplace_only: 'Marketplace copy only', marketplace_broken: 'Marketplace copy broken', one_host: 'One host',
+    unclear: "Couldn't tell", solid: 'Looks solid', on_chain: 'On chain', not_art: 'Not art'
+  };
+  var ATTENTION = { not_found: true, marketplace_only: true, marketplace_broken: true };
   var out = document.getElementById('out');
   var form = document.getElementById('find');
   var input = document.getElementById('q');
@@ -160,8 +236,9 @@
     return m ? Number(m[3]) + ' ' + MONTHS[Number(m[2]) - 1] + ' ' + m[1] : null;
   }
   function short(id) { return id.length > 44 ? id.slice(0, 12) + '…' + id.slice(-28) : id; }
-  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+  function plural(n, one, many) { return num(n) + ' ' + (n === 1 ? one : many); }
   function num(n) { return Number(n).toLocaleString('en'); }
+  function rank(status) { var i = ORDER.indexOf(status); return i < 0 ? ORDER.length : i; }
 
   // ---------- Forever Twins registry (for the "a helper is open" link) ----------
   var registryPromise = null;
@@ -269,7 +346,7 @@
       post('/checker/requests', {
         kind: chosen ? chosen.value : kinds[0],
         contract: info.id,
-        name: info.name || '',
+        name: (info.name || '').slice(0, 120),
         note: note.value,
         contact: contact.value,
         role: role.value,
@@ -294,10 +371,16 @@
     return details;
   }
 
-  function reportCard(card, registry) {
+  // ---------- one collection we have a report on ----------
+  // open: whether the row starts expanded. Returns { node, sort, text } so the list can reorder and filter without rebuilding.
+  function reportRow(card, registry, open) {
     var live = registry && registry[card.id] && registry[card.id].status === 'live' ? registry[card.id] : null;
+    var tags = (card.tags || []).slice();
+    var tagEls = tags.map(function (t) { return el('span', { class: 'tag', text: t }); });
+    if (live) tagEls.push(el('span', { class: 'tag live', text: 'Twin helper open' }));
+    var held = typeof card.held === 'number' ? card.held : null;
+
     var meta = [];
-    if (typeof card.held === 'number') meta.push('You hold ' + num(card.held));
     if (card.tokens_approx) meta.push('about ' + num(card.tokens_approx) + ' pieces in the collection');
     var d = day(card.deployed);
     if (d) meta.push('deployed ' + d);
@@ -306,77 +389,187 @@
     var headline = card.headline && card.label && card.headline.indexOf(card.label + '. ') === 0 ? card.headline.slice(card.label.length + 2) : card.headline;
     var bare = card.status === 'not_art' && !(card.good && card.good.length) && !(card.worry && card.worry.length);
 
-    var article = el('article', { class: 'card s-' + card.status, 'data-id': card.id },
-      el('span', { class: 'badge' }, el('i'), card.label),
-      el('h2', { text: card.name }),
-      meta.length ? el('p', { class: 'meta', text: meta.join(' · ') }) : null,
+    var node = el('details', { class: 'row s-' + card.status, 'data-id': card.id });
+    if (open) node.open = true;
+    node.appendChild(el('summary', { class: 'rowsum' },
+      el('span', { class: 'nm', text: card.name }),
+      held !== null ? el('span', { class: 'hd', text: '×' + num(held), title: 'You hold ' + num(held) }) : (card.tokens_approx ? el('span', { class: 'hd mut small', text: '~' + num(card.tokens_approx) }) : null),
+      el('span', { class: 'mt' },
+        el('span', { class: 'chip s-' + card.status, title: card.label }, el('i'), SHORT[card.status] || card.label),
+        el('span', { class: 'tags' }, tagEls)),
+      el('span', { class: 'chev', 'aria-hidden': 'true' })));
+
+    var body = el('div', { class: 'rowbody' },
+      el('p', { class: 'meta', text: [card.label].concat(meta).join(' · ') }),
       headline ? el('p', { class: 'headline', text: headline }) : null,
       card.summary ? el('p', { class: 'summary', text: card.summary }) : null,
       bare ? null : el('div', { class: 'cols' },
         list("What's good", card.good, 'Nothing we could confirm yet.'),
         list('What worries us', card.worry, 'Nothing found in our checks.')),
       el('p', { class: 'evidence', text: evidenceLine(card) }));
-
     if (live) {
-      article.appendChild(el('p', { class: 'helper' }, 'A Forever Twins helper is open for this collection: ',
+      body.appendChild(el('p', { class: 'helper' }, 'A Forever Twins helper is open for this collection: ',
         el('a', { href: '/forever-twins/collection/' + encodeURIComponent(live.key), text: 'give a piece a permanent on-chain twin' }), '.'));
     }
     if (!card.special && card.status !== 'not_art') {
       var kinds = live ? ['retest'] : ['retest', 'helper'];
-      article.appendChild(requestBox({ id: card.id, name: card.name, kinds: kinds, summary: 'Ask us to re-test this' + (live ? '' : ' or to open a helper for it') }));
+      body.appendChild(requestBox({ id: card.id, name: card.name, kinds: kinds, summary: 'Ask us to re-test this' + (live ? '' : ' or to open a helper for it') }));
     }
-    return article;
+    node.appendChild(body);
+
+    var c = card.checked || {};
+    return {
+      node: node, group: card.status, held: held || 0, name: card.name.toLowerCase(), size: card.tokens_approx || 0,
+      checked: [c.contract, c.marketplace].filter(Boolean).sort().pop() || '', rank: rank(card.status),
+      text: (card.name + ' ' + card.id).toLowerCase()
+    };
   }
 
-  function uncoveredCard(id) {
-    return el('article', { class: 'card uncovered', 'data-id': id },
-      el('span', { class: 'badge' }, el('i'), 'Not in our research'),
-      el('h2', { class: 'mono', text: short(id) }),
-      el('p', { class: 'headline', text: "We haven't tested this contract, so we can't say anything about it, good or bad." }),
-      el('p', { class: 'summary mut', text: 'That is not the same as "fine". If you hold it or made it, you can ask us to look.' }),
-      requestBox({ id: id, name: '', kinds: ['assess'], summary: 'Ask us to assess this collection' }));
-  }
-
-  function othersBlock(others, total) {
-    var wrap = el('details', { class: 'plain' });
-    wrap.appendChild(el('summary', { text: 'Also in this wallet, not in our research (' + plural(total, 'collection', 'collections') + ')' }));
-    var ul = el('ul', { class: 'others' });
-    others.forEach(function (o) {
-      var li = el('li', {}, el('span', {}, el('span', { class: 'mono id', text: o.id }), ' ', el('span', { class: 'mut', text: '× ' + num(o.held) })));
-      var holder = el('div', {});
-      var btn = el('button', { type: 'button', class: 'quiet', text: 'Ask us to assess' });
-      btn.addEventListener('click', function () {
-        btn.remove();
-        holder.appendChild(requestBox({ id: o.id, name: '', kinds: ['assess'], summary: 'Ask us to assess this collection' }));
-        holder.firstChild.open = true;
+  // ---------- one collection we have NO report on, with a one-tap "count me in" ----------
+  function otherRow(o, fromWallet) {
+    var label = o.asset && o.asset !== 'nft' ? o.asset : o.id.split('.').slice(1).join('.') || o.id;
+    var act = el('div', { class: 'act' });
+    var btn = el('button', { type: 'button', class: 'quiet', text: 'Ask us to check this' });
+    var err = el('span', { class: 'err', role: 'status' });
+    btn.addEventListener('click', function () {
+      btn.disabled = true; btn.textContent = 'Sending…'; err.textContent = '';
+      // role is left blank: whoever looked at a wallet may not be its owner.
+      post('/checker/requests', { kind: 'assess', contract: o.id, name: label.slice(0, 120), role: '', website: '' }).then(function (res) {
+        if (res.status === 200 && res.data && res.data.ok) { btn.textContent = 'Counted, thanks'; btn.className = 'quiet done'; return; }
+        btn.disabled = false; btn.textContent = 'Try again';
+        err.textContent = (res.data && res.data.error) ? res.data.error : "That didn't go through, and we can't tell whether it was saved.";
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = 'Try again';
+        err.textContent = "We couldn't reach the server.";
       });
-      holder.appendChild(btn);
-      li.appendChild(holder);
-      ul.appendChild(li);
     });
-    wrap.appendChild(ul);
-    if (total > others.length) wrap.appendChild(el('p', { class: 'mut small', text: 'Showing the ' + others.length + ' you hold most of.' }));
+    act.appendChild(btn); act.appendChild(err);
+    var node = el('div', { class: 'row other', 'data-id': o.id },
+      el('span', { class: 'nm' }, label, el('span', { class: 'mono sub', text: short(o.id) })),
+      fromWallet ? el('span', { class: 'hd', text: '×' + num(o.held), title: 'You hold ' + num(o.held) }) : null,
+      el('span', { class: 'mt' }, el('span', { class: 'chip' }, el('i'), 'Not in research'), el('span', { class: 'tag', text: 'No information yet' })),
+      act);
+    return { node: node, group: 'other', held: o.held, name: label.toLowerCase(), size: 0, checked: '', rank: 99, text: (label + ' ' + o.id).toLowerCase() };
+  }
+
+  // ---------- totals and the list ----------
+  function totalsPanel(w, results) {
+    var attnItems = 0; var attnCols = 0;
+    results.forEach(function (r) { if (ATTENTION[r.status]) { attnItems += r.held || 0; attnCols += 1; } });
+    var reports = w.items_in_reports; var none = w.items_not_covered;
+    var rest = Math.max(0, reports - attnItems);
+    var total = Math.max(1, reports + none);
+    function tile(cls, n, label, sub) {
+      return el('div', { class: 'tile ' + cls }, el('div', { class: 'n', text: num(n) }), el('div', { class: 'l' }, label), sub ? el('div', { class: 'l', text: sub }) : null);
+    }
+    return el('section', { 'aria-label': 'Totals' },
+      el('div', { class: 'tiles' },
+        tile('', w.items_read, 'NFTs found', 'in ' + plural(w.collections_held, 'collection', 'collections')),
+        tile('t-rep', reports, 'with a report', 'in ' + plural(w.collections_covered, 'collection', 'collections')),
+        tile('t-none', none, 'no information yet', 'in ' + plural(w.collections_not_covered, 'collection', 'collections')),
+        tile('t-attn', attnItems, 'need attention', 'in ' + plural(attnCols, 'collection', 'collections'))),
+      el('div', { class: 'bar', role: 'img', 'aria-label': num(attnItems) + ' need attention, ' + num(rest) + ' have another report, ' + num(none) + ' have no information' },
+        el('span', { class: 'b-attn', style: 'width:' + (attnItems / total * 100) + '%' }),
+        el('span', { class: 'b-rep', style: 'width:' + (rest / total * 100) + '%' }),
+        el('span', { class: 'b-none', style: 'width:' + (none / total * 100) + '%' })),
+      el('p', { class: 'legend' },
+        el('span', {}, el('i', { style: 'background:var(--bad)' }), 'Needs attention: art not found, or only a marketplace copy works, or the marketplace copy is broken'),
+        el('span', {}, el('i', { style: 'background:var(--acc)' }), 'Other reports'),
+        el('span', {}, el('i', { style: 'background:var(--neutral)' }), 'Not in our research')));
+  }
+
+  function buildList(rows, results) {
+    var sort = 'worst';
+    var chosen = {};
+    var query = '';
+    var allOpen = false;
+
+    var list = el('div', { class: 'rows' });
+    var empty = el('div', { class: 'empty', hidden: true }, 'Nothing matches those filters. ', el('button', { type: 'button', class: 'quiet', text: 'Clear filters' }));
+    var countText = el('span', { 'aria-live': 'polite' });
+    var expand = el('button', { type: 'button', class: 'quiet', text: 'Expand all' });
+
+    // status chips, with how many collections of each
+    var groups = {};
+    rows.forEach(function (r) { groups[r.group] = (groups[r.group] || 0) + 1; });
+    var chipBar = el('div', { class: 'chips', role: 'group', 'aria-label': 'Filter by status' });
+    var chipEls = {};
+    ORDER.concat(['other']).forEach(function (g) {
+      if (!groups[g]) return;
+      var b = el('button', { type: 'button', class: 'chip-btn s-' + g, 'aria-pressed': 'false' }, el('i'), g === 'other' ? 'Not in research' : SHORT[g], el('span', { class: 'c', text: String(groups[g]) }));
+      b.addEventListener('click', function () {
+        if (chosen[g]) delete chosen[g]; else chosen[g] = true;
+        b.setAttribute('aria-pressed', chosen[g] ? 'true' : 'false');
+        apply();
+      });
+      chipEls[g] = b;
+      chipBar.appendChild(b);
+    });
+
+    var select = el('select', { 'aria-label': 'Sort by' },
+      el('option', { value: 'worst', text: 'Sort: worst first' }),
+      el('option', { value: 'held', text: 'Sort: most held' }),
+      el('option', { value: 'name', text: 'Sort: name A–Z' }),
+      el('option', { value: 'size', text: 'Sort: collection size' }),
+      el('option', { value: 'checked', text: 'Sort: recently checked' }));
+    var search = el('input', { type: 'search', placeholder: 'Filter by name in this wallet', 'aria-label': 'Filter by name', autocomplete: 'off', spellcheck: 'false' });
+    var controls = el('div', { class: 'controls' }, select, el('div', { class: 'search' }, search), el('div', {}, expand));
+
+    function clear() {
+      Object.keys(chosen).forEach(function (g) { delete chosen[g]; chipEls[g].setAttribute('aria-pressed', 'false'); });
+      query = ''; search.value = '';
+      apply();
+    }
+    empty.querySelector('button').addEventListener('click', clear);
+    select.addEventListener('change', function () { sort = select.value; apply(); });
+    search.addEventListener('input', function () { query = search.value.trim().toLowerCase(); apply(); });
+    expand.addEventListener('click', function () {
+      allOpen = !allOpen;
+      rows.forEach(function (r) { if (!r.node.hidden && r.node.tagName === 'DETAILS') r.node.open = allOpen; });
+      expand.textContent = allOpen ? 'Collapse all' : 'Expand all';
+    });
+
+    function compare(a, b) {
+      var byName = a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+      if (sort === 'name') return byName;
+      if (sort === 'held') return b.held - a.held || a.rank - b.rank || byName;
+      if (sort === 'size') return b.size - a.size || a.rank - b.rank || byName;
+      if (sort === 'checked') return a.checked < b.checked ? 1 : a.checked > b.checked ? -1 : (a.rank - b.rank || b.held - a.held || byName);
+      return a.rank - b.rank || b.held - a.held || byName;
+    }
+    function apply() {
+      var any = Object.keys(chosen).length > 0;
+      var shown = 0;
+      rows.slice().sort(compare).forEach(function (r) {
+        var ok = (!any || chosen[r.group]) && (!query || r.text.indexOf(query) !== -1);
+        r.node.hidden = !ok;
+        if (ok) shown += 1;
+        list.appendChild(r.node);
+      });
+      empty.hidden = shown !== 0;
+      countText.textContent = 'Showing ' + num(shown) + ' of ' + num(rows.length) + (any || query ? ' (filtered)' : '');
+    }
+
+    var wrap = el('section', { 'aria-label': 'Collections' }, controls, chipBar, el('div', { class: 'countline' }, countText), list, empty);
+    apply();
     return wrap;
   }
 
-  function walletSummary(w, shown) {
-    var lines = [];
-    if (w.items_total === 0) {
-      return box('info', [
-        'The data service shows no NFTs at this address right now.',
-        'Its index can lag a little behind the chain, and this only works for the address that holds them. If you expect some, check the address and try again later.'
-      ]);
-    }
-    lines.push('We read ' + plural(w.items_read, 'NFT', 'NFTs') + ' in ' + plural(w.collections_held, 'collection', 'collections') + '. We have a report on ' + w.collections_covered + ' of them' + (shown ? ', worst first.' : '.'));
-    var kind = 'info';
+  function walletEmpty() {
+    return box('info', [
+      'The data service shows no NFTs at this address right now.',
+      'Its index can lag a little behind the chain, and this only works for the address that holds them. If you expect some, check the address and try again later.'
+    ]);
+  }
+
+  function readWarning(w) {
     if (w.stopped === 'cap') {
-      kind = 'warn';
-      lines.push('This wallet holds more than we read: ' + num(w.items_read) + ' of ' + num(w.items_total) + ' items. Collections held only in the rest are not shown, so a missing collection does not mean it is fine.');
-    } else if (w.stopped === 'read_failed' || !w.complete) {
-      kind = 'warn';
-      lines.push('We could only read part of this wallet (' + num(w.items_read) + ' of ' + num(w.items_total) + ' items) because the data service stopped answering. Try again for the rest.');
+      return box('warn', 'This wallet holds more than we read: ' + num(w.items_read) + ' of ' + num(w.items_total) + ' items. Collections held only in the rest are not shown, so a missing collection does not mean it is fine.');
     }
-    return box(kind, lines);
+    if (w.stopped === 'read_failed' || !w.complete) {
+      return box('warn', 'We could only read part of this wallet (' + num(w.items_read) + ' of ' + num(w.items_total) + ' items) because the data service stopped answering. Try again for the rest.');
+    }
+    return null;
   }
 
   function datasetNote(info) {
@@ -387,7 +580,7 @@
     if (census) bits.push('census run ' + census);
     if (retest) bits.push('collections whose art we could not reach re-tested ' + retest);
     if (!bits.length) return null;
-    return el('p', { class: 'mut small', text: 'Our research: ' + bits.join('; ') + '. Each card shows its own dates.' });
+    return el('p', { class: 'mut small', text: 'Our research: ' + bits.join('; ') + '. Each collection shows its own dates.' });
   }
 
   // ---------- rendering an answer ----------
@@ -398,8 +591,22 @@
     if (data.kind === 'notice') { out.appendChild(box('info', data.message)); return; }
 
     if (data.kind === 'wallet') {
-      out.appendChild(walletSummary(data.wallet, results.length > 1));
-    } else if (data.kind === 'collection') {
+      var w = data.wallet;
+      if (w.items_total === 0) { out.appendChild(walletEmpty()); finish(data); return; }
+      var warning = readWarning(w);
+      if (warning) out.appendChild(warning);
+      out.appendChild(totalsPanel(w, results));
+      var rows = results.map(function (card) { return reportRow(card, registry, false); })
+        .concat((data.others || []).map(function (o) { return otherRow(o, true); }));
+      out.appendChild(buildList(rows, results));
+      if (data.others_total > (data.others || []).length) {
+        out.appendChild(el('p', { class: 'mut small', text: 'Showing the ' + num((data.others || []).length) + ' collections without a report that you hold most of (of ' + num(data.others_total) + ').' }));
+      }
+      finish(data);
+      return;
+    }
+
+    if (data.kind === 'collection') {
       if (!results.length) { out.appendChild(box('info', data.message)); return; }
       var what = (data.tried || []).filter(Boolean)[0];
       out.appendChild(box('info', data.matched_from === 'link'
@@ -407,18 +614,22 @@
         : 'We matched what you typed to ' + (results.length === 1 ? 'a collection' : 'collections') + ' by name. Check it is the one you meant.'));
     }
 
+    var list = el('div', { class: 'rows' });
     results.forEach(function (card) {
-      out.appendChild(card.covered ? reportCard(card, registry) : uncoveredCard(card.id));
+      if (card.covered) list.appendChild(reportRow(card, registry, results.length === 1).node);
+      else list.appendChild(otherRow({ id: card.id, asset: '', held: 0 }, false).node);
     });
+    out.appendChild(list);
+    finish(data);
+  }
 
-    if (data.kind === 'wallet' && data.others_total > 0) out.appendChild(othersBlock(data.others || [], data.others_total));
-
+  function finish(data) {
     var note = datasetNote(data.dataset);
     if (note) out.appendChild(note);
     var caveats = document.getElementById('caveats');
     if (Array.isArray(data.caveats) && data.caveats.length && caveats) {
       caveats.textContent = '';
-      caveats.appendChild(el('li', { text: "This is about whether the art and its description can still be found. It is not about the safety, price or custody of the token itself." }));
+      caveats.appendChild(el('li', { text: 'This is about whether the art and its description can still be found. It is not about the safety, price or custody of the token itself.' }));
       data.caveats.forEach(function (c) { caveats.appendChild(el('li', { text: c })); });
     }
   }
