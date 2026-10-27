@@ -32,7 +32,8 @@ const DATASET_STALE_OK_MS = HOUR_MS;
 const HOLDINGS_BASE = 'https://api.hiro.so';
 const HOLDINGS_PAGE = 200;
 const HOLDINGS_MAX_PAGES = 5; // 1000 items; beyond that the answer says so
-const OTHERS_LISTED = 50;
+const OTHERS_LISTED = 200;
+const DEMAND_MAX_ROWS = 100;
 const NAME_MATCHES_MAX = 5;
 
 // Xtrata inscriptions: stored in the core contract itself. Matched by deployer + name so older core versions held in a
@@ -57,7 +58,7 @@ const GENERIC_WORDS = new Set([
 type Rec = Record<string, any>;
 type Dataset = { generated: string | null; sources: Rec; caveats: string[]; scale: Rec; byId: Map<string, Rec>; byNorm: Map<string, string[]> };
 type Cached = { at: number; dataset: Dataset };
-type Deps = { now?: number; fetcher?: typeof fetch; sleep?: (ms: number) => Promise<void> };
+type Deps = { now?: number; fetcher?: typeof fetch; sleep?: (ms: number) => Promise<void>; waitUntil?: (promise: Promise<unknown>) => void };
 
 let cache: Cached | null = null;
 /** Tests only. */
@@ -193,6 +194,27 @@ const isXtrataCore = (contractId: string) => {
   return address === XTRATA_DEPLOYER && XTRATA_CORE_NAME.test(name || '');
 };
 
+/** Short reasons for the compact view, drawn only from the recorded facts. At most four, problems first. */
+function tagsFor(rec: Rec): string[] {
+  const tags: string[] = [];
+  const contract = rec.contract || {};
+  const market = rec.marketplace || {};
+  const art = rec.art || {};
+  if (rec.status === 'on_chain') tags.push('Stored on chain');
+  if (contract.reaches_art === false) tags.push('Contract link broken');
+  if (rec.status === 'marketplace_only') tags.push('Marketplace copy only');
+  if (typeof market.sampled === 'number' && market.sampled > 0 && typeof market.loaded === 'number') {
+    if (market.loaded === 0) tags.push('No marketplace images loaded');
+    else if (market.loaded < market.sampled) tags.push('Some marketplace images failed');
+  }
+  if (market.single_pinata_account === true) tags.push('Single Pinata account');
+  else if (art.hosts === 'pinata_only') tags.push('Only Pinata held it');
+  else if (art.hosts === 'several') tags.push('Several hosts hold it');
+  if (art.storage === 'own_server') tags.push("Creator's own server");
+  if (rec.status === 'unclear') tags.push('Could not tell');
+  return tags.slice(0, 4);
+}
+
 function card(rec: Rec, dataset: Dataset, held?: number) {
   return {
     covered: true,
@@ -210,6 +232,7 @@ function card(rec: Rec, dataset: Dataset, held?: number) {
     good: Array.isArray(rec.good) ? rec.good : [],
     worry: Array.isArray(rec.worry) ? rec.worry : [],
     helper: rec.helper ?? null,
+    tags: tagsFor(rec),
     ...(held === undefined ? {} : { held })
   };
 }
@@ -232,6 +255,7 @@ function xtrataCard(dataset: Dataset, contractIds: string[], held?: number) {
     good: ['The content is stored in the Xtrata contract, in chunks, so it does not depend on an outside server or file host.'],
     worry: [],
     helper: null,
+    tags: ['Stored on chain'],
     ...(held === undefined ? {} : { held })
   };
 }
@@ -326,6 +350,30 @@ async function readHoldings(address: string, env: any, fetcher: typeof fetch, sl
   return { ok: true, total, read, stopped, byContract };
 }
 
+// ---------- anonymous demand counters ----------
+
+type Demand = { id: string; source: 'contract' | 'wallet'; covered: boolean; items: number };
+const DEMAND_CONTRACT = new RegExp(`^S[PM][${C32}]{20,41}\\.[A-Za-z][A-Za-z0-9_-]{0,127}$`, 'i');
+
+/**
+ * Daily per-collection counts (migration 032): which collections get looked up, which are not covered. No wallet, no IP and no
+ * link between lookups is stored. Best effort: a failure here never changes or delays the answer to the visitor.
+ */
+async function recordDemand(db: any, rows: Demand[], now: number): Promise<void> {
+  if (!db) return;
+  const valid = rows.filter((row) => DEMAND_CONTRACT.test(row.id)).slice(0, DEMAND_MAX_ROWS);
+  if (valid.length === 0) return;
+  try {
+    const day = new Date(now).toISOString().slice(0, 10);
+    const sql = 'INSERT INTO checker_demand(day,contract_id,source,covered,lookups,items) VALUES(?,?,?,?,1,?) ON CONFLICT(day,contract_id,source) DO UPDATE SET lookups=lookups+1, items=items+excluded.items, covered=excluded.covered';
+    const statements = valid.map((row) => db.prepare(sql).bind(day, row.id, row.source, row.covered ? 1 : 0, row.items));
+    if (typeof db.batch === 'function') await db.batch(statements);
+    else for (const statement of statements) await statement.run();
+  } catch {
+    // counters are a convenience, not part of the answer
+  }
+}
+
 // ---------- rate limit ----------
 
 /**
@@ -389,10 +437,21 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
 
     if (parsed.kind === 'notice') return jsonResponse({ ...base, kind: 'notice', code: parsed.code, message: parsed.message, results: [] }, 200, NO_STORE);
 
+    const remember = (rows: Demand[]) => {
+      const job = recordDemand(env?.DB, rows, now);
+      if (deps.waitUntil) deps.waitUntil(job);
+      else return job;
+      return undefined;
+    };
+
     if (parsed.kind === 'contract') {
-      if (isXtrataCore(parsed.id)) return jsonResponse({ ...base, kind: 'contract', results: [xtrataCard(dataset, [parsed.id])] }, 200, NO_STORE);
+      if (isXtrataCore(parsed.id)) {
+        await remember([{ id: parsed.id, source: 'contract', covered: true, items: 0 }]);
+        return jsonResponse({ ...base, kind: 'contract', results: [xtrataCard(dataset, [parsed.id])] }, 200, NO_STORE);
+      }
       const rec = dataset.byId.get(parsed.id);
       const results = rec ? [card(rec, dataset)] : [{ covered: false, id: parsed.id }];
+      await remember([{ id: parsed.id, source: 'contract', covered: Boolean(rec), items: 0 }]);
       return jsonResponse({ ...base, kind: 'contract', results }, 200, NO_STORE);
     }
 
@@ -406,6 +465,7 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
         }, 200, NO_STORE);
       }
       const results = parsed.matches.map((id) => card(dataset.byId.get(id) as Rec, dataset));
+      await remember(parsed.matches.map((id) => ({ id, source: 'contract' as const, covered: true, items: 0 })));
       return jsonResponse({ ...base, kind: 'collection', matched_from: parsed.from, tried: parsed.tried, results }, 200, NO_STORE);
     }
 
@@ -433,6 +493,14 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
     if (xtrataIds.length) results.push(xtrataCard(dataset, xtrataIds, xtrataHeld));
     results.sort(bySeverity);
     others.sort((a, b) => b.held - a.held || a.id.localeCompare(b.id));
+    const itemsInReports = results.reduce((sum, r) => sum + (typeof (r as any).held === 'number' ? (r as any).held : 0), 0);
+    const itemsNotCovered = others.reduce((sum, o) => sum + o.held, 0);
+
+    const seen: Demand[] = [
+      ...results.map((r) => ({ id: r.id, source: 'wallet' as const, covered: true, items: (r as any).held as number })),
+      ...others.map((o) => ({ id: o.id, source: 'wallet' as const, covered: false, items: o.held }))
+    ].sort((a, b) => b.items - a.items);
+    await remember(seen);
 
     return jsonResponse({
       ...base,
@@ -443,7 +511,10 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
         complete: holdings.stopped === null && holdings.read >= holdings.total,
         stopped: holdings.stopped,
         collections_held: holdings.byContract.size,
-        collections_covered: results.length
+        collections_covered: results.length,
+        collections_not_covered: others.length,
+        items_in_reports: itemsInReports,
+        items_not_covered: itemsNotCovered
       },
       results,
       others: others.slice(0, OTHERS_LISTED),
@@ -455,4 +526,4 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
   }
 }
 
-export const onRequest: PagesFunction = ({ request, env }) => handleCheckerLookup(request, env);
+export const onRequest: PagesFunction = ({ request, env, waitUntil }) => handleCheckerLookup(request, env, { waitUntil });

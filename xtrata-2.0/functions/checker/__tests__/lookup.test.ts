@@ -40,11 +40,15 @@ function bucket(content: string | null | Error = fixtureText) {
   return fake;
 }
 
-function database(options: { migrate?: boolean } = {}) {
+function database(options: { migrate?: boolean; demand?: boolean } = {}) {
   const sql = new DatabaseSync(':memory:');
-  if (options.migrate !== false) sql.exec(readFileSync('functions/migrations/031_checker_requests.sql', 'utf8'));
+  if (options.migrate !== false) {
+    sql.exec(readFileSync('functions/migrations/031_checker_requests.sql', 'utf8'));
+    if (options.demand !== false) sql.exec(readFileSync('functions/migrations/032_checker_demand.sql', 'utf8'));
+  }
   return {
     sql,
+    async batch(statements: any[]) { for (const statement of statements) await statement.run(); return []; },
     prepare(query: string) {
       let args: any[] = [];
       return {
@@ -207,7 +211,7 @@ describe('/checker/lookup: a contract', () => {
   it('does not leak fields the page does not need', async () => {
     const { body } = await ask(envOf(), BIRDS);
     expect(Object.keys(body.results[0]).sort()).toEqual([
-      'checked', 'covered', 'deployed', 'evidence', 'evidence_level', 'good', 'headline', 'helper', 'id', 'label', 'name', 'status', 'summary', 'tokens_approx', 'worry'
+      'checked', 'covered', 'deployed', 'evidence', 'evidence_level', 'good', 'headline', 'helper', 'id', 'label', 'name', 'status', 'summary', 'tags', 'tokens_approx', 'worry'
     ]);
   });
 
@@ -348,7 +352,11 @@ describe('/checker/lookup: a wallet', () => {
       ['Xtrata inscription', 'on_chain', 5],
       ['BNS: Bitcoin Name System (V1 - Legacy)', 'not_art', 2]
     ]);
-    expect(body.wallet).toEqual({ items_total: holdings.length, items_read: holdings.length, complete: true, stopped: null, collections_held: 11, collections_covered: 8 });
+    expect(body.wallet).toEqual({
+      items_total: holdings.length, items_read: holdings.length, complete: true, stopped: null,
+      collections_held: 11, collections_covered: 8, collections_not_covered: 2, items_in_reports: 3 + 2 + 1 + 4 + 1 + 2 + 5 + 3 + 2, items_not_covered: 7
+    });
+    expect(body.wallet.items_in_reports + body.wallet.items_not_covered).toBe(holdings.length);
   });
 
   it('lists what is not in the research separately, biggest first, and counts it', async () => {
@@ -360,11 +368,12 @@ describe('/checker/lookup: a wallet', () => {
     expect(body.others_total).toBe(2);
   });
 
-  it('caps the "others" list but still reports how many there are', async () => {
-    const many = Array.from({ length: 70 }, (_v, i) => `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.c${String(i).padStart(2, '0')}::nft`);
+  it('caps the "others" list but still reports how many there are, and counts every item', async () => {
+    const many = Array.from({ length: 230 }, (_v, i) => `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.c${String(i).padStart(3, '0')}::nft`);
     const { body } = await ask(envOf(), WALLET, { fetcher: walletHolding(many).fetcher });
-    expect(body.others).toHaveLength(50);
-    expect(body.others_total).toBe(70);
+    expect(body.others).toHaveLength(200);
+    expect(body.others_total).toBe(230);
+    expect(body.wallet).toMatchObject({ collections_not_covered: 230, items_not_covered: 230, items_in_reports: 0 });
   });
 
   it('asks Hiro for 200 at a time and reads every page until the end', async () => {
@@ -533,5 +542,107 @@ describe('/checker/lookup: our own failures', () => {
     expect(body.error).toBe('lookup_failed');
     expect(text).not.toMatch(/secret|boom/);
     expect(body.message).toMatch(/not a result/);
+  });
+});
+
+describe('/checker/lookup: tags for the compact view', () => {
+  it('derives short reasons from the recorded facts only', async () => {
+    const tags = async (id: string) => (await ask(envOf(), id)).body.results[0].tags as string[];
+    expect(await tags(BIRDS)).toEqual(['Contract link broken', 'Marketplace copy only', 'Single Pinata account']);
+    expect(await tags(ROBOTS)).toEqual(['Contract link broken', 'No marketplace images loaded', "Creator's own server"]);
+    expect(await tags(SATO)).toEqual(["Creator's own server"]);
+    expect(await tags(INVADERS)).toContain('Stored on chain');
+  });
+
+  it('never gives more than four, and says "some failed" only when some did and some loaded', async () => {
+    const rec = { ...fixture.collections[PEPES], contract: { reaches_art: false }, marketplace: { sampled: 16, loaded: 9, single_pinata_account: true }, art: { storage: 'own_server', hosts: 'pinata_only' }, status: 'marketplace_only' };
+    const content = JSON.stringify({ ...fixture, collections: { ...fixture.collections, [PEPES]: rec } });
+    const { body } = await ask({ COLLECTION_ASSETS: bucket(content) }, PEPES);
+    expect(body.results[0].tags).toHaveLength(4);
+    expect(body.results[0].tags).toContain('Some marketplace images failed');
+    expect(body.results[0].tags).not.toContain('No marketplace images loaded');
+  });
+
+  it('gives the Xtrata card its own tag', async () => {
+    expect((await ask(envOf(), XTRATA)).body.results[0].tags).toEqual(['Stored on chain']);
+  });
+});
+
+describe('/checker/lookup: anonymous demand counters', () => {
+  const today = new Date(now).toISOString().slice(0, 10);
+  const demand = (env: any) => env.DB.sql.prepare('SELECT * FROM checker_demand ORDER BY contract_id, source').all() as any[];
+
+  it('counts a contract lookup, covered or not, with no wallet and no IP', async () => {
+    const env = { ...envOf(), DB: database() };
+    await ask(env, BIRDS);
+    await ask(env, BIRDS, { ip: '198.51.100.9' });
+    await ask(env, UNKNOWN);
+    expect(demand(env)).toEqual([
+      { day: today, contract_id: BIRDS, source: 'contract', covered: 1, lookups: 2, items: 0 },
+      { day: today, contract_id: UNKNOWN, source: 'contract', covered: 0, lookups: 1, items: 0 }
+    ]);
+  });
+
+  it('counts a wallet by the collections in it, with how many NFTs, never the address', async () => {
+    const env = { ...envOf(), DB: database() };
+    await ask(env, WALLET, { fetcher: walletHolding([...assets(BIRDS, 3), ...assets(UNKNOWN, 5), ...assets(XTRATA, 2, 'x')]).fetcher });
+    await ask(env, WALLET, { fetcher: walletHolding([...assets(UNKNOWN, 1)]).fetcher });
+    expect(demand(env)).toEqual([
+      { day: today, contract_id: XTRATA, source: 'wallet', covered: 1, lookups: 1, items: 2 },
+      { day: today, contract_id: BIRDS, source: 'wallet', covered: 1, lookups: 1, items: 3 },
+      { day: today, contract_id: UNKNOWN, source: 'wallet', covered: 0, lookups: 2, items: 6 }
+    ]);
+    expect(JSON.stringify(demand(env))).not.toMatch(/SP2J6|203\.0\.113/);
+  });
+
+  it('counts a day separately, and a link or name lookup as a lookup of that collection', async () => {
+    const env = { ...envOf(), DB: database() };
+    await ask(env, 'https://gamma.io/collections/bitcoin-birds');
+    await ask(env, BIRDS, { time: now + 24 * HOUR });
+    expect(demand(env).map((r) => [r.day, r.lookups])).toEqual([[today, 1], [new Date(now + 24 * HOUR).toISOString().slice(0, 10), 1]]);
+  });
+
+  it('counts nothing for notices, failed reads, empty wallets or unmatched names', async () => {
+    const env = { ...envOf(), DB: database() };
+    await ask(env, 'satoshi.btc');
+    await ask(env, 'bitcoin');
+    await ask(env, WALLET, { fetcher: hiro(() => json({}, 500)).fetcher, sleeps: [] });
+    await ask(env, WALLET, { fetcher: walletHolding([]).fetcher });
+    expect(demand(env)).toEqual([]);
+  });
+
+  it('ignores contract ids that are not contract ids (anything upstream sends)', async () => {
+    const env = { ...envOf(), DB: database() };
+    await ask(env, WALLET, { fetcher: walletHolding([`'; DROP TABLE x;--.evil::nft`, `${'A'.repeat(300)}.x::nft`, ...assets(BIRDS, 1)]).fetcher });
+    expect(demand(env).map((r) => r.contract_id)).toEqual([BIRDS]);
+  });
+
+  it('records at most 100 collections per wallet, the ones held most', async () => {
+    const env = { ...envOf(), DB: database() };
+    const many = Array.from({ length: 130 }, (_v, i) => `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.c${String(i).padStart(3, '0')}::nft`);
+    await ask(env, WALLET, { fetcher: walletHolding([...many, ...assets(BIRDS, 4)]).fetcher });
+    const rows = demand(env);
+    expect(rows).toHaveLength(100);
+    expect(rows.some((r) => r.contract_id === BIRDS && r.items === 4)).toBe(true);
+  });
+
+  it('never changes the answer if the counter fails, and works without the table or a database', async () => {
+    const failing = { ...envOf(), DB: { prepare: () => { throw new Error('boom'); } } };
+    expect((await ask(failing, BIRDS)).res.status).toBe(200);
+    const noTable = { ...envOf(), DB: database({ demand: false }) };
+    expect((await ask(noTable, BIRDS)).body.results[0].id).toBe(BIRDS);
+    expect((await ask(envOf(), BIRDS)).res.status).toBe(200);
+  });
+
+  it('uses waitUntil when the platform gives it, so the visitor does not wait', async () => {
+    const env = { ...envOf(), DB: database() };
+    const pending: Promise<unknown>[] = [];
+    const res = await handleCheckerLookup(new Request('https://xtrata.xyz/checker/lookup', {
+      method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://xtrata.xyz' }, body: JSON.stringify({ q: BIRDS })
+    }), env, { now, waitUntil: (p) => { pending.push(p); } });
+    expect(res.status).toBe(200);
+    expect(pending.length).toBeGreaterThan(0);
+    await Promise.all(pending);
+    expect(demand(env)).toHaveLength(1);
   });
 });
