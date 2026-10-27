@@ -85,7 +85,7 @@
   .row.s-marketplace_broken{border-left-color:var(--orange)}
   .row.s-marketplace_only{border-left-color:var(--bad)}
   .row.s-not_found{border-left-color:var(--dead)}
-  .row[hidden]{display:none}
+  .row[hidden],.empty[hidden]{display:none !important}
   .rowsum{display:grid;grid-template-columns:1fr auto;grid-template-areas:"nm hd" "mt mt";gap:4px 10px;padding:9px 12px;cursor:pointer;list-style:none;align-items:center}
   .rowsum::-webkit-details-marker{display:none}
   .rowsum .nm{grid-area:nm;min-width:0;font-weight:650;overflow-wrap:anywhere}
