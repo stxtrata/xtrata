@@ -7060,6 +7060,82 @@ return {
       return { g, tex, screenMesh, hits, buttons, leds, ledOn, ledOff, lever, knob, ticket, tcv, ttex, crest, halo, deck };
     }
 
+    // what a machine's own HUD is offering right now (the on-screen buttons mirror it and press the very same buttons)
+    function hudOffers(root, game) {
+      const out = []; if (game.modalOpen) return out;
+      const q = (sel) => root.querySelector(sel), txt = (el) => (el ? el.textContent : '').replace(/\s+/g, ' ').trim();
+      const fb = q('#featureBar');
+      if (fb && !fb.hidden) {
+        const items = [...root.querySelectorAll('#fbBody button')].filter((b) => !b.disabled && !b.classList.contains('pick') && !b.hasAttribute('data-pick'));   // the numbered picks are already pressed by tapping the screen itself
+        if (items.length) out.push({ kind: 'bonus', tag: txt(q('#fbTag')), title: txt(q('#fbTitle')), info: txt(q('#fbInfo')), items: items.map((b) => ({ label: txt(b).toUpperCase() || 'GO', ref: b })) });
+      }
+      const gb = q('#gamble'); if (gb && !gb.hidden && !gb.disabled) out.push({ kind: 'gamble', label: txt(gb), ref: gb });
+      const tb = q('#turbo'); if (tb) out.push({ kind: 'turbo', label: txt(tb) || 'TURBO', on: tb.getAttribute('aria-pressed') === 'true', ref: tb });
+      return out;
+    }
+    // ---------- on-screen buttons: turbo, gamble and bonus-round buttons drawn on a machine's own screen, so the crosshair can press them without freeing the mouse ----------
+    // A see-through second layer laid over the live screen (the screen is 1400 x 960 canvas units). It does not run any game logic: the page tells it what the machine's own HUD is offering
+    // (collect) and what pressing a button means (click), so the screen and the HUD cannot disagree. It repaints only when something changed.
+    function createScreenButtons(cfg) {
+      const W = cfg.w || 1400, H = cfg.h || 960, THREE = cfg.THREE, screen = cfg.screenMesh;
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+      const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter; tex.anisotropy = 4;
+      const mesh = new THREE.Mesh(screen.geometry, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      mesh.userData.noShadow = true; mesh.castShadow = false; mesh.receiveShadow = false; mesh.visible = false; mesh.renderOrder = 2; screen.add(mesh);
+      const acc = cfg.color || '#e4b457', FONT = '"Josefin Sans",Arial,sans-serif', FLASH = 220;
+      let btns = [], panel = null, sig = '', hov = '', flashId = '', flashT = 0;
+      const rrect = (x, y, w, h, r) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
+      function fit(str, maxW, size, weight) {
+        let s = size; c.font = (weight || 700) + ' ' + s + 'px ' + FONT;
+        while (c.measureText(str).width > maxW && s > 14) { s -= 2; c.font = (weight || 700) + ' ' + s + 'px ' + FONT; }
+        if (c.measureText(str).width > maxW) { while (str.length > 3 && c.measureText(str + '…').width > maxW) str = str.slice(0, -1); str += '…'; }
+        return str;
+      }
+      function layout(items) {
+        btns = []; panel = null;
+        for (const it of items) {
+          if (it.kind === 'turbo') btns.push({ id: 'turbo', x: 262, y: 890, w: 270, h: 54, label: it.label + (it.on ? '  ·  ON' : '  ·  OFF'), on: it.on, ref: it.ref });
+          else if (it.kind === 'gamble') btns.push({ id: 'gamble', x: 840, y: 890, w: 360, h: 54, label: it.label, ref: it.ref, gold: true });
+          else if (it.kind === 'bonus') {   // the bonus strip sits where the printed caption is, so it never covers the reels
+            panel = { x: 150, y: 780, w: 1100, h: 92, tag: it.tag, title: it.title, info: it.info };
+            c.font = '800 26px ' + FONT; let rx = panel.x + panel.w - 18;
+            for (let i = it.items.length - 1; i >= 0; i--) { const b = it.items[i], w = Math.min(430, Math.max(200, c.measureText(b.label).width + 76)); rx -= w; btns.push({ id: 'bonus' + i, x: rx, y: panel.y + 16, w, h: 60, label: b.label, ref: b.ref, cta: true }); rx -= 14; }
+            panel.textW = Math.max(120, rx - panel.x - 30);
+          }
+        }
+      }
+      function paint(now) {
+        c.clearRect(0, 0, W, H);
+        if (panel) {
+          c.save(); c.shadowColor = acc; c.shadowBlur = 24; c.fillStyle = 'rgba(5,7,13,.92)'; rrect(panel.x, panel.y, panel.w, panel.h, 22); c.fill(); c.shadowBlur = 0; c.lineWidth = 3; c.strokeStyle = acc; c.stroke(); c.restore();
+          c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = acc; c.fillText(fit(panel.tag + (panel.title ? '  ·  ' + panel.title : ''), panel.textW, 24, 800), panel.x + 28, panel.y + 30);
+          c.fillStyle = '#d8dbe6'; c.fillText(fit(panel.info, panel.textW, 20, 600), panel.x + 28, panel.y + 62);
+        }
+        for (const b of btns) {
+          const hot = hov === b.id, flash = flashId === b.id && now - flashT < FLASH, fill = b.on || b.cta || flash;
+          c.save(); c.shadowColor = b.gold ? '#ffd76a' : acc; c.shadowBlur = fill || hot ? 26 : 8;
+          c.fillStyle = flash ? '#ffffff' : fill ? (b.gold ? '#ffd76a' : acc) : b.gold ? 'rgba(46,34,8,.92)' : 'rgba(6,8,14,.9)'; rrect(b.x, b.y, b.w, b.h, b.h / 2); c.fill(); c.shadowBlur = 0;
+          c.lineWidth = hot ? 5 : 3; c.strokeStyle = hot ? '#ffffff' : b.gold ? '#ffd76a' : acc; c.stroke(); c.restore();
+          c.fillStyle = fill ? '#06080e' : b.gold ? '#ffe9a8' : '#f4f1e6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(fit(b.label, b.w - 36, b.cta ? 28 : 24, 800), b.x + b.w / 2, b.y + b.h / 2 + 1);
+        }
+      }
+      return {
+        mesh,
+        // called every frame while the machine is live; repaints only when what is offered (or the hover or flash) changed
+        sync(active, now) {
+          if (mesh.visible !== !!active) mesh.visible = !!active;
+          if (!active) { if (hov || btns.length || panel) { hov = ''; sig = ''; btns = []; panel = null; } return; }
+          const items = cfg.collect() || [], fl = flashId && now - flashT < FLASH ? flashId : '';
+          const s2 = JSON.stringify(items.map((i) => [i.kind, i.label, i.on, i.tag, i.title, i.info, i.items && i.items.map((x) => x.label)])) + '|' + hov + '|' + fl;
+          if (s2 === sig) return; sig = s2; layout(items); paint(now); tex.needsUpdate = true;
+        },
+        at(x, y) { if (!mesh.visible) return null; for (const b of btns) if (x >= b.x - 10 && x <= b.x + b.w + 10 && y >= b.y - 10 && y <= b.y + b.h + 10) return b; return null; },
+        hover(b) { const id = b ? b.id : ''; if (id !== hov) { hov = id; sig = ''; } },
+        click(b) { flashId = b.id; flashT = performance.now(); sig = ''; try { if (cfg.sfx) cfg.sfx(); } catch (e) { /* ignore */ } try { cfg.click(b); } catch (e) { console.warn('machine button failed', e); } },
+        get buttons() { return btns.map((b) => ({ id: b.id, label: b.label, x: b.x, y: b.y, w: b.w, h: b.h })); },
+      };
+    }
+
     // ---------- one machine: cabinet + game module + the station the room walks you up to ----------
     const list = [], byId = {};
     function makeMachine(d, side, z) {
@@ -7093,8 +7169,9 @@ return {
         cab.ttex.needsUpdate = true; cab.ticket.visible = true; cab.ticket.scale.y = 0.001; ticketT = performance.now();
       }
       const ex = d.kind === 'ex'; game = ex ? MODS.ex(host) : MODS[d.mod || d.id](host);
+      const ov = ex ? null : createScreenButtons({ THREE, screenMesh: cab.screenMesh, color: d.color, collect: () => hudOffers(root, game), click: (b) => b.ref.click(), sfx: () => sfx.click() });
       st = {
-        id: 'fm_' + d.id, name: d.title, group: g, machine: true, dock: true, zoomed: false, cab, game, root, def: d,
+        id: 'fm_' + d.id, name: d.title, group: g, machine: true, dock: true, zoomed: false, cab, game, root, def: d, ov,
         sign: { material: { opacity: 1 }, visible: false },
         cam: { off: V3(0, 1.6, 3), look: V3(0, 1.4, 0) }, col: cab.col || null,
         leaveMsg: 'Finish your spins and bonus first',
@@ -7142,10 +7219,10 @@ return {
           const h = fmRay.intersectObjects(cab.hits, false)[0]; return h && h.distance < 7 ? h : null;
         },
         _ray(ev) { const r = canvas.getBoundingClientRect(); return this._rayN(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); },
-        hover(ev) { return !!this._ray(ev); },
+        hover(ev) { const h = this._ray(ev); if (ov) ov.hover(h && h.object === cab.screenMesh ? ov.at(h.uv.x * SCW, (1 - h.uv.y) * SCH) : null); return !!h; },
         _use(h) {
           if (!h || game.modalOpen) return false; const o = h.object;
-          if (o === cab.screenMesh) { game.tap(h.uv.x * SCW, (1 - h.uv.y) * SCH); if (!game.hasFeature && !this.zoomed && eng !== this) this.zoom(true); return true; }
+          if (o === cab.screenMesh) { const sx = h.uv.x * SCW, sy = (1 - h.uv.y) * SCH, bx = ov && ov.at(sx, sy); if (bx) { ov.click(bx); return true; } game.tap(sx, sy); if (!game.hasFeature && !this.zoomed && eng !== this) this.zoom(true); return true; }
           if (o.userData.part) { const b = o.userData.btn; if (b) { const e = cab.buttons.find((x) => x.grp === b); if (e) e.t = performance.now(); } game.press(o.userData.part); return true; }
           return false;
         },
@@ -7176,6 +7253,7 @@ return {
           if (leverT) { const u = (now - leverT) / 900; cab.lever.rotation.x = u < 1 ? Math.sin(u * Math.PI) * 1.02 : 0; if (u >= 1) leverT = 0; }
           cab.buttons.forEach((b) => { const u = (now - b.t) / 170; b.grp.position.z = b.z0 - (b.t && u < 1 ? Math.sin(u * Math.PI) * (b.d || 0.012) : 0); });
           if (ticketT) { const u = Math.min(1, (now - ticketT) / 1400); cab.ticket.scale.y = Math.max(0.001, u); if (now - ticketT > 9000) { cab.ticket.visible = false; ticketT = 0; } }
+          if (ov) { if (eg && !focus && locked) { const ch = this._rayN(0, 0); ov.hover(ch && ch.object === cab.screenMesh ? ov.at(ch.uv.x * SCW, (1 - ch.uv.y) * SCH) : null); } ov.sync(act, now); }   // the on-screen buttons (the crosshair can rest on them)
           const lit = act && game.isLit(now);
           cab.leds.forEach((l, i) => { l.material = (lit ? Math.sin(now * 0.012 - i * 0.7) > 0.1 : Math.sin(now * 0.0018 - i * 0.45) > 0.82) ? cab.ledOn : cab.ledOff; });
           if (cab.crest) cab.crest.rotation.y = (now / 1000 * 0.9) % (Math.PI * 2);
