@@ -24,6 +24,7 @@ export const DATASET_KEY = '_system/checker/checker-data.json';
 const NO_STORE = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' };
 const MAX_BODY = 4096;
 const MAX_TWINS = 40;
+const MAX_SEARCH = 12;
 const MAX_QUERY = 2000;
 const HOUR_MS = 3600_000;
 const LOOKUPS_PER_HOUR = 120;
@@ -435,6 +436,31 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
       if (!tloaded.ok) return fail(tloaded.status, tloaded.error, tloaded.message);
       const results = ids.map((id) => tloaded.dataset.byId.get(id)).filter((rec): rec is Rec => Boolean(rec)).map((rec) => card(rec, tloaded.dataset));
       return jsonResponse({ ok: true, dataset: datasetInfo(tloaded.dataset), caveats: tloaded.dataset.caveats, kind: 'twins', results }, 200, NO_STORE);
+    }
+    // Search by name across the whole research. Needs three letters or digits, shows at most MAX_SEARCH, and is rate limited with
+    // the lookups, so it answers "does this collection have a report?" but is a poor way to copy the whole list out.
+    const search: unknown = isObject ? body.search : undefined;
+    if (typeof search === 'string') {
+      const needle = norm(search);
+      if (search.length > 80 || needle.length < 3) throw new BadRequest('Type at least three letters or numbers of the collection\'s name.');
+      const sip = request.headers.get('CF-Connecting-IP') || 'local';
+      const ssalt = typeof env?.TELEMETRY_SALT === 'string' ? env.TELEMETRY_SALT : '';
+      const scount = await bump(env?.DB, 'lookup:', sip, ssalt, now);
+      if (scount !== null && scount > LOOKUPS_PER_HOUR) return fail(429, 'rate_limited', 'Too many lookups from here. Try again in an hour.');
+      const sloaded = await loadDataset(env, now);
+      if (!sloaded.ok) return fail(sloaded.status, sloaded.error, sloaded.message);
+      const sd = sloaded.dataset;
+      const hits: Array<{ rec: Rec; first: boolean }> = [];
+      for (const rec of sd.byId.values()) {
+        const names = [norm(String(rec.name ?? '')), norm(String(rec.id).split('.')[1] ?? '')];
+        if (names.some((n) => n.includes(needle))) hits.push({ rec, first: names.some((n) => n.startsWith(needle)) });
+      }
+      hits.sort((x, y) => Number(y.first) - Number(x.first) || String(x.rec.name).localeCompare(String(y.rec.name)));
+      return jsonResponse({
+        ok: true, dataset: datasetInfo(sd), caveats: sd.caveats, kind: 'search', matches_total: hits.length,
+        results: hits.slice(0, MAX_SEARCH).map((h) => card(h.rec, sd)),
+        ...(hits.length === 0 ? { message: 'No collection in our research has that in its name. It may not be covered yet: paste its contract address (it looks like SP….name) to ask us to check it.' } : {})
+      }, 200, NO_STORE);
     }
     if (typeof q !== 'string' || q.trim() === '') throw new BadRequest('Paste a link, a contract address or a wallet address.');
     if (q.length > MAX_QUERY) throw new BadRequest('That is too long to be a link or an address.');

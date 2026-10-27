@@ -600,6 +600,51 @@ describe('/checker/lookup: reports for a list of contracts (the Forever Twin fil
   });
 });
 
+describe('/checker/lookup: search by name across the research', () => {
+  const find = async (env: any, search: unknown, o: Options = {}) => ask(env, undefined, { ...o, raw: JSON.stringify({ search }) });
+
+  it('finds collections by part of the name, ignoring case and punctuation', async () => {
+    const env = { ...envOf(), DB: database() };
+    for (const term of ['birds', 'BITCOIN bir', 'bitcoin-birds']) {
+      const { res, body } = await find(env, term);
+      expect(res.status).toBe(200);
+      expect(body.kind).toBe('search');
+      expect(body.results.map((r: any) => r.id)).toContain(BIRDS);
+    }
+  });
+
+  it('puts names that start with the search first, and says how many matched in all', async () => {
+    const env = { ...envOf(), DB: database() };
+    const { body } = await find(env, 'pepe');
+    expect(body.results.length).toBeGreaterThan(0);
+    expect(body.matches_total).toBeGreaterThanOrEqual(body.results.length);
+    expect(body.results.every((r: any) => r.covered)).toBe(true);
+  });
+
+  it('refuses searches shorter than three letters or numbers, so it cannot list everything', async () => {
+    const env = { ...envOf(), DB: database() };
+    for (const term of ['', 'a', 'bi', '--', '  b  ']) expect((await find(env, term)).res.status).toBe(400);
+    expect((await find(env, 'x'.repeat(81))).res.status).toBe(400);
+  });
+
+  it('answers a search with no match by saying so, not with an empty list that looks like a result', async () => {
+    const env = { ...envOf(), DB: database() };
+    const { res, body } = await find(env, 'zzzzqqq');
+    expect(res.status).toBe(200);
+    expect(body.results).toEqual([]);
+    expect(body.message).toMatch(/not be covered yet/);
+  });
+
+  it('counts against the lookup limit and records no demand', async () => {
+    const env = { ...envOf(), DB: database() };
+    await find(env, 'birds');
+    expect(env.DB.sql.prepare('SELECT COUNT(*) AS n FROM checker_demand').get().n).toBe(0);
+    let last = 200;
+    for (let i = 0; i < 125; i += 1) last = (await find(env, 'birds', { ip: '198.51.100.50' })).res.status;
+    expect(last).toBe(429);
+  });
+});
+
 describe('/checker/lookup: anonymous demand counters', () => {
   const today = new Date(now).toISOString().slice(0, 10);
   const demand = (env: any) => env.DB.sql.prepare('SELECT * FROM checker_demand ORDER BY contract_id, source').all() as any[];
