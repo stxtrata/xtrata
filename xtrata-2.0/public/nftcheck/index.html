@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>NFT preservation checker · Xtrata</title>
-<meta name="description" content="Paste a link, a contract address or a wallet address and see what we know about where the art of your Stacks NFTs is stored." />
+<meta name="description" content="Paste your wallet address and see what we know about where the art of your Stacks NFTs is stored. You can also check one collection by link, contract address or name." />
 <meta name="robots" content="noindex, nofollow" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <style>
@@ -188,16 +188,16 @@
 <main>
   <div class="lead">
     <h1>Where does your NFT's art actually live?</h1>
-    <p class="mut">Paste a link, a contract address or a wallet address. We'll tell you what we know about where the art is stored, what looks good and what worries us.</p>
+    <p class="mut"><strong>Paste your wallet address</strong> and we'll go through every NFT collection you hold: where the art is stored, what looks good and what worries us. Or check a single collection with a link or contract address, or search by name.</p>
   </div>
 
   <div class="modes" role="group" aria-label="What to look up">
-    <button type="button" class="mode" id="mode-find" aria-pressed="true">Link, contract or wallet</button>
+    <button type="button" class="mode" id="mode-find" aria-pressed="true">Wallet, link or contract</button>
     <button type="button" class="mode" id="mode-search" aria-pressed="false">Search by name</button>
   </div>
   <form class="find" id="find" novalidate>
     <label for="q" style="position:absolute;left:-10000px">Link, contract address or wallet address</label>
-    <input type="text" id="q" name="q" maxlength="2000" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Gamma link, contract (SP…name) or wallet address (SP…)" enterkeyhint="search" />
+    <input type="text" id="q" name="q" maxlength="2000" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Your wallet address (SP…), link or contract" enterkeyhint="search" />
     <button type="submit" id="go">Check</button>
   </form>
   <p class="hint mut small">A wallet address is public, so there is nothing to connect or sign. We don't keep your address or what you paste; we only keep anonymous daily counts of which collections get looked up. Names ending in <code>.btc</code> aren't supported yet; use the address that starts with <code>SP</code>.</p>
@@ -870,7 +870,7 @@
     mode = m;
     modeFind.setAttribute('aria-pressed', m === 'find' ? 'true' : 'false');
     modeSearch.setAttribute('aria-pressed', m === 'search' ? 'true' : 'false');
-    input.placeholder = m === 'search' ? 'Part of a collection name, e.g. pepe or birds' : 'Gamma link, contract (SP…name) or wallet address (SP…)';
+    input.placeholder = m === 'search' ? 'Part of a collection name, e.g. pepe or birds' : 'Your wallet address (SP…), link or contract';
     input.maxLength = m === 'search' ? 80 : 2000;
     go.textContent = m === 'search' ? 'Search' : 'Check';
   }
@@ -882,7 +882,7 @@
   form.addEventListener('submit', function (event) {
     event.preventDefault();
     var q = input.value.trim();
-    if (!q) { out.textContent = ''; out.appendChild(box('info', mode === 'search' ? 'Type part of a collection name first.' : 'Paste a link, a contract address or a wallet address first.')); return; }
+    if (!q) { out.textContent = ''; out.appendChild(box('info', mode === 'search' ? 'Type part of a collection name first.' : 'Paste your wallet address first (or a link or contract address).')); return; }
     var mine = ++serial;
     go.disabled = true;
     out.textContent = '';
