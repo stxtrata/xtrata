@@ -466,7 +466,7 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
         ...(hits.length === 0 ? { message: 'No collection in our research has that in its name. It may not be covered yet: paste its contract address (it looks like SP….name) to ask us to check it.' } : {})
       }, 200, NO_STORE);
     }
-    if (typeof q !== 'string' || q.trim() === '') throw new BadRequest('Paste a link, a contract address or a wallet address.');
+    if (typeof q !== 'string' || q.trim() === '') throw new BadRequest('Paste your wallet address, or a link or contract address.');
     if (q.length > MAX_QUERY) throw new BadRequest('That is too long to be a link or an address.');
 
     const ip = request.headers.get('CF-Connecting-IP') || 'local';
