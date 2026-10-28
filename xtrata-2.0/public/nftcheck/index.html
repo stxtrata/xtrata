@@ -824,6 +824,7 @@
         : 'We matched what you typed to ' + (results.length === 1 ? 'a collection' : 'collections') + ' by name. Check it is the one you meant.'));
     }
 
+    if (data.token_id) out.appendChild(box('info', 'That link is for piece #' + data.token_id + '. This is the collection it belongs to; we check collections, not single pieces.'));
     var list = el('div', { class: 'rows' });
     var shown = [];
     results.forEach(function (card) {
