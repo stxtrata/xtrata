@@ -268,6 +268,28 @@ describe('/checker/lookup: a contract', () => {
   });
 });
 
+describe('/checker/lookup: a link to one piece', () => {
+  it('reads the collection from a marketplace link to one piece, and says which piece', async () => {
+    const { body } = await ask(envOf(), `https://gamma.io/stacks/nfts/${BIRDS}_12`);
+    expect(body.kind).toBe('contract');
+    expect(body.token_id).toBe('12');
+    expect(body.results.map((r: any) => r.id)).toEqual([BIRDS]);
+    expect(body.results[0].covered).toBe(true);
+  });
+
+  it('reports an uncovered collection by its own contract id, not with the piece number stuck on the end', async () => {
+    const { body } = await ask(envOf(), `https://gamma.io/stacks/nfts/${UNKNOWN}_5`);
+    expect(body.token_id).toBe('5');
+    expect(body.results).toEqual([{ covered: false, id: UNKNOWN }]);
+  });
+
+  it('leaves a contract name that really ends in a number alone when the link is not to a piece', async () => {
+    const { body } = await ask(envOf(), `${UNKNOWN}_5`);
+    expect(body.token_id).toBeUndefined();
+    expect(body.results).toEqual([{ covered: false, id: `${UNKNOWN}_5` }]);
+  });
+});
+
 describe('/checker/lookup: a link or a name', () => {
   it('matches a marketplace collection link by its slug', async () => {
     for (const q of ['https://gamma.io/collections/bitcoin-birds', 'gamma.io/collections/bitcoin-birds/12', 'https://gamma.io/collections/bitcoin-birds/12?sort=price#top']) {

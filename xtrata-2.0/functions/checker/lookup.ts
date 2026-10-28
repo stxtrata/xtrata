@@ -137,7 +137,7 @@ async function loadDataset(env: any, now: number): Promise<Loaded> {
 // ---------- what the visitor pasted ----------
 
 type Parsed =
-  | { kind: 'contract'; id: string }
+  | { kind: 'contract'; id: string; token?: string }
   | { kind: 'wallet'; address: string }
   | { kind: 'name'; from: 'link' | 'text'; matches: string[]; tried: string[] }
   | { kind: 'notice'; code: string; message: string };
@@ -163,7 +163,11 @@ function parse(q: string, dataset: Dataset): Parsed {
   if (contract) {
     const address = contract[1].toUpperCase();
     if (!validateStacksAddress(address)) return notice('invalid_address', 'That contract address does not pass its built-in checksum, so it probably has a typo. Please copy it again.');
-    return { kind: 'contract', id: `${address}.${contract[2]}` };
+    // A marketplace link to one piece looks like .../nfts/<contract>_<token id>. The "_5" is the piece, not part of the contract name.
+    const piece = /\/nfts?\//i.test(q) ? /^(.+)_(\d+)$/.exec(contract[2]) : null;
+    return piece
+      ? { kind: 'contract', id: `${address}.${piece[1]}`, token: piece[2] }
+      : { kind: 'contract', id: `${address}.${contract[2]}` };
   }
 
   const address = ADDRESS_IN_TEXT.exec(q);
@@ -489,12 +493,12 @@ export async function handleCheckerLookup(request: Request, env: any, deps: Deps
     if (parsed.kind === 'contract') {
       if (isXtrataCore(parsed.id)) {
         await remember([{ id: parsed.id, source: 'contract', covered: true, items: 0 }]);
-        return jsonResponse({ ...base, kind: 'contract', results: [xtrataCard(dataset, [parsed.id])] }, 200, NO_STORE);
+        return jsonResponse({ ...base, kind: 'contract', ...(parsed.token ? { token_id: parsed.token } : {}), results: [xtrataCard(dataset, [parsed.id])] }, 200, NO_STORE);
       }
       const rec = dataset.byId.get(parsed.id);
       const results = rec ? [card(rec, dataset)] : [{ covered: false, id: parsed.id }];
       await remember([{ id: parsed.id, source: 'contract', covered: Boolean(rec), items: 0 }]);
-      return jsonResponse({ ...base, kind: 'contract', results }, 200, NO_STORE);
+      return jsonResponse({ ...base, kind: 'contract', ...(parsed.token ? { token_id: parsed.token } : {}), results }, 200, NO_STORE);
     }
 
     if (parsed.kind === 'name') {
