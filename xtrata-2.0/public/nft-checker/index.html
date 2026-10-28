@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Preservation checker · Xtrata</title>
+<title>NFT preservation checker · Xtrata</title>
 <meta name="description" content="Paste a link, a contract address or a wallet address and see what we know about where the art of your Stacks NFTs is stored." />
 <meta name="robots" content="noindex, nofollow" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <style>
   :root{color-scheme:dark;--bg:#06080d;--panel:#0f1521;--panel2:#141d2d;--line:#223047;--ink:#e6edf6;--mut:#9aa9bf;--acc:#3ea6ff;--cyan:#5ee9ff;
-    --good:#3ddc97;--warn:#f5c451;--orange:#ff9f43;--bad:#ff6b6b;--dead:#000;--neutral:#8b9bb4;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+    --good:#3ddc97;--warn:#f5c451;--orange:#ff9f43;--bad:#ff6b6b;--dead:#000;--forev:#35e8b8;--neutral:#8b9bb4;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg)}
   a{color:var(--cyan)}
@@ -27,7 +27,10 @@
   code{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
   :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 
-  form.find{margin:18px 0 6px;display:flex;gap:8px;flex-wrap:wrap;max-width:760px}
+  .modes{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 0}
+  button.mode{min-height:38px;padding:4px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 14px system-ui,sans-serif}
+  button.mode[aria-pressed=true]{border-color:var(--cyan);background:#0c2230}
+  form.find{margin:10px 0 6px;display:flex;gap:8px;flex-wrap:wrap;max-width:760px}
   form.find input[type=text]{flex:1 1 280px;min-width:0;min-height:48px;padding:10px 14px;font:16px system-ui,sans-serif;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px}
   button{font:600 16px system-ui,sans-serif;min-height:48px;padding:10px 20px;border-radius:10px;border:1px solid var(--acc);background:var(--acc);color:#04101c;cursor:pointer}
   button:disabled{opacity:.6;cursor:default}
@@ -68,8 +71,11 @@
   .chip-btn{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 14px system-ui,sans-serif;cursor:pointer}
   .chip-btn[aria-pressed=true]{border-color:var(--cyan);background:#0c2230}
   .chip-btn i,.chip i{width:9px;height:9px;border-radius:50%;background:var(--neutral);display:inline-block;flex:none}
+  .chip-btn.twin i{background:var(--cyan)}
+  .chip-btn.twin[aria-pressed=true]{border-color:var(--cyan)}
   .chip-btn .c{color:var(--mut);font-variant-numeric:tabular-nums}
   .s-on_chain i,.s-solid i{background:var(--good)}
+  .s-twinned i{background:var(--forev)}
   .s-one_host i{background:var(--warn)}
   .s-marketplace_broken i{background:var(--orange)}
   .s-marketplace_only i{background:var(--bad)}
@@ -81,6 +87,7 @@
   .rows{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
   .row{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--neutral);border-radius:10px}
   .row.s-on_chain,.row.s-solid{border-left-color:var(--good)}
+  .row.s-twinned{border-left-color:var(--forev)}
   .row.s-one_host{border-left-color:var(--warn)}
   .row.s-marketplace_broken{border-left-color:var(--orange)}
   .row.s-marketplace_only{border-left-color:var(--bad)}
@@ -97,6 +104,7 @@
   .gm{display:inline-block;margin-left:8px;font-size:12px;font-weight:500;color:var(--cyan);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:0 6px;white-space:nowrap;vertical-align:1px}
   .gm:hover{border-color:var(--cyan)}
   .row.other .nm .gm{display:inline-block}
+  .twinnote{margin:10px 0 0;padding:10px 14px;border:1px solid #1d6b57;background:#08201a;border-radius:10px;font-size:15px}
   .hbtn{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:3px 12px;border-radius:999px;border:1px solid var(--acc);background:transparent;color:var(--acc);font:600 13px system-ui,sans-serif;cursor:pointer;text-decoration:none;white-space:nowrap}
   .hbtn:hover{background:#0c2230}
   .hbtn.done{border-color:var(--good);color:var(--good);cursor:default;background:transparent}
@@ -176,16 +184,20 @@
 </style>
 </head>
 <body>
-<header class="top"><a class="logo" href="/" aria-label="Xtrata"><img src="/checker/xtrata-x.webp" alt="" width="28" height="28" /><span aria-hidden="true">trata</span></a><span class="sub">Preservation checker</span></header>
+<header class="top"><a class="logo" href="/" aria-label="Xtrata"><img src="/nft-checker/xtrata-x.webp" alt="" width="28" height="28" /><span aria-hidden="true">trata</span></a><span class="sub">NFT preservation checker</span></header>
 <main>
   <div class="lead">
     <h1>Where does your NFT's art actually live?</h1>
     <p class="mut">Paste a link, a contract address or a wallet address. We'll tell you what we know about where the art is stored, what looks good and what worries us.</p>
   </div>
 
+  <div class="modes" role="group" aria-label="What to look up">
+    <button type="button" class="mode" id="mode-find" aria-pressed="true">Link, contract or wallet</button>
+    <button type="button" class="mode" id="mode-search" aria-pressed="false">Search by name</button>
+  </div>
   <form class="find" id="find" novalidate>
     <label for="q" style="position:absolute;left:-10000px">Link, contract address or wallet address</label>
-    <input type="text" id="q" name="q" maxlength="2000" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Gamma link, contract (SP…name) or wallet address (SP…)" />
+    <input type="text" id="q" name="q" maxlength="2000" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Gamma link, contract (SP…name) or wallet address (SP…)" enterkeyhint="search" />
     <button type="submit" id="go">Check</button>
   </form>
   <p class="hint mut small">A wallet address is public, so there is nothing to connect or sign. We don't keep your address or what you paste; we only keep anonymous daily counts of which collections get looked up. Names ending in <code>.btc</code> aren't supported yet; use the address that starts with <code>SP</code>.</p>
@@ -212,10 +224,10 @@
 
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   // Worst first. unclear and not_art sort last: nothing to act on.
-  var ORDER = ['not_found', 'marketplace_only', 'marketplace_broken', 'one_host', 'unclear', 'solid', 'on_chain', 'not_art'];
+  var ORDER = ['not_found', 'marketplace_only', 'marketplace_broken', 'one_host', 'unclear', 'solid', 'twinned', 'on_chain', 'not_art'];
   var SHORT = {
     not_found: 'Art not found', marketplace_only: 'Marketplace copy only', marketplace_broken: 'Marketplace copy broken', one_host: 'One host',
-    unclear: "Couldn't tell", solid: 'Looks solid', on_chain: 'On chain', not_art: 'Not art'
+    unclear: "Couldn't tell", solid: 'Looks solid', twinned: 'Fully on chain · Twins', on_chain: 'On chain', not_art: 'Not art'
   };
   var ATTENTION = { not_found: true, marketplace_only: true, marketplace_broken: true };
   var out = document.getElementById('out');
@@ -223,6 +235,7 @@
   var input = document.getElementById('q');
   var go = document.getElementById('go');
   var serial = 0;
+  var runSearch = function () {};
 
   // ---------- small helpers ----------
   // Everything from the server goes in through textContent, never innerHTML.
@@ -273,7 +286,7 @@
         .then(function (j) {
           if (!j || !Array.isArray(j.collections)) return null;
           var map = {};
-          j.collections.forEach(function (c) { if (c && c.source) map[c.source] = { key: c.key, status: c.status }; });
+          j.collections.forEach(function (c) { if (c && c.source) map[c.source] = { key: c.key, status: c.status, helper: c.helper || null }; });
           return map;
         })
         .catch(function () { return null; });
@@ -395,6 +408,72 @@
     return details;
   }
 
+  // ---------- live Forever Twins counts, read from the chain the way the Forever Twins page does ----------
+  // A collection whose helper has made a twin for every piece (get-inscribed-count >= the source's get-last-token-id) is
+  // "fully on chain". Read in the visitor's browser; if a read fails nothing changes, so a failure never lifts a rating.
+  var HIRO = 'https://api.hiro.so';
+  var twinReads = {};
+  function clarityUint(hex) {
+    var m = /^0x(?:07)?01([0-9a-f]{32})$/i.exec(hex || '');
+    if (!m) return null;
+    var v = Number(BigInt('0x' + m[1]));
+    return isFinite(v) ? v : null;
+  }
+  function readUint(id, fn) {
+    var dot = String(id).indexOf('.');
+    var addr = id.slice(0, dot); var name = id.slice(dot + 1);
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 6000);
+    return fetch(HIRO + '/v2/contracts/call-read/' + addr + '/' + name + '/' + fn, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sender: addr, arguments: [] }), signal: ctl ? ctl.signal : undefined
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { return d && d.okay ? clarityUint(d.result) : null; })
+      .catch(function () { return null; })
+      .then(function (v) { clearTimeout(timer); return v; });
+  }
+  function twinProgress(source, helper) {
+    if (!twinReads[source]) {
+      twinReads[source] = Promise.all([readUint(helper, 'get-inscribed-count'), readUint(source, 'get-last-token-id')]).then(function (v) {
+        return v[0] === null || v[1] === null || !(v[1] > 0) ? null : { n: v[0], total: v[1] };
+      });
+    }
+    return twinReads[source];
+  }
+  function applyTwin(r, prog) {
+    var pct = Math.min(100, Math.floor(prog.n / prog.total * 100));
+    var done = prog.n >= prog.total;
+    var tags = r.node.querySelector('.tags');
+    if (tags) tags.appendChild(el('span', { class: done ? 'tag live' : 'tag', text: 'Twins ' + num(prog.n) + ' / ' + num(prog.total) + (done ? '' : ' (' + pct + '%)') }));
+    var body = r.node.querySelector('.rowbody');
+    if (done) {
+      r.node.className = r.node.className.replace(/\bs-[a-z_]+/, 's-twinned');
+      var chip = r.node.querySelector('.rowsum .chip');
+      if (chip) { chip.className = 'chip s-twinned'; chip.title = 'Every piece has a permanent on-chain Forever Twin'; chip.textContent = ''; chip.appendChild(el('i')); chip.appendChild(document.createTextNode(SHORT.twinned)); }
+      r.group = 'twinned'; r.rank = rank('twinned');
+      // the old one-line verdict ("rests on a single host") describes the original art, not the twins: say so rather than leave it contradicting the badge
+      var meta = r.node.querySelector('.rowbody .meta');
+      if (meta) { var rest = meta.textContent.split(' · ').slice(1).join(' · '); meta.textContent = rest || 'Original art:'; }
+      var hl = r.node.querySelector('.rowbody .headline');
+      if (hl) hl.textContent = 'About the original art: ' + hl.textContent.charAt(0).toLowerCase() + hl.textContent.slice(1);
+      if (body) body.insertBefore(el('p', { class: 'twinnote' }, el('strong', { text: 'Fully on chain: ' }), 'every one of its ' + num(prog.total) + ' pieces now has a permanent on-chain Forever Twin (' + num(prog.n) + ' of ' + num(prog.total) + ', read from the chain just now). The notes below are about the original art; the twins keep a copy on chain whatever happens to it.'), body.firstChild);
+    } else if (body) {
+      body.insertBefore(el('p', { class: 'twinnote' }, el('strong', { text: 'Twinning in progress: ' }), num(prog.n) + ' of ' + num(prog.total) + ' pieces (' + pct + '%) have a permanent on-chain Forever Twin so far, read from the chain just now. Pieces without one still depend on the original art.'), body.firstChild);
+    }
+  }
+  // rows: the row objects built above. Pass refresh to re-draw the chips and counts afterwards.
+  function watchTwins(rows, registry, refresh) {
+    if (!registry) return;
+    rows.forEach(function (r) {
+      var entry = registry[r.id];
+      if (!entry || entry.status !== 'live' || !entry.helper || r.group === 'other' || r.group === 'not_art') return;
+      twinProgress(r.id, entry.helper).then(function (prog) {
+        if (!prog || !r.node.isConnected) return;
+        applyTwin(r, prog);
+        if (refresh) refresh();
+      });
+    });
+  }
+
   // ---------- one-click "request a helper" ----------
   // One state shared by every button for the same collection (the row's summary and its expanded body), so they never disagree.
   function helperControl(card, live) {
@@ -485,14 +564,15 @@
 
     var c = card.checked || {};
     return {
-      node: node, group: card.status, held: held || 0, name: card.name.toLowerCase(), size: card.tokens_approx || 0,
+      node: node, id: card.id, group: card.status, twin: !!live, held: held || 0, name: card.name.toLowerCase(), size: card.tokens_approx || 0,
       checked: [c.contract, c.marketplace].filter(Boolean).sort().pop() || '', rank: rank(card.status),
       text: (card.name + ' ' + card.id).toLowerCase()
     };
   }
 
   // ---------- one collection we have NO report on, with a one-tap "count me in" ----------
-  function otherRow(o, fromWallet) {
+  function otherRow(o, fromWallet, registry) {
+    var live = registry && registry[o.id] && registry[o.id].status === 'live' ? registry[o.id] : null;
     var label = o.asset && o.asset !== 'nft' ? o.asset : o.id.split('.').slice(1).join('.') || o.id;
     var act = el('div', { class: 'act' });
     var btn = el('button', { type: 'button', class: 'quiet', text: 'Ask us to check this' });
@@ -515,7 +595,7 @@
       fromWallet ? el('span', { class: 'hd', text: '×' + num(o.held), title: 'You hold ' + num(o.held) }) : null,
       el('span', { class: 'mt' }, el('span', { class: 'chip' }, el('i'), 'Not in research'), el('span', { class: 'tag', text: 'No information yet' })),
       act);
-    return { node: node, group: 'other', held: o.held, name: label.toLowerCase(), size: 0, checked: '', rank: 99, text: (label + ' ' + o.id).toLowerCase() };
+    return { node: node, id: o.id, group: 'other', twin: !!live, held: o.held, name: label.toLowerCase(), size: 0, checked: '', rank: 99, text: (label + ' ' + o.id).toLowerCase() };
   }
 
   // ---------- totals and the list ----------
@@ -547,30 +627,56 @@
   function buildList(rows, results) {
     var sort = 'worst';
     var chosen = {};
+    var twinOnly = false;
     var query = '';
     var allOpen = false;
 
     var list = el('div', { class: 'rows' });
-    var empty = el('div', { class: 'empty', hidden: true }, 'Nothing matches those filters. ', el('button', { type: 'button', class: 'quiet', text: 'Clear filters' }));
+    var searchAll = el('button', { type: 'button', class: 'quiet', text: 'Search all collections' });
+    var empty = el('div', { class: 'empty', hidden: true }, 'Nothing in this wallet matches those filters. ', el('button', { type: 'button', class: 'quiet', text: 'Clear filters' }), ' ', searchAll);
     var countText = el('span', { 'aria-live': 'polite' });
     var expand = el('button', { type: 'button', class: 'quiet', text: 'Expand all' });
 
-    // status chips, with how many collections of each
-    var groups = {};
-    rows.forEach(function (r) { groups[r.group] = (groups[r.group] || 0) + 1; });
+    // status chips, with how many collections of each (re-drawn when a status changes after a live twin count arrives)
     var chipBar = el('div', { class: 'chips', role: 'group', 'aria-label': 'Filter by status' });
     var chipEls = {};
-    ORDER.concat(['other']).forEach(function (g) {
-      if (!groups[g]) return;
-      var b = el('button', { type: 'button', class: 'chip-btn s-' + g, 'aria-pressed': 'false' }, el('i'), g === 'other' ? 'Not in research' : SHORT[g], el('span', { class: 'c', text: String(groups[g]) }));
-      b.addEventListener('click', function () {
-        if (chosen[g]) delete chosen[g]; else chosen[g] = true;
-        b.setAttribute('aria-pressed', chosen[g] ? 'true' : 'false');
-        apply();
+    function refreshChips() {
+      var groups = {};
+      rows.forEach(function (r) { if (!r.extra) groups[r.group] = (groups[r.group] || 0) + 1; });
+      ORDER.concat(['other']).forEach(function (g) {
+        var n = groups[g] || 0;
+        if (!n) { if (chipEls[g]) { chipEls[g].hidden = true; if (chosen[g]) { delete chosen[g]; chipEls[g].setAttribute('aria-pressed', 'false'); } } return; }
+        if (!chipEls[g]) {
+          var b = el('button', { type: 'button', class: 'chip-btn s-' + g, 'aria-pressed': 'false' }, el('i'), g === 'other' ? 'Not in research' : SHORT[g], el('span', { class: 'c' }));
+          b.addEventListener('click', function () {
+            if (chosen[g]) delete chosen[g]; else chosen[g] = true;
+            b.setAttribute('aria-pressed', chosen[g] ? 'true' : 'false');
+            apply();
+          });
+          chipEls[g] = b;
+          // keep the scale order: put it before the next chip that exists
+          var after = null;
+          ORDER.concat(['other']).slice(ORDER.concat(['other']).indexOf(g) + 1).some(function (h) { if (chipEls[h]) { after = chipEls[h]; return true; } return false; });
+          chipBar.insertBefore(b, after || (twinChip || null));
+        }
+        chipEls[g].hidden = false;
+        chipEls[g].querySelector('.c').textContent = String(n);
       });
-      chipEls[g] = b;
-      chipBar.appendChild(b);
-    });
+    }
+
+    // "Has a Forever Twin" shows every collection that has a helper, including ones this wallet does not hold (added later by addRows).
+    var twinChip = null; var twinNum = null;
+    function refreshTwin() {
+      var n = rows.filter(function (r) { return r.twin; }).length;
+      if (!n) return;
+      if (!twinChip) {
+        twinNum = el('span', { class: 'c' });
+        twinChip = el('button', { type: 'button', class: 'chip-btn twin', 'aria-pressed': 'false', title: 'Every collection that already has a Forever Twins helper, including ones this wallet does not hold' }, el('i'), 'Has a Forever Twin', twinNum);
+        twinChip.addEventListener('click', function () { twinOnly = !twinOnly; twinChip.setAttribute('aria-pressed', twinOnly ? 'true' : 'false'); apply(); });
+        chipBar.appendChild(twinChip);
+      }
+      twinNum.textContent = String(n);
+    }
 
     var select = el('select', { 'aria-label': 'Sort by' },
       el('option', { value: 'worst', text: 'Sort: worst first' }),
@@ -583,10 +689,12 @@
 
     function clear() {
       Object.keys(chosen).forEach(function (g) { delete chosen[g]; chipEls[g].setAttribute('aria-pressed', 'false'); });
+      twinOnly = false; if (twinChip) twinChip.setAttribute('aria-pressed', 'false');
       query = ''; search.value = '';
       apply();
     }
     empty.querySelector('button').addEventListener('click', clear);
+    searchAll.addEventListener('click', function () { runSearch(query); });
     select.addEventListener('change', function () { sort = select.value; apply(); });
     search.addEventListener('input', function () { query = search.value.trim().toLowerCase(); apply(); });
     expand.addEventListener('click', function () {
@@ -607,18 +715,45 @@
       var any = Object.keys(chosen).length > 0;
       var shown = 0;
       rows.slice().sort(compare).forEach(function (r) {
-        var ok = (!any || chosen[r.group]) && (!query || r.text.indexOf(query) !== -1);
+        var ok = (!r.extra || twinOnly) && (!any || chosen[r.group]) && (!twinOnly || r.twin) && (!query || r.text.indexOf(query) !== -1);
         r.node.hidden = !ok;
         if (ok) shown += 1;
         list.appendChild(r.node);
       });
       empty.hidden = shown !== 0;
-      countText.textContent = 'Showing ' + num(shown) + ' of ' + num(rows.length) + (any || query ? ' (filtered)' : '');
+      searchAll.hidden = query.length < 3;
+      var mine = rows.filter(function (r) { return !r.extra; }).length;
+      var away = twinOnly ? rows.filter(function (r) { return r.extra && !r.node.hidden; }).length : 0;
+      countText.textContent = 'Showing ' + num(shown) + ' of ' + num(mine) + (any || query || twinOnly ? ' (filtered)' : '') + (away ? ', ' + num(away) + ' not in this wallet' : '');
     }
 
     var wrap = el('section', { 'aria-label': 'Collections' }, controls, chipBar, el('div', { class: 'countline' }, countText), list, empty);
+    wrap.addRows = function (more) { more.forEach(function (r) { rows.push(r); }); refreshChips(); refreshTwin(); apply(); };
+    wrap.refresh = function () { refreshChips(); apply(); };
+    refreshChips();
+    refreshTwin();
     apply();
     return wrap;
+  }
+
+  // Collections with a Forever Twins helper that this wallet does not hold: fetched once, kept out of the list until the
+  // "Has a Forever Twin" filter is on. They are not lookups anyone made, so the server records nothing for them.
+  function addTwinsNotHeld(listEl, rows, registry) {
+    if (!registry) return;
+    var have = {}; rows.forEach(function (r) { have[r.id] = true; });
+    var missing = Object.keys(registry).filter(function (src) { return registry[src].status === 'live' && !have[src]; });
+    if (!missing.length) return;
+    post('/checker/lookup', { twins: missing }).then(function (res) {
+      if (!listEl.isConnected || !(res.status === 200 && res.data && res.data.ok && Array.isArray(res.data.results))) return;
+      var extra = res.data.results.filter(function (c) { return c.covered; }).map(function (c) {
+        var r = reportRow(c, registry, false);
+        r.extra = true; r.held = 0;
+        var tags = r.node.querySelector('.tags');
+        if (tags) tags.insertBefore(el('span', { class: 'tag', text: 'Not in this wallet' }), tags.firstChild);
+        return r;
+      });
+      if (extra.length) { listEl.addRows(extra); watchTwins(extra, registry, listEl.refresh); }
+    }).catch(function () { /* the filter just shows the ones this wallet holds */ });
   }
 
   function walletEmpty() {
@@ -663,13 +798,22 @@
       if (warning) out.appendChild(warning);
       out.appendChild(totalsPanel(w, results));
       var rows = results.map(function (card) { return reportRow(card, registry, false); })
-        .concat((data.others || []).map(function (o) { return otherRow(o, true); }));
-      out.appendChild(buildList(rows, results));
+        .concat((data.others || []).map(function (o) { return otherRow(o, true, registry); }));
+      var listEl = buildList(rows, results);
+      out.appendChild(listEl);
+      addTwinsNotHeld(listEl, rows, registry);
+      watchTwins(rows, registry, listEl.refresh);
       if (data.others_total > (data.others || []).length) {
         out.appendChild(el('p', { class: 'mut small', text: 'Showing the ' + num((data.others || []).length) + ' collections without a report that you hold most of (of ' + num(data.others_total) + ').' }));
       }
       finish(data);
       return;
+    }
+
+    if (data.kind === 'search') {
+      if (!results.length) { out.appendChild(box('info', data.message)); return; }
+      var more = data.matches_total > results.length;
+      out.appendChild(box('info', 'Collections in our research with that in the name: ' + num(data.matches_total) + (more ? '. Showing the first ' + num(results.length) + '; type more of the name to narrow it down.' : '.') + ' Check it is the one you meant.'));
     }
 
     if (data.kind === 'collection') {
@@ -681,11 +825,14 @@
     }
 
     var list = el('div', { class: 'rows' });
+    var shown = [];
     results.forEach(function (card) {
-      if (card.covered) list.appendChild(reportRow(card, registry, results.length === 1).node);
-      else list.appendChild(otherRow({ id: card.id, asset: '', held: 0 }, false).node);
+      var r = card.covered ? reportRow(card, registry, results.length === 1) : otherRow({ id: card.id, asset: '', held: 0 }, false, registry);
+      shown.push(r);
+      list.appendChild(r.node);
     });
     out.appendChild(list);
+    watchTwins(shown, registry, null);
     finish(data);
   }
 
@@ -715,19 +862,35 @@
   }
 
   // ---------- the form ----------
+  var mode = 'find';
+  var modeFind = document.getElementById('mode-find');
+  var modeSearch = document.getElementById('mode-search');
+  function setMode(m) {
+    mode = m;
+    modeFind.setAttribute('aria-pressed', m === 'find' ? 'true' : 'false');
+    modeSearch.setAttribute('aria-pressed', m === 'search' ? 'true' : 'false');
+    input.placeholder = m === 'search' ? 'Part of a collection name, e.g. pepe or birds' : 'Gamma link, contract (SP…name) or wallet address (SP…)';
+    input.maxLength = m === 'search' ? 80 : 2000;
+    go.textContent = m === 'search' ? 'Search' : 'Check';
+  }
+  modeFind.addEventListener('click', function () { setMode('find'); input.focus(); });
+  modeSearch.addEventListener('click', function () { setMode('search'); input.focus(); });
+  // From the wallet list: look for this name across everything we have researched.
+  runSearch = function (text) { setMode('search'); input.value = text; form.requestSubmit(); };
+
   form.addEventListener('submit', function (event) {
     event.preventDefault();
     var q = input.value.trim();
-    if (!q) { out.textContent = ''; out.appendChild(box('info', 'Paste a link, a contract address or a wallet address first.')); return; }
+    if (!q) { out.textContent = ''; out.appendChild(box('info', mode === 'search' ? 'Type part of a collection name first.' : 'Paste a link, a contract address or a wallet address first.')); return; }
     var mine = ++serial;
     go.disabled = true;
     out.textContent = '';
     out.appendChild(box('info', 'Looking…'));
-    post('/checker/lookup', { q: q }).then(function (res) {
+    post('/checker/lookup', mode === 'search' ? { search: q } : { q: q }).then(function (res) {
       if (mine !== serial) return null;
       var d = res.data;
       if (res.status === 200 && d && d.ok) {
-        var needsRegistry = Array.isArray(d.results) && d.results.some(function (r) { return r.covered && r.name && !r.special; });
+        var needsRegistry = d.kind === 'wallet' || (Array.isArray(d.results) && d.results.some(function (r) { return r.covered && r.name && !r.special; }));
         return (needsRegistry ? loadRegistry() : Promise.resolve(null)).then(function (registry) {
           if (mine !== serial) return;
           render(d, registry);
