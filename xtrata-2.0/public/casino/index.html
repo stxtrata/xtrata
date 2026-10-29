@@ -4733,7 +4733,7 @@ button{font:inherit;color:inherit;cursor:pointer}
       const pos = ['top', 'top-left', 'top-right', 'bottom', 'bottom-left', 'bottom-right', 'under-left', 'tab'].indexOf(O.badge) >= 0 ? O.badge : 'top';
       root.innerHTML = '<style>' + CSS + '</style><div class="w pos-' + pos + '">' +
         '<button id="pill" type="button" aria-expanded="false" aria-controls="note"><i></i><span>TESTNET<span class="long"> · PLAY MONEY</span></span></button>' +
-        '<div id="note" role="note"><b>TESTNET · PLAY MONEY</b><p>This casino runs on the Stacks testnet. Test STX has no real value.</p><p>LAYR is play money: it can\'t be withdrawn or turned back into STX.</p><p class="st" id="nst"></p></div>' +
+        '<div id="note" role="note"><b>TESTNET · PLAY MONEY</b><p>This casino runs on the Stacks testnet. Test STX has no real value.</p><p>LAYR is play money: it can\'t be withdrawn or turned back into STX.</p><p>Spins, wins and LAYR purchases are logged for statistics, under an anonymous player ID (plus your wallet address if you connect one).</p><p class="st" id="nst"></p></div>' +
         '<div id="bar" role="status"><span id="btxt"></span><button id="bx" type="button" aria-label="Dismiss this note">×</button></div>' +
         '<div id="over" role="dialog" aria-modal="true" aria-labelledby="oh"><div id="card" tabindex="-1"><h1 id="oh"></h1><p id="om"></p><a id="ol" hidden rel="noopener noreferrer"></a><small>This was a testnet game: no real funds were involved.</small></div></div></div>';
       ['pill', 'note', 'nst', 'bar', 'btxt', 'bx', 'over', 'card', 'oh', 'om', 'ol'].forEach((id) => { ui[id] = root.getElementById ? root.getElementById(id) : root.querySelector('#' + id); });
@@ -4989,6 +4989,117 @@ button{font:inherit;color:inherit;cursor:pointer}
         get ready() { return ready(); }, get closed() { return addrOk() && shut(); }, get net() { return SHOP.network; }, get addr() { return S.addr; }, get wallet() { return S.prov ? S.prov.name : ''; }, get pending() { return D.pending; }, get hist() { return D.hist; },
         on(f) { subs.push(f); }, bind(f) { bankCredit = f; },
       };
+    })();
+    window.ROUND_LOG_OPTS = Object.assign({ page: 'casino', addr: () => LX.addr }, window.ROUND_LOG_OPTS || {});   // (a test build can point it elsewhere)
+    // ====================================================================
+    //  ROUND LOG: a statistics log, not a ledger.
+    //  Every spin, bonus, gamble, LAYR purchase and move of LAYR between a machine and the bankroll is sent, batched and in the
+    //  background, to /casino/log so the casino can see what it pays out. It is reported by this page, so it is for statistics, not
+    //  proof; the planned proof is on-chain settlement (docs/plans/CASINO-ONCHAIN-LAYR-PLAN.md).
+    //  What is sent: a random id for this browser, another for this visit, the machine, the stake and the result, the five reel stops
+    //  (so any result can be replayed through the engine), and the connected wallet address if a wallet is connected. No IP address is kept.
+    //  Nothing in the game waits for it and nothing it does can reach the game: every hook is wrapped, the game's own answer is returned
+    //  untouched, and a failed send is retried quietly (and stops for the visit if the endpoint does not exist).
+    //  A browser can opt out with  localStorage.setItem('px_rl_off', '1')  and back in by removing that key.
+    //  Page options (all optional) are read from window.ROUND_LOG_OPTS: { page: 'casino' | 'casino-b', url, addr: () => 'ST...', enabled, flushMs }.
+    //  See docs/plans/CASINO-ROUND-LOG.md for the event format and the server side.
+    // ====================================================================
+    const RoundLog = (() => {
+      if (window.PXRoundLog) return window.PXRoundLog;
+      const O = window.ROUND_LOG_OPTS || {};
+      const URL_ = O.url || '/casino/log', PAGE = O.page || 'casino';
+      const MAX_Q = 500, BATCH = 40, FLUSH_AT = 20, FLUSH_MS = O.flushMs || 12000;
+      const ADDR = /^S[TN][0-9A-HJKMNP-TV-Z]{26,40}$/;
+      const ls = (f) => { try { return f(window.localStorage); } catch (e) { return null; } };
+      const rid = (n) => { const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, (b) => (b % 36).toString(36)).join(''); };
+      let pid = ls((s) => s.getItem('px_rl_pid'));
+      if (!/^p_[a-z0-9]{10,24}$/.test(pid || '')) { pid = 'p_' + rid(16); ls((s) => s.setItem('px_rl_pid', pid)); }
+      const sid = 's_' + rid(10);
+      const off = !!ls((s) => s.getItem('px_rl_off')) || O.enabled === false || (location.protocol === 'file:' && !O.url);
+      let seq = 0, q = [], timer = 0, inflight = false, fails = 0, dead = false, addr = '';
+      const n0 = (v) => { v = Math.round(Number(v)); return Number.isFinite(v) && v >= 0 ? v : 0; };
+      const hex = (v) => (typeof v === 'string' && /^[0-9a-f]{1,32}$/i.test(v) ? v : undefined);   // the server refuses an event whose round id is not hex, so only a well-formed one is sent
+      function later(ms) { if (timer && ms > 0) return; clearTimeout(timer); timer = setTimeout(() => { timer = 0; flush(false); }, ms); }
+      function add(ev) {
+        if (off || dead) return;
+        try { ev.seq = seq++; ev.t = Date.now(); q.push(ev); if (q.length > MAX_Q) q.splice(0, q.length - MAX_Q); later(q.length >= FLUSH_AT ? 0 : FLUSH_MS); } catch (e) { /* never reaches the game */ }
+      }
+      function body(n) {
+        let a = addr; try { if (O.addr) a = O.addr() || a; } catch (e) { /* ignore */ }
+        return JSON.stringify({ v: 1, page: PAGE, pid, sid, addr: ADDR.test(a || '') ? a : null, events: q.slice(0, n) });
+      }
+      function backoff(status) {
+        if (status === 404 || status === 405 || status === 403) { dead = true; q = []; return; }   // no such endpoint here (a local copy, an old deploy): stop for this visit
+        fails++; later(Math.min(300000, 15000 * Math.pow(2, Math.min(fails, 5))));
+      }
+      function flush(unload) {
+        if (off || dead || !q.length) return;
+        if (unload) {   // the page is going away: hand everything left to the browser; the server drops repeats if the page lives on
+          try { while (q.length) { const n = Math.min(BATCH, q.length); const ok = navigator.sendBeacon && navigator.sendBeacon(URL_, new Blob([body(n)], { type: 'application/json' })); if (!ok) break; q.splice(0, n); } } catch (e) { /* ignore */ }
+          return;
+        }
+        if (inflight) return;
+        const n = Math.min(BATCH, q.length); let b; try { b = body(n); } catch (e) { return; }
+        inflight = true;
+        fetch(URL_, { method: 'POST', headers: { 'content-type': 'application/json' }, body: b, keepalive: true })
+          .then((r) => { inflight = false; if (r.ok) { fails = 0; q.splice(0, n); if (q.length) later(q.length >= FLUSH_AT ? 0 : 1000); } else backoff(r.status); })
+          .catch(() => { inflight = false; backoff(0); });
+      }
+      window.addEventListener('pagehide', () => flush(true));
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(true); });
+
+      // ---- engine hooks: wrap the engine's own functions once; the game's answer is returned untouched ----
+      const wrap = (o, name, make) => { const orig = o[name]; if (typeof orig !== 'function' || orig.__rl) return; const w = make(orig); w.__rl = 1; o[name] = w; };
+      const safe = (f) => { try { f(); } catch (e) { /* never reaches the game */ } };
+      function hook(engine, m, getState) {
+        if (!engine || typeof engine.settle !== 'function') return;
+        const reg = engine.__rlReg || (engine.__rlReg = []);   // several machines (and copies of a machine) can share one engine object
+        reg.push({ m, get: getState });
+        if (reg.length > 1 || engine.__rlHooked) return;
+        engine.__rlHooked = 1;
+        const who = (state) => reg.find((e) => { try { return e.get() === state; } catch (x) { return false; } });
+        wrap(engine, 'settle', (orig) => function (state) {
+          const p = state && state.pending, r = orig.apply(this, arguments);
+          safe(() => {
+            const e = r && p && !p.forced && !p.preview && who(state); if (!e) return;
+            const fx = r.triggers ? (r.triggers.free ? 'F' : '') + (r.triggers.vault ? 'V' : '') + (r.triggers.chain ? 'C' : '') : (r.freeAward ? 'F' : '') + (r.bonus ? 'V' : '');
+            add({ m: e.m, k: 'spin', bet: n0(p.bet), free: p.free ? 1 : 0, win: n0(r.total), jp: n0(r.jackpotWin), st: Array.isArray(p.stops) ? p.stops.slice(0, 5).map(n0) : undefined, fx, rid: hex(p.id) });
+          });
+          return r;
+        });
+        if (typeof engine.collect === 'function') {   // Block Fortune family: vault and chain pay when collected
+          wrap(engine, 'collect', (orig) => function (state) {
+            const f = state && state.features && state.features[0], c = orig.apply(this, arguments);
+            safe(() => {
+              const e = c && f && !f.preview && who(state); if (!e) return;
+              add({ m: e.m, k: 'bonus', ty: c.type, bet: n0(f.bet), win: n0(c.amount), jp: n0(c.jackpotWin), rid: hex(f.roundId),
+                d: c.type === 'vault' ? { aw: (f.awards || []).slice(0, 9).map(n0), pk: (f.picks || []).slice(0, 3).map(n0) } : { sum: n0(f.sum), full: f.full ? 1 : 0 } });
+            });
+            return c;
+          });
+        } else if (typeof engine.pick === 'function') {   // Neon Vault: each vault pick pays at once
+          wrap(engine, 'pick', (orig) => function (state) {
+            const b = state && state.bonus, r = orig.apply(this, arguments);
+            safe(() => { const e = r && b && who(state); if (e) add({ m: e.m, k: 'bonus', ty: 'pick', bet: n0(b.bet), win: n0(r.amount), jp: 0, d: { mult: n0(r.multiple) } }); });
+            return r;
+          });
+        }
+        if (typeof engine.gamble === 'function') {
+          wrap(engine, 'gamble', (orig) => function (state, choice) {
+            const stake = state && state.gamble, r = orig.apply(this, arguments);
+            safe(() => { const e = r && who(state); if (e) add({ m: e.m, k: 'gamble', stake: n0(stake), w: r.win ? 1 : 0, win: n0(r.amount), ch: String(choice).toLowerCase().replace(/[^a-z]/g, '').slice(0, 8) || undefined }); });
+            return r;
+          });
+        }
+      }
+      const api = {
+        add, hook, flush: () => flush(false), setAddr(a) { addr = ADDR.test(a || '') ? a : addr; },
+        buy(tx, layr, bh) { add({ m: 'ex', k: 'buy', tx: String(tx || ''), layr: n0(layr), bh: bh ? n0(bh) : undefined }); },
+        move(m, dir, n) { if (n0(n) > 0) add({ m: /^ex/.test(m) ? 'ex' : m, k: 'move', dir, n: n0(n) }); },
+        queued: () => q.slice(), get on() { return !off && !dead; }, ids: { pid, sid },
+      };
+      window.PXRoundLog = api;
+      return api;
     })();
     const MODS = {
       bf: function (host) {
@@ -5257,6 +5368,7 @@ function leave() {
   if ($('modal').open) closeModal(); stopAuto(); const n = state.balance; if (n > 0) { state.balance = 0; state.gamble = 0; save(); host.give(n); } update(); return true;
 }
 update(); drawScreen(0);
+try { host.log.hook(BF, 'bf', () => state); } catch (e) { /* the log never reaches the game */ }
 return {
   frame, onKey, enter, leave, isLit,
   get spinning() { return spinning; }, get busy() { return busy(); },
@@ -5669,6 +5781,7 @@ function leave() {
   if ($('modal').open) closeModal(); stopAuto(); const n = state.balance; if (n > 0) { state.balance = 0; state.gamble = 0; save(); host.give(n); } update(); return true;
 }
 update(); drawScreen(0);
+try { host.log.hook(BF, 'drop', () => state); } catch (e) { /* the log never reaches the game */ }
 return {
   frame, onKey, enter, leave, isLit,
   get spinning() { return spinning; }, get busy() { return busy(); },
@@ -6056,6 +6169,7 @@ function leave() {
   if ($('modal').open) closeModal(); stopAuto(); const n = state.balance; if (n > 0) { state.balance = 0; state.gamble = 0; save(); host.give(n); } update(); return true;
 }
 update(); drawScreen(0);
+try { host.log.hook(BF, 'twins', () => state); } catch (e) { /* the log never reaches the game */ }
 return {
   frame, onKey, enter, leave, isLit,
   get spinning() { return spinning; }, get busy() { return busy(); },
@@ -6426,6 +6540,7 @@ function leave() {
   if ($('modal').open) closeModal(); stopAuto(); const n = state.balance; if (n > 0) { state.balance = 0; state.gamble = 0; save(); host.give(n); } update(); return true;
 }
 update(); drawScreen(0);
+try { host.log.hook(E, 'ds', () => state); } catch (e) { /* the log never reaches the game */ }
 return {
   frame, onKey, enter, leave, isLit,
   get spinning() { return spinning; }, get busy() { return busy(); },
@@ -6667,6 +6782,7 @@ function leave(){
  if($('modal').open)closeModal();stopAuto();const n=state.balance;if(n>0){state.balance=0;state.gamble=0;save();host.give(n);}update();return true;
 }
 update();drawScreen(0);
+try { host.log.hook(NV, 'nv', () => state); } catch (e) { /* the log never reaches the game */ }
 return {
  frame,onKey,enter,leave,isLit,
  get spinning(){return spinning;},get busy(){return busy();},
@@ -7151,11 +7267,11 @@ return {
         tex: { set needsUpdate(v) { if (v) cab.tex.needsUpdate = true; } },
         actx() { audio(); return actx; }, bus() { return busSfx || (actx && actx.destination); },
         toast: (s) => toast(s), bank: () => bank, fmtBank: () => money(bank),
-        take(n) { n = Math.floor(n); if (!(n >= 1) || n > bank + 1e-9) return false; setBank(bank - n); lastBal += n; return true; },
-        give(n) { setBank(bank + n); lastBal = 0; },
+        take(n) { n = Math.floor(n); if (!(n >= 1) || n > bank + 1e-9) return false; setBank(bank - n); lastBal += n; RoundLog.move(d.mod || d.id, 'in', n); return true; },
+        give(n) { setBank(bank + n); lastBal = 0; RoundLog.move(d.mod || d.id, 'out', n); },
         ticket(n) { printTicket(n); },
         goExchange() { goExchange(); },
-        lx: LX, sfx, pull() { leverT = performance.now(); },
+        lx: LX, log: RoundLog, sfx, pull() { leverT = performance.now(); },
         store: !d.copy || d.copy < 2 ? window.localStorage : {
           getItem: (k) => (/\.twins$/.test(k) ? window.localStorage.getItem(k) : /^px\./.test(k) ? window.localStorage.getItem(k + '.c' + d.copy) : null),   // (old v1 saves are not copied into a second machine)
           setItem: (k, v) => { if (/^px\./.test(k)) window.localStorage.setItem(k + '.c' + d.copy, v); else if (/\.twins$/.test(k)) window.localStorage.setItem(k, v); },
@@ -7270,7 +7386,7 @@ return {
     DEFS.forEach((d) => makeMachine(d, d.side, d.z));
     // paid LAYR goes straight into the bankroll (and is not counted as a win in the session figure)
     LX.bind((n) => { startTotal += n; setBank(bank + n); });
-    LX.on((ev, d) => { if (ev === 'credited') { sfx.big(); banner('+' + money(d.layr), 'big'); toast('LAYR EXCHANGE · ' + d.layr.toLocaleString('en-US') + ' LAYR dispensed'); } else if (ev === 'failed') toast(d.why); });
+    LX.on((ev, d) => { if (ev === 'credited') { RoundLog.buy(d.tx, d.layr); sfx.big(); banner('+' + money(d.layr), 'big'); toast('LAYR EXCHANGE · ' + d.layr.toLocaleString('en-US') + ' LAYR dispensed'); } else if (ev === 'failed') toast(d.why); });
     // "out of LAYR": walk the player to the nearest exchange
     function goExchange() {
       const exs = list.filter((s) => s.def.kind === 'ex'); if (!exs.length) return;

@@ -19,6 +19,8 @@ interface D1PreparedStatement {
 
 interface D1Database {
   prepare(query: string): D1PreparedStatement;
+  /** One round trip, all-or-nothing. Optional so a minimal fake D1 still type-checks; callers fall back to run(). */
+  batch?(statements: D1PreparedStatement[]): Promise<unknown[]>;
 }
 
 interface R2Bucket {
