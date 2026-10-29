@@ -82,3 +82,23 @@ bucket_name = "xtrata-runtime-content-cache"
 [[env.preview.r2_buckets]]
 binding = "THUMBNAILS"
 bucket_name = "xtrata-thumbnails"
+
+# Casino room (docs/plans/CASINO-PRESENCE-PLAN.md, workers/casino-room/README.md).
+# The room itself is a Durable Object that lives in its own Worker, "xtrata-casino-room". Deploy THAT Worker first
+# (npx wrangler deploy --config workers/casino-room/wrangler.toml); a Pages deployment that points at a Worker which
+# does not exist yet fails its checks. Because this file is the source of truth for Pages bindings, the binding is
+# declared here and not in the dashboard. The shared secret CASINO_ROOM_SECRET (and the kill switch CASINO_ROOM_DISABLED)
+# are dashboard Secrets for both environments, never in this file.
+# Preview first. Production stays without the binding, so every /casino/room/* route there answers "room offline"
+# and the casino pages are untouched, until the preview test (/casino-room-spike/) has passed.
+[[env.preview.durable_objects.bindings]]
+name = "CASINO_ROOM"
+class_name = "CasinoRoom"
+script_name = "xtrata-casino-room"
+
+# Production: uncomment ONLY after the room Worker is deployed and the preview test has passed.
+# [[durable_objects.bindings]]
+# name = "CASINO_ROOM"
+# class_name = "CasinoRoom"
+# script_name = "xtrata-casino-room"
+# Keep the preview block above as well: once the room is live, both environments carry the binding.

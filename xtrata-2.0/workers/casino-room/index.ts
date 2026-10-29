@@ -1,0 +1,210 @@
+/**
+ * Casino room: the Durable Object that holds who is in the casino and where they sit (P0 spike of
+ * docs/plans/CASINO-PRESENCE-PLAN.md).
+ *
+ * - One object (`idFromName('main')`) is the whole room. WebSockets use the Hibernation API, so an idle room costs almost
+ *   nothing; the room's state lives in each connection's attachment and is rebuilt from `ctx.getWebSockets()` after a wake-up.
+ * - No timers or alarms (they keep a Durable Object awake). Clean-up happens when a socket closes.
+ * - This Worker has NO public route (workers_dev = false, no routes). Only the Pages project can reach the object, through
+ *   its binding, and the Pages Function (functions/casino/room/ws.ts) is the only place that sets the trusted `x-px-addr`
+ *   header after checking the player's session cookie. Never add a route or workers.dev address to this Worker.
+ * - Everything the room decides is in functions/lib/casino-room.ts and is unit tested; this file only moves data.
+ * - The room never touches money. A seat here does not give a seat at a contract table.
+ */
+import { DurableObject } from 'cloudflare:workers';
+import {
+  MAX_SOCKETS,
+  applyLeave,
+  applySit,
+  applyStand,
+  deriveView,
+  newPeer,
+  overflowForAddress,
+  parseClientMessage,
+  shortAddress,
+  takeRate,
+  type Change,
+  type Peer
+} from '../../functions/lib/casino-room';
+
+interface Env { [key: string]: unknown }
+
+const NONCE_PREFIX = 'n:';
+
+export class CasinoRoom extends DurableObject<Env> {
+  /** When this in-memory instance was created. After a hibernation the constructor runs again, so a changed value in a
+   *  pong shows the room slept and woke (the P0 idle test uses this). Nothing depends on it. */
+  private readonly up = Date.now();
+
+  /** Every open connection with its peer record. Rebuilt from attachments, so it is correct after hibernation. */
+  private peers(): Array<{ ws: WebSocket; peer: Peer }> {
+    const list: Array<{ ws: WebSocket; peer: Peer }> = [];
+    for (const ws of this.ctx.getWebSockets()) {
+      const peer = ws.deserializeAttachment() as Peer | null;
+      if (peer && typeof peer.id === 'string') list.push({ ws, peer });
+    }
+    return list;
+  }
+
+  private save(entries: Array<{ ws: WebSocket; peer: Peer }>) {
+    for (const { ws, peer } of entries) {
+      try { ws.serializeAttachment(peer); } catch { /* a closing socket cannot take an attachment */ }
+    }
+  }
+
+  private send(ws: WebSocket, message: unknown) {
+    try { ws.send(JSON.stringify(message)); } catch { /* the socket is closing; its close handler cleans up */ }
+  }
+
+  private broadcast(entries: Array<{ ws: WebSocket }>, message: unknown) {
+    const text = JSON.stringify(message);
+    for (const { ws } of entries) {
+      try { ws.send(text); } catch { /* ignore */ }
+    }
+  }
+
+  private counts(entries: Array<{ peer: Peer }>) {
+    const view = deriveView(entries.map((e) => e.peer));
+    return { joined: view.joined, guests: view.guests };
+  }
+
+  private announce(entries: Array<{ ws: WebSocket; peer: Peer }>, changes: Change[]) {
+    for (const change of changes) {
+      if (change.kind === 'moved') {
+        const target = entries.find((e) => e.peer.id === change.peerId);
+        if (target) this.send(target.ws, { t: 'moved', spot: change.spot });
+      } else if (change.kind === 'sat') {
+        this.broadcast(entries, { t: 'sat', spot: change.spot, who: change.who });
+      } else {
+        this.broadcast(entries, { t: 'stood', spot: change.spot });
+      }
+    }
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Used once by the Pages Function that exchanges a signature for a session: a sign-in request can be used one time.
+    if (url.pathname === '/nonce' && request.method === 'POST') {
+      let body: { n?: unknown; exp?: unknown };
+      try { body = (await request.json()) as { n?: unknown; exp?: unknown }; } catch { return new Response('bad', { status: 400 }); }
+      const nonce = typeof body.n === 'string' && /^[a-f0-9]{64}$/.test(body.n) ? body.n : null;
+      const exp = typeof body.exp === 'number' && Number.isSafeInteger(body.exp) ? body.exp : null;
+      if (!nonce || !exp) return new Response('bad', { status: 400 });
+      const key = NONCE_PREFIX + nonce;
+      if (await this.ctx.storage.get(key)) return Response.json({ ok: false }, { status: 409 });
+      await this.ctx.storage.put(key, exp);
+      // Forget nonces that can no longer be replayed (a challenge lasts two minutes).
+      const now = Date.now();
+      const old = await this.ctx.storage.list<number>({ prefix: NONCE_PREFIX, limit: 200 });
+      const stale = [...old.entries()].filter(([, v]) => typeof v !== 'number' || v < now).map(([k]) => k);
+      if (stale.length) await this.ctx.storage.delete(stale);
+      return Response.json({ ok: true });
+    }
+
+    if (url.pathname.endsWith('/ws')) {
+      if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a WebSocket.', { status: 426 });
+      const entries = this.peers();
+      if (entries.length >= MAX_SOCKETS) return new Response('The room is full.', { status: 503 });
+
+      const address = request.headers.get('x-px-addr') || null;
+      const hash160 = request.headers.get('x-px-k') || null;
+      const now = Date.now();
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+      const peer = newPeer(crypto.randomUUID(), address, hash160, now);
+      this.ctx.acceptWebSocket(server);
+      server.serializeAttachment(peer);
+
+      // No address may hold more than two connections: the oldest extras are closed and their seats freed.
+      const fresh = this.peers();   // includes the connection just accepted
+      const dropped = overflowForAddress(fresh.map((e) => e.peer), address);
+      for (const extra of dropped) {
+        const target = fresh.find((e) => e.peer.id === extra.id);
+        if (!target) continue;
+        const changes = applyStand(fresh.map((e) => e.peer), extra.id);
+        this.save([target]);
+        this.announce(fresh, changes);
+        try { target.ws.close(4001, 'replaced'); } catch { /* already closing */ }
+      }
+
+      const live = fresh.filter((e) => !dropped.some((d) => d.id === e.peer.id));
+      const view = deriveView(live.map((e) => e.peer));
+      this.send(server, {
+        t: 'room', v: 1,
+        you: { a: address, n: shortAddress(address), guest: !address, k: hash160 },
+        spots: view.spots, joined: view.joined, guests: view.guests, at: now
+      });
+      this.broadcast(live.filter((e) => e.ws !== server), { t: 'count', joined: view.joined, guests: view.guests });
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
+    return new Response('Not found.', { status: 404 });
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
+    const entries = this.peers();
+    const mine = entries.find((e) => e.ws === ws);
+    if (!mine) return;
+    const now = Date.now();
+    if (!takeRate(mine.peer, now)) {
+      this.save([mine]);
+      this.send(ws, { t: 'err', code: 'slow-down' });
+      return;
+    }
+    const parsed = parseClientMessage(message);
+    if (!parsed.ok) { this.save([mine]); this.send(ws, { t: 'err', code: parsed.code }); return; }
+
+    const peers = entries.map((e) => e.peer);
+    switch (parsed.msg.t) {
+      case 'ping':
+        this.save([mine]);
+        this.send(ws, { t: 'pong', at: now, up: this.up });
+        return;
+      case 'hello': {
+        this.save([mine]);
+        const view = deriveView(peers);
+        this.send(ws, { t: 'room', v: 1, you: { a: mine.peer.a, n: shortAddress(mine.peer.a), guest: !mine.peer.a, k: mine.peer.k }, spots: view.spots, joined: view.joined, guests: view.guests, at: now });
+        return;
+      }
+      case 'sit': {
+        const result = applySit(peers, mine.peer.id, parsed.msg.spot, now);
+        this.save(entries);
+        if (!result.ok) { this.send(ws, { t: 'err', code: result.code }); return; }
+        this.announce(entries, result.changes);
+        return;
+      }
+      case 'stand': {
+        const changes = applyStand(peers, mine.peer.id);
+        this.save(entries);
+        this.announce(entries, changes);
+        return;
+      }
+    }
+  }
+
+  private async gone(ws: WebSocket) {
+    const entries = this.peers().filter((e) => e.ws !== ws);
+    let peer: Peer | null = null;
+    try { peer = ws.deserializeAttachment() as Peer | null; } catch { /* nothing to free */ }
+    if (peer) {
+      const changes = applyLeave([peer], peer.id);
+      this.announce(entries, changes);
+    }
+    this.broadcast(entries, { t: 'count', ...this.counts(entries) });
+  }
+
+  async webSocketClose(ws: WebSocket, code: number, reason: string) {
+    try { ws.close(code, reason); } catch { /* already closed */ }
+    await this.gone(ws);
+  }
+
+  async webSocketError(ws: WebSocket) {
+    await this.gone(ws);
+  }
+}
+
+export default {
+  // No route reaches this Worker (workers_dev is off); this answer only matters if someone adds one by mistake.
+  async fetch() { return new Response('Casino room service. No public route.', { status: 404 }); }
+};

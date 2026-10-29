@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Casino room test</title>
+<style>
+  :root { color-scheme: dark; --bg:#0d0f14; --card:#161a22; --line:#2a3040; --ink:#ece7da; --dim:#9aa3b2; --gold:#e3b84a; --ok:#58c98a; --bad:#ef6b6b; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:20px 16px 60px; }
+  h1 { font-size:22px; margin:0 0 4px; color:var(--gold); }
+  h2 { font-size:16px; margin:0 0 8px; }
+  p { margin:0 0 10px; }
+  .dim { color:var(--dim); }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin:14px 0; }
+  button { font:inherit; color:var(--ink); background:#222938; border:1px solid var(--line); border-radius:8px; padding:10px 14px; cursor:pointer; min-height:44px; }
+  button.primary { background:var(--gold); color:#1a1405; border-color:var(--gold); font-weight:600; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .status { margin-top:8px; font-size:14px; word-break:break-word; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  #spots { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px; margin-top:10px; }
+  #spots button { text-align:left; font-size:13px; padding:8px 10px; min-height:52px; }
+  #spots button.mine { border-color:var(--gold); background:#2c2616; }
+  #spots button.taken { opacity:.8; }
+  #spots small { display:block; color:var(--dim); }
+  #log { max-height:220px; overflow:auto; font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:#0a0c10; border:1px solid var(--line); border-radius:8px; padding:8px; white-space:pre-wrap; }
+  textarea { width:100%; min-height:120px; background:#0a0c10; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px; font:12px/1.4 ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Casino room test</h1>
+  <p class="dim">A test page for the "people in the room" idea. Signing here is <b>free</b>: it is not a transaction, sends no money and writes nothing to a chain. It only proves which wallet you are, so the room can show you in a seat.</p>
+
+  <section>
+    <h2>1. Connect your wallet</h2>
+    <p class="dim">Use the wallet setup you use for the casino (testnet). Either network works here, and signing is free on both.
+    Please use a throwaway wallet account, not one that holds real funds.</p>
+    <div class="row"><button id="connect-leather" class="primary">Connect Leather</button><button id="connect-xverse" class="primary">Connect Xverse</button><button id="disconnect" disabled>Disconnect</button></div>
+    <div id="walletStatus" class="status dim">Not connected.</div>
+  </section>
+
+  <section>
+    <h2>2. Sign in to the room (one signature)</h2>
+    <p class="dim">Your wallet will show "ParallaX Casino" and "Casino room entry; no spending permission". Check there is no fee.</p>
+    <div class="row"><button id="signin" class="primary" disabled>Sign in (free)</button><button id="signout" disabled>Sign out</button></div>
+    <div id="signStatus" class="status dim">Not signed in. You can still watch the room as a guest.</div>
+  </section>
+
+  <section>
+    <h2>3. The room</h2>
+    <div id="roomStatus" class="status dim">Connecting…</div>
+    <div id="counts" class="status dim"></div>
+    <div id="spots"></div>
+    <div class="row" style="margin-top:10px"><button id="stand" disabled>Stand up</button><button id="idle">Idle test (30 s)</button><button id="reconnect">Reconnect</button></div>
+    <div id="idleStatus" class="status dim"></div>
+  </section>
+
+  <section>
+    <h2>4. Test report</h2>
+    <p class="dim">After trying the steps, press this and paste the text back to Claude.</p>
+    <div class="row"><button id="report" class="primary">Make report</button><button id="copy">Copy</button></div>
+    <textarea id="reportText" readonly placeholder="The report appears here."></textarea>
+  </section>
+
+  <section><h2>Log</h2><div id="log"></div></section>
+</main>
+<script type="module" src="spike.js"></script>
+</body>
+</html>
