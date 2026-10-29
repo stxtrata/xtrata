@@ -18,8 +18,9 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 import { HDKey } from '@scure/bip32';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
+import { normalizeBroadcastResult } from './broadcast-result';
 import {
-  makeContractCall, makeSTXTokenTransfer, broadcastTransaction, callReadOnlyFunction,
+  makeContractCall, makeSTXTokenTransfer, broadcastTransaction as stacksBroadcastTransaction, callReadOnlyFunction,
   estimateTransaction, estimateTransactionByteLength,
   uintCV, standardPrincipalCV, bufferCV, stringAsciiCV, listCV,
   makeStandardSTXPostCondition, FungibleConditionCode, PostConditionMode, AnchorMode,
@@ -53,6 +54,8 @@ export const MAX_BATCH_ITEMS = 40;                               // receipt deps
 const DISCARD_CONSENT = 'i-accept-losing-the-unfinished-upload';
 
 const network: any = new StacksMainnet();
+/** Every broadcast in this file goes through here: a refusal that is not a node rejection (a 403 from a gateway, say) is an error, never a txid. */
+const broadcastTransaction = async (tx: any, net: any): Promise<any> => normalizeBroadcastResult(await stacksBroadcastTransaction(tx, net));
 network.coreApiUrl = location.origin + HIRO_BASE;   // routes read-only + broadcast through the proxy
 
 const enc = new TextEncoder();
@@ -1487,7 +1490,7 @@ async function sendMusic(key: string, from: string, fn: string, args: any[], spe
     weight: String(weight), protocol: String(spendCap || 0n), ids: [txid], fees: { [txid]: String(fee) }, since: Date.now() };
   s.waitSince ||= Date.now(); writeMusicFees(id, s); // persist BEFORE broadcast, including ambiguous network outcomes
   const res: any = await broadcastTransaction(tx, network);
-  if (res?.error) {
+  if (res?.error && !res.ambiguous) {
     // A definitive node rejection did not consume the nonce or mining budget.
     const fresh = readMusicFees(id)!; delete fresh.pending; writeMusicFees(id, fresh);
     throw new MusicFeeWait(`${fn}: ${res.reason || res.error}. Waiting within your approved fee limit.`);

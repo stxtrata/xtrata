@@ -276,3 +276,16 @@ describe('replace-by-fee when a transaction is accepted but never mined', () => 
     for (const f of chain.broadcasts) expect(f).toBeLessThanOrEqual(2_000_000n);
   });
 });
+
+describe('a broadcast the gateway refuses', () => {
+  it('fails at once with the reason instead of reporting a transaction that does not exist', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 5_000_000n);
+    chain.feeQuotes = [3000n];
+    chain.gatewayRefusesBroadcasts = true;
+    await expect(agent.send(KEY, addr, 'begin-or-get', [], null, undefined, null))
+      .rejects.toThrow(/broadcast refused by the network gateway \(Forbidden\)\. Nothing was broadcast/);
+    // one attempt: no fee bumps, no waiting on a txid that was never issued
+    expect(chain.broadcasts).toEqual([3000n]);
+  });
+});
