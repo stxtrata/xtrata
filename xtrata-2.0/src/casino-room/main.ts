@@ -49,6 +49,8 @@ const S = {
   open: false,
   want: null as string | null,
   badSpot: null as string | null,     // a spot the room said it has no such place (an older room Worker): not asked again
+  yielded: null as string | null,     // a spot another tab of the same player took from this one: not asked for again until this tab moves
+  standSent: null as string | null,   // the spot this tab last asked to stand up from: asked once, not every 0.6 s
   lastSent: 0,
   host: null as PXRoomHost | null,
   retryTimer: 0
@@ -102,8 +104,11 @@ const reconcile = () => {
   if (S.service !== 'ok' || !S.connected || !S.you || S.you.guest || !S.signed) return;
   const mine = Object.entries(S.spots).find(([, v]) => v.a === S.you!.a)?.[0] ?? null;
   if (S.want) {
-    if (mine !== S.want && S.want !== S.badSpot && !S.spots[S.want] && Date.now() - S.lastSent > 1200) send({ t: 'sit', spot: S.want });
-  } else if (mine && Date.now() - S.lastSent > 600) {
+    if (mine !== S.want && S.want !== S.badSpot && S.want !== S.yielded && !S.spots[S.want] && Date.now() - S.lastSent > 1200) send({ t: 'sit', spot: S.want });
+  } else if (mine && mine !== S.standSent && Date.now() - S.lastSent > 600) {
+    // Once per spot. The room only stands up the connection that sat there, so if the seat belongs to another tab or device of
+    // this player, repeating this would never take effect and would only run into the room's message limit ("slow down").
+    S.standSent = mine;
     send({ t: 'stand' });
   }
 };
@@ -121,11 +126,13 @@ const connect = () => {
     switch (m.t) {
       case 'room':
         S.you = m.you; S.spots = m.spots || {}; S.joined = m.joined; S.guests = m.guests;
+        S.standSent = null;                                 // a fresh connection holds no seat yet
         if (S.signed && S.you?.guest) S.signed = null;      // the session ran out (4 hours) while the page stayed open
         chat?.room(m.players, !!(S.you && !S.you.guest));
         break;
       case 'sat': S.spots[m.spot] = m.who; break;
-      case 'stood': delete S.spots[m.spot]; break;
+      case 'stood': delete S.spots[m.spot]; if (S.standSent === m.spot) S.standSent = null; break;
+      case 'moved': S.yielded = m.spot; break;       // another tab of this player sat down elsewhere: that tab wins; this one stops asking
       case 'count': S.joined = m.joined; S.guests = m.guests; break;
       case 'say': case 'dm': chat?.heard(m); return;
       case 'join': chat?.joined(m.who); return;
@@ -133,7 +140,8 @@ const connect = () => {
       case 'reported': chat?.reported(); return;
       case 'err':
         if (m.code === 'no-such-spot') S.badSpot = S.want;
-        else if (isChatError(m.code)) chat?.failed(m.code);
+        else if (isChatError(m.code) && chat?.failed(m.code)) { /* chat showed it */ }
+        else if (m.code === 'slow-down') S.lastSent = Date.now() + 3000;    // the seat updates were too quick: wait a few seconds before the next
         return;
       default: return;      // moved, pong: nothing to draw; reconcile() decides whether to try again
     }
@@ -200,6 +208,7 @@ async function join(kind: WalletKind) {
 async function leave() {
   try { await postJson('/casino/room/session', { method: 'DELETE' }); } catch { /* the cookie dies by itself in 4 hours */ }
   S.signed = null; S.wallet = null; S.error = '';
+  chat?.endSession();
   chat?.disconnected();
   reconnect(); paint();
 }
@@ -317,7 +326,7 @@ function paint() {
     parts.push(el('p', `${S.joined} signed in, ${S.guests} watching.`));
     parts.push(fact('Be seen', 'Sit at a table or connect to a machine and your Adrian and name tag appear there for everyone in the room. Stand up or walk away and they go too.'));
     parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
-    parts.push(fact('Live chat', 'Press Chat to talk to the room. Tap a name, or Here now, to send someone a direct message, block or report them. Messages are not secret and are not saved.'));
+    parts.push(fact('Live chat', 'Press Chat to talk to the room and scroll back through this session. Tap a name, or Here now, to send someone a direct message, block or report them. Messages are not secret; this session\'s chat is kept in this tab only and cleared when you leave the room.'));
     parts.push(el('p', 'Nothing here moves any money.', 'fact'));
     const b = el('button', 'Leave the room'); b.onclick = () => { void leave(); };
     parts.push(b);
@@ -348,7 +357,7 @@ function paint() {
 
 const watchSeat = () => {
   const spot = S.host?.currentSpot() ?? null;
-  if (spot !== S.want) { S.want = spot; pushPeople(); }
+  if (spot !== S.want) { S.want = spot; S.yielded = null; S.standSent = null; pushPeople(); }   // the player moved: this tab speaks for them again
   reconcile();
 };
 

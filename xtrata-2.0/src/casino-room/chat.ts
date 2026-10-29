@@ -1,15 +1,17 @@
 /**
- * The casino's live chat: room chat and direct messages, shown as one plain column of text floating over the casino (no box) that
- * fades by itself. A "Chat" button opens a typing line. Tapping a name (in the column or in "Here now") offers Message, Block and
- * Report. A direct message goes to one person, is tinted in the column, and stays up a little longer; it is not secret (it passes
- * through the room service like everything else, and the guide says so).
+ * The casino's live chat: room chat and direct messages, shown as one plain column of text floating over the casino (no box).
+ * Nothing fades. With the chat closed the newest few lines stay on screen; a "Chat" button opens a typing line and the whole of this
+ * session's chat, which scrolls. The session's chat is kept in this tab only (sessionStorage, so a reload keeps it) and is cleared when
+ * the player leaves the room, when their room session ends, or when the tab closes. Tapping a name (in the column or in "Here now")
+ * offers Message, Block and Report. A direct message goes to one person and is tinted; it is not secret (it passes through the room
+ * service like everything else, and the guide says so).
  *
  * It rides on the room connection that main.ts already owns (it neither opens a socket nor signs anyone in) and never touches money or
  * game state. Everything shown is put on the page as text, never as markup. The room enforces the real rules (signed in to speak, 280
  * characters, no links, one message every two seconds, two-way blocking); this file only makes them easy to live with.
  */
 import {
-  BLOCKS_KEY, ChatLog, MAX_BLOCKS, MAX_CHARS, REPORT_REASONS, Roster, UI_KEY, checkSend, errorText, parseBlocks, parsePrefs,
+  BLOCKS_KEY, ChatLog, MAX_BLOCKS, MAX_CHARS, REPORT_REASONS, Roster, SESSION_PREFIX, UI_KEY, checkSend, errorText, parseBlocks, parsePrefs,
   type Line, type ReportReason, type UiPrefs, type Who
 } from './chat-core';
 
@@ -31,7 +33,12 @@ const CSS = `
 #pxchat.over{padding:8px;border-radius:10px;background:rgba(12,9,14,.94);border:1px solid rgba(227,184,74,.45);box-shadow:0 8px 24px rgba(0,0,0,.6)}
 #pxchat-lines{display:flex;flex-direction:column;justify-content:flex-end;gap:3px;max-width:100%;min-height:0;flex:0 1 auto;overflow:hidden}
 #pxchat.right #pxchat-lines{align-items:flex-end}
-#pxchat .ln{transition:opacity .6s linear;overflow-wrap:anywhere;text-shadow:0 1px 2px #000,0 0 7px rgba(0,0,0,.9),0 0 14px rgba(0,0,0,.6)}
+#pxchat-lines.scroll{pointer-events:auto;overflow-y:auto;justify-content:flex-start;max-height:min(46vh,440px);overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(227,184,74,.5) transparent;padding-right:6px;box-sizing:border-box;width:100%}
+#pxchat-lines.scroll::-webkit-scrollbar{width:6px}
+#pxchat-lines.scroll::-webkit-scrollbar-thumb{background:rgba(227,184,74,.5);border-radius:3px}
+#pxchat .newer{all:unset;cursor:pointer;pointer-events:auto;align-self:center;font-size:12px;padding:4px 10px;border-radius:12px;background:rgba(227,184,74,.92);color:#1a1208;font-weight:700}
+#pxchat .newer[hidden]{display:none}
+#pxchat .ln{overflow-wrap:anywhere;text-shadow:0 1px 2px #000,0 0 7px rgba(0,0,0,.9),0 0 14px rgba(0,0,0,.6)}
 #pxchat .ln .tx{color:#fff}
 #pxchat .ln.mine .nm{color:#9fd7b0}
 #pxchat .ln.dm .tx{color:#f1d2ff}
@@ -63,10 +70,8 @@ const CSS = `
 #pxchat-btn .dot{display:inline-block;min-width:16px;padding:0 4px;margin-left:6px;border-radius:9px;background:#e3b84a;color:#1a1208;font-size:11px;font-weight:700;text-align:center}
 #pxchat-btn .dot.dm{background:#c58ee6}
 @media (max-width:700px){#pxchat{font-size:12px}}
-@media (prefers-reduced-motion:reduce){#pxchat .ln{transition:none}}
 `;
 
-const HOLD_MS = 14_000, FADE_MS = 4_000;
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, cls?: string) => {
   const e = document.createElement(tag);
   if (text !== undefined) e.textContent = text;            // always text, never markup: a message must not be able to run anything
@@ -93,11 +98,24 @@ export function createChat(deps: ChatDeps) {
   let unread = 0, unreadDm = 0;
   let lastSentAt = 0;
   let pending: { text: string; to: Who | null } | null = null;    // what was just sent, handed back if the room refuses it
-  let timer = 0;
+  let awaitingAt = 0;                      // when chat last sent the room something it could refuse (say, dm, report, blocks)
+  let stick = true;                         // the open chat follows new lines unless the player has scrolled up to read
+  let sessionOf: string | null = null;      // whose session's chat this tab is keeping
 
   const savePrefs = () => { try { window.localStorage.setItem(UI_KEY, JSON.stringify(prefs)); } catch { /* not remembered */ } };
   const saveBlocks = () => { try { window.localStorage.setItem(BLOCKS_KEY, JSON.stringify(blocks)); } catch { /* lasts until the page closes */ } };
   const nameOf = (a: string) => deps.labelFor(a);
+  const saveSession = () => { if (!sessionOf) return; try { window.sessionStorage.setItem(SESSION_PREFIX + sessionOf, log.dump()); } catch { /* full or blocked: the chat still works, it just will not survive a reload */ } };
+  const dropSession = (address: string | null) => { if (!address) return; try { window.sessionStorage.removeItem(SESSION_PREFIX + address); } catch { /* nothing kept */ } };
+  /** Start (or pick back up) the chat for this signed-in player; a different player, or nobody, starts from nothing. */
+  const useSession = (address: string | null) => {
+    if (address === sessionOf) return;
+    dropSession(sessionOf);
+    log.clear(); nodes.forEach((n) => n.remove()); nodes.clear();
+    sessionOf = address;
+    if (address) { try { log.load(window.sessionStorage.getItem(SESSION_PREFIX + address)); } catch { /* nothing kept */ } }
+    stick = true;
+  };
   const isBlocked = (a: string) => blocks.includes(a);
 
   // ---------------------------------------------------------------- the pieces
@@ -107,6 +125,7 @@ export function createChat(deps: ChatDeps) {
 
   const root = el('div'); root.id = 'pxchat';
   const lines = el('div'); lines.id = 'pxchat-lines';
+  const newer = el('button', 'New messages ↓', 'newer'); newer.type = 'button'; newer.hidden = true;
   lines.setAttribute('role', 'log'); lines.setAttribute('aria-live', 'polite'); lines.setAttribute('aria-label', 'Casino chat');
   const menu = el('div', undefined, 'panel'); menu.id = 'pxchat-menu'; menu.hidden = true;
   const side = el('div', undefined, 'panel'); side.id = 'pxchat-panel'; side.hidden = true;
@@ -122,14 +141,14 @@ export function createChat(deps: ChatDeps) {
   const blockedBtn = smallButton('Blocked', () => togglePanel('blocked'));
   peopleBtn.id = 'pxchat-people'; hideBtn.id = 'pxchat-hide'; sideBtn.id = 'pxchat-side'; blockedBtn.id = 'pxchat-blocked';
   bar.append(peopleBtn, hideBtn, sideBtn, blockedBtn);
-  root.append(lines, menu, side, form, bar);
+  root.append(lines, newer, menu, side, form, bar);
 
   const button = el('button'); button.id = 'pxchat-btn'; button.type = 'button';
   button.setAttribute('aria-controls', 'pxchat');
 
   // ---------------------------------------------------------------- painting
   const nodes = new Map<number, HTMLElement>();
-  const pinned = () => typing || !!menuFor || !!panel;
+  const open = () => typing || !!menuFor || !!panel;      // open: the whole session, scrollable; closed: the newest few
   const maxLines = () => (window.matchMedia?.('(max-width:700px)').matches ? 5 : 8);
 
   const nameButton = (who: Who) => {
@@ -158,19 +177,28 @@ export function createChat(deps: ChatDeps) {
     return row;
   };
 
+  const atBottom = () => lines.scrollTop + lines.clientHeight >= lines.scrollHeight - 8;
+  const toBottom = () => { lines.scrollTop = lines.scrollHeight; stick = true; newer.hidden = true; };
+
   const renderLines = () => {
-    const show = log.visible(Date.now(), { max: maxLines(), holdMs: HOLD_MS, fadeMs: FADE_MS, pinned: pinned() });
-    const keep = new Set(show.map((v) => v.line.id));
+    const isOpen = open();
+    const show = isOpen ? log.all() : log.tail(maxLines());
+    const wasScroll = lines.classList.contains('scroll');
+    lines.classList.toggle('scroll', isOpen);
+    const keep = new Set(show.map((l) => l.id));
+    let added = false;
     for (const [id, node] of nodes) if (!keep.has(id)) { node.remove(); nodes.delete(id); }
     let after: Element | null = null;
-    for (const v of show) {
-      let node = nodes.get(v.line.id);
-      if (!node) { node = makeLine(v.line); nodes.set(v.line.id, node); }
+    for (const line of show) {
+      let node = nodes.get(line.id);
+      if (!node) { node = makeLine(line); nodes.set(line.id, node); added = true; }
       const want: Element | null = after ? after.nextElementSibling : lines.firstElementChild;
       if (want !== node) lines.insertBefore(node, want);
-      node.style.opacity = String(v.opacity);
       after = node;
     }
+    if (!isOpen) { newer.hidden = true; stick = true; return; }
+    if (!wasScroll || stick) toBottom();              // opening, or following along: show the newest
+    else if (added) newer.hidden = false;             // reading back: say there is more below instead of jumping
   };
 
   const paintButton = () => {
@@ -259,7 +287,6 @@ export function createChat(deps: ChatDeps) {
     blockedBtn.textContent = blocks.length ? `Blocked (${blocks.length})` : 'Blocked';
     blockedBtn.classList.toggle('on', panel === 'blocked');
     paintButton(); paintForm(); paintMenu(); paintPanel(); renderLines(); place();
-    schedule();
   };
 
   /**
@@ -293,12 +320,6 @@ export function createChat(deps: ChatDeps) {
     root.classList.toggle('over', squeezed && !root.hidden && (typing || nodes.size > 0));
   };
 
-  /** Lines fade on their own: tick while there is something on screen, stop when there is not. */
-  const schedule = () => {
-    window.clearTimeout(timer);
-    if (prefs.hidden || document.hidden) return;
-    if (nodes.size || pinned()) timer = window.setTimeout(() => { renderLines(); place(); schedule(); }, 500);
-  };
 
   // ---------------------------------------------------------------- actions
   const note = (text: string) => { log.add(null, text, false, Date.now()); };
@@ -333,13 +354,13 @@ export function createChat(deps: ChatDeps) {
   }
   const toRoom = () => { target = null; renderAll(); input.focus(); };
 
-  const sendBlocks = () => { if (deps.me()) deps.send({ t: 'blocks', list: blocks }); };
+  const sendBlocks = () => { if (deps.me() && deps.send({ t: 'blocks', list: blocks })) awaitingAt = Date.now(); };
   function setBlocked(who: Who, on: boolean) {
     const label = nameOf(who.a);
     if (on) {
       if (blocks.length >= MAX_BLOCKS) { note(errorText('too-many-blocks')); return; }
       if (!blocks.includes(who.a)) blocks.push(who.a);
-      log.dropFrom(who.a);
+      log.dropFrom(who.a); saveSession();
       if (target?.a === who.a) target = null;
       note(`You blocked ${label}. Neither of you will see the other's messages.`);
     } else {
@@ -353,13 +374,18 @@ export function createChat(deps: ChatDeps) {
   }
   function report(who: Who, why: ReportReason) {
     if (!deps.me() || !deps.connected()) { note('Not connected to the room, so the report was not sent.'); return; }
-    deps.send({ t: 'report', who: who.a, why, lines: log.lastFrom(who.a) });
+    if (deps.send({ t: 'report', who: who.a, why, lines: log.lastFrom(who.a) })) awaitingAt = Date.now();
     note('Sending your report…');
   }
 
   // ---------------------------------------------------------------- wiring
   button.onclick = () => { if (typing && !prefs.hidden) closeTyping(); else openTyping(); };
   toChip.onclick = toRoom;
+  newer.onclick = () => toBottom();
+  lines.addEventListener('scroll', () => { stick = atBottom(); if (stick) newer.hidden = true; }, { passive: true });
+  // Scrolling the chat must not also zoom or turn the casino behind it.
+  lines.addEventListener('wheel', (e) => { if (lines.classList.contains('scroll')) e.stopPropagation(); }, { passive: true });
+  lines.addEventListener('touchmove', (e) => { if (lines.classList.contains('scroll')) e.stopPropagation(); }, { passive: true });
 
   form.onsubmit = (event) => {
     event.preventDefault();
@@ -370,7 +396,7 @@ export function createChat(deps: ChatDeps) {
     if (target && roster.known && !roster.has(target.a)) { note(errorText('not-here')); renderAll(); return; }
     const msg = target ? { t: 'dm', to: target.a, text: check.text } : { t: 'say', text: check.text };
     if (!deps.send(msg)) { note(offline); renderAll(); return; }
-    lastSentAt = now; pending = { text: check.text, to: target };
+    lastSentAt = now; awaitingAt = now; pending = { text: check.text, to: target };
     input.value = '';
   };
   // Keys typed here belong to the chat, not the game (E, Q, B, the numbers and WASD would otherwise walk or sit the player).
@@ -391,7 +417,6 @@ export function createChat(deps: ChatDeps) {
   // The welcome panel opens and closes without a resize: move when it does.
   const intro = document.getElementById('intro');
   if (intro && 'MutationObserver' in window) new MutationObserver(() => place()).observe(intro, { attributes: true, attributeFilter: ['class', 'style', 'hidden'] });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) renderAll(); });
 
   // ---------------------------------------------------------------- what main.ts tells us
   const api = {
@@ -408,22 +433,30 @@ export function createChat(deps: ChatDeps) {
       const dm = m.t === 'dm' && m.to && typeof m.to.a === 'string' ? { a: m.to.a } : undefined;
       const line = log.add({ a: m.from.a }, String(m.text ?? '').slice(0, MAX_CHARS * 2), mine, Date.now(), dm);
       if (!line) return;
-      if (mine) pending = null;
+      saveSession();
+      if (mine) { pending = null; stick = true; }
       else if (prefs.hidden) { unread += 1; if (dm) unreadDm += 1; }
       renderAll();
     },
-    /** The room refused something. A refused message goes back into the box so nothing typed is lost. */
-    failed(code: unknown) {
+    /**
+     * The room refused something. Only a refusal of something chat just sent is chat's business: the room also says "slow down" to
+     * the page's own seat updates, and those must not show up as chat notes. Returns whether chat took it.
+     * A refused message goes back into the box so nothing typed is lost.
+     */
+    failed(code: unknown): boolean {
+      if (!pending && Date.now() - awaitingAt > 4000) return false;
       if (pending && !input.value) { input.value = pending.text; if (pending.to && code !== 'not-here' && code !== 'no-such-player') target = pending.to; }
       if (code === 'not-here' || code === 'no-such-player') target = null;
       pending = null;
       note(errorText(code));
       renderAll();
+      return true;
     },
     reported() { note('Report sent. Thank you.'); renderAll(); },
     /** A fresh connection: the room has forgotten our block list, so hand it over again, and take its list of who is here. */
     room(players: unknown, signedIn: boolean) {
       roster.set(players);
+      useSession(signedIn ? deps.me() : null);      // signed out (or the 4 hour session ran out): this session's chat is cleared
       if (signedIn) sendBlocks();
       else { typing = false; target = null; menuFor = null; reporting = false; panel = ''; input.value = ''; pending = null; }
       if (target && !roster.has(target.a)) target = null;
@@ -435,7 +468,9 @@ export function createChat(deps: ChatDeps) {
       if (typeof address === 'string' && target?.a === address) { note(`${nameOf(address)} left the room.`); target = null; }
       renderAll();
     },
-    /** The connection dropped: until the room speaks again we do not know who is here. */
+    /** The player pressed Leave the room: their session's chat is cleared from this tab now. */
+    endSession() { useSession(null); typing = false; target = null; menuFor = null; reporting = false; panel = ''; input.value = ''; pending = null; renderAll(); },
+    /** The connection dropped: until the room speaks again we do not know who is here. Their chat stays: a reconnect is the same session. */
     disconnected() { roster.forget(); renderAll(); },
     /** Names learned from BNS arrive late; relabel what is already on screen. */
     refreshNames() {
@@ -443,7 +478,7 @@ export function createChat(deps: ChatDeps) {
       if (target) paintForm();
     },
     isTyping: () => typing,
-    debug: () => ({ typing, hidden: prefs.hidden, side: prefs.side, target: target?.a ?? null, blocks: [...blocks], lines: log.size, shown: nodes.size, people: roster.others(deps.me()).map((p) => p.a) })
+    debug: () => ({ typing, hidden: prefs.hidden, side: prefs.side, target: target?.a ?? null, blocks: [...blocks], lines: log.size, shown: nodes.size, session: sessionOf, stick, people: roster.others(deps.me()).map((p) => p.a) })
   };
   paintButton();
   return api;

@@ -25,6 +25,11 @@ or standing at a machine puts that person's Adrian (with a BNS-or-short-address 
 **Changing `SPOTS` means redeploying the room Worker** (`npx wrangler deploy --config workers/casino-room/wrangler.toml`), then the Pages
 build. Until the Worker is redeployed an older Worker refuses the new ids (`no-such-spot`) and nobody is drawn at those places.
 
+One player in two tabs or on two devices: the room stands up only the connection that sat, so a tab that is not seated asks to
+stand up once per spot, never on repeat (repeating used to trip the room's general limit of 12 messages per 10 s and show "slow
+down"), and a tab that has been told `moved` (another tab of the same player sat elsewhere) stops asking for its seat until the
+player moves in that tab. Chat shows a room refusal only when chat itself just sent something.
+
 Numbers: at most 16 people drawn on desktop and 6 on phones (the rest are counted but not drawn); figures are built one every 120 ms; people
 more than 12 m away stand still; a person is never drawn in the seat the visitor is in.
 
@@ -46,15 +51,18 @@ visitor's signed cookie. Never add a route or a workers.dev address to it.
 ## Chat on /casino (room chat and direct messages)
 
 What players see: a **Chat** button beside Room (a 💬 icon on phones, where the page's top-right buttons are icons) opens a typing
-line. What people say floats as a plain column of text, no box, under the top buttons on the left, and fades after about 14 s
-(direct messages 30 s; while typing, recent lines stay). Tapping a name, in the column or in **Here now**, offers **Message**,
+line. What people say floats as a plain column of text, no box, under the top buttons on the left. Nothing fades: with the chat
+closed the newest 8 lines (5 on a phone) stay up; open, the column shows everything said this session and scrolls (it follows new
+lines unless you have scrolled up, when a "New messages ↓" button appears instead). The session's chat (up to 500 lines) is kept in
+the tab's sessionStorage under `px_chat_session_v1:<address>`, so a reload keeps it; it is removed on Leave the room, when the room
+session ends (or a different address signs in), and by the browser when the tab closes. The room itself still stores nothing. Tapping a name, in the column or in **Here now**, offers **Message**,
 **Block** and **Report**. A direct message shows as `You → Bob …` / `Alice → you …`, tinted, and the typing line shows a
 "To Alice ×" chip (press it, or Escape on an empty line, to go back to the room). Controls under the typing line: Here now, Hide
 chat, Move right/left, Blocked (with Unblock).
 
 | Piece | Where |
 | --- | --- |
-| Rules with no page (line buffer, fading, block list, report lines, refusal wording, who is here) | `src/casino-room/chat-core.ts`, tests in `src/casino-room/__tests__/chat-core.test.ts` |
+| Rules with no page (session line buffer and keeping it in the tab, block list, report lines, refusal wording, who is here) | `src/casino-room/chat-core.ts`, tests in `src/casino-room/__tests__/chat-core.test.ts` |
 | The column, typing line, menus and controls | `src/casino-room/chat.ts` |
 | Wiring to the room connection (`say`, `dm`, `join`, `leave`, `reported`, chat refusals, reconnects) | `src/casino-room/main.ts` |
 
