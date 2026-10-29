@@ -19,6 +19,8 @@ import { createNameCache } from '../lib/bns/name-cache';
 import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { roomProofData, type RoomChallenge } from '../../functions/lib/casino-room-proof';
 import { connectWallet, connectTrail, rememberProvider, walletMessage, type LinkedWallet, type WalletKind } from './wallet';
+import { createChat, type Chat } from './chat';
+import { isChatError } from './chat-core';
 
 type Person = { key: string; spot: string; label: string; since: number };
 interface PXRoomHost {
@@ -52,6 +54,8 @@ const S = {
   retryTimer: 0
 };
 
+let chat: Chat | null = null;      // the floating chat column (chat.ts); made with the button, only when the room is on
+
 const short = (a: string) => (a.length <= 12 ? a : `${a.slice(0, 5)}…${a.slice(-4)}`);
 const mainnetOf = (a: string) => {
   if (a.startsWith('SP')) return a;
@@ -59,7 +63,7 @@ const mainnetOf = (a: string) => {
   return addressToString({ ...d, version: AddressVersion.MainnetSingleSig });
 };
 // Names are looked up on the mainnet address of the same key (BNS names live on mainnet; ST and SP share one key).
-const names = createNameCache((address) => resolvePrimaryBnsName({ address: mainnetOf(address), network: 'mainnet' }), () => pushPeople());
+const names = createNameCache((address) => resolvePrimaryBnsName({ address: mainnetOf(address), network: 'mainnet' }), () => { pushPeople(); chat?.refreshNames(); });
 const labelFor = (address: string) => {
   let name: string | null = null;
   try { name = names.get(address); } catch { /* bad address: show it short */ }
@@ -118,12 +122,18 @@ const connect = () => {
       case 'room':
         S.you = m.you; S.spots = m.spots || {}; S.joined = m.joined; S.guests = m.guests;
         if (S.signed && S.you?.guest) S.signed = null;      // the session ran out (4 hours) while the page stayed open
+        if (S.you && !S.you.guest) chat?.connectedAgain(); else chat?.signedOut();
         break;
       case 'sat': S.spots[m.spot] = m.who; break;
       case 'stood': delete S.spots[m.spot]; break;
       case 'count': S.joined = m.joined; S.guests = m.guests; break;
-      case 'err': if (m.code === 'no-such-spot') S.badSpot = S.want; return;
-      default: return;      // moved, pong, err: nothing to draw; reconcile() decides whether to try again
+      case 'say': chat?.heard(m); return;
+      case 'reported': chat?.reported(); return;
+      case 'err':
+        if (m.code === 'no-such-spot') S.badSpot = S.want;
+        else if (isChatError(m.code)) chat?.failed(m.code);
+        return;
+      default: return;      // moved, pong: nothing to draw; reconcile() decides whether to try again
     }
     pushPeople(); reconcile(); paint();
   };
@@ -187,6 +197,7 @@ async function join(kind: WalletKind) {
 async function leave() {
   try { await postJson('/casino/room/session', { method: 'DELETE' }); } catch { /* the cookie dies by itself in 4 hours */ }
   S.signed = null; S.wallet = null; S.error = '';
+  chat?.signedOut();
   reconnect(); paint();
 }
 
@@ -240,11 +251,19 @@ function buildUi() {
   btn.setAttribute('aria-label', 'Casino room: see who is here and join');
   btn.onclick = () => { S.open = !S.open; paint(); };
   panel = el('div'); panel.id = 'pxroom-panel'; panel.hidden = true;
-  wrap.append(btn);
+  chat = createChat({
+    send,
+    me: () => (S.you && !S.you.guest ? S.you.a : null),
+    connected: () => S.connected,
+    labelFor,
+    joinPrompt: () => { S.open = true; paint(); }
+  });
+  wrap.append(btn, chat.button);
   const slot = S.host?.mount?.() ?? document.querySelector<HTMLElement>('#tools .rt');
   if (slot) slot.insertBefore(wrap, slot.firstChild);
   else { wrap.style.cssText = 'position:fixed;top:10px;right:10px;z-index:30'; document.body.append(wrap); }
   document.body.append(panel);
+  chat.mount(document.body);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.open) { S.open = false; paint(); } });
   // A tap anywhere outside the panel and the button closes it (on a phone there is no Escape key).
   document.addEventListener('pointerdown', (e) => {
