@@ -41,3 +41,21 @@ export async function run(env: Env, query: string, binds: Array<unknown> = []) {
   }
   return statement.run();
 }
+
+/**
+ * Runs several statements as one D1 batch (one round trip, all-or-nothing) when the binding supports it,
+ * otherwise one after another. Each statement is its own prepared SQL plus bound values.
+ */
+export async function runBatch(env: Env, statements: Array<{ sql: string; binds?: unknown[] }>) {
+  if (statements.length === 0) return;
+  const db = resolveDb(env);
+  const prepared = statements.map((statement) => {
+    const query = db.prepare(statement.sql);
+    return statement.binds && statement.binds.length > 0 ? query.bind(...statement.binds) : query;
+  });
+  if (typeof db.batch === 'function') {
+    await db.batch(prepared);
+    return;
+  }
+  for (const query of prepared) await query.run();
+}
