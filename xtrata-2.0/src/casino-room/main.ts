@@ -19,6 +19,8 @@ import { createNameCache } from '../lib/bns/name-cache';
 import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { roomProofData, type RoomChallenge } from '../../functions/lib/casino-room-proof';
 import { connectWallet, connectTrail, rememberProvider, walletMessage, type LinkedWallet, type WalletKind } from './wallet';
+import { createChat, type Chat } from './chat';
+import { isChatError } from './chat-core';
 
 type Person = { key: string; spot: string; label: string; since: number };
 interface PXRoomHost {
@@ -52,6 +54,8 @@ const S = {
   retryTimer: 0
 };
 
+let chat: Chat | null = null;      // the floating chat column (chat.ts); made with the button, only when the room is on
+
 const short = (a: string) => (a.length <= 12 ? a : `${a.slice(0, 5)}…${a.slice(-4)}`);
 const mainnetOf = (a: string) => {
   if (a.startsWith('SP')) return a;
@@ -59,7 +63,7 @@ const mainnetOf = (a: string) => {
   return addressToString({ ...d, version: AddressVersion.MainnetSingleSig });
 };
 // Names are looked up on the mainnet address of the same key (BNS names live on mainnet; ST and SP share one key).
-const names = createNameCache((address) => resolvePrimaryBnsName({ address: mainnetOf(address), network: 'mainnet' }), () => pushPeople());
+const names = createNameCache((address) => resolvePrimaryBnsName({ address: mainnetOf(address), network: 'mainnet' }), () => { pushPeople(); chat?.refreshNames(); });
 const labelFor = (address: string) => {
   let name: string | null = null;
   try { name = names.get(address); } catch { /* bad address: show it short */ }
@@ -118,12 +122,20 @@ const connect = () => {
       case 'room':
         S.you = m.you; S.spots = m.spots || {}; S.joined = m.joined; S.guests = m.guests;
         if (S.signed && S.you?.guest) S.signed = null;      // the session ran out (4 hours) while the page stayed open
+        chat?.room(m.players, !!(S.you && !S.you.guest));
         break;
       case 'sat': S.spots[m.spot] = m.who; break;
       case 'stood': delete S.spots[m.spot]; break;
       case 'count': S.joined = m.joined; S.guests = m.guests; break;
-      case 'err': if (m.code === 'no-such-spot') S.badSpot = S.want; return;
-      default: return;      // moved, pong, err: nothing to draw; reconcile() decides whether to try again
+      case 'say': case 'dm': chat?.heard(m); return;
+      case 'join': chat?.joined(m.who); return;
+      case 'leave': chat?.left(m.a); return;
+      case 'reported': chat?.reported(); return;
+      case 'err':
+        if (m.code === 'no-such-spot') S.badSpot = S.want;
+        else if (isChatError(m.code)) chat?.failed(m.code);
+        return;
+      default: return;      // moved, pong: nothing to draw; reconcile() decides whether to try again
     }
     pushPeople(); reconcile(); paint();
   };
@@ -131,6 +143,7 @@ const connect = () => {
     if (S.ws !== ws) return;     // a newer connection replaced this one on purpose
     S.ws = null; S.connected = false;
     S.spots = {}; pushPeople();
+    chat?.disconnected();
     if (event.code === 4001) { S.replaced = true; paint(); return; }     // another tab of the visitor's took over
     paint(); retry();
   };
@@ -187,13 +200,24 @@ async function join(kind: WalletKind) {
 async function leave() {
   try { await postJson('/casino/room/session', { method: 'DELETE' }); } catch { /* the cookie dies by itself in 4 hours */ }
   S.signed = null; S.wallet = null; S.error = '';
+  chat?.disconnected();
   reconnect(); paint();
 }
 
 // ------------------------------------------------------------------ the button and its panel
 
 const CSS = `
-#pxroom{position:relative;display:inline-block}
+#pxroom{position:relative;display:inline-flex;gap:inherit;align-items:center}
+#pxroom-btn .n,#pxchat-btn .n{white-space:nowrap}
+#pxchat-btn .ic{display:none}
+@media(max-width:620px){
+  #pxroom{gap:6px}
+  #pxroom-btn .lbl,#pxchat-btn .lbl{display:none}
+  #pxroom-btn i{margin:0 2px 0 0}
+  #pxchat-btn .ic{display:inline}
+  #pxchat-btn .dot{position:absolute;top:-6px;right:-6px;margin:0}
+  #pxchat-btn{position:relative;overflow:visible!important}
+}
 #pxroom-btn{font:inherit;cursor:pointer}
 #pxroom-btn i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#8a8f98;vertical-align:1px}
 #pxroom-btn.live i{background:#2fae66;box-shadow:0 0 6px #2fae66}
@@ -240,11 +264,19 @@ function buildUi() {
   btn.setAttribute('aria-label', 'Casino room: see who is here and join');
   btn.onclick = () => { S.open = !S.open; paint(); };
   panel = el('div'); panel.id = 'pxroom-panel'; panel.hidden = true;
-  wrap.append(btn);
+  chat = createChat({
+    send,
+    me: () => (S.you && !S.you.guest ? S.you.a : null),
+    connected: () => S.connected,
+    labelFor,
+    joinPrompt: () => { S.open = true; paint(); }
+  });
+  wrap.append(btn, chat.button);
   const slot = S.host?.mount?.() ?? document.querySelector<HTMLElement>('#tools .rt');
   if (slot) slot.insertBefore(wrap, slot.firstChild);
   else { wrap.style.cssText = 'position:fixed;top:10px;right:10px;z-index:30'; document.body.append(wrap); }
   document.body.append(panel);
+  chat.mount(document.body);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.open) { S.open = false; paint(); } });
   // A tap anywhere outside the panel and the button closes it (on a phone there is no Escape key).
   document.addEventListener('pointerdown', (e) => {
@@ -253,7 +285,7 @@ function buildUi() {
     if (t && (panel!.contains(t) || btn!.contains(t))) return;
     S.open = false; paint();
   });
-  window.addEventListener('resize', () => { if (S.open) placePanel(); });
+  window.addEventListener('resize', () => paint());     // the button's words show or hide with the width; paint() also re-hangs an open panel
 }
 
 /** Hang the panel just under the Room button wherever the page puts it (on a phone the buttons sit lower than on a laptop). */
@@ -268,8 +300,9 @@ function paint() {
   if (!wrap || !btn || !panel) return;
   const signed = !!(S.signed && S.you && !S.you.guest);
   btn.className = S.connected ? 'live' : 'wait';
-  const count = S.connected ? ` · ${S.joined}` : '';
-  btn.replaceChildren(el('i'), document.createTextNode(signed ? `In the room${count}` : `Room${count}`));
+  // On a phone the page's top-right buttons are 34 px icons, so the words hide and only the dot and the number show.
+  btn.replaceChildren(el('i'), el('span', signed ? 'In the room' : 'Room', 'lbl'), el('span', S.connected ? (window.matchMedia?.('(max-width:620px)').matches ? String(S.joined) : ` · ${S.joined}`) : '', 'n'));
+  btn.setAttribute('aria-label', `Casino room: ${S.connected ? `${S.joined} signed in, ` : ''}${signed ? 'you are in' : 'see who is here and join'}`);
   panel.hidden = !S.open;
   if (!S.open) return;
   placePanel();
@@ -284,7 +317,7 @@ function paint() {
     parts.push(el('p', `${S.joined} signed in, ${S.guests} watching.`));
     parts.push(fact('Be seen', 'Sit at a table or connect to a machine and your Adrian and name tag appear there for everyone in the room. Stand up or walk away and they go too.'));
     parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
-    parts.push(fact('Live chat', 'Chat and direct messages are on the room test page for now. They are not on the casino floor yet.'));
+    parts.push(fact('Live chat', 'Press Chat to talk to the room. Tap a name, or Here now, to send someone a direct message, block or report them. Messages are not secret and are not saved.'));
     parts.push(el('p', 'Nothing here moves any money.', 'fact'));
     const b = el('button', 'Leave the room'); b.onclick = () => { void leave(); };
     parts.push(b);
@@ -295,7 +328,7 @@ function paint() {
       : 'Connecting to the room…'));
     parts.push(fact('Be seen', 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Watching alone shows you to nobody.'));
     parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
-    parts.push(fact('Live chat', 'Chat and direct messages are for signed-in players and are on the room test page for now. They are not on the casino floor yet.'));
+    parts.push(fact('Live chat', 'Signed-in players can chat with the room and send each other direct messages. Messages are not secret and are not saved.'));
     parts.push(fact('Free', 'One signature. It sends no transaction, costs no fee and gives no permission to spend anything.'));
     const row = el('div', undefined, 'row');
     for (const kind of ['leather', 'xverse'] as const) {
@@ -341,5 +374,6 @@ if (existing) attach(existing); else window.addEventListener('px-room-host', () 
 
 // For tests and bug reports only: read-only.
 (window as any).__pxRoom = {
+  chat: () => chat?.debug() ?? null,
   get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, trail: connectTrail.slice() }; }
 };

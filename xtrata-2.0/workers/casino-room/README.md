@@ -1,9 +1,9 @@
-# Casino room (P0 spike, P1 on /casino, plus Talk)
+# Casino room (P0 spike, P1 on /casino, Talk, and chat on /casino)
 
 The live part of "people in the casino": who is signed in, which seat or bar stool each person is at, and (Talk) a list of the
 people in the room that signed-in players can click to send a private message, plus a public room chat. Plan and reasoning:
 `docs/plans/CASINO-PRESENCE-PLAN.md`. This is a throwaway test of the risky parts (a free wallet signature, a Durable Object,
-WebSockets through Cloudflare Pages, reconnecting). The test page `/casino-room-spike/` is where the risky parts are tried first; P1 (below) brings people and seats into `/casino`, and the Talk screen exists only on the test page so far.
+WebSockets through Cloudflare Pages, reconnecting). The test page `/casino-room-spike/` is where the risky parts are tried first; P1 (below) brings people and seats into `/casino`, and "Chat on /casino" (below) brings room chat and direct messages there as a floating column; the full Talk screen is still on the test page.
 
 The room never handles money. A seat in the room does not give a seat at a contract table.
 
@@ -43,9 +43,40 @@ The Worker has **no public address** (`workers_dev = false`, no routes). Only th
 binding, and `functions/casino/room/ws.ts` is the only place that sets the trusted `x-px-addr` header, after checking the
 visitor's signed cookie. Never add a route or a workers.dev address to it.
 
+## Chat on /casino (room chat and direct messages)
+
+What players see: a **Chat** button beside Room (a 💬 icon on phones, where the page's top-right buttons are icons) opens a typing
+line. What people say floats as a plain column of text, no box, under the top buttons on the left, and fades after about 14 s
+(direct messages 30 s; while typing, recent lines stay). Tapping a name, in the column or in **Here now**, offers **Message**,
+**Block** and **Report**. A direct message shows as `You → Bob …` / `Alice → you …`, tinted, and the typing line shows a
+"To Alice ×" chip (press it, or Escape on an empty line, to go back to the room). Controls under the typing line: Here now, Hide
+chat, Move right/left, Blocked (with Unblock).
+
+| Piece | Where |
+| --- | --- |
+| Rules with no page (line buffer, fading, block list, report lines, refusal wording, who is here) | `src/casino-room/chat-core.ts`, tests in `src/casino-room/__tests__/chat-core.test.ts` |
+| The column, typing line, menus and controls | `src/casino-room/chat.ts` |
+| Wiring to the room connection (`say`, `dm`, `join`, `leave`, `reported`, chat refusals, reconnects) | `src/casino-room/main.ts` |
+
+Safeties, page side (the room enforces the real rules either way):
+- Only signed-in players can speak; a guest pressing Chat is sent to the Room panel to join. Guests never receive chat.
+- Everything is put on the page as text, never markup. Links are refused by the room; the refused words go back into the box.
+- Keys typed into the chat go to the chat, not the game (keydown and keypress stop at the box; keyup is left alone so a movement
+  key already held is still let go). Opening the box frees a locked mouse.
+- Blocking takes the person's lines (and your direct messages to them) off screen, is saved in the browser under
+  `px_room_blocks_v1` (the same key as the test page) and is handed to the room again on every connect. It works both ways.
+- Reports attach the last five things that person said that this browser received.
+- Hide is remembered (`px_chat_ui_v1`, with the side). While hidden, the Chat button counts new lines; the dot turns purple if one
+  was a direct message to you.
+- Layout: the column keeps clear of the welcome panel (beside it on a laptop; on a small phone it sits over the panel's top with a
+  dark backing, which goes again on the floor).
+
+No Worker change was needed: the room already sent everything chat uses. Changing chat means `npm run build:casino-room` and
+bumping `room.js?v=` in `public/casino/index.html`.
+
 ## Talk: people list, public chat, private messages
 
-Built on the same room and the same sign-in. Only the test page `/casino-room-spike/` has the Talk screen; `/casino` (P1) is unchanged by it. `/casino` still receives the extra messages and fields Talk adds (`players`, `join`, `leave`, ...) and ignores them, and `public/casino/room.js` does not need rebuilding for Talk.
+Built on the same room and the same sign-in. The test page `/casino-room-spike/` has the full Talk screen; `/casino` uses the same messages through its chat column (next section). The room's rules below apply to both.
 
 - **Who can do what.** Signed-in players can read and post. A guest (no sign-in) sees the list of people and the seats, nothing
   else: a guest who tries to say, message or report gets `sign-in-first`, and public chat and private messages are never sent to
@@ -73,7 +104,7 @@ Built on the same room and the same sign-in. Only the test page `/casino-room-sp
   characters each) is what the reporter's own browser chose to attach, so treat it as the reporter's account, not proof. The
   room keeps the newest 200 in its storage and writes each one to the Worker log as `[casino-room] report {...}`. **There is no
   page to read them yet**: watch with `npx wrangler tail xtrata-casino-room --format pretty` (or the Logs tab on the Worker in
-  the dashboard). If the room is ever opened up beyond the test page, an admin view is the next thing to build.
+  the dashboard). Now that chat is on `/casino`, an admin view to read reports is the next thing to build.
 - **A lost connection is not an empty room.** While the page is disconnected it keeps the last known list on screen, dimmed and
   marked out of date, says "Reconnecting...", and disables the message box. It only says nobody is signed in when the room
   itself said so.
@@ -142,6 +173,13 @@ Confirmed on the deployed Cloudflare preview (2026-10-29), before Talk: the same
 WebSocket to the Durable Object, and the room hibernates and wakes with every seat intact (about 47 ms for the first message after
 a 20 s idle).
 
+Chat on `/casino`, locally (2026-10-29): 22 unit tests for the chat rules, and a browser run with a guest and two signed-in
+players at 1280 px plus phones at 390 and 360 px: 58 checks, covering guest gating, game keys staying in the box, room chat both
+ways, the two-second limit, a link refused and handed back, markup shown as text, Here now, direct messages both ways (and never to
+a guest), replying from a message, the To chip, report, block (lines cleared, room and direct messages kept out, kept after a
+reload), unblock, hide with an unread count and a purple dot for a direct message, hide kept after a reload, move right, the person
+you are writing to leaving, lines fading, and the layout beside the welcome panel and on phones.
+
 Still to check by hand: real Leather and
-Xverse signing on desktop and phone with two accounts talking to each other, and watching a real Worker deploy reconnect everyone
+Xverse signing on desktop and phone with two accounts talking to each other (including chat and direct messages on `/casino`), and watching a real Worker deploy reconnect everyone
 on Cloudflare (it was observed locally).
