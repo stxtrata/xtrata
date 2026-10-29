@@ -349,7 +349,7 @@ const someOwnerHex = (addr: string) => someOwnerHexImpl(addr);
 const quoteHex = (totalFee: number, batches: number) => quoteHexImpl(totalFee, batches);
 const uploadStateHex = (currentIndex: number) => uploadStateHexImpl(currentIndex);
 
-export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) {
+export async function loadAgent(chain: FakeChain, opts: { core?: string; inscribeLock?: boolean } = {}) {
   const stacks = await import('@stacks/transactions');
   someOwnerHexImpl = (addr: string) =>
     stacks.cvToHex(stacks.responseOkCV(stacks.someCV(stacks.standardPrincipalCV(addr))));
@@ -382,7 +382,9 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
 
   const g = globalThis as any;
   g.window = g.window ?? {};
-  g.window.XAO_CONFIG = { hiro: '/hiro/mainnet', mock: false, core: opts.core ?? CORE_CONTRACT.split('.')[1] };
+  // The markup lock is a production safety; the suite exercises the inscription machinery, so it
+  // starts unlocked. inscribe-lock.test.ts loads with `inscribeLock: true` to cover the lock itself.
+  g.window.XAO_CONFIG = { hiro: '/hiro/mainnet', mock: false, core: opts.core ?? CORE_CONTRACT.split('.')[1], inscribeLock: opts.inscribeLock ? undefined : false };
   g.window.localStorage = localStorage;
   g.localStorage = localStorage;
   g.location = { origin: 'https://xtrata.test' };

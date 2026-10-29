@@ -19,6 +19,7 @@ import { HDKey } from '@scure/bip32';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import { normalizeBroadcastResult } from './broadcast-result';
+import { INSCRIBE_LOCK, inscribeLockActive, assertInscribeAllowed, isMarkupMime } from './inscribe-lock';
 import {
   makeContractCall, makeSTXTokenTransfer, broadcastTransaction as stacksBroadcastTransaction, callReadOnlyFunction,
   estimateTransaction, estimateTransactionByteLength,
@@ -622,7 +623,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-29.1';
+export const AGENT_BUILD = '2026-10-29.2';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -1628,6 +1629,7 @@ async function recordMusicTopUp(id: string, quoteId: string, txid: string) {
 }
 
 async function createJob(opts: any) {
+  assertInscribeAllowed(opts);   // temporary lock: HTML/markup jobs cannot finish — refuse before any money moves
   const { file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT, receipt = true, origin = 'wizard', sunoPlayer = null } = opts;
   if (opts.feeMode === 'economy' && !(navigator as any).locks?.request) throw new Error('Economy requires secure browser job locking; use Standard.');
   if (opts.feeMode === 'economy' && (origin !== 'music' || CORE_NAME !== 'xtrata-v3-2-3')) throw new Error('Economy is currently supported only by Music on xtrata-v3-2-3');
@@ -1681,6 +1683,7 @@ async function createJob(opts: any) {
  * items are inscribed exactly as provided.
  */
 async function createBatchJob(opts: any) {
+  assertInscribeAllowed(opts);
   const { items = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT, receipt = true, origin = 'wizard' } = opts;
   if (opts.feeMode === 'economy' && !(navigator as any).locks?.request) throw new Error('Economy requires secure browser job locking; use Standard.');
   if (opts.feeMode === 'economy' && (origin !== 'music' || CORE_NAME !== 'xtrata-v3-2-3')) throw new Error('Economy is currently supported only by Music on xtrata-v3-2-3');
@@ -2621,6 +2624,8 @@ async function reapTick() {
 (window as any).XAO_AGENT_BUILD = AGENT_BUILD;   // version handshake — suno.html blocks live runs on mismatch
 (window as any).XtrataAgent = {
   build: AGENT_BUILD,
+  // Read by the pages so they can show the notice and disable the pay buttons.
+  inscribeLock: { get locked() { return inscribeLockActive(); }, since: INSCRIBE_LOCK.since, title: INSCRIBE_LOCK.title, message: INSCRIBE_LOCK.message, isMarkupMime },
   health: async () => ({ ok: true, mock: MOCK, core: CORE_NAME, net: 'mainnet', windowMs: WINDOW_MS, parentWindowMs: PARENT_WINDOW_MS, deployer: DEPLOYER, build: AGENT_BUILD }),
   // Live owner lookup for the UI (pre-job parent validation): read-only get-owner
   // on the core contract. Returns the owner principal string or null.
