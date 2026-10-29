@@ -208,6 +208,8 @@ const CSS = `
 #pxroom-panel button:disabled{opacity:.5;cursor:default}
 #pxroom-panel .err{color:#ff8a8a;margin:8px 0 0}
 #pxroom-panel .who{color:var(--ink,#f6ead0);font-weight:600;word-break:break-all}
+#pxroom-panel .fact{font-size:12px;line-height:1.5;margin:0 0 8px}
+#pxroom-panel .fact b{color:var(--gold,#e3b84a);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
 `;
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, cls?: string) => {
@@ -215,6 +217,13 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, cls?: 
   if (text !== undefined) e.textContent = text;
   if (cls) e.className = cls;
   return e;
+};
+
+/** A small labelled line for the panel: bold label, then a plain sentence (textContent only, nothing is parsed as HTML). */
+const fact = (label: string, text: string) => {
+  const p = el('p', undefined, 'fact');
+  p.append(el('b', label), document.createTextNode(` ${text}`));
+  return p;
 };
 
 let wrap: HTMLElement | null = null;
@@ -272,15 +281,22 @@ function paint() {
   } else if (signed) {
     parts.push(el('h3', 'You are in the room'));
     parts.push(el('p', `Others see you at your seat as`), el('p', labelFor(S.signed!.address), 'who'));
-    parts.push(el('p', `${S.joined} signed in, ${S.guests} watching. Sit at a table or a machine and you appear there. Nothing here moves any money.`));
+    parts.push(el('p', `${S.joined} signed in, ${S.guests} watching.`));
+    parts.push(fact('Be seen', 'Sit at a table or connect to a machine and your Adrian and name tag appear there for everyone in the room. Stand up or walk away and they go too.'));
+    parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
+    parts.push(fact('Live chat', 'Chat and private messages are on the room test page for now. They are not on the casino floor yet.'));
+    parts.push(el('p', 'Nothing here moves any money.', 'fact'));
     const b = el('button', 'Leave the room'); b.onclick = () => { void leave(); };
     parts.push(b);
   } else {
     parts.push(el('h3', 'Join the room'));
     parts.push(el('p', S.connected
-      ? `You are watching: ${S.joined} signed in, ${S.guests} watching. Join to be seen where you sit.`
+      ? `You are watching: ${S.joined} signed in, ${S.guests} watching.`
       : 'Connecting to the room…'));
-    parts.push(el('p', 'One free signature. It sends no transaction, costs no fee and gives no permission to spend anything.'));
+    parts.push(fact('Be seen', 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Watching alone shows you to nobody.'));
+    parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
+    parts.push(fact('Live chat', 'Chat and private messages are for signed-in players and are on the room test page for now. They are not on the casino floor yet.'));
+    parts.push(fact('Free', 'One signature. It sends no transaction, costs no fee and gives no permission to spend anything.'));
     const row = el('div', undefined, 'row');
     for (const kind of ['leather', 'xverse'] as const) {
       const b = el('button', S.busy ? (S.busy === 'sign' ? 'Check your wallet…' : 'Connecting…') : kind === 'leather' ? 'Leather' : 'Xverse');
