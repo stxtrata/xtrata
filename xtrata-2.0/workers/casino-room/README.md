@@ -135,12 +135,13 @@ works at phone width.
 Talk, locally: 14 end-to-end checks (the 7 above plus 7 for Talk, including that block lists and the people list survive a
 hibernation) and a two-browser check of the test page (guest, public chat, private messages with an unread dot, a link being
 refused and the words handed back, hostile HTML shown as plain text, block, report, leave, no sideways scroll at 390 px wide, and
-the Worker being stopped and restarted underneath open pages). Talk has not yet been run on the deployed preview.
+the Worker being stopped and restarted underneath open pages). Talk has since been run on the deployed Cloudflare preview (2026-10-29): all 14 end-to-end checks pass there, including both
+hibernation checks (the first message after a 20 s idle came back in about 38 ms), with the Worker deployed from `main` at `24824bb`.
 
 Confirmed on the deployed Cloudflare preview (2026-10-29), before Talk: the same 7 end-to-end checks pass, so a Pages Function does forward a
 WebSocket to the Durable Object, and the room hibernates and wakes with every seat intact (about 47 ms for the first message after
 a 20 s idle).
 
-Still to check by hand: Talk on the deployed preview (`ROOM_E2E_URL=https://<preview address>`, now 14 checks), real Leather and
+Still to check by hand: real Leather and
 Xverse signing on desktop and phone with two accounts talking to each other, and watching a real Worker deploy reconnect everyone
 on Cloudflare (it was observed locally).

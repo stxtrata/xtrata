@@ -96,9 +96,10 @@ name = "CASINO_ROOM"
 class_name = "CasinoRoom"
 script_name = "xtrata-casino-room"
 
-# Production: uncomment ONLY after the room Worker is deployed and the preview test has passed.
-# [[durable_objects.bindings]]
-# name = "CASINO_ROOM"
-# class_name = "CasinoRoom"
-# script_name = "xtrata-casino-room"
+# Production: on since the room Worker was deployed and the preview test passed (14 end-to-end checks, 2026-10-29).
+# To switch the room off again without a code change, add the Secret CASINO_ROOM_DISABLED = 1 for Production and redeploy.
+[[durable_objects.bindings]]
+name = "CASINO_ROOM"
+class_name = "CasinoRoom"
+script_name = "xtrata-casino-room"
 # Keep the preview block above as well: once the room is live, both environments carry the binding.
