@@ -10,6 +10,8 @@
  *   header after checking the player's session cookie. Never add a route or workers.dev address to this Worker.
  * - Everything the room decides is in functions/lib/casino-room.ts and is unit tested; this file only moves data.
  * - The room never touches money. A seat here does not give a seat at a contract table.
+ * - Talk: the room also passes on public chat and private messages between signed-in players. Nothing said is stored or
+ *   replayed to later joiners; only reports are written down (newest REPORT_KEEP, and a `[casino-room] report` log line).
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
@@ -17,12 +19,18 @@ import {
   applyLeave,
   applySit,
   applyStand,
+  buildReport,
   deriveView,
   newPeer,
   overflowForAddress,
   parseClientMessage,
+  routeDm,
+  routeSay,
+  setBlocks,
   shortAddress,
+  takeChatRate,
   takeRate,
+  upgradePeer,
   type Change,
   type Peer
 } from '../../functions/lib/casino-room';
@@ -30,6 +38,9 @@ import {
 interface Env { [key: string]: unknown }
 
 const NONCE_PREFIX = 'n:';
+/** Reports people have made about each other (plan section 5.3). Only the newest REPORT_KEEP are kept. */
+const REPORT_PREFIX = 'r:';
+const REPORT_KEEP = 200;
 
 export class CasinoRoom extends DurableObject<Env> {
   /** When this in-memory instance was created. After a hibernation the constructor runs again, so a changed value in a
@@ -41,7 +52,7 @@ export class CasinoRoom extends DurableObject<Env> {
     const list: Array<{ ws: WebSocket; peer: Peer }> = [];
     for (const ws of this.ctx.getWebSockets()) {
       const peer = ws.deserializeAttachment() as Peer | null;
-      if (peer && typeof peer.id === 'string') list.push({ ws, peer });
+      if (peer && typeof peer.id === 'string') list.push({ ws, peer: upgradePeer(peer) });
     }
     return list;
   }
@@ -133,9 +144,14 @@ export class CasinoRoom extends DurableObject<Env> {
       this.send(server, {
         t: 'room', v: 1,
         you: { a: address, n: shortAddress(address), guest: !address, k: hash160 },
-        spots: view.spots, joined: view.joined, guests: view.guests, at: now
+        spots: view.spots, players: view.players, joined: view.joined, guests: view.guests, at: now
       });
-      this.broadcast(live.filter((e) => e.ws !== server), { t: 'count', joined: view.joined, guests: view.guests });
+      const others = live.filter((e) => e.ws !== server);
+      // A second tab of someone already here is not a new person.
+      if (address && !others.some((e) => e.peer.a === address)) {
+        this.broadcast(others, { t: 'join', who: { a: address, n: shortAddress(address) } });
+      }
+      this.broadcast(others, { t: 'count', joined: view.joined, guests: view.guests });
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -164,7 +180,7 @@ export class CasinoRoom extends DurableObject<Env> {
       case 'hello': {
         this.save([mine]);
         const view = deriveView(peers);
-        this.send(ws, { t: 'room', v: 1, you: { a: mine.peer.a, n: shortAddress(mine.peer.a), guest: !mine.peer.a, k: mine.peer.k }, spots: view.spots, joined: view.joined, guests: view.guests, at: now });
+        this.send(ws, { t: 'room', v: 1, you: { a: mine.peer.a, n: shortAddress(mine.peer.a), guest: !mine.peer.a, k: mine.peer.k }, spots: view.spots, players: view.players, joined: view.joined, guests: view.guests, at: now });
         return;
       }
       case 'sit': {
@@ -180,7 +196,48 @@ export class CasinoRoom extends DurableObject<Env> {
         this.announce(entries, changes);
         return;
       }
+      case 'say':
+      case 'dm':
+      case 'report': {
+        // Guests only watch. Chat is also slower than the room's general limit: one message every 2 s, 20 a minute.
+        if (!mine.peer.a) { this.save([mine]); this.send(ws, { t: 'err', code: 'sign-in-first' }); return; }
+        if (!takeChatRate(mine.peer, now)) { this.save([mine]); this.send(ws, { t: 'err', code: 'slow-down' }); return; }
+        this.save([mine]);
+        if (parsed.msg.t === 'report') {
+          const built = buildReport(peers, mine.peer.id, parsed.msg.who, parsed.msg.why, parsed.msg.lines, now);
+          if (!built.ok) { this.send(ws, { t: 'err', code: built.code }); return; }
+          await this.keepReport(built.report);
+          this.send(ws, { t: 'reported', who: parsed.msg.who });
+          return;
+        }
+        const routed = parsed.msg.t === 'say'
+          ? routeSay(peers, mine.peer.id, parsed.msg.text, now)
+          : routeDm(peers, mine.peer.id, parsed.msg.to, parsed.msg.text, now);
+        if (!routed.ok) { this.send(ws, { t: 'err', code: routed.code }); return; }
+        const text = JSON.stringify(routed.message);
+        for (const e of entries) {
+          if (!routed.to.includes(e.peer.id)) continue;
+          try { e.ws.send(text); } catch { /* closing; its close handler cleans up */ }
+        }
+        return;
+      }
+      case 'blocks': {
+        const list = setBlocks(peers, mine.peer.id, parsed.msg.list);
+        this.save(entries);
+        this.send(ws, list ? { t: 'blocks', list } : { t: 'err', code: 'sign-in-first' });
+        return;
+      }
     }
+  }
+
+  /** Stores a report and writes it to the Worker's log (`wrangler tail xtrata-casino-room`). There is no admin page yet. */
+  private async keepReport(report: { at: number; by: string; who: string; why: string; lines: string[] }) {
+    const key = REPORT_PREFIX + String(report.at).padStart(15, '0') + ':' + crypto.randomUUID().slice(0, 8);
+    await this.ctx.storage.put(key, report);
+    console.log('[casino-room] report', JSON.stringify(report));
+    const all = await this.ctx.storage.list({ prefix: REPORT_PREFIX });
+    const extra = [...all.keys()].slice(0, Math.max(0, all.size - REPORT_KEEP));
+    if (extra.length) await this.ctx.storage.delete(extra);
   }
 
   private async gone(ws: WebSocket) {
@@ -190,6 +247,7 @@ export class CasinoRoom extends DurableObject<Env> {
     if (peer) {
       const changes = applyLeave([peer], peer.id);
       this.announce(entries, changes);
+      if (peer.a && !entries.some((e) => e.peer.a === peer!.a)) this.broadcast(entries, { t: 'leave', a: peer.a });
     }
     this.broadcast(entries, { t: 'count', ...this.counts(entries) });
   }

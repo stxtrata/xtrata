@@ -247,6 +247,7 @@ function paintSigned() {
   setStatus('signStatus', s
     ? `Signed in as ${s.address} (${s.network}). Account key hash ${s.hash160.slice(0, 12)}… Session ends ${new Date(s.expiresAt).toLocaleTimeString()}.`
     : 'Not signed in. You can still watch the room as a guest.', s ? 'ok' : '');
+  paintChat();
 }
 
 // ------------------------------------------------------------------ room
@@ -293,6 +294,7 @@ function connect() {
     state.opened += 1;
     log(`room: connected (${state.timers.wsOpenMs} ms)`);
     setStatus('roomStatus', 'Connected to the room.', 'ok');
+    paintChat();
     if (state.attempts > 1) state.reconnects += 1;
     state.attempts = 0;
   };
@@ -301,6 +303,7 @@ function connect() {
     switch (m.t) {
       case 'room':
         state.you = m.you; state.spots = m.spots || {}; state.joined = m.joined; state.guests = m.guests;
+        chat.players = m.players || []; chat.known = true; sendBlocks();
         if (state.wantSpot && state.you && !state.you.guest && !Object.values(state.spots).some((s) => s.a === state.you!.a)) {
           log('re-sitting at ' + state.wantSpot); ws.send(JSON.stringify({ t: 'sit', spot: state.wantSpot }));
         }
@@ -309,10 +312,24 @@ function connect() {
       case 'stood': delete state.spots[m.spot]; break;
       case 'moved': log(`another tab of yours took ${m.spot}`); if (state.wantSpot === m.spot) state.wantSpot = null; break;
       case 'count': state.joined = m.joined; state.guests = m.guests; break;
+      case 'join':
+        if (!chat.players.some((p) => p.a === m.who.a)) chat.players.push({ a: m.who.a, n: m.who.n, spot: null });
+        note(chat.room, `${m.who.n} arrived.`);
+        break;
+      case 'leave': {
+        const gone = chat.players.find((p) => p.a === m.a);
+        chat.players = chat.players.filter((p) => p.a !== m.a);
+        if (gone) { note(chat.room, `${gone.n} left.`); if (chat.threads[m.a]) note(chat.threads[m.a].lines, `${gone.n} left the room.`); }
+        break;
+      }
+      case 'say': case 'dm': heard(m); break;
+      case 'blocks': log(`room keeps ${m.list.length} blocked`); break;
+      case 'reported': setStatus('chatStatus', 'Report sent. Thank you.', 'ok'); log('report sent'); break;
       case 'pong': state.timers.pingMs = Math.round(performance.now() - state.pingSent); log(`pong (${state.timers.pingMs} ms)`); break;
-      case 'err': log('room says: ' + m.code); break;
+      case 'err': log('room says: ' + m.code); chatFailed(m.code); break;
     }
     paintRoom();
+    paintChat();
   };
   ws.onclose = (event) => {
     state.lastClose = { code: event.code, reason: event.reason };
@@ -321,6 +338,7 @@ function connect() {
     state.ws = null;
     if (event.code === 4001) { state.replaced = true; setStatus('roomStatus', 'Another tab of yours replaced this one.', 'bad'); return; }
     setStatus('roomStatus', 'Disconnected. Reconnecting…', 'bad');
+    paintChat();
     scheduleRetry();
   };
   ws.onerror = () => { state.results.websocket = state.results.websocket === 'open' ? 'open' : 'error'; };
@@ -358,11 +376,237 @@ function finishIdle(m: any) {
   log('idle test: ' + state.results.idle);
 }
 
+// ------------------------------------------------------------------ people and chat
+
+type Person = { a: string; n: string };
+type Line = { who: Person | null; mine: boolean; text: string; at: number };   // `who` is null for a note from the room
+type Thread = { name: string; lines: Line[]; unread: boolean };
+const MAX_LINES = 200;
+const MAX_BLOCKS = 40;
+const BLOCKS_KEY = 'px_room_blocks_v1';
+const loadBlocks = (): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(BLOCKS_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((a) => typeof a === 'string').slice(0, MAX_BLOCKS) : [];
+  } catch { return []; }
+};
+const chat = {
+  players: [] as Array<{ a: string; n: string; spot: string | null }>,
+  known: false,                         // the room has told us who is here at least once; before that, "nobody here" would be a guess
+  room: [] as Line[],
+  threads: {} as Record<string, Thread>,
+  open: [] as string[],                 // addresses with a tab, in the order they were opened
+  active: 'room',
+  unreadRoom: false,
+  blocks: loadBlocks(),
+  pending: null as null | string,       // the text just sent, handed back if the room refuses it
+  sent: 0,
+  received: 0,
+  errors: [] as string[]
+};
+const saveBlocks = () => {
+  try { localStorage.setItem(BLOCKS_KEY, JSON.stringify(chat.blocks)); } catch { /* a private window: the list lasts until the page closes */ }
+};
+const CHAT_ERRORS: Record<string, string> = {
+  'no-links': 'Links are not allowed in messages.',
+  'too-long': 'That message is too long (280 characters at most).',
+  'empty': 'Type something first.',
+  'slow-down': 'Slow down a little: one message every two seconds.',
+  'not-here': 'That person has left the room.',
+  'blocked': 'You have blocked this person. Unblock them to message them.',
+  'not-you': 'You cannot do that to yourself.',
+  'sign-in-first': 'Sign in (step 2) to chat.',
+  'no-such-player': 'That person is not in the room.'
+};
+
+const mine = () => (state.you && !state.you.guest ? state.you.a : null);
+const connected = () => state.ws?.readyState === WebSocket.OPEN;
+const spotOf = (address: string) => Object.entries(state.spots).find(([, v]) => v.a === address)?.[0] ?? null;
+const pushLine = (lines: Line[], line: Line) => { lines.push(line); if (lines.length > MAX_LINES) lines.splice(0, lines.length - MAX_LINES); };
+const note = (lines: Line[], text: string) => pushLine(lines, { who: null, mine: false, text, at: Date.now() });
+const clock = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, className?: string) => {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;          // always text, never markup: a message must not be able to run anything
+  if (className) node.className = className;
+  return node;
+};
+
+const ensureThread = (p: Person) => {
+  const thread = chat.threads[p.a] ?? (chat.threads[p.a] = { name: p.n, lines: [], unread: false });
+  if (!chat.open.includes(p.a)) chat.open.push(p.a);
+  return thread;
+};
+const openThread = (p: Person) => {
+  ensureThread(p).unread = false;
+  chat.active = p.a;
+  paintChat();
+  $<HTMLInputElement>('chatInput').focus();
+};
+
+const paintPlayers = () => {
+  const box = $('players');
+  box.textContent = '';
+  box.classList.toggle('stale', chat.known && !connected());
+  if (!chat.known || chat.players.length === 0) {
+    // A room we could not reach is not an empty room: only say "nobody" when the room itself said so.
+    box.append(el('div', !chat.known ? (connected() ? 'Asking the room who is here…' : 'Not connected to the room.') : 'Nobody is signed in right now.', 'status dim'));
+    return;
+  }
+  const me = mine();
+  for (const p of chat.players) {
+    const b = el('button', undefined, p.a === me ? 'me' : '');
+    b.type = 'button';
+    b.setAttribute('role', 'listitem');
+    b.append(el('span', p.a === me ? 'You' : p.n), el('small', [spotOf(p.a) ?? 'not seated', chat.blocks.includes(p.a) ? 'blocked' : ''].filter(Boolean).join(' · ')));
+    b.disabled = !me || p.a === me || !connected();
+    b.onclick = () => openThread({ a: p.a, n: p.n });
+    box.append(b);
+  }
+};
+
+const paintTabs = () => {
+  const tabs = $('tabs');
+  tabs.textContent = '';
+  const add = (id: string, label: string, unread: boolean) => {
+    const b = el('button', label, chat.active === id ? 'on' : '');
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(chat.active === id));
+    if (unread) b.append(el('span', undefined, 'dot'));
+    b.onclick = () => {
+      chat.active = id;
+      if (id === 'room') chat.unreadRoom = false; else chat.threads[id].unread = false;
+      paintChat();
+    };
+    tabs.append(b);
+  };
+  add('room', 'Room', chat.unreadRoom);
+  for (const a of chat.open) add(a, chat.threads[a].name, chat.threads[a].unread);
+};
+
+const paintThread = () => {
+  const box = $('thread');
+  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 24;
+  box.textContent = '';
+  const inRoom = chat.active === 'room';
+  const lines = inRoom ? chat.room : chat.threads[chat.active]?.lines ?? [];
+  if (lines.length === 0) box.append(el('p', mine() ? 'No messages yet.' : 'Guests can see who is here but cannot read or send messages.', 'line note'));
+  for (const l of lines) {
+    const p = el('p', undefined, 'line' + (l.who ? (l.mine ? ' mine' : ' other') : ' note'));
+    if (l.who) {
+      const who = l.who;
+      const name = el('b', l.mine ? 'You' : who.n);
+      if (!l.mine && inRoom) { name.title = 'Message ' + who.n; name.onclick = () => openThread(who); }
+      p.append(name, document.createTextNode(' ' + l.text));
+    } else p.append(document.createTextNode(l.text));
+    p.append(el('time', clock(l.at)));
+    box.append(p);
+  }
+  if (stick) box.scrollTop = box.scrollHeight;
+};
+
+const paintTools = () => {
+  const inDm = chat.active !== 'room';
+  $('threadTools').hidden = !inDm;
+  if (inDm) {
+    $('blockBtn').textContent = chat.blocks.includes(chat.active) ? 'Unblock' : 'Block';
+    $<HTMLButtonElement>('reportBtn').disabled = !mine() || !connected();
+  }
+};
+
+const paintComposer = () => {
+  const can = !!mine() && connected();
+  const input = $<HTMLInputElement>('chatInput');
+  input.disabled = !can;
+  $<HTMLButtonElement>('chatSend').disabled = !can;
+  input.placeholder = !mine() ? 'Sign in to chat' : !connected() ? 'Reconnecting…' : chat.active === 'room' ? 'Say something to the room' : `Message ${chat.threads[chat.active]?.name ?? ''}`;
+  $('chatGate').textContent = mine()
+    ? 'Messages are not private: they pass through the room service and are not stored. No links. Block hides you and them from each other.'
+    : 'Guests can see who is here but cannot read or send messages. Sign in (step 2) to chat.';
+};
+
+function paintChat() { paintPlayers(); paintTabs(); paintThread(); paintTools(); paintComposer(); }
+
+const chatFailed = (code: string) => {
+  const text = CHAT_ERRORS[code];
+  if (!text) return;
+  chat.errors.push(code);
+  if (chat.errors.length > 10) chat.errors.shift();
+  setStatus('chatStatus', text, 'bad');
+  const input = $<HTMLInputElement>('chatInput');
+  if (chat.pending && !input.value) input.value = chat.pending;   // give the person their words back
+  chat.pending = null;
+};
+
+const sendBlocks = () => { if (mine() && connected()) state.ws!.send(JSON.stringify({ t: 'blocks', list: chat.blocks })); };
+
+const heard = (m: any) => {
+  const me = mine();
+  const own = m.from.a === me;
+  if (own) chat.pending = null; else chat.received += 1;
+  if (m.t === 'say') {
+    pushLine(chat.room, { who: m.from, mine: own, text: m.text, at: m.at });
+    if (chat.active !== 'room' && !own) chat.unreadRoom = true;
+    return;
+  }
+  const other: Person = own ? m.to : m.from;
+  const thread = ensureThread(other);
+  pushLine(thread.lines, { who: m.from, mine: own, text: m.text, at: m.at });
+  if (chat.active !== other.a && !own) thread.unread = true;
+};
+
+$<HTMLFormElement>('composer').onsubmit = (event) => {
+  event.preventDefault();
+  const input = $<HTMLInputElement>('chatInput');
+  const text = input.value.replace(/\s+/g, ' ').trim();
+  if (!text) return;
+  if (!mine() || !connected()) { setStatus('chatStatus', 'Not connected to the room.', 'bad'); return; }
+  chat.pending = text;
+  input.value = '';
+  setStatus('chatStatus', '');
+  chat.sent += 1;
+  send(chat.active === 'room' ? { t: 'say', text } : { t: 'dm', to: chat.active, text });
+};
+
+$('blockBtn').onclick = () => {
+  const who = chat.active;
+  if (who === 'room') return;
+  const thread = chat.threads[who];
+  if (chat.blocks.includes(who)) {
+    chat.blocks = chat.blocks.filter((a) => a !== who);
+    note(thread.lines, `You unblocked ${thread.name}.`);
+  } else {
+    if (chat.blocks.length >= MAX_BLOCKS) { setStatus('chatStatus', 'Your block list is full.', 'bad'); return; }
+    chat.blocks.push(who);
+    note(thread.lines, `You blocked ${thread.name}. Neither of you will see the other's messages.`);
+  }
+  saveBlocks();
+  sendBlocks();
+  paintChat();
+};
+
+$('reportBtn').onclick = () => {
+  const who = chat.active;
+  if (who === 'room' || !mine() || !connected()) return;
+  const why = $<HTMLSelectElement>('reportWhy').value;
+  // What the reporter chooses to attach: the last few things this person said that this browser received.
+  const lines = [...chat.room, ...(chat.threads[who]?.lines ?? [])].filter((l) => l.who?.a === who).slice(-5).map((l) => l.text.slice(0, 120));
+  setStatus('chatStatus', 'Sending report…');
+  send({ t: 'report', who, why, lines });
+};
+
+$('closeBtn').onclick = () => {
+  chat.open = chat.open.filter((a) => a !== chat.active);
+  chat.active = 'room';
+  paintChat();
+};
+
 // ------------------------------------------------------------------ report
 
 const makeReport = () => {
   const report = {
-    page: 'casino-room-spike v1',
+    page: 'casino-room-spike v2 (people and chat)',
     at: new Date().toISOString(),
     userAgent: navigator.userAgent,
     wallet: { kind: linked?.kind ?? null, selectedProviderId: getSelectedWalletProviderId() || null, address: linked?.address ?? null, network: linked?.network ?? null, connectedVia: linked?.via ?? null, connectTrail: trail },
@@ -370,7 +614,8 @@ const makeReport = () => {
     results: state.results,
     timersMs: state.timers,
     websocket: { opened: state.opened, reconnects: state.reconnects, lastClose: state.lastClose, replaced: state.replaced },
-    room: { you: state.you, joined: state.joined, guests: state.guests, spots: state.spots }
+    room: { you: state.you, joined: state.joined, guests: state.guests, spots: state.spots },
+    chat: { players: chat.players.length, sent: chat.sent, received: chat.received, blocked: chat.blocks.length, openChats: chat.open.length, lastErrors: chat.errors }
   };
   return JSON.stringify(report, null, 2);
 };
@@ -386,6 +631,7 @@ $('copy').onclick = async () => {
 paintWallet();
 paintSigned();
 paintRoom();
+paintChat();
 (async () => {
   try {
     const { res, body } = await postJson('/casino/room/session');
