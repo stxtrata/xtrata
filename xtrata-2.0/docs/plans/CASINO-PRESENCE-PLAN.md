@@ -94,16 +94,37 @@ Jim wants good, simple, cheap options. "Cheap" here means: uses what the Adrian 
 | 7 | Arrival gesture | none, nod, wave/greet | existing gestures |
 | 8 | A drink on your table | none, whisky, cocktail, water | a small glass prop like the bar's bottles and glasses |
 | 9 | Holder badges | automatic, from the chain (for example Forever Twins holder), shown as a tiny badge on the tag | chain read, no player choice, nothing to fake |
+| 10 | **Wear an NFT** | an NFT you own, printed on the back, the front, or both, of your shirt (section 4.5) | a decal on the torso, new but small |
 
 Players do not get the staff waistcoats (house liveries), so a player never looks like a dealer or the bartender.
 
 **Where it is stored:** off chain, in the room service, against the player's address, as a handful of small numbers (for example `{p:2, s:7, t:3, h:1, k:4, i:6, g:1, d:2}`, under 40 bytes). The server only accepts values from the fixed lists above, so nobody can send odd colours or text. Changing look is a free message, no wallet prompt. Until a player chooses, their look comes from a hash of their address, so everyone looks different from the first visit. An optional "make my look permanent" step on chain (a small contract write) could come later if Jim wants it to follow players across apps; it is not needed for the room.
 
-**Later, a real picture (not in v1):** a small round picture next to the tag, taken from an Xtrata inscription the signer owns (checked against the chain) and shown as a thumbnail (the repo already has `functions/lib/thumbnails.ts`). Inscription content is arbitrary, so this needs an allowlist of collections (for example Forever Twins and the other forevered collections already used on the machines) or a report-and-hide tool.
+**A real picture:** Jim wants players to *wear* an NFT image on their Adrian's clothes, like a PFP printed on the shirt. That is option 10 and has its own section (4.5).
 
-**Recommendation:** ship options 1 to 6 with the first version of the room (they are almost all colour and list work), add 7 to 9 next, and keep the picture badge as a separate decision.
+**Recommendation:** ship options 1 to 6 with the first version of the room (they are almost all colour and list work), add 7 to 10 next.
 
-### 4.5 Who can be seen and who can talk
+### 4.5 Wearing an NFT on your shirt (Jim, 2026-10-29)
+
+**Idea:** a player picks an NFT they own; its image appears printed on the front, the back, or both, of their Adrian's shirt, like a PFP worn as clothing. Other players see it from across the room.
+
+**Why the back matters most:** seated players face their table, so anyone walking up behind sees their back. A back print is what people will actually see; the front is seen by the dealer, the opposite seat and anyone looking across the table.
+
+**Is it feasible with the Adrian model? Yes, with a decal, not by editing the shirt.** What I checked in `adrian.glb` (read from the copy embedded in `/casino`): the shirt is its own skinned mesh (`Tailored_shirt`) with the material "Ivory cotton", which is **a flat colour with no texture image**, so there is no print area to paint into without redoing the shirt's texture layout. The skeleton has torso bones (`spine01` to `spine05`, `clavicle_L/R`). A **decal** is a thin, slightly curved square attached to a torso bone, a few millimetres in front of (or behind) the shirt surface; it follows the pose, and one extra small draw per worn print. Its position is found automatically (a ray from in front or behind hits the shirt in the bind pose, and the decal is parented to the bone at that point), so no hand-tuned numbers per body shape. The model also has a hidden chest "Xtrata woven insignia" badge mesh for staff; that stays hidden for players. **Not yet tried:** fitting on all six personas, how the decal looks while seated, and what it costs on a weak GPU (a 128 x 128 picture per worn print is small).
+
+**Where the picture comes from (the hard part is trust, not drawing):**
+1. **Xtrata inscriptions the player owns.** Ownership is a chain read by the room service when the look is saved (and again when the player joins), using the checked-read style the repo requires (a failed read is not "doesn't own it"). The picture is the inscription's thumbnail from the existing `/thumb` pipeline (cached WebP), which is same-origin, so no cross-site image problems.
+2. **Other SIP-009 NFTs** point at arbitrary web addresses. Fetching those is a security and moderation risk (huge files, slow hosts, tracking, rude images). Not in the first version; possible later through the same thumbnail pipeline, fetched and shrunk by our server, never by the viewers' browsers.
+3. **Moderation, because a shirt in a shared room is public:** only collections on an allowlist (starting with the Forever Twins collections, Bitcoin Pepes and Bitcoin Birds already used on the machines, and Jim's own), a block list for single tokens, and a Report button that hides a print for everyone at once.
+4. **Worn only while owned:** if the player no longer holds it when they next join, the print disappears and they are told.
+
+**What others receive:** just `{contract, token id, side}`, a few dozen bytes. Each viewer's browser loads the same cached thumbnail itself. A cap on how many distinct prints are drawn at once (for example 12 desktop, 4 phone) falls back to a plain shirt beyond that.
+
+**Choices for the player:** which NFT (a picker listing what they own from the allowlisted collections), front, back or both, and a size (small / medium). Free, instant, off chain.
+
+**Phase:** the first version of the Look panel (P3) ships options 1 to 6; the NFT shirt print is its own step right after, because it needs the ownership check, the allowlist and the decal work. It does not change P0 or P1.
+
+### 4.6 Who can be seen and who can talk
 
 - Guests (no signature): see everything, are invisible, cannot message.
 - Joined players: visible (unless Guest mode), can message other joined players.
@@ -226,6 +247,8 @@ At this design's traffic (a seat change or message is a few events per player pe
 8. OK to start with the P0 spike on testnet?
 
 ## 12. Decisions so far (Jim, 2026-10-29)
+
+0. **Wear an NFT on the shirt (front and/or back): wanted.** See section 4.5. Open questions: which collections go on the allowlist first, and whether non-Xtrata NFTs are ever wanted.
 
 1. **One signature per visit: yes** (option A; option C may be added later on top of the same signature).
 2. **Name tag: on-chain details only for now** (BNS name, otherwise short address). No nicknames.
