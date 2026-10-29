@@ -14,8 +14,12 @@ export const BLOCKS_KEY = 'px_room_blocks_v1';     // the same key the test page
 export const UI_KEY = 'px_chat_ui_v1';
 
 export type Who = { a: string; n?: string };
-/** `who` is null for a note from the page itself ("Report sent."). */
-export type Line = { id: number; who: Who | null; mine: boolean; text: string; at: number };
+/**
+ * `who` is null for a note from the page itself ("Report sent."). `to` is set on a direct message: the person it was sent to.
+ * A direct message is between two people, but it is not secret: it passes through the room service like everything else.
+ */
+export type Line = { id: number; who: Who | null; mine: boolean; text: string; at: number; to?: Who };
+export const DM_HOLD_MS = 30_000;      // a direct message stays up longer than room chat: it was meant for you
 export type Side = 'left' | 'right';
 export type UiPrefs = { hidden: boolean; side: Side };
 export const DEFAULT_PREFS: UiPrefs = { hidden: false, side: 'left' };
@@ -63,6 +67,9 @@ export const ERROR_TEXT: Record<string, string> = {
   'sign-in-first': 'Join the room first to chat.',
   'blocked': 'You have blocked this person.',
   'not-you': 'You cannot do that to yourself.',
+  'not-here': 'That person has left the room.',
+  'no-such-player': 'That person is not in the room.',
+  'gone': 'That person has left the room.',
   'too-many-blocks': 'Your block list is full (40 people).',
   'rate-limited': 'You are sending too much. Wait a moment.'
 };
@@ -93,16 +100,17 @@ export class ChatLog {
 
   setBlocked(list: string[]) { this.blocked = new Set(list); }
 
-  add(who: Who | null, text: string, mine: boolean, at: number): Line | null {
+  add(who: Who | null, text: string, mine: boolean, at: number, to?: Who): Line | null {
     if (who && !mine && this.blocked.has(who.a)) return null;       // the room already keeps these from us; this covers a block made a moment ago
     const line: Line = { id: (this.seq += 1), who, mine, text, at };
+    if (to) line.to = to;
     this.lines.push(line);
     if (this.lines.length > MAX_LINES) this.lines.splice(0, this.lines.length - MAX_LINES);
     return line;
   }
 
-  /** Blocking someone takes what they already said off the screen too. */
-  dropFrom(address: string) { this.lines = this.lines.filter((l) => l.who?.a !== address); }
+  /** Blocking someone takes what they already said off the screen too, and the direct messages you sent them. */
+  dropFrom(address: string) { this.lines = this.lines.filter((l) => l.who?.a !== address && l.to?.a !== address); }
 
   /** The last few things somebody said, as this browser received them: what a report can attach (short, so a report stays small). */
   lastFrom(address: string, count = 5, chars = 120): string[] {
@@ -118,8 +126,9 @@ export class ChatLog {
     for (const line of this.lines.slice(-o.max)) {
       const age = now - line.at;
       if (o.pinned && age <= PINNED_MAX_AGE_MS) { out.push({ line, opacity: 1 }); continue; }
-      if (age <= o.holdMs) { out.push({ line, opacity: 1 }); continue; }
-      const left = 1 - (age - o.holdMs) / o.fadeMs;
+      const hold = line.to ? Math.max(o.holdMs, DM_HOLD_MS) : o.holdMs;
+      if (age <= hold) { out.push({ line, opacity: 1 }); continue; }
+      const left = 1 - (age - hold) / o.fadeMs;
       if (left > 0) out.push({ line, opacity: Math.round(left * 100) / 100 });
     }
     return out;
@@ -127,4 +136,29 @@ export class ChatLog {
 
   get size() { return this.lines.length; }
   clear() { this.lines = []; }
+}
+
+/**
+ * Who is signed in to the room right now, kept from the room's own messages: the full list arrives with every connect, then
+ * `join` and `leave` keep it current. `known` stays false until the room has said who is here: a room we have not heard from
+ * is not an empty room.
+ */
+export class Roster {
+  private people = new Map<string, Who>();
+  known = false;
+
+  set(list: unknown) {
+    this.people.clear();
+    if (Array.isArray(list)) for (const p of list) if (p && typeof p.a === 'string') this.people.set(p.a, { a: p.a, n: typeof p.n === 'string' ? p.n : undefined });
+    this.known = true;
+  }
+  join(who: unknown) {
+    const w = who as Who | null;
+    if (w && typeof w.a === 'string') this.people.set(w.a, { a: w.a, n: w.n });
+  }
+  leave(address: unknown) { if (typeof address === 'string') this.people.delete(address); }
+  has(address: string) { return this.people.has(address); }
+  forget() { this.people.clear(); this.known = false; }
+  /** Everybody but you, in the order they arrived. */
+  others(me: string | null): Who[] { return [...this.people.values()].filter((p) => p.a !== me); }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ChatLog, MAX_BLOCKS, MAX_CHARS, MAX_LINES, PINNED_MAX_AGE_MS, SEND_GAP_MS, checkSend, errorText, parseBlocks, parsePrefs, sanitizeBlocks, tidy
+  ChatLog, DM_HOLD_MS, Roster, MAX_BLOCKS, MAX_CHARS, MAX_LINES, PINNED_MAX_AGE_MS, SEND_GAP_MS, checkSend, errorText, parseBlocks, parsePrefs, sanitizeBlocks, tidy
 } from '../chat-core';
 
 const A = 'ST3RKSCZP4D6Q6R43382VB6BF650KZ7QKH855FQ9P';
@@ -122,5 +122,50 @@ describe('what a report carries', () => {
     expect(got[0].startsWith('a3-')).toBe(true);
     expect(got.every((t) => t.length <= 120)).toBe(true);
     expect(log.lastFrom(B)).toEqual(['bob says hi']);
+  });
+});
+
+describe('direct messages', () => {
+  it('stay on screen longer than room chat', () => {
+    const log = new ChatLog();
+    log.add({ a: A }, 'room line', false, 0);
+    log.add({ a: A }, 'for you', false, 0, { a: B });
+    const at = (t: number) => log.visible(t, OPTS).map((v) => v.line.text);
+    expect(at(20_000)).toEqual(['for you']);
+    expect(at(DM_HOLD_MS + OPTS.fadeMs + 1)).toEqual([]);
+  });
+  it('blocking someone also clears the direct messages you sent them', () => {
+    const log = new ChatLog();
+    log.add({ a: B }, 'to alice', true, 1, { a: A });
+    log.add({ a: B }, 'to the room', true, 2);
+    log.dropFrom(A);
+    expect(log.visible(3, OPTS).map((v) => v.line.text)).toEqual(['to the room']);
+  });
+  it('the room\'s refusals for direct messages have words', () => {
+    for (const code of ['not-here', 'no-such-player', 'blocked', 'not-you']) expect(errorText(code)).not.toMatch(/could not take that/);
+  });
+});
+
+describe('who is here', () => {
+  it('is unknown until the room says, then follows joins and leaves, never listing you', () => {
+    const r = new Roster();
+    expect(r.known).toBe(false);
+    r.set([{ a: A, n: 'ST3RK…FQ9P' }, { a: B, n: 'ST9YQ…BDDA' }]);
+    expect(r.known).toBe(true);
+    expect(r.others(A).map((p) => p.a)).toEqual([B]);
+    r.leave(B);
+    expect(r.others(A)).toEqual([]);
+    r.join({ a: B, n: 'x' });
+    expect(r.has(B)).toBe(true);
+    r.forget();
+    expect(r.known).toBe(false);
+  });
+  it('ignores junk from the wire', () => {
+    const r = new Roster();
+    r.set([null, 7, { a: 5 }, { a: A }]);
+    r.join(null); r.join({ n: 'no address' }); r.leave(undefined);
+    expect(r.others(null).map((p) => p.a)).toEqual([A]);
+    r.set('not a list');
+    expect(r.others(null)).toEqual([]);
   });
 });
