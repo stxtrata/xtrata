@@ -18,8 +18,11 @@ import { validateStacksAddress } from '@stacks/transactions';
 export const XTRATA_FEE_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 
 export const BPS = 10_000;
-/** Default partner share of the wizard fee: 50%. */
-export const DEFAULT_SHARE_BPS = 5_000;
+/**
+ * Standard partner share of the wizard fee when an entry gives no `share`: 25%. A bigger share (fak.fun's 50%)
+ * is a negotiated deal and is written into that partner's entry explicitly, so it can never arrive by omission.
+ */
+export const DEFAULT_SHARE_BPS = 2_500;
 /** Below this the partner transfer is not worth sending; the amount goes to Xtrata instead (0.01 STX). */
 export const DEFAULT_MIN_PAYOUT_USTX = 10_000n;
 const MAX_MIN_PAYOUT_USTX = 100_000_000n; // 100 STX: anything bigger is a typo
@@ -128,7 +131,7 @@ function parseEntry(raw: unknown, path: string, feeAddress: string): { partner?:
     errors,
     partner: {
       slug, name, address: e.payoutAddress as string, active: e.active as boolean,
-      shareBps, selfReferral: e.selfReferral === undefined ? true : (e.selfReferral as boolean),
+      shareBps, selfReferral: e.selfReferral === undefined ? false : (e.selfReferral as boolean),
       selfShareBps, minPayoutUstx: minPayout,
     },
   };

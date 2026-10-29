@@ -30,7 +30,7 @@ const PARTNER_B = 'SPH248H248H248H248H248H248H248H249PPB6QW';
 const PAYER = 'SPSK6CSK6CSK6CSK6CSK6CSK6CSK6CSK6E8654Z3';
 
 let registry = { status: 200, body: { version: 1, partners: [
-  { slug: 'test-partner', name: 'Test Partner', payoutAddress: PARTNER, active: true, share: 0.5 },
+  { slug: 'test-partner', name: 'Test Partner', payoutAddress: PARTNER, active: true, share: 0.5, selfReferral: true },
   { slug: 'retired', name: 'Retired', payoutAddress: PARTNER_B, active: false },
 ] } };
 

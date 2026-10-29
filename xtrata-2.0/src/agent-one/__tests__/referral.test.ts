@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  BPS, DEFAULT_MIN_PAYOUT_USTX, DEFAULT_SHARE_BPS, MEMO_MAX_BYTES, SLUG_MAX, XTRATA_FEE_ADDRESS,
+  BPS, DEFAULT_MIN_PAYOUT_USTX, MEMO_MAX_BYTES, SLUG_MAX, XTRATA_FEE_ADDRESS,
   isSelfReferral, parseRegistry, payoutAddressProblem, planPayout, referralMemo, resolvePartner,
   sanitizeSlug, shareToBps, splitFee, type Partner,
 } from '../referral';
@@ -134,7 +134,7 @@ describe('splitFee', () => {
     }
   });
   it('the real 4 MB music quote splits as planned: 0.61 STX fee -> 0.305 each', () => {
-    expect(splitFee(610_000n, DEFAULT_SHARE_BPS, DEFAULT_MIN_PAYOUT_USTX)).toEqual({ partner: 305_000n, xtrata: 305_000n });
+    expect(splitFee(610_000n, 5000, DEFAULT_MIN_PAYOUT_USTX)).toEqual({ partner: 305_000n, xtrata: 305_000n });
   });
 });
 
@@ -204,8 +204,12 @@ describe('parseRegistry', () => {
     expect(r.partners).toHaveLength(1);
     expect(r.partners[0]).toMatchObject({
       slug: 'fak-fun', name: 'fak.fun', address: PARTNER_A, active: true,
-      shareBps: 5000, selfReferral: true, selfShareBps: 5000, minPayoutUstx: 10_000n,
+      shareBps: 2500, selfReferral: false, selfShareBps: 2500, minPayoutUstx: 10_000n,
     });
+  });
+  it('a bigger share or self-referral never arrives by omission: both must be written into the entry', () => {
+    const deal = parseRegistry(registry(entry({ share: 0.5, selfReferral: true }))).partners[0];
+    expect(deal).toMatchObject({ shareBps: 5000, selfReferral: true, selfShareBps: 5000 });
   });
   it('honours explicit share, selfShare, selfReferral and minPayoutUstx; selfShare falls back to share', () => {
     const a = parseRegistry(registry(entry({ share: 0.7, selfReferral: false, minPayoutUstx: 0 }))).partners[0];

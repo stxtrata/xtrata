@@ -18,7 +18,7 @@ beforeEach(async () => {
   chain = new FakeChain(); chain.realTxIds = true; chain.ledger = true;
   agent = await loadAgent(chain); api = (window as any).XtrataAgent;
   Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: async (_n: string, o: any, cb: any) => (cb || o)({}) } });
-  partnerEntry = { slug: SLUG, name: 'fak.fun', payoutAddress: PARTNER, active: true, share: 0.5 };
+  partnerEntry = { slug: SLUG, name: 'fak.fun', payoutAddress: PARTNER, active: true, share: 0.5, selfReferral: true };
   regOverride = null; clearReferralRegistryCache();
   const inner = (globalThis as any).fetch;
   (globalThis as any).fetch = vi.fn(async (input: any, init?: any) => {
@@ -148,6 +148,14 @@ describe('regression and price', () => {
 });
 
 describe('self-referral and minimum payout', () => {
+  it('an entry that does not say selfReferral (the standard terms) pays a partner who pays through their own link like any other referral: no rebate as change', async () => {
+    delete partnerEntry.selfReferral;
+    const s = await inscribedJob({ referral: SLUG, payer: PARTNER });
+    await run(s.id);
+    const t = chain.stxTransfers.filter((x) => x.from === s.dep);
+    expect(t.find((x) => x.to === PARTNER && x.memo === MEMO)!.amount).toBe(s.fee / 2n);
+    expect(stored(s.id).referralRebateUstx).toBeUndefined();
+  });
   it('payer is the partner and self-referral is on: no partner transfer, the rebate comes back as change', async () => {
     const plain = await inscribedJob(); await run(plain.id); const changePlain = chain.balances.get(plain.payer)!;
     chain.balances.set(XTRATA_FEE_ADDRESS, 0n); chain.stxTransfers.length = 0;
