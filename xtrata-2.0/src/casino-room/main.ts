@@ -284,7 +284,7 @@ function paint() {
     parts.push(el('p', `${S.joined} signed in, ${S.guests} watching.`));
     parts.push(fact('Be seen', 'Sit at a table or connect to a machine and your Adrian and name tag appear there for everyone in the room. Stand up or walk away and they go too.'));
     parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
-    parts.push(fact('Live chat', 'Chat and private messages are on the room test page for now. They are not on the casino floor yet.'));
+    parts.push(fact('Live chat', 'Chat and direct messages are on the room test page for now. They are not on the casino floor yet.'));
     parts.push(el('p', 'Nothing here moves any money.', 'fact'));
     const b = el('button', 'Leave the room'); b.onclick = () => { void leave(); };
     parts.push(b);
@@ -295,7 +295,7 @@ function paint() {
       : 'Connecting to the room…'));
     parts.push(fact('Be seen', 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Watching alone shows you to nobody.'));
     parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
-    parts.push(fact('Live chat', 'Chat and private messages are for signed-in players and are on the room test page for now. They are not on the casino floor yet.'));
+    parts.push(fact('Live chat', 'Chat and direct messages are for signed-in players and are on the room test page for now. They are not on the casino floor yet.'));
     parts.push(fact('Free', 'One signature. It sends no transaction, costs no fee and gives no permission to spend anything.'));
     const row = el('div', undefined, 'row');
     for (const kind of ['leather', 'xverse'] as const) {
