@@ -308,6 +308,8 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   return { txid: out.txid, d: out.d };
 }
 
+const UNSEEN_CANCEL_MS = 20_000;     // a cancel is honoured this long after the node is seen not to have our transaction
+const UNSEEN_GIVE_UP_MS = 180_000;   // never in the mempool for this long: stop waiting for it
 const RBF_AFTER_MS = 90000;   // give the cheap fee a fair run before paying more
 const RBF_MAX = 3;
 
@@ -336,11 +338,19 @@ async function confirmOrEscalate(p: {
   const txids: string[] = [p.txid];
   let fee = p.fee, bumps = 0, lastEscalate = Date.now();
   let reads = 0, lastErr: unknown = null;
+  // When EVERY transaction we are watching comes back 404, the node has never seen one of
+  // them: nothing is in the mempool and nothing was mined. Waiting longer cannot change that
+  // (a transaction the node accepted is visible within seconds), and it used to hold a job,
+  // and a Cancel, for the whole 18 minute loop. Seen live on 29 Oct: a broadcast the gateway
+  // had refused was waited on, and "Stop and refund" sat on "Cancelling" for 18 minutes.
+  let unseenSince: number | null = null;
 
   for (let i = 0; i < 210; i++) {
+    let notFound = 0;
     for (const id of txids) {
       try {
         const r = await hfetch(`/extended/v1/tx/${id}`);
+        if (r.status === 404) notFound += 1;
         if (!r.ok) throw new Error(`tx lookup ${r.status}`);
         const d: any = await r.json();
         reads += 1;
@@ -356,6 +366,18 @@ async function confirmOrEscalate(p: {
         if (String(e).includes('TX abort') || String(e).includes('TX dropped')) throw e;
         lastErr = e;
       }
+    }
+
+    if (notFound === txids.length) {
+      unseenSince ??= Date.now();
+      const unseenFor = Date.now() - unseenSince;
+      // A cancel with nothing in flight can be honoured at once; nothing needs to settle first.
+      if (p.logId && unseenFor >= UNSEEN_CANCEL_MS && isCancelRequested(p.logId)) throw new JobCancelled();
+      if (unseenFor >= UNSEEN_GIVE_UP_MS) {
+        throw new Error(`${p.fn}: the network never received transaction ${txids[txids.length - 1]} (not in the mempool after ${Math.round(unseenFor / 1000)}s). Nothing was spent on it.`);
+      }
+    } else {
+      unseenSince = null;
     }
 
     if (bumps < RBF_MAX && Date.now() - lastEscalate >= RBF_AFTER_MS) {
@@ -600,7 +622,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-25.5';
+export const AGENT_BUILD = '2026-10-29.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;

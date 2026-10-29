@@ -289,3 +289,48 @@ describe('a broadcast the gateway refuses', () => {
     expect(chain.broadcasts).toEqual([3000n]);
   });
 });
+
+describe('a transaction the node never received', () => {
+  let now: number;
+  const useVirtualClock = () => {
+    now = 1_700_000_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((f: any, ms = 0) => { now += Number(ms) || 0; f(); return 0 as any; }) as any);
+  };
+
+  it('stops waiting after a few minutes instead of holding the job for eighteen', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 20_000_000n);
+    chain.feeQuotes = [3000n];
+    // The broadcast was "accepted", but the node has no such transaction (every lookup is a 404).
+    chain.fail('/extended/v1/tx/', 404, { error: 'could not find transaction by ID' });
+    useVirtualClock();
+    await expect(agent.send(KEY, addr, 'add-chunk-batch', [], null, undefined, null))
+      .rejects.toThrow(/never received transaction .* Nothing was spent on it/);
+    // gave up at about 180 s of virtual time, nowhere near the old 18 minutes
+    expect(now - 1_700_000_000_000).toBeLessThan(5 * 60_000);
+  });
+
+  it('honours a Cancel at once when nothing is in flight', async () => {
+    const addr = DEPOSIT;
+    const id = 'job-cancel-unseen';
+    localStorage.setItem('xao-job-' + id, JSON.stringify({ jobId: id, status: 'INSCRIBING', cancelRequested: true }));
+    chain.balances.set(addr, 20_000_000n);
+    chain.feeQuotes = [3000n];
+    chain.fail('/extended/v1/tx/', 404, { error: 'could not find transaction by ID' });
+    useVirtualClock();
+    await expect(agent.send(KEY, addr, 'add-chunk-batch', [], null, undefined, id))
+      .rejects.toThrow(/cancelled by request/);
+    expect(now - 1_700_000_000_000).toBeLessThan(60_000);
+  });
+
+  it('keeps waiting while the node does know the transaction', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 20_000_000n);
+    chain.feeQuotes = [3000n];
+    chain.minFeeToConfirm = 0n;
+    useVirtualClock();
+    const out = await agent.send(KEY, addr, 'add-chunk-batch', [], null, undefined, null);
+    expect(out.txid).toBeTruthy();
+  });
+});
