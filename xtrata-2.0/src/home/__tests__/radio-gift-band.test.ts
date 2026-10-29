@@ -121,14 +121,19 @@ it('a locked album refuses every other way of starting a song: the tuner, lists,
 
 it('once unlocked, the tuner and lists work again', async () => {
   const api = await startOnFm();
+  const now = () => String(api.getState().nowPlaying?.tokenId ?? '');
+  // Judge by what is ON AIR, not by what was fetched: resolved tracks are cached, so a song FM already
+  // played or preloaded is started without any request. Pick a target that is not the song on air now.
+  const target = ['7771', '7772', '7773', '7774'].find((id) => id !== now())!;
   api.setGiftPlayer(album);
   api.setGiftLock(true);
-  api.playToken('7773');
+  await vi.waitFor(() => expect(now()).toBe('11'), { timeout: 5000 });
+  api.playToken(target); // refused while locked
   await new Promise((r) => setTimeout(r, 60));
-  expect(asked.includes('7773')).toBe(false);
+  expect(now()).toBe('11');
   api.setGiftLock(false);
-  api.playToken('7773');
-  await vi.waitFor(() => expect(asked.includes('7773')).toBe(true), { timeout: 5000 });
+  api.playToken(target);
+  await vi.waitFor(() => expect(now()).toBe(target), { timeout: 5000 });
 }, 30000);
 
 it('pressing play on a paused foreign song starts the album instead of resuming that song', async () => {

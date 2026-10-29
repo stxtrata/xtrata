@@ -40,6 +40,8 @@ describe('starter song library', () => {
     for (const entry of index.songs) {
       const project = load(entry.file);
       for (const channel of project.channels) {
+        // The project has 16 channel slots; unused ones have no source at all (nothing to attribute).
+        if (channel.source == null) continue;
         expect(channel.source.type, entry.id).toBe('pack');
         const row = packSoundRow(channel.source.value);
         expect(row.pack.attribution, entry.id).toBeFalsy();
