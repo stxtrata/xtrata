@@ -92,7 +92,7 @@ const PINS = {
   'xtrata-v1-1-1': '1f9ee448262d982017f69479718628689af4a660c28905492b4bad84096d74fd',
   'xtrata-v2-1-0': '3f632b0adc44788366c1cce87a497e0dc789bc99fdd7fd9024a5c47b7df05e2c',
   'xtrata-v3-2-3': '4d5ed9db022bb345d712ceadbd75d8d9540bd0a5b4d9122017c770b8d00a8ac7',
-  release: '20f45de654d56f12ac450a11a58aa53f64eeaf4cff02dae0d6fcda2839c393fe'
+  release: '6aac3703a1fb24ea56a190d50a8deb960db4fc289d975fbe7387e2c0a334f8f6'
 };
 const NEW_CONTRACTS = ['xtrata-posters-v1', 'xtrata-world-v2', 'xtrata-screen-v1', 'xtrata-games-v1'];
 // The core and the two contracts it reads from (deployed by the canary on testnet only, with the testnet SIP-009 trait).

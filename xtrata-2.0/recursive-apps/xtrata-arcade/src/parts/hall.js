@@ -1699,6 +1699,50 @@ $('cpx').addEventListener('click', closeChain);
 addEventListener('keydown', e=>{ if(chainOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); closeChain() } }, true);
 $('chainp').addEventListener('click', e=>{ if(e.target===$('chainp')) closeChain() });
 /* ================================================================
+   RADIO DOCK: music is part of the hall's own frame, so it is there in the hall, the lobby and every room.
+   One small button (bottom left). It opens Xtrata Radio (radio.xtrata.xyz/radio, the one origin the listening wallet trusts) in a panel:
+   free listening for everyone, and a holder unlocks their passkey wallet there to play the albums they hold. The panel is only HIDDEN when
+   you close it, never taken down, so an album keeps playing while you walk, play a game or go through a door. Nothing here touches money or
+   keys: the radio app does all of that in its own page. A room cannot see or reach this panel (rooms run in their own sandboxed frames).
+   ================================================================ */
+const RADIO_URL='https://radio.xtrata.xyz/radio';
+let radioOpen=false, radioLoaded=false;
+function radioPaint(){   // the button is there while you can walk or are in a room; games take the whole screen, so it steps aside (the music goes on)
+  const b=$('xa-radio-btn'); if(!b) return;
+  const show=(state==='walk' || state==='room') && !chainOpen;
+  if(b.hidden===show) b.hidden=!show;
+  b.classList.toggle('on',radioOpen);
+}
+function radioShow(){
+  if(radioOpen || chainOpen) return;
+  radioOpen=true;
+  if(document.pointerLockElement) document.exitPointerLock();
+  for(const k in keys) keys[k]=false;
+  const f=$('xa-radio-frame'), box=$('xa-radio');
+  if(!radioLoaded){   // the radio is loaded the first time it is asked for, not when the hall starts
+    radioLoaded=true; $('xa-radio-open').href=RADIO_URL;
+    f.setAttribute('allow','autoplay; fullscreen; clipboard-write; publickey-credentials-get https://radio.xtrata.xyz; publickey-credentials-create https://radio.xtrata.xyz');   // passkeys, to the radio's origin only (set with the address, so the empty frame does not name an origin it is not on)
+    f.src=RADIO_URL;
+    try{ if(Room.isOn()){ Room.toggle(); paintRoom() } }catch(e){}   // the machines' own music steps aside for the radio (the music button brings it back)
+  }
+  box.classList.remove('away'); box.removeAttribute('inert'); box.setAttribute('aria-hidden','false');
+  radioPaint(); try{ $('xa-radio-hide').focus({preventScroll:true}) }catch(e){}
+}
+function radioHide(){
+  if(!radioOpen) return;
+  radioOpen=false;
+  const box=$('xa-radio'); box.classList.add('away'); box.setAttribute('inert',''); box.setAttribute('aria-hidden','true');
+  try{ document.activeElement && document.activeElement.blur && document.activeElement.blur() }catch(e){}
+  radioPaint(); if(state==='walk') tryLock(); else if(state==='room' && roomUI && roomUI.frame){ try{ roomUI.frame.focus() }catch(e){} }
+}
+$('xa-radio-btn').addEventListener('click', ()=>{ initAudio(); radioOpen ? radioHide() : radioShow() });
+$('xa-radio-hide').addEventListener('click', radioHide);
+$('xa-radio').addEventListener('click', e=>{ if(e.target===$('xa-radio')) radioHide() });
+addEventListener('keydown', e=>{ if(radioOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); radioHide() } }, true);
+setInterval(radioPaint, 400);   // (not called here: `state` is declared further down)
+if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.hallState=()=>state;   // tests only
+if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:$('xa-radio-frame').getAttribute('src'), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow')});   // read-only, for tests
+/* ================================================================
    CABINETS — one generator, ten configs
    ================================================================ */
 const CAB_DEFAULTS = {w:.8, depth:.72, kick:.8, cp:.2, cpBack:.16, cpRise:.09, tilt:16, screenH:.54,
@@ -2281,7 +2325,7 @@ let state='intro', focusIdx=-1, locked=false, tween=null, saved=null, zoomTarget
 const ray=new THREE.Raycaster(); ray.far=2.8;
 const center=new THREE.Vector2(0,0);
 
-const modalOpen = () => chainOpen || !!document.querySelector('#xa-root .xa-modal');
+const modalOpen = () => chainOpen || radioOpen || !!document.querySelector('#xa-root .xa-modal');
 addEventListener('keydown', e=>{
   if(state==='play' || modalOpen()) return;          // the engine owns the keyboard while a game or dialog is up
   keys[e.code]=true;

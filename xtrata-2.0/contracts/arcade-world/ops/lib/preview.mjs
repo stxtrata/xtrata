@@ -1,11 +1,20 @@
 // Local preview: the real, built hall page with a small control panel that feeds it a scene file, so a story can be walked
 // through and scrubbed block by block BEFORE anything is written to a chain. Output is one local HTML file (git-ignored).
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { APP } from './catalogue.mjs';
 import { snapshotAt, resolveScenes } from './snapshot.mjs';
 
-export const HALL_FILE = join(APP, 'dist', 'xtrata-arcade-v1.5.0.html');
+// The newest built hall in dist (xtrata-arcade-v<major>.<minor>.<patch>.html, highest version): never a version number written here,
+// so a rebuild under a new version cannot leave this reading an old file (or a file that is not there).
+function newestHall() {
+  const dir = join(APP, 'dist');
+  const found = readdirSync(dir).filter((f) => /^xtrata-arcade-v\d+\.\d+\.\d+\.html$/.test(f))
+    .sort((a, b) => { const x = a.match(/\d+/g).map(Number), y = b.match(/\d+/g).map(Number); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; });
+  if (!found.length) throw new Error('no built hall in ' + dir + ' (run: node build/modular.mjs build)');
+  return join(dir, found[found.length - 1]);
+}
+export const HALL_FILE = newestHall();
 
 // Heights worth looking at: just before the first change, each distinct start, and just after the last.
 export function keyframes(scenes, height) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Build a local page that shows a TEST NETWORK's contracts in the real hall (reads only; nothing is sent).
-//   (--hall FILE shows another built hall, e.g. ../../recursive-apps/xtrata-arcade/dist/xtrata-arcade-v2.0.0.html; default is the v1.5.0 hall)
+//   (--hall FILE shows another built hall, e.g. ../../recursive-apps/xtrata-arcade/dist/xtrata-arcade-v2.0.0.html; default is the newest built hall)
 //   node ops/view.mjs --world ST...xtrata-world-v1 --posters ST...xtrata-posters-v1 [--screen ST...xtrata-screen-v1] [--scores ST...xtrata-arcade-scores-v2] [--registry ST...xtrata-world-v2] [--games ST...xtrata-games-v1 --core ST...xtrata-v3-2-3] [--rooms casino=casino-room.html|TITLE|entry-still.jpg|entry-depth.png,...] [--out path.html]
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
