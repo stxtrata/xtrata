@@ -65,7 +65,7 @@ describe('receipts produced by a real delivery', () => {
   beforeEach(async () => {
     chain.ledger = true; chain.realTxIds = true; agent = await loadAgent(chain); // reload with ledger on
     Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: async (_n: string, o: any, cb: any) => (cb || o)({}) } });
-    regEntry = { slug: SLUG, name: 'fak.fun', payoutAddress: PARTNER, active: true, share: 0.5 };
+    regEntry = { slug: SLUG, name: 'fak.fun', payoutAddress: PARTNER, active: true, share: 0.5, selfReferral: true };
     clearReferralRegistryCache();
     const inner = (globalThis as any).fetch;
     (globalThis as any).fetch = vi.fn(async (input: any, init?: any) => String(input).endsWith(REGISTRY_PATH) ? new Response(JSON.stringify({ version: 1, partners: [regEntry] })) : inner(input, init));
