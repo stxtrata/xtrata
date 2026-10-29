@@ -27,6 +27,27 @@
   #spots button.taken { opacity:.8; }
   #spots small { display:block; color:var(--dim); }
   #log { max-height:220px; overflow:auto; font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:#0a0c10; border:1px solid var(--line); border-radius:8px; padding:8px; white-space:pre-wrap; }
+  [hidden] { display:none !important; }
+  #players { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; }
+  #players.stale { opacity:.55; }
+  #players button { font-size:13px; padding:8px 10px; min-height:44px; text-align:left; }
+  #players button.me { border-color:var(--gold); }
+  #players small { display:block; color:var(--dim); }
+  #tabs { gap:6px; margin-top:10px; }
+  #tabs button { font-size:13px; padding:6px 12px; }
+  #tabs button.on { border-color:var(--gold); background:#2c2616; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--gold); margin-left:8px; }
+  #thread { height:240px; overflow:auto; background:#0a0c10; border:1px solid var(--line); border-radius:8px; padding:8px; margin:8px 0; }
+  .line { margin:0 0 6px; word-break:break-word; font-size:15px; }
+  .line b { color:var(--gold); font-weight:600; }
+  .line.mine b { color:var(--ok); }
+  .line.other b { cursor:pointer; }
+  .line.note { color:var(--dim); font-style:italic; font-size:13px; }
+  .line time { color:var(--dim); font-size:11px; margin-left:8px; }
+  #composer { margin:0; flex-wrap:nowrap; }
+  #chatInput { flex:1; min-width:0; background:#0a0c10; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; min-height:44px; }
+  #chatInput:disabled { opacity:.5; }
+  select { font:inherit; color:var(--ink); background:#222938; border:1px solid var(--line); border-radius:8px; padding:10px; min-height:44px; }
   textarea { width:100%; min-height:120px; background:#0a0c10; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px; font:12px/1.4 ui-monospace, Menlo, monospace; }
 </style>
 </head>
@@ -60,7 +81,26 @@
   </section>
 
   <section>
-    <h2>4. Test report</h2>
+    <h2>4. People and chat</h2>
+    <p id="chatGate" class="status dim">Sign in (step 2) to chat.</p>
+    <div id="players" role="list" aria-label="People in the room"></div>
+    <div id="tabs" class="row" role="tablist"></div>
+    <div id="thread" role="log" aria-live="polite" aria-label="Messages"></div>
+    <div id="threadTools" class="row" hidden>
+      <button id="blockBtn" type="button">Block</button>
+      <select id="reportWhy" aria-label="Reason for report"><option value="spam">Spam</option><option value="abuse">Abuse</option><option value="scam">Scam</option><option value="other">Other</option></select>
+      <button id="reportBtn" type="button">Report</button>
+      <button id="closeBtn" type="button">Close chat</button>
+    </div>
+    <form id="composer" class="row" autocomplete="off">
+      <input id="chatInput" type="text" maxlength="280" enterkeyhint="send" aria-label="Message" placeholder="Sign in to chat" disabled>
+      <button id="chatSend" class="primary" type="submit" disabled>Send</button>
+    </form>
+    <div id="chatStatus" class="status dim"></div>
+  </section>
+
+  <section>
+    <h2>5. Test report</h2>
     <p class="dim">After trying the steps, press this and paste the text back to Claude.</p>
     <div class="row"><button id="report" class="primary">Make report</button><button id="copy">Copy</button></div>
     <textarea id="reportText" readonly placeholder="The report appears here."></textarea>

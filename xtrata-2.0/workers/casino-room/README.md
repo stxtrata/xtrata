@@ -1,6 +1,7 @@
-# Casino room (P0 spike)
+# Casino room (P0 spike, plus Talk)
 
-The live part of "people in the casino": who is signed in and which seat or bar stool each person is at. Plan and reasoning:
+The live part of "people in the casino": who is signed in, which seat or bar stool each person is at, and (Talk) a list of the
+people in the room that signed-in players can click to send a private message, plus a public room chat. Plan and reasoning:
 `docs/plans/CASINO-PRESENCE-PLAN.md`. This is a throwaway test of the risky parts (a free wallet signature, a Durable Object,
 WebSockets through Cloudflare Pages, reconnecting). It adds **no page to the casino itself**; the only page is `/casino-room-spike/`.
 
@@ -20,6 +21,43 @@ The room never handles money. A seat in the room does not give a seat at a contr
 The Worker has **no public address** (`workers_dev = false`, no routes). Only the Pages project can reach it, through its
 binding, and `functions/casino/room/ws.ts` is the only place that sets the trusted `x-px-addr` header, after checking the
 visitor's signed cookie. Never add a route or a workers.dev address to it.
+
+## Talk: people list, public chat, private messages
+
+Built on the same room and the same sign-in. Only the test page `/casino-room-spike/` uses it; the casino pages are untouched.
+
+- **Who can do what.** Signed-in players can read and post. A guest (no sign-in) sees the list of people and the seats, nothing
+  else: a guest who tries to say, message or report gets `sign-in-first`, and public chat and private messages are never sent to
+  guests at all.
+- **People list.** Every `room` message now carries `players` (one entry per signed-in address: `{a, n, spot}`). `join` and
+  `leave` are broadcast when a person's first connection opens and their last one closes, so a second tab of the same person
+  causes neither.
+- **Messages the client sends.** `say {text}` to the room, `dm {to, text}` to one person, `blocks {list}` (the full list, which
+  replaces the old one), `report {who, why, lines}`. Replies: `say`, `dm`, `join`, `leave`, `blocks`, `reported`, or `err {code}`.
+- **A private message goes to every open tab of the recipient**, and an echo goes to every tab of the sender, so a person with
+  two tabs sees the whole conversation in both.
+- **Limits** (all in `functions/lib/casino-room.ts`, with tests): 280 characters (counted as characters, not bytes); one chat
+  message every 2 seconds and 20 a minute; 2048-byte frames; 40 blocked people; no links (`://`, `www.`, and bare domains on
+  the usual scam TLDs); hidden and direction-changing characters and line breaks are stripped before anything else is checked.
+  The refusal codes are `empty`, `too-long`, `no-links`, `slow-down`, `no-such-player`, `not-you`, `not-here`, `blocked`,
+  `too-many-blocks`, `sign-in-first`, `gone`.
+- **Blocking is two-way.** If Alice blocks Bob, she stops hearing him and he stops reaching her. Bob is not told: he still sees
+  his own message echoed, as if it went through. (If you block someone yourself and then message them, you are told: `blocked`.) The block list lives with the connection, so it survives the room hibernating;
+  the test page also saves it in the browser (`px_room_blocks_v1`) and sends it again on every connect, so it survives a
+  reconnect or a deploy as well.
+- **Nothing is stored.** Public chat and private messages are passed on and forgotten: someone who joins sees only what is said
+  after they arrive, and a message to a person who just left is refused with `not-here`. Reports are the only thing the room
+  writes down.
+- **Reports.** A report is `{at, by, who, why, lines}`: `why` is one of `spam`, `abuse`, `scam`, `other`, and `lines` (up to 5, 200
+  characters each) is what the reporter's own browser chose to attach, so treat it as the reporter's account, not proof. The
+  room keeps the newest 200 in its storage and writes each one to the Worker log as `[casino-room] report {...}`. **There is no
+  page to read them yet**: watch with `npx wrangler tail xtrata-casino-room --format pretty` (or the Logs tab on the Worker in
+  the dashboard). If the room is ever opened up beyond the test page, an admin view is the next thing to build.
+- **A lost connection is not an empty room.** While the page is disconnected it keeps the last known list on screen, dimmed and
+  marked out of date, says "Reconnecting...", and disables the message box. It only says nobody is signed in when the room
+  itself said so.
+- **The room still never handles money.** Drinks and tokens between players are a later phase and must be real on-chain
+  transfers; nothing in Talk moves a token.
 
 ## Switching it on (preview first)
 
@@ -73,9 +111,15 @@ gives a guest; other websites are refused; an idle room hibernates and wakes wit
 Worker (what a deploy does) disconnects everyone, the pages say so, then reconnect on their own and sit back down; the test page
 works at phone width.
 
-Confirmed on the deployed Cloudflare preview (2026-10-29): the same 7 end-to-end checks pass, so a Pages Function does forward a
+Talk, locally: 14 end-to-end checks (the 7 above plus 7 for Talk, including that block lists and the people list survive a
+hibernation) and a two-browser check of the test page (guest, public chat, private messages with an unread dot, a link being
+refused and the words handed back, hostile HTML shown as plain text, block, report, leave, no sideways scroll at 390 px wide, and
+the Worker being stopped and restarted underneath open pages). Talk has not yet been run on the deployed preview.
+
+Confirmed on the deployed Cloudflare preview (2026-10-29), before Talk: the same 7 end-to-end checks pass, so a Pages Function does forward a
 WebSocket to the Durable Object, and the room hibernates and wakes with every seat intact (about 47 ms for the first message after
 a 20 s idle).
 
-Still to check by hand: real Leather and Xverse signing on desktop and phone, and watching a real Worker deploy reconnect everyone
+Still to check by hand: Talk on the deployed preview (`ROOM_E2E_URL=https://<preview address>`, now 14 checks), real Leather and
+Xverse signing on desktop and phone with two accounts talking to each other, and watching a real Worker deploy reconnect everyone
 on Cloudflare (it was observed locally).

@@ -183,3 +183,163 @@ describe.skipIf(!BASE)('casino room end to end', () => {
     closeAll(watcher);
   }, 120_000);
 });
+
+// ------------------------------------------------------------------ talk (player list, public chat, private messages)
+
+const seen = (c: { msgs: Msg[] }, test: (m: Msg) => boolean) => c.msgs.filter(test);
+const someone = () => { const w = wallet(); return signIn(w); };
+
+describe.skipIf(!BASE)('casino room talk end to end', () => {
+  it('lists signed-in people, and tells the room when someone arrives or leaves', async () => {
+    const alice = await someone(), bob = await someone();
+    const watcher = await join();
+    const a = await join({ cookie: alice.cookie });
+    expect(a.room.players.map((p: Msg) => p.a)).toContain(alice.w.address);
+    const arrived = a.waitFor((m) => m.t === 'join' && m.who.a === bob.w.address);
+    const guestSaw = watcher.waitFor((m) => m.t === 'join' && m.who.a === bob.w.address);
+    const b = await join({ cookie: bob.cookie });
+    expect(b.room.players.map((p: Msg) => p.a)).toEqual(expect.arrayContaining([alice.w.address, bob.w.address]));
+    expect((await arrived).who.n).toBe(`${bob.w.address.slice(0, 5)}…${bob.w.address.slice(-4)}`);
+    await guestSaw;                                             // guests can see who is here, as the plan says
+
+    const a2 = await join({ cookie: alice.cookie });            // a second tab of someone already here is not an arrival
+    await a2.quiet(500);
+    expect(seen(b, (m) => m.t === 'join' && m.who.a === alice.w.address && m.at !== undefined)).toEqual([]);
+    expect(seen(b, (m) => m.t === 'join' && m.who.a === alice.w.address)).toHaveLength(0);
+
+    a.ws.close();                                               // she still has a tab open, so she has not left
+    await b.quiet(500);
+    expect(seen(b, (m) => m.t === 'leave')).toEqual([]);
+    const left = b.waitFor((m) => m.t === 'leave' && m.a === alice.w.address);
+    a2.ws.close();
+    await left;
+    closeAll(watcher, b);
+  }, 30_000);
+
+  it('public chat reaches signed-in people only; guests can watch but not speak', async () => {
+    const alice = await someone(), bob = await someone();
+    const a = await join({ cookie: alice.cookie }), b = await join({ cookie: bob.cookie }), guest = await join();
+    const heard = b.waitFor((m) => m.t === 'say');
+    a.send({ t: 'say', text: '  hello   room ' });
+    const m = await heard;
+    expect(m).toMatchObject({ from: { a: alice.w.address }, text: 'hello room' });
+    await a.waitFor((x) => x.t === 'say');                      // the speaker's own screen shows it because the room sent it back
+    guest.send({ t: 'say', text: 'let me in' });
+    expect((await guest.waitFor((x) => x.t === 'err')).code).toBe('sign-in-first');
+    await guest.quiet(500);
+    expect(seen(guest, (x) => x.t === 'say')).toEqual([]);
+    closeAll(a, b, guest);
+  }, 30_000);
+
+  it('private messages reach every tab of the other person and every tab of the sender, and nobody else', async () => {
+    const alice = await someone(), bob = await someone(), carol = await someone();
+    const a1 = await join({ cookie: alice.cookie }), a2 = await join({ cookie: alice.cookie });
+    const b = await join({ cookie: bob.cookie }), c = await join({ cookie: carol.cookie });
+    const t1 = a1.waitFor((m) => m.t === 'dm'), t2 = a2.waitFor((m) => m.t === 'dm'), echo = b.waitFor((m) => m.t === 'dm');
+    b.send({ t: 'dm', to: alice.w.address, text: 'psst' });
+    for (const got of await Promise.all([t1, t2, echo])) {
+      expect(got).toMatchObject({ from: { a: bob.w.address }, to: { a: alice.w.address }, text: 'psst' });
+    }
+    await c.quiet(500);
+    expect(seen(c, (m) => m.t === 'dm')).toEqual([]);
+
+    b.send({ t: 'dm', to: bob.w.address, text: 'me' });          // too soon after the last one, so the room says slow down first
+    expect((await b.waitFor((m) => m.t === 'err')).code).toBe('slow-down');
+    await b.quiet(2100);
+    b.send({ t: 'dm', to: bob.w.address, text: 'me' });
+    expect((await b.waitFor((m) => m.t === 'err' && m.code === 'not-you')).code).toBe('not-you');
+    await b.quiet(2100);
+    b.send({ t: 'dm', to: 'ST9NOBODY00000000000000000000000000000', text: 'hello?' });
+    expect((await b.waitFor((m) => m.t === 'err' && m.code === 'not-here')).code).toBe('not-here');
+    closeAll(a1, a2, b, c);
+  }, 30_000);
+
+  it('blocking hides both people from each other and nobody else, and the blocked person is not told', async () => {
+    const alice = await someone(), bob = await someone(), carol = await someone();
+    const a = await join({ cookie: alice.cookie });
+    const b1 = await join({ cookie: bob.cookie }), b2 = await join({ cookie: bob.cookie }), c = await join({ cookie: carol.cookie });
+    a.send({ t: 'blocks', list: [bob.w.address] });
+    expect((await a.waitFor((m) => m.t === 'blocks')).list).toEqual([bob.w.address]);
+
+    b1.send({ t: 'say', text: 'hi everyone' });
+    await c.waitFor((m) => m.t === 'say');
+    await a.quiet(600);
+    expect(seen(a, (m) => m.t === 'say')).toEqual([]);           // Alice does not hear Bob
+
+    a.send({ t: 'say', text: 'hello from alice' });
+    await c.waitFor((m) => m.t === 'say' && m.from.a === alice.w.address);
+    await b1.quiet(600);
+    expect(seen(b1, (m) => m.t === 'say' && m.from.a === alice.w.address)).toEqual([]);   // and Bob does not hear Alice
+
+    b2.send({ t: 'dm', to: alice.w.address, text: 'are you there' });
+    await b2.waitFor((m) => m.t === 'dm');                       // Bob sees it as sent, with no error
+    await a.quiet(600);
+    expect(seen(a, (m) => m.t === 'dm')).toEqual([]);
+    expect(seen(b2, (m) => m.t === 'err')).toEqual([]);
+
+    await a.quiet(1500);
+    a.send({ t: 'dm', to: bob.w.address, text: 'go away' });     // Alice is told she has him blocked
+    expect((await a.waitFor((m) => m.t === 'err' && m.code === 'blocked')).code).toBe('blocked');
+
+    a.send({ t: 'blocks', list: [] });                           // unblocking brings the conversation back
+    await a.waitFor((m) => m.t === 'blocks' && m.list.length === 0);
+    await b1.quiet(2100);
+    b1.send({ t: 'say', text: 'we are friends again' });
+    await a.waitFor((m) => m.t === 'say' && m.from.a === bob.w.address);
+    closeAll(a, b1, b2, c);
+  }, 30_000);
+
+  it('refuses links and over-long messages without using up the speaker\'s chat allowance, and slows down fast talkers', async () => {
+    const alice = await someone();
+    const a = await join({ cookie: alice.cookie });
+    a.send({ t: 'say', text: 'claim your prize at free-chips.xyz' });
+    expect((await a.waitFor((m) => m.t === 'err')).code).toBe('no-links');
+    a.send({ t: 'say', text: 'x'.repeat(281) });
+    await a.waitFor((m) => m.t === 'err' && m.code === 'too-long');
+    a.send({ t: 'say', text: '   ' });
+    await a.waitFor((m) => m.t === 'err' && m.code === 'empty');
+    a.send({ t: 'say', text: 'first' });
+    await a.waitFor((m) => m.t === 'say' && m.text === 'first');    // the refused ones did not count against her
+    a.send({ t: 'say', text: 'second' });
+    expect((await a.waitFor((m) => m.t === 'err' && m.code === 'slow-down')).code).toBe('slow-down');
+    closeAll(a);
+  }, 30_000);
+
+  it('keeps block lists, the player list and the chat allowance when the room hibernates', async () => {
+    const alice = await someone(), bob = await someone();
+    const a = await join({ cookie: alice.cookie }), b = await join({ cookie: bob.cookie });
+    a.send({ t: 'blocks', list: [bob.w.address] });
+    await a.waitFor((m) => m.t === 'blocks');
+    b.send({ t: 'say', text: 'before the nap' });
+    await b.waitFor((m) => m.t === 'say');
+    b.send({ t: 'ping' });
+    const before = await b.waitFor((m) => m.t === 'pong');
+
+    await new Promise((r) => setTimeout(r, IDLE_MS));            // nobody says anything
+
+    b.send({ t: 'say', text: 'right after' });                   // the 2-second chat gap is long over, so this is allowed
+    await b.waitFor((m) => m.t === 'say' && m.text === 'right after');
+    await a.quiet(600);
+    expect(seen(a, (m) => m.t === 'say' && m.from.a === bob.w.address)).toEqual([]);   // Alice still has Bob blocked
+    b.send({ t: 'hello' });
+    const again = await b.waitFor((m) => m.t === 'room' && m !== b.room);
+    expect(again.players.map((p: Msg) => p.a)).toEqual(expect.arrayContaining([alice.w.address, bob.w.address]));
+    b.send({ t: 'ping' });
+    const after = await b.waitFor((m) => m.t === 'pong' && m !== before);
+    console.log(`[room-e2e] talk idle ${IDLE_MS} ms; instance start ${before.up} -> ${after.up} (${before.up === after.up ? 'did NOT hibernate' : 'hibernated and woke'})`);
+    closeAll(a, b);
+  }, 120_000);
+
+  it('keeps a report, and refuses a report about yourself', async () => {
+    const alice = await someone(), bob = await someone();
+    const a = await join({ cookie: alice.cookie }), b = await join({ cookie: bob.cookie });
+    a.send({ t: 'report', who: bob.w.address, why: 'scam', lines: ['send me chips at evil.com'] });
+    expect((await a.waitFor((m) => m.t === 'reported')).who).toBe(bob.w.address);
+    await a.quiet(2100);
+    a.send({ t: 'report', who: alice.w.address, why: 'spam' });
+    expect((await a.waitFor((m) => m.t === 'err' && m.code === 'not-you')).code).toBe('not-you');
+    await b.quiet(300);
+    expect(seen(b, (m) => m.t === 'reported' || m.t === 'err')).toEqual([]);   // the person reported is told nothing (the room is shared, so other tests' chat may pass by)
+    closeAll(a, b);
+  }, 30_000);
+});
