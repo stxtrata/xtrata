@@ -42,7 +42,7 @@ Pages this applies to: `/casino` and `/casino-b` (both already contain the room,
 1. **Arrive.** Walk in as today. You can see seated Adrians with name tags. Nobody sees you. A small badge in a corner: "You are watching. Join the room".
 2. **Join.** Click it. The wallet asks for one signature. The prompt shows the app name ("ParallaX Casino"), what it is for ("room entry") and an expiry. No fee, no transaction.
 3. **Sit.** Walk up to any free spot and press the usual SIT/PLAY (or click a glowing ring, as today). Your Adrian appears there (fade in, or walk in from the door), with your tag. Others see you appear.
-4. **Be seen.** Your tag floats over your head: BNS name if you have one, otherwise a short address like `SP3J…X743`. Colours of your clothes come from your address (stable, so people learn to recognise you).
+4. **Be seen.** Your tag floats over your head: BNS name if you have one, otherwise a short address like `SP3J…X743`. Until you pick your own look (section 4.4), your clothes and hair come from your address (stable, so people learn to recognise you).
 5. **Talk.** Anyone clicks you: a card with your name and **Message**. Messages open a small chat window. They are temporary (see section 7).
 6. **Leave.** Stand up, close the tab, or go quiet for a minute: your Adrian disappears. Come back within the session window and you are signed in again with no prompt.
 
@@ -77,11 +77,31 @@ Optional later: a wave or raise-glass emote (the 15 baked clips already include 
 - Free-text nicknames are **not** in v1 (impersonation and abuse). Possible later: a nickname that is always shown with the address suffix.
 - Players can choose **"Show as Guest 4821"** (no name, no address in the room list) and still sit and chat.
 
-### 4.4 The "PFP" part
+### 4.4 Player look ("PFP") and customisation
 
-- **v1 (no uploads, nothing to moderate):** the Adrian *is* the avatar. Clothes colour and, if the six personas are switched back on, the persona come from a hash of the address. Plus the tag.
-- **v2:** a small round picture next to the tag, taken from an Xtrata inscription that the signer owns (checked against the chain) and shown as a thumbnail (the repo already has a thumbnail pipeline, `functions/lib/thumbnails.ts`). Content from inscriptions is arbitrary, so this needs an allowlist of collections (for example Forever Twins and the other forevered collections already used on the machines) or a report-and-hide tool.
-- Decision for Jim: v1 only, or v1 then v2.
+Jim wants good, simple, cheap options. "Cheap" here means: uses what the Adrian code already supports, needs no new 3D models, nothing to upload, nothing to moderate, and costs the player nothing. What the code supports today (read in `public/casino/index.html`): six body/hair personas (`m1 m2 m3 f1 f2 f3`; the page currently locks everybody to `m1` through `ONE_CHARACTER`, so remote players need that switch made per person), own-clothes tint (`wear: {shirt, trousers}`), hair colour and hair-do per persona, skin tint, and the existing gestures (`greet`, `nod`, `win`, `lose`, `deal`, `reveal`). **Not supported:** hats, glasses, jewellery or any accessory; those would need new modelled parts and are not cheap.
+
+**The menu (a "Look" panel, free, instant, changeable any time):**
+
+| # | Option | Choices | Built on |
+|---|---|---|---|
+| 1 | Body and hair style | 6 personas | existing personas |
+| 2 | Shirt colour | about 16 swatches | `dressCivilian` |
+| 3 | Trousers colour | about 8 swatches | `dressCivilian` |
+| 4 | Hair colour | about 8 | persona `hairColor` |
+| 5 | Skin tone | about 6 | persona `look` tint |
+| 6 | Name tag style | frame colour (about 8) plus a small icon (suits, chip, star, bolt, and similar, about 12) | tag sprite, new but tiny |
+| 7 | Arrival gesture | none, nod, wave/greet | existing gestures |
+| 8 | A drink on your table | none, whisky, cocktail, water | a small glass prop like the bar's bottles and glasses |
+| 9 | Holder badges | automatic, from the chain (for example Forever Twins holder), shown as a tiny badge on the tag | chain read, no player choice, nothing to fake |
+
+Players do not get the staff waistcoats (house liveries), so a player never looks like a dealer or the bartender.
+
+**Where it is stored:** off chain, in the room service, against the player's address, as a handful of small numbers (for example `{p:2, s:7, t:3, h:1, k:4, i:6, g:1, d:2}`, under 40 bytes). The server only accepts values from the fixed lists above, so nobody can send odd colours or text. Changing look is a free message, no wallet prompt. Until a player chooses, their look comes from a hash of their address, so everyone looks different from the first visit. An optional "make my look permanent" step on chain (a small contract write) could come later if Jim wants it to follow players across apps; it is not needed for the room.
+
+**Later, a real picture (not in v1):** a small round picture next to the tag, taken from an Xtrata inscription the signer owns (checked against the chain) and shown as a thumbnail (the repo already has `functions/lib/thumbnails.ts`). Inscription content is arbitrary, so this needs an allowlist of collections (for example Forever Twins and the other forevered collections already used on the machines) or a report-and-hide tool.
+
+**Recommendation:** ship options 1 to 6 with the first version of the room (they are almost all colour and list work), add 7 to 9 next, and keep the picture badge as a separate decision.
 
 ### 4.5 Who can be seen and who can talk
 
@@ -163,9 +183,11 @@ A fixed list per page (`blackjack.1`, `blackjack.2`, `holdem.1`, `pvpholdem.1`, 
 | **P0. Spike** | Read `docs/WALLET-PLAYBOOK.md` in full first (its section 10 is the ship checklist for any wallet change). Then a throwaway Worker with the Durable Object, a Pages Function that forwards a WebSocket to it, and a sign-in button on `/casino`. | (a) WebSocket forwarding from a Pages Function works (the Cloudflare pages I read do not say either way; if not, put the Worker on a subdomain like `room.xtrata.xyz`, as `radio.` and `wallet.` already are). (b) Leather and Xverse, desktop **and** mobile, return a signature the server accepts. (c) Hibernation works and a deploy reconnects cleanly. |
 | **P1. Seen** | Sign-in, spot map, static Adrians with name tags on both pages; guests can watch; NPC patrons yield to real people. | Two real browsers see each other; refresh keeps you seated; closing the tab clears you within about a minute; fail-open verified by killing the service; frame time with 16 figures checked on the slow headless renderer and on a real GPU/phone. |
 | **P2. Talk** | Click-a-person card, private messages, mute/block/report, rate limits. | Abuse tests (spam, links, oversize, replayed challenge, forged header, second tab). |
-| **P3. Look** | Colours/persona from address, bar stools, walk-in animation, a wave and a raise-glass emote. Optional PFP badge from an owned inscription (allowlist). | Visual review with Jim; badge fetch cannot block rendering. |
+| **P3. Look** | The Look panel (section 4.4: options 1 to 6 first, then 7 to 9), bar stools, walk-in animation. The picture badge from an owned inscription (allowlist) is a separate, later decision. | Visual review with Jim; badge fetch cannot block rendering. |
 | **P4. Give** | Drinks, tips, hand LAYR via `layr` transfers. | Depends on the on-chain LAYR plan P1; real post-conditions; conservation checks. |
 | **P5. Prove** | Session-key signing (option C), verifiable messages, moderation console, mainnet review. | Independent review of the signing scheme; Jim's explicit go for mainnet. |
+
+**P0 in plain words.** A small throwaway test, not a feature. Three pieces: (1) a tiny Worker holding the Durable Object, which only counts connections and says who is here; (2) a Pages Function that forwards a browser's WebSocket to it and checks the wallet signature (the Studio login code with a new casino domain); (3) a hidden test page, not linked from `/casino`, with a Sign in button that shows "connected as SP…" and the other open tabs. It answers three questions: does Pages forward the WebSocket, do Leather and Xverse (desktop and phone) sign and does our server accept it, does the room survive hibernation and a deploy. It does not touch `/casino`, `/casino-b`, any contract, or any chips or STX; the signature is free and nothing is written to a chain. I build and test it locally with `wrangler dev`; deploying the Worker, binding it to the Pages project and adding one secret need Jim's Cloudflare account (three or four commands, given to him ready to paste), and the real-wallet checks need Jim's wallets. Undo: delete the Worker and the binding.
 
 Tests, in the style of the rest of the repo: the room logic (spots, limits, bans) is a plain module with unit tests; the Durable Object is a thin shell around it; the Pages Functions get request/response tests like `casino-log.test.ts`; the browser side is tested with several headless browsers at once against `wrangler dev`, using the fake-wallet approach from the existing wallet tests. Real wallets are tested by hand on the final gate.
 
@@ -202,6 +224,16 @@ At this design's traffic (a seat change or message is a few events per player pe
 6. Messages: private one-to-one only, or also a public bar chat? (Recommended: private first.)
 7. Which Cloudflare route for the live service: Pages function forwarding if the spike confirms it, else a `room.` subdomain?
 8. OK to start with the P0 spike on testnet?
+
+## 12. Decisions so far (Jim, 2026-10-29)
+
+1. **One signature per visit: yes** (option A; option C may be added later on top of the same signature).
+2. **Name tag: on-chain details only for now** (BNS name, otherwise short address). No nicknames.
+3. **Look: wants good, simple, cheap customisation**, not only address-derived colours. Answered by the Look menu in section 4.4 (recolour and list work, no new 3D parts, free, off chain). Jim to say which of options 1 to 9 he wants first and whether the picture badge is wanted at all.
+4. **Guests can see the room's people** without signing in (and are invisible to others): yes.
+5. Cap on figures drawn (16 desktop, 6 phone) and room size (300): defaults stand unless Jim says otherwise.
+6. Messages private one-to-one first, and the choice of route for the live service, still open.
+7. **P0 spike:** Jim asked for an explanation before deciding; it is the "P0 in plain words" paragraph in section 8. Go / no-go still to come.
 
 ---
 
