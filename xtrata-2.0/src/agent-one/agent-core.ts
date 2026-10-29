@@ -11,6 +11,8 @@
 //
 // UNTESTED IN THIS ENV — validate with XAO_CONFIG.mock=true in a browser first, then a small live job.
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { freezeReferral } from './referral-registry';
+import { planPayout, referralMemo, type Partner } from './referral';
 import { generateMnemonic, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { HDKey } from '@scure/bip32';
@@ -417,14 +419,14 @@ async function transferFee(opts: any): Promise<bigint> {
     return low > TRANSFER_FEE_FLOOR ? low : TRANSFER_FEE_FLOOR;
   } catch { return TRANSFER_FEE_FLOOR; }
 }
-async function sendStx(key: string, amount: bigint, to: string, fee: bigint) {
+async function sendStx(key: string, amount: bigint, to: string, fee: bigint, memo?: string) {
   // Same lesson as sendNft: REFUND_TX_FEE (5,000 uSTX) is what a refund BUDGETS, not
   // what the mempool will accept when it is busy. Two sweeps sat unmined for days at
   // exactly that fee. Floor it, and let the caller's budget cover the difference.
   const useFee = fee > TRANSFER_FEE_FLOOR ? fee : TRANSFER_FEE_FLOOR;
   const from = getAddressFromPrivateKey(key, TransactionVersion.Mainnet);
   let nonce: bigint | undefined; try { nonce = await safeNonce(from); } catch {}
-  const tx: any = await makeSTXTokenTransfer({ recipient: to, amount, senderKey: key, network, fee: useFee, anchorMode: AnchorMode.Any, nonce } as any);
+  const tx: any = await makeSTXTokenTransfer({ recipient: to, amount, senderKey: key, network, fee: useFee, anchorMode: AnchorMode.Any, nonce, ...(memo ? { memo } : {}) } as any);
   const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('stx: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res; await waitTx(txid); return txid;
 }
 const tidFrom = (d: any) => { const r = d?.tx_result?.repr || ''; const m = /token-id u(\d+)/.exec(r) || /\(ok u(\d+)\)/.exec(r); return m ? m[1] : null; };
@@ -595,7 +597,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-23.1';
+export const AGENT_BUILD = '2026-10-25.5';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -775,6 +777,7 @@ function receiptData(job: any, x: any) {
     tokenId: job.tokenId, receiptTokenId: x.receiptTokenId || null, recipient: x.recipient || job.recipient || job.user, agentIdentityId: job.agentIdentityId || null, origin: job.origin || 'wizard',
     parents: (job.parents || []).map(String),
     outcome: x.outcome || 'inscribed', note: x.note || null,
+    ...(x.referral ? { referral: x.referral } : {}),
     depositReceived: received.toString(), xtrataProtocol: fileProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
     networkFee: networkFee.toString(), agentFeePct: Number(job.agentFeePct ?? AGENT_FEE_PCT),
     agentFee: agentFee.toString(), changeReturned: changeR.toString(),
@@ -822,7 +825,7 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 ${row('Xtrata protocol fee', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
 ${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
 ${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
-<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>${referralRowHtml(d, row, stxr, escHtml)}
 ${row('Change returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}
 ${d.note ? row('Note', escHtml(d.note)) : ''}
 <div class="tot">${row('Total paid', stxr(d.totalPaid) + usd(d.totalPaid))}</div>` : `<h1>Outcome</h1>
@@ -833,6 +836,46 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 <div class="tot">${row('Returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}</div>`}
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · settled on Bitcoin via Stacks</div>
 </div></div></body></html>`;
+}
+
+
+// ---------- referral on receipts ----------
+type ReferralView = { slug: string; name: string; kind: 'planned' | 'paid' | 'pending' | 'rebate'; amountUstx: string; tx?: string };
+/** One line under the wizard fee. Empty string when the job has no referral, so unreferred receipts are byte-for-byte unchanged. */
+function referralRowHtml(d: any, row: (k: string, v: string) => string, stxr: (u: any) => string, escHtml: (s: any) => string): string {
+  const r: ReferralView | undefined = d && d.referral;
+  if (!r) return '';
+  const who = escHtml(r.name);
+  if (r.kind === 'rebate') return row('↳ Referral rebate · ' + who, stxr(r.amountUstx) + ' back in your change');
+  if (r.kind === 'pending') return row('↳ Referral · ' + who, 'to be settled by Xtrata');
+  return row('↳ Referral · ' + who, stxr(r.amountUstx) + ' of the wizard fee');
+}
+/** What to show for a referred job: `final` false = the split agreed before payout (on-chain receipt), true = what happened. */
+function referralView(job: any, agentFee: bigint, payer: string | null, final: boolean): ReferralView | null {
+  if (!(job && job.referral && job.origin === 'music')) return null;
+  const base = { slug: String(job.referral.slug), name: String(job.referral.name) };
+  if (final) {
+    if (job.referralOwed) return { ...base, kind: 'pending', amountUstx: String(job.referralOwed.amountUstx) };
+    if (job.referralTx) return { ...base, kind: 'paid', amountUstx: String(job.referralPaidUstx || '0'), tx: String(job.referralTx) };
+    if (job.referralRebateUstx) return { ...base, kind: 'rebate', amountUstx: String(job.referralRebateUstx) };
+    return null;
+  }
+  const plan = planPayout({ agentFee, partner: frozenPartner(job), payer });
+  if (plan.rebateToPayer > 0n) return { ...base, kind: 'rebate', amountUstx: plan.rebateToPayer.toString() };
+  if (plan.toPartner > 0n) return { ...base, kind: 'planned', amountUstx: plan.toPartner.toString() };
+  return null;
+}
+/** The self-referral rebate stays in the wallet and returns as change, so the fee the user actually bears is smaller. */
+function referralRebate(job: any, agentFee: bigint, payer: string | null): bigint {
+  if (!(job && job.referral && job.origin === 'music')) return 0n;
+  return planPayout({ agentFee, partner: frozenPartner(job), payer }).rebateToPayer;
+}
+/** Mock mode moves no money; it records what a live run would, so the receipt and page can be checked in a browser. */
+function mockReferral(job: any, agentFee: bigint) {
+  if (!(job.referral && job.origin === 'music')) return;
+  const plan = planPayout({ agentFee, partner: frozenPartner(job), payer: job.funder || job.expectedFunder || job.user || null });
+  if (plan.toPartner > 0n) { job.referralTx = '0xMOCK_REFERRAL'; job.referralPaidUstx = plan.toPartner.toString(); }
+  else if (plan.rebateToPayer > 0n) job.referralRebateUstx = plan.rebateToPayer.toString();
 }
 
 // ---------- funder + retrying STX sends (mirror core) ----------
@@ -1318,7 +1361,7 @@ async function recoverJobAssets(jobIn: any) {
     : `ownership index refresh deferred · ${indexRefresh.error}`);
   return { recovered: true, ...job.recovery };
 }
-async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }
+async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4, memo?: string) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee, memo); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }
 async function sendNftRetry(key: string, from: string, id: string, to: string, tries = 5) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendNft(key, from, id, to); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(Math.min(30000, 8000 * (i + 1))); continue; } throw e; } } throw last; }
 async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5): Promise<any> { let last: any; for (let i = 0; i < tries; i++) { let bal = 0n; try { bal = await balance(fromAddr); } catch (e) { last = e; await sleep(5000); continue; } if (bal <= REFUND_TX_FEE) return { sent: false, amount: '0', balance: bal.toString() }; const amount = bal - REFUND_TX_FEE; try { const tx = await sendStx(key, amount, to, REFUND_TX_FEE); return { sent: true, tx, amount: amount.toString() }; } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last || new Error('sweep failed'); }
 async function inscribeReceipt(key: string, from: string, html: string, uri: string, deps: string[]) { const data = enc.encode(html); const q = await quoteFee(data.length, chunkBytes(data).length); const tokenId = await mintSingle(key, from, data, 'text/html', uri, deps, q.protocolFee); return { tokenId }; }
@@ -1332,7 +1375,8 @@ function musicProtected(job: any, s: MusicFeeState) {
   return BigInt(job.protocolFee) - BigInt(s.protocolSpent) + BigInt(s.service)
     + BigInt(job.receiptProtocol || 0) + BigInt(job.receiptMiner || 0)
     + BigInt((job.parents || []).length) * PARENT_RETURN_FEE
-    + DELIVERY_RESERVE + BigInt(Math.max(0, (job.items?.length || 1) - 1)) * ITEM_DELIVERY_FEE + REFUND_TX_FEE;
+    + DELIVERY_RESERVE + BigInt(Math.max(0, (job.items?.length || 1) - 1)) * ITEM_DELIVERY_FEE + REFUND_TX_FEE
+    + referralFeeReserve(job);   // the partner transfer is one more tx; Economy spending must not dip into it
 }
 function initialiseMusicFees(job: any, est: any) {
   if (est.feeMode !== 'economy') return;
@@ -1569,6 +1613,8 @@ async function createJob(opts: any) {
   if (parentIds.some((p) => !/^\d+$/.test(p))) throw new Error('parents must be token-id uints');
   if (new Set(parentIds).size !== parentIds.length) throw new Error('duplicate parent token ids');
   if (parentIds.length > 50) throw new Error('at most 50 parents');
+  // REFERRAL: resolved before any file is read or wallet made, so a registry outage creates no job.
+  const referral = await freezeReferral(opts.referral, origin, { sleep });
   const data = new Uint8Array(await (file as File).arrayBuffer());
   // DUPLICATE-HASH GUARD: the contract rejects re-inscribing an identical hash — refuse BEFORE creating
   // a job or taking payment, so identical content is never paid for twice.
@@ -1596,6 +1642,7 @@ async function createJob(opts: any) {
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
     status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin, sunoPlayer,
+    ...(referral ? { referral } : {}),
   };
   initialiseMusicFees(job, est);
   writeJob(job); return publicJob(job);
@@ -1615,6 +1662,7 @@ async function createBatchJob(opts: any) {
   if (!Array.isArray(items) || !items.length) throw new Error('items required');
   if (items.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${items.length} items (max ${MAX_BATCH_ITEMS})`);
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
+  const referral = await freezeReferral(opts.referral, origin, { sleep });
   const validIds = (list: any[], what: string) => {
     const ids = (list || []).map((p: any) => String(p).trim()).filter(Boolean);
     if (ids.some((p) => !/^\d+$/.test(p))) throw new Error(`${what} must be token-id uints`);
@@ -1672,6 +1720,7 @@ async function createBatchJob(opts: any) {
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
     status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin,
+    ...(referral ? { referral } : {}),
   };
   initialiseMusicFees(job, est);
   writeJob(job); return publicJob(job);
@@ -1825,6 +1874,7 @@ function batchReceiptData(job: any, x: any) {
   return {
     jobId: job.jobId, core: job.core, date: new Date().toISOString(), batch: true,
     outcome: x.outcome || 'inscribed', note: x.note || null,
+    ...(x.referral ? { referral: x.referral } : {}),
     items: job.items.map((i: any) => ({ idx: i.idx, uri: i.uri, mime: i.mime, bytes: i.bytes, tokenId: i.tokenId || null, status: i.status, error: i.error || null })),
     counts: { total: job.items.length, minted: minted.length, failed: job.items.filter((i: any) => i.status === 'FAILED').length, skipped: job.items.filter((i: any) => i.status === 'SKIPPED').length },
     parents: (job.parents || []).map(String), receiptTokenId: x.receiptTokenId || null,
@@ -1874,11 +1924,88 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 ${row('Xtrata protocol fees (' + d.counts.minted + ' mints)', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
 ${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
 ${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
-<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>${referralRowHtml(d, row, stxr, escHtml)}
 ${row('Change returned', stxr(d.changeReturned) + usd(d.changeReturned))}
 <div class="tot">${row(ok ? 'Total paid' : 'Returned to you', stxr(ok ? d.totalPaid : d.changeReturned) + usd(ok ? d.totalPaid : d.changeReturned))}</div>
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · one payment, ${d.counts.total} inscriptions · settled on Bitcoin via Stacks</div>
 </div></div></body></html>`;
+}
+
+// ---------- REFERRAL PAYOUT (music wizard only) ----------
+// A referred music job splits the wizard fee: the partner's share goes to the address FROZEN on the
+// job at creation, the rest to Xtrata. The user's price and the protocol fee are untouched. Rules:
+//  - Partner first (memo `xtrata-ref:<slug>`), id persisted at once, THEN Xtrata, then the usual sweep.
+//  - Never paid twice: `job.referralTx` is checked first; `job.referralIntent` is written BEFORE the
+//    broadcast, and a re-run with an intent but no tx id looks the transfer up on chain before sending.
+//  - Delivery of the inscription is never affected. If the partner leg fails for good, Xtrata is paid
+//    the full fee and `job.referralOwed` records what is owed for manual settlement.
+//  - A lookup that FAILED is not "nothing found": it records `referralOwed` (unverified) and Xtrata is
+//    sent only fee - partner share, so the wallet can never be asked for more than it holds.
+function referralActive(job: any): boolean { return !!(job && job.referral && job.origin === 'music' && !job.mock); }
+function referralFeeReserve(job: any): bigint { return referralActive(job) ? REFUND_TX_FEE : 0n; }
+function frozenPartner(job: any): Partner {
+  const r = job.referral;
+  return { slug: r.slug, name: r.name, address: r.address, active: true, shareBps: r.shareBps, selfReferral: !!r.selfReferral, selfShareBps: r.selfShareBps, minPayoutUstx: BigInt(r.minPayoutUstx || '0') };
+}
+const memoText = (m: unknown) => { const h = String(m || '').replace(/^0x/, ''); let o = ''; for (let i = 0; i + 1 < h.length; i += 2) { const c = parseInt(h.slice(i, i + 2), 16); if (c) o += String.fromCharCode(c); } return o; };
+/** Look for our partner transfer among the deposit wallet's confirmed + pending sends. THROWS if either read fails. */
+async function findReferralTransfer(from: string, to: string, amount: bigint, memo: string): Promise<string | null> {
+  const match = (tx: any) => tx && tx.tx_type === 'token_transfer' && tx.sender_address === from && tx.token_transfer
+    && tx.token_transfer.recipient_address === to && String(tx.token_transfer.amount) === amount.toString()
+    && memoText(tx.token_transfer.memo) === memo && !/abort/.test(String(tx.tx_status || ''));
+  for (const path of [`/extended/v1/address/${from}/mempool?limit=50`, `/extended/v1/address/${from}/transactions?limit=50`]) {
+    const r = await hfetch(path);
+    if (!r.ok) throw new Error(`transaction lookup failed (HTTP ${r.status})`);
+    const d: any = await r.json();
+    if (!Array.isArray(d?.results)) throw new Error('transaction lookup returned no results');
+    const hit = d.results.find(match);
+    if (hit) return String(hit.tx_id).replace(/^0x/, '');   // same bare form sendStx returns
+  }
+  return null;
+}
+/** Send the wizard fee. Unreferred jobs: exactly the old single transfer to Xtrata. Returns the Xtrata tx id. */
+async function payWizardFee(job: any, dep: { key: string; address: string }, agentFee: bigint, payer: string | null): Promise<any> {
+  const xtrataTo = job.agentFeeAddress || AGENT_FEE_ADDRESS;
+  if (!referralActive(job)) return sendStxRetry(dep.key, agentFee, xtrataTo, REFUND_TX_FEE);
+  const partner = frozenPartner(job);
+  const plan = planPayout({ agentFee, partner, payer });
+  const memo = referralMemo(partner.slug);
+  let partnerPaid = 0n;
+  let xtrataAmount = agentFee - plan.rebateToPayer;
+  if (plan.selfReferral && plan.rebateToPayer > 0n) job.referralRebateUstx = plan.rebateToPayer.toString();
+  if (plan.toPartner > 0n) {
+    const to = partner.address; const amt = plan.toPartner;
+    const owed = (reason: string) => { job.referralOwed = { slug: partner.slug, address: to, amountUstx: amt.toString(), reason, at: new Date().toISOString() }; writeJob(job); xaoLog(job.jobId, `referral payout not sent (${reason}) — recorded as owed`); };
+    if (job.referralTx) {
+      partnerPaid = BigInt(job.referralPaidUstx || amt);                      // already paid by an earlier run
+    } else {
+      let adopted: string | null = null; let unverified = false;
+      if (job.referralIntent) {                                            // an earlier run may have broadcast it
+        try { adopted = await findReferralTransfer(dep.address, to, amt, memo); } catch { unverified = true; }
+      }
+      if (adopted) { job.referralTx = adopted; job.referralPaidUstx = amt.toString(); writeJob(job); partnerPaid = amt; }
+      else if (unverified) { owed('could not confirm whether an earlier attempt was sent'); partnerPaid = amt; }   // keep the share in reserve; settle by hand
+      else {
+        job.referralIntent = { to, amountUstx: amt.toString(), memo, at: new Date().toISOString() }; writeJob(job);
+        try {
+          const tx = await sendStxRetry(dep.key, amt, to, REFUND_TX_FEE, 4, memo);
+          job.referralTx = tx; job.referralPaidUstx = amt.toString(); writeJob(job); partnerPaid = amt;
+        } catch (e) {
+          // It may still have been broadcast (e.g. a confirmation timeout): look before concluding it failed.
+          try {
+            const found = await findReferralTransfer(dep.address, to, amt, memo);
+            if (found) { job.referralTx = found; job.referralPaidUstx = amt.toString(); writeJob(job); partnerPaid = amt; }
+            else owed('transfer failed: ' + errMsg(e));
+          } catch { owed('transfer failed and could not be confirmed: ' + errMsg(e)); partnerPaid = amt; }
+        }
+      }
+    }
+  }
+  xtrataAmount = agentFee - plan.rebateToPayer - partnerPaid;
+  job.referralSplit = { agentFee: agentFee.toString(), partner: partnerPaid.toString(), xtrata: xtrataAmount.toString(), rebate: plan.rebateToPayer.toString() };
+  writeJob(job);
+  if (xtrataAmount <= 0n) return null;
+  return sendStxRetry(dep.key, xtrataAmount, xtrataTo, REFUND_TX_FEE);
 }
 async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd: number | null) {
   const minted = job.items.filter((i: any) => i.tokenId);
@@ -1888,9 +2015,10 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
     const receiptTokenId = job.receipt === false ? null : String(Math.floor(1000 + Math.random() * 9000));
     const sumProt = minted.reduce((s: bigint, i: any) => s + BigInt(i.protocolFee || '0'), 0n);
     const change = received - sumProt - BigInt(job.receiptProtocol || '0') - agentFee;
-    const d = batchReceiptData(job, { received, agentFee, receiptTokenId, change: change > 0n ? change : 0n, stxUsd });
+    mockReferral(job, agentFee);
+    const d = batchReceiptData(job, { received, agentFee, receiptTokenId, change: change > 0n ? change : 0n, stxUsd, referral: referralView(job, agentFee, job.funder || job.expectedFunder || job.user || null, true) });
     job.receiptHtml = buildBatchReceiptHtml(d);
-    const receipt: any = { ...d, deliverTxs: minted.map((i: any) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    const receipt: any = { ...d, deliverTxs: minted.map((i: any) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND', ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: null } : {}) };
     if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p: string) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
     Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
     delete job.ephemeralMnemonic; job.status = doneStatus(); writeJob(job);
@@ -1899,14 +2027,15 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
   }
   const dep = deriveFrom(job.ephemeralMnemonic);
   const refundTo = (await resolveFunder(job)) || job.user;
+  const feeShown = agentFee - referralRebate(job, agentFee, refundTo);   // a self-referral rebate comes back as change
   let liveBal0: bigint | null = null; try { liveBal0 = await balance(job.depositAddress); } catch {}
   let estChange: bigint | undefined;
   if (liveBal0 != null && liveBal0 > 0n) {
-    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + agentFee
-      + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + BigInt(minted.length) * ITEM_DELIVERY_FEE + DELIVERY_RESERVE + REFUND_TX_FEE;
+    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + feeShown
+      + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + BigInt(minted.length) * ITEM_DELIVERY_FEE + DELIVERY_RESERVE + REFUND_TX_FEE + referralFeeReserve(job);
     estChange = liveBal0 > reserveAhead ? liveBal0 - reserveAhead : 0n;
   }
-  const prelim = batchReceiptData(job, { received, agentFee, receiptTokenId: null, change: estChange, stxUsd });
+  const prelim = batchReceiptData(job, { received, agentFee: feeShown, receiptTokenId: null, change: estChange, stxUsd, referral: referralView(job, agentFee, refundTo, false) });
   const idDep = job.agentIdentityId;
   const receiptDeps = [...minted.map((i: any) => String(i.tokenId)), ...(job.parents || []).map(String), ...(idDep ? [String(idDep)] : [])].slice(0, 50);
   let receiptTokenId: string | null = null;
@@ -1942,14 +2071,14 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
   { const n0 = notes.length; await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes); if (notes.length > n0) holdFunds = true; }
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0';
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
-  try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
+  try { if (agentFee > 0n) agentFeeTx = await payWizardFee(job, dep, agentFee, refundTo); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   prog('returning your change');
   if (holdFunds) notes.push('change kept in the deposit wallet to pay for returning the inscription — the page will finish this automatically');
   else try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending (' + errMsg(e) + ')'); }
   const note = notes.length ? notes.join('; ') : null;
-  const finalD = batchReceiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), stxUsd, note });
+  const finalD = batchReceiptData(job, { received, agentFee: feeShown, receiptTokenId, change: BigInt(refundedUstx), stxUsd, note, referral: referralView(job, agentFee, refundTo, true) });
   job.receiptHtml = buildBatchReceiptHtml(finalD);
-  const receipt = { ...finalD, deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined };
+  const receipt = { ...finalD, deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined, ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: job.referralOwed || null } : {}) };
   Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, refundedUstx, receipt });
   let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
   let holdsNft = (job.parents || []).length > 0;
@@ -1975,25 +2104,27 @@ async function deliver(job: any) {
   if (job.mock) {
     // On-chain receipt optional: when off, no receipt token — but the HTML is still built + saved.
     const receiptTokenId = job.receipt === false ? null : String(Math.floor(1000 + Math.random() * 9000));
-    const d = receiptData(job, { received, agentFee, receiptTokenId, stxUsd });
+    mockReferral(job, agentFee);
+    const d = receiptData(job, { received, agentFee, receiptTokenId, stxUsd, referral: referralView(job, agentFee, job.funder || job.expectedFunder || job.user || null, true) });
     job.receiptHtml = buildReceiptHtml(d);
-    const receipt: any = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    const receipt: any = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND', ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: null } : {}) };
     if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p: string) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
     Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
     delete job.ephemeralMnemonic; job.status = 'COMPLETE'; writeJob(job); return { receipt };
   }
   const dep = deriveFrom(job.ephemeralMnemonic);
   const refundTo = (await resolveFunder(job)) || job.user;
+  const feeShown = agentFee - referralRebate(job, agentFee, refundTo);   // a self-referral rebate comes back as change
   let liveBal0: bigint | null = null; try { liveBal0 = await balance(job.depositAddress); } catch {}
   let mainMinerForReceipt = BigInt(job.mainMinerFee || job.minerReserve || '0');
   let estChange: bigint | undefined;
   if (liveBal0 != null && liveBal0 > 0n) {
     const spentSoFar = received > liveBal0 ? received - liveBal0 : 0n;
     if (spentSoFar > BigInt(job.protocolFee)) mainMinerForReceipt = spentSoFar - BigInt(job.protocolFee);
-    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + agentFee + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + DELIVERY_RESERVE + REFUND_TX_FEE;
+    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + feeShown + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + DELIVERY_RESERVE + REFUND_TX_FEE + referralFeeReserve(job);
     estChange = liveBal0 > reserveAhead ? liveBal0 - reserveAhead : 0n;
   }
-  const prelim = receiptData(job, { received, agentFee, receiptTokenId: null, change: estChange, mainMinerFee: mainMinerForReceipt.toString(), stxUsd });
+  const prelim = receiptData(job, { received, agentFee: feeShown, receiptTokenId: null, change: estChange, mainMinerFee: mainMinerForReceipt.toString(), stxUsd, referral: referralView(job, agentFee, refundTo, false) });
   const idDep = job.agentIdentityId;
   const receiptDeps = idDep ? [String(job.tokenId), String(idDep)] : [String(job.tokenId)];
   // On-chain receipt is optional. When off we skip the extra mint entirely (saving its
@@ -2026,14 +2157,14 @@ async function deliver(job: any) {
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
   { const n0 = notes.length; await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes); if (notes.length > n0) holdFunds = true; }
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
-  try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
+  try { if (agentFee > 0n) agentFeeTx = await payWizardFee(job, dep, agentFee, refundTo); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   if (holdFunds) notes.push('change kept in the deposit wallet to pay for returning the inscription — the page will finish this automatically');
   else { prog('returning your change');
   try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); } }
   const note = notes.length ? notes.join('; ') : null;
-  const finalD = receiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), mainMinerFee: mainMinerForReceipt.toString(), stxUsd, note });
+  const finalD = receiptData(job, { received, agentFee: feeShown, receiptTokenId, change: BigInt(refundedUstx), mainMinerFee: mainMinerForReceipt.toString(), stxUsd, note, referral: referralView(job, agentFee, refundTo, true) });
   job.receiptHtml = buildReceiptHtml(finalD);
-  const receipt = { ...finalD, deliverTx, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined };
+  const receipt = { ...finalD, deliverTx, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined, ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: job.referralOwed || null } : {}) };
   Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), deliverTx, receiptDeliverTx, agentFeeTx, refundTx, refundedUstx, receipt });
   // SAFETY: never wipe the key while the wallet still holds STX or ANY inscription (e.g. a parent
   // whose return transfer failed) — or while we can't confirm it's empty.
@@ -2802,4 +2933,4 @@ export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, g
 // meaningful when exercised against a degraded API rather than asserted on in source.
 export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob, autoRun, returnStrays, unsealedUploadFor };
 // Exported so the branding can be verified by RENDERING a receipt, not by reading the template.
-export { buildReceiptHtml, buildBatchReceiptHtml, brandFor, receivedForJob };
+export { buildReceiptHtml, buildBatchReceiptHtml, brandFor, receivedForJob, deliver, musicProtected };

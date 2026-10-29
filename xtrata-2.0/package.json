@@ -93,6 +93,7 @@
     "build:radio-ppp": "vite build -c vite.radio-ppp.config.ts && node scripts/stamp-radio-assets.mjs",
     "build:music-support": "node scripts/music-support/package.mjs",
     "test:music-support-package": "node scripts/music-support/source-package-smoke.mjs",
+    "smoke:music-referral": "node scripts/music-referral-smoke.mjs",
     "music:lounge": "node scripts/wizard/radio-plays-server.mjs",
     "test:radio-support": "node scripts/radio-support/harness.mjs",
     "music:desktop": "npm --prefix desktop/music start",

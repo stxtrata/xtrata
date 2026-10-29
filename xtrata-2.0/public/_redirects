@@ -79,6 +79,11 @@
 /bounty/zdao/tracker/1 /bounty/zdao/tracker/1/ 301
 
 /music /music/ 301
+# Music referral links: /m/<partner-slug> opens the normal music wizard with ?ref=<slug>.
+# The page only ever reads the slug; the payout address comes from music-partners.json.
+/m /music/ 302
+/m/ /music/ 302
+/m/:slug /music/?ref=:slug 302
 /radio/lounge /music/lounge 301
 /radio/lounge.html /music/lounge 301
 /music/lounge.html /music/lounge 301

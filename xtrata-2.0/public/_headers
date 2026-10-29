@@ -46,6 +46,10 @@
 /music/*
   Cache-Control: no-cache
 
+# Referral partner registry: revalidate every time so an edit (or an `active:false` switch-off) takes effect at once.
+/music-partners.json
+  Cache-Control: no-cache
+
 /wizard/music-diagnostics.js
   Cache-Control: no-cache
 

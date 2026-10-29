@@ -130,11 +130,17 @@ export class FakeChain {
     m = /\/extended\/v1\/address\/([^/]+)\/transactions/.exec(url);
     if (m) {
       const addr = m[1];
-      const rows = (this.inbound.get(addr) ?? []).map((r) => ({
+      const rows: any[] = (this.inbound.get(addr) ?? []).map((r) => ({
         tx_type: 'token_transfer',
         sender_address: r.sender,
         token_transfer: { recipient_address: addr, amount: String(r.amount) }
       }));
+      if (this.ledger) for (const t of this.stxTransfers) {
+        if (t.from !== addr) continue;
+        const hex = Array.from(new TextEncoder().encode(t.memo)).map((b) => b.toString(16).padStart(2, '0')).join('').padEnd(68, '0');
+        rows.push({ tx_id: t.txid, tx_type: 'token_transfer', tx_status: this.txStatus.get(t.txid) === 'success' ? 'success' : 'pending', sender_address: addr,
+          token_transfer: { recipient_address: t.to, amount: String(t.amount), memo: `0x${hex}` } });
+      }
       return json({ results: rows });
     }
 
@@ -232,8 +238,30 @@ export class FakeChain {
       if (fee <= this.minAcceptedFee) {
         return json({ error: 'transaction rejected', reason: 'FeeTooLow', reason_data: { expected: String(this.minAcceptedFee + 1n) } }, 400);
       }
+      const info = this.lastBroadcastInfo;
+      if (this.ledger && info?.kind === 'stx' && this.rejectStxTo && info.to === this.rejectStxTo && this.rejectStxToTimes > 0) {
+        this.rejectStxToTimes -= 1;
+        return json({ error: 'transaction rejected', reason: this.rejectStxReason }, 400);
+      }
       const txid = this.realTxIds && this.lastSignedId ? `0x${this.lastSignedId}` : `0x${(++this.txSeq).toString(16).padStart(64, '0')}`;
       this.txStatus.set(txid, fee >= this.minFeeToConfirm ? 'success' : 'pending');
+      if (this.ledger && info) {
+        this.onBroadcast?.(info);
+        this.feesPaid += info.fee;
+        const bal = (a: string) => this.balances.get(a) ?? 0n;
+        if (info.kind === 'stx' && info.to != null && info.amount != null) {
+          this.balances.set(info.from, bal(info.from) - info.amount - info.fee);
+          this.balances.set(info.to, bal(info.to) + info.amount);
+          this.stxTransfers.push({ txid, from: info.from, to: info.to, amount: info.amount, memo: info.memo ?? '', fee: info.fee });
+        } else if (info.kind === 'nft' && info.nftId != null && info.to) {
+          this.balances.set(info.from, bal(info.from) - info.fee);
+          this.transfer(info.nftId, info.to);
+          this.nftTransfers.push({ txid, id: info.nftId, to: info.to });
+        } else {
+          this.balances.set(info.from, bal(info.from) - info.fee);
+        }
+        if (this.hangConfirmFor && info.kind === 'stx' && info.memo === this.hangConfirmFor) this.txStatus.set(txid, 'pending_forever');
+      }
       if (fee >= this.minFeeToConfirm) {
         // A confirmed replacement supersedes every earlier tx for the same nonce.
         const n = this.lastBroadcastNonce;
@@ -252,7 +280,7 @@ export class FakeChain {
     // Hiro returns the txid WITHOUT a 0x prefix from /v2/transactions but accepts
     // either form on lookup, so normalise both ends here.
     m = /\/extended\/v1\/tx\/(?:0x)?([0-9a-f]+)/.exec(url);
-    if (m) { const id = `0x${m[1]}`; return json(this.txDetails.get(id) || { tx_status: this.txStatus.get(id) ?? 'pending', tx_id: id, canonical: true, is_unanchored: false }); }
+    if (m) { const id = `0x${m[1]}`; if (this.txStatus.get(id) === 'pending_forever') return json({ tx_status: 'pending', tx_id: id, canonical: true, is_unanchored: false }); return json(this.txDetails.get(id) || { tx_status: this.txStatus.get(id) ?? 'pending', tx_id: id, canonical: true, is_unanchored: false }); }
 
     if (url.includes('/v2/accounts/')) return json({ balance: '0x0', nonce: 1 });
 
@@ -280,6 +308,24 @@ export class FakeChain {
   pending: Array<{ nonce: number; fee: number; kind: string; sinceIso?: string }> = [];
   /** When set, every broadcast is refused with this reason. */
   rejectAllBroadcasts: string | null = null;
+  /** Ledger mode (off by default, so older tests are untouched): broadcasts move balances
+   *  and tokens, and outbound transfers (with memo) are listed by the address endpoints. */
+  ledger = false;
+  /** Sum of every network fee the ledger has charged. */
+  feesPaid = 0n;
+  stxTransfers: Array<{ txid: string; from: string; to: string; amount: bigint; memo: string; fee: bigint }> = [];
+  nftTransfers: Array<{ txid: string; id: string; to: string }> = [];
+  /** Decoded by the fetch shim for the transaction being broadcast. */
+  lastBroadcastInfo: null | { kind: 'stx' | 'nft' | 'other'; from: string; to?: string; amount?: bigint; memo?: string; fee: bigint; nftId?: string } = null;
+  /** Reject STX transfers to this recipient with a node error, `rejectStxToTimes` times (default forever). */
+  rejectStxTo: string | null = null;
+  rejectStxToTimes = Infinity;
+  rejectStxReason = 'ServerFailureNoSuchChainTip';
+  /** Called with each accepted broadcast, before the ledger moves — lets a test inspect persisted state at that instant. */
+  onBroadcast: ((info: NonNullable<FakeChain['lastBroadcastInfo']>) => void) | null = null;
+  /** Reject only the transfer carrying this memo prefix (the referral leg) at the broadcast step. */
+  /** After the broadcast is ACCEPTED, make waiting for it fail (a confirmation timeout) — the tx still lands. */
+  hangConfirmFor: string | null = null;
   /** Highest nonce the chain has actually MINED. Everything above it waits its turn,
    *  so a hole between this and the mempool strands every queued transaction. */
   lastExecutedNonce = 0;
@@ -381,6 +427,15 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
             const r = tx.payload && tx.payload.recipient;
             chain.lastBroadcastRecipient = r ? stacks.cvToString(r) : null;
           } catch { chain.lastBroadcastRecipient = null; }
+          try {
+            const p: any = tx.payload; const fromAddr = stacks.addressToString({ type: 0, version: 22, hash160: tx.auth.spendingCondition.signer } as any);
+            const feeB = BigInt(tx.auth.spendingCondition.fee.toString());
+            if (p.recipient && p.amount != null) {
+              chain.lastBroadcastInfo = { kind: 'stx', from: fromAddr, to: stacks.cvToString(p.recipient), amount: BigInt(p.amount.toString()), memo: p.memo?.content ?? '', fee: feeB };
+            } else if (p.functionName && p.functionName.content === 'transfer' && p.functionArgs?.length === 3) {
+              chain.lastBroadcastInfo = { kind: 'nft', from: fromAddr, to: stacks.cvToString(p.functionArgs[2]), nftId: String((p.functionArgs[0] as any).value), fee: feeB };
+            } else chain.lastBroadcastInfo = { kind: 'other', from: fromAddr, fee: feeB };
+          } catch { chain.lastBroadcastInfo = null; }
           try {
             chain.lastBroadcastSender = stacks.getAddressFromPublicKey(
               tx.auth.spendingCondition.signer ? tx.auth.spendingCondition.signer : '', undefined as any
