@@ -105,6 +105,7 @@
     "build:canary:arcade-launch": "node scripts/build-arcade-launch-canary.mjs",
     "build:canary:arcade-v2-launch": "node scripts/build-arcade-v2-launch-canary.mjs",
     "build:canary:forever-twins": "node scripts/build-forever-twins-launch-canary.mjs",
+    "build:canary:somewhere-else": "node scripts/build-somewhere-else-canary.mjs",
     "test:live-frames": "node scripts/test-live-frame-manager.mjs"
   },
   "dependencies": {

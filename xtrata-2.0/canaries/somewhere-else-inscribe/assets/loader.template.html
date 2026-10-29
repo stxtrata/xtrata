@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Somewhere Else (read from the chain)</title>
+<meta name="description" content="Jim Crane's long read on NFT art loss, fetched from Stacks and checked against its hash as it loads.">
+<style>
+:root{--bg:#f7f1e3;--fg:#1c2740;--mut:#5b6478;--acc:#d2601f;--line:#dccfb6;--card:#fbf7ec;--ok:#2f7d4f;--bad:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#141b2d;--fg:#ece4d2;--mut:#9aa3b8;--acc:#f08a45;--line:#2c3650;--card:#1a2338;--ok:#6cc08b;--bad:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:46rem;margin:0 auto;padding:0 16px}
+#boot{padding:2.5rem 0 1rem}
+#boot h1{font:700 1.05rem/1.2 ui-monospace,Menlo,Consolas,monospace;margin:0 0 .8rem;letter-spacing:.02em}
+#boot h1 span{color:var(--acc)}
+#log{font:13px/1.55 ui-monospace,Menlo,Consolas,monospace;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:.8rem 1rem;min-height:5.5rem;color:var(--mut);overflow-wrap:anywhere}
+#log div b{color:var(--fg);font-weight:600}#log .ok{color:var(--ok)}#log .bad{color:var(--bad)}
+#bar{height:4px;background:var(--line);border-radius:2px;margin-top:.6rem;overflow:hidden}
+#bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .25s}
+#frame{display:block;width:100%;border:0;background:transparent;height:60vh}
+#frame.hide{display:none}
+#proof{margin:2rem auto 4rem;max-width:46rem;padding:0 16px}
+#proof h2{font-size:1rem;margin:0 0 .6rem;font-family:ui-monospace,Menlo,Consolas,monospace}
+#proof .box{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1rem}
+#proof dl{margin:0;display:grid;grid-template-columns:max-content 1fr;gap:.35rem 1rem;font-size:13px}
+#proof dt{color:var(--mut)}#proof dd{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+#proof .ok{color:var(--ok);font-weight:600}#proof .bad{color:var(--bad);font-weight:600}
+details{margin-top:1rem;font-size:14px}summary{cursor:pointer;color:var(--acc)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:.7rem;overflow:auto;font-size:12px;line-height:1.45;max-height:22rem}
+button{font:inherit;font-size:13px;padding:.3rem .7rem;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer;margin:.4rem 0}
+#fail{display:none;margin:1rem 0;padding:1rem;border:1px solid var(--bad);border-radius:6px}
+</style></head>
+<body>
+<div class="wrap" id="boot">
+ <h1>reading <span>Somewhere Else</span> from Stacks</h1>
+ <div id="log" aria-live="polite"></div><div id="bar"><i></i></div>
+ <div id="fail"></div>
+</div>
+<iframe id="frame" class="hide" title="Somewhere Else" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+<section id="proof" hidden><h2>proof</h2><div class="box"><dl id="facts"></dl>
+<details><summary>Check it without this page</summary>
+<p>Paste this into a terminal with Node 18 or later. It asks a Stacks node directly, rebuilds the file and compares the hash. It needs nothing from this page or from us.</p>
+<button id="copy">Copy script</button><pre id="script"></pre></details></div></section>
+<noscript><div class="wrap"><p>This page reads the article from the Stacks chain with JavaScript. Without it, open the file directly: <a href="__RESOLVER_LINK__">__RESOLVER_LINK__</a></p></div></noscript>
+<script>
+"use strict";
+const CONFIG = __CONFIG__;
+const $ = s => document.querySelector(s);
+const enc = new TextEncoder();
+const hex = u8 => Array.from(u8, b => b.toString(16).padStart(2, "0")).join("");
+const unhex = s => { s = s.replace(/^0x/, ""); const o = new Uint8Array(s.length / 2); for (let i = 0; i < o.length; i++) o[i] = parseInt(s.substr(i * 2, 2), 16); return o; };
+const sha = async u8 => new Uint8Array(await crypto.subtle.digest("SHA-256", u8));
+const cat = (a, b) => { const o = new Uint8Array(a.length + b.length); o.set(a); o.set(b, a.length); return o; };
+const short = h => h.slice(0, 10) + "…" + h.slice(-6);
+
+// ---- log ----
+let logEl = $("#log"), bar = $("#bar i");
+function say(html, cls) { const d = document.createElement("div"); if (cls) d.className = cls; d.innerHTML = html; logEl.appendChild(d); while (logEl.children.length > 7) logEl.firstChild.remove(); }
+const setBar = f => bar.style.width = Math.round(f * 100) + "%";
+
+// ---- Clarity values (just what we need) ----
+const cvUint = n => "0x01" + BigInt(n).toString(16).padStart(32, "0");
+const cvList = items => "0x0b" + items.length.toString(16).padStart(8, "0") + items.map(x => x.slice(2)).join("");
+function decode(u8) {
+  let p = 0; const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const u32 = () => { const v = dv.getUint32(p); p += 4; return v; };
+  const big = n => { let v = 0n; for (let i = 0; i < n; i++) v = (v << 8n) | BigInt(u8[p + i]); p += n; return v; };
+  function rd() {
+    const t = u8[p++];
+    switch (t) {
+      case 0x00: case 0x01: return { t: "int", v: big(16) };
+      case 0x02: { const n = u32(); const v = u8.slice(p, p + n); p += n; return { t: "buff", v }; }
+      case 0x03: return { t: "bool", v: true };
+      case 0x04: return { t: "bool", v: false };
+      case 0x05: p += 21; return { t: "principal" };
+      case 0x06: p += 21; p += 1 + u8[p]; return { t: "principal" };
+      case 0x07: return { t: "ok", v: rd() };
+      case 0x08: return { t: "err", v: rd() };
+      case 0x09: return { t: "none" };
+      case 0x0a: return { t: "some", v: rd() };
+      case 0x0b: { const n = u32(), a = []; for (let i = 0; i < n; i++) a.push(rd()); return { t: "list", v: a }; }
+      case 0x0c: { const n = u32(), o = {}; for (let i = 0; i < n; i++) { const l = u8[p++]; const k = new TextDecoder().decode(u8.slice(p, p + l)); p += l; o[k] = rd(); } return { t: "tuple", v: o }; }
+      case 0x0d: case 0x0e: { const n = u32(); const v = new TextDecoder().decode(u8.slice(p, p + n)); p += n; return { t: "str", v }; }
+      default: throw new Error("unknown Clarity type 0x" + t.toString(16));
+    }
+  }
+  return rd();
+}
+
+// ---- nodes: ordered failover, each with a timeout ----
+let goodNode = 0;
+async function callRead(fn, args) {
+  const [addr, name] = CONFIG.contract.split(".");
+  let last;
+  for (let k = 0; k < CONFIG.nodes.length; k++) {
+    const i = (goodNode + k) % CONFIG.nodes.length, base = CONFIG.nodes[i].replace(/\/+$/, "");
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), CONFIG.timeoutMs);
+    try {
+      const r = await fetch(`${base}/v2/contracts/call-read/${addr}/${name}/${fn}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sender: addr, arguments: args }), signal: ctl.signal });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      if (!j.okay || typeof j.result !== "string") throw new Error(j.cause || "call failed");
+      goodNode = i; return decode(unhex(j.result));
+    } catch (e) { last = e; say(`node ${new URL(base, location.href).host} did not answer (${e.name === "AbortError" ? "timeout" : e.message}), trying the next`, "bad"); }
+    finally { clearTimeout(to); }
+  }
+  throw last || new Error("no node answered");
+}
+
+async function getMeta(id) {
+  const r = await callRead("get-inscription-meta", [cvUint(id)]);
+  if (r.t !== "some") throw new Error("inscription #" + id + " not found");
+  const m = r.v.v;
+  return { size: Number(m["total-size"].v), chunks: Number(m["total-chunks"].v), mime: m["mime-type"].v, sealed: m.sealed.v, hash: hex(m["final-hash"].v) };
+}
+
+// Reads every chunk, recomputes Xtrata's rolling hash (sha256(previous || chunk), starting from 32 zero bytes).
+async function readInscription(id, expectedHash, onChunk) {
+  const meta = await getMeta(id);
+  if (!meta.sealed) throw new Error("inscription is not sealed");
+  const parts = new Array(meta.chunks), B = CONFIG.batch;
+  const batches = []; for (let s = 0; s < meta.chunks; s += B) batches.push(s);
+  let next = 0, got = 0;
+  async function worker() {
+    while (next < batches.length) {
+      const s = batches[next++], idx = []; for (let i = s; i < Math.min(s + B, meta.chunks); i++) idx.push(i);
+      const r = await callRead("get-chunk-batch", [cvUint(id), cvList(idx.map(cvUint))]);
+      if (r.t !== "list" || r.v.length !== idx.length) throw new Error("unexpected batch reply");
+      r.v.forEach((e, j) => { if (e.t !== "some") throw new Error("chunk " + idx[j] + " missing"); parts[idx[j]] = e.v.v; got++; onChunk && onChunk(got, meta.chunks); });
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONFIG.parallel, batches.length) }, worker));
+  let run = new Uint8Array(32), total = 0;
+  for (const c of parts) { run = await sha(cat(run, c)); total += c.length; }
+  const out = new Uint8Array(total); let o = 0; for (const c of parts) { out.set(c, o); o += c.length; }
+  const rolling = hex(run);
+  if (out.length !== meta.size) throw new Error(`size mismatch: ${out.length} vs ${meta.size}`);
+  if (rolling !== meta.hash) throw new Error("recomputed hash does not match the chain's record");
+  if (expectedHash && rolling !== expectedHash) throw new Error("hash does not match the one this page was published with");
+  return { bytes: out, meta, rolling, sha256: hex(await sha(out)) };
+}
+
+const PIX = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function proofRows(rows) { $("#facts").innerHTML = rows.map(([k, v, c]) => `<dt>${k}</dt><dd${c ? ` class="${c}"` : ""}>${v}</dd>`).join(""); }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function verifyScript(id, hash) {
+  const [a, n] = CONFIG.contract.split(".");
+  return `// Node 18+. Rebuilds inscription #${id} from a Stacks node and checks its hash.
+const NODE = ${JSON.stringify(CONFIG.nodes[0])}, A = ${JSON.stringify(a)}, N = ${JSON.stringify(n)}, ID = ${id};
+const crypto = require("crypto");
+const u = n => "0x01" + BigInt(n).toString(16).padStart(32, "0");
+const call = async (fn, args) => { const r = await fetch(\`\${NODE}/v2/contracts/call-read/\${A}/\${N}/\${fn}\`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sender: A, arguments: args }) }); const j = await r.json(); if (!j.okay) throw new Error(j.cause); return Buffer.from(j.result.slice(2), "hex"); };
+(async () => {
+  const meta = await call("get-inscription-meta", [u(ID)]);          // (some {…}); read from the tuple by field name
+  const chunks = Number(BigInt("0x" + meta.subarray(meta.indexOf(Buffer.from("total-chunks")) + 12 + 1, meta.indexOf(Buffer.from("total-chunks")) + 12 + 17).toString("hex")));
+  const fh = meta.indexOf(Buffer.from("final-hash")) + 10 + 5, onChainHash = meta.subarray(fh, fh + 32).toString("hex");
+  let run = Buffer.alloc(32), parts = [];
+  for (let s = 0; s < chunks; s += 16) {
+    const idx = []; for (let i = s; i < Math.min(s + 16, chunks); i++) idx.push(u(i));
+    const r = await call("get-chunk-batch", [u(ID), "0x0b" + idx.length.toString(16).padStart(8, "0") + idx.map(x => x.slice(2)).join("")]);
+    let p = 5; for (let i = 0; i < idx.length; i++) { p += 1 + 1; const n = r.readUInt32BE(p); p += 4; const c = r.subarray(p, p + n); p += n; run = crypto.createHash("sha256").update(run).update(c).digest(); parts.push(c); }
+  }
+  const file = Buffer.concat(parts);
+  console.log("bytes", file.length, "\\nsha256", crypto.createHash("sha256").update(file).digest("hex"));
+  console.log("rolling hash", run.toString("hex"), "\\non chain    ", onChainHash, run.toString("hex") === onChainHash ? "\\nMATCH" : "\\nMISMATCH");
+  require("fs").writeFileSync("inscription-" + ID, file);
+})();`;
+}
+
+async function main() {
+  if (!crypto.subtle) throw new Error("this browser blocks crypto here (needs https)");
+  const id = CONFIG.articleId;
+  say(`asking Stacks for inscription <b>#${id}</b> (${esc(CONFIG.contract.split(".")[1])})`);
+  const art = await readInscription(id, CONFIG.articleHash, (g, n) => { say(`reading chunk <b>${g}</b> of <b>${n}</b> from the chain`); setBar(.3 * g / n); });
+  say(`hash recomputed: <b>${short(art.rolling)}</b> matches the sealed record`, "ok");
+  const html = new TextDecoder().decode(art.bytes);
+  // Parse, park every image's address, and show the page with blanks where images go, so nothing loads from a web host.
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script,iframe,object,embed,link[rel=stylesheet]").forEach(n => n.remove());
+  const imgs = [...doc.querySelectorAll("img[data-ins]")];
+  imgs.forEach(im => { im.dataset.fallback = im.getAttribute("src"); im.setAttribute("src", PIX); im.removeAttribute("loading"); });
+  const fr = $("#frame");
+  await new Promise(r => { fr.onload = r; fr.srcdoc = "<!doctype html>" + doc.documentElement.outerHTML; fr.classList.remove("hide"); });
+  const fd = fr.contentDocument, size = () => { fr.style.height = Math.ceil(fd.body.getBoundingClientRect().height) + "px"; };
+  size(); new ResizeObserver(size).observe(fd.body); fr.contentWindow.addEventListener("resize", size);
+  $("#boot").style.paddingBottom = "0";
+  setBar(.3);
+  $("#proof").hidden = false;
+  $("#script").textContent = verifyScript(id);
+  $("#copy").onclick = () => navigator.clipboard && navigator.clipboard.writeText($("#script").textContent);
+  const rows = [["contract", esc(CONFIG.contract)], ["inscription", "#" + id], ["type", esc(art.meta.mime)], ["size", art.meta.size.toLocaleString() + " bytes in " + art.meta.chunks + " chunks"],
+    ["chain's hash", art.meta.hash], ["recomputed", art.rolling], ["published with", CONFIG.articleHash || "(none)"], ["file SHA-256", art.sha256],
+    ["result", "match", "ok"], ["images", "0 of " + imgs.length + " fetched and checked"]];
+  proofRows(rows);
+
+  // Images: each fetched from the chain by its own inscription ID and checked against the hash the article carries.
+  let done = 0, bad = [];
+  const q = imgs.slice();
+  async function iw() {
+    while (q.length) {
+      const im = q.shift(), iid = Number(im.dataset.ins);
+      const el = fd.querySelector(`img[data-ins="${iid}"]`);
+      try {
+        const r = await readInscription(iid, im.dataset.hash || null);
+        el.src = URL.createObjectURL(new Blob([r.bytes], { type: r.meta.mime }));
+      } catch (e) { bad.push(iid + ": " + e.message); el.src = im.dataset.fallback; el.title = "not verified: " + e.message; }
+      done++; setBar(.3 + .7 * done / imgs.length);
+      rows[9] = ["images", `${done - bad.length} of ${imgs.length} fetched from the chain and checked` + (bad.length ? `, <span class="bad">${bad.length} unverified</span>` : ""), bad.length ? "" : (done === imgs.length ? "ok" : "")];
+      proofRows(rows); say(`image <b>${done}</b> of ${imgs.length} ${bad.length && bad[bad.length - 1].startsWith(iid + ":") ? "could not be verified" : "verified"}`, bad.length && bad[bad.length - 1].startsWith(iid + ":") ? "bad" : "ok");
+      size();
+    }
+  }
+  await Promise.all(Array.from({ length: CONFIG.parallelImages }, iw));
+  say(done === imgs.length && !bad.length ? "all done: text and images read from the chain and checked" : "done, with unverified images (see proof)", bad.length ? "bad" : "ok");
+  setBar(1); size();
+  setTimeout(() => { $("#log").parentElement.style.display = "none"; }, 4000);
+}
+main().catch(e => {
+  say("stopped: " + esc(e.message), "bad");
+  const f = $("#fail"); f.style.display = "block";
+  f.innerHTML = `I could not read the article from any Stacks node just now (${esc(e.message)}). The data is still on the chain: it is inscription #${CONFIG.articleId} on ${esc(CONFIG.contract)}. You can try again in a minute, or read the direct copy at <a href="__RESOLVER_LINK__">__RESOLVER_LINK__</a>.`;
+});
+</script></body></html>

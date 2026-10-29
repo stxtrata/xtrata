@@ -179,3 +179,35 @@ A throwaway wallet cannot sign owner-only calls, so hand it ownership for the ru
 - `@stacks/transactions` v6 cannot build a Clarity 4 deploy ("Cannot recognize ClarityVersion: 4"); a wallet does it for the
   page, but a key-file signer must use v7 (as the ops tools do). The runner test found this; test the runner too, with `fetch`
   answered by the same mock chain.
+
+## Inscribing files you own, with zero wallet prompts (`somewhere-else-inscribe`)
+
+When a job is "inscribe N files, some of which embed the IDs of the others, then hand them over", do not ask the owner to
+approve N transactions. The page creates a temporary wallet, the owner funds it once by hand, the wallet signs every
+`mint-single-tx` and `transfer`, and the page finishes by sweeping the leftover STX to the owner. The owner signs nothing
+in the page and the only wallet action is one plain send. Worked example: `canaries/somewhere-else-inscribe`.
+
+- **The chain is the memory.** Look a file up with `get-id-by-hash` (rolling hash) before every mint; found means reuse it
+  (after checking size, mime and sealed), never re-send. Anything that depends on earlier IDs (an article that embeds image
+  IDs, a reader pinned to the article's hash) is rebuilt from the chain by a pure function, so "Forget local progress" and a
+  cleared browser still resume. Pending transactions are remembered by label and waited on after a reload instead of re-sent.
+- **Build order is dictated by the hashes**: images, then the document that carries their IDs and hashes, then the loader
+  that is pinned to that document's ID and hash. Each is one `mint-single-tx` (at most 32 chunks, 512 KB).
+- **Deny-mode post-conditions on everything.** A mint carries one STX `LessEqual` condition equal to the live
+  `quote-single-tx-fee` total; a transfer carries one NFT `Sends` condition for that id. A wrong fee or a wrong id aborts
+  instead of overpaying or moving the wrong token.
+- **Miner fee from the real size**: the serialised transaction length x the network floor of 1 micro-STX per byte x a
+  multiplier (default 1.5; live uploads have run 1.0x to 2.9x the floor), minimum 5,000 micro-STX. Do not use
+  `/v2/fees/transfer` for this: it is the per-byte rate for plain transfers (24 on 2026-10-29) and would overprice a 226 KB
+  mint 24 times. `/v2/fees/transaction` cannot take a body over 1 MiB, so big transactions are priced from their size.
+  Broadcast large transactions to Hiro directly first; the proxy is the fallback.
+- **Funding target** = miner fees + protocol fees + hand-over + sweep, plus 15% and 0.1 STX, recomputed for what is
+  *left* (zero when everything is done). While minting keep a tail back (about 0.14 STX) so the hand-over can always be paid.
+  If the balance runs short mid-run the page shows exactly how much more to send and waits.
+- **Say what the chain will record**: the creator of every inscription is the temporary wallet; only the owner field moves.
+- Owner address: typed twice, validated with the C32 checksum, confirmed in a dialog, optionally baked in at build time
+  (`--owner`). Recovery buttons: send everything to the owner now, save the key again, restore a key, forget pending
+  transactions, forget local progress, export report.
+- Mock test (`mock-chain-test.cjs`) covers: two-stage funding, re-run after forgetting progress sends nothing, a rejected
+  broadcast, a transaction left pending across a reload, rescue after an interruption, a corrupted chunk on read-back,
+  an identical file already on chain from someone else, owner validation, a tampered asset refused at build.
