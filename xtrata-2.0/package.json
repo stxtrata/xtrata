@@ -12,6 +12,7 @@
     "build:radio-test-wallet": "vite build -c vite.radio-test-wallet.config.ts",
     "build": "vite build",
     "build:forever-twins-wallet": "vite build -c vite.forever-twins.config.ts",
+    "build:casino-room-spike": "vite build -c vite.casino-room-spike.config.ts",
     "build:ft-large": "vite build -c vite.ft-large.config.ts",
     "build:agent-one-wallet": "vite build -c vite.agent-one-wallet.config.ts",
     "build:agent-one": "vite build -c vite.agent-one.config.ts",

@@ -92,3 +92,6 @@ dist-listening-wallet
 
 # Audionaut gate sell layer: any local audio test files (music comes from inscription 3567)
 /public/audionaut/sell/_local/
+
+# Local Cloudflare state (wrangler dev / pages dev)
+.wrangler/

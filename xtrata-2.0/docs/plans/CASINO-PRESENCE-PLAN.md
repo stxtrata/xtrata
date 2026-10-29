@@ -201,14 +201,32 @@ A fixed list per page (`blackjack.1`, `blackjack.2`, `holdem.1`, `pvpholdem.1`, 
 
 | Phase | What ships | Gate to pass |
 |---|---|---|
-| **P0. Spike** | Read `docs/WALLET-PLAYBOOK.md` in full first (its section 10 is the ship checklist for any wallet change). Then a throwaway Worker with the Durable Object, a Pages Function that forwards a WebSocket to it, and a sign-in button on `/casino`. | (a) WebSocket forwarding from a Pages Function works (the Cloudflare pages I read do not say either way; if not, put the Worker on a subdomain like `room.xtrata.xyz`, as `radio.` and `wallet.` already are). (b) Leather and Xverse, desktop **and** mobile, return a signature the server accepts. (c) Hibernation works and a deploy reconnects cleanly. |
+| **P0. Spike** | Read `docs/WALLET-PLAYBOOK.md` in full first (its section 10 is the ship checklist for any wallet change). Then a throwaway Worker with the Durable Object, Pages Functions that forward a WebSocket to it, and a hidden test page `/casino-room-spike/` (nothing is added to `/casino`). **Built; see 8.1.** | (a) WebSocket forwarding from a Pages Function works (the Cloudflare pages I read do not say either way; if not, put the Worker on a subdomain like `room.xtrata.xyz`, as `radio.` and `wallet.` already are). (b) Leather and Xverse, desktop **and** mobile, return a signature the server accepts. (c) Hibernation works and a deploy reconnects cleanly. |
 | **P1. Seen** | Sign-in, spot map, static Adrians with name tags on both pages; guests can watch; NPC patrons yield to real people. | Two real browsers see each other; refresh keeps you seated; closing the tab clears you within about a minute; fail-open verified by killing the service; frame time with 16 figures checked on the slow headless renderer and on a real GPU/phone. |
 | **P2. Talk** | Click-a-person card, private messages, mute/block/report, rate limits. | Abuse tests (spam, links, oversize, replayed challenge, forged header, second tab). |
 | **P3. Look** | The Look panel (section 4.4: options 1 to 6 first, then 7 to 9), bar stools, walk-in animation. The picture badge from an owned inscription (allowlist) is a separate, later decision. | Visual review with Jim; badge fetch cannot block rendering. |
 | **P4. Give** | Drinks, tips, hand LAYR via `layr` transfers. | Depends on the on-chain LAYR plan P1; real post-conditions; conservation checks. |
 | **P5. Prove** | Session-key signing (option C), verifiable messages, moderation console, mainnet review. | Independent review of the signing scheme; Jim's explicit go for mainnet. |
 
-**P0 in plain words.** A small throwaway test, not a feature. Three pieces: (1) a tiny Worker holding the Durable Object, which only counts connections and says who is here; (2) a Pages Function that forwards a browser's WebSocket to it and checks the wallet signature (the Studio login code with a new casino domain); (3) a hidden test page, not linked from `/casino`, with a Sign in button that shows "connected as SP…" and the other open tabs. It answers three questions: does Pages forward the WebSocket, do Leather and Xverse (desktop and phone) sign and does our server accept it, does the room survive hibernation and a deploy. It does not touch `/casino`, `/casino-b`, any contract, or any chips or STX; the signature is free and nothing is written to a chain. I build and test it locally with `wrangler dev`; deploying the Worker, binding it to the Pages project and adding one secret need Jim's Cloudflare account (three or four commands, given to him ready to paste), and the real-wallet checks need Jim's wallets. Undo: delete the Worker and the binding.
+**P0 in plain words.** A small throwaway test, not a feature. Three pieces: (1) a tiny Worker holding the Durable Object, which only counts connections and says who is here; (2) a Pages Function that forwards a browser's WebSocket to it and checks the wallet signature (the Studio login code with a new casino domain); (3) a hidden test page, not linked from `/casino`, with a Sign in button that shows "connected as SP…" and the other open tabs. It answers three questions: does Pages forward the WebSocket, do Leather and Xverse (desktop and phone) sign and does our server accept it, does the room survive hibernation and a deploy. It does not touch `/casino`, `/casino-b`, any contract, or any chips or STX; the signature is free and nothing is written to a chain. I build and test it locally with `wrangler dev`; deploying the Worker and adding one secret need Jim's Cloudflare account (one command and one dashboard field, in `workers/casino-room/README.md`; the binding itself is in `wrangler.toml`), and the real-wallet checks need Jim's wallets. Undo: delete the Worker and the binding.
+
+### 8.1 P0 results (branch `claude/casino-room-spike`, 2026-10-29)
+
+Built: the room Worker (`workers/casino-room/`), room rules as a plain tested module, a free SIP-018 sign-in (one signature, 4 hour cookie, single-use challenge), three Pages Functions (`/casino/room/challenge`, `/session`, `/ws`) and the test page. Deploy steps are in `workers/casino-room/README.md`.
+
+| Gate | Result |
+|---|---|
+| (a) Pages Function forwards a WebSocket to the Durable Object | **Works locally** (`wrangler pages dev` with the Worker). **Not yet confirmed on production Pages**; Cloudflare's docs only show this for Workers. Needs Jim's preview deploy. Fallback if it fails: a `room.` subdomain. |
+| (b) Leather and Xverse, desktop and phone, sign and the server accepts | **Not tested with real wallets.** A fake wallet that signs through the app's real signing code (the `requestStructuredSignature` route) is accepted. Needs Jim's wallets. |
+| (c) Hibernation and deploy | **Confirmed locally.** The room hibernated after about 15 s idle, woke with every seat intact and answered in a few milliseconds. Stopping and restarting the Worker (what a deploy does) disconnected everyone; both pages said "Disconnected. Reconnecting…" rather than showing an empty room, reconnected on their own about 8 s after the Worker came back, and the signed-in player was sat back down without clicking. |
+
+Local checks that passed: 29 unit tests; 7 end-to-end tests against the running server (guests cannot sit; sign-in works once and a replay gets 409; seats first come first served; forged `x-px-*` headers and bad cookies become guests; other origins get 403; a second tab takes over the seat and a third closes the oldest connection; slow-down at 12 messages per 10 s; hibernation); 24 checks in a real headless browser with two signed-in players and a guest (one signature only, second tab needs none, seats seen live, sign-out frees the seat, no page errors, phone width).
+
+Found while testing, all fixed:
+- **Browser sign-in challenge was refused.** A same-site `GET` carries no `Origin` header (only POST and WebSocket do), so the origin gate rejected the page's own request while scripted tests that add the header passed. The gate now also accepts `Sec-Fetch-Site: same-origin` on a GET (unit tested).
+- **The app's wallet code only accepts mainnet accounts** (`src/lib/wallet/session.ts`). So a tester's wallet must stay on its normal mainnet setting even though the casino runs on testnet. Signing is free and chain-independent.
+- **`wrangler.toml` is the source of truth for Pages bindings** (it sets `pages_build_output_dir`), so the Durable Object binding is declared there, preview only for now, and cannot be added in the dashboard. The room Worker must be deployed before a Pages deployment that names it.
+- Local wrangler 4.106 supports compatibility dates only up to 2026-07-07, so the Worker pins `2026-07-01`.
 
 Tests, in the style of the rest of the repo: the room logic (spots, limits, bans) is a plain module with unit tests; the Durable Object is a thin shell around it; the Pages Functions get request/response tests like `casino-log.test.ts`; the browser side is tested with several headless browsers at once against `wrangler dev`, using the fake-wallet approach from the existing wallet tests. Real wallets are tested by hand on the final gate.
 
@@ -226,7 +244,7 @@ At this design's traffic (a seat change or message is a few events per player pe
 
 - **Pages to Durable Object WebSocket forwarding** is not confirmed in the docs I could read (they show it for Workers). P0 tests it; the subdomain fallback is straightforward.
 - **Wallet signing in each environment** (Xverse and Leather, desktop, mobile, in-app browsers) is the main unknown; the playbook says wallet behaviour has surprised the team before. `/casino` has never asked for a signature.
-- **Testnet versus mainnet addresses.** The casino is on testnet; the same key gives an `ST…` and an `SP…` address. Decide which one identifies a player and how BNS (mainnet) is looked up for a testnet address. Needs a rule before P1.
+- **Testnet versus mainnet addresses: mostly answered by P0.** The app's wallet code only accepts mainnet accounts, so a player's identity is their mainnet `SP…` address (BNS is looked up on mainnet, which is where it lives). The server also stores the public-key hash, which is identical for the `SP…` and `ST…` forms of one key (unit tested), so a future link to a testnet address is a lookup, not a second identity. Remaining: a wallet set to testnet may be refused by the connect code; the test page tells people to leave it on mainnet.
 - **Deploys restart the object** and drop everyone for a moment. Clients must reconnect and re-sit automatically.
 - **`XA_HOSTS` changes:** a remove / reposition / re-tint call is probably needed (see section 2).
 - **Performance** of many skinned Adrians (each has a 163-bone skeleton) is not measured. The cap and static poses are the mitigation; P1 measures it.
@@ -256,7 +274,7 @@ At this design's traffic (a seat change or message is a few events per player pe
 4. **Guests can see the room's people** without signing in (and are invisible to others): yes.
 5. Cap on figures drawn (16 desktop, 6 phone) and room size (300): defaults stand unless Jim says otherwise.
 6. Messages private one-to-one first, and the choice of route for the live service, still open.
-7. **P0 spike:** Jim asked for an explanation before deciding; it is the "P0 in plain words" paragraph in section 8. Go / no-go still to come.
+7. **P0 spike: go given (Jim, 10:43).** Built and tested locally (section 8.1). Next: Jim deploys the room Worker, adds the secret, opens the preview test page and tries real wallets; then decide whether to start P1.
 
 ---
 

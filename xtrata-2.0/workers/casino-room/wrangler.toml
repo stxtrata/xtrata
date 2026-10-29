@@ -1,0 +1,19 @@
+# Casino room: the Durable Object behind the player-presence plan (docs/plans/CASINO-PRESENCE-PLAN.md, P0 spike).
+# Holds who is in the casino and where they sit. It has NO public route: only the Pages project reaches it, through a binding.
+#   deploy:  npx wrangler deploy --config workers/casino-room/wrangler.toml
+#   then bind it to the Pages project (Settings -> Bindings -> Add -> Durable Object): variable CASINO_ROOM, class CasinoRoom,
+#   worker xtrata-casino-room, for BOTH Production and Preview. Do NOT put the binding in the root wrangler.toml: if the Worker
+#   does not exist yet, a Pages deploy that names it can fail. Steps and checks: workers/casino-room/README.md
+name = "xtrata-casino-room"
+main = "index.ts"
+compatibility_date = "2026-07-01"
+# 2026-07-01 (not newer) so `wrangler dev` works with the workerd that ships in this repo's wrangler (it supports up to 2026-07-07).
+workers_dev = false
+
+[[durable_objects.bindings]]
+name = "CASINO_ROOM"
+class_name = "CasinoRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CasinoRoom"]
