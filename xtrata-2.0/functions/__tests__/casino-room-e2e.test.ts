@@ -219,11 +219,13 @@ describe.skipIf(!BASE)('casino room talk end to end', () => {
   it('public chat reaches signed-in people only; guests can watch but not speak', async () => {
     const alice = await someone(), bob = await someone();
     const a = await join({ cookie: alice.cookie }), b = await join({ cookie: bob.cookie }), guest = await join();
+    // both waiters are set up before sending: the room can deliver to the speaker before the listener, and a waiter only sees messages that arrive after it
     const heard = b.waitFor((m) => m.t === 'say');
+    const echoed = a.waitFor((x) => x.t === 'say');             // the speaker's own screen shows it because the room sent it back
     a.send({ t: 'say', text: '  hello   room ' });
     const m = await heard;
     expect(m).toMatchObject({ from: { a: alice.w.address }, text: 'hello room' });
-    await a.waitFor((x) => x.t === 'say');                      // the speaker's own screen shows it because the room sent it back
+    await echoed;
     guest.send({ t: 'say', text: 'let me in' });
     expect((await guest.waitFor((x) => x.t === 'err')).code).toBe('sign-in-first');
     await guest.quiet(500);
