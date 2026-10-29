@@ -358,6 +358,43 @@ const noteRetryableHiroKeyFailure = (apiKey: string | null, status: number) => {
   hiroKeyCooldownUntil.set(apiKey, Date.now() + HIRO_KEY_COOLDOWN_MS);
 };
 
+
+/**
+ * Optional second provider for transaction BROADCASTS only (reads stay on Hiro).
+ *
+ * Hiro's gateway answers HTTP 403 {"message":"Forbidden"} to any POST body that contains page
+ * markup (<script, <style, <!doctype ...), which every HTML inscription transaction does. Set
+ * STACKS_BROADCAST_BASE_MAINNET (a Stacks node/API base URL, with any key embedded in it) and
+ * POST /v2/transactions goes there instead. If that provider is unreachable or returns a 5xx the
+ * request falls back to Hiro, so setting it can only add a route, never remove one.
+ */
+const getBroadcastBase = (network: string, env: Record<string, string | undefined>) => {
+  if (String(network || '').trim().toLowerCase() !== 'mainnet') return null;
+  const raw = (env.STACKS_BROADCAST_BASE_MAINNET || '').trim();
+  return raw ? normalizeBase(raw) : null;
+};
+const isBroadcastPath = (method: string, path: string) =>
+  method === 'POST' && /^v2\/transactions\/?$/.test(path.replace(/^\/+/, ''));
+
+const forwardBroadcast = async (params: {
+  base: string;
+  headers: Headers;
+  body?: ArrayBuffer;
+  signal?: AbortSignal;
+}): Promise<Response | null> => {
+  const headers = new Headers();
+  headers.set('content-type', params.headers.get('content-type') || 'application/octet-stream');
+  try {
+    const response = await fetch(`${params.base}/v2/transactions`, { method: 'POST', headers, body: params.body, signal: params.signal });
+    if (response.status >= 500) return null;       // provider trouble: let Hiro try
+    const out = new Headers(response.headers);
+    out.set('x-xtrata-broadcast-via', 'secondary');
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers: out });
+  } catch {
+    return null;
+  }
+};
+
 const forwardToHiro = async (params: {
   targetUrl: string;
   method: string;
@@ -449,6 +486,11 @@ export const proxyHiroRequest = async (params: {
     isSafeMethod(method)
       ? undefined
       : await request.arrayBuffer();
+  const broadcastBase = isBroadcastPath(method, path) ? getBroadcastBase(params.network, env) : null;
+  if (broadcastBase) {
+    const via = await forwardBroadcast({ base: broadcastBase, headers, body, signal: params.signal });
+    if (via) return withCorsHeaders(via);
+  }
   const load = () =>
     forwardToHiro({
       targetUrl,

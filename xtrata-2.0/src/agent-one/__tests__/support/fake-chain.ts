@@ -229,6 +229,10 @@ export class FakeChain {
       const fee = this.lastBroadcastFee ?? 0n;
       this.broadcasts.push(fee);
       if (this.lastBroadcastRecipient) this.transferRecipients.push(this.lastBroadcastRecipient);
+      if (this.gatewayRefusesBroadcasts) {
+        // What Hiro's gateway sends for a body it dislikes: no `error`, no `txid`.
+        return json({ message: 'Forbidden' }, 403);
+      }
       if (this.rejectAllBroadcasts) {
         return json({ error: 'transaction rejected', reason: this.rejectAllBroadcasts }, 400);
       }
@@ -306,6 +310,8 @@ export class FakeChain {
   selfTransferAddress: string | null = null;
   /** Transactions sitting in the mempool for the address under test. */
   pending: Array<{ nonce: number; fee: number; kind: string; sinceIso?: string }> = [];
+  /** When true, every broadcast gets the gateway's HTTP 403 {"message":"Forbidden"} (a WAF in front of the node, not a node rejection). */
+  gatewayRefusesBroadcasts = false;
   /** When set, every broadcast is refused with this reason. */
   rejectAllBroadcasts: string | null = null;
   /** Ledger mode (off by default, so older tests are untouched): broadcasts move balances
