@@ -1,17 +1,22 @@
 /**
- * The parts of the casino chat that need no page: the line buffer, which lines are still on screen, the block list's rules,
+ * The parts of the casino chat that need no page: the session's line buffer (and keeping it in this tab), the block list's rules,
  * what to attach to a report, the friendly wording for the room's refusals. Kept free of the DOM so it can be tested on its own.
  * The page side is chat.ts. The room's own rules (280 characters, no links, one message every two seconds, signed-in only,
  * two-way blocking) are enforced by the room itself; nothing here is the only line of defence.
  */
 
-export const MAX_LINES = 200;          // what this browser remembers (a report can attach a few of these)
+export const MAX_LINES = 500;          // the session's chat this tab keeps (scrollable while the chat is open)
 export const MAX_BLOCKS = 40;          // the room refuses a longer list
 export const SEND_GAP_MS = 2000;       // the room's own limit is one message every two seconds
 export const MAX_CHARS = 280;
-export const PINNED_MAX_AGE_MS = 5 * 60_000;   // while typing, lines stay up, but not for ever: an hour-old line is not "what was just said"
 export const BLOCKS_KEY = 'px_room_blocks_v1';     // the same key the test page uses, so a block made there holds here
 export const UI_KEY = 'px_chat_ui_v1';
+/**
+ * This session's chat is kept in the tab's sessionStorage under this prefix plus the player's address, so a reload keeps it. It is
+ * removed when the player leaves the room, when their room session ends, and by the browser when the tab closes. It never leaves
+ * the browser.
+ */
+export const SESSION_PREFIX = 'px_chat_session_v1:';
 
 export type Who = { a: string; n?: string };
 /**
@@ -19,7 +24,6 @@ export type Who = { a: string; n?: string };
  * A direct message is between two people, but it is not secret: it passes through the room service like everything else.
  */
 export type Line = { id: number; who: Who | null; mine: boolean; text: string; at: number; to?: Who };
-export const DM_HOLD_MS = 30_000;      // a direct message stays up longer than room chat: it was meant for you
 export type Side = 'left' | 'right';
 export type UiPrefs = { hidden: boolean; side: Side };
 export const DEFAULT_PREFS: UiPrefs = { hidden: false, side: 'left' };
@@ -117,21 +121,28 @@ export class ChatLog {
     return this.lines.filter((l) => l.who?.a === address).slice(-count).map((l) => l.text.slice(0, chars));
   }
 
-  /**
-   * Which lines to show. A line stays fully visible for `holdMs`, fades over `fadeMs`, and is gone after that. While the player is typing
-   * (or has a menu open) the last `max` lines stay for up to five minutes. At most `max` lines are ever shown.
-   */
-  visible(now: number, o: { max: number; holdMs: number; fadeMs: number; pinned: boolean }): Array<{ line: Line; opacity: number }> {
-    const out: Array<{ line: Line; opacity: number }> = [];
-    for (const line of this.lines.slice(-o.max)) {
-      const age = now - line.at;
-      if (o.pinned && age <= PINNED_MAX_AGE_MS) { out.push({ line, opacity: 1 }); continue; }
-      const hold = line.to ? Math.max(o.holdMs, DM_HOLD_MS) : o.holdMs;
-      if (age <= hold) { out.push({ line, opacity: 1 }); continue; }
-      const left = 1 - (age - hold) / o.fadeMs;
-      if (left > 0) out.push({ line, opacity: Math.round(left * 100) / 100 });
+  /** Everything this session, oldest first: what the open chat scrolls through. */
+  all(): Line[] { return this.lines.slice(); }
+  /** The newest few: what the closed chat shows. */
+  tail(count: number): Line[] { return count > 0 ? this.lines.slice(-count) : []; }
+
+  /** What is kept in the tab: people's lines only (the page's own notes are not worth keeping), short field names. */
+  dump(): string {
+    return JSON.stringify(this.lines.filter((l) => l.who).map((l) => ({ a: l.who!.a, m: l.mine ? 1 : 0, t: l.text, at: l.at, ...(l.to ? { to: l.to.a } : {}) })));
+  }
+  /** Put back what `dump` kept. Anything malformed is skipped, and anyone now blocked stays out. */
+  load(raw: string | null): number {
+    if (!raw) return 0;
+    let list: unknown;
+    try { list = JSON.parse(raw); } catch { return 0; }
+    if (!Array.isArray(list)) return 0;
+    let n = 0;
+    for (const v of list.slice(-MAX_LINES)) {
+      if (!v || typeof v.a !== 'string' || typeof v.t !== 'string' || typeof v.at !== 'number') continue;
+      const to = typeof v.to === 'string' ? { a: v.to } : undefined;
+      if (this.add({ a: v.a }, v.t.slice(0, MAX_CHARS * 2), v.m === 1, v.at, to)) n += 1;
     }
-    return out;
+    return n;
   }
 
   get size() { return this.lines.length; }

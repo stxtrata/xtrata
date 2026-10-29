@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ChatLog, DM_HOLD_MS, Roster, MAX_BLOCKS, MAX_CHARS, MAX_LINES, PINNED_MAX_AGE_MS, SEND_GAP_MS, checkSend, errorText, parseBlocks, parsePrefs, sanitizeBlocks, tidy
+  ChatLog, Roster, MAX_BLOCKS, MAX_CHARS, MAX_LINES, SEND_GAP_MS, checkSend, errorText, parseBlocks, parsePrefs, sanitizeBlocks, tidy
 } from '../chat-core';
 
 const A = 'ST3RKSCZP4D6Q6R43382VB6BF650KZ7QKH855FQ9P';
 const B = 'ST9YQRPH9XWQJ032WH0251TRCY0DPS9BKQYGBDDA';
-const OPTS = { max: 8, holdMs: 14_000, fadeMs: 4_000, pinned: false };
+const texts = (log: ChatLog) => log.all().map((l) => l.text);
 
 describe('block list', () => {
   it('keeps only address-shaped strings, once each, at most 40', () => {
@@ -63,30 +63,42 @@ describe('the room refusing something', () => {
   });
 });
 
-describe('what is on screen', () => {
-  it('shows a line fully, fades it, then drops it', () => {
+describe('the session\'s chat', () => {
+  it('nothing fades: every line stays until the session ends', () => {
     const log = new ChatLog();
     log.add({ a: A }, 'one', false, 0);
-    expect(log.visible(10_000, OPTS).map((v) => v.opacity)).toEqual([1]);
-    expect(log.visible(16_000, OPTS).map((v) => v.opacity)).toEqual([0.5]);
-    expect(log.visible(18_001, OPTS)).toEqual([]);
+    log.add({ a: B }, 'two', false, 3_600_000);
+    expect(texts(log)).toEqual(['one', 'two']);
   });
-  it('shows at most `max` lines, the newest', () => {
+  it('the closed chat shows the newest few, the open chat everything', () => {
     const log = new ChatLog();
     for (let i = 0; i < 20; i += 1) log.add({ a: A }, `m${i}`, false, i);
-    expect(log.visible(100, { ...OPTS, max: 5 }).map((v) => v.line.text)).toEqual(['m15', 'm16', 'm17', 'm18', 'm19']);
+    expect(log.tail(5).map((l) => l.text)).toEqual(['m15', 'm16', 'm17', 'm18', 'm19']);
+    expect(log.tail(0)).toEqual([]);
+    expect(log.all()).toHaveLength(20);
   });
-  it('keeps recent lines up while the player is typing, but not for ever', () => {
-    const log = new ChatLog();
-    log.add({ a: A }, 'old', false, 0);
-    expect(log.visible(60_000, OPTS)).toEqual([]);
-    expect(log.visible(60_000, { ...OPTS, pinned: true }).map((v) => v.line.text)).toEqual(['old']);
-    expect(log.visible(PINNED_MAX_AGE_MS + 1, { ...OPTS, pinned: true })).toEqual([]);
-  });
-  it('remembers only the most recent 200 lines', () => {
+  it('keeps the most recent 500 lines', () => {
     const log = new ChatLog();
     for (let i = 0; i < MAX_LINES + 30; i += 1) log.add({ a: A }, `m${i}`, false, i);
     expect(log.size).toBe(MAX_LINES);
+    expect(log.all()[0].text).toBe('m30');
+  });
+  it('survives a reload through dump and load, people\'s lines only', () => {
+    const log = new ChatLog();
+    log.add({ a: A }, 'hello room', false, 1);
+    log.add({ a: B }, 'to alice', true, 2, { a: A });
+    log.add(null, 'Report sent.', false, 3);
+    const again = new ChatLog();
+    expect(again.load(log.dump())).toBe(2);
+    expect(again.all().map((l) => [l.who?.a, l.mine, l.text, l.to?.a])).toEqual([[A, false, 'hello room', undefined], [B, true, 'to alice', A]]);
+  });
+  it('load skips junk and keeps blocked people out', () => {
+    const log = new ChatLog();
+    log.setBlocked([A]);
+    expect(log.load('not json')).toBe(0);
+    expect(log.load(JSON.stringify({ not: 'a list' }))).toBe(0);
+    expect(log.load(JSON.stringify([null, { a: 5 }, { a: A, t: 'blocked', at: 1 }, { a: B, t: 'ok', at: 2 }, { a: B, t: 'no time' }]))).toBe(1);
+    expect(texts(log)).toEqual(['ok']);
   });
 });
 
@@ -98,7 +110,7 @@ describe('blocking', () => {
     log.dropFrom(A);
     log.setBlocked([A]);
     expect(log.add({ a: A }, 'after', false, 3)).toBeNull();
-    expect(log.visible(5, OPTS).map((v) => v.line.text)).toEqual(['keep']);
+    expect(texts(log)).toEqual(['keep']);
   });
   it('never hides your own lines, even if your address is somehow in the list', () => {
     const log = new ChatLog();
@@ -126,20 +138,12 @@ describe('what a report carries', () => {
 });
 
 describe('direct messages', () => {
-  it('stay on screen longer than room chat', () => {
-    const log = new ChatLog();
-    log.add({ a: A }, 'room line', false, 0);
-    log.add({ a: A }, 'for you', false, 0, { a: B });
-    const at = (t: number) => log.visible(t, OPTS).map((v) => v.line.text);
-    expect(at(20_000)).toEqual(['for you']);
-    expect(at(DM_HOLD_MS + OPTS.fadeMs + 1)).toEqual([]);
-  });
   it('blocking someone also clears the direct messages you sent them', () => {
     const log = new ChatLog();
     log.add({ a: B }, 'to alice', true, 1, { a: A });
     log.add({ a: B }, 'to the room', true, 2);
     log.dropFrom(A);
-    expect(log.visible(3, OPTS).map((v) => v.line.text)).toEqual(['to the room']);
+    expect(texts(log)).toEqual(['to the room']);
   });
   it('the room\'s refusals for direct messages have words', () => {
     for (const code of ['not-here', 'no-such-player', 'blocked', 'not-you']) expect(errorText(code)).not.toMatch(/could not take that/);
