@@ -101,7 +101,7 @@ Signatures are the root wallet's prompts on mainnet for a fresh launch (the mock
 | 2 | Deploy | 4 | `xtrata-world-v2`, `xtrata-posters-v1`, `xtrata-screen-v1`, `xtrata-games-v1` at Clarity 4 (each skipped when already there with the pinned source; refused when the name holds other source); sources read back; root owner, treasury and admins are the root wallet |
 | 3a | Kinds | 3 | Fund the temporary wallet, make it a KINDS-only admin, remove it again; it signs the 24 `register-kind` itself, each checked to get the planned id |
 | 3b | Hall | 8 | `create-space` arcade and hall (owner = root wallet), both live, the four bays; then `verifyManifest()` reads the plan back |
-| 3c | Setup | 1 | Treasury, screen fee recipient and poster publishers already at the launch settings (the deployer holds them); the games contract's delay set to the launch value and, on mainnet, locked (`lock-delay`, one-way) |
+| 3c | Setup | 2 | Treasury, screen fee recipient and poster publishers already at the launch settings (the deployer holds them); the games contract's delay set to the launch value (mainnet: 6 blocks, about an hour; the contract starts at 144, so this is one `set-delay`) and, on mainnet, locked (`lock-delay`, one-way) |
 | 3d | Registry read-back | none | The hall's own reader (world.js + world2.js) finds the hall live and four bays that resolve to posters |
 | 4 | Engine pack | 1 (0 if already inscribed) | One transaction, child of #55, fee capped by a post-condition |
 | 4 | Hall pack | 4 (0 if already inscribed) | Staged route: begin, 2 chunk batches, seal; each fee capped by a post-condition |
@@ -112,7 +112,7 @@ Signatures are the root wallet's prompts on mainnet for a fresh launch (the mock
 | 8 | Ownership | none | Root owner, treasury, no admins, screen and posters roles, games contract admin / delay / lock / not paused / successor, leaderboard owner; explorer links |
 | 9 | Audit | none | Everything re-read; the repo and site changes to make |
 
-**29 signatures in all on mainnet** (30 if a hall publisher grant is configured: `NETWORKS.mainnet.hallPublisher`). Tick "sign the
+**30 signatures in all on mainnet** (31 if a hall publisher grant is configured: `NETWORKS.mainnet.hallPublisher`). Tick "sign the
 24 kinds with my wallet" to sign the kinds yourself (24 prompts instead of 3).
 
 On a fresh testnet the rehearsal adds step 1b, deploy the core (3: `xtrata-v1-1-1`, `xtrata-v2-1-0`, `xtrata-v3-2-3` at

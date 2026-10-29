@@ -19,7 +19,7 @@ The canary's `lock-delay` call passes the launch delay, the pins are refreshed, 
 ## Decided not to build (Jim, 24 Oct)
 
 - **Guardian key / multisig for the games admin (F1).** One admin only. Jim will move the arcade and casino owner addresses to a Ledger device later; the admin role can be handed over with `propose-admin` / `accept-admin` at any time. Until then the protections against a stolen key are the one-day delay and `set-hidden`, and a thief with the key can also take the admin role.
-- **A floor on the delay (F2).** Left as is: the launch procedure sets 144 and locks it straight away (`lock-delay 144`, and the canary refuses to continue if the delay is not the launch value).
+- **A floor on the delay (F2).** No contract floor. Jim, 29 Oct 2026: mainnet launches with a 1-hour wait for new games (6 burn blocks) and locks it straight away (`set-delay 6`, then `lock-delay 6`; the canary refuses to continue if the delay is not the launch value). Testnet uses 6 and leaves it unlocked. The wait is the window to notice a bad add; `set-hidden` is the kill switch. The mainnet launch is now 30 signatures.
 - **Freezing the hall's objects before running a cartridge (F3).** Not built, pending Jim's confirmation (his reply to that item referred to keys, which it does not involve). Cartridges run in the hall's page and are trusted as long as the admin key is.
 - **Buyer "stop my run" and a sweep for STX sent to the contract by mistake (screen L2, L3).** Skipped for now: more code in the contract that holds money.
 - Not changed: free review-lane items have no sweep (L4); a picture is bound to its creator, not its owner (L5); the hall does not read the games successor pointer (F7); the hard-wired core in both contracts (F6).

@@ -55,8 +55,9 @@ const NETWORKS = {
     posterPublishers: [],
     hallPublisher: null,
     screenFeeRecipient: MAINNET_ROOT,
-    // the games contract's wait before a new game goes live (burn blocks; 144 = about a day) and whether the canary locks it for ever
-    gamesDelay: 144,
+    // the games contract's wait before a new game goes live (burn blocks; 6 = about an hour, 144 = about a day) and whether the canary locks it for ever.
+    // Jim, 29 Oct 2026: one hour on mainnet, locked. The contract starts at 144, so the launch sends set-delay 6 and then lock-delay 6.
+    gamesDelay: 6,
     lockGamesDelay: true,
     parents: [55],
     bundleId: 3078,
