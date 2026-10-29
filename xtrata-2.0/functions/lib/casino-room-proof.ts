@@ -28,7 +28,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { networkForAddress, type CreatorNetwork } from './creator-proof';
 
 export const ROOM_PROOF_DOMAIN = 'ParallaX Casino';
-export const ROOM_PROOF_PURPOSE = 'Casino room entry; no spending permission';
+export const ROOM_PROOF_PURPOSE = 'ParallaX Casino room sign-in. This is free: it sends no transaction, costs no fees and gives no permission to spend anything.';
 export const ROOM_CHALLENGE_TTL_MS = 2 * 60 * 1000;
 export const ROOM_SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 export const ROOM_COOKIE = 'px_room';
@@ -62,19 +62,22 @@ export const normalizeAddress = (value: unknown) => String(value ?? '').trim().t
 
 const chainId = (network: RoomNetwork) => (network === 'mainnet' ? 1 : 2147483648);
 
-/** The two Clarity values the wallet signs. The wallet shows the domain name and these fields to the player. */
+/**
+ * The sentence the player reads in the wallet. It is ONE plain-English string rather than a record of fields: wallets show
+ * a record collapsed or as raw data, but a sentence reads as it is. The nonce at the end binds the signature to one
+ * challenge; the account and expiry are in the sentence so the player can see them.
+ */
+export const roomProofText = (challenge: Pick<RoomChallenge, 'address' | 'nonce' | 'expires'>) =>
+  `${ROOM_PROOF_PURPOSE} Account ${challenge.address}. Valid until ${new Date(challenge.expires).toISOString().replace('.000Z', 'Z')}. Request code ${challenge.nonce}.`;
+
+/** The two Clarity values the wallet signs (SIP-018): the domain (who is asking, which chain) and the sentence above. */
 export const roomProofData = (challenge: Pick<RoomChallenge, 'address' | 'network' | 'nonce' | 'expires'>) => ({
   domain: tupleCV({
     name: stringAsciiCV(ROOM_PROOF_DOMAIN),
     version: stringAsciiCV('1'),
     'chain-id': uintCV(chainId(challenge.network))
   }),
-  message: tupleCV({
-    purpose: stringAsciiCV(ROOM_PROOF_PURPOSE),
-    address: stringAsciiCV(challenge.address),
-    nonce: stringAsciiCV(challenge.nonce),
-    expires: uintCV(challenge.expires)
-  })
+  message: stringAsciiCV(roomProofText(challenge))
 });
 
 // ----------------------------------------------------------------- secret + MAC

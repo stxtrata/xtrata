@@ -39,10 +39,11 @@ Run these from `xtrata-2.0` after `git fetch && git checkout claude/casino-room-
 5. **Automated check against the preview** (about 30 seconds, uses throwaway keys, no wallet):
    `ROOM_E2E_URL=https://<preview address> npx vitest run functions/__tests__/casino-room-e2e.test.ts`
    Add `ROOM_E2E_IDLE_MS=60000` for a longer idle test.
-6. **Real wallets** (what no script can check). On the test page: Connect wallet, Sign in, take a seat, and watch from a second
-   browser. Do it with Leather and Xverse on desktop and Xverse on a phone. Leave the wallet on its normal mainnet setting.
-   Your wallet should show "ParallaX Casino" and "Casino room entry; no spending permission", with no fee. Then press
-   "Make report" and paste the text back.
+6. **Real wallets** (what no script can check). On the test page press Connect Leather or Connect Xverse, then Sign in, take a
+   seat, and watch from a second browser. Do it with Leather and Xverse on desktop and Xverse on a phone. Use the same wallet
+   setup you use for the casino (testnet is fine; mainnet works too) and a throwaway account. The wallet should say it signs a
+   message, with no fee: in Xverse tap the "Message" row to read it. It is one sentence starting "ParallaX Casino room sign-in.
+   This is free...". Then press "Make report" and paste the text back.
 7. **Production** only after 4 to 6 pass: uncomment the production block at the bottom of `wrangler.toml`, add the secret for
    Production, redeploy.
 

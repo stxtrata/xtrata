@@ -1,19 +1,22 @@
 /**
  * Casino room test page (P0 spike of docs/plans/CASINO-PRESENCE-PLAN.md).
  *
- * Connect a wallet with the app's own connect code, sign ONE free SIP-018 message with the app's own signing code
- * (WALLET-PLAYBOOK section 7: legacy bridge first, RPC only when the wallet removed it), exchange it for a session cookie,
- * then open the room WebSocket, sit on a spot, and prove the room survives idling and reconnecting.
+ * Connect a wallet the way the casino pages do (public/casino/index.html: providers found on the top window, Leather via
+ * getAddresses, Xverse via wallet_disconnect then wallet_connect, either network accepted), sign ONE free SIP-018 message
+ * with the app's own signing code (WALLET-PLAYBOOK: legacy bridge first, RPC only when the wallet removed it), exchange it
+ * for a session cookie, then open the room WebSocket, sit on a spot, and prove the room survives idling and reconnecting.
+ *
+ * The app's standard connect adapter is NOT used: it only accepts mainnet accounts, and the casino runs on testnet, so a
+ * tester whose wallet is set up for the casino would be refused (found in the first real-wallet test, 2026-10-29).
  * Built with `npm run build:casino-room-spike` into public/casino-room-spike/spike.js (not part of `prebuild`).
  */
-import { createStacksWalletAdapter } from '../lib/wallet/adapter';
+import { clearSelectedProviderId, setSelectedProviderId } from '@stacks/connect-ui';
 import { getSelectedWalletProviderId } from '../lib/wallet/connect';
 import { requestStructuredSignature } from '../lib/wallet/structured-sign';
 import { roomProofData, type RoomChallenge } from '../../functions/lib/casino-room-proof';
 import { SPOTS } from '../../functions/lib/casino-room';
 
-const wallet = createStacksWalletAdapter({ appName: 'ParallaX Casino', appIcon: '/favicon.ico' });
-const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const $ =<T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 type SpotView = { a: string; n: string; since: number };
 const state = {
@@ -51,31 +54,128 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 // ------------------------------------------------------------------ wallet
 
+type Kind = 'leather' | 'xverse';
+type Linked = { kind: Kind; address: string; network: 'mainnet' | 'testnet'; via: string };
+let linked: Linked | null = null;
+const trail: string[] = [];     // what each wallet method answered, for the report
+
+const usable = (p: any) => !!p && typeof p.request === 'function';
+// Extensions inject into the top same-origin window only (WALLET-PLAYBOOK), so look there first.
+const hostWin = (): any => {
+  try { const t = window.top; if (t && t !== window.self && t.location.origin === window.location.origin) return t; } catch { /* cross-origin parent */ }
+  return window;
+};
+const wins = (): any[] => { const h = hostWin(); return h === window ? [window] : [h, window]; };
+const find = (get: (w: any) => any) => { for (const w of wins()) { const v = get(w); if (v) return v; } return null; };
+const providerFor = (kind: Kind) => {
+  if (kind === 'leather') {
+    const le = find((w) => (usable(w.LeatherProvider) ? w.LeatherProvider : null));
+    return le ? { rpc: le } : null;
+  }
+  const X = find((w) => { const x = w.XverseProviders || w.xverseProviders; return x && (usable(x.BitcoinProvider) || usable(x.StacksProvider)) ? x : null; });
+  if (!X) return null;
+  const bt = usable(X.BitcoinProvider) ? X.BitcoinProvider : null;
+  const st = usable(X.StacksProvider) ? X.StacksProvider : null;
+  return { rpc: bt || st };
+};
+const detect = (kind: Kind, ms: number) => new Promise<ReturnType<typeof providerFor>>((resolve) => {
+  const started = Date.now();
+  (function look() {
+    const p = providerFor(kind);
+    if (p || Date.now() - started >= ms) resolve(p); else window.setTimeout(look, 150);
+  })();
+});
+
+const codeOf = (x: any) => x?.code ?? x?.error?.code;
+const msgOf = (x: any) => String(x?.message ?? x?.error?.message ?? x ?? 'unknown error');
+const cancelled = (e: any) => [4001, -31001].includes(Number(codeOf(e))) || /cancel|denied|reject|declin|closed/i.test(msgOf(e));
+const unsupported = (e: any) => Number(codeOf(e)) === -32601 || /not supported|method not found|unsupported|not implemented|legacy method/i.test(msgOf(e));
+// Wallets answer as {result}, {error}, {status}, or throw. Everything comes out of here as a result or an Error.
+const call = async (p: any, method: string, params?: unknown) => {
+  const r = params === undefined ? await p.request(method) : await p.request(method, params);
+  if (r && typeof r === 'object') {
+    if (r.error) throw Object.assign(new Error(msgOf(r.error)), { code: codeOf(r.error) });
+    if (r.status === 'error') throw Object.assign(new Error(msgOf(r.error || r)), { code: codeOf(r.error || r) });
+    if ('result' in r) return r.result;
+  }
+  return r;
+};
+// Xverse mobile can reject with a toast and leave the request pending for ever: stop waiting after 90 s.
+const watchdog = <T,>(pr: Promise<T>) => new Promise<T>((resolve, reject) => {
+  const t = window.setTimeout(() => reject(new Error('The wallet did not answer. Check its window.')), 90_000);
+  pr.then((v) => { window.clearTimeout(t); resolve(v); }, (e) => { window.clearTimeout(t); reject(e); });
+});
+const addressesIn = (res: unknown) => (JSON.stringify(res) || '').match(/S[PT][0-9A-HJKMNP-TV-Z]{38,39}/g) || [];
+
+async function connectWallet(kind: Kind): Promise<Linked> {
+  const pv = await detect(kind, 1500);
+  if (!pv) throw new Error(`${kind === 'leather' ? 'Leather' : 'Xverse'} was not found in this browser.`);
+  trail.length = 0;
+  let plans: string[];
+  if (kind === 'xverse') {
+    try { await call(pv.rpc, 'wallet_disconnect'); trail.push('wallet_disconnect: ok'); } catch (e) { trail.push('wallet_disconnect: ' + msgOf(e).slice(0, 80)); }
+    plans = ['wallet_connect', 'wallet_getAccount'];
+  } else {
+    plans = ['getAddresses', 'stx_getAccounts', 'stx_getAddresses', 'stx_requestAccounts'];
+  }
+  let lastError: unknown = null;
+  for (const method of plans) {
+    try {
+      const res = await (kind === 'xverse' ? watchdog(call(pv.rpc, method)) : call(pv.rpc, method));
+      const found = addressesIn(res);
+      if (found.length) {
+        const address = found[0] as string;
+        trail.push(`${method}: ok`);
+        return { kind, address, network: address.startsWith('SP') ? 'mainnet' : 'testnet', via: method };
+      }
+      trail.push(`${method}: answered but no Stacks address in it`);
+    } catch (e) {
+      if (cancelled(e)) { trail.push(`${method}: cancelled`); throw new Error('Connection cancelled.'); }
+      trail.push(`${method}: ${unsupported(e) ? 'not supported' : msgOf(e).slice(0, 80)}`);
+      if (!unsupported(e)) lastError = e;
+    }
+  }
+  throw new Error(lastError ? msgOf(lastError) : 'The wallet did not share a Stacks address.');
+}
+
 const paintWallet = () => {
-  const s = wallet.getSession();
-  const on = !!(s.isConnected && s.address);
-  $<HTMLButtonElement>('signin').disabled = !on;
+  const on = !!linked;
+  $<HTMLButtonElement>('signin').disabled = !on || !!state.signedAs;
   $<HTMLButtonElement>('disconnect').disabled = !on;
-  setStatus('walletStatus', on
-    ? `Connected: ${s.address} (${s.network ?? 'network unknown'}, ${getSelectedWalletProviderId() || 'wallet unknown'})`
-    : 'Not connected.', on ? 'ok' : '');
+  setStatus('walletStatus', linked
+    ? `Connected: ${linked.address} (${linked.network}, ${linked.kind}, via ${linked.via})`
+    : 'Not connected.', linked ? 'ok' : '');
 };
 
-$('connect').onclick = async () => {
+const startConnect = async (kind: Kind) => {
   try {
-    log('connect: opening the wallet chooser');
-    const s = await wallet.connect();
-    log(`connect: ${s.isConnected ? 'ok ' + short(s.address) : 'cancelled'}`);
+    log(`connect: asking ${kind}`);
+    linked = await connectWallet(kind);
+    setSelectedProviderId(kind === 'leather' ? 'LeatherProvider' : 'XverseProviders.BitcoinProvider');   // the ids the standard chooser stores; the signing helper uses them to find the same wallet
+    state.results.connect = `ok (${linked.kind}, ${linked.network}, via ${linked.via})`;
+    log(`connect: ok ${short(linked.address)} (${linked.network}) via ${linked.via}`);
   } catch (e) {
+    linked = null;
+    state.results.connect = 'error: ' + message(e);
     log('connect failed: ' + message(e));
     setStatus('walletStatus', 'Could not connect: ' + message(e), 'bad');
-    state.results.connect = 'error: ' + message(e);
     return;
   }
-  state.results.connect = 'ok';
   paintWallet();
 };
-$('disconnect').onclick = async () => { await wallet.disconnect(); log('wallet disconnected'); paintWallet(); };
+$('connect-leather').onclick = () => startConnect('leather');
+$('connect-xverse').onclick = () => startConnect('xverse');
+$('disconnect').onclick = async () => {
+  const was = linked; linked = null;
+  try { clearSelectedProviderId(); } catch { /* nothing selected */ }
+  if (was) {
+    const pv = providerFor(was.kind);
+    for (const m of was.kind === 'xverse' ? ['wallet_disconnect'] : ['stx_disconnect', 'wallet_disconnect', 'disconnect', 'deactivate']) {
+      try { if (pv) await call(pv.rpc, m); break; } catch (e) { if (!unsupported(e)) break; }
+    }
+  }
+  log('wallet disconnected'); paintWallet(); paintSigned();
+};
 
 // ------------------------------------------------------------------ sign in
 
@@ -87,8 +187,8 @@ const postJson = async (path: string, init?: RequestInit) => {
 };
 
 $('signin').onclick = async () => {
-  const s = wallet.getSession();
-  if (!s.isConnected || !s.address) return;
+  const s = linked;
+  if (!s) return;
   const button = $<HTMLButtonElement>('signin');
   button.disabled = true;
   try {
@@ -142,7 +242,7 @@ $('signout').onclick = async () => {
 
 function paintSigned() {
   const s = state.signedAs;
-  $<HTMLButtonElement>('signin').disabled = !!s || !wallet.getSession().isConnected;
+  $<HTMLButtonElement>('signin').disabled = !!s || !linked;
   $<HTMLButtonElement>('signout').disabled = !s;
   setStatus('signStatus', s
     ? `Signed in as ${s.address} (${s.network}). Account key hash ${s.hash160.slice(0, 12)}… Session ends ${new Date(s.expiresAt).toLocaleTimeString()}.`
@@ -261,12 +361,11 @@ function finishIdle(m: any) {
 // ------------------------------------------------------------------ report
 
 const makeReport = () => {
-  const s = wallet.getSession();
   const report = {
     page: 'casino-room-spike v1',
     at: new Date().toISOString(),
     userAgent: navigator.userAgent,
-    wallet: { provider: getSelectedWalletProviderId() || null, address: s.address || null, network: s.network || null },
+    wallet: { kind: linked?.kind ?? null, selectedProviderId: getSelectedWalletProviderId() || null, address: linked?.address ?? null, network: linked?.network ?? null, connectedVia: linked?.via ?? null, connectTrail: trail },
     signedAs: state.signedAs && { address: state.signedAs.address, network: state.signedAs.network, hash160: state.signedAs.hash160 },
     results: state.results,
     timersMs: state.timers,

@@ -16,6 +16,7 @@ import {
   readRoomSession,
   readRoomSessionToken,
   roomProofData,
+  roomProofText,
   roomSessionCookie,
   secretUsable,
   signRoomSession,
@@ -34,6 +35,25 @@ const wallet = (version: TransactionVersion = TransactionVersion.Testnet, rawKey
 };
 const sign = (challenge: RoomChallenge, key: string) =>
   signStructuredData({ ...roomProofData(challenge), privateKey: createStacksPrivateKey(key) }).data;
+
+describe('what the player reads in the wallet', () => {
+  it('is one plain sentence that names the account, the expiry and that nothing is spent', () => {
+    const w = wallet(TransactionVersion.Testnet);
+    const c = issueRoomChallenge(SECRET, w.address, Date.UTC(2026, 9, 29, 11, 0, 0));
+    const text = roomProofText(c);
+    expect(text).toContain('ParallaX Casino room sign-in');
+    expect(text).toContain('sends no transaction, costs no fees and gives no permission to spend anything');
+    expect(text).toContain(`Account ${c.address}.`);
+    expect(text).toContain('Valid until 2026-10-29T11:02:00Z.');
+    expect(text).toContain(`Request code ${c.nonce}.`);
+    expect(/^[\x20-\x7e]+$/.test(text)).toBe(true);        // printable ASCII only: it is a Clarity string-ascii
+    // the signed message is exactly that sentence, so what the wallet shows is what is verified
+    expect((roomProofData(c).message as { data: string }).data).toBe(text);
+    // a different request has a different sentence, so a signature cannot be moved to another request
+    const other = issueRoomChallenge(SECRET, w.address, Date.UTC(2026, 9, 29, 11, 0, 0));
+    expect(roomProofText(other)).not.toBe(text);
+  });
+});
 
 describe('casino room challenge', () => {
   it('issues a fresh challenge for a testnet or mainnet address and rejects anything else', () => {
