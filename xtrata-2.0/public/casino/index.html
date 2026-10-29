@@ -2060,6 +2060,7 @@ body.parallax-bar-expanded #quickNav,body.parallax-bar-expanded #intro,body.para
         if (h.showWhen) { const vis = !!h.showWhen(); if (c.object.visible !== vis) c.object.visible = vis; if (!vis) { h.acc = 0; continue; } }
         h.acc += dt;
         const d = c.object.getWorldPosition(h.wp).distanceTo(camPos);
+        if (h.freezeBeyond && d > h.freezeBeyond) { h.acc = 0; continue; }   // people from the live room stand still when far away
         if (h.skip > 0 && h.acc < 0.2) { h.skip--; continue; }   // far people animate at a lower rate
         h.skip = d < 8 ? 0 : d < 14 ? 1 : 3;
         c.lookAt(d < 4.2 && !h.noLook ? camPos : null);
@@ -10699,6 +10700,7 @@ function applyTestnetFunding(proof){
     const prev = focus; focus = s; if (prev !== s) tableView = 'table'; audioFocus(!!s);
     if (s) {
       if (!seat) { seat = SEATS[s.id][0]; if (mode === 'walk') { let d2 = 1e9; SEATS[s.id].forEach((k) => { const w = seatWorld(s, k), d = Math.hypot(w.x - player.x, w.z - player.z); if (d < d2) { d2 = d; seat = k; } }); } }
+      if (window.PXRoomHost && PXRoomHost.steer) seat = PXRoomHost.steer(s, seat);   // a seat somebody in the room already has: take a free one at the same table
       curSeat = seat; refreshTableViews(); if (mode === 'walk' && !prev) { const e = eyePos(); camPos.copy(e); look.copy(e).add(aimDir()); }
       const [p, l] = camTargets(s, seat); tgtPos.copy(p); tgtLook.copy(l); $('intro').classList.remove('on'); const gr = greetOf.get(s.group); if (gr) setTimeout(gr, 900);
     } else if (mode === 'walk') {
@@ -11080,6 +11082,142 @@ function applyTestnetFunding(proof){
   }
   let readySent = false, drawn = 0;
   initReviewFeatures();$('intro').classList.add('on'); render(); paintWalkHud(); if (FROM_ARCADE) startAtDoor(); frame();
+  // ---------------- other people in the room (docs/plans/CASINO-PRESENCE-PLAN.md, P1) ----------------
+  // room.js (beside this page) talks to the live room service and hands the people over through window.PXRoomHost. With the room
+  // switched off, or room.js missing, none of this ever runs and the casino plays exactly as before. It never touches game state or money.
+  try { (function () {
+    const MACH = ['drop', 'twins', 'ds', 'bf', 'nv'];          // PX_MACHINE_PACKS order: The Drop, Forever Twins, Deep Strata, Block Fortune, Neon Vault
+    const MAXP = isTouch ? 6 : 16;                              // most people drawn at once (each is a 163-bone skinned figure)
+    const stationById = {}; stations.forEach((s) => (stationById[s.id] = s));
+    const seatSpot = (s, seat) => { const l = SEATS[s.id], i = l ? l.indexOf(seat) : -1; return i < 0 ? null : seat.pad ? s.id + '.pad' : s.id + '.' + (i + 1); };
+    const machineSpot = (m) => MACH[m.type] + '.' + (m.index < 5 ? 1 : 2);     // left wall (.1) then right wall (.2), as buildSlots made them
+    // where the visitor is right now: at a cabinet, or in a seat at a table
+    function mySpot() {
+      if (machineOpen && activeCabinet && machineHere && !machineOutOfRange) return machineSpot(activeCabinet);
+      if (focus && curSeat) return seatSpot(focus, curSeat);
+      return null;
+    }
+    // where a spot is in the room (world position, which way to face, standing or seated)
+    function place(spot) {
+      const parts = String(spot).split('.'), id = parts[0], idx = parts[1];
+      if (MACH.includes(id)) {
+        const m = room.machines.find((k) => MACH[k.type] === id && String(k.index < 5 ? 1 : 2) === idx); if (!m) return null;
+        const w = m.group.localToWorld(V3(0, 0, 1.0));
+        return { x: w.x, z: w.z, yaw: m.group.rotation.y + Math.PI, stand: true };
+      }
+      const s = stationById[id], l = SEATS[id]; if (!s || !l) return null;
+      const seat = idx === 'pad' ? l.find((k) => k.pad) : l[+idx - 1]; if (!seat) return null;
+      const w = toWorld(s, seat.x, seat.z);
+      return { x: w.x, z: w.z, yaw: s.group.rotation.y + Math.atan2(-seat.x, -seat.z), stand: !!seat.pad };
+    }
+    // clothes come from the address, so a person looks the same to everyone and keeps their look
+    const SHIRTS = [0x3a5a8a, 0x6a8a74, 0x8a3a34, 0x7a4a68, 0xd8d0b8, 0x3a4454, 0x8a6a2e, 0x2f6f6a, 0x5a3f78, 0xb8a07a, 0x7a2f4a, 0x4d6a3a, 0x9a4f2a, 0x2a5a4a, 0x8a8f9a, 0x6a2f2f, 0x3f3f6a, 0xa88a4a, 0x5a7a9a, 0x7a6a5a, 0x4a2f4a, 0xc8b8a0, 0x2f4a5a, 0x8a5a6a];
+    const TROUSERS = [0x23262c, 0x2a2d33, 0x3a3028, 0x1e2026];
+    const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+    const wearOf = (key) => { const h = hash(String(key)); return { shirt: SHIRTS[h % SHIRTS.length], trousers: TROUSERS[(h >>> 8) % TROUSERS.length] }; };
+    const SHIRT_MATS = { 'Ivory cotton': 'shirt', 'Midnight waistcoat': 'shirt', 'Satin piping': 'shirt', 'Midnight wool': 'trousers' };
+    function recolour(c, w) { c.model.traverse((o) => { if (!o.isMesh || !o.material) return; const k = SHIRT_MATS[o.material.name]; if (k && o.material.color) o.material.color.setHex(w[k]); }); }
+
+    // name tags: one sprite per person, drawn once when the name changes
+    function makeTag() {
+      const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+      const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
+      sp.scale.set(0.8, 0.15, 1); sp.renderOrder = 20; sp.visible = false; sp.name = 'Room name tag'; scene.add(sp);
+      return { c, tex, sp, text: null };
+    }
+    function drawTag(t, text) {
+      if (t.text === text) return; t.text = text;
+      const g = t.c.getContext('2d'), label = text.length > 22 ? text.slice(0, 21) + '…' : text;
+      g.clearRect(0, 0, 512, 96); g.font = '600 44px system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+      const w = Math.min(500, Math.ceil(g.measureText(label).width) + 56), x = (512 - w) / 2;
+      g.fillStyle = 'rgba(10,6,9,.82)'; g.strokeStyle = 'rgba(227,184,74,.85)'; g.lineWidth = 3;
+      g.beginPath(); (g.roundRect ? g.roundRect(x, 12, w, 72, 36) : g.rect(x, 12, w, 72)); g.fill(); g.stroke();
+      g.fillStyle = '#f6ead0'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, 256, 50);
+      t.tex.needsUpdate = true;
+    }
+
+    const pool = [], pending = [], remote = new Set(); let lastBuild = 0;
+    function makeEntry(stand) {
+      const spec = { group: scene, x: 0, z: 0, yaw: 0, person: 'm1', wear: wearOf('?'), on: false, freezeBeyond: 12 };
+      if (stand) spec.rest = { kind: 'table', y: 1.0, fwd: 0.3, surface: null }; else spec.seat = { h: 0.57 };
+      spec.showWhen = () => spec.on;
+      const e = { stand, spec, key: null, spot: null, on: false, tag: makeTag() };
+      e.col = { k: 'c', x: 0, z: 0, r: 0.3, active: () => e.on && e.stand }; solids.push(e.col);
+      if (!window.XA_HOSTS.failed) window.XA_HOSTS.add(spec);
+      pool.push(e); return e;
+    }
+    function release(e) { e.key = null; e.spot = null; e.on = false; e.spec.on = false; e.tag.sp.visible = false; }
+    function show(e, p, pl) {
+      e.key = p.key; e.spot = p.spot; e.on = true; e.spec.on = true;
+      const w = wearOf(p.key), s = e.spec; s.x = pl.x; s.z = pl.z; s.yaw = pl.yaw; s.wear = w;
+      const c = s.ctrl; if (c) { c.object.position.set(pl.x, 0, pl.z); c.object.rotation.y = pl.yaw; recolour(c, w); }
+      e.col.x = pl.x; e.col.z = pl.z;
+      drawTag(e.tag, p.label); e.tag.sp.position.set(pl.x, pl.stand ? 2.02 : 1.6, pl.z);
+    }
+    // an existing figure is moved at once; a new one is built a little later, one at a time, so a crowded room never stalls a frame
+    function assign(p, create) {
+      const pl = place(p.spot); if (!pl) return true;
+      let e = pool.find((x) => x.key === p.key);
+      if (e && e.stand !== pl.stand) { release(e); e = null; }   // a seated figure cannot stand up, and a standing one cannot sit
+      if (!e) e = pool.find((x) => !x.key && x.stand === pl.stand);
+      if (!e) { if (!create) return false; if (pool.length >= MAXP * 2) return true; e = makeEntry(pl.stand); }
+      show(e, p, pl); return true;
+    }
+    let demo = false;     // ?roomdemo=N: N made-up people and a frame-rate readout, to check how the room draws on a real device; the live room is ignored
+    function setPeople(list) {
+      if (demo) return;
+      applyPeople(list);
+    }
+    function applyPeople(list) {
+      remote.clear(); list.forEach((p) => remote.add(p.spot));
+      const mine = mySpot(), myTable = mine ? mine.split('.')[0] : null;
+      // never draw anybody in the seat the visitor is in (the camera would sit inside their head)
+      const wanted = list.filter((p) => p.spot !== mine).sort((a, b) => ((a.spot.split('.')[0] === myTable ? 0 : 1) - (b.spot.split('.')[0] === myTable ? 0 : 1)) || a.since - b.since).slice(0, MAXP);
+      const keys = new Set(wanted.map((p) => p.key));
+      pool.forEach((e) => { if (e.key && !keys.has(e.key)) release(e); });
+      pending.length = 0;
+      wanted.forEach((p) => { if (!assign(p, false)) pending.push(p); });
+    }
+    let fpsEl = null, fpsT = 0, fpsN = 0, fpsLast = 0;
+    (function tick(now) {
+      requestAnimationFrame(tick);
+      if (fpsEl) { fpsN++; if (now - fpsT >= 1000) { const ms = (now - fpsT) / fpsN, f = fpsEl.dataset.n + ' people drawn: ' + (1000 / ms).toFixed(1) + ' fps (' + ms.toFixed(1) + ' ms a frame)'; if (f !== fpsLast) { fpsEl.textContent = f; fpsLast = f; } fpsT = now; fpsN = 0; } }
+      if (pending.length && now - lastBuild > 120) { lastBuild = now; assign(pending.shift(), true); }
+      const cp = camera.position;
+      for (const e of pool) {
+        if (!e.on) continue;
+        const d = cp.distanceTo(e.tag.sp.position);
+        e.tag.sp.visible = d < 16; e.tag.sp.material.opacity = Math.max(0, Math.min(1, (16 - d) / 5));
+      }
+    })(0);
+
+    const demoArg = /[?&]roomdemo=(\d+)/.exec(location.search);
+    if (demoArg) {
+      const N = Math.min(24, +demoArg[1] || 0), ALL = ['blackjack.1', 'blackjack.2', 'baccarat.1', 'baccarat.2', 'holdem.1', 'holdem.2', 'roulette.pad', 'videopoker.pad', 'pvpholdem.1', 'pvpholdem.2', 'pvpholdem.3', 'liars.1', 'liars.2', 'liars.3', 'drop.1', 'drop.2', 'twins.1', 'twins.2', 'ds.1', 'ds.2', 'bf.1', 'bf.2', 'nv.1', 'nv.2'];
+      fpsEl = document.createElement('div'); fpsEl.dataset.n = String(Math.min(N, MAXP)); fpsEl.id = 'pxRoomDemo';
+      fpsEl.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:50;padding:4px 8px;border-radius:6px;background:rgba(0,0,0,.7);color:#f6ead0;font:12px/1.3 system-ui,sans-serif;pointer-events:none';
+      fpsEl.textContent = 'room demo: ' + N + ' made-up people (at most ' + MAXP + ' are drawn on this device)'; document.body.append(fpsEl);
+      demo = true;
+      applyPeople(ALL.slice(0, N).map((spot, i) => ({ key: 'SPDEMO' + i + 'KEY', spot, label: 'Demo ' + (i + 1), since: i })));
+    }
+    window.PXRoomHost = {
+      version: 1,
+      currentSpot: mySpot,
+      setPeople,
+      // when the visitor takes a seat that somebody in the room already has, they are given a free one at the same table instead
+      steer(s, seat) {
+        try {
+          if (!remote.size || !SEATS[s.id]) return seat;
+          const id = seatSpot(s, seat); if (!id || !remote.has(id)) return seat;
+          return SEATS[s.id].find((k) => !remote.has(seatSpot(s, k))) || seat;
+        } catch (e) { return seat; }
+      },
+      mount: () => document.querySelector('#tools .rt'),
+      debug: () => ({ pool: pool.map((e) => ({ stand: e.stand, key: e.key, spot: e.spot, on: e.on, built: !!e.spec.ctrl, tag: e.tag.sp.visible })), pending: pending.length, remote: [...remote] })   // for tests
+    };
+    window.dispatchEvent(new Event('px-room-host'));
+  })(); } catch (e) { console.warn('[room] presence is unavailable:', e); }   // never let this break the casino
   window.__casino = { machines:room.machines,openMachine:openCasinoMachine,closeMachine:requestMachineExit,get machineOpen(){return machineOpen;},walkCfg: WALK, startAtDoor, lookBy, get leaving() { return leaving; }, get fov() { return camera.fov; }, get exitOpen() { return room.exitDoor ? room.exitDoor.open : null; }, stations, figures, player, enterWalk, exitWalk, sit, setTableView, get tableView(){return tableView;}, get cand() { return cand; }, get mode() { return mode; }, get returning() { return returning; }, solids, setFocus, setBank, stats, audioStats, sfx, audio, setCam(p, l) { tgtPos.set(p[0], p[1], p[2]); tgtLook.set(l[0], l[1], l[2]); camPos.copy(tgtPos); look.copy(tgtLook); }, get bank() { return bank; }, get pixelRatio() { return pr; } };
 })().catch(e=>{console.error('ParallaX room initialization:',e.stack||e);const p=document.createElement('p');p.style.cssText='position:fixed;top:110px;left:24px;z-index:999;color:#e4c99d';p.textContent='The room could not open. '+e.message;document.body.appendChild(p);});
 </script>
@@ -11677,5 +11815,6 @@ button{font:inherit;color:inherit;cursor:pointer}
     }
   })();
 </script>
+<script type="module" src="room.js?v=p1.1"></script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>

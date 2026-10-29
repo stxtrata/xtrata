@@ -1,10 +1,31 @@
-# Casino room (P0 spike)
+# Casino room (P0 spike, P1 on /casino)
 
 The live part of "people in the casino": who is signed in and which seat or bar stool each person is at. Plan and reasoning:
 `docs/plans/CASINO-PRESENCE-PLAN.md`. This is a throwaway test of the risky parts (a free wallet signature, a Durable Object,
 WebSockets through Cloudflare Pages, reconnecting). It adds **no page to the casino itself**; the only page is `/casino-room-spike/`.
 
 The room never handles money. A seat in the room does not give a seat at a contract table.
+
+## P1: people in /casino
+
+`/casino` now loads `room.js` (source `src/casino-room/`, build `npm run build:casino-room`, committed bundle `public/casino/room.js`,
+loaded as a module so a failure there cannot stop the page). It looks the room up on load; if the room answers "offline" or cannot be
+reached it does nothing at all (no button, no figures), which is why **production is unchanged until its binding is switched on**.
+When the room is on, a **Room** button joins the top-right buttons: a guest watches, one free signature joins, and sitting at a table
+or standing at a machine puts that person's Adrian (with a BNS-or-short-address name tag) there for everybody.
+
+| Piece | Where |
+| --- | --- |
+| Client: sign-in, WebSocket, button and panel, BNS names | `src/casino-room/main.ts`, `src/casino-room/wallet.ts` |
+| Page side (figures, name tags, seat detection, "take another seat if this one is taken") | one block in `public/casino/index.html` just before `window.__casino =` (search `PXRoomHost`), plus two one-line hooks (`steer` in `setFocus`, `freezeBeyond` in the Adrian update loop) |
+| The contract between them | `window.PXRoomHost`: `currentSpot()`, `setPeople(list)`, `steer(station, seat)`, `mount()`, `debug()` |
+| Spot ids (14 seats, 10 cabinets, 4 reserved bar stools) | `SPOTS` in `functions/lib/casino-room.ts`; `functions/lib/__tests__/casino-room-spots.test.ts` reads the page and fails if the two disagree |
+
+**Changing `SPOTS` means redeploying the room Worker** (`npx wrangler deploy --config workers/casino-room/wrangler.toml`), then the Pages
+build. Until the Worker is redeployed an older Worker refuses the new ids (`no-such-spot`) and nobody is drawn at those places.
+
+Numbers: at most 16 people drawn on desktop and 6 on phones (the rest are counted but not drawn); figures are built one every 120 ms; people
+more than 12 m away stand still; a person is never drawn in the seat the visitor is in.
 
 ## What is in it
 
