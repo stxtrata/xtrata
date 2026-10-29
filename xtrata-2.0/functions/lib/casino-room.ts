@@ -6,11 +6,17 @@
  * is a small record the Durable Object keeps as the connection's "attachment", which survives hibernation.
  */
 
-/** Every place a person can sit or stand. P0 uses a fixed list; the real list is per page (plan, section 5.2). */
+/**
+ * Every place a person can sit or stand in /casino (P1). Table seats follow SEATS in public/casino/index.html ('.1', '.2'... in
+ * that order; a single standing place is '.pad'); the ten cabinets are the five machines (drop, twins, ds = Deep Strata,
+ * bf = Block Fortune, nv = Neon Vault) on the left wall ('.1') and the right wall ('.2'). The bar ids are reserved for the
+ * stools that come later. The server accepts only ids in this list; changing it means redeploying the room Worker.
+ */
 export const SPOTS = [
   'blackjack.1', 'blackjack.2', 'baccarat.1', 'baccarat.2', 'holdem.1', 'holdem.2',
   'roulette.pad', 'videopoker.pad', 'pvpholdem.1', 'pvpholdem.2', 'pvpholdem.3',
-  'liars.1', 'liars.2', 'liars.3', 'bf.pad', 'drop.pad', 'twins.pad', 'ds.pad', 'nv.pad', 'ex.pad',
+  'liars.1', 'liars.2', 'liars.3',
+  'drop.1', 'drop.2', 'twins.1', 'twins.2', 'ds.1', 'ds.2', 'bf.1', 'bf.2', 'nv.1', 'nv.2',
   'bar.1', 'bar.2', 'bar.3', 'bar.4'
 ] as const;
 const SPOT_SET = new Set<string>(SPOTS);
