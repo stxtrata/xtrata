@@ -72,5 +72,9 @@ gives a guest; other websites are refused; an idle room hibernates and wakes wit
 Worker (what a deploy does) disconnects everyone, the pages say so, then reconnect on their own and sit back down; the test page
 works at phone width.
 
-Not shown, and why the preview test matters: whether **production Pages** forwards a WebSocket through a Function to the
-Durable Object (Cloudflare's documentation only shows this for Workers), and real Leather and Xverse signing on desktop and phone.
+Confirmed on the deployed Cloudflare preview (2026-10-29): the same 7 end-to-end checks pass, so a Pages Function does forward a
+WebSocket to the Durable Object, and the room hibernates and wakes with every seat intact (about 47 ms for the first message after
+a 20 s idle).
+
+Still to check by hand: real Leather and Xverse signing on desktop and phone, and watching a real Worker deploy reconnect everyone
+on Cloudflare (it was observed locally).
