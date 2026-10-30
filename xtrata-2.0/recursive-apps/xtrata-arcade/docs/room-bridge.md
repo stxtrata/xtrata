@@ -172,6 +172,10 @@ It opens Xtrata Radio (`https://radio.xtrata.xyz/radio`, the one origin the list
 - The panel's frame grants passkeys to the radio origin only, and is sandboxed so it cannot navigate the hall away. All money, passkey and album logic stays in the radio page; the hall holds none.
 - The hall's own machine music turns off the first time the radio is opened (the hall's music button brings it back).
 
+- The panel asks the radio for its compact one-screen layout with `?dock=1` (`RADIO_URL` is `/radio?dock=1`). That layout is opt-in inside the radio page: without the flag the standard radio is unchanged.
+- **POP OUT** (in the panel's bar) opens the same radio in its own small window. That window is a top-level page, so Xverse, the listening wallet and passkeys work and paid plays count; inside the panel they cannot (the listening wallet only allows radio.xtrata.xyz as its parent, and extension wallets inject into the top page only). Popping out takes the panel's copy down so there is one radio; the RADIO button then focuses the pop-out; closing it brings the panel back. If the browser blocks the window, the link opens a tab and the panel stays.
+- On a branch preview (`*.pages.dev`) the hall loads that branch's own `/radio?dock=1`, so a radio-page change can be seen before it ships.
+
 A future room type needs nothing here: it inherits the dock because the dock lives in the hall's own frame.
 
 ## 5. A minimal room

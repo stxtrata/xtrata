@@ -13,6 +13,11 @@
 localStorage.setItem('xtrata.radio.gift.incoming.v1',JSON.stringify({code:m[1],at:Date.now()}));
 history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
+<script>
+// Compact "dock" layout: only when the address carries ?dock=1 (the arcade's corner panel and its pop-out window).
+// Without it nothing below changes: every dock rule is scoped to html[data-dock].
+(function(){try{if(/[?&]dock=1(?:&|$)/.test(location.search))document.documentElement.setAttribute('data-dock','1');}catch(e){}})();
+</script>
 <style>
   /* Xtrata Radio — a late-night FM receiver: dark glass, cyan display light, amber accents. */
   :root{color-scheme:dark;--bg:#06080d;--panel:#0f1521;--panel2:#0b111b;--line:#223047;--ink:#e6edf6;--mut:#8b9bb4;
@@ -519,6 +524,51 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .al-how.is-open p{padding:0 4px 12px}
   .sheet-extra .al-row{background:none;border:0;border-bottom:1px solid #20252c;color:#f2f0ea;font:inherit;cursor:pointer;padding:0}
   @media(max-width:420px){html[data-view=album] main{padding:0 16px 24px}.al-ctl{gap:20px}}
+
+  /* ---- Dock layout (?dock=1 only): the whole front panel fits one small window (about 440 x 600) with no sideways scroll.
+     Top bar, receiver, waveform, controls and tuning strip are on one screen; the wallet box, your station and links are below. ---- */
+  html[data-dock],html[data-dock] body{overflow-x:hidden}
+  html[data-dock] body{min-height:0}
+  html[data-dock] .topbar{padding:6px 10px;gap:8px;flex-wrap:nowrap}
+  html[data-dock] .live,html[data-dock] .idpill,html[data-dock] #radio-wallet-address{display:none}
+  html[data-dock] .logo{margin-right:auto;font-size:14px}
+  html[data-dock] .ppp-top{padding:5px 10px;font-size:11.5px}
+  html[data-dock] .radio-wallet{flex-wrap:nowrap;gap:6px;min-width:0}
+  html[data-dock] .radio-wallet button{padding:5px 8px;font-size:12px;white-space:nowrap}
+  html[data-dock] #radio-wallet-message{position:absolute;left:10px;right:10px;top:100%;z-index:31;flex-basis:auto;padding:4px 8px;border-radius:8px;background:#1a0f12;font-size:11.5px}
+  html[data-dock] main{grid-template-columns:minmax(0,1fr);gap:10px;padding:8px 10px 24px;max-width:none}
+  html[data-dock] main>*{min-width:0}
+  html[data-dock] .side{display:contents}
+  html[data-dock] .rx{order:0} html[data-dock] .ppp{order:1} html[data-dock] #likesBox,html[data-dock] .albumlist{order:2} html[data-dock] .strap{order:3}
+  html[data-dock] .receiver{grid-template-columns:84px minmax(0,1fr);gap:10px;padding:10px;border-radius:16px}
+  html[data-dock] .art{border-radius:10px}
+  html[data-dock] .art .fallback{gap:4px;padding:4px}
+  html[data-dock] .art .fallback .fnote,html[data-dock] .chainlink{display:none}
+  html[data-dock] .art .mark{width:34px;height:34px}
+  html[data-dock] .display{gap:6px}
+  html[data-dock] .vfd{padding:8px 10px;border-radius:10px}
+  html[data-dock] .stn{font-size:10px;letter-spacing:.2em}
+  html[data-dock] .ttl{font-size:17px;margin:3px 0 1px}
+  html[data-dock] .artst{font-size:12.5px;min-height:0}
+  html[data-dock] .idrow{margin-top:6px;min-height:0;gap:6px}
+  html[data-dock] .viewbtn{padding:4px 10px;font-size:11.5px}
+  html[data-dock] .spectrum{height:26px}
+  html[data-dock] .nudge{margin-top:8px;padding:7px 8px 7px 10px;gap:8px}
+  html[data-dock] .nudge-s{font-size:11.5px;line-height:1.3}
+  html[data-dock] .timeline{margin-top:8px;gap:6px}
+  html[data-dock] .tl-wave{height:32px}
+  html[data-dock] .tl-t{min-width:32px;font-size:10.5px}
+  html[data-dock] .ctl{margin-top:10px;gap:8px;flex-wrap:nowrap;justify-content:center}
+  html[data-dock] .ctl .grow{flex:1;flex-basis:auto;height:auto}
+  html[data-dock] .cbtn{width:44px;height:44px;font-size:17px;flex:none}
+  html[data-dock] .cbtn.big{width:54px;height:54px;font-size:22px}
+  html[data-dock] .chip{padding:7px 10px;font-size:11px;white-space:nowrap;flex:none}
+  html[data-dock] .tuner{margin-top:10px;height:56px}
+  html[data-dock] .stations{gap:6px}
+  html[data-dock] .stations button{padding:7px 8px}
+  html[data-dock] .stations button span{display:none}
+  /* an album as the music: the same player, the same window (its own rules already fit the window height) */
+  html[data-dock][data-view=album] main{padding:0 12px 16px;max-width:none}
 </style>
 </head>
 <body>

@@ -14494,8 +14494,8 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
 <button id="xa-radio-btn" type="button" aria-haspopup="dialog" aria-label="Xtrata Radio and your albums" title="Xtrata Radio and your albums" hidden><span aria-hidden="true">&#9834;</span><b>RADIO</b></button>
 <div id="xa-radio" class="away" role="dialog" aria-label="Xtrata Radio" aria-hidden="true" inert>
   <div class="rd-box">
-    <div class="rd-bar"><b>XTRATA RADIO</b><span>Keeps playing as you walk</span>
-      <a id="xa-radio-open" target="_blank" rel="noopener">OPEN ON XTRATA &#8599;</a><button id="xa-radio-hide" type="button">HIDE</button></div>
+    <div class="rd-bar"><b>XTRATA RADIO</b><span>Free here &middot; POP OUT to pay for plays</span>
+      <a id="xa-radio-open" target="xaRadioPop" title="Open the radio in its own window: needed for paid plays and for Xverse">POP OUT &#8599;</a><button id="xa-radio-hide" type="button">HIDE</button></div>
     <iframe id="xa-radio-frame" title="Xtrata Radio" referrerpolicy="no-referrer"
       sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>
   </div>
@@ -18226,7 +18226,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
  *
  * The big screen in the middle of the hall. It shows, on one 16:9 canvas:
  *   - the Bitcoin Day clock along the top (what the old day board showed, kept intact)
- *   - LATEST SCORERS on the left (fed by the hall's own score boards, no extra reads)
+ *   - the left column alternates (fed by the hall's own score boards, no extra reads): LATEST SCORERS for 20 s, then the NUMBER ONES
+ *     (the current best score on every board, newest crown first, paged) for 40 s, then latest scorers again, then the number ones A to Z
  *   - a rotating FEATURE panel on the right (news, ads and messages from xtrata-screen-v1)
  *   - a scrolling TICKER along the bottom (short messages and news headlines)
  *
@@ -18253,6 +18254,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     rotateSecs: 12,              // one feature item at a time
     fullEvery: 3,                // every 3rd slot is a full-screen slot (when something has a picture to show)
     tickerPxPerSec: 80,
+    leftLatestSecs: 20,          // left column: latest scorers for this long ...
+    leftChampSecs: 40,           // ... then the number ones for this long (newest crown first, then the next round A to Z)
+    leftRows: 8,                 // rows on a page
     maxLive: 32,                 // the contract's live-set bound
     snapKey: 'xa-screen-snap-v1'
   };
@@ -18497,23 +18501,43 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     var segW = (W - 56 * u) / bpd;
     for (var i = 0; i < bpd; i++) { x.fillStyle = i < done ? ORANGE : i === done ? '#ffffff' : '#1d1a24'; x.fillRect(28 * u + i * segW, 80 * u, Math.max(1, segW - 1), 10 * u); }
 
-    // --- left: latest scorers
-    var lx = 28 * u, lw = 400 * u, top = 112 * u, bottom = H - 120 * u;
+    // --- left: latest scorers, alternating with the number ones (newest crown first, then A to Z)
+    var lx = 28 * u, lw = 400 * u, top = 112 * u, bottom = H - 120 * u, NR = CFG.leftRows;
+    var champs = d.champions && d.champions.length ? d.champions : null, ph0 = leftPhase(d.t || 0, !!champs), shownRows, title, sub = '';
+    var rh = (bottom - (top + 48 * u)) / NR, fade = 1;
+    if (ph0.kind === 'champs') {
+      var list = orderChampions(champs, ph0.order), pages = Math.max(1, Math.ceil(list.length / NR));
+      var pageSecs = pages > 1 ? Math.min(10, Math.max(5, CFG.leftChampSecs / pages)) : CFG.leftChampSecs, pi = Math.floor(ph0.local / pageSecs) % pages, pt = ph0.local - Math.floor(ph0.local / pageSecs) * pageSecs;
+      shownRows = list.slice(pi * NR, pi * NR + NR); title = 'NUMBER ONES';
+      sub = (ph0.order === 'new' ? 'NEWEST FIRST' : 'A TO Z') + (pages > 1 ? '  ' + (pi + 1) + '/' + pages : '');
+      if (pages > 1) fade = Math.max(0, Math.min(1, pt / .35, (pageSecs - pt) / .35));
+    } else { shownRows = (d.scorers || []).slice(0, NR); title = 'LATEST SCORERS'; }
     x.textAlign = 'left'; x.font = Math.round(28 * u) + 'px Bungee, Impact, sans-serif'; x.fillStyle = '#3be4ff'; x.shadowColor = '#3be4ff'; x.shadowBlur = 8;
-    x.fillText('LATEST SCORERS', lx, top + 24 * u); x.shadowBlur = 0;
+    x.fillText(title, lx, top + 24 * u); x.shadowBlur = 0;
+    if (sub) { x.font = Math.round(22 * u) + 'px VT323, monospace'; x.textAlign = 'right'; x.fillStyle = '#8fd3ff'; x.fillText(sub, lx + lw, top + 24 * u); x.textAlign = 'left'; }
     x.fillStyle = '#3be4ff'; x.fillRect(lx, top + 36 * u, lw, 2 * u);
-    var rows = (d.scorers || []).slice(0, 8), rh = (bottom - (top + 48 * u)) / 8;
     x.font = Math.round(26 * u) + 'px VT323, monospace';
-    if (!rows.length) {
+    if (!shownRows.length) {
       x.fillStyle = '#6f6a8f'; x.fillText('NO SCORES YET', lx, top + 48 * u + rh);
     }
-    rows.forEach(function (r, k) {
+    x.globalAlpha = fade;
+    shownRows.forEach(function (r, k) {
       var y = top + 48 * u + rh * k + rh * .72;
-      x.textAlign = 'left'; x.fillStyle = r.colour || '#3be4ff'; x.fillText(String(r.game).toUpperCase().slice(0, 13), lx, y);
+      if (ph0.kind === 'champs' && r.claimed && r.age != null && r.age < bpd) { x.fillStyle = 'rgba(57,255,136,.08)'; x.fillRect(lx - 6 * u, y - rh * .72, lw + 12 * u, rh - 2 * u); }
+      x.font = Math.round(26 * u) + 'px VT323, monospace';
+      x.textAlign = 'left'; x.fillStyle = r.claimed === false ? dim(r.colour) : (r.colour || '#3be4ff'); x.fillText(String(r.game).toUpperCase().slice(0, 13), lx, y);
+      if (r.claimed === false) {
+        x.fillStyle = '#6f6a8f'; x.fillText('NO #1 YET', lx + 172 * u, y);
+        x.textAlign = 'right'; x.fillStyle = '#ffc53d'; x.fillText('BE FIRST', lx + lw, y);
+        return;
+      }
       x.fillStyle = '#ffffff'; x.fillText(String(r.name).slice(0, 10), lx + 172 * u, y);
       x.textAlign = 'right'; x.fillStyle = '#ffc53d'; x.fillText(String(r.score), lx + lw - 56 * u, y);
-      x.fillStyle = '#6f6a8f'; x.fillText(r.age == null ? '' : ago(r.age), lx + lw, y);
+      var fresh = ph0.kind === 'champs' && r.age != null && r.age < bpd;
+      x.fillStyle = fresh ? '#39ff88' : '#6f6a8f'; x.fillText(r.age == null ? '' : ago(r.age), lx + lw, y);
+      if (fresh) { x.font = Math.round(14 * u) + 'px VT323, monospace'; x.fillStyle = '#39ff88'; x.fillText('NEW', lx + lw, y - 24 * u); }
     });
+    x.globalAlpha = 1;
 
     // --- right: feature panel
     var px = 460 * u, pw = W - px - 28 * u, py = top, ph = bottom - top;
@@ -18594,6 +18618,50 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     x.fillStyle = '#8fd3ff'; x.font = Math.round(34 * u) + 'px VT323, monospace'; x.fillText('EVERY TOP SCORE LIVES ON BITCOIN', px + pw / 2, py + ph * .82);
   }
 
+  /* ------------------------------------------------------------ the left column's rotation (pure) */
+  // Which view the left column shows at time t (seconds): latest scorers, number ones newest first, latest scorers, number ones A to Z, and round again.
+  // With no number ones to show (the boards are not read yet) it stays on the latest scorers.
+  function leftPhase(t, haveChamps) {
+    if (!haveChamps) return { kind: 'latest', order: '', local: 0 };
+    var a = CFG.leftLatestSecs, b = CFG.leftChampSecs, cyc = 2 * (a + b), u = (((Number(t) || 0) % cyc) + cyc) % cyc;
+    if (u < a) return { kind: 'latest', order: '', local: u };
+    if (u < a + b) return { kind: 'champs', order: 'new', local: u - a };
+    if (u < 2 * a + b) return { kind: 'latest', order: '', local: u - a - b };
+    return { kind: 'champs', order: 'abc', local: u - 2 * a - b };
+  }
+  // The number one on every board. \`boards\` = [{ game, variant, colour, mode, entries }]; entries is null while the hall has not read that board
+  // (skipped: not read is not the same as empty) and [] when it is read and empty (an unclaimed row, "BE FIRST"). The best score wins: the highest, or
+  // on a time board the lowest; a tie goes to the earlier one. Rows: { game, colour, name, score, age, burn, claimed }.
+  function champions(boards, height, fmt) {
+    var h = Number(height) || 0, out = [];
+    (boards || []).forEach(function (b) {
+      if (!b || !Array.isArray(b.entries)) return;
+      var label = String(b.game || '') + (b.variant ? ' ' + String(b.variant) : '');
+      if (b.variant) label = String(b.game || '').slice(0, 8) + ' ' + String(b.variant).slice(0, 4);
+      var best = null, low = b.mode === 'time';
+      b.entries.forEach(function (e) {
+        var sc = Number(e && e.score); if (!isFinite(sc)) return;
+        if (!best) { best = e; return; }
+        var bs = Number(best.score), eb = Number(e.burn) || 0, bb = Number(best.burn) || 0;
+        if (low ? sc < bs : sc > bs) best = e;
+        else if (sc === bs && eb > 0 && (bb <= 0 || eb < bb)) best = e;
+      });
+      if (!best) { out.push({ game: label, colour: b.colour, name: '', score: '', age: null, burn: 0, claimed: false }); return; }
+      var burn = Number(best.burn) || 0, age = burn > 0 && h ? Math.max(0, h - burn) : null;
+      out.push({ game: label, colour: b.colour, name: String(best.name || ''), score: fmt ? fmt(b.mode, best.score) : String(best.score), age: age, burn: burn, claimed: true });
+    });
+    return out;
+  }
+  // 'new': newest crown first, the unclaimed boards last (A to Z); 'abc': every board A to Z. Does not change the list it is given.
+  function orderChampions(rows, order) {
+    var byName = function (a, b) { return String(a.game).toLowerCase() < String(b.game).toLowerCase() ? -1 : String(a.game).toLowerCase() > String(b.game).toLowerCase() ? 1 : 0; };
+    var list = (rows || []).slice();
+    if (order === 'abc') return list.sort(byName);
+    var claimed = list.filter(function (r) { return r.claimed; }).sort(function (a, b) { return (b.burn || 0) - (a.burn || 0) || byName(a, b); });
+    return claimed.concat(list.filter(function (r) { return !r.claimed; }).sort(byName));
+  }
+  function dim(c) { return c && /^#[0-9a-f]{6}$/i.test(c) ? c + '66' : '#6f6a8f'; }
+
   /* ------------------------------------------------------------ latest scorers (pure) */
   // Builds the scorers list from the hall's board cache. \`boards\` = [{ game, colour, mode, entries:[{name,score,burn}] }].
   // Newest first. With a window (burn blocks, default 288 when omitted) entries older than it are left out; with no window (0) the newest
@@ -18621,7 +18689,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     start: start, stop: stop, refresh: refresh, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
     items: function () { return state.snap ? state.snap.items : []; },
-    paint: paint, latestScorers: latestScorers, slotAt: slotAt, sniffMedia: sniffMedia, idle: function () { tendMedia(null); }, animating: function () { return !!state.animating; },
+    paint: paint, latestScorers: latestScorers, champions: champions, orderChampions: orderChampions, leftPhase: leftPhase, slotAt: slotAt, sniffMedia: sniffMedia, idle: function () { tendMedia(null); }, animating: function () { return !!state.animating; },
     normalizeItem: normalizeItem, isActive: isActive, activeItems: activeItems, featureAt: featureAt,
     wrapText: wrapText, tickerText: tickerText, ago: ago, hasPicture: hasPicture,
     _t: { state: state, load: load, restore: restore, save: save }
@@ -18840,7 +18908,7 @@ function buildRoom(){
   XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw, pitch:player.pitch});   // read-only, for tests
   XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
   XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
-  if(window.XA_TEST) XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 };   // tests only: nothing sets XA_TEST in the shipped page
+  if(window.XA_TEST){ XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 }; XA.centreZ=()=>CENTRE_SCREEN.z }   // tests only: nothing sets XA_TEST in the shipped page
   XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests
   buildDayBoard();
 
@@ -20201,7 +20269,7 @@ function buildDayBoard(){
   for(const sx of [-1,1]){ const len=HH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
   const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.14,.025,.12), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.07); g.add(edge);
   // no collider: its bottom edge (2.25 m) is above head height, so you walk under it
-  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], scorersAt:-1e9};
+  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], champions:[], scorersAt:-1e9};
   paintDayBoard(true);
 }
 // Latest scorers: the newest top-10 entries across every board the hall has cached, whatever their age (the row shows how old), no extra reads.
@@ -20209,14 +20277,19 @@ function screenScorers(){
   const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; if(t && t.entries && t.entries.length) boards.push({game:g.title, colour:g.color, mode:b.mode, entries:t.entries}) }));
   return window.XAScreen ? XAScreen.latestScorers(boards, chain.height, 0, fmtBoard, 8) : [];
 }
+// The number one on every board, from the same cache: a board not read yet is left out, a board read and empty is "NO #1 YET".
+function screenChampions(){
+  const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; boards.push({game:g.title, variant:b.label==='TOP 10' ? '' : String(b.label).replace(/ TOP 10$/,''), colour:g.color, mode:b.mode, entries:t && Array.isArray(t.entries) ? t.entries : null}) }));
+  return window.XAScreen && XAScreen.champions ? XAScreen.champions(boards, chain.height, fmtBoard) : [];
+}
 function paintDayBoard(force){
   if(!dayBoard || chain.day<0) return;
   const now=performance.now();
   const gap=(window.XAScreen && XAScreen.animating && XAScreen.animating()) ? CENTRE_SCREEN.animGapMs : CENTRE_SCREEN.gapMs;   // a GIF or clip on show repaints at about 25 fps
   if(!force && now-dayBoard.last<gap) return;
   dayBoard.last=now;
-  if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } }
-  const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers,
+  if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } try{ dayBoard.champions=screenChampions() }catch(e){ dayBoard.champions=[] } }
+  const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers, champions:dayBoard.champions,
            items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.height)   /* estimated height when the node is down, so a cached snapshot still expires */ : []};
   if(window.XAScreen) XAScreen.paint(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);
   else paintPlainClock(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);   // a release without screen.js: just the day clock
@@ -20337,23 +20410,28 @@ $('chainp').addEventListener('click', e=>{ if(e.target===$('chainp')) closeChain
    you close it, never taken down, so an album keeps playing while you walk, play a game or go through a door. Nothing here touches money or
    keys: the radio app does all of that in its own page. A room cannot see or reach this panel (rooms run in their own sandboxed frames).
    ================================================================ */
-const RADIO_URL='https://radio.xtrata.xyz/radio';
-let radioOpen=false, radioLoaded=false;
+// The radio page the panel and the pop-out window show. ?dock=1 asks the radio for its compact one-screen layout (the standard radio
+// page is untouched without it). A branch preview (*.pages.dev) shows that branch's own radio page so a change can be seen before it ships.
+const RADIO_BASE=/\\.pages\\.dev$/.test(location.hostname) ? location.protocol+'//'+location.host : 'https://radio.xtrata.xyz';
+const RADIO_URL=RADIO_BASE+'/radio?dock=1';
+let radioOpen=false, radioLoaded=false, radioPop=null;
+function radioPopAlive(){ try{ return !!(radioPop && !radioPop.closed) }catch(e){ return false } }
 function radioPaint(){   // the button is there while you can walk or are in a room; games take the whole screen, so it steps aside (the music goes on)
   const b=$('xa-radio-btn'); if(!b) return;
   const show=(state==='walk' || state==='room') && !chainOpen;
   if(b.hidden===show) b.hidden=!show;
-  b.classList.toggle('on',radioOpen);
+  b.classList.toggle('on',radioOpen || radioPopAlive());
 }
 function radioShow(){
   if(radioOpen || chainOpen) return;
+  if(radioPopAlive()){ try{ radioPop.focus() }catch(e){} return }   // the radio is playing in its own window: bring that forward instead of starting a second one
   radioOpen=true;
   if(document.pointerLockElement) document.exitPointerLock();
   for(const k in keys) keys[k]=false;
   const f=$('xa-radio-frame'), box=$('xa-radio');
   if(!radioLoaded){   // the radio is loaded the first time it is asked for, not when the hall starts
-    radioLoaded=true; $('xa-radio-open').href=RADIO_URL;
-    f.setAttribute('allow','autoplay; fullscreen; clipboard-write; publickey-credentials-get https://radio.xtrata.xyz; publickey-credentials-create https://radio.xtrata.xyz');   // passkeys, to the radio's origin only (set with the address, so the empty frame does not name an origin it is not on)
+    radioLoaded=true;
+    f.setAttribute('allow','autoplay; fullscreen; clipboard-write; publickey-credentials-get '+RADIO_BASE+'; publickey-credentials-create '+RADIO_BASE);   // passkeys, to the radio's origin only (set with the address, so the empty frame does not name an origin it is not on)
     f.src=RADIO_URL;
     try{ if(Room.isOn()){ Room.toggle(); paintRoom() } }catch(e){}   // the machines' own music steps aside for the radio (the music button brings it back)
   }
@@ -20367,12 +20445,23 @@ function radioHide(){
   try{ document.activeElement && document.activeElement.blur && document.activeElement.blur() }catch(e){}
   radioPaint(); if(state==='walk') tryLock(); else if(state==='room' && roomUI && roomUI.frame){ try{ roomUI.frame.focus() }catch(e){} }
 }
+// Pop out: the radio in its own small window (a top-level page, so both wallets and the listening wallet's passkey work and paid plays count).
+// One radio at a time: the panel's copy is taken down; the RADIO button then brings the pop-out forward. If the browser blocks the window,
+// the link opens a new tab as it would anyway and the panel stays.
+$('xa-radio-open').href=RADIO_URL;
+$('xa-radio-open').addEventListener('click', e=>{
+  let w=null; try{ w=window.open(RADIO_URL,'xaRadioPop','popup=yes,width=440,height=760') }catch(err){}
+  if(!w) return;
+  e.preventDefault(); radioPop=w; try{ w.focus() }catch(err){}
+  const f=$('xa-radio-frame'); f.removeAttribute('src'); f.removeAttribute('allow'); radioLoaded=false;
+  radioHide(); radioPaint();
+});
 $('xa-radio-btn').addEventListener('click', ()=>{ initAudio(); radioOpen ? radioHide() : radioShow() });
 $('xa-radio-hide').addEventListener('click', radioHide);
 $('xa-radio').addEventListener('click', e=>{ if(e.target===$('xa-radio')) radioHide() });
 addEventListener('keydown', e=>{ if(radioOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); radioHide() } }, true);
 setInterval(radioPaint, 400);   // (not called here: \`state\` is declared further down)
-if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.hallState=()=>state;   // tests only
+if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.exitGame=()=>exitGame(), XA.hallState=()=>state;   // tests only
 if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:$('xa-radio-frame').getAttribute('src'), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow')});   // read-only, for tests
 /* ================================================================
    CABINETS \u2014 one generator, ten configs
@@ -21631,7 +21720,7 @@ fontsReady.then(()=>{
 });
 })();
 
-` }, packSha: { engine: "5e350e962d43da33d39946601f21c619aab5832448f6e3c1813a9b564535843f", hall: "ff9f22a632b1fd7c47c465e39504a9e06b8f3d53a41add44f9d40ad1ac86ccc4" }, fromBundle: ["assets", "three", "games"], ids: { version: "v2.0.0", bundleId: 3078, packs: {}, parts: {}, parentTokenId: 0 }, shell: `<!doctype html>
+` }, packSha: { engine: "5e350e962d43da33d39946601f21c619aab5832448f6e3c1813a9b564535843f", hall: "3e03c218dcdfee5b82c267ddb54178931679d98a79b22a0b18ea5d1417e420dd" }, fromBundle: ["assets", "three", "games"], ids: { version: "v2.0.0", bundleId: 3078, packs: {}, parts: {}, parentTokenId: 0 }, shell: `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -22087,7 +22176,7 @@ fontsReady.then(()=>{
 </script>
 </body>
 </html>
-`, shellSha: "9ce240d230ea4f4f09b491b844d3381a88390d053427efaefd4af2e8d543672c", partSha: { "fonts.css": "8306ea91702ae5a440d4e1124c8a20bf64032b10a0bd65a24c4cc46ad2519259", "room.css": "41eb410ba6f828844f25fed0a23b7d83ac69def4fdcbbcd149c71335a77112da", "hall.css": "d42521e04ece3d1d411bb06ad3d7ab91feb233c13855bab282e6f874ee7b6f3f", "hall-body.html": "1d6ca9c697c0bbc7e95a139d909d8ee6394bba0ae877188c901a5ac17af12a6d", "arcade-kit.js": "6046eccb03c39fdc399b76fea10aa072055bfb2f2e102a664c10335ef02f1625", "arcade-music.js": "233b72d333d7d5b689155c38384fd7dbdeec32f0736b2e59799af4a77ee093ee", "score-client.js": "d1f675c6c9fc9a41c3c1db481cb27c704e4ca5d730d42cda4f41b22747c59214", "arcade-replay.js": "3181864fb284f70bb76693e38d6e6138c276f5b5909f5827d98b4796e766fe48", "arcade-room.js": "0886941c6b608db4b826c9f9ae078ad2a4ec6b7021b8bca8af2bc4713b6690ad", "game-neon-snake.js": "2e260a6d0f67d8799b5c0e679069921e090be7ae23b99b5ab7cb0a07163c4fbf", "game-block-drop.js": "81521afcaf973e145bf6bd89e5c0adb87fbd6859a47480732e455ddddfdd7cb6", "game-cave-diver.js": "dcad97b4c5343958c37be696a88bb33439d940f063eeb869980dde5c3f4cf070", "game-orbit-merge.js": "777aa11626e9ada259948f744d053e205830007d60c1310687fdf73476c95aca", "game-block-runner.js": "42fc1f6738ff9df3e56b3902cc9f70bf8d4dfa6d7adaaaf1bf76876f0c097ae8", "game-brick-breaker.js": "2854d51f2313dba619ac9fd44c39f2c31643ee1db2cb8bcaa148f56c11daf81d", "game-rock-drift.js": "48fd57ee6dce83bbe04db7d1d05c0e12bbaed84262b7d07fff2c3d3986d97c04", "game-stack-tower.js": "a00ae5ad11552f7d9e4deaed6dbdf0569d209c7a300d48f6e4f7f2870c464500", "game-road-hopper.js": "802b779f828fd301b045a3f340cf916bf3990523749db3fed753297749596a05", "game-tile-tap.js": "7e721b38060706e468102732dc6eb9d965bb9386c419b35fd87748a296c0f0ca", "game-merge-2048.js": "f277aeeeb17653737d4101ff27c6825f3fb73205f002081b6f60ed5cba17bf02", "game-block-defence.js": "13ce92b3a962450e95a8c7044cd92725557e440cff691a3ddf4f7e5ee92f1bf4", "game-maze-muncher.js": "b7893e41fa7a057efb34bf5dbbf44f90042f2a79b1df2dee539797a1470e173d", "game-invader-wave.js": "632902cdea5117e68b4e9c91af8aa1381e0d4650cdb698252dfdd32066876240", "game-helix-drop.js": "eb695c93047706f00fd0127d1c2c710a26279ce3ce26f4639fc835f828257013", "game-bubble-pop.js": "3c76041886c8fd42a98be048c34f46376678e154caa8dfdcd97d24b2aaae3bfa", "game-swerve.js": "a59fec3d008eab452ecc290138bc92541af2bd06575af3b49714a4d3af00a811", "game-lunar-lander.js": "3252ba2264cf4b729af9e6e84f5ad5ab43f7cf7143937be8976db126f5fd6b6d", "game-reflex-tap.js": "acdee2ec516b1cbad81b5c6ce2be9cf503e3177dc6eb3d5f93e6e38ba5cd4067", "game-mine-sprint.js": "cbfacdcad186a0efc6a11762d468be8f5feaa6f273418a250ed671b0d47744df", "game-pong-streak.js": "f2e88bc9308337a9aa15661f3e41aa8cffe2a9d917114f19c72c7d78a13d7c7c", "games-registry.js": "c4a724379aa130d46b2edeecbd1698bbb97012f5858a80b287e919f8471552b5", "engine-boot.js": "e47841adab913ae00c19a410896b84fcf4a325fb562261a6cd06f22b36b2ee06", "three.js": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2", "hall-assets.js": "54ddcd97fa211f86ba5d3fc09e9a7a091f3bab1b5f8ae7944d71ac7695747c17", "world.js": "05a4da4caefaa25c7c027d43fe9df00d9188f81da4762a4179f06b5cb7e63081", "world2.js": "5626aede076ef8e5efe22d68cef0a72a81b941753024fc1e002ec34aa02fcb53", "curtain.js": "fccff71a98a9940f38f421b06b47741eb8fc109e73358472884171bff03a29e0", "doors.js": "7f7f63df614f18f76311be8f95d8ef088e31e069957d0e6a67da09d26ffa2e1b", "door-skins.js": "e74df6198c8e4546457c09da688d42ec6d266f9880fd0cc522cb0bba02898b52", "bays.js": "b85744fcb52a2306e63e9fc1880d62370376095f4f07c1d192c35104229b89e8", "screen.js": "d8285ac08e371b7b0d3a2ef839e2d20632eff1685988f2f711e739c8c6643c52", "hall.js": "d40c2d94039021355142e68335ea4f7ec7de2e37cf29fe2fd8d80f2e3a558b36" }, single: `<!doctype html>
+`, shellSha: "9ce240d230ea4f4f09b491b844d3381a88390d053427efaefd4af2e8d543672c", partSha: { "fonts.css": "8306ea91702ae5a440d4e1124c8a20bf64032b10a0bd65a24c4cc46ad2519259", "room.css": "41eb410ba6f828844f25fed0a23b7d83ac69def4fdcbbcd149c71335a77112da", "hall.css": "d42521e04ece3d1d411bb06ad3d7ab91feb233c13855bab282e6f874ee7b6f3f", "hall-body.html": "70c43d4d4044f585d41ff0648ef1b4a03c4a4d65a6698272fd23899806e4d79b", "arcade-kit.js": "6046eccb03c39fdc399b76fea10aa072055bfb2f2e102a664c10335ef02f1625", "arcade-music.js": "233b72d333d7d5b689155c38384fd7dbdeec32f0736b2e59799af4a77ee093ee", "score-client.js": "d1f675c6c9fc9a41c3c1db481cb27c704e4ca5d730d42cda4f41b22747c59214", "arcade-replay.js": "3181864fb284f70bb76693e38d6e6138c276f5b5909f5827d98b4796e766fe48", "arcade-room.js": "0886941c6b608db4b826c9f9ae078ad2a4ec6b7021b8bca8af2bc4713b6690ad", "game-neon-snake.js": "2e260a6d0f67d8799b5c0e679069921e090be7ae23b99b5ab7cb0a07163c4fbf", "game-block-drop.js": "81521afcaf973e145bf6bd89e5c0adb87fbd6859a47480732e455ddddfdd7cb6", "game-cave-diver.js": "dcad97b4c5343958c37be696a88bb33439d940f063eeb869980dde5c3f4cf070", "game-orbit-merge.js": "777aa11626e9ada259948f744d053e205830007d60c1310687fdf73476c95aca", "game-block-runner.js": "42fc1f6738ff9df3e56b3902cc9f70bf8d4dfa6d7adaaaf1bf76876f0c097ae8", "game-brick-breaker.js": "2854d51f2313dba619ac9fd44c39f2c31643ee1db2cb8bcaa148f56c11daf81d", "game-rock-drift.js": "48fd57ee6dce83bbe04db7d1d05c0e12bbaed84262b7d07fff2c3d3986d97c04", "game-stack-tower.js": "a00ae5ad11552f7d9e4deaed6dbdf0569d209c7a300d48f6e4f7f2870c464500", "game-road-hopper.js": "802b779f828fd301b045a3f340cf916bf3990523749db3fed753297749596a05", "game-tile-tap.js": "7e721b38060706e468102732dc6eb9d965bb9386c419b35fd87748a296c0f0ca", "game-merge-2048.js": "f277aeeeb17653737d4101ff27c6825f3fb73205f002081b6f60ed5cba17bf02", "game-block-defence.js": "13ce92b3a962450e95a8c7044cd92725557e440cff691a3ddf4f7e5ee92f1bf4", "game-maze-muncher.js": "b7893e41fa7a057efb34bf5dbbf44f90042f2a79b1df2dee539797a1470e173d", "game-invader-wave.js": "632902cdea5117e68b4e9c91af8aa1381e0d4650cdb698252dfdd32066876240", "game-helix-drop.js": "eb695c93047706f00fd0127d1c2c710a26279ce3ce26f4639fc835f828257013", "game-bubble-pop.js": "3c76041886c8fd42a98be048c34f46376678e154caa8dfdcd97d24b2aaae3bfa", "game-swerve.js": "a59fec3d008eab452ecc290138bc92541af2bd06575af3b49714a4d3af00a811", "game-lunar-lander.js": "3252ba2264cf4b729af9e6e84f5ad5ab43f7cf7143937be8976db126f5fd6b6d", "game-reflex-tap.js": "acdee2ec516b1cbad81b5c6ce2be9cf503e3177dc6eb3d5f93e6e38ba5cd4067", "game-mine-sprint.js": "cbfacdcad186a0efc6a11762d468be8f5feaa6f273418a250ed671b0d47744df", "game-pong-streak.js": "f2e88bc9308337a9aa15661f3e41aa8cffe2a9d917114f19c72c7d78a13d7c7c", "games-registry.js": "c4a724379aa130d46b2edeecbd1698bbb97012f5858a80b287e919f8471552b5", "engine-boot.js": "e47841adab913ae00c19a410896b84fcf4a325fb562261a6cd06f22b36b2ee06", "three.js": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2", "hall-assets.js": "54ddcd97fa211f86ba5d3fc09e9a7a091f3bab1b5f8ae7944d71ac7695747c17", "world.js": "05a4da4caefaa25c7c027d43fe9df00d9188f81da4762a4179f06b5cb7e63081", "world2.js": "5626aede076ef8e5efe22d68cef0a72a81b941753024fc1e002ec34aa02fcb53", "curtain.js": "fccff71a98a9940f38f421b06b47741eb8fc109e73358472884171bff03a29e0", "doors.js": "7f7f63df614f18f76311be8f95d8ef088e31e069957d0e6a67da09d26ffa2e1b", "door-skins.js": "e74df6198c8e4546457c09da688d42ec6d266f9880fd0cc522cb0bba02898b52", "bays.js": "b85744fcb52a2306e63e9fc1880d62370376095f4f07c1d192c35104229b89e8", "screen.js": "eae588e1a2e2e67dea14f6d021a701fa47e1372bff51700b36d85ebef37c86ba", "hall.js": "aa8594c59ac729aa44812fd0af470016999b262350761765a1500510481b97cd" }, single: `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -22545,8 +22634,8 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
 <button id="xa-radio-btn" type="button" aria-haspopup="dialog" aria-label="Xtrata Radio and your albums" title="Xtrata Radio and your albums" hidden><span aria-hidden="true">&#9834;</span><b>RADIO</b></button>
 <div id="xa-radio" class="away" role="dialog" aria-label="Xtrata Radio" aria-hidden="true" inert>
   <div class="rd-box">
-    <div class="rd-bar"><b>XTRATA RADIO</b><span>Keeps playing as you walk</span>
-      <a id="xa-radio-open" target="_blank" rel="noopener">OPEN ON XTRATA &#8599;</a><button id="xa-radio-hide" type="button">HIDE</button></div>
+    <div class="rd-bar"><b>XTRATA RADIO</b><span>Free here &middot; POP OUT to pay for plays</span>
+      <a id="xa-radio-open" target="xaRadioPop" title="Open the radio in its own window: needed for paid plays and for Xverse">POP OUT &#8599;</a><button id="xa-radio-hide" type="button">HIDE</button></div>
     <iframe id="xa-radio-frame" title="Xtrata Radio" referrerpolicy="no-referrer"
       sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>
   </div>
@@ -57187,7 +57276,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
  *
  * The big screen in the middle of the hall. It shows, on one 16:9 canvas:
  *   - the Bitcoin Day clock along the top (what the old day board showed, kept intact)
- *   - LATEST SCORERS on the left (fed by the hall's own score boards, no extra reads)
+ *   - the left column alternates (fed by the hall's own score boards, no extra reads): LATEST SCORERS for 20 s, then the NUMBER ONES
+ *     (the current best score on every board, newest crown first, paged) for 40 s, then latest scorers again, then the number ones A to Z
  *   - a rotating FEATURE panel on the right (news, ads and messages from xtrata-screen-v1)
  *   - a scrolling TICKER along the bottom (short messages and news headlines)
  *
@@ -57214,6 +57304,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     rotateSecs: 12,              // one feature item at a time
     fullEvery: 3,                // every 3rd slot is a full-screen slot (when something has a picture to show)
     tickerPxPerSec: 80,
+    leftLatestSecs: 20,          // left column: latest scorers for this long ...
+    leftChampSecs: 40,           // ... then the number ones for this long (newest crown first, then the next round A to Z)
+    leftRows: 8,                 // rows on a page
     maxLive: 32,                 // the contract's live-set bound
     snapKey: 'xa-screen-snap-v1'
   };
@@ -57458,23 +57551,43 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     var segW = (W - 56 * u) / bpd;
     for (var i = 0; i < bpd; i++) { x.fillStyle = i < done ? ORANGE : i === done ? '#ffffff' : '#1d1a24'; x.fillRect(28 * u + i * segW, 80 * u, Math.max(1, segW - 1), 10 * u); }
 
-    // --- left: latest scorers
-    var lx = 28 * u, lw = 400 * u, top = 112 * u, bottom = H - 120 * u;
+    // --- left: latest scorers, alternating with the number ones (newest crown first, then A to Z)
+    var lx = 28 * u, lw = 400 * u, top = 112 * u, bottom = H - 120 * u, NR = CFG.leftRows;
+    var champs = d.champions && d.champions.length ? d.champions : null, ph0 = leftPhase(d.t || 0, !!champs), shownRows, title, sub = '';
+    var rh = (bottom - (top + 48 * u)) / NR, fade = 1;
+    if (ph0.kind === 'champs') {
+      var list = orderChampions(champs, ph0.order), pages = Math.max(1, Math.ceil(list.length / NR));
+      var pageSecs = pages > 1 ? Math.min(10, Math.max(5, CFG.leftChampSecs / pages)) : CFG.leftChampSecs, pi = Math.floor(ph0.local / pageSecs) % pages, pt = ph0.local - Math.floor(ph0.local / pageSecs) * pageSecs;
+      shownRows = list.slice(pi * NR, pi * NR + NR); title = 'NUMBER ONES';
+      sub = (ph0.order === 'new' ? 'NEWEST FIRST' : 'A TO Z') + (pages > 1 ? '  ' + (pi + 1) + '/' + pages : '');
+      if (pages > 1) fade = Math.max(0, Math.min(1, pt / .35, (pageSecs - pt) / .35));
+    } else { shownRows = (d.scorers || []).slice(0, NR); title = 'LATEST SCORERS'; }
     x.textAlign = 'left'; x.font = Math.round(28 * u) + 'px Bungee, Impact, sans-serif'; x.fillStyle = '#3be4ff'; x.shadowColor = '#3be4ff'; x.shadowBlur = 8;
-    x.fillText('LATEST SCORERS', lx, top + 24 * u); x.shadowBlur = 0;
+    x.fillText(title, lx, top + 24 * u); x.shadowBlur = 0;
+    if (sub) { x.font = Math.round(22 * u) + 'px VT323, monospace'; x.textAlign = 'right'; x.fillStyle = '#8fd3ff'; x.fillText(sub, lx + lw, top + 24 * u); x.textAlign = 'left'; }
     x.fillStyle = '#3be4ff'; x.fillRect(lx, top + 36 * u, lw, 2 * u);
-    var rows = (d.scorers || []).slice(0, 8), rh = (bottom - (top + 48 * u)) / 8;
     x.font = Math.round(26 * u) + 'px VT323, monospace';
-    if (!rows.length) {
+    if (!shownRows.length) {
       x.fillStyle = '#6f6a8f'; x.fillText('NO SCORES YET', lx, top + 48 * u + rh);
     }
-    rows.forEach(function (r, k) {
+    x.globalAlpha = fade;
+    shownRows.forEach(function (r, k) {
       var y = top + 48 * u + rh * k + rh * .72;
-      x.textAlign = 'left'; x.fillStyle = r.colour || '#3be4ff'; x.fillText(String(r.game).toUpperCase().slice(0, 13), lx, y);
+      if (ph0.kind === 'champs' && r.claimed && r.age != null && r.age < bpd) { x.fillStyle = 'rgba(57,255,136,.08)'; x.fillRect(lx - 6 * u, y - rh * .72, lw + 12 * u, rh - 2 * u); }
+      x.font = Math.round(26 * u) + 'px VT323, monospace';
+      x.textAlign = 'left'; x.fillStyle = r.claimed === false ? dim(r.colour) : (r.colour || '#3be4ff'); x.fillText(String(r.game).toUpperCase().slice(0, 13), lx, y);
+      if (r.claimed === false) {
+        x.fillStyle = '#6f6a8f'; x.fillText('NO #1 YET', lx + 172 * u, y);
+        x.textAlign = 'right'; x.fillStyle = '#ffc53d'; x.fillText('BE FIRST', lx + lw, y);
+        return;
+      }
       x.fillStyle = '#ffffff'; x.fillText(String(r.name).slice(0, 10), lx + 172 * u, y);
       x.textAlign = 'right'; x.fillStyle = '#ffc53d'; x.fillText(String(r.score), lx + lw - 56 * u, y);
-      x.fillStyle = '#6f6a8f'; x.fillText(r.age == null ? '' : ago(r.age), lx + lw, y);
+      var fresh = ph0.kind === 'champs' && r.age != null && r.age < bpd;
+      x.fillStyle = fresh ? '#39ff88' : '#6f6a8f'; x.fillText(r.age == null ? '' : ago(r.age), lx + lw, y);
+      if (fresh) { x.font = Math.round(14 * u) + 'px VT323, monospace'; x.fillStyle = '#39ff88'; x.fillText('NEW', lx + lw, y - 24 * u); }
     });
+    x.globalAlpha = 1;
 
     // --- right: feature panel
     var px = 460 * u, pw = W - px - 28 * u, py = top, ph = bottom - top;
@@ -57555,6 +57668,50 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     x.fillStyle = '#8fd3ff'; x.font = Math.round(34 * u) + 'px VT323, monospace'; x.fillText('EVERY TOP SCORE LIVES ON BITCOIN', px + pw / 2, py + ph * .82);
   }
 
+  /* ------------------------------------------------------------ the left column's rotation (pure) */
+  // Which view the left column shows at time t (seconds): latest scorers, number ones newest first, latest scorers, number ones A to Z, and round again.
+  // With no number ones to show (the boards are not read yet) it stays on the latest scorers.
+  function leftPhase(t, haveChamps) {
+    if (!haveChamps) return { kind: 'latest', order: '', local: 0 };
+    var a = CFG.leftLatestSecs, b = CFG.leftChampSecs, cyc = 2 * (a + b), u = (((Number(t) || 0) % cyc) + cyc) % cyc;
+    if (u < a) return { kind: 'latest', order: '', local: u };
+    if (u < a + b) return { kind: 'champs', order: 'new', local: u - a };
+    if (u < 2 * a + b) return { kind: 'latest', order: '', local: u - a - b };
+    return { kind: 'champs', order: 'abc', local: u - 2 * a - b };
+  }
+  // The number one on every board. \`boards\` = [{ game, variant, colour, mode, entries }]; entries is null while the hall has not read that board
+  // (skipped: not read is not the same as empty) and [] when it is read and empty (an unclaimed row, "BE FIRST"). The best score wins: the highest, or
+  // on a time board the lowest; a tie goes to the earlier one. Rows: { game, colour, name, score, age, burn, claimed }.
+  function champions(boards, height, fmt) {
+    var h = Number(height) || 0, out = [];
+    (boards || []).forEach(function (b) {
+      if (!b || !Array.isArray(b.entries)) return;
+      var label = String(b.game || '') + (b.variant ? ' ' + String(b.variant) : '');
+      if (b.variant) label = String(b.game || '').slice(0, 8) + ' ' + String(b.variant).slice(0, 4);
+      var best = null, low = b.mode === 'time';
+      b.entries.forEach(function (e) {
+        var sc = Number(e && e.score); if (!isFinite(sc)) return;
+        if (!best) { best = e; return; }
+        var bs = Number(best.score), eb = Number(e.burn) || 0, bb = Number(best.burn) || 0;
+        if (low ? sc < bs : sc > bs) best = e;
+        else if (sc === bs && eb > 0 && (bb <= 0 || eb < bb)) best = e;
+      });
+      if (!best) { out.push({ game: label, colour: b.colour, name: '', score: '', age: null, burn: 0, claimed: false }); return; }
+      var burn = Number(best.burn) || 0, age = burn > 0 && h ? Math.max(0, h - burn) : null;
+      out.push({ game: label, colour: b.colour, name: String(best.name || ''), score: fmt ? fmt(b.mode, best.score) : String(best.score), age: age, burn: burn, claimed: true });
+    });
+    return out;
+  }
+  // 'new': newest crown first, the unclaimed boards last (A to Z); 'abc': every board A to Z. Does not change the list it is given.
+  function orderChampions(rows, order) {
+    var byName = function (a, b) { return String(a.game).toLowerCase() < String(b.game).toLowerCase() ? -1 : String(a.game).toLowerCase() > String(b.game).toLowerCase() ? 1 : 0; };
+    var list = (rows || []).slice();
+    if (order === 'abc') return list.sort(byName);
+    var claimed = list.filter(function (r) { return r.claimed; }).sort(function (a, b) { return (b.burn || 0) - (a.burn || 0) || byName(a, b); });
+    return claimed.concat(list.filter(function (r) { return !r.claimed; }).sort(byName));
+  }
+  function dim(c) { return c && /^#[0-9a-f]{6}$/i.test(c) ? c + '66' : '#6f6a8f'; }
+
   /* ------------------------------------------------------------ latest scorers (pure) */
   // Builds the scorers list from the hall's board cache. \`boards\` = [{ game, colour, mode, entries:[{name,score,burn}] }].
   // Newest first. With a window (burn blocks, default 288 when omitted) entries older than it are left out; with no window (0) the newest
@@ -57582,7 +57739,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     start: start, stop: stop, refresh: refresh, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
     items: function () { return state.snap ? state.snap.items : []; },
-    paint: paint, latestScorers: latestScorers, slotAt: slotAt, sniffMedia: sniffMedia, idle: function () { tendMedia(null); }, animating: function () { return !!state.animating; },
+    paint: paint, latestScorers: latestScorers, champions: champions, orderChampions: orderChampions, leftPhase: leftPhase, slotAt: slotAt, sniffMedia: sniffMedia, idle: function () { tendMedia(null); }, animating: function () { return !!state.animating; },
     normalizeItem: normalizeItem, isActive: isActive, activeItems: activeItems, featureAt: featureAt,
     wrapText: wrapText, tickerText: tickerText, ago: ago, hasPicture: hasPicture,
     _t: { state: state, load: load, restore: restore, save: save }
@@ -57800,7 +57957,7 @@ function buildRoom(){
   XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw, pitch:player.pitch});   // read-only, for tests
   XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
   XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
-  if(window.XA_TEST) XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 };   // tests only: nothing sets XA_TEST in the shipped page
+  if(window.XA_TEST){ XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 }; XA.centreZ=()=>CENTRE_SCREEN.z }   // tests only: nothing sets XA_TEST in the shipped page
   XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests
   buildDayBoard();
 
@@ -59161,7 +59318,7 @@ function buildDayBoard(){
   for(const sx of [-1,1]){ const len=HH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
   const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.14,.025,.12), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.07); g.add(edge);
   // no collider: its bottom edge (2.25 m) is above head height, so you walk under it
-  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], scorersAt:-1e9};
+  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], champions:[], scorersAt:-1e9};
   paintDayBoard(true);
 }
 // Latest scorers: the newest top-10 entries across every board the hall has cached, whatever their age (the row shows how old), no extra reads.
@@ -59169,14 +59326,19 @@ function screenScorers(){
   const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; if(t && t.entries && t.entries.length) boards.push({game:g.title, colour:g.color, mode:b.mode, entries:t.entries}) }));
   return window.XAScreen ? XAScreen.latestScorers(boards, chain.height, 0, fmtBoard, 8) : [];
 }
+// The number one on every board, from the same cache: a board not read yet is left out, a board read and empty is "NO #1 YET".
+function screenChampions(){
+  const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; boards.push({game:g.title, variant:b.label==='TOP 10' ? '' : String(b.label).replace(/ TOP 10$/,''), colour:g.color, mode:b.mode, entries:t && Array.isArray(t.entries) ? t.entries : null}) }));
+  return window.XAScreen && XAScreen.champions ? XAScreen.champions(boards, chain.height, fmtBoard) : [];
+}
 function paintDayBoard(force){
   if(!dayBoard || chain.day<0) return;
   const now=performance.now();
   const gap=(window.XAScreen && XAScreen.animating && XAScreen.animating()) ? CENTRE_SCREEN.animGapMs : CENTRE_SCREEN.gapMs;   // a GIF or clip on show repaints at about 25 fps
   if(!force && now-dayBoard.last<gap) return;
   dayBoard.last=now;
-  if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } }
-  const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers,
+  if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } try{ dayBoard.champions=screenChampions() }catch(e){ dayBoard.champions=[] } }
+  const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers, champions:dayBoard.champions,
            items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.height)   /* estimated height when the node is down, so a cached snapshot still expires */ : []};
   if(window.XAScreen) XAScreen.paint(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);
   else paintPlainClock(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);   // a release without screen.js: just the day clock
@@ -59297,23 +59459,28 @@ $('chainp').addEventListener('click', e=>{ if(e.target===$('chainp')) closeChain
    you close it, never taken down, so an album keeps playing while you walk, play a game or go through a door. Nothing here touches money or
    keys: the radio app does all of that in its own page. A room cannot see or reach this panel (rooms run in their own sandboxed frames).
    ================================================================ */
-const RADIO_URL='https://radio.xtrata.xyz/radio';
-let radioOpen=false, radioLoaded=false;
+// The radio page the panel and the pop-out window show. ?dock=1 asks the radio for its compact one-screen layout (the standard radio
+// page is untouched without it). A branch preview (*.pages.dev) shows that branch's own radio page so a change can be seen before it ships.
+const RADIO_BASE=/\\.pages\\.dev$/.test(location.hostname) ? location.protocol+'//'+location.host : 'https://radio.xtrata.xyz';
+const RADIO_URL=RADIO_BASE+'/radio?dock=1';
+let radioOpen=false, radioLoaded=false, radioPop=null;
+function radioPopAlive(){ try{ return !!(radioPop && !radioPop.closed) }catch(e){ return false } }
 function radioPaint(){   // the button is there while you can walk or are in a room; games take the whole screen, so it steps aside (the music goes on)
   const b=$('xa-radio-btn'); if(!b) return;
   const show=(state==='walk' || state==='room') && !chainOpen;
   if(b.hidden===show) b.hidden=!show;
-  b.classList.toggle('on',radioOpen);
+  b.classList.toggle('on',radioOpen || radioPopAlive());
 }
 function radioShow(){
   if(radioOpen || chainOpen) return;
+  if(radioPopAlive()){ try{ radioPop.focus() }catch(e){} return }   // the radio is playing in its own window: bring that forward instead of starting a second one
   radioOpen=true;
   if(document.pointerLockElement) document.exitPointerLock();
   for(const k in keys) keys[k]=false;
   const f=$('xa-radio-frame'), box=$('xa-radio');
   if(!radioLoaded){   // the radio is loaded the first time it is asked for, not when the hall starts
-    radioLoaded=true; $('xa-radio-open').href=RADIO_URL;
-    f.setAttribute('allow','autoplay; fullscreen; clipboard-write; publickey-credentials-get https://radio.xtrata.xyz; publickey-credentials-create https://radio.xtrata.xyz');   // passkeys, to the radio's origin only (set with the address, so the empty frame does not name an origin it is not on)
+    radioLoaded=true;
+    f.setAttribute('allow','autoplay; fullscreen; clipboard-write; publickey-credentials-get '+RADIO_BASE+'; publickey-credentials-create '+RADIO_BASE);   // passkeys, to the radio's origin only (set with the address, so the empty frame does not name an origin it is not on)
     f.src=RADIO_URL;
     try{ if(Room.isOn()){ Room.toggle(); paintRoom() } }catch(e){}   // the machines' own music steps aside for the radio (the music button brings it back)
   }
@@ -59327,12 +59494,23 @@ function radioHide(){
   try{ document.activeElement && document.activeElement.blur && document.activeElement.blur() }catch(e){}
   radioPaint(); if(state==='walk') tryLock(); else if(state==='room' && roomUI && roomUI.frame){ try{ roomUI.frame.focus() }catch(e){} }
 }
+// Pop out: the radio in its own small window (a top-level page, so both wallets and the listening wallet's passkey work and paid plays count).
+// One radio at a time: the panel's copy is taken down; the RADIO button then brings the pop-out forward. If the browser blocks the window,
+// the link opens a new tab as it would anyway and the panel stays.
+$('xa-radio-open').href=RADIO_URL;
+$('xa-radio-open').addEventListener('click', e=>{
+  let w=null; try{ w=window.open(RADIO_URL,'xaRadioPop','popup=yes,width=440,height=760') }catch(err){}
+  if(!w) return;
+  e.preventDefault(); radioPop=w; try{ w.focus() }catch(err){}
+  const f=$('xa-radio-frame'); f.removeAttribute('src'); f.removeAttribute('allow'); radioLoaded=false;
+  radioHide(); radioPaint();
+});
 $('xa-radio-btn').addEventListener('click', ()=>{ initAudio(); radioOpen ? radioHide() : radioShow() });
 $('xa-radio-hide').addEventListener('click', radioHide);
 $('xa-radio').addEventListener('click', e=>{ if(e.target===$('xa-radio')) radioHide() });
 addEventListener('keydown', e=>{ if(radioOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); radioHide() } }, true);
 setInterval(radioPaint, 400);   // (not called here: \`state\` is declared further down)
-if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.hallState=()=>state;   // tests only
+if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.exitGame=()=>exitGame(), XA.hallState=()=>state;   // tests only
 if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:$('xa-radio-frame').getAttribute('src'), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow')});   // read-only, for tests
 /* ================================================================
    CABINETS \u2014 one generator, ten configs
@@ -60594,7 +60772,7 @@ fontsReady.then(()=>{
 </script>
 </body>
 </html>
-`, singleSha: "b0509a574544f0d32d1e8f31ae7988216b894a915abd4e8f27d8516b52c0a014", equivalentParents: [] }, releaseSha: "6aac3703a1fb24ea56a190d50a8deb960db4fc289d975fbe7387e2c0a334f8f6", networks: { mainnet: { root: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", treasury: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", core: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3", posterPublishers: [], hallPublisher: null, screenFeeRecipient: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", gamesDelay: 6, lockGamesDelay: true, parents: [55], bundleId: 3078, canDeployCore: false }, testnet: { root: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", treasury: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", core: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J.xtrata-v3-2-3", posterPublishers: [], hallPublisher: null, screenFeeRecipient: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", gamesDelay: 6, lockGamesDelay: false, parents: "stand-in", bundleId: "by-hash", canDeployCore: true } }, contracts: { mainnet: { "xtrata-posters-v1": ';; xtrata-posters-v1\n;;\n;; Poster registry for the Xtrata Arcade (and later rooms). Room-agnostic.\n;;\n;; - Append-only poster records. Hidden is the only way to take one down; history stays.\n;; - The hall computes the wall itself (deterministic rotation) from the pool this\n;;   contract serves: it reads `get-version`, then `get-live` + `get-posters`.\n;; - Bounded live set: at most 64 poster ids are "live" (not expired, not hidden), so the\n;;   hall\'s load cost does not grow with history. Older posters stay readable by id.\n;; - Start days are always in the future (day = burn-block-height / 144), so everyone\n;;   sees the same pool for a given day. Admin pins are the one immediate path.\n;; - Publishers (whitelist) add `community` posters within contract-enforced caps.\n;;   Only admin can place `core` posters, evergreen, pins, or suppress embedded posters.\n;; - Review lane: when on, publisher posters start hidden until admin releases them.\n;; - Instant stop: set-publisher off, set-hidden, or set-paused.\n;; - Successor pointer with a one-way lock; the read interface is frozen at v1.\n;;\n;; Kind values:   0 template, 1 image, 2 sheet, 3 live (art = binding key)\n;; Set values:    0 core, 1 community\n;; Action values: 0 none, 1 play inscription (act-id), 2 allowlisted path (act-text),\n;;                3 play playlist inscription (act-id)\n\n(define-constant ERR-NOT-AUTHORIZED (err u100))\n(define-constant ERR-PAUSED         (err u101))\n(define-constant ERR-NOT-FOUND      (err u102))\n(define-constant ERR-INVALID        (err u103))\n(define-constant ERR-WINDOW         (err u104))\n(define-constant ERR-WEIGHT         (err u105))\n(define-constant ERR-INSCRIPTION    (err u106))\n(define-constant ERR-CAP-DAY        (err u107))\n(define-constant ERR-CAP-LIVE       (err u108))\n(define-constant ERR-GAP            (err u109))\n(define-constant ERR-LIVE-FULL      (err u110))\n(define-constant ERR-NO-PENDING     (err u111))\n(define-constant ERR-LOCKED         (err u112))\n(define-constant ERR-PIN-FULL       (err u113))\n(define-constant ERR-SUPPRESS-FULL  (err u114))\n\n(define-constant DAY-BLOCKS u144)\n(define-constant MAX-LIVE u64)\n(define-constant MAX-COMMUNITY-LIVE u48)\n(define-constant MAX-WEIGHT-CORE u100)\n(define-constant MAX-WEIGHT-COMMUNITY u20)\n(define-constant MAX-SPAN-DAYS u3650)\n(define-constant MAX-IMAGE-BYTES u131072)\n(define-constant MAX-SHEET-BYTES u307200)\n(define-constant MAX-GENESIS-INDEX u159)\n\n(define-data-var admin principal tx-sender)\n(define-data-var pending-admin (optional principal) none)\n(define-data-var paused bool false)\n(define-data-var version uint u0)\n(define-data-var count uint u0)\n(define-data-var review-lane bool false)\n(define-data-var cap-per-day uint u24)\n(define-data-var cap-live-per-publisher uint u12)\n(define-data-var min-gap uint u1)\n(define-data-var successor (optional principal) none)\n(define-data-var successor-locked bool false)\n(define-data-var live (list 64 uint) (list))\n(define-data-var suppressed (list 160 uint) (list))\n\n;; scratch values used by filter/fold helpers (always set just before use)\n(define-data-var scratch-day uint u0)\n(define-data-var scratch-id uint u0)\n(define-data-var scratch-who principal tx-sender)\n\n(define-map Publishers principal bool)\n(define-map LastWrite principal uint)\n(define-map DayCount { who: principal, day: uint } uint)\n\n(define-map Posters uint\n  {\n    owner: principal,\n    set: uint,\n    kind: uint,\n    head: (string-ascii 48),\n    sub: (string-ascii 140),\n    foot: (string-ascii 32),\n    colour: (string-ascii 12),\n    art: (string-ascii 24),\n    image-id: uint,\n    image-hash: (buff 32),\n    image-size: uint,\n    cols: uint,\n    frames: uint,\n    fps: uint,\n    act-kind: uint,\n    act-id: uint,\n    act-text: (string-ascii 64),\n    weight: uint,\n    start-day: uint,\n    end-day: uint,\n    scope: (list 8 (string-ascii 24)),\n    hidden: bool,\n    evergreen: bool,\n    payout: (optional principal),\n    added-at: uint\n  })\n\n(define-map Pins (string-ascii 24)\n  (list 32 { spot: uint, poster: uint, from-day: uint, to-day: uint }))   ;; 32 pins: more than the hall has wall slots (27), so every poster can be programmed\n\n;; ---------------------------------------------------------------------------\n;; Helpers\n\n(define-private (caller-is (who principal))\n  (and (is-eq tx-sender who) (is-eq contract-caller who)))\n\n(define-private (is-admin) (caller-is (var-get admin)))\n\n(define-private (can-publish)\n  (or (is-admin) (and (caller-is tx-sender) (default-to false (map-get? Publishers tx-sender)))))\n\n(define-private (today) (/ burn-block-height DAY-BLOCKS))\n\n(define-private (bump)\n  (begin (var-set version (+ (var-get version) u1)) (var-get version)))\n\n(define-private (note (event (string-ascii 24)) (id uint))\n  (print { event: event, id: id, version: (bump) }))\n\n(define-private (inscription-ok? (id uint) (hash (buff 32)) (size uint) (who principal))\n  (and\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 inscription-exists id) (ok true)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 is-inscription-sealed id) (some true)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-hash id) (some hash)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-size id) (some size)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-creator id) (some who)) ;; @principal core\n  ))\n\n;; live-set filters (read scratch vars)\n(define-private (alive? (id uint))\n  (match (map-get? Posters id)\n    p (and (not (get hidden p))\n           (or (get evergreen p) (> (get end-day p) (var-get scratch-day))))\n    false))\n\n(define-private (not-scratch-id? (id uint)) (not (is-eq id (var-get scratch-id))))\n\n(define-private (owned-live-step (id uint) (n uint))\n  (match (map-get? Posters id)\n    p (if (is-eq (get owner p) (var-get scratch-who)) (+ n u1) n)\n    n))\n\n(define-private (community-step (id uint) (n uint))\n  (match (map-get? Posters id)\n    p (if (is-eq (get set p) u1) (+ n u1) n)\n    n))\n\n;; Prunes expired/hidden ids, then appends `id`. Errors if the set is full, or if a\n;; community poster would take the community share (48 of 64) past its limit.\n(define-private (live-add (id uint))\n  (begin\n    (var-set scratch-day (today))\n    (let ((kept (filter alive? (var-get live))))\n      (if (is-some (index-of? kept id))\n        (ok (var-set live kept))\n        (match (if (and (is-eq (get set (unwrap! (map-get? Posters id) ERR-NOT-FOUND)) u1)\n                        (>= (fold community-step kept u0) MAX-COMMUNITY-LIVE))\n                 none\n                 (as-max-len? (append kept id) u64))\n          next (ok (var-set live next))\n          ERR-LIVE-FULL)))))\n\n(define-private (live-remove (id uint))\n  (begin\n    (var-set scratch-id id)\n    (var-set live (filter not-scratch-id? (var-get live)))))\n\n(define-private (check-weight (set uint) (weight uint))\n  (and (>= weight u1)\n       (<= weight (if (is-eq set u0) MAX-WEIGHT-CORE MAX-WEIGHT-COMMUNITY))))\n\n;; ---------------------------------------------------------------------------\n;; Adding posters\n\n(define-private (add-one\n  (p {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  })\n  (acc (response uint uint)))\n  (match acc\n    n\n      (let (\n        (admin? (is-admin))\n        (day (today))\n        (id (var-get count))\n        (kind (get kind p))\n        (set (get set p))\n        (hidden (and (not admin?) (var-get review-lane)))\n        (day-key { who: tx-sender, day: day })\n        (used (default-to u0 (map-get? DayCount day-key))))\n        (asserts! (<= kind u3) ERR-INVALID)\n        (asserts! (<= set u1) ERR-INVALID)\n        (asserts! (or admin? (and (is-eq set u1) (not (get evergreen p)))) ERR-NOT-AUTHORIZED)\n        (asserts! (>= (len (get head p)) u1) ERR-INVALID)\n        (asserts! (<= (get act-kind p) u3) ERR-INVALID)\n        (asserts! (check-weight set (get weight p)) ERR-WEIGHT)\n        (asserts! (and (> (get start-day p) day)\n                       (> (get end-day p) (get start-day p))\n                       (<= (- (get end-day p) (get start-day p)) MAX-SPAN-DAYS)) ERR-WINDOW)\n        (asserts! (or (not (is-eq kind u3)) (> (len (get art p)) u0)) ERR-INVALID)\n        (if (or (is-eq kind u1) (is-eq kind u2))\n          (begin\n            (asserts! (<= (get image-size p) (if (is-eq kind u1) MAX-IMAGE-BYTES MAX-SHEET-BYTES)) ERR-INSCRIPTION)\n            (asserts! (inscription-ok? (get image-id p) (get image-hash p) (get image-size p) tx-sender) ERR-INSCRIPTION)\n            (asserts! (or (is-eq kind u1)\n                          (and (> (get cols p) u0) (> (get frames p) u0) (<= (get frames p) u64)\n                               (> (get fps p) u0) (<= (get fps p) u30))) ERR-INVALID)\n            true)\n          true)\n        (if admin?\n          true\n          (begin\n            (asserts! (< used (var-get cap-per-day)) ERR-CAP-DAY)\n            (var-set scratch-who tx-sender)\n            (var-set scratch-day day)\n            (asserts! (or hidden\n                          (< (fold owned-live-step (filter alive? (var-get live)) u0)\n                             (var-get cap-live-per-publisher))) ERR-CAP-LIVE)\n            (map-set DayCount day-key (+ used u1))\n            true))\n        (map-set Posters id {\n          owner: tx-sender, set: set, kind: kind,\n          head: (get head p), sub: (get sub p), foot: (get foot p),\n          colour: (get colour p), art: (get art p),\n          image-id: (get image-id p), image-hash: (get image-hash p), image-size: (get image-size p),\n          cols: (get cols p), frames: (get frames p), fps: (get fps p),\n          act-kind: (get act-kind p), act-id: (get act-id p), act-text: (get act-text p),\n          weight: (get weight p), start-day: (get start-day p), end-day: (get end-day p),\n          scope: (get scope p), hidden: hidden, evergreen: (get evergreen p),\n          payout: (get payout p), added-at: stacks-block-height })\n        (var-set count (+ id u1))\n        (if hidden true (begin (try! (live-add id)) true))\n        (note "poster-added" id)\n        (ok (+ n u1)))\n    e (err e)))\n\n(define-private (write-gate)\n  (begin\n    (asserts! (not (var-get paused)) ERR-PAUSED)\n    (asserts! (can-publish) ERR-NOT-AUTHORIZED)\n    (if (is-admin)\n      true\n      (begin\n        (asserts! (match (map-get? LastWrite tx-sender) last (>= burn-block-height (+ last (var-get min-gap))) true) ERR-GAP)\n        (map-set LastWrite tx-sender burn-block-height)\n        true))\n    (ok true)))\n\n(define-public (add-poster\n  (p {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  }))\n  (begin\n    (try! (write-gate))\n    (try! (add-one p (ok u0)))\n    (ok (- (var-get count) u1))))\n\n(define-public (add-posters\n  (ps (list 10 {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  })))\n  (begin\n    (try! (write-gate))\n    (fold add-one ps (ok u0))))\n\n;; ---------------------------------------------------------------------------\n;; Changing posters (never edits content)\n\n(define-private (unhide-one (id uint) (acc (response bool uint)))\n  (match acc\n    ok-v\n      (match (map-get? Posters id)\n        p (begin\n            (map-set Posters id (merge p { hidden: false }))\n            (var-set scratch-day (today))\n            (if (or (get evergreen p) (> (get end-day p) (today)))\n              (try! (live-add id))\n              true)\n            (ok true))\n        ERR-NOT-FOUND)\n    e (err e)))\n\n(define-private (refresh-live (id uint))\n  (match (map-get? Posters id)\n    p (if (and (not (get hidden p)) (or (get evergreen p) (> (get end-day p) (today))))\n        (begin (var-set scratch-day (today)) (live-add id))\n        (ok true))\n    ERR-NOT-FOUND))\n\n(define-public (set-hidden (id uint) (hidden bool))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (or (is-admin) (and hidden (is-eq tx-sender (get owner p)))) ERR-NOT-AUTHORIZED)\n    (if hidden\n      (begin\n        (map-set Posters id (merge p { hidden: true }))\n        (live-remove id)\n        (note "poster-hidden" id)\n        (ok true))\n      (begin\n        (try! (unhide-one id (ok true)))\n        (note "poster-released" id)\n        (ok true)))))\n\n;; Review lane: release a batch of hidden posters.\n(define-public (release-posters (ids (list 20 uint)))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (try! (fold unhide-one ids (ok true)))\n    (print { event: "posters-released", count: (len ids), version: (bump) })\n    (ok true)))\n\n(define-public (set-weight (id uint) (weight uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (check-weight (get set p) weight) ERR-WEIGHT)\n    (map-set Posters id (merge p { weight: weight }))\n    (note "poster-weight" id)\n    (ok true)))\n\n;; Window changes: end-day may always move (but stays after today); start-day only\n;; while the poster has not started, and only to a future day.\n(define-public (set-window (id uint) (start-day uint) (end-day uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)) (day (today)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (and (> end-day start-day) (> end-day day)\n                   (<= (- end-day start-day) MAX-SPAN-DAYS)) ERR-WINDOW)\n    (asserts! (or (is-eq start-day (get start-day p))\n                  (and (> (get start-day p) day) (> start-day day))) ERR-WINDOW)\n    (map-set Posters id (merge p { start-day: start-day, end-day: end-day }))\n    (try! (refresh-live id))\n    (note "poster-window" id)\n    (ok true)))\n\n(define-public (set-set (id uint) (set uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (<= set u1) ERR-INVALID)\n    (asserts! (check-weight set (get weight p)) ERR-WEIGHT)\n    (map-set Posters id (merge p { set: set }))\n    (note "poster-set" id)\n    (ok true)))\n\n(define-public (set-evergreen (id uint) (evergreen bool))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (map-set Posters id (merge p { evergreen: evergreen }))\n    (try! (refresh-live id))\n    (note "poster-evergreen" id)\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Pins (admin only; the one immediate path)\n\n(define-private (pin-keep? (pin { spot: uint, poster: uint, from-day: uint, to-day: uint }))\n  (and (>= (get to-day pin) (var-get scratch-day))\n       (not (is-eq (get spot pin) (var-get scratch-id)))))\n\n(define-public (set-pin (room (string-ascii 24)) (spot uint) (poster uint) (from-day uint) (to-day uint))\n  (let ((kept (begin\n                (var-set scratch-day (today))\n                (var-set scratch-id spot)\n                (filter pin-keep? (default-to (list) (map-get? Pins room))))))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (is-some (map-get? Posters poster)) ERR-NOT-FOUND)\n    (asserts! (and (>= to-day from-day) (>= to-day (today))) ERR-WINDOW)\n    (map-set Pins room\n      (unwrap! (as-max-len? (append kept { spot: spot, poster: poster, from-day: from-day, to-day: to-day }) u32)\n               ERR-PIN-FULL))\n    (print { event: "pin-set", room: room, spot: spot, poster: poster, from-day: from-day, to-day: to-day, version: (bump) })\n    (ok true)))\n\n(define-public (clear-pin (room (string-ascii 24)) (spot uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set scratch-day u0)\n    (var-set scratch-id spot)\n    (map-set Pins room (filter pin-keep? (default-to (list) (map-get? Pins room))))\n    (print { event: "pin-cleared", room: room, spot: spot, version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Suppressing embedded (genesis) posters by index\n\n(define-private (not-scratch-idx? (i uint)) (not (is-eq i (var-get scratch-id))))\n\n(define-public (suppress-genesis (idx uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (<= idx MAX-GENESIS-INDEX) ERR-INVALID)\n    (if (is-some (index-of? (var-get suppressed) idx))\n      (ok true)\n      (begin\n        (var-set suppressed (unwrap! (as-max-len? (append (var-get suppressed) idx) u160) ERR-SUPPRESS-FULL))\n        (print { event: "genesis-suppressed", idx: idx, version: (bump) })\n        (ok true)))))\n\n(define-public (unsuppress-genesis (idx uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set scratch-id idx)\n    (var-set suppressed (filter not-scratch-idx? (var-get suppressed)))\n    (print { event: "genesis-unsuppressed", idx: idx, version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Roles, caps, pause, hand-over, successor\n\n(define-public (set-publisher (who principal) (allowed bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (map-set Publishers who allowed)\n    (print { event: "publisher", who: who, allowed: allowed, version: (bump) })\n    (ok true)))\n\n(define-public (set-review-lane (on bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set review-lane on)\n    (print { event: "review-lane", on: on, version: (bump) })\n    (ok true)))\n\n(define-public (set-caps (per-day uint) (live-per-publisher uint) (gap uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (and (<= per-day u100) (<= live-per-publisher MAX-LIVE) (<= gap u144)) ERR-INVALID)\n    (var-set cap-per-day per-day)\n    (var-set cap-live-per-publisher live-per-publisher)\n    (var-set min-gap gap)\n    (print { event: "caps", per-day: per-day, live-per-publisher: live-per-publisher, gap: gap, version: (bump) })\n    (ok true)))\n\n(define-public (set-paused (value bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set paused value)\n    (print { event: "paused", value: value, version: (bump) })\n    (ok true)))\n\n(define-public (propose-admin (who principal))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set pending-admin (some who))\n    (ok true)))\n\n(define-public (accept-admin)\n  (let ((pending (unwrap! (var-get pending-admin) ERR-NO-PENDING)))\n    (asserts! (is-eq tx-sender pending) ERR-NOT-AUTHORIZED)\n    (var-set admin pending)\n    (var-set pending-admin none)\n    (print { event: "admin", who: pending, version: (bump) })\n    (ok true)))\n\n(define-public (set-successor (who (optional principal)))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (not (var-get successor-locked)) ERR-LOCKED)\n    (var-set successor who)\n    (print { event: "successor", who: who, version: (bump) })\n    (ok true)))\n\n(define-public (lock-successor)\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set successor-locked true)\n    (print { event: "successor-locked", version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Reads (frozen at v1: add new reads as new functions, never change these)\n\n(define-read-only (get-version) (var-get version))\n(define-read-only (get-count) (var-get count))\n(define-read-only (get-today) (today))\n(define-read-only (get-poster (id uint)) (map-get? Posters id))\n(define-read-only (get-posters (ids (list 10 uint))) (map get-poster ids))\n(define-read-only (get-page (start uint))\n  (map get-poster (list start (+ start u1) (+ start u2) (+ start u3) (+ start u4)\n                        (+ start u5) (+ start u6) (+ start u7) (+ start u8) (+ start u9))))\n(define-read-only (get-live) (var-get live))\n(define-read-only (get-pins (room (string-ascii 24))) (default-to (list) (map-get? Pins room)))\n(define-read-only (get-suppressed) (var-get suppressed))\n(define-read-only (get-successor) { successor: (var-get successor), locked: (var-get successor-locked) })\n(define-read-only (is-publisher (who principal)) (default-to false (map-get? Publishers who)))\n(define-read-only (get-config)\n  { admin: (var-get admin), pending-admin: (var-get pending-admin), paused: (var-get paused),\n    review-lane: (var-get review-lane), cap-per-day: (var-get cap-per-day),\n    cap-live-per-publisher: (var-get cap-live-per-publisher), min-gap: (var-get min-gap) })\n', "xtrata-world-v2": `;; xtrata-world-v2  (Xtrata World Standard XWS v1, "xws-1")
+`, singleSha: "06ee03ca2d020fc3d46f47a449a1eab27fceb8804ad79c6548ea36f507c1697d", equivalentParents: [] }, releaseSha: "3231908dfa36c13411f5ecf64dadaf9e121fc037f6adf54c2798b12a94f4d0a5", networks: { mainnet: { root: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", treasury: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", core: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3", posterPublishers: [], hallPublisher: null, screenFeeRecipient: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", gamesDelay: 6, lockGamesDelay: true, parents: [55], bundleId: 3078, canDeployCore: false }, testnet: { root: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", treasury: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", core: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J.xtrata-v3-2-3", posterPublishers: [], hallPublisher: null, screenFeeRecipient: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", gamesDelay: 6, lockGamesDelay: false, parents: "stand-in", bundleId: "by-hash", canDeployCore: true } }, contracts: { mainnet: { "xtrata-posters-v1": ';; xtrata-posters-v1\n;;\n;; Poster registry for the Xtrata Arcade (and later rooms). Room-agnostic.\n;;\n;; - Append-only poster records. Hidden is the only way to take one down; history stays.\n;; - The hall computes the wall itself (deterministic rotation) from the pool this\n;;   contract serves: it reads `get-version`, then `get-live` + `get-posters`.\n;; - Bounded live set: at most 64 poster ids are "live" (not expired, not hidden), so the\n;;   hall\'s load cost does not grow with history. Older posters stay readable by id.\n;; - Start days are always in the future (day = burn-block-height / 144), so everyone\n;;   sees the same pool for a given day. Admin pins are the one immediate path.\n;; - Publishers (whitelist) add `community` posters within contract-enforced caps.\n;;   Only admin can place `core` posters, evergreen, pins, or suppress embedded posters.\n;; - Review lane: when on, publisher posters start hidden until admin releases them.\n;; - Instant stop: set-publisher off, set-hidden, or set-paused.\n;; - Successor pointer with a one-way lock; the read interface is frozen at v1.\n;;\n;; Kind values:   0 template, 1 image, 2 sheet, 3 live (art = binding key)\n;; Set values:    0 core, 1 community\n;; Action values: 0 none, 1 play inscription (act-id), 2 allowlisted path (act-text),\n;;                3 play playlist inscription (act-id)\n\n(define-constant ERR-NOT-AUTHORIZED (err u100))\n(define-constant ERR-PAUSED         (err u101))\n(define-constant ERR-NOT-FOUND      (err u102))\n(define-constant ERR-INVALID        (err u103))\n(define-constant ERR-WINDOW         (err u104))\n(define-constant ERR-WEIGHT         (err u105))\n(define-constant ERR-INSCRIPTION    (err u106))\n(define-constant ERR-CAP-DAY        (err u107))\n(define-constant ERR-CAP-LIVE       (err u108))\n(define-constant ERR-GAP            (err u109))\n(define-constant ERR-LIVE-FULL      (err u110))\n(define-constant ERR-NO-PENDING     (err u111))\n(define-constant ERR-LOCKED         (err u112))\n(define-constant ERR-PIN-FULL       (err u113))\n(define-constant ERR-SUPPRESS-FULL  (err u114))\n\n(define-constant DAY-BLOCKS u144)\n(define-constant MAX-LIVE u64)\n(define-constant MAX-COMMUNITY-LIVE u48)\n(define-constant MAX-WEIGHT-CORE u100)\n(define-constant MAX-WEIGHT-COMMUNITY u20)\n(define-constant MAX-SPAN-DAYS u3650)\n(define-constant MAX-IMAGE-BYTES u131072)\n(define-constant MAX-SHEET-BYTES u307200)\n(define-constant MAX-GENESIS-INDEX u159)\n\n(define-data-var admin principal tx-sender)\n(define-data-var pending-admin (optional principal) none)\n(define-data-var paused bool false)\n(define-data-var version uint u0)\n(define-data-var count uint u0)\n(define-data-var review-lane bool false)\n(define-data-var cap-per-day uint u24)\n(define-data-var cap-live-per-publisher uint u12)\n(define-data-var min-gap uint u1)\n(define-data-var successor (optional principal) none)\n(define-data-var successor-locked bool false)\n(define-data-var live (list 64 uint) (list))\n(define-data-var suppressed (list 160 uint) (list))\n\n;; scratch values used by filter/fold helpers (always set just before use)\n(define-data-var scratch-day uint u0)\n(define-data-var scratch-id uint u0)\n(define-data-var scratch-who principal tx-sender)\n\n(define-map Publishers principal bool)\n(define-map LastWrite principal uint)\n(define-map DayCount { who: principal, day: uint } uint)\n\n(define-map Posters uint\n  {\n    owner: principal,\n    set: uint,\n    kind: uint,\n    head: (string-ascii 48),\n    sub: (string-ascii 140),\n    foot: (string-ascii 32),\n    colour: (string-ascii 12),\n    art: (string-ascii 24),\n    image-id: uint,\n    image-hash: (buff 32),\n    image-size: uint,\n    cols: uint,\n    frames: uint,\n    fps: uint,\n    act-kind: uint,\n    act-id: uint,\n    act-text: (string-ascii 64),\n    weight: uint,\n    start-day: uint,\n    end-day: uint,\n    scope: (list 8 (string-ascii 24)),\n    hidden: bool,\n    evergreen: bool,\n    payout: (optional principal),\n    added-at: uint\n  })\n\n(define-map Pins (string-ascii 24)\n  (list 32 { spot: uint, poster: uint, from-day: uint, to-day: uint }))   ;; 32 pins: more than the hall has wall slots (27), so every poster can be programmed\n\n;; ---------------------------------------------------------------------------\n;; Helpers\n\n(define-private (caller-is (who principal))\n  (and (is-eq tx-sender who) (is-eq contract-caller who)))\n\n(define-private (is-admin) (caller-is (var-get admin)))\n\n(define-private (can-publish)\n  (or (is-admin) (and (caller-is tx-sender) (default-to false (map-get? Publishers tx-sender)))))\n\n(define-private (today) (/ burn-block-height DAY-BLOCKS))\n\n(define-private (bump)\n  (begin (var-set version (+ (var-get version) u1)) (var-get version)))\n\n(define-private (note (event (string-ascii 24)) (id uint))\n  (print { event: event, id: id, version: (bump) }))\n\n(define-private (inscription-ok? (id uint) (hash (buff 32)) (size uint) (who principal))\n  (and\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 inscription-exists id) (ok true)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 is-inscription-sealed id) (some true)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-hash id) (some hash)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-size id) (some size)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-creator id) (some who)) ;; @principal core\n  ))\n\n;; live-set filters (read scratch vars)\n(define-private (alive? (id uint))\n  (match (map-get? Posters id)\n    p (and (not (get hidden p))\n           (or (get evergreen p) (> (get end-day p) (var-get scratch-day))))\n    false))\n\n(define-private (not-scratch-id? (id uint)) (not (is-eq id (var-get scratch-id))))\n\n(define-private (owned-live-step (id uint) (n uint))\n  (match (map-get? Posters id)\n    p (if (is-eq (get owner p) (var-get scratch-who)) (+ n u1) n)\n    n))\n\n(define-private (community-step (id uint) (n uint))\n  (match (map-get? Posters id)\n    p (if (is-eq (get set p) u1) (+ n u1) n)\n    n))\n\n;; Prunes expired/hidden ids, then appends `id`. Errors if the set is full, or if a\n;; community poster would take the community share (48 of 64) past its limit.\n(define-private (live-add (id uint))\n  (begin\n    (var-set scratch-day (today))\n    (let ((kept (filter alive? (var-get live))))\n      (if (is-some (index-of? kept id))\n        (ok (var-set live kept))\n        (match (if (and (is-eq (get set (unwrap! (map-get? Posters id) ERR-NOT-FOUND)) u1)\n                        (>= (fold community-step kept u0) MAX-COMMUNITY-LIVE))\n                 none\n                 (as-max-len? (append kept id) u64))\n          next (ok (var-set live next))\n          ERR-LIVE-FULL)))))\n\n(define-private (live-remove (id uint))\n  (begin\n    (var-set scratch-id id)\n    (var-set live (filter not-scratch-id? (var-get live)))))\n\n(define-private (check-weight (set uint) (weight uint))\n  (and (>= weight u1)\n       (<= weight (if (is-eq set u0) MAX-WEIGHT-CORE MAX-WEIGHT-COMMUNITY))))\n\n;; ---------------------------------------------------------------------------\n;; Adding posters\n\n(define-private (add-one\n  (p {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  })\n  (acc (response uint uint)))\n  (match acc\n    n\n      (let (\n        (admin? (is-admin))\n        (day (today))\n        (id (var-get count))\n        (kind (get kind p))\n        (set (get set p))\n        (hidden (and (not admin?) (var-get review-lane)))\n        (day-key { who: tx-sender, day: day })\n        (used (default-to u0 (map-get? DayCount day-key))))\n        (asserts! (<= kind u3) ERR-INVALID)\n        (asserts! (<= set u1) ERR-INVALID)\n        (asserts! (or admin? (and (is-eq set u1) (not (get evergreen p)))) ERR-NOT-AUTHORIZED)\n        (asserts! (>= (len (get head p)) u1) ERR-INVALID)\n        (asserts! (<= (get act-kind p) u3) ERR-INVALID)\n        (asserts! (check-weight set (get weight p)) ERR-WEIGHT)\n        (asserts! (and (> (get start-day p) day)\n                       (> (get end-day p) (get start-day p))\n                       (<= (- (get end-day p) (get start-day p)) MAX-SPAN-DAYS)) ERR-WINDOW)\n        (asserts! (or (not (is-eq kind u3)) (> (len (get art p)) u0)) ERR-INVALID)\n        (if (or (is-eq kind u1) (is-eq kind u2))\n          (begin\n            (asserts! (<= (get image-size p) (if (is-eq kind u1) MAX-IMAGE-BYTES MAX-SHEET-BYTES)) ERR-INSCRIPTION)\n            (asserts! (inscription-ok? (get image-id p) (get image-hash p) (get image-size p) tx-sender) ERR-INSCRIPTION)\n            (asserts! (or (is-eq kind u1)\n                          (and (> (get cols p) u0) (> (get frames p) u0) (<= (get frames p) u64)\n                               (> (get fps p) u0) (<= (get fps p) u30))) ERR-INVALID)\n            true)\n          true)\n        (if admin?\n          true\n          (begin\n            (asserts! (< used (var-get cap-per-day)) ERR-CAP-DAY)\n            (var-set scratch-who tx-sender)\n            (var-set scratch-day day)\n            (asserts! (or hidden\n                          (< (fold owned-live-step (filter alive? (var-get live)) u0)\n                             (var-get cap-live-per-publisher))) ERR-CAP-LIVE)\n            (map-set DayCount day-key (+ used u1))\n            true))\n        (map-set Posters id {\n          owner: tx-sender, set: set, kind: kind,\n          head: (get head p), sub: (get sub p), foot: (get foot p),\n          colour: (get colour p), art: (get art p),\n          image-id: (get image-id p), image-hash: (get image-hash p), image-size: (get image-size p),\n          cols: (get cols p), frames: (get frames p), fps: (get fps p),\n          act-kind: (get act-kind p), act-id: (get act-id p), act-text: (get act-text p),\n          weight: (get weight p), start-day: (get start-day p), end-day: (get end-day p),\n          scope: (get scope p), hidden: hidden, evergreen: (get evergreen p),\n          payout: (get payout p), added-at: stacks-block-height })\n        (var-set count (+ id u1))\n        (if hidden true (begin (try! (live-add id)) true))\n        (note "poster-added" id)\n        (ok (+ n u1)))\n    e (err e)))\n\n(define-private (write-gate)\n  (begin\n    (asserts! (not (var-get paused)) ERR-PAUSED)\n    (asserts! (can-publish) ERR-NOT-AUTHORIZED)\n    (if (is-admin)\n      true\n      (begin\n        (asserts! (match (map-get? LastWrite tx-sender) last (>= burn-block-height (+ last (var-get min-gap))) true) ERR-GAP)\n        (map-set LastWrite tx-sender burn-block-height)\n        true))\n    (ok true)))\n\n(define-public (add-poster\n  (p {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  }))\n  (begin\n    (try! (write-gate))\n    (try! (add-one p (ok u0)))\n    (ok (- (var-get count) u1))))\n\n(define-public (add-posters\n  (ps (list 10 {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  })))\n  (begin\n    (try! (write-gate))\n    (fold add-one ps (ok u0))))\n\n;; ---------------------------------------------------------------------------\n;; Changing posters (never edits content)\n\n(define-private (unhide-one (id uint) (acc (response bool uint)))\n  (match acc\n    ok-v\n      (match (map-get? Posters id)\n        p (begin\n            (map-set Posters id (merge p { hidden: false }))\n            (var-set scratch-day (today))\n            (if (or (get evergreen p) (> (get end-day p) (today)))\n              (try! (live-add id))\n              true)\n            (ok true))\n        ERR-NOT-FOUND)\n    e (err e)))\n\n(define-private (refresh-live (id uint))\n  (match (map-get? Posters id)\n    p (if (and (not (get hidden p)) (or (get evergreen p) (> (get end-day p) (today))))\n        (begin (var-set scratch-day (today)) (live-add id))\n        (ok true))\n    ERR-NOT-FOUND))\n\n(define-public (set-hidden (id uint) (hidden bool))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (or (is-admin) (and hidden (is-eq tx-sender (get owner p)))) ERR-NOT-AUTHORIZED)\n    (if hidden\n      (begin\n        (map-set Posters id (merge p { hidden: true }))\n        (live-remove id)\n        (note "poster-hidden" id)\n        (ok true))\n      (begin\n        (try! (unhide-one id (ok true)))\n        (note "poster-released" id)\n        (ok true)))))\n\n;; Review lane: release a batch of hidden posters.\n(define-public (release-posters (ids (list 20 uint)))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (try! (fold unhide-one ids (ok true)))\n    (print { event: "posters-released", count: (len ids), version: (bump) })\n    (ok true)))\n\n(define-public (set-weight (id uint) (weight uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (check-weight (get set p) weight) ERR-WEIGHT)\n    (map-set Posters id (merge p { weight: weight }))\n    (note "poster-weight" id)\n    (ok true)))\n\n;; Window changes: end-day may always move (but stays after today); start-day only\n;; while the poster has not started, and only to a future day.\n(define-public (set-window (id uint) (start-day uint) (end-day uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)) (day (today)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (and (> end-day start-day) (> end-day day)\n                   (<= (- end-day start-day) MAX-SPAN-DAYS)) ERR-WINDOW)\n    (asserts! (or (is-eq start-day (get start-day p))\n                  (and (> (get start-day p) day) (> start-day day))) ERR-WINDOW)\n    (map-set Posters id (merge p { start-day: start-day, end-day: end-day }))\n    (try! (refresh-live id))\n    (note "poster-window" id)\n    (ok true)))\n\n(define-public (set-set (id uint) (set uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (<= set u1) ERR-INVALID)\n    (asserts! (check-weight set (get weight p)) ERR-WEIGHT)\n    (map-set Posters id (merge p { set: set }))\n    (note "poster-set" id)\n    (ok true)))\n\n(define-public (set-evergreen (id uint) (evergreen bool))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (map-set Posters id (merge p { evergreen: evergreen }))\n    (try! (refresh-live id))\n    (note "poster-evergreen" id)\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Pins (admin only; the one immediate path)\n\n(define-private (pin-keep? (pin { spot: uint, poster: uint, from-day: uint, to-day: uint }))\n  (and (>= (get to-day pin) (var-get scratch-day))\n       (not (is-eq (get spot pin) (var-get scratch-id)))))\n\n(define-public (set-pin (room (string-ascii 24)) (spot uint) (poster uint) (from-day uint) (to-day uint))\n  (let ((kept (begin\n                (var-set scratch-day (today))\n                (var-set scratch-id spot)\n                (filter pin-keep? (default-to (list) (map-get? Pins room))))))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (is-some (map-get? Posters poster)) ERR-NOT-FOUND)\n    (asserts! (and (>= to-day from-day) (>= to-day (today))) ERR-WINDOW)\n    (map-set Pins room\n      (unwrap! (as-max-len? (append kept { spot: spot, poster: poster, from-day: from-day, to-day: to-day }) u32)\n               ERR-PIN-FULL))\n    (print { event: "pin-set", room: room, spot: spot, poster: poster, from-day: from-day, to-day: to-day, version: (bump) })\n    (ok true)))\n\n(define-public (clear-pin (room (string-ascii 24)) (spot uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set scratch-day u0)\n    (var-set scratch-id spot)\n    (map-set Pins room (filter pin-keep? (default-to (list) (map-get? Pins room))))\n    (print { event: "pin-cleared", room: room, spot: spot, version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Suppressing embedded (genesis) posters by index\n\n(define-private (not-scratch-idx? (i uint)) (not (is-eq i (var-get scratch-id))))\n\n(define-public (suppress-genesis (idx uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (<= idx MAX-GENESIS-INDEX) ERR-INVALID)\n    (if (is-some (index-of? (var-get suppressed) idx))\n      (ok true)\n      (begin\n        (var-set suppressed (unwrap! (as-max-len? (append (var-get suppressed) idx) u160) ERR-SUPPRESS-FULL))\n        (print { event: "genesis-suppressed", idx: idx, version: (bump) })\n        (ok true)))))\n\n(define-public (unsuppress-genesis (idx uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set scratch-id idx)\n    (var-set suppressed (filter not-scratch-idx? (var-get suppressed)))\n    (print { event: "genesis-unsuppressed", idx: idx, version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Roles, caps, pause, hand-over, successor\n\n(define-public (set-publisher (who principal) (allowed bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (map-set Publishers who allowed)\n    (print { event: "publisher", who: who, allowed: allowed, version: (bump) })\n    (ok true)))\n\n(define-public (set-review-lane (on bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set review-lane on)\n    (print { event: "review-lane", on: on, version: (bump) })\n    (ok true)))\n\n(define-public (set-caps (per-day uint) (live-per-publisher uint) (gap uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (and (<= per-day u100) (<= live-per-publisher MAX-LIVE) (<= gap u144)) ERR-INVALID)\n    (var-set cap-per-day per-day)\n    (var-set cap-live-per-publisher live-per-publisher)\n    (var-set min-gap gap)\n    (print { event: "caps", per-day: per-day, live-per-publisher: live-per-publisher, gap: gap, version: (bump) })\n    (ok true)))\n\n(define-public (set-paused (value bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set paused value)\n    (print { event: "paused", value: value, version: (bump) })\n    (ok true)))\n\n(define-public (propose-admin (who principal))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set pending-admin (some who))\n    (ok true)))\n\n(define-public (accept-admin)\n  (let ((pending (unwrap! (var-get pending-admin) ERR-NO-PENDING)))\n    (asserts! (is-eq tx-sender pending) ERR-NOT-AUTHORIZED)\n    (var-set admin pending)\n    (var-set pending-admin none)\n    (print { event: "admin", who: pending, version: (bump) })\n    (ok true)))\n\n(define-public (set-successor (who (optional principal)))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (not (var-get successor-locked)) ERR-LOCKED)\n    (var-set successor who)\n    (print { event: "successor", who: who, version: (bump) })\n    (ok true)))\n\n(define-public (lock-successor)\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set successor-locked true)\n    (print { event: "successor-locked", version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Reads (frozen at v1: add new reads as new functions, never change these)\n\n(define-read-only (get-version) (var-get version))\n(define-read-only (get-count) (var-get count))\n(define-read-only (get-today) (today))\n(define-read-only (get-poster (id uint)) (map-get? Posters id))\n(define-read-only (get-posters (ids (list 10 uint))) (map get-poster ids))\n(define-read-only (get-page (start uint))\n  (map get-poster (list start (+ start u1) (+ start u2) (+ start u3) (+ start u4)\n                        (+ start u5) (+ start u6) (+ start u7) (+ start u8) (+ start u9))))\n(define-read-only (get-live) (var-get live))\n(define-read-only (get-pins (room (string-ascii 24))) (default-to (list) (map-get? Pins room)))\n(define-read-only (get-suppressed) (var-get suppressed))\n(define-read-only (get-successor) { successor: (var-get successor), locked: (var-get successor-locked) })\n(define-read-only (is-publisher (who principal)) (default-to false (map-get? Publishers who)))\n(define-read-only (get-config)\n  { admin: (var-get admin), pending-admin: (var-get pending-admin), paused: (var-get paused),\n    review-lane: (var-get review-lane), cap-per-day: (var-get cap-per-day),\n    cap-live-per-publisher: (var-get cap-live-per-publisher), min-gap: (var-get min-gap) })\n', "xtrata-world-v2": `;; xtrata-world-v2  (Xtrata World Standard XWS v1, "xws-1")
 ;;
 ;; One registry for every space and object in the Xtrata world.
 ;;

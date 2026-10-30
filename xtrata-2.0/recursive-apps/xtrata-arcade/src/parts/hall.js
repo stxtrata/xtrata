@@ -208,7 +208,7 @@ function buildRoom(){
   XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw, pitch:player.pitch});   // read-only, for tests
   XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
   XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
-  if(window.XA_TEST) XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 };   // tests only: nothing sets XA_TEST in the shipped page
+  if(window.XA_TEST){ XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 }; XA.centreZ=()=>CENTRE_SCREEN.z }   // tests only: nothing sets XA_TEST in the shipped page
   XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests
   buildDayBoard();
 
@@ -1569,7 +1569,7 @@ function buildDayBoard(){
   for(const sx of [-1,1]){ const len=HH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
   const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.14,.025,.12), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.07); g.add(edge);
   // no collider: its bottom edge (2.25 m) is above head height, so you walk under it
-  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], scorersAt:-1e9};
+  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], champions:[], scorersAt:-1e9};
   paintDayBoard(true);
 }
 // Latest scorers: the newest top-10 entries across every board the hall has cached, whatever their age (the row shows how old), no extra reads.
@@ -1577,14 +1577,19 @@ function screenScorers(){
   const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; if(t && t.entries && t.entries.length) boards.push({game:g.title, colour:g.color, mode:b.mode, entries:t.entries}) }));
   return window.XAScreen ? XAScreen.latestScorers(boards, chain.height, 0, fmtBoard, 8) : [];
 }
+// The number one on every board, from the same cache: a board not read yet is left out, a board read and empty is "NO #1 YET".
+function screenChampions(){
+  const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; boards.push({game:g.title, variant:b.label==='TOP 10' ? '' : String(b.label).replace(/ TOP 10$/,''), colour:g.color, mode:b.mode, entries:t && Array.isArray(t.entries) ? t.entries : null}) }));
+  return window.XAScreen && XAScreen.champions ? XAScreen.champions(boards, chain.height, fmtBoard) : [];
+}
 function paintDayBoard(force){
   if(!dayBoard || chain.day<0) return;
   const now=performance.now();
   const gap=(window.XAScreen && XAScreen.animating && XAScreen.animating()) ? CENTRE_SCREEN.animGapMs : CENTRE_SCREEN.gapMs;   // a GIF or clip on show repaints at about 25 fps
   if(!force && now-dayBoard.last<gap) return;
   dayBoard.last=now;
-  if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } }
-  const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers,
+  if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } try{ dayBoard.champions=screenChampions() }catch(e){ dayBoard.champions=[] } }
+  const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers, champions:dayBoard.champions,
            items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.height)   /* estimated height when the node is down, so a cached snapshot still expires */ : []};
   if(window.XAScreen) XAScreen.paint(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);
   else paintPlainClock(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);   // a release without screen.js: just the day clock
@@ -1705,23 +1710,28 @@ $('chainp').addEventListener('click', e=>{ if(e.target===$('chainp')) closeChain
    you close it, never taken down, so an album keeps playing while you walk, play a game or go through a door. Nothing here touches money or
    keys: the radio app does all of that in its own page. A room cannot see or reach this panel (rooms run in their own sandboxed frames).
    ================================================================ */
-const RADIO_URL='https://radio.xtrata.xyz/radio';
-let radioOpen=false, radioLoaded=false;
+// The radio page the panel and the pop-out window show. ?dock=1 asks the radio for its compact one-screen layout (the standard radio
+// page is untouched without it). A branch preview (*.pages.dev) shows that branch's own radio page so a change can be seen before it ships.
+const RADIO_BASE=/\.pages\.dev$/.test(location.hostname) ? location.protocol+'//'+location.host : 'https://radio.xtrata.xyz';
+const RADIO_URL=RADIO_BASE+'/radio?dock=1';
+let radioOpen=false, radioLoaded=false, radioPop=null;
+function radioPopAlive(){ try{ return !!(radioPop && !radioPop.closed) }catch(e){ return false } }
 function radioPaint(){   // the button is there while you can walk or are in a room; games take the whole screen, so it steps aside (the music goes on)
   const b=$('xa-radio-btn'); if(!b) return;
   const show=(state==='walk' || state==='room') && !chainOpen;
   if(b.hidden===show) b.hidden=!show;
-  b.classList.toggle('on',radioOpen);
+  b.classList.toggle('on',radioOpen || radioPopAlive());
 }
 function radioShow(){
   if(radioOpen || chainOpen) return;
+  if(radioPopAlive()){ try{ radioPop.focus() }catch(e){} return }   // the radio is playing in its own window: bring that forward instead of starting a second one
   radioOpen=true;
   if(document.pointerLockElement) document.exitPointerLock();
   for(const k in keys) keys[k]=false;
   const f=$('xa-radio-frame'), box=$('xa-radio');
   if(!radioLoaded){   // the radio is loaded the first time it is asked for, not when the hall starts
-    radioLoaded=true; $('xa-radio-open').href=RADIO_URL;
-    f.setAttribute('allow','autoplay; fullscreen; clipboard-write; publickey-credentials-get https://radio.xtrata.xyz; publickey-credentials-create https://radio.xtrata.xyz');   // passkeys, to the radio's origin only (set with the address, so the empty frame does not name an origin it is not on)
+    radioLoaded=true;
+    f.setAttribute('allow','autoplay; fullscreen; clipboard-write; publickey-credentials-get '+RADIO_BASE+'; publickey-credentials-create '+RADIO_BASE);   // passkeys, to the radio's origin only (set with the address, so the empty frame does not name an origin it is not on)
     f.src=RADIO_URL;
     try{ if(Room.isOn()){ Room.toggle(); paintRoom() } }catch(e){}   // the machines' own music steps aside for the radio (the music button brings it back)
   }
@@ -1735,12 +1745,23 @@ function radioHide(){
   try{ document.activeElement && document.activeElement.blur && document.activeElement.blur() }catch(e){}
   radioPaint(); if(state==='walk') tryLock(); else if(state==='room' && roomUI && roomUI.frame){ try{ roomUI.frame.focus() }catch(e){} }
 }
+// Pop out: the radio in its own small window (a top-level page, so both wallets and the listening wallet's passkey work and paid plays count).
+// One radio at a time: the panel's copy is taken down; the RADIO button then brings the pop-out forward. If the browser blocks the window,
+// the link opens a new tab as it would anyway and the panel stays.
+$('xa-radio-open').href=RADIO_URL;
+$('xa-radio-open').addEventListener('click', e=>{
+  let w=null; try{ w=window.open(RADIO_URL,'xaRadioPop','popup=yes,width=440,height=760') }catch(err){}
+  if(!w) return;
+  e.preventDefault(); radioPop=w; try{ w.focus() }catch(err){}
+  const f=$('xa-radio-frame'); f.removeAttribute('src'); f.removeAttribute('allow'); radioLoaded=false;
+  radioHide(); radioPaint();
+});
 $('xa-radio-btn').addEventListener('click', ()=>{ initAudio(); radioOpen ? radioHide() : radioShow() });
 $('xa-radio-hide').addEventListener('click', radioHide);
 $('xa-radio').addEventListener('click', e=>{ if(e.target===$('xa-radio')) radioHide() });
 addEventListener('keydown', e=>{ if(radioOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); radioHide() } }, true);
 setInterval(radioPaint, 400);   // (not called here: `state` is declared further down)
-if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.hallState=()=>state;   // tests only
+if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.exitGame=()=>exitGame(), XA.hallState=()=>state;   // tests only
 if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:$('xa-radio-frame').getAttribute('src'), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow')});   // read-only, for tests
 /* ================================================================
    CABINETS — one generator, ten configs

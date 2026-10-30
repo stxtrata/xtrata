@@ -4,6 +4,8 @@
 //   C  keeps playing   hiding the panel does not unload the radio (same page, loaded once); Esc, HIDE and a click outside all hide it; the hall's keys wait while it is open
 //   D  in a room       the button and the panel are there inside a room (a sandboxed room frame cannot reach them), and the radio is still the same page
 //   E  games           the button steps aside during a game; the radio page is still there afterwards
+//   F  pop-out         POP OUT opens the radio in its own window (compact layout) and takes the panel's copy down, so there is one radio; the RADIO button then
+//                      brings that window forward; once it is closed the panel works again; if the browser blocks the window the panel stays and a tab opens
 // A stub page stands in for the real radio (the test browser cannot reach the network): it counts how many times it was loaded.
 // Run: NODE_PATH=<playwright> CHROME_PATH=... node tests/hall-radio.test.cjs
 const { chromium } = require('playwright');
@@ -57,7 +59,7 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
   await page.click('#xa-radio-btn');
   await page.waitForFunction(() => window.__radioMsgs.length >= 1, null, { timeout: 30000 }).catch(() => {});
   s = await rr();
-  check(s.open && s.loaded && s.src === 'https://radio.xtrata.xyz/radio' && !s.away, 'B: the button opens the radio panel on radio.xtrata.xyz/radio');
+  check(s.open && s.loaded && s.src === 'https://radio.xtrata.xyz/radio?dock=1' && !s.away, 'B: the button opens the radio panel on radio.xtrata.xyz/radio, asking for its compact (dock) layout');
   check(/publickey-credentials-get https:\/\/radio\.xtrata\.xyz/.test(s.allow) && /publickey-credentials-create https:\/\/radio\.xtrata\.xyz/.test(s.allow) && !/publickey-credentials-get \*/.test(s.allow), 'B: passkeys are granted to the radio origin only');
   check(/allow-scripts/.test(s.sandbox) && /allow-same-origin/.test(s.sandbox) && !/allow-top-navigation/.test(s.sandbox), 'B: the frame cannot navigate the hall away (' + s.sandbox + ')');
   check(radioLoads === 1, 'B: the radio was fetched once');
@@ -112,6 +114,35 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
   await page.waitForTimeout(800);
   check(!(await rr()).shown, 'E: during a game the button steps aside');
   check((await frameBorn()) === born && radioLoads === 1, 'E: the radio page is still the same page during the game');
+  // F  pop out: the radio in its own window, one radio at a time
+  await page.evaluate(() => window.XA.exitGame());
+  await page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 30000 });
+  await page.waitForTimeout(600);
+  await page.click('#xa-radio-btn'); await page.waitForTimeout(300);
+  check((await rr()).open, 'F: the panel is open before popping out');
+  check(await page.evaluate(() => /POP OUT/.test(document.getElementById('xa-radio-open').textContent) && document.getElementById('xa-radio-open').getAttribute('href') === 'https://radio.xtrata.xyz/radio?dock=1'), 'F: the panel has a POP OUT link to the compact radio');
+  const loadsBefore = radioLoads;
+  const [pop] = await Promise.all([ctx.waitForEvent('page'), page.click('#xa-radio-open')]);
+  await pop.waitForLoadState('domcontentloaded').catch(() => {});
+  check(pop.url() === 'https://radio.xtrata.xyz/radio?dock=1', 'F: it opens the compact radio in its own window (' + pop.url() + ')');
+  s = await rr();
+  check(!s.open && !s.loaded && !s.src && !s.allow, 'F: the panel is hidden and its copy of the radio is taken down (one radio, no two streams)');
+  await page.click('#xa-radio-btn'); await page.waitForTimeout(400);
+  s = await rr();
+  check(!s.open && !s.src && radioLoads === loadsBefore + 1, 'F: the RADIO button brings the pop-out forward instead of starting a second radio');
+  await pop.close(); await page.waitForTimeout(300);
+  await page.click('#xa-radio-btn');
+  await page.waitForFunction(() => window.XA.radioState().open, null, { timeout: 10000 });
+  s = await rr();
+  check(s.open && s.loaded && s.src === 'https://radio.xtrata.xyz/radio?dock=1', 'F: once the pop-out is closed, the panel works again');
+  // the browser blocks the window: the panel stays, the link opens a tab
+  await page.evaluate(() => { window.__realOpen = window.open; window.open = () => null; });
+  const [tab] = await Promise.all([ctx.waitForEvent('page', { timeout: 10000 }).catch(() => null), page.click('#xa-radio-open')]);
+  await page.waitForTimeout(300);
+  s = await rr();
+  check(s.open && s.loaded && !!s.src, 'F: if the window is blocked the panel stays up');
+  if (tab) await tab.close().catch(() => {});
+  await page.evaluate(() => { window.open = window.__realOpen; });
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close(); srv.close();
   console.log('hall radio tests passed: ' + passed);

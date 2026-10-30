@@ -3,7 +3,8 @@
  *
  * The big screen in the middle of the hall. It shows, on one 16:9 canvas:
  *   - the Bitcoin Day clock along the top (what the old day board showed, kept intact)
- *   - LATEST SCORERS on the left (fed by the hall's own score boards, no extra reads)
+ *   - the left column alternates (fed by the hall's own score boards, no extra reads): LATEST SCORERS for 20 s, then the NUMBER ONES
+ *     (the current best score on every board, newest crown first, paged) for 40 s, then latest scorers again, then the number ones A to Z
  *   - a rotating FEATURE panel on the right (news, ads and messages from xtrata-screen-v1)
  *   - a scrolling TICKER along the bottom (short messages and news headlines)
  *
@@ -30,6 +31,9 @@
     rotateSecs: 12,              // one feature item at a time
     fullEvery: 3,                // every 3rd slot is a full-screen slot (when something has a picture to show)
     tickerPxPerSec: 80,
+    leftLatestSecs: 20,          // left column: latest scorers for this long ...
+    leftChampSecs: 40,           // ... then the number ones for this long (newest crown first, then the next round A to Z)
+    leftRows: 8,                 // rows on a page
     maxLive: 32,                 // the contract's live-set bound
     snapKey: 'xa-screen-snap-v1'
   };
@@ -274,23 +278,43 @@
     var segW = (W - 56 * u) / bpd;
     for (var i = 0; i < bpd; i++) { x.fillStyle = i < done ? ORANGE : i === done ? '#ffffff' : '#1d1a24'; x.fillRect(28 * u + i * segW, 80 * u, Math.max(1, segW - 1), 10 * u); }
 
-    // --- left: latest scorers
-    var lx = 28 * u, lw = 400 * u, top = 112 * u, bottom = H - 120 * u;
+    // --- left: latest scorers, alternating with the number ones (newest crown first, then A to Z)
+    var lx = 28 * u, lw = 400 * u, top = 112 * u, bottom = H - 120 * u, NR = CFG.leftRows;
+    var champs = d.champions && d.champions.length ? d.champions : null, ph0 = leftPhase(d.t || 0, !!champs), shownRows, title, sub = '';
+    var rh = (bottom - (top + 48 * u)) / NR, fade = 1;
+    if (ph0.kind === 'champs') {
+      var list = orderChampions(champs, ph0.order), pages = Math.max(1, Math.ceil(list.length / NR));
+      var pageSecs = pages > 1 ? Math.min(10, Math.max(5, CFG.leftChampSecs / pages)) : CFG.leftChampSecs, pi = Math.floor(ph0.local / pageSecs) % pages, pt = ph0.local - Math.floor(ph0.local / pageSecs) * pageSecs;
+      shownRows = list.slice(pi * NR, pi * NR + NR); title = 'NUMBER ONES';
+      sub = (ph0.order === 'new' ? 'NEWEST FIRST' : 'A TO Z') + (pages > 1 ? '  ' + (pi + 1) + '/' + pages : '');
+      if (pages > 1) fade = Math.max(0, Math.min(1, pt / .35, (pageSecs - pt) / .35));
+    } else { shownRows = (d.scorers || []).slice(0, NR); title = 'LATEST SCORERS'; }
     x.textAlign = 'left'; x.font = Math.round(28 * u) + 'px Bungee, Impact, sans-serif'; x.fillStyle = '#3be4ff'; x.shadowColor = '#3be4ff'; x.shadowBlur = 8;
-    x.fillText('LATEST SCORERS', lx, top + 24 * u); x.shadowBlur = 0;
+    x.fillText(title, lx, top + 24 * u); x.shadowBlur = 0;
+    if (sub) { x.font = Math.round(22 * u) + 'px VT323, monospace'; x.textAlign = 'right'; x.fillStyle = '#8fd3ff'; x.fillText(sub, lx + lw, top + 24 * u); x.textAlign = 'left'; }
     x.fillStyle = '#3be4ff'; x.fillRect(lx, top + 36 * u, lw, 2 * u);
-    var rows = (d.scorers || []).slice(0, 8), rh = (bottom - (top + 48 * u)) / 8;
     x.font = Math.round(26 * u) + 'px VT323, monospace';
-    if (!rows.length) {
+    if (!shownRows.length) {
       x.fillStyle = '#6f6a8f'; x.fillText('NO SCORES YET', lx, top + 48 * u + rh);
     }
-    rows.forEach(function (r, k) {
+    x.globalAlpha = fade;
+    shownRows.forEach(function (r, k) {
       var y = top + 48 * u + rh * k + rh * .72;
-      x.textAlign = 'left'; x.fillStyle = r.colour || '#3be4ff'; x.fillText(String(r.game).toUpperCase().slice(0, 13), lx, y);
+      if (ph0.kind === 'champs' && r.claimed && r.age != null && r.age < bpd) { x.fillStyle = 'rgba(57,255,136,.08)'; x.fillRect(lx - 6 * u, y - rh * .72, lw + 12 * u, rh - 2 * u); }
+      x.font = Math.round(26 * u) + 'px VT323, monospace';
+      x.textAlign = 'left'; x.fillStyle = r.claimed === false ? dim(r.colour) : (r.colour || '#3be4ff'); x.fillText(String(r.game).toUpperCase().slice(0, 13), lx, y);
+      if (r.claimed === false) {
+        x.fillStyle = '#6f6a8f'; x.fillText('NO #1 YET', lx + 172 * u, y);
+        x.textAlign = 'right'; x.fillStyle = '#ffc53d'; x.fillText('BE FIRST', lx + lw, y);
+        return;
+      }
       x.fillStyle = '#ffffff'; x.fillText(String(r.name).slice(0, 10), lx + 172 * u, y);
       x.textAlign = 'right'; x.fillStyle = '#ffc53d'; x.fillText(String(r.score), lx + lw - 56 * u, y);
-      x.fillStyle = '#6f6a8f'; x.fillText(r.age == null ? '' : ago(r.age), lx + lw, y);
+      var fresh = ph0.kind === 'champs' && r.age != null && r.age < bpd;
+      x.fillStyle = fresh ? '#39ff88' : '#6f6a8f'; x.fillText(r.age == null ? '' : ago(r.age), lx + lw, y);
+      if (fresh) { x.font = Math.round(14 * u) + 'px VT323, monospace'; x.fillStyle = '#39ff88'; x.fillText('NEW', lx + lw, y - 24 * u); }
     });
+    x.globalAlpha = 1;
 
     // --- right: feature panel
     var px = 460 * u, pw = W - px - 28 * u, py = top, ph = bottom - top;
@@ -371,6 +395,50 @@
     x.fillStyle = '#8fd3ff'; x.font = Math.round(34 * u) + 'px VT323, monospace'; x.fillText('EVERY TOP SCORE LIVES ON BITCOIN', px + pw / 2, py + ph * .82);
   }
 
+  /* ------------------------------------------------------------ the left column's rotation (pure) */
+  // Which view the left column shows at time t (seconds): latest scorers, number ones newest first, latest scorers, number ones A to Z, and round again.
+  // With no number ones to show (the boards are not read yet) it stays on the latest scorers.
+  function leftPhase(t, haveChamps) {
+    if (!haveChamps) return { kind: 'latest', order: '', local: 0 };
+    var a = CFG.leftLatestSecs, b = CFG.leftChampSecs, cyc = 2 * (a + b), u = (((Number(t) || 0) % cyc) + cyc) % cyc;
+    if (u < a) return { kind: 'latest', order: '', local: u };
+    if (u < a + b) return { kind: 'champs', order: 'new', local: u - a };
+    if (u < 2 * a + b) return { kind: 'latest', order: '', local: u - a - b };
+    return { kind: 'champs', order: 'abc', local: u - 2 * a - b };
+  }
+  // The number one on every board. `boards` = [{ game, variant, colour, mode, entries }]; entries is null while the hall has not read that board
+  // (skipped: not read is not the same as empty) and [] when it is read and empty (an unclaimed row, "BE FIRST"). The best score wins: the highest, or
+  // on a time board the lowest; a tie goes to the earlier one. Rows: { game, colour, name, score, age, burn, claimed }.
+  function champions(boards, height, fmt) {
+    var h = Number(height) || 0, out = [];
+    (boards || []).forEach(function (b) {
+      if (!b || !Array.isArray(b.entries)) return;
+      var label = String(b.game || '') + (b.variant ? ' ' + String(b.variant) : '');
+      if (b.variant) label = String(b.game || '').slice(0, 8) + ' ' + String(b.variant).slice(0, 4);
+      var best = null, low = b.mode === 'time';
+      b.entries.forEach(function (e) {
+        var sc = Number(e && e.score); if (!isFinite(sc)) return;
+        if (!best) { best = e; return; }
+        var bs = Number(best.score), eb = Number(e.burn) || 0, bb = Number(best.burn) || 0;
+        if (low ? sc < bs : sc > bs) best = e;
+        else if (sc === bs && eb > 0 && (bb <= 0 || eb < bb)) best = e;
+      });
+      if (!best) { out.push({ game: label, colour: b.colour, name: '', score: '', age: null, burn: 0, claimed: false }); return; }
+      var burn = Number(best.burn) || 0, age = burn > 0 && h ? Math.max(0, h - burn) : null;
+      out.push({ game: label, colour: b.colour, name: String(best.name || ''), score: fmt ? fmt(b.mode, best.score) : String(best.score), age: age, burn: burn, claimed: true });
+    });
+    return out;
+  }
+  // 'new': newest crown first, the unclaimed boards last (A to Z); 'abc': every board A to Z. Does not change the list it is given.
+  function orderChampions(rows, order) {
+    var byName = function (a, b) { return String(a.game).toLowerCase() < String(b.game).toLowerCase() ? -1 : String(a.game).toLowerCase() > String(b.game).toLowerCase() ? 1 : 0; };
+    var list = (rows || []).slice();
+    if (order === 'abc') return list.sort(byName);
+    var claimed = list.filter(function (r) { return r.claimed; }).sort(function (a, b) { return (b.burn || 0) - (a.burn || 0) || byName(a, b); });
+    return claimed.concat(list.filter(function (r) { return !r.claimed; }).sort(byName));
+  }
+  function dim(c) { return c && /^#[0-9a-f]{6}$/i.test(c) ? c + '66' : '#6f6a8f'; }
+
   /* ------------------------------------------------------------ latest scorers (pure) */
   // Builds the scorers list from the hall's board cache. `boards` = [{ game, colour, mode, entries:[{name,score,burn}] }].
   // Newest first. With a window (burn blocks, default 288 when omitted) entries older than it are left out; with no window (0) the newest
@@ -398,7 +466,7 @@
     start: start, stop: stop, refresh: refresh, snapshot: function () { return state.snap; },
     onChange: function (fn) { state.listeners.push(fn); },
     items: function () { return state.snap ? state.snap.items : []; },
-    paint: paint, latestScorers: latestScorers, slotAt: slotAt, sniffMedia: sniffMedia, idle: function () { tendMedia(null); }, animating: function () { return !!state.animating; },
+    paint: paint, latestScorers: latestScorers, champions: champions, orderChampions: orderChampions, leftPhase: leftPhase, slotAt: slotAt, sniffMedia: sniffMedia, idle: function () { tendMedia(null); }, animating: function () { return !!state.animating; },
     normalizeItem: normalizeItem, isActive: isActive, activeItems: activeItems, featureAt: featureAt,
     wrapText: wrapText, tickerText: tickerText, ago: ago, hasPicture: hasPicture,
     _t: { state: state, load: load, restore: restore, save: save }
