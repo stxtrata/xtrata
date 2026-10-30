@@ -174,7 +174,7 @@ It opens Xtrata Radio (`https://radio.xtrata.xyz/radio`, the one origin the list
 
 - The panel asks the radio for its compact one-screen layout with `?dock=1` (`RADIO_URL` is `/radio?dock=1`). That layout is opt-in inside the radio page: without the flag the standard radio is unchanged.
 - **POP OUT** (in the panel's bar) opens the same radio in its own small window. That window is a top-level page, so Xverse, the listening wallet and passkeys work and paid plays count; inside the panel they cannot (the listening wallet only allows radio.xtrata.xyz as its parent, and extension wallets inject into the top page only). Popping out takes the panel's copy down so there is one radio; the RADIO button then focuses the pop-out; closing it brings the panel back. If the browser blocks the window, the link opens a tab and the panel stays.
-- On a branch preview (`*.pages.dev`) the hall loads that branch's own `/radio?dock=1`, so a radio-page change can be seen before it ships.
+- The hall always loads the live radio. Only on a branch preview (`*.pages.dev`), adding `?radiobranch=1` to the hall's address swaps in that branch's own `/radio?dock=1` to look at a layout change before it ships (the preview deployment has no likes contract or wallet setup, so it shows no likes and cannot connect a listening wallet).
 
 A future room type needs nothing here: it inherits the dock because the dock lives in the hall's own frame.
 

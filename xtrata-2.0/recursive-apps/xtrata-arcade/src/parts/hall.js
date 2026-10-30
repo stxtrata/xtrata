@@ -1711,8 +1711,9 @@ $('chainp').addEventListener('click', e=>{ if(e.target===$('chainp')) closeChain
    keys: the radio app does all of that in its own page. A room cannot see or reach this panel (rooms run in their own sandboxed frames).
    ================================================================ */
 // The radio page the panel and the pop-out window show. ?dock=1 asks the radio for its compact one-screen layout (the standard radio
-// page is untouched without it). A branch preview (*.pages.dev) shows that branch's own radio page so a change can be seen before it ships.
-const RADIO_BASE=/\.pages\.dev$/.test(location.hostname) ? location.protocol+'//'+location.host : 'https://radio.xtrata.xyz';
+// page is untouched without it). Always the live radio (your likes, playlists and paid plays are there). Only on a branch preview (*.pages.dev)
+// does the address ?radiobranch=1 swap in that branch's own radio page, to look at a layout change before it ships; the preview has no likes or wallet set up.
+const RADIO_BASE=(/\.pages\.dev$/.test(location.hostname) && /[?&]radiobranch=1(?:&|$)/.test(location.search)) ? location.protocol+'//'+location.host : 'https://radio.xtrata.xyz';
 const RADIO_URL=RADIO_BASE+'/radio?dock=1';
 let radioOpen=false, radioLoaded=false, radioPop=null;
 function radioPopAlive(){ try{ return !!(radioPop && !radioPop.closed) }catch(e){ return false } }
