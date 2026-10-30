@@ -7,8 +7,9 @@ looks redundant here without reading this file** — most of these rules exist
 because the obvious implementation breaks in a way unit types cannot catch.
 
 Enforced by tests: `src/lib/wallet/__tests__/connect.test.ts`,
-`adapter.test.ts`, `wallet-invariants.test.ts`, and
-`src/agent-one/__tests__/wallet-payment.test.ts`. If one of those fails, a rule
+`adapter.test.ts`, `wallet-invariants.test.ts`,
+`src/agent-one/__tests__/wallet-payment.test.ts`, and (casino connect)
+`src/casino-room/__tests__/layr-exchange-connect.test.ts`. If one of those fails, a rule
 below is being violated — fix the code, never weaken the test.
 
 **Scope:** this file covers the Xverse and Leather extension/in-app-browser
@@ -138,6 +139,16 @@ persisted. Never call connect-ui's `getInstalledProviders` directly.
 - `wallet_connect` results can mix BTC + STX purposes in one `addresses` list;
   `extractStacksAddress` walks the payload and validates rather than assuming a
   shape.
+- **A connect request carries no parameters.** Xverse's phone app answers `wallet_connect` with
+  `Invalid parameters.` as soon as it carries any (2026-10-30: the casino's LAYR exchange called
+  `request('getAddresses', { network: 'testnet' })`; the Stacks library turns that into `wallet_connect`
+  for Xverse and passes the parameter on; the desktop extension accepted it, the phone app did not). Never
+  put `network` or anything else on a connect request; check the network on the address that comes back.
+  Enforced by `src/casino-room/__tests__/layr-exchange-connect.test.ts`, which runs the casino pages' own
+  exchange code.
+- The Stacks library saves the picked wallet in `STX_PROVIDER` only AFTER its own request succeeded. Code
+  that connects some other way (a fallback `wallet_connect`) must save it itself, or the payment step
+  cannot find the wallet.
 
 ## 7. Leather
 

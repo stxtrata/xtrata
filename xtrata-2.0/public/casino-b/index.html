@@ -7448,6 +7448,50 @@ function create(options){
  async function releaseXverse(){
   try{const p=window.XverseProviders&&window.XverseProviders.BitcoinProvider;if(p&&typeof p.request==='function'){log('Xverse: ending the old session');await Promise.race([Promise.resolve(p.request('wallet_disconnect')).catch(()=>{}),new Promise(r=>setTimeout(r,3000))]);}}catch(_){}
  }
+ // Connecting asks for NO parameters. The library hands Xverse a wallet_connect and Leather a getAddresses, and both take none; the old
+ // call added { network: 'testnet' }, which Xverse's phone app answers with "Invalid parameters." (2026-10-30). Whether the account is on
+ // testnet is checked on the address that comes back. If Xverse is the only wallet on the page and still refuses, the casino asks the way
+ // the wizard does (WALLET-PLAYBOOK rules 3 and 6): wallet_connect, then wallet_getAccount, on Xverse's own request provider.
+ const connectTrail=[];
+ const answeredNo=e=>!!e&&([4001,-31001].includes(Number(e.code))||e.code==='cancelled-here'||e.code==='wallet-timeout'||/cancel|denied|reject|declin|closed/i.test(String(e.message||'')));
+ const answerText=r=>{try{return JSON.stringify(r)||'';}catch(_){return '';}};
+ const stacksAccountIn=r=>{
+  const list=r&&(r.addresses||(r.result&&r.result.addresses));
+  if(Array.isArray(list)){const a=list.find(a=>a&&(a.symbol==='STX'||a.purpose==='stacks')&&validAddress(a.address))||list.find(a=>a&&validAddress(a.address));if(a)return a;}
+  const found=(answerText(r).match(/S[NT][0-9A-HJKMNP-TV-Z]{38,39}/g)||[]).find(validAddress);
+  return found?{address:found}:null;
+ };
+ async function askForAddresses(){
+  connectTrail.length=0;
+  try{return await ask('getAddresses',undefined,{force:true,timeoutMs:180000});}
+  catch(e){
+   connectTrail.push('getAddresses: '+String(e&&e.message||e).slice(0,80));
+   const X=window.XverseProviders,xp=X&&(usable(X.BitcoinProvider)?X.BitcoinProvider:usable(X.StacksProvider)?X.StacksProvider:null);
+   // With Leather installed as well there is no telling which wallet was picked, so the wallet's answer is shown as it came.
+   if(answeredNo(e)||!xp||usable(window.LeatherProvider))throw e;
+   log('Xverse refused the connect ('+(e&&e.message)+'); asking the Xverse way: wallet_connect with no parameters');
+   status='Approve the connection in Xverse…';emit();
+   let last=e;
+   for(const method of['wallet_connect','wallet_getAccount']){
+    try{
+     const r=await ask(method,undefined,{timeoutMs:180000,run:()=>rpc(xp,method)});
+     if(stacksAccountIn(r)){
+      connectTrail.push(method+': ok');
+      // The library saves the picked wallet only after a request of its own succeeded; the payment step finds the wallet through it.
+      try{localStorage.setItem('STX_PROVIDER',xp===X.BitcoinProvider?'XverseProviders.BitcoinProvider':'XverseProviders.StacksProvider');}catch(_){}
+      return r;
+     }
+     if(/S[PMNT][0-9A-HJKMNP-TV-Z]{38,39}/.test(answerText(r))){connectTrail.push(method+': answered on another network');return r;}
+     connectTrail.push(method+': no Stacks address in the answer');
+    }catch(x){
+     connectTrail.push(method+': '+String(x&&x.message||x).slice(0,80));
+     if(answeredNo(x))throw x;
+     if(!unsupported(x))last=x;
+    }
+   }
+   throw Object.assign(new Error((last&&last.message||'Xverse did not share a Stacks address.')+' (tried '+connectTrail.join('; ')+')'),{code:last&&last.code});
+  }
+ }
  // Paying goes to the wallet the way the Xtrata wizard calls it (docs/WALLET-PLAYBOOK.md): Leather takes the full parameter set;
  // Xverse takes it on its Stacks provider, and only if that is missing the minimal set on its Bitcoin provider. The bare library call
  // sent the minimal set to both: Leather answers "Invalid params", Xverse answers "Network mismatch".
@@ -7485,7 +7529,7 @@ function create(options){
  }
  const validAddress=a=>/^S[NT]/.test(a)&&sdk().validateStacksAddress(a);
  async function connect(){if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status='Choose your Stacks testnet wallet…';emit();
-  try{await releaseXverse();const r=await ask('getAddresses',{network:'testnet'},{force:true,timeoutMs:180000}),list=r.addresses||r.result?.addresses||[],a=list.find(a=>a.symbol==='STX'&&validAddress(a.address))||list.find(a=>validAddress(a.address));if(!a)throw Error('Switch your wallet to Stacks testnet and reconnect.');
+  try{await releaseXverse();const r=await askForAddresses(),a=stacksAccountIn(r);if(!a)throw Error('Switch your wallet to Stacks testnet and reconnect.');
    if(pending&&pending.address!==a.address)throw Error('Reconnect the wallet used for the pending transfer: '+pending.address);
    address=a.address;phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
@@ -10955,7 +10999,7 @@ function applyTestnetFunding(proof){
     if(!testnetLAYR.snapshot().pending&&!/INPUT|SELECT|TEXTAREA/.test(tag)&&(e.code==='ArrowLeft'||e.code==='ArrowRight')){e.preventDefault();selectDispenserAmount(Math.max(1,Math.min(10,dispenserAmount+(e.code==='ArrowRight'?1:-1))));}return true;
   }
   function bindLAYRDispensers(){
-    const act=fn=>()=>{Promise.resolve().then(fn).catch(e=>{if($('layrTestnetError'))$('layrTestnetError').textContent=e.message;});};
+    const act=fn=>()=>{Promise.resolve().then(fn).catch(e=>{const box=$('layrTestnetError');if(box){box.textContent=e.message;try{box.scrollIntoView({block:'nearest',behavior:'smooth'});}catch(_){}}});};
     $('layrRefreshBalance').onclick=()=>testnetLAYR.refreshBalance();
     $('layrDispenserButton').onclick=()=>openLAYRDispenser(0);$('layrDispenserIntro').onclick=()=>openLAYRDispenser(0);$('layrCloseDispenser').onclick=closeLAYRDispenser;
     $('layrAmountRange').oninput=e=>selectDispenserAmount(Number(e.target.value));for(const b of document.querySelectorAll('[data-layr-amount]'))b.onclick=()=>selectDispenserAmount(Number(b.dataset.layrAmount));
