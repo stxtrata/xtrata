@@ -34,7 +34,7 @@ const TESTNET = !!process.env.TESTNET;
 const NET = TESTNET ? 'testnet' : 'mainnet';
 const C = createMockChain({ testnet: TESTNET });
 const { S, exec, deploy, readOnly, ROOT, WRONG, SCORES, BUNDLE, BOARDS, chunksOf, sha, pp, hex0, muted, T, V7, Cl } = C;
-const NEW = ['xtrata-world-v2', 'xtrata-posters-v1', 'xtrata-screen-v1'];
+const NEW = ['xtrata-world-v2', 'xtrata-posters-v1', 'xtrata-screen-v1', 'xtrata-games-v1'];
 let simnet;
 const newTx = (status, repr) => { const id = '0x' + sha('wallet' + (++S.txn)).toString('hex'); S.tx.set(id, { tx_status: status, tx_result: { repr }, block_height: simnet.blockHeight }); return id; };
 async function route(r) {
@@ -136,14 +136,14 @@ async function route(r) {
     // one signature for a pack within the one-transaction limit (32 chunks); begin + chunk batches of 30 + seal beyond it
     const packSigs = (name) => { const n = Math.ceil(fs.readFileSync(path.join(ROOTDIR, 'recursive-apps/xtrata-arcade/dist/packs/xtrata-arcade-' + name + '.txt')).length / 16384); return n <= 32 ? 1 : 2 + Math.ceil(n / 30); };
     const expected = TESTNET
-      ? { connect: 0, preflight: 0, core: 3, fixtures: 1 + 2 + Math.ceil(chunksOf(BUNDLE).length / 30), deploy: 4, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': packSigs('engine'), 'pack-hall': packSigs('hall'), parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 }
-      : { connect: 0, preflight: 0, deploy: 3, kinds: 3, hall: 8, setup: 0, registry: 0, 'pack-engine': packSigs('engine'), 'pack-hall': packSigs('hall'), parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 };
+      ? { connect: 0, preflight: 0, core: 4, fixtures: 1 + 2 + Math.ceil(chunksOf(BUNDLE).length / 30), deploy: 5, kinds: 3, hall: 8, setup: 1, registry: 0, 'pack-engine': packSigs('engine'), 'pack-hall': packSigs('hall'), parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0, boards26: 0, testgames: 6 }
+      : { connect: 0, preflight: 0, deploy: 4, kinds: 3, hall: 8, setup: 2, registry: 0, 'pack-engine': packSigs('engine'), 'pack-hall': packSigs('hall'), parent: 1, release: 0, board: 1, submit: 1, fund: 1, copy: 0, sweep: 0, close: 1, boardwallet: 1, handover: 1, production: 0, handback: 1, ownership: 0, audit: 0 };
     const got = Object.fromEntries(ids.map((i) => [i, S.sigs[i] || 0]));
     console.log('  wallet signatures per step: ' + ids.map((i) => `${i} ${got[i]}`).join(', ') + ` · total ${S.walletCalls}`);
     check(JSON.stringify(got) === JSON.stringify(expected), `signatures per step match the README (${Object.values(expected).reduce((a, b) => a + b, 0)} in all)`);
-    if (TESTNET) check(['xtrata-v1-1-1', 'xtrata-v2-1-0', 'xtrata-v3-2-3'].every((n, i) => S.deploys[i] && S.deploys[i].name === n && S.deploys[i].version === 3), 'testnet: the canary deployed the core trio first, in order, at Clarity 3');
+    if (TESTNET) check(['nft-trait', 'xtrata-v1-1-1', 'xtrata-v2-1-0', 'xtrata-v3-2-3'].every((n, i) => S.deploys[i] && S.deploys[i].name === n) && S.deploys.slice(1, 4).every((d) => d.version === 3), 'testnet: the canary deployed the SIP-009 trait, then the core trio, first and in order, the trio at Clarity 3');
     const fresh3 = S.deploys.filter((d) => NEW.includes(d.name) || d.name === 'xtrata-arcade-scores-v2');
-    check(fresh3.length === (TESTNET ? 4 : 3) && fresh3.every((d) => d.version === 4) && NEW.every((n) => fresh3.some((d) => d.name === n)), `the three contracts${TESTNET ? ' and the leaderboard' : ''} were deployed at Clarity 4 from the root wallet`);
+    check(fresh3.length === (TESTNET ? 5 : 4) && fresh3.every((d) => d.version === 4) && NEW.every((n) => fresh3.some((d) => d.name === n)), `the four contracts${TESTNET ? ' and the leaderboard' : ''} were deployed at Clarity 4 from the root wallet`);
     const W2 = ROOT + '.xtrata-world-v2';
     const v = (fn, args = []) => V7.cvToValue(readOnly(W2, fn, args), true);
     const root = readOnly(W2, 'get-root', []);
@@ -184,17 +184,20 @@ async function route(r) {
     await boot.waitForFunction(() => window.XAWorld && window.XAWorld.snapshot(), null, { timeout: 90000 }).catch(() => {});
     if (S.readFails.length) console.log(`  refused reads so far: ${S.readFails.length}, last: ${JSON.stringify(S.readFails.slice(-4))}`);
     const info = await boot.evaluate(() => ({
-      world: window.XA_WORLD_CONFIG, mode: window.XAWorld.mode(), enabled: window.XAWorld.enabled(), cfg: window.XAWorld.config(),
+      world: window.XA_WORLD_CONFIG, games: window.XA_GAMES_CONFIG, gamesStatus: window.XAGamesRegistry && window.XAGamesRegistry.status(), mode: window.XAWorld.mode(), enabled: window.XAWorld.enabled(), cfg: window.XAWorld.config(),
       wall: window.XA.wallState().map((s) => ({ head: s.head, shown: s.shown, chain: s.chain })),
       bays: window.XA.bayState && window.XA.bayState() ? window.XA.bayState().bays.slice(0, 4).map((b) => (b && b.plan ? { base: b.plan.base, layers: (b.plan.overlays || []).length + (b.plan.cover ? 1 : 0) } : null)) : null,
       snap: window.XAWorld.snapshot() ? { src: window.XAWorld.snapshot().src, bays: (window.XAWorld.snapshot().bays || []).length } : null
     }));
     const reads = S.reads.slice(readsBefore).map((r) => r.fn);
     const want = { posters: ROOT + '.xtrata-posters-v1', registry: ROOT + '.xtrata-world-v2', screen: ROOT + '.xtrata-screen-v1' };
+    const gamesWant = { contract: ROOT + '.xtrata-games-v1' };
     check(JSON.stringify(info.world) === JSON.stringify(want), `the parent hands the hall XA_WORLD_CONFIG = ${JSON.stringify(info.world)}`);
+    check(JSON.stringify(info.games) === JSON.stringify(gamesWant), `and XA_GAMES_CONFIG = ${JSON.stringify(info.games)}`);
     check(info.mode === 2 && info.enabled && info.cfg.registry === want.registry, 'the hall\'s world reader is on the registry (mode 2)');
     check(reads.some((x) => /^xtrata-world-v2\.(resolve-path|get-objects)/.test(x)) && reads.some((x) => /^xtrata-world-v2\.get-object-view/.test(x)), `the hall read the registry from the chain (${reads.filter((x) => /world-v2/.test(x)).length} reads)`);
-    check(reads.some((x) => /^xtrata-posters-v1\./.test(x)) && reads.some((x) => /^xtrata-screen-v1\./.test(x)), 'and the poster and screen contracts');
+    check(reads.some((x) => /^xtrata-posters-v1\./.test(x)) && reads.some((x) => /^xtrata-screen-v1\./.test(x)) && reads.some((x) => /^xtrata-games-v1\./.test(x)), 'and the poster, screen and games contracts');
+    check(info.gamesStatus && info.gamesStatus.ok === true && info.gamesStatus.count === 0 && info.wall.length === 27, 'the hall read the (still empty) games contract: ok, 0 added, the 21 built-in games as they are');
     const BAY_SLOTS = { L: [12, 13], R: [25, 26], NL: [0, 1], NR: [14, 15] };
     check(info.wall.length === 27 && Object.values(BAY_SLOTS).flat().every((i) => info.wall[i].shown), 'all four bays show their posters (the poster slots in every bay are shown)');
     check(info.snap && info.snap.src === want.registry && info.snap.bays === 4, `the hall's snapshot came from the registry with 4 bays (${JSON.stringify(info.snap)})`);

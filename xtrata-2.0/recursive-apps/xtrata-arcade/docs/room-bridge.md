@@ -161,6 +161,23 @@ The script talks to `window.parent` with `postMessage`; the hall listens only to
 
 Pages written for earlier halls that post `{xa:'room-ready'}` and `{xa:'leave-room'}` themselves keep working.
 
+## 4b. Music in every room: the radio dock (part of the hall, not of any room)
+
+The hall puts one small **RADIO** button (bottom left, above the room, below the BACK button's layer) on every screen where you can walk or are in a room.
+It opens Xtrata Radio (`https://radio.xtrata.xyz/radio`, the one origin the listening wallet trusts) in a panel that belongs to the hall page, so:
+
+- A room does nothing to get it, and cannot see, move or reach it (rooms run in their own sandboxed frames). A room should leave the bottom-left corner clear.
+- It keeps playing as you go through doors: closing the panel only hides it. The radio is loaded the first time it is asked for, never at start.
+- During a game the button steps aside (games take the whole screen); the music carries on.
+- The panel's frame grants passkeys to the radio origin only, and is sandboxed so it cannot navigate the hall away. All money, passkey and album logic stays in the radio page; the hall holds none.
+- The hall's own machine music turns off the first time the radio is opened (the hall's music button brings it back).
+
+- The panel asks the radio for its compact one-screen layout with `?dock=1` (`RADIO_URL` is `/radio?dock=1`). That layout is opt-in inside the radio page: without the flag the standard radio is unchanged.
+- **POP OUT** (in the panel's bar) opens the same radio in its own small window. That window is a top-level page, so Xverse, the listening wallet and passkeys work and paid plays count; inside the panel they cannot (the listening wallet only allows radio.xtrata.xyz as its parent, and extension wallets inject into the top page only). Popping out takes the panel's copy down so there is one radio; the RADIO button then focuses the pop-out; closing it brings the panel back. If the browser blocks the window, the link opens a tab and the panel stays.
+- On a branch preview (`*.pages.dev`) the hall loads that branch's own `/radio?dock=1`, so a radio-page change can be seen before it ships.
+
+A future room type needs nothing here: it inherits the dock because the dock lives in the hall's own frame.
+
 ## 5. A minimal room
 
 ```html

@@ -249,14 +249,25 @@
     // (hash-checked). The hall gives a room page its own copy of three.js, which is this text (the `three` pack, or #3078's).
     window.XA_PARTS = { threeText: function () { return byName['three.js'] || ''; } };
     if (CONFIG.world) window.XA_WORLD_CONFIG = CONFIG.world;   // contract ids for the world reader (absent = off)
+    if (CONFIG.games) window.XA_GAMES_CONFIG = CONFIG.games;   // the games contract (absent = the built-in games only)
     window.XA_BUILD = { version: CONFIG.version, bundleId: CONFIG.bundleId, packs: CONFIG.packs, parts: CONFIG.parts };
-    P.ORDER.js.forEach(function (n) {
-      if (!byName[n]) return;                  // an optional part that was not found
+    for (var k = 0; k < P.ORDER.js.length; k++) {
+      var n = P.ORDER.js[k];
+      // Just before the engine starts, let the engine add games that were registered on chain after this hall was inscribed.
+      // The part that does it is in the engine pack (so it can be fixed without a new parent); it never throws and has its own
+      // time limit, and this wait has another: whatever happens, the hall starts.
+      if (n === 'engine-boot.js' && typeof window.XA_PREBOOT === 'function') {
+        progress('Checking for new games…');
+        try {
+          await Promise.race([Promise.resolve(window.XA_PREBOOT()), new Promise(function (res) { setTimeout(res, 30000); })]);
+        } catch (e) { console.warn('[xa:parent] games check failed', e); }
+      }
+      if (!byName[n]) continue;                // an optional part that was not found
       var s = document.createElement('script');
       s.setAttribute('data-xa-part', n);
       s.text = byName[n] + '\n//# sourceURL=xa-' + n;
       document.body.appendChild(s);          // separate scripts: one failing part cannot stop the rest
-    });
+    }
     patchLeather();
     var load = document.getElementById('xa-load');
     load.classList.add('done');

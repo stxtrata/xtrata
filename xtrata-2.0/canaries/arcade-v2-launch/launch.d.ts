@@ -23,13 +23,14 @@ declare module "xa:launch" {
     releaseSha: string;
     networks: Record<Net, {
       root: string; treasury: string; core: string; posterPublishers: string[]; hallPublisher: string | null;
-      screenFeeRecipient: string; parents: number[] | string; bundleId: number | string; canDeployCore: boolean;
+      screenFeeRecipient: string; gamesDelay: number; lockGamesDelay: boolean; parents: number[] | string; bundleId: number | string; canDeployCore: boolean;
     }>;
     contracts: Record<Net, Record<string, string>>;
     contractSha: Record<Net, Record<string, string>>;
     coreTestnet: Record<string, string>;
     coreTestnetSha: Record<string, string>;
     boards: { id: string; game: string; mode: number; max: number }[];
+    testGames: { id: string; title: string; file: string; mode: number; max: number; source: string }[];
     /** score-client.js, world.js and world2.js: the hall's own registry reader */
     reader: Record<string, string>;
   };

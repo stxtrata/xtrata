@@ -84,7 +84,7 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   // a pack within the one-transaction limit (32 chunks) is one transaction; beyond it: begin + chunk batches of 30 + seal
   const packTxs = (name) => { const n = Math.ceil(fs.readFileSync(path.join(ROOTDIR, 'recursive-apps/xtrata-arcade/dist/packs/xtrata-arcade-' + name + '.txt')).length / 16384); return n <= 32 ? 1 : 2 + Math.ceil(n / 30); };
   const packsAndParent = packTxs('engine') + packTxs('hall') + 1;
-  check(byRoot === 4 + 11 + 4 + 3 + 8 + packsAndParent, `the root key signed ${byRoot} transactions (trait + core trio 4, fixtures 11, deploys 4, kinds 3, hall 8, packs and parent ${packsAndParent} = ${4 + 11 + 4 + 3 + 8 + packsAndParent})`);
+  check(byRoot === 4 + 11 + 5 + 1 + 3 + 8 + packsAndParent, `the root key signed ${byRoot} transactions (trait + core trio 4, fixtures 11, deploys 5, games delay 1, kinds 3, hall 8, packs and parent ${packsAndParent} = ${4 + 11 + 5 + 1 + 3 + 8 + packsAndParent})`);
   const kinds = C.S.calls.filter((c) => c.fn === 'xtrata-world-v2.register-kind');
   const hot = (kinds[0] && kinds[0].sender) || addr;
   check(kinds.length === 24 && hot !== addr && kinds.every((c) => c.sender === hot), `the 24 kinds were signed by the temporary KINDS admin ${hot}`);
@@ -92,13 +92,37 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   check(C.pp(C.readOnly(W2, 'get-admin', [C.Cl.principal(hot)])) === 'u0', 'the temporary wallet is no longer a registry admin');
   check(C.pp(C.readOnly(W2, 'get-root', [])) === `{ owner: '${addr}, paused: false, pending: none, treasury: '${addr} }`, 'registry root owner and treasury are the root key');
   check(/PASS registry: hall space #3 live/.test(r.out) && /all four bays resolve to posters/.test(r.out), 'the hall\'s own reader (hallread.mjs) read the hall back: four bays on posters');
-  check(C.S.deploys.filter((d) => d.raw).map((d) => `${d.name}@${d.version}`).join() === 'nft-trait@3,xtrata-v1-1-1@3,xtrata-v2-1-0@3,xtrata-v3-2-3@3,xtrata-world-v2@4,xtrata-posters-v1@4,xtrata-screen-v1@4,xtrata-arcade-scores-v2@4', 'the runner deployed the SIP-009 trait and the core trio at Clarity 3, then the four contracts at Clarity 4');
+  check(C.S.deploys.filter((d) => d.raw).map((d) => `${d.name}@${d.version}`).join() === 'nft-trait@3,xtrata-v1-1-1@3,xtrata-v2-1-0@3,xtrata-v3-2-3@3,xtrata-world-v2@4,xtrata-posters-v1@4,xtrata-screen-v1@4,xtrata-games-v1@4,xtrata-arcade-scores-v2@4', 'the runner deployed the SIP-009 trait and the core trio at Clarity 3, then the five contracts at Clarity 4');
   check(C.S.violations.length === 0, `every STX movement was covered by a deny-mode post-condition${C.S.violations.length ? ': ' + C.S.violations.join('; ') : ''}`);
 
   const before = sent();
   r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--forget']);
   check(r.code === 0 && sent() === before, `a re-run after --forget passes and sends nothing (${sent() - before} sent)`);
   if (r.code !== 0) console.log(r.out.split('\n').filter((l) => /FAIL|!!/.test(l)).join('\n').slice(0, 1500));
+
+  // the two test games: inscribed, boards registered, listed on the games contract (testnet only, run on request: not one of the default steps)
+  check(!R.DEFAULT_STEPS.includes('testgames'), 'the test-games step is not part of the default launch steps');
+  check(R.FULL_EXTRA_STEPS.join() === 'boards26,testgames', '--full adds boards26 and testgames');
+  const txBefore = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,boards26,testgames']);
+  if (r.code !== 0) console.log(r.out.split('\n').filter((l) => /FAIL|!!/.test(l)).join('\n').slice(0, 1500));
+  check(r.code === 0 && /PASS testgames/.test(r.out), 'the testgames step passes');
+  check((C.S.rawBySender[addr] || 0) - txBefore === 32, `it sent 32 transactions: 26 boards, then 2 cartridge inscriptions, 2 set-board and 2 add-game (${(C.S.rawBySender[addr] || 0) - txBefore})`);
+  const G = `${addr}.xtrata-games-v1`, SC = `${addr}.xtrata-arcade-scores-v2`;
+  check(C.pp(C.readOnly(G, 'get-count', [])) === 'u2', 'the games contract lists 2 games');
+  const g0 = C.pp(C.readOnly(G, 'get-game', [C.Cl.uint(0)])), g1 = C.pp(C.readOnly(G, 'get-game', [C.Cl.uint(1)]));
+  check(/id: "xa_test_catcher"/.test(g0) && /index: u21/.test(g0) && /id: "xa_test_sprint"/.test(g1) && /index: u22/.test(g1) && /kind: u1/.test(g0), 'game 0 is xa_test_catcher (replay number 21) and game 1 is xa_test_sprint (22)');
+  const allBoards = JSON.parse(fs.readFileSync(path.join(ROOTDIR, 'recursive-apps/xtrata-arcade/boards.json'), 'utf8'));
+  let boardsOk = 0;
+  for (const b of allBoards) { const t = C.pp(C.readOnly(SC, 'get-board', [C.Cl.stringAscii(b.id)])); if (new RegExp('mode: u' + b.mode).test(t) && /enabled: true/.test(t) && /engine-id: u\d+/.test(t)) boardsOk++; }
+  check(boardsOk === allBoards.length, `all ${allBoards.length} arcade boards exist on the leaderboard, enabled, with the right mode (${boardsOk})`);
+  const b0 = C.pp(C.readOnly(SC, 'get-board', [C.Cl.stringAscii('xa_test_catcher')])), b1 = C.pp(C.readOnly(SC, 'get-board', [C.Cl.stringAscii('xa_test_sprint')]));
+  check(/mode: u0/.test(b0) && /mode: u1/.test(b1) && /enabled: true/.test(b0) && /enabled: true/.test(b1), 'both score boards exist and are enabled: Sat Catcher highest wins, Arrow Sprint lowest wins');
+  check(/live at burn block/.test(r.out) && /replay number 21/.test(r.out), 'the step says when each game goes live');
+  const txMid = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,boards26,testgames']);
+  check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txMid, 'running it again sends nothing');
+  check(C.S.violations.length === 0, 'every STX movement was still covered by a deny-mode post-condition');
 
   fs.rmSync(tmp, { recursive: true, force: true });
   if (failed) { console.log(`FAILED: ${failed} (${passed} checks passed)`); process.exit(1); }

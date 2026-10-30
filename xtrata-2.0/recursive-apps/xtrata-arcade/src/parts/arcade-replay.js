@@ -49,6 +49,18 @@
 
   /* ------------------------------------------------- boards & pilots */
   function gameIndex(game) { return GAME_IDS.indexOf(game.id); }
+  // Extra games (from the games contract) get a permanent index of 21 or more. Indices 0 to 20 are the built-in games and can
+  // never be given to another id. An index that is taken, or an id that already has one, is refused. Returns true if the id now has this index.
+  var BUILT_IN = 21;
+  function registerIndex(id, idx) {
+    idx = Number(idx);
+    if (!/^[a-z0-9_]{3,24}$/.test(String(id)) || !(idx >= BUILT_IN && idx <= 255) || idx !== Math.floor(idx)) return false;
+    var have = GAME_IDS.indexOf(id);
+    if (have >= 0) return have === idx;
+    if (GAME_IDS[idx] !== undefined) return false;
+    GAME_IDS[idx] = id;
+    return true;
+  }
   function variantForMode(game, mode) {
     return (game.variants || []).filter(function (v) { return v.mode === mode; })[0] || null;
   }
@@ -63,7 +75,7 @@
     if (!address) return null;
     try {
       var d = C.c32decodeAddress(address);
-      if (!/^S[PM]/.test(String(address).toUpperCase())) return null;
+      if (!/^S[PMTN]/.test(String(address).toUpperCase())) return null;
       return { address: address, version: d.version, hash160: d.hash160 };
     } catch (e) { return null; }
   }
@@ -459,7 +471,7 @@
 
   XA.replay = {
     ENGINE: ENGINE, HEADER: HEADER, MAX_BYTES: MAX_BYTES, GAME_IDS: GAME_IDS, BUTTONS: BUTTONS,
-    boardFor: boardFor, pilotFor: pilotFor, seedFor: seedFor, gameIndex: gameIndex, qpt: qpt,
+    boardFor: boardFor, pilotFor: pilotFor, seedFor: seedFor, gameIndex: gameIndex, registerIndex: registerIndex, BUILT_IN: BUILT_IN, qpt: qpt,
     record: record, decode: decode, simulate: simulate, verify: verify, playback: playback,
     MAX_STEPS: MAX_STEPS, CHUNK: CHUNK, MAX_INSCRIBE_CHUNKS: MAX_INSCRIBE_CHUNKS, readHeader: readHeader,
     isPointer: isPointer, isSeal: isSeal, makeSeal: makeSeal, mismatch: mismatch, makePointer: makePointer, readPointer: readPointer, resolve: resolve,

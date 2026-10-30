@@ -141,12 +141,27 @@ function createChain(world) {
     },
     'get-chunk-batch': ([id, idxs]) => { const b = insc(id) || Buffer.alloc(0); return cv.ok(cv.list(idxs.map((i) => { const c = b.subarray(i * CHUNK, (i + 1) * CHUNK); return c.length ? cv.some(cv.buff(c)) : cv.none(); }))); },
   };
+  // The games contract (xtrata-games-v1): world.games = { height, items: [{ id, title, index, kind, engineMin, codeId, hash?, size?, liveAt, hidden }] }.
+  // hash / size default to the inscription's real chain hash and length (set them to lie about it).
+  const gameCv = (n) => {
+    const it = ((W.games && W.games.items) || [])[n]; if (!it) return cv.none();
+    const b = insc(it.codeId);
+    return cv.some(cv.tuple({ id: cv.ascii(it.id), title: cv.ascii(it.title || it.id), index: cv.uint(it.index), kind: cv.uint(it.kind == null ? 1 : it.kind),
+      'engine-min': cv.uint(it.engineMin || 1), 'code-id': cv.uint(it.codeId), 'code-hash': cv.buff(it.hash || (b ? chainHash(b) : Buffer.alloc(32))),
+      'code-size': cv.uint(it.size == null ? (b ? b.length : 0) : it.size), 'added-at': cv.uint(1), 'live-at': cv.uint(it.liveAt || 1), hidden: cv.bool(!!it.hidden) }));
+  };
+  const games = {
+    'get-version': () => cv.uint(1),
+    'get-count': () => cv.uint(((W.games && W.games.items) || []).length),
+    'get-height': () => cv.uint((W.games && W.games.height) || W.height),
+    'get-games': ([ns]) => cv.list(ns.map(gameCv)),
+  };
   const posters = { 'get-version': () => cv.uint(1), 'get-live': () => cv.list([]), 'get-pins': () => cv.list([]), 'get-suppressed': () => cv.list([]) };
 
   function call(contract, fn, args) {
     const name = String(contract).split('.').pop();
     log.push({ contract: name, fn, args });
-    const table = /world-v2/.test(name) ? registry : /posters/.test(name) ? posters : /^xtrata-v\d/.test(name) ? core : null;
+    const table = /world-v2/.test(name) ? registry : /posters/.test(name) ? posters : /games/.test(name) ? games : /^xtrata-v\d/.test(name) ? core : null;
     const f = table && table[fn];
     if (!f) return null;
     if (W.fail && W.fail(name, fn, args)) throw new Error('mock chain: refused');

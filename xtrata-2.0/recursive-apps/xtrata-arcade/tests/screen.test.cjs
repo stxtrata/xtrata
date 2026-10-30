@@ -336,6 +336,72 @@ test('5 latest scorers from a canned get-top10 response: window, newest first, d
   ok(has(x, '50M') && !has(x, 'NO SCORES YET'));
 });
 
+/* ------------------------------------------------------------ 5b  the left column: latest scorers and the number ones */
+test('5b the left column rotates: latest 20 s, number ones newest first 40 s, latest 20 s, number ones A to Z 40 s; without number ones it stays on latest', () => {
+  const S = boot().S;
+  const at = (t, have) => S.leftPhase(t, have);
+  eq(at(0, true), { kind: 'latest', order: '', local: 0 });
+  eq(at(19.9, true).kind, 'latest');
+  eq(at(20, true), { kind: 'champs', order: 'new', local: 0 });
+  eq(at(59.9, true).order, 'new');
+  eq(at(60, true), { kind: 'latest', order: '', local: 0 });
+  eq(at(80, true), { kind: 'champs', order: 'abc', local: 0 });
+  eq(at(119.9, true).order, 'abc');
+  eq(at(120, true).kind, 'latest', 'and round again');
+  eq(at(1e6 + 25, true).kind, ['latest', 'champs'][((1e6 + 25) % 120) < 20 ? 0 : ((1e6 + 25) % 120) < 60 ? 1 : ((1e6 + 25) % 120) < 80 ? 0 : 1]);
+  for (const t of [0, 25, 70, 100]) eq(at(t, false).kind, 'latest', 'no number ones to show at t=' + t);
+});
+
+test('5c number ones: best score per board (highest, or lowest on a time board), earlier wins a tie, unread boards skipped, empty boards unclaimed; order newest first or A to Z', () => {
+  const S = boot().S;
+  const fmt = (m, v) => m + ':' + v;
+  const rows = S.champions([
+    { game: 'Zed Game', colour: '#f00', mode: 'score', entries: [{ name: 'LOW', score: 5, burn: 4000 }, { name: 'TOP', score: 90, burn: 4900 }, { name: 'TIE', score: 90, burn: 4500 }] },
+    { game: 'Arrow Sprint', colour: '#0f0', mode: 'time', entries: [{ name: 'FAST', score: 96, burn: 4990 }, { name: 'SLOW', score: 1878, burn: 4100 }] },
+    { game: 'Midgame', colour: '#00f', mode: 'score', entries: [{ name: 'OLD', score: 10, burn: 3000 }] },
+    { game: 'Block Drop', variant: 'SPRINT TOP 10', colour: '#ff0', mode: 'time', entries: [] },
+    { game: 'Not Read Yet', colour: '#fff', mode: 'score', entries: null },
+    null
+  ], 5000, fmt);
+  eq(rows.map((r) => r.game), ['Zed Game', 'Arrow Sprint', 'Midgame', 'Block Dr SPRI'], 'the unread board and the null are skipped; a variant is cut to fit');
+  eq(rows[0], { game: 'Zed Game', colour: '#f00', name: 'TIE', score: 'score:90', age: 500, burn: 4500, claimed: true }, 'highest wins; the earlier of two equal scores');
+  eq(rows[1].name, 'FAST', 'on a time board the lowest wins'); eq(rows[1].score, 'time:96');
+  eq(rows[3].claimed, false, 'a board that was read and is empty is unclaimed');
+  eq(S.orderChampions(rows, 'new').map((r) => r.game), ['Arrow Sprint', 'Zed Game', 'Midgame', 'Block Dr SPRI'], 'newest crown first, unclaimed last');
+  eq(S.orderChampions(rows, 'abc').map((r) => r.game), ['Arrow Sprint', 'Block Dr SPRI', 'Midgame', 'Zed Game'], 'A to Z, unclaimed in place');
+  eq(rows.map((r) => r.game), ['Zed Game', 'Arrow Sprint', 'Midgame', 'Block Dr SPRI'], 'ordering does not change the list it is given');
+  eq(S.champions(null, 5, fmt), []);
+  eq(S.champions([{ game: 'G', mode: 'score', entries: [{ name: 'X', score: 3, burn: 0 }] }], 5000, null)[0], { game: 'G', colour: undefined, name: 'X', score: '3', age: null, burn: 0, claimed: true }, 'no burn height: age unknown, never a made-up number');
+});
+
+test('5d drawn: latest scorers at first, then the number ones (title, order, page), a NEW mark under a day, unclaimed rows, paging, and the old behaviour without number ones', () => {
+  const S = boot().S;
+  const mk = (i, burn) => ({ game: 'Game ' + String.fromCharCode(65 + i), colour: '#3be4ff', name: 'P' + i, score: String(i * 10), age: burn == null ? null : 5000 - burn, burn: burn || 0, claimed: burn != null });
+  const champs = Array.from({ length: 20 }, (_, i) => mk(i, 4999 - i * 30));
+  champs.push(mk(20, null), mk(21, null));   // two unclaimed
+  const scorers = [{ game: 'Latest Game', colour: '#f0f', name: 'ZOE', score: '123', age: 3 }];
+  const D = (t, c) => draw(S, { height: 5000, t, scorers, champions: c });
+  let x = D(5, champs);
+  ok(has(x, 'LATEST SCORERS') && has(x, 'ZOE') && !has(x, 'NUMBER ONES'), 't=5: latest scorers');
+  x = D(21, champs);   // number ones, newest first: page 1 of 3 (22 rows, 8 a page)
+  ok(has(x, 'NUMBER ONES') && has(x, 'NEWEST FIRST  1/3') && !has(x, 'LATEST SCORERS'), 't=21: number ones, newest first, page 1 of 3');
+  ok(has(x, 'GAME A') && has(x, 'P0') && has(x, 'NEW'), 'the newest crown is first, inside a day, marked NEW');
+  ok(!has(x, 'GAME I'), 'only eight rows on a page');
+  x = D(20 + 12, champs);   // page 2 starts at local 11.7+ (pageSecs = 40/3 clamped to 10): local 12 is page 2
+  ok(has(x, 'NEWEST FIRST  2/3') && has(x, 'GAME I'), 'it pages on');
+  x = D(20 + 25, champs);
+  ok(has(x, 'NEWEST FIRST  3/3') && has(x, 'NO #1 YET') && has(x, 'BE FIRST'), 'the unclaimed boards come last and say so');
+  x = D(85, champs);
+  ok(has(x, 'NUMBER ONES') && has(x, 'A TO Z  1/3'), 't=85: the second round is A to Z');
+  x = D(65, champs);
+  ok(has(x, 'LATEST SCORERS'), 't=65: latest scorers again');
+  x = D(25, []);
+  ok(has(x, 'LATEST SCORERS') && has(x, 'ZOE') && !has(x, 'NUMBER ONES'), 'no number ones known: always the latest scorers (the old behaviour)');
+  x = D(25, undefined);
+  ok(has(x, 'LATEST SCORERS'), 'champions not supplied at all: the old behaviour');
+  eq(x.saves, x.restores, 'paint balances save/restore');
+});
+
 /* ------------------------------------------------------------ 6  pictures */
 // the first bytes of each format we accept (the sniffer only needs the header)
 const pad = (a) => { const u = new Uint8Array(32); u.set(a); return u; };

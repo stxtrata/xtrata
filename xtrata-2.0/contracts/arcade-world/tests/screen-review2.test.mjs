@@ -19,7 +19,7 @@ async function screen() {
   const bal = (who) => simnet.getAssetsMap().get('STX').get(who) ?? 0n;
   const me = `${deployer}.xtrata-screen-v1`;
   const buy = (sender, o = {}) => call('buy-slot', [
-    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(''), U(0), Cl.buffer(new Uint8Array(0)), U(0), U(o.days ?? 1), U(0),
+    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(''), U(0), Cl.buffer(new Uint8Array(0)), U(0), U(o.days ?? 1), U(0), U(o.max ?? 1000000000000),
   ], sender);
   const item = (id) => ro('get-item', [U(id)]).value.value;
   const idOf = (r) => Number(r.result.value.value);
@@ -61,17 +61,18 @@ test('L9 the review window is fixed when a slot is bought: set-limits later neit
   s.solvent();
 });
 
-test('L9 hiding a paid item during its run refunds the unused days and ends the run; it cannot be unhidden', async () => {
+test('L9 hiding a paid item during its run refunds the unused blocks and ends the run; it cannot be unhidden', async () => {
   const s = await screen();
   const { W, simnet } = s;
   const a = s.idOf(s.buy(W[0], { days: 3 }));               // 3 days of message: 6 STX
   assert.equal(R(s.call('approve', [U(a)], W[1])), OK);
-  simnet.mineEmptyBurnBlocks(DAY + 1);                       // day 2 has started: 2 days used, 1 unused
-  assert.equal(s.paid(a).unearned.value, 2_000_000n);
+  simnet.mineEmptyBurnBlocks(DAY + 1);                       // 145 of the 432 blocks bought have run
+  const earned = (6_000_000n * 145n) / 432n;                 // charged per block, rounded down
+  assert.equal(s.paid(a).unearned.value, 6_000_000n - earned);
   const b0 = s.bal(W[0]), r0 = s.bal(W[5]);
   assert.equal(R(s.call('set-hidden', [U(a), Cl.bool(true)], W[1])), OK);
-  assert.equal(s.bal(W[0]), b0 + 2_000_000n);
-  assert.equal(s.bal(W[5]), r0 + 4_000_000n);
+  assert.equal(s.bal(W[0]), b0 + 6_000_000n - earned);
+  assert.equal(s.bal(W[5]), r0 + earned);
   const it = s.item(a);
   assert.equal(it.status.value, 2n);
   assert.equal(it['closed-reason'].value, 5n);
@@ -112,12 +113,14 @@ test('L9 retiring a paid item mid-run refunds pro rata, after a partial settle, 
   assert.equal(R(s.call('approve', [U(a)], W[1])), OK);
   simnet.mineEmptyBurnBlocks(1);
   const r0 = s.bal(W[5]), b0 = s.bal(W[0]);
-  assert.equal(R(s.call('settle', [U(a)], W[3])), '(ok u20000000)');   // day 1 earned
-  assert.equal(s.bal(W[5]), r0 + 5_000_000n);
-  simnet.mineEmptyBurnBlocks(2 * DAY);                                  // now in day 3: 3 used, 2 unused
+  const e1 = (25_000_000n * 1n) / 720n;                                 // one block has run: charged for that block only
+  assert.equal(R(s.call('settle', [U(a)], W[3])), `(ok u${25_000_000n - e1})`);
+  assert.equal(s.bal(W[5]), r0 + e1);
+  simnet.mineEmptyBurnBlocks(2 * DAY);                                  // 289 of 720 blocks have run
   assert.equal(R(s.call('retire', [U(a)], W[1])), OK);
-  assert.equal(s.bal(W[5]), r0 + 15_000_000n);
-  assert.equal(s.bal(W[0]), b0 + 10_000_000n);
+  const e2 = (25_000_000n * 289n) / 720n;                               // the whole earned part, paid exactly once
+  assert.equal(s.bal(W[5]), r0 + e2);
+  assert.equal(s.bal(W[0]), b0 + 25_000_000n - e2);
   assert.equal(s.item(a).escrow.value, 0n);
   assert.equal(R(s.call('retire', [U(a)], W[1])), err(409));
   // a publisher (level 1) cannot retire a paid item, and neither can the buyer

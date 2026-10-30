@@ -55,6 +55,10 @@ const NETWORKS = {
     posterPublishers: [],
     hallPublisher: null,
     screenFeeRecipient: MAINNET_ROOT,
+    // the games contract's wait before a new game goes live (burn blocks; 6 = about an hour, 144 = about a day) and whether the canary locks it for ever.
+    // Jim, 29 Oct 2026: one hour on mainnet, locked. The contract starts at 144, so the launch sends set-delay 6 and then lock-delay 6.
+    gamesDelay: 6,
+    lockGamesDelay: true,
     parents: [55],
     bundleId: 3078,
     canDeployCore: false
@@ -66,6 +70,8 @@ const NETWORKS = {
     posterPublishers: [],
     hallPublisher: null,
     screenFeeRecipient: process.env.XA_TESTNET_TREASURY || TESTNET_ROOT,
+    gamesDelay: 6,
+    lockGamesDelay: false,
     parents: 'stand-in',     // a small inscription the canary makes on the testnet core in place of #55
     bundleId: 'by-hash',     // the bundle is inscribed on the testnet core by the canary; its id is found by its chain hash
     canDeployCore: TESTNET_CORE.split('.')[0] === TESTNET_ROOT && TESTNET_CORE.split('.')[1] === 'xtrata-v3-2-3'
@@ -80,14 +86,15 @@ const NETWORKS = {
 const PINS = {
   'xtrata-posters-v1': '3e9bdfc500c97a166804e15bda29df852e7f0dbea2fe2ebe97048f67399618fb',
   'xtrata-world-v2': 'a72774e95967b81d33c339779e49a7313d864382caed9fe0f08b3761ed9cbc39',
-  'xtrata-screen-v1': '0039464e5225edee74e3aa8d02699b8effe7cc67360cfcb511eb02a02fe47dc1',
+  'xtrata-screen-v1': '80dda1331f3d42ba6b0fb24d01cc146963ba256abec98f7c32cb0b24ab3c34e7',
+  'xtrata-games-v1': '0768b467c33d7384236aaaafeda3de7beee866119269f808c6292c27684aa53e',
   'xtrata-arcade-scores-v2': 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5',
   'xtrata-v1-1-1': '1f9ee448262d982017f69479718628689af4a660c28905492b4bad84096d74fd',
   'xtrata-v2-1-0': '3f632b0adc44788366c1cce87a497e0dc789bc99fdd7fd9024a5c47b7df05e2c',
   'xtrata-v3-2-3': '4d5ed9db022bb345d712ceadbd75d8d9540bd0a5b4d9122017c770b8d00a8ac7',
-  release: '76b9119c8a9ec85e46d6bea604ea0119d77062639e835e7f35d5dc26625be252'
+  release: '3231908dfa36c13411f5ecf64dadaf9e121fc037f6adf54c2798b12a94f4d0a5'
 };
-const NEW_CONTRACTS = ['xtrata-posters-v1', 'xtrata-world-v2', 'xtrata-screen-v1'];
+const NEW_CONTRACTS = ['xtrata-posters-v1', 'xtrata-world-v2', 'xtrata-screen-v1', 'xtrata-games-v1'];
 // The core and the two contracts it reads from (deployed by the canary on testnet only, with the testnet SIP-009 trait).
 const CORE_FILES = { 'xtrata-v1-1-1': 'xtrata-v1.1.1.clar', 'xtrata-v2-1-0': 'xtrata-v2.1.0.clar', 'xtrata-v3-2-3': 'xtrata-v3.2.3.clar' };
 const actual = {};
@@ -243,6 +250,11 @@ const launch = {
   coreTestnet,
   coreTestnetSha: Object.fromEntries(Object.entries(coreTestnet).map(([k, v]) => [k, sha(v)])),
   boards,
+  // two small test games for the games contract (testnet only: the `testgames` step); the sources are the files in recursive-apps/xtrata-arcade/games-extra
+  testGames: [
+    { id: 'xa_test_catcher', title: 'Sat Catcher', file: 'test-catcher.js', mode: 0, max: 100000 },
+    { id: 'xa_test_sprint', title: 'Arrow Sprint', file: 'test-sprint.js', mode: 1, max: 360000 }
+  ].map((g) => ({ ...g, source: readFileSync(resolve(XA, 'games-extra', g.file), 'utf8') })),
   // the hall's own registry reader, run by the canary against the registry before anything is inscribed
   reader: Object.fromEntries(['score-client.js', 'world.js', 'world2.js'].map((n) => [n, parts[n]]))
 };

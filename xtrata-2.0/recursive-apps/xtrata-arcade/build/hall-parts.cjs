@@ -27,7 +27,7 @@
   var PACKS = {
     assets: ['fonts.css', 'hall-assets.js'],
     three: ['three.js'],
-    engine: ['room.css', 'arcade-kit.js', 'arcade-music.js', 'score-client.js', 'arcade-replay.js', 'arcade-room.js', 'engine-boot.js'],
+    engine: ['room.css', 'arcade-kit.js', 'arcade-music.js', 'score-client.js', 'arcade-replay.js', 'arcade-room.js', 'games-registry.js', 'engine-boot.js'],
     games: ['game-neon-snake.js', 'game-block-drop.js', 'game-cave-diver.js', 'game-orbit-merge.js', 'game-block-runner.js',
       'game-brick-breaker.js', 'game-rock-drift.js', 'game-stack-tower.js', 'game-road-hopper.js', 'game-tile-tap.js',
       'game-merge-2048.js', 'game-block-defence.js', 'game-maze-muncher.js', 'game-invader-wave.js', 'game-helix-drop.js',
@@ -35,7 +35,7 @@
     hall: ['hall.css', 'hall-body.html', 'world.js', 'world2.js', 'curtain.js', 'doors.js', 'door-skins.js', 'bays.js', 'screen.js', 'hall.js']
   };
   // Parts that older releases (v1.x single files) do not have. The hall runs without them.
-  var OPTIONAL = ['world.js', 'world2.js', 'curtain.js', 'doors.js', 'door-skins.js', 'bays.js', 'screen.js'];
+  var OPTIONAL = ['games-registry.js', 'world.js', 'world2.js', 'curtain.js', 'doors.js', 'door-skins.js', 'bays.js', 'screen.js'];
   var PACK_ORDER = ['assets', 'three', 'engine', 'games', 'hall'];
 
   // Load order. CSS goes to <head>, the markup to <body>, scripts run in this order.
@@ -43,7 +43,7 @@
     css: ['fonts.css', 'room.css', 'hall.css'],
     html: ['hall-body.html'],
     js: ['arcade-kit.js', 'arcade-music.js', 'score-client.js', 'arcade-replay.js', 'arcade-room.js']
-      .concat(PACKS.games, ['engine-boot.js', 'three.js', 'hall-assets.js', 'world.js', 'world2.js', 'curtain.js', 'doors.js', 'door-skins.js', 'bays.js', 'screen.js', 'hall.js'])
+      .concat(PACKS.games, ['games-registry.js', 'engine-boot.js', 'three.js', 'hall-assets.js', 'world.js', 'world2.js', 'curtain.js', 'doors.js', 'door-skins.js', 'bays.js', 'screen.js', 'hall.js'])
   };
 
   function packOf(part) {

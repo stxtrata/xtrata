@@ -14,13 +14,19 @@
 ;; - Review lane: when on, publisher items wait for approval and are not live until then.
 ;; - PAID SLOTS (off until the admin switches them on): a buyer pays price-per-day x days into
 ;;   escrow held by this contract and the item waits as `pending`. The review window is fixed per
-;;   item when it is bought (a later set-limits does not move it). Reject, cancel and sweep refund
-;;   the buyer in full. Approve starts the run; the escrow stays here and is earned a day at a time
-;;   (a day is charged once its first block has passed; the approval block itself is free, which
-;;   always favours the buyer). `settle` (anyone) pays what has been earned to the fee
-;;   recipient of that moment. A reviewer who hides or retires a paid item during its run ends it:
-;;   the earned days go to the fee recipient and the unused days back to the buyer (all of it if
-;;   it never ran), and the item closes (reason 5). Nothing but those paths can move escrow: there
+;;   item when it is bought (a later set-limits does not move it). The buyer states the most they
+;;   will pay (`max-price`), so a price change between click and confirmation can never cost them
+;;   more than they agreed. Reject, cancel and sweep refund the buyer in full. Approve starts the
+;;   run; the escrow stays here and is earned block by block, in proportion to the blocks that have
+;;   run (price x blocks run / blocks bought, rounded down, so any rounding goes the buyer's way and
+;;   no uSTX is lost; the approval block itself is free). `settle` (anyone) pays what has been earned
+;;   to the fee recipient of that moment. A reviewer who hides or retires a paid item during its run
+;;   ends it: the blocks run so far are earned by the fee recipient and the rest goes back to the
+;;   buyer (all of it if it never ran), and the item closes (reason 5).
+;; - Version: the number the hall polls. It moves only when something the hall paints can have changed
+;;   (posting, approving, hiding, retiring, settings). Buying, cancelling, rejecting, sweeping and
+;;   settling a pending or running slot do not move it, so buying and cancelling cannot make every
+;;   hall re-read the screen. Nothing but those paths can move escrow: there
 ;;   is no admin withdraw, and every escrowed uSTX is either refundable or settleable. Pause blocks
 ;;   buying and approving, never refunds, settling or retiring.
 ;; - Successor pointer with a one-way lock; the read interface is frozen at v1.
@@ -29,7 +35,7 @@
 ;; Kind values:   0 message, 1 news, 2 ad
 ;; Status values: 0 pending (awaiting review), 1 approved (live or scheduled), 2 closed
 ;; Closed reasons: 1 rejected, 2 cancelled, 3 swept (review window passed), 4 retired,
-;;                 5 a paid run ended early by a reviewer (unused days refunded)
+;;                 5 a paid run ended early by a reviewer (the unused part refunded)
 ;; Publisher levels: 1 publisher, 2 reviewer
 
 (define-constant ERR-NOT-AUTHORIZED (err u400))
@@ -46,6 +52,7 @@
 (define-constant ERR-NO-PENDING     (err u412))
 (define-constant ERR-LOCKED         (err u413))
 (define-constant ERR-PRICE          (err u414))
+(define-constant ERR-PRICE-MOVED    (err u415))
 
 (define-constant DAY-BLOCKS u144)
 (define-constant MAX-LIVE u32)
@@ -145,6 +152,10 @@
 (define-private (note (event (string-ascii 24)) (id uint))
   (print { event: event, id: id, version: (bump) }))
 
+;; Like `note`, but for events that cannot change what the hall paints: the version is reported, not moved.
+(define-private (quiet (event (string-ascii 24)) (id uint))
+  (print { event: event, id: id, version: (var-get version) }))
+
 (define-private (inscription-ok? (id uint) (hash (buff 32)) (size uint) (who principal))
   (and
     (is-eq (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 inscription-exists id) (ok true)) ;; @principal core
@@ -228,19 +239,19 @@
          (< (len (filter is-kind? l)) (cap-of kind))
          (< (len (filter is-paid? l)) (var-get max-paid-live)))))
 
-;; The part of a running paid item's price not yet earned: whole unstarted days x price per day.
-;; used = ceil(ran / DAY-BLOCKS): a day is charged once its first block has passed (the approval
-;; block itself charges nothing), so any rounding goes the buyer's way and no uSTX is lost.
+;; The part of a running paid item's price not yet earned. Earned = price x blocks run / blocks bought,
+;; rounded down, so the unearned part is rounded up (any rounding goes the buyer's way) and the two
+;; always add up to the price: no uSTX is lost. The approval block itself charges nothing.
 (define-private (unearned (it { kind: uint, head: (string-ascii 80), body: (string-ascii 240), image-id: uint,
     image-hash: (buff 32), image-size: uint, layout: uint, weight: uint, publisher: principal, paid: bool,
     buyer: (optional principal), days: uint, price: uint, escrow: uint, status: uint, hidden: bool,
     starts-at: uint, ends-at: uint, added-at: uint, closed-reason: uint }))
   (let (
-    (ran (if (> burn-block-height (get starts-at it)) (- burn-block-height (get starts-at it)) u0))
-    (used (/ (+ ran (- DAY-BLOCKS u1)) DAY-BLOCKS)))
-    (if (or (is-eq (get days it) u0) (>= used (get days it)))
+    (total (* (get days it) DAY-BLOCKS))
+    (ran (if (> burn-block-height (get starts-at it)) (- burn-block-height (get starts-at it)) u0)))
+    (if (or (is-eq total u0) (>= ran total))
       u0
-      (* (/ (get price it) (get days it)) (- (get days it) used)))))
+      (- (get price it) (/ (* (get price it) ran) total)))))
 
 ;; A running paid item: pay the earned part of its escrow to the fee recipient. With `stop`, also
 ;; refund the unearned part to the buyer (the run ends). Returns the escrow left on the item.
@@ -253,7 +264,7 @@
     (if stop (try! (pay-out left (default-to (var-get fee-recipient) (get buyer it)))) true)
     (map-set Items id (merge it { escrow: (if stop u0 left) }))
     (if (or (> earned u0) (and stop (> left u0)))
-      (begin (print { event: "slot-settled", id: id, earned: earned, refunded: (if stop left u0), version: (bump) }) true)
+      (begin (print { event: "slot-settled", id: id, earned: earned, refunded: (if stop left u0), version: (var-get version) }) true)
       true)
     (ok (if stop u0 left))))
 
@@ -293,7 +304,7 @@
     (ok id)))
 
 ;; Retire an item: the admin, a reviewer, or the publisher of a free item. Works while paused.
-;; A running paid item is settled: earned days to the fee recipient, unused days back to the buyer.
+;; A running paid item is settled: the part earned so far to the fee recipient, the unearned rest back to the buyer.
 (define-public (retire (id uint))
   (let ((it (unwrap! (map-get? Items id) ERR-NOT-FOUND)))
     (asserts! (< (get status it) u2) ERR-STATUS)
@@ -310,8 +321,8 @@
     (ok true)))
 
 ;; Hide or unhide an item (admin or reviewer). Unhiding puts it back in the live set if it is still running.
-;; Hiding a paid item ends its run for good (closed, reason 5): earned days to the fee recipient,
-;; unused days back to the buyer.
+;; Hiding a paid item ends its run for good (closed, reason 5): the part earned so far to the fee recipient,
+;; the unearned rest back to the buyer.
 (define-public (set-hidden (id uint) (hidden bool))
   (let ((it (unwrap! (map-get? Items id) ERR-NOT-FOUND)))
     (asserts! (is-reviewer) ERR-NOT-AUTHORIZED)
@@ -341,7 +352,7 @@
 
 (define-public (buy-slot
   (kind uint) (head (string-ascii 80)) (body (string-ascii 240))
-  (image-id uint) (image-hash (buff 32)) (image-size uint) (days uint) (layout uint))
+  (image-id uint) (image-hash (buff 32)) (image-size uint) (days uint) (layout uint) (max-price uint))
   (let (
     (buyer tx-sender)
     (id (var-get count))
@@ -355,6 +366,7 @@
     (asserts! (> (len head) u0) ERR-INVALID)
     (asserts! (and (>= days (var-get min-days)) (<= days (var-get max-days))) ERR-WINDOW)
     (asserts! (> price u0) ERR-PRICE)
+    (asserts! (<= price max-price) ERR-PRICE-MOVED)
     (asserts! (< pend (var-get max-pending-per-buyer)) ERR-CAP-PENDING)
     (asserts! (image-valid? image-id image-hash image-size buyer) ERR-INSCRIPTION)
     (asserts! (layout-ok? layout image-size) ERR-INVALID)
@@ -370,11 +382,11 @@
     (map-set PendingCount buyer (+ pend u1))
     (map-set Deadlines id (+ burn-block-height (var-get review-window)))
     (var-set count (+ id u1))
-    (print { event: "slot-bought", id: id, buyer: buyer, kind: kind, days: days, price: price, version: (bump) })
+    (print { event: "slot-bought", id: id, buyer: buyer, kind: kind, days: days, price: price, version: (var-get version) })
     (ok id)))
 
 ;; Approve a pending item (admin or reviewer). A paid item's run starts now (its escrow stays here
-;; and is earned day by day, see settle); a free item from the review lane goes live in its own window.
+;; and is earned block by block, see settle); a free item from the review lane goes live in its own window.
 (define-public (approve (id uint))
   (let (
     (it (unwrap! (map-get? Items id) ERR-NOT-FOUND))
@@ -406,7 +418,7 @@
     (map-set Items id (merge it { status: u2, closed-reason: u1, escrow: u0 }))
     (match (get buyer it) b (dec-pending b) false)
     (try! (pay-out (get escrow it) (default-to tx-sender (get buyer it))))
-    (print { event: "item-rejected", id: id, reason: reason, version: (bump) })
+    (print { event: "item-rejected", id: id, reason: reason, version: (var-get version) })
     (ok true)))
 
 ;; The buyer takes a pending item back and is refunded in full. Works while paused.
@@ -419,7 +431,7 @@
     (map-set Items id (merge it { status: u2, closed-reason: u2, escrow: u0 }))
     (dec-pending b)
     (try! (pay-out (get escrow it) b))
-    (note "item-cancelled" id)
+    (quiet "item-cancelled" id)
     (ok true)))
 
 ;; Once the review window has passed, anyone can send a pending paid item's escrow back to its buyer.
@@ -432,11 +444,11 @@
     (map-set Items id (merge it { status: u2, closed-reason: u3, escrow: u0 }))
     (dec-pending b)
     (try! (pay-out (get escrow it) b))
-    (note "item-swept" id)
+    (quiet "item-swept" id)
     (ok true)))
 
-;; Pay what a running paid item has earned so far to the fee recipient (anyone may call; a day
-;; counts once started, so after the run everything is earned). Works while paused.
+;; Pay what a running paid item has earned so far to the fee recipient (anyone may call; it is earned
+;; in proportion to the blocks run, so after the run everything is earned). Works while paused.
 (define-public (settle (id uint))
   (let ((it (unwrap! (map-get? Items id) ERR-NOT-FOUND)))
     (asserts! (and (get paid it) (is-eq (get status it) u1)) ERR-STATUS)
@@ -537,6 +549,15 @@
     (print { event: "admin-proposed", who: who, version: (bump) })
     (ok true)))
 
+;; Withdraws a hand-over that was proposed by mistake (or to the wrong address).
+(define-public (cancel-admin-proposal)
+  (begin
+    (asserts! (is-admin) ERR-NOT-AUTHORIZED)
+    (asserts! (is-some (var-get pending-admin)) ERR-NO-PENDING)
+    (var-set pending-admin none)
+    (note "admin-proposal-cancelled" u0)
+    (ok true)))
+
 (define-public (accept-admin)
   (let ((pending (unwrap! (var-get pending-admin) ERR-NO-PENDING)))
     (asserts! (caller-is pending) ERR-NOT-AUTHORIZED)
@@ -561,7 +582,8 @@
     (ok true)))
 
 ;; ---------------------------------------------------------------------------
-;; Reads (frozen at v1: add new reads as new functions, never change these)
+;; Reads (this contract is immutable once deployed: if the design must change, a new contract is deployed and
+;; the successor pointer says where)
 
 (define-read-only (get-version) (var-get version))
 (define-read-only (get-count) (var-get count))

@@ -169,6 +169,7 @@ const hostImpl: E.Host = {
         const W = win.XAWorld, cfg = W.config();
         return {
           worldConfig: JSON.parse(JSON.stringify(win.XA_WORLD_CONFIG || null)), mode: W.mode(), enabled: !!W.enabled(),
+          gamesConfig: JSON.parse(JSON.stringify(win.XA_GAMES_CONFIG || null)), games: win.XAGamesRegistry ? win.XAGamesRegistry.status() : null,
           registry: cfg.registry, posters: cfg.posters, screen: (win.XA_WORLD_CONFIG || {}).screen || '',
           wall: win.XA.wallState().map((s: any) => ({ head: s.head, shown: s.shown })),
           bays: win.XA.bayState ? JSON.parse(JSON.stringify((win.XA.bayState() || { bays: [] }).bays.map((b: any) => b && b.plan ? { base: b.plan.base } : null))) : null,
@@ -247,7 +248,7 @@ const renderHeader = () => {
   $('#root').textContent = E.rootAddr();
   $('#hot').textContent = `${E.hotAddress()} (key kept in this browser only)`;
   const w = E.worldIds();
-  $('#target').textContent = `registry ${w.registry} · posters ${w.posters} · screen ${w.screen}${E.state.inscriptionId ? ` · parent #${E.state.inscriptionId}` : ''}`;
+  $('#target').textContent = `registry ${w.registry} · posters ${w.posters} · screen ${w.screen} · games ${E.gamesIds().contract}${E.state.inscriptionId ? ` · parent #${E.state.inscriptionId}` : ''}`;
   $('#disconnect').toggleAttribute('hidden', !s);
   renderInscribing();
 };
@@ -256,11 +257,11 @@ const renderInscribing = () => {
   const built = new Date(__BUILT_AT__);
   const st = E.state;
   const rows: [string, string][] = [
-    ['Contracts', `${E.NAMES.world} · ${E.NAMES.posters} · ${E.NAMES.screen} at ${E.short(E.rootAddr())} (Clarity 4)`],
+    ['Contracts', `${E.NAMES.world} · ${E.NAMES.posters} · ${E.NAMES.screen} · ${E.NAMES.games} at ${E.short(E.rootAddr())} (Clarity 4)`],
     ['Registry', (() => { try { const c = E.launchPlan().calls; return `${c.length} planned calls (ops/lib/v2-plan.mjs launchCalls): ${c.filter((x) => x.fn === 'register-kind').length} kinds, arcade + hall live, 4 bays that show posters (no lobby)`; } catch (e) { return errText(e); } })()],
     ...E.PACKS.map((f): [string, string] => [`${f.label[0].toUpperCase()}${f.label.slice(1)}`,
       `${f.bytes.length.toLocaleString()} bytes · ${f.chunks.length} chunks · sha256 ${f.sha}${st?.packIds?.[f.key] ? ` · #${st.packIds[f.key]}` : ''}`]),
-    ['Parent', `${E.kb(E.parentEstimate())} text/html · CONFIG.world = { posters, registry, screen }${st?.inscriptionId ? ` · #${st.inscriptionId}` : ''}`],
+    ['Parent', `${E.kb(E.parentEstimate())} text/html · CONFIG.world = { posters, registry, screen } · CONFIG.games = { contract }${st?.inscriptionId ? ` · #${st.inscriptionId}` : ''}`],
     [`From #${E.RELEASE.bundle.id}`, `${E.RELEASE.fromBundle.join(', ')} (bundle sha256 ${E.short(E.RELEASE.bundle.sha256)}, not re-inscribed on mainnet)`],
     ['Release', E.RELEASE_SHA],
     ['Canary built', `${built.toLocaleString()} (your time) · ${__BUILT_AT__} UTC`],
