@@ -688,7 +688,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-30.1';
+export const AGENT_BUILD = '2026-10-30.2';
 const LOG_KEEP = 300;   // lines kept per job; a 36-batch upload writes ~8 per batch, and the START of a run is what explains a stall
 // Why this exists: a job that wrote nothing could not be told apart from one that was merely slow, and a
 // failed localStorage write used to vanish into an empty catch. Counting both makes "the page could not

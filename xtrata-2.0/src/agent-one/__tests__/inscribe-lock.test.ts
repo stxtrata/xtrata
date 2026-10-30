@@ -19,12 +19,18 @@ describe('isMarkupMime', () => {
 });
 
 describe('assertInscribeAllowed (lock on)', () => {
-  beforeEach(() => { (globalThis as any).window = { XAO_CONFIG: {} }; });
+  // The lock is released in the shipped build (2026-10-30), so these tests switch it on the way a page can.
+  beforeEach(() => { (globalThis as any).window = { XAO_CONFIG: { inscribeLock: true } }; });
   afterEach(() => { delete (globalThis as any).window; });
 
-  it('is on by default', () => {
-    expect(INSCRIBE_LOCK.locked).toBe(true);
+  it('can be forced on from page config, so a re-lock is one line', () => {
     expect(inscribeLockActive()).toBe(true);
+  });
+  it('is released in the shipped build: no config, no lock', () => {
+    (globalThis as any).window = { XAO_CONFIG: {} };
+    expect(INSCRIBE_LOCK.locked).toBe(false);
+    expect(inscribeLockActive()).toBe(false);
+    expect(() => assertInscribeAllowed({ mime: 'text/html', origin: 'music', receipt: true })).not.toThrow();
   });
   it('refuses markup single jobs, markup batches, music/suno jobs and the on-chain receipt', () => {
     expect(() => assertInscribeAllowed({ file: file(), uri: 'u', mime: 'text/html' })).toThrow(InscribeLockedError);

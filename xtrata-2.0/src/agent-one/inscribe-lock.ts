@@ -9,16 +9,16 @@
 // Until the broadcast route is fixed there is no way for those jobs to finish, so the honest
 // thing is to stop taking them *before* any money moves.
 //
-// HOW TO UNLOCK
-// Set `locked: false` below (and bump AGENT_BUILD + the ?v= on the pages) once a markup-bearing
-// broadcast gets through again. For testing against the live chain only, a page can set
-// `window.XAO_CONFIG.inscribeLock = false` before the agent loads; nothing in the product does.
+// STATUS: RELEASED 2026-10-30. Hiro confirmed the 403 came from a gateway change on their side and adjusted the
+// firewall rules, so `locked` below is now false. To lock again quickly (for example if the 403 comes back), set
+// `locked: true`, bump AGENT_BUILD + the ?v= on the pages and rebuild; or, for one page only, set
+// `window.XAO_CONFIG.inscribeLock = true` before the agent loads.
 //
 // WHAT IT DOES NOT TOUCH
 // Refund, Cancel and resume of jobs that already exist. Those must keep working.
 
 export const INSCRIBE_LOCK = {
-  locked: true,
+  locked: false,
   since: '2026-10-29',
   title: 'Song and web page inscribing is paused',
   message:
@@ -48,6 +48,7 @@ export class InscribeLockedError extends Error {
 function lockOn(): boolean {
   try {
     const cfg = (typeof window !== 'undefined' ? (window as any).XAO_CONFIG : null) || {};
+    if (cfg.inscribeLock === true) return true;    // forces the lock on, whatever the shipped default is
     if (cfg.inscribeLock === false) return false;
   } catch { /* fall through to the default */ }
   return INSCRIBE_LOCK.locked;

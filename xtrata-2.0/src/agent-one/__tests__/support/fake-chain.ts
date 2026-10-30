@@ -382,9 +382,10 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string; inscrib
 
   const g = globalThis as any;
   g.window = g.window ?? {};
-  // The markup lock is a production safety; the suite exercises the inscription machinery, so it
-  // starts unlocked. inscribe-lock.test.ts loads with `inscribeLock: true` to cover the lock itself.
-  g.window.XAO_CONFIG = { hiro: '/hiro/mainnet', mock: false, core: opts.core ?? CORE_CONTRACT.split('.')[1], inscribeLock: opts.inscribeLock ? undefined : false };
+  // The markup lock is a production safety that can be switched on again; the suite exercises the
+  // inscription machinery, so it starts unlocked. Tests of the lock itself load with `inscribeLock: true`,
+  // which forces it on whatever the shipped default is.
+  g.window.XAO_CONFIG = { hiro: '/hiro/mainnet', mock: false, core: opts.core ?? CORE_CONTRACT.split('.')[1], inscribeLock: opts.inscribeLock ? true : false };
   g.window.localStorage = localStorage;
   g.localStorage = localStorage;
   g.location = { origin: 'https://xtrata.test' };
