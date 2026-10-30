@@ -37484,7 +37484,7 @@ function radioPopOut(){   // true if the window opened (the link then does not a
   let w=null; try{ w=window.open(RADIO_URL,'xaRadioPop','popup=yes,width=440,height=760') }catch(err){}
   if(!w) return false;
   radioPop=w; try{ w.focus() }catch(err){}
-  const f=$('xa-radio-frame'); f.removeAttribute('src'); f.removeAttribute('allow'); radioLoaded=false;
+  const f=$('xa-radio-frame'); f.src='about:blank'; f.removeAttribute('allow'); radioLoaded=false;   // really unload it (removing src would leave the page running, holding pay-per-play's one-tab lock and playing a second stream)
   if(radioNow && radioNow.src==='panel') radioNow=null;
   radioHide(); radioPaint(); return true;
 }
@@ -37528,7 +37528,7 @@ addEventListener('keydown', e=>{
 }, true);
 setInterval(radioPaint, 400);   // (not called here: `state` is declared further down)
 if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.exitGame=()=>exitGame(), XA.hallState=()=>state;   // tests only
-if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:$('xa-radio-frame').getAttribute('src'), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow'), np:{shown:!$('xa-radio-np').hidden, text:$('xa-radio-np-t').textContent, playing:$('xa-radio-np').querySelector('[data-cmd=toggle]').textContent}, now:radioNow, barNote:rdBarNote.textContent});   // read-only, for tests
+if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:($('xa-radio-frame').getAttribute('src')==='about:blank'?null:$('xa-radio-frame').getAttribute('src')), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow'), np:{shown:!$('xa-radio-np').hidden, text:$('xa-radio-np-t').textContent, playing:$('xa-radio-np').querySelector('[data-cmd=toggle]').textContent}, now:radioNow, barNote:rdBarNote.textContent});   // read-only, for tests
 /* ================================================================
    CABINETS — one generator, ten configs
    ================================================================ */

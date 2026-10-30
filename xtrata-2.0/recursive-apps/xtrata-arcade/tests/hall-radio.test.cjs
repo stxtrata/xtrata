@@ -143,6 +143,8 @@ window.sendState=function(o){peers.forEach(function(w){w.postMessage(Object.assi
   check(pop.url() === 'https://radio.xtrata.xyz/radio?dock=1', 'F: it opens the compact radio in its own window (' + pop.url() + ')');
   s = await rr();
   check(!s.open && !s.loaded && !s.src && !s.allow, 'F: the panel is hidden and its copy of the radio is taken down (one radio, no two streams)');
+  await page.waitForTimeout(500);
+  check(!page.frames().some((f) => /radio\.xtrata\.xyz/.test(f.url())), 'F: the panel\'s radio page is really gone (not just its address): it would hold the pay-per-play one-tab lock and play a second stream');
   await page.click('#xa-radio-btn'); await page.waitForTimeout(400);
   s = await rr();
   check(!s.open && !s.src && radioLoads === loadsBefore + 1, 'F: the RADIO button brings the pop-out forward instead of starting a second radio');
