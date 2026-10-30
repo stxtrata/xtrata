@@ -1066,5 +1066,65 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
 fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=dbb88c2684f3')}).catch(function(){});
 </script>
+<script>
+// Arcade dock bridge: runs ONLY with ?dock=1 (the arcade's corner panel and its pop-out window). Without that flag this block does nothing.
+// 1. A hall page that is one of the allowed Xtrata origins can pair with this page (it answers our "ready" with a "hello"). Once paired we
+//    tell it what is playing (title, artist, playing or not) and it can send play/pause, next and previous. Nothing that spends money
+//    can be sent from outside: likes and paid plays are only ever started by a tap in this window.
+// 2. Inside the hall's small panel (framed, no opener) the passkey wallet cannot load, so a tap on the heart or on the wallet / pay-per-play
+//    controls asks the hall to open the pop-out window instead (where they work), and does not start the action here.
+(function(){
+  var root=document.documentElement; if(!root.hasAttribute('data-dock'))return;
+  var HALL=/^https:\/\/(?:www\.)?xtrata\.xyz$|^https:\/\/(?:[a-z0-9-]+\.)?xtrata\.pages\.dev$/;
+  var embedded=false,opener=null,parentWin=null;
+  try{if(window.opener&&window.opener!==window)opener=window.opener}catch(e){}
+  try{if(window.parent&&window.parent!==window)parentWin=window.parent}catch(e){}
+  embedded=!!parentWin&&!opener;
+  var peers=[opener,parentWin].filter(Boolean), paired=null, api=null, last='';
+  function say(win,origin,msg){msg.xtrataRadio=1;try{win.postMessage(msg,origin)}catch(e){}}
+  function ready(){peers.forEach(function(w){say(w,'*',{type:'ready'})})}   // carries nothing: only tells the hall a radio page is here
+  function snapshot(s){var np=s&&s.nowPlaying;return {type:'state',title:np?np.title:'',artist:np&&np.artist?np.artist:'',playing:!!(typeof s.playing==='boolean'?s.playing:s.on),on:!!s.on,busy:!!s.giftWait}}
+  function push(s){
+    if(!paired)return; var m=snapshot(s), sig=JSON.stringify(m); if(sig===last)return; last=sig;
+    say(paired.win,paired.origin,m);
+  }
+  addEventListener('message',function(e){
+    var d=e.data; if(!d||d.xtrataHall!==1)return;
+    var from=null; peers.forEach(function(w){if(w===e.source)from=w}); if(!from)return;      // only the page that opened or framed us
+    if(!HALL.test(e.origin))return;                                                          // and only an Xtrata origin
+    if(d.type==='hello'){paired={win:from,origin:e.origin};last='';if(api&&api.getState)try{push(api.getState())}catch(x){}return}
+    if(!paired||from!==paired.win||e.origin!==paired.origin||!api)return;
+    if(d.type==='cmd'){try{if(d.cmd==='toggle')api.playPause();else if(d.cmd==='next')api.next();else if(d.cmd==='prev')api.prev()}catch(x){}}
+  });
+  addEventListener('pagehide',function(){if(paired)say(paired.win,paired.origin,{type:'bye'})});
+  var tries=0,t=setInterval(function(){
+    if(window.XtrataRadio){clearInterval(t);api=window.XtrataRadio;api.subscribe(push);ready();
+      setInterval(function(){if(!paired)ready()},4000)}     // a hall that was reloaded pairs again on the next beat
+    else if(++tries>100)clearInterval(t);
+  },120);
+  if(!embedded)return;
+  // inside the panel: the wallet-needing controls hand over to the pop-out
+  var note=null,noteTimer=0;
+  function show(text){
+    if(!note){note=document.createElement('div');note.setAttribute('role','status');
+      note.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:80;padding:10px 12px;border-radius:12px;background:#10261f;border:1px solid #2f7d5c;color:#d7fbe8;font:13px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+      document.body.appendChild(note)}
+    note.textContent=text;note.hidden=false;clearTimeout(noteTimer);noteTimer=setTimeout(function(){note.hidden=true},6000);
+  }
+  // R and Esc inside the panel: the hall cannot see keys typed in this frame, so ask it to close the panel (not while typing in a field)
+  document.addEventListener('keydown',function(e){
+    if((e.code!=='KeyR'&&e.code!=='Escape')||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;
+    var t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;
+    peers.forEach(function(w){say(w,'*',{type:'hide-request'})});
+  });
+  document.addEventListener('click',function(e){
+    var el=e.target&&e.target.closest?e.target.closest('#heart,#ppp-top,#radio-wallet-connect,#ppp button'):null;
+    if(!el)return; e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+    var why=el.id==='heart'?'like':'wallet';
+    peers.forEach(function(w){say(w,'*',{type:'need-wallet',why:why})});
+    show(why==='like'?'Likes are paid with your passkey wallet, which works in the pop-out window. Opening it…':'Your wallet and paid plays work in the pop-out window. Opening it…');
+  },true);
+})();
+</script>
 </body>
 </html>

@@ -1715,13 +1715,26 @@ $('chainp').addEventListener('click', e=>{ if(e.target===$('chainp')) closeChain
 // does the address ?radiobranch=1 swap in that branch's own radio page, to look at a layout change before it ships; the preview has no likes or wallet set up.
 const RADIO_BASE=(/\.pages\.dev$/.test(location.hostname) && /[?&]radiobranch=1(?:&|$)/.test(location.search)) ? location.protocol+'//'+location.host : 'https://radio.xtrata.xyz';
 const RADIO_URL=RADIO_BASE+'/radio?dock=1';
-let radioOpen=false, radioLoaded=false, radioPop=null;
+let radioOpen=false, radioLoaded=false, radioPop=null, radioNow=null, npSig='';   // radioNow: what the radio (panel or pop-out) says is playing
 function radioPopAlive(){ try{ return !!(radioPop && !radioPop.closed) }catch(e){ return false } }
 function radioPaint(){   // the button is there while you can walk or are in a room; games take the whole screen, so it steps aside (the music goes on)
   const b=$('xa-radio-btn'); if(!b) return;
   const show=(state==='walk' || state==='room') && !chainOpen;
   if(b.hidden===show) b.hidden=!show;
   b.classList.toggle('on',radioOpen || radioPopAlive());
+  // now playing: a small strip beside the button while the panel is shut and something is on (display and transport only)
+  if(radioNow && radioNow.src==='pop' && !radioPopAlive()) radioNow=null;
+  const np=$('xa-radio-np'), on=!!(show && !radioOpen && radioNow && (radioNow.title || radioNow.on));
+  if(np.hidden===on) np.hidden=!on;
+  if(on){
+    const sig=[radioNow.title,radioNow.artist,radioNow.playing,radioNow.busy].join('\u0001');
+    if(sig!==npSig){ npSig=sig;
+      const txt=(radioNow.title||'Tuning…')+(radioNow.artist?' · '+radioNow.artist:'');
+      $('xa-radio-np-t').textContent=txt; np.title=txt;
+      const pp=np.querySelector('[data-cmd=toggle]'); pp.innerHTML=radioNow.playing?'&#9208;':'&#9654;';
+      for(const x of np.querySelectorAll('button')) x.disabled=!!radioNow.busy;
+    }
+  }
 }
 function radioShow(){
   if(radioOpen || chainOpen) return;
@@ -1736,7 +1749,7 @@ function radioShow(){
     f.src=RADIO_URL;
     try{ if(Room.isOn()){ Room.toggle(); paintRoom() } }catch(e){}   // the machines' own music steps aside for the radio (the music button brings it back)
   }
-  box.classList.remove('away'); box.removeAttribute('inert'); box.setAttribute('aria-hidden','false');
+  box.classList.remove('away'); box.removeAttribute('inert'); box.setAttribute('aria-hidden','false'); rdBarNote.textContent=rdBarText;
   radioPaint(); try{ $('xa-radio-hide').focus({preventScroll:true}) }catch(e){}
 }
 function radioHide(){
@@ -1750,20 +1763,55 @@ function radioHide(){
 // One radio at a time: the panel's copy is taken down; the RADIO button then brings the pop-out forward. If the browser blocks the window,
 // the link opens a new tab as it would anyway and the panel stays.
 $('xa-radio-open').href=RADIO_URL;
-$('xa-radio-open').addEventListener('click', e=>{
+function radioPopOut(){   // true if the window opened (the link then does not also open a tab)
   let w=null; try{ w=window.open(RADIO_URL,'xaRadioPop','popup=yes,width=440,height=760') }catch(err){}
-  if(!w) return;
-  e.preventDefault(); radioPop=w; try{ w.focus() }catch(err){}
+  if(!w) return false;
+  radioPop=w; try{ w.focus() }catch(err){}
   const f=$('xa-radio-frame'); f.removeAttribute('src'); f.removeAttribute('allow'); radioLoaded=false;
-  radioHide(); radioPaint();
+  if(radioNow && radioNow.src==='panel') radioNow=null;
+  radioHide(); radioPaint(); return true;
+}
+$('xa-radio-open').addEventListener('click', e=>{ if(radioPopOut()) e.preventDefault() });
+// The radio and the hall talk by postMessage (only with the radio's ?dock=1 layout): the radio says what is playing and answers play/pause, next
+// and previous. Only the radio's own origin, and only from our panel or our pop-out window, is listened to. Nothing that spends money goes over it.
+// Inside the panel the passkey wallet cannot load, so a tap on the heart or a wallet control there asks us to open the pop-out instead.
+function radioCmd(cmd){
+  let t=null; try{ t=radioPopAlive() ? radioPop : (radioLoaded ? $('xa-radio-frame').contentWindow : null) }catch(e){}
+  if(t) try{ t.postMessage({xtrataHall:1, type:'cmd', cmd}, RADIO_BASE) }catch(e){}
+}
+for(const b of $('xa-radio-np').querySelectorAll('button')) b.addEventListener('click', ()=>radioCmd(b.dataset.cmd));
+const rdBarNote=$('xa-radio').querySelector('.rd-bar span'), rdBarText=rdBarNote.textContent;
+addEventListener('message', e=>{
+  const d=e.data; if(!d || d.xtrataRadio!==1 || e.origin!==RADIO_BASE) return;
+  const fromPop=radioPopAlive() && e.source===radioPop;
+  let fromPanel=false; try{ fromPanel=radioLoaded && e.source===$('xa-radio-frame').contentWindow }catch(x){}
+  if(!fromPop && !fromPanel) return;
+  const src=fromPop ? 'pop' : 'panel';
+  if(d.type==='ready'){ try{ e.source.postMessage({xtrataHall:1, type:'hello'}, RADIO_BASE) }catch(x){} }
+  else if(d.type==='state'){ radioNow={src, title:String(d.title||'').slice(0,120), artist:String(d.artist||'').slice(0,120), playing:!!d.playing, on:!!d.on, busy:!!d.busy} }
+  else if(d.type==='hide-request' && fromPanel){ radioHide() }
+  else if(d.type==='bye'){ if(radioNow && radioNow.src===src) radioNow=null }
+  else if(d.type==='need-wallet' && fromPanel){
+    if(radioPopOut()) rdBarNote.textContent=rdBarText;
+    else { rdBarNote.textContent='Pop-up blocked: allow pop-ups, then click POP OUT'; toast('Allow pop-ups to use likes and paid plays') }
+  }
+  radioPaint();
 });
 $('xa-radio-btn').addEventListener('click', ()=>{ initAudio(); radioOpen ? radioHide() : radioShow() });
 $('xa-radio-hide').addEventListener('click', radioHide);
 $('xa-radio').addEventListener('click', e=>{ if(e.target===$('xa-radio')) radioHide() });
 addEventListener('keydown', e=>{ if(radioOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); radioHide() } }, true);
+// R: open the radio (this frees the mouse so you can use it); R again, or HIDE, puts you straight back into the hall with the mouse captured (no extra click).
+// Not while typing in a field, and not in a game (the game owns the keyboard). Inside the radio's own panel the radio page forwards R and Esc ("hide-request").
+addEventListener('keydown', e=>{
+  if(e.code!=='KeyR' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t=e.target; if(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+  if(radioOpen){ e.preventDefault(); e.stopPropagation(); radioHide(); return }
+  if((state==='walk' || state==='room') && !chainOpen && !document.querySelector('#xa-root .xa-modal')){ e.preventDefault(); e.stopPropagation(); initAudio(); radioShow() }
+}, true);
 setInterval(radioPaint, 400);   // (not called here: `state` is declared further down)
 if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.exitGame=()=>exitGame(), XA.hallState=()=>state;   // tests only
-if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:$('xa-radio-frame').getAttribute('src'), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow')});   // read-only, for tests
+if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:$('xa-radio-frame').getAttribute('src'), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow'), np:{shown:!$('xa-radio-np').hidden, text:$('xa-radio-np-t').textContent, playing:$('xa-radio-np').querySelector('[data-cmd=toggle]').textContent}, now:radioNow, barNote:rdBarNote.textContent});   // read-only, for tests
 /* ================================================================
    CABINETS — one generator, ten configs
    ================================================================ */
@@ -2359,7 +2407,7 @@ addEventListener('keydown', e=>{
   else if(e.code==='KeyQ' && focusIdx>=0 && GAMES[focusIdx].variants[0]){ startGame(focusIdx, GAMES[focusIdx].variants[0].key) }
   else if(e.code==='KeyT'){ openScores() }
   else if(e.code==='KeyM'){ toggleMute() }
-  else if(e.code==='KeyR'){ Room.toggle(); paintRoom() }
+  else if(e.code==='KeyN'){ Room.toggle(); paintRoom() }   // (R is the radio)
 });
 addEventListener('keyup', e=>{ keys[e.code]=false });
 addEventListener('blur', ()=>{ for(const k in keys) keys[k]=false });
@@ -2472,7 +2520,7 @@ function toggleFs(){ try{ if(document.fullscreenElement) document.exitFullscreen
 $('hscores').addEventListener('click', openScores);
 $('hwallet').addEventListener('click', ()=>{ freeMouse(); initAudio(); try{ XARoom.wallet() }catch(e){ console.error(e) } });
 $('hmute').addEventListener('click', toggleMute);
-function paintRoom(){ const b=$('hroom'); b.style.opacity=Room.isOn()?1:.45; b.title=Room.isOn()?'Room music on (R)':'Room music off (R)' }
+function paintRoom(){ const b=$('hroom'); b.style.opacity=Room.isOn()?1:.45; b.title=Room.isOn()?'Room music on (N)':'Room music off (N)' }
 $('hroom').addEventListener('click', ()=>{ initAudio(); Room.toggle(); paintRoom() }); paintRoom();
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) Room.pause(); else if(state==='walk'||state==='intro') Room.resume() });
 $('hfs').addEventListener('click', toggleFs);
@@ -2581,7 +2629,7 @@ function findFocus(){
 
 /* What the player is looking at in a bay (a curtain they may pull). Cabinets and playable posters come first. */
 function updateBayFocus(){
-  if(bayEngine.isGrabbing()) return;
+  if(!bayEngine || bayEngine.isGrabbing()) return;   // (no bay engine when the world reader is off)
   let h=null, hold=true;
   if(bayToast && performance.now()<bayToast.until){ h=bayToast.text; hold=false }
   else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ bayEngine.setScope(inLobbyZone() ? (i=>i>=HALL_BAYS) : (i=>i<HALL_BAYS)); const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }

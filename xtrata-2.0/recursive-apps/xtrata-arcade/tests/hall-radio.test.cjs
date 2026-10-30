@@ -4,6 +4,8 @@
 //   C  keeps playing   hiding the panel does not unload the radio (same page, loaded once); Esc, HIDE and a click outside all hide it; the hall's keys wait while it is open
 //   D  in a room       the button and the panel are there inside a room (a sandboxed room frame cannot reach them), and the radio is still the same page
 //   E  games           the button steps aside during a game; the radio page is still there afterwards
+//   G  bridge          the radio says what is playing: a now-playing strip with play/pause, next, previous (panel or pop-out; other origins ignored); a heart tap in the
+//                      panel opens the pop-out; a blocked pop-up leaves the panel up and says so
 //   F  pop-out         POP OUT opens the radio in its own window (compact layout) and takes the panel's copy down, so there is one radio; the RADIO button then
 //                      brings that window forward; once it is closed the panel works again; if the browser blocks the window the panel stays and a tab opens
 // A stub page stands in for the real radio (the test browser cannot reach the network): it counts how many times it was loaded.
@@ -19,6 +21,20 @@ const HTML = fs.readFileSync(path.join(DIST, fs.readdirSync(DIST).find((f) => /^
 let passed = 0;
 function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' + name); }
 
+// The stand-in radio speaks the dock protocol like the real page does (public/radio.html): it says "ready", answers the hall's "hello" with what is
+// playing, logs every message from the hall, and can ask for the pop-out the way the panel's heart does.
+const STUB_JS = `
+var peers=[window.opener,window.parent].filter(function(x){return x&&x!==window});
+window.__log=[];
+try{parent.postMessage({radioStub:Date.now()},"*")}catch(e){}
+peers.forEach(function(w){w.postMessage({xtrataRadio:1,type:'ready'},'*')});
+addEventListener('message',function(e){var d=e.data;if(d&&d.xtrataHall===1){window.__log.push(d);
+  if(d.type==='hello')e.source.postMessage({xtrataRadio:1,type:'state',title:'Test Song',artist:'Test Artist',playing:true,on:true},e.origin)}});
+window.sendNeed=function(){peers.forEach(function(w){w.postMessage({xtrataRadio:1,type:'need-wallet',why:'like'},'*')})};
+window.sendHide=function(){peers.forEach(function(w){w.postMessage({xtrataRadio:1,type:'hide-request'},'*')})};
+window.sendState=function(o){peers.forEach(function(w){w.postMessage(Object.assign({xtrataRadio:1,type:'state'},o),'*')})};
+`.replace(/\n/g, ' ');
+
 (async () => {
   const srv = http.createServer((req, res) => {
     if (/room-stub\.html/.test(req.url)) { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><title>stub room</title><body style="background:#123;color:#fff"><h1>ROOM STUB</h1><script>parent.postMessage({xa:"room-ready"},"*")</script>'); return; }
@@ -32,10 +48,10 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
   let radioLoads = 0;
   await ctx.route(/^https:\/\/radio\.xtrata\.xyz\//, (route) => {
     radioLoads++;
-    route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>stub radio</title><body style="background:#222;color:#fff"><h1>RADIO STUB</h1><script>parent.postMessage({radioStub:Date.now()},"*")</script>' });
+    route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>stub radio</title><body style="background:#222;color:#fff"><h1>RADIO STUB</h1><script>' + STUB_JS + '</script>' });
   });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)(?!radio\.xtrata\.xyz)/, (route) => route.abort('failed'));
-  await ctx.addInitScript(() => { window.XA_TEST = 1; Element.prototype.requestPointerLock = function () {}; window.__radioMsgs = []; addEventListener('message', (e) => { if (e.data && e.data.radioStub) window.__radioMsgs.push(e.data.radioStub); }); });
+  await ctx.addInitScript(() => { window.XA_TEST = 1; window.__locks = 0; Element.prototype.requestPointerLock = function () { window.__locks++; }; window.__radioMsgs = []; addEventListener('message', (e) => { if (e.data && e.data.radioStub) window.__radioMsgs.push(e.data.radioStub); }); });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -143,6 +159,72 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
   check(s.open && s.loaded && !!s.src, 'F: if the window is blocked the panel stays up');
   if (tab) await tab.close().catch(() => {});
   await page.evaluate(() => { window.open = window.__realOpen; });
+  // G  now playing + transport, and the panel's hand-over to the pop-out
+  const stubFrame = () => page.frames().find((f) => /radio\.xtrata\.xyz/.test(f.url()));
+  if (!(await rr()).open) { await page.click('#xa-radio-btn'); await page.waitForTimeout(300); }
+  check((await rr()).open && !!(await rr()).src, 'G: the panel is open (the radio loads again)');
+  await page.waitForFunction(() => window.XA.radioState().now && window.XA.radioState().now.src === 'panel', null, { timeout: 15000 });
+  s = await rr();
+  check(s.now.title === 'Test Song' && s.now.artist === 'Test Artist' && s.now.playing, 'G: the hall hears what the radio is playing (the radio answered the hall\'s hello)');
+  check(!s.np.shown, 'G: while the panel is open the strip is not shown (the panel has its own controls)');
+  await page.click('#xa-radio-hide'); await page.waitForTimeout(500);
+  s = await rr();
+  check(s.np.shown && /Test Song/.test(s.np.text) && /Test Artist/.test(s.np.text), 'G: with the panel shut, a now-playing strip shows the song (' + s.np.text + ')');
+  check(s.np.playing === '\u23F8', 'G: and a pause button while it plays');
+  const logOf = (fr) => fr.evaluate(() => window.__log.map((m) => m.type + (m.cmd ? ':' + m.cmd : '')));
+  await page.click('#xa-radio-np [data-cmd=next]'); await page.waitForTimeout(300);
+  await page.click('#xa-radio-np [data-cmd=toggle]'); await page.waitForTimeout(300);
+  const lg = await logOf(stubFrame());
+  check(lg[0] === 'hello' && lg.includes('cmd:next') && lg.includes('cmd:toggle'), 'G: the strip\'s next and play/pause reach the radio (' + lg.join(',') + ')');
+  await stubFrame().evaluate(() => window.sendState({ title: 'Second Song', artist: '', playing: false, on: true })); await page.waitForTimeout(700);
+  s = await rr();
+  check(/Second Song/.test(s.np.text) && s.np.playing === '\u25B6', 'G: it follows the radio: new song, and a play button when paused');
+  // a message that is not from the radio's own origin is ignored
+  await page.evaluate(() => window.postMessage({ xtrataRadio: 1, type: 'state', title: 'EVIL', playing: true, on: true }, '*')); await page.waitForTimeout(600);
+  check(!/EVIL/.test((await rr()).np.text), 'G: a message from any other origin is ignored');
+  // the panel's heart / wallet controls hand over to the pop-out
+  await page.click('#xa-radio-btn'); await page.waitForTimeout(300);
+  const [pop2] = await Promise.all([ctx.waitForEvent('page'), stubFrame().evaluate(() => window.sendNeed())]);
+  await pop2.waitForLoadState('domcontentloaded').catch(() => {});
+  s = await rr();
+  check(pop2.url() === 'https://radio.xtrata.xyz/radio?dock=1' && !s.open && !s.src, 'G: a heart tap in the panel opens the pop-out and takes the panel\'s radio down');
+  await page.waitForFunction(() => window.XA.radioState().now && window.XA.radioState().now.src === 'pop', null, { timeout: 15000 });
+  await page.waitForTimeout(600);
+  s = await rr();
+  check(s.np.shown && /Test Song/.test(s.np.text), 'G: the strip now follows the pop-out');
+  await page.click('#xa-radio-np [data-cmd=next]'); await page.waitForTimeout(300);
+  const lg2 = await logOf(pop2);
+  check(lg2.includes('cmd:next'), 'G: and its buttons control the pop-out (' + lg2.join(',') + ')');
+  await pop2.close(); await page.waitForTimeout(900);
+  check(!(await rr()).np.shown, 'G: closing the pop-out clears the strip');
+  // pop-up blocked: the panel stays and says so
+  await page.click('#xa-radio-btn');
+  await page.waitForFunction(() => window.XA.radioState().now && window.XA.radioState().now.src === 'panel', null, { timeout: 15000 });
+  await page.evaluate(() => { window.__realOpen2 = window.open; window.open = () => null; });
+  await stubFrame().evaluate(() => window.sendNeed()); await page.waitForTimeout(500);
+  s = await rr();
+  check(s.open && /blocked/i.test(s.barNote), 'G: if the pop-up is blocked the panel stays and says to allow pop-ups (' + s.barNote + ')');
+  await page.evaluate(() => { window.open = window.__realOpen2; });
+  // H  R hotkey: open the radio and free the mouse; R, or the radio's own R/Esc, or HIDE, close it and capture the mouse again (no extra click)
+  if ((await rr()).open) { await page.click('#xa-radio-hide'); await page.waitForTimeout(300); }
+  await page.evaluate(() => { window.__locks = 0; });
+  await page.keyboard.press('KeyR'); await page.waitForTimeout(400);
+  check((await rr()).open, 'H: R opens the radio panel');
+  await page.keyboard.press('KeyR'); await page.waitForTimeout(400);
+  s = await rr();
+  check(!s.open && (await page.evaluate(() => window.__locks)) >= 1, 'H: R again hides it and asks for the mouse back (' + (await page.evaluate(() => window.__locks)) + ' capture requests)');
+  await page.evaluate(() => { window.__locks = 0; });
+  await page.click('#xa-radio-btn'); await page.waitForTimeout(300);
+  await page.click('#xa-radio-hide'); await page.waitForTimeout(300);
+  check(!(await rr()).open && (await page.evaluate(() => window.__locks)) >= 1, 'H: HIDE puts you back in the hall with the mouse captured');
+  await page.keyboard.press('KeyR'); await page.waitForTimeout(400);
+  await page.evaluate(() => { window.__locks = 0; });
+  await stubFrame().evaluate(() => window.sendHide()); await page.waitForTimeout(500);
+  check(!(await rr()).open && (await page.evaluate(() => window.__locks)) >= 1, 'H: R or Esc typed inside the radio panel (which the hall cannot see) hides it too');
+  const room0 = await page.evaluate(() => document.getElementById('hroom').title);
+  await page.keyboard.press('KeyN'); await page.waitForTimeout(300);
+  const room1 = await page.evaluate(() => document.getElementById('hroom').title);
+  check(!(await rr()).open && room0 !== room1, 'H: the room-music toggle moved to N (R is the radio): ' + room0 + ' -> ' + room1);
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close(); srv.close();
   console.log('hall radio tests passed: ' + passed);

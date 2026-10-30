@@ -103,6 +103,13 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
 #xa-radio-btn:hover,#xa-radio-btn.on{border-color:var(--amber)}
 #xa-radio-btn.on b{color:var(--amber)}
 @media (max-width:560px){#xa-radio-btn b{display:none}#xa-radio-btn{padding:9px 11px}}
+#xa-radio-np{position:fixed;left:calc(max(12px,env(safe-area-inset-left,0px)) + 104px);bottom:max(12px,env(safe-area-inset-bottom,0px));z-index:9400;display:flex;align-items:center;gap:2px;max-width:min(420px,calc(100vw - 130px));height:36px;padding:0 12px 0 4px;border-radius:999px;background:rgba(20,16,34,.86);border:1px solid rgba(243,238,255,.18);backdrop-filter:blur(6px)}
+#xa-radio-np[hidden]{display:none}
+#xa-radio-np button{width:30px;height:30px;border:0;border-radius:50%;background:none;color:var(--ink);font-size:13px;cursor:pointer;padding:0;line-height:1}
+#xa-radio-np button:hover{color:var(--amber)}
+#xa-radio-np button:disabled{opacity:.35;cursor:default}
+#xa-radio-np-t{margin-left:6px;min-width:0;font-size:15px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--f-label);font-size:10.5px;letter-spacing:.04em}
+@media (max-width:560px){#xa-radio-np{left:calc(max(12px,env(safe-area-inset-left,0px)) + 52px);max-width:calc(100vw - 72px)}#xa-radio-np-t{display:none}}
 #xa-radio{position:fixed;inset:0;z-index:9700;background:rgba(3,3,10,.55);display:flex;align-items:flex-end;justify-content:flex-start;padding:max(12px,env(safe-area-inset-top,0px)) 12px max(64px,calc(env(safe-area-inset-bottom,0px) + 56px)) 12px}
 #xa-radio.away{visibility:hidden;pointer-events:none;background:transparent}
 #xa-radio .rd-box{width:min(440px,100%);height:min(86vh,720px);max-height:100%;display:flex;flex-direction:column;background:#0b0b10;border:2px solid #f7931a;border-radius:8px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.6)}

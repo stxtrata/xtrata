@@ -1,7 +1,7 @@
 <div id="stage"></div>
 
 <div id="cross" class="hud"></div>
-<div id="hint" class="hud" hidden>WASD walk · mouse look · E start · Q alt mode · T scores · Esc frees mouse</div>
+<div id="hint" class="hud" hidden>WASD walk · mouse look · E start · Q alt mode · T scores · R radio · Esc frees mouse</div>
 <div id="lockhint" class="hud" hidden>Click to look around, or drag</div>
 <div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b>START</b> <span id="ptitle"></span></span><span class="alt" id="palt" hidden><span class="key">Q</span><b id="pvar"></b></span></div>
 <div id="pprompt" class="hud" hidden><span class="key">E</span><span class="t"><b>PLAY ON-CHAIN</b> <span id="pptitle"></span></span></div>
@@ -12,7 +12,7 @@
   <button id="hscores" type="button" title="High scores (T)">🏆<span class="wide"> SCORES</span></button>
   <button id="hwallet" type="button"><span class="dot"></span><span class="lbl">WALLET</span></button>
   <button id="hmute" type="button" aria-label="Toggle sound (M)">🔊</button>
-  <button id="hroom" type="button" aria-label="Toggle room music (R)">♫</button>
+  <button id="hroom" type="button" aria-label="Toggle room music (N)">♫</button>
   <button id="hfs" type="button" class="wide" aria-label="Fullscreen">⛶</button>
 </div>
 <div id="stick" class="hud" hidden><div id="knob"></div></div>
@@ -54,7 +54,9 @@
 </div>
 <!-- Radio dock: part of the hall itself, so it is there in the hall, the lobby and every room. The panel is only hidden (never taken down)
      once opened, so an album keeps playing while you walk, play a game or go through a door. -->
-<button id="xa-radio-btn" type="button" aria-haspopup="dialog" aria-label="Xtrata Radio and your albums" title="Xtrata Radio and your albums" hidden><span aria-hidden="true">&#9834;</span><b>RADIO</b></button>
+<button id="xa-radio-btn" type="button" aria-haspopup="dialog" aria-label="Xtrata Radio and your albums" title="Xtrata Radio and your albums (R)" hidden><span aria-hidden="true">&#9834;</span><b>RADIO</b></button>
+<!-- Now playing: what the radio (panel or pop-out) says it is playing, with play/pause, next and previous. Display and transport only: likes and paid plays stay in the radio. -->
+<div id="xa-radio-np" role="group" aria-label="Now playing" hidden><button type="button" data-cmd="prev" aria-label="Previous song">&#9198;</button><button type="button" data-cmd="toggle" aria-label="Play or pause">&#9654;</button><button type="button" data-cmd="next" aria-label="Next song">&#9197;</button><span id="xa-radio-np-t"></span></div>
 <div id="xa-radio" class="away" role="dialog" aria-label="Xtrata Radio" aria-hidden="true" inert>
   <div class="rd-box">
     <div class="rd-bar"><b>XTRATA RADIO</b><span>Free here &middot; POP OUT to pay for plays</span>
