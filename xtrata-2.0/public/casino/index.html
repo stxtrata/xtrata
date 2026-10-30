@@ -167,7 +167,7 @@ body.layr-cashier-open .hud,body.layr-cashier-open #quickNav,body.layr-cashier-o
 
 .layr-presets button[aria-pressed=true]{color:#f8deae;border-color:#d6b67b;background:#d4af6720}
 
-#layrRecovery{margin-top:18px}#layrRecovery label{display:block;margin:12px 0;font-size:10px;color:#a5b2c2}#layrRecovery input:not([type=checkbox]){display:block;width:100%;margin-top:7px;padding:10px;border:1px solid #c3a06555;background:#08131f;color:#f0debd;border-radius:4px;font:11px monospace}#layrCheckTransaction,#layrRecovery button,.layr-wallet-row button{padding:10px 12px;background:#13263a;border:1px solid #c4a26166;border-radius:4px;color:#e0c59c;font:11px Arial;cursor:pointer}.layr-wallet-row{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 8px}#layrWalletAddress{font:10px/1.6 monospace;color:#a2b2c6;word-break:break-all}#layrTestnetError{font-size:12px;line-height:1.6;color:#edbd86}#layrTransactionLink{font:11px Arial;color:#d7bf91;display:inline-block;margin:8px 12px 8px 0}#layrRecovery{padding:14px;background:#142639;border:1px solid #c7a36b55;font:11px/1.6 Arial}#layrRecovery input[type=checkbox]{accent-color:#c3a066}#layrDispenserPanel button:disabled{opacity:.45;cursor:default}#layrDispenserPanel[hidden],#layrDispenserPanel [hidden]{display:none!important}
+#layrRecovery{margin-top:18px}#layrRecovery label{display:block;margin:12px 0;font-size:10px;color:#a5b2c2}#layrRecovery input:not([type=checkbox]){display:block;width:100%;margin-top:7px;padding:10px;border:1px solid #c3a06555;background:#08131f;color:#f0debd;border-radius:4px;font:11px monospace}#layrCheckTransaction,#layrRecovery button,.layr-wallet-row button{padding:10px 12px;background:#13263a;border:1px solid #c4a26166;border-radius:4px;color:#e0c59c;font:11px Arial;cursor:pointer}.layr-wallet-row{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 8px}#layrWalletAddress{font:10px/1.6 monospace;color:#a2b2c6;word-break:break-all}#layrTestnetError{font-size:12px;line-height:1.6;color:#edbd86}#layrOwnWalletNote{font-size:12px;line-height:1.6;color:#a9c8ee;margin:6px 0 8px}#layrTransactionLink{font:11px Arial;color:#d7bf91;display:inline-block;margin:8px 12px 8px 0}#layrRecovery{padding:14px;background:#142639;border:1px solid #c7a36b55;font:11px/1.6 Arial}#layrRecovery input[type=checkbox]{accent-color:#c3a066}#layrDispenserPanel button:disabled{opacity:.45;cursor:default}#layrDispenserPanel[hidden],#layrDispenserPanel [hidden]{display:none!important}
 
 .layr-account-note code{display:block;font-size:10px;overflow-wrap:anywhere;color:#c6af89}
 
@@ -194,26 +194,37 @@ body.parallax-bar-expanded #quickNav,body.parallax-bar-expanded #intro,body.para
 <div id="tools"><button id="back" aria-label="Back to the floor">← Floor</button><div id="bankpill"><span>LAYR · SHARED BALANCE</span><b id="bank">0 LAYR</b><em id="sess"></em></div><div class="rt"><button id="chipsButton" aria-label="View the LAYR chips">LAYR</button><button id="ambienceButton" aria-label="Adjust room ambience">◐</button><button id="scbtn" aria-label="Open the Strata Club tables (testnet rules)" title="Strata Club tables">⛓ Strata Club</button><button id="modebtn" aria-label="Switch between walking and overview">🚶 Walk</button><button id="music" aria-label="Toggle music" title="Music">🎵</button><button id="mute" aria-label="Toggle sound">🔊</button></div></div>
 <div id="cross" class="hud" hidden></div><div id="hint" class="hud" hidden>WASD walk · mouse look · Shift run · E sit / play · Tab overview</div><div id="lockhint" class="hud" hidden>Click to look around, or drag</div><div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b id="pverb">SIT</b> <span id="ptitle"></span></span></div><button id="tapsit" class="hud" hidden></button><div id="stick" class="hud" hidden><div id="knob"></div></div>
 <section id="machinesPanel" class="pxmodal" hidden aria-label="Fruit machines"><button class="close" data-close-px="machinesPanel" aria-label="Close machine selection">×</button><h2>Find your next spin.</h2><p>Five original machines. Ten cabinets across the floor. Walk up and press E to connect without moving your camera. Space plays; keep walking and looking around. Cabinet view is optional.</p><div class="machine-grid"><button class="machine-choice" data-machine-type="0" style="--machine-color:#30203e;--machine-accent:#4fe3d2"><b>The Drop</b><small>Music · beat-locked reels</small><em>PLAY THE MACHINE ↗</em></button><button class="machine-choice" data-machine-type="1" style="--machine-color:#102c42;--machine-accent:#39d8ff"><b>Forever Twins</b><small>On-chain art · twin bonuses</small><em>PLAY THE MACHINE ↗</em></button><button class="machine-choice" data-machine-type="2" style="--machine-color:#3c291b;--machine-accent:#ffbe70"><b>Deep Strata</b><small>Excavation · layer cascades</small><em>PLAY THE MACHINE ↗</em></button><button class="machine-choice" data-machine-type="3" style="--machine-color:#243121;--machine-accent:#e7c18a"><b>Block Fortune</b><small>Genesis edition · crypto reels</small><em>PLAY THE MACHINE ↗</em></button><button class="machine-choice" data-machine-type="4" style="--machine-color:#172a30;--machine-accent:#80c7bd"><b>Neon Vault</b><small>Bitcoin · vault bonuses</small><em>PLAY THE MACHINE ↗</em></button></div></section>
-<div id="pxMachineToolbar"><button id="pxMachineLeave">Disconnect</button><button id="pxMachineHere" aria-pressed="true">Play here</button><button id="pxMachineView">Cabinet view</button><button id="pxMachineFullscreen">Full screen</button></div>
+<div id="pxMachineToolbar"><button id="pxMachineLeave" aria-label="Walk away from this machine">← Walk away</button><button id="pxMachineHere" aria-pressed="true">Play here</button><button id="pxMachineView">Cabinet view</button><button id="pxMachineFullscreen">Full screen</button></div>
 <div id="pxFallbackMachine" hidden><canvas id="pxFallbackScreen" width="1400" height="960" aria-label="Live machine screen"></canvas></div>
 <section id="pxCabinetControls" hidden aria-label="Casino machine controls"><div class="pxCabinetInfo"><div class="pxName"><b id="pxMachineName"></b><small>CASINO FLOOR · SHARED LAYR</small></div><div><small>BALANCE</small><b id="pxMachineBalance">—</b></div><div><small>BET</small><b id="pxMachineBet">—</b></div><div><small>LAST WIN</small><b id="pxMachineWin">—</b><button id="pxMachineGamble" data-cabinet-action="gamble" hidden></button></div></div><div id="pxMachineStatus" aria-live="polite">Connecting…</div><div class="pxCabinetActions"><button id="pxMachineBetDown" data-cabinet-action="betDown" aria-label="Decrease machine bet">−</button><button id="pxMachineBetUp" data-cabinet-action="betUp" aria-label="Increase machine bet">+</button><button data-cabinet-action="max">Max bet</button><button id="pxMachineTurbo" data-cabinet-action="turbo" aria-pressed="false">Turbo</button><button id="pxMachineAuto" data-cabinet-action="auto" aria-pressed="false">Auto</button><button id="pxMachineSound" data-cabinet-action="sound">Sound on</button><button data-cabinet-action="pays">Pays</button><button id="pxMachineRules">? Rules</button><button id="pxMachineMoreButton">More</button><button id="pxMachineSpin" data-cabinet-action="spin">Connecting…</button></div><p id="pxMachineModeHint"></p><div id="pxMachineMore" hidden><button data-cabinet-action="pays">Paytable</button><button data-cabinet-action="max">Max bet</button><button data-cabinet-action="turbo">Toggle turbo</button><button data-cabinet-action="auto">Autoplay</button><button data-cabinet-action="account">LAYR account</button><button data-cabinet-action="history">Session history</button><button data-cabinet-action="settings">Settings</button><button data-cabinet-action="sound">Toggle sound</button></div></section>
 <div id="pxMachineFeature" hidden aria-label="Machine bonus"></div><div id="pxMachineModal" hidden role="dialog" aria-modal="true" aria-label="Machine options"></div>
-<section id="layrDispenserPanel" hidden role="dialog" aria-modal="false" aria-labelledby="layrExchangeHeading">
- <div class="layr-panel-head"><div><small>PARALLAX / STACKS TESTNET</small><h2 id="layrExchangeHeading">LAYR exchange.</h2></div><button id="layrCloseDispenser" aria-label="Close LAYR dispenser">×</button></div>
- <p id="layrDispenserTitle"></p><p class="review-note">Both dispensers credit the same LAYR balance in this browser.</p>
-<div class="review-balances"><div><small>AVAILABLE TESTNET STX</small><b id="layrWalletBalance">Connect wallet</b><button id="layrRefreshBalance" aria-label="Refresh wallet balance">↻</button></div><div><small>YOUR CASINO LAYR</small><b id="layrReviewBalance">—</b></div></div>
-<p id="layrBalanceHint" class="review-note">Network fees are additional; your wallet confirms the final fee.</p>
+<section id="layrDispenserPanel" hidden role="dialog" aria-modal="false" aria-labelledby="layrExchangeHeading" data-state="disconnected">
+ <div class="layr-panel-head"><div><small>TESTNET · PLAY MONEY</small><h2 id="layrExchangeHeading">LAYR exchange</h2><p id="layrDispenserTitle"></p></div><button id="layrCloseDispenser" class="lx-leave" aria-label="Leave the LAYR exchange">✕ Leave</button></div>
+ <div class="lx-wallet lx-card">
+  <button id="layrConnectWallet" class="lx-connect">Connect wallet</button>
+  <div class="lx-who"><small>WALLET</small><span id="layrWalletAddress"></span></div>
+  <div class="lx-stx"><small>TESTNET STX</small><b id="layrWalletBalance">—</b><button id="layrRefreshBalance" aria-label="Refresh wallet balance">↻</button><a id="lxFaucet" href="https://explorer.hiro.so/sandbox/faucet?chain=testnet" target="_blank" rel="noopener">Get free testnet STX ↗</a></div>
+  <p id="lxWalletHint" class="lx-hint"></p>
+ </div>
+ <p id="layrOwnWalletNote" role="status" hidden>Heads up: this is the exchange's own wallet, and a wallet can't pay itself. To buy LAYR, connect a different wallet or account.</p>
+ <div class="lx-chips"><small>YOUR CHIPS</small><b id="layrReviewBalance">—</b></div>
+ <div class="lx-buy">
+  <div class="layr-presets" role="group" aria-label="Choose an amount"><button data-layr-amount="1" aria-pressed="true"><b>1 STX</b><small>100k LAYR</small></button><button data-layr-amount="2" aria-pressed="false"><b>2 STX</b><small>200k LAYR</small></button><button data-layr-amount="5" aria-pressed="false"><b>5 STX</b><small>500k LAYR</small></button><button data-layr-amount="10" aria-pressed="false"><b>10 STX</b><small>1M LAYR</small></button></div>
+  <button id="layrDispenseButton" disabled>Buy</button>
+  <p id="layrBalanceHint" class="lx-hint"></p>
+ </div>
  <div id="layrProgress" role="status" aria-live="polite"><span id="layrSpinner" hidden aria-hidden="true"></span><b id="layrProgressTitle">Ready to connect</b><ol><li data-funding-step="wallet">Wallet approval</li><li data-funding-step="pending">Confirmation</li><li data-funding-step="credited">LAYR credited</li></ol><p id="layrDispenserStatus"></p><a id="layrTransactionLink" hidden target="_blank" rel="noopener">View testnet transaction ↗</a><button id="layrCheckTransaction" hidden>Check confirmation</button></div>
-<div id="layrSuccessReceipt" hidden role="status"></div><label class="layr-terminal-label">Dispenser<select id="layrDispenserSelect" aria-label="Choose LAYR dispenser"><option value="0">Grand entrance · LAYR-01</option><option value="1">The lounge · LAYR-02</option></select></label>
- <div class="layr-quote"><div><small>YOU PAY · TESTNET</small><strong><span id="layrStxAmount">1</span><em> STX</em></strong></div><span class="layr-arrow">→</span><div><small>CASINO CREDIT</small><strong><span id="layrReceiveAmount">100,000</span><em> LAYR</em></strong></div></div>
- <label class="layr-range-label" for="layrAmountRange">Choose 1–10 testnet STX</label><input id="layrAmountRange" type="range" min="1" max="10" step="1" value="1" aria-label="STX amount">
- <div class="layr-presets"><button data-layr-amount="1" aria-pressed="true">1 STX</button><button data-layr-amount="2" aria-pressed="false">2 STX</button><button data-layr-amount="5" aria-pressed="false">5 STX</button><button data-layr-amount="10" aria-pressed="false">10 STX</button></div>
- <div class="layr-wallet-row"><button id="layrConnectWallet">Connect testnet wallet</button><button id="layrSyncFunding">Check pending transfer</button></div><p id="layrWalletAddress"></p>
- <button id="layrDispenseButton" disabled>Connect your testnet wallet</button>
+ <div id="layrSuccessReceipt" hidden role="status"></div>
  <p id="layrTestnetError" role="alert"></p>
- <details id="layrRecoveryDetails"><summary>Recover an earlier transfer</summary><div id="layrRecovery" hidden><p>Already paid, or lost the wallet response? Connect the sending wallet and recover its testnet transfer here.</p><label>Transaction ID<input id="layrRecoveryTx" placeholder="0x…" autocomplete="off"></label><button id="layrRecoverTransaction">Recover transaction</button><div id="layrUnsignedRecovery" hidden><label><input id="layrNoBroadcast" type="checkbox"> I checked my wallet: no transaction was broadcast</label><button id="layrClearUnsigned">Clear unsigned request</button></div></div></details>
- <p><a href="https://explorer.hiro.so/sandbox/faucet?chain=testnet" target="_blank" rel="noopener">Get testnet STX ↗</a> <span class="review-note">Select Stacks testnet in your wallet.</span></p><div class="layr-room-balance"><span>Shared casino LAYR balance</span><b><span id="layrRoomBalance"></span> LAYR</b></div>
- <p class="layr-account-note">Your wallet sends a plain testnet STX transfer to <code>ST10W2EEM757922QTVDZZ5CSEW55JEFNN33V2E7YA</code>. After the testnet API confirms it, LAYR is credited in this browser. These are browser casino credits. Network fees are additional. Casino LAYR, game progress and receipts stay in this browser and do not automatically sync to other browsers or devices. Clearing site data can remove them.</p>
+ <details id="lxMore"><summary>More options</summary>
+  <label class="layr-terminal-label">Exchange<select id="layrDispenserSelect" aria-label="Choose LAYR dispenser"><option value="0">Grand entrance · LAYR-01</option><option value="1">The lounge · LAYR-02</option></select></label>
+  <p class="lx-hint">Both exchanges fill the same chip balance.</p>
+  <label class="layr-range-label" for="layrAmountRange">Other amount: <span id="lxRangeValue">1</span> STX</label><input id="layrAmountRange" type="range" min="1" max="10" step="1" value="1" aria-label="STX amount">
+  <span hidden><span id="layrStxAmount">1</span><span id="layrReceiveAmount">100,000</span><button id="layrSyncFunding">Check pending transfer</button></span>
+  <details id="layrRecoveryDetails"><summary>Recover an earlier transfer</summary><div id="layrRecovery" hidden><p>Already paid, or lost the wallet response? Connect the sending wallet and recover its testnet transfer here.</p><label>Transaction ID<input id="layrRecoveryTx" placeholder="0x…" autocomplete="off"></label><button id="layrRecoverTransaction">Recover transaction</button><div id="layrUnsignedRecovery" hidden><label><input id="layrNoBroadcast" type="checkbox"> I checked my wallet: no transaction was broadcast</label><button id="layrClearUnsigned">Clear unsigned request</button></div></div></details>
+  <div class="layr-room-balance"><span>Shared casino LAYR balance</span><b><span id="layrRoomBalance"></span> LAYR</b></div>
+  <p class="layr-account-note">Your wallet sends a plain testnet STX transfer to <code>ST10W2EEM757922QTVDZZ5CSEW55JEFNN33V2E7YA</code>. After the testnet API confirms it, LAYR is credited in this browser. These are browser casino credits. Network fees are additional. Casino LAYR, game progress and receipts stay in this browser and do not automatically sync to other browsers or devices. Clearing site data can remove them.</p>
+ </details>
 </section>
 
 
@@ -2308,7 +2319,7 @@ function mount(options){
 `;root.appendChild(compact);const wrap=document.createElement('div');root.appendChild(wrap);
  wrap.innerHTML=`<svg class="pb-atlas" aria-hidden="true"><defs><image id="pbAtlasImage" width="${catalog.atlas.width}" height="${catalog.atlas.height}" href="${options.atlas||window.ParallaxBarAtlas}"></image></defs></svg>
  <div class="pb-stage" hidden><canvas id="pbStage" aria-label="Live three dimensional bar and bartender"></canvas><div class="pb-stage-label">ADRIAN / YOUR BARTENDER</div><div class="pb-stage-brand">The Afterglow.</div><div class="pb-stage-note">Live 3D geometry · simplified lighting<br>WebGL is unavailable in this browser.</div></div>
- <section class="pb-shell" hidden role="dialog" aria-modal="false" aria-labelledby="pbTitle"><header class="pb-head"><div><div class="pb-kicker">PARALLAX / DRINKS AFTER DARK</div><h2 id="pbTitle">The Afterglow.</h2><p>Fine drinks. Progressively bad ideas.</p></div><div class="pb-head-tools"><div class="pb-wallet" title="Shared local LAYR account. On-chain settlement is not connected."><small>YOUR LAYR BALANCE</small><span id="pbBalance">0</span></div><button class="pb-icon pb-history-head" data-act="history" aria-label="Order history">↺</button><button class="pb-icon" data-act="collapse" aria-label="Look at the bar">−</button><button class="pb-icon" data-act="close" aria-label="Leave the bar">×</button></div></header>
+ <section class="pb-shell" hidden role="dialog" aria-modal="false" aria-labelledby="pbTitle"><header class="pb-head"><div><div class="pb-kicker">PARALLAX / DRINKS AFTER DARK</div><h2 id="pbTitle">The Afterglow.</h2><p>Fine drinks. Progressively bad ideas.</p></div><div class="pb-head-tools"><div class="pb-wallet" title="Shared local LAYR account. On-chain settlement is not connected."><small>YOUR LAYR BALANCE</small><span id="pbBalance">0</span></div><button class="pb-icon pb-history-head" data-act="history" aria-label="Order history">↺</button><button class="pb-icon" data-act="collapse" aria-label="Look at the bar">−</button><button class="pb-icon" data-act="close" aria-label="Leave the bar" style="font:700 13px Arial;padding:8px 14px;min-height:40px;border:1px solid #d6b67b;border-radius:999px;color:#f3d9a6;white-space:nowrap">← Leave</button></div></header>
  <nav class="pb-tabs" aria-label="Menu sections">${[{id:'all',label:'Everything'},...catalog.categories].map(c=>`<button data-act="category" data-id="${c.id}" aria-selected="false">${c.label}</button>`).join('')}</nav>
  <div class="pb-view-tabs" role="tablist" aria-label="Bar panel"><button data-act="view-menu" role="tab" aria-selected="true">Menu</button><button data-act="view-round" role="tab" aria-selected="false">Your round <span id="pbRoundCount"></span></button><button data-act="history" role="tab" aria-selected="false">Your evening</button></div><div class="pb-layout" data-view="menu"><main class="pb-menu" id="pbMenu"></main><aside class="pb-side"><div class="pb-host"><div class="pb-monogram" aria-hidden="true">A</div><div><span class="pb-host-name">Adrian</span><span class="pb-host-role">HEAD BARTENDER · AT YOUR SERVICE</span></div></div><div class="pb-bubble" id="pbMessage" aria-live="polite"></div><div class="pb-chat-actions"><button data-act="recommend">Recommend a drink</button><button data-act="outrageous">Something ridiculous</button><button data-act="zero">Alcohol-free</button><button data-act="snacks">A little food</button></div><form class="pb-ask" id="pbAsk"><input id="pbQuestion" maxlength="140" placeholder="Ask about a drink…" aria-label="Ask the bartender"><button aria-label="Ask Adrian">↗</button></form><div class="pb-cart-heading"><h3>Your round <small id="pbCount"></small></h3><button data-act="clear">Clear basket</button></div><div id="pbCart"></div><div class="pb-total"><span>TOTAL</span><b id="pbTotal">0 LAYR</b></div><div class="pb-after"><span>Balance afterwards</span><span id="pbAfter">—</span></div><button class="pb-pay" data-act="pay" id="pbPay">Add something to your round</button><p class="pb-note">Virtual drinks & food. Charged once from your shared LAYR balance. Up to 6 servings per round.</p><p class="pb-error" id="pbError" role="status"></p><button class="pb-reconnect" data-act="reconnect" id="pbReconnect" hidden>Reconnect LAYR account</button><div class="pb-order" id="pbOrder" hidden><small id="pbOrderRef"></small><div class="pb-order-title" id="pbOrderTitle"></div><div class="pb-order-copy" id="pbOrderCopy"></div><div class="pb-track" id="pbTrack"><span id="pbProgress"></span></div><div class="pb-servings" id="pbServings"></div><button class="pb-sip" data-act="consume" id="pbConsume" hidden>Take a sip</button><button class="pb-sip" data-act="take-serving" id="pbTakeServing" hidden>Take to my next table</button></div><button class="pb-orders-link" data-act="history">Your orders & receipts ↗</button></aside></div></section>
  <button class="pb-mini" hidden data-act="expand">The Afterglow · Menu ↗<small id="pbMiniStatus">Adrian is at your service</small></button><div class="pb-toast" hidden role="status"></div>`;
@@ -7536,7 +7547,7 @@ function create(options){
    address=a.address;phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
  }
- async function purchase(stx){if(exchangeShut())throw Error(SHUT_MSG);if(busy||pending)throw Error('Resolve the pending wallet transfer before sending another payment.');if(!Number.isInteger(stx)||stx<1||stx>10)throw Error('Choose a whole amount from 1 to 10 STX.');if(!address)throw Error('Connect your testnet wallet first.');
+ async function purchase(stx){if(exchangeShut())throw Error(SHUT_MSG);if(busy||pending)throw Error('Resolve the pending wallet transfer before sending another payment.');if(!Number.isInteger(stx)||stx<1||stx>10)throw Error('Choose a whole amount from 1 to 10 STX.');if(!address)throw Error('Connect your testnet wallet first.');if(address===RECIPIENT)throw Error('The LAYR exchange pays into this wallet, and a wallet cannot pay itself. Connect a different wallet or account to buy LAYR.');
   if(walletBalance.status==='ready'&&Date.now()-walletBalance.checkedAt<60000&&BigInt(walletBalance.availableMicroStx)<BigInt(stx)*1000000n)throw Error('Not enough available testnet STX for this amount. Network fees are additional.');
   busy=true;busyKind='purchase';error='';phase='wallet';receipt=null;storage.removeItem(PENDING+'.receipt');
   try{if(!account.ready()&&!await account.acquire())throw Error(account.error()||'Close other casino tabs, then reconnect.');
@@ -8247,10 +8258,14 @@ function applyTestnetFunding(proof){
     const isolated=html.slice(0,begin)+'<script>'+npcAccountSource+endTag+html.slice(end+endTag.length);
     return isolated.replace(/connect\(\s*ac\.destination\s*\)/g,'connect(window.ParallaxNpcSound.output(ac))').replace('<script>'+npcAccountSource,'<script>'+npcAudioSource+npcAccountSource).replace('window.PX_CASINO_ENGINE={','window.ParallaxNpcSoundInit=audioInit;window.PX_CASINO_ENGINE={');
   }
+  // MOBILE REELS (2026-10-30): phone browsers pause animation in hidden frames, which froze the reels mid-spin.
+  // Each game frame gets a tiny helper; if its own animation timer stalls for 120 ms, the casino's main loop drives it instead.
+  function pxRafShim(html){const shim='<script>(function(){var w=window,nat=w.requestAnimationFrame&&w.requestAnimationFrame.bind(w),natC=w.cancelAnimationFrame&&w.cancelAnimationFrame.bind(w);if(!nat||w.__pxPump)return;var q=new Map(),n=0,h=0,since=0,driven=false;function run(t){h=0;since=0;var list=Array.from(q.values());q.clear();for(var i=0;i<list.length;i++){try{list[i](t)}catch(e){(function(e){setTimeout(function(){throw e})})(e)}}}w.requestAnimationFrame=function(cb){var id=++n;q.set(id,cb);if(!since)since=performance.now();if(!h&&!driven)h=nat(run);return id};w.cancelAnimationFrame=function(id){q.delete(id)};w.__pxPump=function(){if(!q.size)return;var now=performance.now();if(!driven&&now-since<120)return;driven=true;if(h){natC(h);h=0}run(now)}})();<\/script>',m=/<head[^>]*>/i.exec(html);return m?html.slice(0,m.index+m[0].length)+shim+html.slice(m.index+m[0].length):shim+html;}
+  function pumpMachineFrames(){for(const f of document.getElementsByClassName('pxLogicFrame')){try{const w=f.contentWindow;if(w&&w.__pxPump)w.__pxPump();}catch(_){}}}
   async function startNpcMachine(machine){
     let frame;
     try{
-      const html=npcGameDocument(await decodePXGzip(window.PX_MACHINE_PACKS[machine.type].game));
+      const html=pxRafShim(npcGameDocument(await decodePXGzip(window.PX_MACHINE_PACKS[machine.type].game)));
       frame=document.createElement('iframe');frame.className='pxLogicFrame';frame.title='Casino guest practice machine';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
       const api=await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('NPC machine did not become ready')),20000);frame.onload=()=>{clearTimeout(timeout);const api=frame.contentWindow.PX_CASINO_ENGINE;api?resolve(api):reject(Error('NPC machine engine unavailable'));};frame.srcdoc=html;});
       await api.activate();
@@ -8392,7 +8407,7 @@ function applyTestnetFunding(proof){
   }
   async function createCasinoEngine(type){
     if(machineEngines.has(type))return machineEngines.get(type);
-    const html=pxRlPatch(await decodePXGzip(window.PX_MACHINE_PACKS[type].game)),frame=document.createElement('iframe');frame.className='pxLogicFrame';frame.title=window.PX_MACHINE_PACKS[type].name+' game logic';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
+    const html=pxRafShim(pxRlPatch(await decodePXGzip(window.PX_MACHINE_PACKS[type].game))),frame=document.createElement('iframe');frame.className='pxLogicFrame';frame.title=window.PX_MACHINE_PACKS[type].name+' game logic';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
     const api=await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Machine did not become ready')),20000);frame.onload=()=>{const api=frame.contentWindow.PX_CASINO_ENGINE;if(!api){clearTimeout(timeout);reject(new Error('Game engine API missing'));return;}clearTimeout(timeout);resolve(api);};frame.srcdoc=html;});
     const texture=new THREE.CanvasTexture(api.screen);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=false;texture.anisotropy=16;
     for(const m of room.machines.filter(m=>m.type===type&&!m.occupied)){const screen=m.model.getObjectByName('px-screenMesh');if(screen){screen.material=screen.material.clone();screen.material.map=texture;screen.material.color.setHex(0xffffff);screen.material.needsUpdate=true;}}
@@ -10965,19 +10980,35 @@ function applyTestnetFunding(proof){
     return Object.freeze({stx,microStx:stx*1000000,layr:stx*100000,rate:100000,network:'testnet',mode:'testnet',onChainConnected:!!testnetLAYR.snapshot().address});
   }
   function paintDispenserPanel(){
-    const q=layrQuote(dispenserAmount),st=testnetLAYR.snapshot(),fmt=n=>n.toLocaleString('en-GB'),shut=exchangeShut();
+    const q=layrQuote(dispenserAmount),st=testnetLAYR.snapshot(),fmt=n=>n.toLocaleString('en-GB'),shut=exchangeShut(),own=!!st.address&&st.address===st.recipient;
     paintReviewFunding(st,q);if(st.pending?.state==='check-wallet')$('layrRecoveryDetails').open=true;
     $('layrDispenserTitle').textContent=activeDispenser?activeDispenser.label+' · '+activeDispenser.id:'LAYR exchange';
     $('layrStxAmount').textContent=String(q.stx);$('layrReceiveAmount').textContent=fmt(q.layr);$('layrRoomBalance').textContent=fmt(bank);$('layrAmountRange').value=String(q.stx);
     for(const b of document.querySelectorAll('[data-layr-amount]')){b.setAttribute('aria-pressed',String(+b.dataset.layrAmount===q.stx));b.disabled=st.busy||!!st.pending||shut;}
-    $('layrAmountRange').disabled=st.busy||!!st.pending||shut;$('layrDispenseButton').disabled=!st.address||st.busy||!!st.pending||shut||reviewInsufficient(st,q);
-    $('layrDispenseButton').textContent=shut&&!st.pending?'Exchange closed for now':st.pending?'Awaiting testnet confirmation…':st.busy?'Wallet request in progress…':!st.address?'Connect your testnet wallet':'Pay '+q.stx+' testnet STX → '+fmt(q.layr)+' LAYR';
+    $('layrAmountRange').disabled=st.busy||!!st.pending||shut;$('layrDispenseButton').disabled=!st.address||own||st.busy||!!st.pending||shut||reviewInsufficient(st,q);
+    $('layrDispenseButton').textContent=shut&&!st.pending?'Exchange closed for now':st.pending?'Awaiting testnet confirmation…':st.busy?'Wallet request in progress…':!st.address?'Connect your testnet wallet':own?'Use a different wallet to pay':'Pay '+q.stx+' testnet STX → '+fmt(q.layr)+' LAYR';
     $('layrConnectWallet').textContent=st.busy&&st.busyKind==='connect'?'Cancel wallet request':st.address?'Reconnect testnet wallet':'Connect testnet wallet';$('layrConnectWallet').disabled=(st.busy&&st.busyKind!=='connect')||(shut&&!st.pending&&!(st.busy&&st.busyKind==='connect'));
-    $('layrWalletAddress').textContent=st.address||'No testnet wallet connected';$('layrSyncFunding').disabled=!st.address||!st.pending?.txId||st.busy;
+    $('layrWalletAddress').textContent=st.address||'No testnet wallet connected';{const note=$('layrOwnWalletNote');if(note)note.hidden=!own;}$('layrSyncFunding').disabled=!st.address||!st.pending?.txId||st.busy;
     $('layrDispenserStatus').textContent=shut&&!st.busy&&!st.pending?'The LAYR exchange is closed for now. Payments you already sent are still credited.':st.status||'1 testnet STX = 100,000 LAYR. Connect your wallet to purchase.';$('layrTestnetError').textContent=st.error;
     const txId=st.pending?.txId||st.receipt?.txId;$('layrTransactionLink').hidden=!txId;if(txId)$('layrTransactionLink').href='https://explorer.hiro.so/txid/'+txId+'?chain=testnet';
-    $('layrCheckTransaction').hidden=!st.pending?.txId;$('layrRecovery').hidden=false;$('layrUnsignedRecovery').hidden=!st.pending||!!st.pending.txId;$('layrClearUnsigned').disabled=st.busy;
+    $('layrCheckTransaction').hidden=!st.pending?.txId;$('layrRecovery').hidden=false;$('layrUnsignedRecovery').hidden=!st.pending||!!st.pending.txId;$('layrClearUnsigned').disabled=st.busy;try{pxPaintExchange(st,q,shut,own);}catch(e){console.warn('exchange layout',e);}
     for(const d of room.dispensers||[])drawDispenserScreen(d);
+  }
+  // EXCHANGE LAYOUT (2026-10-30): one main button at a time; the panel's data-state drives what shows.
+  function pxPaintExchange(st,q,shut,own){
+    const panel=$('layrDispenserPanel');if(!panel)return;
+    const fmt=n=>Number(n).toLocaleString('en-GB'),phase=st.pending?.state==='check-wallet'?'check-wallet':st.phase,connecting=st.busy&&st.busyKind==='connect';
+    const state=shut&&!st.pending&&!st.busy?'shut':!st.address?(connecting?'connecting':'disconnected'):(st.busy||st.pending)?'busy':'ready';
+    panel.dataset.state=state;
+    const cw=$('layrConnectWallet');cw.textContent=connecting?'Cancel':st.address?'Switch':'Connect wallet';cw.setAttribute('aria-label',connecting?'Cancel the wallet request':st.address?'Connect a different wallet':'Connect your testnet wallet');
+    const a=st.address||'',w=$('layrWalletAddress');w.textContent=a?a.slice(0,5)+'…'+a.slice(-4):'';w.title=a;
+    $('lxWalletHint').textContent=state==='connecting'?'Approve the connection in your wallet…':state==='disconnected'?'Free to connect. Set your wallet to Stacks testnet. 1 STX buys 100,000 LAYR.':state==='shut'?'The exchange is closed for now. Payments you already sent are still credited.':'';
+    const insufficient=reviewInsufficient(st,q),buy=$('layrDispenseButton');
+    buy.textContent=state==='shut'?'Exchange closed for now':st.pending?'Waiting for confirmation…':st.busy?'Approve in your wallet…':own?'This wallet can’t pay itself':insufficient?'Not enough testnet STX':'Buy '+fmt(q.layr)+' LAYR · '+q.stx+' STX';
+    if(!insufficient&&st.walletBalance?.status!=='unavailable')$('layrBalanceHint').textContent='Plus a small network fee, shown in your wallet.';
+    $('layrProgress').hidden=!((st.busy&&!connecting)||!!st.pending||!!st.checking||['wallet','pending','indexing','cancelled','failed','check-wallet'].includes(phase)||(['credited','already-credited'].includes(phase)&&!st.receipt));
+    if(phase==='check-wallet')$('lxMore').open=true;
+    const rv=$('lxRangeValue');if(rv)rv.textContent=String(q.stx);
   }
   function selectDispenserAmount(amount){layrQuote(amount);dispenserAmount=amount;paintDispenserPanel();}
   function openLAYRDispenser(selection){
@@ -11104,7 +11135,7 @@ function applyTestnetFunding(proof){
     signA += ((focus ? 0 : 1) - signA) * Math.min(1, dt * 5); stations.forEach((s) => { s.sign.material.opacity = signA; s.sign.visible = signA > 0.02; });
     room.neon.material.color.setScalar(0.85 + 0.15 * Math.sin(t * 2.4));
     room.bulbs.forEach((b, i) => { const on = ((Math.floor(t * 6) + i) % 4) === 0; b.material.color.setHex(on ? 0xffd86b : 0x4a3208); });
-    updateNpcMachine(performance.now());updateCasinoMachines(t);updateConnectedMachine(t);pxOvFrame();updateLAYRDispensers();barUI?.tick(performance.now(),dt);testnetLAYR.tick(performance.now());
+    pumpMachineFrames();updateNpcMachine(performance.now());updateCasinoMachines(t);updateConnectedMachine(t);pxOvFrame();updateLAYRDispensers();barUI?.tick(performance.now(),dt);testnetLAYR.tick(performance.now());
     const dpos = room.dust.geometry.attributes.position.array; for (let i = 0; i < dpos.length; i += 3) { dpos[i + 1] += dt * 0.05; dpos[i] += Math.sin(t * 0.3 + i) * dt * 0.03; if (dpos[i + 1] > 5) dpos[i + 1] = 0.5; } room.dust.geometry.attributes.position.needsUpdate = true;
     if (walkLive()) {
       walkMove(dt); const e = eyePos(); camPos.copy(e); look.copy(e).add(aimDir()); tgtPos.copy(camPos); tgtLook.copy(look);
@@ -11860,6 +11891,75 @@ button{font:inherit;color:inherit;cursor:pointer}
     }
   })();
 </script>
-<script type="module" src="room.js?v=p2.1"></script>
+<script type="module" src="room.js?v=p2.2"></script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>
+
+<style id="pxExitAndExchange">
+/* 2026-10-30: one clear way out everywhere, and a simpler LAYR exchange. */
+#layrDispenserPanel,#layrDispenserPanel *{box-sizing:border-box}
+#layrDispenserPanel{width:min(420px,calc(100vw - 30px));padding:0 18px 18px;font-family:Arial,Helvetica,sans-serif}
+#layrDispenserPanel .layr-panel-head{position:sticky;top:0;z-index:3;margin:0 -18px 14px;padding:14px 18px 12px;background:#0b1626;border-bottom:1px solid #d6b67b33;align-items:center}
+#layrDispenserPanel .layr-panel-head small{font:9px Arial;letter-spacing:.18em;color:#b99c70}
+#layrDispenserPanel .layr-panel-head h2{font:400 26px Georgia;margin:4px 0 0;color:#f0dab5}
+#layrDispenserPanel #layrDispenserTitle{font:11px Arial;color:#96a7bf;margin:4px 0 0}
+#layrDispenserPanel .lx-leave{flex:none;min-height:42px;padding:0 16px;font:700 14px Arial;color:#f3d9a6;background:#ffffff0d;border:1px solid #d6b67b;border-radius:999px;cursor:pointer;white-space:nowrap}
+#layrDispenserPanel .lx-leave:hover,#layrDispenserPanel .lx-leave:focus-visible{background:#d6b67b2e}
+#layrDispenserPanel .lx-card{background:#0f2134;border:1px solid #d6b67b33;border-radius:8px;padding:12px 14px}
+#layrDispenserPanel .lx-wallet{display:grid;grid-template-columns:1fr auto;gap:10px 12px;align-items:center}
+#layrDispenserPanel .lx-wallet small,#layrDispenserPanel .lx-chips small{display:block;font:9px Arial;letter-spacing:.14em;color:#9fb0c6;margin-bottom:3px}
+#layrDispenserPanel .lx-connect{grid-column:2;grid-row:1;min-height:38px;padding:0 14px;font:600 13px Arial;color:#e8cf9f;background:#13263a;border:1px solid #c4a26188;border-radius:6px;cursor:pointer}
+#layrDispenserPanel[data-state=disconnected] .lx-connect{grid-column:1/-1;grid-row:auto;min-height:54px;font:700 16px Arial;color:#17110b;background:linear-gradient(100deg,#c39a55,#ecca8f);border-color:#f0d39c}
+#layrDispenserPanel[data-state=connecting] .lx-connect{grid-column:1/-1;grid-row:auto;min-height:54px;font:600 15px Arial}
+#layrDispenserPanel .lx-who{grid-column:1;grid-row:1;min-width:0}
+#layrDispenserPanel #layrWalletAddress{font:15px ui-monospace,Menlo,monospace;color:#e8eef7;word-break:normal}
+#layrDispenserPanel .lx-stx{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#layrDispenserPanel .lx-stx small{flex-basis:100%;margin:0}
+#layrDispenserPanel #layrWalletBalance{font:600 18px Arial;color:#f6eddb}
+#layrDispenserPanel #layrRefreshBalance{min-height:30px;padding:0 9px;background:#13263a;border:1px solid #c4a26155;border-radius:6px;color:#e0c59c;cursor:pointer}
+#layrDispenserPanel #lxFaucet{margin-left:auto;font:12px Arial;color:#d7bf91}
+#layrDispenserPanel[data-state=disconnected] :is(.lx-who,.lx-stx),#layrDispenserPanel[data-state=connecting] :is(.lx-who,.lx-stx),#layrDispenserPanel[data-state=shut] :is(.lx-connect,.lx-who,.lx-stx){display:none}
+#layrDispenserPanel .lx-hint{grid-column:1/-1;margin:0;font:12px/1.5 Arial;color:#9fb0c6}
+#layrDispenserPanel .lx-hint:empty,#layrDispenserPanel #layrTestnetError:empty{display:none}
+#layrDispenserPanel #layrOwnWalletNote{margin:10px 2px 0}
+#layrDispenserPanel .lx-chips{display:flex;justify-content:space-between;align-items:baseline;margin:16px 2px}
+#layrDispenserPanel .lx-chips small{margin:0}
+#layrDispenserPanel #layrReviewBalance{font:400 22px Georgia;color:#efd3a0}
+#layrDispenserPanel:not([data-state=ready]):not([data-state=busy]) .lx-buy{display:none}
+#layrDispenserPanel .layr-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px}
+#layrDispenserPanel .layr-presets button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;padding:8px 2px;background:#13263a;border:1px solid #c4a26155;border-radius:8px;color:#e9dcc4;cursor:pointer}
+#layrDispenserPanel .layr-presets button b{font:700 15px Arial}
+#layrDispenserPanel .layr-presets button small{font:11px Arial;color:#9fb0c6}
+#layrDispenserPanel .layr-presets button[aria-pressed=true]{background:#d6b67b26;border-color:#e3c07f;color:#ffe6b5;box-shadow:inset 0 0 0 1px #e3c07f}
+#layrDispenserPanel .layr-presets button[aria-pressed=true] small{color:#e8cf9f}
+#layrDispenserPanel #layrDispenseButton{min-height:54px;padding:0 10px;font:700 16px Arial;border-radius:8px}
+#layrDispenserPanel #layrBalanceHint{margin:8px 2px 0;text-align:center}
+#layrDispenserPanel[data-state=busy] #layrBalanceHint{display:none}
+#layrDispenserPanel #layrProgress{margin:14px 0 0}
+#layrDispenserPanel #layrSuccessReceipt{margin-top:10px}
+#layrDispenserPanel #layrTestnetError{margin:12px 2px 0}
+#layrDispenserPanel #lxMore{margin-top:16px;border-top:1px solid #d6b67b26;padding-top:6px}
+#layrDispenserPanel #lxMore>summary{cursor:pointer;font:600 13px Arial;color:#c9b38a;padding:10px 0;min-height:24px}
+#layrDispenserPanel #lxMore[open]>:not(summary){margin-top:12px}
+#layrDispenserPanel #lxMore .layr-terminal-label{font:12px Arial}
+#layrDispenserPanel #lxMore .layr-terminal-label select{font:13px Arial;padding:9px}
+#layrDispenserPanel #lxMore .layr-range-label{display:block;font:12px Arial}
+@media(max-width:620px){
+ #layrDispenserPanel{left:0;right:0;bottom:0;width:100vw;max-height:84dvh;padding:0 16px calc(16px + env(safe-area-inset-bottom));border-radius:14px 14px 0 0;border-left:0;border-right:0;border-bottom:0}
+ #layrDispenserPanel .layr-panel-head{margin:0 -16px 12px;padding:12px 16px 10px}
+ #layrDispenserPanel .layr-panel-head h2{font-size:22px}
+ #layrDispenserPanel .lx-leave{min-height:44px}
+ #layrDispenserPanel .layr-presets{gap:6px}
+}
+/* Fruit machines: "Walk away" comes first and is finger-sized. */
+#pxMachineToolbar{flex-wrap:wrap}
+#pxMachineToolbar #pxMachineLeave{order:-1;font-weight:700;color:#f3d9a6;border:1px solid #d6b67b;background:#1a1408f0}
+@media(max-width:620px){
+ #pxMachineToolbar button,body.machine-floor #pxMachineToolbar button{font-size:11px;padding:0 10px;min-height:38px}
+ #pxMachineToolbar #pxMachineLeave,body.machine-floor #pxMachineToolbar #pxMachineLeave{font-size:13px;min-height:44px;padding:0 14px;margin-right:auto}
+}
+/* Tables: "Stand up" comes first and stands out. */
+#tableViews #tableLeave{order:-1;font-weight:700;color:#f3d9a6;border:1px solid #d6b67b;background:#1a1408}
+#tableViews #tableLeave::before{content:"\2190  "}
+@media(max-width:620px){#panel #tableViews #tableLeave{min-height:40px;font-size:12px;padding:0 12px}}
+</style>

@@ -37,6 +37,7 @@ function exchangeModule(html: string): string {
 const MINE = 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG'; // a testnet address
 const MAINNET = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const BTC = 'tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx';
+const EXCHANGE = 'ST10W2EEM757922QTVDZZ5CSEW55JEFNN33V2E7YA'; // the Xtrata core wallet the exchange is paid into
 const XVERSE_ID = 'XverseProviders.BitcoinProvider';
 
 type Wallet = (method: string, params?: unknown) => unknown;
@@ -234,11 +235,51 @@ describe.each(PAGES)('LAYR exchange connect: %s', (rel) => {
       expect(w.ex.snapshot().busy).toBe(false);
     }
   });
+
+  it('connected as the exchange wallet itself: buying is refused before the wallet is asked, and nothing is left pending', async () => {
+    const w = makeWorld(page(rel), { xverse: phoneApp({ addresses: [{ address: EXCHANGE, purpose: 'stacks' }] }), picks: 'xverse' });
+    await expect(w.ex.connect()).resolves.toBe(EXCHANGE);
+    expect(w.ex.snapshot().recipient).toBe(EXCHANGE); // the page compares the two to show its heads-up
+    const e = await failure(w.ex.purchase(1));
+    expect(e?.message).toMatch(/cannot pay itself/);
+    expect(w.methods('xverse')).not.toContain('stx_transferStx');
+    const s = w.ex.snapshot();
+    expect(s.pending).toBeNull();
+    expect(s.busy).toBe(false);
+    expect([...w.store.keys()].filter((k) => /pending/i.test(k))).toEqual([]);
+  });
+
+  it('any other wallet still gets its payment request', async () => {
+    const xverse: Wallet = (method) => {
+      if (method === 'wallet_disconnect') return null;
+      if (method === 'wallet_connect') return { addresses: [{ address: MINE, purpose: 'stacks' }] };
+      return { txid: '0x' + 'ab'.repeat(32) };
+    };
+    const w = makeWorld(page(rel), { xverse, picks: 'xverse' });
+    await expect(w.ex.connect()).resolves.toBe(MINE);
+    await failure(w.ex.purchase(1)); // how it ends does not matter here, only that the wallet was asked
+    expect(w.methods('xverse')).toContain('stx_transferStx');
+  });
+
 });
 
 describe('both casino pages', () => {
   it('carry the same exchange module', () => {
     expect(exchangeModule(page(PAGES[0] as string))).toBe(exchangeModule(page(PAGES[1] as string)));
+  });
+
+  it('show a calm heads-up, not the error line, when the connected wallet is the exchange wallet', () => {
+    for (const rel of PAGES) {
+      const html = page(rel);
+      expect(html, rel).toMatch(/<p id="layrOwnWalletNote"[^>]*\bhidden>/);
+      const at = html.indexOf('function paintDispenserPanel()');
+      expect(at, rel).toBeGreaterThan(0);
+      const body = html.slice(at, at + 6500);
+      expect(body, rel).toContain('own=!!st.address&&st.address===st.recipient');
+      expect(body, rel).toContain("own?'Use a different wallet to pay'");
+      expect(body, rel).toMatch(/\$\('layrDispenseButton'\)\.disabled=[^;]*\bown\b/);
+      expect(body, rel).toContain("$('layrOwnWalletNote')");
+    }
   });
 
   it('bring a connect error into view, because on a phone it sits below the button', () => {
