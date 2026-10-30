@@ -101,6 +101,16 @@ try {
     ok((await msgsOf(hall)).length === 0, 'the standard radio (no ?dock=1) sends the hall nothing');
     await ctx.close();
   }
+  { // R typed in the pop-out asks the hall to take over again
+    const ctx = await bridgeCtx(); const hall = await ctx.newPage(); await hall.goto('https://xtrata.xyz/');
+    const [pop] = await Promise.all([ctx.waitForEvent('page'), hall.evaluate(() => { window.openRadio('?dock=1'); })]);
+    await pop.waitForLoadState('domcontentloaded'); await patch(pop); await hall.waitForTimeout(1200);
+    await pop.keyboard.press('KeyR'); await hall.waitForTimeout(400);
+    ok((await hall.evaluate(() => window.msgs.filter((x) => x.data.type === 'hide-request').length)) === 1, 'pop-out: R asks the hall to take over again');
+    await pop.keyboard.press('Escape'); await hall.waitForTimeout(300);
+    ok((await hall.evaluate(() => window.msgs.filter((x) => x.data.type === 'hide-request').length)) === 1, 'pop-out: Esc does nothing special');
+    await ctx.close();
+  }
   { // inside the hall's panel: heart / wallet controls and R / Esc are handed to the hall
     const ctx = await bridgeCtx(); const hall = await ctx.newPage(); await hall.goto('https://xtrata.xyz/');
     await hall.evaluate(() => window.frameRadio('?dock=1')); let fr = null; for (let i = 0; i < 100 && !fr; i++) { fr = hall.frames().find((f) => /radio\.xtrata\.xyz/.test(f.url())); if (!fr) await hall.waitForTimeout(100); }

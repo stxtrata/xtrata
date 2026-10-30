@@ -223,6 +223,16 @@ window.sendState=function(o){peers.forEach(function(w){w.postMessage(Object.assi
   await page.evaluate(() => { window.__locks = 0; });
   await stubFrame().evaluate(() => window.sendHide()); await page.waitForTimeout(500);
   check(!(await rr()).open && (await page.evaluate(() => window.__locks)) >= 1, 'H: R or Esc typed inside the radio panel (which the hall cannot see) hides it too');
+  // R typed in the pop-out: the hall is asked to take over again (focus + mouse); the pop-out is left open and playing
+  await page.click('#xa-radio-btn'); await page.waitForTimeout(300);
+  const [pop3] = await Promise.all([ctx.waitForEvent('page'), page.click('#xa-radio-open')]);
+  await pop3.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForFunction(() => window.XA.radioState().now && window.XA.radioState().now.src === 'pop', null, { timeout: 15000 });
+  await page.evaluate(() => { window.__locks = 0; window.__focused = 0; const f = window.focus; window.focus = function () { window.__focused++; return f.apply(this, arguments); }; });
+  await pop3.evaluate(() => window.sendHide()); await page.waitForTimeout(500);
+  check((await page.evaluate(() => window.__focused)) >= 1 && (await page.evaluate(() => window.__locks)) >= 1, 'H: R in the pop-out asks the hall to take the focus and the mouse back (focus ' + (await page.evaluate(() => window.__focused)) + ', mouse ' + (await page.evaluate(() => window.__locks)) + ')');
+  check(!pop3.isClosed(), 'H: and the pop-out stays open (the music keeps playing)');
+  await pop3.close(); await page.waitForTimeout(700);
   const room0 = await page.evaluate(() => document.getElementById('hroom').title);
   await page.keyboard.press('KeyN'); await page.waitForTimeout(300);
   const room1 = await page.evaluate(() => document.getElementById('hroom').title);

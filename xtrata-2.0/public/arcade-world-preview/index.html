@@ -37507,6 +37507,10 @@ addEventListener('message', e=>{
   if(d.type==='ready'){ try{ e.source.postMessage({xtrataHall:1, type:'hello'}, RADIO_BASE) }catch(x){} }
   else if(d.type==='state'){ radioNow={src, title:String(d.title||'').slice(0,120), artist:String(d.artist||'').slice(0,120), playing:!!d.playing, on:!!d.on, busy:!!d.busy} }
   else if(d.type==='hide-request' && fromPanel){ radioHide() }
+  else if(d.type==='hide-request' && fromPop){   // R in the pop-out: back to the arcade (the pop-out keeps playing). Browsers may not let us take the window focus or the mouse without a click in this window.
+    try{ window.focus() }catch(x){}
+    if(state==='walk') tryLock(); else if(state==='room' && roomUI && roomUI.frame){ try{ roomUI.frame.focus() }catch(x){} }
+  }
   else if(d.type==='bye'){ if(radioNow && radioNow.src===src) radioNow=null }
   else if(d.type==='need-wallet' && fromPanel){
     if(radioPopOut()) rdBarNote.textContent=rdBarText;

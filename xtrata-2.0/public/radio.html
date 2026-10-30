@@ -1102,6 +1102,15 @@ fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){retu
       setInterval(function(){if(!paired)ready()},4000)}     // a hall that was reloaded pairs again on the next beat
     else if(++tries>100)clearInterval(t);
   },120);
+  // in the pop-out window: R asks the hall to take over again (and tries to bring the hall window forward; browsers may refuse that, in which case one click in the hall is needed)
+  if(opener&&!embedded){
+    document.addEventListener('keydown',function(e){
+      if(e.code!=='KeyR'||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;
+      var t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;
+      peers.forEach(function(w){say(w,'*',{type:'hide-request'})});
+      try{opener.focus()}catch(x){}
+    });
+  }
   if(!embedded)return;
   // inside the panel: the wallet-needing controls hand over to the pop-out
   var note=null,noteTimer=0;
