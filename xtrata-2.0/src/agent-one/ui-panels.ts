@@ -383,6 +383,65 @@ export function unfinishedBanner(opts: { skipJobId?: string | null; mount?: HTML
   return job;
 }
 
+// ---------- support: "what was the page doing?" ----------
+
+/**
+ * The newest line of the job's log, as a sentence: how long ago, and what it says.
+ *
+ * A job that has gone quiet looks identical to one that is merely slow, so the card shows how old the last
+ * sign of life is. `stalled` is true past two minutes: every normal step logs or polls well inside that.
+ */
+export function lastActivity(job: any): { text: string; ageSec: number; stalled: boolean } | null {
+  const log: string[] = job && Array.isArray(job.log) ? job.log : [];
+  if (!log.length) return null;
+  const line = String(log[log.length - 1]);
+  const at = Date.parse(line.slice(0, 24));
+  if (!at) return null;
+  const ageSec = Math.max(0, Math.round((Date.now() - at) / 1000));
+  const ago = ageSec < 90 ? `${ageSec}s` : ageSec < 5400 ? `${Math.round(ageSec / 60)} min` : `${(ageSec / 3600).toFixed(1)} h`;
+  return { text: `Last activity ${ago} ago: ${line.slice(25, 165)}`, ageSec, stalled: ageSec > 120 };
+}
+
+/**
+ * Copy the plain-text diagnostics for a job (build, browser, timers, network counters, the step log).
+ * It never contains the deposit key. In-app browsers often refuse clipboard writes, so when copying fails
+ * the text is shown selected in a box that can be long-pressed instead of failing silently.
+ */
+export async function copyDiagnostics(jobId: string, el?: HTMLElement | null) {
+  let text = '';
+  try { text = await (window as any).XtrataAgent.getDiagnostics(jobId); }
+  catch (e: any) { text = `Could not build diagnostics: ${(e && e.message) || e}`; }
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch { /* fall through */ }
+  if (!ok) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      ok = document.execCommand('copy');
+      ta.remove();
+    } catch { /* fall through */ }
+  }
+  if (ok) {
+    if (el) { const was = el.textContent; el.textContent = 'Copied ✓'; setTimeout(() => { el.textContent = was; }, 2000); }
+    return true;
+  }
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px';
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#111;color:#eee;border:1px solid #333;border-radius:12px;padding:14px;max-width:560px;width:100%;max-height:85vh;display:flex;flex-direction:column;gap:10px;font:14px system-ui,sans-serif';
+  const head = document.createElement('div');
+  head.textContent = 'Diagnostics. Press and hold in the box, choose Select all, then Copy, and send it to support.';
+  const ta = document.createElement('textarea');
+  ta.readOnly = true; ta.value = text;
+  ta.style.cssText = 'flex:1;min-height:240px;width:100%;font:11px/1.4 ui-monospace,monospace;background:#0b0b0b;color:#ddd;border:1px solid #333;border-radius:8px;padding:8px';
+  const close = document.createElement('button');
+  close.type = 'button'; close.textContent = 'Close'; close.style.cssText = 'align-self:flex-start;padding:8px 16px;border-radius:8px;border:1px solid #555;background:#222;color:#eee';
+  close.onclick = () => box.remove();
+  card.append(head, ta, close); box.append(card); document.body.appendChild(box);
+  ta.focus(); ta.select();
+  return false;
+}
 
 // ---------- inscribe lock notice ----------
 // While the markup lock is on (see inscribe-lock.ts) the song/player pages cannot finish a
@@ -449,5 +508,5 @@ if (typeof document !== 'undefined') {
 // scripts and cannot import.
 if (typeof window !== 'undefined') {
   const w = window as any;
-  w.XtrataUI = Object.assign(w.XtrataUI || {}, { confirmDanger, unfinishedBanner, dismissUnfinished, keepOpenBanner, setTitleProgress, enableFinishNotice, notifyAvailable, inscribeLockNotice });
+  w.XtrataUI = Object.assign(w.XtrataUI || {}, { confirmDanger, unfinishedBanner, dismissUnfinished, keepOpenBanner, setTitleProgress, enableFinishNotice, notifyAvailable, copyDiagnostics, lastActivity, inscribeLockNotice });
 }

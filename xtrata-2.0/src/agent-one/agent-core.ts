@@ -29,6 +29,10 @@ import {
 } from '@stacks/transactions';
 import { MusicFeeWait, MusicFeeRecovery, type MusicFeeState, readMusicFees, writeMusicFees, musicWeight, musicTransactionCap, confirmedMusicTransaction, speedUpAmounts, verifyMusicTopUp } from './music-fees';
 import { StacksMainnet } from '@stacks/network';
+import {
+  withTimeout, makeSleep, RunTracker, withDeadline, buildDiagnostics, netStats, sleepStats,
+  STALL_BREAK_MS, CANCEL_STALL_MS,
+} from './net-guard';
 
 const cfg: any = (window as any).XAO_CONFIG || {};
 const MOCK: boolean = !!cfg.mock;
@@ -48,6 +52,7 @@ export const PARENT_WINDOW_MS: number = Number(cfg.parentWindowMs || 900000); //
 // and NFT returns sat unmined for days, and an unmined transfer holds its nonce and
 // jams everything queued behind it.
 const PERTX_MINER = 30000n, DELIVERY_RESERVE = 200000n, REFUND_TX_FEE = 20000n, MINT_CAP = 2000000n, RECEIPT_EST = 9000;
+const RECEIPT_BUDGET_MS = 5 * 60 * 1000;                        // the optional refund receipt gets this long, then the refund moves on
 const PARENT_RETURN_FEE = 30000n;                                // per-parent NFT return-transfer reserve
 const ITEM_DELIVERY_FEE = 30000n;                                // per extra batch-item delivery transfer reserve
 export const MAX_BATCH_ITEMS = 40;                               // receipt deps cap 50 − parents/identity headroom
@@ -58,16 +63,26 @@ const network: any = new StacksMainnet();
 /** Every broadcast in this file goes through here: a refusal that is not a node rejection (a 403 from a gateway, say) is an error, never a txid. */
 const broadcastTransaction = async (tx: any, net: any): Promise<any> => normalizeBroadcastResult(await stacksBroadcastTransaction(tx, net));
 network.coreApiUrl = location.origin + HIRO_BASE;   // routes read-only + broadcast through the proxy
+// Every request the Stacks library makes (broadcast, fee estimate, nonce, read-only calls) goes through
+// network.fetchFn. Without a deadline, ONE request that never answers (a phone's in-app browser
+// after the app was backgrounded, a half-open connection) froze a whole job with no error, no log line
+// and no way for Stop or the reaper to reach it. A timeout is an ordinary transient error: it retries.
+const timedFetch = withTimeout((u: any, i?: any) => fetch(u, i));
+network.fetchFn = withTimeout(network.fetchFn);
 
 const enc = new TextEncoder();
-const hfetch = (p: string, init?: any) => fetch(location.origin + HIRO_BASE + p, init);
+const hfetch = (p: string, init?: any) => timedFetch(location.origin + HIRO_BASE + p, init);
 // Throttle-resistant sleep: window timers are throttled to ~1/min (and eventually frozen)
 // in background tabs, which has stalled live uploads mid-run. Worker timers are exempt
 // from tab timer throttling, so confirmation polls keep firing while the tab is hidden.
-const sleepWorker: Worker | null = (() => { try { return new Worker(URL.createObjectURL(new Blob(['onmessage=(e)=>setTimeout(()=>postMessage(e.data.id),e.data.ms)'], { type: 'text/javascript' }))); } catch { return null; } })();
-let sleepSeq = 0; const sleepWaiters = new Map<number, () => void>();
-if (sleepWorker) sleepWorker.onmessage = (e: MessageEvent) => { const r = sleepWaiters.get(e.data); if (r) { sleepWaiters.delete(e.data); r(); } };
-const sleep = (ms: number) => new Promise<void>((r) => { if (sleepWorker) { const id = ++sleepSeq; sleepWaiters.set(id, r); sleepWorker.postMessage({ id, ms }); } else setTimeout(r, ms); });
+// "The worker exists" is not "the worker answers": some in-app browsers build it and never deliver a
+// message, and every await sleep() then hangs for ever. makeSleep also arms a plain timer a few seconds
+// later, so the worker is the precise path and the plain timer is the safety net.
+const sleep = makeSleep(() => new Worker(URL.createObjectURL(new Blob(['onmessage=(e)=>setTimeout(()=>postMessage(e.data.id),e.data.ms)'], { type: 'text/javascript' }))));
+// Which job runs are alive. A loop that polls (confirmation waits, fee waits) calls touchRuns() each lap; a
+// run whose promise simply never settles touches nothing, and watchTick() releases it after STALL_BREAK_MS.
+const runs = new RunTracker();
+const touchRuns = () => runs.touchAll();
 const chunkBytes = (d: Uint8Array) => { const o: Uint8Array[] = []; for (let i = 0; i < d.length; i += CHUNK) o.push(d.slice(i, i + CHUNK)); return o; };
 const toHex = (b: Uint8Array) => Array.from(b).map((x) => x.toString(16).padStart(2, '0')).join('');
 const fromHex = (h: string) => new Uint8Array((h.match(/../g) || []).map((x) => parseInt(x, 16)));
@@ -126,13 +141,48 @@ async function quoteFee(sizeBytes: number, chunks: number) {
   const t: any = (await ro('quote-inscription-fee', [uintCV(BigInt(sizeBytes)), uintCV(BigInt(chunks)), uintCV(single ? 2 : 1)])).value.value;
   return { single, protocolFee: BigInt(t['total-fee'].value), batches: Number(t['upload-batches'].value) };
 }
+/**
+ * Broadcast, and if the answer never comes back, look on chain before anyone retries.
+ *
+ * A timeout on the POST does not mean the transaction was refused: the node may have accepted a 525 KB
+ * batch and the reply been lost on a flaky mobile link. Retrying blindly would pay for the same batch
+ * twice (~0.5 STX each). The txid is fixed by the signed bytes, so we can simply ask whether it exists.
+ * A rejection WITH an answer ({ error }) is returned untouched for the caller's existing handling.
+ */
+async function broadcastSafe(tx: any, logId: string | null = null, label = 'tx'): Promise<any> {
+  let txid: string | null = null;
+  try { txid = '0x' + String(tx.txid()).replace(/^0x/, ''); } catch {}
+  const t0 = Date.now();
+  try {
+    return await broadcastTransaction(tx, network);
+  } catch (e) {
+    xaoLog(logId, `${label}: broadcast got no answer after ${Math.round((Date.now() - t0) / 1000)}s (${errMsg(e)}) — checking whether it landed before anything is retried`);
+    if (txid) {
+      for (let i = 0; i < 5; i++) {
+        await sleep(3000);
+        try {
+          const r = await hfetch(`/extended/v1/tx/${txid}`);
+          if (r.ok) {
+            const d: any = await r.json();
+            if (d && d.tx_status) { xaoLog(logId, `${label}: ${txid} IS on chain (${d.tx_status}) — the answer was lost, not the transaction`); return { txid }; }
+          }
+        } catch {}
+      }
+    }
+    throw e;
+  }
+}
+const CONFIRM_WALL_MS = 20 * 60 * 1000;   // hard wall-clock ceiling on any confirmation wait
 // Nakamoto-aware: poll 2 s for the first ~90 s (most blocks land in seconds), then 6 s. ~16 min ceiling.
 async function waitTx(txid: string) {
   // Track whether we ever actually reached the API. Swallowing every read error and
   // then reporting "not confirmed" blames the transaction for what was an outage —
   // and the caller treats those two very differently.
   let reads = 0; let lastReadErr: unknown = null;
-  for (let i = 0; i < 210; i++) {
+  const waitStart = Date.now();
+  // The lap count alone is not a time limit any more: with request deadlines a lap can take 25 s.
+  for (let i = 0; i < 210 && Date.now() - waitStart < CONFIRM_WALL_MS; i++) {
+    touchRuns();
     try {
       const r = await hfetch(`/extended/v1/tx/${txid}`);
       if (!r.ok) throw new Error(`tx lookup ${r.status}`);
@@ -242,6 +292,8 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
   try { opts.nonce = await safeNonce(from, logId); } catch {}
+  // Step-by-step breadcrumbs. A stalled send used to leave NO trace of which step it was waiting in.
+  xaoLog(logId, `${fn}: preparing · nonce ${opts.nonce != null ? opts.nonce : 'wallet default'}`);
   // Cap the fee at the lesser of MINT_CAP and the balance minus what delivery+refund
   // still need, so NotEnoughFunds becomes a wait instead of a failure. A LOOKUP
   // failure must not lower the cap — a cap of 0 makes every estimate look like a
@@ -249,8 +301,9 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   let effCap = MINT_CAP;
   let headroom: bigint | null = null;
   try {
-    const bal = await balance(from);
+    const bal = await balance(from).catch((e: any) => { xaoLog(logId, `${fn}: balance lookup failed (${errMsg(e)}) — using the default fee cap`); throw e; });
     headroom = bal > (DELIVERY_RESERVE + REFUND_TX_FEE) ? bal - (DELIVERY_RESERVE + REFUND_TX_FEE) : 0n;
+    xaoLog(logId, `${fn}: balance ${bal} µSTX · fee headroom ${headroom}`);
   } catch { headroom = null; }        // unknown → keep the safe default cap
   // Genuinely no headroom: say so instead of broadcasting something unpayable.
   if (headroom === 0n) throw new Error(`${fn}: deposit wallet has no headroom left for fees — nothing was broadcast`);
@@ -264,6 +317,7 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   // not a fallback, it is a guaranteed FeeTooLow.
   let cheapestQuote: bigint | null = null;
   for (let attempt = 0; ; attempt++) {
+    if (attempt === 0) xaoLog(logId, `${fn}: building and pricing the transaction`);
     tx = await quoteLowFee(opts);
     fee = BigInt(tx.auth.spendingCondition.fee.toString());
     if (cheapestQuote == null || fee < cheapestQuote) cheapestQuote = fee;
@@ -282,7 +336,8 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
     const floor = cheapestQuote ?? 0n;
     throw new Error(`${fn}: cannot afford the network fee — cheapest quote ${floor} µSTX, affordable ${effCap} µSTX. Nothing was broadcast.`);
   }
-  let res: any = await broadcastTransaction(tx, network);
+  xaoLog(logId, `${fn}: broadcasting ${Math.round(tx.serialize().length / 1024)} KB · nonce ${tx.auth.spendingCondition.nonce.toString()} · fee ${fee} µSTX`);
+  let res: any = await broadcastSafe(tx, logId, fn);
   // FeeTooLow is deterministic for a given fee — waiting cannot fix it, only a bigger
   // fee can. It used to fall out to the caller's retry, which re-ran the whole
   // estimate/wait cycle (up to four minutes) and arrived at the same rejected fee.
@@ -291,7 +346,7 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
     if (next <= fee) { xaoLog(logId, `${fn}: FeeTooLow at ${fee} µSTX and already at the affordable ceiling — cannot bump further`); break; }
     xaoLog(logId, `${fn}: FeeTooLow at ${fee} µSTX — retrying at ${next} µSTX (bump ${bump}/3)`);
     tx = await makeContractCall({ ...opts, fee: next }); fee = next;
-    res = await broadcastTransaction(tx, network);
+    res = await broadcastSafe(tx, logId, fn);
   }
   if (res.error) { xaoLog(logId, `${fn}: broadcast REJECTED — ${res.error} ${res.reason || ''}`); throw new Error(`${fn}: ${res.error} ${res.reason || ''}`); }
   // Only a fee that ACTUALLY broadcast is "good". Recording it before the broadcast
@@ -339,6 +394,8 @@ async function confirmOrEscalate(p: {
   const txids: string[] = [p.txid];
   let fee = p.fee, bumps = 0, lastEscalate = Date.now();
   let reads = 0, lastErr: unknown = null;
+  const waitStart = Date.now();
+  let lastBeat = waitStart;
   // When EVERY transaction we are watching comes back 404, the node has never seen one of
   // them: nothing is in the mempool and nothing was mined. Waiting longer cannot change that
   // (a transaction the node accepted is visible within seconds), and it used to hold a job,
@@ -346,8 +403,14 @@ async function confirmOrEscalate(p: {
   // had refused was waited on, and "Stop and refund" sat on "Cancelling" for 18 minutes.
   let unseenSince: number | null = null;
 
-  for (let i = 0; i < 210; i++) {
+  for (let i = 0; i < 210 && Date.now() - waitStart < CONFIRM_WALL_MS; i++) {
     let notFound = 0;
+    touchRuns();
+    // A heartbeat every ~30 s: proof the run is alive AND a line in the log saying what it is waiting on.
+    if (p.logId && Date.now() - lastBeat >= 30000) {
+      lastBeat = Date.now();
+      xaoLog(p.logId, `${p.fn}: still waiting for 0x${String(txids[txids.length - 1]).replace(/^0x/, '').slice(0, 10)}… · ${Math.round((Date.now() - waitStart) / 1000)}s · ${reads} lookups answered${lastErr ? ` · last lookup error: ${errMsg(lastErr)}` : ''}`);
+    }
     for (const id of txids) {
       try {
         const r = await hfetch(`/extended/v1/tx/${id}`);
@@ -387,7 +450,7 @@ async function confirmOrEscalate(p: {
         lastEscalate = Date.now();
         try {
           const rtx = await makeContractCall({ ...p.opts, fee: next, nonce: p.usedNonce });
-          const rres: any = await broadcastTransaction(rtx, network);
+          const rres: any = await broadcastSafe(rtx, p.logId, p.fn);
           if (rres?.error) {
             xaoLog(p.logId, `${p.fn}: fee escalation rejected (${rres.error} ${rres.reason || ''}) — still waiting on ${fee} µSTX`);
           } else {
@@ -427,7 +490,7 @@ async function sendNft(key: string, from: string, id: string, to: string) {
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: 'transfer', functionArgs: [uintCV(BigInt(id)), standardPrincipalCV(from), standardPrincipalCV(to)], senderKey: key, network, postConditionMode: PostConditionMode.Allow, anchorMode: AnchorMode.Any, nonce };
   const fee = await transferFee(opts);
   const tx: any = await makeContractCall({ ...opts, fee });
-  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('nft: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res;
+  const res: any = await broadcastSafe(tx); if (res.error) throw new Error('nft: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res;
   // Escalate rather than wait for ever: same nonce, higher fee, until it is mined.
   const used = nonce != null ? nonce : (await safeNonce(from).catch(() => undefined));
   if (used != null) { const r = await confirmOrEscalate({ txid, opts, usedNonce: used, fee, effCap: MINT_CAP, fn: 'transfer', logId: null }); return r.txid; }
@@ -453,7 +516,7 @@ async function sendStx(key: string, amount: bigint, to: string, fee: bigint, mem
   const from = getAddressFromPrivateKey(key, TransactionVersion.Mainnet);
   let nonce: bigint | undefined; try { nonce = await safeNonce(from); } catch {}
   const tx: any = await makeSTXTokenTransfer({ recipient: to, amount, senderKey: key, network, fee: useFee, anchorMode: AnchorMode.Any, nonce, ...(memo ? { memo } : {}) } as any);
-  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('stx: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res; await waitTx(txid); return txid;
+  const res: any = await broadcastSafe(tx); if (res.error) throw new Error('stx: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res; await waitTx(txid); return txid;
 }
 const tidFrom = (d: any) => { const r = d?.tx_result?.repr || ''; const m = /token-id u(\d+)/.exec(r) || /\(ok u(\d+)\)/.exec(r); return m ? m[1] : null; };
 
@@ -480,6 +543,7 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
   const q: any = (await ro('quote-inscription-fee', [uintCV(BigInt(data.length)), uintCV(BigInt(total)), uintCV(1)])).value.value;
   const beginFee = BigInt(q['begin-fee'].value), sealFee = BigInt(q['seal-fee'].value);
   onProg(`planned · ${total} chunks`);
+  xaoLog(job.jobId, `plan: ${total} chunks · ${data.length} bytes · ${Math.ceil(total / BATCH)} batch(es) · begin fee ${beginFee} · seal fee ${sealFee}`);
   let idx: number | null = null;
   try { const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); idx = st.value ? Number(st.value.value['current-index'].value) : null; } catch { idx = null; }
   // Remember the content hash on the JOB. An upload lives on-chain under
@@ -519,6 +583,7 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
       batchFeeCap = spendable / remBatches;
       if (bal < runway) { const m = `fee runway low — ${bal} µSTX left vs ~${runway} projected for ${remBatches} remaining batch(es); this batch is capped at ${batchFeeCap} µSTX`; xaoLog(job.jobId, m); onProg(m); }
     } catch { batchFeeCap = null; }
+    xaoLog(job.jobId, `batch ${Math.floor(idx / BATCH) + 1}/${Math.ceil(total / BATCH)} · chunks ${idx}-${idx + batch.length - 1} of ${total} · ${Math.round(batch.length * CHUNK / 1024)} KB`);
     await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg, job.jobId, batchFeeCap);
     const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`);
   }
@@ -556,7 +621,7 @@ const TRANSIENT_TX = /NotEnoughFunds|ConflictingNonceInMempool|TooMuchChaining|t
 let _stxUsd: { v: number | null; t: number } = { v: null, t: 0 };
 async function stxUsdPrice(): Promise<number | null> {
   if (Date.now() - _stxUsd.t < 60000) return _stxUsd.v;          // 60s cache (used by estimate + receipt)
-  try { const d: any = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=blockstack&vs_currencies=usd')).json(); const p = d && d.blockstack && d.blockstack.usd; _stxUsd = { v: p ? Number(p) : null, t: Date.now() }; } catch { _stxUsd = { v: _stxUsd.v, t: Date.now() }; }
+  try { const d: any = await (await timedFetch('https://api.coingecko.com/api/v3/simple/price?ids=blockstack&vs_currencies=usd')).json(); const p = d && d.blockstack && d.blockstack.usd; _stxUsd = { v: p ? Number(p) : null, t: Date.now() }; } catch { _stxUsd = { v: _stxUsd.v, t: Date.now() }; }
   return _stxUsd.v;
 }
 const balOf = async (job: any): Promise<bigint> => (MOCK ? BigInt(job.requiredUstx) : balance(job.depositAddress));
@@ -623,11 +688,30 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-29.2';
+export const AGENT_BUILD = '2026-10-30.1';
+const LOG_KEEP = 300;   // lines kept per job; a 36-batch upload writes ~8 per batch, and the START of a run is what explains a stall
+// Why this exists: a job that wrote nothing could not be told apart from one that was merely slow, and a
+// failed localStorage write used to vanish into an empty catch. Counting both makes "the page could not
+// save anything" visible in the diagnostics instead of looking like a hang.
+let storageWriteFailures = 0, lastStorageError = '';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
-  try { const j = readJob(id); j.log = ((j.log || []).slice(-199)).concat(new Date().toISOString() + ' ' + msg); writeJob(j); } catch {}
+  runs.touch(id);
+  try { const j = readJob(id); j.log = ((j.log || []).slice(-(LOG_KEEP - 1))).concat(new Date().toISOString() + ' ' + msg); writeJob(j); } catch {}
+}
+/** One refund stage: in the log, on the job card (job.progress), and counted as activity by the stall breaker. */
+function refundStep(id: string, msg: string) {
+  xaoLog(id, msg);
+  try { const j = readJob(id); j.progress = msg; j.progressAt = new Date().toISOString(); writeJob(j); } catch {}
+}
+/** What kind of browser is this run in? The first thing anyone asks about a stall. */
+function envSummary(): string {
+  try {
+    const nav: any = typeof navigator !== 'undefined' ? navigator : {};
+    const vis = typeof document !== 'undefined' ? document.visibilityState : 'no-document';
+    return `build ${AGENT_BUILD} · page ${vis} · online ${nav.onLine} · link ${(nav.connection && nav.connection.effectiveType) || '?'} · timers ${sleepStats.workerCreated ? 'worker' : 'plain'} · ${String(nav.userAgent || '').slice(0, 140)}`;
+  } catch { return `build ${AGENT_BUILD}`; }
 }
 /**
  * Persist a job, preserving a cancel that arrived while this copy was in flight.
@@ -651,14 +735,24 @@ function xaoLog(id: string | null, msg: string) {
  */
 function writeJob(j: any) {
   try {
-    if (j && !j.cancelRequested) {
+    if (j) {
       try {
         const stored = JSON.parse(localStorage.getItem(jobKey(j.jobId)) || 'null');
-        if (stored && stored.cancelRequested) j.cancelRequested = true;
+        if (stored && stored.cancelRequested && !j.cancelRequested) j.cancelRequested = true;
+        // The log only ever grows (xaoLog is the sole writer, and it writes a fresh copy). A long-running path
+        // holds its own older copy of the job and writes it back wholesale, which used to wipe every line
+        // logged in between: the refund would log its steps and then erase them on the final save, leaving
+        // a stuck job with nothing to show. A copy in flight can only be BEHIND what is stored, never ahead, so if
+        // the stored log ends in a line this copy has not got, the stored log wins. (Comparing timestamps instead
+        // fails when two lines land in the same millisecond, which the refund's rapid-fire stages do.)
+        const lastOf = (a: any) => (Array.isArray(a) && a.length ? String(a[a.length - 1]) : '');
+        const storedLast = stored && Array.isArray(stored.log) ? lastOf(stored.log) : '';
+        if (storedLast && !(Array.isArray(j.log) && j.log.includes(storedLast))) j.log = stored.log;
       } catch {}
     }
     localStorage.setItem(jobKey(j.jobId), JSON.stringify(j));
-  } catch {}
+    if (j && j.jobId) runs.touch(j.jobId);
+  } catch (e) { storageWriteFailures += 1; lastStorageError = errMsg(e).slice(0, 120); }
   return j;
 }
 function readJob(id: string): any { const s = localStorage.getItem(jobKey(id)); if (!s) throw new Error('job not found: ' + id); return JSON.parse(s); }
@@ -1110,7 +1204,7 @@ async function unstickQueue(job: any, key: string, addr: string, to: string, onP
     onProg(`filling missing nonce ${missing} — nothing occupies it, so everything above it is stuck`);
     try {
       const tx: any = await makeSTXTokenTransfer({ recipient: to, amount: 1n, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce: missing } as any);
-      const res: any = await broadcastTransaction(tx, network);
+      const res: any = await broadcastSafe(tx);
       if (res.error) throw new Error(res.error + (res.reason ? ' ' + res.reason : ''));
       replaced.push({ nonce: String(missing), filledGap: true, fee: String(fee), txid: res.txid || res });
       xaoLog(job.jobId, `nonce ${missing}: gap filled at ${fee} uSTX`);
@@ -1139,7 +1233,7 @@ async function unstickQueue(job: any, key: string, addr: string, to: string, onP
       // build was refused by the node every time and nothing was ever replaced. One
       // microSTX goes to the payer instead — the same address the refund targets.
       const tx: any = await makeSTXTokenTransfer({ recipient: to, amount: 1n, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce: stuck.nonce } as any);
-      const res: any = await broadcastTransaction(tx, network);
+      const res: any = await broadcastSafe(tx);
       if (res.error) throw new Error(res.error + (res.reason ? ' ' + res.reason : ''));
       replaced.push({ nonce: String(stuck.nonce), was: String(stuck.fee), now: String(fee), fee: String(fee), txid: res.txid || res });
       xaoLog(job.jobId, `nonce ${stuck.nonce}: replacement broadcast at ${fee} uSTX`);
@@ -1389,7 +1483,8 @@ async function recoverJobAssets(jobIn: any) {
 }
 async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4, memo?: string) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee, memo); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }
 async function sendNftRetry(key: string, from: string, id: string, to: string, tries = 5) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendNft(key, from, id, to); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(Math.min(30000, 8000 * (i + 1))); continue; } throw e; } } throw last; }
-async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5): Promise<any> { let last: any; for (let i = 0; i < tries; i++) { let bal = 0n; try { bal = await balance(fromAddr); } catch (e) { last = e; await sleep(5000); continue; } if (bal <= REFUND_TX_FEE) return { sent: false, amount: '0', balance: bal.toString() }; const amount = bal - REFUND_TX_FEE; try { const tx = await sendStx(key, amount, to, REFUND_TX_FEE); return { sent: true, tx, amount: amount.toString() }; } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last || new Error('sweep failed'); }
+// `keep` holds some STX back (the refund keeps enough for the optional receipt); the rest goes home NOW.
+async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5, keep = 0n): Promise<any> { let last: any; for (let i = 0; i < tries; i++) { let bal = 0n; try { bal = await balance(fromAddr); } catch (e) { last = e; await sleep(5000); continue; } if (bal <= REFUND_TX_FEE + keep) return { sent: false, amount: '0', balance: bal.toString() }; const amount = bal - REFUND_TX_FEE - keep; try { const tx = await sendStx(key, amount, to, REFUND_TX_FEE); return { sent: true, tx, amount: amount.toString() }; } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last || new Error('sweep failed'); }
 async function inscribeReceipt(key: string, from: string, html: string, uri: string, deps: string[]) { const data = enc.encode(html); const q = await quoteFee(data.length, chunkBytes(data).length); const tokenId = await mintSingle(key, from, data, 'text/html', uri, deps, q.protocolFee); return { tokenId }; }
 
 // ---------- estimate→create→inscribe→deliver→refund (mirror core) ----------
@@ -1512,7 +1607,7 @@ async function sendMusic(key: string, from: string, fn: string, args: any[], spe
   s.pending = { fn, args: args.map(cvToHex), nonce: String(tx.auth.spendingCondition.nonce), fee: String(fee),
     weight: String(weight), protocol: String(spendCap || 0n), ids: [txid], fees: { [txid]: String(fee) }, since: Date.now() };
   s.waitSince ||= Date.now(); writeMusicFees(id, s); // persist BEFORE broadcast, including ambiguous network outcomes
-  const res: any = await broadcastTransaction(tx, network);
+  const res: any = await broadcastSafe(tx);
   if (res?.error && !res.ambiguous) {
     // A definitive node rejection did not consume the nonce or mining budget.
     const fresh = readMusicFees(id)!; delete fresh.pending; writeMusicFees(id, fresh);
@@ -1554,7 +1649,7 @@ async function settleMusicPending(key: string, from: string, id: string): Promis
     const fresh = readMusicFees(id)!;
     if (fresh.upgrade?.state !== 'payment') {
       fresh.pending!.since = Date.now(); writeMusicFees(id, fresh);
-      await broadcastTransaction(tx, network);
+      await broadcastSafe(tx);
       xaoLog(id, 'Re-submitted the identical saved transaction after a missing broadcast; nonce and fee unchanged.');
     }
   }
@@ -1572,7 +1667,7 @@ async function settleMusicPending(key: string, from: string, id: string): Promis
       const tx = await makeContractCall({ ...opts, fee: next }); const txid = tx.txid();
       s = readMusicFees(id)!; s.pending!.ids.push(txid); s.pending!.fees[txid] = String(next);
       s.pending!.fee = String(next); s.pending!.since = Date.now(); writeMusicFees(id, s);
-      const res: any = await broadcastTransaction(tx, network);
+      const res: any = await broadcastSafe(tx);
       xaoLog(id, res?.error ? 'Replacement rejected; watching every original transaction.' : `Speed-up replacement sent at ${next} µSTX using nonce ${p.nonce}.`);
     }
   }
@@ -2245,23 +2340,58 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
   const dep = deriveFrom(job.ephemeralMnemonic);
   const returnTo = (await resolveFunder(job)) || job.user;
   const out: any = { reason, deliveredNfts: [], refundTx: null };
+  // Every stage is logged AND written to job.progress. The refund used to go quiet for minutes at a time (up to
+  // three sequential confirmations), which looks exactly like being stuck and cannot be told apart from it.
+  refundStep(job.jobId, returnTo
+    ? `refund 1/4 · checking for inscriptions to send back to ${String(returnTo).slice(0, 8)}…`
+    : 'refund · no paying address could be found, so nothing can be sent back automatically');
   // Hand back EVERY inscription this wallet holds: escrowed parents, anything it minted (token /
   // receipt), and any WRONG inscription sent by mistake (strays return to whoever sent them).
   const nftReturns = await returnAllHeldNfts(job, dep.key, dep.address, returnTo);
   for (const r of nftReturns) { if (r.tx) out.deliveredNfts.push({ id: r.id, tx: r.tx, to: r.to }); else out.nftError = `#${r.id}: ${r.error || 'no return address'}`; }
   if (nftReturns.length) { job.nftReturns = [...(job.nftReturns || []), ...nftReturns]; writeJob(job); }
+  let refundedTotal = 0n;
+  const addSweep = (sw: any) => {
+    if (!sw || !sw.sent) return;
+    out.refundTx = out.refundTx || sw.tx;
+    out.refundTxs = [...(out.refundTxs || []), sw.tx];
+    refundedTotal += BigInt(sw.amount || '0');
+    out.refundedUstx = refundedTotal.toString();
+    xaoLog(job.jobId, `refund: ${sw.amount} µSTX sent to ${returnTo} · tx ${sw.tx}`);
+  };
   if (returnTo) {
-    try {
-      const b0 = await balance(dep.address);
-      const need = BigInt(job.receiptProtocol || '110000') + 80000n + REFUND_TX_FEE;
-      if (b0 > need + 50000n) {
+    // MONEY FIRST. The receipt is a nicety that costs up to three sequential confirmations; if anything in them
+    // stalls, the payer's STX must already be on its way. So everything the receipt does not need goes home now,
+    // the receipt runs on the remainder under a time limit, and a final sweep returns whatever is left.
+    let b0 = 0n;
+    try { b0 = await balance(dep.address); } catch (e) { out.receiptError = errMsg(e); xaoLog(job.jobId, `refund: balance lookup failed (${errMsg(e)}) — skipping the receipt, sweeping directly`); }
+    const need = BigInt(job.receiptProtocol || '110000') + 80000n + REFUND_TX_FEE;
+    // The receipt is an HTML page. While the gateway lock is on it cannot be broadcast, and its first step
+    // (begin-or-get) pays a protocol fee that is not refundable, so a receipt that cannot finish is not started.
+    const receiptBlocked = inscribeLockActive();
+    if (receiptBlocked && b0 > need + 50000n) xaoLog(job.jobId, 'refund: receipt skipped while HTML inscribing is paused — sending everything back in one go');
+    const wantReceipt = !receiptBlocked && b0 > need + 50000n;
+    // send() will not spend below DELIVERY_RESERVE + REFUND_TX_FEE, so the float held back for the receipt has to include them.
+    const keep = wantReceipt ? need + DELIVERY_RESERVE + REFUND_TX_FEE : 0n;
+    let earlyFailed = false;
+    if (wantReceipt && b0 > keep + REFUND_TX_FEE + 50000n) {
+      refundStep(job.jobId, 'refund 2/4 · sending your STX back now (the receipt comes after)');
+      try { addSweep(await sweepStxTo(dep.key, dep.address, returnTo, 5, keep)); }
+      catch (e) { earlyFailed = true; out.refundError = errMsg(e); xaoLog(job.jobId, `refund: early sweep failed (${errMsg(e)}) — skipping the receipt and retrying the sweep`); }
+    }
+    if (wantReceipt && !earlyFailed) {
+      refundStep(job.jobId, 'refund 3/4 · writing the refund receipt (optional, your STX is already sent)');
+      try {
         const d = receiptData(job, { received: receivedForJob(job), agentFee: 0n, change: b0 - need, receiptTokenId: null, recipient: returnTo, outcome: 'refunded', note: reason });
-        const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(d), `xtrata:receipt/${job.jobId}`, job.tokenId ? [String(job.tokenId)] : []);
+        const r: any = await withDeadline(inscribeReceipt(dep.key, dep.address, buildReceiptHtml(d), `xtrata:receipt/${job.jobId}`, job.tokenId ? [String(job.tokenId)] : []), RECEIPT_BUDGET_MS, 'the refund receipt');
         if (r.tokenId) { try { await sendNftRetry(dep.key, dep.address, r.tokenId, returnTo); } catch {} job.receiptTokenId = r.tokenId; out.receiptTokenId = r.tokenId; job.receiptHtml = buildReceiptHtml(d); }
-      }
-    } catch (e) { out.receiptError = errMsg(e); }
+      } catch (e) { out.receiptError = errMsg(e); xaoLog(job.jobId, `refund: receipt skipped (${errMsg(e)}) — the refund itself does not depend on it`); }
+    }
+    refundStep(job.jobId, 'refund 4/4 · returning everything that is left');
+    try { addSweep(await sweepStxTo(dep.key, dep.address, returnTo)); }
+    catch (e) { out.refundError = errMsg(e); xaoLog(job.jobId, `refund: final sweep failed (${errMsg(e)})`); }
+    if (out.refundedUstx != null) job.refundedUstx = out.refundedUstx;
   }
-  if (returnTo) { try { const sw = await sweepStxTo(dep.key, dep.address, returnTo); if (sw.sent) { out.refundTx = sw.tx; out.refundedUstx = sw.amount; } } catch (e) { out.refundError = errMsg(e); } }
   let leftover: bigint | null = null; try { leftover = await balance(dep.address); } catch {}
   // NEVER-STRAND (NFT edition): never discard the key while the wallet still holds an inscription
   // (e.g. a parent that arrived without enough STX to send it back yet).
@@ -2385,6 +2515,13 @@ try {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { void syncWakeLock(); void watchTick(); } });
   window.addEventListener('focus', () => { void syncWakeLock(); void watchTick(); });
 } catch {}
+// When a run stalls, the first question is "was the page in the background / offline at the time?". Record it.
+try {
+  const logRunning = (m: string) => { for (const id of PROCESSING) xaoLog(id, m); };
+  document.addEventListener('visibilitychange', () => logRunning(`page ${document.visibilityState}`));
+  window.addEventListener('online', () => logRunning('network came back online'));
+  window.addEventListener('offline', () => logRunning('network went OFFLINE'));
+} catch {}
 // AUTO-RESUME: transient failures (network, timeouts, rate limits) do NOT refund — the job parks back at
 // FUNDED/INSCRIBED and the watcher resumes exactly where it left off. Resume is safe end-to-end: staged
 // uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
@@ -2415,24 +2552,31 @@ function assertNotCancelled(id: string) {
 const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
+  // This run's lease. If the stall breaker later releases the run, its late result must not tear down whatever
+  // run took over: only the CURRENT lease may clear PROCESSING or trigger a retry/refund.
+  const token = runs.start(id);
+  const release = () => { if (runs.end(id, token)) PROCESSING.delete(id); };
   void syncWakeLock();
+  xaoLog(id, `run started · ${envSummary()}`);
   const managed = readMusicFees(id);
   const run = () => managed ? (navigator as any).locks.request(`xao-music-job:${id}`, { ifAvailable: true }, (lock: any) => lock ? fn() : undefined) : fn();
   Promise.resolve().then(run).then(() => {
+    if (!runs.isCurrent(id, token)) { xaoLog(id, 'a run that had been released has now finished — its result is ignored'); return; }
     try { const j = readJob(id); if (j.retryCount && (j.status === 'COMPLETE' || j.status === 'COMPLETE_WITH_SKIPS')) { delete j.retryCount; writeJob(j); } } catch {}
-    PROCESSING.delete(id);
+    release();
   }).catch(async (e) => {
     const msg = errMsg(e);
-    if (e instanceof MusicFeeRecovery) { const j = readJob(id); j.status = 'NEEDS_RECOVERY'; j.keepKey = true; j.error = msg; j.progress = msg; writeJob(j); PROCESSING.delete(id); return; }
+    if (!runs.isCurrent(id, token)) { xaoLog(id, `a run that had been released has now failed (${msg}) — ignored, the current run owns this job`); return; }
+    if (e instanceof MusicFeeRecovery) { const j = readJob(id); j.status = 'NEEDS_RECOVERY'; j.keepKey = true; j.error = msg; j.progress = msg; writeJob(j); release(); return; }
     if (e instanceof MusicFeeWait || readMusicFees(id)?.pending || readMusicFees(id)?.upgrade?.state === 'payment') {
       const j = readJob(id); j.status = 'FEE_WAITING'; j.progress = msg; j.progressAt = new Date().toISOString(); writeJob(j);
-      PROCESSING.delete(id); return;
+      release(); return;
     }
     // A cancel is not an error: no retry, no NEEDS_RECOVERY, straight to the refund.
     if (e instanceof JobCancelled || isCancelRequested(id)) {
       xaoLog(id, 'cancelled by request — returning everything to the payer');
-      try { await refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'); } catch {}
-      PROCESSING.delete(id);
+      try { await refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'); } catch (e2) { xaoLog(id, `REFUND FAILED: ${errMsg(e2)} — it will be retried`); }
+      release();
       return;
     }
     try {
@@ -2442,7 +2586,7 @@ function background(id: string, fn: () => Promise<any>) {
         j.progress = `recovered from a hiccup — resuming where it left off (attempt ${j.retryCount}/${MAX_RETRIES})`;
         j.progressAt = new Date().toISOString(); writeJob(j);
         xaoLog(id, `TRANSIENT error — auto-resume scheduled from ${j.status} (${j.retryCount}/${MAX_RETRIES}): ${msg}`);
-        PROCESSING.delete(id); return;
+        release(); return;
       }
       // An already-minted token can't be un-minted, so never route it to a refund it can't honour.
       // Its delivery just needs recovery — park with the key retained instead of thrashing.
@@ -2451,15 +2595,63 @@ function background(id: string, fn: () => Promise<any>) {
         j.keepKeyReason = 'inscription minted but delivery did not finish — continue recovery to send it home';
         j.progress = j.keepKeyReason; j.progressAt = new Date().toISOString(); writeJob(j);
         xaoLog(id, `delivery incomplete for token #${j.tokenId} — parked as NEEDS_RECOVERY (not refunded): ${msg}`);
-        PROCESSING.delete(id); return;
+        release(); return;
       }
       writeJob(j);
       xaoLog(id, `FATAL error (${FATAL_ERR.test(msg) ? 'deterministic failure' : 'retries exhausted'}) — refunding: ${msg}`);
     } catch {}
-    try { await refundAndClose(readJob(id), 'error: ' + msg); } catch {}
-    PROCESSING.delete(id);
+    try { await refundAndClose(readJob(id), 'error: ' + msg); } catch (e2) { xaoLog(id, `REFUND FAILED: ${errMsg(e2)} — it will be retried`); }
+    release();
   });
 }
+
+/**
+ * Take a run that has gone quiet away from its stuck promise.
+ *
+ * Why this exists: watchTick() and reapTick() both skip anything in PROCESSING, so a run whose promise
+ * never settles was invisible to the only two things that could have rescued it. The reaper's "no progress within
+ * the window -> refund" rule was bypassed for as long as the hang lasted, and a Stop request waited for a
+ * checkpoint the stuck run would never reach.
+ *
+ * Releasing hands the job back to that existing machinery:
+ *  - Stop was pressed          -> refund now
+ *  - managed (Economy) job     -> the music branch of watchTick restarts it
+ *  - otherwise                 -> the same path as a transient error: park for resume, refund once retries are spent
+ * The released run keeps no claim on the job: its eventual result is ignored (see the lease in background()).
+ */
+function releaseStalledRun(id: string, idleMs: number) {
+  const secs = Math.round(idleMs / 1000);
+  xaoLog(id, `STALL: no activity for ${secs}s — the last line above is the step it was stuck in. Releasing the run so the job can retry or refund.`);
+  runs.release(id);
+  PROCESSING.delete(id);
+  try {
+    const j = readJob(id);
+    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(j.status)) return;
+    if (j.cancelRequested) {
+      background(id, () => refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'));
+      return;
+    }
+    if (readMusicFees(id)) { j.progress = `stalled for ${secs}s — restarting`; j.progressAt = new Date(Date.now() - 60000).toISOString(); writeJob(j); return; }
+    j.retryCount = (j.retryCount || 0) + 1;
+    j.error = `stalled for ${secs}s with no activity`;
+    if (j.retryCount <= MAX_RETRIES) {
+      j.status = j.tokenId ? 'INSCRIBED' : 'FUNDED';
+      j.progress = `the run stalled — resuming where it left off (attempt ${j.retryCount}/${MAX_RETRIES})`;
+      j.progressAt = new Date().toISOString(); writeJob(j);
+      xaoLog(id, `stall treated as a transient error — auto-resume from ${j.status} (${j.retryCount}/${MAX_RETRIES})`);
+    } else if (j.tokenId) {
+      j.status = 'NEEDS_RECOVERY'; j.keepKey = true;
+      j.keepKeyReason = 'inscription minted but the run stalled before delivery finished — continue recovery to send it home';
+      j.progress = j.keepKeyReason; j.progressAt = new Date().toISOString(); writeJob(j);
+    } else {
+      writeJob(j);
+      xaoLog(id, 'stalled again after every retry — refunding');
+      background(id, () => refundAndClose(readJob(id), 'error: the run kept stalling'));
+    }
+  } catch (e) { xaoLog(id, `could not hand the stalled job back: ${errMsg(e)}`); }
+}
+// A refund that keeps failing must not be retried every 4 s forever: that buries the log and hammers the API.
+const refundAttempts = new Map<string, { at: number; n: number }>();
 // Finished jobs that still hold their one-shot key are checked for late money. Often just after the job
 // closed, then ever more rarely: it is insurance, and there can be dozens of these.
 const lateDepositCheckedAt = new Map<string, number>();
@@ -2511,7 +2703,12 @@ async function watchTick() {
   void syncWakeLock();
   lateChecksThisTick = 0;
   for (const j of listJobsRaw()) {
-    if (PROCESSING.has(j.jobId)) continue;
+    if (PROCESSING.has(j.jobId)) {
+      // A run that is processing but silent is the one case nothing else can see. See releaseStalledRun().
+      const idle = runs.idleMs(j.jobId);
+      if (idle > (j.cancelRequested ? CANCEL_STALL_MS : STALL_BREAK_MS)) releaseStalledRun(j.jobId, idle);
+      continue;
+    }
     if (readMusicFees(j.jobId) && ['FEE_WAITING', 'INSCRIBING'].includes(j.status)) {
       if (Date.now() - (Date.parse(j.progressAt || '') || 0) < 20000) continue;
       background(j.jobId, () => autoRun(readJob(j.jobId))); continue;
@@ -2519,6 +2716,9 @@ async function watchTick() {
     // A cancel requested while the tab was closed. Honour it before any resume
     // logic below, or the watcher would happily restart the job we were asked to stop.
     if (j.cancelRequested && !['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(j.status)) {
+      const a = refundAttempts.get(j.jobId) || { at: 0, n: 0 };
+      if (Date.now() - a.at < Math.min(60000, 4000 * 2 ** a.n)) continue;   // back off: 4 s, 8 s, 16 s ... 60 s
+      refundAttempts.set(j.jobId, { at: Date.now(), n: a.n + 1 });
       background(j.jobId, () => refundAndClose(readJob(j.jobId), 'cancelled by request — everything returned to the payer'));
       continue;
     }
@@ -2666,6 +2866,8 @@ async function reapTick() {
     if (job.tokenId || (job.items || []).some((i: any) => i.tokenId)) {
       return { error: 'this job has already minted an inscription — use recovery, which returns the token and the remaining STX' };
     }
+    // Measured BEFORE this call writes or logs anything: both count as activity and would hide a silent run.
+    const idle = PROCESSING.has(id) ? runs.idleMs(id) : 0;
     job.cancelRequested = true;
     job.progress = 'cancelling — returning everything to the payer';
     job.progressAt = new Date().toISOString();
@@ -2673,7 +2875,12 @@ async function reapTick() {
     xaoLog(id, 'cancel requested');
     // Already running: the loop aborts at its next checkpoint and background()'s
     // handler does the refund. Idle: refund right now.
-    if (PROCESSING.has(id)) return { cancelling: true, jobId: id, wasRunning: true };
+    if (PROCESSING.has(id)) {
+      // A healthy run logs or polls every few seconds. One that has been silent for 45 s will not reach a
+      // checkpoint on its own, so take the job away from it and refund now instead of showing "cancelling" for days.
+      if (idle > 45000) { releaseStalledRun(id, idle); return { cancelling: true, jobId: id, wasRunning: false, forced: true }; }
+      return { cancelling: true, jobId: id, wasRunning: true };
+    }
     background(id, () => refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'));
     return { cancelling: true, jobId: id, wasRunning: false };
   },
@@ -2841,6 +3048,21 @@ async function reapTick() {
   },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
   getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },
+  // Everything support needs, as one block of text a stuck user can paste into a message. Never includes the key.
+  getDiagnostics: async (id: string) => {
+    let job: any;
+    try { job = readJob(id); } catch { return `No job ${id} is stored in this browser.`; }
+    const nav: any = navigator;
+    let storage = 'unknown';
+    try { storage = nav.storage && nav.storage.persisted ? ((await nav.storage.persisted()) ? 'persistent' : 'NOT persistent') : 'unsupported'; } catch {}
+    if (storageWriteFailures) storage += ` · ${storageWriteFailures} FAILED SAVES (${lastStorageError})`;
+    const idle = PROCESSING.has(id) ? `${Math.round(runs.idleMs(id) / 1000)}s idle` : 'not running';
+    return buildDiagnostics(job, {
+      build: AGENT_BUILD, nowIso: new Date().toISOString(), userAgent: String(nav.userAgent || ''), visibility: typeof document !== 'undefined' ? document.visibilityState : 'no-document',
+      online: typeof nav.onLine === 'boolean' ? nav.onLine : null, connection: (nav.connection && nav.connection.effectiveType) || '', storage,
+      workerOk: sleepStats.workerCreated,
+    }, netStats, sleepStats, [`run: ${idle}`]);
+  },
   // Storage durability, so a page can warn rather than assume its job will survive.
   requestDurableStorage,
   getBytesPersistError,
@@ -2964,3 +3186,5 @@ export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, g
 export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob, autoRun, returnStrays, unsealedUploadFor };
 // Exported so the branding can be verified by RENDERING a receipt, not by reading the template.
 export { buildReceiptHtml, buildBatchReceiptHtml, brandFor, receivedForJob, deliver, musicProtected };
+// Stall + refund internals, exported so the fault-injection tests can drive them for real.
+export { refundAndClose, releaseStalledRun, background, watchTick, runs, PROCESSING, writeJob, readJob, xaoLog, sweepStxTo, broadcastSafe };

@@ -796,7 +796,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-10-29.2"></script>
+<script src="agent-one.js?v=2026-10-30.1"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script src="music-thumbnail.js?v=1"></script>
@@ -837,6 +837,14 @@ async function api(path, opts){
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/delete$/))) return A.deleteJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)$/))) return A.getJob(mm[1]);
   throw new Error('no route: '+path);
+}
+// Support footer for a job card: how old the last sign of life is, and a button that copies the step log.
+// Plain text, never contains the deposit key. A job that has gone quiet looks the same as a slow one without this.
+function supportFooter(job,live){
+  const U=window.XtrataUI||{}; const la=live&&U.lastActivity?U.lastActivity(job):null;
+  return `<div class="muted" style="margin-top:12px;font-size:11.5px">
+    ${la?`<div${la.stalled?' style="color:var(--warn)"':''}>${la.stalled?'⚠ ':''}${esc(la.text)}${la.stalled?'. The page retries a stalled step by itself. If this stays put, tap Copy diagnostics and send it to support.':''}</div>`:''}
+    <a href="#" onclick="window.XtrataUI.copyDiagnostics('${esc(job.jobId)}',this);return false">Copy diagnostics</a> <span>(plain text for support, never includes your key)</span></div>`;
 }
 function copyBtn(text){ return `<button class="copy" onclick="navigator.clipboard.writeText('${esc(text)}');this.textContent='copied'">copy</button>`; }
 function xtrataWallet(){ return window.XtrataWallet || null; }
@@ -2037,6 +2045,7 @@ async function renderJobDetail(jobId,out,isActive){
           <button class="btn ghost" onclick="act('discard','${esc(job.jobId)}')">Clear this job</button>
         </div>
         <div class="err" id="jobErr"></div></div>`:''}
+      ${supportFooter(job,active||!!job.cancelRequested&&st!=='CANCELLED')}
     </div>`;
     if(st==='NEEDS_RECOVERY') checkStuck(jobId);
   }catch(e){ /* transient read (job file mid-write) — keep polling */ }
