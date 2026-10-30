@@ -7739,7 +7739,9 @@ async function cy(t, e) {
     domain: e.domain,
     message: e.message,
     network: Fw(e.network),
-    stxAddress: e.stxAddress
+    stxAddress: e.stxAddress,
+    // Xverse on phones reads the app name from appDetails and crashes without it.
+    appDetails: { name: "ParallaX Casino", icon: (typeof location < "u" ? location.origin : "") + "/favicons/xtrata-apple-touch-icon.png" }
   }), r = await t.structuredDataSignatureRequest(n);
   if (!(r != null && r.signature)) throw new Error("The wallet did not return a signature. Nothing changed.");
   return String(r.signature);
