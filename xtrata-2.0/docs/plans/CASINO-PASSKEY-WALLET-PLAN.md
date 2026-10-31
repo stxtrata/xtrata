@@ -1,6 +1,6 @@
 # ParallaX Casino: passkey wallet for the LAYR exchange (plan)
 
-Written 2026-10-31. **Status: BUILT 2026-10-31, not deployed.** Behind a flag (`?passkey=1`) until `casino-wallet.xtrata.xyz` is live.
+Written 2026-10-31. **Status: LIVE on testnet 2026-10-31.** `casino-wallet.xtrata.xyz` deployed; on for everyone (`?passkey=0` hides it in a browser).
 Decisions in section 7; what was built and how to ship it in section 8. Testnet only.
 
 Goal: someone with no Stacks wallet walks up to a LAYR exchange, taps once (Face ID / fingerprint), gets a
@@ -246,6 +246,12 @@ Everything above is built and tested. Nothing is deployed: the casino page shows
 
 ### How it behaves
 
+- **Who sees what (Jim, 2026-10-31).** "Play now · no wallet needed" is for NEW players only: no wallet extension in the browser,
+  none ever connected here (`STX_PROVIDER`), no casino wallet on this device, and no LAYR chips. Everyone else gets the standard
+  exchange ("Connect wallet") plus "Create a passkey wallet" while the wallet they use is not a passkey wallet (an extension, the
+  browser-only wallet, or none), or "Open my passkey wallet · ST…" when this device already has one. A browser-only wallet can be
+  upgraded this way; chips are per browser, so nothing is lost. The box's `casino.status` reports `passkeyAddress` / `deviceAddress`
+  (public) for this; an older box without them still works, the page falls back to `kind`.
 - **Play now · no wallet needed** → the casino wallet opens as its own dialog above the page (not inside the exchange panel: the frame's
   confirm button only arms while fully visible with no blur, transform or overlap, and the panel has a blur and scrolls) → passkey
   made and proven (two matching PRF results) → Hiro faucet (500 STX) → as soon as the balance covers it, the exchange buys
@@ -285,6 +291,5 @@ these changes. It expects `{ state, session }` and the box now also returns `fea
    Check: `curl -sI https://casino-wallet.xtrata.xyz/ | grep -i frame-ancestors` shows `https://xtrata.xyz`, and
    `curl -s -o /dev/null -w '%{http_code}\n' https://casino-wallet.xtrata.xyz/create` prints 200.
 3. Commit and deploy the main site as usual (`public/casino/index.html`, `public/casino/passkey-wallet.js`, `public/casino-b/index.html`).
-4. Try it: `https://xtrata.xyz/casino/?passkey=1` on desktop Chrome, an iPhone (new-tab passkey) and Android. `?passkey=0` turns it off.
-5. To make it the default for everyone: in `#pxPasskeyWallet` (casino page), change `if(get(FLAG)!=='1')return;` to
-   `if(get(FLAG)==='0')return;`.
+4. Try it on desktop Chrome, an iPhone (new-tab passkey) and Android. `?passkey=0` turns it off in a browser, `?passkey=1` back on.
+5. Done 2026-10-31: on for everyone (`if(get(FLAG)==='0')return;` in `#pxPasskeyWallet`).

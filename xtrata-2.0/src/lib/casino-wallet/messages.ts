@@ -10,6 +10,10 @@ export interface CasinoStatus {
   /** This browser can make or use passkeys at all (PRF is only known after a real ceremony). */
   passkeys: boolean;
   features: string[];
+  /** The passkey wallet this device used last, if any (public). */
+  passkeyAddress?: string;
+  /** The browser-only wallet kept on this device, if any (public). */
+  deviceAddress?: string;
 }
 
 export interface CasinoOpenParams {
@@ -25,4 +29,4 @@ export interface CasinoOpenResult { address: string; kind: CasinoWalletKind }
 export interface CasinoSignBuyParams { stx: number; fee: string; nonce: string }
 export interface CasinoSignBuyResult { raw: string; txid: string }
 
-export const CASINO_FEATURES = ['buy', 'device'] as const;
+export const CASINO_FEATURES = ['buy', 'device', 'held'] as const;

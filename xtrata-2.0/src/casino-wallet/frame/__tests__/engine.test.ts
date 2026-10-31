@@ -113,6 +113,18 @@ describe('casino wallet engine (wallet origin)', () => {
     expect(EXCHANGE_ADDRESS).toBe('ST10W2EEM757922QTVDZZ5CSEW55JEFNN33V2E7YA');
   });
 
+  it('reports both wallets a device holds, so the page can offer a passkey wallet to a browser-only player', async () => {
+    const s = setup();
+    const device = await s.h['casino.open']({ mode: 'device' });
+    expect(await s.h['casino.status']()).toMatchObject({ state: 'unlocked', kind: 'device', deviceAddress: device.address });
+    expect((await s.h['casino.status']()).passkeyAddress).toBeUndefined();
+    // Upgrading: the open browser-only wallet does not stop a passkey wallet being made.
+    expect(await s.h['casino.open']({ mode: 'create' })).toEqual({ address: ADDRESS, kind: 'passkey' });
+    expect(await s.h['casino.status']()).toMatchObject({ state: 'unlocked', kind: 'passkey', passkeyAddress: ADDRESS, deviceAddress: device.address });
+    await s.h['casino.lock']();
+    expect(await s.h['casino.status']()).toMatchObject({ state: 'known', kind: 'passkey', passkeyAddress: ADDRESS, deviceAddress: device.address });
+  });
+
   it('cancel in the frame signs nothing and leaves no wallet', async () => {
     const s = setup({ cancel: ['create'] });
     await expect(s.h['casino.open']({ mode: 'create' })).rejects.toThrow(/cancelled/);

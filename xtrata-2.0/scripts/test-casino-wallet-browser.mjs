@@ -1,5 +1,5 @@
 // Real-browser check of the ParallaX Casino "Play now" flow (docs/plans/CASINO-PASSKEY-WALLET-PLAN.md): the real casino page
-// (public/casino/index.html, ?passkey=1), the real casino wallet box (dist-casino-wallet) on its own origin in an iframe, Chrome's
+// (public/casino/index.html), the real casino wallet box (dist-casino-wallet) on its own origin in an iframe, Chrome's
 // virtual authenticator with PRF, and a FAKE Hiro testnet API (faucet, balances, nonces, broadcast, transaction lookup).
 // Nothing reaches a real network and no funds move.
 //
@@ -64,7 +64,7 @@ const typeOf = (path) => types[(/\.[a-z]+$/.exec(path) || [''])[0]] || 'applicat
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined });
 
-async function newPlayer({ prf = true } = {}) {
+async function newPlayer({ prf = true, extension = false } = {}) {
   const context = await browser.newContext({ viewport: { width: 900, height: 900 } });
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
@@ -94,14 +94,15 @@ async function newPlayer({ prf = true } = {}) {
     options: { protocol: 'ctap2', ctap2Version: 'ctap2_1', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: prf, automaticPresenceSimulation: true }
   });
   // The page's wallet script would load https://casino-wallet.xtrata.xyz; point it at the test wallet origin.
-  await page.addInitScript((w) => {
+  await page.addInitScript(([w, ext]) => {
     if (window.top !== window) return;
     window.ParallaxCasinoWalletOrigin = w;
+    if (ext) window.LeatherProvider = { request: async () => ({}) }; // what Leather injects
     // Headless software WebGL draws the 3D casino at about 1 frame a second, which starves clicks. Draw one frame every 4 s instead:
     // this test is about the exchange panel, not the scene.
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => setTimeout(() => raf(cb), 4000);
-  }, WALLET);
+  }, [WALLET, extension]);
   return { context, page, errors, logs };
 }
 
@@ -131,12 +132,14 @@ async function waitFor(page, check, ms, label) {
   }
 }
 
-async function openExchange(page) {
-  await page.goto(SITE + '/casino/?passkey=1', { waitUntil: 'domcontentloaded', timeout: 120000 });
+/** Opens the casino on its normal link and the first exchange; waits until the casino wallet has said what this device holds. */
+async function openExchange(page, expect = '#lxPlayNow') {
+  await page.goto(SITE + '/casino/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.ParallaxLAYRExchange && window.ParallaxPasskeyWallet, null, { timeout: 120000 });
   await page.evaluate(() => window.ParallaxLAYRExchange.open(0));
-  await page.locator('#lxPlayNow').waitFor({ state: 'visible' });
+  await page.locator(expect).waitFor({ state: 'visible' });
 }
+const visible = (page, sel) => page.locator(sel).isVisible();
 
 // ---- 1. a new player with a passkey ----
 {
@@ -169,33 +172,72 @@ async function openExchange(page) {
   await waitFor(page, async () => chain.broadcasts.length === 2 && ['credited', 'already-credited'].includes((await snap(page)).phase), 60000, 'second buy');
   assert.deepEqual(chain.broadcasts[1], { sender: address, recipient: EXCHANGE, amount: 2n * STX, fee: 3000n, nonce: 1 });
 
-  // Reload: one tap opens the same wallet, and the first buy is NOT repeated.
-  await openExchange(page);
-  await page.waitForFunction(() => /Open my casino wallet/.test(document.getElementById('lxPlayNow').textContent));
-  await page.locator('#lxPlayNow').click();
+  // Reload: no longer a new player (chips, and a passkey wallet here), so the standard exchange shows, with one tap to open the same
+  // wallet. The first buy is NOT repeated.
+  await openExchange(page, '#lxPasskeyAltBtn');
+  assert.equal(await visible(page, '#lxPlayNow'), false, 'Play now is for new players only');
+  assert.equal(await page.locator('#layrConnectWallet').textContent(), 'Connect wallet');
+  assert.match(await page.locator('#lxPasskeyAltBtn').textContent(), /^Open my passkey wallet · ST/);
+  if (shots) await page.screenshot({ path: `${shots}/4-returning.png`, timeout: 120000, animations: 'disabled' });
+  await page.locator('#lxPasskeyAltBtn').click();
   await confirmInFrame(page, async () => !!(await snap(page)).address, 'unlock');
   assert.equal((await snap(page)).address, address);
   await page.waitForFunction(() => /Ready/.test(document.getElementById('lxPasskeyStatus').textContent), null, { timeout: 30000 });
   assert.equal(chain.broadcasts.length, 2, 'no second automatic buy');
   assert.equal(chain.faucetCalls.length, 1, 'no faucet call while funded');
   assert.deepEqual(errors, []);
+  assert.equal(await visible(page, '#lxPasskeyAlt'), false, 'no passkey offer while on a passkey wallet');
   await context.close();
-  console.log('ok 1 · passkey: create → faucet → auto-buy 1,000,000 LAYR → buy again → reload unlocks, no repeat');
+  console.log('ok 1 · new player: Play now → passkey → faucet → auto-buy 1,000,000 LAYR → buy again → returns to the standard exchange, one tap, no repeat');
 }
 
-// ---- 2. a browser with no passkey PRF: the browser-only wallet ----
+// ---- 2. browser-only wallet, then offered (and upgraded to) a passkey wallet ----
+{
+  const { context, page, errors } = await newPlayer();
+  await openExchange(page);
+  await page.locator('#lxPlayDevice').click();
+  await confirmInFrame(page, async () => !!(await snap(page)).address, 'browser-only wallet');
+  const device = (await snap(page)).address;
+  await waitFor(page, async () => ['credited', 'already-credited'].includes((await snap(page)).phase), 90000, 'device first buy');
+  assert.equal(chain.broadcasts.at(-1).sender, device);
+  assert.equal(chain.broadcasts.at(-1).amount, 10n * STX);
+  // Not linked to a passkey: the standard exchange offers one.
+  await page.locator('#lxPasskeyAltBtn').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#lxPasskeyAltBtn').textContent(), 'Create a passkey wallet');
+  await page.locator('#lxPasskeyAltBtn').click();
+  await confirmInFrame(page, async () => { const a = (await snap(page)).address; return !!a && a !== device; }, 'upgrade to passkey');
+  const passkey = (await snap(page)).address;
+  await waitFor(page, async () => chain.broadcasts.at(-1).sender === passkey && ['credited', 'already-credited'].includes((await snap(page)).phase), 90000, 'passkey first buy');
+  await page.waitForFunction(() => document.getElementById('lxPasskeyAlt').hidden);
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('ok 2 · browser-only wallet → auto-buy → offered "Create a passkey wallet" → upgraded → auto-buy');
+}
+
+// ---- 2b. no passkey PRF on this device: the browser-only wallet still works ----
 {
   const { context, page, errors } = await newPlayer({ prf: false });
   await openExchange(page);
   await page.locator('#lxPlayDevice').click();
-  await confirmInFrame(page, async () => !!(await snap(page)).address, 'browser-only wallet');
-  const address = (await snap(page)).address;
-  await waitFor(page, async () => ['credited', 'already-credited'].includes((await snap(page)).phase), 90000, 'device first buy');
-  assert.equal(chain.broadcasts.at(-1).sender, address);
-  assert.equal(chain.broadcasts.at(-1).amount, 10n * STX);
+  await confirmInFrame(page, async () => !!(await snap(page)).address, 'browser-only wallet, no PRF');
+  await waitFor(page, async () => ['credited', 'already-credited'].includes((await snap(page)).phase), 90000, 'device first buy, no PRF');
   assert.deepEqual(errors, []);
   await context.close();
-  console.log('ok 2 · no passkey: browser-only wallet → faucet → auto-buy');
+  console.log('ok 2b · no passkey PRF: browser-only wallet → faucet → auto-buy');
+}
+
+// ---- 2c. a player with a wallet extension: standard exchange, plus the passkey option ----
+{
+  const { context, page, errors } = await newPlayer({ extension: true });
+  await openExchange(page, '#lxPasskeyAltBtn');
+  assert.equal(await visible(page, '#lxPlayNow'), false);
+  assert.equal(await page.locator('#layrConnectWallet').textContent(), 'Connect wallet');
+  assert.equal(await page.locator('#lxPasskeyAltBtn').textContent(), 'Create a passkey wallet');
+  assert.match(await page.locator('#lxPasskeyAltNote').textContent(), /500 free testnet STX/);
+  if (shots) await page.screenshot({ path: `${shots}/5-has-extension.png`, timeout: 120000, animations: 'disabled' });
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('ok 2c · wallet extension: standard exchange with "Create a passkey wallet", no Play now');
 }
 
 // ---- 3. flag off: the page is exactly as before ----

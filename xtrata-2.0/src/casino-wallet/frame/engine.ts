@@ -105,13 +105,15 @@ export function createCasinoEngine(deps: { passkey: PasskeyPort; ui: CasinoUiPor
   const status = (): CasinoStatus => {
     const passkeys = deps.passkey.available();
     const features = [...CASINO_FEATURES];
-    if (identity && kind) return { state: 'unlocked', kind, address: identity.address, passkeys, features };
     const s = load();
     const last = lastRecord();
+    // Both kinds this device holds, as public addresses, so the page can offer "open my passkey wallet" or "create one".
+    const held = { ...(last ? { passkeyAddress: last.address } : {}), ...(s.device ? { deviceAddress: s.device.address } : {}) };
+    if (identity && kind) return { state: 'unlocked', kind, address: identity.address, passkeys, features, ...held };
     // Offer what the player used last: the passkey wallet, or the browser-only one.
-    if (s.lastKind === 'device' && s.device) return { state: 'known', kind: 'device', address: s.device.address, passkeys, features };
-    if (last) return { state: 'known', kind: 'passkey', address: last.address, passkeys, features };
-    if (s.device) return { state: 'known', kind: 'device', address: s.device.address, passkeys, features };
+    if (s.lastKind === 'device' && s.device) return { state: 'known', kind: 'device', address: s.device.address, passkeys, features, ...held };
+    if (last) return { state: 'known', kind: 'passkey', address: last.address, passkeys, features, ...held };
+    if (s.device) return { state: 'known', kind: 'device', address: s.device.address, passkeys, features, ...held };
     return { state: 'none', passkeys, features };
   };
   const refreshIdle = () => { const v = status(); deps.ui.idle({ state: v.state, kind: v.kind, address: v.address, passkeys: v.passkeys }); };

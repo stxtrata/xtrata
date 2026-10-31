@@ -203,6 +203,7 @@ body.parallax-bar-expanded #quickNav,body.parallax-bar-expanded #intro,body.para
  <div class="lx-wallet lx-card">
   <button id="layrConnectWallet" class="lx-connect">Connect wallet</button>
   <div id="lxPasskey" hidden><button id="lxPlayNow" class="lx-play">Play now · no wallet needed</button><button id="lxPlayDevice" class="lx-linkish">No passkey? Play in this browser only</button></div>
+  <div id="lxPasskeyAlt" hidden><button id="lxPasskeyAltBtn" class="lx-alt">Create a passkey wallet</button><button id="lxDeviceAlt" class="lx-linkish" hidden>Open my browser-only wallet</button><p id="lxPasskeyAltNote" class="lx-hint"></p></div>
   <div id="lxPasskeyTools" hidden><button id="lxFaucetTop">Get 500 free testnet STX</button></div>
   <p id="lxPasskeyStatus" class="lx-hint" aria-live="polite"></p>
   <div class="lx-who"><small>WALLET</small><span id="layrWalletAddress"></span></div>
@@ -12190,13 +12191,16 @@ button{font:inherit;color:inherit;cursor:pointer}
 </script>
 <style id="pxPasskeyWalletStyle">
 /* ParallaX Casino: "Play now" with the casino's own testnet wallet (docs/plans/CASINO-PASSKEY-WALLET-PLAN.md). */
-#layrDispenserPanel #lxPasskey,#layrDispenserPanel #lxPasskeyTools,#layrDispenserPanel #lxPasskeyStatus{grid-column:1/-1}
+#layrDispenserPanel #lxPasskey,#layrDispenserPanel #lxPasskeyAlt,#layrDispenserPanel #lxPasskeyTools,#layrDispenserPanel #lxPasskeyStatus{grid-column:1/-1}
 #layrDispenserPanel #lxPasskey{display:grid;gap:6px;order:-1}
-#layrDispenserPanel :is(#lxPasskey,#lxPasskeyTools)[hidden]{display:none}
+#layrDispenserPanel #lxPasskeyAlt{display:grid;gap:6px}
+#layrDispenserPanel :is(#lxPasskey,#lxPasskeyAlt,#lxPasskeyTools,#lxPasskeyAltBtn,#lxDeviceAlt)[hidden]{display:none}
+#layrDispenserPanel .lx-alt{min-height:40px;padding:0 12px;font:600 14px Arial;color:#e8cf9f;background:#13263a;border:1px solid #c4a26188;border-radius:6px;cursor:pointer}
+#layrDispenserPanel .lx-alt:disabled{opacity:.6;cursor:default}
 #layrDispenserPanel .lx-play{min-height:54px;padding:0 12px;font:700 16px Arial;color:#17110b;background:linear-gradient(100deg,#c39a55,#ecca8f);border:1px solid #f0d39c;border-radius:6px;cursor:pointer}
 #layrDispenserPanel .lx-play:disabled{opacity:.6;cursor:default}
 #layrDispenserPanel .lx-linkish{justify-self:center;padding:6px;background:none;border:0;color:#d7bf91;font:12px Arial;text-decoration:underline;cursor:pointer}
-#layrDispenserPanel.lx-passkey-on[data-state=disconnected] .lx-connect{min-height:42px;font:600 14px Arial;color:#e8cf9f;background:#13263a;border-color:#c4a26188}
+#layrDispenserPanel.lx-passkey-new[data-state=disconnected] .lx-connect{min-height:42px;font:600 14px Arial;color:#e8cf9f;background:#13263a;border-color:#c4a26188}
 /* The wallet frame opens as its own dialog on top of everything, NOT inside the exchange panel: the frame's confirm button only arms
    while it is fully visible with no filter, transform, opacity or overlap from the page (IntersectionObserver v2, the radio's
    clickjacking guard), and the panel's blur and scrolling would keep it disabled. No transform, filter or opacity on this element. */
@@ -12207,39 +12211,60 @@ button{font:inherit;color:inherit;cursor:pointer}
 #layrDispenserPanel #lxPasskeyTools{display:flex;gap:8px;flex-wrap:wrap}
 #layrDispenserPanel #lxPasskeyTools button{min-height:34px;padding:0 12px;background:#13263a;border:1px solid #c4a26155;border-radius:6px;color:#e0c59c;font:12px Arial;cursor:pointer}
 #layrDispenserPanel #lxPasskeyStatus a{color:#d7bf91}
-#layrDispenserPanel[data-state=shut] :is(#lxPasskey,#lxPasskeyTools){display:none}
+#layrDispenserPanel[data-state=shut] :is(#lxPasskey,#lxPasskeyAlt,#lxPasskeyTools){display:none}
 </style>
 <div id="lxPasskeyFrame" role="dialog" aria-label="Casino wallet (testnet)" hidden></div>
 <script id="pxPasskeyWallet">
-/* ParallaX Casino: "Play now" with the casino's own TESTNET wallet (docs/plans/CASINO-PASSKEY-WALLET-PLAN.md).
-   A player with no Stacks wallet taps once: the wallet on casino-wallet.xtrata.xyz is made from a passkey (or kept in this browser
-   only), Hiro's testnet faucet sends 500 STX, and as soon as they land the exchange buys 10 STX = 1,000,000 LAYR by itself, once per
-   wallet. The exchange's own pending/check/credit flow does the rest. Behind a flag until the wallet origin is live:
-   ?passkey=1 turns it on in this browser, ?passkey=0 turns it off. */
+/* ParallaX Casino: the casino's own TESTNET wallet at the LAYR exchange (docs/plans/CASINO-PASSKEY-WALLET-PLAN.md).
+   - A NEW player (no wallet extension, never connected one here, no casino wallet on this device, no chips) sees one big button:
+     "Play now · no wallet needed". The wallet on casino-wallet.xtrata.xyz is made from a passkey (or kept in this browser only),
+     Hiro's testnet faucet sends 500 STX, and as soon as they land the exchange buys 10 STX = 1,000,000 LAYR by itself, once per wallet.
+   - EVERYONE ELSE sees the standard exchange (Connect wallet), plus "Create a passkey wallet" unless the wallet they are using is
+     already a passkey wallet ("Open my passkey wallet" when this device already has one).
+   On for everyone. ?passkey=0 turns it off in this browser, ?passkey=1 back on. */
 (function(){'use strict';
  const FLAG='xtrata.parallax.passkey',AUTO='xtrata.parallax.passkey.autobuy.v1',DRIP='xtrata.parallax.passkey.faucet.v1',FIRST_BUY=10,WAIT_MS=10*60e3;
  const get=k=>{try{return localStorage.getItem(k);}catch(_){return null;}},set=(k,v)=>{try{localStorage.setItem(k,v);}catch(_){}};
  try{const q=new URLSearchParams(location.search).get('passkey');if(q==='1')set(FLAG,'1');else if(q==='0')set(FLAG,'0');}catch(_){}
- if(get(FLAG)!=='1')return;
- const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ if(get(FLAG)==='0')return;
+ const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms)),short=a=>a.slice(0,5)+'…'+a.slice(-4);
  const book=k=>{try{return JSON.parse(get(k)||'{}')||{};}catch(_){return {};}};
- let ex=null,pw=null,box=null,working=false,msg='',msgLink='';
+ let ex=null,pw=null,box=null,boxChecked=false,working=false,msg='',msgLink='';
  const say=(t,link)=>{msg=t||'';msgLink=link||'';paint();};
  const shut=()=>{const c=window.CasinoStatus;return !!(c&&c.get().state!=='open');};
  function showError(e){const t=String(e&&e.message||e||'');if(/cancel/i.test(t)){say('');return;}const b=$('layrTestnetError');if(b){b.textContent=t;try{b.scrollIntoView({block:'nearest',behavior:'smooth'});}catch(_){}}}
 
+ // What this browser already has. Extensions inject these objects; STX_PROVIDER is set once any wallet has connected here.
+ const extension=()=>{try{return !!(window.LeatherProvider||window.XverseProviders||window.StacksProvider||window.HiroWalletProvider||window.AsignaProvider||get('STX_PROVIDER'));}catch(_){return false;}};
+ const chips=()=>{try{const a=window.ParallaxLAYRAccount;return a?Number(a.balance())||0:0;}catch(_){return 0;}};
+ const held=()=>({
+  passkey:box&&(box.passkeyAddress||(box.kind==='passkey'?box.address:''))||'',
+  device:box&&(box.deviceAddress||(box.kind==='device'?box.address:''))||''
+ });
+ // A new player: nothing in this browser says they have a wallet or chips. Only they get the big "Play now".
+ const isNew=()=>{const h=held();return boxChecked&&!h.passkey&&!h.device&&!extension()&&chips()<=0;};
+
  function paint(st,state){
   const panel=$('layrDispenserPanel');if(!panel||!ex||!pw)return;
-  st=st||ex.snapshot();state=state||panel.dataset.state;panel.classList.add('lx-passkey-on');
-  const mine=!!st.address&&st.walletKind==='passkey',known=box&&box.state==='known',noPasskeys=box&&!box.passkeys;
-  $('lxPasskey').hidden=state!=='disconnected';
-  const play=$('lxPlayNow');play.disabled=working;
-  play.textContent=known?'Open my casino wallet · '+box.address.slice(0,5)+'…'+box.address.slice(-4):'Play now · no wallet needed';
-  $('lxPlayDevice').hidden=!!(noPasskeys||known&&box.kind==='device');
-  if(state==='disconnected'){$('layrConnectWallet').textContent='I have a Stacks wallet';
-   $('lxWalletHint').textContent=known?'Welcome back. One tap opens your casino wallet.':'New here? Play now makes you a free testnet wallet with your passkey, fills it with 500 testnet STX and buys your first 1,000,000 LAYR.';}
-  else if(state==='connecting'&&working)$('lxWalletHint').textContent='Finish in the casino wallet window.';
-  else if(mine&&state==='ready')$('lxWalletHint').textContent='Casino wallet · testnet. Buying chips needs no popup.';
+  st=st||ex.snapshot();state=state||panel.dataset.state;
+  const h=held(),mine=!!st.address&&st.walletKind==='passkey',onPasskey=mine&&!!box&&box.state==='unlocked'&&box.kind==='passkey';
+  const fresh=state==='disconnected'&&isNew(),cw=$('layrConnectWallet');
+  panel.classList.toggle('lx-passkey-new',fresh);
+  // New players: Play now first, "I have a Stacks wallet" second.
+  $('lxPasskey').hidden=!fresh;$('lxPlayNow').disabled=working;$('lxPlayDevice').hidden=!!(box&&!box.passkeys);
+  if(fresh){cw.textContent='I have a Stacks wallet';$('lxWalletHint').textContent='New here? Play now makes you a free testnet wallet with your passkey, fills it with 500 testnet STX and buys your first 1,000,000 LAYR.';}
+  else if(state==='disconnected'&&cw.textContent==='I have a Stacks wallet')cw.textContent='Connect wallet';
+  // Everyone else: the standard exchange, plus a passkey wallet unless the wallet in use already is one.
+  const offer=!fresh&&!onPasskey&&!!box&&(state==='disconnected'||state==='ready')&&(!!h.passkey||box.passkeys||state==='disconnected'&&!!h.device);
+  $('lxPasskeyAlt').hidden=!offer;
+  if(offer){
+   const b=$('lxPasskeyAltBtn');b.disabled=working;b.hidden=!h.passkey&&!box.passkeys;
+   b.textContent=h.passkey?(state==='disconnected'?'Open my passkey wallet · ':'Switch to my passkey wallet · ')+short(h.passkey):'Create a passkey wallet';
+   const d=$('lxDeviceAlt');d.disabled=working;d.hidden=!(state==='disconnected'&&h.device&&!mine);if(h.device)d.textContent='Open my browser-only wallet · '+short(h.device);
+   $('lxPasskeyAltNote').textContent=h.passkey||!box.passkeys?'':'A free testnet wallet opened with Face ID or your fingerprint: no extension, 500 free testnet STX. Your chips stay as they are.';
+  }
+  if(state==='connecting'&&working)$('lxWalletHint').textContent='Finish in the casino wallet window.';
+  else if(mine&&state==='ready')$('lxWalletHint').textContent=(onPasskey?'Passkey wallet':'Browser-only wallet')+' · testnet. Buying chips needs no popup.';
   const fh=$('layrBalanceHint');if(mine&&fh&&/shown in your wallet/.test(fh.textContent))fh.textContent='Plus a '+(pw.fee/1e6)+' STX network fee.';
   $('lxPasskeyTools').hidden=!mine||state==='shut';$('lxFaucetTop').disabled=working;
   const f=$('lxFaucet');if(f)f.hidden=mine;
@@ -12279,28 +12304,33 @@ button{font:inherit;color:inherit;cursor:pointer}
   try{await ex.purchase(FIRST_BUY);}finally{say('');}
  }
 
+ async function refreshBox(){try{box=await pw.status();}catch(_){}boxChecked=true;paint();}
  async function run(fn){if(working)return;working=true;$('layrTestnetError').textContent='';paint();try{await fn();}catch(e){say('');showError(e);}finally{working=false;paint();}}
- async function playNow(mode){
-  if(!mode){try{box=await pw.status();}catch(_){}mode=box&&box.state==='known'?(box.kind==='device'?'device':'unlock'):(box&&!box.passkeys?'device':'create');}
+ async function open(mode){
+  if(!mode){await refreshBox();mode=held().passkey?'unlock':held().device?'device':box&&!box.passkeys?'device':'create';}
   say('');
   await ex.connectPasskey(mode);
-  try{box=await pw.status();}catch(_){}
+  await refreshBox();
   await fundAndBuy(false);
  }
 
  function start(){
   ex=window.ParallaxLAYRExchange.client;pw=window.ParallaxPasskeyWallet;
   pw.attach($('lxPasskeyFrame'));
-  $('lxPlayNow').onclick=()=>run(()=>playNow());
-  $('lxPlayDevice').onclick=()=>run(()=>playNow('device'));
+  $('lxPlayNow').onclick=()=>run(()=>open());
+  $('lxPlayDevice').onclick=()=>run(()=>open('device'));
+  $('lxPasskeyAltBtn').onclick=()=>run(()=>open(held().passkey?'unlock':'create'));
+  $('lxDeviceAlt').onclick=()=>run(()=>open('device'));
   $('lxFaucetTop').onclick=()=>run(()=>fundAndBuy(true));
   ex.subscribe(()=>paint());
-  pw.status().then(s=>{box=s;paint();},()=>{});
-  paint();
+  try{window.ParallaxLAYRAccount?.subscribe?.(()=>paint());}catch(_){}
+  refreshBox();
+  // Extensions can inject a moment after load: look again once they have had the chance.
+  setTimeout(()=>paint(),2500);
  }
  let tries=0;
  (function wait(){if(window.ParallaxLAYRExchange&&window.ParallaxPasskeyWallet&&$('lxPasskeyFrame'))return start();if(++tries<300)setTimeout(wait,100);})();
- const s=document.createElement('script');s.type='module';s.src='passkey-wallet.js?v=1';document.head.appendChild(s);
+ const s=document.createElement('script');s.type='module';s.src='passkey-wallet.js?v=2';document.head.appendChild(s);
 })();
 </script>
 <script type="module" src="room.js?v=p3.1"></script>
