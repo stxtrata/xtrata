@@ -4,6 +4,7 @@ import { createCasinoEngine, STORE_KEY } from '../engine';
 import { BUY_FEE, checkSignedBuy, EXCHANGE_ADDRESS } from '../../../lib/casino-wallet/tx';
 import { assertNoSecrets, isBridgeRequest, BRIDGE_PROTOCOL } from '../../../lib/wallet/passkey/bridge/protocol';
 import { createListeningEngine } from '../../../listening-wallet/frame/engine';
+import { issueRoomChallenge, verifyRoomProof } from '../../../../functions/lib/casino-room-proof';
 
 const PRF = Uint8Array.from({ length: 32 }, (_, i) => i);
 const ADDRESS = 'ST2SMCB4CV776FCP9A2EK0ZM37NAXM1MFJMMX9DW8'; // the locked vector in src/lib/casino-wallet/__tests__
@@ -132,9 +133,35 @@ describe('casino wallet engine (wallet origin)', () => {
   });
 });
 
+describe('casino room sign-in from the wallet box', () => {
+  const SECRET = 's'.repeat(40);
+  it('signs the room sentence the server verifies, for its own address only', async () => {
+    const s = setup();
+    await expect(s.h['casino.signRoomJoin']({})).rejects.toThrow(/Open the casino wallet/);
+    await s.h['casino.open']({ mode: 'create' });
+    const challenge = issueRoomChallenge(SECRET, ADDRESS);
+    const { signature } = await s.h['casino.signRoomJoin']({ address: challenge.address, network: challenge.network, nonce: challenge.nonce, expires: challenge.expires });
+    expect(verifyRoomProof(challenge, signature)).toMatchObject({ address: ADDRESS });
+    assertNoSecrets({ signature });
+    expect(s.panels).toHaveLength(3); // no extra prompt: the Room panel tap is the consent
+  });
+
+  it('refuses another address, mainnet, a stale or far-off expiry and a bad nonce', async () => {
+    const s = setup();
+    await s.h['casino.open']({ mode: 'create' });
+    const c = issueRoomChallenge(SECRET, ADDRESS);
+    const base = { address: c.address, network: c.network, nonce: c.nonce, expires: c.expires };
+    await expect(s.h['casino.signRoomJoin']({ ...base, address: 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG' })).rejects.toThrow(/different wallet/);
+    await expect(s.h['casino.signRoomJoin']({ ...base, network: 'mainnet' })).rejects.toThrow(/testnet/);
+    await expect(s.h['casino.signRoomJoin']({ ...base, expires: Date.now() - 1 })).rejects.toThrow(/expired/);
+    await expect(s.h['casino.signRoomJoin']({ ...base, expires: Date.now() + 60 * 60_000 })).rejects.toThrow(/expired/);
+    await expect(s.h['casino.signRoomJoin']({ ...base, nonce: 'zz' })).rejects.toThrow(/Invalid/);
+  });
+});
+
 describe('the casino and radio wallet boxes stay apart', () => {
   it('casino methods are in the bridge protocol', () => {
-    for (const method of ['casino.status', 'casino.open', 'casino.signBuy', 'casino.cancel', 'casino.lock'])
+    for (const method of ['casino.status', 'casino.open', 'casino.signBuy', 'casino.signRoomJoin', 'casino.cancel', 'casino.lock'])
       expect(isBridgeRequest({ protocol: BRIDGE_PROTOCOL, kind: 'request', id: 'x1', method })).toBe(true);
   });
 

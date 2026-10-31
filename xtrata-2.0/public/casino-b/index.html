@@ -7532,16 +7532,19 @@ function create(options){
  async function connect(){if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status='Choose your Stacks testnet wallet…';emit();
   try{await releaseXverse();const r=await askForAddresses(),a=stacksAccountIn(r);if(!a)throw Error('Switch your wallet to Stacks testnet and reconnect.');
    if(pending&&pending.address!==a.address)throw Error('Reconnect the wallet used for the pending transfer: '+pending.address);
-   address=a.address;walletKind='extension';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
+   address=a.address;walletKind='extension';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();announce();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
  }
  // The casino's own testnet wallet (casino-wallet.xtrata.xyz, docs/plans/CASINO-PASSKEY-WALLET-PLAN.md): made from a passkey, or kept in
  // this browser only. Loaded by public/casino/passkey-wallet.js as window.ParallaxPasskeyWallet; without it this path is simply absent.
  // It goes through ask() like any wallet, so the watchdog, Cancel and the save-before-asking rule all still apply.
+ // Tells the room a wallet just connected here, so it can sign the player in straight away (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md).
+ function announce(){let kind='casino';if(walletKind!=='passkey'){let p=null;try{p=localStorage.getItem('STX_PROVIDER');}catch(_){}kind=/Leather/.test(p||'')?'leather':/Xverse/.test(p||'')?'xverse':'other';}
+  try{window.dispatchEvent(new CustomEvent('px-wallet-connected',{detail:{kind,address}}));}catch(_){}}
  async function connectPasskey(mode,anyPasskey){const pw=window.ParallaxPasskeyWallet;if(!pw)throw Error('The casino wallet did not load. Reload the page.');if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status=mode==='device'?'Confirm in the casino wallet window…':'Use your passkey in the casino wallet window…';emit();
   try{const r=await ask('casino.open',{mode},{timeoutMs:1800000,run:()=>pw.open(mode,!!anyPasskey)}),a=r&&r.address;if(typeof a!=='string'||!/^ST/.test(a)||!validAddress(a))throw Error('The casino wallet did not give a testnet address.');
    if(pending&&pending.address!==a)throw Error('Open the wallet used for the pending transfer: '+pending.address);
-   address=a;walletKind='passkey';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Casino wallet open.';if(pending?.txId)await check();return address;
+   address=a;walletKind='passkey';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();announce();status='Casino wallet open.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
  }
  async function purchase(stx){if(exchangeShut())throw Error(SHUT_MSG);if(busy||pending)throw Error('Resolve the pending wallet transfer before sending another payment.');if(!Number.isInteger(stx)||stx<1||stx>10)throw Error('Choose a whole amount from 1 to 10 STX.');if(!address)throw Error('Connect your testnet wallet first.');if(address===RECIPIENT)throw Error('The LAYR exchange pays into this wallet, and a wallet cannot pay itself. Connect a different wallet or account to buy LAYR.');

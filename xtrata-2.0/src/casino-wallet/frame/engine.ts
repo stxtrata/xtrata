@@ -13,7 +13,9 @@
  * Plan: docs/plans/CASINO-PASSKEY-WALLET-PLAN.md.
  */
 import { bytesToHex } from '@stacks/common';
-import { makeSTXTokenTransfer } from '@stacks/transactions';
+import { createStacksPrivateKey, encodeStructuredData, makeSTXTokenTransfer, signMessageHashRsv } from '@stacks/transactions';
+import { sha256 } from '@noble/hashes/sha256';
+import { ROOM_CHALLENGE_TTL_MS, roomProofData } from '../../../functions/lib/casino-room-proof';
 import {
   casinoBase, deriveCasinoIdentity, identityFromKeyHex, randomCasinoKeyHex, type CasinoIdentity
 } from '../../lib/casino-wallet/derive';
@@ -297,6 +299,26 @@ export function createCasinoEngine(deps: { passkey: PasskeyPort; ui: CasinoUiPor
       const tx = await makeSTXTokenTransfer({ ...buyTransferOptions(buy), senderKey: identity.privateKey });
       const raw = tx.serialize() as unknown;
       return { raw: typeof raw === 'string' ? raw : bytesToHex(raw as Uint8Array), txid: '0x' + tx.txid() };
+    },
+
+    /**
+     * The casino room's free sign-in (functions/lib/casino-room-proof.ts): the SIP-018 sentence the room server checks, for THIS
+     * wallet's own address only, rebuilt here from the challenge's public fields so the page cannot make it sign anything else.
+     * No panel while the wallet is open: the player's tap on "Casino wallet" in the Room panel is the consent
+     * (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md, decision 1). It sends nothing and moves nothing.
+     */
+    'casino.signRoomJoin': async (params: unknown): Promise<{ signature: string }> => {
+      if (!identity) throw new Error('Open the casino wallet first.');
+      const p = (params ?? {}) as { address?: unknown; network?: unknown; nonce?: unknown; expires?: unknown };
+      if (p.address !== identity.address) throw new Error('That room sign-in is for a different wallet.');
+      if (p.network !== 'testnet') throw new Error('The casino wallet signs in on testnet only.');
+      if (typeof p.nonce !== 'string' || !/^[a-f0-9]{64}$/.test(p.nonce)) throw new Error('Invalid room sign-in request.');
+      const t = now();
+      if (typeof p.expires !== 'number' || !Number.isSafeInteger(p.expires) || p.expires <= t || p.expires > t + ROOM_CHALLENGE_TTL_MS + 30_000)
+        throw new Error('That room sign-in request has expired. Try again.');
+      const data = roomProofData({ address: identity.address, network: 'testnet', nonce: p.nonce, expires: p.expires });
+      const messageHash = bytesToHex(sha256(encodeStructuredData(data)));
+      return { signature: signMessageHashRsv({ messageHash, privateKey: createStacksPrivateKey(identity.privateKey) }).data };
     },
 
     'casino.cancel': async (): Promise<{ withdrawn: boolean }> => ({ withdrawn: deps.ui.cancel() }),

@@ -29,4 +29,4 @@ export interface CasinoOpenResult { address: string; kind: CasinoWalletKind }
 export interface CasinoSignBuyParams { stx: number; fee: string; nonce: string }
 export interface CasinoSignBuyResult { raw: string; txid: string }
 
-export const CASINO_FEATURES = ['buy', 'device', 'held'] as const;
+export const CASINO_FEATURES = ['buy', 'device', 'held', 'room'] as const;

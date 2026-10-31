@@ -7549,16 +7549,19 @@ function create(options){
  async function connect(){if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status='Choose your Stacks testnet wallet…';emit();
   try{await releaseXverse();const r=await askForAddresses(),a=stacksAccountIn(r);if(!a)throw Error('Switch your wallet to Stacks testnet and reconnect.');
    if(pending&&pending.address!==a.address)throw Error('Reconnect the wallet used for the pending transfer: '+pending.address);
-   address=a.address;walletKind='extension';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
+   address=a.address;walletKind='extension';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();announce();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
  }
  // The casino's own testnet wallet (casino-wallet.xtrata.xyz, docs/plans/CASINO-PASSKEY-WALLET-PLAN.md): made from a passkey, or kept in
  // this browser only. Loaded by public/casino/passkey-wallet.js as window.ParallaxPasskeyWallet; without it this path is simply absent.
  // It goes through ask() like any wallet, so the watchdog, Cancel and the save-before-asking rule all still apply.
+ // Tells the room a wallet just connected here, so it can sign the player in straight away (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md).
+ function announce(){let kind='casino';if(walletKind!=='passkey'){let p=null;try{p=localStorage.getItem('STX_PROVIDER');}catch(_){}kind=/Leather/.test(p||'')?'leather':/Xverse/.test(p||'')?'xverse':'other';}
+  try{window.dispatchEvent(new CustomEvent('px-wallet-connected',{detail:{kind,address}}));}catch(_){}}
  async function connectPasskey(mode,anyPasskey){const pw=window.ParallaxPasskeyWallet;if(!pw)throw Error('The casino wallet did not load. Reload the page.');if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status=mode==='device'?'Confirm in the casino wallet window…':'Use your passkey in the casino wallet window…';emit();
   try{const r=await ask('casino.open',{mode},{timeoutMs:1800000,run:()=>pw.open(mode,!!anyPasskey)}),a=r&&r.address;if(typeof a!=='string'||!/^ST/.test(a)||!validAddress(a))throw Error('The casino wallet did not give a testnet address.');
    if(pending&&pending.address!==a)throw Error('Open the wallet used for the pending transfer: '+pending.address);
-   address=a;walletKind='passkey';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Casino wallet open.';if(pending?.txId)await check();return address;
+   address=a;walletKind='passkey';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();announce();status='Casino wallet open.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
  }
  async function purchase(stx){if(exchangeShut())throw Error(SHUT_MSG);if(busy||pending)throw Error('Resolve the pending wallet transfer before sending another payment.');if(!Number.isInteger(stx)||stx<1||stx>10)throw Error('Choose a whole amount from 1 to 10 STX.');if(!address)throw Error('Connect your testnet wallet first.');if(address===RECIPIENT)throw Error('The LAYR exchange pays into this wallet, and a wallet cannot pay itself. Connect a different wallet or account to buy LAYR.');
@@ -12304,7 +12307,7 @@ button{font:inherit;color:inherit;cursor:pointer}
   try{await ex.purchase(FIRST_BUY);}finally{say('');}
  }
 
- async function refreshBox(){try{box=await pw.status();}catch(_){}boxChecked=true;paint();}
+ async function refreshBox(){try{box=await pw.status();}catch(_){}boxChecked=true;paint();try{window.dispatchEvent(new Event('px-casino-wallet-ready'));}catch(_){}}
  async function run(fn){if(working)return;working=true;$('layrTestnetError').textContent='';paint();try{await fn();}catch(e){say('');showError(e);}finally{working=false;paint();}}
  async function open(mode){
   if(!mode){await refreshBox();mode=held().passkey?'unlock':held().device?'device':box&&!box.passkeys?'device':'create';}
@@ -12322,6 +12325,20 @@ button{font:inherit;color:inherit;cursor:pointer}
   $('lxPasskeyAltBtn').onclick=()=>run(()=>open(held().passkey?'unlock':'create'));
   $('lxDeviceAlt').onclick=()=>run(()=>open('device'));
   $('lxFaucetTop').onclick=()=>run(()=>fundAndBuy(true));
+  // For the room (public/casino/room.js): the same casino wallet as the exchange, so one wallet buys chips and joins the room
+  // (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md, step 3).
+  window.ParallaxCasinoWalletUI=Object.freeze({
+   available:()=>!!(box&&Array.isArray(box.features)&&box.features.includes('room')),
+   isNew:()=>isNew(),
+   describe:()=>{const h=held();
+    if(h.passkey)return{label:'Casino wallet · '+short(h.passkey),mode:'unlock',has:true};
+    if(h.device)return{label:'Casino wallet · '+short(h.device),mode:'device',has:true};
+    return{label:'Make a free casino wallet',mode:box&&!box.passkeys?'device':'create',has:false};},
+   open:async()=>{const st=ex.snapshot();if(st.address&&st.walletKind==='passkey')return st.address;
+    await refreshBox();const h=held();await ex.connectPasskey(h.passkey?'unlock':h.device?'device':box&&!box.passkeys?'device':'create');await refreshBox();return ex.snapshot().address;},
+   // A wallet made new from the room: 500 free testnet STX and the first 1,000,000 LAYR, with the exchange's once-only rules.
+   fundNew:()=>run(()=>fundAndBuy(false))
+  });
   ex.subscribe(()=>paint());
   try{window.ParallaxLAYRAccount?.subscribe?.(()=>paint());}catch(_){}
   refreshBox();
@@ -12330,10 +12347,10 @@ button{font:inherit;color:inherit;cursor:pointer}
  }
  let tries=0;
  (function wait(){if(window.ParallaxLAYRExchange&&window.ParallaxPasskeyWallet&&$('lxPasskeyFrame'))return start();if(++tries<300)setTimeout(wait,100);})();
- const s=document.createElement('script');s.type='module';s.src='passkey-wallet.js?v=2';document.head.appendChild(s);
+ const s=document.createElement('script');s.type='module';s.src='passkey-wallet.js?v=3';document.head.appendChild(s);
 })();
 </script>
-<script type="module" src="room.js?v=p3.1"></script>
+<script type="module" src="room.js?v=p3.2"></script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>
 

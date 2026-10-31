@@ -9,7 +9,9 @@
  */
 import { setSelectedProviderId } from '@stacks/connect-ui';
 
-export type WalletKind = 'leather' | 'xverse';
+/** 'casino': the casino's own testnet wallet (passkey or browser-only) on casino-wallet.xtrata.xyz, through the page's
+ * window.ParallaxCasinoWalletUI (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md). */
+export type WalletKind = 'leather' | 'xverse' | 'casino';
 export type LinkedWallet = { kind: WalletKind; address: string; network: 'mainnet' | 'testnet'; via: string };
 
 const usable = (p: any) => !!p && typeof p.request === 'function';
@@ -65,7 +67,30 @@ export const addressesIn = (res: unknown): string[] => (JSON.stringify(res) || '
 /** What each wallet method answered, newest connect only (for a bug report). */
 export const connectTrail: string[] = [];
 
+/** The casino wallet's page helper, when the page has loaded it and its wallet box can sign the room sign-in. */
+export const casinoWalletUi = (): null | {
+  available(): boolean; isNew(): boolean; describe(): { label: string; mode: string; has: boolean };
+  open(): Promise<string>; fundNew(): Promise<void>;
+} => {
+  const ui = (hostWin() as any).ParallaxCasinoWalletUI ?? (window as any).ParallaxCasinoWalletUI;
+  try { return ui && ui.available() ? ui : null; } catch { return null; }
+};
+
+/** Signs the room sign-in with the open casino wallet (the box signs; the page checks it). */
+export const casinoSignRoomJoin = (challenge: unknown): Promise<string> => {
+  const pw = (hostWin() as any).ParallaxPasskeyWallet ?? (window as any).ParallaxPasskeyWallet;
+  if (!pw?.signRoomJoin) return Promise.reject(new Error('The casino wallet is not loaded. Reload the page.'));
+  return pw.signRoomJoin(challenge);
+};
+
 export async function connectWallet(kind: WalletKind): Promise<LinkedWallet> {
+  if (kind === 'casino') {
+    const ui = casinoWalletUi();
+    if (!ui) throw new Error('The casino wallet is not available here yet. Reload the page.');
+    const address = await ui.open();
+    if (!address) throw new Error('The casino wallet did not open.');
+    return { kind, address, network: address.startsWith('SP') ? 'mainnet' : 'testnet', via: 'casino-wallet' };
+  }
   const pv = await detect(kind, 1500);
   if (!pv) throw new Error(`${kind === 'leather' ? 'Leather' : 'Xverse'} was not found in this browser.`);
   connectTrail.length = 0;
@@ -97,7 +122,9 @@ export async function connectWallet(kind: WalletKind): Promise<LinkedWallet> {
 }
 
 /** The ids the app's standard chooser stores; requestStructuredSignature uses them to reach the same wallet again. */
-export const rememberProvider = (kind: WalletKind) =>
+export const rememberProvider = (kind: WalletKind) => {
+  if (kind === 'casino') return;      // the casino wallet signs through its own frame, not through an extension
   setSelectedProviderId(kind === 'leather' ? 'LeatherProvider' : 'XverseProviders.BitcoinProvider');
+};
 
 export const walletMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));

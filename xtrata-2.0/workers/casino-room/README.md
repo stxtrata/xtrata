@@ -155,6 +155,21 @@ A signed-in player on the floor (not at a seat or machine) is drawn walking for 
 - Rules and tests: `functions/lib/casino-room.ts`, `functions/lib/__tests__/casino-room-move.test.ts`, and the walking case in
   `functions/__tests__/casino-room-e2e.test.ts`.
 
+## Joining with the casino wallet, and anonymous watching off (2026-10-31)
+
+Plan: `docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md`.
+
+- **Casino wallet.** The Room panel offers the casino's own testnet wallet (passkey or browser-only, on
+  `casino-wallet.xtrata.xyz`) beside Leather and Xverse. It signs the same SIP-018 sentence through `casino.signRoomJoin`, so
+  the sign-in endpoints are unchanged. Everyone is asked to join on arrival, and connecting a wallet at the LAYR exchange signs
+  the player in straight away.
+- **Guests see the head count only**, unless the Pages variable `CASINO_ROOM_GUESTS` is `1`. `functions/casino/room/ws.ts`
+  passes the choice as `x-px-watch` (it drops any `x-px-*` header a browser sends); this Worker gives a guest who may not watch
+  a `room` message with `watch: false` and empty spots, players and walkers, and passes them no seats, arrivals, spins or moves.
+  Signed-in players see everything. A Worker that has not been redeployed ignores the header (guests keep watching).
+- **Deploy order:** this Worker first (`npx wrangler deploy --config workers/casino-room/wrangler.toml`), then the Pages site.
+  To let guests watch again: set `CASINO_ROOM_GUESTS=1` on the Pages project and redeploy it.
+
 ## Switching it on (preview first)
 
 Run these from `xtrata-2.0` after `git fetch && git checkout claude/casino-room-spike && npm install`.

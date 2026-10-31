@@ -30,6 +30,12 @@ export const roomConfig = (env: Record<string, unknown> | undefined): RoomConfig
   return { ok: true, secret, namespace };
 };
 
+/**
+ * Whether a visitor who has not signed in may watch the room (see who sits where, walkers, spins). Off unless the Pages variable
+ * CASINO_ROOM_GUESTS is "1" (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md, step 6). Guests always see the head count.
+ */
+export const guestsMayWatch = (env: Record<string, unknown> | undefined) => (env || {}).CASINO_ROOM_GUESTS === '1';
+
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
 export const roomOffline = (reason: string) => jsonResponse({ error: 'The casino room is offline.', reason }, 503, NO_STORE);

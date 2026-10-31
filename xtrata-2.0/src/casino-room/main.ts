@@ -29,7 +29,7 @@ import { requestStructuredSignature } from '../lib/wallet/structured-sign';
 import { createNameCache } from '../lib/bns/name-cache';
 import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { roomProofData, type RoomChallenge } from '../../functions/lib/casino-room-proof';
-import { connectWallet, connectTrail, rememberProvider, walletMessage, type LinkedWallet, type WalletKind } from './wallet';
+import { casinoSignRoomJoin, casinoWalletUi, connectWallet, connectTrail, rememberProvider, walletMessage, type LinkedWallet, type WalletKind } from './wallet';
 import { createChat, type Chat } from './chat';
 import { isChatError } from './chat-core';
 
@@ -66,6 +66,9 @@ const S = {
   joined: 0,
   guests: 0,
   busy: '' as '' | 'connect' | 'sign',
+  watch: true,                        // false: the room hides itself from visitors who have not signed in (CASINO_ROOM_GUESTS off)
+  prompted: false,                    // the arrival "Join the room" panel has opened once on this page
+  arrivedAt: 0,                       // when the first room message came, for the arrival prompt's short wait
   error: '',
   open: false,
   want: null as string | null,
@@ -169,6 +172,8 @@ const connect = () => {
     switch (m.t) {
       case 'room':
         S.you = m.you; S.spots = m.spots || {}; S.joined = m.joined; S.guests = m.guests;
+        S.watch = m.watch !== false;                         // an older room says nothing: guests may watch there
+        if (!S.arrivedAt) S.arrivedAt = Date.now();
         S.features = Array.isArray(m.features) ? m.features.filter((f: unknown) => typeof f === 'string') : [];
         S.walk = new Map();
         for (const w of Array.isArray(m.walkers) ? m.walkers : []) if (w && typeof w.a === 'string') S.walk.set(w.a, { x: +w.x, z: +w.z, r: +w.r, at: +w.at });
@@ -243,10 +248,13 @@ async function signIn(wallet: LinkedWallet) {
   S.busy = 'sign'; paint();
   let signature: string;
   try {
-    signature = await requestStructuredSignature({
-      domain, message, network: challenge.network, stxAddress: wallet.address,
-      appDetails: { name: 'ParallaX Casino', icon: `${location.origin}/favicons/xtrata-apple-touch-icon.png` }
-    });
+    // The casino wallet signs in its own frame (no popup while it is open); extensions through the app's standard request.
+    signature = wallet.kind === 'casino'
+      ? await casinoSignRoomJoin(challenge)
+      : await requestStructuredSignature({
+        domain, message, network: challenge.network, stxAddress: wallet.address,
+        appDetails: { name: 'ParallaX Casino', icon: `${location.origin}/favicons/xtrata-apple-touch-icon.png` }
+      });
   } catch (e) { throw new Error('The wallet did not sign: ' + walletMessage(e)); }
   const { res: sres, body: sbody } = await postJson('/casino/room/session', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ challenge, signature })
@@ -259,17 +267,67 @@ async function signIn(wallet: LinkedWallet) {
 async function join(kind: WalletKind) {
   if (S.busy) return;
   S.error = ''; S.busy = 'connect'; paint();
+  // A casino wallet made new here gets the exchange's welcome (500 free testnet STX, then the first 1,000,000 LAYR).
+  const fresh = kind === 'casino' && !(casinoWalletUi()?.describe().has);
   try {
     S.wallet = await connectWallet(kind);
     rememberProvider(kind);
     await signIn(S.wallet);
     S.open = false;
+    if (fresh) void casinoWalletUi()?.fundNew().catch(() => {});
   } catch (e) {
-    S.error = walletMessage(e);
+    S.error = /cancel/i.test(walletMessage(e)) ? '' : walletMessage(e);
   } finally {
     S.busy = ''; paint();
   }
 }
+
+/**
+ * A wallet connected somewhere on the page (the LAYR exchange announces it): sign the player into the room straight away
+ * (Jim, 2026-10-31). The casino wallet signs silently; Leather and Xverse show their one signature request.
+ */
+async function joinWithConnected(event: Event) {
+  const d = (event as CustomEvent).detail as { kind?: string; address?: string } | undefined;
+  if (!d || typeof d.address !== 'string' || S.service !== 'ok' || S.busy) return;
+  if (S.signed?.address === d.address) return;
+  const kind = d.kind === 'casino' || d.kind === 'leather' || d.kind === 'xverse' ? d.kind : null;
+  if (!kind) return;                  // a wallet the room cannot sign with yet: the Join panel still offers the others
+  S.error = ''; S.busy = 'sign'; paint();
+  try {
+    S.wallet = { kind, address: d.address, network: d.address.startsWith('SP') ? 'mainnet' : 'testnet', via: 'page' };
+    rememberProvider(kind);
+    await signIn(S.wallet);
+    S.open = false;
+  } catch (e) {
+    const text = walletMessage(e);
+    if (!/cancel/i.test(text)) { S.error = text; S.open = true; }
+  } finally {
+    S.busy = ''; paint();
+  }
+}
+
+/**
+ * The arrival prompt: everyone is asked to join the room (Jim, 2026-10-31). Once per page, a couple of seconds after the room
+ * answers, never over a hand or a machine in play, and never when a session from the last 4 hours is still live.
+ */
+const ARRIVAL_WAIT_MS = 2000;
+const arrivalPrompt = () => {
+  if (S.prompted || S.service !== 'ok' || !S.connected || S.signed || S.busy || S.open || !S.arrivedAt) return;
+  if (Date.now() - S.arrivedAt < ARRIVAL_WAIT_MS) return;
+  if (S.host?.currentSpot()) return;
+  S.prompted = true; S.open = true; paint();
+};
+
+/** The join buttons, in the order that fits this visitor: their casino wallet or their extension first, a new visitor the casino wallet. */
+const joinOrder = (): WalletKind[] => {
+  const ui = casinoWalletUi();
+  let used: string | null = null;
+  try { used = localStorage.getItem('STX_PROVIDER'); } catch { /* storage blocked */ }
+  const ext: WalletKind[] = /Xverse/.test(used || '') ? ['xverse', 'leather'] : ['leather', 'xverse'];
+  if (!ui) return ext;
+  if (ui.describe().has || !used) return ['casino', ...ext];
+  return [ext[0] as WalletKind, 'casino', ext[1] as WalletKind];
+};
 
 async function leave() {
   try { await postJson('/casino/room/session', { method: 'DELETE' }); } catch { /* the cookie dies by itself in 4 hours */ }
@@ -398,23 +456,32 @@ function paint() {
     parts.push(b);
   } else {
     parts.push(el('h3', 'Join the room'));
-    parts.push(el('p', S.connected
-      ? `You are watching: ${S.joined} signed in, ${S.guests} watching.`
-      : 'Connecting to the room…'));
-    parts.push(fact('Be seen', 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Watching alone shows you to nobody.'));
+    parts.push(el('p', !S.connected
+      ? 'Connecting to the room…'
+      : S.watch
+        ? `You are watching: ${S.joined} signed in, ${S.guests} watching.`
+        : `${S.joined} ${S.joined === 1 ? 'person is' : 'people are'} in the room. Sign in to join them.`));
+    parts.push(fact('Be seen', S.watch
+      ? 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Watching alone shows you to nobody.'
+      : 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Until you join you are invisible, and the room is hidden from you; the casino still plays as normal.'));
     parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
     parts.push(fact('Live chat', 'Signed-in players can chat with the room and send each other direct messages. Messages are not secret and are not saved.'));
     parts.push(fact('Free', 'One signature. It sends no transaction, costs no fee and gives no permission to spend anything.'));
     const row = el('div', undefined, 'row');
-    for (const kind of ['leather', 'xverse'] as const) {
-      const b = el('button', S.busy ? (S.busy === 'sign' ? 'Check your wallet…' : 'Connecting…') : kind === 'leather' ? 'Leather' : 'Xverse');
+    const ui = casinoWalletUi();
+    const names: Record<WalletKind, string> = { leather: 'Leather', xverse: 'Xverse', casino: ui ? ui.describe().label : 'Casino wallet' };
+    for (const kind of joinOrder()) {
+      const b = el('button', S.busy ? (S.busy === 'sign' ? 'Check your wallet…' : 'Connecting…') : names[kind]);
       b.disabled = !!S.busy || !S.connected;
       b.onclick = () => { void join(kind); };
+      if (kind === 'casino') b.style.flexBasis = '100%';
       row.append(b);
       if (S.busy) break;
     }
     parts.push(row);
+    if (ui && !ui.describe().has) parts.push(el('p', 'No wallet? The casino wallet is free: made with Face ID or your fingerprint, with 500 free testnet STX and your first 1,000,000 LAYR.', 'fact'));
     if (S.error) parts.push(el('p', S.error, 'err'));
+    if (!S.busy) { const later = el('button', 'Not now'); later.onclick = () => { S.open = false; paint(); }; parts.push(later); }
   }
   panel.replaceChildren(...parts);
 }
@@ -457,6 +524,9 @@ async function start() {
   buildUi(); paint();
   connect();
   window.setInterval(watchSeat, 250);
+  window.setInterval(arrivalPrompt, 500);
+  window.addEventListener('px-wallet-connected', (e) => { void joinWithConnected(e); });
+  window.addEventListener('px-casino-wallet-ready', () => paint());
   window.addEventListener('px-room-play', onOwnSpin);
   window.addEventListener('px-room-move', onOwnMove);
 }
@@ -472,5 +542,5 @@ if (existing) attach(existing); else window.addEventListener('px-room-host', () 
 // For tests and bug reports only: read-only.
 (window as any).__pxRoom = {
   chat: () => chat?.debug() ?? null,
-  get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, features: S.features.slice(), walkers: [...S.walk.keys()], ownMove: S.ownMove, trail: connectTrail.slice() }; }
+  get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, watch: S.watch, prompted: S.prompted, open: S.open, busy: S.busy, error: S.error, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, features: S.features.slice(), walkers: [...S.walk.keys()], ownMove: S.ownMove, trail: connectTrail.slice() }; }
 };

@@ -6,7 +6,7 @@
  * dropped first. Plan: docs/plans/CASINO-PRESENCE-PLAN.md (P0 spike).
  */
 import { readRoomSession } from '../../lib/casino-room-proof';
-import { roomConfig, roomJson, roomOffline, roomStub, sameOriginRequest } from '../../lib/casino-room-http';
+import { guestsMayWatch, roomConfig, roomJson, roomOffline, roomStub, sameOriginRequest } from '../../lib/casino-room-http';
 
 export const onRequest: PagesFunction = async ({ request, env }) => {
   const config = roomConfig(env);
@@ -27,6 +27,8 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
     headers.set('x-px-addr', session.a);
     headers.set('x-px-k', session.k);
   }
+  // Anonymous watching is off unless the Pages variable CASINO_ROOM_GUESTS is "1": guests then see only the head count.
+  headers.set('x-px-watch', guestsMayWatch(env) ? '1' : '0');
   try {
     const url = new URL(request.url);
     return await roomStub(config.namespace).fetch(new Request(`https://room.internal${url.pathname}`, { method: 'GET', headers }));

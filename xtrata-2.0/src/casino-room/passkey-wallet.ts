@@ -10,6 +10,7 @@
 import { WalletBridgeClient } from '../lib/wallet/passkey/bridge/client';
 import { BUY_FEE, checkSignedBuy, EXCHANGE_ADDRESS } from '../lib/casino-wallet/tx';
 import type { CasinoOpenResult, CasinoSignBuyResult, CasinoStatus } from '../lib/casino-wallet/messages';
+import { verifyRoomProof, type RoomChallenge } from '../../functions/lib/casino-room-proof';
 
 const w = window as any;
 /** Overridable before this script loads, for local tests only. */
@@ -158,11 +159,24 @@ async function faucet(address: string): Promise<string> {
   return r.body.txId;
 }
 
+/**
+ * The casino room's free sign-in, signed by the open casino wallet (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md). Only the
+ * challenge's public fields go to the box; the signature is checked here with the room server's own check before it is used.
+ */
+async function signRoomJoin(challenge: RoomChallenge): Promise<string> {
+  if (!client) throw new Error('Open your casino wallet first.');
+  const { signature } = await quick<{ signature: string }>(client, 'casino.signRoomJoin', {
+    address: challenge.address, network: challenge.network, nonce: challenge.nonce, expires: challenge.expires
+  });
+  if (!verifyRoomProof(challenge, signature)) throw new Error('The casino wallet did not sign the room sign-in correctly. Nothing was sent.');
+  return signature;
+}
+
 w.ParallaxPasskeyWallet = Object.freeze({
-  version: '1.0.0',
+  version: '1.1.0',
   origin: ORIGIN,
   /** Network fee for one buy, in microSTX (add it to the amount when checking the balance). */
   fee: Number(BUY_FEE),
-  attach, status, open, cancel, lock, buy, faucet
+  attach, status, open, cancel, lock, buy, faucet, signRoomJoin
 });
 try { window.dispatchEvent(new Event('parallax-passkey-wallet')); } catch { /* old browsers */ }

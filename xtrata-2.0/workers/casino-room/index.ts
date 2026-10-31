@@ -19,6 +19,9 @@
  * - Walking: a signed-in player on the floor sends `move {x, z, r}` a couple of times a second (or `move {off}`); the room keeps
  *   each connection's last position (in its attachment, so it survives hibernation), passes it to everyone else and lists the
  *   walkers in the `room` message. Moves have their own limit too. Still no timers: the room hibernates between messages.
+ * - Guests (not signed in) see the room only when the Pages Function says so (`x-px-watch: 1`, from the Pages variable
+ *   CASINO_ROOM_GUESTS). Otherwise they get the head count and nothing else: no seats, walkers, spins or arrivals
+ *   (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md, step 6). Signed-in players always see everything.
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
@@ -29,6 +32,7 @@ import {
   applySit,
   applyStand,
   buildReport,
+  canSee,
   deriveView,
   leaveFloor,
   newPeer,
@@ -36,6 +40,7 @@ import {
   parseClientMessage,
   routeDm,
   routePlay,
+  roomMessage,
   routeSay,
   setBlocks,
   shortAddress,
@@ -80,9 +85,11 @@ export class CasinoRoom extends DurableObject<Env> {
     try { ws.send(JSON.stringify(message)); } catch { /* the socket is closing; its close handler cleans up */ }
   }
 
-  private broadcast(entries: Array<{ ws: WebSocket }>, message: unknown) {
+  /** To every connection that may see the room's people; `everyone` (the head count only) also reaches guests who may not watch. */
+  private broadcast(entries: Array<{ ws: WebSocket; peer: Peer }>, message: unknown, everyone = false) {
     const text = JSON.stringify(message);
-    for (const { ws } of entries) {
+    for (const { ws, peer } of entries) {
+      if (!everyone && !canSee(peer)) continue;
       try { ws.send(text); } catch { /* ignore */ }
     }
   }
@@ -133,10 +140,12 @@ export class CasinoRoom extends DurableObject<Env> {
 
       const address = request.headers.get('x-px-addr') || null;
       const hash160 = request.headers.get('x-px-k') || null;
+      // Only the Pages Function sets this (it drops every x-px-* header a browser sends). Missing = guests may not watch.
+      const watch = request.headers.get('x-px-watch') === '1';
       const now = Date.now();
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
-      const peer = newPeer(crypto.randomUUID(), address, hash160, now);
+      const peer = newPeer(crypto.randomUUID(), address, hash160, now, watch);
       this.ctx.acceptWebSocket(server);
       server.serializeAttachment(peer);
 
@@ -154,17 +163,13 @@ export class CasinoRoom extends DurableObject<Env> {
 
       const live = fresh.filter((e) => !dropped.some((d) => d.id === e.peer.id));
       const view = deriveView(live.map((e) => e.peer));
-      this.send(server, {
-        t: 'room', v: 1, features: ROOM_FEATURES,
-        you: { a: address, n: shortAddress(address), guest: !address, k: hash160 },
-        spots: view.spots, players: view.players, walkers: view.walkers, joined: view.joined, guests: view.guests, at: now
-      });
+      this.send(server, roomMessage(live.map((e) => e.peer), peer, now, ROOM_FEATURES));
       const others = live.filter((e) => e.ws !== server);
       // A second tab of someone already here is not a new person.
       if (address && !others.some((e) => e.peer.a === address)) {
         this.broadcast(others, { t: 'join', who: { a: address, n: shortAddress(address) } });
       }
-      this.broadcast(others, { t: 'count', joined: view.joined, guests: view.guests });
+      this.broadcast(others, { t: 'count', joined: view.joined, guests: view.guests }, true);
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -218,8 +223,7 @@ export class CasinoRoom extends DurableObject<Env> {
         return;
       case 'hello': {
         this.save([mine]);
-        const view = deriveView(peers);
-        this.send(ws, { t: 'room', v: 1, features: ROOM_FEATURES, you: { a: mine.peer.a, n: shortAddress(mine.peer.a), guest: !mine.peer.a, k: mine.peer.k }, spots: view.spots, players: view.players, walkers: view.walkers, joined: view.joined, guests: view.guests, at: now });
+        this.send(ws, roomMessage(peers, mine.peer, now, ROOM_FEATURES));
         return;
       }
       case 'sit': {
@@ -290,7 +294,7 @@ export class CasinoRoom extends DurableObject<Env> {
       if (off) this.broadcast(entries, off);
       if (peer.a && !entries.some((e) => e.peer.a === peer!.a)) this.broadcast(entries, { t: 'leave', a: peer.a });
     }
-    this.broadcast(entries, { t: 'count', ...this.counts(entries) });
+    this.broadcast(entries, { t: 'count', ...this.counts(entries) }, true);
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string) {

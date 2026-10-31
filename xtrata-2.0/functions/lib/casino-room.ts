@@ -88,11 +88,31 @@ export type Peer = {
   /** When `p` last changed (room clock), and recent move times for the move limit. */
   pt: number;
   ml: number[];
+  /**
+   * Guests only: whether this guest may watch the room. `false` = sees the head count and nothing else (no seats, walkers or
+   * spins). Set per connection from the Pages variable CASINO_ROOM_GUESTS (functions/casino/room/ws.ts); off unless it is "1"
+   * (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md, step 6). Missing on connections saved before the switch existed = may watch.
+   */
+  w?: boolean;
 };
 
-export const newPeer = (id: string, address: string | null, hash160: string | null, now: number): Peer => ({
-  id, a: address, k: hash160, spot: null, since: now, rl: [], cl: [], b: [], pl: [], p: null, pt: 0, ml: []
+export const newPeer = (id: string, address: string | null, hash160: string | null, now: number, watch = true): Peer => ({
+  id, a: address, k: hash160, spot: null, since: now, rl: [], cl: [], b: [], pl: [], p: null, pt: 0, ml: [], w: watch
 });
+
+/** Whether a connection may see the room's people: every signed-in player, and guests only while watching is allowed. */
+export const canSee = (peer: Pick<Peer, 'a' | 'w'>) => !!peer.a || peer.w !== false;
+
+/**
+ * The `room` message a connection gets on arrival (and after `hello`). A guest who may not watch gets the head count and the
+ * features only, with `watch: false` so the page can say "sign in to join them".
+ */
+export const roomMessage = (peers: Peer[], me: Peer, now: number, features: readonly string[]) => {
+  const view = deriveView(peers);
+  const you = { a: me.a, n: shortAddress(me.a), guest: !me.a, k: me.k };
+  if (!canSee(me)) return { t: 'room', v: 1, features, you, watch: false, spots: {}, players: [], walkers: [], joined: view.joined, guests: view.guests, at: now };
+  return { t: 'room', v: 1, features, you, watch: true, spots: view.spots, players: view.players, walkers: view.walkers, joined: view.joined, guests: view.guests, at: now };
+};
 
 /** A connection saved before chat (or spins) existed has no `cl`, `b` or `pl`: fill them in so the rest of the code can rely on them. */
 export const upgradePeer = (peer: Peer): Peer => {
@@ -419,7 +439,7 @@ export const routePlay = (peers: Peer[], meId: string, msg: { spot: string; s: n
   if (!me) return { ok: false, code: 'play-gone' };
   if (!me.a) return { ok: false, code: 'play-sign-in-first' };
   if (me.spot !== msg.spot) return { ok: false, code: 'play-not-your-spot' };
-  const to = peers.filter((p) => p.id !== meId).map((p) => p.id);
+  const to = peers.filter((p) => p.id !== meId && canSee(p)).map((p) => p.id);
   return { ok: true, message: { t: 'play', spot: msg.spot, a: me.a, s: msg.s, b: msg.b, f: msg.f, at: now }, to };
 };
 
@@ -449,7 +469,7 @@ export const applyMove = (peers: Peer[], meId: string, msg: { x: number; z: numb
   const me = peers.find((p) => p.id === meId);
   if (!me) return { ok: false, code: 'move-gone' };
   if (!me.a) return { ok: false, code: 'move-sign-in-first' };
-  const to = peers.filter((p) => p.id !== meId).map((p) => p.id);
+  const to = peers.filter((p) => p.id !== meId && canSee(p)).map((p) => p.id);
   if ('off' in msg) {
     me.p = null; me.pt = now;
     return { ok: true, message: { t: 'move', a: me.a, off: true, at: now }, to };

@@ -11,6 +11,18 @@ import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { deserializeTransaction, addressToString, addressFromVersionHash, AddressVersion } from '@stacks/transactions';
+import { build } from 'esbuild';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+// The room server's own challenge and signature check (functions/lib/casino-room-proof.ts), bundled for this script, so the
+// fake room below accepts exactly what the real one would.
+const proofFile = join(tmpdir(), `casino-room-proof-${process.pid}.mjs`);
+await build({ entryPoints: [new URL('../functions/lib/casino-room-proof.ts', import.meta.url).pathname], bundle: true, format: 'esm', platform: 'node', outfile: proofFile, logLevel: 'silent',
+  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" } });
+const proof = await import(pathToFileURL(proofFile).href);
+const ROOM_SECRET = 'r'.repeat(40);
 
 const shots = process.argv[2];
 const dist = new URL('../dist-casino-wallet/', import.meta.url);
@@ -64,7 +76,12 @@ const typeOf = (path) => types[(/\.[a-z]+$/.exec(path) || [''])[0]] || 'applicat
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined });
 
-async function newPlayer({ prf = true, extension = false } = {}) {
+/**
+ * room: false (default) answers the room endpoints 503, as when the room is off, so the exchange checks are not covered by the
+ * arrival prompt. room: true runs a fake room: real challenges and signature checks, a session per player, and a WebSocket that
+ * shows guests the head count only (anonymous watching off).
+ */
+async function newPlayer({ prf = true, extension = false, room = false } = {}) {
   const context = await browser.newContext({ viewport: { width: 900, height: 900 } });
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
@@ -73,6 +90,24 @@ async function newPlayer({ prf = true, extension = false } = {}) {
       try {
         return route.fulfill({ status: 200, body: await readFile(new URL(path, dist)), headers: { 'content-type': typeOf(path), 'content-security-policy': csp, 'x-content-type-options': 'nosniff' } });
       } catch { return route.fulfill({ status: 404, body: '' }); }
+    }
+    if (url.origin === SITE && url.pathname.startsWith('/casino/room/')) {
+      if (!room) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"The casino room is offline."}' });
+      const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+      if (url.pathname === '/casino/room/challenge') return json(200, { challenge: proof.issueRoomChallenge(ROOM_SECRET, url.searchParams.get('address')) });
+      if (url.pathname === '/casino/room/session') {
+        const method = route.request().method();
+        if (method === 'GET') return json(200, roomState.signed ? { address: roomState.signed, expiresAt: Date.now() + 3600e3 } : { address: null, expiresAt: null });
+        if (method === 'DELETE') { roomState.signed = null; return json(200, { ok: true }); }
+        const body = JSON.parse(route.request().postData() || '{}');
+        let challenge;
+        try { challenge = proof.validateRoomChallenge(ROOM_SECRET, body.challenge); } catch (e) { return json(400, { error: e.message }); }
+        const ok = proof.verifyRoomProof(challenge, body.signature);
+        if (!ok) return json(401, { error: 'That signature does not match this address. Nothing changed.' });
+        roomState.signed = ok.address; roomState.signIns.push(ok.address);
+        return json(200, { address: ok.address, hash160: ok.hash160, network: challenge.network, expiresAt: Date.now() + 3600e3 });
+      }
+      return route.fulfill({ status: 404, body: '' });
     }
     if (url.origin === SITE) {
       if (url.pathname === '/casino-status.json') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"state":"open"}' });
@@ -83,6 +118,18 @@ async function newPlayer({ prf = true, extension = false } = {}) {
     if (url.origin === API) return hiro(route, url);
     return route.abort();
   });
+  const roomState = { signed: null, signIns: [] };
+  if (room) {
+    await context.routeWebSocket(/\/casino\/room\/ws$/, (ws) => {
+      const a = roomState.signed;
+      const hello = () => ws.send(JSON.stringify({
+        t: 'room', v: 1, features: ['play', 'move'], you: { a, n: a ? a.slice(0, 5) : 'Guest', guest: !a, k: null },
+        watch: !!a, spots: {}, players: a ? [{ a, n: a.slice(0, 5), spot: null }] : [], walkers: [], joined: 3 + (a ? 1 : 0), guests: a ? 0 : 1, at: Date.now()
+      }));
+      hello();
+      ws.onMessage((m) => { try { const t = JSON.parse(String(m)).t; if (t === 'hello') hello(); if (t === 'ping') ws.send(JSON.stringify({ t: 'pong', at: Date.now() })); } catch { /* ignore */ } });
+    });
+  }
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
   const errors = [], logs = [];
@@ -103,7 +150,7 @@ async function newPlayer({ prf = true, extension = false } = {}) {
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => setTimeout(() => raf(cb), 4000);
   }, [WALLET, extension]);
-  return { context, page, errors, logs };
+  return { context, page, errors, logs, roomState };
 }
 
 /** Confirm each panel INSIDE the wallet frame until `done()` (arming delay: a click too early is ignored, so retry). */
@@ -238,6 +285,58 @@ const visible = (page, sel) => page.locator(sel).isVisible();
   assert.deepEqual(errors, []);
   await context.close();
   console.log('ok 2c · wallet extension: standard exchange with "Create a passkey wallet", no Play now');
+}
+
+// ---- R1. a brand-new visitor: asked to join on arrival, joins with a new casino wallet, gets STX and chips ----
+const roomState_ = (page) => page.evaluate(() => window.__pxRoom?.state ?? null);
+const roomButton = (page, text) => page.locator('#pxroom-panel button', { hasText: text });
+{
+  const { context, page, errors, roomState } = await newPlayer({ room: true });
+  await page.goto(SITE + '/casino/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction(() => window.__pxRoom?.state?.open && window.ParallaxCasinoWalletUI?.available(), null, { timeout: 120000 });
+  const panelText = await page.locator('#pxroom-panel').innerText();
+  assert.match(panelText, /3 people are in the room\. Sign in to join them\./);
+  assert.match(panelText, /Until you join you are invisible/);
+  const first = await page.locator('#pxroom-panel .row button').first().textContent();
+  assert.equal(first, 'Make a free casino wallet', 'a new visitor is offered the casino wallet first');
+  if (shots) await page.screenshot({ path: `${shots}/6-arrival.png`, timeout: 120000, animations: 'disabled' });
+  await roomButton(page, 'Make a free casino wallet').click();
+  await confirmInFrame(page, async () => !!(await roomState_(page))?.signed, 'join the room with a new casino wallet');
+  const address = (await roomState_(page)).signed;
+  assert.match(address, /^ST/);
+  assert.deepEqual(roomState.signIns, [address], 'the room server accepted the casino wallet signature');
+  assert.equal((await snap(page)).address, address, 'one wallet for the room and the exchange');
+  // The welcome: 500 free testnet STX, then the first 1,000,000 LAYR.
+  await waitFor(page, async () => ['credited', 'already-credited'].includes((await snap(page)).phase), 90000, 'room-made wallet first buy');
+  assert.equal(chain.broadcasts.at(-1).sender, address);
+  // Reload within the session: no prompt, still in the room.
+  await page.goto(SITE + '/casino/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction(() => window.__pxRoom?.state?.signed, null, { timeout: 120000 });
+  await page.waitForTimeout(4000);
+  assert.equal((await roomState_(page)).prompted, false, 'no arrival prompt while a session is live');
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('ok R1 · new visitor: arrival prompt (room hidden) → casino wallet → signed in → 500 STX + 1,000,000 LAYR; reload: no prompt');
+}
+
+// ---- R2. "Not now", then Play now at the exchange: signed into the room without touching the Room panel ----
+{
+  const { context, page, errors, roomState } = await newPlayer({ room: true });
+  await page.goto(SITE + '/casino/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction(() => window.__pxRoom?.state?.open && window.ParallaxCasinoWalletUI?.available(), null, { timeout: 120000 });
+  await roomButton(page, 'Not now').click();
+  assert.equal((await roomState_(page)).open, false);
+  assert.equal((await roomState_(page)).signed, null, 'Not now leaves them invisible');
+  await page.evaluate(() => window.ParallaxLAYRExchange.open(0));
+  await page.locator('#lxPlayNow').click();
+  await confirmInFrame(page, async () => !!(await roomState_(page))?.signed, 'Play now signs into the room');
+  const address = (await snap(page)).address;
+  assert.equal((await roomState_(page)).signed, address);
+  assert.deepEqual(roomState.signIns, [address]);
+  await waitFor(page, async () => ['credited', 'already-credited'].includes((await snap(page)).phase), 90000, 'Play now first buy');
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('ok R2 · Not now keeps them invisible; Play now at the exchange signs them into the room automatically');
 }
 
 // ---- 3. flag off: the page is exactly as before ----

@@ -76,6 +76,8 @@ export type WalletMethod =
   | 'casino.open'
   /** Sign one 1-10 STX testnet transfer to the LAYR exchange. Returns signed bytes only. */
   | 'casino.signBuy'
+  /** Sign the casino room's free sign-in sentence for the wallet's own address. Returns the signature only. */
+  | 'casino.signRoomJoin'
   /** Withdraw a waiting panel, as if the player pressed Cancel. Can never approve anything. */
   | 'casino.cancel'
   /** Drop the key from memory. */
@@ -103,6 +105,7 @@ export const WALLET_METHODS: readonly WalletMethod[] = [
   'casino.status',
   'casino.open',
   'casino.signBuy',
+  'casino.signRoomJoin',
   'casino.cancel',
   'casino.lock'
 ];
