@@ -256,6 +256,30 @@ Tests, in the style of the rest of the repo: the room logic (spots, limits, bans
 
 ---
 
+### 8.3 Spin replay: watching someone play a machine (2026-10-31, `/casino` only)
+
+Jim asked (iPad and desktop, two players): when I spin, the people around me should see my machine spin, the same screen
+with a small delay. Built as **replay, not video**: the player's page sends each spin's reel stops, bet and free-spin flag
+through the room; each watcher's page runs its own copy of that machine (play money, like the guest player's machine) and
+spins it to those stops. Every machine picks its reels first from its own strips, so the stops alone fix the reels and the
+win; a few dozen bytes a spin instead of a picture stream.
+
+| Part | Where |
+|---|---|
+| `play` message, who may send it, its own limit, `features: ["play"]` | `functions/lib/casino-room.ts`, `workers/casino-room/index.ts` |
+| Send own spins (`px-room-play` event), pass others' to `PXRoomHost.play()` | `src/casino-room/main.ts` → `public/casino/room.js` |
+| Report own spins (engine `start` hooked beside the round log), watched-cabinet copies | `public/casino/index.html` (presence block, "spins") |
+
+**Exact:** reels, line wins, Deep Strata cascades, free-spin and bonus triggers (Node replay of 4,000 spins per machine).
+**Not exact:** bonus contents and jackpot amounts (drawn after the reels by the copy's own randomness), and the player's own
+picks and gambles (not sent). Making bonuses exact would mean sending the bonus draws or the player's picks as well.
+
+**Limits:** at most 4 watched copies on a desktop, 2 on a phone or tablet; started only within 18 m; given up when the player
+leaves or after 90 s without a spin; autoplay faster than a copy can show is skipped ahead. Each copy is a game frame like the
+guest player's, so it costs about the same.
+
+**Gate still to pass:** two real devices watching each other on the preview, frame rate with two copies on a phone.
+
 ## 9. Cost and scale (estimate)
 
 Cloudflare's published Durable Object terms (checked 2026-10-29): only SQLite-backed objects on the Workers Free plan, with 100,000 requests a day free; on the paid plan 1 million requests a month included then $0.15 per million; **incoming** WebSocket messages count at a 20-to-1 ratio (100 messages = 5 requests), outgoing messages are free; an idle object that can hibernate is not billed for time.

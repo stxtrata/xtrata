@@ -10,6 +10,11 @@
  *   currentSpot(): string | null          the seat/machine id the visitor is at right now (ids: functions/lib/casino-room.ts)
  *   setPeople(list): void                 everyone else in the room: { key (address), spot, label, since }
  * and an optional  mount(): HTMLElement   where the "Room" button goes (the page's top-right button group).
+ * and an optional  play(spot, spin): void  another player's spin at a cabinet, for the page to replay on that cabinet
+ *
+ * Spins: the page announces the visitor's own spins with a `px-room-play` window event ({ spot, s: reel stops, b: bet, f: free }).
+ * This client passes them to the room only when the room lists the `play` feature and the visitor holds that cabinet, and hands
+ * everyone else's spins to `play()`. Nothing about a spin moves money or is checked here; it only makes a cabinet look alive.
  *
  * Built with `npm run build:casino-room` into public/casino/room.js (not part of `prebuild`, so it can never break a deploy).
  */
@@ -23,11 +28,13 @@ import { createChat, type Chat } from './chat';
 import { isChatError } from './chat-core';
 
 type Person = { key: string; spot: string; label: string; since: number };
+type Spin = { a: string; s: number[]; b: number; f: boolean };
 interface PXRoomHost {
   version: number;
   currentSpot(): string | null;
   setPeople(list: Person[]): void;
   mount?(): HTMLElement | null;
+  play?(spot: string, spin: Spin): void;
 }
 type SpotView = { a: string; n: string; since: number };
 type Signed = { address: string; hash160?: string; expiresAt?: number };
@@ -41,6 +48,7 @@ const S = {
   attempts: 0,
   replaced: false,
   you: null as null | { a: string | null; n: string; guest: boolean },
+  features: [] as string[],           // what the room says it can do ('play': spins); an older room lists nothing
   spots: {} as Record<string, SpotView>,
   joined: 0,
   guests: 0,
@@ -126,6 +134,7 @@ const connect = () => {
     switch (m.t) {
       case 'room':
         S.you = m.you; S.spots = m.spots || {}; S.joined = m.joined; S.guests = m.guests;
+        S.features = Array.isArray(m.features) ? m.features.filter((f: unknown) => typeof f === 'string') : [];
         S.standSent = null;                                 // a fresh connection holds no seat yet
         if (S.signed && S.you?.guest) S.signed = null;      // the session ran out (4 hours) while the page stayed open
         chat?.room(m.players, !!(S.you && !S.you.guest));
@@ -138,7 +147,14 @@ const connect = () => {
       case 'join': chat?.joined(m.who); return;
       case 'leave': chat?.left(m.a); return;
       case 'reported': chat?.reported(); return;
+      case 'play':
+        // Another player's spin: the page spins its copy of that cabinet to the same stops. A failure there changes nothing else.
+        if (typeof m.spot === 'string' && Array.isArray(m.s) && typeof m.b === 'number') {
+          try { S.host?.play?.(m.spot, { a: String(m.a || ''), s: m.s, b: m.b, f: !!m.f }); } catch (e) { console.warn('[room] the page could not show a spin', e); }
+        }
+        return;
       case 'err':
+        if (typeof m.code === 'string' && m.code.startsWith('play-')) return;     // a spin the room did not pass on: nothing to show
         if (m.code === 'no-such-spot') S.badSpot = S.want;
         else if (isChatError(m.code) && chat?.failed(m.code)) { /* chat showed it */ }
         else if (m.code === 'slow-down') S.lastSent = Date.now() + 3000;    // the seat updates were too quick: wait a few seconds before the next
@@ -180,7 +196,10 @@ async function signIn(wallet: LinkedWallet) {
   S.busy = 'sign'; paint();
   let signature: string;
   try {
-    signature = await requestStructuredSignature({ domain, message, network: challenge.network, stxAddress: wallet.address });
+    signature = await requestStructuredSignature({
+      domain, message, network: challenge.network, stxAddress: wallet.address,
+      appDetails: { name: 'ParallaX Casino', icon: `${location.origin}/favicons/xtrata-apple-touch-icon.png` }
+    });
   } catch (e) { throw new Error('The wallet did not sign: ' + walletMessage(e)); }
   const { res: sres, body: sbody } = await postJson('/casino/room/session', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ challenge, signature })
@@ -355,6 +374,16 @@ function paint() {
 
 // ------------------------------------------------------------------ start
 
+/** The visitor's own spin, announced by the page: passed to the room when the room takes spins and the visitor holds that cabinet. */
+const onOwnSpin = (event: Event) => {
+  const d = (event as CustomEvent).detail;
+  if (!d || typeof d.spot !== 'string' || !Array.isArray(d.s) || typeof d.b !== 'number') return;
+  if (!S.features.includes('play') || S.service !== 'ok' || !S.connected || !S.signed || !S.you || S.you.guest) return;
+  if (S.spots[d.spot]?.a !== S.you.a) return;      // the room only takes spins from the person at that cabinet
+  // Sent directly, not through send(): a spin must not hold back the seat updates, which wait for a quiet moment after a send.
+  if (S.ws?.readyState === WebSocket.OPEN) S.ws.send(JSON.stringify({ t: 'play', spot: d.spot, s: d.s.slice(0, 8), b: d.b, f: !!d.f }));
+};
+
 const watchSeat = () => {
   const spot = S.host?.currentSpot() ?? null;
   if (spot !== S.want) { S.want = spot; S.yielded = null; S.standSent = null; pushPeople(); }   // the player moved: this tab speaks for them again
@@ -371,6 +400,7 @@ async function start() {
   buildUi(); paint();
   connect();
   window.setInterval(watchSeat, 250);
+  window.addEventListener('px-room-play', onOwnSpin);
 }
 
 const attach = (host: PXRoomHost) => {
@@ -384,5 +414,5 @@ if (existing) attach(existing); else window.addEventListener('px-room-host', () 
 // For tests and bug reports only: read-only.
 (window as any).__pxRoom = {
   chat: () => chat?.debug() ?? null,
-  get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, trail: connectTrail.slice() }; }
+  get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, features: S.features.slice(), trail: connectTrail.slice() }; }
 };

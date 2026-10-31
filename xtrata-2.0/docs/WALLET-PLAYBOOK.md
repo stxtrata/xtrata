@@ -146,6 +146,11 @@ persisted. Never call connect-ui's `getInstalledProviders` directly.
   put `network` or anything else on a connect request; check the network on the address that comes back.
   Enforced by `src/casino-room/__tests__/layr-exchange-connect.test.ts`, which runs the casino pages' own
   exchange code.
+- **A legacy signing request carries `appDetails` ({ name, icon }).** Xverse's phone app reads the app's
+  name from it when asked to sign a structured message through the legacy bridge and crashes without it
+  ("Cannot read property 'name' of undefined", 2026-10-30, casino room sign-in). The desktop extension did
+  not need it, so desktop testing never showed the bug. `requestStructuredSignature()` always sends it
+  (default "Xtrata"); locked by `structured-sign.test.ts`.
 - The Stacks library saves the picked wallet in `STX_PROVIDER` only AFTER its own request succeeded. Code
   that connects some other way (a fallback `wallet_connect`) must save it itself, or the payment step
   cannot find the wallet.

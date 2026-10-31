@@ -2,11 +2,25 @@ import { legacyNetworkFromConnectNetwork, signStructuredMessage } from '@stacks/
 import { cvToHex, type ClarityValue } from '@stacks/transactions';
 import { getSelectedWalletProviderId, getStacksProvider } from './connect';
 
+type AppDetails = { name: string; icon: string };
+
 type SignParams = {
   domain: ClarityValue;
   message: ClarityValue;
   network: 'mainnet' | 'testnet';
   stxAddress: string;
+  /** The app name and icon the wallet shows. Optional: pages that do not say get Xtrata's. */
+  appDetails?: AppDetails;
+};
+
+/**
+ * Xverse's phone app reads the app's name from `appDetails` on a legacy signing request and crashes without it
+ * ("Cannot read property 'name' of undefined" in handleStructureMessageSigning, 2026-10-30, casino room sign-in from
+ * the Xverse app on iOS). The desktop extension does not need it. @stacks/connect's own popups always sent it.
+ */
+const defaultAppDetails = (): AppDetails => {
+  const origin = typeof location !== 'undefined' && location.origin && location.origin !== 'null' ? location.origin : 'https://xtrata.xyz';
+  return { name: 'Xtrata', icon: `${origin}/favicons/xtrata-apple-touch-icon.png` };
 };
 
 // Hex without the 0x prefix, the same shape stx_callContract arguments already use with Leather.
@@ -73,7 +87,8 @@ async function signViaLegacy(provider: any, params: SignParams): Promise<string>
     domain: params.domain as any,
     message: params.message as any,
     network: legacyNetworkFromConnectNetwork(params.network),
-    stxAddress: params.stxAddress
+    stxAddress: params.stxAddress,
+    appDetails: params.appDetails ?? defaultAppDetails()
   } as any);
   const result = await provider.structuredDataSignatureRequest(token);
   if (!result?.signature) throw new Error('The wallet did not return a signature. Nothing changed.');

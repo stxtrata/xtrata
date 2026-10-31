@@ -12,10 +12,15 @@
  * - The room never touches money. A seat here does not give a seat at a contract table.
  * - Talk: the room also passes on public chat and private messages between signed-in players. Nothing said is stored or
  *   replayed to later joiners; only reports are written down (newest REPORT_KEEP, and a `[casino-room] report` log line).
+ * - Spins: a player at a machine sends each spin's reel stops; the room passes them to everyone else so their copy of that
+ *   cabinet spins to the same result. Only the player seated at that cabinet may send one, spins have their own limit (they
+ *   never count against the general one), and nothing about them is kept. The `room` message lists `features: ['play']` so a
+ *   newer client only sends spins to a room that understands them.
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
   MAX_SOCKETS,
+  ROOM_FEATURES,
   applyLeave,
   applySit,
   applyStand,
@@ -25,10 +30,12 @@ import {
   overflowForAddress,
   parseClientMessage,
   routeDm,
+  routePlay,
   routeSay,
   setBlocks,
   shortAddress,
   takeChatRate,
+  takePlayRate,
   takeRate,
   upgradePeer,
   type Change,
@@ -142,7 +149,7 @@ export class CasinoRoom extends DurableObject<Env> {
       const live = fresh.filter((e) => !dropped.some((d) => d.id === e.peer.id));
       const view = deriveView(live.map((e) => e.peer));
       this.send(server, {
-        t: 'room', v: 1,
+        t: 'room', v: 1, features: ROOM_FEATURES,
         you: { a: address, n: shortAddress(address), guest: !address, k: hash160 },
         spots: view.spots, players: view.players, joined: view.joined, guests: view.guests, at: now
       });
@@ -163,12 +170,25 @@ export class CasinoRoom extends DurableObject<Env> {
     const mine = entries.find((e) => e.ws === ws);
     if (!mine) return;
     const now = Date.now();
+    const parsed = parseClientMessage(message);
+    // A spin has its own limit and never counts against the general one, so autoplay cannot slow a player's seat or chat.
+    if (parsed.ok && parsed.msg.t === 'play') {
+      if (!takePlayRate(mine.peer, now)) { this.save([mine]); this.send(ws, { t: 'err', code: 'play-too-fast' }); return; }
+      this.save([mine]);
+      const routed = routePlay(entries.map((e) => e.peer), mine.peer.id, parsed.msg, now);
+      if (!routed.ok) { this.send(ws, { t: 'err', code: routed.code }); return; }
+      const text = JSON.stringify(routed.message);
+      for (const e of entries) {
+        if (!routed.to.includes(e.peer.id)) continue;
+        try { e.ws.send(text); } catch { /* closing; its close handler cleans up */ }
+      }
+      return;
+    }
     if (!takeRate(mine.peer, now)) {
       this.save([mine]);
       this.send(ws, { t: 'err', code: 'slow-down' });
       return;
     }
-    const parsed = parseClientMessage(message);
     if (!parsed.ok) { this.save([mine]); this.send(ws, { t: 'err', code: parsed.code }); return; }
 
     const peers = entries.map((e) => e.peer);
@@ -180,7 +200,7 @@ export class CasinoRoom extends DurableObject<Env> {
       case 'hello': {
         this.save([mine]);
         const view = deriveView(peers);
-        this.send(ws, { t: 'room', v: 1, you: { a: mine.peer.a, n: shortAddress(mine.peer.a), guest: !mine.peer.a, k: mine.peer.k }, spots: view.spots, players: view.players, joined: view.joined, guests: view.guests, at: now });
+        this.send(ws, { t: 'room', v: 1, features: ROOM_FEATURES, you: { a: mine.peer.a, n: shortAddress(mine.peer.a), guest: !mine.peer.a, k: mine.peer.k }, spots: view.spots, players: view.players, joined: view.joined, guests: view.guests, at: now });
         return;
       }
       case 'sit': {

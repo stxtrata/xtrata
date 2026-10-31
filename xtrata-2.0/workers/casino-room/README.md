@@ -119,6 +119,25 @@ Built on the same room and the same sign-in. The test page `/casino-room-spike/`
 - **The room still never handles money.** Drinks and tokens between players are a later phase and must be real on-chain
   transfers; nothing in Talk moves a token.
 
+## Spins: watching someone play a machine
+
+When a signed-in player at a cabinet spins, everyone else in the room sees that cabinet spin to the same result, a moment later.
+The spin is not a picture: it is the five reel stops (where each reel lands), the bet and whether it was a free spin. Every
+machine picks its reels first, from its own reel strips, so the stops alone decide the reels and the win. Each watcher's page runs
+its own copy of that machine with play money (the same way the guest player's machine works) and spins it to those stops.
+
+- **Message.** `play {spot, s, b, f}`: the cabinet (`drop.1` … `nv.2`), the stops (3 to 8 whole numbers), the bet (a whole
+  number) and free spin (true or false). The room passes `play {spot, a, s, b, f, at}` to every other connection, guests included.
+- **Who may send it.** Only the player seated at that cabinet (`play-not-your-spot` otherwise; guests get `play-sign-in-first`).
+- **Limits.** One spin every 0.4 s and 100 a minute per connection (`play-too-fast`). Spins never count against the general
+  limit, so autoplay cannot slow a player's seat updates or chat. All spin errors start with `play-`, so the chat never shows them.
+- **Older rooms.** The `room` message now lists `features: ["play"]`. The client only sends spins to a room that lists it, so a
+  newer `room.js` against an older room Worker sends nothing (and shows no errors). Deploy the Worker first, then the page.
+- **Not replayed exactly (yet).** Bonus contents (vault prizes, chain frames) are drawn from new random numbers after the reels,
+  so a watcher sees the bonus happen but its prizes can differ. The player's own picks and gambles are not sent.
+- Nothing about spins is kept, checked or paid. Rules and tests: `functions/lib/casino-room.ts`,
+  `functions/lib/__tests__/casino-room-play.test.ts`.
+
 ## Switching it on (preview first)
 
 Run these from `xtrata-2.0` after `git fetch && git checkout claude/casino-room-spike && npm install`.

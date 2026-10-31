@@ -8241,7 +8241,7 @@ function applyTestnetFunding(proof){
   function updateNpcMachineSound(){
     const engine=npcMachineEngine;if(!engine?.sound||!window.__casino)return;
     engine.machine.group.updateWorldMatrix(true,false);const source=engine.machine.group.localToWorld(V3(0,1.45,.35)),listener=camera.getWorldPosition(V3()),forward=camera.getWorldDirection(V3()),up=V3(0,1,0).applyQuaternion(camera.quaternion);
-    const enabled=!!(actx?.state==='running'&&!muted&&!document.hidden&&mode==='walk'&&!focus&&!machineOpen&&!scOpen&&!dispenserOpen&&!barUI?.isOpen);
+    const enabled=!!(actx?.state==='running'&&!muted&&!document.hidden&&mode==='walk'&&!focus&&!machineOpen&&!scOpen&&!dispenserOpen&&!barUI?.isOpen&&!engine.machine.pxSpect);
     const distance=source.distanceTo(listener),level=npcSoundLevel(distance,enabled);
     audioStats.npcMachine={distance,level};engine.sound.update({source,listener,forward,up,level});
   }
@@ -8291,7 +8291,7 @@ function applyTestnetFunding(proof){
     return ui.spinDisabled?null:()=>engine.api.action('spin');
   }
   function updateNpcMachine(now){
-    const engine=npcMachineEngine;npcPressAmount=0;if(!engine||document.hidden)return;
+    const engine=npcMachineEngine;npcPressAmount=0;if(!engine||document.hidden||engine.machine.pxSpect)return;
     const revision=engine.api.revision();if(revision!==engine.revision){engine.revision=revision;engine.texture.needsUpdate=true;}
     if(npcPressStarted){
       const elapsed=now-npcPressStarted;npcPressAmount=Math.max(0,1-Math.abs(elapsed-500)/350);
@@ -8306,7 +8306,7 @@ function applyTestnetFunding(proof){
   function updateCasinoMachines(t){
     const now=performance.now(),motion=machineOpen&&!machineLoading?getActiveEngine()?.api.mechanics?.():null;
     for(const m of room.machines){
-      const live=m===activeCabinet?motion:null;
+      const live=m===activeCabinet?motion:(m.pxSpect?.ready?m.pxSpect.api.mechanics?.()||null:null);
       if(live?.lever&&live.lever.id!==m.lastLeverSignal){
         m.lastLeverSignal=live.lever.id;
         if(live.lever.elapsed<live.lever.duration)m.leverPull={start:now-live.lever.elapsed,duration:live.lever.duration,angle:live.lever.angle};
@@ -8406,7 +8406,7 @@ function applyTestnetFunding(proof){
       if(!hits||hits.length!==1)return html;
       const m=re.exec.call(new RegExp(re.source),html),ids={'the-drop':'drop','forever-twins':'twins','deep-strata':'ds','block-fortune':'bf','neon-vault':'nv'},id=ids[m[2]];
       if(!id)return html;
-      return html.replace(m[0],()=>m[1]+"(()=>{const X="+m[3]+";try{window.parent.PXRoundLog.hook(X,'"+id+"',()=>state)}catch(e){}return X})())");
+      return html.replace(m[0],()=>m[1]+"(()=>{const X="+m[3]+";try{window.parent.PXRoundLog.hook(X,'"+id+"',()=>state)}catch(e){}try{window.parent.PXSpinCast&&window.parent.PXSpinCast.hook(X,'"+id+"')}catch(e){}return X})())");
     }catch(e){return html;}
   }
   async function createCasinoEngine(type){
@@ -8414,7 +8414,7 @@ function applyTestnetFunding(proof){
     const html=pxRafShim(pxRlPatch(await decodePXGzip(window.PX_MACHINE_PACKS[type].game))),frame=document.createElement('iframe');frame.className='pxLogicFrame';frame.title=window.PX_MACHINE_PACKS[type].name+' game logic';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
     const api=await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Machine did not become ready')),20000);frame.onload=()=>{const api=frame.contentWindow.PX_CASINO_ENGINE;if(!api){clearTimeout(timeout);reject(new Error('Game engine API missing'));return;}clearTimeout(timeout);resolve(api);};frame.srcdoc=html;});
     const texture=new THREE.CanvasTexture(api.screen);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=false;texture.anisotropy=16;
-    for(const m of room.machines.filter(m=>m.type===type&&!m.occupied)){const screen=m.model.getObjectByName('px-screenMesh');if(screen){screen.material=screen.material.clone();screen.material.map=texture;screen.material.color.setHex(0xffffff);screen.material.needsUpdate=true;}}
+    for(const m of room.machines.filter(m=>m.type===type&&!m.occupied&&!m.pxSpect)){const screen=m.model.getObjectByName('px-screenMesh');if(screen){screen.material=screen.material.clone();screen.material.map=texture;screen.material.color.setHex(0xffffff);screen.material.needsUpdate=true;}}
     const engine={api,frame,texture,revision:-1,css:window.PX_MACHINE_PACKS[type].css};machineEngines.set(type,engine);return engine;
   }
   async function openCasinoMachine(selection,view='here'){
@@ -11259,11 +11259,154 @@ function applyTestnetFunding(proof){
       pending.length = 0;
       wanted.forEach((p) => { if (!assign(p, false)) pending.push(p); });
     }
+    // ---------------- spins: watch other players play (spin replay) ----------------
+    // A player's spin is sent to the room as its reel stops (room.js, functions/lib/casino-room.ts). Each watcher's page runs
+    // its own copy of that machine with play money, the way the guest player's machine works, and spins it to the same stops:
+    // the same reels and the same win, a moment later. Only the reels are replayed exactly; bonus contents are this copy's own.
+    // Nothing here touches the visitor's game, LAYR or wallet. Any failure leaves the cabinet as it was.
+    const SPECT_MAX = isTouch ? 2 : 4, SPECT_NEAR = 18, SPECT_FORGET_MS = 90000;
+    const spect = new Map();     // cabinet -> its copy of the machine
+    let spectNextPoll = 0;
+    // The visitor's own spins: the machine frame calls this once its engine exists (see pxRlPatch); it never changes a spin.
+    window.PXSpinCast = Object.freeze({
+      hook(X, id) {
+        if (!X || typeof X.start !== 'function' || X.__pxCast) return;
+        X.__pxCast = 1; const orig = X.start;
+        X.start = function (state, rng) {
+          const p = orig.apply(this, arguments);
+          try { if (rng === undefined && p && Array.isArray(p.stops) && !p.preview && !p.forced) announceSpin(id, p); } catch (e) { /* never in the way */ }
+          return p;
+        };
+      }
+    });
+    function announceSpin(id, p) {
+      if (!(machineOpen && activeCabinet && machineHere && !machineOutOfRange) || MACH[activeCabinet.type] !== id) return;
+      const b = Number(p.bet), s = p.stops.slice(0, 8).map((n) => Number(n));
+      if (!Number.isSafeInteger(b) || b <= 0 || !s.every((n) => Number.isSafeInteger(n) && n >= 0)) return;
+      window.dispatchEvent(new CustomEvent('px-room-play', { detail: { spot: machineSpot(activeCabinet), s, b, f: !!p.free } }));
+    }
+    const cabinetAt = (spot) => {
+      const parts = String(spot).split('.'), id = parts[0], idx = parts[1];
+      return MACH.includes(id) ? room.machines.find((k) => MACH[k.type] === id && String(k.index < 5 ? 1 : 2) === idx) || null : null;
+    };
+    const cabinetDistance = (m) => { m.group.updateWorldMatrix(true, false); return m.group.localToWorld(V3(0, 1.45, .35)).distanceTo(camera.position); };
+    // The guest player's document, plus a hook that hands the next spin our stops (the engine draws its reels from the first numbers).
+    function spectDocument(html) {
+      const re = /(GAME_ID='([a-z-]+)', *LAYR=window\.ParallaxLAYRAccount, *E=LAYR\.machine\(GAME_ID,)(BF\.create\(DEEP_STRATA_RULES\)|BF|NV)\)/g, hits = html.match(re);
+      if (!hits || hits.length !== 1) throw Error('Could not find the machine engine.');
+      const m = new RegExp(re.source).exec(html);
+      return html.replace(m[0], () => m[1] + "(()=>{const X=" + m[3] + ";const o=X.start;X.start=function(st,rng){const q=window.__pxReplay;window.__pxReplay=null;" +
+        "if(q&&rng===undefined){let i=0;return o.call(this,st,n=>i<q.length?((q[i++]%n)+n)%n:Math.floor(Math.random()*n));}return o.apply(this,arguments)};" +
+        "window.__pxReplayBets=X.bets;window.__pxReplayState=()=>state;return X})())");
+    }
+    async function spectStart(m, spot) {
+      const e = { m, spot, queue: [], ready: false, last: performance.now(), nextAt: 0, revision: -1 };
+      spect.set(m, e);
+      let frame;
+      try {
+        const html = pxRafShim(spectDocument(npcGameDocument(await decodePXGzip(window.PX_MACHINE_PACKS[m.type].game))));
+        frame = document.createElement('iframe'); frame.className = 'pxLogicFrame'; frame.title = 'Another player’s machine'; frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1; document.body.appendChild(frame);
+        const api = await new Promise((resolve, reject) => { const timeout = setTimeout(() => reject(Error('The machine did not become ready')), 20000); frame.onload = () => { clearTimeout(timeout); const a = frame.contentWindow.PX_CASINO_ENGINE; a ? resolve(a) : reject(Error('Machine engine unavailable')); }; frame.srcdoc = html; });
+        await api.activate();
+        if (spect.get(m) !== e) { frame.remove(); return; }      // given up while it loaded
+        const screen = m.model.getObjectByName('px-screenMesh'); if (!screen) throw Error('Machine screen unavailable');
+        const texture = new THREE.CanvasTexture(api.screen); texture.minFilter = texture.magFilter = THREE.LinearFilter; texture.generateMipmaps = false; texture.anisotropy = 16;
+        e.prevMaterial = screen.material; e.screen = screen;
+        screen.material = e.material = screen.material.clone(); screen.material.map = texture; screen.material.color.setHex(0xffffff); screen.material.needsUpdate = true;
+        Object.assign(e, { api, frame, texture, sound: frame.contentWindow.ParallaxNpcSound, ready: true });
+        m.pxSpect = e;
+      } catch (err) {
+        frame?.remove(); if (spect.get(m) === e) spect.delete(m);
+        console.warn('[room] could not show another player’s machine:', err);
+      }
+    }
+    function spectStop(e) {
+      spect.delete(e.m);
+      if (e.m.pxSpect === e) delete e.m.pxSpect;
+      try {
+        if (e.screen && e.prevMaterial) {
+          // Give the cabinet back its own screen: the visitor's copy of this machine if one opened meanwhile, else what it showed before.
+          const own = machineEngines.get(e.m.type);
+          if (own && !e.m.occupied && e.prevMaterial.map !== own.texture) {
+            const mat = e.prevMaterial.clone(); mat.map = own.texture; mat.color.setHex(0xffffff); mat.needsUpdate = true; e.screen.material = mat;
+          } else e.screen.material = e.prevMaterial;
+        }
+        e.material?.dispose();
+      } catch (_) { }
+      try { e.sound?.stop?.(); } catch (_) { }
+      try { e.texture?.dispose(); } catch (_) { }
+      try { e.frame?.remove(); } catch (_) { }
+    }
+    function spectPlay(spot, spin) {
+      if (demo || document.hidden) return;
+      const m = cabinetAt(spot);
+      if (!m || m === activeCabinet || !Array.isArray(spin.s) || !spin.s.length) return;
+      const s = spin.s.slice(0, 8).map(Number), b = Number(spin.b);
+      if (!s.every((n) => Number.isSafeInteger(n) && n >= 0) || !Number.isSafeInteger(b)) return;
+      let e = spect.get(m);
+      if (!e) {
+        if (cabinetDistance(m) > SPECT_NEAR) return;            // too far away to see the screen: nothing to start
+        if (spect.size >= SPECT_MAX) {
+          let old = null;                                        // make room: the copy that has been quiet longest, if it is idle
+          for (const x of spect.values()) if (x.ready && !x.api.ui().spinning && (!old || x.last < old.last)) old = x;
+          if (!old) return; spectStop(old);
+        }
+        spectStart(m, spot); e = spect.get(m);
+      }
+      e.spot = spot; e.last = performance.now();
+      e.queue.push({ s, b, f: !!spin.f });
+      if (e.queue.length > 2) e.queue.splice(0, e.queue.length - 2);      // fast autoplay: skip ahead rather than lag behind
+    }
+    // One step for a copy: finish any bonus screen it opened, or start the next spin with the player's stops.
+    function spectStep(e, now) {
+      if (!e.ready || now < e.nextAt) return;
+      const api = e.api, doc = e.frame.contentDocument, w = e.frame.contentWindow, ui = api.ui();
+      if (ui.spinning) return;
+      const modal = doc.getElementById('modal');
+      if (modal?.open) {
+        const b = modal.querySelector('[data-vault]:not(:disabled),#bonusDone:not(:disabled),#freeStart:not(:disabled),#featureContinue:not(:disabled)');
+        if (b) b.click(); else api.closeModal();
+        e.nextAt = now + 700; return;
+      }
+      const bar = doc.getElementById('featureBar');
+      if (bar && !bar.hidden) { const b = bar.querySelector('[data-pick]:not(:disabled),#fbGo:not(:disabled)'); if (b) b.click(); e.nextAt = now + 700; return; }
+      if (ui.spinDisabled || !e.queue.length) return;
+      const q = e.queue.shift();
+      try {
+        const st = w.__pxReplayState?.();
+        if (st) { if (!(st.free > 0) && Array.isArray(w.__pxReplayBets) && w.__pxReplayBets.includes(q.b)) st.bet = q.b; st.turbo = e.queue.length > 0; }
+      } catch (_) { }
+      w.__pxReplay = q.s; api.action('spin'); e.nextAt = now + 300;
+    }
+    function spectFrame(now) {
+      if (!spect.size) return;
+      const listener = camera.getWorldPosition(V3()), forward = camera.getWorldDirection(V3()), up = V3(0, 1, 0).applyQuaternion(camera.quaternion);
+      const hear = !!(actx?.state === 'running' && !muted && !document.hidden && mode === 'walk' && !focus && !machineOpen && !scOpen && !dispenserOpen && !barUI?.isOpen);
+      const poll = now >= spectNextPoll; if (poll) spectNextPoll = now + 250;
+      for (const e of [...spect.values()]) {
+        const gone = !remote.has(e.spot) || now - e.last > SPECT_FORGET_MS;
+        if (!e.ready) { if (gone && now - e.last > 30000) spectStop(e); continue; }
+        try {
+          const revision = e.api.revision(); if (revision !== e.revision) { e.revision = revision; e.texture.needsUpdate = true; }
+          const spinning = e.api.ui().spinning;
+          if (gone && !spinning) { spectStop(e); continue; }        // the player left (or stopped playing long ago): the cabinet goes back to normal
+          if (poll && !document.hidden) spectStep(e, now);
+          if (e.sound) {
+            e.m.group.updateWorldMatrix(true, false);
+            const source = e.m.group.localToWorld(V3(0, 1.45, .35));
+            e.sound.update({ source, listener, forward, up, level: npcSoundLevel(source.distanceTo(listener), hear) });
+          }
+        } catch (err) { console.warn('[room] another player’s machine stopped:', err); spectStop(e); }
+      }
+    }
+    window.addEventListener('pointerdown', () => { for (const e of spect.values()) try { e.sound?.unlock(); } catch (_) { } }, { capture: true, passive: true });
+    window.addEventListener('pagehide', () => { for (const e of spect.values()) try { e.sound?.stop(); } catch (_) { } });
     let fpsEl = null, fpsT = 0, fpsN = 0, fpsLast = 0;
     (function tick(now) {
       requestAnimationFrame(tick);
       if (fpsEl) { fpsN++; if (now - fpsT >= 1000) { const ms = (now - fpsT) / fpsN, f = fpsEl.dataset.n + ' people drawn: ' + (1000 / ms).toFixed(1) + ' fps (' + ms.toFixed(1) + ' ms a frame)'; if (f !== fpsLast) { fpsEl.textContent = f; fpsLast = f; } fpsT = now; fpsN = 0; } }
       if (pending.length && now - lastBuild > 120) { lastBuild = now; assign(pending.shift(), true); }
+      try { spectFrame(now); } catch (e) { /* never break the room */ }
       const cp = camera.position;
       for (const e of pool) {
         if (!e.on) continue;
@@ -11285,6 +11428,8 @@ function applyTestnetFunding(proof){
       version: 1,
       currentSpot: mySpot,
       setPeople,
+      // another player's spin at a cabinet: replay it there (see "spins" above)
+      play(spot, spin) { try { spectPlay(spot, spin); } catch (e) { console.warn('[room] spin replay failed', e); } },
       // when the visitor takes a seat that somebody in the room already has, they are given a free one at the same table instead
       steer(s, seat) {
         try {
@@ -11294,7 +11439,7 @@ function applyTestnetFunding(proof){
         } catch (e) { return seat; }
       },
       mount: () => document.querySelector('#tools .rt'),
-      debug: () => ({ pool: pool.map((e) => ({ stand: e.stand, key: e.key, spot: e.spot, on: e.on, built: !!e.spec.ctrl, tag: e.tag.sp.visible })), pending: pending.length, remote: [...remote] })   // for tests
+      debug: () => ({ pool: pool.map((e) => ({ stand: e.stand, key: e.key, spot: e.spot, on: e.on, built: !!e.spec.ctrl, tag: e.tag.sp.visible })), pending: pending.length, remote: [...remote], spins: [...spect.values()].map((e) => ({ spot: e.spot, ready: e.ready, queue: e.queue.length })) })   // for tests
     };
     window.dispatchEvent(new Event('px-room-host'));
   })(); } catch (e) { console.warn('[room] presence is unavailable:', e); }   // never let this break the casino
@@ -11895,7 +12040,7 @@ button{font:inherit;color:inherit;cursor:pointer}
     }
   })();
 </script>
-<script type="module" src="room.js?v=p2.2"></script>
+<script type="module" src="room.js?v=p3.0"></script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>
 

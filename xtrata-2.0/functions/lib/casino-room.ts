@@ -24,6 +24,11 @@ export const SPOTS = [
 const SPOT_SET = new Set<string>(SPOTS);
 export const isSpot = (value: unknown): value is string => typeof value === 'string' && SPOT_SET.has(value);
 
+/** The five machines, in PX_MACHINE_PACKS order. Their ten cabinets ('drop.1' … 'nv.2') are the only spots that can send spins. */
+export const MACHINE_IDS = ['drop', 'twins', 'ds', 'bf', 'nv'] as const;
+export const isMachineSpot = (value: unknown): value is string =>
+  isSpot(value) && (MACHINE_IDS as readonly string[]).includes(value.split('.')[0]);
+
 /** Large enough for one 280-character message in the widest characters, or a full block list; small enough to ignore junk. */
 export const MAX_FRAME_BYTES = 2048;
 export const MAX_SOCKETS = 300;
@@ -45,22 +50,40 @@ export const MAX_REPORT_LINES = 5;
 export const MAX_REPORT_LINE_CHARS = 200;
 
 /**
+ * Spin replay. A player at a machine sends the reel stops of each spin as it starts; everyone else in the room spins their own
+ * copy of that machine to the same stops, so they watch the same reels and the same win. The stops alone decide the reels
+ * (every machine picks them first, from its own reel strips), so a spin is a few numbers, not a picture.
+ * The room only passes spins on: it never checks or stores a result, and nothing here moves money.
+ */
+export const ROOM_FEATURES = ['play'] as const;
+/** Spins have their own limit, apart from RATE_LIMIT, so a player on turbo or autoplay never slows their seat updates or chat. */
+export const PLAY_MIN_GAP_MS = 400;
+export const PLAY_PER_MINUTE = 100;
+export const MIN_STOPS = 3;
+export const MAX_STOPS = 8;
+export const MAX_STOP = 9_999;
+export const MAX_BET = 1_000_000;
+
+/**
  * One open connection. `a` is null for a guest (watching only). `rl` holds recent message times for the rate limit, `cl` the
  * recent chat times, and `b` the addresses this connection's player has blocked (the player's own list, sent on every connect).
  */
 export type Peer = {
   id: string; a: string | null; k: string | null; spot: string | null; since: number;
   rl: number[]; cl: number[]; b: string[];
+  /** Recent spin times, for the spin limit. */
+  pl: number[];
 };
 
 export const newPeer = (id: string, address: string | null, hash160: string | null, now: number): Peer => ({
-  id, a: address, k: hash160, spot: null, since: now, rl: [], cl: [], b: []
+  id, a: address, k: hash160, spot: null, since: now, rl: [], cl: [], b: [], pl: []
 });
 
-/** A connection saved before chat existed has no `cl` or `b`: fill them in so the rest of the code can rely on them. */
+/** A connection saved before chat (or spins) existed has no `cl`, `b` or `pl`: fill them in so the rest of the code can rely on them. */
 export const upgradePeer = (peer: Peer): Peer => {
   if (!Array.isArray(peer.cl)) peer.cl = [];
   if (!Array.isArray(peer.b)) peer.b = [];
+  if (!Array.isArray(peer.pl)) peer.pl = [];
   return peer;
 };
 
@@ -131,7 +154,9 @@ export type ClientMessage =
   | { t: 'dm'; to: string; text: string }
   /** The player's whole block list (replaces the last one). Kept by the player's browser and sent on every connect. */
   | { t: 'blocks'; list: string[] }
-  | { t: 'report'; who: string; why: ReportReason; lines: string[] };
+  | { t: 'report'; who: string; why: ReportReason; lines: string[] }
+  /** One spin by the player seated at `spot` (a cabinet): the reel stops in reel order, the bet, and whether it was a free spin. */
+  | { t: 'play'; spot: string; s: number[]; b: number; f: boolean };
 
 export type ParseResult = { ok: true; msg: ClientMessage } | { ok: false; code: string };
 
@@ -175,6 +200,15 @@ export const parseClientMessage = (raw: unknown): ParseResult => {
         if (clean) lines.push(Array.from(clean).slice(0, MAX_REPORT_LINE_CHARS).join(''));
       }
       return { ok: true, msg: { t: 'report', who: value.who, why: value.why, lines } };
+    }
+    case 'play': {
+      // Codes start with "play-" so the room client never mistakes them for a chat error and shows them to the player.
+      if (!isMachineSpot(value.spot)) return { ok: false, code: 'play-bad-spot' };
+      const stops = value.s;
+      if (!Array.isArray(stops) || stops.length < MIN_STOPS || stops.length > MAX_STOPS) return { ok: false, code: 'play-bad' };
+      if (!stops.every((n: unknown) => Number.isSafeInteger(n) && (n as number) >= 0 && (n as number) <= MAX_STOP)) return { ok: false, code: 'play-bad' };
+      if (!Number.isSafeInteger(value.b) || value.b <= 0 || value.b > MAX_BET) return { ok: false, code: 'play-bad' };
+      return { ok: true, msg: { t: 'play', spot: value.spot, s: stops.slice() as number[], b: value.b, f: value.f === true || value.f === 1 } };
     }
     default: return { ok: false, code: 'bad-message' };
   }
@@ -318,4 +352,33 @@ export const buildReport = (peers: Peer[], meId: string, who: string, why: Repor
   if (!me.a) return { ok: false, code: 'sign-in-first' };
   if (who === me.a) return { ok: false, code: 'not-you' };
   return { ok: true, report: { at: now, by: me.a, who, why, lines } };
+};
+
+// ------------------------------------------------------------------ spins
+
+/** Records one spin for this peer. False, recording nothing, when it comes too soon after the last or there are too many a minute. */
+export const takePlayRate = (peer: Peer, now: number): boolean => {
+  const recent = (Array.isArray(peer.pl) ? peer.pl : []).filter((t) => now - t < 60_000);
+  const last = recent[recent.length - 1];
+  if ((last !== undefined && now - last < PLAY_MIN_GAP_MS) || recent.length >= PLAY_PER_MINUTE) { peer.pl = recent; return false; }
+  recent.push(now);
+  peer.pl = recent;
+  return true;
+};
+
+export type PlayMessage = { t: 'play'; spot: string; a: string; s: number[]; b: number; f: boolean; at: number };
+
+/**
+ * A spin goes to every other connection in the room, guests included (they can watch the room too). Only the player seated at
+ * that cabinet may send it, so nobody can make a machine they are not at appear to spin. Blocking hides talk, not play, in the
+ * same way that it does not hide where someone sits.
+ */
+export const routePlay = (peers: Peer[], meId: string, msg: { spot: string; s: number[]; b: number; f: boolean }, now: number):
+  Routed<PlayMessage> => {
+  const me = peers.find((p) => p.id === meId);
+  if (!me) return { ok: false, code: 'play-gone' };
+  if (!me.a) return { ok: false, code: 'play-sign-in-first' };
+  if (me.spot !== msg.spot) return { ok: false, code: 'play-not-your-spot' };
+  const to = peers.filter((p) => p.id !== meId).map((p) => p.id);
+  return { ok: true, message: { t: 'play', spot: msg.spot, a: me.a, s: msg.s, b: msg.b, f: msg.f, at: now }, to };
 };

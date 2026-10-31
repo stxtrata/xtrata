@@ -131,6 +131,38 @@ describe.skipIf(!BASE)('casino room end to end', () => {
     expect(code).toBe(403);
   });
 
+  it('spins: the player at a cabinet is replayed to everyone else, and nobody else can spin it', async () => {
+    const alice = await signIn(), bob = await signIn();
+    const watcher = await join();
+    const a = await join({ cookie: alice.cookie });
+    const b = await join({ cookie: bob.cookie });
+    expect(a.room.features).toContain('play');                 // the client only sends spins to a room that says this
+
+    a.send({ t: 'sit', spot: 'drop.2' });
+    await watcher.waitFor((m) => m.t === 'sat' && m.spot === 'drop.2');
+    const toBob = b.waitFor((m) => m.t === 'play'), toWatcher = watcher.waitFor((m) => m.t === 'play');
+    a.send({ t: 'play', spot: 'drop.2', s: [7, 30, 2, 19, 11], b: 200, f: false });
+    for (const m of [await toBob, await toWatcher]) expect(m).toMatchObject({ t: 'play', spot: 'drop.2', a: alice.w.address, s: [7, 30, 2, 19, 11], b: 200, f: false });
+    await a.quiet(500);
+    expect(a.msgs.some((m) => m.t === 'play')).toBe(false);   // the player is not sent their own spin
+
+    b.send({ t: 'play', spot: 'drop.2', s: [1, 1, 1, 1, 1], b: 20, f: false });
+    expect((await b.waitFor((m) => m.t === 'err')).code).toBe('play-not-your-spot');
+    watcher.send({ t: 'play', spot: 'drop.2', s: [1, 1, 1, 1, 1], b: 20, f: false });
+    expect((await watcher.waitFor((m) => m.t === 'err')).code).toBe('play-sign-in-first');
+    a.send({ t: 'play', spot: 'blackjack.1', s: [1, 1, 1, 1, 1], b: 20, f: false });
+    expect((await a.waitFor((m) => m.t === 'err')).code).toBe('play-bad-spot');
+
+    // Spins have their own limit and do not use up the general one: a burst is slowed, seats still work.
+    await a.quiet(500);
+    for (let i = 0; i < 5; i++) a.send({ t: 'play', spot: 'drop.2', s: [i, i, i, i, i], b: 20, f: false });
+    expect((await a.waitFor((m) => m.t === 'err' && m.code === 'play-too-fast')).code).toBe('play-too-fast');
+    a.send({ t: 'sit', spot: 'drop.1' });
+    await watcher.waitFor((m) => m.t === 'sat' && m.spot === 'drop.1');
+    expect(a.msgs.some((m) => m.t === 'err' && m.code === 'slow-down')).toBe(false);
+    closeAll(watcher, a, b);
+  });
+
   it('one address, one seat: a second tab takes it over and a third connection closes the oldest', async () => {
     const alice = await signIn();
     const tab1 = await join({ cookie: alice.cookie });
