@@ -1483,6 +1483,8 @@ body.parallax-bar-expanded #quickNav,body.parallax-bar-expanded #intro,body.para
 (function () {
   'use strict';
   if (!window.THREE) return;
+  // Phones and tablets (2026-10-31): half-size textures and no shadows cast by people. See "PERFORMANCE" in the room below.
+  const TOUCH = (() => { try { return !!(window.matchMedia && matchMedia('(pointer:coarse)').matches) || 'ontouchstart' in window; } catch (_) { return false; } })();
   const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0), Q = () => new THREE.Quaternion();
   const clamp = THREE.MathUtils.clamp, damp = THREE.MathUtils.damp;
   const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
@@ -1503,10 +1505,26 @@ body.parallax-bar-expanded #quickNav,body.parallax-bar-expanded #intro,body.para
     const NC = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
     const acc = (i) => { const a = j.accessors[i]; return new CT[a.componentType](views[a.bufferView], a.byteOffset || 0, a.count * NC[a.type]); };
     const texes = await Promise.all((j.textures || []).map(async (t) => {
-      const im = j.images[t.source];
-      const bmp = await createImageBitmap(new Blob([views[im.bufferView]], { type: im.mimeType }));
-      const tx = new THREE.Texture(bmp); tx.flipY = false; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 4; tx.needsUpdate = true; return tx;
+      const im = j.images[t.source], blob = new Blob([views[im.bufferView]], { type: im.mimeType });
+      const bmp = await createImageBitmap(blob);
+      let src = bmp;
+      if (TOUCH && bmp.width >= 1024) {   // half size on phones and tablets: the skin alone is 2048 x 2048 (about 21 MB on the GPU)
+        const c = document.createElement('canvas'); c.width = bmp.width >> 1; c.height = bmp.height >> 1;
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); try { bmp.close(); } catch (_) { } src = c;
+      }
+      const tx = new THREE.Texture(src); tx.flipY = false; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 4; tx.needsUpdate = true;
+      tx.userData.pxBlob = blob; return tx;
     }));
+    // When a phone or tablet runs short of graphics memory it can drop the page's WebGL context; three.js restores it and sends every
+    // texture again, but an ImageBitmap may no longer be readable then, so heads and hands came back black. Rebuild those from the file.
+    try {
+      const gl = document.getElementById('gl');
+      if (gl) gl.addEventListener('webglcontextrestored', () => {
+        texes.forEach(async (tx) => {
+          try { if (typeof ImageBitmap !== 'undefined' && tx.image instanceof ImageBitmap) tx.image = await createImageBitmap(tx.userData.pxBlob); tx.needsUpdate = true; } catch (_) { }
+        });
+      });
+    } catch (_) { }
     // the factors are linear; the room draws textures raw (no sRGB pass), so lift them to screen space
     const lift = (c) => Math.pow(c, 1 / 2.2);
     const mats = (j.materials || []).map((m) => {
@@ -1544,7 +1562,7 @@ body.parallax-bar-expanded #quickNav,body.parallax-bar-expanded #intro,body.para
         // a generous fixed bound: skinned vertices stay within reach of the hips, so off-screen people stop costing the GPU
         g.boundingSphere = new THREE.Sphere(V(0, 0.95, 0), 1.45);
         const mesh = n.skin !== undefined ? new THREE.SkinnedMesh(g, mats[p.material]) : new THREE.Mesh(g, mats[p.material]);
-        mesh.name = j.meshes[n.mesh].name || nodes[i].name; mesh.castShadow = true; mesh.receiveShadow = true;
+        mesh.name = j.meshes[n.mesh].name || nodes[i].name; mesh.castShadow = !TOUCH; mesh.receiveShadow = true;
         nodes[i].add(mesh);
         if (n.skin !== undefined) { nodes[i].updateMatrixWorld(true); mesh.bind(skels[n.skin], mesh.matrixWorld); }
       });
@@ -1773,7 +1791,7 @@ body.parallax-bar-expanded #quickNav,body.parallax-bar-expanded #intro,body.para
       if (sh.shoulders) pairDelta('clavicle_L', 'clavicle_R', sh.shoulders);
       if (sh.hips) pairDelta('upperleg01_L', 'upperleg01_R', sh.hips);
       this.mixer = new THREE.AnimationMixer(this.model); this.actions = {}; for (const c of asset.animations) this.actions[c.name] = this.mixer.clipAction(c);
-      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = !TOUCH; o.receiveShadow = true; } });
       this.state = 'hosting'; this.current = 'Idle'; this.time = 0; this.expression = 'neutral'; this.expressionValue = 0; this.targetSmile = 0; this.lookTarget = null; this.lookAngles = V(); this.blinkClock = 0; this.nextBlink = 3.2 + Math.random() * 1.5; this.disposed = false; this.held = {}; this.handOverrides = {}; this.sequence = null; this.deckHold = null; this.walk = null; this.turn = null; this.seat = null; this.nodT = 9; this.rest = null; this.restW = 0;
       this.sockets = { L: this.model.getObjectByName('HandSocket_L'), R: this.model.getObjectByName('HandSocket_R') };
       this.mixerPose = this.capturePose(); this.corePose = this.capturePose(); this.transition = null; this.finishedAction = null;
@@ -8102,11 +8120,16 @@ function applyTestnetFunding(proof){
   // ---------------- scene & room ----------------
   const canvas = $('gl');
   let renderer,webglOK=true;
-  try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});}catch(e){
+  // PERFORMANCE (2026-10-31). On phones and tablets: no multisample anti-aliasing and at most 1.5x sharpness (an iPad's 2x screen with
+  // anti-aliasing can need well over 100 MB of graphics memory, and running short makes the iPad drop the page's WebGL context);
+  // cheaper shadows that people do not cast; the marble reflection off by default. On every device: shadow maps are redrawn every
+  // second frame (every third on touch) instead of every frame. Add ?fps to the address to see frames per second and draw calls.
+  const PX_TOUCH=(()=>{try{return !!(window.matchMedia&&matchMedia('(pointer:coarse)').matches)||'ontouchstart' in window;}catch(_){return false;}})();
+  try{renderer=new THREE.WebGLRenderer({canvas,antialias:!PX_TOUCH,powerPreference:'high-performance'});}catch(e){
     webglOK=false;document.body.classList.add('fallback');
     renderer={shadowMap:{enabled:false,autoUpdate:false},setPixelRatio(){},setSize(){},render(){},toneMappingExposure:1.15};
   }
-  const MAXPR = Math.min(window.devicePixelRatio || 1, 2); let pr = MAXPR;
+  const MAXPR = Math.min(window.devicePixelRatio || 1, PX_TOUCH ? 1.5 : 2); let pr = MAXPR;
   renderer.setPixelRatio(pr);
   try { if(!webglOK) throw new Error("no WebGL"); // soft room reflection environment
     const ec = document.createElement('canvas'); ec.width = 512; ec.height = 256; const x = ec.getContext('2d');
@@ -8115,7 +8138,7 @@ function applyTestnetFunding(proof){
     const et = new THREE.CanvasTexture(ec); et.mapping = THREE.EquirectangularReflectionMapping; const pm = new THREE.PMREMGenerator(renderer); envTex = pm.fromEquirectangular(et).texture; pm.dispose();
   } catch (e) { envTex = null; }
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = PX_TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; let pxShadowTick = 0;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x060b12); scene.fog = new THREE.Fog(0x060b12, 26, 60);
   const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 80); camera.rotation.order = 'YXZ';   // (as in the arcade hall: yaw, then pitch)
@@ -10855,7 +10878,7 @@ function applyTestnetFunding(proof){
 
   // ---------------- loop (adaptive resolution) ----------------
   // Reflections follow every displayed frame. Quality changes resolution, never motion cadence.
-  let reflectionQuality='balanced';
+  let reflectionQuality=PX_TOUCH?'off':'balanced';   // off by default on phones and tablets (see PERFORMANCE); "Set the mood" turns it on
   function setupMarbleReflection(){
     if(!webglOK)return;
     const rt=new THREE.WebGLRenderTarget(512,512,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBFormat});
@@ -10904,7 +10927,12 @@ function applyTestnetFunding(proof){
   $('ambienceButton').onclick=()=>showPXModal('ambiencePanel');$('chipsButton').onclick=()=>showPXModal('chipsPanel');$('helpButton').onclick=()=>showPXModal('helpPanel');
   document.querySelectorAll('[data-close-px]').forEach(b=>b.onclick=()=>$(b.dataset.closePx).hidden=true);
   $('pxLight').oninput=e=>{const value=+e.target.value;renderer.toneMappingExposure=value;room.ambient.intensity=.27*value;};
-  $('pxReflection').onchange=e=>reflectionQuality=e.target.value;
+  $('pxReflection').value=reflectionQuality;$('pxReflection').onchange=e=>reflectionQuality=e.target.value;
+  // ?fps: a small readout for comparing devices (frames per second, sharpness, draw calls, triangles, GPU textures).
+  const pxFpsEl=/[?&]fps\b/.test(location.search)?(()=>{const d=document.createElement('div');d.id='pxFps';d.style.cssText='position:fixed;left:8px;bottom:8px;z-index:60;padding:4px 8px;border-radius:6px;background:rgba(0,0,0,.72);color:#f6ead0;font:12px/1.35 ui-monospace,Menlo,monospace;pointer-events:none;white-space:pre';document.body.append(d);return d;})():null;
+  let pxFpsT=0,pxFpsN=0;
+  function pxFpsFrame(){const now=performance.now();pxFpsN++;if(!pxFpsT)pxFpsT=now;if(now-pxFpsT<500)return;const fps=pxFpsN*1000/(now-pxFpsT),i=renderer.info||{};pxFpsT=now;pxFpsN=0;
+    pxFpsEl.textContent=fps.toFixed(0)+' fps · '+(PX_TOUCH?'touch':'desktop')+' · sharpness '+pr.toFixed(2)+'x\n'+(i.render?i.render.calls+' draws · '+Math.round(i.render.triangles/1000)+'k triangles · ':'')+(i.memory?i.memory.textures+' textures':'')+' · reflection '+reflectionQuality;}
   function pxView(pos,target){if(focus){setFocus(null);if(focus)return;}if(mode==='walk')exitWalk();tgtPos.copy(V3(...pos));tgtLook.copy(V3(...target));$('intro').classList.remove('on');}
   $('viewHall').onclick=()=>{pxView([0,2.65,9.45],[0,2.55,-7]);$('intro').classList.add('on');};$('viewLounge').onclick=()=>pxView([1.3,2.1,-4.6],[6,1.8,-10]);$('viewSalon').onclick=()=>pxView([-6,2.2,-11.9],[-6,1.6,-18]);
   // Keep visual-only venue controls separate from the table's existing keyboard shortcuts.
@@ -11176,8 +11204,10 @@ function applyTestnetFunding(proof){
     }
     updateExit(dt); updateRings(t, dt); updatePatrons(t);updateNpcMachineSound();
     paintFallbackHands();
+    if (++pxShadowTick % (PX_TOUCH ? 3 : 2) === 0) renderer.shadowMap.needsUpdate = true;   // see PERFORMANCE
     if(room.updateReflection) room.updateReflection();
     renderer.render(scene, camera);
+    if (pxFpsEl) pxFpsFrame();
     if (!readySent && ++drawn >= 3) { readySent = true; try { if (window.parent !== window) parent.postMessage({ xa: 'room-ready' }, '*'); } catch (e) { } }   // tells the arcade the room has drawn its first frames, so it can take the entry still away
     requestAnimationFrame(frame);
   }
