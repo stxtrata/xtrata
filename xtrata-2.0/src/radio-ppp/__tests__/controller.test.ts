@@ -539,7 +539,7 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
       expect(s.ppp.snapshot().likeFunds).toMatchObject({ address: LISTENING, album: true, low: true, balance: 0n, pending: false });
       await s.ppp.toggleLike({ song: 7 });
       expect(s.chain.broadcasts).toHaveLength(0);
-      expect(s.ppp.snapshot().error).toMatch(/main listener wallet is out of funds/);
+      expect(s.ppp.snapshot().error).toMatch(/Likes need a little STX in your main listener wallet/);
       expect(s.failed).toEqual([7]);
       await s.ppp.topUpLikes();
       expect(s.chain.deposits.at(-1)).toEqual([LISTENING, TARGET]);

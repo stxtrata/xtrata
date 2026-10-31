@@ -244,7 +244,7 @@ export const definitelyRejected = (e: unknown) => {
 };
 /** After a like or unlike confirms, the same song's heart stays locked this long. */
 export const LIKE_COOLDOWN_MS = 3_000;
-const OUT_OF_LIKES = 'Your main listener wallet is out of funds, so likes are paused. Top it up (it only needs a little) and your likes carry on.';
+export const OUT_OF_LIKES = 'Your album keeps playing. Likes need a little STX in your main listener wallet, which is empty right now: top it up and your likes carry on.';
 const randomId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
 
 export function createPppController(deps: PppDeps) {

@@ -188,10 +188,15 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .xtrata-radio{display:none !important}
   @media(max-width:980px){
     main{grid-template-columns:1fr}
-    /* One column: pay-per-play goes to the very top (CSS order only: the wallet box is never moved
-       in the page, so it never reloads), then the receiver, then likes and links. */
+    /* One column. Once there is music (playing, or plays on their way) the receiver comes first, then the album's
+       songs, then the Xtrata Music panel, then likes and links. While something needs setting up (passkey, unlock,
+       link, a gift link) src/radio-ppp/page.ts sets html[data-ppp-first] and the panel goes to the very top, where
+       the tap is. CSS order only: the wallet box is never moved in the page, so it never reloads. */
     .side{display:contents}
-    .ppp{order:-1}
+    .albumlist{order:1}
+    .ppp{order:2}
+    #likesBox{order:3}
+    html[data-ppp-first] .ppp{order:-1}
     .strap{order:10}
   }
   @media(max-width:640px){
@@ -320,7 +325,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-addr-short{font-family:var(--mono);font-size:12px}
   .ppp-addr-full{font-family:var(--mono);font-size:12px;word-break:break-all;user-select:all}
   .ppp-pick{margin:6px 0}
-  .ppp .ppp-lowbox{border:2px solid #ff8a8a;border-radius:8px;background:rgba(255,138,138,.09);padding:10px 12px;margin:8px 0}
+  .ppp .ppp-lowbox{border:1px solid rgba(255,207,138,.45);border-radius:8px;background:rgba(255,207,138,.06);padding:10px 12px;margin:8px 0}
   #tuner.locked{opacity:.35;cursor:not-allowed}
   .ppp-shelf-tools{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.ppp-shelf-tools input{flex:1 1 11em;min-width:0}
   .ppp-shelf-list{list-style:none;margin:6px 0;padding:0}.ppp-shelf-list li{position:relative;display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:10px;border-bottom:1px solid var(--line,rgba(255,255,255,.08));touch-action:manipulation;transition:background .12s}.ppp-shelf-list li:has(.ppp-pick:not(:disabled)){cursor:pointer}.ppp-shelf-list li:has(.ppp-pick:not(:disabled)):hover,.ppp-shelf-list li:focus-within{background:rgba(0,229,255,.08)}.ppp-shelf-list li.now{background:rgba(0,229,255,.05)}.ppp-shelf-list .ppp-pick::after{content:'';position:absolute;inset:0;border-radius:10px}.ppp-shelf-list .ppp-pick:focus-visible{outline:none}.ppp-shelf-list li:has(.ppp-pick:focus-visible){outline:2px solid var(--cyan);outline-offset:-2px}.ppp-shelf-list li>button:not(.ppp-pick){position:relative;z-index:1}.ppp-shelf-list li.now{color:var(--cyan)}.ppp-shelf-list .t{font-weight:600}.ppp-shelf-list li button:last-child{margin-left:auto}.ppp-shelf-art{flex:0 0 52px;width:52px;height:52px;border-radius:8px;overflow:hidden;background:#143a40;display:grid;place-items:center;font-size:22px}.ppp-shelf-art img{width:100%;height:100%;object-fit:cover;display:block}.ppp-shelf-txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}.ppp-shelf-list .ppp-mute{font-size:11.5px}
@@ -383,7 +388,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp .ppp-wait{margin:6px 0 8px}.ppp .ppp-wait-t{margin:0 0 5px;color:#ffcf8a;font-size:12px;font-weight:600}
   .ppp .ppp-wait-track{height:6px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}
   .ppp .ppp-wait-fill{height:100%;width:4%;border-radius:999px;background:linear-gradient(90deg,#ffb347,#ffd36e);transition:width .9s linear}
-  .ppp .ppp-wait.is-long .ppp-wait-fill{width:35%;animation:pppwait 1.6s ease-in-out infinite alternate}
+  .ppp .ppp-wait.is-long .ppp-wait-fill{width:35%;animation:pppwait 1.6s ease-in-out infinite alternate;background:linear-gradient(90deg,#ff6b6b,#ff8a8a)}
+  .ppp .ppp-wait.is-long .ppp-wait-t{color:#ff8a8a}
   @keyframes pppwait{from{margin-left:0}to{margin-left:65%}}
   @media (prefers-reduced-motion:reduce){.ppp .ppp-wait.is-long .ppp-wait-fill{animation:none;width:100%;opacity:.6}}
   .ppp-gift-fold input[type=range]{width:100%;accent-color:#e9b949}
@@ -1064,7 +1070,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=dbb88c2684f3')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=86b585be4285')}).catch(function(){});
 </script>
 </body>
 </html>

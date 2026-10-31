@@ -9,7 +9,7 @@ import { requestStructuredSignature } from '../lib/wallet/structured-sign';
 import { showStxTransfer } from '../lib/wallet/connect';
 import { costPerPlay, HOLDER_PAYMENT, RESERVE, stx, TARGET } from '../lib/listening-wallet/policy';
 import { account, api, balance, broadcast, owner, transaction, validateSaved, verify } from '../radio-test-wallet/chain';
-import { createPppController, TOP_UP_PLAYS, type GateConfig, type Snapshot } from './controller';
+import { ARRIVAL_GRACE_MS, createPppController, OUT_OF_LIKES, TOP_UP_PLAYS, type GateConfig, type Snapshot } from './controller';
 import { showSteps, stagesFor, stageOf, type StageView } from './stages';
 import { findFunder } from '../lib/listening-wallet/funder';
 import { readHistory } from '../lib/listening-wallet/ledger';
@@ -201,6 +201,8 @@ function start(root: HTMLElement) {
   // like itself and never opens the main-wallet page.
   (window as any).XtrataRadioLikeHandler = (d: { song: number; likedBy?: string[]; title?: string; artist?: string }) => {
     if (!d || !Number.isSafeInteger(d.song) || d.song < 0) return false;
+    // The main listener wallet only matters once they use it: tapping the heart is when its funds come into it.
+    if (ppp.snapshot().likeFunds?.album) likeTried = true;
     loadCatalogue();
     const n = songName(d.song, { title: d.title, artist: d.artist });
     return ppp.heart({ song: d.song, title: n.title || undefined, artist: n.artist || undefined, likedBy: Array.isArray(d.likedBy) ? d.likedBy : undefined });
@@ -219,25 +221,48 @@ function start(root: HTMLElement) {
 
   // A gifted wallet's album becomes a band on the radio; when its paid plays run out the radio stops (no free mode).
   let giftPushed = '', stopPushed: string | null = null, lockPushed = false, waitPushed = false;
-  const syncGift = (s: Snapshot) => {
+  const syncGift = (raw: Snapshot, s: Snapshot) => {
     const radio = (window as any).XtrataRadio;
     if (!radio?.setGiftPlayer || !radio?.setGiftStop) return; // pushed again at the next render, once the radio is there
-    const p = s.step === 'off' || s.step === 'elsewhere' ? null : s.gift?.player ?? null;
+    const p = raw.step === 'off' || raw.step === 'elsewhere' ? null : raw.gift?.player ?? null;
     const id = p ? p.id + ':' + p.cover + ':' + p.tracks.map((t) => t.id).join(',') : '';
     if (id !== giftPushed) {
       radio.setGiftPlayer(p ? { id: p.id, title: p.title, subtitle: p.subtitle, tracks: listedTracks(p).map((t) => t.id), hidden: hiddenTrack(p)?.id ?? null, cover: p.cover } : null);
       giftPushed = id;
     }
-    const stop = s.giftStop?.text ?? null; // any passkey wallet is paid-only, not just a gifted album
+    // Plays on their way (as the panel sees it): the radio says so, never "out of plays".
+    const gs = s.depositPending && raw.step === 'fund' && raw.giftStop?.reason === 'out' ? { reason: 'arriving', text: 'YOUR PLAYS ARE ARRIVING' } : raw.giftStop;
+    const stop = gs?.text ?? null; // any passkey wallet is paid-only, not just a gifted album
     if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
     // Plays on their way: the radio greys its controls and says so, instead of looking broken.
-    const wait = s.giftStop?.reason === 'arriving';
+    const wait = gs?.reason === 'arriving';
     if (wait !== waitPushed) { radio.setGiftWait?.(wait); waitPushed = wait; }
-    const lock = !!p && !!s.albumLock?.locked;
+    const lock = !!p && !!raw.albumLock?.locked;
     if (lock !== lockPushed) { radio.setGiftLock?.(lock); lockPushed = lock; }
     // Per-wallet song memory lasts only while this passkey stays unlocked on this page.
-    if (['locked', 'intro', 'wrong-wallet', 'unsupported', 'connect', 'not-invited', 'off', 'elsewhere'].includes(s.step)) radio.forgetWallets?.();
+    if (['locked', 'intro', 'wrong-wallet', 'unsupported', 'connect', 'not-invited', 'off', 'elsewhere'].includes(raw.step)) radio.forgetWallets?.();
   };
+
+  /** The listener has tapped a heart while an album is open: only then does the main listener wallet's balance matter. */
+  let likeTried = false;
+  /**
+   * A new album wallet that holds nothing yet and has never played, just after it opened: its plays are on their way, not
+   * missing. For ARRIVAL_GRACE_MS from the first time it is seen like this it reads as "arriving" (amber), never as
+   * "out of plays" (red). Only if nothing has landed after that is it a real problem.
+   */
+  const firstEmpty = new Map<string, number>();
+  const settling = (s: Snapshot): number | null => {
+    // Never funded: empty, nothing played from it here, and either unused on-chain or made on this device just now.
+    const fresh = s.step === 'fund' && !s.depositPending && !!s.gift && !!s.listening && s.balance === 0n
+      && !s.entries.some((e) => e.kind === 'play') && (s.brandNew || s.createdHere);
+    if (!fresh) return null;
+    let since = firstEmpty.get(s.listening!);
+    if (since === undefined) { since = Date.now(); firstEmpty.set(s.listening!, since); }
+    return Date.now() - since < ARRIVAL_GRACE_MS ? since : null;
+  };
+  /** Never-played album wallet, past the grace, still empty: the plays really have not arrived. */
+  const neverArrived = (s: Snapshot) => s.step === 'fund' && !s.depositPending && !!s.gift && s.balance === 0n
+    && !s.entries.some((e) => e.kind === 'play') && !!s.listening && firstEmpty.has(s.listening);
 
   const short = (a?: string) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');
   /** A balance as plays at today's play cost (after the return reserve). */
@@ -471,10 +496,6 @@ function start(root: HTMLElement) {
   };
   for (const ms of [1500, 4000, 9000]) setTimeout(() => render(ppp.snapshot()), ms);
 
-  /**
-   * An album wallet is open, and the main listener wallet that signs every like has run out of funds. Loud on purpose:
-   * the address, a copy button and (with a main wallet connected) a one-tap top-up. Quiet again once funds are on the way.
-   */
   /** Add plays to the open album from My player: one tap per amount, greyed out when My player cannot cover it. */
   function topUpAlbumRow(s: Snapshot, cls = ''): HTMLElement {
     const box = el('div', '', 'ppp-topup');
@@ -496,18 +517,26 @@ function start(root: HTMLElement) {
     return room > 0n ? Number(room / s.playCost) : 0;
   };
 
+  /**
+   * An album wallet is open and the main listener wallet that signs likes is empty. That is normal for someone who was
+   * sent an album: the album plays without it. So nothing is said until they tap a heart; then a calm amber note with the
+   * address, a copy button and (with a main wallet connected) a one-tap top-up. It sits under everything else.
+   */
   function likeFundsBanner(s: Snapshot): HTMLElement[] {
     const f = s.likeFunds;
     if (!f || !f.album || (!f.low && !f.pending)) return [];
+    if (!f.low) likeTried = false; // funded: the next time it runs dry it waits for a heart again
+    if (f.low && !likeTried) return [];
     const box = el('div', '', 'ppp-pick ppp-lowbox');
     if (!f.low) {
-      const p = el('p', 'Top-up for your main listener wallet is on its way. ', 'ppp-warn');
+      if (!f.txid) return [];
+      const p = el('p', 'Top-up for liking songs is on its way. ', 'ppp-warn');
       if (f.txid) p.append(link('View', explorer(f.txid)));
       box.append(p);
       return [box];
     }
-    box.append(el('p', '⚠ YOUR MAIN LISTENER WALLET IS OUT OF FUNDS', 'ppp-bad ppp-lowtitle'));
-    box.append(el('p', 'It signs every like for all your albums, so they all count for you. Likes are paused until it has a little STX. 0.1 STX is hundreds of likes.'));
+    box.append(el('p', '♥ Liking songs needs a little STX', 'ppp-warn ppp-lowtitle'));
+    box.append(el('p', 'Your album keeps playing as normal. Likes are signed by your main listener wallet, which is empty right now. 0.1 STX there is hundreds of likes, for all your albums.'));
     box.append(el('p', f.address, 'ppp-addr-full'));
     const row = el('div', '', 'ppp-open-row'); // not .ppp-actions: the panel refills the first element with that class
     row.append(copyButton('copy-likes-address', 'Copy address', () => f.address, 'primary', () => render(ppp.snapshot())));
@@ -548,7 +577,7 @@ function start(root: HTMLElement) {
       box.setAttribute('aria-valuenow', String(Math.round((elapsed / grace) * 100)));
     } else {
       fill.style.width = '';
-      text.textContent = 'Still arriving… this can take a few minutes. Nothing for you to do: it starts by itself.';
+      text.textContent = 'Your plays are taking longer than usual to arrive. Still watching for them: keep this page open and it starts by itself.';
       box.classList.add('is-long');
       box.removeAttribute('aria-valuenow');
     }
@@ -562,6 +591,22 @@ function start(root: HTMLElement) {
     if (++arrivalTicks % 10 === 0) render(ppp.snapshot());
   }, 1000);
 
+  /**
+   * Phones show one column. While there is something to set up (make or unlock the passkey, link, a gift link waiting)
+   * the panel goes to the top, where the tap is. Once there is music (playing, or plays on their way) the player comes
+   * first and the panel sits under it. CSS order only (public/radio.html): the wallet box never moves, so never reloads.
+   */
+  let firstShown: boolean | null = null;
+  function syncOrder(s: Snapshot) {
+    if (s.step === 'loading' && firstShown !== null) return; // keep the last layout while it checks
+    const setup = ['intro', 'locked', 'link', 'connect', 'wrong-wallet', 'unsupported'].includes(s.step);
+    const first = setup || !!s.busy || s.armed || (!!gifts.pendingCode() && !['ready', 'fund', 'over'].includes(s.step));
+    if (first === firstShown) return;
+    firstShown = first;
+    if (first) document.documentElement.dataset.pppFirst = '1';
+    else delete document.documentElement.dataset.pppFirst;
+  }
+
   function render(raw: Snapshot) {
     // "Continue listening" unlocked the same passkey: go back into the album it had open. Another passkey: stay put.
     if (resumeAlbum && ['ready', 'fund', 'over'].includes(raw.step) && !raw.busy) {
@@ -572,9 +617,15 @@ function start(root: HTMLElement) {
     // A gift being claimed or sent to this wallet is money on its way: the panel and the radio say "on its way",
     // never "no funds · artists unpaid" (which reads as if something went wrong). The gift code sees the real state.
     const giftWait = gifts.inProgress(raw);
-    const s: Snapshot = giftWait && raw.step === 'fund' ? { ...raw, depositPending: true } : raw;
+    const settleSince = settling(raw);
+    const s: Snapshot = giftWait && raw.step === 'fund' ? { ...raw, depositPending: true }
+      : settleSince !== null ? { ...raw, depositPending: true, arrival: { since: settleSince, graceMs: ARRIVAL_GRACE_MS } }
+      : raw;
+    // A like refused only because the main listener wallet is empty is a note, not an error: the album is still playing.
+    const softError = s.error === OUT_OF_LIKES;
     syncIdentity(s);
-    syncGift(raw);
+    syncGift(raw, s);
+    syncOrder(s);
     syncHeader(s);
     // The gift banner can start the claim while it draws, and the claim redraws everything as "on its way". Stop here
     // rather than paint this older, not-yet-waiting picture over it.
@@ -752,6 +803,7 @@ function start(root: HTMLElement) {
         break;
       case 'fund': {
         if (s.depositPending) { if (s.arrival) key.push(arrivalBar(s.arrival)); /* the "on their way" line below says the rest */ }
+        else if (neverArrived(s)) key.push(el('p', 'Your plays have not arrived yet. Keep this page open: they start by themselves when they land. If nothing happens in a few minutes, open your album link again.', 'ppp-bad'));
         else if (s.gift?.player) key.push(el('p', 'Out of plays · add more to keep listening', 'ppp-bad'));
         else if (s.entries.length) key.push(el('p', 'No plays left · add plays to keep counting', 'ppp-bad'));
         else key.push(el('p', `Add plays · 1 STX ≈ ${Math.floor(Number(1_000_000n / cost)).toLocaleString()} plays`));
@@ -884,7 +936,8 @@ function start(root: HTMLElement) {
     const elsewhereLines = inApp && (gifts.pendingCode() || ['intro', 'locked', 'unsupported'].includes(s.step)) ? openElsewhere(inApp, gifts.pendingCode()) : [];
     if (!album) {
       key.unshift(...giftLines);
-      key.unshift(...likeFundsBanner(s));
+      // Anything about the main listener wallet goes last: the album is what matters here.
+      key.push(...likeFundsBanner(s));
       // Inside an app's own browser (Instagram, X, ...) passkeys often fail: before anything else, offer the real one.
       key.unshift(...elsewhereLines);
     }
@@ -952,10 +1005,10 @@ function start(root: HTMLElement) {
     const msgEl = $('.ppp-msg');
     const shownMsg = msg && key.some((k) => (k.textContent ?? '').startsWith(msg.replace(/[.✓\s]+$/, ''))) ? '' : msg;
     // A check that has not answered yet is an amber "still trying", never an error, and only when nothing else is said.
-    const notice = !shownMsg && !s.error ? s.notice : '';
+    const notice = !shownMsg && !s.error ? s.notice : softError && !shownMsg ? s.error : '';
     msgEl.textContent = shownMsg || notice;
     msgEl.classList.toggle('is-warn', !!notice);
-    $('.ppp-err').textContent = s.error;
+    $('.ppp-err').textContent = softError ? '' : s.error;
 
     // Three small folds: recently played (with the full log inside), wallet, how it works.
     const plays = (s.entries as Shown[]).filter((e) => e.kind === 'play');
@@ -1008,10 +1061,10 @@ function start(root: HTMLElement) {
     const status: HTMLElement[] = [...lines];
     // Plays on their way: a countdown that says "just wait", calm amber, never an error.
     if (s.depositPending && s.arrival) status.push(arrivalBar(s.arrival));
-    if (s.error) status.push(el('p', s.error, 'ppp-bad'));
+    if (s.error) status.push(el('p', s.error, s.error === OUT_OF_LIKES ? 'ppp-warn' : 'ppp-bad'));
     else if (s.message && !asking) status.push(el('p', s.message, 'ppp-cyan'));
     else if (s.notice) status.push(el('p', s.notice, 'ppp-warn'));
-    if (a.mode === 'open' && s.likeFunds?.album && s.likeFunds.low && !s.likeFunds.pending)
+    if (a.mode === 'open' && likeTried && s.likeFunds?.album && s.likeFunds.low && !s.likeFunds.pending)
       status.push(el('p', 'Likes are paused: My player needs a few plays to sign them.', 'ppp-warn'));
     const hint = 'Kept on this device with Face ID or your passkey. No app or account needed.';
     let primary: AlbumInput['primary'] = null, secondary: AlbumInput['secondary'] = null;

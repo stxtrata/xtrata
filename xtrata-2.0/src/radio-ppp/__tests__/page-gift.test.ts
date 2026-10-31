@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: null as any, topUp: vi.fn(), topUpAlbum: vi.fn(), openAlbum: vi.fn(), bind: vi.fn(), arriving: vi.fn(), route: null as null | ((url: string, init?: any) => Response | undefined), radio: null as any, session: { isConnected: false } as any, signed: [] as any[] }));
 vi.mock('../controller', () => ({
-  TOP_UP_PLAYS: [100, 250, 500],
+  TOP_UP_PLAYS: [100, 250, 500], ARRIVAL_GRACE_MS: 60_000, OUT_OF_LIKES: 'Your album keeps playing. Likes need a little STX in your main listener wallet, which is empty right now: top it up and your likes carry on.',
   createPppController: (deps: any) => {
     h.changed = deps.changed;
     return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), topUpLikes: () => h.topUp(), topUpAlbum: (a: bigint) => h.topUpAlbum(a), openAlbum: (n: number) => h.openAlbum(n), bindAlbum: (n: number) => h.bind(n), albumArriving: (...a: unknown[]) => h.arriving(...a), onListened: async () => {}, giftSent: () => {} }, {
@@ -64,7 +64,8 @@ describe('Gift Edition panel', () => {
   });
 
   it('tells the radio to stop when the plays are gone, with a quiet pointer to Xverse and Leather', async () => {
-    const root = await open({ step: 'fund', balance: 3_000n, giftPlays: 0, giftStop: { reason: 'out', text: 'OUT OF PLAYS — ADD MORE TO KEEP LISTENING' } });
+    const played = [{ id: 'p1', kind: 'play', song: 11, status: 'confirmed', created: Date.now(), amount: '50', recipient: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP' }];
+    const root = await open({ step: 'fund', balance: 3_000n, giftPlays: 0, entries: played, giftStop: { reason: 'out', text: 'OUT OF PLAYS — ADD MORE TO KEEP LISTENING' } });
     expect(h.radio.setGiftStop).toHaveBeenLastCalledWith('OUT OF PLAYS — ADD MORE TO KEEP LISTENING');
     const key = root.querySelector('.ppp-key')!;
     expect(text(key)).toContain('no plays left');
@@ -80,7 +81,7 @@ describe('Gift Edition panel', () => {
     const root = await open({ ...funding, depositPending: true, depositTxid: undefined, arrival: { since: 0, graceMs: 60_000 } });
     expect([...root.querySelectorAll('button')].some((b) => /Deposit .* STX/.test(b.textContent ?? ''))).toBe(false);
     expect(text(root)).toMatch(/nothing to add/i);
-    h.snap = { ...h.snap, depositPending: false, arrival: null };
+    h.snap = { ...h.snap, depositPending: false, arrival: null, createdHere: false }; // an older wallet, played out
     h.changed();
     expect([...root.querySelectorAll('button')].some((b) => /Deposit 1(\.0+)? STX from my wallet/.test(b.textContent ?? ''))).toBe(true);
   });
@@ -138,10 +139,19 @@ describe('main listener wallet out of funds (an album wallet is open)', () => {
   const low = { address: ROOT, balance: 0n, low: true, album: true, pending: false, main: undefined as string | undefined };
   const album = { gift: null, giftStop: null, giftPlays: 0 };
 
-  it('warns loudly with the address and a copy button, and no pay button without a main wallet', async () => {
+  it('says nothing until the listener taps a heart: the album plays without it', async () => {
     const root = await open({ ...album, likeFunds: low });
+    expect(root.querySelector('.ppp-lowbox')).toBeNull();
+    expect(text(root)).not.toMatch(/OUT OF FUNDS|main listener wallet/i);
+  });
+
+  it('after a heart tap: a calm note at the bottom with the address and a copy button, no pay button without a main wallet', async () => {
+    const root = await open({ ...album, likeFunds: low });
+    (window as any).XtrataRadioLikeHandler({ song: 11 }); h.changed();
     const key = root.querySelector('.ppp-key')!;
-    expect(text(key)).toContain('YOUR MAIN LISTENER WALLET IS OUT OF FUNDS');
+    expect(text(key)).toContain('Liking songs needs a little STX');
+    expect(key.lastElementChild!.classList.contains('ppp-lowbox')).toBe(true);
+    expect(key.querySelector('.ppp-bad')).toBeNull();
     expect(text(key)).toContain(ROOT);
     expect(key.querySelector('.ppp-lowbox')).not.toBeNull();
     expect([...key.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Copy address']);
@@ -149,6 +159,7 @@ describe('main listener wallet out of funds (an album wallet is open)', () => {
 
   it('offers a one-tap top-up from the connected main wallet', async () => {
     const root = await open({ ...album, solo: false, main: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP', likeFunds: { ...low, main: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP' } });
+    (window as any).XtrataRadioLikeHandler({ song: 11 }); h.changed();
     const pay = [...root.querySelectorAll('.ppp-key button')].find((b) => /Pay 1.000000 STX from my wallet/.test(b.textContent ?? '')) as HTMLButtonElement;
     expect([...root.querySelectorAll('.ppp-key button')].map((b) => b.textContent)).toContain('Pay 1.000000 STX from my wallet');
     expect(pay).toBeTruthy();
@@ -583,12 +594,21 @@ describe('waiting for plays to arrive', () => {
     expect(document.documentElement.dataset.ppp).toBeUndefined(); // the radio is not dressed as "not paying"
   });
 
-  it('past the first minute it keeps moving and stays calm: it never turns into an error', async () => {
+  it('past the first minute it turns red (that is when something may really be wrong), and keeps watching', async () => {
     const root = await open({ ...arriving, gift: null, arrival: { since: Date.now() - 95_000, graceMs: 60_000 } });
     const bar = root.querySelector('.ppp-wait')!;
     expect(bar.classList.contains('is-long')).toBe(true);
-    expect(text(bar)).toMatch(/Still arriving.*starts by itself/);
+    expect(text(bar)).toMatch(/taking longer than usual.*starts by itself/);
+  });
+
+  it('a brand-new album wallet that is still empty reads as arriving, never as out of plays', async () => {
+    const root = await open({ step: 'fund', balance: 0n, balanceState: 'empty', playsLeft: 0, session: null, giftPlays: 0, depositPending: false, arrival: null, entries: [],
+      giftStop: { reason: 'out', text: 'OUT OF PLAYS — ADD MORE TO KEEP LISTENING' } });
+    expect(root.querySelector('.ppp-wait')).not.toBeNull();
     expect(root.querySelector('.ppp-bad')).toBeNull();
+    expect(text(root)).not.toMatch(/Out of plays|no plays left/);
+    expect(h.radio.setGiftStop).toHaveBeenLastCalledWith('YOUR PLAYS ARE ARRIVING');
+    expect(h.radio.setGiftWait).toHaveBeenLastCalledWith(true);
   });
 
   it('tells the radio to grey its controls while plays arrive, and to wake them once they have', async () => {
@@ -620,5 +640,20 @@ describe('the free player (the main site)', () => {
     expect(nudge.querySelector('button')!.textContent).toBe('Get a player');
     expect(document.documentElement.dataset.ppp).toBe('free'); // neither "on" (gold) nor "off" (drab and orange)
     expect(document.getElementById('onair')!.hidden).toBe(true);
+  });
+});
+
+describe('phone layout: the player first once there is music', () => {
+  beforeEach(() => { delete document.documentElement.dataset.pppFirst; localStorage.clear(); });
+
+  it('puts the panel on top only while something needs setting up', async () => {
+    await open({ step: 'intro', gift: null, balance: undefined });
+    expect(document.documentElement.dataset.pppFirst).toBe('1');
+    h.snap = { ...base, step: 'fund', balance: 0n, giftPlays: 0, depositPending: true, arrival: { since: Date.now(), graceMs: 60_000 } };
+    h.changed();
+    expect(document.documentElement.dataset.pppFirst).toBeUndefined(); // plays on their way: the player leads
+    h.snap = { ...base };
+    h.changed();
+    expect(document.documentElement.dataset.pppFirst).toBeUndefined(); // playing
   });
 });
