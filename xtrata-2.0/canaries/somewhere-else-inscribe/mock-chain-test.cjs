@@ -194,12 +194,15 @@ async function fullRun(s, S, { stagedFunding = false } = {}) {
     const swept = S.bal.get(OWNER) ?? 0n;
     console.log('  info  owner received', Number(swept) / 1e6, 'STX back; miner fees', Number(S.broadcasts.reduce((t, x) => t + x.fee, 0n)) / 1e6, 'STX');
     // the article and the reader on the mock chain are what the Python kit would build
-    const ids = MAN.map((m) => S.byHash.get(m.rolling));
-    check(ids.every((i) => i !== undefined), 'all 24 images were stored under their expected hashes');
+    const ids = MAN.filter((m) => m.inArticle !== false).map((m) => S.byHash.get(m.rolling));
+    check(MAN.every((m) => S.byHash.get(m.rolling) !== undefined), 'all 24 images were stored under their expected hashes');
+    check(MAN.filter((m) => m.inArticle === false).length === 1 && ids.length === 23, 'the article uses 23 of the 24 inscribed images (slot 9 is inscribed and handed over but left out of the text)');
     const metas = [...S.meta.entries()];
     const html = metas.filter(([, m]) => m.mime === 'text/html').sort((x, y) => x[0] - y[0]);
     const art = html[0], ldr = html[1];
     check(art && [...art[1].bytes.toString().matchAll(/data-ins="(\d+)"/g)].map((x) => Number(x[1])).join() === ids.join(), 'the inscribed article references the image IDs in order');
+    const unused = S.byHash.get(MAN.find((m) => m.inArticle === false).rolling);
+    check(art && !art[1].bytes.toString().includes(`data-ins="${unused}"`) && !art[1].bytes.toString().includes('class="by"'), 'the unused image is not referenced by the article, and the text matches the doc (no byline line)');
     check(ldr && ldr[1].bytes.toString().includes(`"articleId": ${art[0]}`) && ldr[1].bytes.toString().includes(art[1].hash), 'the inscribed reader is pinned to the article ID and hash');
     const report = await s.page.evaluate(() => document.querySelector('[data-step="report"]').closest('section').querySelector('textarea')?.value || '');
     check(/READER \(share this\)\s+https:\/\/xtrata\.xyz\/inscription\/\d+/.test(report), 'the report prints the reader link');
@@ -212,6 +215,33 @@ async function fullRun(s, S, { stagedFunding = false } = {}) {
       const b = await s.click(id); check(b.startsWith('pass'), `after forgetting progress: ${id} passes`);
     }
     check(S.broadcasts.length === before, `after forgetting progress nothing was sent (${S.broadcasts.length - before} new transactions)`);
+    check(s.errs.length === 0, 'no page errors' + (s.errs.length ? ': ' + s.errs[0] : ''));
+    await s.ctx.close();
+  }
+
+  console.log('\n=== H: the 24 images are already on chain from an earlier run; this build inscribes only the article and reader ===');
+  for (const variant of ['keeps its browser state', 'browser progress forgotten (only the chain remembers)']) {
+    console.log('  --', variant);
+    const S = newMock(); const s = await session(browser, S);
+    await s.setOwner(OWNER); await s.click('owner'); await s.click('preflight'); await s.click('wallet'); await s.fund(await s.needMicro()); await s.click('fund');
+    let b = await s.click('images'); check(b.startsWith('pass') && S.mints === 24, `24 images inscribed by the earlier run (${S.mints})`);
+    const hotAddr = await s.hot();
+    S.bal.set(hotAddr, 1124002n);                                    // roughly what is left in the temporary wallet
+    if (variant.startsWith('browser')) { await s.page.click('#forget'); await s.page.waitForTimeout(300); } else { await s.page.reload(); await s.page.waitForSelector('[data-step="owner"]'); }
+    const sent = S.broadcasts.length;
+    if (variant.startsWith('browser')) { await s.setOwner(OWNER); await s.click('owner'); }
+    b = await s.click('preflight');
+    check(b.startsWith('pass') && /24 of 26 already on chain/.test(b) && /2 to inscribe/.test(b), 'preflight sees 24 images already on chain and plans only 2 inscriptions');
+    check(!/FUND [3-9]/.test(b), 'and asks for far less than the original amount');
+    await s.click('wallet'); await s.click('fund');
+    for (const id of ['images', 'article', 'loader', 'verify', 'handover', 'sweep', 'report']) { b = await s.click(id); check(b.startsWith('pass'), `${id} passes`); }
+    check(S.mints === 26, `only the article and reader were newly inscribed (${S.mints - 24} new mints)`);
+    check([...S.meta.values()].length === 26 && [...S.meta.values()].every((m) => m.owner === OWNER), 'all 26 inscriptions, including the unused image, end up with the owner wallet');
+    check((S.bal.get(hotAddr) ?? 0n) === 0n, 'temporary wallet swept to zero');
+    const art = [...S.meta.entries()].filter(([, m]) => m.mime === 'text/html').sort((x, y) => x[0] - y[0])[0];
+    const refs = [...art[1].bytes.toString().matchAll(/data-ins="(\d+)"/g)].map((x) => Number(x[1]));
+    check(refs.length === 23 && !refs.includes(S.byHash.get(MAN.find((m) => m.inArticle === false).rolling)), 'the article carries 23 image references');
+    check(S.badShape.length === 0, 'post-conditions all as expected');
     check(s.errs.length === 0, 'no page errors' + (s.errs.length ? ': ' + s.errs[0] : ''));
     await s.ctx.close();
   }

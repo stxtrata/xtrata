@@ -31,7 +31,8 @@ const webp = manifest.map((m) => {
 });
 if (new Set(manifest.map((m) => m.slot)).size !== manifest.length) fail('duplicate slots in the manifest');
 const figures = (source.match(/<p><img [^>]*?\/><\/p>|<p>\[image: [\s\S]*?\]<\/p>/g) || []).length;
-if (figures !== manifest.length) fail(`the article has ${figures} image placeholders but the manifest has ${manifest.length} images`);
+const inArticle = manifest.filter((m) => m.inArticle !== false).length;
+if (figures !== inArticle) fail(`the article has ${figures} image placeholders but the manifest has ${inArticle} images flagged for the article (${manifest.length} in all)`);
 const pinsNow = { assetsSha: sha(manifest.map((m) => m.sha256).join('\n')), sourceSha: sha(source), loaderSha: sha(loaderTpl) };
 
 const pinsPath = resolve(dir, 'pins.json');
@@ -52,7 +53,7 @@ const cfg = {
 };
 if (!cfg.resolver.includes('{id}')) fail('--resolver must contain {id}');
 if (!(cfg.feeMult >= 1 && cfg.feeMult <= 10)) fail('--fee-mult must be 1..10');
-const files = { source, loaderTpl, manifest: manifest.map(({ slot, alt, width, height, bytes, rolling, mime, sha256 }, i) => ({ slot, alt, width, height, bytes, rolling, mime, sha256, file: manifest[i].file })), webp };
+const files = { source, loaderTpl, manifest: manifest.map(({ slot, alt, width, height, bytes, rolling, mime, sha256, inArticle }, i) => ({ slot, alt, width, height, bytes, rolling, mime, sha256, file: manifest[i].file, ...(inArticle === false ? { inArticle: false } : {}) })), webp };
 
 const stamp = `se-${new Date().toISOString().slice(0, 10)}-${sha(readFileSync(resolve(dir, 'main.ts'), 'utf8') + readFileSync(resolve(dir, 'article.ts'), 'utf8') + pinsNow.assetsSha).slice(0, 8)}`;
 const result = await build({

@@ -28,12 +28,13 @@ ol{padding-left:1.4em}li{margin-bottom:.8em}li p{margin:0}
 .colophon{margin-top:3.5rem;padding-top:1rem;border-top:1px solid var(--line);color:var(--mut);font:14px/1.5 system-ui,sans-serif}
 `;
 
-const COLOPHON = '<p class="colophon">Inscribed on Stacks with Xtrata. Text and all 24 images are stored on chain, and each image is checked against a fingerprint written into this page. Read it from the chain, with the proof, at the reader this was loaded from, or fetch the bytes yourself using the steps in the reader\'s proof box.</p>';
+const colophon = (n: number) => `<p class="colophon">Inscribed on Stacks with Xtrata. Text and all ${n} images are stored on chain, and each image is checked against a fingerprint written into this page. Read it from the chain, with the proof, at the reader this was loaded from, or fetch the bytes yourself using the steps in the reader's proof box.</p>`;
 
 /**
  * @param source   the pandoc HTML of the article (assets/source-article.html)
  * @param assets   one entry per image in document order
- * @param ids      the 24 image inscription IDs in the same order (strings are accepted so tests can pass tokens)
+ * @param assets   only the images that appear in the article (the manifest may hold more, flagged inArticle:false)
+ * @param ids      the image inscription IDs for those assets in the same order (strings are accepted so tests can pass tokens)
  * @param resolver address pattern for an inscription, e.g. https://xtrata.xyz/inscription/{id}
  */
 export function buildArticle(source: string, assets: Asset[], ids: (number | string)[], resolver: string): string {
@@ -55,7 +56,7 @@ export function buildArticle(source: string, assets: Asset[], ids: (number | str
   h = h.replace('<p>By Jim Crane</p>', '<p class="by">By Jim Crane</p>');
   const doc = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Somewhere Else</title>'
     + '<meta name="description" content="What happens when the NFT you own turns out to be a receipt for a file on someone else\'s server. By Jim Crane.">'
-    + `<base target="_blank"><style>${CSS}</style></head><body><main>${h}${COLOPHON}</main></body></html>`;
+    + `<base target="_blank"><style>${CSS}</style></head><body><main>${h}${colophon(assets.length)}</main></body></html>`;
   return doc.replace(/\n+/g, '\n');
 }
 

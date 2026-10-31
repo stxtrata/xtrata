@@ -120,7 +120,7 @@
   "srcbytes": 184996
  },
  {
-  "slot": 9,
+  "slot": 9, "inArticle": false,
   "file": "webp/09.webp",
   "alt": "A film still leading to a film reel, which splits into a working IPFS copy with a green tick and a Cloudinary copy that has gone, with a cross",
   "bytes": 90258,

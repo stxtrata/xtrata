@@ -7,7 +7,7 @@ One self-contained page that takes the frozen article all the way onto Stacks th
    open, finds anything already on chain from an earlier run, and prints the exact amount to fund.
 3. **Temporary wallet.** Created in this browser; its key file is downloaded and you confirm it is saved.
 4. **Fund.** You send that amount (from any wallet or exchange) to the temporary address shown. The page watches for it.
-5. **Images.** The 24 WebPs are inscribed one at a time, looked up by hash first so nothing already on chain is re-sent.
+5. **Images.** The 24 WebPs are inscribed one at a time, looked up by hash first so nothing already on chain is re-sent. An image flagged `inArticle: false` in `manifest.json` (slot 9, cut from the text after it was inscribed) is still inscribed and handed over, but the article does not reference it, so the article carries 23 images.
 6. **Article.** `buildArticle` writes each image's new inscription ID and hash into the article HTML, then it is inscribed.
 7. **Reader.** `buildLoader` pins the reader to the article's ID and hash, then it is inscribed. This is the shared link.
 8. **Verify.** All 26 are read back through the contract and every hash and byte is recomputed.
@@ -72,3 +72,6 @@ Runs the whole flow against a strict in-memory mock of the core and the Hiro API
 "Forget local progress" that sends nothing, a rejected broadcast, a transaction left pending across a reload, rescue after an
 interruption, a corrupted chunk on read-back, a file already inscribed by someone else, address validation, and a tampered
 image refused at build time.
+
+## Re-pinning after a text change
+Edit `assets/source-article.html` (and `manifest.json` if images change), run `node scripts/build-somewhere-else-canary.mjs --pin`, review the diff, rebuild. Images already on chain are found by hash and skipped, so a later build only inscribes what is new (article, reader). If the browser that ran an earlier build still holds the temporary wallet, the new build picks up where it stopped; otherwise use "Restore key" with the downloaded key file.

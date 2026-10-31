@@ -21,7 +21,7 @@ declare const __CFG__: string;
 declare const __FILES__: string;
 declare const __PINS__: string;
 
-type Man = Asset & { file: string; mime: string; sha256: string };
+type Man = Asset & { file: string; mime: string; sha256: string; inArticle?: boolean };
 type Cfg = { core: string; resolver: string; tokenUri: string; ownerPin?: string; feeMult: number; nodes: string[] };
 const CFG: Cfg = JSON.parse(__CFG__);
 const FILES = JSON.parse(__FILES__) as { source: string; loaderTpl: string; manifest: Man[]; webp: string[] };
@@ -97,6 +97,9 @@ const mkItem = (key: string, label: string, bytes: Uint8Array, mime: string): It
 const slotKey = (slot: number) => `image-${String(slot).padStart(2, '0')}`;
 const imageItem = (i: number) => mkItem(slotKey(MAN[i].slot), `image ${MAN[i].slot} of ${MAN.length}`, IMG[i], MAN[i].mime);
 const IMAGE_ITEMS = MAN.map((_, i) => imageItem(i));
+// every image in the manifest is inscribed and handed over; only those not flagged inArticle:false appear in the article
+const IN_ART = MAN.map((m, i) => (m.inArticle === false ? -1 : i)).filter((i) => i >= 0);
+const ART_MAN = IN_ART.map((i) => MAN[i]);
 
 // ---------- state (a cache only: the chain is the memory) ----------
 type TxRec = { step: string; label: string; txid: string; status: string; result?: string; pass?: boolean; block?: number };
@@ -295,12 +298,12 @@ const mintItem = async (stepId: string, it: Item): Promise<number> => {
 };
 
 // ---------- the article and the loader, built from the IDs on chain ----------
-const imageIds = (): number[] => IMAGE_ITEMS.map((it) => {
+const imageIds = (): number[] => IN_ART.map((i) => IMAGE_ITEMS[i]).map((it) => {
   const id = state.ids[it.key];
   if (id === undefined) throw new Error(`${it.label} has not been inscribed yet.`);
   return id;
 });
-const articleItem = (): Item => mkItem('article', 'the article', enc(buildArticle(FILES.source, MAN, imageIds(), CFG.resolver)), 'text/html');
+const articleItem = (): Item => mkItem('article', 'the article', enc(buildArticle(FILES.source, ART_MAN, imageIds(), CFG.resolver)), 'text/html');
 const loaderItem = (): Item => {
   const id = state.ids.article, hash = state.hashes.article;
   if (id === undefined || !hash) throw new Error('The article has not been inscribed yet.');
@@ -333,7 +336,7 @@ const planCost = async (): Promise<Plan> => {
   const todo: Item[] = IMAGE_ITEMS.filter((it) => state.ids[it.key] === undefined);
   // the article and reader are about the size of the real ones; build with placeholder IDs so the estimate does not need the images yet
   const placeholder = (n: number) => Array.from({ length: n }, (_, i) => 900000 + i);
-  if (state.ids.article === undefined) todo.push(mkItem('article', 'the article', enc(buildArticle(FILES.source, MAN, placeholder(MAN.length), CFG.resolver)), 'text/html'));
+  if (state.ids.article === undefined) todo.push(mkItem('article', 'the article', enc(buildArticle(FILES.source, ART_MAN, placeholder(ART_MAN.length), CFG.resolver)), 'text/html'));
   if (state.ids.loader === undefined) todo.push(mkItem('loader', 'the reader', enc(buildLoader(FILES.loaderTpl,
     { contract: CFG.core, articleId: 900100, articleHash: '0'.repeat(64), nodes: CFG.nodes, timeoutMs: 20000, batch: 16, parallel: 2, parallelImages: 3 }, CFG.resolver)), 'text/html'));
   let miner = 0n, protocol = 0n;
@@ -518,7 +521,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'verify', title: 'Read everything back from the chain', who: 'Reads only',
-    intro: 'Reads all 26 inscriptions back through the contract and recomputes every hash and byte, then checks that the article points at the 24 image IDs and the reader at the article.',
+    intro: 'Reads all 26 inscriptions back through the contract and recomputes every hash and byte, then checks that the article points at its image IDs and the reader at the article.',
     action: 'Verify on chain',
     run: async () => {
       const items = [...IMAGE_ITEMS, articleItem(), loaderItem()];
@@ -532,12 +535,12 @@ const STEPS: Step[] = [
       });
       const html = new TextDecoder().decode(items[items.length - 2].bytes);
       const refs = [...html.matchAll(/data-ins="(\d+)"/g)].map((m) => Number(m[1]));
-      if (refs.length !== IMAGE_ITEMS.length || refs.some((r, i) => r !== state.ids[IMAGE_ITEMS[i].key])) throw new Error('The article does not reference the 24 image IDs in order.');
+      if (refs.length !== IN_ART.length || refs.some((r, i) => r !== state.ids[IMAGE_ITEMS[IN_ART[i]].key])) throw new Error(`The article does not reference its ${IN_ART.length} image IDs in order.`);
       const ldr = new TextDecoder().decode(items[items.length - 1].bytes);
       if (!ldr.includes(`"articleId": ${state.ids.article}`) || !ldr.includes(state.hashes.article)) throw new Error('The reader is not pinned to the article.');
       let live = 'resolver not checked';
       try { const r = await fetch(CFG.resolver.replace('{id}', String(state.ids.loader)), { method: 'GET', mode: 'cors' }); live = `resolver answered ${r.status}`; } catch { live = 'resolver could not be reached from this page (not required)'; }
-      return `all ${items.length} read back and identical to the files · article references the 24 images · reader pinned to article #${state.ids.article} · ${live}`;
+      return `all ${items.length} read back and identical to the files · article references its ${IN_ART.length} images · reader pinned to article #${state.ids.article} · ${live}`;
     }
   },
   {
@@ -569,7 +572,7 @@ const STEPS: Step[] = [
       const link = CFG.resolver.replace('{id}', String(state.ids.loader));
       const lines = [
         `READER (share this)  ${link}`, `ARTICLE              #${state.ids.article}  hash ${state.hashes.article}`, `READER INSCRIPTION   #${state.ids.loader}  hash ${state.hashes.loader}`, '',
-        'IMAGES (document order)', ...IMAGE_ITEMS.map((it, i) => `  ${String(MAN[i].slot).padStart(2)}  #${state.ids[it.key]}  ${CFG.resolver.replace('{id}', String(state.ids[it.key]))}`), '',
+        'IMAGES (document order)', ...IMAGE_ITEMS.map((it, i) => `  ${String(MAN[i].slot).padStart(2)}  #${state.ids[it.key]}  ${CFG.resolver.replace('{id}', String(state.ids[it.key]))}${MAN[i].inArticle === false ? '  (inscribed, not used in the article)' : ''}`), '',
         others.length ? `NOT OWNED BY YOU (an identical file was already on chain before this run, so it was reused): ${others.join('; ')}` : `OWNER of all ${allKeys().length}: ${owner}`, `CREATOR recorded on chain: ${hotAddress()} (the temporary wallet)`, `Temporary wallet balance: ${stx(left)}`, '',
         'NEXT: replace [LOADER] in the hook package, the plan doc and the launch posts with the reader link above; keep ids.json with the audit package; keep the temporary key file until you have seen the 26 inscriptions in your wallet.'
       ];
