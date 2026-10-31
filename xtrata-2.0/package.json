@@ -14,6 +14,8 @@
     "build:forever-twins-wallet": "vite build -c vite.forever-twins.config.ts",
     "build:casino-room-spike": "vite build -c vite.casino-room-spike.config.ts",
     "build:casino-room": "vite build -c vite.casino-room.config.ts",
+    "build:casino-passkey": "vite build -c vite.casino-passkey.config.ts",
+    "build:casino-wallet": "vite build -c vite.casino-wallet.config.ts",
     "build:ft-large": "vite build -c vite.ft-large.config.ts",
     "build:agent-one-wallet": "vite build -c vite.agent-one-wallet.config.ts",
     "build:agent-one": "vite build -c vite.agent-one.config.ts",

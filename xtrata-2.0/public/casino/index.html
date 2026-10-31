@@ -202,6 +202,9 @@ body.parallax-bar-expanded #quickNav,body.parallax-bar-expanded #intro,body.para
  <div class="layr-panel-head"><div><small>TESTNET · PLAY MONEY</small><h2 id="layrExchangeHeading">LAYR exchange</h2><p id="layrDispenserTitle"></p></div><button id="layrCloseDispenser" class="lx-leave" aria-label="Leave the LAYR exchange">✕ Leave</button></div>
  <div class="lx-wallet lx-card">
   <button id="layrConnectWallet" class="lx-connect">Connect wallet</button>
+  <div id="lxPasskey" hidden><button id="lxPlayNow" class="lx-play">Play now · no wallet needed</button><button id="lxPlayDevice" class="lx-linkish">No passkey? Play in this browser only</button></div>
+  <div id="lxPasskeyTools" hidden><button id="lxFaucetTop">Get 500 free testnet STX</button></div>
+  <p id="lxPasskeyStatus" class="lx-hint" aria-live="polite"></p>
   <div class="lx-who"><small>WALLET</small><span id="layrWalletAddress"></span></div>
   <div class="lx-stx"><small>TESTNET STX</small><b id="layrWalletBalance">—</b><button id="layrRefreshBalance" aria-label="Refresh wallet balance">↻</button><a id="lxFaucet" href="https://explorer.hiro.so/sandbox/faucet?chain=testnet" target="_blank" rel="noopener">Get free testnet STX ↗</a></div>
   <p id="lxWalletHint" class="lx-hint"></p>
@@ -7436,7 +7439,7 @@ function verifyTransfer(tx,expected){
 }
 function create(options){
  const account=options.account,storage=options.storage||localStorage,fetcher=options.fetch||window.fetch;
- let address=null,busy=false,pending=null,status='',error='',lastCheck=0,checking=false,busyKind='',cancelWallet=null,phase='ready',receipt=null;
+ let address=null,busy=false,pending=null,status='',error='',lastCheck=0,checking=false,busyKind='',cancelWallet=null,phase='ready',receipt=null,walletKind='extension';
  let walletBalance={status:'disconnected',availableMicroStx:null,checkedAt:0},balanceRequest=0;
  const listeners=new Set(),emit=()=>{for(const f of listeners)f(snapshot());};
  const log=(...a)=>{try{console.log('[casino-b:wallet]',...a);}catch(_){}};
@@ -7515,6 +7518,7 @@ function create(options){
  const unsupported=e=>!!e&&(e.code===-32601||e.code===-32001||/not (?:supported|found|implemented|available)|unknown method|unsupported|invalid method|no such method/i.test(String(e.message||'')));
  const mismatch=e=>/network mismatch|mismatch.*network|network.*mismatch/i.test(String(e&&e.message||''));
  async function payViaWallet(base){
+  if(walletKind==='passkey'){const pw=window.ParallaxPasskeyWallet;if(!pw)throw Object.assign(Error('The casino wallet is not loaded. Reload the page. Nothing was sent.'),{code:'NOT_SENT'});log('pay: casino wallet (no popup)');return pw.buy({stx:Number(BigInt(base.amount)/1000000n),address});}
   let sel=null;try{sel=localStorage.getItem('STX_PROVIDER');}catch(_){}
   const full={recipient:base.recipient,amount:base.amount,memo:base.memo,network:'testnet',address,sponsored:false};
   if(sel==='LeatherProvider'&&usable(window.LeatherProvider)){log('pay: Leather, full parameter set');return rpc(window.LeatherProvider,'stx_transferStx',full);}
@@ -7544,18 +7548,27 @@ function create(options){
  async function connect(){if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status='Choose your Stacks testnet wallet…';emit();
   try{await releaseXverse();const r=await askForAddresses(),a=stacksAccountIn(r);if(!a)throw Error('Switch your wallet to Stacks testnet and reconnect.');
    if(pending&&pending.address!==a.address)throw Error('Reconnect the wallet used for the pending transfer: '+pending.address);
-   address=a.address;phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
+   address=a.address;walletKind='extension';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
+  }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
+ }
+ // The casino's own testnet wallet (casino-wallet.xtrata.xyz, docs/plans/CASINO-PASSKEY-WALLET-PLAN.md): made from a passkey, or kept in
+ // this browser only. Loaded by public/casino/passkey-wallet.js as window.ParallaxPasskeyWallet; without it this path is simply absent.
+ // It goes through ask() like any wallet, so the watchdog, Cancel and the save-before-asking rule all still apply.
+ async function connectPasskey(mode,anyPasskey){const pw=window.ParallaxPasskeyWallet;if(!pw)throw Error('The casino wallet did not load. Reload the page.');if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status=mode==='device'?'Confirm in the casino wallet window…':'Use your passkey in the casino wallet window…';emit();
+  try{const r=await ask('casino.open',{mode},{timeoutMs:1800000,run:()=>pw.open(mode,!!anyPasskey)}),a=r&&r.address;if(typeof a!=='string'||!/^ST/.test(a)||!validAddress(a))throw Error('The casino wallet did not give a testnet address.');
+   if(pending&&pending.address!==a)throw Error('Open the wallet used for the pending transfer: '+pending.address);
+   address=a;walletKind='passkey';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Casino wallet open.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
  }
  async function purchase(stx){if(exchangeShut())throw Error(SHUT_MSG);if(busy||pending)throw Error('Resolve the pending wallet transfer before sending another payment.');if(!Number.isInteger(stx)||stx<1||stx>10)throw Error('Choose a whole amount from 1 to 10 STX.');if(!address)throw Error('Connect your testnet wallet first.');if(address===RECIPIENT)throw Error('The LAYR exchange pays into this wallet, and a wallet cannot pay itself. Connect a different wallet or account to buy LAYR.');
-  if(walletBalance.status==='ready'&&Date.now()-walletBalance.checkedAt<60000&&BigInt(walletBalance.availableMicroStx)<BigInt(stx)*1000000n)throw Error('Not enough available testnet STX for this amount. Network fees are additional.');
+  if(walletBalance.status==='ready'&&Date.now()-walletBalance.checkedAt<60000&&BigInt(walletBalance.availableMicroStx)<BigInt(stx)*1000000n+(walletKind==='passkey'?BigInt(window.ParallaxPasskeyWallet?.fee||0):0n))throw Error('Not enough available testnet STX for this amount. Network fees are additional.');
   busy=true;busyKind='purchase';error='';phase='wallet';receipt=null;storage.removeItem(PENDING+'.receipt');
   try{if(!account.ready()&&!await account.acquire())throw Error(account.error()||'Close other casino tabs, then reconnect.');
    // Save before asking the wallet; an ambiguous response never triggers a
    // second payment automatically. The bank and processed tx ID are atomic.
    pending={address,recipient:RECIPIENT,stx,created:Date.now(),txId:null,state:'wallet-request'};storage.setItem(PENDING,JSON.stringify(pending));status='Confirm '+stx+' testnet STX in your wallet. Fees are additional.';emit();
    let r;try{r=await ask('stx_transferStx',{recipient:RECIPIENT,amount:String(stx*1000000),memo:'ParallaX LAYR',network:'testnet'},{timeoutMs:180000,run:()=>payViaWallet({recipient:RECIPIENT,amount:String(stx*1000000),memo:'ParallaX LAYR'}),late:v=>{const id=normalizeId(v.txid||v.txId||v.result?.txid||v.result?.txId);if(pending&&!pending.txId){pending.txId=id;pending.state='pending';phase='pending';storage.setItem(PENDING,JSON.stringify(pending));status='Transfer broadcast on testnet. Waiting for confirmation…';emit();}}});}
-   catch(e){if(e.code===4001||e.code===-32000&&/reject|cancel|denied/i.test(e.message)||/user (rejected|cancelled|canceled|denied)/i.test(e.message)){storage.removeItem(PENDING);pending=null;phase='cancelled';status='Wallet request cancelled. No LAYR was added.';}else if(e&&(e.code===-32602||e.code===-32601)){storage.removeItem(PENDING);pending=null;phase='failed';status='The wallet could not process the request. Nothing was sent.';}else{pending.state='check-wallet';phase='check-wallet';storage.setItem(PENDING,JSON.stringify(pending));status='Check your wallet for the transaction ID before sending again.';}throw e;}
+   catch(e){if(e&&e.code==='NOT_SENT'){storage.removeItem(PENDING);pending=null;phase='failed';status=e.message;}else if(e.code===4001||e.code===-32000&&/reject|cancel|denied/i.test(e.message)||/user (rejected|cancelled|canceled|denied)/i.test(e.message)){storage.removeItem(PENDING);pending=null;phase='cancelled';status='Wallet request cancelled. No LAYR was added.';}else if(e&&(e.code===-32602||e.code===-32601)){storage.removeItem(PENDING);pending=null;phase='failed';status='The wallet could not process the request. Nothing was sent.';}else{pending.state='check-wallet';phase='check-wallet';storage.setItem(PENDING,JSON.stringify(pending));status='Check your wallet for the transaction ID before sending again.';}throw e;}
    try{pending.txId=normalizeId(r.txid||r.txId||r.result?.txid||r.result?.txId);}catch(_){pending.state='check-wallet';phase='check-wallet';storage.setItem(PENDING,JSON.stringify(pending));throw Error('No transaction ID was returned. Recover it from your wallet before sending again.');}
    pending.state='pending';phase='pending';storage.setItem(PENDING,JSON.stringify(pending));status='Transfer broadcast on testnet. Waiting for confirmation…';return pending.txId;
   }catch(e){if(!pending&&phase==='wallet'){phase='failed';status='The LAYR account could not be opened. No wallet transfer was requested.';}error=e.message;throw e;}finally{busy=false;emit();}
@@ -7574,9 +7587,9 @@ function create(options){
   pending={...(pending||{address,recipient:RECIPIENT,stx:null,created:Date.now()}),txId:id,state:'recovery'};storage.setItem(PENDING,JSON.stringify(pending));emit();return check();
  }
  function clearUnsigned(){if(busy||checking)throw Error('Wait for the wallet request to finish before clearing it.');if(!pending||pending.txId)throw Error('A broadcast transfer must be checked, not discarded.');storage.removeItem(PENDING);pending=null;phase='ready';status='Unsigned request cleared. Confirm in your wallet that no transfer was broadcast.';error='';emit();}
- function snapshot(){return{address,busy,busyKind:busy?busyKind:'',checking,phase,pending:pending?{...pending}:null,receipt:receipt?{...receipt}:null,walletBalance:{...walletBalance},status,error,recipient:RECIPIENT,network:'testnet'};}
- function cancel(){if(busy&&busyKind==='connect'&&cancelWallet){cancelWallet();return;}if(busy&&busyKind==='purchase')throw Error('A payment request is open in your wallet. Approve or reject it there; this page cannot cancel it safely.');}
- return{connect,cancel,purchase,check,recover,clearUnsigned,snapshot,refreshBalance,subscribe(f){listeners.add(f);return()=>listeners.delete(f);},tick(now){if(address&&pending?.txId&&now-lastCheck>12000){lastCheck=now;check();}}};
+ function snapshot(){return{address,busy,busyKind:busy?busyKind:'',checking,phase,pending:pending?{...pending}:null,receipt:receipt?{...receipt}:null,walletBalance:{...walletBalance},status,error,recipient:RECIPIENT,network:'testnet',walletKind};}
+ function cancel(){if(busy&&busyKind==='connect'&&cancelWallet){cancelWallet();try{window.ParallaxPasskeyWallet?.cancel();}catch(_){}return;}if(busy&&busyKind==='purchase')throw Error('A payment request is open in your wallet. Approve or reject it there; this page cannot cancel it safely.');}
+ return{connect,connectPasskey,cancel,purchase,check,recover,clearUnsigned,snapshot,refreshBalance,subscribe(f){listeners.add(f);return()=>listeners.delete(f);},tick(now){if(address&&pending?.txId&&now-lastCheck>12000){lastCheck=now;check();}}};
 }
 window.ParallaxTestnetLAYR=Object.freeze({create,verifyTransfer,normalizeId,recipient:RECIPIENT,network:'testnet',version:'2.0.0'});
 })();
@@ -11034,6 +11047,7 @@ function applyTestnetFunding(proof){
     $('layrProgress').hidden=!((st.busy&&!connecting)||!!st.pending||!!st.checking||['wallet','pending','indexing','cancelled','failed','check-wallet'].includes(phase)||(['credited','already-credited'].includes(phase)&&!st.receipt));
     if(phase==='check-wallet')$('lxMore').open=true;
     const rv=$('lxRangeValue');if(rv)rv.textContent=String(q.stx);
+    try{window.pxPasskeyPaint&&window.pxPasskeyPaint(st,state);}catch(e){console.warn('casino wallet paint',e);}
   }
   function selectDispenserAmount(amount){layrQuote(amount);dispenserAmount=amount;paintDispenserPanel();}
   function openLAYRDispenser(selection){
@@ -12173,6 +12187,121 @@ button{font:inherit;color:inherit;cursor:pointer}
       } catch (e) { /* ignore */ }
     }
   })();
+</script>
+<style id="pxPasskeyWalletStyle">
+/* ParallaX Casino: "Play now" with the casino's own testnet wallet (docs/plans/CASINO-PASSKEY-WALLET-PLAN.md). */
+#layrDispenserPanel #lxPasskey,#layrDispenserPanel #lxPasskeyTools,#layrDispenserPanel #lxPasskeyStatus{grid-column:1/-1}
+#layrDispenserPanel #lxPasskey{display:grid;gap:6px;order:-1}
+#layrDispenserPanel :is(#lxPasskey,#lxPasskeyTools)[hidden]{display:none}
+#layrDispenserPanel .lx-play{min-height:54px;padding:0 12px;font:700 16px Arial;color:#17110b;background:linear-gradient(100deg,#c39a55,#ecca8f);border:1px solid #f0d39c;border-radius:6px;cursor:pointer}
+#layrDispenserPanel .lx-play:disabled{opacity:.6;cursor:default}
+#layrDispenserPanel .lx-linkish{justify-self:center;padding:6px;background:none;border:0;color:#d7bf91;font:12px Arial;text-decoration:underline;cursor:pointer}
+#layrDispenserPanel.lx-passkey-on[data-state=disconnected] .lx-connect{min-height:42px;font:600 14px Arial;color:#e8cf9f;background:#13263a;border-color:#c4a26188}
+/* The wallet frame opens as its own dialog on top of everything, NOT inside the exchange panel: the frame's confirm button only arms
+   while it is fully visible with no filter, transform, opacity or overlap from the page (IntersectionObserver v2, the radio's
+   clickjacking guard), and the panel's blur and scrolling would keep it disabled. No transform, filter or opacity on this element. */
+#lxPasskeyFrame{position:fixed;left:0;right:0;top:max(16px,10vh);margin:0 auto;width:min(440px,calc(100vw - 24px));z-index:2147483000}
+#lxPasskeyFrame[hidden]{display:none}
+#lxPasskeyFrame::before{content:'';position:fixed;inset:0;z-index:-1;background:#02060cd9}
+#lxPasskeyFrame iframe{display:block;width:100%;height:min(360px,calc(100dvh - 40px));border:1px solid #d6b67b;border-radius:10px;background:#fff}
+#layrDispenserPanel #lxPasskeyTools{display:flex;gap:8px;flex-wrap:wrap}
+#layrDispenserPanel #lxPasskeyTools button{min-height:34px;padding:0 12px;background:#13263a;border:1px solid #c4a26155;border-radius:6px;color:#e0c59c;font:12px Arial;cursor:pointer}
+#layrDispenserPanel #lxPasskeyStatus a{color:#d7bf91}
+#layrDispenserPanel[data-state=shut] :is(#lxPasskey,#lxPasskeyTools){display:none}
+</style>
+<div id="lxPasskeyFrame" role="dialog" aria-label="Casino wallet (testnet)" hidden></div>
+<script id="pxPasskeyWallet">
+/* ParallaX Casino: "Play now" with the casino's own TESTNET wallet (docs/plans/CASINO-PASSKEY-WALLET-PLAN.md).
+   A player with no Stacks wallet taps once: the wallet on casino-wallet.xtrata.xyz is made from a passkey (or kept in this browser
+   only), Hiro's testnet faucet sends 500 STX, and as soon as they land the exchange buys 10 STX = 1,000,000 LAYR by itself, once per
+   wallet. The exchange's own pending/check/credit flow does the rest. Behind a flag until the wallet origin is live:
+   ?passkey=1 turns it on in this browser, ?passkey=0 turns it off. */
+(function(){'use strict';
+ const FLAG='xtrata.parallax.passkey',AUTO='xtrata.parallax.passkey.autobuy.v1',DRIP='xtrata.parallax.passkey.faucet.v1',FIRST_BUY=10,WAIT_MS=10*60e3;
+ const get=k=>{try{return localStorage.getItem(k);}catch(_){return null;}},set=(k,v)=>{try{localStorage.setItem(k,v);}catch(_){}};
+ try{const q=new URLSearchParams(location.search).get('passkey');if(q==='1')set(FLAG,'1');else if(q==='0')set(FLAG,'0');}catch(_){}
+ if(get(FLAG)!=='1')return;
+ const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ const book=k=>{try{return JSON.parse(get(k)||'{}')||{};}catch(_){return {};}};
+ let ex=null,pw=null,box=null,working=false,msg='',msgLink='';
+ const say=(t,link)=>{msg=t||'';msgLink=link||'';paint();};
+ const shut=()=>{const c=window.CasinoStatus;return !!(c&&c.get().state!=='open');};
+ function showError(e){const t=String(e&&e.message||e||'');if(/cancel/i.test(t)){say('');return;}const b=$('layrTestnetError');if(b){b.textContent=t;try{b.scrollIntoView({block:'nearest',behavior:'smooth'});}catch(_){}}}
+
+ function paint(st,state){
+  const panel=$('layrDispenserPanel');if(!panel||!ex||!pw)return;
+  st=st||ex.snapshot();state=state||panel.dataset.state;panel.classList.add('lx-passkey-on');
+  const mine=!!st.address&&st.walletKind==='passkey',known=box&&box.state==='known',noPasskeys=box&&!box.passkeys;
+  $('lxPasskey').hidden=state!=='disconnected';
+  const play=$('lxPlayNow');play.disabled=working;
+  play.textContent=known?'Open my casino wallet · '+box.address.slice(0,5)+'…'+box.address.slice(-4):'Play now · no wallet needed';
+  $('lxPlayDevice').hidden=!!(noPasskeys||known&&box.kind==='device');
+  if(state==='disconnected'){$('layrConnectWallet').textContent='I have a Stacks wallet';
+   $('lxWalletHint').textContent=known?'Welcome back. One tap opens your casino wallet.':'New here? Play now makes you a free testnet wallet with your passkey, fills it with 500 testnet STX and buys your first 1,000,000 LAYR.';}
+  else if(state==='connecting'&&working)$('lxWalletHint').textContent='Finish in the casino wallet window.';
+  else if(mine&&state==='ready')$('lxWalletHint').textContent='Casino wallet · testnet. Buying chips needs no popup.';
+  const fh=$('layrBalanceHint');if(mine&&fh&&/shown in your wallet/.test(fh.textContent))fh.textContent='Plus a '+(pw.fee/1e6)+' STX network fee.';
+  $('lxPasskeyTools').hidden=!mine||state==='shut';$('lxFaucetTop').disabled=working;
+  const f=$('lxFaucet');if(f)f.hidden=mine;
+  const s=$('lxPasskeyStatus');s.replaceChildren();if(msg){s.append(msg);if(msgLink){const a=document.createElement('a');a.href=msgLink;a.target='_blank';a.rel='noopener';a.textContent=' View ↗';s.append(a);}}
+ }
+ window.pxPasskeyPaint=paint;
+
+ async function balance(){await ex.refreshBalance();const b=ex.snapshot().walletBalance;return b&&b.status==='ready'?BigInt(b.availableMicroStx):null;}
+
+ // Free STX from Hiro's faucet (500 a request), then the one automatic first buy. Safe to run again: it never asks the faucet twice in
+ // ten minutes on its own, and the first buy is marked BEFORE it is asked for, so a reload can never buy twice.
+ async function fundAndBuy(topUp){
+  const st=ex.snapshot();if(!st.address||st.walletKind!=='passkey')return;
+  const addr=st.address,need=BigInt(FIRST_BUY)*1000000n+BigInt(pw.fee);
+  let bal=await balance();
+  if(topUp||bal===null||bal<need){
+   const drips=book(DRIP);
+   if(topUp||Date.now()-(drips[addr]||0)>WAIT_MS){
+    say('Asking the testnet faucet for 500 free STX…');
+    const tx=await pw.faucet(addr);drips[addr]=Date.now();set(DRIP,JSON.stringify(drips));
+    say('500 free testnet STX on the way. This usually takes under a minute…','https://explorer.hiro.so/txid/'+tx+'?chain=testnet');
+   }else say('Waiting for your free testnet STX to arrive…');
+   const start=bal??0n,t0=Date.now();
+   for(;;){
+    await sleep(6000);
+    if(ex.snapshot().address!==addr)return;
+    bal=await balance();
+    if(bal!==null&&(topUp?bal>start:bal>=need))break;
+    if(Date.now()-t0>WAIT_MS){say('The free STX are taking a while. Tap "Get 500 free testnet STX" to ask again.');return;}
+   }
+  }
+  const auto=book(AUTO);
+  if(auto[addr]){say(topUp?'500 free testnet STX added.':'Ready. Choose an amount and buy chips.');return;}
+  if(ex.snapshot().pending||shut()){say('');return;}
+  auto[addr]=Date.now();set(AUTO,JSON.stringify(auto));
+  say('Buying your first 1,000,000 LAYR…');
+  try{await ex.purchase(FIRST_BUY);}finally{say('');}
+ }
+
+ async function run(fn){if(working)return;working=true;$('layrTestnetError').textContent='';paint();try{await fn();}catch(e){say('');showError(e);}finally{working=false;paint();}}
+ async function playNow(mode){
+  if(!mode){try{box=await pw.status();}catch(_){}mode=box&&box.state==='known'?(box.kind==='device'?'device':'unlock'):(box&&!box.passkeys?'device':'create');}
+  say('');
+  await ex.connectPasskey(mode);
+  try{box=await pw.status();}catch(_){}
+  await fundAndBuy(false);
+ }
+
+ function start(){
+  ex=window.ParallaxLAYRExchange.client;pw=window.ParallaxPasskeyWallet;
+  pw.attach($('lxPasskeyFrame'));
+  $('lxPlayNow').onclick=()=>run(()=>playNow());
+  $('lxPlayDevice').onclick=()=>run(()=>playNow('device'));
+  $('lxFaucetTop').onclick=()=>run(()=>fundAndBuy(true));
+  ex.subscribe(()=>paint());
+  pw.status().then(s=>{box=s;paint();},()=>{});
+  paint();
+ }
+ let tries=0;
+ (function wait(){if(window.ParallaxLAYRExchange&&window.ParallaxPasskeyWallet&&$('lxPasskeyFrame'))return start();if(++tries<300)setTimeout(wait,100);})();
+ const s=document.createElement('script');s.type='module';s.src='passkey-wallet.js?v=1';document.head.appendChild(s);
+})();
 </script>
 <script type="module" src="room.js?v=p3.1"></script>
 </body></html>

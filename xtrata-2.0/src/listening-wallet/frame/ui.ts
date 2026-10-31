@@ -32,12 +32,15 @@ function visibilityGuard(target: Element) {
   };
 }
 
-export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
+/**
+ * The confirm panel on its own (every approval in the frame goes through `act`). Shared by the radio's listening wallet and the
+ * casino wallet: both frames use the same panel markup (#panel, #p-ok, #p-cancel, …). `cancelledMessage` is what a Cancel says.
+ */
+export function panelUi(cancelledMessage?: string): Pick<UiPort, 'act' | 'cancel'> {
   let open = false;
   let withdraw: (() => boolean) | null = null;
   const guard = visibilityGuard($('p-ok'));
-  $('idle-stop').addEventListener('click', local.stop);
-  $('idle-lock').addEventListener('click', local.lock);
+  const cancelled = () => new CancelledError(cancelledMessage);
 
   return {
     act<T>(panel: Panel, action: () => Promise<T>): Promise<T> {
@@ -78,7 +81,7 @@ export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
 
       return new Promise<T>((resolve, reject) => {
         const close = () => { open = false; withdraw = null; clearInterval(arming); $('panel').hidden = true; $('idle').hidden = false; ok.onclick = cancel.onclick = null; };
-        withdraw = () => { if (running) return false; close(); reject(new CancelledError()); return true; };
+        withdraw = () => { if (running) return false; close(); reject(cancelled()); return true; };
         // The action starts synchronously inside the click so WebAuthn keeps the user activation.
         ok.onclick = (event) => {
           if (!event.isTrusted || performance.now() < armedAt) return;
@@ -96,11 +99,19 @@ export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
             }
           );
         };
-        cancel.onclick = () => { close(); reject(new CancelledError()); };
+        cancel.onclick = () => { close(); reject(cancelled()); };
       });
     },
 
-    cancel() { return withdraw ? withdraw() : false; },
+    cancel() { return withdraw ? withdraw() : false; }
+  };
+}
+
+export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
+  $('idle-stop').addEventListener('click', local.stop);
+  $('idle-lock').addEventListener('click', local.lock);
+  return {
+    ...panelUi(),
 
     idle(view: IdleView) {
       const lines: string[] = [];

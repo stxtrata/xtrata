@@ -45,7 +45,7 @@ type Call = { who: string; method: string; args: number; params?: unknown };
 
 const err = (message: string, code?: number) => Object.assign(new Error(message), { code });
 
-function makeWorld(page: string, o: { xverse?: Wallet; leather?: Wallet; picks?: 'xverse' | 'leather' | null; stored?: string; rewrites?: boolean }) {
+function makeWorld(page: string, o: { xverse?: Wallet; leather?: Wallet; picks?: 'xverse' | 'leather' | null; stored?: string; rewrites?: boolean; passkey?: unknown }) {
   const calls: Call[] = [];
   const store = new Map<string, string>();
   if (o.stored) store.set('STX_PROVIDER', o.stored);
@@ -64,6 +64,7 @@ function makeWorld(page: string, o: { xverse?: Wallet; leather?: Wallet; picks?:
     localStorage,
     fetch: async () => ({ ok: true, json: async () => ({ available: '5000000' }) })
   };
+  if (o.passkey) win.ParallaxPasskeyWallet = o.passkey;
   if (o.xverse) win.XverseProviders = { BitcoinProvider: provider('xverse', o.xverse) };
   if (o.leather) win.LeatherProvider = provider('leather', o.leather);
   // The library's chooser: the person picks a wallet and the request goes to it. Like the real library, it rewrites getAddresses to
@@ -261,6 +262,73 @@ describe.each(PAGES)('LAYR exchange connect: %s', (rel) => {
     expect(w.methods('xverse')).toContain('stx_transferStx');
   });
 
+});
+
+/** A stand-in for public/casino/passkey-wallet.js (window.ParallaxPasskeyWallet): the casino's own testnet wallet. */
+function fakePasskeyWallet(o: { address?: string; buy?: (p: { stx: number; address: string }) => Promise<{ txid: string }> } = {}) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  return {
+    calls,
+    wallet: {
+      fee: 3000,
+      open: async (...args: unknown[]) => { calls.push({ method: 'open', args }); return { address: o.address ?? MINE, kind: 'passkey' }; },
+      cancel: async () => void calls.push({ method: 'cancel', args: [] }),
+      buy: async (p: { stx: number; address: string }) => { calls.push({ method: 'buy', args: [p] }); return o.buy ? o.buy(p) : { txid: '0x' + 'cd'.repeat(32) }; }
+    }
+  };
+}
+
+describe.each(PAGES)('LAYR exchange, casino wallet (passkey) path: %s', (rel) => {
+  it('opens through the casino wallet, asks no extension, and pays with no popup', async () => {
+    const pk = fakePasskeyWallet();
+    const w = makeWorld(page(rel), { passkey: pk.wallet, xverse: phoneApp(), picks: 'xverse' });
+    await expect(w.ex.connectPasskey('create')).resolves.toBe(MINE);
+    expect(pk.calls[0]).toEqual({ method: 'open', args: ['create', false] });
+    expect(w.ex.snapshot()).toMatchObject({ address: MINE, walletKind: 'passkey' });
+    await expect(w.ex.purchase(10)).resolves.toBe('0x' + 'cd'.repeat(32));
+    expect(pk.calls.find((c) => c.method === 'buy')?.args[0]).toEqual({ stx: 10, address: MINE });
+    expect(w.ex.snapshot().pending).toMatchObject({ address: MINE, stx: 10, txId: '0x' + 'cd'.repeat(32) });
+    expect(w.calls.filter((c) => c.who !== 'sdk' || c.method !== 'getAddresses')).toEqual([]); // no extension was touched
+  });
+
+  it('a buy that never reached the network leaves nothing pending', async () => {
+    const pk = fakePasskeyWallet({ buy: async () => { throw Object.assign(new Error('The testnet refused the transfer (BadNonce). Nothing was sent.'), { code: 'NOT_SENT' }); } });
+    const w = makeWorld(page(rel), { passkey: pk.wallet });
+    await w.ex.connectPasskey('unlock');
+    const e = await failure(w.ex.purchase(1));
+    expect(e?.message).toMatch(/Nothing was sent/);
+    expect(w.ex.snapshot()).toMatchObject({ pending: null, phase: 'failed', busy: false });
+    expect([...w.store.keys()].filter((k) => /pending/i.test(k))).toEqual([]);
+  });
+
+  it('counts the network fee when checking the balance', async () => {
+    const pk = fakePasskeyWallet();
+    const w = makeWorld(page(rel), { passkey: pk.wallet }); // the fake testnet API reports 5 STX available
+    await w.ex.connectPasskey('create');
+    await until(() => w.ex.snapshot().walletBalance.status === 'ready');
+    expect((await failure(w.ex.purchase(5)))?.message).toMatch(/Not enough/);
+    expect(pk.calls.some((c) => c.method === 'buy')).toBe(false);
+    await expect(w.ex.purchase(4)).resolves.toMatch(/^0x/);
+  });
+
+  it('Cancel withdraws the waiting casino wallet panel', async () => {
+    const pk = fakePasskeyWallet();
+    let release!: () => void;
+    pk.wallet.open = (...args: unknown[]) => { pk.calls.push({ method: 'open', args }); return new Promise((r) => { release = () => r({ address: MINE, kind: 'passkey' }); }); };
+    const w = makeWorld(page(rel), { passkey: pk.wallet });
+    const opening = failure(w.ex.connectPasskey('create'));
+    await until(() => w.ex.snapshot().busy);
+    w.ex.cancel();
+    expect((await opening)?.message).toMatch(/cancelled/i);
+    expect(pk.calls.map((c) => c.method)).toContain('cancel');
+    expect(w.ex.snapshot()).toMatchObject({ address: null, busy: false });
+    release();
+  });
+
+  it('without the casino wallet script the path is simply absent', async () => {
+    const w = makeWorld(page(rel), {});
+    expect((await failure(w.ex.connectPasskey('create')))?.message).toMatch(/did not load/);
+  });
 });
 
 describe('both casino pages', () => {

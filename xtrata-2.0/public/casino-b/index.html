@@ -7423,7 +7423,7 @@ function verifyTransfer(tx,expected){
 }
 function create(options){
  const account=options.account,storage=options.storage||localStorage,fetcher=options.fetch||window.fetch;
- let address=null,busy=false,pending=null,status='',error='',lastCheck=0,checking=false,busyKind='',cancelWallet=null,phase='ready',receipt=null;
+ let address=null,busy=false,pending=null,status='',error='',lastCheck=0,checking=false,busyKind='',cancelWallet=null,phase='ready',receipt=null,walletKind='extension';
  let walletBalance={status:'disconnected',availableMicroStx:null,checkedAt:0},balanceRequest=0;
  const listeners=new Set(),emit=()=>{for(const f of listeners)f(snapshot());};
  const log=(...a)=>{try{console.log('[casino-b:wallet]',...a);}catch(_){}};
@@ -7502,6 +7502,7 @@ function create(options){
  const unsupported=e=>!!e&&(e.code===-32601||e.code===-32001||/not (?:supported|found|implemented|available)|unknown method|unsupported|invalid method|no such method/i.test(String(e.message||'')));
  const mismatch=e=>/network mismatch|mismatch.*network|network.*mismatch/i.test(String(e&&e.message||''));
  async function payViaWallet(base){
+  if(walletKind==='passkey'){const pw=window.ParallaxPasskeyWallet;if(!pw)throw Object.assign(Error('The casino wallet is not loaded. Reload the page. Nothing was sent.'),{code:'NOT_SENT'});log('pay: casino wallet (no popup)');return pw.buy({stx:Number(BigInt(base.amount)/1000000n),address});}
   let sel=null;try{sel=localStorage.getItem('STX_PROVIDER');}catch(_){}
   const full={recipient:base.recipient,amount:base.amount,memo:base.memo,network:'testnet',address,sponsored:false};
   if(sel==='LeatherProvider'&&usable(window.LeatherProvider)){log('pay: Leather, full parameter set');return rpc(window.LeatherProvider,'stx_transferStx',full);}
@@ -7531,18 +7532,27 @@ function create(options){
  async function connect(){if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status='Choose your Stacks testnet wallet…';emit();
   try{await releaseXverse();const r=await askForAddresses(),a=stacksAccountIn(r);if(!a)throw Error('Switch your wallet to Stacks testnet and reconnect.');
    if(pending&&pending.address!==a.address)throw Error('Reconnect the wallet used for the pending transfer: '+pending.address);
-   address=a.address;phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
+   address=a.address;walletKind='extension';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Testnet wallet connected. Choose 1–10 STX.';if(pending?.txId)await check();return address;
+  }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
+ }
+ // The casino's own testnet wallet (casino-wallet.xtrata.xyz, docs/plans/CASINO-PASSKEY-WALLET-PLAN.md): made from a passkey, or kept in
+ // this browser only. Loaded by public/casino/passkey-wallet.js as window.ParallaxPasskeyWallet; without it this path is simply absent.
+ // It goes through ask() like any wallet, so the watchdog, Cancel and the save-before-asking rule all still apply.
+ async function connectPasskey(mode,anyPasskey){const pw=window.ParallaxPasskeyWallet;if(!pw)throw Error('The casino wallet did not load. Reload the page.');if(busy)return;if(exchangeShut()&&!pending)throw Error(SHUT_MSG);busy=true;busyKind='connect';error='';status=mode==='device'?'Confirm in the casino wallet window…':'Use your passkey in the casino wallet window…';emit();
+  try{const r=await ask('casino.open',{mode},{timeoutMs:1800000,run:()=>pw.open(mode,!!anyPasskey)}),a=r&&r.address;if(typeof a!=='string'||!/^ST/.test(a)||!validAddress(a))throw Error('The casino wallet did not give a testnet address.');
+   if(pending&&pending.address!==a)throw Error('Open the wallet used for the pending transfer: '+pending.address);
+   address=a;walletKind='passkey';phase=pending?(pending.txId?'pending':'check-wallet'):'ready';void refreshBalance();status='Casino wallet open.';if(pending?.txId)await check();return address;
   }catch(e){error=e.message;status='';throw e;}finally{busy=false;emit();}
  }
  async function purchase(stx){if(exchangeShut())throw Error(SHUT_MSG);if(busy||pending)throw Error('Resolve the pending wallet transfer before sending another payment.');if(!Number.isInteger(stx)||stx<1||stx>10)throw Error('Choose a whole amount from 1 to 10 STX.');if(!address)throw Error('Connect your testnet wallet first.');if(address===RECIPIENT)throw Error('The LAYR exchange pays into this wallet, and a wallet cannot pay itself. Connect a different wallet or account to buy LAYR.');
-  if(walletBalance.status==='ready'&&Date.now()-walletBalance.checkedAt<60000&&BigInt(walletBalance.availableMicroStx)<BigInt(stx)*1000000n)throw Error('Not enough available testnet STX for this amount. Network fees are additional.');
+  if(walletBalance.status==='ready'&&Date.now()-walletBalance.checkedAt<60000&&BigInt(walletBalance.availableMicroStx)<BigInt(stx)*1000000n+(walletKind==='passkey'?BigInt(window.ParallaxPasskeyWallet?.fee||0):0n))throw Error('Not enough available testnet STX for this amount. Network fees are additional.');
   busy=true;busyKind='purchase';error='';phase='wallet';receipt=null;storage.removeItem(PENDING+'.receipt');
   try{if(!account.ready()&&!await account.acquire())throw Error(account.error()||'Close other casino tabs, then reconnect.');
    // Save before asking the wallet; an ambiguous response never triggers a
    // second payment automatically. The bank and processed tx ID are atomic.
    pending={address,recipient:RECIPIENT,stx,created:Date.now(),txId:null,state:'wallet-request'};storage.setItem(PENDING,JSON.stringify(pending));status='Confirm '+stx+' testnet STX in your wallet. Fees are additional.';emit();
    let r;try{r=await ask('stx_transferStx',{recipient:RECIPIENT,amount:String(stx*1000000),memo:'ParallaX LAYR',network:'testnet'},{timeoutMs:180000,run:()=>payViaWallet({recipient:RECIPIENT,amount:String(stx*1000000),memo:'ParallaX LAYR'}),late:v=>{const id=normalizeId(v.txid||v.txId||v.result?.txid||v.result?.txId);if(pending&&!pending.txId){pending.txId=id;pending.state='pending';phase='pending';storage.setItem(PENDING,JSON.stringify(pending));status='Transfer broadcast on testnet. Waiting for confirmation…';emit();}}});}
-   catch(e){if(e.code===4001||e.code===-32000&&/reject|cancel|denied/i.test(e.message)||/user (rejected|cancelled|canceled|denied)/i.test(e.message)){storage.removeItem(PENDING);pending=null;phase='cancelled';status='Wallet request cancelled. No LAYR was added.';}else if(e&&(e.code===-32602||e.code===-32601)){storage.removeItem(PENDING);pending=null;phase='failed';status='The wallet could not process the request. Nothing was sent.';}else{pending.state='check-wallet';phase='check-wallet';storage.setItem(PENDING,JSON.stringify(pending));status='Check your wallet for the transaction ID before sending again.';}throw e;}
+   catch(e){if(e&&e.code==='NOT_SENT'){storage.removeItem(PENDING);pending=null;phase='failed';status=e.message;}else if(e.code===4001||e.code===-32000&&/reject|cancel|denied/i.test(e.message)||/user (rejected|cancelled|canceled|denied)/i.test(e.message)){storage.removeItem(PENDING);pending=null;phase='cancelled';status='Wallet request cancelled. No LAYR was added.';}else if(e&&(e.code===-32602||e.code===-32601)){storage.removeItem(PENDING);pending=null;phase='failed';status='The wallet could not process the request. Nothing was sent.';}else{pending.state='check-wallet';phase='check-wallet';storage.setItem(PENDING,JSON.stringify(pending));status='Check your wallet for the transaction ID before sending again.';}throw e;}
    try{pending.txId=normalizeId(r.txid||r.txId||r.result?.txid||r.result?.txId);}catch(_){pending.state='check-wallet';phase='check-wallet';storage.setItem(PENDING,JSON.stringify(pending));throw Error('No transaction ID was returned. Recover it from your wallet before sending again.');}
    pending.state='pending';phase='pending';storage.setItem(PENDING,JSON.stringify(pending));status='Transfer broadcast on testnet. Waiting for confirmation…';return pending.txId;
   }catch(e){if(!pending&&phase==='wallet'){phase='failed';status='The LAYR account could not be opened. No wallet transfer was requested.';}error=e.message;throw e;}finally{busy=false;emit();}
@@ -7561,9 +7571,9 @@ function create(options){
   pending={...(pending||{address,recipient:RECIPIENT,stx:null,created:Date.now()}),txId:id,state:'recovery'};storage.setItem(PENDING,JSON.stringify(pending));emit();return check();
  }
  function clearUnsigned(){if(busy||checking)throw Error('Wait for the wallet request to finish before clearing it.');if(!pending||pending.txId)throw Error('A broadcast transfer must be checked, not discarded.');storage.removeItem(PENDING);pending=null;phase='ready';status='Unsigned request cleared. Confirm in your wallet that no transfer was broadcast.';error='';emit();}
- function snapshot(){return{address,busy,busyKind:busy?busyKind:'',checking,phase,pending:pending?{...pending}:null,receipt:receipt?{...receipt}:null,walletBalance:{...walletBalance},status,error,recipient:RECIPIENT,network:'testnet'};}
- function cancel(){if(busy&&busyKind==='connect'&&cancelWallet){cancelWallet();return;}if(busy&&busyKind==='purchase')throw Error('A payment request is open in your wallet. Approve or reject it there; this page cannot cancel it safely.');}
- return{connect,cancel,purchase,check,recover,clearUnsigned,snapshot,refreshBalance,subscribe(f){listeners.add(f);return()=>listeners.delete(f);},tick(now){if(address&&pending?.txId&&now-lastCheck>12000){lastCheck=now;check();}}};
+ function snapshot(){return{address,busy,busyKind:busy?busyKind:'',checking,phase,pending:pending?{...pending}:null,receipt:receipt?{...receipt}:null,walletBalance:{...walletBalance},status,error,recipient:RECIPIENT,network:'testnet',walletKind};}
+ function cancel(){if(busy&&busyKind==='connect'&&cancelWallet){cancelWallet();try{window.ParallaxPasskeyWallet?.cancel();}catch(_){}return;}if(busy&&busyKind==='purchase')throw Error('A payment request is open in your wallet. Approve or reject it there; this page cannot cancel it safely.');}
+ return{connect,connectPasskey,cancel,purchase,check,recover,clearUnsigned,snapshot,refreshBalance,subscribe(f){listeners.add(f);return()=>listeners.delete(f);},tick(now){if(address&&pending?.txId&&now-lastCheck>12000){lastCheck=now;check();}}};
 }
 window.ParallaxTestnetLAYR=Object.freeze({create,verifyTransfer,normalizeId,recipient:RECIPIENT,network:'testnet',version:'2.0.0'});
 })();

@@ -95,7 +95,7 @@ export interface StorePort {
 
 export class CancelledError extends Error {
   readonly code = 'CANCELLED';
-  constructor() { super('Cancelled in the listening wallet. Nothing was signed.'); this.name = 'CancelledError'; }
+  constructor(message = 'Cancelled in the listening wallet. Nothing was signed.') { super(message); this.name = 'CancelledError'; }
 }
 
 interface WalletRecord {

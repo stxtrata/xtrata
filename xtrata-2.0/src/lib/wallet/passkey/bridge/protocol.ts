@@ -64,7 +64,22 @@ export type WalletMethod =
   /** Stop paying but stay unlocked. */
   | 'listening.stop'
   /** Drop the key from memory. */
-  | 'listening.lock';
+  | 'listening.lock'
+  /*
+   * ParallaX Casino testnet wallet (casino-wallet.xtrata.xyz, a SEPARATE wallet origin from the radio's).
+   * See src/lib/casino-wallet/ and docs/plans/CASINO-PASSKEY-WALLET-PLAN.md. A radio box does not implement these,
+   * and the casino box implements only these.
+   */
+  /** Device state and, while open, the wallet's address. */
+  | 'casino.status'
+  /** Create, unlock or open the no-passkey wallet; the player taps a button inside the frame. Also approves buys. */
+  | 'casino.open'
+  /** Sign one 1-10 STX testnet transfer to the LAYR exchange. Returns signed bytes only. */
+  | 'casino.signBuy'
+  /** Withdraw a waiting panel, as if the player pressed Cancel. Can never approve anything. */
+  | 'casino.cancel'
+  /** Drop the key from memory. */
+  | 'casino.lock';
 
 export const WALLET_METHODS: readonly WalletMethod[] = [
   'wallet.status',
@@ -84,7 +99,12 @@ export const WALLET_METHODS: readonly WalletMethod[] = [
   'listening.bindSlot',
   'listening.cancel',
   'listening.stop',
-  'listening.lock'
+  'listening.lock',
+  'casino.status',
+  'casino.open',
+  'casino.signBuy',
+  'casino.cancel',
+  'casino.lock'
 ];
 
 export interface BridgeRequest {
