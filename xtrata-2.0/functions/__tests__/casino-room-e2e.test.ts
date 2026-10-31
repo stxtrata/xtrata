@@ -163,6 +163,56 @@ describe.skipIf(!BASE)('casino room end to end', () => {
     closeAll(watcher, a, b);
   });
 
+  it('walking: a player on the floor is passed to everyone, listed for late arrivals, and taken off when they sit or leave', async () => {
+    const alice = await signIn(), bob = await signIn();
+    const watcher = await join();
+    const a = await join({ cookie: alice.cookie });
+    const b = await join({ cookie: bob.cookie });
+    expect(a.room.features).toEqual(expect.arrayContaining(['play', 'move']));
+    expect(Array.isArray(a.room.walkers)).toBe(true);
+
+    const toBob = b.waitFor((m) => m.t === 'move' && m.a === alice.w.address), toWatcher = watcher.waitFor((m) => m.t === 'move');
+    a.send({ t: 'move', x: 1.234, z: -2.5, r: 0.5 });
+    for (const m of [await toBob, await toWatcher]) {
+      expect(m).toMatchObject({ t: 'move', a: alice.w.address, x: 1.23, z: -2.5, r: 0.5 });
+      expect(typeof m.at).toBe('number');
+    }
+    await a.quiet(400);
+    expect(a.msgs.some((m) => m.t === 'move')).toBe(false);          // the walker is not sent their own position
+
+    const late = await join();                                          // someone arriving later sees where Alice is
+    expect(late.room.walkers).toEqual([expect.objectContaining({ a: alice.w.address, x: 1.23, z: -2.5, r: 0.5 })]);
+
+    watcher.send({ t: 'move', x: 0, z: 0, r: 0 });
+    expect((await watcher.waitFor((m) => m.t === 'err')).code).toBe('move-sign-in-first');
+    b.send({ t: 'move', x: 99, z: 0, r: 0 });
+    expect((await b.waitFor((m) => m.t === 'err')).code).toBe('move-bad');
+
+    // A burst is slowed with its own code, and does not use up the general limit: a seat still works afterwards.
+    await a.quiet(300);
+    for (let i = 0; i < 6; i++) a.send({ t: 'move', x: i * 0.1, z: 0, r: 0 });
+    expect((await a.waitFor((m) => m.t === 'err' && m.code === 'move-too-fast')).code).toBe('move-too-fast');
+    expect(a.msgs.some((m) => m.t === 'err' && m.code === 'slow-down')).toBe(false);
+
+    // Sitting takes Alice off the floor; a move while seated is refused; the room no longer lists her as walking.
+    const sat = watcher.waitFor((m) => m.t === 'sat' && m.spot === 'bar.3');
+    a.send({ t: 'sit', spot: 'bar.3' });
+    await sat;
+    await a.quiet(300);
+    a.send({ t: 'move', x: 2, z: 2, r: 0 });
+    expect((await a.waitFor((m) => m.t === 'err' && m.code === 'move-seated')).code).toBe('move-seated');
+    const after = await join();
+    expect(after.room.walkers.some((w: any) => w.a === alice.w.address)).toBe(false);
+
+    // Bob walks, then closes his connection: everyone is told he is off the floor.
+    b.send({ t: 'move', x: -3, z: 4, r: 1 });
+    await watcher.waitFor((m) => m.t === 'move' && m.a === bob.w.address && !m.off);
+    const off = watcher.waitFor((m) => m.t === 'move' && m.a === bob.w.address && m.off === true);
+    b.ws.close();
+    expect((await off).off).toBe(true);
+    closeAll(watcher, a, late, after);
+  });
+
   it('one address, one seat: a second tab takes it over and a third connection closes the oldest', async () => {
     const alice = await signIn();
     const tab1 = await join({ cookie: alice.cookie });

@@ -8412,7 +8412,7 @@ function applyTestnetFunding(proof){
   }
   function hideMachinePatron(m){
     const take=o=>{if(o&&o.visible&&!hiddenMachinePeople.some(x=>x===o)){hiddenMachinePeople.push(o);o.visible=false;}};
-    for(const h of window.XA_HOSTS?.hosts||[])if(h.wear&&h.ctrl&&Math.abs(h.z-m.group.position.z)<.85&&Math.abs(h.x-m.group.position.x)<2)take(h.ctrl.object);
+    for(const h of window.XA_HOSTS?.hosts||[])if(h.wear&&!h.pxWalker&&h.ctrl&&Math.abs(h.z-m.group.position.z)<.85&&Math.abs(h.x-m.group.position.x)<2)take(h.ctrl.object);
     for(const p of typeof patrons==='undefined'?[]:patrons){const o=p.fig.group;if(Math.abs(o.position.z-m.group.position.z)<.85&&Math.abs(o.position.x-m.group.position.x)<2)take(o);}
   }
   async function loadCasinoEngine(type){
@@ -11422,12 +11422,122 @@ function applyTestnetFunding(proof){
     }
     window.addEventListener('pointerdown', () => { for (const e of spect.values()) try { e.sound?.unlock(); } catch (_) { } }, { capture: true, passive: true });
     window.addEventListener('pagehide', () => { for (const e of spect.values()) try { e.sound?.stop(); } catch (_) { } });
+    // ---------------- walking: other players on the floor (docs/plans/CASINO-PRESENCE-PLAN.md, 8.4) ----------------
+    // room.js hands over where each signed-in player stands, a couple of times a second while they move. Each is drawn as an
+    // Adrian with a name tag, WALK_DELAY ms in the past, gliding between the two positions around that moment; the room's clock
+    // is estimated from arrival times, so network jitter does not make them stutter. Walkers share the figure cap with seated
+    // people (seated first, then the nearest walkers), never block the visitor, and cost nothing while nobody walks.
+    // ?walkdemo=N on the address draws N made-up walkers circling the floor, to try it (and its frame rate) on one device.
+    const WALK_DELAY = 450, WALK_SNAP = 5, WALK_GO = 0.25;
+    const walkers = new Map(), wpool = [];
+    let walkClock = null, walkAlloc = 0, walkPrev = 0, walkDemo = false, walkWarned = false;
+    const shortKey = (k) => (k.length <= 12 ? k : k.slice(0, 5) + '…' + k.slice(-4));
+    function walkClockFrom(at) { const d = Date.now() - at; if (walkClock === null || d < walkClock) walkClock = d; else walkClock += (d - walkClock) * 0.02; }
+    function walkUpsert(p, live) {
+      if (!p || typeof p.key !== 'string' || ![p.x, p.z, p.r].every(Number.isFinite)) return;
+      let w = walkers.get(p.key);
+      if (!w) { w = { key: p.key, label: p.label || '', buf: [], e: null, x: p.x, z: p.z, yaw: p.r, moving: false, slowFor: 0, speed: 0 }; walkers.set(p.key, w); }
+      if (p.label && p.label !== w.label) { w.label = p.label; if (w.e) drawTag(w.e.tag, w.label); }
+      if (!live && w.buf.length) return;                    // the room's list only says where someone already is
+      const at = Number(p.at) || Date.now();
+      if (live) walkClockFrom(at);
+      const t = live ? at : -1e15;                         // a listed position is not a step to glide through
+      if (w.buf.length && t < w.buf[w.buf.length - 1].t) return;   // arrived out of order: older than what is here
+      w.buf.push({ t, x: p.x, z: p.z, r: p.r }); if (w.buf.length > 12) w.buf.splice(0, w.buf.length - 12);
+    }
+    function walkRelease(e) { e.key = null; e.spec.on = false; e.tag.sp.visible = false; }
+    function walkDrop(key) { const w = walkers.get(key); if (!w) return; if (w.e) walkRelease(w.e); walkers.delete(key); }
+    function makeWalker() {
+      const spec = { group: scene, x: 0, z: 0, yaw: 0, person: 'm1', wear: wearOf('?'), on: false, freezeBeyond: 14, pxWalker: true };
+      spec.showWhen = () => spec.on;
+      if (!window.XA_HOSTS.failed) window.XA_HOSTS.add(spec);
+      const e = { spec, key: null, tag: makeTag() }; wpool.push(e); return e;
+    }
+    // Who gets a figure: the nearest walkers, in the places the seated people leave free (chosen again a few times a second).
+    function walkAllocate(now) {
+      if (now - walkAlloc < 300) return; walkAlloc = now;
+      const space = Math.max(0, MAXP - pool.filter((e) => e.on).length), cp = camera.position;
+      const order = [...walkers.values()].sort((a, b) => Math.hypot(a.x - cp.x, a.z - cp.z) - Math.hypot(b.x - cp.x, b.z - cp.z)).slice(0, space);
+      const keep = new Set(order.map((w) => w.key));
+      for (const w of walkers.values()) if (w.e && !keep.has(w.key)) { walkRelease(w.e); w.e = null; }
+      for (const w of order) {
+        if (w.e) continue;
+        let e = wpool.find((x) => !x.key);
+        if (!e) { if (now - lastBuild < 120) continue; lastBuild = now; e = makeWalker(); }   // one new figure at a time
+        const wear = wearOf(w.key); e.key = w.key; w.e = e; e.spec.wear = wear; e.spec.on = true;
+        if (e.spec.ctrl) recolour(e.spec.ctrl, wear);
+        drawTag(e.tag, w.label || shortKey(w.key));
+      }
+    }
+    function walkFrame(now, dt) {
+      if (!walkers.size) return;
+      walkAllocate(now);
+      const at = Date.now() - (walkClock || 0) - WALK_DELAY, cp = camera.position;
+      for (const w of walkers.values()) {
+        const b = w.buf; if (!b.length) continue;
+        let x, z, r, speed = 0, dir = null;
+        if (at <= b[0].t) ({ x, z, r } = b[0]);
+        else if (at >= b[b.length - 1].t) ({ x, z, r } = b[b.length - 1]);
+        else {
+          let i = 1; while (b[i].t < at) i++;
+          const p = b[i - 1], q = b[i], dist = Math.hypot(q.x - p.x, q.z - p.z), span = Math.max(1, q.t - p.t);
+          if (dist > WALK_SNAP || p.t < 0) ({ x, z, r } = q);   // a jump (they sat down and came back elsewhere, or a listed start): no glide
+          else {
+            const u = (at - p.t) / span;
+            x = p.x + (q.x - p.x) * u; z = p.z + (q.z - p.z) * u; r = p.r + Math.atan2(Math.sin(q.r - p.r), Math.cos(q.r - p.r)) * u;
+            speed = dist / (span / 1000); if (dist > 0.02) dir = Math.atan2(q.x - p.x, q.z - p.z);
+          }
+          if (i > 2) b.splice(0, i - 2);                      // forget what is long behind (keep the step being drawn)
+        }
+        w.x = x; w.z = z; w.speed = speed;
+        if (speed > WALK_GO) { w.moving = true; w.slowFor = 0; } else if (w.moving && (w.slowFor += dt) > 0.25) w.moving = false;
+        const want = w.moving && dir !== null ? dir : r;      // face the way they go; standing, face where they look
+        w.yaw += Math.atan2(Math.sin(want - w.yaw), Math.cos(want - w.yaw)) * Math.min(1, dt * 10);
+        const e = w.e; if (!e) continue;
+        e.spec.x = x; e.spec.z = z; e.spec.yaw = w.yaw;
+        const c = e.spec.ctrl;
+        if (c) {
+          c.object.position.set(x, 0, z); c.object.rotation.y = w.yaw;
+          if (w.moving) { if (c.current !== 'Walk') c.playAnimation('Walk', 0.2); if (c.current === 'Walk' && c.active) c.active.setEffectiveTimeScale(Math.max(0.8, Math.min(2.4, (speed || 1) / 0.9))); }
+          else if (c.current === 'Walk') c.playAnimation('Idle', 0.3);
+        }
+        e.tag.sp.position.set(x, 2.02, z);
+        const d = cp.distanceTo(e.tag.sp.position); e.tag.sp.visible = d < 16; e.tag.sp.material.opacity = Math.max(0, Math.min(1, (16 - d) / 5));
+      }
+    }
+    // The visitor's own walking: where they stand on the floor, at most every 0.4 s and only after a step or a turn; `off` once
+    // when they sit, connect to a machine or leave the floor. room.js decides whether the room is told.
+    let ownLast = null, ownAt = 0, ownOn = false;
+    function ownMoveFrame(now) {
+      const on = webglOK && mode === 'walk' && !mySpot() && !document.hidden;
+      if (!on) { if (ownOn) { ownOn = false; ownLast = null; window.dispatchEvent(new CustomEvent('px-room-move', { detail: { off: true } })); } return; }
+      if (now - ownAt < 400) return;
+      const x = Math.round(player.x * 100) / 100, z = Math.round(player.z * 100) / 100, r = Math.round(Math.atan2(-Math.sin(player.yaw), -Math.cos(player.yaw)) * 1000) / 1000;
+      if (ownOn && ownLast && Math.hypot(x - ownLast.x, z - ownLast.z) < 0.05 && Math.abs(Math.atan2(Math.sin(r - ownLast.r), Math.cos(r - ownLast.r))) < 0.1) return;
+      ownOn = true; ownLast = { x, z, r }; ownAt = now;
+      window.dispatchEvent(new CustomEvent('px-room-move', { detail: { x, z, r } }));
+    }
+    const walkDemoArg = /[?&]walkdemo=(\d+)/.exec(location.search), walkDemoState = [];
+    let walkDemoT = 0;
+    if (walkDemoArg) { const n = Math.min(24, +walkDemoArg[1] || 0); walkDemo = n > 0; for (let i = 0; i < n; i++) walkDemoState.push({ a: i * 1.7, rad: 3 + (i % 4) * 1.6, dir: i % 2 ? 1 : -1 }); }
+    function walkDemoFrame(now) {
+      if (!walkDemo || now - walkDemoT < 400) return;
+      const dt = walkDemoT ? (now - walkDemoT) / 1000 : 0; walkDemoT = now;
+      walkDemoState.forEach((s, i) => {
+        const stopped = i % 3 === 2 && Math.sin(now / 4000 + i) > 0.4;          // every third one stops now and then
+        if (!stopped) s.a += s.dir * 1.2 / s.rad * dt;
+        const x = Math.sin(s.a) * s.rad, z = 2 + Math.cos(s.a) * s.rad, r = Math.atan2(Math.cos(s.a) * s.dir, -Math.sin(s.a) * s.dir);
+        walkUpsert({ key: 'SPWALKDEMO' + i + 'X', label: 'Walker ' + (i + 1), x, z, r, at: Date.now() }, true);
+      });
+    }
     let fpsEl = null, fpsT = 0, fpsN = 0, fpsLast = 0;
     (function tick(now) {
       requestAnimationFrame(tick);
       if (fpsEl) { fpsN++; if (now - fpsT >= 1000) { const ms = (now - fpsT) / fpsN, f = fpsEl.dataset.n + ' people drawn: ' + (1000 / ms).toFixed(1) + ' fps (' + ms.toFixed(1) + ' ms a frame)'; if (f !== fpsLast) { fpsEl.textContent = f; fpsLast = f; } fpsT = now; fpsN = 0; } }
       if (pending.length && now - lastBuild > 120) { lastBuild = now; assign(pending.shift(), true); }
       try { spectFrame(now); } catch (e) { /* never break the room */ }
+      try { const wdt = Math.min(0.1, Math.max(0, (now - walkPrev) / 1000)); walkPrev = now; walkDemoFrame(now); walkFrame(now, wdt); ownMoveFrame(now); }
+      catch (e) { if (!walkWarned) { walkWarned = true; console.warn('[room] walking stopped:', e); } }
       const cp = camera.position;
       for (const e of pool) {
         if (!e.on) continue;
@@ -11451,6 +11561,9 @@ function applyTestnetFunding(proof){
       setPeople,
       // another player's spin at a cabinet: replay it there (see "spins" above)
       play(spot, spin) { try { spectPlay(spot, spin); } catch (e) { console.warn('[room] spin replay failed', e); } },
+      // other players walking on the floor (see "walking" above): everyone at once, or one change
+      moves(list) { if (walkDemo) return; try { const keep = new Set(); (list || []).forEach((p) => { keep.add(p.key); walkUpsert(p, false); }); for (const k of [...walkers.keys()]) if (!keep.has(k)) walkDrop(k); } catch (e) { console.warn('[room] walkers failed', e); } },
+      move(p) { if (walkDemo) return; try { if (p && p.off) walkDrop(p.key); else walkUpsert(p, true); } catch (e) { console.warn('[room] a walker failed', e); } },
       // when the visitor takes a seat that somebody in the room already has, they are given a free one at the same table instead
       steer(s, seat) {
         try {
@@ -11460,7 +11573,7 @@ function applyTestnetFunding(proof){
         } catch (e) { return seat; }
       },
       mount: () => document.querySelector('#tools .rt'),
-      debug: () => ({ pool: pool.map((e) => ({ stand: e.stand, key: e.key, spot: e.spot, on: e.on, built: !!e.spec.ctrl, tag: e.tag.sp.visible })), pending: pending.length, remote: [...remote], spins: [...spect.values()].map((e) => ({ spot: e.spot, ready: e.ready, queue: e.queue.length })) })   // for tests
+      debug: () => ({ pool: pool.map((e) => ({ stand: e.stand, key: e.key, spot: e.spot, on: e.on, built: !!e.spec.ctrl, tag: e.tag.sp.visible })), pending: pending.length, remote: [...remote], spins: [...spect.values()].map((e) => ({ spot: e.spot, ready: e.ready, queue: e.queue.length })), walkers: [...walkers.values()].map((w) => ({ key: w.key, label: w.label, drawn: !!w.e, built: !!w.e?.spec.ctrl, x: w.x, z: w.z, moving: w.moving, anim: w.e?.spec.ctrl?.current || null, tag: !!w.e?.tag.sp.visible, samples: w.buf.length })), own: ownOn ? ownLast : null })   // for tests
     };
     window.dispatchEvent(new Event('px-room-host'));
   })(); } catch (e) { console.warn('[room] presence is unavailable:', e); }   // never let this break the casino
@@ -12061,7 +12174,7 @@ button{font:inherit;color:inherit;cursor:pointer}
     }
   })();
 </script>
-<script type="module" src="room.js?v=p3.0"></script>
+<script type="module" src="room.js?v=p3.1"></script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>
 

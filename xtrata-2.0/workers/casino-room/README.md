@@ -138,6 +138,23 @@ its own copy of that machine with play money (the same way the guest player's ma
 - Nothing about spins is kept, checked or paid. Rules and tests: `functions/lib/casino-room.ts`,
   `functions/lib/__tests__/casino-room-play.test.ts`.
 
+## Walking: seeing players move around the floor
+
+A signed-in player on the floor (not at a seat or machine) is drawn walking for everyone else, about half a second behind.
+
+- **Message.** `move {x, z, r}`: position on the floor in metres (rounded to 1 cm, within 20 m of the centre) and facing in
+  radians; `move {off: true}`: no longer on the floor. The room passes `move {a, x, z, r, at}` or `move {a, off, at}` to every
+  other connection, guests included, stamped with the room's clock.
+- **Rules.** Signed-in players only (`move-sign-in-first`); refused while seated (`move-seated`): a seat always wins, and
+  sitting clears the position on every tab. A closing connection that was on the floor is announced as `move {a, off}`.
+  The `room` message lists `walkers` (one per address, the latest position), so late arrivals see them.
+- **Limits.** One move every 0.25 s and 200 a minute (`move-too-fast`); the page sends at most one every 0.4 s, only after
+  moving or turning. Moves never count against the general limit. All codes start with `move-`.
+- **Older rooms.** `features` now lists `["play", "move"]`; a client only sends moves to a room that lists `move`.
+- **Cost.** An hour of continuous walking is 7,200 messages, billed as 360 requests. No timers, so the room still hibernates.
+- Rules and tests: `functions/lib/casino-room.ts`, `functions/lib/__tests__/casino-room-move.test.ts`, and the walking case in
+  `functions/__tests__/casino-room-e2e.test.ts`.
+
 ## Switching it on (preview first)
 
 Run these from `xtrata-2.0` after `git fetch && git checkout claude/casino-room-spike && npm install`.

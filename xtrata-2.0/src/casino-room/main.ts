@@ -11,10 +11,16 @@
  *   setPeople(list): void                 everyone else in the room: { key (address), spot, label, since }
  * and an optional  mount(): HTMLElement   where the "Room" button goes (the page's top-right button group).
  * and an optional  play(spot, spin): void  another player's spin at a cabinet, for the page to replay on that cabinet
+ * and optional     moves(list) / move(one)  other players walking on the floor: everyone at once, or one change
+ *                  ({ key, label, x, z, r, at } with `at` on the room's clock, or { key, off: true })
  *
  * Spins: the page announces the visitor's own spins with a `px-room-play` window event ({ spot, s: reel stops, b: bet, f: free }).
  * This client passes them to the room only when the room lists the `play` feature and the visitor holds that cabinet, and hands
  * everyone else's spins to `play()`. Nothing about a spin moves money or is checked here; it only makes a cabinet look alive.
+ *
+ * Walking: the page announces the visitor's position on the floor with a `px-room-move` window event ({ x, z, r } or { off }).
+ * This client passes it on only when the room lists the `move` feature and the visitor is signed in, resends the last one
+ * after a reconnect, and hands everyone else's positions to `moves()` / `move()`.
  *
  * Built with `npm run build:casino-room` into public/casino/room.js (not part of `prebuild`, so it can never break a deploy).
  */
@@ -29,12 +35,16 @@ import { isChatError } from './chat-core';
 
 type Person = { key: string; spot: string; label: string; since: number };
 type Spin = { a: string; s: number[]; b: number; f: boolean };
+type Walker = { key: string; label: string; x: number; z: number; r: number; at: number };
+type Pos = { x: number; z: number; r: number; at: number };
 interface PXRoomHost {
   version: number;
   currentSpot(): string | null;
   setPeople(list: Person[]): void;
   mount?(): HTMLElement | null;
   play?(spot: string, spin: Spin): void;
+  moves?(list: Walker[]): void;
+  move?(one: Walker | { key: string; off: true }): void;
 }
 type SpotView = { a: string; n: string; since: number };
 type Signed = { address: string; hash160?: string; expiresAt?: number };
@@ -48,7 +58,10 @@ const S = {
   attempts: 0,
   replaced: false,
   you: null as null | { a: string | null; n: string; guest: boolean },
-  features: [] as string[],           // what the room says it can do ('play': spins); an older room lists nothing
+  features: [] as string[],           // what the room says it can do ('play': spins, 'move': walking); an older room lists nothing
+  walk: new Map<string, Pos>(),       // other signed-in players on the floor, by address: their latest position
+  ownMove: null as null | { x: number; z: number; r: number },   // the visitor's own last position on the floor (null: off it)
+  ownSent: false,                     // whether the room currently holds a position for this connection
   spots: {} as Record<string, SpotView>,
   joined: 0,
   guests: 0,
@@ -73,7 +86,7 @@ const mainnetOf = (a: string) => {
   return addressToString({ ...d, version: AddressVersion.MainnetSingleSig });
 };
 // Names are looked up on the mainnet address of the same key (BNS names live on mainnet; ST and SP share one key).
-const names = createNameCache((address) => resolvePrimaryBnsName({ address: mainnetOf(address), network: 'mainnet' }), () => { pushPeople(); chat?.refreshNames(); });
+const names = createNameCache((address) => resolvePrimaryBnsName({ address: mainnetOf(address), network: 'mainnet' }), () => { pushPeople(); pushWalkers(); chat?.refreshNames(); });
 const labelFor = (address: string) => {
   let name: string | null = null;
   try { name = names.get(address); } catch { /* bad address: show it short */ }
@@ -81,6 +94,28 @@ const labelFor = (address: string) => {
 };
 
 // ------------------------------------------------------------------ the page
+
+const walkerOf = (key: string, p: Pos): Walker => ({ key, label: labelFor(key), x: p.x, z: p.z, r: p.r, at: p.at });
+/** Everyone else walking on the floor, as one list (the page keeps whoever is still in it and drops the rest). */
+const pushWalkers = () => {
+  if (!S.host?.moves || S.service !== 'ok') return;
+  const me = S.you?.a ?? null;
+  const list = [...S.walk.entries()].filter(([a]) => a !== me).map(([a, p]) => walkerOf(a, p));
+  try { S.host.moves(list); } catch (e) { console.warn('[room] the page could not draw the walkers', e); }
+};
+const walkOne = (key: string, p: Pos | null) => {
+  if (p) S.walk.set(key, p); else S.walk.delete(key);
+  if (!S.host?.move || key === (S.you?.a ?? null)) return;
+  try { S.host.move(p ? walkerOf(key, p) : { key, off: true }); } catch (e) { console.warn('[room] the page could not move a walker', e); }
+};
+/** Sends the visitor's own position (or that they left the floor), when the room takes moves and the visitor is signed in. */
+const sendOwnMove = () => {
+  if (!S.features.includes('move') || S.service !== 'ok' || !S.connected || !S.signed || !S.you || S.you.guest) return;
+  if (S.ws?.readyState !== WebSocket.OPEN) return;
+  // Sent directly, not through send(): moves must not hold back the seat updates, which wait for a quiet moment after a send.
+  if (S.ownMove) { S.ws.send(JSON.stringify({ t: 'move', ...S.ownMove })); S.ownSent = true; }
+  else if (S.ownSent) { S.ws.send(JSON.stringify({ t: 'move', off: true })); S.ownSent = false; }
+};
 
 const pushPeople = () => {
   if (!S.host || S.service !== 'ok') return;
@@ -135,17 +170,21 @@ const connect = () => {
       case 'room':
         S.you = m.you; S.spots = m.spots || {}; S.joined = m.joined; S.guests = m.guests;
         S.features = Array.isArray(m.features) ? m.features.filter((f: unknown) => typeof f === 'string') : [];
+        S.walk = new Map();
+        for (const w of Array.isArray(m.walkers) ? m.walkers : []) if (w && typeof w.a === 'string') S.walk.set(w.a, { x: +w.x, z: +w.z, r: +w.r, at: +w.at });
+        pushWalkers();
+        S.ownSent = false; sendOwnMove();               // a fresh connection: say where the visitor is standing, if on the floor
         S.standSent = null;                                 // a fresh connection holds no seat yet
         if (S.signed && S.you?.guest) S.signed = null;      // the session ran out (4 hours) while the page stayed open
         chat?.room(m.players, !!(S.you && !S.you.guest));
         break;
-      case 'sat': S.spots[m.spot] = m.who; break;
+      case 'sat': S.spots[m.spot] = m.who; if (m.who?.a && S.walk.has(m.who.a)) walkOne(m.who.a, null); break;
       case 'stood': delete S.spots[m.spot]; if (S.standSent === m.spot) S.standSent = null; break;
       case 'moved': S.yielded = m.spot; break;       // another tab of this player sat down elsewhere: that tab wins; this one stops asking
       case 'count': S.joined = m.joined; S.guests = m.guests; break;
       case 'say': case 'dm': chat?.heard(m); return;
       case 'join': chat?.joined(m.who); return;
-      case 'leave': chat?.left(m.a); return;
+      case 'leave': chat?.left(m.a); if (S.walk.has(m.a)) walkOne(m.a, null); return;
       case 'reported': chat?.reported(); return;
       case 'play':
         // Another player's spin: the page spins its copy of that cabinet to the same stops. A failure there changes nothing else.
@@ -153,8 +192,15 @@ const connect = () => {
           try { S.host?.play?.(m.spot, { a: String(m.a || ''), s: m.s, b: m.b, f: !!m.f }); } catch (e) { console.warn('[room] the page could not show a spin', e); }
         }
         return;
+      case 'move':
+        // Another player walking (or leaving the floor): the page draws them there, a moment behind.
+        if (typeof m.a === 'string') {
+          if (m.off) walkOne(m.a, null);
+          else if ([m.x, m.z, m.r, m.at].every((n) => typeof n === 'number' && Number.isFinite(n))) walkOne(m.a, { x: m.x, z: m.z, r: m.r, at: m.at });
+        }
+        return;
       case 'err':
-        if (typeof m.code === 'string' && m.code.startsWith('play-')) return;     // a spin the room did not pass on: nothing to show
+        if (typeof m.code === 'string' && (m.code.startsWith('play-') || m.code.startsWith('move-'))) return;   // spins and moves the room did not pass on: nothing to show
         if (m.code === 'no-such-spot') S.badSpot = S.want;
         else if (isChatError(m.code) && chat?.failed(m.code)) { /* chat showed it */ }
         else if (m.code === 'slow-down') S.lastSent = Date.now() + 3000;    // the seat updates were too quick: wait a few seconds before the next
@@ -167,6 +213,7 @@ const connect = () => {
     if (S.ws !== ws) return;     // a newer connection replaced this one on purpose
     S.ws = null; S.connected = false;
     S.spots = {}; pushPeople();
+    S.walk = new Map(); pushWalkers(); S.ownSent = false;
     chat?.disconnected();
     if (event.code === 4001) { S.replaced = true; paint(); return; }     // another tab of the visitor's took over
     paint(); retry();
@@ -384,6 +431,16 @@ const onOwnSpin = (event: Event) => {
   if (S.ws?.readyState === WebSocket.OPEN) S.ws.send(JSON.stringify({ t: 'play', spot: d.spot, s: d.s.slice(0, 8), b: d.b, f: !!d.f }));
 };
 
+/** The visitor's own position on the floor (or that they left it), announced by the page. */
+const onOwnMove = (event: Event) => {
+  const d = (event as CustomEvent).detail;
+  if (!d) return;
+  if (d.off) S.ownMove = null;
+  else if ([d.x, d.z, d.r].every((n) => typeof n === 'number' && Number.isFinite(n))) S.ownMove = { x: d.x, z: d.z, r: d.r };
+  else return;
+  sendOwnMove();
+};
+
 const watchSeat = () => {
   const spot = S.host?.currentSpot() ?? null;
   if (spot !== S.want) { S.want = spot; S.yielded = null; S.standSent = null; pushPeople(); }   // the player moved: this tab speaks for them again
@@ -401,6 +458,7 @@ async function start() {
   connect();
   window.setInterval(watchSeat, 250);
   window.addEventListener('px-room-play', onOwnSpin);
+  window.addEventListener('px-room-move', onOwnMove);
 }
 
 const attach = (host: PXRoomHost) => {
@@ -414,5 +472,5 @@ if (existing) attach(existing); else window.addEventListener('px-room-host', () 
 // For tests and bug reports only: read-only.
 (window as any).__pxRoom = {
   chat: () => chat?.debug() ?? null,
-  get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, features: S.features.slice(), trail: connectTrail.slice() }; }
+  get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, features: S.features.slice(), walkers: [...S.walk.keys()], ownMove: S.ownMove, trail: connectTrail.slice() }; }
 };

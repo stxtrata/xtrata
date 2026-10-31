@@ -55,7 +55,7 @@ export const MAX_REPORT_LINE_CHARS = 200;
  * (every machine picks them first, from its own reel strips), so a spin is a few numbers, not a picture.
  * The room only passes spins on: it never checks or stores a result, and nothing here moves money.
  */
-export const ROOM_FEATURES = ['play'] as const;
+export const ROOM_FEATURES = ['play', 'move'] as const;
 /** Spins have their own limit, apart from RATE_LIMIT, so a player on turbo or autoplay never slows their seat updates or chat. */
 export const PLAY_MIN_GAP_MS = 400;
 export const PLAY_PER_MINUTE = 100;
@@ -63,6 +63,16 @@ export const MIN_STOPS = 3;
 export const MAX_STOPS = 8;
 export const MAX_STOP = 9_999;
 export const MAX_BET = 1_000_000;
+
+/**
+ * Walking (presence plan 8.4). A signed-in player on the floor sends where they stand and which way they face, a couple of
+ * times a second while they move; everyone else draws them walking there, a moment behind. The room keeps only the last
+ * position of each connection and never stores a history. `r` is the facing angle in the characters' convention.
+ */
+export const MOVE_MIN_GAP_MS = 250;
+export const MOVE_PER_MINUTE = 200;   // the page sends at most 150 a minute (one every 0.4 s)
+/** The floor is 26 x 22 m around the origin; anything beyond this is not a place in the room. */
+export const MOVE_BOUND = 20;
 
 /**
  * One open connection. `a` is null for a guest (watching only). `rl` holds recent message times for the rate limit, `cl` the
@@ -73,10 +83,15 @@ export type Peer = {
   rl: number[]; cl: number[]; b: string[];
   /** Recent spin times, for the spin limit. */
   pl: number[];
+  /** Where this connection's player stands on the floor ([x, z, facing]), or null when they are not on the floor. */
+  p: [number, number, number] | null;
+  /** When `p` last changed (room clock), and recent move times for the move limit. */
+  pt: number;
+  ml: number[];
 };
 
 export const newPeer = (id: string, address: string | null, hash160: string | null, now: number): Peer => ({
-  id, a: address, k: hash160, spot: null, since: now, rl: [], cl: [], b: [], pl: []
+  id, a: address, k: hash160, spot: null, since: now, rl: [], cl: [], b: [], pl: [], p: null, pt: 0, ml: []
 });
 
 /** A connection saved before chat (or spins) existed has no `cl`, `b` or `pl`: fill them in so the rest of the code can rely on them. */
@@ -84,6 +99,9 @@ export const upgradePeer = (peer: Peer): Peer => {
   if (!Array.isArray(peer.cl)) peer.cl = [];
   if (!Array.isArray(peer.b)) peer.b = [];
   if (!Array.isArray(peer.pl)) peer.pl = [];
+  if (!Array.isArray(peer.ml)) peer.ml = [];
+  if (!Array.isArray(peer.p) || peer.p.length !== 3) peer.p = null;
+  if (typeof peer.pt !== 'number') peer.pt = 0;
   return peer;
 };
 
@@ -94,11 +112,14 @@ export const shortAddress = (address: string | null) =>
 export type SpotView = { a: string; n: string; since: number };
 /** One signed-in person in the room, listed once however many tabs they have open; `spot` is where they sit, if anywhere. */
 export type PlayerView = { a: string; n: string; spot: string | null };
-export type RoomView = { spots: Record<string, SpotView>; players: PlayerView[]; joined: number; guests: number };
+/** A signed-in player standing or walking on the floor (not seated), once per address: their latest position. */
+export type WalkerView = { a: string; n: string; x: number; z: number; r: number; at: number };
+export type RoomView = { spots: Record<string, SpotView>; players: PlayerView[]; walkers: WalkerView[]; joined: number; guests: number };
 
 export const deriveView = (peers: Peer[]): RoomView => {
   const spots: Record<string, SpotView> = {};
   const players = new Map<string, PlayerView>();
+  const walkers = new Map<string, WalkerView>();
   let joined = 0;
   let guests = 0;
   for (const peer of peers) {
@@ -109,8 +130,14 @@ export const deriveView = (peers: Peer[]): RoomView => {
       players.set(peer.a, entry);
     }
     if (peer.a && peer.spot) spots[peer.spot] = { a: peer.a, n: shortAddress(peer.a), since: peer.since };
+    if (peer.a && peer.p && !peer.spot) {
+      const seen = walkers.get(peer.a);
+      if (!seen || peer.pt > seen.at) walkers.set(peer.a, { a: peer.a, n: shortAddress(peer.a), x: peer.p[0], z: peer.p[1], r: peer.p[2], at: peer.pt });
+    }
   }
-  return { spots, players: [...players.values()], joined, guests };
+  // Someone seated on one tab and walking on another is shown seated.
+  for (const a of walkers.keys()) if (Object.values(spots).some((v) => v.a === a)) walkers.delete(a);
+  return { spots, players: [...players.values()], walkers: [...walkers.values()], joined, guests };
 };
 
 // ------------------------------------------------------------------ text
@@ -156,7 +183,10 @@ export type ClientMessage =
   | { t: 'blocks'; list: string[] }
   | { t: 'report'; who: string; why: ReportReason; lines: string[] }
   /** One spin by the player seated at `spot` (a cabinet): the reel stops in reel order, the bet, and whether it was a free spin. */
-  | { t: 'play'; spot: string; s: number[]; b: number; f: boolean };
+  | { t: 'play'; spot: string; s: number[]; b: number; f: boolean }
+  /** Where the player stands on the floor and which way they face; or `off`: they are not on the floor any more. */
+  | { t: 'move'; x: number; z: number; r: number }
+  | { t: 'move'; off: true };
 
 export type ParseResult = { ok: true; msg: ClientMessage } | { ok: false; code: string };
 
@@ -210,6 +240,15 @@ export const parseClientMessage = (raw: unknown): ParseResult => {
       if (!Number.isSafeInteger(value.b) || value.b <= 0 || value.b > MAX_BET) return { ok: false, code: 'play-bad' };
       return { ok: true, msg: { t: 'play', spot: value.spot, s: stops.slice() as number[], b: value.b, f: value.f === true || value.f === 1 } };
     }
+    case 'move': {
+      if (value.off === true) return { ok: true, msg: { t: 'move', off: true } };
+      const { x, z, r } = value;
+      const inside = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= MOVE_BOUND;
+      if (!inside(x) || !inside(z) || typeof r !== 'number' || !Number.isFinite(r)) return { ok: false, code: 'move-bad' };
+      const facing = Math.atan2(Math.sin(r), Math.cos(r));      // any angle, folded into -pi..pi
+      const round = (n: number, k: number) => Math.round(n * k) / k;
+      return { ok: true, msg: { t: 'move', x: round(x, 100), z: round(z, 100), r: round(facing, 1000) } };
+    }
     default: return { ok: false, code: 'bad-message' };
   }
 };
@@ -255,6 +294,7 @@ export const applySit = (peers: Peer[], meId: string, spot: string, now: number)
   }
   me.spot = spot;
   me.since = now;
+  for (const p of peers) if (p.a === me.a) { p.p = null; p.pt = now; }   // sitting down takes the player off the floor, on every tab
   changes.push({ kind: 'sat', spot, who: { a: me.a, n: shortAddress(me.a), since: now }, peerId: me.id });
   return { ok: true, changes };
 };
@@ -381,4 +421,50 @@ export const routePlay = (peers: Peer[], meId: string, msg: { spot: string; s: n
   if (me.spot !== msg.spot) return { ok: false, code: 'play-not-your-spot' };
   const to = peers.filter((p) => p.id !== meId).map((p) => p.id);
   return { ok: true, message: { t: 'play', spot: msg.spot, a: me.a, s: msg.s, b: msg.b, f: msg.f, at: now }, to };
+};
+
+// ------------------------------------------------------------------ walking
+
+/** Records one move for this peer. False, recording nothing, when it comes too soon after the last or there are too many a minute. */
+export const takeMoveRate = (peer: Peer, now: number): boolean => {
+  const recent = (Array.isArray(peer.ml) ? peer.ml : []).filter((t) => now - t < 60_000);
+  const last = recent[recent.length - 1];
+  if ((last !== undefined && now - last < MOVE_MIN_GAP_MS) || recent.length >= MOVE_PER_MINUTE) { peer.ml = recent; return false; }
+  recent.push(now);
+  peer.ml = recent;
+  return true;
+};
+
+export type MoveMessage =
+  | { t: 'move'; a: string; x: number; z: number; r: number; at: number }
+  | { t: 'move'; a: string; off: true; at: number };
+
+/**
+ * A player's position (or `off`) goes to every other connection, guests included. Only a signed-in player who is not seated
+ * may move: a seat always wins over a position, so a late move after sitting down cannot pull someone off their seat.
+ * Records the position on the connection, so later arrivals see it in the room view.
+ */
+export const applyMove = (peers: Peer[], meId: string, msg: { x: number; z: number; r: number } | { off: true }, now: number):
+  Routed<MoveMessage> => {
+  const me = peers.find((p) => p.id === meId);
+  if (!me) return { ok: false, code: 'move-gone' };
+  if (!me.a) return { ok: false, code: 'move-sign-in-first' };
+  const to = peers.filter((p) => p.id !== meId).map((p) => p.id);
+  if ('off' in msg) {
+    me.p = null; me.pt = now;
+    return { ok: true, message: { t: 'move', a: me.a, off: true, at: now }, to };
+  }
+  if (me.spot) return { ok: false, code: 'move-seated' };
+  me.p = [msg.x, msg.z, msg.r]; me.pt = now;
+  return { ok: true, message: { t: 'move', a: me.a, x: msg.x, z: msg.z, r: msg.r, at: now }, to };
+};
+
+/**
+ * When a connection closes while its player was on the floor, the others are told to take them off it, unless another tab of
+ * the same player is still on the floor (that one goes on being drawn). `others` are the connections still open.
+ */
+export const leaveFloor = (others: Peer[], gone: Peer, now: number): MoveMessage | null => {
+  if (!gone.a || !gone.p) return null;
+  if (others.some((p) => p.a === gone.a && p.p)) return null;
+  return { t: 'move', a: gone.a, off: true, at: now };
 };

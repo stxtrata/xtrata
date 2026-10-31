@@ -280,6 +280,50 @@ guest player's, so it costs about the same.
 
 **Gate still to pass:** two real devices watching each other on the preview, frame rate with two copies on a phone.
 
+### 8.4 Walking: seeing signed-in players move around the floor (planned and built 2026-10-31, `/casino` only)
+
+Jim asked to see connected players walking around the room, not only seated, at a couple of updates a second. Chosen:
+**position updates at most every 0.4 s, drawn about half a second behind and smoothed** (option A of the options given).
+
+**Message.** `move {x, z, r}`: where the player stands on the floor (metres, rounded to 1 cm) and which way they face
+(radians, in the characters' convention: `atan2` of the facing direction's x and z). `move {off: true}`: no longer on the
+floor (sitting, at a machine, flying the overview camera). The room keeps each connection's last position, stamps it with
+its own clock, and passes `move {a, x, z, r, at}` or `move {a, off, at}` to every other connection, guests included.
+- Only signed-in players; refused while the connection holds a seat (`move-seated`), so sitting always wins.
+- Bounds: |x| and |z| within 20 m (the floor is 26 x 22 m). Anything else is `move-bad`.
+- Own limit: one every 0.25 s and 200 a minute (`move-too-fast`); never counts against the general limit. All codes start
+  with `move-`, so the chat never shows them.
+- Sitting clears the position for every connection of that address; a closing connection that had a position tells the
+  room `move {a, off}`. The `room` message carries `walkers` (one per address, the latest), so a late arrival sees them.
+- The room announces `features: ["play", "move"]`; a newer client sends nothing to an older room.
+
+**Sending (page).** While walking on the floor and not at a seat or machine, the page announces its position at most every
+0.4 s and only after moving 5 cm or turning 0.1 rad, then once more when it stops; leaving the floor sends `off` once. The
+room client forwards that only when the room supports it and the player is signed in; after a reconnect it resends the
+last position.
+
+**Drawing (page).** Each walker is an Adrian (the address picks the clothes, as for seated people) with the same gold name
+tag. The page keeps the last few positions and draws each walker 0.45 s in the past, gliding between the two positions
+around that moment (estimated against the room's clock, so network jitter does not make them stutter); a gap over 5 m is
+a jump, not a glide. Moving faster than 0.25 m/s plays the model's Walk loop (speeded up with pace, capped) and faces the
+way they travel; standing still plays Idle and faces where they look. Walkers do not block the local player (a laggy
+walker can never trap anyone), and the casino's other people logic leaves them alone.
+
+**Limits.** Walkers share the existing caps with seated people (16 drawn on a desktop, 6 on a phone or tablet; seated
+people at your table first, then the nearest walkers), figures are built one at a time and reused, and walkers over 14 m
+away stop animating (they still move). No walkers, no cost.
+
+**Cost.** One hour of continuous walking is 7,200 messages, billed as 360 requests (incoming messages count 20 to 1;
+outgoing are free). The paid plan's 1 million included requests cover about 2,800 walking hours a month; the free plan's
+100,000 a day about 280 walking hours a day, less other room traffic. No timers, so the room still hibernates.
+
+**Tests.** Unit tests for the message, bounds, limits, routing, seat interplay and the room view; an end-to-end test
+against a local room; and the real `/casino` page with the real `room.js` in a headless browser against a stand-in room:
+the Adrians load, a remote walker appears with a tag, walks and stops, a player sitting removes them, and the page sends
+its own position while walking and `off` when it stops being on the floor, with no page errors.
+
+**Deploy order:** room Worker first, then the site.
+
 ## 9. Cost and scale (estimate)
 
 Cloudflare's published Durable Object terms (checked 2026-10-29): only SQLite-backed objects on the Workers Free plan, with 100,000 requests a day free; on the paid plan 1 million requests a month included then $0.15 per million; **incoming** WebSocket messages count at a 20-to-1 ratio (100 messages = 5 requests), outgoing messages are free; an idle object that can hibernate is not billed for time.

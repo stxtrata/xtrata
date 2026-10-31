@@ -16,16 +16,21 @@
  *   cabinet spins to the same result. Only the player seated at that cabinet may send one, spins have their own limit (they
  *   never count against the general one), and nothing about them is kept. The `room` message lists `features: ['play']` so a
  *   newer client only sends spins to a room that understands them.
+ * - Walking: a signed-in player on the floor sends `move {x, z, r}` a couple of times a second (or `move {off}`); the room keeps
+ *   each connection's last position (in its attachment, so it survives hibernation), passes it to everyone else and lists the
+ *   walkers in the `room` message. Moves have their own limit too. Still no timers: the room hibernates between messages.
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
   MAX_SOCKETS,
   ROOM_FEATURES,
   applyLeave,
+  applyMove,
   applySit,
   applyStand,
   buildReport,
   deriveView,
+  leaveFloor,
   newPeer,
   overflowForAddress,
   parseClientMessage,
@@ -35,6 +40,7 @@ import {
   setBlocks,
   shortAddress,
   takeChatRate,
+  takeMoveRate,
   takePlayRate,
   takeRate,
   upgradePeer,
@@ -151,7 +157,7 @@ export class CasinoRoom extends DurableObject<Env> {
       this.send(server, {
         t: 'room', v: 1, features: ROOM_FEATURES,
         you: { a: address, n: shortAddress(address), guest: !address, k: hash160 },
-        spots: view.spots, players: view.players, joined: view.joined, guests: view.guests, at: now
+        spots: view.spots, players: view.players, walkers: view.walkers, joined: view.joined, guests: view.guests, at: now
       });
       const others = live.filter((e) => e.ws !== server);
       // A second tab of someone already here is not a new person.
@@ -184,6 +190,19 @@ export class CasinoRoom extends DurableObject<Env> {
       }
       return;
     }
+    // A move has its own limit too: walking never slows a player's seat updates or chat.
+    if (parsed.ok && parsed.msg.t === 'move') {
+      if (!takeMoveRate(mine.peer, now)) { this.save([mine]); this.send(ws, { t: 'err', code: 'move-too-fast' }); return; }
+      const routed = applyMove(entries.map((e) => e.peer), mine.peer.id, parsed.msg, now);
+      this.save([mine]);
+      if (!routed.ok) { this.send(ws, { t: 'err', code: routed.code }); return; }
+      const text = JSON.stringify(routed.message);
+      for (const e of entries) {
+        if (!routed.to.includes(e.peer.id)) continue;
+        try { e.ws.send(text); } catch { /* closing; its close handler cleans up */ }
+      }
+      return;
+    }
     if (!takeRate(mine.peer, now)) {
       this.save([mine]);
       this.send(ws, { t: 'err', code: 'slow-down' });
@@ -200,7 +219,7 @@ export class CasinoRoom extends DurableObject<Env> {
       case 'hello': {
         this.save([mine]);
         const view = deriveView(peers);
-        this.send(ws, { t: 'room', v: 1, features: ROOM_FEATURES, you: { a: mine.peer.a, n: shortAddress(mine.peer.a), guest: !mine.peer.a, k: mine.peer.k }, spots: view.spots, players: view.players, joined: view.joined, guests: view.guests, at: now });
+        this.send(ws, { t: 'room', v: 1, features: ROOM_FEATURES, you: { a: mine.peer.a, n: shortAddress(mine.peer.a), guest: !mine.peer.a, k: mine.peer.k }, spots: view.spots, players: view.players, walkers: view.walkers, joined: view.joined, guests: view.guests, at: now });
         return;
       }
       case 'sit': {
@@ -267,6 +286,8 @@ export class CasinoRoom extends DurableObject<Env> {
     if (peer) {
       const changes = applyLeave([peer], peer.id);
       this.announce(entries, changes);
+      const off = leaveFloor(entries.map((e) => upgradePeer(e.peer)), upgradePeer(peer), Date.now());
+      if (off) this.broadcast(entries, off);
       if (peer.a && !entries.some((e) => e.peer.a === peer!.a)) this.broadcast(entries, { t: 'leave', a: peer.a });
     }
     this.broadcast(entries, { t: 'count', ...this.counts(entries) });
