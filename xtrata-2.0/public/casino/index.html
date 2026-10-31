@@ -8262,6 +8262,27 @@ function applyTestnetFunding(proof){
     const isolated=html.slice(0,begin)+'<script>'+npcAccountSource+endTag+html.slice(end+endTag.length);
     return isolated.replace(/connect\(\s*ac\.destination\s*\)/g,'connect(window.ParallaxNpcSound.output(ac))').replace('<script>'+npcAccountSource,'<script>'+npcAudioSource+npcAccountSource).replace('window.PX_CASINO_ENGINE={','window.ParallaxNpcSoundInit=audioInit;window.PX_CASINO_ENGINE={');
   }
+  // LIGHTER ON PHONES AND TABLETS (2026-10-31). iPad Safari caps how much canvas memory one page may use; past the cap, new
+  // canvases silently stop drawing (a black screen with stray dots). Every machine draws its screen on a 2800x1920 canvas (about
+  // 21 MB) and runs a hidden 3D view of its own cabinet that the casino never shows. On a touch device the screen is drawn at half
+  // size (the games draw in 1400x960 units and scale up 2x, so the picture is the same, a little softer up close), and game frames
+  // that nobody looks at stop drawing their hidden view. Each change is made only when the game's text is exactly as expected.
+  function pxTouch(){try{return !!(window.matchMedia&&matchMedia('(pointer:coarse)').matches)||'ontouchstart' in window;}catch(_){return false;}}
+  function pxLiteDocument(html,hideView){
+    let out=html;
+    if(pxTouch()){
+      const re=/const screen *= *canvas\(2800, *1920\), *sg *= *screen\.getContext\('2d'\); *sg\.setTransform\(2, *0, *0, *2, *0, *0\);/g;
+      if((out.match(re)||[]).length===1)out=out.replace(re,"const screen=canvas(1400,960),sg=screen.getContext('2d');sg.setTransform(1,0,0,1,0,0);");
+    }
+    if(hideView){
+      const re=/renderer\.render\(\s*scene\s*,\s*camera\s*\)/g;
+      if((out.match(re)||[]).length===2){
+        out=out.replace(re,'(window.__pxHidden||renderer.render(scene,camera))');
+        const m=/<head[^>]*>/i.exec(out);if(m)out=out.slice(0,m.index+m[0].length)+'<script>window.__pxHidden=true<\/script>'+out.slice(m.index+m[0].length);
+      }
+    }
+    return out;
+  }
   // MOBILE REELS (2026-10-30): phone browsers pause animation in hidden frames, which froze the reels mid-spin.
   // Each game frame gets a tiny helper; if its own animation timer stalls for 120 ms, the casino's main loop drives it instead.
   function pxRafShim(html){const shim='<script>(function(){var w=window,nat=w.requestAnimationFrame&&w.requestAnimationFrame.bind(w),natC=w.cancelAnimationFrame&&w.cancelAnimationFrame.bind(w);if(!nat||w.__pxPump)return;var q=new Map(),n=0,h=0,since=0,driven=false;function run(t){h=0;since=0;var list=Array.from(q.values());q.clear();for(var i=0;i<list.length;i++){try{list[i](t)}catch(e){(function(e){setTimeout(function(){throw e})})(e)}}}w.requestAnimationFrame=function(cb){var id=++n;q.set(id,cb);if(!since)since=performance.now();if(!h&&!driven)h=nat(run);return id};w.cancelAnimationFrame=function(id){q.delete(id)};w.__pxPump=function(){if(!q.size)return;var now=performance.now();if(!driven&&now-since<120)return;driven=true;if(h){natC(h);h=0}run(now)}})();<\/script>',m=/<head[^>]*>/i.exec(html);return m?html.slice(0,m.index+m[0].length)+shim+html.slice(m.index+m[0].length):shim+html;}
@@ -8269,8 +8290,8 @@ function applyTestnetFunding(proof){
   async function startNpcMachine(machine){
     let frame;
     try{
-      const html=pxRafShim(npcGameDocument(await decodePXGzip(window.PX_MACHINE_PACKS[machine.type].game)));
-      frame=document.createElement('iframe');frame.className='pxLogicFrame';frame.title='Casino guest practice machine';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
+      const html=pxRafShim(pxLiteDocument(npcGameDocument(await decodePXGzip(window.PX_MACHINE_PACKS[machine.type].game)),true));
+      frame=document.createElement('iframe');frame.className='pxLogicFrame pxLite';frame.title='Casino guest practice machine';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
       const api=await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('NPC machine did not become ready')),20000);frame.onload=()=>{clearTimeout(timeout);const api=frame.contentWindow.PX_CASINO_ENGINE;api?resolve(api):reject(Error('NPC machine engine unavailable'));};frame.srcdoc=html;});
       await api.activate();
       const screen=machine.model.getObjectByName('px-screenMesh');if(!screen)throw Error('NPC machine screen unavailable');
@@ -8411,7 +8432,7 @@ function applyTestnetFunding(proof){
   }
   async function createCasinoEngine(type){
     if(machineEngines.has(type))return machineEngines.get(type);
-    const html=pxRafShim(pxRlPatch(await decodePXGzip(window.PX_MACHINE_PACKS[type].game))),frame=document.createElement('iframe');frame.className='pxLogicFrame';frame.title=window.PX_MACHINE_PACKS[type].name+' game logic';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
+    const html=pxRafShim(pxLiteDocument(pxRlPatch(await decodePXGzip(window.PX_MACHINE_PACKS[type].game)),pxTouch())),frame=document.createElement('iframe');frame.className=pxTouch()?'pxLogicFrame pxLite':'pxLogicFrame';frame.title=window.PX_MACHINE_PACKS[type].name+' game logic';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
     const api=await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Machine did not become ready')),20000);frame.onload=()=>{const api=frame.contentWindow.PX_CASINO_ENGINE;if(!api){clearTimeout(timeout);reject(new Error('Game engine API missing'));return;}clearTimeout(timeout);resolve(api);};frame.srcdoc=html;});
     const texture=new THREE.CanvasTexture(api.screen);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=false;texture.anisotropy=16;
     for(const m of room.machines.filter(m=>m.type===type&&!m.occupied&&!m.pxSpect)){const screen=m.model.getObjectByName('px-screenMesh');if(screen){screen.material=screen.material.clone();screen.material.map=texture;screen.material.color.setHex(0xffffff);screen.material.needsUpdate=true;}}
@@ -11062,15 +11083,15 @@ function applyTestnetFunding(proof){
       const mesh=m.model.getObjectByName('px-screenMesh');if(!mesh?.material?.map?.image)continue;
       let idle=idleLAYRScreens.get(m.type);
       if(!idle){
-        const source=mesh.material.map.image,c=document.createElement('canvas');c.width=2800;c.height=1920;
+        const source=mesh.material.map.image,c=document.createElement('canvas'),S=pxTouch()?1:2;c.width=1400*S;c.height=960*S;   // half size on phones and tablets (see pxLiteDocument)
         const ctx=c.getContext('2d'),texture=new THREE.CanvasTexture(c);texture.generateMipmaps=false;texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.anisotropy=16;
-        idle={source,canvas:c,ctx,texture};idleLAYRScreens.set(m.type,idle);
+        idle={source,canvas:c,ctx,texture,S};idleLAYRScreens.set(m.type,idle);
       }
       if(mesh.material.map!==idle.texture){mesh.material=mesh.material.clone();mesh.material.map=idle.texture;mesh.material.needsUpdate=true;}
     }
     for(const [type,idle] of idleLAYRScreens){
       if(machineEngines.has(type)){idle.texture.dispose();idleLAYRScreens.delete(type);continue;}
-      const c=idle.ctx;c.clearRect(0,0,2800,1920);c.drawImage(idle.source,0,0,2800,1920);c.save();c.scale(2,2);
+      const c=idle.ctx,S=idle.S||2;c.clearRect(0,0,1400*S,960*S);c.drawImage(idle.source,0,0,1400*S,960*S);c.save();c.scale(S,S);
       c.fillStyle='#121316';c.fillRect(52,886,500,60);c.fillStyle='#f2e8da';c.font='600 26px Arial';c.textBaseline='middle';c.textAlign='left';c.fillText('LAYR  '+bank.toLocaleString('en-GB',{maximumFractionDigits:2}),68,920);c.restore();idle.texture.needsUpdate=true;
     }
   }
@@ -11264,7 +11285,7 @@ function applyTestnetFunding(proof){
     // its own copy of that machine with play money, the way the guest player's machine works, and spins it to the same stops:
     // the same reels and the same win, a moment later. Only the reels are replayed exactly; bonus contents are this copy's own.
     // Nothing here touches the visitor's game, LAYR or wallet. Any failure leaves the cabinet as it was.
-    const SPECT_MAX = isTouch ? 2 : 4, SPECT_NEAR = 18, SPECT_FORGET_MS = 90000;
+    const SPECT_MAX = isTouch ? 1 : 4, SPECT_NEAR = 18, SPECT_FORGET_MS = 90000;
     const spect = new Map();     // cabinet -> its copy of the machine
     let spectNextPoll = 0;
     // The visitor's own spins: the machine frame calls this once its engine exists (see pxRlPatch); it never changes a spin.
@@ -11304,8 +11325,8 @@ function applyTestnetFunding(proof){
       spect.set(m, e);
       let frame;
       try {
-        const html = pxRafShim(spectDocument(npcGameDocument(await decodePXGzip(window.PX_MACHINE_PACKS[m.type].game))));
-        frame = document.createElement('iframe'); frame.className = 'pxLogicFrame'; frame.title = 'Another player’s machine'; frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1; document.body.appendChild(frame);
+        const html = pxRafShim(pxLiteDocument(spectDocument(npcGameDocument(await decodePXGzip(window.PX_MACHINE_PACKS[m.type].game))), true));
+        frame = document.createElement('iframe'); frame.className = 'pxLogicFrame pxLite'; frame.title = 'Another player’s machine'; frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1; document.body.appendChild(frame);
         const api = await new Promise((resolve, reject) => { const timeout = setTimeout(() => reject(Error('The machine did not become ready')), 20000); frame.onload = () => { clearTimeout(timeout); const a = frame.contentWindow.PX_CASINO_ENGINE; a ? resolve(a) : reject(Error('Machine engine unavailable')); }; frame.srcdoc = html; });
         await api.activate();
         if (spect.get(m) !== e) { frame.remove(); return; }      // given up while it loaded
@@ -11387,7 +11408,7 @@ function applyTestnetFunding(proof){
         const gone = !remote.has(e.spot) || now - e.last > SPECT_FORGET_MS;
         if (!e.ready) { if (gone && now - e.last > 30000) spectStop(e); continue; }
         try {
-          const revision = e.api.revision(); if (revision !== e.revision) { e.revision = revision; e.texture.needsUpdate = true; }
+          const revision = e.api.revision(); if (revision !== e.revision && (!isTouch || now - (e.upAt || 0) >= 40)) { e.revision = revision; e.upAt = now; e.texture.needsUpdate = true; }   // phones: at most 25 screen updates a second
           const spinning = e.api.ui().spinning;
           if (gone && !spinning) { spectStop(e); continue; }        // the player left (or stopped playing long ago): the cabinet goes back to normal
           if (poll && !document.hidden) spectStep(e, now);
@@ -12108,6 +12129,7 @@ button{font:inherit;color:inherit;cursor:pointer}
  #pxMachineToolbar #pxMachineLeave,body.machine-floor #pxMachineToolbar #pxMachineLeave{font-size:13px;min-height:44px;padding:0 14px;margin-right:auto}
 }
 /* Tables: "Stand up" comes first and stands out. */
+.pxLogicFrame.pxLite{width:160px!important;height:136px!important}
 #tableViews #tableLeave{order:-1;font-weight:700;color:#f3d9a6;border:1px solid #d6b67b;background:#1a1408}
 #tableViews #tableLeave::before{content:"\2190  "}
 @media(max-width:620px){#panel #tableViews #tableLeave{min-height:40px;font-size:12px;padding:0 12px}}
