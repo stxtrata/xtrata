@@ -242,3 +242,19 @@ you are writing to leaving, lines fading, and the layout beside the welcome pane
 Still to check by hand: real Leather and
 Xverse signing on desktop and phone with two accounts talking to each other (including chat and direct messages on `/casino`), and watching a real Worker deploy reconnect everyone
 on Cloudflare (it was observed locally).
+
+## Playing together (2026-11-01, docs/plans/CASINO-PLAY-TOGETHER-PLAN.md)
+
+The room also carries the social layer: reactions, big wins (the last 8 kept in storage under `wins`), the daily drop (`d:<key>`,
+one per player per UTC day), table chat (`say` with `ch: 'table'`) and watching a table (`watch`), shared roulette and baccarat
+rounds (`round`, `bet`: results come from HMAC-SHA256 of the round under a secret kept in storage as `sec`, committed before the
+bets close and revealed after), drinks for other players (`gift`), and the Salon waiting list and relay (`seek`, `pvp`). The rules are
+in `functions/lib/casino-social.ts` and `functions/lib/casino-rounds.ts`; this Worker still only moves data and keeps no timers
+(rounds run on the clock, worked out from the time of each message).
+
+Anonymous day counters (`c:<YYYY-MM-DD>`: connections, sign-ins new and returning, peak, chat lines, reactions, wins, bets, drinks,
+daily drops, Salon messages) are served by `GET /casino/room/stats` through the Pages binding; no address or message is in them.
+
+To ship it: `npx wrangler deploy` here (nothing to migrate), then push the page. Tests: `functions/lib/__tests__/casino-social.test.ts`,
+`node scripts/test-salon-relay.mjs`, and `node scripts/test-casino-together.mjs`, which runs this Worker's real code (bundled with a
+small stand-in for the Workers runtime, `accept()` is split out of `fetch` for it) behind two real browsers on `/casino`.

@@ -7,6 +7,9 @@
  * the rules can be tested without a Workers runtime. The room's truth is a list of peers (one per open connection); a peer
  * is a small record the Durable Object keeps as the connection's "attachment", which survives hibernation.
  */
+import { parseSocialMessage, type SalonTable, type SocialMessage } from './casino-social';
+import type { Bets, RoundTable } from './casino-rounds';
+
 
 /**
  * Every place a person can sit or stand in /casino (P1). Table seats follow SEATS in public/casino/index.html ('.1', '.2'... in
@@ -94,6 +97,12 @@ export type Peer = {
    * (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md, step 6). Missing on connections saved before the switch existed = may watch.
    */
   w?: boolean;
+  /** The social layer's fields (functions/lib/casino-social.ts): the table watched, bets on the current shared round, a Salon game
+   *  being waited for, and recent times for the reaction, win, gift and relay limits. All optional: older connections lack them. */
+  wt?: string | null;
+  rb?: { tb: RoundTable; n: number; bets: Bets } | null;
+  sk?: { tb: SalonTable; stake: number; at: number } | null;
+  rx?: number[]; wn?: number[]; gl?: number[]; pv?: number[];
 };
 
 export const newPeer = (id: string, address: string | null, hash160: string | null, now: number, watch = true): Peer => ({
@@ -197,7 +206,8 @@ export type ClientMessage =
   | { t: 'sit'; spot: string }
   | { t: 'stand' }
   | { t: 'ping' }
-  | { t: 'say'; text: string }
+  /** `ch: 'table'`: only the people at the speaker's table (sitting there or watching it) hear it. */
+  | { t: 'say'; text: string; ch?: 'table' }
   | { t: 'dm'; to: string; text: string }
   /** The player's whole block list (replaces the last one). Kept by the player's browser and sent on every connect. */
   | { t: 'blocks'; list: string[] }
@@ -206,7 +216,8 @@ export type ClientMessage =
   | { t: 'play'; spot: string; s: number[]; b: number; f: boolean }
   /** Where the player stands on the floor and which way they face; or `off`: they are not on the floor any more. */
   | { t: 'move'; x: number; z: number; r: number }
-  | { t: 'move'; off: true };
+  | { t: 'move'; off: true }
+  | SocialMessage;
 
 export type ParseResult = { ok: true; msg: ClientMessage } | { ok: false; code: string };
 
@@ -224,7 +235,8 @@ export const parseClientMessage = (raw: unknown): ParseResult => {
       return isSpot(value.spot) ? { ok: true, msg: { t: 'sit', spot: value.spot } } : { ok: false, code: 'no-such-spot' };
     case 'say': {
       const text = cleanText(value.text);
-      return text.ok ? { ok: true, msg: { t: 'say', text: text.text } } : { ok: false, code: text.code };
+      if (!text.ok) return { ok: false, code: text.code };
+      return { ok: true, msg: value.ch === 'table' ? { t: 'say', text: text.text, ch: 'table' } : { t: 'say', text: text.text } };
     }
     case 'dm': {
       if (!isAddressLike(value.to)) return { ok: false, code: 'no-such-player' };
@@ -269,7 +281,7 @@ export const parseClientMessage = (raw: unknown): ParseResult => {
       const round = (n: number, k: number) => Math.round(n * k) / k;
       return { ok: true, msg: { t: 'move', x: round(x, 100), z: round(z, 100), r: round(facing, 1000) } };
     }
-    default: return { ok: false, code: 'bad-message' };
+    default: return parseSocialMessage(value) ?? { ok: false, code: 'bad-message' };
   }
 };
 

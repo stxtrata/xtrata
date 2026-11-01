@@ -52,6 +52,33 @@ import {
   type Change,
   type Peer
 } from '../../functions/lib/casino-room';
+import {
+  SOCIAL_FEATURES,
+  applyBet,
+  applySeek,
+  bump,
+  claimDaily,
+  counterKey,
+  currentBets,
+  markSeen,
+  pushWin,
+  routeGift,
+  routeReact,
+  routeRelay,
+  routeWin,
+  seekers,
+  tableAudience,
+  type Counter,
+  type DailyRecord,
+  type DayCounts,
+  type Out,
+  type SeenRecord,
+  type WinEntry
+} from '../../functions/lib/casino-social';
+import { ROUND_TABLES, roundInfo } from '../../functions/lib/casino-rounds';
+
+/** Everything this room can do; a client only uses what is listed (an older client ignores what it does not know). */
+const FEATURES = [...ROOM_FEATURES, ...SOCIAL_FEATURES] as const;
 
 interface Env { [key: string]: unknown }
 
@@ -59,6 +86,12 @@ const NONCE_PREFIX = 'n:';
 /** Reports people have made about each other (plan section 5.3). Only the newest REPORT_KEEP are kept. */
 const REPORT_PREFIX = 'r:';
 const REPORT_KEEP = 200;
+/** The social layer's storage: the round secret, the win feed, daily drops and first/last days per player, and day counters. */
+const SECRET_KEY = 'sec';
+const WINS_KEY = 'wins';
+const DAILY_PREFIX = 'd:';
+const SEEN_PREFIX = 'u:';
+const COUNTER_PREFIX = 'c:';
 
 export class CasinoRoom extends DurableObject<Env> {
   /** When this in-memory instance was created. After a hibernation the constructor runs again, so a changed value in a
@@ -112,6 +145,96 @@ export class CasinoRoom extends DurableObject<Env> {
     }
   }
 
+  /** The `room` message, plus the social layer: the win feed, everyone's bets on the current shared rounds, and Salon seekers. */
+  private async welcome(peers: Peer[], me: Peer, now: number) {
+    const base = roomMessage(peers, me, now, FEATURES) as Record<string, unknown>;
+    if (base.watch === false) return base;
+    const wins = (await this.ctx.storage.get<WinEntry[]>(WINS_KEY)) || [];
+    const bets: Record<string, unknown> = {};
+    for (const tb of ROUND_TABLES) bets[tb] = currentBets(peers, tb, now);
+    return { ...base, wins, bets, seekers: seekers(peers) };
+  }
+
+  private secret: Uint8Array | null = null;
+  /** The round secret: 32 random bytes made once and kept, so rounds stay the same across wake-ups (and their seeds can be checked). */
+  private async roundSecret() {
+    if (this.secret) return this.secret;
+    let stored = await this.ctx.storage.get<number[]>(SECRET_KEY);
+    if (!Array.isArray(stored) || stored.length !== 32) {
+      stored = [...crypto.getRandomValues(new Uint8Array(32))];
+      await this.ctx.storage.put(SECRET_KEY, stored);
+    }
+    this.secret = Uint8Array.from(stored);
+    return this.secret;
+  }
+
+  /** Adds to today's anonymous counters (one small record per UTC day; never an address or a message). */
+  private async count(keys: Counter[], at = Date.now(), peakNow?: number) {
+    if (!keys.length && peakNow === undefined) return;
+    const key = counterKey(at);
+    let counts = (await this.ctx.storage.get<DayCounts>(key)) || {};
+    for (const k of keys) counts = bump(counts, k);
+    if (peakNow !== undefined) counts = { ...counts, pk: Math.max(counts.pk || 0, peakNow) };
+    await this.ctx.storage.put(key, counts);
+  }
+
+  /** A new connection: counted, and a signed-in player's first visit today is counted as returning or new (by key hash, not address). */
+  private async counted(peer: Peer, connections: number) {
+    try {
+      const keys: Counter[] = ['v'];
+      const who = peer.k || peer.a;
+      if (who) {
+        const seenKey = SEEN_PREFIX + who;
+        const marked = markSeen(await this.ctx.storage.get<SeenRecord>(seenKey), Date.now());
+        if (marked.store) await this.ctx.storage.put(seenKey, marked.store);
+        keys.push(...marked.counts);
+      }
+      await this.count(keys, Date.now(), connections);
+    } catch (e) { console.warn('[casino-room] counting failed', e); }
+  }
+
+  private deliver(entries: Array<{ ws: WebSocket; peer: Peer }>, outs: Out[]) {
+    for (const out of outs) {
+      const text = JSON.stringify(out.message);
+      for (const e of entries) {
+        if (!out.to.includes(e.peer.id)) continue;
+        try { e.ws.send(text); } catch { /* closing; its close handler cleans up */ }
+      }
+    }
+  }
+
+  /** A new connection, already upgraded: its peer record, the welcome, and the news for everyone else. (Separate from fetch so the
+   *  two-browser test, scripts/test-casino-together.mjs, can run the real room without a Workers runtime.) */
+  private async accept(server: WebSocket, address: string | null, hash160: string | null, watch: boolean) {
+    const now = Date.now();
+    const peer = newPeer(crypto.randomUUID(), address, hash160, now, watch);
+    this.ctx.acceptWebSocket(server);
+    server.serializeAttachment(peer);
+
+    // No address may hold more than two connections: the oldest extras are closed and their seats freed.
+    const fresh = this.peers();   // includes the connection just accepted
+    const dropped = overflowForAddress(fresh.map((e) => e.peer), address);
+    for (const extra of dropped) {
+      const target = fresh.find((e) => e.peer.id === extra.id);
+      if (!target) continue;
+      const changes = applyStand(fresh.map((e) => e.peer), extra.id);
+      this.save([target]);
+      this.announce(fresh, changes);
+      try { target.ws.close(4001, 'replaced'); } catch { /* already closing */ }
+    }
+
+    const live = fresh.filter((e) => !dropped.some((d) => d.id === e.peer.id));
+    const view = deriveView(live.map((e) => e.peer));
+    this.send(server, await this.welcome(live.map((e) => e.peer), peer, now));
+    void this.counted(peer, live.length);
+    const others = live.filter((e) => e.ws !== server);
+    // A second tab of someone already here is not a new person.
+    if (address && !others.some((e) => e.peer.a === address)) {
+      this.broadcast(others, { t: 'join', who: { a: address, n: shortAddress(address) } });
+    }
+    this.broadcast(others, { t: 'count', joined: view.joined, guests: view.guests }, true);
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -133,6 +256,13 @@ export class CasinoRoom extends DurableObject<Env> {
       return Response.json({ ok: true });
     }
 
+    // The anonymous day counters, newest first (the Pages Function /casino/room/stats passes this on; nothing personal is in it).
+    if (url.pathname === '/stats' && request.method === 'GET') {
+      const all = await this.ctx.storage.list<DayCounts>({ prefix: COUNTER_PREFIX, reverse: true, limit: 60 });
+      const days = [...all.entries()].map(([k, v]) => ({ day: k.slice(COUNTER_PREFIX.length), ...v }));
+      return Response.json({ days, now: Date.now() }, { headers: { 'cache-control': 'no-store' } });
+    }
+
     if (url.pathname.endsWith('/ws')) {
       if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a WebSocket.', { status: 426 });
       const entries = this.peers();
@@ -142,34 +272,9 @@ export class CasinoRoom extends DurableObject<Env> {
       const hash160 = request.headers.get('x-px-k') || null;
       // Only the Pages Function sets this (it drops every x-px-* header a browser sends). Missing = guests may not watch.
       const watch = request.headers.get('x-px-watch') === '1';
-      const now = Date.now();
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
-      const peer = newPeer(crypto.randomUUID(), address, hash160, now, watch);
-      this.ctx.acceptWebSocket(server);
-      server.serializeAttachment(peer);
-
-      // No address may hold more than two connections: the oldest extras are closed and their seats freed.
-      const fresh = this.peers();   // includes the connection just accepted
-      const dropped = overflowForAddress(fresh.map((e) => e.peer), address);
-      for (const extra of dropped) {
-        const target = fresh.find((e) => e.peer.id === extra.id);
-        if (!target) continue;
-        const changes = applyStand(fresh.map((e) => e.peer), extra.id);
-        this.save([target]);
-        this.announce(fresh, changes);
-        try { target.ws.close(4001, 'replaced'); } catch { /* already closing */ }
-      }
-
-      const live = fresh.filter((e) => !dropped.some((d) => d.id === e.peer.id));
-      const view = deriveView(live.map((e) => e.peer));
-      this.send(server, roomMessage(live.map((e) => e.peer), peer, now, ROOM_FEATURES));
-      const others = live.filter((e) => e.ws !== server);
-      // A second tab of someone already here is not a new person.
-      if (address && !others.some((e) => e.peer.a === address)) {
-        this.broadcast(others, { t: 'join', who: { a: address, n: shortAddress(address) } });
-      }
-      this.broadcast(others, { t: 'count', joined: view.joined, guests: view.guests }, true);
+      await this.accept(server, address, hash160, watch);
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -208,6 +313,24 @@ export class CasinoRoom extends DurableObject<Env> {
       }
       return;
     }
+    // The social layer's own limits (reactions, wins, drinks, the Salon relay): never counted against the seat and chat limit.
+    if (parsed.ok && (parsed.msg.t === 'react' || parsed.msg.t === 'win' || parsed.msg.t === 'gift' || parsed.msg.t === 'pvp')) {
+      const peers = entries.map((e) => e.peer), msg = parsed.msg;
+      if (msg.t === 'win') {
+        const r = routeWin(peers, mine.peer, msg, now);
+        this.save([mine]);
+        if (!r.ok) { this.send(ws, { t: 'err', code: r.code }); return; }
+        await this.ctx.storage.put(WINS_KEY, pushWin(await this.ctx.storage.get<WinEntry[]>(WINS_KEY), r.entry));
+        this.deliver(entries, r.out); void this.count(['w']);
+        return;
+      }
+      const r = msg.t === 'react' ? routeReact(peers, mine.peer, msg, now) : msg.t === 'gift' ? routeGift(peers, mine.peer, msg, now) : routeRelay(peers, mine.peer, msg, now);
+      this.save([mine]);
+      if (!r.ok) { this.send(ws, { t: 'err', code: r.code }); return; }
+      this.deliver(entries, r.out);
+      void this.count([msg.t === 'react' ? 'rx' : msg.t === 'gift' ? 'g' : 'pv']);
+      return;
+    }
     if (!takeRate(mine.peer, now)) {
       this.save([mine]);
       this.send(ws, { t: 'err', code: 'slow-down' });
@@ -223,7 +346,7 @@ export class CasinoRoom extends DurableObject<Env> {
         return;
       case 'hello': {
         this.save([mine]);
-        this.send(ws, roomMessage(peers, mine.peer, now, ROOM_FEATURES));
+        this.send(ws, await this.welcome(peers, mine.peer, now));
         return;
       }
       case 'sit': {
@@ -253,9 +376,18 @@ export class CasinoRoom extends DurableObject<Env> {
           this.send(ws, { t: 'reported', who: parsed.msg.who });
           return;
         }
+        if (parsed.msg.t === 'say' && parsed.msg.ch === 'table') {
+          // Table chat: only the people at the speaker's table (sitting or watching) hear it.
+          const audience = tableAudience(peers, mine.peer);
+          if (!audience) { this.send(ws, { t: 'err', code: 'no-table' }); return; }
+          this.deliver(entries, [{ to: audience.ids, message: { t: 'say', ch: 'table', tb: audience.table, from: { a: mine.peer.a, n: shortAddress(mine.peer.a) }, text: parsed.msg.text, at: now } }]);
+          void this.count(['ch']);
+          return;
+        }
         const routed = parsed.msg.t === 'say'
           ? routeSay(peers, mine.peer.id, parsed.msg.text, now)
           : routeDm(peers, mine.peer.id, parsed.msg.to, parsed.msg.text, now);
+        void this.count(['ch']);
         if (!routed.ok) { this.send(ws, { t: 'err', code: routed.code }); return; }
         const text = JSON.stringify(routed.message);
         for (const e of entries) {
@@ -268,6 +400,41 @@ export class CasinoRoom extends DurableObject<Env> {
         const list = setBlocks(peers, mine.peer.id, parsed.msg.list);
         this.save(entries);
         this.send(ws, list ? { t: 'blocks', list } : { t: 'err', code: 'sign-in-first' });
+        return;
+      }
+      case 'watch': {
+        mine.peer.wt = parsed.msg.tb;
+        this.save([mine]);
+        return;
+      }
+      case 'round': {
+        const info = await roundInfo(await this.roundSecret(), parsed.msg.tb, now);
+        this.save([mine]);
+        this.send(ws, { ...info, bets: currentBets(peers, parsed.msg.tb, now) });
+        return;
+      }
+      case 'bet': {
+        const r = applyBet(peers, mine.peer, parsed.msg, now);
+        this.save([mine]);
+        if (!r.ok) { this.send(ws, { t: 'err', code: r.code }); return; }
+        this.deliver(entries, r.out); void this.count(['b']);
+        return;
+      }
+      case 'seek': {
+        const r = applySeek(peers, mine.peer, parsed.msg, now);
+        this.save([mine]);
+        if (!r.ok) { this.send(ws, { t: 'err', code: r.code }); return; }
+        this.deliver(entries, r.out);
+        return;
+      }
+      case 'daily': {
+        this.save([mine]);
+        const who = mine.peer.k || mine.peer.a;
+        if (!who) { this.send(ws, { t: 'err', code: 'daily-sign-in-first' }); return; }
+        const key = DAILY_PREFIX + who;
+        const claim = claimDaily(await this.ctx.storage.get<DailyRecord>(key), now);
+        if (claim.store) { await this.ctx.storage.put(key, claim.store); void this.count(['dd']); }
+        this.send(ws, claim.reply);
         return;
       }
     }
@@ -292,7 +459,10 @@ export class CasinoRoom extends DurableObject<Env> {
       this.announce(entries, changes);
       const off = leaveFloor(entries.map((e) => upgradePeer(e.peer)), upgradePeer(peer), Date.now());
       if (off) this.broadcast(entries, off);
-      if (peer.a && !entries.some((e) => e.peer.a === peer!.a)) this.broadcast(entries, { t: 'leave', a: peer.a });
+      if (peer.a && !entries.some((e) => e.peer.a === peer!.a)) {
+        if (peer.sk) this.broadcast(entries, { t: 'seek', a: peer.a, off: true, at: Date.now() });
+        this.broadcast(entries, { t: 'leave', a: peer.a });
+      }
     }
     this.broadcast(entries, { t: 'count', ...this.counts(entries) }, true);
   }
