@@ -23,7 +23,8 @@ export type Who = { a: string; n?: string };
  * `who` is null for a note from the page itself ("Report sent."). `to` is set on a direct message: the person it was sent to.
  * A direct message is between two people, but it is not secret: it passes through the room service like everything else.
  */
-export type Line = { id: number; who: Who | null; mine: boolean; text: string; at: number; to?: Who };
+/** `tb` is set on a table-chat line: the table it was said at (only the people at that table heard it). */
+export type Line = { id: number; who: Who | null; mine: boolean; text: string; at: number; to?: Who; tb?: string };
 export type Side = 'left' | 'right';
 export type UiPrefs = { hidden: boolean; side: Side };
 export const DEFAULT_PREFS: UiPrefs = { hidden: false, side: 'left' };
@@ -75,7 +76,8 @@ export const ERROR_TEXT: Record<string, string> = {
   'no-such-player': 'That person is not in the room.',
   'gone': 'That person has left the room.',
   'too-many-blocks': 'Your block list is full (40 people).',
-  'rate-limited': 'You are sending too much. Wait a moment.'
+  'rate-limited': 'You are sending too much. Wait a moment.',
+  'no-table': 'Sit at a table (or stand by one) to talk to that table.'
 };
 /** Refusals that belong to chat (the room also sends others, such as a seat being taken, which are not chat's business). */
 export const isChatError = (code: unknown): boolean => typeof code === 'string' && Object.prototype.hasOwnProperty.call(ERROR_TEXT, code);
@@ -104,10 +106,11 @@ export class ChatLog {
 
   setBlocked(list: string[]) { this.blocked = new Set(list); }
 
-  add(who: Who | null, text: string, mine: boolean, at: number, to?: Who): Line | null {
+  add(who: Who | null, text: string, mine: boolean, at: number, to?: Who, tb?: string): Line | null {
     if (who && !mine && this.blocked.has(who.a)) return null;       // the room already keeps these from us; this covers a block made a moment ago
     const line: Line = { id: (this.seq += 1), who, mine, text, at };
     if (to) line.to = to;
+    if (tb) line.tb = tb;
     this.lines.push(line);
     if (this.lines.length > MAX_LINES) this.lines.splice(0, this.lines.length - MAX_LINES);
     return line;

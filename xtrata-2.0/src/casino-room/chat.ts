@@ -23,6 +23,8 @@ export interface ChatDeps {
   labelFor(address: string): string;
   /** A guest pressed Chat: bring up the Room panel so they can join. */
   joinPrompt(): void;
+  /** The table the visitor is at or watching, for table chat (null: not at a table, or the room has no table chat). */
+  table?(): string | null;
 }
 
 const CSS = `
@@ -42,6 +44,9 @@ const CSS = `
 #pxchat .ln .tx{color:#fff}
 #pxchat .ln.mine .nm{color:#9fd7b0}
 #pxchat .ln.dm .tx{color:#f1d2ff}
+#pxchat .ln.tb .tx{color:#bfe6ff}
+#pxchat .ln.tb .tag{color:#8fcbf0;font-size:11px;font-weight:700;letter-spacing:.04em;margin-right:2px}
+#pxchat .to.tb{background:rgba(30,70,110,.9);color:#d6eeff;border-color:#7fb8e0}
 #pxchat .ln.dm .tag{color:#d9a8f5;font-size:11px;font-weight:700;letter-spacing:.04em;margin-right:2px}
 #pxchat .ln.note{font-style:italic;color:var(--dim,#c9b894)}
 #pxchat .nm{all:unset;cursor:pointer;pointer-events:auto;color:var(--gold,#e3b84a);font-weight:700;margin-right:2px}
@@ -92,6 +97,7 @@ export function createChat(deps: ChatDeps) {
 
   let typing = false;
   let target: Who | null = null;            // who the typing line is talking to; null is the whole room
+  let toTable = false;                      // the typing line talks to the visitor's table only (table chat)
   let menuFor: Who | null = null;           // the person whose Message / Block / Report menu is open
   let reporting = false;
   let panel: '' | 'people' | 'blocked' = '';
@@ -139,8 +145,10 @@ export function createChat(deps: ChatDeps) {
   const hideBtn = smallButton('Hide chat', () => hide());
   const sideBtn = smallButton('', () => { prefs.side = prefs.side === 'left' ? 'right' : 'left'; savePrefs(); renderAll(); });
   const blockedBtn = smallButton('Blocked', () => togglePanel('blocked'));
+  const tableBtn = smallButton('Table', () => { toTable = !toTable; target = null; renderAll(); if (typing) input.focus(); });
+  tableBtn.id = 'pxchat-table';
   peopleBtn.id = 'pxchat-people'; hideBtn.id = 'pxchat-hide'; sideBtn.id = 'pxchat-side'; blockedBtn.id = 'pxchat-blocked';
-  bar.append(peopleBtn, hideBtn, sideBtn, blockedBtn);
+  bar.append(tableBtn, peopleBtn, hideBtn, sideBtn, blockedBtn);
   root.append(lines, newer, menu, side, form, bar);
 
   const button = el('button'); button.id = 'pxchat-btn'; button.type = 'button';
@@ -160,7 +168,7 @@ export function createChat(deps: ChatDeps) {
   };
 
   const makeLine = (line: Line) => {
-    const cls = !line.who ? 'ln note' : `ln${line.mine ? ' mine' : ''}${line.to ? ' dm' : ''}`;
+    const cls = !line.who ? 'ln note' : `ln${line.mine ? ' mine' : ''}${line.to ? ' dm' : ''}${line.tb ? ' tb' : ''}`;
     const row = el('div', undefined, cls);
     if (!line.who) { row.append(el('span', line.text, 'tx')); return row; }
     // Real spaces between the parts, so the line reads (and copies, and is spoken) as "Alice → you hello", not "Alice→ youhello".
@@ -170,6 +178,7 @@ export function createChat(deps: ChatDeps) {
       if (line.mine) parts.push(el('span', 'You', 'nm'), el('span', '→', 'tag'), nameButton(line.to));
       else parts.push(nameButton(line.who), el('span', '→ you', 'tag'));
     } else {
+      if (line.tb) parts.push(el('span', 'Table', 'tag'));
       parts.push(line.mine ? el('span', 'You', 'nm') : nameButton(line.who));
     }
     parts.push(el('span', line.text, 'tx'));
@@ -210,15 +219,25 @@ export function createChat(deps: ChatDeps) {
       : 'Casino chat: type a message');
   };
 
+  const tableNow = () => (deps.table ? deps.table() : null);
+  const TABLE_NAMES: Record<string, string> = { blackjack: 'blackjack', baccarat: 'baccarat', holdem: "Hold'em", roulette: 'roulette', videopoker: 'video poker', pvpholdem: "Salon Hold'em", liars: "Liar's Dice" };
   const paintForm = () => {
+    if (toTable && !tableNow()) toTable = false;          // walked away from the table: back to the room
     form.hidden = !typing || prefs.hidden;
-    toChip.hidden = !target;
+    toChip.hidden = !target && !toTable;
+    toChip.classList.toggle('tb', toTable && !target);
     if (target) {
       toChip.textContent = `To ${nameOf(target.a)} ×`;
       toChip.setAttribute('aria-label', `Writing to ${nameOf(target.a)}. Press to write to the whole room instead.`);
+    } else if (toTable) {
+      toChip.textContent = 'To this table ×';
+      toChip.setAttribute('aria-label', 'Writing to the people at your table. Press to write to the whole room instead.');
     }
     input.classList.toggle('dm', !!target);
-    const ph = target ? `Message ${nameOf(target.a)}` : 'Say something to the room';
+    const table = tableNow();
+    tableBtn.hidden = !table;
+    tableBtn.classList.toggle('on', toTable);
+    const ph = target ? `Message ${nameOf(target.a)}` : toTable && table ? `Say something to the ${TABLE_NAMES[table] || table} table` : 'Say something to the room';
     input.placeholder = ph; input.setAttribute('aria-label', ph);
   };
 
@@ -352,7 +371,7 @@ export function createChat(deps: ChatDeps) {
     panel = '';
     openTyping();
   }
-  const toRoom = () => { target = null; renderAll(); input.focus(); };
+  const toRoom = () => { target = null; toTable = false; renderAll(); input.focus(); };
 
   const sendBlocks = () => { if (deps.me() && deps.send({ t: 'blocks', list: blocks })) awaitingAt = Date.now(); };
   function setBlocked(who: Who, on: boolean) {
@@ -394,7 +413,7 @@ export function createChat(deps: ChatDeps) {
     const offline = 'Not connected to the room yet. Your message is still in the box.';
     if (!check.ok) { note(check.code === 'offline' ? offline : errorText(check.code)); renderAll(); return; }     // the text stays in the box
     if (target && roster.known && !roster.has(target.a)) { note(errorText('not-here')); renderAll(); return; }
-    const msg = target ? { t: 'dm', to: target.a, text: check.text } : { t: 'say', text: check.text };
+    const msg = target ? { t: 'dm', to: target.a, text: check.text } : toTable && tableNow() ? { t: 'say', text: check.text, ch: 'table' } : { t: 'say', text: check.text };
     if (!deps.send(msg)) { note(offline); renderAll(); return; }
     lastSentAt = now; awaitingAt = now; pending = { text: check.text, to: target };
     input.value = '';
@@ -426,12 +445,13 @@ export function createChat(deps: ChatDeps) {
      * Someone spoke: `say` to the room or `dm` to one person. The room sends our own lines back too (to every tab of ours), so our
      * screen shows exactly what was delivered.
      */
-    heard(m: { t?: string; from?: Who; to?: Who; text?: string }) {
+    heard(m: { t?: string; from?: Who; to?: Who; text?: string; ch?: string; tb?: string }) {
       if (!m?.from || typeof m.from.a !== 'string') return;
       const me = deps.me();
       const mine = !!me && m.from.a === me;
       const dm = m.t === 'dm' && m.to && typeof m.to.a === 'string' ? { a: m.to.a } : undefined;
-      const line = log.add({ a: m.from.a }, String(m.text ?? '').slice(0, MAX_CHARS * 2), mine, Date.now(), dm);
+      const tb = m.t === 'say' && m.ch === 'table' && typeof m.tb === 'string' ? m.tb : undefined;
+      const line = log.add({ a: m.from.a }, String(m.text ?? '').slice(0, MAX_CHARS * 2), mine, Date.now(), dm, tb);
       if (!line) return;
       saveSession();
       if (mine) { pending = null; stick = true; }

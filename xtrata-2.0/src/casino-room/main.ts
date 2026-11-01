@@ -32,6 +32,7 @@ import { roomProofData, type RoomChallenge } from '../../functions/lib/casino-ro
 import { casinoSignRoomJoin, casinoWalletUi, connectWallet, connectTrail, rememberProvider, walletMessage, type LinkedWallet, type WalletKind } from './wallet';
 import { createChat, type Chat } from './chat';
 import { isChatError } from './chat-core';
+import { baccaratCards, rouletteResult, verifySeed } from '../../functions/lib/casino-rounds';
 
 type Person = { key: string; spot: string; label: string; since: number };
 type Spin = { a: string; s: number[]; b: number; f: boolean };
@@ -47,6 +48,15 @@ interface PXRoomHost {
   move?(one: Walker | { key: string; off: true }): void;
   /** Whether the visitor is signed into the room (visible to others), and as which address. */
   self?(info: { signed: boolean; address: string | null }): void;
+  /**
+   * The social layer (docs/plans/CASINO-PLAY-TOGETHER-PLAN.md): every room message the page may want that this client does not
+   * handle itself (react, win, daily, round, bet, gift, seek, pvp, say), plus `{ t: 'room', features, wins, bets, seekers, at }`
+   * on each fresh connection and `{ t: 'err', code }` for a refusal of something the page sent. The page sends its own messages
+   * with a `px-room-send` window event ({ detail: message }); see onPageSend.
+   */
+  on?(message: Record<string, unknown>): void;
+  /** The table the visitor is at or watching (for table chat), or null. */
+  table?(): string | null;
 }
 type SpotView = { a: string; n: string; since: number };
 type Signed = { address: string; hash160?: string; expiresAt?: number };
@@ -122,6 +132,13 @@ const sendOwnMove = () => {
   else if (S.ownSent) { S.ws.send(JSON.stringify({ t: 'move', off: true })); S.ownSent = false; }
 };
 
+/** Hands a room message to the page's social layer. A failure there changes nothing here. */
+const tellPage = (m: Record<string, unknown>) => {
+  try { S.host?.on?.(m); } catch (e) { console.warn('[room] the page could not take a room message', e); }
+};
+/** Refusals of the page's own social messages (they go back to the page, never into the chat column). */
+const PAGE_CODES = /^(react|win|daily|round|gift|pvp|table|no-table)/;
+
 const pushPeople = () => {
   if (!S.host || S.service !== 'ok') return;
   const me = S.you?.a ?? null;
@@ -184,14 +201,16 @@ const connect = () => {
         S.standSent = null;                                 // a fresh connection holds no seat yet
         if (S.signed && S.you?.guest) S.signed = null;      // the session ran out (4 hours) while the page stayed open
         chat?.room(m.players, !!(S.you && !S.you.guest));
+        tellPage({ t: 'room', features: S.features.slice(), wins: m.wins || [], bets: m.bets || {}, seekers: m.seekers || [], at: m.at, you: S.you, watch: S.watch });
         break;
       case 'sat': S.spots[m.spot] = m.who; if (m.who?.a && S.walk.has(m.who.a)) walkOne(m.who.a, null); break;
       case 'stood': delete S.spots[m.spot]; if (S.standSent === m.spot) S.standSent = null; break;
       case 'moved': S.yielded = m.spot; break;       // another tab of this player sat down elsewhere: that tab wins; this one stops asking
       case 'count': S.joined = m.joined; S.guests = m.guests; break;
-      case 'say': case 'dm': chat?.heard(m); return;
-      case 'join': chat?.joined(m.who); return;
-      case 'leave': chat?.left(m.a); if (S.walk.has(m.a)) walkOne(m.a, null); return;
+      case 'say': case 'dm': chat?.heard(m); if (m.t === 'say') tellPage(m); return;
+      case 'join': chat?.joined(m.who); tellPage(m); return;
+      case 'leave': chat?.left(m.a); if (S.walk.has(m.a)) walkOne(m.a, null); tellPage(m); return;
+      case 'react': case 'win': case 'daily': case 'round': case 'bet': case 'gift': case 'seek': case 'pvp': tellPage(m); return;
       case 'reported': chat?.reported(); return;
       case 'play':
         // Another player's spin: the page spins its copy of that cabinet to the same stops. A failure there changes nothing else.
@@ -208,6 +227,7 @@ const connect = () => {
         return;
       case 'err':
         if (typeof m.code === 'string' && (m.code.startsWith('play-') || m.code.startsWith('move-'))) return;   // spins and moves the room did not pass on: nothing to show
+        if (typeof m.code === 'string' && PAGE_CODES.test(m.code)) { tellPage({ t: 'err', code: m.code }); if (m.code !== 'no-table') return; }
         if (m.code === 'no-such-spot') S.badSpot = S.want;
         else if (isChatError(m.code) && chat?.failed(m.code)) { /* chat showed it */ }
         else if (m.code === 'slow-down') S.lastSent = Date.now() + 3000;    // the seat updates were too quick: wait a few seconds before the next
@@ -404,7 +424,8 @@ function buildUi() {
     me: () => (S.you && !S.you.guest ? S.you.a : null),
     connected: () => S.connected,
     labelFor,
-    joinPrompt: () => { S.open = true; paint(); }
+    joinPrompt: () => { S.open = true; paint(); },
+    table: () => (S.features.includes('table') ? (S.host?.table?.() ?? null) : null)
   });
   wrap.append(btn, chat.button);
   const slot = S.host?.mount?.() ?? document.querySelector<HTMLElement>('#tools .rt');
@@ -463,6 +484,8 @@ function paint() {
     parts.push(fact('Be seen', 'Sit at a table or connect to a machine and your Adrian and name tag appear there for everyone in the room. Stand up or walk away and they go too.'));
     parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
     parts.push(fact('Live chat', 'Press Chat to talk to the room and scroll back through this session. Tap a name, or Here now, to send someone a direct message, block or report them. Messages are not secret; this session\'s chat is kept in this tab only and cleared when you leave the room.'));
+    if (S.features.includes('rounds')) parts.push(fact('Play together', 'Roulette and baccarat are shared tables: everyone there plays the same spin or hand, dealt by the room on a timer and checked by your own browser. In the Strata Salon you can take on another player instead of the house bot.'));
+    if (S.features.includes('react')) parts.push(fact('React', 'Press 😊 to react, buy your table a round, send someone a drink or invite a friend. Table chat (the Table button in Chat) reaches only the people at your table. Sign in each day for a free daily drop of LAYR.'));
     parts.push(el('p', 'Nothing here moves any money.', 'fact'));
     const b = el('button', 'Leave the room'); b.onclick = () => { void leave(); };
     parts.push(b);
@@ -520,6 +543,21 @@ const onOwnMove = (event: Event) => {
   sendOwnMove();
 };
 
+/**
+ * The page's own social messages (reactions, wins, the daily drop, shared-round bets, drinks, Salon moves...). Only what the room
+ * lists as a feature is sent; everything but `round` and `watch` needs the visitor signed in. A message that cannot go now is
+ * handed back as `{ t: 'unsent', msg }`, so the page never waits for an answer that will not come.
+ */
+const FEATURE_OF: Record<string, string> = { react: 'react', win: 'win', daily: 'daily', watch: 'table', round: 'rounds', bet: 'rounds', gift: 'gift', seek: 'pvp', pvp: 'pvp' };
+const onPageSend = (event: Event) => {
+  const msg = (event as CustomEvent).detail as Record<string, unknown> | undefined;
+  if (!msg || typeof msg.t !== 'string' || !FEATURE_OF[msg.t]) return;
+  const anyone = msg.t === 'round' || msg.t === 'watch';
+  const ok = S.service === 'ok' && S.connected && S.features.includes(FEATURE_OF[msg.t]) && (anyone || !!(S.signed && S.you && !S.you.guest));
+  if (!ok || S.ws?.readyState !== WebSocket.OPEN) { tellPage({ t: 'unsent', msg }); return; }
+  S.ws.send(JSON.stringify(msg));     // directly: social messages must not hold back the seat updates
+};
+
 const watchSeat = () => {
   const spot = S.host?.currentSpot() ?? null;
   if (spot !== S.want) { S.want = spot; S.yielded = null; S.standSent = null; pushPeople(); }   // the player moved: this tab speaks for them again
@@ -541,7 +579,11 @@ async function start() {
   window.addEventListener('px-casino-wallet-ready', () => paint());
   window.addEventListener('px-room-play', onOwnSpin);
   window.addEventListener('px-room-move', onOwnMove);
+  window.addEventListener('px-room-send', onPageSend);
 }
+
+// The shared rounds' fairness check and results, for the page (the same code the room's tests run): see casino-rounds.ts.
+(window as any).PXRounds = Object.freeze({ verifySeed, rouletteResult, baccaratCards });
 
 const attach = (host: PXRoomHost) => {
   if (S.host) return;
