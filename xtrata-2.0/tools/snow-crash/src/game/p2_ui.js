@@ -27,7 +27,7 @@ function update() {
   $('freeCount').textContent = state.free ? `${state.free} JACKED IN · 2×` : 'LAYR';
   $('spins').textContent = fmt(state.spins); $('wagered').textContent = fmt(state.wagered); $('paidOut').textContent = fmt(state.paidOut);
   $('meterSide').textContent = fmt(E.meter(state, shownBet)); $('potSide').textContent = fmt(state.pot);
-  $('gamble').hidden = $('gHeads').hidden = $('gHacks').hidden = $('collect').hidden = !canGamble; $('testBtn').hidden = !TESTBUILD;
+  $('gamble').hidden = $('gHeads').hidden = $('gHacks').hidden = $('collect').hidden = !canGamble; $('testBtn').hidden = !(TESTBUILD || lab.on);
   const label = spinLabel(f, broke);
   $('spinText').textContent = label; $('spinSub').textContent = SUB[label] || 'press space'; $('spin').classList.toggle('spinning', spinning); $('spin').classList.toggle('small', label.length > 7);
   $('spin').disabled = sessionLock || !LAYR.ready() || spinInputBusy(); $('spin').setAttribute('aria-busy', String(spinInputBusy())); $('turbo').disabled = spinInputBusy();

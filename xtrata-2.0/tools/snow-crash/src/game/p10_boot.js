@@ -31,7 +31,7 @@ $('account').onclick = openAccount; $('gamble').onclick = openGamble; $('rules')
 $('fsBtn').onclick = fsToggle; $('collect').onclick = () => { if (!state.gamble || busy() || locked()) return; state.gamble = 0; save(); toast('Win kept in your balance.'); sound('click'); update(); }; $('testBtn').onclick = openTest;
 $('gHeads').onclick = () => gambleCall('even'); $('gHacks').onclick = () => gambleCall('odd');
 $('sound').onclick = () => { state.muted = !state.muted; audioInit(); ambient(); save(); update(); toast(state.muted ? 'Sound off.' : 'Sound on.'); };
-addEventListener('keydown', e => { if (e.repeat || e.target.matches('input,textarea,select') || modalOpen()) return; if (e.code === 'Space') { e.preventDefault(); spinClick(); } else if (/^[1-9]$/.test(e.key) && pres && pres.bonus === 'vault') pickBind(Number(e.key) - 1); else if (e.key.toLowerCase() === 'm') $('sound').click(); else if (e.key.toLowerCase() === 'f') fsToggle(); else if (e.key === 'Escape') { if (autoLeft) { stopAuto(); status('AUTOPILOT OFF'); } } });
+addEventListener('keydown', e => { if (e.repeat || e.target.matches('input,textarea,select') || modalOpen()) return; if (e.code === 'Space') { e.preventDefault(); spinClick(); } else if (/^[1-9]$/.test(e.key) && pres && pres.bonus === 'vault') pickBind(Number(e.key) - 1); else if (e.key.toLowerCase() === 'm') $('sound').click(); else if (e.key.toLowerCase() === 'f') fsToggle(); else if (e.key.toLowerCase() === 'l') enterLab(); else if (e.key === 'Escape') { if (autoLeft) { stopAuto(); status('AUTOPILOT OFF'); } } });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { stopAuto(); if (ac) ac.suspend().catch(() => {}); } else if (ac && !state.muted) ac.resume().catch(() => {}); });
 /* ---------- Frame loop (idle frames capped near 30 fps) ---------- */
 let lastHl = -1, lastPoolSize = 0;
@@ -48,6 +48,7 @@ function animate(now) {
 }
 /* ---------- Boot ---------- */
 function resume() {
+  if (lab.on) { lab.on = false; E = E0; lab.real = null; lab.twins = null; }
   state = LAYR.openGame(GAME_ID, E); ensureExtras();
   if (state.pending) { lastResult = E.settle(state); setTimeout(() => toast('Your interrupted spin has been restored and settled.'), 900); }
   save(); update();
@@ -76,18 +77,43 @@ function craftRng(kind) { // pick reel stops that produce the outcome; every oth
 function seq(stops) { let i = 0; return n => i < stops.length ? stops[i++] : BF.randomInt(n); }
 function openTest() {
   const B = (k, t, sub) => `<button data-t="${k}"><b>${t}</b><br><small>${sub}</small></button>`;
-  showModal('test', 'Test tools.', `<p class="fine">Play-money test build only. Each button deals a real round through the real engine, then plays the scene.</p><div class="test-grid">${B('free', 'Jacked In', 'three Crash Punks logos')}${B('vault', 'The #1 Club', 'three This Is #1 marks')}${B('chain', 'Forever Street', 'five Forever tiles')}${B('jackpot', 'Total Crash', 'five Legendary punks')}${B('gamble', 'Heads or Hacks', 'a win to gamble')}${B('win', 'Any win', 'a plain line win')}${B('twins:none', 'Twins: none', 'every punk NOT YET FOREVER')}${B('twins:some', 'Twins: some', 'a third are forever')}${B('twins:all', 'Twins: all', 'every punk forever')}${B('power', 'Power up', 'switch the cabinet on')}${B('reduced', 'Reduced motion', 'toggle')}${B('reset', 'Reset balance', 'back to the play balance')}</div>`, 'TEST');
+  showModal('test', lab.on ? 'Bonus lab.' : 'Test tools.', `<p class="fine">${lab.on ? 'Practice play: your own LAYR, saved game, jackpot meters and Holder Pot are not touched, and nothing here is saved. Each button deals a real round through the real engine, then plays the scene.' : 'Play-money test build only. Each button deals a real round through the real engine, then plays the scene.'}</p><div class="test-grid">${B('free', 'Jacked In', 'three Crash Punks logos')}${B('vault', 'The #1 Club', 'three This Is #1 marks')}${B('chain', 'Forever Street', 'five Forever tiles')}${B('jackpot', 'Total Crash', 'five Legendary punks')}${B('gamble', 'Heads or Hacks', 'a win, then press GAMBLE')}${B('win', 'Any win', 'a plain line win')}${B('twins:none', 'Twins: none', 'every punk NOT YET FOREVER')}${B('twins:some', 'Twins: some', 'a third are forever')}${B('twins:all', 'Twins: all', 'every punk forever')}${B('power', 'Power up', 'switch the cabinet on')}${B('reduced', 'Reduced motion', 'toggle')}${B('reset', 'Reset balance', 'back to the play balance')}${lab.on ? B('leave', 'Leave the lab', 'back to your real game') : ''}</div>`, lab.on ? 'BONUS LAB' : 'TEST');
   document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {
     const k = b.dataset.t; let r = '';
     if (k.startsWith('twins:')) { r = JSON.stringify(TEST.setTwins(k.slice(6))); toast(`Twins set: ${k.slice(6)}`); closeModal(); return; }
     if (k === 'power') { TEST.setPower(true); toast('Cabinet powered on.'); closeModal(); return; }
     if (k === 'reduced') { TEST.setReduced(!state.reduced); toast(state.reduced ? 'Reduced motion on.' : 'Reduced motion off.'); return; }
-    if (k === 'reset') { try { if (window.parent.SC_RESET) window.parent.SC_RESET(); } catch (e) {} state.balance = Math.max(state.balance, 10000); save(); update(); toast('Balance topped up.'); closeModal(); return; }
+    if (k === 'leave') { closeModal(); exitLab(); return; }
+    if (k === 'reset') { if (lab.on) { state.balance = 10000; state.bet = 100; } else { try { if (window.parent.SC_RESET) window.parent.SC_RESET(); } catch (e) {} state.balance = Math.max(state.balance, 10000); } save(); update(); toast(lab.on ? 'Practice balance reset to 10,000.' : 'Balance topped up.'); closeModal(); return; }
     closeModal(); r = TEST.force(k); if (r !== 'ok') toast(`Could not start: ${r}`);
   });
 }
+
+/* ---------- Bonus lab: test every bonus on the live cabinet without touching anything real ---------- */
+function enterLab() {
+  if (lab.on) { openTest(); return true; }
+  if (sessionLock || !LAYR.ready()) { toast('Connect your LAYR account first, then open the Bonus lab.'); return false; }
+  if (spinning || pres || feature() || state.free > 0) { toast('Finish the current round first, then open the Bonus lab.'); return false; }
+  stopAuto(); closeModal();
+  lab.real = state; lab.twins = { helper: sources.helper, twins: sources.twins, flags: items.map(i => [i.forever, i.xtrataId]) };
+  const s = BF.fresh(); s.balance = 10000; s.powered = true;
+  for (const k of ['muted', 'volume', 'ambient', 'turbo', 'reduced', 'showLines']) s[k] = state[k];
+  lab.on = true; state = s; E = BF; ensureExtras();
+  screenDirty = true; update(); status('BONUS LAB · PRACTICE PLAY'); toast('Bonus lab: practice LAYR only. Your real balance and game are untouched.');
+  openTest(); return true;
+}
+function exitLab() {
+  if (!lab.on) return true;
+  if (spinning || pres || feature() || state.free > 0) { toast('Finish or skip the round first, then leave the lab.'); return false; }
+  stopAuto(); closeModal();
+  const t = lab.twins; items.forEach((it, k) => { if (t.flags[k]) { it.forever = t.flags[k][0]; it.xtrataId = t.flags[k][1]; } }); sources.helper = t.helper; sources.twins = t.twins;
+  rebuildPools(); refaceIdle(); liveLabel();
+  state = lab.real; E = E0; lab.on = false; lab.real = null; lab.twins = null; lastResult = null;
+  ensureExtras(); screenDirty = true; update(); status('BACK TO YOUR REAL GAME'); toast('Left the Bonus lab. Your real game is exactly as you left it.');
+  return true;
+}
 const TEST = {
-  force(kind) { if (spinning || pres || feature() || state.free > 0) return 'busy'; if (sessionLock) return 'locked'; if (dark()) state.powered = true; if (state.balance < state.bet) { toast('Reset the test balance first.'); return 'broke'; } const rng = craftRng(kind); if (!rng) return 'no-seed'; spinForced = rng; spin(); return 'ok'; },
+  force(kind) { if (spinning || pres || feature() || state.free > 0) return 'busy'; if (sessionLock && !lab.on) return 'locked'; if (dark()) state.powered = true; if (state.balance < state.bet) { toast('Reset the test balance first.'); return 'broke'; } const rng = craftRng(kind); if (!rng) return 'no-seed'; spinForced = rng; spin(); return 'ok'; },
   setTwins(mode) { const n = items.length; items.forEach((it, k) => { it.forever = mode === 'all' || (mode === 'some' && k % 3 === 0); it.xtrataId = it.forever ? String(90000 + it.id) : null; }); if (mode === 'none') { sources.helper = 'none'; sources.twins = 0; } else { sources.helper = 'live'; sources.twins = mode === 'all' ? 120 : 37; } rebuildPools(); refaceIdle(); liveLabel(); screenDirty = true; return { mode, forever: items.filter(i => i.forever).length, of: n, helper: sources.helper, twins: sources.twins }; },
   setPower(on) { state.powered = !!on; save(); update(); },
   setReduced(on) { state.reduced = !!on; save(); update(); },
@@ -122,7 +148,7 @@ window.PX_CASINO_ENGINE = {
   refreshAccount() { screenDirty = true; update(); drawScreen(performance.now()); },
   mechanics() { return { lever: leverStart > 0 ? { id: leverStart, elapsed: Math.max(0, performance.now() - leverStart), duration: 900, angle: 1.02 } : null, spinZ: null, armZ: null, bonus: pres ? { kind: pres.bonus, stage: pres.stage } : null, dark: dark() }; },
   async activate() { const epoch = pxSessionEpoch, ready = await pxClaimSession(); if (epoch !== pxSessionEpoch) throw new Error('Connection was cancelled. Reconnect to play.'); if (!ready) throw new Error(LAYR.error() || 'The LAYR account is unavailable. Close the other casino tab, then reconnect.'); pxEngineActive = true; animate.last = performance.now(); screenDirty = true; update(); drawScreen(performance.now()); },
-  deactivate() { if (spinning || pres) return false; stopAuto(); if (fs.active) fsExit(); if (pxEngineActive) save(); pxEngineActive = false; if (ac) ac.suspend().catch(() => {}); pxReleaseLease(); return true; },
+  deactivate() { if (spinning || pres) return false; if (lab.on && !exitLab()) return false; stopAuto(); if (fs.active) fsExit(); if (pxEngineActive) save(); pxEngineActive = false; if (ac) ac.suspend().catch(() => {}); pxReleaseLease(); return true; },
   action(name) { if (pxEngineActive) pxControl(name); },
   stopAuto() { stopAuto(); },
   tap(x, y) { screenTap(x, y); },

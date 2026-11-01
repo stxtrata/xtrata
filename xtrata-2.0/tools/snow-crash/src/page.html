@@ -43,7 +43,7 @@ header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:1
    same transaction rules as the casino's account: the balance can only change inside a committed engine call.
    Play balance only. Stored in this page's localStorage; Reset puts it back to the start balance.
    ------------------------------------------------------------------------------------------------ */
-window.SC_TEST_PAGE = true;
+window.SC_TEST_PAGE = !/[?&]prod\b/.test(location.search); /* ?prod mimics the casino: the game gets no test hooks, so only the in-game Bonus lab is available */
 (() => {
   const KEY = 'snowcrash.testpage.account.v1', START = 10000; let acct = null, owned = false, draft = null; const metadata = new WeakMap(), listeners = new Set();
   try { acct = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}

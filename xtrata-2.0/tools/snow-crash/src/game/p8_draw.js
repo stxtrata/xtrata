@@ -81,6 +81,7 @@ function drawScreen(now) {
     if (st === 'outro') drawWipe(now, p.t0, true); else if ((st === 'intro' || st === 'play') && now - p.t0 < 650 && !reduced() && p.stage === 'intro') drawWipe(now, p.t0, false);
   } else { text(sg, MSG(), 700, 812, 26, state.free ? CY : MAG2); }
   if (dark() && !p) drawStandby(now);
+  if (lab.on) { sg.save(); sg.fillStyle = '#ffd23f'; sg.fillRect(0, 0, 1400, 24); text(sg, 'BONUS LAB · PRACTICE LAYR · NOTHING HERE IS REAL · YOUR REAL GAME IS UNTOUCHED', 700, 17, 15, '#1a0a00', 'Arial', 'center', '900'); sg.restore(); }
   sg.drawImage(crtLayer, 0, 0);
   applyCrash(now);
   rev++; screenDirty = false; fsBlit();

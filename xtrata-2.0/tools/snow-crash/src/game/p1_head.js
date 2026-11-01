@@ -3,7 +3,7 @@
    Every outcome comes from BF before any punk is chosen for a cell, so the art can never change a result. */
 (() => {
 'use strict';let pxEngineActive=false;
-const GAME_ID='snow-crash', LAYR=window.ParallaxLAYRAccount, E=LAYR.machine(GAME_ID,BF);
+const GAME_ID='snow-crash', LAYR=window.ParallaxLAYRAccount, E0=LAYR.machine(GAME_ID,BF); let E=E0;
 if (window.__bfUnsupported) return;
 const $ = id => document.getElementById(id), fmt = n => (Math.round(n*100)/100).toLocaleString('en-GB',{maximumFractionDigits:2});
 const CACHE_KEY = 'xtrata.snowcrash.twins', bets = E.bets, THRESHOLD = 100, POT_RATE = .01;
@@ -14,6 +14,8 @@ const TIER = { cherry: { k: '4', name: 'TIER IV', col: '#39d8ff' }, lemon: { k: 
 const NAMES = { cherry: 'Tier IV punk', lemon: 'Tier III punk', chip: 'Tier II punk', block: 'Tier I punk', artifact: 'Rare punk', bitcoin: 'Legendary punk', wild: 'Hologram avatar', scatter: 'Crash Punks logo', vault: '#1 mark', chain: 'Forever tile' };
 const TESTBUILD = (() => { try { return !!window.parent.SC_TEST_PAGE; } catch (e) { return false; } })();
 let storageOK = true, sessionLock = true;
+// Bonus lab: a practice sandbox with its own state and the raw engine. While it is on, nothing touches the LAYR account, the saved game, the jackpot meters or the Holder Pot.
+const lab = { on: false, real: null, twins: null };
 let state = LAYR.openGame(GAME_ID,E);
 function weekKey(d = new Date()) { const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())), dow = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - dow); const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return `${t.getUTCFullYear()}-W${String(Math.ceil(((t - y0) / 864e5 + 1) / 7)).padStart(2, '0')}`; }
 const r2 = n => Math.round(n * 100) / 100;
@@ -26,13 +28,13 @@ function ensureExtras() {
   if (!state.potKey) state.potKey = wk;
   if (state.potKey !== wk) { state.lastPot = { key: state.potKey, pot: r2(state.pot), twins: Number.isFinite(sources.twins) ? sources.twins : null }; state.potKey = wk; state.pot = 0; }
 }
-function save() { if (!sessionLock) LAYR.saveGame(state); }
+function save() { if (!sessionLock && !lab.on) LAYR.saveGame(state); }
 let pres = null, spinForced = null, spinning = false, autoLeft = 0, autoTimer = 0, lastResult = null, lastDraw = 0, screenDirty = true, winUntil = 0, chainFlash = 0, animations = [], leverStart = 0, crash = null;
 const feature = () => E.feature(state);
 const busy = () => spinning || !!pres || !!feature() || state.free > 0;
 function toast(s) { $('toast').textContent = s; $('toast').classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => $('toast').classList.remove('show'), 3400); }
 function status(s) { $('status').textContent = s; screenDirty = true; }
-function locked(){if(sessionLock||!LAYR.ready()){toast(LAYR.error()||'LAYR account is not available.');return true;}return false;}
+function locked(){if(lab.on)return false;if(sessionLock||!LAYR.ready()){toast(LAYR.error()||'LAYR account is not available.');return true;}return false;}
 
 /* ---------- Standby: the cabinet ships dark until Crash Punks has a Forever Twins helper with enough twins ---------- */
 const sources = { registry: 'pending', helper: 'pending', twins: null, twinsFailed: false, images: 0, imageFailures: 0, bundled: 0, cached: false, done: false };

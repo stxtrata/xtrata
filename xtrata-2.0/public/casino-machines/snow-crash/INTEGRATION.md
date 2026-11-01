@@ -15,6 +15,18 @@
 
 Build sources are in `tools/snow-crash/` (parts of the game script, the page, the model builder, the build scripts). The engine and the LAYR adapter inside the game are copied byte for byte from Forever Twins; `tools/snow-crash/verify.py` checks that.
 
+## 0. Testing every bonus on the live cabinet: the Bonus lab
+
+The test page's Test panel only exists on the test page (it needs `window.parent.SC_TEST_PAGE`). In the casino the game ships with a **Bonus lab** built in, so every bonus can be tested on the real cabinet without risking anything real.
+
+**Open it** (cabinet must be seated and idle, LAYR connected): press **L**, or Settings → "Bonus lab", or from fullscreen use the bar's Settings button. The Test panel then opens. A yellow ribbon, "BONUS LAB · PRACTICE LAYR · NOTHING HERE IS REAL", stays on the screen while it is on.
+
+**What it does:** it swaps in a separate practice game (10,000 practice LAYR, its own bet, jackpot meters and Holder Pot) running on the raw Block Fortune engine. While it is on, nothing is written to the LAYR account, the saved game, the round log or the jackpot meters, and the dark-until-100-twins lock does not apply, so it works on the live cabinet today. The panel has a button for each of: Jacked In, The #1 Club, Forever Street, Total Crash, Heads or Hacks (a winning spin, then press GAMBLE), and any win; Twins none/some/all (restored when you leave); Reduced motion; Reset balance; Leave the lab. Every bonus plays its four stages (trigger, intro, play, summary) with Skip, on the room screen, the HTML port and the fullscreen bar.
+
+**Leave it** with "Leave the lab" in the panel, Settings, or by walking away (the machine leaves the lab by itself when the room deactivates it). Leaving restores the real game exactly as it was, and the twins view is restored.
+
+**Caveats:** (1) The room shows `ui().balance`, so the room's balance display shows the practice balance while the lab is on; the ribbon says so. (2) The outcomes are real engine outcomes, with the reel stops chosen to trigger the bonus you asked for. They show how the bonus plays, not how often it occurs. (3) It is open to anyone at the cabinet. That is safe while the lab cannot reach real balances, which is how it is built; if a real-money mode is ever added, gate the lab behind an owner check first. (4) `?prod` on the standalone test page (`/casino-machines/snow-crash/?prod`) removes the test hooks, so you can try the lab exactly as the casino will present it.
+
 ## 1. Add the pack
 
 In `public/casino/index.html`, find the script that starts `window.PX_MACHINE_PACKS=[{"name":"The Drop", ...`. Append the object in `pack.json` as a sixth entry, after Neon Vault, so the order becomes The Drop, Forever Twins, Deep Strata, Block Fortune, Neon Vault, **Snow Crash**. The order is the machine type index everywhere below.
