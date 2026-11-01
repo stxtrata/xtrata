@@ -18,6 +18,7 @@ import {
   verifyRoomProof
 } from '../../lib/casino-room-proof';
 import { burnNonce, roomConfig, roomJson, roomOffline, sameOriginRequest } from '../../lib/casino-room-http';
+import { primaryNameOf } from '../../lib/casino-room-bns';
 
 const MAX_BODY_BYTES = 4096;
 
@@ -29,7 +30,7 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
   if (request.method === 'GET') {
     const session = readRoomSession(config.secret, request);
     return roomJson(session
-      ? { address: session.a, hash160: session.k, expiresAt: session.exp }
+      ? { address: session.a, hash160: session.k, expiresAt: session.exp, bns: session.bn ?? null, bnsChecked: session.bc === true }
       : { address: null, expiresAt: null });
   }
 
@@ -67,11 +68,14 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
   }
   if (!fresh) return roomJson({ error: 'This sign-in request was already used. Start again.' }, 409);
 
+  // The Salon's rule (docs/plans/CASINO-SALON-BNS-PLAN.md): read the player's primary BNS name once, now. A failed read is kept
+  // as "not checked" (the Salon then offers "try again"), never as "no name".
+  const bns = await primaryNameOf(proof.address, env as Record<string, unknown>);
   const token = signRoomSession(config.secret, {
-    a: proof.address, k: proof.hash160, n: challenge.nonce, iat: now, exp: now + ROOM_SESSION_TTL_MS
+    a: proof.address, k: proof.hash160, n: challenge.nonce, iat: now, exp: now + ROOM_SESSION_TTL_MS, bn: bns.name, bc: bns.checked
   });
   return roomJson(
-    { address: proof.address, hash160: proof.hash160, network: challenge.network, expiresAt: now + ROOM_SESSION_TTL_MS },
+    { address: proof.address, hash160: proof.hash160, network: challenge.network, expiresAt: now + ROOM_SESSION_TTL_MS, bns: bns.name, bnsChecked: bns.checked },
     200,
     { 'Set-Cookie': roomSessionCookie(token, request) }
   );

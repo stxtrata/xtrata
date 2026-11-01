@@ -258,3 +258,35 @@ daily drops, Salon messages) are served by `GET /casino/room/stats` through the 
 To ship it: `npx wrangler deploy` here (nothing to migrate), then push the page. Tests: `functions/lib/__tests__/casino-social.test.ts`,
 `node scripts/test-salon-relay.mjs`, and `node scripts/test-casino-together.mjs`, which runs this Worker's real code (bundled with a
 small stand-in for the Workers runtime, `accept()` is split out of `fetch` for it) behind two real browsers on `/casino`.
+
+## Coming back (2026-11-01, docs/plans/CASINO-COME-BACK-PLAN.md)
+
+Phase 3: levels and badges, daily missions, weekly leaderboards, the evening slot tournament, a progressive jackpot, happy hour, friends,
+and the LAYR balance kept per player so it follows them between devices. Rules in `functions/lib/casino-progress.ts`; new features
+`progress, missions, boards, tourney, jackpot, bal, friends, hh`. Still no timers: a finished tournament is paid when someone next
+connects or plays. Two optional variables exist for tests only and must stay unset in production: `CASINO_SCHEDULE` (JSON, a shorter
+schedule) and `CASINO_JACKPOT_ODDS`. Storage keys: `p:` profiles, `b:` balances, `f:` friends, `wk:` boards, `t:` tournaments, `jp`.
+
+## The Salon: BNS names only (2026-11-01, docs/plans/CASINO-SALON-BNS-PLAN.md)
+
+The Salon (player-versus-player Hold'em and Liar's Dice, behind the arch) is for players with a primary BNS name.
+
+- **The name.** The primary BNS name (BNS-V2 `get-primary`) of the mainnet twin of the signed-in testnet address, read by the
+  Pages Function at sign-in (`POST /casino/room/session`) with one 3 s deadline across both Hiro bases, and cached (a name 10
+  minutes, "no name" 30 s; a failed read is never cached). Three answers, kept apart: a name, no name, or not checked. The
+  signed cookie carries them (`bn`, `bc`); `ws.ts` passes them to the room as `x-px-bns` and `x-px-bnsc` (only it can set
+  `x-px-*`). `POST /casino/room/bns` checks again for the signed-in address and renews the cookie with the same expiry; a failed
+  re-check keeps the earlier answer. Code: `functions/lib/casino-room-bns.ts`, `functions/casino/room/bns.ts`.
+- **The room refuses, without a checked name:** sitting at `pvpholdem.*` and `liars.*`, `move` positions inside the Salon
+  (`move-salon`), and `seek`/`pvp` sent by someone without a name or only to someone without one (`pvp-opponent-no-bns`). Codes:
+  `salon-sign-in-first`, `salon-bns-unchecked`, `salon-bns-required` (and the same with `pvp-`). The `room` message's `you` gains
+  `bns` and `bnsChecked`; `features` gains `salon-bns`, and the page applies the rule only to a room that lists it.
+- **The page.** A velvet rope and a "THE SALON · BNS NAMES ONLY" sign at the arch, an invisible wall across it from the casino
+  side only (leaving is never blocked), and a panel explaining why, with Join the room, Get a BNS name at bns.one, Check again or
+  Try again as fits. Every way to a Salon table (Strata Club, welcome buttons, table clicks, `?meet=`) goes through `setFocus`,
+  which refuses with the same panel. The "Private salon" camera view stays open to everyone.
+- **Switch for tests:** `CASINO_ROOM_BNS_LOOKUP=off` skips the lookup (everyone reads as "not checked", so the Salon is shut).
+  Leave it unset in production.
+- **Deploy order:** this Worker first, then the Pages site. An older Worker ignores the headers; an older page ignores the rule.
+- Tests: `functions/lib/__tests__/casino-room-bns.test.ts`, `functions/__tests__/casino-room-bns-functions.test.ts`,
+  `functions/lib/__tests__/casino-room-salon.test.ts`, and the Salon case in `functions/__tests__/casino-room-e2e.test.ts`.

@@ -49,6 +49,13 @@ interface PXRoomHost {
   /** Whether the visitor is signed into the room (visible to others), and as which address. */
   self?(info: { signed: boolean; address: string | null }): void;
   /**
+   * The Salon's door (docs/plans/CASINO-SALON-BNS-PLAN.md): whether the visitor may go into the Salon, as the room says.
+   * `allowed` (with their primary BNS name), `no-name`, `unchecked` (the lookup failed: offer "try again"), `guest` (join the room
+   * first), `connecting`, `offline`, or `unenforced` (an older room without the rule: the Salon behaves as it always did).
+   * The page asks for a fresh check with a `px-room-bns-check` window event; the answer comes back through on({ t: 'bns-check' }).
+   */
+  salon?(info: SalonInfo): void;
+  /**
    * The social layer (docs/plans/CASINO-PLAY-TOGETHER-PLAN.md): every room message the page may want that this client does not
    * handle itself (react, win, daily, round, bet, gift, seek, pvp, say), plus `{ t: 'room', features, wins, bets, seekers, at }`
    * on each fresh connection and `{ t: 'err', code }` for a refusal of something the page sent. The page sends its own messages
@@ -59,6 +66,8 @@ interface PXRoomHost {
   table?(): string | null;
 }
 type SpotView = { a: string; n: string; since: number };
+type SalonState = 'allowed' | 'no-name' | 'unchecked' | 'guest' | 'connecting' | 'offline' | 'unenforced';
+type SalonInfo = { state: SalonState; address: string | null; name: string | null };
 type Signed = { address: string; hash160?: string; expiresAt?: number };
 
 const S = {
@@ -137,7 +146,7 @@ const tellPage = (m: Record<string, unknown>) => {
   try { S.host?.on?.(m); } catch (e) { console.warn('[room] the page could not take a room message', e); }
 };
 /** Refusals of the page's own social messages (they go back to the page, never into the chat column). */
-const PAGE_CODES = /^(react|win|daily|round|gift|pvp|table|no-table)/;
+const PAGE_CODES = /^(react|win|daily|round|gift|pvp|table|no-table|log|bal|board|friends|tourney|card|mission)/;
 
 const pushPeople = () => {
   if (!S.host || S.service !== 'ok') return;
@@ -201,7 +210,9 @@ const connect = () => {
         S.standSent = null;                                 // a fresh connection holds no seat yet
         if (S.signed && S.you?.guest) S.signed = null;      // the session ran out (4 hours) while the page stayed open
         chat?.room(m.players, !!(S.you && !S.you.guest));
-        tellPage({ t: 'room', features: S.features.slice(), wins: m.wins || [], bets: m.bets || {}, seekers: m.seekers || [], at: m.at, you: S.you, watch: S.watch });
+        tellPage({ t: 'room', features: S.features.slice(), wins: m.wins || [], bets: m.bets || {}, seekers: m.seekers || [], at: m.at, you: S.you, watch: S.watch,
+          // phase 3: levels, the jackpot, the tournament, happy hour, and the visitor's own profile, balance, friends and notices
+          levels: m.levels || {}, jackpot: m.jackpot || null, tourney: m.tourney || null, hh: m.hh || null, me: m.me || null, bal: m.bal ?? null, friends: m.friends || null, notices: m.notices || [] });
         break;
       case 'sat': S.spots[m.spot] = m.who; if (m.who?.a && S.walk.has(m.who.a)) walkOne(m.who.a, null); break;
       case 'stood': delete S.spots[m.spot]; if (S.standSent === m.spot) S.standSent = null; break;
@@ -211,6 +222,8 @@ const connect = () => {
       case 'join': chat?.joined(m.who); tellPage(m); return;
       case 'leave': chat?.left(m.a); if (S.walk.has(m.a)) walkOne(m.a, null); tellPage(m); return;
       case 'react': case 'win': case 'daily': case 'round': case 'bet': case 'gift': case 'seek': case 'pvp': tellPage(m); return;
+      // phase 3 (functions/lib/casino-progress.ts)
+      case 'me': case 'hh': case 'lvl': case 'badge': case 'mission-done': case 'bal': case 'board': case 'friends': case 'tourney': case 'tourney-end': case 'jp': case 'jackpot': case 'card': tellPage(m); return;
       case 'reported': chat?.reported(); return;
       case 'play':
         // Another player's spin: the page spins its copy of that cabinet to the same stops. A failure there changes nothing else.
@@ -228,7 +241,7 @@ const connect = () => {
       case 'err':
         if (typeof m.code === 'string' && (m.code.startsWith('play-') || m.code.startsWith('move-'))) return;   // spins and moves the room did not pass on: nothing to show
         if (typeof m.code === 'string' && PAGE_CODES.test(m.code)) { tellPage({ t: 'err', code: m.code }); if (m.code !== 'no-table') return; }
-        if (m.code === 'no-such-spot') S.badSpot = S.want;
+        if (m.code === 'no-such-spot' || (typeof m.code === 'string' && m.code.startsWith('salon-'))) S.badSpot = S.want;   // a seat the room will not give: stop asking
         else if (isChatError(m.code) && chat?.failed(m.code)) { /* chat showed it */ }
         else if (m.code === 'slow-down') S.lastSent = Date.now() + 3000;    // the seat updates were too quick: wait a few seconds before the next
         return;
@@ -461,8 +474,42 @@ const tellSelf = () => {
   try { S.host?.self?.({ signed, address }); } catch (e) { console.warn('[room] the page could not take the sign-in state', e); }
 };
 
+/** The Salon's door, as the room sees the visitor (see PXRoomHost.salon). Told to the page whenever it changes. */
+const salonInfo = (): SalonInfo => {
+  const you = S.you as (null | { a: string | null; guest: boolean; bns?: string | null; bnsChecked?: boolean });
+  const address = you && !you.guest ? you.a : null;
+  if (S.service === 'offline') return { state: 'offline', address: null, name: null };
+  if (!S.connected || !you) return { state: 'connecting', address: null, name: null };
+  if (!S.features.includes('salon-bns')) return { state: 'unenforced', address, name: null };
+  if (you.guest || !S.signed) return { state: 'guest', address: null, name: null };
+  if (you.bnsChecked !== true) return { state: 'unchecked', address, name: null };
+  if (!you.bns) return { state: 'no-name', address, name: null };
+  return { state: 'allowed', address, name: you.bns };
+};
+let toldSalon = '';
+const tellSalon = () => {
+  const info = salonInfo(), key = JSON.stringify(info);
+  if (key === toldSalon) return;
+  toldSalon = key;
+  try { S.host?.salon?.(info); } catch (e) { console.warn('[room] the page could not take the Salon state', e); }
+};
+/** "Check my BNS name again": the session is renewed with the new answer, then the room is rejoined so it sees it too. */
+let bnsChecking = false;
+const onBnsCheck = async () => {
+  if (bnsChecking || S.service !== 'ok') return;
+  bnsChecking = true;
+  try {
+    const { res, body } = await postJson('/casino/room/bns', { method: 'POST' });
+    tellPage({ t: 'bns-check', ok: res.ok, bns: body?.bns ?? null, bnsChecked: body?.bnsChecked === true, failed: !res.ok || body?.failed === true, error: res.ok ? null : body?.error || `The room answered ${res.status}.` });
+    if (res.ok) reconnect();
+  } catch {
+    tellPage({ t: 'bns-check', ok: false, bns: null, bnsChecked: false, failed: true, error: 'Could not reach the room.' });
+  } finally { bnsChecking = false; }
+};
+
 function paint() {
   tellSelf();
+  tellSalon();
   if (!wrap || !btn || !panel) return;
   const signed = !!(S.signed && S.you && !S.you.guest);
   btn.className = S.connected ? 'live' : 'wait';
@@ -548,7 +595,10 @@ const onOwnMove = (event: Event) => {
  * lists as a feature is sent; everything but `round` and `watch` needs the visitor signed in. A message that cannot go now is
  * handed back as `{ t: 'unsent', msg }`, so the page never waits for an answer that will not come.
  */
-const FEATURE_OF: Record<string, string> = { react: 'react', win: 'win', daily: 'daily', watch: 'table', round: 'rounds', bet: 'rounds', gift: 'gift', seek: 'pvp', pvp: 'pvp' };
+const FEATURE_OF: Record<string, string> = {
+  react: 'react', win: 'win', daily: 'daily', watch: 'table', round: 'rounds', bet: 'rounds', gift: 'gift', seek: 'pvp', pvp: 'pvp',
+  log: 'progress', mission: 'missions', card: 'progress', board: 'boards', tjoin: 'tourney', bal: 'bal', friends: 'friends'
+};
 const onPageSend = (event: Event) => {
   const msg = (event as CustomEvent).detail as Record<string, unknown> | undefined;
   if (!msg || typeof msg.t !== 'string' || !FEATURE_OF[msg.t]) return;
@@ -565,12 +615,13 @@ const watchSeat = () => {
 };
 
 async function start() {
+  const offline = () => { S.service = 'offline'; tellSalon(); };   // the casino plays on; only the Salon's door needs to know
   try {
     const { res, body } = await postJson('/casino/room/session');
-    if (res.status === 503) return;          // the room is switched off: say nothing, change nothing
+    if (res.status === 503) return offline();          // the room is switched off: say nothing, change nothing
     if (res.ok && body?.address) S.signed = { address: body.address, hash160: body.hash160, expiresAt: body.expiresAt };
     S.service = 'ok';
-  } catch { return; }                       // unreachable: fail open
+  } catch { return offline(); }                       // unreachable: fail open
   buildUi(); paint();
   connect();
   window.setInterval(watchSeat, 250);
@@ -580,6 +631,7 @@ async function start() {
   window.addEventListener('px-room-play', onOwnSpin);
   window.addEventListener('px-room-move', onOwnMove);
   window.addEventListener('px-room-send', onPageSend);
+  window.addEventListener('px-room-bns-check', () => { void onBnsCheck(); });
 }
 
 // The shared rounds' fairness check and results, for the page (the same code the room's tests run): see casino-rounds.ts.
@@ -596,5 +648,5 @@ if (existing) attach(existing); else window.addEventListener('px-room-host', () 
 // For tests and bug reports only: read-only.
 (window as any).__pxRoom = {
   chat: () => chat?.debug() ?? null,
-  get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, watch: S.watch, prompted: S.prompted, open: S.open, busy: S.busy, error: S.error, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, features: S.features.slice(), walkers: [...S.walk.keys()], ownMove: S.ownMove, trail: connectTrail.slice() }; }
+  get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, watch: S.watch, prompted: S.prompted, open: S.open, busy: S.busy, error: S.error, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, features: S.features.slice(), walkers: [...S.walk.keys()], ownMove: S.ownMove, salon: salonInfo(), trail: connectTrail.slice() }; }
 };

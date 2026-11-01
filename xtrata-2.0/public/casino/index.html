@@ -8911,7 +8911,27 @@ function applyTestnetFunding(proof){
       solidsExtra.push({ k: 'b', x0: SX0 - 0.5, x1: SX0, z0: SZ0 - 0.5, z1: zw + 0.1 });
       solidsExtra.push({ k: 'b', x0: SX1, x1: SX1 + 0.5, z0: SZ0 - 0.5, z1: zw + 0.1 });
       solidsExtra.push({ k: 'b', x0: SX0, x1: SX1, z0: SZ0 - 0.5, z1: SZ0 });
-      room.salon = { AX, AW, AH, SX0, SX1, SZ0, SH };
+      room.salon = { AX, AW, AH, SX0, SX1, SZ0, SH, zw };
+      // The Salon is for players with a primary BNS name (docs/plans/CASINO-SALON-BNS-PLAN.md). Closed until room.js says
+      // otherwise; an older room without the rule ('unenforced') leaves it open as before.
+      room.salonDoor = { state: 'connecting', address: null, name: null };
+      room.salonOpen = () => room.salonDoor.state === 'allowed' || room.salonDoor.state === 'unenforced';
+      {
+        const rope = new THREE.Group(); rope.name = 'Salon rope'; scene.add(rope);
+        const velvet = new THREE.MeshStandardMaterial({ color: 0x7a0f1c, roughness: 0.82, metalness: 0.05 }), rz = zw + 0.42, px = AW / 2 - 0.12;
+        [-1, 1].forEach((k) => {
+          cyl(0.035, 0.05, 0.92, gold, AX + k * px, 0.46, rz, rope, 16); cyl(0.13, 0.15, 0.04, gold, AX + k * px, 0.02, rz, rope, 20);
+          const top = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 10), gold); top.position.set(AX + k * px, 0.95, rz); rope.add(top);
+        });
+        const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(AX - px, 0.9, rz), new THREE.Vector3(AX, 0.52, rz), new THREE.Vector3(AX + px, 0.9, rz));
+        rope.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.024, 8, false), velvet));
+        rope.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.userData.noShadow = true; } });
+        room.salonRope = rope;
+        const plaque = pxSign(scene, AX, AH + 0.6, zw + 0.2, 2.3, 0.5, 'THE SALON', 'B N S   N A M E S   O N L Y', false); plaque.name = 'Salon rule sign';
+        // The invisible wall: across the arch, only while the door is closed to the visitor, and only from the casino side,
+        // so someone already inside (who signs out, say) can always walk out.
+        solidsExtra.push({ k: 'b', x0: AX - AW / 2, x1: AX + AW / 2, z0: zw - 0.12, z1: zw + 0.12, active: () => !room.salonOpen() && player.z > zw - 0.05 });
+      }
     }
   }
   upgradeRoom();
@@ -11319,6 +11339,10 @@ function applyTestnetFunding(proof){
   }
 
   function setFocus(s, seat) {
+    if (s && (s.id === 'pvpholdem' || s.id === 'liars') && room.salonOpen && !room.salonOpen()) {   // the Salon's rule (CASINO-SALON-BNS-PLAN)
+      if (room.salonDoorShow) room.salonDoorShow('table'); else toast('The Salon is for players with a BNS name.');
+      return;
+    }
     if(s&&barUI?.isOpen)barUI.close();
     if(s&&!layrAccount.ready()){toast(layrAccount.error()||'LAYR account is unavailable.');return;}
     if (focus && s && focus !== s && !focus.canLeave()) { toast('Finish the hand first'); return; }
@@ -11772,6 +11796,83 @@ function applyTestnetFunding(proof){
   }
   let readySent = false, drawn = 0;
   initReviewFeatures();$('intro').classList.add('on'); render(); paintWalkHud(); if (FROM_ARCADE) startAtDoor(); frame();
+  // ---------------- the Salon's door (docs/plans/CASINO-SALON-BNS-PLAN.md) ----------------
+  // The Salon (player-versus-player Hold'em and Liar's Dice) is for players with a primary BNS name. room.js tells the page what
+  // the room says about the visitor (PXRoomHost.salon); the room itself refuses Salon seats, Salon floor and matches without a
+  // name, so this is the explanation and the walking part: a velvet rope and an invisible wall in the arch (room.salonOpen), and
+  // this panel. Leaving the Salon is never blocked; looking in from the "Private salon" view stays open to everyone.
+  {
+    if (!room.salonOpen) { room.salonDoor = { state: 'connecting', address: null, name: null }; room.salonOpen = () => room.salonDoor.state === 'allowed' || room.salonDoor.state === 'unenforced'; }   // no arch drawn (no 3D)
+    const css = document.createElement('style');
+    css.textContent = '#pxSalonDoor{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:46;width:min(440px,calc(100vw - 24px));padding:14px 16px 16px;'
+      + 'background:linear-gradient(135deg,#101d30f5,#070e19f5);backdrop-filter:blur(8px);border:1px solid #b18d53;border-top:3px solid #dfbb7d;border-radius:8px;box-shadow:0 14px 50px #000a;color:#f6eddb;font:13px/1.5 Arial,Helvetica,sans-serif}'
+      + '#pxSalonDoor[hidden]{display:none!important}#pxSalonDoor small{display:block;font:10px Arial;letter-spacing:.18em;color:#b99c70}'
+      + '#pxSalonDoor h3{margin:3px 34px 6px 0;font:400 20px Georgia,serif;color:#f0dab5}#pxSalonDoor p{margin:0 0 10px;color:#c9d3e0}#pxSalonDoor p.note{color:#e8cf9f;margin-top:-2px}'
+      + '#pxSalonDoor .row{display:flex;gap:8px;flex-wrap:wrap}#pxSalonDoor .row>*{flex:1 1 150px;min-height:42px;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;border-radius:6px;font:600 13px Arial;text-decoration:none;cursor:pointer;box-sizing:border-box}'
+      + '#pxSalonDoor .go{color:#17110b;background:linear-gradient(100deg,#c39a55,#ecca8f);border:1px solid #f0d39c}#pxSalonDoor .alt{color:#e8cf9f;background:#13263a;border:1px solid #c4a26188}'
+      + '#pxSalonDoor button:disabled{opacity:.55;cursor:default}#pxSalonDoor .x{position:absolute;top:8px;right:8px;min-height:34px;padding:0 10px;font:16px Arial;color:#d4c8b6;background:none;border:0;cursor:pointer}'
+      + '@media(max-width:620px){#pxSalonDoor{left:0;right:0;bottom:0;transform:none;width:100vw;border-radius:14px 14px 0 0;padding-bottom:calc(16px + env(safe-area-inset-bottom))}}';
+    document.head.append(css);
+    const el = document.createElement('div'); el.id = 'pxSalonDoor'; el.hidden = true; el.setAttribute('role', 'dialog'); el.setAttribute('aria-live', 'polite'); el.setAttribute('aria-label', 'The Salon: BNS names only');
+    document.body.append(el);
+    let shown = false, why = '', checking = false, note = '', welcomeTimer = 0;
+    const short = (a) => (!a ? '' : a.length <= 12 ? a : a.slice(0, 5) + '…' + a.slice(-4));
+    const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
+    const button = (text, cls, onclick, disabled) => { const b = node('button', text, cls); b.type = 'button'; b.onclick = onclick; b.disabled = !!disabled; return b; };
+    const check = () => { if (checking) return; checking = true; note = ''; paint(); window.dispatchEvent(new Event('px-room-bns-check')); };
+    function paint() {
+      if (!shown) { el.hidden = true; return; }
+      const d = room.salonDoor || { state: 'connecting' }, parts = [];
+      parts.push(button('✕', 'x', hide), node('small', 'PRIVATE SALON · PLAYER VS PLAYER'));
+      const row = node('div', undefined, 'row');
+      if (d.state === 'allowed' || d.state === 'unenforced') {
+        parts.push(node('h3', d.name ? 'Welcome, ' + d.name + '.' : 'Welcome.'), node('p', 'The Salon is open to you.'));
+      } else if (d.state === 'guest') {
+        parts.push(node('h3', 'BNS names only'), node('p', 'The Salon is for players with a primary BNS name. Join the room so we can check yours: one free signature, no transaction.'));
+        row.append(button('Join the room', 'go', () => { const b = document.getElementById('pxroom-btn'); if (b) b.click(); }));
+      } else if (d.state === 'no-name') {
+        parts.push(node('h3', 'BNS names only'), node('p', short(d.address) + ' has no primary BNS name. Names are read from Stacks mainnet for this wallet; if you already own one, set it as your primary name.'));
+        const link = node('a', 'Get a BNS name at bns.one ↗', 'go'); link.href = 'https://bns.one'; link.target = '_blank'; link.rel = 'noopener';
+        row.append(link, button(checking ? 'Checking…' : 'I have one now: check again', 'alt', check, checking));
+      } else if (d.state === 'unchecked') {
+        parts.push(node('h3', 'BNS names only'), node('p', 'We couldn’t check your BNS name just now, so the Salon stays closed for the moment.'));
+        row.append(button(checking ? 'Checking…' : 'Try again', 'go', check, checking));
+      } else if (d.state === 'offline') {
+        parts.push(node('h3', 'BNS names only'), node('p', 'The Salon needs the casino room to check BNS names, and the room is offline right now. The rest of the casino is open.'));
+      } else {
+        parts.push(node('h3', 'BNS names only'), node('p', 'Checking your BNS name with the room…'));
+      }
+      if (note) parts.push(node('p', note, 'note'));
+      if (row.childNodes.length) parts.push(row);
+      el.replaceChildren(...parts); el.hidden = false;
+    }
+    function show(reason) { why = reason; shown = true; note = ''; clearTimeout(welcomeTimer); paint(); }
+    function hide() { shown = false; clearTimeout(welcomeTimer); paint(); }
+    room.salonDoorShow = show;
+    // what room.js says (PXRoomHost.salon): the rope goes when the door opens, and an open panel says welcome, then goes
+    room.salonDoorSet = (info) => {
+      const was = room.salonOpen();
+      room.salonDoor = { state: String(info && info.state || 'connecting'), address: info && info.address || null, name: info && info.name || null };
+      if (room.salonRope) room.salonRope.visible = !room.salonOpen();
+      if (shown) { paint(); if (!was && room.salonOpen()) { clearTimeout(welcomeTimer); welcomeTimer = setTimeout(hide, 2600); } }
+    };
+    // the answer to "check again" (on({ t: 'bns-check' })); the room is rejoined by room.js, and salonDoorSet follows
+    room.salonDoorChecked = (m) => {
+      checking = false;
+      note = m.bns ? 'Found ' + m.bns + '. Opening the door…' : m.failed ? 'That check didn’t work. Try again in a moment.' : m.bnsChecked ? 'Still no primary BNS name on this wallet.' : (m.error || '');
+      paint();
+    };
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && shown) hide(); });
+    // walking up to the rope shows why it is there; walking away (or the door opening) puts the panel away again
+    setInterval(() => {
+      const s = room.salon; if (!s) return;
+      if (room.salonRope) room.salonRope.visible = !room.salonOpen();
+      if (mode !== 'walk' || room.salonOpen()) return;
+      const atRope = Math.abs(player.x - s.AX) < s.AW / 2 + 0.45 && player.z > s.zw && player.z < s.zw + 1.15;
+      if (atRope && !shown) show('door');
+      else if (shown && why === 'door' && Math.hypot(player.x - s.AX, player.z - s.zw) > 2.8) hide();
+    }, 200);
+  }
   // ---------------- other people in the room (docs/plans/CASINO-PRESENCE-PLAN.md, P1) ----------------
   // room.js (beside this page) talks to the live room service and hands the people over through window.PXRoomHost. With the room
   // switched off, or room.js missing, none of this ever runs and the casino plays exactly as before. It never touches game state or money.
@@ -11816,15 +11917,32 @@ function applyTestnetFunding(proof){
       sp.scale.set(0.8, 0.15, 1); sp.renderOrder = 20; sp.visible = false; sp.name = 'Room name tag'; scene.add(sp);
       return { c, tex, sp, text: null };
     }
-    function drawTag(t, text) {
-      if (t.text === text) return; t.text = text;
+    // Phase 3 (docs/plans/CASINO-COME-BACK-PLAN.md): a player's level and their rarest badge ride on the name tag. The room sends
+    // them (`levels` on arrival, `lvl` on a change); a key with none shows the plain tag, as before.
+    const tagLv = new Map();
+    const BADGE_EMO = { 'first-win': '🍀', hundred: '💯', 'big-win': '💥', monster: '🐉', 'high-roller': '💎', 'grand-tour': '🗺️', 'slot-fan': '🎰', regular: '📅', generous: '🍾', party: '🎉', marathon: '🏃', contender: '🎟️', champion: '🏆', jackpot: '👑', 'level-10': '⭐' };
+    function drawTag(t, text, key) {
+      const lv = key ? tagLv.get(key) : null, sig = text + '|' + (lv ? lv.lv + (lv.bd || '') : '');
+      if (t.text === sig) return; t.text = sig;
       const g = t.c.getContext('2d'), label = text.length > 22 ? text.slice(0, 21) + '…' : text;
       g.clearRect(0, 0, 512, 96); g.font = '600 44px system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
-      const w = Math.min(500, Math.ceil(g.measureText(label).width) + 56), x = (512 - w) / 2;
+      const lw = lv ? 60 : 0, bw = lv && lv.bd && BADGE_EMO[lv.bd] ? 50 : 0;
+      const w = Math.min(500, Math.ceil(g.measureText(label).width) + 56 + lw + bw), x = (512 - w) / 2;
       g.fillStyle = 'rgba(10,6,9,.82)'; g.strokeStyle = 'rgba(227,184,74,.85)'; g.lineWidth = 3;
       g.beginPath(); (g.roundRect ? g.roundRect(x, 12, w, 72, 36) : g.rect(x, 12, w, 72)); g.fill(); g.stroke();
-      g.fillStyle = '#f6ead0'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, 256, 50);
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      if (lv) {
+        g.fillStyle = '#e3b84a'; g.beginPath(); g.arc(x + 40, 48, 27, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#1a1006'; g.font = '800 ' + (lv.lv >= 100 ? 24 : 32) + 'px system-ui,-apple-system,Segoe UI,Roboto,sans-serif'; g.fillText(String(lv.lv), x + 40, 50);
+        g.font = '600 44px system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+      }
+      g.fillStyle = '#f6ead0'; g.fillText(label, x + lw + (w - lw - bw) / 2, 50);
+      if (bw) { g.font = '40px system-ui,Apple Color Emoji,Segoe UI Emoji,sans-serif'; g.fillText(BADGE_EMO[lv.bd], x + w - 44, 52); }
       t.tex.needsUpdate = true;
+    }
+    function retag(key) {
+      for (const e of pool) if (e.on && e.key === key && e.tag.text) drawTag(e.tag, e.tag.text.split('|')[0], key);
+      const w = walkers.get(key); if (w && w.e) drawTag(w.e.tag, w.label || shortKey(w.key), key);
     }
 
     const pool = [], pending = [], remote = new Set(); let lastBuild = 0;
@@ -11846,7 +11964,7 @@ function applyTestnetFunding(proof){
       const w = wearOf(p.key), s = e.spec; s.x = pl.x; s.z = pl.z; s.yaw = pl.yaw; s.wear = w;
       const c = s.ctrl; if (c) { c.object.position.set(pl.x, 0, pl.z); c.object.rotation.y = pl.yaw; recolour(c, w); }
       e.col.x = pl.x; e.col.z = pl.z;
-      drawTag(e.tag, p.label); e.tag.sp.position.set(pl.x, pl.stand ? 2.02 : 1.6, pl.z);
+      drawTag(e.tag, p.label, p.key); e.tag.sp.position.set(pl.x, pl.stand ? 2.02 : 1.6, pl.z);
     }
     // an existing figure is moved at once; a new one is built a little later, one at a time, so a crowded room never stalls a frame
     function assign(p, create) {
@@ -11896,6 +12014,7 @@ function applyTestnetFunding(proof){
           X.settle = function (state) {
             const p = state && state.pending, r = os.apply(this, arguments);
             try { if (p && !p.free && r && r.total > 0 && machineOpen && activeCabinet && MACH[activeCabinet.type] === id) social.ownWin(id, r.total, p.bet); } catch (e) { /* never in the way */ }
+            try { if (p && r && machineOpen && activeCabinet && MACH[activeCabinet.type] === id) social.ownSpin(id, p, r); } catch (e) { /* never in the way */ }      // levels, missions, the tournament and the jackpot
             return r;
           };
         }
@@ -12038,7 +12157,7 @@ function applyTestnetFunding(proof){
       if (!p || typeof p.key !== 'string' || ![p.x, p.z, p.r].every(Number.isFinite)) return;
       let w = walkers.get(p.key);
       if (!w) { w = { key: p.key, label: p.label || '', buf: [], e: null, x: p.x, z: p.z, yaw: p.r, moving: false, slowFor: 0, speed: 0 }; walkers.set(p.key, w); }
-      if (p.label && p.label !== w.label) { w.label = p.label; if (w.e) drawTag(w.e.tag, w.label); }
+      if (p.label && p.label !== w.label) { w.label = p.label; if (w.e) drawTag(w.e.tag, w.label, w.key); }
       if (!live && w.buf.length) return;                    // the room's list only says where someone already is
       const at = Number(p.at) || Date.now();
       if (live) walkClockFrom(at);
@@ -12069,7 +12188,7 @@ function applyTestnetFunding(proof){
         if (!e) { if (now - lastBuild < 120) continue; lastBuild = now; e = makeWalker(); }   // one new figure at a time
         const wear = wearOf(w.key); e.key = w.key; w.e = e; e.spec.wear = wear; e.spec.on = true;
         if (e.spec.ctrl) recolour(e.spec.ctrl, wear);
-        drawTag(e.tag, w.label || shortKey(w.key));
+        drawTag(e.tag, w.label || shortKey(w.key), w.key);
       }
     }
     function walkFrame(now, dt) {
@@ -12310,7 +12429,7 @@ function applyTestnetFunding(proof){
           parts.push(mk('h4', giftTo === 'table' ? 'A round for your table' : 'A drink for ' + nameOf(giftTo)));
           const pick = mk('div', undefined, 'pick');
           for (const [d, [emo, name, price]] of Object.entries(DRINK)) {
-            const b = mk('button', `${emo} ${name[0].toUpperCase() + name.slice(1)} · ${price} LAYR${giftTo === 'table' ? ' each' : ''}`);
+            const b = mk('button', `${emo} ${name[0].toUpperCase() + name.slice(1)} · ${priceOf(d)} LAYR${giftTo === 'table' ? ' each' : ''}${hhOn() ? ' (happy hour)' : ''}`);
             b.onclick = () => { gift(giftTo, d); trayMode = ''; tray.hidden = true; }; pick.append(b);
           }
           parts.push(pick); const back = mk('button', 'Back'); back.onclick = () => { trayMode = ''; paintTray(); }; const row = mk('div', undefined, 'row'); row.append(back); parts.push(row);
@@ -12342,7 +12461,7 @@ function applyTestnetFunding(proof){
         send({ t: 'react', e: k });
       }
       function gift(to, d) {
-        const price = DRINK[d][2], n = to === 'table' ? S.real.filter((p) => p.spot.split('.')[0] === tableNow() && p.key !== S.me).length : 1;
+        const price = priceOf(d), n = to === 'table' ? S.real.filter((p) => p.spot.split('.')[0] === tableNow() && p.key !== S.me).length : 1;
         if (!has('gift')) { toast('Join the room to send drinks.'); return; }
         if (bank < price * Math.max(1, n)) { toast('Not enough LAYR for that.'); return; }
         send({ t: 'gift', to, d });
@@ -12439,6 +12558,360 @@ function applyTestnetFunding(proof){
         }
       }
 
+      // ---------------- phase 3: reasons to come back (docs/plans/CASINO-COME-BACK-PLAN.md) ----------------
+      // Levels and badges (on name tags), daily missions, the weekly boards, the evening slot tournament, the progressive jackpot,
+      // happy hour, friends, a "Tonight" card, and the LAYR balance following the player to another device. The room keeps the
+      // records (functions/lib/casino-progress.ts); this page reports its own hands and spins (`log`) and shows what comes back.
+      // Every part waits for the room to list its feature, so an older room leaves the casino exactly as it was.
+      const P = { me: null, levels: {}, jp: null, jpLast: null, tour: null, hh: null, friends: [], board: null, card: null, tab: 'night', night: { hands: 0, spins: 0, wins: 0, best: null, staked: 0, back: 0 }, sync: null, notices: [], credited: 0 };
+      const BADGES = [
+        ['first-win', '🍀', 'First win', 'Win a hand or a spin'], ['hundred', '💯', 'Hundred hands', 'Play 100 hands or spins'], ['big-win', '💥', 'Big winner', 'Win 10× your bet'],
+        ['monster', '🐉', 'Monster win', 'Win 50× your bet'], ['high-roller', '💎', 'High roller', 'Win 100,000 LAYR at once'], ['grand-tour', '🗺️', 'Grand tour', 'Play every table'],
+        ['slot-fan', '🎰', 'Slot fan', 'Spin every machine'], ['regular', '📅', 'Regular', 'Come back 7 days in a row'], ['generous', '🍾', 'Generous', 'Send 10 drinks'],
+        ['party', '🎉', 'Life of the party', 'React 50 times'], ['marathon', '🏃', 'Marathon', 'Play 1,000 hands or spins'], ['contender', '🎟️', 'Contender', 'Play in a slot tournament'],
+        ['champion', '🏆', 'Champion', 'Win a slot tournament'], ['jackpot', '👑', 'Jackpot', 'Hit the progressive jackpot'], ['level-10', '⭐', 'Level 10', 'Reach level 10']
+      ];      // the same list as BADGES in functions/lib/casino-progress.ts
+      const badgeOf = (id) => BADGES.find((b) => b[0] === id) || [id, '🏅', id, ''];
+      const hhOn = () => !!(P.hh && S.features.has('hh') && roomNowMs() >= P.hh.start && roomNowMs() < P.hh.end);
+      const roomNowMs = () => Date.now() - (S.offset || 0);
+      const priceOf = (d) => DRINK[d][2] * (hhOn() ? 0.5 : 1);
+      const clock = (ms) => { const s = Math.max(0, Math.round(ms / 1000)), m = Math.floor(s / 60); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ':' + String(s % 60).padStart(2, '0'); };
+      const localTime = (t) => { try { return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+      const css3 = document.createElement('style');
+      css3.textContent = `#pxMeBtn{font:inherit;display:flex;align-items:center;gap:6px}#pxMeBtn i{font-style:normal;display:inline-block;width:34px;height:4px;border-radius:2px;background:rgba(227,184,74,.25);overflow:hidden}#pxMeBtn i b{display:block;height:100%;background:#e3b84a}
+#pxMe{position:fixed;z-index:41;width:min(380px,calc(100vw - 20px));max-height:min(70vh,560px);overflow:auto;box-sizing:border-box;padding:12px 14px;border-radius:12px;background:rgba(12,9,14,.97);color:#f6ead0;border:1px solid #e3b84a;box-shadow:0 10px 40px rgba(0,0,0,.55);font:13px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+#pxMe[hidden]{display:none}#pxMe h4{margin:10px 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#e3b84a}#pxMe p{margin:0 0 6px;color:#c9b894;font-size:12px}
+#pxMe .tabs{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px}#pxMe .tabs button{font:inherit;font-size:11px;padding:5px 8px;border-radius:14px;background:transparent;color:#c9b894;border:1px solid rgba(227,184,74,.35);cursor:pointer}#pxMe .tabs button[aria-selected=true]{background:rgba(227,184,74,.22);color:#f6ead0;border-color:#e3b84a}
+#pxMe .lv{display:flex;align-items:center;gap:10px;margin:2px 0 8px}#pxMe .lv strong{font-size:22px;color:#e3b84a}#pxMe .bar{flex:1;height:8px;border-radius:4px;background:rgba(227,184,74,.18);overflow:hidden}#pxMe .bar b{display:block;height:100%;background:linear-gradient(90deg,#c9962e,#ffd86b)}
+#pxMe ol,#pxMe ul{margin:0;padding:0;list-style:none}#pxMe li{padding:5px 0;border-top:1px solid rgba(227,184,74,.15);display:flex;gap:8px;align-items:center;justify-content:space-between}#pxMe li b{color:#e3b84a;font-weight:600}#pxMe li .dim{opacity:.45}
+#pxMe li button,#pxMe .act{font:inherit;font-size:11px;padding:5px 9px;border-radius:8px;background:rgba(227,184,74,.14);color:#f6ead0;border:1px solid rgba(227,184,74,.6);cursor:pointer}#pxMe .act{display:inline-block;margin:4px 6px 4px 0;font-size:12px;padding:7px 11px}
+#pxMe .mbar{height:5px;border-radius:3px;background:rgba(227,184,74,.18);margin-top:4px;overflow:hidden}#pxMe .mbar b{display:block;height:100%;background:#7fd08a}#pxMe .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}#pxMe .grid span{font-size:24px;text-align:center;padding:6px 0;border-radius:8px;background:rgba(227,184,74,.08);border:1px solid rgba(227,184,74,.25)}#pxMe .grid span.off{filter:grayscale(1);opacity:.3}
+#pxMe canvas{width:100%;height:auto;border-radius:8px;background:#120d10;border:1px solid rgba(227,184,74,.3)}
+#pxEvents{position:fixed;left:50%;transform:translateX(-50%);top:max(64px,calc(env(safe-area-inset-top) + 54px));z-index:43;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;pointer-events:none;max-width:calc(100vw - 24px)}
+#pxEvents button{pointer-events:auto;font:600 12px/1.3 system-ui,-apple-system,Segoe UI,sans-serif;padding:6px 12px;border-radius:16px;background:rgba(12,9,14,.88);color:#f6ead0;border:1px solid rgba(227,184,74,.7);cursor:pointer;white-space:nowrap}
+#pxEvents button.hh{border-color:#d9a8f5}#pxEvents button.tour{border-color:#ffd86b;background:rgba(42,26,5,.92)}
+@media(max-width:620px){#pxEvents{top:112px}#pxEvents button{font-size:11px;padding:5px 9px}}
+body.machine-connected #pxEvents{top:10px}`;
+      document.head.append(css3);
+      const meBtn = document.createElement('button'); meBtn.id = 'pxMeBtn'; meBtn.type = 'button'; meBtn.hidden = true; meBtn.setAttribute('aria-label', 'Your level, missions, leaderboards and friends');
+      const meEl = document.createElement('div'); meEl.id = 'pxMe'; meEl.hidden = true; meEl.setAttribute('role', 'dialog'); meEl.setAttribute('aria-label', 'Your casino'); document.body.append(meEl);
+      const events = document.createElement('div'); events.id = 'pxEvents'; events.setAttribute('aria-live', 'polite'); document.body.append(events);
+      function mountMe() { const slot = document.querySelector('#tools .rt'); if (slot && !meBtn.isConnected) slot.insertBefore(meBtn, slot.firstChild); }
+      function placeMe() { const r = (meBtn.isConnected && !meBtn.hidden ? meBtn : btn).getBoundingClientRect(); meEl.style.top = Math.round(Math.max(60, r.bottom + 8)) + 'px'; meEl.style.right = Math.round(Math.max(10, innerWidth - r.right)) + 'px'; }
+      function openMe(tab) { if (tab) P.tab = tab; meEl.hidden = false; tray.hidden = true; freeMouse(); if (P.tab === 'week') send({ t: 'board' }); paintMe(); placeMe(); }
+      meBtn.onclick = (e) => { e.stopPropagation(); if (meEl.hidden) openMe(); else meEl.hidden = true; };
+      document.addEventListener('pointerdown', (e) => { if (!meEl.hidden && !meEl.contains(e.target) && !meBtn.contains(e.target) && !events.contains(e.target)) meEl.hidden = true; });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') meEl.hidden = true; });
+      function paintMeBtn() {
+        const m = P.me; meBtn.hidden = !(S.signed && m && S.features.has('progress')); mountMe();
+        if (!m) return;
+        const pct = Math.max(0, Math.min(100, ((m.xp - m.from) / Math.max(1, m.to - m.from)) * 100));
+        meBtn.replaceChildren(document.createTextNode('⭐ ' + m.lv), Object.assign(document.createElement('i'), { innerHTML: `<b style="width:${pct.toFixed(0)}%"></b>` }));
+        meBtn.title = `Level ${m.lv} · ${m.xp.toLocaleString('en-GB')} XP (${(m.to - m.xp).toLocaleString('en-GB')} to level ${m.lv + 1})`;
+      }
+      const tabs = [['night', 'Tonight'], ['missions', 'Missions'], ['badges', 'Badges'], ['week', 'This week'], ['tour', 'Tournament'], ['friends', 'Friends']];
+      function paintMe() {
+        if (meEl.hidden) return;
+        const parts = [], m = P.me;
+        const tb = mk('div', undefined, 'tabs');
+        for (const [id, label] of tabs) { const b = mk('button', label); b.setAttribute('aria-selected', String(P.tab === id)); b.onclick = () => openMe(id); tb.append(b); }
+        parts.push(tb);
+        if (m) {
+          const lv = mk('div', undefined, 'lv'), bar = mk('div', undefined, 'bar'), fill = mk('b');
+          fill.style.width = Math.max(0, Math.min(100, ((m.xp - m.from) / Math.max(1, m.to - m.from)) * 100)).toFixed(0) + '%'; bar.append(fill);
+          lv.append(mk('strong', 'Level ' + m.lv), bar, mk('span', `${(m.to - m.xp).toLocaleString('en-GB')} XP to go`));
+          parts.push(lv);
+          if (hhOn()) parts.push(mk('p', '🍸 Happy hour: double XP and a double daily drop, drinks half price.'));
+        } else parts.push(mk('p', 'Sign in to the room to earn levels, badges and missions.'));
+        const T = P.tab;
+        if (T === 'night') {
+          const n = P.night;
+          parts.push(mk('h4', 'Tonight, on this device'));
+          const ul = mk('ul');
+          const row = (a, b) => { const li = mk('li'); li.append(mk('span', a), mk('b', b)); ul.append(li); };
+          row('Hands at the tables', String(n.hands)); row('Spins on the machines', String(n.spins)); row('Wins', String(n.wins));
+          row('Best win', n.best ? `${fmtX(n.best.x)} on ${GAME[n.best.g] || n.best.g} · +${money(n.best.w)}` : '—');
+          row('LAYR played', money(n.staked)); row('LAYR back', money(n.back));
+          const net = n.back - n.staked; row('Net', (net >= 0 ? '+' : '') + money(net));
+          parts.push(ul, mk('p', 'Play money on testnet. Rewards here are for playing, never for how much you bet.'));
+        } else if (T === 'missions') {
+          if (!m) { parts.push(mk('p', 'Missions need the room.')); }
+          else {
+            parts.push(mk('h4', 'Today’s missions'));
+            const ol = mk('ol');
+            for (const x of m.missions.list) {
+              const li = mk('li'), left = mk('div'); left.style.flex = '1';
+              left.append(mk('div', (x.done ? '✅ ' : '🎯 ') + x.text), Object.assign(mk('div', undefined, 'mbar'), { innerHTML: `<b style="width:${Math.round((x.have / x.need) * 100)}%"></b>` }));
+              li.append(left, mk('b', x.done ? 'Done' : `${x.have}/${x.need} · +${money(x.reward)}`)); ol.append(li);
+            }
+            parts.push(ol, mk('p', `All three today: +${money(m.missions.bonus)} more. New missions in ${clock(m.missions.next - roomNowMs())}.`));
+          }
+        } else if (T === 'badges') {
+          const have = new Set(m ? m.bd : []);
+          parts.push(mk('h4', `Badges · ${have.size} of ${BADGES.length}`));
+          const g = mk('div', undefined, 'grid');
+          for (const [id, e, name, how] of BADGES) { const sp = mk('span', e, have.has(id) ? '' : 'off'); sp.title = name + ' — ' + how; sp.setAttribute('aria-label', name + (have.has(id) ? ' (earned)' : ' (not yet): ' + how)); g.append(sp); }
+          parts.push(g, mk('p', 'Your rarest badge shows on your name tag. Hover or press a badge to see how to earn it.'));
+          g.onclick = (e) => { const sp = e.target.closest('span'); if (sp) toast(sp.title); };
+        } else if (T === 'week') {
+          const b = P.board;
+          if (!b) parts.push(mk('p', S.features.has('boards') ? 'Loading this week’s boards…' : 'Leaderboards need the room.'));
+          else {
+            parts.push(mk('p', `Resets Monday 00:00 UTC · ${clock(b.ends - roomNowMs())} left.`));
+            const list = (title, rows, fmt) => {
+              parts.push(mk('h4', title)); const ol = mk('ol');
+              if (!rows.length) ol.append(mk('li', 'Nobody yet: it could be you.'));
+              rows.slice(0, 10).forEach((r, i) => { const li = mk('li'); li.append(mk('span', `${i + 1}. ${r.a === S.me ? 'You' : nameOf(r.a, r.n)}`), mk('b', fmt(r))); ol.append(li); });
+              parts.push(ol);
+            };
+            list('Biggest win', b.cur.big, (r) => `+${money(r.v)}` + (r.x ? ` · ${fmtX(r.x)} ${GAME[r.g] || ''}` : ''));
+            list('Most XP', b.cur.xp, (r) => r.v.toLocaleString('en-GB') + ' XP');
+            list('Most hands and spins', b.cur.play, (r) => r.v.toLocaleString('en-GB'));
+            list('Most generous', b.cur.gift, (r) => r.v + (r.v === 1 ? ' drink' : ' drinks'));
+            const last = b.last && b.last.xp && b.last.xp[0];
+            if (last) parts.push(mk('p', `Last week’s top player: ${nameOf(last.a, last.n)} (${last.v.toLocaleString('en-GB')} XP).`));
+          }
+        } else if (T === 'tour') {
+          const t = P.tour;
+          if (!t || !S.features.has('tourney')) parts.push(mk('p', 'Slot tournaments need the room.'));
+          else {
+            const now = roomNowMs(), g = GAME[t.g] || t.g;
+            parts.push(mk('h4', t.on ? `Tournament on ${g} · ${clock(t.end - now)} left` : `Next tournament: ${g} at ${localTime(t.start)}`));
+            parts.push(mk('p', `Free to join. Your score is the total of your wins as multiples of the bet over your first ${t.spins} spins on ${g}, so the size of your bet makes no difference. Prizes: ${t.prizes.map(money).join(', ')}.`));
+            if (t.on) {
+              if (t.mine) parts.push(mk('p', `You: ${fmtX(t.mine.sc)} after ${t.mine.sp} of ${t.spins} spins.`));
+              const go = mk('button', t.mine ? `Play ${g}` : `Join and play ${g}`, 'act');
+              go.onclick = () => { if (!t.mine) send({ t: 'tjoin' }); meEl.hidden = true; goMachine(t.g); };
+              parts.push(go);
+            }
+            const ol = mk('ol');
+            (t.top || []).slice(0, 10).forEach((e, i) => { const li = mk('li'); li.append(mk('span', `${i + 1}. ${e.a === S.me ? 'You' : nameOf(e.a, e.n)}`), mk('b', `${fmtX(e.sc)} · ${e.sp}/${t.spins}`)); ol.append(li); });
+            if (t.on) { parts.push(mk('h4', `Standings · ${t.players} playing`)); parts.push(ol); }
+          }
+        } else if (T === 'friends') {
+          parts.push(mk('h4', 'Who’s here'));
+          const cv = document.createElement('canvas'); cv.width = 360; cv.height = 200; parts.push(cv); drawMap(cv);
+          parts.push(mk('p', 'Gold: friends · white: other players · green: you · grey: house regulars.'));
+          const here = others(), fr = new Set(P.friends), ol = mk('ol');
+          for (const [a, n] of here) {
+            const li = mk('li'), nm = mk('span', (fr.has(a) ? '★ ' : '') + n), btns = mk('span');
+            const card = mk('button', 'Card'); card.onclick = () => send({ t: 'card', a });
+            const f = mk('button', fr.has(a) ? 'Unfriend' : 'Add friend'); f.disabled = !S.features.has('friends');
+            f.onclick = () => { const next = fr.has(a) ? P.friends.filter((x) => x !== a) : [...P.friends, a]; send({ t: 'friends', list: next }); };
+            btns.append(card, document.createTextNode(' '), f); li.append(nm, btns); ol.append(li);
+          }
+          if (!here.length) ol.append(mk('li', 'Nobody else is in the room right now.'));
+          parts.push(ol);
+          const away = P.friends.filter((a) => !here.some(([x]) => x === a));
+          if (away.length) { parts.push(mk('h4', 'Friends not here')); const ul = mk('ul'); for (const a of away) { const li = mk('li'); li.append(mk('span', shortKey(a), 'dim')); const rm = mk('button', 'Unfriend'); rm.onclick = () => send({ t: 'friends', list: P.friends.filter((x) => x !== a) }); li.append(rm); ul.append(li); } parts.push(ul); }
+          if (P.card) {
+            const c = P.card; parts.push(mk('h4', `${nameOf(c.a, c.n)} · level ${c.lv}`));
+            parts.push(mk('p', `${(c.bd || []).map((id) => badgeOf(id)[1]).join(' ') || 'No badges yet'} · ${c.st.h} hands, ${c.st.s} spins, best ${fmtX(c.st.bx)}${c.st.tw ? ' · ' + c.st.tw + ' tournament win' + (c.st.tw > 1 ? 's' : '') : ''}`));
+          }
+          parts.push(mk('p', 'Friends get a notice when you arrive, and you when they do.'));
+        }
+        meEl.replaceChildren(...parts);
+      }
+      function goMachine(g) {
+        const type = ['drop', 'twins', 'ds', 'bf', 'nv'].indexOf(g);
+        try { if (type >= 0) openCasinoMachine(type); } catch (e) { toast(e.message); }
+      }
+      // ---- the floor map: everyone as a dot (friends gold)
+      let bounds = null;
+      function mapBounds() {
+        if (bounds) return bounds;
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+        const add = (o) => { const p = new THREE.Vector3(); o.getWorldPosition(p); x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); };
+        stations.forEach((s) => add(s.group)); room.machines.forEach((m) => add(m.group));
+        const pad = 2.5; bounds = { x0: x0 - pad, x1: x1 + pad, z0: z0 - pad, z1: z1 + pad + 3 }; return bounds;
+      }
+      function drawMap(cv) {
+        try {
+          const g = cv.getContext('2d'), b = mapBounds(), W = cv.width, H = cv.height, sx = W / (b.x1 - b.x0), sz = H / (b.z1 - b.z0), s = Math.min(sx, sz);
+          const ox = (W - (b.x1 - b.x0) * s) / 2, oz = (H - (b.z1 - b.z0) * s) / 2;
+          const at = (x, z) => [ox + (x - b.x0) * s, oz + (z - b.z0) * s];
+          g.clearRect(0, 0, W, H); g.font = '10px system-ui,sans-serif'; g.textAlign = 'center';
+          g.fillStyle = 'rgba(227,184,74,.22)';
+          for (const st of stations) { const p = new THREE.Vector3(); st.group.getWorldPosition(p); const [x, y] = at(p.x, p.z); g.beginPath(); g.ellipse(x, y, 12, 8, 0, 0, Math.PI * 2); g.fill(); }
+          for (const m of room.machines) { const p = new THREE.Vector3(); m.group.getWorldPosition(p); const [x, y] = at(p.x, p.z); g.fillRect(x - 4, y - 4, 8, 8); }
+          const fr = new Set(P.friends), dot = (x, z, col, label) => { const [px, py] = at(x, z); g.fillStyle = col; g.beginPath(); g.arc(px, py, 4.5, 0, Math.PI * 2); g.fill(); if (label) { g.fillStyle = '#f6ead0'; g.fillText(label, px, py - 7); } };
+          for (const p of S.real.concat(S.regulars)) { if (p.key === S.me) continue; const pl = place(p.spot); if (pl) dot(pl.x, pl.z, p.regular ? '#777' : fr.has(p.key) ? '#ffd86b' : '#f6ead0', fr.has(p.key) ? nameOf(p.key, p.label) : ''); }
+          for (const w of walkers.values()) { if (w.key === S.me) continue; dot(w.x, w.z, fr.has(w.key) ? '#ffd86b' : '#f6ead0', fr.has(w.key) ? nameOf(w.key, w.label) : ''); }
+          const mine = mySpot() ? place(mySpot()) : { x: player.x, z: player.z }; if (mine) dot(mine.x, mine.z, '#7fd08a', 'You');
+        } catch (e) { console.warn('[room] the floor map failed', e); }
+      }
+
+      // ---- the strip of what is on now: happy hour, the tournament, the jackpot
+      function paintEvents() {
+        const now = roomNowMs(), out = [];
+        if (P.hh && S.features.has('hh')) {
+          if (hhOn()) out.push(['hh', `🍸 Happy hour · ${clock(P.hh.end - now)} left`, () => openMe('night')]);
+          else if (P.hh.start - now < 3600000 && P.hh.start > now) out.push(['hh', `🍸 Happy hour at ${localTime(P.hh.start)}`, () => openMe('night')]);
+        }
+        const t = P.tour;
+        if (t && S.features.has('tourney')) {
+          const g = GAME[t.g] || t.g;
+          if (t.on) out.push(['tour', t.mine ? `🏆 ${g} tournament · you ${fmtX(t.mine.sc)} (${t.mine.sp}/${t.spins}) · ${clock(t.end - now)}` : `🏆 ${g} tournament on · ${clock(t.end - now)} left · join`, () => openMe('tour')]);
+          else if (t.start - now < 3600000 && t.start > now) out.push(['tour', `🏆 ${g} tournament at ${localTime(t.start)}`, () => openMe('tour')]);
+        }
+        if (P.jp && S.features.has('jackpot') && !document.body.classList.contains('machine-connected')) out.push(['jp', `👑 Jackpot ${money(P.jp)}`, () => toast('The progressive jackpot: every paid spin on any machine adds to it (the house pays the 1%), and any paid spin can win it.')]);
+        const sig = out.map((o) => o[0] + o[1]).join('|');
+        if (sig === paintEvents.sig) return; paintEvents.sig = sig;
+        events.replaceChildren(...out.map(([cls, text, fn]) => { const b = mk('button', text, cls); b.onclick = (e) => { e.stopPropagation(); fn(); }; return b; }));
+      }
+
+      // ---- the jackpot on a sign above the machines
+      let jpSign = null;
+      function paintJackpotSign() {
+        if (!P.jp || !S.features.has('jackpot')) { if (jpSign) jpSign.visible = false; return; }
+        try {
+          if (!jpSign) {
+            const c = document.createElement('canvas'); c.width = 1024; c.height = 200;
+            const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+            jpSign = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
+            jpSign.scale.set(3.2, 0.625, 1); jpSign.renderOrder = 19; jpSign.name = 'Progressive jackpot sign'; jpSign.userData = { c, tex, v: null };
+            const p = new THREE.Vector3(), sum = new THREE.Vector3(); room.machines.forEach((m) => { m.group.getWorldPosition(p); sum.add(p); });
+            sum.divideScalar(Math.max(1, room.machines.length)); jpSign.position.set(sum.x, 3.35, sum.z); scene.add(jpSign);
+          }
+          jpSign.visible = true;
+          const v = Math.floor(P.jp); if (jpSign.userData.v === v) return; jpSign.userData.v = v;
+          const { c, tex } = jpSign.userData, g = c.getContext('2d');
+          g.clearRect(0, 0, 1024, 200); g.fillStyle = 'rgba(14,8,4,.88)'; g.strokeStyle = '#ffd86b'; g.lineWidth = 6;
+          g.beginPath(); (g.roundRect ? g.roundRect(8, 8, 1008, 184, 30) : g.rect(8, 8, 1008, 184)); g.fill(); g.stroke();
+          g.textAlign = 'center'; g.fillStyle = '#e3b84a'; g.font = '700 38px system-ui,-apple-system,Segoe UI,sans-serif'; g.fillText('PROGRESSIVE JACKPOT', 512, 62);
+          g.fillStyle = '#fff3c0'; g.font = '800 86px system-ui,-apple-system,Segoe UI,sans-serif'; g.fillText(v.toLocaleString('en-GB') + ' LAYR', 512, 160);
+          tex.needsUpdate = true;
+        } catch (e) { console.warn('[room] the jackpot sign failed', e); }
+      }
+
+      // ---- the visitor's own hands and spins, reported to the room (and counted for "Tonight")
+      function logPlay(k, g, bet, won, free) {
+        if (!(bet > 0) || !(won >= 0)) return;
+        const n = P.night;
+        if (!free) { if (k === 'spin') n.spins++; else n.hands++; n.staked += bet; }
+        n.back += won;
+        if (won > bet) { n.wins++; const x = won / bet; if (!n.best || won - bet > n.best.w) n.best = { x, w: won - bet, g }; }
+        if (!S.signed || !S.features.has('progress')) return;
+        const sh = k === 'hand' && (g === 'roulette' || g === 'baccarat') && shared.active(g);
+        send({ t: 'log', k, g, bet: Math.round(bet * 100) / 100, won: Math.round(won * 100) / 100, free: !!free, sh });
+      }
+      window.addEventListener('px-own-outcome', (e) => { const d = e.detail || {}; if (d.stake > 0) logPlay('hand', d.game, d.stake, Math.max(0, d.net + d.stake), false); });
+      function ownSpin(id, pending, result) { try { logPlay('spin', id, Number(pending.bet), Math.max(0, Number(result && result.total) || 0), !!pending.free); } catch (_) { } }
+
+      // ---- the balance that follows the player (the room keeps it per player; this page sends its changes as deltas)
+      // Saved in this browser: whose chips the local balance is (`owner`) and the last value agreed with the room (`base`).
+      const SYNC_KEY = 'px.balsync';
+      const total = () => bank + heldTotal();
+      function syncSave() { if (P.sync) store.set(SYNC_KEY, { owner: P.sync.owner, base: P.sync.base }); }
+      function adjust(by) { if (!by) return true; try { setBank(bank + by); return true; } catch (e) { console.warn('[room] the balance could not be updated', e); return false; } }
+      function syncStart(bal) {
+        if (!S.me || !S.features.has('bal') || !layrAccount.ready()) { P.sync = null; return; }
+        const rec = store.get(SYNC_KEY) || null, me = S.me;
+        P.sync = { owner: me, base: 0, inflight: 0, busy: false, at: 0 };
+        if (!bal) { P.sync.inflight = total(); P.sync.busy = true; send({ t: 'bal', init: total() }); return; }
+        if (rec && rec.owner === me) { adjust(bal.v - rec.base); P.sync.base = bal.v; }             // played elsewhere meanwhile: theirs added; ours goes up next
+        else if (rec && rec.owner !== me) { adjust(bal.v - total()); P.sync.base = bal.v; }         // another player's chips: this player's balance instead
+        else { adjust(bal.v); P.sync.base = bal.v; }                                                // first time in this browser: these chips join the account
+        syncSave();
+      }
+      function syncOn(m) {
+        const s = P.sync; if (!s || typeof m.v !== 'number') return;
+        const expected = s.base + (m.mine ? s.inflight : 0);
+        const external = Math.round((m.v - expected) * 100) / 100;
+        s.base = m.v; if (m.mine) { s.inflight = 0; s.busy = false; }
+        if (external) adjust(external);
+        syncSave();
+        if (m.got > 0) P.credited += m.got;
+        if (m.got > 0) {
+          if (m.why === 'missions-all') { banner(`ALL MISSIONS DONE  +${money(m.got)}`, 'big'); sfx.big && sfx.big(); }
+          else if (/^tourney-/.test(m.why || '')) { banner(`TOURNAMENT ${m.why.slice(8) === '1' ? 'WINNER' : 'PRIZE'}  +${money(m.got)}`, 'big'); sfx.big && sfx.big(); }
+        }
+      }
+      function syncFrame(now) {
+        const s = P.sync; if (!s || s.busy || !S.me || s.owner !== S.me || now - s.at < 1500) return;
+        const d = Math.round((total() - s.base) * 100) / 100;
+        if (!d) return;
+        s.at = now; s.inflight = d; s.busy = true; send({ t: 'bal', d });
+        setTimeout(() => { if (s.busy && s.inflight === d && performance.now() - s.at > 14000) { s.busy = false; s.inflight = 0; } }, 15000);   // no answer: try again
+      }
+
+      function onProgress(m) {
+        switch (m.t) {
+          case 'me': P.me = m; paintMeBtn(); paintMe(); return true;
+          case 'lvl': {
+            tagLv.set(m.a, { lv: m.lv, bd: m.bd }); retag(m.a);
+            if (m.up) { const k = keyOf(m.a); bubble(k, '⭐ Level ' + m.lv, 'gift', 4500); gestureOf(k, 'win'); if (m.a === S.me) { banner('LEVEL ' + m.lv, 'big'); sfx.big && sfx.big(); } }
+            return true;
+          }
+          case 'badge': {
+            const b = badgeOf(m.id), k = keyOf(m.a); bubble(k, b[1], 'emo', 4500);
+            if (m.a === S.me) { banner(`BADGE  ${b[1]} ${b[2]}`, 'big'); toast(`New badge: ${b[2]} (${b[3]}).`); }
+            return true;
+          }
+          case 'mission-done': toast(`Mission done: ${m.text} · +${money(m.reward)}`); bubble('me', '🎯', 'emo', 3500); sfx.chip && sfx.chip(3); return true;
+          case 'bal': syncOn(m); return true;
+          case 'board': P.board = m; paintMe(); return true;
+          case 'friends': P.friends = Array.isArray(m.list) ? m.list : []; paintMe(); return true;
+          case 'card': P.card = m; P.tab = 'friends'; openMe(); return true;
+          case 'jp': P.jp = m.v; paintEvents(); paintJackpotSign(); return true;
+          case 'jackpot': {
+            const who = nameOf(m.a, m.n);
+            winEl.textContent = `👑 ${who} ${who === 'You' ? 'won' : 'just won'} the PROGRESSIVE JACKPOT · +${money(m.w)}`;
+            winEl.classList.remove('on'); void winEl.offsetWidth; winEl.classList.add('on'); clearTimeout(showWin.h); showWin.h = setTimeout(() => winEl.classList.remove('on'), 9000);
+            const k = keyOf(m.a); bubble(k, '👑', 'emo', 6000); gestureOf(k, 'win'); cheerRegulars();
+            if (m.a === S.me) { banner(`JACKPOT  +${money(m.w)}`, 'big'); sfx.big && sfx.big(); }
+            return true;
+          }
+          case 'tourney': {
+            const prevMine = P.tour && P.tour.n === m.n ? P.tour.mine : null;
+            P.tour = m.mine || !prevMine ? m : { ...m, mine: prevMine };
+            paintEvents(); paintMe(); return true;
+          }
+          case 'tourney-end': {
+            const w = Array.isArray(m.winners) ? m.winners : [];
+            if (w.length) { winEl.textContent = `🏆 ${GAME[m.g] || m.g} tournament: ` + w.map((x) => `${x.place}. ${nameOf(x.a, x.n)} ${fmtX(x.sc)}`).join(' · '); winEl.classList.remove('on'); void winEl.offsetWidth; winEl.classList.add('on'); clearTimeout(showWin.h); showWin.h = setTimeout(() => winEl.classList.remove('on'), 9000); }
+            if (w[0]) { const k = keyOf(w[0].a); bubble(k, '🏆', 'emo', 6000); gestureOf(k, 'win'); }
+            return true;
+          }
+          case 'join': {
+            const a = m.who && m.who.a;
+            if (a && P.friends.includes(a)) { toast(`👋 Your friend ${nameOf(a, m.who.n)} just arrived.`); setTimeout(() => bubble(a, '👋', 'emo', 4000), 1200); }
+            return false;
+          }
+          default: return false;
+        }
+      }
+      function roomProgress(m) {
+        P.levels = m.levels || {}; tagLv.clear();
+        for (const [a, v] of Object.entries(P.levels)) if (v && v.lv) tagLv.set(a, { lv: v.lv, bd: v.bd }); 
+        for (const a of tagLv.keys()) retag(a);
+        P.jp = m.jackpot && m.jackpot.v || null; P.tour = m.tourney || null; P.hh = m.hh || null;
+        if (m.me) P.me = m.me;
+        if (Array.isArray(m.friends)) P.friends = m.friends;
+        paintMeBtn(); paintEvents(); paintJackpotSign();
+        P.lastBal = m.bal || null; P.roomAt = m.me ? performance.now() : 0;      // a signed-in welcome (it carries `me` and `bal`)
+        if (S.me) syncStart(P.lastBal);
+        for (const n of m.notices || []) {
+          const what = n.why === 'jackpot' ? 'the progressive jackpot' : /^tourney-/.test(n.why) ? `place ${n.why.slice(8)} in the slot tournament` : n.why === 'missions-all' ? 'all three missions' : 'a mission';
+          setTimeout(() => toast(`While you were away: ${what} · +${money(n.v)} (already in your balance).`), 2500);
+        }
+      }
+      function progressFrame(now) {
+        syncFrame(now);
+        if (now - (progressFrame.t || 0) > 1000) {
+          progressFrame.t = now; paintEvents();
+          if (!meEl.hidden && (P.tab === 'tour' || P.tab === 'friends')) paintMe();
+          // A tournament or happy hour begins or ends on the room's clock: then ask the room what is on now (and so let it pay a
+          // finished tournament). The room has no timers; this is what moves it on when nobody is playing.
+          const nowMs = roomNowMs(), lastMs = progressFrame.last || nowMs; progressFrame.last = nowMs;
+          const edges = [P.tour && P.tour.start, P.tour && P.tour.end, P.hh && P.hh.start, P.hh && P.hh.end].filter((x) => typeof x === 'number');
+          if (S.signed && S.features.has('progress') && edges.some((b) => lastMs < b && b <= nowMs)) {
+            if (P.tour) P.tour = { ...P.tour, on: nowMs >= P.tour.start && nowMs < P.tour.end };
+            setTimeout(() => send({ t: 'mission' }), 1500 + Math.random() * 2000);
+          }
+        }
+      }
+
       // ---- what the room says
       function on(m) {
         switch (m.t) {
@@ -12451,7 +12924,9 @@ function applyTestnetFunding(proof){
             askDaily();
             shared.room(m);
             salon.on({ t: 'seekers', list: m.seekers || [] });
+            roomProgress(m);
             return;
+          case 'join': onProgress(m); return;
           case 'react': { const k = keyOf(m.a); bubble(k, EMO[m.e] || '👍', 'emo', 3200); gestureOf(k, GEST[m.e] || 'nod'); return; }
           case 'say': if (m.from && typeof m.text === 'string') bubble(keyOf(m.from.a), m.text.length > 90 ? m.text.slice(0, 88) + '…' : m.text, m.ch === 'table' ? 'table' : '', Math.min(9000, 3000 + m.text.length * 60)); return;
           case 'win': showWin(m); return;
@@ -12461,14 +12936,14 @@ function applyTestnetFunding(proof){
             bubble(keyOf(m.a), m.round ? d[0] + ' a round!' : d[0] + ' → ' + nameOf(list[0]), 'gift', 4500);
             list.forEach((a) => { if (a !== S.me) bubble(a, d[0], 'emo', 5000); });
             if (m.a === S.me) {
-              const cost = d[2] * list.length;
+              const cost = priceOf(m.d in DRINK ? m.d : 'champagne') * list.length;
               try { setBank(bank - Math.min(bank, cost)); } catch (_) { }
               toast(m.round ? `You bought a round of ${d[1]} (${money(cost)}).` : `You sent ${nameOf(list[0])} a ${d[1]}.`);
             } else if (list.includes(S.me)) { bubble('me', d[0], 'emo', 5000); toast(`${nameOf(m.a, m.n)} ${m.round ? 'bought your table a round of ' + d[1] : 'sent you a ' + d[1]} ${d[0]}`); gestureOf(keyOf(m.a), 'raise'); }
             return;
           }
           case 'err': {
-            const T = { 'react-too-fast': 'Easy: one reaction at a time.', 'gift-nobody': 'Nobody else is at your table.', 'gift-no-table': 'Sit at a table to buy it a round.', 'gift-not-here': 'They have left the room.', 'gift-blocked': 'You cannot send that person a drink.', 'gift-too-fast': 'One drink at a time.', 'round-closed': 'Bets are closed for this round.' };
+            const T = { 'react-too-fast': 'Easy: one reaction at a time.', 'gift-nobody': 'Nobody else is at your table.', 'gift-no-table': 'Sit at a table to buy it a round.', 'gift-not-here': 'They have left the room.', 'gift-blocked': 'You cannot send that person a drink.', 'gift-too-fast': 'One drink at a time.', 'round-closed': 'Bets are closed for this round.', 'tourney-not-on': 'The tournament is not running right now.', 'card-not-here': 'They have left the room.', 'log-too-fast': '' };
             if (T[m.code]) toast(T[m.code]);
             shared.err(m.code);
             return;
@@ -12477,12 +12952,15 @@ function applyTestnetFunding(proof){
           case 'round': case 'bet': shared.on(m); return;
           case 'seek': case 'pvp': salon.on(m); return;
           case 'leave': salon.on(m); return;
-          default: return;
+          case 'hh': P.hh = m; paintEvents(); return;
+          default: onProgress(m); return;
         }
       }
       function self(info) {
+        const was = S.me;
         S.me = info && info.signed ? info.address : null; S.signed = !!S.me;
         btn.hidden = !S.signed || !S.features.has('react'); mount();
+        if (S.me !== was) { P.sync = null; paintMeBtn(); if (S.me && P.roomAt) syncStart(P.lastBal); }      // the room's welcome came first
         askDaily(); shared.self(S.me);
       }
       function setReal(list) { S.real = list; refresh(); }
@@ -12497,8 +12975,8 @@ function applyTestnetFunding(proof){
         bar.append(go, no); setTimeout(() => document.body.append(bar), 1500);
       }
 
-      function frame(now) { try { bubbleFrame(now); regularsFrame(now); if (now - (frame.w || 0) > 1000) { frame.w = now; watchFrame(); } } catch (e) { if (!frame.warned) { frame.warned = true; console.warn('[room] the social layer stopped:', e); } } }
-      return { on, self, setReal, refresh, frame, ownWin, tableNow, send, has, bubble, roomNow: () => Date.now() - S.offset, me: () => S.me, features: S.features, get feat() { return S.features; } };
+      function frame(now) { try { bubbleFrame(now); regularsFrame(now); progressFrame(now); if (now - (frame.w || 0) > 1000) { frame.w = now; watchFrame(); } } catch (e) { if (!frame.warned) { frame.warned = true; console.warn('[room] the social layer stopped:', e); } } }
+      return { on, self, setReal, refresh, frame, ownWin, ownSpin, tableNow, progress: P, priceOf, tags: () => Object.fromEntries(tagLv), send, has, bubble, roomNow: () => Date.now() - S.offset, me: () => S.me, features: S.features, get feat() { return S.features; } };
     })();
     window.__pxSocial = social;
     try { social.refresh(); } catch (e) { console.warn('[room] regulars could not start:', e); }
@@ -12522,7 +13000,9 @@ function applyTestnetFunding(proof){
       // whether the visitor is signed into the room (visible to others) and as which address: personal space and your own look
       self(info) { try { roomVisible = !!(info && info.signed); meWear(roomVisible && typeof info.address === 'string' ? info.address : null); social.self(info); } catch (e) { console.warn('[room] self failed', e); } },
       // the social layer (docs/plans/CASINO-PLAY-TOGETHER-PLAN.md): room messages in, and the table the visitor is at or watching
-      on(m) { try { social.on(m); } catch (e) { console.warn('[room] social message failed', e); } },
+      on(m) { try { if (m && m.t === 'bns-check') { room.salonDoorChecked && room.salonDoorChecked(m); return; } social.on(m); } catch (e) { console.warn('[room] social message failed', e); } },
+      // the Salon's door (docs/plans/CASINO-SALON-BNS-PLAN.md): what the room says about the visitor's BNS name
+      salon(info) { try { room.salonDoorSet && room.salonDoorSet(info); } catch (e) { console.warn('[room] salon state failed', e); } },
       table: () => { try { return social.tableNow(); } catch (e) { return null; } },
       mount: () => document.querySelector('#tools .rt'),
       debug: () => ({ pool: pool.map((e) => ({ stand: e.stand, key: e.key, spot: e.spot, on: e.on, built: !!e.spec.ctrl, tag: e.tag.sp.visible })), pending: pending.length, remote: [...remote], spins: [...spect.values()].map((e) => ({ spot: e.spot, ready: e.ready, queue: e.queue.length })), walkers: [...walkers.values()].map((w) => ({ key: w.key, label: w.label, drawn: !!w.e, built: !!w.e?.spec.ctrl, x: w.x, z: w.z, moving: w.moving, anim: w.e?.spec.ctrl?.current || null, tag: !!w.e?.tag.sp.visible, samples: w.buf.length })), own: ownOn ? ownLast : null })   // for tests
@@ -13308,7 +13788,7 @@ button{font:inherit;color:inherit;cursor:pointer}
  const s=document.createElement('script');s.type='module';s.src='passkey-wallet.js?v=4';document.head.appendChild(s);
 })();
 </script>
-<script type="module" src="room.js?v=p4.0"></script>
+<script type="module" src="room.js?v=p5.1"></script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>
 

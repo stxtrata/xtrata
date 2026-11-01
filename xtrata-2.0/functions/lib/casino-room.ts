@@ -7,7 +7,8 @@
  * the rules can be tested without a Workers runtime. The room's truth is a list of peers (one per open connection); a peer
  * is a small record the Durable Object keeps as the connection's "attachment", which survives hibernation.
  */
-import { parseSocialMessage, type SalonTable, type SocialMessage } from './casino-social';
+import { isInSalon, isSalonSpot, parseSocialMessage, salonRefusal, type SalonTable, type SocialMessage } from './casino-social';
+import { parseProgressMessage, type ProgressMessage } from './casino-progress';
 import type { Bets, RoundTable } from './casino-rounds';
 
 
@@ -58,7 +59,7 @@ export const MAX_REPORT_LINE_CHARS = 200;
  * (every machine picks them first, from its own reel strips), so a spin is a few numbers, not a picture.
  * The room only passes spins on: it never checks or stores a result, and nothing here moves money.
  */
-export const ROOM_FEATURES = ['play', 'move'] as const;
+export const ROOM_FEATURES = ['play', 'move', 'salon-bns'] as const;
 /** Spins have their own limit, apart from RATE_LIMIT, so a player on turbo or autoplay never slows their seat updates or chat. */
 export const PLAY_MIN_GAP_MS = 400;
 export const PLAY_PER_MINUTE = 100;
@@ -103,10 +104,18 @@ export type Peer = {
   rb?: { tb: RoundTable; n: number; bets: Bets } | null;
   sk?: { tb: SalonTable; stake: number; at: number } | null;
   rx?: number[]; wn?: number[]; gl?: number[]; pv?: number[];
+  /** Phase 3 (functions/lib/casino-progress.ts): the player's level and the badge on their tag, and recent times for the play-log
+   *  and balance limits. Optional too. */
+  lv?: number; bd?: string | null; lg?: number[]; bl?: number[];
+  /** The Salon's rule (docs/plans/CASINO-SALON-BNS-PLAN.md): the primary BNS name read at sign-in (null: none) and whether it
+   *  was checked (false: the lookup failed). From headers only the Pages Function sets. Missing on older connections = not checked. */
+  bn?: string | null; bc?: boolean;
 };
 
-export const newPeer = (id: string, address: string | null, hash160: string | null, now: number, watch = true): Peer => ({
-  id, a: address, k: hash160, spot: null, since: now, rl: [], cl: [], b: [], pl: [], p: null, pt: 0, ml: [], w: watch
+export const newPeer = (id: string, address: string | null, hash160: string | null, now: number, watch = true,
+  bns: { name: string | null; checked: boolean } = { name: null, checked: false }): Peer => ({
+  id, a: address, k: hash160, spot: null, since: now, rl: [], cl: [], b: [], pl: [], p: null, pt: 0, ml: [], w: watch,
+  bn: address ? bns.name : null, bc: address ? bns.checked : false
 });
 
 /** Whether a connection may see the room's people: every signed-in player, and guests only while watching is allowed. */
@@ -118,7 +127,7 @@ export const canSee = (peer: Pick<Peer, 'a' | 'w'>) => !!peer.a || peer.w !== fa
  */
 export const roomMessage = (peers: Peer[], me: Peer, now: number, features: readonly string[]) => {
   const view = deriveView(peers);
-  const you = { a: me.a, n: shortAddress(me.a), guest: !me.a, k: me.k };
+  const you = { a: me.a, n: shortAddress(me.a), guest: !me.a, k: me.k, bns: me.bn ?? null, bnsChecked: me.bc === true };
   if (!canSee(me)) return { t: 'room', v: 1, features, you, watch: false, spots: {}, players: [], walkers: [], joined: view.joined, guests: view.guests, at: now };
   return { t: 'room', v: 1, features, you, watch: true, spots: view.spots, players: view.players, walkers: view.walkers, joined: view.joined, guests: view.guests, at: now };
 };
@@ -217,7 +226,8 @@ export type ClientMessage =
   /** Where the player stands on the floor and which way they face; or `off`: they are not on the floor any more. */
   | { t: 'move'; x: number; z: number; r: number }
   | { t: 'move'; off: true }
-  | SocialMessage;
+  | SocialMessage
+  | ProgressMessage;
 
 export type ParseResult = { ok: true; msg: ClientMessage } | { ok: false; code: string };
 
@@ -281,7 +291,7 @@ export const parseClientMessage = (raw: unknown): ParseResult => {
       const round = (n: number, k: number) => Math.round(n * k) / k;
       return { ok: true, msg: { t: 'move', x: round(x, 100), z: round(z, 100), r: round(facing, 1000) } };
     }
-    default: return parseSocialMessage(value) ?? { ok: false, code: 'bad-message' };
+    default: return parseSocialMessage(value) ?? parseProgressMessage(value) ?? { ok: false, code: 'bad-message' };
   }
 };
 
@@ -309,6 +319,8 @@ export const applySit = (peers: Peer[], meId: string, spot: string, now: number)
   if (!me) return { ok: false, code: 'gone' };
   if (!me.a) return { ok: false, code: 'sign-in-first' };
   if (!isSpot(spot)) return { ok: false, code: 'no-such-spot' };
+  // The Salon's seats need a primary BNS name (docs/plans/CASINO-SALON-BNS-PLAN.md).
+  if (isSalonSpot(spot)) { const refused = salonRefusal(me); if (refused) return { ok: false, code: refused }; }
   const holder = peers.find((p) => p.spot === spot && p.id !== meId);
   if (holder && holder.a !== me.a) return { ok: false, code: 'taken' };
   const changes: Change[] = [];
@@ -487,6 +499,7 @@ export const applyMove = (peers: Peer[], meId: string, msg: { x: number; z: numb
     return { ok: true, message: { t: 'move', a: me.a, off: true, at: now }, to };
   }
   if (me.spot) return { ok: false, code: 'move-seated' };
+  if (isInSalon(msg.x, msg.z) && salonRefusal(me)) return { ok: false, code: 'move-salon' };   // the Salon's floor needs a BNS name too
   me.p = [msg.x, msg.z, msg.r]; me.pt = now;
   return { ok: true, message: { t: 'move', a: me.a, x: msg.x, z: msg.z, r: msg.r, at: now }, to };
 };

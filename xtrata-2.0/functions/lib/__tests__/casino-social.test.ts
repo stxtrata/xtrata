@@ -81,14 +81,15 @@ describe('tables: chat, watching, Salon seeks and the relay', () => {
     expect(tableAudience([me], peer('5', A))).toBe(null);
   });
   it('lists who is waiting for a Salon game and stops when they say so', () => {
-    const me = peer('1', A);
+    const me = { ...peer('1', A), bn: 'alice.btc', bc: true };   // the Salon needs a primary BNS name (casino-room-salon.test.ts)
     expect(applySeek([me], me, { tb: 'liars', stake: 25 }, 10).ok).toBe(true);
-    expect(seekers([me])).toEqual([{ a: A, n: 'ST2SM…9DW8', tb: 'liars', stake: 25, at: 10 }]);
+    expect(seekers([me])).toEqual([{ a: A, n: 'alice.btc', tb: 'liars', stake: 25, at: 10 }]);
     applySeek([me], me, { off: true }, 11);
     expect(seekers([me])).toEqual([]);
   });
   it('relays moves to the other player only', () => {
-    const me = peer('1', A), them = peer('2', B), them2 = peer('3', B);
+    const named = (p: Peer, bn: string) => Object.assign(p, { bn, bc: true });   // both players need a primary BNS name
+    const me = named(peer('1', A), 'alice.btc'), them = named(peer('2', B), 'bob.btc'), them2 = named(peer('3', B), 'bob.btc');
     const r = routeRelay([me, them, them2], me, { to: B, d: { op: 'bid' } }, 0);
     expect(r.ok && r.out[0].to).toEqual(['2', '3']);
     expect(routeRelay([me], me, { to: B, d: 1 }, 0)).toEqual({ ok: false, code: 'pvp-not-here' });

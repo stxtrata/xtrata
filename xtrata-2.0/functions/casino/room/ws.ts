@@ -7,6 +7,7 @@
  */
 import { readRoomSession } from '../../lib/casino-room-proof';
 import { guestsMayWatch, roomConfig, roomJson, roomOffline, roomStub, sameOriginRequest } from '../../lib/casino-room-http';
+import { BNS_NAME_RE } from '../../lib/casino-room-bns';
 
 export const onRequest: PagesFunction = async ({ request, env }) => {
   const config = roomConfig(env);
@@ -26,6 +27,9 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
   if (session) {
     headers.set('x-px-addr', session.a);
     headers.set('x-px-k', session.k);
+    // The Salon's rule: the primary BNS name read at sign-in, and whether it was checked (docs/plans/CASINO-SALON-BNS-PLAN.md).
+    headers.set('x-px-bns', typeof session.bn === 'string' && BNS_NAME_RE.test(session.bn) ? session.bn : '');
+    headers.set('x-px-bnsc', session.bc === true ? '1' : '0');
   }
   // Anonymous watching is off unless the Pages variable CASINO_ROOM_GUESTS is "1": guests then see only the head count.
   headers.set('x-px-watch', guestsMayWatch(env) ? '1' : '0');

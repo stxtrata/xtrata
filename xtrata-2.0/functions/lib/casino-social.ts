@@ -24,7 +24,22 @@ export type SocialPeer = {
   rb?: { tb: RoundTable; n: number; bets: Bets } | null;
   sk?: { tb: SalonTable; stake: number; at: number } | null;
   rx?: number[]; wn?: number[]; gl?: number[]; pv?: number[];
+  /** The Salon's rule: the primary BNS name read at sign-in, and whether it was checked (see salonRefusal). */
+  bn?: string | null; bc?: boolean;
 };
+
+/**
+ * The Salon (the player-versus-player room: Hold'em and Liar's Dice) is for players with a primary BNS name
+ * (docs/plans/CASINO-SALON-BNS-PLAN.md). The name is read at sign-in by the Pages Function and arrives with the connection.
+ * Returns why a player may not play there, or null when they may. "Not checked" (the lookup failed) is its own answer.
+ */
+export const salonRefusal = (peer: { a: string | null; bn?: string | null; bc?: boolean }): string | null =>
+  !peer.a ? 'salon-sign-in-first' : peer.bc !== true ? 'salon-bns-unchecked' : !peer.bn ? 'salon-bns-required' : null;
+/** The Salon's seats (functions/lib/casino-room.ts SPOTS). */
+export const isSalonSpot = (spot: string) => /^(pvpholdem|liars)\./.test(spot);
+/** The Salon's floor, behind the arch in the back wall (public/casino/index.html, room.salon): x -11.2 to -0.8, z beyond -11. */
+export const SALON_AREA = { x0: -11.4, x1: -0.6, z: -11.05 } as const;
+export const isInSalon = (x: number, z: number) => z < SALON_AREA.z && x > SALON_AREA.x0 && x < SALON_AREA.x1;
 
 const seen = (peer: { a: string | null; w?: boolean }) => !!peer.a || peer.w !== false;
 const blockedBy = (peers: SocialPeer[], holder: string, other: string) =>
@@ -216,13 +231,16 @@ export const routeGift = (peers: SocialPeer[], me: SocialPeer, msg: { to: string
 /** Waiting for a Salon game: everyone who may see the room is told, so somebody can come and sit down. `off` stops waiting. */
 export const applySeek = (peers: SocialPeer[], me: SocialPeer, msg: { tb: SalonTable; stake: number } | { off: true }, now: number): Result => {
   if (!me.a) return { ok: false, code: 'pvp-sign-in-first' };
+  // Waiting for a game is a Salon action: a primary BNS name is needed. Stopping is always allowed.
+  const refused = 'off' in msg ? null : salonRefusal(me);
+  if (refused) return { ok: false, code: refused.replace('salon-', 'pvp-') };
   me.sk = 'off' in msg ? null : { tb: msg.tb, stake: msg.stake, at: now };
   const to = peers.filter((p) => p.id !== me.id && seen(p)).map((p) => p.id);
-  return { ok: true, out: [{ to, message: me.sk ? { t: 'seek', a: me.a, n: short(me.a), tb: me.sk.tb, stake: me.sk.stake, at: now } : { t: 'seek', a: me.a, off: true, at: now } }] };
+  return { ok: true, out: [{ to, message: me.sk ? { t: 'seek', a: me.a, n: me.bn || short(me.a), tb: me.sk.tb, stake: me.sk.stake, at: now } : { t: 'seek', a: me.a, off: true, at: now } }] };
 };
 export const seekers = (peers: SocialPeer[]) => {
   const out: Array<{ a: string; n: string; tb: SalonTable; stake: number; at: number }> = [], done = new Set<string>();
-  for (const p of peers) if (p.a && p.sk && !done.has(p.a)) { done.add(p.a); out.push({ a: p.a, n: short(p.a), tb: p.sk.tb, stake: p.sk.stake, at: p.sk.at }); }
+  for (const p of peers) if (p.a && p.sk && !done.has(p.a) && !salonRefusal(p)) { done.add(p.a); out.push({ a: p.a, n: p.bn || short(p.a), tb: p.sk.tb, stake: p.sk.stake, at: p.sk.at }); }
   return out;
 };
 
@@ -236,9 +254,13 @@ export const routeRelay = (peers: SocialPeer[], me: SocialPeer, msg: { to: strin
   const targets = peers.filter((p) => p.a === msg.to);
   if (!targets.length) return { ok: false, code: 'pvp-not-here' };
   if (hidden(peers, me.a, msg.to)) return { ok: false, code: 'pvp-blocked' };
+  // A Salon game is between two players who both have a primary BNS name.
+  const refused = salonRefusal(me);
+  if (refused) return { ok: false, code: refused.replace('salon-', 'pvp-') };
+  if (!targets.some((p) => !salonRefusal(p))) return { ok: false, code: 'pvp-opponent-no-bns' };
   const lim = takeLimit(me.pv, now, 0, 30, 10_000); me.pv = lim.list;
   if (!lim.ok) return { ok: false, code: 'pvp-too-fast' };
-  return { ok: true, out: [{ to: targets.map((p) => p.id), message: { t: 'pvp', a: me.a, n: short(me.a), d: msg.d, at: now } }] };
+  return { ok: true, out: [{ to: targets.filter((p) => !salonRefusal(p)).map((p) => p.id), message: { t: 'pvp', a: me.a, n: me.bn || short(me.a), d: msg.d, at: now } }] };
 };
 
 // ------------------------------------------------------------------ the daily drop

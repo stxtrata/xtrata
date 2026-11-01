@@ -53,6 +53,10 @@ export type RoomSession = {
   n: string;
   iat: number;
   exp: number;
+  /** The player's primary BNS name when they signed in (the Salon's rule), null when they have none. Older cookies lack it. */
+  bn?: string | null;
+  /** Whether that name was actually checked: false (or missing) means the lookup failed, so the Salon says "try again". */
+  bc?: boolean;
 };
 
 const encoder = new TextEncoder();

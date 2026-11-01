@@ -213,6 +213,39 @@ describe.skipIf(!BASE)('casino room end to end', () => {
     closeAll(watcher, a, late, after);
   });
 
+  it('the Salon: without a checked BNS name, no Salon seat, no Salon floor, no "Find a player"; the main floor is unchanged', async () => {
+    // Locally the BNS lookup cannot reach the API, so a throwaway key comes back "could not check": the door must stay closed.
+    // (The "has a name" path is covered by casino-room-salon.test.ts and casino-room-bns-functions.test.ts.)
+    const alice = await signIn();
+    expect(await alice.res.clone().json()).toMatchObject({ bnsChecked: false });
+    const a = await join({ cookie: alice.cookie });
+    expect(a.room.features).toEqual(expect.arrayContaining(['salon-bns']));
+    expect(a.room.you).toMatchObject({ a: alice.w.address, bns: null, bnsChecked: false });
+
+    a.send({ t: 'sit', spot: 'liars.1' });
+    expect((await a.waitFor((m) => m.t === 'err')).code).toBe('salon-bns-unchecked');
+    await a.quiet(300);
+    a.send({ t: 'move', x: -6, z: -13, r: 0 });
+    expect((await a.waitFor((m) => m.t === 'err' && m.code === 'move-salon')).code).toBe('move-salon');
+    await a.quiet(300);
+    a.send({ t: 'seek', tb: 'liars', stake: 25 });
+    expect((await a.waitFor((m) => m.t === 'err' && String(m.code).startsWith('pvp-'))).code).toBe('pvp-bns-unchecked');
+
+    // the main floor is unchanged
+    const watcher = await join();
+    const sat = watcher.waitFor((m) => m.t === 'sat' && m.spot === 'holdem.2');
+    await a.quiet(1300);
+    a.send({ t: 'sit', spot: 'holdem.2' });
+    await sat;
+
+    // "check again" answers for the signed-in player only, and says when the check itself failed
+    const again = await fetch(`${BASE}/casino/room/bns`, { method: 'POST', headers: { origin: ORIGIN, cookie: alice.cookie } });
+    expect(again.status).toBe(200);
+    expect(await again.json()).toMatchObject({ address: alice.w.address, bnsChecked: false, failed: true });
+    expect((await fetch(`${BASE}/casino/room/bns`, { method: 'POST', headers: { origin: ORIGIN } })).status).toBe(401);
+    closeAll(a, watcher);
+  });
+
   it('one address, one seat: a second tab takes it over and a third connection closes the oldest', async () => {
     const alice = await signIn();
     const tab1 = await join({ cookie: alice.cookie });
@@ -241,7 +274,7 @@ describe.skipIf(!BASE)('casino room end to end', () => {
   it('keeps everyone and every seat when the room goes idle and hibernates', async () => {
     const alice = await signIn();
     const a = await join({ cookie: alice.cookie });
-    a.send({ t: 'sit', spot: 'liars.2' });
+    a.send({ t: 'sit', spot: 'baccarat.2' });   // a main-floor seat: the Salon's need a BNS name (the Salon test below)
     await a.waitFor((m) => m.t === 'sat');
     const watcher = await join();
     await new Promise((r) => setTimeout(r, 300));
@@ -255,11 +288,11 @@ describe.skipIf(!BASE)('casino room end to end', () => {
     const after = await watcher.waitFor((m) => m.t === 'pong' && m !== before);
     watcher.send({ t: 'hello' });
     const again = await watcher.waitFor((m) => m.t === 'room' && m !== watcher.room);
-    expect(again.spots['liars.2']?.a).toBe(alice.w.address);
+    expect(again.spots['baccarat.2']?.a).toBe(alice.w.address);
     expect(again.joined).toBeGreaterThanOrEqual(1);
     // `up` is when the object's memory was created: a different value means it hibernated and woke, with the room intact.
     console.log(`[room-e2e] idle ${IDLE_MS} ms; instance start ${before.up} -> ${after.up} (${before.up === after.up ? 'did NOT hibernate' : 'hibernated and woke'}); first message after the idle came back ~${Date.now() - pingAt} ms later`);
-    const stood = watcher.waitFor((m) => m.t === 'stood' && m.spot === 'liars.2');
+    const stood = watcher.waitFor((m) => m.t === 'stood' && m.spot === 'baccarat.2');
     a.ws.close();                                           // and a woken room still frees seats
     await stood;
     closeAll(watcher);
