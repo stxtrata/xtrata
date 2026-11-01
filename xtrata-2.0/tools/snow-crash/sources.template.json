@@ -1,0 +1,72 @@
+{
+ "machine": "snow-crash",
+ "rule": "Every symbol on the reels is real Stacks or Bitcoin material. Nothing is drawn or imitated by hand. A punk with no Forever Twins twin is shown desaturated with a NOT YET FOREVER stamp.",
+ "collection": {
+  "name": "Crash Punks",
+  "creator": "grace.btc",
+  "mintedOn": "This Is #1, 12 December 2021",
+  "collectionId": "grace.btc/crash_punks",
+  "lastTokenId": 5754,
+  "tokensWithMetadata": 5140,
+  "tokensWithoutMetadata404": 614,
+  "note": "5,754 is the highest token id read from the contract. 614 ids returned no metadata from the Hiro metadata API and are not in any tier."
+ },
+ "tiers": {
+  "method": "Rarity score = sum over a punk's traits of ln(collection size / trait frequency), computed across all 5,140 punks with metadata. Rarest 1% = Legendary, next 4% = Rare, the remaining 95% split into four equal tiers (Tier I rarest of the four).",
+  "counts": {
+   "1": 1220,
+   "2": 1220,
+   "3": 1220,
+   "4": 1223,
+   "L": 51,
+   "R": 206
+  },
+  "tierStringFile": "art/snow-crash-art.json (tierString: one character per token id, 0 = no metadata)",
+  "metadataSource": "https://api.hiro.so/metadata/v1/nft/<contract>/<id>",
+  "imageSource": "IPFS Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/<id>.png via https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/<cid>/<id>.png, re-encoded to webp q0.82"
+ },
+ "logos": [
+  {
+   "symbol": "vault (The #1 Club)",
+   "name": "This Is #1 mark",
+   "file": "tools/snow-crash/art/logos/this-is-number-one.svg (also embedded in the game as a data URI)",
+   "source": "thisisnumberone.com, the platform Crash Punks minted on. Fetched 2026-11-01. The exact asset URL was not recorded at fetch time: confirm it against the site before release.",
+   "usedAs": "The vault symbol on the reels and the club entrance and booth scenes. Used as supplied.",
+   "permission": "NEEDED: ask This Is #1 before the machine goes on the public floor."
+  },
+  {
+   "symbol": "scatter (Jacked In) and the topper",
+   "name": "Crash Punks logo",
+   "file": null,
+   "source": "Not found. No official logo file could be located from the collection's Gamma page, the This Is #1 page or its socials from the tools available. Nothing was drawn or traced.",
+   "usedAs": "The scatter tile shows the name CRASH PUNKS set in type on a tile in the project's magenta; the cabinet topper (role crest) carries the same wording on the hologram.",
+   "permission": "NEEDED: the official logo file (and the project's OK) from the Crash Punks creator, grace.btc. Replace the typed tile and the topper texture when it arrives."
+  }
+ ],
+ "brandAssets": [
+  {
+   "name": "Xtrata mark",
+   "file": "tools/snow-crash/art/ (series bible, Brand assets)",
+   "usedAs": "Lower door of the cabinet, the souvenir ticket and the Forever tile. Used exactly as given.",
+   "permission": "Own brand"
+  },
+  {
+   "name": "ParallaX Casino wordmark",
+   "file": "series bible, Brand assets",
+   "usedAs": "Marquee foot. Used exactly as given, smaller than the machine name.",
+   "permission": "Own brand"
+  }
+ ],
+ "onChainRecords": [
+  {
+   "symbol": "chain (Forever Street)",
+   "what": "A Crash Punk's Xtrata inscription id once twinned, otherwise its token number",
+   "source": "Read live from the Forever Twins registry (https://xtrata.xyz/forever-twins/data/registry.v2.json) and the collection's helper contract. No helper exists for Crash Punks yet, so every tile shows the token number."
+  }
+ ],
+ "live": {
+  "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json",
+  "cache": "6 hours, localStorage key xtrata.snowcrash.twins",
+  "failedRead": "A failed or empty read is shown as unknown, never as no twins."
+ }
+}

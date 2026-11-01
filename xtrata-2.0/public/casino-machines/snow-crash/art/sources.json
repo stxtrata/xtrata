@@ -1,0 +1,6255 @@
+{
+ "machine": "snow-crash",
+ "generated": "2026-11-01T17:30Z",
+ "rule": "Every symbol on the reels is real Stacks or Bitcoin material. Nothing is drawn or imitated by hand. A punk with no Forever Twins twin is shown desaturated with a NOT YET FOREVER stamp.",
+ "collection": {
+  "name": "Crash Punks",
+  "creator": "grace.btc",
+  "mintedOn": "This Is #1, 12 December 2021",
+  "contract": "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2",
+  "collectionId": "grace.btc/crash_punks",
+  "lastTokenId": 5754,
+  "tokensWithMetadata": 5140,
+  "tokensWithoutMetadata404": 614,
+  "note": "5,754 is the highest token id read from the contract. 614 ids returned no metadata from the Hiro metadata API and are not in any tier."
+ },
+ "tiers": {
+  "method": "Rarity score = sum over a punk's traits of ln(collection size / trait frequency), computed across all 5,140 punks with metadata. Rarest 1% = Legendary, next 4% = Rare, the remaining 95% split into four equal tiers (Tier I rarest of the four).",
+  "counts": {
+   "1": 1220,
+   "2": 1220,
+   "3": 1220,
+   "4": 1223,
+   "L": 51,
+   "R": 206
+  },
+  "tierStringFile": "art/snow-crash-art.json (tierString: one character per token id, 0 = no metadata)",
+  "metadataSource": "https://api.hiro.so/metadata/v1/nft/<contract>/<id>",
+  "imageSource": "IPFS Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/<id>.png via https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/<cid>/<id>.png, re-encoded to webp q0.82"
+ },
+ "punks": [
+  {
+   "tokenId": 140,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 33.2,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Green"
+    ],
+    [
+     "Outfit Front",
+     "Vest Bionic Arms"
+    ],
+    [
+     "Head",
+     "Head Green"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Grin"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Green"
+    ],
+    [
+     "Eyegear",
+     "Visors Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/140",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/140.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/140.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 876,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 32.84,
+   "traits": [
+    [
+     "Background",
+     "Lime"
+    ],
+    [
+     "Back Accessory",
+     "Katana"
+    ],
+    [
+     "Outfit Back",
+     "LED Jacket Green Back"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Brown"
+    ],
+    [
+     "Mohawks",
+     "Fohawk Black"
+    ],
+    [
+     "Eyegear",
+     "Visors Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/876",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/876.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/876.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1030,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 33.63,
+   "traits": [
+    [
+     "Background",
+     "Matrix"
+    ],
+    [
+     "Back Accessory",
+     "Rifle"
+    ],
+    [
+     "Outfit Back",
+     "Astro Suit Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Astro Suit Front"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Neon Fracture"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Hair",
+     "Bob Black Red"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1030",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1030.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1030.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1212,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 32.86,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Gold Harpoon"
+    ],
+    [
+     "Headgear Back",
+     "Ninja Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Ninja Suit"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Bitcoin Black"
+    ],
+    [
+     "Mouth",
+     "StacksPop"
+    ],
+    [
+     "Eyes",
+     "Eyes Pink"
+    ],
+    [
+     "Headgear Front",
+     "Ninja Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1212",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1212.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1212.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1230,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 34.68,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double"
+    ],
+    [
+     "Neck",
+     "Neck Purple"
+    ],
+    [
+     "Outfit Front",
+     "Glitch Suit"
+    ],
+    [
+     "Head",
+     "Head Purple"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Warpaint"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Chip"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Lime"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Pink"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1230",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1230.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1230.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1468,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 32.66,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Back Accessory",
+     "Katana"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono BTC STX"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Scar"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Side Head Markings",
+     "Mid Side Tattoo GM"
+    ],
+    [
+     "Mouth",
+     "Beard-FuManChu"
+    ],
+    [
+     "Eyes",
+     "SideEye Yellow"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat Gold BTC"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1468",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1468.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1468.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2808,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 32.43,
+   "traits": [
+    [
+     "Background",
+     "Blue"
+    ],
+    [
+     "Back Accessory",
+     "Gold Harpoon"
+    ],
+    [
+     "Outfit Back",
+     "Trenchcoat NeonPurple Back"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Trenchcoat NeonPurple Front"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Mid Side Tattoo GM"
+    ],
+    [
+     "Mouth",
+     "Bills"
+    ],
+    [
+     "Eyes",
+     "Laser Eyes Blue"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2808",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2808.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2808.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3041,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 33.26,
+   "traits": [
+    [
+     "Background",
+     "Mint"
+    ],
+    [
+     "Back Accessory",
+     "Light Saber"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Holographic"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Tattoos Neon Emojis"
+    ],
+    [
+     "Mouth",
+     "Growl Fangs"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Turquoise"
+    ],
+    [
+     "Eyegear",
+     "Eyepatch"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3041",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3041.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3041.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3175,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 33.22,
+   "traits": [
+    [
+     "Background",
+     "Lime"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double Obsidian"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Holographic"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Mid Side Tattoo GM"
+    ],
+    [
+     "Mouth",
+     "Kiss"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Red"
+    ],
+    [
+     "Eyegear",
+     "Visors Metaverse"
+    ],
+    [
+     "Headgear Front",
+     "BaseballCap NY"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3175",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3175.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3175.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3394,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 33.81,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Outfit Back",
+     "Armor Jacket Sunset Back"
+    ],
+    [
+     "Neck",
+     "Neck Green"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Green"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Bitcoin Black"
+    ],
+    [
+     "Mouth",
+     "StacksPop"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Lime"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Fire"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3394",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3394.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3394.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3482,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 35.38,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Back Accessory",
+     "Earth"
+    ],
+    [
+     "Neck",
+     "Neck Orange"
+    ],
+    [
+     "Outfit Front",
+     "Kimono BTC STX"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Side Head Markings",
+     "Side Chip"
+    ],
+    [
+     "Mouth",
+     "Mask Grafitti"
+    ],
+    [
+     "Eyes",
+     "Eyes Purple"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat Gold BTC"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3482",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3482.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3482.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3782,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 36.1,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Grid"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Outfit Back",
+     "Astro Suit Back"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Astro Suit Front"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Metal Disc"
+    ],
+    [
+     "Mouth",
+     "Growl Fangs"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ],
+    [
+     "Headgear Front",
+     "Astro Helmet"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3782",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3782.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3782.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4394,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 35.51,
+   "traits": [
+    [
+     "Background",
+     "Matrix"
+    ],
+    [
+     "Back Accessory",
+     "Katana Obsidian"
+    ],
+    [
+     "Headgear Back",
+     "Jacket Red Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Red"
+    ],
+    [
+     "Head",
+     "Head White Square"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Bills"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Eyegear",
+     "Goggles VR"
+    ],
+    [
+     "Headgear Front",
+     "Jacket Red Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4394",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4394.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4394.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4549,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 35.23,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Circuit"
+    ],
+    [
+     "Long Hair",
+     "Long Hair Pink"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Neck",
+     "Neck White"
+    ],
+    [
+     "Outfit Front",
+     "Bodysuit Bionic Arm"
+    ],
+    [
+     "Head",
+     "Head White Round"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "BubbleGum"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Pink"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4549",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4549.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4549.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4966,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 33.29,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Grid"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Outfit Back",
+     "Stacks Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Stacks Hoodie"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Bandage"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Cookie"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Lime"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Purple"
+    ],
+    [
+     "Eyegear",
+     "Visors Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4966",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4966.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4966.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5328,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 33.62,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Headgear Back",
+     "Warrior Helmet Gold Back"
+    ],
+    [
+     "Neck",
+     "Neck Purple"
+    ],
+    [
+     "Outfit Front",
+     "Sweater Vest"
+    ],
+    [
+     "Head",
+     "Head Purple"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Grin"
+    ],
+    [
+     "Eyes",
+     "Laser Eyes Blue"
+    ],
+    [
+     "Headgear Front",
+     "Warrior Helmet Gold Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5328",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5328.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5328.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5411,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 35.91,
+   "traits": [
+    [
+     "Background",
+     "Peach"
+    ],
+    [
+     "Back Accessory",
+     "Skateboard"
+    ],
+    [
+     "Outfit Back",
+     "Trenchcoat NeonPink Back"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Trenchcoat NeonPink Front"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Chip"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Blue"
+    ],
+    [
+     "Headgear Front",
+     "Tubes"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5411",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5411.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5411.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5602,
+   "tier": "1",
+   "tierName": "Tier I (red frame)",
+   "engineSlot": "block",
+   "rarityScore": 33.37,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Back Accessory",
+     "Katana Gold"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Vest Bionic Arms"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Beard-Black"
+    ],
+    [
+     "Eyes",
+     "Frown Red"
+    ],
+    [
+     "Eyegear",
+     "Visors Metaverse"
+    ],
+    [
+     "Headgear Front",
+     "Tubes"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5602",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5602.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5602.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 131,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 31.44,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Rifle"
+    ],
+    [
+     "Neck",
+     "Neck Purple"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Plum"
+    ],
+    [
+     "Head",
+     "Head Purple"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Neon Fracture"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Grin"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Lime"
+    ],
+    [
+     "Hair",
+     "Shaved Black"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/131",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/131.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/131.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 373,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 31.14,
+   "traits": [
+    [
+     "Background",
+     "Mint"
+    ],
+    [
+     "Outfit Back",
+     "Trenchcoat NeonPink Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Trenchcoat NeonPink Front"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Mouth",
+     "Pizza"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Purple"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/373",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/373.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/373.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 652,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 30.44,
+   "traits": [
+    [
+     "Background",
+     "Mint"
+    ],
+    [
+     "Back Accessory",
+     "Katana Obsidian"
+    ],
+    [
+     "Headgear Back",
+     "Ninja Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Tan"
+    ],
+    [
+     "Outfit Front",
+     "Ninja Suit"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Mouth",
+     "Snarl"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Headgear Front",
+     "Ninja Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/652",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/652.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/652.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 749,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 31.97,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Meltems Blowtorch"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Sweater Vest"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Tattoos Neon Emojis"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Stacks"
+    ],
+    [
+     "Mouth",
+     "Pizza"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Blue"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Fire"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/749",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/749.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/749.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 752,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 30.57,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Back Accessory",
+     "Rifle"
+    ],
+    [
+     "Outfit Back",
+     "Stacks Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Stacks Hoodie"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Mouth",
+     "StacksPop"
+    ],
+    [
+     "Eyes",
+     "Frown Aqua"
+    ],
+    [
+     "Hair",
+     "Afro Light"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/752",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/752.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/752.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1465,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 30.98,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Neck",
+     "Neck Tan"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Forest"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Tattoos Neon Emojis"
+    ],
+    [
+     "Mouth",
+     "Bills"
+    ],
+    [
+     "Eyes",
+     "Laser Eyes Blue"
+    ],
+    [
+     "Hair",
+     "Bob Black Red"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1465",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1465.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1465.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1849,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 30.67,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Neck",
+     "Neck Brown"
+    ],
+    [
+     "Outfit Front",
+     "Military Suit"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Lips Bare"
+    ],
+    [
+     "Eyes",
+     "Laser Eyes Red"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Purple"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1849",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1849.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1849.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1893,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 32.05,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Circuit"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Stacculent"
+    ],
+    [
+     "Head",
+     "Head White Round"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Warpaint"
+    ],
+    [
+     "Mouth",
+     "Pizza"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Hair",
+     "Bob Black Red"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1893",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1893.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1893.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2611,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 31.36,
+   "traits": [
+    [
+     "Background",
+     "Pink"
+    ],
+    [
+     "Outfit Back",
+     "Stacks Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Stacks Hoodie"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Side Head Markings",
+     "Mid Side Tattoo GM"
+    ],
+    [
+     "Mouth",
+     "Mask NeonDrips"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2611",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2611.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2611.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2839,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 30.05,
+   "traits": [
+    [
+     "Background",
+     "Mint"
+    ],
+    [
+     "Back Accessory",
+     "Skateboard"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Sweater Vest"
+    ],
+    [
+     "Head",
+     "Head Green"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Mouth",
+     "Pizza"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Mohawks",
+     "Fohawk Black"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2839",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2839.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2839.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3082,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 32.25,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Outfit Back",
+     "Stacks TieDye Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck Green"
+    ],
+    [
+     "Outfit Front",
+     "Stacks TieDye Hoodie Front"
+    ],
+    [
+     "Head",
+     "Head Green"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Stacks"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3082",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3082.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3082.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3140,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 31.61,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Holographic"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Mid Side Tattoo GM"
+    ],
+    [
+     "Mouth",
+     "Mask Skull"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Black"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Fire"
+    ],
+    [
+     "Eyegear",
+     "Goggles VR"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3140",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3140.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3140.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3615,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 32.25,
+   "traits": [
+    [
+     "Background",
+     "Lime"
+    ],
+    [
+     "Neck",
+     "Neck White"
+    ],
+    [
+     "Outfit Front",
+     "Barcode Suit"
+    ],
+    [
+     "Head",
+     "Head White Square"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Scar"
+    ],
+    [
+     "Mouth",
+     "Beard-Gray"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Hair",
+     "Shaved Gray"
+    ],
+    [
+     "Eyegear",
+     "Eye Bandage"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3615",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3615.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3615.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4390,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 30.54,
+   "traits": [
+    [
+     "Background",
+     "Peach"
+    ],
+    [
+     "Back Accessory",
+     "Katana"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Suit Dark"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Brown"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4390",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4390.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4390.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4828,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 30.88,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Grid"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Forest"
+    ],
+    [
+     "Head",
+     "Head Green"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Mid Side Tattoo GM"
+    ],
+    [
+     "Mouth",
+     "Smirk"
+    ],
+    [
+     "Eyes",
+     "SideEye Red"
+    ],
+    [
+     "Headgear Front",
+     "Wires"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4828",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4828.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4828.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4877,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 32.08,
+   "traits": [
+    [
+     "Background",
+     "Pink"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Suit Silver Gold"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Neon Fracture"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Turquoise"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Fire"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4877",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4877.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4877.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5234,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 30.53,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Outfit Back",
+     "LED Jacket Green Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Lips Bare"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Turquoise"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5234",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5234.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5234.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5491,
+   "tier": "2",
+   "tierName": "Tier II (violet frame)",
+   "engineSlot": "chip",
+   "rarityScore": 31.13,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Hex"
+    ],
+    [
+     "Neck",
+     "Neck White"
+    ],
+    [
+     "Outfit Front",
+     "Kimono BTC STX"
+    ],
+    [
+     "Head",
+     "Head White Round"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Tattoos Neon Emojis"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Bitcoin"
+    ],
+    [
+     "Mouth",
+     "Kiss"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Lime"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5491",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5491.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5491.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 726,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.99,
+   "traits": [
+    [
+     "Background",
+     "Lime"
+    ],
+    [
+     "Back Accessory",
+     "Katana"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono White"
+    ],
+    [
+     "Head",
+     "Head Blue"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Hair",
+     "Bob Navy Teal"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/726",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/726.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/726.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 755,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.59,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Back Accessory",
+     "Skateboard"
+    ],
+    [
+     "Outfit Back",
+     "Stacks TieDye Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Stacks TieDye Hoodie Front"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Bitcoin Black"
+    ],
+    [
+     "Mouth",
+     "Bills"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Black"
+    ],
+    [
+     "Eyegear",
+     "Visors Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/755",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/755.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/755.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 900,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 29.48,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono White"
+    ],
+    [
+     "Head",
+     "Head Purple"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Tattoos Neon Emojis"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Pink"
+    ],
+    [
+     "Hair",
+     "High Ponytail Gray"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/900",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/900.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/900.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1530,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.27,
+   "traits": [
+    [
+     "Background",
+     "Mint"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Outfit Back",
+     "Stacks Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck Light Brown"
+    ],
+    [
+     "Outfit Front",
+     "Stacks Hoodie"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Grin"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Hair",
+     "Afro Light"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1530",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1530.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1530.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1882,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 29.58,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Stacks"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Tattoos Neon Emojis"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Low Side Tattoo Sumerian"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Blue"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Purple"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1882",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1882.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1882.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2098,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 29.34,
+   "traits": [
+    [
+     "Background",
+     "Mint"
+    ],
+    [
+     "Back Accessory",
+     "Katana Obsidian"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Suit"
+    ],
+    [
+     "Head",
+     "Head Purple"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Growl"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Eyegear",
+     "Goggles VR"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2098",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2098.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2098.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2357,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.46,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Light Saber"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Barcode Suit"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Diode"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Kiss"
+    ],
+    [
+     "Eyes",
+     "Eyes Pink"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Fire"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2357",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2357.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2357.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2838,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.32,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Grid"
+    ],
+    [
+     "Back Accessory",
+     "Katana"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Shirt NY"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Stacks"
+    ],
+    [
+     "Mouth",
+     "Pizza"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Blue"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2838",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2838.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2838.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3154,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.36,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Grid"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Outfit Back",
+     "Armor Jacket Sunrise Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Side Head Markings",
+     "Low Side Tattoo Wagmi"
+    ],
+    [
+     "Mouth",
+     "Pizza"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Fire"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3154",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3154.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3154.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3184,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 29.82,
+   "traits": [
+    [
+     "Background",
+     "Lime"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Neck",
+     "Neck Orange"
+    ],
+    [
+     "Outfit Front",
+     "Sweater Vest"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Hair",
+     "High Ponytail Black"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3184",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3184.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3184.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3303,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.57,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Black"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Mouth",
+     "Mask Skull"
+    ],
+    [
+     "Eyes",
+     "SideEye Green"
+    ],
+    [
+     "Hair",
+     "Afro Light"
+    ],
+    [
+     "Eyegear",
+     "Eyepatch"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3303",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3303.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3303.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3704,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.34,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Hex"
+    ],
+    [
+     "Outfit Back",
+     "Stacks Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Stacks Hoodie"
+    ],
+    [
+     "Head",
+     "Head White Square"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Brown"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3704",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3704.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3704.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3891,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.47,
+   "traits": [
+    [
+     "Background",
+     "Mint"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Bitcoin"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Stacks"
+    ],
+    [
+     "Mouth",
+     "Growl Fangs"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Red"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Fire"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3891",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3891.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3891.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3926,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 29.13,
+   "traits": [
+    [
+     "Background",
+     "Matrix"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Bodysuit Bionic Arm"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Bitcoin Black"
+    ],
+    [
+     "Mouth",
+     "Smirk"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Fire"
+    ],
+    [
+     "Eyegear",
+     "Eye Bionic"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3926",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3926.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3926.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4520,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.94,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Miami Shirt"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Toothpick"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Hair",
+     "Shaved Black"
+    ],
+    [
+     "Eyegear",
+     "Visors Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4520",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4520.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4520.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4908,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 28.3,
+   "traits": [
+    [
+     "Background",
+     "Matrix"
+    ],
+    [
+     "Outfit Back",
+     "Astro Suit Back"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Astro Suit Front"
+    ],
+    [
+     "Head",
+     "Head White Square"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Grin"
+    ],
+    [
+     "Eyes",
+     "SideEye Red"
+    ],
+    [
+     "Hair",
+     "Shaved Gray"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4908",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4908.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4908.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4992,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 29.98,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Skateboard"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Suit"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Implants",
+     "Forehead Horns Back"
+    ],
+    [
+     "Mouth",
+     "Mask NeonDrips"
+    ],
+    [
+     "Eyes",
+     "Laser Eyes Blue"
+    ],
+    [
+     "Headgear Front",
+     "Forehead Horns Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4992",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4992.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4992.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5066,
+   "tier": "3",
+   "tierName": "Tier III (green frame)",
+   "engineSlot": "lemon",
+   "rarityScore": 29.16,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Grid"
+    ],
+    [
+     "Back Accessory",
+     "Earth"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Stacks"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Chip"
+    ],
+    [
+     "Mouth",
+     "StacksPop"
+    ],
+    [
+     "Eyes",
+     "Eyes Green"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat Gold BTC"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5066",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5066.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5066.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 207,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 26.64,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Grid"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Sweater Vest"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "BubbleGum"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Lime"
+    ],
+    [
+     "Eyegear",
+     "Visors Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/207",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/207.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/207.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 284,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 26.73,
+   "traits": [
+    [
+     "Background",
+     "Matrix"
+    ],
+    [
+     "Back Accessory",
+     "Katana Obsidian"
+    ],
+    [
+     "Outfit Back",
+     "Astro Suit Back"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Astro Suit Front"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Lips Bare"
+    ],
+    [
+     "Eyes",
+     "Laser Eyes Blue"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/284",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/284.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/284.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 428,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 26.01,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Rifle"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono BTC STX"
+    ],
+    [
+     "Head",
+     "Head Purple"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Black"
+    ],
+    [
+     "Hair",
+     "High Ponytail Black"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/428",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/428.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/428.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 707,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 27.3,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Back Accessory",
+     "Light Saber"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Barcode Suit"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Side Head Markings",
+     "Low Side Tattoo Sumerian"
+    ],
+    [
+     "Mouth",
+     "Pizza"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Black"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/707",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/707.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/707.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1017,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 24.5,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Back Accessory",
+     "Skateboard"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Stacks Punk Jacket"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Smirk"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Hair",
+     "Afro Light"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1017",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1017.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1017.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1583,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 26.55,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Grid"
+    ],
+    [
+     "Back Accessory",
+     "Katana Gold"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Black"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Pizza"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1583",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1583.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1583.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1714,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 24.57,
+   "traits": [
+    [
+     "Background",
+     "Peach"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Stacks"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Grin"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Red"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1714",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1714.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1714.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2136,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 26.41,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Holographic"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "StacksPop"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Lime"
+    ],
+    [
+     "Hair",
+     "Bob Blue"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2136",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2136.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2136.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2404,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 24.85,
+   "traits": [
+    [
+     "Background",
+     "Matrix"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Cherry"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Grin"
+    ],
+    [
+     "Eyes",
+     "Frown Red"
+    ],
+    [
+     "Hair",
+     "Afro Light"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2404",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2404.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2404.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2966,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 27.23,
+   "traits": [
+    [
+     "Background",
+     "Lime"
+    ],
+    [
+     "Back Accessory",
+     "Katana Obsidian"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Barcode Suit"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Diode"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Growl"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Blue"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2966",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2966.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2966.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3274,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 26.01,
+   "traits": [
+    [
+     "Background",
+     "Matrix"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Barcode Suit"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Purple"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3274",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3274.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3274.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4087,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 26.36,
+   "traits": [
+    [
+     "Background",
+     "Blue"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Sweater Vest"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Laser Eyes Blue"
+    ],
+    [
+     "Hair",
+     "Bob Blue"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4087",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4087.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4087.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4223,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 27.49,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Bodysuit Bionic Arm"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Black"
+    ],
+    [
+     "Hair",
+     "Afro Light"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4223",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4223.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4223.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4789,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 24.89,
+   "traits": [
+    [
+     "Background",
+     "Mint"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Black"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Mouth",
+     "Smirk"
+    ],
+    [
+     "Eyes",
+     "Laser Eyes Red"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4789",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4789.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4789.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4919,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 27.41,
+   "traits": [
+    [
+     "Background",
+     "Pink"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Holographic"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Mask Grafitti"
+    ],
+    [
+     "Eyes",
+     "Frown Aqua"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4919",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4919.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4919.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5143,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 23.28,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Forest"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Green"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Turquoise"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5143",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5143.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5143.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5243,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 26.74,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Cherry"
+    ],
+    [
+     "Head",
+     "Head White Square"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Blue"
+    ],
+    [
+     "Hair",
+     "Shaved Pink"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5243",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5243.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5243.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5585,
+   "tier": "4",
+   "tierName": "Tier IV (cyan frame)",
+   "engineSlot": "cherry",
+   "rarityScore": 27.57,
+   "traits": [
+    [
+     "Background",
+     "Mint"
+    ],
+    [
+     "Back Accessory",
+     "Skateboard"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Kimono White"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Mohawks",
+     "Fohawk Blue"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5585",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5585.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5585.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 250,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 41.17,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Back Accessory",
+     "Gold Harpoon"
+    ],
+    [
+     "Outfit Back",
+     "Stacks TieDye Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck Green"
+    ],
+    [
+     "Outfit Front",
+     "Stacks TieDye Hoodie Front"
+    ],
+    [
+     "Head",
+     "Head Green"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Stacks"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Turquoise"
+    ],
+    [
+     "Eyegear",
+     "Eyepatch"
+    ],
+    [
+     "Headgear Front",
+     "BaseballCap NY"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/250",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/250.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/250.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 323,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 40.06,
+   "traits": [
+    [
+     "Background",
+     "Lime"
+    ],
+    [
+     "Outfit Back",
+     "Stacks TieDye Hoodie Back"
+    ],
+    [
+     "Headgear Back",
+     "Bitcoin Bunny Back"
+    ],
+    [
+     "Neck",
+     "Neck Orange"
+    ],
+    [
+     "Outfit Front",
+     "Stacks TieDye Hoodie Front"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Metal Disc"
+    ],
+    [
+     "Mouth",
+     "Growl"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Blue"
+    ],
+    [
+     "Headgear Front",
+     "Forehead Bitcoin Bunny Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/323",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/323.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/323.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 610,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 43.24,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Hex"
+    ],
+    [
+     "Long Hair",
+     "Long Hair Pink"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double Obsidian"
+    ],
+    [
+     "Outfit Back",
+     "Armor Jacket Sunrise Back"
+    ],
+    [
+     "Neck",
+     "Neck Light Brown"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Low Side Tattoo Wagmi"
+    ],
+    [
+     "Mouth",
+     "Tongue"
+    ],
+    [
+     "Eyes",
+     "Laser Eyes Blue"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Pink"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/610",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/610.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/610.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 738,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 40,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Katana"
+    ],
+    [
+     "Headgear Back",
+     "Jacket Yellow Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Yellow"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Scar"
+    ],
+    [
+     "Side Head Markings",
+     "Mid Side Tattoo GM"
+    ],
+    [
+     "Mouth",
+     "Pouty Mouth Joint"
+    ],
+    [
+     "Eyes",
+     "Eyes Pink"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ],
+    [
+     "Headgear Front",
+     "Jacket Yellow Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/738",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/738.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/738.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 981,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 43.76,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Back Accessory",
+     "Katana Obsidian"
+    ],
+    [
+     "Outfit Back",
+     "Armor Jacket Sunset Back"
+    ],
+    [
+     "Headgear Back",
+     "Bitcoin Bunny Back"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Bitcoin"
+    ],
+    [
+     "Mouth",
+     "Smile"
+    ],
+    [
+     "Eyes",
+     "Eyes Purple"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ],
+    [
+     "Headgear Front",
+     "Forehead Bitcoin Bunny Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/981",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/981.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/981.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1006,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 41.21,
+   "traits": [
+    [
+     "Background",
+     "Lime"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Suit"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Warpaint"
+    ],
+    [
+     "Mouth",
+     "Beard-Red"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Hair",
+     "Shaved Red"
+    ],
+    [
+     "Eyegear",
+     "Sunglasses Platinum"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1006",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1006.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1006.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1031,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 40.25,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Skateboard"
+    ],
+    [
+     "Outfit Back",
+     "Astro Suit Back"
+    ],
+    [
+     "Neck",
+     "Neck Orange"
+    ],
+    [
+     "Outfit Front",
+     "Astro Suit Front"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Scar"
+    ],
+    [
+     "Side Head Markings",
+     "Side Chip"
+    ],
+    [
+     "Mouth",
+     "Pizza"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Red"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Dreads"
+    ],
+    [
+     "Eyegear",
+     "Sunglasses Lime"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1031",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1031.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1031.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1054,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 40.38,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Back Accessory",
+     "Gold Harpoon"
+    ],
+    [
+     "Outfit Back",
+     "Trenchcoat NeonPurple Back"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Trenchcoat NeonPurple Front"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Implants",
+     "Forehead Horns Back"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "StacksPop"
+    ],
+    [
+     "Eyes",
+     "SideEye Red"
+    ],
+    [
+     "Eyegear",
+     "Goggles Red"
+    ],
+    [
+     "Headgear Front",
+     "Forehead Horns Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1054",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1054.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1054.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1304,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 39.69,
+   "traits": [
+    [
+     "Background",
+     "Blue"
+    ],
+    [
+     "Back Accessory",
+     "Katana Silver"
+    ],
+    [
+     "Headgear Back",
+     "Jacket Yellow Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Yellow"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Tattoos Neon Emojis"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Low Side Tattoo Wagmi"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Pink"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ],
+    [
+     "Headgear Front",
+     "Jacket Yellow Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1304",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1304.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1304.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2207,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 43.97,
+   "traits": [],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2207",
+   "image": {
+    "ipfs": "",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2207.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2212,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 43.97,
+   "traits": [],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2212",
+   "image": {
+    "ipfs": "",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2212.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2447,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 40.2,
+   "traits": [
+    [
+     "Background",
+     "Blue"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double Silver"
+    ],
+    [
+     "Headgear Back",
+     "Jacket Blue Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Blue"
+    ],
+    [
+     "Head",
+     "Head Purple"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Neon Fracture"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Mouth",
+     "Smirk"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Black"
+    ],
+    [
+     "Eyegear",
+     "Eye Bionic"
+    ],
+    [
+     "Headgear Front",
+     "Jacket Blue Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2447",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2447.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2447.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2789,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 42.34,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Outfit Back",
+     "Stacks TieDye Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Stacks TieDye Hoodie Front"
+    ],
+    [
+     "Head",
+     "Head White Square"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Scar"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Chip"
+    ],
+    [
+     "Mouth",
+     "Beard-Gray"
+    ],
+    [
+     "Eyes",
+     "Frown Aqua"
+    ],
+    [
+     "Eyegear",
+     "Goggles Steampunk"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat White"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2789",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2789.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2789.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2863,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 42.35,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Grid"
+    ],
+    [
+     "Back Accessory",
+     "Gold Harpoon"
+    ],
+    [
+     "Outfit Back",
+     "LED Jacket Orange Back"
+    ],
+    [
+     "Headgear Back",
+     "Warrior Helmet Gold Back"
+    ],
+    [
+     "Neck",
+     "Neck Blue"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Blue"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Neon Fracture"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Green"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ],
+    [
+     "Headgear Front",
+     "Warrior Helmet Gold Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2863",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2863.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2863.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2922,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 44.59,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Grid"
+    ],
+    [
+     "Long Hair",
+     "Long Hair Purple"
+    ],
+    [
+     "Back Accessory",
+     "Katana Gold"
+    ],
+    [
+     "Neck",
+     "Neck Tan"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Leopard Green"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Side Head Markings",
+     "Low Side Tattoo CityCoins"
+    ],
+    [
+     "Mouth",
+     "Pout"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Red"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Purple"
+    ],
+    [
+     "Eyegear",
+     "Sunglasses Platinum"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2922",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2922.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2922.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4403,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 42.25,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double"
+    ],
+    [
+     "Headgear Back",
+     "Jacket Blue Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Orange"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Blue"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Warpaint"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Mouth",
+     "Smirk"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Eyegear",
+     "Eye Bandage"
+    ],
+    [
+     "Headgear Front",
+     "Jacket Blue Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4403",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4403.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4403.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4664,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 39.93,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Rifle"
+    ],
+    [
+     "Neck",
+     "Neck Purple"
+    ],
+    [
+     "Outfit Front",
+     "Crash Punk Jacket Spiked"
+    ],
+    [
+     "Head",
+     "Head Purple"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Scar"
+    ],
+    [
+     "Implants",
+     "Forehead Horns Back"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "StacksPop"
+    ],
+    [
+     "Eyes",
+     "Frown Red"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ],
+    [
+     "Headgear Front",
+     "Forehead Horns Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4664",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4664.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4664.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4688,
+   "tier": "L",
+   "tierName": "Legendary (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "rarityScore": 39.97,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Earth"
+    ],
+    [
+     "Outfit Back",
+     "Armor Jacket Platinum Back"
+    ],
+    [
+     "Headgear Back",
+     "Bitcoin Bunny Back"
+    ],
+    [
+     "Neck",
+     "Neck Blue"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Blue"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Pink"
+    ],
+    [
+     "Eyegear",
+     "Visors Metaverse"
+    ],
+    [
+     "Headgear Front",
+     "Forehead Bitcoin Bunny Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4688",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4688.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4688.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 288,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 36.91,
+   "traits": [
+    [
+     "Background",
+     "Pink"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double Silver"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Blue"
+    ],
+    [
+     "Head",
+     "Head Blue"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Bandage"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Stacks"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Brown"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ],
+    [
+     "Headgear Front",
+     "Samurai Hat"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/288",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/288.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/288.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 290,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 36.95,
+   "traits": [
+    [
+     "Background",
+     "Matrix"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double Silver"
+    ],
+    [
+     "Headgear Back",
+     "Ninja Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Ninja Suit"
+    ],
+    [
+     "Head",
+     "Head White Round"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Chip"
+    ],
+    [
+     "Mouth",
+     "Rose"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Red"
+    ],
+    [
+     "Eyegear",
+     "Goggles VR"
+    ],
+    [
+     "Headgear Front",
+     "Ninja Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/290",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/290.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/290.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 648,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 37.08,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Back Accessory",
+     "Katana"
+    ],
+    [
+     "Headgear Back",
+     "Jacket Blue Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Blue"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Side Head Markings",
+     "Mid Side Tattoo GM"
+    ],
+    [
+     "Mouth",
+     "BubbleGum"
+    ],
+    [
+     "Eyes",
+     "Eyes Green"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ],
+    [
+     "Headgear Front",
+     "Jacket Blue Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/648",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/648.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/648.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1492,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 37.04,
+   "traits": [
+    [
+     "Background",
+     "Lime"
+    ],
+    [
+     "Back Accessory",
+     "Rifle"
+    ],
+    [
+     "Neck",
+     "Neck Light Brown"
+    ],
+    [
+     "Outfit Front",
+     "Glitch Suit"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Low Side Tattoo Sumerian"
+    ],
+    [
+     "Mouth",
+     "Beard-Gray"
+    ],
+    [
+     "Eyes",
+     "SideEye Green"
+    ],
+    [
+     "Eyegear",
+     "Goggles Metaverse"
+    ],
+    [
+     "Headgear Front",
+     "Recorder Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/1492",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1492.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/1492.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2445,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 38.05,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Back Accessory",
+     "Katana Silver"
+    ],
+    [
+     "Headgear Back",
+     "Ninja Hood Back"
+    ],
+    [
+     "Neck",
+     "Neck Tan"
+    ],
+    [
+     "Outfit Front",
+     "Ninja Suit"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Neon Fracture"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Chip"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Turquoise"
+    ],
+    [
+     "Headgear Front",
+     "Ninja Hood Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2445",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2445.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2445.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2478,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 37.81,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Circuit"
+    ],
+    [
+     "Outfit Back",
+     "LED Jacket Green Back"
+    ],
+    [
+     "Neck",
+     "Neck Tan"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Tan"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Mid Side Tattoo GM"
+    ],
+    [
+     "Mouth",
+     "Awe"
+    ],
+    [
+     "Eyes",
+     "Surprised Blue"
+    ],
+    [
+     "Eyegear",
+     "Sunglasses Platinum"
+    ],
+    [
+     "Headgear Front",
+     "Wires"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/2478",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2478.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/2478.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3627,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 37.7,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Back Accessory",
+     "Light Saber"
+    ],
+    [
+     "Outfit Back",
+     "LED Jacket Green Back"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Green"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "Eyes Blue"
+    ],
+    [
+     "Hair",
+     "Bob Teal"
+    ],
+    [
+     "Eyegear",
+     "Sunglasses Celeste"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3627",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3627.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3627.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3911,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 36.66,
+   "traits": [
+    [
+     "Background",
+     "Yellow"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double"
+    ],
+    [
+     "Outfit Back",
+     "Stacks TieDye Hoodie Back"
+    ],
+    [
+     "Neck",
+     "Neck White"
+    ],
+    [
+     "Outfit Front",
+     "Stacks TieDye Hoodie Front"
+    ],
+    [
+     "Head",
+     "Head White Square"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Eyes",
+     "Frown Yellow"
+    ],
+    [
+     "Hair",
+     "Shaved Blue"
+    ],
+    [
+     "Eyegear",
+     "Eyepatch"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3911",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3911.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3911.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3963,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 36.91,
+   "traits": [
+    [
+     "Background",
+     "Pink"
+    ],
+    [
+     "Back Accessory",
+     "Rifle"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Suit Silver Gold"
+    ],
+    [
+     "Head",
+     "Head Orange"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Scar"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Side Head Markings",
+     "Low Side Tattoo Wagmi"
+    ],
+    [
+     "Mouth",
+     "Grin"
+    ],
+    [
+     "Eyes",
+     "SideEye Green"
+    ],
+    [
+     "Eyegear",
+     "Eye Bionic"
+    ],
+    [
+     "Headgear Front",
+     "Wires"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/3963",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3963.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/3963.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4551,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 38.37,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Grid"
+    ],
+    [
+     "Long Hair",
+     "Long Hair Purple"
+    ],
+    [
+     "Back Accessory",
+     "Katana"
+    ],
+    [
+     "Neck",
+     "Neck Metal"
+    ],
+    [
+     "Outfit Front",
+     "Sweater Vest"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Warpaint"
+    ],
+    [
+     "Implants",
+     "Robo"
+    ],
+    [
+     "Mouth",
+     "Pout"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Black"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Purple"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4551",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4551.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4551.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4725,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 36.74,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Rifle"
+    ],
+    [
+     "Neck",
+     "Neck Green"
+    ],
+    [
+     "Outfit Front",
+     "Barcode Suit"
+    ],
+    [
+     "Head",
+     "Head Green"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Tattoos Neon Emojis"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Mask Sugar Skull"
+    ],
+    [
+     "Eyes",
+     "Eyes Green"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Pink"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4725",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4725.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4725.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4762,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 37.13,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Hex"
+    ],
+    [
+     "Long Hair",
+     "Long Hair Turquoise"
+    ],
+    [
+     "Outfit Back",
+     "Astro Suit Back"
+    ],
+    [
+     "Neck",
+     "Neck Steampunk"
+    ],
+    [
+     "Outfit Front",
+     "Astro Suit Front"
+    ],
+    [
+     "Head",
+     "Head Brown"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Growl Fangs"
+    ],
+    [
+     "Eyes",
+     "Eyes Pink"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Turquoise"
+    ],
+    [
+     "Eyegear",
+     "Eyepatch"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4762",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4762.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4762.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4793,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 36.74,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Hex"
+    ],
+    [
+     "Long Hair",
+     "Long Hair Pink"
+    ],
+    [
+     "Back Accessory",
+     "Katana Double"
+    ],
+    [
+     "Outfit Back",
+     "LED Jacket Navy Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Tattoos Neon Emojis"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Mouth",
+     "Metal Jaw"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Black"
+    ],
+    [
+     "Mohawks",
+     "Mohawk Half Pink"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4793",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4793.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4793.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4876,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 37.77,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Gold Harpoon"
+    ],
+    [
+     "Outfit Back",
+     "Armor Jacket Platinum Back"
+    ],
+    [
+     "Neck",
+     "Neck Light Brown"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Side Head Markings",
+     "Side Chip"
+    ],
+    [
+     "Mouth",
+     "Kiss"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Black"
+    ],
+    [
+     "Eyegear",
+     "Eyes Bitcoin"
+    ],
+    [
+     "Headgear Front",
+     "BaseballCap NY"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/4876",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4876.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/4876.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5041,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 38.02,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Circuit"
+    ],
+    [
+     "Back Accessory",
+     "Pizza Box"
+    ],
+    [
+     "Headgear Back",
+     "Bitcoin Bunny Back"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Kimono Blossoms Cherry"
+    ],
+    [
+     "Head",
+     "Head Light Brown"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Low Side Tattoo Wagmi"
+    ],
+    [
+     "Mouth",
+     "Lips Bare"
+    ],
+    [
+     "Eyes",
+     "Eyes Purple"
+    ],
+    [
+     "Eyegear",
+     "Goggles Steampunk"
+    ],
+    [
+     "Headgear Front",
+     "Forehead Bitcoin Bunny Front"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5041",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5041.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5041.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5418,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 37.04,
+   "traits": [
+    [
+     "Background",
+     "Midnight Holo Hex"
+    ],
+    [
+     "Back Accessory",
+     "Computer"
+    ],
+    [
+     "Neck",
+     "Neck Gunmetal"
+    ],
+    [
+     "Outfit Front",
+     "Cam Suit"
+    ],
+    [
+     "Head",
+     "Head White Square"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Side Head Markings",
+     "Side Tattoo Stacks"
+    ],
+    [
+     "Mouth",
+     "Smirk"
+    ],
+    [
+     "Eyes",
+     "Smiling"
+    ],
+    [
+     "Mohawks",
+     "Fohawk Red"
+    ],
+    [
+     "Eyegear",
+     "Goggles Steampunk"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5418",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5418.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5418.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5556,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 37.5,
+   "traits": [
+    [
+     "Background",
+     "Purple Holo Grid"
+    ],
+    [
+     "Back Accessory",
+     "Rifle"
+    ],
+    [
+     "Outfit Back",
+     "Armor Jacket Sunrise Back"
+    ],
+    [
+     "Neck",
+     "Neck White"
+    ],
+    [
+     "Outfit Front",
+     "Jacket Neck Front"
+    ],
+    [
+     "Head",
+     "Head White Square"
+    ],
+    [
+     "Forehead",
+     "Forehead Chip"
+    ],
+    [
+     "Piercings",
+     "STX Earrings"
+    ],
+    [
+     "Mouth",
+     "Beard-Gray"
+    ],
+    [
+     "Eyes",
+     "SideEye Green"
+    ],
+    [
+     "Hair",
+     "Shaved Gray"
+    ],
+    [
+     "Eyegear",
+     "Eye Bionic"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5556",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5556.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5556.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5640,
+   "tier": "R",
+   "tierName": "Rare (silver frame)",
+   "engineSlot": "artifact",
+   "rarityScore": 39.38,
+   "traits": [
+    [
+     "Background",
+     "Purple"
+    ],
+    [
+     "Back Accessory",
+     "Katana"
+    ],
+    [
+     "Outfit Back",
+     "Astro Suit Back"
+    ],
+    [
+     "Neck",
+     "Neck Beige"
+    ],
+    [
+     "Outfit Front",
+     "Astro Suit Front"
+    ],
+    [
+     "Head",
+     "Head Beige"
+    ],
+    [
+     "Cheek Markings",
+     "Cheek Neon Fracture"
+    ],
+    [
+     "Forehead",
+     "Forehead Tattoo PIC"
+    ],
+    [
+     "Piercings",
+     "Piercings"
+    ],
+    [
+     "Mouth",
+     "Bills"
+    ],
+    [
+     "Eyes",
+     "RoboEyes Blue"
+    ],
+    [
+     "Eyegear",
+     "Sunglasses Lime"
+    ],
+    [
+     "Headgear Front",
+     "Astro Helmet"
+    ]
+   ],
+   "metadata": "https://api.hiro.so/metadata/v1/nft/SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.crashpunks-v2/5640",
+   "image": {
+    "ipfs": "ipfs://Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5640.png",
+    "resolvedVia": "https://images.gamma.io/cdn-cgi/image/width=160,height=160/https://stxnft.mypinata.cloud/ipfs/Qmb84UcaMr1MUwNbYBnXWHM3kEaDcYrKuPWwyRLVTNKELC/5640.png",
+    "bundledAs": "webp, 160px, data URI inside art/snow-crash-art.json and the game"
+   }
+  }
+ ],
+ "punkImageCount": 108,
+ "logos": [
+  {
+   "symbol": "vault (The #1 Club)",
+   "name": "This Is #1 mark",
+   "file": "tools/snow-crash/art/logos/this-is-number-one.svg (also embedded in the game as a data URI)",
+   "source": "thisisnumberone.com, the platform Crash Punks minted on. Fetched 2026-11-01. The exact asset URL was not recorded at fetch time: confirm it against the site before release.",
+   "usedAs": "The vault symbol on the reels and the club entrance and booth scenes. Used as supplied.",
+   "permission": "NEEDED: ask This Is #1 before the machine goes on the public floor."
+  },
+  {
+   "symbol": "scatter (Jacked In) and the topper",
+   "name": "Crash Punks logo",
+   "file": null,
+   "source": "Not found. No official logo file could be located from the collection's Gamma page, the This Is #1 page or its socials from the tools available. Nothing was drawn or traced.",
+   "usedAs": "The scatter tile shows the name CRASH PUNKS set in type on a tile in the project's magenta; the cabinet topper (role crest) carries the same wording on the hologram.",
+   "permission": "NEEDED: the official logo file (and the project's OK) from the Crash Punks creator, grace.btc. Replace the typed tile and the topper texture when it arrives."
+  }
+ ],
+ "brandAssets": [
+  {
+   "name": "Xtrata mark",
+   "file": "tools/snow-crash/art/ (series bible, Brand assets)",
+   "usedAs": "Lower door of the cabinet, the souvenir ticket and the Forever tile. Used exactly as given.",
+   "permission": "Own brand"
+  },
+  {
+   "name": "ParallaX Casino wordmark",
+   "file": "series bible, Brand assets",
+   "usedAs": "Marquee foot. Used exactly as given, smaller than the machine name.",
+   "permission": "Own brand"
+  }
+ ],
+ "onChainRecords": [
+  {
+   "symbol": "chain (Forever Street)",
+   "what": "A Crash Punk's Xtrata inscription id once twinned, otherwise its token number",
+   "source": "Read live from the Forever Twins registry (https://xtrata.xyz/forever-twins/data/registry.v2.json) and the collection's helper contract. No helper exists for Crash Punks yet, so every tile shows the token number."
+  }
+ ],
+ "live": {
+  "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json",
+  "cache": "6 hours, localStorage key xtrata.snowcrash.twins",
+  "failedRead": "A failed or empty read is shown as unknown, never as no twins."
+ }
+}
