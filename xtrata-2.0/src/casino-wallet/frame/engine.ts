@@ -33,7 +33,7 @@ export const CANCELLED_MESSAGE = 'Cancelled in the casino wallet. Nothing was si
 export interface CasinoIdleView { state: CasinoStatus['state']; kind?: CasinoWalletKind; address?: string; passkeys: boolean }
 
 export interface CasinoUiPort {
-  act<T>(panel: Panel, action: () => Promise<T>): Promise<T>;
+  act<T>(panel: Panel, action: () => Promise<T>, alt?: () => Promise<T>): Promise<T>;
   cancel(): boolean;
   idle(view: CasinoIdleView): void;
 }
@@ -128,7 +128,8 @@ export function createCasinoEngine(deps: { passkey: PasskeyPort; ui: CasinoUiPor
   }
 
   /** Make a passkey (in a new tab on WebKit), prove PRF twice, derive. Same order as the radio, so a funded wallet always opens. */
-  async function create(): Promise<CasinoIdentity> {
+  /** `made`: a passkey just made in the choice panel's own tap (see `choose`), so the first create step is skipped. */
+  async function create(made?: { credentialId: string; prf?: Uint8Array }): Promise<CasinoIdentity> {
     const existing = load().wallets;
     const exclude = existing.map((w) => w.credentialId);
     const createPanel: Panel = {
@@ -145,7 +146,8 @@ export function createCasinoEngine(deps: { passkey: PasskeyPort; ui: CasinoUiPor
     const resume = pendingNow();
     let created: { credentialId: string; prf?: Uint8Array };
     try {
-      if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
+      if (made) { created = made; setPending({ at: now(), tries: 0, credentialId: made.credentialId }); }
+      else if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
         if (resume?.credentialId) created = { credentialId: resume.credentialId };
         else {
           created = await deps.ui.act(createPanel, () => deps.passkey.create(exclude, PASSKEY_NAME));
@@ -215,8 +217,13 @@ export function createCasinoEngine(deps: { passkey: PasskeyPort; ui: CasinoUiPor
     }
   }
 
+  /**
+   * Open a passkey wallet this device has used. One known passkey: asked for by id, one tap. Several (or `anyPasskey`): the
+   * browser's own list of this device's casino passkeys, to choose from.
+   */
   async function unlock(anyPasskey: boolean): Promise<CasinoIdentity> {
-    const last = anyPasskey ? undefined : lastRecord();
+    const known = load().wallets;
+    const last = anyPasskey || known.length > 1 ? undefined : lastRecord() ?? known[0];
     const r = await deps.ui.act({
       kind: 'unlock',
       title: 'Welcome back',
@@ -224,6 +231,40 @@ export function createCasinoEngine(deps: { passkey: PasskeyPort; ui: CasinoUiPor
       lines: [...TESTNET_LINES, 'The key is rebuilt from your passkey and forgotten when you lock or close this page.'],
       confirmLabel: 'Open with passkey'
     }, () => deps.passkey.evaluate(last?.credentialId));
+    return finishUnlock(r);
+  }
+
+  /**
+   * Nothing on this device says which passkey is yours (a new browser, or a passkey synced from another device): browsers do not
+   * let a page see passkeys before asking, so ask. "Use my passkey" shows the device's casino passkeys (one: a single tap; several:
+   * the browser's list). Only if there is none, or the player prefers, is a new one made ("Make a new one").
+   */
+  async function choose(): Promise<CasinoIdentity> {
+    const newTab = !!(deps.passkey.createsInNewTab?.() && deps.passkey.openCreator);
+    const picked = await deps.ui.act<{ use: { credentialId: string; prf: Uint8Array; userHandle?: string } } | { made?: { credentialId: string; prf?: Uint8Array } }>({
+      kind: 'unlock',
+      title: 'Open your casino wallet',
+      summary: 'Use your casino passkey (Face ID, fingerprint or device code). No casino passkey yet? Make one.',
+      lines: [
+        ...TESTNET_LINES,
+        'Passkeys sync between your devices (iCloud Keychain, Google Password Manager), so a casino wallet made on another device opens here too.'
+      ],
+      warnings: ['If you make a new one and later delete its passkey, that wallet is gone. It only ever holds free testnet STX.'],
+      confirmLabel: 'Use my passkey',
+      altLabel: 'Make a new one'
+    }, async () => {
+      try { return { use: await deps.passkey.evaluate() }; }
+      catch (e) {
+        if ((e as { retryable?: boolean })?.retryable)
+          throw Object.assign(new Error('No casino passkey was found or chosen on this device. Try again, or tap "Make a new one".'), { retryable: true });
+        throw e;
+      }
+    }, async () => (newTab ? {} : { made: await deps.passkey.create(load().wallets.map((w) => w.credentialId), PASSKEY_NAME) }));
+    if ('use' in picked) return finishUnlock(picked.use);
+    return create(picked.made);
+  }
+
+  async function finishUnlock(r: { credentialId: string; prf: Uint8Array; userHandle?: string }): Promise<CasinoIdentity> {
     let second: Uint8Array | undefined;
     try {
       const known = record(r.credentialId);
@@ -283,10 +324,12 @@ export function createCasinoEngine(deps: { passkey: PasskeyPort; ui: CasinoUiPor
     'casino.open': (params: unknown): Promise<CasinoOpenResult> => interact(async () => {
       const p = params as CasinoOpenParams | undefined;
       const mode = p?.mode;
-      if (mode !== 'create' && mode !== 'unlock' && mode !== 'device') throw new Error('Choose create, unlock or device.');
+      if (mode !== 'create' && mode !== 'unlock' && mode !== 'device' && mode !== 'auto') throw new Error('Choose auto, create, unlock or device.');
       if (identity && kind && (mode === 'device') === (kind === 'device')) return { address: identity.address, kind };
       if (mode !== 'device' && !deps.passkey.available()) throw new Error('This browser cannot use passkeys. Choose "Play without a passkey".');
-      const opened = mode === 'device' ? await openDevice() : mode === 'create' ? await create() : await unlock(p?.anyPasskey === true);
+      // auto: this device's passkey wallet if it knows one (or several: the browser's list), otherwise use-or-make (`choose`)
+      const opened = mode === 'device' ? await openDevice() : mode === 'create' ? await create()
+        : mode === 'auto' ? (load().wallets.length ? await unlock(false) : await choose()) : await unlock(p?.anyPasskey === true);
       if (opened.address === EXCHANGE_ADDRESS) throw new Error('This wallet is the exchange itself and cannot buy chips.');
       identity = opened;
       kind = mode === 'device' ? 'device' : 'passkey';

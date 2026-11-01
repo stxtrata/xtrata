@@ -45,6 +45,8 @@ interface PXRoomHost {
   play?(spot: string, spin: Spin): void;
   moves?(list: Walker[]): void;
   move?(one: Walker | { key: string; off: true }): void;
+  /** Whether the visitor is signed into the room (visible to others), and as which address. */
+  self?(info: { signed: boolean; address: string | null }): void;
 }
 type SpotView = { a: string; n: string; since: number };
 type Signed = { address: string; hash160?: string; expiresAt?: number };
@@ -429,7 +431,17 @@ function placePanel() {
   panel.style.top = `${Math.min(top, Math.max(64, window.innerHeight - 220))}px`;
 }
 
+/** Tells the page whether the visitor is visible in the room (signed in) and as which address: personal space and their own look. */
+let toldSelf: string | null | undefined;
+const tellSelf = () => {
+  const signed = !!(S.signed && S.you && !S.you.guest), address = signed ? S.signed!.address : null;
+  if (address === toldSelf) return;
+  toldSelf = address;
+  try { S.host?.self?.({ signed, address }); } catch (e) { console.warn('[room] the page could not take the sign-in state', e); }
+};
+
 function paint() {
+  tellSelf();
   if (!wrap || !btn || !panel) return;
   const signed = !!(S.signed && S.you && !S.you.guest);
   btn.className = S.connected ? 'live' : 'wait';
@@ -479,7 +491,7 @@ function paint() {
       if (S.busy) break;
     }
     parts.push(row);
-    if (ui && !ui.describe().has) parts.push(el('p', 'No wallet? The casino wallet is free: made with Face ID or your fingerprint, with 500 free testnet STX and your first 1,000,000 LAYR.', 'fact'));
+    if (ui && !ui.describe().has) parts.push(el('p', 'Casino wallet: use your casino passkey from any of your devices, or make one free with Face ID or your fingerprint (500 free testnet STX and your first 1,000,000 LAYR).', 'fact'));
     if (S.error) parts.push(el('p', S.error, 'err'));
     if (!S.busy) { const later = el('button', 'Not now'); later.onclick = () => { S.open = false; paint(); }; parts.push(later); }
   }

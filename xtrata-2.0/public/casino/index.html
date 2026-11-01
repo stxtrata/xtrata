@@ -191,8 +191,8 @@ body.parallax-bar-expanded #quickNav,body.parallax-bar-expanded #intro,body.para
 <section id="ambiencePanel" class="pxmodal" hidden aria-label="Ambience"><button class="close" data-close-px="ambiencePanel" aria-label="Close ambience">×</button><h2>Set the mood.</h2><p>Make yourself at home in the Parallax lounge.</p><label>Room brightness<input id="pxLight" type="range" min="0.7" max="1.8" step="0.05" value="1.15"></label><label>Room ambience<input id="pxAmbience" type="range" min="0" max="100" step="5" value="50" aria-label="Room ambience volume"></label><label>Marble reflections<select id="pxReflection"><option value="balanced">Balanced</option><option value="high">High detail</option><option value="off">Off · faster</option></select></label><p>Room ambience is the background hum of the casino. Music and sound effects switch on and off with 🎵 and 🔊 at the top.</p></section>
 <section id="chipsPanel" class="pxmodal" hidden aria-label="LAYR house chips"><button class="close" data-close-px="chipsPanel" aria-label="Close chips">×</button><h2>The house collection.</h2><p>Six denominations. One unmistakable mark.</p><div class="chipCollection" id="chipCollection"></div><p>Tables also use 1, 5 and 25 LAYR change chips. All balances here are practice chips.</p></section>
 <section id="helpPanel" class="pxmodal" hidden aria-label="Controls and help"><button class="close" data-close-px="helpPanel" aria-label="Close help">×</button><h2>Your evening, your way.</h2><dl><dt>EXPLORE</dt><dd>WASD / arrows to walk. Mouse or drag to look. Shift to run. E to sit or play. Tab for the grand hall.</dd><dt>TAKE A SEAT</dt><dd>Choose a table from the welcome panel, click it in the room, or press 1–7. Click a fruit machine, approach it and press E, or use Machines to choose any of the five games. Escape returns to the floor when the current hand allows it.</dd><dt>PLAY HERE</dt><dd>Connecting to a machine keeps your camera, movement and the casino ambience. Space plays, Q opens the controls, and E or Escape disconnects. Walk away to disconnect automatically after the current spin. Cabinet view and Screen view are optional; Play here returns you to your place.</dd><dt>BE SEEN</dt><dd>Anyone can watch: the Room button shows who is here. Join with one free wallet signature (Leather or Xverse) and everyone else sees your Adrian at your seat, with a name tag showing your BNS name or a short version of your address. Stand up or walk away and your Adrian goes with you. If you only watch, nobody sees you. The signature sends no transaction, costs no fee and cannot spend anything, and the room never moves any money. Leave the room any time from the same panel.</dd><dt>CONNECTING TO SPACES</dt><dd>Every table seat and every fruit machine is a space. Sitting down or connecting to a machine puts you in that space for everyone in the room. Each space holds one person: if someone already has the seat you pick, you are given a free one at the same table. Being seen in a space reserves nothing and changes no game: your hand, spins and LAYR stay between you and the table or machine. The Afterglow Bar stools are not part of the room yet.</dd><dt>LIVE CHAT</dt><dd>Signed-in players can talk. Press Chat (💬 on a phone) to type. What people say floats down the side of the screen, newest at the bottom, and stays there; while the chat is open you can scroll back through everything said since you joined. Hide chat tucks it away and Move right puts it on the other side. Tap a name, or Here now, to send that person a direct message (marked “→ you” when it is for you), block them or report them. Messages are not secret: they pass through the room service, so never share anything sensitive. Each is up to 280 characters, with no links, one every two seconds. The room saves nothing (only a report, if someone sends one); your browser keeps this session's chat in this tab and clears it when you leave the room or close the tab. Blocking works both ways: neither of you can reach the other. Guests can see who is here but cannot chat.</dd><dt>THE AFTERGLOW BAR</dt><dd>Click Bar, press B, or approach the counter and press E. Order cocktails and snacks from Adrian. Purchases use your shared LAYR balance. Your round stays on the bar after you close the menu; choose a serving to enjoy a sip or bite.</dd><dt>GET LAYR</dt><dd>Two dispensers serve the entrance and lounge. Click one, approach and press E, or choose Get LAYR. Connect your Stacks testnet wallet. A plain STX transfer goes to the configured house address; the testnet API verifies it before crediting LAYR in your browser at 100,000 per STX, for 1–10 STX. Recover an already paid transfer by its transaction ID. Each transfer can credit the shared casino balance once.</dd><dt>ON MOBILE</dt><dd>Drag the left side to move and the right side to look. Tap the sit button when near a table.</dd><dt>LAYR</dt><dd>Practice chips only. No wallet connection or deposits. The salon follows the existing local testnet simulation.</dd></dl></section>
-<div id="tools"><button id="back" aria-label="Back to the floor">← Floor</button><div id="bankpill"><span>LAYR · SHARED BALANCE</span><b id="bank">0 LAYR</b><em id="sess"></em></div><div class="rt"><button id="chipsButton" aria-label="View the LAYR chips">LAYR</button><button id="ambienceButton" aria-label="Adjust room ambience">◐</button><button id="scbtn" aria-label="Open the Strata Club tables (testnet rules)" title="Strata Club tables">⛓ Strata Club</button><button id="modebtn" aria-label="Switch between walking and overview">🚶 Walk</button><button id="music" aria-label="Toggle music" title="Music">🎵</button><button id="mute" aria-label="Toggle sound">🔊</button></div></div>
-<div id="cross" class="hud" hidden></div><div id="hint" class="hud" hidden>WASD walk · mouse look · Shift run · E sit / play · Tab overview</div><div id="lockhint" class="hud" hidden>Click to look around, or drag</div><div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b id="pverb">SIT</b> <span id="ptitle"></span></span></div><button id="tapsit" class="hud" hidden></button><div id="stick" class="hud" hidden><div id="knob"></div></div>
+<div id="tools"><button id="back" aria-label="Back to the floor">← Floor</button><div id="bankpill"><span>LAYR · SHARED BALANCE</span><b id="bank">0 LAYR</b><em id="sess"></em></div><div class="rt"><button id="chipsButton" aria-label="View the LAYR chips">LAYR</button><button id="ambienceButton" aria-label="Adjust room ambience">◐</button><button id="scbtn" aria-label="Open the Strata Club tables (testnet rules)" title="Strata Club tables">⛓ Strata Club</button><button id="viewbtn" aria-label="Switch view: behind you or first person" title="View (V)">👤</button><button id="modebtn" aria-label="Switch between walking and overview">🚶 Walk</button><button id="music" aria-label="Toggle music" title="Music">🎵</button><button id="mute" aria-label="Toggle sound">🔊</button></div></div>
+<div id="cross" class="hud" hidden></div><div id="hint" class="hud" hidden>WASD walk · mouse look · Shift run · E sit / play · V view · Tab overview</div><div id="lockhint" class="hud" hidden>Click to look around, or drag</div><div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b id="pverb">SIT</b> <span id="ptitle"></span></span></div><button id="tapsit" class="hud" hidden></button><div id="stick" class="hud" hidden><div id="knob"></div></div>
 <section id="machinesPanel" class="pxmodal" hidden aria-label="Fruit machines"><button class="close" data-close-px="machinesPanel" aria-label="Close machine selection">×</button><h2>Find your next spin.</h2><p>Five original machines. Ten cabinets across the floor. Walk up and press E to connect without moving your camera. Space plays; keep walking and looking around. Cabinet view is optional.</p><div class="machine-grid"><button class="machine-choice" data-machine-type="0" style="--machine-color:#30203e;--machine-accent:#4fe3d2"><b>The Drop</b><small>Music · beat-locked reels</small><em>PLAY THE MACHINE ↗</em></button><button class="machine-choice" data-machine-type="1" style="--machine-color:#102c42;--machine-accent:#39d8ff"><b>Forever Twins</b><small>On-chain art · twin bonuses</small><em>PLAY THE MACHINE ↗</em></button><button class="machine-choice" data-machine-type="2" style="--machine-color:#3c291b;--machine-accent:#ffbe70"><b>Deep Strata</b><small>Excavation · layer cascades</small><em>PLAY THE MACHINE ↗</em></button><button class="machine-choice" data-machine-type="3" style="--machine-color:#243121;--machine-accent:#e7c18a"><b>Block Fortune</b><small>Genesis edition · crypto reels</small><em>PLAY THE MACHINE ↗</em></button><button class="machine-choice" data-machine-type="4" style="--machine-color:#172a30;--machine-accent:#80c7bd"><b>Neon Vault</b><small>Bitcoin · vault bonuses</small><em>PLAY THE MACHINE ↗</em></button></div></section>
 <div id="pxMachineToolbar"><button id="pxMachineLeave" aria-label="Walk away from this machine">← Walk away</button><button id="pxMachineHere" aria-pressed="true">Play here</button><button id="pxMachineView">Cabinet view</button><button id="pxMachineFullscreen">Full screen</button></div>
 <div id="pxFallbackMachine" hidden><canvas id="pxFallbackScreen" width="1400" height="960" aria-label="Live machine screen"></canvas></div>
@@ -10464,7 +10464,7 @@ function applyTestnetFunding(proof){
   const toWorld = (s, x, z) => { const a = s.group.rotation.y; return { x: s.group.position.x + Math.cos(a) * x + Math.sin(a) * z, z: s.group.position.z - Math.sin(a) * x + Math.cos(a) * z }; };
   // colliders: circles, boxes (world axis) and ellipses (table-local)
   const solids = [];
-  [-1,1].forEach(sign=>[-8.7,-2.4,4.6].forEach(z=>solids.push({k:'c',x:sign*11.9,z,r:.4})));
+  [-1,1].forEach(sign=>[-8.7,-2.4,4.6].forEach(z=>solids.push({k:'c',x:sign*11.9,z,r:.4,tall:1})));
   stations.forEach((s) => {
     const a = s.group.rotation.y, px = s.group.position.x, pz = s.group.position.z;
     const ell = (a1, b1) => solids.push({ k: 'e', cx: px, cz: pz, a: a1, b: b1, rot: a });
@@ -10478,8 +10478,8 @@ function applyTestnetFunding(proof){
     else if (s.id === 'videopoker') { solids.push({ k: 'r', cx: px, cz: pz, hx: 0.72, hz: 0.58, rot: a, oz: 0.05 }); }
     (SEATS[s.id] || []).forEach((seat) => { if (!seat.pad) circ(seat.x, seat.z, 0.24); });
   });
-  room.machines.forEach(m=>solids.push({k:'r',cx:m.group.position.x,cz:m.group.position.z,hx:.88,hz:.43,rot:m.group.rotation.y}));
-  solidsExtra.forEach((o) => solids.push(o));
+  room.machines.forEach(m=>solids.push({k:'r',cx:m.group.position.x,cz:m.group.position.z,hx:.88,hz:.43,rot:m.group.rotation.y,tall:1}));
+  solidsExtra.forEach((o) => { o.tall = 1; solids.push(o); });   // walls, the bar, the salon: all tall enough to stop the camera
   function collide() {
     player.x = clamp(player.x, -RW / 2 + 1.2, RW / 2 - 1.2); player.z = clamp(player.z, room.salon ? room.salon.SZ0 + 0.62 : -RD / 2 + 0.7, RD / 2 - 0.7);
     for (let it = 0; it < 2; it++) for (const o of solids) {
@@ -10493,6 +10493,47 @@ function applyTestnetFunding(proof){
   }
   const eyePos = () => V3(player.x, EYE + Math.sin(player.bob) * WALK.bobAmp, player.z);
   const aimDir = () => V3(-Math.sin(player.yaw) * Math.cos(player.pitch), Math.sin(player.pitch), -Math.cos(player.yaw) * Math.cos(player.pitch));
+  // ---------------- the "behind you" view (docs/plans/CASINO-OWN-ADRIAN-PLAN.md) ----------------
+  // The default: the camera hangs on a short boom behind your own Adrian, so you see yourself walk, sit and play. V or the 👤
+  // button switches to first person (the arcade hall's view, unchanged). Walking itself is the same either way: the mouse and
+  // the joystick still turn and move `player`; only where the camera sits changes.
+  const VIEW_KEY = 'xtrata.parallax.view';
+  let viewMode = (() => { try { return localStorage.getItem(VIEW_KEY) === 'first' ? 'first' : 'behind'; } catch (e) { return 'behind'; } })();
+  const behind = () => viewMode === 'behind' && webglOK;
+  const BOOM = { back: 2.6, up: 0.55, head: 1.55, min: 0.55, clear: 0.22, steps: 10 };
+  let boomLen = BOOM.back, meFrameHook = null;
+  // Is (x, z) inside a wall, pillar, machine or the bar (anything tall), or off the floor? Tables and stools are below the camera.
+  function pointBlocked(x, z, r) {
+    if (Math.abs(x) > RW / 2 - 0.35 || z > RD / 2 - 0.35 || z < (room.salon ? room.salon.SZ0 + 0.3 : -RD / 2 + 0.35)) return true;
+    for (const o of solids) {
+      if (!o.tall || (o.active && !o.active())) continue;
+      if (o.k === 'c') { if (Math.hypot(x - o.x, z - o.z) < o.r + r) return true; }
+      else if (o.k === 'b') { const nx = clamp(x, o.x0, o.x1), nz = clamp(z, o.z0, o.z1); if (Math.hypot(x - nx, z - nz) < r) return true; }
+      else {
+        const c = Math.cos(o.rot), sn = Math.sin(o.rot), dx = x - o.cx, dz = z - o.cz, lx = c * dx - sn * dz, lz = sn * dx + c * dz;
+        if (o.k === 'e') { const A = o.a + r, B = o.b + r; if ((lx * lx) / (A * A) + (lz * lz) / (B * B) < 1) return true; }
+        else { const oz = o.oz || 0; if (Math.abs(lx) < o.hx + r && Math.abs(lz - oz) < o.hz + r) return true; }
+      }
+    }
+    return false;
+  }
+  // How far a camera can go from (x, z) along (dx, dz) before something tall is in the way (marched in steps; no raycasts).
+  function freeRun(x, z, dx, dz, want) {
+    for (let i = 1; i <= BOOM.steps; i++) { const t = want * i / BOOM.steps; if (pointBlocked(x + dx * t, z + dz * t, BOOM.clear)) return Math.max(BOOM.min, want * (i - 1) / BOOM.steps); }
+    return want;
+  }
+  // The walking camera in the behind view: from your head, back along where you look (so looking down lifts the camera, looking up
+  // lowers it), shortened at once when something is in the way and eased back out when it clears.
+  function boomPose(dt) {
+    const d = aimDir(), hx = player.x, hy = BOOM.head + Math.sin(player.bob) * WALK.bobAmp * 0.5, hz = player.z;
+    const flat = Math.hypot(d.x, d.z) || 1, free = freeRun(hx, hz, -d.x / flat, -d.z / flat, BOOM.back * flat) / flat;
+    boomLen = dt ? (free < boomLen ? free : boomLen + (free - boomLen) * Math.min(1, dt * 3)) : free;
+    const lift = BOOM.up * boomLen / BOOM.back;
+    const pos = V3(hx - d.x * boomLen, clamp(hy - d.y * boomLen + lift, 0.45, 2.9), hz - d.z * boomLen);
+    return { pos, look: V3(hx + d.x * 2, hy + d.y * 2, hz + d.z * 2) };
+  }
+  // Where the camera should settle when you start walking or stand up, in either view.
+  function walkTargets() { if (behind()) { const b = boomPose(0); return [b.pos, b.look]; } const e = eyePos(); return [e, e.clone().add(aimDir().multiplyScalar(3))]; }
   let stepT = 0;
   function walkMove(dt) {
     let f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) - joy.vy, s = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joy.vx;
@@ -10529,7 +10570,7 @@ function applyTestnetFunding(proof){
   }
   function paintWalkHud() {
     const walking = mode === 'walk' && !focus && !returning && machineAllowsWalk();
-    $('cross').hidden = !walking; $('cross').classList.toggle('on', !!cand);
+    $('cross').hidden = !walking || behind(); $('cross').classList.toggle('on', !!cand);
     $('hint').hidden = !walking || isTouch; $('lockhint').hidden = !walking || isTouch || !!document.pointerLockElement;
     $('prompt').hidden = !(walking && cand); $('tapsit').hidden = !(walking && cand && isTouch);
     if(cand?.bar){$('ptitle').textContent='The Afterglow · Bar';$('pverb').textContent='ORDER';$('tapsit').textContent='ORDER · THE AFTERGLOW';}
@@ -10537,13 +10578,14 @@ function applyTestnetFunding(proof){
     else if(cand&&cand.machine){$('ptitle').textContent=cand.machine.name;$('pverb').textContent=cand.machine.occupied?'IN USE':machineOpen&&cand.machine===activeCabinet?'DISCONNECT':'PLAY HERE';$('tapsit').textContent=(cand.machine.occupied?'IN USE · ':machineOpen&&cand.machine===activeCabinet?'DISCONNECT · ':'PLAY HERE · ')+cand.machine.name;}
     else if (cand) { const seatNo = SEATS[cand.s.id].length > 1 ? ' · seat ' + (SEATS[cand.s.id].indexOf(cand.seat) + 1) : ''; $('ptitle').textContent = cand.s.name + seatNo; $('pverb').textContent = VERB[cand.s.id]; $('tapsit').textContent = VERB[cand.s.id] + ' · ' + cand.s.name; }
     $('modebtn').textContent = mode === 'walk' ? 'Grand hall' : 'Explore'; $('modebtn').hidden = !!focus;
+    const vb = $('viewbtn'); if (vb) { vb.textContent = behind() ? '👤' : '👁'; vb.setAttribute('aria-pressed', String(behind())); vb.title = behind() ? 'View: behind you (V for first person)' : 'View: first person (V to see yourself)'; vb.hidden = !webglOK; }
     $('back').hidden = mode === 'walk' && !focus; $('back').textContent = mode === 'walk' ? '← Stand up' : '← Floor';
   }
   function enterWalk() {
     if(!webglOK){toast('3D exploration needs WebGL. Choose a table below to play.');return;}
     mode = 'walk'; audio(); $('intro').classList.remove('on'); returning = true;
     player.x = 0; player.z = 6.2; player.yaw = 0; player.pitch = -0.08;
-    const e = eyePos(), d = aimDir(); tgtPos.copy(e); tgtLook.copy(e).add(d.multiplyScalar(3)); paintWalkHud(); tryLock();
+    const [wp, wl] = walkTargets(); tgtPos.copy(wp); tgtLook.copy(wl); paintWalkHud(); tryLock();
   }
   // ---- the way out: a door on the entrance wall. Walk up to it and it opens; walk through and you are back in the arcade's lobby (no button).
   let leaving = false;
@@ -10565,7 +10607,7 @@ function applyTestnetFunding(proof){
   function startAtDoor() {
     mode = 'walk'; returning = false; $('intro').classList.remove('on');
     player.x = 0; player.z = 9.4; player.yaw = 0; player.pitch = -0.08;
-    const e = eyePos(), d = aimDir(); camPos.copy(e); look.copy(e).add(d); tgtPos.copy(camPos); tgtLook.copy(look); fovBase = WALK.fov; paintWalkHud();
+    const [wp, wl] = walkTargets(); camPos.copy(wp); look.copy(wl); tgtPos.copy(camPos); tgtLook.copy(look); fovBase = WALK.fov; paintWalkHud();
   }
   function exitWalk() { mode = 'overview'; returning = false; tgtPos.copy(HOME.pos); tgtLook.copy(HOME.look); $('intro').classList.add('on'); freeMouse(); paintWalkHud(); }
   const canvasEl = canvas;
@@ -10631,7 +10673,19 @@ function applyTestnetFunding(proof){
   }
 
   // ---------------- focus & input ----------------
+  // In the behind view a seat (or a pad) is shot over your own Adrian's shoulder, looking at the felt. The table-view buttons
+  // (eyes, overhead, screen) still switch to the views below.
   function camTargets(s, seat) {
+    if (!behind() || tableView !== 'table' || !seat) return camTargetsFirst(s, seat);
+    const w = seat.pad ? standWorld(s, seat) : seatWorld(s, seat), c = s.group.position;
+    let dx = w.x - c.x, dz = w.z - c.z; const len = Math.hypot(dx, dz) || 1; dx /= len; dz /= len;   // from the table's centre out through your place
+    // Over the right shoulder, and a little high: straight behind, your own head would hide the cards dealt in front of you.
+    const narrow = Math.max(0, .9 - camera.aspect), back = freeRun(w.x, w.z, dx, dz, (seat.pad ? 1.45 : 1.25) * (1 + narrow)), side = 0.42;
+    const sx = -dz * side, sz = dx * side;
+    const p = V3(w.x + dx * back + sx, (seat.pad ? 2.15 : 2.0) + narrow * 0.6, w.z + dz * back + sz);
+    return [p, V3(c.x + (w.x - c.x) * 0.35, 0.85, c.z + (w.z - c.z) * 0.35)];   // aimed between your place and the table's centre
+  }
+  function camTargetsFirst(s, seat) {
     const asp = camera.aspect;
     let off, lk;
     if (tableView === 'seat' && s.id !== 'videopoker') {
@@ -10803,12 +10857,12 @@ function applyTestnetFunding(proof){
     if (s) {
       if (!seat) { seat = SEATS[s.id][0]; if (mode === 'walk') { let d2 = 1e9; SEATS[s.id].forEach((k) => { const w = seatWorld(s, k), d = Math.hypot(w.x - player.x, w.z - player.z); if (d < d2) { d2 = d; seat = k; } }); } }
       if (window.PXRoomHost && PXRoomHost.steer) seat = PXRoomHost.steer(s, seat);   // a seat somebody in the room already has: take a free one at the same table
-      curSeat = seat; refreshTableViews(); if (mode === 'walk' && !prev) { const e = eyePos(); camPos.copy(e); look.copy(e).add(aimDir()); }
+      curSeat = seat; refreshTableViews(); if (mode === 'walk' && !prev && !behind()) { const e = eyePos(); camPos.copy(e); look.copy(e).add(aimDir()); }
       const [p, l] = camTargets(s, seat); tgtPos.copy(p); tgtLook.copy(l); $('intro').classList.remove('on'); const gr = greetOf.get(s.group); if (gr) setTimeout(gr, 900);
     } else if (mode === 'walk') {
       // stand up where you were sat, facing the table
       if (prev && curSeat) { const w = standWorld(prev, curSeat), t = toWorld(prev, 0, 0); player.x = w.x; player.z = w.z; player.yaw = Math.atan2(-(t.x - w.x), -(t.z - w.z)); player.pitch = -0.2; collide(); }
-      returning = true; const e = eyePos(); tgtPos.copy(e); tgtLook.copy(e).add(aimDir().multiplyScalar(3)); tryLock();
+      returning = true; const [wp, wl] = walkTargets(); tgtPos.copy(wp); tgtLook.copy(wl); tryLock();
     } else { tgtPos.copy(HOME.pos); tgtLook.copy(HOME.look); $('intro').classList.add('on'); }
     render(); paintWalkHud();
     if(s)queueMicrotask(()=>{if(focus===s)showFirstRules(s);});
@@ -10817,7 +10871,14 @@ function applyTestnetFunding(proof){
   $('mute').onclick = () => { audio(); setMuted(!muted); $('mute').textContent = muted ? '🔇' : '🔊'; };
   $('music').onclick = () => { audio(); setMusic(!musicOn); $('music').textContent = musicOn ? '🎵' : '🎵̸'; $('music').style.opacity = musicOn ? 1 : 0.45; };
   $('intro').querySelectorAll('.btns button:not([id^="sc-"])').forEach((b, i) => (b.onclick = () => { audio(); setFocus(stations[i]); }));
-  $('walkin').onclick = enterWalk; $('modebtn').onclick = () => { audio(); if (mode === 'walk') exitWalk(); else enterWalk(); };
+  $('walkin').onclick = enterWalk; function toggleView() {
+    viewMode = viewMode === 'behind' ? 'first' : 'behind'; boomLen = BOOM.back;
+    try { localStorage.setItem(VIEW_KEY, viewMode); } catch (e) { }
+    if (focus) { const [p, l] = camTargets(focus, curSeat); tgtPos.copy(p); tgtLook.copy(l); }
+    paintWalkHud(); toast(viewMode === 'behind' ? 'View: behind you' : 'View: first person');
+  }
+  $('viewbtn').onclick = () => { audio(); toggleView(); };
+  $('modebtn').onclick = () => { audio(); if (mode === 'walk') exitWalk(); else enterWalk(); };
   // ---- The Strata Club: the two player-versus-player tables (Hold'em, Liar's Dice) that run the testnet contracts' exact rules, framed over the floor.
   //      Each page has a practice table (simulated chain + bot) and a "Watch a testnet game" tab that replays real games from Hiro's testnet API.
   let scOpen=false;
@@ -10833,6 +10894,7 @@ function applyTestnetFunding(proof){
     if(handleMachineKey(e))return;
     if (scOpen) { if (e.code === 'Escape') closeClub(); return; }
     if (e.code === 'Escape') { if (focus) requestReviewLeave(); return; }
+    if (e.code === 'KeyV' && !e.repeat) { e.preventDefault(); toggleView(); return; }
     if (!focus) {
       if (/^Digit[1-7]$/.test(e.code)) { const st = stations[+e.code.slice(-1) - 1]; if (st) setFocus(st); return; }
       if (mode === 'walk') { keys[e.code] = true; if (e.repeat || returning) return; if ((e.code === 'KeyE' || e.code === 'Enter' || e.code === 'Space') && cand) { e.preventDefault(); sit(cand); } else if (e.code === 'Tab') { e.preventDefault(); exitWalk(); } else if (/^Arrow|Space/.test(e.code)) e.preventDefault(); }
@@ -11181,17 +11243,20 @@ function applyTestnetFunding(proof){
     pumpMachineFrames();updateNpcMachine(performance.now());updateCasinoMachines(t);updateConnectedMachine(t);pxOvFrame();updateLAYRDispensers();barUI?.tick(performance.now(),dt);testnetLAYR.tick(performance.now());
     const dpos = room.dust.geometry.attributes.position.array; for (let i = 0; i < dpos.length; i += 3) { dpos[i + 1] += dt * 0.05; dpos[i] += Math.sin(t * 0.3 + i) * dt * 0.03; if (dpos[i + 1] > 5) dpos[i + 1] = 0.5; } room.dust.geometry.attributes.position.needsUpdate = true;
     if (walkLive()) {
-      walkMove(dt); const e = eyePos(); camPos.copy(e); look.copy(e).add(aimDir()); tgtPos.copy(camPos); tgtLook.copy(look);
-      camera.position.copy(camPos); camera.rotation.set(player.pitch, player.yaw, 0);   // set straight from the mouse, as in the arcade hall
+      walkMove(dt);
+      if (behind()) { const b = boomPose(dt); camPos.copy(b.pos); look.copy(b.look); tgtPos.copy(camPos); tgtLook.copy(look); camera.position.copy(camPos); camera.lookAt(look); }
+      else { const e = eyePos(); camPos.copy(e); look.copy(e).add(aimDir()); tgtPos.copy(camPos); tgtLook.copy(look);
+      camera.position.copy(camPos); camera.rotation.set(player.pitch, player.yaw, 0); }   // first person: set straight from the mouse, as in the arcade hall
       const c = findCand(); if (c !== cand && (!c || !cand || c.seat !== cand.seat)) { cand = c; paintWalkHud(); } else cand = c;
     } else {
-      if (mode === 'walk' && !focus && machineAllowsCamera()) { const e = eyePos(); tgtPos.copy(e); tgtLook.copy(e).add(aimDir().multiplyScalar(3)); }   // settling after standing up: the mouse still steers
+      if (mode === 'walk' && !focus && machineAllowsCamera()) { const [wp, wl] = walkTargets(); tgtPos.copy(wp); tgtLook.copy(wl); }   // settling after standing up: the mouse still steers
       const k = 1 - Math.exp(-dt * (returning ? 4.2 : 3.2)); camPos.lerp(tgtPos, k); look.lerp(tgtLook, k);
       if (returning && camPos.distanceTo(tgtPos) < 0.06 && look.distanceTo(tgtLook) < 0.25) { returning = false; cand = null; paintWalkHud(); }
       const par = !barUI?.isOpen && !focus && machineAllowsCamera() && mode === 'overview';
       camera.position.set(camPos.x + (par ? px * 0.9 : 0), camPos.y + (par ? -py * 0.3 : 0), camPos.z); camera.lookAt(look);
       if (focus) cand = null;
     }
+    if (meFrameHook) { try { meFrameHook(dt); } catch (e) { meFrameHook = null; console.warn('[view] your figure stopped:', e); } }   // after the camera, before the frame is drawn
     updateExit(dt); updateRings(t, dt); updatePatrons(t);updateNpcMachineSound();
     paintFallbackHands();
     if(room.updateReflection) room.updateReflection();
@@ -11257,12 +11322,15 @@ function applyTestnetFunding(proof){
     }
 
     const pool = [], pending = [], remote = new Set(); let lastBuild = 0;
+    // Personal space (docs/plans/CASINO-OWN-ADRIAN-PLAN.md): other people are solid only while you are signed into the room, so
+    // they can see you too. Signed out you are invisible to them, and you pass through them. room.js says which (PXRoomHost.self).
+    let roomVisible = false;
     function makeEntry(stand) {
       const spec = { group: scene, x: 0, z: 0, yaw: 0, person: 'm1', wear: wearOf('?'), on: false, freezeBeyond: 12 };
       if (stand) spec.rest = { kind: 'table', y: 1.0, fwd: 0.3, surface: null }; else spec.seat = { h: 0.57 };
       spec.showWhen = () => spec.on;
       const e = { stand, spec, key: null, spot: null, on: false, tag: makeTag() };
-      e.col = { k: 'c', x: 0, z: 0, r: 0.3, active: () => e.on && e.stand }; solids.push(e.col);
+      e.col = { k: 'c', x: 0, z: 0, r: 0.3, person: true, active: () => e.on && e.stand && roomVisible }; solids.push(e.col);
       if (!window.XA_HOSTS.failed) window.XA_HOSTS.add(spec);
       pool.push(e); return e;
     }
@@ -11469,7 +11537,9 @@ function applyTestnetFunding(proof){
       const spec = { group: scene, x: 0, z: 0, yaw: 0, person: 'm1', wear: wearOf('?'), on: false, freezeBeyond: 14, pxWalker: true };
       spec.showWhen = () => spec.on;
       if (!window.XA_HOSTS.failed) window.XA_HOSTS.add(spec);
-      const e = { spec, key: null, tag: makeTag() }; wpool.push(e); return e;
+      const e = { spec, key: null, tag: makeTag() };
+      e.col = { k: 'c', x: 0, z: 0, r: 0.3, person: true, active: () => roomVisible && !!e.key && e.spec.on }; solids.push(e.col);   // personal space: walk round them
+      wpool.push(e); return e;
     }
     // Who gets a figure: the nearest walkers, in the places the seated people leave free (chosen again a few times a second).
     function walkAllocate(now) {
@@ -11512,7 +11582,7 @@ function applyTestnetFunding(proof){
         const want = w.moving && dir !== null ? dir : r;      // face the way they go; standing, face where they look
         w.yaw += Math.atan2(Math.sin(want - w.yaw), Math.cos(want - w.yaw)) * Math.min(1, dt * 10);
         const e = w.e; if (!e) continue;
-        e.spec.x = x; e.spec.z = z; e.spec.yaw = w.yaw;
+        e.spec.x = x; e.spec.z = z; e.spec.yaw = w.yaw; if (e.col) { e.col.x = x; e.col.z = z; }
         const c = e.spec.ctrl;
         if (c) {
           c.object.position.set(x, 0, z); c.object.rotation.y = w.yaw;
@@ -11523,6 +11593,50 @@ function applyTestnetFunding(proof){
         const d = cp.distanceTo(e.tag.sp.position); e.tag.sp.visible = d < 16; e.tag.sp.material.opacity = Math.max(0, Math.min(1, (16 - d) / 5));
       }
     }
+    // ---------------- you: your own Adrian, seen in the behind view (docs/plans/CASINO-OWN-ADRIAN-PLAN.md) ----------------
+    // Two figures like everyone else's: standing (the floor, machines, pads) and seated (tables), placed where the room places you,
+    // so you see yourself where others see you. The clothes come from your room address, as they do for everyone who sees you;
+    // before you join, a plain outfit. Never counted against MAXP, never given a name tag, and never inside the camera.
+    const me = { stand: null, sit: null, key: 'you', yaw: Math.PI, moving: false, slowFor: 0, lx: null, lz: null };
+    function meFigures() {
+      if (me.stand || !window.XA_HOSTS || window.XA_HOSTS.failed) return;
+      const make = (seated) => {
+        const spec = { group: scene, x: player.x, z: player.z, yaw: 0, person: 'm1', wear: wearOf(me.key), on: false, noLook: true, pxWalker: true, pxSelf: true };
+        if (seated) spec.seat = { h: 0.57 };
+        spec.showWhen = () => spec.on; window.XA_HOSTS.add(spec); return spec;
+      };
+      me.stand = make(false); me.sit = make(true);
+    }
+    function meWear(key) { me.key = key || 'you'; const w = wearOf(me.key); for (const s of [me.stand, me.sit]) { if (!s) continue; s.wear = w; if (s.ctrl) recolour(s.ctrl, w); } }
+    function mePose(spec, x, z, yaw) { spec.x = x; spec.z = z; spec.yaw = yaw; const c = spec.ctrl; if (c) { c.object.position.set(x, 0, z); c.object.rotation.y = yaw; } }
+    function meFrame(dt) {
+      meFigures(); if (!me.stand) return;
+      let stand = false, sit = false;
+      if (behind() && !document.hidden) {
+        const spot = mySpot();
+        if (spot) { const pl = place(spot); if (pl) { if (pl.stand) { stand = true; mePose(me.stand, pl.x, pl.z, pl.yaw); } else { sit = true; mePose(me.sit, pl.x, pl.z, pl.yaw); } } }
+        else if (mode === 'walk' && !focus) {
+          stand = true;
+          const x = player.x, z = player.z, d = me.lx === null ? 0 : Math.hypot(x - me.lx, z - me.lz), speed = dt > 0 ? d / dt : 0; me.lx = x; me.lz = z;
+          if (speed > WALK_GO) { me.moving = true; me.slowFor = 0; } else if (me.moving && (me.slowFor += dt) > 0.15) me.moving = false;
+          const face = Math.atan2(-Math.sin(player.yaw), -Math.cos(player.yaw));      // the same facing ownMoveFrame sends the room
+          me.yaw += Math.atan2(Math.sin(face - me.yaw), Math.cos(face - me.yaw)) * Math.min(1, dt * 14);
+          mePose(me.stand, x, z, me.yaw);
+          const c = me.stand.ctrl;
+          if (c) {
+            if (me.moving) { if (c.current !== 'Walk') c.playAnimation('Walk', 0.2); if (c.current === 'Walk' && c.active) c.active.setEffectiveTimeScale(Math.max(0.8, Math.min(2.4, speed / 0.9))); }
+            else if (c.current === 'Walk') c.playAnimation('Idle', 0.3);
+          }
+        }
+      }
+      // never inside the camera: hidden when it comes that close (the eyes view at a table, a machine close-up, a tight corner)
+      const cp = camera.position;
+      if (stand && (Math.hypot(cp.x - me.stand.x, cp.z - me.stand.z) < 0.5 || (machineOpen && machineCloseup))) stand = false;
+      if (sit && Math.hypot(cp.x - me.sit.x, cp.z - me.sit.z) < 0.5) sit = false;
+      if (!stand) me.lx = null;
+      me.stand.on = stand; me.sit.on = sit;
+    }
+    meFrameHook = meFrame;
     // The visitor's own walking: where they stand on the floor, at most every 0.4 s and only after a step or a turn; `off` once
     // when they sit, connect to a machine or leave the floor. room.js decides whether the room is told.
     let ownLast = null, ownAt = 0, ownOn = false;
@@ -11590,11 +11704,15 @@ function applyTestnetFunding(proof){
           return SEATS[s.id].find((k) => !remote.has(seatSpot(s, k))) || seat;
         } catch (e) { return seat; }
       },
+      // whether the visitor is signed into the room (visible to others) and as which address: personal space and your own look
+      self(info) { try { roomVisible = !!(info && info.signed); meWear(roomVisible && typeof info.address === 'string' ? info.address : null); } catch (e) { console.warn('[room] self failed', e); } },
       mount: () => document.querySelector('#tools .rt'),
       debug: () => ({ pool: pool.map((e) => ({ stand: e.stand, key: e.key, spot: e.spot, on: e.on, built: !!e.spec.ctrl, tag: e.tag.sp.visible })), pending: pending.length, remote: [...remote], spins: [...spect.values()].map((e) => ({ spot: e.spot, ready: e.ready, queue: e.queue.length })), walkers: [...walkers.values()].map((w) => ({ key: w.key, label: w.label, drawn: !!w.e, built: !!w.e?.spec.ctrl, x: w.x, z: w.z, moving: w.moving, anim: w.e?.spec.ctrl?.current || null, tag: !!w.e?.tag.sp.visible, samples: w.buf.length })), own: ownOn ? ownLast : null })   // for tests
     };
     window.dispatchEvent(new Event('px-room-host'));
   })(); } catch (e) { console.warn('[room] presence is unavailable:', e); }   // never let this break the casino
+  // For tests and bug reports: the view, where the camera and the player are, and a way to stand the player somewhere (pushed out of anything solid).
+  window.__casinoView = { get mode() { return viewMode; }, get behind() { return behind(); }, get camera() { return camera.position.toArray(); }, get player() { return { x: player.x, z: player.z, yaw: player.yaw }; }, get boom() { return boomLen; }, toggle: () => toggleView(), blocked: (x, z) => pointBlocked(x, z, BOOM.clear), standAt(x, z) { player.x = x; player.z = z; collide(); return { x: player.x, z: player.z }; }, get me() { const h = (window.XA_HOSTS?.hosts || []).filter((k) => k.pxSelf); return h.map((k) => ({ seated: !!k.seat, on: !!k.on, x: k.x, z: k.z, built: !!k.ctrl })); } };
   window.__casino = { machines:room.machines,openMachine:openCasinoMachine,closeMachine:requestMachineExit,get machineOpen(){return machineOpen;},walkCfg: WALK, startAtDoor, lookBy, get leaving() { return leaving; }, get fov() { return camera.fov; }, get exitOpen() { return room.exitDoor ? room.exitDoor.open : null; }, stations, figures, player, enterWalk, exitWalk, sit, setTableView, get tableView(){return tableView;}, get cand() { return cand; }, get mode() { return mode; }, get returning() { return returning; }, solids, setFocus, setBank, stats, audioStats, sfx, audio, setCam(p, l) { tgtPos.set(p[0], p[1], p[2]); tgtLook.set(l[0], l[1], l[2]); camPos.copy(tgtPos); look.copy(tgtLook); }, get bank() { return bank; }, get pixelRatio() { return pr; } };
 })().catch(e=>{console.error('ParallaX room initialization:',e.stack||e);const p=document.createElement('p');p.style.cssText='position:fixed;top:110px;left:24px;z-index:999;color:#e4c99d';p.textContent='The room could not open. '+e.message;document.body.appendChild(p);});
 </script>
@@ -12246,6 +12364,10 @@ button{font:inherit;color:inherit;cursor:pointer}
  });
  // A new player: nothing in this browser says they have a wallet or chips. Only they get the big "Play now".
  const isNew=()=>{const h=held();return boxChecked&&!h.passkey&&!h.device&&!extension()&&chips()<=0;};
+ // A wallet box that can offer "use my passkey or make one" (any casino passkey synced to this device is found when asked).
+ const canChoose=()=>!!(box&&Array.isArray(box.features)&&box.features.includes('choose'));
+ // How to open: this device's passkey wallet (or the browser's list of casino passkeys), the browser-only one, or use-or-make.
+ const openMode=()=>{const h=held();if(h.passkey)return canChoose()?'auto':'unlock';if(h.device)return 'device';if(box&&!box.passkeys)return 'device';return canChoose()?'auto':'create';};
 
  function paint(st,state){
   const panel=$('layrDispenserPanel');if(!panel||!ex||!pw)return;
@@ -12262,9 +12384,9 @@ button{font:inherit;color:inherit;cursor:pointer}
   $('lxPasskeyAlt').hidden=!offer;
   if(offer){
    const b=$('lxPasskeyAltBtn');b.disabled=working;b.hidden=!h.passkey&&!box.passkeys;
-   b.textContent=h.passkey?(state==='disconnected'?'Open my passkey wallet · ':'Switch to my passkey wallet · ')+short(h.passkey):'Create a passkey wallet';
+   b.textContent=h.passkey?(state==='disconnected'?'Open my passkey wallet · ':'Switch to my passkey wallet · ')+short(h.passkey):canChoose()?'Passkey wallet':'Create a passkey wallet';
    const d=$('lxDeviceAlt');d.disabled=working;d.hidden=!(state==='disconnected'&&h.device&&!mine);if(h.device)d.textContent='Open my browser-only wallet · '+short(h.device);
-   $('lxPasskeyAltNote').textContent=h.passkey||!box.passkeys?'':'A free testnet wallet opened with Face ID or your fingerprint: no extension, 500 free testnet STX. Your chips stay as they are.';
+   $('lxPasskeyAltNote').textContent=h.passkey||!box.passkeys?'':canChoose()?'Use your casino passkey from any of your devices, or make one free with Face ID or your fingerprint: no extension, 500 free testnet STX. Your chips stay as they are.':'A free testnet wallet opened with Face ID or your fingerprint: no extension, 500 free testnet STX. Your chips stay as they are.';
   }
   if(state==='connecting'&&working)$('lxWalletHint').textContent='Finish in the casino wallet window.';
   else if(mine&&state==='ready')$('lxWalletHint').textContent=(onPasskey?'Passkey wallet':'Browser-only wallet')+' · testnet. Buying chips needs no popup.';
@@ -12310,7 +12432,7 @@ button{font:inherit;color:inherit;cursor:pointer}
  async function refreshBox(){try{box=await pw.status();}catch(_){}boxChecked=true;paint();try{window.dispatchEvent(new Event('px-casino-wallet-ready'));}catch(_){}}
  async function run(fn){if(working)return;working=true;$('layrTestnetError').textContent='';paint();try{await fn();}catch(e){say('');showError(e);}finally{working=false;paint();}}
  async function open(mode){
-  if(!mode){await refreshBox();mode=held().passkey?'unlock':held().device?'device':box&&!box.passkeys?'device':'create';}
+  if(!mode){await refreshBox();mode=openMode();}
   say('');
   await ex.connectPasskey(mode);
   await refreshBox();
@@ -12322,7 +12444,7 @@ button{font:inherit;color:inherit;cursor:pointer}
   pw.attach($('lxPasskeyFrame'));
   $('lxPlayNow').onclick=()=>run(()=>open());
   $('lxPlayDevice').onclick=()=>run(()=>open('device'));
-  $('lxPasskeyAltBtn').onclick=()=>run(()=>open(held().passkey?'unlock':'create'));
+  $('lxPasskeyAltBtn').onclick=()=>run(()=>open(canChoose()?'auto':held().passkey?'unlock':'create'));
   $('lxDeviceAlt').onclick=()=>run(()=>open('device'));
   $('lxFaucetTop').onclick=()=>run(()=>fundAndBuy(true));
   // For the room (public/casino/room.js): the same casino wallet as the exchange, so one wallet buys chips and joins the room
@@ -12331,11 +12453,11 @@ button{font:inherit;color:inherit;cursor:pointer}
    available:()=>!!(box&&Array.isArray(box.features)&&box.features.includes('room')),
    isNew:()=>isNew(),
    describe:()=>{const h=held();
-    if(h.passkey)return{label:'Casino wallet · '+short(h.passkey),mode:'unlock',has:true};
+    if(h.passkey)return{label:'Casino wallet · '+short(h.passkey),mode:openMode(),has:true};
     if(h.device)return{label:'Casino wallet · '+short(h.device),mode:'device',has:true};
-    return{label:'Make a free casino wallet',mode:box&&!box.passkeys?'device':'create',has:false};},
+    return{label:canChoose()&&box.passkeys?'Casino wallet':'Make a free casino wallet',mode:openMode(),has:false};},
    open:async()=>{const st=ex.snapshot();if(st.address&&st.walletKind==='passkey')return st.address;
-    await refreshBox();const h=held();await ex.connectPasskey(h.passkey?'unlock':h.device?'device':box&&!box.passkeys?'device':'create');await refreshBox();return ex.snapshot().address;},
+    await refreshBox();await ex.connectPasskey(openMode());await refreshBox();return ex.snapshot().address;},
    // A wallet made new from the room: 500 free testnet STX and the first 1,000,000 LAYR, with the exchange's once-only rules.
    fundNew:()=>run(()=>fundAndBuy(false))
   });
@@ -12347,10 +12469,10 @@ button{font:inherit;color:inherit;cursor:pointer}
  }
  let tries=0;
  (function wait(){if(window.ParallaxLAYRExchange&&window.ParallaxPasskeyWallet&&$('lxPasskeyFrame'))return start();if(++tries<300)setTimeout(wait,100);})();
- const s=document.createElement('script');s.type='module';s.src='passkey-wallet.js?v=3';document.head.appendChild(s);
+ const s=document.createElement('script');s.type='module';s.src='passkey-wallet.js?v=4';document.head.appendChild(s);
 })();
 </script>
-<script type="module" src="room.js?v=p3.2"></script>
+<script type="module" src="room.js?v=p3.3"></script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>
 

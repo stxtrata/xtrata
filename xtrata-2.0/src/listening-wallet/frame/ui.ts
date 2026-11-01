@@ -43,10 +43,14 @@ export function panelUi(cancelledMessage?: string): Pick<UiPort, 'act' | 'cancel
   const cancelled = () => new CancelledError(cancelledMessage);
 
   return {
-    act<T>(panel: Panel, action: () => Promise<T>): Promise<T> {
+    act<T>(panel: Panel, action: () => Promise<T>, altAction?: () => Promise<T>): Promise<T> {
       if (open) return Promise.reject(new Error('The listening wallet is already waiting for you.'));
       open = true;
       const ok = $<HTMLButtonElement>('p-ok'), cancel = $<HTMLButtonElement>('p-cancel'), error = $('p-error');
+      const alt = altAction && panel.altLabel ? document.getElementById('p-alt') as HTMLButtonElement | null : null;   // only the casino frame has one
+      const altEl = document.getElementById('p-alt') as HTMLButtonElement | null;
+      if (altEl) { altEl.hidden = !alt; altEl.onclick = null; }
+      if (alt) alt.textContent = panel.altLabel!;
       $('p-title').textContent = panel.title;
       // With a summary, the button sits right under it and the full text folds into "Details".
       const folded = !!panel.summary;
@@ -71,34 +75,36 @@ export function panelUi(cancelledMessage?: string): Pick<UiPort, 'act' | 'cancel
       // Confirm stays disabled until the panel has been up, and fully visible, for the arming delay,
       // so it never invites a tap it would then refuse (e.g. while the page moves the frame).
       const armedAt = performance.now() + ARM_DELAY_MS;
-      ok.disabled = true;
+      ok.disabled = true; if (alt) alt.disabled = true;   // both arm together
       let running = false;
       const ready = () => performance.now() >= armedAt && guard.steady(ARM_DELAY_MS);
       const arming = setInterval(() => {
         if (!open) { clearInterval(arming); return; }
-        if (!running) ok.disabled = !ready();
+        if (!running) { ok.disabled = !ready(); if (alt) alt.disabled = ok.disabled; }
       }, 100);
 
       return new Promise<T>((resolve, reject) => {
-        const close = () => { open = false; withdraw = null; clearInterval(arming); $('panel').hidden = true; $('idle').hidden = false; ok.onclick = cancel.onclick = null; };
+        const close = () => { open = false; withdraw = null; clearInterval(arming); $('panel').hidden = true; $('idle').hidden = false; ok.onclick = cancel.onclick = null; if (alt) { alt.onclick = null; alt.hidden = true; } };
         withdraw = () => { if (running) return false; close(); reject(cancelled()); return true; };
         // The action starts synchronously inside the click so WebAuthn keeps the user activation.
-        ok.onclick = (event) => {
+        const runner = (run: () => Promise<T>) => (event: MouseEvent) => {
           if (!event.isTrusted || performance.now() < armedAt) return;
           if (!guard.isVisible()) { error.textContent = 'This panel is partly hidden by the page. Scroll it fully into view, then confirm.'; return; }
           if (!guard.steady(ARM_DELAY_MS)) return; // just moved into view: the button re-enables shortly
-          ok.disabled = cancel.disabled = true;
+          ok.disabled = cancel.disabled = true; if (alt) alt.disabled = true;
           error.textContent = '';
           running = true;
-          action().then(
+          run().then(
             (value) => { close(); resolve(value); },
             (err: unknown) => {
               const e = err as { retryable?: boolean; message?: string };
-              if (e?.retryable) { running = false; error.textContent = e.message ?? 'Try again.'; ok.disabled = cancel.disabled = false; return; }
+              if (e?.retryable) { running = false; error.textContent = e.message ?? 'Try again.'; ok.disabled = cancel.disabled = false; if (alt) alt.disabled = false; return; }
               close(); reject(err);
             }
           );
         };
+        ok.onclick = runner(action);
+        if (alt && altAction) alt.onclick = runner(altAction);
         cancel.onclick = () => { close(); reject(cancelled()); };
       });
     },

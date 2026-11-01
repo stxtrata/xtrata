@@ -1,6 +1,14 @@
 # ParallaX Casino: your own Adrian, a "behind me" view, and personal space (plan)
 
-Written 2026-10-31. **Status: PLAN ONLY.** Nothing built.
+Written 2026-10-31. **Status: BUILT 2026-10-31** (steps 1-4; the phone pass, step 5, is still to do on real devices).
+Decisions in section 8 (Jim: behind you is the DEFAULT, first person by V or the 👤 button).
+
+What was built, in `public/casino/index.html`: `viewMode` (`xtrata.parallax.view`, default `behind`), `boomPose()` /
+`freeRun()` / `pointBlocked()` (tall obstacles are flagged `tall` in `solids`), `walkTargets()`, `camTargets()` behind variant
+(over the shoulder; the old one is `camTargetsFirst`), the 👤 button (`#viewbtn`) and V, the own figures (`me`, `meFrame`, run
+from the frame loop through `meFrameHook` just before the frame is drawn), walker colliders and `roomVisible`, and
+`PXRoomHost.self()` (called by room.js whenever the sign-in state changes). Test hooks: `window.__casinoView`.
+Browser checks V and P in `scripts/test-casino-wallet-browser.mjs`.
 
 Goals (Jim, 2026-10-31):
 1. The player has their own Adrian, and can switch the view so the camera sits behind them: they see themselves walk the
@@ -128,7 +136,7 @@ Room.js is rebuilt with `npm run build:casino-room` (its `?v=` bumped in the pag
 
 ## 8. Decisions for Jim (each has a default)
 
-1. **Default view.** Default: first person, as today, with V / the eye button to switch. (Or behind by default.)
+1. **Default view: behind you** (Jim, 2026-10-31), with V / the 👤 button for first person.
 2. **At tables in the behind view:** over the shoulder by default, with the table-view buttons still there. (Or keep today's
    table cameras and show your Adrian only while walking.)
 3. **Personal space size.** Default: about 0.6 m between centres (`r: 0.3` + `PR`).

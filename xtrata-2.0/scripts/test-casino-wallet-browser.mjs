@@ -137,7 +137,7 @@ async function newPlayer({ prf = true, extension = false, room = false } = {}) {
   page.on('console', (m) => logs.push(m.text()));
   const cdp = await context.newCDPSession(page);
   await cdp.send('WebAuthn.enable');
-  await cdp.send('WebAuthn.addVirtualAuthenticator', {
+  const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
     options: { protocol: 'ctap2', ctap2Version: 'ctap2_1', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: prf, automaticPresenceSimulation: true }
   });
   // The page's wallet script would load https://casino-wallet.xtrata.xyz; point it at the test wallet origin.
@@ -150,16 +150,19 @@ async function newPlayer({ prf = true, extension = false, room = false } = {}) {
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => setTimeout(() => raf(cb), 4000);
   }, [WALLET, extension]);
-  return { context, page, errors, logs, roomState };
+  return { context, page, errors, logs, roomState, cdp, authenticatorId };
 }
 
 /** Confirm each panel INSIDE the wallet frame until `done()` (arming delay: a click too early is ignored, so retry). */
-async function confirmInFrame(page, done, label) {
+async function confirmInFrame(page, done, label, { makeNew = false } = {}) {
   const frame = page.frameLocator('#lxPasskeyFrame iframe');
+  // makeNew: while the "use my passkey or make one" panel shows, answer "Make a new one"; confirm every other panel.
   for (let i = 0; i < 80; i++) {
     if (await done()) return;
-    const ok = frame.locator('#p-ok');
-    if (await ok.isVisible().catch(() => false) && await ok.isEnabled().catch(() => false)) await ok.click({ timeout: 2000 }).catch(() => {});
+    const alt = frame.locator('#p-alt'), ok = frame.locator('#p-ok');
+    const choosing = makeNew && await alt.isVisible().catch(() => false);
+    const button = choosing ? alt : ok;
+    if (await button.isVisible().catch(() => false) && await button.isEnabled().catch(() => false)) await button.click({ timeout: 2000 }).catch(() => {});
     await page.waitForTimeout(400);
   }
   const text = await frame.locator('body').innerText().catch((e) => 'unreadable: ' + e.message);
@@ -199,7 +202,7 @@ const visible = (page, sel) => page.locator(sel).isVisible();
   await page.locator('#lxPlayNow').click();
   await page.locator('#lxPasskeyFrame iframe').waitFor({ state: 'visible' });
   if (shots) { await page.waitForTimeout(1200); await page.screenshot({ path: `${shots}/2-wallet-panel.png`, timeout: 120000, animations: 'disabled' }); }
-  await confirmInFrame(page, async () => !!(await snap(page)).address, 'create passkey wallet');
+  await confirmInFrame(page, async () => !!(await snap(page)).address, 'create passkey wallet', { makeNew: true });
   const address = (await snap(page)).address;
   assert.match(address, /^ST/);
   assert.equal((await snap(page)).walletKind, 'passkey');
@@ -250,15 +253,15 @@ const visible = (page, sel) => page.locator(sel).isVisible();
   assert.equal(chain.broadcasts.at(-1).amount, 10n * STX);
   // Not linked to a passkey: the standard exchange offers one.
   await page.locator('#lxPasskeyAltBtn').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('#lxPasskeyAltBtn').textContent(), 'Create a passkey wallet');
+  assert.equal(await page.locator('#lxPasskeyAltBtn').textContent(), 'Passkey wallet');
   await page.locator('#lxPasskeyAltBtn').click();
-  await confirmInFrame(page, async () => { const a = (await snap(page)).address; return !!a && a !== device; }, 'upgrade to passkey');
+  await confirmInFrame(page, async () => { const a = (await snap(page)).address; return !!a && a !== device; }, 'upgrade to passkey', { makeNew: true });
   const passkey = (await snap(page)).address;
   await waitFor(page, async () => chain.broadcasts.at(-1).sender === passkey && ['credited', 'already-credited'].includes((await snap(page)).phase), 90000, 'passkey first buy');
   await page.waitForFunction(() => document.getElementById('lxPasskeyAlt').hidden);
   assert.deepEqual(errors, []);
   await context.close();
-  console.log('ok 2 · browser-only wallet → auto-buy → offered "Create a passkey wallet" → upgraded → auto-buy');
+  console.log('ok 2 · browser-only wallet → auto-buy → offered "Passkey wallet" → made one → auto-buy');
 }
 
 // ---- 2b. no passkey PRF on this device: the browser-only wallet still works ----
@@ -279,29 +282,30 @@ const visible = (page, sel) => page.locator(sel).isVisible();
   await openExchange(page, '#lxPasskeyAltBtn');
   assert.equal(await visible(page, '#lxPlayNow'), false);
   assert.equal(await page.locator('#layrConnectWallet').textContent(), 'Connect wallet');
-  assert.equal(await page.locator('#lxPasskeyAltBtn').textContent(), 'Create a passkey wallet');
-  assert.match(await page.locator('#lxPasskeyAltNote').textContent(), /500 free testnet STX/);
+  assert.equal(await page.locator('#lxPasskeyAltBtn').textContent(), 'Passkey wallet');
+  assert.match(await page.locator('#lxPasskeyAltNote').textContent(), /Use your casino passkey from any of your devices.*500 free testnet STX/);
   if (shots) await page.screenshot({ path: `${shots}/5-has-extension.png`, timeout: 120000, animations: 'disabled' });
   assert.deepEqual(errors, []);
   await context.close();
-  console.log('ok 2c · wallet extension: standard exchange with "Create a passkey wallet", no Play now');
+  console.log('ok 2c · wallet extension: standard exchange with "Passkey wallet" (use yours or make one), no Play now');
 }
 
 // ---- R1. a brand-new visitor: asked to join on arrival, joins with a new casino wallet, gets STX and chips ----
 const roomState_ = (page) => page.evaluate(() => window.__pxRoom?.state ?? null);
 const roomButton = (page, text) => page.locator('#pxroom-panel button', { hasText: text });
 {
-  const { context, page, errors, roomState } = await newPlayer({ room: true });
+  const { context, page, errors, roomState, cdp, authenticatorId } = await newPlayer({ room: true });
   await page.goto(SITE + '/casino/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.__pxRoom?.state?.open && window.ParallaxCasinoWalletUI?.available(), null, { timeout: 120000 });
   const panelText = await page.locator('#pxroom-panel').innerText();
   assert.match(panelText, /3 people are in the room\. Sign in to join them\./);
   assert.match(panelText, /Until you join you are invisible/);
   const first = await page.locator('#pxroom-panel .row button').first().textContent();
-  assert.equal(first, 'Make a free casino wallet', 'a new visitor is offered the casino wallet first');
+  assert.equal(first, 'Casino wallet', 'a new visitor is offered the casino wallet first');
   if (shots) await page.screenshot({ path: `${shots}/6-arrival.png`, timeout: 120000, animations: 'disabled' });
-  await roomButton(page, 'Make a free casino wallet').click();
-  await confirmInFrame(page, async () => !!(await roomState_(page))?.signed, 'join the room with a new casino wallet');
+  await roomButton(page, 'Casino wallet').click();
+  if (shots) { await page.locator('#lxPasskeyFrame iframe').waitFor({ state: 'visible' }); await page.waitForTimeout(1500); await page.screenshot({ path: `${shots}/7-use-or-make.png`, timeout: 120000, animations: 'disabled' }); }
+  await confirmInFrame(page, async () => !!(await roomState_(page))?.signed, 'join the room with a new casino wallet', { makeNew: true });
   const address = (await roomState_(page)).signed;
   assert.match(address, /^ST/);
   assert.deepEqual(roomState.signIns, [address], 'the room server accepted the casino wallet signature');
@@ -314,8 +318,20 @@ const roomButton = (page, text) => page.locator('#pxroom-panel button', { hasTex
   await page.waitForFunction(() => window.__pxRoom?.state?.signed, null, { timeout: 120000 });
   await page.waitForTimeout(4000);
   assert.equal((await roomState_(page)).prompted, false, 'no arrival prompt while a session is live');
+
+  // The same passkey on a "new device": this browser forgets every casino wallet record; the passkey is still in the
+  // authenticator (as a synced passkey would be). "Use my passkey" must open the SAME wallet, and no new passkey is made.
+  const box = page.frames().find((f) => f.url().startsWith(WALLET));
+  await box.evaluate(() => localStorage.clear());
+  await openExchange(page, '#lxPasskeyAltBtn');
+  assert.equal(await page.locator('#lxPasskeyAltBtn').textContent(), 'Passkey wallet');
+  await page.locator('#lxPasskeyAltBtn').click();
+  await confirmInFrame(page, async () => (await snap(page)).address === address, 'synced passkey opens the same wallet');
+  const { credentials } = await cdp.send('WebAuthn.getCredentials', { authenticatorId });
+  assert.equal(credentials.length, 1, 'no second passkey was made');
   assert.deepEqual(errors, []);
   await context.close();
+  console.log('ok R1b · same passkey, browser forgot the wallet: "Use my passkey" opens the same wallet, no new passkey');
   console.log('ok R1 · new visitor: arrival prompt (room hidden) → casino wallet → signed in → 500 STX + 1,000,000 LAYR; reload: no prompt');
 }
 
@@ -329,7 +345,7 @@ const roomButton = (page, text) => page.locator('#pxroom-panel button', { hasTex
   assert.equal((await roomState_(page)).signed, null, 'Not now leaves them invisible');
   await page.evaluate(() => window.ParallaxLAYRExchange.open(0));
   await page.locator('#lxPlayNow').click();
-  await confirmInFrame(page, async () => !!(await roomState_(page))?.signed, 'Play now signs into the room');
+  await confirmInFrame(page, async () => !!(await roomState_(page))?.signed, 'Play now signs into the room', { makeNew: true });
   const address = (await snap(page)).address;
   assert.equal((await roomState_(page)).signed, address);
   assert.deepEqual(roomState.signIns, [address]);
@@ -337,6 +353,59 @@ const roomButton = (page, text) => page.locator('#pxroom-panel button', { hasTex
   assert.deepEqual(errors, []);
   await context.close();
   console.log('ok R2 · Not now keeps them invisible; Play now at the exchange signs them into the room automatically');
+}
+
+// ---- V. your own Adrian and the behind view (the default), and first person by V ----
+const view = (page) => page.evaluate(() => { const v = window.__casinoView; return { mode: v.mode, behind: v.behind, camera: v.camera, player: v.player, boom: v.boom, me: v.me }; });
+{
+  const { context, page, errors } = await newPlayer();
+  await page.goto(SITE + '/casino/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction(() => window.__casinoView && window.XA_HOSTS?.ready, null, { timeout: 120000 });
+  await page.evaluate(() => window.__casino.startAtDoor());
+  await page.waitForFunction(() => window.__casinoView.me.some((m) => !m.seated && m.on && m.built), null, { timeout: 60000 });
+  // Out on the open floor (at the door the wall is right behind you and the boom is short, as it should be).
+  await page.evaluate(() => window.__casinoView.standAt(0, 3));
+  // The boom eases back out after the door; this test browser draws a frame only every 4 s, so that takes a while here.
+  await page.waitForFunction(() => window.__casinoView.boom > 2.4, null, { timeout: 180000 });
+  let v = await view(page);
+  assert.equal(v.mode, 'behind', 'behind you is the default');
+  const [cx, cy, cz] = v.camera, back = Math.hypot(cx - v.player.x, cz - v.player.z);
+  assert.ok(back > 1.5 && back < 2.8 && cz > v.player.z && cy > 1.6, `camera behind and above you (${back.toFixed(2)} m back, ${cy.toFixed(2)} m up)`);
+  if (shots) await page.screenshot({ path: `${shots}/8-behind-you.png`, timeout: 120000, animations: 'disabled' });
+  await page.keyboard.press('KeyV');
+  await page.waitForFunction(() => window.__casinoView.mode === 'first' && !window.__casinoView.me.some((m) => m.on), null, { timeout: 20000 });
+  v = await view(page);
+  assert.ok(Math.hypot(v.camera[0] - v.player.x, v.camera[2] - v.player.z) < 0.05, 'first person: the camera is at your eyes');
+  assert.equal(await page.evaluate(() => localStorage.getItem('xtrata.parallax.view')), 'first', 'the choice is remembered');
+  await page.keyboard.press('KeyV');
+  await page.waitForFunction(() => window.__casinoView.mode === 'behind' && window.__casinoView.me.some((m) => m.on), null, { timeout: 20000 });
+  // Against the back wall the boom shortens instead of going through it.
+  await page.evaluate(() => { window.__casinoView.standAt(0, 9.0); });
+  await page.waitForTimeout(9000);
+  v = await view(page);
+  assert.ok(v.camera[2] < 11 - 0.3, `the camera stays inside the room (z ${v.camera[2].toFixed(2)})`);
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('ok V · behind you by default (own Adrian shown), V for first person (remembered), the boom stops at walls');
+}
+
+// ---- P. personal space: other players are solid while you are signed in, and you pass through them while you are not ----
+{
+  const { context, page, errors } = await newPlayer();
+  await page.goto(SITE + '/casino/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction(() => window.__casinoView && window.PXRoomHost && window.XA_HOSTS?.ready, null, { timeout: 120000 });
+  await page.evaluate(() => { window.__casino.startAtDoor(); window.PXRoomHost.move({ key: 'ST2BOB00000000000000000000000000000000', label: 'Bob', x: 0, z: 6, r: 0, at: Date.now() }); });
+  const gap = () => page.evaluate(() => { const p = window.__casinoView.standAt(0.05, 6.05); return Math.hypot(p.x, p.z - 6); });
+  await page.evaluate(() => window.PXRoomHost.self({ signed: true, address: 'ST1ALICE000000000000000000000000000000' }));
+  const t0 = Date.now(); let d = await gap();
+  while (d < 0.6 && Date.now() - t0 < 30000) { await page.waitForTimeout(1000); d = await gap(); }
+  assert.ok(d >= 0.6, `signed in: kept out of Bob's personal space (${d.toFixed(2)} m)`);
+  await page.evaluate(() => window.PXRoomHost.self({ signed: false, address: null }));
+  d = await gap();
+  assert.ok(d < 0.1, `signed out (invisible): walks through Bob (${d.toFixed(2)} m)`);
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('ok P · personal space while signed in (about 0.6 m); invisible visitors pass through');
 }
 
 // ---- 3. flag off: the page is exactly as before ----

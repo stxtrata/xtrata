@@ -17,8 +17,11 @@ export interface CasinoStatus {
 }
 
 export interface CasinoOpenParams {
-  /** create: a new passkey wallet. unlock: an existing passkey wallet. device: the no-passkey fallback (made if missing). */
-  mode: 'create' | 'unlock' | 'device';
+  /**
+   * auto: the passkey wallet this device knows (several: the browser's list), else "use my passkey or make one".
+   * create: a new passkey wallet. unlock: an existing passkey wallet. device: the no-passkey fallback (made if missing).
+   */
+  mode: 'auto' | 'create' | 'unlock' | 'device';
   /** unlock only: offer any casino passkey instead of the one this device used last. */
   anyPasskey?: boolean;
 }
@@ -29,4 +32,4 @@ export interface CasinoOpenResult { address: string; kind: CasinoWalletKind }
 export interface CasinoSignBuyParams { stx: number; fee: string; nonce: string }
 export interface CasinoSignBuyResult { raw: string; txid: string }
 
-export const CASINO_FEATURES = ['buy', 'device', 'held', 'room'] as const;
+export const CASINO_FEATURES = ['buy', 'device', 'held', 'room', 'choose'] as const;

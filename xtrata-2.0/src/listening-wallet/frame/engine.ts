@@ -64,6 +64,11 @@ export interface Panel {
   confirmLabel: string;
   /** Lines the listener must not miss (shown as warnings). */
   warnings?: string[];
+  /**
+   * A second choice beside the confirm button (the casino wallet's "Make a new one"). Shown only when `act` is also given an
+   * `alt` action and the frame has a #p-alt button; the radio never uses it.
+   */
+  altLabel?: string;
 }
 
 export interface IdleView {
@@ -79,7 +84,7 @@ export interface UiPort {
    * click handler (WebAuthn needs the user activation) and its result resolves the promise.
    * Cancel rejects with CancelledError.
    */
-  act<T>(panel: Panel, action: () => Promise<T>): Promise<T>;
+  act<T>(panel: Panel, action: () => Promise<T>, alt?: () => Promise<T>): Promise<T>;
   /**
    * Withdraw the open panel as if Cancel were pressed, unless its confirmed action is already
    * running. Returns whether a waiting panel was withdrawn. Withdrawing can never approve anything.

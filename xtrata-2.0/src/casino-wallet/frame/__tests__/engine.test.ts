@@ -9,17 +9,20 @@ import { issueRoomChallenge, verifyRoomProof } from '../../../../functions/lib/c
 const PRF = Uint8Array.from({ length: 32 }, (_, i) => i);
 const ADDRESS = 'ST2SMCB4CV776FCP9A2EK0ZM37NAXM1MFJMMX9DW8'; // the locked vector in src/lib/casino-wallet/__tests__
 
-function setup(opts: { outputs?: Uint8Array[]; cancel?: Panel['kind'][]; available?: boolean; newTab?: boolean; handle?: string } = {}) {
+function setup(opts: { outputs?: Uint8Array[]; cancel?: Panel['kind'][]; available?: boolean; newTab?: boolean; handle?: string; alt?: boolean; map?: Map<string, string>; noPasskey?: boolean } = {}) {
   const outputs = opts.outputs ?? [PRF, PRF, PRF, PRF, PRF, PRF];
   const panels: Panel[] = [];
-  const map = new Map<string, string>();
+  const map = opts.map ?? new Map<string, string>();
   const opened: string[] = [];
   let evaluations = 0;
   let madeUserId = '';
   const passkey: PasskeyPort = {
     available: () => opts.available ?? true,
     create: async () => ({ credentialId: 'cred-1' }),
-    evaluate: async (id) => ({ credentialId: id ?? 'cred-1', prf: outputs[evaluations++].slice(), userHandle: opts.handle ?? madeUserId }),
+    evaluate: async (id) => {
+      if (opts.noPasskey) throw Object.assign(new Error('cancelled or timed out'), { retryable: true });
+      return { credentialId: id ?? 'cred-1', prf: outputs[evaluations++].slice(), userHandle: opts.handle ?? madeUserId };
+    },
     createsInNewTab: () => !!opts.newTab,
     openCreator: (_x, name, userId) => { madeUserId = userId; opened.push(name); }
   };
@@ -27,10 +30,10 @@ function setup(opts: { outputs?: Uint8Array[]; cancel?: Panel['kind'][]; availab
     passkey,
     store: { get: (k) => map.get(k) ?? null, set: (k, v) => void map.set(k, v) },
     ui: {
-      act: async (panel, action) => {
+      act: async (panel, action, alt) => {
         panels.push(panel);
         if (opts.cancel?.includes(panel.kind)) throw new CancelledError('cancelled');
-        return action();
+        return opts.alt && alt && panel.altLabel ? alt() : action();
       },
       cancel: () => false,
       idle: () => {}
@@ -130,6 +133,56 @@ describe('casino wallet engine (wallet origin)', () => {
     const s = setup({ cancel: ['create'] });
     await expect(s.h['casino.open']({ mode: 'create' })).rejects.toThrow(/cancelled/);
     expect(await s.h['casino.status']()).toMatchObject({ state: 'none' });
+  });
+});
+
+describe('opening a casino wallet: an existing passkey first, a new one only by choice (Jim, 2026-10-31)', () => {
+  it('a device that knows one passkey opens it with one tap', async () => {
+    const s = setup();
+    await s.h['casino.open']({ mode: 'create' });
+    await s.h['casino.lock']();
+    s.panels.length = 0;
+    expect(await s.h['casino.open']({ mode: 'auto' })).toEqual({ address: ADDRESS, kind: 'passkey' });
+    expect(s.panels.map((p) => p.kind)).toEqual(['unlock']);
+  });
+
+  it('a passkey synced from another device opens the same wallet (offered first, then checked once on this device)', async () => {
+    const first = setup();
+    await first.h['casino.open']({ mode: 'create' });
+    const here = setup();                                   // a new browser: nothing stored, the same passkey (same PRF)
+    expect(await here.h['casino.status']()).toMatchObject({ state: 'none' });
+    expect(await here.h['casino.open']({ mode: 'auto' })).toEqual({ address: ADDRESS, kind: 'passkey' });
+    expect(here.panels.map((p) => p.kind)).toEqual(['unlock', 'verify-passkey']);
+    expect(here.panels[0]).toMatchObject({ confirmLabel: 'Use my passkey', altLabel: 'Make a new one' });
+  });
+
+  it('"Make a new one" makes a passkey wallet from the same panel', async () => {
+    const s = setup({ alt: true });
+    expect(await s.h['casino.open']({ mode: 'auto' })).toEqual({ address: ADDRESS, kind: 'passkey' });
+    expect(s.panels.map((p) => p.kind)).toEqual(['unlock', 'confirm-passkey', 'verify-passkey']);
+  });
+
+  it('no casino passkey on the device: says so and points at "Make a new one"', async () => {
+    const s = setup({ noPasskey: true });
+    await expect(s.h['casino.open']({ mode: 'auto' })).rejects.toThrow(/No casino passkey was found.*Make a new one/);
+    expect(await s.h['casino.status']()).toMatchObject({ state: 'none' });
+  });
+
+  it('several passkeys known here: the browser\'s list is shown (no single id asked for)', async () => {
+    const asked: Array<string | undefined> = [];
+    const s = setup();
+    await s.h['casino.open']({ mode: 'create' });
+    await s.h['casino.lock']();
+    const stored = JSON.parse(s.map.get(STORE_KEY) as string);
+    stored.wallets.push({ credentialId: 'cred-2', address: 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG' });
+    s.map.set(STORE_KEY, JSON.stringify(stored));
+    const again = createCasinoEngine({
+      passkey: { available: () => true, create: async () => ({ credentialId: 'x' }), evaluate: async (id) => { asked.push(id); return { credentialId: 'cred-1', prf: PRF.slice() }; } },
+      store: { get: (k) => s.map.get(k) ?? null, set: (k, v) => void s.map.set(k, v) },
+      ui: { act: async (_p, a) => a(), cancel: () => false, idle: () => {} }
+    });
+    expect(await again.handlers['casino.open']({ mode: 'auto' })).toEqual({ address: ADDRESS, kind: 'passkey' });
+    expect(asked).toEqual([undefined]);
   });
 });
 

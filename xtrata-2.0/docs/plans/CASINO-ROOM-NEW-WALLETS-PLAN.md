@@ -179,6 +179,22 @@ fine for testing. A nickname (signed once, stored by the room) is a separate, op
 | 6 | Browser test, real devices | |
 | 7 | Later: Other Stacks wallet, nicknames | Later |
 
+## 6a. An existing passkey is always offered first (Jim, 2026-10-31)
+
+Browsers do not let a page see a device's passkeys before asking, and the wallet box only remembers passkeys used in that
+browser. So on a new device (or a passkey synced from another one) it looked as if there were none, and only "make a new one"
+was offered. Now (`casino.open { mode: 'auto' }`, feature `choose`):
+
+- This browser knows one casino passkey: it is asked for directly (one tap).
+- It knows several: the browser's own list of casino passkeys, to choose from.
+- It knows none: one panel, **Use my passkey** (the browser shows the device's casino passkeys, synced ones included; a
+  passkey not seen here before is checked once more for a stable result) or **Make a new one**. If none is found or chosen,
+  it says so and points at "Make a new one". Making a new passkey happens only by that choice.
+
+The exchange's Play now, its "Passkey wallet" button and the room's "Casino wallet" button all open this way. An older box
+without `choose` keeps the previous behaviour. The panel's second button (`#p-alt`, `altLabel`) is in the shared panel code
+(`src/listening-wallet/frame/ui.ts`); the radio's frame has no such button and never passes one.
+
 ## 7. Decisions (Jim, 2026-10-31)
 
 1. **No extra box prompt when joining.** The tap in the Room panel is the consent; the box prompts only to unlock.
