@@ -8,6 +8,9 @@ Open `index.html` from a web server (for example `python3 -m http.server` in `pu
 `/casino-machines/ordinal-rush/`). It shows the cabinet in a small 3D studio with the real game running on its screen, a
 test LAYR balance, Cabinet and Screen views, Full screen, and a hidden **Test** panel.
 
+The test page can be open in any number of tabs at once: each tab has its own test account, which survives a reload of
+that tab. Only inside the casino does the machine use the room's one shared LAYR account, which allows a single tab.
+
 ## Folder
 
 | Path | What it is |
@@ -28,6 +31,7 @@ test LAYR balance, Cabinet and Screen views, Full screen, and a hidden **Test** 
 | `tools/exact-rtp.py` | Exact RTP from the strips: all 33,554,432 reel positions, features in closed form. Prints 94.380%. |
 | `tools/rtp-sim.cjs` | Seeded 5,000,000-spin simulation of the engine inside `pack.json`, and a byte comparison with Forever Twins' engine. |
 | `tools/check-sharp.cjs` | Fullscreen on a 2x display: the screen canvas matches the display's pixels and stays readable; saves reel crops and frames of Land Grab respins. |
+| `tools/check-tabs.cjs` | Several test tabs at once: each starts and plays on its own test account, a reload keeps its balance, a duplicated tab gets a new account. |
 | `tools/test-page.cjs` | End-to-end test of `index.html`: deck, lever, every bonus in four stages, Skip, reduced motion, fullscreen sessions at desktop and phone width. |
 
 ```bash

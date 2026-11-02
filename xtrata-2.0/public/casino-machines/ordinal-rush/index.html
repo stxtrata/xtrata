@@ -49,7 +49,20 @@ button{font:inherit;color:inherit;cursor:pointer}
 <div id="err" role="alert"></div>
 <iframe id="game" title="Ordinal Rush game" allow="fullscreen; autoplay" aria-hidden="true" tabindex="-1"></iframe>
 <script>window.PX_STANDALONE_TEST = true; // tells the game frame that test hooks are allowed here; the casino never sets this
-(() => { const k = 'xtrata.parallax.test.ordinal-rush.layr.v1'; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); if (!r.bank) { r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } } catch (e) {} })();</script>
+// Each browser tab gets its own test account, so the test page runs in any number of tabs at once. (In the casino the
+// machine uses the room's one shared account, which is single-tab by design.) The id survives a reload of the same tab;
+// a duplicated tab, which copies sessionStorage, sees the original still alive and takes a new id.
+window.OR_TEST_TAB = (() => { const P = 'xtrata.parallax.test.ordinal-rush.', page = Math.random().toString(36).slice(2), now = Date.now(); let id = null;
+  try { id = sessionStorage.getItem(P + 'tab'); const a = id && JSON.parse(localStorage.getItem(P + 'alive.' + id) || 'null'); if (a && a.page !== page && now - a.t < 6000) id = null; } catch (e) { id = null; }
+  if (!id) id = now.toString(36) + Math.random().toString(36).slice(2, 6);
+  try { sessionStorage.setItem(P + 'tab', id); } catch (e) {}
+  const beat = () => { try { localStorage.setItem(P + 'alive.' + id, JSON.stringify({ page, t: Date.now() })); localStorage.setItem(P + 'seen.' + id, String(Date.now())); } catch (e) {} };
+  beat(); setInterval(beat, 2000); addEventListener('pagehide', () => { try { localStorage.removeItem(P + 'alive.' + id); } catch (e) {} });
+  // Tidy away test accounts from tabs not seen for three days.
+  try { for (const k of Object.keys(localStorage)) { if (!k.startsWith(P + 'seen.')) continue; const old = k.slice((P + 'seen.').length); if (old !== id && now - Number(localStorage.getItem(k)) > 3 * 864e5) ['layr.v1.', 'lease.v1.', 'seen.', 'alive.'].forEach(x => localStorage.removeItem(P + x + old)); } } catch (e) {}
+  return id; })();
+window.OR_TEST_KEY = 'xtrata.parallax.test.ordinal-rush.layr.v1.' + window.OR_TEST_TAB;
+(() => { const k = window.OR_TEST_KEY; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); if (!r.bank) { r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } } catch (e) {} })();</script>
 <script src="vendor/layr-test-stub.js"></script>
 <script src="vendor/three-subset.js"></script>
 <script src="vendor/software-renderer.js"></script>
@@ -152,8 +165,8 @@ document.querySelectorAll('[data-h]').forEach(b => b.onclick = () => { OR.test.l
 $('tReduced').onclick = () => $('tReduced').setAttribute('aria-pressed', String(OR.test.setReduced($('tReduced').getAttribute('aria-pressed') !== 'true')));
 $('tTurbo').onclick = () => $('tTurbo').setAttribute('aria-pressed', String(OR.test.setTurbo($('tTurbo').getAttribute('aria-pressed') !== 'true')));
 document.querySelectorAll('[data-sim]').forEach(b => b.onclick = async () => { const out = $('simOut'); out.textContent = 'Running…'; try { const r = await OR.test.simulate(Number(b.dataset.sim), 20261101, p => { out.textContent = `Running… ${Math.round(p * 100)}%`; }); out.textContent = `${fmt(r.spins)} spins, seed ${r.seed}: RTP ${r.rtp.toFixed(2)}% · Airdrop 1 in ${r.freeEvery.toFixed(0)} · Vault 1 in ${r.pickEvery.toFixed(0)} · Land Grab 1 in ${r.holdEvery.toFixed(0)} · ${r.jackpots} jackpots. Exact: 94.380%.`; } catch (e) { out.textContent = e.message; } });
-$('resetBal').onclick = () => { const k = 'xtrata.parallax.test.ordinal-rush.layr.v1'; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } catch (e) {} api.refreshAccount(); paintBal(); };
-$('resetMachine').onclick = () => { if (!confirm('Reset the test machine (jackpot meters, Holder Pot, history) and reload?')) return; const k = 'xtrata.parallax.test.ordinal-rush.layr.v1'; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); delete (r.layrGames || {})['ordinal-rush']; r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } catch (e) {} api.deactivate(); location.reload(); };
+$('resetBal').onclick = () => { const k = window.OR_TEST_KEY; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } catch (e) {} api.refreshAccount(); paintBal(); };
+$('resetMachine').onclick = () => { if (!confirm('Reset the test machine (jackpot meters, Holder Pot, history) and reload?')) return; const k = window.OR_TEST_KEY; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); delete (r.layrGames || {})['ordinal-rush']; r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } catch (e) {} api.deactivate(); location.reload(); };
 window.ORTest = { api, OR, frame, setView, enterFs, exitFs, model, camera, renderer };
 
 /* ---- loop: the screen texture, the turning coin, the lever and spin button, the floor glow; idle capped near 30 fps ---- */

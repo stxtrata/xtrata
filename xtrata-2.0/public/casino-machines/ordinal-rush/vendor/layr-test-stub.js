@@ -1,5 +1,6 @@
 /* TEST STUB of window.ParallaxLAYRAccount for the standalone Ordinal Rush page. It is the casino adapter with its own
-   storage keys, so it can never read or change a real casino balance. */
+   storage keys, so it can never read or change a real casino balance, and one account per browser tab (window.OR_TEST_TAB),
+   so any number of test tabs can run at once. */
 /* One existing LAYR account for the room and every cabinet.
    This local adapter does not claim to verify or transfer on-chain tokens. */
 (() => {
@@ -10,9 +11,10 @@
       return;
     }
   } catch (_) {}
-  const KEY = 'xtrata.parallax.test.ordinal-rush.layr.v1', LEGACY_KEY='xtrata.parallax.test.none', LOCK = 'xtrata.parallax.test.ordinal-rush.layr.v1';
+  const TEST_TAB = typeof window.OR_TEST_TAB === 'string' && window.OR_TEST_TAB ? '.' + window.OR_TEST_TAB : '';
+  const KEY = ('xtrata.parallax.test.ordinal-rush.layr.v1' + TEST_TAB), LEGACY_KEY='xtrata.parallax.test.none', LOCK = ('xtrata.parallax.test.ordinal-rush.layr.v1' + TEST_TAB);
   let owned = false, acquiring = null, releaseLock = null, room = null, draft = null, fault = '';
-  const LEASE_KEY='xtrata.parallax.test.ordinal-rush.lease.v1',LEASE_MS=60000;
+  const LEASE_KEY=('xtrata.parallax.test.ordinal-rush.lease.v1' + TEST_TAB),LEASE_MS=60000;
   let leaseDB=null,leaseToken=null,leaseTimer=null,leaseFallback=false;
   const metadata = new WeakMap(), listeners = new Set();
   const copy = value => JSON.parse(JSON.stringify(value));
@@ -98,7 +100,7 @@
     fault = '';
     if(!navigator.locks){acquiring=acquireFallback().finally(()=>{acquiring=null;});return acquiring;}
     acquiring = new Promise(resolve => {
-      navigator.locks.request(LOCK, { ifAvailable: true }, async lock => {
+      navigator.locks.request(LOCK, { ifAvailable: !TEST_TAB }, async lock => {
         if (!lock) { fault = 'The LAYR account is active in another tab. Close it, then reload or reconnect.'; resolve(false); return; }
         try { read(); } catch (e) { fault = e.message; resolve(false); return; }
         owned = true;
