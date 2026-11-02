@@ -1,6 +1,6 @@
 # ParallaX Casino: a main room for side-by-side games, bots only in the Salon
 
-Status: plan written 2026-11-01. Step 1 (the people) built 2026-11-02 with Jim's changes, see section 0; the new game and the Salon move are not built. Page: `/casino` (`public/casino/index.html`); `/casino-b` unchanged.
+Status: plan written 2026-11-01. Built 2026-11-02: the people (section 0), Sic Bo in Hold'em's place (section 2), and a house screen (section 9). Not built: Hold'em with bots in the Salon (section 3), more machines (section 8). Page: `/casino` (`public/casino/index.html`); `/casino-b` unchanged.
 Replaces `CASINO-NPC-TAGS-PLAN.md` sections 1 and 4.1 (who stays in the room); its tag design still applies to the bots that stay.
 
 **The ask.** The main room keeps the fruit machines and the games several people can play side by side. Texas Hold'em, poker in
@@ -19,9 +19,9 @@ the dealers at their tables and the bartender behind the bar: no Hold'em bots, n
   (section 3) if wanted.
 - **Room:** the daily mission "Play 5 hands of Hold'em" became "Play 5 hands at any table", in the same place in the list, so
   nobody else's missions change. Needs the room Worker deployed.
-- Its spot (right of the room, where the table stood) is empty marble until the replacement is chosen (section 2, or section 8).
+- **Sic Bo** now stands in that spot (Jim, 2026-11-02): see section 2.
 
-## 1. Who and what was in the main room (read from the code, before step 1) (read from the code)
+## 1. Who and what was in the main room (read from the code, before step 1)
 
 | What | Where | Plan |
 |---|---|---|
@@ -53,6 +53,25 @@ Dragon Tiger was ruled out: it plays almost exactly like baccarat, which is alre
 
 The new table keeps the Hold'em table's place, its two seats and its stools, and gets a dealer in a house waistcoat (a new
 livery colour). Spots in the room: `sicbo.1` and `sicbo.2` (or the id of the game chosen).
+
+### 2.1 Sic Bo, as built (2026-11-02)
+
+- **The table** (`makeSicBo` in `public/casino/index.html`): Hold'em's place, size and two stools; a deep red felt with the betting
+  layout; three dice under a glass dome on a gold dish at the dealer's end, which lifts and shakes for each roll; a dealer in a new
+  vermilion waistcoat; its own sign, plaque, rug and rules card; the welcome button "Sic Bo" in Hold'em's old place.
+- **The bets** (37): Small 4-10 and Big 11-17 (1:1, both lose to any triple), Odd and Even (1:1, lose to a triple), the totals 4 to
+  17 (60, 30, 17, 12, 8, 6, 6, 6, 6, 8, 12, 17, 30, 60 to 1), a double of a number (10:1), any triple (30:1), a chosen triple
+  (180:1), a single number (1:1, 2:1 or 3:1 as it shows on one, two or three dice). The panel groups them in three tabs: Big ·
+  Small, Totals, Numbers. Keys: s, b, o, e, a pick Small, Big, Odd, Even, Any triple; c clears; d rolls; r repeats.
+- **Shared rolls**, like baccarat: signed in to a room that lists `rounds`, everyone at the table bets on the same roll, every 30 s
+  (15 s to bet). The room commits to a seed, reveals it when bets close, and each browser checks it and works the dice out from it
+  (`sicboDice` in `functions/lib/casino-rounds.ts`, on `window.PXRounds`). Alone or offline, the table rolls on its own with the
+  browser's secure random numbers.
+- **The rules** live in one small block in the page (`SicBoModel`, between `SICBO-MODEL-START` and `-END`), which the unit tests
+  run directly. Big or Small returns 97.2% (2.78% to the house), the best bet on the table; every other bet returns less.
+- **Room:** `sicbo` is a shared-round table with its own bet keys; spots `sicbo.1` and `sicbo.2` replace `holdem.1` and `.2`;
+  table chat and watching know it; the mission in Hold'em's old place is now "Play 5 rounds of Sic Bo", and the shared-rounds
+  mission counts Sic Bo too.
 
 ## 3. Hold'em with bots moves to the Salon
 
@@ -142,3 +161,22 @@ side. Ways to add more, simplest first:
 Every new design adds its game to the page (about 2 MB each; the page is about 24 MB now) and its spots to the room service
 (`SPOTS`, the `MACH` list), and a phone or iPad holds one more idle screen in memory. More cabinets of an existing design cost
 almost nothing. Suggested: A or B for the next one or two designs; C if the series is going to grow.
+
+## 9. The house screen (built 2026-11-02)
+
+Jim: "a display somewhere in the room that rotates through users' achievements and leaderboards and other promotional or
+otherwise engaging or informative content".
+
+- **Where:** a 2.3 m wide screen in a gold frame on the back wall, left of the Salon arch, facing the floor and the entrance.
+  (Under the PARALLAX sign was tried first, but the floating jackpot sign hides that spot from the floor.)
+- **What it shows,** a slide every 8 seconds, the room's news and the house's notices taking turns:
+  - the room's news, when there is any: big wins tonight (the room's last eight), the progressive jackpot, the slot tournament
+    (standings and time left while it runs; the time and prizes when it is later today), this week's boards (most XP, biggest
+    win, most generous), happy hour (on, or coming within three hours), and how many people are playing;
+  - the house's notices, always: Sic Bo, the Salon (BNS names only), the Afterglow (send someone a drink), levels, badges and
+    missions.
+- **Where the news comes from:** what this page already receives from the room (the `room` message's `wins`, `jackpot`,
+  `tourney` and `hh`, and the `win`, `jp` and `tourney` messages). The weekly boards are asked for once every five minutes while
+  signed in (`board`). Nothing new in the room service. With the room off, only the notices show.
+- **Cost:** one 1024 by 576 canvas, redrawn once a second while the tab is visible (the clocks on it count down).
+- **To add a notice:** one more entry in `NOTICES` in the house screen block.

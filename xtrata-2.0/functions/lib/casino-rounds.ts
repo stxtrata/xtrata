@@ -1,5 +1,5 @@
 /**
- * Shared rounds at the roulette and baccarat tables (docs/plans/CASINO-PLAY-TOGETHER-PLAN.md, phase 2).
+ * Shared rounds at the roulette, baccarat and Sic Bo tables (docs/plans/CASINO-PLAY-TOGETHER-PLAN.md, phase 2).
  *
  * Everyone at a shared table plays the same round: the same roulette number, the same baccarat cards. Rounds run on the room's
  * clock: round `n` of a table starts at `n * period` milliseconds since 1970 and its bets close `close` milliseconds later. No timer
@@ -14,7 +14,7 @@
  * The chips are play money kept in each player's browser (LAYR); nothing here moves money.
  */
 
-export const ROUND_TABLES = ['roulette', 'baccarat'] as const;
+export const ROUND_TABLES = ['roulette', 'baccarat', 'sicbo'] as const;
 export type RoundTable = (typeof ROUND_TABLES)[number];
 export const isRoundTable = (value: unknown): value is RoundTable =>
   typeof value === 'string' && (ROUND_TABLES as readonly string[]).includes(value);
@@ -22,7 +22,8 @@ export const isRoundTable = (value: unknown): value is RoundTable =>
 /** period: one round, start to start. close: bets close this long after the round starts (the result is shown from then on). */
 export const ROUND_TIMING: Record<RoundTable, { period: number; close: number }> = {
   roulette: { period: 32_000, close: 17_000 },
-  baccarat: { period: 30_000, close: 15_000 }
+  baccarat: { period: 30_000, close: 15_000 },
+  sicbo: { period: 30_000, close: 15_000 }
 };
 
 export const roundAt = (table: RoundTable, now: number) => Math.floor(now / ROUND_TIMING[table].period);
@@ -37,7 +38,10 @@ export const MAX_BET_KEYS = 40;
 export const MAX_BET_AMOUNT = 1_000_000;
 const ROULETTE_KEY = /^(?:n:(?:[0-9]|[12][0-9]|3[0-6])|m:(?:[0-9]|[12][0-9]|3[0-6])(?:,(?:[0-9]|[12][0-9]|3[0-6])){1,5}|red|black|odd|even|low|high|d[123]|c[123])$/;
 const BACCARAT_KEYS = new Set(['player', 'banker', 'tie', 'pp', 'bp']);
-export const isBetKey = (table: RoundTable, key: string) => (table === 'roulette' ? ROULETTE_KEY.test(key) : BACCARAT_KEYS.has(key));
+/** Sic Bo: small, big, odd, even, any triple; totals n4 to n17; a double d1-d6, a triple t1-t6, a single number s1-s6 (37 in all). */
+const SICBO_KEY = /^(?:small|big|odd|even|any|n(?:[4-9]|1[0-7])|[dts][1-6])$/;
+export const isBetKey = (table: RoundTable, key: string) =>
+  table === 'roulette' ? ROULETTE_KEY.test(key) : table === 'baccarat' ? BACCARAT_KEYS.has(key) : SICBO_KEY.test(key);
 
 export type Bets = Record<string, number>;
 /** A player's bets for one round, cleaned: known keys only, whole positive amounts, no more than the limits. Null when not valid. */
@@ -110,6 +114,12 @@ export const baccaratCards = (seedHex: string, count = 6): Card[] => {
     out.push({ r: 2 + (inDeck % 13), s: SUITS[Math.floor(inDeck / 13)] });
   }
   return out;
+};
+
+/** The three dice (1 to 6) of a Sic Bo round, in the order they are shown. */
+export const sicboDice = (seedHex: string): [number, number, number] => {
+  const rand = seedRandom(seedHex);
+  return [rand.below(6) + 1, rand.below(6) + 1, rand.below(6) + 1];
 };
 
 // ------------------------------------------------------------------ seeds and commitments (the room's side; async WebCrypto)

@@ -44,7 +44,7 @@ const browser = await chromium.launch({ headless: true, executablePath: process.
 async function player(address, start = 1000000) {
   const context = await browser.newContext({ viewport: { width: 320, height: 240 } });
   await context.addInitScript((start) => {
-    try { localStorage.setItem('xtrata.parallax.layr.account.v1', JSON.stringify({ bank: start })); for (const id of ['blackjack', 'roulette', 'holdem', 'baccarat', 'videopoker', 'pvpholdem', 'liars']) localStorage.setItem('parallax.rules.v1.' + id, 'true'); } catch (e) { }
+    try { localStorage.setItem('xtrata.parallax.layr.account.v1', JSON.stringify({ bank: start })); for (const id of ['blackjack', 'roulette', 'sicbo', 'baccarat', 'videopoker', 'pvpholdem', 'liars']) localStorage.setItem('parallax.rules.v1.' + id, 'true'); } catch (e) { }
   }, start);
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());

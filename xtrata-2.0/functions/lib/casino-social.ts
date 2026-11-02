@@ -57,7 +57,7 @@ export const takeLimit = (list: number[] | undefined, now: number, gap: number, 
 };
 
 /** The table a spot belongs to ('blackjack.2' -> 'blackjack'); machines and the bar are not tables. */
-export const TABLES = ['blackjack', 'baccarat', 'holdem', 'roulette', 'videopoker', 'pvpholdem', 'liars'] as const;
+export const TABLES = ['blackjack', 'baccarat', 'sicbo', 'holdem', 'roulette', 'videopoker', 'pvpholdem', 'liars'] as const;   // holdem: older pages
 export const isTable = (value: unknown): value is string => typeof value === 'string' && (TABLES as readonly string[]).includes(value);
 export const tableOf = (peer: Pick<SocialPeer, 'spot' | 'wt'>): string | null => {
   const fromSpot = peer.spot ? peer.spot.split('.')[0] : null;

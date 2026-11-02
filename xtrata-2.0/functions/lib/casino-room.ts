@@ -19,7 +19,7 @@ import type { Bets, RoundTable } from './casino-rounds';
  * stools that come later. The server accepts only ids in this list; changing it means redeploying the room Worker.
  */
 export const SPOTS = [
-  'blackjack.1', 'blackjack.2', 'baccarat.1', 'baccarat.2', 'holdem.1', 'holdem.2',
+  'blackjack.1', 'blackjack.2', 'baccarat.1', 'baccarat.2', 'sicbo.1', 'sicbo.2',
   'roulette.pad', 'videopoker.pad', 'pvpholdem.1', 'pvpholdem.2', 'pvpholdem.3',
   'liars.1', 'liars.2', 'liars.3',
   'drop.1', 'drop.2', 'twins.1', 'twins.2', 'ds.1', 'ds.2', 'bf.1', 'bf.2', 'nv.1', 'nv.2',

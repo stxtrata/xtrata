@@ -32,7 +32,7 @@ import { roomProofData, type RoomChallenge } from '../../functions/lib/casino-ro
 import { casinoSignRoomJoin, casinoWalletUi, connectWallet, connectTrail, rememberProvider, walletMessage, type LinkedWallet, type WalletKind } from './wallet';
 import { createChat, type Chat } from './chat';
 import { isChatError } from './chat-core';
-import { baccaratCards, rouletteResult, verifySeed } from '../../functions/lib/casino-rounds';
+import { baccaratCards, rouletteResult, sicboDice, verifySeed } from '../../functions/lib/casino-rounds';
 
 type Person = { key: string; spot: string; label: string; since: number };
 type Spin = { a: string; s: number[]; b: number; f: boolean };
@@ -635,7 +635,7 @@ async function start() {
 }
 
 // The shared rounds' fairness check and results, for the page (the same code the room's tests run): see casino-rounds.ts.
-(window as any).PXRounds = Object.freeze({ verifySeed, rouletteResult, baccaratCards });
+(window as any).PXRounds = Object.freeze({ verifySeed, rouletteResult, baccaratCards, sicboDice });
 
 const attach = (host: PXRoomHost) => {
   if (S.host) return;

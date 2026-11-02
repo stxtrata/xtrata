@@ -8,7 +8,7 @@ const discover = process.argv[3] === 'discover';
 const only = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const pub = new URL('../public/', import.meta.url);
 const SITE = 'https://xtrata.test';
-const IDS = ['blackjack', 'roulette', 'baccarat', 'videopoker', 'pvpholdem', 'liars'];   // Hold'em left the main room (CASINO-MAIN-ROOM-PLAN)
+const IDS = ['blackjack', 'roulette', 'sicbo', 'baccarat', 'videopoker', 'pvpholdem', 'liars'];   // Sic Bo took Hold'em's place (CASINO-MAIN-ROOM-PLAN)
 const SIZES = (process.env.SIZES || 'desktop,phone').split(',');
 const SIZE = { desktop: { viewport: { width: 1440, height: 900 } }, laptop: { viewport: { width: 1280, height: 720 } }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 }, tablet: { viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 }, ipad: { viewport: { width: 1180, height: 820 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 } };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.json': 'application/json', '.glb': 'model/gltf-binary' };
@@ -16,7 +16,7 @@ await mkdir(out, { recursive: true });
 const PLAN = {
   blackjack: [{ chip: 100 }, { id: 'deal', wait: 6000 }],
   roulette: [{ chip: 100 }, { id: 'bet', data: { k: 'red' }, force: true }, { id: 'spin', wait: 12000 }],
-  holdem: [{ id: 'buyin' }, { re: /deal|start|new/i, wait: 6000 }, { re: /^(check|call)$/i, wait: 5000 }, { re: /^(check|call)$/i, wait: 5000 }],
+  sicbo: [{ id: 'spot', data: { s: 'big' } }, { chip: 100 }, { id: 'deal', wait: 8000 }],
   baccarat: [{ id: 'spot', data: { s: 'player' } }, { chip: 100 }, { id: 'deal', wait: 10000 }],
   videopoker: [{ id: 'deal', wait: 5000 }],
   pvpholdem: [{ id: 'buy100' }, { re: /deal|start|new|next/i, wait: 6000 }, { re: /^(check|call)$/i, wait: 5000 }],

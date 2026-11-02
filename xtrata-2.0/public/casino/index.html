@@ -258,7 +258,7 @@ body.pxdock .rgwrap{overflow:visible}body.pxdock .road{grid-template-rows:repeat
 <div id="casinoBuild" aria-label="Build version">Steve review · A–C.1</div><div id="toast"></div>
 <div id="scov" role="dialog" aria-label="The Strata Club tables"><div id="scbar"><b>THE STRATA CLUB · TESTNET TABLES</b><button id="sc-th" aria-pressed="true">Hold'em</button><button id="sc-td" aria-pressed="false">Liar's Dice</button><button id="scclose">← Back to the floor</button></div><iframe id="scframe" title="Strata Club table" allow="clipboard-write"></iframe></div><div id="banner" aria-hidden="true"></div>
 <div id="intro"><h1>The night is yours.</h1><p>Step into a world of marble, velvet and golden light. Explore ten fruit machines, visit The Afterglow bar or either LAYR dispenser, settle into the lounge, or take your seat at one of seven tables.</p><button id="walkin" class="primary" style="width:100%;margin-bottom:10px;padding:13px;font-weight:700;font-size:16px;background:linear-gradient(#e3b84a,#b98a22);color:#1a1006;border-color:#ffe08a">ENTER THE CASINO &nbsp; ↗</button>
-<div class="btns"><button>Blackjack<small>split · double</small></button><button>Roulette<small>combo bets</small></button><button>Baccarat<small>pairs · road</small></button><button>Video Poker<small>hint · double up</small></button></div>
+<div class="btns"><button>Blackjack<small>split · double</small></button><button>Roulette<small>combo bets</small></button><button>Sic Bo<small>three dice · big or small</small></button><button>Baccarat<small>pairs · road</small></button><button>Video Poker<small>hint · double up</small></button></div>
 <div class="btns" style="margin-top:10px;grid-template-columns:repeat(2,1fr)"><button style="border-color:#ad8b4d">Salon Hold’em<small>heads-up · demo opponent</small></button><button style="border-color:#ad8b4d">Salon Liar’s Dice<small>demo opponent</small></button></div><button id="barIntro" class="layr-intro-button">The Afterglow · cocktails & bites ↗</button><button id="layrDispenserIntro" class="layr-intro-button">Get LAYR · chip dispensers ↗</button><button id="browseMachinesIntro">Browse the fruit machines ↗</button></div><div id="panel"><div id="tableViews" role="group" aria-label="Game view"><span>VIEW</span><button type="button" data-view="table" aria-pressed="true">Table</button><button type="button" data-view="seat" aria-pressed="false">Seated</button><button type="button" data-view="overhead" aria-pressed="false">Top down</button><button type="button" data-view="screen" aria-pressed="false" hidden>Screen</button><button type="button" id="tableGuide">Guide</button><button type="button" id="tableRules">? Rules</button><button type="button" id="tableLeave">Leave table</button><button type="button" id="tableFullscreen" aria-pressed="false">Full screen</button><button type="button" id="tableMini" aria-pressed="false" aria-label="Hide the table controls">▾ Hide</button></div><span id="pTitle"></span><p id="tableLeaveNote" class="review-note" hidden></p><div id="pvpIdentity" aria-live="polite"></div><div id="pMsg" aria-live="polite"></div><div id="pHint" style="display:none"></div><div id="reviewSeatServing" hidden><span id="reviewServingName"></span><button id="reviewSip">Take a sip</button><button id="reviewReturnDrink">Return to bar</button></div><div id="pGame"></div><section id="vpPaytable" hidden aria-label="Video poker paytable"></section><div id="pChips"></div><div id="pActions"></div><button id="broke">Get LAYR</button></div>
 <script>
 /**
@@ -2075,6 +2075,7 @@ body.pxdock .rgwrap{overflow:visible}body.pxdock .road{grid-template-rows:repeat
     plum: { 'Midnight waistcoat': 0x2a1034, 'Satin piping': 0xcfc4ae },
     ink: { 'Midnight waistcoat': 0x0a0d13, 'Satin piping': 0x2fa06a },
     teal: { 'Midnight waistcoat': 0x0c3034, 'Satin piping': 0x3fe094 },
+    vermilion: { 'Midnight waistcoat': 0x5a1a08, 'Satin piping': 0xf0b84a },
   };
   function applyLook(model, look) {
     const cloned = {};
@@ -8824,7 +8825,7 @@ function applyTestnetFunding(proof){
     // Blue velvet islands and a gold-bordered central approach.
     const rug=canvasTex(512,512,(c,w,h)=>{c.fillStyle='#071c3c';c.fillRect(0,0,w,h);c.strokeStyle='#b89450';c.lineWidth=3;c.strokeRect(10,10,w-20,h-20);c.lineWidth=1;c.strokeRect(19,19,w-38,h-38);for(let i=0;i<12;i++){c.strokeStyle='rgba(158,177,195,.08)';c.beginPath();c.moveTo(i*70-250,0);c.lineTo(i*70+260,h);c.stroke();}});
     const rmat=new THREE.MeshStandardMaterial({map:rug,roughness:.95});
-    [[-6.6,-2.6,5.3,4.3],[-6.2,3.2,4.8,4.2],[6.2,3.2,3.6,4.1],[0,-5.6,6.8,4.3]].forEach(([x,z,w,d])=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),rmat);m.rotation.x=-Math.PI/2;m.position.set(x,.008,z);m.receiveShadow=true;scene.add(m);});
+    [[-6.6,-2.6,5.3,4.3],[6.6,-2.6,5.3,4.3],[-6.2,3.2,4.8,4.2],[6.2,3.2,3.6,4.1],[0,-5.6,6.8,4.3]].forEach(([x,z,w,d])=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),rmat);m.rotation.x=-Math.PI/2;m.position.set(x,.008,z);m.receiveShadow=true;scene.add(m);});
     // Marble medallion and the actual house mark, extracted from the supplied app's uniform.
     const medallion=canvasTex(1024,1024,(c,w,h)=>{c.fillStyle='#080d14';c.fillRect(0,0,w,h);for(let i=0;i<3;i++){c.strokeStyle=i===1?'#477dc2':'#b78d46';c.lineWidth=3;c.beginPath();c.arc(w/2,h/2,w*.48-i*17,0,7);c.stroke();}drawPXLogo(c,260,220,504,504);c.fillStyle='#e3c487';c.font='32px Georgia';c.textAlign='center';drawPXWordmark(c,512,800,47,660);});
     const med=new THREE.Mesh(new THREE.CircleGeometry(1.8,96),new THREE.MeshStandardMaterial({map:medallion,metalness:.45,roughness:.22,envMap:envTex}));med.rotation.x=-Math.PI/2;med.position.set(0,.007,4.15);scene.add(med);
@@ -8926,7 +8927,7 @@ function applyTestnetFunding(proof){
         rope.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.024, 8, false), velvet));
         rope.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.userData.noShadow = true; } });
         room.salonRope = rope;
-        const plaque = pxSign(scene, AX, AH + 0.6, zw + 0.2, 2.3, 0.5, 'THE SALON', 'B N S   N A M E S   O N L Y', false); plaque.name = 'Salon rule sign';
+        const plaque = pxSign(rope, AX, 0.64, rz + 0.035, 0.7, 0.2, 'BNS NAMES ONLY', 'THE SALON · PLAYER VS PLAYER', false); plaque.name = 'Salon rule sign';
         // The invisible wall: across the arch, only while the door is closed to the visitor, and only from the casino side,
         // so someone already inside (who signs out, say) can always walk out.
         solidsExtra.push({ k: 'b', x0: AX - AW / 2, x1: AX + AW / 2, z0: zw - 0.12, z1: zw + 0.12, active: () => !room.salonOpen() && player.z > zw - 0.05 });
@@ -9341,7 +9342,7 @@ function applyTestnetFunding(proof){
   }
 
   // ---- playing together at one table (docs/plans/CASINO-PLAY-TOGETHER-PLAN.md) ----
-  // Shared rounds: at roulette and baccarat every signed-in player plays the same round, dealt by the room on its clock with a
+  // Shared rounds: at roulette, baccarat and Sic Bo every signed-in player plays the same round, dealt by the room on its clock with a
   // commit-then-reveal seed (functions/lib/casino-rounds.ts; room.js puts the checks and the results on window.PXRounds). The tables
   // register here, and the room's social layer (the presence block below) feeds them. Off, unsigned or offline: each table plays
   // on its own, exactly as before. The Salon relay (player against player) registers its listeners on `salon` the same way.
@@ -9362,7 +9363,7 @@ function applyTestnetFunding(proof){
     err(code) { this.each((t) => t.err && t.err(code)); },
     unsent(msg) { if (msg && this.tables[msg.tb]) this.each((t) => t.err && t.id === msg.tb && t.err('unsent')); }
   };
-  window.__pxShared = () => ({ me: shared.me, feat: [...shared.feat], tables: Object.keys(shared.tables), active: { roulette: shared.active('roulette'), baccarat: shared.active('baccarat') }, rounds: !!window.PXRounds, offset: shared.offset });   // for tests
+  window.__pxShared = () => ({ me: shared.me, feat: [...shared.feat], tables: Object.keys(shared.tables), active: { roulette: shared.active('roulette'), baccarat: shared.active('baccarat'), sicbo: shared.active('sicbo') }, rounds: !!window.PXRounds, offset: shared.offset });   // for tests
   const salon = { listeners: [], on(m) { for (const f of this.listeners) try { f(m); } catch (e) { console.warn('[salon] relay message failed:', e); } } };
 
   // ====================================================================
@@ -9910,6 +9911,245 @@ function applyTestnetFunding(proof){
             he.act(0, id); syncPot(); render(); await syncCommunity();
             if (he.phase === 'done') { await endHand(); return; }
             ui = 'waiting'; await botLoop(); return;
+          }
+        } catch (e) { console.error(e); }
+        busy = false; render();
+      },
+    };
+    return st;
+  }
+
+  // ====================================================================
+  //  STATION: SIC BO  (three dice under a glass dome; shared rounds on the room's clock, like baccarat)
+  //  In Hold'em's old place on the main floor (docs/plans/CASINO-MAIN-ROOM-PLAN.md).
+  // ====================================================================
+  /* SICBO-MODEL-START: the rules alone, no drawing (functions/lib/__tests__/casino-sicbo.test.ts runs this block) */
+  const SicBoModel = (() => {
+    // what a bet on one total pays (to one); 4 and 17 are the rarest
+    const TOTAL_PAYS = { 4: 60, 5: 30, 6: 17, 7: 12, 8: 8, 9: 6, 10: 6, 11: 6, 12: 6, 13: 8, 14: 12, 15: 17, 16: 30, 17: 60 };
+    const SIX = [1, 2, 3, 4, 5, 6];
+    const KEYS = ['small', 'big', 'odd', 'even', 'any', ...Object.keys(TOTAL_PAYS).map((t) => 'n' + t), ...SIX.map((k) => 'd' + k), ...SIX.map((k) => 't' + k), ...SIX.map((k) => 's' + k)];
+    /** What one unit staked on `key` gives back, stake included, for these three dice (0: the bet loses). */
+    function pays(key, dice) {
+      const sum = dice[0] + dice[1] + dice[2], triple = dice[0] === dice[1] && dice[1] === dice[2], count = (v) => dice.filter((d) => d === v).length;
+      if (key === 'small') return !triple && sum <= 10 ? 2 : 0;          // 4 to 10; any triple loses
+      if (key === 'big') return !triple && sum >= 11 ? 2 : 0;            // 11 to 17; any triple loses
+      if (key === 'odd') return !triple && sum % 2 === 1 ? 2 : 0;
+      if (key === 'even') return !triple && sum % 2 === 0 ? 2 : 0;
+      if (key === 'any') return triple ? 31 : 0;                          // any triple 30:1
+      const k = +key.slice(1);
+      if (key[0] === 'n') return sum === k && TOTAL_PAYS[k] ? TOTAL_PAYS[k] + 1 : 0;
+      if (key[0] === 'd') return count(k) >= 2 ? 11 : 0;                  // a double of k: 10:1
+      if (key[0] === 't') return count(k) === 3 ? 181 : 0;                // a triple of k: 180:1
+      if (key[0] === 's') { const c = count(k); return c ? c + 1 : 0; }   // a single number: 1:1, 2:1 or 3:1 as it shows on one, two or three dice
+      return 0;
+    }
+    const settle = (bets, dice) => Object.entries(bets).reduce((a, [k, v]) => a + v * pays(k, dice), 0);
+    const odds = (key) => key === 'small' || key === 'big' || key === 'odd' || key === 'even' ? '1:1' : key === 'any' ? '30:1' : key[0] === 'n' ? TOTAL_PAYS[+key.slice(1)] + ':1' : key[0] === 'd' ? '10:1' : key[0] === 't' ? '180:1' : '1–3:1';
+    const describe = (dice) => { const sum = dice[0] + dice[1] + dice[2], triple = dice[0] === dice[1] && dice[1] === dice[2]; return { sum, triple, size: triple ? 'triple' : sum <= 10 ? 'small' : 'big' }; };
+    return Object.freeze({ KEYS, TOTAL_PAYS, pays, settle, odds, describe });
+  })();
+  /* SICBO-MODEL-END */
+  window.SicBoModel = SicBoModel;
+  function makeSicBo() {
+    const SB = SicBoModel, SX = 1.75, SZ = 1.1, K = 0.94 / 512, FACE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+    // Where each bet sits on the felt (table-local metres; +z is the players' side), and what it says.
+    const LAY = [];
+    const put = (key, x, z, w, h, label, sub) => LAY.push({ key, x, z, w, h, label, sub });
+    put('small', -1.2, -0.28, 0.32, 0.2, 'SMALL', '4–10 · 1:1'); put('odd', -1.2, -0.04, 0.32, 0.2, 'ODD', '1:1');
+    put('big', 1.2, -0.28, 0.32, 0.2, 'BIG', '11–17 · 1:1'); put('even', 1.2, -0.04, 0.32, 0.2, 'EVEN', '1:1');
+    put('any', 0, -0.16, 0.5, 0.44, 'ANY TRIPLE', '30:1');
+    [1, 2, 3, 4, 5, 6].forEach((k, i) => { const x = [-0.82, -0.63, -0.44, 0.44, 0.63, 0.82][i]; put('d' + k, x, -0.28, 0.17, 0.2, null, '10:1'); put('t' + k, x, -0.04, 0.17, 0.2, null, '180:1'); });
+    Object.keys(SB.TOTAL_PAYS).forEach((t, i) => put('n' + t, -1.17 + i * 0.18, 0.24, 0.165, 0.24, t, SB.TOTAL_PAYS[t] + ':1'));
+    [1, 2, 3, 4, 5, 6].forEach((k, i) => put('s' + k, -0.9 + i * 0.36, 0.53, 0.32, 0.2, null, '1:1 · 2:1 · 3:1'));
+    const byKey = {}; LAY.forEach((l) => (byKey[l.key] = l));
+    const pipDie = (ctx, cx, cy, s, v) => {
+      ctx.save(); ctx.fillStyle = 'rgba(246,239,220,.92)'; rr(ctx, cx - s / 2, cy - s / 2, s, s, s * 0.18); ctx.fill();
+      const P = { 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]] }[v];
+      ctx.fillStyle = v === 1 ? '#b3122b' : '#15151c'; P.forEach(([px, py]) => { ctx.beginPath(); ctx.arc(cx + px * s * 0.27, cy + py * s * 0.27, s * (v === 1 ? 0.14 : 0.09), 0, 7); ctx.fill(); });
+      ctx.restore();
+    };
+    const g = ovalTable(SX, SZ, (ctx, w, h) => {
+      feltBase(ctx, w, h, '#5a1414', '#2a0808');
+      ctx.save(); ctx.translate(w / 2, h / 2); ctx.scale(1 / SX, 1); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const gold = 'rgba(255,215,120,.9)'; ctx.strokeStyle = gold; ctx.fillStyle = gold;
+      ctx.font = '700 58px Georgia,serif'; ctx.fillText('SIC BO', -0.78 / K, -0.6 / (K * SZ)); ctx.font = '26px Georgia,serif'; ctx.fillText('THREE DICE', 0.78 / K, -0.6 / (K * SZ));
+      LAY.forEach((l) => {
+        const cx = l.x / K, cy = l.z / (K * SZ), bw = l.w / K, bh = l.h / (K * SZ);
+        ctx.lineWidth = 3; rr(ctx, cx - bw / 2 + 4, cy - bh / 2 + 4, bw - 8, bh - 8, 12); ctx.stroke();
+        const k = l.key, n = +k.slice(1), s = Math.min(bw * 0.24, 34);
+        if (k[0] === 'd' && n) { pipDie(ctx, cx - s * 0.58, cy - bh * 0.12, s, n); pipDie(ctx, cx + s * 0.58, cy - bh * 0.12, s, n); }
+        else if (k[0] === 't' && n) { pipDie(ctx, cx - s * 1.05, cy - bh * 0.12, s * 0.9, n); pipDie(ctx, cx, cy - bh * 0.12, s * 0.9, n); pipDie(ctx, cx + s * 1.05, cy - bh * 0.12, s * 0.9, n); }
+        else if (k[0] === 's' && n) { pipDie(ctx, cx, cy - bh * 0.12, s * 1.3, n); }
+        else { ctx.fillStyle = gold; ctx.font = (k[0] === 'n' ? '700 40px' : '700 30px') + ' Georgia,serif'; ctx.fillText(String(l.label), cx, cy - bh * 0.12); }
+        ctx.fillStyle = gold; ctx.font = (k[0] === 's' ? '16px' : '18px') + ' Georgia,serif'; ctx.fillText(l.sub, cx, cy + bh * 0.3);
+      });
+      ctx.restore();
+    }, 0x2a1408);
+    tableLight(g);
+    // the dome: three dice on a gold dish under glass, at the dealer's end
+    const dome = new THREE.Group(); dome.position.set(0, 0.866, -0.64); g.add(dome);
+    cyl(0.17, 0.18, 0.025, GOLDM(), 0, 0.012, 0, dome, 32); cyl(0.15, 0.15, 0.004, M(0x2a0808, { roughness: 0.9 }), 0, 0.026, 0, dome, 32);
+    const glass = new THREE.Mesh(new THREE.SphereGeometry(0.155, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0.3, envMap: envTex || null, envMapIntensity: 1.2, depthWrite: false }));
+    glass.position.y = 0.026; glass.userData.noShadow = true; dome.add(glass);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 8), GOLDM()); knob.position.y = 0.19; dome.add(knob);
+    const REST = [[-0.055, 0.035], [0.055, 0.035], [0, -0.055]], dieY = 0.028 + DIE_SZ / 2;
+    let shown = [5, 3, 1];
+    const dice = shown.map((v, i) => { const d = makeDie(v, i * 0.7); d.position.set(REST[i][0], dieY, REST[i][1]); dome.add(d); return d; });
+    const setDice = (vals) => { shown = vals.slice(); vals.forEach((v, i) => { dice[i].quaternion.copy(qFor(v, (Math.random() - 0.5) * 1.2)); dice[i].position.set(REST[i][0] + (Math.random() - 0.5) * 0.012, dieY, REST[i][1] + (Math.random() - 0.5) * 0.012); }); };
+    const fig = addFigure(g, 0, -1.2, 0, { standing: true, skin: SKIN[1], hair: 0x1a1410, hairStyle: 'slick', style: 'vest', vest: 0x5a1a08, tie: 0x1a1a22, baseFace: { smile: 0.2 } });
+    figOf.set(g, fig); greetOf.set(g, () => fig.greet());
+    const stacks = {}; LAY.forEach((l) => (stacks[l.key] = stackAt(g, l.x, 0.87, l.z + 0.02)));
+    let bets = {}, lastBets = null, spot = 'big', tab = 'main', busy = false, ui = 'bet', msg = 'Choose a bet, then add chips. Bet as many as you like.', tone = '', hist = [], result = null;
+    const total = () => Object.values(bets).reduce((a, b) => a + b, 0);
+    const sync = () => LAY.forEach((l) => rebuildStack(stacks[l.key], bets[l.key] || 0, 6));
+    const setSpot = (k) => { spot = k; render(); };
+    const nameOf = (k) => { const l = byKey[k]; if (!l) return k; const n = +k.slice(1); return k[0] === 'd' && n ? 'double ' + n : k[0] === 't' && n ? 'triple ' + n : k[0] === 's' && n ? 'single ' + n : k[0] === 'n' && n ? 'total ' + n : l.label.toLowerCase(); };
+    const rollDie = () => { const a = new Uint32Array(1); for (;;) { crypto.getRandomValues(a); if (a[0] < 4294967292) return (a[0] % 6) + 1; } };
+    const said = (d) => { const r = SB.describe(d); return `${d.join(' · ')} = ${r.sum}` + (r.triple ? ' (triple ' + d[0] + ')' : r.size === 'small' ? ' (small)' : ' (big)'); };
+    // The roll: the dome lifts and shakes, the dice tumble, then land on `vals`. A shared roll keeps to the clock (`untilMs`).
+    async function rollShow(vals, untilMs) {
+      const t0 = performance.now(), dur = untilMs ? Math.max(0.6, Math.min(1.8, (untilMs - t0) / 1000 - 0.3)) : 1.8;
+      try { fig.deal(); } catch (_) { }
+      let lastClick = 0;
+      await tween(dur, (k) => {
+        const amp = Math.sin(Math.PI * Math.min(1, k)) * 0.02;
+        dome.position.y = 0.866 + amp * 1.5; dome.position.x = Math.sin(k * 60) * amp; dome.rotation.z = Math.sin(k * 47) * amp * 2;
+        dice.forEach((d, i) => { if (k < 0.92) { d.rotation.set(d.rotation.x + 0.6 + i * 0.1, d.rotation.y + 0.45, d.rotation.z + 0.3); d.position.y = dieY + Math.abs(Math.sin(k * 40 + i)) * 0.05; } });
+        if (performance.now() - lastClick > 140 && k < 0.9) { lastClick = performance.now(); try { sfx.chip(); } catch (_) { } }
+      });
+      dome.position.set(0, 0.866, -0.64); dome.rotation.set(0, 0, 0); setDice(vals);
+      try { sfx.click(); } catch (_) { }
+    }
+    // Pays out `betsOn` (already taken from the bank as `stake`) for these dice.
+    function settleSb(vals, betsOn, stake, late) {
+      const back = SB.settle(betsOn, vals); setBank(bank + back); const net = back - stake; hist.push(vals.slice()); if (hist.length > 30) hist.shift();
+      const won = Object.keys(betsOn).filter((k) => SB.pays(k, vals) > 0).map(nameOf);
+      result = { vals: vals.slice(), won };
+      msg = (late ? 'While you were away: ' : '') + said(vals) + '. ' + (net > 0 ? 'You win ' + money(net) + (won.length ? ' (' + won.join(', ') + ')' : '') : net === 0 ? 'Bets returned' : 'You lose ' + money(-net));
+      tone = net > 0 ? 'win' : net < 0 ? 'lose' : ''; outcome(st, net, stake); record(net);
+    }
+    // ---- shared rounds (see `shared` above): one roll for everyone at the table, on the room's clock. Off: the table on its own.
+    const TB = 'sicbo';
+    const SH = { n: -1, period: 30000, close: 15000, info: null, asked: 0, others: new Map(), mine: null, sent: '', closedN: -1, dealing: false, dealtN: -1, renderAt: 0, solo: false };
+    const shOn = () => shared.active(TB);
+    const roundOf = (seed) => window.PXRounds.sicboDice(seed);
+    async function shSettlePrev(prev) {
+      const mine = SH.mine; if (!mine || mine.done || mine.n !== prev.n) return;
+      mine.done = true;
+      if (!(await window.PXRounds.verifySeed(prev.seed, mine.commit || prev.commit))) { setBank(bank + mine.stake); toast('A shared round could not be checked, so your bets were returned.'); return; }
+      SH.settled = (SH.settled || 0) + 1; settleSb(roundOf(prev.seed), mine.bets, mine.stake, true); render();
+    }
+    async function shReveal(info) {
+      if (SH.dealing || SH.dealtN === info.n) return;
+      SH.dealtN = info.n;
+      const commit = (SH.info && SH.info.n === info.n && SH.info.commit) || info.commit;
+      if (!(await window.PXRounds.verifySeed(info.seed, commit))) {
+        msg = 'This roll could not be checked against what the table promised, so it is void. Bets returned.'; tone = 'lose';
+        if (SH.mine && SH.mine.n === info.n && !SH.mine.done) { SH.mine.done = true; setBank(bank + SH.mine.stake); }
+        render(); return;
+      }
+      const vals = roundOf(info.seed); SH.dealing = true; ui = 'dealing'; SH.last = said(vals);
+      const left = ((info.n + 1) * SH.period - shared.now()) - 3000;      // ms before the next round opens, less a moment to read the result
+      try { await rollShow(vals, performance.now() + Math.max(1500, left)); } finally { SH.dealing = false; }
+      if (SH.mine && SH.mine.n === info.n && !SH.mine.done) { SH.mine.done = true; SH.settled = (SH.settled || 0) + 1; settleSb(vals, SH.mine.bets, SH.mine.stake, false); }
+      else { hist.push(vals.slice()); if (hist.length > 30) hist.shift(); result = { vals: vals.slice(), won: [] }; msg = said(vals) + '.'; tone = ''; }
+      ui = 'result';
+      if (SH.n !== info.n && busy) { busy = false; ui = 'bet'; bets = {}; sync(); if (!SH.mine || SH.mine.done) SH.mine = null; }     // the next round opened during the roll: its bets are open now
+      render();
+    }
+    function shFrame() {
+      if (!shOn()) { if (SH.n !== -1) { SH.n = -1; SH.others.clear(); if (focus === st) render(); } return; }
+      if (SH.solo) return;
+      const near = focus === st || (SH.mine && !SH.mine.done) || g.position.distanceTo(camera.position) < 12;
+      if (!near) return;
+      const now = shared.now(), n = Math.floor(now / SH.period), closeAt = n * SH.period + SH.close;
+      if (n !== SH.n) {
+        SH.n = n; SH.info = null; SH.asked = 0; SH.sent = ''; SH.others.clear();
+        if (!SH.dealing) { busy = false; ui = 'bet'; bets = {}; sync(); if (!SH.mine || SH.mine.done) { SH.mine = null; msg = (SH.last ? `Last roll: ${SH.last}. ` : 'Shared table: everyone here bets on the same roll. ') + 'Choose a bet, then add chips.'; tone = ''; } }
+        if (focus === st) render();
+      }
+      if ((!SH.info || (now >= closeAt && !SH.info.seed)) && now - SH.asked > 2500) { SH.asked = now; shared.send({ t: 'round', tb: TB }); }
+      if (now < closeAt && !busy && ui === 'bet') {
+        const j = JSON.stringify(bets);
+        if (j !== SH.sent) { SH.sent = j; shared.send({ t: 'bet', tb: TB, n, bets }); }
+      }
+      if (now >= closeAt && SH.closedN !== n) {
+        SH.closedN = n; const stake = total();
+        if (stake > 0 && stake <= bank) { setBank(bank - stake); lastBets = Object.assign({}, bets); SH.mine = { n, bets: Object.assign({}, bets), stake, done: false, commit: SH.info && SH.info.n === n ? SH.info.commit : null }; msg = 'No more bets…'; }
+        else if (stake > 0) { toast('Not enough LAYR for those bets'); bets = {}; sync(); }
+        else if (!SH.mine || SH.mine.done) msg = 'No more bets. Watching this roll.';
+        busy = true; ui = 'dealing'; tone = ''; if (focus === st) render();
+      }
+      if (focus === st && performance.now() - SH.renderAt > 500) { SH.renderAt = performance.now(); render(); }
+    }
+    shared.register(TB, {
+      id: TB,
+      changed(list) { if (Array.isArray(list)) { SH.others.clear(); for (const o of list) if (o.a !== shared.me) SH.others.set(o.a, { nm: o.n, bets: o.bets }); } if (focus === st) render(); },
+      onRoom(m) {
+        if (m.t === 'bet') { if (m.n === SH.n && m.a !== shared.me) { if (Object.keys(m.bets || {}).length) SH.others.set(m.a, { nm: m.nm, bets: m.bets }); else SH.others.delete(m.a); if (focus === st) render(); } return; }
+        if (m.t !== 'round') return;
+        if (typeof m.period === 'number') SH.period = m.period; if (typeof m.close === 'number') SH.close = m.close;
+        if (m.prev && m.prev.seed) shSettlePrev(m.prev);
+        if (m.n !== SH.n) return;
+        if (!SH.info || !SH.info.commit) SH.info = m; else if (m.seed) SH.info.seed = m.seed;
+        if (Array.isArray(m.bets)) this.changed(m.bets);
+        if (m.seed) shReveal(m);
+      },
+      err(code) { if (code === 'round-closed' && focus === st) { msg = 'Bets were already closed for that roll.'; render(); } }
+    });
+    const TABS = [['main', 'Big · Small'], ['totals', 'Totals'], ['dice', 'Numbers']];
+    const TAB_KEYS = { main: ['small', 'big', 'odd', 'even', 'any'], totals: Object.keys(SB.TOTAL_PAYS).map((t) => 'n' + t), dice: [1, 2, 3, 4, 5, 6].flatMap((k) => ['s' + k]).concat([1, 2, 3, 4, 5, 6].map((k) => 'd' + k), [1, 2, 3, 4, 5, 6].map((k) => 't' + k)) };
+    const COLS = { main: 5, totals: 7, dice: 6 };
+    const btnLabel = (k) => { const n = +k.slice(1); if (k[0] === 's' && n) return FACE[n]; if (k[0] === 'd' && n) return FACE[n] + FACE[n]; if (k[0] === 't' && n) return FACE[n] + FACE[n] + FACE[n]; if (k[0] === 'n' && n) return String(n); return byKey[k].label.replace('ANY TRIPLE', 'Any triple').replace(/^(\w)(\w+)$/, (m, a, b) => a + b.toLowerCase()); };
+    const st = {
+      id: 'sicbo', name: 'Sic Bo', group: g, chipMode: 'add', chips: 'add',
+      cam: { off: V3(0, 2.5, 2.7), look: V3(0, 0.45, -0.1) },
+      canLeave() { return !busy || shOn(); },     // shared: the roll settles even after you stand up
+      debug: () => ({ bets: Object.assign({}, bets), busy, ui, shown: shown.slice(), result, last: SH.last || null, settled: SH.settled || 0, sh: { n: SH.n, mine: SH.mine, others: [...SH.others.keys()] } }),   // for tests
+      update() { try { shFrame(); } catch (e) { console.warn('[shared] sicbo:', e); } },
+      addBet(v) { if (ui !== 'bet' || busy) return; if (total() + v > bank) { toast('Not enough bankroll'); return; } bets[spot] = (bets[spot] || 0) + v; sync(); dropTop(stacks[spot], v); },
+      clearBet() { if (ui !== 'bet' || busy) return; bets = {}; sync(); },
+      key(k) {
+        if (ui !== 'bet' || busy) return false;
+        const m = { s: 'small', b: 'big', o: 'odd', e: 'even', a: 'any' }; if (m[k]) { tab = 'main'; setSpot(m[k]); return true; }
+        if (k === 'c') { st.clearBet(); return true; } return false;
+      },
+      view() {
+        const editable = !busy && ui === 'bet';
+        const tabs = '<div class="spots" style="grid-template-columns:repeat(3,1fr)">' + TABS.map(([t, l]) => `<button class="side ${tab === t ? 'sel' : ''}" data-a="sbtab" data-t="${t}">${l}<small>${TAB_KEYS[t].reduce((a, k) => a + (bets[k] || 0), 0) ? money(TAB_KEYS[t].reduce((a, k) => a + (bets[k] || 0), 0)) + ' on' : '&nbsp;'}</small></button>`).join('') + '</div>';
+        const spots = `<div class="spots" style="grid-template-columns:repeat(${COLS[tab]},1fr)">` + TAB_KEYS[tab].map((k) => `<button class="side ${spot === k ? 'sel' : ''}" data-a="spot" data-s="${k}" ${editable ? '' : 'disabled'} title="${nameOf(k)} · ${SB.odds(k)}">${btnLabel(k)}<small>${k[0] === 's' && +k.slice(1) ? '1–3:1' : SB.odds(k)}</small><b>${bets[k] ? money(bets[k]) : '&nbsp;'}</b></button>`).join('') + '</div>';
+        const tot = `<div class="tot">Total bet <b>${money(total())}</b> · adding to <b>${nameOf(spot)}</b> (${SB.odds(spot)})</div>`;
+        const dice_ = result ? `<div class="hands"><span>Dice <b>${result.vals.map((v) => FACE[v]).join(' ')}</b></span><span>Total <b>${SB.describe(result.vals).sum}</b></span><span><b>${SB.describe(result.vals).size}</b></span></div>` : '';
+        const histH = hist.length ? `<div class="tot dim">Last rolls: ${hist.slice(-12).reverse().map((d) => { const r = SB.describe(d); return `<b>${r.sum}</b>${r.triple ? 'T' : r.size === 'small' ? 'S' : 'B'}`; }).join(' · ')}</div>` : '';
+        const canRe = lastBets && Object.values(lastBets).reduce((a, b) => a + b, 0) <= bank;
+        const a = ui === 'bet' ? [{ id: 'deal', label: 'ROLL ' + money(total()), kind: 'primary', key: 'd', dis: busy || total() <= 0 || total() > bank }, { id: 'repeat', label: 'Repeat last', key: 'r', dis: busy || !canRe }] : [{ id: 'new', label: 'New round', kind: 'primary', key: 'n', dis: busy }];
+        let shared_ = '';
+        if (shOn()) {      // shared table: the room rolls on its clock; the button shows the countdown
+          const now = shared.now(), closeAt = SH.n * SH.period + SH.close, open = !busy && ui === 'bet' && now < closeAt;
+          a.length = 0;
+          a.push({ id: 'status', label: SH.n < 0 ? 'Joining the table…' : open ? `Bets close in ${Math.max(0, Math.ceil((closeAt - now) / 1000))} s` : SH.dealing ? 'Rolling…' : `Next roll in ${Math.max(0, Math.ceil(((SH.n + 1) * SH.period - now) / 1000))} s`, kind: 'primary', dis: true });
+          if (open) a.push({ id: 'repeat', label: 'Repeat last', key: 'r', dis: !canRe });
+          const list = [...SH.others.values()].map((o) => `${o.nm} <b>${Object.entries(o.bets || {}).map(([k, v]) => money(v) + ' ' + nameOf(k)).join(', ')}</b>`);
+          shared_ = `<div class="tot dim">Shared table · ${list.length ? 'also betting: ' + list.join(' · ') : 'nobody else is betting this roll'}</div>`;
+        }
+        return { msg, tone, game: shared_ + tabs + spots + tot + dice_ + histH, actions: a, chips: ui === 'bet' ? 'add' : null, lock: busy, canGetLAYR: ui === 'bet' };
+      },
+      async act(id, d) {
+        if (id === 'sbtab') { if (TAB_KEYS[d.t]) { tab = d.t; render(); } return; }
+        if (busy) return;
+        if (id === 'spot') { if (byKey[d.s]) setSpot(d.s); return; }
+        busy = true; render();
+        try {
+          if (id === 'repeat') { bets = Object.assign({}, lastBets); sync(); }
+          else if (id === 'new') { ui = 'bet'; result = null; bets = lastBets && Object.values(lastBets).reduce((a, b) => a + b, 0) <= bank ? Object.assign({}, lastBets) : {}; sync(); msg = 'Choose a bet, then add chips.'; tone = ''; }
+          else if (id === 'deal') {
+            if (shOn()) { busy = false; return; }          // the shared table rolls on the room's clock
+            const stake = total(); if (stake <= 0 || stake > bank) { busy = false; return; }
+            lastBets = Object.assign({}, bets); setBank(bank - stake); msg = ''; tone = ''; ui = 'dealing'; SH.solo = true;
+            const vals = [rollDie(), rollDie(), rollDie()];
+            try { await rollShow(vals); } finally { SH.solo = false; }
+            settleSb(vals, bets, stake, false); ui = 'result';
           }
         } catch (e) { console.error(e); }
         busy = false; render();
@@ -10736,15 +10976,15 @@ function applyTestnetFunding(proof){
   }
 
   // ---------------- place stations ----------------
-  stations = [makeBlackjack(), makeRoulette(), makeBaccarat(), makeVideoPoker(), makePvpHoldem(), makeLiarsDice()];
+  stations = [makeBlackjack(), makeRoulette(), makeSicBo(), makeBaccarat(), makeVideoPoker(), makePvpHoldem(), makeLiarsDice()];
   stations.forEach(station=>{
     const act=station.act.bind(station),view=station.view.bind(station),canLeave=station.canLeave.bind(station);
     station.canLeave=()=>!tableActionsInFlight.has(station)&&canLeave();
     station.view=()=>{const v=view();if(tableActionsInFlight.has(station)){v.lock=true;v.actions=(v.actions||[]).map(a=>({...a,dis:true}));}return v;};
     station.act=async(...args)=>{if(tableActionsInFlight.has(station))return;tableActionsInFlight.add(station);try{return await act(...args);}finally{tableActionsInFlight.delete(station);render();}};
   });
-  const placement = { blackjack: [-6.6, -2.6, 0.45], roulette: [0, -5.6, 0], holdem: [6.6, -2.6, -0.45], baccarat: [-6.2, 3.2, 0.7], videopoker: [6.2, 3.2, -0.7], pvpholdem: [-8.6, -16.0, -0.35], liars: [-3.5, -16.0, 0.35] };
-  const TAGS = { blackjack: ['BLACKJACK', 'split · double · insurance'], roulette: ['ROULETTE', 'European · single zero'], holdem: ["TEXAS HOLD'EM", 'you vs three players'], baccarat: ['BACCARAT', 'player · banker · tie'], videopoker: ['VIDEO POKER', 'jacks or better'], pvpholdem: ["HOLD'EM · PvP", 'heads-up · no limit'], liars: ["LIAR'S DICE", 'player vs player'] };
+  const placement = { blackjack: [-6.6, -2.6, 0.45], roulette: [0, -5.6, 0], sicbo: [6.6, -2.6, -0.45], baccarat: [-6.2, 3.2, 0.7], videopoker: [6.2, 3.2, -0.7], pvpholdem: [-8.6, -16.0, -0.35], liars: [-3.5, -16.0, 0.35] };
+  const TAGS = { blackjack: ['BLACKJACK', 'split · double · insurance'], roulette: ['ROULETTE', 'European · single zero'], sicbo: ['SIC BO', 'three dice · shared rolls'], baccarat: ['BACCARAT', 'player · banker · tie'], videopoker: ['VIDEO POKER', 'jacks or better'], pvpholdem: ["HOLD'EM · PvP", 'heads-up · no limit'], liars: ["LIAR'S DICE", 'player vs player'] };
   stations.forEach((s) => {
     const p = placement[s.id]; s.group.position.set(p[0], 0, p[1]); s.group.rotation.y = p[2]; scene.add(s.group);
     const sign = textSprite(512, 128, 1.7, 0.425, (ctx, w, h) => {
@@ -10796,6 +11036,10 @@ function applyTestnetFunding(proof){
       plaque(g, 0.0, 0.93, 1.02, 0.3, 0.1, ["HOLD'EM", 'FIXED LIMIT 5 / 10 LAYR'], 0.0, 0.5);
       chipColumns(g, -1.25, 0.866, 0.08, [25], [1], 0.1);
     },
+    sicbo(s) {
+      const g = s.group;
+      plaque(g, -1.3, 0.93, 0.6, 0.26, 0.1, ['SIC BO', 'MIN 5 · MAX 500 LAYR'], 0.0, 0.5);
+    },
     roulette(s) {
       const g = s.group; const post = cyl(0.012, 0.014, 1.2, chrome(), 2.15, 0.6, 0.25, g, 8); box(0.34, 0.2, 0.02, GOLDM(), 2.15, 1.25, 0.25, g);
       const bd = new THREE.Mesh(new THREE.PlaneGeometry(0.31, 0.17), new THREE.MeshBasicMaterial({ map: plaqueTex(['ROULETTE', 'MIN 5 · MAX 500 LAYR']), color: 0xdddddd })); bd.position.set(2.15, 1.25, 0.262); bd.userData.noShadow = true; g.add(bd);
@@ -10822,6 +11066,7 @@ function applyTestnetFunding(proof){
     XA_HOSTS.add({ group: byId.blackjack.group, x: 0, z: -1.17, yaw: 0, person: 'f1', livery: 'emerald', rest: { kind: 'table', y: 0.975, fwd: 0.31 }, fig: figOf.get(byId.blackjack.group) });
     XA_HOSTS.add({ group: byId.roulette.group, x: -0.3, z: -1.02, yaw: 0, person: 'm2', livery: 'burgundy', rest: { kind: 'table', y: 0.95, fwd: 0.27 }, fig: figOf.get(byId.roulette.group) });
     XA_HOSTS.add({ group: byId.baccarat.group, x: 0, z: -1.17, yaw: 0, person: 'f2', livery: 'plum', rest: { kind: 'table', y: 0.975, fwd: 0.31 }, fig: figOf.get(byId.baccarat.group) });
+    XA_HOSTS.add({ group: byId.sicbo.group, x: 0, z: -1.33, yaw: 0, person: 'm3', livery: 'vermilion', rest: { kind: 'table', y: 0.975, fwd: 0.35 }, fig: figOf.get(byId.sicbo.group) });
     XA_HOSTS.add({ group: byId.pvpholdem.group, x: 0, z: -1.33, yaw: 0, person: 'm3', livery: 'ink', rest: { kind: 'table', y: 0.975, fwd: 0.35 } });
     XA_HOSTS.add({ group: byId.liars.group, x: 0, z: -1.17, yaw: 0, person: 'f3', livery: 'teal', rest: { kind: 'table', y: 0.975, fwd: 0.31 } });
     XA_HOSTS.add({ group: scene, x: 2.5, z: 7.9, yaw: Math.atan2(-2.5, 3.0), person: 'm1', livery: 'midnight', role: 'greeter', rest: 'back' });
@@ -10857,13 +11102,13 @@ function applyTestnetFunding(proof){
   const SEATS = {
     blackjack: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.25 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.25 } }],
     baccarat: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.25 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.25 } }],
-    holdem: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.35 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.35 } }],
+    sicbo: [{ x: -0.7, z: 1.35, stand: { x: -0.7, z: 2.35 } }, { x: 0.7, z: 1.35, stand: { x: 0.7, z: 2.35 } }],
     roulette: [{ x: 0, z: 1.6, pad: true, stand: { x: 0, z: 1.6 } }],
     videopoker: [{ x: 0, z: 1.55, pad: true, stand: { x: 0, z: 1.55 } }],
     pvpholdem: [{ x: -1.15, z: 1.05, stand: { x: -1.75, z: 1.75 } }, { x: -0.4, z: 1.42, stand: { x: -0.5, z: 2.35 } }, { x: 0.4, z: 1.42, stand: { x: 0.5, z: 2.35 } }],
     liars: [{ x: -1.0, z: 0.95, stand: { x: -1.6, z: 1.6 } }, { x: -0.35, z: 1.28, stand: { x: -0.45, z: 2.2 } }, { x: 0.35, z: 1.28, stand: { x: 0.45, z: 2.2 } }]
   };
-  const VERB = { blackjack: 'SIT', baccarat: 'SIT', holdem: 'SIT', roulette: 'PLAY', videopoker: 'PLAY', pvpholdem: 'SIT', liars: 'SIT' };
+  const VERB = { blackjack: 'SIT', baccarat: 'SIT', sicbo: 'SIT', roulette: 'PLAY', videopoker: 'PLAY', pvpholdem: 'SIT', liars: 'SIT' };
   const toWorld = (s, x, z) => { const a = s.group.rotation.y; return { x: s.group.position.x + Math.cos(a) * x + Math.sin(a) * z, z: s.group.position.z - Math.sin(a) * x + Math.cos(a) * z }; };
   // colliders: circles, boxes (world axis) and ellipses (table-local)
   const solids = [];
@@ -10874,7 +11119,7 @@ function applyTestnetFunding(proof){
     const circ = (x, z, r) => { const w = toWorld(s, x, z); solids.push({ k: 'c', x: w.x, z: w.z, r }); };
     if (s.id === 'blackjack') { ell(1.58, 1.02); circ(0, -0.98, 0.42); }
     else if (s.id === 'baccarat') { ell(1.58, 1.02); circ(0, -1.0, 0.42); }
-    else if (s.id === 'holdem') { ell(1.78, 1.15); [[-2.15, 0], [0, -1.32], [2.15, 0]].forEach(([x, z]) => circ(x, z, 0.42)); }
+    else if (s.id === 'sicbo') { ell(1.78, 1.15); circ(0, -1.25, 0.42); }
     else if (s.id === 'roulette') { solids.push({ k: 'r', cx: px, cz: pz, hx: 1.8, hz: 0.85, rot: a }); circ(-0.3, -1.02, 0.42); }
     else if (s.id === 'pvpholdem') { ell(1.78, 1.15); circ(0, -1.05, 0.4); circ(1.15, 1.05, 0.28); }
     else if (s.id === 'liars') { ell(1.58, 1.02); circ(0, -1.05, 0.4); circ(1.0, 0.95, 0.28); }
@@ -11196,6 +11441,7 @@ function applyTestnetFunding(proof){
   const REVIEW_RULES={
     blackjack:{title:'Blackjack',steps:['Choose your bet, then Deal. Aim for a higher total than the dealer without going over 21.','Hit takes another card; Stand ends your turn. Double and Split appear only when allowed. Insurance is offered against a dealer ace.','Blackjack pays 3:2. The dealer stands on all 17s. Equal totals push. Aces count as 1 or 11.','The dealer’s face-down card stays hidden until the dealer’s turn. Finish the hand before leaving.']},
     roulette:{title:'European roulette',steps:['Select a chip value, then click numbers or outside bets. Undo or Clear adjusts your bets before you spin.','This is a single-zero wheel. A straight number pays 35:1 profit; red/black, odd/even and low/high pay 1:1; dozens and columns pay 2:1. Zero loses on outside bets.','Use Combo mode to choose the numbered combinations offered by this table. The total stake is shown before you spin.','Wait for the wheel to settle before leaving.']},
+    sicbo:{title:'Sic Bo',steps:['Choose a bet (Big · Small, Totals or Numbers), then add chips. Bet on as many as you like, then Roll.','Three dice are shaken under the dome. Small is a total of 4 to 10, Big 11 to 17; both pay 1:1, and both lose to any triple. Odd and Even pay 1:1 and also lose to a triple.','Totals pay from 6:1 (9 to 12) up to 60:1 (4 or 17). A double pays 10:1, any triple 30:1, a chosen triple 180:1. A single number pays 1:1, 2:1 or 3:1 as it shows on one, two or three dice.','When you are signed in to the room, everyone at the table bets on the same roll, made by the room and checked by your browser. The countdown shows when bets close.']},
     holdem:{title:'Texas Hold’em',steps:['Buy in to take a seat against three simulated opponents. Two private cards are dealt to each player.','Build the best five-card hand from your two cards and the five community cards. Betting happens before the flop, on the flop, turn and river.','Check, call, raise or fold when it is your turn. This table uses fixed-limit 5 / 10 LAYR betting.','Cash remaining chips back to your shared balance by leaving between hands.']},
     baccarat:{title:'Baccarat',steps:['Bet on Player, Banker, Tie or the available pair bets, then Deal. You are choosing a hand, not drawing cards yourself.','The hand closest to 9 wins. Aces count as 1, tens and picture cards as 0; only the last digit of the total counts. Drawing follows the table’s automatic rules.','Player pays 1:1 profit; Banker pays 0.95:1 after commission; Tie pays 8:1. Player and Banker stakes push on a tie. Pair bets pay 11:1.','Wait until the round settles before leaving.']},
     videopoker:{title:'Video poker · Jacks or Better',steps:['Set your bet and Deal five cards. Click the cards you want to hold, or use keys 1–5.','Draw replaces unheld cards once. A pair of jacks or better is the minimum paying hand.','Hint suggests holds; Auto-hold selects suggested cards. Both are optional.','The on-screen paytable shows total return as a multiple of your stake, including the stake. The optional double-up risks that win. Leaving during double-up collects the amount currently offered.']},
@@ -12287,7 +12533,7 @@ function applyTestnetFunding(proof){
       const EMO = { wave: '👋', cheer: '🎉', clap: '👏', thumbs: '👍', laugh: '😂', wow: '😮', nooo: '😱', glass: '🥂' };
       const GEST = { wave: 'greet', cheer: 'win', clap: 'win', thumbs: 'nod', laugh: 'nod', wow: 'look', nooo: 'lose', glass: 'raise' };
       const DRINK = { champagne: ['🍾', 'champagne', 500], cocktail: ['🍸', 'cocktail', 250], whisky: ['🥃', 'whisky', 100], beer: ['🍺', 'beer', 80], espresso: ['☕', 'espresso', 140], water: ['💧', 'glass of water', 20] };
-      const GAME = { blackjack: 'blackjack', baccarat: 'baccarat', holdem: "Hold'em", roulette: 'roulette', videopoker: 'video poker', pvpholdem: "Salon Hold'em", liars: "Liar's Dice", drop: 'The Drop', twins: 'Forever Twins', ds: 'Deep Strata', bf: 'Block Fortune', nv: 'Neon Vault' };
+      const GAME = { blackjack: 'blackjack', baccarat: 'baccarat', sicbo: 'Sic Bo', holdem: "Hold'em", roulette: 'roulette', videopoker: 'video poker', pvpholdem: "Salon Hold'em", liars: "Liar's Dice", drop: 'The Drop', twins: 'Forever Twins', ds: 'Deep Strata', bf: 'Block Fortune', nv: 'Neon Vault' };
       const css = document.createElement('style');
       css.textContent = `#pxBubbles{position:fixed;inset:0;pointer-events:none;z-index:9;overflow:hidden}
 .pxb{position:absolute;left:0;top:0;transform:translate(-50%,-100%);max-width:min(240px,60vw);padding:5px 10px;border-radius:14px;background:rgba(12,9,14,.9);color:#f6ead0;font:600 13px/1.3 system-ui,-apple-system,Segoe UI,sans-serif;border:1px solid rgba(227,184,74,.65);text-align:center;transition:opacity .35s;overflow-wrap:anywhere;will-change:transform}
@@ -12737,6 +12983,90 @@ body.machine-connected #pxEvents{top:10px}`;
         } catch (e) { console.warn('[room] the jackpot sign failed', e); }
       }
 
+      // ---- the house screen: one big display on the back wall that turns through the room's news (docs/plans/CASINO-MAIN-ROOM-PLAN.md, section 9)
+      // Big wins tonight, the progressive jackpot, the slot tournament, the weekly boards, happy hour, and the house's own notices.
+      // Everything on it is already known to this page (the room's messages above); with the room off it shows the notices only.
+      // One 1024x576 canvas, redrawn at most once a second while the page is visible, so it costs next to nothing.
+      const houseScreen = (() => {
+        const W = 1024, H = 576, SLIDE_MS = 8000, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        const ctx = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+        const SW = 2.0, SHh = SW * H / W, grp = new THREE.Group(); grp.name = 'House screen'; grp.position.set(-8.63, 3.0, -10.9);
+        try {
+          box(SW + 0.14, SHh + 0.14, 0.06, GOLDM(), 0, 0, 0, grp); box(SW + 0.04, SHh + 0.04, 0.07, M(0x05070b), 0, 0, 0.004, grp);
+          const face = new THREE.Mesh(new THREE.PlaneGeometry(SW, SHh), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })); face.position.z = 0.042; face.userData.noShadow = true; grp.add(face);
+          glowSprite(-8.63, 3.0, -10.6, 3.0, 0x9fc8ff, 0.08); scene.add(grp);
+        } catch (e) { console.warn('[room] the house screen could not be built', e); }
+        const GOLD = '#e3b84a', CREAM = '#f6ead0', DIM = '#b9a888', SERIF = 'Georgia,"Times New Roman",serif', SANS = 'system-ui,-apple-system,Segoe UI,sans-serif';
+        const frameBg = (kicker) => {
+          const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#0c1424'); gr.addColorStop(1, '#05080f'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+          ctx.strokeStyle = 'rgba(227,184,74,.55)'; ctx.lineWidth = 3; ctx.strokeRect(14, 14, W - 28, H - 28); ctx.lineWidth = 1; ctx.strokeRect(24, 24, W - 48, H - 48);
+          ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = GOLD; ctx.font = `600 22px ${SANS}`; ctx.fillText(kicker.toUpperCase().split('').join(' '), 56, 74);
+          ctx.textAlign = 'right'; ctx.fillStyle = DIM; ctx.font = `500 20px ${SANS}`; ctx.fillText('PARALLAX · CASINO', W - 56, 74);
+        };
+        const fit = (text, max, size, weight, family) => { let s = size; do { ctx.font = `${weight} ${s}px ${family}`; s -= 2; } while (ctx.measureText(text).width > max && s > 12); return text; };
+        const title = (text, y, size) => { ctx.textAlign = 'center'; ctx.fillStyle = CREAM; fit(text, W - 140, size || 64, 400, SERIF); ctx.fillText(text, W / 2, y); };
+        const line = (text, y, size, color) => { ctx.textAlign = 'center'; ctx.fillStyle = color || DIM; fit(text, W - 160, size || 28, 400, SANS); ctx.fillText(text, W / 2, y); };
+        const rows = (list, y0) => {      // [left, right] pairs, a ranked table
+          list.slice(0, 5).forEach(([l, r], i) => {
+            const y = y0 + i * 62; ctx.fillStyle = i % 2 ? 'rgba(255,255,255,.03)' : 'rgba(227,184,74,.07)'; ctx.fillRect(110, y - 40, W - 220, 54);
+            ctx.textAlign = 'left'; ctx.fillStyle = GOLD; ctx.font = `700 30px ${SERIF}`; ctx.fillText(String(i + 1), 132, y);
+            ctx.fillStyle = CREAM; fit(l, 470, 30, 500, SANS); ctx.fillText(l, 182, y);
+            ctx.textAlign = 'right'; ctx.fillStyle = GOLD; fit(r, 300, 30, 700, SANS); ctx.fillText(r, W - 132, y);
+          });
+        };
+        const who = (a, n) => (a === S.me ? 'You' : nameOf(a, n));
+        // the house's own notices: always there, so the screen is never empty
+        const NOTICES = [
+          () => { frameBg('New on the floor'); title('Sic Bo', 210, 96); line('Three dice under the dome. Big or Small pays 1:1.', 300, 32, CREAM); line('Totals to 60:1 · triples to 180:1 · on the right of the floor', 352); line('Signed in, everyone at the table bets on the same roll.', 440, 24); },
+          () => { frameBg('The Salon'); title('Player against player', 210, 72); line("Heads-up Hold'em and Liar's Dice, through the arch.", 300, 32, CREAM); line('BNS names only · get yours at bns.one', 360); },
+          () => { frameBg('The Afterglow'); title('Send someone a drink', 210, 72); line('Order at the bar, or from a player’s name tag.', 300, 32, CREAM); line('Cocktails · bites · happy hour on the room’s clock', 360); },
+          () => { frameBg('Your night'); title('Levels, badges and missions', 210, 64); line('Three missions every day · fifteen badges to collect', 300, 32, CREAM); line('Join the room, then open your level at the top of the screen.', 360); }
+        ];
+        // the room's news, when there is any
+        function newsSlides() {
+          const out = [], now = roomNowMs();
+          if (S.wins && S.wins.length) out.push(() => { frameBg('Big wins tonight'); title('Big wins', 150, 60); rows(S.wins.map((m) => [`${who(m.a, m.n)} · ${GAME[m.g] || m.g}`, `${fmtX(m.x)} · +${money(m.w)}`]), 240); });
+          if (P.jp && S.features.has('jackpot')) out.push(() => { frameBg('Progressive jackpot'); line('Every paid spin adds to it. Any paid spin can win it.', 170, 28); ctx.textAlign = 'center'; ctx.fillStyle = '#fff3c0'; const t = Math.floor(P.jp).toLocaleString('en-GB'); fit(t, W - 200, 150, 700, SERIF); ctx.fillText(t, W / 2, 350); line('LAYR', 420, 40, GOLD); });
+          const t = P.tour;
+          if (t && S.features.has('tourney') && (t.on || (t.start > now && t.start - now < 6 * 3600000))) out.push(() => {
+            const g = GAME[t.g] || t.g, n2 = roomNowMs();
+            frameBg(t.on ? 'Slot tournament · on now' : 'Slot tournament tonight');
+            if (t.on) { title(`${g} · ${clock(t.end - n2)} left`, 150, 54); if ((t.top || []).length) rows(t.top.map((e) => [who(e.a, e.n), `${fmtX(e.sc)} · ${e.sp}/${t.spins}`]), 240); else line('Nobody has played yet. Free to join.', 300, 32, CREAM); }
+            else { title(`${g} at ${localTime(t.start)}`, 220, 66); line(`Free to join · your first ${t.spins} spins count · bet size makes no difference`, 300, 28, CREAM); if (t.prizes) line('Prizes: ' + t.prizes.map(money).join(' · '), 360); }
+          });
+          const b = P.board;
+          if (b && b.cur) {
+            if ((b.cur.xp || []).length) out.push(() => { frameBg('This week · most XP'); title('Leaderboard', 150, 60); rows(b.cur.xp.map((r) => [who(r.a, r.n), r.v.toLocaleString('en-GB') + ' XP']), 240); });
+            if ((b.cur.big || []).length) out.push(() => { frameBg('This week · biggest win'); title('Biggest wins', 150, 60); rows(b.cur.big.map((r) => [who(r.a, r.n) + (r.g ? ' · ' + (GAME[r.g] || r.g) : ''), '+' + money(r.v)]), 240); });
+            if ((b.cur.gift || []).length) out.push(() => { frameBg('This week · most generous'); title('Rounds bought', 150, 60); rows(b.cur.gift.map((r) => [who(r.a, r.n), r.v + (r.v === 1 ? ' drink' : ' drinks')]), 240); });
+          }
+          if (P.hh && S.features.has('hh') && (hhOn() || (P.hh.start > now && P.hh.start - now < 3 * 3600000))) out.push(() => { frameBg('The Afterglow'); title('Happy hour', 210, 90); line(hhOn() ? `Drinks at half price · ${clock(P.hh.end - roomNowMs())} left` : `Drinks at half price from ${localTime(P.hh.start)}`, 310, 34, CREAM); });
+          const here = (S.real || []).length;
+          if (here > 1) out.push(() => { frameBg('In the room'); title(`${here} people playing now`, 240, 70); line('Say hello in the room chat, or send a drink.', 320, 30, CREAM); });
+          return out;
+        }
+        let order = [], at = -1, shown = -1, lastBoard = 0, ok = true;
+        function tick() {
+          if (!ok || document.hidden) return;
+          try {
+            const now = Date.now();
+            if (S.signed && S.features.has('boards') && now - lastBoard > 300000) { lastBoard = now; send({ t: 'board' }); }      // the weekly boards, every five minutes
+            const slot = Math.floor(now / SLIDE_MS);
+            if (slot !== at) {
+              at = slot; const news = newsSlides(); order = [];      // the news and the notices take turns
+              for (let i = 0; i < Math.max(news.length, NOTICES.length); i++) { if (news[i]) order.push(news[i]); if (NOTICES[i]) order.push(NOTICES[i]); }
+              shown = slot % order.length; if (window.__pxHouseScreen) window.__pxHouseScreen.slides = order.length;
+            }
+            order[shown](); tex.needsUpdate = true;      // redrawn every second, so the clocks on it count down
+          } catch (e) { ok = false; console.warn('[room] the house screen stopped', e); }
+        }
+        setInterval(tick, 1000); tick();
+        // for tests: draw slide i now and hand back the picture
+        const shot = (i) => { tick(); if (!order.length) return null; order[i % order.length](); tex.needsUpdate = true; return cv.toDataURL('image/png'); };
+        return { group: grp, canvas: cv, tick, shot, slides: 0 };
+      })();
+      window.__pxHouseScreen = houseScreen;      // for tests
+
       // ---- the visitor's own hands and spins, reported to the room (and counted for "Tonight")
       function logPlay(k, g, bet, won, free) {
         if (!(bet > 0) || !(won >= 0)) return;
@@ -12745,7 +13075,7 @@ body.machine-connected #pxEvents{top:10px}`;
         n.back += won;
         if (won > bet) { n.wins++; const x = won / bet; if (!n.best || won - bet > n.best.w) n.best = { x, w: won - bet, g }; }
         if (!S.signed || !S.features.has('progress')) return;
-        const sh = k === 'hand' && (g === 'roulette' || g === 'baccarat') && shared.active(g);
+        const sh = k === 'hand' && (g === 'roulette' || g === 'baccarat' || g === 'sicbo') && shared.active(g);
         send({ t: 'log', k, g, bet: Math.round(bet * 100) / 100, won: Math.round(won * 100) / 100, free: !!free, sh });
       }
       window.addEventListener('px-own-outcome', (e) => { const d = e.detail || {}; if (d.stake > 0) logPlay('hand', d.game, d.stake, Math.max(0, d.net + d.stake), false); });
@@ -13741,7 +14071,7 @@ button{font:inherit;color:inherit;cursor:pointer}
  const s=document.createElement('script');s.type='module';s.src='passkey-wallet.js?v=4';document.head.appendChild(s);
 })();
 </script>
-<script type="module" src="room.js?v=p5.1"></script>
+<script type="module" src="room.js?v=p5.2"></script>
 </body></html>
 <style>.layr-account-note{font-size:12px;line-height:1.65;color:#9eacc0;margin:20px 0 0}</style>
 

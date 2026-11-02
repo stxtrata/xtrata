@@ -29,7 +29,7 @@ describe('who may use the Salon', () => {
 
   it('knows the Salon seats and the Salon floor', () => {
     for (const s of ['pvpholdem.1', 'pvpholdem.3', 'liars.1', 'liars.3']) expect(isSalonSpot(s)).toBe(true);
-    for (const s of ['holdem.1', 'blackjack.2', 'bar.1', 'drop.1']) expect(isSalonSpot(s)).toBe(false);
+    for (const s of ['sicbo.1', 'blackjack.2', 'bar.1', 'drop.1']) expect(isSalonSpot(s)).toBe(false);
     expect(isInSalon(-6, -11.5)).toBe(true);        // just through the arch
     expect(isInSalon(-6, -19)).toBe(true);          // the far wall
     expect(isInSalon(-6, -10.9)).toBe(false);       // the main floor, in front of the arch
@@ -48,7 +48,7 @@ describe('the room enforces it', () => {
     const peers = [named('a', ALICE, 'alice.btc'), nameless('b', BOB)];
     expect(applySit(peers, 'b', 'liars.1', 2000)).toEqual({ ok: false, code: 'salon-bns-required' });
     expect(applySit(peers, 'b', 'pvpholdem.2', 2000)).toEqual({ ok: false, code: 'salon-bns-required' });
-    expect(applySit(peers, 'b', 'holdem.1', 2000).ok).toBe(true);
+    expect(applySit(peers, 'b', 'sicbo.1', 2000).ok).toBe(true);
     expect(applySit(peers, 'a', 'liars.1', 2000).ok).toBe(true);
     const u = [unchecked('u', BOB)];
     expect(applySit(u, 'u', 'liars.2', 2000)).toEqual({ ok: false, code: 'salon-bns-unchecked' });

@@ -220,7 +220,7 @@ export function createChat(deps: ChatDeps) {
   };
 
   const tableNow = () => (deps.table ? deps.table() : null);
-  const TABLE_NAMES: Record<string, string> = { blackjack: 'blackjack', baccarat: 'baccarat', holdem: "Hold'em", roulette: 'roulette', videopoker: 'video poker', pvpholdem: "Salon Hold'em", liars: "Liar's Dice" };
+  const TABLE_NAMES: Record<string, string> = { blackjack: 'blackjack', baccarat: 'baccarat', sicbo: 'Sic Bo', holdem: "Hold'em", roulette: 'roulette', videopoker: 'video poker', pvpholdem: "Salon Hold'em", liars: "Liar's Dice" };
   const paintForm = () => {
     if (toTable && !tableNow()) toTable = false;          // walked away from the table: back to the room
     form.hidden = !typing || prefs.hidden;

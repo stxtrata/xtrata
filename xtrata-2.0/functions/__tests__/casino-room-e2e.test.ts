@@ -233,9 +233,9 @@ describe.skipIf(!BASE)('casino room end to end', () => {
 
     // the main floor is unchanged
     const watcher = await join();
-    const sat = watcher.waitFor((m) => m.t === 'sat' && m.spot === 'holdem.2');
+    const sat = watcher.waitFor((m) => m.t === 'sat' && m.spot === 'sicbo.2');
     await a.quiet(1300);
-    a.send({ t: 'sit', spot: 'holdem.2' });
+    a.send({ t: 'sit', spot: 'sicbo.2' });
     await sat;
 
     // "check again" answers for the signed-in player only, and says when the check itself failed
@@ -249,14 +249,14 @@ describe.skipIf(!BASE)('casino room end to end', () => {
   it('one address, one seat: a second tab takes it over and a third connection closes the oldest', async () => {
     const alice = await signIn();
     const tab1 = await join({ cookie: alice.cookie });
-    tab1.send({ t: 'sit', spot: 'holdem.1' });
+    tab1.send({ t: 'sit', spot: 'sicbo.1' });
     await tab1.waitFor((m) => m.t === 'sat');
     const tab2 = await join({ cookie: alice.cookie });
     const told = tab1.waitFor((m) => m.t === 'moved');
-    tab2.send({ t: 'sit', spot: 'holdem.1' });
-    expect((await told).spot).toBe('holdem.1');
+    tab2.send({ t: 'sit', spot: 'sicbo.1' });
+    expect((await told).spot).toBe('sicbo.1');
     const observer = await join();
-    expect(observer.room.spots['holdem.1']?.a).toBe(alice.w.address);
+    expect(observer.room.spots['sicbo.1']?.a).toBe(alice.w.address);
 
     const tab3 = await join({ cookie: alice.cookie });
     await tab3.quiet(1200);

@@ -113,12 +113,12 @@ describe('casino room seats', () => {
 
   it('standing up and leaving free the seat; both are quiet when there is nothing to free', () => {
     const peers = [peer('a', ALICE), peer('b', BOB)];
-    applySit(peers, 'a', 'holdem.2', 1);
+    applySit(peers, 'a', 'sicbo.2', 1);
     expect(applyStand(peers, 'b')).toEqual([]);
-    expect(applyStand(peers, 'a')).toEqual([{ kind: 'stood', spot: 'holdem.2', peerId: 'a' }]);
+    expect(applyStand(peers, 'a')).toEqual([{ kind: 'stood', spot: 'sicbo.2', peerId: 'a' }]);
     expect(applyStand(peers, 'a')).toEqual([]);
-    applySit(peers, 'b', 'holdem.2', 2);
-    expect(applyLeave(peers, 'b')).toEqual([{ kind: 'stood', spot: 'holdem.2', peerId: 'b' }]);
+    applySit(peers, 'b', 'sicbo.2', 2);
+    expect(applyLeave(peers, 'b')).toEqual([{ kind: 'stood', spot: 'sicbo.2', peerId: 'b' }]);
     expect(deriveView(peers).spots).toEqual({});
   });
 

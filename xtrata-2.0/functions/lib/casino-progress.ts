@@ -221,13 +221,13 @@ export const placeOnBoard = (b: Boards, kind: 'big' | 'xp' | 'play' | 'gift', en
 export type MissionKind = 'hand' | 'spin' | 'win' | 'shared' | 'gift' | 'react' | 'tchat' | 'salon';
 export type Mission = { id: string; kind: MissionKind; g: string | null; need: number; text: string; reward: number };
 const GAME_NAME: Record<string, string> = {
-  blackjack: 'blackjack', baccarat: 'baccarat', holdem: "Hold'em", roulette: 'roulette', videopoker: 'video poker',
+  blackjack: 'blackjack', baccarat: 'baccarat', sicbo: 'Sic Bo', holdem: "Hold'em", roulette: 'roulette', videopoker: 'video poker',
   drop: 'The Drop', twins: 'Forever Twins', ds: 'Deep Strata', bf: 'Block Fortune', nv: 'Neon Vault'
 };
 const PLAY_POOL: Mission[] = [
   ...['blackjack', 'baccarat'].map((g) => ({ id: 'hands-' + g, kind: 'hand' as const, g, need: 5, text: `Play 5 hands of ${GAME_NAME[g]}`, reward: 2_500 })),
-  // Hold'em left the main room (docs/plans/CASINO-MAIN-ROOM-PLAN.md); "any table" keeps its place, so everyone else's missions stay as they were
-  { id: 'hands-any', kind: 'hand' as const, g: null, need: 5, text: 'Play 5 hands at any table', reward: 2_500 },
+  // Sic Bo took Hold'em's place in the main room and in this list (docs/plans/CASINO-MAIN-ROOM-PLAN.md), so everyone else's missions stay as they were
+  { id: 'hands-sicbo', kind: 'hand' as const, g: 'sicbo', need: 5, text: 'Play 5 rounds of Sic Bo', reward: 2_500 },
   ...['roulette', 'videopoker'].map((g) => ({ id: 'hands-' + g, kind: 'hand' as const, g, need: 5, text: `Play 5 hands of ${GAME_NAME[g]}`, reward: 2_500 })),
   ...MACHINES.map((g) => ({ id: 'spins-' + g, kind: 'spin' as const, g, need: 20, text: `Spin ${GAME_NAME[g]} 20 times`, reward: 2_500 }))
 ];
@@ -235,7 +235,7 @@ const SOCIAL_POOL: Mission[] = [
   { id: 'drink', kind: 'gift', g: null, need: 1, text: 'Send someone a drink (or buy a round)', reward: 2_500 },
   { id: 'react', kind: 'react', g: null, need: 3, text: 'React 3 times', reward: 2_500 },
   { id: 'tchat', kind: 'tchat', g: null, need: 1, text: 'Say something in table chat', reward: 2_500 },
-  { id: 'shared', kind: 'shared', g: null, need: 3, text: 'Play 3 shared rounds of roulette or baccarat', reward: 2_500 }
+  { id: 'shared', kind: 'shared', g: null, need: 3, text: 'Play 3 shared rounds of roulette, baccarat or Sic Bo', reward: 2_500 }
 ];
 const STRETCH_POOL: Mission[] = [
   { id: 'wins', kind: 'win', g: null, need: 3, text: 'Win 3 times, anywhere', reward: 5_000 },
