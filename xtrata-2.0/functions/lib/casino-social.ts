@@ -22,7 +22,7 @@ export type SocialPeer = {
   id: string; a: string | null; spot: string | null; b: string[]; w?: boolean;
   wt?: string | null;
   rb?: { tb: RoundTable; n: number; bets: Bets } | null;
-  sk?: { tb: SalonTable; stake: number; at: number } | null;
+  sk?: { tb: GameTable; stake: number; at: number } | null;
   rx?: number[]; wn?: number[]; gl?: number[]; pv?: number[];
   /** The Salon's rule: the primary BNS name read at sign-in, and whether it was checked (see salonRefusal). */
   bn?: string | null; bc?: boolean;
@@ -57,7 +57,7 @@ export const takeLimit = (list: number[] | undefined, now: number, gap: number, 
 };
 
 /** The table a spot belongs to ('blackjack.2' -> 'blackjack'); machines and the bar are not tables. */
-export const TABLES = ['blackjack', 'baccarat', 'sicbo', 'holdem', 'roulette', 'videopoker', 'pvpholdem', 'liars'] as const;   // holdem: older pages
+export const TABLES = ['blackjack', 'baccarat', 'sicbo', 'holdem', 'roulette', 'videopoker', 'pvpholdem', 'liars', 'chess1', 'chess2'] as const;   // holdem: older pages
 export const isTable = (value: unknown): value is string => typeof value === 'string' && (TABLES as readonly string[]).includes(value);
 export const tableOf = (peer: Pick<SocialPeer, 'spot' | 'wt'>): string | null => {
   const fromSpot = peer.spot ? peer.spot.split('.')[0] : null;
@@ -73,6 +73,16 @@ export const DRINKS = ['champagne', 'cocktail', 'whisky', 'beer', 'espresso', 'w
 export type Drink = (typeof DRINKS)[number];
 export const SALON_TABLES = ['pvpholdem', 'liars'] as const;
 export type SalonTable = (typeof SALON_TABLES)[number];
+/**
+ * The chess tables at the two lounge sofas in the main room (public/casino/chess.js, docs/plans/CASINO-CHESS-PLAN.md). Players wait
+ * for a game and relay their moves exactly as at the Salon tables, but the main room is open to everyone: signing in is enough, no
+ * BNS name. A chess game may be a friendly (stake 0).
+ */
+export const CHESS_TABLES = ['chess1', 'chess2'] as const;
+export type ChessTable = (typeof CHESS_TABLES)[number];
+export const isChessTable = (value: unknown): value is ChessTable => typeof value === 'string' && (CHESS_TABLES as readonly string[]).includes(value);
+/** Every table where two players can wait for each other and relay a game. */
+export type GameTable = SalonTable | ChessTable;
 
 /** A big win is announced only if it is at least this many times the bet, or at least this much (the page also checks). */
 export const WIN_MIN_MULT = 10;
@@ -90,7 +100,7 @@ export type SocialMessage =
   | { t: 'round'; tb: RoundTable }
   | { t: 'bet'; tb: RoundTable; n: number; bets: Bets }
   | { t: 'gift'; to: string; d: Drink }
-  | { t: 'seek'; tb: SalonTable; stake: number }
+  | { t: 'seek'; tb: GameTable; stake: number }
   | { t: 'seek'; off: true }
   | { t: 'pvp'; to: string; d: unknown };
 
@@ -132,8 +142,9 @@ export const parseSocialMessage = (value: any): { ok: true; msg: SocialMessage }
     }
     case 'seek': {
       if (value.off === true) return { ok: true, msg: { t: 'seek', off: true } };
-      if (!(SALON_TABLES as readonly string[]).includes(value.tb)) return { ok: false, code: 'pvp-bad' };
-      if (!Number.isSafeInteger(value.stake) || value.stake <= 0 || value.stake > MAX_SEEK_STAKE) return { ok: false, code: 'pvp-bad' };
+      const chess = isChessTable(value.tb);
+      if (!chess && !(SALON_TABLES as readonly string[]).includes(value.tb)) return { ok: false, code: 'pvp-bad' };
+      if (!Number.isSafeInteger(value.stake) || value.stake < (chess ? 0 : 1) || value.stake > MAX_SEEK_STAKE) return { ok: false, code: 'pvp-bad' };
       return { ok: true, msg: { t: 'seek', tb: value.tb, stake: value.stake } };
     }
     case 'pvp': {
@@ -229,18 +240,18 @@ export const routeGift = (peers: SocialPeer[], me: SocialPeer, msg: { to: string
 };
 
 /** Waiting for a Salon game: everyone who may see the room is told, so somebody can come and sit down. `off` stops waiting. */
-export const applySeek = (peers: SocialPeer[], me: SocialPeer, msg: { tb: SalonTable; stake: number } | { off: true }, now: number): Result => {
+export const applySeek = (peers: SocialPeer[], me: SocialPeer, msg: { tb: GameTable; stake: number } | { off: true }, now: number): Result => {
   if (!me.a) return { ok: false, code: 'pvp-sign-in-first' };
-  // Waiting for a game is a Salon action: a primary BNS name is needed. Stopping is always allowed.
-  const refused = 'off' in msg ? null : salonRefusal(me);
+  // Waiting for a Salon game needs a primary BNS name; a chess table in the main room only needs signing in. Stopping is always allowed.
+  const refused = 'off' in msg || isChessTable(msg.tb) ? null : salonRefusal(me);
   if (refused) return { ok: false, code: refused.replace('salon-', 'pvp-') };
   me.sk = 'off' in msg ? null : { tb: msg.tb, stake: msg.stake, at: now };
   const to = peers.filter((p) => p.id !== me.id && seen(p)).map((p) => p.id);
   return { ok: true, out: [{ to, message: me.sk ? { t: 'seek', a: me.a, n: me.bn || short(me.a), tb: me.sk.tb, stake: me.sk.stake, at: now } : { t: 'seek', a: me.a, off: true, at: now } }] };
 };
 export const seekers = (peers: SocialPeer[]) => {
-  const out: Array<{ a: string; n: string; tb: SalonTable; stake: number; at: number }> = [], done = new Set<string>();
-  for (const p of peers) if (p.a && p.sk && !done.has(p.a) && !salonRefusal(p)) { done.add(p.a); out.push({ a: p.a, n: p.bn || short(p.a), tb: p.sk.tb, stake: p.sk.stake, at: p.sk.at }); }
+  const out: Array<{ a: string; n: string; tb: GameTable; stake: number; at: number }> = [], done = new Set<string>();
+  for (const p of peers) if (p.a && p.sk && !done.has(p.a) && (isChessTable(p.sk.tb) || !salonRefusal(p))) { done.add(p.a); out.push({ a: p.a, n: p.bn || short(p.a), tb: p.sk.tb, stake: p.sk.stake, at: p.sk.at }); }
   return out;
 };
 
@@ -254,13 +265,16 @@ export const routeRelay = (peers: SocialPeer[], me: SocialPeer, msg: { to: strin
   const targets = peers.filter((p) => p.a === msg.to);
   if (!targets.length) return { ok: false, code: 'pvp-not-here' };
   if (hidden(peers, me.a, msg.to)) return { ok: false, code: 'pvp-blocked' };
-  // A Salon game is between two players who both have a primary BNS name.
-  const refused = salonRefusal(me);
+  // A Salon game is between two players who both have a primary BNS name. A chess game (the move names a chess table) needs only
+  // signing in: the Salon tables ignore any move not addressed to them, so naming a chess table never lets a Salon game past the rule.
+  const chess = isChessTable((msg.d as { tb?: unknown } | null)?.tb);
+  const refused = chess ? null : salonRefusal(me);
   if (refused) return { ok: false, code: refused.replace('salon-', 'pvp-') };
-  if (!targets.some((p) => !salonRefusal(p))) return { ok: false, code: 'pvp-opponent-no-bns' };
+  const allowed = (p: SocialPeer) => chess || !salonRefusal(p);
+  if (!targets.some(allowed)) return { ok: false, code: 'pvp-opponent-no-bns' };
   const lim = takeLimit(me.pv, now, 0, 30, 10_000); me.pv = lim.list;
   if (!lim.ok) return { ok: false, code: 'pvp-too-fast' };
-  return { ok: true, out: [{ to: targets.filter((p) => !salonRefusal(p)).map((p) => p.id), message: { t: 'pvp', a: me.a, n: me.bn || short(me.a), d: msg.d, at: now } }] };
+  return { ok: true, out: [{ to: targets.filter(allowed).map((p) => p.id), message: { t: 'pvp', a: me.a, n: me.bn || short(me.a), d: msg.d, at: now } }] };
 };
 
 // ------------------------------------------------------------------ the daily drop

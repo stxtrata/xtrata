@@ -33,8 +33,19 @@ describe('casino room spots match the /casino page', () => {
     for (const id of fromMachines) expect(isSpot(id), id).toBe(true);
   });
 
+  // The lounge chess tables add their seats at run time (public/casino/chess.js: a sofa and an armchair each).
+  const chessJs = readFileSync(join(__dirname, '../../../public/casino/chess.js'), 'utf8');
+  const chessIds = [...chessJs.matchAll(/\{ id: '(chess\d)'/g)].map((m) => m[1]);
+  const fromChess = chessIds.flatMap((id) => [`${id}.1`, `${id}.2`]);
+
+  it('accepts every seat at the lounge chess tables, which the page loads from chess.js', () => {
+    expect(html).toContain('<script src="chess.js?v=');
+    expect(fromChess).toEqual(['chess1.1', 'chess1.2', 'chess2.1', 'chess2.2']);
+    for (const id of fromChess) expect(isSpot(id), id).toBe(true);
+  });
+
   it('has no spot the page can never produce, apart from the bar stools reserved for later', () => {
-    const known = new Set([...fromSeats, ...fromMachines]);
+    const known = new Set([...fromSeats, ...fromMachines, ...fromChess]);
     const dead = SPOTS.filter((id) => !known.has(id) && !id.startsWith('bar.'));
     expect(dead).toEqual([]);
   });

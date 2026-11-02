@@ -7,7 +7,7 @@
  * the rules can be tested without a Workers runtime. The room's truth is a list of peers (one per open connection); a peer
  * is a small record the Durable Object keeps as the connection's "attachment", which survives hibernation.
  */
-import { isInSalon, isSalonSpot, parseSocialMessage, salonRefusal, type SalonTable, type SocialMessage } from './casino-social';
+import { isInSalon, isSalonSpot, parseSocialMessage, salonRefusal, type GameTable, type SocialMessage } from './casino-social';
 import { parseProgressMessage, type ProgressMessage } from './casino-progress';
 import type { Bets, RoundTable } from './casino-rounds';
 
@@ -22,6 +22,7 @@ export const SPOTS = [
   'blackjack.1', 'blackjack.2', 'baccarat.1', 'baccarat.2', 'sicbo.1', 'sicbo.2',
   'roulette.pad', 'videopoker.pad', 'pvpholdem.1', 'pvpholdem.2', 'pvpholdem.3',
   'liars.1', 'liars.2', 'liars.3',
+  'chess1.1', 'chess1.2', 'chess2.1', 'chess2.2',   // the lounge chess tables (sofa, armchair): public/casino/chess.js
   'drop.1', 'drop.2', 'twins.1', 'twins.2', 'ds.1', 'ds.2', 'bf.1', 'bf.2', 'nv.1', 'nv.2',
   'bar.1', 'bar.2', 'bar.3', 'bar.4'
 ] as const;
@@ -102,7 +103,7 @@ export type Peer = {
    *  being waited for, and recent times for the reaction, win, gift and relay limits. All optional: older connections lack them. */
   wt?: string | null;
   rb?: { tb: RoundTable; n: number; bets: Bets } | null;
-  sk?: { tb: SalonTable; stake: number; at: number } | null;
+  sk?: { tb: GameTable; stake: number; at: number } | null;
   rx?: number[]; wn?: number[]; gl?: number[]; pv?: number[];
   /** Phase 3 (functions/lib/casino-progress.ts): the player's level and the badge on their tag, and recent times for the play-log
    *  and balance limits. Optional too. */
