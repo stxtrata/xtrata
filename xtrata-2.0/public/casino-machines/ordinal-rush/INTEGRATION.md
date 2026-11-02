@@ -9,7 +9,7 @@ that index.
 ## 1. The pack
 
 Append the contents of `pack.json` as one more entry of `window.PX_MACHINE_PACKS` (the `<script>window.PX_MACHINE_PACKS=[…];</script>`
-line). It has exactly the existing keys: `name`, `description`, `color`, `accent` (`#f7931a`), `model`, `game`, `css`.
+line). It has exactly the existing keys: `name`, `description`, `color`, `accent` (`#f7931a`), `model`, `game`, `css`. The pack is about 2.8 MB, most of it the bundled art, which is kept sharp (pixel grids, SVG, near-native images) rather than shrunk.
 Append it as text rather than re-serialising the array, so the other machines' bytes stay identical (`tools/build.mjs`
 shows the splice-free way it was produced). No change to the game code is needed: it already uses
 `window.parent.ParallaxLAYRAccount` and the canvas-and-controls API.
@@ -98,6 +98,9 @@ registered host. `index.html` in this folder does exactly this and is the refere
 
 ## 6. Optional extras the room can use
 
+* While the game is in fullscreen it resizes its `screen` canvas to the display's pixels and back to 2800 x 1920 on exit;
+  a host that keeps a texture of it should re-read its size when `revision()` changes.
+
 * `PX_CASINO_ENGINE.mechanics().show` is `{kind, stage}` while a bonus scene runs (`free`, `vault`, `chain`, `jackpot`,
   `gamble`; `trigger`, `intro`, `play`, `outro`). The test page uses it to speed up the coin and pulse the floor glow; the
   room can do the same for its plaque, glow sprite and lights. Older rooms ignore it.
@@ -110,7 +113,7 @@ registered host. `index.html` in this folder does exactly this and is the refere
 * `window.ParallaxLAYRAccount` on the parent (the game never opens a second balance).
 * The canvas-and-controls host: activate/deactivate, `screen` as a texture, `revision()`, `mechanics()` for the lever
   (`px-lever` rotation.x) and spin button (`px-spinPhysical` z), the crest turning on the room clock.
-* Network: live art top-ups load from `https://ordinals.com/content/<id>` (served with `Access-Control-Allow-Origin: *`)
+* Network: live art top-ups, and the original files of Taproot Wizards and OMB, load from `https://ordinals.com/content/<id>` (served with `Access-Control-Allow-Origin: *`)
   and the block height from `https://xtrata.xyz/hiro/mainnet/v2/info` (fallback `https://api.hiro.so/v2/info`). Without
   either, the machine plays with its bundled art and shows the height as stale.
 * Test hooks (`OrdinalRush.test`) exist only on local development hosts or when the parent sets

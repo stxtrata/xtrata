@@ -1,5 +1,5 @@
-/* Ordinal Rush — a ParallaX Casino machine. Every symbol is a real Bitcoin inscription loaded from ordinals.com (bundled as
-   small tiles in OR_ART, topped up live), or a real on-chain Bitmap record. The maths is the shared Block Fortune v2 engine
+/* Ordinal Rush — a ParallaX Casino machine. Every symbol is a real Bitcoin inscription loaded from ordinals.com (bundled in
+   OR_ART at their own pixel grid, as SVG, or near native size, and topped up live), or a real on-chain Bitmap record. The maths is the shared Block Fortune v2 engine
    (BF) unchanged: every outcome is fixed by BF before any art is chosen, and art is picked with Math.random, never the
    engine's generator, so loaded inscriptions can never change a result. The casino owns all 3D rendering and cameras; this
    frame only draws the cabinet screen and handles the controls. */
@@ -139,57 +139,105 @@ const hashStr = s => { let h = 2166136261; for (const ch of String(s)) h = Math.
 function loadImage(url, ms = 20000) { return new Promise((res, rej) => { const img = new Image(); img.crossOrigin = 'anonymous'; img.decoding = 'async'; const timer = setTimeout(() => { img.src = ''; rej(Error('timeout')); }, ms); img.onload = () => { clearTimeout(timer); res(img); }; img.onerror = () => { clearTimeout(timer); rej(Error('image failed')); }; img.src = url; }); }
 for (const id of ['brandmark', 'loaderMark']) { const el = $(id); if (el) xtrataLogo(el.getContext('2d'), el.width / 2, el.height / 2, el.width * .9); }
 
-/* ---------- Reel tiles: real inscriptions, each with its inscription number ---------- */
-const TILE = 192; // tiles are drawn on a 240-unit grid at 192 px, which keeps ~150 tiles within phone canvas-memory limits
+/* ---------- Sharp art: every image is drawn at the size it is shown, straight onto the screen ----------
+   Pixel art (a known pixel grid) is scaled only by whole numbers with nearest-neighbour sampling, so each source pixel is
+   an exact square at any size. Vector inscriptions (SVG) are drawn at the size shown. Other images are scaled pixel for
+   pixel when shown larger than their native size (as ordinals.com shows them) and with high-quality smoothing when smaller. */
+// An upscaled pixel-art file (a 576 x 576 Bitcoin Frog is an 8x copy of a 72 x 72 grid): returns the block size, or 1.
+function detectGrid(d, W, H) {
+  for (let s = Math.floor(Math.min(W, H) / 8); s >= 2; s--) {
+    if (W % s || H % s) continue;
+    const nx = W / s, ny = H / s, m = Math.floor(s * .2), pts = [[m, m], [s - 1 - m, m], [m, s - 1 - m], [s - 1 - m, s - 1 - m]]; let bad = 0;
+    for (let by = 0; by < ny; by++) for (let bx = 0; bx < nx; bx++) { const ci = ((by * s + (s >> 1)) * W + bx * s + (s >> 1)) * 4; let worst = 0;
+      for (const [fx, fy] of pts) { const i = ((by * s + fy) * W + bx * s + fx) * 4; worst = Math.max(worst, Math.abs(d[i] - d[ci]) + Math.abs(d[i + 1] - d[ci + 1]) + Math.abs(d[i + 2] - d[ci + 2]) + Math.abs(d[i + 3] - d[ci + 3])); }
+      if (worst > 36) bad++; }
+    if (bad / (nx * ny) < .02) return s;
+  }
+  return 1;
+}
+// Reduce a live-loaded image to its pixel grid when it is an exact upscale; otherwise keep it as it is.
+function gridItem(img, pixelCollection) {
+  const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+  try { if (W <= 2400 && H <= 2400) { const c = canvas(W, H), g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, W, H).data, s = detectGrid(d, W, H);
+      if (s > 1) { const w = W / s, h = H / s, o = canvas(w, h), og = o.getContext('2d'), od = og.createImageData(w, h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = ((y * s + (s >> 1)) * W + x * s + (s >> 1)) * 4, j = (y * w + x) * 4; od.data[j] = d[i]; od.data[j + 1] = d[i + 1]; od.data[j + 2] = d[i + 2]; od.data[j + 3] = d[i + 3]; } og.putImageData(od, 0, 0); return { img: o, kind: 'pixel', w, h }; } } } catch (e) { /* unreadable: keep the original */ }
+  return { img, kind: pixelCollection ? 'pixel' : 'raster', w: W, h: H };
+}
+// Draw an inscription's art into the box (x, y, w, h), in the context's current units.
+function drawArt(ctx, it, x, y, w, h) {
+  const img = it && it.img; if (!img) return; const nw = it.w || img.naturalWidth || img.width, nh = it.h || img.naturalHeight || img.height; if (!nw || !nh) return;
+  const m = ctx.getTransform();
+  if (m.b || m.c) { const f = Math.min(w / nw, h / nh); ctx.imageSmoothingEnabled = it.kind !== 'pixel'; ctx.drawImage(img, x + (w - nw * f) / 2, y + (h - nh * f) / 2, nw * f, nh * f); ctx.imageSmoothingEnabled = true; return; }
+  const bw = w * Math.abs(m.a), bh = h * Math.abs(m.d), fit = Math.min(bw / nw, bh / nh); let dw, dh, smooth;
+  if (it.kind === 'vector') { dw = nw * fit; dh = nh * fit; smooth = true; }
+  else if (fit >= 1) { const k = it.kind === 'pixel' ? Math.floor(fit) : fit; dw = nw * k; dh = nh * k; smooth = false; }
+  else { dw = nw * fit; dh = nh * fit; smooth = true; }
+  const dx = Math.round(m.a * x + m.e + (bw - dw) / 2), dy = Math.round(m.d * y + m.f + (bh - dh) / 2), rw = Math.max(1, Math.round(dw)), rh = Math.max(1, Math.round(dh));
+  // SVG and downscaled images are rasterised once per size and reused, so a frame only copies pixels 1:1.
+  const src = smooth ? sizedArt(it, rw, rh) : img;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = smooth && src === img; if (smooth) ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, dx, dy, rw, rh); ctx.restore();
+}
+function sizedArt(it, w, h) {
+  const key = w + 'x' + h, c = it.sized || (it.sized = new Map()); let r = c.get(key);
+  if (!r) { if (w * h > 1400 * 1400) return it.img; r = canvas(w, h); const g = r.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; try { g.drawImage(it.img, 0, 0, w, h); } catch (e) { return it.img; }
+    c.set(key, r); if (c.size > 4) c.delete(c.keys().next().value); }
+  else { c.delete(key); c.set(key, r); } // most recently used last
+  return r;
+}
+// A tile is drawn, never pre-rendered: draw(g) paints it in a 240-unit square, and drawT places it at any size.
+function drawT(ctx, t, x, y, w, h = w) {
+  if (!t) return; ctx.save();
+  if (ctx.shadowBlur) round(ctx, x + w * .05, y + h * .025, w * .9, h * .9, w * .058, '#141417');
+  ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.translate(x, y); ctx.scale(w / 240, h / 240); t.draw(ctx); ctx.restore();
+}
 // A tile is the inscription's own art in a frame: gold for NodeMonkes (the jackpot symbol), orange for the Puppet wild.
-function artTile(img, sym, item) {
-  const c = canvas(TILE, TILE), g = c.getContext('2d'), col = COLS[sym], wild = sym === 'wild', gold = sym === 'bitcoin'; g.scale(TILE / 240, TILE / 240);
-  const frame = gold ? lin(g, 0, 0, 0, 240, ['#fff1b8', '#f2c14e', '#a87411']) : wild ? lin(g, 0, 0, 0, 240, ['#ffc56b', ACCENT, '#a8550a']) : '#3a3a40';
-  g.shadowColor = gold ? '#f2c14e' : wild ? ACCENT : '#000'; g.shadowBlur = gold || wild ? 14 : 4;
-  round(g, 12, 6, 216, 216, 14, '#141417'); g.shadowBlur = 0; round(g, 12, 6, 216, 216, 14, null, frame, gold || wild ? 7 : 3);
-  g.save(); g.beginPath(); g.roundRect(24, 18, 192, 158, 8); g.clip(); g.fillStyle = '#0d0d10'; g.fillRect(24, 18, 192, 158);
-  const pixel = !!col.pixel || item.px, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, fit = Math.min(192 / w, 158 / h), k = pixel && fit >= 1 ? Math.floor(fit) : fit;
-  g.imageSmoothingEnabled = !pixel; g.drawImage(img, 24 + (192 - w * k) / 2, 18 + (158 - h * k) / 2, w * k, h * k); g.restore();
-  round(g, 24, 180, 192, 32, 7, wild ? ACCENT : gold ? '#f2c14e' : '#0d0d10');
-  text(g, wild ? `WILD · ${num(item.num)}` : num(item.num), 120, 197, wild || String(item.num).length > 8 ? 17 : 20, wild || gold ? '#1a0d00' : '#f3e6d0');
-  return c;
+function artTile(sym, item) {
+  const wild = sym === 'wild', gold = sym === 'bitcoin';
+  return { item, draw(g) {
+    const frame = gold ? lin(g, 0, 0, 0, 240, ['#fff1b8', '#f2c14e', '#a87411']) : wild ? lin(g, 0, 0, 0, 240, ['#ffc56b', ACCENT, '#a8550a']) : '#3a3a40';
+    if (gold || wild) round(g, 8, 2, 224, 224, 17, null, gold ? '#f2c14e40' : '#f7931a40', 9);
+    round(g, 12, 6, 216, 216, 14, '#141417', frame, gold || wild ? 7 : 3);
+    g.save(); g.beginPath(); g.roundRect(24, 18, 192, 158, 8); g.clip(); g.fillStyle = sym === 'scatter' ? '#ffffff' : '#0d0d10'; g.fillRect(24, 18, 192, 158); drawArt(g, item, 24, 18, 192, 158); g.restore();
+    round(g, 24, 180, 192, 32, 7, wild ? ACCENT : gold ? '#f2c14e' : '#0d0d10');
+    text(g, wild ? `WILD · ${num(item.num)}` : num(item.num), 120, 197, wild || String(item.num).length > 8 ? 17 : 20, wild || gold ? '#1a0d00' : '#f3e6d0'); } };
 }
 // Bitmap parcels: the real block number from a real `.bitmap` inscription, drawn as a data tile over a district grid.
 function bitmapTile(b, value) {
-  const c = canvas(TILE, TILE), g = c.getContext('2d'); g.scale(TILE / 240, TILE / 240); g.shadowColor = ACCENT; g.shadowBlur = 10; round(g, 12, 6, 216, 216, 14, '#151006', ACCENT, 4); g.shadowBlur = 0;
-  let h = hashStr(b.block); for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) { h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; const on = h % 5; round(g, 30 + x * 30, 22 + y * 22, 26, 18, 3, on === 0 ? '#f7931a55' : on === 1 ? '#f7931a2a' : '#ffffff0d'); }
-  g.fillStyle = '#151006d0'; g.fillRect(24, 70, 192, 60);
-  text(g, String(b.block), 120, 100, 44, '#ffd18a', 'Courier New', 'center', '900');
-  round(g, 24, 180, 192, 32, 7, '#0d0d10'); text(g, value ? `${value}×` : '.BITMAP', 120, 196, value ? 22 : 18, value ? '#ffffff' : ACCENT);
-  return c;
+  return { draw(g) { round(g, 8, 2, 224, 224, 17, null, '#f7931a33', 8); round(g, 12, 6, 216, 216, 14, '#151006', ACCENT, 4);
+    let h = hashStr(b.block); for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) { h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; const on = h % 5; round(g, 30 + x * 30, 22 + y * 22, 26, 18, 3, on === 0 ? '#f7931a55' : on === 1 ? '#f7931a2a' : '#ffffff0d'); }
+    g.fillStyle = '#151006d0'; g.fillRect(24, 70, 192, 60);
+    text(g, String(b.block), 120, 100, 44, '#ffd18a', 'Courier New', 'center', '900');
+    round(g, 24, 180, 192, 32, 7, '#0d0d10'); text(g, value ? `${value}×` : '.BITMAP', 120, 196, value ? 22 : 18, value ? '#ffffff' : ACCENT); } };
 }
 // Shown only until art exists: the collection's name set in type, in its colour. Never a drawing.
 function nameTile(sym) {
-  const c = canvas(TILE, TILE), g = c.getContext('2d'), col = COLS[sym]; g.scale(TILE / 240, TILE / 240);
-  round(g, 12, 6, 216, 216, 14, '#141417', col.color, 4);
-  const words = col.name.toUpperCase().split(' '); words.forEach((w, i) => text(g, w, 120, 110 - (words.length - 1) * 18 + i * 36, w.length > 9 ? 22 : 30, col.color, 'Arial', 'center', '900'));
-  text(g, 'LOADING INSCRIPTION', 120, 196, 13, '#8a8f99');
-  return c;
+  const col = COLS[sym];
+  return { draw(g) { round(g, 12, 6, 216, 216, 14, '#141417', col.color, 4);
+    const words = col.name.toUpperCase().split(' '); words.forEach((w, i) => text(g, w, 120, 110 - (words.length - 1) * 18 + i * 36, w.length > 9 ? 22 : 30, col.color, 'Arial', 'center', '900'));
+    text(g, 'LOADING INSCRIPTION', 120, 196, 13, '#8a8f99'); } };
 }
 const pools = Object.fromEntries(Object.keys(COLS).map(s => [s, []])), names = Object.fromEntries(Object.keys(COLS).map(s => [s, nameTile(s)]));
 const sources = { bundled: 0, live: 0, liveFailures: 0, done: false };
 const BITMAPS = (MANIFEST.bitmap || []).map(([id, n, block]) => ({ id, num: n, block }));
 pools.chain = BITMAPS.map(b => ({ key: 'bitmap', id: b.id, num: b.num, block: b.block, tile: bitmapTile(b) }));
-let zeroImg = null;
+let zeroItem = null;
 async function loadBundled() {
   const keyToSym = Object.fromEntries(Object.entries(COLS).map(([s, c]) => [c.key, s]));
-  await Promise.all(ART.tiles.map(async t => { const sym = keyToSym[t.key]; if (!sym) return; try { const img = await loadImage(t.src, 8000); pools[sym].push({ key: t.key, id: t.id, num: t.num, img, tile: artTile(img, sym, t), bundled: true }); sources.bundled++; } catch (e) {} }));
-  if (ART.runestone) { try { const img = await loadImage(ART.runestone.src, 8000); const kids = (MANIFEST.runestone || []).slice(0, 8).map(([id, n]) => ({ id, num: n })); (kids.length ? kids : [{ id: ART.runestone.id, num: ART.runestone.num }]).forEach(k => pools.scatter.push({ key: 'runestone', id: k.id, num: k.num, delegate: ART.runestone.id, img, tile: artTile(img, 'scatter', k), bundled: true })); sources.bundled++; } catch (e) {} }
-  if (ART.zero) { try { zeroImg = await loadImage(ART.zero.src, 8000); } catch (e) {} }
+  await Promise.all(ART.tiles.map(async t => { const sym = keyToSym[t.key]; if (!sym) return; try { const img = await loadImage(t.src, 8000); const it = { key: t.key, id: t.id, num: t.num, img, kind: t.kind || (COLS[sym].pixel ? 'pixel' : 'raster'), w: t.w || img.naturalWidth, h: t.h || img.naturalHeight, orig: !!t.orig, bundled: true }; it.tile = artTile(sym, it); pools[sym].push(it); sources.bundled++; } catch (e) {} }));
+  if (ART.runestone) { try { const r = ART.runestone, img = await loadImage(r.src, 8000); const kids = (MANIFEST.runestone || []).slice(0, 8).map(([id, n]) => ({ id, num: n })); (kids.length ? kids : [{ id: r.id, num: r.num }]).forEach(k => { const it = { key: 'runestone', id: k.id, num: k.num, delegate: r.id, img, kind: r.kind || 'raster', w: r.w || img.naturalWidth, h: r.h || img.naturalHeight, bundled: true }; it.tile = artTile('scatter', it); pools.scatter.push(it); }); sources.bundled++; } catch (e) {} }
+  if (ART.zero) { try { const img = await loadImage(ART.zero.src, 8000); zeroItem = { img, kind: 'pixel', w: img.naturalWidth, h: img.naturalHeight }; } catch (e) {} }
   screenDirty = true;
 }
-// Image inscriptions top up live from ordinals.com (served with CORS, so the canvas stays readable) to about 18 per symbol.
+// Image inscriptions top up live from ordinals.com (served with CORS, so the canvas stays readable) to about 18 per symbol,
+// and bundled copies smaller than their original (Taproot Wizards, OMB) are replaced by the original file.
 async function loadLive() {
   const queue = [];
-  for (const [sym, col] of Object.entries(COLS)) { if (!col.live) continue; const have = new Set(pools[sym].map(t => t.id)); (MANIFEST[col.key] || []).filter(([id]) => !have.has(id)).sort(() => Math.random() - .5).slice(0, Math.max(0, 16 - have.size)).forEach(([id, n]) => queue.push({ sym, id, num: n })); }
-  let i = 0; const worker = async () => { while (i < queue.length) { const q = queue[i++]; try { const img = await loadImage(`${ORD}/content/${q.id}`); pools[q.sym].push({ key: COLS[q.sym].key, id: q.id, num: q.num, img, tile: artTile(img, q.sym, q) }); sources.live++; } catch (e) { sources.liveFailures++; } } };
+  for (const [sym, col] of Object.entries(COLS)) { if (!col.live) continue; pools[sym].filter(it => it.orig).forEach(it => queue.push({ sym, upgrade: it })); const have = new Set(pools[sym].map(t => t.id)); (MANIFEST[col.key] || []).filter(([id]) => !have.has(id)).sort(() => Math.random() - .5).slice(0, Math.max(0, 16 - have.size)).forEach(([id, n]) => queue.push({ sym, id, num: n })); }
+  let i = 0; const worker = async () => { while (i < queue.length) { const q = queue[i++]; try {
+    if (q.upgrade) { const img = await loadImage(`${ORD}/content/${q.upgrade.id}`); Object.assign(q.upgrade, gridItem(img, COLS[q.sym].pixel), { orig: false, bundled: false, sized: null }); sources.live++; screenDirty = true; continue; }
+    const img = await loadImage(`${ORD}/content/${q.id}`); const it = { key: COLS[q.sym].key, id: q.id, num: q.num, ...gridItem(img, COLS[q.sym].pixel) }; it.tile = artTile(q.sym, it); pools[q.sym].push(it); sources.live++; } catch (e) { sources.liveFailures++; } } };
   await Promise.all(Array.from({ length: 4 }, worker)); sources.done = true; screenDirty = true;
-  loadImage(`${ORD}/content/${ZERO_ID}`).then(img => { zeroImg = img; }).catch(() => {});
+  loadImage(`${ORD}/content/${ZERO_ID}`).then(img => { zeroItem = { img, kind: 'pixel', w: img.naturalWidth, h: img.naturalHeight }; screenDirty = true; }).catch(() => {});
 }
 
 /* ---------- Faces: which inscription a cell shows. Chosen after the result, with Math.random only. ---------- */
@@ -203,14 +251,17 @@ function refaceIdle() { faces = state.grid.map((col, c) => col.map((s, r) => fac
 // The casino turns this canvas into the cabinet's screen texture; the version bump is how it knows to re-upload.
 const screen=canvas(2800,1920),sg=screen.getContext('2d');sg.setTransform(2,0,0,2,0,0);
 const screenTexture = { version: 0, set needsUpdate(v) { if (v) this.version++; } };
-const baseLayer = canvas(1400, 960), RX = 45, RY = 206, RW = 1310, RH = 570, CW = RW / 5, RHT = RH / 3;
-(function drawBase() { const g = baseLayer.getContext('2d'); g.fillStyle = lin(g, 0, 0, 1400, 960, ['#1d2023', '#121416', '#1a1c1f']); g.fillRect(0, 0, 1400, 960);
+const baseLayer = canvas(2800, 1920), RX = 45, RY = 206, RW = 1310, RH = 570, CW = RW / 5, RHT = RH / 3;
+function drawBase() { baseLayer.width = screen.width; baseLayer.height = screen.height; const g = baseLayer.getContext('2d'); g.setTransform(screen.width / 1400, 0, 0, screen.height / 960, 0, 0); g.fillStyle = lin(g, 0, 0, 1400, 960, ['#1d2023', '#121416', '#1a1c1f']); g.fillRect(0, 0, 1400, 960);
   g.strokeStyle = '#ffffff07'; g.lineWidth = 1; for (let x = 0; x < 1400; x += 28) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 960); g.stroke(); } for (let y = 0; y < 960; y += 28) { g.beginPath(); g.moveTo(0, y); g.lineTo(1400, y); g.stroke(); }
   round(g, 18, 14, 380, 172, 12, '#0f1012', '#f7931a44', 2); round(g, 412, 14, 576, 172, 12, '#0f1012', '#f7931a88', 2); round(g, 1002, 14, 380, 172, 12, '#0f1012', '#f7931a44', 2);
   text(g, 'BLOCK HEIGHT', 208, 46, 18, '#c9a46a', 'Arial', 'center', '700'); text(g, 'INSCRIPTION #0 JACKPOT', 700, 42, 22, ACCENT, 'Arial', 'center', '800'); text(g, 'HOLDER POT', 1192, 46, 18, '#c9a46a', 'Arial', 'center', '700');
   round(g, RX - 12, RY - 12, RW + 24, RH + 24, 16, '#0b0c0e', lin(g, 0, RY - 12, 0, RY + RH + 12, ['#f5d38c', '#a77a2e', '#e6bd6b', '#7a5520']), 6);
   for (let c = 0; c < 5; c++) { g.fillStyle = lin(g, 0, RY, 0, RY + RH, ['#16181b', '#22252a', '#16181b']); g.fillRect(RX + c * CW, RY, CW - 3, RH); }
-  g.fillStyle = '#ffffff12'; g.fillRect(45, 893, 1310, 1); })();
+  g.fillStyle = '#ffffff12'; g.fillRect(45, 893, 1310, 1); }
+drawBase();
+// The screen's backing store: 2800 x 1920 as the cabinet texture, and the display's real pixels in fullscreen.
+function setScreenSize(w, h) { w = Math.max(700, Math.min(4096, Math.round(w))); h = Math.max(480, Math.min(4096, Math.round(h))); if (screen.width === w && screen.height === h) return; screen.width = w; screen.height = h; sg.setTransform(w / 1400, 0, 0, h / 960, 0, 0); drawBase(); screenDirty = true; screenTexture.needsUpdate = true; }
 const shadeGrad = sg.createLinearGradient(0, RY, 0, RY + RH); shadeGrad.addColorStop(0, '#000b'); shadeGrad.addColorStop(.15, '#0000'); shadeGrad.addColorStop(.82, '#0000'); shadeGrad.addColorStop(1, '#000b');
 function highlightIndex(now) { return !spinning && !feature() && !scene && lastResult && lastResult.wins.length ? Math.floor(now / 1400) % lastResult.wins.length : -1; }
 function reelOffset(a, now) {
@@ -226,8 +277,8 @@ function drawReels(now) {
   for (let c = 0; c < 5; c++) {
     sg.save(); sg.beginPath(); sg.rect(RX + c * CW, RY, CW - 3, RH); sg.clip();
     const a = spinning && animations[c];
-    if (a) { const offset = reelOffset(a, now) * RHT; const first = Math.max(0, Math.floor(offset / RHT)); for (let i = first; i < Math.min(a.sequence.length, first + 4); i++) { const [s, f] = a.sequence[i]; sg.drawImage(tileFor(s, f), cellX(c), RY + i * RHT - offset + 7, 176, 176); } }
-    else for (let r = 0; r < 3; r++) sg.drawImage(tileFor(state.grid[c][r], faces[c][r]), cellX(c), RY + r * RHT + 7, 176, 176);
+    if (a) { const offset = reelOffset(a, now) * RHT; const first = Math.max(0, Math.floor(offset / RHT)); for (let i = first; i < Math.min(a.sequence.length, first + 4); i++) { const [s, f] = a.sequence[i]; drawT(sg, tileFor(s, f), cellX(c), RY + i * RHT - offset + 7, 176, 176); } }
+    else for (let r = 0; r < 3; r++) drawT(sg, tileFor(state.grid[c][r], faces[c][r]), cellX(c), RY + r * RHT + 7, 176, 176);
     sg.fillStyle = shadeGrad; sg.fillRect(RX + c * CW, RY, CW, RH); sg.restore();
     if (a && a.antic && now < a.start + a.land) { sg.save(); sg.globalAlpha = .55 + .45 * Math.sin(now / 90); sg.shadowColor = ACCENT; sg.shadowBlur = 24; round(sg, RX + c * CW + 4, RY + 4, CW - 11, RH - 8, 12, null, '#ffc56b', 5); sg.restore(); }
   }
@@ -240,7 +291,7 @@ function drawReels(now) {
 function drawAirdrop(now) {
   const it = pools.scatter[0]; if (!it || !motionOK()) return;
   sg.save(); sg.globalAlpha = .7; sg.shadowColor = ACCENT; sg.shadowBlur = 18;
-  for (let k = 0; k < 14; k++) { const sp = 90 + (hashStr('r' + k) % 70), x = RX + 20 + (hashStr('x' + k) % (RW - 80)), y = ((now / 1000 * sp + (hashStr('y' + k) % 900)) % (RH + 120)) + RY - 90, s = 40 + (k % 3) * 12; sg.drawImage(it.img, x, y, s, s); }
+  for (let k = 0; k < 14; k++) { const sp = 90 + (hashStr('r' + k) % 70), x = RX + 20 + (hashStr('x' + k) % (RW - 80)), y = ((now / 1000 * sp + (hashStr('y' + k) % 900)) % (RH + 120)) + RY - 90, s = 40 + (k % 3) * 12; drawArt(sg, it, x, y, s, s); }
   sg.restore();
 }
 // Bitmap Land Grab: each locked cell is a real Bitmap parcel. Which parcel is cosmetic (a hash of the round id), never the engine.
@@ -263,7 +314,7 @@ function drawBlocks() { const h = state.history.slice(0, 21).reverse(), n = 21, 
    trigger → intro → play → outro. The engine has already dealt every result before a scene starts; scenes only reveal.
    Skip jumps to the outro with the same total. Turbo shortens every animation; reduced motion swaps movement for fades. */
 const TITLES = { free: 'THE AIRDROP', vault: 'WIZARD VAULT', chain: 'BITMAP LAND GRAB', jackpot: 'INSCRIPTION #0', gamble: 'ODD SAT / EVEN SAT' };
-const RULES = { free: 'Eight free spins. Runestones rain; every win pays 2×. More Runestones add four.', vault: 'Nine sealed sats. Open three: a Wizard reveals each one’s rarity and prize.', chain: 'Claim Bitmap parcels. Any new parcel resets your three respins. All 15 wins Inscription #0.', jackpot: 'The first inscription on Bitcoin. Five NodeMonkes on the centre row found it.', gamble: '' };
+const RULES = { free: 'Eight free spins. Runestones rain; every win pays 2×. More Runestones add four.', vault: 'Nine sealed sats. Open three: a Wizard reveals each one’s rarity and prize.', chain: 'Claim Bitmap parcels. Any new parcel resets your three respins. All 15 wins Inscription #0.', jackpot: 'Five NodeMonkes on the centre row win the Inscription #0 Jackpot: the progressive LAYR meter, named after the first inscription on Bitcoin.', gamble: '' };
 const TRIGGER_SYM = { free: 'scatter', vault: 'vault', chain: 'chain' };
 const motionOK = () => !state.reduced && !matchMedia('(prefers-reduced-motion: reduce)').matches;
 const speed = () => state.turbo ? .4 : 1;
@@ -282,6 +333,8 @@ function sfx(kind, i = 0) { audioInit(); if (!ac || state.muted) return;
   if (kind === 'reset') { tone(1318.5, .15, 'sine', .07); tone(1760, .2, 'sine', .06, .08); }
   if (kind === 'tick') tone(1600 + (i % 6) * 60, .03, 'sine', .025);
   if (kind === 'roll') noise(.03, 2600, 5, .1);
+  if (kind === 'scan') { tone(330, 1.1, 'sawtooth', .022, 0, 2.6); noise(1, 1800, 1.2, .05); }
+  if (kind === 'miss') { tone(196, .25, 'triangle', .07, 0, .7); noise(.08, 500, 1, .12); }
   if (kind === 'land') { noise(.06, 1500, 2, .3); tone(660, .16, 'triangle', .09); }
   if (kind === 'summary') { [659.25, 783.99, 1046.5].forEach((n, k) => tone(n, .35, 'triangle', .07, k * .08)); }
 }
@@ -317,7 +370,7 @@ function primaryAction() {
 function primaryLabel(broke) {
   if (!scene) { if (feature()) return 'CONTINUE'; if (state.freeActive && !state.free) return 'SUMMARY'; return state.free ? 'AIRDROP' : broke ? 'GET LAYR' : 'INSCRIBE'; }
   const { kind, stage } = scene, f = feature();
-  if (stage === 'trigger') return 'CONTINUE'; if (stage === 'intro') return kind === 'gamble' ? 'CALL IT' : kind === 'jackpot' ? 'CLAIM' : 'START';
+  if (stage === 'trigger') return 'CONTINUE'; if (stage === 'intro') return kind === 'gamble' ? 'CALL IT' : kind === 'jackpot' ? 'REVEAL' : 'START';
   if (stage === 'play') { if (kind === 'vault') return f && E.featureDone(f) ? 'COLLECT' : `OPEN ${f ? 3 - f.picks.length : 0}`; if (kind === 'chain') return f && E.featureDone(f) ? 'COLLECT' : 'RESPIN'; if (kind === 'jackpot') return 'SUMMARY'; return scene.data.landed ? 'CONTINUE' : 'REVEALING'; }
   return 'CONTINUE';
 }
@@ -358,7 +411,15 @@ function collectScene(skipped = false) {
 // Bonus actions (also used by the feature bar, the screen and the keyboard).
 function featureAction() { const f = feature(); if (!f || spinning || locked()) return; if (!scene) { startScene(f.type, {}, 'intro'); return; } if (scene.stage !== 'play') { primaryAction(); return; }
   if (E.featureDone(f)) { collectScene(); return; }
-  if (f.type === 'chain') { const before = f.frames[f.index].left; const fr = E.respin(state); save(); chainFlash = performance.now(); const now = performance.now(); fr.added.forEach((i, k) => { scene.stampAt[i] = now + k * 120 * speed(); setTimeout(() => sfx('stamp'), k * 120 * speed()); }); if (fr.added.length) { if (before < 3) { scene.resetAt = now; setTimeout(() => sfx('reset'), 200); } } else sound('respin'); renderBar(); update(); }
+  if (f.type === 'chain') { const now = performance.now(); if (scene.roll && now < scene.roll.until) return; // one respin at a time: the last one finishes rolling first
+    // Each respin rolls: every empty parcel spins through block numbers, a scan sweeps the map, then new parcels stamp down one by one.
+    const before = f.frames[f.index].left, fr = E.respin(state); save(); const R = (motionOK() ? 1250 : 350) * speed(), gap = 170 * speed(), n = (scene.roll ? scene.roll.n : 0) + 1, settle = R + fr.added.length * gap;
+    scene.roll = { at: now, until: now + R, added: fr.added.slice(), before, left: f.frames[f.index].left, n, settle: now + settle };
+    sfx('scan'); if (motionOK()) for (let k = 0; k < 9; k++) setTimeout(() => sfx('roll'), k * R / 10);
+    fr.added.forEach((i, k) => { scene.stampAt[i] = now + R + k * gap; setTimeout(() => sfx('stamp'), R + k * gap); });
+    chainFlash = now + settle;
+    if (fr.added.length) { if (before < 3) { scene.resetAt = now + settle; setTimeout(() => sfx('reset'), settle + 80); } } else setTimeout(() => sfx('miss'), R);
+    renderBar(); update(); }
   else toast('Open three sealed sats first.'); }
 function pickVault(i) { if (locked() || !scene || scene.kind !== 'vault' || scene.stage !== 'play') { if (scene && scene.kind === 'vault' && scene.stage === 'intro') setStage('play'); else return; } const f = feature(); if (!f) return; const r = E.pick(state, i); if (!r) return; save(); scene.reveal[i] = performance.now(); sfx('crack', i); if (r.multiple >= 8) setTimeout(() => sfx('reveal-big'), 520 * speed()); else setTimeout(() => sound('pick', i), 450 * speed()); renderBar(); update(); }
 function keepWin() { state.gamble = 0; save(); scene = null; hideBar(); toast('Win kept in your balance.'); update(); }
@@ -369,9 +430,9 @@ function openGamble() { if (locked() || !state.gamble || busy()) return; if (sta
 function button(label, x, y, w, h, fn, primary = true) { round(sg, x, y, w, h, 14, primary ? lin(sg, x, y, x + w, y + h, ['#ffc56b', '#f7931a', '#d9770f']) : '#1d1a16', primary ? '#fff1b8' : '#86603f', 3); text(sg, label, x + w / 2, y + h / 2 + 1, primary ? 28 : 22, primary ? '#1a0d00' : '#f3e6d0', 'Arial', 'center', '900'); hits.push({ x, y, w, h, fn }); }
 function skipChip() { if (canSkip()) button('SKIP ›', RX + RW - 150, RY + 14, 136, 50, skipScene, false); }
 function backdrop(kind, now, dim = 1) { const g = sg; g.save(); if (kind !== 'jackpot' || !scene || scene.stage !== 'play') { g.beginPath(); g.rect(RX, RY, RW, RH); g.clip(); }
-  if (kind === 'free') { g.fillStyle = lin(g, 0, RY, 0, RY + RH, ['#05070c', '#1b1208', '#2a1606']); g.fillRect(RX, RY, RW, RH); if (pools.scatter[0] && motionOK()) for (let k = 0; k < 18; k++) { const sp = 70 + (hashStr('i' + k) % 80), x = RX + (hashStr('ix' + k) % RW), y = ((now / 1000 * sp + (hashStr('iy' + k) % 700)) % (RH + 160)) + RY - 120, s = 46 + (k % 4) * 14; g.globalAlpha = .35 * dim; g.drawImage(pools.scatter[0].img, x, y, s, s); } }
+  if (kind === 'free') { g.fillStyle = lin(g, 0, RY, 0, RY + RH, ['#05070c', '#1b1208', '#2a1606']); g.fillRect(RX, RY, RW, RH); if (pools.scatter[0] && motionOK()) for (let k = 0; k < 18; k++) { const sp = 70 + (hashStr('i' + k) % 80), x = RX + (hashStr('ix' + k) % RW), y = ((now / 1000 * sp + (hashStr('iy' + k) % 700)) % (RH + 160)) + RY - 120, s = 46 + (k % 4) * 14; g.globalAlpha = .35 * dim; drawArt(g, pools.scatter[0], x, y, s, s); } }
   if (kind === 'vault') { g.fillStyle = lin(g, 0, RY, 0, RY + RH, ['#140d06', '#1f1408', '#0d0905']); g.fillRect(RX, RY, RW, RH); g.globalAlpha = .12 * dim; for (let k = 0; k < 9; k++) { const [x, y, w, h] = capsuleRect(k); g.beginPath(); g.arc(x + w / 2, y + h / 2, h * .42, 0, 7); g.fillStyle = ACCENT; g.fill(); } }
-  if (kind === 'chain') { g.fillStyle = '#100c07'; g.fillRect(RX, RY, RW, RH); const off = motionOK() ? (now / 40) % 250 : 0; g.globalAlpha = .28 * dim; BITMAPS.forEach((b, k) => { const t = parcelTile({ roundId: 'map' }, k, 0); const x = RX + (k % 7) * 190 - off + 20, y = RY + Math.floor(k / 7) * 190 + 10; g.drawImage(t, x, y, 170, 170); g.drawImage(t, x + 1330, y, 170, 170); }); }
+  if (kind === 'chain') { g.fillStyle = '#100c07'; g.fillRect(RX, RY, RW, RH); const off = motionOK() ? (now / 40) % 250 : 0; g.globalAlpha = .28 * dim; BITMAPS.forEach((b, k) => { const t = parcelTile({ roundId: 'map' }, k, 0); const x = RX + (k % 7) * 190 - off + 20, y = RY + Math.floor(k / 7) * 190 + 10; drawT(g, t, x, y, 170, 170); drawT(g, t, x + 1330, y, 170, 170); }); }
   if (kind === 'jackpot') { g.fillStyle = '#0b0703'; g.fillRect(0, 0, 1400, 960); const a = motionOK() ? now / 2400 : 0; g.translate(700, 480); for (let k = 0; k < 18; k++) { g.rotate(Math.PI / 9); g.globalAlpha = .12 * dim; g.fillStyle = k % 2 ? '#f7931a' : '#f2c14e'; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, 1200, a, a + Math.PI / 18); g.closePath(); g.fill(); } }
   if (kind === 'gamble') { g.fillStyle = lin(g, 0, RY, 0, RY + RH, ['#0e0e10', '#1a1307']); g.fillRect(RX, RY, RW, RH); }
   g.restore(); }
@@ -382,24 +443,24 @@ function drawTrigger(now) { const { kind } = scene, t = (now - scene.t0) / TRIGG
   const cells = kind === 'jackpot' ? cellsOf('bitcoin', true) : kind === 'gamble' ? [] : cellsOf(TRIGGER_SYM[kind] || 'scatter');
   drawReels(now); sg.fillStyle = `rgba(0,0,0,${Math.min(.62, t * 1.6)})`; sg.fillRect(RX, RY, RW, RH);
   cells.forEach(([c, r], k) => { const lift = motionOK() ? Math.sin(Math.min(1, t * 1.4) * Math.PI / 2) : 1, bob = motionOK() ? Math.sin(now / 160 + k) * 6 : 0, s = 176 * (1 + .14 * lift);
-    sg.save(); sg.shadowColor = kind === 'jackpot' ? '#f2c14e' : ACCENT; sg.shadowBlur = 20 + 25 * Math.abs(Math.sin(now / 200 + k)); sg.drawImage(tileFor(state.grid[c][r], faces[c][r]), RX + c * CW + CW / 2 - s / 2, RY + r * RHT + RHT / 2 - s / 2 - 16 * lift + bob, s, s); sg.restore(); });
+    sg.save(); sg.shadowColor = kind === 'jackpot' ? '#f2c14e' : ACCENT; sg.shadowBlur = 20 + 25 * Math.abs(Math.sin(now / 200 + k)); drawT(sg, tileFor(state.grid[c][r], faces[c][r]), RX + c * CW + CW / 2 - s / 2, RY + r * RHT + RHT / 2 - s / 2 - 16 * lift + bob, s, s); sg.restore(); });
   if (kind === 'gamble') drawSatCoin(700, RY + RH / 2, 150 * ease(t * 2), now, '?');
   if (t > .5) titleCard(TITLES[kind], kind === 'jackpot' ? 'FIVE NODEMONKES ON THE CENTRE ROW' : kind === 'gamble' ? `${fmt(scene.data.stake)} LAYR RIDES ON ONE CALL` : `${cells.length} ${NAMES[TRIGGER_SYM[kind]].toUpperCase()}S`, now, (t - .5) * 1.4);
   if (t >= 1) setStage('intro'); }
 function drawSatCoin(cx, cy, r, now, face) { if (r <= 1) return; const spin = motionOK() ? Math.cos(now / 220) : 1; sg.save(); sg.translate(cx, cy); sg.scale(Math.max(.08, Math.abs(spin)), 1); sg.shadowColor = ACCENT; sg.shadowBlur = 30; sg.fillStyle = lin(sg, -r, -r, r, r, ['#ffd18a', ACCENT, '#a8550a']); sg.beginPath(); sg.arc(0, 0, r, 0, 7); sg.fill(); sg.shadowBlur = 0; sg.lineWidth = 8; sg.strokeStyle = '#7a3e06'; sg.beginPath(); sg.arc(0, 0, r * .86, 0, 7); sg.stroke(); text(sg, 'SAT', 0, -r * .32, r * .26, '#3a1f05', 'Arial', 'center', '900'); text(sg, face, 0, r * .18, r * .62, '#3a1f05', 'Arial', 'center', '900'); sg.restore(); }
 function drawIntro(now) { const { kind } = scene, t = (now - scene.t0) / (600 * speed()), a = Math.min(1, t);
   backdrop(kind, now); sg.save(); sg.globalAlpha = a; const yIn = motionOK() ? (1 - ease(t)) * 40 : 0;
-  if (kind === 'free' && pools.scatter[0]) { sg.shadowColor = ACCENT; sg.shadowBlur = 40; sg.drawImage(pools.scatter[0].img, 330 - 120, RY + 120 + yIn, 240, 240); sg.shadowBlur = 0; }
-  if (kind === 'vault') { const w = tileFor('vault', wizardFaces[0] ?? pickFace('vault')); sg.drawImage(w, 210, RY + 110 + yIn, 250, 250); }
-  if (kind === 'chain') { sg.drawImage(parcelTile({ roundId: 'intro' }, 0, 0), 215, RY + 115 + yIn, 230, 230); }
-  if (kind === 'jackpot' && zeroImg) { sg.shadowColor = '#f2c14e'; sg.shadowBlur = 50; round(sg, 190, RY + 100 + yIn, 280, 280, 18, '#111', '#f2c14e', 8); sg.shadowBlur = 0; sg.imageSmoothingEnabled = false; sg.drawImage(zeroImg, 200, RY + 110 + yIn, 260, 260); sg.imageSmoothingEnabled = true; }
+  if (kind === 'free' && pools.scatter[0]) { sg.shadowColor = ACCENT; sg.shadowBlur = 40; drawArt(sg, pools.scatter[0], 330 - 120, RY + 120 + yIn, 240, 240); sg.shadowBlur = 0; }
+  if (kind === 'vault') { const w = tileFor('vault', wizardFaces[0] ?? pickFace('vault')); drawT(sg, w, 210, RY + 110 + yIn, 250, 250); }
+  if (kind === 'chain') { drawT(sg, parcelTile({ roundId: 'intro' }, 0, 0), 215, RY + 115 + yIn, 230, 230); }
+  if (kind === 'jackpot' && zeroItem) { sg.shadowColor = '#f2c14e'; sg.shadowBlur = 50; round(sg, 190, RY + 100 + yIn, 280, 280, 18, '#fff', '#f2c14e', 8); sg.shadowBlur = 0; drawArt(sg, zeroItem, 200, RY + 110 + yIn, 260, 260); }
   if (kind === 'gamble') drawSatCoin(330, RY + 240, 130, now, '?');
   sg.shadowColor = ACCENT; sg.shadowBlur = 24; text(sg, TITLES[kind], 890, RY + 150 + yIn, kind === 'chain' ? 58 : 66, '#ffd18a', 'Georgia, serif', 'center', '900'); sg.shadowBlur = 0;
   const rule = kind === 'gamble' ? `Call the sat number's last digit. Right doubles your ${fmt(scene.data.stake)} LAYR win; wrong loses it.` : RULES[kind];
   wrapText(rule, 890, RY + 232 + yIn, 640, 30, '#f3e6d0', 26);
   sg.restore();
   if (kind === 'gamble') { button('ODD', 600, RY + 380, 180, 84, () => callGamble('odd')); button('EVEN', 800, RY + 380, 180, 84, () => callGamble('even')); button('KEEP WIN', 1000, RY + 390, 170, 64, keepWin, false); }
-  else button(kind === 'jackpot' ? 'CLAIM' : 'START', 760, RY + 380, 260, 88, primaryAction);
+  else button(kind === 'jackpot' ? 'REVEAL' : 'START', 760, RY + 380, 260, 88, primaryAction);
   skipChip(); }
 function wrapText(s, x, y, maxW, lh, color, size) { sg.font = `700 ${size}px Arial`; const words = s.split(' '); let line = '', yy = y; for (const w of words) { const t = line ? line + ' ' + w : w; if (sg.measureText(t).width > maxW && line) { text(sg, line, x, yy, size, color, 'Arial', 'center', '700'); line = w; yy += lh; } else line = t; } if (line) text(sg, line, x, yy, size, color, 'Arial', 'center', '700'); }
 function drawVaultPlay(f, now) {
@@ -413,28 +474,49 @@ function drawVaultPlay(f, now) {
         sg.restore(); continue; }
       const k = motionOK() ? ease((t - .45) / .55) : 1, big = m >= 8; sg.save(); if (big) { sg.shadowColor = '#f2c14e'; sg.shadowBlur = 30 + 20 * Math.sin(now / 150); }
       round(sg, x, y, w, h, 14, big ? '#3a240c' : '#1f1407', big ? '#f2c14e' : ACCENT, big ? 6 : 4); sg.restore();
-      const s = (h - 16) * (motionOK() ? .6 + .4 * k : 1); sg.drawImage(tileFor('vault', wizardFaces[i]), x + 8 + (h - 16 - s) / 2, y + 8 + (h - 16 - s) / 2, s, s);
+      const s = (h - 16) * (motionOK() ? .6 + .4 * k : 1); drawT(sg, tileFor('vault', wizardFaces[i]), x + 8 + (h - 16 - s) / 2, y + 8 + (h - 16 - s) / 2, s, s);
       const shown = Math.round(m * Math.min(1, k * 1.2)); text(sg, RARITY[m] || '', x + h + (w - h) / 2, y + h / 2 - 34, 22, big ? '#fff1b8' : '#ffd18a'); text(sg, `${Math.max(1, shown)}×`, x + h + (w - h) / 2, y + h / 2 + 4, 46, '#ffffff', 'Arial'); text(sg, `${fmt(Math.max(1, shown) * f.bet)} LAYR`, x + h + (w - h) / 2, y + h / 2 + 44, 18, '#ffc56b'); }
     else if (done && now - doneAt > 900 * speed()) { round(sg, x, y, w, h, 14, '#121315', '#3a2a14', 2); text(sg, RARITY[m] || '', x + w / 2, y + h / 2 - 16, 16, '#6b5232'); text(sg, `${m}×`, x + w / 2, y + h / 2 + 14, 30, '#6b5232'); }
     else { const hover = motionOK() ? Math.sin(now / 400 + i) * 3 : 0; round(sg, x, y + hover, w, h, 14, lin(sg, x, y, x, y + h, ['#2a1c0b', '#130d06']), ACCENT, 3); sg.beginPath(); sg.arc(x + 70, y + h / 2 + hover, 44, 0, 7); sg.fillStyle = '#a8550a'; sg.fill(); sg.lineWidth = 4; sg.strokeStyle = '#ffd18a'; sg.stroke(); text(sg, String(i + 1), x + 70, y + h / 2 + hover + 2, 38, '#1a0d00', 'Arial', 'center', '900'); text(sg, 'SEALED SAT', x + w / 2 + 50, y + h / 2 - 22 + hover, 24, '#ffd18a'); text(sg, satFor(f, i).toLocaleString('en-GB'), x + w / 2 + 50, y + h / 2 + 12 + hover, 16, '#9c7a4a', 'Courier New', 'center', '700'); if (!done) hits.push({ x, y, w, h, fn: () => pickVault(i) }); } }
   if (done && now - doneAt > 900 * speed()) button('COLLECT', 570, RY + RH + 8, 260, 64, collectScene);
   skipChip(); }
 function drawGrabPlay(f, now) {
-  backdrop('chain', now, .35); const fr = f.frames[f.index], tot = fr.cells.reduce((a, v) => a + v, 0);
-  fr.cells.forEach((v, i) => { const x = RX + (i % 5) * CW + 8, y = RY + Math.floor(i / 5) * RHT + 8, w = CW - 19, h = RHT - 16, at = scene.stampAt[i];
-    if (v) { const t = at ? (now - at) / (320 * speed()) : 9; if (t < 0) { round(sg, x, y, w, h, 14, '#101113', '#3a2a14', 2); return; } const s = motionOK() ? 1 + .7 * (1 - ease(t)) : 1; sg.save(); sg.globalAlpha = Math.min(1, t * 3); if (t < 1.5) { sg.shadowColor = ACCENT; sg.shadowBlur = 40 * (1.5 - Math.min(1.5, t)); } const hh = h * s; sg.drawImage(parcelTile(f, i, v), x + (w - hh) / 2, y + (h - hh) / 2, hh, hh); sg.restore(); if (t > .6) text(sg, fmt(v * f.bet), x + w / 2, y + h - 4, 16, '#ffd18a'); }
-    else { round(sg, x, y, w, h, 14, '#101113cc', '#3a2a14', 2); text(sg, 'UNCLAIMED', x + w / 2, y + h / 2 - 10, 15, '#6b5232'); text(sg, 'PARCEL', x + w / 2, y + h / 2 + 12, 13, '#4d3b24'); } });
-  // Respins left: three lamps that visibly refill whenever a new parcel lands.
-  const rs = scene.resetAt && now - scene.resetAt < 900 ? 1 : 0; sg.save(); round(sg, RX + 14, RY + 14, 290, 52, 12, '#0b0b0de6', rs ? '#ffd18a' : '#86603f', rs ? 4 : 2); text(sg, 'RESPINS', RX + 80, RY + 41, 20, '#ffd18a', 'Arial', 'center', '900');
-  for (let k = 0; k < 3; k++) { const on = k < fr.left; sg.beginPath(); sg.arc(RX + 170 + k * 44, RY + 40, 15, 0, 7); sg.fillStyle = on ? (rs ? '#fff1b8' : ACCENT) : '#2a2420'; if (on && rs) { sg.shadowColor = ACCENT; sg.shadowBlur = 20; } sg.fill(); sg.shadowBlur = 0; } sg.restore();
+  backdrop('chain', now, .35); const fr = f.frames[f.index], tot = fr.cells.reduce((a, v) => a + v, 0), ro = scene.roll, rolling = !!ro && now < ro.until, rt = rolling ? (now - ro.at) / (ro.until - ro.at) : 1;
+  fr.cells.forEach((v, i) => { const x = RX + (i % 5) * CW + 8, y = RY + Math.floor(i / 5) * RHT + 8, w = CW - 19, h = RHT - 16, at = scene.stampAt[i], landing = !!ro && ro.added.includes(i);
+    // A cell that is empty, or that this respin is about to fill, spins while the respin rolls.
+    if (rolling && (!v || (landing && at > now))) { drawRollingCell(x, y, w, h, i, now, rt, landing); return; }
+    if (v) { const t = at ? (now - at) / (320 * speed()) : 9; if (t < 0) { drawRollingCell(x, y, w, h, i, now, 1, true); return; }
+      const s = motionOK() ? 1 + .7 * (1 - ease(t)) : 1; sg.save(); sg.globalAlpha = Math.min(1, t * 3); if (t < 1.5) { sg.shadowColor = ACCENT; sg.shadowBlur = 40 * (1.5 - Math.min(1.5, t)); } const hh = h * s; drawT(sg, parcelTile(f, i, v), x + (w - hh) / 2, y + (h - hh) / 2, hh, hh); sg.restore();
+      if (t < 1.2 && motionOK()) { sg.save(); sg.globalAlpha = Math.max(0, 1 - t / 1.2); sg.strokeStyle = '#ffd18a'; sg.lineWidth = 6; sg.beginPath(); sg.roundRect(x - t * 30, y - t * 30, w + t * 60, h + t * 60, 18); sg.stroke(); sg.restore(); }
+      if (t > .6) text(sg, fmt(v * f.bet), x + w / 2, y + h - 4, 16, '#ffd18a'); }
+    else { const missed = !!ro && !rolling && now - ro.until < 650 * speed(), m = missed ? 1 - (now - ro.until) / (650 * speed()) : 0;
+      round(sg, x, y, w, h, 14, '#101113cc', missed ? `rgba(255,120,60,${(.25 + .6 * m).toFixed(3)})` : '#3a2a14', missed ? 3 : 2); text(sg, 'UNCLAIMED', x + w / 2, y + h / 2 - 10, 15, '#6b5232'); text(sg, 'PARCEL', x + w / 2, y + h / 2 + 12, 13, '#4d3b24'); } });
+  // The scan: a beam of light sweeps the map once per respin.
+  if (rolling && motionOK()) { const bx = RX - 120 + (RW + 240) * ease(rt); sg.save(); sg.beginPath(); sg.rect(RX, RY, RW, RH); sg.clip(); const gr = sg.createLinearGradient(bx - 120, 0, bx + 120, 0); gr.addColorStop(0, '#f7931a00'); gr.addColorStop(.5, '#ffd18a55'); gr.addColorStop(1, '#f7931a00'); sg.fillStyle = gr; sg.fillRect(bx - 120, RY, 240, RH); sg.fillStyle = '#fff1b8'; sg.fillRect(bx - 2, RY, 4, RH); sg.restore(); }
+  // Respins left: three lamps. The one being spent drains while the respin rolls; they all refill when a new parcel lands.
+  const rs = scene.resetAt && now >= scene.resetAt && now - scene.resetAt < 900 ? 1 : 0, shown = rolling ? ro.before : ro && now < ro.settle ? Math.max(ro.left, ro.before - 1) : fr.left;
+  sg.save(); round(sg, RX + 14, RY + 14, 290, 52, 12, '#0b0b0de6', rs ? '#ffd18a' : '#86603f', rs ? 4 : 2); text(sg, 'RESPINS', RX + 80, RY + 41, 20, '#ffd18a', 'Arial', 'center', '900');
+  for (let k = 0; k < 3; k++) { const spending = rolling && k === ro.before - 1, on = k < shown; sg.beginPath(); sg.arc(RX + 170 + k * 44, RY + 40, 15, 0, 7); sg.fillStyle = on ? (rs ? '#fff1b8' : ACCENT) : '#2a2420'; if (spending) sg.globalAlpha = .2 + .8 * Math.abs(Math.cos(rt * Math.PI * 3)) * (1 - rt); if (on && rs) { sg.shadowColor = ACCENT; sg.shadowBlur = 20; } sg.fill(); sg.globalAlpha = 1; sg.shadowBlur = 0; } sg.restore();
+  // What this respin did, in words: scanning, then "+2 PARCELS · RESPINS RESET TO 3" or "NO NEW PARCELS".
+  if (ro && now < ro.settle + 1100 * speed()) { const good = !rolling && ro.added.length > 0, res = rolling ? `RESPIN ${ro.n} · SCANNING THE BLOCKS` : good ? `+${ro.added.length} PARCEL${ro.added.length > 1 ? 'S' : ''}${ro.before < 3 ? ' · RESPINS RESET TO 3' : ''}` : `NO NEW PARCELS · ${ro.left} RESPIN${ro.left === 1 ? '' : 'S'} LEFT`;
+    const pop = motionOK() && !rolling ? 1 + .12 * Math.max(0, 1 - (now - ro.until) / 300) : 1; sg.save(); sg.translate(700, RY + 40); sg.scale(pop, pop); round(sg, -280, -24, 560, 48, 12, good ? '#2a1606f0' : '#0b0b0de6', good ? ACCENT : '#86603f', good ? 3 : 2); text(sg, res, 0, 1, 20, good ? '#ffd18a' : '#d0c0a8', 'Arial', 'center', '900'); sg.restore(); }
   round(sg, RX + RW - 340, RY + RH - 66, 326, 52, 12, '#0b0b0de6', '#86603f', 2); text(sg, `CLAIMED ${fmt(tot * f.bet)} LAYR`, RX + RW - 177, RY + RH - 40, 22, '#ffd18a', 'Arial', 'center', '900');
   if (E.featureDone(f) && now - chainFlash > 700) button('COLLECT', 570, RY + RH / 2 - 37, 260, 74, collectScene);
-  else if (!E.featureDone(f)) hits.push({ x: RX, y: RY, w: RW, h: RH, fn: featureAction });
+  else if (!E.featureDone(f) && !rolling) hits.push({ x: RX, y: RY, w: RW, h: RH, fn: featureAction });
   skipChip(); }
+// One empty parcel mid-respin: block numbers race past and slow down, then either lock (a new parcel) or fade back to empty.
+function drawRollingCell(x, y, w, h, i, now, rt, landing) {
+  const hot = landing && rt > .7; sg.save(); round(sg, x, y, w, h, 14, '#0e0c09', hot ? '#ffd18a' : '#5a4226', hot ? 4 : 2); sg.beginPath(); sg.roundRect(x + 3, y + 3, w - 6, h - 6, 12); sg.clip();
+  if (motionOK() && BITMAPS.length) { const v = 1.4 * (1 - .85 * ease(rt)) + .15, pos = now * v + i * 97, off = pos % 60, base = Math.floor(pos / 60);
+    for (let k = -1; k < 4; k++) { const b = BITMAPS[(base + k + i * 5) % BITMAPS.length], yy = y + h / 2 + (1 - k) * 60 + off - 30;
+      sg.globalAlpha = Math.max(0, 1 - Math.abs(yy - (y + h / 2)) / (h * .7)) * (.45 + .55 * ease(rt)); text(sg, String(b.block), x + w / 2, yy, 34, hot ? '#fff1b8' : '#ffd18a', 'Courier New', 'center', '900'); }
+    sg.globalAlpha = 1; const gr = sg.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, '#0e0c09'); gr.addColorStop(.3, '#0e0c0900'); gr.addColorStop(.7, '#0e0c0900'); gr.addColorStop(1, '#0e0c09'); sg.fillStyle = gr; sg.fillRect(x, y, w, h); }
+  else { sg.globalAlpha = .5 + .5 * Math.abs(Math.sin(now / 90 + i)); text(sg, '· · ·', x + w / 2, y + h / 2, 30, '#ffd18a'); }
+  sg.restore(); }
 function drawJackpotPlay(now) { backdrop('jackpot', now); const t = Math.min(1, (now - scene.t0) / (4200 * speed())), amt = scene.data.amount * ease(t);
   // Chasing bulbs round the whole screen.
   for (let k = 0; k < 56; k++) { const p = k / 56, x = p < .25 ? 30 + p * 4 * 1340 : p < .5 ? 1370 : p < .75 ? 1370 - (p - .5) * 4 * 1340 : 30, y = p < .25 ? 22 : p < .5 ? 22 + (p - .25) * 4 * 916 : p < .75 ? 938 : 938 - (p - .75) * 4 * 916, on = motionOK() ? (k + Math.floor(now / 90)) % 3 === 0 : k % 2 === 0; sg.beginPath(); sg.arc(x, y, 9, 0, 7); sg.fillStyle = on ? '#fff1b8' : '#5a3a14'; sg.fill(); }
-  const s = 300 + (motionOK() ? 20 * Math.sin(now / 300) : 0); sg.save(); sg.shadowColor = '#f2c14e'; sg.shadowBlur = 60; round(sg, 700 - s / 2 - 16, 120 - 16, s + 32, s + 32, 20, '#111', '#f2c14e', 10); sg.restore(); if (zeroImg) { sg.imageSmoothingEnabled = false; sg.drawImage(zeroImg, 700 - s / 2, 120, s, s); sg.imageSmoothingEnabled = true; }
+  const s = 300 + (motionOK() ? 20 * Math.sin(now / 300) : 0); sg.save(); sg.shadowColor = '#f2c14e'; sg.shadowBlur = 60; round(sg, 700 - s / 2 - 16, 120 - 16, s + 32, s + 32, 20, '#111', '#f2c14e', 10); sg.restore(); if (zeroItem) { round(sg, 700 - s / 2, 120, s, s, 6, '#fff'); drawArt(sg, zeroItem, 700 - s / 2, 120, s, s); }
   sg.save(); sg.shadowColor = ACCENT; sg.shadowBlur = 30; text(sg, 'INSCRIPTION #0 JACKPOT', 700, 500, 64, '#ffd18a', 'Georgia, serif', 'center', '900'); sg.restore();
   text(sg, `${fmt(Math.round(amt))} LAYR`, 700, 600, 90, '#ffffff', 'Arial', 'center', '900'); text(sg, 'THE FIRST INSCRIPTION ON BITCOIN · FROM ORDINALS.COM', 700, 680, 20, '#c9a46a', 'Arial', 'center', '800');
   if (t < 1 && Math.floor(now / 70) !== Math.floor((now - 17) / 70)) sfx('tick', Math.floor(now / 70));
@@ -452,7 +534,7 @@ function drawOutro(now) { const { kind, data } = scene, t = Math.min(1, (now - s
   if (kind === 'free') { title = 'AIRDROP CLAIMED'; total = data.total; lines = [`${data.count} free spins played at 2×${data.retriggers ? ` · ${data.retriggers} retrigger${data.retriggers > 1 ? 's' : ''}` : ''}`, data.best ? `Biggest spin ${fmt(data.best)} LAYR` : 'Includes any Vault or Land Grab won during the Airdrop', data.skipped ? 'Skipped: same total, no animation' : ''] }
   if (kind === 'vault') { title = 'VAULT OPENED'; total = data.total; lines = [`3 sats opened: ${(data.picks || []).map(m => `${RARITY[m]} ${m}×`).join(' · ')}`, `${(data.picks || []).reduce((a, b) => a + b, 0)}× your ${fmt(data.bet || 0)} LAYR bet`] }
   if (kind === 'chain') { title = 'LAND GRABBED'; total = data.total; lines = [`${data.cells}/15 parcels claimed · ${data.respins} respins`, data.jackpot ? `All 15 claimed: Inscription #0 Jackpot +${fmt(data.jackpot)} next` : 'Fill all 15 to win Inscription #0'] }
-  if (kind === 'jackpot') { title = 'INSCRIPTION #0'; total = data.amount; lines = ['The jackpot meter for this bet level paid in full', 'The meter restarts at 500× your bet'] }
+  if (kind === 'jackpot') { title = 'JACKPOT WON'; total = data.amount; lines = ['The jackpot meter for this bet level paid in full', 'The meter restarts at 500× your bet'] }
   if (kind === 'gamble') { const r = data.result; title = r ? (r.win ? 'DOUBLED' : 'NOT THIS TIME') : 'WIN KEPT'; total = r ? r.amount : data.stake; lines = r ? [`Sat ${r.sat.toLocaleString('en-GB')} is ${r.parity}; you called ${r.choice}`, r.win ? `Your ${fmt(r.stake)} LAYR win doubled` : `Your ${fmt(r.stake)} LAYR win is lost; other LAYR untouched`] : [] }
   const k = ease(t); if (t < 1 && Math.floor(now / 60) !== Math.floor((now - 17) / 60)) sfx('tick', Math.floor(now / 60));
   sg.save(); sg.globalAlpha = Math.min(1, t * 3); sg.shadowColor = ACCENT; sg.shadowBlur = 24; text(sg, title, 700, RY + 110, 64, '#ffd18a', 'Georgia, serif', 'center', '900'); sg.shadowBlur = 0;
@@ -465,7 +547,7 @@ function drawAirdropPlay(now) { // the reels, re-skinned: night sky, falling Run
   round(sg, 300, RY - 30, 800, 46, 12, '#1a0d00', ACCENT, 3); text(sg, `THE AIRDROP · ${state.free} SPIN${state.free === 1 ? '' : 'S'} LEFT · ${fmt(state.freeTotal)} LAYR · ALL WINS 2×`, 700, RY - 6, 20, '#ffd18a', 'Arial', 'center', '900');
   return w; }
 function drawScreen(now) {
-  hits = []; sg.drawImage(baseLayer, 0, 0);
+  hits = []; sg.save(); sg.setTransform(1, 0, 0, 1, 0, 0); sg.drawImage(baseLayer, 0, 0); sg.restore();
   const f = feature(), shownBet = f ? f.bet : state.free ? state.freeBet : state.bet, hs = holderState();
   text(sg, height.value ? height.value.toLocaleString('en-GB') : '—', 208, 102, 46, '#ffe2ad', 'Courier New', 'center', '900');
   text(sg, height.value ? (height.stale ? 'LAST KNOWN · STALE' : 'BITCOIN · LIVE') : 'UNAVAILABLE', 208, 148, 15, height.stale ? '#8a6e45' : '#c9a46a');
@@ -550,7 +632,7 @@ function renderBar() {
   const { kind, stage } = scene, f = feature(), tag = { free: 'FEATURE 01', vault: 'FEATURE 02', chain: 'FEATURE 03', jackpot: 'JACKPOT', gamble: 'GAMBLE' }[kind];
   let html = '', info = '';
   if (stage === 'trigger') { info = 'Triggered'; html = '<button class="bar-cta" data-act="primary">Continue ›</button>'; }
-  else if (stage === 'intro') { info = kind === 'gamble' ? `${fmt(scene.data.stake)} LAYR on one call` : RULES[kind]; html = kind === 'gamble' ? '<button class="bar-cta" data-act="odd">Odd sat</button><button class="bar-cta" data-act="even">Even sat</button><button class="pick" data-act="keep">Keep win</button>' : `<button class="bar-cta" data-act="primary">${kind === 'jackpot' ? 'Claim' : 'Start'} ›</button><button class="pick" data-act="skip" aria-label="Skip to the summary">Skip</button>`; }
+  else if (stage === 'intro') { info = kind === 'gamble' ? `${fmt(scene.data.stake)} LAYR on one call` : RULES[kind]; html = kind === 'gamble' ? '<button class="bar-cta" data-act="odd">Odd sat</button><button class="bar-cta" data-act="even">Even sat</button><button class="pick" data-act="keep">Keep win</button>' : `<button class="bar-cta" data-act="primary">${kind === 'jackpot' ? 'Reveal' : 'Start'} ›</button><button class="pick" data-act="skip" aria-label="Skip to the summary">Skip</button>`; }
   else if (stage === 'play' && kind === 'vault' && f) { const done = f.picks.length === 3, total = f.picks.reduce((a, i) => a + f.awards[i], 0) * f.bet; info = done ? `${fmt(total)} LAYR revealed` : `Open ${3 - f.picks.length} of 9 sealed sats`; html = Array.from({ length: 9 }, (_, i) => `<button class="pick capsule${f.picks.includes(i) ? ' picked' : ''}" data-pick="${i}" ${f.picks.includes(i) || done ? 'disabled' : ''} aria-label="Sealed sat ${i + 1}${f.picks.includes(i) ? `, ${RARITY[f.awards[i]]}, ${f.awards[i]} times bet` : ''}">${f.picks.includes(i) ? f.awards[i] + '×' : i + 1}</button>`).join('') + (done ? '<button class="bar-cta" data-act="primary">Collect ↗</button>' : '<button class="pick" data-act="skip" aria-label="Skip to the summary">Skip</button>'); }
   else if (stage === 'play' && kind === 'chain' && f) { const fr = f.frames[f.index], n = fr.cells.filter(Boolean).length, done = E.featureDone(f); info = done ? `${n}/15 parcels · ${fmt(f.sum * f.bet)} LAYR` : `${fr.left} respin${fr.left === 1 ? '' : 's'} left · ${n}/15 claimed`; html = `<button class="bar-cta" data-act="primary">${done ? 'Collect ↗' : 'Respin ⛏'}</button>${done ? '' : '<button class="pick" data-act="skip" aria-label="Skip to the summary">Skip</button>'}`; }
   else if (stage === 'play') { info = kind === 'jackpot' ? `${fmt(scene.data.amount)} LAYR` : 'Revealing the sat…'; html = '<button class="pick" data-act="skip" aria-label="Skip to the summary">Skip</button>'; }
@@ -564,7 +646,7 @@ function closeModal() { if ($('modal').open) $('modal').close(); update(); }
 $('close').onclick = closeModal; $('modal').addEventListener('cancel', e => { e.preventDefault(); closeModal(); });
 $('modal').addEventListener('click', e => { if (e.target === $('modal')) { const r = $('modal').getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeModal(); } });
 const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
-const iconURL = {}, icon = s => iconURL[s] || (iconURL[s] = (() => { const c = canvas(64, 64); c.getContext('2d').drawImage(tileFor(s, pools[s].length ? 0 : -1), 0, 0, 64, 64); return c.toDataURL(); })());
+const iconURL = {}, icon = s => iconURL[s] || (iconURL[s] = (() => { const c = canvas(128, 128); drawT(c.getContext('2d'), tileFor(s, pools[s].length ? 0 : -1), 0, 0, 128, 128); return c.toDataURL(); })());
 function openCollections() {
   const rows = Object.entries(COLS).map(([s, c]) => { const n = pools[s].length, b = pools[s].filter(t => t.bundled).length; return `<tr><td><img class="pay-icon" src="${icon(s)}" alt="">${esc(c.name)}</td><td>${s === 'wild' ? 'Wild' : esc(NAMES[s])}</td><td>${fmt(n)}</td><td>${s === 'chain' ? 'on-chain text' : `${fmt(b)} bundled · ${fmt(n - b)} live`}</td></tr>`; }).join('');
   showModal('collections', 'The inscriptions on the reels.', `<p>Every symbol here is a real Bitcoin inscription, shown with its inscription number. Ordinals are already permanent: <b>already forever</b>. Small copies are bundled into the machine so the reels show real art from the first frame, and image inscriptions top up live from <b>ordinals.com</b>. Recursive inscriptions (Pizza Ninjas, Quantum Cats, OnChainMonkey) and the 3D Runestone are shown as stills taken from their own render. Bitmap parcels are real <code>.bitmap</code> inscriptions; each tile shows the block number read from its text.</p>
@@ -647,10 +729,10 @@ function updateFsBar() { if (!fsOn) return; const q = id => $('fsBar').querySele
   for (const id of ['betDown', 'betUp', 'max']) q(id).disabled = busy() || sessionLock; q('auto').querySelector('b').textContent = autoLeft ? `STOP ${autoLeft}` : 'AUTO-MINE';
   q('turbo').setAttribute('aria-pressed', String(!!state.turbo)); q('sound').querySelector('b').textContent = state.muted ? 'SOUND OFF' : 'SOUND'; q('volume').querySelector('input').value = state.volume; show('test', TEST_OK);
 }
-function fitFs() { if (!fsOn) return; const st = $('fsStage'), w = st.clientWidth - 16, h = st.clientHeight - 16, k = Math.max(.1, Math.min(w / 1400, h / 960)); screen.style.width = `${Math.floor(1400 * k)}px`; screen.style.height = `${Math.floor(960 * k)}px`; }
+function fitFs() { if (!fsOn) return; const st = $('fsStage'), w = st.clientWidth - 16, h = st.clientHeight - 16, k = Math.max(.1, Math.min(w / 1400, h / 960)), cw = Math.floor(1400 * k), ch = Math.floor(960 * k), dpr = window.devicePixelRatio || 1; screen.style.width = `${cw}px`; screen.style.height = `${ch}px`; setScreenSize(cw * dpr, ch * dpr); }
 // Show or hide the fullscreen layout. Hosts call this through PX_CASINO_ENGINE.fullscreen(on) once they have made the frame visible.
 function setFullscreenLayout(on) { fsOn = !!on; $('fs').hidden = !fsOn; document.body.classList.toggle('fs-on', fsOn);
-  if (fsOn) { $('fsStage').appendChild(screen); fitFs(); updateFsBar(); } else if (screen.parentNode) screen.remove(); screenDirty = true; return fsOn; }
+  if (fsOn) { $('fsStage').appendChild(screen); fitFs(); updateFsBar(); } else { if (screen.parentNode) screen.remove(); screen.style.width = screen.style.height = ''; setScreenSize(2800, 1920); } screenDirty = true; return fsOn; }
 async function requestFullscreen(on) { if (fsHost) { fsHost(!!on); return; }
   if (on) { setFullscreenLayout(true); fsSelf = true; try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); } catch (e) { /* the fixed full-viewport layer stays as the fallback */ } }
   else { fsSelf = false; try { if (document.fullscreenElement) await document.exitFullscreen(); } catch (e) {} setFullscreenLayout(false); } }
@@ -737,7 +819,7 @@ requestAnimationFrame(animate); window.__bfReady = true; $('loading').style.opac
 window.OrdinalRush = Object.freeze({ version: '1.1.0', machine: GAME_ID,
   sources: () => ({ ...sources, pools: Object.fromEntries(Object.entries(pools).map(([k, v]) => [k, v.length])) }),
   pools: () => Object.fromEntries(Object.entries(pools).map(([k, v]) => [k, v.map(t => ({ key: t.key, id: t.id, number: t.num, bundled: !!t.bundled }))])),
-  faces: () => faces.map(c => c.slice()), holder: () => JSON.parse(JSON.stringify(holderState())), height: () => ({ ...height }), scene: () => scene ? { kind: scene.kind, stage: scene.stage } : null, fullscreen: () => fsOn,
+  faces: () => faces.map(c => c.slice()), holder: () => JSON.parse(JSON.stringify(holderState())), height: () => ({ ...height }), scene: () => scene ? { kind: scene.kind, stage: scene.stage, ...(scene.roll ? { respins: scene.roll.n } : {}) } : null, fullscreen: () => fsOn,
   soundLog: () => soundLog.map(e => ({ ...e })), perf: () => ({ ...perf }), screen: () => screen,
   snapshot: () => JSON.parse(JSON.stringify({ state, spinning, autoLeft, sessionLock })), rules: { lines: E.lines, pays: E.pays, strips: E.stripCodes },
   test: testApi });
