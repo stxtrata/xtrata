@@ -4,6 +4,8 @@
 //   C  keeps playing   hiding the panel does not unload the radio (same page, loaded once); Esc, HIDE and a click outside all hide it; the hall's keys wait while it is open
 //   D  in a room       the button and the panel are there inside a room (a sandboxed room frame cannot reach them), and the radio is still the same page
 //   E  games           the button steps aside during a game; the radio page is still there afterwards
+//   I  remote          with the radio in its pop-out, R / the RADIO button open the hall's own remote (prev, play/pause, next, heart); R, Esc, HIDE and a click outside close it
+//                      and take the mouse back; it closes with the pop-out; with a radio that is not talking to us R just brings the pop-out forward
 //   G  bridge          the radio says what is playing: a now-playing strip with play/pause, next, previous (panel or pop-out; other origins ignored); a heart tap in the
 //                      panel opens the pop-out; a blocked pop-up leaves the panel up and says so
 //   F  pop-out         POP OUT opens the radio in its own window (compact layout) and takes the panel's copy down, so there is one radio; the RADIO button then
@@ -29,8 +31,9 @@ window.__log=[];
 try{parent.postMessage({radioStub:Date.now()},"*")}catch(e){}
 peers.forEach(function(w){w.postMessage({xtrataRadio:1,type:'ready'},'*')});
 addEventListener('message',function(e){var d=e.data;if(d&&d.xtrataHall===1){window.__log.push(d);
-  if(d.type==='hello')e.source.postMessage({xtrataRadio:1,type:'state',title:'Test Song',artist:'Test Artist',playing:true,on:true},e.origin)}});
+  if(d.type==='hello')e.source.postMessage({xtrataRadio:1,type:'state',title:'Test Song',artist:'Test Artist',playing:true,on:true,liked:false,pending:false},e.origin)}});
 window.sendNeed=function(){peers.forEach(function(w){w.postMessage({xtrataRadio:1,type:'need-wallet',why:'like'},'*')})};
+window.sendBye=function(){peers.forEach(function(w){w.postMessage({xtrataRadio:1,type:'bye'},'*')})};
 window.sendHide=function(){peers.forEach(function(w){w.postMessage({xtrataRadio:1,type:'hide-request'},'*')})};
 window.sendState=function(o){peers.forEach(function(w){w.postMessage(Object.assign({xtrataRadio:1,type:'state'},o),'*')})};
 `.replace(/\n/g, ' ');
@@ -233,6 +236,49 @@ window.sendState=function(o){peers.forEach(function(w){w.postMessage(Object.assi
   check((await page.evaluate(() => window.__focused)) >= 1 && (await page.evaluate(() => window.__locks)) >= 1, 'H: R in the pop-out asks the hall to take the focus and the mouse back (focus ' + (await page.evaluate(() => window.__focused)) + ', mouse ' + (await page.evaluate(() => window.__locks)) + ')');
   check(!pop3.isClosed(), 'H: and the pop-out stays open (the music keeps playing)');
   await pop3.close(); await page.waitForTimeout(700);
+  // I  the remote: with the radio in its pop-out and talking to us, R opens the hall's own remote (R/Esc/HIDE/click outside close it and take the mouse back)
+  if ((await rr()).open) { await page.click('#xa-radio-hide'); await page.waitForTimeout(300); }
+  const [pop4] = await Promise.all([ctx.waitForEvent('page'), (async () => { await page.click('#xa-radio-btn'); await page.waitForTimeout(300); await page.click('#xa-radio-open'); })()]);
+  await pop4.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForFunction(() => window.XA.radioState().now && window.XA.radioState().now.src === 'pop', null, { timeout: 15000 });
+  await page.evaluate(() => { window.__locks = 0; });
+  await page.keyboard.press('KeyR'); await page.waitForTimeout(500);
+  s = await rr();
+  check(s.remote.open && !s.remote.away && !s.open, 'I: R opens the hall\'s own remote (not the pop-out window, not the panel)');
+  if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, 'radio-remote.png') });
+  check(s.remote.title === 'Test Song' && !s.np.shown, 'I: it shows the song, and the small strip steps aside');
+  const logOf2 = (fr) => fr.evaluate(() => window.__log.map((m) => m.type + (m.cmd ? ':' + m.cmd : '')));
+  for (const c of ['prev', 'toggle', 'next', 'like']) { await page.click('#xa-remote [data-cmd=' + c + ']'); await page.waitForTimeout(200); }
+  const lg4 = await logOf2(pop4);
+  check(['cmd:prev', 'cmd:toggle', 'cmd:next', 'cmd:like'].every((x) => lg4.includes(x)), 'I: previous, play/pause, next and the heart all reach the pop-out (' + lg4.join(',') + ')');
+  await pop4.evaluate(() => window.sendState({ title: 'Test Song', artist: 'Test Artist', playing: false, on: true, liked: true, pending: false })); await page.waitForTimeout(500);
+  s = await rr();
+  check(s.remote.liked && s.remote.play === '\u25B6', 'I: the heart shows liked and the button shows play when the pop-out says so');
+  await pop4.evaluate(() => window.sendState({ title: 'Test Song', artist: 'Test Artist', playing: true, on: true, liked: false, pending: true })); await page.waitForTimeout(500);
+  check((await rr()).remote.pending, 'I: and a like on its way shows as pending');
+  await page.keyboard.press('KeyR'); await page.waitForTimeout(400);
+  check(!(await rr()).remote.open && (await page.evaluate(() => window.__locks)) >= 1, 'I: R again closes it and takes the mouse back');
+  await page.evaluate(() => { window.__locks = 0; });
+  await page.keyboard.press('KeyR'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.waitForTimeout(400);
+  check(!(await rr()).remote.open && (await page.evaluate(() => window.__locks)) >= 1, 'I: Esc closes it and takes the mouse back');
+  await page.evaluate(() => { window.__locks = 0; });
+  await page.click('#xa-radio-btn'); await page.waitForTimeout(300);
+  check((await rr()).remote.open, 'I: the RADIO button opens the remote too');
+  await page.mouse.click(900, 120); await page.waitForTimeout(400);
+  check(!(await rr()).remote.open && (await page.evaluate(() => window.__locks)) >= 1, 'I: a click outside it closes it and takes the mouse back');
+  // the pop-out goes away while the remote is up: the remote closes with it
+  await page.keyboard.press('KeyR'); await page.waitForTimeout(300);
+  await pop4.close(); await page.waitForTimeout(1000);
+  check(!(await rr()).remote.open, 'I: closing the pop-out closes the remote');
+  // an older radio that does not talk to us: R brings the window forward and opens no remote
+  const [pop5] = await Promise.all([ctx.waitForEvent('page'), (async () => { await page.click('#xa-radio-btn'); await page.waitForTimeout(300); await page.click('#xa-radio-open'); })()]);
+  await pop5.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForFunction(() => window.XA.radioState().now && window.XA.radioState().now.src === 'pop', null, { timeout: 15000 });
+  await pop5.evaluate(() => window.sendBye()); await page.waitForTimeout(400);
+  await page.keyboard.press('KeyR'); await page.waitForTimeout(400);
+  s = await rr();
+  check(!s.remote.open && !s.open, 'I: with a radio that is not talking to us, R opens neither the remote nor the panel (it brings the pop-out forward)');
+  await pop5.close(); await page.waitForTimeout(700);
   const room0 = await page.evaluate(() => document.getElementById('hroom').title);
   await page.keyboard.press('KeyN'); await page.waitForTimeout(300);
   const room1 = await page.evaluate(() => document.getElementById('hroom').title);

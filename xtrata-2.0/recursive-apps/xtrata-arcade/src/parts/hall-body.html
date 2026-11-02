@@ -57,6 +57,16 @@
 <button id="xa-radio-btn" type="button" aria-haspopup="dialog" aria-label="Xtrata Radio and your albums" title="Xtrata Radio and your albums (R)" hidden><span aria-hidden="true">&#9834;</span><b>RADIO</b></button>
 <!-- Now playing: what the radio (panel or pop-out) says it is playing, with play/pause, next and previous. Display and transport only: likes and paid plays stay in the radio. -->
 <div id="xa-radio-np" role="group" aria-label="Now playing" hidden><button type="button" data-cmd="prev" aria-label="Previous song">&#9198;</button><button type="button" data-cmd="toggle" aria-label="Play or pause">&#9654;</button><button type="button" data-cmd="next" aria-label="Next song">&#9197;</button><span id="xa-radio-np-t"></span></div>
+<!-- Radio remote: while the radio plays in its pop-out window, R opens this (drawn by the hall, so R / Esc / HIDE close it and put the mouse straight back). Display and four buttons;
+     the pop-out holds the wallet and does the paying. -->
+<div id="xa-remote" class="away" role="dialog" aria-label="Xtrata Radio remote" aria-hidden="true" inert>
+  <div class="rm-box">
+    <div class="rm-bar"><b>XTRATA RADIO</b><span>Playing in the pop-out window</span><button id="xa-remote-win" type="button">OPEN WINDOW &#8599;</button><button id="xa-remote-hide" type="button">HIDE</button></div>
+    <div class="rm-song"><b id="xa-remote-title">&nbsp;</b><i id="xa-remote-artist"></i></div>
+    <div class="rm-ctl"><button type="button" data-cmd="prev" aria-label="Previous song">&#9198;</button><button type="button" data-cmd="toggle" aria-label="Play or pause">&#9654;</button><button type="button" data-cmd="next" aria-label="Next song">&#9197;</button><button type="button" data-cmd="like" id="xa-remote-like" aria-label="Like this song on-chain">&#9829;</button></div>
+    <p class="rm-hint">R or Esc puts you back in the arcade. The heart is paid from the pop-out window's wallet.</p>
+  </div>
+</div>
 <div id="xa-radio" class="away" role="dialog" aria-label="Xtrata Radio" aria-hidden="true" inert>
   <div class="rd-box">
     <div class="rd-bar"><b>XTRATA RADIO</b><span>Free here &middot; POP OUT to pay for plays</span>

@@ -90,7 +90,7 @@ try {
     for (const c of ['toggle', 'next', 'prev', 'like', 'power']) await hall.evaluate((cmd) => window.pw.postMessage({ xtrataHall: 1, type: 'cmd', cmd }, 'https://radio.xtrata.xyz'), c);
     await pop.waitForTimeout(800);
     const calls = await pop.evaluate(() => window.__calls || []);
-    if (allowed) ok(['playPause', 'next', 'prev'].every((k) => calls.includes(k)) && !calls.includes('toggleLike'), `${origin}: play/pause, next and previous work; like is not a command (${calls.join(',')})`);
+    if (allowed) ok(['playPause', 'next', 'prev', 'toggleLike'].every((k) => calls.includes(k)) && calls.length === 4, `${origin}: play/pause, next, previous and the heart work; 'power' is not a command (${calls.join(',')})`);
     else ok(calls.length === 0, `${origin}: no command is obeyed (${calls.join(',') || 'none'})`);
     await ctx.close();
   }

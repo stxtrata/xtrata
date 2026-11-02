@@ -1715,16 +1715,18 @@ $('chainp').addEventListener('click', e=>{ if(e.target===$('chainp')) closeChain
 // does the address ?radiobranch=1 swap in that branch's own radio page, to look at a layout change before it ships; the preview has no likes or wallet set up.
 const RADIO_BASE=(/\.pages\.dev$/.test(location.hostname) && /[?&]radiobranch=1(?:&|$)/.test(location.search)) ? location.protocol+'//'+location.host : 'https://radio.xtrata.xyz';
 const RADIO_URL=RADIO_BASE+'/radio?dock=1';
-let radioOpen=false, radioLoaded=false, radioPop=null, radioNow=null, npSig='';   // radioNow: what the radio (panel or pop-out) says is playing
+let radioOpen=false, radioLoaded=false, radioPop=null, radioNow=null, npSig='', remoteOpen=false, rmSig='';   // radioNow: what the radio (panel or pop-out) says is playing
 function radioPopAlive(){ try{ return !!(radioPop && !radioPop.closed) }catch(e){ return false } }
 function radioPaint(){   // the button is there while you can walk or are in a room; games take the whole screen, so it steps aside (the music goes on)
   const b=$('xa-radio-btn'); if(!b) return;
   const show=(state==='walk' || state==='room') && !chainOpen;
   if(b.hidden===show) b.hidden=!show;
-  b.classList.toggle('on',radioOpen || radioPopAlive());
+  b.classList.toggle('on',radioOpen || remoteOpen || radioPopAlive());
+  if(remoteOpen && (!radioPopAlive() || !radioNow || radioNow.src!=='pop' || !show)) remoteHide(true);   // the pop-out went away (or a game began): the remote has nothing to control
+  remotePaint();
   // now playing: a small strip beside the button while the panel is shut and something is on (display and transport only)
   if(radioNow && radioNow.src==='pop' && !radioPopAlive()) radioNow=null;
-  const np=$('xa-radio-np'), on=!!(show && !radioOpen && radioNow && (radioNow.title || radioNow.on));
+  const np=$('xa-radio-np'), on=!!(show && !radioOpen && !remoteOpen && radioNow && (radioNow.title || radioNow.on));
   if(np.hidden===on) np.hidden=!on;
   if(on){
     const sig=[radioNow.title,radioNow.artist,radioNow.playing,radioNow.busy].join('\u0001');
@@ -1738,7 +1740,10 @@ function radioPaint(){   // the button is there while you can walk or are in a r
 }
 function radioShow(){
   if(radioOpen || chainOpen) return;
-  if(radioPopAlive()){ try{ radioPop.focus() }catch(e){} return }   // the radio is playing in its own window: bring that forward instead of starting a second one
+  if(radioPopAlive()){
+    if(radioNow && radioNow.src==='pop'){ remoteShow(); return }   // the radio is playing in its pop-out and talking to us: our own remote (R toggles it)
+    try{ radioPop.focus() }catch(e){} return                       // an older radio that does not talk to us: bring the window forward
+  }   // the radio is playing in its own window: bring that forward instead of starting a second one
   radioOpen=true;
   if(document.pointerLockElement) document.exitPointerLock();
   for(const k in keys) keys[k]=false;
@@ -1788,7 +1793,7 @@ addEventListener('message', e=>{
   if(!fromPop && !fromPanel) return;
   const src=fromPop ? 'pop' : 'panel';
   if(d.type==='ready'){ try{ e.source.postMessage({xtrataHall:1, type:'hello'}, RADIO_BASE) }catch(x){} }
-  else if(d.type==='state'){ radioNow={src, title:String(d.title||'').slice(0,120), artist:String(d.artist||'').slice(0,120), playing:!!d.playing, on:!!d.on, busy:!!d.busy} }
+  else if(d.type==='state'){ radioNow={src, title:String(d.title||'').slice(0,120), artist:String(d.artist||'').slice(0,120), playing:!!d.playing, on:!!d.on, busy:!!d.busy, liked:!!d.liked, pending:!!d.pending} }
   else if(d.type==='hide-request' && fromPanel){ radioHide() }
   else if(d.type==='hide-request' && fromPop){   // R in the pop-out: back to the arcade (the pop-out keeps playing). Browsers may not let us take the window focus or the mouse without a click in this window.
     try{ window.focus() }catch(x){}
@@ -1801,21 +1806,55 @@ addEventListener('message', e=>{
   }
   radioPaint();
 });
-$('xa-radio-btn').addEventListener('click', ()=>{ initAudio(); radioOpen ? radioHide() : radioShow() });
+$('xa-radio-btn').addEventListener('click', ()=>{ initAudio(); radioOpen ? radioHide() : remoteOpen ? remoteHide() : radioShow() });
 $('xa-radio-hide').addEventListener('click', radioHide);
 $('xa-radio').addEventListener('click', e=>{ if(e.target===$('xa-radio')) radioHide() });
 addEventListener('keydown', e=>{ if(radioOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); radioHide() } }, true);
+// The remote: while the radio plays in its pop-out window (and talks to us), R opens this small panel drawn by the hall. Play/pause, next, previous and the heart
+// are sent to the pop-out, which holds the wallet and does the paying. R, Esc, HIDE or a click outside close it and capture the mouse again.
+function remotePaint(){
+  const box=$('xa-remote'); if(!box || !remoteOpen || !radioNow) return;
+  const sig=[radioNow.title,radioNow.artist,radioNow.playing,radioNow.busy,radioNow.liked,radioNow.pending].join('\u0001');
+  if(sig===rmSig) return; rmSig=sig;
+  $('xa-remote-title').textContent=radioNow.title||'Tuning…'; $('xa-remote-artist').textContent=radioNow.artist||'';
+  box.querySelector('[data-cmd=toggle]').innerHTML=radioNow.playing?'&#9208;':'&#9654;';
+  const lk=$('xa-remote-like'); lk.classList.toggle('on',!!radioNow.liked && !radioNow.pending); lk.classList.toggle('pending',!!radioNow.pending);
+  lk.setAttribute('aria-pressed',String(!!radioNow.liked));
+  for(const x of box.querySelectorAll('.rm-ctl button')) x.disabled=!!radioNow.busy || (x.id==='xa-remote-like' && !!radioNow.pending);
+}
+function remoteShow(){
+  if(remoteOpen || chainOpen) return;
+  remoteOpen=true; rmSig='';
+  if(document.pointerLockElement) document.exitPointerLock();
+  for(const k in keys) keys[k]=false;
+  const box=$('xa-remote'); box.classList.remove('away'); box.removeAttribute('inert'); box.setAttribute('aria-hidden','false');
+  remotePaint(); radioPaint(); try{ $('xa-remote-hide').focus({preventScroll:true}) }catch(e){}
+}
+function remoteHide(quiet){
+  if(!remoteOpen) return;
+  remoteOpen=false;
+  const box=$('xa-remote'); box.classList.add('away'); box.setAttribute('inert',''); box.setAttribute('aria-hidden','true');
+  try{ document.activeElement && document.activeElement.blur && document.activeElement.blur() }catch(e){}
+  if(quiet) return;
+  radioPaint(); if(state==='walk') tryLock(); else if(state==='room' && roomUI && roomUI.frame){ try{ roomUI.frame.focus() }catch(e){} }
+}
+for(const b of $('xa-remote').querySelectorAll('.rm-ctl button')) b.addEventListener('click', ()=>radioCmd(b.dataset.cmd));
+$('xa-remote-hide').addEventListener('click', ()=>remoteHide());
+$('xa-remote-win').addEventListener('click', ()=>{ try{ radioPop.focus() }catch(e){} });
+$('xa-remote').addEventListener('click', e=>{ if(e.target===$('xa-remote')) remoteHide() });
+addEventListener('keydown', e=>{ if(remoteOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); remoteHide() } }, true);
 // R: open the radio (this frees the mouse so you can use it); R again, or HIDE, puts you straight back into the hall with the mouse captured (no extra click).
 // Not while typing in a field, and not in a game (the game owns the keyboard). Inside the radio's own panel the radio page forwards R and Esc ("hide-request").
 addEventListener('keydown', e=>{
   if(e.code!=='KeyR' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
   const t=e.target; if(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
   if(radioOpen){ e.preventDefault(); e.stopPropagation(); radioHide(); return }
+  if(remoteOpen){ e.preventDefault(); e.stopPropagation(); remoteHide(); return }
   if((state==='walk' || state==='room') && !chainOpen && !document.querySelector('#xa-root .xa-modal')){ e.preventDefault(); e.stopPropagation(); initAudio(); radioShow() }
 }, true);
 setInterval(radioPaint, 400);   // (not called here: `state` is declared further down)
 if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.exitGame=()=>exitGame(), XA.hallState=()=>state;   // tests only
-if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:($('xa-radio-frame').getAttribute('src')==='about:blank'?null:$('xa-radio-frame').getAttribute('src')), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow'), np:{shown:!$('xa-radio-np').hidden, text:$('xa-radio-np-t').textContent, playing:$('xa-radio-np').querySelector('[data-cmd=toggle]').textContent}, now:radioNow, barNote:rdBarNote.textContent});   // read-only, for tests
+if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:($('xa-radio-frame').getAttribute('src')==='about:blank'?null:$('xa-radio-frame').getAttribute('src')), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow'), np:{shown:!$('xa-radio-np').hidden, text:$('xa-radio-np-t').textContent, playing:$('xa-radio-np').querySelector('[data-cmd=toggle]').textContent}, now:radioNow, barNote:rdBarNote.textContent, remote:{open:remoteOpen, away:$('xa-remote').classList.contains('away'), title:$('xa-remote-title').textContent, play:$('xa-remote').querySelector('[data-cmd=toggle]').textContent, liked:$('xa-remote-like').classList.contains('on'), pending:$('xa-remote-like').classList.contains('pending')}});   // read-only, for tests
 /* ================================================================
    CABINETS — one generator, ten configs
    ================================================================ */
@@ -2399,7 +2438,7 @@ let state='intro', focusIdx=-1, locked=false, tween=null, saved=null, zoomTarget
 const ray=new THREE.Raycaster(); ray.far=2.8;
 const center=new THREE.Vector2(0,0);
 
-const modalOpen = () => chainOpen || radioOpen || !!document.querySelector('#xa-root .xa-modal');
+const modalOpen = () => chainOpen || radioOpen || remoteOpen || !!document.querySelector('#xa-root .xa-modal');
 addEventListener('keydown', e=>{
   if(state==='play' || modalOpen()) return;          // the engine owns the keyboard while a game or dialog is up
   keys[e.code]=true;
