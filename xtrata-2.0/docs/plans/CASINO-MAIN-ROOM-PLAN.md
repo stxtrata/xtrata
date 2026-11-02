@@ -1,13 +1,27 @@
 # ParallaX Casino: a main room for side-by-side games, bots only in the Salon
 
-Status: plan, written 2026-11-01 for Jim. Nothing built yet. Page: `/casino` (`public/casino/index.html`); `/casino-b` unchanged.
+Status: plan written 2026-11-01. Step 1 (the people) built 2026-11-02 with Jim's changes, see section 0; the new game and the Salon move are not built. Page: `/casino` (`public/casino/index.html`); `/casino-b` unchanged.
 Replaces `CASINO-NPC-TAGS-PLAN.md` sections 1 and 4.1 (who stays in the room); its tag design still applies to the bots that stay.
 
 **The ask.** The main room keeps the fruit machines and the games several people can play side by side. Texas Hold'em, poker in
 general and the player-versus-player games live in the Salon, where players can still play bots. The main room's only people are
 the dealers at their tables and the bartender behind the bar: no Hold'em bots, nobody at the bar, nobody playing a machine.
 
-## 1. Who and what is in the main room today (read from the code)
+## 0. Built 2026-11-02 (Jim: "remove them all apart from the staff", keep the greeter, Hold'em out of the main room)
+
+- **Gone:** the Texas Hold'em table and its three bots (Ace, Mia, Sam) from the main room, with its rug and welcome button; the woman
+  at the bar and the two people on the bar stools; the man playing a machine (his cabinet no longer shows IN USE, so all ten are
+  free); the "house regulars" a later change had added (Mia, Sam and Ace standing at machines when the room was quiet; `?regulars=1`
+  still shows them, for trying).
+- **Stay:** the blackjack, roulette and baccarat dealers, the greeter, the bartender, the two Salon hosts, and the Salon opponents
+  (real players, shown during a match).
+- **Hold'em with bots** is not played anywhere for now. Its code is still in the page (`makeHoldem`), ready to move into the Salon
+  (section 3) if wanted.
+- **Room:** the daily mission "Play 5 hands of Hold'em" became "Play 5 hands at any table", in the same place in the list, so
+  nobody else's missions change. Needs the room Worker deployed.
+- Its spot (right of the room, where the table stood) is empty marble until the replacement is chosen (section 2, or section 8).
+
+## 1. Who and what was in the main room (read from the code, before step 1) (read from the code)
 
 | What | Where | Plan |
 |---|---|---|
@@ -112,3 +126,19 @@ Deploy order as before: the room Worker first, then the site.
 4. **NPC tags** (from the earlier plan): give Ace, Mia and Sam a blue NPC tag in the Salon (recommended), or no tags?
 5. **The greeter:** remove (as asked: "just the dealers and the bartender"), or keep him as staff by the door?
 6. **Ship the people removal first**, on its own, or all together?
+
+## 8. More fruit machines: making room
+
+The room is 26 m by 22 m. Each machine design has two cabinets, one on each side wall, 3.4 m apart; five designs fill five bays a
+side. Ways to add more, simplest first:
+
+| Option | Room for | Work |
+|---|---|---|
+| **A. One more bay by the entrance** | 1 more design (2 cabinets) | Small: a sixth position on each side wall near the front door (where the earlier Plebs & Legends attempt went). No change to the room's shape |
+| **B. A machine island in the empty Hold'em spot** | 4 to 6 cabinets, back to back | Small to medium: a new layout for cabinets in the middle of the floor (today they only stand against walls); colliders and camera views for it. Uses the space instead of a new table |
+| **C. A slot hall: a new wing through an arch, like the Salon** | 10 to 16 cabinets | Medium: the Salon's build (an arch in a wall, an inner box with its own walls, floor, lights and colliders) is already written and can be reused. The main room is untouched. Best fit for the 15-machine series |
+| **D. Stretch the whole room** | as many as wanted | Largest: the size is two numbers, but about 30 positions are written in by hand (walls, columns, wall lights, the door, the greeter, camera views, colliders), and each has to be moved and checked |
+
+Every new design adds its game to the page (about 2 MB each; the page is about 24 MB now) and its spots to the room service
+(`SPOTS`, the `MACH` list), and a phone or iPad holds one more idle screen in memory. More cabinets of an existing design cost
+almost nothing. Suggested: A or B for the next one or two designs; C if the series is going to grow.

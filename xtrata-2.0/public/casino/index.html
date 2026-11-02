@@ -258,7 +258,7 @@ body.pxdock .rgwrap{overflow:visible}body.pxdock .road{grid-template-rows:repeat
 <div id="casinoBuild" aria-label="Build version">Steve review · A–C.1</div><div id="toast"></div>
 <div id="scov" role="dialog" aria-label="The Strata Club tables"><div id="scbar"><b>THE STRATA CLUB · TESTNET TABLES</b><button id="sc-th" aria-pressed="true">Hold'em</button><button id="sc-td" aria-pressed="false">Liar's Dice</button><button id="scclose">← Back to the floor</button></div><iframe id="scframe" title="Strata Club table" allow="clipboard-write"></iframe></div><div id="banner" aria-hidden="true"></div>
 <div id="intro"><h1>The night is yours.</h1><p>Step into a world of marble, velvet and golden light. Explore ten fruit machines, visit The Afterglow bar or either LAYR dispenser, settle into the lounge, or take your seat at one of seven tables.</p><button id="walkin" class="primary" style="width:100%;margin-bottom:10px;padding:13px;font-weight:700;font-size:16px;background:linear-gradient(#e3b84a,#b98a22);color:#1a1006;border-color:#ffe08a">ENTER THE CASINO &nbsp; ↗</button>
-<div class="btns"><button>Blackjack<small>split · double</small></button><button>Roulette<small>combo bets</small></button><button>Texas Hold’em<small>three opponents</small></button><button>Baccarat<small>pairs · road</small></button><button>Video Poker<small>hint · double up</small></button></div>
+<div class="btns"><button>Blackjack<small>split · double</small></button><button>Roulette<small>combo bets</small></button><button>Baccarat<small>pairs · road</small></button><button>Video Poker<small>hint · double up</small></button></div>
 <div class="btns" style="margin-top:10px;grid-template-columns:repeat(2,1fr)"><button style="border-color:#ad8b4d">Salon Hold’em<small>heads-up · demo opponent</small></button><button style="border-color:#ad8b4d">Salon Liar’s Dice<small>demo opponent</small></button></div><button id="barIntro" class="layr-intro-button">The Afterglow · cocktails & bites ↗</button><button id="layrDispenserIntro" class="layr-intro-button">Get LAYR · chip dispensers ↗</button><button id="browseMachinesIntro">Browse the fruit machines ↗</button></div><div id="panel"><div id="tableViews" role="group" aria-label="Game view"><span>VIEW</span><button type="button" data-view="table" aria-pressed="true">Table</button><button type="button" data-view="seat" aria-pressed="false">Seated</button><button type="button" data-view="overhead" aria-pressed="false">Top down</button><button type="button" data-view="screen" aria-pressed="false" hidden>Screen</button><button type="button" id="tableGuide">Guide</button><button type="button" id="tableRules">? Rules</button><button type="button" id="tableLeave">Leave table</button><button type="button" id="tableFullscreen" aria-pressed="false">Full screen</button><button type="button" id="tableMini" aria-pressed="false" aria-label="Hide the table controls">▾ Hide</button></div><span id="pTitle"></span><p id="tableLeaveNote" class="review-note" hidden></p><div id="pvpIdentity" aria-live="polite"></div><div id="pMsg" aria-live="polite"></div><div id="pHint" style="display:none"></div><div id="reviewSeatServing" hidden><span id="reviewServingName"></span><button id="reviewSip">Take a sip</button><button id="reviewReturnDrink">Return to bar</button></div><div id="pGame"></div><section id="vpPaytable" hidden aria-label="Video poker paytable"></section><div id="pChips"></div><div id="pActions"></div><button id="broke">Get LAYR</button></div>
 <script>
 /**
@@ -8315,14 +8315,13 @@ function applyTestnetFunding(proof){
   function buildSlots(W,gold){
     room.machines=[];
     const zPositions=[-7.6,-4.2,-.8,2.6,6];
-    const occupiedIndex=Math.floor(Math.random()*zPositions.length*2);
     const templates=pxPreparedMachines.map(d=>packedCabinet(d));
     [-1,1].forEach(side=>templates.forEach((template,type)=>{
       const group=new THREE.Group(),model=template.clone(true),bb=new THREE.Box3().setFromObject(model),size=bb.getSize(V3(0,0,0)),scale=2.6/size.y;
       model.scale.multiplyScalar(scale);model.position.y-=bb.min.y*scale;group.add(model);
       const z=zPositions[type];group.position.set(side*(W/2-.67),.012,z);group.rotation.y=-side*Math.PI/2;group.name='ParallaX · '+window.PX_MACHINE_PACKS[type].name;scene.add(group);
       const animations=[];for(const role of ['crest','recordGroup','core','lever','spinPhysical','armPivot']){const o=model.getObjectByName('px-'+role);if(o)animations.push({o,role,base:o.rotation.clone(),homePosition:o.position.clone()});}
-      const item={type,index:room.machines.length,name:window.PX_MACHINE_PACKS[type].name,group,model,animations,occupied:room.machines.length===occupiedIndex};room.machines.push(item);
+      const item={type,index:room.machines.length,name:window.PX_MACHINE_PACKS[type].name,group,model,animations,occupied:false};room.machines.push(item);
       const plaque=pxSign(group,0,2.94,0,1.52,.27,item.name,item.occupied?'I N   U S E':'P L A Y   ↗',false);plaque.name='Machine name';
       glowSprite(side*(W/2-1),1.5,z,1.5,[0x4fe3d2,0x39d8ff,0xffbe70,0xe7c18a,0x80c7bd][type],.11);
     }));
@@ -8825,7 +8824,7 @@ function applyTestnetFunding(proof){
     // Blue velvet islands and a gold-bordered central approach.
     const rug=canvasTex(512,512,(c,w,h)=>{c.fillStyle='#071c3c';c.fillRect(0,0,w,h);c.strokeStyle='#b89450';c.lineWidth=3;c.strokeRect(10,10,w-20,h-20);c.lineWidth=1;c.strokeRect(19,19,w-38,h-38);for(let i=0;i<12;i++){c.strokeStyle='rgba(158,177,195,.08)';c.beginPath();c.moveTo(i*70-250,0);c.lineTo(i*70+260,h);c.stroke();}});
     const rmat=new THREE.MeshStandardMaterial({map:rug,roughness:.95});
-    [[-6.6,-2.6,5.3,4.3],[6.6,-2.6,5.3,4.3],[-6.2,3.2,4.8,4.2],[6.2,3.2,3.6,4.1],[0,-5.6,6.8,4.3]].forEach(([x,z,w,d])=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),rmat);m.rotation.x=-Math.PI/2;m.position.set(x,.008,z);m.receiveShadow=true;scene.add(m);});
+    [[-6.6,-2.6,5.3,4.3],[-6.2,3.2,4.8,4.2],[6.2,3.2,3.6,4.1],[0,-5.6,6.8,4.3]].forEach(([x,z,w,d])=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),rmat);m.rotation.x=-Math.PI/2;m.position.set(x,.008,z);m.receiveShadow=true;scene.add(m);});
     // Marble medallion and the actual house mark, extracted from the supplied app's uniform.
     const medallion=canvasTex(1024,1024,(c,w,h)=>{c.fillStyle='#080d14';c.fillRect(0,0,w,h);for(let i=0;i<3;i++){c.strokeStyle=i===1?'#477dc2':'#b78d46';c.lineWidth=3;c.beginPath();c.arc(w/2,h/2,w*.48-i*17,0,7);c.stroke();}drawPXLogo(c,260,220,504,504);c.fillStyle='#e3c487';c.font='32px Georgia';c.textAlign='center';drawPXWordmark(c,512,800,47,660);});
     const med=new THREE.Mesh(new THREE.CircleGeometry(1.8,96),new THREE.MeshStandardMaterial({map:medallion,metalness:.45,roughness:.22,envMap:envTex}));med.rotation.x=-Math.PI/2;med.position.set(0,.007,4.15);scene.add(med);
@@ -10737,7 +10736,7 @@ function applyTestnetFunding(proof){
   }
 
   // ---------------- place stations ----------------
-  stations = [makeBlackjack(), makeRoulette(), makeHoldem(), makeBaccarat(), makeVideoPoker(), makePvpHoldem(), makeLiarsDice()];
+  stations = [makeBlackjack(), makeRoulette(), makeBaccarat(), makeVideoPoker(), makePvpHoldem(), makeLiarsDice()];
   stations.forEach(station=>{
     const act=station.act.bind(station),view=station.view.bind(station),canLeave=station.canLeave.bind(station);
     station.canLeave=()=>!tableActionsInFlight.has(station)&&canLeave();
@@ -10810,32 +10809,9 @@ function applyTestnetFunding(proof){
     }
   };
   stations.forEach((s) => { try { dressers[s.id](s); } catch (e) { console.error(e); } });
-  // One guest plays a randomly chosen machine; the other guests are at the bar.
-  // Leave table stools, the bar approach and the central aisles clear.
+  // Nobody plays a machine or sits at the bar any more: the room's people are the staff and the real players
+  // (docs/plans/CASINO-MAIN-ROOM-PLAN.md). The bar stools and all ten cabinets are free.
   const patrons = [];
-  // Three r128 localToWorld uses the current matrixWorld; all furniture and
-  // machine transforms must be updated before calculating guest positions.
-  scene.updateMatrixWorld(true);
-  const guestMachine=room.machines.find(m=>m.occupied),guestMachineSpot=guestMachine.group.localToWorld(V3(.4,0,.98));
-  const guestButton=guestMachine.model.getObjectByName('px-spinPhysical');
-  const guestButtonWorld=guestButton?new THREE.Box3().setFromObject(guestButton).getCenter(V3(0,0,0)):guestMachine.group.localToWorld(V3(.4,1,.38));
-  startNpcMachine(guestMachine);
-  [
-   {x:guestMachineSpot.x,z:guestMachineSpot.z,yaw:guestMachine.group.rotation.y+Math.PI,role:'machine',look:{skin:SKIN[1],style:'jacket',jacket:0x2a3a52,shirt:0xe8e0cc,hair:0x2a1a10,hairStyle:'short',beard:'stubble',pants:0x26262e}},
-   {x:8.8,z:-7.0,yaw:Math.atan2(-2.8,-2.2),role:'bar',look:{skin:SKIN[0],style:'jacket',jacket:0x4a2a3a,shirt:0xf0e8e0,hair:0x7a3a1a,hairStyle:'long',lashes:true,thinBrows:true,earrings:true,pants:0x1c1c26}}
-  ].forEach(({x,z,yaw,role,look}) => {
-    const f = addFigure(scene,x,z,yaw,Object.assign({standing:true,handY:.98,reach:.36,spread:.12},look));
-    patrons.push({fig:f,role,next:3+Math.random()*8});
-    solidsExtra.push({k:'c',x,z,r:.36});
-  });
-  // Occupy the two end stools, leaving the two central seats and servings clear.
-  [-1.8,1.8].forEach((x,i) => {
-    const pos=room.barModel.group.localToWorld(V3(x,0,1.02));
-    const look=i===0?{skin:SKIN[0],style:'jacket',jacket:0x534151,shirt:0xe6d9ca,hair:0x513325,hairStyle:'long',pants:0x29242c}:{skin:SKIN[2],style:'shirt',shirt:0x587785,hair:0x191612,hairStyle:'short',pants:0x252831};
-    const f=addFigure(scene,pos.x,pos.z,Math.PI,Object.assign({standing:false,baseY:.15,handY:1.16,reach:.30,spread:.12},look));
-    f.group.position.y=.15; patrons.push({fig:f,role:'barseat',seatHeight:.81,next:5+i*4});
-    // The bar's existing stool collider already covers this occupied seat.
-  });
   const bartender = addFigure(scene, room.barPos.x, room.barPos.z - 0.35, 0, { standing: true, skin: SKIN[1], style: 'vest', vest: 0x14141c, tie: 0x8c1420, hair: 0x141414, hairStyle: 'slick', beard: 'stubble', watch: true, handY: 1.15, reach: 0.5, spread: 0.2 });
   solidsExtra.push({ k: 'c', x: room.barPos.x, z: room.barPos.z - 0.35, r: 0.42 }); let barGreet = 0;
   // ---------------- the people: every figure in the room becomes one of the six Adrian personas (the woodcut cast retires when he loads) ----------------
@@ -10851,11 +10827,7 @@ function applyTestnetFunding(proof){
     XA_HOSTS.add({ group: scene, x: 2.5, z: 7.9, yaw: Math.atan2(-2.5, 3.0), person: 'm1', livery: 'midnight', role: 'greeter', rest: 'back' });
     solidsExtra.push({ k: 'c', x: 2.5, z: 7.9, r: 0.36 });
     dedicatedBarHost=XA_HOSTS.add({ group: scene, x: room.barPos.x, z: room.barPos.z - 0.35, yaw: 0, person: 'm1', livery: 'midnight', rest: {kind:'table',y:1.2,fwd:.38,surface:room.barModel.counter}, fig: bartender });
-    // the players and regulars, in their own clothes
-    const hb = figsAt(byId.holdem.group);   // the bot table's three, in creation order: left, facing, right
-    if (hb[0]) XA_HOSTS.add({ group: byId.holdem.group, x: -2.15, z: 0, yaw: Math.PI / 2, person: 'f2', wear: { shirt: 0x6a8a74, trousers: 0x2a2d33 }, seat: { h: 0.57 }, fig: hb[0] });
-    if (hb[1]) XA_HOSTS.add({ group: byId.holdem.group, x: 0, z: -1.32, yaw: 0, person: 'm1', wear: { shirt: 0x3a4454, trousers: 0x23262c }, seat: { h: 0.57 }, fig: hb[1] });
-    if (hb[2]) XA_HOSTS.add({ group: byId.holdem.group, x: 2.15, z: 0, yaw: -Math.PI / 2, person: 'm2', wear: { shirt: 0x8a3a34, trousers: 0x1e2026 }, seat: { h: 0.57 }, fig: hb[2] });
+    // the opponents at the Salon tables (real players, shown during a match)
     XA_HOSTS.add({ group: byId.pvpholdem.group, x: 1.15, z: 1.05, yaw: Math.atan2(-1.15, -1.05), person: 'f3', wear: { shirt: 0x7a4a68, trousers: 0x23262c }, seat: { h: 0.57 }, fig: figOf.get(byId.pvpholdem.group), showWhen: () => !!byId.pvpholdem.group.userData.oppSeated });
     XA_HOSTS.add({ group: byId.liars.group, x: 1.0, z: 0.95, yaw: Math.atan2(-1.0, -0.95), person: 'm2', wear: { shirt: 0x2c2c34, trousers: 0x191b20 }, seat: { h: 0.57 }, fig: figOf.get(byId.liars.group), showWhen: () => !!byId.liars.group.userData.oppSeated });
     const PWEAR = [{ shirt: 0x3a5a8a, trousers: 0x2a2d33 }, { shirt: 0xd8d0b8, trousers: 0x3a3028 }, { shirt: 0x8a2a2a, trousers: 0x20222a }, { shirt: 0xe0c8c0, trousers: 0x1c1c26 }];
@@ -10864,25 +10836,6 @@ function applyTestnetFunding(proof){
     ['pvpholdem', 'liars'].forEach((id) => { const s = byId[id], old = greetOf.get(s.group); greetOf.set(s.group, () => { if (old) old(); XA_HOSTS.cue(s.group, 'greet'); }); });
   }
   function updatePatrons(t) {
-    patrons.forEach((p) => {
-      if (p.role === 'machine') {
-        // A slow, repeated reach and button press; the skinned character's head
-        // stays directed at the cabinet instead of following the passing camera.
-        const c=p.host?.ctrl,press=npcPressAmount;
-        if(c?.bones?.wrist_R){
-          const reach=guestButtonWorld.clone(),toward=reach.clone().sub(c.object.position);toward.y=0;toward.normalize();
-          // Keep the index finger just short of the button, then press in.
-          reach.addScaledVector(toward,-(.23-.12*press));reach.y+=.035;
-          const rest=c.object.localToWorld(V3(-.18,1.05,.24));rest.lerp(reach,.45+.55*press);
-          const target=c.model.worldToLocal(rest);
-          c.rig.arm('R',target,{forward:V3(0,0,1),palm:'down'});c.rig.hand('R','point',1);c.model.updateMatrixWorld(true);
-        }else if(press>.8&&!p.lastPressed){p.fig.deal();}
-        p.lastPressed=press>.8;
-        return;
-      }
-      if (p.role === 'barseat') { if(t>p.next){p.next=t+7+Math.random()*7;p.fig.nod();} return; }
-      if (t > p.next) { p.next = t + 4 + Math.random() * 9; const r = Math.random(); if (r < 0.62) p.fig.check(); else if (r < 0.74) p.fig.think(0.5); else if (r < 0.84) p.fig.shrug(); else if (r < 0.92) p.fig.groan(); else p.fig.fistPump(); }
-    });
     if (barUI?.currentOrder?.status!=='preparing' && mode === 'walk' && t > barGreet && Math.hypot(player.x - room.barPos.x, player.z - room.barPos.z) < 5) { barGreet = t + 45; bartender.greet(); }
   }
   stations.forEach((s) => s.group.traverse((o) => { if (o.isMesh && !o.userData.noShadow) { o.castShadow = true; o.receiveShadow = true; } }));
@@ -12530,7 +12483,7 @@ function applyTestnetFunding(proof){
       const REG_SPOTS = ['drop.1', 'twins.2', 'nv.1', 'bf.2', 'ds.1', 'drop.2', 'twins.1', 'nv.2', 'bf.1', 'ds.2'];
       let regSeed = Math.floor(Math.random() * REG_SPOTS.length);
       function regularsFor(list) {
-        if (demo || /[?&]regulars=0/.test(location.search)) return [];
+        if (demo || !/[?&]regulars=1/.test(location.search)) return [];     // off: the room's only people are staff and real players (CASINO-MAIN-ROOM-PLAN)
         const people = list.length + [...walkers.keys()].filter((k) => !k.startsWith('SPWALKDEMO')).length;
         const want = Math.max(0, Math.min(REG.length, 3 - people)); if (!want) return [];
         const taken = new Set(list.map((p) => p.spot)), mine = mySpot(); if (mine) taken.add(mine);

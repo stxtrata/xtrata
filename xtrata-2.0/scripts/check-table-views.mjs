@@ -8,7 +8,7 @@ const discover = process.argv[3] === 'discover';
 const only = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const pub = new URL('../public/', import.meta.url);
 const SITE = 'https://xtrata.test';
-const IDS = ['blackjack', 'roulette', 'holdem', 'baccarat', 'videopoker', 'pvpholdem', 'liars'];
+const IDS = ['blackjack', 'roulette', 'baccarat', 'videopoker', 'pvpholdem', 'liars'];   // Hold'em left the main room (CASINO-MAIN-ROOM-PLAN)
 const SIZES = (process.env.SIZES || 'desktop,phone').split(',');
 const SIZE = { desktop: { viewport: { width: 1440, height: 900 } }, laptop: { viewport: { width: 1280, height: 720 } }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 }, tablet: { viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 }, ipad: { viewport: { width: 1180, height: 820 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 } };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.json': 'application/json', '.glb': 'model/gltf-binary' };
