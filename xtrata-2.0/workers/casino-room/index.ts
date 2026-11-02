@@ -65,6 +65,7 @@ import {
   routeGift,
   routeReact,
   routeRelay,
+  routeSpec,
   routeWin,
   seekers,
   tableAudience,
@@ -581,6 +582,14 @@ export class CasinoRoom extends DurableObject<Env> {
         const sent = r.out[0]?.message as { to?: string[] } | undefined;
         await this.socialEvent(entries, mine.peer, 'gift', now, Math.max(1, sent?.to?.length || 1));
       }
+      return;
+    }
+    // Watching a chess game (docs/plans/CASINO-CHESS-PLAN.md, section 7): snapshots and asks have their own limits.
+    if (parsed.ok && parsed.msg.t === 'spec') {
+      const r = routeSpec(entries.map((e) => e.peer), mine.peer, parsed.msg, now);
+      this.save([mine]);
+      if (!r.ok) { this.send(ws, { t: 'err', code: r.code }); return; }
+      this.deliver(entries, r.out);
       return;
     }
     if (!takeRate(mine.peer, now)) {

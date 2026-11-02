@@ -1,6 +1,6 @@
 # ParallaX Casino: chess at the lounge sofas, powered by XChess
 
-Status: BUILT 2026-11-02, not deployed. Page: `/casino` (`public/casino/index.html` + `public/casino/chess.js`). Room Worker
+Status: BUILT 2026-11-02 (watching added the same day, section 7), not deployed. Page: `/casino` (`public/casino/index.html` + `public/casino/chess.js`). Room Worker
 change needed for player-against-player only (house games work without it).
 
 **The ask (Jim, 2026-11-02).** Playable XChess-powered chessboards on the tables by each sofa: challenge one of the built-in house
@@ -94,5 +94,42 @@ the room Worker first, then the site.
 1. **No BNS name for chess** (main room, signing in is enough), as built. Or keep the Salon's rule for chess too?
 2. **House games are free.** A paying bot table would be beaten by anyone who learns the house players' lines.
 3. **Stakes for player against player:** friendly, 1,000 or 10,000 LAYR. Other amounts?
-4. **Watching:** people standing by see the players seated, not the moves. Spectating could relay moves to watchers later.
+4. **Watching:** built (section 7). Anyone at or near the table sees the game live, guests included.
 5. **Missions:** chess does not count towards "Play 5 hands at any table". Should a finished game count?
+
+## 7. Watching a game (added 2026-11-02)
+
+Jim: "people watching should be able to also see it being played live". The two players' moves already travel through the room, but
+the Salon relay sends them to one address (the opponent). Chess has no hidden information, so the game can go to the whole table.
+
+**How it travels.** The host of a game (the player who waited) sends a **snapshot** after every move, when asked, and every 15 s:
+the position (FEN), every move packed into two characters each (from and to square in a 64-letter alphabet, a mark after a
+promotion), the last move, both clocks, the stake, a draw offer and the result. About 150 bytes plus 2 per move; a game too long for
+one message (over 500 moves) sends the position only. The room passes it to everyone **sitting at or watching that table** (the room
+already knows: a person counts as watching when sat there or walking within 3.2 m, the same audience as table chat), guests who may
+see the room included, never to other tables, and never between people who have blocked each other. Someone who arrives mid-game
+asks; the room passes the ask to the players seated there, and the host answers at once.
+
+**What a watcher sees.** The 3D board on that table shows the live game on their own page: pieces move, last move and check are
+marked. Walking past shows a note at the top, "♟ alice.btc vs bob.btc · tap the table to watch". Clicking the table while two other
+people play there puts you **beside the table** (a standing place the room never counts as a seat), looking across the board, with
+a panel showing both players, both clocks counting down, the moves and the result. A watcher's clicks never move anything.
+
+**Trust.** The room only takes snapshots from someone seated at that table. Each watcher's page replays the moves with XChess and
+uses them only if they reach the position sent; otherwise it shows the position alone. A dishonest player could only mislead
+watchers, never the opponent (whose own copy of the game is the truth).
+
+| File | Change |
+| --- | --- |
+| `functions/lib/casino-social.ts` | `spec` message (snapshot or ask, chess tables only, at most 1,500 bytes); `routeSpec`; feature `spec`; limits: snapshots 40 in 10 s, asks one every 2 s and 10 a minute |
+| `workers/casino-room/index.ts` | routes `spec` with its own limits, beside the other social messages |
+| `src/casino-room/main.ts` → `public/casino/room.js` | lets `spec` through both ways; a guest may ask. Rebuilt with `npm run build:casino-room` (the rebuild of the unchanged source was byte-identical first) |
+| `public/casino/chess.js` | snapshots, watching, the standing place, the note (`c2`) |
+| `public/casino/index.html` | step 2 of the patch script: room hooks for chess.js, `spec` to chess.js, `PXRoomHost.taken()`, the standing place in `setFocus`, `chess.js?v=c2`, `room.js?v=p5.3` |
+| `functions/lib/__tests__/casino-room-chess.test.ts` | six more tests (parsing, audience, who may send, asks, limits, blocking) |
+
+**Checked:** the room suites (266 tests); three browsers through a stand-in room running the real routing (`routeSpec`,
+`routeRelay`, `applySeek`): two players and a guest watcher, who is not given a seat, asks and catches up, sees every move and the
+checkmate with clocks, cannot move pieces, sees the next game while walking past (with the note), and catches up again after a
+reload. Not checked: the live room (deploy the Worker first) and real phones.
+

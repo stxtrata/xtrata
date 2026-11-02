@@ -69,10 +69,29 @@ LINE_AFTER = {
 }
 
 
-def apply(s):
-    if 'chess.js?v=' in s:
-        return s, False
-    for old, new in PATCHES:
+# Step 2 (2026-11-02, plan section 7): watching other people's chess games. Applied after step 1, only once.
+WATCH_MARK = 'PXChess.onSpec'
+WATCH_PATCHES = [
+    # the room hooks chess.js uses to send and receive game snapshots
+    ("lobby: (o) => makeSalonLobby(o), seat: () => curSeat,",
+     "lobby: (o) => makeSalonLobby(o), seat: () => curSeat,\n"
+     "      roomSend: (m) => shared.send(m), roomHas: (f) => shared.feat.has(f), roomMe: () => shared.me,\n"
+     "      watching: () => (window.PXRoomHost && PXRoomHost.table ? PXRoomHost.table() : null), taken: () => (window.PXRoomHost && PXRoomHost.taken ? PXRoomHost.taken() : []),"),
+    # the room's chess snapshots go to the chess tables
+    ("case 'seek': case 'pvp': salon.on(m); return;",
+     "case 'seek': case 'pvp': salon.on(m); return;\n          case 'spec': if (window.PXChess) PXChess.onSpec(m); return;   // a chess game being watched (chess.js)"),
+    # which seats other people have (so a chess table where two others play is watched from beside it, not sat on)
+    ("table: () => { try { return social.tableNow(); } catch (e) { return null; } },",
+     "table: () => { try { return social.tableNow(); } catch (e) { return null; } },\n      taken: () => [...remote],   // spots other people have (the lounge chess tables)"),
+    ("if (window.PXRoomHost && PXRoomHost.steer) seat = PXRoomHost.steer(s, seat);   // a seat somebody in the room already has: take a free one at the same table",
+     "if (window.PXRoomHost && PXRoomHost.steer) seat = PXRoomHost.steer(s, seat);   // a seat somebody in the room already has: take a free one at the same table\n      if (s.watchSeat) { const ws = s.watchSeat(); if (ws) seat = ws; }   // two other people are playing chess here: watch from beside the table"),
+    ('chess.js?v=c1"', 'chess.js?v=c2"'),
+    ('room.js?v=p5.2"', 'room.js?v=p5.3"'),
+]
+
+
+def run(s, patches):
+    for old, new in patches:
         n = s.count(old)
         if n != 1:
             raise SystemExit(f'anchor found {n} times (want 1): {old[:80]!r}')
@@ -81,16 +100,25 @@ def apply(s):
             s = s[:e] + LINE_AFTER[old] + s[e:]
         else:
             s = s.replace(old, new)
-    return s, True
+    return s
+
+
+def apply(s):
+    done = []
+    if 'chess.js?v=' not in s:
+        s = run(s, PATCHES); done.append('chess tables')
+    if WATCH_MARK not in s:
+        s = run(s, WATCH_PATCHES); done.append('watching')
+    return s, done
 
 
 if __name__ == '__main__':
     path = sys.argv[1]
     s = open(path, encoding='utf-8').read()
-    out, changed = apply(s)
-    if not changed:
+    out, done = apply(s)
+    if not done:
         print('already patched'); sys.exit(0)
     if '--check' in sys.argv:
         print('all anchors found; not written'); sys.exit(0)
     open(path, 'w', encoding='utf-8').write(out)
-    print('patched', path, len(s), '->', len(out))
+    print('patched', path, '(' + ', '.join(done) + ')', len(s), '->', len(out))

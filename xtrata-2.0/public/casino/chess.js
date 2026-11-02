@@ -342,6 +342,27 @@
     document.head.appendChild(st);
   }
   const stars = (n) => `<span class="st" aria-label="strength ${n} of 5">${'★'.repeat(n)}<span style="opacity:.25">${'★'.repeat(5 - n)}</span></span>`;
+  // ---- watching (section 7 of the plan): a game travels as a small snapshot. Moves pack into two characters each (from and to
+  // square, 0..63, in a 64-letter alphabet) with a mark after a promotion, so even a long game fits one room message.
+  const SQ64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', PROMO_MARK = { q: '!', r: '~', b: '*', n: '^' };
+  const sqIdx = (s) => (s.charCodeAt(1) - 49) * 8 + (s.charCodeAt(0) - 97), idxSq = (i) => 'abcdefgh'[i % 8] + (Math.floor(i / 8) + 1);
+  function packMoves(uci) { return uci.map((u) => SQ64[sqIdx(u.slice(0, 2))] + SQ64[sqIdx(u.slice(2, 4))] + (u[4] ? PROMO_MARK[u[4]] : '')).join(''); }
+  function unpackMoves(str) {
+    if (typeof str !== 'string' || str.length > 1400) return null;
+    const out = [], back = Object.fromEntries(Object.entries(PROMO_MARK).map(([k, v]) => [v, k]));
+    for (let i = 0; i < str.length;) {
+      const f = SQ64.indexOf(str[i]), t = SQ64.indexOf(str[i + 1]); if (f < 0 || t < 0) return null; i += 2;
+      let u = idxSq(f) + idxSq(t); if (back[str[i]]) { u += back[str[i]]; i++; }
+      out.push(u);
+    }
+    return out;
+  }
+  const SPEC_FRESH = 45000, SPEC_AFTER = 30000, SPEC_BEAT = 15000;   // a live game unseen this long is gone; a finished one stays shown; the host repeats itself
+  let chip = null, chipOwner = null;
+  function specChip(text) {
+    if (!chip) { chip = document.createElement('div'); chip.id = 'pxChessWatch'; chip.setAttribute('role', 'status'); chip.style.cssText = 'position:fixed;left:50%;top:calc(' + (innerWidth < 600 ? 150 : 102) + 'px + env(safe-area-inset-top));transform:translateX(-50%);z-index:30;max-width:calc(100vw - 32px);padding:7px 14px;border-radius:999px;background:rgba(8,18,32,.88);border:1px solid rgba(212,168,58,.55);color:#f1e3b8;font:600 13px Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;display:none'; document.body.appendChild(chip); }
+    chip.style.display = text ? 'block' : 'none'; if (text && chip.textContent !== text) chip.textContent = text;
+  }
   const GLYPH = { wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙', bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟' };
 
   // ======================================================================= the stations
@@ -355,10 +376,18 @@
     const saved = store.get();
     // house game state (this browser only)
     let H = null;            // { profile, me, seed, uci:[], pos, over:{result,termination,winner}, verified, thinking }
+    let R = null;            // a game between two other people at this table, as their snapshots show it (watching)
+    let specSent = { key: '', at: 0 }, specAskAt = 0, specAnswerAt = 0, hereSince = 0;
+    // on the side of the table away from the glasses (sofa x +0.37 is table x -0.37 at both lounges)
+    const WATCH_SEAT = { x: 1.08, z: 0.12, pad: true, watch: true, stand: { x: 1.45, z: 0.35 } };
     let pick = { profile: saved.profile || 'gambit', colour: saved.colour || 'w', stake: 0 };
     let sel = null, targets = [], promo = null, hint = null, hintUntil = 0, msg = '', tone = '', busy = false, lastSec = -1, S = null, result = null;
-    const me = () => (S ? S.myColour() : H ? H.me : 'w');
-    const pos = () => (S && S.table.pos ? S.table.pos : H ? H.pos : null);
+    const watchingHere = () => ctx.focus() === st && !!(ctx.seat() && ctx.seat().watch);
+    const liveR = () => !!R && Date.now() - R.rx < (R.result ? SPEC_AFTER : SPEC_FRESH);
+    // what the board shows: your own game against a player, else a game you are watching, else your house game
+    const showR = () => !S && liveR() && !(H && ctx.focus() === st && !watchingHere());
+    const me = () => (S ? S.myColour() : showR() ? 'w' : H ? H.me : 'w');
+    const pos = () => (S && S.table.pos ? S.table.pos : showR() ? R.pos : H ? H.pos : null);
     const mySeatIsSofa = () => { const s = ctx.seat(); return !s || s.z > 0 || ctx.focus() !== st; };
     const stats = () => store.get().stats || {};
     function record(profile, outcome) { const v = store.get(); v.stats = v.stats || {}; const r = v.stats[profile] = v.stats[profile] || { w: 0, d: 0, l: 0 }; r[outcome]++; store.set(v); }
@@ -369,12 +398,12 @@
     function paint(instant) {
       orient(); const p = pos();
       if (!p) { if (engine.api) board.sync(boardMap(new (engine.api.Position)(START)), instant); board.marks({}); return; }
-      const lm = S ? S.table.g && S.table.g.lastMove : H && H.last;
+      const lm = S ? S.table.g && S.table.g.lastMove : showR() ? R.last : H && H.last;
       const bm = boardMap(p); board.sync(bm, instant, lm); if (instant) board.rebuildTrays(bm);
       const check = p.inCheck() ? kingSquare(p, p.turn === 0 ? 'w' : 'b') : null;
       board.marks({ last: lm, sel, targets, check, hint: hint && performance.now() < hintUntil ? hint : null });
     }
-    const myTurn = () => { const p = pos(); if (!p) return false; if (S) return !!S.table.g && !S.table.g.result && (p.turn === 0 ? 'w' : 'b') === me(); return !!H && !H.over && !H.thinking && (p.turn === 0 ? 'w' : 'b') === H.me; };
+    const myTurn = () => { const p = pos(); if (!p || (!S && showR())) return false; if (S) return !!S.table.g && !S.table.g.result && (p.turn === 0 ? 'w' : 'b') === me(); return !!H && !H.over && !H.thinking && (p.turn === 0 ? 'w' : 'b') === H.me; };
     function refresh() { paint(false); if (ctx.focus() === st) ctx.render(); }
 
     // ---- house games
@@ -445,6 +474,7 @@
     }
     function clickSquare(s) {
       const p = pos(); if (!p) { return false; }
+      if (!S && showR()) { ctx.toast('You are watching ' + R.wn + ' and ' + R.bn + '.'); return true; }
       if (!myTurn()) { if ((H && H.over) || (S && S.table.g && S.table.g.result)) return true; ctx.toast(H && H.thinking ? houseName(H.profile) + ' is thinking…' : 'Wait for your turn.'); return true; }
       if (sel && targets.some((t) => t.sq === s)) { tryMove(sel, s); return true; }
       const piece = boardMap(p).get(s);
@@ -458,11 +488,71 @@
       promo = null; refresh(); return true;
     }
 
+    // ---- watching: the host of a game sends snapshots for the people at the table; everyone else draws them
+    function snapshot() {
+      const g = S && S.table.g; if (!g) return null;
+      const c = S.clocks(), m = packMoves(g.uci);
+      const d = { k: 1, w: g.white, b: g.black, on: S.oppName, f: S.table.pos.fen(), l: g.uci.length ? g.uci[g.uci.length - 1] : '', c: [Math.round(c.w), Math.round(c.b)], st: S.stake };
+      if (m.length <= 1000) d.m = m;          // a very long game sends the position only
+      if (g.result) { d.r = g.result; d.tm = g.term; }
+      if (g.offer) d.of = g.offer;
+      return d;
+    }
+    function specSend(force) {
+      if (!S || !S.chain.host || !ctx.roomHas('spec')) return;
+      const g = S.table.g; if (!g) return;
+      const key = g.uci.length + '|' + (g.result || '') + '|' + (g.offer || ''), now = Date.now();
+      if (!force && key === specSent.key && now - specSent.at < SPEC_BEAT) return;
+      if (g.result && key === specSent.key && !force) return;   // a finished game is announced once (and to anyone who asks)
+      const d = snapshot(); if (!d) return;
+      specSent = { key, at: now }; ctx.roomSend({ t: 'spec', tb: def.id, d });
+    }
+    const onSpec = (m) => {
+      if (m.ask) { if (S && S.chain.host && Date.now() - specAnswerAt > 1000) { specAnswerAt = Date.now(); specSend(true); } return; }
+      if (S) return;                                       // you are playing at this table: your own copy is the truth
+      const d = m.d, E = engine.api;
+      if (!E || !d || typeof d !== 'object' || typeof d.f !== 'string' || typeof d.w !== 'string' || typeof d.b !== 'string' || (m.a !== d.w && m.a !== d.b)) return;
+      const me0 = ctx.roomMe(); if (me0 && (d.w === me0 || d.b === me0) && lobby.match) return;
+      // the moves are replayed with XChess and must reach the position sent; without them, the position alone is shown
+      let p = null, uci = null; const moves = d.m !== undefined ? unpackMoves(d.m) : null;
+      if (moves) { const q = new E.Position(START, 'legal-en-passant'); if (moves.every((u) => q.applyUci(u)) && q.fen().split(' ').slice(0, 4).join(' ') === d.f.split(' ').slice(0, 4).join(' ')) { p = q; uci = moves; } }
+      if (!p) { p = E.Position.tryFrom(d.f, 'legal-en-passant'); if (!p) return; }
+      const name = (s) => String(s || '').slice(0, 40), senderIsWhite = m.a === d.w;
+      const key = d.w + '|' + d.b, same = R && R.key === key && (!uci || !R.uci || uci.length >= R.uci.length);
+      const l = typeof d.l === 'string' && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(d.l) ? [d.l.slice(0, 2), d.l.slice(2, 4)] : null;
+      const c = Array.isArray(d.c) && d.c.length === 2 && d.c.every((x) => Number.isFinite(x) && x >= 0 && x < 1e5) ? { w: d.c[0], b: d.c[1] } : null;
+      const was = R;
+      R = { key, w: d.w, b: d.b, wn: name(senderIsWhite ? m.n : d.on) || 'White', bn: name(senderIsWhite ? d.on : m.n) || 'Black', pos: p, uci, last: l, clocks: c, rx: Date.now(),
+            result: typeof d.r === 'string' && /^(1-0|0-1|1\/2-1\/2)$/.test(d.r) ? d.r : null, term: typeof d.tm === 'string' ? d.tm.slice(0, 24) : null, stake: Number.isSafeInteger(d.st) && d.st > 0 ? d.st : 0, offer: d.of === 'w' || d.of === 'b' ? d.of : null };
+      if (showR()) { if (!same) { sel = null; targets = []; board.clear(); } paint(!same); if (was && !was.result && R.result) ctx.sfx('win'); }
+      if (ctx.focus() === st) ctx.render();
+    };
+    const turnOf = (p) => (p.turn === 0 ? 'w' : 'b');
+    function watchClocks() {
+      if (!R || !R.clocks) return null; const c = { w: R.clocks.w, b: R.clocks.b };
+      if (!R.result) { const s = turnOf(R.pos); c[s] = Math.max(0, c[s] - (Date.now() - R.rx) / 1000); }
+      return c;
+    }
+    function specFrame() {
+      const now = Date.now();
+      if (S) { specSend(false); return; }
+      // standing by (or sitting to watch) a table where other people sit: ask the host for the game, unless it is already showing
+      const here = ctx.watching() === def.id, taken = ctx.taken().filter((x) => x.split('.')[0] === def.id).length;
+      if (!here) hereSince = 0; else if (!hereSince) hereSince = now;
+      // the page tells the room which table it is watching about once a second: ask only once that has gone, or the room says "not here"
+      if (here && taken && now - hereSince > 1500 && ctx.roomHas('spec') && (!R || now - R.rx > 20000) && now - specAskAt > (R ? 20000 : 6000)) { specAskAt = now; ctx.roomSend({ t: 'spec', tb: def.id, ask: true }); }
+      if (R && !liveR()) { const had = showR.was; R = null; if (had) { msg = ''; board.clear(); paint(true); if (ctx.focus() === st) ctx.render(); } }
+      showR.was = showR();
+      return here;
+    }
+    // the place to stand when two other people are playing here: beside the table, not in a player's seat (the room never sees it)
+    const watchSeat = () => (!S && (liveR() || ctx.taken().filter((x) => x.split('.')[0] === def.id).length >= 2) ? WATCH_SEAT : null);
+
     // ---- player against player
     lobby.busy = () => !!(H && !H.over && H.uci.length > 0);
     lobby.onStart = (session) => {
-      S = session; H = null; sel = null; targets = []; promo = null; hint = null; result = null; board.clear();
-      S.onChange = () => { if (S === session) refresh(); };
+      S = session; H = null; R = null; specSent = { key: '', at: 0 }; sel = null; targets = []; promo = null; hint = null; result = null; board.clear();
+      S.onChange = () => { if (S === session) { specSend(false); refresh(); } };
       S.onSettle = (net, gm) => {
         const mine = S.myColour(), won = gm.winner === mine, draw = gm.winner === null;
         if (S.stake > 0) ctx.setBank(ctx.bank() + (draw ? S.stake : won ? 2 * S.stake : 0));
@@ -485,6 +575,12 @@
       seats: SEATS,
       camFor(seat, view, asp) {
         const sg = seat && seat.z < 0 ? -1 : 1; let off, lk;
+        if (seat && seat.watch && view !== 'overhead') {   // watching: from beside the table, a little above it
+          const sx = Math.sign(seat.x) || 1, tallW = asp < 0.9;
+          off = new THREE.Vector3(sx * (tallW ? 0.62 : 0.92), tallW ? 1.38 : 1.3, 0.04); lk = new THREE.Vector3(0, 0.55, 0);
+          if (view === 'seat') { off.set(sx * 0.8, 1.05, 0.04); lk.set(-sx * 0.05, 0.55, 0); }
+          return [off, lk];
+        }
         // On a phone held upright the board has to span the screen's width (squares big enough for a fingertip), so the camera comes
         // in steep and close; the bottom sheet's space is handled by the page (frameFit).
         const tall = asp < 0.9, fit = tall ? Math.max(0.5, 0.78 * (0.46 / Math.max(0.3, asp))) : 1;
@@ -504,6 +600,12 @@
       },
       update(t) {
         board.update(); lobby.frame(ctx.focus() === st);
+        if (engine.api && (t - (st.specT || 0) > 0.5)) {
+          st.specT = t; const here = specFrame();
+          if (here && !ctx.focus() && showR()) { chipOwner = def.id; specChip('♟ ' + R.wn + ' vs ' + R.bn + (R.result ? ' · ' + R.result : '') + ' · tap the table to watch'); }
+          else if (chipOwner === def.id) { chipOwner = null; specChip(null); }
+        }
+        if (!S && showR() && ctx.focus() === st && R && !R.result) { const sec = Math.floor(performance.now() / 1000); if (sec !== lastSec) { lastSec = sec; ctx.render(); } }
         if (ctx.focus() === st && engine.api) { const was = board.flip; orient(); if (was !== board.flip) paint(true); }
         if (st.sign && !st.signSet) { st.signSet = true; st.sign.position.y = 1.95; st.sign.scale.multiplyScalar(0.75); }
         if (st.sign) st.sign.visible = ctx.focus() !== st;
@@ -520,6 +622,18 @@
         const p = pos(), live = (H && !H.over) || (S && S.table.g && !S.table.g.result);
         const moves = p ? p.pgnMoveText() : '';
         const promoHtml = promo ? `<div class="row promo"><span class="dim">Promote to</span>${['q', 'r', 'b', 'n'].map((x) => `<button data-a="promo" data-p="${x}" aria-label="${NAMES[x]}">${GLYPH[me() + x]}</button>`).join('')}</div>` : '';
+        if (!S && showR()) {
+          const c = watchClocks(), turn = turnOf(R.pos);
+          const ck = (s, who) => `${c ? `<span class="clk ${!R.result && turn === s ? 'on' : ''} ${c[s] < 30 ? 'low' : ''}">${clock(c[s])}</span> ` : ''}<span class="who">${esc(who)} ${s === 'w' ? '♔' : '♚'}</span>`;
+          const mv = R.uci ? (R.pos.pgnMoveText() || '<span class="dim">No moves yet.</span>') : '<span class="dim">Position only (a long game).</span>';
+          game = `<div class="pxc"><div class="row">${ck('b', R.bn)}</div><div class="row">${ck('w', R.wn)}<span class="dim">· ${R.stake ? ctx.money(R.stake) + ' each' : 'friendly'}</span></div><div class="moves">${R.uci ? esc(mv) : mv}</div>${R.offer && !R.result ? `<div class="dim">${esc(R.offer === 'w' ? R.wn : R.bn)} has offered a draw.</div>` : ''}</div>`;
+          msg = R.result ? (R.result === '1/2-1/2' ? 'Drawn' : (R.result === '1-0' ? R.wn : R.bn) + ' wins') + ' · ' + R.result + ' by ' + (TERM[R.term] || R.term || 'agreement') + '.' : 'Watching · ' + (turn === 'w' ? R.wn : R.bn) + ' to move' + (R.pos.inCheck() ? ' (check!)' : '') + '.';
+          tone = '';
+          return { msg, tone, hint: '', game, actions: a, chips: null, lock: false, canGetLAYR: false };
+        }
+        if (!S && watchingHere()) {
+          return { msg: 'Nobody is playing here now.', tone: '', hint: '', game: '<div class="pxc"><div class="dim">Stand up, then sit down to play.</div></div>', actions: [], chips: null, lock: false, canGetLAYR: false };
+        }
         if (S) {
           const gm = S.table.g, c = S.clocks(), mine = S.myColour();
           if (!gm) game = `<div class="pxc"><div class="who">${esc(S.oppName)}${S.stake ? ' · ' + ctx.money(S.stake) + ' each' : ' · friendly'}</div><div class="dim">Setting up the board…</div></div>`;
@@ -595,11 +709,12 @@
     // a house game left unfinished in this browser carries on where it was
     const resume = saved.games && saved.games[def.id];
     loadEngine().then(() => { if (resume && !H && !S) startHouse(resume); else paint(true); }).catch(() => { });
+    st.onSpec = onSpec; st.watchSeat = watchSeat;
     // for tests and bug reports (scripts/test-casino-chess.mjs): what the table holds now
-    st.debug = () => { const p = pos(), g = S && S.table.g; return { mode: S ? 'pvp' : H ? 'house' : 'idle', fen: p ? p.fen() : null, uci: H ? H.uci.slice() : g ? g.uci.slice() : [], me: p ? me() : null, over: H ? H.over : g && g.result ? { result: g.result, termination: g.term } : null, verified: H ? H.verified : null, thinking: !!(H && H.thinking), legal: p ? p.movesUci() : [], flip: board.flip, seed: H ? H.seed : null, clocks: S ? S.clocks() : null, stake: S ? S.stake : 0, host: S ? !!S.chain.host : null, msg }; };
+    st.debug = () => { const p = pos(), g = S && S.table.g; return { mode: S ? 'pvp' : showR() ? 'watch' : H ? 'house' : 'idle', watch: R ? { wn: R.wn, bn: R.bn, moves: R.uci ? R.uci.length : null, result: R.result, clocks: watchClocks(), seat: watchingHere() } : null, fen: p ? p.fen() : null, uci: H ? H.uci.slice() : g ? g.uci.slice() : [], me: p ? me() : null, over: H ? H.over : g && g.result ? { result: g.result, termination: g.term } : null, verified: H ? H.verified : null, thinking: !!(H && H.thinking), legal: p ? p.movesUci() : [], flip: board.flip, seed: H ? H.seed : null, clocks: S ? S.clocks() : null, stake: S ? S.stake : 0, host: S ? !!S.chain.host : null, msg }; };
     st.squareFromPoint = (x, y) => board.pick(ctx.ray({ clientX: x, clientY: y }));
     st.squareAt = (sq) => { const [x, z] = sqPos(sq); return board.root.localToWorld(new THREE.Vector3(x, 0.017, z)); };
-    st.houseShown = (where) => !!(H && !H.over) && ctx.focus() === st && (where === 'chair') === mySeatIsSofa();
+    st.houseShown = (where) => !!(H && !H.over) && !showR() && !watchingHere() && ctx.focus() === st && (where === 'chair') === mySeatIsSofa();
     return st;
   }
 
@@ -614,10 +729,12 @@
   });
   let built = [];
   root.PXChess = {
-    version: 'c1', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
+    version: 'c2', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
     placement, TAGS, SEATS: SEATS_OUT, VERB, engine, loadEngine, ask, houseList, makeRelayTable, makeSession,
     makeStations(ctx) {
       // the station's seats must be the very objects in the page's SEATS (the room maps a seat to its spot by identity)
+      // the room hooks are optional: a page without them simply never shows other people's games
+      ctx = Object.assign({ roomSend: () => { }, roomHas: () => false, roomMe: () => null, watching: () => null, taken: () => [] }, ctx);
       built = SOFAS.map((def) => { const st = makeStation(ctx, def); return st; });
       built.forEach((st) => { SEATS_OUT[st.id] = st.seats; });
       return built;
@@ -630,6 +747,9 @@
         hosts.add({ group: st.group, x: 0, z: 1.2, yaw: Math.PI, person: def.person, wear, seat: { h: 0.66 }, showWhen: () => st.houseShown('sofa') });
       });
     },
+    // a `spec` message from the room (watching a game): to the table it names
+    onSpec(m) { const st = built.find((s) => s.id === (m && m.tb)); if (st && st.onSpec) try { st.onSpec(m); } catch (e) { console.warn('[chess] a snapshot failed', e); } },
+    packMoves, unpackMoves,
     stations: () => built
   };
 })(window);

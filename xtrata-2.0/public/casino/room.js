@@ -8777,6 +8777,7 @@ const M3 = (t) => t.length <= 12 ? t : `${t.slice(0, 5)}…${t.slice(-4)}`, R3 =
       case "gift":
       case "seek":
       case "pvp":
+      case "spec":
         jt(n);
         return;
       case "me":
@@ -9089,6 +9090,7 @@ const em = (t) => {
   gift: "gift",
   seek: "pvp",
   pvp: "pvp",
+  spec: "spec",
   log: "progress",
   mission: "missions",
   card: "progress",
@@ -9100,7 +9102,7 @@ const em = (t) => {
   var s;
   const e = t.detail;
   if (!e || typeof e.t != "string" || !wl[e.t]) return;
-  const n = e.t === "round" || e.t === "watch";
+  const n = e.t === "round" || e.t === "watch" || e.t === "spec" && e.ask === !0;
   if (!(p.service === "ok" && p.connected && p.features.includes(wl[e.t]) && (n || !!(p.signed && p.you && !p.you.guest))) || ((s = p.ws) == null ? void 0 : s.readyState) !== WebSocket.OPEN) {
     jt({ t: "unsent", msg: e });
     return;

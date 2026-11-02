@@ -9,7 +9,7 @@
 import { cleanBets, isRoundTable, betsOpen, roundAt, type Bets, type RoundTable } from './casino-rounds';
 
 /** Features the room offers on top of casino-room's ROOM_FEATURES (the client only uses what the room lists). */
-export const SOCIAL_FEATURES = ['react', 'win', 'daily', 'table', 'rounds', 'gift', 'pvp'] as const;
+export const SOCIAL_FEATURES = ['react', 'win', 'daily', 'table', 'rounds', 'gift', 'pvp', 'spec'] as const;
 
 // ------------------------------------------------------------------ the extra things a connection carries
 
@@ -24,6 +24,8 @@ export type SocialPeer = {
   rb?: { tb: RoundTable; n: number; bets: Bets } | null;
   sk?: { tb: GameTable; stake: number; at: number } | null;
   rx?: number[]; wn?: number[]; gl?: number[]; pv?: number[];
+  /** Recent times for the chess spectator limits: snapshots sent (`sp`) and asks (`sa`). */
+  sp?: number[]; sa?: number[];
   /** The Salon's rule: the primary BNS name read at sign-in, and whether it was checked (see salonRefusal). */
   bn?: string | null; bc?: boolean;
 };
@@ -102,7 +104,9 @@ export type SocialMessage =
   | { t: 'gift'; to: string; d: Drink }
   | { t: 'seek'; tb: GameTable; stake: number }
   | { t: 'seek'; off: true }
-  | { t: 'pvp'; to: string; d: unknown };
+  | { t: 'pvp'; to: string; d: unknown }
+  | { t: 'spec'; tb: ChessTable; d: unknown }
+  | { t: 'spec'; tb: ChessTable; ask: true };
 
 const addressLike = (v: unknown): v is string => typeof v === 'string' && /^S[0-9A-Z]{4,63}$/.test(v);
 /** What a player may name as a game in a win: a table, or a machine's short id. */
@@ -153,6 +157,15 @@ export const parseSocialMessage = (value: any): { ok: true; msg: SocialMessage }
       try { size = new TextEncoder().encode(JSON.stringify(value.d)).length; } catch { return { ok: false, code: 'pvp-bad' }; }
       if (size > MAX_RELAY_BYTES) return { ok: false, code: 'pvp-too-big' };
       return { ok: true, msg: { t: 'pvp', to: value.to, d: value.d } };
+    }
+    case 'spec': {
+      if (!isChessTable(value.tb)) return { ok: false, code: 'spec-bad' };
+      if (value.ask === true) return { ok: true, msg: { t: 'spec', tb: value.tb, ask: true } };
+      if (value.d === undefined) return { ok: false, code: 'spec-bad' };
+      let size = 0;
+      try { size = new TextEncoder().encode(JSON.stringify(value.d)).length; } catch { return { ok: false, code: 'spec-bad' }; }
+      if (size > MAX_RELAY_BYTES) return { ok: false, code: 'spec-too-big' };
+      return { ok: true, msg: { t: 'spec', tb: value.tb, d: value.d } };
     }
     default: return null;
   }
@@ -275,6 +288,34 @@ export const routeRelay = (peers: SocialPeer[], me: SocialPeer, msg: { to: strin
   const lim = takeLimit(me.pv, now, 0, 30, 10_000); me.pv = lim.list;
   if (!lim.ok) return { ok: false, code: 'pvp-too-fast' };
   return { ok: true, out: [{ to: targets.filter(allowed).map((p) => p.id), message: { t: 'pvp', a: me.a, n: me.bn || short(me.a), d: msg.d, at: now } }] };
+};
+
+/**
+ * Watching a chess game (docs/plans/CASINO-CHESS-PLAN.md, section 7). Chess has no hidden information, so a game can be shown to
+ * everyone at the table. A player seated at a chess table sends a snapshot of the game (`d`: the position, the moves, the clocks);
+ * the room passes it to everyone else sitting at or watching that table, guests who may see the room included. Someone who arrives
+ * mid-game asks (`ask`), and the room passes the ask to the players seated there, whose page answers with a snapshot. The room never
+ * reads `d`; each watcher's page replays the moves with the XChess engine before showing them. Nothing is stored.
+ */
+const mayWatch = (p: SocialPeer) => !!p.a || p.w !== false;
+const seatedAt = (p: SocialPeer, table: string) => !!p.spot && p.spot.split('.')[0] === table;
+export const routeSpec = (peers: SocialPeer[], me: SocialPeer, msg: { tb: ChessTable; d: unknown } | { tb: ChessTable; ask: true }, now: number): Result => {
+  if (tableOf(me) !== msg.tb) return { ok: false, code: 'spec-not-here' };
+  const from = me.a;
+  const visible = (p: SocialPeer) => p.id !== me.id && mayWatch(p) && (!from || !p.a || !hidden(peers, p.a, from));
+  if ('ask' in msg) {
+    if (!mayWatch(me)) return { ok: false, code: 'spec-not-here' };
+    const lim = takeLimit(me.sa, now, 2000, 10); me.sa = lim.list;
+    if (!lim.ok) return { ok: false, code: 'spec-too-fast' };
+    const to = peers.filter((p) => visible(p) && !!p.a && seatedAt(p, msg.tb)).map((p) => p.id);
+    return { ok: true, out: to.length ? [{ to, message: { t: 'spec', tb: msg.tb, ask: true, at: now } }] : [] };
+  }
+  if (!from) return { ok: false, code: 'spec-sign-in-first' };
+  if (!seatedAt(me, msg.tb)) return { ok: false, code: 'spec-not-seated' };
+  const lim = takeLimit(me.sp, now, 0, 40, 10_000); me.sp = lim.list;
+  if (!lim.ok) return { ok: false, code: 'spec-too-fast' };
+  const to = peers.filter((p) => visible(p) && tableOf(p) === msg.tb).map((p) => p.id);
+  return { ok: true, out: to.length ? [{ to, message: { t: 'spec', tb: msg.tb, a: from, n: me.bn || short(from), d: msg.d, at: now } }] : [] };
 };
 
 // ------------------------------------------------------------------ the daily drop

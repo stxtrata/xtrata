@@ -221,7 +221,7 @@ const connect = () => {
       case 'say': case 'dm': chat?.heard(m); if (m.t === 'say') tellPage(m); return;
       case 'join': chat?.joined(m.who); tellPage(m); return;
       case 'leave': chat?.left(m.a); if (S.walk.has(m.a)) walkOne(m.a, null); tellPage(m); return;
-      case 'react': case 'win': case 'daily': case 'round': case 'bet': case 'gift': case 'seek': case 'pvp': tellPage(m); return;
+      case 'react': case 'win': case 'daily': case 'round': case 'bet': case 'gift': case 'seek': case 'pvp': case 'spec': tellPage(m); return;
       // phase 3 (functions/lib/casino-progress.ts)
       case 'me': case 'hh': case 'lvl': case 'badge': case 'mission-done': case 'bal': case 'board': case 'friends': case 'tourney': case 'tourney-end': case 'jp': case 'jackpot': case 'card': tellPage(m); return;
       case 'reported': chat?.reported(); return;
@@ -591,18 +591,18 @@ const onOwnMove = (event: Event) => {
 };
 
 /**
- * The page's own social messages (reactions, wins, the daily drop, shared-round bets, drinks, Salon moves...). Only what the room
+ * The page's own social messages (reactions, wins, the daily drop, shared-round bets, drinks, Salon moves, chess snapshots...). Only what the room
  * lists as a feature is sent; everything but `round` and `watch` needs the visitor signed in. A message that cannot go now is
  * handed back as `{ t: 'unsent', msg }`, so the page never waits for an answer that will not come.
  */
 const FEATURE_OF: Record<string, string> = {
-  react: 'react', win: 'win', daily: 'daily', watch: 'table', round: 'rounds', bet: 'rounds', gift: 'gift', seek: 'pvp', pvp: 'pvp',
+  react: 'react', win: 'win', daily: 'daily', watch: 'table', round: 'rounds', bet: 'rounds', gift: 'gift', seek: 'pvp', pvp: 'pvp', spec: 'spec',
   log: 'progress', mission: 'missions', card: 'progress', board: 'boards', tjoin: 'tourney', bal: 'bal', friends: 'friends'
 };
 const onPageSend = (event: Event) => {
   const msg = (event as CustomEvent).detail as Record<string, unknown> | undefined;
   if (!msg || typeof msg.t !== 'string' || !FEATURE_OF[msg.t]) return;
-  const anyone = msg.t === 'round' || msg.t === 'watch';
+  const anyone = msg.t === 'round' || msg.t === 'watch' || (msg.t === 'spec' && msg.ask === true);   // a guest may watch a chess game
   const ok = S.service === 'ok' && S.connected && S.features.includes(FEATURE_OF[msg.t]) && (anyone || !!(S.signed && S.you && !S.you.guest));
   if (!ok || S.ws?.readyState !== WebSocket.OPEN) { tellPage({ t: 'unsent', msg }); return; }
   S.ws.send(JSON.stringify(msg));     // directly: social messages must not hold back the seat updates
