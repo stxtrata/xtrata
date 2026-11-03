@@ -28,10 +28,12 @@ function createAstroCabinet(THREE, {screenTexture=null, lighting=false, art=null
  for(const sign of [-1,1]){
   const x=sign*.40;
   side('Red side chassis',profile,x,.055,red);
-  // Large printed side panel, with custom UV coordinates in the Y/Z plane.
-  const artPoly=[[-.46,.12],[.39,.12],[.24,.81],[.48,1.09],[.27,1.22],[.08,1.79],[-.42,1.95],[-.49,1.65]];
-  const tex=flatTex(THREE,'#1a1f55');const artMat=new THREE.MeshStandardMaterial({name:'Rocket side print',map:tex,roughness:.5,metalness:.1,side:THREE.DoubleSide});
-  artMaterials.push(artMat);const sh=new THREE.Shape();artPoly.forEach(([z,y],i)=>i?sh.lineTo(z,y):sh.moveTo(z,y));const geo=new THREE.ShapeGeometry(sh);const pos=geo.attributes.position,uv=geo.attributes.uv;for(let i=0;i<pos.count;i++){uv.setXY(i,(pos.getX(i)+.50)/1.05,(pos.getY(i)-.08)/1.93);}geo.rotateY(-Math.PI/2);add(geo,artMat,'Rocket artwork '+sign,[sign*.435,0,0]);
+  // Large printed side panel: the complete poster, fitted to the cabinet profile (title below the upper armor). Custom UVs in the Y/Z plane.
+  const tex=flatTex(THREE,'#1a1f55');const artMat=new THREE.MeshStandardMaterial({name:'Poster side print '+sign,map:tex,roughness:.46,metalness:.08,side:THREE.DoubleSide});artMaterials.push(artMat);
+  const backdrop=side('Side skin backing',[[-.46,.12],[.39,.12],[.24,.81],[.48,1.09],[.27,1.22],[.08,1.79],[-.42,1.95],[-.49,1.65]],sign*.435,.004,black);
+  const verts=[sign*.444,.18,-.45,sign*.444,.18,.07,sign*.444,1.65,-.45,sign*.444,1.65,.07];
+  const uvs=sign<0?[0,0,1,0,0,1,1,1]:[1,0,0,0,1,1,0,1];
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geo.setIndex([0,1,2,1,3,2]);geo.computeVertexNormals();add(geo,artMat,'Poster skin '+(sign<0?'left':'right'));
   side('Front armor rail',[[.39,.08],[.51,.08],[.51,.23],[.35,.83],[.60,1.05],[.60,1.16],[.38,1.24],[.17,1.79],[.34,1.91],[.33,2.13],[.27,2.15],[.25,1.94],[.10,1.80],[.29,1.19],[.51,1.10],[.25,.85]],sign*.456,.045,white);
   side('Upper wing armor',[[-.51,1.35],[-.51,1.49],[-.40,1.74],[.23,2.13],[.25,2.21],[.16,2.19],[-.48,1.81],[-.57,1.43]],sign*.455,.045,white);
   side('Rear fin',[[-.48,1.61],[-.48,2.16],[-.39,2.26],[-.34,2.25],[-.34,1.78]],sign*.39,.055,red);
@@ -88,7 +90,7 @@ function createAstroCabinet(THREE, {screenTexture=null, lighting=false, art=null
  box('Rear service panel',.66,1.41,.018,[0,.93,-.446],black);
  for(let j=0;j<8;j++)box('Rear vent',.43,.012,.012,[0,1.38+j*.027,-.46],rubber);
  box('Power inlet',.07,.05,.02,[.22,.25,-.46],rubber);
- root.userData={version:'2.0',units:'metres',front:'+Z',screen:{width:.589,height:.640},design:'Reference-matched reconstruction; rear inferred'};
+ root.userData={version:'3.0',dependencyInscription:3075,units:'metres',front:'+Z',screen:{width:.589,height:.640},design:'Reference-matched reconstruction; rear inferred'};
  const ready=Promise.all([
   (art&&art.side?loadTex(THREE,art.side):Promise.resolve(null)).then(texture=>{
    if(!texture)return;texture.anisotropy=4;

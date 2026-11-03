@@ -30,11 +30,11 @@ window.store = (function () { try { localStorage.setItem('x', '1'); return 'work
 </script></body></html>`);
 const BIG_LIE = 9501;
 const PNG1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-const manifestSvg = (note, withArt = true) => Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10"><title>art</title>' +
-  (note ? '<metadata id="xtrata-game"><![CDATA[' + JSON.stringify(note) + ']]></metadata>' : '') +
-  (withArt ? '<image id="xa-cab-marquee" x="0" y="0" width="10" height="2" href="' + PNG1 + '" xlink:href="' + PNG1 + '"/><image id="xa-cab-side" x="0" y="2" width="10" height="8" href="' + PNG1 + '" xlink:href="' + PNG1 + '"/>' : '') + '</svg>');
-const good = { v: 1, kind: 'framed-game', board: 'astro3', game: { id: 9500, hash: MC.chainHash(GAME_PAGE).toString('hex'), size: GAME_PAGE.length } };
-const MAN = { 9600: manifestSvg(good), 9601: manifestSvg({ ...good, game: { ...good.game, hash: 'ab'.repeat(32) } }), 9602: manifestSvg(null), 9603: manifestSvg({ ...good, board: 'other_board' }), 9604: manifestSvg(good, false) };
+// A manifest picture: a real (tiny) png with the note written after its last chunk, as the generator writes it into a real poster's metadata.
+const manifestPic = (note) => Buffer.concat([Buffer.from(PNG1.split(',')[1], 'base64'), Buffer.from(note ? '<xtrata-game>' + JSON.stringify(note) + '</xtrata-game>' : '', 'latin1')]);
+const good = { v: 1, kind: 'framed-game', board: 'astro3', marquee: PNG1, game: { id: 9500, hash: MC.chainHash(GAME_PAGE).toString('hex'), size: GAME_PAGE.length } };
+const { marquee: _m, ...noMarquee } = good;
+const MAN = { 9600: manifestPic(good), 9601: manifestPic({ ...good, game: { ...good.game, hash: 'ab'.repeat(32) } }), 9602: manifestPic(null), 9603: manifestPic({ ...good, board: 'other_board' }), 9604: manifestPic(noMarquee), 9606: fs.readFileSync(path.join(ROOT, '..', 'astro-blaster-3', 'cabinet', 'astro-blaster-3-cabinet.webp')), 3075: fs.readFileSync(path.join(ROOT, '..', 'astro-blaster-3', 'release', 'astro-blaster-3.html')), 9605: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><metadata>' + JSON.stringify(good) + '</metadata></svg>') };
 const CONTENT = { 3078: fs.readFileSync(path.join(ROOT, 'release', 'xtrata-arcade.html')), 9500: GAME_PAGE, [BIG_LIE]: GAME_PAGE, ...MAN };
 for (const [name, id] of Object.entries(PACK_IDS)) CONTENT[id] = fs.readFileSync(path.join(DIST, manifest.packs[name].file));
 const GAMES_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-games-v1';
@@ -281,7 +281,7 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   check(g.status.loaded.join() === 'astro3' && g.ids.length === BUILT_IN_COUNT + 1, 'F7: a manifest picture adds the game (' + JSON.stringify(g.status.skipped) + ')');
   check(g.def && g.def.framed.id === 9500 && g.def.framed.size === GAME_PAGE.length && g.def.board === 'astro3', 'F7: the game framed is the inscription the note names (#9500), not the picture (' + JSON.stringify(g.def) + ')');
   const art = await r.page.evaluate(() => { const a = window.XA.games.find((x) => x.id === 'astro3').cabinetArt; return a && { side: /^data:image\/png/.test(a.side || ''), marquee: /^data:image\/png/.test(a.marquee || '') }; });
-  check(art && art.side && art.marquee, 'F7: the cabinet art comes from the picture (side and marquee)');
+  check(art && art.side && art.marquee, 'F7: the cabinet art comes from the picture (the picture is the side print, the note carries the marquee)');
   check(g.scripts === 0, 'F7: no script was fetched or run');
   await r.page.click('#go'); await r.page.waitForTimeout(800);
   await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
@@ -290,6 +290,33 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   check(true, 'F7: playing opens the real game from the note\'s inscription');
   await r.page.click('#xa-framed-back'); await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
   check(!r.errors.length, 'F7: no page errors ' + r.errors.slice(0, 2).join(' | '));
+  await r.ctx.close();
+
+  // The real thing: the poster as made by ops/framed-manifest.mjs, the real Astro Blaster 3 release page as #3075.
+  r = await open('/games.html', chainWith([mItem(9606)]));
+  g = await look(r.page);
+  const real = await r.page.evaluate(() => { const d = window.XA.games.find((x) => x.id === 'astro3'); return d && { id: d.framed.id, size: d.framed.size, side: (d.cabinetArt.side || '').slice(0, 22), marquee: (d.cabinetArt.marquee || '').slice(0, 22) }; });
+  check(real && real.id === 3075 && real.size === MAN[3075].length && /^data:image\/webp/.test(real.side) && /^data:image\/png/.test(real.marquee), 'F7: the real poster (webp) is read: it names #3075 and carries the marquee (' + JSON.stringify(real) + ')');
+  await r.page.click('#go'); await r.page.waitForTimeout(800);
+  await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
+  if (process.env.SHOTS) {                      // the cabinet wearing the real poster and marquee
+    const L = await r.page.evaluate(() => window.XAHall.layout().cabinets.find((c) => c.id === 'astro3'));
+    const sgn = L.side < 0 ? 1 : -1;
+    const shot = async (name, dx, dz, yawOff, pitch) => { const x = L.side < 0 ? -4.84 + dx : 4.84 - dx, yaw = (L.side < 0 ? Math.PI / 2 : -Math.PI / 2) + yawOff;
+      await r.page.evaluate(([x, z, yaw, pitch]) => window.XA.pose(x, z, yaw, pitch), [x, L.z + dz, yaw, pitch]); await r.page.waitForTimeout(2500); await r.page.screenshot({ path: path.join(process.env.SHOTS, name) }); };
+    await shot('real-front.png', 2.2, 0, 0, 0.1); await shot('real-angle.png', 2.4, 1.3, -0.45, 0.05);
+    for (const [nm, dz, yaw] of [['real-side-a.png', 1.7, 0.6], ['real-side-b.png', -1.7, Math.PI - 0.6]]) {
+      await r.page.evaluate(([x, z, yaw]) => window.XA.pose(x, z, yaw, 0.05), [sgn * -3.5, L.z + dz, sgn > 0 ? yaw : -yaw]); await r.page.waitForTimeout(2500); await r.page.screenshot({ path: path.join(process.env.SHOTS, nm) });
+    }
+  }
+  await r.page.evaluate((i) => window.XA.startGame(i), g.ids.indexOf('astro3'));
+  await r.page.waitForFunction(() => window.XA.framedState && window.XA.framedState().open && window.XA.framedState().loaded, null, { timeout: 120000 });
+  check(true, 'F7: the real Astro Blaster 3 page, matched to the hash in the real poster, opens in the frame');
+  await r.page.waitForTimeout(4000);
+  const gfr = r.page.frames().find((f) => f !== r.page.mainFrame() && f.url() !== r.page.url());
+  console.log('     (the frame\'s page: ' + (gfr ? await gfr.title().catch(() => '?') : 'no frame') + ')');
+  await r.page.click('#xa-framed-back'); await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
+  check(!r.errors.length, 'F7: no page errors with the real poster and game ' + r.errors.slice(0, 2).join(' | '));
   await r.ctx.close();
 
   // The note names a hash the real game does not have: the cabinet may exist but the game is never opened.
@@ -304,8 +331,8 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   check(f8.failed && !f8.loaded, 'F7: a game that does not match the hash in the note is not opened (' + f8.why + ')');
   await r.ctx.close();
 
-  // A picture with no note, a note for another board, and a picture with a note but no art.
-  for (const [id, why] of [[9602, 'no note'], [9603, 'other board']]) {
+  // A picture with no note, a note for another board, something that is not an image, and a note with no marquee.
+  for (const [id, why] of [[9602, 'no note'], [9603, 'other board'], [9605, 'not an image (an svg)']]) {
     r = await open('/games.html', chainWith([mItem(id)]));
     g = await look(r.page);
     check(!g.ids.includes('astro3') && g.status.skipped.some((x) => x.id === 'astro3' && /manifest/.test(x.reason)), 'F7: a picture with ' + why + ' is skipped, the hall carries on (' + JSON.stringify(g.status.skipped) + ')');
@@ -314,7 +341,7 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   r = await open('/games.html', chainWith([mItem(9604)]));
   g = await look(r.page);
   const art4 = await r.page.evaluate(() => { const a = window.XA.games.find((x) => x.id === 'astro3'); return a && a.cabinetArt; });
-  check(g.ids.includes('astro3') && art4 && !art4.side && !art4.marquee, 'F7: a note with no art still works (plain cabinet)');
+  check(g.ids.includes('astro3') && art4 && /^data:image\/png/.test(art4.side) && !art4.marquee, 'F7: a note with no marquee still works (the picture is still the side print)');
   await r.ctx.close();
 
   /* ------------------------------------------------ F6 the real hand-up, with a real viewer window above the hall */

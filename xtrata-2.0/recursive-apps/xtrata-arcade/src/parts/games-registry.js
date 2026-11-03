@@ -68,25 +68,31 @@
     return true;
   }
 
-  // The manifest picture (an SVG): <metadata id="xtrata-game"> holds JSON { v:1, kind:"framed-game", game:{ id, hash, size }, board? }, and two <image> elements
-  // (id xa-cab-side, id xa-cab-marquee) hold the cabinet art as data URIs. The picture is only READ as text: it is never put in the page, never run.
-  function parseManifest(text, gameId, C) {
-    var m = /<metadata\b[^>]*\bid="xtrata-game"[^>]*>([\s\S]*?)<\/metadata>/.exec(text);
-    if (!m) throw new Error('no game note in the picture');
-    var raw = m[1].replace(/^\s*<!\[CDATA\[/, '').replace(/\]\]>\s*$/, '');
+  // The manifest picture: an ordinary still image (webp, png or jpeg) whose bytes also carry a note, written as <xtrata-game>{json}</xtrata-game> (in a webp it
+  // sits in the XMP metadata chunk). The note is { v:1, kind:"framed-game", board?, game:{ id, hash, size }, marquee?: "data:image/...;base64,..." }.
+  // The picture IS the cabinet's side print (the whole file becomes a data URI for the texture); the marquee, if any, comes from the note.
+  // The file is only READ as bytes: it is never put in the page except as an image, and never run.
+  function sniffImage(b) {
+    if (b.length > 12 && b[0] === 0xff && b[1] === 0xd8) return 'jpeg';
+    if (b.length > 12 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png';
+    if (b.length > 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'webp';
+    return null;
+  }
+  function latin1(bytes) { var out = [], step = 0x8000; for (var i = 0; i < bytes.length; i += step) out.push(String.fromCharCode.apply(null, bytes.subarray(i, i + step))); return out.join(''); }
+  function parseManifest(bytes, gameId, C) {
+    var kind = sniffImage(bytes);
+    if (!kind) throw new Error('the picture is not a webp, png or jpeg image');
+    var text = latin1(bytes);
+    var at = text.indexOf('<xtrata-game>'), end = at < 0 ? -1 : text.indexOf('</xtrata-game>', at);
+    if (at < 0 || end < 0) throw new Error('no game note in the picture');
     var j;
-    try { j = JSON.parse(raw); } catch (e) { throw new Error('the game note is not valid'); }
+    try { j = JSON.parse(text.slice(at + 13, end)); } catch (e) { throw new Error('the game note is not valid'); }
     var g = j && j.game;
     if (!j || j.v !== 1 || j.kind !== 'framed-game' || !g) throw new Error('not a framed-game note');
     if (!(Number.isSafeInteger(g.id) && g.id > 0) || !/^[0-9a-fA-F]{64}$/.test(String(g.hash || '')) || !(Number.isSafeInteger(g.size) && g.size > 0 && g.size <= FRAMED_CAP)) throw new Error('the game note is incomplete');
     if (j.board !== undefined && j.board !== gameId) throw new Error('the note is for a different board');
-    function art(id) {
-      var tag = new RegExp('<image\\b[^>]*\\bid="' + id + '"[^>]*>').exec(text);
-      if (!tag) return null;
-      var h = /(?:xlink:)?href="(data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+\/=]+)"/.exec(tag[0]);
-      return h && h[1].length <= ART_CAP ? h[1] : null;
-    }
-    return { game: { id: g.id, hash: C.hexToBytes(g.hash), size: g.size }, art: { side: art('xa-cab-side'), marquee: art('xa-cab-marquee') } };
+    var marquee = typeof j.marquee === 'string' && /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(j.marquee) && j.marquee.length <= ART_CAP ? j.marquee : null;
+    return { game: { id: g.id, hash: C.hexToBytes(g.hash), size: g.size }, art: { side: 'data:image/' + kind + ';base64,' + btoa(latin1(bytes)), marquee: marquee } };
   }
 
   // The cabinet's neon colours, by game number, so every framed game looks different without anything else on chain.
@@ -183,7 +189,7 @@
       var mfetched = await Promise.all(manifests.map(function (g) {
         return S.getInscription(g.codeId, g.codeHash).then(function (bytes) {
           if (bytes.length !== g.codeSize) throw new Error('size differs from the contract');
-          return parseManifest(new TextDecoder('utf-8').decode(bytes), g.id, C);
+          return parseManifest(bytes, g.id, C);
         }).then(function (m) { return { g: g, m: m }; }, function (e) { skip(g.id, 'manifest: ' + ((e && e.message) || e)); return null; });
       }));
       mfetched.forEach(function (f) {
