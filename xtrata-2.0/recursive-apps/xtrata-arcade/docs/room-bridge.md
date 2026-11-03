@@ -203,16 +203,16 @@ The game never signs. It speaks the two hand-offs it speaks on xtrata.xyz, and t
 
 ### Manifest games (kind 3): the same game, added through a picture
 
-A framed game can also be added through a small **manifest picture**: `add-game(... kind u3 ...)` where `code-id` is an SVG that looks like an ordinary still image (the cabinet's art) and carries the note the hall needs. This is for a game whose inscription was made by someone other than the games admin: the contract only accepts an inscription its admin created, and the picture is the admin's own inscription that points at the real game. The picture is not playable and is never run.
+A framed game can also be added through a **manifest picture**: `add-game(... kind u3 ...)` where `code-id` is an ordinary still image (webp, png or jpeg: the cabinet's poster) with a note written into its metadata. This is for a game whose inscription was made by someone other than the games admin: the contract only accepts an inscription its admin created, so the admin inscribes the picture and the picture points at the real game. The picture is not playable and is never run.
 
-The SVG holds:
+What the hall reads from the picture file:
 
-- `<metadata id="xtrata-game">` with JSON `{"v":1,"kind":"framed-game","board":"astro3","game":{"id":3075,"hash":"<64 hex, the xtrata chain hash>","size":326043}}`. `board`, if present, must equal the contract's game id.
-- `<image id="xa-cab-marquee">` and `<image id="xa-cab-side">` as `data:image/jpeg|png|webp;base64,…` (at most 2 MB each): the cabinet's marquee and side print. A note with no art still works (plain cabinet).
+- The picture itself is the cabinet's **side print** (the whole file becomes the texture, the full poster fitted to both side panels).
+- A note written as `<xtrata-game>{...}</xtrata-game>` anywhere in the file's bytes (in a webp it sits in the XMP metadata chunk, in a png in a text chunk): `{"v":1,"kind":"framed-game","board":"astro3","game":{"id":3075,"hash":"<64 hex, the xtrata chain hash>","size":326043},"marquee":"data:image/png;base64,…"}`. `board`, if present, must equal the contract's game id. `marquee` (optional, at most 2 MB) is the picture for the cabinet's marquee light box.
 
-The hall reads the picture only as text (never put in the page), checks it against the contract's hash and size, and registers the game as in kind 2 with the game named by the note. The real game is fetched only when played and must have exactly the hash and size in the note; if it differs, the game is not opened. A picture with no note, a bad note or another board's note is skipped and the rest of the hall carries on. The picture must be at most 1 MiB (the contract's limit).
+The hall checks the file against the contract's hash and size, reads it only as bytes, and registers the game as in kind 2, with the game named by the note. The real game is fetched only when played and must have exactly the hash and size in the note; if it differs, the game is not opened. A file that is not an image, has no note, has a bad note or a note for another board is skipped and the rest of the hall carries on. The file must be at most 1 MiB (the contract's limit).
 
-Make the picture with `contracts/arcade-world/ops/framed-manifest.mjs` (offline; prints the `add-game` values).
+Make the picture with `contracts/arcade-world/ops/framed-manifest.mjs` (offline; the poster's pixels are untouched; it prints the `add-game` values). Astro Blaster 3's is `recursive-apps/astro-blaster-3/cabinet/astro-blaster-3-cabinet.webp`, made from `cabinet-poster.webp` and `cabinet-marquee.webp`.
 
 Tests: `tests/hall-framed.test.cjs` (F1-F7). Pre-flight before `add-game`: `contracts/arcade-world/ops/framed-check.mjs` (kind 2) or `framed-manifest.mjs` (kind 3).
 
