@@ -14,6 +14,7 @@ import {
   BLOCKS_KEY, ChatLog, MAX_BLOCKS, MAX_CHARS, REPORT_REASONS, Roster, SESSION_PREFIX, UI_KEY, checkSend, errorText, parseBlocks, parsePrefs,
   type Line, type ReportReason, type UiPrefs, type Who
 } from './chat-core';
+import { addressBlock, isAddress } from './address-card';
 
 export interface ChatDeps {
   send(msg: unknown): boolean;
@@ -25,6 +26,8 @@ export interface ChatDeps {
   joinPrompt(): void;
   /** The table the visitor is at or watching, for table chat (null: not at a table, or the room has no table chat). */
   table?(): string | null;
+  /** The mainnet address of the same key (BNS names live on mainnet), for the address shown in a person's menu. */
+  mainnetOf?(address: string): string;
 }
 
 const CSS = `
@@ -69,6 +72,7 @@ const CSS = `
 #pxchat .panel{pointer-events:auto;padding:8px 10px;border-radius:10px;background:rgba(12,9,14,.92);border:1px solid rgba(227,184,74,.55);max-width:100%;box-sizing:border-box;text-align:left;max-height:38vh;overflow:auto}
 #pxchat .panel p{margin:0 0 6px;color:var(--dim,#c9b894);font-size:12px}
 #pxchat .panel p.who{color:var(--ink,#f6ead0);font-weight:700;font-size:13px}
+#pxchat.peek #pxchat-lines,#pxchat.peek .newer{display:none}
 #pxchat .panel .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px}
 #pxchat .panel .row:last-child{margin-bottom:0}
 #pxchat .panel .row > span{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
@@ -247,9 +251,12 @@ export function createChat(deps: ChatDeps) {
     if (!menuFor) return;
     const who = menuFor;
     const blocked = isBlocked(who.a);
-    menu.append(el('p', nameOf(who.a), 'who'));
+    const self = who.a === deps.me();
+    menu.append(el('p', self ? `${nameOf(who.a)} (you)` : nameOf(who.a), 'who'));
+    if (isAddress(who.a) && !reporting) menu.append(addressBlock(who.a, deps.mainnetOf));   // their full address, to copy (say, to send them a BNS name)
     const row = el('div', undefined, 'row');
-    if (!reporting) {
+    if (self) { /* your own menu: just the address */ }
+    else if (!reporting) {
       const msg = smallButton('Message', () => { closeMenu(); startDm(who); });
       msg.disabled = blocked || !roster.has(who.a);
       if (blocked) menu.append(el('p', 'You have blocked this person. Unblock them to message them.'));
@@ -296,7 +303,8 @@ export function createChat(deps: ChatDeps) {
   };
 
   const renderAll = () => {
-    root.hidden = prefs.hidden;
+    root.hidden = prefs.hidden && !menuFor;      // a hidden chat still shows a person's menu when you tap them in the casino
+    root.classList.toggle('peek', prefs.hidden && !!menuFor);
     root.classList.remove('left', 'right'); root.classList.add(prefs.side);
     bar.hidden = !typing || prefs.hidden;
     const others = roster.others(deps.me()).length;
@@ -497,6 +505,8 @@ export function createChat(deps: ChatDeps) {
       root.querySelectorAll<HTMLElement>('button.nm[data-a]').forEach((b) => { b.textContent = nameOf(b.dataset.a!); });
       if (target) paintForm();
     },
+    /** Someone tapped a person in the casino (their figure or name tag): show their menu, with their address. */
+    openPerson(address: unknown): boolean { if (!isAddress(address)) return false; openMenu({ a: address }); return true; },
     isTyping: () => typing,
     debug: () => ({ typing, hidden: prefs.hidden, side: prefs.side, target: target?.a ?? null, blocks: [...blocks], lines: log.size, shown: nodes.size, session: sessionOf, stick, people: roster.others(deps.me()).map((p) => p.a) })
   };

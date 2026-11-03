@@ -3,7 +3,7 @@
 
 Anchor-based and idempotent: every change finds one exact piece of the page and fails loudly if it is missing or not unique,
 so it can be re-run on the latest page after other edits. Running it twice changes nothing the second time.
-Usage: scripts/patch-casino-chess.py <index.html> [--check]
+Usage: patch_casino_chess.py <index.html> [--check]
 """
 import sys
 
@@ -175,6 +175,54 @@ LOOK_PATCHES = [
 ]
 
 
+# Step 5 (2026-11-03): looking around at a table now turns the same way as walking (drag right looks right, drag up looks up), and
+# at a chess table on a computer a click into the room captures the mouse: the mouse looks around, a dot marks the middle, and a
+# click picks up (or moves to) whatever the dot is on. Esc gives the cursor back for the panel (and only a second Esc leaves).
+AIM_MARK = 'seatLook.lockable'
+AIM_PATCHES = [
+    ("    d.x = ev.clientX; d.y = ev.clientY; const k = d.mouse ? 0.0028 : 0.0045;\n"
+     "    seatLook.ty += dx * k; seatLook.tp = Math.max(-1.1, Math.min(1.1, seatLook.tp + dy * k));\n",
+     "    d.x = ev.clientX; d.y = ev.clientY; const k = d.mouse ? WALK.drag : WALK.touchLook;   // the same feel and the same direction as walking\n"
+     "    seatLook.ty -= dx * k; seatLook.tp = Math.max(-1.1, Math.min(1.1, seatLook.tp - dy * k));\n"),
+    ("  window.addEventListener('pointerup', endLook); window.addEventListener('pointercancel', endLook);",
+     "  window.addEventListener('pointerup', endLook); window.addEventListener('pointercancel', endLook);\n"
+     "  // ---- a computer at a chess table: a click into the room captures the mouse (as when walking). The mouse then looks around, a dot\n"
+     "  // marks the middle, and a click picks up or moves to whatever the dot is on (chess.js). Esc gives the cursor back for the panel.\n"
+     "  seatLook.lockable = () => !isTouch && !!focus && !!focus.aim && tableView !== 'overhead' && !barUI?.isOpen && !machineOpen;\n"
+     "  seatLook.locked = () => !!focus && document.pointerLockElement === canvas;\n"
+     "  seatLook.unlockAt = -1e9; seatLook.told = false;\n"
+     "  document.addEventListener('pointerlockchange', () => {\n"
+     "    if (document.pointerLockElement !== canvas) { seatLook.unlockAt = performance.now(); return; }\n"
+     "    if (focus && focus.aim && !seatLook.told) { seatLook.told = true; toast('Mouse look: click whatever the dot is on · Esc for the cursor'); }\n"
+     "  });\n"
+     "  window.addEventListener('mousemove', (ev) => { if (!seatLook.locked() || tableView === 'overhead') return; seatLook.ty -= (ev.movementX || 0) * WALK.look; seatLook.tp = Math.max(-1.1, Math.min(1.1, seatLook.tp - (ev.movementY || 0) * WALK.look)); });"),
+    # with the mouse captured every click is at the dot (chess.js knows); otherwise a click on nothing at a chess table captures it
+    ("canvas.addEventListener('click', (ev) => {if(seatLook&&performance.now()-seatLook.swallow<350)return; if(reviewPickServing(ev))return;",
+     "canvas.addEventListener('click', (ev) => {if(seatLook&&performance.now()-seatLook.swallow<350)return; if(seatLook&&seatLook.locked&&seatLook.locked()){if(focus.pickClick)focus.pickClick(ev);return;} if(reviewPickServing(ev))return;"),
+    ("if(machineOpen){machineSurfaceClick(ev);return;}audio(); if (!focus && mode === 'overview')",
+     "if(machineOpen){machineSurfaceClick(ev);return;}if(seatLook&&seatLook.lockable&&seatLook.lockable()){try{const lp=canvas.requestPointerLock();if(lp&&lp.catch)lp.catch(()=>{});}catch(e){}return;}audio(); if (!focus && mode === 'overview')"),
+    # Esc first gives back a captured mouse; the same press does not also leave the table
+    ("if (e.code === 'Escape') { if (focus) requestReviewLeave(); return; }",
+     "if (e.code === 'Escape') { if (document.pointerLockElement) { freeMouse(); return; } if (focus && !(seatLook && performance.now() - seatLook.unlockAt < 500)) requestReviewLeave(); return; }"),
+    # the dot: shown while the mouse is captured at a table, ringed when it is on something you can pick up or move to
+    ("$('cross').hidden = !walking || behind(); $('cross').classList.toggle('on', !!cand);",
+     "const aimAt = !walking && typeof seatLook !== 'undefined' && !!seatLook && !!seatLook.locked && seatLook.locked(); $('cross').hidden = aimAt ? false : (!walking || behind()); $('cross').classList.toggle('on', aimAt ? !!(focus.aim && focus.aim()) : !!cand);"),
+    ("      if (seatLook) { const e = Math.min(1, dt * 12); seatLook.yaw += (seatLook.ty - seatLook.yaw) * e; seatLook.pitch += (seatLook.tp - seatLook.pitch) * e; }\n",
+     "      if (seatLook) { const e = Math.min(1, dt * 12); seatLook.yaw += (seatLook.ty - seatLook.yaw) * e; seatLook.pitch += (seatLook.tp - seatLook.pitch) * e; }\n"
+     "      if (seatLook && seatLook.locked && seatLook.locked()) { const c = $('cross'), on = !!(focus.aim && focus.aim()); if (c.hidden) c.hidden = false; if (c.classList.contains('on') !== on) c.classList.toggle('on', on); }\n"),
+    # leaving: standing up into walking keeps the captured mouse (walking uses it); anywhere else it is given back. A tip, once.
+    ("const prev = focus; focus = s; if (prev !== s) { tableView = 'table'; miniPick = null; seatLookReset();",
+     "const prev = focus; focus = s; if (prev !== s) { tableView = 'table'; miniPick = null; seatLookReset(); if (document.pointerLockElement === canvas && (s ? !s.aim : (prev && mode !== 'walk'))) freeMouse();"
+     " if (s && s.aim && !isTouch && !store.get('parallax.aimhint.v1')) { store.set('parallax.aimhint.v1', 1); setTimeout(() => { if (focus === s && !seatLook.locked()) toast('Tip: click the room to look with the mouse, then click the piece under the dot'); }, 6500); }"),
+    ("tableView = view; seatLookReset();\n    const [p, l] = camTargets(focus, curSeat);",
+     "tableView = view; seatLookReset(); if (view === 'overhead' && document.pointerLockElement === canvas) freeMouse();\n    const [p, l] = camTargets(focus, curSeat);"),
+    # with the mouse captured the picture holds still (the felt is not re-fitted beside the panel), so what is under the dot stays there
+    ("(seatLook && (Math.abs(seatLook.ty) > 0.05 || Math.abs(seatLook.tp) > 0.05))) return;",
+     "(seatLook && (Math.abs(seatLook.ty) > 0.05 || Math.abs(seatLook.tp) > 0.05 || (seatLook.locked && seatLook.locked())))) return;"),
+    ('chess.js?v=c4"', 'chess.js?v=c5"'),
+]
+
+
 def chess_version(s):
     import re
     m = re.search(r'chess\.js\?v=c(\d+)"', s)
@@ -191,6 +239,8 @@ def apply(s):
         s = run(s, INPUT_PATCHES); done.append('touch and drag')
     if LOOK_MARK not in s:
         s = run(s, LOOK_PATCHES); done.append('sofas, seat heights, free look')
+    if AIM_MARK not in s:
+        s = run(s, AIM_PATCHES); done.append('look direction, mouse aim at chess')
     return s, done
 
 

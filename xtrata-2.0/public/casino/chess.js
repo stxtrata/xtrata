@@ -421,13 +421,19 @@
   }
   const SPEC_FRESH = 45000, SPEC_AFTER = 30000, SPEC_BEAT = 15000;   // a live game unseen this long is gone; a finished one stays shown; the host repeats itself
   let chip = null, chipOwner = null;
-  let pointerOn = false, touchOwner = null, touchSaved = null;
+  let pointerOn = false, touchOwner = null, touchSaved = null, lockTravel = 0;
+  // the mouse is captured (a click into the room at the table, on a computer): every press, move and release is then at the dot in the
+  // middle of the screen, and how far the mouse has moved since the press decides drag or click (the pointer itself stays put)
+  function lockedEl(ctx) { const el = ctx.canvasEl && ctx.canvasEl(); return el && document.pointerLockElement === el ? el : null; }
+  function centreEv(el, ev) { const r = el.getBoundingClientRect(); return { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: ev && ev.pointerId != null ? ev.pointerId : 1, pointerType: 'mouse', button: (ev && ev.button) || 0, locked: true, travel: lockTravel }; }
   function attachPointer(ctx) {
     if (pointerOn) return; const el = ctx.canvasEl(); if (!el || !root.PointerEvent) return; pointerOn = true;
     const to = (kind) => (ev) => {
       const st = built.find((s) => ctx.focus() === s); if (!st || !st.pointer) return;
-      if (kind === 'down') { if (st.pointer('down', ev)) try { el.setPointerCapture(ev.pointerId); } catch (_) { } }
-      else st.pointer(kind, ev);
+      const lk = lockedEl(ctx); if (lk) { if (kind === 'down') lockTravel = 0; else if (kind === 'move') lockTravel += Math.abs(ev.movementX || 0) + Math.abs(ev.movementY || 0); }
+      const e = lk ? centreEv(lk, ev) : ev;
+      if (kind === 'down') { if (st.pointer('down', e)) try { el.setPointerCapture(ev.pointerId); } catch (_) { } }
+      else st.pointer(kind, e);
     };
     el.addEventListener('pointerdown', to('down')); el.addEventListener('pointermove', to('move'));
     el.addEventListener('pointerup', to('up')); el.addEventListener('pointercancel', to('cancel'));
@@ -590,7 +596,8 @@
 
     // ---- touch, pen and mouse on the board. Pointer events, not `click`: while walking, the room cancels every touch at its end
     // (so a tap never scrolls the page), and on an iPad that also cancels the click a tap would have made.
-    let grab = null, hoverLift = null, lastHandled = 0;
+    let grab = null, hoverLift = null, lastHandled = 0, aimOn = false;
+    const far = (ev, g) => ev.locked ? ev.travel : Math.hypot(ev.clientX - g.x, ev.clientY - g.y);   // how far a press has travelled
     const clampB = (v) => Math.max(-(HALF + SQ * 0.5), Math.min(HALF + SQ * 0.5, v));
     function setCursor(c) { const el = ctx.canvasEl(); if (el && c) el.style.cursor = c; }
     function hoverAt(ev) {
@@ -599,7 +606,7 @@
       let cur = '', lift = null;
       if (myTurn()) { if (res.kind === 'target') cur = 'pointer'; else if (res.kind === 'mine') { cur = 'grab'; lift = res.sq; } }
       if (hoverLift !== lift) { if (hoverLift && hoverLift !== sel) board.lift(hoverLift, 0); hoverLift = lift; if (lift && lift !== sel) board.lift(lift, 0.007); }
-      setCursor(cur);
+      aimOn = !!cur; setCursor(cur);
     }
     const pointer = {
       down(ev) {
@@ -615,7 +622,7 @@
       move(ev) {
         if (!grab || ev.pointerId !== grab.id) { if (!grab) hoverAt(ev); return; }
         if (!grab.dragging) {
-          if (!grab.from || Math.hypot(ev.clientX - grab.x, ev.clientY - grab.y) < 8) return;
+          if (!grab.from || far(ev, grab) < 8) return;
           grab.dragging = true; board.held = board.pieces.get(grab.from) || null; setCursor('grabbing');
         }
         const at = board.onBoard(ctx.ray(ev)); if (!at || !board.held) return;
@@ -636,7 +643,7 @@
           refresh(); return;
         }
         if (g.from) { if (g.wasSel === g.from) { sel = null; targets = []; refresh(); } return; }   // picked up on press; tapping it again puts it down
-        if (Math.hypot(ev.clientX - g.x, ev.clientY - g.y) > 12) return;   // a swipe, not a tap
+        if (far(ev, g) > 12) return;   // a swipe, not a tap
         tapRes(g.res);
       },
       cancel() { if (!grab) return; grab = null; board.held = null; board.hover(null); board.home(); }
@@ -750,15 +757,18 @@
       pickClick(ev) {
         if (ctx.focus() !== st) return false;
         if (performance.now() - lastHandled < 800) return true;              // the same tap, already handled as a pointer
-        const r = board.pickAt(ctx.ray(ev)); if (!r.piece && !r.board && !r.near) return false;
+        const lk = lockedEl(ctx), r = board.pickAt(ctx.ray(lk ? centreEv(lk, ev) : ev)); if (!r.piece && !r.board && !r.near) return false;
         ctx.audio(); return tapRes(resolve(r));
       },
       pointer(kind, ev) { return pointer[kind](ev); },
       holding() { return !!(grab && grab.from); },                 // a piece is in your hand: a drag moves it, not the view
       lookStart() { if (grab && !grab.from) grab = null; },        // the page took the drag to look around: that press is no tap
+      aim() { return aimOn; },                                     // the dot (mouse captured) is on something you can pick up or move to
       update(t) {
         board.update(); lobby.frame(ctx.focus() === st);
         if (!grab) board.home();
+        { const lk = ctx.focus() === st && lockedEl(ctx);   // mouse captured: the view turns under the dot, so the dot's piece (or the one in your hand) is followed every frame
+          if (lk) { if (grab && grab.dragging) pointer.move(centreEv(lk, { pointerId: grab.id })); else if (!grab) hoverAt(centreEv(lk, null)); } }
         if (ctx.focus() === st) attachPointer(ctx); if (!ctx.ownsTouch) touchMode(ctx.focus() === st ? st : null, st);
         if (engine.api && (t - (st.specT || 0) > 0.5)) {
           st.specT = t; const here = specFrame();
@@ -890,7 +900,7 @@
   });
   let built = [];
   root.PXChess = {
-    version: 'c4', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
+    version: 'c5', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
     sofas: SOFAS.map((d) => [d.x, d.z, d.ry]),   // where the page draws the two lounge sofas
     placement, TAGS, SEATS: SEATS_OUT, VERB, engine, loadEngine, ask, houseList, makeRelayTable, makeSession,
     makeStations(ctx) {

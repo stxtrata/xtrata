@@ -31,6 +31,7 @@ import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { roomProofData, type RoomChallenge } from '../../functions/lib/casino-room-proof';
 import { casinoSignRoomJoin, casinoWalletUi, connectWallet, connectTrail, rememberProvider, walletMessage, type LinkedWallet, type WalletKind } from './wallet';
 import { createChat, type Chat } from './chat';
+import { addressBlock } from './address-card';
 import { isChatError } from './chat-core';
 import { baccaratCards, rouletteResult, sicboDice, verifySeed } from '../../functions/lib/casino-rounds';
 
@@ -55,6 +56,10 @@ interface PXRoomHost {
    * The page asks for a fresh check with a `px-room-bns-check` window event; the answer comes back through on({ t: 'bns-check' }).
    */
   salon?(info: SalonInfo): void;
+  /** Who is here (docs/plans/CASINO-WHO-IS-HERE-PLAN.md): the addresses marked away (idle), so their name tags can turn grey. */
+  awayOf?(list: string[]): void;
+  /** The visitor went away (idle): stand them up from their seat or machine, if the page can. */
+  standUp?(): void;
   /**
    * The social layer (docs/plans/CASINO-PLAY-TOGETHER-PLAN.md): every room message the page may want that this client does not
    * handle itself (react, win, daily, round, bet, gift, seek, pvp, say), plus `{ t: 'room', features, wins, bets, seekers, at }`
@@ -98,8 +103,24 @@ const S = {
   standSent: null as string | null,   // the spot this tab last asked to stand up from: asked once, not every 0.6 s
   lastSent: 0,
   host: null as PXRoomHost | null,
-  retryTimer: 0
+  retryTimer: 0,
+  // who is here (docs/plans/CASINO-WHO-IS-HERE-PLAN.md): everyone signed in (with whether they are away), the visitor's own away,
+  // whether this tab has left by itself (parked: in the background too long, or idle too long), and the clocks for those
+  players: new Map<string, { a: string; aw?: boolean }>(),
+  away: false,
+  parked: '' as '' | 'hidden' | 'idle',
+  lastActive: Date.now(),
+  hiddenAt: 0,
+  lastBeat: 0
 };
+
+/** Heartbeat, leave after this long in the background, away after this long idle, leave after this long idle. `?roomtimes=a,b,c,d`
+ *  (milliseconds) shortens them for a test. */
+const HERE = (() => {
+  const t = { beat: 30_000, hide: 5 * 60_000, away: 20 * 60_000, leave: 30 * 60_000 };
+  try { const m = /[?&]roomtimes=(\d+),(\d+),(\d+),(\d+)/.exec(location.search); if (m) { t.beat = +m[1]; t.hide = +m[2]; t.away = +m[3]; t.leave = +m[4]; } } catch { /* no location */ }
+  return t;
+})();
 
 let chat: Chat | null = null;      // the floating chat column (chat.ts); made with the button, only when the room is on
 
@@ -176,6 +197,7 @@ const send = (msg: unknown) => {
 /** Bring the room in line with where the visitor is: sit when they sit, stand when they stand. */
 const reconcile = () => {
   if (S.service !== 'ok' || !S.connected || !S.you || S.you.guest || !S.signed) return;
+  if (S.away) return;      // away: the room stood the visitor up; no seat is asked for until they are back
   const mine = Object.entries(S.spots).find(([, v]) => v.a === S.you!.a)?.[0] ?? null;
   if (S.want) {
     if (mine !== S.want && S.want !== S.badSpot && S.want !== S.yielded && !S.spots[S.want] && Date.now() - S.lastSent > 1200) send({ t: 'sit', spot: S.want });
@@ -210,6 +232,13 @@ const connect = () => {
         S.standSent = null;                                 // a fresh connection holds no seat yet
         if (S.signed && S.you?.guest) S.signed = null;      // the session ran out (4 hours) while the page stayed open
         chat?.room(m.players, !!(S.you && !S.you.guest));
+        S.players = new Map();
+        for (const p of Array.isArray(m.players) ? m.players : []) if (p && typeof p.a === 'string') S.players.set(p.a, { a: p.a, aw: p.aw === true });
+        tellAway();
+        if (S.features.includes('here') && S.ws?.readyState === WebSocket.OPEN) {      // this tab sends heartbeats; and is still away, if it was
+          S.ws.send(JSON.stringify({ t: 'here' }));
+          if (S.away && S.signed && S.you && !S.you.guest) S.ws.send(JSON.stringify({ t: 'away', on: true }));
+        }
         tellPage({ t: 'room', features: S.features.slice(), wins: m.wins || [], bets: m.bets || {}, seekers: m.seekers || [], at: m.at, you: S.you, watch: S.watch,
           // phase 3: levels, the jackpot, the tournament, happy hour, and the visitor's own profile, balance, friends and notices
           levels: m.levels || {}, jackpot: m.jackpot || null, tourney: m.tourney || null, hh: m.hh || null, me: m.me || null, bal: m.bal ?? null, friends: m.friends || null, notices: m.notices || [] });
@@ -219,8 +248,9 @@ const connect = () => {
       case 'moved': S.yielded = m.spot; break;       // another tab of this player sat down elsewhere: that tab wins; this one stops asking
       case 'count': S.joined = m.joined; S.guests = m.guests; break;
       case 'say': case 'dm': chat?.heard(m); if (m.t === 'say') tellPage(m); return;
-      case 'join': chat?.joined(m.who); tellPage(m); return;
-      case 'leave': chat?.left(m.a); if (S.walk.has(m.a)) walkOne(m.a, null); tellPage(m); return;
+      case 'join': if (m.who && typeof m.who.a === 'string') S.players.set(m.who.a, { a: m.who.a }); chat?.joined(m.who); tellPage(m); paint(); return;
+      case 'leave': S.players.delete(m.a); tellAway(); chat?.left(m.a); if (S.walk.has(m.a)) walkOne(m.a, null); tellPage(m); paint(); return;
+      case 'away': if (typeof m.a === 'string') { S.players.set(m.a, { a: m.a, aw: m.on === true }); tellAway(); } break;
       case 'react': case 'win': case 'daily': case 'round': case 'bet': case 'gift': case 'seek': case 'pvp': case 'spec': tellPage(m); return;
       // phase 3 (functions/lib/casino-progress.ts)
       case 'me': case 'hh': case 'lvl': case 'badge': case 'mission-done': case 'bal': case 'board': case 'friends': case 'tourney': case 'tourney-end': case 'jp': case 'jackpot': case 'card': tellPage(m); return;
@@ -254,11 +284,67 @@ const connect = () => {
     S.ws = null; S.connected = false;
     S.spots = {}; pushPeople();
     S.walk = new Map(); pushWalkers(); S.ownSent = false;
+    S.players = new Map(); tellAway();
     chat?.disconnected();
     if (event.code === 4001) { S.replaced = true; paint(); return; }     // another tab of the visitor's took over
     paint(); retry();
   };
   ws.onerror = () => { /* onclose follows */ };
+};
+
+// ------------------------------------------------------------------ who is here: heartbeats, the background, idle and away
+
+let toldAway = '';
+/** The addresses marked away, to the page (grey name tags), whenever the list changes. */
+const tellAway = () => {
+  const list = [...S.players.values()].filter((p) => p.aw).map((p) => p.a).sort(), key = list.join();
+  if (key === toldAway) return;
+  toldAway = key;
+  try { S.host?.awayOf?.(list); } catch (e) { console.warn('[room] the page could not take who is away', e); }
+};
+/** This tab leaves the room by itself (in the background, or idle, too long): the seat is freed and the name goes. The session
+ *  stays, so coming back rejoins at once with no new signature. */
+const park = (why: 'hidden' | 'idle') => {
+  if (S.parked || !S.ws) return;
+  S.parked = why;
+  const old = S.ws; S.ws = null; S.connected = false;
+  window.clearTimeout(S.retryTimer);
+  try { old.close(1000, why); } catch { /* already closed */ }
+  S.spots = {}; pushPeople(); S.walk = new Map(); pushWalkers(); S.ownSent = false; S.players = new Map(); tellAway();
+  chat?.disconnected(); paint();
+};
+const unpark = () => {
+  if (!S.parked) return;
+  S.parked = ''; S.attempts = 0; S.lastActive = Date.now();
+  connect(); paint();
+};
+/** Away (idle on an open tab): the room is told, and the page stands the visitor up. Back: the room is told again. */
+const setAway = (on: boolean) => {
+  if (S.away === on) return;
+  S.away = on;
+  if (S.ws?.readyState === WebSocket.OPEN && S.features.includes('here') && S.signed && S.you && !S.you.guest) S.ws.send(JSON.stringify({ t: 'away', on }));
+  if (on) { try { S.host?.standUp?.(); } catch (e) { console.warn('[room] the page could not stand the visitor up', e); } }
+  paint();
+};
+/** Anything the visitor does (a tap, a key, walking, a spin): they are here. */
+const active = () => {
+  S.lastActive = Date.now();
+  if (S.away) setAway(false);
+  if (S.parked === 'idle' || (S.parked === 'hidden' && !document.hidden)) unpark();
+};
+/** Once a second: the heartbeat when it is due, and the background and idle clocks. */
+const hereTick = () => {
+  if (S.service !== 'ok') return;
+  const now = Date.now();
+  if (S.ws?.readyState === WebSocket.OPEN && S.features.includes('here') && now - S.lastBeat >= HERE.beat) {
+    S.lastBeat = now;
+    try { S.ws.send('ping'); } catch { /* closing */ }     // a bare ping: the room answers it without waking
+  }
+  if (S.parked) return;
+  if (document.hidden) { if (S.hiddenAt && now - S.hiddenAt > HERE.hide) park('hidden'); return; }
+  const idle = now - S.lastActive, signedIn = !!(S.signed && S.you && !S.you.guest);
+  if (idle > HERE.leave) park('idle');
+  else if (signedIn && !S.away && idle > HERE.away && S.features.includes('here')) setAway(true);
 };
 
 const retry = () => {
@@ -390,6 +476,13 @@ const CSS = `
 #pxroom-btn i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#8a8f98;vertical-align:1px}
 #pxroom-btn.live i{background:#2fae66;box-shadow:0 0 6px #2fae66}
 #pxroom-btn.wait i{background:#e3b84a}
+#pxroom-btn.away i{background:#8a8f98;box-shadow:none}
+#pxroom-btn .lbl{display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}
+#pxroom-panel .here{display:flex;flex-direction:column;gap:4px;max-height:240px;overflow:auto;margin:0 0 10px}
+#pxroom-panel .here .person{display:flex;justify-content:space-between;align-items:center;gap:8px;flex:none;text-align:left;padding:6px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(227,184,74,.25)}
+#pxroom-panel .here .nm{color:var(--ink,#f6ead0);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pxroom-panel .here .at{color:var(--dim,#b7a587);font-size:12px;white-space:nowrap}
+#pxroom-panel .here .away .nm,#pxroom-panel .here .away .at{color:#8a8f98;font-style:italic}
 #pxroom-panel{position:fixed;top:max(64px,calc(env(safe-area-inset-top) + 54px));right:10px;width:min(320px,calc(100vw - 20px));z-index:40;box-sizing:border-box;padding:14px 16px;border-radius:12px;background:rgba(12,9,14,.98);backdrop-filter:blur(6px);color:var(--ink,#f6ead0);border:1px solid var(--gold,#e3b84a);box-shadow:0 10px 40px rgba(0,0,0,.55);font-size:13px;line-height:1.45;pointer-events:auto}
 #pxroom-panel[hidden]{display:none}
 #pxroom-panel h3{margin:0 0 6px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold,#e3b84a);font-weight:700}
@@ -437,6 +530,7 @@ function buildUi() {
     me: () => (S.you && !S.you.guest ? S.you.a : null),
     connected: () => S.connected,
     labelFor,
+    mainnetOf,
     joinPrompt: () => { S.open = true; paint(); },
     table: () => (S.features.includes('table') ? (S.host?.table?.() ?? null) : null)
   });
@@ -507,27 +601,65 @@ const onBnsCheck = async () => {
   } finally { bnsChecking = false; }
 };
 
+/** Where a player is, for the Here now list: their table or machine, walking, or just in the room. */
+const PLACE: Record<string, string> = { blackjack: 'Blackjack', baccarat: 'Baccarat', sicbo: 'Sic Bo', roulette: 'Roulette', videopoker: 'Video poker', pvpholdem: "Salon Hold'em", liars: "Liar's Dice",
+  drop: 'The Drop', twins: 'Forever Twins', ds: 'Deep Strata', bf: 'Block Fortune', nv: 'Neon Vault', bar: 'The bar', chess1: 'Chess', chess2: 'Chess' };
+const whereOf = (a: string) => {
+  const spot = Object.entries(S.spots).find(([, v]) => v.a === a)?.[0];
+  if (spot) { const id = spot.split('.')[0]; return PLACE[id] || id; }
+  return S.walk.has(a) ? 'walking' : 'in the room';
+};
+/** Everyone signed in, you first; a tap opens their card (name, address, message, block, report), the same as in chat. */
+const hereNow = (parts: HTMLElement[]) => {
+  const me = S.you?.a ?? null;
+  const list = [...S.players.values()].sort((x, y) => (x.a === me ? -1 : y.a === me ? 1 : labelFor(x.a).localeCompare(labelFor(y.a))));
+  parts.push(el('h3', `Here now · ${list.length}`));
+  const box = el('div', undefined, 'here');
+  for (const p of list.slice(0, 50)) {
+    const row = el('button', undefined, 'person' + (p.aw ? ' away' : '')); row.type = 'button';
+    row.append(el('span', labelFor(p.a) + (p.a === me ? ' (you)' : ''), 'nm'), el('span', p.aw ? 'away' : whereOf(p.a), 'at'));
+    row.onclick = () => { const d: { a: string; handled?: boolean } = { a: p.a }; window.dispatchEvent(new CustomEvent('px-room-person', { detail: d })); if (d.handled) { S.open = false; paint(); } };
+    box.append(row);
+  }
+  if (list.length > 50) box.append(el('p', `and ${list.length - 50} more`, 'fact'));
+  if (!list.length) box.append(el('p', 'Nobody is signed in yet.', 'fact'));
+  parts.push(box, el('p', `${S.guests} watching without signing in.`, 'fact'));
+};
+
 function paint() {
   tellSelf();
   tellSalon();
   if (!wrap || !btn || !panel) return;
   const signed = !!(S.signed && S.you && !S.you.guest);
-  btn.className = S.connected ? 'live' : 'wait';
+  const me = signed ? labelFor(S.signed!.address) : null;
+  btn.className = S.parked ? 'wait' : S.away ? 'away' : S.connected ? 'live' : 'wait';
   // On a phone the page's top-right buttons are 34 px icons, so the words hide and only the dot and the number show.
-  btn.replaceChildren(el('i'), el('span', signed ? 'In the room' : 'Room', 'lbl'), el('span', S.connected ? (window.matchMedia?.('(max-width:620px)').matches ? String(S.joined) : ` · ${S.joined}`) : '', 'n'));
-  btn.setAttribute('aria-label', `Casino room: ${S.connected ? `${S.joined} signed in, ` : ''}${signed ? 'you are in' : 'see who is here and join'}`);
+  btn.replaceChildren(el('i'), el('span', S.parked ? 'Rejoin the room' : me ? (S.away ? `${me} · away` : me) : 'Room', 'lbl'), el('span', S.connected ? (window.matchMedia?.('(max-width:620px)').matches ? String(S.joined) : ` · ${S.joined}`) : '', 'n'));
+  btn.setAttribute('aria-label', `Casino room: ${S.connected ? `${S.joined} signed in, ` : ''}${S.parked ? 'you left; tap to rejoin' : me ? `you are in as ${me}${S.away ? ', marked away' : ''}` : 'see who is here and join'}`);
   panel.hidden = !S.open;
   if (!S.open) return;
   placePanel();
   const parts: HTMLElement[] = [];
-  if (S.replaced) {
+  if (S.parked) {
+    parts.push(el('h3', 'Room'), el('p', S.parked === 'hidden'
+      ? 'This tab was in the background for a while, so it left the room and your seat was freed.'
+      : 'You were away for a while, so you left the room and your seat was freed.'));
+    const b = el('button', 'Rejoin the room'); b.onclick = () => { active(); unpark(); };
+    parts.push(b);
+  } else if (S.replaced) {
     parts.push(el('h3', 'Room'), el('p', 'Another tab of yours took over the room. You are not connected here.'));
     const b = el('button', 'Use this tab instead'); b.onclick = () => { reconnect(); paint(); };
     parts.push(b);
   } else if (signed) {
-    parts.push(el('h3', 'You are in the room'));
-    parts.push(el('p', `Others see you at your seat as`), el('p', labelFor(S.signed!.address), 'who'));
-    parts.push(el('p', `${S.joined} signed in, ${S.guests} watching.`));
+    parts.push(el('h3', 'Connected as'), el('p', me!, 'who'));
+    const via: Record<string, string> = { leather: 'Leather', xverse: 'Xverse', casino: 'your casino wallet' };
+    parts.push(el('p', (S.wallet ? `With ${via[S.wallet.kind] || S.wallet.kind}. ` : '') + 'Others see this name on your tag.', 'fact'));
+    if (S.away) {
+      parts.push(el('p', 'You are marked away (idle for a while), so you were stood up. Do anything to come back.', 'err'));
+      const back = el('button', "I'm back"); back.onclick = () => active(); parts.push(back);
+    }
+    parts.push(el('p', 'Your address (tap Copy to share it, say for someone to send you a BNS name):'), addressBlock(S.signed!.address, mainnetOf));
+    hereNow(parts);
     parts.push(fact('Be seen', 'Sit at a table or connect to a machine and your Adrian and name tag appear there for everyone in the room. Stand up or walk away and they go too.'));
     parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
     parts.push(fact('Live chat', 'Press Chat to talk to the room and scroll back through this session. Tap a name, or Here now, to send someone a direct message, block or report them. Messages are not secret; this session\'s chat is kept in this tab only and cleared when you leave the room.'));
@@ -546,6 +678,7 @@ function paint() {
     parts.push(fact('Be seen', S.watch
       ? 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Watching alone shows you to nobody.'
       : 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Until you join you are invisible, and the room is hidden from you; the casino still plays as normal.'));
+    if (S.connected && S.watch) hereNow(parts);
     parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
     parts.push(fact('Live chat', 'Signed-in players can chat with the room and send each other direct messages. Messages are not secret and are not saved.'));
     parts.push(fact('Free', 'One signature. It sends no transaction, costs no fee and gives no permission to spend anything.'));
@@ -632,6 +765,14 @@ async function start() {
   window.addEventListener('px-room-move', onOwnMove);
   window.addEventListener('px-room-send', onPageSend);
   window.addEventListener('px-room-bns-check', () => { void onBnsCheck(); });
+  // who is here: a heartbeat, and the background and idle clocks; anything the visitor does means they are here
+  window.setInterval(hereTick, 1000);
+  for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(type, active, { capture: true, passive: true });
+  window.addEventListener('px-room-play', active);
+  window.addEventListener('px-room-move', active);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) S.hiddenAt = Date.now(); else { S.hiddenAt = 0; active(); } });
+  // The page: somebody tapped another player in the casino (their figure or name tag). Their menu (with their address) opens in chat.
+  window.addEventListener('px-room-person', (e) => { const d = (e as CustomEvent).detail; if (d && chat && chat.openPerson(d.a)) d.handled = true; });
 }
 
 // The shared rounds' fairness check and results, for the page (the same code the room's tests run): see casino-rounds.ts.
@@ -648,5 +789,6 @@ if (existing) attach(existing); else window.addEventListener('px-room-host', () 
 // For tests and bug reports only: read-only.
 (window as any).__pxRoom = {
   chat: () => chat?.debug() ?? null,
+  here: () => ({ away: S.away, parked: S.parked, players: [...S.players.values()], idleFor: Date.now() - S.lastActive, times: { ...HERE } }),
   get state() { return { service: S.service, signed: S.signed?.address ?? null, connected: S.connected, watch: S.watch, prompted: S.prompted, open: S.open, busy: S.busy, error: S.error, you: S.you, spots: S.spots, joined: S.joined, guests: S.guests, want: S.want, features: S.features.slice(), walkers: [...S.walk.keys()], ownMove: S.ownMove, salon: salonInfo(), trail: connectTrail.slice() }; }
 };

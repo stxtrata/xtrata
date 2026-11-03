@@ -192,3 +192,31 @@ that is turned into an image at once, giving its canvas memory back.
 Files: `public/casino/chess.js` (`c4`), and step 4 of `scripts/patch-casino-chess.py` for `public/casino/index.html` (the sofa
 positions, seat heights for seated figures, the look, touch handling while seated).
 
+
+## 10. Look direction, mouse aiming, and who is that (added 2026-11-03)
+
+**The look turns the way walking does.** Step 4's drag moved the view like grabbing the room (drag right, the room went right and
+you looked left). Jim: keep it as walking. Now a drag right looks right and a drag up looks up, with walking's own speeds
+(`WALK.drag` for the mouse, `WALK.touchLook` for touch), at every table.
+
+**Mouse aiming at a chess table (a computer).** A click on the room (not the board, not the panel) captures the mouse, as walking
+does. The mouse then looks around (walking's `WALK.look`), a dot marks the middle of the screen, and it rings gold when it is on one
+of your pieces or a square you can move to. A click picks up (or moves to) whatever the dot is on; holding the button on a piece and
+turning the view carries the piece, and letting go over a square plays it. While the mouse is captured the picture holds still (the
+felt is not re-fitted beside the panel), so what is under the dot stays there. Esc gives the cursor back for the panel and stays at
+the table; a second Esc leaves. Standing up keeps the captured mouse for walking; sitting at another table gives it back; the
+overhead view never captures. chess.js does the aiming (every press, move and release is at the middle while the mouse is captured,
+and how far the mouse moved since the press decides drag or click); the page does the capturing, the look and the dot.
+Not on touch screens, which have no mouse to capture.
+
+**Who is that.** A click or tap on another player (their figure, or their name tag when it shows within 16 m) opens their menu in
+chat: their BNS name, and their full address twice, each with Copy: the testnet `ST…` address the casino plays with, and the mainnet
+`SP…` address of the same key. BNS names live on mainnet and the Salon looks a player's name up on that mainnet address, so a BNS
+name for the Salon is sent to the `SP…` address. The same menu opens from a name in chat or in Here now, keeps Message, Block and
+Report, and shows even when chat is hidden. Your own address (both) is in the Room panel. It works walking (mouse, captured mouse,
+touch), seated at a table, and at a chess table with the mouse captured (the player under the dot). From the overview a click on a
+table still sits you there. House regulars are not players (no address) and open nothing. Without room.js the page copies the
+address and says so. The LAYR dispenser's short wallet address copies the whole one when tapped.
+
+Files: `public/casino/chess.js` (`c5`); step 5 of `scripts/patch-casino-chess.py`; `scripts/patch-casino-people.py` (run after it);
+`src/casino-room/address-card.ts` (new), `chat.ts` and `main.ts`, built into `public/casino/room.js` (`p6`).
