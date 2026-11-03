@@ -111,7 +111,12 @@ const S = {
   parked: '' as '' | 'hidden' | 'idle',
   lastActive: Date.now(),
   hiddenAt: 0,
-  lastBeat: 0
+  lastBeat: 0,
+  // the welcome card (docs/plans/CASINO-WELCOME-JOIN-PLAN.md): the join step lives in the page's welcome card, not a second window
+  resumed: false,                     // signed in from an earlier visit's session (the card says "Welcome back")
+  trying: null as WalletKind | null,  // the wallet being asked right now, for the card's "Check Leather..." line
+  later: false,                       // the visitor went in without signing in: the card's join step shrinks to one line
+  introSeen: false                    // the welcome card has shown while the room was on: no separate arrival panel
 };
 
 /** Heartbeat, leave after this long in the background, away after this long idle, leave after this long idle. `?roomtimes=a,b,c,d`
@@ -131,7 +136,7 @@ const mainnetOf = (a: string) => {
   return addressToString({ ...d, version: AddressVersion.MainnetSingleSig });
 };
 // Names are looked up on the mainnet address of the same key (BNS names live on mainnet; ST and SP share one key).
-const names = createNameCache((address) => resolvePrimaryBnsName({ address: mainnetOf(address), network: 'mainnet' }), () => { pushPeople(); pushWalkers(); chat?.refreshNames(); });
+const names = createNameCache((address) => resolvePrimaryBnsName({ address: mainnetOf(address), network: 'mainnet' }), () => { pushPeople(); pushWalkers(); chat?.refreshNames(); paint(); });
 const labelFor = (address: string) => {
   let name: string | null = null;
   try { name = names.get(address); } catch { /* bad address: show it short */ }
@@ -361,7 +366,10 @@ const reconnect = () => {
 
 // ------------------------------------------------------------------ sign in
 
-async function signIn(wallet: LinkedWallet) {
+let joinGen = 0;      // bumped by Cancel in the welcome card: a wallet that answers after that is ignored
+const cancelled = () => new Error('Sign-in cancelled.');
+
+async function signIn(wallet: LinkedWallet, gen = joinGen) {
   const { res: cres, body: cbody } = await postJson(`/casino/room/challenge?address=${encodeURIComponent(wallet.address)}`);
   if (!cres.ok) throw new Error(cbody?.error || `The room answered ${cres.status}.`);
   const challenge = cbody.challenge as RoomChallenge;
@@ -376,32 +384,41 @@ async function signIn(wallet: LinkedWallet) {
         domain, message, network: challenge.network, stxAddress: wallet.address,
         appDetails: { name: 'ParallaX Casino', icon: `${location.origin}/favicons/xtrata-apple-touch-icon.png` }
       });
-  } catch (e) { throw new Error('The wallet did not sign: ' + walletMessage(e)); }
+  } catch (e) { if (gen !== joinGen) throw cancelled(); throw new Error('The wallet did not sign: ' + walletMessage(e)); }
+  if (gen !== joinGen) throw cancelled();
   const { res: sres, body: sbody } = await postJson('/casino/room/session', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ challenge, signature })
   });
   if (!sres.ok) throw new Error(sbody?.error || `The room answered ${sres.status}.`);
   S.signed = { address: sbody.address, hash160: sbody.hash160, expiresAt: sbody.expiresAt };
+  S.resumed = false;
   reconnect();      // the cookie is set: reconnect so the room knows who this is
 }
 
 async function join(kind: WalletKind) {
   if (S.busy) return;
-  S.error = ''; S.busy = 'connect'; paint();
+  const gen = ++joinGen;
+  S.error = ''; S.busy = 'connect'; S.trying = kind; paint();
   // A casino wallet made new here gets the exchange's welcome (500 free testnet STX, then the first 1,000,000 LAYR).
   const fresh = kind === 'casino' && !(casinoWalletUi()?.describe().has);
   try {
-    S.wallet = await connectWallet(kind);
+    const wallet = await connectWallet(kind);
+    if (gen !== joinGen) throw cancelled();
+    S.wallet = wallet;
     rememberProvider(kind);
-    await signIn(S.wallet);
+    await signIn(wallet, gen);
     S.open = false;
     if (fresh) void casinoWalletUi()?.fundNew().catch(() => {});
   } catch (e) {
-    S.error = /cancel/i.test(walletMessage(e)) ? '' : walletMessage(e);
+    if (gen === joinGen) S.error = /cancel/i.test(walletMessage(e)) ? '' : walletMessage(e);
   } finally {
-    S.busy = ''; paint();
+    if (gen === joinGen) { S.busy = ''; S.trying = null; }
+    paint();
   }
 }
+
+/** Cancel in the welcome card: stop waiting for the wallet (its window may stay open; whatever it answers is ignored). */
+const cancelJoin = () => { joinGen++; S.busy = ''; S.trying = null; S.error = ''; paint(); };
 
 /**
  * A wallet connected somewhere on the page (the LAYR exchange announces it): sign the player into the room straight away
@@ -413,17 +430,19 @@ async function joinWithConnected(event: Event) {
   if (S.signed?.address === d.address) return;
   const kind = d.kind === 'casino' || d.kind === 'leather' || d.kind === 'xverse' ? d.kind : null;
   if (!kind) return;                  // a wallet the room cannot sign with yet: the Join panel still offers the others
-  S.error = ''; S.busy = 'sign'; paint();
+  const gen = ++joinGen;
+  S.error = ''; S.busy = 'sign'; S.trying = kind; paint();
   try {
     S.wallet = { kind, address: d.address, network: d.address.startsWith('SP') ? 'mainnet' : 'testnet', via: 'page' };
     rememberProvider(kind);
-    await signIn(S.wallet);
+    await signIn(S.wallet, gen);
     S.open = false;
   } catch (e) {
     const text = walletMessage(e);
-    if (!/cancel/i.test(text)) { S.error = text; S.open = true; }
+    if (gen === joinGen && !/cancel/i.test(text)) { S.error = text; S.open = !introShown(); }   // the welcome card shows it, when it is up
   } finally {
-    S.busy = ''; paint();
+    if (gen === joinGen) { S.busy = ''; S.trying = null; }
+    paint();
   }
 }
 
@@ -433,6 +452,8 @@ async function joinWithConnected(event: Event) {
  */
 const ARRIVAL_WAIT_MS = 2000;
 const arrivalPrompt = () => {
+  if (S.service === 'ok' && introShown()) { if (!S.introSeen) { S.introSeen = true; paint(); } }
+  if (S.introSeen) return;            // the welcome card asked them to join (docs/plans/CASINO-WELCOME-JOIN-PLAN.md): no second window
   if (S.prompted || S.service !== 'ok' || !S.connected || S.signed || S.busy || S.open || !S.arrivedAt) return;
   if (Date.now() - S.arrivedAt < ARRIVAL_WAIT_MS) return;
   if (S.host?.currentSpot()) return;
@@ -452,7 +473,7 @@ const joinOrder = (): WalletKind[] => {
 
 async function leave() {
   try { await postJson('/casino/room/session', { method: 'DELETE' }); } catch { /* the cookie dies by itself in 4 hours */ }
-  S.signed = null; S.wallet = null; S.error = '';
+  S.signed = null; S.wallet = null; S.error = ''; S.resumed = false; S.later = false;
   chat?.endSession();
   chat?.disconnected();
   reconnect(); paint();
@@ -495,6 +516,49 @@ const CSS = `
 #pxroom-panel .who{color:var(--ink,#f6ead0);font-weight:600;word-break:break-all}
 #pxroom-panel .fact{font-size:12px;line-height:1.5;margin:0 0 8px}
 #pxroom-panel .fact b{color:var(--gold,#e3b84a);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
+#intro #introJoin{margin:0 0 4px;padding:14px 0 0;border-top:1px solid rgba(227,184,74,.18)}
+#intro #introJoin[hidden]{display:none}
+#introJoin .jh{display:flex;align-items:center;gap:8px;margin:0 0 6px;font:700 10px Arial,sans-serif;letter-spacing:.2em;color:var(--gold,#e3b84a);text-transform:uppercase}
+#introJoin .jh i{font-style:normal;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--gold,#e3b84a);font-size:10px;letter-spacing:0}
+#introJoin .jh.done i{border-color:#2fae66;color:#2fae66}
+#intro #introJoin p{font:11.5px/1.6 Arial,sans-serif;color:#9aa6b6;margin:0 0 10px;max-width:none}
+#intro #introJoin p b{color:#e8d6b0;font-weight:600}
+#intro #introJoin p.fine{font-size:10px;line-height:1.5;color:#7f8ca0;margin:0 0 4px}
+#intro #introJoin p.fine b{color:#b9c3d0}
+#intro #introJoin p.lead2{font-size:12px;color:#aab4c2}
+#introJoin .wallets{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px}
+#introJoin .wallets button{font:600 13px Arial,sans-serif;color:var(--ink,#f6ead0);background:rgba(227,184,74,.08);border:1px solid rgba(227,184,74,.55);border-radius:6px;padding:11px 10px;text-align:left;cursor:pointer;margin:0;letter-spacing:0;text-transform:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#introJoin .wallets button small{display:block;font:400 10px Arial,sans-serif;color:#8997a9;margin-top:3px;white-space:normal}
+#introJoin .wallets button.wide{grid-column:1/-1;background:linear-gradient(100deg,rgba(227,184,74,.22),rgba(227,184,74,.08));border-color:var(--gold,#e3b84a)}
+#introJoin .wallets button:hover:not(:disabled){background:rgba(227,184,74,.24)}
+#introJoin .wallets button:disabled{opacity:.5;cursor:default}
+#introJoin .wallets button.on{opacity:.85;border-style:dashed}
+#introJoin .lnk{display:inline;background:none!important;border:0!important;padding:0!important;margin:0;font:11px Arial,sans-serif!important;color:#b7a587!important;text-decoration:underline;text-underline-offset:3px;cursor:pointer;width:auto;letter-spacing:0;text-transform:none}
+#introJoin .lnk.guest{display:block;margin:6px auto 4px}
+#introJoin .msg{display:flex;gap:10px;align-items:center;border:1px dashed rgba(227,184,74,.6);border-radius:6px;padding:12px;font:12px/1.5 Arial,sans-serif;color:#e8d6b0;margin:0 0 8px}
+#introJoin .msg small{display:block;color:#9aa6b6;font-size:11px}
+#introJoin .msg.err{border-style:solid;border-color:rgba(255,120,120,.6);color:#ffb0b0;background:rgba(120,30,30,.18)}
+#introJoin .spin{width:16px;height:16px;flex:none;border:2px solid rgba(227,184,74,.3);border-top-color:var(--gold,#e3b84a);border-radius:50%;animation:pxspin .9s linear infinite}
+@keyframes pxspin{to{transform:rotate(360deg)}}
+#introJoin .me{display:flex;align-items:center;gap:12px;background:rgba(47,174,102,.08);border:1px solid rgba(47,174,102,.45);border-radius:6px;padding:10px 12px;margin:0 0 8px}
+#introJoin .me.away{background:rgba(138,143,152,.08);border-color:rgba(138,143,152,.45)}
+#introJoin .me .dot{width:10px;height:10px;border-radius:50%;background:#2fae66;box-shadow:0 0 8px #2fae66;flex:none}
+#introJoin .me.away .dot{background:#8a8f98;box-shadow:none}
+#introJoin .me div{min-width:0;flex:1}
+#introJoin .me b{display:block;font:600 15px Arial,sans-serif;color:var(--ink,#f6ead0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#introJoin .me div span{font:11px Arial,sans-serif;color:#9aa6b6}
+#introJoin .me .lnk{flex:none}
+#intro #introJoin p.here{font-size:11px;margin:0 0 4px}
+#intro #introJoin p.here b{color:var(--gold,#e3b84a)}
+#introJoin button.later{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;margin:0 0 4px;padding:10px 12px;border:1px solid rgba(227,184,74,.35);border-radius:6px;background:rgba(227,184,74,.06);font:11.5px Arial,sans-serif;color:#9aa6b6;text-align:left;cursor:pointer;letter-spacing:0;text-transform:none}
+#introJoin button.later b{color:#e8d6b0;font-weight:600}
+#introJoin button.later .go{color:var(--gold,#e3b84a);font-size:16px}
+@media(max-width:620px){
+  #intro #introJoin{padding-top:10px}
+  #introJoin .wallets button{padding:9px 8px;font-size:12px}
+  #introJoin .me{padding:8px 10px}
+  #introJoin .me b{font-size:14px}
+}
 `;
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, cls?: string) => {
@@ -626,9 +690,134 @@ const hereNow = (parts: HTMLElement[]) => {
   parts.push(box, el('p', `${S.guests} watching without signing in.`, 'fact'));
 };
 
+// ------------------------------------------------------------------ the welcome card's join step
+
+/*
+ * The welcome card (docs/plans/CASINO-WELCOME-JOIN-PLAN.md): the page's "The night is yours." card has an empty
+ * <div id="introJoin"> and this fills it with the room sign-in, so a visitor sees one window with two steps (join, then step in)
+ * instead of the card plus a Room panel that opened by itself. The same join() as the Room panel; the panel stays on the Room
+ * button for switching, leaving and Here now. Classes on #intro tell the page's own part of the card what to show:
+ *   join-on     the room is on (the step headings may show)     join-ask   asking them to join: Enter is outlined
+ *   join-steps  show "2 Step in"                                  join-back  "Welcome back": the card's lead line hides
+ * With the room off or unreachable nothing is added and the card is exactly as before.
+ */
+const introBox = () => document.getElementById('intro');
+const introShown = () => {
+  const box = introBox();
+  if (!box || !box.classList.contains('on') || !document.getElementById('introJoin')) return false;
+  try { return getComputedStyle(box).display !== 'none'; } catch { return true; }
+};
+const WALLET_NAME: Record<WalletKind, string> = { leather: 'Leather', xverse: 'Xverse', casino: 'your casino wallet' };
+let introHtml = '';
+
+function paintIntro() {
+  const box = introBox(), slot = document.getElementById('introJoin');
+  if (!box || !slot) return;
+  const set = (on: Record<string, boolean>) => { for (const [k, v] of Object.entries(on)) box.classList.toggle(k, v); };
+  if (S.service !== 'ok') {
+    set({ 'join-on': false, 'join-ask': false, 'join-steps': false, 'join-back': false });
+    slot.hidden = true; slot.replaceChildren(); introHtml = '';
+    return;
+  }
+  const signed = !!(S.signed && S.you && !S.you.guest);
+  const mode = S.parked ? 'parked' : S.replaced ? 'replaced' : signed ? (S.resumed ? 'back' : 'in')
+    : S.signed ? 'joining' : S.busy ? 'busy' : S.later ? 'later' : 'join';
+  const ask = mode === 'join' || mode === 'busy' || mode === 'joining';
+  set({ 'join-on': true, 'join-ask': ask, 'join-steps': ask || mode === 'in', 'join-back': mode === 'back' });
+
+  const parts: HTMLElement[] = [];
+  const head = (n: string, text: string, done = false) => { const h = el('div', undefined, 'jh' + (done ? ' done' : '')); h.append(el('i', n), document.createTextNode(text)); return h; };
+  const link = (text: string, go: () => void, cls = 'lnk') => { const b = el('button', text, cls); b.type = 'button'; b.onclick = go; return b; };
+  const ui = casinoWalletUi();
+  const walletButtons = (live: boolean) => {
+    const row = el('div', undefined, 'wallets');
+    const order = joinOrder();
+    order.forEach((kind, i) => {
+      const b = el('button', undefined, (order.length === 3 && i === 0 ? 'wide' : '') + (S.trying === kind ? ' on' : '')); b.type = 'button';
+      const title = kind === 'casino' ? (ui ? ui.describe().label : 'Casino wallet') : kind === 'leather' ? 'Leather' : 'Xverse';
+      const note = kind === 'casino'
+        ? (ui?.describe().has ? 'Face ID or fingerprint · your passkey' : 'Face ID or fingerprint · free · 1,000,000 LAYR to start')
+        : S.trying === kind ? 'waiting…' : kind === 'leather' ? 'browser extension' : 'extension or app';
+      b.append(document.createTextNode(title), el('small', note));
+      b.disabled = !live || !S.connected;
+      b.onclick = () => { void join(kind); };
+      row.append(b);
+    });
+    return row;
+  };
+  const meBox = (sub: string, action: string) => {
+    const box = el('div', undefined, 'me' + (S.away ? ' away' : ''));
+    const txt = el('div'); txt.append(el('b', labelFor(S.signed!.address)), el('span', sub));
+    box.append(el('span', undefined, 'dot'), txt, link(action, () => { void leave(); }));
+    return box;
+  };
+  const count = (n: number) => `${n} ${n === 1 ? 'player is' : 'players are'} in the room now.`;
+
+  if (mode === 'join') {
+    parts.push(head('1', 'Join the room'));
+    const p = el('p'); p.append(document.createTextNode('Sign in so other players can see you, chat and play the shared tables with you. '));
+    p.append(el('b', S.connected ? (S.joined ? count(S.joined) : 'Be the first one in tonight.') : 'Connecting to the room…'));
+    parts.push(p, walletButtons(true));
+    const fine = el('p', undefined, 'fine'); fine.append(el('b', 'One free signature.'), document.createTextNode(' No transaction, no fee, no permission to spend anything.'));
+    parts.push(fine);
+    if (S.error) parts.push(el('div', S.error, 'msg err'));
+    parts.push(link('Or look around first, without signing in', () => { S.later = true; paint(); document.getElementById('walkin')?.click(); }, 'lnk guest'));
+  } else if (mode === 'busy' || mode === 'joining') {
+    parts.push(head('1', 'Join the room'));
+    const name = S.trying ? WALLET_NAME[S.trying] : 'your wallet';
+    const text = mode === 'joining' ? `Joining the room as ${labelFor(S.signed!.address)}…`
+      : S.busy === 'connect' ? (S.trying === 'casino' ? 'Opening your casino wallet…' : `Connecting to ${name}…`)
+        : S.trying === 'casino' ? 'Confirm with Face ID or your fingerprint to sign in.' : `Check ${name}: approve the free sign-in message.`;
+    const msg = el('div', undefined, 'msg'), t = el('div', text);
+    if (mode === 'busy') t.append(el('small', 'No transaction. Nothing to pay.'));
+    msg.append(el('span', undefined, 'spin'), t);
+    parts.push(msg);
+    if (mode === 'busy') parts.push(walletButtons(false), link('Cancel', cancelJoin, 'lnk guest'));
+  } else if (mode === 'in') {
+    parts.push(head('✓', 'You are in the room', true));
+    const via = S.wallet ? `${S.wallet.kind === 'casino' ? 'Casino wallet' : WALLET_NAME[S.wallet.kind]} · ` : '';
+    parts.push(meBox(S.away ? 'away · do anything to come back' : `${via}the name others see on your tag`, 'Switch'));
+    const others = [...S.players.values()].filter((p) => p.a !== S.signed!.address);
+    const here = el('p', undefined, 'here');
+    if (!others.length) here.textContent = 'Nobody else is signed in yet. Sit down and they will see you when they arrive.';
+    else {
+      here.append(document.createTextNode('Here now: '));
+      others.slice(0, 2).forEach((p, i) => {
+        const w = whereOf(p.a), at = p.aw ? 'away' : w === 'walking' || w === 'in the room' ? w : `at ${w}`;
+        if (i) here.append(document.createTextNode(' · '));
+        here.append(el('b', labelFor(p.a)), document.createTextNode(` ${at}`));
+      });
+      if (others.length > 2) here.append(document.createTextNode(' · '), el('b', `+${others.length - 2} more`));
+    }
+    parts.push(here);
+  } else if (mode === 'back') {
+    parts.push(el('p', 'Welcome back. You are still signed in from earlier, so you are already in the room.', 'lead2'));
+    parts.push(meBox(S.away ? 'away · do anything to come back' : `signed in · ${S.joined} here now`, 'Not you?'));
+  } else if (mode === 'later') {
+    const b = el('button', undefined, 'later'); b.type = 'button';
+    const t = el('span'); t.append(el('b', 'Join the room'), document.createTextNode(' to be seen, chat and play together'));
+    b.append(t, el('span', '›', 'go'));
+    b.onclick = () => { S.later = false; paint(); };
+    parts.push(b);
+  } else if (mode === 'parked') {
+    parts.push(el('div', S.parked === 'hidden' ? 'This tab was in the background for a while, so it left the room.' : 'You were away for a while, so you left the room.', 'msg'));
+    parts.push(link('Rejoin the room', () => { active(); unpark(); }, 'lnk guest'));
+  } else {
+    parts.push(el('div', 'Another tab of yours is in the room. You are not connected here.', 'msg'));
+    parts.push(link('Use this tab instead', () => { reconnect(); paint(); }, 'lnk guest'));
+  }
+  // Only rebuilt when something changed, so a click is never lost to a repaint between press and release.
+  const next = el('div'); next.append(...parts);
+  slot.hidden = false;
+  if (next.innerHTML === introHtml) return;
+  introHtml = next.innerHTML;
+  slot.replaceChildren(...parts);
+}
+
 function paint() {
   tellSelf();
   tellSalon();
+  paintIntro();
   if (!wrap || !btn || !panel) return;
   const signed = !!(S.signed && S.you && !S.you.guest);
   const me = signed ? labelFor(S.signed!.address) : null;
@@ -752,7 +941,7 @@ async function start() {
   try {
     const { res, body } = await postJson('/casino/room/session');
     if (res.status === 503) return offline();          // the room is switched off: say nothing, change nothing
-    if (res.ok && body?.address) S.signed = { address: body.address, hash160: body.hash160, expiresAt: body.expiresAt };
+    if (res.ok && body?.address) { S.signed = { address: body.address, hash160: body.hash160, expiresAt: body.expiresAt }; S.resumed = true; }
     S.service = 'ok';
   } catch { return offline(); }                       // unreachable: fail open
   buildUi(); paint();
@@ -765,6 +954,13 @@ async function start() {
   window.addEventListener('px-room-move', onOwnMove);
   window.addEventListener('px-room-send', onPageSend);
   window.addEventListener('px-room-bns-check', () => { void onBnsCheck(); });
+  // The welcome card's own buttons (Enter, a table, the bar...): going in without signing in means "later" for the join step.
+  document.getElementById('intro')?.addEventListener('click', (e) => {
+    // composedPath, not closest(): a button inside the join step may already have been redrawn (detached) by its own click
+    const path = e.composedPath() as Element[];
+    if (!path.some((n) => n instanceof HTMLButtonElement) || path.some((n) => n instanceof Element && n.id === 'introJoin')) return;
+    if (!(S.signed && S.you && !S.you.guest) && !S.busy && !S.later) { S.later = true; paint(); }
+  });
   // who is here: a heartbeat, and the background and idle clocks; anything the visitor does means they are here
   window.setInterval(hereTick, 1000);
   for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(type, active, { capture: true, passive: true });
