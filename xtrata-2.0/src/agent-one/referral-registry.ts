@@ -65,10 +65,14 @@ export async function loadPartners(opts: { sleep?: (ms: number) => Promise<void>
   throw new Error(`Could not check the referral link right now (${lastErr instanceof Error ? lastErr.message : String(lastErr)}). No job was created — please try again.`);
 }
 
+/** The wizards whose jobs can carry a referral: both build song players and charge the same wizard fee. */
+export const REFERRAL_ORIGINS: readonly string[] = ['music', 'suno'];
+export const takesReferrals = (origin: unknown): boolean => REFERRAL_ORIGINS.includes(String(origin));
+
 /**
  * Resolve the `referral` option of createJob/createBatchJob into a frozen record, or null.
- *  - Only the music wizard takes referrals (origin === 'music'); anything else is ignored
- *    and the registry is not even fetched.
+ *  - Only the song-player wizards take referrals (music and Suno, see REFERRAL_ORIGINS); anything
+ *    else is ignored and the registry is not even fetched.
  *  - Only a plain string slug is read. An object (e.g. someone passing an address) is ignored.
  *  - No slug → null with no network call, so jobs without a referral behave exactly as before.
  */
@@ -77,7 +81,7 @@ export async function freezeReferral(
   origin: string,
   opts: { sleep?: (ms: number) => Promise<void>; now?: () => number } = {},
 ): Promise<FrozenReferral | null> {
-  if (origin !== 'music') return null;
+  if (!takesReferrals(origin)) return null;
   if (typeof referral !== 'string') return null;
   const slug = sanitizeSlug(referral);
   if (!slug) return null;

@@ -11,7 +11,7 @@
 //
 // UNTESTED IN THIS ENV — validate with XAO_CONFIG.mock=true in a browser first, then a small live job.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { freezeReferral } from './referral-registry';
+import { freezeReferral, takesReferrals } from './referral-registry';
 import { planPayout, referralMemo, type Partner } from './referral';
 import { generateMnemonic, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
@@ -688,7 +688,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-10-30.2';
+export const AGENT_BUILD = '2026-11-03.1';
 const LOG_KEEP = 300;   // lines kept per job; a 36-batch upload writes ~8 per batch, and the START of a run is what explains a stall
 // Why this exists: a job that wrote nothing could not be told apart from one that was merely slow, and a
 // failed localStorage write used to vanish into an empty catch. Counting both makes "the page could not
@@ -972,7 +972,7 @@ function referralRowHtml(d: any, row: (k: string, v: string) => string, stxr: (u
 }
 /** What to show for a referred job: `final` false = the split agreed before payout (on-chain receipt), true = what happened. */
 function referralView(job: any, agentFee: bigint, payer: string | null, final: boolean): ReferralView | null {
-  if (!(job && job.referral && job.origin === 'music')) return null;
+  if (!(job && job.referral && takesReferrals(job.origin))) return null;
   const base = { slug: String(job.referral.slug), name: String(job.referral.name) };
   if (final) {
     if (job.referralOwed) return { ...base, kind: 'pending', amountUstx: String(job.referralOwed.amountUstx) };
@@ -987,12 +987,12 @@ function referralView(job: any, agentFee: bigint, payer: string | null, final: b
 }
 /** The self-referral rebate stays in the wallet and returns as change, so the fee the user actually bears is smaller. */
 function referralRebate(job: any, agentFee: bigint, payer: string | null): bigint {
-  if (!(job && job.referral && job.origin === 'music')) return 0n;
+  if (!(job && job.referral && takesReferrals(job.origin))) return 0n;
   return planPayout({ agentFee, partner: frozenPartner(job), payer }).rebateToPayer;
 }
 /** Mock mode moves no money; it records what a live run would, so the receipt and page can be checked in a browser. */
 function mockReferral(job: any, agentFee: bigint) {
-  if (!(job.referral && job.origin === 'music')) return;
+  if (!(job.referral && takesReferrals(job.origin))) return;
   const plan = planPayout({ agentFee, partner: frozenPartner(job), payer: job.funder || job.expectedFunder || job.user || null });
   if (plan.toPartner > 0n) { job.referralTx = '0xMOCK_REFERRAL'; job.referralPaidUstx = plan.toPartner.toString(); }
   else if (plan.rebateToPayer > 0n) job.referralRebateUstx = plan.rebateToPayer.toString();
@@ -2064,7 +2064,7 @@ ${row('Change returned', stxr(d.changeReturned) + usd(d.changeReturned))}
 //    the full fee and `job.referralOwed` records what is owed for manual settlement.
 //  - A lookup that FAILED is not "nothing found": it records `referralOwed` (unverified) and Xtrata is
 //    sent only fee - partner share, so the wallet can never be asked for more than it holds.
-function referralActive(job: any): boolean { return !!(job && job.referral && job.origin === 'music' && !job.mock); }
+function referralActive(job: any): boolean { return !!(job && job.referral && takesReferrals(job.origin) && !job.mock); }
 function referralFeeReserve(job: any): bigint { return referralActive(job) ? REFUND_TX_FEE : 0n; }
 function frozenPartner(job: any): Partner {
   const r = job.referral;
