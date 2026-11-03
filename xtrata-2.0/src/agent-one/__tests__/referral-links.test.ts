@@ -34,10 +34,14 @@ describe('registry hosting', () => {
   it('is revalidated on every load, so an edit or active:false takes effect at once', () => {
     expect(headers).toMatch(/^\/music-partners\.json\n\s+Cache-Control: no-cache$/m);
   });
-  it('the shipped registry is valid and, until a go-live PR, has no active partner', () => {
+  it('the shipped registry is valid and its only active partner is fak.fun, on the agreed terms', () => {
+    // Every go-live PR edits this on purpose: a partner earns real STX the moment they are listed,
+    // so the shipped list is pinned here and any change to it has to be a visible edit to this test.
     const p = parseRegistry(registry);
     expect(p.errors).toEqual([]);
-    expect(p.partners.filter((x) => x.active)).toEqual([]);
+    expect(p.partners.filter((x) => x.active).map((x) => ({ slug: x.slug, address: x.address, shareBps: x.shareBps, selfReferral: x.selfReferral }))).toEqual([
+      { slug: 'fak-fun', address: 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22', shareBps: 5000, selfReferral: true },
+    ]);
   });
 });
 
