@@ -84,6 +84,10 @@
 /m /music/ 302
 /m/ /music/ 302
 /m/:slug /music/?ref=:slug 302
+# Same for the Suno wizard (SUNO More): /s/<partner-slug> opens it with ?ref=<slug>.
+/s /wizard/suno 302
+/s/ /wizard/suno 302
+/s/:slug /wizard/suno?ref=:slug 302
 /radio/lounge /music/lounge 301
 /radio/lounge.html /music/lounge 301
 /music/lounge.html /music/lounge 301
