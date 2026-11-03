@@ -246,7 +246,7 @@ on Cloudflare (it was observed locally).
 ## Playing together (2026-11-01, docs/plans/CASINO-PLAY-TOGETHER-PLAN.md)
 
 The room also carries the social layer: reactions, big wins (the last 8 kept in storage under `wins`), the daily drop (`d:<key>`,
-one per player per UTC day), table chat (`say` with `ch: 'table'`) and watching a table (`watch`), shared roulette and baccarat
+one per player per UTC day), table chat (`say` with `ch: 'table'`) and watching a table (`watch`), shared roulette, baccarat and Sic Bo
 rounds (`round`, `bet`: results come from HMAC-SHA256 of the round under a secret kept in storage as `sec`, committed before the
 bets close and revealed after), drinks for other players (`gift`), and the Salon waiting list and relay (`seek`, `pvp`). The rules are
 in `functions/lib/casino-social.ts` and `functions/lib/casino-rounds.ts`; this Worker still only moves data and keeps no timers
