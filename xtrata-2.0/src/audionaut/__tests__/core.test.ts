@@ -23,7 +23,7 @@ const fakeHiro = (held: number[], minted: number[]) => {
       return json({ total: held.length, results: page.map((id) => ({ value: { repr: `u${id}` } })) });
     }
     const arg = JSON.parse(String(init?.body)).arguments[0] as string;
-    const id = Number(BigInt(arg.slice(4)));
+    const id = Number(BigInt('0x' + arg.slice(4)));
     return json({ okay: true, result: minted.includes(id) ? '0x0a0c00000003' : '0x09' });
   }) as unknown as typeof fetch;
   return { fetchImpl, calls };

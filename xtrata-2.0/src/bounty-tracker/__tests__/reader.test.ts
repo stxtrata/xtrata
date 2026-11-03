@@ -14,21 +14,26 @@ const DEP = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const C = (n: string) => DEP + '.' + n;
 const D = Date.parse('2026-10-05T00:00:00Z') / 1000;
 
-function world() {
+function world(base = D) {
   let seq = 0, reqs = 0;
-  const chain: Record<string, any[]> = {};
+  const chain: Record<string, any[]> = {}, mints: any[] = [];
   const add = (id: string, fn: string, addr: string, off: number, extra: any = {}) => {
-    (chain[id] = chain[id] || []).unshift({ tx_id: '0x' + (++seq).toString(16).padStart(4, '0'), tx_status: 'success', tx_type: 'contract_call',
-      burn_block_time: D + off, sender_address: addr, contract_call: { contract_id: id, function_name: fn, function_args: [] }, ...extra });
+    const tx_id = '0x' + (++seq).toString(16).padStart(4, '0');
+    (chain[id] = chain[id] || []).unshift({ tx_id, tx_status: 'success', tx_type: 'contract_call',
+      burn_block_time: base + off, sender_address: addr, contract_call: { contract_id: id, function_name: fn, function_args: [] }, ...extra });
+    return tx_id;
   };
+  let mintsDown = false;
   const get = async (u: string) => {
     reqs++;
+    const mm = u.match(/tokens\/nft\/mints\?.*limit=(\d+)&offset=(\d+)/);
+    if (mm) { if (mintsDown) throw new Error(u + ' -> 500'); return { total: mints.length, results: mints.slice(+mm[2], +mm[2] + +mm[1]) }; }
     const m = u.match(/address\/([^/]+)\/transactions\?limit=(\d+)&offset=(\d+)/)!;
     if (!(m[1] in chain) && /v1-2|xtrata-market|chess|v1-3/.test(m[1])) throw new Error(u + ' -> 404');
     const all = chain[m[1]] || [];
     return { total: all.length, results: all.slice(+m[3], +m[3] + +m[2]) };
   };
-  return { chain, add, get, reqs: () => reqs, reset: () => { reqs = 0; } };
+  return { chain, add, get, reqs: () => reqs, reset: () => { reqs = 0; }, mints, down: () => { mintsDown = true; } };
 }
 function seeded() {
   const w = world();
@@ -207,5 +212,95 @@ describe('size-weighted inscription tickets', () => {
     const w = world();
     seal(w, 'SPA', H(9), 10);
     expect(ofAddr(await run(w), 'SPA').n).toMatchObject({ ins: 1, inp: 1, inu: 1 });
+  });
+});
+
+describe('wizard inscriptions follow the person they were made for', () => {
+  const MB = 1048576;
+  const INS = C('xtrata-v3-2-3');
+  const arg = (name: string, repr: string) => ({ name, repr });
+  const H = (n: number) => '0x' + n.toString(16).padStart(64, '0');
+  const cc = (fn: string, args: any[]) => ({ contract_call: { contract_id: INS, function_name: fn, function_args: args } });
+  // a mint by `who` creating token `id` (newest mint is listed first, as the API does)
+  const mint = (w: ReturnType<typeof world>, who: string, id: number, size: number, off: number) => {
+    const tx = w.add(INS, 'mint-single-tx', who, off, cc('mint-single-tx', [arg('h', H(id)), arg('mime', '"audio/mpeg"'), arg('total-size', 'u' + size), arg('c', '(list)'), arg('u', '"x"')]));
+    w.mints.unshift({ tx_id: tx, value: { repr: 'u' + id }, recipient: who });
+    return tx;
+  };
+  const give = (w: ReturnType<typeof world>, from: string, to: string, id: number, off: number, sender = from) =>
+    w.add(INS, 'transfer', sender, off, cc('transfer', [arg('id', 'u' + id), arg('sender', "'" + from), arg('recipient', "'" + to)]));
+  const W1 = 'SP1WIZARDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', USER = 'SP2USERBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+  const run = async (w: ReturnType<typeof world>, prev: any = null, draws: string[] = []) => L.run({ api: 'x', cutoff: '2026-10-01T00:00:00Z', draws, frozenDraws: 0 }, w.get, prev);
+  const ofAddr = (out: any, a: string) => out.addresses.find((x: any) => x.addr === a);
+
+  it('credits the receiver, with the size tickets, and empties the throwaway wallet', async () => {
+    const w = world();
+    mint(w, W1, 100, 2 * MB + 5, 10); give(w, W1, USER, 100, 10);
+    const out = await run(w);
+    expect(ofAddr(out, USER).n).toEqual({ ins: 1, inp: 3 });
+    expect(ofAddr(out, W1).n).toEqual({});
+    expect(ofAddr(out, W1).tx.ins).toBeUndefined();
+  });
+
+  it('keeps the draw windows right: a transfer after the cut-off leaves that draw with the minter', async () => {
+    const w = world();
+    mint(w, W1, 100, 100, 10); give(w, W1, USER, 100, 500);
+    const out = await run(w, null, [new Date((D + 100) * 1000).toISOString(), new Date((D + 1000) * 1000).toISOString()]);
+    expect(ofAddr(out, W1).w[0]).toEqual({ ins: 1, inp: 1 }); expect(ofAddr(out, USER).w[0]).toEqual({});
+    expect(ofAddr(out, W1).w[1]).toEqual({}); expect(ofAddr(out, USER).w[1]).toEqual({ ins: 1, inp: 1 });
+    expect(ofAddr(out, USER).n).toEqual({ ins: 1, inp: 1 });
+  });
+
+  it('only hands over what the minter itself transferred, soon after the mint', async () => {
+    const w = world();
+    mint(w, W1, 100, 100, 10); give(w, W1, USER, 100, 10 + 7 * 3600);   // 7 hours later: a gift, not the wizard
+    mint(w, W1, 101, 100, 20); give(w, W1, USER, 101, 21, 'SPSOMEONEELSE');   // not sent by the minter
+    mint(w, W1, 102, 100, 30); give(w, USER, W1, 102, 31);   // other direction
+    const out = await run(w);
+    expect(ofAddr(out, W1).n).toEqual({ ins: 3, inp: 3 });
+    expect(ofAddr(out, USER)).toBeUndefined();
+  });
+
+  it('moves one item of a batch and leaves the rest', async () => {
+    const w = world();
+    const tx = w.add(INS, 'seal-inscription-batch', W1, 10, cc('seal-inscription-batch', [arg('items', `(list (tuple (hash ${H(1)}) (token-uri-string "a")) (tuple (hash ${H(2)}) (token-uri-string "b")))`)]));
+    w.mints.unshift({ tx_id: tx, value: { repr: 'u201' }, recipient: W1 }); w.mints.unshift({ tx_id: tx, value: { repr: 'u200' }, recipient: W1 });   // mixed order on purpose
+    give(w, W1, USER, 200, 11);
+    const out = await run(w);
+    expect(ofAddr(out, USER).n.ins).toBe(1); expect(ofAddr(out, W1).n.ins).toBe(1);
+  });
+
+  it('picks up a transfer that lands in a later run, and ends up the same as a read from scratch', async () => {
+    const now = Math.floor(Date.now() / 1000) - 3600;
+    const w = world(now);
+    mint(w, W1, 100, 100, 10);
+    const first = await run(w);
+    expect(ofAddr(first, W1).n).toEqual({ ins: 1, inp: 1 });
+    give(w, W1, USER, 100, 20);
+    const second = await run(w, first.state);
+    expect(second.mode).toBe('incremental');
+    expect(ofAddr(second, USER).n).toEqual({ ins: 1, inp: 1 });
+    expect(ofAddr(second, W1).n).toEqual({});
+    expect(second.changed.sort()).toEqual([USER, W1].sort());
+    const third = await run(w, second.state);     // reading the same transfer again changes nothing
+    expect(ofAddr(third, USER).n).toEqual({ ins: 1, inp: 1 });
+    expect(norm(await run(w))).toBe(norm(third));
+  });
+
+  it('does not fail when the mint list is unavailable: the mint stays with the minter', async () => {
+    const w = world();
+    mint(w, W1, 100, 100, 10); give(w, W1, USER, 100, 11); w.down();
+    const out = await run(w);
+    expect(out.failed).toBe(false);
+    expect(ofAddr(out, W1).n).toEqual({ ins: 1, inp: 1 });
+  });
+
+  it('leaves a draw that is already frozen exactly as it was counted', async () => {
+    const w = world();
+    mint(w, W1, 100, 100, 10); give(w, W1, USER, 100, 10);
+    const draws = [new Date((D + 100) * 1000).toISOString(), new Date((D + 1000) * 1000).toISOString()];
+    const out = await L.run({ api: 'x', cutoff: '2026-10-01T00:00:00Z', draws }, w.get, null);   // default: draw 1 frozen
+    expect(ofAddr(out, W1).w[0]).toEqual({ ins: 1, inp: 1 }); expect(ofAddr(out, USER).w[0]).toEqual({});
+    expect(ofAddr(out, USER).w[1]).toEqual({ ins: 1, inp: 1 }); expect(ofAddr(out, USER).n).toEqual({ ins: 1, inp: 1 });
   });
 });

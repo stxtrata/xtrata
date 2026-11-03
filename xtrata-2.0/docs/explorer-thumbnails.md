@@ -84,9 +84,15 @@ How each kind gets its thumbnail:
 | image | resized from the inscription (fit inside 256, never enlarged; pictures that already fit stay at their size, lossless, nearest-neighbour, so pixel art is not blurred) | `backfill-all-thumbnails.mjs` |
 | svg | rasterised, only when it has no script and no outside references | `backfill-all-thumbnails.mjs` |
 | song (audio player HTML) | the cover the radio already extracts | `backfill-thumbnails.mjs` |
+| song player HTML not in the radio catalogue | the cover (`<img id="coverArt">`) and title/artist (`#xtrata-music-metadata`) read out of the file itself; other HTML is skipped untouched | `backfill-all-thumbnails.mjs --kinds html` |
 | html | declared `xtrata:thumbnail` tag, else a rendered screenshot | planned (Phase 3) |
 | audio, video | cover, or a grabbed frame | planned |
 | text, json, code | no picture; the grid keeps its label | by design |
+
+Song players that never reached the radio catalogue are handled with `--kinds html` (opt in, so the default run is
+unchanged). Only files carrying the Xtrata Music metadata block with `assetType: song` are touched; HTML under
+`--min-html-bytes` (default 200000) is never downloaded, and any other HTML is left with no row so the render phase
+still finds it. A song with no embedded cover gets a `none` row that keeps its title and artist.
 
 Rows made from the file itself use `source = 'render'`. A re-run skips `ready` and `none` rows, retries `failed`
 ones, and never replaces a stored thumbnail with a failure.
@@ -119,3 +125,20 @@ migration is safe (the endpoint falls back to the old query); running either scr
 npx wrangler d1 execute xtrata-manage --remote --file functions/migrations/022_thumbnail_animated.sql
 node scripts/backfill-all-thumbnails.mjs --recheck-animated --concurrency 5
 ```
+
+## New songs: thumbnail at mint time
+
+- When a song job completes, the Inscription Wizard (`xtrata-agent-one/wizard/music-thumbnail.js`) shrinks the cover to a 256 px WebP in the browser and POSTs it to `/thumb/<contract>/<tokenId>` (`functions/lib/thumbnail-ingest.ts`).
+- The server accepts it only for a token that is in the index as `text/html`, has no ready thumbnail, and sends a real WebP of 40 KB or less. A token not yet indexed gets HTTP 409 and the wizard retries for about two minutes.
+- Covers that reference another inscription (`/inscription/<id>`) are followed by the backfill script (`coverRef` in `scripts/lib/song-cover.mjs`).
+- `npm run thumbnails:sync` fills anything the wizard missed (closed tab, other tools). It does not replace existing rows; use `--force` for that.
+- Pages Functions have no Images binding, which is why the resizing happens in the browser.
+
+## Songs with no thumbnail: made when someone opens them
+
+Songs minted outside the Inscription Wizard, or before its post-mint ping existed, have no
+thumbnail. When anyone selects one in the Explorer and the index lists no thumbnail for it,
+`src/home/song-thumbnail.js` reads the cover from the song file the page just loaded, shrinks it
+to a small WebP in the browser and sends it to `POST /thumb/<contract>/<id>`. The server only
+accepts it for an indexed HTML token with no ready thumbnail, so a stored one is never replaced.
+The tile shows it from the next page load. `thumbnails:sync` remains the way to fill many at once.

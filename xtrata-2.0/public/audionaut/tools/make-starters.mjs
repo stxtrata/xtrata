@@ -192,7 +192,8 @@ for (const song of songs) {
       all = await measure(MS + 1500);
       const scale = 0.84 / Math.max(all.peak, 1e-3);
       if (scale > 0.95 && scale < 1.05) break;
-      proj.masterVolume = +Math.max(0.2, Math.min(1, proj.masterVolume * scale)).toFixed(3);
+      // Capped at 0.8: the library's headroom rule (starter-library.test.ts). A quiet mix is left a touch under the peak target rather than pushed past the cap.
+      proj.masterVolume = +Math.max(0.2, Math.min(0.8, proj.masterVolume * scale)).toFixed(3);
       engine.setMasterVolume?.(proj.masterVolume);
     }
     proj.channels.forEach((c) => (c.mute = false));

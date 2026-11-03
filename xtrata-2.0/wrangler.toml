@@ -7,6 +7,18 @@ MUSIC_PROFILE_ENABLED = "1"
 # Deployed mainnet source verified byte-for-byte on 2026-09-14.
 RADIO_LIKES_CONTRACT = "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0"
 RUNTIME_CONTENT_CACHE_LIMIT_BYTES = "5368709120"
+# Radio pay-per-play (docs/radio/PAY-PER-PLAY.md). The fixed addresses live here; the switch
+# RADIO_PPP_ENABLED and the canary list RADIO_PPP_ALLOWLIST are dashboard Secrets so they can be
+# changed without a code push. Do not also define those two here: a var and a secret cannot share a name.
+# The same goes for the optional RADIO_PPP_PASSKEY_ONLY secret ("1" lets listeners without a Stacks wallet use a passkey wallet alone).
+RADIO_PPP_HOST = "radio.xtrata.xyz"
+RADIO_LISTENING_WALLET_ORIGIN = "https://wallet.xtrata.xyz"
+# Content isolation (functions/lib/content-isolation.ts, CONTENT-ORIGIN-SPLIT-PLAN.md).
+# Deliberately NOT defined here so it can be switched per environment from the dashboard without a push:
+#   INSCRIPTION_SANDBOX         "1" sandboxes direct loads of raw HTML/SVG at /i/, /inscription/ and
+#                               /runtime/content (CSP sandbox, opaque origin, no allow-same-origin).
+#   INSCRIPTION_SANDBOX_EXEMPT  token ids (or "<contractId>:<tokenId>") that must keep running as xtrata.xyz.
+# Unset = off. Enable on the Preview environment first and run the canary in the plan before Production.
 
 [limits]
 cpu_ms = 30000
@@ -52,6 +64,8 @@ bucket_name = "xtrata-thumbnails"
 
 [env.preview.vars]
 MUSIC_PROFILE_ENABLED = "1"
+# On-chain radio likes on branch previews (public identifier, reads mainnet; same contract as production), so a preview radio shows your likes and playlists.
+RADIO_LIKES_CONTRACT = "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0"
 RUNTIME_CONTENT_CACHE_LIMIT_BYTES = "5368709120"
 
 [[env.preview.d1_databases]]
@@ -70,3 +84,24 @@ bucket_name = "xtrata-runtime-content-cache"
 [[env.preview.r2_buckets]]
 binding = "THUMBNAILS"
 bucket_name = "xtrata-thumbnails"
+
+# Casino room (docs/plans/CASINO-PRESENCE-PLAN.md, workers/casino-room/README.md).
+# The room itself is a Durable Object that lives in its own Worker, "xtrata-casino-room". Deploy THAT Worker first
+# (npx wrangler deploy --config workers/casino-room/wrangler.toml); a Pages deployment that points at a Worker which
+# does not exist yet fails its checks. Because this file is the source of truth for Pages bindings, the binding is
+# declared here and not in the dashboard. The shared secret CASINO_ROOM_SECRET (and the kill switch CASINO_ROOM_DISABLED)
+# are dashboard Secrets for both environments, never in this file.
+# Preview first. Production stays without the binding, so every /casino/room/* route there answers "room offline"
+# and the casino pages are untouched, until the preview test (/casino-room-spike/) has passed.
+[[env.preview.durable_objects.bindings]]
+name = "CASINO_ROOM"
+class_name = "CasinoRoom"
+script_name = "xtrata-casino-room"
+
+# Production: on since the room Worker was deployed and the preview test passed (14 end-to-end checks, 2026-10-29).
+# To switch the room off again without a code change, add the Secret CASINO_ROOM_DISABLED = 1 for Production and redeploy.
+[[durable_objects.bindings]]
+name = "CASINO_ROOM"
+class_name = "CasinoRoom"
+script_name = "xtrata-casino-room"
+# Keep the preview block above as well: once the room is live, both environments carry the binding.

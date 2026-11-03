@@ -113,6 +113,13 @@
 
     <!-- One rotating strip replaces the Collections banner and the campaign cards.
          Slides live in HOMEPAGE_STRIP_SLIDES (src/home/homepage-content.js). -->
+    <!-- Free album drop bar: live count or countdown, filled by src/home/giveaway-hero.js from GET /radio/giveaway. -->
+    <a id="giveBar" class="home-supbar home-supbar--give home-only" href="/giveaway" data-home-action="giveaway:bar" data-state="loading">
+      <span class="home-supbar__tag"><span class="home-sup-dot" aria-hidden="true"></span><span class="home-supbar__tag-word">Free album</span></span>
+      <span class="home-supbar__text" data-givebar="text">One copy every ten minutes, free to keep</span>
+      <span class="home-supbar__go" data-givebar="go">See the drop &rarr;</span>
+    </a>
+
     <!-- Music Supporters banner. Filled by src/home/music-supporters.js from /api/music-stats.
          Hidden by the script when the totals cannot be read, so it never shows a false zero. -->
     <a class="home-supbar home-only" id="musicBanner" href="/music/heroes" target="_blank" rel="noopener" data-sup-root data-state="loading" data-home-action="supporters:banner">
@@ -128,6 +135,15 @@
         <span class="section-kicker section-kicker--live" id="registryModeBadge">On Xtrata this week</span>
         <h1 class="living-hero__title" id="registryIntroTitle">Everything here <em>is alive, and on-chain.</em></h1>
         <p class="living-hero__lead" id="registryIntroLead">Every tile is a real inscription. Press one to play it, hear it or open it.</p>
+        <a class="hero-champ" id="heroChampion" href="/i/3075" target="_blank" rel="noopener" hidden aria-label="Astro Blaster 3 reigning champion">
+          <span class="hero-champ__crown" aria-hidden="true">&#9819;</span>
+          <span class="hero-champ__body">
+            <span class="hero-champ__kicker">Astro Blaster 3 &middot; Reigning champion</span>
+            <span class="hero-champ__name" data-champ="name">&hellip;</span>
+            <span class="hero-champ__score" data-champ="score"></span>
+          </span>
+          <span class="hero-champ__go" data-champ="go">Think you can beat it? Take the crown &rarr;</span>
+        </a>
         <div class="living-hero__actions">
           <button class="btn hero-btn hero-btn--lime" id="introPrepareButton" type="button" data-home-action="hero:create">Create yours</button>
           <a class="btn secondary hero-btn" href="#fresh" target="_self" data-home-action="hero:fresh">See everything new</a>
@@ -142,6 +158,33 @@
       <div class="living-hero__stage home-wall" id="featuredObjectStage" aria-label="Featured Xtrata objects"></div>
     </section>
 
+    <!-- The Audionaut banner: wordmark revealed by animation 35 (src/home/audionaut-banner.js). -->
+    <a class="aud-banner home-only" id="audionautBanner" href="/audionaut" target="_blank" rel="noopener" aria-label="The Audionaut, Audional Sequencer. Open the studio" data-home-action="banner:audionaut">
+      <svg id="audionautWordmark" viewBox="0 0 1400 250" aria-hidden="true" focusable="false"><g class="aud-banner__mark" fill="#fff"></g></svg>
+      <span class="aud-banner__sub"><span>Audional Sequencer &middot; Blockchain Audional Work(space)Station</span><b>Open the studio &rarr;</b></span>
+    </a>
+
+    <!-- Free album drop: the live giveaway (GET /radio/giveaway). Discs, counts and the claim link are filled in by giveaway-hero.js. -->
+    <section class="give-hero home-only" id="giveawayHero" data-state="loading" aria-labelledby="giveHeroTitle">
+      <div class="give-hero__copy">
+        <span class="give-hero__kicker" data-give="kicker">Free album drop &middot; limited edition</span>
+        <h2 class="give-hero__title" id="giveHeroTitle"><span data-give="total">Limited edition.</span> Free. <em>Gone one every ten minutes.</em></h2>
+        <p class="give-hero__lead" data-give="lead">A new copy goes live here on a timer. Be first to claim it and it is yours to keep, with only your face or fingerprint to sign up.</p>
+        <div class="give-hero__actions">
+          <a class="give-hero__cta" data-give="cta" href="/giveaway" data-home-action="hero:giveaway">Watch the drop &rarr;</a>
+          <span class="give-hero__status" data-give="status" hidden></span>
+        </div>
+      </div>
+      <div class="give-hero__run" aria-live="off">
+        <div class="give-hero__discs" data-give="discs" role="img" aria-label="Every copy in the edition" hidden></div>
+        <div class="give-hero__legend" aria-hidden="true">
+          <span><i class="is-done"></i>Claimed</span>
+          <span><i class="is-now"></i>Live now</span>
+          <span><i></i>Still to come</span>
+        </div>
+      </div>
+    </section>
+
     <section class="home-panel home-bounty home-only" id="homeBounty" aria-label="The Create, Inscribe, Share bounty"></section>
 
     <section class="home-panel home-sup home-only" id="musicSupporters" aria-labelledby="homeSupTitle" data-sup-root data-state="loading">
@@ -149,10 +192,10 @@
         <div class="home-sup__copy">
           <span class="home-kicker home-kicker--violet">Xtrata Music · Music Supporters</span>
           <h2 class="home-panel__title" id="homeSupTitle">Every play <em>supports someone.</em></h2>
-          <p class="home-sup__lead">Listeners in the Xtrata Music app pay a small amount straight to the song holder each time a song starts. Every payment is recorded on Stacks, so anyone can count them.</p>
+          <p class="home-sup__lead">New: set up your music support wallet right in your browser with a passkey, for just 1 STX. Then every song you hear on Xtrata Radio pays a small amount straight to the song holder. Every payment is recorded on Stacks, so anyone can count them.</p>
           <div class="home-sup__actions">
             <a class="home-btn home-btn--solid" style="--tone: var(--home-violet)" href="/music/heroes" target="_blank" rel="noopener" data-home-action="supporters:heroes">Meet the Music Heroes →</a>
-            <a class="home-btn" href="/music/lounge#downloads" target="_blank" rel="noopener" data-home-action="supporters:get-app">Get Xtrata Music</a>
+            <a class="home-btn" href="https://radio.xtrata.xyz/radio" target="_blank" rel="noopener" data-home-action="supporters:get-wallet">Create your wallet &middot; 1 STX</a>
           </div>
         </div>
         <div class="home-sup__ledger">
@@ -188,10 +231,10 @@
           <h2 class="home-panel__title" id="homeMusicTitle">Songs that live on Bitcoin. <em>Hear one now.</em></h2>
         </div>
         <div class="home-tabs" id="homeMusicTabs" role="tablist" aria-label="Sort songs"></div>
-        <a class="home-btn home-btn--ghost" href="/music/lounge" target="_blank" rel="noopener" data-home-action="music:lounge">All songs in the Lounge →</a>
+        <a class="home-btn home-btn--ghost" href="https://radio.xtrata.xyz/radio" target="_blank" rel="noopener" data-home-action="music:radio">All songs on Xtrata Radio →</a>
       </div>
       <div class="home-shelf" id="homeMusicShelf"></div>
-      <p class="home-panel__foot">Free to play here, through Xtrata Radio. In the Xtrata Music app, every play sends a micropayment to the song's holder.</p>
+      <p class="home-panel__foot">Free to play here. On Xtrata Radio, a passkey wallet in your browser (1 STX) sends a micropayment to the song's holder on every play.</p>
     </section>
 
     <section class="home-panel home-aud home-only" id="homeAudionauts" aria-label="Audionauts, a new collection on Xtrata"></section>

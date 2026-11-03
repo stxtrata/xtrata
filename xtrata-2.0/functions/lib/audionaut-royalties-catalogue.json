@@ -1,0 +1,937 @@
+{
+  "engineTokenId": 3060,
+  "engineSha256": "d4829e6892ef9617b9efb0a79eecadcfa993680271a1af2ee96e601edcfd6985",
+  "artistRule": "Current holder of the lowest primary song inscription ID for each artist in this catalogue",
+  "artists": [
+    {
+      "artist": "Cicada",
+      "firstSongId": 577
+    },
+    {
+      "artist": "Audionals",
+      "firstSongId": 1097
+    },
+    {
+      "artist": "Hundred Little Reasons",
+      "firstSongId": 312
+    },
+    {
+      "artist": "3ai3",
+      "firstSongId": 1091
+    },
+    {
+      "artist": "Lio Rush",
+      "firstSongId": 2969
+    },
+    {
+      "artist": "melophonic",
+      "firstSongId": 8
+    },
+    {
+      "artist": "DeOrganized Media",
+      "firstSongId": 2989
+    },
+    {
+      "artist": "BotCupid",
+      "firstSongId": 2753
+    },
+    {
+      "artist": "Xtrata Demo",
+      "firstSongId": 2830
+    },
+    {
+      "artist": "Χ₮¡₪¢₮",
+      "firstSongId": 2983
+    }
+  ],
+  "editions": [
+    {
+      "edition": 1,
+      "seed": 10415,
+      "name": "Ion",
+      "songId": 577,
+      "title": "Stacks Transmission",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 2,
+      "seed": 808909,
+      "name": "Ember",
+      "songId": 2885,
+      "title": "NEVER ENEMIES",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 3,
+      "seed": 19690720,
+      "name": "Luna",
+      "songId": 2889,
+      "title": "Where Every Note Remains",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 4,
+      "seed": 21000000,
+      "name": "Genesis",
+      "songId": 2189,
+      "title": "A hundred little reasons",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 5,
+      "seed": 1984,
+      "name": "Mirage",
+      "songId": 2190,
+      "title": "Make good your escape",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 6,
+      "seed": 314159,
+      "name": "Prism",
+      "songId": 1731,
+      "title": "Smalltalk",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 7,
+      "seed": 707707,
+      "name": "Echo",
+      "songId": 2964,
+      "title": "Slow Motion Behind the Machines",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 8,
+      "seed": 233000,
+      "name": "Vesper",
+      "songId": 3036,
+      "title": "One Impresses, One Arrives",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 9,
+      "seed": 919191,
+      "name": "Nova",
+      "songId": 2969,
+      "title": "Dontjudgeme",
+      "artist": "Lio Rush"
+    },
+    {
+      "edition": 10,
+      "seed": 101010,
+      "name": "Circuit",
+      "songId": 1107,
+      "title": "VST late night",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 11,
+      "seed": 606060,
+      "name": "Sol",
+      "songId": 8,
+      "title": "Russian Rampage",
+      "artist": "melophonic"
+    },
+    {
+      "edition": 12,
+      "seed": 120012,
+      "name": "Drift",
+      "songId": 577,
+      "title": "Stacks Transmission",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 13,
+      "seed": 2873619721,
+      "name": "Altair",
+      "songId": 1117,
+      "title": "This Is #1",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 14,
+      "seed": 218916213,
+      "name": "Andromeda",
+      "songId": 3018,
+      "title": "The Room Without an Exam",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 15,
+      "seed": 2702512613,
+      "name": "Aphelion",
+      "songId": 315,
+      "title": "Entertainment",
+      "artist": "melophonic"
+    },
+    {
+      "edition": 16,
+      "seed": 4208725766,
+      "name": "Apollo",
+      "songId": 312,
+      "title": "Smalltalk",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 17,
+      "seed": 107361743,
+      "name": "Aquila",
+      "songId": 1050,
+      "title": "Permanent Waveform",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 18,
+      "seed": 2979509151,
+      "name": "Arcturus",
+      "songId": 2188,
+      "title": "Easy Now",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 19,
+      "seed": 222951256,
+      "name": "Ariel",
+      "songId": 3031,
+      "title": "Le Magasin Fermé",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 20,
+      "seed": 2100304071,
+      "name": "Artemis",
+      "songId": 2186,
+      "title": "Big Pink Blanket",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 21,
+      "seed": 963177658,
+      "name": "Astra",
+      "songId": 1101,
+      "title": "Drop VST, Load BVST",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 22,
+      "seed": 3207700871,
+      "name": "Atlas",
+      "songId": 689,
+      "title": "Permanent Waveform",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 23,
+      "seed": 1972359553,
+      "name": "Aurora",
+      "songId": 2186,
+      "title": "Big Pink Blanket",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 24,
+      "seed": 4281467668,
+      "name": "Axiom",
+      "songId": 1097,
+      "title": "Local Drive Offline - BVST",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 25,
+      "seed": 3874244697,
+      "name": "Beacon",
+      "songId": 2186,
+      "title": "Big Pink Blanket",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 26,
+      "seed": 1865614420,
+      "name": "Bellatrix",
+      "songId": 1117,
+      "title": "This Is #1",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 27,
+      "seed": 399146673,
+      "name": "Borealis",
+      "songId": 2896,
+      "title": "When the Server Falls",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 28,
+      "seed": 3748820759,
+      "name": "Caelum",
+      "songId": 3020,
+      "title": "The Book Beneath My Coat",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 29,
+      "seed": 3252916666,
+      "name": "Callisto",
+      "songId": 1105,
+      "title": "B-VST (The Decentralized Mix)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 30,
+      "seed": 162410333,
+      "name": "Calypso",
+      "songId": 1122,
+      "title": "Someday",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 31,
+      "seed": 734091384,
+      "name": "Capella",
+      "songId": 2187,
+      "title": "Courageous and proud",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 32,
+      "seed": 3110239667,
+      "name": "Cassiopeia",
+      "songId": 2896,
+      "title": "When the Server Falls",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 33,
+      "seed": 142092889,
+      "name": "Castor",
+      "songId": 3018,
+      "title": "The Room Without an Exam",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 34,
+      "seed": 659868901,
+      "name": "Celeste",
+      "songId": 1107,
+      "title": "VST late night",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 35,
+      "seed": 1919131175,
+      "name": "Ceres",
+      "songId": 2910,
+      "title": "MORE LIKE THIS",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 36,
+      "seed": 3538710457,
+      "name": "Charon",
+      "songId": 785,
+      "title": "Dot Dot BTC",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 37,
+      "seed": 2433108393,
+      "name": "Comet",
+      "songId": 1107,
+      "title": "VST late night",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 38,
+      "seed": 3662791266,
+      "name": "Cosmo",
+      "songId": 3031,
+      "title": "Le Magasin Fermé",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 39,
+      "seed": 41286540,
+      "name": "Cygnus",
+      "songId": 2989,
+      "title": "Dee Organized Media keeps the mindshare  3 soulful female hot",
+      "artist": "DeOrganized Media"
+    },
+    {
+      "edition": 40,
+      "seed": 3301022797,
+      "name": "Delta",
+      "songId": 2910,
+      "title": "MORE LIKE THIS",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 41,
+      "seed": 4271898249,
+      "name": "Deneb",
+      "songId": 2892,
+      "title": "A Thousand Small Percentages",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 42,
+      "seed": 1333493947,
+      "name": "Dione",
+      "songId": 2985,
+      "title": "The Long Table",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 43,
+      "seed": 211325111,
+      "name": "Eclipse",
+      "songId": 1122,
+      "title": "Someday",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 44,
+      "seed": 4288312055,
+      "name": "Electra",
+      "songId": 2755,
+      "title": "Touch And Pulse",
+      "artist": "BotCupid"
+    },
+    {
+      "edition": 45,
+      "seed": 2467697730,
+      "name": "Elara",
+      "songId": 2895,
+      "title": "It Was Only Midnight",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 46,
+      "seed": 3982955601,
+      "name": "Enceladus",
+      "songId": 2896,
+      "title": "When the Server Falls",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 47,
+      "seed": 655374807,
+      "name": "Equinox",
+      "songId": 2756,
+      "title": "Neon Portal",
+      "artist": "BotCupid"
+    },
+    {
+      "edition": 48,
+      "seed": 2371052622,
+      "name": "Eris",
+      "songId": 315,
+      "title": "Entertainment",
+      "artist": "melophonic"
+    },
+    {
+      "edition": 49,
+      "seed": 3932507716,
+      "name": "Europa",
+      "songId": 1091,
+      "title": "Sidelong Eye",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 50,
+      "seed": 1531426052,
+      "name": "Eventide",
+      "songId": 1120,
+      "title": "Bass Sample 1",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 51,
+      "seed": 3484575548,
+      "name": "Faraday",
+      "songId": 1097,
+      "title": "Local Drive Offline - BVST",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 52,
+      "seed": 3225130795,
+      "name": "Fathom",
+      "songId": 2885,
+      "title": "NEVER ENEMIES",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 53,
+      "seed": 1874966996,
+      "name": "Flux",
+      "songId": 2978,
+      "title": "XTRATA 8BAR 27 - Disco Octaves 116 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 54,
+      "seed": 581582490,
+      "name": "Gemini",
+      "songId": 2883,
+      "title": "Let The Score Remember All",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 55,
+      "seed": 1776933078,
+      "name": "Halley",
+      "songId": 2187,
+      "title": "Courageous and proud",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 56,
+      "seed": 1832406525,
+      "name": "Helios",
+      "songId": 2969,
+      "title": "Dontjudgeme",
+      "artist": "Lio Rush"
+    },
+    {
+      "edition": 57,
+      "seed": 4022613748,
+      "name": "Horizon",
+      "songId": 2985,
+      "title": "The Long Table",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 58,
+      "seed": 1681794096,
+      "name": "Hyperion",
+      "songId": 3036,
+      "title": "One Impresses, One Arrives",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 59,
+      "seed": 1587824823,
+      "name": "Iapetus",
+      "songId": 2978,
+      "title": "XTRATA 8BAR 27 - Disco Octaves 116 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 60,
+      "seed": 1298188416,
+      "name": "Indra",
+      "songId": 785,
+      "title": "Dot Dot BTC",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 61,
+      "seed": 1841429544,
+      "name": "Io",
+      "songId": 1101,
+      "title": "Drop VST, Load BVST",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 62,
+      "seed": 1288636994,
+      "name": "Iris",
+      "songId": 1731,
+      "title": "Smalltalk",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 63,
+      "seed": 2599540403,
+      "name": "Juno",
+      "songId": 2189,
+      "title": "A hundred little reasons",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 64,
+      "seed": 4150367446,
+      "name": "Kepler",
+      "songId": 3036,
+      "title": "One Impresses, One Arrives",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 65,
+      "seed": 1628068427,
+      "name": "Lyra",
+      "songId": 1050,
+      "title": "Permanent Waveform",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 66,
+      "seed": 1386736150,
+      "name": "Magnetar",
+      "songId": 2188,
+      "title": "Easy Now",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 67,
+      "seed": 1537950551,
+      "name": "Maia",
+      "songId": 1101,
+      "title": "Drop VST, Load BVST",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 68,
+      "seed": 3795898736,
+      "name": "Meridian",
+      "songId": 688,
+      "title": "System Prime - Cicada",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 69,
+      "seed": 2855241102,
+      "name": "Meteor",
+      "songId": 2190,
+      "title": "Make good your escape",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 70,
+      "seed": 825221198,
+      "name": "Mira",
+      "songId": 1105,
+      "title": "B-VST (The Decentralized Mix)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 71,
+      "seed": 3470864789,
+      "name": "Nebula",
+      "songId": 1105,
+      "title": "B-VST (The Decentralized Mix)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 72,
+      "seed": 1406138844,
+      "name": "Neptune",
+      "songId": 2830,
+      "title": "First Light",
+      "artist": "Xtrata Demo"
+    },
+    {
+      "edition": 73,
+      "seed": 2757947542,
+      "name": "Nix",
+      "songId": 2978,
+      "title": "XTRATA 8BAR 27 - Disco Octaves 116 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 74,
+      "seed": 608423193,
+      "name": "Oberon",
+      "songId": 2971,
+      "title": "XTRATA 8BAR 30 - Modular Sequence 130 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 75,
+      "seed": 1951727708,
+      "name": "Odyssey",
+      "songId": 2981,
+      "title": "XTRATA 8BAR 23 - Trap 808 Slide 146 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 76,
+      "seed": 874837766,
+      "name": "Orion",
+      "songId": 3032,
+      "title": "Les Clés",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 77,
+      "seed": 2677165173,
+      "name": "Osiris",
+      "songId": 2892,
+      "title": "A Thousand Small Percentages",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 78,
+      "seed": 3565447992,
+      "name": "Parallax",
+      "songId": 312,
+      "title": "Smalltalk",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 79,
+      "seed": 3189361945,
+      "name": "Pegasus",
+      "songId": 2964,
+      "title": "Slow Motion Behind the Machines",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 80,
+      "seed": 3775601381,
+      "name": "Perseus",
+      "songId": 2830,
+      "title": "First Light",
+      "artist": "Xtrata Demo"
+    },
+    {
+      "edition": 81,
+      "seed": 3153567875,
+      "name": "Phobos",
+      "songId": 1099,
+      "title": "Drop VST, Load BVST / Nu-Disco Mix",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 82,
+      "seed": 2287983252,
+      "name": "Phoenix",
+      "songId": 2755,
+      "title": "Touch And Pulse",
+      "artist": "BotCupid"
+    },
+    {
+      "edition": 83,
+      "seed": 4043032601,
+      "name": "Pioneer",
+      "songId": 1091,
+      "title": "Sidelong Eye",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 84,
+      "seed": 136478061,
+      "name": "Polaris",
+      "songId": 2983,
+      "title": "LIQUIDEZ",
+      "artist": "Χ₮¡₪¢₮"
+    },
+    {
+      "edition": 85,
+      "seed": 2738603967,
+      "name": "Pollux",
+      "songId": 3020,
+      "title": "The Book Beneath My Coat",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 86,
+      "seed": 940455832,
+      "name": "Proteus",
+      "songId": 2971,
+      "title": "XTRATA 8BAR 30 - Modular Sequence 130 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 87,
+      "seed": 340361303,
+      "name": "Pulsar",
+      "songId": 2972,
+      "title": "XTRATA 8BAR 28 - Glitch Bass Microscope 98 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 88,
+      "seed": 166396121,
+      "name": "Quantum",
+      "songId": 8,
+      "title": "Russian Rampage",
+      "artist": "melophonic"
+    },
+    {
+      "edition": 89,
+      "seed": 125332506,
+      "name": "Quasar",
+      "songId": 2989,
+      "title": "Dee Organized Media keeps the mindshare  3 soulful female hot",
+      "artist": "DeOrganized Media"
+    },
+    {
+      "edition": 90,
+      "seed": 4000268174,
+      "name": "Rhea",
+      "songId": 2983,
+      "title": "LIQUIDEZ",
+      "artist": "Χ₮¡₪¢₮"
+    },
+    {
+      "edition": 91,
+      "seed": 3303377778,
+      "name": "Rigel",
+      "songId": 2889,
+      "title": "Where Every Note Remains",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 92,
+      "seed": 1976675089,
+      "name": "Sagan",
+      "songId": 1120,
+      "title": "Bass Sample 1",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 93,
+      "seed": 1748064074,
+      "name": "Selene",
+      "songId": 689,
+      "title": "Permanent Waveform",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 94,
+      "seed": 390024424,
+      "name": "Sirius",
+      "songId": 688,
+      "title": "System Prime - Cicada",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 95,
+      "seed": 4001416501,
+      "name": "Solstice",
+      "songId": 2981,
+      "title": "XTRATA 8BAR 23 - Trap 808 Slide 146 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 96,
+      "seed": 15464910,
+      "name": "Sonar",
+      "songId": 2756,
+      "title": "Neon Portal",
+      "artist": "BotCupid"
+    },
+    {
+      "edition": 97,
+      "seed": 900372673,
+      "name": "Sputnik",
+      "songId": 2972,
+      "title": "XTRATA 8BAR 28 - Glitch Bass Microscope 98 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 98,
+      "seed": 863081808,
+      "name": "Stratos",
+      "songId": 2753,
+      "title": "From Spark to Signal",
+      "artist": "BotCupid"
+    },
+    {
+      "edition": 99,
+      "seed": 2052159544,
+      "name": "Talos",
+      "songId": 3032,
+      "title": "Les Clés",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 100,
+      "seed": 1230001428,
+      "name": "Tethys",
+      "songId": 1731,
+      "title": "Smalltalk",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 101,
+      "seed": 1501876640,
+      "name": "Titan",
+      "songId": 2972,
+      "title": "XTRATA 8BAR 28 - Glitch Bass Microscope 98 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 102,
+      "seed": 2856635224,
+      "name": "Triton",
+      "songId": 2883,
+      "title": "Let The Score Remember All",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 103,
+      "seed": 1999469191,
+      "name": "Umbra",
+      "songId": 688,
+      "title": "System Prime - Cicada",
+      "artist": "Cicada"
+    },
+    {
+      "edition": 104,
+      "seed": 3441450437,
+      "name": "Vega",
+      "songId": 2971,
+      "title": "XTRATA 8BAR 30 - Modular Sequence 130 (Bass)",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 105,
+      "seed": 2700008639,
+      "name": "Vector",
+      "songId": 1122,
+      "title": "Someday",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 106,
+      "seed": 577195349,
+      "name": "Vega-Prime",
+      "songId": 2895,
+      "title": "It Was Only Midnight",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 107,
+      "seed": 3793565730,
+      "name": "Vela",
+      "songId": 2883,
+      "title": "Let The Score Remember All",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 108,
+      "seed": 1079535215,
+      "name": "Venus",
+      "songId": 3020,
+      "title": "The Book Beneath My Coat",
+      "artist": "3ai3"
+    },
+    {
+      "edition": 109,
+      "seed": 2682525554,
+      "name": "Vertex",
+      "songId": 1099,
+      "title": "Drop VST, Load BVST / Nu-Disco Mix",
+      "artist": "Audionals"
+    },
+    {
+      "edition": 110,
+      "seed": 3597813857,
+      "name": "Zenith",
+      "songId": 2189,
+      "title": "A hundred little reasons",
+      "artist": "Hundred Little Reasons"
+    },
+    {
+      "edition": 111,
+      "seed": 1335823683,
+      "name": "Zephyr",
+      "songId": 2753,
+      "title": "From Spark to Signal",
+      "artist": "BotCupid"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+ "owner": "ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E",
+ "contracts": {
+  "screen": "xtrata-screen-v1"
+ },
+ "steps": [
+  {
+   "as": "reviewer",
+   "contract": "screen",
+   "fn": "approve",
+   "note": "approve the paid ad: 10 STX to the fee wizard",
+   "release": 10000000,
+   "args": [
+    {
+     "uint": 2
+    }
+   ]
+  },
+  {
+   "as": "reviewer",
+   "contract": "screen",
+   "fn": "reject",
+   "note": "reject the paid news: 5 STX back to the buyer",
+   "release": 5000000,
+   "args": [
+    {
+     "uint": 4
+    },
+    {
+     "uint": 1
+    }
+   ]
+  }
+ ]
+}

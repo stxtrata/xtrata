@@ -1,0 +1,10 @@
+{
+  "owner": "ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E",
+  "contracts": { "scores": "xtrata-arcade-scores-v2" },
+  "steps": [
+    { "as": "player1", "contract": "scores", "fn": "submit-score", "note": "neon snake, daily",
+      "args": [ {"ascii":"xa_neon_snake"}, {"uint":209}, {"uint":4200}, {"ascii":"WIZARD ONE"}, {"hex":"58415201cc5ac30b266d837c7ffb6ed3469ae0156657cadf00000000"} ] },
+    { "as": "player2", "contract": "scores", "fn": "submit-score", "note": "neon snake, daily",
+      "args": [ {"ascii":"xa_neon_snake"}, {"uint":209}, {"uint":3100}, {"ascii":"WIZARD TWO"}, {"hex":"58415201ad6c430ebbfdfd753e1465ac09a4135d29751b3000000000"} ] }
+  ]
+}

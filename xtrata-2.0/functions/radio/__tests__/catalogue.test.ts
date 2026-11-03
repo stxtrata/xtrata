@@ -7,7 +7,10 @@ import { refreshRadioMetadata } from '../../lib/radio-metadata';
 import { onRequest } from '../counts';
 import { onRequest as sessions } from '../../debug/radio-sessions';
 import { RADIO_CONTRACT } from '../../lib/radio-report';
-vi.mock('../../inscription/handler',()=>({onInscriptionRequest:({request}: {request:Request})=>fetch(request.url)}));
+import { SONG_RULES_SINCE, checkSongsNow } from '../../lib/radio-metadata';
+import { onRequest as playable } from '../../index/playable';
+import { served, webm, withHiddenTrack } from '../../../src/lib/radio/__tests__/song-fixtures';
+vi.mock('../../inscription/handler',()=>({onInscriptionRequest:({request}: {request:Request})=>request.headers.has('range')?fetch(request.url,{headers:{range:request.headers.get('range')!}}):fetch(request.url)}));
 const {DatabaseSync}=createRequire(import.meta.url)('node:sqlite');
 let db:any,env:any;
 const key='private-test-key-longer-than-24-characters';
@@ -100,4 +103,63 @@ it('retains known names and artwork while optional metadata refresh is pending o
   db.prepare('UPDATE radio_metadata SET status=? WHERE token_id=1').run(state);
   const data=await(await get()).json();expect(data.tracks[0].title).toBe('Known title');expect(data.tracks[0].artist).toBe('Known artist');expect(data.tracks[0].thumbnail).toBe('/radio/artwork?id=1');
  }
+});
+
+describe('songs that live elsewhere: hidden tracks, all-audio video files and linked audio',()=>{
+ const FILES:Record<number,{type:string;bytes:Uint8Array}>={
+  8:{type:'video/webm',bytes:webm('A_OPUS')},                                       // audio only, minted as video
+  139:{type:'video/webm',bytes:withHiddenTrack(webm('V_VP9'),webm('A_OPUS'))},     // a hidden track
+  50:{type:'video/webm',bytes:webm('V_VP9','A_OPUS')},                              // a film: not a song
+  319:{type:'text/html',bytes:new TextEncoder().encode('<title>Russian Rampage</title><audio><source src="https://xtrata.xyz/inscription/8" type="audio/webm"></audio><img src="https://xtrata.xyz/inscription/134">')},
+  60:{type:'text/html',bytes:new TextEncoder().encode('<title>Linked later</title><source src="/inscription/8">')},
+  70:{type:'text/html',bytes:new TextEncoder().encode('<title>A game</title><script>new Audio("x")</script>')}
+ };
+ const setupFiles=()=>{
+  likesSetup();
+  for(const [id,f] of Object.entries(FILES))db.prepare('INSERT INTO inscription_index(contract,token_id,sealed,mime) VALUES(?,?,1,?)').run(RADIO_CONTRACT,Number(id),f.type);
+  // 60 and 70 were looked at under the old rules and judged "not a song"; 60 was before the rules widened.
+  db.prepare("INSERT INTO radio_metadata(token_id,title,artist,album,status,checked_at,cover_checked,is_song) VALUES(60,'','','','ready',?,1,0)").run(SONG_RULES_SINCE-1000);
+  db.prepare("INSERT INTO radio_metadata(token_id,title,artist,album,status,checked_at,cover_checked,is_song) VALUES(70,'','','','ready',?,1,0)").run(SONG_RULES_SINCE+1000);
+  const fetcher=vi.fn(async(url:string,init?:{headers?:Record<string,string>})=>{const f=FILES[Number(url.split('/').pop())];return f?served(f.bytes,f.type,init?.headers?.range):new Response('',{status:404});});
+  vi.stubGlobal('fetch',fetcher);
+  return fetcher;
+ };
+ const song=(id:number)=>(db.prepare('SELECT is_song FROM radio_metadata WHERE token_id=?').get(id) as any)?.is_song;
+
+ it('reads each file once and records song (1), hidden track (2) or not a song (0)',async()=>{
+  const fetcher=setupFiles();
+  for(let i=0;i<6;i++)await refreshRadioMetadata(env);
+  expect([song(8),song(139),song(50),song(319),song(60),song(70)]).toEqual([1,2,0,1,1,0]);
+  // video files are read by range only: their last 30 bytes, then their first bytes when there is no hidden track
+  const ranged=fetcher.mock.calls.filter((c:any)=>Number(c[0].split('/').pop())===139).map((c:any)=>c[1]?.headers?.range);
+  expect(ranged).toEqual(['bytes=-30']);
+  const calls=fetcher.mock.calls.length;
+  for(let i=0;i<3;i++)await refreshRadioMetadata(env);
+  expect(fetcher.mock.calls.length).toBe(calls); // nothing is read twice
+  expect((db.prepare('SELECT title FROM radio_metadata WHERE token_id=319').get() as any).title).toBe('Russian Rampage');
+ });
+
+ it('verified songs join the catalogue and the station even when listeners once reported them as duds; hidden tracks stay unlisted',async()=>{
+  setupFiles();
+  db.prepare("INSERT INTO radio_verdicts(contract,token_id,verdict,reason,updated_at) VALUES(?,8,'dud','mime:video/webm',0)").run(RADIO_CONTRACT);
+  db.prepare("INSERT INTO radio_verdicts(contract,token_id,verdict,reason,updated_at) VALUES(?,319,'dud','html-no-audio',0)").run(RADIO_CONTRACT);
+  for(let i=0;i<6;i++)await refreshRadioMetadata(env);
+  const ids=(await(await get()).json()).tracks.map((r:any)=>r.id);
+  expect(ids).toEqual(expect.arrayContaining([1,2,3,8,60,319]));
+  expect(ids).not.toContain(139);expect(ids).not.toContain(50);expect(ids).not.toContain(70);
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response('')));
+  const list=await(await playable({env,request:new Request('https://test/index/playable?contract='+RADIO_CONTRACT)} as any)).json();
+  expect(list.video).toEqual([8]);
+  expect(list.duds).not.toContain(8);expect(list.duds).not.toContain(319);
+  expect(list.html).toEqual(expect.arrayContaining([319,60,70]));
+  expect([...list.audio,...list.video,...list.html]).not.toContain(139);
+ });
+
+ it('checkSongsNow reads named inscriptions straight away, retrying a failed read, and nothing else',async()=>{
+  const fetcher=setupFiles();
+  db.prepare("INSERT INTO radio_metadata(token_id,status,checked_at) VALUES(139,'failed',?)").run(Date.now());
+  await checkSongsNow(env,[139,319,1,99999]);
+  expect([song(139),song(319)]).toEqual([2,1]);
+  expect(fetcher.mock.calls.every((c:any)=>[139,319].includes(Number(c[0].split('/').pop())))).toBe(true);
+ });
 });

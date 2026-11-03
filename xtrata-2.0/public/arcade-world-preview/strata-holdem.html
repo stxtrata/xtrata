@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hold'em · The Strata Club</title>
+<link rel="stylesheet" href="strata-club.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>The Strata Club</h1><span>Heads-up Hold'em</span></div>
+    <div class="purse" id="purse"></div>
+  </header>
+  <div class="tabs" role="tablist" aria-label="Mode">
+    <button class="tab" role="tab" id="tab-play" aria-selected="true" data-tab="play">Practice table</button>
+    <button class="tab" role="tab" id="tab-watch" aria-selected="false" data-tab="watch">Watch a testnet game</button>
+  </div>
+  <main id="app" aria-live="off"></main>
+  <div class="sr" id="live" aria-live="polite"></div>
+  <footer>
+    Practice mode runs the exact contract rules in your browser against a simulated chain and a bot opponent. Each player's cards come from their own secret seed and a block hash, committed before anyone sees a card,
+    so nobody can pick their hand. Test chips only.
+  </footer>
+</div>
+
+<script src="strata-dice-model.js"></script>
+<script src="strata-holdem-model.js"></script>
+<script>
+(() => {
+'use strict';
+const H = window.HoldemModel, S = H.S, DM = window.DiceModel;
+const $ = (s, r = document) => r.querySelector(s);
+const rand32 = () => crypto.getRandomValues(new Uint8Array(32));
+const fmt = (n) => n.toLocaleString('en-GB');
+const hex = (u8) => DM.toHex(u8);
+const RANK_LABEL = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const RANK_WORD = ['twos', 'threes', 'fours', 'fives', 'sixes', 'sevens', 'eights', 'nines', 'tens', 'jacks', 'queens', 'kings', 'aces'];
+const RANK_SING = ['two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'jack', 'queen', 'king', 'ace'];
+const SUITS = ['♣', '♦', '♥', '♠'], SUIT_NAME = ['clubs', 'diamonds', 'hearts', 'spades'];
+const STREET = ['Pre-flop', 'Flop', 'Turn', 'River'];
+
+// ---------------- cards ----------------
+function cardHTML(c, { cls = '', fresh = false } = {}) {
+  if (c === null || c === undefined) return `<span class="pcard empty ${cls}" aria-hidden="true"></span>`;
+  if (c === 'back') return `<span class="pcard back ${cls}${fresh ? ' deal' : ''}" role="img" aria-label="face-down card"></span>`;
+  const r = H.rankOf(c), s = H.suitOf(c), red = s === 1 || s === 2;
+  return `<span class="pcard ${red ? 'red' : ''} ${cls}${fresh ? ' deal' : ''}" role="img" aria-label="${RANK_SING[r]} of ${SUIT_NAME[s]}"><span class="r">${RANK_LABEL[r]}</span><span class="s">${SUITS[s]}</span></span>`;
+}
+const smallCards = (arr) => `<span class="cards">${arr.map((c) => cardHTML(c, { cls: 'sm' })).join('')}</span>`;
+const cname = (c) => RANK_LABEL[H.rankOf(c)] + SUITS[H.suitOf(c)];
+
+// ---------------- hand helpers (any 5 to 7 cards) ----------------
+function bestScore(cards) {
+  const n = cards.length; if (n < 5) return -1;
+  if (n === 5) return H.eval5(cards);
+  let best = -1;
+  const pick = (start, chosen) => {
+    if (chosen.length === 5) { best = Math.max(best, H.eval5(chosen)); return; }
+    for (let i = start; i < n; i++) { chosen.push(cards[i]); pick(i + 1, chosen); chosen.pop(); }
+  };
+  pick(0, []); return best;
+}
+const digit = (score, i) => Math.floor(score / Math.pow(13, 4 - i)) % 13;
+function describe(score) {
+  const cat = H.category(score), d0 = digit(score, 0), d1 = digit(score, 1), L = (d) => RANK_LABEL[d];
+  switch (cat) {
+    case 0: return `${L(d0)} high`;
+    case 1: return `Pair of ${RANK_WORD[d0]}`;
+    case 2: return `Two pair, ${RANK_WORD[d0]} and ${RANK_WORD[d1]}`;
+    case 3: return `Three ${RANK_WORD[d0]}`;
+    case 4: return d0 === 3 ? 'Straight, five high' : `Straight, ${L(d0)} high`;
+    case 5: return `Flush, ${L(d0)} high`;
+    case 6: return `Full house, ${RANK_WORD[d0]} full of ${RANK_WORD[d1]}`;
+    case 7: return `Four ${RANK_WORD[d0]}`;
+    default: return d0 === 12 ? 'Royal flush' : d0 === 3 ? 'Steel wheel, straight flush' : `Straight flush, ${L(d0)} high`;
+  }
+}
+
+// ---------------- simulated chain ----------------
+const BLOCK_MS = 3000, START_CHIPS = 10000;
+const sim = {
+  height: 1000, hashes: {}, queue: [], table: null, id: null,
+  me: 'YOU', bot: 'BOT', role: 'creator', mySeed: null, botSeed: null,
+  started: false, helper: true, raiseTo: 0, raiseKey: '', seen: new Set(), holeNote: '', lastHole: '', once: {}, botTimers: {}, timer: null, banner: null, topped: false
+};
+function newTable() { sim.table = H.createTable({ rakeBps: 200, rakeTo: 'HOUSE', balances: { YOU: START_CHIPS, BOT: START_CHIPS, HOUSE: 0 } }); }
+newTable();
+const ctx = () => ({ time: Math.floor(Date.now() / 1000), height: sim.height, hashAt: (h) => sim.hashes[h] || null });
+const G = () => (sim.id ? sim.table.games.get(sim.id) : null);
+const isA = (g) => g.a === sim.me;
+
+// A call is confirmed by the next block, like the real chain.
+function submit(label, fn) { return new Promise((resolve) => sim.queue.push({ label, fn, resolve })); }
+function tick() {
+  sim.height++; sim.hashes[sim.height] = rand32();
+  const q = sim.queue; sim.queue = [];
+  for (const item of q) item.resolve(item.fn(ctx()));
+  autopilot(); render();
+}
+setInterval(tick, BLOCK_MS);
+sim.hashes[sim.height] = rand32();
+
+function once(key, fn) { // run a chain call at most once per key; if it is refused, allow a retry shortly after
+  if (sim.once[key]) return; sim.once[key] = true;
+  Promise.resolve(fn()).then((r) => { if (r && r.err) setTimeout(() => delete sim.once[key], 1200); });
+}
+
+// ---------------- views of the game ----------------
+function pot(g) { return 2 * g.buyin - g.stackA - g.stackB; }
+const pending = (g) => g.state === S.PLAYING && g.nextStreetAt > 0;
+const streetReady = (g, c) => c.height >= g.nextStreetAt && !!sim.hashes[g.nextStreetAt];
+// The board as the chain will have it once the next call lands: a new street is dealt by the first action, but the cards are already fixed.
+function dispBoard(g) {
+  let b = g.board.slice(); const c = ctx();
+  if ((g.state === S.PLAYING || g.state === S.RUNOUT) && g.nextStreetAt > 0 && streetReady(g, c)) {
+    const h = sim.hashes[g.nextStreetAt];
+    if (g.state === S.RUNOUT) b = H.drawCards(b, H.streetHash(sim.id, h, 9), 5 - b.length);
+    else { const st = g.street + 1; b = H.drawCards(b, H.streetHash(sim.id, h, st), st === 1 ? 3 : 1); }
+  }
+  return b;
+}
+function holeFor(seed, g, board) { const h = sim.hashes[g.dealHeight]; return h && g.state >= S.PLAYING ? H.holeCards(seed, h, board) : null; }
+function myHole(g, board) {
+  const rev = isA(g) ? g.holeA : g.holeB; if (rev) return rev;
+  return holeFor(sim.mySeed, g, board);
+}
+const botHole = (g, board) => holeFor(sim.botSeed, g, board);
+const pname = (p) => (p === sim.me ? 'You' : p === sim.bot ? 'Bot' : p);
+const clock = (s) => { s = Math.max(0, s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const iAct = (g) => g.state === S.PLAYING && (g.aToAct ? g.a : g.b) === sim.me;
+
+// ---------------- bot ----------------
+function strength(hole, board) {
+  if (!hole) return 0;
+  if (board.length < 3) return 0;
+  const all = hole.concat(board), sc = bestScore(all), cat = H.category(sc);
+  if (board.length >= 5 && cat <= H.category(bestScore(board)) && sc === bestScore(board)) return 0.3; // plays the board
+  const ranks = all.map(H.rankOf), brank = board.map(H.rankOf), hr = hole.map(H.rankOf);
+  if (cat >= 6) return 0.97; if (cat === 5) return 0.93; if (cat === 4) return 0.92;
+  if (cat === 3) return hr.includes(digit(sc, 0)) ? 0.88 : 0.55;
+  if (cat === 2) return hr.includes(digit(sc, 0)) && hr.includes(digit(sc, 1)) ? 0.82 : 0.7;
+  if (cat === 1) { const pr = digit(sc, 0), mine = hr.includes(pr); return mine ? (pr >= Math.max(...brank) ? 0.62 : 0.42) : (Math.max(...hr) >= 9 ? 0.28 : 0.2); }
+  const suits = [0, 0, 0, 0]; all.forEach((c) => suits[H.suitOf(c)]++); const fd = suits.some((n, s) => n >= 4 && hole.some((c) => H.suitOf(c) === s));
+  const set = new Set(ranks); if (set.has(12)) set.add(-1);
+  let oe = false; for (let lo = -1; lo <= 8; lo++) { let n = 0; for (let k = 0; k < 5; k++) if (set.has(lo + k)) n++; if (n >= 4 && hr.some((r) => r >= lo && r < lo + 5)) oe = true; }
+  return fd ? 0.4 : oe ? 0.34 : 0.1 + (Math.max(...hr) >= 10 ? 0.04 : 0);
+}
+function chen(hole) {
+  const v = (r) => (r === 12 ? 10 : r === 11 ? 8 : r === 10 ? 7 : r === 9 ? 6 : (r + 2) / 2);
+  const [a, b] = hole.map(H.rankOf).sort((x, y) => y - x); let s = v(a);
+  if (a === b) return Math.max(5, s * 2);
+  if (H.suitOf(hole[0]) === H.suitOf(hole[1])) s += 2;
+  const gap = a - b - 1; s -= gap === 0 ? 0 : gap === 1 ? 1 : gap === 2 ? 2 : gap === 3 ? 4 : 5;
+  if (gap <= 1 && a < 10) s += 1;
+  return Math.ceil(s);
+}
+function botDecide(g) {
+  const o = H.options(g, sim.bot); if (!o) return null;
+  const board = dispBoard(g), hole = botHole(g, board); if (!hole) return null;
+  if (sim.botMode === 'jam') return o.canRaise ? { a: 2, amt: o.maxRaiseTo } : { a: 1 }; // test hooks
+  if (sim.botMode === 'station') return { a: 1 };
+  const potTot = pot(g), bb = g.bb, r = Math.random();
+  const facing = o.toCall > 0, potOdds = facing ? o.toCall / (potTot + o.toCall) : 0;
+  const sizeTo = (frac) => { let to = Math.round(o.oppBet + frac * (potTot + o.toCall)); to = Math.max(o.minRaiseTo, Math.min(o.maxRaiseTo, to)); if (to >= o.maxRaiseTo * 0.7) to = o.maxRaiseTo; return to; };
+  const raise = (frac) => (o.canRaise ? { a: 2, amt: sizeTo(frac) } : facing ? { a: 1 } : { a: 1 });
+  const fold = () => (o.canCheck ? { a: 1 } : { a: 0 });
+  if (board.length === 0) {
+    const ch = chen(hole) + (Math.random() * 2 - 1);
+    if (facing) {
+      const big = o.toCall > 3 * bb;
+      if (ch >= 12) return r < 0.7 ? raise(0.9 + Math.random() * 0.6) : { a: 1 };
+      if (ch >= 8) return big && ch < 9 && r < 0.5 ? fold() : r < 0.22 ? raise(0.8) : { a: 1 };
+      if (ch >= 5) return o.toCall <= 3 * bb && !(o.toCall > bb * 2 && ch < 6) ? { a: 1 } : fold();
+      return o.toCall <= bb / 2 + 0.1 && r < 0.6 ? { a: 1 } : fold();
+    }
+    if (ch >= 8 && r < 0.6) return raise(0.8); if (r < 0.1) return raise(0.7); return { a: 1 };
+  }
+  const st = Math.max(0, Math.min(1, strength(hole, board) + (Math.random() * 0.16 - 0.08)));
+  if (facing) {
+    if (st > 0.8) return r < 0.5 ? raise(0.8 + Math.random() * 0.5) : { a: 1 };
+    if (st > potOdds + 0.12 || (st >= 0.33 && potOdds < 0.3)) return r < 0.06 ? raise(0.7) : { a: 1 };
+    return r < 0.05 ? raise(0.7) : fold();
+  }
+  if (st > 0.55) return r < 0.78 ? raise(0.5 + Math.random() * 0.3) : { a: 1 };
+  if (st > 0.3) return r < 0.25 ? raise(0.4) : { a: 1 };
+  return r < 0.12 ? raise(0.55) : { a: 1 };
+}
+function botAct() {
+  const g = G(); if (!g || g.state !== S.PLAYING || (g.aToAct ? g.a : g.b) !== sim.bot) return;
+  const d = botDecide(g); if (!d) return;
+  submit('bot acts', (c) => {
+    let r = sim.table.act(c, sim.bot, sim.id, d.a, d.amt || 0);
+    if (r.err && d.a !== 1) r = sim.table.act(c, sim.bot, sim.id, 1, 0); // never stall on an illegal pick
+    if (r.err) r = sim.table.act(c, sim.bot, sim.id, 0, 0);
+    return r;
+  });
+}
+
+// ---------------- autopilot: everything the table does without being asked ----------------
+function autopilot() {
+  const g = G(); if (!g) return; const c = ctx(), id = sim.id;
+  if (g.state === S.OPEN && sim.role === 'creator' && c.time >= (g.openedAt || 0)) {
+    once(`join:${id}`, () => new Promise((res) => setTimeout(() => { sim.botSeed = rand32(); submit('bot joins', (cc) => sim.table.join(cc, sim.bot, id, DM.sha256(sim.botSeed))).then(res); }, 1500 + Math.random() * 1500)));
+  }
+  if (g.state === S.DEALING && c.height > g.dealHeight) once(`start:${id}`, () => submit('start hand', (cc) => sim.table.startHand(cc, id)));
+  if (g.state === S.RUNOUT && streetReady(g, c)) once(`adv:${id}:${g.nextStreetAt}`, () => submit('advance', (cc) => sim.table.advance(cc, id)));
+  if (g.state === S.PLAYING && (g.aToAct ? g.a : g.b) === sim.bot && (!pending(g) || streetReady(g, c))) {
+    const key = `bot:${id}:${g.street}:${g.acts}:${g.betA}:${g.betB}:${g.aToAct}:${g.nextStreetAt}`;
+    once(key, () => new Promise((res) => setTimeout(() => { botAct(); res(); }, 1200 + Math.random() * 1800)));
+  }
+  if (g.state === S.SHOWDOWN) {
+    const botIsA = g.a === sim.bot;
+    if (!(botIsA ? g.holeA : g.holeB)) once(`brev:${id}`, () => new Promise((res) => setTimeout(() => { submit('bot reveals', (cc) => sim.table.reveal(cc, sim.bot, id, sim.botSeed)).then(res); }, 900 + Math.random() * 1600)));
+    if (!(botIsA ? g.holeB : g.holeA) && !busyFlag) once(`mrev:${id}`, () => submit('auto reveal', (cc) => sim.table.reveal(cc, sim.me, id, sim.mySeed))); // the real table signs this reveal for you
+  }
+  // the bot claims against a player whose clock ran out; anyone can
+  if ((g.state === S.PLAYING || g.state === S.SHOWDOWN) && g.deadline && c.time >= g.deadline + 1 && (g.state === S.SHOWDOWN || (g.aToAct ? g.a : g.b) === sim.me))
+    once(`claim:${id}:${g.deadline}`, () => submit('bot claims timeout', (cc) => sim.table.claimTimeout(cc, id)));
+}
+setInterval(() => { if (G()) autopilot(); }, 700);
+
+// ---------------- player actions ----------------
+let busyFlag = false; const busy = (b) => { busyFlag = b; render(); };
+function say(t) { const l = $('#live'); if (l) l.textContent = t; }
+async function startTable(role, bb, bbs, turn) {
+  Object.assign(sim, { id: null, role, mySeed: rand32(), botSeed: rand32(), started: true, raiseKey: '', seen: new Set(), holeNote: '', lastHole: '', once: {}, topped: false });
+  const buyin = bb * bbs, open = 600, bal = sim.table.bal;
+  if (bal.YOU < buyin) { bal.YOU = START_CHIPS; sim.topped = true; }
+  if (bal.BOT < buyin) bal.BOT = START_CHIPS;
+  if (role === 'creator') {
+    const r = await submit('create', (c) => sim.table.create(c, sim.me, { buyin, bb, turn, open, commit: DM.sha256(sim.mySeed) }));
+    sim.id = r.ok; if (G()) G().openedAt = 0;
+  } else {
+    const r = await submit('bot creates', (c) => sim.table.create(c, sim.bot, { buyin, bb, turn, open, commit: DM.sha256(sim.botSeed) }));
+    sim.id = r.ok;
+    await submit('join', (c) => sim.table.join(c, sim.me, sim.id, DM.sha256(sim.mySeed)));
+  }
+  say('Table opened. Waiting for the next block.'); render();
+}
+async function doAct(a, amt) {
+  busy(true); const r = await submit('act', (c) => sim.table.act(c, sim.me, sim.id, a, amt || 0)); busy(false);
+  if (r.err) say('That move was refused (code ' + r.err + ').'); render();
+}
+async function doClaim() { busy(true); await submit('claim', (c) => sim.table.claimTimeout(c, sim.id)); busy(false); }
+async function doCancel() { busy(true); await submit('cancel', (c) => sim.table.cancelOpen(c, sim.me, sim.id)); busy(false); }
+async function doReveal() { busy(true); await submit('reveal', (c) => sim.table.reveal(c, sim.me, sim.id, sim.mySeed)); busy(false); }
+
+// ---------------- rendering: play ----------------
+function renderPurse() { const b = sim.table.bal; $('#purse').innerHTML = `<span class="pill">Your chips <b>${fmt(b.YOU)}</b> LAYR</span><span class="pill">Rake pot <b>${fmt(b.HOUSE)}</b></span>`; }
+function renderLobby() {
+  return `<div class="lobby">
+    <section class="card"><h2>Open a table</h2><p>You post the buy-in and the bot sits down after a moment. One hand, winner takes the pot. The block hash picks who has the button.</p>
+      <div class="row"><label class="f">Big blind<select id="bb"><option>20</option><option value="50">50</option><option value="100">100</option></select></label>
+      <label class="f">Buy-in<select id="bbs"><option value="20" selected>20 big blinds</option><option value="50">50 big blinds</option><option value="100">100 big blinds</option></select></label>
+      <label class="f">Turn clock<select id="turn"><option value="30">30 s</option><option value="60" selected>60 s</option><option value="120">120 s</option></select></label></div>
+      <div class="actions"><button class="btn" data-act="open">Open table</button></div></section>
+    <section class="card"><h2>Sit at the bot's table</h2><p>The bot has posted a buy-in. You match it, and the hand starts a block later.</p>
+      <div class="row"><label class="f">Big blind<select id="bb2"><option>20</option><option value="50">50</option><option value="100">100</option></select></label>
+      <label class="f">Buy-in<select id="bbs2"><option value="20" selected>20 big blinds</option><option value="50">50 big blinds</option><option value="100">100 big blinds</option></select></label>
+      <label class="f">Turn clock<select id="turn2"><option value="30">30 s</option><option value="60" selected>60 s</option><option value="120">120 s</option></select></label></div>
+      <div class="actions"><button class="btn ghost" data-act="sit">Take the seat</button></div></section>
+    <section class="card" style="grid-column:1/-1"><h2>How the table works</h2>
+      <ol style="margin:0;padding-left:20px;color:var(--muted);font-size:14px;line-height:1.7">
+        <li>Each player locks in a secret seed. A block later the chain fixes the shuffle: your two cards come from <b style="color:var(--cream)">your own seed</b> and the block hash, so the bot cannot see them and neither can anyone watching.</li>
+        <li>Standard no-limit Hold'em, two players. The button posts the small blind and acts first before the flop. Fold, check or call, or raise (a raise must be at least the last raise, unless you are all-in).</li>
+        <li>The flop, turn and river come from later block hashes. A new street needs one fresh block, so expect a short pause after each round of betting.</li>
+        <li>If the hand reaches a showdown both players reveal their seeds and the contract ranks the best five of seven cards. Ties split the pot. Fold or run out the clock and the other player takes the pot.</li>
+        <li>Because each player has their own deck, both players can sometimes hold the same card, and a card of yours can change if the board happens to land on it. Your cards are final at the showdown.</li>
+        <li>A 2% rake goes to the house, rounded down, so tiny pots are rake-free. Practice chips refill when you run out.</li>
+      </ol></section>
+  </div>`;
+}
+function ringSVG(frac) {
+  const r = 28, c = 2 * Math.PI * r;
+  return `<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="5"/><circle cx="32" cy="32" r="${r}" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - Math.max(0, Math.min(1, frac)))}"/></svg>`;
+}
+function fresh(key) { const k = sim.id + ':' + key; if (sim.seen.has(k)) return false; sim.seen.add(k); return true; }
+
+function eventsFor(id) { return sim.table.log.filter((e) => e.id === id); }
+function historyHTML(g) {
+  const ev = eventsFor(sim.id); if (!ev.length) return '<div class="empty">Waiting for the deal.</div>';
+  const items = [];
+  for (const e of ev) {
+    const who = e.by ? pname(e.by) : '';
+    switch (e.event) {
+      case 'hand': items.push(`<li class="st"><span>${e.buttonA === isA(g) ? 'You have' : 'Bot has'} the button · blinds ${g.bb / 2}/${g.bb}</span></li>`); break;
+      case 'street': items.push(`<li class="st"><span class="by">${e.street === 9 ? 'Run-out' : STREET[e.street]}</span>${smallCards(e.street === 9 ? e.board : e.board.slice(e.street === 1 ? 0 : e.street + 1))}</li>`); break;
+      case 'check': items.push(`<li class="${e.by === sim.me ? 'me' : ''}"><span class="by">${who}</span>checks</li>`); break;
+      case 'call': items.push(`<li class="${e.by === sim.me ? 'me' : ''}"><span class="by">${who}</span>calls ${fmt(e.amount)}</li>`); break;
+      case 'raise': items.push(`<li class="${e.by === sim.me ? 'me' : ''}"><span class="by">${who}</span>raises to ${fmt(e.to)}</li>`); break;
+      case 'fold': items.push(`<li class="${e.by === sim.me ? 'me' : ''}"><span class="by">${who}</span>folds</li>`); break;
+      case 'all-in': items.push(`<li class="st"><span>All-in and called. The rest of the board is dealt.</span></li>`); break;
+      case 'showdown': items.push(`<li class="st"><span>Showdown. Both players reveal their seeds.</span></li>`); break;
+      case 'revealed': items.push(`<li><span class="by">${who}</span>shows ${smallCards(e.hole)}</li>`); break;
+      case 'timeout': items.push(`<li class="st"><span>A clock ran out.</span></li>`); break;
+      default: break;
+    }
+  }
+  return `<ol>${items.map((x) => x).join('')}</ol>`;
+}
+function statusText(g, c) {
+  const myTurn = iAct(g), street = pending(g) ? g.street + 1 : g.street;
+  switch (g.state) {
+    case S.OPEN: return sim.role === 'creator' ? 'Your buy-in is on the table. Waiting for an opponent.' : 'Waiting for the table to open.';
+    case S.DEALING: return 'Both seeds are locked in. The cards are dealt from the next block.';
+    case S.PLAYING:
+      if (pending(g) && !streetReady(g, c)) return `${['', 'The flop', 'The turn', 'The river'][street]} is dealt from the next block. Betting reopens in a moment.`;
+      return myTurn ? 'Your move.' : 'Bot is thinking.';
+    case S.RUNOUT: return 'All-in. The remaining cards come from the next block.';
+    case S.SHOWDOWN: return g.holeA && g.holeB ? 'Settling.' : 'Showdown. Both players reveal their seeds so the cards can be ranked.';
+    default: return '';
+  }
+}
+function resultBanner(g) {
+  if (g.state === S.CANCELLED) return `<div class="banner void">Table closed. Buy-in returned.</div>`;
+  if (g.state !== S.DONE) return '';
+  const ev = eventsFor(sim.id), st = ev.find((e) => e.event === 'settled'); if (!st) return '';
+  const mine = isA(g) ? st.toA : st.toB, net = mine - g.buyin, pottotal = 2 * g.buyin - 0;
+  const folded = ev.find((e) => e.event === 'fold'), timedout = ev.find((e) => e.event === 'timeout');
+  let how = '';
+  if (folded) how = `${pname(folded.by)} folded.`;
+  else if (timedout) how = timedout.state === S.PLAYING ? 'A player ran out of time and folded.' : 'The reveal window closed.';
+  else if (g.holeA && g.holeB) {
+    const sa = bestScore(g.holeA.concat(g.board)), sb = bestScore(g.holeB.concat(g.board)), me = isA(g) ? sa : sb, bot = isA(g) ? sb : sa;
+    how = `You had <b style="color:var(--cream)">${describe(me)}</b>. Bot had <b style="color:var(--cream)">${describe(bot)}</b>.`;
+  }
+  const cls = net > 0 ? 'win' : net < 0 ? 'lose' : 'void';
+  const head = net > 0 ? `You win ${fmt(net)} LAYR` : net < 0 ? `You lose ${fmt(-net)} LAYR` : 'Split pot';
+  const split = !g.winner && g.holeA && g.holeB ? ` The pot is split: you get ${fmt(mine)} back.` : '';
+  return `<div class="banner ${cls}">${head}</div><div class="status" style="text-align:center;margin:0 auto">${how}${split} Rake ${st.rake}.</div>`;
+}
+function renderTable() {
+  const g = G(), c = ctx(); if (!g) return '';
+  const me = sim.me, iA = isA(g), done = g.state === S.DONE || g.state === S.CANCELLED;
+  const board = dispBoard(g), mineH = g.state >= S.PLAYING ? myHole(g, board) : null;
+  const botRev = g.a === sim.bot ? g.holeA : g.holeB, shown = g.state === S.DONE && g.holeA && g.holeB;
+  const settledEv = g.state === S.DONE ? eventsFor(sim.id).find((e) => e.event === 'settled') : null;
+  let myBet = iA ? g.betA : g.betB, oppBet = iA ? g.betB : g.betA, myStack = iA ? g.stackA : g.stackB, oppStack = iA ? g.stackB : g.stackA;
+  if (settledEv) { myStack = iA ? settledEv.toA : settledEv.toB; oppStack = iA ? settledEv.toB : settledEv.toA; myBet = 0; oppBet = 0; }
+  const myBtn = g.state >= S.PLAYING && g.buttonA === iA, oppBtn = g.state >= S.PLAYING && g.buttonA !== iA;
+  const myTurn = iAct(g), ready = !pending(g) || streetReady(g, c), canAct = myTurn && ready && !busyFlag;
+  // hole-card provisional note
+  const holeKey = mineH ? mineH.join(',') : '';
+  if (mineH && sim.lastHole && sim.lastHole !== holeKey && !(iA ? g.holeA : g.holeB)) sim.holeNote = 'A board card landed on one of your cards, so it was replaced from your own card stream. Your cards are final at the showdown.';
+  if (holeKey) sim.lastHole = holeKey;
+  const hcards = (arr, who) => arr ? arr.map((x, i) => cardHTML(x, { fresh: fresh(who + x), cls: shown && who === 'b' ? '' : '' })).join('') : cardHTML(null) + cardHTML(null);
+  const myRow = mineH ? hcards(mineH, 'm') : [cardHTML(null), cardHTML(null)].join('');
+  const oppRow = shown ? hcards(botRev, 'b') : g.state >= S.PLAYING ? cardHTML('back') + cardHTML('back') : cardHTML(null) + cardHTML(null);
+  const boardRow = [0, 1, 2, 3, 4].map((i) => (i < board.length ? cardHTML(board[i], { fresh: fresh('bd' + board[i]) }) : cardHTML(null))).join('');
+  // timer
+  const timerShown = (g.state === S.PLAYING || g.state === S.SHOWDOWN) && g.deadline;
+  const secs = g.deadline ? g.deadline - c.time : 0;
+  const total = g.state === S.SHOWDOWN ? H.LIM.REVEAL_SECS : g.turn + (pending(g) ? H.LIM.STREET_GRACE : 0);
+  const ringCls = secs <= 5 ? 'crit' : secs <= 10 ? 'low' : '';
+  sim.timer = timerShown ? { cls: ringCls, svg: ringSVG(secs / total), text: clock(secs) } : null;
+  // controls
+  const o = H.options(g, me), oo = o || { toCall: 0, minRaiseTo: 0, maxRaiseTo: 0, canRaise: false, myBet: 0, oppBet: 0, myStack: 0 };
+  const rk = `${sim.id}:${g.street}:${g.acts}:${g.betA}:${g.betB}`;
+  if (sim.raiseKey !== rk) { sim.raiseKey = rk; sim.raiseTo = o ? o.minRaiseTo : 0; }
+  if (o) sim.raiseTo = Math.max(oo.minRaiseTo, Math.min(oo.maxRaiseTo, sim.raiseTo));
+  const potNow = pot(g), potAfterCall = potNow + oo.toCall;
+  const presetTo = (frac) => Math.max(oo.minRaiseTo, Math.min(oo.maxRaiseTo, Math.round(oo.oppBet + frac * potAfterCall)));
+  const expired = (g.state === S.PLAYING || g.state === S.SHOWDOWN) && g.deadline && c.time >= g.deadline;
+  const hs = mineH && board.length >= 3 ? describe(bestScore(mineH.concat(board))) : mineH && board.length === 0 && g.state >= S.PLAYING ? `Pre-flop strength ${chen(mineH)}/20 (Chen score)` : '';
+  const need = oo.toCall > 0 ? Math.round((oo.toCall / (potNow + oo.toCall)) * 100) : null;
+  const raiseWord = oo.oppBet === 0 ? 'Bet' : 'Raise';
+  const allin = oo.canRaise && sim.raiseTo === oo.maxRaiseTo;
+  const controls = done ? `<div class="actions"><button class="btn" data-act="again">Play again</button></div>` : g.state === S.PLAYING || g.state === S.OPEN || g.state === S.SHOWDOWN ? `
+    <div class="rbox">
+      <div class="actions">
+        <button class="btn liar" data-act="fold" ${canAct ? '' : 'disabled'}>Fold</button>
+        <button class="btn ghost" data-act="call" ${canAct ? '' : 'disabled'}>${oo.toCall === 0 ? 'Check' : `Call ${fmt(oo.toCall)}`}</button>
+        ${o && !o.canRaise ? '' : `<button class="btn" data-act="raise" id="raiseBtn" ${canAct && oo.canRaise ? '' : 'disabled'}>${!o ? 'Raise' : allin ? `All-in ${fmt(sim.raiseTo)}` : `${raiseWord} to ${fmt(sim.raiseTo)}`}</button>`}
+        ${g.state === S.OPEN ? `<button class="btn ghost" data-act="cancel">Cancel table</button>` : ''}
+        ${expired ? `<button class="btn ghost" data-act="claim">Claim timeout</button>` : ''}
+        ${g.state === S.SHOWDOWN && !(iA ? g.holeA : g.holeB) ? `<button class="btn" data-act="reveal" ${busyFlag ? 'disabled' : ''}>Reveal my cards</button>` : ''}
+      </div>
+      ${g.state === S.PLAYING && !(o && !o.canRaise) ? `<div class="rangewrap"><input type="range" id="rangeIn" min="${oo.minRaiseTo}" max="${oo.maxRaiseTo}" step="1" value="${sim.raiseTo}" ${canAct && oo.canRaise && oo.minRaiseTo < oo.maxRaiseTo ? '' : 'disabled'} aria-label="Raise to">
+        <div class="presets" role="group" aria-label="Sizes">
+          <button data-preset="min" ${canAct && oo.canRaise ? '' : 'disabled'}>Min</button>
+          <button data-preset="0.5" ${canAct && oo.canRaise ? '' : 'disabled'}>½ pot</button>
+          <button data-preset="0.75" ${canAct && oo.canRaise ? '' : 'disabled'}>¾ pot</button>
+          <button data-preset="1" ${canAct && oo.canRaise ? '' : 'disabled'}>Pot</button>
+          <button data-preset="max" ${canAct && oo.canRaise ? '' : 'disabled'}>All-in</button></div></div>` : ''}
+      ${g.state === S.PLAYING && pending(g) && !ready ? `<div class="hint">Cards come from the next block. Betting reopens then (a fold has to wait for it too).</div>` : ''}
+      ${sim.helper && hs ? `<div class="hint"><span class="handname">${hs}</span>${need !== null && myTurn ? ` · Call ${fmt(oo.toCall)} to win ${fmt(potNow)}: you need ${need}% to break even` : ''}</div>` : ''}
+    </div>` : '';
+  const phase = ['Open table', 'Dealing', pending(g) ? `${STREET[g.street + 1]} · dealing` : STREET[g.street], 'Showdown', 'Settled', 'Closed', 'All-in · run-out'][g.state];
+  const fair = fairness(g, c);
+  return `<div class="table"><div class="felt">
+    <div class="seat opp"><div class="who"><span class="name">Bot ${oppBtn ? '<span class="dbtn" title="Button · small blind">D</span>' : ''}</span><span class="meta">${iA ? 'joiner' : 'creator'}${g.state >= S.PLAYING ? (oppBtn ? ' · small blind' : ' · big blind') : ''}</span>
+      <span class="stackline"><span class="chip"><i></i>${fmt(g.state >= S.PLAYING ? oppStack : g.buyin)}</span>${oppBet ? `<span class="bet" title="Bet this street">Bet ${fmt(oppBet)}</span>` : ''}</span></div>
+      <div class="hole ${g.state === S.PLAYING && !myTurn ? 'turnglow' : ''}" aria-label="Opponent cards">${oppRow}</div></div>
+    <div class="centre">
+      <div class="board"><div class="phase">${phase}</div>
+        <div class="boardrow" aria-label="Board">${boardRow}</div>
+        <div class="potline"><span class="tag">Pot</span><span class="big">${fmt(g.state >= S.PLAYING ? potNow : g.state === S.OPEN ? g.buyin : 0)}</span></div>
+        ${timerShown ? `<div class="ring" id="timer" style="color:var(--brass)" role="timer" aria-label="seconds left"></div>` : ''}
+        <div class="status">${statusText(g, c)}</div>${resultBanner(g)}</div>
+      <aside class="history" aria-label="Hand history"><h3>This hand</h3>${historyHTML(g)}</aside>
+    </div>
+    <div><div class="seat"><div class="who"><span class="name">You ${myBtn ? '<span class="dbtn" title="Button · small blind">D</span>' : ''}</span><span class="meta">${iA ? 'creator' : 'joiner'}${g.state >= S.PLAYING ? (myBtn ? ' · small blind' : ' · big blind') : ''}</span>
+      <span class="stackline"><span class="chip"><i></i>${fmt(g.state >= S.PLAYING ? myStack : g.buyin)}</span>${myBet ? `<span class="bet">Bet ${fmt(myBet)}</span>` : ''}</span></div>
+      <div class="hole ${myTurn && g.state === S.PLAYING ? 'turnglow' : ''}" aria-label="Your cards">${myRow}</div></div>
+      ${sim.holeNote && !done ? `<div class="note" style="margin-top:8px">${sim.holeNote}</div>` : ''}
+      <div class="controls" style="margin-top:12px">${controls}</div>
+      <div class="row" style="margin-top:8px"><label class="hint"><input type="checkbox" id="helpTog" ${sim.helper ? 'checked' : ''}> Hand helper</label></div></div>
+  </div></div>${fair}`;
+}
+function fairness(g, c) {
+  const rows = [], iA = isA(g);
+  rows.push(`<div>Your commitment <code>${hex(DM.sha256(sim.mySeed))}</code></div>`);
+  const oc = iA ? g.commitB : g.commitA; if (oc) rows.push(`<div>Opponent commitment <code>${hex(oc)}</code></div>`);
+  if (g.dealHeight) rows.push(`<div>Deal block <b>#${g.dealHeight}</b>${sim.hashes[g.dealHeight] ? ` · hash <code>${hex(sim.hashes[g.dealHeight])}</code>` : ' · not mined yet'}</div>`);
+  if (g.state === S.DONE && g.holeA && g.holeB) {
+    const ok1 = hex(DM.sha256(sim.mySeed)) === hex(iA ? g.commitA : g.commitB), ok2 = hex(DM.sha256(sim.botSeed)) === hex(iA ? g.commitB : g.commitA);
+    rows.push(`<div>Your seed <code>${hex(sim.mySeed)}</code> <span class="${ok1 ? 'ok' : 'no'}">${ok1 ? '✓ matches commitment' : '✗'}</span></div>`);
+    rows.push(`<div>Bot seed <code>${hex(sim.botSeed)}</code> <span class="${ok2 ? 'ok' : 'no'}">${ok2 ? '✓ matches commitment' : '✗'}</span></div>`);
+    const mine = H.holeCards(sim.mySeed, sim.hashes[g.dealHeight], g.board), theirs = H.holeCards(sim.botSeed, sim.hashes[g.dealHeight], g.board);
+    const mm = (iA ? g.holeA : g.holeB).join() === mine.join(), tt = (iA ? g.holeB : g.holeA).join() === theirs.join();
+    rows.push(`<div>Re-derived from the seeds and the deal hash: your cards ${mine.map(cname).join(' ')} <span class="${mm ? 'ok' : 'no'}">${mm ? '✓' : '✗'}</span> · bot cards ${theirs.map(cname).join(' ')} <span class="${tt ? 'ok' : 'no'}">${tt ? '✓' : '✗'}</span></div>`);
+  }
+  const streets = eventsFor(sim.id).filter((e) => e.event === 'street');
+  if (streets.length) rows.push(`<div>Board cards came from later block hashes: ${streets.map((e) => (e.street === 9 ? 'run-out' : STREET[e.street]) + ' ← block hash fixed one block after the betting closed').join(' · ')}.</div>`);
+  rows.push(`<div>Your two cards = the first two cards not already on the board from <code>sha256(seed ‖ deal block hash)</code>, four bytes each, mod 52 (more candidates in reserve). Each player has their own stream, so the same card can sit in both hands, and a card can be replaced if the board lands on it. Nobody knows the block hash when they commit, so nobody can choose cards. If you lose your seed you cannot reveal at a showdown and the other player takes the pot, so the real table keeps it in a saved vault.</div>`);
+  return `<details class="fair"><summary>Fairness check</summary><div class="in">${rows.join('')}</div></details>`;
+}
+function renderPlay() { return sim.started && sim.id ? renderTable() : renderLobby(); }
+
+// ---------------- rendering: watch a testnet game ----------------
+const WATCH = { base: 'https://api.testnet.hiro.so', contract: 'ST1Y19C7FK3RP0QP68Z577W30GDEHAWEG27G9WKJ0.casino-holdem-v1', id: 8, out: '' };
+function renderWatch() {
+  return `<section class="card"><h2>Watch a testnet game</h2><p>Reads the Hold'em contract on Stacks testnet and replays one game from its event log. Hole cards appear once a player has revealed.</p>
+    <div class="row"><label class="f">Game number<input type="number" id="gid" min="1" value="${WATCH.id}"></label><button class="btn" data-act="load">Load game</button></div>
+    <div class="chain-tag">${WATCH.contract}</div></section><div id="watchout" class="spectate-out" style="margin-top:14px">${WATCH.out}</div>`;
+}
+const short = (p) => (p ? p.replace(/^'/, '').slice(0, 6) + '…' + p.slice(-4) : '?');
+function getField(repr, k) {
+  const m = new RegExp(`\\(${k} ('?[A-Z0-9.]+|u\\d+|true|false|none|\\(some [^)]*\\)|"[^"]*"|\\(list[^)]*\\))\\)`).exec(repr); return m ? m[1] : null;
+}
+const getList = (repr, k) => { const v = getField(repr, k); return v ? (v.match(/u(\d+)/g) || []).map((x) => Number(x.slice(1))) : []; };
+const num = (repr, k) => { const v = getField(repr, k); return v ? Number(v.replace('u', '')) : 0; };
+function watchTimeline(rows, id) {
+  const line = (k, t) => `<div><span class="k">${k}</span><span>${t}</span></div>`;
+  let board = [], holes = [], buyin = 0, bb = 0, settled = null;
+  const out = rows.map((repr) => {
+    const ev = (getField(repr, 'event') || '').replace(/"/g, '');
+    switch (ev) {
+      case 'created': buyin = num(repr, 'buyin'); bb = num(repr, 'bb'); return line('created', `${short(getField(repr, 'a'))} posts a buy-in of ${fmt(buyin)} · blinds ${bb / 2}/${bb} · turn ${num(repr, 'turn-secs')} s`);
+      case 'joined': return line('joined', `${short(getField(repr, 'b'))} matches it · deal block #${num(repr, 'deal-height')}`);
+      case 'hand': return line('hand', `${getField(repr, 'button-a') === 'true' ? 'Creator' : 'Joiner'} has the button`);
+      case 'street': { board = getList(repr, 'board'); const st = num(repr, 'street'); return line(st === 9 ? 'run-out' : STREET[st].toLowerCase(), smallCards(board)); }
+      case 'check': return line('check', `${short(getField(repr, 'by'))} checks`);
+      case 'call': return line('call', `${short(getField(repr, 'by'))} calls ${fmt(num(repr, 'amount'))}`);
+      case 'raise': return line('raise', `${short(getField(repr, 'by'))} raises to ${fmt(num(repr, 'to'))}`);
+      case 'fold': return line('fold', `${short(getField(repr, 'by'))} folds`);
+      case 'all-in': return line('all-in', 'Both players are all-in');
+      case 'showdown': return line('showdown', 'Seeds are revealed to rank the hands');
+      case 'revealed': { const h = getList(repr, 'hole'); holes.push(h); return line('revealed', `${short(getField(repr, 'by'))} · ${smallCards(h)}`); }
+      case 'timeout': return line('timeout', num(repr, 'state') === 2 ? 'A player ran out of time to act' : 'The reveal window closed');
+      case 'settled': settled = { a: num(repr, 'to-a'), b: num(repr, 'to-b'), rake: num(repr, 'rake') }; return line('settled', `Creator receives ${fmt(settled.a)}, joiner ${fmt(settled.b)}, rake ${fmt(settled.rake)}`);
+      case 'cancelled': return line('cancelled', 'Creator reclaimed the buy-in');
+      default: return line(ev, repr);
+    }
+  });
+  let verdict = '';
+  if (holes.length === 2 && board.length === 5) {
+    const s = holes.map((h) => bestScore(h.concat(board)));
+    verdict = `<div class="card"><h2 style="font-size:18px">Showdown</h2><p>Board ${smallCards(board)}</p><p>First to reveal: ${smallCards(holes[0])} <b style="color:var(--cream)">${describe(s[0])}</b><br>Second: ${smallCards(holes[1])} <b style="color:var(--cream)">${describe(s[1])}</b><br>${s[0] === s[1] ? 'The hands are equal, so the pot is split.' : 'The better hand takes the pot.'}</p></div>`;
+  }
+  return `<div class="card"><h2>Game ${id}</h2><div class="timeline">${out.join('')}</div></div>${verdict}`;
+}
+async function loadWatch() {
+  const id = Number($('#gid').value) || 1; WATCH.id = id; $('#watchout').innerHTML = '<div class="card"><p>Loading from the chain…</p></div>';
+  try {
+    let events = [], off = 0;
+    for (let i = 0; i < 8; i++) {
+      const r = await fetch(`${WATCH.base}/extended/v1/contract/${WATCH.contract}/events?limit=50&offset=${off}`); if (!r.ok) throw new Error('node said ' + r.status);
+      const j = await r.json(); events = events.concat(j.results); if (j.results.length < 50) break; off += 50;
+    }
+    const rows = events.reverse().map((e) => e.contract_log.value.repr).filter((r) => new RegExp(`\\(id u${id}\\)`).test(r));
+    WATCH.out = rows.length ? watchTimeline(rows, id) : '<div class="card"><p>No events for that game number yet.</p></div>';
+  } catch (e) { WATCH.out = `<div class="card"><p>Could not read the chain from this page (${e.message}). The Hiro testnet API may be blocking this origin.</p></div>`; }
+  $('#watchout').innerHTML = WATCH.out;
+}
+
+// ---------------- shell ----------------
+let tab = 'play', lastHTML = '';
+function render() {
+  renderPurse(); $('#purse').style.visibility = tab === 'watch' ? 'hidden' : 'visible';
+  if (tab === 'watch') { if (!$('#gid')) $('#app').innerHTML = renderWatch(); return; }
+  const html = renderPlay();
+  if (html !== lastHTML) { const keepHelp = document.activeElement && document.activeElement.id === 'helpTog'; $('#app').innerHTML = html; lastHTML = html; if (keepHelp && $('#helpTog')) $('#helpTog').focus(); }
+  const hs = document.querySelector('.history'); if (hs) hs.scrollTop = hs.scrollHeight;
+  const tm = $('#timer'); if (tm && sim.timer) { tm.className = 'ring ' + sim.timer.cls; tm.innerHTML = sim.timer.svg + '<div class="t">' + sim.timer.text + '</div>'; }
+}
+setInterval(() => { if (tab === 'play' && G()) render(); }, 1000);
+function setRaise(v) { // update without rebuilding the slider while the player drags it
+  const g = G(), o = g && H.options(g, sim.me); if (!o) return;
+  sim.raiseTo = Math.max(o.minRaiseTo, Math.min(o.maxRaiseTo, Math.round(v)));
+  const r = $('#rangeIn'); if (r) r.value = sim.raiseTo;
+  const b = $('#raiseBtn'); if (b) b.textContent = sim.raiseTo === o.maxRaiseTo ? `All-in ${fmt(sim.raiseTo)}` : `${o.oppBet === 0 ? 'Bet' : 'Raise'} to ${fmt(sim.raiseTo)}`;
+  lastHTML = renderPlay();
+}
+document.addEventListener('input', (e) => { if (e.target.id === 'rangeIn') setRaise(Number(e.target.value)); });
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button, input'); if (!t) return;
+  if (t.dataset.tab) { tab = t.dataset.tab; document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab))); lastHTML = ''; $('#app').innerHTML = tab === 'watch' ? renderWatch() : ''; render(); return; }
+  const g = G();
+  if (t.dataset.preset && g) {
+    const o = H.options(g, sim.me); if (!o) return; const p = t.dataset.preset, potAfter = pot(g) + o.toCall;
+    setRaise(p === 'min' ? o.minRaiseTo : p === 'max' ? o.maxRaiseTo : o.oppBet + Number(p) * potAfter); return;
+  }
+  const a = t.dataset.act; if (!a) return;
+  if (a === 'open') startTable('creator', Number($('#bb').value), Number($('#bbs').value), Number($('#turn').value));
+  else if (a === 'sit') startTable('joiner', Number($('#bb2').value), Number($('#bbs2').value), Number($('#turn2').value));
+  else if (a === 'fold') doAct(0); else if (a === 'call') doAct(1); else if (a === 'raise') doAct(2, sim.raiseTo);
+  else if (a === 'reveal') doReveal(); else if (a === 'claim') doClaim(); else if (a === 'cancel') doCancel();
+  else if (a === 'again') { sim.started = false; sim.id = null; lastHTML = ''; render(); }
+  else if (a === 'load') loadWatch();
+});
+document.addEventListener('change', (e) => { if (e.target.id === 'helpTog') { sim.helper = e.target.checked; lastHTML = ''; render(); } });
+
+window.__strata = { sim, H, tick, submit, ctx, G, pot, dispBoard, bestScore, describe, chen, strength, watchTimeline };
+$('#app').innerHTML = renderPlay(); renderPurse();
+})();
+</script>
+</body>
+</html>

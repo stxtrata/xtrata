@@ -1,11 +1,17 @@
 import { attachAudibleStart } from '../lib/radio/audible-start.js';
+import { attachAudibleListen } from '../lib/radio/audible-listen';
+import { createLikeTracker } from '../lib/radio/like-tracker';
 import {radioArtist,radioTitle} from '../lib/radio/artist-credits.mjs';
+import { audioMime, hiddenTrackRange, linkedAudioId, linkedImageId, webmAudioOnly, HIDDEN_TRAILER_BYTES, MEDIA_HEAD_BYTES } from '../lib/radio/song-sources.mjs';
 // Xtrata Radio — a little embedded radio station for the homepage soundtrack.
 // Toggling on makes a radio-tuning noise (WebAudio, no assets) and then plays a
 // random rotation of inscribed songs. Tracks are ordinary inscriptions: raw
 // audio ones play directly from /inscription/<id>; HTML player inscriptions
 // (the Opus players) are fetched and their embedded data:audio source is
-// extracted and played, so the station works across formats.
+// extracted and played, so the station works across formats. Also songs that
+// live elsewhere (src/lib/radio/song-sources.mjs): a hidden track appended to a
+// video, an all-audio WebM minted as video/webm, and a player that links its
+// audio from another inscription.
 
 import radioCss from './radio.css?inline';
 import { createRadioOnchainState } from '../lib/radio/onchain-state';
@@ -45,7 +51,7 @@ const saveState = (state) => {
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* noop */ }
 };
 
-export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = true } = {}) => {
+export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = true, hiddenTrackSilenceMs = 60000 } = {}) => {
   if (!tokenIds.length || typeof document === 'undefined') {
     return null;
   }
@@ -241,7 +247,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
           // session-only: a false positive must never permanently blacklist a song
           if (currentTokenId) trackCache.set(String(currentTokenId), null);
           silentSince = 0;
-          player.pause();
+          pauseOwn();
           void tuneToNextTrack();
         }
       }
@@ -400,7 +406,8 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // --- track resolution ---------------------------------------------------
   // Hardcoded ignore list: inscriptions that resolve as media but must never
   // air (e.g. #1065 — a video-only mp4 with no decodable audio track).
-  const IGNORE_IDS = new Set(['1065', '5', '319', '1090']);
+  // #319 used to be here; it is a player whose audio is linked from #8, which the radio now follows.
+  const IGNORE_IDS = new Set(['1065', '5', '1090']);
   // ids that failed transiently (502s, network errors) rest for 45s before the
   // pickers may try them again — prevents tight resolve/warm-ping loops.
   const transientFailAt = new Map();
@@ -410,8 +417,10 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // re-discovering the same dead ids (a big source of NO SIGNAL runs).
   // v2: v1 could be mass-poisoned by misrouted content responses (the app
   // shell answering /runtime/content marks EVERY probed id a dud) — discard it.
-  const DUDS_KEY = 'xtrata.radio.duds.v2';
-  try { window.localStorage.removeItem('xtrata.radio.duds.v1'); } catch { /* noop */ }
+  // v3: hidden tracks, all-audio "video" files and linked-audio players became
+  // songs, so v2's verdicts on them are wrong — start again.
+  const DUDS_KEY = 'xtrata.radio.duds.v3';
+  try { window.localStorage.removeItem('xtrata.radio.duds.v1'); window.localStorage.removeItem('xtrata.radio.duds.v2'); } catch { /* noop */ }
   try {
     JSON.parse(window.localStorage.getItem(DUDS_KEY) || '[]').forEach((id) => trackCache.set(String(id), null));
   } catch { /* fresh cache */ }
@@ -438,7 +447,63 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       }
     } catch { /* noop */ }
   };
-  const resolveTrack = async (tokenId) => {
+  // An album's cover: any inscription the creator names. An image inscription is used as it is; a page that embeds an
+  // image (the same way songs carry theirs) gives that image. Not found or not an image: no cover, never an error.
+  const coverCache = new Map();
+  const resolveCover = async (id) => {
+    const wanted = String(id);
+    if (coverCache.has(wanted)) return coverCache.get(wanted);
+    const cores = ['SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3', 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0', 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1'];
+    let url = '';
+    try {
+      for (const core of cores) {
+        const src = `/runtime/content?contractId=${encodeURIComponent(core)}&tokenId=${wanted}&network=mainnet`;
+        const res = await fetch(src);
+        const mime = (res.headers.get('content-type') || '').toLowerCase();
+        if (!res.ok || mime.includes('application/json')) { try { await res.body?.cancel(); } catch { /* noop */ } continue; }
+        if (mime.startsWith('image/')) { try { await res.body?.cancel(); } catch { /* noop */ } url = src; }
+        else if (mime.includes('text/html')) {
+          const found = (await res.text()).match(/<img[^>]+src="(data:image\/[^"]+)"/i);
+          if (found) url = found[1].replace(/&amp;/g, '&');
+        } else { try { await res.body?.cancel(); } catch { /* noop */ } }
+        break;
+      }
+    } catch { return ''; } // a hiccup: try again next time, do not remember "no cover"
+    coverCache.set(wanted, url);
+    return url;
+  };
+  let albumCoverUrl = '';
+
+  // A byte range of an inscription and the file's full size ('&r=1': its own cache entry, apart from the media
+  // element's). A server that ignores Range sends the whole file: slice it here.
+  const rangeBytes = async (url, range) => {
+    const res = await fetch(url + '&r=1', { headers: { Range: range } });
+    if (!res.ok) throw new Error('range ' + res.status);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (res.status !== 206) {
+      const suffix = /^bytes=-(\d+)$/.exec(range), span = /^bytes=(\d+)-(\d*)$/.exec(range);
+      const part = suffix ? bytes.subarray(Math.max(0, bytes.length - Number(suffix[1])))
+        : span ? bytes.subarray(Number(span[1]), span[2] ? Number(span[2]) + 1 : bytes.length) : bytes;
+      return { bytes: part, total: bytes.length };
+    }
+    return { bytes, total: Number((res.headers.get('content-range') || '').split('/')[1]) };
+  };
+  // A video inscription that is really a song: a hidden track appended to it (cut out and played on its own), or a
+  // WebM whose tracks are all audio. Both play from a Blob typed as audio, so every browser treats them as songs.
+  // Returns {src, hidden} | null (not a song) | undefined (could not tell right now).
+  const videoSong = async (url) => {
+    try {
+      const tail = await rangeBytes(url, `bytes=-${HIDDEN_TRAILER_BYTES}`);
+      const hidden = hiddenTrackRange(tail.bytes, tail.total);
+      let part = null;
+      if (hidden) part = (await rangeBytes(url, `bytes=${hidden.start}-${hidden.end - 1}`)).bytes;
+      else if (webmAudioOnly((await rangeBytes(url, `bytes=0-${MEDIA_HEAD_BYTES - 1}`)).bytes)) part = (await rangeBytes(url, 'bytes=0-')).bytes;
+      const type = part ? audioMime(part) : '';
+      return type ? { src: URL.createObjectURL(new Blob([part], { type })), hidden: !!hidden } : null;
+    } catch { return undefined; }
+  };
+
+  const resolveTrack = async (tokenId, depth = 0) => {
     if (IGNORE_IDS.has(String(tokenId))) {
       radioLog(`ignored #${tokenId}`, 'on the hardcoded ignore list', tokenId);
       trackCache.set(String(tokenId), null);   // cache as dud so pickers stop selecting it
@@ -503,7 +568,19 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         // both are playable through the audio element.
         // players must embed data:audio — data:video is no longer accepted
         const match = html.match(/<source[^>]+src="(data:audio\/[^"]+)"/i);
-        if (!match && /<script[^>]+src="\//i.test(html)) {
+        // A player that links its audio from another inscription (<source src="/inscription/8">): play that one.
+        // One level only. An old "dud" verdict on the linked file is looked at again once, since the rules widened.
+        const linkedId = !match && depth === 0 ? linkedAudioId(html) : null;
+        let linkedSrc = '';
+        if (linkedId) {
+          const key = String(linkedId);
+          if (trackCache.get(key) === null) trackCache.delete(key);
+          const inner = await resolveTrack(key, 1);
+          if (inner) linkedSrc = inner.src;
+          else if (!trackCache.has(key)) { definitive = false; shareable = false; } // could not tell right now
+          else { shareable = false; dudReason = 'linked-no-audio'; } // a dud for this visit only, never reported
+        }
+        if (!match && !linkedId && /<script[^>]+src="\//i.test(html)) {
           // An inscribed player is self-contained; a same-origin <script src="/…">
           // means this is OUR APP SHELL misrouted onto the content route (vite
           // dev without functions, SPA fallback). That's no verdict on the
@@ -511,28 +588,35 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
           definitive = false;
           shareable = false;
           radioLog(`resolve #${tokenId}`, 'app shell answered the content route — transient, no verdict', tokenId);
-        } else if (!match) {
+        } else if (!match && !linkedId) {
           // real inscribed html with no embedded audio: inscriptions are
           // immutable, so this verdict is stable — persist and share it, or
           // every session (and every listener) re-grinds the same non-player
           // html at the head of the chain in order mode.
           dudReason = 'html-no-audio';
         }
-        if (match) {
+        if (match || linkedSrc) {
           const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
           const metadata = inscriptionMetadata(html);
           const coverMatch = html.match(/<img[^>]+src="(data:image\/[^"]+)"/i);
+          const coverId = coverMatch ? null : linkedImageId(html);
           resolved = {
-            src: match[1].replace(/&amp;/g, '&'),
+            src: match ? match[1].replace(/&amp;/g, '&') : linkedSrc,
             title: metadata.title || (titleMatch ? titleMatch[1].trim() : '') || `#${tokenId}`,
             artist: metadata.artist,
             album: metadata.album,
-            cover: coverMatch ? coverMatch[1] : '',
+            cover: coverMatch ? coverMatch[1] : coverId ? `/inscription/${coverId}` : '',
             tokenId
           };
         }
+      } else if (response.ok && mime.startsWith('video/')) {
+        await response.body?.cancel?.();
+        const song = await videoSong(src.replace(/&m=1$/, ''));
+        if (song) resolved = { src: song.src, title: `#${tokenId}`, tokenId, hiddenTrack: song.hidden };
+        else if (song === undefined) { definitive = false; shareable = false; }
+        else { dudReason = 'mime:' + mime.split(';')[0]; radioLog(`verdict #${tokenId}`, `not a song (${dudReason}) — dud`, tokenId); }
       } else {
-        // A real response with a non-audio, non-html mime (video, image, …)
+        // A real response with a non-audio, non-html mime (image, …)
         // is a definitive "not a song". This is AUTHORITATIVE content from the
         // token's own core — it must override transient 502s from other cores,
         // otherwise the id never gets cached and the picker loops on it forever.
@@ -628,7 +712,13 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // --- likes, bands, presets, events ---------------------------------------
   let likes = []; // Confirmed on-chain likes for the currently connected wallet only.
   let chainState;
-  let band = 'fm';                         // 'fm' | 'liked' | 'chain'
+  let band = 'fm';                         // 'fm' | 'liked' | 'chain' | 'gift' (only while a gift player is loaded)
+  // A gift player (pay-per-play page): an album that loops as its own band, and a hard stop when the
+  // paid plays are used up (the radio then goes quiet instead of carrying on for free).
+  let giftPlayer = null;                   // {id,title,subtitle,tracks:[tokenId strings],hidden:tokenId string|null,cover}
+  let giftLock = false;                    // a curated album is the only band until the listener funds a wallet of their own
+  let giftWait = false;                    // plays are on their way: the controls rest, greyed out, until they land
+  let giftStop = null;                     // null, or the text to show when playback is refused
   let preset = 'all';                      // within FM: 'music' | 'all'
   // Shuffle is OFF by default: the dial plays in order (likes/curated/chain
   // sequence per band). Neither shuffle nor loop persists across visits —
@@ -645,16 +735,25 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   let relatives = [];
   let relativesFor = null;
 
+  // Set once the like tracking below exists: { liked, pending, locked } for the playing song.
+  let heartView = () => null;
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
-    likesStatus: chainState?.snapshot().status || 'disconnected', band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
+    gift: giftPlayer ? { id: giftPlayer.id, title: giftPlayer.title, subtitle: giftPlayer.subtitle, tracks: giftPlayer.tracks.length } : null, giftStop, giftWait, giftLocked: gated(),
+    albumCover: giftPlayer && albumCoverUrl ? { url: albumCoverUrl, tokenId: giftPlayer.cover } : null,
+    likesStatus: chainState?.snapshot().status || 'disconnected', likesRetryAt: chainState?.snapshot().retryAt, likesCheckedAt: chainState?.snapshot().checkedAt, band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
     loop: player.loop,
-    relatives: relatives.slice()
+    relatives: relatives.slice(),
+    heart: heartView()
   });
   const supportStarts = attachAudibleStart(player, detail => {
     window.dispatchEvent(new CustomEvent('xtrata:radio-audible-start', { detail }));
+  });
+  // A real listen (30 s audible, or half of a shorter song): pay-per-play pays on this.
+  const listens = attachAudibleListen(player, detail => {
+    window.dispatchEvent(new CustomEvent('xtrata:radio-listened', { detail }));
   });
   const emit = () => {
     const snapshot = stateSnapshot();
@@ -706,7 +805,42 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     likesDialog.append(close);
     if (!likesDialog.open) likesDialog.showModal();
   };
+  // Likes sent from a pay-per-play listening wallet light (or clear) the heart straight away, until
+  // the confirmed on-chain state catches up (or 5 minutes pass).
+  // Likes the pay-per-play listening wallet is sending: orange while on their way, locked until
+  // the chain confirms plus 3 seconds, so a like cannot be toggled on and off in quick succession.
+  const likeTrack = createLikeTracker({ isLiked, changed: (ms) => setTimeout(emit, ms) });
+  const likeShown = likeTrack.shown, likePending = likeTrack.pending, likeLocked = likeTrack.locked;
+  heartView = () => (nowPlaying?.tokenId != null
+    ? { liked: likeShown(nowPlaying.tokenId), pending: likePending(nowPlaying.tokenId), locked: likeLocked(nowPlaying.tokenId) }
+    : null);
+  window.addEventListener('xtrata:radio-like-sent', (e) => {
+    const d = e.detail;
+    if (d && Number.isSafeInteger(d.song) && typeof d.liked === 'boolean') { likeTrack.sent(d.song, d.liked); emit(); }
+  });
+  window.addEventListener('xtrata:radio-like-confirmed', (e) => {
+    const d = e.detail;
+    if (d && Number.isSafeInteger(d.song) && typeof d.liked === 'boolean') { likeTrack.confirmed(d.song, d.liked); emit(); }
+  });
+  window.addEventListener('xtrata:radio-like-failed', (e) => { if (e.detail && likeTrack.failed(e.detail.song)) emit(); });
   const toggleLike = () => {
+    // On the pay-per-play radio a listener's listening wallet toggles the like itself, straight on the
+    // likes contract (no wallet popup). It returns true when it takes the tap; otherwise the usual
+    // main-wallet review opens.
+    const viaListening = window.XtrataRadioLikeHandler;
+    // A like for this song is still on its way (or just confirmed): ignore the tap.
+    if (nowPlaying?.tokenId != null && likeLocked(nowPlaying.tokenId)) return likeShown(nowPlaying.tokenId);
+    if (nowPlaying?.tokenId != null && typeof viaListening === 'function') {
+      const chain = chainState?.snapshot();
+      const current = chain?.status === 'ready' ? chain.likes.find((l) => l.tokenId === String(nowPlaying.tokenId)) : undefined;
+      try {
+        if (viaListening({ song: Number(nowPlaying.tokenId), likedBy: chain?.status === 'ready' ? (current?.by || []) : undefined, title: nowPlaying.title || '', artist: nowPlaying.artist || '' }) === true) {
+          likeTrack.started(nowPlaying.tokenId, !likeShown(nowPlaying.tokenId));
+          emit();
+          return likeShown(nowPlaying.tokenId);
+        }
+      } catch { /* fall through to the wallet review */ }
+    }
     if (nowPlaying?.tokenId != null) window.open('/radio/endorse?id=' + encodeURIComponent(nowPlaying.tokenId) + '&action=review', '_blank', 'noopener');
     else openOnchainLikes();
     return nowPlaying ? isLiked(nowPlaying.tokenId) : false;
@@ -742,19 +876,26 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   };
 
   const BANDS = ['fm', 'liked', 'chain'];
+  const bandList = () => (giftPlayer ? (giftLock ? ['gift'] : ['gift', ...BANDS]) : BANDS);
+  // A locked album is the only music: whatever asks for a song (the tuner, a list, a preloaded or remembered track,
+  // "previous") is checked against it at the one place a song actually starts. A page default, not security.
+  const gated = () => !!giftPlayer && giftLock;
+  const inAlbum = (id) => !!giftPlayer && (giftPlayer.tracks.includes(String(id)) || giftPlayer.hidden === String(id));
+  const allowed = (id) => !gated() || inAlbum(id);
+  const LOCKED_TEXT = 'THIS ALBUM PLAYS ONLY ITS OWN SONGS';
   const setBand = (next) => {
-    if (!BANDS.includes(next)) return;
+    if (!bandList().includes(next)) return;
     band = next;
     persistExtras();
     if (on) {
-      writeScreen(band === 'fm' ? 'BAND: FM — CURATED + CHAIN' : band === 'liked' ? (likes.length ? 'BAND: LIKED — YOUR STATION' : 'BAND: LIKED — CONNECT WALLET / LIKE ON-CHAIN') : 'BAND: CHAIN — FULL EXPLORATION');
+      writeScreen(band === 'gift' ? 'BAND: GIFT — ' + String(giftPlayer?.title || '').toUpperCase().slice(0, 28) : band === 'fm' ? 'BAND: FM — CURATED + CHAIN' : band === 'liked' ? (likes.length ? 'BAND: LIKED — YOUR STATION' : 'BAND: LIKED — CONNECT WALLET / LIKE ON-CHAIN') : 'BAND: CHAIN — FULL EXPLORATION');
       sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
       // The current song keeps playing — only what's CUED changes.
       requeueForMode();
     }
     emit();
   };
-  const cycleBand = () => setBand(BANDS[(BANDS.indexOf(band) + 1) % BANDS.length]);
+  const cycleBand = () => { const list = bandList(); setBand(list[(list.indexOf(band) + 1) % list.length]); };
   const PRESETS = ['all', 'music'];
   const cyclePreset = () => {
     preset = PRESETS[(PRESETS.indexOf(preset) + 1) % PRESETS.length];
@@ -773,6 +914,123 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     preloadQueue.length = 0;
     window.setTimeout(() => { void preloadNextTrack(); }, 150);
   }
+
+  // A freshly opened album always starts at its first song: a first load, a page refresh (which would
+  // otherwise resume the previous song), or coming back from another album. Stays set until a tune consumes it.
+  let albumStartPending = false;
+
+  // An album's hidden track is not one of its listed songs. It plays only after HIDDEN_TRACK_SILENCE_MS of silence
+  // at the end of the last song, and only when the album ran from its first song to its last with nothing skipped
+  // or picked by hand (pausing and seeking are fine; shuffle is not a run). Any tune, or pressing play, during the
+  // silence ends the wait, and the album then simply goes round again.
+  const HIDDEN_TRACK_SILENCE_MS = Number.isFinite(hiddenTrackSilenceMs) && hiddenTrackSilenceMs >= 0 ? hiddenTrackSilenceMs : 60000;
+  let albumRunClean = false; // the album has been running, in order, from its first song with no skip
+  let naturalEnd = false;    // the tune about to happen follows a song that finished by itself
+  let hiddenWait = null;
+  const cancelHiddenWait = () => { if (hiddenWait) { window.clearTimeout(hiddenWait); hiddenWait = null; } };
+  const startHiddenWait = () => {
+    if (!giftPlayer || !giftPlayer.hidden || band !== 'gift' || !albumRunClean || shuffleMode || giftStop) return false;
+    if (String(currentTokenId) !== giftPlayer.tracks[giftPlayer.tracks.length - 1]) return false;
+    albumRunClean = false;
+    const { id: album, hidden } = giftPlayer;
+    radioLog('album ran start to finish: hidden track after the silence', { tokenId: hidden, ms: HIDDEN_TRACK_SILENCE_MS }, hidden);
+    cancelHiddenWait();
+    hiddenWait = window.setTimeout(async () => {
+      hiddenWait = null;
+      if (!on || !giftPlayer || giftPlayer.id !== album || band !== 'gift' || !player.paused) return;
+      const track = await resolveTrack(hidden);
+      if (!on || !giftPlayer || giftPlayer.id !== album || !player.paused) return;
+      if (track) void tuneToNextTrack(track);
+      else { naturalEnd = true; void tuneToNextTrack(); } // could not play it: go round the album as usual
+    }, HIDDEN_TRACK_SILENCE_MS);
+    return true;
+  };
+
+  // What each wallet of this unlocked session last had on ('' = the first wallet, otherwise the album's id): its
+  // song and position. Switching back to a wallet in the same session resumes there; a page refresh (a new passkey
+  // unlock) or locking forgets all of it, and the first wallet / a freshly opened album starts clean.
+  const walletMemory = new Map();
+  let resumeAt = null; // {id, position}: seek to this when that song next starts
+  const rememberWallet = () => {
+    if (!on || !currentTokenId) return;
+    if (giftPlayer && !inAlbum(currentTokenId)) return; // an album that was only opened, never started
+    walletMemory.set(giftPlayer ? giftPlayer.id : '', { tokenId: String(currentTokenId), position: Number(player.currentTime) || 0 });
+  };
+
+  // Put a remembered song back, cued and paused at its position: the listener presses play (nothing is charged or
+  // started behind their back). Radio off: it is the song the next switch-on tunes to.
+  const cueTrack = async (mem) => {
+    albumRunClean = false; // resuming partway is not a run from the first song
+    cancelHiddenWait();
+    if (!on) { forcedNext = mem.tokenId; resumeAt = { id: mem.tokenId, position: mem.position }; return; }
+    const track = await resolveTrack(String(mem.tokenId));
+    if (!track || !on || !allowed(track.tokenId)) return;
+    const token = ++tuneToken;
+    // this cue supersedes any tune still in flight, so it lowers the flag that tune would have lowered
+    const endCue = () => { if (token === tuneToken) tuneInFlight = false; };
+    endCue();
+    pauseOwn();
+    stopTicker();
+    supportStarts.select(Number(track.tokenId));
+    listens.select(Number(track.tokenId));
+    playCounter.select(PLAYABLE_CONTRACT, Number(track.tokenId));
+    player.src = track.src;
+    const seek = () => { try { player.currentTime = mem.position; } catch { /* pre-metadata */ } };
+    if (player.readyState >= 1) seek(); else player.addEventListener('loadedmetadata', seek, { once: true });
+    currentTokenId = track.tokenId || null;
+    nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', album: track.album || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
+    manualPause = true;
+    writeScreen('PRESS ▶ TO PLAY');
+    player.addEventListener('playing', () => {
+      if (token !== tuneToken) return; // the listener moved on first
+      setNow('', true);
+      startTicker(track);
+      void fetchRelatives(track.tokenId);
+      startVu();
+      if (history[history.length - 1] !== track) history.push(track);
+      window.setTimeout(() => { void preloadNextTrack(); }, 1500);
+      persist();
+      emit();
+    }, { once: true });
+    persist();
+    emit();
+  };
+
+  // Show the album's first song as the one waiting, without touching the audio (the listener has paused or
+  // the browser will not autoplay): pressing play then tunes to it (see playPause).
+  const showAlbumStart = async (id) => {
+    const track = await resolveTrack(String(id));
+    if (!track || !albumStartPending || !giftPlayer || giftPlayer.tracks[0] !== String(id)) return;
+    nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', album: track.album || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
+    writeScreen('PRESS ▶ TO PLAY');
+    emit();
+  };
+
+  // The album just became the music (loaded, locked, or opened): drop what was cued for the old mode and
+  // "previous" history from outside it. Opened again within the same session, it resumes where it was. Opened fresh
+  // it starts at its first song; if a foreign song is on air move there, unless the listener paused or the browser
+  // needs a tap first.
+  const enterAlbum = (fresh = false) => {
+    if (!giftPlayer) return;
+    const remembered = fresh ? walletMemory.get(giftPlayer.id) : null;
+    const back = remembered && inAlbum(remembered.tokenId) ? remembered : null;
+    if (fresh && !back) {
+      albumStartPending = true;
+      // a new listen of the album: songs heard last time must not be skipped by the no-repeat cycle
+      giftPlayer.tracks.forEach((id) => played.delete(id));
+      savePlayed();
+    } else if (back) albumStartPending = false;
+    preloadQueue.length = 0;
+    if (gated()) history.splice(0, history.length, ...history.filter((t) => inAlbum(t.tokenId)));
+    if (back) { void cueTrack(back); return; }
+    const firstId = giftPlayer.tracks[0];
+    if (!on) { if (albumStartPending) forcedNext = firstId; return; }
+    if (!albumStartPending && currentTokenId && inAlbum(currentTokenId)) { requeueForMode(); return; }
+    forcedNext = firstId;
+    if (giftStop || manualPause) { void showAlbumStart(firstId); return; } // the first album song starts at the next play
+    pauseOwn();
+    void tuneToNextTrack();
+  };
 
   const setShuffle = (nextOn) => {
     shuffleMode = Boolean(nextOn);
@@ -846,7 +1104,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       // Pre-seed the dud cache with community-reported unplayables so this
       // browser never wastes a tune attempt rediscovering them.
       (data.duds || []).forEach((id) => trackCache.set(String(id), null));
-      const ids = [...(data.audio || []), ...(data.html || [])].map(String);
+      const ids = [...(data.audio || []), ...(data.video || []), ...(data.html || [])].map(String);
       if (!ids.length) return;
       const hadPool = knownSet.size > 0;
       for (const id of ids) {
@@ -926,7 +1184,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // Self-healing state: the radio must never stay silently stuck — see the
   // NO SIGNAL retry (bottom of tuneToNextTrack) and the stuck-watchdog below.
   let noSignalRetries = 0;
-  let manualPause = false;       // user pressed pause — the watchdog must respect it
+  // The listener stopped the music (pause button, media keys, headphones, OS controls). Nothing
+  // restarts it until they press play again: no watchdog, retry, error retune or tap-anywhere.
+  let manualPause = false;
+  // Pauses the radio makes itself (changing song, skipping a dud) are not the listener's.
+  let ownPauseAt = -1e9;
+  const pauseOwn = () => { ownPauseAt = performance.now(); try { player.pause(); } catch { /* noop */ } };
   let lastTuneAt = 0;
   let hadGesture = false;        // autoplay policy: only auto-retry after a real user gesture
   try {
@@ -935,11 +1198,20 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   } catch { /* conservative default: stays false until a click */ }
 
   let forcedNext = null;
+  // The listener's own order for the LIKED station (set by the radio page's likes list).
+  // Likes not in it yet (new ones) come first, then the saved order.
+  let likedOrder = [];
+  const orderLiked = (ids) => {
+    if (!likedOrder.length) return ids;
+    const rank = new Map(likedOrder.map((id, i) => [id, i]));
+    return ids.map((id, i) => [id, rank.has(id) ? rank.get(id) : -ids.length + i]).sort((a, b) => a[1] - b[1]).map(([id]) => id);
+  };
   // Ordered pool for shuffle-OFF playback: liked band follows your saved list;
   // FM plays the curated order (then known chain songs ascending, preset ALL);
   // CHAIN walks every known song by ascending id.
   const sequentialPool = () => {
-    if (band === 'liked') return chainState.snapshot().likes.map((l) => String(l.tokenId));
+    if (band === 'gift' && giftPlayer) return giftPlayer.tracks.slice();
+    if (band === 'liked') return orderLiked(chainState.snapshot().likes.map((l) => String(l.tokenId)));
     const known = knownPool.slice().sort((a, b) => Number(a) - Number(b));
     if (band === 'chain') return known;
     if (preset === 'music') return playlist.slice();
@@ -964,7 +1236,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         // so walking from index 0 burned every tune attempt on duds; starting
         // anywhere keeps in-order behaviour (walk onward from the seed) while
         // giving each session a different playlist.
-        const start = cur ? pool.indexOf(cur) : Math.floor(Math.random() * pool.length) - 1;
+        const start = cur ? pool.indexOf(cur) : (band === 'gift' ? -1 : Math.floor(Math.random() * pool.length) - 1);
         const playableCount = pool.reduce((n, id) => n + (trackCache.get(id) === null ? 0 : 1), 0);
         const walk = (skipPlayed) => {
           for (let step = 1; step <= pool.length; step += 1) {
@@ -977,8 +1249,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
           }
           return null;
         };
-        // Prefer the next song that has NOT yet aired this cycle.
-        choice = walk(true);
+        // Prefer the next song that has NOT yet aired this cycle. An album is the exception: it plays in its own
+        // running order whatever was heard before (a tapped song, an earlier visit), so skip is always the next track.
+        choice = band === 'gift' && giftPlayer ? walk(false) : walk(true);
         // Nothing left unaired → every other available song has played, so open
         // a fresh cycle and resume the running order (current still held to last).
         if (!choice && pool.some((id) => trackCache.get(id) !== null && played.has(id))) {
@@ -999,6 +1272,13 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     // Band routing: LIKED = your station only; CHAIN = pure exploration;
     // FM = curated (+ discovery unless preset MUSIC).
     likes = chainState ? chainState.snapshot().likes.slice() : [];
+    if (band === 'gift' && giftPlayer) {
+      const pool = giftPlayer.tracks.filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
+      choice = (pool.length ? pool : giftPlayer.tracks)[Math.floor(Math.random() * (pool.length || giftPlayer.tracks.length))];
+      recent.push(choice);
+      if (recent.length > 8) recent.shift();
+      return choice;
+    }
     if (band === 'liked' && likes.length) {
       const pool = likes.map((l) => l.tokenId).filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
       choice = (pool.length ? pool : likes.map((l) => l.tokenId))[Math.floor(Math.random() * (pool.length || likes.length))];
@@ -1256,12 +1536,17 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
 
   const history = [];
   const tuneToNextTrack = async (trackOverride) => {
+    if (giftStop) { refuseForGift(); return; }
     const token = ++tuneToken;
     // What the listener actually ASKED for, captured before pickNext consumes it.
     // Without this, a requested song that fails to resolve fell through to attempt 2
     // with forcedNext already spent — so the retry picked a random track and the
     // listener got a song they never chose, with nothing said about it.
     const requestedId = forcedNext;
+    const natural = naturalEnd;
+    naturalEnd = false;
+    cancelHiddenWait();
+    albumStartPending = false;
     tuneInFlight = true;
     // Only the CURRENT tune may lower the flag. A superseded tune returning early
     // would otherwise clear it while the newer one is still swapping src — reopening
@@ -1305,6 +1590,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       // Keep the queue topped up in the background.
       window.setTimeout(() => { void preloadNextTrack(); }, 300);
       if (token !== tuneToken || !on) { endTune(); return; }
+      if (track && !allowed(track.tokenId)) {
+        radioLog(`blocked #${track.tokenId}`, 'the open album is locked: only its own songs play', track.tokenId);
+        trackOverride = null;
+        if (requestedId) { setNow('-- ' + LOCKED_TEXT + ' --', false); endTune(); return; }
+        // Never keep a stale foreign song cued; the next pick comes from the album band.
+        preloadQueue.length = 0;
+        track = null;
+      }
       if (!track) {
         if (requestedId) {
           // Be honest rather than substituting. Silently playing something else is
@@ -1323,10 +1616,23 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       }
       if (token !== tuneToken || !on) { endTune(); return; }
       supportStarts.select(Number(track.tokenId));
+      listens.select(Number(track.tokenId));
       playCounter.select(PLAYABLE_CONTRACT, Number(track.tokenId));
+      if (band === 'gift' && giftPlayer) {
+        // The album's first song starts a run; anything but a song finishing by itself (or the hidden track) ends it.
+        const id = String(track.tokenId);
+        if (id === giftPlayer.tracks[0]) albumRunClean = !shuffleMode;
+        else if (!natural || id === giftPlayer.hidden) albumRunClean = false;
+      }
       if (player.src !== track.src) {
         player.src = track.src;
       }
+      if (resumeAt && resumeAt.id === String(track.tokenId)) {
+        const at = resumeAt.position;
+        resumeAt = null;
+        const seek = () => { try { player.currentTime = at; } catch { /* pre-metadata */ } };
+        if (player.readyState >= 1) seek(); else player.addEventListener('loadedmetadata', seek, { once: true });
+      } else resumeAt = null;
       radioLog(`play #${track.tokenId}`, { src: (track.src || '').slice(0, 80) }, track.tokenId);
       try {
         // Watchdog: a broken stream (e.g. bad 206 range responses on big
@@ -1358,7 +1664,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         return;
       } catch (error) {
         radioLog(`play FAILED #${track.tokenId}`, { error: String(error), mediaError: player.error && player.error.code, ready: player.readyState, net: player.networkState }, track.tokenId);
-        try { player.pause(); player.removeAttribute('src'); player.load(); } catch { /* reset for next attempt */ }
+        try { pauseOwn(); player.removeAttribute('src'); player.load(); } catch { /* reset for next attempt */ }
         trackCache.delete(track.tokenId); // stalled stream: retry later, don't dud
         // Autoplay refusal, decode failure, or stall — try another station.
       }
@@ -1374,7 +1680,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       setNow(`-- NO SIGNAL — RETUNING IN ${Math.round(delay / 1000)}S --`, false);
       radioLog('no signal — scheduling auto-retune', { retry: noSignalRetries, delayMs: delay });
       window.setTimeout(() => {
-        if (on && token === tuneToken && player.paused && hadGesture) void tuneToNextTrack();
+        if (on && token === tuneToken && player.paused && hadGesture && !manualPause) void tuneToNextTrack();
       }, delay);
     }
   };
@@ -1383,6 +1689,8 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     // Same guard: an `ended` raised while a tune is mid-swap belongs to the source
     // being replaced, not to a song that finished playing.
     if (on && !tuneInFlight) {
+      if (startHiddenWait()) return; // the album ran start to finish: silence, then its hidden track
+      naturalEnd = true;
       void tuneToNextTrack();
     }
   });
@@ -1398,11 +1706,27 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     // NOT while we are the ones changing the source. Swapping src aborts the previous
     // load and surfaces as an error on the element; retuning here would discard the
     // song the listener just asked for and replace it with an unrequested one.
-    if (on && !tuneInFlight) {
+    if (on && !tuneInFlight && !manualPause) {
       void tuneToNextTrack();
     }
   });
+  // Any pause the radio did not make itself is the listener's: remember it (and save it, so the
+  // next page does not start playing either) until they press play.
+  player.addEventListener('pause', () => {
+    if (!on || tuneInFlight || player.ended || performance.now() - ownPauseAt < 1500) return;
+    manualPause = true;
+    persist();
+    emit();
+  });
+  player.addEventListener('play', () => { manualPause = false; cancelHiddenWait(); });
 
+  // Used up: nothing starts and nothing advances. Whatever is playing is paused where it is.
+  const refuseForGift = () => {
+    manualPause = true;
+    pauseOwn();
+    writeScreen(giftStop || 'GIFT PLAYS FINISHED');
+    emit();
+  };
   const switchOn = () => {
     on = true;
     if (volumeStep < 1) volumeStep = 8; // knob was clicked off — restore default
@@ -1439,7 +1763,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   toggleButton.addEventListener('click', () => (on ? switchOff() : switchOn()));
   const skip = (direction) => {
     if (!on) return;
-    player.pause();
+    pauseOwn();
     if (direction === 'prev' && history.length > 1) {
       history.pop(); // current
       void tuneToNextTrack(history.pop());
@@ -1468,6 +1792,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const persist = () => {
     saveState({
       on,
+      paused: on && manualPause,
       volumeStep,
       tokenId: currentTokenId,
       position: Number.isFinite(player.currentTime) ? player.currentTime : 0,
@@ -1501,12 +1826,15 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       applyVolume();
       renderKnob();
       supportStarts.select(Number(saved.tokenId));
+      listens.select(Number(saved.tokenId));
       playCounter.select(PLAYABLE_CONTRACT, Number(saved.tokenId));
       player.src = track.src;
       currentTokenId = track.tokenId || null;
       nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', album: track.album || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
       emit();
+      const resumedTune = tuneToken;
       const begin = () => {
+        if (tuneToken !== resumedTune) return; // the listener already moved on (e.g. an album starting at its first song)
         try { if (Number(saved.position) > 1 && player.currentTime < 1) player.currentTime = Number(saved.position); } catch { /* noop */ }
         currentTokenId = track.tokenId || null;
         setNow('', true);
@@ -1519,16 +1847,24 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         persist();
       };
       try { player.currentTime = Math.max(0, Number(saved.position) || 0); } catch { /* pre-metadata */ }
+      // Paused here, or the browser will not play before a tap: the song waits, cued, for the
+      // play button. Never "tap anywhere": a click elsewhere on the page must not start music.
+      const waitForPlay = (text) => {
+        manualPause = true;
+        writeScreen(text);
+        player.addEventListener('playing', begin, { once: true });
+        emit();
+      };
+      // The album may have loaded while this was still resolving: it starts at its first song, not here.
+      const albumFirst = () => { if (giftPlayer && albumStartPending) enterAlbum(); };
+      if (saved.paused) { waitForPlay('PAUSED — PRESS ▶ TO PLAY'); albumFirst(); return; }
       try {
         await player.play();
         begin();
+        albumFirst();
       } catch {
-        writeScreen('▶ TAP ANYWHERE TO RESUME');
-        const once = () => {
-          document.removeEventListener('pointerdown', once, true);
-          player.play().then(begin).catch(() => { writeScreen('▶ RADIO PAUSED — CLICK TO RETUNE'); });
-        };
-        document.addEventListener('pointerdown', once, true);
+        waitForPlay('▶ PRESS PLAY TO RESUME');
+        albumFirst();
       }
     };
     void resume();
@@ -1542,7 +1878,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     switchOn, switchOff,
     isOn: () => on,
     playPause: () => {
+      if (giftStop && (!on || player.paused)) { if (!on) switchOn(); else refuseForGift(); return; }
       if (!on) { switchOn(); }
+      else if (player.paused && band === 'gift' && giftPlayer && (albumStartPending || (currentTokenId && !inAlbum(currentTokenId)))) { manualPause = false; void tuneToNextTrack(); }
       else if (player.paused) { manualPause = false; player.play().catch(() => { void tuneToNextTrack(); }); }
       else { manualPause = true; player.pause(); }
     },
@@ -1551,21 +1889,107 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     toggleLike,
     isLiked: () => (nowPlaying ? isLiked(nowPlaying.tokenId) : false),
     getLikes: () => chainState.snapshot().likes.slice(),
-    refreshLikes: () => chainState.refresh(true),
+    refreshLikes: () => chainState.refresh(true, true),
     cycleBand, setBand, cyclePreset,
     setShuffle, toggleShuffle: () => setShuffle(!shuffleMode),
     setLoop, toggleLoop: () => setLoop(!player.loop),
     getState: () => stateSnapshot(),
     unlike: (id) => openOnchainLikes(id),
     playToken: (id) => {
+      if (!allowed(id)) { writeScreen(LOCKED_TEXT); return; }
       forcedNext = String(id);
       // Anything cued was chosen to follow the PREVIOUS song, so it is stale the moment
       // the listener jumps somewhere else. Dropping it costs one preload, and keeps
       // "what plays after this" honest rather than a leftover from the old sequence.
       preloadQueue.length = 0;
-      if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); }
+      if (!on) { switchOn(); } else { pauseOwn(); void tuneToNextTrack(); }
     },
     nudgeVolume,
+    /**
+     * A gift player's album as its own looping band (token ids in play order, plus an optional `hidden` track id
+     * that plays only after a full uninterrupted run), or null to remove it.
+     * Loading one switches to it; removing it while it is the active band returns to FM.
+     */
+    setGiftPlayer: (def) => {
+      const tracks = def && Array.isArray(def.tracks) ? def.tracks.map(String).filter((id) => /^\d{1,9}$/.test(id)).slice(0, 40) : [];
+      const nextId = tracks.length ? String(def.id || '') : '';
+      if (nextId !== (giftPlayer ? giftPlayer.id : '')) rememberWallet(); // leaving a wallet: note where it was
+      if (!tracks.length) {
+        const wasAlbum = !!giftPlayer;
+        cancelHiddenWait();
+        albumRunClean = false;
+        giftPlayer = null;
+        albumCoverUrl = '';
+        albumStartPending = false;
+        if (band === 'gift') setBand('fm'); else emit();
+        const back = wasAlbum ? walletMemory.get('') : null;
+        if (back) void cueTrack(back); // back on the first wallet: its last song, cued at its position
+        return;
+      }
+      const first = !giftPlayer || giftPlayer.id !== def.id;
+      const cover = Number.isSafeInteger(def.cover) && def.cover > 0 ? String(def.cover) : null;
+      if (first || !giftPlayer || giftPlayer.cover !== cover) {
+        albumCoverUrl = '';
+        if (cover) void resolveCover(cover).then((url) => { if (giftPlayer && giftPlayer.cover === cover && url) { albumCoverUrl = url; emit(); } });
+      }
+      const hiddenId = def.hidden != null && /^\d{1,9}$/.test(String(def.hidden)) && !tracks.includes(String(def.hidden)) ? String(def.hidden) : null;
+      if (first) { cancelHiddenWait(); albumRunClean = false; }
+      giftPlayer = { id: String(def.id || ''), title: String(def.title || '').slice(0, 60), subtitle: String(def.subtitle || '').slice(0, 80), tracks, hidden: hiddenId, cover };
+      if (first) { setBand('gift'); enterAlbum(true); } else emit();
+    },
+    /** The listening wallet was locked (or another passkey opened): nothing is remembered across that. */
+    forgetWallets: () => { walletMemory.clear(); resumeAt = null; },
+    /** While locked, the loaded album is the only band: no FM, LIKED or CHAIN. A page default, not security. */
+    setGiftLock: (on) => {
+      const next = !!on;
+      if (next === giftLock) return;
+      giftLock = next;
+      if (giftLock && giftPlayer && band !== 'gift') setBand('gift'); else emit();
+      if (giftLock) enterAlbum();
+    },
+    /** Refuse to start or advance (a gift player whose paid plays are used up). Pass null to allow playback again. */
+    setGiftStop: (text) => {
+      const next = typeof text === 'string' && text ? text.slice(0, 40) : null;
+      if (next === giftStop) return;
+      giftStop = next;
+      if (giftStop && on) refuseForGift(); else emit();
+    },
+    /** Plays are on their way (a gift is landing): the controls rest, greyed out, until they arrive. */
+    setGiftWait: (on) => {
+      const next = Boolean(on);
+      if (next === giftWait) return;
+      giftWait = next;
+      root.classList.toggle('is-gift-wait', giftWait);
+      emit();
+    },
+    /** The listener's order for the LIKED station: inscription ids, first plays first. */
+    setLikedOrder: (ids) => { likedOrder = Array.isArray(ids) ? ids.map(String).slice(0, 5000) : []; },
+    /**
+     * Read-only live spectrum for the radio page: fills `out` (a Uint8Array) with the analyser's
+     * frequency bins and returns true, or returns false when there is no analyser (not played yet,
+     * or a browser such as iOS Safari that gives none). Never affects playback.
+     */
+    getSpectrum: (out) => {
+      if (!analyser || !(out instanceof Uint8Array)) return false;
+      try { analyser.getByteFrequencyData(out); return true; } catch { return false; }
+    },
+    spectrumSize: () => (analyser ? analyser.frequencyBinCount : 0),
+    /** Where the current song is: seconds in, and its length (null while unknown, e.g. still loading). */
+    getPosition: () => ({
+      current: Number.isFinite(player.currentTime) ? player.currentTime : 0,
+      duration: nowPlaying && Number.isFinite(player.duration) && player.duration > 0 ? player.duration : null
+    }),
+    /**
+     * Jump within the current song (the radio page's timeline). Skipped-over audio never counts
+     * towards a listen or a paid play (audible-listen ignores seeks). Returns false when it can't.
+     */
+    seek: (seconds) => {
+      const d = player.duration;
+      if (!on || !nowPlaying || !Number.isFinite(d) || d <= 0 || !Number.isFinite(seconds)) return false;
+      try { player.currentTime = Math.max(0, Math.min(d - 0.25, seconds)); return true; } catch { return false; }
+    },
+    /** The current song's audio address, so the page can draw its whole waveform. */
+    currentSource: () => (nowPlaying && player.currentSrc) || null,
     subscribe: (cb) => { listeners.add(cb); cb(stateSnapshot()); return () => listeners.delete(cb); }
   };
   // --- receiver faceplate wiring -----------------------------------------
@@ -1615,7 +2039,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const bandCore = root.querySelector('.xtrata-radio__pot--band .xtrata-radio__potcore');
   const presetCore = root.querySelector('.xtrata-radio__pot--preset .xtrata-radio__potcore');
   const renderPots = () => {
-    if (bandCore) bandCore.style.transform = 'rotate(' + ((BANDS.indexOf(band) - 1) * 45) + 'deg)';
+    if (bandCore) bandCore.style.transform = 'rotate(' + ((Math.max(0, bandList().indexOf(band)) - (giftPlayer ? 2 : 1)) * 45) + 'deg)';
     if (presetCore) presetCore.style.transform = 'rotate(' + (preset === 'music' ? 45 : -45) + 'deg)';
   };
   root.querySelector('.xtrata-radio__pot--band').addEventListener('click', (event) => { event.stopPropagation(); cycleBand(); });
@@ -1627,10 +2051,13 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   artEl.addEventListener('click', (event) => event.stopPropagation());
   const renderArt = (snap) => {
     const np = snap.nowPlaying;
-    const cover = np && np.cover;
+    // an album shows its own cover until a song with artwork of its own plays; then that song's artwork
+    const album = snap.albumCover;
+    const own = np && np.cover ? np.cover : '';
+    const cover = own || (album ? album.url : '');
     if (cover) {
       if (artImg.getAttribute('src') !== cover) artImg.src = cover;
-      artEl.href = '/i/' + np.tokenId;
+      artEl.href = '/i/' + (own ? np.tokenId : album.tokenId);
       artEl.classList.add('has-art');
     } else {
       artEl.classList.remove('has-art');
@@ -1693,6 +2120,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const renderPctl = (snap) => {
     ppBtn.textContent = snap.playing ? '\u23f8' : '\u25b6';
     pctl.querySelector('[data-p="power"]').classList.toggle('is-lit', Boolean(snap.on));
+    Array.prototype.forEach.call(pctl.querySelectorAll('button'), (b) => { b.disabled = Boolean(snap.giftWait); });
   };
 
 
@@ -1702,11 +2130,15 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     renderRelatives(snap);
     renderPctl(snap);
     const heart = faceBtn('heart');
-    const confirmed = Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId));
-    heart.classList.toggle('is-lit', confirmed);
+    const confirmed = Boolean(snap.nowPlaying && likeShown(snap.nowPlaying.tokenId));
+    const pending = Boolean(snap.heart?.pending);
+    heart.classList.toggle('is-lit', confirmed || pending);
+    heart.classList.toggle('is-pending', pending);
     heart.setAttribute('aria-pressed', String(confirmed));
     const chainStatus = chainState?.snapshot().status;
-    heart.title = chainStatus === 'disconnected' ? 'Connect your wallet to like on-chain' : chainStatus === 'unavailable' ? 'On-chain likes unavailable — open wallet actions' : confirmed ? 'Liked on-chain — open wallet actions to unlike' : 'Like on-chain — open wallet actions';
+    heart.title = pending ? (confirmed ? 'Like on its way — waiting for the chain to confirm' : 'Unlike on its way — waiting for the chain to confirm')
+      : snap.heart?.locked ? 'Confirmed on-chain'
+      : chainStatus === 'disconnected' ? 'Connect your wallet to like on-chain' : chainStatus === 'unavailable' || chainStatus === 'paused' ? 'On-chain like status is temporarily unavailable — open wallet actions' : confirmed ? 'Liked on-chain — open wallet actions to unlike' : 'Like on-chain — open wallet actions';
     heart.setAttribute('aria-busy', String(chainStatus === 'loading'));
     heart.setAttribute('aria-label', heart.title);
     faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');
@@ -1750,14 +2182,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     const wantRadio = (new URLSearchParams(window.location.search).get('radio') || '').toLowerCase();
     if (['fullscreen', 'full', 'fs', '1', 'on'].includes(wantRadio)) {
       setFull(true);
-      if (!(saved && saved.on && saved.tokenId)) {
-        writeScreen('▶ TAP ANYWHERE TO START THE RADIO');
-        const onceStart = () => {
-          document.removeEventListener('pointerdown', onceStart, true);
-          if (!on) switchOn();
-        };
-        document.addEventListener('pointerdown', onceStart, true);
-      }
+      if (!(saved && saved.on && saved.tokenId)) writeScreen('▶ PRESS PLAY TO START THE RADIO');
     }
   } catch { /* noop */ }
 
@@ -1797,14 +2222,24 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
 
   const chainLike = root.querySelector('.xtrata-radio__chain-like');
   const walletSession = createWalletSessionStore();
-  chainState = createRadioOnchainState({wallet: () => walletSession.load(), metadata: id => trackCache.get(String(id)), changed: () => {
+  // A passkey-only listener has no Stacks wallet: the pay-per-play panel (when it is running) offers the
+  // listening address as the identity, so the heart and likes list follow it.
+  const likeIdentity = () => {
+    const session = walletSession.load();
+    // The panel only offers an identity while it runs passkey-only (no connected, invited wallet), so it wins then.
+    const listening = typeof window.XtrataRadioListeningIdentity === 'function' ? window.XtrataRadioListeningIdentity() : undefined;
+    if (typeof listening === 'string' && listening) return {...session, isConnected: true, network: 'mainnet', address: listening};
+    return session;
+  };
+  chainState = createRadioOnchainState({wallet: likeIdentity, metadata: id => trackCache.get(String(id)), changed: () => {
     likes = chainState.snapshot().likes.slice(); emit();
   }});
-  const refreshChainLikes = (force = false) => { void chainState.refresh(force); };
+  // force: skip the 60s throttle (focus/visibility) but still respect a failure backoff. manual: explicit user/wallet action, always runs.
+  const refreshChainLikes = (force = false, manual = false) => { void chainState.refresh(force, manual); };
   window.addEventListener('focus', () => refreshChainLikes(true));
-  window.addEventListener('xtrata:wallet-changed', () => refreshChainLikes(true));
+  window.addEventListener('xtrata:wallet-changed', () => refreshChainLikes(true, true));
   window.addEventListener('storage', event => {
-    if (event.key === null || event.key === 'xtrata.v15.1.wallet.session' || event.key === LIKES_KEY || event.key?.startsWith('xtrata.radio.chain.pending:')) refreshChainLikes(true);
+    if (event.key === null || event.key === 'xtrata.v15.1.wallet.session' || event.key === LIKES_KEY || event.key?.startsWith('xtrata.radio.chain.pending:')) refreshChainLikes(true, true);
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshChainLikes(true); });
   window.setInterval(() => { if (!document.hidden) refreshChainLikes(); }, 15000);

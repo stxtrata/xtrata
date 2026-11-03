@@ -1,0 +1,1031 @@
+/*
+ * Xtrata Arcade: doors (hall pack part)
+ *
+ * Your "Threshold" wireframe doors (wireframe-doors.html), rebuilt for the Three.js hall. What is carried over unchanged:
+ * the 14 door styles (outline plus face decoration, written as data), the spring and damper mechanics of the handle, the
+ * latch and the leaf (same constants), the locked-handle rattle, and the synthesised door sounds with their three
+ * material profiles. What changes: the page's CSS 3D and SVG become a Three.js group (leaf slabs hinged on their outer
+ * edge, canvas-texture faces, a framed doorway), and the sounds ride the hall's own audio bus as positional voices.
+ *
+ *   1. STYLES      pure data and drawing ops (no DOM): outline points, decoration, hinge and handle art
+ *   2. MODEL       DoorModel: the physics (pure, runs in Node), with a sound interface it calls but does not own
+ *   3. SFX         createSfx(getEnv, getListener): the door sounds as positional voices on the room audio bus
+ *   4. MESH        buildMesh(): the Three.js door for one bay
+ *
+ * Only what bays.js asks for runs here; nothing in this file touches the network or evaluates chain data.
+ */
+(function (root) {
+  'use strict';
+  if (root.XADoors) return;
+
+  var DEG = Math.PI / 180, HMAX = 22, MAXA = 108, DEF_OPEN = 105;
+  var KH = 900, CH = 37, KD = 150, CD = 17.6, RAT_LEN = 0.8, RAT_STOP = 13;
+  var BOLT = { l: 0.03, d: 0.018, h: 0.03, throw: 0.018, gap: 0.008 };   // metres: the latch bolt (length, depth, height), how far it throws, the gap between the leaf edge and the keep
+  var LATCH_ZONE = 4, LATCH_HOME = 0.4, CATCH = 45;   // degrees: where the strike takes the bolt, where the leaf counts as home; the catch spring
+  var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+  var r2 = function (n) { return Math.round(n * 100) / 100; };
+  var ease = function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+
+  /* ================================================================ 1. STYLES */
+  // Drawing ops are small strings, one per line: "kind<TAB>classes<TAB>args". kinds: P path (SVG path data), R rounded
+  // rect (x y w h r), C circle (x y r), K begin clip rect, E end clip. classes: l stroke, f filled panel, k solid, d dimmed, t thick.
+  var P = function (d, c) { return 'P\t' + (c || 'l') + '\t' + d + '\n'; };
+  var LN = function (x1, y1, x2, y2, c) { return P('M' + r2(x1) + ' ' + r2(y1) + 'L' + r2(x2) + ' ' + r2(y2), c); };
+  var RC = function (x, y, w, h, c, r) { return 'R\t' + (c || 'l') + '\t' + [r2(x), r2(y), r2(w), r2(h), r || 0].join(' ') + '\n'; };
+  var CI = function (x, y, r, c) { return 'C\t' + (c || 'l') + '\t' + [r2(x), r2(y), r2(r)].join(' ') + '\n'; };
+  var ptsPath = function (pts) { return 'M' + pts.map(function (p) { return r2(p[0]) + ' ' + r2(p[1]); }).join('L') + 'Z'; };
+  var poly = function (pts, c) { return P(ptsPath(pts), c); };
+  var CLIP = function (x, y, w, h) { return 'K\t\t' + [r2(x), r2(y), r2(w), r2(h)].join(' ') + '\n'; };
+  var ENDCLIP = 'E\t\t\n';
+
+  function polyEdge(pts) {           // x-extent of a convex polygon at height y
+    return function (y) {
+      var lo = Infinity, hi = -Infinity;
+      for (var i = 0; i < pts.length; i++) {
+        var a = pts[i], b = pts[(i + 1) % pts.length];
+        if ((a[1] <= y && b[1] >= y) || (b[1] <= y && a[1] >= y)) {
+          if (a[1] === b[1]) { lo = Math.min(lo, a[0], b[0]); hi = Math.max(hi, a[0], b[0]); }
+          else { var x = a[0] + (y - a[1]) / (b[1] - a[1]) * (b[0] - a[0]); lo = Math.min(lo, x); hi = Math.max(hi, x); }
+        }
+      }
+      return lo === Infinity ? [0, 0] : [lo, hi];
+    };
+  }
+  function mkShape(pts, extra) { var s = { pts: pts, d: ptsPath(pts), edge: polyEdge(pts) }; for (var k in extra) s[k] = extra[k]; return s; }
+  function rectShape(W, H) { return mkShape([[0, 0], [W, 0], [W, H], [0, H]]); }
+  function arc(cx, cy, rx, ry, a0, a1, n) { var o = []; for (var i = 0; i <= n; i++) { var t = a0 + (a1 - a0) * i / n; o.push([cx + rx * Math.cos(t), cy - ry * Math.sin(t)]); } return o; }
+  function ellipseShape(W, H) { var o = [], rx = W / 2, ry = H / 2; for (var i = 0; i < 56; i++) { var t = i / 56 * 2 * Math.PI; o.push([rx + rx * Math.cos(t), ry + ry * Math.sin(t)]); } return mkShape(o); }
+  function archShape(W, H) { var r = W / 2; return mkShape([[0, H], [0, r]].concat(arc(r, r, r, r, Math.PI, 0, 24).slice(1, -1), [[W, r], [W, H]])); }
+  function gothicShape(W, H) {
+    var a = Math.min(0.866 * W, H * 0.55), R = (W * W / 4 + a * a) / W, tEnd = Math.acos(clamp((W / 2 - R) / R, -1, 1));
+    var left = arc(R, a, R, R, Math.PI, tEnd, 20);                       // from the left edge up to the apex
+    var right = left.slice(0, -1).reverse().map(function (p) { return [W - p[0], p[1]]; });
+    return mkShape([[0, H]].concat(left, right, [[W, H]]), { a: a, R: R });
+  }
+  function vintageShape(W, H) {
+    var s = W * 0.12, o = [[0, H], [0, s]];
+    for (var i = 1; i < 18; i++) { var t = i / 18, u = 1 - t; o.push([u * u * 0 + 2 * u * t * (W / 2) + t * t * W, u * u * s + 2 * u * t * (-s) + t * t * s]); }
+    return mkShape(o.concat([[W, s], [W, H]]));
+  }
+
+  /* raised panel + a grid of them (the building block of most door faces) */
+  function panel(x, y, w, h, o) {
+    o = o || {}; var b = o.bev != null ? o.bev : 5, r = o.r != null ? o.r : 2;
+    if (w < b * 3 || h < b * 3) return RC(x, y, w, h, 'l', r);
+    return RC(x, y, w, h, 'l', r) + RC(x + b, y + b, w - 2 * b, h - 2 * b, 'l d', 1) +
+      LN(x, y, x + b, y + b, 'l d') + LN(x + w, y, x + w - b, y + b, 'l d') + LN(x, y + h, x + b, y + h - b, 'l d') + LN(x + w, y + h, x + w - b, y + h - b, 'l d');
+  }
+  function grid(c, o) {
+    var cols = o.cols || 1, rows = o.rows || [1], gap = o.gap != null ? o.gap : 10,
+      top = o.top != null ? o.top : c.rail, bottom = o.bottom != null ? o.bottom : (c.H - c.rail),
+      x0 = o.x0 != null ? o.x0 : (c.x0 + c.sW), x1 = o.x1 != null ? o.x1 : (c.x1 - c.sW);
+    var cw = (x1 - x0 - gap * (cols - 1)) / cols, sum = rows.reduce(function (a, b) { return a + b; }, 0), avail = bottom - top - gap * (rows.length - 1), y = top, s = '';
+    rows.forEach(function (r) { var h = avail * r / sum; for (var i = 0; i < cols; i++) s += panel(x0 + i * (cw + gap), y, cw, h, o); y += h + gap; });
+    return s;
+  }
+
+  var STYLES = {};
+  function registerStyle(name, def) {
+    var o = { name: name, label: name, leaves: 1, handle: 'lever', handleY: 0.54, hingeYs: [0.18, 0.5, 0.82], w: 120, h: 220, strap: 0.18, strapTh: 7, sfx: 'wood' };
+    for (var k in def) o[k] = def[k];
+    STYLES[name] = o; return o;
+  }
+
+  registerStyle('rect', { label: 'Classic six-panel', w: 120, h: 220, shape: rectShape,
+    decor: function (c) { return grid(c, { cols: 2, rows: [1, 1.45, 1.15] }); } });
+  registerStyle('tall', { label: 'Tall and narrow', w: 82, h: 300, shape: rectShape,
+    decor: function (c) {
+      var s = grid(c, { cols: 1, rows: [0.7, 2.6] });
+      var x = c.x0 + c.sW + 5, w = c.w - 2 * c.sW - 10, avail = c.H - 2 * c.rail - 10, h1 = avail * 0.7 / 3.3, y = c.rail + 5;
+      for (var k = 1; k < 4; k++) s += LN(x, y + (h1 - 10) * k / 4, x + w, y + (h1 - 10) * k / 4, 'l d');
+      return s;
+    } });
+  registerStyle('wide', { label: 'Short and wide (barn)', w: 250, h: 168, handle: 'bar', shape: rectShape,
+    decor: function (c) {
+      var m = 10, s = RC(c.x0 + m, m, c.w - 2 * m, c.H - 2 * m, 'l', 2);
+      for (var x = c.x0 + m + 24; x < c.x1 - m - 6; x += 24) s += LN(x, m, x, c.H - m, 'l d');
+      return s + LN(c.x0 + m, c.H * 0.2, c.x1 - m, c.H * 0.2) + LN(c.x0 + m, c.H * 0.8, c.x1 - m, c.H * 0.8) + LN(c.x0 + m, c.H * 0.8, c.x1 - m, c.H * 0.2);
+    } });
+  registerStyle('arch', { label: 'Rounded arch', w: 130, h: 250, hingeYs: [0.38, 0.6, 0.82], shape: archShape,
+    decor: function (c) {
+      var cx = c.W / 2, r = c.W / 2, s = c.inset(8) + LN(6, r, c.W - 6, r);
+      for (var i = 1; i < 7; i++) { var t = Math.PI * i / 7; s += LN(cx, r, cx - Math.cos(t) * (r - 8), r - Math.sin(t) * (r - 8), 'l d'); }
+      return s + grid(c, { cols: 2, rows: [1, 1.15], top: r + 12 });
+    } });
+  registerStyle('gothic', { label: 'Gothic pointed arch', w: 120, h: 280, hingeYs: [0.45, 0.65, 0.85], shape: gothicShape,
+    decor: function (c) {
+      var a = c.shape.a, cx = c.W / 2, rr = Math.min(c.W * 0.12, a * 0.22);
+      return c.inset(c.sW * 0.55) + grid(c, { cols: 2, rows: [1], top: a + 12 }) + CI(cx, a * 0.5, rr) + CI(cx, a * 0.5, rr * 0.45, 'l d') + LN(cx, a * 0.5 + rr, cx, a + 2, 'l d');
+    } });
+  registerStyle('double', { label: 'Double doors', w: 230, h: 236, leaves: 2, shape: rectShape,
+    decor: function (c) {
+      var s = grid(c, { cols: 1, rows: [1.25, 1] });
+      var x = c.x0 + c.sW + 5, w = c.w - 2 * c.sW - 10, avail = c.H - 2 * c.rail - 10, h1 = avail * 1.25 / 2.25, y = c.rail + 5, hh = h1 - 10;
+      s += LN(x + w / 2, y, x + w / 2, y + hh, 'l d');
+      for (var k = 1; k < 4; k++) s += LN(x, y + hh * k / 4, x + w, y + hh * k / 4, 'l d');
+      return s;
+    } });
+  registerStyle('cathedral', { label: 'Cathedral double', w: 240, h: 310, leaves: 2, hingeYs: [0.45, 0.65, 0.85], shape: gothicShape,
+    decor: function (c) {
+      var a = c.shape.a, cx = c.W / 2, rr = Math.min(c.W * 0.1, a * 0.2);
+      return c.inset(c.sW * 0.5) + grid(c, { cols: 1, rows: [1], top: a + 12 }) + CI(cx, a * 0.55, rr) + CI(cx, a * 0.55, rr * 0.5, 'l d') + LN(cx, a * 0.55 + rr, cx, a + 2, 'l d');
+    } });
+  registerStyle('circle', { label: 'Round vault', sfx: 'metal', w: 190, h: 190, square: true, hOff: 36, handleY: 0.5, hingeYs: [0.3, 0.7], strap: 0.1,
+    shape: function (W) { return ellipseShape(W, W); },
+    decor: function (c) {
+      var cx = c.W / 2, cy = c.H / 2, r = c.W / 2, s = CI(cx, cy, r - 12) + CI(cx, cy, r - 26, 'l d'), i, t;
+      for (i = 0; i < 18; i++) { t = i / 18 * 2 * Math.PI; s += CI(cx + (r - 6) * Math.cos(t), cy + (r - 6) * Math.sin(t), 1.7, 'k'); }
+      for (i = 0; i < 6; i++) { t = i / 6 * 2 * Math.PI + 0.26; s += LN(cx + r * 0.17 * Math.cos(t), cy + r * 0.17 * Math.sin(t), cx + (r - 26) * Math.cos(t), cy + (r - 26) * Math.sin(t), 'l d'); }
+      return s + CI(cx, cy, r * 0.17, 'f') + CI(cx, cy, r * 0.07);
+    } });
+  registerStyle('oval', { label: 'Oval porthole', sfx: 'metal', w: 130, h: 210, hOff: 30, hingeYs: [0.3, 0.7], strap: 0.1, shape: ellipseShape,
+    decor: function (c) {
+      var cx = c.W / 2, s = c.inset(10) + c.inset(24, 'l d');
+      return s + CI(cx, c.H * 0.3, c.W * 0.17, 'f') + CI(cx, c.H * 0.3, c.W * 0.1, 'l d') + LN(c.W * 0.2, c.H * 0.62, c.W * 0.8, c.H * 0.62, 'l d') + LN(c.W * 0.2, c.H * 0.7, c.W * 0.8, c.H * 0.7, 'l d');
+    } });
+  registerStyle('hexagon', { label: 'Hexagonal', sfx: 'metal', w: 170, h: 200, hOff: 32, hingeYs: [0.36, 0.64], strap: 0.1,
+    shape: function (W, H) { return mkShape([[W / 2, 0], [W, H * 0.25], [W, H * 0.75], [W / 2, H], [0, H * 0.75], [0, H * 0.25]]); },
+    decor: function (c) {
+      var cx = c.W / 2, cy = c.H / 2, k = 0.74, inner = c.shape.pts.map(function (p) { return [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k]; });
+      var s = poly(inner);
+      c.shape.pts.forEach(function (p, i) { s += LN(p[0], p[1], inner[i][0], inner[i][1], 'l d'); });
+      inner.forEach(function (p) { s += CI(p[0], p[1], 1.8, 'k'); });
+      return s + CI(cx, cy, c.W * 0.11, 'f') + CI(cx, cy, c.W * 0.05);
+    } });
+  registerStyle('octagon', { label: 'Octagonal', sfx: 'metal', w: 170, h: 210, hOff: 30, hingeYs: [0.3, 0.7], strap: 0.1,
+    shape: function (W, H) { var k = Math.min(W, H) * 0.26; return mkShape([[k, 0], [W - k, 0], [W, k], [W, H - k], [W - k, H], [k, H], [0, H - k], [0, k]]); },
+    decor: function (c) {
+      var cx = c.W / 2, cy = c.H / 2, sc = function (pts, k) { return pts.map(function (p) { return [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k]; }); };
+      var i1 = sc(c.shape.pts, 0.72), i2 = sc(c.shape.pts, 0.42), s = poly(i1) + poly(i2, 'l d');
+      c.shape.pts.forEach(function (p, i) { s += LN(p[0], p[1], i1[i][0], i1[i][1], 'l d'); });
+      i1.forEach(function (p) { s += CI(p[0], p[1], 1.8, 'k'); });
+      return s;
+    } });
+  registerStyle('industrial', { label: 'Heavy industrial', sfx: 'metal', w: 190, h: 232, handle: 'bar', strap: 0.4, strapTh: 11, hingeYs: [0.14, 0.5, 0.86],
+    shape: function (W, H) { return mkShape([[18, 0], [W - 18, 0], [W, 18], [W, H], [0, H], [0, 18]]); },
+    decor: function (c) {
+      var m = 9, s = RC(c.x0 + m, m, c.w - 2 * m, c.H - 2 * m, 'l', 2), x, y;
+      s += LN(c.x0 + m, c.H * 0.34, c.x1 - m, c.H * 0.34) + LN(c.x0 + m, c.H * 0.66, c.x1 - m, c.H * 0.66) + LN(c.x0 + m, c.H * 0.34, c.x1 - m, c.H * 0.66, 'l d') + LN(c.x1 - m, c.H * 0.34, c.x0 + m, c.H * 0.66, 'l d');
+      for (x = c.x0 + m + 10; x < c.x1 - m - 4; x += 18) s += CI(x, m + 7, 1.6, 'k') + CI(x, c.H - m - 7, 1.6, 'k');
+      for (y = m + 22; y < c.H - m - 10; y += 18) s += CI(c.x0 + m + 7, y, 1.6, 'k') + CI(c.x1 - m - 7, y, 1.6, 'k');
+      var by = c.H - m - 36, bh = 20, bx = c.x0 + m + 14, bw = c.w - 2 * m - 28;
+      s += CLIP(bx, by, bw, bh);
+      for (x = bx - bh; x < bx + bw; x += 12) s += LN(x, by + bh, x + bh, by, 'l d');
+      return s + ENDCLIP + RC(bx, by, bw, bh, 'l');
+    } });
+  registerStyle('vintage', { label: 'Vintage panelled', w: 140, h: 252, handle: 'knob', strap: 0.3, strapTh: 8, hingeYs: [0.16, 0.5, 0.84], shape: vintageShape,
+    decor: function (c) {
+      var cx = c.W / 2, s = grid(c, { cols: 2, rows: [1, 1.35, 1], top: c.rail + 8, bottom: c.H - c.rail - 6, bev: 7, r: 3 });
+      s += RC(cx - 20, c.H * 0.4, 40, 10, 'f', 2) + LN(cx - 14, c.H * 0.4 + 5, cx + 14, c.H * 0.4 + 5, 'l d');
+      return s + CI(cx, c.H * 0.17, 8) + CI(cx, c.H * 0.17 - 11, 3, 'f');
+    } });
+  registerStyle('scifi', { label: 'Sci-fi airlock', sfx: 'tech', w: 160, h: 262, handle: 'bar', hingeYs: [0.2, 0.5, 0.8],
+    shape: function (W, H) { return mkShape([[26, 0], [W - 26, 0], [W, 26], [W, H - 14], [W - 14, H], [14, H], [0, H - 14], [0, 26]]); },
+    decor: function (c) {
+      var m = 9, s = c.inset(m), sx = c.x1 - m - 11, i;
+      for (i = 0; i < 8; i++) s += RC(sx, c.H * 0.18 + i * 13, 5, 8, i % 3 ? 'k d' : 'k', 1);
+      for (i = 0; i < 4; i++) { var x = c.x0 + 36 + i * 14, y = c.H * 0.09; s += P('M' + x + ' ' + y + 'l7 6l-7 6'); }
+      var sy = c.H * 0.3, scx = c.x0 + c.w * 0.42;
+      s += CI(scx, sy, 15) + CI(scx, sy, 6, 'l d') + CI(scx, sy, 2, 'k') + LN(scx - 21, sy, scx - 11, sy) + LN(scx + 11, sy, scx + 21, sy) + LN(scx, sy - 21, scx, sy - 11) + LN(scx, sy + 11, scx, sy + 21);
+      s += P('M' + (c.x0 + m + 6) + ' ' + c.H * 0.82 + 'H' + (c.x0 + c.w * 0.42) + 'l12 -12H' + (c.x1 - m - 26), 'l d') + CI(c.x1 - m - 26, c.H * 0.82 - 12, 2.2, 'k');
+      return s + P('M' + (c.x0 + m + 4) + ' ' + (m + 16) + 'v-12h12') + P('M' + (c.x1 - m - 4) + ' ' + (c.H - m - 16) + 'v12h-12');
+    } });
+
+  var STYLE_NAMES = Object.keys(STYLES);
+
+  // Hinge straps drawn on a leaf face
+  function hingeArt(c, S, L) {
+    var len = Math.max(14, S.strap * L.w), th = S.strapTh, s = '';
+    S.hingeYs.forEach(function (f) {
+      var y = f * c.H, e = c.edge(y);
+      if (L.hinge === 'R') { var x = e[1]; s += RC(x - len, y - th / 2, len, th, 'f', 1.5) + CI(x - len * 0.7, y, 1.2, 'k') + CI(x - len * 0.3, y, 1.2, 'k'); }
+      else { var x2 = e[0]; s += RC(x2, y - th / 2, len, th, 'f', 1.5) + CI(x2 + len * 0.3, y, 1.2, 'k') + CI(x2 + len * 0.7, y, 1.2, 'k'); }
+    });
+    return s;
+  }
+  // The handle lever, centred on its axis (0,0), pointing along +x
+  function leverArt(type, Lh) {
+    if (type === 'knob') return CI(0, 0, 11, 'f') + P('M8 -2.8H' + (Lh - 4) + 'A2.8 2.8 0 0 1 ' + (Lh - 4) + ' 2.8H8Z', 'f') + CI(0, 0, 5.5, 'l d') + LN(0, 0, 9, 0, 'l d');
+    if (type === 'bar') return RC(-6, -6.5, Lh * 1.25 + 6, 13, 'f', 6.5) + CI(Lh * 1.25 - 3, 0, 2.4, 'k') + LN(2, 0, Lh * 1.25 - 10, 0, 'l d') + CI(0, 0, 3.5, 'l');
+    return P('M0 -5.5H' + (Lh - 2) + 'A5.5 5.5 0 0 1 ' + (Lh - 2) + ' 5.5H0A5.5 5.5 0 0 1 0 -5.5Z', 'f') + LN(6, 0, Lh - 8, 0, 'l d') + CI(0, 0, 4, 'l');
+  }
+
+  // The layout numbers every part of one door shares (design units, y down, as in the draft).
+  function layoutOf(styleName, w, h) {
+    var S = STYLES[styleName], W = clamp(Math.round(w || S.w), 60, 320), H = S.square ? W : clamp(Math.round(h || S.h), 110, 360);
+    var nL = S.leaves, leafW = W / nL, shape = S.shape(W, H), hy = H * S.handleY;
+    var thick = clamp(Math.round(W * 0.06), 6, 14), fw = clamp(Math.round(W * 0.07), 8, 14);
+    var leaves = [];
+    for (var i = 0; i < nL; i++) {
+      var x0 = i * leafW, x1 = x0 + leafW, hinge = nL === 1 ? 'R' : (i === 0 ? 'L' : 'R'), sW = Math.max(24, 0.2 * leafW), off = Math.max(S.hOff || 0, sW / 2, 22);
+      var L = { i: i, x0: x0, x1: x1, w: leafW, hinge: hinge, hy: hy, dir: hinge === 'R' ? 1 : -1, inw: hinge === 'R' ? 1 : -1, Lh: clamp(0.22 * leafW, 22, 44), sW: sW };
+      L.hx = hinge === 'R' ? x0 + off : x1 - off;
+      // the lever lies from the rose toward the hinge: keep rose and arm (and the pad at its end) inside the leaf, never over its edge
+      var room = hinge === 'R' ? x1 - L.hx : L.hx - x0, mult = S.handle === 'bar' ? 1.25 : 1;
+      L.Lh = clamp(Math.min(L.Lh, (room - 12) / mult), 8, 44);
+      L.latch = hinge === 'R' ? (nL === 1 ? shape.edge(hy)[0] : x0) : (nL === 2 ? x1 : shape.edge(hy)[1]);
+      L.axis = hinge === 'R' ? (nL === 1 ? W : x1) : x0;       // the hinge line, where the leaf is pivoted
+      leaves.push(L);
+    }
+    return { S: S, W: W, H: H, nL: nL, leafW: leafW, shape: shape, hy: hy, thick: thick, fw: fw, leaves: leaves };
+  }
+  // The decoration ops for one face of one leaf (what drawFace paints), with the draft's context object.
+  function faceOps(G, L, side, noRose) {   // noRose: the lit skins draw a real handle, so the flat rose disc is left out of their relief
+    var S = G.S, shape = G.shape;
+    var c = { W: G.W, H: G.H, x0: L.x0, x1: L.x1, w: G.leafW, sW: L.sW, rail: Math.max(14, G.H * 0.055), shape: shape, edge: shape.edge, key: 'f' + L.i + side, leaf: L.i,
+      inset: function (inn, cls) { var k = [(G.W - 2 * inn) / G.W, (G.H - 2 * inn) / G.H]; return poly(shape.pts.map(function (p) { return [inn + p[0] * k[0], inn + p[1] * k[1]]; }), cls || 'l'); } };
+    var s = poly(shape.pts, 'f') + S.decor(c) + hingeArt(c, S, L) + (noRose ? '' : CI(L.hx, G.hy, 9, 'f') + CI(L.hx, G.hy, 3, 'l d'));
+    if (G.nL > 1) s += LN(L.hinge === 'L' ? L.x1 : L.x0, 0, L.hinge === 'L' ? L.x1 : L.x0, G.H);
+    return s;
+  }
+
+  // Paint ops onto a 2D context already scaled to design units. st: { line, fill, lw }.
+  function drawOps(ctx, ops, st) {
+    var lines = ops.split('\n'), clipDepth = 0, i;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (i = 0; i < lines.length; i++) {
+      var f = lines[i].split('\t'); if (f.length < 3 && f[0] !== 'E') continue;
+      var t = f[0], cl = (f[1] || '').split(' '), arg = f[2] || '', dim = cl.indexOf('d') >= 0, thick = cl.indexOf('t') >= 0, kind = cl[0];
+      if (t === 'K') { var n = arg.split(' ').map(Number); ctx.save(); ctx.beginPath(); ctx.rect(n[0], n[1], n[2], n[3]); ctx.clip(); clipDepth++; continue; }
+      if (t === 'E') { if (clipDepth) { ctx.restore(); clipDepth--; } continue; }
+      var p = new Path2D(), a = arg.split(' ').map(Number);
+      if (t === 'P') p = new Path2D(arg);
+      else if (t === 'C') p.arc(a[0], a[1], a[2], 0, Math.PI * 2);
+      else if (t === 'R') {
+        var x = a[0], y = a[1], w = a[2], h = a[3], r = Math.min(a[4] || 0, w / 2, h / 2);
+        p.moveTo(x + r, y); p.lineTo(x + w - r, y); p.arcTo(x + w, y, x + w, y + r, r); p.lineTo(x + w, y + h - r); p.arcTo(x + w, y + h, x + w - r, y + h, r);
+        p.lineTo(x + r, y + h); p.arcTo(x, y + h, x, y + h - r, r); p.lineTo(x, y + r); p.arcTo(x, y, x + r, y, r); p.closePath();
+      } else continue;
+      ctx.save(); ctx.globalAlpha = dim ? 0.42 : 1; ctx.lineWidth = st.lw * (thick ? 2.4 : 1); ctx.strokeStyle = st.line;
+      if (kind === 'k') { ctx.fillStyle = st.line; ctx.fill(p); }
+      else { if (kind === 'f') { ctx.fillStyle = st.fill; ctx.fill(p); } ctx.stroke(p); }
+      ctx.restore();
+    }
+    while (clipDepth-- > 0) ctx.restore();
+  }
+
+  /* ================================================================ 2. MODEL (pure physics) */
+  var NULL_SFX = { handleDown: noop, latchRetract: noop, handleReturn: noop, latch: noop, rattle: noop, bolt: noop, slam: noop, stop: noop, seal: noop, knock: noop, creak: noop, kill: noop };
+  function noop() {}
+
+  function rattleProfile(t, amp) {
+    var h;
+    if (t < 0.07) h = RAT_STOP * ease(t / 0.07);
+    else { var u0 = t - 0.07; h = RAT_STOP - 5.5 * amp * Math.exp(-u0 * 6) * Math.abs(Math.sin(u0 * 2 * Math.PI * 10.5)); }
+    var u = Math.max(0, t - 0.07), dec = Math.exp(-u * 7) * amp;
+    return { h: h, sx: dec * 0.9 * Math.sin(u * 2 * Math.PI * 21), sr: dec * 0.32 * Math.abs(Math.sin(u * 2 * Math.PI * 10.5 + 0.4)) };
+  }
+
+  // cfg: { style, locked, openAngle }. sfx: an object with the NULL_SFX methods (all optional).
+  function DoorModel(cfg, sfx) {
+    var name = STYLES[cfg && cfg.style] ? cfg.style : 'rect';
+    this.cfg = { style: name, locked: !(cfg && cfg.locked === false), openAngle: clamp(cfg && cfg.openAngle != null ? cfg.openAngle : DEF_OPEN, 20, MAXA - 3), sound: cfg && PROF[cfg.sound] ? cfg.sound : '' };
+    this.style = STYLES[name];
+    this.sfx = Object.assign({}, NULL_SFX, sfx || {});
+    this.pos = { x: 0, y: 1.2, z: 0 };
+    this.angle = 0; this.vel = 0; this.mode = 'free'; this.drive = null; this.pendingOpen = false;
+    this.handle = { a: 0, v: 0, hold: false, holdT: 0, carry: false }; this.rattle = { active: false, t: 0, amp: 1 };
+    this.shakeX = 0; this.shakeR = 0; this.awake = false; this.dragging = false;
+  }
+  var DM = DoorModel.prototype;
+  DM.wake = function () { this.awake = true; };
+  DM.isOpen = function () { return this.angle > 0.6 || this.pendingOpen || (this.mode === 'drive' && this.drive.to > 0); };
+  DM.startDrive = function (to) {
+    var from = this.angle, dist = Math.abs(to - from), opening = to > from;
+    if (opening && from < 1) this.sfx.seal(this);
+    this.mode = 'drive'; this.drive = { from: from, to: to, t: 0, dur: opening ? 0.55 + 0.75 * dist / 105 : 0.5 + 0.7 * dist / 105 }; this.wake();
+  };
+  DM.startRattle = function (amp) {
+    amp = amp == null ? 1 : amp; var r = this.rattle;
+    r.amp = amp; r.t = (r.active && this.handle.a > 6) ? 0.07 : 0; r.active = true;
+    this.handle.hold = false; this.handle.carry = false; this.pendingOpen = false; this.sfx.rattle(this, amp); this.wake();
+  };
+  DM.latchHit = function (imp) { this.handle.v += clamp(imp * 0.9, 25, 130); };
+  DM.step = function (h) {
+    var H = this.handle, R = this.rattle, sfx = this.sfx;
+    if (R.active) {
+      R.t += h;
+      if (R.t >= RAT_LEN) { R.active = false; this.shakeX = this.shakeR = 0; H.v = 0; }
+      else { var p = rattleProfile(R.t, R.amp); H.a = p.h; H.v = 0; this.shakeX = p.sx; this.shakeR = p.sr; }
+    }
+    if (!R.active && this.shakeX) { this.shakeX *= Math.exp(-18 * h); if (Math.abs(this.shakeX) < 0.01) this.shakeX = 0; }   // a knock's tremble dies away
+    /* The latch. Closing a door, the handle is held down (the bolt stays pulled in) until the leaf is home; only then is it let go and the
+       bolt snaps into the frame. A leaf that swings into the strike zone on its own (pushed shut) has its bolt pushed in by the strike's
+       ramp the same way, so the bolt never hits the frame and leaves the door resting ajar. */
+    if (!R.active) {
+      if (!H.carry && !this.pendingOpen && this.mode !== 'drive' && this.angle > LATCH_HOME && this.angle < LATCH_ZONE && this.vel < -1) H.carry = true;
+      if (H.carry) {
+        var opening = this.mode === 'drive' ? this.drive.to > 0 : this.vel > 2;
+        if (this.angle <= LATCH_HOME || this.pendingOpen || opening) { H.carry = false; H.hold = false; }
+        else { H.hold = true; H.holdT = 0; }
+      }
+    }
+    if (!R.active) {
+      if (H.hold && !H.carry && !this.dragging && !this.pendingOpen) { H.holdT += h; if (this.angle > 2.5 || H.holdT > 0.35) H.hold = false; }
+      H.v += (KH * ((H.hold ? HMAX : 0) - H.a) - CH * H.v) * h; H.a += H.v * h;
+      if (H.a < -1.5) { H.a = -1.5; H.v = Math.abs(H.v) * 0.25; } else if (H.a > HMAX + 3) { H.a = HMAX + 3; H.v = -Math.abs(H.v) * 0.25; }
+    }
+    if (H.hold && !H.h1) { H.h1 = true; sfx.handleDown(this); } else if (!H.hold) H.h1 = false;
+    if (H.a >= HMAX * 0.8 && !H.lt) { H.lt = true; sfx.latchRetract(this); } else if (H.a < HMAX * 0.5) H.lt = false;
+    if (H.a > 8) H.out = Math.max(H.out || 0, H.a);
+    else if (H.a < 2 && H.out) { sfx.handleReturn(this, clamp(H.out / HMAX, 0.3, 1)); H.out = 0; }
+    // the leaf only starts to move once the handle has pulled the latch clear
+    if (this.pendingOpen && H.a >= HMAX * 0.8 && !R.active) { this.pendingOpen = false; this.startDrive(this.cfg.openAngle); }
+    if (this.mode === 'drive') {
+      var D = this.drive; D.t += h; var u = Math.min(1, D.t / D.dur), ref = D.from + (D.to - D.from) * ease(u);
+      this.vel += (KD * (ref - this.angle) - CD * this.vel) * h; this.angle += this.vel * h;
+      if (u >= 1 && D.to > 0 && Math.abs(this.angle - D.to) < 0.25 && Math.abs(this.vel) < 2) { this.angle = D.to; this.vel = 0; this.mode = 'free'; }
+    } else {
+      var a = this.angle, acc = 0;
+      if (this.cfg.locked && a < 3) acc = -420 * a - 26 * this.vel; else if (a < LATCH_ZONE) acc = -CATCH * a;   // the latch's spring pulls the last few degrees home
+      this.vel += acc * h; this.vel *= Math.exp(-1.9 * h);
+      if (Math.abs(this.vel) < 3 && a > LATCH_ZONE) this.vel *= Math.exp(-10 * h);   // hinge friction: the door stays where it is left
+      this.angle += this.vel * h;
+    }
+    if (this.angle < 0) {            // closed against the stop: a small bounce and the latch clicks
+      var imp = -this.vel, held = this.handle.carry; this.angle = 0; this.handle.carry = false; this.handle.hold = false;   // home: let the handle go, the bolt snaps in
+      if (imp > 10) { this.vel = Math.min(imp * 0.08, 4); if (!held) this.latchHit(imp); sfx.slam(this, imp); }   // a small bounce, never enough to leave the strike zone
+      else { this.vel = 0; if (imp > 2) sfx.latch(this, 0.55); }
+      if (this.mode === 'drive' && this.drive.to <= 0) this.mode = 'free';
+    }
+    if (this.angle > MAXA) { var v = this.vel; this.angle = MAXA; this.vel = v > 0 ? -v * 0.22 : v; if (v > 25) sfx.stop(this, clamp(v / 220, 0.15, 0.8)); }
+  };
+  DM.update = function (dt) {
+    dt = Math.min(0.05, Math.max(0, dt));
+    var n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;
+    for (var i = 0; i < n; i++) this.step(h);
+    this.sfx.creak(this, Math.abs(this.vel));
+  };
+  DM.settled = function () {
+    var H = this.handle;
+    return this.mode === 'free' && !this.pendingOpen && !this.rattle.active && !H.hold && !this.shakeX && Math.abs(this.vel) < 0.02 && Math.abs(H.v) < 0.05 && Math.abs(H.a) < 0.02 && (!this.cfg.locked || this.angle < 0.001);
+  };
+  // visitor operations
+  DM.open = function (force) {
+    if (this.cfg.locked && !force) { this.startRattle(1); return false; }
+    this.handle.carry = false;
+    if (this.angle >= this.cfg.openAngle - 1 || (this.mode === 'drive' && this.drive.to > 0)) return true;
+    if (this.angle < 1) { this.handle.hold = true; this.handle.holdT = 0; this.pendingOpen = true; this.wake(); }
+    else this.startDrive(this.cfg.openAngle);
+    return true;
+  };
+  DM.close = function () {
+    this.pendingOpen = false; this.handle.hold = false;
+    if (this.angle < 0.3 && this.mode !== 'drive') { this.mode = 'free'; this.handle.carry = false; this.wake(); return true; }
+    this.handle.carry = true; this.handle.hold = true; this.handle.holdT = 0;   // hold the handle down (latch pulled in) until the leaf is home
+    this.startDrive(-12); return true;
+  };
+  DM.toggle = function () { return this.isOpen() ? this.close() : this.open(); };
+  DM.lock = function (quiet) { if (!this.cfg.locked && !quiet) this.sfx.bolt(this, true); this.cfg.locked = true; this.pendingOpen = false; this.handle.hold = false; this.wake(); };
+  DM.unlock = function (quiet) { if (this.cfg.locked && !quiet) this.sfx.bolt(this, false); this.cfg.locked = false; this.wake(); };
+  DM.knock = function () { this.sfx.knock(this); this.shakeX = 0.5; this.wake(); };
+  DM.state = function () { return { style: this.cfg.style, locked: this.cfg.locked, angle: this.angle, open: this.isOpen(), mode: this.mode, handle: this.handle.a, rattling: this.rattle.active, awake: this.awake }; };
+
+  /* ================================================================ 3. SFX (synthesised, positional on the room audio bus) */
+  var PROF = { wood: { kind: 'wood', pitch: 1, ring: 0.3, thud: 78 }, metal: { kind: 'metal', pitch: 0.78, ring: 1, thud: 56 }, tech: { kind: 'tech', pitch: 1.25, ring: 0.1, thud: 84 },
+    glass: { kind: 'glass', pitch: 1.4, ring: 0.8, thud: 70 } };                                // a skin can pick any of these (door-skins.js sound), whatever the style says
+  var REACH = 10;
+  // getEnv(): { ctx, master, wet } or null. getListener(): { x, z }.
+  function createSfx(getEnv, getListener) {
+    var noiseBuf = null, noiseCtx = null, winT = 0, winN = 0, log = [];
+    function noise(ctx) {
+      if (noiseBuf && noiseCtx === ctx) return noiseBuf;
+      var n = ctx.sampleRate * 2, b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+      for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      noiseCtx = ctx; return (noiseBuf = b);
+    }
+    function mkPan(ctx, pos) {
+      var pan = ctx.createPanner(); pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 1.4; pan.rolloffFactor = 1.3; pan.maxDistance = 40;
+      if (pan.positionX) { pan.positionX.value = pos.x; pan.positionY.value = pos.y; pan.positionZ.value = pos.z; } else pan.setPosition(pos.x, pos.y, pos.z);
+      return pan;
+    }
+    function ready() { var e = getEnv(); return e && e.ctx && e.ctx.state === 'running' ? e : null; }
+    function profOf(d) { return PROF[d.cfg && d.cfg.sound && PROF[d.cfg.sound] ? d.cfg.sound : d.style.sfx || 'wood']; }
+    function gate(d, v, name) {
+      var e = ready(); if (!e) return null;
+      var now = Date.now(); if (now - winT > 100) { winT = now; winN = 0; } if (++winN > 16) return null;
+      var L = getListener() || { x: 0, z: 0 }; if (Math.hypot(d.pos.x - L.x, d.pos.z - L.z) > REACH) return null;
+      var ctx = e.ctx, g = ctx.createGain(); g.gain.value = v;
+      var pan = mkPan(ctx, d.pos), send = ctx.createGain(); send.gain.value = 0.2;
+      g.connect(pan); pan.connect(e.master); g.connect(send); if (e.wet) send.connect(e.wet);
+      setTimeout(function () { try { g.disconnect(); pan.disconnect(); send.disconnect(); } catch (er) {} }, 3500);
+      log.push({ name: name, at: ctx.currentTime }); if (log.length > 60) log.shift();
+      return { ctx: ctx, p: profOf(d), out: g, t: ctx.currentTime + 0.004 };
+    }
+    var env = function (g, t, peak, att, dur) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); };
+    function nz(G, dt, dur, type, f, q, peak, att) {
+      var ctx = G.ctx, t = G.t + dt, s = ctx.createBufferSource(); s.buffer = noise(ctx);
+      var fl = ctx.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+      var g = ctx.createGain(); env(g, t, peak, att || 0.002, dur);
+      s.connect(fl); fl.connect(g); g.connect(G.out); s.start(t, Math.random() * 1.4); s.stop(t + dur + 0.03);
+    }
+    function tn(G, dt, f0, f1, dur, type, peak, att) {
+      var ctx = G.ctx, t = G.t + dt, o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t);
+      if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      var g = ctx.createGain(); env(g, t, peak, att || 0.002, dur);
+      o.connect(g); g.connect(G.out); o.start(t); o.stop(t + dur + 0.03);
+    }
+    var click = function (G, dt, v, pi) { nz(G, dt, 0.014, 'highpass', 3000 * pi, 0.7, 0.45 * v); tn(G, dt, 2400 * pi, 1500 * pi, 0.03, 'sine', 0.16 * v); };
+    function knk(G, dt, v) {
+      var k = G.p;
+      tn(G, dt, 520 * k.pitch, 500 * k.pitch, 0.1 + 0.12 * k.ring, 'triangle', 0.2 * v);
+      tn(G, dt, 1170 * k.pitch, 1150 * k.pitch, 0.06 + 0.1 * k.ring, 'sine', 0.1 * v * (0.5 + k.ring));
+      nz(G, dt, 0.03, 'bandpass', 1500, 2, 0.3 * v); tn(G, dt, 150, 90, 0.06, 'sine', 0.25 * v);
+    }
+    var S = {
+      handleDown: function (d) { var G = gate(d, 0.9, 'handleDown'); if (!G) return; var k = G.p;
+        if (k.kind === 'tech') { tn(G, 0, 520, 780, 0.07, 'sine', 0.12); click(G, 0, 0.6, k.pitch); return; }
+        nz(G, 0, 0.07, 'bandpass', 900 * k.pitch, 2.5, 0.14); click(G, 0.012, 0.8, k.pitch); tn(G, 0.012, 200 * k.pitch, 120 * k.pitch, 0.05, 'triangle', 0.12); },
+      latchRetract: function (d) { var G = gate(d, 0.8, 'latchRetract'); if (!G) return; var k = G.p;
+        click(G, 0, 1, k.pitch * 0.9); tn(G, 0, 700 * k.pitch, 320 * k.pitch, 0.06, 'triangle', 0.12); nz(G, 0.025, 0.04, 'bandpass', 2600, 3, 0.14);
+        if (k.kind === 'tech') tn(G, 0.02, 1200, 1700, 0.05, 'sine', 0.08); },
+      handleReturn: function (d, v) { var G = gate(d, 0.55 * (v || 1), 'handleReturn'); if (!G) return; var k = G.p;
+        click(G, 0, 0.7, k.pitch * 0.9); tn(G, 0, 260 * k.pitch, 160 * k.pitch, 0.04, 'triangle', 0.1); },
+      latch: function (d, v, delay) { var G = gate(d, v || 1, 'latch'); if (!G) return; var k = G.p; G.t += delay || 0;
+        click(G, 0, 1, k.pitch); tn(G, 0, 950 * k.pitch, 480 * k.pitch, 0.05, 'triangle', 0.16);
+        click(G, 0.05, 0.6, k.pitch * 0.7); nz(G, 0.05, 0.04, 'bandpass', 1800, 3, 0.1); },
+      rattle: function (d, amp) { var G = gate(d, 0.9, 'rattle'); if (!G) return; var k = G.p;
+        nz(G, 0, 0.07, 'bandpass', 900 * k.pitch, 2.5, 0.14); click(G, 0.01, 0.7, k.pitch);
+        if (k.kind === 'tech') { tn(G, 0.07, 170, 170, 0.1, 'square', 0.07 * amp); tn(G, 0.2, 170, 170, 0.1, 'square', 0.06 * amp); }
+        for (var i = 0; i < 14; i++) { var u = i / 21, v = amp * Math.exp(-6 * u); if (v < 0.07) break; knk(G, 0.07 + u, v * 0.75); }
+        nz(G, 0.07, 0.45, 'bandpass', 650 * k.pitch, 1.2, 0.06 * amp, 0.01);
+        if (k.kind === 'glass') for (var j = 0; j < 4; j++) tn(G, 0.05 + j * 0.06, 2400 + j * 310, 2380 + j * 300, 0.12, 'sine', 0.035 * amp); },
+      bolt: function (d, locking) { var G = gate(d, 0.9, locking ? 'lock' : 'unlock'); if (!G) return; var k = G.p;
+        if (k.kind === 'tech') {
+          if (locking) { tn(G, 0, 880, 880, 0.07, 'sine', 0.2); tn(G, 0.09, 620, 620, 0.1, 'sine', 0.2); } else { tn(G, 0, 620, 620, 0.07, 'sine', 0.2); tn(G, 0.09, 990, 990, 0.12, 'sine', 0.2); }
+          nz(G, 0.2, 0.05, 'highpass', 2500, 0.7, 0.14); return;
+        }
+        if (locking) {
+          nz(G, 0, 0.09, 'bandpass', 1400 * k.pitch, 2, 0.1); tn(G, 0.07, 160 * k.pitch, 62 * k.pitch, 0.16, 'sine', 0.55);
+          nz(G, 0.07, 0.09, 'lowpass', 700, 0.7, 0.35); click(G, 0.07, 1, k.pitch); tn(G, 0.075, 1900 * k.pitch, 1880 * k.pitch, 0.1 + 0.25 * k.ring, 'sine', 0.05 * (0.4 + k.ring));
+        } else {
+          nz(G, 0, 0.08, 'bandpass', 1900 * k.pitch, 2, 0.09); tn(G, 0.06, 230 * k.pitch, 110 * k.pitch, 0.12, 'sine', 0.38);
+          click(G, 0.06, 0.9, k.pitch * 1.15); nz(G, 0.06, 0.05, 'lowpass', 900, 0.7, 0.2); click(G, 0.12, 0.4, k.pitch * 1.3);
+        } },
+      thud: function (d, v) { var G = gate(d, v, 'thud'); if (!G) return; var k = G.p;
+        tn(G, 0, k.thud * 1.25, k.thud * 0.5, 0.28, 'sine', 0.8); nz(G, 0, 0.2, 'lowpass', 240, 0.8, 0.5);
+        if (k.kind === 'wood') nz(G, 0, 0.07, 'bandpass', 420, 1.2, 0.35);
+        else if (k.kind === 'metal') { nz(G, 0, 0.05, 'bandpass', 2200, 2, 0.25); tn(G, 0, 330, 320, 0.5, 'sine', 0.12); tn(G, 0, 740, 730, 0.35, 'triangle', 0.06); }
+        else if (k.kind === 'glass') { nz(G, 0, 0.04, 'bandpass', 3000, 2, 0.2); tn(G, 0, 1760, 1750, 0.45, 'sine', 0.1); tn(G, 0.01, 2640, 2630, 0.3, 'sine', 0.06); }
+        else nz(G, 0, 0.28, 'bandpass', 3800, 0.9, 0.18, 0.01); },
+      slam: function (d, imp) { var v = clamp(imp / 150, 0.12, 1); S.thud(d, v); S.latch(d, 0.5 + 0.5 * v, 0.025); },
+      stop: function (d, v) { S.thud(d, v * 0.6); },
+      seal: function (d) { var G = gate(d, 0.9, 'seal'); if (!G) return;
+        if (G.p.kind === 'tech') { nz(G, 0, 0.4, 'highpass', 3500, 0.6, 0.35, 0.03); return; }
+        nz(G, 0, 0.14, 'lowpass', 420, 0.7, 0.9, 0.01); nz(G, 0.01, 0.08, 'bandpass', 900, 1, 0.15, 0.01); },
+      // knuckles on the door: three raps (new here; the draft had no knocking)
+      knock: function (d) { var G = gate(d, 1, 'knock'); if (!G) return; var k = G.p, t = 0;
+        for (var i = 0; i < 3; i++) {
+          var f = k.thud * (1.6 + Math.random() * 0.3); tn(G, t, f, f * 0.5, 0.09, 'sine', 0.55 - i * 0.06); nz(G, t, 0.04, 'bandpass', k.kind === 'metal' ? 2200 : 900, 1.4, 0.35 - i * 0.05);
+          if (k.kind === 'metal') tn(G, t, 640, 630, 0.25, 'sine', 0.08);
+          if (k.kind === 'glass') tn(G, t, 1900, 1880, 0.3, 'sine', 0.06);
+          t += 0.17 + Math.random() * 0.07;
+        } }
+    };
+    // the continuous hinge creak, one voice per moving door, driven by the leaf speed (deg/s)
+    function makeVoice(d, e) {
+      var ctx = e.ctx, p = profOf(d), out = ctx.createGain(); out.gain.value = 0;
+      var pan = mkPan(ctx, d.pos); out.connect(pan); pan.connect(e.master);
+      var V = { p: p, out: out, pan: pan, srcs: [], jit: 0, base: 1 };
+      var mkNoise = function () { var s = ctx.createBufferSource(); s.buffer = noise(ctx); s.loop = true; s.start(0, Math.random() * 1.4); V.srcs.push(s); return s; };
+      var rn = mkNoise(), rf = ctx.createBiquadFilter(); rf.type = 'lowpass'; rf.frequency.value = p.kind === 'metal' ? 140 : 200;
+      V.rg = ctx.createGain(); V.rg.gain.value = 0; rn.connect(rf); rf.connect(V.rg); V.rg.connect(out);
+      if (p.kind === 'tech') {
+        var o = ctx.createOscillator(); o.type = 'sine'; V.o1 = o; V.cg = ctx.createGain(); V.cg.gain.value = 0; o.connect(V.cg); V.cg.connect(out); o.start(); V.srcs.push(o);
+        var hn = mkNoise(), hf = ctx.createBiquadFilter(); hf.type = 'highpass'; hf.frequency.value = 3200; V.hg = ctx.createGain(); V.hg.gain.value = 0; hn.connect(hf); hf.connect(V.hg); V.hg.connect(out);
+      } else {
+        var o1 = ctx.createOscillator(), o2 = ctx.createOscillator(); o1.type = 'sawtooth'; o2.type = 'square'; V.o1 = o1; V.o2 = o2;
+        V.f = ctx.createBiquadFilter(); V.f.type = 'bandpass'; V.f.Q.value = p.kind === 'metal' ? 12 : 8; V.f.frequency.value = 900;
+        V.cg = ctx.createGain(); V.cg.gain.value = 0; o1.connect(V.f); o2.connect(V.f); V.f.connect(V.cg); V.cg.connect(out);
+        var lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 6.5; lg.gain.value = 14; lfo.connect(lg); lg.connect(o1.detune); lg.connect(o2.detune);
+        o1.start(); o2.start(); lfo.start(); V.srcs.push(o1, o2, lfo);
+      }
+      return V;
+    }
+    function endVoice(d) {
+      var V = d._snd, e = getEnv(); if (!V) return; d._snd = null;
+      try { var t = e && e.ctx ? e.ctx.currentTime : 0; V.out.gain.cancelScheduledValues(t); V.out.gain.setTargetAtTime(0, t, 0.04); V.srcs.forEach(function (s) { try { s.stop(t + 0.3); } catch (er) {} });
+        setTimeout(function () { try { V.out.disconnect(); V.pan.disconnect(); } catch (er) {} }, 600); } catch (er) {}
+    }
+    function creak(d, sp) {
+      var e = ready(), V = d._snd;
+      if (!e) { if (V) endVoice(d); return; }
+      var L = getListener() || { x: 0, z: 0 };
+      if (Math.hypot(d.pos.x - L.x, d.pos.z - L.z) > REACH) { if (V) endVoice(d); return; }
+      if (!V) { if (sp < 10) return; V = d._snd = makeVoice(d, e); } else if (sp < 3) { endVoice(d); return; }
+      var t = e.ctx.currentTime, k = V.p, a = clamp((sp - 4) / 90, 0, 1);
+      V.rg.gain.setTargetAtTime(a * 0.3 * (k.kind === 'metal' ? 1.3 : 1), t, 0.06); V.out.gain.setTargetAtTime(1, t, 0.05);
+      if (k.kind === 'tech') { V.o1.frequency.setTargetAtTime((260 + sp * 5) * k.pitch * 0.8, t, 0.05); V.cg.gain.setTargetAtTime(a * 0.035, t, 0.05); V.hg.gain.setTargetAtTime(a * 0.06, t, 0.08); }
+      else {
+        var now = Date.now(); if (now > V.jit) { V.jit = now + 90 + Math.random() * 130; V.base = 1 + (Math.random() - 0.5) * 0.35; }
+        var f = (120 + sp * 1.4) * k.pitch * V.base;
+        V.o1.frequency.setTargetAtTime(f, t, 0.03); V.o2.frequency.setTargetAtTime(f * 1.52, t, 0.03); V.f.frequency.setTargetAtTime(Math.min(2600, f * 4.5), t, 0.04); V.cg.gain.setTargetAtTime(a * a * 0.09, t, 0.04);
+      }
+    }
+    var api = { creak: creak, kill: endVoice, _log: function () { return log.slice(); }, _syn: S };
+    Object.keys(S).forEach(function (k) { api[k] = S[k]; });
+    return api;
+  }
+
+  /* ================================================================ 4. MESH (needs THREE and a canvas) */
+  var LINE_COLOR = { wood: '#62dcff', metal: '#ffb04a', tech: '#5dffa6' };
+  var FILL = 'rgba(7,11,17,0.975)', FRAME = '#0f1722';
+
+  // opts: { THREE, mkCanvas(w,h), tex(canvas), model, maxW, maxH (metres), color }
+  /* ---- looking into a room from its doorway ----
+     ROOM describes the room's "entry view" (build/snap-room.cjs takes it, and checks it matches this): a colour picture and a depth map, drawn from where a visitor stands the
+     moment they walk in (k: eye height and pitch, as in the casino's startAtDoor; z: how far inside the doorway, in the door's own space, -z being into the room), with a wider
+     lens (vfov) than the room uses, so there is a little picture to spare round the edges. The depth map holds the distance along the view axis in 12 bits over 0..zmax metres.
+     roomRay() follows a ray from anywhere into that picture and says what it sees: the first place it passes behind something in the depth map. It is used twice: by the doorway
+     window below, and by walkIn() for the glide you take when you step through. WIN is the older, flat version (a picture hung behind the doorway) for a room that has no depth map. */
+  var ROOM = { vfov: 80, aspect: 16 / 9, zmax: 32, k: { z: -1.48, eye: 1.6, pitch: -0.08 }, glide: 1500 };
+  var WIN = { dist: 6.5, camZ: 0.45, eye: 1.6, pitch: -0.08, fov: 68 };
+  var ROOM_GLSL = [
+    'uniform sampler2D uMap; uniform sampler2D uDepth; uniform vec3 uK; uniform vec3 uKf; uniform vec3 uKr; uniform vec3 uKu; uniform vec2 uTan; uniform float uZmax; uniform vec2 uFloor;',
+    'float roomZ(vec2 uv){ vec4 d = texture2D(uDepth, uv); return (floor(d.r * 255.0 + 0.5) * 16.0 + floor(floor(d.g * 255.0 + 0.5) / 16.0)) / 4095.0 * uZmax; }',
+    'vec2 roomUv(vec3 P, out float zc){ vec3 q = P - uK; zc = dot(q, uKf); float iz = 1.0 / max(zc, 0.001); return vec2(0.5 + 0.5 * dot(q, uKr) * iz / uTan.x, 0.5 + 0.5 * dot(q, uKu) * iz / uTan.y); }',
+    // what lies beyond the picture's edge: the floor just inside the doorway is below and behind the eye the picture was taken from, so it is not in it; the carpet is carried on, straight, from the picture's bottom edge
+    'vec4 roomBeyond(vec3 O, vec3 D){',
+    '  if (D.y > -0.02) return vec4(0.05, 0.02, 0.03, 0.0);',
+    '  float tf = (uFloor.x - O.y) / D.y; float xf = dot(O + D * tf - uK, uKr);',
+    '  float ext = max(0.0, uFloor.y - dot(O + D * tf - uK, uKf));',   // how far beyond the picture's bottom edge: the carpet darkens a little as it goes
+    '  return vec4(texture2D(uMap, vec2(clamp(0.5 + 0.5 * xf / uFloor.y / uTan.x, 0.002, 0.998), 0.012)).rgb * (0.95 - 0.25 * smoothstep(0.0, 2.5, ext)), 1.0);',
+    '}',
+    'vec4 roomRay(vec3 O, vec3 D){',
+    '  float df = dot(D, uKf), of = dot(O - uK, uKf), s0 = 0.0;',
+    '  if (of < 0.06) { if (df < 0.02) return vec4(0.0); s0 = (0.06 - of) / df; }',   // the picture starts where the ray reaches the eye it was taken from
+    '  float s1 = min((uZmax * 0.98 - of) / max(df, 0.02), s0 + 60.0), prev = s0, zc = 0.0, sh = s1; bool seen = false, hit = false;',
+    '  for (int i = 1; i <= 96; i++) {',
+    '    float t = float(i) / 96.0, s = s0 + (s1 - s0) * t * t; vec2 uv = roomUv(O + D * s, zc);',   // steps are finer near the viewer
+    '    if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) { seen = true; if (zc >= roomZ(uv)) { hit = true; sh = s; break; } } else if (seen) break;',
+    '    prev = s;',
+    '  }',
+    '  if (!hit) return roomBeyond(O, D);',
+    '  float a = prev, b = sh;',
+    '  for (int j = 0; j < 7; j++) { float m = 0.5 * (a + b); vec2 um = roomUv(O + D * m, zc); if (zc >= roomZ(um)) b = m; else a = m; }',
+    '  vec2 uv = clamp(roomUv(O + D * b, zc), 0.001, 0.999);',
+    '  float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));',
+    '  return vec4(mix(roomBeyond(O, D).rgb, texture2D(uMap, uv).rgb, smoothstep(0.0, 0.03, edge)), 1.0);',
+    '}'
+  ].join('\n');
+  function roomUniforms(T) {
+    var cp = Math.cos(ROOM.k.pitch), sp = Math.sin(ROOM.k.pitch), th = Math.tan(ROOM.vfov * Math.PI / 360);
+    return { uMap: { value: null }, uDepth: { value: null }, uK: { value: new T.Vector3(0, ROOM.k.eye, ROOM.k.z) }, uKf: { value: new T.Vector3(0, sp, -cp) }, uKr: { value: new T.Vector3(1, 0, 0) },
+      uKu: { value: new T.Vector3(0, cp, sp) }, uTan: { value: new T.Vector2(th * ROOM.aspect, th) }, uZmax: { value: ROOM.zmax }, uFloor: { value: new T.Vector2(0, 1.6) } };
+  }
+  // the eye's height above the door's own floor (floorY below the door's origin) fixes where the floor is, and how far ahead the picture's bottom row reaches it
+  function roomFloor(T, u, floorY) {
+    var cp = Math.cos(ROOM.k.pitch), sp = Math.sin(ROOM.k.pitch), th = Math.tan(ROOM.vfov * Math.PI / 360), yc = (2 * 0.012 - 1) * th;
+    u.uK.value.y = ROOM.k.eye - floorY; u.uFloor.value.set(-floorY, -ROOM.k.eye / (sp + cp * yc));   // (the bottom-row ray: forward + up * yc; its slope is sp + cp * yc, negative)
+  }
+  // The glide: a full-screen view of the room, from where the visitor's eye is now to where the room's own first view is, in ROOM.glide ms. It draws on a canvas of its own
+  // (a second small WebGL context, thrown away afterwards) that the caller places over the hall; when it arrives the picture is the room's first view, so the live room can take over.
+  function walkIn(T, group, win, camera, opts) {
+    var w = opts.width || window.innerWidth, h = opts.height || window.innerHeight, fov = opts.fov || camera.fov || 68, ms = opts.ms || ROOM.glide;
+    var renderer = new T.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(opts.pixelRatio || Math.min(1, 0.9 * (window.devicePixelRatio || 1))); renderer.setSize(w, h, false);
+    var dom = renderer.domElement; dom.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;z-index:8900;opacity:0;pointer-events:none';
+    var u = roomUniforms(T); u.uMap.value = win.map; u.uDepth.value = win.depth; u.uK.value.copy(win.uniforms.uK.value); u.uFloor.value.copy(win.uniforms.uFloor.value);
+    u.uO = { value: new T.Vector3() }; u.uF = { value: new T.Vector3(0, 0, -1) }; u.uR = { value: new T.Vector3(1, 0, 0) }; u.uU = { value: new T.Vector3(0, 1, 0) }; u.uCamTan = { value: new T.Vector2(1, 1) };
+    var mat = new T.ShaderMaterial({ uniforms: u, depthTest: false, depthWrite: false,
+      vertexShader: 'varying vec2 vN; void main(){ vN = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: 'varying vec2 vN; uniform vec3 uO; uniform vec3 uF; uniform vec3 uR; uniform vec3 uU; uniform vec2 uCamTan;\n' + ROOM_GLSL + '\n' +
+        'void main(){ vec3 D = normalize(uF + vN.x * uCamTan.x * uR + vN.y * uCamTan.y * uU); vec4 r = roomRay(uO, D); gl_FragColor = vec4(r.rgb + (1.0 - r.a) * vec3(0.05, 0.02, 0.03), 1.0); }' });
+    var geo = new T.PlaneGeometry(2, 2), mesh = new T.Mesh(geo, mat), scene = new T.Scene(), cam = new T.Camera(); mesh.frustumCulled = false; scene.add(mesh);
+    // from the eye as it is now (in the door's own space) to the room's first view
+    group.updateWorldMatrix(true, false); camera.updateMatrixWorld();
+    var cm = new T.Matrix4().multiplyMatrices(new T.Matrix4().copy(group.matrixWorld).invert(), camera.matrixWorld), p0 = new T.Vector3(), q0 = new T.Quaternion(), sc = new T.Vector3();
+    cm.decompose(p0, q0, sc);
+    var p1 = new T.Vector3(0, u.uK.value.y, ROOM.k.z), q1 = new T.Quaternion().setFromEuler(new T.Euler(ROOM.k.pitch, 0, 0, 'YXZ')), q = new T.Quaternion(), t0 = 0;
+    var tv = Math.tan(fov * Math.PI / 360); u.uCamTan.value.set(tv * w / h, tv);
+    function pose(e) {
+      u.uO.value.lerpVectors(p0, p1, e); q.copy(q0).slerp(q1, Math.min(1, e * 1.25));
+      u.uF.value.set(0, 0, -1).applyQuaternion(q); u.uR.value.set(1, 0, 0).applyQuaternion(q); u.uU.value.set(0, 1, 0).applyQuaternion(q);
+    }
+    pose(0);
+    return {
+      dom: dom, ms: ms, done: false,
+      render: function (now) {   // now: a clock in ms (performance.now())
+        if (!t0) t0 = now; var t = Math.min(1, (now - t0) / ms); this.done = t >= 1; this.t = t; pose(1 - Math.pow(1 - t, 2.2)); renderer.render(scene, cam);
+      },
+      resize: function (nw, nh) { renderer.setSize(nw, nh, false); u.uCamTan.value.set(tv * nw / nh, tv); },
+      dispose: function () { try { geo.dispose(); mat.dispose(); renderer.dispose(); renderer.forceContextLoss(); } catch (e) { } if (dom.parentNode) dom.parentNode.removeChild(dom); }
+    };
+  }
+
+  function buildMesh(o) {
+    var T = o.THREE, m = o.model, G = layoutOf(m.cfg.style, o.w, o.h), S = G.S, W = G.W, H = G.H;
+    var s = Math.min((o.maxH || 2.25) / H, (o.maxW || 2.4) / W, 0.0105);       // metres per design unit
+    var line = o.color || LINE_COLOR[S.sfx] || LINE_COLOR.wood, lw = 1.5;
+    var ppu = Math.min(4, 1024 / Math.max(G.leafW, H, 1));
+    var group = new T.Group(), disposables = [], pick = [];
+    var SK = o.skin && o.skin.kit && o.skin.rec ? o.skin : null;            // a lit, textured finish (door-skins.js); null = the neon Threshold look
+    // A door set into the wall: the slab is thin and its front sits only a few centimetres off the wall face, so it reads as
+    // part of the wall (and its foot lines up with the wall's foot) rather than as a board standing in the room.
+    var zWall = 0.006, zFrame = 0.01, zLeaf = 0.012, th = Math.min(G.thick * s, 0.03);
+    function canvasTex(w, h, paint) {
+      var cv = o.mkCanvas(Math.ceil(w * ppu), Math.ceil(h * ppu)), x = cv.getContext('2d'); x.scale(ppu, ppu); paint(x);
+      var t = o.tex(cv); t.anisotropy = 4; disposables.push(t); return t;
+    }
+    function basicMat(map, extra) { var mt = new T.MeshBasicMaterial(Object.assign({ map: map, transparent: true, depthWrite: false }, extra || {})); disposables.push(mt); return mt; }
+    function shapeOf(pts, ox) { var sh = new T.Shape(); pts.forEach(function (p, i) { var x = (p[0] - ox) * s, y = (H - p[1]) * s; if (i) sh.lineTo(x, y); else sh.moveTo(x, y); }); sh.closePath(); return sh; }
+
+    /* a skin: the band is the frame finish; the leaves, the handle and the straps are lit and textured */
+    var skinTex = null;
+    function skinBand(x, shp, outerD) {
+      var fr = SK.frameRec, pat = null;
+      if (fr) {
+        var fm = SK.kit.render(fr, { w: 128, h: 128, seed: 99, wear: 0 }), fc = o.mkCanvas(128, 128), fx = fc.getContext('2d'), id = fx.createImageData(128, 128);
+        id.data.set(fm.albedo); fx.putImageData(id, 0, 0); pat = x.createPattern(fc, 'repeat');
+      }
+      x.save(); x.clip(new Path2D(outerD + G.shape.d), 'evenodd'); x.lineJoin = 'round';
+      x.strokeStyle = 'rgba(0,0,0,0.42)'; x.lineWidth = 2 * G.fw + 5; x.stroke(shp);                           // a soft shadow edge on the wall
+      if (pat) { x.strokeStyle = pat; x.lineWidth = 2 * G.fw; x.stroke(shp); }
+      if (pat) { x.strokeStyle = 'rgba(255,255,255,0.2)'; x.lineWidth = 3.5; x.stroke(shp); }                // a lit edge along the opening
+      x.restore();
+    }
+    function skinMaps() {                                                                           // one set of maps for the whole door; each leaf shows its strip
+      var KT = SK.kit, sc = (SK.maxSide || 512) / Math.max(W, H), w = Math.max(16, Math.round(W * sc)), h = Math.max(16, Math.round(H * sc));
+      var ops = G.leaves.map(function (L) { return faceOps(G, L, 0, true); }).join('');
+      var rel = KT.relief(G.shape.pts, ops, W, H, w, h), L0 = G.leaves[0];
+      var mp = KT.render(SK.rec, { w: w, h: h, rel: rel, seed: 1234, wear: SK.wear, tint: SK.tint || null, handle: [L0.hx / W, G.hy / H] });
+      function cv(fill) { var c = o.mkCanvas(w, h), x = c.getContext('2d'), id = x.createImageData(w, h); fill(id.data); x.putImageData(id, 0, 0); return c; }
+      var n = w * h, glass = !!(SK.rec.pane || SK.rec.opacity < 1), em = SK.rec.emissive ? KT.hexToRgb(SK.rec.emissive.color) : null;
+      var albedo = cv(function (d) { for (var i = 0; i < n; i++) { d[i * 4] = mp.albedo[i * 4]; d[i * 4 + 1] = mp.albedo[i * 4 + 1]; d[i * 4 + 2] = mp.albedo[i * 4 + 2]; d[i * 4 + 3] = Math.min(mp.albedo[i * 4 + 3], rel.mask[i] * 255); } });
+      var orm = cv(function (d) { for (var i = 0; i < n; i++) { d[i * 4] = 255; d[i * 4 + 1] = mp.orm[i * 4]; d[i * 4 + 2] = mp.orm[i * 4 + 1]; d[i * 4 + 3] = 255; } });
+      var nrm = cv(function (d) { for (var i = 0; i < n; i++) { d[i * 4] = mp.normal[i * 4]; d[i * 4 + 1] = mp.normal[i * 4 + 1]; d[i * 4 + 2] = mp.normal[i * 4 + 2]; d[i * 4 + 3] = 255; } });
+      var emi = em ? cv(function (d) { var k = SK.rec.emissive.intensity * 1.1; for (var i = 0; i < n; i++) { var g = Math.min(1, mp.groove[i]) * k; d[i * 4] = em[0] * 255 * g; d[i * 4 + 1] = em[1] * 255 * g; d[i * 4 + 2] = em[2] * 255 * g; d[i * 4 + 3] = 255; } }) : null
+      function lin(c) { var t = new T.CanvasTexture(c); t.anisotropy = 4; disposables.push(t); return t; }
+      var tA = o.tex(albedo); disposables.push(tA);
+      return { albedo: tA, orm: lin(orm), normal: lin(nrm), emissive: emi ? o.tex(emi) : null, glass: glass, base: SK.rec.base };
+    }
+    // the hardware finish: the skin's metal, aged by its wear (a little duller and browner), reflecting a brighter generated room than the doors do
+    function hwFinish(dim, extra) {
+      var h = SK.hw || { color: '#c9a24a', rough: 0.3, metal: 1 }, wr = clamp(SK.wear || 0, 0, 1), c = new T.Color(h.color);
+      c.lerp(new T.Color(h.color).multiplyScalar(0.4).lerp(new T.Color('#5a4630'), 0.4), wr * 0.5); if (dim) c.multiplyScalar(dim);
+      var mt = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: clamp(h.rough + wr * 0.3 + (dim ? 0.1 : 0), 0.05, 0.92), metalness: h.metal, envMap: SK.envHw || SK.env || null, envMapIntensity: 1.4, side: T.DoubleSide }, extra || {}));
+      disposables.push(mt); return mt;
+    }
+    function hwMat() { return hwFinish(0); }
+    function hwMats(type) {
+      var em = SK.rec && SK.rec.emissive ? SK.rec.emissive.color : '#3be6ff', env = SK.envHw || SK.env || null;
+      var porcelain = type === 'knob' && SK.family === 'painted';   // a painted door gets a porcelain knob, as an old painted door would
+      var knob = porcelain ? new T.MeshPhysicalMaterial({ color: new T.Color('#efe9dc'), roughness: 0.2, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.1, envMap: env, envMapIntensity: 1.1 }) : null;
+      var m = { fin: hwFinish(0), acc: hwFinish(0.62), dark: new T.MeshStandardMaterial({ color: 0x07080a, roughness: 0.92, metalness: 0, side: T.DoubleSide }), glow: new T.MeshBasicMaterial({ color: new T.Color(em) }) };
+      m.knob = knob || m.fin; disposables.push(m.dark, m.glow); if (knob) disposables.push(knob); return m;
+    }
+    if (SK) skinTex = skinMaps();
+
+    /* doorway: dark recess with depth lines, framed by a band (one plane behind the leaves) */
+    var pad = G.fw + 4, doorW = (W + 2 * pad) * s, doorH = (H + 2 * pad) * s;
+    var wayTex = canvasTex(W + 2 * pad, H + 2 * pad, function (x) {
+      x.translate(pad, pad);
+      var shp = new Path2D(G.shape.d), outerD = 'M' + -pad + ' ' + -pad + 'H' + (W + pad) + 'V' + (H + pad) + 'H' + -pad + 'Z';
+      x.save(); x.clip(shp);
+      var gr = x.createRadialGradient(W / 2, H * 0.45, 4, W / 2, H * 0.5, Math.max(W, H) * 0.75); gr.addColorStop(0, '#1c3550'); gr.addColorStop(1, '#04070b'); x.fillStyle = gr; x.fillRect(-pad, -pad, W + 2 * pad, H + 2 * pad);
+      x.strokeStyle = line; x.globalAlpha = SK ? 0 : 0.22; x.lineJoin = 'round';
+      for (var k = 0.84; k > 0.3; k -= 0.18) { x.save(); x.translate(W / 2, H / 2); x.scale(k, k); x.translate(-W / 2, -H / 2); x.lineWidth = lw / k; x.stroke(shp); x.restore(); }
+      x.restore();
+      if (SK) { skinBand(x, shp, outerD); return; }
+      x.save(); x.clip(new Path2D(outerD + G.shape.d), 'evenodd');     // the band lives outside the opening only
+      x.lineJoin = 'round'; x.strokeStyle = FRAME; x.lineWidth = 2 * G.fw; x.stroke(shp);
+      x.strokeStyle = line; x.globalAlpha = 0.35; x.lineWidth = G.fw * 1.1; x.stroke(shp);
+      x.restore();
+      x.save(); x.shadowColor = line; x.shadowBlur = 5; x.strokeStyle = line; x.lineWidth = lw; x.stroke(shp); x.restore();
+    });
+    // the frame band reaches below the opening by a margin; cut that off so the doorway stands on the floor, not in it
+    var padS = pad * s, wayGeo = new T.PlaneGeometry(doorW, doorH - padS), vmin = pad / (H + 2 * pad), wuv = wayGeo.attributes.uv;
+    for (var ui = 0; ui < wuv.count; ui++) wuv.setY(ui, vmin + wuv.getY(ui) * (1 - vmin));
+    disposables.push(wayGeo);
+    var way = new T.Mesh(wayGeo, SK ? (function () { var mt = new T.MeshStandardMaterial({ map: wayTex, transparent: true, depthWrite: false, roughness: 0.75, metalness: 0, envMap: SK.env || null, envMapIntensity: 0.4 }); disposables.push(mt); return mt; })() : basicMat(wayTex)); way.position.set(0, (doorH - padS) / 2, zWall); way.renderOrder = 0; group.add(way);
+
+    /* a threshold sill in the frame finish: a low block the door stands on, so the doorway has some depth */
+    if (SK && SK.frameRec) {
+      var fr = SK.frameRec, sillMat = new T.MeshStandardMaterial({ color: new T.Color(fr.base).multiplyScalar(0.85), roughness: fr.rough, metalness: fr.metal, envMap: SK.env || null, envMapIntensity: 1 });
+      var sillGeo = new T.BoxGeometry((W + 2 * G.fw + 6) * s, 0.032, 0.09); disposables.push(sillMat, sillGeo);
+      var sill = new T.Mesh(sillGeo, sillMat); sill.position.set(0, 0.016, 0.045); sill.raycast = function () {}; sill.renderOrder = 1; group.add(sill);
+    }
+
+    /* leaves */
+    var strikes = {};
+    var leafObjs = G.leaves.map(function (L) {
+      var pivot = new T.Group(); pivot.position.set((L.axis - W / 2) * s, 0, zLeaf);
+      // the slab: the outline clipped to this leaf's strip, extruded for thickness
+      var clipped = clipStrip(G.shape.pts, L.x0, L.x1), body = new T.Mesh(new T.ExtrudeGeometry(shapeOf(clipped, L.axis), { depth: th, bevelEnabled: false }),
+        SK ? new T.MeshStandardMaterial({ color: new T.Color(SK.rec.base).multiplyScalar(0.5), roughness: 0.7, metalness: SK.rec.metal * 0.6 }) : new T.MeshBasicMaterial({ color: 0x070b11 }));
+      disposables.push(body.material, body.geometry); pivot.add(body); pick.push(body);
+      var cx = ((L.x0 + L.x1) / 2 - L.axis) * s, front, back, hands;
+      if (SK) {
+        // the leaf's strip of the door's maps, lit; the back shows the same strip mirrored so panels sit where they do on the front
+        var face = function (flip) {
+          var mt = new T.MeshStandardMaterial({ map: skinTex.albedo, normalMap: skinTex.normal, normalScale: new T.Vector2(1, -1), roughnessMap: skinTex.orm, metalnessMap: skinTex.orm, roughness: 1, metalness: 1,
+            envMap: SK.env || null, envMapIntensity: 1.5, transparent: skinTex.glass, depthWrite: !skinTex.glass, alphaTest: skinTex.glass ? 0 : 0.5, side: T.FrontSide });
+          if (skinTex.emissive) { mt.emissive = new T.Color(0xffffff); mt.emissiveMap = skinTex.emissive; mt.emissiveIntensity = 1; }
+          else if (!skinTex.glass) { mt.emissive = new T.Color(0xffffff); mt.emissiveMap = skinTex.albedo; mt.emissiveIntensity = 0.13; }   // the hall is dim: a doorway should never go pitch dark
+          disposables.push(mt);
+          var g = new T.PlaneGeometry(L.w * s, H * s), uv = g.attributes.uv, u0 = L.x0 / W, u1 = L.x1 / W;
+          for (var ui = 0; ui < uv.count; ui++) uv.setX(ui, (flip ? u1 : u0) + (uv.getX(ui)) * ((flip ? u0 : u1) - (flip ? u1 : u0)));
+          disposables.push(g); return new T.Mesh(g, mt);
+        };
+        front = face(false); back = face(true);
+        front.position.set(cx, H * s / 2, th + 0.0015); back.position.set(cx, H * s / 2, -0.0015); back.rotation.y = Math.PI;
+        front.raycast = back.raycast = function () {}; front.renderOrder = back.renderOrder = 1; pivot.add(front, back);
+        // hinge straps and the lever with its rose: small lit metal parts, on both faces
+        var hm = hwMat(), strapG = new T.BoxGeometry(1, 1, 1); disposables.push(strapG);
+        S.hingeYs.forEach(function (f) {
+          var e = G.shape.edge(f * H), ax = L.hinge === 'R' ? e[1] : e[0], len2 = Math.max(14, S.strap * L.w), tk = S.strapTh;
+          [th + 0.003, -0.003].forEach(function (z) {
+            var sm = new T.Mesh(strapG, hm); sm.scale.set(len2 * s, tk * s, 0.006); sm.position.set((ax + (L.hinge === 'R' ? -len2 / 2 : len2 / 2) - L.axis) * s, (H - f * H) * s, z); sm.raycast = function () {}; pivot.add(sm);
+          });
+        });
+        // the handle: hardware chosen for this kind of door (section 5), the same on both faces; the parts that turn are in `lever`
+        var hwType = hardwareOf(S), HP = hwParts(T, hwType), HM = hwMats(hwType), hwS = s * hardwareScale(S);
+        disposables.push.apply(disposables, HP.geos);
+        hands = [th + 0.004, -0.004].map(function (z, k) {
+          var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = k ? -L.dir : L.dir;   // the back handle is the front one seen from the other side: same spindle, same direction (and it turns the same way)
+          var lv = new T.Group(), st = new T.Group(); lv.scale.setScalar(hwS); st.scale.setScalar(hwS);
+          HP.parts.forEach(function (p) { var mesh = new T.Mesh(p.g, HM[p.m] || HM.fin); mesh.position.set(p.x, p.y, p.z); mesh.raycast = function () {}; (p.rot ? lv : st).add(mesh); });
+          hg.add(st, lv); pivot.add(hg); return { g: hg, lever: lv, type: hwType, porcelain: HM.knob !== HM.fin };
+        });
+      } else {
+      var faceTex = [0, 1].map(function (sd) { return canvasTex(L.w, H, function (x) {
+        x.translate(-L.x0, 0);
+        if (G.nL > 1) { x.beginPath(); x.rect(L.hinge === 'R' ? L.x0 - 4 : L.x0 - 4, -6, L.w + 8, H + 12); x.clip(); }
+        x.shadowColor = line; x.shadowBlur = 4; drawOps(x, faceOps(G, L, sd), { line: line, fill: FILL, lw: lw });
+      }); });
+      front = new T.Mesh(new T.PlaneGeometry(L.w * s, H * s), basicMat(faceTex[0])); back = new T.Mesh(new T.PlaneGeometry(L.w * s, H * s), basicMat(faceTex[1]));
+      front.position.set(cx, H * s / 2, th + 0.0015); back.position.set(cx, H * s / 2, -0.0015); back.rotation.y = Math.PI;
+      front.raycast = back.raycast = function () {}; front.renderOrder = back.renderOrder = 1; pivot.add(front, back);
+      // the handle (a lever that turns with the physics), on both faces
+      var bs = 2 * (L.Lh + 16), levTex = canvasTex(bs, bs, function (x) { x.translate(bs / 2, bs / 2); x.shadowColor = line; x.shadowBlur = 3; drawOps(x, leverArt(S.handle, L.Lh), { line: line, fill: FILL, lw: lw }); });
+      hands = [th + 0.004, -0.004].map(function (z, k) {
+        var hg = new T.Group(); hg.position.set((L.hx - L.axis) * s, (H - G.hy) * s, z); if (k) hg.rotation.y = Math.PI; hg.scale.x = k ? -L.dir : L.dir;   // as above: mirrored on the back so both levers point and turn the same way
+        var lm = new T.Mesh(new T.PlaneGeometry(bs * s, bs * s), basicMat(levTex)); lm.raycast = function () {}; lm.renderOrder = 2; hg.add(lm); pivot.add(hg); return { g: hg, lever: lm };
+      });
+      }
+      var led = new T.Mesh(new T.CircleGeometry(2.4 * s, 12), new T.MeshBasicMaterial({ color: 0xff6a6a })); led.position.set((L.hx - L.axis) * s, (H - G.hy - 16) * s, th + 0.005); led.raycast = function () {}; pivot.add(led); disposables.push(led.material, led.geometry);
+      /* The latch: a real bolt (about 3 cm long, 1.8 cm deep, bevelled at the tip) that slides out of a faceplate on the leaf's edge, and a
+         strike set into the frame: a keep (a block of the frame finish beside the leaf) with a metal strike plate and a dark mortise the
+         bolt goes into. Pulled in, the bolt sits inside the leaf; let go, it throws out through the faceplate and into the keep (the part
+         inside the keep is hidden by it, so it reads as going into the frame). Double doors meet in the middle and have no keep. */
+      var yB = (H - G.hy) * s, zB = th * 0.5, out = -L.inw, bd = Math.min(BOLT.d, th * 0.8), bev = 0.006, bh = BOLT.h;
+      var bshape = new T.Shape(); bshape.moveTo(-BOLT.l / 2, -bd / 2); bshape.lineTo(BOLT.l / 2 - bev, -bd / 2); bshape.lineTo(BOLT.l / 2, -bd / 2 + bev);
+      bshape.lineTo(BOLT.l / 2, bd / 2 - bev); bshape.lineTo(BOLT.l / 2 - bev, bd / 2); bshape.lineTo(-BOLT.l / 2, bd / 2); bshape.closePath();
+      var bgeo = new T.ExtrudeGeometry(bshape, { depth: bh, bevelEnabled: false }); bgeo.rotateX(Math.PI / 2); bgeo.center();
+      var metal = function () { var mt = SK ? hwMat() : new T.MeshBasicMaterial({ color: 0xc9d4de }); if (!SK) disposables.push(mt); return mt; };
+      var bolt = new T.Mesh(bgeo, metal()); bolt.scale.x = out; bolt.position.set((L.latch - L.axis) * s - L.inw * (BOLT.throw - (BOLT.l / 2 + 0.002)), yB, zB);   // the tip points out of the leaf
+      bolt.raycast = function () {}; pivot.add(bolt); disposables.push(bgeo);
+      if (G.nL === 1) {
+        var fpG = new T.BoxGeometry(0.003, 0.17, Math.min(0.024, th * 0.95)), fp = new T.Mesh(fpG, metal()); fp.position.set((L.latch - L.axis) * s + out * 0.0015, yB, zB); fp.raycast = function () {}; pivot.add(fp); disposables.push(fpG);
+        var gx = (L.latch - W / 2) * s, zc = zLeaf + zB, keepMat = SK && SK.frameRec
+          ? new T.MeshStandardMaterial({ color: new T.Color(SK.frameRec.base).multiplyScalar(0.85), roughness: SK.frameRec.rough, metalness: SK.frameRec.metal, envMap: SK.env || null, envMapIntensity: 1 })
+          : new T.MeshBasicMaterial({ color: 0x0f1722 });
+        var keepG = new T.BoxGeometry(0.05, 0.28, zc + BOLT.d / 2 + 0.012), keep = new T.Mesh(keepG, keepMat); keep.position.set(gx + out * (BOLT.gap + 0.025), yB, (zc + BOLT.d / 2 + 0.012) / 2); keep.raycast = function () {};
+        var stG = new T.BoxGeometry(0.003, 0.14, 0.032), st = new T.Mesh(stG, metal()); st.position.set(gx + out * (BOLT.gap - 0.0015), yB, zc); st.raycast = function () {};
+        var moG = new T.PlaneGeometry(0.022, 0.034), mo = new T.Mesh(moG, new T.MeshBasicMaterial({ color: 0x020305 })); mo.position.set(gx + out * (BOLT.gap - 0.0031), yB, zc); mo.rotation.y = L.inw * Math.PI / 2; mo.raycast = function () {};
+        group.add(keep, st, mo); disposables.push(keepMat, keepG, stG, moG, mo.material);
+        strikes[L.i] = { out: out, edge: gx, face: BOLT.gap, keepEnd: BOLT.gap + 0.05 };
+      }
+      group.add(pivot);
+      return { L: L, pivot: pivot, hands: hands, led: led, bolt: bolt, boltX: (L.latch - L.axis) * s };
+    });
+
+    function sync() {
+      var a = m.angle, hA = m.handle.a, r = clamp(hA / (HMAX * 0.8), 0, 1);
+      leafObjs.forEach(function (lo) {
+        var L = lo.L; lo.pivot.rotation.y = (L.hinge === 'R' ? 1 : -1) * (a + m.shakeR) * DEG; lo.pivot.position.x = (L.axis - W / 2) * s + m.shakeX * s;
+        lo.hands.forEach(function (h) { h.lever.rotation.z = -hA * DEG; });
+        var rr = r;   // the bolt follows the handle: held in while the door closes, out once the leaf is home
+        lo.bolt.position.x = lo.boltX - L.inw * (BOLT.throw * (1 - rr) - (BOLT.l / 2 + 0.002)); lo.led.material.color.setHex(m.cfg.locked ? 0xff6a6a : 0x5dffa6);
+      });
+    }
+    // where the bolt is, in metres beyond the leaf's edge (negative: inside the leaf), and where the strike's face and the back of the keep are (for tests)
+    function latch() {
+      return leafObjs.map(function (lo) {
+        var L = lo.L, st = strikes[L.i], out = -L.inw, tip = (lo.bolt.position.x - lo.boltX) * out + BOLT.l / 2;
+        return { tip: tip, face: st ? st.face : null, keepEnd: st ? st.keepEnd : null, hasKeep: !!st };
+      });
+    }
+    function dispose() {
+      if (group.parent) group.parent.remove(group);
+      group.traverse(function (ob) { if (ob.geometry && disposables.indexOf(ob.geometry) < 0) ob.geometry.dispose(); });
+      disposables.forEach(function (d) { if (d.dispose) d.dispose(); });
+    }
+    /* Portal mode, for a door that opens onto a real room built behind the wall. The wall has a thickness (depth metres, a drywall
+       cavity): the doorway becomes a short tunnel lined with a reveal. The opening is cut out of the doorway picture (the frame band stays),
+       and two invisible copies of the opening write the stencil, one at each wall face (bit 1 for the wall on this side, bit 2 for the wall
+       of the room behind), which the wall materials test, so neither wall is drawn over its opening and the room behind shows through. */
+    var portalParts = null, portalOn = false, Z_WALL = -0.02;   // the wall's face is 2 cm behind the bay's origin
+    function portal(on, depth) {
+      on = !!on; if (on === portalOn) return; portalOn = on;
+      if (on) {
+        if (!portalParts) {
+          depth = depth > 0 ? depth : 0.2;
+          var src = wayTex.image, shp2 = new Path2D(G.shape.d);
+          var bc = o.mkCanvas(src.width, src.height), bx = bc.getContext('2d'); bx.drawImage(src, 0, 0);
+          bx.save(); bx.scale(ppu, ppu); bx.translate(pad, pad); bx.globalCompositeOperation = 'destination-out'; bx.fill(shp2); bx.restore();
+          var hc = o.mkCanvas(src.width, src.height), hx = hc.getContext('2d'); hx.scale(ppu, ppu); hx.translate(pad, pad); hx.fillStyle = '#fff'; hx.fill(shp2);
+          var bandTex = o.tex(bc), holeTex = o.tex(hc); bandTex.anisotropy = 4; disposables.push(bandTex, holeTex);
+          var maskOf = function (bit, z) {
+            var mm = new T.MeshBasicMaterial({ map: holeTex, alphaTest: 0.5, colorWrite: false, depthWrite: false, depthTest: false, side: T.DoubleSide, fog: false });
+            mm.stencilWrite = true; mm.stencilRef = bit; mm.stencilWriteMask = bit; mm.stencilFunc = T.AlwaysStencilFunc; mm.stencilZPass = T.ReplaceStencilOp; disposables.push(mm);
+            var mk = new T.Mesh(wayGeo, mm); mk.position.set(way.position.x, way.position.y, z); mk.renderOrder = -100; mk.raycast = function () {}; return mk;
+          };
+          // the reveal: the opening's outline carried back through the wall, so the thickness of the wall can be seen from the doorway
+          var pts = G.shape.pts, pos = [], idx = [], z1 = Z_WALL - depth;
+          for (var pi = 0; pi < pts.length; pi++) {
+            var pa = pts[pi], pb = pts[(pi + 1) % pts.length]; if (pa[0] === pb[0] && pa[1] === pb[1]) continue;
+            var ax = (pa[0] - W / 2) * s, ay = (H - pa[1]) * s, bx2 = (pb[0] - W / 2) * s, by2 = (H - pb[1]) * s, k0 = pos.length / 3;
+            pos.push(ax, ay, Z_WALL, bx2, by2, Z_WALL, bx2, by2, z1, ax, ay, z1); idx.push(k0, k0 + 1, k0 + 2, k0, k0 + 2, k0 + 3);
+          }
+          var rg = new T.BufferGeometry(); rg.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); rg.setIndex(idx); rg.computeVertexNormals();
+          var rm = new T.MeshStandardMaterial({ color: 0x2b2538, emissive: 0x0b0914, roughness: 0.95, metalness: 0, side: T.DoubleSide }); disposables.push(rg, rm);
+          var reveal = new T.Mesh(rg, rm); reveal.raycast = function () {};
+          portalParts = { band: bandTex, near: maskOf(1, Z_WALL), far: maskOf(2, Z_WALL - depth), reveal: reveal, plain: way.material.map };
+        }
+        way.material.map = portalParts.band; way.material.needsUpdate = true; group.add(portalParts.near, portalParts.far, portalParts.reveal);
+      } else if (portalParts) {
+        way.material.map = portalParts.plain; way.material.needsUpdate = true; group.remove(portalParts.near, portalParts.far, portalParts.reveal);
+      }
+    }
+    /* a window onto the room behind the door, made from the room's "entry view": a colour picture and a depth map of what you see the moment you walk in
+       (build/snap-room.cjs takes them; ROOM says how). For every pixel of the opening, a ray from your eye is followed on into that picture, found where it first goes
+       behind something in the depth map, and the colour there is drawn: so the ropes, the tables and the far wall slide past each other as you move, as they would
+       through a real doorway. A room with only a picture (no depth map) gets a flat picture hung 6.5 m behind the doorway instead (WIN): right from the doorway, less so beside it.
+       Both are drawn as they are (the pictures are finished screen shots: no tone mapping, no second colour conversion). Also here: the doorway's own soft shading, and the
+       warm light the open door lets out across the floor. */
+    var win = null, winKey = '', spill = null;
+    function spillTex() {
+      var c = o.mkCanvas(128, 128), x = c.getContext('2d'), g; x.scale(1, 2); g = x.createRadialGradient(64, 0, 2, 64, 0, 64);   // (an ellipse: fades out before the edge of the patch on every side)
+      g.addColorStop(0, 'rgba(255,196,120,0.55)'); g.addColorStop(0.35, 'rgba(255,170,90,0.22)'); g.addColorStop(1, 'rgba(255,150,70,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 64);
+      var t = new T.CanvasTexture(c); disposables.push(t); return t;
+    }
+    function windowTo(url, depthUrl) {
+      url = url || ''; depthUrl = depthUrl || ''; var key = url + '|' + depthUrl; if (key === winKey) return; winKey = key;
+      if (win) { group.remove(win.mesh); win.mat.dispose(); [win.map, win.depth].forEach(function (t) { if (t) t.dispose(); }); win = null; }
+      if (spill) { group.remove(spill); spill.material.dispose(); spill.geometry.dispose(); spill = null; }
+      if (!url) return;
+      group.updateWorldMatrix(true, false);   // the door's own space starts a few cm above the floor: the eye is measured from the floor
+      var floorY = group.matrixWorld.elements[13];
+      var maskTex = canvasTex(W + 2 * pad, H + 2 * pad, function (x) { x.translate(pad, pad); x.fillStyle = '#fff'; x.fill(new Path2D(G.shape.d)); });
+      var mine = { url: url, depthUrl: depthUrl, map: null, depth: null, mesh: null, mat: null, ready: false, deep: !!depthUrl, uniforms: null }, u;
+      var shade = 'uniform sampler2D uMask; uniform vec3 uCam; varying vec2 vUv; varying vec3 vL;\n' +
+        'float openness(){ float m = 0.0; for (int i = 0; i < 8; i++) { float a = float(i) * 0.785398; m += texture2D(uMask, vUv + vec2(cos(a), sin(a)) * 0.05).a; } return m / 8.0; }\n';   // 1 well inside the opening, less near its edge
+      var vert = 'varying vec2 vUv; varying vec3 vL; uniform vec3 uPos; void main(){ vUv = uv; vL = position + uPos; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+      if (depthUrl) {
+        u = roomUniforms(T); roomFloor(T, u, floorY); u.uMask = { value: maskTex }; u.uCam = { value: new T.Vector3(0, 1.6, 3) }; u.uPos = { value: new T.Vector3(way.position.x, way.position.y, 0.008) };
+        mine.mat = new T.ShaderMaterial({ uniforms: u, vertexShader: vert, fragmentShader: shade + ROOM_GLSL + '\n' +
+          'void main(){ if (texture2D(uMask, vUv).a < 0.5) discard; vec4 r = roomRay(vL, normalize(vL - uCam)); vec3 c = r.rgb * mix(0.5, 1.0, smoothstep(0.55, 1.0, openness())); gl_FragColor = vec4(c, 1.0); }' });
+      } else {
+        var cp = Math.cos(WIN.pitch), sp = Math.sin(WIN.pitch), reach = (WIN.dist + WIN.camZ) / cp, half = Math.tan(ROOM.vfov * Math.PI / 360) * reach;   // (the picture is the wide one: the room's own 68 degrees are its middle)
+        var dir = new T.Vector3(0, sp, -cp), cam0 = new T.Vector3(0, WIN.eye - floorY, WIN.camZ), p0 = cam0.clone().addScaledVector(dir, reach);
+        u = { uMap: { value: null }, uMask: { value: maskTex }, uCam: { value: new T.Vector3(0, 1.6, 3) }, uP0: { value: p0 }, uN: { value: dir }, uUp: { value: new T.Vector3(0, cp, sp) },
+          uHalf: { value: new T.Vector2(half * 2.3, half) }, uPos: { value: new T.Vector3(way.position.x, way.position.y, 0.008) } };
+        mine.mat = new T.ShaderMaterial({ uniforms: u, vertexShader: vert, fragmentShader: shade + 'uniform sampler2D uMap; uniform vec3 uP0; uniform vec3 uN; uniform vec3 uUp; uniform vec2 uHalf;\n' +
+          'void main(){ if (texture2D(uMask, vUv).a < 0.5) discard; vec3 d = vL - uCam; float dn = dot(d, uN); if (dn <= 0.0001) discard; float t = dot(uP0 - uCam, uN) / dn; if (t <= 0.0) discard;\n' +
+          ' vec3 q = uCam + d * t - uP0; vec2 uv = vec2(0.5 + q.x / (2.0 * uHalf.x), 0.5 + dot(q, uUp) / (2.0 * uHalf.y));\n' +
+          ' if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.02, 0.015, 0.03, 1.0); return; }\n' +
+          ' gl_FragColor = vec4(texture2D(uMap, uv).rgb * mix(0.5, 1.0, smoothstep(0.55, 1.0, openness())), 1.0); }' });
+      }
+      mine.uniforms = u;
+      var mesh = new T.Mesh(wayGeo, mine.mat); mesh.position.set(way.position.x, way.position.y, 0.008);
+      mesh.raycast = function () {}; mesh.visible = false; mesh.frustumCulled = false; group.add(mesh); mine.mesh = mesh; win = mine;
+      var need = depthUrl ? 2 : 1, got = function () { if (--need > 0 || win !== mine) return; mine.ready = true; };
+      var loader = new T.TextureLoader(), fail = function () { /* no picture: the doorway stays the dark recess */ };
+      loader.load(url, function (t) {
+        if (win !== mine) { t.dispose(); return; }
+        t.anisotropy = 4; mine.map = t; u.uMap.value = t; if (!depthUrl) u.uHalf.value.x = u.uHalf.value.y * (t.image.width / t.image.height); got();
+      }, undefined, fail);
+      if (depthUrl) loader.load(depthUrl, function (t) {
+        if (win !== mine) { t.dispose(); return; }
+        t.minFilter = t.magFilter = T.NearestFilter; t.generateMipmaps = false; mine.depth = t; u.uDepth.value = t; got();
+      }, undefined, fail);
+      // the light that falls out of an open door across the floor
+      var sm = new T.MeshBasicMaterial({ map: spillTex(), transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: 0, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      var sg = new T.PlaneGeometry(3.6, 3.4); sg.rotateX(-Math.PI / 2);
+      spill = new T.Mesh(sg, sm); spill.position.set(0, 0.004 - floorY, 1.7 + 0.03); spill.visible = false; spill.raycast = function () {}; spill.renderOrder = 3; group.add(spill);
+    }
+    function windowInfo() { return win ? { url: win.url, depth: win.depthUrl, deep: win.deep, ready: win.ready, visible: win.mesh.visible, spill: spill ? spill.material.opacity : 0, cam: win.uniforms.uCam.value.toArray() } : null; }
+    // each frame: where the viewer's eye is in the door's own space, and how far open the door is (0 shut .. 1 wide)
+    function windowView(cam, open, time) {
+      if (!win) return; var show = open > 0.02 && win.ready; if (win.mesh.visible !== show) win.mesh.visible = show;
+      if (spill) { var sv = open > 0.02; if (spill.visible !== sv) spill.visible = sv; if (sv) spill.material.opacity = Math.min(1, open * 1.3) * (0.94 + 0.06 * Math.sin((time || 0) * 2.3)); }
+      if (show) win.uniforms.uCam.value.copy(cam);
+    }
+    // the glide you take when you walk in: see walkIn() below
+    function glide(camera, opts) { return win && win.ready && win.deep ? walkIn(T, group, win, camera, opts || {}) : null; }
+    sync();
+    function handle() {   // where the first leaf's handle is in the world, and which kind it is (for tests and previews)
+      var h = leafObjs[0].hands[0], v = new T.Vector3(); group.updateMatrixWorld(true); h.g.getWorldPosition(v); return { x: v.x, y: v.y, z: v.z, type: h.type || 'canvas', turn: h.lever.rotation.z, porcelain: !!h.porcelain };
+    }
+    return { group: group, way: way, sync: sync, dispose: dispose, pick: pick, portal: portal, window: windowTo, windowView: windowView, windowInfo: windowInfo, glide: glide, WIN: WIN, latch: latch, handle: handle, scale: s, size: { w: W * s, h: H * s }, layout: G };
+  }
+
+  // Sutherland-Hodgman: the part of a convex polygon between two vertical lines
+  function clipStrip(pts, x0, x1) {
+    function clipHalf(poly, keep, inside) {
+      var out = [];
+      for (var i = 0; i < poly.length; i++) {
+        var a = poly[i], b = poly[(i + 1) % poly.length], ia = inside(a), ib = inside(b);
+        if (ia) out.push(a);
+        if (ia !== ib) { var t = (keep - a[0]) / (b[0] - a[0]); out.push([keep, a[1] + t * (b[1] - a[1])]); }
+      }
+      return out;
+    }
+    var p = clipHalf(pts, x0, function (q) { return q[0] >= x0 - 1e-9; });
+    return clipHalf(p, x1, function (q) { return q[0] <= x1 + 1e-9; });
+  }
+
+
+  /* ================================================================ 5. HARDWARE (the handle on a skinned door) */
+  // One handle TYPE per door style, so each door carries the hardware its kind of door would really have: a lever on a rose
+  // for a panelled door, a long backplate for a tall narrow one, a forged thumb-latch bar on a barn door, a cranked lever on an
+  // oval plate for the arch, an iron ring on a rosette for the gothic doors, a wheel for a vault or a hatch, a T-bar for the
+  // porthole, a heavy forged lever for the industrial door, a knob with its keyhole plate for the vintage door and a lit
+  // paddle for the airlock. The finish (brass, chrome, bronze, black iron) comes from the skin; its wear dulls and ages it.
+  // All sizes are in centimetres (1 design unit at the standard scale), the spindle is the origin, +x points toward the hinge
+  // and +z out of the door face. Parts marked rot turn with the handle; the rest (plates, roses, keyhole) stay on the door.
+  var HANDLE_OF = { rect: 'lever', tall: 'plate', wide: 'barn', arch: 'cranked', gothic: 'ring', double: 'lever', cathedral: 'ring', circle: 'wheel', oval: 'tee', hexagon: 'tee', octagon: 'wheel', industrial: 'heavy', vintage: 'knob', scifi: 'touch' };
+  var HANDLE_SCALE = { double: 1.2, cathedral: 1.2, circle: 1.5, octagon: 1.1, hexagon: 1.0, oval: 1.2, industrial: 1.15 };
+  // extent of each type from the spindle, before scaling: [toward the latch edge, toward the hinge, below, above]
+  var HW_EXTENT = { lever: [3.6, 17, 12.2, 3.6], plate: [3.2, 16, 15.9, 8.9], barn: [3, 25.7, 15.4, 11.4], cranked: [3.4, 16.1, 13.2, 4.8], ring: [5.4, 14.2, 7.4, 7.4],
+    wheel: [11.5, 11.5, 11.5, 11.5], tee: [7.9, 7.9, 4.8, 4.8], heavy: [6.9, 25, 6.9, 6.9], knob: [3.9, 3.9, 14.6, 3.9], touch: [3.6, 14.2, 14.4, 8.4] };   // measured from the geometry, rounded up
+  function hardwareOf(S) { var t = S && (S.hw || HANDLE_OF[S.name]); return HW_EXTENT[t] ? t : 'lever'; }
+  function hardwareScale(S) { return (S && (S.hwScale || HANDLE_SCALE[S.name])) || 1; }
+  // the parts of one handle: [{ g: geometry, m: material key, rot, x, y, z }]; geometry is built once and shared by both faces
+  function hwParts(T, type) {
+    var parts = [], geos = [], PI = Math.PI;
+    function add(g, m, rot, x, y, z) { geos.push(g); parts.push({ g: g, m: m, rot: !!rot, x: x || 0, y: y || 0, z: z || 0 }); return g; }
+    function lathe(prof, seg) { var g = new T.LatheGeometry(prof.map(function (p) { return new T.Vector2(p[0], p[1]); }), seg || 32); g.rotateX(PI / 2); return g; }
+    function rose(r, h) { return lathe([[0, 0], [r, 0], [r, h * 0.32], [r * 0.9, h * 0.62], [r * 0.66, h * 0.92], [r * 0.34, h], [0, h]]); }
+    function tube(pts, r, flat) { var g = new T.TubeGeometry(new T.CatmullRomCurve3(pts.map(function (p) { return new T.Vector3(p[0], p[1], p[2]); }), false, 'catmullrom', 0.5), 36, r, 14, false); if (flat) g.scale(1, flat, 1); return g; }
+    function ball(r) { return new T.SphereGeometry(r, 18, 14); }
+    function cyl(r, h, seg) { var g = new T.CylinderGeometry(r, r, h, seg || 20); g.rotateX(PI / 2); return g; }
+    function roundShape(w, h, r) {
+      var sh = new T.Shape(), x = -w / 2, y = -h / 2; r = Math.min(r, w / 2, h / 2);
+      sh.moveTo(x + r, y); sh.lineTo(x + w - r, y); sh.absarc(x + w - r, y + r, r, -PI / 2, 0, false); sh.lineTo(x + w, y + h - r); sh.absarc(x + w - r, y + h - r, r, 0, PI / 2, false);
+      sh.lineTo(x + r, y + h); sh.absarc(x + r, y + h - r, r, PI / 2, PI, false); sh.lineTo(x, y + r); sh.absarc(x + r, y + r, r, PI, PI * 1.5, false); return sh;
+    }
+    function slab(shape, depth, bev) { var g = new T.ExtrudeGeometry(shape, { depth: depth, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 14 }); g.translate(0, 0, bev); return g; }
+    var TOP = 0;   // the height of the last plate's face, so screws and keyholes sit on it
+    function plate(w, h, r, depth, x, y) { var bv = Math.min(0.22, depth * 0.5); TOP = depth + 2 * bv; add(slab(roundShape(w, h, r), depth, bv), 'fin', false, x, y, 0); return TOP; }
+    function screws(list, r) { list.forEach(function (p) { add(new T.CylinderGeometry(r, r * 0.85, 0.3, 14).rotateX(PI / 2), 'acc', false, p[0], p[1], TOP + 0.1); }); }
+    function keyhole(x, y) { add(new T.CircleGeometry(0.58, 18), 'dark', false, x, y + 0.5, TOP + 0.03); add(new T.PlaneGeometry(0.55, 1.6), 'dark', false, x, y - 0.55, TOP + 0.03); }
+    function bar(len, w, depth, tail) {   // a flat forged bar along +x that widens into a spade at its end
+      var sh = new T.Shape(), h = w / 2, t = tail || h * 1.6;
+      sh.moveTo(0, -h); sh.lineTo(len - 7, -h); sh.lineTo(len - 4.6, -t); sh.lineTo(len - 0.8, -t); sh.absarc(len - 0.8, 0, t, -PI / 2, PI / 2, false); sh.lineTo(len - 4.6, t); sh.lineTo(len - 7, h); sh.lineTo(0, h); sh.closePath();
+      var g = new T.ExtrudeGeometry(sh, { depth: depth, bevelEnabled: true, bevelThickness: 0.22, bevelSize: 0.22, bevelSegments: 3, curveSegments: 14 }); g.translate(0, 0, 0.22); return g;
+    }
+    if (type === 'lever') {
+      add(rose(3.4, 1.3), 'fin'); plate(3.4, 7.2, 1.1, 0.4, 0, -8.2); keyhole(0, -8.2);
+      add(lathe([[0, 0], [1.9, 0], [1.9, 0.5], [1.4, 0.95], [0, 0.95]]), 'fin', true, 0, 0, 1.2); add(cyl(1.0, 3.2), 'fin', true, 0, 0, 1.9);
+      add(tube([[0, 0, 3.3], [2.2, 0, 3.55], [6.5, 0, 3.55], [11, 0, 3.4], [14, 0, 2.8], [15.8, 0, 1.7]], 0.95, 0.82), 'fin', true); add(ball(0.95), 'fin', true, 0, 0, 3.3); add(ball(0.96), 'fin', true, 15.8, 0, 1.7);
+    } else if (type === 'plate') {
+      plate(5.6, 24, 1.2, 0.45, 0, -3.5); screws([[0, 7.4], [0, -14.4]], 0.5); keyhole(0, -8.4); add(rose(2.5, 1.2), 'fin', false, 0, 0, 0.5);
+      add(cyl(0.9, 3.0), 'fin', true, 0, 0, 1.9); add(tube([[0, 0, 3.0], [2, 0, 3.2], [12, 0, 3.2], [14.2, 0, 2.5], [15, 0, 1.6]], 0.78, 0.82), 'fin', true); add(ball(0.78), 'fin', true, 15, 0, 1.6);
+    } else if (type === 'barn') {
+      plate(5, 26, 0.8, 0.35, 0, -2); screws([[0, 9], [0, 4.5], [0, -8.5], [0, -13]], 0.6);
+      add(rose(2.7, 1.5), 'fin', false, 0, 0, 0.45); add(bar(24, 2.5, 0.9, 2.1), 'fin', true, 0, 0, 2.0); add(cyl(1.15, 1.2), 'acc', true, 0, 0, 3.2);
+    } else if (type === 'cranked') {
+      var oval = new T.Shape(); oval.absellipse(0, -4.2, 3.0, 8.6, 0, PI * 2, false, 0);
+      TOP = 0.85; add(slab(oval, 0.45, 0.2), 'fin', false, 0, 0, 0); screws([[0, 2.6], [0, -11]], 0.45); keyhole(0, -8.6); add(rose(2.3, 1.5), 'fin', false, 0, 0, 0.5);
+      add(cyl(0.95, 3.0), 'fin', true, 0, 0, 1.9); add(tube([[0, 0, 3.3], [2.5, 0, 3.6], [6, -1.6, 3.5], [9.5, -2.5, 3.4], [13, -2.5, 2.9], [15, -2.5, 1.8]], 0.9, 0.85), 'fin', true);
+      add(ball(0.95), 'fin', true, 0, 0, 3.3); add(ball(0.95), 'fin', true, 15, -2.5, 1.8);
+    } else if (type === 'ring') {
+      add(cyl(5.2, 0.4, 40), 'fin', false, 0, 0, 0.2); for (var i = 0; i < 8; i++) { var a = i / 8 * PI * 2; add(ball(0.42), 'acc', false, Math.cos(a) * 4.2, Math.sin(a) * 4.2, 0.55); }
+      add(lathe([[0, 0], [3.0, 0], [3.0, 0.5], [2.4, 1.2], [1.2, 1.7], [0, 1.8]]), 'fin', false, 0, 0, 0.4);
+      add(tube([[0, 0, 1.8], [0.2, 0, 3.2], [0.9, 0, 4.0]], 0.7), 'acc', true); add(new T.TorusGeometry(6.2, 0.95, 14, 44), 'fin', true, 6.8, 0, 4.0);
+    } else if (type === 'wheel') {
+      add(rose(4.4, 2.2), 'fin'); add(cyl(1.3, 3.4), 'fin', true, 0, 0, 2.7);
+      add(new T.TorusGeometry(10.2, 1.1, 14, 56), 'fin', true, 0, 0, 5.4);
+      for (var k = 0; k < 4; k++) { var sg = new T.CylinderGeometry(0.75, 0.75, 10.2, 12); sg.translate(0, 5.1, 0); sg.rotateZ(k * PI / 2 + PI / 4); add(sg, 'fin', true, 0, 0, 5.4); }
+      add(lathe([[0, 0], [2.3, 0], [2.3, 0.7], [1.5, 1.5], [0, 1.6]]), 'fin', true, 0, 0, 5.4);
+    } else if (type === 'tee') {
+      plate(8.8, 8.8, 4.3, 0.5, 0, 0); screws([[3.4, 0], [-3.4, 0], [0, 3.4], [0, -3.4]], 0.4); add(rose(2.7, 1.5), 'fin', false, 0, 0, 0.5);
+      add(cyl(1.1, 3.4), 'fin', true, 0, 0, 2.4); add(tube([[-6.2, 0, 4.7], [0, 0, 4.7], [6.2, 0, 4.7]], 0.95), 'fin', true); add(ball(1.5), 'fin', true, -6.2, 0, 4.7); add(ball(1.5), 'fin', true, 6.2, 0, 4.7);
+    } else if (type === 'heavy') {
+      plate(13, 13, 1.2, 0.5, 0, 0); [[4.8, 4.8], [-4.8, 4.8], [4.8, -4.8], [-4.8, -4.8]].forEach(function (p) { add(new T.CylinderGeometry(0.95, 0.95, 0.6, 6).rotateX(PI / 2), 'acc', false, p[0], p[1], 0.8); });
+      add(lathe([[0, 0], [3.4, 0], [3.4, 2.2], [2.6, 3.0], [0, 3.1]]), 'fin', true, 0, 0, 0.5);
+      add(slab(roundShape(24, 3.4, 1.5), 1.6, 0.3), 'fin', true, 10.4, 0, 2.6);
+      for (var r = 0; r < 6; r++) add(new T.BoxGeometry(0.5, 3.9, 2.2), 'acc', true, 11.6 + r * 1.9, 0, 3.0);
+      add(ball(2.0), 'fin', true, 22.8, 0, 3.4);
+    } else if (type === 'knob') {
+      add(rose(3.7, 1.0), 'fin'); plate(3.6, 9.2, 1.4, 0.42, 0, -9.6); keyhole(0, -9.6); screws([[0, -13.4], [0, -5.8]], 0.4);
+      add(cyl(1.15, 3.2), 'fin', true, 0, 0, 2.2);
+      add(lathe([[0, 3.4], [2.0, 3.4], [2.1, 3.9], [1.2, 4.4], [2.4, 5.2], [2.8, 6.6], [2.4, 7.9], [1.4, 8.6], [0, 8.8]]), 'knob', true);
+    } else {   // touch: a lit paddle on a dark glass bezel
+      plate(6.4, 22, 2.2, 0.6, 0, -3); add(new T.PlaneGeometry(4.2, 19.4), 'dark', false, 0, -3, 0.9); add(new T.PlaneGeometry(0.5, 16.6), 'glow', false, -1.4, -3, 0.95);
+      add(cyl(2.0, 2.8, 24), 'fin', true, 0, 0, 1.6);
+      add(slab(roundShape(15, 3.3, 1.5), 1.2, 0.3), 'fin', true, 6.2, 0, 2.7); add(new T.BoxGeometry(13, 0.45, 0.2), 'glow', true, 7.0, 0, 4.5);
+    }
+    return { parts: parts, geos: geos };
+  }
+
+  root.XADoors = {
+    STYLES: STYLES, STYLE_NAMES: STYLE_NAMES, DoorModel: DoorModel, createSfx: createSfx, buildMesh: buildMesh,
+    layoutOf: layoutOf, faceOps: faceOps, leverArt: leverArt, HW: { HANDLE_OF: HANDLE_OF, SCALE: HANDLE_SCALE, EXTENT: HW_EXTENT, TYPES: Object.keys(HW_EXTENT), of: hardwareOf, scale: hardwareScale, parts: hwParts }, drawOps: drawOps, clipStrip: clipStrip, rattleProfile: rattleProfile,
+    ROOM: ROOM, WIN: WIN, ROOM_GLSL: ROOM_GLSL, roomUniforms: roomUniforms, roomFloor: roomFloor,
+    CONST: { HMAX: HMAX, MAXA: MAXA, DEF_OPEN: DEF_OPEN, KH: KH, CH: CH, KD: KD, CD: CD }
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = root.XADoors;
+})(typeof window !== 'undefined' ? window : globalThis);

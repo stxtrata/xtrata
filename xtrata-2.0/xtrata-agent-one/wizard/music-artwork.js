@@ -29,9 +29,46 @@
       );
     return list;
   }
+  // Counts the frames in a GIF by walking its block structure (no decoding). Returns 0 when the
+  // bytes are not a readable GIF, so callers treat "unknown" as "not animated".
+  function countGifFrames(bytes) {
+    const n = bytes.length;
+    if (n < 13 || String.fromCharCode(...bytes.subarray(0, 3)) !== 'GIF') return 0;
+    const skipBlocks = (at) => {
+      while (at < n && bytes[at] !== 0) at += bytes[at] + 1;
+      return at + 1;
+    };
+    let at = 13;
+    if (bytes[10] & 0x80) at += 3 * (1 << ((bytes[10] & 7) + 1));
+    let frames = 0;
+    while (at < n) {
+      const b = bytes[at];
+      if (b === 0x3b) break;
+      if (b === 0x21) at = skipBlocks(at + 2);
+      else if (b === 0x2c) {
+        frames++;
+        if (at + 10 > n) break;
+        const flags = bytes[at + 9];
+        at += 10;
+        if (flags & 0x80) at += 3 * (1 << ((flags & 7) + 1));
+        at = skipBlocks(at + 1);
+      } else break;
+    }
+    return frames;
+  }
+  const gifNote =
+    'Animated GIF: it is embedded exactly as uploaded so it keeps moving. It cannot be resized or compressed here, so shrink it elsewhere first if it is large.';
+  async function frameCount(file) {
+    if (file.type !== 'image/gif') return 0;
+    try {
+      return countGifFrames(new Uint8Array(await file.arrayBuffer()));
+    } catch {
+      return 0;
+    }
+  }
   async function decode(file) {
-    if (!/^image\/(png|jpeg|webp)$/.test(file.type))
-      throw Error('Choose a still PNG, JPEG or WebP image.');
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type))
+      throw Error('Choose a PNG, JPEG, WebP or GIF image.');
     if (file.size > 20 * 1048576)
       throw Error('Artwork above 20 MiB is too large to prepare here. Resize it locally first.');
     const bitmap = await createImageBitmap(file);
@@ -46,11 +83,15 @@
   async function inspect(file) {
     const image = await decode(file);
     try {
+      const frames = await frameCount(file),
+        list = warnings(image.width, image.height, file.size);
+      if (frames > 1) list.unshift(gifNote);
       return {
         width: image.width,
         height: image.height,
         bytes: file.size,
-        warnings: warnings(image.width, image.height, file.size)
+        animated: frames > 1,
+        warnings: list
       };
     } finally {
       image.close();
@@ -66,6 +107,17 @@
     const image = await decode(file);
     try {
       const original = { width: image.width, height: image.height, bytes: file.size };
+      // Re-encoding through a canvas keeps only the first frame, so an animated GIF is never
+      // touched. A one-frame GIF is just a still image and takes the normal route below.
+      const frames = await frameCount(file);
+      if (frames > 1)
+        return {
+          file,
+          original,
+          ...original,
+          animated: true,
+          warnings: [gifNote, ...warnings(image.width, image.height, file.size)]
+        };
       if (preset === 'original')
         return {
           file,
@@ -126,5 +178,13 @@
       bytes = Uint8Array.from(raw, (c) => c.charCodeAt(0));
     return new File([bytes], 'player-cover', { type: mime || 'image/jpeg' });
   };
-  window.XtrataMusicArtwork = { profiles, dimensions, warnings, inspect, optimise, fromBase64 };
+  window.XtrataMusicArtwork = {
+    profiles,
+    dimensions,
+    warnings,
+    countGifFrames,
+    inspect,
+    optimise,
+    fromBase64
+  };
 })();

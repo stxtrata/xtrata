@@ -11,13 +11,17 @@
 //
 // UNTESTED IN THIS ENV — validate with XAO_CONFIG.mock=true in a browser first, then a small live job.
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { freezeReferral, takesReferrals } from './referral-registry';
+import { planPayout, referralMemo, type Partner } from './referral';
 import { generateMnemonic, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { HDKey } from '@scure/bip32';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
+import { normalizeBroadcastResult } from './broadcast-result';
+import { INSCRIBE_LOCK, inscribeLockActive, assertInscribeAllowed, isMarkupMime } from './inscribe-lock';
 import {
-  makeContractCall, makeSTXTokenTransfer, broadcastTransaction, callReadOnlyFunction,
+  makeContractCall, makeSTXTokenTransfer, broadcastTransaction as stacksBroadcastTransaction, callReadOnlyFunction,
   estimateTransaction, estimateTransactionByteLength,
   uintCV, standardPrincipalCV, bufferCV, stringAsciiCV, listCV,
   makeStandardSTXPostCondition, FungibleConditionCode, PostConditionMode, AnchorMode,
@@ -25,6 +29,10 @@ import {
 } from '@stacks/transactions';
 import { MusicFeeWait, MusicFeeRecovery, type MusicFeeState, readMusicFees, writeMusicFees, musicWeight, musicTransactionCap, confirmedMusicTransaction, speedUpAmounts, verifyMusicTopUp } from './music-fees';
 import { StacksMainnet } from '@stacks/network';
+import {
+  withTimeout, makeSleep, RunTracker, withDeadline, buildDiagnostics, netStats, sleepStats,
+  STALL_BREAK_MS, CANCEL_STALL_MS,
+} from './net-guard';
 
 const cfg: any = (window as any).XAO_CONFIG || {};
 const MOCK: boolean = !!cfg.mock;
@@ -44,6 +52,7 @@ export const PARENT_WINDOW_MS: number = Number(cfg.parentWindowMs || 900000); //
 // and NFT returns sat unmined for days, and an unmined transfer holds its nonce and
 // jams everything queued behind it.
 const PERTX_MINER = 30000n, DELIVERY_RESERVE = 200000n, REFUND_TX_FEE = 20000n, MINT_CAP = 2000000n, RECEIPT_EST = 9000;
+const RECEIPT_BUDGET_MS = 5 * 60 * 1000;                        // the optional refund receipt gets this long, then the refund moves on
 const PARENT_RETURN_FEE = 30000n;                                // per-parent NFT return-transfer reserve
 const ITEM_DELIVERY_FEE = 30000n;                                // per extra batch-item delivery transfer reserve
 export const MAX_BATCH_ITEMS = 40;                               // receipt deps cap 50 − parents/identity headroom
@@ -51,17 +60,29 @@ export const MAX_BATCH_ITEMS = 40;                               // receipt deps
 const DISCARD_CONSENT = 'i-accept-losing-the-unfinished-upload';
 
 const network: any = new StacksMainnet();
+/** Every broadcast in this file goes through here: a refusal that is not a node rejection (a 403 from a gateway, say) is an error, never a txid. */
+const broadcastTransaction = async (tx: any, net: any): Promise<any> => normalizeBroadcastResult(await stacksBroadcastTransaction(tx, net));
 network.coreApiUrl = location.origin + HIRO_BASE;   // routes read-only + broadcast through the proxy
+// Every request the Stacks library makes (broadcast, fee estimate, nonce, read-only calls) goes through
+// network.fetchFn. Without a deadline, ONE request that never answers (a phone's in-app browser
+// after the app was backgrounded, a half-open connection) froze a whole job with no error, no log line
+// and no way for Stop or the reaper to reach it. A timeout is an ordinary transient error: it retries.
+const timedFetch = withTimeout((u: any, i?: any) => fetch(u, i));
+network.fetchFn = withTimeout(network.fetchFn);
 
 const enc = new TextEncoder();
-const hfetch = (p: string, init?: any) => fetch(location.origin + HIRO_BASE + p, init);
+const hfetch = (p: string, init?: any) => timedFetch(location.origin + HIRO_BASE + p, init);
 // Throttle-resistant sleep: window timers are throttled to ~1/min (and eventually frozen)
 // in background tabs, which has stalled live uploads mid-run. Worker timers are exempt
 // from tab timer throttling, so confirmation polls keep firing while the tab is hidden.
-const sleepWorker: Worker | null = (() => { try { return new Worker(URL.createObjectURL(new Blob(['onmessage=(e)=>setTimeout(()=>postMessage(e.data.id),e.data.ms)'], { type: 'text/javascript' }))); } catch { return null; } })();
-let sleepSeq = 0; const sleepWaiters = new Map<number, () => void>();
-if (sleepWorker) sleepWorker.onmessage = (e: MessageEvent) => { const r = sleepWaiters.get(e.data); if (r) { sleepWaiters.delete(e.data); r(); } };
-const sleep = (ms: number) => new Promise<void>((r) => { if (sleepWorker) { const id = ++sleepSeq; sleepWaiters.set(id, r); sleepWorker.postMessage({ id, ms }); } else setTimeout(r, ms); });
+// "The worker exists" is not "the worker answers": some in-app browsers build it and never deliver a
+// message, and every await sleep() then hangs for ever. makeSleep also arms a plain timer a few seconds
+// later, so the worker is the precise path and the plain timer is the safety net.
+const sleep = makeSleep(() => new Worker(URL.createObjectURL(new Blob(['onmessage=(e)=>setTimeout(()=>postMessage(e.data.id),e.data.ms)'], { type: 'text/javascript' }))));
+// Which job runs are alive. A loop that polls (confirmation waits, fee waits) calls touchRuns() each lap; a
+// run whose promise simply never settles touches nothing, and watchTick() releases it after STALL_BREAK_MS.
+const runs = new RunTracker();
+const touchRuns = () => runs.touchAll();
 const chunkBytes = (d: Uint8Array) => { const o: Uint8Array[] = []; for (let i = 0; i < d.length; i += CHUNK) o.push(d.slice(i, i + CHUNK)); return o; };
 const toHex = (b: Uint8Array) => Array.from(b).map((x) => x.toString(16).padStart(2, '0')).join('');
 const fromHex = (h: string) => new Uint8Array((h.match(/../g) || []).map((x) => parseInt(x, 16)));
@@ -120,13 +141,48 @@ async function quoteFee(sizeBytes: number, chunks: number) {
   const t: any = (await ro('quote-inscription-fee', [uintCV(BigInt(sizeBytes)), uintCV(BigInt(chunks)), uintCV(single ? 2 : 1)])).value.value;
   return { single, protocolFee: BigInt(t['total-fee'].value), batches: Number(t['upload-batches'].value) };
 }
+/**
+ * Broadcast, and if the answer never comes back, look on chain before anyone retries.
+ *
+ * A timeout on the POST does not mean the transaction was refused: the node may have accepted a 525 KB
+ * batch and the reply been lost on a flaky mobile link. Retrying blindly would pay for the same batch
+ * twice (~0.5 STX each). The txid is fixed by the signed bytes, so we can simply ask whether it exists.
+ * A rejection WITH an answer ({ error }) is returned untouched for the caller's existing handling.
+ */
+async function broadcastSafe(tx: any, logId: string | null = null, label = 'tx'): Promise<any> {
+  let txid: string | null = null;
+  try { txid = '0x' + String(tx.txid()).replace(/^0x/, ''); } catch {}
+  const t0 = Date.now();
+  try {
+    return await broadcastTransaction(tx, network);
+  } catch (e) {
+    xaoLog(logId, `${label}: broadcast got no answer after ${Math.round((Date.now() - t0) / 1000)}s (${errMsg(e)}) — checking whether it landed before anything is retried`);
+    if (txid) {
+      for (let i = 0; i < 5; i++) {
+        await sleep(3000);
+        try {
+          const r = await hfetch(`/extended/v1/tx/${txid}`);
+          if (r.ok) {
+            const d: any = await r.json();
+            if (d && d.tx_status) { xaoLog(logId, `${label}: ${txid} IS on chain (${d.tx_status}) — the answer was lost, not the transaction`); return { txid }; }
+          }
+        } catch {}
+      }
+    }
+    throw e;
+  }
+}
+const CONFIRM_WALL_MS = 20 * 60 * 1000;   // hard wall-clock ceiling on any confirmation wait
 // Nakamoto-aware: poll 2 s for the first ~90 s (most blocks land in seconds), then 6 s. ~16 min ceiling.
 async function waitTx(txid: string) {
   // Track whether we ever actually reached the API. Swallowing every read error and
   // then reporting "not confirmed" blames the transaction for what was an outage —
   // and the caller treats those two very differently.
   let reads = 0; let lastReadErr: unknown = null;
-  for (let i = 0; i < 210; i++) {
+  const waitStart = Date.now();
+  // The lap count alone is not a time limit any more: with request deadlines a lap can take 25 s.
+  for (let i = 0; i < 210 && Date.now() - waitStart < CONFIRM_WALL_MS; i++) {
+    touchRuns();
     try {
       const r = await hfetch(`/extended/v1/tx/${txid}`);
       if (!r.ok) throw new Error(`tx lookup ${r.status}`);
@@ -160,6 +216,20 @@ async function ownerOfChecked(id: string): Promise<{ owner: string | null; ok: b
   } catch { return { owner: null, ok: false }; }
 }
 
+// Is this inscription in this wallet right now? 'unknown' when the read keeps failing.
+// ownerOf() returns null for BOTH "someone else owns it" and "the API said 429", and the escrow code
+// used that null to decide a parent had already left — so one rate-limited read skipped the parent's
+// return, the STX was swept away, and the wallet was left holding the parent with no fee to move it
+// (inscription #3049, 14 Sept 2026). A failed read must never be taken as "not here".
+async function heldBy(id: string, addr: string, tries = 5): Promise<'yes' | 'no' | 'unknown'> {
+  for (let i = 0; i < tries; i++) {
+    const r = await ownerOfChecked(id);
+    if (r.ok) return r.owner === addr ? 'yes' : 'no';
+    if (i < tries - 1) await sleep(3000 * (i + 1));
+  }
+  return 'unknown';
+}
+
 // ---- signed sends (browser) ----
 // FEE POLICY — never crash a job on a fee estimate. The node's estimator returns absurd one-off spikes
 // (observed: identical add-chunk-batch txs quoted 0.52 STX then 74–114 STX). Three stages:
@@ -168,6 +238,17 @@ async function ownerOfChecked(id: string): Promise<{ owner: string | null; ok: b
 //      "network fees are high — waiting", not look stuck (our own ~512 KB batches can drive fees up);
 //   3. bounded fallback — 2× the last successful fee for this fn, never above the cap.
 const lastGoodFee = new Map<string, bigint>();
+
+/**
+ * The node's fee endpoint takes the whole transaction as hex in a JSON body, and Hiro
+ * rejects any request body over 1 MiB with a 413 (FST_ERR_CTP_BODY_TOO_LARGE). Hex is
+ * two characters per byte, so a transaction over ~512 KB can never be estimated — and a
+ * full 32-chunk add-chunk-batch is 524,661 bytes. Above this size we do not ask: the
+ * low estimate on a full batch is the 1 uSTX/byte relay floor anyway (see above), so
+ * the byte length IS the quote. Kept well under the limit to leave room for the wrapper.
+ */
+export const MAX_ESTIMATE_TX_BYTES = 400000;
+export const floorFeeFor = (byteLength: number): bigint => BigInt(Math.max(1, Math.ceil(byteLength)));
 
 /**
  * Build the transaction at the node's LOW fee estimate rather than the middle one.
@@ -190,13 +271,20 @@ const lastGoodFee = new Map<string, bigint>();
  */
 async function quoteLowFee(opts: any) {
   if (opts.fee != null) return makeContractCall(opts);
+  let len: number | null = null;
   try {
     // fee: 1 keeps this local — no estimate request is made while building.
     const draft: any = await makeContractCall({ ...opts, fee: 1n });
-    const est: any = await estimateTransaction(draft.payload, estimateTransactionByteLength(draft), network);
+    len = estimateTransactionByteLength(draft);
+    // Too big to estimate: price it at the floor and never make the request.
+    if (len > MAX_ESTIMATE_TX_BYTES) return makeContractCall({ ...opts, fee: floorFeeFor(len) });
+    const est: any = await estimateTransaction(draft.payload, len, network);
     const low = est && est[0] && est[0].fee != null ? BigInt(est[0].fee) : null;
     if (low != null && low > 0n) return makeContractCall({ ...opts, fee: low });
-  } catch { /* estimator unavailable → fall back to the library's own default */ }
+  } catch { /* estimator unavailable → fall back below */ }
+  // The library's own default fee makes a SECOND estimate request with the same body, so
+  // for an oversized transaction it must never be reached — it threw an uncaught 413.
+  if (len != null && len > MAX_ESTIMATE_TX_BYTES) return makeContractCall({ ...opts, fee: floorFeeFor(len) });
   return makeContractCall(opts);
 }
 async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null, feeCeiling: bigint | null = null) {
@@ -204,6 +292,8 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
   try { opts.nonce = await safeNonce(from, logId); } catch {}
+  // Step-by-step breadcrumbs. A stalled send used to leave NO trace of which step it was waiting in.
+  xaoLog(logId, `${fn}: preparing · nonce ${opts.nonce != null ? opts.nonce : 'wallet default'}`);
   // Cap the fee at the lesser of MINT_CAP and the balance minus what delivery+refund
   // still need, so NotEnoughFunds becomes a wait instead of a failure. A LOOKUP
   // failure must not lower the cap — a cap of 0 makes every estimate look like a
@@ -211,8 +301,9 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   let effCap = MINT_CAP;
   let headroom: bigint | null = null;
   try {
-    const bal = await balance(from);
+    const bal = await balance(from).catch((e: any) => { xaoLog(logId, `${fn}: balance lookup failed (${errMsg(e)}) — using the default fee cap`); throw e; });
     headroom = bal > (DELIVERY_RESERVE + REFUND_TX_FEE) ? bal - (DELIVERY_RESERVE + REFUND_TX_FEE) : 0n;
+    xaoLog(logId, `${fn}: balance ${bal} µSTX · fee headroom ${headroom}`);
   } catch { headroom = null; }        // unknown → keep the safe default cap
   // Genuinely no headroom: say so instead of broadcasting something unpayable.
   if (headroom === 0n) throw new Error(`${fn}: deposit wallet has no headroom left for fees — nothing was broadcast`);
@@ -226,6 +317,7 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   // not a fallback, it is a guaranteed FeeTooLow.
   let cheapestQuote: bigint | null = null;
   for (let attempt = 0; ; attempt++) {
+    if (attempt === 0) xaoLog(logId, `${fn}: building and pricing the transaction`);
     tx = await quoteLowFee(opts);
     fee = BigInt(tx.auth.spendingCondition.fee.toString());
     if (cheapestQuote == null || fee < cheapestQuote) cheapestQuote = fee;
@@ -244,7 +336,8 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
     const floor = cheapestQuote ?? 0n;
     throw new Error(`${fn}: cannot afford the network fee — cheapest quote ${floor} µSTX, affordable ${effCap} µSTX. Nothing was broadcast.`);
   }
-  let res: any = await broadcastTransaction(tx, network);
+  xaoLog(logId, `${fn}: broadcasting ${Math.round(tx.serialize().length / 1024)} KB · nonce ${tx.auth.spendingCondition.nonce.toString()} · fee ${fee} µSTX`);
+  let res: any = await broadcastSafe(tx, logId, fn);
   // FeeTooLow is deterministic for a given fee — waiting cannot fix it, only a bigger
   // fee can. It used to fall out to the caller's retry, which re-ran the whole
   // estimate/wait cycle (up to four minutes) and arrived at the same rejected fee.
@@ -253,7 +346,7 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
     if (next <= fee) { xaoLog(logId, `${fn}: FeeTooLow at ${fee} µSTX and already at the affordable ceiling — cannot bump further`); break; }
     xaoLog(logId, `${fn}: FeeTooLow at ${fee} µSTX — retrying at ${next} µSTX (bump ${bump}/3)`);
     tx = await makeContractCall({ ...opts, fee: next }); fee = next;
-    res = await broadcastTransaction(tx, network);
+    res = await broadcastSafe(tx, logId, fn);
   }
   if (res.error) { xaoLog(logId, `${fn}: broadcast REJECTED — ${res.error} ${res.reason || ''}`); throw new Error(`${fn}: ${res.error} ${res.reason || ''}`); }
   // Only a fee that ACTUALLY broadcast is "good". Recording it before the broadcast
@@ -271,6 +364,8 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   return { txid: out.txid, d: out.d };
 }
 
+const UNSEEN_CANCEL_MS = 20_000;     // a cancel is honoured this long after the node is seen not to have our transaction
+const UNSEEN_GIVE_UP_MS = 180_000;   // never in the mempool for this long: stop waiting for it
 const RBF_AFTER_MS = 90000;   // give the cheap fee a fair run before paying more
 const RBF_MAX = 3;
 
@@ -299,11 +394,27 @@ async function confirmOrEscalate(p: {
   const txids: string[] = [p.txid];
   let fee = p.fee, bumps = 0, lastEscalate = Date.now();
   let reads = 0, lastErr: unknown = null;
+  const waitStart = Date.now();
+  let lastBeat = waitStart;
+  // When EVERY transaction we are watching comes back 404, the node has never seen one of
+  // them: nothing is in the mempool and nothing was mined. Waiting longer cannot change that
+  // (a transaction the node accepted is visible within seconds), and it used to hold a job,
+  // and a Cancel, for the whole 18 minute loop. Seen live on 29 Oct: a broadcast the gateway
+  // had refused was waited on, and "Stop and refund" sat on "Cancelling" for 18 minutes.
+  let unseenSince: number | null = null;
 
-  for (let i = 0; i < 210; i++) {
+  for (let i = 0; i < 210 && Date.now() - waitStart < CONFIRM_WALL_MS; i++) {
+    let notFound = 0;
+    touchRuns();
+    // A heartbeat every ~30 s: proof the run is alive AND a line in the log saying what it is waiting on.
+    if (p.logId && Date.now() - lastBeat >= 30000) {
+      lastBeat = Date.now();
+      xaoLog(p.logId, `${p.fn}: still waiting for 0x${String(txids[txids.length - 1]).replace(/^0x/, '').slice(0, 10)}… · ${Math.round((Date.now() - waitStart) / 1000)}s · ${reads} lookups answered${lastErr ? ` · last lookup error: ${errMsg(lastErr)}` : ''}`);
+    }
     for (const id of txids) {
       try {
         const r = await hfetch(`/extended/v1/tx/${id}`);
+        if (r.status === 404) notFound += 1;
         if (!r.ok) throw new Error(`tx lookup ${r.status}`);
         const d: any = await r.json();
         reads += 1;
@@ -321,13 +432,25 @@ async function confirmOrEscalate(p: {
       }
     }
 
+    if (notFound === txids.length) {
+      unseenSince ??= Date.now();
+      const unseenFor = Date.now() - unseenSince;
+      // A cancel with nothing in flight can be honoured at once; nothing needs to settle first.
+      if (p.logId && unseenFor >= UNSEEN_CANCEL_MS && isCancelRequested(p.logId)) throw new JobCancelled();
+      if (unseenFor >= UNSEEN_GIVE_UP_MS) {
+        throw new Error(`${p.fn}: the network never received transaction ${txids[txids.length - 1]} (not in the mempool after ${Math.round(unseenFor / 1000)}s). Nothing was spent on it.`);
+      }
+    } else {
+      unseenSince = null;
+    }
+
     if (bumps < RBF_MAX && Date.now() - lastEscalate >= RBF_AFTER_MS) {
       const next = fee * 2n > p.effCap ? p.effCap : fee * 2n;
       if (next > fee) {
         lastEscalate = Date.now();
         try {
           const rtx = await makeContractCall({ ...p.opts, fee: next, nonce: p.usedNonce });
-          const rres: any = await broadcastTransaction(rtx, network);
+          const rres: any = await broadcastSafe(rtx, p.logId, p.fn);
           if (rres?.error) {
             xaoLog(p.logId, `${p.fn}: fee escalation rejected (${rres.error} ${rres.reason || ''}) — still waiting on ${fee} µSTX`);
           } else {
@@ -367,7 +490,7 @@ async function sendNft(key: string, from: string, id: string, to: string) {
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: 'transfer', functionArgs: [uintCV(BigInt(id)), standardPrincipalCV(from), standardPrincipalCV(to)], senderKey: key, network, postConditionMode: PostConditionMode.Allow, anchorMode: AnchorMode.Any, nonce };
   const fee = await transferFee(opts);
   const tx: any = await makeContractCall({ ...opts, fee });
-  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('nft: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res;
+  const res: any = await broadcastSafe(tx); if (res.error) throw new Error('nft: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res;
   // Escalate rather than wait for ever: same nonce, higher fee, until it is mined.
   const used = nonce != null ? nonce : (await safeNonce(from).catch(() => undefined));
   if (used != null) { const r = await confirmOrEscalate({ txid, opts, usedNonce: used, fee, effCap: MINT_CAP, fn: 'transfer', logId: null }); return r.txid; }
@@ -378,20 +501,22 @@ async function sendNft(key: string, from: string, id: string, to: string) {
 async function transferFee(opts: any): Promise<bigint> {
   try {
     const draft: any = await makeContractCall({ ...opts, fee: 1n });
-    const est: any = await estimateTransaction(draft.payload, estimateTransactionByteLength(draft), network);
+    const len = estimateTransactionByteLength(draft);
+    if (len > MAX_ESTIMATE_TX_BYTES) return floorFeeFor(len) > TRANSFER_FEE_FLOOR ? floorFeeFor(len) : TRANSFER_FEE_FLOOR;
+    const est: any = await estimateTransaction(draft.payload, len, network);
     const low = est && est[0] && est[0].fee != null ? BigInt(est[0].fee) : 0n;
     return low > TRANSFER_FEE_FLOOR ? low : TRANSFER_FEE_FLOOR;
   } catch { return TRANSFER_FEE_FLOOR; }
 }
-async function sendStx(key: string, amount: bigint, to: string, fee: bigint) {
+async function sendStx(key: string, amount: bigint, to: string, fee: bigint, memo?: string) {
   // Same lesson as sendNft: REFUND_TX_FEE (5,000 uSTX) is what a refund BUDGETS, not
   // what the mempool will accept when it is busy. Two sweeps sat unmined for days at
   // exactly that fee. Floor it, and let the caller's budget cover the difference.
   const useFee = fee > TRANSFER_FEE_FLOOR ? fee : TRANSFER_FEE_FLOOR;
   const from = getAddressFromPrivateKey(key, TransactionVersion.Mainnet);
   let nonce: bigint | undefined; try { nonce = await safeNonce(from); } catch {}
-  const tx: any = await makeSTXTokenTransfer({ recipient: to, amount, senderKey: key, network, fee: useFee, anchorMode: AnchorMode.Any, nonce } as any);
-  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('stx: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res; await waitTx(txid); return txid;
+  const tx: any = await makeSTXTokenTransfer({ recipient: to, amount, senderKey: key, network, fee: useFee, anchorMode: AnchorMode.Any, nonce, ...(memo ? { memo } : {}) } as any);
+  const res: any = await broadcastSafe(tx); if (res.error) throw new Error('stx: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res; await waitTx(txid); return txid;
 }
 const tidFrom = (d: any) => { const r = d?.tx_result?.repr || ''; const m = /token-id u(\d+)/.exec(r) || /\(ok u(\d+)\)/.exec(r); return m ? m[1] : null; };
 
@@ -418,6 +543,7 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
   const q: any = (await ro('quote-inscription-fee', [uintCV(BigInt(data.length)), uintCV(BigInt(total)), uintCV(1)])).value.value;
   const beginFee = BigInt(q['begin-fee'].value), sealFee = BigInt(q['seal-fee'].value);
   onProg(`planned · ${total} chunks`);
+  xaoLog(job.jobId, `plan: ${total} chunks · ${data.length} bytes · ${Math.ceil(total / BATCH)} batch(es) · begin fee ${beginFee} · seal fee ${sealFee}`);
   let idx: number | null = null;
   try { const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); idx = st.value ? Number(st.value.value['current-index'].value) : null; } catch { idx = null; }
   // Remember the content hash on the JOB. An upload lives on-chain under
@@ -457,6 +583,7 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
       batchFeeCap = spendable / remBatches;
       if (bal < runway) { const m = `fee runway low — ${bal} µSTX left vs ~${runway} projected for ${remBatches} remaining batch(es); this batch is capped at ${batchFeeCap} µSTX`; xaoLog(job.jobId, m); onProg(m); }
     } catch { batchFeeCap = null; }
+    xaoLog(job.jobId, `batch ${Math.floor(idx / BATCH) + 1}/${Math.ceil(total / BATCH)} · chunks ${idx}-${idx + batch.length - 1} of ${total} · ${Math.round(batch.length * CHUNK / 1024)} KB`);
     await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg, job.jobId, batchFeeCap);
     const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`);
   }
@@ -480,13 +607,21 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
 // final artifact), so there is no server-side ffmpeg step here.
 // ============================================================================
 const ustxToStx = (u: any) => (Number(u) / 1e6).toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
-const errMsg = (e: any) => String((e && e.message) || e);
+const errMsg = (e: any) => {
+  if (e && e.message) return String(e.message);
+  // A thrown fetch Response (or any plain object) used to print as "[object Object]".
+  if (e && typeof e === 'object') {
+    if (e.status != null) return `HTTP ${e.status}${e.statusText ? ' ' + e.statusText : ''}`;
+    try { const j = JSON.stringify(e); if (j && j !== '{}') return j; } catch { /* fall through */ }
+  }
+  return String(e);
+};
 const addrEq = (a: any, b: any) => !!a && !!b && String(a).trim() === String(b).trim();
 const TRANSIENT_TX = /NotEnoughFunds|ConflictingNonceInMempool|TooMuchChaining|too much chaining|bad nonce|NoSuchAccount/i;
 let _stxUsd: { v: number | null; t: number } = { v: null, t: 0 };
 async function stxUsdPrice(): Promise<number | null> {
   if (Date.now() - _stxUsd.t < 60000) return _stxUsd.v;          // 60s cache (used by estimate + receipt)
-  try { const d: any = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=blockstack&vs_currencies=usd')).json(); const p = d && d.blockstack && d.blockstack.usd; _stxUsd = { v: p ? Number(p) : null, t: Date.now() }; } catch { _stxUsd = { v: _stxUsd.v, t: Date.now() }; }
+  try { const d: any = await (await timedFetch('https://api.coingecko.com/api/v3/simple/price?ids=blockstack&vs_currencies=usd')).json(); const p = d && d.blockstack && d.blockstack.usd; _stxUsd = { v: p ? Number(p) : null, t: Date.now() }; } catch { _stxUsd = { v: _stxUsd.v, t: Date.now() }; }
   return _stxUsd.v;
 }
 const balOf = async (job: any): Promise<bigint> => (MOCK ? BigInt(job.requiredUstx) : balance(job.depositAddress));
@@ -553,11 +688,30 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-09-12.1';
+export const AGENT_BUILD = '2026-11-03.1';
+const LOG_KEEP = 300;   // lines kept per job; a 36-batch upload writes ~8 per batch, and the START of a run is what explains a stall
+// Why this exists: a job that wrote nothing could not be told apart from one that was merely slow, and a
+// failed localStorage write used to vanish into an empty catch. Counting both makes "the page could not
+// save anything" visible in the diagnostics instead of looking like a hang.
+let storageWriteFailures = 0, lastStorageError = '';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
-  try { const j = readJob(id); j.log = ((j.log || []).slice(-199)).concat(new Date().toISOString() + ' ' + msg); writeJob(j); } catch {}
+  runs.touch(id);
+  try { const j = readJob(id); j.log = ((j.log || []).slice(-(LOG_KEEP - 1))).concat(new Date().toISOString() + ' ' + msg); writeJob(j); } catch {}
+}
+/** One refund stage: in the log, on the job card (job.progress), and counted as activity by the stall breaker. */
+function refundStep(id: string, msg: string) {
+  xaoLog(id, msg);
+  try { const j = readJob(id); j.progress = msg; j.progressAt = new Date().toISOString(); writeJob(j); } catch {}
+}
+/** What kind of browser is this run in? The first thing anyone asks about a stall. */
+function envSummary(): string {
+  try {
+    const nav: any = typeof navigator !== 'undefined' ? navigator : {};
+    const vis = typeof document !== 'undefined' ? document.visibilityState : 'no-document';
+    return `build ${AGENT_BUILD} · page ${vis} · online ${nav.onLine} · link ${(nav.connection && nav.connection.effectiveType) || '?'} · timers ${sleepStats.workerCreated ? 'worker' : 'plain'} · ${String(nav.userAgent || '').slice(0, 140)}`;
+  } catch { return `build ${AGENT_BUILD}`; }
 }
 /**
  * Persist a job, preserving a cancel that arrived while this copy was in flight.
@@ -581,14 +735,24 @@ function xaoLog(id: string | null, msg: string) {
  */
 function writeJob(j: any) {
   try {
-    if (j && !j.cancelRequested) {
+    if (j) {
       try {
         const stored = JSON.parse(localStorage.getItem(jobKey(j.jobId)) || 'null');
-        if (stored && stored.cancelRequested) j.cancelRequested = true;
+        if (stored && stored.cancelRequested && !j.cancelRequested) j.cancelRequested = true;
+        // The log only ever grows (xaoLog is the sole writer, and it writes a fresh copy). A long-running path
+        // holds its own older copy of the job and writes it back wholesale, which used to wipe every line
+        // logged in between: the refund would log its steps and then erase them on the final save, leaving
+        // a stuck job with nothing to show. A copy in flight can only be BEHIND what is stored, never ahead, so if
+        // the stored log ends in a line this copy has not got, the stored log wins. (Comparing timestamps instead
+        // fails when two lines land in the same millisecond, which the refund's rapid-fire stages do.)
+        const lastOf = (a: any) => (Array.isArray(a) && a.length ? String(a[a.length - 1]) : '');
+        const storedLast = stored && Array.isArray(stored.log) ? lastOf(stored.log) : '';
+        if (storedLast && !(Array.isArray(j.log) && j.log.includes(storedLast))) j.log = stored.log;
       } catch {}
     }
     localStorage.setItem(jobKey(j.jobId), JSON.stringify(j));
-  } catch {}
+    if (j && j.jobId) runs.touch(j.jobId);
+  } catch (e) { storageWriteFailures += 1; lastStorageError = errMsg(e).slice(0, 120); }
   return j;
 }
 function readJob(id: string): any { const s = localStorage.getItem(jobKey(id)); if (!s) throw new Error('job not found: ' + id); return JSON.parse(s); }
@@ -733,6 +897,7 @@ function receiptData(job: any, x: any) {
     tokenId: job.tokenId, receiptTokenId: x.receiptTokenId || null, recipient: x.recipient || job.recipient || job.user, agentIdentityId: job.agentIdentityId || null, origin: job.origin || 'wizard',
     parents: (job.parents || []).map(String),
     outcome: x.outcome || 'inscribed', note: x.note || null,
+    ...(x.referral ? { referral: x.referral } : {}),
     depositReceived: received.toString(), xtrataProtocol: fileProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
     networkFee: networkFee.toString(), agentFeePct: Number(job.agentFeePct ?? AGENT_FEE_PCT),
     agentFee: agentFee.toString(), changeReturned: changeR.toString(),
@@ -780,7 +945,7 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 ${row('Xtrata protocol fee', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
 ${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
 ${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
-<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>${referralRowHtml(d, row, stxr, escHtml)}
 ${row('Change returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}
 ${d.note ? row('Note', escHtml(d.note)) : ''}
 <div class="tot">${row('Total paid', stxr(d.totalPaid) + usd(d.totalPaid))}</div>` : `<h1>Outcome</h1>
@@ -791,6 +956,46 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 <div class="tot">${row('Returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}</div>`}
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · settled on Bitcoin via Stacks</div>
 </div></div></body></html>`;
+}
+
+
+// ---------- referral on receipts ----------
+type ReferralView = { slug: string; name: string; kind: 'planned' | 'paid' | 'pending' | 'rebate'; amountUstx: string; tx?: string };
+/** One line under the wizard fee. Empty string when the job has no referral, so unreferred receipts are byte-for-byte unchanged. */
+function referralRowHtml(d: any, row: (k: string, v: string) => string, stxr: (u: any) => string, escHtml: (s: any) => string): string {
+  const r: ReferralView | undefined = d && d.referral;
+  if (!r) return '';
+  const who = escHtml(r.name);
+  if (r.kind === 'rebate') return row('↳ Referral rebate · ' + who, stxr(r.amountUstx) + ' back in your change');
+  if (r.kind === 'pending') return row('↳ Referral · ' + who, 'to be settled by Xtrata');
+  return row('↳ Referral · ' + who, stxr(r.amountUstx) + ' of the wizard fee');
+}
+/** What to show for a referred job: `final` false = the split agreed before payout (on-chain receipt), true = what happened. */
+function referralView(job: any, agentFee: bigint, payer: string | null, final: boolean): ReferralView | null {
+  if (!(job && job.referral && takesReferrals(job.origin))) return null;
+  const base = { slug: String(job.referral.slug), name: String(job.referral.name) };
+  if (final) {
+    if (job.referralOwed) return { ...base, kind: 'pending', amountUstx: String(job.referralOwed.amountUstx) };
+    if (job.referralTx) return { ...base, kind: 'paid', amountUstx: String(job.referralPaidUstx || '0'), tx: String(job.referralTx) };
+    if (job.referralRebateUstx) return { ...base, kind: 'rebate', amountUstx: String(job.referralRebateUstx) };
+    return null;
+  }
+  const plan = planPayout({ agentFee, partner: frozenPartner(job), payer });
+  if (plan.rebateToPayer > 0n) return { ...base, kind: 'rebate', amountUstx: plan.rebateToPayer.toString() };
+  if (plan.toPartner > 0n) return { ...base, kind: 'planned', amountUstx: plan.toPartner.toString() };
+  return null;
+}
+/** The self-referral rebate stays in the wallet and returns as change, so the fee the user actually bears is smaller. */
+function referralRebate(job: any, agentFee: bigint, payer: string | null): bigint {
+  if (!(job && job.referral && takesReferrals(job.origin))) return 0n;
+  return planPayout({ agentFee, partner: frozenPartner(job), payer }).rebateToPayer;
+}
+/** Mock mode moves no money; it records what a live run would, so the receipt and page can be checked in a browser. */
+function mockReferral(job: any, agentFee: bigint) {
+  if (!(job.referral && takesReferrals(job.origin))) return;
+  const plan = planPayout({ agentFee, partner: frozenPartner(job), payer: job.funder || job.expectedFunder || job.user || null });
+  if (plan.toPartner > 0n) { job.referralTx = '0xMOCK_REFERRAL'; job.referralPaidUstx = plan.toPartner.toString(); }
+  else if (plan.rebateToPayer > 0n) job.referralRebateUstx = plan.rebateToPayer.toString();
 }
 
 // ---------- funder + retrying STX sends (mirror core) ----------
@@ -999,7 +1204,7 @@ async function unstickQueue(job: any, key: string, addr: string, to: string, onP
     onProg(`filling missing nonce ${missing} — nothing occupies it, so everything above it is stuck`);
     try {
       const tx: any = await makeSTXTokenTransfer({ recipient: to, amount: 1n, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce: missing } as any);
-      const res: any = await broadcastTransaction(tx, network);
+      const res: any = await broadcastSafe(tx);
       if (res.error) throw new Error(res.error + (res.reason ? ' ' + res.reason : ''));
       replaced.push({ nonce: String(missing), filledGap: true, fee: String(fee), txid: res.txid || res });
       xaoLog(job.jobId, `nonce ${missing}: gap filled at ${fee} uSTX`);
@@ -1028,7 +1233,7 @@ async function unstickQueue(job: any, key: string, addr: string, to: string, onP
       // build was refused by the node every time and nothing was ever replaced. One
       // microSTX goes to the payer instead — the same address the refund targets.
       const tx: any = await makeSTXTokenTransfer({ recipient: to, amount: 1n, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce: stuck.nonce } as any);
-      const res: any = await broadcastTransaction(tx, network);
+      const res: any = await broadcastSafe(tx);
       if (res.error) throw new Error(res.error + (res.reason ? ' ' + res.reason : ''));
       replaced.push({ nonce: String(stuck.nonce), was: String(stuck.fee), now: String(fee), fee: String(fee), txid: res.txid || res });
       xaoLog(job.jobId, `nonce ${stuck.nonce}: replacement broadcast at ${fee} uSTX`);
@@ -1087,7 +1292,9 @@ async function returnAllHeldNfts(job: any, key: string, fromAddr: string, fallba
   const itemTokenIds = new Set(((job.items || []).map((i: any) => i.tokenId)).filter(Boolean).map(String));
   for (const id of ids) {
     try {
-      if ((await ownerOf(String(id))) !== fromAddr) continue;
+      const here = await heldBy(String(id), fromAddr);
+      if (here === 'no') continue;
+      if (here === 'unknown') throw new Error(`could not confirm whether #${id} is in this wallet (the API kept failing) — it is not being treated as gone; try again`);
       const isDeclared = (job.parents || []).map(String).includes(String(id)) || String(id) === String(job.tokenId) || String(id) === String(job.receiptTokenId) || itemTokenIds.has(String(id));
       const sender = await detectNftSender(fromAddr, String(id));
       const to = isDeclared ? (fallbackTo || sender) : (sender || fallbackTo);
@@ -1274,9 +1481,10 @@ async function recoverJobAssets(jobIn: any) {
     : `ownership index refresh deferred · ${indexRefresh.error}`);
   return { recovered: true, ...job.recovery };
 }
-async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }
+async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4, memo?: string) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee, memo); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }
 async function sendNftRetry(key: string, from: string, id: string, to: string, tries = 5) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendNft(key, from, id, to); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(Math.min(30000, 8000 * (i + 1))); continue; } throw e; } } throw last; }
-async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5): Promise<any> { let last: any; for (let i = 0; i < tries; i++) { let bal = 0n; try { bal = await balance(fromAddr); } catch (e) { last = e; await sleep(5000); continue; } if (bal <= REFUND_TX_FEE) return { sent: false, amount: '0', balance: bal.toString() }; const amount = bal - REFUND_TX_FEE; try { const tx = await sendStx(key, amount, to, REFUND_TX_FEE); return { sent: true, tx, amount: amount.toString() }; } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last || new Error('sweep failed'); }
+// `keep` holds some STX back (the refund keeps enough for the optional receipt); the rest goes home NOW.
+async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5, keep = 0n): Promise<any> { let last: any; for (let i = 0; i < tries; i++) { let bal = 0n; try { bal = await balance(fromAddr); } catch (e) { last = e; await sleep(5000); continue; } if (bal <= REFUND_TX_FEE + keep) return { sent: false, amount: '0', balance: bal.toString() }; const amount = bal - REFUND_TX_FEE - keep; try { const tx = await sendStx(key, amount, to, REFUND_TX_FEE); return { sent: true, tx, amount: amount.toString() }; } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last || new Error('sweep failed'); }
 async function inscribeReceipt(key: string, from: string, html: string, uri: string, deps: string[]) { const data = enc.encode(html); const q = await quoteFee(data.length, chunkBytes(data).length); const tokenId = await mintSingle(key, from, data, 'text/html', uri, deps, q.protocolFee); return { tokenId }; }
 
 // ---------- estimate→create→inscribe→deliver→refund (mirror core) ----------
@@ -1288,7 +1496,8 @@ function musicProtected(job: any, s: MusicFeeState) {
   return BigInt(job.protocolFee) - BigInt(s.protocolSpent) + BigInt(s.service)
     + BigInt(job.receiptProtocol || 0) + BigInt(job.receiptMiner || 0)
     + BigInt((job.parents || []).length) * PARENT_RETURN_FEE
-    + DELIVERY_RESERVE + BigInt(Math.max(0, (job.items?.length || 1) - 1)) * ITEM_DELIVERY_FEE + REFUND_TX_FEE;
+    + DELIVERY_RESERVE + BigInt(Math.max(0, (job.items?.length || 1) - 1)) * ITEM_DELIVERY_FEE + REFUND_TX_FEE
+    + referralFeeReserve(job);   // the partner transfer is one more tx; Economy spending must not dip into it
 }
 function initialiseMusicFees(job: any, est: any) {
   if (est.feeMode !== 'economy') return;
@@ -1398,8 +1607,8 @@ async function sendMusic(key: string, from: string, fn: string, args: any[], spe
   s.pending = { fn, args: args.map(cvToHex), nonce: String(tx.auth.spendingCondition.nonce), fee: String(fee),
     weight: String(weight), protocol: String(spendCap || 0n), ids: [txid], fees: { [txid]: String(fee) }, since: Date.now() };
   s.waitSince ||= Date.now(); writeMusicFees(id, s); // persist BEFORE broadcast, including ambiguous network outcomes
-  const res: any = await broadcastTransaction(tx, network);
-  if (res?.error) {
+  const res: any = await broadcastSafe(tx);
+  if (res?.error && !res.ambiguous) {
     // A definitive node rejection did not consume the nonce or mining budget.
     const fresh = readMusicFees(id)!; delete fresh.pending; writeMusicFees(id, fresh);
     throw new MusicFeeWait(`${fn}: ${res.reason || res.error}. Waiting within your approved fee limit.`);
@@ -1440,7 +1649,7 @@ async function settleMusicPending(key: string, from: string, id: string): Promis
     const fresh = readMusicFees(id)!;
     if (fresh.upgrade?.state !== 'payment') {
       fresh.pending!.since = Date.now(); writeMusicFees(id, fresh);
-      await broadcastTransaction(tx, network);
+      await broadcastSafe(tx);
       xaoLog(id, 'Re-submitted the identical saved transaction after a missing broadcast; nonce and fee unchanged.');
     }
   }
@@ -1458,7 +1667,7 @@ async function settleMusicPending(key: string, from: string, id: string): Promis
       const tx = await makeContractCall({ ...opts, fee: next }); const txid = tx.txid();
       s = readMusicFees(id)!; s.pending!.ids.push(txid); s.pending!.fees[txid] = String(next);
       s.pending!.fee = String(next); s.pending!.since = Date.now(); writeMusicFees(id, s);
-      const res: any = await broadcastTransaction(tx, network);
+      const res: any = await broadcastSafe(tx);
       xaoLog(id, res?.error ? 'Replacement rejected; watching every original transaction.' : `Speed-up replacement sent at ${next} µSTX using nonce ${p.nonce}.`);
     }
   }
@@ -1515,6 +1724,7 @@ async function recordMusicTopUp(id: string, quoteId: string, txid: string) {
 }
 
 async function createJob(opts: any) {
+  assertInscribeAllowed(opts);   // temporary lock: HTML/markup jobs cannot finish — refuse before any money moves
   const { file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT, receipt = true, origin = 'wizard', sunoPlayer = null } = opts;
   if (opts.feeMode === 'economy' && !(navigator as any).locks?.request) throw new Error('Economy requires secure browser job locking; use Standard.');
   if (opts.feeMode === 'economy' && (origin !== 'music' || CORE_NAME !== 'xtrata-v3-2-3')) throw new Error('Economy is currently supported only by Music on xtrata-v3-2-3');
@@ -1525,6 +1735,8 @@ async function createJob(opts: any) {
   if (parentIds.some((p) => !/^\d+$/.test(p))) throw new Error('parents must be token-id uints');
   if (new Set(parentIds).size !== parentIds.length) throw new Error('duplicate parent token ids');
   if (parentIds.length > 50) throw new Error('at most 50 parents');
+  // REFERRAL: resolved before any file is read or wallet made, so a registry outage creates no job.
+  const referral = await freezeReferral(opts.referral, origin, { sleep });
   const data = new Uint8Array(await (file as File).arrayBuffer());
   // DUPLICATE-HASH GUARD: the contract rejects re-inscribing an identical hash — refuse BEFORE creating
   // a job or taking payment, so identical content is never paid for twice.
@@ -1552,6 +1764,7 @@ async function createJob(opts: any) {
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
     status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin, sunoPlayer,
+    ...(referral ? { referral } : {}),
   };
   initialiseMusicFees(job, est);
   writeJob(job); return publicJob(job);
@@ -1565,12 +1778,14 @@ async function createJob(opts: any) {
  * items are inscribed exactly as provided.
  */
 async function createBatchJob(opts: any) {
+  assertInscribeAllowed(opts);
   const { items = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT, receipt = true, origin = 'wizard' } = opts;
   if (opts.feeMode === 'economy' && !(navigator as any).locks?.request) throw new Error('Economy requires secure browser job locking; use Standard.');
   if (opts.feeMode === 'economy' && (origin !== 'music' || CORE_NAME !== 'xtrata-v3-2-3')) throw new Error('Economy is currently supported only by Music on xtrata-v3-2-3');
   if (!Array.isArray(items) || !items.length) throw new Error('items required');
   if (items.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${items.length} items (max ${MAX_BATCH_ITEMS})`);
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
+  const referral = await freezeReferral(opts.referral, origin, { sleep });
   const validIds = (list: any[], what: string) => {
     const ids = (list || []).map((p: any) => String(p).trim()).filter(Boolean);
     if (ids.some((p) => !/^\d+$/.test(p))) throw new Error(`${what} must be token-id uints`);
@@ -1628,6 +1843,7 @@ async function createBatchJob(opts: any) {
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
     status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin,
+    ...(referral ? { referral } : {}),
   };
   initialiseMusicFees(job, est);
   writeJob(job); return publicJob(job);
@@ -1781,6 +1997,7 @@ function batchReceiptData(job: any, x: any) {
   return {
     jobId: job.jobId, core: job.core, date: new Date().toISOString(), batch: true,
     outcome: x.outcome || 'inscribed', note: x.note || null,
+    ...(x.referral ? { referral: x.referral } : {}),
     items: job.items.map((i: any) => ({ idx: i.idx, uri: i.uri, mime: i.mime, bytes: i.bytes, tokenId: i.tokenId || null, status: i.status, error: i.error || null })),
     counts: { total: job.items.length, minted: minted.length, failed: job.items.filter((i: any) => i.status === 'FAILED').length, skipped: job.items.filter((i: any) => i.status === 'SKIPPED').length },
     parents: (job.parents || []).map(String), receiptTokenId: x.receiptTokenId || null,
@@ -1830,11 +2047,88 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 ${row('Xtrata protocol fees (' + d.counts.minted + ' mints)', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
 ${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
 ${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
-<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>${referralRowHtml(d, row, stxr, escHtml)}
 ${row('Change returned', stxr(d.changeReturned) + usd(d.changeReturned))}
 <div class="tot">${row(ok ? 'Total paid' : 'Returned to you', stxr(ok ? d.totalPaid : d.changeReturned) + usd(ok ? d.totalPaid : d.changeReturned))}</div>
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · one payment, ${d.counts.total} inscriptions · settled on Bitcoin via Stacks</div>
 </div></div></body></html>`;
+}
+
+// ---------- REFERRAL PAYOUT (music wizard only) ----------
+// A referred music job splits the wizard fee: the partner's share goes to the address FROZEN on the
+// job at creation, the rest to Xtrata. The user's price and the protocol fee are untouched. Rules:
+//  - Partner first (memo `xtrata-ref:<slug>`), id persisted at once, THEN Xtrata, then the usual sweep.
+//  - Never paid twice: `job.referralTx` is checked first; `job.referralIntent` is written BEFORE the
+//    broadcast, and a re-run with an intent but no tx id looks the transfer up on chain before sending.
+//  - Delivery of the inscription is never affected. If the partner leg fails for good, Xtrata is paid
+//    the full fee and `job.referralOwed` records what is owed for manual settlement.
+//  - A lookup that FAILED is not "nothing found": it records `referralOwed` (unverified) and Xtrata is
+//    sent only fee - partner share, so the wallet can never be asked for more than it holds.
+function referralActive(job: any): boolean { return !!(job && job.referral && takesReferrals(job.origin) && !job.mock); }
+function referralFeeReserve(job: any): bigint { return referralActive(job) ? REFUND_TX_FEE : 0n; }
+function frozenPartner(job: any): Partner {
+  const r = job.referral;
+  return { slug: r.slug, name: r.name, address: r.address, active: true, shareBps: r.shareBps, selfReferral: !!r.selfReferral, selfShareBps: r.selfShareBps, minPayoutUstx: BigInt(r.minPayoutUstx || '0') };
+}
+const memoText = (m: unknown) => { const h = String(m || '').replace(/^0x/, ''); let o = ''; for (let i = 0; i + 1 < h.length; i += 2) { const c = parseInt(h.slice(i, i + 2), 16); if (c) o += String.fromCharCode(c); } return o; };
+/** Look for our partner transfer among the deposit wallet's confirmed + pending sends. THROWS if either read fails. */
+async function findReferralTransfer(from: string, to: string, amount: bigint, memo: string): Promise<string | null> {
+  const match = (tx: any) => tx && tx.tx_type === 'token_transfer' && tx.sender_address === from && tx.token_transfer
+    && tx.token_transfer.recipient_address === to && String(tx.token_transfer.amount) === amount.toString()
+    && memoText(tx.token_transfer.memo) === memo && !/abort/.test(String(tx.tx_status || ''));
+  for (const path of [`/extended/v1/address/${from}/mempool?limit=50`, `/extended/v1/address/${from}/transactions?limit=50`]) {
+    const r = await hfetch(path);
+    if (!r.ok) throw new Error(`transaction lookup failed (HTTP ${r.status})`);
+    const d: any = await r.json();
+    if (!Array.isArray(d?.results)) throw new Error('transaction lookup returned no results');
+    const hit = d.results.find(match);
+    if (hit) return String(hit.tx_id).replace(/^0x/, '');   // same bare form sendStx returns
+  }
+  return null;
+}
+/** Send the wizard fee. Unreferred jobs: exactly the old single transfer to Xtrata. Returns the Xtrata tx id. */
+async function payWizardFee(job: any, dep: { key: string; address: string }, agentFee: bigint, payer: string | null): Promise<any> {
+  const xtrataTo = job.agentFeeAddress || AGENT_FEE_ADDRESS;
+  if (!referralActive(job)) return sendStxRetry(dep.key, agentFee, xtrataTo, REFUND_TX_FEE);
+  const partner = frozenPartner(job);
+  const plan = planPayout({ agentFee, partner, payer });
+  const memo = referralMemo(partner.slug);
+  let partnerPaid = 0n;
+  let xtrataAmount = agentFee - plan.rebateToPayer;
+  if (plan.selfReferral && plan.rebateToPayer > 0n) job.referralRebateUstx = plan.rebateToPayer.toString();
+  if (plan.toPartner > 0n) {
+    const to = partner.address; const amt = plan.toPartner;
+    const owed = (reason: string) => { job.referralOwed = { slug: partner.slug, address: to, amountUstx: amt.toString(), reason, at: new Date().toISOString() }; writeJob(job); xaoLog(job.jobId, `referral payout not sent (${reason}) — recorded as owed`); };
+    if (job.referralTx) {
+      partnerPaid = BigInt(job.referralPaidUstx || amt);                      // already paid by an earlier run
+    } else {
+      let adopted: string | null = null; let unverified = false;
+      if (job.referralIntent) {                                            // an earlier run may have broadcast it
+        try { adopted = await findReferralTransfer(dep.address, to, amt, memo); } catch { unverified = true; }
+      }
+      if (adopted) { job.referralTx = adopted; job.referralPaidUstx = amt.toString(); writeJob(job); partnerPaid = amt; }
+      else if (unverified) { owed('could not confirm whether an earlier attempt was sent'); partnerPaid = amt; }   // keep the share in reserve; settle by hand
+      else {
+        job.referralIntent = { to, amountUstx: amt.toString(), memo, at: new Date().toISOString() }; writeJob(job);
+        try {
+          const tx = await sendStxRetry(dep.key, amt, to, REFUND_TX_FEE, 4, memo);
+          job.referralTx = tx; job.referralPaidUstx = amt.toString(); writeJob(job); partnerPaid = amt;
+        } catch (e) {
+          // It may still have been broadcast (e.g. a confirmation timeout): look before concluding it failed.
+          try {
+            const found = await findReferralTransfer(dep.address, to, amt, memo);
+            if (found) { job.referralTx = found; job.referralPaidUstx = amt.toString(); writeJob(job); partnerPaid = amt; }
+            else owed('transfer failed: ' + errMsg(e));
+          } catch { owed('transfer failed and could not be confirmed: ' + errMsg(e)); partnerPaid = amt; }
+        }
+      }
+    }
+  }
+  xtrataAmount = agentFee - plan.rebateToPayer - partnerPaid;
+  job.referralSplit = { agentFee: agentFee.toString(), partner: partnerPaid.toString(), xtrata: xtrataAmount.toString(), rebate: plan.rebateToPayer.toString() };
+  writeJob(job);
+  if (xtrataAmount <= 0n) return null;
+  return sendStxRetry(dep.key, xtrataAmount, xtrataTo, REFUND_TX_FEE);
 }
 async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd: number | null) {
   const minted = job.items.filter((i: any) => i.tokenId);
@@ -1844,9 +2138,10 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
     const receiptTokenId = job.receipt === false ? null : String(Math.floor(1000 + Math.random() * 9000));
     const sumProt = minted.reduce((s: bigint, i: any) => s + BigInt(i.protocolFee || '0'), 0n);
     const change = received - sumProt - BigInt(job.receiptProtocol || '0') - agentFee;
-    const d = batchReceiptData(job, { received, agentFee, receiptTokenId, change: change > 0n ? change : 0n, stxUsd });
+    mockReferral(job, agentFee);
+    const d = batchReceiptData(job, { received, agentFee, receiptTokenId, change: change > 0n ? change : 0n, stxUsd, referral: referralView(job, agentFee, job.funder || job.expectedFunder || job.user || null, true) });
     job.receiptHtml = buildBatchReceiptHtml(d);
-    const receipt: any = { ...d, deliverTxs: minted.map((i: any) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    const receipt: any = { ...d, deliverTxs: minted.map((i: any) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND', ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: null } : {}) };
     if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p: string) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
     Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
     delete job.ephemeralMnemonic; job.status = doneStatus(); writeJob(job);
@@ -1855,14 +2150,15 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
   }
   const dep = deriveFrom(job.ephemeralMnemonic);
   const refundTo = (await resolveFunder(job)) || job.user;
+  const feeShown = agentFee - referralRebate(job, agentFee, refundTo);   // a self-referral rebate comes back as change
   let liveBal0: bigint | null = null; try { liveBal0 = await balance(job.depositAddress); } catch {}
   let estChange: bigint | undefined;
   if (liveBal0 != null && liveBal0 > 0n) {
-    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + agentFee
-      + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + BigInt(minted.length) * ITEM_DELIVERY_FEE + DELIVERY_RESERVE + REFUND_TX_FEE;
+    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + feeShown
+      + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + BigInt(minted.length) * ITEM_DELIVERY_FEE + DELIVERY_RESERVE + REFUND_TX_FEE + referralFeeReserve(job);
     estChange = liveBal0 > reserveAhead ? liveBal0 - reserveAhead : 0n;
   }
-  const prelim = batchReceiptData(job, { received, agentFee, receiptTokenId: null, change: estChange, stxUsd });
+  const prelim = batchReceiptData(job, { received, agentFee: feeShown, receiptTokenId: null, change: estChange, stxUsd, referral: referralView(job, agentFee, refundTo, false) });
   const idDep = job.agentIdentityId;
   const receiptDeps = [...minted.map((i: any) => String(i.tokenId)), ...(job.parents || []).map(String), ...(idDep ? [String(idDep)] : [])].slice(0, 50);
   let receiptTokenId: string | null = null;
@@ -1884,26 +2180,33 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
     }
   }
   const parentReturnTxs: any[] = [];
+  // If any parent (or stray) could not be sent home, the change STAYS in the wallet to pay for moving it later.
+  let holdFunds = false;
   for (const pid of (job.parents || [])) {
-    try { if ((await ownerOf(String(pid))) === dep.address) { const ptx = await sendNftRetry(dep.key, dep.address, String(pid), refundTo); parentReturnTxs.push({ id: String(pid), tx: ptx }); xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`); } }
-    catch (e) { notes.push(`parent #${pid} return pending (` + errMsg(e) + ')'); job.keepKey = true; }
+    try {
+      const here = await heldBy(String(pid), dep.address);
+      if (here === 'unknown') throw new Error('could not confirm whether it is still in the deposit wallet');
+      if (here === 'yes') { const ptx = await sendNftRetry(dep.key, dep.address, String(pid), refundTo); parentReturnTxs.push({ id: String(pid), tx: ptx }); xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`); }
+    }
+    catch (e) { notes.push(`parent #${pid} return pending (` + errMsg(e) + ')'); job.keepKey = true; holdFunds = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
-  await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes);
+  { const n0 = notes.length; await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes); if (notes.length > n0) holdFunds = true; }
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0';
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
-  try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
+  try { if (agentFee > 0n) agentFeeTx = await payWizardFee(job, dep, agentFee, refundTo); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   prog('returning your change');
-  try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending (' + errMsg(e) + ')'); }
+  if (holdFunds) notes.push('change kept in the deposit wallet to pay for returning the inscription — the page will finish this automatically');
+  else try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending (' + errMsg(e) + ')'); }
   const note = notes.length ? notes.join('; ') : null;
-  const finalD = batchReceiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), stxUsd, note });
+  const finalD = batchReceiptData(job, { received, agentFee: feeShown, receiptTokenId, change: BigInt(refundedUstx), stxUsd, note, referral: referralView(job, agentFee, refundTo, true) });
   job.receiptHtml = buildBatchReceiptHtml(finalD);
-  const receipt = { ...finalD, deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined };
+  const receipt = { ...finalD, deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined, ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: job.referralOwed || null } : {}) };
   Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, refundedUstx, receipt });
   let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
   let holdsNft = (job.parents || []).length > 0;
   try { holdsNft = (await heldInscriptions(job.depositAddress)).length > 0; } catch {}
-  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) { delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; }
   else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : holdsNft ? 'wallet still holds an inscription — return it via recovery' : `wallet still holds ${leftover} uSTX`; }
   job.status = doneStatus(); writeJob(job);
   job.items.forEach((_: any, i: number) => idbDeleteBytes(`${job.jobId}:${i}`));
@@ -1924,25 +2227,27 @@ async function deliver(job: any) {
   if (job.mock) {
     // On-chain receipt optional: when off, no receipt token — but the HTML is still built + saved.
     const receiptTokenId = job.receipt === false ? null : String(Math.floor(1000 + Math.random() * 9000));
-    const d = receiptData(job, { received, agentFee, receiptTokenId, stxUsd });
+    mockReferral(job, agentFee);
+    const d = receiptData(job, { received, agentFee, receiptTokenId, stxUsd, referral: referralView(job, agentFee, job.funder || job.expectedFunder || job.user || null, true) });
     job.receiptHtml = buildReceiptHtml(d);
-    const receipt: any = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    const receipt: any = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND', ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: null } : {}) };
     if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p: string) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
     Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
     delete job.ephemeralMnemonic; job.status = 'COMPLETE'; writeJob(job); return { receipt };
   }
   const dep = deriveFrom(job.ephemeralMnemonic);
   const refundTo = (await resolveFunder(job)) || job.user;
+  const feeShown = agentFee - referralRebate(job, agentFee, refundTo);   // a self-referral rebate comes back as change
   let liveBal0: bigint | null = null; try { liveBal0 = await balance(job.depositAddress); } catch {}
   let mainMinerForReceipt = BigInt(job.mainMinerFee || job.minerReserve || '0');
   let estChange: bigint | undefined;
   if (liveBal0 != null && liveBal0 > 0n) {
     const spentSoFar = received > liveBal0 ? received - liveBal0 : 0n;
     if (spentSoFar > BigInt(job.protocolFee)) mainMinerForReceipt = spentSoFar - BigInt(job.protocolFee);
-    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + agentFee + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + DELIVERY_RESERVE + REFUND_TX_FEE;
+    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + feeShown + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + DELIVERY_RESERVE + REFUND_TX_FEE + referralFeeReserve(job);
     estChange = liveBal0 > reserveAhead ? liveBal0 - reserveAhead : 0n;
   }
-  const prelim = receiptData(job, { received, agentFee, receiptTokenId: null, change: estChange, mainMinerFee: mainMinerForReceipt.toString(), stxUsd });
+  const prelim = receiptData(job, { received, agentFee: feeShown, receiptTokenId: null, change: estChange, mainMinerFee: mainMinerForReceipt.toString(), stxUsd, referral: referralView(job, agentFee, refundTo, false) });
   const idDep = job.agentIdentityId;
   const receiptDeps = idDep ? [String(job.tokenId), String(idDep)] : [String(job.tokenId)];
   // On-chain receipt is optional. When off we skip the extra mint entirely (saving its
@@ -1959,33 +2264,37 @@ async function deliver(job: any) {
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0'; const notes: string[] = [];
   // Parent(s) go home FIRST — the user's own inscription(s) are the most valuable thing in this wallet.
   const parentReturnTxs: any[] = [];
+  let holdFunds = false;   // a parent/stray that could not be sent home keeps the change in the wallet to pay for it
   for (const pid of (job.parents || [])) {
     try {
-      if ((await ownerOf(String(pid))) === dep.address) {
+      const here = await heldBy(String(pid), dep.address);
+      if (here === 'unknown') throw new Error('could not confirm whether it is still in the deposit wallet');
+      if (here === 'yes') {
         prog(`returning parent #${pid} to your wallet`);
         const ptx = await sendNftRetry(dep.key, dep.address, String(pid), refundTo);
         parentReturnTxs.push({ id: String(pid), tx: ptx });
         xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`);
       }
-    } catch (e) { notes.push(`parent #${pid} return pending — recovery will send it home (` + errMsg(e) + ')'); job.keepKey = true; }
+    } catch (e) { notes.push(`parent #${pid} return pending — recovery will send it home (` + errMsg(e) + ')'); job.keepKey = true; holdFunds = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
-  await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes);
+  { const n0 = notes.length; await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes); if (notes.length > n0) holdFunds = true; }
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
-  try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
-  prog('returning your change');
-  try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); }
+  try { if (agentFee > 0n) agentFeeTx = await payWizardFee(job, dep, agentFee, refundTo); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
+  if (holdFunds) notes.push('change kept in the deposit wallet to pay for returning the inscription — the page will finish this automatically');
+  else { prog('returning your change');
+  try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); } }
   const note = notes.length ? notes.join('; ') : null;
-  const finalD = receiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), mainMinerFee: mainMinerForReceipt.toString(), stxUsd, note });
+  const finalD = receiptData(job, { received, agentFee: feeShown, receiptTokenId, change: BigInt(refundedUstx), mainMinerFee: mainMinerForReceipt.toString(), stxUsd, note, referral: referralView(job, agentFee, refundTo, true) });
   job.receiptHtml = buildReceiptHtml(finalD);
-  const receipt = { ...finalD, deliverTx, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined };
+  const receipt = { ...finalD, deliverTx, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined, ...(job.referral ? { referralTx: job.referralTx || null, referralOwed: job.referralOwed || null } : {}) };
   Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), deliverTx, receiptDeliverTx, agentFeeTx, refundTx, refundedUstx, receipt });
   // SAFETY: never wipe the key while the wallet still holds STX or ANY inscription (e.g. a parent
   // whose return transfer failed) — or while we can't confirm it's empty.
   let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
   let holdsNft = (job.parents || []).length > 0;   // assume the worst until proven empty
   try { holdsNft = (await heldInscriptions(job.depositAddress)).length > 0; } catch {}
-  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) { delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; }
   else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : holdsNft ? 'wallet still holds an inscription — return it via recovery' : `wallet still holds ${leftover} uSTX — sweep with recover-all`; }
   job.status = 'COMPLETE'; writeJob(job); idbDeleteBytes(job.jobId); return { receipt };
 }
@@ -2010,7 +2319,7 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
       if (to) { try { const sw = await sweepStxTo(dep.key, dep.address, to); if (sw.sent) { job.refundTx = sw.tx; job.refundedUstx = sw.amount; } } catch {} }
       let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
       let holdsNft = true; try { holdsNft = (await heldInscriptions(job.depositAddress)).length > 0; } catch {}
-      if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+      if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) { delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; }
       else if (leftover != null) { job.keepKey = true; job.keepKeyReason = holdsNft ? 'wallet still holds an inscription — return it via recovery' : `~${leftover} uSTX leftover — sweep with recover-all`; }
     }
     job.status = 'COMPLETE'; writeJob(job); return { alreadyDelivered: true };
@@ -2031,23 +2340,58 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
   const dep = deriveFrom(job.ephemeralMnemonic);
   const returnTo = (await resolveFunder(job)) || job.user;
   const out: any = { reason, deliveredNfts: [], refundTx: null };
+  // Every stage is logged AND written to job.progress. The refund used to go quiet for minutes at a time (up to
+  // three sequential confirmations), which looks exactly like being stuck and cannot be told apart from it.
+  refundStep(job.jobId, returnTo
+    ? `refund 1/4 · checking for inscriptions to send back to ${String(returnTo).slice(0, 8)}…`
+    : 'refund · no paying address could be found, so nothing can be sent back automatically');
   // Hand back EVERY inscription this wallet holds: escrowed parents, anything it minted (token /
   // receipt), and any WRONG inscription sent by mistake (strays return to whoever sent them).
   const nftReturns = await returnAllHeldNfts(job, dep.key, dep.address, returnTo);
   for (const r of nftReturns) { if (r.tx) out.deliveredNfts.push({ id: r.id, tx: r.tx, to: r.to }); else out.nftError = `#${r.id}: ${r.error || 'no return address'}`; }
   if (nftReturns.length) { job.nftReturns = [...(job.nftReturns || []), ...nftReturns]; writeJob(job); }
+  let refundedTotal = 0n;
+  const addSweep = (sw: any) => {
+    if (!sw || !sw.sent) return;
+    out.refundTx = out.refundTx || sw.tx;
+    out.refundTxs = [...(out.refundTxs || []), sw.tx];
+    refundedTotal += BigInt(sw.amount || '0');
+    out.refundedUstx = refundedTotal.toString();
+    xaoLog(job.jobId, `refund: ${sw.amount} µSTX sent to ${returnTo} · tx ${sw.tx}`);
+  };
   if (returnTo) {
-    try {
-      const b0 = await balance(dep.address);
-      const need = BigInt(job.receiptProtocol || '110000') + 80000n + REFUND_TX_FEE;
-      if (b0 > need + 50000n) {
+    // MONEY FIRST. The receipt is a nicety that costs up to three sequential confirmations; if anything in them
+    // stalls, the payer's STX must already be on its way. So everything the receipt does not need goes home now,
+    // the receipt runs on the remainder under a time limit, and a final sweep returns whatever is left.
+    let b0 = 0n;
+    try { b0 = await balance(dep.address); } catch (e) { out.receiptError = errMsg(e); xaoLog(job.jobId, `refund: balance lookup failed (${errMsg(e)}) — skipping the receipt, sweeping directly`); }
+    const need = BigInt(job.receiptProtocol || '110000') + 80000n + REFUND_TX_FEE;
+    // The receipt is an HTML page. While the gateway lock is on it cannot be broadcast, and its first step
+    // (begin-or-get) pays a protocol fee that is not refundable, so a receipt that cannot finish is not started.
+    const receiptBlocked = inscribeLockActive();
+    if (receiptBlocked && b0 > need + 50000n) xaoLog(job.jobId, 'refund: receipt skipped while HTML inscribing is paused — sending everything back in one go');
+    const wantReceipt = !receiptBlocked && b0 > need + 50000n;
+    // send() will not spend below DELIVERY_RESERVE + REFUND_TX_FEE, so the float held back for the receipt has to include them.
+    const keep = wantReceipt ? need + DELIVERY_RESERVE + REFUND_TX_FEE : 0n;
+    let earlyFailed = false;
+    if (wantReceipt && b0 > keep + REFUND_TX_FEE + 50000n) {
+      refundStep(job.jobId, 'refund 2/4 · sending your STX back now (the receipt comes after)');
+      try { addSweep(await sweepStxTo(dep.key, dep.address, returnTo, 5, keep)); }
+      catch (e) { earlyFailed = true; out.refundError = errMsg(e); xaoLog(job.jobId, `refund: early sweep failed (${errMsg(e)}) — skipping the receipt and retrying the sweep`); }
+    }
+    if (wantReceipt && !earlyFailed) {
+      refundStep(job.jobId, 'refund 3/4 · writing the refund receipt (optional, your STX is already sent)');
+      try {
         const d = receiptData(job, { received: receivedForJob(job), agentFee: 0n, change: b0 - need, receiptTokenId: null, recipient: returnTo, outcome: 'refunded', note: reason });
-        const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(d), `xtrata:receipt/${job.jobId}`, job.tokenId ? [String(job.tokenId)] : []);
+        const r: any = await withDeadline(inscribeReceipt(dep.key, dep.address, buildReceiptHtml(d), `xtrata:receipt/${job.jobId}`, job.tokenId ? [String(job.tokenId)] : []), RECEIPT_BUDGET_MS, 'the refund receipt');
         if (r.tokenId) { try { await sendNftRetry(dep.key, dep.address, r.tokenId, returnTo); } catch {} job.receiptTokenId = r.tokenId; out.receiptTokenId = r.tokenId; job.receiptHtml = buildReceiptHtml(d); }
-      }
-    } catch (e) { out.receiptError = errMsg(e); }
+      } catch (e) { out.receiptError = errMsg(e); xaoLog(job.jobId, `refund: receipt skipped (${errMsg(e)}) — the refund itself does not depend on it`); }
+    }
+    refundStep(job.jobId, 'refund 4/4 · returning everything that is left');
+    try { addSweep(await sweepStxTo(dep.key, dep.address, returnTo)); }
+    catch (e) { out.refundError = errMsg(e); xaoLog(job.jobId, `refund: final sweep failed (${errMsg(e)})`); }
+    if (out.refundedUstx != null) job.refundedUstx = out.refundedUstx;
   }
-  if (returnTo) { try { const sw = await sweepStxTo(dep.key, dep.address, returnTo); if (sw.sent) { out.refundTx = sw.tx; out.refundedUstx = sw.amount; } } catch (e) { out.refundError = errMsg(e); } }
   let leftover: bigint | null = null; try { leftover = await balance(dep.address); } catch {}
   // NEVER-STRAND (NFT edition): never discard the key while the wallet still holds an inscription
   // (e.g. a parent that arrived without enough STX to send it back yet).
@@ -2071,7 +2415,7 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
   else if (leftover != null && leftover <= REFUND_TX_FEE) {
     // NEVER-STRAND GUARD: a never-funded job keeps its key (EXPIRED) — a slow payment confirming after
     // cancellation must never land at a keyless address.
-    if (job.depositReceivedUstx || leftover > 0n) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; }
+    if (job.depositReceivedUstx || leftover > 0n) { delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; job.status = 'CANCELLED'; }
     // An explicit cancel must REST as cancelled. Landing on EXPIRED left the job
     // re-runnable by the watcher and still offering its own Stop button, so the
     // thing the user just stopped looked like it had not stopped at all. The key is
@@ -2171,6 +2515,13 @@ try {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { void syncWakeLock(); void watchTick(); } });
   window.addEventListener('focus', () => { void syncWakeLock(); void watchTick(); });
 } catch {}
+// When a run stalls, the first question is "was the page in the background / offline at the time?". Record it.
+try {
+  const logRunning = (m: string) => { for (const id of PROCESSING) xaoLog(id, m); };
+  document.addEventListener('visibilitychange', () => logRunning(`page ${document.visibilityState}`));
+  window.addEventListener('online', () => logRunning('network came back online'));
+  window.addEventListener('offline', () => logRunning('network went OFFLINE'));
+} catch {}
 // AUTO-RESUME: transient failures (network, timeouts, rate limits) do NOT refund — the job parks back at
 // FUNDED/INSCRIBED and the watcher resumes exactly where it left off. Resume is safe end-to-end: staged
 // uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
@@ -2201,24 +2552,31 @@ function assertNotCancelled(id: string) {
 const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
+  // This run's lease. If the stall breaker later releases the run, its late result must not tear down whatever
+  // run took over: only the CURRENT lease may clear PROCESSING or trigger a retry/refund.
+  const token = runs.start(id);
+  const release = () => { if (runs.end(id, token)) PROCESSING.delete(id); };
   void syncWakeLock();
+  xaoLog(id, `run started · ${envSummary()}`);
   const managed = readMusicFees(id);
   const run = () => managed ? (navigator as any).locks.request(`xao-music-job:${id}`, { ifAvailable: true }, (lock: any) => lock ? fn() : undefined) : fn();
   Promise.resolve().then(run).then(() => {
+    if (!runs.isCurrent(id, token)) { xaoLog(id, 'a run that had been released has now finished — its result is ignored'); return; }
     try { const j = readJob(id); if (j.retryCount && (j.status === 'COMPLETE' || j.status === 'COMPLETE_WITH_SKIPS')) { delete j.retryCount; writeJob(j); } } catch {}
-    PROCESSING.delete(id);
+    release();
   }).catch(async (e) => {
     const msg = errMsg(e);
-    if (e instanceof MusicFeeRecovery) { const j = readJob(id); j.status = 'NEEDS_RECOVERY'; j.keepKey = true; j.error = msg; j.progress = msg; writeJob(j); PROCESSING.delete(id); return; }
+    if (!runs.isCurrent(id, token)) { xaoLog(id, `a run that had been released has now failed (${msg}) — ignored, the current run owns this job`); return; }
+    if (e instanceof MusicFeeRecovery) { const j = readJob(id); j.status = 'NEEDS_RECOVERY'; j.keepKey = true; j.error = msg; j.progress = msg; writeJob(j); release(); return; }
     if (e instanceof MusicFeeWait || readMusicFees(id)?.pending || readMusicFees(id)?.upgrade?.state === 'payment') {
       const j = readJob(id); j.status = 'FEE_WAITING'; j.progress = msg; j.progressAt = new Date().toISOString(); writeJob(j);
-      PROCESSING.delete(id); return;
+      release(); return;
     }
     // A cancel is not an error: no retry, no NEEDS_RECOVERY, straight to the refund.
     if (e instanceof JobCancelled || isCancelRequested(id)) {
       xaoLog(id, 'cancelled by request — returning everything to the payer');
-      try { await refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'); } catch {}
-      PROCESSING.delete(id);
+      try { await refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'); } catch (e2) { xaoLog(id, `REFUND FAILED: ${errMsg(e2)} — it will be retried`); }
+      release();
       return;
     }
     try {
@@ -2228,7 +2586,7 @@ function background(id: string, fn: () => Promise<any>) {
         j.progress = `recovered from a hiccup — resuming where it left off (attempt ${j.retryCount}/${MAX_RETRIES})`;
         j.progressAt = new Date().toISOString(); writeJob(j);
         xaoLog(id, `TRANSIENT error — auto-resume scheduled from ${j.status} (${j.retryCount}/${MAX_RETRIES}): ${msg}`);
-        PROCESSING.delete(id); return;
+        release(); return;
       }
       // An already-minted token can't be un-minted, so never route it to a refund it can't honour.
       // Its delivery just needs recovery — park with the key retained instead of thrashing.
@@ -2237,19 +2595,120 @@ function background(id: string, fn: () => Promise<any>) {
         j.keepKeyReason = 'inscription minted but delivery did not finish — continue recovery to send it home';
         j.progress = j.keepKeyReason; j.progressAt = new Date().toISOString(); writeJob(j);
         xaoLog(id, `delivery incomplete for token #${j.tokenId} — parked as NEEDS_RECOVERY (not refunded): ${msg}`);
-        PROCESSING.delete(id); return;
+        release(); return;
       }
       writeJob(j);
       xaoLog(id, `FATAL error (${FATAL_ERR.test(msg) ? 'deterministic failure' : 'retries exhausted'}) — refunding: ${msg}`);
     } catch {}
-    try { await refundAndClose(readJob(id), 'error: ' + msg); } catch {}
-    PROCESSING.delete(id);
+    try { await refundAndClose(readJob(id), 'error: ' + msg); } catch (e2) { xaoLog(id, `REFUND FAILED: ${errMsg(e2)} — it will be retried`); }
+    release();
   });
+}
+
+/**
+ * Take a run that has gone quiet away from its stuck promise.
+ *
+ * Why this exists: watchTick() and reapTick() both skip anything in PROCESSING, so a run whose promise
+ * never settles was invisible to the only two things that could have rescued it. The reaper's "no progress within
+ * the window -> refund" rule was bypassed for as long as the hang lasted, and a Stop request waited for a
+ * checkpoint the stuck run would never reach.
+ *
+ * Releasing hands the job back to that existing machinery:
+ *  - Stop was pressed          -> refund now
+ *  - managed (Economy) job     -> the music branch of watchTick restarts it
+ *  - otherwise                 -> the same path as a transient error: park for resume, refund once retries are spent
+ * The released run keeps no claim on the job: its eventual result is ignored (see the lease in background()).
+ */
+function releaseStalledRun(id: string, idleMs: number) {
+  const secs = Math.round(idleMs / 1000);
+  xaoLog(id, `STALL: no activity for ${secs}s — the last line above is the step it was stuck in. Releasing the run so the job can retry or refund.`);
+  runs.release(id);
+  PROCESSING.delete(id);
+  try {
+    const j = readJob(id);
+    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(j.status)) return;
+    if (j.cancelRequested) {
+      background(id, () => refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'));
+      return;
+    }
+    if (readMusicFees(id)) { j.progress = `stalled for ${secs}s — restarting`; j.progressAt = new Date(Date.now() - 60000).toISOString(); writeJob(j); return; }
+    j.retryCount = (j.retryCount || 0) + 1;
+    j.error = `stalled for ${secs}s with no activity`;
+    if (j.retryCount <= MAX_RETRIES) {
+      j.status = j.tokenId ? 'INSCRIBED' : 'FUNDED';
+      j.progress = `the run stalled — resuming where it left off (attempt ${j.retryCount}/${MAX_RETRIES})`;
+      j.progressAt = new Date().toISOString(); writeJob(j);
+      xaoLog(id, `stall treated as a transient error — auto-resume from ${j.status} (${j.retryCount}/${MAX_RETRIES})`);
+    } else if (j.tokenId) {
+      j.status = 'NEEDS_RECOVERY'; j.keepKey = true;
+      j.keepKeyReason = 'inscription minted but the run stalled before delivery finished — continue recovery to send it home';
+      j.progress = j.keepKeyReason; j.progressAt = new Date().toISOString(); writeJob(j);
+    } else {
+      writeJob(j);
+      xaoLog(id, 'stalled again after every retry — refunding');
+      background(id, () => refundAndClose(readJob(id), 'error: the run kept stalling'));
+    }
+  } catch (e) { xaoLog(id, `could not hand the stalled job back: ${errMsg(e)}`); }
+}
+// A refund that keeps failing must not be retried every 4 s forever: that buries the log and hammers the API.
+const refundAttempts = new Map<string, { at: number; n: number }>();
+// Finished jobs that still hold their one-shot key are checked for late money. Often just after the job
+// closed, then ever more rarely: it is insurance, and there can be dozens of these.
+const lateDepositCheckedAt = new Map<string, number>();
+const LATE_CHECKS_PER_TICK = 3;
+let lateChecksThisTick = 0;
+function lateCheckDue(j: any): boolean {
+  const since = Date.parse(j.cancelledAt || j.progressAt || j.createdAt || '') || 0;
+  const age = Date.now() - since;
+  const every = age < 3600000 ? 30000 : age < 7 * 86400000 ? 300000 : 1800000;
+  return Date.now() - (lateDepositCheckedAt.get(j.jobId) || 0) >= every;
+}
+async function lateSweepCheck(id: string) {
+  lateDepositCheckedAt.set(id, Date.now());
+  let j: any; try { j = readJob(id); } catch { return; }
+  if (!j.ephemeralMnemonic || PROCESSING.has(id)) return;
+  let stx: bigint; try { stx = await balance(j.depositAddress); } catch { return; }   // a failed read is "don't know", never "empty"
+  let nfts: string[] | null = null; try { nfts = await heldInscriptions(j.depositAddress); } catch { nfts = null; }
+  if (stx > REFUND_TX_FEE) {
+    xaoLog(id, `${stx} uSTX found at a finished job's deposit address — returning it to the payer`);
+    background(id, () => refundAndClose(readJob(id), 'funds found after the job closed — returned to the payer'));
+    return;
+  }
+  if (nfts && nfts.length) {
+    if (stx >= TRANSFER_FEE_FLOOR) {
+      xaoLog(id, `inscription #${nfts.join(', #')} found at a finished job's deposit address — returning it to the payer`);
+      background(id, () => refundAndClose(readJob(id), 'inscription found after the job closed — returned to the payer'));
+    } else {
+      // Cannot pay the transfer fee: surface it (this clears the quiet grace flag so the banner shows it).
+      j = readJob(id); j.status = 'NEEDS_RECOVERY'; j.keepKey = true; delete j.keepKeyGrace;
+      j.keepKeyReason = `wallet still holds inscription #${nfts.join(', #')} and has no STX left to move it — send a little STX (0.1 is plenty) to ${j.depositAddress}, then run recovery`;
+      j.progress = j.keepKeyReason; j.progressAt = new Date().toISOString(); writeJob(j);
+    }
+    return;
+  }
+  if (nfts && !j.keepKeyGrace && ['COMPLETE', 'COMPLETE_WITH_SKIPS'].includes(j.status)) {
+    // Verified empty on both counts: keep the key quietly (nothing is at stake) so the reminder stops nagging.
+    j = readJob(id); j.keepKeyGrace = true; j.keepKeyReason = (j.keepKeyReason || '') + ' · verified empty — key kept so a late payment is never stranded'; writeJob(j);
+  }
+}
+async function staleFlagCheck(id: string) {
+  lateDepositCheckedAt.set(id, Date.now());
+  let j: any; try { j = readJob(id); } catch { return; }
+  if (j.ephemeralMnemonic || !j.keepKey) return;
+  let stx: bigint; try { stx = await balance(j.depositAddress); } catch { return; }
+  let nfts: string[]; try { nfts = await heldInscriptions(j.depositAddress); } catch { return; }
+  if (stx <= REFUND_TX_FEE && !nfts.length) { j = readJob(id); delete j.keepKey; delete j.keepKeyGrace; delete j.keepKeyReason; writeJob(j); }
 }
 async function watchTick() {
   void syncWakeLock();
+  lateChecksThisTick = 0;
   for (const j of listJobsRaw()) {
-    if (PROCESSING.has(j.jobId)) continue;
+    if (PROCESSING.has(j.jobId)) {
+      // A run that is processing but silent is the one case nothing else can see. See releaseStalledRun().
+      const idle = runs.idleMs(j.jobId);
+      if (idle > (j.cancelRequested ? CANCEL_STALL_MS : STALL_BREAK_MS)) releaseStalledRun(j.jobId, idle);
+      continue;
+    }
     if (readMusicFees(j.jobId) && ['FEE_WAITING', 'INSCRIBING'].includes(j.status)) {
       if (Date.now() - (Date.parse(j.progressAt || '') || 0) < 20000) continue;
       background(j.jobId, () => autoRun(readJob(j.jobId))); continue;
@@ -2257,7 +2716,29 @@ async function watchTick() {
     // A cancel requested while the tab was closed. Honour it before any resume
     // logic below, or the watcher would happily restart the job we were asked to stop.
     if (j.cancelRequested && !['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(j.status)) {
+      const a = refundAttempts.get(j.jobId) || { at: 0, n: 0 };
+      if (Date.now() - a.at < Math.min(60000, 4000 * 2 ** a.n)) continue;   // back off: 4 s, 8 s, 16 s ... 60 s
+      refundAttempts.set(j.jobId, { at: Date.now(), n: a.n + 1 });
       background(j.jobId, () => refundAndClose(readJob(j.jobId), 'cancelled by request — everything returned to the payer'));
+      continue;
+    }
+    // A finished job that still holds the one-shot key. Cancelling before the payment confirmed leaves a
+    // CANCELLED job with a grace key; a delivery that could not return a parent leaves a COMPLETE job
+    // holding it. Nothing used to watch those addresses again, so a payment confirming a few seconds
+    // after a cancel (81.12 STX, 18 Oct 2026) or an inscription left behind (#3049) just sat there while the
+    // page said "funds returned". Look now and then and send anything found straight back to the payer.
+    if (['CANCELLED', 'COMPLETE', 'COMPLETE_WITH_SKIPS'].includes(j.status) && j.ephemeralMnemonic && j.depositAddress && !j.mock) {
+      if (lateChecksThisTick >= LATE_CHECKS_PER_TICK || !lateCheckDue(j)) continue;
+      lateChecksThisTick++;
+      await lateSweepCheck(j.jobId);
+      continue;
+    }
+    // Older builds deleted the key after a verified-empty sweep but left keepKey set, so the unfinished-jobs
+    // reminder kept nagging about a job with nothing left in it. Heal it — but only after looking at the chain.
+    if (['CANCELLED', 'COMPLETE', 'COMPLETE_WITH_SKIPS'].includes(j.status) && j.keepKey && !j.ephemeralMnemonic && !j.keepKeyGrace && j.depositAddress && !j.mock) {
+      if (lateChecksThisTick >= LATE_CHECKS_PER_TICK || !lateCheckDue(j)) continue;
+      lateChecksThisTick++;
+      await staleFlagCheck(j.jobId);
       continue;
     }
     // A page close/reload can interrupt the browser-held recovery between
@@ -2343,6 +2824,8 @@ async function reapTick() {
 (window as any).XAO_AGENT_BUILD = AGENT_BUILD;   // version handshake — suno.html blocks live runs on mismatch
 (window as any).XtrataAgent = {
   build: AGENT_BUILD,
+  // Read by the pages so they can show the notice and disable the pay buttons.
+  inscribeLock: { get locked() { return inscribeLockActive(); }, since: INSCRIBE_LOCK.since, title: INSCRIBE_LOCK.title, message: INSCRIBE_LOCK.message, isMarkupMime },
   health: async () => ({ ok: true, mock: MOCK, core: CORE_NAME, net: 'mainnet', windowMs: WINDOW_MS, parentWindowMs: PARENT_WINDOW_MS, deployer: DEPLOYER, build: AGENT_BUILD }),
   // Live owner lookup for the UI (pre-job parent validation): read-only get-owner
   // on the core contract. Returns the owner principal string or null.
@@ -2383,6 +2866,8 @@ async function reapTick() {
     if (job.tokenId || (job.items || []).some((i: any) => i.tokenId)) {
       return { error: 'this job has already minted an inscription — use recovery, which returns the token and the remaining STX' };
     }
+    // Measured BEFORE this call writes or logs anything: both count as activity and would hide a silent run.
+    const idle = PROCESSING.has(id) ? runs.idleMs(id) : 0;
     job.cancelRequested = true;
     job.progress = 'cancelling — returning everything to the payer';
     job.progressAt = new Date().toISOString();
@@ -2390,7 +2875,12 @@ async function reapTick() {
     xaoLog(id, 'cancel requested');
     // Already running: the loop aborts at its next checkpoint and background()'s
     // handler does the refund. Idle: refund right now.
-    if (PROCESSING.has(id)) return { cancelling: true, jobId: id, wasRunning: true };
+    if (PROCESSING.has(id)) {
+      // A healthy run logs or polls every few seconds. One that has been silent for 45 s will not reach a
+      // checkpoint on its own, so take the job away from it and refund now instead of showing "cancelling" for days.
+      if (idle > 45000) { releaseStalledRun(id, idle); return { cancelling: true, jobId: id, wasRunning: false, forced: true }; }
+      return { cancelling: true, jobId: id, wasRunning: true };
+    }
     background(id, () => refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'));
     return { cancelling: true, jobId: id, wasRunning: false };
   },
@@ -2558,6 +3048,21 @@ async function reapTick() {
   },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
   getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },
+  // Everything support needs, as one block of text a stuck user can paste into a message. Never includes the key.
+  getDiagnostics: async (id: string) => {
+    let job: any;
+    try { job = readJob(id); } catch { return `No job ${id} is stored in this browser.`; }
+    const nav: any = navigator;
+    let storage = 'unknown';
+    try { storage = nav.storage && nav.storage.persisted ? ((await nav.storage.persisted()) ? 'persistent' : 'NOT persistent') : 'unsupported'; } catch {}
+    if (storageWriteFailures) storage += ` · ${storageWriteFailures} FAILED SAVES (${lastStorageError})`;
+    const idle = PROCESSING.has(id) ? `${Math.round(runs.idleMs(id) / 1000)}s idle` : 'not running';
+    return buildDiagnostics(job, {
+      build: AGENT_BUILD, nowIso: new Date().toISOString(), userAgent: String(nav.userAgent || ''), visibility: typeof document !== 'undefined' ? document.visibilityState : 'no-document',
+      online: typeof nav.onLine === 'boolean' ? nav.onLine : null, connection: (nav.connection && nav.connection.effectiveType) || '', storage,
+      workerOk: sleepStats.workerCreated,
+    }, netStats, sleepStats, [`run: ${idle}`]);
+  },
   // Storage durability, so a page can warn rather than assume its job will survive.
   requestDurableStorage,
   getBytesPersistError,
@@ -2680,4 +3185,6 @@ export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, g
 // meaningful when exercised against a degraded API rather than asserted on in source.
 export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob, autoRun, returnStrays, unsealedUploadFor };
 // Exported so the branding can be verified by RENDERING a receipt, not by reading the template.
-export { buildReceiptHtml, buildBatchReceiptHtml, brandFor, receivedForJob };
+export { buildReceiptHtml, buildBatchReceiptHtml, brandFor, receivedForJob, deliver, musicProtected };
+// Stall + refund internals, exported so the fault-injection tests can drive them for real.
+export { refundAndClose, releaseStalledRun, background, watchTick, runs, PROCESSING, writeJob, readJob, xaoLog, sweepStxTo, broadcastSafe };

@@ -24,7 +24,7 @@ function parentShell(template, lib) {
 function parentConfig(ids, packOrder) {
   var packs = {};
   packOrder.forEach(function (n) { packs[n] = Number((ids.packs || {})[n] || 0); });
-  return {
+  var cfg = {
     version: ids.version,
     bundleId: Number(ids.bundleId || 0),
     packs: packs,
@@ -34,6 +34,12 @@ function parentConfig(ids, packOrder) {
     // gateway (R2) only when it matches, and reads the chain otherwise.
     hashes: ids.hashes || {}
   };
+  // The world contracts (posters + world). Left out unless named, so the hall stays off and identical to v1.3.
+  // (registry: the object registry. Rooms are never listed in the parent: doors and their rooms come from the registry.)
+  if (ids.world && (ids.world.posters || ids.world.world || ids.world.registry)) cfg.world = ids.world;
+  // The games contract (xtrata-games-v1): extra games the hall adds by itself. Left out unless named: the hall is then the built-in 21.
+  if (ids.games && ids.games.contract) cfg.games = { contract: String(ids.games.contract) };
+  return cfg;
 }
 
 function fillParent(shell, config) {

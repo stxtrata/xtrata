@@ -1,0 +1,1404 @@
+{
+ "machine": "ordinal-rush",
+ "generated": "2026-11-01",
+ "note": "Inscription IDs and numbers for every reel symbol. \"bundled\" items are drawn from art.js; the rest of the image-type items are loaded live from https://ordinals.com/content/<id> at run time. Numbers were read from https://ordinals.com/r/inscription/<id> (or the list source for recursive collections).",
+ "collections": {
+  "bitcoin-frogs": {
+   "slot": "cherry",
+   "name": "Bitcoin Frogs",
+   "itemNoun": "Bitcoin Frog",
+   "accent": "#47a447",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/bitcoin-frogs/inscriptions.json",
+   "liveLoad": true,
+   "items": [
+    {
+     "id": "b1d25aa861bfd3eb84e000aeebd880bdf653598baaaadcb9b9907ec994773998i0",
+     "number": 407182,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "7bbbe7683a393d0301a673b2fd5e57c67f5732be83d2cdc23f13c1fb8c03f3e7i0",
+     "number": 395542,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "ea2b0e597b7c31555f1642df11ebee06c85a250190efcae66e51f238c93f9633i0",
+     "number": 402825,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "28b127f9383d2a8afcbfd1f837040908b4d183e633e55f9f009979f7c99fb86ai0",
+     "number": 405080,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "2d9415ce23f65dde06c2cc7170cf0f3d06d997db985d3421d0b4c3123749e8bfi0",
+     "number": 408871,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "ae08ba8eba58fe12bef868a053fd2a0ab15b930639c95e23e3dc533692f83feei0",
+     "number": 411704,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "afacff6c313ac1fb70eb175b43a0b39523a837fee541b904340efef43e70a5d9i0",
+     "number": 410134,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "1e44a83539f624b5e11d10f1df062e48c1d74661313e26df91d4096117a99df4i0",
+     "number": 411960,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "281b72580b619faf6163e38f0235a5d11dc480a176a37fe494da7bdcd0b5a46bi0",
+     "number": 405119,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "b2168ff0cdc82f0236688ef35430a96af0a316073655954a52f8b05325a675c3i0",
+     "number": 409079,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "22bc873002008d2b3f68e63eaa35a7cf3dfc4d70236418294e68c014f007931di0",
+     "number": 402012,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "4bdf1cf5fe452fa4efad7a27edb5bba1027a151a4d28f26a8587ad0056f79c98i0",
+     "number": 407201,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "99877c1132eaf6b25baf8f304ce8cb26474b870dd72941afa81046be8228ded3i0",
+     "number": 409923,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "7309fad1b63a0ba8320d66620a777eba6c1f6305612b8f8fe125605f8d1e2fcdi0",
+     "number": 409651,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "c2151ec1543c575414dc54764a36b5a3527199ad1f1ac1113b90591ebca34f3fi0",
+     "number": 403330,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "0e9df0aba9f013f400e43b63e2974b53dc4e9b05adb928009d803c7f361065dfi0",
+     "number": 411052,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "2f0415acb1059008cb0c8728698c8b382c5921b767ab0a3a92593429081b95aai0",
+     "number": 407971,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "59fe40a2551e2b43637c5beedb7956826812ae3d6748568d3dac0a08e9e38ac3i0",
+     "number": 409085,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "4d750b1576f2b15cab43211614ea0360f5c023636b1fb008da4aca0d4792dc3bi0",
+     "number": 403187,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "5a609b54c4ef8e8e31efbc59e23bf9433ba592cc4440904fe5aba211941d645ei0",
+     "number": 404625,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "f32baf00aa5158ca58ab3e4ba9f2ecc7e3c27252676438560b1a03d7a762c9f4i0",
+     "number": 411970,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "073ddfb767fca51ee71921c44b8f8e2910a96957ac78b51acf0c205305a2b714i0",
+     "number": 401424,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "8537fb6d86ce69782092809f244092959d4de0f6f2fb8d39daf60d71e83e10d5i0",
+     "number": 409972,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "c0d3879fdc50598dce3a68664de6e5291aa3bccb6ef573444b40c8d814cf1a9di0",
+     "number": 407397,
+     "contentType": "image/webp",
+     "bundled": false
+    }
+   ]
+  },
+  "pizza-ninjas": {
+   "slot": "lemon",
+   "name": "Pizza Ninjas",
+   "itemNoun": "Pizza Ninja",
+   "accent": "#ff5400",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "liveLoad": false,
+   "items": [
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i42",
+     "number": 56246211,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i52",
+     "number": 56246221,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i64",
+     "number": 56246233,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i21",
+     "number": 56246190,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i17",
+     "number": 56246186,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i7",
+     "number": 56246176,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i57",
+     "number": 56246226,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i66",
+     "number": 56246235,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i49",
+     "number": 56246218,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i14",
+     "number": 56246183,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i2",
+     "number": 56246171,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i40",
+     "number": 56246209,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i9",
+     "number": 56246178,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i44",
+     "number": 56246213,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i18",
+     "number": 56246187,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i16",
+     "number": 56246185,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i3",
+     "number": 56246172,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i34",
+     "number": 56246203,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i6",
+     "number": 56246175,
+     "bundled": false
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i27",
+     "number": 56246196,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i63",
+     "number": 56246232,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i46",
+     "number": 56246215,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i68",
+     "number": 56246237,
+     "bundled": true
+    },
+    {
+     "id": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i59",
+     "number": 56246228,
+     "bundled": false
+    }
+   ]
+  },
+  "ocm-genesis": {
+   "slot": "chip",
+   "name": "OnChainMonkey",
+   "itemNoun": "OnChainMonkey",
+   "accent": "#d9a300",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "liveLoad": false,
+   "items": [
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i714",
+     "number": -264982,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i606",
+     "number": -264874,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i687",
+     "number": -264955,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i609",
+     "number": -264877,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i726",
+     "number": -264994,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i723",
+     "number": -264991,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i729",
+     "number": -264997,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i744",
+     "number": -265012,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i660",
+     "number": -264928,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i717",
+     "number": -264985,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i693",
+     "number": -264961,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i747",
+     "number": -265015,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i666",
+     "number": -264934,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i621",
+     "number": -264889,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i615",
+     "number": -264883,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i624",
+     "number": -264892,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i678",
+     "number": -264946,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i627",
+     "number": -264895,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i699",
+     "number": -264967,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i705",
+     "number": -264973,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i675",
+     "number": -264943,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i639",
+     "number": -264907,
+     "bundled": true
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i654",
+     "number": -264922,
+     "bundled": false
+    },
+    {
+     "id": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i690",
+     "number": -264958,
+     "bundled": true
+    }
+   ]
+  },
+  "omb": {
+   "slot": "block",
+   "name": "Ordinal Maxi Biz",
+   "itemNoun": "OMB",
+   "accent": "#e03131",
+   "listSource": "https://ordiscan.com/collection/omb",
+   "liveLoad": true,
+   "items": [
+    {
+     "id": "f9ccead93698e4124b0a04b46857a9ee49a326340f37187729627ab895119340i0",
+     "number": 89945,
+     "contentType": "image/jpeg",
+     "bundled": true
+    },
+    {
+     "id": "40e359170344787c8070bc0d300f21043a517e12da0f1818b1e2c026b0d8be2bi0",
+     "number": 103092,
+     "contentType": "image/jpeg",
+     "bundled": true
+    },
+    {
+     "id": "4bf5307a72b6f08026f8841eeca20a665295519caafc8faa5632803e4338af3fi0",
+     "number": 103387,
+     "contentType": "image/jpeg",
+     "bundled": true
+    },
+    {
+     "id": "03d499a9de427ba00e0132bd5b42e0ea02c2c442ad8f17564c6384cea1d1c75ai0",
+     "number": 103416,
+     "contentType": "image/jpeg",
+     "bundled": true
+    },
+    {
+     "id": "b111680d299da28e7f79c37e4335f416b030cddea8a13af57762600067b0302di0",
+     "number": 111814,
+     "contentType": "image/jpeg",
+     "bundled": true
+    },
+    {
+     "id": "9e7f2f4706940f828e9e830d3be497bf4db5b8076e8466063711789fa91cdaa3i0",
+     "number": 111815,
+     "contentType": "image/jpeg",
+     "bundled": true
+    },
+    {
+     "id": "3357eae0924f7f89f070b94f0b2966a31b62619002c092b399e0094095abdbeci0",
+     "number": 111816,
+     "contentType": "image/jpeg",
+     "bundled": true
+    },
+    {
+     "id": "c591abf263fea77f2c824412d906f0edb02d4e6181f6b8c72edc297b85ab4911i0",
+     "number": 111913,
+     "contentType": "image/jpeg",
+     "bundled": true
+    },
+    {
+     "id": "6c7f2e572a6633f4ae4919912cc117c999d66a4e766328023ea1aba42c49661ei0",
+     "number": 111914,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "0e773e1440f0b07db9610f87462e1a19c74770526b8b2e29202cb3e6a8fca126i0",
+     "number": 111915,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "94302b5c40d1898356351d533ecfe467c7a969e7f8e69e5af4ca3f92ed31132fi0",
+     "number": 113090,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "0ac998e396667f79a1ac5d46a7e6c76b13ab529eebbea0b69b66a91e5f179a2ei0",
+     "number": 122543,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "ac62f5fd7a26ece3d18dfceecfc96095f59ce228a6cf925294645cd213ee248ei0",
+     "number": 122544,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "e3b3b46bb57b04a1a326d87c6bd928e847a9560df48e73c4ab90a25cae796a99i0",
+     "number": 122638,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "c3ccc760eccf8a5cb7e65c4423fdfcdc2c818d8958b3251945c0e1f4dbf80417i0",
+     "number": 122857,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "76b029758b38f9ed678c97a95e50bda3ffacb7a55962f9e592ead01187c7f55ai0",
+     "number": 122887,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "f977b773a32c8a1fc3c21c156f994107f1065137cd0c21f7adabb94c61c092afi0",
+     "number": 123167,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "426831cabde23a784ce60fab384e663ae5eaeb69189df9298b7549c108836feci0",
+     "number": 123245,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "c0cbb08da59117a3aeb7ff92c20936fe986af10ff551477cc1a7b2cde5f588f7i0",
+     "number": 123512,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "c9d49fd957fa7c9aabcbcf1063651967201a7b42fd1f33f975b3600cad9d3f34i0",
+     "number": 123525,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "cf9170cdf4beece64ffdbb06f42a149547688ea8cb559790bb32f5432f52c9a7i0",
+     "number": 123527,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "36356825a1afaf0ca478d1895384c1b60915253635b39ea8b3e7477bcc3e2279i0",
+     "number": 123550,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "4777e386676b29214ad7aa3af3e0bfd4dbb5140efa34b3b9a2b114c6e8c409edi0",
+     "number": 123555,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "acb52a93201d643ceb59f0e2c619eccc0595703a6da370190ed614a1bd276f75i0",
+     "number": 123572,
+     "contentType": "image/jpeg",
+     "bundled": false
+    }
+   ]
+  },
+  "quantum-cats": {
+   "slot": "artifact",
+   "name": "Quantum Cats",
+   "itemNoun": "Quantum Cat",
+   "accent": "#c84bff",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "liveLoad": false,
+   "items": [
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i26",
+     "number": 53785886,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i22",
+     "number": 53785882,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i21",
+     "number": 53785881,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i10",
+     "number": 53785870,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i32",
+     "number": 53785892,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i18",
+     "number": 53785878,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i16",
+     "number": 53785876,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i7",
+     "number": 53785867,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i39",
+     "number": 53785899,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i17",
+     "number": 53785877,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i4",
+     "number": 53785864,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i1",
+     "number": 53785861,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i14",
+     "number": 53785874,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i3",
+     "number": 53785863,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i30",
+     "number": 53785890,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i5",
+     "number": 53785865,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i13",
+     "number": 53785873,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i29",
+     "number": 53785889,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i33",
+     "number": 53785893,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i42",
+     "number": 53785902,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i47",
+     "number": 53785907,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i0",
+     "number": 53785860,
+     "bundled": false
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i2",
+     "number": 53785862,
+     "bundled": true
+    },
+    {
+     "id": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i15",
+     "number": 53785875,
+     "bundled": false
+    }
+   ]
+  },
+  "nodemonkes": {
+   "slot": "bitcoin",
+   "name": "NodeMonkes",
+   "itemNoun": "NodeMonke",
+   "accent": "#f2c14e",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "liveLoad": true,
+   "items": [
+    {
+     "id": "b75ecef16910b8fea6f9aa80ae67132f652e96ef5221242165216df1fb12f921i0",
+     "number": 83555,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "23fc22e98f20d8e18a3d71f4e7a741de385e622357ec44d7f3b7d9cc86938106i0",
+     "number": 83529,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "b7e161d91fae64a0ac8c6e83a92eb15807b9fb54a13015172c8627ccfe65071ai0",
+     "number": 83552,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "8e530337416ff4b7ea893bb7d0376a4e79004726336213b9a50da56a9a2f0101i0",
+     "number": 83522,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "39d99772fb6b23eb0d5041ca52ac39ca1bc36e19db004c06d179df44d0730616i0",
+     "number": 83542,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "a599bfa1aa80bf68b83283acab211d0e8be01100d05bbc880f2b4e15d8c73916i0",
+     "number": 83543,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "84fe05b18b7f05f5d748a0d2420876f9cfeb4f15d9db4855b5dc5d0a612c0417i0",
+     "number": 83547,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "6627c3121a8a6e674c5cc483fb4ebdffedd37eb74583fddda886957459d19213i0",
+     "number": 83539,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "63812015b926b71e26a7355e1fb7d15dfc83f11a97b5d61da6c5d9c06108c72bi0",
+     "number": 83563,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "814595ee37c14cee1775f7b0d14addb85a60b0be826b5f9d8f0d5d0e72b05d02i0",
+     "number": 83525,
+     "contentType": "image/png",
+     "bundled": true
+    },
+    {
+     "id": "817e00e197a42dde1cd93266f08042234a22f960b223a28cc1a97df1f26bbf32i0",
+     "number": 83565,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "d637c64e89cd775eae594e49ec43e1ba06e731668a2a8383c122123c8c8f7912i0",
+     "number": 83537,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "4f7c3cca26a58824770f809f97c4375946500ef25bc334a8fdeafabe88e79f35i0",
+     "number": 83568,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "455b2b8fb64af1925561dd05848dcf6a2e5caa2beaecfbb6bbee38f4d38f9d16i0",
+     "number": 83546,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "2affb68483dd9e918afdf242603acd7e7c2a83f1c6bb5164edd5e5b46c7ae028i0",
+     "number": 83561,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "4a96e256a2d40e82d932f23d78802c38af0b996038099d68e3972e5b102d7408i0",
+     "number": 83531,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "464e561663495bfd77fb9447cd330e5ca8246739b3a4a844e7340ad461840321i0",
+     "number": 83554,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "985493e48367695e1db08e575544ebfa0fefe2989bb69ddc4bc1eb61f532b52ci0",
+     "number": 83564,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "ce1800e802e7d9d9659c18bd2c9823e5a51b4d458b7ba17b7838bcdf0dcb860ai0",
+     "number": 83533,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "9315b0a517f35806fb77b154ffc31daf024463f5469f5d238bae7d38f16f9522i0",
+     "number": 83556,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "053c67c5b118511203e89541386bd37dac451c0e41ea7ae82f065b805b2ae703i0",
+     "number": 83526,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "4c3803c073838692f461eb8bee25d49aa86e2237345f1c6a03760fbefa73cb0fi0",
+     "number": 83536,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "515784e03a050ee3cb77d33d6ff67175862d124bffe0516dfebee803d2a34a1ei0",
+     "number": 83553,
+     "contentType": "image/png",
+     "bundled": false
+    },
+    {
+     "id": "1f04f36655e8893f7f869f18b808f1da22e49d765ba137b2c1a3dbd407375218i0",
+     "number": 83549,
+     "contentType": "image/png",
+     "bundled": false
+    }
+   ]
+  },
+  "bitcoin-puppets": {
+   "slot": "wild",
+   "name": "Bitcoin Puppets",
+   "itemNoun": "Bitcoin Puppet",
+   "accent": "#f7931a",
+   "listSource": "https://ordiscan.com/collection/bitcoin-puppets",
+   "liveLoad": true,
+   "items": [
+    {
+     "id": "db3953afa8d120a5ce51870c938565c2e30e1fef9cf58a94d6c2c43ee9cf8eefi0",
+     "number": 53105833,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "9a4e74444435604f9fbc0e742e379961574b6f3174bbf4c123cb81d418f1136bi0",
+     "number": 53105623,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "b589744c7ae4968066cd5f0845498efc47e5843c18395c0b99c9e93ba0c12119i0",
+     "number": 53105739,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "790088daaf0a16b756bacbb8f636dbefb76ce0b753ab18057f196ace902d5effi0",
+     "number": 53105626,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "6ea57dce1dd40ee731747e638b09e57ff9f73dd8975f1f38172f500216511a39i0",
+     "number": 53105820,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "6d30fbd67b5046fbee860dfa9c72cd48a1e7a4afef44235d25ea2390e1d40e30i0",
+     "number": 53105819,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "481f46ca3686a8d15a445b672645f3479bc93c0424a96ae16d069b0543ca76f3i0",
+     "number": 53105835,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "7da4e45efbf6464e3435131d7cc01fbb6c4616be3786470794c12bdf8ab4f46bi0",
+     "number": 53105824,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "5a23948fb3bee843f7272d4c10a4a2c0c275e8578346e04c342d674f3cbb31cbi0",
+     "number": 53105743,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "e4520773d3d7a182ed4bd8875626419db5db3ec73fcacd4cc48ad060afb02a30i0",
+     "number": 53105612,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "f36f18d9f93ab4778043ab296a16230a85276cc361f60c7d6f8afce247d8a131i0",
+     "number": 53105740,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "aa38ed1178fef713e4c47ef9a79615d19f862f49ad6e14fd5d7557d9ac976904i0",
+     "number": 53105816,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "8385948ed538c474f03fdf1d377848f310ba86dd2ee21bb582da4c76a88443fai0",
+     "number": 53105838,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "e1997978dd52abd412b22fecec251d4c602764184b7ecda08bfdc046a3316e0bi0",
+     "number": 53105737,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "c9cd96d55affe59010c8772fc79b1d24129f4d06ff3835a24042585366beed00i0",
+     "number": 53105815,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "301f47a13ab67c21f3c869c417ffa1a3c484abeaa8c3c618ece77523d9b11f94i0",
+     "number": 53105614,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "a33ff0d36fe545b198c4db598d3de2eb8f96c4e0af3ad36ba6bd603b0e547523i0",
+     "number": 53105840,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "c47bc90b5b28b155536563ba9cd893b8d84e23d8690061993f06052c01ec211ci0",
+     "number": 53105818,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "dc87ce1caca5ab3449daf60ea5363be107ce31fb091916b8063a7974bd5997b0i0",
+     "number": 53105615,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "d383dc42386c130f42964accf8a0bca58aeb3c8417df55cc76044b84db788802i0",
+     "number": 53105736,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "9d76437c45e4ecec19047c59845b3d8aadb4a865cebcae9ff21cae87f7f324cbi0",
+     "number": 53105829,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "b58c5c8457b3812a011e87cf105d2b44c1426cef4e5f14aee85b1b018f148611i0",
+     "number": 53105817,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "3904180681fd621e7298cf5859e16f509bfc18addb6990f36fcd9cbe060155bai0",
+     "number": 53105828,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "946f0afcb84ff33b32c1494ced3e58461259f940747857fc75756710aee40ad2i0",
+     "number": 53105744,
+     "contentType": "image/webp",
+     "bundled": false
+    }
+   ]
+  },
+  "taproot-wizards": {
+   "slot": "vault",
+   "name": "Taproot Wizards",
+   "itemNoun": "Taproot Wizard",
+   "accent": "#4f7cff",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/taproot-wizards/inscriptions.json",
+   "liveLoad": true,
+   "items": [
+    {
+     "id": "c308627f85019137730ae0215f32bfd820006c3fdccfe3406c25bc8ea4f23ba5i0",
+     "number": 149385,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "235212a8a6c3cfbc08e0526438736d78eecf7dea702da80c0c928039a0dc929di0",
+     "number": 149282,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "2fa2c01849de3e7fe921f7add7bbcb0c73334cf8aeb2f4f58636b0cc6dcfd549i0",
+     "number": 148496,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "3ced650b3b32875f0030244a5ff3b350b8ef82ae9fd05db5400c94210c995700i0",
+     "number": 147866,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "cdb56894d82157747797bc301775178eb31c5a0cd5ca2c8ca9792dfdaf5d5b2bi0",
+     "number": 148355,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "23aeab91a21911abee8126eece178f9ce7bd3d3f54eb76d97bf359fccd41d9b1i0",
+     "number": 149501,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "62035d166efbe906e64c59a6a8ae2186c4cfe9497db6eedfb0376f6f7dae525ei0",
+     "number": 147895,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "9f74344c97e1454f20e53ef1da5cb011f301c696bde550fee4bdf521d2dba647i0",
+     "number": 148171,
+     "contentType": "image/webp",
+     "bundled": true
+    },
+    {
+     "id": "c36be83957e2c78e2b4ea164109f9981cf5c11556306b2ea2383850958e3b6eai0",
+     "number": 150149,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "c3e5bfd18ccc0ba44be1c172ea8add45a9d089baa88877aba62dfb50af41a580i0",
+     "number": 148014,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "f771a0340cd1fc397f1810b9838332e1e89f0ccc6af320426c626827de56ae09i0",
+     "number": 148049,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "4963384359a1d367a43dae0cb86ce8ba56071aa7df609f7347d5a0eaa096cb9ei0",
+     "number": 149315,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "92313105cf788d218d9c61e6b8d8e5b0b0aabdd6b147db99ce1fee4739d9b168i0",
+     "number": 148865,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "8565b09a684d8dfbe66ff4900983f2b7acf2d7a9b952f44eb1394801624ba877i0",
+     "number": 148979,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "a9354d9af1ced34cd943fc8381493ab2b9688983af65f034f70fea6ea925b4f0i0",
+     "number": 150199,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "b8364dec376df92a544f02da1f2bc82b8c87a78c15be0528b52ad24438a7db0di0",
+     "number": 148054,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "f9026a44e7f6d0847c1a83ea07cba27e9aad5550bd03e05be2840cd7a23680c2i0",
+     "number": 149684,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "fb0cbf1d8fdb3e56cd9fabc453a5e670073e0f0ee7c853449db29f42d6b35827i0",
+     "number": 148094,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "7404468b7524e23d9b6d8914193c0fff5c97d79befa008e3eb0ec41e4d10b2bci0",
+     "number": 56480,
+     "contentType": "image/jpeg",
+     "bundled": false
+    },
+    {
+     "id": "4e1f21543091b00d10d73e05a81cf38d369d41301fd599ec527646f4f2f9838di0",
+     "number": 149161,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "f1ff06dfa5b14db4efc5960b9ef45e17754ed9eb071133100d3b6aab4d0b391di0",
+     "number": 147943,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "0cd5ba72e393bbb9bab78a3966f27c84029448bb23d63a726b28d8e687d91e23i0",
+     "number": 148087,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "f4f24eb9cd29de979f104766128373e096ec4406f57acf77e4c73a3a92a5eeebi0",
+     "number": 150160,
+     "contentType": "image/webp",
+     "bundled": false
+    },
+    {
+     "id": "e4a0606222d6c4b25836f03110cdeeb1feef382b7fb4e463276c14a65c10c59ei0",
+     "number": 149314,
+     "contentType": "image/webp",
+     "bundled": false
+    }
+   ]
+  },
+  "runestone": {
+   "slot": "scatter",
+   "name": "Runestone",
+   "itemNoun": "Runestone",
+   "accent": "#9aa7b8",
+   "listSource": "https://ordiscan.com/collection/runestone",
+   "original": {
+    "id": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+    "number": 63140674,
+    "contentType": "model/gltf+json"
+   },
+   "items": [
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci0",
+     "number": 64362424,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci1",
+     "number": 64362425,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci2",
+     "number": 64362426,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci3",
+     "number": 64362427,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci4",
+     "number": 64362428,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci5",
+     "number": 64362429,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci6",
+     "number": 64362430,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci7",
+     "number": 64362431,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci8",
+     "number": 64362432,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci9",
+     "number": 64362433,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci10",
+     "number": 64362434,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci11",
+     "number": 64362435,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci12",
+     "number": 64362436,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci13",
+     "number": 64362437,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci14",
+     "number": 64362438,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci15",
+     "number": 64362439,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci16",
+     "number": 64362440,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci17",
+     "number": 64362441,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    },
+    {
+     "id": "5f3dafcdd142358b332e0939d37174b76472735df8df29325901d2c7d18a152ci18",
+     "number": 64362442,
+     "delegate": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0"
+    }
+   ]
+  },
+  "bitmap": {
+   "slot": "chain",
+   "name": "Bitmap",
+   "itemNoun": "Bitmap parcel",
+   "accent": "#f7931a",
+   "listSource": "https://ordinals.com/inscriptions/block/<height> (blocks 800050-802000 scanned; text read from /content/<id>; for duplicate claims the lowest inscription number is kept)",
+   "items": [
+    {
+     "id": "d919d7d22bf03038baf081fc7636bc88ba271e13c0de03b3466745560755102ei0",
+     "number": 19114952,
+     "text": "800050.bitmap",
+     "block": 800050
+    },
+    {
+     "id": "5fcf3e54e57d55b82a05a998d9f99b0ccb63edaa3b26edfa308bc02d71c4f206i0",
+     "number": 19142005,
+     "text": "800078.bitmap",
+     "block": 800078
+    },
+    {
+     "id": "6b14c2fc7984694cfe0870b89ef09b3ce35399bac744455e215c1cb2e9806089i0",
+     "number": 19141916,
+     "text": "800080.bitmap",
+     "block": 800080
+    },
+    {
+     "id": "575f42ec09d1c18502a94bcd908f7d35d51bc75a301d59e33b0a899d8d40da22i0",
+     "number": 19281784,
+     "text": "800150.bitmap",
+     "block": 800150
+    },
+    {
+     "id": "42b54fef19aea5b3bc3e8c8eb13a1e6d560e3f88c95e52cc5d9cf28e7479e827i0",
+     "number": 19511380,
+     "text": "800300.bitmap",
+     "block": 800300
+    },
+    {
+     "id": "5155cd3e66071b3735376de609134f036201095ab9b9f3a2425b4013125c60e8i0",
+     "number": 19635331,
+     "text": "800379.bitmap",
+     "block": 800379
+    },
+    {
+     "id": "75f97efdf157e87f4a2a96383ac59180d5f833abf41aae756cb2159ff2e34b4ai0",
+     "number": 19635330,
+     "text": "800380.bitmap",
+     "block": 800380
+    },
+    {
+     "id": "46824578aa955f2ece8244f278237d9f4d3f78b77c6221758c9b309808abc45di0",
+     "number": 19698525,
+     "text": "800450.bitmap",
+     "block": 800450
+    },
+    {
+     "id": "98f6d47e96e55bcb2474b185d37ee4488d5c001a25a3d168a95398943966764di0",
+     "number": 19755346,
+     "text": "800496.bitmap",
+     "block": 800496
+    },
+    {
+     "id": "c05ec9a347e1802982c9d515a6b354ebca7e1c51d00d5c345dff4160bff0c0b9i0",
+     "number": 19755348,
+     "text": "800497.bitmap",
+     "block": 800497
+    },
+    {
+     "id": "771ac5c4e29d044a1d435dda7a9e6ba556c5eb4aae889a72ffdfcbe83a1c1bf1i0",
+     "number": 19755349,
+     "text": "800498.bitmap",
+     "block": 800498
+    },
+    {
+     "id": "e722222dbba56a31ce115fa51d358af3b3532e96856b8c7da94940254611b450i0",
+     "number": 19755347,
+     "text": "800499.bitmap",
+     "block": 800499
+    },
+    {
+     "id": "19c7db46964969f8277b1155da4649c50717932c6db6a9b2ccfe672e41109f7ei0",
+     "number": 19863176,
+     "text": "800599.bitmap",
+     "block": 800599
+    },
+    {
+     "id": "573b00b4cb37ddc130c9a1409d9b3d66435c80dbf3807b0198d7f8f42b9d204fi0",
+     "number": 19863172,
+     "text": "800600.bitmap",
+     "block": 800600
+    },
+    {
+     "id": "ed921621115b621368d432539eba43de9e576bfe34ae7b211fb8701251c4c2d7i0",
+     "number": 19978392,
+     "text": "800700.bitmap",
+     "block": 800700
+    },
+    {
+     "id": "8f3d4f53e9468ff33041bebd12be08f43058116c9c214e02caafed9d7b31113ei0",
+     "number": 20865284,
+     "text": "801200.bitmap",
+     "block": 801200
+    },
+    {
+     "id": "c2764edc873d21aafa8519e76ac20466538a387d34b41b51a653ae3f1e51e028i0",
+     "number": 21530469,
+     "text": "801789.bitmap",
+     "block": 801789
+    },
+    {
+     "id": "55df52169f0d98b00c85255c8b1db01b99ed98158e31b5ab1c9d015c7c6facb1i0",
+     "number": 21530481,
+     "text": "801800.bitmap",
+     "block": 801800
+    },
+    {
+     "id": "38c042d4256883a50d05829df8f20f955a904eb471a7ecef736896fe0704cfa8i0",
+     "number": 21961139,
+     "text": "802000.bitmap",
+     "block": 802000
+    }
+   ]
+  }
+ },
+ "inscription0": {
+  "id": "6fb976ab49dcec017f1e201e84395983204ae1a7c2abf7ced0a85d692e442799i0",
+  "number": 0,
+  "contentType": "image/png"
+ }
+}

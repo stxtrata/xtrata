@@ -51,6 +51,66 @@ function makeSend(ctx, bus) {
   return { input: thru, output: thru, send };
 }
 
+// ------------------------------------------------------------------ shared returns
+// The delay and the reverb every send feeds are project-wide, so their settings live in
+// project.returns (saved with the song) rather than in any one slot. A send plugin names its
+// return in `shared`, and the panels show these params next to the slot's own Send amount.
+// Defaults are the fixed values the buses always had: a dotted-8th echo at 35% feedback
+// through a 4 kHz low-pass, and a 2.2 s noise-burst reverb. Nothing saved changes sound.
+export const BEAT_DIVS = [
+  ["1/16", 0.25],
+  ["1/8", 0.5],
+  ["1/8.", 0.75],
+  ["1/4", 1],
+  ["1/4.", 1.5],
+  ["1/2", 2],
+  ["1 bar", 4],
+];
+export const RETURN_SCHEMA = {
+  delay: [
+    { key: "time", label: "Echo time", options: BEAT_DIVS.map(([v]) => [v, v]), def: "1/8." },
+    { key: "feedback", label: "Feedback", min: 0, max: 0.92, step: 0.01, def: 0.35 },
+    { key: "tone", label: "Tone (Hz)", log: true, min: 500, max: 16000, step: 50, def: 4000 },
+    { key: "spread", label: "Ping-pong", min: 0, max: 1, step: 0.01, def: 0 },
+    { key: "ret", label: "Return", min: 0, max: 1.5, step: 0.01, def: 1 },
+  ],
+  reverb: [
+    { key: "decay", label: "Decay (s)", min: 0.3, max: 8, step: 0.1, def: 2.2 },
+    { key: "shape", label: "Shape", min: 1.5, max: 6, step: 0.1, def: 3 },
+    { key: "predelay", label: "Pre-delay (ms)", min: 0, max: 250, step: 1, def: 0 },
+    { key: "damp", label: "Damping (Hz)", log: true, min: 800, max: 20000, step: 100, def: 20000 },
+    { key: "width", label: "Width", min: 0, max: 1, step: 0.01, def: 1 },
+    { key: "ret", label: "Return", min: 0, max: 1.5, step: 0.01, def: 1 },
+  ],
+};
+
+function cleanParamSet(schema, raw) {
+  const out = {};
+  for (const p of schema) {
+    const v = raw?.[p.key];
+    if (p.options) out[p.key] = p.options.some(([o]) => o === v) ? v : p.def;
+    else out[p.key] = Number.isFinite(+v) && v !== null && v !== "" ? Math.max(p.min, Math.min(p.max, +v)) : p.def;
+  }
+  return out;
+}
+export const returnDefaults = () => ({
+  delay: cleanParamSet(RETURN_SCHEMA.delay, null),
+  reverb: cleanParamSet(RETURN_SCHEMA.reverb, null),
+});
+export const cleanReturns = (raw) => ({
+  delay: cleanParamSet(RETURN_SCHEMA.delay, raw?.delay),
+  reverb: cleanParamSet(RETURN_SCHEMA.reverb, raw?.reverb),
+});
+// The project's return settings, created on first use so older projects need no migration.
+export function returnsOf(project) {
+  if (!project.returns) project.returns = returnDefaults();
+  return project.returns;
+}
+// Every param a plugin's panel shows: its own, then its shared return's.
+export const typeParams = (t) => [...(t?.params || []), ...(RETURN_SCHEMA[t?.shared] || [])];
+// Which keys of a mixed param object belong to the shared return
+export const sharedKeys = (t) => new Set((RETURN_SCHEMA[t?.shared] || []).map((p) => p.key));
+
 
 // ------------------------------------------------------------------ shared DSP helpers
 const dbToLin = (db) => Math.pow(10, db / 20);
@@ -2604,7 +2664,9 @@ export const PLUGIN_TYPES = {
   // Pass the signal straight through and tap a copy into the project's shared delay
   // or reverb. Where the send sits in the chain decides what it taps.
   delaySend: {
-    name: "Delay send",
+    name: "Blocktime",
+    role: "Delay send",
+    shared: "delay",
     kind: "fx",
     category: "Space",
     color: "#facc15",
@@ -2620,7 +2682,9 @@ export const PLUGIN_TYPES = {
   },
 
   reverbSend: {
-    name: "Reverb send",
+    name: "Liquidity",
+    role: "Reverb send",
+    shared: "reverb",
     kind: "fx",
     category: "Space",
     color: "#a78bfa",
@@ -2751,6 +2815,69 @@ export function legacyFxSlots(fx) {
   return { pre, post };
 }
 
+// ------------------------------------------------------------------ strip sends
+// A strip's delay and reverb sends are two values on the strip, owner.sends:
+//   { delay: { amount, enabled }, reverb: { amount, enabled } }   (a bus is absent when unused)
+// They tap the signal after the LAST plugin, which is where every shipped song already had
+// them. Older files stored each send as a plugin slot at the end of the FX list; normalizeOwner
+// folds those into owner.sends. A send that sits before another plugin stays a slot, so the
+// tap point (and the sound) never moves.
+export const SEND_BUSES = ["delay", "reverb"];
+export const SEND_TYPE = { delay: "delaySend", reverb: "reverbSend" };
+const SEND_BUS_OF = { delaySend: "delay", reverbSend: "reverb" };
+export const sendBusOf = (type) => SEND_BUS_OF[type] || null;
+
+export function cleanSends(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const bus of SEND_BUSES) {
+    const r = raw[bus];
+    if (!r || typeof r !== "object") continue;
+    const a = +r.amount;
+    out[bus] = {
+      amount: Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 0.25,
+      enabled: r.enabled !== false,
+    };
+  }
+  return out;
+}
+
+// The strip's sends dressed as slots, so a list of plugin rows can show and edit them the same
+// way. Reads and writes go straight to owner.sends. Ids look like "send:delay".
+export function sendRows(owner) {
+  if (!owner?.sends) return [];
+  return SEND_BUSES.filter((bus) => owner.sends[bus]).map((bus) => {
+    const rec = owner.sends[bus];
+    return {
+      id: `send:${bus}`,
+      type: SEND_TYPE[bus],
+      synthetic: bus,
+      get enabled() {
+        return rec.enabled !== false;
+      },
+      set enabled(v) {
+        rec.enabled = !!v;
+      },
+      get params() {
+        return { amount: rec.amount };
+      },
+      set params(p) {
+        const a = +p?.amount;
+        if (Number.isFinite(a)) rec.amount = Math.max(0, Math.min(1, a));
+      },
+    };
+  });
+}
+
+// Add a send to a strip, or return false if it already has one for that bus.
+export function addSend(owner, bus, amount = 0.25) {
+  if (!SEND_TYPE[bus]) return false;
+  owner.sends = cleanSends(owner.sends);
+  if (owner.sends[bus]) return false;
+  owner.sends[bus] = { amount, enabled: true };
+  return true;
+}
+
 // Bring a channel or synth to the current shape, in place: fx and inserts become
 // clean slot arrays. A legacy fx object converts with the same signal order it had:
 // if there were inserts, its filter/drive go to the front of the insert chain
@@ -2760,6 +2887,7 @@ export function normalizeOwner(owner) {
   if (!owner) return false;
   const beforeIns = owner.inserts;
   const beforeFx = owner.fx;
+  const beforeSends = owner.sends;
   let inserts = cleanChain(owner.inserts);
   let fx;
   if (isLegacyFx(owner.fx)) {
@@ -2772,12 +2900,31 @@ export function normalizeOwner(owner) {
   // ids key live plugin instances, so they must be unique across both chains
   const insIds = new Set(inserts.map((s) => s.id));
   for (const s of fx) if (insIds.has(s.id)) s.id = slotId();
+  // Fold the send slots at the very end of the signal path into owner.sends. A bus the strip
+  // already has a send for keeps its extra slot (still audible, still in the list).
+  const sends = cleanSends(owner.sends);
+  const tail = [...inserts, ...fx];
+  let end = tail.length;
+  while (end > 0 && SEND_BUS_OF[tail[end - 1].type]) end--;
+  const folded = new Set();
+  for (const s of tail.slice(end)) {
+    const bus = SEND_BUS_OF[s.type];
+    if (sends[bus]) continue;
+    sends[bus] = { amount: s.params.amount, enabled: s.enabled };
+    folded.add(s.id);
+  }
+  if (folded.size) {
+    inserts = inserts.filter((s) => !folded.has(s.id));
+    fx = fx.filter((s) => !folded.has(s.id));
+  }
   const changed =
     JSON.stringify(inserts) !== JSON.stringify(beforeIns) ||
-    JSON.stringify(fx) !== JSON.stringify(beforeFx);
+    JSON.stringify(fx) !== JSON.stringify(beforeFx) ||
+    JSON.stringify(sends) !== JSON.stringify(beforeSends);
   if (changed) {
     owner.inserts = inserts;
     owner.fx = fx;
+    owner.sends = sends;
   }
   return changed;
 }

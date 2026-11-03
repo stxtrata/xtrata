@@ -1,0 +1,13 @@
+name = "xtrata-audionaut-royalties"
+main = "index.ts"
+compatibility_date = "2026-10-12"
+workers_dev = false
+[triggers]
+crons = ["*/5 * * * *"]
+[limits]
+cpu_ms = 30000
+subrequests = 2000
+[[d1_databases]]
+binding = "DB"
+database_name = "xtrata-manage"
+database_id = "7d7cf4b8-bc72-41b2-9eea-cc4af9aea54b"

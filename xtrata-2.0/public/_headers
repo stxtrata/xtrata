@@ -46,6 +46,10 @@
 /music/*
   Cache-Control: no-cache
 
+# Referral partner registry: revalidate every time so an edit (or an `active:false` switch-off) takes effect at once.
+/music-partners.json
+  Cache-Control: no-cache
+
 /wizard/music-diagnostics.js
   Cache-Control: no-cache
 
@@ -106,6 +110,8 @@
   Cache-Control: no-cache
 /music/lounge.html
   Cache-Control: no-cache
+/radio/ppp.js
+  Cache-Control: no-cache
 /radio/lounge.js
   Cache-Control: no-cache
 
@@ -138,3 +144,48 @@
   Cache-Control: no-cache
 /audionaut/daw/js/*
   Cache-Control: no-cache
+
+# ParallaX Casino (/casino): one self-contained page under a stable filename. Force revalidation so a
+# redeploy is never served from a stale CDN/browser cache.
+/casino
+  Cache-Control: no-cache
+/casino/
+  Cache-Control: no-cache
+/casino/*
+  Cache-Control: no-cache
+
+# ParallaX Casino B (/casino-b): the alternate "GPT v0.8" build of the casino, one self-contained page.
+# Same rule as /casino: always revalidate so a redeploy is never served from a stale cache.
+/casino-b
+  Cache-Control: no-cache
+/casino-b/
+  Cache-Control: no-cache
+/casino-b/*
+  Cache-Control: no-cache
+
+# The casino's shutdown switch + TESTNET notice (public/casino-status.json): the casino pages re-read it every minute, so it must never be cached.
+/casino-status.json
+  Cache-Control: no-store
+
+# Pay-per-play radio host (functions/lib/radio-host.ts, docs/radio/PAY-PER-PLAY.md).
+# The listening wallet trusts this origin, so nothing except the radio's own pages may run here:
+# every other static page is served sandboxed (opaque origin, no scripts). Function routes that
+# can execute inscriptions are guarded in code. If you change the hostname, change it here too.
+https://radio.xtrata.xyz/*
+  Content-Security-Policy: sandbox
+https://radio.xtrata.xyz/radio
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio.html
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/catalogue*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/stats*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/guide*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/share*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/embed*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/endorse*
+  ! Content-Security-Policy

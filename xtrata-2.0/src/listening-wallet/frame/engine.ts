@@ -1,0 +1,678 @@
+/**
+ * Listening wallet engine. Runs ONLY inside the wallet origin (wallet.xtrata.xyz).
+ *
+ * The key is derived from the passkey on unlock (derive.ts), kept in this module's
+ * memory, and dropped on lock or when the frame unloads. Nothing secret is written to
+ * storage: the store holds only credential ids, addresses and public link signatures.
+ *
+ * Every interactive step (create, unlock, approve spending, return funds) is shown and
+ * confirmed INSIDE this frame, so the embedding page can ask but cannot approve.
+ */
+import { makeContractCall, makeSTXTokenTransfer } from '@stacks/transactions';
+import { deriveSlotIdentity, isSlot, listeningBase, type ListeningIdentity } from '../../lib/listening-wallet/derive';
+import { signSlotBinding, validateSlotBinding } from '../../lib/listening-wallet/slots';
+import { isMainnetStandardAddress, signLink, verifyLinkSignature } from '../../lib/listening-wallet/link';
+import {
+  costPerPlay, LIKE_FEE, MOVE_FEE_CAP, MOVE_MIN, RESERVE, returnPlan, SessionLedger, stx, TARGET, validateSessionTerms, type SessionTerms
+} from '../../lib/listening-wallet/policy';
+import { likeCallOptions, moveTransferOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
+import type {
+  BindSlotParams, BindSlotResult, LinkParams, LinkResult, MoveParams, MoveResult, OpenSlotResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams,
+  SignPlayParams, SlotAddressResult, SlotParams, StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
+} from '../../lib/listening-wallet/messages';
+import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
+
+const b64u = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+export interface PasskeyPort {
+  /** WebAuthn present at all. PRF support is only known after a real ceremony. */
+  available(): boolean;
+  /**
+   * Create a discoverable passkey; `prf` is set when the authenticator evaluated PRF at creation.
+   * `exclude` lists existing listening-wallet credentials the authenticator must not duplicate: given when making a
+   * wallet with no main wallet, empty when making one for a specific main wallet (a new passkey beside the others).
+   */
+  create(exclude?: string[], name?: string, userId?: string): Promise<{ credentialId: string; prf?: Uint8Array }>;
+  /**
+   * Assertion with PRF. Without a credential id the browser offers any listening-wallet passkey. `userHandle` is the
+   * passkey's public user id (base64url), used to recognise a passkey made in another tab.
+   */
+  evaluate(credentialId?: string): Promise<{ credentialId: string; prf: Uint8Array; userHandle?: string }>;
+  /**
+   * True where passkeys cannot be CREATED inside this frame (WebKit: Safari and every iPhone browser refuse
+   * creation in a cross-origin frame, though they allow sign-in). The passkey is then made on a top-level
+   * wallet page in a new tab (`openCreator`), and the frame signs in with it as usual.
+   */
+  createsInNewTab?(): boolean;
+  /**
+   * Opens the top-level create page. Must run synchronously inside the listener's tap (popup rules). `userId` (16 random
+   * bytes, base64url, public) becomes the new passkey's user id, so the frame can tell that exact passkey apart.
+   */
+  openCreator?(exclude: string[], name: string, userId: string): void;
+}
+
+export interface Panel {
+  kind: 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link';
+  title: string;
+  /**
+   * One or two plain lines shown above the button. When set, `lines` and `warnings` fold into a
+   * "Details" section below it, so the button is in view without scrolling. Without it, every line
+   * stays visible (used where the detail IS the thing to check, e.g. the full return address).
+   */
+  summary?: string;
+  lines: string[];
+  confirmLabel: string;
+  /** Lines the listener must not miss (shown as warnings). */
+  warnings?: string[];
+  /**
+   * A second choice beside the confirm button (the casino wallet's "Make a new one"). Shown only when `act` is also given an
+   * `alt` action and the frame has a #p-alt button; the radio never uses it.
+   */
+  altLabel?: string;
+}
+
+export interface IdleView {
+  state: StatusResult['state'];
+  address?: string;
+  linked?: string;
+  session: SessionSummary | null;
+}
+
+export interface UiPort {
+  /**
+   * Show `panel` and wait. When the listener presses confirm, `action` runs inside that
+   * click handler (WebAuthn needs the user activation) and its result resolves the promise.
+   * Cancel rejects with CancelledError.
+   */
+  act<T>(panel: Panel, action: () => Promise<T>, alt?: () => Promise<T>): Promise<T>;
+  /**
+   * Withdraw the open panel as if Cancel were pressed, unless its confirmed action is already
+   * running. Returns whether a waiting panel was withdrawn. Withdrawing can never approve anything.
+   */
+  cancel(): boolean;
+  idle(view: IdleView): void;
+}
+
+export interface StorePort {
+  get(key: string): string | null;
+  set(key: string, value: string): void;
+}
+
+export class CancelledError extends Error {
+  readonly code = 'CANCELLED';
+  constructor(message = 'Cancelled in the listening wallet. Nothing was signed.') { super(message); this.name = 'CancelledError'; }
+}
+
+interface WalletRecord {
+  credentialId: string;
+  address: string;
+  link?: { main: string; issued: number; mainSignature: string };
+}
+/**
+ * A passkey this device has made but not yet proven. Only public ids are kept (never a secret). If the page reloads,
+ * the panel is closed or the phone discards the tab before the check finishes, the next attempt picks this up instead
+ * of making a second passkey beside it. Nothing is ever funded against it: it becomes a wallet only through `remember`,
+ * after the PRF check (docs/PASSKEY-WALLET.md §3.1), and that clears it.
+ */
+interface PendingPasskey { at: number; tries: number; credentialId?: string; userId?: string; label?: string }
+interface Stored { version: 1; wallets: WalletRecord[]; last?: string; pending?: PendingPasskey }
+/** A half-made passkey is picked up for a day; after this many failed pick-ups it is dropped and a fresh one is made. */
+const PENDING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const PENDING_MAX_TRIES = 3;
+
+const STORE_KEY = 'xtrata.listening-wallet.v1';
+const MAX_WALLETS = 25;
+const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
+/** STX without trailing zeros, for the one-line summaries (0.00035, 1). */
+const stxs = (v: bigint) => stx(v).replace(/\.?0+$/, '');
+/** The one-line terms: price per song and the cap before it asks again. */
+const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+const equalBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+function bigintParam(value: unknown, label: string): bigint {
+  if (typeof value !== 'string' || !/^(0|[1-9]\d{0,17})$/.test(value)) throw new Error(`Invalid ${label}.`);
+  return BigInt(value);
+}
+
+function termsFrom(params: TermsParams | undefined, now: number): SessionTerms | undefined {
+  if (!params) return undefined;
+  return validateSessionTerms({
+    fee: bigintParam(params.fee, 'fee'),
+    maxPlays: params.maxPlays,
+    budget: bigintParam(params.budget, 'budget'),
+    expires: params.expires
+  }, now);
+}
+
+function termsLines(t: SessionTerms): string[] {
+  return [
+    `Each song you listen to for 30 seconds pays ${stx(50n)} STX to its holder, plus a ${stx(t.fee)} STX network fee.`,
+    t.maxPlays === 1
+      ? 'This approves ONE paid play.'
+      : `It keeps paying until you switch it off or the wallet runs out, for up to ${stx(t.budget)} STX before it asks again.`,
+    'Songs skipped before 30 seconds play free, and paused or muted time does not count.',
+    `Tapping the radio's heart likes or unlikes from this wallet too, for a ${stx(LIKE_FEE)} STX network fee, and counts for your linked main wallet (or for this listening address if none is linked).`
+  ];
+}
+
+export function createListeningEngine(deps: {
+  passkey: PasskeyPort;
+  ui: UiPort;
+  store: StorePort;
+  now?: () => number;
+}) {
+  const now = deps.now ?? Date.now;
+  /** The open wallet: the passkey's own (slot 0) or one derived from it for an album (slot n). */
+  let identity: ListeningIdentity | null = null;
+  /** The passkey's own wallet, and the non-extractable key every other wallet is derived from. Both drop on lock. */
+  let root: ListeningIdentity | null = null;
+  let base: CryptoKey | null = null;
+  let slot = 0;
+  let credentialId: string | null = null;
+  let ledger: SessionLedger | null = null;
+  let interactive = false;
+  let signing = false;
+
+  const load = (): Stored => {
+    try {
+      const parsed = JSON.parse(deps.store.get(STORE_KEY) || 'null');
+      if (parsed?.version === 1 && Array.isArray(parsed.wallets)) return parsed;
+    } catch { /* fall through */ }
+    return { version: 1, wallets: [] };
+  };
+  const save = (s: Stored) => deps.store.set(STORE_KEY, JSON.stringify(s));
+  const record = (id: string | null) => (id ? load().wallets.find((w) => w.credentialId === id) : undefined);
+  const lastRecord = () => { const s = load(); return s.wallets.find((w) => w.credentialId === s.last); };
+  const remember = (rec: WalletRecord) => {
+    const s = load();
+    // One listening wallet per main-wallet address, plus a passkey-only one: never silently forget a wallet that may hold funds.
+    s.wallets = [rec, ...s.wallets.filter((w) => w.credentialId !== rec.credentialId)].slice(0, MAX_WALLETS);
+    s.last = rec.credentialId;
+    delete s.pending; // a proven passkey is a wallet now
+    save(s);
+  };
+  const pendingNow = (): PendingPasskey | undefined => {
+    const p = load().pending;
+    return p && now() - p.at < PENDING_MAX_AGE_MS && p.tries < PENDING_MAX_TRIES ? p : undefined;
+  };
+  const setPending = (p: PendingPasskey | undefined) => {
+    const s = load();
+    if (!p && !s.pending) return; // nothing to forget: write nothing
+    if (p) s.pending = p; else delete s.pending;
+    save(s);
+  };
+  /**
+   * After a failure while proving a passkey. A cancelled or retryable one (closed panel, cancelled prompt, wrong choice in the
+   * list) keeps the passkey for the next try. A definite one (an unstable PRF result) forgets it: start over, as §3.1 says.
+   */
+  const afterFailure = (resume: PendingPasskey | undefined, e: unknown) => {
+    const keep = e instanceof CancelledError || !!(e as { retryable?: boolean })?.retryable;
+    if (!keep) setPending(undefined);
+    else if (resume) setPending({ ...resume, tries: resume.tries + 1 });
+  };
+
+  const summary = (): SessionSummary | null => {
+    if (!ledger) return null;
+    const x = ledger.summary;
+    return { plays: x.plays, spent: x.spent.toString(), playsLeft: x.playsLeft, budgetLeft: x.budgetLeft.toString(), expires: x.expires };
+  };
+
+  const features = [...LISTENING_FEATURES];
+  const validMain = (m: unknown): string | undefined => (typeof m === 'string' && isMainnetStandardAddress(m) ? m : undefined);
+  /**
+   * Which of this device's listening wallets serves a connected main wallet: the one linked to it; else a wallet
+   * that was never linked (a passkey-only one) which that wallet can claim by linking; else none, and the page
+   * offers a new one. Without a main wallet, the one used last. A wallet linked to a DIFFERENT main wallet is
+   * never offered: each address keeps its own plays, likes and funds.
+   */
+  const pick = (main?: string): WalletRecord | undefined => {
+    if (!main) return lastRecord();
+    const wallets = load().wallets;
+    return wallets.find((w) => w.link?.main === main) ?? wallets.find((w) => !w.link);
+  };
+  // The main wallet the open listening wallet was unlocked for, and the one the idle view follows.
+  let unlockedFor: string | undefined;
+  let viewMain: string | undefined;
+  /** Main wallets the device's OTHER listening wallets belong to: not the reported wallet's, and not the connected one. */
+  const othersOf = (shown: WalletRecord | undefined, main?: string): { others?: string[] } => {
+    const mine = new Set([shown?.link?.main, main].filter(Boolean));
+    const others = [...new Set(load().wallets.flatMap((w) => (w.link && !mine.has(w.link.main) ? [w.link.main] : [])))];
+    return others.length ? { others } : {};
+  };
+  const status = (main?: string): StatusResult => {
+    if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
+    if (identity) {
+      const open = record(credentialId);
+      return { state: 'unlocked', address: identity.address, slot, root: (root ?? identity).address, linked: open?.link?.main, ...othersOf(open, main), session: summary(), features };
+    }
+    const last = pick(main);
+    return last
+      ? { state: 'known', address: last.address, linked: last.link?.main, ...othersOf(last, main), session: null, features }
+      : { state: 'none', ...othersOf(undefined, main), session: null, features };
+  };
+  const refreshIdle = () => deps.ui.idle(status(viewMain));
+  const lockNow = () => { identity = null; root = null; base = null; slot = 0; ledger = null; credentialId = null; unlockedFor = undefined; };
+
+  /** One panel at a time: the listener answers inside the frame, so stacking prompts would confuse. */
+  async function interact<T>(run: () => Promise<T>): Promise<T> {
+    if (interactive) throw new Error('The listening wallet is already waiting for you in its panel.');
+    interactive = true;
+    try { return await run(); } finally { interactive = false; refreshIdle(); }
+  }
+
+  const requireUnlocked = () => {
+    if (!identity) throw new Error('Unlock the listening wallet first.');
+    return identity;
+  };
+
+  async function create(terms?: SessionTerms, main?: string): Promise<{ id: ListeningIdentity; base: CryptoKey }> {
+    const existing = load().wallets;
+    const exclude = main ? [] : existing.map((w) => w.credentialId);
+    const name = main ? `Xtrata listening wallet · ${short(main)}` : undefined;
+    const createPanel: Panel = {
+      kind: 'create',
+      title: 'Make your player',
+      // One glance, in a listener's words: no prices or wallet talk. The costs and the 1 STX rule are under Details.
+      summary: 'Kept on this device with your passkey. No app or account needed.'
+        + (existing.length ? (main ? ` (A separate wallet for ${short(main)}.)` : ' (A second wallet on this device.)') : ''),
+      lines: [
+        'A small spending wallet for paying artists as you listen. It is made from a passkey on this device, so there is nothing to install and no key is stored anywhere.',
+        'Your browser will ask you to save a passkey (Face ID, Touch ID, Windows Hello or your phone).',
+        ...(terms ? termsLines(terms) : [])
+      ],
+      warnings: [
+        'Keep no more than 1 STX in it.',
+        'Anyone who can use this passkey on an unlocked device can spend it.',
+        'If you lose the passkey, whatever is in this wallet is lost. You can return funds to a wallet of yours at any time.',
+        ...(existing.length
+          ? [`This device already has a listening wallet (${existing.map((w) => short(w.address)).join(', ')}). A new one is a separate wallet${main ? ` for ${short(main)}: each address keeps its own plays, likes and funds. The old one is still there for the wallet it belongs to` : ': to reach the old one later, choose its passkey when unlocking'}.`]
+          : [])
+      ],
+      confirmLabel: terms ? 'Create and start listening' : 'Create with passkey'
+    };
+    // A passkey made a moment ago that never got proven (reload, closed panel, discarded tab): finish that one.
+    const resume = pendingNow();
+    let created: { credentialId: string; prf?: Uint8Array };
+    try {
+      if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
+        if (resume?.credentialId) created = { credentialId: resume.credentialId };
+        else {
+          created = await deps.ui.act(createPanel, () => deps.passkey.create(
+            // A wallet for a specific address is meant to be a NEW passkey beside the others. Excluding the existing
+            // credentials there makes the authenticator refuse ("already registered") on exactly the device that has them.
+            // Without an address the old guard stays: do not quietly make a duplicate of a wallet this device already has.
+            exclude, name));
+          setPending({ at: now(), tries: 0, credentialId: created.credentialId });
+        }
+      } else {
+        // This browser will not make a passkey inside a frame: make it on wallet.xtrata.xyz in a new tab, then
+        // sign in with it here. Nothing secret crosses between the tabs: the frame picks a random public user id for
+        // the new passkey and only accepts a sign-in that comes back with it (an older passkey synced to this
+        // device cannot pass for the new one, even when this device has no record of it).
+        let userId: string, label: string;
+        if (resume?.userId && resume.label) {
+          // The tab was opened before a reload: go straight back to "Made your passkey?" instead of opening a second one.
+          userId = resume.userId; label = resume.label;
+        } else {
+          const idBytes = crypto.getRandomValues(new Uint8Array(16));
+          userId = b64u(idBytes);
+          // Four characters to tell this passkey apart in the device's passkey list.
+          const tag = Array.from(idBytes.slice(0, 2), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+          label = `${name ?? 'Xtrata listening wallet'} · ${tag}`;
+          const [u, l] = [userId, label];
+          await deps.ui.act({
+            ...createPanel,
+            lines: [...createPanel.lines, 'On this browser the passkey is made on a wallet.xtrata.xyz page that opens in a new tab. Make it there, then come back to this tab.'],
+            confirmLabel: 'Make my passkey (new tab)'
+          }, async () => { setPending({ at: now(), tries: 0, userId: u, label: l }); deps.passkey.openCreator!(exclude, l, u); return true; });
+        }
+        const wanted = userId;
+        created = await deps.ui.act({
+          kind: 'confirm-passkey',
+          title: 'Made your passkey?',
+          summary: `In the new tab, tap "Create passkey". Then come back here, tap below and choose "${label}".`,
+          lines: ['The wallet is ready as soon as that passkey is confirmed.'],
+          confirmLabel: 'I made it: use my passkey'
+        }, async () => {
+          const r = await deps.passkey.evaluate();
+          if (r.userHandle !== wanted) {
+            r.prf.fill(0);
+            throw Object.assign(new Error(`That is a different passkey. Choose "${label}", the one you just made (or make it in the new tab first).`), { retryable: true });
+          }
+          return r;
+        });
+        setPending({ at: now(), tries: 0, credentialId: created.credentialId });
+      }
+    } catch (e) {
+      // A pick-up that fails or is cancelled counts; after a few, the half-made passkey is dropped and a fresh one is made.
+      afterFailure(resume, e);
+      throw e;
+    }
+
+    // Prove PRF is live AND stable before the address is ever shown for funding
+    // (docs/PASSKEY-WALLET.md §3.1). A wallet whose PRF output changes is unreachable.
+    const outputs: Uint8Array[] = created.prf ? [created.prf] : [];
+    try {
+      while (outputs.length < 2) {
+        const first = outputs.length === 0;
+        const r = await deps.ui.act({
+          kind: first ? 'confirm-passkey' : 'verify-passkey',
+          title: first ? 'Confirm your passkey' : 'One more check',
+          lines: [first
+            ? 'Tap the passkey you just saved.'
+            : 'Once more, to check it gives the same wallet every time.'],
+          confirmLabel: 'Use passkey'
+        }, () => deps.passkey.evaluate(created.credentialId));
+        if (r.credentialId !== created.credentialId) throw new Error('A different passkey was used. Start again with the new one.');
+        outputs.push(r.prf);
+      }
+      if (!equalBytes(outputs[0], outputs[1]))
+        throw new Error('This passkey did not give a stable result, so pay-per-play is not available on this device. Nothing was funded. Listening stays free.');
+      const key = await listeningBase(outputs[0]);
+      const id = await deriveSlotIdentity(key, 0);
+      credentialId = created.credentialId;
+      remember({ credentialId: created.credentialId, address: id.address });
+      return { id, base: key };
+    } catch (e) {
+      afterFailure(resume, e);
+      throw e;
+    } finally {
+      outputs.forEach((o) => o.fill(0));
+    }
+  }
+
+  /** A name from the page, kept to plain letters, digits and . _ - so it cannot carry anything but a name. */
+  const cleanLabel = (v: unknown) => (typeof v === 'string' ? v.replace(/[^\p{L}\p{N}._ -]/gu, '').trim().slice(0, 40) : '');
+
+  async function unlockExisting(anyPasskey = false, terms?: SessionTerms, label?: string, forMain?: string): Promise<{ id: ListeningIdentity; base: CryptoKey }> {
+    const last = anyPasskey ? undefined : pick(forMain);
+    // A listening wallet linked to a main wallet is that person's wallet: greet them by it. The listening
+    // address is plumbing for them. Without a link (passkey-only) the listening address is the identity.
+    const main = last?.link?.main;
+    const owner = main ? [cleanLabel(label), short(main)].filter(Boolean).join(' · ') : '';
+    const who = main ? (cleanLabel(label) || short(main)) : '';
+    const r = await deps.ui.act({
+      kind: 'unlock',
+      title: who ? `Welcome back, ${who}` : 'Welcome back',
+      summary: [main ? (cleanLabel(label) ? short(main) : '') : last ? short(last.address) : '', terms ? 'One tap to carry on listening' : 'Unlock for this visit'].filter(Boolean).join(' · '),
+      // Kept short: on the radio this panel opens by itself and its button should sit in view.
+      lines: terms
+        ? [main ? `Plays and likes are credited to ${owner}. One passkey tap unlocks your listening wallet for this visit and carries on paying as you listen.`
+            : last ? `Wallet ${short(last.address)}. One passkey tap unlocks it for this visit and carries on paying as you listen.` : 'Use your listening-wallet passkey to unlock it for this visit and carry on paying as you listen.',
+          `Each song you listen to for 30 seconds pays ${stx(50n)} STX to its holder, plus a ${stx(terms.fee)} STX network fee, for up to ${stx(terms.budget)} STX before it asks again. Switch off any time.`]
+        : [main ? `Plays and likes are credited to ${owner}. Use your listening wallet's passkey to unlock it for this visit.`
+            : last ? `Wallet ${short(last.address)}. Use its passkey to unlock it for this visit.` : 'Use your listening-wallet passkey to unlock it for this visit.',
+          'The key is rebuilt from your passkey and forgotten when you lock or close this page.'],
+      confirmLabel: terms ? 'Unlock and keep listening' : 'Unlock with passkey'
+    }, () => deps.passkey.evaluate(last?.credentialId));
+    let second: Uint8Array | undefined;
+    try {
+      const known = record(r.credentialId);
+      if (!known) {
+        // First use of this passkey on this device (e.g. synced from another): prove PRF is stable
+        // here too before showing an address that might be funded from this device.
+        const again = await deps.ui.act({
+          kind: 'verify-passkey',
+          title: 'One more check',
+          lines: ['New device: tap the same passkey once more to check it gives the same wallet.'],
+          confirmLabel: 'Use passkey'
+        }, () => deps.passkey.evaluate(r.credentialId));
+        second = again.prf;
+        if (again.credentialId !== r.credentialId || !equalBytes(r.prf, again.prf))
+          throw new Error('This passkey did not give a stable result on this device. Nothing was signed. Use the device where you created it.');
+      }
+      const key = await listeningBase(r.prf);
+      const id = await deriveSlotIdentity(key, 0);
+      if (known && known.address !== id.address)
+        throw new Error('This passkey no longer gives the same wallet on this device. Nothing was signed. Use another device to return its funds.');
+      credentialId = r.credentialId;
+      remember({ ...(known ?? {}), credentialId: r.credentialId, address: id.address });
+      return { id, base: key };
+    } finally {
+      r.prf.fill(0);
+      second?.fill(0);
+    }
+  }
+
+  async function approve(terms: SessionTerms, title: string): Promise<void> {
+    await deps.ui.act({
+      kind: 'session', title, lines: termsLines(terms), confirmLabel: 'Approve',
+      summary: `${stxs(costPerPlay(terms.fee))} STX a song · ${stxs(LIKE_FEE)} STX a like · up to ${stxs(terms.budget)} STX`
+    }, async () => undefined);
+    ledger = new SessionLedger(terms, now());
+  }
+
+  const handlers = {
+    'listening.status': async (params?: unknown): Promise<StatusResult> => {
+      const main = validMain((params as StatusParams | undefined)?.main);
+      viewMain = main;
+      // A different main wallet is connected than the one this wallet was opened for, and another of this
+      // device's wallets serves it: close this one. Locking only ever denies service, and the page then
+      // offers the right wallet (or a new one). A wallet opened for this same main wallet stays open.
+      if (identity && main !== unlockedFor) {
+        if (pick(main)?.credentialId !== credentialId) { lockNow(); refreshIdle(); }
+        else unlockedFor = main;
+      }
+      return status(main);
+    },
+
+    'listening.unlock': (params: unknown): Promise<UnlockResult> => interact(async () => {
+      const p = params as UnlockParams;
+      if (p?.mode !== 'create' && p?.mode !== 'unlock') throw new Error('Choose create or unlock.');
+      if (!deps.passkey.available()) throw new Error('This browser does not support passkeys. Listening stays free.');
+      const terms = termsFrom(p.terms, now());
+      const main = validMain(p.main);
+      viewMain = main;
+      if (!identity) {
+        // The terms are shown on the same panel as the passkey button, so that one confirm click
+        // inside the frame both unlocks and approves paying as you listen.
+        const opened = p.mode === 'create' ? await create(terms, main) : await unlockExisting(p.anyPasskey === true, terms, p.label, main);
+        identity = root = opened.id;
+        base = opened.base;
+        slot = 0;
+        unlockedFor = main;
+        if (terms) ledger = new SessionLedger(terms, now());
+      } else if (terms) await approve(terms, 'Approve paying as you listen');
+      return { address: identity.address, session: summary() };
+    }),
+
+    // Linking sets the ONLY address funds can be returned to, so it is confirmed in the frame,
+    // with the full address, even when the main wallet's signature is valid: anyone can sign a
+    // link for an address they control.
+    'listening.link': (params: unknown): Promise<LinkResult> => interact(async () => {
+      const id = requireUnlocked();
+      // The link belongs to the passkey and is signed by its own wallet; albums inherit it through their binding.
+      if (slot !== 0) throw new Error('Open your own listening wallet to link a main wallet.');
+      const p = params as LinkParams;
+      const link = { main: p?.main, listening: id.address, issued: p?.issued };
+      if (!isMainnetStandardAddress(link.main) || link.main === id.address || !Number.isSafeInteger(link.issued))
+        throw new Error('Invalid main wallet for linking.');
+      if (!verifyLinkSignature(link, p.mainSignature, link.main))
+        throw new Error('The main wallet signature does not match this listening wallet. Nothing was linked.');
+      const current = record(credentialId)?.link?.main;
+      if (current === link.main) {
+        return { main: link.main, listening: id.address, issued: link.issued, listeningSignature: signLink(link, id.privateKey) };
+      }
+      await deps.ui.act({
+        kind: 'link',
+        title: current ? 'Change where returns go?' : 'Confirm your main wallet',
+        lines: [
+          'Funds in this listening wallet can only ever be returned to:',
+          link.main,
+          'Check this is your own wallet address before confirming.'
+        ],
+        warnings: current ? [`Returns currently go to ${current}. Confirming replaces it. If you did not ask for this, press Cancel.`] : undefined,
+        confirmLabel: current ? 'Yes, change it' : 'This is my wallet'
+      }, async () => undefined);
+      if (identity !== id) throw new Error('Wallet locked before linking finished.');
+      const rec = record(credentialId);
+      remember({ credentialId: credentialId!, address: id.address, ...(rec ?? {}), link: { main: link.main, issued: link.issued, mainSignature: p.mainSignature } });
+      return { main: link.main, listening: id.address, issued: link.issued, listeningSignature: signLink(link, id.privateKey) };
+    }),
+
+    // One passkey, many wallets: other wallets are derived on demand from the key held since unlock, so none of
+    // these need another passkey tap. They only choose WHICH of the passkey's wallets is open; nothing here
+    // can move money or change where returns go (that stays with the passkey's link, confirmed in a panel).
+    'listening.slotAddress': async (params: unknown): Promise<SlotAddressResult> => {
+      requireUnlocked();
+      const n = (params as SlotParams | undefined)?.slot;
+      if (!isSlot(n) || !base) throw new Error('That wallet number is not available.');
+      return { slot: n, address: (await deriveSlotIdentity(base, n)).address };
+    },
+
+    'listening.openSlot': async (params: unknown): Promise<OpenSlotResult> => {
+      requireUnlocked();
+      const n = (params as SlotParams | undefined)?.slot;
+      if (!isSlot(n) || !base) throw new Error('That wallet number is not available.');
+      if (signing) throw new Error('Still signing. Switch again in a moment.');
+      if (interactive) throw new Error('The listening wallet is waiting for you in its panel.');
+      if (n === slot) return { slot, address: identity!.address, session: summary() };
+      const next = await deriveSlotIdentity(base, n);
+      if (!identity || !base || signing) throw new Error('Wallet locked or busy. Nothing changed.');
+      identity = next;
+      slot = n;
+      refreshIdle();
+      return { slot, address: next.address, session: summary() };
+    },
+
+    'listening.bindSlot': async (params: unknown): Promise<BindSlotResult> => {
+      requireUnlocked();
+      const p = params as BindSlotParams | undefined;
+      if (!base || !root) throw new Error('Unlock the listening wallet first.');
+      if (!isSlot(p?.slot)) throw new Error('That wallet number is not available.');
+      const derived = await deriveSlotIdentity(base, p!.slot);
+      const binding = validateSlotBinding({ root: root.address, slot: p!.slot, address: derived.address, issued: p!.issued }, now());
+      return { ...binding, rootSignature: signSlotBinding(binding, root.privateKey), slotSignature: signSlotBinding(binding, derived.privateKey) };
+    },
+
+    // Money between the passkey's own wallets (My player <-> an album, or the first-wallet likes float). The destination is a
+    // wallet NUMBER derived here, never an address from the page, so it can only ever land with the same listener: no panel.
+    'listening.signMove': async (params: unknown): Promise<MoveResult> => {
+      const open = requireUnlocked();
+      const p = params as MoveParams | undefined;
+      if (!base || !root) throw new Error('Unlock the listening wallet first.');
+      const fromSlot = p?.from === undefined ? slot : p.from;
+      if (!isSlot(p?.to) || !isSlot(fromSlot) || p!.to === fromSlot) throw new Error('Choose two different wallets of this passkey.');
+      if (signing) throw new Error('Still signing. Try again in a moment.');
+      signing = true;
+      try {
+        const amount = bigintParam(p!.amount, 'amount'), fee = bigintParam(p!.fee, 'fee'), nonce = bigintParam(p!.nonce, 'nonce'), balance = bigintParam(p!.balance, 'balance');
+        if (amount < MOVE_MIN) throw new Error('That is too small to move.');
+        if (fee < 1n || fee > MOVE_FEE_CAP) throw new Error('That network fee is not allowed.');
+        if (balance < amount + fee + RESERVE) throw new Error('Not enough in that wallet to move this and keep its reserve.');
+        const source = fromSlot === slot ? open : fromSlot === 0 ? root : await deriveSlotIdentity(base, fromSlot);
+        const target = await deriveSlotIdentity(base, p!.to);
+        const tx = await makeSTXTokenTransfer({ ...moveTransferOptions(target.address, amount, fee, nonce), senderKey: source.privateKey });
+        if (identity !== open) throw new Error('Wallet locked before the move was signed. Nothing moved.');
+        refreshIdle();
+        return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), from: source.address, to: target.address, amount: amount.toString(), fee: fee.toString() };
+      } finally {
+        signing = false;
+      }
+    },
+
+    'listening.approveSession': (params: unknown): Promise<SessionSummary> => interact(async () => {
+      requireUnlocked();
+      const terms = termsFrom(params as TermsParams, now());
+      if (!terms) throw new Error('Session terms required.');
+      await approve(terms, 'Approve paying as you listen');
+      return summary()!;
+    }),
+
+    'listening.signPlay': async (params: unknown): Promise<SignedResult> => {
+      const id = requireUnlocked();
+      if (!ledger) throw new Error('No approved listening session. This start plays free.');
+      if (signing) throw new Error('Still signing the previous play. This start plays free.');
+      signing = true;
+      try {
+        const p = params as SignPlayParams;
+        const fee = bigintParam(p?.fee, 'fee'), nonce = bigintParam(p?.nonce, 'nonce'), balance = bigintParam(p?.balance, 'balance');
+        if (balance > TARGET) throw new Error('This wallet holds more than 1 STX. Return the excess to keep paying.');
+        if (balance < RESERVE + costPerPlay(fee)) throw new Error('Balance too low for another paid play. Top up to keep paying.');
+        const options = playCallOptions(id.address, id.publicKey, { core: p.core, song: p.song, receipt: p.receipt, fee, nonce });
+        const session = ledger;
+        session.consume(fee, now());
+        const tx = await makeContractCall({ ...options, senderKey: id.privateKey });
+        if (identity !== id || ledger !== session) throw new Error('Listening stopped before signing finished. Nothing was returned.');
+        refreshIdle();
+        return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid() };
+      } finally {
+        signing = false;
+      }
+    },
+
+    // A like or unlike is a deliberate tap on the radio's heart, covered by the approved session:
+    // it moves nothing (Deny mode, no post-conditions) and costs only the session's network fee.
+    'listening.signLike': async (params: unknown): Promise<SignedResult> => {
+      const open = requireUnlocked();
+      if (!ledger) throw new Error('Paying is switched off, so likes go through your main wallet.');
+      // Every like is signed by the passkey's own wallet, whichever album wallet is open, so all of a
+      // listener's likes live under one address (linked or not: unlinked likes count for that address).
+      const id = root ?? open;
+      if (signing) throw new Error('Still signing. Try the like again in a moment.');
+      signing = true;
+      try {
+        const p = params as SignLikeParams;
+        const fee = bigintParam(p?.fee, 'fee'), nonce = bigintParam(p?.nonce, 'nonce'), balance = bigintParam(p?.balance, 'balance');
+        if (balance > TARGET) throw new Error('This wallet holds more than 1 STX. Return the excess first.');
+        if (balance < RESERVE + fee) throw new Error('Your main listener wallet is out of funds. Top it up to like songs.');
+        const options = likeCallOptions(id.publicKey, { song: p.song, liked: p.liked, fee, nonce });
+        const session = ledger;
+        session.consumeLike(fee, now());
+        const tx = await makeContractCall({ ...options, senderKey: id.privateKey });
+        if (identity !== open || ledger !== session) throw new Error('Listening stopped before signing finished. Nothing was returned.');
+        refreshIdle();
+        return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid() };
+      } finally {
+        signing = false;
+      }
+    },
+
+    'listening.prepareReturn': (params: unknown): Promise<ReturnResult> => interact(async () => {
+      const id = requireUnlocked();
+      const p = params as ReturnParams;
+      // A linked main wallet always wins. Without one, the page supplies the destination (the
+      // funder it found on chain, or an address the listener typed) and the listener confirms
+      // the FULL address below; this frame cannot read the chain, so it cannot check where it came from.
+      const linkedMain = record(credentialId)?.link?.main;
+      const supplied = typeof p?.destination === 'string' ? p.destination.trim() : '';
+      if (!linkedMain) {
+        if (!supplied) throw new Error('Choose where to send the funds first, or link a main wallet.');
+        if (!isMainnetStandardAddress(supplied)) throw new Error('Choose a standard mainnet address (starting SP) to send to.');
+        if (supplied === id.address) throw new Error('That is this listening wallet itself. Choose a different address.');
+      }
+      const main = linkedMain ?? supplied;
+      const toLabel = linkedMain ? 'your main wallet' : 'this address';
+      if (p?.mode !== 'excess' && p?.mode !== 'all' && p?.mode !== 'amount') throw new Error('Choose Return excess, Return all or an amount.');
+      const plan = returnPlan(p.mode, bigintParam(p.balance, 'balance'), bigintParam(p.fee, 'fee'), p.mode === 'amount' ? bigintParam(p.amount, 'amount') : undefined);
+      const nonce = bigintParam(p.nonce, 'nonce');
+      ledger = null; // pause new paid plays while a return is prepared
+      await deps.ui.act({
+        kind: 'return',
+        title: p.mode === 'all' ? 'Return everything' : p.mode === 'amount' ? 'Return part of the balance' : 'Return the excess',
+        summary: `Send ${stx(plan.amount)} STX to ${toLabel} ${main}. Network fee ${stx(plan.fee)} STX.`,
+        lines: [
+          `Send ${stx(plan.amount)} STX to ${toLabel} ${main}.`,
+          ...(linkedMain ? [] : ['Check every character of this address. A transfer to a wrong address cannot be undone. Do not send to an exchange deposit address unless it accepts transfers from other wallets.']),
+          `Network fee ${stx(plan.fee)} STX. Left in this wallet: ${stx(plan.remaining)} STX.`,
+          `Amounts use the balance the radio page reported (${stx(bigintParam(p.balance, 'balance'))} STX). If the real balance differs, the network rejects the transfer and nothing moves.`,
+          'Paid listening is paused. Turn it back on any time after this confirms.'
+        ],
+        confirmLabel: 'Confirm return'
+      }, async () => undefined);
+      if (identity !== id) throw new Error('Wallet locked before the return was signed.');
+      const tx = await makeSTXTokenTransfer({ ...returnTransferOptions(main, plan.amount, plan.fee, nonce), senderKey: id.privateKey });
+      return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), amount: plan.amount.toString(), fee: plan.fee.toString(), recipient: main, mode: plan.mode };
+    }),
+
+    // The page may withdraw a panel it asked for (e.g. to unlock a different wallet instead).
+    'listening.cancel': async () => ({ cancelled: deps.ui.cancel() }),
+
+    'listening.stop': async () => { ledger = null; refreshIdle(); return { stopped: true }; },
+
+    'listening.lock': async () => { lockNow(); refreshIdle(); return { locked: true }; }
+  };
+
+  refreshIdle();
+  return { handlers, status, lock: () => void handlers['listening.lock']() };
+}

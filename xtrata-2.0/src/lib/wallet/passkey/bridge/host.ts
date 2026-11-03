@@ -31,6 +31,11 @@ export interface WalletBridgeHostOptions {
    */
   allowedParentOrigins: readonly string[];
   handlers: Partial<Record<WalletMethod, WalletHandler>>;
+  /**
+   * Answer only the window that embeds this frame. Without it, any window on an allowed origin
+   * that holds a reference to a top-level wallet window (window.open) could drive it.
+   */
+  requireParentSource?: boolean;
   listenTarget?: Pick<Window, 'addEventListener' | 'removeEventListener'>;
 }
 
@@ -62,6 +67,7 @@ export class WalletBridgeHost {
     // Origin allowlist first: an unrecognised embedder gets no reply at all,
     // not even an error, so it learns nothing about what lives here.
     if (!this.allowed.has(event.origin)) return;
+    if (this.options.requireParentSource && (window.parent === window || event.source !== window.parent)) return;
     if (!isBridgeRequest(event.data)) return;
 
     const { id, method, params } = event.data;

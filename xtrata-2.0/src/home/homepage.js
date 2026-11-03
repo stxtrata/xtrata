@@ -14,6 +14,9 @@ import {
 } from './homepage-content.js';
 import { pickSwap as pickWallSwap, pickWall } from './wall-rotation.js';
 import { initMusicSupporters, stopMusicSupporters } from './music-supporters.js';
+import { initAudionautBanner, stopAudionautBanner } from './audionaut-banner.js';
+import { initArcadeChampion, stopArcadeChampion } from './arcade-champion.js';
+import { initGiveawayHero, stopGiveawayHero } from './giveaway-hero.js';
 
 const HOME_ACTION_EVENT = 'xtrata:homepage-action';
 const HOME_MOUNT_IDS = [
@@ -144,7 +147,7 @@ const createChessBoard = (className = '') => {
 // ---------------------------------------------------------------------------
 // Radio: homepage plays go through the site radio already in the header, so
 // there is only ever one player and plays are counted like any other listen.
-// Free to the listener: the paid per-play path lives in the Xtrata Music app.
+// Free to the listener: the paid per-play path lives on the radio page (passkey wallet).
 const radioApi = () =>
   window.XtrataRadio && typeof window.XtrataRadio.playToken === 'function' ? window.XtrataRadio : null;
 
@@ -1090,9 +1093,15 @@ export const initHomepage = () => {
     // issuing requests and polluting that page's browser diagnostics.
     clearHomepage();
     stopMusicSupporters();
+    stopAudionautBanner();
+    stopArcadeChampion();
+    stopGiveawayHero();
     return;
   }
   initMusicSupporters();
+  initAudionautBanner();
+  initArcadeChampion();
+  initGiveawayHero();
   renderStrip();
   renderWall();
   renderNowPlaying();

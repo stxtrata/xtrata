@@ -30,10 +30,10 @@ it('heart opens wallet guidance even before a song starts; saved likes remain ac
 });
 
 it('restores artwork and metadata when resuming a saved song without skipping',async()=>{
- localStorage.setItem('xtrata.radio.v1',JSON.stringify({on:true,tokenId:'2889',position:15}));
+ localStorage.setItem('xtrata.radio.v1',JSON.stringify({on:true,tokenId:'7777',position:15}));
  vi.spyOn(HTMLMediaElement.prototype,'play').mockResolvedValue();
  vi.stubGlobal('fetch',vi.fn(async(input)=>String(input).startsWith('/runtime/content')?new Response('<title>Restored song</title><script type="application/json">{"artist":"Artist","album":"Album"}</script><img src="data:image/png;base64,YQ=="><source src="data:audio/mpeg;base64,YQ==">',{headers:{'content-type':'text/html'}}):new Response(JSON.stringify({tracks:[]}))));
- const api=initXtrataRadio({tokenIds:['2889'],resumePlayback:true});
- await vi.waitFor(()=>expect(api!.getState().nowPlaying).toMatchObject({tokenId:'2889',title:'Restored song',artist:'Artist',album:'Album',cover:'data:image/png;base64,YQ=='}));
+ const api=initXtrataRadio({tokenIds:['7777'],resumePlayback:true});
+ await vi.waitFor(()=>expect(api!.getState().nowPlaying).toMatchObject({tokenId:'7777',title:'Restored song',artist:'Artist',album:'Album',cover:'data:image/png;base64,YQ=='}));
  vi.restoreAllMocks();
 });

@@ -82,6 +82,8 @@ export function makeLegacyChannel(i) {
     trimEnd: 1,
     inserts: [],
     fx: [],
+    // Delay / reverb sends, tapped after the last plugin: { delay?, reverb? } of { amount, enabled }
+    sends: {},
   };
 }
 // A project in the pre-region shape: channels that own their sample, sequences with step rows.
@@ -131,6 +133,7 @@ export function makeInstrument(i) {
     solo: false,
     inserts: [], // same plugin chains as sample channels
     fx: [],
+    sends: {},
   };
 }
 

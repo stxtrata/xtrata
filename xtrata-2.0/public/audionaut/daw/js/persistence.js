@@ -19,7 +19,7 @@ import { validateWordSelection } from "./word-index.js";
 import { SYNTH_BANK } from "./synths.js";
 import { validateSoundMetadata } from "./onboard-library.js";
 import { validateClipSnapshot } from "./clip-contract.js";
-import { normalizeOwner } from "./plugins.js";
+import { normalizeOwner, cleanReturns } from "./plugins.js";
 import {
   bindChannel,
   blankSample,
@@ -232,6 +232,7 @@ function normalizeNative(data) {
       // fx/inserts: current chains, or the old fixed FX object + 4 insert slots
       channel.inserts = c.inserts;
       channel.fx = c.fx && typeof c.fx === "object" ? c.fx : [];
+      channel.sends = c.sends; // delay / reverb send values; older files hold them as FX slots
       normalizeOwner(channel);
     });
   }
@@ -259,6 +260,7 @@ function normalizeNative(data) {
       p.instruments[i].fx =
         inst && inst.fx && typeof inst.fx === "object" ? inst.fx : [];
       p.instruments[i].inserts = inst?.inserts;
+      p.instruments[i].sends = inst?.sends;
       normalizeOwner(p.instruments[i]);
       {
         const cur0 = p.instruments[i];
@@ -394,6 +396,7 @@ function normalizeNative(data) {
   p.swing = finite(p.swing, 0, 0, 60);
   p.masterVolume = finite(p.masterVolume, 0.9, 0, 1.5);
   p.fadeMs = finite(p.fadeMs, 15, 1, 500);
+  if (data.returns && typeof data.returns === "object") p.returns = cleanReturns(data.returns);
   p.currentSequence =
     finite(data.currentSequence, 0, 0, p.sequences.length - 1) | 0;
   return p;

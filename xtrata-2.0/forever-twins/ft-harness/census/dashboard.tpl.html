@@ -1,0 +1,274 @@
+<title>Stacks NFT Preservation Census</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column for the story, widening to full width for the bar and the ledger table. */
+:root {
+  --bg: #f6f6f9; --surface: #ffffff; --ink: #16151f; --ink-2: #4b4a5c; --ink-3: #78778a; --rule: #dedde8;
+  --accent: #5546d6; --accent-soft: #ecebfb;
+  --b-onchain: #2a78d6; --b-healthy: #0ca30c; --b-fragile: #eda100; --b-mkt: #d55181; --b-walking: #ec835a; --b-failing: #d95926; --b-lost: #d03b3b; --b-unclear: #9a99a8; --b-notart: #c9c8d4;
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #13131a; --surface: #1c1c25; --ink: #f0eff6; --ink-2: #c4c3d3; --ink-3: #9291a6; --rule: #33323f;
+  --accent: #9b90f0; --accent-soft: #272540; --b-notart: #4a4958; --b-unclear: #77768a; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #13131a; --surface: #1c1c25; --ink: #f0eff6; --ink-2: #c4c3d3; --ink-3: #9291a6; --rule: #33323f;
+  --accent: #9b90f0; --accent-soft: #272540; --b-notart: #4a4958; --b-unclear: #77768a; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 32px 64px; display: flex; flex-direction: column; gap: 40px; }
+.col { max-width: 68ch; }
+h1, h2, h3 { font-family: var(--f-display); font-stretch: 85%; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 800; line-height: 1.05; }
+h2 { font-size: 22px; font-weight: 700; }
+h3 { font-size: 16px; font-weight: 700; }
+p { margin: 0; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.lede { font-size: 17px; color: var(--ink-2); margin-top: 12px; }
+.mono { font-family: var(--f-mono); font-size: 12.5px; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+a { color: var(--accent); }
+
+/* bar */
+.barbox { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.barhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.seg button { font: 500 13px var(--f-body); background: transparent; color: var(--ink-2); border: 0; padding: 6px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); }
+.seg button:focus-visible, .chip:focus-visible, input:focus-visible, select:focus-visible, tr.row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bar { display: flex; gap: 2px; height: 34px; }
+.bar div { min-width: 3px; border-radius: 3px; position: relative; cursor: default; }
+.legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px 20px; }
+.lg { display: grid; grid-template-columns: 12px 1fr auto; gap: 4px 10px; align-items: baseline; }
+.sw { width: 12px; height: 12px; border-radius: 3px; transform: translateY(1px); }
+.lg b { font-weight: 600; }
+.lg .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.lg p { grid-column: 2 / 4; color: var(--ink-3); font-size: 13px; line-height: 1.45; }
+
+/* layers diagram */
+.layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.layer { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 12px; }
+.chain span { border: 1px solid var(--rule); border-radius: 6px; padding: 3px 8px; background: var(--bg); }
+.chain i { font-style: normal; color: var(--ink-3); }
+.layer p { color: var(--ink-2); font-size: 14px; }
+
+/* findings */
+.findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px 32px; }
+.finding { display: flex; flex-direction: column; gap: 6px; border-top: 2px solid var(--ink); padding-top: 12px; min-width: 0; }
+.finding .big { font-family: var(--f-display); font-stretch: 80%; font-weight: 800; font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
+.finding p { color: var(--ink-2); font-size: 14px; }
+
+/* table */
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 12.5px var(--f-body); display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--ink-2); color: var(--ink); }
+.chip .sw { width: 9px; height: 9px; transform: none; }
+input[type=search], select { font: 14px var(--f-body); padding: 7px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); color: var(--ink); }
+input[type=search] { flex: 1 1 220px; min-width: 0; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 13.5px; }
+th { text-align: left; font: 600 11.5px var(--f-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); padding: 10px 12px; border-bottom: 1px solid var(--rule); position: sticky; top: 0; background: var(--surface); cursor: pointer; white-space: nowrap; }
+th[aria-sort] { color: var(--ink); }
+td { padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td.n { font-family: var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+tr.row { cursor: pointer; }
+tr.row:hover td { background: var(--accent-soft); }
+.nm { font-weight: 600; }
+.cid { font-family: var(--f-mono); font-size: 11px; color: var(--ink-3); word-break: break-all; }
+.pill { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500; }
+.pill .sw { width: 10px; height: 10px; transform: none; }
+.muted { color: var(--ink-3); }
+tr.detail td { background: var(--bg); }
+.detail dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
+.detail dt { color: var(--ink-3); font-size: 12.5px; }
+.detail dd { margin: 0; font-family: var(--f-mono); font-size: 12px; word-break: break-all; }
+.count { color: var(--ink-3); font-size: 13px; }
+.method { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px 40px; }
+.method ul { margin: 0; padding-left: 18px; color: var(--ink-2); display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+footer { color: var(--ink-3); font-size: 13px; border-top: 1px solid var(--rule); padding-top: 16px; }
+@media (max-width: 560px) { .wrap { padding-inline: 16px; } .bar { height: 26px; } }
+@media (prefers-reduced-motion: no-preference) { tr.row td { transition: background .12s; } }
+</style>
+
+<div class="wrap">
+  <header class="col">
+    <div class="eyebrow">Forever Twins · survey run __RUNDATE__</div>
+    <h1 style="margin-top:8px">Stacks NFT Preservation Census</h1>
+    <p class="lede">Where the art behind the top 250 Stacks NFT collections actually lives, and whether you can still reach it. Each collection was checked twice: once by following the link written in its smart contract, and once by loading the images Gamma's marketplace shows.</p>
+  </header>
+
+  <section class="stack" aria-labelledby="h-layers">
+    <h2 id="h-layers">Two ways to find the art</h2>
+    <div class="layers">
+      <div class="layer">
+        <div class="eyebrow">Layer 1 · the contract</div>
+        <div class="chain"><span>contract</span><i>→</i><span>get-token-uri</span><i>→</i><span>metadata file</span><i>→</i><span>image</span></div>
+        <p>The only route that belongs to the token itself. If any link in this chain is gone, the NFT no longer points at its art.</p>
+      </div>
+      <div class="layer">
+        <div class="eyebrow">Layer 2 · the marketplace index</div>
+        <div class="chain"><span>Gamma database</span><i>→</i><span>its own image copy</span></div>
+        <p>Gamma keeps its own record of each token's image, mostly on its old "stxnft" Pinata account. When layer 1 dies, this copy is often the only thing still showing the art.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="barbox" aria-labelledby="h-bar">
+    <div class="barhead">
+      <h2 id="h-bar">The 250, by preservation status</h2>
+      <div class="seg" role="group" aria-label="Size the bar by">
+        <button type="button" id="by-count" aria-pressed="true">Collections</button>
+        <button type="button" id="by-vol" aria-pressed="false">Trading volume</button>
+      </div>
+    </div>
+    <div class="bar" id="bar" role="img" aria-label="Stacked bar of collections by status"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="stack" aria-labelledby="h-find">
+    <h2 id="h-find">What stands out</h2>
+    <div class="findings" id="findings"></div>
+  </section>
+
+  <section class="stack" aria-labelledby="h-table">
+    <h2 id="h-table">Every collection</h2>
+    <div class="controls">
+      <input type="search" id="q" placeholder="Search name or contract" aria-label="Search collections">
+      <select id="year" aria-label="Year deployed"><option value="">All years</option></select>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="chips" id="chips" role="group" aria-label="Filter by status"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th data-k="rank" aria-sort="ascending">#</th>
+          <th data-k="name">Collection</th>
+          <th data-k="year">Year</th>
+          <th data-k="volume_stx">Volume (STX)</th>
+          <th data-k="bucket">Status</th>
+          <th data-k="contract_state">Contract link</th>
+          <th data-k="marketplace_ok">Gamma images</th>
+          <th data-k="art_storage">Art stored on</th>
+          <th data-k="ipfs_durability">IPFS hosting</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size:13px">Select a row for the links that were tested.</p>
+  </section>
+
+  <section class="stack" aria-labelledby="h-method">
+    <h2 id="h-method">How this was measured</h2>
+    <div class="method">
+      <ul>
+        <li>Collections: Gamma's all-time volume ranking for Stacks, top 250.</li>
+        <li>Contract layer: contract source and <span class="mono">get-token-uri</span> read through the Hiro API for up to four tokens per collection; metadata and image fetched as written, then through three IPFS gateways (Filebase, Pinata public, Gamma's Pinata).</li>
+        <li>Marketplace layer: up to 16 tokens per collection loaded from the image addresses Gamma serves; failures re-tested slowly.</li>
+        <li>IPFS hosting: the public IPFS routing service was asked which machines still store each folder.</li>
+      </ul>
+      <ul>
+        <li>This is a sample, not a full scan of every token. A collection marked "Failing" may have more or fewer broken tokens than the sample shows.</li>
+        <li>Results are a snapshot from one run on one day, from one network. Servers that were briefly down will look dead. Repeat runs are the way to confirm.</li>
+        <li>"Pinata only" means only Pinata machines answered for that content. It says nothing about how long Pinata will keep it.</li>
+        <li>Ratings describe reachability, not the value or legitimacy of any collection.</li>
+      </ul>
+    </div>
+  </section>
+  <footer>Census by Forever Twins (Xtrata). Harness: browser script reading Gamma's public API, the Hiro Stacks API and public IPFS gateways; read-only.</footer>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const BUCKETS = [
+  ['On chain', '--b-onchain', 'The image can be rebuilt from the contract itself, with no outside file.'],
+  ['Healthy', '--b-healthy', 'Contract link works, art on Arweave or on IPFS with more than one host.'],
+  ['Fragile', '--b-fragile', 'Everything works today, but the art rests on one host: usually Pinata alone, or the creator’s own server.'],
+  ['Marketplace copy broken', '--b-mkt', 'Contract link works, but some of Gamma’s images fail to load.'],
+  ['Walking dead', '--b-walking', 'The contract no longer leads to the art. Gamma still shows it from its own copy.'],
+  ['Failing', '--b-failing', 'Contract link dead and some of Gamma’s copies failing too.'],
+  ['Lost', '--b-lost', 'Contract link dead and none of the sampled images load on Gamma.'],
+  ['Unclear', '--b-unclear', 'The test could not tell, usually because a server blocked the check.'],
+  ['Not artwork', '--b-notart', 'Names, passes and protocol tokens. Listed for completeness.'],
+];
+const color = Object.fromEntries(BUCKETS.map(([b, c]) => [b, `var(${c})`]));
+const CONTRACT = { 'works': 'Works', 'works-template': 'Works (placeholder URL)', 'on-chain': 'On chain', 'shared-file': 'One file for all tokens', 'dead': 'Dead', 'image-dead': 'Image dead', 'no-image-field': 'No image in file', 'uri-error': 'Contract call fails', 'unverified': 'Blocked check' };
+const S = DATA.summary; const rows = DATA.rows;
+const fmt = (n) => (n || 0).toLocaleString('en-GB');
+let mode = 'count';
+function drawBar() {
+  const bar = document.getElementById('bar'); bar.innerHTML = '';
+  const tot = mode === 'count' ? S.n : S.total_vol;
+  for (const [b] of BUCKETS) {
+    const v = mode === 'count' ? S.counts[b] : S.vol[b]; if (!v) continue;
+    const d = document.createElement('div'); d.style.flex = `${v} 1 0`; d.style.background = color[b];
+    d.title = `${b}: ${mode === 'count' ? v + ' collections' : fmt(v) + ' STX'} (${(100 * v / tot).toFixed(1)}%)`;
+    bar.appendChild(d);
+  }
+  const lg = document.getElementById('legend'); lg.innerHTML = '';
+  for (const [b, , desc] of BUCKETS) {
+    const v = mode === 'count' ? S.counts[b] : S.vol[b];
+    const el = document.createElement('div'); el.className = 'lg';
+    el.innerHTML = `<span class="sw" style="background:${color[b]}"></span><b>${b}</b><span class="num">${mode === 'count' ? v : fmt(v) + ' STX'}</span><p>${desc}</p>`;
+    lg.appendChild(el);
+  }
+}
+for (const [id, m] of [['by-count', 'count'], ['by-vol', 'vol']]) document.getElementById(id).addEventListener('click', () => { mode = m; document.getElementById('by-count').setAttribute('aria-pressed', m === 'count'); document.getElementById('by-vol').setAttribute('aria-pressed', m === 'vol'); drawBar(); });
+drawBar();
+
+const dead = (S.counts['Walking dead'] || 0) + (S.counts['Failing'] || 0) + (S.counts['Lost'] || 0);
+const F = [
+  [dead + ' of ' + S.n_art, 'art collections no longer reach their artwork through their own contract. ' + (S.counts['Walking dead'] || 0) + ' of them still look fine on Gamma, only because Gamma keeps its own copy. ' + S.fixable + ' of the ' + dead + ' still let their owner change the link, so a repair is possible if the owner is still around.'],
+  [String(S.counts['Lost'] || 0), 'collections show blank tiles on Gamma for every token sampled. Five are Megapont contracts (Robots, Robot Components, both expansions and the Space Agency), whose API no longer serves images.'],
+  [String(S.stacksart), 'Stacks Art era collections point every token at one shared file on stacksart.com, which now returns the Stacks Art web page. The contracts never held per-token art links at all.'],
+  [S.gamma_pin + ' of ' + S.n_art, 'collections have their Gamma images served from one Pinata account ("stxnft", Gamma\u2019s old name). It is the biggest single point of failure on Stacks.'],
+  [S.pinata_only + ' of ' + S.n_art, 'collections on IPFS are stored by Pinata alone. No other machine on the IPFS network answered for that content.'],
+  [String((S.counts['Healthy'] || 0) + (S.counts['On chain'] || 0)), 'collections look durable today: Arweave, IPFS with several hosts, or art rebuilt on chain. Stacks Invaders is the only on-chain one in the top 250.'],
+];
+document.getElementById('findings').innerHTML = F.map(([n, t]) => `<div class="finding"><div class="big">${n}</div><p>${t}</p></div>`).join('');
+
+// table
+const active = new Set(BUCKETS.map(b => b[0]).filter(b => b !== 'Not artwork'));
+const chips = document.getElementById('chips');
+for (const [b] of BUCKETS) {
+  const c = document.createElement('button'); c.type = 'button'; c.className = 'chip'; c.setAttribute('aria-pressed', active.has(b));
+  c.innerHTML = `<span class="sw" style="background:${color[b]}"></span>${b} <span class="muted">${S.counts[b] || 0}</span>`;
+  c.addEventListener('click', () => { active.has(b) ? active.delete(b) : active.add(b); c.setAttribute('aria-pressed', active.has(b)); render(); });
+  chips.appendChild(c);
+}
+const years = [...new Set(rows.map(r => r.year).filter(Boolean))].sort();
+const ysel = document.getElementById('year'); years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; ysel.appendChild(o); });
+let sortK = 'rank', sortDir = 1; const open = new Set();
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => { const k = th.dataset.k; if (sortK === k) sortDir *= -1; else { sortK = k; sortDir = k === 'volume_stx' ? -1 : 1; } document.querySelectorAll('th').forEach(t => t.removeAttribute('aria-sort')); th.setAttribute('aria-sort', sortDir > 0 ? 'ascending' : 'descending'); render(); }));
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function ratio(s) { const [a, b] = String(s).split('/').map(Number); return b ? a / b : -1; }
+function render() {
+  const q = document.getElementById('q').value.trim().toLowerCase(); const y = ysel.value;
+  let list = rows.filter(r => active.has(r.bucket) && (!y || r.year === y) && (!q || r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q)));
+  list.sort((a, b) => { let x = a[sortK], z = b[sortK]; if (sortK === 'marketplace_ok') { x = ratio(x); z = ratio(z); } if (typeof x === 'number' || typeof z === 'number') return ((x ?? -1) - (z ?? -1)) * sortDir; return String(x ?? '').localeCompare(String(z ?? '')) * sortDir; });
+  document.getElementById('count').textContent = `${list.length} shown`;
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = list.map(r => {
+    const main = `<tr class="row" tabindex="0" data-id="${esc(r.id)}"><td class="n">${r.rank}</td><td><div class="nm">${esc(r.name)}</div><div class="cid">${esc(r.id)}</div></td><td class="n">${esc(r.year || '–')}</td><td class="n">${fmt(r.volume_stx)}</td><td><span class="pill"><span class="sw" style="background:${color[r.bucket]}"></span>${esc(r.bucket)}</span></td><td>${esc(CONTRACT[r.contract_state] || r.contract_state)}</td><td class="n">${esc(r.marketplace_ok)}</td><td>${esc(r.art_storage || '–')}</td><td>${esc(r.ipfs_durability || '–')}</td></tr>`;
+    if (!open.has(r.id)) return main;
+    return main + `<tr class="detail"><td></td><td colspan="8"><dl>
+      <dt>Contract link</dt><dd>${esc(r.uri_example || '(none returned)')}</dd>
+      <dt>Image in metadata</dt><dd>${esc(r.img_example || '(not read)')}</dd>
+      <dt>Gamma image</dt><dd>${esc(r.market_example || '(none)')}</dd>
+      <dt>Reached via</dt><dd>${esc(r.works_via || '–')}</dd>
+      <dt>Owner can change link</dt><dd>${r.uri_changeable ? 'yes' : 'no'}</dd>
+      ${r.notes ? `<dt>Notes</dt><dd style="font-family:var(--f-body)">${esc(r.notes)}</dd>` : ''}
+      <dt>On Gamma</dt><dd><a href="https://gamma.io/stacks/collections/${esc(r.id)}" target="_blank" rel="noopener">open collection</a></dd>
+    </dl></td></tr>`;
+  }).join('');
+}
+document.getElementById('tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr.row'); if (!tr || e.target.closest('a')) return; const id = tr.dataset.id; open.has(id) ? open.delete(id) : open.add(id); render(); });
+document.getElementById('tbody').addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const tr = e.target.closest('tr.row'); if (!tr) return; e.preventDefault(); const id = tr.dataset.id; open.has(id) ? open.delete(id) : open.add(id); render(); const again = document.querySelector(`tr.row[data-id="${CSS.escape(id)}"]`); again && again.focus(); });
+document.getElementById('q').addEventListener('input', render); ysel.addEventListener('change', render);
+render();
+</script>

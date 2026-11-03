@@ -45,11 +45,14 @@ export const ARTIST_CREDITS = Object.freeze({
   "3032": "3ai3",
   "3036": "3ai3"
 });
+// Credits confirmed by the artist directly, for songs that carry no metadata of their own (not in the CSV above).
+const CONFIRMED_ARTISTS = Object.freeze({139: 'melophonic'});
 export function radioArtist(id, fallback = "") {
- return Object.hasOwn(ARTIST_CREDITS, String(id)) ? ARTIST_CREDITS[String(id)] : fallback;
+ const key = String(id);
+ return Object.hasOwn(ARTIST_CREDITS, key) ? ARTIST_CREDITS[key] : Object.hasOwn(CONFIRMED_ARTISTS, key) ? CONFIRMED_ARTISTS[key] : fallback;
 }
 
-const TITLES = Object.freeze({312: 'Smalltalk', 315: 'Entertainment'});
+const TITLES = Object.freeze({139: 'Subterranean (Extended Mix with Phil Hartnoll)', 312: 'Smalltalk', 315: 'Entertainment'});
 export function radioTitle(id, fallback = '') {
  return Object.hasOwn(TITLES, String(id)) ? TITLES[String(id)] : fallback;
 }

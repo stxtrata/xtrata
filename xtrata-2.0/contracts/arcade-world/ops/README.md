@@ -1,0 +1,113 @@
+# Arcade world: operator toolkit
+
+Tools for running the Xtrata Arcade's world contracts (`xtrata-world-v1` rooms, bays, scenes and looks; `xtrata-posters-v1` the poster registry).
+Everything here is **local-first and dry-run by default**. Nothing is deployed, signed or sent unless every confirmation below is in place.
+Phase 4 (scenes), 4b (posters) and 5 (testnet rehearsal) of `claude/arcade-world-contracts-plan.md`.
+
+Run from `contracts/arcade-world` (`npm install` once). Node 20+.
+
+## The safety model
+
+A real send needs **all** of these (see `lib/guard.mjs`; every sending tool checks them before it reads or builds anything):
+1. `--execute` on the command line (otherwise: dry run).
+2. `XA_OPS_CONFIRM=broadcast-testnet` (or `broadcast-mainnet`) in the environment.
+3. A key file (`--key-file` or `XA_OPS_KEY_FILE`) holding one hex private key. On testnet it must not be the admin wallet's key.
+4. Mainnet only: `--i-mean-mainnet` as well. `deploy.mjs` refuses mainnet altogether (mainnet contracts come from `contracts/live` and are a separate decision).
+5. No kill file: if `ops/KILL` exists (or the path in `XA_OPS_KILL`), every sending tool stops.
+
+The tools never hold or print keys, and the key file is read only at the moment of sending. Make a disposable testnet key with `keygen.mjs`.
+Output files go to `ops/out/` (git-ignored); the bot's journal is `ops/.run-<file>.json` (git-ignored).
+
+## What is here
+
+| Tool | What it does |
+|---|---|
+| `validate.mjs file.scene.json` | Checks a scene file against the contract's rules and the hall's drawing rules, then prints the timeline. Offline, or against a chain with `--network`. |
+| `preview.mjs file.scene.json` | Writes one local HTML page: the real hall showing your scenes, with buttons to jump to each key block. |
+| `submit.mjs file.scene.json` | Compiles scenes into `add-scenes` calls (8 per call, all-or-nothing). Dry run writes the calls as hex to `out/`. With the confirmations, sends and reads back. Re-running skips what is already on chain. |
+| `readback.mjs` | Reads a room's bays from a chain and compares with a scene file; `--at h1,h2` shows what will show at those blocks. |
+| `revert.mjs` | Puts a bay back to posters now (one scene). |
+| `validate-posters.mjs file.poster.json` | Checks a poster file, including your caps and live count when run against a chain. |
+| `campaign.mjs rotation\|calendar list.json` | Generates a poster file from a short list (a rotation over N days, or events with a lead time). |
+| `bot.mjs file.poster.json` | The publisher bot: sends posters in safe batches within the contract's caps, remembers what it sent, stops on the kill file, pause, lost whitelist or any cap error. |
+| `review.mjs` | Review lane: lists posters waiting hidden; releases chosen ones (admin only). |
+| `deploy.mjs` | Test network only. Deploys the stand-in core, the poster contract, the world contract and the door-skins contract in order. |
+| `setup-chain.mjs` | One-time: registers the 23 built-in looks, the rooms and the publishers. Skips what exists. |
+| `skins.mjs` | Registers the hall's 19 built-in door skins on `xtrata-door-skins-v1` (admin only). Dry run by default, skips skins already there, reports differences. Offline (no `--network`) it just lists them. Scene files that use the `door-skin` look are checked by `validate.mjs` (unknown skin, skin that does not suit the door, unknown frame or hardware). Needs `--skins <contract id>` or `XA_SKINS`. |
+| `view.mjs` | Builds a local page showing a test network's contracts in the real hall (read-only). |
+| `rehearsal.mjs` | The whole launch sequence on a simulated chain. Writes `out/rehearsal-report.md`. |
+| `keygen.mjs` | Makes a disposable test-network key file. |
+| `relay.mjs`, `relay-merge.mjs` | Sign testnet transactions offline and pack them for a browser to send (see below). |
+| `v2.mjs` | The hall on `xtrata-world-v2` (the object registry): `deploy`, `seed` a scene file into spaces/kinds/bay objects/layer objects (`--hall-only`), `lobby`, `room` (`--entry`), `patch` ONE object, `add` ONE object, `bay`, `reset`, `verify` (manifest vs chain), `read` (the hall's own reader). Dry run by default; offline signing only. See `docs/HALL-V2-SCHEMA.md` and `docs/REVIEW-2-FIXES.md`. |
+
+## Scene file
+
+```json
+{ "format": "arcade-scene-file/1", "room": "arcade-hall",
+  "scenes": [
+    { "bay": 0, "at": "+6h", "base": "door", "door": "door-gothic", "interaction": "knock",
+      "layers": [ { "look": "curtain-house", "params": { "color": "#7a1020" }, "state": "closed" },
+                  { "look": "sign-board", "params": { "text": "coming soon", "tone": "gold" } } ],
+      "link": { "room": "lobby", "arrivalBay": 0 } } ] }
+```
+- `at`: a block height, or `+N` blocks, `+Nm` minutes, `+Nh` hours, `+Nd` days from the current height (10 minutes a block). Relative times are fixed when the file is compiled, so use absolute heights for anything you will submit later.
+- `base`: `posters`, `wall` or `door`. `door`: `door-rect`, `door-arch`, ... (defaults to `door-rect` for a door). `interaction`: `none`, `knock`, `peek`, `enter` (`enter` needs a `link`).
+- `look`: a built-in key (`curtain-house`, `sign-board`, `caution-tape`, `work-site`, `hum`, `light-steady`, `light-pulse`, `light-flicker`), a registered look name, or a look id. A sign board sits on the wall behind a curtain; add `"front": true` to hang one on the cloth.
+- At most one cover, one sound and one light per scene; at most 8 layers; params up to 256 characters; a bay's timeline holds 48 scenes.
+- Warnings (not errors) tell you where the hall will clamp a value or ignore a key.
+
+## Poster file
+
+```json
+{ "format": "arcade-poster-file/1", "defaults": { "set": "community", "weight": 5 },
+  "posters": [ { "head": "TOURNAMENT FRIDAY", "sub": "Brick Breaker, 8pm", "art": "trophy", "colour": "orange",
+                 "from": "+1d", "days": 3, "action": { "kind": "path", "path": "/arcade" } } ] }
+```
+Posters always start after today (a Bitcoin day is 144 blocks). Publishers add community posters only, weight 1 to 20, within the daily and live caps; the admin can add core posters (weight to 100), evergreen posters and anything else. The generators write absolute day numbers so the same file means the same thing on every run.
+
+## Tests
+
+`npm test` runs the contract tests and the toolkit tests (`tests/ops-*.test.mjs`), including a check that the validator and the contracts agree on every rejection, and that no sending tool will send without its confirmations. The preview page is checked in a real browser by `recursive-apps/xtrata-arcade/tests/ops-preview.test.cjs`.
+
+## Sending through a browser (when this machine cannot reach the node)
+
+`relay.mjs` signs one phase OFFLINE (deploy, setup, room, scenes, posters, call, revert, retract, fund). `room` registers one extra room (for example a 4-bay test room); scenes for it then need `--extra-room ID:BAYS` with explicit nonces and packs the signed transactions into a small gzip+base64 text. A browser that can reach the node then POSTs each signed transaction to `/v2/transactions` and waits for it to confirm. The browser only ever sees signed bytes, never a key. It is testnet only and passes through the same guard as the other sending tools (`--execute`, `XA_OPS_CONFIRM=broadcast-testnet`, a key file that is not the admin wallet, no KILL file). `relay-merge.mjs` joins several packs in order. Tested by `tests/ops-relay.test.mjs`.
+
+## The four bays
+
+The arcade hall has four contract-controlled wall areas, numbered in the contract's order: **0** far left, **1** far right, **2** near left and **3** near right (the entrance end). Each is a pair of posters by default and can instead be a door, a curtain, a sign board, a lamp or sounds. The hall room is registered with `bays: 4` (`ROOMS` in `lib/catalogue.mjs`); the lobby has 2. A room's bay count is fixed when it is registered (the contract allows up to 8). `examples/four-doorways.scene.json` uses all four. The four pinned poster spots (pins 1 to 4) now sit on the free poster slots nearest the entrance, beside the near bays.
+
+## The hall on the object registry (xtrata-world-v2)
+
+`v2.mjs` plans calls for `xtrata-world-v2` (every sign, door, lamp, curtain and sound is its own object with its own timeline). It writes
+a steps file (`ops/out/v2/<cmd>.steps.json`, the `relay-steps.mjs` format, which now also takes `list`, `tuple`, `int` and `deploy`),
+and with `--execute` (same guard as the other tools) signs it offline and packs it in files of at most 24 transactions.
+`ops/out/v2/hall-v2.manifest.json` records the ids the plan assumes (they are predicted: relay the packs in order, each after the
+previous one confirmed) and what each object shows, so `patch` can change one sign with one small call. The schema is in
+`docs/HALL-V2-SCHEMA.md`; the hall reads it when `XA_WORLD_CONFIG.registry` is set.
+
+```
+node ops/v2.mjs deploy                                                        # dry run; add --execute --nonces deployer=N
+node ops/v2.mjs seed ops/examples/four-doorways-testnet-hall.scene.json --height H --delegate publisher --delegate-expires +30d
+node ops/v2.mjs seed hall.scene.json --height H --hall-only                   # the hall alone: no lobby space, no lobby bays
+node ops/v2.mjs lobby [lobby.scene.json]                                      # ... and the lobby later
+node ops/v2.mjs room  --slug casino --title "Royal Flush Casino" --entry 1234  # opens from inscription 1234 (hash, size read from the core)
+node ops/v2.mjs patch --object hall/bay-1/sign --set text="STAFF ONLY" --set tone=gold
+node ops/v2.mjs add   --bay hall/bay-3 --kind sign-board --params '{"text":"HI"}' --at +1h --height H
+node ops/v2.mjs bay   --bay hall/bay-0 --base posters
+node ops/v2.mjs reset --bay hall/bay-0
+node ops/v2.mjs verify                                                        # chain vs the manifest's predicted ids; stops at the first mismatch
+node ops/v2.mjs read  --registry ST....xtrata-world-v2 [--verify]
+```
+
+- **Delegates** (`--delegate publisher`, the bot) get a **STATE-only** grant in each room the plan builds: they change what existing
+  objects show and cannot add objects, bindings or doors. `--delegate-expires` (a height or `+N`/`+Nh`/`+Nd` from `--height`) makes it lapse.
+- **Hall only**: `seed --hall-only` refuses a hall scene that links to the lobby (leave that bay out, run `lobby`, then seed that bay).
+- **Entry**: `room --entry N` reads `get-inscription-hash`, `get-inscription-size` and `is-inscription-sealed` from the core
+  (`--core`, default `<owner>.mock-xtrata-core` on testnet, via `--api-base`), then plans `create-space`, `set-space-entry`, live. A room
+  that already exists gets only `set-space-entry`. Offline: `--entry-hash HEX --entry-size N` (the contract still checks them against the core).
+- **Ids are predicted.** Spaces and objects share the registry's id counter, so the packs must land in order and in full. Run `verify`
+  after each pack: it reads kinds, spaces (and entries), objects and grants in plan order and stops at the first one that differs.
+- **For a browser page with a wallet**: `ops/lib/v2-plan.mjs` imports nothing. `launchCalls({ network, owner, publisher, publisherExpires, rooms })`
+  is the full ordered call list of a hall-only launch (`clarityArg(arg, Cl)` makes each argument a Clarity value; `verifyManifest` checks
+  the result). `ops/lib/v2.mjs` re-exports all of it (its API is unchanged) and adds the scene-file planners.

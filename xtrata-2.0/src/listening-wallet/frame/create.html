@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Make your listening-wallet passkey</title>
+</head>
+<body>
+<main id="app" class="create">
+  <header><strong>Listening wallet</strong><span class="origin">wallet.xtrata.xyz</span></header>
+  <h1>Make your listening-wallet passkey</h1>
+  <p id="c-intro">This makes the passkey for your new Xtrata Radio listening wallet. Your phone or computer saves it (Face ID, Touch ID or your device code). Nothing else is stored, here or anywhere.</p>
+  <p id="c-name" class="muted"></p>
+  <div class="row"><button id="c-ok" type="button" class="primary">Create passkey</button></div>
+  <p id="c-error" role="alert"></p>
+  <section id="c-done" hidden>
+    <p class="ok"><strong>Passkey saved ✓</strong></p>
+    <p>Go back to the Xtrata Radio tab and tap <strong>“I made it: use my passkey”</strong>.</p>
+    <div class="row"><button id="c-close" type="button">Close this tab</button></div>
+  </section>
+</main>
+<script type="module" src="./create.ts"></script>
+</body>
+</html>

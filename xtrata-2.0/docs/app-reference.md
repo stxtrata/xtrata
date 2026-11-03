@@ -96,6 +96,28 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 
 ## Artist manager portal
 
+- `music/artist/` provides `/music/artist/`, royalty overview, collection list and
+  a planned pay-per-play reporting page. `src/music-artist/routes.ts` is the
+  collection/link registry; `functions/lib/music-artist.ts` maps each collection
+  to its verifier. Portal identity reuses the existing root-scoped signed cookie
+  through `/api/music/artist/session`.
+- `music/artist/royalties/collections/audionauts-1-0/`, `src/audionaut-royalties/page.ts` and
+  `functions/api/audionaut-royalties.ts` provide the wallet-authenticated Audionaut
+  artist ledger and live song/payment CSV export. `functions/lib/audionaut-royalties.ts`
+  verifies minted identities, the first-song receiving holders and historical
+  5 STX receipts. `functions/lib/audionaut-royalty-automation.ts` and
+  `workers/audionaut-royalties/` discover tagged payments every five minutes,
+  resume history scans and preserve ambiguous transfers for admin assignment.
+  `functions/lib/audionaut-royalty-chain.ts` reuses the Hiro proxy key pool/cache
+  with a bounded request deadline; failed verification preserves sign-in for
+  retry while hiding the ledger. Concurrent snapshot reads are shared.
+  `functions/lib/audionaut-royalty-admin.ts` reserves per-edition manual Xtrata
+  payments and reconciles submitted IDs. `audionaut-royalty-sales.ts` verifies
+  incoming collection-sale proof for Xtrata-retained royalties. Only the exact
+  Xtrata canary address gets browser payment buttons; the cron never signs.
+  Migration 025 adds attempt history and verified sale caches.
+  Migrations 023/024 and `docs/plans/AUDIONAUT-ROYALTIES.md` describe operation.
+
 - `src/config/manage.ts` defines `MANAGE_PATH`, parses `VITE_ARTIST_ALLOWLIST`, and exposes helpers for the gate; the same allowlist drives the `/manage` entry point.
 - `src/manage/ArtistManagerGate.tsx` handles wallet connect/disconnect, theme selection, and allowlist validation before rendering `CollectionManagerApp`.
 - `src/manage/ManageWalletContext.tsx` reuses the shared wallet adapter/session store to isolate the manage portal session from the public app.
@@ -114,7 +136,7 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 
 - `public/bounty/zdao/tracker/1/index.html` is the public, read-only ticket tracker. It reads public contract calls through `/hiro/mainnet`, so there is no server state for tickets. `ledger-reader.js` is the incremental reader (also used by the Bounty Ticket Ledger artifact): it remembers the newest transactions per contract and only fetches what is new. `scripts/bounty-tracker-bake.mjs` bakes the latest saved state into the page.
 - Ticket kinds live in the page's `KINDS` and `SOURCES` tables. Add a kind there and in `ledger-reader.js` (`DEFAULT_CFG.sources`) together.
-- The page has a **Live draw** section (countdown, then an in-browser seeded draw from the first Bitcoin block after the cut-off; see CHANGELOG-2.0.md 2026-10-07). Ticket weights live in `KINDS[].w` (Audionaut 5, chess 2) and `TEAM` lists wallets excluded from the draws; both must match the offline draw script. All three draws are computed in-page: a win takes one ticket (`winners` in `handles.json`; add each draw's winners there before the next draw), inscriptions count by size from Draw 2 (`inp`), and `?liveTest=`, `?liveTest2=`, `?liveTest3=` rehearse a draw at a chosen cut-off. The page passes `DRAWS` to the ledger reader, so keep the baked state's `draws`/`w` (the bake script does).
+- The page has a **Live draw** section (countdown, then an in-browser seeded draw from the first Bitcoin block after the cut-off; see CHANGELOG-2.0.md 2026-10-07). Ticket weights live in `KINDS[].w` (Audionaut 5, chess 2) and `TEAM` lists wallets excluded from the draws; both must match the offline draw script. All three draws are computed in-page: a win takes one ticket (`winners` in `handles.json`; add each draw's winners there before the next draw), inscriptions count by size from Draw 2 (`inp`), and `?liveTest=`, `?liveTest2=`, `?liveTest3=` rehearse a draw at a chosen cut-off. Wizard inscriptions are credited to the wallet that receives them (a direct transfer by the minter within 6 hours; see CHANGELOG-2.0.md 2026-10-12). Bump `ATT` in `ledger-reader.js` whenever the way a mint is credited changes, so saved states are read again. The page passes `DRAWS` to the ledger reader, so keep the baked state's `draws`/`w` (the bake script does).
 - `handles.json` holds team-confirmed X handles and winners. Wallet-signed handles live in D1 (`bounty_handles`, migration 020) behind `functions/bounty/handles.ts`; `functions/lib/bounty-handle.ts` is shared by the page bundle (`src/bounty-tracker/wallet.ts`, built to `wallet.js` by `npm run build:bounty-tracker`) and the function. A signature proves wallet control only, so self-linked handles are labelled as such. Wallet work follows `docs/WALLET-PLAYBOOK.md`.
 - The page opens with a sticky wallet bar (`#mebar`, drawn by `paintWallet()`): connect when signed out; address, standing, tickets and the X handle (add/edit inline) when connected. It re-renders only when its inputs change (`barKey`) so an open handle input is not wiped by a refresh. The checker follows the connected wallet (`syncChecker`); the leaderboard only highlights your row.
 - Tests: `src/bounty-tracker/__tests__/reader.test.ts`, `functions/bounty/__tests__/handles.test.ts`.
@@ -206,6 +228,20 @@ To onboard a new collection — and keep the standalone viewer in sync — do al
 4. Add the collection to `forever-twins/data/contracts.json` reference data and
    `docs/contract-inventory.md` for provenance.
 5. Add/extend tests in `src/lib/twins/__tests__/resolver.test.ts`.
+
+### Preservation checker (first testable version, `/nftcheck/`; `/checker`, `/nft-checker`, `/nftchecker` and `/nft-check` redirect there; the data calls stay at `/checker/lookup` and `/checker/requests`)
+
+A page where someone pastes an NFT link, a contract or a wallet address and sees how well the art behind it is preserved. Design decision (26 Oct 2026): only tell people about what they look up or hold, no public browsable list of collections, noindex, and a request button on every report card.
+
+- `public/nftcheck/index.html` is the whole page (one file, no build step). Everything from the server is rendered as text, never as HTML. Nothing is put in the page URL.
+- `functions/checker/lookup.ts` (`POST /checker/lookup`, body `{ q }`) answers with report cards. `q` can be a contract id, a Stacks wallet address, a link containing either, or a collection link or name. Wallets are read from Hiro (`/extended/v1/tokens/nft/holdings`, 200 a time, at most 5 pages, key rotation through `lib/hiro-keys.ts`) and the answer says if it read only part. A collection is found by contract id or by an exact name / slug only: there is no partial matching and no list. Failed is never shown as empty: no research data, an unreadable file or a failed holdings read are errors that say so (503 / 500 / 502), and an empty wallet is a separate, explained answer. POST, not GET, so a wallet address never lands in a URL or log. Rate limit 120 lookups and 20 wallet reads an hour per salted-hash IP, in the same D1 table as the request form (different key prefix); a missing counter table does not block a lookup.
+- The research data is read from **R2** (`COLLECTION_ASSETS`, key `_system/checker/checker-data.json`, kept private, cached five minutes, a stale copy is used for up to an hour if R2 fails). It is built by `forever-twins/ft-harness/checker/export_checker_data.py` and uploaded by hand: see that folder's README. The `_system/` prefix cannot collide with a collection's own files (collection ids never start with an underscore).
+- `functions/checker/requests.ts` (`POST /checker/requests`, D1 tables from `functions/migrations/031_checker_requests.sql`) stores requests to re-test a collection, add an open helper for it, or assess one the census has not covered. It stores no wallet and no IP, has no public read (triage queries are in the migration), and rate limits by a salted hash of the IP.
+- Wallet results page: totals tiles, status chips as filters, sort / name filter, compact expandable rows (tags from `tagsFor()` in lookup.ts), one-tap "Ask us to check this" on uncovered collections (posts an `assess` request with no role). Requests are limited to 15 an hour per salted-hash IP.
+- Demand counters: `functions/migrations/032_checker_demand.sql` (`checker_demand`). `recordDemand()` in lookup.ts is best-effort and anonymous (UTC day + contract id + source + covered + counts; never the wallet, IP or pasted text); it records contract/link lookups and each collection found in a read wallet. Triage queries are in the migration header.
+- Tests: `functions/checker/__tests__/lookup.test.ts` (fake R2, fake Hiro, in-memory SQLite) and `requests.test.ts`; `__tests__/fixtures/checker-data.sample.json` is a seven-collection slice of the dataset.
+- `forever-twins/ft-harness/checker/` builds the dataset: `export_checker_data.py` folds the census buckets and the older risk ratings into one public scale, `checker-verdicts.json` holds the hand-checked layer, and `ft-frozen-flags.cjs` reads each collection's "frozen" flag from chain (not yet run). Its README explains the scale, the cautions (detection is by name; sample-based) and how to rebuild. The generated `out/` folder is git-ignored.
+- Not built yet: connecting a wallet in the browser (the page reads a public address instead), live twin counts from the helpers, `.btc` name lookup, a Gamma link that carries only a token id.
 
 ## Protocol, chunking, and viewer data
 

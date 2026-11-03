@@ -6,7 +6,7 @@
 //   link.getEnabled()/setEnabled(b)            link.onChange(fn) -> unsubscribe (external edits)
 //   link.inst() -> live engine instance {nodes}   link.taps() -> {inAn,outAn} analysers
 // Face-native values: knobs are real units, selects are an INDEX into the option list.
-import { PLUGIN_TYPES } from "../plugins.js";
+import { PLUGIN_TYPES, typeParams } from "../plugins.js";
 
 const REG = {};
 const fontsDone = new Set();
@@ -90,7 +90,7 @@ function deriveParams(id, def) {
   const T = PLUGIN_TYPES[id];
   if (!T) { console.error('Kit.register(' + id + '): no such plugin type in PLUGIN_TYPES'); return []; }
   const labels = def.labels || {}, fmts = def.fmts || {};
-  return (T.params || []).map(rp => {
+  return typeParams(T).map(rp => {
     const raw = rp.label || rp.key;
     const m = /\s*\(([^)]*)\)\s*$/.exec(raw);
     const label = labels[rp.key] || (m ? raw.replace(m[0], '') : raw);
@@ -389,6 +389,21 @@ function makeP(typeId, def, root, link) {
           c.fillRect(i * bw + gap / 2, H - h, Math.max(1, bw - gap), h);
         }
       });
+    },
+    // The shared return a send feeds (delay or reverb): live level and waveform of what it adds.
+    busData() {
+      const an = link.bus && link.bus();
+      if (!an) return null;
+      if (!BUF.bus || BUF.bus.length !== an.fftSize) BUF.bus = new Float32Array(an.fftSize);
+      an.getFloatTimeDomainData(BUF.bus);
+      return BUF.bus;
+    },
+    busPeak() {
+      const b = P.busData();
+      if (!b) return 0;
+      let m = 0;
+      for (let i = 0; i < b.length; i++) { const a = Math.abs(b[i]); if (a > m) m = a; }
+      return m;
     },
     noteOn() {}, noteOff() {}, onNote() { return () => {}; }, keyboard(el) { if (el) el.textContent = ""; },
     dispose() { disposers.forEach((f) => f()); disposers.length = 0; all.clear(); Object.keys(subs).forEach((k) => subs[k].clear()); presetSubs.clear(); },

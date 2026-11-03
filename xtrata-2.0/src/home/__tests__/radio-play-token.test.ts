@@ -45,7 +45,7 @@ describe('a deliberate click is never overridden by the player itself', () => {
     // therefore landed on a song nobody chose, intermittently, depending on whether
     // the previous track was still loading. That is the "chaotic" part.
     expect(radio).toContain('if (on && !tuneInFlight) {');
-    expect((radio.match(/if \(on && !tuneInFlight\) \{/g) || []).length).toBe(2);   // error AND ended
+    expect((radio.match(/if \(on && !tuneInFlight( && !manualPause)?\) \{/g) || []).length).toBe(2);   // error AND ended
   });
 
   it('only the current tune may lower the in-flight flag', () => {
@@ -92,7 +92,7 @@ describe('an explicit song request beats the preload queue', () => {
     const fn = radio.slice(radio.indexOf('playToken: (id) =>'), radio.indexOf('playToken: (id) =>') + 500);
     // off -> switchOn() tunes; on -> pause and retune. Both reach pickNext with the
     // forced id set, now that the queue cannot pre-empt it.
-    expect(fn).toContain('if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); }');
+    expect(fn).toContain('if (!on) { switchOn(); } else { pauseOwn(); void tuneToNextTrack(); }');
   });
 });
 
@@ -132,5 +132,17 @@ describe('a silent analyser is not evidence of a silent song', () => {
     const body = branch.slice(0, branch.indexOf('} else if (player.currentTime'));
     expect(body).toContain('silentSince = 0;');
     expect(body, 'an unproven analyser must never start the silence clock').not.toContain('performance.now()');
+  });
+});
+
+describe('once stopped, the radio stays stopped until play is pressed', () => {
+  it('has no tap-anywhere start, and every automatic restart checks the listener’s pause', () => {
+    expect(radio).not.toMatch(/TAP ANYWHERE/);
+    expect(radio).toContain('if (!on || manualPause || !hadGesture) return;'); // stuck watchdog
+    expect(radio).toContain('player.paused && hadGesture && !manualPause) void tuneToNextTrack();'); // no-signal retry
+    expect(radio).toContain('if (on && !tuneInFlight && !manualPause) {'); // media error retune
+  });
+  it('only the radio’s own pauses are exempt from counting as the listener’s', () => {
+    expect((radio.match(/\bplayer\.pause\(\)/g) || []).length).toBe(3); // pauseOwn itself, switchOff, the pause button
   });
 });

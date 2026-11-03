@@ -1,0 +1,323 @@
+# Audionaut artist royalty ledger
+
+Implemented 12 October 2026. Page: `/music/artist/royalties/collections/audionauts-1-0/`.
+API: `/api/music/artist/royalties/collections/audionauts-1-0`.
+The original page permanently redirects; the original API remains compatible.
+
+## Plan and resulting behaviour
+
+1. Read the Audionauts 1.0 contract's minted index at a confirmed block. Read each
+   inscription's original edition/seed wrapper and mint context. Display only
+   verified minted editions, never uploaded files or reservations.
+2. Match editions to their primary secret song and artist using the reviewed
+   engine #3060 catalogue and the supplied song-assignment credits.
+3. For each artist, use the current holder of their lowest song inscription ID in
+   this catalogue as the receiving wallet, as requested. Normalize BotCupid's
+   capitalization and use the nonempty DeOrganized Media credit for both copies
+   of song #2989. LIQUIDEZ uses the supplied Χ₮¡₪¢₮ credit, also present in the
+   revised Audionaut wrappers. Artist display credits are not ownership claims.
+4. Require wallet message sign-in. Approved receiving holders and Xtrata admins
+   can see the complete ledger and filter to their royalties. Server access is
+   enforced even when the collection studio's `CREATOR_AUTH_MODE` is off or log.
+5. Track exactly 5 STX per minted edition. Automatically discover and link
+   explicitly tagged transfers. An admin can assign older unlabelled transfers
+   to their covered editions. Verify total, recipient, canonical block, mint
+   timing, and historical receiving-song ownership before storing a receipt.
+6. Reverify recorded transfers on each refresh. Show Paid, No receipt, or Could
+   not verify. The admin's allocation identifies the transfer as a royalty; the
+   chain establishes that the specified amount reached the correct holder.
+
+This page records receipts only, as confirmed by the user on 12 October. It never
+constructs, signs or broadcasts a payment. Existing payments are not assumed
+unpaid: editions without a verified allocation are shown as **No receipt**.
+
+## Automated operation
+
+The separate `xtrata-audionaut-royalties` Worker runs every five minutes, including
+when nobody has the page open. It uses the existing first-party Hiro read proxy
+and D1 database, with no wallet secrets. `workers/audionaut-royalties/wrangler.toml`
+owns its schedule. Apply migration 024 in addition to 023 before enabling it.
+
+- Scan current receiving wallets, previously monitored holders and optionally
+  configured paying wallets. An admin saves public payer addresses in the page.
+  Payer history is needed to discover payments to holders from before monitoring
+  began. No paying address has been assumed from unrelated wallet configuration.
+- For automatic allocation, use a standard direct STX transfer memo such as
+  `audionaut:84`, or `audionaut:2,5` for a 10 STX batch to a common receiving holder.
+  Memos must fit Stacks' 34-byte limit. Unrelated or ambiguous 5 STX transfers
+  cannot establish which edition was paid. Unlabelled transfers from configured
+  payers enter the admin review list; they need a one-time edition assignment.
+- Backfill three 50-transaction pages per address per run at a pinned canonical
+  block. Resume durable offsets on later runs and inspect a recent page while an
+  older backfill continues. Rewind on a changed canonical block. Incomplete or
+  failed discovery is visible on the page. Retry failed tagged candidates.
+- Validate each discovered transfer through the same historical ownership and
+  exact-amount checks as manual receipts. Store allocations atomically and
+  reverify the ledger each run. A database lease prevents overlapping scheduled
+  runs, and duplicate transfers or editions cannot create a second payment.
+- Refresh the authenticated, visible page once a minute, with no overlapping
+  requests. Pause while an admin form is open; stop when signed out or hidden.
+  **Download song and payment list** exports the current minted assignments,
+  receiving addresses and verified payment links as CSV. Source text is escaped
+  against spreadsheet formulas.
+
+This release recognizes direct token-transfer transactions. A contract's generic
+STX event or send-many payment does not establish the required edition memo and
+allocation under this policy, and must not be silently counted as Paid.
+
+Transaction pagination follows Hiro's official v1 address route's `until_block`
+and offset semantics; see [the route source](https://github.com/hirosystems/stacks-blockchain-api/blob/main/src/api/routes/v1/address.ts).
+The existing project uses v1 transaction evidence; these endpoints are currently
+deprecated in favor of v3 but remain supported. The background schedule uses
+[Cloudflare Worker Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/).
+
+## Receiving songs
+
+"First song" means the lowest primary-song inscription ID in the reviewed
+Audionaut assignments. It does not search every unrelated inscription on Xtrata.
+The rule is visible on the page. Addresses are resolved from chain ownership,
+not hardcoded from a wallet list or guessed from creator metadata.
+
+| Artist | Receiving song inscription |
+| --- | ---: |
+| melophonic | 8 |
+| Hundred Little Reasons | 312 |
+| Cicada | 577 |
+| 3ai3 | 1091 |
+| Audionals | 1097 |
+| BotCupid | 2753 |
+| Xtrata Demo | 2830 |
+| Lio Rush | 2969 |
+| Χ₮¡₪¢₮ | 2983 |
+| DeOrganized Media | 2989 |
+
+The chain reader uses six confirmations by default and reuses a chain-only
+snapshot for at most one minute. Every authenticated response is private and
+uncached. A failed holder read does not become a receiving address. A receiving
+song held by a contract/escrow requires ownership resolution before that artist
+can sign in or receive a new verified receipt; this first release does not guess
+an escrow's beneficial owner.
+
+After a receiving song changes hands, the new direct holder can sign in. Existing
+paid receipts remain tied to the holder at the payment block. “My royalties”
+includes both current receiving assignments and payments made to the signed-in
+address. No extra royalties are added for bonus tracks or playlists.
+
+## Deployment and operation
+
+Before publishing this code:
+
+- Apply `functions/migrations/018_creator_sessions.sql` if not already installed.
+- Apply `functions/migrations/023_audionaut_royalties.sql` to the environment's D1
+  database. It adds payment records and edition allocations; it does not alter
+  existing collections or payments.
+- Apply `functions/migrations/024_audionaut_royalty_automation.sql` for resumable
+  discovery, candidate review and scheduler status.
+- Retain the existing `DB` binding, Hiro API keys and `XTRATA_ADMIN_ADDRESSES`.
+  The latter defaults to the existing Xtrata owner address. Receiving holders do
+  not need to be added to the creator allowlist.
+- Build with the normal pipeline. `build:audionaut` now also builds the ledger's
+  wallet/page bundle; `public/` assets are copied by the normal Vite build.
+
+After deployment, visit `/music/artist/royalties/collections/audionauts-1-0/`, sign in with the admin wallet,
+open **Record an existing payment**, and enter the transfer transaction ID and
+the comma-separated edition numbers it covers. A batch covering N editions must
+transfer exactly N × 5 STX to their common historical receiving wallet. The
+receipt form does not send any STX. A transfer can be allocated only once and an
+edition can have only one receipt, enforced atomically in D1. Invalid/pending
+receipts are refused. Receipts are immutable in this first release; a mistaken
+allocation needs an audited operator database correction, not a recipient edit.
+
+The user authorized pushing and production deployment on 12 October. Release
+preparation uses the current production branch plus these royalty commits only.
+No actual wallet sign-in, signing or payment is performed during verification.
+
+To refresh the reviewed catalogue, download the engine as text, then run:
+
+```bash
+node scripts/audionaut-royalties-catalogue.mjs engine.js song-assignments.csv
+```
+
+The generator parses JSON literals without executing downloaded code. Review the
+diff before deploying. It preserves artist credits from the supplied CSV, refuses
+conflicting nonempty credits, and records the engine's SHA-256 for provenance.
+The catalogue is pinned to the immutable #3060 engine; edition/seed/core/engine
+references are checked against minted bytes. Unrecognized wrappers fail closed.
+
+## Verification
+
+- Live public chain read: 18 minted editions, all ten receiving holders resolved.
+  Editions: 2, 5, 11, 15, 25, 29, 31, 33, 34, 58, 60, 76, 80, 83, 84, 95, 100, 108.
+- Targeted source/payment/access tests: 26 passed, plus 87 existing wallet/session
+  regression tests passed (113 total). Checks cover incomplete mint evidence, wrong/failed
+  payments, historical holders, missing ownership, strict sign-in, batch
+  allocations, duplicate receipts and transactional rollback.
+- Browser smoke: signed-out gate, receiving/admin views, filters, unsafe metadata
+  displayed as text, failed/successful receipt registration, cleared data after
+  denial/sign-out, desktop and 390-pixel mobile layout. Fresh extension-free
+  browser, simulated sessions/receipts, disposable generated addresses.
+- Ledger bundle, main Vite build and Cloudflare Functions worker compile pass.
+- Repository-wide TypeScript checking still reports existing typing failures in
+  the wider project. No diagnostics reference the new ledger files.
+
+Repeat the relevant checks with:
+
+```bash
+npm run build:audionaut-royalties
+npx vitest run functions/lib/__tests__/audionaut-royalties.test.ts functions/lib/__tests__/audionaut-royalty-automation.test.ts functions/api/__tests__/audionaut-royalties.test.ts
+node scripts/audionaut-royalties-smoke.mjs
+```
+
+Screenshots and downloaded live evidence stay local under ignored scratch/tmp
+paths. Only source, tests, schema and documentation belong in the commit.
+
+Automation verification: 37 targeted tests passed. The browser smoke also checks
+monitored-address configuration, discovered candidate assignment, inert metadata,
+CSV download, one-minute authorized refresh and stopping after sign-out. Worker
+dry-run compilation passes. These checks use local simulations/disposable
+addresses and never connect an existing wallet or broadcast a transaction.
+
+## Production rollout, 12 October 2026
+
+- Production code commits: `91184840e` (ledger) and `ceed76889` (automation),
+  cherry-picked onto current main. Pushed main and `codex/audionaut-royalties-release`.
+  Source implementation remains on `codex/audionaut-royalties`.
+- Migrations 023 and 024 applied to `xtrata-manage`; existing creator sessions
+  were already installed. Page deployment `55d39fe0-0f10-407c-b297-1b27c5970767`
+  completed successfully at 00:47:52 UTC. Confirmed actual Pages build root is
+  `xtrata-2.0`; no hosting configuration change was needed.
+- Worker version `ec75b877-469e-4f3d-a83d-0dcb39e419a5` deployed with its five-minute
+  schedule and production D1 binding. First real scheduled run at 00:50:09 UTC
+  completed in about 22 seconds, 144 ms CPU, with no errors.
+- First run: 18 minted editions at confirmed block 9,181,444; ten artist receiving
+  songs resolve to eight distinct wallets. Scanned 19 history pages and saved
+  eight address cursors; four historical backfills continue on later runs. Zero
+  receipts verified/imported so far. This does not mean all royalties are unpaid.
+- Live HTML, bundle, styles and unauthenticated API `401`/private no-store headers
+  verified. Fresh extension-free Chrome confirmed desktop and mobile sign-in
+  views with no page errors and no wallet connected. The production release
+  passed all 37 targeted tests, full site build and Functions compilation.
+- Paying address information has not been supplied; no payer was inferred or
+  configured. The administrator can add public paying addresses to locate older
+  transfers. Unlabelled payments need their covered editions assigned once.
+  Future explicitly tagged transfers are reconciled automatically. No wallet
+  key was used for signing and no STX was sent.
+
+## Throttled sign-in recovery, 12 October 2026
+
+A reported live sign-in connected Xverse successfully, then failed with `Chain
+verification unavailable (429)`. The API reader used only the first configured
+Hiro key, unlike the scheduled verifier's first-party proxy. Mint, holder and
+historical receipt reads now use that existing proxy service in-process on Pages,
+including its key cooldowns, failover and read cache. The scheduled worker keeps
+its existing first-party transport. Per-read deadlines bound all attempts.
+
+Concurrent API scans share their pending result and one-minute successful cache;
+failed scans are retried, and expired holder evidence cannot grant access.
+A valid session survives a temporary verification error, with a Retry checks
+button and visible-tab minute retries. Ledger data stays hidden until checks
+succeed; denial or expiry clears data and stops polling.
+
+Verification: 57 targeted tests, including actual default mint/holder/receipt
+transport with first-key 429, bounded all-key failure, abort handling, scan
+sharing/expiry/failure recovery, and authenticated API error privacy. Browser
+simulations cover automatic/manual recovery without wallet reconnection,
+connection loss, expired sessions and sign-out. No live wallet used.
+
+Released fix commit `20a60bc60` on production main. Pages deployment
+`598207e5-15ad-4e2d-a6b4-4dd5e683611a` completed at 06:59:37 UTC.
+The isolated release passed the same 57 tests, full site build and Functions
+compilation. A read-only live-chain handler check with a simulated session and
+empty local receipt fixture returned HTTP 200, 18 minted rows, and all ten artist
+holders resolved at confirmed block 9,184,143. Live HTML and JavaScript include
+the retry/recovery controls; signed-out production API remains HTTP 401 with
+private/no-store headers and no ledger data. No wallet was connected or signed.
+
+## Music artist portal and manual canary payments, 12 October 2026
+
+The user approved the `/music/artist/` hierarchy and then extended the earlier
+tracking-only scope with explicit payment buttons for the public Xtrata canary
+identity `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X` (xtrata.btc). No actual
+signing or payment was authorized for our testing; all wallet tests simulate it.
+
+Canonical artist pages:
+- `/music/artist/`: sign-in and dashboard.
+- `/music/artist/royalties/`: income sources.
+- `/music/artist/royalties/collections/`: registered collection ledgers.
+- `/music/artist/royalties/collections/audionauts-1-0/`: existing ledger.
+- `/music/artist/royalties/plays/`: clearly labelled planned artist reporting,
+  linking to the existing Music lounge's confirmed listener payments.
+
+APIs mirror this under `/api/music/artist/`; session aliases the existing signed
+challenge handler and root-scoped HttpOnly cookie. Discovery and plays availability
+require a signed session even with studio auth off/log. Financial reads retain the
+collection-specific holder/admin checks. Add future collection metadata to
+`src/music-artist/routes.ts` and its dedicated verifier to `functions/lib/music-artist.ts`.
+The old `/api/audionaut-royalties` handler remains compatible for existing clients.
+Legacy page/index/assets redirect to the new page/assets. Links are added to Music
+and the lounge. Both browser bundles build into `music/artist/assets` before the
+existing static music copy step, so the copy does not erase the portal.
+
+Manual payments require the signed-in Xtrata administrator and a fresh matching
+mainnet wallet selection. Every eligible row offers a review showing the full
+receiving address, edition, 5 STX amount and confirmed ownership block. The wallet
+then asks for transfer approval and its fee. The server derives recipient/amount
+and memo `audionaut:<edition>`; it never trusts browser overrides. A partial unique
+index permits only one active attempt per edition across tabs. Submitted IDs are
+captured before storage, with public-ID-only local recovery if the server is busy.
+An explicit wallet cancellation releases the attempt; ambiguous results remain
+reserved and expose Attach transaction ID. Pending/dropped/noncanonical or wrong
+sender/amount/recipient/memo never count as Paid. A confirmed on-chain abort can
+be retried. GET and the five-minute verifier reconcile durable pending IDs and
+store canonical historical-holder-verified receipts atomically. The cron has no
+signer and sends no funds. Migration 025 adds attempt history and sale proof cache.
+
+Xtrata-held receiving songs show `Paid · retained by Xtrata` under the requested
+internal-settlement policy, separately typed as `retained` from external `paid`.
+No self-transfer is requested. Verified sale links require the exact collection
+mint, matching NFT token/confirmed block and at least 5 STX incoming sale revenue
+per minted token after the final NFT mint event. Protocol fees cannot count as
+sale revenue. Missing proof stays explicitly pending while the internal retention
+policy applies. Cached sale proofs recheck their canonical block. The transaction
+reader also binds Hiro's physical `block_hash` to the canonical `index_block_hash`
+before historical receiving-owner reads.
+
+Verification: 148 targeted royalty/portal/wallet tests, two extension-free browser
+simulations (shared sign-in/navigation, admin review, transaction ID and confirmation
+updates, cancellation, ambiguous recovery, recipient denial, CSV/filters, 429 retry,
+sign-out, planned plays and mobile), both browser builds, Functions compile and
+scheduled Worker dry-run. Live public-chain checks with a simulated session and
+local in-memory database found 18 mints, ten artist holders and seven Xtrata-retained
+royalties. Four sale receipts verified on the first pass; two more verified on
+retry, with the remaining proof deferred due to HTTP 429. No personal wallet was
+connected, no wallet secret was read, and no payment was signed or sent.
+
+Repeat browser checks:
+```
+npm run build:audionaut-royalties
+npm run build:music-artist
+node scripts/audionaut-royalties-smoke.mjs
+node scripts/music-artist-smoke.mjs
+```
+Hiro schema references: [NFT instance history](https://docs.hiro.so/en/apis/stacks-blockchain-api/reference/tokens/get-nft-instance-history)
+and [transaction events](https://docs.hiro.so/en/apis/stacks-blockchain-api/reference/transactions/get-transaction-events).
+
+Production release: isolated commit `4b0258bca` was pushed to `main` and
+`codex/music-artist-release`, excluding unrelated branch history and generated
+media. Pages production deployment `30628d13-9c0e-4e4b-a0a7-d88b242ff433`
+completed successfully at 08:34:46 UTC on 12 October 2026. Migration 025 was
+applied to `xtrata-manage`; both tables and the active-attempt unique index were
+verified. Scheduled tracker version `754b7295-8a7b-4455-a2ef-89f3300a358b`
+was deployed with its existing five-minute schedule and D1 binding.
+
+The isolated release passed the full site build, Functions compilation and all
+148 targeted tests. Live verification confirmed all five canonical pages and
+three shared assets return 200; legacy page/assets and trailing-slash aliases
+redirect correctly. New and compatible old financial APIs return private,
+no-store 401 responses without a session; the shared session reports signed out,
+and unknown collections return 404. A fresh extension-free Chrome browser
+checked all five deployed pages at mobile width with no horizontal overflow or
+page errors. No real wallet was connected and no payment was signed or sent.
+The first scheduled production scan after rollout completed without errors:
+18 mints, seven internally settled royalties, zero unverified rows, and four
+cached sale proofs. The production manual-attempt table remained empty.

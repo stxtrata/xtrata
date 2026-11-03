@@ -83,10 +83,16 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     cta: HOMEPAGE_BOUNTY.tracker.label, href: HOMEPAGE_BOUNTY.tracker.href
   }),
   Object.freeze({
+    id: 'giveaway', tag: 'Live', tone: 'violet',
+    title: 'Free album: one copy every ten minutes.',
+    line: 'Be first to claim the live copy and it is yours to keep. Your face or fingerprint is the only sign-up.',
+    cta: 'See the live copy', href: '/giveaway'
+  }),
+  Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
-    title: 'Xtrata Music is out for Mac and Windows.',
-    line: "Every play pays the song's holder, on-chain.",
-    cta: 'Get the app', href: '/music/lounge', newTab: true
+    title: 'New: make a Stacks wallet with Face ID.',
+    line: 'Tap a link on your phone. No app, no seed phrase. Every song you hear pays its holder.',
+    cta: 'Try it on your phone', href: 'https://radio.xtrata.xyz/radio', newTab: true
   }),
   Object.freeze({
     id: 'chess', tag: 'Play', tone: 'amber',
@@ -126,8 +132,8 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   Object.freeze({
     id: 'radio', tag: 'Live', tone: 'lime',
     title: 'Xtrata Radio.',
-    line: 'Hear what is on-chain right now, or embed it on your own site.',
-    cta: 'Open the Lounge', href: '/music/lounge', newTab: true
+    line: 'Hear what is on-chain right now. Like songs and pay artists per play with a passkey wallet.',
+    cta: 'Open Xtrata Radio', href: 'https://radio.xtrata.xyz/radio', newTab: true
   }),
   Object.freeze({
     id: 'forever-twins', tag: 'New', tone: 'orange',
@@ -167,12 +173,6 @@ const WALL_ASTRO = Object.freeze({
   image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', badge: '#3075',
   href: '/i/3075', newTab: true
 });
-const WALL_TIMELOOP = Object.freeze({
-  id: 'timeloop', kind: 'image', tone: 'paper',
-  eyebrow: 'Play · mystery', title: 'Timeloop Detective', subtitle: 'Solve the Meridian heist.',
-  image: '/home/wall/timeloop-3047.webp', position: 'top', badge: '#3047',
-  href: '/i/3047', newTab: true
-});
 const WALL_KP_LOOPS = Object.freeze({
   id: 'kp-loops', kind: 'image', tone: 'pink',
   eyebrow: 'Play · no wallet', title: 'KP Loops', subtitle: "Kieron Pepper's drum loops. Layer them and play.",
@@ -188,6 +188,13 @@ const WALL_AUDIONAUTS = Object.freeze({
   image: '/home/wall/audionauts-3059.webp',
   // Once the mint is live every tile and banner goes to the collection page.
   href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
+});
+const WALL_GIVEAWAY = Object.freeze({
+  // The free album drop: one copy goes live every ten minutes. Leads to the page with the details and the claim.
+  id: 'giveaway', kind: 'image', tone: 'pink',
+  eyebrow: 'Free · limited edition', title: 'Free album drop', subtitle: 'One copy every ten minutes. Be first.',
+  image: '/home/wall/giveaway-drop.webp', position: 'center',
+  href: '/giveaway'
 });
 const WALL_FOREVER_TWINS = Object.freeze({
   // The Forever Twins campaign: one twin from each of the three newest collections.
@@ -240,9 +247,9 @@ export const HOMEPAGE_WALL_ROTATION = Object.freeze({
   pool: Object.freeze([
     // Weights only list slots where the art crops well: Astro Blaster and the KP Loops poster are big or tall only.
     Object.freeze({ tile: WALL_ASTRO, weights: Object.freeze({ big: 3 }) }),
-    Object.freeze({ tile: WALL_TIMELOOP, weights: Object.freeze({ big: 2, tall: 2, wide: 2 }) }),
     Object.freeze({ tile: WALL_KP_LOOPS, weights: Object.freeze({ big: 2, tall: 2 }) }),
     Object.freeze({ tile: WALL_AUDIONAUTS, weights: Object.freeze({ big: 2, wide: 3 }) }),
+    Object.freeze({ tile: WALL_GIVEAWAY, weights: Object.freeze({ big: 2, tall: 2, wide: 3 }) }),
     Object.freeze({ tile: WALL_FOREVER_TWINS, weights: Object.freeze({ big: 3, tall: 3, wide: 2 }) })
   ]),
   // Milliseconds between swaps (random in this range) and how long a crossfade takes.
@@ -256,7 +263,8 @@ export const HOMEPAGE_MUSIC = Object.freeze({
   countsUrl: '/radio/counts?range=all',
   artworkUrl: (id) => `/radio/artwork?id=${encodeURIComponent(id)}`,
   limit: 8,
-  loungeHref: '/music/lounge',
+  // The Lounge is retired from the homepage: every music link goes to the radio page.
+  loungeHref: 'https://radio.xtrata.xyz/radio',
   fallback: Object.freeze([
     { id: 3062, title: 'Neon Portal Bloom', artist: 'BotCupid' },
     { id: 3061, title: 'Swamp Pop Riot', artist: 'BotCupid' },
@@ -312,7 +320,6 @@ export const HOMEPAGE_FRESH = Object.freeze({
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
     { id: 3075, kind: 'game', title: 'Astro Blaster 3', by: 'On-chain high scores', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', href: '/i/3075' },
     { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: AUDIONAUTS_LIVE ? 'Minting now' : 'Original music from L1', image: '/home/wall/audionauts-3059.webp', href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, listen: true },
-    { id: 3047, kind: 'game', title: 'Timeloop Detective · Meridian', by: 'HTML game', image: '/home/wall/timeloop-3047.webp', position: 'top', href: '/i/3047' },
     { id: 1107, kind: 'code', title: 'VST late night', by: 'HTML + audio', image: '/home/wall/vst-1107.webp', href: '/xplorer?gallery=jim-music&sel=1107' }
   ]),
   filters: Object.freeze([
@@ -326,15 +333,14 @@ export const HOMEPAGE_FRESH = Object.freeze({
 
 export const HOMEPAGE_PLAY = Object.freeze([
   { id: 'chess', kind: 'chess', tag: '#3072 · Chess', title: 'Challenge anyone', copy: 'Play a person on-chain, or the computer for practice. Casual games are free.', href: '/i/3072', tone: 'amber' },
-  { id: 'timeloop', image: '/home/wall/timeloop-3047.webp', position: 'top', tag: '#3047 · Mystery', title: 'Solve the Meridian heist', copy: 'One day, fifty million missing, and only you remember. Rewind until you prove it.', href: '/i/3047', tone: 'paper' },
   { id: 'kp-loops', image: '/home/kp-loops.webp', position: 'left center', tag: 'KP Loops · loop station', title: 'Play the KP loop station', copy: "Kieron Pepper's drum loops to layer and play. No wallet needed.", href: '/kp-loops/#kp-loops', tone: 'pink' },
   { id: 'astro-blaster', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', tag: '#3075 · Arcade', title: 'Astro Blaster 3', copy: 'Every top score lives on Bitcoin. Set your pilot, beat the Top 10 and post your run on-chain.', href: '/i/3075', tone: 'cyan' },
   { id: 'xtrata-arcade', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', tag: '#3111 · Arcade', title: 'Xtrata Arcade', copy: 'Walk a 3D hall of 21 cabinets. Every run is recorded and the Top 10 lives on Bitcoin.', href: '/i/3111', tone: 'violet' }
 ]);
 
 export const HOMEPAGE_PROGRAMMES = Object.freeze([
-  { id: 'music-app', tone: 'violet', art: 'covers', tag: 'App · Mac and Windows', title: 'Xtrata Music', copy: "Listen to on-chain songs. Every play pays the song's holder.",
-    actions: [{ label: 'Download', href: '/music/lounge', primary: true }, { label: 'Put your music on', href: '/music/' }] },
+  { id: 'music-app', tone: 'violet', art: 'covers', tag: 'Radio · passkey wallet', title: 'A wallet from Face ID', copy: 'New: make a Stacks wallet on your phone with a passkey. No app, no seed phrase. Every song you hear pays its holder and every like is on-chain.',
+    actions: [{ label: 'Try it on your phone', href: 'https://radio.xtrata.xyz/radio', primary: true }, { label: 'Put your music on', href: '/music/' }] },
   { id: 'radio', tone: 'amber', image: '/radio-face.jpg', tag: 'Radio · in your browser', title: 'Xtrata Radio', copy: "Press play and hear what's on-chain. Embed it on your own site too.",
     actions: [{ label: 'Tune in', radio: true, primary: true }, { label: 'Embed', href: '/radio/share' }] },
   { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · new contracts', title: 'Forever Twins', copy: 'NYC Degens, Megapont Ape Club and Bitcoin Monkeys now have Forever Twin contracts. Holders can give their piece a self-contained, fully on-chain twin.',

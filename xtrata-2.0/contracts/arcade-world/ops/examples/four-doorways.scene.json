@@ -1,0 +1,17 @@
+{
+  "format": "arcade-scene-file/1",
+  "room": "arcade-hall",
+  "scenes": [
+    { "bay": 0, "at": "+1h", "base": "wall", "interaction": "peek",
+      "layers": [
+        { "look": "curtain-house", "params": { "color": "#7a1020" }, "state": "closed" },
+        { "look": "sign-board", "params": { "text": "coming soon", "sub": "far left", "tone": "gold" } } ] },
+    { "bay": 1, "at": "+1h", "base": "door", "door": "door-arch", "interaction": "knock",
+      "layers": [ { "look": "sign-board", "params": { "text": "staff only", "sub": "far right", "tone": "orange" } } ] },
+    { "bay": 2, "at": "+1h", "base": "door", "door": "door-gothic", "interaction": "enter",
+      "layers": [ { "look": "sign-board", "params": { "text": "lobby", "sub": "near left: the entrance end", "tone": "gold" } } ],
+      "link": { "room": "lobby", "arrivalBay": 0 } },
+    { "bay": 3, "at": "+1h", "base": "wall", "interaction": "none",
+      "layers": [ { "look": "sign-board", "params": { "text": "new room", "sub": "near right", "tone": "gold" } }, { "look": "light-pulse", "params": { "tone": "orange", "rate": 2 } } ] }
+  ]
+}
