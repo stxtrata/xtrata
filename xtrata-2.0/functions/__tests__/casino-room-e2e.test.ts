@@ -7,6 +7,8 @@
  * Uses throwaway keys, so it needs no wallet. It signs in people, opens real WebSockets and checks seats, takeover, forged
  * identities, the origin gate, rate limits, and that the room survives going idle (hibernation).
  * Set ROOM_E2E_IDLE_MS (default 20000) to change how long the idle check waits.
+ * The "who is here" test runs only when ROOM_E2E_STALE_MS is set to the room Worker's CASINO_ROOM_STALE_MS (for example 3000:
+ * `wrangler dev ... --var CASINO_ROOM_STALE_MS:3000`), so it does not wait the real 90 seconds.
  */
 import { describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
@@ -50,7 +52,8 @@ function open(headers: Record<string, string> = {}, origin = ORIGIN) {
   const ws = new WebSocket(WS_URL, { headers: { origin, ...headers } });
   const closed: { code?: number; reason?: string; rejected?: number } = {};
   ws.on('message', (data) => {
-    const m = JSON.parse(String(data));
+    let m: Msg;
+    try { m = JSON.parse(String(data)); } catch { m = { t: 'raw', text: String(data) } as Msg; }     // the room's bare "pong" to a heartbeat
     msgs.push(m);
     for (const w of [...waiters]) if (w.test(m)) { clearTimeout(w.timer); waiters.splice(waiters.indexOf(w), 1); w.resolve(m); }
   });
@@ -458,5 +461,57 @@ describe.skipIf(!BASE)('casino room talk end to end', () => {
     await b.quiet(300);
     expect(seen(b, (m) => m.t === 'reported' || m.t === 'err')).toEqual([]);   // the person reported is told nothing (the room is shared, so other tests' chat may pass by)
     closeAll(a, b);
+  }, 30_000);
+});
+
+const STALE_MS = Number(process.env.ROOM_E2E_STALE_MS || 0);
+describe.skipIf(!BASE || !STALE_MS)('casino room: who is here (docs/plans/CASINO-WHO-IS-HERE-PLAN.md)', () => {
+  it('closes a connection that promised heartbeats and went quiet, frees its seat and tells the room; keeps the others', async () => {
+    const alice = await signIn(), bob = await signIn(), carol = await signIn();
+    const a = await join({ cookie: alice.cookie });      // promises heartbeats, then goes silent (a phone that locked)
+    const b = await join({ cookie: bob.cookie });        // sends heartbeats
+    const c = await join({ cookie: carol.cookie });      // an older page: never says `here`
+    expect(a.room.features).toEqual(expect.arrayContaining(['here']));
+    a.send({ t: 'here' }); b.send({ t: 'here' });
+    const sat = c.waitFor((m) => m.t === 'sat' && m.spot === 'blackjack.1');
+    await a.quiet(300); a.send({ t: 'sit', spot: 'blackjack.1' }); await sat;
+    // the heartbeat: a bare "ping", answered "pong" by the room without waking it
+    const pong = b.waitFor((m) => m.t === 'raw' && (m as any).text === 'pong');
+    b.ws.send('ping'); await pong;
+    const beat = setInterval(() => { try { b.ws.send('ping'); } catch { /* closed */ } }, Math.max(250, STALE_MS / 4));
+    try {
+      const stood = c.waitFor((m) => m.t === 'stood' && m.spot === 'blackjack.1', STALE_MS * 4 + 8000);
+      const left = c.waitFor((m) => m.t === 'leave' && m.a === alice.w.address, STALE_MS * 4 + 8000);
+      await stood; await left;
+      await a.quiet(500);
+      expect(a.closed.code).toBe(4002);
+      await a.quiet(STALE_MS * 2);
+      expect(b.closed.code).toBeUndefined();             // heartbeats keep a connection
+      expect(c.closed.code).toBeUndefined();             // a page without heartbeats is never closed this way
+      expect(seen(c, (m) => m.t === 'leave' && (m.a === bob.w.address || m.a === carol.w.address))).toEqual([]);
+    } finally { clearInterval(beat); closeAll(a, b, c); }
+  }, STALE_MS * 10 + 30_000);
+
+  it('away: stands the player up, tells everyone, lists them as away, and back again', async () => {
+    const bob = await signIn(), carol = await signIn();
+    const b = await join({ cookie: bob.cookie });
+    const c = await join({ cookie: carol.cookie });
+    const sat = c.waitFor((m) => m.t === 'sat' && m.spot === 'sicbo.1');
+    b.send({ t: 'sit', spot: 'sicbo.1' }); await sat;
+    const stood = c.waitFor((m) => m.t === 'stood' && m.spot === 'sicbo.1');
+    const away = c.waitFor((m) => m.t === 'away' && m.a === bob.w.address);
+    await b.quiet(1300);
+    b.send({ t: 'away', on: true });
+    await stood;
+    expect(await away).toMatchObject({ t: 'away', a: bob.w.address, on: true });
+    const late = await join();
+    expect((late.room.players as Array<{ a: string; aw?: boolean }>).find((p) => p.a === bob.w.address)?.aw).toBe(true);
+    const back = c.waitFor((m) => m.t === 'away' && m.a === bob.w.address && m.on === false);
+    await b.quiet(1300);
+    b.send({ t: 'away', on: false });
+    await back;
+    late.send({ t: 'away', on: true });
+    expect((await late.waitFor((m) => m.t === 'err')).code).toBe('away-sign-in-first');
+    closeAll(b, c, late);
   }, 30_000);
 });

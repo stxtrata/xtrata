@@ -290,3 +290,23 @@ The Salon (player-versus-player Hold'em and Liar's Dice, behind the arch) is for
 - **Deploy order:** this Worker first, then the Pages site. An older Worker ignores the headers; an older page ignores the rule.
 - Tests: `functions/lib/__tests__/casino-room-bns.test.ts`, `functions/__tests__/casino-room-bns-functions.test.ts`,
   `functions/lib/__tests__/casino-room-salon.test.ts`, and the Salon case in `functions/__tests__/casino-room-e2e.test.ts`.
+
+## Who is here (2026-11-03, docs/plans/CASINO-WHO-IS-HERE-PLAN.md)
+
+- **Heartbeats.** A client that sends `{t:'here'}` (room feature `here`) then sends a bare `ping` text every 30 s. The room
+  answers `pong` by itself without waking (`setWebSocketAutoResponse`) and keeps the time of the answer per connection.
+- **Gone quiet.** A connection that said `here` and has not been heard from for 90 s (no message, no answered ping) is closed
+  (code 4002) and handled like a normal leave: seat freed; `stood`, `leave` and the head count go out. The check runs whenever the
+  room is awake (at most every 15 s) and on an alarm every 60 s while anyone is connected (an empty room sets none, so it still
+  hibernates). Connections that never said `here` (older pages) are never closed this way. The Worker variable
+  `CASINO_ROOM_STALE_MS` shortens the 90 s for a test; leave it unset in production.
+- **Away.** `{t:'away', on}` from a signed-in player: `on` stands them up and marks them away; everyone who can see the room gets
+  `{t:'away', a, on}`, and `players` in the `room` message carries `aw: true`. A player counts as away only while every tab of
+  theirs is. Refusal: `away-sign-in-first`.
+- **The client** (room.js) sends the heartbeat; marks the player away after 20 minutes without a tap, key, step or spin (the page
+  stands them up, and everyone sees their tag go grey with "away"); leaves the room after 30 minutes idle or 5 minutes in the
+  background; and rejoins with the same session (no new signature) as soon as they are back. `?roomtimes=beat,hide,away,leave`
+  (milliseconds) shortens these for a test. The Room button shows the name you are in as; the Room panel shows "Connected as" and
+  Here now (everyone signed in and where they are; a tap opens their card).
+- Tests: `functions/lib/__tests__/casino-room-here.test.ts`, and the "who is here" cases in `functions/__tests__/casino-room-e2e.test.ts`
+  (they run when `ROOM_E2E_STALE_MS` is set to the Worker's `CASINO_ROOM_STALE_MS`, for example 3000).

@@ -27,6 +27,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   MAX_SOCKETS,
   ROOM_FEATURES,
+  applyAway,
   applyLeave,
   applyMove,
   applySit,
@@ -44,6 +45,9 @@ import {
   routeSay,
   setBlocks,
   shortAddress,
+  staleIds,
+  STALE_MS,
+  SWEEP_MS,
   takeChatRate,
   takeMoveRate,
   takePlayRate,
@@ -149,6 +153,44 @@ export class CasinoRoom extends DurableObject<Env> {
   /** When this in-memory instance was created. After a hibernation the constructor runs again, so a changed value in a
    *  pong shows the room slept and woke (the P0 idle test uses this). Nothing depends on it. */
   private readonly up = Date.now();
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    // Who is here (docs/plans/CASINO-WHO-IS-HERE-PLAN.md): a bare "ping" is answered "pong" without waking the room, and the
+    // time of the answer is kept per connection (getWebSocketAutoResponseTimestamp), so heartbeats cost nothing.
+    try { ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong')); } catch { /* a stand-in runtime (tests) */ }
+  }
+
+  // ------------------------------------------------------------------ who is here: closing connections that have gone quiet
+
+  private swept = 0;
+  /** STALE_MS, or the Worker variable CASINO_ROOM_STALE_MS for a test (normally unset). The check runs at least this often. */
+  private staleMs() { const n = Number(this.env.CASINO_ROOM_STALE_MS); return Number.isFinite(n) && n >= 1000 ? n : STALE_MS; }
+  private sweepMs() { return Math.min(SWEEP_MS, Math.max(1000, Math.floor(this.staleMs() / 2))); }
+  private autoAt(ws: WebSocket): number | null {
+    try { const d = this.ctx.getWebSocketAutoResponseTimestamp(ws); return d ? d.getTime() : null; } catch { return null; }
+  }
+  /** Closes every connection that promised heartbeats and has gone quiet (not `keep`, which just spoke), and frees its seat. */
+  private async sweep(now: number, keep?: WebSocket) {
+    this.swept = now;
+    const all = this.peers();
+    const stale = staleIds(all.filter((e) => e.ws !== keep).map(({ ws, peer }) => ({ id: peer.id, since: peer.since, hb: peer.hb, hd: peer.hd, auto: this.autoAt(ws) })), now, this.staleMs());
+    for (const id of stale) {
+      const e = all.find((x) => x.peer.id === id); if (!e) continue;
+      try { e.ws.serializeAttachment(null); } catch { /* closing already */ }     // out of every list from now on
+      try { e.ws.close(4002, 'quiet'); } catch { /* already closed */ }
+      await this.gone(e.ws, e.peer);
+    }
+  }
+  /** The once-a-minute check, only while someone is connected (an alarm wakes the room briefly; an empty room sets none). */
+  private async keepSweeping(now: number) {
+    try { if ((await this.ctx.storage.getAlarm()) == null) await this.ctx.storage.setAlarm(now + this.sweepMs()); } catch { /* a stand-in runtime (tests) */ }
+  }
+  async alarm() {
+    const now = Date.now();
+    await this.sweep(now);
+    if (this.peers().length) { try { await this.ctx.storage.setAlarm(now + this.sweepMs()); } catch { /* ignore */ } }
+  }
 
   /** Every open connection with its peer record. Rebuilt from attachments, so it is correct after hibernation. */
   private peers(): Array<{ ws: WebSocket; peer: Peer }> {
@@ -427,6 +469,7 @@ export class CasinoRoom extends DurableObject<Env> {
     const peer = newPeer(crypto.randomUUID(), address, hash160, now, watch, bns);
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment(peer);
+    void this.keepSweeping(now);
 
     // No address may hold more than two connections: the oldest extras are closed and their seats freed.
     const fresh = this.peers();   // includes the connection just accepted
@@ -513,10 +556,13 @@ export class CasinoRoom extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
+    const t0 = Date.now();
+    if (t0 - this.swept > 15_000) await this.sweep(t0, ws);       // who is here: anyone else gone quiet goes first
     const entries = this.peers();
     const mine = entries.find((e) => e.ws === ws);
     if (!mine) return;
     const now = Date.now();
+    mine.peer.hd = now;                                            // heard from (saved with the rest of this message's changes)
     const parsed = parseClientMessage(message);
     // A spin has its own limit and never counts against the general one, so autoplay cannot slow a player's seat or chat.
     if (parsed.ok && parsed.msg.t === 'play') {
@@ -605,6 +651,17 @@ export class CasinoRoom extends DurableObject<Env> {
         this.save([mine]);
         this.send(ws, { t: 'pong', at: now, up: this.up });
         return;
+      case 'here':
+        mine.peer.hb = true; this.save([mine]);
+        return;
+      case 'away': {
+        const r = applyAway(peers, mine.peer.id, parsed.msg.on);
+        this.save(entries);
+        if (!r.ok) { this.send(ws, { t: 'err', code: r.code }); return; }
+        this.announce(entries, r.changes);
+        this.deliver(entries, [{ message: r.message, to: r.to }]);
+        return;
+      }
       case 'hello': {
         this.save([mine]);
         this.send(ws, await this.welcome(peers, mine.peer, now));
@@ -770,10 +827,10 @@ export class CasinoRoom extends DurableObject<Env> {
     if (extra.length) await this.ctx.storage.delete(extra);
   }
 
-  private async gone(ws: WebSocket) {
+  private async gone(ws: WebSocket, known?: Peer) {
     const entries = this.peers().filter((e) => e.ws !== ws);
-    let peer: Peer | null = null;
-    try { peer = ws.deserializeAttachment() as Peer | null; } catch { /* nothing to free */ }
+    let peer: Peer | null = known || null;
+    if (!peer) try { peer = ws.deserializeAttachment() as Peer | null; } catch { /* nothing to free */ }
     if (peer) {
       const changes = applyLeave([peer], peer.id);
       this.announce(entries, changes);

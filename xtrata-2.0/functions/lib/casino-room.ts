@@ -60,7 +60,17 @@ export const MAX_REPORT_LINE_CHARS = 200;
  * (every machine picks them first, from its own reel strips), so a spin is a few numbers, not a picture.
  * The room only passes spins on: it never checks or stores a result, and nothing here moves money.
  */
-export const ROOM_FEATURES = ['play', 'move', 'salon-bns'] as const;
+export const ROOM_FEATURES = ['play', 'move', 'salon-bns', 'here'] as const;
+
+/**
+ * Who is here (docs/plans/CASINO-WHO-IS-HERE-PLAN.md). A client that says `here` sends a bare "ping" every 30 s, which the room
+ * answers without waking (Cloudflare's WebSocket auto-response). A connection that said `here` and has not been heard from for
+ * STALE_MS (a message or an answered ping) has gone without closing: the room closes it and frees its seat. Clients that never
+ * said `here` (older pages) are never closed this way. `away` marks a player who is idle on an open tab.
+ */
+export const STALE_MS = 90_000;
+export const SWEEP_MS = 60_000;
+
 /** Spins have their own limit, apart from RATE_LIMIT, so a player on turbo or autoplay never slows their seat updates or chat. */
 export const PLAY_MIN_GAP_MS = 400;
 export const PLAY_PER_MINUTE = 100;
@@ -111,6 +121,9 @@ export type Peer = {
   /** The Salon's rule (docs/plans/CASINO-SALON-BNS-PLAN.md): the primary BNS name read at sign-in (null: none) and whether it
    *  was checked (false: the lookup failed). From headers only the Pages Function sets. Missing on older connections = not checked. */
   bn?: string | null; bc?: boolean;
+  /** Who is here (STALE_MS above): `hb` the client sends heartbeats, `hd` when the room last heard from it, `aw` the player is away
+   *  (idle on an open tab: stood up, name tag grey). Optional: older connections lack them. */
+  hb?: boolean; hd?: number; aw?: boolean;
 };
 
 export const newPeer = (id: string, address: string | null, hash160: string | null, now: number, watch = true,
@@ -144,13 +157,31 @@ export const upgradePeer = (peer: Peer): Peer => {
   return peer;
 };
 
+/** Connections that said `here` but have gone quiet for longer than `limit`: their ids, to be closed. `auto` is when the room last
+ *  answered their heartbeat by itself (Cloudflare does not wake the room for it). */
+export const staleIds = (list: Array<{ id: string; since: number; hb?: boolean; hd?: number; auto?: number | null }>, now: number, limit = STALE_MS) =>
+  list.filter((p) => p.hb === true && now - Math.max(p.since, p.hd || 0, p.auto || 0) > limit).map((p) => p.id);
+
+/** The player's own `away` (idle) or back. Away stands them up (their seat or machine is freed); everyone who can see the room is
+ *  told, once per player, whether the player is away: only when every tab of theirs is. */
+export const applyAway = (peers: Peer[], meId: string, on: boolean) => {
+  const me = peers.find((p) => p.id === meId);
+  if (!me) return { ok: false as const, code: 'gone' };
+  if (!me.a) return { ok: false as const, code: 'away-sign-in-first' };
+  if (on) me.aw = true; else delete me.aw;
+  const changes = on ? applyStand(peers, meId) : [];
+  const mine = peers.filter((p) => p.a === me.a), away = mine.every((p) => p.aw === true);
+  const to = peers.filter((p) => canSee(p)).map((p) => p.id);
+  return { ok: true as const, changes, message: { t: 'away', a: me.a, on: away }, to };
+};
+
 /** SP3JNSEX...X743 style label from an on-chain address (P0 has no BNS lookup). */
 export const shortAddress = (address: string | null) =>
   !address ? 'Guest' : address.length <= 12 ? address : `${address.slice(0, 5)}…${address.slice(-4)}`;
 
 export type SpotView = { a: string; n: string; since: number };
 /** One signed-in person in the room, listed once however many tabs they have open; `spot` is where they sit, if anywhere. */
-export type PlayerView = { a: string; n: string; spot: string | null };
+export type PlayerView = { a: string; n: string; spot: string | null; aw?: boolean };
 /** A signed-in player standing or walking on the floor (not seated), once per address: their latest position. */
 export type WalkerView = { a: string; n: string; x: number; z: number; r: number; at: number };
 export type RoomView = { spots: Record<string, SpotView>; players: PlayerView[]; walkers: WalkerView[]; joined: number; guests: number };
@@ -164,8 +195,10 @@ export const deriveView = (peers: Peer[]): RoomView => {
   for (const peer of peers) {
     if (peer.a) joined += 1; else guests += 1;
     if (peer.a) {
-      const entry = players.get(peer.a) ?? { a: peer.a, n: shortAddress(peer.a), spot: null };
+      const seen = players.get(peer.a), entry = seen ?? { a: peer.a, n: shortAddress(peer.a), spot: null };
       if (peer.spot) entry.spot = peer.spot;
+      // away only while every tab of theirs is away (one live tab means they are here)
+      if (peer.aw && (!seen || seen.aw)) entry.aw = true; else delete entry.aw;
       players.set(peer.a, entry);
     }
     if (peer.a && peer.spot) spots[peer.spot] = { a: peer.a, n: shortAddress(peer.a), since: peer.since };
@@ -216,6 +249,9 @@ export type ClientMessage =
   | { t: 'sit'; spot: string }
   | { t: 'stand' }
   | { t: 'ping' }
+  /** This client sends heartbeats (see STALE_MS); `away`: the player is idle (on) or back (off). */
+  | { t: 'here' }
+  | { t: 'away'; on: boolean }
   /** `ch: 'table'`: only the people at the speaker's table (sitting there or watching it) hear it. */
   | { t: 'say'; text: string; ch?: 'table' }
   | { t: 'dm'; to: string; text: string }
@@ -241,6 +277,8 @@ export const parseClientMessage = (raw: unknown): ParseResult => {
   switch (value.t) {
     case 'hello': return { ok: true, msg: { t: 'hello' } };
     case 'ping': return { ok: true, msg: { t: 'ping' } };
+    case 'here': return { ok: true, msg: { t: 'here' } };
+    case 'away': return { ok: true, msg: { t: 'away', on: value.on === true } };
     case 'stand': return { ok: true, msg: { t: 'stand' } };
     case 'sit':
       return isSpot(value.spot) ? { ok: true, msg: { t: 'sit', spot: value.spot } } : { ok: false, code: 'no-such-spot' };
