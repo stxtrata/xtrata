@@ -184,6 +184,27 @@ It opens Xtrata Radio (`https://radio.xtrata.xyz/radio`, the one origin the list
 
 A future room type needs nothing here: it inherits the dock because the dock lives in the hall's own frame.
 
+## 4c. Framed games: a game that is its own inscription (games registry, kind 2)
+
+Not a room and not a cartridge: a game that already lives on chain as a page of its own, with its own engine, replays and score board (Astro Blaster 3, inscription #3075, is the first). The games contract takes it with `add-game(... kind u2 ...)`:
+
+| field | meaning for a framed game |
+|---|---|
+| `id` | also the NAME OF ITS SCORE BOARD (`astro3`): the cabinet's Top 10 reads exactly this board, highest score wins |
+| `code-id`, `code-hash`, `code-size` | the game's page. Not fetched when the hall starts: it is fetched (hash and size checked, `XAScores.getInscription`) when you walk up to the machine and again from cache when you play |
+| `title` | the cabinet's name |
+
+What the hall does with it: the game gets a cabinet like any other (one more machine, named by its title, with a generated attract screen and the Top 10 over it); playing it zooms in as usual, then frames the page full screen in a sandboxed frame (`allow-scripts allow-pointer-lock allow-downloads`, never same-origin, the same as a room) with **BACK TO THE ARCADE** above it. It has no `XA_ROOM` bridge. The hall does not replay or verify its runs (no WATCH / VERIFY buttons in High scores): its own replay format and the score contract do that.
+
+The game never signs. It speaks the two hand-offs it speaks on xtrata.xyz, and the hall answers only the open game's own window:
+
+- `xtrata:arcade:submit {id, payload}`: a finished run to post. The hall checks only the shape (board starts with the game's id, name 3-12 of `A-Za-z0-9 _.-`, positive whole score, replay is base64url under about 100 KB) and passes it up to the window above the hall (the Xtrata viewer: its review dialog, its wallet). The viewer's `submit-opened` / `submit-result {txId | cancelled | error}` come back under the game's own id. With no viewer above the hall (or one that does not answer within 4 s) the hall opens `xtrata.xyz/arcade/submit#p=…` in a tab, or shows a link if the browser blocks it.
+- `xtrata:wallet:hello` then `xtrata:wallet:request` with `method: "stx_requestAccounts"`: the pilot's address, from the wallet the hall is already connected to (connected on the spot if not). Any other method is refused. With no wallet reachable the hello is not answered and the game offers to paste an address.
+
+Tests: `tests/hall-framed.test.cjs`. Pre-flight before `add-game`: `contracts/arcade-world/ops/framed-check.mjs`.
+
+Limits worth knowing: the sandboxed page has no `localStorage` (a game that keeps settings there starts fresh each time), and cannot open tabs or use the clipboard; the hall's radio button steps aside while a framed game is open, like during any cabinet game.
+
 ## 5. A minimal room
 
 ```html

@@ -501,6 +501,32 @@
     });
   }
 
+  // A finished run of a framed game (a page of its own, such as Astro Blaster 3) handed up to the xtrata.xyz viewer, which shows its own review and signs.
+  // Resolves { txId } | { cancelled:true } | { error } | { noHost:true } (nobody above answered in time). Nothing is signed here.
+  function hasHost() { return bridgeTargets().length > 0; }
+  function submitLink(payload) {
+    return CFG.runtimeOrigin + '/arcade/submit#p=' + base64url(new TextEncoder().encode(JSON.stringify(payload)));
+  }
+  function relaySubmit(payload, onOpened) {
+    var targets = bridgeTargets();
+    if (!targets.length) return Promise.resolve({ noHost: true });
+    var id = 'xa-fr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    return new Promise(function (resolve) {
+      var opened = false;
+      var t0 = setTimeout(function () { if (!opened) { root.removeEventListener('message', onMsg); resolve({ noHost: true }); } }, 4000);
+      function onMsg(ev) {
+        var d = ev && ev.data;
+        if (!d || typeof d !== 'object' || d.id !== id || targets.indexOf(ev.source) < 0) return;
+        if (d.type === 'xtrata:arcade:submit-opened') { opened = true; clearTimeout(t0); if (onOpened) try { onOpened(); } catch (e) {} return; }
+        if (d.type !== 'xtrata:arcade:submit-result') return;
+        root.removeEventListener('message', onMsg); clearTimeout(t0);
+        resolve(d.txId ? { txId: String(d.txId) } : d.cancelled ? { cancelled: true } : { error: String(d.error || 'The score was not posted.') });
+      }
+      root.addEventListener('message', onMsg);
+      targets.forEach(function (t) { try { t.postMessage({ type: 'xtrata:arcade:submit', id: id, payload: payload }, '*'); } catch (e) {} });
+    });
+  }
+
   /* --------------------------------------------------- host bridge */
   var bridge = { token: '', hostOrigin: '', nonce: '', tries: 0, seq: 0, pending: {}, listening: false };
   function bridgeTargets() {
@@ -942,6 +968,9 @@
     connect: connect,
     disconnect: disconnect,
     submit: submit,
+    hasHost: hasHost,
+    relaySubmit: relaySubmit,
+    submitLink: submitLink,
     callContract: callContract,
     runtimeUrl: runtimeUrl,
     openRuntime: openRuntime,

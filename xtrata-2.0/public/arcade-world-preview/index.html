@@ -2086,6 +2086,32 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     });
   }
 
+  // A finished run of a framed game (a page of its own, such as Astro Blaster 3) handed up to the xtrata.xyz viewer, which shows its own review and signs.
+  // Resolves { txId } | { cancelled:true } | { error } | { noHost:true } (nobody above answered in time). Nothing is signed here.
+  function hasHost() { return bridgeTargets().length > 0; }
+  function submitLink(payload) {
+    return CFG.runtimeOrigin + '/arcade/submit#p=' + base64url(new TextEncoder().encode(JSON.stringify(payload)));
+  }
+  function relaySubmit(payload, onOpened) {
+    var targets = bridgeTargets();
+    if (!targets.length) return Promise.resolve({ noHost: true });
+    var id = 'xa-fr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    return new Promise(function (resolve) {
+      var opened = false;
+      var t0 = setTimeout(function () { if (!opened) { root.removeEventListener('message', onMsg); resolve({ noHost: true }); } }, 4000);
+      function onMsg(ev) {
+        var d = ev && ev.data;
+        if (!d || typeof d !== 'object' || d.id !== id || targets.indexOf(ev.source) < 0) return;
+        if (d.type === 'xtrata:arcade:submit-opened') { opened = true; clearTimeout(t0); if (onOpened) try { onOpened(); } catch (e) {} return; }
+        if (d.type !== 'xtrata:arcade:submit-result') return;
+        root.removeEventListener('message', onMsg); clearTimeout(t0);
+        resolve(d.txId ? { txId: String(d.txId) } : d.cancelled ? { cancelled: true } : { error: String(d.error || 'The score was not posted.') });
+      }
+      root.addEventListener('message', onMsg);
+      targets.forEach(function (t) { try { t.postMessage({ type: 'xtrata:arcade:submit', id: id, payload: payload }, '*'); } catch (e) {} });
+    });
+  }
+
   /* --------------------------------------------------- host bridge */
   var bridge = { token: '', hostOrigin: '', nonce: '', tries: 0, seq: 0, pending: {}, listening: false };
   function bridgeTargets() {
@@ -2527,6 +2553,9 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     connect: connect,
     disconnect: disconnect,
     submit: submit,
+    hasHost: hasHost,
+    relaySubmit: relaySubmit,
+    submitLink: submitLink,
     callContract: callContract,
     runtimeUrl: runtimeUrl,
     openRuntime: openRuntime,
@@ -3423,7 +3452,7 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
         h('span', { class: 'xa-rank', text: '#' + e.rank }),
         h('span', { class: 'xa-who' }, [h('b', { text: e.name }), h('small', { text: S.shortAddress(e.player) + (you ? ' · you' : '') })]),
         h('span', { class: 'xa-pts', text: fmtVal(mode, e.score) }),
-        game ? h('span', { class: 'xa-tools' }, [watchButton(game, mode, e), saveButton(game, mode, e), verifyButton(game, mode, e)]) : null
+        game && !game.framed ? h('span', { class: 'xa-tools' }, [watchButton(game, mode, e), saveButton(game, mode, e), verifyButton(game, mode, e)]) : null
       ]);
     }));
   }
@@ -3467,6 +3496,7 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     closeModal();
     var game = XA.games.filter(function (g) { return g.id === id; })[0];
     if (!game) return;
+    if (game.framed) { openInfo(game.title, game.title + ' is played in a window of its own, which only the 3D hall can open. Walk up to its cabinet in the hall to play it.'); return; }
     var variant = variantOf(game, variantKey);
     var mode = variant ? variant.mode : game.mode;
     endSession(true);
@@ -31412,6 +31442,8 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
   if (root.XAGamesRegistry) return;
 
   var KIND_CARTRIDGE = 1;
+  var KIND_FRAMED = 2;                // a game that is its own page (an inscription): the hall gives it a cabinet and frames it when played
+  var FRAMED_CAP = 16 * 1024 * 1024;  // the same limit as a room page
   var MAX_ADDED = 64;                 // the contract's own cap; also a safety bound here
   var TIME_LIMIT_MS = 20000;          // the whole load, after which the hall starts with what it has
   var ID_OK = /^[a-z0-9_]{3,24}$/;
@@ -31460,6 +31492,48 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     return true;
   }
 
+  // The cabinet's neon colours, by game number, so every framed game looks different without anything else on chain.
+  var COLOURS = ['#3be4ff', '#ff5cf0', '#ffb347', '#7dffb2', '#ff6b6b', '#a78bfa'];
+
+  // A framed game is registered like any other game (so it gets a cabinet, a Top 10 on its screen, a place in the High scores list)
+  // but it has no script of its own: def.framed says which inscription to frame, and the hall does the rest.
+  function registerFramed(g) {
+    var XA = root.XA;
+    var color = COLOURS[g.n % COLOURS.length];
+    var title = g.title || g.id;
+    try {
+      XA.registerGame({
+        id: g.id, order: 1000 + g.n, title: title, tagline: 'Played straight from the chain', color: color,
+        size: { w: 320, h: 240 }, controls: 'Opens the original game',
+        framed: { id: g.codeId, hash: g.codeHash, size: g.codeSize },
+        create: function () { throw new Error('a framed game is played in its own frame'); },
+        attract: function (ctx, w, h, t) { drawFramedAttract(ctx, t || 0, w || 320, h || 240, title, color, g.codeId); }
+      });
+    } catch (e) { return false; }
+    return XA.games.some(function (x) { return x.id === g.id; });
+  }
+
+  // What a framed game's cabinet shows when nobody is playing: its name over a moving star field.
+  function drawFramedAttract(ctx, t, w, h, title, color, codeId) {
+    ctx.save();
+    ctx.fillStyle = '#05040f'; ctx.fillRect(0, 0, w, h);
+    for (var i = 0; i < 46; i++) {
+      var sp = 14 + (i * 37) % 60, x = (i * 97.3) % w, y = ((i * 53.7) + t * sp) % h;
+      ctx.globalAlpha = 0.25 + ((i * 13) % 7) / 10; ctx.fillStyle = i % 5 === 0 ? color : '#dfe8ff';
+      ctx.fillRect(x, y, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 2 : 1);
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    var size = Math.max(14, Math.min(h * 0.16, w * 1.5 / Math.max(6, String(title).length)));
+    ctx.font = 'bold ' + Math.round(size) + 'px Bungee, Impact, sans-serif';
+    ctx.shadowColor = color; ctx.shadowBlur = 18; ctx.fillStyle = color;
+    ctx.fillText(String(title).toUpperCase(), w / 2, h * 0.44);
+    ctx.shadowBlur = 0; ctx.fillStyle = '#e8e2ff'; ctx.font = Math.round(h * 0.075) + 'px VT323, monospace';
+    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 3.1);
+    ctx.fillText('PRESS START', w / 2, h * 0.64);
+    ctx.globalAlpha = 0.55; ctx.fillText('INSCRIPTION #' + codeId, w / 2, h * 0.86);
+    ctx.restore();
+  }
+
   async function load() {
     var cfg = root.XA_GAMES_CONFIG;
     if (!cfg || !cfg.contract) return state;              // off: the hall is exactly the built-in 21
@@ -31489,12 +31563,21 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
       var wanted = games.filter(function (g) {
         if (g.hidden) { skip(g.id, 'hidden'); return false; }
         if (!(g.liveAt <= height)) { skip(g.id, 'not live yet'); return false; }
-        if (g.kind !== KIND_CARTRIDGE) { skip(g.id, 'unknown kind'); return false; }
+        if (g.kind !== KIND_CARTRIDGE && g.kind !== KIND_FRAMED) { skip(g.id, 'unknown kind'); return false; }
+        if (g.kind === KIND_FRAMED && !(g.codeSize > 0 && g.codeSize <= FRAMED_CAP)) { skip(g.id, 'too big to frame'); return false; }
         if (!(g.engineMin <= (R.ENGINE || 1))) { skip(g.id, 'needs a newer engine'); return false; }
         if (!ID_OK.test(g.id)) { skip(g.id, 'invalid id'); return false; }
         if (XA.games.some(function (x) { return x.id === g.id; }) || R.GAME_IDS.indexOf(g.id) >= 0 && R.GAME_IDS.indexOf(g.id) < (R.BUILT_IN || 21)) { skip(g.id, 'built-in id'); return false; }
         if (!g.codeHash || g.codeHash.length !== 32) { skip(g.id, 'bad hash'); return false; }
         return true;
+      });
+      // A framed game is not run here: it gets a cabinet now and its page is fetched (and checked) only when someone plays it.
+      var framed = wanted.filter(function (g) { return g.kind === KIND_FRAMED; });
+      wanted = wanted.filter(function (g) { return g.kind === KIND_CARTRIDGE; });
+      framed.forEach(function (g) {
+        if (closed) return;
+        if (!registerFramed(g)) { skip(g.id, 'could not make a cabinet'); return; }
+        state.loaded.push(g.id);
       });
       // Fetch every cartridge at once (gateway first, chain as fallback; the bytes must match the contract's hash).
       var fetched = await Promise.all(wanted.map(function (g) {
@@ -38350,6 +38433,7 @@ function startGame(i, vkey){
 
 function openGame(i, vkey){
   state='play'; for(const k in keys) keys[k]=false;
+  if(GAMES[i].def.framed){ try{ openFramed(i) }catch(e){ console.error(e); exitFramed(); return } requestAnimationFrame(()=>{ $('flash').style.opacity=0 }); return }
   try{ XARoom.start(GAMES[i].id, vkey) }
   catch(e){ console.error(e); exitGame(); return }
   requestAnimationFrame(()=>{ $('flash').style.opacity=0 });
@@ -38368,6 +38452,138 @@ function exitGame(){
   tween={fromP:zoomTarget.to.clone(), fromQ:zoomTarget.toQ.clone(), toP:saved.pos, toQ:saved.quat, t:.05, dur:.9, fadeAt:99, faded:true,
     done:()=>{ state='walk'; activeIdx=-1; updateHud() }};
 }
+
+/* ---------- framed games (games registry, kind 2): a game that is its own page ----------
+   Some games already live on chain as a page of their own (Astro Blaster 3 is inscription #3075) and keep their own engine, replays and
+   score boards. The registry gives such a game a cabinet (its Top 10 on the screen like any other machine); playing it zooms into the
+   machine as usual and then FRAMES the game's inscription: fetched by id, checked against its chain hash and size (XAScores.getInscription),
+   and put in a sandboxed frame (allow-scripts allow-pointer-lock allow-downloads, never allow-same-origin) full screen, with BACK above it.
+   The game never signs anything and never sees the hall: it speaks the same two small hand-offs it speaks on xtrata.xyz, and the hall answers:
+     xtrata:arcade:submit   a finished run to post -> passed up to the Xtrata viewer (its own review dialog and wallet), or, with no viewer above
+                            the hall, opened as the xtrata.xyz /arcade/submit page. The hall checks the shape of the payload, nothing more.
+     xtrata:wallet:hello / request (stx_requestAccounts)   the pilot's address, only: from the wallet the hall is already connected to.
+   Messages are taken only from the open game's own window. */
+let fr=null;                                          // the open framed game: { i, def, frame, token }
+const framedCache=new Map();                          // game id -> Promise<html> (a failed fetch is forgotten, so the next try reads again)
+function framedHtml(def){
+  let p=framedCache.get(def.id);
+  if(p) return p;
+  const F=def.framed, S=window.XAScores;
+  p=Promise.resolve().then(async()=>{
+    if(!S || !S.getInscription) throw new Error('no reader');
+    if(!(F.size>0) || F.size>ROOM_CAP) throw new Error('too big to open here');
+    const bytes=await S.getInscription(F.id, F.hash);
+    if(!bytes || bytes.length!==F.size) throw new Error('the game is not the size the contract says');
+    return new TextDecoder('utf-8').decode(bytes);
+  });
+  p.catch(()=>{ if(framedCache.get(def.id)===p) framedCache.delete(def.id) });
+  framedCache.set(def.id,p);
+  return p;
+}
+let framedUI=null;
+function framedEls(){
+  if(framedUI) return framedUI;
+  const mk=(tag,css)=>{ const e=document.createElement(tag); e.style.cssText=css; return e };
+  const load=mk('div','position:fixed;inset:0;z-index:8100;background:radial-gradient(ellipse at 50% 40%,#1b1233,#05040a 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#e8e2ff;text-align:center');
+  load.innerHTML='<div class="fr-t" style="font:34px Bungee,Impact,sans-serif;letter-spacing:.08em;color:#3be4ff;text-shadow:0 0 18px rgba(60,230,255,.5)"></div><div class="fr-s" style="font:16px VT323,monospace;letter-spacing:.14em;opacity:.8"></div>';
+  const back=mk('button','position:fixed;top:max(10px,env(safe-area-inset-top));left:10px;z-index:9500;display:none;padding:7px 14px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer');
+  back.type='button'; back.id='xa-framed-back'; back.textContent='← BACK TO THE ARCADE';
+  back.addEventListener('click',e=>{ e.stopPropagation(); exitFramed() });
+  const note=mk('div','position:fixed;bottom:max(14px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:9500;display:none;max-width:min(92vw,560px);padding:8px 14px;font:15px VT323,monospace;letter-spacing:.1em;color:#ffd7a0;background:rgba(10,12,24,.94);border:1px solid #8a5a3b;border-radius:8px;text-align:center');
+  document.body.append(load,back,note);
+  framedUI={load,back,note,title:load.querySelector('.fr-t'),sub:load.querySelector('.fr-s')};
+  return framedUI;
+}
+function framedNote(text,link,ms){
+  const U=framedEls(); U.note.textContent='';
+  U.note.append(document.createTextNode(text));
+  if(link){ const a=document.createElement('a'); a.href=link; a.target='_blank'; a.rel='noopener'; a.textContent=' OPEN THE SUBMIT PAGE ↗'; a.style.cssText='color:#7dffb2;margin-left:8px'; U.note.append(a) }
+  U.note.style.display='block'; clearTimeout(framedNote.t); framedNote.t=setTimeout(()=>{ U.note.style.display='none' },ms||12000);
+}
+function framedPost(msg){ try{ if(fr && fr.frame && fr.frame.contentWindow) fr.frame.contentWindow.postMessage(msg,'*') }catch(e){} }
+function openFramed(i){
+  const g=GAMES[i], def=g.def, U=framedEls();
+  U.title.textContent=g.title; U.sub.textContent='OPENING THE GAME…'; U.load.style.display='flex'; U.back.style.display='block'; U.note.style.display='none';
+  const f=document.createElement('iframe'); f.title=g.title; f.setAttribute('sandbox',ROOM_SANDBOX); f.dataset.xaFramed=def.id; f.setAttribute('allow','autoplay; fullscreen');
+  f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden';
+  fr={i,def,frame:f,token:'xaf-'+Math.random().toString(36).slice(2)+Date.now().toString(36)};
+  document.body.appendChild(f);
+  const mine=fr;
+  framedHtml(def).then(html=>{
+    if(fr!==mine) return;                             // left while it was loading
+    f.addEventListener('load',()=>{ if(fr!==mine) return; f.dataset.loaded='1'; f.style.visibility='visible'; U.load.style.display='none'; try{ f.focus() }catch(e){} });
+    f.srcdoc=html;
+  }).catch(e=>{
+    if(fr!==mine) return;
+    f.dataset.failed='1'; f.dataset.why=String(e&&e.message||e||'');
+    U.sub.textContent='COULD NOT OPEN THE GAME · '+String(e&&e.message||e||'').toUpperCase().slice(0,60)+' · GO BACK AND TRY AGAIN';
+  });
+}
+function exitFramed(){
+  if(!fr) return;
+  const f=fr.frame; fr=null;
+  try{ f.src='about:blank' }catch(e){} f.remove();   // (about:blank first: removing the node alone can leave the game's audio running in some browsers)
+  const U=framedEls(); U.load.style.display='none'; U.back.style.display='none'; U.note.style.display='none';
+  exitGame();
+}
+// what the hall passes up to the viewer for a run to post; the viewer shows its own review, replays the run, and signs
+const FRAMED_ID=/^[A-Za-z0-9_-]{1,64}$/;
+function framedPayloadOk(def,pl){
+  if(!pl || typeof pl!=='object' || Array.isArray(pl)) return false;
+  const board=pl.board;
+  if(typeof board!=='string' || !/^[a-z0-9_-]{3,24}$/.test(board) || board.indexOf(def.id)!==0) return false;
+  if(!Number.isSafeInteger(pl.score) || pl.score<=0) return false;
+  if(typeof pl.name!=='string' || !/^[A-Za-z0-9 _.-]{3,12}$/.test(pl.name)) return false;
+  if(typeof pl.replay!=='string' || !/^[A-Za-z0-9_-]{8,}$/.test(pl.replay) || pl.replay.length>140000) return false;
+  return true;
+}
+function framedSubmit(id,pl){
+  if(!fr) return;
+  const mine=fr, S=window.XAScores;
+  if(!FRAMED_ID.test(id) || !framedPayloadOk(mine.def,pl)){ framedPost({type:'xtrata:arcade:submit-result', id, error:'This score could not be read.'}); return }
+  if(mine.sending){ framedPost({type:'xtrata:arcade:submit-result', id, error:'A score submission is already waiting for you.'}); return }
+  const link=S && S.submitLink ? S.submitLink(pl) : '';
+  const viaTab=()=>{                                  // no viewer above the hall: the xtrata.xyz submit page, in a tab
+    if(!link){ framedPost({type:'xtrata:arcade:submit-result', id, error:'This arcade cannot post scores from here.'}); return }
+    let w=null; try{ w=window.open(link,'_blank','noopener') }catch(e){ w=null }
+    framedPost({type:'xtrata:arcade:submit-opened', id});
+    if(!w) framedNote('Your browser blocked the new tab.', link, 20000);
+    else framedNote('The submit page opened in a new tab. Confirm there with your wallet.', link, 12000);
+  };
+  if(!S || !S.relaySubmit || !S.hasHost || !S.hasHost()){ viaTab(); return }
+  mine.sending=true;
+  S.relaySubmit(pl, ()=>framedPost({type:'xtrata:arcade:submit-opened', id})).then(r=>{
+    mine.sending=false;
+    if(fr!==mine) return;
+    if(r.txId) framedPost({type:'xtrata:arcade:submit-result', id, txId:r.txId});
+    else if(r.cancelled) framedPost({type:'xtrata:arcade:submit-result', id, cancelled:true});
+    else if(r.error) framedPost({type:'xtrata:arcade:submit-result', id, error:String(r.error).slice(0,200)});
+    else viaTab();                                    // the viewer never answered
+  });
+}
+function framedWallet(d){
+  const S=window.XAScores;
+  if(d.type==='xtrata:wallet:hello'){
+    if(typeof d.nonce!=='string' || d.nonce.length>80 || !S || !S.status || S.status().route==='none') return;   // no wallet reachable: say nothing, and the game offers to paste an address
+    framedPost({type:'xtrata:wallet:hello-ack', nonce:d.nonce, bridgeToken:fr.token});
+    return;
+  }
+  if(typeof d.requestId!=='string' || d.requestId.length>80 || d.bridgeToken!==fr.token) return;
+  const reply=(o)=>framedPost(Object.assign({type:'xtrata:wallet:response', requestId:d.requestId}, o));
+  if(d.method!=='stx_requestAccounts'){ reply({ok:false, error:{message:'This arcade shares the wallet address only.'}}); return }
+  const mine=fr;
+  Promise.resolve().then(async()=>{ const st=S.status(); return st.address || await S.connect() })
+    .then(a=>{ if(fr===mine) reply(a?{ok:true, result:{address:a}}:{ok:false, error:{message:'No wallet address.'}}) },
+          e=>{ if(fr===mine) reply({ok:false, error:{message:String(e&&e.message||'Wallet request refused.').slice(0,160)}}) });
+}
+window.addEventListener('message',e=>{
+  const d=e.data;
+  if(!fr || !fr.frame || e.source!==fr.frame.contentWindow || !d || typeof d!=='object' || typeof d.type!=='string') return;
+  if(d.type==='xtrata:arcade:submit') framedSubmit(d.id,d.payload);
+  else if(d.type==='xtrata:wallet:hello' || d.type==='xtrata:wallet:request') framedWallet(d);
+});
+if(window.XA_TEST) XA.framedState=()=>fr?{open:true, id:fr.def.id, loaded:fr.frame.dataset.loaded==='1', failed:fr.frame.dataset.failed==='1', why:fr.frame.dataset.why||'', sandbox:fr.frame.getAttribute('sandbox'), back:framedEls().back.style.display!=='none', note:framedEls().note.textContent}:{open:false};   // tests only
+
 window.XA_CONFIG = window.XA_CONFIG || {};
 window.XA_CONFIG.onExit = exitGame;
 
@@ -38818,7 +39034,7 @@ function frame(now){
     camera.rotation.set(player.pitch, player.yaw, 0);
     if(state==='intro') player.yaw = Math.sin(time*.15)*.18;
   }
-  if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud() } updatePosterFocus() }
+  if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud(); if(f>=0 && GAMES[f].def.framed) framedHtml(GAMES[f].def).catch(()=>{}) } updatePosterFocus() }   // a framed game's page is fetched as you walk up to its machine
   if(state==='walk' || state==='intro') tickCentreScreen();
 
   if(tween){

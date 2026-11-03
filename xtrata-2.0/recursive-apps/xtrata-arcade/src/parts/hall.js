@@ -2602,6 +2602,7 @@ function startGame(i, vkey){
 
 function openGame(i, vkey){
   state='play'; for(const k in keys) keys[k]=false;
+  if(GAMES[i].def.framed){ try{ openFramed(i) }catch(e){ console.error(e); exitFramed(); return } requestAnimationFrame(()=>{ $('flash').style.opacity=0 }); return }
   try{ XARoom.start(GAMES[i].id, vkey) }
   catch(e){ console.error(e); exitGame(); return }
   requestAnimationFrame(()=>{ $('flash').style.opacity=0 });
@@ -2620,6 +2621,138 @@ function exitGame(){
   tween={fromP:zoomTarget.to.clone(), fromQ:zoomTarget.toQ.clone(), toP:saved.pos, toQ:saved.quat, t:.05, dur:.9, fadeAt:99, faded:true,
     done:()=>{ state='walk'; activeIdx=-1; updateHud() }};
 }
+
+/* ---------- framed games (games registry, kind 2): a game that is its own page ----------
+   Some games already live on chain as a page of their own (Astro Blaster 3 is inscription #3075) and keep their own engine, replays and
+   score boards. The registry gives such a game a cabinet (its Top 10 on the screen like any other machine); playing it zooms into the
+   machine as usual and then FRAMES the game's inscription: fetched by id, checked against its chain hash and size (XAScores.getInscription),
+   and put in a sandboxed frame (allow-scripts allow-pointer-lock allow-downloads, never allow-same-origin) full screen, with BACK above it.
+   The game never signs anything and never sees the hall: it speaks the same two small hand-offs it speaks on xtrata.xyz, and the hall answers:
+     xtrata:arcade:submit   a finished run to post -> passed up to the Xtrata viewer (its own review dialog and wallet), or, with no viewer above
+                            the hall, opened as the xtrata.xyz /arcade/submit page. The hall checks the shape of the payload, nothing more.
+     xtrata:wallet:hello / request (stx_requestAccounts)   the pilot's address, only: from the wallet the hall is already connected to.
+   Messages are taken only from the open game's own window. */
+let fr=null;                                          // the open framed game: { i, def, frame, token }
+const framedCache=new Map();                          // game id -> Promise<html> (a failed fetch is forgotten, so the next try reads again)
+function framedHtml(def){
+  let p=framedCache.get(def.id);
+  if(p) return p;
+  const F=def.framed, S=window.XAScores;
+  p=Promise.resolve().then(async()=>{
+    if(!S || !S.getInscription) throw new Error('no reader');
+    if(!(F.size>0) || F.size>ROOM_CAP) throw new Error('too big to open here');
+    const bytes=await S.getInscription(F.id, F.hash);
+    if(!bytes || bytes.length!==F.size) throw new Error('the game is not the size the contract says');
+    return new TextDecoder('utf-8').decode(bytes);
+  });
+  p.catch(()=>{ if(framedCache.get(def.id)===p) framedCache.delete(def.id) });
+  framedCache.set(def.id,p);
+  return p;
+}
+let framedUI=null;
+function framedEls(){
+  if(framedUI) return framedUI;
+  const mk=(tag,css)=>{ const e=document.createElement(tag); e.style.cssText=css; return e };
+  const load=mk('div','position:fixed;inset:0;z-index:8100;background:radial-gradient(ellipse at 50% 40%,#1b1233,#05040a 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#e8e2ff;text-align:center');
+  load.innerHTML='<div class="fr-t" style="font:34px Bungee,Impact,sans-serif;letter-spacing:.08em;color:#3be4ff;text-shadow:0 0 18px rgba(60,230,255,.5)"></div><div class="fr-s" style="font:16px VT323,monospace;letter-spacing:.14em;opacity:.8"></div>';
+  const back=mk('button','position:fixed;top:max(10px,env(safe-area-inset-top));left:10px;z-index:9500;display:none;padding:7px 14px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer');
+  back.type='button'; back.id='xa-framed-back'; back.textContent='← BACK TO THE ARCADE';
+  back.addEventListener('click',e=>{ e.stopPropagation(); exitFramed() });
+  const note=mk('div','position:fixed;bottom:max(14px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:9500;display:none;max-width:min(92vw,560px);padding:8px 14px;font:15px VT323,monospace;letter-spacing:.1em;color:#ffd7a0;background:rgba(10,12,24,.94);border:1px solid #8a5a3b;border-radius:8px;text-align:center');
+  document.body.append(load,back,note);
+  framedUI={load,back,note,title:load.querySelector('.fr-t'),sub:load.querySelector('.fr-s')};
+  return framedUI;
+}
+function framedNote(text,link,ms){
+  const U=framedEls(); U.note.textContent='';
+  U.note.append(document.createTextNode(text));
+  if(link){ const a=document.createElement('a'); a.href=link; a.target='_blank'; a.rel='noopener'; a.textContent=' OPEN THE SUBMIT PAGE ↗'; a.style.cssText='color:#7dffb2;margin-left:8px'; U.note.append(a) }
+  U.note.style.display='block'; clearTimeout(framedNote.t); framedNote.t=setTimeout(()=>{ U.note.style.display='none' },ms||12000);
+}
+function framedPost(msg){ try{ if(fr && fr.frame && fr.frame.contentWindow) fr.frame.contentWindow.postMessage(msg,'*') }catch(e){} }
+function openFramed(i){
+  const g=GAMES[i], def=g.def, U=framedEls();
+  U.title.textContent=g.title; U.sub.textContent='OPENING THE GAME…'; U.load.style.display='flex'; U.back.style.display='block'; U.note.style.display='none';
+  const f=document.createElement('iframe'); f.title=g.title; f.setAttribute('sandbox',ROOM_SANDBOX); f.dataset.xaFramed=def.id; f.setAttribute('allow','autoplay; fullscreen');
+  f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden';
+  fr={i,def,frame:f,token:'xaf-'+Math.random().toString(36).slice(2)+Date.now().toString(36)};
+  document.body.appendChild(f);
+  const mine=fr;
+  framedHtml(def).then(html=>{
+    if(fr!==mine) return;                             // left while it was loading
+    f.addEventListener('load',()=>{ if(fr!==mine) return; f.dataset.loaded='1'; f.style.visibility='visible'; U.load.style.display='none'; try{ f.focus() }catch(e){} });
+    f.srcdoc=html;
+  }).catch(e=>{
+    if(fr!==mine) return;
+    f.dataset.failed='1'; f.dataset.why=String(e&&e.message||e||'');
+    U.sub.textContent='COULD NOT OPEN THE GAME · '+String(e&&e.message||e||'').toUpperCase().slice(0,60)+' · GO BACK AND TRY AGAIN';
+  });
+}
+function exitFramed(){
+  if(!fr) return;
+  const f=fr.frame; fr=null;
+  try{ f.src='about:blank' }catch(e){} f.remove();   // (about:blank first: removing the node alone can leave the game's audio running in some browsers)
+  const U=framedEls(); U.load.style.display='none'; U.back.style.display='none'; U.note.style.display='none';
+  exitGame();
+}
+// what the hall passes up to the viewer for a run to post; the viewer shows its own review, replays the run, and signs
+const FRAMED_ID=/^[A-Za-z0-9_-]{1,64}$/;
+function framedPayloadOk(def,pl){
+  if(!pl || typeof pl!=='object' || Array.isArray(pl)) return false;
+  const board=pl.board;
+  if(typeof board!=='string' || !/^[a-z0-9_-]{3,24}$/.test(board) || board.indexOf(def.id)!==0) return false;
+  if(!Number.isSafeInteger(pl.score) || pl.score<=0) return false;
+  if(typeof pl.name!=='string' || !/^[A-Za-z0-9 _.-]{3,12}$/.test(pl.name)) return false;
+  if(typeof pl.replay!=='string' || !/^[A-Za-z0-9_-]{8,}$/.test(pl.replay) || pl.replay.length>140000) return false;
+  return true;
+}
+function framedSubmit(id,pl){
+  if(!fr) return;
+  const mine=fr, S=window.XAScores;
+  if(!FRAMED_ID.test(id) || !framedPayloadOk(mine.def,pl)){ framedPost({type:'xtrata:arcade:submit-result', id, error:'This score could not be read.'}); return }
+  if(mine.sending){ framedPost({type:'xtrata:arcade:submit-result', id, error:'A score submission is already waiting for you.'}); return }
+  const link=S && S.submitLink ? S.submitLink(pl) : '';
+  const viaTab=()=>{                                  // no viewer above the hall: the xtrata.xyz submit page, in a tab
+    if(!link){ framedPost({type:'xtrata:arcade:submit-result', id, error:'This arcade cannot post scores from here.'}); return }
+    let w=null; try{ w=window.open(link,'_blank','noopener') }catch(e){ w=null }
+    framedPost({type:'xtrata:arcade:submit-opened', id});
+    if(!w) framedNote('Your browser blocked the new tab.', link, 20000);
+    else framedNote('The submit page opened in a new tab. Confirm there with your wallet.', link, 12000);
+  };
+  if(!S || !S.relaySubmit || !S.hasHost || !S.hasHost()){ viaTab(); return }
+  mine.sending=true;
+  S.relaySubmit(pl, ()=>framedPost({type:'xtrata:arcade:submit-opened', id})).then(r=>{
+    mine.sending=false;
+    if(fr!==mine) return;
+    if(r.txId) framedPost({type:'xtrata:arcade:submit-result', id, txId:r.txId});
+    else if(r.cancelled) framedPost({type:'xtrata:arcade:submit-result', id, cancelled:true});
+    else if(r.error) framedPost({type:'xtrata:arcade:submit-result', id, error:String(r.error).slice(0,200)});
+    else viaTab();                                    // the viewer never answered
+  });
+}
+function framedWallet(d){
+  const S=window.XAScores;
+  if(d.type==='xtrata:wallet:hello'){
+    if(typeof d.nonce!=='string' || d.nonce.length>80 || !S || !S.status || S.status().route==='none') return;   // no wallet reachable: say nothing, and the game offers to paste an address
+    framedPost({type:'xtrata:wallet:hello-ack', nonce:d.nonce, bridgeToken:fr.token});
+    return;
+  }
+  if(typeof d.requestId!=='string' || d.requestId.length>80 || d.bridgeToken!==fr.token) return;
+  const reply=(o)=>framedPost(Object.assign({type:'xtrata:wallet:response', requestId:d.requestId}, o));
+  if(d.method!=='stx_requestAccounts'){ reply({ok:false, error:{message:'This arcade shares the wallet address only.'}}); return }
+  const mine=fr;
+  Promise.resolve().then(async()=>{ const st=S.status(); return st.address || await S.connect() })
+    .then(a=>{ if(fr===mine) reply(a?{ok:true, result:{address:a}}:{ok:false, error:{message:'No wallet address.'}}) },
+          e=>{ if(fr===mine) reply({ok:false, error:{message:String(e&&e.message||'Wallet request refused.').slice(0,160)}}) });
+}
+window.addEventListener('message',e=>{
+  const d=e.data;
+  if(!fr || !fr.frame || e.source!==fr.frame.contentWindow || !d || typeof d!=='object' || typeof d.type!=='string') return;
+  if(d.type==='xtrata:arcade:submit') framedSubmit(d.id,d.payload);
+  else if(d.type==='xtrata:wallet:hello' || d.type==='xtrata:wallet:request') framedWallet(d);
+});
+if(window.XA_TEST) XA.framedState=()=>fr?{open:true, id:fr.def.id, loaded:fr.frame.dataset.loaded==='1', failed:fr.frame.dataset.failed==='1', why:fr.frame.dataset.why||'', sandbox:fr.frame.getAttribute('sandbox'), back:framedEls().back.style.display!=='none', note:framedEls().note.textContent}:{open:false};   // tests only
+
 window.XA_CONFIG = window.XA_CONFIG || {};
 window.XA_CONFIG.onExit = exitGame;
 
@@ -3070,7 +3203,7 @@ function frame(now){
     camera.rotation.set(player.pitch, player.yaw, 0);
     if(state==='intro') player.yaw = Math.sin(time*.15)*.18;
   }
-  if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud() } updatePosterFocus() }
+  if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud(); if(f>=0 && GAMES[f].def.framed) framedHtml(GAMES[f].def).catch(()=>{}) } updatePosterFocus() }   // a framed game's page is fetched as you walk up to its machine
   if(state==='walk' || state==='intro') tickCentreScreen();
 
   if(tween){
