@@ -1941,7 +1941,24 @@ function skinTex(src){
   return t;
 }
 function skinMat(t, glow){ return new THREE.MeshStandardMaterial({map:t, emissive:0xffffff, emissiveMap:t, emissiveIntensity:glow==null?.35:glow, roughness:.55}) }
+/* A game with a hand-built cabinet model (window.XA_CAB3D[game id], a part of the hall such as cabinet-astro3.js) stands that model in its slot instead of the
+   parametric cabinet. The model brings its own body, screen, controls and marquee; the hall gives it a screen canvas (portrait, the shape of the model's screen),
+   puts its back at the slot's back like every other machine, and drives its start button. Everything else (focus, zoom into the screen, sound, collision) is shared. */
+function buildModelCabinet(game, i){
+  const spec=window.XA_CAB3D[game.id], cab=spec.build(THREE,{lighting:false});
+  const group=new THREE.Group(); group.add(cab.group); cab.group.updateMatrixWorld(true);
+  const bb=new THREE.Box3().setFromObject(cab.group); cab.group.position.z=-bb.min.z;   // back at z=0, front forward, the way the hall's own machines stand
+  const D=bb.max.z-bb.min.z, w=bb.max.x-bb.min.x;
+  const SW=256, SH=Math.round(SW*spec.screen.h/spec.screen.w), sc=mkCanvas(SW,SH), sctx=sc.getContext('2d'), stex=tex(sc);
+  cab.setScreenTexture(stex); cab.screen.material.toneMapped=false;
+  const glow=new THREE.Mesh(new THREE.PlaneGeometry(w*1.9,1.25), new THREE.MeshBasicMaterial({map:glowTex(), color:game.color, transparent:true, opacity:.5, blending:THREE.AdditiveBlending, depthWrite:false, toneMapped:false}));
+  glow.rotation.x=-Math.PI/2; glow.position.set(0,.006,D+.5); glow.renderOrder=1;
+  group.traverse(o=>{ if(o.isMesh){ o.userData.cab=i; pickables.push(o) } });
+  return {i, game, cfg:Object.assign({}, CAB_DEFAULTS, {w, depth:D}), group, glow, screen:cab.screen, sw:spec.screen.w, sh:spec.screen.h, sctx, stex,
+    startBtn:new THREE.Object3D(), startMat:cab.startButton.material, frontLocal:new THREE.Vector3(0,0,D+.1), press:-1, fails:0, model:cab};
+}
 function buildCabinet(game, i){
+  if(window.XA_CAB3D && window.XA_CAB3D[game.id] && window.XA_CAB3D[game.id].build) return buildModelCabinet(game, i);
   const c = Object.assign({}, CAB_DEFAULTS, game.cabinet);
   const D=c.depth, t=THREE.MathUtils.degToRad(c.tilt), lean=THREE.MathUtils.degToRad(c.mLean);
   // side profile, z forward / y up
@@ -2157,7 +2174,7 @@ function scanOverlay(){ if(_scan) return _scan; const c=mkCanvas(256,192), x=c.g
   const v=x.createRadialGradient(128,96,192*.4,128,96,192*.85); v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(0,0,0,.55)');
   x.fillStyle=v; x.fillRect(0,0,256,192); return _scan=c }
 function drawAttract(m, t){
-  const x=m.sctx, W=256, H=192, col=m.game.color, on=focusIdx===m.i;
+  const x=m.sctx, W=x.canvas.width, H=x.canvas.height, col=m.game.color, on=focusIdx===m.i;   // 256x192, or the shape of a model cabinet's own screen
   x.save(); x.setTransform(1,0,0,1,0,0); x.globalAlpha=1; x.globalCompositeOperation='source-over';
   x.fillStyle='#03020a'; x.fillRect(0,0,W,H);
   if(m.fails<3){ try{ m.game.def.attract(x,W,H,t) }catch(e){ m.fails++ } }
@@ -2172,7 +2189,7 @@ function drawAttract(m, t){
     x.fillStyle='rgba(3,2,10,.7)'; x.fillRect(0,H-28,W,28);
     x.font='22px VT323, monospace'; x.fillStyle=on?'#ffc53d':'#f3eeff'; x.fillText(on?'▶ PRESS START':'PRESS START',W/2,H-14);
   }
-  x.drawImage(scanOverlay(),0,0);
+  x.drawImage(scanOverlay(),0,0,W,H);
   x.restore();
   m.stex.needsUpdate=true;
 }

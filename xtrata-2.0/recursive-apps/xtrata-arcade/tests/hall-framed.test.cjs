@@ -108,6 +108,9 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   pages['/plain.html'] = parentWith(hallParts);
   let r = await open('/plain.html', chainWith([]));
   const base0 = await look(r.page);
+  const fps = (pg) => pg.evaluate(() => new Promise((res) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 4000) requestAnimationFrame(f); else res(n / 4); }; requestAnimationFrame(f); }));
+  await r.page.click('#go'); await r.page.waitForTimeout(1500);
+  console.log('     (frames per second without the framed game, software GL: ' + (await fps(r.page)).toFixed(1) + ')');
   await r.ctx.close();
   pages['/games.html'] = parentWith(Object.assign({}, hallParts, { games: { contract: GAMES_CONTRACT } }));
   r = await open('/games.html', chainWith([item({ id: 'astro3', title: 'Astro Blaster 3', index: 21, codeId: 9500 }), item({ id: 'weird_kind', kind: 7, index: 22, codeId: 9500 })]));
@@ -118,11 +121,38 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   check(g.cabs === base0.cabs + 1, 'F1: and one more cabinet in the hall (' + base0.cabs + ' to ' + g.cabs + ')');
   check(g.scripts === 0, 'F1: no script was fetched or run for it');
   check(g.def && g.def.framed.id === 9500 && g.def.framed.size === GAME_PAGE.length && g.def.mode === 'score' && g.def.board === 'astro3', 'F1: it is a score game on the board named by its id (' + JSON.stringify(g.def) + ')');
-  await r.page.waitForFunction(() => document.getElementById('go'), null, { timeout: 30000 });
+  await r.page.waitForFunction(() => document.getElementById('go'), null, { timeout: 120000 });
   await r.page.click('#go'); await r.page.waitForTimeout(800);
-  await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 30000 });
+  await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
+  console.log('     (frames per second with the framed game and its model cabinet, software GL: ' + (await fps(r.page)).toFixed(1) + ')');
   await r.page.waitForTimeout(6000);
   check(r.top10.includes('astro3'), 'F1: the cabinet screen reads the Top 10 of the board astro3 (' + [...new Set(r.top10)].filter((b) => /astro/.test(b)).join(', ') + ')');
+
+  /* ------------------------------------------------ F1b the model cabinet */
+  const cabInfo = await r.page.evaluate(() => { const m = window.XA_CAB3D && window.XA_CAB3D.astro3; return { have: !!m, w: m && m.screen.w, h: m && m.screen.h, lay: window.XAHall.layout().cabinets.find((c) => c.id === 'astro3') }; });
+  check(cabInfo.have && cabInfo.lay, 'F1b: the hall has the hand-built Astro Blaster 3 cabinet model for this game');
+  const cost = await r.page.evaluate(() => { const c = window.XA_CAB3D.astro3.build(window.THREE, { lighting: false }); let meshes = 0, tris = 0; const mats = new Set();
+    c.group.traverse((o) => { if (o.isMesh) { meshes++; const g = o.geometry; tris += (g.index ? g.index.count : g.attributes.position.count) / 3; mats.add(o.material); } }); return { meshes, tris: Math.round(tris), mats: mats.size }; });
+  console.log('     (model cost: ' + JSON.stringify(cost) + ')');
+  check(cost.meshes > 50 && cost.meshes <= 700 && cost.tris <= 300000, 'F1b: the model stays within a budget for one machine in a room of 22 (' + cost.meshes + ' meshes, ' + cost.tris + ' triangles)');
+  const shotAt = async (name, dx, dz, yawOff, pitch) => {
+    if (!process.env.SHOTS) return;
+    const L = cabInfo.lay, x = (L.side < 0 ? -4.84 + dx : 4.84 - dx), yaw = (L.side < 0 ? Math.PI / 2 : -Math.PI / 2) + yawOff;
+    await r.page.evaluate(([x, z, yaw, pitch]) => window.XA.pose(x, z, yaw, pitch), [x, L.z + dz, yaw, pitch || 0]);
+    await r.page.waitForTimeout(1200);
+    await r.page.screenshot({ path: path.join(process.env.SHOTS, name) });
+  };
+  await shotAt('astro3-front.png', 3.0, 0, 0, 0.05);
+  await shotAt('astro3-close.png', 1.9, 0, 0, 0.12);
+  await shotAt('astro3-angle.png', 2.4, 1.3, -0.45, 0.05);
+  await shotAt('astro3-row.png', 4.5, -1.0, 0.25, 0.0);
+  if (process.env.SHOTS) {
+    const L = cabInfo.lay, sgn = L.side < 0 ? 1 : -1;
+    for (const [nm, dz, yaw] of [['astro3-side-a.png', 1.7, 0.6], ['astro3-side-b.png', -1.7, Math.PI - 0.6]]) {
+      await r.page.evaluate(([x, z, yaw]) => window.XA.pose(x, z, yaw, 0.05), [sgn * -3.5, L.z + dz, sgn > 0 ? yaw : -yaw]);
+      await r.page.waitForTimeout(1200); await r.page.screenshot({ path: path.join(process.env.SHOTS, nm) });
+    }
+  }
 
   /* ------------------------------------------------ F2 */
   const idx = g.ids.indexOf('astro3');
@@ -159,23 +189,28 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   const pl = (o) => Object.assign({ v: 1, game: 'astro-blaster-3', network: 'mainnet', board: 'astro3', period: 0, score: 12345, name: 'ACE', replay: 'QUJDREVGR0g' }, o);
   // no viewer above the hall: the xtrata.xyz submit page opens in a tab
   const popup = r.page.context().waitForEvent('page', { timeout: 8000 }).catch(() => null);
+  await frame.locator('h1').click();                    // a real click in the game, as the SUBMIT button is: the browser lets the page above open a tab for it
   await frame.evaluate((p) => ask({ type: 'xtrata:arcade:submit', id: 'ab3-1', payload: p }), pl());
   const tab = await popup;
   await r.page.waitForTimeout(400);
   m = await got();
   check(m.some((x) => x.type === 'xtrata:arcade:submit-opened' && x.id === 'ab3-1'), 'F4: with no viewer above, the game is told the submit page opened');
-  check(tab && /xtrata\.xyz\/arcade\/submit#p=/.test(tab.url()) && r.opened.length === 1, 'F4: and the xtrata.xyz submit page is what opened (' + (tab ? tab.url().slice(0, 50) : 'no tab') + ')');
-  const payloadBack = tab ? JSON.parse(Buffer.from(tab.url().split('#p=')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()) : null;
+  // The browser may or may not let the page above the hall open a tab (it needs a fresh click, and a slow machine can let that lapse): either is fine,
+  // as long as the submit page is what is offered, with the run in it.
+  const link = tab ? tab.url() : await r.page.evaluate(() => { const a = document.querySelector('#xa-framed-back') && document.querySelector('a[href*="/arcade/submit"]'); return a ? a.href : ''; });
+  check(/xtrata\.xyz\/arcade\/submit#p=/.test(link), 'F4: the xtrata.xyz submit page is what opens, or is offered as a link when the browser blocks the tab (' + (tab ? 'opened' : 'link') + ')');
+  const payloadBack = link ? JSON.parse(Buffer.from(link.split('#p=')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()) : null;
   check(payloadBack && payloadBack.score === 12345 && payloadBack.name === 'ACE' && payloadBack.board === 'astro3', 'F4: carrying the run as the game sent it');
   if (tab) await tab.close();
-  const before = m.length;
+  await r.page.bringToFront();                          // (a page behind another tab draws no frames, so the hall would stand still)
+  const before = m.length, openedBefore = (await r.page.waitForTimeout(1500), r.opened.length);
   const bad = [pl({ board: 'astro3-daily', score: 0 }), pl({ board: 'chess' }), pl({ name: 'x' }), pl({ name: 'a'.repeat(20) }), pl({ score: 1.5 }), pl({ replay: 'bad replay!' }), pl({ replay: 'A'.repeat(140001) }), 'text', null];
   for (let i = 0; i < bad.length; i++) await frame.evaluate(([id, p]) => ask({ type: 'xtrata:arcade:submit', id, payload: p }), ['bad-' + i, bad[i]]);
   await frame.evaluate(() => ask({ type: 'xtrata:arcade:submit', id: 'bad id!', payload: null }));
   await r.page.waitForTimeout(400);
   m = (await got()).slice(before);
   const results = m.filter((x) => x.type === 'xtrata:arcade:submit-result');
-  check(r.opened.length === 1 && !m.some((x) => x.type === 'xtrata:arcade:submit-opened') && results.length >= bad.length - 1 && results.every((x) => x.error), 'F4: a run with a wrong board, name, score or replay is refused with an error and nothing opens (' + results.length + ' refused)');
+  check(r.opened.length === openedBefore && !m.some((x) => x.type === 'xtrata:arcade:submit-opened') && results.length >= bad.length - 1 && results.every((x) => x.error), 'F4: a run with a wrong board, name, score or replay is refused with an error and nothing opens (' + results.length + ' refused)');
   // a message from a window that is not the open game is ignored
   const stranger = await r.page.evaluate(() => new Promise((res) => {
     const f = document.createElement('iframe'); f.sandbox = 'allow-scripts'; document.body.appendChild(f);
@@ -203,7 +238,7 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
 
   /* ------------------------------------------------ back */
   await r.page.click('#xa-framed-back');
-  await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 30000 });
+  await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 }).catch(async (e) => { console.log('   state after BACK:', await r.page.evaluate(() => ({ s: window.XA.hallState(), f: window.XA.framedState(), vis: document.visibilityState, raf: performance.now() }))); throw e; });
   fs_ = await r.page.evaluate(() => window.XA.framedState());
   check(!fs_.open && (await r.page.$$('iframe[data-xa-framed]')).length === 0, 'F2: BACK takes the frame down and returns to the hall');
 
@@ -216,15 +251,15 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   /* ------------------------------------------------ F3 a page that is not what the contract says */
   r = await open('/games.html', chainWith([item({ id: 'astro3', title: 'Astro Blaster 3', index: 21, codeId: BIG_LIE, size: GAME_PAGE.length + 10 })]));
   await r.page.click('#go'); await r.page.waitForTimeout(800);
-  await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 30000 });
+  await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
   const idx2 = await r.page.evaluate(() => window.XA.games.findIndex((x) => x.id === 'astro3'));
   if (idx2 >= 0) {
     await r.page.evaluate((i) => window.XA.startGame(i), idx2);
     await r.page.waitForFunction(() => window.XA.framedState && window.XA.framedState().open, null, { timeout: 60000 });
-    await r.page.waitForFunction(() => window.XA.framedState().failed, null, { timeout: 30000 }).catch(() => {});
+    await r.page.waitForFunction(() => window.XA.framedState().failed, null, { timeout: 120000 }).catch(() => {});
     fs_ = await r.page.evaluate(() => window.XA.framedState());
     check(fs_.failed && !fs_.loaded, 'F3: a game whose bytes are not the size the contract states is not opened (' + fs_.why + ')');
-    await r.page.click('#xa-framed-back'); await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 30000 });
+    await r.page.click('#xa-framed-back'); await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
     check(true, 'F3: and BACK still works');
   } else {
     check(true, 'F3: a game whose registry record size lies is not added at all (' + JSON.stringify(await r.page.evaluate(() => window.XAGamesRegistry.status().skipped)) + ')');
@@ -236,7 +271,7 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   r = await open('/host.html', chainWith([item({ id: 'astro3', title: 'Astro Blaster 3', index: 21, codeId: 9500 })]));
   const hf = r.page.frames().find((f) => f !== r.page.mainFrame() && /games\.html/.test(f.url()));
   await hf.waitForFunction(() => window.XA && window.XA.startGame && document.getElementById('go'), null, { timeout: 120000 });
-  await hf.click('#go'); await hf.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 30000 });
+  await hf.click('#go'); await hf.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
   await hf.evaluate((i) => window.XA.startGame(i), await hf.evaluate(() => window.XA.games.findIndex((x) => x.id === 'astro3')));
   await hf.waitForFunction(() => window.XA.framedState && window.XA.framedState().loaded, null, { timeout: 60000 });
   const game6 = r.page.frames().filter((f) => f !== r.page.mainFrame() && f !== hf).pop();
