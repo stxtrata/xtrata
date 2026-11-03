@@ -9671,19 +9671,21 @@ function applyTestnetFunding(proof){
     // A shared spin runs on the wall clock (a slow phone still lands on time for the next round's bets); a solo spin by frames, as before.
     const wallTween = (dur, fn) => new Promise((resolve) => { const t0 = performance.now(); const step = () => { const u = Math.min(1, (performance.now() - t0) / (dur * 1000)); fn(u); if (u < 1) requestAnimationFrame(step); else resolve(); }; requestAnimationFrame(step); });
     async function spinTo(n, wallDur) {
-      sfx.whirrStart();
+      const heard = () => focus === st;      // sound only for the player at the table; the shared wheel turns silently for everyone else
+      if (heard()) sfx.whirrStart();
       const idx = CE.WHEEL.indexOf(n), rest = (idx + 0.5) * step;
       const dur = wallDur || 7.5, a0 = wheel.rotation.y, total = -Math.PI * 2 * 3.2, K = Math.PI * 2 * 9;
       let lastSeg = -1, dropped = false;
       await (wallDur ? wallTween : tween)(dur, (u) => {
-        sfx.whirr(u); if (u > 0.86 && !dropped) { dropped = true; sfx.ballDrop(); }
+        if (heard()) { sfx.whirrStart(); sfx.whirr(u); } else sfx.whirrStop();
+        if (u > 0.86 && !dropped) { dropped = true; if (heard()) sfx.ballDrop(); }
         wheel.rotation.y = a0 + total * (1 - Math.pow(1 - u, 2.2));
         const e = 1 - Math.pow(1 - u, 2.6), rel = rest + K * (1 - e);
         const drop = Math.min(1, Math.max(0, (u - 0.62) / 0.3));
         const r = 0.53 - 0.17 * drop * drop;
         const hop = u > 0.82 && u < 0.97 ? Math.abs(Math.sin((u - 0.82) * 60)) * 0.03 * (0.97 - u) * 7 : 0;
         placeBall(rel, r, ballY(r) + hop);
-        const seg = Math.floor(((rel % (Math.PI * 2)) + Math.PI * 2) / step); if (seg !== lastSeg) { lastSeg = seg; if (u > 0.3) sfx.tick(); }
+        const seg = Math.floor(((rel % (Math.PI * 2)) + Math.PI * 2) / step); if (seg !== lastSeg) { lastSeg = seg; if (u > 0.3 && heard()) sfx.tick(); }
       });
       placeBall(rest, 0.36, ballY(0.36)); sfx.whirrStop();
       const wp = n === 0 ? zeroPos : numPos(n); winMark.position.x = wp.x; winMark.position.z = wp.z; dolly.position.set(wp.x, 0.867, wp.z); dolly.visible = true; winMark.visible = true; hlGrp.rotation.y = -rest; hlGrp.visible = true; croupier.cheer();
@@ -10018,10 +10020,10 @@ function applyTestnetFunding(proof){
         const amp = Math.sin(Math.PI * Math.min(1, k)) * 0.02;
         dome.position.y = 0.866 + amp * 1.5; dome.position.x = Math.sin(k * 60) * amp; dome.rotation.z = Math.sin(k * 47) * amp * 2;
         dice.forEach((d, i) => { if (k < 0.92) { d.rotation.set(d.rotation.x + 0.6 + i * 0.1, d.rotation.y + 0.45, d.rotation.z + 0.3); d.position.y = dieY + Math.abs(Math.sin(k * 40 + i)) * 0.05; } });
-        if (performance.now() - lastClick > 140 && k < 0.9) { lastClick = performance.now(); try { sfx.chip(); } catch (_) { } }
+        if (focus === st && performance.now() - lastClick > 140 && k < 0.9) { lastClick = performance.now(); try { sfx.chip(); } catch (_) { } }      // heard only at the table
       });
       dome.position.set(0, 0.866, -0.64); dome.rotation.set(0, 0, 0); setDice(vals);
-      try { sfx.click(); } catch (_) { }
+      if (focus === st) try { sfx.click(); } catch (_) { }
     }
     // Pays out `betsOn` (already taken from the bank as `stake`) for these dice.
     function settleSb(vals, betsOn, stake, late) {
