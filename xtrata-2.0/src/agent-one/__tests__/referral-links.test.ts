@@ -93,8 +93,13 @@ describe('the music page reads ?ref=', () => {
   });
 });
 
-describe('only the music page takes a referral', () => {
+describe('only the music and Suno pages take a referral', () => {
   it('no other wizard page mentions it', () => {
-    for (const f of ['index.html', 'manifests.html', 'suno.html']) expect(read('../../../xtrata-agent-one/wizard/' + f)).not.toMatch(/referralSlug|xtrata-music-ref/);
+    // The general wizard and the manifest page stay out of the referral program on purpose.
+    // (Suno joined in 2026-11; its own wiring is covered by referral-suno.test.ts.)
+    for (const f of ['index.html', 'manifests.html']) expect(read('../../../xtrata-agent-one/wizard/' + f)).not.toMatch(/referralSlug|xtrata-music-ref/);
+  });
+  it('the Suno page does take it', () => {
+    expect(read('../../../xtrata-agent-one/wizard/suno.html')).toMatch(/referralSlug/);
   });
 });
