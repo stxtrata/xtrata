@@ -223,6 +223,35 @@ AIM_PATCHES = [
 ]
 
 
+# Step 6 (2026-11-03): the X-Chess view (a flat 2D board, CASINO-CHESS-NEXT-PLAN section 4). A station may add views of its own
+# (focus.extraViews): the button shows only at chess tables; in it the room does not look around or capture the mouse (as overhead);
+# Esc asks the table first (it closes the X-Chess view, or leaves move review); chess.js can read and set the view.
+XVIEW_MARK = 'focus.extraViews'
+XVIEW_PATCHES = [
+    ('<button type="button" data-view="overhead" aria-pressed="false">Top down</button>',
+     '<button type="button" data-view="overhead" aria-pressed="false">Top down</button><button type="button" data-view="xchess" aria-pressed="false" hidden>X-Chess</button>'),
+    ("b.hidden = video ? (b.dataset.view === 'seat' || b.dataset.view === 'overhead') : b.dataset.view === 'screen';",
+     "b.hidden = video ? (b.dataset.view === 'seat' || b.dataset.view === 'overhead' || b.dataset.view === 'xchess') : (b.dataset.view === 'screen' || (b.dataset.view === 'xchess' && !(focus && focus.extraViews && focus.extraViews.includes('xchess'))));"),
+    ("const allowed = focus.id === 'videopoker' ? ['table', 'screen'] : ['table', 'seat', 'overhead'];",
+     "const allowed = focus.id === 'videopoker' ? ['table', 'screen'] : ['table', 'seat', 'overhead'].concat(focus.extraViews || []);"),
+    ("tableView = view; seatLookReset(); if (view === 'overhead' && document.pointerLockElement === canvas) freeMouse();",
+     "tableView = view; seatLookReset(); if ((view === 'overhead' || view === 'xchess') && document.pointerLockElement === canvas) freeMouse(); if (focus.onView) focus.onView(view);"),
+    ("canvas.addEventListener('pointerdown', (ev) => { if (!focus || tableView === 'overhead' || (ev.button || 0) > 0",
+     "canvas.addEventListener('pointerdown', (ev) => { if (!focus || tableView === 'overhead' || tableView === 'xchess' || (ev.button || 0) > 0"),
+    ("    if (!focus || tableView === 'overhead' || (focus.holding && focus.holding())) { seatLook.drag = null; return; }",
+     "    if (!focus || tableView === 'overhead' || tableView === 'xchess' || (focus.holding && focus.holding())) { seatLook.drag = null; return; }"),
+    ("seatLook.lockable = () => !isTouch && !!focus && !!focus.aim && tableView !== 'overhead' &&",
+     "seatLook.lockable = () => !isTouch && !!focus && !!focus.aim && tableView !== 'overhead' && tableView !== 'xchess' &&"),
+    ("window.addEventListener('mousemove', (ev) => { if (!seatLook.locked() || tableView === 'overhead') return;",
+     "window.addEventListener('mousemove', (ev) => { if (!seatLook.locked() || tableView === 'overhead' || tableView === 'xchess') return;"),
+    ("if (e.code === 'Escape') { if (document.pointerLockElement) { freeMouse(); return; } if (focus &&",
+     "if (e.code === 'Escape') { if (document.pointerLockElement) { freeMouse(); return; } if (focus && focus.escape && focus.escape()) { render(); return; } if (focus &&"),
+    ("roomMe: () => shared.me, ownsTouch: true,",
+     "roomMe: () => shared.me, ownsTouch: true, tableView: () => tableView, setView: (v) => setTableView(v),"),
+    ('chess.js?v=c5"', 'chess.js?v=c6"'),
+]
+
+
 def chess_version(s):
     import re
     m = re.search(r'chess\.js\?v=c(\d+)"', s)
@@ -241,6 +270,8 @@ def apply(s):
         s = run(s, LOOK_PATCHES); done.append('sofas, seat heights, free look')
     if AIM_MARK not in s:
         s = run(s, AIM_PATCHES); done.append('look direction, mouse aim at chess')
+    if XVIEW_MARK not in s:
+        s = run(s, XVIEW_PATCHES); done.append('the X-Chess view')
     return s, done
 
 
