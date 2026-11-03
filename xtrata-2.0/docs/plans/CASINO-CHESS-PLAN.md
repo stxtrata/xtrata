@@ -133,3 +133,34 @@ watchers, never the opponent (whose own copy of the game is the truth).
 checkmate with clocks, cannot move pieces, sees the next game while walking past (with the note), and catches up again after a
 reload. Not checked: the live room (deploy the Worker first) and real phones.
 
+## 8. Touch, pen and mouse: tap or drag the pieces (added 2026-11-03)
+
+Jim, after the first real game (iPad against the Mac): the iPad, playing white, could not select a piece or a square, and from the seat
+the squares are hard to see; tap the pieces themselves, and ideally grab and move them.
+
+**Why the iPad failed.** The board listened for `click`. While walking, the room cancels every touch at its end (`endTouch` calls
+`preventDefault` so a tap never scrolls the page), and on iOS a cancelled touch never makes a click. Sitting down by walking up leaves
+the page in walking mode, so taps never reached the board. The Mac used a real mouse click. The first tests sat down from the overview,
+where the click gets through, so they missed it; `touch.mjs` now walks up and sits first, and reproduced the failure.
+
+**What changed (all in `chess.js`, `c3`).**
+- The board takes **pointer events** (touch, pen and mouse alike) on the room's canvas, added once, after the page's own listeners. The
+  page's click is still swallowed when it repeats a tap already handled.
+- **Pieces, not squares:** a press is read in the order you see it: the piece actually drawn under the finger (its head counts, even
+  where it overlaps the square behind), else the board square, else (a near miss on a slim piece) the piece whose upright centre line
+  passes within half a square. Your piece is picked up; an enemy piece you may capture is taken; a destination square moves there.
+- **Two cases found in testing, where a piece stands in front of where you aimed:** the piece you are holding is lifted, so its head
+  covers the near part of the square in front of it: a destination there wins over putting the piece down. And an enemy piece you
+  cannot take (say a knight in front of the pawn your queen can capture) means nothing to tap, so the destination behind it counts.
+- **Tap then tap, or drag:** press one of your pieces and it is picked up (its moves show); tap a destination, or drag: the piece lifts
+  and follows the finger, the square under it lights when it is a legal destination, and letting go there makes the move (in a game
+  against a player it waits on that square while the move is sent). An illegal drop glides back. Tapping the held piece puts it down.
+- **Easier to see and hit:** squares 5.8 cm (board 51 cm, was 45), move dots and capture rings larger, the Seated view 15 cm higher;
+  on desktop a hand cursor over your pieces and a small lift on hover.
+- While you sit at a chess table the canvas takes `touch-action: none` (no page pan, zoom or press menu), restored when you leave.
+
+**Checked:** iPad-sized touch screen (1180×820), desktop mouse (1440×900) and phone (390×844), each walking up and sitting: tap the
+pawn then a square, tap the knight by its head, drag the bishop, an illegal drop, tap a piece twice, capture by tapping the enemy piece,
+and more moves played by tapping only. The two-player and watching tests pass with every move made by clicking pieces (the watcher sees
+the queen take on f7 behind the knight on f6, mate).
+

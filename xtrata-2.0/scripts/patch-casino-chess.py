@@ -103,12 +103,19 @@ def run(s, patches):
     return s
 
 
+# Step 3 (2026-11-03): touch, pen and mouse on the board (tap or drag the pieces) is all in chess.js; the page only loads the new version.
+INPUT_MARK = 'chess.js?v=c3'
+INPUT_PATCHES = [('chess.js?v=c2"', 'chess.js?v=c3"')]
+
+
 def apply(s):
     done = []
     if 'chess.js?v=' not in s:
         s = run(s, PATCHES); done.append('chess tables')
     if WATCH_MARK not in s:
         s = run(s, WATCH_PATCHES); done.append('watching')
+    if INPUT_MARK not in s:
+        s = run(s, INPUT_PATCHES); done.append('touch and drag')
     return s, done
 
 

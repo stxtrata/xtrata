@@ -169,7 +169,7 @@
   }
 
   // ======================================================================= 3D: board and pieces
-  const SQ = 0.05, BOARD_Y = 0.541, HALF = SQ * 4;
+  const SQ = 0.058, BOARD_Y = 0.541, HALF = SQ * 4;   // 51 cm of squares (was 45): easier to read from the seats and to tap
   const sqName = (f, r) => 'abcdefgh'[f] + (r + 1);
   const sqFR = (s) => [s.charCodeAt(0) - 97, s.charCodeAt(1) - 49];
   const sqPos = (s) => { const [f, r] = sqFR(s); return [(f - 3.5) * SQ, (3.5 - r) * SQ]; };     // board-local, white at +z
@@ -192,6 +192,7 @@
     geo.head.translate(0, 0, -0.1 * SQ);
     geo.crossV = new THREE.BoxGeometry(0.07 * SQ, 0.26 * SQ, 0.07 * SQ); geo.crossH = new THREE.BoxGeometry(0.2 * SQ, 0.07 * SQ, 0.07 * SQ);
     geo.band = new THREE.TorusGeometry(0.3 * SQ, 0.028 * SQ, 6, 22); geo.band.rotateX(Math.PI / 2);
+    geo.hitH = 1.75 * SQ; geo.hit = new THREE.CylinderGeometry(0.47 * SQ, 0.47 * SQ, geo.hitH, 10);
     return geo;
   }
   function boardTexture(THREE) {
@@ -210,9 +211,9 @@
     const t = new THREE.CanvasTexture(c); t.anisotropy = 4; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
     return t;
   }
-  let GEO = null;
+  let GEO = null, HIT_MAT = null;
   function makeBoard(ctx, parent) {
-    const { THREE } = ctx; GEO = GEO || profiles(THREE);
+    const { THREE } = ctx; GEO = GEO || profiles(THREE); HIT_MAT = HIT_MAT || new THREE.MeshBasicMaterial({ visible: false });
     const root = new THREE.Group(); root.position.y = BOARD_Y; parent.add(root);
     const gold = ctx.GOLDM(), W = SQ * 8 + 0.05;
     ctx.box(W + 0.012, 0.016, W + 0.012, gold, 0, 0.008, 0, root);
@@ -224,8 +225,8 @@
     const hl = new THREE.Group(); hl.position.y = 0.0175; root.add(hl);
     const flat = (color, op, size) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(size || SQ * 0.96, size || SQ * 0.96), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.visible = false; m.userData.noShadow = true; hl.add(m); return m; };
     const ring = (color, op, r0, r1) => { const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 28), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.visible = false; hl.add(m); return m; };
-    const H = { last: [flat(0xd4a83a, 0.34), flat(0xd4a83a, 0.34)], sel: flat(0xff9a3c, 0.6), check: flat(0xff2b2b, 0.5), hint: [flat(0x3dff9a, 0.45), flat(0x3dff9a, 0.45)], dots: [], caps: [] };
-    for (let i = 0; i < 28; i++) { H.dots.push(ring(0x5ec8ff, 0.95, 0, SQ * 0.16)); H.caps.push(ring(0xff7a3d, 0.9, SQ * 0.36, SQ * 0.46)); }
+    const H = { last: [flat(0xd4a83a, 0.34), flat(0xd4a83a, 0.34)], sel: flat(0xff9a3c, 0.6), check: flat(0xff2b2b, 0.5), hint: [flat(0x3dff9a, 0.45), flat(0x3dff9a, 0.45)], hover: flat(0x9fe8ff, 0.42), dots: [], caps: [] };
+    for (let i = 0; i < 28; i++) { H.dots.push(ring(0x5ec8ff, 0.95, 0, SQ * 0.22)); H.caps.push(ring(0xff7a3d, 0.92, SQ * 0.33, SQ * 0.48)); }
     const place = (m, s) => { const [x, z] = sqPos(s); m.position.set(x, 0, z); m.visible = true; };
 
     const B = { root, top, pieces: new Map(), captured: { w: [], b: [] }, tweens: [], flip: false, checkSq: null };
@@ -235,7 +236,9 @@
       const band = new THREE.Mesh(GEO.band, gold); band.position.y = 0.15 * SQ; g.add(band);
       if (type === 'n') { const h = new THREE.Mesh(GEO.head, mat); h.castShadow = true; h.rotation.y = colour === 'w' ? -Math.PI / 2 + 0.6 : Math.PI / 2 - 0.6; /* three-quarters on, so the head reads from your seat */ g.add(h); }
       if (type === 'k') { const v = new THREE.Mesh(GEO.crossV, gold), h = new THREE.Mesh(GEO.crossH, gold); v.position.y = 1.42 * SQ; h.position.y = 1.44 * SQ; g.add(v, h); }
-      g.userData = { type, colour }; pieceRoot.add(g); return g;
+      // the tap area: an invisible column a little wider and taller than the piece, so its head and body both count
+      const hit = new THREE.Mesh(GEO.hit, HIT_MAT); hit.position.y = GEO.hitH / 2; hit.userData.hit = true; g.add(hit);
+      g.userData = { type, colour, hit }; pieceRoot.add(g); return g;
     }
     const tween = (obj, dur, fn, done) => B.tweens.push({ obj, t0: performance.now(), dur: dur * 1000, fn, done });
     B.update = () => {
@@ -286,10 +289,47 @@
     };
     B.clear = () => { for (const m of B.pieces.values()) pieceRoot.remove(m); for (const c of ['w', 'b']) { B.captured[c].forEach((m) => pieceRoot.remove(m)); B.captured[c] = []; } B.pieces.clear(); B.tweens = []; };
     B.setFlip = (flip) => { B.flip = !!flip; root.rotation.y = flip ? Math.PI : 0; };
+    // pieces that are off their square (after a drag) glide back, except the one in your hand and one dropped while its move is sent
+    B.held = null; B.parked = null;
+    B.home = () => {
+      if (B.parked && performance.now() > B.parked.until) B.parked = null;
+      for (const [s2, m] of B.pieces) {
+        if (m === B.held || (B.parked && B.parked.m === m) || B.tweens.some((t) => t.obj === m)) continue;
+        const [x, z] = sqPos(s2); if (Math.hypot(m.position.x - x, m.position.z - z) < 1e-4) continue;
+        const x0 = m.position.x, z0 = m.position.z, y0 = m.position.y;
+        tween(m, 0.22, (u) => m.position.set(x0 + (x - x0) * u, y0 * (1 - u), z0 + (z - z0) * u));
+      }
+    };
+    // what is under the pointer: the nearest piece's square (its tap area), and the square of the board itself
+    const HEIGHT = { p: 0.83, n: 1.15, b: 1.22, r: 0.93, q: 1.45, k: 1.5 }, A = new THREE.Vector3(), Bv = new THREE.Vector3();
+    // what is under the pointer, in the order you see it: the piece actually drawn there (nearest), the board square, and for a
+    // near miss on a slim piece, the piece whose upright centre line passes closest to the pointer (within half a square)
+    B.pickAt = (ray) => {
+      const owner = new Map(), meshes = [];
+      for (const [s2, m] of B.pieces) m.traverse((o) => { if (o.isMesh && !o.userData.hit) { owner.set(o, s2); meshes.push(o); } });
+      const real = ray.intersectObjects(meshes, false)[0];
+      let near = null, best = (SQ * 0.5) ** 2;
+      for (const [s2, m] of B.pieces) {
+        m.getWorldPosition(A); Bv.copy(A); Bv.y += HEIGHT[m.userData.type] * SQ;
+        const d = ray.ray.distanceSqToSegment(A, Bv); if (d < best) { best = d; near = s2; }
+      }
+      return { piece: real ? owner.get(real.object) : null, board: B.pick(ray), near };
+    };
+    B.pickPiece = (ray) => { const r = B.pickAt(ray); return r.piece || r.near; };
+    const PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), V = new THREE.Vector3();
+    // where the pointer meets the top of the board (board-local x, z), for dragging
+    B.onBoard = (ray) => {
+      top.updateMatrixWorld(); PLANE.constant = -top.getWorldPosition(V).y;
+      if (!ray.ray.intersectPlane(PLANE, V)) return null;
+      const p = root.worldToLocal(V.clone()), f = Math.floor(p.x / SQ + 4), r = Math.floor(4 - p.z / SQ);
+      return { x: p.x, z: p.z, sq: f >= 0 && f < 8 && r >= 0 && r < 8 ? sqName(f, r) : null };
+    };
+    B.lift = (s2, up) => { const m = B.pieces.get(s2); if (m && m !== B.held && !B.tweens.some((t) => t.obj === m)) m.position.y = up; };
+    B.hover = (s2) => { if (s2) place(H.hover, s2); else H.hover.visible = false; };
     B.marks = ({ last, sel, targets, check, hint }) => {
       H.last.forEach((m, i) => (last ? place(m, last[i]) : (m.visible = false)));
       if (sel) place(H.sel, sel); else H.sel.visible = false;
-      for (const [s2, m] of B.pieces) { const up = s2 === sel ? 0.012 : 0; if (Math.abs(m.position.y - up) > 1e-4 && !B.tweens.some((t) => t.obj === m)) m.position.y = up; }
+      for (const [s2, m] of B.pieces) { if (m === B.held) continue; const up = s2 === sel ? 0.014 : 0; if (Math.abs(m.position.y - up) > 1e-4 && !B.tweens.some((t) => t.obj === m)) m.position.y = up; }
       H.dots.forEach((m) => (m.visible = false)); H.caps.forEach((m) => (m.visible = false));
       (targets || []).slice(0, 28).forEach((t, i) => place(t.capture ? H.caps[i] : H.dots[i], t.sq));
       if (check) place(H.check, check); else H.check.visible = false;
@@ -359,6 +399,25 @@
   }
   const SPEC_FRESH = 45000, SPEC_AFTER = 30000, SPEC_BEAT = 15000;   // a live game unseen this long is gone; a finished one stays shown; the host repeats itself
   let chip = null, chipOwner = null;
+  let pointerOn = false, touchOwner = null, touchSaved = null;
+  function attachPointer(ctx) {
+    if (pointerOn) return; const el = ctx.canvasEl(); if (!el || !root.PointerEvent) return; pointerOn = true;
+    const to = (kind) => (ev) => {
+      const st = built.find((s) => ctx.focus() === s); if (!st || !st.pointer) return;
+      if (kind === 'down') { if (st.pointer('down', ev)) try { el.setPointerCapture(ev.pointerId); } catch (_) { } }
+      else st.pointer(kind, ev);
+    };
+    el.addEventListener('pointerdown', to('down')); el.addEventListener('pointermove', to('move'));
+    el.addEventListener('pointerup', to('up')); el.addEventListener('pointercancel', to('cancel'));
+  }
+  // while you sit at a chess table, a drag on the board moves a piece: the browser may not pan, zoom or show its press menu
+  function touchMode(owner, caller) {
+    if (owner === touchOwner || (!owner && touchOwner !== caller)) return;
+    const el = document.getElementById('gl'); if (!el) return;
+    if (owner) { if (!touchSaved) touchSaved = [el.style.touchAction, el.style.webkitTouchCallout, el.style.webkitUserSelect]; el.style.touchAction = 'none'; el.style.webkitTouchCallout = 'none'; el.style.webkitUserSelect = 'none'; }
+    else if (touchSaved) { [el.style.touchAction, el.style.webkitTouchCallout, el.style.webkitUserSelect] = touchSaved; touchSaved = null; }
+    touchOwner = owner;
+  }
   function specChip(text) {
     if (!chip) { chip = document.createElement('div'); chip.id = 'pxChessWatch'; chip.setAttribute('role', 'status'); chip.style.cssText = 'position:fixed;left:50%;top:calc(' + (innerWidth < 600 ? 150 : 102) + 'px + env(safe-area-inset-top));transform:translateX(-50%);z-index:30;max-width:calc(100vw - 32px);padding:7px 14px;border-radius:999px;background:rgba(8,18,32,.88);border:1px solid rgba(212,168,58,.55);color:#f1e3b8;font:600 13px Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;display:none'; document.body.appendChild(chip); }
     chip.style.display = text ? 'block' : 'none'; if (text && chip.textContent !== text) chip.textContent = text;
@@ -399,7 +458,7 @@
       orient(); const p = pos();
       if (!p) { if (engine.api) board.sync(boardMap(new (engine.api.Position)(START)), instant); board.marks({}); return; }
       const lm = S ? S.table.g && S.table.g.lastMove : showR() ? R.last : H && H.last;
-      const bm = boardMap(p); board.sync(bm, instant, lm); if (instant) board.rebuildTrays(bm);
+      const bm = boardMap(p); board.sync(bm, instant, lm); if (instant) board.rebuildTrays(bm); board.home();
       const check = p.inCheck() ? kingSquare(p, p.turn === 0 ? 'w' : 'b') : null;
       board.marks({ last: lm, sel, targets, check, hint: hint && performance.now() < hintUntil ? hint : null });
     }
@@ -472,21 +531,93 @@
       if (!checkOver()) houseMove();
       refresh();
     }
-    function clickSquare(s) {
-      const p = pos(); if (!p) { return false; }
+    function select(q) {
+      const p = pos(), occ = boardMap(p), piece = occ.get(q); sel = q;
+      targets = [...new Set(p.movesUci().filter((u) => u.startsWith(q)).map((u) => u.slice(2, 4)))].map((sq) => ({ sq, capture: occ.has(sq) || (piece[1] === 'p' && sq[0] !== q[0]) }));
+      ctx.sfx('select');
+    }
+    const isTarget = (q) => !!q && !!sel && targets.some((t) => t.sq === q);
+    const mineAt = (q) => { const p = pos(); if (!q || !p) return false; const c = boardMap(p).get(q); return !!c && c[0] === me(); };
+    // What a press means, from what is under it (board.pickAt): the piece you can see there decides (yours: pick it up; one you may
+    // capture: take it; an enemy piece you cannot take: the destination behind it, if any). With no piece drawn there, the square
+    // decides, then a near miss on a slim piece.
+    function resolve(r) {
+      const kind = (q) => (!q ? null : isTarget(q) ? 'target' : mineAt(q) ? 'mine' : null);
+      // the held piece is lifted, so from a seat its head covers the near part of the square in front: a destination there wins
+      if (r.piece && r.piece === sel && isTarget(r.board)) return { kind: 'target', sq: r.board };
+      if (r.piece) {
+        const k = kind(r.piece); if (k) return { kind: k, sq: r.piece };
+        // an enemy piece you cannot take means nothing to tap: it is standing in front of where you aimed, so a destination behind it counts
+        if (isTarget(r.board)) return { kind: 'target', sq: r.board };
+        if (isTarget(r.near)) return { kind: 'target', sq: r.near };
+        return { kind: null, sq: null };
+      }
+      const kb = kind(r.board); if (kb) return { kind: kb, sq: r.board };
+      const kn = kind(r.near); return kn ? { kind: kn, sq: r.near } : { kind: null, sq: null };
+    }
+    // A tap (or a click): a destination moves the piece you hold there; one of your pieces is picked up, or put down if already held.
+    function tapRes(res) {
+      const p = pos(); if (!p) return false;
       if (!S && showR()) { ctx.toast('You are watching ' + R.wn + ' and ' + R.bn + '.'); return true; }
       if (!myTurn()) { if ((H && H.over) || (S && S.table.g && S.table.g.result)) return true; ctx.toast(H && H.thinking ? houseName(H.profile) + ' is thinking…' : 'Wait for your turn.'); return true; }
-      if (sel && targets.some((t) => t.sq === s)) { tryMove(sel, s); return true; }
-      const piece = boardMap(p).get(s);
-      if (piece && piece[0] === me()) {
-        if (sel === s) { sel = null; targets = []; } else {
-          sel = s; const occ = boardMap(p);
-          targets = [...new Set(p.movesUci().filter((u) => u.startsWith(s)).map((u) => u.slice(2, 4)))].map((sq) => ({ sq, capture: occ.has(sq) || (piece[1] === 'p' && sq[0] !== s[0]) }));
-          ctx.sfx('select');
-        }
-      } else { sel = null; targets = []; }
+      if (res.kind === 'target') { tryMove(sel, res.sq); return true; }
+      if (res.kind === 'mine') { if (sel === res.sq) { sel = null; targets = []; } else select(res.sq); } else { sel = null; targets = []; }
       promo = null; refresh(); return true;
     }
+    const clickSquare = (q) => tapRes(resolve({ piece: null, board: q, near: null }));
+
+    // ---- touch, pen and mouse on the board. Pointer events, not `click`: while walking, the room cancels every touch at its end
+    // (so a tap never scrolls the page), and on an iPad that also cancels the click a tap would have made.
+    let grab = null, hoverLift = null, lastHandled = 0;
+    const clampB = (v) => Math.max(-(HALF + SQ * 0.5), Math.min(HALF + SQ * 0.5, v));
+    function setCursor(c) { const el = ctx.canvasEl(); if (el && c) el.style.cursor = c; }
+    function hoverAt(ev) {
+      if (ev.pointerType !== 'mouse' || promo) return;
+      const res = resolve(board.pickAt(ctx.ray(ev)));
+      let cur = '', lift = null;
+      if (myTurn()) { if (res.kind === 'target') cur = 'pointer'; else if (res.kind === 'mine') { cur = 'grab'; lift = res.sq; } }
+      if (hoverLift !== lift) { if (hoverLift && hoverLift !== sel) board.lift(hoverLift, 0); hoverLift = lift; if (lift && lift !== sel) board.lift(lift, 0.007); }
+      setCursor(cur);
+    }
+    const pointer = {
+      down(ev) {
+        if (ev.button > 0 || grab) return false;
+        const r = board.pickAt(ctx.ray(ev)); if (!r.piece && !r.board && !r.near) return false;
+        ctx.audio(); lastHandled = performance.now();
+        const res = resolve(r);
+        grab = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, res, dragging: false, from: null, wasSel: sel };
+        // one of your pieces, on your turn: it is picked up now (its moves show) and follows a drag
+        if (res.kind === 'mine' && myTurn() && !promo) { grab.from = res.sq; if (sel !== res.sq) { select(res.sq); refresh(); } }
+        return true;
+      },
+      move(ev) {
+        if (!grab || ev.pointerId !== grab.id) { if (!grab) hoverAt(ev); return; }
+        if (!grab.dragging) {
+          if (!grab.from || Math.hypot(ev.clientX - grab.x, ev.clientY - grab.y) < 8) return;
+          grab.dragging = true; board.held = board.pieces.get(grab.from) || null; setCursor('grabbing');
+        }
+        const at = board.onBoard(ctx.ray(ev)); if (!at || !board.held) return;
+        board.held.position.set(clampB(at.x), 0.03, clampB(at.z));
+        board.hover(isTarget(at.sq) ? at.sq : null);
+      },
+      up(ev) {
+        if (!grab || ev.pointerId !== grab.id) return;
+        const g = grab; grab = null; board.hover(null); lastHandled = performance.now();
+        if (g.dragging) {
+          const m = board.held; board.held = null; setCursor('grab');
+          const at = board.onBoard(ctx.ray(ev)), to = at && at.sq;
+          if (m && to && to !== g.from && isTarget(to) && myTurn()) {
+            // set down exactly on the square: it waits there while a move to a player goes out, and is simply there in a house game
+            const [x, z] = sqPos(to); m.position.set(x, 0, z); board.parked = { m, until: performance.now() + 4000 };
+            tryMove(g.from, to); if (!S) board.parked = null;
+          } else board.home();
+          refresh(); return;
+        }
+        if (g.from) { if (g.wasSel === g.from) { sel = null; targets = []; refresh(); } return; }   // picked up on press; tapping it again puts it down
+        tapRes(g.res);
+      },
+      cancel() { if (!grab) return; grab = null; board.held = null; board.hover(null); board.home(); }
+    };
 
     // ---- watching: the host of a game sends snapshots for the people at the table; everyone else draws them
     function snapshot() {
@@ -577,17 +708,17 @@
         const sg = seat && seat.z < 0 ? -1 : 1; let off, lk;
         if (seat && seat.watch && view !== 'overhead') {   // watching: from beside the table, a little above it
           const sx = Math.sign(seat.x) || 1, tallW = asp < 0.9;
-          off = new THREE.Vector3(sx * (tallW ? 0.62 : 0.92), tallW ? 1.38 : 1.3, 0.04); lk = new THREE.Vector3(0, 0.55, 0);
+          off = new THREE.Vector3(sx * (tallW ? 0.7 : 1.0), tallW ? 1.45 : 1.36, 0.04); lk = new THREE.Vector3(0, 0.55, 0);
           if (view === 'seat') { off.set(sx * 0.8, 1.05, 0.04); lk.set(-sx * 0.05, 0.55, 0); }
           return [off, lk];
         }
         // On a phone held upright the board has to span the screen's width (squares big enough for a fingertip), so the camera comes
         // in steep and close; the bottom sheet's space is handled by the page (frameFit).
-        const tall = asp < 0.9, fit = tall ? Math.max(0.5, 0.78 * (0.46 / Math.max(0.3, asp))) : 1;
-        if (view === 'overhead') { off = new THREE.Vector3(0, tall ? 0.55 + fit * 1.05 : 1.48, 0.06 * sg); lk = new THREE.Vector3(0, 0.55, 0); }
-        else if (view === 'seat') { off = new THREE.Vector3(0, 1.05, 1.02 * sg); lk = new THREE.Vector3(0, 0.55, -0.06 * sg); if (tall) off.sub(lk).multiplyScalar(1 + (0.9 - asp) * 1.15).add(lk); }
+        const tall = asp < 0.9, fit = tall ? Math.max(0.5, 0.78 * (0.46 / Math.max(0.3, asp))) * (SQ / 0.05) : 1;
+        if (view === 'overhead') { off = new THREE.Vector3(0, tall ? 0.55 + fit * 1.05 : 1.6, 0.06 * sg); lk = new THREE.Vector3(0, 0.55, 0); }
+        else if (view === 'seat') { off = new THREE.Vector3(0, 1.2, 1.0 * sg); lk = new THREE.Vector3(0, 0.55, -0.08 * sg); /* eyes a little higher: the far ranks open up */ if (tall) off.sub(lk).multiplyScalar(1 + (0.9 - asp) * 1.15).add(lk); }
         else if (tall) { off = new THREE.Vector3(0, 0.55 + fit * 0.86, fit * 0.5 * sg); lk = new THREE.Vector3(0, 0.55, -0.015 * sg); }
-        else { off = new THREE.Vector3(0, 1.3, 0.8 * sg); lk = new THREE.Vector3(0, 0.55, -0.04 * sg); }
+        else { off = new THREE.Vector3(0, 1.38, 0.88 * sg); lk = new THREE.Vector3(0, 0.55, -0.04 * sg); }
         return [off, lk];
       },
       canLeave() { return !(S && S.table.g && !S.table.g.result) && !busy; },
@@ -595,11 +726,15 @@
       held() { return S && !S.settled ? S.stake : 0; },
       pickClick(ev) {
         if (ctx.focus() !== st) return false;
-        const s = board.pick(ctx.ray(ev)); if (!s) return false;
-        ctx.audio(); return clickSquare(s);
+        if (performance.now() - lastHandled < 800) return true;              // the same tap, already handled as a pointer
+        const r = board.pickAt(ctx.ray(ev)); if (!r.piece && !r.board && !r.near) return false;
+        ctx.audio(); return tapRes(resolve(r));
       },
+      pointer(kind, ev) { return pointer[kind](ev); },
       update(t) {
         board.update(); lobby.frame(ctx.focus() === st);
+        if (!grab) board.home();
+        if (ctx.focus() === st) attachPointer(ctx); touchMode(ctx.focus() === st ? st : null, st);
         if (engine.api && (t - (st.specT || 0) > 0.5)) {
           st.specT = t; const here = specFrame();
           if (here && !ctx.focus() && showR()) { chipOwner = def.id; specChip('♟ ' + R.wn + ' vs ' + R.bn + (R.result ? ' · ' + R.result : '') + ' · tap the table to watch'); }
@@ -711,7 +846,8 @@
     loadEngine().then(() => { if (resume && !H && !S) startHouse(resume); else paint(true); }).catch(() => { });
     st.onSpec = onSpec; st.watchSeat = watchSeat;
     // for tests and bug reports (scripts/test-casino-chess.mjs): what the table holds now
-    st.debug = () => { const p = pos(), g = S && S.table.g; return { mode: S ? 'pvp' : showR() ? 'watch' : H ? 'house' : 'idle', watch: R ? { wn: R.wn, bn: R.bn, moves: R.uci ? R.uci.length : null, result: R.result, clocks: watchClocks(), seat: watchingHere() } : null, fen: p ? p.fen() : null, uci: H ? H.uci.slice() : g ? g.uci.slice() : [], me: p ? me() : null, over: H ? H.over : g && g.result ? { result: g.result, termination: g.term } : null, verified: H ? H.verified : null, thinking: !!(H && H.thinking), legal: p ? p.movesUci() : [], flip: board.flip, seed: H ? H.seed : null, clocks: S ? S.clocks() : null, stake: S ? S.stake : 0, host: S ? !!S.chain.host : null, msg }; };
+    st.debug = () => { const p = pos(), g = S && S.table.g; return { mode: S ? 'pvp' : showR() ? 'watch' : H ? 'house' : 'idle', sel, targets: targets.map((t) => t.sq), watch: R ? { wn: R.wn, bn: R.bn, moves: R.uci ? R.uci.length : null, result: R.result, clocks: watchClocks(), seat: watchingHere() } : null, fen: p ? p.fen() : null, uci: H ? H.uci.slice() : g ? g.uci.slice() : [], me: p ? me() : null, over: H ? H.over : g && g.result ? { result: g.result, termination: g.term } : null, verified: H ? H.verified : null, thinking: !!(H && H.thinking), legal: p ? p.movesUci() : [], flip: board.flip, seed: H ? H.seed : null, clocks: S ? S.clocks() : null, stake: S ? S.stake : 0, host: S ? !!S.chain.host : null, msg }; };
+    st.debugPick = (x, y) => { const r = board.pickAt(ctx.ray({ clientX: x, clientY: y })); return { ...r, res: resolve(r), myTurn: myTurn(), sel }; };
     st.squareFromPoint = (x, y) => board.pick(ctx.ray({ clientX: x, clientY: y }));
     st.squareAt = (sq) => { const [x, z] = sqPos(sq); return board.root.localToWorld(new THREE.Vector3(x, 0.017, z)); };
     st.houseShown = (where) => !!(H && !H.over) && !showR() && !watchingHere() && ctx.focus() === st && (where === 'chair') === mySeatIsSofa();
@@ -729,12 +865,12 @@
   });
   let built = [];
   root.PXChess = {
-    version: 'c2', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
+    version: 'c3', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
     placement, TAGS, SEATS: SEATS_OUT, VERB, engine, loadEngine, ask, houseList, makeRelayTable, makeSession,
     makeStations(ctx) {
       // the station's seats must be the very objects in the page's SEATS (the room maps a seat to its spot by identity)
       // the room hooks are optional: a page without them simply never shows other people's games
-      ctx = Object.assign({ roomSend: () => { }, roomHas: () => false, roomMe: () => null, watching: () => null, taken: () => [] }, ctx);
+      ctx = Object.assign({ roomSend: () => { }, roomHas: () => false, roomMe: () => null, watching: () => null, taken: () => [], canvasEl: () => document.getElementById('gl') }, ctx);
       built = SOFAS.map((def) => { const st = makeStation(ctx, def); return st; });
       built.forEach((st) => { SEATS_OUT[st.id] = st.seats; });
       return built;
@@ -750,6 +886,7 @@
     // a `spec` message from the room (watching a game): to the table it names
     onSpec(m) { const st = built.find((s) => s.id === (m && m.tb)); if (st && st.onSpec) try { st.onSpec(m); } catch (e) { console.warn('[chess] a snapshot failed', e); } },
     packMoves, unpackMoves,
+    input: () => ({ pointerOn, touch: !!touchOwner }),   // for tests
     stations: () => built
   };
 })(window);
