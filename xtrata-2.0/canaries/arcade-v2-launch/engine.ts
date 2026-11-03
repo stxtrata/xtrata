@@ -801,7 +801,40 @@ const packStep = (f: Upload): Step => ({
   }
 });
 
-export const STEPS: Step[] = [
+export 
+// ---------- Astro Blaster 3 (testnet rehearsal): the manifest picture, assembled around the testnet id the game gets ----------
+const b64bytes = (t: string) => Uint8Array.from(atob(t), (c) => c.charCodeAt(0));
+const u32le = (n: number) => new Uint8Array([n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]);
+const cat = (...a: Uint8Array[]) => { const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let p = 0; for (const x of a) { o.set(x, p); p += x.length; } return o; };
+const ascii = (t: string) => Uint8Array.from(t, (c) => c.charCodeAt(0));
+/** Writes `note` into a webp's XMP metadata without touching the pixels (the same thing ops/framed-manifest.mjs does for the real inscription). */
+const embedNote = (img: Uint8Array, note: string): Uint8Array => {
+  const dv = new DataView(img.buffer, img.byteOffset, img.byteLength);
+  if (String.fromCharCode(...img.subarray(0, 4)) !== 'RIFF' || String.fromCharCode(...img.subarray(8, 12)) !== 'WEBP') throw new Error('the poster is not a webp');
+  const chunks: { t: string; d: Uint8Array }[] = [];
+  for (let o = 12; o + 8 <= img.length;) { const n = dv.getUint32(o + 4, true); chunks.push({ t: String.fromCharCode(...img.subarray(o, o + 4)), d: img.slice(o + 8, o + 8 + n) }); o += 8 + n + (n & 1); }
+  if (!chunks.length) throw new Error('the poster has no chunks');
+  if (chunks[0].t !== 'VP8X') {
+    const d = chunks[0].d, v = new DataView(d.buffer, d.byteOffset, d.byteLength); let w: number, h: number;
+    if (chunks[0].t === 'VP8 ') { w = v.getUint16(6, true) & 0x3fff; h = v.getUint16(8, true) & 0x3fff; }
+    else if (chunks[0].t === 'VP8L') { const x = v.getUint32(1, true); w = (x & 0x3fff) + 1; h = ((x >>> 14) & 0x3fff) + 1; }
+    else throw new Error('unknown webp layout');
+    const x = new Uint8Array(10); x[0] = chunks[0].t === 'VP8L' ? 0x10 : 0;
+    x[4] = (w - 1) & 255; x[5] = ((w - 1) >> 8) & 255; x[6] = ((w - 1) >> 16) & 255; x[7] = (h - 1) & 255; x[8] = ((h - 1) >> 8) & 255; x[9] = ((h - 1) >> 16) & 255;
+    chunks.unshift({ t: 'VP8X', d: x });
+  }
+  chunks[0].d[0] |= 0x04;                                         // XMP present
+  chunks.push({ t: 'XMP ', d: cat(ascii('<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:xtrata="https://xtrata.xyz/ns/">'),
+    ascii(note), ascii('</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="w"?>')) });
+  const parts = chunks.map(({ t, d }) => cat(ascii(t), u32le(d.length), d, new Uint8Array(d.length & 1)));
+  const body = cat(ascii('WEBP'), ...parts);
+  return cat(ascii('RIFF'), u32le(body.length), body);
+};
+const latin1 = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return s; };
+/** The picture's note text: `<xtrata-game>{...}</xtrata-game>`, naming the real game's inscription id, chain hash and size, and carrying the marquee. */
+const astroNote = (gameId: bigint, game: Upload) => `<xtrata-game>${JSON.stringify({ v: 1, kind: 'framed-game', board: LAUNCH.astro.id, game: { id: Number(gameId), hash: toHex(game.hash), size: game.bytes.length }, marquee: `data:image/webp;base64,${LAUNCH.astro.marquee}` })}</xtrata-game>`;
+
+const STEPS: Step[] = [
   {
     id: 'connect', title: 'Connect the root wallet', who: 'Web wallet',
     intro: 'Opens the wallet chooser, then the wallet\'s own account picker. Pick the root owner for this network: it deploys the three contracts, owns every space, owns #55 and the leaderboard, inscribes the release and moves the boards.',
@@ -1552,6 +1585,41 @@ export const STEPS: Step[] = [
       }
       const h = await gread('get-height');
       return `${lines.join(' · ')} · burn height now ${String(h).replace(/^u/, '')}: a game shows in the hall once its live-at block has passed (delay ${NET().gamesDelay} blocks); reload the hall then`;
+    }
+  }
+  ,{
+    id: 'astrotest', testnetOnly: true, title: `Add ${LAUNCH.astro.title} (a framed game with a cabinet picture) to the games contract`, who: 'Web wallet · up to about 40 signatures (fewer for what is already done)',
+    intro: `Testnet only, to see the real ${LAUNCH.astro.title} in the real hall before it goes near mainnet. Inscribes the game exactly as it is on mainnet (#3075, v3.0.2), then builds the cabinet picture (the poster with a note in its metadata naming the game's testnet inscription, its chain hash and size, plus the marquee), inscribes that, registers the "${LAUNCH.astro.id}" score board if it is missing, and calls add-game with kind 3. Both inscriptions are re-used when the same bytes are already there.`,
+    action: 'Add Astro Blaster 3',
+    run: async () => {
+      const w = requireRoot(), parent = state.inscriptionId, g = LAUNCH.astro;
+      if (!parent) throw new Error('The parent is not inscribed yet: run the parent step first (the board names it as its engine).');
+      const ga = await gread('get-admin');
+      if (ga !== w.address) throw new Error(`${NAMES.games} admin is ${ga}, not the root wallet.`);
+      const gameUp = makeUploadBytes('astro-game', `${g.title} (v3.0.2, as #3075)`, 'text/html', b64bytes(g.game));
+      const gameIns = await inscribe('astrotest', gameUp, [], []);
+      const pic = embedNote(b64bytes(g.poster), astroNote(BigInt(gameIns.id), gameUp));
+      if (pic.length > 1048576) throw new Error(`the cabinet picture is ${pic.length} bytes; the games contract allows 1 MiB`);
+      const picUp = makeUploadBytes('astro-picture', `${g.title} cabinet picture`, 'image/webp', pic);
+      const picIns = await inscribe('astrotest', picUp, [], []);
+      const wantBoard = (b: Awaited<ReturnType<typeof readBoard>>) => !!b && b.enabled === 'true' && b.mode === '0';
+      if (!wantBoard(await readBoard(g.id))) {
+        await runTx('astrotest', `set-board ${g.id} → #${parent}`, () => rootCall(scoresId(), 'set-board',
+          [stringAsciiCV(g.id), uintCV(0), uintCV(999999999), uintCV(0), uintCV(BigInt(parent)), boolCV(false), boolCV(true)]));
+        await eventually(`${g.id} board`, async () => (wantBoard(await readBoard(g.id)) ? null : 'board not set yet'));
+      }
+      let n = await gread('get-game-number', [stringAsciiCV(g.id)]);
+      if (n === null) {
+        await runTx('astrotest', `add-game ${g.id} (kind 3)`, () => rootCall(cid(NAMES.games), 'add-game',
+          [stringAsciiCV(g.id), stringAsciiCV(g.title), uintCV(BigInt(picIns.id)), bufferCV(picUp.hash), uintCV(pic.length), uintCV(3), uintCV(1)]));
+        n = await eventually(`${g.id} on the games contract`, async () => ((await gread('get-game-number', [stringAsciiCV(g.id)])) === null ? 'not listed yet' : null)).then(() => gread('get-game-number', [stringAsciiCV(g.id)]));
+      }
+      const rec: any = await gread('get-game', [uintCV(BigInt(String(n).replace(/^u/, '')))]);
+      if (!rec || String(rec['code-id']).replace(/^u/, '') !== String(picIns.id) || String(rec['code-hash']).replace(/^0x/, '') !== toHex(picUp.hash)) {
+        throw new Error(`${g.id} is on the games contract with a different picture than #${picIns.id}; use a new id for a changed game.`);
+      }
+      const h = await gread('get-height');
+      return `${g.id}: game ${String(n).replace(/^u/, '')}, kind 3, picture #${picIns.id} (${picUp.bytes.length} bytes, hash 0x${toHex(picUp.hash)}), game #${gameIns.id} (${gameUp.bytes.length} bytes) · burn height now ${String(h).replace(/^u/, '')}, live at ${String(rec['live-at']).replace(/^u/, '')} (delay ${NET().gamesDelay} blocks)`;
     }
   }
 ];

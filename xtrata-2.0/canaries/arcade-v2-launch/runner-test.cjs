@@ -122,6 +122,27 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   const txMid = C.S.rawBySender[addr] || 0;
   r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,boards26,testgames']);
   check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txMid, 'running it again sends nothing');
+  // The Astro Blaster 3 step: the real game and a cabinet picture assembled around the id the game gets; add-game kind 3.
+  check(!R.FULL_EXTRA_STEPS.includes('astrotest') && !R.DEFAULT_STEPS.includes('astrotest'), 'the Astro Blaster 3 step is only run when asked for');
+  const txA = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,astrotest']);
+  if (r.code !== 0) console.log(r.out.split('\n').filter((l) => /FAIL|!!|rror/.test(l)).join('\n').slice(0, 1800));
+  check(r.code === 0 && /PASS astrotest/.test(r.out), 'the astrotest step passes');
+  const GAMES = `${addr}.xtrata-games-v1`;
+  const ga = C.pp(C.readOnly(GAMES, 'get-game', [C.Cl.uint(2)]));
+  check(/id: "astro3"/.test(ga) && /kind: u3/.test(ga) && /code-size: u\d+/.test(ga), 'game 2 is astro3, kind 3 (' + ga.replace(/\s+/g, ' ').slice(0, 160) + ')');
+  const picId = Number(/code-id: u(\d+)/.exec(ga)[1]), picSize = Number(/code-size: u(\d+)/.exec(ga)[1]);
+  const picBytes = C.inscriptionBytes(picId), gameBytes = C.inscriptionBytes(picId - 1);
+  const crypto = require('crypto');
+  const chainHash = (b) => { let h = Buffer.alloc(32); for (let i = 0; i < b.length; i += 16384) h = crypto.createHash('sha256').update(Buffer.concat([h, b.subarray(i, i + 16384)])).digest(); return h; };
+  const txt = picBytes.toString('latin1'), note = JSON.parse(txt.slice(txt.indexOf('<xtrata-game>') + 13, txt.indexOf('</xtrata-game>')));
+  check(picBytes.length === picSize && picBytes.subarray(0, 4).toString() === 'RIFF' && picBytes.subarray(8, 12).toString() === 'WEBP', 'the picture inscribed is a webp of the size the contract holds (' + picSize + ' bytes)');
+  check(note.board === 'astro3' && note.game.id === picId - 1 && note.game.size === gameBytes.length && note.game.hash === chainHash(gameBytes).toString('hex'), 'its note names the game inscription (#' + (picId - 1) + '), its size and its chain hash');
+  check(/^data:image\/webp;base64,/.test(note.marquee) && gameBytes.toString('utf8').includes('<title>Astro Blaster 3</title>'), 'the note carries the marquee, and the game inscribed is Astro Blaster 3');
+  check(/id: "astro3"/.test(C.pp(C.readOnly(`${addr}.xtrata-arcade-scores-v2`, 'get-board', [C.Cl.stringAscii('astro3')]))) || /mode: u0/.test(C.pp(C.readOnly(`${addr}.xtrata-arcade-scores-v2`, 'get-board', [C.Cl.stringAscii('astro3')]))), 'the astro3 score board exists');
+  const txB = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,astrotest']);
+  check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txB, 'running it again sends nothing (' + (txB - txA) + ' transactions the first time)');
   check(C.S.violations.length === 0, 'every STX movement was still covered by a deny-mode post-condition');
 
   fs.rmSync(tmp, { recursive: true, force: true });

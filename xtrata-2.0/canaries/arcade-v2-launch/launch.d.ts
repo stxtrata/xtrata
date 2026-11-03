@@ -31,6 +31,7 @@ declare module "xa:launch" {
     coreTestnetSha: Record<string, string>;
     boards: { id: string; game: string; mode: number; max: number }[];
     testGames: { id: string; title: string; file: string; mode: number; max: number; source: string }[];
+    astro: { id: string; title: string; game: string; poster: string; marquee: string };
     /** score-client.js, world.js and world2.js: the hall's own registry reader */
     reader: Record<string, string>;
   };

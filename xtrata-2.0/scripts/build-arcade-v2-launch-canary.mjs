@@ -255,6 +255,12 @@ const launch = {
     { id: 'xa_test_catcher', title: 'Sat Catcher', file: 'test-catcher.js', mode: 0, max: 100000 },
     { id: 'xa_test_sprint', title: 'Arrow Sprint', file: 'test-sprint.js', mode: 1, max: 360000 }
   ].map((g) => ({ ...g, source: readFileSync(resolve(XA, 'games-extra', g.file), 'utf8') })),
+  // Astro Blaster 3 for the testnet rehearsal (the `astrotest` step): the game exactly as inscribed on mainnet (#3075, v3.0.2) and the cabinet poster and marquee.
+  // The step inscribes the game, then builds the manifest picture around the testnet id the game gets (the note names it), then calls add-game kind 3.
+  astro: (() => {
+    const d = resolve(root, 'recursive-apps/astro-blaster-3'), b64 = (f) => readFileSync(resolve(d, f)).toString('base64');
+    return { id: 'astro3', title: 'Astro Blaster 3', game: b64('release/astro-blaster-3-inscribed-3075.html'), poster: b64('cabinet/cabinet-poster.webp'), marquee: b64('cabinet/cabinet-marquee.webp') };
+  })(),
   // the hall's own registry reader, run by the canary against the registry before anything is inscribed
   reader: Object.fromEntries(['score-client.js', 'world.js', 'world2.js'].map((n) => [n, parts[n]]))
 };
