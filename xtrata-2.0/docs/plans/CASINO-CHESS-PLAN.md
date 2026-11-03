@@ -220,3 +220,11 @@ address and says so. The LAYR dispenser's short wallet address copies the whole 
 
 Files: `public/casino/chess.js` (`c5`); step 5 of `scripts/patch-casino-chess.py`; `scripts/patch-casino-people.py` (run after it);
 `src/casino-room/address-card.ts` (new), `chat.ts` and `main.ts`, built into `public/casino/room.js` (`p6`).
+
+## 11. Material, move review, clearer pieces and the X-Chess view (added 2026-11-03)
+
+Jim's son's notes after playing, planned and built in `CASINO-CHESS-NEXT-PLAN.md` (chess.js `c6`, page patch step 6):
+- the pieces each side has taken, and +N for the side ahead;
+- |◀ ◀ ▶ ▶| and Back to the game for looking through the moves;
+- 3D pieces with outlines, graphite black pieces and more defined shapes;
+- an X-Chess view under View: a flat 2D board in the X-Chess style with chess.com-like pieces of our own.
