@@ -5,6 +5,8 @@
 //   F4  hand-offs: the pilot's address (only to the open game, only for stx_requestAccounts), a run to post (shape checked) goes up to the viewer
 //       or, with no viewer above the hall, opens the xtrata.xyz submit page; a bad board / name / score is refused; messages from anyone else are ignored
 //   F6  a real window above the hall (the viewer): the run goes up under the hall's own id, the viewer's answer comes back under the game's id; a silent viewer falls back to the submit page
+//   F7  a manifest game (kind 3): the contract's inscription is a picture whose note names the real game; the hall takes the cabinet art from it,
+//       checks the real game against the hash in the note, and skips a picture with no note or for another board
 //   F5  other kinds are still ignored (kind 7 = unknown), and the High scores list has no replay tools for a framed game
 // Run: NODE_PATH=<playwright + @stacks/transactions> CHROME_PATH=... node tests/hall-framed.test.cjs
 const { chromium } = require('playwright');
@@ -27,7 +29,13 @@ window.ask = function (m) { parent.postMessage(m, '*'); };
 window.store = (function () { try { localStorage.setItem('x', '1'); return 'works'; } catch (e) { return 'blocked'; } })();
 </script></body></html>`);
 const BIG_LIE = 9501;
-const CONTENT = { 3078: fs.readFileSync(path.join(ROOT, 'release', 'xtrata-arcade.html')), 9500: GAME_PAGE, [BIG_LIE]: GAME_PAGE };
+const PNG1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const manifestSvg = (note, withArt = true) => Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10"><title>art</title>' +
+  (note ? '<metadata id="xtrata-game"><![CDATA[' + JSON.stringify(note) + ']]></metadata>' : '') +
+  (withArt ? '<image id="xa-cab-marquee" x="0" y="0" width="10" height="2" href="' + PNG1 + '" xlink:href="' + PNG1 + '"/><image id="xa-cab-side" x="0" y="2" width="10" height="8" href="' + PNG1 + '" xlink:href="' + PNG1 + '"/>' : '') + '</svg>');
+const good = { v: 1, kind: 'framed-game', board: 'astro3', game: { id: 9500, hash: MC.chainHash(GAME_PAGE).toString('hex'), size: GAME_PAGE.length } };
+const MAN = { 9600: manifestSvg(good), 9601: manifestSvg({ ...good, game: { ...good.game, hash: 'ab'.repeat(32) } }), 9602: manifestSvg(null), 9603: manifestSvg({ ...good, board: 'other_board' }), 9604: manifestSvg(good, false) };
+const CONTENT = { 3078: fs.readFileSync(path.join(ROOT, 'release', 'xtrata-arcade.html')), 9500: GAME_PAGE, [BIG_LIE]: GAME_PAGE, ...MAN };
 for (const [name, id] of Object.entries(PACK_IDS)) CONTENT[id] = fs.readFileSync(path.join(DIST, manifest.packs[name].file));
 const GAMES_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-games-v1';
 const BUILT_IN_COUNT = 21;
@@ -42,7 +50,7 @@ function parentWith(config) {
   return html.replace(m[0], () => 'var CONFIG = ' + JSON.stringify(Object.assign(base, config)) + ';');
 }
 const item = (o) => Object.assign({ title: o.id, kind: 2, engineMin: 1, liveAt: 100, hidden: false }, o);
-const chainWith = (items) => MC.createChain({ games: { height: 5000, items }, inscriptions: { 9500: GAME_PAGE, [BIG_LIE]: GAME_PAGE } });
+const chainWith = (items) => MC.createChain({ games: { height: 5000, items }, inscriptions: { 9500: GAME_PAGE, [BIG_LIE]: GAME_PAGE, ...MAN } });
 const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
 
 (async () => {
@@ -115,7 +123,7 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   pages['/games.html'] = parentWith(Object.assign({}, hallParts, { games: { contract: GAMES_CONTRACT } }));
   r = await open('/games.html', chainWith([item({ id: 'astro3', title: 'Astro Blaster 3', index: 21, codeId: 9500 }), item({ id: 'weird_kind', kind: 7, index: 22, codeId: 9500 })]));
   check(!r.loadErr, 'F1: the hall loads with a framed game on the contract (' + (r.loadErr || 'no error') + ')');
-  const g = await look(r.page);
+  let g = await look(r.page);
   check(g.status.loaded.join() === 'astro3' && g.status.skipped.some((s) => s.id === 'weird_kind' && /unknown kind/.test(s.reason)), 'F1/F5: the framed game is added and an unknown kind (7) is still skipped (' + JSON.stringify(g.status.skipped) + ')');
   check(g.ids.length === BUILT_IN_COUNT + 1 && g.ids[BUILT_IN_COUNT] === 'astro3' && JSON.stringify(g.ids.slice(0, BUILT_IN_COUNT)) === JSON.stringify(base0.ids), 'F1: 22 games, the new one after the 21 built-in games, which are unchanged');
   check(g.cabs === base0.cabs + 1, 'F1: and one more cabinet in the hall (' + base0.cabs + ' to ' + g.cabs + ')');
@@ -264,6 +272,49 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   } else {
     check(true, 'F3: a game whose registry record size lies is not added at all (' + JSON.stringify(await r.page.evaluate(() => window.XAGamesRegistry.status().skipped)) + ')');
   }
+  await r.ctx.close();
+
+  /* ------------------------------------------------ F7 a manifest picture (kind 3) */
+  const mItem = (codeId) => item({ id: 'astro3', title: 'Astro Blaster 3', index: 21, kind: 3, codeId });
+  r = await open('/games.html', chainWith([mItem(9600)]));
+  g = await look(r.page);
+  check(g.status.loaded.join() === 'astro3' && g.ids.length === BUILT_IN_COUNT + 1, 'F7: a manifest picture adds the game (' + JSON.stringify(g.status.skipped) + ')');
+  check(g.def && g.def.framed.id === 9500 && g.def.framed.size === GAME_PAGE.length && g.def.board === 'astro3', 'F7: the game framed is the inscription the note names (#9500), not the picture (' + JSON.stringify(g.def) + ')');
+  const art = await r.page.evaluate(() => { const a = window.XA.games.find((x) => x.id === 'astro3').cabinetArt; return a && { side: /^data:image\/png/.test(a.side || ''), marquee: /^data:image\/png/.test(a.marquee || '') }; });
+  check(art && art.side && art.marquee, 'F7: the cabinet art comes from the picture (side and marquee)');
+  check(g.scripts === 0, 'F7: no script was fetched or run');
+  await r.page.click('#go'); await r.page.waitForTimeout(800);
+  await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
+  await r.page.evaluate((i) => window.XA.startGame(i), g.ids.indexOf('astro3'));
+  await r.page.waitForFunction(() => window.XA.framedState && window.XA.framedState().open && window.XA.framedState().loaded, null, { timeout: 120000 });
+  check(true, 'F7: playing opens the real game from the note\'s inscription');
+  await r.page.click('#xa-framed-back'); await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
+  check(!r.errors.length, 'F7: no page errors ' + r.errors.slice(0, 2).join(' | '));
+  await r.ctx.close();
+
+  // The note names a hash the real game does not have: the cabinet may exist but the game is never opened.
+  r = await open('/games.html', chainWith([mItem(9601)]));
+  await r.page.click('#go'); await r.page.waitForTimeout(800);
+  await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
+  const i8 = await r.page.evaluate(() => window.XA.games.findIndex((x) => x.id === 'astro3'));
+  await r.page.evaluate((i) => window.XA.startGame(i), i8);
+  await r.page.waitForFunction(() => window.XA.framedState && window.XA.framedState().open, null, { timeout: 120000 });
+  await r.page.waitForFunction(() => window.XA.framedState().failed, null, { timeout: 120000 }).catch(() => {});
+  const f8 = await r.page.evaluate(() => window.XA.framedState());
+  check(f8.failed && !f8.loaded, 'F7: a game that does not match the hash in the note is not opened (' + f8.why + ')');
+  await r.ctx.close();
+
+  // A picture with no note, a note for another board, and a picture with a note but no art.
+  for (const [id, why] of [[9602, 'no note'], [9603, 'other board']]) {
+    r = await open('/games.html', chainWith([mItem(id)]));
+    g = await look(r.page);
+    check(!g.ids.includes('astro3') && g.status.skipped.some((x) => x.id === 'astro3' && /manifest/.test(x.reason)), 'F7: a picture with ' + why + ' is skipped, the hall carries on (' + JSON.stringify(g.status.skipped) + ')');
+    await r.ctx.close();
+  }
+  r = await open('/games.html', chainWith([mItem(9604)]));
+  g = await look(r.page);
+  const art4 = await r.page.evaluate(() => { const a = window.XA.games.find((x) => x.id === 'astro3'); return a && a.cabinetArt; });
+  check(g.ids.includes('astro3') && art4 && !art4.side && !art4.marquee, 'F7: a note with no art still works (plain cabinet)');
   await r.ctx.close();
 
   /* ------------------------------------------------ F6 the real hand-up, with a real viewer window above the hall */

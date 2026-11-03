@@ -53,7 +53,7 @@ notes.forEach((n) => console.log(`note: ${n}`));
 if (problems.length) { console.log('\nNOT READY:'); problems.forEach((p) => console.log(`  - ${p}`)); process.exit(1); }
 
 console.log('\nREADY. Do these in order (nothing here has been sent):');
-console.log(`  1. The inscription${args.inscription ? ' #' + args.inscription : ''} must be SEALED and must have been created by the wallet that is the games contract admin (xtrata.btc): add-game refuses any other creator.`);
+console.log(`  1. The inscription${args.inscription ? ' #' + args.inscription : ''} must be SEALED and must have been created by the wallet that is the games contract admin (xtrata.btc): add-game refuses any other creator. If the game was inscribed by another wallet (as #3075 was, by jim.btc), use ops/framed-manifest.mjs instead: the admin inscribes a small picture that points at the game.`);
 console.log(`     Check on xtrata.xyz that #${args.inscription || '<id>'} was minted by that wallet. If it was not, the game has to be inscribed again from the admin wallet.`);
 console.log('  2. On the scores contract the hall reads, as its owner, make sure the board exists (about 0.02 STX):');
 console.log(`       set-board  id "${id}"  mode u0   (highest wins)    -- skip if it is already there; check get-board first`);

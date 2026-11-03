@@ -1945,7 +1945,7 @@ function skinMat(t, glow){ return new THREE.MeshStandardMaterial({map:t, emissiv
    parametric cabinet. The model brings its own body, screen, controls and marquee; the hall gives it a screen canvas (portrait, the shape of the model's screen),
    puts its back at the slot's back like every other machine, and drives its start button. Everything else (focus, zoom into the screen, sound, collision) is shared. */
 function buildModelCabinet(game, i){
-  const spec=window.XA_CAB3D[game.id], cab=spec.build(THREE,{lighting:false});
+  const spec=window.XA_CAB3D[game.id], cab=spec.build(THREE,{lighting:false, art:game.def.cabinetArt||null});
   const group=new THREE.Group(); group.add(cab.group); cab.group.updateMatrixWorld(true);
   const bb=new THREE.Box3().setFromObject(cab.group); cab.group.position.z=-bb.min.z;   // back at z=0, front forward, the way the hall's own machines stand
   const D=bb.max.z-bb.min.z, w=bb.max.x-bb.min.x;

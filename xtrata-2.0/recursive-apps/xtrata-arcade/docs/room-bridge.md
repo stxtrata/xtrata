@@ -201,7 +201,20 @@ The game never signs. It speaks the two hand-offs it speaks on xtrata.xyz, and t
 - `xtrata:arcade:submit {id, payload}`: a finished run to post. The hall checks only the shape (board starts with the game's id, name 3-12 of `A-Za-z0-9 _.-`, positive whole score, replay is base64url under about 100 KB) and passes it up to the window above the hall (the Xtrata viewer: its review dialog, its wallet). The viewer's `submit-opened` / `submit-result {txId | cancelled | error}` come back under the game's own id. With no viewer above the hall (or one that does not answer within 4 s) the hall opens `xtrata.xyz/arcade/submit#p=…` in a tab, or shows a link if the browser blocks it.
 - `xtrata:wallet:hello` then `xtrata:wallet:request` with `method: "stx_requestAccounts"`: the pilot's address, from the wallet the hall is already connected to (connected on the spot if not). Any other method is refused. With no wallet reachable the hello is not answered and the game offers to paste an address.
 
-Tests: `tests/hall-framed.test.cjs`. Pre-flight before `add-game`: `contracts/arcade-world/ops/framed-check.mjs`.
+### Manifest games (kind 3): the same game, added through a picture
+
+A framed game can also be added through a small **manifest picture**: `add-game(... kind u3 ...)` where `code-id` is an SVG that looks like an ordinary still image (the cabinet's art) and carries the note the hall needs. This is for a game whose inscription was made by someone other than the games admin: the contract only accepts an inscription its admin created, and the picture is the admin's own inscription that points at the real game. The picture is not playable and is never run.
+
+The SVG holds:
+
+- `<metadata id="xtrata-game">` with JSON `{"v":1,"kind":"framed-game","board":"astro3","game":{"id":3075,"hash":"<64 hex, the xtrata chain hash>","size":326043}}`. `board`, if present, must equal the contract's game id.
+- `<image id="xa-cab-marquee">` and `<image id="xa-cab-side">` as `data:image/jpeg|png|webp;base64,…` (at most 2 MB each): the cabinet's marquee and side print. A note with no art still works (plain cabinet).
+
+The hall reads the picture only as text (never put in the page), checks it against the contract's hash and size, and registers the game as in kind 2 with the game named by the note. The real game is fetched only when played and must have exactly the hash and size in the note; if it differs, the game is not opened. A picture with no note, a bad note or another board's note is skipped and the rest of the hall carries on. The picture must be at most 1 MiB (the contract's limit).
+
+Make the picture with `contracts/arcade-world/ops/framed-manifest.mjs` (offline; prints the `add-game` values).
+
+Tests: `tests/hall-framed.test.cjs` (F1-F7). Pre-flight before `add-game`: `contracts/arcade-world/ops/framed-check.mjs` (kind 2) or `framed-manifest.mjs` (kind 3).
 
 Limits worth knowing: the sandboxed page has no `localStorage` (a game that keeps settings there starts fresh each time), and cannot open tabs or use the clipboard; the hall's radio button steps aside while a framed game is open, like during any cabinet game.
 

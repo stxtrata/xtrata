@@ -14316,7 +14316,4180 @@ var sha2562 = sha256;
 var import_transactions2 = __toESM(require_dist4(), 1);
 
 // xa:launch
-var launch_default = { release: { version: "v2.0.0", bundle: { id: 3078, sha256: "d9fa6b2085d64c1e5cb63682bbc278e1fe83a335d8dda914d657d9ba675bd62c", bytes: 3915150, chunks: 239, chainHash: "d6221767e2cc13238d921e1a804a87277bcbd04da4b1433dcfebe30279a08035" }, packOrder: ["assets", "three", "engine", "games", "hall"], inscribe: ["engine", "hall"], packs: { engine: "/*@xa-pack engine v1*/\n/*@xa-part room.css*/\n/* Xtrata Arcade \u2014 room styles (leaf module) */\n:root {\n  --xa-bg: #05060f;\n  --xa-floor: #0a0c1c;\n  --xa-panel: #10132a;\n  --xa-panel-2: #171b38;\n  --xa-line: rgba(140, 160, 255, 0.18);\n  --xa-text: #eef1ff;\n  --xa-dim: #9aa3c7;\n  --xa-faint: #5d6590;\n  --xa-pink: #ff3fa4;\n  --xa-cyan: #3ff0ff;\n  --xa-green: #39ff88;\n  --xa-gold: #ffd23f;\n  --xa-red: #ff4d6d;\n  --xa-radius: 14px;\n  --xa-mono: ui-monospace, \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace;\n  --xa-sans: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  color-scheme: dark;\n}\n* { box-sizing: border-box; }\nhtml, body { margin: 0; height: 100%; background: var(--xa-bg); color: var(--xa-text); }\nbody { font: 15px/1.45 var(--xa-sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }\nbutton { font: inherit; color: inherit; }\n.xa-hidden { display: none !important; }\n\n/* ------------------------------------------------------------ room */\n.xa-room {\n  min-height: 100vh;\n  background:\n    radial-gradient(1200px 500px at 50% -120px, rgba(255, 63, 164, 0.16), transparent 70%),\n    radial-gradient(900px 400px at 90% 110%, rgba(63, 240, 255, 0.10), transparent 70%),\n    linear-gradient(transparent 62%, rgba(110, 90, 255, 0.07) 62%) 0 0 / 100% 100%,\n    var(--xa-bg);\n  padding: 20px 16px 48px;\n}\n.xa-floor-grid {\n  position: fixed; inset: auto 0 0 0; height: 38vh; pointer-events: none; z-index: 0;\n  background:\n    linear-gradient(rgba(110, 90, 255, 0.22) 1px, transparent 1px) 0 0 / 100% 36px,\n    linear-gradient(90deg, rgba(110, 90, 255, 0.22) 1px, transparent 1px) 0 0 / 60px 100%;\n  transform: perspective(420px) rotateX(58deg);\n  transform-origin: bottom;\n  mask-image: linear-gradient(transparent, #000 70%);\n  -webkit-mask-image: linear-gradient(transparent, #000 70%);\n  opacity: 0.55;\n}\n.xa-wrap { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; }\n.xa-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }\n.xa-logo { font: 900 clamp(24px, 5vw, 42px)/1 var(--xa-mono); letter-spacing: 0.08em; margin: 0; }\n.xa-logo span:first-child {\n  color: #fff; text-shadow: 0 0 6px var(--xa-pink), 0 0 18px var(--xa-pink), 0 0 38px rgba(255, 63, 164, 0.6);\n}\n.xa-logo span:last-child {\n  color: var(--xa-cyan); text-shadow: 0 0 6px var(--xa-cyan), 0 0 20px rgba(63, 240, 255, 0.7);\n  animation: xa-flicker 6s infinite;\n}\n@keyframes xa-flicker { 0%, 92%, 100% { opacity: 1 } 93% { opacity: .4 } 94% { opacity: 1 } 96% { opacity: .6 } }\n.xa-sub { margin: 8px 0 0; color: var(--xa-dim); font-size: 14px; }\n.xa-top-actions { display: flex; gap: 8px; align-items: center; }\n.xa-pill {\n  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px;\n  border-radius: 999px; border: 1px solid var(--xa-line); background: var(--xa-panel);\n  font: 700 12px/1 var(--xa-mono); letter-spacing: .06em; text-transform: uppercase; cursor: pointer;\n}\n.xa-pill:hover { border-color: rgba(140, 160, 255, 0.45); }\n.xa-pill:focus-visible, .xa-btn:focus-visible, .xa-icon:focus-visible { outline: 2px solid var(--xa-cyan); outline-offset: 2px; }\n.xa-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--xa-faint); box-shadow: 0 0 8px currentColor; }\n.xa-dot.is-on { background: var(--xa-green); color: var(--xa-green); }\n.xa-dot.is-warn { background: var(--xa-gold); color: var(--xa-gold); }\n.xa-icon {\n  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--xa-line); background: var(--xa-panel);\n  cursor: pointer; display: grid; place-items: center; font-size: 16px;\n}\n\n.xa-cabinets {\n  display: grid; gap: 22px; margin-top: 28px;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n}\n.xa-cab {\n  --c: var(--xa-cyan);\n  position: relative; display: flex; flex-direction: column;\n  background: linear-gradient(180deg, #151935, #0c0f22 60%, #090b19);\n  border: 1px solid rgba(255, 255, 255, 0.06);\n  border-radius: 18px 18px 10px 10px; padding: 12px 12px 14px;\n  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 32px -12px var(--c);\n  transition: transform .18s ease, box-shadow .18s ease;\n}\n.xa-cab:hover { transform: translateY(-3px); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5), 0 24px 50px rgba(0, 0, 0, .6), 0 0 44px -10px var(--c); }\n.xa-marquee {\n  border-radius: 10px; padding: 10px 12px; text-align: center;\n  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));\n  border: 1px solid rgba(255, 255, 255, 0.08);\n}\n.xa-marquee h2 {\n  margin: 0; font: 900 20px/1.1 var(--xa-mono); letter-spacing: .12em; text-transform: uppercase;\n  color: #fff; text-shadow: 0 0 6px var(--c), 0 0 18px var(--c);\n}\n.xa-marquee p { margin: 4px 0 0; font-size: 12px; color: var(--xa-dim); }\n.xa-screen {\n  position: relative; margin: 12px 4px 0; border-radius: 12px; overflow: hidden;\n  aspect-ratio: 4 / 3; background: #000;\n  box-shadow: inset 0 0 0 3px #050610, inset 0 0 30px rgba(0, 0, 0, .9), 0 0 0 1px rgba(255, 255, 255, .05);\n}\n.xa-screen canvas { width: 100%; height: 100%; display: block; }\n.xa-screen::after {\n  content: \"\"; position: absolute; inset: 0; pointer-events: none;\n  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px);\n  mix-blend-mode: multiply;\n}\n.xa-insert {\n  position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; pointer-events: none;\n  font: 800 11px/1 var(--xa-mono); letter-spacing: .2em; color: #fff; text-shadow: 0 0 8px var(--c);\n  animation: xa-blink 1.2s steps(2) infinite;\n}\n@keyframes xa-blink { 50% { opacity: 0 } }\n.xa-cab-stats { display: flex; justify-content: space-between; gap: 8px; margin: 12px 6px 0; font: 700 12px/1.3 var(--xa-mono); }\n.xa-cab-stats div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }\n.xa-cab-stats span:first-child { color: var(--xa-faint); font-size: 10px; letter-spacing: .12em; }\n.xa-cab-stats b { color: var(--xa-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.xa-cab-stats .xa-right { text-align: right; align-items: flex-end; }\n.xa-cab-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }\n.xa-cab-actions .xa-btn-variant { grid-column: 1 / -1; font-size: 12px; padding-top: 8px; padding-bottom: 8px; border-color: var(--c, var(--xa-cyan)); color: #fff; background: transparent; }\n.xa-mode-tabs { display: flex; gap: 6px; margin: -6px 0 12px; }\n.xa-mode-tab { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--xa-line); background: transparent; cursor: pointer; font: 700 12px/1 var(--xa-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--xa-dim); }\n.xa-mode-tab[aria-selected=\"true\"] { color: #fff; border-style: solid; border-color: var(--c, var(--xa-cyan)); }\n\n.xa-btn {\n  min-height: 44px; padding: 10px 16px; border-radius: 10px; cursor: pointer;\n  border: 1px solid var(--xa-line); background: var(--xa-panel-2);\n  font: 800 13px/1 var(--xa-mono); letter-spacing: .1em; text-transform: uppercase;\n}\n.xa-btn:hover { border-color: rgba(140, 160, 255, 0.5); }\n.xa-btn[disabled] { opacity: .45; cursor: not-allowed; }\n.xa-btn-play {\n  --c: var(--xa-cyan);\n  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 32%, #10132a), color-mix(in srgb, var(--c) 14%, #0b0d1f));\n  border-color: color-mix(in srgb, var(--c) 70%, transparent);\n  box-shadow: 0 0 16px -4px var(--c), inset 0 1px 0 rgba(255, 255, 255, .2);\n  color: #fff;\n}\n.xa-btn-primary { background: linear-gradient(180deg, #ff5bb3, #d81f84); border-color: #ff8cc9; color: #fff; box-shadow: 0 0 18px -4px var(--xa-pink); }\n.xa-foot { margin-top: 34px; color: var(--xa-faint); font-size: 12.5px; text-align: center; }\n.xa-foot code { font-family: var(--xa-mono); color: var(--xa-dim); }\n\n/* ----------------------------------------------------- scoreboard */\n.xa-modal {\n  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px;\n  background: rgba(3, 4, 12, .76); backdrop-filter: blur(4px);\n}\n.xa-card {\n  width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto;\n  background: var(--xa-panel); border: 1px solid var(--xa-line); border-radius: var(--xa-radius);\n  padding: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6);\n}\n.xa-card h3 { margin: 0; font: 900 18px/1.2 var(--xa-mono); letter-spacing: .1em; text-transform: uppercase; }\n.xa-tabs { display: flex; gap: 6px; margin: 14px 0; flex-wrap: wrap; }\n.xa-tab { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--xa-line); background: transparent; cursor: pointer; font: 700 12px/1 var(--xa-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--xa-dim); }\n.xa-tab[aria-selected=\"true\"] { color: #fff; border-color: var(--c, var(--xa-cyan)); box-shadow: 0 0 12px -4px var(--c, var(--xa-cyan)); }\n.xa-board { list-style: none; margin: 0; padding: 0; font: 600 14px/1.2 var(--xa-mono); }\n.xa-board li {\n  display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center;\n  padding: 10px 8px; border-bottom: 1px solid rgba(255, 255, 255, .05);\n}\n.xa-board li:nth-child(1) .xa-rank { color: var(--xa-gold); text-shadow: 0 0 10px var(--xa-gold); }\n.xa-board li:nth-child(2) .xa-rank { color: #d9e2ff; }\n.xa-board li:nth-child(3) .xa-rank { color: #ffae6b; }\n.xa-board li.is-you { background: rgba(57, 255, 136, .08); border-radius: 8px; }\n.xa-rank { font-weight: 900; color: var(--xa-dim); }\n.xa-who { min-width: 0; }\n.xa-who b { display: block; }\n.xa-who small { color: var(--xa-faint); font-size: 11px; }\n.xa-pts { font-weight: 900; font-variant-numeric: tabular-nums; }\n.xa-empty, .xa-error { padding: 22px 8px; text-align: center; color: var(--xa-dim); }\n.xa-error { color: var(--xa-gold); }\n.xa-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; color: var(--xa-faint); font-size: 12px; }\n\n/* ------------------------------------------------------ game view */\n.xa-game {\n  position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;\n  background: radial-gradient(900px 500px at 50% 40%, #0c1030, var(--xa-bg));\n}\n.xa-hud {\n  display: flex; align-items: center; gap: 12px; padding: 10px 14px;\n  border-bottom: 1px solid var(--xa-line); background: rgba(5, 6, 15, .75);\n  font: 800 13px/1 var(--xa-mono); letter-spacing: .08em;\n}\n.xa-hud .xa-title { text-transform: uppercase; color: #fff; text-shadow: 0 0 10px var(--c); white-space: nowrap; }\n.xa-hud-stats { display: flex; gap: 18px; margin-left: auto; align-items: baseline; }\n.xa-hud-stats div { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }\n.xa-hud-stats small { font-size: 9px; color: var(--xa-faint); letter-spacing: .14em; }\n.xa-hud-stats b { font-size: 16px; font-variant-numeric: tabular-nums; }\n#xa-score { color: #fff; text-shadow: 0 0 10px var(--c); }\n.xa-status { padding: 6px 14px; min-height: 26px; text-align: center; font: 700 11px/1.3 var(--xa-mono); letter-spacing: .12em; color: var(--xa-dim); }\n.xa-stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; padding: 6px 10px; touch-action: none; user-select: none; -webkit-user-select: none; }\n.xa-stage canvas { display: block; border-radius: 10px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 0 40px -12px var(--c); }\n.xa-overlay {\n  position: absolute; inset: 0; display: grid; place-items: center; z-index: 5; padding: 16px;\n  background: rgba(3, 4, 12, .72);\n}\n.xa-countdown { font: 900 72px/1 var(--xa-mono); color: #fff; text-shadow: 0 0 20px var(--c), 0 0 50px var(--c); pointer-events: none; background: none; }\n.xa-over { width: min(420px, 100%); text-align: center; }\n.xa-over h3 { margin: 0; font: 900 26px/1 var(--xa-mono); letter-spacing: .14em; color: #fff; text-shadow: 0 0 12px var(--xa-pink); }\n.xa-final { margin: 14px 0 4px; font: 900 44px/1 var(--xa-mono); font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 16px var(--c); }\n.xa-badge { display: inline-block; margin-top: 6px; padding: 5px 10px; border-radius: 999px; font: 800 11px/1 var(--xa-mono); letter-spacing: .1em; background: rgba(57, 255, 136, .14); color: var(--xa-green); }\n.xa-verdict { margin: 12px 0 0; color: var(--xa-dim); font-size: 14px; }\n.xa-verdict b { color: var(--xa-gold); }\n.xa-submit { margin-top: 14px; padding: 14px; border-radius: 12px; border: 1px solid var(--xa-line); background: var(--xa-panel); text-align: left; }\n.xa-submit label { display: block; font: 700 11px/1 var(--xa-mono); letter-spacing: .12em; color: var(--xa-faint); margin-bottom: 6px; }\n.xa-name {\n  width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--xa-line);\n  background: #070919; color: #fff; font: 800 18px/1 var(--xa-mono); letter-spacing: .12em; text-transform: uppercase;\n}\n.xa-name:focus { outline: 2px solid var(--xa-cyan); outline-offset: 1px; }\n.xa-submit .xa-btn { width: 100%; margin-top: 10px; }\n.xa-note { margin: 8px 0 0; font-size: 12px; color: var(--xa-faint); }\n.xa-msg { margin: 10px 0 0; font-size: 13px; }\n.xa-feewarn { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--xa-red); background: rgba(255, 70, 90, .12); color: #fff; font-size: 13px; line-height: 1.4; }\n.xa-feewarn p { margin: 6px 0 0; }\n.xa-feewarn-t { display: block; font: 800 12px/1.2 var(--xa-mono); letter-spacing: .06em; color: var(--xa-red); }\n.xa-feewarn b { color: var(--xa-gold); }\n.xa-feehow { margin-top: 8px; font-size: 12px; }\n.xa-feehow summary { cursor: pointer; color: var(--xa-cyan); }\n.xa-feesteps { margin: 6px 0 0; padding-left: 20px; }\n.xa-feesteps li { margin: 4px 0; }\n.xa-feeremind { color: var(--xa-gold); }\n.xa-feemodal { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(3, 4, 12, .88); }\n.xa-feemodal-card { max-width: 440px; width: 100%; max-height: 92vh; overflow: auto; padding: 18px; border-radius: 14px; border: 2px solid var(--xa-red); background: #0b0e24; color: #fff; text-align: left; }\n.xa-feemodal-card h3 { margin: 0 0 8px; color: var(--xa-red); }\n.xa-feebig { margin: 0; font-size: 18px; line-height: 1.35; font-weight: 700; }\n.xa-feebig b { color: var(--xa-gold); }\n.xa-msg.is-ok { color: var(--xa-green); }\n.xa-msg.is-err { color: var(--xa-red); }\n.xa-msg a { color: var(--xa-cyan); }\n.xa-over-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }\n.xa-pause h3 { text-align: center; }\n\n/* touch pads */\n.xa-pads { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 14px calc(12px + env(safe-area-inset-bottom)); }\n.xa-pad-group { display: grid; gap: 8px; }\n.xa-pad {\n  width: 60px; height: 60px; border-radius: 16px; border: 1px solid rgba(140, 160, 255, .3);\n  background: rgba(23, 27, 56, .85); font: 900 18px/1 var(--xa-mono); color: #fff; touch-action: none;\n  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;\n}\n.xa-pad.is-down { background: color-mix(in srgb, var(--c) 40%, #171b38); box-shadow: 0 0 18px -4px var(--c); }\n.xa-pad.xa-wide { font-size: 12px; letter-spacing: .06em; }\n.xa-dpad { grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 60px); }\n.xa-dpad .up { grid-column: 2; grid-row: 1; }\n.xa-dpad .left { grid-column: 1; grid-row: 2; }\n.xa-dpad .down { grid-column: 2; grid-row: 2; }\n.xa-dpad .right { grid-column: 3; grid-row: 2; }\n.xa-pad-hint { flex: 1; text-align: center; font: 700 12px/1.3 var(--xa-mono); letter-spacing: .12em; color: var(--xa-faint); }\n.xa-row { grid-auto-flow: column; align-self: end; }\n.xa-grid2 { grid-template-columns: repeat(2, auto); }\n\n@media (max-width: 520px) {\n  .xa-hud { gap: 8px; padding: 8px 10px; }\n  .xa-hud .xa-title { display: none; }\n  .xa-hud-stats { gap: 12px; }\n  .xa-pad { width: 54px; height: 54px; }\n  .xa-pads { padding-left: 10px; padding-right: 10px; }\n  .xa-dpad { grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(2, 54px); }\n  .xa-cabinets { gap: 16px; }\n}\n@media (prefers-reduced-motion: reduce) {\n  .xa-logo span:last-child, .xa-insert { animation: none; }\n  .xa-cab { transition: none; }\n}\n\n/*@xa-part arcade-kit.js*/\n/*\n * Xtrata Arcade \u2014 shared kit (leaf module)\n *\n * Every game cartridge and the room itself depend on this module. It owns:\n *   - the game registry            XA.registerGame(def) / XA.games\n *   - input (keys, touch pads, swipes, hold)   XA.createInput(el)\n *   - a tiny WebAudio synth        XA.audio\n *   - particles / floating text    XA.createFx()\n *   - small helpers                XA.util\n *\n * No network access and no wallet code live here, so a cartridge can never\n * reach the score contract except through the room.\n */\n(function (root) {\n  'use strict';\n  if (root.XA && root.XA.kitVersion) return;\n\n  var KIT_VERSION = '1.0.0';\n\n  /* ------------------------------------------------------------ util */\n  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }\n  function lerp(a, b, t) { return a + (b - a) * t; }\n  // mulberry32 \u2014 small seeded RNG so a run can be replayed from its seed.\n  function rng(seed) {\n    var s = (seed >>> 0) || 0x9e3779b9;\n    var f = function () {\n      s = (s + 0x6d2b79f5) >>> 0;\n      var t = s;\n      t = Math.imul(t ^ (t >>> 15), t | 1);\n      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n    };\n    f.int = function (n) { return Math.floor(f() * n); };\n    f.range = function (a, b) { return a + f() * (b - a); };\n    f.pick = function (arr) { return arr[Math.floor(f() * arr.length)]; };\n    return f;\n  }\n  function newSeed() {\n    try {\n      var a = new Uint32Array(1);\n      root.crypto.getRandomValues(a);\n      return a[0] >>> 0;\n    } catch (e) {\n      return (Date.now() ^ (Math.random() * 4294967296)) >>> 0;\n    }\n  }\n  function store(key, value) {\n    try {\n      if (value === undefined) {\n        var raw = root.localStorage.getItem('xa:' + key);\n        return raw == null ? null : JSON.parse(raw);\n      }\n      root.localStorage.setItem('xa:' + key, JSON.stringify(value));\n    } catch (e) { /* storage may be blocked in sandboxed frames */ }\n    return null;\n  }\n  function fmt(n) {\n    return String(Math.floor(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');\n  }\n  function glowText(ctx, text, x, y, size, color, align, weight) {\n    ctx.save();\n    ctx.font = (weight || 800) + ' ' + size + 'px \"Press Start 2P\", ui-monospace, Menlo, Consolas, monospace';\n    ctx.textAlign = align || 'center';\n    ctx.textBaseline = 'middle';\n    ctx.shadowColor = color;\n    ctx.shadowBlur = size * 0.6;\n    ctx.fillStyle = color;\n    ctx.fillText(text, x, y);\n    ctx.shadowBlur = 0;\n    ctx.fillStyle = 'rgba(255,255,255,0.85)';\n    ctx.globalAlpha = 0.35;\n    ctx.fillText(text, x, y);\n    ctx.restore();\n  }\n  function roundRect(ctx, x, y, w, h, r) {\n    r = Math.min(r, w / 2, h / 2);\n    ctx.beginPath();\n    ctx.moveTo(x + r, y);\n    ctx.arcTo(x + w, y, x + w, y + h, r);\n    ctx.arcTo(x + w, y + h, x, y + h, r);\n    ctx.arcTo(x, y + h, x, y, r);\n    ctx.arcTo(x, y, x + w, y, r);\n    ctx.closePath();\n  }\n\n  /* ----------------------------------------------------------- audio */\n  var audio = (function () {\n    var ctx = null;\n    var master = null;\n    var muted = !!store('muted');\n    function ensure() {\n      if (ctx) return ctx;\n      var AC = root.AudioContext || root.webkitAudioContext;\n      if (!AC) return null;\n      try {\n        ctx = new AC();\n        master = ctx.createGain();\n        master.gain.value = muted ? 0 : 0.32;\n        master.connect(ctx.destination);\n      } catch (e) { ctx = null; }\n      return ctx;\n    }\n    function unlock() {\n      var c = ensure();\n      if (c && c.state === 'suspended' && c.resume) c.resume();\n    }\n    // tone(freq, dur, {type, vol, slide, delay})\n    function tone(freq, dur, o) {\n      o = o || {};\n      var c = ensure();\n      if (!c || muted) return;\n      var t0 = c.currentTime + (o.delay || 0);\n      var osc = c.createOscillator();\n      var g = c.createGain();\n      osc.type = o.type || 'square';\n      osc.frequency.setValueAtTime(freq, t0);\n      if (o.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(20, freq * o.slide), t0 + dur);\n      var v = o.vol == null ? 0.25 : o.vol;\n      g.gain.setValueAtTime(0.0001, t0);\n      g.gain.exponentialRampToValueAtTime(v, t0 + 0.008);\n      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);\n      osc.connect(g); g.connect(master);\n      osc.start(t0); osc.stop(t0 + dur + 0.02);\n    }\n    function noise(dur, o) {\n      o = o || {};\n      var c = ensure();\n      if (!c || muted) return;\n      var len = Math.max(1, Math.floor(c.sampleRate * dur));\n      var buf = c.createBuffer(1, len, c.sampleRate);\n      var d = buf.getChannelData(0);\n      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);\n      var src = c.createBufferSource();\n      src.buffer = buf;\n      var filter = c.createBiquadFilter();\n      filter.type = 'lowpass';\n      filter.frequency.value = o.cutoff || 1800;\n      var g = c.createGain();\n      g.gain.value = o.vol == null ? 0.3 : o.vol;\n      src.connect(filter); filter.connect(g); g.connect(master);\n      src.start(c.currentTime + (o.delay || 0));\n    }\n    function arp(notes, step, o) {\n      for (var i = 0; i < notes.length; i++) {\n        tone(notes[i], step * 1.4, Object.assign({}, o, { delay: i * step }));\n      }\n    }\n    function setMuted(m) {\n      muted = !!m;\n      store('muted', muted);\n      if (master) master.gain.value = muted ? 0 : 0.32;\n    }\n    return {\n      unlock: unlock, tone: tone, noise: noise, arp: arp,\n      // Shared graph access for the music engine: it plays through the same\n      // master gain, so the mute button silences music and effects alike.\n      context: function () { return ensure(); },\n      bus: function () { ensure(); return master; },\n      isMuted: function () { return muted; }, setMuted: setMuted\n    };\n  })();\n\n  /* -------------------------------------------------------------- fx */\n  function createFx() {\n    var parts = [];\n    var texts = [];\n    return {\n      burst: function (x, y, color, n, speed, life) {\n        n = n || 14; speed = speed || 120; life = life || 0.6;\n        for (var i = 0; i < n; i++) {\n          var a = Math.random() * Math.PI * 2;\n          var s = speed * (0.35 + Math.random() * 0.65);\n          parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,\n            life: life * (0.6 + Math.random() * 0.4), max: life, color: color,\n            size: 1.5 + Math.random() * 2.5 });\n        }\n        if (parts.length > 900) parts.splice(0, parts.length - 900);\n      },\n      trail: function (x, y, color, vx, vy) {\n        parts.push({ x: x, y: y, vx: vx || 0, vy: vy || 0, life: 0.35, max: 0.35, color: color, size: 2 });\n      },\n      text: function (x, y, str, color, size) {\n        texts.push({ x: x, y: y, str: str, color: color || '#fff', life: 0.9, size: size || 14 });\n      },\n      update: function (dt) {\n        var i;\n        for (i = parts.length - 1; i >= 0; i--) {\n          var p = parts[i];\n          p.life -= dt;\n          if (p.life <= 0) { parts.splice(i, 1); continue; }\n          p.x += p.vx * dt; p.y += p.vy * dt;\n          p.vx *= 0.96; p.vy *= 0.96;\n        }\n        for (i = texts.length - 1; i >= 0; i--) {\n          texts[i].life -= dt;\n          texts[i].y -= 28 * dt;\n          if (texts[i].life <= 0) texts.splice(i, 1);\n        }\n      },\n      draw: function (ctx) {\n        ctx.save();\n        ctx.globalCompositeOperation = 'lighter';\n        for (var i = 0; i < parts.length; i++) {\n          var p = parts[i];\n          ctx.globalAlpha = Math.max(0, p.life / p.max);\n          ctx.fillStyle = p.color;\n          ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);\n        }\n        ctx.restore();\n        for (var j = 0; j < texts.length; j++) {\n          var t = texts[j];\n          ctx.save();\n          ctx.globalAlpha = Math.min(1, t.life * 2);\n          glowText(ctx, t.str, t.x, t.y, t.size, t.color);\n          ctx.restore();\n        }\n      },\n      clear: function () { parts.length = 0; texts.length = 0; }\n    };\n  }\n\n  /* ----------------------------------------------------------- input */\n  var KEYMAP = {\n    ArrowUp: 'up', KeyW: 'up',\n    ArrowDown: 'down', KeyS: 'down',\n    ArrowLeft: 'left', KeyA: 'left',\n    ArrowRight: 'right', KeyD: 'right',\n    Space: 'a',\n    KeyZ: 'b', KeyJ: 'b',\n    KeyX: 'c', KeyK: 'c',\n    KeyC: 'd', ShiftLeft: 'd', ShiftRight: 'd',\n    Digit1: 'k1', Digit2: 'k2', Digit3: 'k3', Digit4: 'k4', Digit5: 'k5',\n    Digit6: 'k6', Digit7: 'k7', Digit8: 'k8', Digit9: 'k9',\n    Numpad1: 'k1', Numpad2: 'k2', Numpad3: 'k3', Numpad4: 'k4', Numpad5: 'k5',\n    Numpad6: 'k6', Numpad7: 'k7', Numpad8: 'k8', Numpad9: 'k9',\n    KeyF: 'f',\n    Enter: 'start',\n    Escape: 'pause', KeyP: 'pause'\n  };\n\n  // One input object per play session. `surface` receives pointer events\n  // (hold + swipe); on-screen pads call press()/release() directly.\n  function createInput(surface) {\n    var held = {};\n    var hitQ = {};\n    var swipes = [];\n    var pointer = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null, swiped: false, moved: 0 };\n    var listeners = [];\n\n    function press(name) {\n      if (!held[name]) hitQ[name] = true;\n      held[name] = true;\n    }\n    function release(name) { held[name] = false; }\n    function on(target, type, fn, opts) {\n      target.addEventListener(type, fn, opts);\n      listeners.push(function () { target.removeEventListener(type, fn, opts); });\n    }\n\n    function typing(e) {\n      var t = e.target;\n      return !!(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '')));\n    }\n    on(root, 'keydown', function (e) {\n      var name = KEYMAP[e.code];\n      if (!name || typing(e)) return;\n      e.preventDefault();\n      if (e.repeat) return;\n      press(name);\n    });\n    on(root, 'keyup', function (e) {\n      var name = KEYMAP[e.code];\n      if (name && !typing(e)) release(name);\n    });\n    on(root, 'blur', function () { held = {}; pointer.down = false; });\n\n    if (surface) {\n      var SWIPE = 24;\n      on(surface, 'pointerdown', function (e) {\n        // Leave real UI (overlay buttons, name input) alone: capturing the\n        // pointer here would retarget their click to the surface.\n        var t = e.target;\n        if (t && t !== surface && t.closest && t.closest('button, a, input, select, textarea, [data-xa-ui]')) return;\n        audio.unlock();\n        pointer.down = true; pointer.id = e.pointerId; pointer.swiped = false;\n        pointer.sx = pointer.x = e.clientX; pointer.sy = pointer.y = e.clientY; pointer.moved++;\n        pointer.t = performance.now();\n        press('hold');\n        try { surface.setPointerCapture(e.pointerId); } catch (err) {}\n        e.preventDefault();\n      }, { passive: false });\n      on(surface, 'pointermove', function (e) {\n        // Hover (mouse) still updates the position so aiming games can follow it.\n        if (!pointer.down) {\n          if (e.pointerType === 'mouse') { pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved++; }\n          return;\n        }\n        if (e.pointerId !== pointer.id) return;\n        pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved++;\n        var dx = pointer.x - pointer.sx, dy = pointer.y - pointer.sy;\n        if (Math.abs(dx) > SWIPE || Math.abs(dy) > SWIPE) {\n          var dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');\n          swipes.push(dir);\n          pointer.swiped = true;\n          pointer.sx = pointer.x; pointer.sy = pointer.y;\n        }\n      });\n      var end = function (e) {\n        if (e.pointerId !== pointer.id) return;\n        if (pointer.down && !pointer.swiped && performance.now() - pointer.t < 260) swipes.push('tap');\n        pointer.down = false;\n        release('hold');\n        // Edge event so a press+release inside one frame is never lost.\n        hitQ.release = true;\n      };\n      on(surface, 'pointerup', end);\n      on(surface, 'pointercancel', end);\n    }\n\n    return {\n      // held: is the virtual button down right now?\n      held: function (name) { return !!held[name]; },\n      // hit: was it pressed since the last endFrame()? (edge-triggered)\n      hit: function (name) { return !!hitQ[name]; },\n      takeSwipes: function () { var s = swipes; swipes = []; return s; },\n      pointer: pointer,\n      press: press,\n      release: release,\n      endFrame: function () { hitQ = {}; },\n      reset: function () { held = {}; hitQ = {}; swipes = []; },\n      destroy: function () { listeners.forEach(function (off) { off(); }); listeners = []; }\n    };\n  }\n\n  /* ------------------------------------------------ bitcoin glyph\n     btc(ctx, x, y, r, {coin, fill, ink, glow, alpha}) draws a \u20BF centred on x,y.\n     coin:true (default) draws the orange disc; coin:false draws just the symbol in `ink`.\n     Pure drawing: no randomness, no state, safe to call from any render(). */\n  function btc(ctx, x, y, r, o) {\n    o = o || {};\n    var coin = o.coin !== false, ink = o.ink || (coin ? '#ffffff' : '#f7931a');\n    ctx.save();\n    if (o.alpha != null) ctx.globalAlpha *= o.alpha;\n    if (coin) {\n      ctx.shadowColor = o.fill || '#f7931a'; ctx.shadowBlur = o.glow == null ? r * 0.8 : o.glow;\n      ctx.fillStyle = o.fill || '#f7931a'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;\n    } else if (o.glow) { ctx.shadowColor = ink; ctx.shadowBlur = o.glow; }\n    var s = coin ? r * 0.62 : r;\n    ctx.translate(x, y); ctx.rotate(-0.24);\n    ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1, s * 0.2); ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';\n    ctx.beginPath();\n    ctx.moveTo(-s * 0.42, -s * 0.72); ctx.lineTo(-s * 0.42, s * 0.72);\n    ctx.moveTo(-s * 0.55, -s * 0.72); ctx.lineTo(s * 0.12, -s * 0.72);\n    ctx.quadraticCurveTo(s * 0.62, -s * 0.72, s * 0.52, -s * 0.36); ctx.quadraticCurveTo(s * 0.45, -s * 0.02, s * 0.1, 0);\n    ctx.lineTo(-s * 0.42, 0); ctx.moveTo(s * 0.1, 0);\n    ctx.quadraticCurveTo(s * 0.7, 0, s * 0.62, s * 0.38); ctx.quadraticCurveTo(s * 0.55, s * 0.72, s * 0.14, s * 0.72);\n    ctx.lineTo(-s * 0.55, s * 0.72);\n    ctx.moveTo(-s * 0.14, -s * 0.72); ctx.lineTo(-s * 0.14, -s * 0.98); ctx.moveTo(s * 0.12, -s * 0.72); ctx.lineTo(s * 0.12, -s * 0.98);\n    ctx.moveTo(-s * 0.14, s * 0.72); ctx.lineTo(-s * 0.14, s * 0.98); ctx.moveTo(s * 0.12, s * 0.72); ctx.lineTo(s * 0.12, s * 0.98);\n    ctx.stroke();\n    ctx.restore();\n  }\n\n  /* -------------------------------------------------------- registry */\n  var games = [];\n  function registerGame(def) {\n    var required = ['id', 'title', 'create', 'attract', 'size'];\n    for (var i = 0; i < required.length; i++) {\n      if (!def[required[i]]) throw new Error('Game is missing \"' + required[i] + '\"');\n    }\n    if (!/^[a-z0-9_]{3,32}$/.test(def.id)) throw new Error('Invalid game id ' + def.id);\n    if (games.some(function (g) { return g.id === def.id; })) return;\n    def.mode = def.mode === 'time' ? 'time' : 'score';\n    // Variants share the game-id but post to a different contract mode, so a\n    // variant must use a mode no other entry of this game already uses.\n    var usedModes = [def.mode];\n    def.variants = (Array.isArray(def.variants) ? def.variants : []).filter(function (v) {\n      if (!v || !/^[a-z0-9_]{2,16}$/.test(v.key || '')) return false;\n      v.mode = v.mode === 'time' ? 'time' : 'score';\n      if (usedModes.indexOf(v.mode) >= 0) return false;\n      usedModes.push(v.mode);\n      v.label = String(v.label || v.key).slice(0, 16);\n      return true;\n    });\n    games.push(def);\n    games.sort(function (a, b) { return (a.order || 99) - (b.order || 99); });\n    if (typeof root.dispatchEvent === 'function') {\n      try { root.dispatchEvent(new CustomEvent('xa:game-registered', { detail: def.id })); } catch (e) {}\n    }\n  }\n\n  root.XA = {\n    kitVersion: KIT_VERSION,\n    games: games,\n    registerGame: registerGame,\n    createInput: createInput,\n    createFx: createFx,\n    audio: audio,\n    util: {\n      clamp: clamp, lerp: lerp, rng: rng, newSeed: newSeed, store: store,\n      fmt: fmt, glowText: glowText, roundRect: roundRect, btc: btc\n    }\n  };\n})(typeof window !== 'undefined' ? window : this);\n\n/*@xa-part arcade-music.js*/\n/*\n * Xtrata Arcade \u2014 music engine (leaf module, loads after arcade-kit)\n *\n * One small sequencer + synth that every cartridge can drive its own way.\n *\n *   XA.music.play(song, { fade, intensity, keepFilter })  start or crossfade to a song\n *   XA.music.stop(fade) / pause() / resume()\n *   XA.music.setIntensity(0..1)         layers fade in/out by `track.layer`\n *   XA.music.setTempo(bpm, rampSecs)    live tempo (ramped)\n *   XA.music.setKey(midi) / transpose(n) / setScale(name)\n *   XA.music.setFilter(hz, secs)        master low-pass (underwater, slow-mo\u2026)\n *   XA.music.setTrack(name, on)         force a track on/off\n *   XA.music.note(inst, degree, opts)   play a note in key, optionally quantized\n *   XA.music.stinger(seq, opts)         a quantized phrase (level clear etc.)\n *   XA.music.tapeStop(secs)             slow-down + pitch-drop, then stop\n *   XA.music.duck(amount, secs)\n *   XA.music.pulse() / beatPhase()      0..1 for visuals synced to the beat\n *   XA.music.onStep(fn)                 callback per scheduled 16th step\n *\n * Songs are data: { bpm, key, scale, chords:[degrees per bar], tracks:[\u2026] }.\n * A track plays a string pattern (one token per step) or a function that\n * returns notes, so games can generate lines from their own state.\n *\n * Pattern tokens: drums  'x' hit, 'X' accent, '.' rest\n *                 melody scale degrees (\u2026-1 0 1 2\u2026), '.' rest, '-' hold,\n *                 optional octave marks: '7' is the next octave; '^'/'_' shift \xB11 oct\n */\n(function (root) {\n  'use strict';\n  var XA = root.XA;\n  if (!XA) throw new Error('arcade-kit must load before arcade-music');\n  if (XA.music) return;\n\n  var SCALES = {\n    major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10],\n    phrygian: [0, 1, 3, 5, 7, 8, 10], lydian: [0, 2, 4, 6, 7, 9, 11], mixolydian: [0, 2, 4, 5, 7, 9, 10],\n    harmonic: [0, 2, 3, 5, 7, 8, 11], pentatonic: [0, 2, 4, 7, 9], minorPent: [0, 3, 5, 7, 10],\n    whole: [0, 2, 4, 6, 8, 10]\n  };\n  var LOOKAHEAD = 0.14, TICK_MS = 25;\n\n  var ctx = null, out = null, filter = null, musicGain = null, noiseBuf = null;\n  var decks = [];            // playing songs; the last one is \"current\"\n  var timer = null, paused = false, pauseAt = 0;\n  var detune = 0, detuneTo = 0, detuneFrom = 0, detuneT0 = 0, detuneT1 = 0;\n  var stepListeners = [];\n  var beatTimes = [];\n  var volume = 0.9;\n  var lastIntensity = 0;\n\n  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }\n  function now() { return ctx ? ctx.currentTime : 0; }\n\n  function ensure() {\n    if (ctx) return ctx;\n    ctx = XA.audio.context();\n    if (!ctx) return null;\n    out = XA.audio.bus();\n    filter = ctx.createBiquadFilter();\n    filter.type = 'lowpass'; filter.frequency.value = 18000; filter.Q.value = 0.7;\n    musicGain = ctx.createGain();\n    musicGain.gain.value = volume;\n    musicGain.connect(filter); filter.connect(out);\n    var len = ctx.sampleRate;\n    noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);\n    var d = noiseBuf.getChannelData(0);\n    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;\n    return ctx;\n  }\n\n  /* ------------------------------------------------------ instruments\n     Each voice: (dest, t, freq, dur, vel, p) \u2192 schedules nodes on `dest`. */\n  function env(g, t, a, peak, dur, rel) {\n    g.gain.setValueAtTime(0.0001, t);\n    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a);\n    g.gain.setValueAtTime(Math.max(0.0002, peak), t + Math.max(a, dur));\n    g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(a, dur) + rel);\n    return t + Math.max(a, dur) + rel + 0.02;\n  }\n  function osc(type, f, t, end, dest, det) {\n    var o = ctx.createOscillator();\n    o.type = type; o.frequency.setValueAtTime(f, t);\n    o.detune.setValueAtTime((det || 0) + detuneAt(t), t);\n    if (detuneT1 > t) o.detune.linearRampToValueAtTime((det || 0) + detuneTo, detuneT1);\n    o.connect(dest); o.start(t); o.stop(end);\n    return o;\n  }\n  function noiseSrc(t, end, dest) {\n    var s = ctx.createBufferSource();\n    s.buffer = noiseBuf; s.loop = true;\n    s.connect(dest); s.start(t, Math.random() * 0.5); s.stop(end);\n    return s;\n  }\n  function detuneAt(t) {\n    if (t >= detuneT1) return detuneTo;\n    if (t <= detuneT0) return detuneFrom;\n    return detuneFrom + (detuneTo - detuneFrom) * (t - detuneT0) / (detuneT1 - detuneT0);\n  }\n  var INST = {\n    kick: function (dest, t, f, dur, vel) {\n      var g = ctx.createGain(); g.connect(dest);\n      var end = env(g, t, 0.002, 0.9 * vel, 0.02, 0.28);\n      var o = osc('sine', 150, t, end, g);\n      o.frequency.exponentialRampToValueAtTime(42, t + 0.14);\n    },\n    snare: function (dest, t, f, dur, vel) {\n      var g = ctx.createGain(); g.connect(dest);\n      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.8; bp.connect(g);\n      var end = env(g, t, 0.002, 0.55 * vel, 0.02, 0.16);\n      noiseSrc(t, end, bp);\n      var g2 = ctx.createGain(); g2.connect(dest);\n      var e2 = env(g2, t, 0.002, 0.3 * vel, 0.01, 0.08);\n      osc('triangle', 185, t, e2, g2);\n    },\n    clap: function (dest, t, f, dur, vel) {\n      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 1.2; bp.connect(dest);\n      for (var i = 0; i < 3; i++) {\n        var g = ctx.createGain(); g.connect(bp);\n        var tt = t + i * 0.012;\n        noiseSrc(tt, env(g, tt, 0.001, 0.5 * vel, 0.005, i === 2 ? 0.14 : 0.02), g);\n      }\n    },\n    hat: function (dest, t, f, dur, vel, p) {\n      var g = ctx.createGain(); g.connect(dest);\n      var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7200; hp.connect(g);\n      noiseSrc(t, env(g, t, 0.001, 0.22 * vel, 0.005, p && p.open ? 0.22 : 0.045), hp);\n    },\n    shaker: function (dest, t, f, dur, vel) {\n      var g = ctx.createGain(); g.connect(dest);\n      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 5200; bp.Q.value = 2; bp.connect(g);\n      noiseSrc(t, env(g, t, 0.015, 0.12 * vel, 0.01, 0.06), bp);\n    },\n    bass: function (dest, t, f, dur, vel, p) {\n      var g = ctx.createGain(); g.connect(dest);\n      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = (p && p.q) || 6; lp.connect(g);\n      var cut = (p && p.cutoff) || 900;\n      lp.frequency.setValueAtTime(cut * (0.6 + vel), t);\n      lp.frequency.exponentialRampToValueAtTime(Math.max(90, cut * 0.18), t + Math.min(0.3, dur + 0.05));\n      var end = env(g, t, 0.004, 0.5 * vel, dur, 0.08);\n      osc('sawtooth', f, t, end, lp);\n      osc('square', f / 2, t, end, lp, 4);\n    },\n    sub: function (dest, t, f, dur, vel) {\n      var g = ctx.createGain(); g.connect(dest);\n      osc('sine', f, t, env(g, t, 0.01, 0.6 * vel, dur, 0.15), g);\n    },\n    lead: function (dest, t, f, dur, vel, p) {\n      var g = ctx.createGain(); g.connect(dest);\n      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = (p && p.cutoff) || 3200; lp.connect(g);\n      var end = env(g, t, 0.01, 0.22 * vel, dur, 0.12);\n      var o = osc((p && p.wave) || 'square', f, t, end, lp);\n      osc('sawtooth', f, t, end, lp, 9);\n      var lfo = ctx.createOscillator(), lg = ctx.createGain();\n      lfo.frequency.value = 5.5; lg.gain.value = f * 0.006;\n      lfo.connect(lg); lg.connect(o.frequency); lfo.start(t + 0.12); lfo.stop(end);\n    },\n    pluck: function (dest, t, f, dur, vel, p) {\n      var g = ctx.createGain(); g.connect(dest);\n      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.connect(g);\n      lp.frequency.setValueAtTime((p && p.cutoff) || 5000, t);\n      lp.frequency.exponentialRampToValueAtTime(400, t + 0.25);\n      var end = env(g, t, 0.002, 0.3 * vel, 0.02, (p && p.decay) || 0.28);\n      osc((p && p.wave) || 'triangle', f, t, end, lp);\n      osc('square', f * 2, t, end, lp, -6);\n    },\n    marimba: function (dest, t, f, dur, vel) {\n      var g = ctx.createGain(); g.connect(dest);\n      var end = env(g, t, 0.002, 0.38 * vel, 0.01, 0.4);\n      osc('sine', f, t, end, g);\n      var g2 = ctx.createGain(); g2.connect(dest);\n      osc('sine', f * 4, t, env(g2, t, 0.001, 0.1 * vel, 0.005, 0.07), g2);\n    },\n    bell: function (dest, t, f, dur, vel) {\n      [[1, 0.28, 1.6], [2.76, 0.1, 0.9], [5.4, 0.05, 0.5]].forEach(function (h) {\n        var g = ctx.createGain(); g.connect(dest);\n        osc('sine', f * h[0], t, env(g, t, 0.002, h[1] * vel, 0.01, h[2]), g);\n      });\n    },\n    pad: function (dest, t, f, dur, vel, p) {\n      var g = ctx.createGain(); g.connect(dest);\n      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = (p && p.cutoff) || 1100; lp.connect(g);\n      var end = env(g, t, (p && p.attack) || 0.45, 0.12 * vel, dur, (p && p.release) || 0.9);\n      osc('sawtooth', f, t, end, lp, -8);\n      osc('sawtooth', f, t, end, lp, 8);\n      osc('triangle', f / 2, t, end, lp);\n    },\n    arp: function (dest, t, f, dur, vel, p) {\n      var g = ctx.createGain(); g.connect(dest);\n      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = (p && p.cutoff) || 2600; lp.Q.value = 4; lp.connect(g);\n      osc('square', f, t, env(g, t, 0.002, 0.16 * vel, 0.03, 0.12), lp);\n    },\n    riser: function (dest, t, f, dur, vel) {\n      var g = ctx.createGain(); g.connect(dest);\n      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 3; bp.connect(g);\n      bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(6000, t + dur);\n      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25 * vel, t + dur); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);\n      noiseSrc(t, t + dur + 0.1, bp);\n    }\n  };\n\n  /* ------------------------------------------------------ pitch helpers */\n  function degToMidi(deg, key, scaleName, oct) {\n    var sc = SCALES[scaleName] || SCALES.minor;\n    var n = sc.length;\n    var o = Math.floor(deg / n);\n    var i = ((deg % n) + n) % n;\n    return key + 12 * (oct || 0) + 12 * o + sc[i];\n  }\n  function parsePattern(str) {\n    return String(str).trim().split(/\\s+/).map(function (tok) {\n      if (tok === '.' || tok === '-') return tok;\n      if (tok === 'x' || tok === 'X') return tok;\n      var octShift = 0;\n      while (tok[0] === '^') { octShift++; tok = tok.slice(1); }\n      while (tok[0] === '_') { octShift--; tok = tok.slice(1); }\n      var n = parseInt(tok, 10);\n      return isNaN(n) ? '.' : { deg: n, oct: octShift };\n    });\n  }\n  // Drum strings may be written without spaces (\"x...x...\").\n  function tokens(track) {\n    if (track._tokens) return track._tokens;\n    var p = track.pattern;\n    if (typeof p === 'string' && !/\\s/.test(p.trim())) p = p.split('').join(' ');\n    track._tokens = parsePattern(p);\n    return track._tokens;\n  }\n\n  /* ------------------------------------------------------------- decks */\n  function makeDeck(song) {\n    var bus = ctx.createGain();\n    bus.gain.value = 0.0001;\n    bus.connect(musicGain);\n    var d = {\n      song: song, bus: bus, step: 0, nextTime: now() + 0.06,\n      bpm: song.bpm || 120, bpmFrom: song.bpm || 120, bpmTo: song.bpm || 120, rampT0: 0, rampT1: 0,\n      key: song.key != null ? song.key : 57, scale: song.scale || 'minor',\n      intensity: 0, forced: {}, tracks: [], rng: XA.util.rng(song.seed || 7),\n      state: {}, dead: false\n    };\n    song.tracks.forEach(function (tr) {\n      var g = ctx.createGain();\n      g.gain.value = 0.0001;\n      g.connect(bus);\n      d.tracks.push({ def: tr, gain: g, on: false, holdUntil: 0 });\n    });\n    return d;\n  }\n  function deckBpmAt(d, t) {\n    if (t >= d.rampT1) return d.bpmTo;\n    if (t <= d.rampT0) return d.bpmFrom;\n    return d.bpmFrom + (d.bpmTo - d.bpmFrom) * (t - d.rampT0) / (d.rampT1 - d.rampT0);\n  }\n  function refreshTracks(d, t, ramp) {\n    d.tracks.forEach(function (tr) {\n      var def = tr.def;\n      var want = d.forced[def.name] != null ? d.forced[def.name] : d.intensity >= (def.layer || 0) && (def.maxLayer == null || d.intensity < def.maxLayer);\n      if (want === tr.on) return;\n      tr.on = want;\n      var g = tr.gain.gain;\n      g.cancelScheduledValues(t);\n      g.setValueAtTime(Math.max(0.0001, g.value), t);\n      g.exponentialRampToValueAtTime(want ? (def.gain == null ? 0.6 : def.gain) : 0.0001, t + (ramp == null ? 0.6 : ramp));\n    });\n  }\n  function chordAt(d, bar) {\n    var ch = d.song.chords;\n    if (!ch || !ch.length) return 0;\n    var per = d.song.barsPerChord || 1;\n    return ch[Math.floor(bar / per) % ch.length];\n  }\n\n  function scheduleStep(d, t) {\n    var song = d.song, spb = song.stepsPerBar || 16;\n    var step = d.step, bar = Math.floor(step / spb), inBar = step % spb;\n    var chord = chordAt(d, bar);\n    var secPerStep = 60 / deckBpmAt(d, t) / 4;\n    var info = { step: step, bar: bar, stepInBar: inBar, beat: Math.floor(inBar / 4), chord: chord, time: t,\n      intensity: d.intensity, rng: d.rng, state: d.state, key: d.key, scale: d.scale, secPerStep: secPerStep };\n    d.tracks.forEach(function (tr) {\n      var def = tr.def;\n      if (!tr.on && !(def.always)) return;\n      var rate = def.rate || 1;\n      if (step % rate) return;\n      var notes = null;\n      if (typeof def.fn === 'function') {\n        notes = def.fn(info);\n      } else if (def.pattern) {\n        var tk = tokens(def);\n        var idx = Math.floor(step / rate) % tk.length;\n        var tok = tk[idx];\n        if (tok === '.' || tok === '-') return;\n        if (tok === 'x' || tok === 'X') notes = { drum: true, vel: tok === 'X' ? 1 : 0.7 };\n        else {\n          // hold length: count following '-'\n          var len = 1;\n          while (tk[(idx + len) % tk.length] === '-' && len < tk.length) len++;\n          notes = { deg: tok.deg, oct: tok.oct, steps: len * rate };\n        }\n      }\n      if (!notes) return;\n      (Array.isArray(notes) ? notes : [notes]).forEach(function (n) {\n        if (n == null) return;\n        if (typeof n === 'number') n = { deg: n };\n        var vel = (n.vel == null ? 0.8 : n.vel) * (def.vel == null ? 1 : def.vel);\n        var dur = (n.steps || def.steps || rate) * secPerStep * (def.legato || 0.9);\n        var voice = INST[n.inst || def.inst];\n        if (!voice) return;\n        var freq = 0;\n        if (!n.drum && n.deg != null) {\n          var deg = n.deg + (def.chord ? chord : 0);\n          freq = mtof(degToMidi(deg, d.key, d.scale, (def.octave || 0) + (n.oct || 0)));\n        }\n        var swing = song.swing && inBar % 2 ? song.swing * secPerStep : 0;\n        try { voice(tr.gain, t + swing, freq, dur, vel, def.params); } catch (e) { /* never break the loop */ }\n      });\n    });\n    if (inBar % 4 === 0 && d === current()) { beatTimes.push(t); if (beatTimes.length > 8) beatTimes.shift(); }\n    if (d === current()) stepListeners.forEach(function (fn) { try { fn(info); } catch (e) {} });\n    d.nextTime += secPerStep;\n    d.step++;\n  }\n\n  function current() { for (var i = decks.length - 1; i >= 0; i--) if (!decks[i].dead) return decks[i]; return null; }\n\n  function tick() {\n    if (!ctx || paused) return;\n    var horizon = ctx.currentTime + LOOKAHEAD;\n    decks.forEach(function (d) {\n      if (d.nextTime < ctx.currentTime - 0.2) d.nextTime = ctx.currentTime + 0.02; // tab was asleep\n      while (d.nextTime < horizon) scheduleStep(d, d.nextTime);\n    });\n    decks = decks.filter(function (d) { return !(d.dead && d.deadAt < ctx.currentTime); });\n    if (!decks.length) { clearInterval(timer); timer = null; }\n  }\n  function startTimer() { if (!timer) timer = setInterval(tick, TICK_MS); }\n\n  function fadeDeck(d, secs) {\n    var t = now();\n    d.dead = true;\n    d.deadAt = t + secs + 0.1;\n    d.bus.gain.cancelScheduledValues(t);\n    d.bus.gain.setValueAtTime(Math.max(0.0001, d.bus.gain.value), t);\n    d.bus.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.02, secs));\n  }\n\n  /* --------------------------------------------------------- public API */\n  var api = {\n    SCALES: SCALES,\n    instruments: INST,\n    // Spatial decks for the 3D hall: the same sequencer and instruments, but each deck\n    // plays into its own node (a cabinet's speaker) and is not part of play()/stop().\n    ensure: function () { return !!ensure(); },\n    makeRoomDeck: function (song, dest) {\n      if (!ensure()) return null;\n      var d = makeDeck(song);\n      d.bus.disconnect(); d.bus.connect(dest); d.bus.gain.value = 1;\n      d.intensity = 1; d.room = true; d.nextTime = now() + 0.05;\n      refreshTracks(d, now(), 0.05);\n      return d;\n    },\n    runRoomDeck: function (d, horizon) {\n      if (!ctx || !d) return;\n      if (d.nextTime < ctx.currentTime - 0.2) d.nextTime = ctx.currentTime + 0.02;\n      var n = 0; while (d.nextTime < horizon && n++ < 64) scheduleStep(d, d.nextTime);\n    },\n    killRoomDeck: function (d) { try { d.bus.disconnect(); } catch (e) {} },\n    play: function (song, opts) {\n      if (!ensure()) return;\n      opts = opts || {};\n      var fade = opts.fade == null ? 0.8 : opts.fade;\n      var t = now();\n      var prev = current();\n      if (prev) fadeDeck(prev, fade);\n      detune = detuneTo = detuneFrom = 0; detuneT0 = detuneT1 = 0;\n      if (!opts.keepFilter) {\n        filter.frequency.cancelScheduledValues(t);\n        filter.frequency.setValueAtTime(opts.filter || song.filter || 18000, t);\n      }\n      var d = makeDeck(song);\n      d.intensity = lastIntensity = opts.intensity == null ? 0 : opts.intensity;\n      if (prev && opts.keepStep) { d.step = prev.step; d.nextTime = prev.nextTime; }\n      decks.push(d);\n      refreshTracks(d, t, 0.05);\n      d.bus.gain.setValueAtTime(0.0001, t);\n      d.bus.gain.exponentialRampToValueAtTime(song.gain || 0.8, t + Math.max(0.05, fade));\n      paused = false;\n      musicGain.gain.cancelScheduledValues(t);\n      musicGain.gain.setValueAtTime(volume, t);\n      startTimer();\n      return d;\n    },\n    stop: function (fade) {\n      if (!ctx) return;\n      decks.forEach(function (d) { if (!d.dead) fadeDeck(d, fade == null ? 0.5 : fade); });\n    },\n    isPlaying: function () { return !!current(); },\n    pause: function () {\n      if (!ctx || paused || !current()) return;\n      paused = true; pauseAt = ctx.currentTime;\n      musicGain.gain.cancelScheduledValues(pauseAt);\n      musicGain.gain.setValueAtTime(musicGain.gain.value, pauseAt);\n      musicGain.gain.linearRampToValueAtTime(0.0001, pauseAt + 0.15);\n    },\n    resume: function () {\n      if (!ctx || !paused) return;\n      paused = false;\n      var t = ctx.currentTime;\n      decks.forEach(function (d) { d.nextTime = t + 0.05; });\n      musicGain.gain.cancelScheduledValues(t);\n      musicGain.gain.setValueAtTime(0.0001, t);\n      musicGain.gain.linearRampToValueAtTime(volume, t + 0.3);\n      startTimer();\n    },\n    setIntensity: function (v) {\n      lastIntensity = Math.max(0, Math.min(1, v));\n      var d = current();\n      if (!d || !ctx) return;\n      if (Math.abs(d.intensity - lastIntensity) < 1e-3) return;\n      d.intensity = lastIntensity;\n      refreshTracks(d, now());\n    },\n    intensity: function () { return lastIntensity; },\n    setTrack: function (name, on) {\n      var d = current();\n      if (!d) return;\n      if (on == null) delete d.forced[name]; else d.forced[name] = !!on;\n      d.tracks.forEach(function (tr) { if (tr.def.name === name) tr.on = null; }); // force a re-evaluation\n      refreshTracks(d, now(), 0.25);\n    },\n    setTempo: function (bpm, ramp) {\n      var d = current();\n      if (!d || !ctx) return;\n      var t = now();\n      d.bpmFrom = deckBpmAt(d, t);\n      d.bpmTo = Math.max(20, Math.min(320, bpm));\n      d.rampT0 = t; d.rampT1 = t + (ramp || 0.001);\n    },\n    tempo: function () { var d = current(); return d ? deckBpmAt(d, now()) : 0; },\n    setKey: function (midi) { var d = current(); if (d) d.key = midi; },\n    transpose: function (semis) { var d = current(); if (d) d.key += semis; },\n    setScale: function (name) { var d = current(); if (d && SCALES[name]) d.scale = name; },\n    setFilter: function (hz, secs) {\n      if (!ensure()) return;\n      var t = now();\n      filter.frequency.cancelScheduledValues(t);\n      filter.frequency.setValueAtTime(Math.max(60, filter.frequency.value), t);\n      filter.frequency.exponentialRampToValueAtTime(Math.max(60, Math.min(20000, hz)), t + (secs || 0.3));\n    },\n    duck: function (amount, secs) {\n      if (!ensure()) return;\n      var t = now(), lo = Math.max(0.0001, volume * (1 - amount));\n      musicGain.gain.cancelScheduledValues(t);\n      musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);\n      musicGain.gain.exponentialRampToValueAtTime(lo, t + 0.04);\n      musicGain.gain.exponentialRampToValueAtTime(volume, t + (secs || 0.5));\n    },\n    // Pitch/tempo slump like a tape machine losing power, then silence.\n    tapeStop: function (secs) {\n      var d = current();\n      if (!d || !ctx) return;\n      secs = secs || 1.2;\n      var t = now();\n      api.setTempo(d.bpm * 0.25, secs);\n      detuneFrom = detuneAt(t); detuneTo = -1500; detuneT0 = t; detuneT1 = t + secs;\n      api.setFilter(300, secs);\n      fadeDeck(d, secs * 1.1);\n    },\n    // Quantization helper: next step/beat/bar boundary on the audio clock.\n    nextGrid: function (q) {\n      var d = current();\n      if (!ctx) return 0;\n      if (!d || !q) return ctx.currentTime + 0.01;\n      var spb = d.song.stepsPerBar || 16;\n      var n = q === 'bar' ? spb : q === 'beat' ? 4 : q === '8' ? 2 : 1;\n      var sps = 60 / deckBpmAt(d, d.nextTime) / 4;\n      var ahead = (n - (d.step % n)) % n;\n      var t = d.nextTime + ahead * sps;\n      while (t < ctx.currentTime + 0.005) t += n * sps;\n      return t;\n    },\n    // Play one note in the current key/scale (chord-relative when opts.chord).\n    note: function (inst, deg, opts) {\n      if (!ensure()) return;\n      opts = opts || {};\n      var d = current();\n      var key = d ? d.key : 57, scale = d ? d.scale : 'minor';\n      var chord = opts.chord && d ? chordAt(d, Math.floor(d.step / (d.song.stepsPerBar || 16))) : 0;\n      var t = opts.at || api.nextGrid(opts.quantize);\n      var voice = INST[inst];\n      if (!voice) return;\n      var freq = mtof(degToMidi(deg + chord, key, scale, opts.octave || 0));\n      var g = ctx.createGain();\n      g.gain.value = opts.gain == null ? 0.7 : opts.gain;\n      g.connect(musicGain);\n      voice(g, t, freq, opts.dur || 0.15, opts.vel == null ? 0.9 : opts.vel, opts.params);\n      return t;\n    },\n    // A short phrase: [{ deg, at: stepOffset, steps, inst }] quantized as a unit.\n    stinger: function (seq, opts) {\n      if (!ensure()) return;\n      opts = opts || {};\n      var d = current();\n      var t0 = api.nextGrid(opts.quantize || 'beat');\n      var sps = d ? 60 / deckBpmAt(d, t0) / 4 : 0.12;\n      seq.forEach(function (n) {\n        api.note(n.inst || opts.inst || 'lead', n.deg, { at: t0 + (n.at || 0) * sps, dur: (n.steps || 1) * sps * 0.9,\n          octave: n.oct || opts.octave || 0, vel: n.vel, gain: opts.gain, params: opts.params });\n      });\n    },\n    onStep: function (fn) { stepListeners.push(fn); return function () { stepListeners = stepListeners.filter(function (f) { return f !== fn; }); }; },\n    clearListeners: function () { stepListeners = []; },\n    // 1 on the beat, decaying towards 0 before the next one (for visuals).\n    pulse: function (sharpness) {\n      if (!ctx || !beatTimes.length) return 0;\n      var t = ctx.currentTime, last = null;\n      for (var i = beatTimes.length - 1; i >= 0; i--) if (beatTimes[i] <= t) { last = beatTimes[i]; break; }\n      if (last == null) return 0;\n      return Math.exp(-(t - last) * (sharpness || 7));\n    },\n    beatPhase: function () {\n      var d = current();\n      if (!ctx || !d || !beatTimes.length) return 0;\n      var spb = 60 / deckBpmAt(d, ctx.currentTime);\n      var last = beatTimes.filter(function (b) { return b <= ctx.currentTime; }).pop();\n      return last == null ? 0 : Math.min(1, (ctx.currentTime - last) / spb);\n    },\n    degToMidi: degToMidi,\n    mtof: mtof\n  };\n  XA.music = api;\n})(window);\n\n/*@xa-part score-client.js*/\n/*\n * Xtrata Arcade \u2014 score client (leaf module)\n *\n * The only module that talks to the network or a wallet. Shared by every\n * cartridge in the room; each game is just a different `game-id` on the same\n * contract (xtrata-arcade-scores-v2 by default).\n *\n * Reads:   Hiro `call-read` \u2192 get-top10 / get-board / get-replay, decoded here.\n * Writes:  submit-score(board, period, score, name, replay), signed in this priority order:\n *   1. Host bridge, generic         `stx_callContract`          (runtime page)\n *   2. Direct wallet provider       (only when the page is top-level)\n *   3. Nothing can sign here        \u2192 hand the player the secure-runtime link\n *\n * Every write is Deny-mode with a single STX post-condition capped at the\n * contract's current fee, so a signature can never move more than the fee.\n *\n * A read that FAILED is reported as { ok:false } \u2014 never as an empty board.\n */\n(function (root) {\n  'use strict';\n  if (root.XAScores) return;\n\n  var CFG = {\n    network: 'mainnet',\n    contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',\n    contractName: 'xtrata-arcade-scores-v2',\n    readSender: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',\n    apiBases: null,               // default: same-origin /hiro proxy (if any) then Hiro\n    runtimeOrigin: 'https://xtrata.xyz',\n    contentContractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3',\n    parentTokenId: 0,\n    boardTtlMs: 45000,\n    bridgeTimeoutMs: 170000,\n    appName: 'xtrata-arcade',\n    inlineMax: 60000,             // replays larger than this are stored as their own inscription\n    // The network (miner) fee players are told to set on a score post. Wallets estimate their own and have\n    // suggested 0.5 STX. One number, here only: the warning copy and the fee we pass (when a wallet takes it) read it.\n    networkFeeHintUstx: 3000,     // 0.003 STX\n    networkFeePerByteUstx: 0      // raise (e.g. 1) only if measured: tx larger than hint/perByte bytes then scale up\n  };\n\n  var HEX = '0123456789abcdef';\n  var C32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';\n\n  function err(message, code) {\n    var e = new Error(message);\n    if (code !== undefined) e.code = code;\n    return e;\n  }\n  function log() {\n    try {\n      var args = Array.prototype.slice.call(arguments);\n      args.unshift('[xa:scores]');\n      console.log.apply(console, args);\n    } catch (e) {}\n  }\n\n  /* ---------------------------------------------------------- bytes */\n  function hexToBytes(hex) {\n    var clean = String(hex || '').replace(/^0x/i, '');\n    if (clean.length % 2) throw err('Invalid hex length');\n    var out = new Uint8Array(clean.length / 2);\n    for (var i = 0; i < out.length; i++) out[i] = parseInt(clean.substr(i * 2, 2), 16);\n    return out;\n  }\n  function bytesToHex(bytes) {\n    var s = '';\n    for (var i = 0; i < bytes.length; i++) s += HEX[bytes[i] >> 4] + HEX[bytes[i] & 15];\n    return s;\n  }\n  function asciiBytes(str) {\n    var out = new Uint8Array(str.length);\n    for (var i = 0; i < str.length; i++) out[i] = str.charCodeAt(i) & 0x7f;\n    return out;\n  }\n\n  /* --------------------------------------------------------- sha256 */\n  var K = new Uint32Array([\n    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,\n    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,\n    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,\n    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,\n    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,\n    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,\n    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,\n    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2\n  ]);\n  function sha256(msg) {\n    var h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,\n      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);\n    var l = msg.length;\n    var padLen = ((l + 9 + 63) >> 6) << 6;\n    var buf = new Uint8Array(padLen);\n    buf.set(msg); buf[l] = 0x80;\n    var bits = l * 8;\n    buf[padLen - 4] = (bits >>> 24) & 255; buf[padLen - 3] = (bits >>> 16) & 255;\n    buf[padLen - 2] = (bits >>> 8) & 255; buf[padLen - 1] = bits & 255;\n    var w = new Uint32Array(64);\n    for (var off = 0; off < padLen; off += 64) {\n      for (var i = 0; i < 16; i++) {\n        w[i] = (buf[off + i * 4] << 24) | (buf[off + i * 4 + 1] << 16) | (buf[off + i * 4 + 2] << 8) | buf[off + i * 4 + 3];\n      }\n      for (i = 16; i < 64; i++) {\n        var a0 = w[i - 15], a1 = w[i - 2];\n        var s0 = ((a0 >>> 7) | (a0 << 25)) ^ ((a0 >>> 18) | (a0 << 14)) ^ (a0 >>> 3);\n        var s1 = ((a1 >>> 17) | (a1 << 15)) ^ ((a1 >>> 19) | (a1 << 13)) ^ (a1 >>> 10);\n        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;\n      }\n      var a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];\n      for (i = 0; i < 64; i++) {\n        var S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));\n        var ch = (e & f) ^ (~e & g);\n        var t1 = (hh + S1 + ch + K[i] + w[i]) | 0;\n        var S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));\n        var mj = (a & b) ^ (a & c) ^ (b & c);\n        var t2 = (S0 + mj) | 0;\n        hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;\n      }\n      h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;\n    }\n    var out = new Uint8Array(32);\n    for (i = 0; i < 8; i++) {\n      out[i * 4] = h[i] >>> 24; out[i * 4 + 1] = (h[i] >>> 16) & 255;\n      out[i * 4 + 2] = (h[i] >>> 8) & 255; out[i * 4 + 3] = h[i] & 255;\n    }\n    return out;\n  }\n\n  /* ------------------------------------------------------------ c32 */\n  function c32encode(bytes) {\n    var lead = 0;\n    while (lead < bytes.length && bytes[lead] === 0) lead++;\n    var n = BigInt('0x' + (bytesToHex(bytes) || '0'));\n    var s = '';\n    while (n > 0n) { s = C32[Number(n % 32n)] + s; n = n / 32n; }\n    for (var i = 0; i < lead; i++) s = '0' + s;\n    return s;\n  }\n  function c32address(version, hash160) {\n    var payload = new Uint8Array(21);\n    payload[0] = version; payload.set(hash160, 1);\n    var check = sha256(sha256(payload)).slice(0, 4);\n    var data = new Uint8Array(24);\n    data.set(hash160); data.set(check, 20);\n    return 'S' + C32[version] + c32encode(data);\n  }\n  function c32decodeAddress(address) {\n    var a = String(address || '').trim().toUpperCase();\n    if (!/^S[0-9A-Z]{20,41}$/.test(a)) throw err('Invalid Stacks address');\n    var version = C32.indexOf(a[1]);\n    var body = a.slice(2);\n    var n = 0n;\n    for (var i = 0; i < body.length; i++) {\n      var v = C32.indexOf(body[i]);\n      if (v < 0) throw err('Invalid Stacks address');\n      n = n * 32n + BigInt(v);\n    }\n    var bytes = hexToBytes(n.toString(16).padStart(48, '0'));\n    var hash160 = bytes.slice(0, 20);\n    if (c32address(version, hash160) !== a) throw err('Stacks address checksum mismatch');\n    return { version: version, hash160: hash160 };\n  }\n  function isMainnetAddress(a) {\n    try { c32decodeAddress(a); } catch (e) { return false; }\n    return /^S[PM]/.test(String(a).toUpperCase());\n  }\n\n  /* ---------------------------------------------------- Clarity codec */\n  function cvUint(value) {\n    var n = BigInt(value);\n    if (n < 0n) throw err('uint cannot be negative');\n    return '0x01' + n.toString(16).padStart(32, '0');\n  }\n  function cvBuff(bytes) {\n    return '0x02' + bytes.length.toString(16).padStart(8, '0') + bytesToHex(bytes);\n  }\n  function cvPrincipal(address) {\n    var d = c32decodeAddress(address);\n    return '0x05' + d.version.toString(16).padStart(2, '0') + bytesToHex(d.hash160);\n  }\n  function cvAscii(str) {\n    var s = String(str);\n    if (!/^[\\x20-\\x7e]*$/.test(s)) throw err('string-ascii must be printable ASCII');\n    return '0x0d' + s.length.toString(16).padStart(8, '0') + bytesToHex(asciiBytes(s));\n  }\n  // Minimal deserializer: enough for the leaderboard contract's return types.\n  function decodeCV(hex) {\n    var b = hexToBytes(hex);\n    var p = 0;\n    function u32() { var v = ((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]) >>> 0; p += 4; return v; }\n    function big(nbytes, signed) {\n      var v = BigInt('0x' + bytesToHex(b.slice(p, p + nbytes)));\n      if (signed && b[p] & 0x80) v -= (1n << BigInt(nbytes * 8));\n      p += nbytes;\n      return v;\n    }\n    function read() {\n      var t = b[p++];\n      switch (t) {\n        case 0x00: return { type: 'int', value: big(16, true) };\n        case 0x01: return { type: 'uint', value: big(16, false) };\n        case 0x02: { var n = u32(); var v = b.slice(p, p + n); p += n; return { type: 'buffer', value: v }; }\n        case 0x03: return { type: 'bool', value: true };\n        case 0x04: return { type: 'bool', value: false };\n        case 0x05: { var ver = b[p++]; var h = b.slice(p, p + 20); p += 20;\n          return { type: 'principal', value: c32address(ver, h) }; }\n        case 0x06: { var ver2 = b[p++]; var h2 = b.slice(p, p + 20); p += 20;\n          var ln = b[p++]; var name = String.fromCharCode.apply(null, b.slice(p, p + ln)); p += ln;\n          return { type: 'principal', value: c32address(ver2, h2) + '.' + name }; }\n        case 0x07: return { type: 'ok', value: read() };\n        case 0x08: return { type: 'err', value: read() };\n        case 0x09: return { type: 'none', value: null };\n        case 0x0a: return { type: 'some', value: read() };\n        case 0x0b: { var len = u32(); var arr = []; for (var i = 0; i < len; i++) arr.push(read()); return { type: 'list', value: arr }; }\n        case 0x0c: { var cnt = u32(); var obj = {};\n          for (var j = 0; j < cnt; j++) {\n            var kl = b[p++]; var key = String.fromCharCode.apply(null, b.slice(p, p + kl)); p += kl;\n            obj[key] = read();\n          }\n          return { type: 'tuple', value: obj }; }\n        case 0x0d: { var sl = u32(); var s = String.fromCharCode.apply(null, b.slice(p, p + sl)); p += sl; return { type: 'ascii', value: s }; }\n        case 0x0e: { var ul = u32(); var ub = b.slice(p, p + ul); p += ul;\n          return { type: 'utf8', value: new TextDecoder().decode(ub) }; }\n        default: throw err('Unsupported Clarity type 0x' + t.toString(16));\n      }\n    }\n    return read();\n  }\n\n  /* STX post-condition, wire format (for direct wallet routes).\n     type 0x00 STX | principal 0x02 standard(version,hash160) | code | u64 amount\n     BARE hex, no 0x: Leather parses post-condition strings with a strict\n     decoder (@noble/hashes hexToBytes) that rejects \"0x\" and reports it as\n     \"Not a serialized post condition\". Xverse accepts bare hex too. */\n  var CONDITION_LTE = 0x05;\n  function stxPostConditionHex(address, amount) {\n    var d = c32decodeAddress(address);\n    var amt = BigInt(amount).toString(16).padStart(16, '0');\n    return '00' + '02' + d.version.toString(16).padStart(2, '0') + bytesToHex(d.hash160) +\n      CONDITION_LTE.toString(16).padStart(2, '0') + amt;\n  }\n\n  /* ---------------------------------------------------------- reads */\n  function hasRealOrigin() {\n    try { return /^https?:$/.test(root.location.protocol) && root.location.origin !== 'null'; }\n    catch (e) { return false; }\n  }\n  function apiBases() {\n    if (Array.isArray(CFG.apiBases) && CFG.apiBases.length) return CFG.apiBases.slice();\n    var out = [];\n    if (hasRealOrigin() && /xtrata\\.xyz$/.test(root.location.hostname)) {\n      out.push(root.location.origin + '/hiro/' + CFG.network);\n    }\n    out.push(CFG.network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so');\n    return out;\n  }\n  async function callRead(fn, args, contractId) {\n    var bases = apiBases();\n    var last = null;\n    var target = contractId ? String(contractId).split('.') : [CFG.contractAddress, CFG.contractName];\n    for (var i = 0; i < bases.length; i++) {\n      var url = bases[i].replace(/\\/+$/, '') + '/v2/contracts/call-read/' +\n        target[0] + '/' + target[1] + '/' + fn;\n      try {\n        var res = await fetch(url, {\n          method: 'POST',\n          headers: { 'Content-Type': 'application/json' },\n          body: JSON.stringify({ sender: CFG.readSender, arguments: args || [] })\n        });\n        if (!res.ok) throw err('HTTP ' + res.status);\n        var body = await res.json();\n        if (!body || body.okay !== true || typeof body.result !== 'string') {\n          throw err(body && body.cause ? String(body.cause) : 'read-only call failed');\n        }\n        return decodeCV(body.result);\n      } catch (e) { last = e; }\n    }\n    throw last || err('read-only call failed');\n  }\n\n  // Network fee (micro-STX) to recommend for a transaction of about `txBytes` bytes.\n  function networkFeeHint(txBytes) {\n    var f = CFG.networkFeeHintUstx, per = CFG.networkFeePerByteUstx;\n    return per > 0 && txBytes > 0 ? Math.max(f, Math.ceil(txBytes * per)) : f;\n  }\n\n  var boardCache = {};\n  function some(cv) { return cv && cv.type === 'some' ? cv.value : null; }\n  // \u2192 { ok:true, entries:[{rank,name,player,score,burn,engineId,replayHash}], at } | { ok:false, error }\n  // `board` is the contract board id (XA.replay.boardFor). `mode` is only used for the \"qualifies\" check.\n  async function getTop10(board, mode, force) {\n    var hit = boardCache[board];\n    if (!force && hit && hit.ok && Date.now() - hit.at < CFG.boardTtlMs) return hit;\n    try {\n      var cv = await callRead('get-top10', [cvAscii(board), cvUint(0)]);\n      if (cv.type === 'ok') cv = cv.value;\n      if (cv.type !== 'list') throw err('unexpected get-top10 shape');\n      var entries = [];\n      cv.value.forEach(function (slot, idx) {\n        var some_ = some(slot);\n        if (!some_) return;\n        var t = some_.value;\n        entries.push({\n          rank: idx + 1,\n          name: t.name.value,\n          player: t.player.value,\n          score: Number(t.score.value),\n          burn: Number(t['burn-height'].value),\n          engineId: Number(t['engine-id'].value),\n          replayHash: bytesToHex(t['replay-hash'].value)\n        });\n      });\n      var out = { ok: true, entries: entries, at: Date.now() };\n      boardCache[board] = out;\n      return out;\n    } catch (e) {\n      log('board read failed', board, e && e.message);\n      // Keep serving a stale good board, but flag it.\n      if (hit && hit.ok) return Object.assign({}, hit, { stale: true });\n      return { ok: false, error: e && e.message ? e.message : String(e) };\n    }\n  }\n  // 'yes' | 'no' | 'unknown' \u2014 unknown when the board could not be read.\n  function qualifies(board, score, mode) {\n    if (!board || !board.ok) return 'unknown';\n    if (!(score > 0)) return 'no';\n    if (board.entries.length < 10) return 'yes';\n    var last = board.entries[board.entries.length - 1].score;\n    return (mode === 'time' ? score < last : score > last) ? 'yes' : 'no';\n  }\n  var infoCache = {};\n  // \u2192 { ok:true, registered:false } | { ok:true, registered:true, fee, enabled, maxScore, engineId } | { ok:false, error }\n  async function getBoardInfo(board) {\n    var hit = infoCache[board];\n    if (hit && Date.now() - hit.at < 60000) return hit;\n    try {\n      var cv = await callRead('get-board', [cvAscii(board)]);\n      var s = some(cv);\n      var out = { ok: true, at: Date.now(), registered: !!s };\n      if (s) {\n        var t = s.value;\n        out.fee = BigInt(t.fee.value).toString();\n        out.enabled = t.enabled.value === true;\n        out.maxScore = Number(t['max-score'].value);\n        out.engineId = Number(t['engine-id'].value);\n      }\n      infoCache[board] = out;\n      return out;\n    } catch (e) {\n      return { ok: false, error: e && e.message ? e.message : String(e) };\n    }\n  }\n  // The submission fee for a board, as { ok, value } (micro-STX), plus whether the board is open.\n  async function getFee(board) {\n    var info = await getBoardInfo(board);\n    if (!info.ok) return info;\n    if (!info.registered) return { ok: true, value: '0', registered: false, enabled: false };\n    return { ok: true, value: info.fee, registered: true, enabled: info.enabled };\n  }\n  // The stored replay bytes for a player's entry on a board (period 0), or null.\n  async function getReplay(board, address) {\n    var cv = await callRead('get-replay', [cvAscii(board), cvUint(0), cvPrincipal(address)]);\n    var s = some(cv);\n    return s ? s.value : null;\n  }\n\n  /* ------------------------------------------- long replays as Xtrata inscriptions\n     A replay larger than INLINE_MAX does not fit in a score entry. It is inscribed on the Xtrata core in one\n     transaction (mint-single-tx, up to 32 chunks = 512 KB; the player pays the core fee and the network fee),\n     and the score entry stores a small pointer to it (XA.replay.makePointer). */\n  var INLINE_MAX = 60000, CHUNK = 16384, MAX_INSCRIBE_CHUNKS = 32;\n  var REPLAY_MIME = 'application/octet-stream';\n  var TOKEN_URI = 'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';\n  function cvList(items) {\n    return '0x0b' + items.length.toString(16).padStart(8, '0') + items.map(function (x) { return String(x).replace(/^0x/i, ''); }).join('');\n  }\n  function chunksOf(bytes) {\n    var out = [];\n    for (var i = 0; i < bytes.length; i += CHUNK) out.push(bytes.subarray(i, Math.min(bytes.length, i + CHUNK)));\n    return out;\n  }\n  function chainHash(bytes) {\n    var h = new Uint8Array(32);\n    chunksOf(bytes).forEach(function (c) { var m = new Uint8Array(32 + c.length); m.set(h, 0); m.set(c, 32); h = sha256(m); });\n    return h;\n  }\n  function needsInscription(bytes) { return bytes.length > (Number(CFG.inlineMax) || INLINE_MAX); }\n  // What storing a long replay costs: { ok, chunks, fee (micro-STX string), tooBig } \u2014 fee excludes the network fee.\n  async function quoteReplay(size) {\n    var n = Math.ceil(size / CHUNK);\n    if (n > MAX_INSCRIBE_CHUNKS) return { ok: true, chunks: n, tooBig: true, fee: '0' };\n    try {\n      var cv = await callRead('quote-single-tx-fee', [cvUint(size), cvUint(n)], CFG.contentContractId);\n      var t = cv && cv.type === 'ok' ? cv.value : cv;\n      return { ok: true, chunks: n, tooBig: false, fee: String(t.value['total-fee'].value) };\n    } catch (e) { return { ok: false, chunks: n, tooBig: false, error: (e && e.message) || String(e) }; }\n  }\n  async function inscriptionIdByHash(hash) {\n    var cv = await callRead('get-id-by-hash', [cvBuff(hash)], CFG.contentContractId);\n    var v = cv && cv.type === 'ok' ? cv.value : cv;\n    v = some(v);\n    return v ? Number(v.value) : null;\n  }\n  async function inscriptionMeta(id) {\n    var cv = await callRead('get-inscription-meta', [cvUint(id)], CFG.contentContractId);\n    var v = cv && cv.type === 'ok' ? cv.value : cv;\n    v = some(v);\n    if (!v) return null;\n    var t = v.value;\n    return { chunks: Number(t['total-chunks'].value), size: Number(t['total-size'].value), sealed: !!(t.sealed && t.sealed.value),\n      creator: t.creator ? t.creator.value : '', hash: t['final-hash'] ? bytesToHex(t['final-hash'].value) : '' };\n  }\n  // Bytes of inscription `id`, checked against the expected chain hash: the xtrata.xyz gateway first, the chain as fallback.\n  var inscriptionCache = {};\n  async function getInscription(id, hash) {\n    var want = bytesToHex(hash);\n    var key = id + ':' + want;\n    if (inscriptionCache[key]) return inscriptionCache[key];\n    var p = (async function () {\n      try {\n        var res = await fetch(CFG.runtimeOrigin.replace(/\\/+$/, '') + '/i/' + id + '?raw=1', { cache: 'force-cache' });\n        if (res.ok) {\n          var b = new Uint8Array(await res.arrayBuffer());\n          if (bytesToHex(chainHash(b)) === want) return b;\n        }\n      } catch (e) { /* gateway unreachable: read the chain */ }\n      var meta = await inscriptionMeta(id);\n      if (!meta || !meta.sealed) throw err('Replay inscription #' + id + ' is not on chain yet.');\n      var parts = [], got = 0;\n      for (var i = 0; i < meta.chunks; i += 8) {\n        var idx = [];\n        for (var k = i; k < Math.min(meta.chunks, i + 8); k++) idx.push(cvUint(k));\n        var cv = await callRead('get-chunk-batch', [cvUint(id), cvList(idx)], CFG.contentContractId);\n        var list = (cv && cv.type === 'ok' ? cv.value : cv).value;\n        list.forEach(function (it) { var v = it.type === 'some' ? it.value : it; parts.push(v.value); got += v.value.length; });\n      }\n      var out = new Uint8Array(got), o = 0;\n      parts.forEach(function (c) { out.set(c, o); o += c.length; });\n      if (bytesToHex(chainHash(out)) !== want) throw err('Replay inscription #' + id + ' does not match its hash.');\n      return out;\n    })();\n    inscriptionCache[key] = p;\n    p.catch(function () { delete inscriptionCache[key]; });\n    return p;\n  }\n  // Waits until a broadcast transaction is confirmed; throws if it failed.\n  async function waitTx(txid, onTick) {\n    var id = /^0x/.test(txid) ? txid : '0x' + txid;\n    var started = Date.now();\n    while (Date.now() - started < 20 * 60000) {\n      var bases = apiBases();\n      for (var i = 0; i < bases.length; i++) {\n        try {\n          var res = await fetch(bases[i].replace(/\\/+$/, '') + '/extended/v1/tx/' + id, { cache: 'no-store' });\n          if (res.status === 404) break;\n          if (!res.ok) continue;\n          var tx = await res.json();\n          if (tx.tx_status === 'success') return tx;\n          if (/^abort|^dropped/.test(String(tx.tx_status))) {\n            throw err('The transaction failed on chain (' + tx.tx_status + (tx.tx_result && tx.tx_result.repr ? ': ' + tx.tx_result.repr : '') + ').');\n          }\n          break;\n        } catch (e) { if (e && /failed on chain/.test(e.message)) throw e; }\n      }\n      if (onTick) try { onTick(Math.round((Date.now() - started) / 1000)); } catch (e) {}\n      await new Promise(function (res) { setTimeout(res, 4000); });\n    }\n    throw err('Still waiting for transaction ' + id.slice(0, 12) + '\u2026 Check your wallet history, then post again: nothing is paid twice.');\n  }\n  function base64url(bytes) {\n    var bin = '';\n    for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));\n    return btoa(bin).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  }\n  // Inside the xtrata.xyz viewer the site signs: hand it the whole run; it stores the replay and posts the score.\n  function hostSubmitLong(input) {\n    var targets = bridgeTargets();\n    if (!targets.length) return Promise.reject(err('No host window.', -32001));\n    var id = 'xa-long-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);\n    var payload = { v: 1, game: 'xtrata-arcade', network: CFG.network, contract: CFG.contractAddress + '.' + CFG.contractName,\n      board: input.board, period: 0, score: input.score, name: input.name, replay: base64url(input.replay) };\n    return new Promise(function (resolve, reject) {\n      var opened = false;\n      var t0 = setTimeout(function () {\n        if (opened) return;\n        root.removeEventListener('message', onMsg);\n        reject(err('This viewer cannot store long replays yet. Open the arcade at xtrata.xyz/arcade to post this run, or save the replay and post it later.', -32601));\n      }, 5000);\n      function onMsg(ev) {\n        var d = ev && ev.data;\n        if (!d || typeof d !== 'object' || d.id !== id) return;\n        if (d.type === 'xtrata:arcade:submit-opened') { opened = true; clearTimeout(t0); if (input.onProgress) input.onProgress('Confirm in the xtrata.xyz dialog\u2026'); return; }\n        if (d.type !== 'xtrata:arcade:submit-result') return;\n        root.removeEventListener('message', onMsg); clearTimeout(t0);\n        if (d.txId) resolve({ ok: true, txid: d.txId, route: 'host:long' });\n        else if (d.cancelled) reject(err('Cancelled. Nothing was posted.', 4001));\n        else reject(err(String(d.error || 'The score was not posted.')));\n      }\n      root.addEventListener('message', onMsg);\n      targets.forEach(function (t) { try { t.postMessage({ type: 'xtrata:arcade:submit', id: id, payload: payload }, '*'); } catch (e) {} });\n    });\n  }\n\n  // A finished run of a framed game (a page of its own, such as Astro Blaster 3) handed up to the xtrata.xyz viewer, which shows its own review and signs.\n  // Resolves { txId } | { cancelled:true } | { error } | { noHost:true } (nobody above answered in time). Nothing is signed here.\n  function hasHost() { return bridgeTargets().length > 0; }\n  function submitLink(payload) {\n    return CFG.runtimeOrigin + '/arcade/submit#p=' + base64url(new TextEncoder().encode(JSON.stringify(payload)));\n  }\n  function relaySubmit(payload, onOpened) {\n    var targets = bridgeTargets();\n    if (!targets.length) return Promise.resolve({ noHost: true });\n    var id = 'xa-fr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);\n    return new Promise(function (resolve) {\n      var opened = false;\n      var t0 = setTimeout(function () { if (!opened) { root.removeEventListener('message', onMsg); resolve({ noHost: true }); } }, 4000);\n      function onMsg(ev) {\n        var d = ev && ev.data;\n        if (!d || typeof d !== 'object' || d.id !== id || targets.indexOf(ev.source) < 0) return;\n        if (d.type === 'xtrata:arcade:submit-opened') { opened = true; clearTimeout(t0); if (onOpened) try { onOpened(); } catch (e) {} return; }\n        if (d.type !== 'xtrata:arcade:submit-result') return;\n        root.removeEventListener('message', onMsg); clearTimeout(t0);\n        resolve(d.txId ? { txId: String(d.txId) } : d.cancelled ? { cancelled: true } : { error: String(d.error || 'The score was not posted.') });\n      }\n      root.addEventListener('message', onMsg);\n      targets.forEach(function (t) { try { t.postMessage({ type: 'xtrata:arcade:submit', id: id, payload: payload }, '*'); } catch (e) {} });\n    });\n  }\n\n  /* --------------------------------------------------- host bridge */\n  var bridge = { token: '', hostOrigin: '', nonce: '', tries: 0, seq: 0, pending: {}, listening: false };\n  function bridgeTargets() {\n    var out = [];\n    try { if (root.opener && root.opener !== root) out.push(root.opener); } catch (e) {}\n    try { if (root.parent && root.parent !== root) out.push(root.parent); } catch (e) {}\n    try { if (root.top && root.top !== root && out.indexOf(root.top) < 0) out.push(root.top); } catch (e) {}\n    return out;\n  }\n  function postOrigin() {\n    if (bridge.hostOrigin) return bridge.hostOrigin;\n    return hasRealOrigin() ? root.location.origin : '*';\n  }\n  function listen() {\n    if (bridge.listening) return;\n    bridge.listening = true;\n    root.addEventListener('message', function (ev) {\n      var d = ev && ev.data;\n      if (!d || typeof d !== 'object') return;\n      if (d.type === 'xtrata:wallet:hello-ack') {\n        if (bridge.token || d.nonce !== bridge.nonce || typeof d.bridgeToken !== 'string') return;\n        bridge.token = d.bridgeToken;\n        bridge.hostOrigin = ev.origin && ev.origin !== 'null' ? ev.origin : '';\n        log('host bridge granted by', bridge.hostOrigin || '(opaque origin)');\n        emit();\n        return;\n      }\n      if (d.type !== 'xtrata:wallet:response') return;\n      var okOrigin = (bridge.hostOrigin && ev.origin === bridge.hostOrigin) ||\n        (hasRealOrigin() && ev.origin === root.location.origin);\n      if (!okOrigin) return;\n      var entry = bridge.pending[d.requestId];\n      if (!entry) return;\n      delete bridge.pending[d.requestId];\n      clearTimeout(entry.timer);\n      if (d.ok) entry.resolve(d.result);\n      else {\n        var detail = d.error || {};\n        entry.reject(err(detail.message || 'Host wallet bridge rejected the request.',\n          typeof detail.code === 'number' ? detail.code : undefined));\n      }\n    });\n  }\n  function hello() {\n    var targets = bridgeTargets();\n    if (!targets.length || bridge.token) return;\n    if (!bridge.nonce) {\n      try { bridge.nonce = root.crypto.randomUUID(); }\n      catch (e) { bridge.nonce = 'xa-' + Date.now().toString(36) + Math.random().toString(36).slice(2); }\n    }\n    bridge.tries++;\n    targets.forEach(function (t) {\n      try {\n        t.postMessage({ type: 'xtrata:wallet:hello', app: CFG.appName, version: 'v1',\n          nonce: bridge.nonce, wants: ['wallet-bridge', 'arcade-score'] }, '*');\n      } catch (e) {}\n    });\n    if (bridge.tries < 6) setTimeout(hello, 600 * bridge.tries);\n  }\n  function bridgeRequest(method, params, timeoutMs) {\n    if (!bridge.token) return Promise.reject(err('No host wallet bridge.', -32001));\n    var targets = bridgeTargets();\n    if (!targets.length) return Promise.reject(err('No host window.', -32001));\n    return new Promise(function (resolve, reject) {\n      var id = 'xa-' + (++bridge.seq) + '-' + Date.now().toString(36);\n      var timer = setTimeout(function () {\n        delete bridge.pending[id];\n        reject(err('No wallet response. Check your wallet history before retrying.', -32002));\n      }, timeoutMs || CFG.bridgeTimeoutMs);\n      bridge.pending[id] = { resolve: resolve, reject: reject, timer: timer };\n      var msg = { type: 'xtrata:wallet:request', requestId: id, bridgeToken: bridge.token,\n        method: method, params: params == null ? null : params };\n      targets.forEach(function (t) { try { t.postMessage(msg, postOrigin()); } catch (e) {} });\n    });\n  }\n\n  /* ------------------------------------------------- direct wallets */\n  function isTopLevel() {\n    try { return root.top === root; } catch (e) { return false; }\n  }\n  // Every Stacks wallet this top-level page can reach, one entry per wallet (Leather, Xverse).\n  function directProviders() {\n    if (!isTopLevel()) return [];\n    var out = [];\n    var ok = function (p) { return p && typeof p.request === 'function'; };\n    if (ok(root.LeatherProvider)) out.push({ kind: 'leather', name: 'Leather', p: root.LeatherProvider });\n    var xv = root.XverseProviders || root.xverseProviders;\n    if (xv && ok(xv.BitcoinProvider)) out.push({ kind: 'xverse', name: 'Xverse', p: xv.BitcoinProvider });\n    else if (xv && ok(xv.StacksProvider)) out.push({ kind: 'xverse', name: 'Xverse', p: xv.StacksProvider });\n    // A bare window.StacksProvider belongs to whichever wallet claimed it last: only use it when nothing else answered.\n    if (!out.length && ok(root.StacksProvider)) out.push({ kind: 'leather', name: 'Stacks wallet', p: root.StacksProvider });\n    return out;\n  }\n  // The wallet the player picked when connecting; before that, any reachable one (for \"can this page sign?\").\n  function directProvider() {\n    var all = directProviders();\n    if (!all.length) return null;\n    return all.filter(function (d) { return d.kind === state.via; })[0] || all[0];\n  }\n  // Several wallets installed: ask which one, every time a wallet is connected (never pick one silently).\n  function chooseProvider(all) {\n    if (all.length < 2) return Promise.resolve(all[0] || null);\n    return new Promise(function (resolve) {\n      var doc = root.document;\n      var wrap = doc.createElement('div');\n      wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', 'Choose a wallet');\n      wrap.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:rgba(3,4,12,.72);font:15px/1.4 system-ui,sans-serif';\n      var card = doc.createElement('div');\n      card.style.cssText = 'width:min(340px,calc(100% - 32px));padding:20px;border-radius:16px;border:1px solid rgba(120,140,255,.45);background:#0c1230;color:#eef4ff;box-shadow:0 20px 60px rgba(0,0,0,.6)';\n      var h = doc.createElement('div');\n      h.textContent = 'Connect with which wallet?';\n      h.style.cssText = 'font-weight:800;font-size:18px;margin-bottom:12px';\n      card.appendChild(h);\n      function done(v) { root.removeEventListener('keydown', onKey, true); wrap.remove(); resolve(v); }\n      function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(null); } }\n      all.forEach(function (d, i) {\n        var b = doc.createElement('button');\n        b.type = 'button'; b.textContent = d.name;\n        b.style.cssText = 'display:block;width:100%;margin:0 0 8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(57,230,255,.5);background:rgba(57,230,255,.08);color:#eef4ff;font:700 15px system-ui,sans-serif;cursor:pointer;text-align:left';\n        b.onclick = function () { done(d); };\n        card.appendChild(b);\n        if (i === 0) setTimeout(function () { try { b.focus(); } catch (e) {} }, 0);\n      });\n      var c = doc.createElement('button');\n      c.type = 'button'; c.textContent = 'Cancel';\n      c.style.cssText = 'display:block;width:100%;margin-top:4px;padding:10px;border-radius:10px;border:0;background:transparent;color:#9fb0d8;font:600 14px system-ui,sans-serif;cursor:pointer';\n      c.onclick = function () { done(null); };\n      card.appendChild(c);\n      wrap.addEventListener('click', function (e) { if (e.target === wrap) done(null); });\n      wrap.appendChild(card);\n      (doc.body || doc.documentElement).appendChild(wrap);\n      root.addEventListener('keydown', onKey, true);\n    });\n  }\n  function unwrap(r) {\n    if (r && r.error) throw err(r.error.message || 'Wallet error', r.error.code);\n    if (r && r.status === 'error') throw err((r.error && r.error.message) || 'Wallet error');\n    return r && r.result !== undefined ? r.result : r;\n  }\n  function findStxAddress(payload) {\n    var found = '';\n    (function walk(v, depth) {\n      if (found || depth > 6 || v == null) return;\n      if (typeof v === 'string') {\n        if (/^S[PMTN][0-9A-Z]{20,41}$/.test(v)) {\n          try { c32decodeAddress(v); found = v; } catch (e) { /* not an address */ }\n        }\n        return;\n      }\n      if (typeof v !== 'object') return;\n      // Prefer entries explicitly marked as STX / stacks.\n      if ((v.symbol === 'STX' || v.purpose === 'stacks') && typeof v.address === 'string') {\n        found = v.address; return;\n      }\n      Object.keys(v).forEach(function (k) { walk(v[k], depth + 1); });\n    })(payload, 0);\n    return found;\n  }\n\n  /* --------------------------------------------------------- state */\n  var state = { address: '', via: '' };\n  var subs = [];\n  function emit() { subs.forEach(function (fn) { try { fn(status()); } catch (e) {} }); }\n  function status() {\n    var route = bridge.token ? 'host' : directProvider() ? 'direct' : 'none';\n    return { route: route, address: state.address, network: CFG.network,\n      contract: CFG.contractAddress + '.' + CFG.contractName };\n  }\n\n  async function connect() {\n    var s = status();\n    var result;\n    if (s.route === 'host') {\n      result = await bridgeRequest('wallet_connect', { app: CFG.appName }, 120000);\n      state.via = 'host';\n    } else if (s.route === 'direct') {\n      var d = await chooseProvider(directProviders());\n      if (!d) throw err('Wallet connection cancelled.', 4001);\n      if (d.kind === 'leather') result = unwrap(await d.p.request('getAddresses'));\n      else result = unwrap(await d.p.request('wallet_connect', {\n        addresses: ['stacks'], message: 'Connect to Xtrata Arcade to post high scores.' }));\n      state.via = d.kind;\n    } else {\n      throw err('No wallet is reachable from here. Open the arcade on xtrata.xyz.', 4900);\n    }\n    var address = findStxAddress(result);\n    if (!address) throw err('The wallet did not return a Stacks address.');\n    if (CFG.network === 'mainnet' && !/^S[PM]/.test(address)) {\n      throw err('Switch your wallet to Stacks mainnet and connect again.');\n    }\n    state.address = address;\n    emit();\n    return address;\n  }\n  function disconnect() { state.address = ''; state.via = ''; emit(); }\n\n  function cleanName(name) {\n    return String(name || '').replace(/[^A-Za-z0-9_.\\- ]/g, '').trim().slice(0, 12);\n  }\n  function runtimeUrl() {\n    // Without a minted parent id there is no runtime page to deep-link to yet.\n    if (!(Number(CFG.parentTokenId) > 0)) return CFG.runtimeOrigin.replace(/\\/+$/, '') + '/arcade';\n    var u = CFG.runtimeOrigin.replace(/\\/+$/, '') + '/runtime/?contractId=' +\n      encodeURIComponent(CFG.contentContractId) + '&network=' + CFG.network;\n    if (Number(CFG.parentTokenId) > 0) u += '&tokenId=' + CFG.parentTokenId;\n    return u;\n  }\n  function openRuntime() {\n    var url = runtimeUrl();\n    if (!(Number(CFG.parentTokenId) > 0)) return url;\n    bridgeTargets().forEach(function (t) {\n      try {\n        t.postMessage({ type: 'xtrata:arcade:wallet-intent', intent: 'open-runtime',\n          payload: { runtimeUrl: url }, bridgeToken: bridge.token || '' }, postOrigin());\n      } catch (e) {}\n    });\n    return url;\n  }\n  function txidOf(r) {\n    if (!r) return '';\n    if (typeof r === 'string') return r;\n    return r.txid || r.txId || (r.result && (r.result.txid || r.result.txId)) || '';\n  }\n\n  /*\n   * submit({ board, score, name, replay, pilotHash? }) \u2192\n   *   { ok:true, txid, route } |\n   *   { ok:false, needsRuntime:true, runtimeUrl, reason }   (no signer here)\n   * `board` is a contract board id, `replay` the Uint8Array from XA.replay. The contract checks that\n   * bytes 4..23 of the replay are the signing wallet's hash160; `pilotHash` (hex) lets us fail early.\n   * Throws on user cancel / wallet errors.\n   */\n  async function submit(input) {\n    var board = String(input.board || '');\n    var score = Math.floor(Number(input.score));\n    var name = cleanName(input.name);\n    var replay = input.replay;\n    if (!/^[a-z0-9_-]{3,24}$/.test(board)) throw err('Invalid board id.');\n    if (!(score > 0) || score > Number.MAX_SAFE_INTEGER) throw err('Score must be a positive whole number.');\n    if (name.length < 3) throw err('Name needs 3\u201312 letters or numbers.');\n    if (!(replay instanceof Uint8Array) || !replay.length) throw err('This run has no replay to post.');\n    var progress = typeof input.onProgress === 'function' ? input.onProgress : function () {};\n    var seal = !!input.seal;            // keep the replay, post only its fingerprint (any size, one approval)\n    var long = !seal && needsInscription(replay);\n    if (long && Math.ceil(replay.length / CHUNK) > MAX_INSCRIBE_CHUNKS) {\n      throw err('This replay is ' + Math.round(replay.length / 1024) + ' KB, more than the 512 KB a single inscription can hold. Save the replay so the run is kept.');\n    }\n\n    var s = status();\n    if (s.route === 'none') {\n      return { ok: false, needsRuntime: true, runtimeUrl: openRuntime(),\n        reason: 'This page cannot reach a wallet.' };\n    }\n    if (!state.address) await connect();\n    var address = state.address;\n    if (input.pilotHash && bytesToHex(c32decodeAddress(address).hash160) !== input.pilotHash) {\n      throw err('This run was played with a different wallet. Connect that wallet to post it.');\n    }\n\n    var fee = await getFee(board);\n    if (!fee.ok) throw err('Could not read the board right now. Try again in a moment.');\n    if (!fee.registered) throw err('This board is not open yet.');\n    if (!fee.enabled) throw err('This board is closed.');\n\n    var contract = CFG.contractAddress + '.' + CFG.contractName;\n    var r;\n\n    if (long && s.route === 'host') return hostSubmitLong({ board: board, score: score, name: name, replay: replay, onProgress: progress });\n\n    var stored = replay, replayId = null, minted = false;\n    if (seal) {\n      stored = root.XA.replay.makeSeal(replay);\n      progress('Approve in your wallet: post your score with your replay\\'s fingerprint.');\n    }\n    if (long) {\n      // 1. The full replay as its own inscription (re-used if these exact bytes are already on chain).\n      var d0 = directProvider();\n      var hash = chainHash(replay);\n      replayId = await inscriptionIdByHash(hash).catch(function () { return null; });\n      if (replayId === null) {\n        var q = await quoteReplay(replay.length);\n        if (!q.ok) throw err('Could not read the inscription fee right now. Try again in a moment.');\n        progress('Approve 1 of 2 in your wallet: store your ' + Math.round(replay.length / 1024) + ' KB replay as an inscription.');\n        var chunkArgs = chunksOf(replay).map(function (c) { return cvBuff(c); });\n        var margs = [cvBuff(hash), cvAscii(REPLAY_MIME), cvUint(replay.length), cvList(chunkArgs), cvAscii(TOKEN_URI)]\n          .map(function (a) { return String(a).replace(/^0x/i, ''); });\n        var core = CFG.contentContractId;\n        var mp = { contract: core, functionName: 'mint-single-tx', functionArgs: margs, arguments: margs,\n          postConditionMode: 'deny', postConditions: [stxPostConditionHex(address, q.fee)] };\n        if (d0.kind === 'leather') mp.network = CFG.network;\n        var mr = unwrap(await d0.p.request('stx_callContract', mp));\n        var mtx = txidOf(mr); minted = true;\n        if (!mtx) throw err('The wallet did not return a transaction id for the replay.');\n        progress('Storing your replay on chain\u2026 (this takes a block or two)');\n        await waitTx(mtx, function (sec) { progress('Storing your replay on chain\u2026 ' + sec + ' s'); });\n        for (var tries = 0; tries < 20 && replayId === null; tries++) {\n          replayId = await inscriptionIdByHash(hash).catch(function () { return null; });\n          if (replayId === null) await new Promise(function (res) { setTimeout(res, 3000); });\n        }\n        if (replayId === null) throw err('The replay was stored but its inscription id is not visible yet. Post again in a minute: it will not be stored twice.');\n      }\n      stored = root.XA.replay.makePointer(replay, replayId, hash);\n      progress((minted ? 'Approve 2 of 2' : 'Your replay is already stored as #' + replayId + '. Approve') + ' in your wallet: post your score.');\n    }\n    var args = [cvAscii(board), cvUint(0), cvUint(score), cvAscii(name), cvBuff(stored)];\n\n    if (s.route === 'host') {\n      // Generic contract call (the secure /runtime page supports this).\n      try {\n        r = await bridgeRequest('stx_callContract', {\n          contract: contract,\n          contractAddress: CFG.contractAddress,\n          contractName: CFG.contractName,\n          functionName: 'submit-score',\n          functionArgs: args,\n          network: CFG.network,\n          postConditionMode: 'deny',\n          postConditions: [{ type: 'stx', principal: address, amount: fee.value, conditionCode: 'lte' }]\n        });\n        return { ok: true, txid: txidOf(r), route: 'host:contract-call' };\n      } catch (e2) {\n        if (e2.code !== -32601) throw e2;\n        return { ok: false, needsRuntime: true, runtimeUrl: openRuntime(),\n          reason: 'This viewer does not sign score transactions yet.' };\n      }\n    }\n\n    // Direct provider (top-level page). Never send `sender` (wallet playbook \xA72).\n    var d = directProvider();\n    var bareArgs = args.map(function (a) { return String(a).replace(/^0x/i, ''); });   // bare hex for wallets\n    var params = {\n      contract: contract,\n      functionName: 'submit-score',\n      functionArgs: bareArgs,\n      arguments: bareArgs,\n      postConditionMode: 'deny',\n      postConditions: [stxPostConditionHex(address, fee.value)]\n    };\n    if (d.kind === 'leather') params.network = CFG.network;\n    r = unwrap(await d.p.request('stx_callContract', params));\n    return { ok: true, txid: txidOf(r), route: 'direct:' + d.kind, replayId: replayId, sealed: seal };\n  }\n\n  /*\n   * callContract({ contract, fn, args, maxUstx, expectAddress? }) -> { ok:true, txid, route }\n   * A contract call asked for by a hosted room (the hall's room bridge has already checked that the room is hosted, that the contract is\n   * approved on the world registry, and that the player said yes). Signed through the same routes as a score post, with the same rules\n   * (docs/WALLET-PLAYBOOK.md): never send `sender`; post-condition mode deny with exactly one STX post-condition, \"the connected account\n   * sends at most maxUstx\", so the call can move nothing else; bare hex to wallets; an account other than the one the player confirmed\n   * aborts the call (never re-targeted). Throws on cancel and on wallet errors.\n   */\n  var CLARITY_NAME = /^[a-zA-Z][a-zA-Z0-9!?_-]{0,127}$/;\n  async function callContract(input) {\n    input = input || {};\n    var contract = String(input.contract || ''), fn = String(input.fn || '');\n    if (!/^S[0-9A-Z]{25,41}\\.[a-zA-Z][a-zA-Z0-9-]{0,39}$/.test(contract)) throw err('Invalid contract.');\n    if (!CLARITY_NAME.test(fn)) throw err('Invalid function name.');\n    var args = Array.isArray(input.args) ? input.args.map(function (a) { return String(a).replace(/^0x/i, ''); }) : null;\n    if (!args || args.length > 32 || !args.every(function (a) { return /^([0-9a-fA-F]{2})+$/.test(a) && a.length <= 131072; })) throw err('Invalid arguments.');\n    var cap;\n    try { cap = BigInt(String(input.maxUstx)); } catch (e) { throw err('Invalid spending limit.'); }\n    if (cap < 0n) throw err('Invalid spending limit.');\n    var s = status();\n    if (s.route === 'none') throw err('No wallet is reachable from here. Open the arcade on xtrata.xyz.', 4900);\n    if (!state.address) await connect();\n    var address = state.address;\n    if (input.expectAddress && input.expectAddress !== address) {\n      throw err('Your wallet is now connected as ' + address + ', not the account you confirmed. Nothing was signed.', 'WALLET_ADDRESS_MISMATCH');\n    }\n    if ((CFG.network === 'mainnet') !== /^S[PM]/.test(address)) throw err('Switch your wallet to Stacks ' + CFG.network + ' and connect again.');\n    var parts = contract.split('.'), r;\n    if (s.route === 'host') {\n      r = await bridgeRequest('stx_callContract', {\n        contract: contract, contractAddress: parts[0], contractName: parts[1], functionName: fn,\n        functionArgs: args.map(function (a) { return '0x' + a; }), network: CFG.network, postConditionMode: 'deny',\n        postConditions: [{ type: 'stx', principal: address, amount: cap.toString(), conditionCode: 'lte' }]\n      });\n      return { ok: true, txid: txidOf(r), route: 'host:contract-call' };\n    }\n    // Direct provider (top-level page). Never send `sender` (wallet playbook \xA72).\n    var d = directProvider();\n    var params = { contract: contract, functionName: fn, functionArgs: args, arguments: args, postConditionMode: 'deny',\n      postConditions: [stxPostConditionHex(address, cap.toString())] };\n    if (d.kind === 'leather') params.network = CFG.network;\n    r = unwrap(await d.p.request('stx_callContract', params));\n    var txid = txidOf(r);\n    if (!txid) throw err('The wallet did not return a transaction id.');\n    return { ok: true, txid: txid, route: 'direct:' + d.kind };\n  }\n\n  /* ------------------------------------------------------ local PBs */\n  function localBest(gameId) {\n    var v = root.XA && root.XA.util.store('pb:' + gameId);\n    return typeof v === 'number' ? v : 0;\n  }\n  function recordLocal(gameId, score) {\n    var best = localBest(gameId);\n    if (score > best && root.XA) root.XA.util.store('pb:' + gameId, score);\n    return Math.max(best, score);\n  }\n\n  /* ----------------------------------------------------------- boot */\n  (function boot() {\n    listen();\n    try {\n      var t = new URLSearchParams(root.location.search || '').get('walletBridgeToken');\n      if (t) { bridge.token = t.trim(); log('host bridge token from URL'); }\n    } catch (e) {}\n    hello();\n    var lastRoute = status().route, polls = 0;\n    var watch = setInterval(function () {\n      var r = status().route;\n      if (r !== lastRoute) { lastRoute = r; emit(); }\n      if (++polls >= 40 || r === 'host') clearInterval(watch);\n    }, 500);\n  })();\n\n  root.XAScores = {\n    configure: function (patch) {\n      Object.keys(patch || {}).forEach(function (k) { if (k in CFG) CFG[k] = patch[k]; });\n      boardCache = {}; infoCache = {};\n      emit();\n    },\n    config: function () { return Object.assign({}, CFG); },\n    networkFeeHint: networkFeeHint,\n    getTop10: getTop10,\n    qualifies: qualifies,\n    getFee: getFee,\n    getBoardInfo: getBoardInfo,\n    getReplay: getReplay,\n    getInscription: getInscription,\n    read: callRead,\n    inscriptionIdByHash: inscriptionIdByHash,\n    quoteReplay: quoteReplay,\n    needsInscription: needsInscription,\n    INLINE_MAX: INLINE_MAX,\n    status: status,\n    onChange: function (fn) { subs.push(fn); fn(status()); },\n    connect: connect,\n    disconnect: disconnect,\n    submit: submit,\n    hasHost: hasHost,\n    relaySubmit: relaySubmit,\n    submitLink: submitLink,\n    callContract: callContract,\n    runtimeUrl: runtimeUrl,\n    openRuntime: openRuntime,\n    cleanName: cleanName,\n    localBest: localBest,\n    recordLocal: recordLocal,\n    shortAddress: function (a) { a = String(a || ''); return a.length > 12 ? a.slice(0, 5) + '\u2026' + a.slice(-4) : a; },\n    // exposed for tests\n    _codec: { cvList: cvList, cvUint: cvUint, cvAscii: cvAscii, cvBuff: cvBuff, cvPrincipal: cvPrincipal, decodeCV: decodeCV, c32address: c32address,\n      c32decodeAddress: c32decodeAddress, stxPostConditionHex: stxPostConditionHex, sha256: sha256,\n      bytesToHex: bytesToHex, hexToBytes: hexToBytes, isMainnetAddress: isMainnetAddress }\n  };\n})(typeof window !== 'undefined' ? window : globalThis);\n\n/*@xa-part arcade-replay.js*/\n/*\n * Xtrata Arcade \u2014 replays (leaf module)\n *\n * Every ranked run is a pure function of (pilot wallet, nonce, per-step input). The room records the\n * input the game actually saw, packs it into a compact replay, and the leaderboard contract stores it\n * beside the score. Anyone can re-run the replay through the same inscribed game and check that it\n * reaches the same score.\n *\n * Replay bytes (little endian). The wallet hash sits at a fixed offset because the contract checks it.\n *    0-2  \"XAR\"      3  format (bit 7 set = body is not compressed)\n *    4-23 pilot hash160        24 pilot address version\n *    25   flags: bit0 time mode, bit1 completed (finish() was called)\n *    26-27 engine version      28-31 nonce (the run seed is derived from wallet + nonce + game)\n *    32-35 steps (updates)     36-39 score (time runs: centiseconds)\n *    40   game index           41 variant index (0 = base)     42-43 reserved\n *  then deflate-raw of the event stream:\n *    format 1: varint(step delta) \xB7 flags \xB7 fields, one event after another\n *    flags: 1 held  2 hit  4 pointer  8 pointer-button changed  16 button is down  32 pointer moved  64 swipes\n *    format 2 (v1.5+): the same events, column by column (every step delta, then every flag byte, held, hit,\n *      pointer x, pointer y, swipes), each column a run of varints, the columns' byte lengths first. Pointer\n *      moves are stored as the change from the previous move (smooth mouse motion becomes small numbers).\n *      Same events, same game, about a fifth smaller after deflate.\n *    format 3: a POINTER to a replay too big for a score entry. Same 44-byte header (so the contract's wallet\n *      check still applies), then, uncompressed: 0x01 \xB7 varint(inscription id) \xB7 32-byte Xtrata chain hash of the\n *      full replay \xB7 varint(full length). The full replay is an Xtrata inscription; resolve() fetches it and\n *      accepts it only if its chain hash matches and its header equals this one.\n */\n(function (root) {\n  'use strict';\n  var XA = root.XA, S = root.XAScores;\n  if (!XA || !S) throw new Error('arcade-kit and score-client must load before arcade-replay');\n  var U = XA.util, C = S._codec;\n\n  var ENGINE = 1, FORMAT = 2, F_EVENTS = 1, F_COLUMNS = 2, F_POINTER = 3, HEADER = 44;\n  var MAX_BYTES = 60000;                 // largest replay posted inline: the contract allows 65,536; keep headroom\n  var MAX_STEPS = 60 * 60 * 60 * 4;      // 4 hours: longer replays are stored as their own inscription\n  var CHUNK = 16384, MAX_INSCRIBE_CHUNKS = 32;   // one-transaction inscription on the Xtrata core (512 KB)\n  var STEP = 1 / 60, QN = 4;             // pointer positions are kept to a quarter of a playfield unit\n\n  // Fixed order: an index in the header names the game. Never reorder; only append.\n  var GAME_IDS = ['xa_block_defence', 'xa_block_drop', 'xa_block_runner', 'xa_brick_breaker', 'xa_bubble_pop', 'xa_cave_diver',\n    'xa_helix_drop', 'xa_invader_wave', 'xa_lunar_lander', 'xa_maze_muncher', 'xa_merge_2048', 'xa_mine_sprint', 'xa_neon_snake',\n    'xa_orbit_merge', 'xa_pong_streak', 'xa_reflex_tap', 'xa_road_hopper', 'xa_rock_drift', 'xa_stack_tower', 'xa_swerve', 'xa_tile_tap'];\n  var BUTTONS = ['up', 'down', 'left', 'right', 'a', 'b', 'c', 'd', 'k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8', 'k9', 'f', 'start', 'hold', 'release'];\n  var SWIPES = ['left', 'right', 'up', 'down', 'tap'];\n\n  function q(v) { v = Math.round(v * QN); return v > 32000 ? 32000 : v < -32000 ? -32000 : v; }\n  function qpt(v) { return q(v) / QN; }\n\n  /* ------------------------------------------------- boards & pilots */\n  function gameIndex(game) { return GAME_IDS.indexOf(game.id); }\n  // Extra games (from the games contract) get a permanent index of 21 or more. Indices 0 to 20 are the built-in games and can\n  // never be given to another id. An index that is taken, or an id that already has one, is refused. Returns true if the id now has this index.\n  var BUILT_IN = 21;\n  function registerIndex(id, idx) {\n    idx = Number(idx);\n    if (!/^[a-z0-9_]{3,24}$/.test(String(id)) || !(idx >= BUILT_IN && idx <= 255) || idx !== Math.floor(idx)) return false;\n    var have = GAME_IDS.indexOf(id);\n    if (have >= 0) return have === idx;\n    if (GAME_IDS[idx] !== undefined) return false;\n    GAME_IDS[idx] = id;\n    return true;\n  }\n  function variantForMode(game, mode) {\n    return (game.variants || []).filter(function (v) { return v.mode === mode; })[0] || null;\n  }\n  // The contract board for a game in a mode: the base board is the game id; a timed variant adds its key.\n  function boardFor(game, mode) {\n    mode = mode || game.mode;\n    if (mode === game.mode) return game.id;\n    var v = variantForMode(game, mode);\n    return v ? game.id + '_' + v.key : game.id;\n  }\n  function pilotFor(address) {\n    if (!address) return null;\n    try {\n      var d = C.c32decodeAddress(address);\n      if (!/^S[PMTN]/.test(String(address).toUpperCase())) return null;\n      return { address: address, version: d.version, hash160: d.hash160 };\n    } catch (e) { return null; }\n  }\n  // The run seed is bound to the wallet: rewriting the wallet bytes of someone else's replay changes the seed.\n  function seedFor(hash160, nonce, gameIdx) {\n    var h = 0x811c9dc5;\n    function mix(b) { h ^= b & 255; h = Math.imul(h, 16777619) >>> 0; }\n    for (var i = 0; i < 20; i++) mix(hash160[i]);\n    for (var j = 0; j < 4; j++) mix(nonce >>> (j * 8));\n    mix(gameIdx);\n    return (h >>> 0) || 0x9e3779b9;\n  }\n\n  /* --------------------------------------------------------- bytes */\n  function putVar(out, v) { while (v >= 128) { out.push((v % 128) | 128); v = Math.floor(v / 128); } out.push(v); }\n  function zz(n) { return n < 0 ? -2 * n - 1 : 2 * n; }\n  function unzz(u) { return u % 2 ? -(u + 1) / 2 : u / 2; }\n  function Reader(b) { this.b = b; this.i = 0; }\n  Reader.prototype.varint = function () {\n    var v = 0, mul = 1, byte;\n    do {\n      if (this.i >= this.b.length) throw new Error('Replay ends early');\n      byte = this.b[this.i++]; v += (byte & 127) * mul; mul *= 128;\n    } while (byte & 128);\n    return v;\n  };\n  Reader.prototype.byte = function () {\n    if (this.i >= this.b.length) throw new Error('Replay ends early');\n    return this.b[this.i++];\n  };\n\n  async function pipe(bytes, stream) {\n    var res = new Response(new Blob([bytes]).stream().pipeThrough(stream));\n    return new Uint8Array(await res.arrayBuffer());\n  }\n  async function pack(body) {\n    if (typeof CompressionStream === 'function') {\n      try { return { data: await pipe(body, new CompressionStream('deflate-raw')), raw: false }; } catch (e) { /* store raw */ }\n    }\n    return { data: body, raw: true };\n  }\n  async function unpack(body, raw) {\n    if (raw) return body;\n    if (typeof DecompressionStream !== 'function') throw new Error('This browser cannot unpack replays');\n    return pipe(body, new DecompressionStream('deflate-raw'));\n  }\n\n  /* ------------------------------------------------------ recorder */\n  function Recorder(meta, input, pointer) {\n    this.meta = meta; this.input = input; this.pointer = pointer;\n    this.body = []; this.step = 0; this.lastAt = 0;\n    this.cur = { held: 0, px: 0, py: 0, down: 0 };\n    this.prevMoved = 0; this.snap = null; this.sw = [];\n    var self = this, take = input.takeSwipes;\n    input.takeSwipes = function () {\n      var r = take.call(input);\n      for (var i = 0; i < r.length; i++) { var k = SWIPES.indexOf(r[i]); if (k >= 0) self.sw.push(k); }\n      return r;\n    };\n  }\n  Recorder.prototype.before = function () {\n    var inp = this.input, hm = 0, ht = 0;\n    for (var i = 0; i < BUTTONS.length; i++) {\n      if (inp.held(BUTTONS[i])) hm |= 1 << i;\n      if (inp.hit(BUTTONS[i])) ht |= 1 << i;\n    }\n    var p = this.pointer();\n    var moved = p.moved !== this.prevMoved; this.prevMoved = p.moved;\n    this.snap = { hm: hm, ht: ht, px: q(p.x), py: q(p.y), down: p.down ? 1 : 0, moved: moved };\n    this.sw = [];\n  };\n  Recorder.prototype.after = function () {\n    var s = this.snap, c = this.cur, sw = this.sw, f = 0;\n    if (s.hm !== c.held) f |= 1;\n    if (s.ht) f |= 2;\n    if (s.px !== c.px || s.py !== c.py) f |= 4;\n    if (s.down !== c.down) f |= 8 | (s.down ? 16 : 0);\n    if (s.moved) f |= 32;\n    if (sw.length) f |= 64;\n    if (f) {\n      var b = this.body;\n      putVar(b, this.step - this.lastAt); b.push(f);\n      if (f & 1) putVar(b, s.hm);\n      if (f & 2) putVar(b, s.ht);\n      if (f & 4) { putVar(b, zz(s.px - c.px)); putVar(b, zz(s.py - c.py)); }\n      if (f & 64) { b.push(Math.min(sw.length, 255)); for (var i = 0; i < sw.length && i < 255; i++) b.push(sw[i]); }\n      c.held = s.hm; c.px = s.px; c.py = s.py; c.down = s.down;\n      this.lastAt = this.step;\n    }\n    this.step++;\n  };\n  // \u2192 Uint8Array (format 2), or null only for an empty run or one longer than MAX_STEPS.\n  // Runs larger than MAX_BYTES are still returned: they are posted as an inscription plus a pointer.\n  Recorder.prototype.finish = async function (score, completed) {\n    var m = this.meta;\n    if (this.step < 1 || this.step > MAX_STEPS) return null;\n    var packed = await pack(encodeColumns(eventsFromBody(new Uint8Array(this.body))));\n    var out = new Uint8Array(HEADER + packed.data.length), dv = new DataView(out.buffer);\n    out[0] = 88; out[1] = 65; out[2] = 82;                       // \"XAR\"\n    out[3] = FORMAT | (packed.raw ? 128 : 0);\n    out.set(m.hash160, 4); out[24] = m.version;\n    out[25] = (m.time ? 1 : 0) | (completed ? 2 : 0);\n    dv.setUint16(26, ENGINE, true); dv.setUint32(28, m.nonce >>> 0, true);\n    dv.setUint32(32, this.step, true); dv.setUint32(36, Math.max(0, Math.floor(score)) >>> 0, true);\n    out[40] = m.gameIdx; out[41] = m.variantIdx;\n    out.set(packed.data, HEADER);\n    return out;\n  };\n  // Rough size of the replay so far (bytes after packing), for the in-game \"long run\" hint.\n  Recorder.prototype.estimate = function () { return HEADER + Math.round(this.body.length * 0.4); };\n\n  /* ------------------------------------------- event body, formats 1 and 2 */\n  function eventsFromBody(body) {\n    var r = new Reader(body), at = 0, out = [];\n    while (r.i < body.length) {\n      at += r.varint();\n      var f = r.byte(), e = { at: at, f: f };\n      if (f & 1) e.held = r.varint();\n      if (f & 2) e.hit = r.varint();\n      if (f & 4) { e.dx = unzz(r.varint()); e.dy = unzz(r.varint()); }\n      if (f & 64) { var n = r.byte(); e.sw = []; for (var i = 0; i < n; i++) e.sw.push(r.byte()); }\n      out.push(e);\n    }\n    return out;\n  }\n  function encodeColumns(events) {\n    var d = [], fl = [], held = [], hit = [], px = [], py = [], sw = [], last = -1, pdx = 0, pdy = 0;\n    for (var i = 0; i < events.length; i++) {\n      var e = events[i], f = e.f;\n      putVar(d, e.at - last - 1); last = e.at; fl.push(f);\n      if (f & 1) putVar(held, e.held);\n      if (f & 2) putVar(hit, e.hit);\n      if (f & 4) { putVar(px, zz(e.dx - pdx)); putVar(py, zz(e.dy - pdy)); pdx = e.dx; pdy = e.dy; } else { pdx = 0; pdy = 0; }\n      if (f & 64) { sw.push(e.sw.length); for (var k = 0; k < e.sw.length; k++) sw.push(e.sw[k]); }\n    }\n    var cols = [d, fl, held, hit, px, py, sw], head = [];\n    putVar(head, events.length);\n    cols.forEach(function (c) { putVar(head, c.length); });\n    var out = new Uint8Array(head.length + cols.reduce(function (n, c) { return n + c.length; }, 0)), o = 0;\n    out.set(head, 0); o = head.length;\n    cols.forEach(function (c) { out.set(c, o); o += c.length; });\n    return out;\n  }\n  function eventsFromColumns(body) {\n    var r = new Reader(body), n = r.varint(), lens = [];\n    for (var c = 0; c < 7; c++) lens.push(r.varint());\n    var readers = [], o = r.i;\n    for (c = 0; c < 7; c++) { readers.push(new Reader(body.subarray(o, o + lens[c]))); o += lens[c]; }\n    if (o !== body.length) throw new Error('Replay columns do not add up');\n    var D = readers[0], F = readers[1], H = readers[2], T = readers[3], X = readers[4], Y = readers[5], W = readers[6];\n    var out = [], last = -1, pdx = 0, pdy = 0;\n    for (var i = 0; i < n; i++) {\n      var at = last + 1 + D.varint(), f = F.byte(), e = { at: at, f: f };\n      last = at;\n      if (f & 1) e.held = H.varint();\n      if (f & 2) e.hit = T.varint();\n      if (f & 4) { e.dx = pdx + unzz(X.varint()); e.dy = pdy + unzz(Y.varint()); pdx = e.dx; pdy = e.dy; } else { pdx = 0; pdy = 0; }\n      if (f & 64) { var k = W.byte(); e.sw = []; for (var j = 0; j < k; j++) e.sw.push(W.byte()); }\n      out.push(e);\n    }\n    return out;\n  }\n\n  /* ------------------------------------------- big replays: inscription + pointer */\n  function readHeader(bytes) {\n    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);\n    return { hash160: bytes.slice(4, 24), version: bytes[24], time: !!(bytes[25] & 1), completed: !!(bytes[25] & 2),\n      engine: dv.getUint16(26, true), nonce: dv.getUint32(28, true), steps: dv.getUint32(32, true), score: dv.getUint32(36, true),\n      gameIdx: bytes[40], variantIdx: bytes[41] };\n  }\n  function checkMagic(bytes) {\n    if (!(bytes instanceof Uint8Array)) throw new Error('Not an Xtrata Arcade replay');\n    if (bytes.length < HEADER) throw new Error('Replay too short');\n    if (bytes[0] !== 88 || bytes[1] !== 65 || bytes[2] !== 82) throw new Error('Not an Xtrata Arcade replay');\n  }\n  function isPointer(bytes) {\n    try { checkMagic(bytes); return (bytes[3] & 127) === F_POINTER; } catch (e) { return false; }\n  }\n  // The Xtrata core's content hash: sha256(previous \u2016 chunk) over 16 KB chunks, starting from 32 zero bytes.\n  function chunksOf(bytes) {\n    var out = [];\n    for (var i = 0; i < bytes.length; i += CHUNK) out.push(bytes.subarray(i, Math.min(bytes.length, i + CHUNK)));\n    return out;\n  }\n  function chainHash(bytes) {\n    var h = new Uint8Array(32);\n    chunksOf(bytes).forEach(function (c) { var m = new Uint8Array(32 + c.length); m.set(h, 0); m.set(c, 32); h = C.sha256(m); });\n    return h;\n  }\n  function makePointer(full, id, hash) {\n    checkMagic(full);\n    var b = [1];\n    putVar(b, Number(id)); for (var i = 0; i < 32; i++) b.push(hash[i]); putVar(b, full.length);\n    var out = new Uint8Array(HEADER + b.length);\n    out.set(full.subarray(0, HEADER), 0);\n    out[3] = F_POINTER | 128;\n    out.set(b, HEADER);\n    return out;\n  }\n  // A seal: the score entry holds only the run's header and the replay's fingerprints (Xtrata chain hash, sha256, length).\n  // The player keeps the file. Anyone holding it can prove it is this run; if it is ever inscribed on Xtrata as these\n  // exact bytes, the chain hash finds it.\n  function makeSeal(full) {\n    checkMagic(full);\n    if (isPointer(full)) throw new Error('Cannot seal a pointer');\n    var b = [2], ch = chainHash(full), sh = C.sha256(full);\n    for (var i = 0; i < 32; i++) b.push(ch[i]);\n    for (i = 0; i < 32; i++) b.push(sh[i]);\n    putVar(b, full.length);\n    var out = new Uint8Array(HEADER + b.length);\n    out.set(full.subarray(0, HEADER), 0);\n    out[3] = F_POINTER | 128;\n    out.set(b, HEADER);\n    return out;\n  }\n  function readPointer(bytes) {\n    checkMagic(bytes);\n    if ((bytes[3] & 127) !== F_POINTER) throw new Error('Not a replay pointer');\n    var r = new Reader(bytes.subarray(HEADER)), kind = r.byte(), i, hash = new Uint8Array(32);\n    if (kind === 1) {\n      var id = r.varint();\n      for (i = 0; i < 32; i++) hash[i] = r.byte();\n      return { kind: 'inscription', id: id, hash: hash, length: r.varint() };\n    }\n    if (kind === 2) {\n      var sha = new Uint8Array(32);\n      for (i = 0; i < 32; i++) hash[i] = r.byte();\n      for (i = 0; i < 32; i++) sha[i] = r.byte();\n      return { kind: 'seal', id: null, hash: hash, sha256: sha, length: r.varint() };\n    }\n    throw new Error('Unknown replay pointer');\n  }\n  function isSeal(bytes) { try { return isPointer(bytes) && readPointer(bytes).kind === 'seal'; } catch (e) { return false; } }\n  // Does this file belong to this stored entry (pointer or seal)? Returns null when it does, or the reason it does not.\n  function mismatch(stored, full) {\n    var p = readPointer(stored);\n    if (!(full instanceof Uint8Array)) full = new Uint8Array(full);\n    try { checkMagic(full); } catch (e) { return e.message; }\n    if (isPointer(full)) return 'That file is a pointer, not a replay';\n    if (full.length !== p.length) return 'That replay is a different size from the one on the board';\n    if (C.bytesToHex(chainHash(full)) !== C.bytesToHex(p.hash)) return 'That replay does not match the fingerprint on the board';\n    if (p.sha256 && C.bytesToHex(C.sha256(full)) !== C.bytesToHex(p.sha256)) return 'That replay does not match the fingerprint on the board';\n    for (var i = 4; i < HEADER; i++) if (full[i] !== stored[i]) return 'That replay is for a different run';\n    return null;\n  }\n  function sealedError() {\n    var e = new Error('Sealed run: the player kept this replay and it has not been published yet');\n    e.sealed = true;\n    return e;\n  }\n  // A full replay for any stored entry: inline bytes as they are; a pointer resolved through `fetchInscription`\n  // (id, chainHash) \u2192 bytes; a seal through `opts.file` (a copy the viewer supplies) or, failing that, an Xtrata\n  // inscription of the same bytes found by its chain hash. Whatever comes back must match the stored fingerprints.\n  async function resolve(bytes, fetchInscription, opts) {\n    opts = opts || {};\n    if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);\n    if (!isPointer(bytes)) return bytes;\n    var p = readPointer(bytes), full, why;\n    if (opts.file) {\n      full = opts.file instanceof Uint8Array ? opts.file : new Uint8Array(opts.file);\n      if ((why = mismatch(bytes, full))) throw new Error(why);\n      return full;\n    }\n    var get = fetchInscription || (S.getInscription && function (id, hash) { return S.getInscription(id, hash); });\n    var id = p.id;\n    if (p.kind === 'seal') {\n      var find = opts.findByHash || (S.inscriptionIdByHash && function (h) { return S.inscriptionIdByHash(h); });\n      if (find) { try { id = await find(p.hash); } catch (e) { id = null; } }\n      if (id == null || !get) throw sealedError();\n    }\n    if (!get) throw new Error('This replay is stored as inscription #' + id + ' and cannot be fetched here');\n    full = await get(id, p.hash);\n    if (!(full instanceof Uint8Array)) full = new Uint8Array(full);\n    if ((why = mismatch(bytes, full))) throw new Error('Replay inscription #' + id + ': ' + why.replace(/^That /, 'the '));\n    return full;\n  }\n  function record(game, variant, pilot, nonce, input, pointer) {\n    var mode = variant ? variant.mode : game.mode;\n    return new Recorder({ hash160: pilot.hash160, version: pilot.version, nonce: nonce, gameIdx: gameIndex(game),\n      variantIdx: variant ? game.variants.indexOf(variant) + 1 : 0, time: mode === 'time' }, input, pointer);\n  }\n\n  /* ------------------------------------------------------ decoding */\n  async function decode(bytes) {\n    if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);\n    checkMagic(bytes);\n    var fmt = bytes[3] & 127;\n    if (fmt === F_POINTER) throw new Error('This replay is stored as an inscription: resolve it first');\n    if (fmt !== F_EVENTS && fmt !== F_COLUMNS) throw new Error('Unsupported replay format ' + fmt);\n    var h = readHeader(bytes);\n    if (h.steps < 1 || h.steps > MAX_STEPS) throw new Error('Run length out of range');\n    var body = await unpack(bytes.subarray(HEADER), !!(bytes[3] & 128));\n    h.events = (fmt === F_COLUMNS ? eventsFromColumns : eventsFromBody)(body);\n    h.events.forEach(function (e) { if (e.sw) e.sw = e.sw.map(function (k) { return SWIPES[k] || 'tap'; }); });\n    return h;\n  }\n\n  /* ------------------------------------------------------ playback */\n  function playback(events) {\n    var i = 0, held = 0, hit = 0, sw = [], down = 0, qx = 0, qy = 0;\n    var P = { x: 0, y: 0, down: false, moved: 0 };\n    var input = {\n      held: function (n) { var k = BUTTONS.indexOf(n); return k >= 0 && !!((held >>> k) & 1); },\n      hit: function (n) { var k = BUTTONS.indexOf(n); return k >= 0 && !!((hit >>> k) & 1); },\n      takeSwipes: function () { var s = sw; sw = []; return s; },\n      pointer: P, press: function () {}, release: function () {}, endFrame: function () {}, reset: function () {}, destroy: function () {}\n    };\n    return {\n      input: input,\n      pointer: function () { return { x: qx / QN, y: qy / QN, down: !!down, moved: P.moved }; },\n      load: function (step) {\n        hit = 0; sw = [];\n        while (i < events.length && events[i].at === step) {\n          var e = events[i++], f = e.f;\n          if (f & 1) held = e.held;\n          if (f & 2) hit = e.hit;\n          if (f & 4) { qx += e.dx; qy += e.dy; }\n          if (f & 8) down = (f & 16) ? 1 : 0;\n          if (f & 32) P.moved++;\n          if (f & 64) sw = e.sw.slice();\n        }\n      }\n    };\n  }\n  var silentAudio = typeof Proxy === 'function'\n    ? new Proxy({}, { get: function (t, k) { return k === 'isMuted' ? function () { return true; } : function () {}; } })\n    : { tone: function () {}, arp: function () {}, noise: function () {}, isMuted: function () { return true; } };\n\n  var nextTick = function () { return new Promise(function (res) { setTimeout(res, 0); }); };\n\n  // Re-run a decoded replay through the game. Nothing is drawn, nothing is heard, nothing is saved.\n  async function simulate(dec) {\n    var game = XA.games.filter(function (g) { return g.id === GAME_IDS[dec.gameIdx]; })[0];\n    if (!game) throw new Error('This replay is for a game that is not in this arcade');\n    var variant = dec.variantIdx ? (game.variants || [])[dec.variantIdx - 1] : null;\n    if (dec.variantIdx && !variant) throw new Error('Unknown game variant');\n    var mode = variant ? variant.mode : game.mode;\n    if ((mode === 'time') !== dec.time) throw new Error('Replay mode does not match the game');\n    var pb = playback(dec.events), st = { score: 0, over: false, completed: false };\n    var seed = seedFor(dec.hash160, dec.nonce, dec.gameIdx);\n    var api = {\n      W: game.size.w, H: game.size.h, input: pb.input, audio: silentAudio, fx: XA.createFx(),\n      rng: U.rng(seed), seed: seed, ranked: true,\n      shake: function () {}, setStatus: function () {},\n      addScore: function (n) { if (!st.over) st.score += Math.max(0, Math.floor(n)); },\n      setScore: function (n) { if (!st.over) st.score = Math.max(0, Math.floor(n)); },\n      getScore: function () { return st.score; },\n      gameOver: function () { st.over = true; },\n      finish: function () { if (!st.over) { st.completed = true; st.over = true; } },\n      mode: mode, variant: variant ? variant.key : null, pointer: pb.pointer\n    };\n    // Games remember bests in local storage for display only. Give the replay a blank one so it never leans on yours.\n    var realStore = U.store, mem = {};\n    var blank = function (k, v) { if (v === undefined) return k in mem ? mem[k] : null; mem[k] = v; return null; };\n    var steps = 0;\n    try {\n      U.store = blank;\n      var inst = game.create(api);\n      while (steps < dec.steps && !st.over) {\n        pb.load(steps);\n        inst.update(STEP);\n        steps++;\n        if (steps % 4000 === 0) { U.store = realStore; await nextTick(); U.store = blank; }\n      }\n    } finally { U.store = realStore; }\n    return { score: st.score, steps: steps, over: st.over, completed: st.completed };\n  }\n\n  // expect: { address, score, board } \u2013 whatever the leaderboard entry claims.\n  async function verify(bytes, expect) {\n    expect = expect || {};\n    try {\n      bytes = await resolve(bytes, expect.fetchInscription, { file: expect.file, findByHash: expect.findByHash });\n      var dec = await decode(bytes);\n      if (expect.address) {\n        var p = pilotFor(expect.address);\n        if (!p || C.bytesToHex(p.hash160) !== C.bytesToHex(dec.hash160)) return { ok: false, reason: 'Flown by a different wallet' };\n      }\n      if (expect.score != null && Number(expect.score) !== dec.score) return { ok: false, reason: 'Replay score differs from the board' };\n      var game = XA.games.filter(function (g) { return g.id === GAME_IDS[dec.gameIdx]; })[0];\n      if (!game) return { ok: false, reason: 'Unknown game' };\n      var variant = dec.variantIdx ? (game.variants || [])[dec.variantIdx - 1] : null;\n      if (expect.board && expect.board !== boardFor(game, variant ? variant.mode : game.mode)) return { ok: false, reason: 'Replay is for a different board' };\n      var r = await simulate(dec);\n      if (!r.over || r.steps !== dec.steps) return { ok: false, reason: 'Replay does not reach the end of the run' };\n      if (r.score !== dec.score) return { ok: false, reason: 'Replay reaches ' + r.score + ', not ' + dec.score };\n      if (r.completed !== dec.completed) return { ok: false, reason: 'Replay finishes differently' };\n      return { ok: true, score: r.score, steps: r.steps, game: game.id };\n    } catch (e) {\n      return { ok: false, sealed: !!(e && e.sealed), reason: (e && e.message) || String(e) };\n    }\n  }\n\n  XA.replay = {\n    ENGINE: ENGINE, HEADER: HEADER, MAX_BYTES: MAX_BYTES, GAME_IDS: GAME_IDS, BUTTONS: BUTTONS,\n    boardFor: boardFor, pilotFor: pilotFor, seedFor: seedFor, gameIndex: gameIndex, registerIndex: registerIndex, BUILT_IN: BUILT_IN, qpt: qpt,\n    record: record, decode: decode, simulate: simulate, verify: verify, playback: playback,\n    MAX_STEPS: MAX_STEPS, CHUNK: CHUNK, MAX_INSCRIBE_CHUNKS: MAX_INSCRIBE_CHUNKS, readHeader: readHeader,\n    isPointer: isPointer, isSeal: isSeal, makeSeal: makeSeal, mismatch: mismatch, makePointer: makePointer, readPointer: readPointer, resolve: resolve,\n    chainHash: chainHash, chunksOf: chunksOf, encodeColumns: encodeColumns, eventsFromColumns: eventsFromColumns, eventsFromBody: eventsFromBody\n  };\n})(typeof window !== 'undefined' ? window : globalThis);\n\n/*@xa-part arcade-room.js*/\n/*\n * Xtrata Arcade \u2014 the room (leaf module)\n *\n * Builds the arcade floor from whatever cartridges registered with XA, runs\n * one play session at a time, and owns the game-over \u2192 on-chain submit flow.\n * Cartridges never see the wallet: they only report a score through `api`.\n *\n * Boot: the parent sets window.XA_CONFIG (optional) and calls XARoom.boot().\n */\n(function (root) {\n  'use strict';\n  var XA = root.XA, S = root.XAScores;\n  if (!XA || !S) throw new Error('arcade-kit and score-client must load before arcade-room');\n  var U = XA.util;\n  var doc = root.document;\n\n  function h(tag, attrs, kids) {\n    var el = doc.createElement(tag);\n    if (attrs) Object.keys(attrs).forEach(function (k) {\n      var v = attrs[k];\n      if (v == null || v === false) return;\n      if (k === 'class') el.className = v;\n      else if (k === 'text') el.textContent = v;\n      else if (k === 'style') el.setAttribute('style', v);\n      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);\n      else el.setAttribute(k, v === true ? '' : v);\n    });\n    (kids || []).forEach(function (c) { if (c != null) el.appendChild(typeof c === 'string' ? doc.createTextNode(c) : c); });\n    return el;\n  }\n  function $(sel, ctx) { return (ctx || doc).querySelector(sel); }\n\n  var rootEl, roomEl, gameEl, modalEl;\n  var cabinets = [];            // { game, canvas, ctx, statsEl }\n  var session = null;\n  var raf = 0, lastTs = 0;\n  var walletStatus = S.status();\n  var boards = {};              // gameId:mode \u2192 last board result\n  function boardOf(g, mode) { return XA.replay.boardFor(g, mode); }   // contract board id\n\n  /* A cabinet can host variants (e.g. Block Drop Sprint 40). Each variant posts\n     under the same game-id with its own contract mode, so boards, personal\n     bests and formatting are all keyed by (game, mode). */\n  function bk(g, mode) { return g.id + ':' + (mode || g.mode); }\n  function variantOf(g, key) {\n    return key ? (g.variants || []).filter(function (v) { return v.key === key; })[0] || null : null;\n  }\n  function modeLabel(g, mode) {\n    if (mode === g.mode) return g.modeLabel || (mode === 'time' ? 'Time' : 'Score');\n    var v = (g.variants || []).filter(function (x) { return x.mode === mode; })[0];\n    return v ? v.label : mode;\n  }\n  // Time scores are centiseconds: 8345 \u2192 1:23.45.\n  function fmtVal(mode, v) {\n    if (mode !== 'time') return U.fmt(v);\n    v = Math.max(0, Math.round(Number(v) || 0));\n    var m = Math.floor(v / 6000), sec = Math.floor(v / 100) % 60, cs = v % 100;\n    return (m ? m + ':' + (sec < 10 ? '0' : '') : '') + sec + '.' + (cs < 10 ? '0' : '') + cs + (m ? '' : 's');\n  }\n  function localBest(g, mode) {\n    if (mode !== 'time') return S.localBest(g.id);\n    var v = U.store('pbt:' + g.id);\n    return typeof v === 'number' && v > 0 ? v : 0;\n  }\n  function recordLocal(g, mode, v) {\n    if (mode !== 'time') return S.recordLocal(g.id, v);\n    var best = localBest(g, mode);\n    if (v > 0 && (!best || v < best)) { U.store('pbt:' + g.id, v); return v; }\n    return best;\n  }\n  function fmtBest(g, mode) {\n    var b = localBest(g, mode);\n    return mode === 'time' && !b ? '\u2014' : fmtVal(mode, b);\n  }\n\n  /* ------------------------------------------------------ room view */\n  function buildRoom() {\n    var cfg = root.XA_CONFIG || {};\n    var walletBtn = h('button', { class: 'xa-pill', id: 'xa-wallet', type: 'button', onclick: onWalletClick },\n      [h('span', { class: 'xa-dot' }), h('span', { class: 'xa-wallet-label', text: 'Wallet' })]);\n    var muteBtn = h('button', { class: 'xa-icon', id: 'xa-mute', type: 'button', 'aria-label': 'Toggle sound', onclick: function () {\n      XA.audio.setMuted(!XA.audio.isMuted()); XA.audio.unlock(); paintMute();\n    } });\n    var boardsBtn = h('button', { class: 'xa-pill', type: 'button', onclick: function () { openBoards(XA.games[0] && XA.games[0].id); } },\n      [h('span', { text: '\u{1F3C6}' }), h('span', { text: 'High scores' })]);\n\n    var grid = h('div', { class: 'xa-cabinets' });\n    XA.games.forEach(function (g) {\n      var canvas = h('canvas', { width: 320, height: 240, 'aria-hidden': 'true' });\n      var stats = h('div', { class: 'xa-cab-stats' }, [\n        h('div', {}, [h('span', { text: 'YOUR BEST' }), h('b', { class: 'xa-pb', text: fmtBest(g, g.mode) })]),\n        h('div', { class: 'xa-right' }, [h('span', { text: 'CHAIN #1' }), h('b', { class: 'xa-top1', text: '\u2026' })])\n      ]);\n      var cab = h('article', { class: 'xa-cab', style: '--c:' + g.color, 'data-game': g.id }, [\n        h('div', { class: 'xa-marquee' }, [h('h2', { text: g.title }), h('p', { text: g.tagline || '' })]),\n        h('div', { class: 'xa-screen' }, [canvas, h('div', { class: 'xa-insert', text: 'PRESS PLAY' })]),\n        stats,\n        h('div', { class: 'xa-cab-actions' + (g.variants.length ? ' has-variants' : '') }, [\n          h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', 'data-play': g.id,\n            onclick: function () { startGame(g.id); } }, ['\u25B6 Play']),\n          h('button', { class: 'xa-btn', type: 'button', 'aria-label': g.title + ' high scores',\n            onclick: function () { openBoards(g.id); } }, ['\u{1F3C6}'])\n        ].concat(g.variants.map(function (v) {\n          return h('button', { class: 'xa-btn xa-btn-variant', style: '--c:' + g.color, type: 'button',\n            'data-play-variant': g.id + ':' + v.key, title: v.tagline || v.label,\n            onclick: function () { startGame(g.id, v.key); } }, [(v.mode === 'time' ? '\u23F1 ' : '\u25B6 ') + v.label]);\n        })))\n      ]);\n      grid.appendChild(cab);\n      cabinets.push({ game: g, canvas: canvas, ctx: canvas.getContext('2d'), el: cab });\n    });\n\n    roomEl = h('main', { class: 'xa-room' }, [\n      h('div', { class: 'xa-floor-grid' }),\n      h('div', { class: 'xa-wrap' }, [\n        h('header', { class: 'xa-top' }, [\n          h('div', {}, [\n            h('h1', { class: 'xa-logo' }, [h('span', { text: 'XTRATA ' }), h('span', { text: 'ARCADE' })]),\n            h('p', { class: 'xa-sub', text: cfg.subtitle || (XA.games.length + ' cabinets \xB7 one on-chain leaderboard contract \xB7 built on Stacks') })\n          ]),\n          h('div', { class: 'xa-top-actions' }, [boardsBtn, walletBtn, muteBtn])\n        ]),\n        grid,\n        h('p', { class: 'xa-foot' }, [\n          'Top 10 per game lives on-chain in ',\n          h('code', { text: S.config().contractName }),\n          '. Posting a score costs the contract fee plus the network fee.'\n        ])\n      ])\n    ]);\n    rootEl.appendChild(roomEl);\n    paintMute();\n    paintWallet();\n  }\n\n  function paintMute() {\n    var b = $('#xa-mute');\n    if (b) b.textContent = XA.audio.isMuted() ? '\u{1F507}' : '\u{1F50A}';\n  }\n  function paintWallet() {\n    var b = $('#xa-wallet');\n    if (!b) return;\n    var dot = $('.xa-dot', b), label = $('.xa-wallet-label', b);\n    dot.className = 'xa-dot';\n    if (walletStatus.address) {\n      dot.classList.add('is-on');\n      label.textContent = S.shortAddress(walletStatus.address);\n      b.title = 'Connected ' + walletStatus.address;\n    } else if (walletStatus.route === 'none') {\n      dot.classList.add('is-warn');\n      label.textContent = 'View only';\n      b.title = 'Scores can be posted when the arcade is opened on xtrata.xyz';\n    } else {\n      label.textContent = 'Connect';\n      b.title = 'Connect a Stacks wallet to post high scores';\n    }\n  }\n  function onXtrataTop() {\n    try { return root.top === root && /(^|\\.)xtrata\\.xyz$/.test(root.location.hostname); } catch (e) { return false; }\n  }\n  async function onWalletClick() {\n    XA.audio.unlock();\n    walletStatus = S.status(); paintWallet();   // never trust a status read before the extension arrived\n    if (walletStatus.address) { S.disconnect(); return; }\n    if (walletStatus.route === 'none') {\n      if (onXtrataTop()) openInfo('No wallet found',\n        'No Stacks wallet extension answered in this browser. Install or unlock Leather or Xverse and reload, or play from the arcade page on Xtrata.', S.runtimeUrl());\n      else openInfo('View-only here',\n        'This copy of the arcade cannot reach a wallet, so you can play and see the boards but not post scores. ' +\n        'Open the arcade on Xtrata to post.', S.runtimeUrl());\n      return;\n    }\n    try { await S.connect(); } catch (e) { openInfo('Wallet not connected', e.message || String(e)); }\n  }\n\n  async function refreshCabinet(cab, force) {\n    var g = cab.game;\n    $('.xa-pb', cab.el).textContent = fmtBest(g, g.mode);\n    var board = await S.getTop10(g.id, g.mode, force);\n    boards[bk(g)] = board;\n    var el = $('.xa-top1', cab.el);\n    if (!board.ok) { el.textContent = 'offline'; el.title = board.error || ''; return; }\n    var top = board.entries[0];\n    el.textContent = top ? fmtVal(g.mode, top.score) + ' ' + top.name : 'be first';\n    el.title = top ? top.name + ' \xB7 ' + top.player : 'No scores yet';\n  }\n\n  /* ----------------------------------------------------- scoreboard */\n  function closeModal() {\n    if (modalEl) { modalEl.remove(); modalEl = null; }\n  }\n  function modal(card) {\n    closeModal();\n    modalEl = h('div', { class: 'xa-modal', role: 'dialog', 'aria-modal': 'true', onclick: function (e) {\n      if (e.target === modalEl) closeModal();\n    } }, [card]);\n    rootEl.appendChild(modalEl);\n    var f = card.querySelector('button');\n    if (f) f.focus();\n  }\n  function openInfo(title, text, link) {\n    modal(h('div', { class: 'xa-card' }, [\n      h('h3', { text: title }),\n      h('p', { class: 'xa-verdict', text: text }),\n      link ? h('p', { class: 'xa-note' }, [h('a', { href: link, target: '_blank', rel: 'noopener', style: 'color:var(--xa-cyan)', text: 'Open on xtrata.xyz \u2197' })]) : null,\n      h('div', { class: 'xa-card-foot' }, [h('span'), h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])\n    ]));\n  }\n  function verifyButton(game, mode, e) {\n    var b = h('button', { class: 'xa-btn', type: 'button', title: 'Fetch the stored replay and run it through this game' }, ['\u2713?']);\n    b.addEventListener('click', async function () {\n      b.disabled = true; b.textContent = '\u2026';\n      try {\n        var bytes = await S.getReplay(boardOf(game, mode), e.player);\n        if (!bytes) throw new Error('no replay stored');\n        var r = await XA.replay.verify(bytes, { address: e.player, score: e.score, board: boardOf(game, mode), file: sealedCopy(bytes) });\n        if (r.sealed) { b.disabled = false; b.textContent = '\u{1F512} sealed'; b.style.color = 'var(--xa-gold)'; b.onclick = function () { sealedInfo(game, mode, e, bytes); }; return; }\n        b.textContent = r.ok ? '\u2713 verified' : '\u2717 ' + r.reason;\n        b.style.color = r.ok ? '#7dffb2' : '#ff8c8c';\n      } catch (x) { b.textContent = '\u2717 ' + ((x && x.message) || 'failed'); b.style.color = '#ff8c8c'; }\n    });\n    return b;\n  }\n  var replayCache = {};\n  async function fetchReplay(game, mode, e) {\n    var key = boardOf(game, mode) + ':' + e.player + ':' + e.score;\n    if (!replayCache[key]) replayCache[key] = S.getReplay(boardOf(game, mode), e.player).then(function (b) {\n      if (!b) { delete replayCache[key]; throw new Error('No replay is stored for this entry.'); }\n      // a long run's entry points at its replay inscription; a sealed one is matched to a copy kept here or on chain\n      return XA.replay.resolve(b, null, { file: sealedCopy(b) }).catch(function (x) { if (x && x.sealed) x.stored = b; throw x; });\n    }).catch(function (x) { delete replayCache[key]; throw x; });\n    return replayCache[key];\n  }\n  function watchButton(game, mode, e) {\n    return h('button', { class: 'xa-btn', type: 'button', title: 'Watch this run, replayed from the chain', onclick: async function (ev) {\n      var b = ev.currentTarget; b.disabled = true; b.textContent = '\u2026';\n      try { var bytes = await fetchReplay(game, mode, e); closeModal(); watchReplay(bytes, { name: e.name, rank: e.rank }); }\n      catch (x) { b.disabled = false; b.textContent = '\u25B6'; if (x && x.sealed) sealedInfo(game, mode, e, x.stored); else openInfo('Replay unavailable', (x && x.message) || String(x)); }\n    } }, ['\u25B6']);\n  }\n  function saveButton(game, mode, e) {\n    return h('button', { class: 'xa-btn', type: 'button', title: 'Download this replay file', onclick: async function (ev) {\n      var b = ev.currentTarget; b.disabled = true;\n      try { saveReplay(await fetchReplay(game, mode, e), boardOf(game, mode) + '-' + e.name + '-' + e.score); }\n      catch (x) { if (x && x.sealed) sealedInfo(game, mode, e, x.stored); else openInfo('Replay unavailable', (x && x.message) || String(x)); }\n      b.disabled = false;\n    } }, ['\u2B07']);\n  }\n  function saveReplay(bytes, base) {\n    try {\n      var url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));\n      var a = doc.createElement('a');\n      a.href = url; a.download = 'xtrata-arcade-' + String(base).replace(/[^A-Za-z0-9_.-]+/g, '_') + '.xar';\n      doc.body.appendChild(a); a.click(); a.remove();\n      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);\n    } catch (x) { openInfo('Download blocked', 'This viewer does not allow downloads. Open the arcade on xtrata.xyz to save replays.'); }\n  }\n  /* ------------------------ sealed runs: the board holds the replay's fingerprint, the player holds the file */\n  function hex(b) { return S._codec.bytesToHex(b); }\n  function runKey(bytes) { return b64(bytes.subarray(4, 44)); }          // the run itself, whatever form it is stored in\n  function sealedCopies() { var v = U.store('sealed'); return Array.isArray(v) ? v : []; }\n  function keepSealed(bytes) {\n    try {\n      var k = runKey(bytes), list = sealedCopies().filter(function (u) { return u.k !== k; });\n      list.unshift({ k: k, at: Date.now(), b: b64(bytes) });\n      list = list.slice(0, UNPOSTED_MAX);\n      while (list.length && JSON.stringify(list).length > UNPOSTED_BYTES) list.pop();\n      U.store('sealed', list);\n    } catch (e) { /* storage blocked or full: the downloaded file is the copy */ }\n  }\n  // A copy of a sealed run's replay held in this browser (the player's own, or one checked here), if any.\n  function sealedCopy(stored) {\n    try {\n      if (!XA.replay.isSeal(stored)) return null;\n      var k = runKey(stored), hit = sealedCopies().concat(unposted()).filter(function (u) { return (u.k || (u.b && runKey(unb64(u.b)))) === k; });\n      for (var i = 0; i < hit.length; i++) { var full = unb64(hit[i].b); if (!XA.replay.mismatch(stored, full)) return full; }\n    } catch (e) {}\n    return null;\n  }\n  function sealedInfo(game, mode, e, stored) {\n    var R = XA.replay, p = R.readPointer(stored), kb = Math.max(1, Math.round(p.length / 1024));\n    var out = h('p', { class: 'xa-msg', 'aria-live': 'polite' });\n    var pick = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: 'Check a replay file' });\n    pick.addEventListener('click', function () {\n      var inp = h('input', { type: 'file', accept: '.xar,application/octet-stream', style: 'display:none' });\n      inp.addEventListener('change', async function () {\n        var f = inp.files && inp.files[0]; inp.remove();\n        if (!f) return;\n        var full = new Uint8Array(await f.arrayBuffer()), why = R.mismatch(stored, full);\n        if (why) { out.className = 'xa-msg is-err'; out.textContent = '\u2717 ' + why + '.'; return; }\n        out.className = 'xa-msg'; out.textContent = 'Fingerprint matches \u2713 Re-playing the run\u2026';\n        var r = await R.verify(stored, { address: e.player, score: e.score, board: boardOf(game, mode), file: full });\n        if (!out.isConnected) return;\n        if (!r.ok) { out.className = 'xa-msg is-err'; out.textContent = '\u2717 Fingerprint matches but the run does not check out: ' + r.reason; return; }\n        keepSealed(full);\n        delete replayCache[boardOf(game, mode) + ':' + e.player + ':' + e.score];\n        out.className = 'xa-msg is-ok';\n        out.replaceChildren('\u2713 Verified: this file is the sealed run and it scores ' + fmtVal(mode, r.score) + '. ',\n          h('button', { class: 'xa-link', type: 'button', text: 'Watch it', onclick: function () { closeModal(); watchReplay(full, { name: e.name, rank: e.rank }); } }));\n      });\n      doc.body.appendChild(inp); inp.click();\n    });\n    modal(h('div', { class: 'xa-card' }, [\n      h('h3', { text: '\u{1F512} Sealed run' }),\n      h('p', { class: 'xa-verdict', text: e.name + ' \xB7 ' + fmtVal(mode, e.score) + ' \xB7 ' + kb + ' KB replay' }),\n      h('p', { class: 'xa-note', text: 'The player posted this score with a fingerprint of the replay instead of the replay itself, and kept the file. ' +\n        'Whoever has the file can check it here: it must match the fingerprint exactly and re-play to this score. If the file is ever inscribed on Xtrata, it is found and played from the chain automatically.' }),\n      h('p', { class: 'xa-note', style: 'word-break:break-all;font-size:11px;opacity:.8', text: 'sha256 ' + hex(p.sha256) }),\n      out,\n      h('div', { class: 'xa-card-foot' }, [pick, h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])\n    ]));\n  }\n\n  function openReplayFile(post) {\n    var inp = h('input', { type: 'file', accept: '.xar,application/octet-stream', style: 'display:none' });\n    inp.addEventListener('change', async function () {\n      var f = inp.files && inp.files[0]; inp.remove();\n      if (!f) return;\n      try {\n        var bytes = await XA.replay.resolve(new Uint8Array(await f.arrayBuffer()));\n        if (post === true) postSavedRun(bytes); else watchReplay(bytes, { name: f.name.replace(/\\.xar$/, '') });\n      } catch (x) { openInfo('Could not open that replay', (x && x.message) || String(x)); }\n    });\n    doc.body.appendChild(inp); inp.click();\n  }\n\n  /* --------------------------- unposted runs: a great run is never lost\n     Every ranked run that would make a Top 10 is kept in this browser (when storage is allowed) until it is\n     posted, and can always be saved as a file. Either can be posted later from the machine's title screen. */\n  var UNPOSTED_MAX = 3, UNPOSTED_BYTES = 1500000;\n  function b64(bytes) {\n    var bin = '';\n    for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));\n    return btoa(bin);\n  }\n  function unb64(t) { var bin = atob(t), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }\n  function unposted() { var v = U.store('unposted'); return Array.isArray(v) ? v : []; }\n  function keepUnposted(board, score, mode, bytes) {\n    try {\n      var list = unposted().filter(function (u) { return u.r !== b64(bytes.subarray(0, 44)); });\n      list.unshift({ board: board, score: score, mode: mode, at: Date.now(), r: b64(bytes.subarray(0, 44)), b: b64(bytes) });\n      list = list.slice(0, UNPOSTED_MAX);\n      while (list.length > 1 && JSON.stringify(list).length > UNPOSTED_BYTES) list.pop();\n      U.store('unposted', list);\n    } catch (e) { /* storage blocked: Save replay still works */ }\n  }\n  function dropUnposted(bytes) {\n    try { var k = b64(bytes.subarray(0, 44)); U.store('unposted', unposted().filter(function (u) { return u.r !== k; })); } catch (e) {}\n  }\n  // A saved or kept run: re-played here first, then posted like a fresh one.\n  async function postSavedRun(bytes) {\n    var R = XA.replay, hd;\n    try { hd = R.readHeader(bytes); } catch (x) { openInfo('Not a replay', 'That file is not an Xtrata Arcade replay.'); return; }\n    var game = XA.games.filter(function (g) { return g.id === R.GAME_IDS[hd.gameIdx]; })[0];\n    if (!game) { openInfo('Unknown game', 'This replay is for a game that is not in this arcade.'); return; }\n    var variant = hd.variantIdx ? (game.variants || [])[hd.variantIdx - 1] : null;\n    var mode = variant ? variant.mode : game.mode, board = R.boardFor(game, mode);\n    var pilotAddr = S._codec.c32address(hd.version || 22, hd.hash160);\n    var body = h('div', {});\n    modal(h('div', { class: 'xa-card' }, [\n      h('h3', { text: 'Post a saved run' }),\n      h('p', { class: 'xa-verdict', text: game.title + (variant ? ' \xB7 ' + variant.label : '') + ' \xB7 ' + fmtVal(mode, hd.score) + ' \xB7 flown by ' + S.shortAddress(pilotAddr) }),\n      body,\n      h('div', { class: 'xa-card-foot' }, [h('span'), h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])\n    ]));\n    body.replaceChildren(h('p', { class: 'xa-note', text: 'Re-playing the run to check it\u2026' }));\n    var chk = await R.verify(bytes, { score: hd.score, board: board });\n    if (!body.isConnected) return;\n    if (!chk.ok) { body.replaceChildren(h('p', { class: 'xa-msg is-err', text: 'This run does not check out (' + chk.reason + '), so it cannot be posted.' })); return; }\n    var top = await S.getTop10(board, mode, true);\n    if (!body.isConnected) return;\n    var rank = insertRank(top, hd.score, mode);\n    if (top.ok && !rank) { body.replaceChildren(h('p', { class: 'xa-note', text: 'Replay checked \u2713 but the Top 10 has moved on: this score no longer makes the board.' })); return; }\n    var box = h('div', { class: 'xa-submit' });\n    body.replaceChildren(h('p', { class: 'xa-note', text: rank ? 'Replay checked \u2713 It would be #' + rank + ' on the board.' : 'Replay checked \u2713' }), box);\n    postCard(box, { game: game, mode: mode, score: hd.score, bytes: bytes, pilot: { address: pilotAddr, hash160: hd.hash160 }, checked: true });\n  }\n  // Replays are drawn and heard like a live run, fed from the recorded input instead of the keyboard.\n  async function watchReplay(bytes, info) {\n    var dec;\n    try { dec = await XA.replay.decode(bytes); }\n    catch (x) { openInfo('Could not read that replay', (x && x.message) || String(x)); return; }\n    var game = XA.games.filter(function (g) { return g.id === XA.replay.GAME_IDS[dec.gameIdx]; })[0];\n    if (!game) { openInfo('Unknown game', 'This replay is for a game that is not in this arcade.'); return; }\n    var variant = dec.variantIdx ? (game.variants || [])[dec.variantIdx - 1] : null;\n    startGame(game.id, variant && variant.key, { watch: dec, bytes: bytes, info: info || {} });\n  }\n  function boardList(board, game, highlight, mode) {\n    mode = mode || (game && game.mode) || 'score';\n    if (!board) return h('div', { class: 'xa-empty', text: 'Loading\u2026' });\n    if (!board.ok) return h('div', { class: 'xa-error', text: 'Couldn\u2019t reach the leaderboard right now. It isn\u2019t empty \u2014 try again in a moment.' });\n    if (!board.entries.length) return h('div', { class: 'xa-empty', text: 'No scores yet. The first run that lands here is permanent until someone beats it.' });\n    return h('ol', { class: 'xa-board' }, board.entries.map(function (e) {\n      var you = walletStatus.address && e.player === walletStatus.address;\n      return h('li', { class: you || (highlight && highlight === e.rank) ? 'is-you' : '' }, [\n        h('span', { class: 'xa-rank', text: '#' + e.rank }),\n        h('span', { class: 'xa-who' }, [h('b', { text: e.name }), h('small', { text: S.shortAddress(e.player) + (you ? ' \xB7 you' : '') })]),\n        h('span', { class: 'xa-pts', text: fmtVal(mode, e.score) }),\n        game && !game.framed ? h('span', { class: 'xa-tools' }, [watchButton(game, mode, e), saveButton(game, mode, e), verifyButton(game, mode, e)]) : null\n      ]);\n    }));\n  }\n  function openBoards(gameId, mode) {\n    var game = XA.games.filter(function (g) { return g.id === gameId; })[0] || XA.games[0];\n    var modes = [game.mode].concat(game.variants.map(function (v) { return v.mode; }));\n    if (modes.indexOf(mode) < 0) mode = game.mode;\n    var key = bk(game, mode);\n    var body = h('div', {}, [boardList(boards[key], game, 0, mode)]);\n    var tabs = h('div', { class: 'xa-tabs', role: 'tablist' }, XA.games.map(function (g) {\n      return h('button', { class: 'xa-tab', role: 'tab', type: 'button', style: '--c:' + g.color,\n        'aria-selected': g.id === game.id ? 'true' : 'false', onclick: function () { openBoards(g.id); } }, [g.title]);\n    }));\n    var modeTabs = modes.length > 1 ? h('div', { class: 'xa-mode-tabs', role: 'tablist', 'aria-label': game.title + ' boards' }, modes.map(function (m) {\n      return h('button', { class: 'xa-mode-tab', role: 'tab', type: 'button', 'data-mode': m,\n        'aria-selected': m === mode ? 'true' : 'false', onclick: function () { openBoards(game.id, m); } },\n        [(m === 'time' ? '\u23F1 ' : '') + modeLabel(game, m)]);\n    })) : null;\n    var foot = h('div', { class: 'xa-card-foot' }, [\n      h('span', { text: 'Your best: ' + fmtBest(game, mode) }),\n      h('span', {}, [\n        h('button', { class: 'xa-btn', type: 'button', style: 'margin-right:8px', onclick: async function () {\n          body.replaceChildren(boardList(null));\n          boards[key] = await S.getTop10(boardOf(game, mode), mode, true);\n          body.replaceChildren(boardList(boards[key], game, 0, mode));\n        } }, ['\u21BB Refresh']),\n        h('button', { class: 'xa-btn', type: 'button', onclick: closeModal }, ['Close'])\n      ])\n    ]);\n    modal(h('div', { class: 'xa-card', style: '--c:' + game.color }, [h('h3', { text: 'High scores' }), tabs, modeTabs, body, foot]));\n    if (!boards[key]) S.getTop10(boardOf(game, mode), mode).then(function (b) {\n      boards[key] = b;\n      if (modalEl && body.isConnected) body.replaceChildren(boardList(b, game, 0, mode));\n    });\n  }\n\n  /* ------------------------------------------------------- session */\n  function startGame(id, variantKey, opts) {\n    opts = opts || {};\n    XA.audio.unlock();\n    closeModal();\n    var game = XA.games.filter(function (g) { return g.id === id; })[0];\n    if (!game) return;\n    if (game.framed) { openInfo(game.title, game.title + ' is played in a window of its own, which only the 3D hall can open. Walk up to its cabinet in the hall to play it.'); return; }\n    var variant = variantOf(game, variantKey);\n    var mode = variant ? variant.mode : game.mode;\n    endSession(true);\n    if (XA.music) { XA.music.stop(0.15); XA.music.clearListeners(); }\n\n    var canvas = h('canvas', { 'aria-label': game.title + ' playfield' });\n    var stage = h('div', { class: 'xa-stage' }, [canvas]);\n    var scoreEl = h('b', { id: 'xa-score', text: '0' });\n    var bestEl = h('b', { text: fmtBest(game, mode) });\n    var hiEl = h('b', { text: '\u2026' });\n    var statusEl = h('div', { class: 'xa-status', 'aria-live': 'polite' });\n    var pauseBtn = h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Pause', text: '\u275A\u275A', onclick: function () { togglePause(); } });\n    gameEl = h('section', { class: 'xa-game', style: '--c:' + game.color }, [\n      h('div', { class: 'xa-hud' }, [\n        h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Back to the arcade', text: '\u25C0', onclick: function () { endSession(); } }),\n        h('span', { class: 'xa-title', text: game.title + (variant ? ' \xB7 ' + variant.label : '') }),\n        h('div', { class: 'xa-hud-stats' }, [\n          h('div', {}, [h('small', { text: mode === 'time' ? 'TIME' : 'SCORE' }), scoreEl]),\n          h('div', {}, [h('small', { text: 'BEST' }), bestEl]),\n          h('div', {}, [h('small', { text: 'CHAIN #1' }), hiEl])\n        ]),\n        pauseBtn\n      ]),\n      statusEl,\n      stage\n    ]);\n    var watch = opts.watch || null, pb = watch ? XA.replay.playback(watch.events) : null;\n    var input = watch ? pb.input : XA.createInput(stage);\n    var pads = watch ? null : buildPads(game.touch, input, game);\n    if (pads) gameEl.appendChild(pads);\n    rootEl.appendChild(gameEl);\n    roomEl.setAttribute('aria-hidden', 'true');\n\n    var pilot = watch ? null : XA.replay.pilotFor(walletStatus.address);      // connected wallet \u2192 a ranked, recorded run\n    var nonce = U.newSeed();\n    var seed = watch ? XA.replay.seedFor(watch.hash160, watch.nonce, watch.gameIdx) : pilot ? XA.replay.seedFor(pilot.hash160, nonce, XA.replay.gameIndex(game)) : nonce;\n    var fx = XA.createFx();\n    session = {\n      game: game, variant: variant, mode: mode, completed: false, canvas: canvas, ctx: canvas.getContext('2d'), stage: stage, input: input, fx: fx,\n      score: 0, shake: 0, state: 'countdown', countdown: 3.0, acc: 0, seed: seed,\n      scoreEl: scoreEl, statusEl: statusEl, hiEl: hiEl, scale: 1, overlay: null, startedAt: Date.now()\n    };\n    var s = session;\n    if (watch) { s.state = 'watch'; s.watch = watch; s.pb = pb; s.steps = 0; s.speed = 1; s.bytes = opts.bytes; s.info = opts.info; }\n    else if (!opts.go) s.state = 'ready';\n    var live = function () { return s.state === 'play' || s.state === 'watch'; };\n    var api = {\n      W: game.size.w, H: game.size.h, input: input, audio: XA.audio, fx: fx,\n      rng: U.rng(seed), seed: seed, ranked: !!pilot,\n      shake: function (n) { s.shake = Math.max(s.shake, n); },\n      addScore: function (n) { if (live()) s.score += Math.max(0, Math.floor(n)); },\n      setScore: function (n) { if (live()) s.score = Math.max(0, Math.floor(n)); },\n      getScore: function () { return s.score; },\n      setStatus: function (t) { if (s.statusEl.textContent !== t) s.statusEl.textContent = t; },\n      gameOver: function () { if (s.state === 'play') finish(); else if (s.state === 'watch') endWatch(s); },\n      // Which board this run is for. In 'time' mode the score is the elapsed\n      // time in centiseconds (lower wins): keep it current with setScore and\n      // call finish() on completion. gameOver() without finish() is a DNF.\n      mode: mode,\n      variant: variant ? variant.key : null,\n      finish: function () { if (s.state === 'play') { s.completed = true; finish(); } else if (s.state === 'watch') { s.completed = true; endWatch(s); } },\n      // Pointer in playfield units. `moved` increments on every move/press, so a\n      // game can tell \"the pointer is steering\" from \"the keys are steering\".\n      pointer: watch ? pb.pointer : function () {\n        var p = input.pointer, r = canvas.getBoundingClientRect();\n        // quarter-unit resolution, so a replay can reproduce exactly what the game saw\n        return { x: XA.replay.qpt((p.x - r.left) / s.scale), y: XA.replay.qpt((p.y - r.top) / s.scale), down: p.down, moved: p.moved };\n      }\n    };\n    if (pilot && gameEl) {\n      s.pilot = pilot;\n      s.rec = XA.replay.record(game, variant, pilot, nonce, input, api.pointer);\n    }\n    var tag = s.tagEl = h('span', { class: 'xa-runtag', style: 'margin-left:8px;font-size:11px;letter-spacing:.08em;white-space:nowrap;color:' + (pilot ? '#7dffb2' : '#9aa3c7'),\n      title: watch ? 'Replay' : pilot ? 'Ranked: this run is recorded and can be posted on-chain.' : 'Practice: connect a wallet before you start to rank a run.',\n      text: watch ? '\u25B6 REPLAY' : pilot ? '\u25CF RANKED' : 'PRACTICE' });\n    var ttl = $('.xa-title', gameEl); if (ttl) ttl.appendChild(tag);\n    if (watch) { var realStore = U.store; U.store = blankStore(s); try { s.instance = game.create(api); } finally { U.store = realStore; } }\n    else s.instance = game.create(api);\n    fit();\n    if (watch) showWatch(s); else if (s.state === 'ready') showReady(s); else showCountdown();\n    S.getTop10(boardOf(game, mode), mode).then(function (b) {\n      boards[bk(game, mode)] = b;\n      if (session !== s) return;\n      hiEl.textContent = b.ok ? (b.entries[0] ? fmtVal(mode, b.entries[0].score) : '\u2014') : 'offline';\n    });\n  }\n\n  (function () {\n    var st = doc.createElement('style');\n    st.textContent = '.xa-board li { grid-template-columns: 34px 1fr auto auto; }\\n.xa-tools { display: flex; gap: 4px; justify-content: flex-end; }\\n.xa-tools .xa-btn { margin: 0 !important; padding: 3px 8px !important; font-size: 11px !important; min-height: 0; }\\n.xa-ready-overlay { overflow: auto; align-items: start; background: rgba(3, 4, 12, .6); }\\n.xa-ready { width: min(520px, 100%); margin: auto; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--xa-line); background: rgba(8, 10, 26, .9); box-shadow: 0 0 40px -12px var(--c); }\\n.xa-ready h3 { font-size: 30px; text-shadow: 0 0 14px var(--c), 0 0 34px var(--c); }\\n.xa-ready-variant { margin-top: 6px; font: 800 12px/1 var(--xa-mono); letter-spacing: .16em; color: var(--c); text-transform: uppercase; }\\n.xa-ready-tag { margin: 12px 0 0; font: 800 12px/1.4 var(--xa-mono); letter-spacing: .1em; color: var(--xa-dim); }\\n.xa-ready-tag.is-ranked { color: var(--xa-green); }\\n.xa-ready-tag.is-warn { color: #ffc53d; }\\n.xa-ready-msg { margin: 6px 0 0; font: 700 12px/1.4 var(--xa-mono); color: var(--xa-dim); min-height: 0; }\\n.xa-ready-msg.is-err { color: #ff4d6d; }\\n.xa-btn-connect { font-weight: 800; }\\n.xa-link { background: none; border: 0; padding: 0; font: inherit; color: var(--xa-cyan); text-decoration: underline; cursor: pointer; }\\n.xa-ready-head { display: flex; justify-content: space-between; margin: 16px 0 4px; font: 800 11px/1 var(--xa-mono); letter-spacing: .14em; color: var(--xa-faint); }\\n.xa-ready-board { max-height: 38vh; overflow: auto; text-align: left; border-top: 1px solid var(--xa-line); }\\n.xa-ready-board .xa-board { font-size: 13px; }\\n.xa-ready-board .xa-board li { padding: 7px 6px; }\\n.xa-ready .xa-variants { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }\\n.xa-replay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }';\n    (doc.head || doc.documentElement).appendChild(st);\n  })();\n  function blankStore(s) {\n    var mem = {};\n    return function (k, v) { if (v === undefined) return k in mem ? mem[k] : null; mem[k] = v; return null; };\n  }\n  function beginRun(s) {\n    if (!s || session !== s || s.state !== 'ready') return;\n    s.state = 'countdown'; s.countdown = 3.0; s.input.reset();\n    showCountdown();\n  }\n  // Connect from the ready card, then reopen the same machine as a ranked run.\n  async function connectForRun(s, btn, msg) {\n    if (!s || session !== s || s.state !== 'ready' || s.connecting) return;\n    s.connecting = true;\n    var label = btn.textContent;\n    btn.disabled = true; btn.textContent = 'Check your wallet\\u2026';\n    msg.className = 'xa-ready-msg'; msg.textContent = '';\n    try {\n      await S.connect();\n      walletStatus = S.status(); paintWallet();\n      if (session === s && s.state === 'ready' && walletStatus.address) {\n        startGame(s.game.id, s.variant ? s.variant.key : null);   // same machine, now ranked\n        return;\n      }\n      throw new Error('The wallet did not return an address.');\n    } catch (e) {\n      if (session !== s) return;\n      msg.className = 'xa-ready-msg is-err';\n      msg.textContent = 'Not connected: ' + ((e && e.message) || String(e)) + ' Try again, or play a practice run.';\n      btn.disabled = false; btn.textContent = label;\n    } finally { s.connecting = false; }\n  }\n  // \"You have an unposted run\" on a machine's title screen.\n  function unpostedRow(g, mode) {\n    var mine = unposted().filter(function (u) { return u.board === boardOf(g, mode); });\n    if (!mine.length) return null;\n    return h('div', { class: 'xa-note', style: 'margin-top:10px;padding:10px;border-radius:10px;border:1px solid var(--xa-gold);text-align:left' },\n      [h('b', { style: 'color:var(--xa-gold)', text: 'Unposted run' + (mine.length > 1 ? 's' : '') + ' kept in this browser' })].concat(mine.map(function (u) {\n        var bytes = unb64(u.b);\n        return h('div', { style: 'display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:6px' }, [\n          h('span', { text: fmtVal(u.mode, u.score) + ' \xB7 ' + new Date(u.at).toLocaleString() }),\n          h('span', { style: 'display:flex;gap:6px' }, [\n            h('button', { class: 'xa-btn', type: 'button', style: 'padding:4px 10px;font-size:11px', onclick: function () { postSavedRun(bytes); } }, ['Post']),\n            h('button', { class: 'xa-btn', type: 'button', style: 'padding:4px 10px;font-size:11px', onclick: function () { saveReplay(bytes, u.board + '-' + u.score); } }, ['\u2B07 Save'])\n          ])\n        ]);\n      })));\n  }\n  function showReady(s) {\n    var g = s.game, mode = s.mode, vkey = s.variant ? s.variant.key : null;\n    var list = h('div', { class: 'xa-ready-board' }, [boardList(boards[bk(g, mode)], g, 0, mode)]);\n    // A run is bound to the wallet it starts with (the replay is seeded from it),\n    // so a score can only be posted if the wallet is connected BEFORE the run.\n    // Not connected \u2192 connecting is the main action; practice is the fallback.\n    walletStatus = S.status(); paintWallet();\n    var canConnect = !s.pilot && walletStatus.route !== 'none';\n    var start, practice = null, tag, msg = h('p', { class: 'xa-ready-msg', 'aria-live': 'polite' });\n    if (s.pilot) {\n      start = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { beginRun(s); } }, ['\u25B6 START']);\n      tag = h('p', { class: 'xa-ready-tag is-ranked', text: '\u25CF RANKED \xB7 flying as ' + S.shortAddress(s.pilot.address) });\n    } else if (canConnect) {\n      start = h('button', { class: 'xa-btn xa-btn-play xa-btn-connect', style: '--c:' + g.color, type: 'button', onclick: function () { connectForRun(s, start, msg); } }, ['\\uD83D\\uDD17 CONNECT WALLET']);\n      practice = h('button', { class: 'xa-btn', type: 'button', title: 'Play without a wallet. The score cannot be posted on-chain.', onclick: function () { beginRun(s); } }, ['\u25B6 Practice']);\n      tag = h('p', { class: 'xa-ready-tag is-warn', text: 'NOT CONNECTED \xB7 connect first to post your score on-chain. A practice run cannot be posted afterwards.' });\n    } else {\n      start = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { beginRun(s); } }, ['\u25B6 PRACTICE']);\n      tag = h('p', { class: 'xa-ready-tag is-warn' }, ['VIEW ONLY \xB7 no wallet can be reached here, so this score cannot be posted. ',\n        h('a', { href: S.runtimeUrl(), target: '_blank', rel: 'noopener', style: 'color:var(--xa-cyan)', text: 'Play on xtrata.xyz \\u2197' })]);\n    }\n    s.primary = canConnect ? function () { connectForRun(s, start, msg); } : function () { beginRun(s); };\n    var modes = [null].concat(g.variants || []);\n    var switcher = modes.length > 1 ? h('div', { class: 'xa-variants' }, modes.filter(function (v) { return (v ? v.key : null) !== vkey; }).map(function (v) {\n      return h('button', { class: 'xa-btn xa-btn-variant', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, v ? v.key : null); } },\n        [v ? (v.mode === 'time' ? '\u23F1 ' : '\u25B6 ') + v.label : '\u25B6 ' + modeLabel(g, g.mode)]);\n    })) : null;\n    setOverlay(h('div', { class: 'xa-overlay xa-ready-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over xa-ready' }, [\n      h('h3', { text: g.title }),\n      s.variant ? h('div', { class: 'xa-ready-variant', text: s.variant.label }) : null,\n      h('p', { class: 'xa-verdict', text: (s.variant && s.variant.tagline) || g.tagline || '' }),\n      g.controls ? h('p', { class: 'xa-note', text: g.controls }) : null,\n      tag,\n      msg,\n      h('div', { class: 'xa-ready-head' }, [h('span', { text: 'ON-CHAIN TOP 10' }), h('span', { text: 'YOUR BEST ' + fmtBest(g, mode) })]),\n      list,\n      h('div', { class: 'xa-over-actions' }, [start, practice, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['\u25C0 Arcade'])]),\n      switcher,\n      unpostedRow(g, mode),\n      h('p', { class: 'xa-note' }, [canConnect ? 'Enter or Space to connect \xB7 Esc to go back \xB7 ' : 'Enter or Space to start \xB7 Esc to go back \xB7 ',\n        h('button', { class: 'xa-link', type: 'button', onclick: function () { openReplayFile(false); } }, ['watch a replay file']), ' \xB7 ',\n        h('button', { class: 'xa-link', type: 'button', onclick: function () { openReplayFile(true); } }, ['post a saved run'])])\n    ])]));\n    start.focus();\n    S.getTop10(boardOf(g, mode), mode, true).then(function (b) {\n      boards[bk(g, mode)] = b;\n      if (session === s && s.state === 'ready' && list.isConnected) list.replaceChildren(boardList(b, g, 0, mode));\n    });\n  }\n  function showWatch(s) {\n    var who = s.info && s.info.name ? s.info.name : 'replay';\n    s.statusEl.textContent = 'REPLAY \xB7 ' + who + (s.info && s.info.rank ? ' \xB7 #' + s.info.rank : '') + ' \xB7 target ' + fmtVal(s.mode, s.watch.score);\n    var speed = h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Replay speed', text: '1\xD7', onclick: function () {\n      s.speed = s.speed >= 8 ? 1 : s.speed * 2; speed.textContent = s.speed + '\xD7';\n    } });\n    var hud = $('.xa-hud', gameEl); if (hud) hud.insertBefore(speed, hud.lastChild);\n    setOverlay(null);\n  }\n  function endWatch(s) {\n    if (s.state !== 'watch') return;\n    s.state = 'watched';\n    var ok = s.score === s.watch.score;\n    var g = s.game, vkey = s.variant ? s.variant.key : null;\n    setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over' }, [\n      h('h3', { text: 'REPLAY OVER' }),\n      h('div', { class: 'xa-final', text: fmtVal(s.mode, s.score) }),\n      h('p', { class: 'xa-verdict', text: ok ? 'The replay reached exactly the recorded score.' : 'This replay ended at ' + fmtVal(s.mode, s.score) + ', not the recorded ' + fmtVal(s.mode, s.watch.score) + '.' }),\n      h('div', { class: 'xa-over-actions' }, [\n        h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { watchReplay(s.bytes, s.info); } }, ['\u21BB Watch again']),\n        h('button', { class: 'xa-btn', type: 'button', onclick: function () { startGame(g.id, vkey); } }, ['\u25C0 Back'])\n      ]),\n      h('div', { class: 'xa-replay-row' }, [h('button', { class: 'xa-btn', type: 'button', onclick: function () { saveReplay(s.bytes, boardOf(g, s.mode) + '-' + ((s.info && s.info.name) || 'replay') + '-' + s.watch.score); } }, ['\u2B07 Save replay'])])\n    ])]));\n  }\n  function buildPads(kind, input, game) {\n    var coarse = root.matchMedia && root.matchMedia('(pointer: coarse)').matches;\n    if (!coarse && !/[?&]pads=1/.test(root.location.search || '')) return null;\n    function pad(name, label, cls) {\n      var b = h('button', { class: 'xa-pad ' + (cls || '') + ' ' + name, type: 'button', 'aria-label': name, text: label });\n      function down(e) { e.preventDefault(); XA.audio.unlock(); b.classList.add('is-down'); input.press(name); try { b.setPointerCapture(e.pointerId); } catch (x) {} }\n      function up() { b.classList.remove('is-down'); input.release(name); }\n      b.addEventListener('pointerdown', down);\n      b.addEventListener('pointerup', up);\n      b.addEventListener('pointercancel', up);\n      b.addEventListener('lostpointercapture', up);\n      b.addEventListener('contextmenu', function (e) { e.preventDefault(); });\n      return b;\n    }\n    if (kind === 'dpad') {\n      return h('div', { class: 'xa-pads' }, [\n        h('div', { class: 'xa-pad-hint', text: 'SWIPE OR USE THE PAD' }),\n        h('div', { class: 'xa-pad-group xa-dpad' }, [pad('up', '\u25B2'), pad('left', '\u25C0'), pad('down', '\u25BC'), pad('right', '\u25B6')])\n      ]);\n    }\n    if (kind === 'blocks') {\n      return h('div', { class: 'xa-pads' }, [\n        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '\u25C0'), pad('down', '\u25BC'), pad('right', '\u25B6')]),\n        h('div', { class: 'xa-pad-group xa-grid2' }, [pad('b', '\u27F2'), pad('c', '\u27F3'), pad('d', 'HOLD', 'xa-wide'), pad('a', '\u2913')])\n      ]);\n    }\n    if (kind === 'lander') {\n      return h('div', { class: 'xa-pads' }, [\n        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '\u27F2'), pad('right', '\u27F3')]),\n        h('div', { class: 'xa-pad-group xa-row' }, [pad('up', 'THRUST', 'xa-wide')])\n      ]);\n    }\n    if (kind === 'shooter') {\n      return h('div', { class: 'xa-pads' }, [\n        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '\u25C0'), pad('right', '\u25B6')]),\n        h('div', { class: 'xa-pad-group xa-row' }, [pad('a', 'FIRE', 'xa-wide')])\n      ]);\n    }\n    if (kind === 'ship') {\n      return h('div', { class: 'xa-pads' }, [\n        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '\u27F2'), pad('right', '\u27F3')]),\n        h('div', { class: 'xa-pad-group xa-row' }, [pad('up', 'THRUST', 'xa-wide'), pad('a', 'FIRE', 'xa-wide')])\n      ]);\n    }\n    if (kind === 'hint') {\n      return h('div', { class: 'xa-pads' }, [h('div', { class: 'xa-pad-hint', text: game.touchHint || '' })]);\n    }\n    if (kind === 'hold') {\n      return h('div', { class: 'xa-pads' }, [h('div', { class: 'xa-pad-hint', text: 'TOUCH AND HOLD ANYWHERE ON THE SCREEN TO SWIM' })]);\n    }\n    return null;\n  }\n\n  function fit() {\n    if (!session) return;\n    var s = session, g = s.game;\n    var rect = s.stage.getBoundingClientRect();\n    var availW = Math.max(100, rect.width - 20), availH = Math.max(100, rect.height - 12);\n    var scale = Math.min(availW / g.size.w, availH / g.size.h);\n    var dpr = Math.min(root.devicePixelRatio || 1, 2.5);\n    s.scale = scale;\n    s.dpr = dpr;\n    s.canvas.style.width = Math.floor(g.size.w * scale) + 'px';\n    s.canvas.style.height = Math.floor(g.size.h * scale) + 'px';\n    s.canvas.width = Math.floor(g.size.w * scale * dpr);\n    s.canvas.height = Math.floor(g.size.h * scale * dpr);\n  }\n\n  function setOverlay(el) {\n    if (!session) return;\n    if (session.overlay) session.overlay.remove();\n    session.overlay = el;\n    if (el) session.stage.appendChild(el);\n  }\n  function showCountdown() {\n    var n = h('div', { class: 'xa-countdown', text: '3' });\n    setOverlay(h('div', { class: 'xa-overlay', style: 'background:rgba(3,4,12,.35)' }, [n]));\n    session.countEl = n;\n    XA.audio.tone(440, 0.1, { type: 'square', vol: 0.15 });\n  }\n\n  function togglePause(force) {\n    var s = session;\n    if (!s) return;\n    if (s.state === 'play' && force !== false) {\n      s.state = 'paused';\n      if (XA.music) XA.music.pause();\n      s.input.reset();\n      setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over xa-pause' }, [\n        h('h3', { text: 'PAUSED' }),\n        h('div', { class: 'xa-over-actions' }, [\n          h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + s.game.color, type: 'button', onclick: function () { togglePause(); } }, ['Resume']),\n          h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['Quit'])\n        ])\n      ])]));\n      $('.xa-overlay button', s.stage).focus();\n    } else if (s.state === 'paused' && force !== true) {\n      s.state = 'play';\n      s.acc = 0;\n      s.input.reset();\n      if (XA.music) XA.music.resume();\n      setOverlay(null);\n    }\n  }\n\n  function endSession(silent) {\n    if (!session) return;\n    session.input.destroy();\n    session = null;\n    if (XA.music) { XA.music.stop(0.35); XA.music.clearListeners(); }\n    if (gameEl) { gameEl.remove(); gameEl = null; }\n    roomEl.removeAttribute('aria-hidden');\n    cabinets.forEach(function (c) { refreshCabinet(c); });\n    var btn = $('[data-play]');\n    if (btn && btn.offsetParent) btn.focus();\n    var hostCfg = root.XA_CONFIG || {};\n    if (silent !== true && typeof hostCfg.onExit === 'function') { try { hostCfg.onExit(); } catch (e) { console.error(e); } }\n  }\n\n  /* --------------------------------------------------- game over */\n  function insertRank(board, score, mode) {\n    if (!board || !board.ok) return 0;\n    for (var i = 0; i < 10; i++) {\n      var e = board.entries[i];\n      if (!e) return i + 1;\n      if (mode === 'time' ? score < e.score : score > e.score) return i + 1;\n    }\n    return 0;\n  }\n\n  async function finish() {\n    var s = session;\n    s.state = 'over';\n    s.input.reset();\n    // Games may already have stopped their music (e.g. their own death cue).\n    if (XA.music && XA.music.isPlaying()) XA.music.tapeStop(1.3);\n    var g = s.game, mode = s.mode, vkey = s.variant ? s.variant.key : null;\n    var score = s.score;\n    var dnf = mode === 'time' && !s.completed;\n    if (dnf) score = 0;\n    if (s.rec && !s.replayP) s.replayP = s.rec.finish(score, s.completed);   // ready for Watch / Save on the game-over card\n    var prevBest = localBest(g, mode);\n    var best = recordLocal(g, mode, score);\n    var isPb = score > 0 && (mode === 'time' ? (!prevBest || score < prevBest) : score > prevBest);\n    XA.audio.arp(isPb ? [523, 659, 784, 1047] : [392, 330, 262], 0.09, { type: 'triangle', vol: 0.2 });\n\n    var verdict = h('p', { class: 'xa-verdict', text: 'Checking the on-chain board\u2026' });\n    var submitBox = h('div', { class: 'xa-submit xa-hidden' });\n    var again = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, vkey, { go: true }); } }, ['\u21BB Play again']);\n    setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over' }, [\n      h('h3', { text: dnf ? 'DID NOT FINISH' : mode === 'time' ? 'FINISHED' : 'GAME OVER' }),\n      h('div', { class: 'xa-final', text: dnf ? '\u2014' : fmtVal(mode, score) }),\n      isPb ? h('span', { class: 'xa-badge', text: '\u2605 NEW PERSONAL BEST' }) : h('span', { class: 'xa-note', text: 'Best ' + fmtBest(g, mode) }),\n      verdict,\n      submitBox,\n      h('div', { class: 'xa-over-actions' }, [again, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['\u25C0 Arcade'])]),\n      s.replayP ? h('div', { class: 'xa-replay-row' }, [\n        h('button', { class: 'xa-btn', type: 'button', onclick: async function () { var b = await s.replayP; if (b) watchReplay(b, { name: 'Your run' }); } }, ['\u25B6 Watch my run']),\n        h('button', { class: 'xa-btn', type: 'button', onclick: async function () { var b = await s.replayP; if (b) saveReplay(b, boardOf(g, mode) + '-' + score); } }, ['\u2B07 Save replay'])\n      ]) : null\n    ])]));\n    again.focus();\n\n    if (dnf) { verdict.textContent = 'Finish the run to set a time for the board.'; return; }\n    if (!(score > 0)) { verdict.textContent = 'Score something to get on the board.'; return; }\n    var board = await S.getTop10(boardOf(g, mode), mode, true);\n    if (session !== s) return;\n    boards[bk(g, mode)] = board;\n    var rank = insertRank(board, score, mode);\n    if (!board.ok) {\n      verdict.textContent = 'Couldn\u2019t check the leaderboard right now \u2014 you can still try to post.';\n    } else if (rank) {\n      if (s.rec) verdict.replaceChildren('That run makes the top 10 at ', h('b', { text: '#' + rank }), '. Post it on-chain to keep it until someone beats it.');\n      // A practice run is not bound to a wallet, so it can never be posted: say so up front, not after a connect.\n      else verdict.replaceChildren('That would have been ', h('b', { text: '#' + rank }), ' on the board, but practice runs can\\u2019t be posted.');\n    } else {\n      var tenth = board.entries[9];\n      verdict.textContent = mode === 'time'\n        ? 'The top 10 starts at ' + fmtVal(mode, tenth.score) + '. ' + fmtVal(mode, score - tenth.score + 1) + ' faster to get on the board.'\n        : 'The top 10 starts at ' + U.fmt(tenth.score) + '. ' + U.fmt(tenth.score - score + 1) + ' more to get on the board.';\n      return;\n    }\n    if (s.rec && !s.replayP) s.replayP = s.rec.finish(score, s.completed);\n    // A Top 10 run is kept in this browser until it is posted, so closing the tab or a failed post never loses it.\n    if (s.rec && s.replayP) s.replayP.then(function (b) { if (b) keepUnposted(boardOf(g, mode), score, mode, b); });\n    buildSubmit(submitBox, s, score, rank);\n  }\n\n  // Game over after a practice run. A run is locked to the wallet it started with (its replay is seeded\n  // from it), so this score can't be posted even if the player connects now. Say that plainly, let them\n  // connect here, show the result as soon as the wallet answers, and offer a ranked run straight away.\n  function practiceBox(box, s) {\n    var g = s.game, vkey = s.variant ? s.variant.key : null;\n    function render() {\n      if (session !== s || !box.isConnected) return;\n      var st = S.status();\n      if (st.address) {\n        box.replaceChildren(\n          h('p', { class: 'xa-note', style: 'margin:0;color:var(--xa-green)', text: '\\u2713 Connected as ' + S.shortAddress(st.address) + '. Your next run is ranked and can be posted.' }),\n          h('p', { class: 'xa-note', text: 'This practice run stays unposted: a run is locked to the wallet it starts with, so nobody can claim a score they didn\\u2019t play.' }),\n          h('button', { class: 'xa-btn xa-btn-play', style: 'margin-top:10px;--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, vkey, { go: true }); } }, ['\\u25B6 Play a ranked run'])\n        );\n        return;\n      }\n      var msg = h('p', { class: 'xa-msg' });\n      var btn = h('button', { class: 'xa-btn', type: 'button', style: 'margin-top:10px', onclick: async function () {\n        if (btn.disabled) return;\n        walletStatus = S.status(); paintWallet();\n        if (walletStatus.route === 'none') { onWalletClick(); return; }\n        btn.disabled = true; btn.textContent = 'Check your wallet\\u2026'; msg.className = 'xa-msg'; msg.textContent = '';\n        try {\n          await S.connect();\n          walletStatus = S.status(); paintWallet();\n          if (!walletStatus.address) throw new Error('The wallet did not return an address.');\n          render();\n        } catch (e) {\n          if (session !== s || !box.isConnected) return;\n          btn.disabled = false; btn.textContent = 'Connect wallet';\n          msg.className = 'xa-msg is-err'; msg.textContent = 'Not connected: ' + ((e && e.message) || String(e));\n        }\n      } }, ['Connect wallet']);\n      box.replaceChildren(\n        h('p', { class: 'xa-note', style: 'margin:0', text: 'Practice run: this score can\\u2019t be posted, even if you connect now. A run is locked to the wallet it starts with.' }),\n        h('p', { class: 'xa-note', text: 'Connect, then play again: every run after that is ranked and can be posted on-chain.' }),\n        btn, msg\n      );\n    }\n    render();\n    // The wallet may connect from elsewhere (the hall's button, a slow extension): keep this box in step.\n    S.onChange(function () { render(); });\n  }\n  function buildSubmit(box, s, score, rank) {\n    var g = s.game;\n    var st = S.status();\n    box.classList.remove('xa-hidden');\n    if (!s.rec) { practiceBox(box, s); return; }\n    if (st.route === 'none') {\n      box.replaceChildren(\n        h('p', { class: 'xa-note', style: 'margin:0', text: 'This copy of the arcade can\u2019t reach a wallet, so this score can\u2019t be posted from here. Open the arcade on Xtrata to post your runs.' }),\n        h('a', { class: 'xa-btn', href: S.runtimeUrl(), target: '_blank', rel: 'noopener', style: 'display:block;text-align:center;text-decoration:none;margin-top:10px' }, ['Open on xtrata.xyz \u2197'])\n      );\n      return;\n    }\n    postCard(box, { game: g, mode: s.mode, score: score, bytesP: s.replayP, pilot: s.pilot });\n  }\n  /* ------------------------------------------------ network-fee warning */\n  // Wallets estimate their own network fee for a score post and have suggested 0.5 STX. Players should set the\n  // small figure in score-client's config (networkFeeHintUstx). Three places: a banner on the post panel, a notice\n  // the first time in each session, and a reminder line while the wallet is open.\n  var feeNoticeSeen = false;\n  function feeStx(txBytes) { return String(Number(S.networkFeeHint(txBytes)) / 1e6); }\n  function feeSeenStored() { try { return root.sessionStorage.getItem('xa:feeNotice') === '1'; } catch (e) { return false; } }\n  function feeMarkSeen() { feeNoticeSeen = true; try { root.sessionStorage.setItem('xa:feeNotice', '1'); } catch (e) { /* in-memory flag still holds for this page */ } }\n  // fee = the figure to enter (STX string), or null for the long-run flow where the right fee depends on the replay's size.\n  function feeHowSteps(fee) {\n    return h('ol', { class: 'xa-feesteps' }, [\n      h('li', { text: 'On your wallet\u2019s confirm screen find the line called \u201CFee\u201D or \u201CNetwork fee\u201D. It usually has an Edit, pencil or Advanced control next to it.' }),\n      h('li', { text: 'Choose \u201CCustom\u201D, or type into the fee box.' + (fee ? ' If the wallet shows micro-STX (\xB5STX), the amount is ' + Math.round(Number(fee) * 1e6) + '.' : '') }),\n      h('li', { text: fee ? 'Enter ' + fee + ' STX and save it.' : 'Lower it well below what the wallet suggested, then save it.' }),\n      h('li', { text: fee ? 'Check that the Fee line now says ' + fee + ' STX before you press Confirm. If it still shows 0.5 STX, cancel (this costs nothing) and try again.'\n        : 'Check the Fee line before you press Confirm. If it is still around 0.5 STX, cancel (this costs nothing) and choose \u201CSeal it\u201D instead.' }),\n      h('li', { text: 'The board fee shown on its own line is separate and correct. Only the network fee needs changing.' })\n    ]);\n  }\n  // `inscribe` = the two-approval long-run flow, where the network fee grows with the replay's size, so no fixed figure.\n  function feeBanner(inscribe, txBytes) {\n    var fee = feeStx(txBytes);\n    var box = h('div', { class: 'xa-feewarn', role: 'note' });\n    box.append(h('b', { class: 'xa-feewarn-t', text: 'BEFORE YOU APPROVE: CHECK THE NETWORK FEE' }));\n    if (inscribe) {\n      box.append(h('p', { text: 'Your wallet sets the network fee for each approval, and for a big replay it can be high. If it suggests something like 0.5 STX, cancel and choose \u201CSeal it\u201D instead.' }));\n    } else {\n      box.append(h('p', {}, ['Set the network fee to ', h('b', { text: fee + ' STX' }), '. Your wallet may suggest ', h('b', { text: '0.5 STX' }), ': ', h('b', { text: 'do NOT pay that' }), '. You can cancel at no cost.']));\n    }\n    var d = h('details', { class: 'xa-feehow' });\n    d.append(h('summary', { text: 'How do I change the fee?' }), feeHowSteps(inscribe ? null : fee), h('p', { class: 'xa-note', text: 'The wording differs between Xverse, Leather and other wallets, but every one of them lets you edit the fee before you confirm.' }));\n    box.append(d);\n    return box;\n  }\n  // Resolves true to carry on to the wallet, false if the player backs out. Once per session.\n  function feeNoticeOnce(inscribe, txBytes) {\n    if (feeNoticeSeen || feeSeenStored()) { feeNoticeSeen = true; return Promise.resolve(true); }\n    return new Promise(function (resolve) {\n      var fee = feeStx(txBytes);\n      var ok = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: inscribe ? 'OK, I\u2019ll check the fee' : 'OK, I\u2019ll set ' + fee + ' STX' });\n      var no = h('button', { class: 'xa-btn', type: 'button', text: 'Not now' });\n      var wrap = h('div', { class: 'xa-feemodal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Before your wallet opens' }, [\n        h('div', { class: 'xa-feemodal-card' }, [\n          h('h3', { text: 'Before your wallet opens' }),\n          inscribe\n            ? h('p', { class: 'xa-feebig', text: 'Check the network fee on every approval. If your wallet suggests something like 0.5 STX, cancel.' })\n            : h('p', { class: 'xa-feebig' }, ['Set the NETWORK FEE to ', h('b', { text: fee + ' STX' }), '.', h('br'), 'Your wallet may suggest ', h('b', { text: '0.5 STX' }), '. ', h('b', { text: 'Do NOT pay that.' })]),\n          h('details', { class: 'xa-feehow', open: '' }, [h('summary', { text: 'How do I change the fee?' }), feeHowSteps(inscribe ? null : fee)]),\n          h('div', { class: 'xa-over-actions' }, [no, ok])\n        ])\n      ]);\n      function done(v) { wrap.remove(); root.removeEventListener('keydown', onKey, true); if (v) feeMarkSeen(); resolve(v); }\n      function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } }\n      ok.addEventListener('click', function () { done(true); });\n      no.addEventListener('click', function () { done(false); });\n      root.addEventListener('keydown', onKey, true);\n      root.document.body.appendChild(wrap);\n      ok.focus();\n    });\n  }\n\n  // The name / cost / post box for a ranked run: at game over, or later from a saved replay.\n  // opts: { game, mode, score, pilot:{address, hash160}, bytes | bytesP, checked }\n  function postCard(box, opts) {\n    var g = opts.game, mode = opts.mode, score = opts.score;\n    var s = { pilot: opts.pilot };\n    var name = h('input', { class: 'xa-name', id: 'xa-name', maxlength: '12', autocomplete: 'off', spellcheck: 'false',\n      value: U.store('name') || '', placeholder: 'AAA', 'aria-describedby': 'xa-name-note' });\n    name.addEventListener('input', function () {\n      var c = S.cleanName(name.value).toUpperCase();\n      if (c !== name.value) name.value = c;\n    });\n    var msg = h('p', { class: 'xa-msg', 'aria-live': 'polite' });\n    var btn = h('button', { class: 'xa-btn xa-btn-primary', type: 'button' }, ['Post score on-chain']);\n    var feeNote = h('p', { class: 'xa-note', id: 'xa-name-note', text: '3\u201312 letters or numbers. Your wallet will ask you to confirm.' });\n    var boardId = boardOf(g, mode), replayBytes = null;\n    var longNote = h('div', { class: 'xa-note xa-long', style: 'display:none;color:var(--xa-gold)' });\n    var how = 'inline';     // inline | inscribe | seal\n    var feeBox = h('div', { class: 'xa-feebox' });\n    function txBytesNow() { return how === 'seal' ? 400 : (replayBytes ? replayBytes.length + 350 : 0); }\n    function paintFee() { feeBox.replaceChildren(feeBanner(how === 'inscribe', txBytesNow())); }\n    function walletMsg(t) {\n      var inscribe = how === 'inscribe';\n      msg.replaceChildren(t, h('br'), h('b', { class: 'xa-feeremind', text: inscribe ? 'Check the network fee before you approve.' : 'Network fee: set ' + feeStx(txBytesNow()) + ' STX, not 0.5.' }));\n    }\n    paintFee();\n    function choice(val, title, text, on) {\n      var r = h('input', { type: 'radio', name: 'xa-how', value: val });\n      r.checked = !!on;\n      r.addEventListener('change', function () { if (r.checked) { how = val; btn.textContent = val === 'seal' ? 'Save replay & post sealed score' : 'Post score on-chain'; paintFee(); } });\n      return h('label', { class: 'xa-how', style: 'display:flex;gap:8px;align-items:flex-start;margin:6px 0;cursor:pointer;color:var(--xa-ink,#e8eef7)' },\n        [r, h('span', {}, [h('b', { text: title }), h('br'), h('span', { style: 'opacity:.85', text: text })])]);\n    }\n    btn.disabled = true;\n    msg.textContent = 'Checking your replay\u2026';\n    S.getFee(boardId).then(function (f) {\n      if (!f.ok) return;\n      if (!f.registered) { feeNote.textContent = 'This board is not open for scores yet.'; return; }\n      feeNote.textContent = '3\u201312 letters or numbers. Board fee ' + (Number(f.value) / 1e6) + ' STX (capped by a post-condition), plus the network fee you set in your wallet.';\n    });\n    (async function () {\n      replayBytes = opts.bytes || await opts.bytesP;\n      if (!replayBytes) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run is longer than 4 hours and cannot be recorded.'; return; }\n      var long = S.needsInscription(replayBytes), kb = Math.max(1, Math.round(replayBytes.length / 1024));\n      if (long) {\n        how = 'inscribe'; paintFee();\n        longNote.style.display = '';\n        longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than a score entry holds. Working out the cost\u2026' }));\n        var tooBig = Math.ceil(replayBytes.length / XA.replay.CHUNK) > XA.replay.MAX_INSCRIBE_CHUNKS;\n        var sealText = 'Board fee plus a normal network fee, one approval. Your replay file is saved to your device now and the board keeps its fingerprint. ' +\n          'Anyone you give the file to can check it matches, and you can inscribe it later. Keep the file safe: without it nobody can watch the run.';\n        var render = function (q) {\n          if (!longNote.isConnected) return;\n          if (tooBig) {\n            how = 'seal'; btn.textContent = 'Save replay & post sealed score'; paintFee();\n            longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than the 512 KB one inscription holds, so this score is posted sealed.' }),\n              choice('seal', 'Seal it', sealText, true));\n            return;\n          }\n          longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than a score entry holds. Choose how to post it:' }),\n            choice('inscribe', 'Inscribe the replay', (q && q.ok ? 'Inscription fee ' + (Number(q.fee) / 1e6) + ' STX' : 'A small inscription fee') +\n              ' plus network fees (higher for a bigger replay), two approvals. The replay lives on chain and anyone can watch it.', how === 'inscribe'),\n            choice('seal', 'Seal it (cheaper)', sealText, how === 'seal'));\n        };\n        S.quoteReplay(replayBytes.length).then(render, function () { render(null); });\n      }\n      if (!opts.checked) {\n        msg.textContent = long ? 'Checking your replay (a long run takes a moment)\u2026' : 'Checking your replay\u2026';\n        // Re-run our own replay first: never let anyone pay to post a run that will not check out.\n        var chk = await XA.replay.verify(replayBytes, { address: s.pilot.address, score: score, board: boardId });\n        if (!msg.isConnected) return;\n        if (!chk.ok) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run could not be verified, so it can\u2019t be posted (' + chk.reason + ').'; return; }\n      }\n      msg.className = 'xa-msg is-ok'; msg.textContent = 'Replay checked \u2713 Ready to post.';\n      btn.disabled = false;\n    })();\n    btn.addEventListener('click', async function () {\n      var n = S.cleanName(name.value).toUpperCase();\n      if (n.length < 3) { msg.className = 'xa-msg is-err'; msg.textContent = 'Name needs at least 3 characters.'; name.focus(); return; }\n      U.store('name', n);\n      var sealIt = how === 'seal';\n      if (!(await feeNoticeOnce(how === 'inscribe', txBytesNow()))) return;\n      btn.disabled = true; name.disabled = true;\n      longNote.querySelectorAll('input').forEach(function (r) { r.disabled = true; });\n      msg.className = 'xa-msg'; walletMsg('Check your wallet to confirm\u2026');\n      if (sealIt) { keepSealed(replayBytes); saveReplay(replayBytes, boardId + '-' + n + '-' + score + '-sealed'); }\n      try {\n        var r = await S.submit({ board: boardId, score: score, name: n, replay: replayBytes, seal: sealIt, pilotHash: S._codec.bytesToHex(s.pilot.hash160),\n          onProgress: function (t) { if (msg.isConnected) { msg.className = 'xa-msg'; if (/wallet|approve/i.test(t)) walletMsg(t); else msg.textContent = t; } } });\n        if (r.ok) {\n          dropUnposted(replayBytes);\n          var tx = r.txid ? (/^0x/.test(r.txid) ? r.txid : '0x' + r.txid) : '';\n          msg.className = 'xa-msg is-ok';\n          msg.replaceChildren('Submitted! It shows on the board once the transaction confirms. ',\n            tx ? h('a', { href: 'https://explorer.hiro.so/txid/' + tx + '?chain=' + S.config().network, target: '_blank', rel: 'noopener', text: 'View transaction \u2197' }) : '');\n          btn.textContent = sealIt ? 'Posted sealed \u2713' : 'Posted \u2713';\n          if (sealIt) msg.append(h('br'), 'Your replay file was saved as xtrata-arcade-' + (boardId + '-' + n + '-' + score + '-sealed').replace(/[^A-Za-z0-9_.-]+/g, '_') + '.xar. Keep it: it is the proof of this run. ',\n            h('button', { class: 'xa-link', type: 'button', text: 'Save it again', onclick: function () { saveReplay(replayBytes, boardId + '-' + n + '-' + score + '-sealed'); } }));\n          XA.audio.arp([784, 988, 1175, 1568], 0.07, { type: 'square', vol: 0.18 });\n        } else if (r.needsRuntime) {\n          msg.className = 'xa-msg is-err';\n          msg.replaceChildren(r.reason + ' ', h('a', { href: r.runtimeUrl, target: '_blank', rel: 'noopener', text: 'Open the secure runtime \u2197' }));\n          btn.disabled = false; name.disabled = false;\n          longNote.querySelectorAll('input').forEach(function (r) { r.disabled = false; });\n        }\n      } catch (e) {\n        msg.className = 'xa-msg is-err';\n        msg.textContent = (e && e.message) || 'The wallet did not sign.';\n        btn.disabled = false; name.disabled = false;\n        longNote.querySelectorAll('input').forEach(function (r) { r.disabled = false; });\n      }\n    });\n    box.replaceChildren(h('label', { for: 'xa-name', text: 'NAME ON THE BOARD' }), name, feeNote, longNote, feeBox, btn, msg);\n  }\n\n  /* ---------------------------------------------------------- loop */\n  var STEP = 1 / 60;\n  var attractT = 0, attractAcc = 0;\n  function frame(ts) {\n    raf = root.requestAnimationFrame(frame);\n    var dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 0;\n    lastTs = ts;\n    if (session) runSession(dt);\n    else runAttract(dt);\n  }\n  function runAttract(dt) {\n    attractT += dt;\n    attractAcc += dt;\n    if (attractAcc < 1 / 30) return;\n    attractAcc = 0;\n    cabinets.forEach(function (c) {\n      var r = c.canvas.getBoundingClientRect();\n      if (!r.width) return;\n      var dpr = Math.min(root.devicePixelRatio || 1, 2);\n      var w = Math.round(r.width * dpr), hgt = Math.round(r.height * dpr);\n      if (c.canvas.width !== w || c.canvas.height !== hgt) { c.canvas.width = w; c.canvas.height = hgt; }\n      c.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);\n      try { c.game.attract(c.ctx, r.width, r.height, attractT); } catch (e) {}\n    });\n  }\n  function runSession(dt) {\n    var s = session;\n    var g = s.game;\n    if (s.state === 'countdown') {\n      var before = Math.ceil(s.countdown);\n      s.countdown -= dt;\n      var now = Math.ceil(s.countdown);\n      if (now !== before && now > 0) { s.countEl.textContent = String(now); XA.audio.tone(440, 0.1, { type: 'square', vol: 0.15 }); }\n      if (s.countdown <= 0) {\n        s.state = 'play';\n        s.input.reset();\n        setOverlay(null);\n        XA.audio.tone(880, 0.16, { type: 'square', vol: 0.18 });\n      }\n    } else if (s.state === 'play') {\n      if (s.input.hit('pause')) { togglePause(); }\n      else {\n        s.acc += dt;\n        var steps = 0;\n        while (s.acc >= STEP && steps < 6 && session === s && s.state === 'play') {\n          if (s.rec) s.rec.before();\n          s.instance.update(STEP);\n          if (s.rec) s.rec.after();\n          s.input.endFrame();\n          s.fx.update(STEP);\n          s.acc -= STEP;\n          steps++;\n        }\n        // Long-run hint: once the replay outgrows a score entry, say so (posting will store it as an inscription).\n        if (s.rec && !s.longHint && s.rec.step % 120 === 0 && s.rec.estimate() > (S.config().inlineMax || S.INLINE_MAX) && s.tagEl) {\n          s.longHint = true;\n          s.tagEl.textContent = '\\u25CF RANKED \\u00B7 LONG RUN';\n          s.tagEl.style.color = '#ffcf5a';\n          s.tagEl.title = 'This replay is now bigger than a score entry holds. You can still post it: it will be stored as its own Xtrata inscription (a small extra fee and one more wallet approval).';\n        }\n      }\n    } else if (s.state === 'ready') {\n      if (s.input.hit('start') || s.input.hit('a')) (s.primary || function () { beginRun(s); })();\n      else if (s.input.hit('pause')) { endSession(); return; }\n      s.input.endFrame();\n    } else if (s.state === 'watch') {\n      s.acc += dt * s.speed;\n      var wsteps = 0, realStore = U.store;\n      U.store = s.blank || (s.blank = blankStore(s));\n      try {\n        while (s.acc >= STEP && wsteps < 6 * s.speed && session === s && s.state === 'watch') {\n          if (s.steps >= s.watch.steps) { endWatch(s); break; }\n          s.pb.load(s.steps);\n          s.instance.update(STEP);\n          s.steps++;\n          s.fx.update(STEP);\n          s.acc -= STEP;\n          wsteps++;\n        }\n      } finally { U.store = realStore; }\n    } else if (s.state === 'over' || s.state === 'watched') {\n      s.fx.update(dt);\n    }\n    if (session !== s) return;\n    var shown = fmtVal(s.mode, s.score);\n    if (s.scoreEl.textContent !== shown) s.scoreEl.textContent = shown;\n\n    var ctx = s.ctx, k = s.scale * s.dpr;\n    ctx.setTransform(k, 0, 0, k, 0, 0);\n    if (s.shake > 0.1) {\n      ctx.translate((Math.random() - 0.5) * s.shake, (Math.random() - 0.5) * s.shake);\n      s.shake *= Math.pow(0.02, dt);\n    } else s.shake = 0;\n    ctx.save();\n    ctx.beginPath(); ctx.rect(-20, -20, g.size.w + 40, g.size.h + 40); ctx.clip();\n    if (s.state === 'ready') {\n      s.attractT = (s.attractT || 0) + dt;\n      try { g.attract(ctx, g.size.w, g.size.h, s.attractT); } catch (e) { s.instance.render(ctx); }\n      ctx.restore();\n      return;\n    }\n    s.instance.render(ctx);\n    s.fx.draw(ctx);\n    ctx.restore();\n  }\n\n  /* ---------------------------------------------------------- boot */\n  function boot(mount) {\n    if (rootEl) return;\n    var cfg = root.XA_CONFIG || {};\n    if (cfg.scores) S.configure(cfg.scores);\n    rootEl = mount || doc.getElementById('xa-root') || doc.body;\n    buildRoom();\n    S.onChange(function (st) {\n      walletStatus = st;\n      paintWallet();\n    });\n    cabinets.forEach(function (c) { refreshCabinet(c); });\n    root.addEventListener('resize', fit);\n    doc.addEventListener('visibilitychange', function () { if (doc.hidden) togglePause(true); });\n    root.addEventListener('keydown', function (e) {\n      if (e.key === 'Escape' && modalEl) { closeModal(); return; }\n      if (!session) return;\n      if (e.key === 'Enter' && session.state === 'over' && doc.activeElement && doc.activeElement.id !== 'xa-name' &&\n          doc.activeElement.tagName !== 'BUTTON' && doc.activeElement.tagName !== 'A') startGame(session.game.id, session.variant && session.variant.key, { go: true });\n      if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && session.state === 'paused') togglePause();\n    });\n    raf = root.requestAnimationFrame(frame);\n  }\n\n  /*\n   * A hosted room (the hall's room bridge, XA_ROOM.call) asks the player to sign a contract call. The same dialog as the fee notice:\n   * which room asks, the contract and function, the most it can spend (the call's only post-condition) and the network-fee warning.\n   * Resolves true to open the wallet, false if the player backs out. Everything shown is text (the room title is already plain ASCII).\n   */\n  function ustxToStx(u) { var s = String(u).replace(/^0+(?=\\d)/, ''); while (s.length < 7) s = '0' + s; var w = s.slice(0, -6), f = s.slice(-6).replace(/0+$/, ''); return w + (f ? '.' + f : ''); }\n  function confirmCall(o) {\n    o = o || {};\n    return new Promise(function (resolve) {\n      var ok = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: 'Open my wallet' });\n      var no = h('button', { class: 'xa-btn', type: 'button', text: 'Not now' });\n      var wrap = h('div', { class: 'xa-feemodal xa-callmodal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'A room asks you to sign' }, [\n        h('div', { class: 'xa-feemodal-card' }, [\n          h('h3', { text: String(o.room || 'This room') + ' asks you to sign' }),\n          h('p', { class: 'xa-feebig' }, ['It can spend at most ', h('b', { text: ustxToStx(o.maxUstx || 0) + ' STX' }), ' from your wallet. If the call would move anything more, it fails and nothing is spent.']),\n          h('p', { class: 'xa-note', text: 'Contract: ' + String(o.contract || '') }),\n          h('p', { class: 'xa-note', text: 'Function: ' + String(o.fn || '') }),\n          h('p', { class: 'xa-note', text: o.address ? 'Signing as ' + S.shortAddress(o.address) + '.' : 'Your wallet will ask you to connect first.' }),\n          feeBanner(false, 0),\n          h('div', { class: 'xa-over-actions' }, [no, ok])\n        ])\n      ]);\n      function done(v) { wrap.remove(); root.removeEventListener('keydown', onKey, true); resolve(v); }\n      function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } }\n      ok.addEventListener('click', function () { done(true); });\n      no.addEventListener('click', function () { done(false); });\n      root.addEventListener('keydown', onKey, true);\n      root.document.body.appendChild(wrap);\n      ok.focus();\n    });\n  }\n\n  root.XARoom = {\n    confirmCall: confirmCall,\n    boot: boot,\n    start: startGame,\n    back: endSession,\n    boards: openBoards,\n    wallet: onWalletClick,\n    _session: function () { return session; }\n  };\n})(window);\n\n/*@xa-part games-registry.js*/\n/*\n * Extra games from the games contract (xtrata-games-v1).\n *\n * The 21 built-in games are part of the hall and nothing here can touch them. This part adds games that were\n * registered on chain after the hall was inscribed: it reads the contract before the engine starts, fetches each live\n * game's cartridge script from its inscription (hash-checked), gives it its permanent replay index, and runs it so it\n * registers itself like any built-in game. The hall then builds one cabinet per registered game, so the room grows by itself.\n *\n * Never blocks the hall: no contract configured (window.XA_GAMES_CONFIG absent) = nothing happens; a failed read, a slow\n * read, or a bad game = the built-in 21 (plus any good extras) and the reason in XAGamesRegistry.status().\n * The parent calls window.XA_PREBOOT() and waits for it (with its own time limit) before the engine starts.\n */\n(function (root) {\n  'use strict';\n  if (root.XAGamesRegistry) return;\n\n  var KIND_CARTRIDGE = 1;\n  var KIND_FRAMED = 2;                // a game that is its own page (an inscription): the hall gives it a cabinet and frames it when played\n  var FRAMED_CAP = 16 * 1024 * 1024;  // the same limit as a room page\n  var MAX_ADDED = 64;                 // the contract's own cap; also a safety bound here\n  var TIME_LIMIT_MS = 20000;          // the whole load, after which the hall starts with what it has\n  var ID_OK = /^[a-z0-9_]{3,24}$/;\n  var state = { configured: false, done: false, ok: false, error: '', count: 0, loaded: [], skipped: [] };\n\n  function num(cv) { return cv && cv.value !== undefined && cv.value !== null ? Number(cv.value) : NaN; }\n  function field(t, k) { return t && t[k] ? t[k] : null; }\n\n  function skip(id, why) { state.skipped.push({ id: id, reason: why }); }\n\n  // One record from get-games \u2192 a plain object, or null when the slot is empty.\n  function parseGame(n, cv) {\n    if (!cv || cv.type !== 'some' || !cv.value || cv.value.type !== 'tuple') return null;\n    var t = cv.value.value;\n    var hash = field(t, 'code-hash');\n    return {\n      n: n,\n      id: field(t, 'id') ? String(field(t, 'id').value) : '',\n      title: field(t, 'title') ? String(field(t, 'title').value) : '',\n      index: num(field(t, 'index')),\n      kind: num(field(t, 'kind')),\n      engineMin: num(field(t, 'engine-min')),\n      codeId: num(field(t, 'code-id')),\n      codeHash: hash && hash.value ? hash.value : null,\n      codeSize: num(field(t, 'code-size')),\n      liveAt: num(field(t, 'live-at')),\n      hidden: !!(field(t, 'hidden') && field(t, 'hidden').value)\n    };\n  }\n\n  function runCartridge(g, code) {\n    var XA = root.XA, before = XA.games.map(function (x) { return x.id; });\n    var s = root.document.createElement('script');\n    s.setAttribute('data-xa-game', g.id);\n    s.text = code + '\\n//# sourceURL=xa-game-' + g.id;\n    root.document.body.appendChild(s);                    // a throwing cartridge cannot stop the rest\n    // A cartridge may only register its own id: anything else it registered is removed again.\n    for (var i = XA.games.length - 1; i >= 0; i--) {\n      var id = XA.games[i].id;\n      if (before.indexOf(id) < 0 && id !== g.id) XA.games.splice(i, 1);\n    }\n    var mine = XA.games.filter(function (x) { return x.id === g.id; })[0];\n    if (!mine) return false;\n    mine.order = 1000 + g.n;                              // after the built-in games, in the order they were added\n    XA.games.sort(function (a, b) { return (a.order || 99) - (b.order || 99); });\n    return true;\n  }\n\n  // The cabinet's neon colours, by game number, so every framed game looks different without anything else on chain.\n  var COLOURS = ['#3be4ff', '#ff5cf0', '#ffb347', '#7dffb2', '#ff6b6b', '#a78bfa'];\n\n  // A framed game is registered like any other game (so it gets a cabinet, a Top 10 on its screen, a place in the High scores list)\n  // but it has no script of its own: def.framed says which inscription to frame, and the hall does the rest.\n  function registerFramed(g) {\n    var XA = root.XA;\n    var color = COLOURS[g.n % COLOURS.length];\n    var title = g.title || g.id;\n    try {\n      XA.registerGame({\n        id: g.id, order: 1000 + g.n, title: title, tagline: 'Played straight from the chain', color: color,\n        size: { w: 320, h: 240 }, controls: 'Opens the original game',\n        framed: { id: g.codeId, hash: g.codeHash, size: g.codeSize },\n        create: function () { throw new Error('a framed game is played in its own frame'); },\n        attract: function (ctx, w, h, t) { drawFramedAttract(ctx, t || 0, w || 320, h || 240, title, color, g.codeId); }\n      });\n    } catch (e) { return false; }\n    return XA.games.some(function (x) { return x.id === g.id; });\n  }\n\n  // What a framed game's cabinet shows when nobody is playing: its name over a moving star field.\n  function drawFramedAttract(ctx, t, w, h, title, color, codeId) {\n    ctx.save();\n    ctx.fillStyle = '#05040f'; ctx.fillRect(0, 0, w, h);\n    for (var i = 0; i < 46; i++) {\n      var sp = 14 + (i * 37) % 60, x = (i * 97.3) % w, y = ((i * 53.7) + t * sp) % h;\n      ctx.globalAlpha = 0.25 + ((i * 13) % 7) / 10; ctx.fillStyle = i % 5 === 0 ? color : '#dfe8ff';\n      ctx.fillRect(x, y, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 2 : 1);\n    }\n    ctx.globalAlpha = 1; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';\n    var size = Math.max(14, Math.min(h * 0.16, w * 1.5 / Math.max(6, String(title).length)));\n    ctx.font = 'bold ' + Math.round(size) + 'px Bungee, Impact, sans-serif';\n    ctx.shadowColor = color; ctx.shadowBlur = 18; ctx.fillStyle = color;\n    ctx.fillText(String(title).toUpperCase(), w / 2, h * 0.44);\n    ctx.shadowBlur = 0; ctx.fillStyle = '#e8e2ff'; ctx.font = Math.round(h * 0.075) + 'px VT323, monospace';\n    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 3.1);\n    ctx.fillText('PRESS START', w / 2, h * 0.64);\n    ctx.globalAlpha = 0.55; ctx.fillText('INSCRIPTION #' + codeId, w / 2, h * 0.86);\n    ctx.restore();\n  }\n\n  async function load() {\n    var cfg = root.XA_GAMES_CONFIG;\n    if (!cfg || !cfg.contract) return state;              // off: the hall is exactly the built-in 21\n    state.configured = true;\n    var S = root.XAScores, XA = root.XA, R = XA && XA.replay;\n    if (!S || !S.read || !XA || !R || !R.registerIndex) { state.error = 'engine not ready'; return state; }\n    var C = S._codec, contract = String(cfg.contract);\n    var closed = false;\n    var handle = null;\n    var timer = new Promise(function (res) { handle = setTimeout(function () { closed = true; res('late'); }, cfg.timeoutMs || TIME_LIMIT_MS); });\n\n    var work = (async function () {\n      var count = num(await S.read('get-count', [], contract));\n      var height = num(await S.read('get-height', [], contract));\n      if (!(count >= 0) || !(height >= 0)) throw new Error('unexpected reply from the games contract');\n      state.count = count;\n      count = Math.min(count, MAX_ADDED);\n      var games = [];\n      for (var from = 0; from < count; from += 10) {\n        var ids = [];\n        for (var k = from; k < Math.min(count, from + 10); k++) ids.push(C.cvUint(k));\n        var list = await S.read('get-games', [C.cvList(ids)], contract);\n        if (!list || list.type !== 'list') throw new Error('unexpected get-games reply');\n        list.value.forEach(function (cv, j) { var g = parseGame(from + j, cv); if (g) games.push(g); });\n      }\n      // Which games are loaded now: live, not hidden, a kind and engine this hall understands, a valid new id.\n      var wanted = games.filter(function (g) {\n        if (g.hidden) { skip(g.id, 'hidden'); return false; }\n        if (!(g.liveAt <= height)) { skip(g.id, 'not live yet'); return false; }\n        if (g.kind !== KIND_CARTRIDGE && g.kind !== KIND_FRAMED) { skip(g.id, 'unknown kind'); return false; }\n        if (g.kind === KIND_FRAMED && !(g.codeSize > 0 && g.codeSize <= FRAMED_CAP)) { skip(g.id, 'too big to frame'); return false; }\n        if (!(g.engineMin <= (R.ENGINE || 1))) { skip(g.id, 'needs a newer engine'); return false; }\n        if (!ID_OK.test(g.id)) { skip(g.id, 'invalid id'); return false; }\n        if (XA.games.some(function (x) { return x.id === g.id; }) || R.GAME_IDS.indexOf(g.id) >= 0 && R.GAME_IDS.indexOf(g.id) < (R.BUILT_IN || 21)) { skip(g.id, 'built-in id'); return false; }\n        if (!g.codeHash || g.codeHash.length !== 32) { skip(g.id, 'bad hash'); return false; }\n        return true;\n      });\n      // A framed game is not run here: it gets a cabinet now and its page is fetched (and checked) only when someone plays it.\n      var framed = wanted.filter(function (g) { return g.kind === KIND_FRAMED; });\n      wanted = wanted.filter(function (g) { return g.kind === KIND_CARTRIDGE; });\n      framed.forEach(function (g) {\n        if (closed) return;\n        if (!registerFramed(g)) { skip(g.id, 'could not make a cabinet'); return; }\n        state.loaded.push(g.id);\n      });\n      // Fetch every cartridge at once (gateway first, chain as fallback; the bytes must match the contract's hash).\n      var fetched = await Promise.all(wanted.map(function (g) {\n        return S.getInscription(g.codeId, g.codeHash).then(function (bytes) {\n          if (bytes.length !== g.codeSize) throw new Error('size differs from the contract');\n          return new TextDecoder('utf-8').decode(bytes);\n        }).then(function (text) { return { g: g, text: text }; }, function (e) { skip(g.id, 'could not load: ' + ((e && e.message) || e)); return null; });\n      }));\n      if (closed) return;                                  // too late: the hall has started without them\n      // Run in the order they were added.\n      fetched.forEach(function (f) {\n        if (!f || closed) return;\n        var g = f.g;\n        var ran = false;\n        try { ran = runCartridge(g, f.text); } catch (e) { skip(g.id, 'cartridge error: ' + ((e && e.message) || e)); return; }\n        if (!ran) { skip(g.id, 'did not register itself'); return; }\n        // The replay number is given only to a game that is really in the hall, so a failed game leaves no trace.\n        if (!R.registerIndex(g.id, g.index)) {\n          for (var i = XA.games.length - 1; i >= 0; i--) if (XA.games[i].id === g.id) XA.games.splice(i, 1);\n          skip(g.id, 'replay index refused');\n          return;\n        }\n        state.loaded.push(g.id);\n      });\n      state.ok = true;\n    })();\n\n    try {\n      await Promise.race([work.catch(function (e) { state.error = (e && e.message) || String(e); }), timer]);\n    } finally {\n      clearTimeout(handle);\n      state.done = true;\n      if (closed && !state.error && !state.ok) state.error = 'timed out';\n    }\n    return state;\n  }\n\n  var started = null;\n  root.XA_PREBOOT = function () { if (!started) started = load().catch(function (e) { state.error = (e && e.message) || String(e); state.done = true; return state; }); return started; };\n  root.XAGamesRegistry = { status: function () { return JSON.parse(JSON.stringify(state)); }, load: root.XA_PREBOOT };\n})(typeof window !== 'undefined' ? window : globalThis);\n\n/*@xa-part engine-boot.js*/\n\n/* Engine boot: the flat room builds (hidden behind the 3D hall) and owns sessions, boards and the wallet. */\nwindow.XA_CONFIG = Object.assign(window.XA_CONFIG || {}, { subtitle: (window.XA && window.XA.games.length !== 21 ? window.XA.games.length : 'Twenty-one') + ' games, one on-chain leaderboard contract \xB7 post scores from xtrata.xyz' });\nXARoom.boot(document.getElementById('xa-root'));\n", hall: `/*@xa-pack hall v1*/
+var launch_default = { release: { version: "v2.0.0", bundle: { id: 3078, sha256: "d9fa6b2085d64c1e5cb63682bbc278e1fe83a335d8dda914d657d9ba675bd62c", bytes: 3915150, chunks: 239, chainHash: "d6221767e2cc13238d921e1a804a87277bcbd04da4b1433dcfebe30279a08035" }, packOrder: ["assets", "three", "engine", "games", "hall"], inscribe: ["engine", "hall"], packs: { engine: `/*@xa-pack engine v1*/
+/*@xa-part room.css*/
+/* Xtrata Arcade \u2014 room styles (leaf module) */
+:root {
+  --xa-bg: #05060f;
+  --xa-floor: #0a0c1c;
+  --xa-panel: #10132a;
+  --xa-panel-2: #171b38;
+  --xa-line: rgba(140, 160, 255, 0.18);
+  --xa-text: #eef1ff;
+  --xa-dim: #9aa3c7;
+  --xa-faint: #5d6590;
+  --xa-pink: #ff3fa4;
+  --xa-cyan: #3ff0ff;
+  --xa-green: #39ff88;
+  --xa-gold: #ffd23f;
+  --xa-red: #ff4d6d;
+  --xa-radius: 14px;
+  --xa-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --xa-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--xa-bg); color: var(--xa-text); }
+body { font: 15px/1.45 var(--xa-sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+button { font: inherit; color: inherit; }
+.xa-hidden { display: none !important; }
+
+/* ------------------------------------------------------------ room */
+.xa-room {
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 500px at 50% -120px, rgba(255, 63, 164, 0.16), transparent 70%),
+    radial-gradient(900px 400px at 90% 110%, rgba(63, 240, 255, 0.10), transparent 70%),
+    linear-gradient(transparent 62%, rgba(110, 90, 255, 0.07) 62%) 0 0 / 100% 100%,
+    var(--xa-bg);
+  padding: 20px 16px 48px;
+}
+.xa-floor-grid {
+  position: fixed; inset: auto 0 0 0; height: 38vh; pointer-events: none; z-index: 0;
+  background:
+    linear-gradient(rgba(110, 90, 255, 0.22) 1px, transparent 1px) 0 0 / 100% 36px,
+    linear-gradient(90deg, rgba(110, 90, 255, 0.22) 1px, transparent 1px) 0 0 / 60px 100%;
+  transform: perspective(420px) rotateX(58deg);
+  transform-origin: bottom;
+  mask-image: linear-gradient(transparent, #000 70%);
+  -webkit-mask-image: linear-gradient(transparent, #000 70%);
+  opacity: 0.55;
+}
+.xa-wrap { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; }
+.xa-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.xa-logo { font: 900 clamp(24px, 5vw, 42px)/1 var(--xa-mono); letter-spacing: 0.08em; margin: 0; }
+.xa-logo span:first-child {
+  color: #fff; text-shadow: 0 0 6px var(--xa-pink), 0 0 18px var(--xa-pink), 0 0 38px rgba(255, 63, 164, 0.6);
+}
+.xa-logo span:last-child {
+  color: var(--xa-cyan); text-shadow: 0 0 6px var(--xa-cyan), 0 0 20px rgba(63, 240, 255, 0.7);
+  animation: xa-flicker 6s infinite;
+}
+@keyframes xa-flicker { 0%, 92%, 100% { opacity: 1 } 93% { opacity: .4 } 94% { opacity: 1 } 96% { opacity: .6 } }
+.xa-sub { margin: 8px 0 0; color: var(--xa-dim); font-size: 14px; }
+.xa-top-actions { display: flex; gap: 8px; align-items: center; }
+.xa-pill {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px;
+  border-radius: 999px; border: 1px solid var(--xa-line); background: var(--xa-panel);
+  font: 700 12px/1 var(--xa-mono); letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+}
+.xa-pill:hover { border-color: rgba(140, 160, 255, 0.45); }
+.xa-pill:focus-visible, .xa-btn:focus-visible, .xa-icon:focus-visible { outline: 2px solid var(--xa-cyan); outline-offset: 2px; }
+.xa-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--xa-faint); box-shadow: 0 0 8px currentColor; }
+.xa-dot.is-on { background: var(--xa-green); color: var(--xa-green); }
+.xa-dot.is-warn { background: var(--xa-gold); color: var(--xa-gold); }
+.xa-icon {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--xa-line); background: var(--xa-panel);
+  cursor: pointer; display: grid; place-items: center; font-size: 16px;
+}
+
+.xa-cabinets {
+  display: grid; gap: 22px; margin-top: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.xa-cab {
+  --c: var(--xa-cyan);
+  position: relative; display: flex; flex-direction: column;
+  background: linear-gradient(180deg, #151935, #0c0f22 60%, #090b19);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px 18px 10px 10px; padding: 12px 12px 14px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 32px -12px var(--c);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.xa-cab:hover { transform: translateY(-3px); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5), 0 24px 50px rgba(0, 0, 0, .6), 0 0 44px -10px var(--c); }
+.xa-marquee {
+  border-radius: 10px; padding: 10px 12px; text-align: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.xa-marquee h2 {
+  margin: 0; font: 900 20px/1.1 var(--xa-mono); letter-spacing: .12em; text-transform: uppercase;
+  color: #fff; text-shadow: 0 0 6px var(--c), 0 0 18px var(--c);
+}
+.xa-marquee p { margin: 4px 0 0; font-size: 12px; color: var(--xa-dim); }
+.xa-screen {
+  position: relative; margin: 12px 4px 0; border-radius: 12px; overflow: hidden;
+  aspect-ratio: 4 / 3; background: #000;
+  box-shadow: inset 0 0 0 3px #050610, inset 0 0 30px rgba(0, 0, 0, .9), 0 0 0 1px rgba(255, 255, 255, .05);
+}
+.xa-screen canvas { width: 100%; height: 100%; display: block; }
+.xa-screen::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+.xa-insert {
+  position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; pointer-events: none;
+  font: 800 11px/1 var(--xa-mono); letter-spacing: .2em; color: #fff; text-shadow: 0 0 8px var(--c);
+  animation: xa-blink 1.2s steps(2) infinite;
+}
+@keyframes xa-blink { 50% { opacity: 0 } }
+.xa-cab-stats { display: flex; justify-content: space-between; gap: 8px; margin: 12px 6px 0; font: 700 12px/1.3 var(--xa-mono); }
+.xa-cab-stats div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xa-cab-stats span:first-child { color: var(--xa-faint); font-size: 10px; letter-spacing: .12em; }
+.xa-cab-stats b { color: var(--xa-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xa-cab-stats .xa-right { text-align: right; align-items: flex-end; }
+.xa-cab-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
+.xa-cab-actions .xa-btn-variant { grid-column: 1 / -1; font-size: 12px; padding-top: 8px; padding-bottom: 8px; border-color: var(--c, var(--xa-cyan)); color: #fff; background: transparent; }
+.xa-mode-tabs { display: flex; gap: 6px; margin: -6px 0 12px; }
+.xa-mode-tab { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--xa-line); background: transparent; cursor: pointer; font: 700 12px/1 var(--xa-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--xa-dim); }
+.xa-mode-tab[aria-selected="true"] { color: #fff; border-style: solid; border-color: var(--c, var(--xa-cyan)); }
+
+.xa-btn {
+  min-height: 44px; padding: 10px 16px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--xa-line); background: var(--xa-panel-2);
+  font: 800 13px/1 var(--xa-mono); letter-spacing: .1em; text-transform: uppercase;
+}
+.xa-btn:hover { border-color: rgba(140, 160, 255, 0.5); }
+.xa-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.xa-btn-play {
+  --c: var(--xa-cyan);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 32%, #10132a), color-mix(in srgb, var(--c) 14%, #0b0d1f));
+  border-color: color-mix(in srgb, var(--c) 70%, transparent);
+  box-shadow: 0 0 16px -4px var(--c), inset 0 1px 0 rgba(255, 255, 255, .2);
+  color: #fff;
+}
+.xa-btn-primary { background: linear-gradient(180deg, #ff5bb3, #d81f84); border-color: #ff8cc9; color: #fff; box-shadow: 0 0 18px -4px var(--xa-pink); }
+.xa-foot { margin-top: 34px; color: var(--xa-faint); font-size: 12.5px; text-align: center; }
+.xa-foot code { font-family: var(--xa-mono); color: var(--xa-dim); }
+
+/* ----------------------------------------------------- scoreboard */
+.xa-modal {
+  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px;
+  background: rgba(3, 4, 12, .76); backdrop-filter: blur(4px);
+}
+.xa-card {
+  width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto;
+  background: var(--xa-panel); border: 1px solid var(--xa-line); border-radius: var(--xa-radius);
+  padding: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
+}
+.xa-card h3 { margin: 0; font: 900 18px/1.2 var(--xa-mono); letter-spacing: .1em; text-transform: uppercase; }
+.xa-tabs { display: flex; gap: 6px; margin: 14px 0; flex-wrap: wrap; }
+.xa-tab { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--xa-line); background: transparent; cursor: pointer; font: 700 12px/1 var(--xa-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--xa-dim); }
+.xa-tab[aria-selected="true"] { color: #fff; border-color: var(--c, var(--xa-cyan)); box-shadow: 0 0 12px -4px var(--c, var(--xa-cyan)); }
+.xa-board { list-style: none; margin: 0; padding: 0; font: 600 14px/1.2 var(--xa-mono); }
+.xa-board li {
+  display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center;
+  padding: 10px 8px; border-bottom: 1px solid rgba(255, 255, 255, .05);
+}
+.xa-board li:nth-child(1) .xa-rank { color: var(--xa-gold); text-shadow: 0 0 10px var(--xa-gold); }
+.xa-board li:nth-child(2) .xa-rank { color: #d9e2ff; }
+.xa-board li:nth-child(3) .xa-rank { color: #ffae6b; }
+.xa-board li.is-you { background: rgba(57, 255, 136, .08); border-radius: 8px; }
+.xa-rank { font-weight: 900; color: var(--xa-dim); }
+.xa-who { min-width: 0; }
+.xa-who b { display: block; }
+.xa-who small { color: var(--xa-faint); font-size: 11px; }
+.xa-pts { font-weight: 900; font-variant-numeric: tabular-nums; }
+.xa-empty, .xa-error { padding: 22px 8px; text-align: center; color: var(--xa-dim); }
+.xa-error { color: var(--xa-gold); }
+.xa-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; color: var(--xa-faint); font-size: 12px; }
+
+/* ------------------------------------------------------ game view */
+.xa-game {
+  position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+  background: radial-gradient(900px 500px at 50% 40%, #0c1030, var(--xa-bg));
+}
+.xa-hud {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border-bottom: 1px solid var(--xa-line); background: rgba(5, 6, 15, .75);
+  font: 800 13px/1 var(--xa-mono); letter-spacing: .08em;
+}
+.xa-hud .xa-title { text-transform: uppercase; color: #fff; text-shadow: 0 0 10px var(--c); white-space: nowrap; }
+.xa-hud-stats { display: flex; gap: 18px; margin-left: auto; align-items: baseline; }
+.xa-hud-stats div { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.xa-hud-stats small { font-size: 9px; color: var(--xa-faint); letter-spacing: .14em; }
+.xa-hud-stats b { font-size: 16px; font-variant-numeric: tabular-nums; }
+#xa-score { color: #fff; text-shadow: 0 0 10px var(--c); }
+.xa-status { padding: 6px 14px; min-height: 26px; text-align: center; font: 700 11px/1.3 var(--xa-mono); letter-spacing: .12em; color: var(--xa-dim); }
+.xa-stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; padding: 6px 10px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.xa-stage canvas { display: block; border-radius: 10px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 0 40px -12px var(--c); }
+.xa-overlay {
+  position: absolute; inset: 0; display: grid; place-items: center; z-index: 5; padding: 16px;
+  background: rgba(3, 4, 12, .72);
+}
+.xa-countdown { font: 900 72px/1 var(--xa-mono); color: #fff; text-shadow: 0 0 20px var(--c), 0 0 50px var(--c); pointer-events: none; background: none; }
+.xa-over { width: min(420px, 100%); text-align: center; }
+.xa-over h3 { margin: 0; font: 900 26px/1 var(--xa-mono); letter-spacing: .14em; color: #fff; text-shadow: 0 0 12px var(--xa-pink); }
+.xa-final { margin: 14px 0 4px; font: 900 44px/1 var(--xa-mono); font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 16px var(--c); }
+.xa-badge { display: inline-block; margin-top: 6px; padding: 5px 10px; border-radius: 999px; font: 800 11px/1 var(--xa-mono); letter-spacing: .1em; background: rgba(57, 255, 136, .14); color: var(--xa-green); }
+.xa-verdict { margin: 12px 0 0; color: var(--xa-dim); font-size: 14px; }
+.xa-verdict b { color: var(--xa-gold); }
+.xa-submit { margin-top: 14px; padding: 14px; border-radius: 12px; border: 1px solid var(--xa-line); background: var(--xa-panel); text-align: left; }
+.xa-submit label { display: block; font: 700 11px/1 var(--xa-mono); letter-spacing: .12em; color: var(--xa-faint); margin-bottom: 6px; }
+.xa-name {
+  width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--xa-line);
+  background: #070919; color: #fff; font: 800 18px/1 var(--xa-mono); letter-spacing: .12em; text-transform: uppercase;
+}
+.xa-name:focus { outline: 2px solid var(--xa-cyan); outline-offset: 1px; }
+.xa-submit .xa-btn { width: 100%; margin-top: 10px; }
+.xa-note { margin: 8px 0 0; font-size: 12px; color: var(--xa-faint); }
+.xa-msg { margin: 10px 0 0; font-size: 13px; }
+.xa-feewarn { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--xa-red); background: rgba(255, 70, 90, .12); color: #fff; font-size: 13px; line-height: 1.4; }
+.xa-feewarn p { margin: 6px 0 0; }
+.xa-feewarn-t { display: block; font: 800 12px/1.2 var(--xa-mono); letter-spacing: .06em; color: var(--xa-red); }
+.xa-feewarn b { color: var(--xa-gold); }
+.xa-feehow { margin-top: 8px; font-size: 12px; }
+.xa-feehow summary { cursor: pointer; color: var(--xa-cyan); }
+.xa-feesteps { margin: 6px 0 0; padding-left: 20px; }
+.xa-feesteps li { margin: 4px 0; }
+.xa-feeremind { color: var(--xa-gold); }
+.xa-feemodal { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(3, 4, 12, .88); }
+.xa-feemodal-card { max-width: 440px; width: 100%; max-height: 92vh; overflow: auto; padding: 18px; border-radius: 14px; border: 2px solid var(--xa-red); background: #0b0e24; color: #fff; text-align: left; }
+.xa-feemodal-card h3 { margin: 0 0 8px; color: var(--xa-red); }
+.xa-feebig { margin: 0; font-size: 18px; line-height: 1.35; font-weight: 700; }
+.xa-feebig b { color: var(--xa-gold); }
+.xa-msg.is-ok { color: var(--xa-green); }
+.xa-msg.is-err { color: var(--xa-red); }
+.xa-msg a { color: var(--xa-cyan); }
+.xa-over-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.xa-pause h3 { text-align: center; }
+
+/* touch pads */
+.xa-pads { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 14px calc(12px + env(safe-area-inset-bottom)); }
+.xa-pad-group { display: grid; gap: 8px; }
+.xa-pad {
+  width: 60px; height: 60px; border-radius: 16px; border: 1px solid rgba(140, 160, 255, .3);
+  background: rgba(23, 27, 56, .85); font: 900 18px/1 var(--xa-mono); color: #fff; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.xa-pad.is-down { background: color-mix(in srgb, var(--c) 40%, #171b38); box-shadow: 0 0 18px -4px var(--c); }
+.xa-pad.xa-wide { font-size: 12px; letter-spacing: .06em; }
+.xa-dpad { grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 60px); }
+.xa-dpad .up { grid-column: 2; grid-row: 1; }
+.xa-dpad .left { grid-column: 1; grid-row: 2; }
+.xa-dpad .down { grid-column: 2; grid-row: 2; }
+.xa-dpad .right { grid-column: 3; grid-row: 2; }
+.xa-pad-hint { flex: 1; text-align: center; font: 700 12px/1.3 var(--xa-mono); letter-spacing: .12em; color: var(--xa-faint); }
+.xa-row { grid-auto-flow: column; align-self: end; }
+.xa-grid2 { grid-template-columns: repeat(2, auto); }
+
+@media (max-width: 520px) {
+  .xa-hud { gap: 8px; padding: 8px 10px; }
+  .xa-hud .xa-title { display: none; }
+  .xa-hud-stats { gap: 12px; }
+  .xa-pad { width: 54px; height: 54px; }
+  .xa-pads { padding-left: 10px; padding-right: 10px; }
+  .xa-dpad { grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(2, 54px); }
+  .xa-cabinets { gap: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xa-logo span:last-child, .xa-insert { animation: none; }
+  .xa-cab { transition: none; }
+}
+
+/*@xa-part arcade-kit.js*/
+/*
+ * Xtrata Arcade \u2014 shared kit (leaf module)
+ *
+ * Every game cartridge and the room itself depend on this module. It owns:
+ *   - the game registry            XA.registerGame(def) / XA.games
+ *   - input (keys, touch pads, swipes, hold)   XA.createInput(el)
+ *   - a tiny WebAudio synth        XA.audio
+ *   - particles / floating text    XA.createFx()
+ *   - small helpers                XA.util
+ *
+ * No network access and no wallet code live here, so a cartridge can never
+ * reach the score contract except through the room.
+ */
+(function (root) {
+  'use strict';
+  if (root.XA && root.XA.kitVersion) return;
+
+  var KIT_VERSION = '1.0.0';
+
+  /* ------------------------------------------------------------ util */
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  // mulberry32 \u2014 small seeded RNG so a run can be replayed from its seed.
+  function rng(seed) {
+    var s = (seed >>> 0) || 0x9e3779b9;
+    var f = function () {
+      s = (s + 0x6d2b79f5) >>> 0;
+      var t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    f.int = function (n) { return Math.floor(f() * n); };
+    f.range = function (a, b) { return a + f() * (b - a); };
+    f.pick = function (arr) { return arr[Math.floor(f() * arr.length)]; };
+    return f;
+  }
+  function newSeed() {
+    try {
+      var a = new Uint32Array(1);
+      root.crypto.getRandomValues(a);
+      return a[0] >>> 0;
+    } catch (e) {
+      return (Date.now() ^ (Math.random() * 4294967296)) >>> 0;
+    }
+  }
+  function store(key, value) {
+    try {
+      if (value === undefined) {
+        var raw = root.localStorage.getItem('xa:' + key);
+        return raw == null ? null : JSON.parse(raw);
+      }
+      root.localStorage.setItem('xa:' + key, JSON.stringify(value));
+    } catch (e) { /* storage may be blocked in sandboxed frames */ }
+    return null;
+  }
+  function fmt(n) {
+    return String(Math.floor(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');
+  }
+  function glowText(ctx, text, x, y, size, color, align, weight) {
+    ctx.save();
+    ctx.font = (weight || 800) + ' ' + size + 'px "Press Start 2P", ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = align || 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = color;
+    ctx.shadowBlur = size * 0.6;
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.globalAlpha = 0.35;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /* ----------------------------------------------------------- audio */
+  var audio = (function () {
+    var ctx = null;
+    var master = null;
+    var muted = !!store('muted');
+    function ensure() {
+      if (ctx) return ctx;
+      var AC = root.AudioContext || root.webkitAudioContext;
+      if (!AC) return null;
+      try {
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = muted ? 0 : 0.32;
+        master.connect(ctx.destination);
+      } catch (e) { ctx = null; }
+      return ctx;
+    }
+    function unlock() {
+      var c = ensure();
+      if (c && c.state === 'suspended' && c.resume) c.resume();
+    }
+    // tone(freq, dur, {type, vol, slide, delay})
+    function tone(freq, dur, o) {
+      o = o || {};
+      var c = ensure();
+      if (!c || muted) return;
+      var t0 = c.currentTime + (o.delay || 0);
+      var osc = c.createOscillator();
+      var g = c.createGain();
+      osc.type = o.type || 'square';
+      osc.frequency.setValueAtTime(freq, t0);
+      if (o.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(20, freq * o.slide), t0 + dur);
+      var v = o.vol == null ? 0.25 : o.vol;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(v, t0 + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g); g.connect(master);
+      osc.start(t0); osc.stop(t0 + dur + 0.02);
+    }
+    function noise(dur, o) {
+      o = o || {};
+      var c = ensure();
+      if (!c || muted) return;
+      var len = Math.max(1, Math.floor(c.sampleRate * dur));
+      var buf = c.createBuffer(1, len, c.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      var src = c.createBufferSource();
+      src.buffer = buf;
+      var filter = c.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = o.cutoff || 1800;
+      var g = c.createGain();
+      g.gain.value = o.vol == null ? 0.3 : o.vol;
+      src.connect(filter); filter.connect(g); g.connect(master);
+      src.start(c.currentTime + (o.delay || 0));
+    }
+    function arp(notes, step, o) {
+      for (var i = 0; i < notes.length; i++) {
+        tone(notes[i], step * 1.4, Object.assign({}, o, { delay: i * step }));
+      }
+    }
+    function setMuted(m) {
+      muted = !!m;
+      store('muted', muted);
+      if (master) master.gain.value = muted ? 0 : 0.32;
+    }
+    return {
+      unlock: unlock, tone: tone, noise: noise, arp: arp,
+      // Shared graph access for the music engine: it plays through the same
+      // master gain, so the mute button silences music and effects alike.
+      context: function () { return ensure(); },
+      bus: function () { ensure(); return master; },
+      isMuted: function () { return muted; }, setMuted: setMuted
+    };
+  })();
+
+  /* -------------------------------------------------------------- fx */
+  function createFx() {
+    var parts = [];
+    var texts = [];
+    return {
+      burst: function (x, y, color, n, speed, life) {
+        n = n || 14; speed = speed || 120; life = life || 0.6;
+        for (var i = 0; i < n; i++) {
+          var a = Math.random() * Math.PI * 2;
+          var s = speed * (0.35 + Math.random() * 0.65);
+          parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+            life: life * (0.6 + Math.random() * 0.4), max: life, color: color,
+            size: 1.5 + Math.random() * 2.5 });
+        }
+        if (parts.length > 900) parts.splice(0, parts.length - 900);
+      },
+      trail: function (x, y, color, vx, vy) {
+        parts.push({ x: x, y: y, vx: vx || 0, vy: vy || 0, life: 0.35, max: 0.35, color: color, size: 2 });
+      },
+      text: function (x, y, str, color, size) {
+        texts.push({ x: x, y: y, str: str, color: color || '#fff', life: 0.9, size: size || 14 });
+      },
+      update: function (dt) {
+        var i;
+        for (i = parts.length - 1; i >= 0; i--) {
+          var p = parts[i];
+          p.life -= dt;
+          if (p.life <= 0) { parts.splice(i, 1); continue; }
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          p.vx *= 0.96; p.vy *= 0.96;
+        }
+        for (i = texts.length - 1; i >= 0; i--) {
+          texts[i].life -= dt;
+          texts[i].y -= 28 * dt;
+          if (texts[i].life <= 0) texts.splice(i, 1);
+        }
+      },
+      draw: function (ctx) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (var i = 0; i < parts.length; i++) {
+          var p = parts[i];
+          ctx.globalAlpha = Math.max(0, p.life / p.max);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+        }
+        ctx.restore();
+        for (var j = 0; j < texts.length; j++) {
+          var t = texts[j];
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, t.life * 2);
+          glowText(ctx, t.str, t.x, t.y, t.size, t.color);
+          ctx.restore();
+        }
+      },
+      clear: function () { parts.length = 0; texts.length = 0; }
+    };
+  }
+
+  /* ----------------------------------------------------------- input */
+  var KEYMAP = {
+    ArrowUp: 'up', KeyW: 'up',
+    ArrowDown: 'down', KeyS: 'down',
+    ArrowLeft: 'left', KeyA: 'left',
+    ArrowRight: 'right', KeyD: 'right',
+    Space: 'a',
+    KeyZ: 'b', KeyJ: 'b',
+    KeyX: 'c', KeyK: 'c',
+    KeyC: 'd', ShiftLeft: 'd', ShiftRight: 'd',
+    Digit1: 'k1', Digit2: 'k2', Digit3: 'k3', Digit4: 'k4', Digit5: 'k5',
+    Digit6: 'k6', Digit7: 'k7', Digit8: 'k8', Digit9: 'k9',
+    Numpad1: 'k1', Numpad2: 'k2', Numpad3: 'k3', Numpad4: 'k4', Numpad5: 'k5',
+    Numpad6: 'k6', Numpad7: 'k7', Numpad8: 'k8', Numpad9: 'k9',
+    KeyF: 'f',
+    Enter: 'start',
+    Escape: 'pause', KeyP: 'pause'
+  };
+
+  // One input object per play session. \`surface\` receives pointer events
+  // (hold + swipe); on-screen pads call press()/release() directly.
+  function createInput(surface) {
+    var held = {};
+    var hitQ = {};
+    var swipes = [];
+    var pointer = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null, swiped: false, moved: 0 };
+    var listeners = [];
+
+    function press(name) {
+      if (!held[name]) hitQ[name] = true;
+      held[name] = true;
+    }
+    function release(name) { held[name] = false; }
+    function on(target, type, fn, opts) {
+      target.addEventListener(type, fn, opts);
+      listeners.push(function () { target.removeEventListener(type, fn, opts); });
+    }
+
+    function typing(e) {
+      var t = e.target;
+      return !!(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '')));
+    }
+    on(root, 'keydown', function (e) {
+      var name = KEYMAP[e.code];
+      if (!name || typing(e)) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      press(name);
+    });
+    on(root, 'keyup', function (e) {
+      var name = KEYMAP[e.code];
+      if (name && !typing(e)) release(name);
+    });
+    on(root, 'blur', function () { held = {}; pointer.down = false; });
+
+    if (surface) {
+      var SWIPE = 24;
+      on(surface, 'pointerdown', function (e) {
+        // Leave real UI (overlay buttons, name input) alone: capturing the
+        // pointer here would retarget their click to the surface.
+        var t = e.target;
+        if (t && t !== surface && t.closest && t.closest('button, a, input, select, textarea, [data-xa-ui]')) return;
+        audio.unlock();
+        pointer.down = true; pointer.id = e.pointerId; pointer.swiped = false;
+        pointer.sx = pointer.x = e.clientX; pointer.sy = pointer.y = e.clientY; pointer.moved++;
+        pointer.t = performance.now();
+        press('hold');
+        try { surface.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
+      }, { passive: false });
+      on(surface, 'pointermove', function (e) {
+        // Hover (mouse) still updates the position so aiming games can follow it.
+        if (!pointer.down) {
+          if (e.pointerType === 'mouse') { pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved++; }
+          return;
+        }
+        if (e.pointerId !== pointer.id) return;
+        pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved++;
+        var dx = pointer.x - pointer.sx, dy = pointer.y - pointer.sy;
+        if (Math.abs(dx) > SWIPE || Math.abs(dy) > SWIPE) {
+          var dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+          swipes.push(dir);
+          pointer.swiped = true;
+          pointer.sx = pointer.x; pointer.sy = pointer.y;
+        }
+      });
+      var end = function (e) {
+        if (e.pointerId !== pointer.id) return;
+        if (pointer.down && !pointer.swiped && performance.now() - pointer.t < 260) swipes.push('tap');
+        pointer.down = false;
+        release('hold');
+        // Edge event so a press+release inside one frame is never lost.
+        hitQ.release = true;
+      };
+      on(surface, 'pointerup', end);
+      on(surface, 'pointercancel', end);
+    }
+
+    return {
+      // held: is the virtual button down right now?
+      held: function (name) { return !!held[name]; },
+      // hit: was it pressed since the last endFrame()? (edge-triggered)
+      hit: function (name) { return !!hitQ[name]; },
+      takeSwipes: function () { var s = swipes; swipes = []; return s; },
+      pointer: pointer,
+      press: press,
+      release: release,
+      endFrame: function () { hitQ = {}; },
+      reset: function () { held = {}; hitQ = {}; swipes = []; },
+      destroy: function () { listeners.forEach(function (off) { off(); }); listeners = []; }
+    };
+  }
+
+  /* ------------------------------------------------ bitcoin glyph
+     btc(ctx, x, y, r, {coin, fill, ink, glow, alpha}) draws a \u20BF centred on x,y.
+     coin:true (default) draws the orange disc; coin:false draws just the symbol in \`ink\`.
+     Pure drawing: no randomness, no state, safe to call from any render(). */
+  function btc(ctx, x, y, r, o) {
+    o = o || {};
+    var coin = o.coin !== false, ink = o.ink || (coin ? '#ffffff' : '#f7931a');
+    ctx.save();
+    if (o.alpha != null) ctx.globalAlpha *= o.alpha;
+    if (coin) {
+      ctx.shadowColor = o.fill || '#f7931a'; ctx.shadowBlur = o.glow == null ? r * 0.8 : o.glow;
+      ctx.fillStyle = o.fill || '#f7931a'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    } else if (o.glow) { ctx.shadowColor = ink; ctx.shadowBlur = o.glow; }
+    var s = coin ? r * 0.62 : r;
+    ctx.translate(x, y); ctx.rotate(-0.24);
+    ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1, s * 0.2); ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.42, -s * 0.72); ctx.lineTo(-s * 0.42, s * 0.72);
+    ctx.moveTo(-s * 0.55, -s * 0.72); ctx.lineTo(s * 0.12, -s * 0.72);
+    ctx.quadraticCurveTo(s * 0.62, -s * 0.72, s * 0.52, -s * 0.36); ctx.quadraticCurveTo(s * 0.45, -s * 0.02, s * 0.1, 0);
+    ctx.lineTo(-s * 0.42, 0); ctx.moveTo(s * 0.1, 0);
+    ctx.quadraticCurveTo(s * 0.7, 0, s * 0.62, s * 0.38); ctx.quadraticCurveTo(s * 0.55, s * 0.72, s * 0.14, s * 0.72);
+    ctx.lineTo(-s * 0.55, s * 0.72);
+    ctx.moveTo(-s * 0.14, -s * 0.72); ctx.lineTo(-s * 0.14, -s * 0.98); ctx.moveTo(s * 0.12, -s * 0.72); ctx.lineTo(s * 0.12, -s * 0.98);
+    ctx.moveTo(-s * 0.14, s * 0.72); ctx.lineTo(-s * 0.14, s * 0.98); ctx.moveTo(s * 0.12, s * 0.72); ctx.lineTo(s * 0.12, s * 0.98);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* -------------------------------------------------------- registry */
+  var games = [];
+  function registerGame(def) {
+    var required = ['id', 'title', 'create', 'attract', 'size'];
+    for (var i = 0; i < required.length; i++) {
+      if (!def[required[i]]) throw new Error('Game is missing "' + required[i] + '"');
+    }
+    if (!/^[a-z0-9_]{3,32}$/.test(def.id)) throw new Error('Invalid game id ' + def.id);
+    if (games.some(function (g) { return g.id === def.id; })) return;
+    def.mode = def.mode === 'time' ? 'time' : 'score';
+    // Variants share the game-id but post to a different contract mode, so a
+    // variant must use a mode no other entry of this game already uses.
+    var usedModes = [def.mode];
+    def.variants = (Array.isArray(def.variants) ? def.variants : []).filter(function (v) {
+      if (!v || !/^[a-z0-9_]{2,16}$/.test(v.key || '')) return false;
+      v.mode = v.mode === 'time' ? 'time' : 'score';
+      if (usedModes.indexOf(v.mode) >= 0) return false;
+      usedModes.push(v.mode);
+      v.label = String(v.label || v.key).slice(0, 16);
+      return true;
+    });
+    games.push(def);
+    games.sort(function (a, b) { return (a.order || 99) - (b.order || 99); });
+    if (typeof root.dispatchEvent === 'function') {
+      try { root.dispatchEvent(new CustomEvent('xa:game-registered', { detail: def.id })); } catch (e) {}
+    }
+  }
+
+  root.XA = {
+    kitVersion: KIT_VERSION,
+    games: games,
+    registerGame: registerGame,
+    createInput: createInput,
+    createFx: createFx,
+    audio: audio,
+    util: {
+      clamp: clamp, lerp: lerp, rng: rng, newSeed: newSeed, store: store,
+      fmt: fmt, glowText: glowText, roundRect: roundRect, btc: btc
+    }
+  };
+})(typeof window !== 'undefined' ? window : this);
+
+/*@xa-part arcade-music.js*/
+/*
+ * Xtrata Arcade \u2014 music engine (leaf module, loads after arcade-kit)
+ *
+ * One small sequencer + synth that every cartridge can drive its own way.
+ *
+ *   XA.music.play(song, { fade, intensity, keepFilter })  start or crossfade to a song
+ *   XA.music.stop(fade) / pause() / resume()
+ *   XA.music.setIntensity(0..1)         layers fade in/out by \`track.layer\`
+ *   XA.music.setTempo(bpm, rampSecs)    live tempo (ramped)
+ *   XA.music.setKey(midi) / transpose(n) / setScale(name)
+ *   XA.music.setFilter(hz, secs)        master low-pass (underwater, slow-mo\u2026)
+ *   XA.music.setTrack(name, on)         force a track on/off
+ *   XA.music.note(inst, degree, opts)   play a note in key, optionally quantized
+ *   XA.music.stinger(seq, opts)         a quantized phrase (level clear etc.)
+ *   XA.music.tapeStop(secs)             slow-down + pitch-drop, then stop
+ *   XA.music.duck(amount, secs)
+ *   XA.music.pulse() / beatPhase()      0..1 for visuals synced to the beat
+ *   XA.music.onStep(fn)                 callback per scheduled 16th step
+ *
+ * Songs are data: { bpm, key, scale, chords:[degrees per bar], tracks:[\u2026] }.
+ * A track plays a string pattern (one token per step) or a function that
+ * returns notes, so games can generate lines from their own state.
+ *
+ * Pattern tokens: drums  'x' hit, 'X' accent, '.' rest
+ *                 melody scale degrees (\u2026-1 0 1 2\u2026), '.' rest, '-' hold,
+ *                 optional octave marks: '7' is the next octave; '^'/'_' shift \xB11 oct
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before arcade-music');
+  if (XA.music) return;
+
+  var SCALES = {
+    major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10],
+    phrygian: [0, 1, 3, 5, 7, 8, 10], lydian: [0, 2, 4, 6, 7, 9, 11], mixolydian: [0, 2, 4, 5, 7, 9, 10],
+    harmonic: [0, 2, 3, 5, 7, 8, 11], pentatonic: [0, 2, 4, 7, 9], minorPent: [0, 3, 5, 7, 10],
+    whole: [0, 2, 4, 6, 8, 10]
+  };
+  var LOOKAHEAD = 0.14, TICK_MS = 25;
+
+  var ctx = null, out = null, filter = null, musicGain = null, noiseBuf = null;
+  var decks = [];            // playing songs; the last one is "current"
+  var timer = null, paused = false, pauseAt = 0;
+  var detune = 0, detuneTo = 0, detuneFrom = 0, detuneT0 = 0, detuneT1 = 0;
+  var stepListeners = [];
+  var beatTimes = [];
+  var volume = 0.9;
+  var lastIntensity = 0;
+
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+  function now() { return ctx ? ctx.currentTime : 0; }
+
+  function ensure() {
+    if (ctx) return ctx;
+    ctx = XA.audio.context();
+    if (!ctx) return null;
+    out = XA.audio.bus();
+    filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass'; filter.frequency.value = 18000; filter.Q.value = 0.7;
+    musicGain = ctx.createGain();
+    musicGain.gain.value = volume;
+    musicGain.connect(filter); filter.connect(out);
+    var len = ctx.sampleRate;
+    noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return ctx;
+  }
+
+  /* ------------------------------------------------------ instruments
+     Each voice: (dest, t, freq, dur, vel, p) \u2192 schedules nodes on \`dest\`. */
+  function env(g, t, a, peak, dur, rel) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a);
+    g.gain.setValueAtTime(Math.max(0.0002, peak), t + Math.max(a, dur));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(a, dur) + rel);
+    return t + Math.max(a, dur) + rel + 0.02;
+  }
+  function osc(type, f, t, end, dest, det) {
+    var o = ctx.createOscillator();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    o.detune.setValueAtTime((det || 0) + detuneAt(t), t);
+    if (detuneT1 > t) o.detune.linearRampToValueAtTime((det || 0) + detuneTo, detuneT1);
+    o.connect(dest); o.start(t); o.stop(end);
+    return o;
+  }
+  function noiseSrc(t, end, dest) {
+    var s = ctx.createBufferSource();
+    s.buffer = noiseBuf; s.loop = true;
+    s.connect(dest); s.start(t, Math.random() * 0.5); s.stop(end);
+    return s;
+  }
+  function detuneAt(t) {
+    if (t >= detuneT1) return detuneTo;
+    if (t <= detuneT0) return detuneFrom;
+    return detuneFrom + (detuneTo - detuneFrom) * (t - detuneT0) / (detuneT1 - detuneT0);
+  }
+  var INST = {
+    kick: function (dest, t, f, dur, vel) {
+      var g = ctx.createGain(); g.connect(dest);
+      var end = env(g, t, 0.002, 0.9 * vel, 0.02, 0.28);
+      var o = osc('sine', 150, t, end, g);
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+    },
+    snare: function (dest, t, f, dur, vel) {
+      var g = ctx.createGain(); g.connect(dest);
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.8; bp.connect(g);
+      var end = env(g, t, 0.002, 0.55 * vel, 0.02, 0.16);
+      noiseSrc(t, end, bp);
+      var g2 = ctx.createGain(); g2.connect(dest);
+      var e2 = env(g2, t, 0.002, 0.3 * vel, 0.01, 0.08);
+      osc('triangle', 185, t, e2, g2);
+    },
+    clap: function (dest, t, f, dur, vel) {
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 1.2; bp.connect(dest);
+      for (var i = 0; i < 3; i++) {
+        var g = ctx.createGain(); g.connect(bp);
+        var tt = t + i * 0.012;
+        noiseSrc(tt, env(g, tt, 0.001, 0.5 * vel, 0.005, i === 2 ? 0.14 : 0.02), g);
+      }
+    },
+    hat: function (dest, t, f, dur, vel, p) {
+      var g = ctx.createGain(); g.connect(dest);
+      var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7200; hp.connect(g);
+      noiseSrc(t, env(g, t, 0.001, 0.22 * vel, 0.005, p && p.open ? 0.22 : 0.045), hp);
+    },
+    shaker: function (dest, t, f, dur, vel) {
+      var g = ctx.createGain(); g.connect(dest);
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 5200; bp.Q.value = 2; bp.connect(g);
+      noiseSrc(t, env(g, t, 0.015, 0.12 * vel, 0.01, 0.06), bp);
+    },
+    bass: function (dest, t, f, dur, vel, p) {
+      var g = ctx.createGain(); g.connect(dest);
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = (p && p.q) || 6; lp.connect(g);
+      var cut = (p && p.cutoff) || 900;
+      lp.frequency.setValueAtTime(cut * (0.6 + vel), t);
+      lp.frequency.exponentialRampToValueAtTime(Math.max(90, cut * 0.18), t + Math.min(0.3, dur + 0.05));
+      var end = env(g, t, 0.004, 0.5 * vel, dur, 0.08);
+      osc('sawtooth', f, t, end, lp);
+      osc('square', f / 2, t, end, lp, 4);
+    },
+    sub: function (dest, t, f, dur, vel) {
+      var g = ctx.createGain(); g.connect(dest);
+      osc('sine', f, t, env(g, t, 0.01, 0.6 * vel, dur, 0.15), g);
+    },
+    lead: function (dest, t, f, dur, vel, p) {
+      var g = ctx.createGain(); g.connect(dest);
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = (p && p.cutoff) || 3200; lp.connect(g);
+      var end = env(g, t, 0.01, 0.22 * vel, dur, 0.12);
+      var o = osc((p && p.wave) || 'square', f, t, end, lp);
+      osc('sawtooth', f, t, end, lp, 9);
+      var lfo = ctx.createOscillator(), lg = ctx.createGain();
+      lfo.frequency.value = 5.5; lg.gain.value = f * 0.006;
+      lfo.connect(lg); lg.connect(o.frequency); lfo.start(t + 0.12); lfo.stop(end);
+    },
+    pluck: function (dest, t, f, dur, vel, p) {
+      var g = ctx.createGain(); g.connect(dest);
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.connect(g);
+      lp.frequency.setValueAtTime((p && p.cutoff) || 5000, t);
+      lp.frequency.exponentialRampToValueAtTime(400, t + 0.25);
+      var end = env(g, t, 0.002, 0.3 * vel, 0.02, (p && p.decay) || 0.28);
+      osc((p && p.wave) || 'triangle', f, t, end, lp);
+      osc('square', f * 2, t, end, lp, -6);
+    },
+    marimba: function (dest, t, f, dur, vel) {
+      var g = ctx.createGain(); g.connect(dest);
+      var end = env(g, t, 0.002, 0.38 * vel, 0.01, 0.4);
+      osc('sine', f, t, end, g);
+      var g2 = ctx.createGain(); g2.connect(dest);
+      osc('sine', f * 4, t, env(g2, t, 0.001, 0.1 * vel, 0.005, 0.07), g2);
+    },
+    bell: function (dest, t, f, dur, vel) {
+      [[1, 0.28, 1.6], [2.76, 0.1, 0.9], [5.4, 0.05, 0.5]].forEach(function (h) {
+        var g = ctx.createGain(); g.connect(dest);
+        osc('sine', f * h[0], t, env(g, t, 0.002, h[1] * vel, 0.01, h[2]), g);
+      });
+    },
+    pad: function (dest, t, f, dur, vel, p) {
+      var g = ctx.createGain(); g.connect(dest);
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = (p && p.cutoff) || 1100; lp.connect(g);
+      var end = env(g, t, (p && p.attack) || 0.45, 0.12 * vel, dur, (p && p.release) || 0.9);
+      osc('sawtooth', f, t, end, lp, -8);
+      osc('sawtooth', f, t, end, lp, 8);
+      osc('triangle', f / 2, t, end, lp);
+    },
+    arp: function (dest, t, f, dur, vel, p) {
+      var g = ctx.createGain(); g.connect(dest);
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = (p && p.cutoff) || 2600; lp.Q.value = 4; lp.connect(g);
+      osc('square', f, t, env(g, t, 0.002, 0.16 * vel, 0.03, 0.12), lp);
+    },
+    riser: function (dest, t, f, dur, vel) {
+      var g = ctx.createGain(); g.connect(dest);
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 3; bp.connect(g);
+      bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(6000, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25 * vel, t + dur); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
+      noiseSrc(t, t + dur + 0.1, bp);
+    }
+  };
+
+  /* ------------------------------------------------------ pitch helpers */
+  function degToMidi(deg, key, scaleName, oct) {
+    var sc = SCALES[scaleName] || SCALES.minor;
+    var n = sc.length;
+    var o = Math.floor(deg / n);
+    var i = ((deg % n) + n) % n;
+    return key + 12 * (oct || 0) + 12 * o + sc[i];
+  }
+  function parsePattern(str) {
+    return String(str).trim().split(/\\s+/).map(function (tok) {
+      if (tok === '.' || tok === '-') return tok;
+      if (tok === 'x' || tok === 'X') return tok;
+      var octShift = 0;
+      while (tok[0] === '^') { octShift++; tok = tok.slice(1); }
+      while (tok[0] === '_') { octShift--; tok = tok.slice(1); }
+      var n = parseInt(tok, 10);
+      return isNaN(n) ? '.' : { deg: n, oct: octShift };
+    });
+  }
+  // Drum strings may be written without spaces ("x...x...").
+  function tokens(track) {
+    if (track._tokens) return track._tokens;
+    var p = track.pattern;
+    if (typeof p === 'string' && !/\\s/.test(p.trim())) p = p.split('').join(' ');
+    track._tokens = parsePattern(p);
+    return track._tokens;
+  }
+
+  /* ------------------------------------------------------------- decks */
+  function makeDeck(song) {
+    var bus = ctx.createGain();
+    bus.gain.value = 0.0001;
+    bus.connect(musicGain);
+    var d = {
+      song: song, bus: bus, step: 0, nextTime: now() + 0.06,
+      bpm: song.bpm || 120, bpmFrom: song.bpm || 120, bpmTo: song.bpm || 120, rampT0: 0, rampT1: 0,
+      key: song.key != null ? song.key : 57, scale: song.scale || 'minor',
+      intensity: 0, forced: {}, tracks: [], rng: XA.util.rng(song.seed || 7),
+      state: {}, dead: false
+    };
+    song.tracks.forEach(function (tr) {
+      var g = ctx.createGain();
+      g.gain.value = 0.0001;
+      g.connect(bus);
+      d.tracks.push({ def: tr, gain: g, on: false, holdUntil: 0 });
+    });
+    return d;
+  }
+  function deckBpmAt(d, t) {
+    if (t >= d.rampT1) return d.bpmTo;
+    if (t <= d.rampT0) return d.bpmFrom;
+    return d.bpmFrom + (d.bpmTo - d.bpmFrom) * (t - d.rampT0) / (d.rampT1 - d.rampT0);
+  }
+  function refreshTracks(d, t, ramp) {
+    d.tracks.forEach(function (tr) {
+      var def = tr.def;
+      var want = d.forced[def.name] != null ? d.forced[def.name] : d.intensity >= (def.layer || 0) && (def.maxLayer == null || d.intensity < def.maxLayer);
+      if (want === tr.on) return;
+      tr.on = want;
+      var g = tr.gain.gain;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(Math.max(0.0001, g.value), t);
+      g.exponentialRampToValueAtTime(want ? (def.gain == null ? 0.6 : def.gain) : 0.0001, t + (ramp == null ? 0.6 : ramp));
+    });
+  }
+  function chordAt(d, bar) {
+    var ch = d.song.chords;
+    if (!ch || !ch.length) return 0;
+    var per = d.song.barsPerChord || 1;
+    return ch[Math.floor(bar / per) % ch.length];
+  }
+
+  function scheduleStep(d, t) {
+    var song = d.song, spb = song.stepsPerBar || 16;
+    var step = d.step, bar = Math.floor(step / spb), inBar = step % spb;
+    var chord = chordAt(d, bar);
+    var secPerStep = 60 / deckBpmAt(d, t) / 4;
+    var info = { step: step, bar: bar, stepInBar: inBar, beat: Math.floor(inBar / 4), chord: chord, time: t,
+      intensity: d.intensity, rng: d.rng, state: d.state, key: d.key, scale: d.scale, secPerStep: secPerStep };
+    d.tracks.forEach(function (tr) {
+      var def = tr.def;
+      if (!tr.on && !(def.always)) return;
+      var rate = def.rate || 1;
+      if (step % rate) return;
+      var notes = null;
+      if (typeof def.fn === 'function') {
+        notes = def.fn(info);
+      } else if (def.pattern) {
+        var tk = tokens(def);
+        var idx = Math.floor(step / rate) % tk.length;
+        var tok = tk[idx];
+        if (tok === '.' || tok === '-') return;
+        if (tok === 'x' || tok === 'X') notes = { drum: true, vel: tok === 'X' ? 1 : 0.7 };
+        else {
+          // hold length: count following '-'
+          var len = 1;
+          while (tk[(idx + len) % tk.length] === '-' && len < tk.length) len++;
+          notes = { deg: tok.deg, oct: tok.oct, steps: len * rate };
+        }
+      }
+      if (!notes) return;
+      (Array.isArray(notes) ? notes : [notes]).forEach(function (n) {
+        if (n == null) return;
+        if (typeof n === 'number') n = { deg: n };
+        var vel = (n.vel == null ? 0.8 : n.vel) * (def.vel == null ? 1 : def.vel);
+        var dur = (n.steps || def.steps || rate) * secPerStep * (def.legato || 0.9);
+        var voice = INST[n.inst || def.inst];
+        if (!voice) return;
+        var freq = 0;
+        if (!n.drum && n.deg != null) {
+          var deg = n.deg + (def.chord ? chord : 0);
+          freq = mtof(degToMidi(deg, d.key, d.scale, (def.octave || 0) + (n.oct || 0)));
+        }
+        var swing = song.swing && inBar % 2 ? song.swing * secPerStep : 0;
+        try { voice(tr.gain, t + swing, freq, dur, vel, def.params); } catch (e) { /* never break the loop */ }
+      });
+    });
+    if (inBar % 4 === 0 && d === current()) { beatTimes.push(t); if (beatTimes.length > 8) beatTimes.shift(); }
+    if (d === current()) stepListeners.forEach(function (fn) { try { fn(info); } catch (e) {} });
+    d.nextTime += secPerStep;
+    d.step++;
+  }
+
+  function current() { for (var i = decks.length - 1; i >= 0; i--) if (!decks[i].dead) return decks[i]; return null; }
+
+  function tick() {
+    if (!ctx || paused) return;
+    var horizon = ctx.currentTime + LOOKAHEAD;
+    decks.forEach(function (d) {
+      if (d.nextTime < ctx.currentTime - 0.2) d.nextTime = ctx.currentTime + 0.02; // tab was asleep
+      while (d.nextTime < horizon) scheduleStep(d, d.nextTime);
+    });
+    decks = decks.filter(function (d) { return !(d.dead && d.deadAt < ctx.currentTime); });
+    if (!decks.length) { clearInterval(timer); timer = null; }
+  }
+  function startTimer() { if (!timer) timer = setInterval(tick, TICK_MS); }
+
+  function fadeDeck(d, secs) {
+    var t = now();
+    d.dead = true;
+    d.deadAt = t + secs + 0.1;
+    d.bus.gain.cancelScheduledValues(t);
+    d.bus.gain.setValueAtTime(Math.max(0.0001, d.bus.gain.value), t);
+    d.bus.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.02, secs));
+  }
+
+  /* --------------------------------------------------------- public API */
+  var api = {
+    SCALES: SCALES,
+    instruments: INST,
+    // Spatial decks for the 3D hall: the same sequencer and instruments, but each deck
+    // plays into its own node (a cabinet's speaker) and is not part of play()/stop().
+    ensure: function () { return !!ensure(); },
+    makeRoomDeck: function (song, dest) {
+      if (!ensure()) return null;
+      var d = makeDeck(song);
+      d.bus.disconnect(); d.bus.connect(dest); d.bus.gain.value = 1;
+      d.intensity = 1; d.room = true; d.nextTime = now() + 0.05;
+      refreshTracks(d, now(), 0.05);
+      return d;
+    },
+    runRoomDeck: function (d, horizon) {
+      if (!ctx || !d) return;
+      if (d.nextTime < ctx.currentTime - 0.2) d.nextTime = ctx.currentTime + 0.02;
+      var n = 0; while (d.nextTime < horizon && n++ < 64) scheduleStep(d, d.nextTime);
+    },
+    killRoomDeck: function (d) { try { d.bus.disconnect(); } catch (e) {} },
+    play: function (song, opts) {
+      if (!ensure()) return;
+      opts = opts || {};
+      var fade = opts.fade == null ? 0.8 : opts.fade;
+      var t = now();
+      var prev = current();
+      if (prev) fadeDeck(prev, fade);
+      detune = detuneTo = detuneFrom = 0; detuneT0 = detuneT1 = 0;
+      if (!opts.keepFilter) {
+        filter.frequency.cancelScheduledValues(t);
+        filter.frequency.setValueAtTime(opts.filter || song.filter || 18000, t);
+      }
+      var d = makeDeck(song);
+      d.intensity = lastIntensity = opts.intensity == null ? 0 : opts.intensity;
+      if (prev && opts.keepStep) { d.step = prev.step; d.nextTime = prev.nextTime; }
+      decks.push(d);
+      refreshTracks(d, t, 0.05);
+      d.bus.gain.setValueAtTime(0.0001, t);
+      d.bus.gain.exponentialRampToValueAtTime(song.gain || 0.8, t + Math.max(0.05, fade));
+      paused = false;
+      musicGain.gain.cancelScheduledValues(t);
+      musicGain.gain.setValueAtTime(volume, t);
+      startTimer();
+      return d;
+    },
+    stop: function (fade) {
+      if (!ctx) return;
+      decks.forEach(function (d) { if (!d.dead) fadeDeck(d, fade == null ? 0.5 : fade); });
+    },
+    isPlaying: function () { return !!current(); },
+    pause: function () {
+      if (!ctx || paused || !current()) return;
+      paused = true; pauseAt = ctx.currentTime;
+      musicGain.gain.cancelScheduledValues(pauseAt);
+      musicGain.gain.setValueAtTime(musicGain.gain.value, pauseAt);
+      musicGain.gain.linearRampToValueAtTime(0.0001, pauseAt + 0.15);
+    },
+    resume: function () {
+      if (!ctx || !paused) return;
+      paused = false;
+      var t = ctx.currentTime;
+      decks.forEach(function (d) { d.nextTime = t + 0.05; });
+      musicGain.gain.cancelScheduledValues(t);
+      musicGain.gain.setValueAtTime(0.0001, t);
+      musicGain.gain.linearRampToValueAtTime(volume, t + 0.3);
+      startTimer();
+    },
+    setIntensity: function (v) {
+      lastIntensity = Math.max(0, Math.min(1, v));
+      var d = current();
+      if (!d || !ctx) return;
+      if (Math.abs(d.intensity - lastIntensity) < 1e-3) return;
+      d.intensity = lastIntensity;
+      refreshTracks(d, now());
+    },
+    intensity: function () { return lastIntensity; },
+    setTrack: function (name, on) {
+      var d = current();
+      if (!d) return;
+      if (on == null) delete d.forced[name]; else d.forced[name] = !!on;
+      d.tracks.forEach(function (tr) { if (tr.def.name === name) tr.on = null; }); // force a re-evaluation
+      refreshTracks(d, now(), 0.25);
+    },
+    setTempo: function (bpm, ramp) {
+      var d = current();
+      if (!d || !ctx) return;
+      var t = now();
+      d.bpmFrom = deckBpmAt(d, t);
+      d.bpmTo = Math.max(20, Math.min(320, bpm));
+      d.rampT0 = t; d.rampT1 = t + (ramp || 0.001);
+    },
+    tempo: function () { var d = current(); return d ? deckBpmAt(d, now()) : 0; },
+    setKey: function (midi) { var d = current(); if (d) d.key = midi; },
+    transpose: function (semis) { var d = current(); if (d) d.key += semis; },
+    setScale: function (name) { var d = current(); if (d && SCALES[name]) d.scale = name; },
+    setFilter: function (hz, secs) {
+      if (!ensure()) return;
+      var t = now();
+      filter.frequency.cancelScheduledValues(t);
+      filter.frequency.setValueAtTime(Math.max(60, filter.frequency.value), t);
+      filter.frequency.exponentialRampToValueAtTime(Math.max(60, Math.min(20000, hz)), t + (secs || 0.3));
+    },
+    duck: function (amount, secs) {
+      if (!ensure()) return;
+      var t = now(), lo = Math.max(0.0001, volume * (1 - amount));
+      musicGain.gain.cancelScheduledValues(t);
+      musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
+      musicGain.gain.exponentialRampToValueAtTime(lo, t + 0.04);
+      musicGain.gain.exponentialRampToValueAtTime(volume, t + (secs || 0.5));
+    },
+    // Pitch/tempo slump like a tape machine losing power, then silence.
+    tapeStop: function (secs) {
+      var d = current();
+      if (!d || !ctx) return;
+      secs = secs || 1.2;
+      var t = now();
+      api.setTempo(d.bpm * 0.25, secs);
+      detuneFrom = detuneAt(t); detuneTo = -1500; detuneT0 = t; detuneT1 = t + secs;
+      api.setFilter(300, secs);
+      fadeDeck(d, secs * 1.1);
+    },
+    // Quantization helper: next step/beat/bar boundary on the audio clock.
+    nextGrid: function (q) {
+      var d = current();
+      if (!ctx) return 0;
+      if (!d || !q) return ctx.currentTime + 0.01;
+      var spb = d.song.stepsPerBar || 16;
+      var n = q === 'bar' ? spb : q === 'beat' ? 4 : q === '8' ? 2 : 1;
+      var sps = 60 / deckBpmAt(d, d.nextTime) / 4;
+      var ahead = (n - (d.step % n)) % n;
+      var t = d.nextTime + ahead * sps;
+      while (t < ctx.currentTime + 0.005) t += n * sps;
+      return t;
+    },
+    // Play one note in the current key/scale (chord-relative when opts.chord).
+    note: function (inst, deg, opts) {
+      if (!ensure()) return;
+      opts = opts || {};
+      var d = current();
+      var key = d ? d.key : 57, scale = d ? d.scale : 'minor';
+      var chord = opts.chord && d ? chordAt(d, Math.floor(d.step / (d.song.stepsPerBar || 16))) : 0;
+      var t = opts.at || api.nextGrid(opts.quantize);
+      var voice = INST[inst];
+      if (!voice) return;
+      var freq = mtof(degToMidi(deg + chord, key, scale, opts.octave || 0));
+      var g = ctx.createGain();
+      g.gain.value = opts.gain == null ? 0.7 : opts.gain;
+      g.connect(musicGain);
+      voice(g, t, freq, opts.dur || 0.15, opts.vel == null ? 0.9 : opts.vel, opts.params);
+      return t;
+    },
+    // A short phrase: [{ deg, at: stepOffset, steps, inst }] quantized as a unit.
+    stinger: function (seq, opts) {
+      if (!ensure()) return;
+      opts = opts || {};
+      var d = current();
+      var t0 = api.nextGrid(opts.quantize || 'beat');
+      var sps = d ? 60 / deckBpmAt(d, t0) / 4 : 0.12;
+      seq.forEach(function (n) {
+        api.note(n.inst || opts.inst || 'lead', n.deg, { at: t0 + (n.at || 0) * sps, dur: (n.steps || 1) * sps * 0.9,
+          octave: n.oct || opts.octave || 0, vel: n.vel, gain: opts.gain, params: opts.params });
+      });
+    },
+    onStep: function (fn) { stepListeners.push(fn); return function () { stepListeners = stepListeners.filter(function (f) { return f !== fn; }); }; },
+    clearListeners: function () { stepListeners = []; },
+    // 1 on the beat, decaying towards 0 before the next one (for visuals).
+    pulse: function (sharpness) {
+      if (!ctx || !beatTimes.length) return 0;
+      var t = ctx.currentTime, last = null;
+      for (var i = beatTimes.length - 1; i >= 0; i--) if (beatTimes[i] <= t) { last = beatTimes[i]; break; }
+      if (last == null) return 0;
+      return Math.exp(-(t - last) * (sharpness || 7));
+    },
+    beatPhase: function () {
+      var d = current();
+      if (!ctx || !d || !beatTimes.length) return 0;
+      var spb = 60 / deckBpmAt(d, ctx.currentTime);
+      var last = beatTimes.filter(function (b) { return b <= ctx.currentTime; }).pop();
+      return last == null ? 0 : Math.min(1, (ctx.currentTime - last) / spb);
+    },
+    degToMidi: degToMidi,
+    mtof: mtof
+  };
+  XA.music = api;
+})(window);
+
+/*@xa-part score-client.js*/
+/*
+ * Xtrata Arcade \u2014 score client (leaf module)
+ *
+ * The only module that talks to the network or a wallet. Shared by every
+ * cartridge in the room; each game is just a different \`game-id\` on the same
+ * contract (xtrata-arcade-scores-v2 by default).
+ *
+ * Reads:   Hiro \`call-read\` \u2192 get-top10 / get-board / get-replay, decoded here.
+ * Writes:  submit-score(board, period, score, name, replay), signed in this priority order:
+ *   1. Host bridge, generic         \`stx_callContract\`          (runtime page)
+ *   2. Direct wallet provider       (only when the page is top-level)
+ *   3. Nothing can sign here        \u2192 hand the player the secure-runtime link
+ *
+ * Every write is Deny-mode with a single STX post-condition capped at the
+ * contract's current fee, so a signature can never move more than the fee.
+ *
+ * A read that FAILED is reported as { ok:false } \u2014 never as an empty board.
+ */
+(function (root) {
+  'use strict';
+  if (root.XAScores) return;
+
+  var CFG = {
+    network: 'mainnet',
+    contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    contractName: 'xtrata-arcade-scores-v2',
+    readSender: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    apiBases: null,               // default: same-origin /hiro proxy (if any) then Hiro
+    runtimeOrigin: 'https://xtrata.xyz',
+    contentContractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3',
+    parentTokenId: 0,
+    boardTtlMs: 45000,
+    bridgeTimeoutMs: 170000,
+    appName: 'xtrata-arcade',
+    inlineMax: 60000,             // replays larger than this are stored as their own inscription
+    // The network (miner) fee players are told to set on a score post. Wallets estimate their own and have
+    // suggested 0.5 STX. One number, here only: the warning copy and the fee we pass (when a wallet takes it) read it.
+    networkFeeHintUstx: 3000,     // 0.003 STX
+    networkFeePerByteUstx: 0      // raise (e.g. 1) only if measured: tx larger than hint/perByte bytes then scale up
+  };
+
+  var HEX = '0123456789abcdef';
+  var C32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+  function err(message, code) {
+    var e = new Error(message);
+    if (code !== undefined) e.code = code;
+    return e;
+  }
+  function log() {
+    try {
+      var args = Array.prototype.slice.call(arguments);
+      args.unshift('[xa:scores]');
+      console.log.apply(console, args);
+    } catch (e) {}
+  }
+
+  /* ---------------------------------------------------------- bytes */
+  function hexToBytes(hex) {
+    var clean = String(hex || '').replace(/^0x/i, '');
+    if (clean.length % 2) throw err('Invalid hex length');
+    var out = new Uint8Array(clean.length / 2);
+    for (var i = 0; i < out.length; i++) out[i] = parseInt(clean.substr(i * 2, 2), 16);
+    return out;
+  }
+  function bytesToHex(bytes) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) s += HEX[bytes[i] >> 4] + HEX[bytes[i] & 15];
+    return s;
+  }
+  function asciiBytes(str) {
+    var out = new Uint8Array(str.length);
+    for (var i = 0; i < str.length; i++) out[i] = str.charCodeAt(i) & 0x7f;
+    return out;
+  }
+
+  /* --------------------------------------------------------- sha256 */
+  var K = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ]);
+  function sha256(msg) {
+    var h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+    var l = msg.length;
+    var padLen = ((l + 9 + 63) >> 6) << 6;
+    var buf = new Uint8Array(padLen);
+    buf.set(msg); buf[l] = 0x80;
+    var bits = l * 8;
+    buf[padLen - 4] = (bits >>> 24) & 255; buf[padLen - 3] = (bits >>> 16) & 255;
+    buf[padLen - 2] = (bits >>> 8) & 255; buf[padLen - 1] = bits & 255;
+    var w = new Uint32Array(64);
+    for (var off = 0; off < padLen; off += 64) {
+      for (var i = 0; i < 16; i++) {
+        w[i] = (buf[off + i * 4] << 24) | (buf[off + i * 4 + 1] << 16) | (buf[off + i * 4 + 2] << 8) | buf[off + i * 4 + 3];
+      }
+      for (i = 16; i < 64; i++) {
+        var a0 = w[i - 15], a1 = w[i - 2];
+        var s0 = ((a0 >>> 7) | (a0 << 25)) ^ ((a0 >>> 18) | (a0 << 14)) ^ (a0 >>> 3);
+        var s1 = ((a1 >>> 17) | (a1 << 15)) ^ ((a1 >>> 19) | (a1 << 13)) ^ (a1 >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      var a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+      for (i = 0; i < 64; i++) {
+        var S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+        var ch = (e & f) ^ (~e & g);
+        var t1 = (hh + S1 + ch + K[i] + w[i]) | 0;
+        var S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+        var mj = (a & b) ^ (a & c) ^ (b & c);
+        var t2 = (S0 + mj) | 0;
+        hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+    }
+    var out = new Uint8Array(32);
+    for (i = 0; i < 8; i++) {
+      out[i * 4] = h[i] >>> 24; out[i * 4 + 1] = (h[i] >>> 16) & 255;
+      out[i * 4 + 2] = (h[i] >>> 8) & 255; out[i * 4 + 3] = h[i] & 255;
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------ c32 */
+  function c32encode(bytes) {
+    var lead = 0;
+    while (lead < bytes.length && bytes[lead] === 0) lead++;
+    var n = BigInt('0x' + (bytesToHex(bytes) || '0'));
+    var s = '';
+    while (n > 0n) { s = C32[Number(n % 32n)] + s; n = n / 32n; }
+    for (var i = 0; i < lead; i++) s = '0' + s;
+    return s;
+  }
+  function c32address(version, hash160) {
+    var payload = new Uint8Array(21);
+    payload[0] = version; payload.set(hash160, 1);
+    var check = sha256(sha256(payload)).slice(0, 4);
+    var data = new Uint8Array(24);
+    data.set(hash160); data.set(check, 20);
+    return 'S' + C32[version] + c32encode(data);
+  }
+  function c32decodeAddress(address) {
+    var a = String(address || '').trim().toUpperCase();
+    if (!/^S[0-9A-Z]{20,41}$/.test(a)) throw err('Invalid Stacks address');
+    var version = C32.indexOf(a[1]);
+    var body = a.slice(2);
+    var n = 0n;
+    for (var i = 0; i < body.length; i++) {
+      var v = C32.indexOf(body[i]);
+      if (v < 0) throw err('Invalid Stacks address');
+      n = n * 32n + BigInt(v);
+    }
+    var bytes = hexToBytes(n.toString(16).padStart(48, '0'));
+    var hash160 = bytes.slice(0, 20);
+    if (c32address(version, hash160) !== a) throw err('Stacks address checksum mismatch');
+    return { version: version, hash160: hash160 };
+  }
+  function isMainnetAddress(a) {
+    try { c32decodeAddress(a); } catch (e) { return false; }
+    return /^S[PM]/.test(String(a).toUpperCase());
+  }
+
+  /* ---------------------------------------------------- Clarity codec */
+  function cvUint(value) {
+    var n = BigInt(value);
+    if (n < 0n) throw err('uint cannot be negative');
+    return '0x01' + n.toString(16).padStart(32, '0');
+  }
+  function cvBuff(bytes) {
+    return '0x02' + bytes.length.toString(16).padStart(8, '0') + bytesToHex(bytes);
+  }
+  function cvPrincipal(address) {
+    var d = c32decodeAddress(address);
+    return '0x05' + d.version.toString(16).padStart(2, '0') + bytesToHex(d.hash160);
+  }
+  function cvAscii(str) {
+    var s = String(str);
+    if (!/^[\\x20-\\x7e]*$/.test(s)) throw err('string-ascii must be printable ASCII');
+    return '0x0d' + s.length.toString(16).padStart(8, '0') + bytesToHex(asciiBytes(s));
+  }
+  // Minimal deserializer: enough for the leaderboard contract's return types.
+  function decodeCV(hex) {
+    var b = hexToBytes(hex);
+    var p = 0;
+    function u32() { var v = ((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]) >>> 0; p += 4; return v; }
+    function big(nbytes, signed) {
+      var v = BigInt('0x' + bytesToHex(b.slice(p, p + nbytes)));
+      if (signed && b[p] & 0x80) v -= (1n << BigInt(nbytes * 8));
+      p += nbytes;
+      return v;
+    }
+    function read() {
+      var t = b[p++];
+      switch (t) {
+        case 0x00: return { type: 'int', value: big(16, true) };
+        case 0x01: return { type: 'uint', value: big(16, false) };
+        case 0x02: { var n = u32(); var v = b.slice(p, p + n); p += n; return { type: 'buffer', value: v }; }
+        case 0x03: return { type: 'bool', value: true };
+        case 0x04: return { type: 'bool', value: false };
+        case 0x05: { var ver = b[p++]; var h = b.slice(p, p + 20); p += 20;
+          return { type: 'principal', value: c32address(ver, h) }; }
+        case 0x06: { var ver2 = b[p++]; var h2 = b.slice(p, p + 20); p += 20;
+          var ln = b[p++]; var name = String.fromCharCode.apply(null, b.slice(p, p + ln)); p += ln;
+          return { type: 'principal', value: c32address(ver2, h2) + '.' + name }; }
+        case 0x07: return { type: 'ok', value: read() };
+        case 0x08: return { type: 'err', value: read() };
+        case 0x09: return { type: 'none', value: null };
+        case 0x0a: return { type: 'some', value: read() };
+        case 0x0b: { var len = u32(); var arr = []; for (var i = 0; i < len; i++) arr.push(read()); return { type: 'list', value: arr }; }
+        case 0x0c: { var cnt = u32(); var obj = {};
+          for (var j = 0; j < cnt; j++) {
+            var kl = b[p++]; var key = String.fromCharCode.apply(null, b.slice(p, p + kl)); p += kl;
+            obj[key] = read();
+          }
+          return { type: 'tuple', value: obj }; }
+        case 0x0d: { var sl = u32(); var s = String.fromCharCode.apply(null, b.slice(p, p + sl)); p += sl; return { type: 'ascii', value: s }; }
+        case 0x0e: { var ul = u32(); var ub = b.slice(p, p + ul); p += ul;
+          return { type: 'utf8', value: new TextDecoder().decode(ub) }; }
+        default: throw err('Unsupported Clarity type 0x' + t.toString(16));
+      }
+    }
+    return read();
+  }
+
+  /* STX post-condition, wire format (for direct wallet routes).
+     type 0x00 STX | principal 0x02 standard(version,hash160) | code | u64 amount
+     BARE hex, no 0x: Leather parses post-condition strings with a strict
+     decoder (@noble/hashes hexToBytes) that rejects "0x" and reports it as
+     "Not a serialized post condition". Xverse accepts bare hex too. */
+  var CONDITION_LTE = 0x05;
+  function stxPostConditionHex(address, amount) {
+    var d = c32decodeAddress(address);
+    var amt = BigInt(amount).toString(16).padStart(16, '0');
+    return '00' + '02' + d.version.toString(16).padStart(2, '0') + bytesToHex(d.hash160) +
+      CONDITION_LTE.toString(16).padStart(2, '0') + amt;
+  }
+
+  /* ---------------------------------------------------------- reads */
+  function hasRealOrigin() {
+    try { return /^https?:$/.test(root.location.protocol) && root.location.origin !== 'null'; }
+    catch (e) { return false; }
+  }
+  function apiBases() {
+    if (Array.isArray(CFG.apiBases) && CFG.apiBases.length) return CFG.apiBases.slice();
+    var out = [];
+    if (hasRealOrigin() && /xtrata\\.xyz$/.test(root.location.hostname)) {
+      out.push(root.location.origin + '/hiro/' + CFG.network);
+    }
+    out.push(CFG.network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so');
+    return out;
+  }
+  async function callRead(fn, args, contractId) {
+    var bases = apiBases();
+    var last = null;
+    var target = contractId ? String(contractId).split('.') : [CFG.contractAddress, CFG.contractName];
+    for (var i = 0; i < bases.length; i++) {
+      var url = bases[i].replace(/\\/+$/, '') + '/v2/contracts/call-read/' +
+        target[0] + '/' + target[1] + '/' + fn;
+      try {
+        var res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sender: CFG.readSender, arguments: args || [] })
+        });
+        if (!res.ok) throw err('HTTP ' + res.status);
+        var body = await res.json();
+        if (!body || body.okay !== true || typeof body.result !== 'string') {
+          throw err(body && body.cause ? String(body.cause) : 'read-only call failed');
+        }
+        return decodeCV(body.result);
+      } catch (e) { last = e; }
+    }
+    throw last || err('read-only call failed');
+  }
+
+  // Network fee (micro-STX) to recommend for a transaction of about \`txBytes\` bytes.
+  function networkFeeHint(txBytes) {
+    var f = CFG.networkFeeHintUstx, per = CFG.networkFeePerByteUstx;
+    return per > 0 && txBytes > 0 ? Math.max(f, Math.ceil(txBytes * per)) : f;
+  }
+
+  var boardCache = {};
+  function some(cv) { return cv && cv.type === 'some' ? cv.value : null; }
+  // \u2192 { ok:true, entries:[{rank,name,player,score,burn,engineId,replayHash}], at } | { ok:false, error }
+  // \`board\` is the contract board id (XA.replay.boardFor). \`mode\` is only used for the "qualifies" check.
+  async function getTop10(board, mode, force) {
+    var hit = boardCache[board];
+    if (!force && hit && hit.ok && Date.now() - hit.at < CFG.boardTtlMs) return hit;
+    try {
+      var cv = await callRead('get-top10', [cvAscii(board), cvUint(0)]);
+      if (cv.type === 'ok') cv = cv.value;
+      if (cv.type !== 'list') throw err('unexpected get-top10 shape');
+      var entries = [];
+      cv.value.forEach(function (slot, idx) {
+        var some_ = some(slot);
+        if (!some_) return;
+        var t = some_.value;
+        entries.push({
+          rank: idx + 1,
+          name: t.name.value,
+          player: t.player.value,
+          score: Number(t.score.value),
+          burn: Number(t['burn-height'].value),
+          engineId: Number(t['engine-id'].value),
+          replayHash: bytesToHex(t['replay-hash'].value)
+        });
+      });
+      var out = { ok: true, entries: entries, at: Date.now() };
+      boardCache[board] = out;
+      return out;
+    } catch (e) {
+      log('board read failed', board, e && e.message);
+      // Keep serving a stale good board, but flag it.
+      if (hit && hit.ok) return Object.assign({}, hit, { stale: true });
+      return { ok: false, error: e && e.message ? e.message : String(e) };
+    }
+  }
+  // 'yes' | 'no' | 'unknown' \u2014 unknown when the board could not be read.
+  function qualifies(board, score, mode) {
+    if (!board || !board.ok) return 'unknown';
+    if (!(score > 0)) return 'no';
+    if (board.entries.length < 10) return 'yes';
+    var last = board.entries[board.entries.length - 1].score;
+    return (mode === 'time' ? score < last : score > last) ? 'yes' : 'no';
+  }
+  var infoCache = {};
+  // \u2192 { ok:true, registered:false } | { ok:true, registered:true, fee, enabled, maxScore, engineId } | { ok:false, error }
+  async function getBoardInfo(board) {
+    var hit = infoCache[board];
+    if (hit && Date.now() - hit.at < 60000) return hit;
+    try {
+      var cv = await callRead('get-board', [cvAscii(board)]);
+      var s = some(cv);
+      var out = { ok: true, at: Date.now(), registered: !!s };
+      if (s) {
+        var t = s.value;
+        out.fee = BigInt(t.fee.value).toString();
+        out.enabled = t.enabled.value === true;
+        out.maxScore = Number(t['max-score'].value);
+        out.engineId = Number(t['engine-id'].value);
+      }
+      infoCache[board] = out;
+      return out;
+    } catch (e) {
+      return { ok: false, error: e && e.message ? e.message : String(e) };
+    }
+  }
+  // The submission fee for a board, as { ok, value } (micro-STX), plus whether the board is open.
+  async function getFee(board) {
+    var info = await getBoardInfo(board);
+    if (!info.ok) return info;
+    if (!info.registered) return { ok: true, value: '0', registered: false, enabled: false };
+    return { ok: true, value: info.fee, registered: true, enabled: info.enabled };
+  }
+  // The stored replay bytes for a player's entry on a board (period 0), or null.
+  async function getReplay(board, address) {
+    var cv = await callRead('get-replay', [cvAscii(board), cvUint(0), cvPrincipal(address)]);
+    var s = some(cv);
+    return s ? s.value : null;
+  }
+
+  /* ------------------------------------------- long replays as Xtrata inscriptions
+     A replay larger than INLINE_MAX does not fit in a score entry. It is inscribed on the Xtrata core in one
+     transaction (mint-single-tx, up to 32 chunks = 512 KB; the player pays the core fee and the network fee),
+     and the score entry stores a small pointer to it (XA.replay.makePointer). */
+  var INLINE_MAX = 60000, CHUNK = 16384, MAX_INSCRIBE_CHUNKS = 32;
+  var REPLAY_MIME = 'application/octet-stream';
+  var TOKEN_URI = 'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
+  function cvList(items) {
+    return '0x0b' + items.length.toString(16).padStart(8, '0') + items.map(function (x) { return String(x).replace(/^0x/i, ''); }).join('');
+  }
+  function chunksOf(bytes) {
+    var out = [];
+    for (var i = 0; i < bytes.length; i += CHUNK) out.push(bytes.subarray(i, Math.min(bytes.length, i + CHUNK)));
+    return out;
+  }
+  function chainHash(bytes) {
+    var h = new Uint8Array(32);
+    chunksOf(bytes).forEach(function (c) { var m = new Uint8Array(32 + c.length); m.set(h, 0); m.set(c, 32); h = sha256(m); });
+    return h;
+  }
+  function needsInscription(bytes) { return bytes.length > (Number(CFG.inlineMax) || INLINE_MAX); }
+  // What storing a long replay costs: { ok, chunks, fee (micro-STX string), tooBig } \u2014 fee excludes the network fee.
+  async function quoteReplay(size) {
+    var n = Math.ceil(size / CHUNK);
+    if (n > MAX_INSCRIBE_CHUNKS) return { ok: true, chunks: n, tooBig: true, fee: '0' };
+    try {
+      var cv = await callRead('quote-single-tx-fee', [cvUint(size), cvUint(n)], CFG.contentContractId);
+      var t = cv && cv.type === 'ok' ? cv.value : cv;
+      return { ok: true, chunks: n, tooBig: false, fee: String(t.value['total-fee'].value) };
+    } catch (e) { return { ok: false, chunks: n, tooBig: false, error: (e && e.message) || String(e) }; }
+  }
+  async function inscriptionIdByHash(hash) {
+    var cv = await callRead('get-id-by-hash', [cvBuff(hash)], CFG.contentContractId);
+    var v = cv && cv.type === 'ok' ? cv.value : cv;
+    v = some(v);
+    return v ? Number(v.value) : null;
+  }
+  async function inscriptionMeta(id) {
+    var cv = await callRead('get-inscription-meta', [cvUint(id)], CFG.contentContractId);
+    var v = cv && cv.type === 'ok' ? cv.value : cv;
+    v = some(v);
+    if (!v) return null;
+    var t = v.value;
+    return { chunks: Number(t['total-chunks'].value), size: Number(t['total-size'].value), sealed: !!(t.sealed && t.sealed.value),
+      creator: t.creator ? t.creator.value : '', hash: t['final-hash'] ? bytesToHex(t['final-hash'].value) : '' };
+  }
+  // Bytes of inscription \`id\`, checked against the expected chain hash: the xtrata.xyz gateway first, the chain as fallback.
+  var inscriptionCache = {};
+  async function getInscription(id, hash) {
+    var want = bytesToHex(hash);
+    var key = id + ':' + want;
+    if (inscriptionCache[key]) return inscriptionCache[key];
+    var p = (async function () {
+      try {
+        var res = await fetch(CFG.runtimeOrigin.replace(/\\/+$/, '') + '/i/' + id + '?raw=1', { cache: 'force-cache' });
+        if (res.ok) {
+          var b = new Uint8Array(await res.arrayBuffer());
+          if (bytesToHex(chainHash(b)) === want) return b;
+        }
+      } catch (e) { /* gateway unreachable: read the chain */ }
+      var meta = await inscriptionMeta(id);
+      if (!meta || !meta.sealed) throw err('Replay inscription #' + id + ' is not on chain yet.');
+      var parts = [], got = 0;
+      for (var i = 0; i < meta.chunks; i += 8) {
+        var idx = [];
+        for (var k = i; k < Math.min(meta.chunks, i + 8); k++) idx.push(cvUint(k));
+        var cv = await callRead('get-chunk-batch', [cvUint(id), cvList(idx)], CFG.contentContractId);
+        var list = (cv && cv.type === 'ok' ? cv.value : cv).value;
+        list.forEach(function (it) { var v = it.type === 'some' ? it.value : it; parts.push(v.value); got += v.value.length; });
+      }
+      var out = new Uint8Array(got), o = 0;
+      parts.forEach(function (c) { out.set(c, o); o += c.length; });
+      if (bytesToHex(chainHash(out)) !== want) throw err('Replay inscription #' + id + ' does not match its hash.');
+      return out;
+    })();
+    inscriptionCache[key] = p;
+    p.catch(function () { delete inscriptionCache[key]; });
+    return p;
+  }
+  // Waits until a broadcast transaction is confirmed; throws if it failed.
+  async function waitTx(txid, onTick) {
+    var id = /^0x/.test(txid) ? txid : '0x' + txid;
+    var started = Date.now();
+    while (Date.now() - started < 20 * 60000) {
+      var bases = apiBases();
+      for (var i = 0; i < bases.length; i++) {
+        try {
+          var res = await fetch(bases[i].replace(/\\/+$/, '') + '/extended/v1/tx/' + id, { cache: 'no-store' });
+          if (res.status === 404) break;
+          if (!res.ok) continue;
+          var tx = await res.json();
+          if (tx.tx_status === 'success') return tx;
+          if (/^abort|^dropped/.test(String(tx.tx_status))) {
+            throw err('The transaction failed on chain (' + tx.tx_status + (tx.tx_result && tx.tx_result.repr ? ': ' + tx.tx_result.repr : '') + ').');
+          }
+          break;
+        } catch (e) { if (e && /failed on chain/.test(e.message)) throw e; }
+      }
+      if (onTick) try { onTick(Math.round((Date.now() - started) / 1000)); } catch (e) {}
+      await new Promise(function (res) { setTimeout(res, 4000); });
+    }
+    throw err('Still waiting for transaction ' + id.slice(0, 12) + '\u2026 Check your wallet history, then post again: nothing is paid twice.');
+  }
+  function base64url(bytes) {
+    var bin = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+  }
+  // Inside the xtrata.xyz viewer the site signs: hand it the whole run; it stores the replay and posts the score.
+  function hostSubmitLong(input) {
+    var targets = bridgeTargets();
+    if (!targets.length) return Promise.reject(err('No host window.', -32001));
+    var id = 'xa-long-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    var payload = { v: 1, game: 'xtrata-arcade', network: CFG.network, contract: CFG.contractAddress + '.' + CFG.contractName,
+      board: input.board, period: 0, score: input.score, name: input.name, replay: base64url(input.replay) };
+    return new Promise(function (resolve, reject) {
+      var opened = false;
+      var t0 = setTimeout(function () {
+        if (opened) return;
+        root.removeEventListener('message', onMsg);
+        reject(err('This viewer cannot store long replays yet. Open the arcade at xtrata.xyz/arcade to post this run, or save the replay and post it later.', -32601));
+      }, 5000);
+      function onMsg(ev) {
+        var d = ev && ev.data;
+        if (!d || typeof d !== 'object' || d.id !== id) return;
+        if (d.type === 'xtrata:arcade:submit-opened') { opened = true; clearTimeout(t0); if (input.onProgress) input.onProgress('Confirm in the xtrata.xyz dialog\u2026'); return; }
+        if (d.type !== 'xtrata:arcade:submit-result') return;
+        root.removeEventListener('message', onMsg); clearTimeout(t0);
+        if (d.txId) resolve({ ok: true, txid: d.txId, route: 'host:long' });
+        else if (d.cancelled) reject(err('Cancelled. Nothing was posted.', 4001));
+        else reject(err(String(d.error || 'The score was not posted.')));
+      }
+      root.addEventListener('message', onMsg);
+      targets.forEach(function (t) { try { t.postMessage({ type: 'xtrata:arcade:submit', id: id, payload: payload }, '*'); } catch (e) {} });
+    });
+  }
+
+  // A finished run of a framed game (a page of its own, such as Astro Blaster 3) handed up to the xtrata.xyz viewer, which shows its own review and signs.
+  // Resolves { txId } | { cancelled:true } | { error } | { noHost:true } (nobody above answered in time). Nothing is signed here.
+  function hasHost() { return bridgeTargets().length > 0; }
+  function submitLink(payload) {
+    return CFG.runtimeOrigin + '/arcade/submit#p=' + base64url(new TextEncoder().encode(JSON.stringify(payload)));
+  }
+  function relaySubmit(payload, onOpened) {
+    var targets = bridgeTargets();
+    if (!targets.length) return Promise.resolve({ noHost: true });
+    var id = 'xa-fr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    return new Promise(function (resolve) {
+      var opened = false;
+      var t0 = setTimeout(function () { if (!opened) { root.removeEventListener('message', onMsg); resolve({ noHost: true }); } }, 4000);
+      function onMsg(ev) {
+        var d = ev && ev.data;
+        if (!d || typeof d !== 'object' || d.id !== id || targets.indexOf(ev.source) < 0) return;
+        if (d.type === 'xtrata:arcade:submit-opened') { opened = true; clearTimeout(t0); if (onOpened) try { onOpened(); } catch (e) {} return; }
+        if (d.type !== 'xtrata:arcade:submit-result') return;
+        root.removeEventListener('message', onMsg); clearTimeout(t0);
+        resolve(d.txId ? { txId: String(d.txId) } : d.cancelled ? { cancelled: true } : { error: String(d.error || 'The score was not posted.') });
+      }
+      root.addEventListener('message', onMsg);
+      targets.forEach(function (t) { try { t.postMessage({ type: 'xtrata:arcade:submit', id: id, payload: payload }, '*'); } catch (e) {} });
+    });
+  }
+
+  /* --------------------------------------------------- host bridge */
+  var bridge = { token: '', hostOrigin: '', nonce: '', tries: 0, seq: 0, pending: {}, listening: false };
+  function bridgeTargets() {
+    var out = [];
+    try { if (root.opener && root.opener !== root) out.push(root.opener); } catch (e) {}
+    try { if (root.parent && root.parent !== root) out.push(root.parent); } catch (e) {}
+    try { if (root.top && root.top !== root && out.indexOf(root.top) < 0) out.push(root.top); } catch (e) {}
+    return out;
+  }
+  function postOrigin() {
+    if (bridge.hostOrigin) return bridge.hostOrigin;
+    return hasRealOrigin() ? root.location.origin : '*';
+  }
+  function listen() {
+    if (bridge.listening) return;
+    bridge.listening = true;
+    root.addEventListener('message', function (ev) {
+      var d = ev && ev.data;
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'xtrata:wallet:hello-ack') {
+        if (bridge.token || d.nonce !== bridge.nonce || typeof d.bridgeToken !== 'string') return;
+        bridge.token = d.bridgeToken;
+        bridge.hostOrigin = ev.origin && ev.origin !== 'null' ? ev.origin : '';
+        log('host bridge granted by', bridge.hostOrigin || '(opaque origin)');
+        emit();
+        return;
+      }
+      if (d.type !== 'xtrata:wallet:response') return;
+      var okOrigin = (bridge.hostOrigin && ev.origin === bridge.hostOrigin) ||
+        (hasRealOrigin() && ev.origin === root.location.origin);
+      if (!okOrigin) return;
+      var entry = bridge.pending[d.requestId];
+      if (!entry) return;
+      delete bridge.pending[d.requestId];
+      clearTimeout(entry.timer);
+      if (d.ok) entry.resolve(d.result);
+      else {
+        var detail = d.error || {};
+        entry.reject(err(detail.message || 'Host wallet bridge rejected the request.',
+          typeof detail.code === 'number' ? detail.code : undefined));
+      }
+    });
+  }
+  function hello() {
+    var targets = bridgeTargets();
+    if (!targets.length || bridge.token) return;
+    if (!bridge.nonce) {
+      try { bridge.nonce = root.crypto.randomUUID(); }
+      catch (e) { bridge.nonce = 'xa-' + Date.now().toString(36) + Math.random().toString(36).slice(2); }
+    }
+    bridge.tries++;
+    targets.forEach(function (t) {
+      try {
+        t.postMessage({ type: 'xtrata:wallet:hello', app: CFG.appName, version: 'v1',
+          nonce: bridge.nonce, wants: ['wallet-bridge', 'arcade-score'] }, '*');
+      } catch (e) {}
+    });
+    if (bridge.tries < 6) setTimeout(hello, 600 * bridge.tries);
+  }
+  function bridgeRequest(method, params, timeoutMs) {
+    if (!bridge.token) return Promise.reject(err('No host wallet bridge.', -32001));
+    var targets = bridgeTargets();
+    if (!targets.length) return Promise.reject(err('No host window.', -32001));
+    return new Promise(function (resolve, reject) {
+      var id = 'xa-' + (++bridge.seq) + '-' + Date.now().toString(36);
+      var timer = setTimeout(function () {
+        delete bridge.pending[id];
+        reject(err('No wallet response. Check your wallet history before retrying.', -32002));
+      }, timeoutMs || CFG.bridgeTimeoutMs);
+      bridge.pending[id] = { resolve: resolve, reject: reject, timer: timer };
+      var msg = { type: 'xtrata:wallet:request', requestId: id, bridgeToken: bridge.token,
+        method: method, params: params == null ? null : params };
+      targets.forEach(function (t) { try { t.postMessage(msg, postOrigin()); } catch (e) {} });
+    });
+  }
+
+  /* ------------------------------------------------- direct wallets */
+  function isTopLevel() {
+    try { return root.top === root; } catch (e) { return false; }
+  }
+  // Every Stacks wallet this top-level page can reach, one entry per wallet (Leather, Xverse).
+  function directProviders() {
+    if (!isTopLevel()) return [];
+    var out = [];
+    var ok = function (p) { return p && typeof p.request === 'function'; };
+    if (ok(root.LeatherProvider)) out.push({ kind: 'leather', name: 'Leather', p: root.LeatherProvider });
+    var xv = root.XverseProviders || root.xverseProviders;
+    if (xv && ok(xv.BitcoinProvider)) out.push({ kind: 'xverse', name: 'Xverse', p: xv.BitcoinProvider });
+    else if (xv && ok(xv.StacksProvider)) out.push({ kind: 'xverse', name: 'Xverse', p: xv.StacksProvider });
+    // A bare window.StacksProvider belongs to whichever wallet claimed it last: only use it when nothing else answered.
+    if (!out.length && ok(root.StacksProvider)) out.push({ kind: 'leather', name: 'Stacks wallet', p: root.StacksProvider });
+    return out;
+  }
+  // The wallet the player picked when connecting; before that, any reachable one (for "can this page sign?").
+  function directProvider() {
+    var all = directProviders();
+    if (!all.length) return null;
+    return all.filter(function (d) { return d.kind === state.via; })[0] || all[0];
+  }
+  // Several wallets installed: ask which one, every time a wallet is connected (never pick one silently).
+  function chooseProvider(all) {
+    if (all.length < 2) return Promise.resolve(all[0] || null);
+    return new Promise(function (resolve) {
+      var doc = root.document;
+      var wrap = doc.createElement('div');
+      wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', 'Choose a wallet');
+      wrap.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:rgba(3,4,12,.72);font:15px/1.4 system-ui,sans-serif';
+      var card = doc.createElement('div');
+      card.style.cssText = 'width:min(340px,calc(100% - 32px));padding:20px;border-radius:16px;border:1px solid rgba(120,140,255,.45);background:#0c1230;color:#eef4ff;box-shadow:0 20px 60px rgba(0,0,0,.6)';
+      var h = doc.createElement('div');
+      h.textContent = 'Connect with which wallet?';
+      h.style.cssText = 'font-weight:800;font-size:18px;margin-bottom:12px';
+      card.appendChild(h);
+      function done(v) { root.removeEventListener('keydown', onKey, true); wrap.remove(); resolve(v); }
+      function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(null); } }
+      all.forEach(function (d, i) {
+        var b = doc.createElement('button');
+        b.type = 'button'; b.textContent = d.name;
+        b.style.cssText = 'display:block;width:100%;margin:0 0 8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(57,230,255,.5);background:rgba(57,230,255,.08);color:#eef4ff;font:700 15px system-ui,sans-serif;cursor:pointer;text-align:left';
+        b.onclick = function () { done(d); };
+        card.appendChild(b);
+        if (i === 0) setTimeout(function () { try { b.focus(); } catch (e) {} }, 0);
+      });
+      var c = doc.createElement('button');
+      c.type = 'button'; c.textContent = 'Cancel';
+      c.style.cssText = 'display:block;width:100%;margin-top:4px;padding:10px;border-radius:10px;border:0;background:transparent;color:#9fb0d8;font:600 14px system-ui,sans-serif;cursor:pointer';
+      c.onclick = function () { done(null); };
+      card.appendChild(c);
+      wrap.addEventListener('click', function (e) { if (e.target === wrap) done(null); });
+      wrap.appendChild(card);
+      (doc.body || doc.documentElement).appendChild(wrap);
+      root.addEventListener('keydown', onKey, true);
+    });
+  }
+  function unwrap(r) {
+    if (r && r.error) throw err(r.error.message || 'Wallet error', r.error.code);
+    if (r && r.status === 'error') throw err((r.error && r.error.message) || 'Wallet error');
+    return r && r.result !== undefined ? r.result : r;
+  }
+  function findStxAddress(payload) {
+    var found = '';
+    (function walk(v, depth) {
+      if (found || depth > 6 || v == null) return;
+      if (typeof v === 'string') {
+        if (/^S[PMTN][0-9A-Z]{20,41}$/.test(v)) {
+          try { c32decodeAddress(v); found = v; } catch (e) { /* not an address */ }
+        }
+        return;
+      }
+      if (typeof v !== 'object') return;
+      // Prefer entries explicitly marked as STX / stacks.
+      if ((v.symbol === 'STX' || v.purpose === 'stacks') && typeof v.address === 'string') {
+        found = v.address; return;
+      }
+      Object.keys(v).forEach(function (k) { walk(v[k], depth + 1); });
+    })(payload, 0);
+    return found;
+  }
+
+  /* --------------------------------------------------------- state */
+  var state = { address: '', via: '' };
+  var subs = [];
+  function emit() { subs.forEach(function (fn) { try { fn(status()); } catch (e) {} }); }
+  function status() {
+    var route = bridge.token ? 'host' : directProvider() ? 'direct' : 'none';
+    return { route: route, address: state.address, network: CFG.network,
+      contract: CFG.contractAddress + '.' + CFG.contractName };
+  }
+
+  async function connect() {
+    var s = status();
+    var result;
+    if (s.route === 'host') {
+      result = await bridgeRequest('wallet_connect', { app: CFG.appName }, 120000);
+      state.via = 'host';
+    } else if (s.route === 'direct') {
+      var d = await chooseProvider(directProviders());
+      if (!d) throw err('Wallet connection cancelled.', 4001);
+      if (d.kind === 'leather') result = unwrap(await d.p.request('getAddresses'));
+      else result = unwrap(await d.p.request('wallet_connect', {
+        addresses: ['stacks'], message: 'Connect to Xtrata Arcade to post high scores.' }));
+      state.via = d.kind;
+    } else {
+      throw err('No wallet is reachable from here. Open the arcade on xtrata.xyz.', 4900);
+    }
+    var address = findStxAddress(result);
+    if (!address) throw err('The wallet did not return a Stacks address.');
+    if (CFG.network === 'mainnet' && !/^S[PM]/.test(address)) {
+      throw err('Switch your wallet to Stacks mainnet and connect again.');
+    }
+    state.address = address;
+    emit();
+    return address;
+  }
+  function disconnect() { state.address = ''; state.via = ''; emit(); }
+
+  function cleanName(name) {
+    return String(name || '').replace(/[^A-Za-z0-9_.\\- ]/g, '').trim().slice(0, 12);
+  }
+  function runtimeUrl() {
+    // Without a minted parent id there is no runtime page to deep-link to yet.
+    if (!(Number(CFG.parentTokenId) > 0)) return CFG.runtimeOrigin.replace(/\\/+$/, '') + '/arcade';
+    var u = CFG.runtimeOrigin.replace(/\\/+$/, '') + '/runtime/?contractId=' +
+      encodeURIComponent(CFG.contentContractId) + '&network=' + CFG.network;
+    if (Number(CFG.parentTokenId) > 0) u += '&tokenId=' + CFG.parentTokenId;
+    return u;
+  }
+  function openRuntime() {
+    var url = runtimeUrl();
+    if (!(Number(CFG.parentTokenId) > 0)) return url;
+    bridgeTargets().forEach(function (t) {
+      try {
+        t.postMessage({ type: 'xtrata:arcade:wallet-intent', intent: 'open-runtime',
+          payload: { runtimeUrl: url }, bridgeToken: bridge.token || '' }, postOrigin());
+      } catch (e) {}
+    });
+    return url;
+  }
+  function txidOf(r) {
+    if (!r) return '';
+    if (typeof r === 'string') return r;
+    return r.txid || r.txId || (r.result && (r.result.txid || r.result.txId)) || '';
+  }
+
+  /*
+   * submit({ board, score, name, replay, pilotHash? }) \u2192
+   *   { ok:true, txid, route } |
+   *   { ok:false, needsRuntime:true, runtimeUrl, reason }   (no signer here)
+   * \`board\` is a contract board id, \`replay\` the Uint8Array from XA.replay. The contract checks that
+   * bytes 4..23 of the replay are the signing wallet's hash160; \`pilotHash\` (hex) lets us fail early.
+   * Throws on user cancel / wallet errors.
+   */
+  async function submit(input) {
+    var board = String(input.board || '');
+    var score = Math.floor(Number(input.score));
+    var name = cleanName(input.name);
+    var replay = input.replay;
+    if (!/^[a-z0-9_-]{3,24}$/.test(board)) throw err('Invalid board id.');
+    if (!(score > 0) || score > Number.MAX_SAFE_INTEGER) throw err('Score must be a positive whole number.');
+    if (name.length < 3) throw err('Name needs 3\u201312 letters or numbers.');
+    if (!(replay instanceof Uint8Array) || !replay.length) throw err('This run has no replay to post.');
+    var progress = typeof input.onProgress === 'function' ? input.onProgress : function () {};
+    var seal = !!input.seal;            // keep the replay, post only its fingerprint (any size, one approval)
+    var long = !seal && needsInscription(replay);
+    if (long && Math.ceil(replay.length / CHUNK) > MAX_INSCRIBE_CHUNKS) {
+      throw err('This replay is ' + Math.round(replay.length / 1024) + ' KB, more than the 512 KB a single inscription can hold. Save the replay so the run is kept.');
+    }
+
+    var s = status();
+    if (s.route === 'none') {
+      return { ok: false, needsRuntime: true, runtimeUrl: openRuntime(),
+        reason: 'This page cannot reach a wallet.' };
+    }
+    if (!state.address) await connect();
+    var address = state.address;
+    if (input.pilotHash && bytesToHex(c32decodeAddress(address).hash160) !== input.pilotHash) {
+      throw err('This run was played with a different wallet. Connect that wallet to post it.');
+    }
+
+    var fee = await getFee(board);
+    if (!fee.ok) throw err('Could not read the board right now. Try again in a moment.');
+    if (!fee.registered) throw err('This board is not open yet.');
+    if (!fee.enabled) throw err('This board is closed.');
+
+    var contract = CFG.contractAddress + '.' + CFG.contractName;
+    var r;
+
+    if (long && s.route === 'host') return hostSubmitLong({ board: board, score: score, name: name, replay: replay, onProgress: progress });
+
+    var stored = replay, replayId = null, minted = false;
+    if (seal) {
+      stored = root.XA.replay.makeSeal(replay);
+      progress('Approve in your wallet: post your score with your replay\\'s fingerprint.');
+    }
+    if (long) {
+      // 1. The full replay as its own inscription (re-used if these exact bytes are already on chain).
+      var d0 = directProvider();
+      var hash = chainHash(replay);
+      replayId = await inscriptionIdByHash(hash).catch(function () { return null; });
+      if (replayId === null) {
+        var q = await quoteReplay(replay.length);
+        if (!q.ok) throw err('Could not read the inscription fee right now. Try again in a moment.');
+        progress('Approve 1 of 2 in your wallet: store your ' + Math.round(replay.length / 1024) + ' KB replay as an inscription.');
+        var chunkArgs = chunksOf(replay).map(function (c) { return cvBuff(c); });
+        var margs = [cvBuff(hash), cvAscii(REPLAY_MIME), cvUint(replay.length), cvList(chunkArgs), cvAscii(TOKEN_URI)]
+          .map(function (a) { return String(a).replace(/^0x/i, ''); });
+        var core = CFG.contentContractId;
+        var mp = { contract: core, functionName: 'mint-single-tx', functionArgs: margs, arguments: margs,
+          postConditionMode: 'deny', postConditions: [stxPostConditionHex(address, q.fee)] };
+        if (d0.kind === 'leather') mp.network = CFG.network;
+        var mr = unwrap(await d0.p.request('stx_callContract', mp));
+        var mtx = txidOf(mr); minted = true;
+        if (!mtx) throw err('The wallet did not return a transaction id for the replay.');
+        progress('Storing your replay on chain\u2026 (this takes a block or two)');
+        await waitTx(mtx, function (sec) { progress('Storing your replay on chain\u2026 ' + sec + ' s'); });
+        for (var tries = 0; tries < 20 && replayId === null; tries++) {
+          replayId = await inscriptionIdByHash(hash).catch(function () { return null; });
+          if (replayId === null) await new Promise(function (res) { setTimeout(res, 3000); });
+        }
+        if (replayId === null) throw err('The replay was stored but its inscription id is not visible yet. Post again in a minute: it will not be stored twice.');
+      }
+      stored = root.XA.replay.makePointer(replay, replayId, hash);
+      progress((minted ? 'Approve 2 of 2' : 'Your replay is already stored as #' + replayId + '. Approve') + ' in your wallet: post your score.');
+    }
+    var args = [cvAscii(board), cvUint(0), cvUint(score), cvAscii(name), cvBuff(stored)];
+
+    if (s.route === 'host') {
+      // Generic contract call (the secure /runtime page supports this).
+      try {
+        r = await bridgeRequest('stx_callContract', {
+          contract: contract,
+          contractAddress: CFG.contractAddress,
+          contractName: CFG.contractName,
+          functionName: 'submit-score',
+          functionArgs: args,
+          network: CFG.network,
+          postConditionMode: 'deny',
+          postConditions: [{ type: 'stx', principal: address, amount: fee.value, conditionCode: 'lte' }]
+        });
+        return { ok: true, txid: txidOf(r), route: 'host:contract-call' };
+      } catch (e2) {
+        if (e2.code !== -32601) throw e2;
+        return { ok: false, needsRuntime: true, runtimeUrl: openRuntime(),
+          reason: 'This viewer does not sign score transactions yet.' };
+      }
+    }
+
+    // Direct provider (top-level page). Never send \`sender\` (wallet playbook \xA72).
+    var d = directProvider();
+    var bareArgs = args.map(function (a) { return String(a).replace(/^0x/i, ''); });   // bare hex for wallets
+    var params = {
+      contract: contract,
+      functionName: 'submit-score',
+      functionArgs: bareArgs,
+      arguments: bareArgs,
+      postConditionMode: 'deny',
+      postConditions: [stxPostConditionHex(address, fee.value)]
+    };
+    if (d.kind === 'leather') params.network = CFG.network;
+    r = unwrap(await d.p.request('stx_callContract', params));
+    return { ok: true, txid: txidOf(r), route: 'direct:' + d.kind, replayId: replayId, sealed: seal };
+  }
+
+  /*
+   * callContract({ contract, fn, args, maxUstx, expectAddress? }) -> { ok:true, txid, route }
+   * A contract call asked for by a hosted room (the hall's room bridge has already checked that the room is hosted, that the contract is
+   * approved on the world registry, and that the player said yes). Signed through the same routes as a score post, with the same rules
+   * (docs/WALLET-PLAYBOOK.md): never send \`sender\`; post-condition mode deny with exactly one STX post-condition, "the connected account
+   * sends at most maxUstx", so the call can move nothing else; bare hex to wallets; an account other than the one the player confirmed
+   * aborts the call (never re-targeted). Throws on cancel and on wallet errors.
+   */
+  var CLARITY_NAME = /^[a-zA-Z][a-zA-Z0-9!?_-]{0,127}$/;
+  async function callContract(input) {
+    input = input || {};
+    var contract = String(input.contract || ''), fn = String(input.fn || '');
+    if (!/^S[0-9A-Z]{25,41}\\.[a-zA-Z][a-zA-Z0-9-]{0,39}$/.test(contract)) throw err('Invalid contract.');
+    if (!CLARITY_NAME.test(fn)) throw err('Invalid function name.');
+    var args = Array.isArray(input.args) ? input.args.map(function (a) { return String(a).replace(/^0x/i, ''); }) : null;
+    if (!args || args.length > 32 || !args.every(function (a) { return /^([0-9a-fA-F]{2})+$/.test(a) && a.length <= 131072; })) throw err('Invalid arguments.');
+    var cap;
+    try { cap = BigInt(String(input.maxUstx)); } catch (e) { throw err('Invalid spending limit.'); }
+    if (cap < 0n) throw err('Invalid spending limit.');
+    var s = status();
+    if (s.route === 'none') throw err('No wallet is reachable from here. Open the arcade on xtrata.xyz.', 4900);
+    if (!state.address) await connect();
+    var address = state.address;
+    if (input.expectAddress && input.expectAddress !== address) {
+      throw err('Your wallet is now connected as ' + address + ', not the account you confirmed. Nothing was signed.', 'WALLET_ADDRESS_MISMATCH');
+    }
+    if ((CFG.network === 'mainnet') !== /^S[PM]/.test(address)) throw err('Switch your wallet to Stacks ' + CFG.network + ' and connect again.');
+    var parts = contract.split('.'), r;
+    if (s.route === 'host') {
+      r = await bridgeRequest('stx_callContract', {
+        contract: contract, contractAddress: parts[0], contractName: parts[1], functionName: fn,
+        functionArgs: args.map(function (a) { return '0x' + a; }), network: CFG.network, postConditionMode: 'deny',
+        postConditions: [{ type: 'stx', principal: address, amount: cap.toString(), conditionCode: 'lte' }]
+      });
+      return { ok: true, txid: txidOf(r), route: 'host:contract-call' };
+    }
+    // Direct provider (top-level page). Never send \`sender\` (wallet playbook \xA72).
+    var d = directProvider();
+    var params = { contract: contract, functionName: fn, functionArgs: args, arguments: args, postConditionMode: 'deny',
+      postConditions: [stxPostConditionHex(address, cap.toString())] };
+    if (d.kind === 'leather') params.network = CFG.network;
+    r = unwrap(await d.p.request('stx_callContract', params));
+    var txid = txidOf(r);
+    if (!txid) throw err('The wallet did not return a transaction id.');
+    return { ok: true, txid: txid, route: 'direct:' + d.kind };
+  }
+
+  /* ------------------------------------------------------ local PBs */
+  function localBest(gameId) {
+    var v = root.XA && root.XA.util.store('pb:' + gameId);
+    return typeof v === 'number' ? v : 0;
+  }
+  function recordLocal(gameId, score) {
+    var best = localBest(gameId);
+    if (score > best && root.XA) root.XA.util.store('pb:' + gameId, score);
+    return Math.max(best, score);
+  }
+
+  /* ----------------------------------------------------------- boot */
+  (function boot() {
+    listen();
+    try {
+      var t = new URLSearchParams(root.location.search || '').get('walletBridgeToken');
+      if (t) { bridge.token = t.trim(); log('host bridge token from URL'); }
+    } catch (e) {}
+    hello();
+    var lastRoute = status().route, polls = 0;
+    var watch = setInterval(function () {
+      var r = status().route;
+      if (r !== lastRoute) { lastRoute = r; emit(); }
+      if (++polls >= 40 || r === 'host') clearInterval(watch);
+    }, 500);
+  })();
+
+  root.XAScores = {
+    configure: function (patch) {
+      Object.keys(patch || {}).forEach(function (k) { if (k in CFG) CFG[k] = patch[k]; });
+      boardCache = {}; infoCache = {};
+      emit();
+    },
+    config: function () { return Object.assign({}, CFG); },
+    networkFeeHint: networkFeeHint,
+    getTop10: getTop10,
+    qualifies: qualifies,
+    getFee: getFee,
+    getBoardInfo: getBoardInfo,
+    getReplay: getReplay,
+    getInscription: getInscription,
+    read: callRead,
+    inscriptionIdByHash: inscriptionIdByHash,
+    quoteReplay: quoteReplay,
+    needsInscription: needsInscription,
+    INLINE_MAX: INLINE_MAX,
+    status: status,
+    onChange: function (fn) { subs.push(fn); fn(status()); },
+    connect: connect,
+    disconnect: disconnect,
+    submit: submit,
+    hasHost: hasHost,
+    relaySubmit: relaySubmit,
+    submitLink: submitLink,
+    callContract: callContract,
+    runtimeUrl: runtimeUrl,
+    openRuntime: openRuntime,
+    cleanName: cleanName,
+    localBest: localBest,
+    recordLocal: recordLocal,
+    shortAddress: function (a) { a = String(a || ''); return a.length > 12 ? a.slice(0, 5) + '\u2026' + a.slice(-4) : a; },
+    // exposed for tests
+    _codec: { cvList: cvList, cvUint: cvUint, cvAscii: cvAscii, cvBuff: cvBuff, cvPrincipal: cvPrincipal, decodeCV: decodeCV, c32address: c32address,
+      c32decodeAddress: c32decodeAddress, stxPostConditionHex: stxPostConditionHex, sha256: sha256,
+      bytesToHex: bytesToHex, hexToBytes: hexToBytes, isMainnetAddress: isMainnetAddress }
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+/*@xa-part arcade-replay.js*/
+/*
+ * Xtrata Arcade \u2014 replays (leaf module)
+ *
+ * Every ranked run is a pure function of (pilot wallet, nonce, per-step input). The room records the
+ * input the game actually saw, packs it into a compact replay, and the leaderboard contract stores it
+ * beside the score. Anyone can re-run the replay through the same inscribed game and check that it
+ * reaches the same score.
+ *
+ * Replay bytes (little endian). The wallet hash sits at a fixed offset because the contract checks it.
+ *    0-2  "XAR"      3  format (bit 7 set = body is not compressed)
+ *    4-23 pilot hash160        24 pilot address version
+ *    25   flags: bit0 time mode, bit1 completed (finish() was called)
+ *    26-27 engine version      28-31 nonce (the run seed is derived from wallet + nonce + game)
+ *    32-35 steps (updates)     36-39 score (time runs: centiseconds)
+ *    40   game index           41 variant index (0 = base)     42-43 reserved
+ *  then deflate-raw of the event stream:
+ *    format 1: varint(step delta) \xB7 flags \xB7 fields, one event after another
+ *    flags: 1 held  2 hit  4 pointer  8 pointer-button changed  16 button is down  32 pointer moved  64 swipes
+ *    format 2 (v1.5+): the same events, column by column (every step delta, then every flag byte, held, hit,
+ *      pointer x, pointer y, swipes), each column a run of varints, the columns' byte lengths first. Pointer
+ *      moves are stored as the change from the previous move (smooth mouse motion becomes small numbers).
+ *      Same events, same game, about a fifth smaller after deflate.
+ *    format 3: a POINTER to a replay too big for a score entry. Same 44-byte header (so the contract's wallet
+ *      check still applies), then, uncompressed: 0x01 \xB7 varint(inscription id) \xB7 32-byte Xtrata chain hash of the
+ *      full replay \xB7 varint(full length). The full replay is an Xtrata inscription; resolve() fetches it and
+ *      accepts it only if its chain hash matches and its header equals this one.
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA, S = root.XAScores;
+  if (!XA || !S) throw new Error('arcade-kit and score-client must load before arcade-replay');
+  var U = XA.util, C = S._codec;
+
+  var ENGINE = 1, FORMAT = 2, F_EVENTS = 1, F_COLUMNS = 2, F_POINTER = 3, HEADER = 44;
+  var MAX_BYTES = 60000;                 // largest replay posted inline: the contract allows 65,536; keep headroom
+  var MAX_STEPS = 60 * 60 * 60 * 4;      // 4 hours: longer replays are stored as their own inscription
+  var CHUNK = 16384, MAX_INSCRIBE_CHUNKS = 32;   // one-transaction inscription on the Xtrata core (512 KB)
+  var STEP = 1 / 60, QN = 4;             // pointer positions are kept to a quarter of a playfield unit
+
+  // Fixed order: an index in the header names the game. Never reorder; only append.
+  var GAME_IDS = ['xa_block_defence', 'xa_block_drop', 'xa_block_runner', 'xa_brick_breaker', 'xa_bubble_pop', 'xa_cave_diver',
+    'xa_helix_drop', 'xa_invader_wave', 'xa_lunar_lander', 'xa_maze_muncher', 'xa_merge_2048', 'xa_mine_sprint', 'xa_neon_snake',
+    'xa_orbit_merge', 'xa_pong_streak', 'xa_reflex_tap', 'xa_road_hopper', 'xa_rock_drift', 'xa_stack_tower', 'xa_swerve', 'xa_tile_tap'];
+  var BUTTONS = ['up', 'down', 'left', 'right', 'a', 'b', 'c', 'd', 'k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8', 'k9', 'f', 'start', 'hold', 'release'];
+  var SWIPES = ['left', 'right', 'up', 'down', 'tap'];
+
+  function q(v) { v = Math.round(v * QN); return v > 32000 ? 32000 : v < -32000 ? -32000 : v; }
+  function qpt(v) { return q(v) / QN; }
+
+  /* ------------------------------------------------- boards & pilots */
+  function gameIndex(game) { return GAME_IDS.indexOf(game.id); }
+  // Extra games (from the games contract) get a permanent index of 21 or more. Indices 0 to 20 are the built-in games and can
+  // never be given to another id. An index that is taken, or an id that already has one, is refused. Returns true if the id now has this index.
+  var BUILT_IN = 21;
+  function registerIndex(id, idx) {
+    idx = Number(idx);
+    if (!/^[a-z0-9_]{3,24}$/.test(String(id)) || !(idx >= BUILT_IN && idx <= 255) || idx !== Math.floor(idx)) return false;
+    var have = GAME_IDS.indexOf(id);
+    if (have >= 0) return have === idx;
+    if (GAME_IDS[idx] !== undefined) return false;
+    GAME_IDS[idx] = id;
+    return true;
+  }
+  function variantForMode(game, mode) {
+    return (game.variants || []).filter(function (v) { return v.mode === mode; })[0] || null;
+  }
+  // The contract board for a game in a mode: the base board is the game id; a timed variant adds its key.
+  function boardFor(game, mode) {
+    mode = mode || game.mode;
+    if (mode === game.mode) return game.id;
+    var v = variantForMode(game, mode);
+    return v ? game.id + '_' + v.key : game.id;
+  }
+  function pilotFor(address) {
+    if (!address) return null;
+    try {
+      var d = C.c32decodeAddress(address);
+      if (!/^S[PMTN]/.test(String(address).toUpperCase())) return null;
+      return { address: address, version: d.version, hash160: d.hash160 };
+    } catch (e) { return null; }
+  }
+  // The run seed is bound to the wallet: rewriting the wallet bytes of someone else's replay changes the seed.
+  function seedFor(hash160, nonce, gameIdx) {
+    var h = 0x811c9dc5;
+    function mix(b) { h ^= b & 255; h = Math.imul(h, 16777619) >>> 0; }
+    for (var i = 0; i < 20; i++) mix(hash160[i]);
+    for (var j = 0; j < 4; j++) mix(nonce >>> (j * 8));
+    mix(gameIdx);
+    return (h >>> 0) || 0x9e3779b9;
+  }
+
+  /* --------------------------------------------------------- bytes */
+  function putVar(out, v) { while (v >= 128) { out.push((v % 128) | 128); v = Math.floor(v / 128); } out.push(v); }
+  function zz(n) { return n < 0 ? -2 * n - 1 : 2 * n; }
+  function unzz(u) { return u % 2 ? -(u + 1) / 2 : u / 2; }
+  function Reader(b) { this.b = b; this.i = 0; }
+  Reader.prototype.varint = function () {
+    var v = 0, mul = 1, byte;
+    do {
+      if (this.i >= this.b.length) throw new Error('Replay ends early');
+      byte = this.b[this.i++]; v += (byte & 127) * mul; mul *= 128;
+    } while (byte & 128);
+    return v;
+  };
+  Reader.prototype.byte = function () {
+    if (this.i >= this.b.length) throw new Error('Replay ends early');
+    return this.b[this.i++];
+  };
+
+  async function pipe(bytes, stream) {
+    var res = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+    return new Uint8Array(await res.arrayBuffer());
+  }
+  async function pack(body) {
+    if (typeof CompressionStream === 'function') {
+      try { return { data: await pipe(body, new CompressionStream('deflate-raw')), raw: false }; } catch (e) { /* store raw */ }
+    }
+    return { data: body, raw: true };
+  }
+  async function unpack(body, raw) {
+    if (raw) return body;
+    if (typeof DecompressionStream !== 'function') throw new Error('This browser cannot unpack replays');
+    return pipe(body, new DecompressionStream('deflate-raw'));
+  }
+
+  /* ------------------------------------------------------ recorder */
+  function Recorder(meta, input, pointer) {
+    this.meta = meta; this.input = input; this.pointer = pointer;
+    this.body = []; this.step = 0; this.lastAt = 0;
+    this.cur = { held: 0, px: 0, py: 0, down: 0 };
+    this.prevMoved = 0; this.snap = null; this.sw = [];
+    var self = this, take = input.takeSwipes;
+    input.takeSwipes = function () {
+      var r = take.call(input);
+      for (var i = 0; i < r.length; i++) { var k = SWIPES.indexOf(r[i]); if (k >= 0) self.sw.push(k); }
+      return r;
+    };
+  }
+  Recorder.prototype.before = function () {
+    var inp = this.input, hm = 0, ht = 0;
+    for (var i = 0; i < BUTTONS.length; i++) {
+      if (inp.held(BUTTONS[i])) hm |= 1 << i;
+      if (inp.hit(BUTTONS[i])) ht |= 1 << i;
+    }
+    var p = this.pointer();
+    var moved = p.moved !== this.prevMoved; this.prevMoved = p.moved;
+    this.snap = { hm: hm, ht: ht, px: q(p.x), py: q(p.y), down: p.down ? 1 : 0, moved: moved };
+    this.sw = [];
+  };
+  Recorder.prototype.after = function () {
+    var s = this.snap, c = this.cur, sw = this.sw, f = 0;
+    if (s.hm !== c.held) f |= 1;
+    if (s.ht) f |= 2;
+    if (s.px !== c.px || s.py !== c.py) f |= 4;
+    if (s.down !== c.down) f |= 8 | (s.down ? 16 : 0);
+    if (s.moved) f |= 32;
+    if (sw.length) f |= 64;
+    if (f) {
+      var b = this.body;
+      putVar(b, this.step - this.lastAt); b.push(f);
+      if (f & 1) putVar(b, s.hm);
+      if (f & 2) putVar(b, s.ht);
+      if (f & 4) { putVar(b, zz(s.px - c.px)); putVar(b, zz(s.py - c.py)); }
+      if (f & 64) { b.push(Math.min(sw.length, 255)); for (var i = 0; i < sw.length && i < 255; i++) b.push(sw[i]); }
+      c.held = s.hm; c.px = s.px; c.py = s.py; c.down = s.down;
+      this.lastAt = this.step;
+    }
+    this.step++;
+  };
+  // \u2192 Uint8Array (format 2), or null only for an empty run or one longer than MAX_STEPS.
+  // Runs larger than MAX_BYTES are still returned: they are posted as an inscription plus a pointer.
+  Recorder.prototype.finish = async function (score, completed) {
+    var m = this.meta;
+    if (this.step < 1 || this.step > MAX_STEPS) return null;
+    var packed = await pack(encodeColumns(eventsFromBody(new Uint8Array(this.body))));
+    var out = new Uint8Array(HEADER + packed.data.length), dv = new DataView(out.buffer);
+    out[0] = 88; out[1] = 65; out[2] = 82;                       // "XAR"
+    out[3] = FORMAT | (packed.raw ? 128 : 0);
+    out.set(m.hash160, 4); out[24] = m.version;
+    out[25] = (m.time ? 1 : 0) | (completed ? 2 : 0);
+    dv.setUint16(26, ENGINE, true); dv.setUint32(28, m.nonce >>> 0, true);
+    dv.setUint32(32, this.step, true); dv.setUint32(36, Math.max(0, Math.floor(score)) >>> 0, true);
+    out[40] = m.gameIdx; out[41] = m.variantIdx;
+    out.set(packed.data, HEADER);
+    return out;
+  };
+  // Rough size of the replay so far (bytes after packing), for the in-game "long run" hint.
+  Recorder.prototype.estimate = function () { return HEADER + Math.round(this.body.length * 0.4); };
+
+  /* ------------------------------------------- event body, formats 1 and 2 */
+  function eventsFromBody(body) {
+    var r = new Reader(body), at = 0, out = [];
+    while (r.i < body.length) {
+      at += r.varint();
+      var f = r.byte(), e = { at: at, f: f };
+      if (f & 1) e.held = r.varint();
+      if (f & 2) e.hit = r.varint();
+      if (f & 4) { e.dx = unzz(r.varint()); e.dy = unzz(r.varint()); }
+      if (f & 64) { var n = r.byte(); e.sw = []; for (var i = 0; i < n; i++) e.sw.push(r.byte()); }
+      out.push(e);
+    }
+    return out;
+  }
+  function encodeColumns(events) {
+    var d = [], fl = [], held = [], hit = [], px = [], py = [], sw = [], last = -1, pdx = 0, pdy = 0;
+    for (var i = 0; i < events.length; i++) {
+      var e = events[i], f = e.f;
+      putVar(d, e.at - last - 1); last = e.at; fl.push(f);
+      if (f & 1) putVar(held, e.held);
+      if (f & 2) putVar(hit, e.hit);
+      if (f & 4) { putVar(px, zz(e.dx - pdx)); putVar(py, zz(e.dy - pdy)); pdx = e.dx; pdy = e.dy; } else { pdx = 0; pdy = 0; }
+      if (f & 64) { sw.push(e.sw.length); for (var k = 0; k < e.sw.length; k++) sw.push(e.sw[k]); }
+    }
+    var cols = [d, fl, held, hit, px, py, sw], head = [];
+    putVar(head, events.length);
+    cols.forEach(function (c) { putVar(head, c.length); });
+    var out = new Uint8Array(head.length + cols.reduce(function (n, c) { return n + c.length; }, 0)), o = 0;
+    out.set(head, 0); o = head.length;
+    cols.forEach(function (c) { out.set(c, o); o += c.length; });
+    return out;
+  }
+  function eventsFromColumns(body) {
+    var r = new Reader(body), n = r.varint(), lens = [];
+    for (var c = 0; c < 7; c++) lens.push(r.varint());
+    var readers = [], o = r.i;
+    for (c = 0; c < 7; c++) { readers.push(new Reader(body.subarray(o, o + lens[c]))); o += lens[c]; }
+    if (o !== body.length) throw new Error('Replay columns do not add up');
+    var D = readers[0], F = readers[1], H = readers[2], T = readers[3], X = readers[4], Y = readers[5], W = readers[6];
+    var out = [], last = -1, pdx = 0, pdy = 0;
+    for (var i = 0; i < n; i++) {
+      var at = last + 1 + D.varint(), f = F.byte(), e = { at: at, f: f };
+      last = at;
+      if (f & 1) e.held = H.varint();
+      if (f & 2) e.hit = T.varint();
+      if (f & 4) { e.dx = pdx + unzz(X.varint()); e.dy = pdy + unzz(Y.varint()); pdx = e.dx; pdy = e.dy; } else { pdx = 0; pdy = 0; }
+      if (f & 64) { var k = W.byte(); e.sw = []; for (var j = 0; j < k; j++) e.sw.push(W.byte()); }
+      out.push(e);
+    }
+    return out;
+  }
+
+  /* ------------------------------------------- big replays: inscription + pointer */
+  function readHeader(bytes) {
+    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return { hash160: bytes.slice(4, 24), version: bytes[24], time: !!(bytes[25] & 1), completed: !!(bytes[25] & 2),
+      engine: dv.getUint16(26, true), nonce: dv.getUint32(28, true), steps: dv.getUint32(32, true), score: dv.getUint32(36, true),
+      gameIdx: bytes[40], variantIdx: bytes[41] };
+  }
+  function checkMagic(bytes) {
+    if (!(bytes instanceof Uint8Array)) throw new Error('Not an Xtrata Arcade replay');
+    if (bytes.length < HEADER) throw new Error('Replay too short');
+    if (bytes[0] !== 88 || bytes[1] !== 65 || bytes[2] !== 82) throw new Error('Not an Xtrata Arcade replay');
+  }
+  function isPointer(bytes) {
+    try { checkMagic(bytes); return (bytes[3] & 127) === F_POINTER; } catch (e) { return false; }
+  }
+  // The Xtrata core's content hash: sha256(previous \u2016 chunk) over 16 KB chunks, starting from 32 zero bytes.
+  function chunksOf(bytes) {
+    var out = [];
+    for (var i = 0; i < bytes.length; i += CHUNK) out.push(bytes.subarray(i, Math.min(bytes.length, i + CHUNK)));
+    return out;
+  }
+  function chainHash(bytes) {
+    var h = new Uint8Array(32);
+    chunksOf(bytes).forEach(function (c) { var m = new Uint8Array(32 + c.length); m.set(h, 0); m.set(c, 32); h = C.sha256(m); });
+    return h;
+  }
+  function makePointer(full, id, hash) {
+    checkMagic(full);
+    var b = [1];
+    putVar(b, Number(id)); for (var i = 0; i < 32; i++) b.push(hash[i]); putVar(b, full.length);
+    var out = new Uint8Array(HEADER + b.length);
+    out.set(full.subarray(0, HEADER), 0);
+    out[3] = F_POINTER | 128;
+    out.set(b, HEADER);
+    return out;
+  }
+  // A seal: the score entry holds only the run's header and the replay's fingerprints (Xtrata chain hash, sha256, length).
+  // The player keeps the file. Anyone holding it can prove it is this run; if it is ever inscribed on Xtrata as these
+  // exact bytes, the chain hash finds it.
+  function makeSeal(full) {
+    checkMagic(full);
+    if (isPointer(full)) throw new Error('Cannot seal a pointer');
+    var b = [2], ch = chainHash(full), sh = C.sha256(full);
+    for (var i = 0; i < 32; i++) b.push(ch[i]);
+    for (i = 0; i < 32; i++) b.push(sh[i]);
+    putVar(b, full.length);
+    var out = new Uint8Array(HEADER + b.length);
+    out.set(full.subarray(0, HEADER), 0);
+    out[3] = F_POINTER | 128;
+    out.set(b, HEADER);
+    return out;
+  }
+  function readPointer(bytes) {
+    checkMagic(bytes);
+    if ((bytes[3] & 127) !== F_POINTER) throw new Error('Not a replay pointer');
+    var r = new Reader(bytes.subarray(HEADER)), kind = r.byte(), i, hash = new Uint8Array(32);
+    if (kind === 1) {
+      var id = r.varint();
+      for (i = 0; i < 32; i++) hash[i] = r.byte();
+      return { kind: 'inscription', id: id, hash: hash, length: r.varint() };
+    }
+    if (kind === 2) {
+      var sha = new Uint8Array(32);
+      for (i = 0; i < 32; i++) hash[i] = r.byte();
+      for (i = 0; i < 32; i++) sha[i] = r.byte();
+      return { kind: 'seal', id: null, hash: hash, sha256: sha, length: r.varint() };
+    }
+    throw new Error('Unknown replay pointer');
+  }
+  function isSeal(bytes) { try { return isPointer(bytes) && readPointer(bytes).kind === 'seal'; } catch (e) { return false; } }
+  // Does this file belong to this stored entry (pointer or seal)? Returns null when it does, or the reason it does not.
+  function mismatch(stored, full) {
+    var p = readPointer(stored);
+    if (!(full instanceof Uint8Array)) full = new Uint8Array(full);
+    try { checkMagic(full); } catch (e) { return e.message; }
+    if (isPointer(full)) return 'That file is a pointer, not a replay';
+    if (full.length !== p.length) return 'That replay is a different size from the one on the board';
+    if (C.bytesToHex(chainHash(full)) !== C.bytesToHex(p.hash)) return 'That replay does not match the fingerprint on the board';
+    if (p.sha256 && C.bytesToHex(C.sha256(full)) !== C.bytesToHex(p.sha256)) return 'That replay does not match the fingerprint on the board';
+    for (var i = 4; i < HEADER; i++) if (full[i] !== stored[i]) return 'That replay is for a different run';
+    return null;
+  }
+  function sealedError() {
+    var e = new Error('Sealed run: the player kept this replay and it has not been published yet');
+    e.sealed = true;
+    return e;
+  }
+  // A full replay for any stored entry: inline bytes as they are; a pointer resolved through \`fetchInscription\`
+  // (id, chainHash) \u2192 bytes; a seal through \`opts.file\` (a copy the viewer supplies) or, failing that, an Xtrata
+  // inscription of the same bytes found by its chain hash. Whatever comes back must match the stored fingerprints.
+  async function resolve(bytes, fetchInscription, opts) {
+    opts = opts || {};
+    if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+    if (!isPointer(bytes)) return bytes;
+    var p = readPointer(bytes), full, why;
+    if (opts.file) {
+      full = opts.file instanceof Uint8Array ? opts.file : new Uint8Array(opts.file);
+      if ((why = mismatch(bytes, full))) throw new Error(why);
+      return full;
+    }
+    var get = fetchInscription || (S.getInscription && function (id, hash) { return S.getInscription(id, hash); });
+    var id = p.id;
+    if (p.kind === 'seal') {
+      var find = opts.findByHash || (S.inscriptionIdByHash && function (h) { return S.inscriptionIdByHash(h); });
+      if (find) { try { id = await find(p.hash); } catch (e) { id = null; } }
+      if (id == null || !get) throw sealedError();
+    }
+    if (!get) throw new Error('This replay is stored as inscription #' + id + ' and cannot be fetched here');
+    full = await get(id, p.hash);
+    if (!(full instanceof Uint8Array)) full = new Uint8Array(full);
+    if ((why = mismatch(bytes, full))) throw new Error('Replay inscription #' + id + ': ' + why.replace(/^That /, 'the '));
+    return full;
+  }
+  function record(game, variant, pilot, nonce, input, pointer) {
+    var mode = variant ? variant.mode : game.mode;
+    return new Recorder({ hash160: pilot.hash160, version: pilot.version, nonce: nonce, gameIdx: gameIndex(game),
+      variantIdx: variant ? game.variants.indexOf(variant) + 1 : 0, time: mode === 'time' }, input, pointer);
+  }
+
+  /* ------------------------------------------------------ decoding */
+  async function decode(bytes) {
+    if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+    checkMagic(bytes);
+    var fmt = bytes[3] & 127;
+    if (fmt === F_POINTER) throw new Error('This replay is stored as an inscription: resolve it first');
+    if (fmt !== F_EVENTS && fmt !== F_COLUMNS) throw new Error('Unsupported replay format ' + fmt);
+    var h = readHeader(bytes);
+    if (h.steps < 1 || h.steps > MAX_STEPS) throw new Error('Run length out of range');
+    var body = await unpack(bytes.subarray(HEADER), !!(bytes[3] & 128));
+    h.events = (fmt === F_COLUMNS ? eventsFromColumns : eventsFromBody)(body);
+    h.events.forEach(function (e) { if (e.sw) e.sw = e.sw.map(function (k) { return SWIPES[k] || 'tap'; }); });
+    return h;
+  }
+
+  /* ------------------------------------------------------ playback */
+  function playback(events) {
+    var i = 0, held = 0, hit = 0, sw = [], down = 0, qx = 0, qy = 0;
+    var P = { x: 0, y: 0, down: false, moved: 0 };
+    var input = {
+      held: function (n) { var k = BUTTONS.indexOf(n); return k >= 0 && !!((held >>> k) & 1); },
+      hit: function (n) { var k = BUTTONS.indexOf(n); return k >= 0 && !!((hit >>> k) & 1); },
+      takeSwipes: function () { var s = sw; sw = []; return s; },
+      pointer: P, press: function () {}, release: function () {}, endFrame: function () {}, reset: function () {}, destroy: function () {}
+    };
+    return {
+      input: input,
+      pointer: function () { return { x: qx / QN, y: qy / QN, down: !!down, moved: P.moved }; },
+      load: function (step) {
+        hit = 0; sw = [];
+        while (i < events.length && events[i].at === step) {
+          var e = events[i++], f = e.f;
+          if (f & 1) held = e.held;
+          if (f & 2) hit = e.hit;
+          if (f & 4) { qx += e.dx; qy += e.dy; }
+          if (f & 8) down = (f & 16) ? 1 : 0;
+          if (f & 32) P.moved++;
+          if (f & 64) sw = e.sw.slice();
+        }
+      }
+    };
+  }
+  var silentAudio = typeof Proxy === 'function'
+    ? new Proxy({}, { get: function (t, k) { return k === 'isMuted' ? function () { return true; } : function () {}; } })
+    : { tone: function () {}, arp: function () {}, noise: function () {}, isMuted: function () { return true; } };
+
+  var nextTick = function () { return new Promise(function (res) { setTimeout(res, 0); }); };
+
+  // Re-run a decoded replay through the game. Nothing is drawn, nothing is heard, nothing is saved.
+  async function simulate(dec) {
+    var game = XA.games.filter(function (g) { return g.id === GAME_IDS[dec.gameIdx]; })[0];
+    if (!game) throw new Error('This replay is for a game that is not in this arcade');
+    var variant = dec.variantIdx ? (game.variants || [])[dec.variantIdx - 1] : null;
+    if (dec.variantIdx && !variant) throw new Error('Unknown game variant');
+    var mode = variant ? variant.mode : game.mode;
+    if ((mode === 'time') !== dec.time) throw new Error('Replay mode does not match the game');
+    var pb = playback(dec.events), st = { score: 0, over: false, completed: false };
+    var seed = seedFor(dec.hash160, dec.nonce, dec.gameIdx);
+    var api = {
+      W: game.size.w, H: game.size.h, input: pb.input, audio: silentAudio, fx: XA.createFx(),
+      rng: U.rng(seed), seed: seed, ranked: true,
+      shake: function () {}, setStatus: function () {},
+      addScore: function (n) { if (!st.over) st.score += Math.max(0, Math.floor(n)); },
+      setScore: function (n) { if (!st.over) st.score = Math.max(0, Math.floor(n)); },
+      getScore: function () { return st.score; },
+      gameOver: function () { st.over = true; },
+      finish: function () { if (!st.over) { st.completed = true; st.over = true; } },
+      mode: mode, variant: variant ? variant.key : null, pointer: pb.pointer
+    };
+    // Games remember bests in local storage for display only. Give the replay a blank one so it never leans on yours.
+    var realStore = U.store, mem = {};
+    var blank = function (k, v) { if (v === undefined) return k in mem ? mem[k] : null; mem[k] = v; return null; };
+    var steps = 0;
+    try {
+      U.store = blank;
+      var inst = game.create(api);
+      while (steps < dec.steps && !st.over) {
+        pb.load(steps);
+        inst.update(STEP);
+        steps++;
+        if (steps % 4000 === 0) { U.store = realStore; await nextTick(); U.store = blank; }
+      }
+    } finally { U.store = realStore; }
+    return { score: st.score, steps: steps, over: st.over, completed: st.completed };
+  }
+
+  // expect: { address, score, board } \u2013 whatever the leaderboard entry claims.
+  async function verify(bytes, expect) {
+    expect = expect || {};
+    try {
+      bytes = await resolve(bytes, expect.fetchInscription, { file: expect.file, findByHash: expect.findByHash });
+      var dec = await decode(bytes);
+      if (expect.address) {
+        var p = pilotFor(expect.address);
+        if (!p || C.bytesToHex(p.hash160) !== C.bytesToHex(dec.hash160)) return { ok: false, reason: 'Flown by a different wallet' };
+      }
+      if (expect.score != null && Number(expect.score) !== dec.score) return { ok: false, reason: 'Replay score differs from the board' };
+      var game = XA.games.filter(function (g) { return g.id === GAME_IDS[dec.gameIdx]; })[0];
+      if (!game) return { ok: false, reason: 'Unknown game' };
+      var variant = dec.variantIdx ? (game.variants || [])[dec.variantIdx - 1] : null;
+      if (expect.board && expect.board !== boardFor(game, variant ? variant.mode : game.mode)) return { ok: false, reason: 'Replay is for a different board' };
+      var r = await simulate(dec);
+      if (!r.over || r.steps !== dec.steps) return { ok: false, reason: 'Replay does not reach the end of the run' };
+      if (r.score !== dec.score) return { ok: false, reason: 'Replay reaches ' + r.score + ', not ' + dec.score };
+      if (r.completed !== dec.completed) return { ok: false, reason: 'Replay finishes differently' };
+      return { ok: true, score: r.score, steps: r.steps, game: game.id };
+    } catch (e) {
+      return { ok: false, sealed: !!(e && e.sealed), reason: (e && e.message) || String(e) };
+    }
+  }
+
+  XA.replay = {
+    ENGINE: ENGINE, HEADER: HEADER, MAX_BYTES: MAX_BYTES, GAME_IDS: GAME_IDS, BUTTONS: BUTTONS,
+    boardFor: boardFor, pilotFor: pilotFor, seedFor: seedFor, gameIndex: gameIndex, registerIndex: registerIndex, BUILT_IN: BUILT_IN, qpt: qpt,
+    record: record, decode: decode, simulate: simulate, verify: verify, playback: playback,
+    MAX_STEPS: MAX_STEPS, CHUNK: CHUNK, MAX_INSCRIBE_CHUNKS: MAX_INSCRIBE_CHUNKS, readHeader: readHeader,
+    isPointer: isPointer, isSeal: isSeal, makeSeal: makeSeal, mismatch: mismatch, makePointer: makePointer, readPointer: readPointer, resolve: resolve,
+    chainHash: chainHash, chunksOf: chunksOf, encodeColumns: encodeColumns, eventsFromColumns: eventsFromColumns, eventsFromBody: eventsFromBody
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+/*@xa-part arcade-room.js*/
+/*
+ * Xtrata Arcade \u2014 the room (leaf module)
+ *
+ * Builds the arcade floor from whatever cartridges registered with XA, runs
+ * one play session at a time, and owns the game-over \u2192 on-chain submit flow.
+ * Cartridges never see the wallet: they only report a score through \`api\`.
+ *
+ * Boot: the parent sets window.XA_CONFIG (optional) and calls XARoom.boot().
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA, S = root.XAScores;
+  if (!XA || !S) throw new Error('arcade-kit and score-client must load before arcade-room');
+  var U = XA.util;
+  var doc = root.document;
+
+  function h(tag, attrs, kids) {
+    var el = doc.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v == null || v === false) return;
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k === 'style') el.setAttribute('style', v);
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : v);
+    });
+    (kids || []).forEach(function (c) { if (c != null) el.appendChild(typeof c === 'string' ? doc.createTextNode(c) : c); });
+    return el;
+  }
+  function $(sel, ctx) { return (ctx || doc).querySelector(sel); }
+
+  var rootEl, roomEl, gameEl, modalEl;
+  var cabinets = [];            // { game, canvas, ctx, statsEl }
+  var session = null;
+  var raf = 0, lastTs = 0;
+  var walletStatus = S.status();
+  var boards = {};              // gameId:mode \u2192 last board result
+  function boardOf(g, mode) { return XA.replay.boardFor(g, mode); }   // contract board id
+
+  /* A cabinet can host variants (e.g. Block Drop Sprint 40). Each variant posts
+     under the same game-id with its own contract mode, so boards, personal
+     bests and formatting are all keyed by (game, mode). */
+  function bk(g, mode) { return g.id + ':' + (mode || g.mode); }
+  function variantOf(g, key) {
+    return key ? (g.variants || []).filter(function (v) { return v.key === key; })[0] || null : null;
+  }
+  function modeLabel(g, mode) {
+    if (mode === g.mode) return g.modeLabel || (mode === 'time' ? 'Time' : 'Score');
+    var v = (g.variants || []).filter(function (x) { return x.mode === mode; })[0];
+    return v ? v.label : mode;
+  }
+  // Time scores are centiseconds: 8345 \u2192 1:23.45.
+  function fmtVal(mode, v) {
+    if (mode !== 'time') return U.fmt(v);
+    v = Math.max(0, Math.round(Number(v) || 0));
+    var m = Math.floor(v / 6000), sec = Math.floor(v / 100) % 60, cs = v % 100;
+    return (m ? m + ':' + (sec < 10 ? '0' : '') : '') + sec + '.' + (cs < 10 ? '0' : '') + cs + (m ? '' : 's');
+  }
+  function localBest(g, mode) {
+    if (mode !== 'time') return S.localBest(g.id);
+    var v = U.store('pbt:' + g.id);
+    return typeof v === 'number' && v > 0 ? v : 0;
+  }
+  function recordLocal(g, mode, v) {
+    if (mode !== 'time') return S.recordLocal(g.id, v);
+    var best = localBest(g, mode);
+    if (v > 0 && (!best || v < best)) { U.store('pbt:' + g.id, v); return v; }
+    return best;
+  }
+  function fmtBest(g, mode) {
+    var b = localBest(g, mode);
+    return mode === 'time' && !b ? '\u2014' : fmtVal(mode, b);
+  }
+
+  /* ------------------------------------------------------ room view */
+  function buildRoom() {
+    var cfg = root.XA_CONFIG || {};
+    var walletBtn = h('button', { class: 'xa-pill', id: 'xa-wallet', type: 'button', onclick: onWalletClick },
+      [h('span', { class: 'xa-dot' }), h('span', { class: 'xa-wallet-label', text: 'Wallet' })]);
+    var muteBtn = h('button', { class: 'xa-icon', id: 'xa-mute', type: 'button', 'aria-label': 'Toggle sound', onclick: function () {
+      XA.audio.setMuted(!XA.audio.isMuted()); XA.audio.unlock(); paintMute();
+    } });
+    var boardsBtn = h('button', { class: 'xa-pill', type: 'button', onclick: function () { openBoards(XA.games[0] && XA.games[0].id); } },
+      [h('span', { text: '\u{1F3C6}' }), h('span', { text: 'High scores' })]);
+
+    var grid = h('div', { class: 'xa-cabinets' });
+    XA.games.forEach(function (g) {
+      var canvas = h('canvas', { width: 320, height: 240, 'aria-hidden': 'true' });
+      var stats = h('div', { class: 'xa-cab-stats' }, [
+        h('div', {}, [h('span', { text: 'YOUR BEST' }), h('b', { class: 'xa-pb', text: fmtBest(g, g.mode) })]),
+        h('div', { class: 'xa-right' }, [h('span', { text: 'CHAIN #1' }), h('b', { class: 'xa-top1', text: '\u2026' })])
+      ]);
+      var cab = h('article', { class: 'xa-cab', style: '--c:' + g.color, 'data-game': g.id }, [
+        h('div', { class: 'xa-marquee' }, [h('h2', { text: g.title }), h('p', { text: g.tagline || '' })]),
+        h('div', { class: 'xa-screen' }, [canvas, h('div', { class: 'xa-insert', text: 'PRESS PLAY' })]),
+        stats,
+        h('div', { class: 'xa-cab-actions' + (g.variants.length ? ' has-variants' : '') }, [
+          h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', 'data-play': g.id,
+            onclick: function () { startGame(g.id); } }, ['\u25B6 Play']),
+          h('button', { class: 'xa-btn', type: 'button', 'aria-label': g.title + ' high scores',
+            onclick: function () { openBoards(g.id); } }, ['\u{1F3C6}'])
+        ].concat(g.variants.map(function (v) {
+          return h('button', { class: 'xa-btn xa-btn-variant', style: '--c:' + g.color, type: 'button',
+            'data-play-variant': g.id + ':' + v.key, title: v.tagline || v.label,
+            onclick: function () { startGame(g.id, v.key); } }, [(v.mode === 'time' ? '\u23F1 ' : '\u25B6 ') + v.label]);
+        })))
+      ]);
+      grid.appendChild(cab);
+      cabinets.push({ game: g, canvas: canvas, ctx: canvas.getContext('2d'), el: cab });
+    });
+
+    roomEl = h('main', { class: 'xa-room' }, [
+      h('div', { class: 'xa-floor-grid' }),
+      h('div', { class: 'xa-wrap' }, [
+        h('header', { class: 'xa-top' }, [
+          h('div', {}, [
+            h('h1', { class: 'xa-logo' }, [h('span', { text: 'XTRATA ' }), h('span', { text: 'ARCADE' })]),
+            h('p', { class: 'xa-sub', text: cfg.subtitle || (XA.games.length + ' cabinets \xB7 one on-chain leaderboard contract \xB7 built on Stacks') })
+          ]),
+          h('div', { class: 'xa-top-actions' }, [boardsBtn, walletBtn, muteBtn])
+        ]),
+        grid,
+        h('p', { class: 'xa-foot' }, [
+          'Top 10 per game lives on-chain in ',
+          h('code', { text: S.config().contractName }),
+          '. Posting a score costs the contract fee plus the network fee.'
+        ])
+      ])
+    ]);
+    rootEl.appendChild(roomEl);
+    paintMute();
+    paintWallet();
+  }
+
+  function paintMute() {
+    var b = $('#xa-mute');
+    if (b) b.textContent = XA.audio.isMuted() ? '\u{1F507}' : '\u{1F50A}';
+  }
+  function paintWallet() {
+    var b = $('#xa-wallet');
+    if (!b) return;
+    var dot = $('.xa-dot', b), label = $('.xa-wallet-label', b);
+    dot.className = 'xa-dot';
+    if (walletStatus.address) {
+      dot.classList.add('is-on');
+      label.textContent = S.shortAddress(walletStatus.address);
+      b.title = 'Connected ' + walletStatus.address;
+    } else if (walletStatus.route === 'none') {
+      dot.classList.add('is-warn');
+      label.textContent = 'View only';
+      b.title = 'Scores can be posted when the arcade is opened on xtrata.xyz';
+    } else {
+      label.textContent = 'Connect';
+      b.title = 'Connect a Stacks wallet to post high scores';
+    }
+  }
+  function onXtrataTop() {
+    try { return root.top === root && /(^|\\.)xtrata\\.xyz$/.test(root.location.hostname); } catch (e) { return false; }
+  }
+  async function onWalletClick() {
+    XA.audio.unlock();
+    walletStatus = S.status(); paintWallet();   // never trust a status read before the extension arrived
+    if (walletStatus.address) { S.disconnect(); return; }
+    if (walletStatus.route === 'none') {
+      if (onXtrataTop()) openInfo('No wallet found',
+        'No Stacks wallet extension answered in this browser. Install or unlock Leather or Xverse and reload, or play from the arcade page on Xtrata.', S.runtimeUrl());
+      else openInfo('View-only here',
+        'This copy of the arcade cannot reach a wallet, so you can play and see the boards but not post scores. ' +
+        'Open the arcade on Xtrata to post.', S.runtimeUrl());
+      return;
+    }
+    try { await S.connect(); } catch (e) { openInfo('Wallet not connected', e.message || String(e)); }
+  }
+
+  async function refreshCabinet(cab, force) {
+    var g = cab.game;
+    $('.xa-pb', cab.el).textContent = fmtBest(g, g.mode);
+    var board = await S.getTop10(g.id, g.mode, force);
+    boards[bk(g)] = board;
+    var el = $('.xa-top1', cab.el);
+    if (!board.ok) { el.textContent = 'offline'; el.title = board.error || ''; return; }
+    var top = board.entries[0];
+    el.textContent = top ? fmtVal(g.mode, top.score) + ' ' + top.name : 'be first';
+    el.title = top ? top.name + ' \xB7 ' + top.player : 'No scores yet';
+  }
+
+  /* ----------------------------------------------------- scoreboard */
+  function closeModal() {
+    if (modalEl) { modalEl.remove(); modalEl = null; }
+  }
+  function modal(card) {
+    closeModal();
+    modalEl = h('div', { class: 'xa-modal', role: 'dialog', 'aria-modal': 'true', onclick: function (e) {
+      if (e.target === modalEl) closeModal();
+    } }, [card]);
+    rootEl.appendChild(modalEl);
+    var f = card.querySelector('button');
+    if (f) f.focus();
+  }
+  function openInfo(title, text, link) {
+    modal(h('div', { class: 'xa-card' }, [
+      h('h3', { text: title }),
+      h('p', { class: 'xa-verdict', text: text }),
+      link ? h('p', { class: 'xa-note' }, [h('a', { href: link, target: '_blank', rel: 'noopener', style: 'color:var(--xa-cyan)', text: 'Open on xtrata.xyz \u2197' })]) : null,
+      h('div', { class: 'xa-card-foot' }, [h('span'), h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])
+    ]));
+  }
+  function verifyButton(game, mode, e) {
+    var b = h('button', { class: 'xa-btn', type: 'button', title: 'Fetch the stored replay and run it through this game' }, ['\u2713?']);
+    b.addEventListener('click', async function () {
+      b.disabled = true; b.textContent = '\u2026';
+      try {
+        var bytes = await S.getReplay(boardOf(game, mode), e.player);
+        if (!bytes) throw new Error('no replay stored');
+        var r = await XA.replay.verify(bytes, { address: e.player, score: e.score, board: boardOf(game, mode), file: sealedCopy(bytes) });
+        if (r.sealed) { b.disabled = false; b.textContent = '\u{1F512} sealed'; b.style.color = 'var(--xa-gold)'; b.onclick = function () { sealedInfo(game, mode, e, bytes); }; return; }
+        b.textContent = r.ok ? '\u2713 verified' : '\u2717 ' + r.reason;
+        b.style.color = r.ok ? '#7dffb2' : '#ff8c8c';
+      } catch (x) { b.textContent = '\u2717 ' + ((x && x.message) || 'failed'); b.style.color = '#ff8c8c'; }
+    });
+    return b;
+  }
+  var replayCache = {};
+  async function fetchReplay(game, mode, e) {
+    var key = boardOf(game, mode) + ':' + e.player + ':' + e.score;
+    if (!replayCache[key]) replayCache[key] = S.getReplay(boardOf(game, mode), e.player).then(function (b) {
+      if (!b) { delete replayCache[key]; throw new Error('No replay is stored for this entry.'); }
+      // a long run's entry points at its replay inscription; a sealed one is matched to a copy kept here or on chain
+      return XA.replay.resolve(b, null, { file: sealedCopy(b) }).catch(function (x) { if (x && x.sealed) x.stored = b; throw x; });
+    }).catch(function (x) { delete replayCache[key]; throw x; });
+    return replayCache[key];
+  }
+  function watchButton(game, mode, e) {
+    return h('button', { class: 'xa-btn', type: 'button', title: 'Watch this run, replayed from the chain', onclick: async function (ev) {
+      var b = ev.currentTarget; b.disabled = true; b.textContent = '\u2026';
+      try { var bytes = await fetchReplay(game, mode, e); closeModal(); watchReplay(bytes, { name: e.name, rank: e.rank }); }
+      catch (x) { b.disabled = false; b.textContent = '\u25B6'; if (x && x.sealed) sealedInfo(game, mode, e, x.stored); else openInfo('Replay unavailable', (x && x.message) || String(x)); }
+    } }, ['\u25B6']);
+  }
+  function saveButton(game, mode, e) {
+    return h('button', { class: 'xa-btn', type: 'button', title: 'Download this replay file', onclick: async function (ev) {
+      var b = ev.currentTarget; b.disabled = true;
+      try { saveReplay(await fetchReplay(game, mode, e), boardOf(game, mode) + '-' + e.name + '-' + e.score); }
+      catch (x) { if (x && x.sealed) sealedInfo(game, mode, e, x.stored); else openInfo('Replay unavailable', (x && x.message) || String(x)); }
+      b.disabled = false;
+    } }, ['\u2B07']);
+  }
+  function saveReplay(bytes, base) {
+    try {
+      var url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+      var a = doc.createElement('a');
+      a.href = url; a.download = 'xtrata-arcade-' + String(base).replace(/[^A-Za-z0-9_.-]+/g, '_') + '.xar';
+      doc.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+    } catch (x) { openInfo('Download blocked', 'This viewer does not allow downloads. Open the arcade on xtrata.xyz to save replays.'); }
+  }
+  /* ------------------------ sealed runs: the board holds the replay's fingerprint, the player holds the file */
+  function hex(b) { return S._codec.bytesToHex(b); }
+  function runKey(bytes) { return b64(bytes.subarray(4, 44)); }          // the run itself, whatever form it is stored in
+  function sealedCopies() { var v = U.store('sealed'); return Array.isArray(v) ? v : []; }
+  function keepSealed(bytes) {
+    try {
+      var k = runKey(bytes), list = sealedCopies().filter(function (u) { return u.k !== k; });
+      list.unshift({ k: k, at: Date.now(), b: b64(bytes) });
+      list = list.slice(0, UNPOSTED_MAX);
+      while (list.length && JSON.stringify(list).length > UNPOSTED_BYTES) list.pop();
+      U.store('sealed', list);
+    } catch (e) { /* storage blocked or full: the downloaded file is the copy */ }
+  }
+  // A copy of a sealed run's replay held in this browser (the player's own, or one checked here), if any.
+  function sealedCopy(stored) {
+    try {
+      if (!XA.replay.isSeal(stored)) return null;
+      var k = runKey(stored), hit = sealedCopies().concat(unposted()).filter(function (u) { return (u.k || (u.b && runKey(unb64(u.b)))) === k; });
+      for (var i = 0; i < hit.length; i++) { var full = unb64(hit[i].b); if (!XA.replay.mismatch(stored, full)) return full; }
+    } catch (e) {}
+    return null;
+  }
+  function sealedInfo(game, mode, e, stored) {
+    var R = XA.replay, p = R.readPointer(stored), kb = Math.max(1, Math.round(p.length / 1024));
+    var out = h('p', { class: 'xa-msg', 'aria-live': 'polite' });
+    var pick = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: 'Check a replay file' });
+    pick.addEventListener('click', function () {
+      var inp = h('input', { type: 'file', accept: '.xar,application/octet-stream', style: 'display:none' });
+      inp.addEventListener('change', async function () {
+        var f = inp.files && inp.files[0]; inp.remove();
+        if (!f) return;
+        var full = new Uint8Array(await f.arrayBuffer()), why = R.mismatch(stored, full);
+        if (why) { out.className = 'xa-msg is-err'; out.textContent = '\u2717 ' + why + '.'; return; }
+        out.className = 'xa-msg'; out.textContent = 'Fingerprint matches \u2713 Re-playing the run\u2026';
+        var r = await R.verify(stored, { address: e.player, score: e.score, board: boardOf(game, mode), file: full });
+        if (!out.isConnected) return;
+        if (!r.ok) { out.className = 'xa-msg is-err'; out.textContent = '\u2717 Fingerprint matches but the run does not check out: ' + r.reason; return; }
+        keepSealed(full);
+        delete replayCache[boardOf(game, mode) + ':' + e.player + ':' + e.score];
+        out.className = 'xa-msg is-ok';
+        out.replaceChildren('\u2713 Verified: this file is the sealed run and it scores ' + fmtVal(mode, r.score) + '. ',
+          h('button', { class: 'xa-link', type: 'button', text: 'Watch it', onclick: function () { closeModal(); watchReplay(full, { name: e.name, rank: e.rank }); } }));
+      });
+      doc.body.appendChild(inp); inp.click();
+    });
+    modal(h('div', { class: 'xa-card' }, [
+      h('h3', { text: '\u{1F512} Sealed run' }),
+      h('p', { class: 'xa-verdict', text: e.name + ' \xB7 ' + fmtVal(mode, e.score) + ' \xB7 ' + kb + ' KB replay' }),
+      h('p', { class: 'xa-note', text: 'The player posted this score with a fingerprint of the replay instead of the replay itself, and kept the file. ' +
+        'Whoever has the file can check it here: it must match the fingerprint exactly and re-play to this score. If the file is ever inscribed on Xtrata, it is found and played from the chain automatically.' }),
+      h('p', { class: 'xa-note', style: 'word-break:break-all;font-size:11px;opacity:.8', text: 'sha256 ' + hex(p.sha256) }),
+      out,
+      h('div', { class: 'xa-card-foot' }, [pick, h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])
+    ]));
+  }
+
+  function openReplayFile(post) {
+    var inp = h('input', { type: 'file', accept: '.xar,application/octet-stream', style: 'display:none' });
+    inp.addEventListener('change', async function () {
+      var f = inp.files && inp.files[0]; inp.remove();
+      if (!f) return;
+      try {
+        var bytes = await XA.replay.resolve(new Uint8Array(await f.arrayBuffer()));
+        if (post === true) postSavedRun(bytes); else watchReplay(bytes, { name: f.name.replace(/\\.xar$/, '') });
+      } catch (x) { openInfo('Could not open that replay', (x && x.message) || String(x)); }
+    });
+    doc.body.appendChild(inp); inp.click();
+  }
+
+  /* --------------------------- unposted runs: a great run is never lost
+     Every ranked run that would make a Top 10 is kept in this browser (when storage is allowed) until it is
+     posted, and can always be saved as a file. Either can be posted later from the machine's title screen. */
+  var UNPOSTED_MAX = 3, UNPOSTED_BYTES = 1500000;
+  function b64(bytes) {
+    var bin = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  function unb64(t) { var bin = atob(t), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+  function unposted() { var v = U.store('unposted'); return Array.isArray(v) ? v : []; }
+  function keepUnposted(board, score, mode, bytes) {
+    try {
+      var list = unposted().filter(function (u) { return u.r !== b64(bytes.subarray(0, 44)); });
+      list.unshift({ board: board, score: score, mode: mode, at: Date.now(), r: b64(bytes.subarray(0, 44)), b: b64(bytes) });
+      list = list.slice(0, UNPOSTED_MAX);
+      while (list.length > 1 && JSON.stringify(list).length > UNPOSTED_BYTES) list.pop();
+      U.store('unposted', list);
+    } catch (e) { /* storage blocked: Save replay still works */ }
+  }
+  function dropUnposted(bytes) {
+    try { var k = b64(bytes.subarray(0, 44)); U.store('unposted', unposted().filter(function (u) { return u.r !== k; })); } catch (e) {}
+  }
+  // A saved or kept run: re-played here first, then posted like a fresh one.
+  async function postSavedRun(bytes) {
+    var R = XA.replay, hd;
+    try { hd = R.readHeader(bytes); } catch (x) { openInfo('Not a replay', 'That file is not an Xtrata Arcade replay.'); return; }
+    var game = XA.games.filter(function (g) { return g.id === R.GAME_IDS[hd.gameIdx]; })[0];
+    if (!game) { openInfo('Unknown game', 'This replay is for a game that is not in this arcade.'); return; }
+    var variant = hd.variantIdx ? (game.variants || [])[hd.variantIdx - 1] : null;
+    var mode = variant ? variant.mode : game.mode, board = R.boardFor(game, mode);
+    var pilotAddr = S._codec.c32address(hd.version || 22, hd.hash160);
+    var body = h('div', {});
+    modal(h('div', { class: 'xa-card' }, [
+      h('h3', { text: 'Post a saved run' }),
+      h('p', { class: 'xa-verdict', text: game.title + (variant ? ' \xB7 ' + variant.label : '') + ' \xB7 ' + fmtVal(mode, hd.score) + ' \xB7 flown by ' + S.shortAddress(pilotAddr) }),
+      body,
+      h('div', { class: 'xa-card-foot' }, [h('span'), h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])
+    ]));
+    body.replaceChildren(h('p', { class: 'xa-note', text: 'Re-playing the run to check it\u2026' }));
+    var chk = await R.verify(bytes, { score: hd.score, board: board });
+    if (!body.isConnected) return;
+    if (!chk.ok) { body.replaceChildren(h('p', { class: 'xa-msg is-err', text: 'This run does not check out (' + chk.reason + '), so it cannot be posted.' })); return; }
+    var top = await S.getTop10(board, mode, true);
+    if (!body.isConnected) return;
+    var rank = insertRank(top, hd.score, mode);
+    if (top.ok && !rank) { body.replaceChildren(h('p', { class: 'xa-note', text: 'Replay checked \u2713 but the Top 10 has moved on: this score no longer makes the board.' })); return; }
+    var box = h('div', { class: 'xa-submit' });
+    body.replaceChildren(h('p', { class: 'xa-note', text: rank ? 'Replay checked \u2713 It would be #' + rank + ' on the board.' : 'Replay checked \u2713' }), box);
+    postCard(box, { game: game, mode: mode, score: hd.score, bytes: bytes, pilot: { address: pilotAddr, hash160: hd.hash160 }, checked: true });
+  }
+  // Replays are drawn and heard like a live run, fed from the recorded input instead of the keyboard.
+  async function watchReplay(bytes, info) {
+    var dec;
+    try { dec = await XA.replay.decode(bytes); }
+    catch (x) { openInfo('Could not read that replay', (x && x.message) || String(x)); return; }
+    var game = XA.games.filter(function (g) { return g.id === XA.replay.GAME_IDS[dec.gameIdx]; })[0];
+    if (!game) { openInfo('Unknown game', 'This replay is for a game that is not in this arcade.'); return; }
+    var variant = dec.variantIdx ? (game.variants || [])[dec.variantIdx - 1] : null;
+    startGame(game.id, variant && variant.key, { watch: dec, bytes: bytes, info: info || {} });
+  }
+  function boardList(board, game, highlight, mode) {
+    mode = mode || (game && game.mode) || 'score';
+    if (!board) return h('div', { class: 'xa-empty', text: 'Loading\u2026' });
+    if (!board.ok) return h('div', { class: 'xa-error', text: 'Couldn\u2019t reach the leaderboard right now. It isn\u2019t empty \u2014 try again in a moment.' });
+    if (!board.entries.length) return h('div', { class: 'xa-empty', text: 'No scores yet. The first run that lands here is permanent until someone beats it.' });
+    return h('ol', { class: 'xa-board' }, board.entries.map(function (e) {
+      var you = walletStatus.address && e.player === walletStatus.address;
+      return h('li', { class: you || (highlight && highlight === e.rank) ? 'is-you' : '' }, [
+        h('span', { class: 'xa-rank', text: '#' + e.rank }),
+        h('span', { class: 'xa-who' }, [h('b', { text: e.name }), h('small', { text: S.shortAddress(e.player) + (you ? ' \xB7 you' : '') })]),
+        h('span', { class: 'xa-pts', text: fmtVal(mode, e.score) }),
+        game && !game.framed ? h('span', { class: 'xa-tools' }, [watchButton(game, mode, e), saveButton(game, mode, e), verifyButton(game, mode, e)]) : null
+      ]);
+    }));
+  }
+  function openBoards(gameId, mode) {
+    var game = XA.games.filter(function (g) { return g.id === gameId; })[0] || XA.games[0];
+    var modes = [game.mode].concat(game.variants.map(function (v) { return v.mode; }));
+    if (modes.indexOf(mode) < 0) mode = game.mode;
+    var key = bk(game, mode);
+    var body = h('div', {}, [boardList(boards[key], game, 0, mode)]);
+    var tabs = h('div', { class: 'xa-tabs', role: 'tablist' }, XA.games.map(function (g) {
+      return h('button', { class: 'xa-tab', role: 'tab', type: 'button', style: '--c:' + g.color,
+        'aria-selected': g.id === game.id ? 'true' : 'false', onclick: function () { openBoards(g.id); } }, [g.title]);
+    }));
+    var modeTabs = modes.length > 1 ? h('div', { class: 'xa-mode-tabs', role: 'tablist', 'aria-label': game.title + ' boards' }, modes.map(function (m) {
+      return h('button', { class: 'xa-mode-tab', role: 'tab', type: 'button', 'data-mode': m,
+        'aria-selected': m === mode ? 'true' : 'false', onclick: function () { openBoards(game.id, m); } },
+        [(m === 'time' ? '\u23F1 ' : '') + modeLabel(game, m)]);
+    })) : null;
+    var foot = h('div', { class: 'xa-card-foot' }, [
+      h('span', { text: 'Your best: ' + fmtBest(game, mode) }),
+      h('span', {}, [
+        h('button', { class: 'xa-btn', type: 'button', style: 'margin-right:8px', onclick: async function () {
+          body.replaceChildren(boardList(null));
+          boards[key] = await S.getTop10(boardOf(game, mode), mode, true);
+          body.replaceChildren(boardList(boards[key], game, 0, mode));
+        } }, ['\u21BB Refresh']),
+        h('button', { class: 'xa-btn', type: 'button', onclick: closeModal }, ['Close'])
+      ])
+    ]);
+    modal(h('div', { class: 'xa-card', style: '--c:' + game.color }, [h('h3', { text: 'High scores' }), tabs, modeTabs, body, foot]));
+    if (!boards[key]) S.getTop10(boardOf(game, mode), mode).then(function (b) {
+      boards[key] = b;
+      if (modalEl && body.isConnected) body.replaceChildren(boardList(b, game, 0, mode));
+    });
+  }
+
+  /* ------------------------------------------------------- session */
+  function startGame(id, variantKey, opts) {
+    opts = opts || {};
+    XA.audio.unlock();
+    closeModal();
+    var game = XA.games.filter(function (g) { return g.id === id; })[0];
+    if (!game) return;
+    if (game.framed) { openInfo(game.title, game.title + ' is played in a window of its own, which only the 3D hall can open. Walk up to its cabinet in the hall to play it.'); return; }
+    var variant = variantOf(game, variantKey);
+    var mode = variant ? variant.mode : game.mode;
+    endSession(true);
+    if (XA.music) { XA.music.stop(0.15); XA.music.clearListeners(); }
+
+    var canvas = h('canvas', { 'aria-label': game.title + ' playfield' });
+    var stage = h('div', { class: 'xa-stage' }, [canvas]);
+    var scoreEl = h('b', { id: 'xa-score', text: '0' });
+    var bestEl = h('b', { text: fmtBest(game, mode) });
+    var hiEl = h('b', { text: '\u2026' });
+    var statusEl = h('div', { class: 'xa-status', 'aria-live': 'polite' });
+    var pauseBtn = h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Pause', text: '\u275A\u275A', onclick: function () { togglePause(); } });
+    gameEl = h('section', { class: 'xa-game', style: '--c:' + game.color }, [
+      h('div', { class: 'xa-hud' }, [
+        h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Back to the arcade', text: '\u25C0', onclick: function () { endSession(); } }),
+        h('span', { class: 'xa-title', text: game.title + (variant ? ' \xB7 ' + variant.label : '') }),
+        h('div', { class: 'xa-hud-stats' }, [
+          h('div', {}, [h('small', { text: mode === 'time' ? 'TIME' : 'SCORE' }), scoreEl]),
+          h('div', {}, [h('small', { text: 'BEST' }), bestEl]),
+          h('div', {}, [h('small', { text: 'CHAIN #1' }), hiEl])
+        ]),
+        pauseBtn
+      ]),
+      statusEl,
+      stage
+    ]);
+    var watch = opts.watch || null, pb = watch ? XA.replay.playback(watch.events) : null;
+    var input = watch ? pb.input : XA.createInput(stage);
+    var pads = watch ? null : buildPads(game.touch, input, game);
+    if (pads) gameEl.appendChild(pads);
+    rootEl.appendChild(gameEl);
+    roomEl.setAttribute('aria-hidden', 'true');
+
+    var pilot = watch ? null : XA.replay.pilotFor(walletStatus.address);      // connected wallet \u2192 a ranked, recorded run
+    var nonce = U.newSeed();
+    var seed = watch ? XA.replay.seedFor(watch.hash160, watch.nonce, watch.gameIdx) : pilot ? XA.replay.seedFor(pilot.hash160, nonce, XA.replay.gameIndex(game)) : nonce;
+    var fx = XA.createFx();
+    session = {
+      game: game, variant: variant, mode: mode, completed: false, canvas: canvas, ctx: canvas.getContext('2d'), stage: stage, input: input, fx: fx,
+      score: 0, shake: 0, state: 'countdown', countdown: 3.0, acc: 0, seed: seed,
+      scoreEl: scoreEl, statusEl: statusEl, hiEl: hiEl, scale: 1, overlay: null, startedAt: Date.now()
+    };
+    var s = session;
+    if (watch) { s.state = 'watch'; s.watch = watch; s.pb = pb; s.steps = 0; s.speed = 1; s.bytes = opts.bytes; s.info = opts.info; }
+    else if (!opts.go) s.state = 'ready';
+    var live = function () { return s.state === 'play' || s.state === 'watch'; };
+    var api = {
+      W: game.size.w, H: game.size.h, input: input, audio: XA.audio, fx: fx,
+      rng: U.rng(seed), seed: seed, ranked: !!pilot,
+      shake: function (n) { s.shake = Math.max(s.shake, n); },
+      addScore: function (n) { if (live()) s.score += Math.max(0, Math.floor(n)); },
+      setScore: function (n) { if (live()) s.score = Math.max(0, Math.floor(n)); },
+      getScore: function () { return s.score; },
+      setStatus: function (t) { if (s.statusEl.textContent !== t) s.statusEl.textContent = t; },
+      gameOver: function () { if (s.state === 'play') finish(); else if (s.state === 'watch') endWatch(s); },
+      // Which board this run is for. In 'time' mode the score is the elapsed
+      // time in centiseconds (lower wins): keep it current with setScore and
+      // call finish() on completion. gameOver() without finish() is a DNF.
+      mode: mode,
+      variant: variant ? variant.key : null,
+      finish: function () { if (s.state === 'play') { s.completed = true; finish(); } else if (s.state === 'watch') { s.completed = true; endWatch(s); } },
+      // Pointer in playfield units. \`moved\` increments on every move/press, so a
+      // game can tell "the pointer is steering" from "the keys are steering".
+      pointer: watch ? pb.pointer : function () {
+        var p = input.pointer, r = canvas.getBoundingClientRect();
+        // quarter-unit resolution, so a replay can reproduce exactly what the game saw
+        return { x: XA.replay.qpt((p.x - r.left) / s.scale), y: XA.replay.qpt((p.y - r.top) / s.scale), down: p.down, moved: p.moved };
+      }
+    };
+    if (pilot && gameEl) {
+      s.pilot = pilot;
+      s.rec = XA.replay.record(game, variant, pilot, nonce, input, api.pointer);
+    }
+    var tag = s.tagEl = h('span', { class: 'xa-runtag', style: 'margin-left:8px;font-size:11px;letter-spacing:.08em;white-space:nowrap;color:' + (pilot ? '#7dffb2' : '#9aa3c7'),
+      title: watch ? 'Replay' : pilot ? 'Ranked: this run is recorded and can be posted on-chain.' : 'Practice: connect a wallet before you start to rank a run.',
+      text: watch ? '\u25B6 REPLAY' : pilot ? '\u25CF RANKED' : 'PRACTICE' });
+    var ttl = $('.xa-title', gameEl); if (ttl) ttl.appendChild(tag);
+    if (watch) { var realStore = U.store; U.store = blankStore(s); try { s.instance = game.create(api); } finally { U.store = realStore; } }
+    else s.instance = game.create(api);
+    fit();
+    if (watch) showWatch(s); else if (s.state === 'ready') showReady(s); else showCountdown();
+    S.getTop10(boardOf(game, mode), mode).then(function (b) {
+      boards[bk(game, mode)] = b;
+      if (session !== s) return;
+      hiEl.textContent = b.ok ? (b.entries[0] ? fmtVal(mode, b.entries[0].score) : '\u2014') : 'offline';
+    });
+  }
+
+  (function () {
+    var st = doc.createElement('style');
+    st.textContent = '.xa-board li { grid-template-columns: 34px 1fr auto auto; }\\n.xa-tools { display: flex; gap: 4px; justify-content: flex-end; }\\n.xa-tools .xa-btn { margin: 0 !important; padding: 3px 8px !important; font-size: 11px !important; min-height: 0; }\\n.xa-ready-overlay { overflow: auto; align-items: start; background: rgba(3, 4, 12, .6); }\\n.xa-ready { width: min(520px, 100%); margin: auto; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--xa-line); background: rgba(8, 10, 26, .9); box-shadow: 0 0 40px -12px var(--c); }\\n.xa-ready h3 { font-size: 30px; text-shadow: 0 0 14px var(--c), 0 0 34px var(--c); }\\n.xa-ready-variant { margin-top: 6px; font: 800 12px/1 var(--xa-mono); letter-spacing: .16em; color: var(--c); text-transform: uppercase; }\\n.xa-ready-tag { margin: 12px 0 0; font: 800 12px/1.4 var(--xa-mono); letter-spacing: .1em; color: var(--xa-dim); }\\n.xa-ready-tag.is-ranked { color: var(--xa-green); }\\n.xa-ready-tag.is-warn { color: #ffc53d; }\\n.xa-ready-msg { margin: 6px 0 0; font: 700 12px/1.4 var(--xa-mono); color: var(--xa-dim); min-height: 0; }\\n.xa-ready-msg.is-err { color: #ff4d6d; }\\n.xa-btn-connect { font-weight: 800; }\\n.xa-link { background: none; border: 0; padding: 0; font: inherit; color: var(--xa-cyan); text-decoration: underline; cursor: pointer; }\\n.xa-ready-head { display: flex; justify-content: space-between; margin: 16px 0 4px; font: 800 11px/1 var(--xa-mono); letter-spacing: .14em; color: var(--xa-faint); }\\n.xa-ready-board { max-height: 38vh; overflow: auto; text-align: left; border-top: 1px solid var(--xa-line); }\\n.xa-ready-board .xa-board { font-size: 13px; }\\n.xa-ready-board .xa-board li { padding: 7px 6px; }\\n.xa-ready .xa-variants { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }\\n.xa-replay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }';
+    (doc.head || doc.documentElement).appendChild(st);
+  })();
+  function blankStore(s) {
+    var mem = {};
+    return function (k, v) { if (v === undefined) return k in mem ? mem[k] : null; mem[k] = v; return null; };
+  }
+  function beginRun(s) {
+    if (!s || session !== s || s.state !== 'ready') return;
+    s.state = 'countdown'; s.countdown = 3.0; s.input.reset();
+    showCountdown();
+  }
+  // Connect from the ready card, then reopen the same machine as a ranked run.
+  async function connectForRun(s, btn, msg) {
+    if (!s || session !== s || s.state !== 'ready' || s.connecting) return;
+    s.connecting = true;
+    var label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Check your wallet\\u2026';
+    msg.className = 'xa-ready-msg'; msg.textContent = '';
+    try {
+      await S.connect();
+      walletStatus = S.status(); paintWallet();
+      if (session === s && s.state === 'ready' && walletStatus.address) {
+        startGame(s.game.id, s.variant ? s.variant.key : null);   // same machine, now ranked
+        return;
+      }
+      throw new Error('The wallet did not return an address.');
+    } catch (e) {
+      if (session !== s) return;
+      msg.className = 'xa-ready-msg is-err';
+      msg.textContent = 'Not connected: ' + ((e && e.message) || String(e)) + ' Try again, or play a practice run.';
+      btn.disabled = false; btn.textContent = label;
+    } finally { s.connecting = false; }
+  }
+  // "You have an unposted run" on a machine's title screen.
+  function unpostedRow(g, mode) {
+    var mine = unposted().filter(function (u) { return u.board === boardOf(g, mode); });
+    if (!mine.length) return null;
+    return h('div', { class: 'xa-note', style: 'margin-top:10px;padding:10px;border-radius:10px;border:1px solid var(--xa-gold);text-align:left' },
+      [h('b', { style: 'color:var(--xa-gold)', text: 'Unposted run' + (mine.length > 1 ? 's' : '') + ' kept in this browser' })].concat(mine.map(function (u) {
+        var bytes = unb64(u.b);
+        return h('div', { style: 'display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:6px' }, [
+          h('span', { text: fmtVal(u.mode, u.score) + ' \xB7 ' + new Date(u.at).toLocaleString() }),
+          h('span', { style: 'display:flex;gap:6px' }, [
+            h('button', { class: 'xa-btn', type: 'button', style: 'padding:4px 10px;font-size:11px', onclick: function () { postSavedRun(bytes); } }, ['Post']),
+            h('button', { class: 'xa-btn', type: 'button', style: 'padding:4px 10px;font-size:11px', onclick: function () { saveReplay(bytes, u.board + '-' + u.score); } }, ['\u2B07 Save'])
+          ])
+        ]);
+      })));
+  }
+  function showReady(s) {
+    var g = s.game, mode = s.mode, vkey = s.variant ? s.variant.key : null;
+    var list = h('div', { class: 'xa-ready-board' }, [boardList(boards[bk(g, mode)], g, 0, mode)]);
+    // A run is bound to the wallet it starts with (the replay is seeded from it),
+    // so a score can only be posted if the wallet is connected BEFORE the run.
+    // Not connected \u2192 connecting is the main action; practice is the fallback.
+    walletStatus = S.status(); paintWallet();
+    var canConnect = !s.pilot && walletStatus.route !== 'none';
+    var start, practice = null, tag, msg = h('p', { class: 'xa-ready-msg', 'aria-live': 'polite' });
+    if (s.pilot) {
+      start = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { beginRun(s); } }, ['\u25B6 START']);
+      tag = h('p', { class: 'xa-ready-tag is-ranked', text: '\u25CF RANKED \xB7 flying as ' + S.shortAddress(s.pilot.address) });
+    } else if (canConnect) {
+      start = h('button', { class: 'xa-btn xa-btn-play xa-btn-connect', style: '--c:' + g.color, type: 'button', onclick: function () { connectForRun(s, start, msg); } }, ['\\uD83D\\uDD17 CONNECT WALLET']);
+      practice = h('button', { class: 'xa-btn', type: 'button', title: 'Play without a wallet. The score cannot be posted on-chain.', onclick: function () { beginRun(s); } }, ['\u25B6 Practice']);
+      tag = h('p', { class: 'xa-ready-tag is-warn', text: 'NOT CONNECTED \xB7 connect first to post your score on-chain. A practice run cannot be posted afterwards.' });
+    } else {
+      start = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { beginRun(s); } }, ['\u25B6 PRACTICE']);
+      tag = h('p', { class: 'xa-ready-tag is-warn' }, ['VIEW ONLY \xB7 no wallet can be reached here, so this score cannot be posted. ',
+        h('a', { href: S.runtimeUrl(), target: '_blank', rel: 'noopener', style: 'color:var(--xa-cyan)', text: 'Play on xtrata.xyz \\u2197' })]);
+    }
+    s.primary = canConnect ? function () { connectForRun(s, start, msg); } : function () { beginRun(s); };
+    var modes = [null].concat(g.variants || []);
+    var switcher = modes.length > 1 ? h('div', { class: 'xa-variants' }, modes.filter(function (v) { return (v ? v.key : null) !== vkey; }).map(function (v) {
+      return h('button', { class: 'xa-btn xa-btn-variant', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, v ? v.key : null); } },
+        [v ? (v.mode === 'time' ? '\u23F1 ' : '\u25B6 ') + v.label : '\u25B6 ' + modeLabel(g, g.mode)]);
+    })) : null;
+    setOverlay(h('div', { class: 'xa-overlay xa-ready-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over xa-ready' }, [
+      h('h3', { text: g.title }),
+      s.variant ? h('div', { class: 'xa-ready-variant', text: s.variant.label }) : null,
+      h('p', { class: 'xa-verdict', text: (s.variant && s.variant.tagline) || g.tagline || '' }),
+      g.controls ? h('p', { class: 'xa-note', text: g.controls }) : null,
+      tag,
+      msg,
+      h('div', { class: 'xa-ready-head' }, [h('span', { text: 'ON-CHAIN TOP 10' }), h('span', { text: 'YOUR BEST ' + fmtBest(g, mode) })]),
+      list,
+      h('div', { class: 'xa-over-actions' }, [start, practice, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['\u25C0 Arcade'])]),
+      switcher,
+      unpostedRow(g, mode),
+      h('p', { class: 'xa-note' }, [canConnect ? 'Enter or Space to connect \xB7 Esc to go back \xB7 ' : 'Enter or Space to start \xB7 Esc to go back \xB7 ',
+        h('button', { class: 'xa-link', type: 'button', onclick: function () { openReplayFile(false); } }, ['watch a replay file']), ' \xB7 ',
+        h('button', { class: 'xa-link', type: 'button', onclick: function () { openReplayFile(true); } }, ['post a saved run'])])
+    ])]));
+    start.focus();
+    S.getTop10(boardOf(g, mode), mode, true).then(function (b) {
+      boards[bk(g, mode)] = b;
+      if (session === s && s.state === 'ready' && list.isConnected) list.replaceChildren(boardList(b, g, 0, mode));
+    });
+  }
+  function showWatch(s) {
+    var who = s.info && s.info.name ? s.info.name : 'replay';
+    s.statusEl.textContent = 'REPLAY \xB7 ' + who + (s.info && s.info.rank ? ' \xB7 #' + s.info.rank : '') + ' \xB7 target ' + fmtVal(s.mode, s.watch.score);
+    var speed = h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Replay speed', text: '1\xD7', onclick: function () {
+      s.speed = s.speed >= 8 ? 1 : s.speed * 2; speed.textContent = s.speed + '\xD7';
+    } });
+    var hud = $('.xa-hud', gameEl); if (hud) hud.insertBefore(speed, hud.lastChild);
+    setOverlay(null);
+  }
+  function endWatch(s) {
+    if (s.state !== 'watch') return;
+    s.state = 'watched';
+    var ok = s.score === s.watch.score;
+    var g = s.game, vkey = s.variant ? s.variant.key : null;
+    setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over' }, [
+      h('h3', { text: 'REPLAY OVER' }),
+      h('div', { class: 'xa-final', text: fmtVal(s.mode, s.score) }),
+      h('p', { class: 'xa-verdict', text: ok ? 'The replay reached exactly the recorded score.' : 'This replay ended at ' + fmtVal(s.mode, s.score) + ', not the recorded ' + fmtVal(s.mode, s.watch.score) + '.' }),
+      h('div', { class: 'xa-over-actions' }, [
+        h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { watchReplay(s.bytes, s.info); } }, ['\u21BB Watch again']),
+        h('button', { class: 'xa-btn', type: 'button', onclick: function () { startGame(g.id, vkey); } }, ['\u25C0 Back'])
+      ]),
+      h('div', { class: 'xa-replay-row' }, [h('button', { class: 'xa-btn', type: 'button', onclick: function () { saveReplay(s.bytes, boardOf(g, s.mode) + '-' + ((s.info && s.info.name) || 'replay') + '-' + s.watch.score); } }, ['\u2B07 Save replay'])])
+    ])]));
+  }
+  function buildPads(kind, input, game) {
+    var coarse = root.matchMedia && root.matchMedia('(pointer: coarse)').matches;
+    if (!coarse && !/[?&]pads=1/.test(root.location.search || '')) return null;
+    function pad(name, label, cls) {
+      var b = h('button', { class: 'xa-pad ' + (cls || '') + ' ' + name, type: 'button', 'aria-label': name, text: label });
+      function down(e) { e.preventDefault(); XA.audio.unlock(); b.classList.add('is-down'); input.press(name); try { b.setPointerCapture(e.pointerId); } catch (x) {} }
+      function up() { b.classList.remove('is-down'); input.release(name); }
+      b.addEventListener('pointerdown', down);
+      b.addEventListener('pointerup', up);
+      b.addEventListener('pointercancel', up);
+      b.addEventListener('lostpointercapture', up);
+      b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      return b;
+    }
+    if (kind === 'dpad') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-hint', text: 'SWIPE OR USE THE PAD' }),
+        h('div', { class: 'xa-pad-group xa-dpad' }, [pad('up', '\u25B2'), pad('left', '\u25C0'), pad('down', '\u25BC'), pad('right', '\u25B6')])
+      ]);
+    }
+    if (kind === 'blocks') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '\u25C0'), pad('down', '\u25BC'), pad('right', '\u25B6')]),
+        h('div', { class: 'xa-pad-group xa-grid2' }, [pad('b', '\u27F2'), pad('c', '\u27F3'), pad('d', 'HOLD', 'xa-wide'), pad('a', '\u2913')])
+      ]);
+    }
+    if (kind === 'lander') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '\u27F2'), pad('right', '\u27F3')]),
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('up', 'THRUST', 'xa-wide')])
+      ]);
+    }
+    if (kind === 'shooter') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '\u25C0'), pad('right', '\u25B6')]),
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('a', 'FIRE', 'xa-wide')])
+      ]);
+    }
+    if (kind === 'ship') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '\u27F2'), pad('right', '\u27F3')]),
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('up', 'THRUST', 'xa-wide'), pad('a', 'FIRE', 'xa-wide')])
+      ]);
+    }
+    if (kind === 'hint') {
+      return h('div', { class: 'xa-pads' }, [h('div', { class: 'xa-pad-hint', text: game.touchHint || '' })]);
+    }
+    if (kind === 'hold') {
+      return h('div', { class: 'xa-pads' }, [h('div', { class: 'xa-pad-hint', text: 'TOUCH AND HOLD ANYWHERE ON THE SCREEN TO SWIM' })]);
+    }
+    return null;
+  }
+
+  function fit() {
+    if (!session) return;
+    var s = session, g = s.game;
+    var rect = s.stage.getBoundingClientRect();
+    var availW = Math.max(100, rect.width - 20), availH = Math.max(100, rect.height - 12);
+    var scale = Math.min(availW / g.size.w, availH / g.size.h);
+    var dpr = Math.min(root.devicePixelRatio || 1, 2.5);
+    s.scale = scale;
+    s.dpr = dpr;
+    s.canvas.style.width = Math.floor(g.size.w * scale) + 'px';
+    s.canvas.style.height = Math.floor(g.size.h * scale) + 'px';
+    s.canvas.width = Math.floor(g.size.w * scale * dpr);
+    s.canvas.height = Math.floor(g.size.h * scale * dpr);
+  }
+
+  function setOverlay(el) {
+    if (!session) return;
+    if (session.overlay) session.overlay.remove();
+    session.overlay = el;
+    if (el) session.stage.appendChild(el);
+  }
+  function showCountdown() {
+    var n = h('div', { class: 'xa-countdown', text: '3' });
+    setOverlay(h('div', { class: 'xa-overlay', style: 'background:rgba(3,4,12,.35)' }, [n]));
+    session.countEl = n;
+    XA.audio.tone(440, 0.1, { type: 'square', vol: 0.15 });
+  }
+
+  function togglePause(force) {
+    var s = session;
+    if (!s) return;
+    if (s.state === 'play' && force !== false) {
+      s.state = 'paused';
+      if (XA.music) XA.music.pause();
+      s.input.reset();
+      setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over xa-pause' }, [
+        h('h3', { text: 'PAUSED' }),
+        h('div', { class: 'xa-over-actions' }, [
+          h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + s.game.color, type: 'button', onclick: function () { togglePause(); } }, ['Resume']),
+          h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['Quit'])
+        ])
+      ])]));
+      $('.xa-overlay button', s.stage).focus();
+    } else if (s.state === 'paused' && force !== true) {
+      s.state = 'play';
+      s.acc = 0;
+      s.input.reset();
+      if (XA.music) XA.music.resume();
+      setOverlay(null);
+    }
+  }
+
+  function endSession(silent) {
+    if (!session) return;
+    session.input.destroy();
+    session = null;
+    if (XA.music) { XA.music.stop(0.35); XA.music.clearListeners(); }
+    if (gameEl) { gameEl.remove(); gameEl = null; }
+    roomEl.removeAttribute('aria-hidden');
+    cabinets.forEach(function (c) { refreshCabinet(c); });
+    var btn = $('[data-play]');
+    if (btn && btn.offsetParent) btn.focus();
+    var hostCfg = root.XA_CONFIG || {};
+    if (silent !== true && typeof hostCfg.onExit === 'function') { try { hostCfg.onExit(); } catch (e) { console.error(e); } }
+  }
+
+  /* --------------------------------------------------- game over */
+  function insertRank(board, score, mode) {
+    if (!board || !board.ok) return 0;
+    for (var i = 0; i < 10; i++) {
+      var e = board.entries[i];
+      if (!e) return i + 1;
+      if (mode === 'time' ? score < e.score : score > e.score) return i + 1;
+    }
+    return 0;
+  }
+
+  async function finish() {
+    var s = session;
+    s.state = 'over';
+    s.input.reset();
+    // Games may already have stopped their music (e.g. their own death cue).
+    if (XA.music && XA.music.isPlaying()) XA.music.tapeStop(1.3);
+    var g = s.game, mode = s.mode, vkey = s.variant ? s.variant.key : null;
+    var score = s.score;
+    var dnf = mode === 'time' && !s.completed;
+    if (dnf) score = 0;
+    if (s.rec && !s.replayP) s.replayP = s.rec.finish(score, s.completed);   // ready for Watch / Save on the game-over card
+    var prevBest = localBest(g, mode);
+    var best = recordLocal(g, mode, score);
+    var isPb = score > 0 && (mode === 'time' ? (!prevBest || score < prevBest) : score > prevBest);
+    XA.audio.arp(isPb ? [523, 659, 784, 1047] : [392, 330, 262], 0.09, { type: 'triangle', vol: 0.2 });
+
+    var verdict = h('p', { class: 'xa-verdict', text: 'Checking the on-chain board\u2026' });
+    var submitBox = h('div', { class: 'xa-submit xa-hidden' });
+    var again = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, vkey, { go: true }); } }, ['\u21BB Play again']);
+    setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over' }, [
+      h('h3', { text: dnf ? 'DID NOT FINISH' : mode === 'time' ? 'FINISHED' : 'GAME OVER' }),
+      h('div', { class: 'xa-final', text: dnf ? '\u2014' : fmtVal(mode, score) }),
+      isPb ? h('span', { class: 'xa-badge', text: '\u2605 NEW PERSONAL BEST' }) : h('span', { class: 'xa-note', text: 'Best ' + fmtBest(g, mode) }),
+      verdict,
+      submitBox,
+      h('div', { class: 'xa-over-actions' }, [again, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['\u25C0 Arcade'])]),
+      s.replayP ? h('div', { class: 'xa-replay-row' }, [
+        h('button', { class: 'xa-btn', type: 'button', onclick: async function () { var b = await s.replayP; if (b) watchReplay(b, { name: 'Your run' }); } }, ['\u25B6 Watch my run']),
+        h('button', { class: 'xa-btn', type: 'button', onclick: async function () { var b = await s.replayP; if (b) saveReplay(b, boardOf(g, mode) + '-' + score); } }, ['\u2B07 Save replay'])
+      ]) : null
+    ])]));
+    again.focus();
+
+    if (dnf) { verdict.textContent = 'Finish the run to set a time for the board.'; return; }
+    if (!(score > 0)) { verdict.textContent = 'Score something to get on the board.'; return; }
+    var board = await S.getTop10(boardOf(g, mode), mode, true);
+    if (session !== s) return;
+    boards[bk(g, mode)] = board;
+    var rank = insertRank(board, score, mode);
+    if (!board.ok) {
+      verdict.textContent = 'Couldn\u2019t check the leaderboard right now \u2014 you can still try to post.';
+    } else if (rank) {
+      if (s.rec) verdict.replaceChildren('That run makes the top 10 at ', h('b', { text: '#' + rank }), '. Post it on-chain to keep it until someone beats it.');
+      // A practice run is not bound to a wallet, so it can never be posted: say so up front, not after a connect.
+      else verdict.replaceChildren('That would have been ', h('b', { text: '#' + rank }), ' on the board, but practice runs can\\u2019t be posted.');
+    } else {
+      var tenth = board.entries[9];
+      verdict.textContent = mode === 'time'
+        ? 'The top 10 starts at ' + fmtVal(mode, tenth.score) + '. ' + fmtVal(mode, score - tenth.score + 1) + ' faster to get on the board.'
+        : 'The top 10 starts at ' + U.fmt(tenth.score) + '. ' + U.fmt(tenth.score - score + 1) + ' more to get on the board.';
+      return;
+    }
+    if (s.rec && !s.replayP) s.replayP = s.rec.finish(score, s.completed);
+    // A Top 10 run is kept in this browser until it is posted, so closing the tab or a failed post never loses it.
+    if (s.rec && s.replayP) s.replayP.then(function (b) { if (b) keepUnposted(boardOf(g, mode), score, mode, b); });
+    buildSubmit(submitBox, s, score, rank);
+  }
+
+  // Game over after a practice run. A run is locked to the wallet it started with (its replay is seeded
+  // from it), so this score can't be posted even if the player connects now. Say that plainly, let them
+  // connect here, show the result as soon as the wallet answers, and offer a ranked run straight away.
+  function practiceBox(box, s) {
+    var g = s.game, vkey = s.variant ? s.variant.key : null;
+    function render() {
+      if (session !== s || !box.isConnected) return;
+      var st = S.status();
+      if (st.address) {
+        box.replaceChildren(
+          h('p', { class: 'xa-note', style: 'margin:0;color:var(--xa-green)', text: '\\u2713 Connected as ' + S.shortAddress(st.address) + '. Your next run is ranked and can be posted.' }),
+          h('p', { class: 'xa-note', text: 'This practice run stays unposted: a run is locked to the wallet it starts with, so nobody can claim a score they didn\\u2019t play.' }),
+          h('button', { class: 'xa-btn xa-btn-play', style: 'margin-top:10px;--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, vkey, { go: true }); } }, ['\\u25B6 Play a ranked run'])
+        );
+        return;
+      }
+      var msg = h('p', { class: 'xa-msg' });
+      var btn = h('button', { class: 'xa-btn', type: 'button', style: 'margin-top:10px', onclick: async function () {
+        if (btn.disabled) return;
+        walletStatus = S.status(); paintWallet();
+        if (walletStatus.route === 'none') { onWalletClick(); return; }
+        btn.disabled = true; btn.textContent = 'Check your wallet\\u2026'; msg.className = 'xa-msg'; msg.textContent = '';
+        try {
+          await S.connect();
+          walletStatus = S.status(); paintWallet();
+          if (!walletStatus.address) throw new Error('The wallet did not return an address.');
+          render();
+        } catch (e) {
+          if (session !== s || !box.isConnected) return;
+          btn.disabled = false; btn.textContent = 'Connect wallet';
+          msg.className = 'xa-msg is-err'; msg.textContent = 'Not connected: ' + ((e && e.message) || String(e));
+        }
+      } }, ['Connect wallet']);
+      box.replaceChildren(
+        h('p', { class: 'xa-note', style: 'margin:0', text: 'Practice run: this score can\\u2019t be posted, even if you connect now. A run is locked to the wallet it starts with.' }),
+        h('p', { class: 'xa-note', text: 'Connect, then play again: every run after that is ranked and can be posted on-chain.' }),
+        btn, msg
+      );
+    }
+    render();
+    // The wallet may connect from elsewhere (the hall's button, a slow extension): keep this box in step.
+    S.onChange(function () { render(); });
+  }
+  function buildSubmit(box, s, score, rank) {
+    var g = s.game;
+    var st = S.status();
+    box.classList.remove('xa-hidden');
+    if (!s.rec) { practiceBox(box, s); return; }
+    if (st.route === 'none') {
+      box.replaceChildren(
+        h('p', { class: 'xa-note', style: 'margin:0', text: 'This copy of the arcade can\u2019t reach a wallet, so this score can\u2019t be posted from here. Open the arcade on Xtrata to post your runs.' }),
+        h('a', { class: 'xa-btn', href: S.runtimeUrl(), target: '_blank', rel: 'noopener', style: 'display:block;text-align:center;text-decoration:none;margin-top:10px' }, ['Open on xtrata.xyz \u2197'])
+      );
+      return;
+    }
+    postCard(box, { game: g, mode: s.mode, score: score, bytesP: s.replayP, pilot: s.pilot });
+  }
+  /* ------------------------------------------------ network-fee warning */
+  // Wallets estimate their own network fee for a score post and have suggested 0.5 STX. Players should set the
+  // small figure in score-client's config (networkFeeHintUstx). Three places: a banner on the post panel, a notice
+  // the first time in each session, and a reminder line while the wallet is open.
+  var feeNoticeSeen = false;
+  function feeStx(txBytes) { return String(Number(S.networkFeeHint(txBytes)) / 1e6); }
+  function feeSeenStored() { try { return root.sessionStorage.getItem('xa:feeNotice') === '1'; } catch (e) { return false; } }
+  function feeMarkSeen() { feeNoticeSeen = true; try { root.sessionStorage.setItem('xa:feeNotice', '1'); } catch (e) { /* in-memory flag still holds for this page */ } }
+  // fee = the figure to enter (STX string), or null for the long-run flow where the right fee depends on the replay's size.
+  function feeHowSteps(fee) {
+    return h('ol', { class: 'xa-feesteps' }, [
+      h('li', { text: 'On your wallet\u2019s confirm screen find the line called \u201CFee\u201D or \u201CNetwork fee\u201D. It usually has an Edit, pencil or Advanced control next to it.' }),
+      h('li', { text: 'Choose \u201CCustom\u201D, or type into the fee box.' + (fee ? ' If the wallet shows micro-STX (\xB5STX), the amount is ' + Math.round(Number(fee) * 1e6) + '.' : '') }),
+      h('li', { text: fee ? 'Enter ' + fee + ' STX and save it.' : 'Lower it well below what the wallet suggested, then save it.' }),
+      h('li', { text: fee ? 'Check that the Fee line now says ' + fee + ' STX before you press Confirm. If it still shows 0.5 STX, cancel (this costs nothing) and try again.'
+        : 'Check the Fee line before you press Confirm. If it is still around 0.5 STX, cancel (this costs nothing) and choose \u201CSeal it\u201D instead.' }),
+      h('li', { text: 'The board fee shown on its own line is separate and correct. Only the network fee needs changing.' })
+    ]);
+  }
+  // \`inscribe\` = the two-approval long-run flow, where the network fee grows with the replay's size, so no fixed figure.
+  function feeBanner(inscribe, txBytes) {
+    var fee = feeStx(txBytes);
+    var box = h('div', { class: 'xa-feewarn', role: 'note' });
+    box.append(h('b', { class: 'xa-feewarn-t', text: 'BEFORE YOU APPROVE: CHECK THE NETWORK FEE' }));
+    if (inscribe) {
+      box.append(h('p', { text: 'Your wallet sets the network fee for each approval, and for a big replay it can be high. If it suggests something like 0.5 STX, cancel and choose \u201CSeal it\u201D instead.' }));
+    } else {
+      box.append(h('p', {}, ['Set the network fee to ', h('b', { text: fee + ' STX' }), '. Your wallet may suggest ', h('b', { text: '0.5 STX' }), ': ', h('b', { text: 'do NOT pay that' }), '. You can cancel at no cost.']));
+    }
+    var d = h('details', { class: 'xa-feehow' });
+    d.append(h('summary', { text: 'How do I change the fee?' }), feeHowSteps(inscribe ? null : fee), h('p', { class: 'xa-note', text: 'The wording differs between Xverse, Leather and other wallets, but every one of them lets you edit the fee before you confirm.' }));
+    box.append(d);
+    return box;
+  }
+  // Resolves true to carry on to the wallet, false if the player backs out. Once per session.
+  function feeNoticeOnce(inscribe, txBytes) {
+    if (feeNoticeSeen || feeSeenStored()) { feeNoticeSeen = true; return Promise.resolve(true); }
+    return new Promise(function (resolve) {
+      var fee = feeStx(txBytes);
+      var ok = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: inscribe ? 'OK, I\u2019ll check the fee' : 'OK, I\u2019ll set ' + fee + ' STX' });
+      var no = h('button', { class: 'xa-btn', type: 'button', text: 'Not now' });
+      var wrap = h('div', { class: 'xa-feemodal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Before your wallet opens' }, [
+        h('div', { class: 'xa-feemodal-card' }, [
+          h('h3', { text: 'Before your wallet opens' }),
+          inscribe
+            ? h('p', { class: 'xa-feebig', text: 'Check the network fee on every approval. If your wallet suggests something like 0.5 STX, cancel.' })
+            : h('p', { class: 'xa-feebig' }, ['Set the NETWORK FEE to ', h('b', { text: fee + ' STX' }), '.', h('br'), 'Your wallet may suggest ', h('b', { text: '0.5 STX' }), '. ', h('b', { text: 'Do NOT pay that.' })]),
+          h('details', { class: 'xa-feehow', open: '' }, [h('summary', { text: 'How do I change the fee?' }), feeHowSteps(inscribe ? null : fee)]),
+          h('div', { class: 'xa-over-actions' }, [no, ok])
+        ])
+      ]);
+      function done(v) { wrap.remove(); root.removeEventListener('keydown', onKey, true); if (v) feeMarkSeen(); resolve(v); }
+      function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } }
+      ok.addEventListener('click', function () { done(true); });
+      no.addEventListener('click', function () { done(false); });
+      root.addEventListener('keydown', onKey, true);
+      root.document.body.appendChild(wrap);
+      ok.focus();
+    });
+  }
+
+  // The name / cost / post box for a ranked run: at game over, or later from a saved replay.
+  // opts: { game, mode, score, pilot:{address, hash160}, bytes | bytesP, checked }
+  function postCard(box, opts) {
+    var g = opts.game, mode = opts.mode, score = opts.score;
+    var s = { pilot: opts.pilot };
+    var name = h('input', { class: 'xa-name', id: 'xa-name', maxlength: '12', autocomplete: 'off', spellcheck: 'false',
+      value: U.store('name') || '', placeholder: 'AAA', 'aria-describedby': 'xa-name-note' });
+    name.addEventListener('input', function () {
+      var c = S.cleanName(name.value).toUpperCase();
+      if (c !== name.value) name.value = c;
+    });
+    var msg = h('p', { class: 'xa-msg', 'aria-live': 'polite' });
+    var btn = h('button', { class: 'xa-btn xa-btn-primary', type: 'button' }, ['Post score on-chain']);
+    var feeNote = h('p', { class: 'xa-note', id: 'xa-name-note', text: '3\u201312 letters or numbers. Your wallet will ask you to confirm.' });
+    var boardId = boardOf(g, mode), replayBytes = null;
+    var longNote = h('div', { class: 'xa-note xa-long', style: 'display:none;color:var(--xa-gold)' });
+    var how = 'inline';     // inline | inscribe | seal
+    var feeBox = h('div', { class: 'xa-feebox' });
+    function txBytesNow() { return how === 'seal' ? 400 : (replayBytes ? replayBytes.length + 350 : 0); }
+    function paintFee() { feeBox.replaceChildren(feeBanner(how === 'inscribe', txBytesNow())); }
+    function walletMsg(t) {
+      var inscribe = how === 'inscribe';
+      msg.replaceChildren(t, h('br'), h('b', { class: 'xa-feeremind', text: inscribe ? 'Check the network fee before you approve.' : 'Network fee: set ' + feeStx(txBytesNow()) + ' STX, not 0.5.' }));
+    }
+    paintFee();
+    function choice(val, title, text, on) {
+      var r = h('input', { type: 'radio', name: 'xa-how', value: val });
+      r.checked = !!on;
+      r.addEventListener('change', function () { if (r.checked) { how = val; btn.textContent = val === 'seal' ? 'Save replay & post sealed score' : 'Post score on-chain'; paintFee(); } });
+      return h('label', { class: 'xa-how', style: 'display:flex;gap:8px;align-items:flex-start;margin:6px 0;cursor:pointer;color:var(--xa-ink,#e8eef7)' },
+        [r, h('span', {}, [h('b', { text: title }), h('br'), h('span', { style: 'opacity:.85', text: text })])]);
+    }
+    btn.disabled = true;
+    msg.textContent = 'Checking your replay\u2026';
+    S.getFee(boardId).then(function (f) {
+      if (!f.ok) return;
+      if (!f.registered) { feeNote.textContent = 'This board is not open for scores yet.'; return; }
+      feeNote.textContent = '3\u201312 letters or numbers. Board fee ' + (Number(f.value) / 1e6) + ' STX (capped by a post-condition), plus the network fee you set in your wallet.';
+    });
+    (async function () {
+      replayBytes = opts.bytes || await opts.bytesP;
+      if (!replayBytes) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run is longer than 4 hours and cannot be recorded.'; return; }
+      var long = S.needsInscription(replayBytes), kb = Math.max(1, Math.round(replayBytes.length / 1024));
+      if (long) {
+        how = 'inscribe'; paintFee();
+        longNote.style.display = '';
+        longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than a score entry holds. Working out the cost\u2026' }));
+        var tooBig = Math.ceil(replayBytes.length / XA.replay.CHUNK) > XA.replay.MAX_INSCRIBE_CHUNKS;
+        var sealText = 'Board fee plus a normal network fee, one approval. Your replay file is saved to your device now and the board keeps its fingerprint. ' +
+          'Anyone you give the file to can check it matches, and you can inscribe it later. Keep the file safe: without it nobody can watch the run.';
+        var render = function (q) {
+          if (!longNote.isConnected) return;
+          if (tooBig) {
+            how = 'seal'; btn.textContent = 'Save replay & post sealed score'; paintFee();
+            longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than the 512 KB one inscription holds, so this score is posted sealed.' }),
+              choice('seal', 'Seal it', sealText, true));
+            return;
+          }
+          longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than a score entry holds. Choose how to post it:' }),
+            choice('inscribe', 'Inscribe the replay', (q && q.ok ? 'Inscription fee ' + (Number(q.fee) / 1e6) + ' STX' : 'A small inscription fee') +
+              ' plus network fees (higher for a bigger replay), two approvals. The replay lives on chain and anyone can watch it.', how === 'inscribe'),
+            choice('seal', 'Seal it (cheaper)', sealText, how === 'seal'));
+        };
+        S.quoteReplay(replayBytes.length).then(render, function () { render(null); });
+      }
+      if (!opts.checked) {
+        msg.textContent = long ? 'Checking your replay (a long run takes a moment)\u2026' : 'Checking your replay\u2026';
+        // Re-run our own replay first: never let anyone pay to post a run that will not check out.
+        var chk = await XA.replay.verify(replayBytes, { address: s.pilot.address, score: score, board: boardId });
+        if (!msg.isConnected) return;
+        if (!chk.ok) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run could not be verified, so it can\u2019t be posted (' + chk.reason + ').'; return; }
+      }
+      msg.className = 'xa-msg is-ok'; msg.textContent = 'Replay checked \u2713 Ready to post.';
+      btn.disabled = false;
+    })();
+    btn.addEventListener('click', async function () {
+      var n = S.cleanName(name.value).toUpperCase();
+      if (n.length < 3) { msg.className = 'xa-msg is-err'; msg.textContent = 'Name needs at least 3 characters.'; name.focus(); return; }
+      U.store('name', n);
+      var sealIt = how === 'seal';
+      if (!(await feeNoticeOnce(how === 'inscribe', txBytesNow()))) return;
+      btn.disabled = true; name.disabled = true;
+      longNote.querySelectorAll('input').forEach(function (r) { r.disabled = true; });
+      msg.className = 'xa-msg'; walletMsg('Check your wallet to confirm\u2026');
+      if (sealIt) { keepSealed(replayBytes); saveReplay(replayBytes, boardId + '-' + n + '-' + score + '-sealed'); }
+      try {
+        var r = await S.submit({ board: boardId, score: score, name: n, replay: replayBytes, seal: sealIt, pilotHash: S._codec.bytesToHex(s.pilot.hash160),
+          onProgress: function (t) { if (msg.isConnected) { msg.className = 'xa-msg'; if (/wallet|approve/i.test(t)) walletMsg(t); else msg.textContent = t; } } });
+        if (r.ok) {
+          dropUnposted(replayBytes);
+          var tx = r.txid ? (/^0x/.test(r.txid) ? r.txid : '0x' + r.txid) : '';
+          msg.className = 'xa-msg is-ok';
+          msg.replaceChildren('Submitted! It shows on the board once the transaction confirms. ',
+            tx ? h('a', { href: 'https://explorer.hiro.so/txid/' + tx + '?chain=' + S.config().network, target: '_blank', rel: 'noopener', text: 'View transaction \u2197' }) : '');
+          btn.textContent = sealIt ? 'Posted sealed \u2713' : 'Posted \u2713';
+          if (sealIt) msg.append(h('br'), 'Your replay file was saved as xtrata-arcade-' + (boardId + '-' + n + '-' + score + '-sealed').replace(/[^A-Za-z0-9_.-]+/g, '_') + '.xar. Keep it: it is the proof of this run. ',
+            h('button', { class: 'xa-link', type: 'button', text: 'Save it again', onclick: function () { saveReplay(replayBytes, boardId + '-' + n + '-' + score + '-sealed'); } }));
+          XA.audio.arp([784, 988, 1175, 1568], 0.07, { type: 'square', vol: 0.18 });
+        } else if (r.needsRuntime) {
+          msg.className = 'xa-msg is-err';
+          msg.replaceChildren(r.reason + ' ', h('a', { href: r.runtimeUrl, target: '_blank', rel: 'noopener', text: 'Open the secure runtime \u2197' }));
+          btn.disabled = false; name.disabled = false;
+          longNote.querySelectorAll('input').forEach(function (r) { r.disabled = false; });
+        }
+      } catch (e) {
+        msg.className = 'xa-msg is-err';
+        msg.textContent = (e && e.message) || 'The wallet did not sign.';
+        btn.disabled = false; name.disabled = false;
+        longNote.querySelectorAll('input').forEach(function (r) { r.disabled = false; });
+      }
+    });
+    box.replaceChildren(h('label', { for: 'xa-name', text: 'NAME ON THE BOARD' }), name, feeNote, longNote, feeBox, btn, msg);
+  }
+
+  /* ---------------------------------------------------------- loop */
+  var STEP = 1 / 60;
+  var attractT = 0, attractAcc = 0;
+  function frame(ts) {
+    raf = root.requestAnimationFrame(frame);
+    var dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 0;
+    lastTs = ts;
+    if (session) runSession(dt);
+    else runAttract(dt);
+  }
+  function runAttract(dt) {
+    attractT += dt;
+    attractAcc += dt;
+    if (attractAcc < 1 / 30) return;
+    attractAcc = 0;
+    cabinets.forEach(function (c) {
+      var r = c.canvas.getBoundingClientRect();
+      if (!r.width) return;
+      var dpr = Math.min(root.devicePixelRatio || 1, 2);
+      var w = Math.round(r.width * dpr), hgt = Math.round(r.height * dpr);
+      if (c.canvas.width !== w || c.canvas.height !== hgt) { c.canvas.width = w; c.canvas.height = hgt; }
+      c.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      try { c.game.attract(c.ctx, r.width, r.height, attractT); } catch (e) {}
+    });
+  }
+  function runSession(dt) {
+    var s = session;
+    var g = s.game;
+    if (s.state === 'countdown') {
+      var before = Math.ceil(s.countdown);
+      s.countdown -= dt;
+      var now = Math.ceil(s.countdown);
+      if (now !== before && now > 0) { s.countEl.textContent = String(now); XA.audio.tone(440, 0.1, { type: 'square', vol: 0.15 }); }
+      if (s.countdown <= 0) {
+        s.state = 'play';
+        s.input.reset();
+        setOverlay(null);
+        XA.audio.tone(880, 0.16, { type: 'square', vol: 0.18 });
+      }
+    } else if (s.state === 'play') {
+      if (s.input.hit('pause')) { togglePause(); }
+      else {
+        s.acc += dt;
+        var steps = 0;
+        while (s.acc >= STEP && steps < 6 && session === s && s.state === 'play') {
+          if (s.rec) s.rec.before();
+          s.instance.update(STEP);
+          if (s.rec) s.rec.after();
+          s.input.endFrame();
+          s.fx.update(STEP);
+          s.acc -= STEP;
+          steps++;
+        }
+        // Long-run hint: once the replay outgrows a score entry, say so (posting will store it as an inscription).
+        if (s.rec && !s.longHint && s.rec.step % 120 === 0 && s.rec.estimate() > (S.config().inlineMax || S.INLINE_MAX) && s.tagEl) {
+          s.longHint = true;
+          s.tagEl.textContent = '\\u25CF RANKED \\u00B7 LONG RUN';
+          s.tagEl.style.color = '#ffcf5a';
+          s.tagEl.title = 'This replay is now bigger than a score entry holds. You can still post it: it will be stored as its own Xtrata inscription (a small extra fee and one more wallet approval).';
+        }
+      }
+    } else if (s.state === 'ready') {
+      if (s.input.hit('start') || s.input.hit('a')) (s.primary || function () { beginRun(s); })();
+      else if (s.input.hit('pause')) { endSession(); return; }
+      s.input.endFrame();
+    } else if (s.state === 'watch') {
+      s.acc += dt * s.speed;
+      var wsteps = 0, realStore = U.store;
+      U.store = s.blank || (s.blank = blankStore(s));
+      try {
+        while (s.acc >= STEP && wsteps < 6 * s.speed && session === s && s.state === 'watch') {
+          if (s.steps >= s.watch.steps) { endWatch(s); break; }
+          s.pb.load(s.steps);
+          s.instance.update(STEP);
+          s.steps++;
+          s.fx.update(STEP);
+          s.acc -= STEP;
+          wsteps++;
+        }
+      } finally { U.store = realStore; }
+    } else if (s.state === 'over' || s.state === 'watched') {
+      s.fx.update(dt);
+    }
+    if (session !== s) return;
+    var shown = fmtVal(s.mode, s.score);
+    if (s.scoreEl.textContent !== shown) s.scoreEl.textContent = shown;
+
+    var ctx = s.ctx, k = s.scale * s.dpr;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    if (s.shake > 0.1) {
+      ctx.translate((Math.random() - 0.5) * s.shake, (Math.random() - 0.5) * s.shake);
+      s.shake *= Math.pow(0.02, dt);
+    } else s.shake = 0;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(-20, -20, g.size.w + 40, g.size.h + 40); ctx.clip();
+    if (s.state === 'ready') {
+      s.attractT = (s.attractT || 0) + dt;
+      try { g.attract(ctx, g.size.w, g.size.h, s.attractT); } catch (e) { s.instance.render(ctx); }
+      ctx.restore();
+      return;
+    }
+    s.instance.render(ctx);
+    s.fx.draw(ctx);
+    ctx.restore();
+  }
+
+  /* ---------------------------------------------------------- boot */
+  function boot(mount) {
+    if (rootEl) return;
+    var cfg = root.XA_CONFIG || {};
+    if (cfg.scores) S.configure(cfg.scores);
+    rootEl = mount || doc.getElementById('xa-root') || doc.body;
+    buildRoom();
+    S.onChange(function (st) {
+      walletStatus = st;
+      paintWallet();
+    });
+    cabinets.forEach(function (c) { refreshCabinet(c); });
+    root.addEventListener('resize', fit);
+    doc.addEventListener('visibilitychange', function () { if (doc.hidden) togglePause(true); });
+    root.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modalEl) { closeModal(); return; }
+      if (!session) return;
+      if (e.key === 'Enter' && session.state === 'over' && doc.activeElement && doc.activeElement.id !== 'xa-name' &&
+          doc.activeElement.tagName !== 'BUTTON' && doc.activeElement.tagName !== 'A') startGame(session.game.id, session.variant && session.variant.key, { go: true });
+      if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && session.state === 'paused') togglePause();
+    });
+    raf = root.requestAnimationFrame(frame);
+  }
+
+  /*
+   * A hosted room (the hall's room bridge, XA_ROOM.call) asks the player to sign a contract call. The same dialog as the fee notice:
+   * which room asks, the contract and function, the most it can spend (the call's only post-condition) and the network-fee warning.
+   * Resolves true to open the wallet, false if the player backs out. Everything shown is text (the room title is already plain ASCII).
+   */
+  function ustxToStx(u) { var s = String(u).replace(/^0+(?=\\d)/, ''); while (s.length < 7) s = '0' + s; var w = s.slice(0, -6), f = s.slice(-6).replace(/0+$/, ''); return w + (f ? '.' + f : ''); }
+  function confirmCall(o) {
+    o = o || {};
+    return new Promise(function (resolve) {
+      var ok = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: 'Open my wallet' });
+      var no = h('button', { class: 'xa-btn', type: 'button', text: 'Not now' });
+      var wrap = h('div', { class: 'xa-feemodal xa-callmodal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'A room asks you to sign' }, [
+        h('div', { class: 'xa-feemodal-card' }, [
+          h('h3', { text: String(o.room || 'This room') + ' asks you to sign' }),
+          h('p', { class: 'xa-feebig' }, ['It can spend at most ', h('b', { text: ustxToStx(o.maxUstx || 0) + ' STX' }), ' from your wallet. If the call would move anything more, it fails and nothing is spent.']),
+          h('p', { class: 'xa-note', text: 'Contract: ' + String(o.contract || '') }),
+          h('p', { class: 'xa-note', text: 'Function: ' + String(o.fn || '') }),
+          h('p', { class: 'xa-note', text: o.address ? 'Signing as ' + S.shortAddress(o.address) + '.' : 'Your wallet will ask you to connect first.' }),
+          feeBanner(false, 0),
+          h('div', { class: 'xa-over-actions' }, [no, ok])
+        ])
+      ]);
+      function done(v) { wrap.remove(); root.removeEventListener('keydown', onKey, true); resolve(v); }
+      function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } }
+      ok.addEventListener('click', function () { done(true); });
+      no.addEventListener('click', function () { done(false); });
+      root.addEventListener('keydown', onKey, true);
+      root.document.body.appendChild(wrap);
+      ok.focus();
+    });
+  }
+
+  root.XARoom = {
+    confirmCall: confirmCall,
+    boot: boot,
+    start: startGame,
+    back: endSession,
+    boards: openBoards,
+    wallet: onWalletClick,
+    _session: function () { return session; }
+  };
+})(window);
+
+/*@xa-part games-registry.js*/
+/*
+ * Extra games from the games contract (xtrata-games-v1).
+ *
+ * The 21 built-in games are part of the hall and nothing here can touch them. This part adds games that were
+ * registered on chain after the hall was inscribed: it reads the contract before the engine starts, fetches each live
+ * game's cartridge script from its inscription (hash-checked), gives it its permanent replay index, and runs it so it
+ * registers itself like any built-in game. The hall then builds one cabinet per registered game, so the room grows by itself.
+ *
+ * Never blocks the hall: no contract configured (window.XA_GAMES_CONFIG absent) = nothing happens; a failed read, a slow
+ * read, or a bad game = the built-in 21 (plus any good extras) and the reason in XAGamesRegistry.status().
+ * The parent calls window.XA_PREBOOT() and waits for it (with its own time limit) before the engine starts.
+ */
+(function (root) {
+  'use strict';
+  if (root.XAGamesRegistry) return;
+
+  var KIND_CARTRIDGE = 1;
+  var KIND_FRAMED = 2;                // a game that is its own page (an inscription): the hall gives it a cabinet and frames it when played
+  var KIND_MANIFEST = 3;              // a framed game described by a small picture (SVG) that names the real game's inscription and its hash, and carries the cabinet art
+  var FRAMED_CAP = 16 * 1024 * 1024;  // the same limit as a room page
+  var MANIFEST_CAP = 4 * 1024 * 1024; // a manifest picture is small; this only bounds a mistake
+  var ART_CAP = 2 * 1024 * 1024;      // each embedded cabinet picture
+  var MAX_ADDED = 64;                 // the contract's own cap; also a safety bound here
+  var TIME_LIMIT_MS = 20000;          // the whole load, after which the hall starts with what it has
+  var ID_OK = /^[a-z0-9_]{3,24}$/;
+  var state = { configured: false, done: false, ok: false, error: '', count: 0, loaded: [], skipped: [] };
+
+  function num(cv) { return cv && cv.value !== undefined && cv.value !== null ? Number(cv.value) : NaN; }
+  function field(t, k) { return t && t[k] ? t[k] : null; }
+
+  function skip(id, why) { state.skipped.push({ id: id, reason: why }); }
+
+  // One record from get-games \u2192 a plain object, or null when the slot is empty.
+  function parseGame(n, cv) {
+    if (!cv || cv.type !== 'some' || !cv.value || cv.value.type !== 'tuple') return null;
+    var t = cv.value.value;
+    var hash = field(t, 'code-hash');
+    return {
+      n: n,
+      id: field(t, 'id') ? String(field(t, 'id').value) : '',
+      title: field(t, 'title') ? String(field(t, 'title').value) : '',
+      index: num(field(t, 'index')),
+      kind: num(field(t, 'kind')),
+      engineMin: num(field(t, 'engine-min')),
+      codeId: num(field(t, 'code-id')),
+      codeHash: hash && hash.value ? hash.value : null,
+      codeSize: num(field(t, 'code-size')),
+      liveAt: num(field(t, 'live-at')),
+      hidden: !!(field(t, 'hidden') && field(t, 'hidden').value)
+    };
+  }
+
+  function runCartridge(g, code) {
+    var XA = root.XA, before = XA.games.map(function (x) { return x.id; });
+    var s = root.document.createElement('script');
+    s.setAttribute('data-xa-game', g.id);
+    s.text = code + '\\n//# sourceURL=xa-game-' + g.id;
+    root.document.body.appendChild(s);                    // a throwing cartridge cannot stop the rest
+    // A cartridge may only register its own id: anything else it registered is removed again.
+    for (var i = XA.games.length - 1; i >= 0; i--) {
+      var id = XA.games[i].id;
+      if (before.indexOf(id) < 0 && id !== g.id) XA.games.splice(i, 1);
+    }
+    var mine = XA.games.filter(function (x) { return x.id === g.id; })[0];
+    if (!mine) return false;
+    mine.order = 1000 + g.n;                              // after the built-in games, in the order they were added
+    XA.games.sort(function (a, b) { return (a.order || 99) - (b.order || 99); });
+    return true;
+  }
+
+  // The manifest picture (an SVG): <metadata id="xtrata-game"> holds JSON { v:1, kind:"framed-game", game:{ id, hash, size }, board? }, and two <image> elements
+  // (id xa-cab-side, id xa-cab-marquee) hold the cabinet art as data URIs. The picture is only READ as text: it is never put in the page, never run.
+  function parseManifest(text, gameId, C) {
+    var m = /<metadata\\b[^>]*\\bid="xtrata-game"[^>]*>([\\s\\S]*?)<\\/metadata>/.exec(text);
+    if (!m) throw new Error('no game note in the picture');
+    var raw = m[1].replace(/^\\s*<!\\[CDATA\\[/, '').replace(/\\]\\]>\\s*$/, '');
+    var j;
+    try { j = JSON.parse(raw); } catch (e) { throw new Error('the game note is not valid'); }
+    var g = j && j.game;
+    if (!j || j.v !== 1 || j.kind !== 'framed-game' || !g) throw new Error('not a framed-game note');
+    if (!(Number.isSafeInteger(g.id) && g.id > 0) || !/^[0-9a-fA-F]{64}$/.test(String(g.hash || '')) || !(Number.isSafeInteger(g.size) && g.size > 0 && g.size <= FRAMED_CAP)) throw new Error('the game note is incomplete');
+    if (j.board !== undefined && j.board !== gameId) throw new Error('the note is for a different board');
+    function art(id) {
+      var tag = new RegExp('<image\\\\b[^>]*\\\\bid="' + id + '"[^>]*>').exec(text);
+      if (!tag) return null;
+      var h = /(?:xlink:)?href="(data:image\\/(?:jpeg|png|webp);base64,[A-Za-z0-9+\\/=]+)"/.exec(tag[0]);
+      return h && h[1].length <= ART_CAP ? h[1] : null;
+    }
+    return { game: { id: g.id, hash: C.hexToBytes(g.hash), size: g.size }, art: { side: art('xa-cab-side'), marquee: art('xa-cab-marquee') } };
+  }
+
+  // The cabinet's neon colours, by game number, so every framed game looks different without anything else on chain.
+  var COLOURS = ['#3be4ff', '#ff5cf0', '#ffb347', '#7dffb2', '#ff6b6b', '#a78bfa'];
+
+  // A framed game is registered like any other game (so it gets a cabinet, a Top 10 on its screen, a place in the High scores list)
+  // but it has no script of its own: def.framed says which inscription to frame, and the hall does the rest.
+  function registerFramed(g, framed, art) {
+    var XA = root.XA;
+    var color = COLOURS[g.n % COLOURS.length];
+    var title = g.title || g.id;
+    try {
+      XA.registerGame({
+        id: g.id, order: 1000 + g.n, title: title, tagline: 'Played straight from the chain', color: color,
+        size: { w: 320, h: 240 }, controls: 'Opens the original game',
+        framed: framed, cabinetArt: art || null,
+        create: function () { throw new Error('a framed game is played in its own frame'); },
+        attract: function (ctx, w, h, t) { drawFramedAttract(ctx, t || 0, w || 320, h || 240, title, color, framed.id); }
+      });
+    } catch (e) { return false; }
+    return XA.games.some(function (x) { return x.id === g.id; });
+  }
+
+  // What a framed game's cabinet shows when nobody is playing: its name over a moving star field.
+  function drawFramedAttract(ctx, t, w, h, title, color, codeId) {
+    ctx.save();
+    ctx.fillStyle = '#05040f'; ctx.fillRect(0, 0, w, h);
+    for (var i = 0; i < 46; i++) {
+      var sp = 14 + (i * 37) % 60, x = (i * 97.3) % w, y = ((i * 53.7) + t * sp) % h;
+      ctx.globalAlpha = 0.25 + ((i * 13) % 7) / 10; ctx.fillStyle = i % 5 === 0 ? color : '#dfe8ff';
+      ctx.fillRect(x, y, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 2 : 1);
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    var size = Math.max(14, Math.min(h * 0.16, w * 1.5 / Math.max(6, String(title).length)));
+    ctx.font = 'bold ' + Math.round(size) + 'px Bungee, Impact, sans-serif';
+    ctx.shadowColor = color; ctx.shadowBlur = 18; ctx.fillStyle = color;
+    ctx.fillText(String(title).toUpperCase(), w / 2, h * 0.44);
+    ctx.shadowBlur = 0; ctx.fillStyle = '#e8e2ff'; ctx.font = Math.round(h * 0.075) + 'px VT323, monospace';
+    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 3.1);
+    ctx.fillText('PRESS START', w / 2, h * 0.64);
+    ctx.globalAlpha = 0.55; ctx.fillText('INSCRIPTION #' + codeId, w / 2, h * 0.86);
+    ctx.restore();
+  }
+
+  async function load() {
+    var cfg = root.XA_GAMES_CONFIG;
+    if (!cfg || !cfg.contract) return state;              // off: the hall is exactly the built-in 21
+    state.configured = true;
+    var S = root.XAScores, XA = root.XA, R = XA && XA.replay;
+    if (!S || !S.read || !XA || !R || !R.registerIndex) { state.error = 'engine not ready'; return state; }
+    var C = S._codec, contract = String(cfg.contract);
+    var closed = false;
+    var handle = null;
+    var timer = new Promise(function (res) { handle = setTimeout(function () { closed = true; res('late'); }, cfg.timeoutMs || TIME_LIMIT_MS); });
+
+    var work = (async function () {
+      var count = num(await S.read('get-count', [], contract));
+      var height = num(await S.read('get-height', [], contract));
+      if (!(count >= 0) || !(height >= 0)) throw new Error('unexpected reply from the games contract');
+      state.count = count;
+      count = Math.min(count, MAX_ADDED);
+      var games = [];
+      for (var from = 0; from < count; from += 10) {
+        var ids = [];
+        for (var k = from; k < Math.min(count, from + 10); k++) ids.push(C.cvUint(k));
+        var list = await S.read('get-games', [C.cvList(ids)], contract);
+        if (!list || list.type !== 'list') throw new Error('unexpected get-games reply');
+        list.value.forEach(function (cv, j) { var g = parseGame(from + j, cv); if (g) games.push(g); });
+      }
+      // Which games are loaded now: live, not hidden, a kind and engine this hall understands, a valid new id.
+      var wanted = games.filter(function (g) {
+        if (g.hidden) { skip(g.id, 'hidden'); return false; }
+        if (!(g.liveAt <= height)) { skip(g.id, 'not live yet'); return false; }
+        if (g.kind !== KIND_CARTRIDGE && g.kind !== KIND_FRAMED && g.kind !== KIND_MANIFEST) { skip(g.id, 'unknown kind'); return false; }
+        if (g.kind === KIND_FRAMED && !(g.codeSize > 0 && g.codeSize <= FRAMED_CAP)) { skip(g.id, 'too big to frame'); return false; }
+        if (g.kind === KIND_MANIFEST && !(g.codeSize > 0 && g.codeSize <= MANIFEST_CAP)) { skip(g.id, 'manifest too big'); return false; }
+        if (!(g.engineMin <= (R.ENGINE || 1))) { skip(g.id, 'needs a newer engine'); return false; }
+        if (!ID_OK.test(g.id)) { skip(g.id, 'invalid id'); return false; }
+        if (XA.games.some(function (x) { return x.id === g.id; }) || R.GAME_IDS.indexOf(g.id) >= 0 && R.GAME_IDS.indexOf(g.id) < (R.BUILT_IN || 21)) { skip(g.id, 'built-in id'); return false; }
+        if (!g.codeHash || g.codeHash.length !== 32) { skip(g.id, 'bad hash'); return false; }
+        return true;
+      });
+      // A framed game is not run here: it gets a cabinet now and its page is fetched (and checked) only when someone plays it.
+      var framed = wanted.filter(function (g) { return g.kind === KIND_FRAMED; });
+      framed.forEach(function (g) {
+        if (closed) return;
+        if (!registerFramed(g, { id: g.codeId, hash: g.codeHash, size: g.codeSize }, null)) { skip(g.id, 'could not make a cabinet'); return; }
+        state.loaded.push(g.id);
+      });
+      // A manifest game: the contract's inscription is a small picture (checked against the contract's hash) that names the real game's inscription,
+      // its hash and size, and carries the cabinet art. The real game is still fetched only when played, and must match the hash the picture names.
+      var manifests = wanted.filter(function (g) { return g.kind === KIND_MANIFEST; });
+      wanted = wanted.filter(function (g) { return g.kind === KIND_CARTRIDGE; });
+      var mfetched = await Promise.all(manifests.map(function (g) {
+        return S.getInscription(g.codeId, g.codeHash).then(function (bytes) {
+          if (bytes.length !== g.codeSize) throw new Error('size differs from the contract');
+          return parseManifest(new TextDecoder('utf-8').decode(bytes), g.id, C);
+        }).then(function (m) { return { g: g, m: m }; }, function (e) { skip(g.id, 'manifest: ' + ((e && e.message) || e)); return null; });
+      }));
+      mfetched.forEach(function (f) {
+        if (!f || closed) return;
+        if (!registerFramed(f.g, f.m.game, f.m.art)) { skip(f.g.id, 'could not make a cabinet'); return; }
+        state.loaded.push(f.g.id);
+      });
+      // Fetch every cartridge at once (gateway first, chain as fallback; the bytes must match the contract's hash).
+      var fetched = await Promise.all(wanted.map(function (g) {
+        return S.getInscription(g.codeId, g.codeHash).then(function (bytes) {
+          if (bytes.length !== g.codeSize) throw new Error('size differs from the contract');
+          return new TextDecoder('utf-8').decode(bytes);
+        }).then(function (text) { return { g: g, text: text }; }, function (e) { skip(g.id, 'could not load: ' + ((e && e.message) || e)); return null; });
+      }));
+      if (closed) return;                                  // too late: the hall has started without them
+      // Run in the order they were added.
+      fetched.forEach(function (f) {
+        if (!f || closed) return;
+        var g = f.g;
+        var ran = false;
+        try { ran = runCartridge(g, f.text); } catch (e) { skip(g.id, 'cartridge error: ' + ((e && e.message) || e)); return; }
+        if (!ran) { skip(g.id, 'did not register itself'); return; }
+        // The replay number is given only to a game that is really in the hall, so a failed game leaves no trace.
+        if (!R.registerIndex(g.id, g.index)) {
+          for (var i = XA.games.length - 1; i >= 0; i--) if (XA.games[i].id === g.id) XA.games.splice(i, 1);
+          skip(g.id, 'replay index refused');
+          return;
+        }
+        state.loaded.push(g.id);
+      });
+      state.ok = true;
+    })();
+
+    try {
+      await Promise.race([work.catch(function (e) { state.error = (e && e.message) || String(e); }), timer]);
+    } finally {
+      clearTimeout(handle);
+      state.done = true;
+      if (closed && !state.error && !state.ok) state.error = 'timed out';
+    }
+    return state;
+  }
+
+  var started = null;
+  root.XA_PREBOOT = function () { if (!started) started = load().catch(function (e) { state.error = (e && e.message) || String(e); state.done = true; return state; }); return started; };
+  root.XAGamesRegistry = { status: function () { return JSON.parse(JSON.stringify(state)); }, load: root.XA_PREBOOT };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+/*@xa-part engine-boot.js*/
+
+/* Engine boot: the flat room builds (hidden behind the 3D hall) and owns sessions, boards and the wallet. */
+window.XA_CONFIG = Object.assign(window.XA_CONFIG || {}, { subtitle: (window.XA && window.XA.games.length !== 21 ? window.XA.games.length : 'Twenty-one') + ' games, one on-chain leaderboard contract \xB7 post scores from xtrata.xyz' });
+XARoom.boot(document.getElementById('xa-root'));
+`, hall: `/*@xa-pack hall v1*/
 /*@xa-part hall.css*/
 
 /* Layout: full-bleed WebGL hall; HUD pinned to screen edges; intro panel bottom-left over the live scene */
@@ -18740,6 +22913,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
 /*@xa-part cabinet-astro3.js*/
 /*
  * Astro Blaster 3: a hand-built cabinet model (Jim's design), used instead of the hall's parametric cabinet for the game whose id is "astro3".
+ * The two pictures it is dressed in (the rocket side print, the marquee) are NOT in the hall: they come from the game's manifest picture on chain
+ * (games registry kind 3, def.cabinetArt) and are passed in as build(THREE, { art:{ side, marquee } }); without them it shows flat colour.
  * Registered as XA_CAB3D.astro3 = { build(THREE) -> { group, screen, startButton, ready, ... } }; the hall (hall.js buildModelCabinet) stands it in a slot,
  * gives it a screen canvas, and drives its start button. Metres, Y up, front +Z, origin on the floor under the centre; about 1.02 wide, 2.27 high, 1.18 deep.
  * Ported from the supplied three r170 module to the hall's r128 (encoding instead of colorSpace, no loadAsync, no point lights, small flat placeholders
@@ -18747,9 +22922,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
  */
 (function () {
  'use strict';
- var SIDE_ART_DATA="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUEBAQEAwUEBAQGBQUGCA0ICAcHCBALDAkNExAUExIQEhIUFx0ZFBYcFhISGiMaHB4fISEhFBkkJyQgJh0gISD/2wBDAQUGBggHCA8ICA8gFRIVICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICD/wAARCAYAAwADASIAAhEBAxEB/8QAHQAAAgIDAQEBAAAAAAAAAAAAAAIBAwQFBgcICf/EAEoQAAEDAwIEBAMHAgUDAwICCwEAAgMEESEFMQYSQVETImFxBzKBFCNCkaGx8FLBCBUzYtEk4fEWQ3IlNFOykoLCGFRjc5Oi0rP/xAAcAQACAwEBAQEAAAAAAAAAAAABAgADBAUGBwj/xAA7EQACAgEDAwIEBAYCAQQCAwEAAQIDEQQhMQUSQRNRIjJhcRShsfAGgZHB0eEjQvEkM1JiFXJDgqLC/9oADAMBAAIRAxEAPwD5FSub1CsLb56pV1GvcoKCLKFc5vUKoiyzyjgdMlChSpyQgYKs3SKWnoimAnYqCOqYqN8IkFIuFDTbBUkWKUjqoQsQlabhMiiDtP5pwVSDYqwFWpgHUEKQhOhRAc2UOFshS4dVINwm+hBUBQcFSgQsabixVbhyuUg5TkBzUAlW4QjY2KClCShQFKUgIQhMKANinSKQeiZEGQhCJAQhCAQQhCAQQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAUtbfJ+X90NbfJ+X91JN/ZOkACblCEwFkwAAspQkc62BulbIDnWwFgzTc12tOOp7omm5vI046nusclY7bfCLIxAlACAFKypZ3Y4IQhMQFKLKE6jjdkBSG39kBt/ZWtaXGwVsY53YrZABJsAshjA0evdDWhosE6vjEUsuocL5G6FIKsaFESub2VjhfI3SqtrOxCgiyArHNVZFlnawx+SVB7qUKfUAwNwhIMFWbpkQg5CVNsoI6qEE2KcG4UEXChpsbFQg6lpsVCEyZC0FMFW03Tgq1MUkhJsU6gjCdAIIuEgTA2UOGbokQJ2myrCkIEGe38QSBWtNxZI9vKb9EGMKpUbo2KQhKEIQACEITAGBwpSJgbpkQlCEIkBCEIBBCEIBBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBS1t8nYboa3mNzgDcpib7YA2CdIAE39B0ChCYBMAALKUJHO6BK2QHPtgLCnmvdjTjqUTTbsYfcrGJWO23wiyMQJQEKVlW+7HBCEJskBSgKE8VjdkBM1t8lDRfJVjWlxsrYxzuxWwa0uNgr2tAFgpa0AWCb2WiMReAV8cVvM7fspji5fM7f9lc1t8nZWimGFKVSECDAqHDqN0KQg0QRI9qtLeoS7qqSzsTgo2KlM9qVU4xsxgKGnohQe6HBCwoUA3CCmIKRYqCOqc5CVQgNNwmVfym6cG4RITsrAcKtS02KdMBcEFKEwViAIR1UjIsmKTYp0wCkWKlMchIFGQYFORztVaZpsgETY2KCrHtuLjdVhKwgCpUFCUhKEIUACAbIQiAdCUFMnICEIUICEISjAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCApDeb0A3KA3m9ANymJ6DACdIAE3wBYDYKEKQOqYAAdUyEjnWwN0rZAc62BusOebdjD7lTPNa7GnPUrEJWS2zwiyKAlChMsnO7HBCEJiAiyAEEpox8sgKQL+yAL+yta0k2CujHO7FbIa0k2CyGtDRZDWhosE60RiKCvijt5nDKI4reZ2/ZXht/ZWig0X9k6EJkgGvQpIUBVEJBUpVIKYIwKUjqFKm6Vogm4SlisIzcKQLBDtzsycGOQRuoWQ5oIVLmEbKqdbQUxAbFWbhIQhpthVr2CNsoI6pioCJBCLhDTY2TEWKUjqoQZSlabhSiiFjThOCqQbFWA3yrUwDqCFIQU6YogwbIcOoQR1Ug3Fk30IIpCgixUoELGnoke3lNxsgFWYc1AJTuEbFBwbIShJQoClAgIQhQAJgeiVCZAHQoBupTEBCEIBBCEIBBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBSAXHsOp7IALj27nsmJFrNwAnSABOLDAChCkDqUwAA6lMhK51vdKQHOtgbrDmm5btafN1PZTNNy+Vp8x/RYhKy22eEPFEEqEJlj5ZYCEITEBACAEEporyyASpAv7IAv7K1rSTYK6Mc7sVsGtJNgr2tDRYIa0NFgnWiMRQWRHHy+Z2/wCyI4+XzO3/AGV7W3yVaKQ1t8lOhCZIAIUpgAMlMkDJgEJCE+yCFW0QrCFJGcKEgSQVO6VSCmCNYlPa4Sg2T2ymSAFrDKRzR02VigjCbGVgBjuZdVFpBWUW9Ejm33Czzr9hkyppugqeWyPdU4aGIOQlTbFQR1UIJscJ9woOQoabGxQIMmabFKpTJkLQmCraeicFWpiklJsU6ghOgEEXCT0TA2Khw6o8kBM05SBSEAlj28wuN1UFa09Cke2xugEUoCAhKQlCgKUpAQhCYUE6RANkUQdCEJiAhCEAghCEAghCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCAhCFCApALjYY7nsgAuNhjueyYkAcrdv3TpAAkW5W4ChCkC+SmAAHVMhI51sDdKQlzrD1WLNNyCwy4/opmlEYsMuKwiSTcm5WayzGyHigJ6lKhSFi+YsBShCYgICFJRivLIQSpAv7KALlWgdArorIrYNaSbBZDWhosEMaGiydaYxFBZEcfL5nb/siKPlHMd/2V7W9SrUhQa3qUyEJkgAp3QnsGhMBsAA0XKQm6CblI53QINgMRrsKdkpFvMNlLTdAYkhIR1T7IIStAK0XUkW2UbpRhgrGOHyu26HsqgEwuDYp0wMut2T09NNUSOii8z7Xa3+ruFSHEbK2KZ0UjZY3Fr2m4I6K6OMgKyDctcCCMEHolIW41erpdQp4q4RiGsFmVDW7P7PH7Fai11JR3wAqc0dNkparS3oVHoVRKIyZQQUDt0VhCQhZ3HA2RSLFKR1T7i3VKkCDTcKUmxun3FwoQkGxVgKqTNNk6YC4IKUJgrEARw6qQb4KkhKcFOAUixUpiLhIN7KMgwVgIcLKpMDbKUKFc3lKjdWuAc1VbFBhDZSoKAlIShCEAAhCEwCQbJkikHomRBkIQiQEIQgEEIQgEEIQoQEIQoQEIQoQEIQoQEIQoQEIQoQEIQoQEIQoQEIQoQEIQoQEIQoQFIaXHt3PZDWlx7AbnsmJFuVuAnSABIA5W4H7qEIAvumASBfKZCVzre6VsgOdbA3WPLJ4bL9eiZ7wxpc4rBkeZHcx/JUWTwOkKSSSSbkpVJQAsDfcywAFKEJuCAhCnZFLO7IGygC5QBcqwCyuSyBsAOgWQxnLvuoYzlyd1YtEYiEq6KP8TvoERR/id9Ashrb+yuSADRf2ToQmSFBShMAGi5TJAbADlFylJuUE3Krc7oEGwEudbA3VRNkE2SkqJZ3YxVlh7hQRbzN2VhFsFJlh7hRoBLXXU7JCLeYbJgb4QISQqyMqzZK5K0FEBF+6MIShGBCdpF1WN09vLzDbY+itiwMtu0jkfkHA9EvLym3ZKM4/gW4dpZrNKfqVF5vAH/URDdg/qHotMY962EbSNS6xHr3VRBVtsJCLHO37KqSChNylcLKxzbIBBw7YqlxyMU2ulcFYRYqFRKIyKiLhQ02Nk5CQhVNYCNspSg3CkKIhY03TgqkGxurQVamAbdKchMFBHVOmKKDZDh1QR1Ug4sm+hBApCCLFCBB2m2CokHVQFY03FkAlIQVL28pv0UIMIBSo2QlIShCFAAhCEQDAqUiYG6ZEJQhCJAQhCAQQhCAQQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAQhChAUtaXHsBuUNbzZOG90xPQYA6J0gATiwwFCEAXyUwAAvkp0JXOsPVKQHOt7qlzg0Fzipc4NBc44WDJIZHdgNgqJzwMkEkhkdc7dAqyUEoAWGUnJloBShCPBAQhTsilkgbKNyjdO0W91alkDZIFlexlsndRGy2TurQtEYigroo7+Zwx0RFHzeZ237rJaL+yuSFBov7J0ITpCgpQmADRcpkgNgAGi5Sk3QTcqtzugQbADndAqybIJskJUSzuxgJUE23QTbdVkklFsKReRcKsi2CrSLKCAd1Y1krKflPoVBFsjZOR0KX5TY7KtoYYG4UYGOiA3t9EHO490uAikWQ0XxseiLkIKRhCx26hMw2d3B39UpJuCUIpgLnNLHDNwdj3CzNO1Kq02qFRTOs6xa5p+WRpwWlYAkIaWHb9lLXYV8J4eUK1nkyJfDfM4wjka4ktafw+ipPYhTvaykuDs9eqdvJCvbG46KLHZPa+yi2FW0QqPqosrSLjmG43SqtoZCW6JXNTlBPdVSiMY9i1yYpyAUtiFQ0EhO09EmxUopgLQm3CrabhOFYgB6JdinI6pTkKwAEcwSdUwNkOHVTkhCYHqkCkIBLD5mqogg2VgNipe24v1QCVIQCgpSEoUBSgQEIQoAEIQiAYG6lImBumIShCESAhCEowIQhQgIQhQgIQhQgIQhQgIQhQgIQhQgIQhQgIQhEgKWtuLuw391Ibjmdt0HdBJJynSFJJv6DslQpAvkqZIAF8lOhI51sDdAhLnAY6qpzgAXOKCQASTYLCllMhsMNHRUzngZIJZTI7s0bBVFBKFhlJtlqQKUIQSwQEIUopZIChCZo6lXJeEAlot7q+Nn4j9Esbbm52V4WiMfAoBWxx8x5jt+6iOPnNzsFlNb0GyuSFAC/srNkbITpCgpQmADRcpkgNgAGi5Sk3KCblVudfAQbADnXwFWSglISol5YwEpSbIJsEmSUWwpBlxVjW290Nbb3VgFlEgjJSLJtkLQ0UiEXCrI6FWkWUEcw9VW1kYraLYUv3v1QG5U2vcdQlwErUWTkYSqpoIqm/RHuoShC6cEJN1II6pkwFzMn3WQYhLEZIxaVnzs7juFhglpV4kILXtPK9uxWiDTWGKxMIINkE3eXWsD07KdvUKfRgF2clI5T+ytwfUFQ3zxkWy0pe1hKiOqj32TkdktsKtoZMWwKVOoIwqWhhCAdkiuDeYEj5h07pCL7JHEhAwVYCq7YUtPRBELQoOCoBTbhOmAQjqpGQhRsU4CCLFCY+YJNioyDDKdp6KsYTeqUIPb1CQK4HmFiqnN5SowkFAKEJSEoUXUpSAhCEQAhCEQDA3UpEwN0xCUIQiEEIQlCCEIUICEIUICEIUICEIUICEIUICEIAJNgLlFLIAThobl2T0HZAszbLu6hOlgAEkm5UITBvUqNkIDepToSOdbAQ4IDnWwN1WSACSbBSASbDJWLUyNJ8NhuBue5VM5YWRkhJZTIbDDQqUKFhlJtlqQJkIQSwQEIQAilkhIUFBKlov7K1LwgEtbfJVrGcx9FDGlx9FkNAAsNlfGIoAfkrGtL3WChrS51gspjA0WC0JYFJa0ABoVoFgoAsFKdIUEITtb1KZEBosLlQTcoc6/sq3OtgbqNikPd0CrJsgmyQlBLO7GAlQTbdBNgq8uKLYUgJLirGtt7qWtt7pwLKJBACyYBACgut7o/YBO4uED1Sg2yE3zC4WhMrJIuqzdpTj12Q4fVBohWTf0P7p4WMkqmCR/IHeUu7diosCEtsqtoKMnUdOq9NqzTVkRY+wc09HtOzh3CwS0grpRrTNT4ei0XVAHS0l/sdSd2A5MZ7tvkdlzu/7EJWkwlaMKSLKFSwhYX90EWJBTMZz3aPm6DulJNrHJCPggZCdp7pBnZT1sinhkLh26KOqG5Fxv1CLXV/O4gwuMjour4Y0CPiad0FAR/mEbeZ1Of/daNyPVcnkZ6LM0vU63RtYpNW06d0FXSyB7Ht/myeLwwr6mXxHoNVoOqupKhjmhw5mEjotLZfTnHWm0Hxb+EdHxzw/Txx67preTUaOPdwG7mj63/mfmQg22sRgjslsW+Ug47SsjKZrHONmi/oi/QqY3FjrtNiFnaQciXINxghK7JvtdZM74pWeK0ckgw9v91j7hJKOCJ5Isot1TbFFkuAkbJgVCkWUwQCOqjcJhkJdiigEA2KHDF1JHVAyj9CCBMOyhwsfRCBBgbFORzNSDIUtNkAleQco3Vr2gi/VVAoMJCZQoSkGQhQcZQIShCEQAhCEQDA3UpEwPdNkhKEIUCCEIQCCEIUICEIUICEIUICEdbbnsnDA3L8nsEyQBWtLs7N7prgDlbgfugklQnACj2RvsnAslzkhAbZMoJAFyq3O5vZRvBCS8nA2SgEmwCGtLjYLHnqBYxRHy/id/V/2VUpYWWMkE9QADFEcfid39B6LEUpVhnNtliQJlClKlgIIQhHkgBSUIAurUvCADRf2VrWlxsFDW3NgshrQ0WCvjEUlrQBYJwC42CgAk2AWVGwMHqVelgVsGMDBYbq4C3uhotk7qVYkAEITNb1KZIBLW9Soc6+Bshzr4Crc62Buo2KDnWwN1UTZBNkhKCWd2MBKgmwQTYKvLii2FIMuKta23uhrbKwCyiQQAspAQAlc7oEeeAEudbASIQiQgFODbIVW+yYFNGQhbe+QrWRmSMlh8zc8vceioB6hWRu5XA35T0PZXxa8gZM0UkEnJKzlJHMD0cO4VJsTdb2Ksgq6B+nag0Bw81NP/AEO/pP8AtK0Tm2cWnBCWcccAT9xXNLTZQALHucpiSW8p6bFIFTwMSRhVlXNI6pHNSSWQoTIPYhD3XcCRYndXRcj/ALt+D+F3qqnMLXFrhsla22CQRi4RdFyCjBQRBwSLOamvfbBVWR7Jmu7p1IBaHG2RgqMg26KyJ7Msk+Q9e3qleA15aTe3VW+MoXJ2fBXG2p8LyStoqkx+ILgHLXf7SOoIJC02uzUOp6jPqGnwindK7nkpxs0ne3putKD2UtefEDr2PdXd6lFKRNyojN7JS3KypS1/mAseoVD9lmnHAUxC2+/sotbCYOI3SndVMYMFRY3U2U2ShIvfB3TWBbfqEqLqIBIUlt28zfqEo3spBsiQXZQcFMTmxQW53UwQMEeiQjlPomFxe6ki4sVCCA5TeqTY2KYHolIO09Er29QjYpwQ4WKASkFBUubyn0UAoBAKVBQEpA2UoS5BQIMhCERQQhCJCQe6ZIpBsmIMhQDdSoEEIQoEEIUhjjm1h3KKQCFLWEi58o7phyN28x7lQSTuUyQMk3DRZg+qhRfNhlH6qNkBSBf0CkN6lMhyQgCyCQBcpXPA23SEkm5QbwECS4527KWMc93K0XKlkbpDYYA3J6Kmoq2taYac+X8T+pVcpJLLD9iaqoZGwwQm5Pzv/sFgISrFZY2yxLAKQgBSkS8sIIQhHkgKdkbKNyrEsEAC5VrRsAoAsr42cuTuroxwI9xmNDRbqnA6BCyIo+Ucx3/ZaIrArZMcfILndXNbbJQ1vUplYkAEITNF/ZOgA1t8nZDj0Clx6BVudYeqjYvIOdb3VRKCepSEoJZ3YxBKgmwQTYKvLii2FIMuKta2yGtt7qwCyKQQAspAQAlc7oFOQA53QJUIRICnYIJACrJuUyRCNsqd8hQj2VSYrHacqw/KqRbdPz2CtUhRg4kWOQpcA48187FLfNwptdw9cFWp52IJkIPfqmc10b7OH/dL1VbXgJCncYR0UNIvYqsIpCnmNwTnopcDsd1PJ5A47Hqhh+AiyMaCC03adkil18hQL2SPkhN8IGVHVTtYokGaU1s3vthJa2ykFOmAaxBwp5r+6gEqL5TgHBvhQSOqgH6IOQoQQtsSAo6bJ7X9+iUgtyqWhkA7fkhQpvdAgOxnoovcIOWlp2XQ0PDNRrGiz6hpB8aalZz1FOPm5Ru4IMZLJzvZSMmxTNs24eMfslcBf0UQpJxg7ouCLJellI9QimQlTy3GFBNjn81IHUFMiMVzTbKWxVvS98KDgpXEGROiBgpzykXS2HdK0FMnDhZVEWNlYMe6Hi4v1QaCVoKOqn0KUJF0EXChGUrRABsmSmxF0AoEGQgFSiKQhT6KLXTEBNdA9EwaLIpEJDHEYsp5APmf9Ai2N1GB1TkJBa35W/UqCSdyl5h0F0WJ3NlMkAuRk74UgdgmDe6XLZBQL4GycABSlc8DZHggyrc/o1KSSoSthwCtihdIb7N7p44Ry+JKeVgzlYlXXGQeFD5Yxi/dJJqKzIPPBFZUgkwQm0Y3I6rCQlWKc23ksSwCkBFlKRLG7CCEIRICnYI2UbqxLBA3TgW90NFvdXRs/EforoxFbJjZbzHdWgIAVscfMbnb91ojHArZMUdzzHboslovlQ0X9lYrEhQQhSBc2TAAC5TE2FgpJDQqybZKL2F5Ic6wVRPUoJublISlSyMBKUm2SgpCblM2FIgkkq1rbe6hjbb7qwCyiQQAsmAQAoc62AjzsAHOtgJEIsiQFJIAUEgBITc5TJEAm5QjdOG290QiEKEwPQqHDqqWKAztupABCS6kHN0UwF7Q17D0e3p3CUOslDfMDfHdMWuY7lcFcmKWvk54gHbt2Kx/VPcDfZQQLYTSeQrYCbMJ7JSLZUjsV1HD/DT+KaCsptMIdq1HEZ2QXzURty4D1Az/ADCKPd9xlvscuTcJ45A0FrxdjsH09UrmOY8se0tcDYgixB7JLWOEmWmDAWuHZuWmx9u6VM3yu5hv+6g25jbbcJGEjHVBGCCj3R0QIZtPplTUaTNXwMMjKd3LMBksB2d7dFhXG66DhDiV3DWvMq5KdtXRyDw6qmeLiaM7j3WTx1o+l6XxIZ9An+0aLXsFVRuvcta7dh9WnCblDYyso5lpINt0wLb52KrHoVJOL9UyZWx3AD1HdLfsgG4UgYv1G4RILfKkk2tuFB6j8lF7H1SMJIcCzlO42KUEXUkW6YKW2cJGElbLRda1DQdUj1DTZjFM0EEXw9pwWn0IWtF0xGLhKwp4HrJhPXTzsj8Nsri8MH4b7hUhNYnCXIQC3kZoBNtuyjzNNiEHe/RSbuHeyZAHa/lcHcocOxTPdCXc0WGn8J6KqylzC03OQeqdAHaQDkY6qXNFrtNx+yqBIVgyNk63AKW2Oyi3orbG2+EoZd1ih2gE391GVYQWGzhfslNiLhLgIjhtYJSR2ynUlwcLFov3S9oclVutkbJgDdFh0F0mAiWUEW2T2xlBA2Q7SCjIwpIcMkGygj6KS53IQDlDGAmTBSVM+YaWeQd2xOKqkjfG8tkY5h7OaQvWuA/i63g3S2U50ClrHNaRzSMudvdcXxhxe/i7UHVLtOgohzc1oxb+6KTyWOMO3OTmBspvjCALDCLBPgoIs47lFh7pg0d1NmhLhhFAPQJg3up5gEpf2UwQfZKXAeqrLj1KjJUbDgYvJwl90K2OF8hwLN7lLuyFYBcbNFystkLIWGWUjGfQIfJBRx3cfMenUrU1FVJUO8xs0bNCWUlDnkKTY1VVyVDiL2YDhqxbouoWCc22WpApsiylBLyyAhCESAp2RsoTpYICdotk7qGt6lXRsvk7K6MfIrZMbL+Y7K4BACdjC8+ndaIryKyY4+c52Cymt6DZQ1tgGgYVoFgrUhQAsEIQmATumw0IADRcpSb5KbgUCepVLnXPopc6/sqyUnIQJSKVW518BM3gYHOvjomY3qd0Mb1KtAsol5CAFkwCAFDnWwEfoAHOtgJEIARIACCbBBNgk3TJEAm5QBcoAuVYBbARCAFk7W2yVLRZBKZIhQQpBvg7piLjmCQhVNCByg7bpbKTe91BJvchIEkOIHcJxLzMDXZtseyrO6kJosjQ529FIbdpIzbcf3UA3FkzHHphw/X0VqFEK2OiazX6BrVLq+mTGGqpXiSNw9Oh9CtcbHbHolFwUmcMK9zruNq7S9croOJNLhbTGuFqqmbgRTjew7Hdcle+Nk5u5hANr2JCUgHdSW+4W8iqCOoU7ZR+xSABpGztkcmbA56FQcIDjZBfUgpGdrFXColNKKdzi6NpLmtP4Sd7e6rJ5snf91FrHdRbMKYxGARhQSeym+LFKUwpIP1CbO4KQGxwnFjtuilkJG5ypbYYcLhLlSDn3Q8kJOD5ctKTGyYjAIweqUjKVhDYqbkI3QLhDBAyCg3G+ybdQb7FBogt+yOqkDFlLbB1twggh0upuS3lBwVJDQLtOEuE/ACACnbe1lGx3UDfdMAt2IuU1mkYOUgJBBObLpoZuG6zh6WCoidS6pGbxyDZ46gq+EVJcit4OYdc4PRRi1la5vmIbm36qsqtoJHKT1CVwzvlOciyUtz6pGgibnfKj903XbKj2VbCBvvsotcIupt9FCCkWUWN9rqzFvVRm6VogoLu6kEHplG6goBG26qb3SAIuVO4GBroulyiyGQ4Juoz7IUhrnGwFygQhM1rnGzRcrIjpScyG3oFe4xU8ZcbNaEVHywZKoqUDMmT2S1dWynYWsIMnQDosOo1F77sh8jf6upWASSbk5VU7ktoDKPuS97pHFz3FxPUpboJULC5Z4LQTIQolggIQhEgKUKLp4rBAKZrepQ1vUq1rS4+iujHyxWwa0uPorwLC3RAAAsNk4BJACvjEUljC91gsprQAGtChjOVoaFaBYK1IUkCwQhCcAJwLC5Q0WyVBNym4AyCblVOdfA2Uvd0CrJ6JOdiIgnolKCUjndAm4QQc7oEMb1KGtvk7K4BRLO4wAWTAIChzre6P0ADnWwN0iEBHBAAQTYIJsEm6ZIgboAuUAXKsAthEIAWwE7RbJUgWyd0J0iAmDepQ1vUqS63urFEBjtJ6IIBFx+ShzHQvAJx0KsA58twRuFSxSkXRnYpjg7IuDuq2iFZ9kC6a9sFQN7JBhhiycjr3StyCD9CpbtZXRYjDrlQRmyYWcPVQQSAjJEIH6hQT1UkEWJ2KDj2ScBF2Pogj8lJF1Fyl4ILfFkDa4UmxS2scJWEcW+ig4KB6qSLtuNwoQjb1CMKS3y8zdu3ZJkFF7EJspF7IFjjZM1p5+W9r7JktwEtAcbE27FK4FrrEK1zQbm3K4Yc3t6pHXIudwmkgIT9VKj0IsjcbpBiLfmgGxspz9VBIJuMJWQYG4upwT6pQbLsuCtG0biY1Gh11W2ir5PNRzONml39JTR32GhHueDjSEW6rY61pFboOt1ej6lHyVNM8seO/qPRa4BI0BrDwxhY37pbBFuoKYOa4WcLHuon7gJZyk2dgd+yhwLSQR9UpwUwNxYHbomyQATbfCsDu9ik5mkbWUc1imTwKXXO4CW3MD0KGknI/JFr5urM5IRym2FBFm3KYi2QVBvffCVoIzKWola6SKnfI1u5aL2SU9NLVVjKSEASP25sBZ+n6tX6ZI51HKG8wLXAjcLEmnlmn8cnkfe92YshKEWk1yBN5LtQ0XVdLANdSGNhNhICC0/ULAvixCzqnU9Rq6RtLVVr5oQcB5vZYIaRjdVySzsHPuRkFN6oBIxsouSlwEMHdFm9k3L/ALso3KiRBLfQIsFZYbFM2MvNmtUcQZKbJgxxNllNpzfzEW7BXBjW7NAU7UTJjMpTu42WQyNkew+qpmroISQXczh0atdPqEsrSxoDGn81XKyEQqLZnz6hDFcNPiO7DZaqeqlqD5zZo2aNlSousc7nLktUUguoQpss27GABShCdLBAQhCBAUo2UEqxRwQEzW9Shrb5KsY3mPorYx8sVslrS4+iva0AWGyAABYJgLmwWiKF4AAk2AWTHGGD1RHGGC53VzW9SrUhSWi2VKEJ0AE7W9Soa2+SpcegTAbIcb4Vb3WwEOdbA3VRNkj32IkBNkhKCUrjb3TcBIcbYG6hrbnOyGt5irgPyUSyNwDR1TgKLKSbBEhBNvdIjdCKWAApJsEEgBVk3KZIgboAuUAXKsAtgIhACysAtk7oAt7o3TpEBM1tslS1tsndQ53QK1RADndApYy+TspZH1d+SsJsroxFbKntDmlj/wA1Q1krHkAXsLi3ZXMkErbHDwna50bg4btOLrPKOQGKXXORulKyKkxvcJI28l/mb2KxzlUNBIRbqEwbcdwosQUvaTJAKa2bqLC6kKIgwyb9U23slCYfoVetxSbgsLHe4PYqkHoVYQRhJaxJSSCgDb7bqDg5TDuFDnA5KRoIhHUKD3CYixQWkGx67JMBIB6H6IyCp6W/JQEGAASDjY9EpT9LhBAcPVTwEUbWKm/fIS2t6hMwXCKYB3O5mjm3GL9wou4YKO4U2v7qx7gLGuYW8sgt2KQRNc/la4AnZQL2yFHKM2UbzyQgggkHB6hKQmcXEguN/VRtvlI9wkWymY97HtexzmuabhzTYg9wVBFrEG4Ki+UnATO1XVazWKplXqEpmqWxiMynd4G1/VYHoneALGyTGyZsLbe7JAsd8FFioupF7eiTAAvhNhLkZTWNr2wiiB0QlueybBANkyIMMHdMLnISt9sKwZHZOkQB27oIs6xFl1HDOiaJr1bHRVuqDT53EBr3/KV7pqn+Hmsb8OJdQ090WpVcfnjkgN+Ztj2TPEeWaIUOaymfMNiDhSG3yVmV1DVadWSUlbTSQSxmxa8LFvbKbBmkmnhiuYLYdf0SgE4CcgHKiwGRslaFELQd90trCxVhBthM0U4YObmL/wBEjjuHJUWtxhHt+Sm2coJtvslwEaMB7wCsslkbLkhrQsON4uXAWsFr555p3HmOBsAqZ2doyWTZyahTsB5XF59AtdJX1ElwH8g7NVAiducBKS0G26yTsk+XgsUURvlRcIJuUWWbu9hiFNkWUoKPuTIIQhMQEIRZTnggKdkbKFYlggJg3qUNb1Ksa0uPorYx8sVsGtLjYK9rQ0WCGtAFgnV8Yi8ABc2CyY4wwXO6I4w0XO6ua3qVakKDW9SmQhMAFIFygC5TEhosEwGwJtgKtzrD1Uk2FyqSb5KDZEgJSEoJSk2F0yWAkE2SgFxUZcVc1tsBLyNwDW9BsnAQAp2CZkAmwVZNypJuVCKWAAp2CNgkJuUyRCCblAFyjdWAW90QgBZWAWCALI3TpEDdOG290AW91DnXwFbGIALugTsjtl35IYy2TunLre6vjERsCbJEKFZlRAUyNN/EZv1TteXsDj1Sscbeo3CvhEdyx+GuyD2KzLchQ4X3/NVkK6QFryOowqiLlUSQSG3BwoO9un7KbkYKOYHBS+CC+hUgKCMoCrCPf0UjHsoBvvurC0YLdirYgYHLfUKsp7XHqoA6KxrIpXt7FDvVTy72QqmhhbXb7bJmuDouQ7jLSgtxdqTIyq2mgi3BQbnbdTbKBg3SBJa4g3UkC3M3b9kxDSPQ7KB5Seo6hNgBXbsgEtNwnfHYczT5Tt6Ku5Byl4YRwT1Cm9rdVAdY90YynANflNxkI3OCgEWsVAHREhNr7JSCHWIsmtumeS5o5hdw690cEKb22yD0UEEbbKbIOyrYTOlp76fDUNGCLFa+y39MzxuGiR+B5C0Qxe/Qqya2TLJxxhkXPZSL3uEG3QqCSDhUFZPS4KkEtNwcdkod6Jsb7KIhOD0sUDCNuuEW9UyIMH9LYTA9wqwc3Nx9E4+Um+FYmAta4YuAfde8cB/Gev4d4DfobK14mY68Ze4mw+q8CB/JPflde591dGSxiSyi6q51s6/iPjKt4h1Cok1GnhnJeT4gA5j9d1yj+XmwLNSc1/dQTbdGUkxJzc3lgTY4UXLtlBdfqlPeyqbK8DAlu6hzh7FKXEjJulO+CkbChua+6LD8RylAJzZQ4jYJfBMDN3I3usSaVsZLI2+YbkrJabO2sqJYGsJkkda/Tqslik1sWRMMlzjkko5e6Yvz5QAFFiTcrH2L7lmSEIKEOAAhCEAghCmyii2QiylBKgAlWpY2QATBvUqQ2ysYwu9ArIx9wNgxhd7K8AAWCALCw2TAdAr4xyLwCyI4uXzO3/ZEcXLl2/7K5rb5OytAS1vUpkITIUFIFygC5T4aEyA2QbNCQm2SgnqVU51z6INgBzrlVkqSUiKWN2MCQm5Q43wNk7G9TuhyMgY23urQLKALJk3BA2SE39kOdfA2UKJeQAp2Qkcb+yZIgE39lCE7Rb3TBBot7q0CyALZO6N06RA3TgW90Nbb3UE3NgrYxABN8BWMZy5O6GM5cndS51sBXxiI2DnWwEiEKxvtJgEE2QTZIT1KpbGBzbns4bFAN8OFkxzg/QqAbgg7hVlZFiTffuoAbflOOxUglruYKJC0uuNihJeRkK4HqkcAchPc9cpDff8ANUtBI6KCM3CctsL9EtrlI0QjmsdsFWAmxsUlrFXOY3kEjNjgjsU0UBsVrrmxwne0gqs9+qtY7nZyHcbK+O+wpUbhwNspTa9wtnqGmT0MFLUuYTTVbPEhk6HuPcFa4gH3Syjh4CKbjZQ11jkXHVSbhQe6pkvIUwcB0yoA6KSAdlFjdV4CR3CMlT+6B0KUI8bw0kPbdpw4KJYTEQ4Hmjd8rv7H1UEFtjuDssinmZHzRyt54H/M3qPUeqdJPZkMXluDYZH6qWm2DkLIqqV9M5rmu54ZMxyDY+nusbO6m6eGRom46I9+iLX9EHsVGKTfKkdAT7FDI3PidIBcM+a3Qd1GLdwimFkuGSCFWQLKy19ioIwo0A6LQWeNoFdH/Q4Fc44WlkbbYrq+DW+NHqVPa947/wA/Jc1VMMeozxne6sl/7aZstWaoyMcgEKLBODuocNj+RVLiZciDt+SmxvlTcWUXuBf6FJgg2EKATmyL49EyIdFw3rdDpdQY9U0hmo0jgQ5mOYe11qdQfRur5Hac17Kdzjytdu0LGBDev1S82d1Y3nBC5tyPLukN+Yg4S819iUXde91GwYJHbqg3UXuN1OTsFCDXYW/KbpOiCco9bKZIQbnZILtKc79lBv1SNEQXJFtkWHQpg0AXecdlGCfK23uo0EG/MFVUQmSQyE2aFcVVVMdJyNbsAqbFsFcmE5zGmzBf1KQkuNyrXRNjNpDnsEjnj8AssEv/ALMtQtiN1CmxKLAbm6TDfASEWTKLoqKRA2UXQmDe6dJvgBABKcCwspA6BXMZYXO6tjHAvIrI75d+StAU2UgEmwFyrYxBkACTYDKyY4wwXOSiOPkFzurmt6lWikNbfJToQmACkC5UKwDlGUyQGwADQkJvlBN/ZVOdfA2QbADnX9lWSgnolKKXljAq3O6BS53QIa2+Sg9xkiWN6lWgWQBZMAm4IACVzugUud0CRRe4AUhASud0CZEIc6+AoQma22SmIS0W91Y1tslDR1KklMkEE7RbJUNb1KHHoFdFAAnNgrGM5cndDGcoud1LndAr4xEbBzugSIQrG8bIiQIJsoJslJtkqlsYCbZKrJJKCSSpVTeQlzm7kfUKsEg3V6rc1XSiUoS+fRK4JtsFBCoaGQoUc3K69kHBTWBsd1XgYCQNttwqzY7J5I+Uixu05BSWuUsiAD3RmxANrqCCN9kW9UqeGQYXtlM02N+oUbhS2xFjurYsU7/hTUdP1fQqvgzWXCNlTzS6fUuH+hUAYafR1rfwLgnxOjlfFI3lewlrh2I3CaJxY61yPUdE0r5Japz5TzPfku7nv9Voa7twZKD2KUHoVY5uUhb1VDREKPRFyE7I+d1gbE7JXNc05Cqccbjiu7hH7FTYFAwC07KvBAzblO3T0S3IUg9CgoBM6grI42mlq2l9LJuOrD3Ciu0+She0hwlp5MxSjZw7LCbm4P0W20zUooWuoa9hmoJfmb1jP9TVZFqS7ZDLD2Zq+uyCDutpqukS6a6OVjxPRTZhqG5BHY9iteWi3ZN2+GLKLi8MWnmdTzB4y04cO47KJ2NhqXMjuWEczT3CVzSCQsqJpqKY04beVnmYe46hKot7BW5jNIveylzf1UtaU3IQiuBTrvhuGy8RT0zs+LA4fotDxJTGl4lnjta4W7+GzvD+IFC04EhLPzTfEijNJxgMWD2lW/8A8ePqdLHdpM+zOLIUbDuExGTdKe6o4OaMW4uMtP6JLEKR2CgHFspXgIXyi/UKHAAjl6mytnpqmlIbUQPiLsjmFgfZKFIQH0UWGVAdnZXRSNidzcnOOoKKeQFecW3UnGTuhxDpCQLNOwSncghHJB8X3wpuR5QcFVg4tt7Jr3PqjkgC1zfdT5uyBkWTgcoFz+aaKywCWN9lbDHE4Xml8Mjoov8AX1R+RKZxSZMiPHmsMtGxUJi4k7C6i+P+Ej5CGCM7pZnyNhAj+c9bKceyYPDIy8t5rbBVTWUQwBSyO8zzbuSoc2GMYcHu7BWSCeodkWb0CrdFHG273gn+kFYu1LhFmStz3OFgAB2CXA3KYyEizWhoUNjcc7DuUvPARSb7BAaSrOVjRjJ7oAJNgLoqHuTJAACZrC7bZWNiAy7KsA7KxIArWBu2/dPZFlZHHznOytUfcDZDWF5sFkMYGDG/dMAALAKwNtunFIa3qUyEJgApQnADRcpkgNkABouUpN0E3Vb3dAg2Ahzr4GyrJ6KSUhKiXljAUjnWwFLnW90rW8x9EW8hSBrb5OyuAQ0fkmCKWAkgKHG3ugmwSKLfcAIAQEONvdMQhzrYCVCZrepTEBrepVrW9SoaL5TEpkggUzW9Soa2+Smc62ArYoAOd0G6eNlsndRGz8RTOd0C0RiI2DndAkQhO3jZESBQTZBNkhNlU2MSTbdV5JRklTsqm8hBQjdSBbJSNjGU02fkbbhPNCGhr2G7HbenooI8T0eP1SkuDSzp2W18YMpS5uVFrpje2VBuZGgC5cP1VDQ6EcMi6ixbtsrAbix2Su+XHRVNDClx5bdN/ZL0umui6qaCDS3Z/wAp3PZQ9jo3cp+h7hAbe9lfBy1Dfszzyv8A/bce/ZFLOxDHBPVNv7qeVzHuikaWvbggoNuqbGAEA90xcQQ7eygtPLzDI2PooIPKQrVlClkgzzDY5VWb2/hVw81Pfq0qs7XRmvIEILtKl7y59zv1R5u31UG1tlS1sMQMGx+iLWQTfCP3VTQwpHUbKSLjCi2cJgRsd0uCCXINwgXLrkYQRnCkEhKgm+0PW2ULH6fqUX2rSpzaSI5LP9zfVXa7w6/S4o6+il+2aTPmGpbnl/2u7Fc8N87Lo+GuJZNDkfTVUIrdJqMVFK/Yju3sVoTzsy6MlJdk/wCvsc+W3Njgpoy+GRr43WcDcFdlxFwhFBpzeI+HJTX6FLklou+lPZw3t+3tlcoIg4evQhOo5ElBweGWVMLSWVEPyS5I/pd1CTw7jKy6Rt+amkw2XAP9LuhUmncyR0T8PabH3VyhncscMrKMvhB5puONKlBsBOF13xrpPs/EVJLy25nFq47SmmHiChlGC2dhP/6QXrPx900t0zS9RA+ZzTf3A/5STjiLRtpWdNZH2PBHA8xSWKte2zz+irNjnYrKzlikG6i3Y2KYjG+UpALb3VTIBuDut87iiqqeF5NBrYIqiPmDopyLSRkdPULn8A2P5oLbZCUZNrgLWIUi3UIt1RhEULhT9EW7KemEcEIup2PdQPQJhYC4Nz2KZEGYbZIwuo4OquE6bVWf+r6Weooi7zeDuB+YXK5Iv0Ug2OCrIvBE8PJuOInaG/WJX8OCVtCXHkbLuB+ZWqNrABDQXG4UvdewIA9VFsiSeXkQ7qMnaym//lQdkrQAIzk5TMtY32GUgv8ARMyxdboUjCYs0ss3kjZysSNo3Wu82AWXLMyPyxN5nd+yx+Som+Zxssrim99xkxLwsHlaXHuUlnvOASskU8bP9R2eyC62GiwUwEqEFhd5+icAAWAsm5Tuce6iyKWSBZTvgJ2Rud6Dur2sazbfurEsAyVsh6v/ACV4HQKQ0lOABsmSAQAApQhMAFIF0bpwOUZRSA2AAASuN/ZBN/ZVOd0CjYAc7oFWTZBNkhKCWd2MBKUm3upJsFWAXFFsKRIBcVa0dBshregTgIpYCACkmwQcBVk3KnIAJuUIUkgBMQgmwSIJuUAXKYhLRf2VgFygDoE+wsEUghtgKWi/sgC5TE2CuigATbA3Uxsv5ioYzmPMdlY42wFfGIrYOdbASIQrW8bICQKCbIJskJt7qlsYCbe6TJOUblTsqW8hDZRujcpsNCVsYMAJCboJJKLJQmda+2HBK9xPmt7oDuYXG6hzXF45fxY+q2yZlSFwd0Dyva8btN1JBaS1zeUjBB6FQQkYyO+4j4SirOBdP4+0FofSyfcalC3ennH4rdGuuPqfXHnZwfRdlwjxbPoEddpdQ3x9J1KPwqmB2xxYOHqFyk8bGVMsTHcwa4gHuO6XseMl0sNKSMe1j3aUWG6Y7JL9eipwVgCQcbjZQ4jn5hi+cdEwFygtCVrYhsuQapSl7Batgb5h/wDit7+61gN99k8U0kEzJ4X8kjDcFbSsp462k/zaiZYXtURDeN3f2Ks+dZ8r8w4yaxhLb9QcEd1HVSOhCcs6q2KyhGPSs8RskfW2Fji9y3qFl0RDdQaOjwqq2IwVz2DGcJpR+BS9gCRPY1x5xdjsOHZJIA2QtBvbr3TOs5okAsdnBIW3df0sq3xgn1FLeoUXzlMQRkJSbjbZUSGRFxcjZBWx0WGhn1iGn1B3JTT/AHbn/wBF9nfQrM4p4Yr+E9dfpdfZ12tlhmb8ssbhdrgUrjtks7fh7jQlS3fIwpNtxuotsdhsfRJgUbmAuCpBtZEjCx/JI3lcP1HdKDY3HQ7JuGTJ1HCnFeo8Kah9opOWekl8tRSSZZK31Hf1Xb6xwTpvEWiv4u+HoM9MPNW6T/7tK7qWjqPTr07Lybnb+HZdDwtxLq/C+sxapo9UYJ2HzN3bI3+lw6hXR52NFdix2T3X6FcdM57eZubYPp7rZOojVUX2hjSZ4BaYd29HL2Om0Xhr4twO1fhbwdG4sazmqtNc60dVbdzfX1/PuuUh4a1HS9UdDUUb6eojcY5qeVtiR1C0Rmntw14Otp9L3PEd0cJFTctRDO0fKQf1Xvfxy001fwg0vUGt+VkLr/Qf8LgavhR9JWMZTsLqaTzRO9O3uF75xzox1X/DPE/k5pIaUO+oJVd9kW4Y87G6WldK7JL5tj4fmjsQbdFiOFtwuhrqF0dhbNlp5YbE3VVtbizz9tLg8MwiFGxwnLeU2spbyWIcPYrLjcy8FZB6KM2THBwCQgn0QIKASVNvoVOOykWIsR9VEAgtd/4QBfqm5S23YqC0+ycBBu04U3vkBQR+fqgG2UCDBwHS5UE3O1lBPW1kcw6o5CTm17o5kXA7o32woQgkd8p+R4HMW2Chga4nmdy2/VBJvYG4U8EI9bqWnzDuoU5SshaWxRi7lUZpHYjZYKzlYBzvt9UhmN7RtVbTCivwrZkcGqCQD5PzVghkeeZ2L91aImM/3FDtwTJjtje84H1KtbC1u+SrcnA/RMG90SCgdAEwb3TbbITJABCEIkBSBcqQ2/smw0JsAbDDQkJugm6rc7oErYAc/oFWTZBNkpKiWd2MQSoJsEE2yVWSXFFsKQZcVa1tsKGtt7q0CyiQQAU7BASON0eQATcqEKdkxA2CrJuVLjcqEyIAFyrAOgUNFvdWgWHqilkIAWCALlAFynw0K2KABIaEMaXm52UNaXu9FcSGiwWiMRWwJsLBIhQrW+1AQIJsgmyrJt7qlsYCbe6TJN0bnKlUt5CGygC5QBdSSGhI3kYCQ0JCSSjJKkBAIAIUpmttkp4xyEuBzzDfr6pnXBsdiqwc3CuD2vj5ThwyCtCeUZS+rkjqYWVAHLM0Bko79isLIKb5hbuLFQBYWPspLfci2JDtipLQ5/ODvgqAmti4+qiYyfgqcFX6K0g391W4ZKpmggPRDjc3CktwHDqosCUpBCs3TK+XTqwStaJI3DlljO0jOoWKRYZS5H0SrKeUFM3mqaXHTeFXULjJp1TmJ+/IerD6rBa02sRlbPh/Vaem8TTtSaZNLqvLK3rEej29iP5uVdquiz6NqAp5SJYnt8SCdvyzMOxC3wSe6JJZXcjRZhqYZegeAfqtnxFS+HNT1AHllYD/AGVNXTc1K5zeouD2K3+pU32/4f0eosFzA/lcfQjCsccJxYqWU37HFZFx/CpBu2xGQpyQFBuLHsseMC5It1B3Uddt1YGtcLjB6hKQdiEJxImIMLd6nxJWavoVDp+pHxpNPaY6eY7+He/KfZaUnr1Rt7FUcFik1wI5uxCGu5QQdimJOB2S9xZV8ELnzmSlEbxd0Z8jutuoVOOyYX5b2x19EpwcIvL3ASAO6vjeQRlUCx26dEw7povAUzpNE1Wr0zUIK2iqX09RC4OZIw2LSvqjgzjfh/4lUEOj8YMipNbjAbDqLQG+J2Dv5b2Xx3FLynJXXcOaz9hrYpec4I2Wl1q6OHz4Z1dFf6c1l4/sfbtN8MueMUlTyu5Hc8cg2K7DWOHY3fDWu0NjMGFzWhcZ8HfiHFrunx6TVTmSRgAie43JHZeyOY18ZaRcEWIXnLZWV2Yn4OhrdTerErXnGGj84OLdEk0yrfHJGQWkjZed1gIeQBhfavxl+GMlQJtSoYxySXIsPlK+UNY4arKOYtqI7L0SuWorUomjXUq+Cvp4f5HDuF0hFlsaikMZNm9Vi+FckHCyuDPMTg4vcxwSCCChzi7eylwDTYJUjWCoCoypKBk5SEJBP0UgXFkuxwgOTJ+4MGZS6dX1cBqKehnnhabF8cZcB72WG+7XFpFrYIIyF1XC/HvEPB7JYtGmgbHKbujmiDwT+4/Nc5X1b9Qr5q2VrWSTOL3BgsLlNJpvYdqOMrkxsg4yFJcoyDjKP3SChncJuYW2ylHrcIsdkUEcE9RdMGEtLgCQErR0Vwkf4fhh1m9gmSAVWzcKckYTGw2UXv6KNEHaxrhd6sHI35Qq2AZzgKwEfhF1UwB5nIDR1Ui/VSpgIWQhCJAQhSATsjghCYNvumDQFBdbZEXJJIGAkJ6lQTYXKqc4n2StkwS518DZITZBPZISol5YwEqCbboJsFXklFsKQEklWNbb3Q1tvdWAWUSCAFkwQAlc7oEedgA53QJUKQESAAlcegQ53QJUyICdot7qGjqVa0dSmCDRYXKnco3TgWGVZFAAANCgAvcjL3WCtADGrRGIrZOGtsEhNygm5UK75UKCCbIJskJtkqlscgmyTco3N1OyqbyENlAFygZKkkNCrbyMBIaEm5RklSgEFO6ACcBOAAFZGOQgBZKXXwEE3NgrA0My7Lu3ZaoxS3YGwc0sdY/Q90vNYqefnYAdxshzLC/RZ/sUFjUOFwq2E7fknBurYvKAQLqxvr7FIcZU81xnB6oEAteIuct8vMW37Ht+yQm4vbZdjwCNI1DW3cPa88RUOqARCY/+xJs1/wDytHxHoFfwtxJXaFqTOWppJDGTuHAbEHqCEraew+Nsmqb8pb0P6JWi5HQJ2kb2vbcdwocA1+Mg7JWsCg9jmktdghT9nkjhZOReNxLb9j2TOeJAy5s5p5Se46LLpakQsmoqlt4ZcO/2u6OCZRTYMvBgt8rsf+Qu/wCFK2i1qgHCetyiMON9OrHH/Qk/ocf6T/wehv59+IgG9iQsumk5XAG+De43Hqnqe+Bk+1nYSaJVUldVaRqEBhqYiWuY4WyP7Le8HaY7UuCuIdEc0umgY57B2Lc/sug4blZ8Q9IioZZGt4p0yP8A6eR2Pt0IHyHu4Db0x2XW8BcOOpuMw6WJ0cFezw5GkbG1nA/mts5r023yjXVVl5XB8vOjc0uGxY4hITcWtuuo4y0ObQeNdW0uSPkMUrrD0uuaeLHOyyzjhZRha7W0ys5HYhHMRvkJyQWgkZ2Pqq7dshVMguCVO4t1RYKWsB6qjGRhAevTqoO6bIPe2CEOAwR9VWwkNcQffooPa6HEdUYIv+aASCHC1/zTAX6qC48vL2UA42ypwyGzoKejfKBVvLWrr6R3C1E0F7zI4dj/AD0P8x581+bHZZMT2AjC1wmmsF9dvZ4PoDgr4kaNodSwUNK5koI5XdjfH63/ADX2PwRxRHxVw9HXsHK4tBcOy/NLTqjw5WuaALFfY3+G7icVdPqOlyy5ZG17Wk+qydQ00XV6seUd52R1OmeV8UePsfQepUlJqFBLSVRHJI0jfZfJfxb+HOuaOZKyGndW6eSSJ4W3LR6gbr0rif4gug1yXTXz+E1rizmv8rhsuKm+LGq6VK+OQtqYb8s1NMOYEd89Fj0tN9eJR8+DdpdLdRXnKw/DPlXUYnh78ggGxstLI0tPzL6U17R/hr8RHSVGl1beF9ddkxyH7iU+/wCHpvceq8X4s4D4m4UqCzVdOc6A5ZVQDnjeO4I/sulKWeVhnC1VMk28HEuybndQR22KZ2cixHcJbZ3VDWTlsmPwmk+KwuB6g5CVwbc8t7dCVNreiQndK3tgUlF8bKL5UEdbpGEm+dkbjbKgZTA9CcKIIvKb5TWIGQPdMbdMqA3Yg39E+AAA38QN/RQWnforc2Njb0ul29/dO4gyQ32T2OL59lXuTcqwYtfZREH8tiAoBa3pc9kzntc2zG2/dVmwPZWyQEDcvscK4OaMNF1Ru6wwrhysFhuszwgjC53wFOAluTsFNgMlAJKEC52F07W2yTdQGSA0ndNhoQXAeqQm+6IOSS4lIXAJXP6BIT1KRsOCS4nJSE9kE3S3TJY3YQuoJsoJASZJUbCkBJcVY1tvdDW291YBZRIIAWTAIAUOdbAR5ADnWwEiEAIkAIcbe6CbBImSICZo6lQ0X9la0X9kQg0dSmKCma3qVYkAlotkqCS42CHHoFYxnKLndaIxA2S1oY31Sk3Klxv7JVevhWRAQcISE9SqmxwJ6lV7lBJJU7KlvIQ2UblG5U4aFW2MBIaEmSUZJUochBSBcoAunwArYxCAAAS3LjZoupy91gnw0Wb9T3WlJR5FbAAM2y7v29kWQAgm3ug35YCsjlN1c0h0Rb13CUWISbHCoTKiBcGysDu/VKjHVRbMgxvzC2bpt23G43SC4NlbKQbStxzYcPVOQVji1wc1xBBuCNwui4n4hfxLQ0NXX2OpUrGwSy9ZWDAce52XNA49VJPM0tPslW5E8EDyuUubb2UO2Re7VCAAFkSyNkgY4/6jPK71HQrGAuEx2ufZRbbADlAuR1TMcAQUrQbWuoF72UWzyiHTaBqdTp2oQVlHUOhqIHh8cgPykL7i+G9bpPxA4cj1mKJlPq0JAqom/wD4g/GPQr4Bp5TG8G6+i/gFxpFoXEkTJ5uSCe0clzix7+yu1EfWobj8y/eDZpZtPs9y3/Etwe+g47pteiitFqDfOQMc5Gf1C+camEseWkWsv0j+LHBsHHHw/mhhAdUwAT07xm9s2+q/P3iTTJaGulhljLHtcQQhobVfp0vMdhL4bKa/mck4EDlOyW1sgq9zTdVEWcQUso4MghzjYqWkC6kgHBUAC+TlUvnI4pJDg4KHnzXGFaWggi3S6rtduyraCLu3lPRLexxlMQoLbHG/RVhIvlSfTZQLYHfZMwjms8Y6oIIowc7HdOCWnKV7eRxF+YdCgEltj02TLZkNhTTEOGV7d8AtekoPiF4fiWbNFY57LweM8pGV3nwvrzSfEOgk5rBwLT+i1d3fBwfk3aKxxtS8M9N+LGpml+I2swMd5fF52+xXDSazJrNGWF4/zGAeUk2ErB091s/jZM6L4pVLr2bPTRSD6heXOqZI5BJHIWPabgg7LTBqNUTsW65xXZ7bG0mrw9xc15a4bZtYrb6T8R+JtDhNIypbW0DvnpKpokjcPY7e4sVztUW18DtQpm2nbieFoH/6YWofISELZqS3RyJaiSezO9qK74d8VvLp6WThrUXHLoiXQk/uB73Wor+ANWihNVpc0GrUtrh8DxzW/b9lx0gJuVkUWpajpsoloKyancP6HkLmtxzuit3Qn/7kf5oSopp6WUw1cMkEgxyytLSqS3GF1cfHNZNCINZoafUI9ruaA7/j9FjyO4Rr7mNk+mSHo03aPpkKYT4Yrrg/kl/U5jqnjjdLcMtcZ3W4m0Jr7uotTp6hvQP8h/uFhv0rUYLn7OTb8Ubg4fol9KWd0VOuS8GCbh1ipAx3Uuje1x5o3NPqFAVXkRjAp2W63CQeyYWuLY91ZEVgRlNHHJNKI443yPOzWNLifoEbb2W74W4mrOE9ebrGn01PPO1haBURh7RfrYgq5IKw3uaeWCWnPLUQyQuOQ2RpafyKTcrc8ScQ1vFOrHU9QbEyYi3LEwNaPoAtRcA5FyikSWM7A08g2uVHKTc3HuVJvYJ/u3NyCPVNjIhQRy2INwrmgAcziq3tAPlcSnYzmy42CzSW4w/PmzRcpxGTlx+iA5rRZjVBJO5Qx7kHLgMDKUklKXBqQvJ9AlcgYHLgFWXEqCbJSUN2MSTZKSouoTpJEJJSF1sBBd2UBpcUrYUiACSrWtt7oDbYCcCyZIIAWTAIsocbY6qfQAOdbASIQjwQEE2CkmwVZNymSIG6kC5UAXKtA6BEINF/ZPsjYWUgXKsSADRfJ2TONsBBNhhTGy55ir4xA2TGy3mO/RS43wFLj0CRXpYWWJyCEJSUkpZGQE/kqyblBN8DZGyobyMGyjco3U4aEjYwYaEmSVJJJQlCCkC5QBcp8AK2MchJwAlAMjrDAH6IALz2A69k+LcrRYfutKSiK2GAOVu3fugBSAoLug/NK3jdkAm2BukQi6olL3IMD1SfiRYhTuLpCskYU42UItc+qZMBI2IRc2LeikGwRgG4ynAL+6ZpHVDhgEJfZDghJbY26KLdFN7ix+iQkgoNhQwuPqrGtdy3I8pxfsVXe+yyqSRlnwy/I/Y/0noU0MN4Yr2RjWKOa5B6qX3DyPWxSndSWxCwOyt7oeozUNUHRvIutEwDmF9uqzGkRPGfVaKG08kzh5R+gXwI46HFXALaeul56miHhPLjuNsrw3/ELwK/RdedrVJFz6bWuJEjRhj+rT23Wm/w9cRPpOIdU0czFjaqBxYAfxWu39Qu8rviDR6rS1mj8Rw/atPLvs9Wy13M6Nkb6i/9lnqonVqZzqW3lfRnWjFXVuTfJ8kzx8kht3WLIbkLuviBwZPwprDRHIKrS6seLR1bMslYds9+lvSy4h7ep2WmzD3RyZRcXhlXKOqHMt7IyDbcK8MY+Bxa7zszbuFnx3bAzgxhzA4OVBJ5uYDHUJ+RxuWm9kpBvlUtMcUi1uoKAGkhrja537KbWO+EOI5bOHsUuCFbgQ4tcLOabFBdzDIs4fqrXOD4xf52jB/qCraeV/MReyV8hEP7Jmkd91L3M8S7BYdkriL3AsgyFgIB3W+4TqjTcYabLt97Zc7vYhZenTGDV6Oa9uSVv7p4ywy2p9tif1PVvjg/n4v0mq//AB6BufawXlTpBaxXp/xfe2ppeFq4ZvTujJ+t15XuSFfJtLBo1jxdIvpaySkqGzQnzDBB2cOoKyK6GB8Ta2jAbBIbGLrG7r9FrTg5FlLXuF7Ei+/qqVPwzLnKwxHjdV2F83VpAseXNkhtvf6KuQoht0ygAE2cpIt8qPW6qwQnDTjB7hOJ5QPLK8fVVfqnsLZOE6k/BMl32yq2M5cPXKqe50hu8D6BKL7dFI5QOt+iOW+WTOSCSPZH1ug3NygOtthLwyEg/UIJHTdSWvLecscG97YSm24TZwQnf3TAkdVDeU/NfHZMLZ5Rj1TIBOcGyteIgwBshc7rjCRhYcvwl5s746J84BgY4ydkNdfAFh3SEjPMLqu7r2HVUTkFIyTI1oSF7nbYCQAAZyVPMeiq3YSdtyoLuyhCdR9yAouglKXAI5ISTbdIXEqMkp2s7peRsYFa0n2Vob0CkC6ZMlggAWU2RZKXdApzwAkuttukQhHggKSQAg4CrJuUyRAJuUAXKALlWAWwEQgB0CsAACALBG5TpEAC5TkhoRhoUNBe70V8YisljS43OytJsMIw0JN1fGInJCEKCeiEpZGSAnoqnG+Apc7oEoVDedhidlG6CpAsLlVtjBsLlKSSUE3KEoQUgXKALlPhoVsY5CGGhQGl5vsBueyGtLzc4aNynJvgCwGwWlJRFbDpytFgFICAEpdfA2SOWCAXdBslQoJ7qiUiASlJvgKCb+yAPyWeUgl4F9t0ux90x7hKTfdXspBRcgqRnZTgi6iINYHI6pbWPugEjZTuFYtwBY2sUu/uFZfASFovcIsiBzS11j7pD2Kscbx8rt27HuFXuEkggMYUtOUqsZY4PVImEPxEnqgpSbEgphZPnIoAmycPcQATskFrFAKaMsMB2PAGtP0PjzTa9rrAPAd+a6vimv8A8q+I9eA7mp6kHmb0Ivv+RXlEUzoaiKVpsWPBXacX1hq5tL1MHMkTWuP0sf2W+ieJ930L4TaraXhnQ6dxFQuopuE+JXGbQqlxMMxy6ikOz2/7drj67hcHxJoFbw5qz6Grs+M+aGdpu2VhyHA9bhUPqOaPldnlx9FutP1qnrtKbw5rz+aiB/6Spd81I4/hv/QT+R9CVZbGM/ij5E7u7ZnH2BGDlRk52KzNR02o02vdS1IsQfK4bOHcLFyw2cPdc5pp7leMCguYQQcqHXubjBTOaSLdkpJAF9kjWCC28vqEt8G4wUx9MpQSTayqa9hhbWxfBU2xkocO4UYslwENrHdS4Cwdb3U8g5Odp65b2S2J6oYIGw9EAhskbhu1wP6qbWG+yV7fKbH2QwTJ6RxxU/bOBOHpr3MUzmH25V54QTc9F0+pVLqj4fQNJv4M7f1XL8zrmy0zZs1T7pqXukKbm1v1UXNlNyVDrWwLO6hZ2jIRcg72R5d/zUEhSCeYEBIQC3GbWSEZxhWuIcMNseyjlBBJNkXEgnaycAW3z2Se2brq9K13heDhSbS9W4eFRXueXR1rDZzR23CEV7jRSfLOXxvsUBzjsQEG2SD1wPRR2vuiLgg3cfVR7pjflucJcHNx9UrCNzEsAJcR2UDfH5KAe2ynZHkAwtcXwreVx5fLbmNgqTf3UmVxABdf0TJpckwb6t0SjodFhrZtagkqZb2pYclvubf3WgaTYc2Co3JNgFOyDab+EmBulilsQbqRZScboYyQgAqcBLcn0QhnBCSeygkBKXdku6RsOCS66gAnZM1h3KsA7KJZCK1tvdWAd0AWTWTcEIUo2SF11OQEl3QJUIsiQFOAEEgBVk3TJEAm5QhO1tvdEJIFlYBYKGi2SpTpEDcpwA0IaLKDdxsFdGIoWL3WCuADW2UNaGtUE3KvjEVsgm5UIQTZGUvCIkBNlW51vdDjb3Sb5Kok/A4BBKCVIHVVN+AgB1KUm5UuN8BQAlGABSBc4QBcpwA0KyMchDDQoALz2aNygAvPYDr2T9OVosAtSXahWwJvYAWA2CkBFsJSb+ySUsEAm/slQlJtus8pEJJ6lITfdGSVIFvdZ5SyMFu6kXKAL5OAgnpsEpC3ZBHfqghNjlsfotSKCsDKYDr+aUhOAQAVAARaxCkWQAb2H0RcEdinWxA9FWTY3VgO9+mVDgL37p2srJBS4Fudx+yXZFs2KgmyrYQtkjuosR7KTthRcg+hSBJcChoU81woBs5RAGtlAxg7fsoJypPf6JgEOddpB3C6Gpm+1cJwOJJdC6391z9rtv1GPcLaadJ4mkVVMenmC00S3a90QxzJc37i6rLx2wq2utC3uMIcejhYkXF+o7qepgmDbQ18VVSN07USXRjEMx+aP0PotdVRS003hSjmt8rhs4LHBBwVlR1DZIRT1BLmfgd1aU/cprEuff8AyQoyRZv0VTjcK1wfDJY9Nj3RLykh7BYO3HYqlrwAotZBwpIINj1Ry2w5Z8YGAnmbcjIVZBsXcps02JHRW81hay2XD2q02k6zHU11EK2id5Z4D+NhwbX6qPDCudzT+ym1vos7Vm6c3U5DpTy+jf5o+bcDsfZYItzC2yQLWHga9hcIJu0iyCOUgDqpFxcHBHQoim3EpfwhUQn8Lmu/JaYfh7rMgkJ02qh6Fqw25Y032VjeUi2cs4JIN9rFQRcZNj3TOc4tIJ+qW3fdVlYrhy7kFQD3TWGMKAM2CTG5BhkXAyt/wvrGmaJX1Euq6PHqtNMzkMT92nuFoLObmwugvN7jdMmFPDyjL1SWjqNVqJ9OgNPSPdzRxHPIOywbH6Jr323UZGQcpWkHyQcHCm2x3Uts443UEAH17KtIBIceufRZdDUx0j5XPpmVHO3lAd+H1WH5e+VJPf8ANWR23ITyOJc8Mx6DAS3Ha6cPIbbnIadwlJFsDCmxCDfZLjqFJFzlAA6i6QIAdk7eZh5gfzUhlrG/XPotvWy8Ot0qKHT6eokrifvJpD5QOwH/AGTxXkhpiSTcnKm46lIL2AOUEWHqUGQCQPVKXEpuS+5TBoGwVeGErDSVYGgbBMG91OAilgBAb3TKMnb80wFgo2Ei3dBICgu7JVMe4AJJQhTZMQgBBICCbBJuikQCblCE4bb3RCDW291Y1vUoa3qVJTJEApmjqUNb1KlzrYG6uigEE3NgrWM5R6qI2coud1LndAr4xEbIcb4CVCE8njZESDZIT1KklVE3Kokxg3N0FTsoAuVU3gYALocegUuNsBKAkGABShO0WTxjkIAWCgAvdYYA/RGXusE+AOVu37rWl2oVsMW5W4AU7BACUm/sklLBAJv7JUJSbLPKROQJslyT6oyT6qdlncsjBspt1P5I2yd0rnWyUCEl3dV5ebDZSAXm52T4aLDdFIJeN8oO1kMIJ5XKXNINlpxgzlefqFYw+UtKW+bo9lADX6KHWJvsVFs3UkXCPgI0LmtmBeLt2Pstm7RpZNOqammvIKUNdIBn7s4DvocfVam/dbbSNZl0uqbLbxIuUxyMOeZh3CtrksOLGjjO5qXNu3m7YKS1yCsusEUdZK2A3hJ5mf8AxOyxBgpZrDyKS9nLtt0SkYzsmcbgW2UE2FjsVXIgmb4U3UhDiCbj6pEgkHJUjsgkAXQUyASHEXBWXp0gbUPZ0eCLLDsngdyVDHDurK3iSYCflke3s6630A03UuGpqaQiHVKFplgJ2qI93M/+QyfUey0U/lqnjvkKWuBIINiP0Rly0Qp9QU7eVxsTuocwNFhsl6WSrKIOXODeU5A/RLYkXuggizgbgqLnsg2EHP8Aqlc5xA6jopt+SjZIyEgDGd1BADlO4tf2TFrSAb+6UJX1vaxRYgprHp0U8h5Oa+yOMogvMTuEznl4bzW5h17qskk5TIZIXQOtzsOzmlVxHlANvRTGSJLlQ3qOidPgjIdbnNh9ENuHg3+ikl3ZKB3QYBy3nfzNFmnp2VZsMdVdBGJZeR0nhnoSq5WGOV8brczTkjqjJZj3E+gm97qCLbZCm4vdFhe/RUtDENBd8oJI7K1sMsrSWNBLdxexVbXFjvKbH0U+a5dzEH0NkFjyQXIJtgqbnB6o3OPzQARlTBCSW8u1yluR6prAg9FIdytLLfVTkhUTfP6IF9wn8MkC2/dZdWdO8JraKGVr7DnfIdz1tlBRb3CbCm4Zq6rQTrLaulZDk+G5/nNvRaQC3SxUBxaLAkD0JsguPUYTZQX9BuY2wlJ5lBOMDCkW3shkBLbg7eyYNB3IuoHKHDmOOqyqqrina2KClZTxN6DJPqU6WxDHNuyNt0t+26kNJyVW2QOa+GhSG9XIu1uyguJS7sgxcAlJJUIRxggIRupwBdEgWUF1tkpdfZQjggIAuUAE7JwLIhACysa22SpDbZKLpkiASma2+ShrepUk291bGIAc62BupjZ+IqGM5jc7K1xsLBXxiI2Q51sBIhCsbwsESBKSpJ6Kpx6BUyYwE3KNkKN1U2MG5Uk8oRhoSblVjBumUJ2jqU0Y5CDW9Sg3ceVqCSTyjdOAGCwyepWuMe1ZYrYYaOVv1PdSAgBK518DZCUsbsgE39kqEpNlmlIgE2S5JRklT6BZm8jBtgKdvdG3ukc7oN1CA51kNaSbuUtZ1cpJvgbJkiATbAUAKQFIF9kQFxbYoLjYA7jqpB5m+qQZWpooQEjZSOyloFxdQ9hjfYpERjICGjmvb3U2TIIrhcJmZwpABFlA8r2k7E2Rxh5IQQP7Ksj81kSM5XEFUubhWSWxBEzrFqgC+26kWsqsEEFt0EZupte9kWwq2iBgjKzKimj+wsqYXXthw9FhBPzPDHMB8p6J4NYaZGI0nfsmNuYOGO6VoLbK08rmFux3af7KEGny9rj1CqAF8GykuLomHeyi4v7p5bvIB7XFikPl3yE3muVWb5FrpGyA4k4GxU81t90uLeynfPZIMQCLm+3UKQzmdZp32UetvQoByCMFQhAG4PRTi1t0waXOJGbi6TmSYwQC0AboPa6YNc5peBcDf0UHa1sI42IKcC1lLRc2JsCgWOHfmggjykIIhPMWv9Qov5iT1RtbNwVI6X+iKZB2NbbLrO6DukbvjbqnbyEcr/oeyWxHSx/dW8oArm2F73Ck8rm+a/N37oIAu4fkjkLml1sKvG4Su2T0UixAymA87PxcpB9/RbXUqnTKunp/sOmGinZ/qm4LZPZBRGWMGpAB23TBuTd2UwaOouEO5D8osn7MC5EO+/5KWxudH4gLQB0O6Ldd1BFyB06lDG+4SLghQQ7qsyZ0D4444rYFnG3VYzuVpscj0QnDHkiFa6wuN0pcXG5P0T9iW2UEdS2yreQkXtmwKW3W2OysMb2sEhZ5TsUvKhhkFFt+ikbkqbADBUXuoQy4J2xQOj+zxvkd/wC47oPRYxsDgKAShM5trBCQQMqSSeqjbpdT9UmCEIUXCLE+ihAupsTui7W+6QuJ9AoQYuAwMlKbk3KhSjggKQ0lSG904F9kQkAWwE4bbJUgAIunSIF0zW9ShrepUudbA3VsYgBzre6GM5jc7IYzmydlaTYYV0YitgTYJEKFa32igoJ6IJskcbe6pbHIcegShAQVS35YwFSMC5QB1KUm5SNhAm5QgJgLlRLIwNF8lM42wN0E2Clo5RzH5jt/ytcI4WWBskN5B/uP6IAQAhxtgfVSUvLAQ49BslQlJss8pEAmyXJKMkqfQLK3kYPQKdtt+6NsDdITc2ChAJ6DdS1oGSpa0NFyg5TJEAm/sgBFk1upRAAF98BOG3bzOPK390WDBd+T0b/yoJLjd35dlYo+4UiSCx2NkN/dOct9UmyvaMyDqmc8mwduNj6JL9VJN0jCM13I66c257jYqsGxCZwscHHRNHghe6IiMTMyz8XoUksRMbrdRcFX0NQ2nnDZm80L8PHothU6c6lczl89NNmKQbey0Rj3LAyMGpj5qanqQPLI0LELTa46LoqWgfV8IVZawmShlIPscj+655rsAqNYeGRrBWW8uRt0SbnCtdi46FVD9VVJAJItkJb3wmA58Xt6ocwtcWvFnDBVbRBHC1irLGwIyozg2vYg5XQa/wAOy6TRUGrUx8XS9SaXwSjZrhbnjPYi4x6gpUthsZWTnnC4v+aXl9fVOHWdYjBUAZtfI29U/Iow/wBMjslNsKQMkd0tjy56IvggxcbgKAXNffqovdtjuFJJIHdIyIV1uY2GO3ZDXcp2TuYQA4nB6pSNrDJStNMPJAJJPKPolLSSmF+a4wUON3XOLoPggNdyi4Q5pDjzCxOcIBHMpdcsAvgHH/CnKIRHI6N12mxIsQdioNwl9VO/VLnwELhPjkF9xslaLhG+CigAfQbpmM5mlxOAowRa+yG3uWg7/qlXJBt8dkzGRufaV9m9D2SgbtKk8rSbOurE8bkFNwTb/wAoHYm1+ytax8rS5jCQBmyrAvgFNhgADlG1u6G2H4rhNyX2GeoKPQ2ACZLBCDf09u6V38CY8puC36qMtNuijYRAMi25TcpAzgpmtsLk2HZTY7nzBDBEVkdbfRAFzgXPZZTIvFJEeD6rq+BeE6jiDiuOgEDnB0TjgdQoqmzXRp5XSUYnFWIwN1IZcEFdzxhwRXaBr0tNJTvY0AGxC5OakmjB5oZGtHUtICLpaWWW6jRXad4mjC5TtckBJex2v6Kx1gcFVlxvsqZLBhFdY55bKM9CpIJ2yFBFt/0VTCTa6sigfNI2NjbuKQAJxgGx33CKW+4GE0ZikLOZryNy3IVdrndNYW7KNu3ui0QPK33SlxPootZCTBCFKACTgXVgYBvk9kxBA0u9k4AGykm6ZrepRIQG3T4AQosSUyQQ3TBvUqQ2ygu6BWqICS63uhjObJ2Qxhdk7K0kAK6MRWwJsk3RuVCt+UUEE2QTZITbJVLY5BNkm+Sjc3UqpvIQKALqALlDjbAVbYwOPQKAEBT6KJZGAC5snw0IADQho5zc4aFphADBov53bdB3TZJuUblBNh6p2xQJtjqkQoJWeUggTZJufVGSVO2AsspZGD0CnYeqNvdISSbBAgE3NgmADRdAAaEdU6WCB1UgIA/NM1pJsMlFbgADOMkpriPA8z/2QSG+Vhz1coa1WJYGwABJvue6cANyUYb7pgzq9aY143YSZGEEkY7pLXCz5oxIzxGb9R3WEU8omJMr2Kg2BTOBuQoa25sfos7Q6I32Tg4slc3kdbvsi/ZBbBLQQQun4a1ClkJ0XVj/ANHObMkP/tO7rlm4N1c0gLTW8PKBnB7PwfwpUQ8RahodYzni1Cld4UnR/LkEetrheQajQS6Zq1Zp07S19PK6Mg9LHC+j/gDrdNxFUx8M6vy/5jSO8agndu8DeP8An/C4/wDxEcGv4b+Jb6yKHkpdTiEzSOrhh37J7JqV3Z5xk1TinBSieLGxGVU5oDvRXtbnzD0KJoSwd+oKDjlGUx9imleXtaSPMMX7hKWkmwTAeXIVONgiZB9Fu6fXZzwzUcO1J8SlfIJ4b/8AtSDGPcFaUmyi9j6Kp7DKWCWgOa0kWuEOaC71CgnsoyTe6KYpJFje+yMgnspNrWKi+PUJ/BCALG4KMXOVBHYoA6pCDEuLOTcX/JQLDdSCAb9DugkG/VR77hIfIXOBIz1PdKbnNlJv0UbJHlkQ7WhzSL2cBcKABfO3VQLf8KcWB7ooJMjOU2G24VVuic5sCDbogtzgE+yDw2QXbNvopIvtsncXOtsQOqeCAzOkaJmMcG3aHGwd6XU7fCCio8paLAhw39VIaHOscdkWNz6YIQHNO+/dHG4CCXc1r4CCAMgXui/M7OMI2FmlAmC2KSSM3a/kNvzVjZiYizwm83dYoJuLm6sBvg3uE0ZPhAaDfcnB/JDr28xx3UHIxgqN7h26KZMDYsbDC3Wn8MavqGg1et0sDTRUrg2RxcL52wtLy2ySL9llRV1VFSvp4ayZkUnzRNfZp+iOPcdY8mK0ZN82NrK1sbTu7lVXNnt6qwHNnJ4pZBk32iHQoa1j9TimmjuMMNrr6g+DnFHw107V442aWKatfhk0hDrC2ei+SA/kGMmyzNG1aXTdcpawSGzD5lpscJ1uqW2fY7Wh10IRdFsfhl5WzR9Z/Gf4o8PNq3afo9FQSVDWhxqZo73xsAvljXuI9U1eZwqZ4/DGA2KJrG/oFia7q8mp6m6pe4uBFrrVF9zl2CqoqFUFXAXW69Sj+Hp2gvruyt+TnCTlyMghO7zOzspaLD5b9lnccs4xSQb7YRYdFfLFLC1rpYnRh+Wlw3VVrnKrlHGwRQHA4sVJPdtlIxtcqPS6XBBmi+bXaO6HWI5nEDsApIxl11BaO9k2NgFIF9h9EwYB8x+gVpa0N8pJHU90lrmwCRrAQviwwEAX2TBnc/RNgKYyQgNAQSjJ2ThoG+6dIgobdPgBBICQkkqxRABdfATsj6u/JMxlsndSXW2V0YitkkgJCboUKzaIAQhKSqmxiCepVZNypJuUbKlvIwbKNyjcqcNCRsYCeUWCRG5UpeQgrGi3uoaOpQbuPK1aIQIABe6wwB1T4wBgBFgByt+p7qdhcq5vwDkMAXSE3KCblKSs8pEAlITcoJv7KdvdZZSyENlO3ujb3SONzYbpQgTc2CYANHqgANHqhOkQFIH5oATtbf0aNyilkANbfA26koJFuVmG9T3QTzYaLN/dMG91bGPhDENb+Sa/Ru6MuNmp8NFhv1K1Rgo8hANDcnJUgFxUtbfJwFDn/hYmAZMclv7hVSsbe7djlRsbqSLeydmEpfsD1H6pL5TPHmUWws7W5YiJHcwsfokAToe2xwcFVteRgB/RWAqtvzC6sI5Tyn6FPBgZ1/BXEU3DfEVFqtO8slppGyNI9CvsP4p6BRfGH4K0fEmicr9Qgj+0QW3Jt54z+S+Eo3ltjfZfT3+H7jiWLgbXeG55wPsr/HhuflDhe/tcEfVPfFyUbYfNF/k+S+iW/az5rqoTFK9rmljmktc0ixaRuCsV0h8PlPTYr1X4j6XSa1LVcTaJCGTxvLdQpWfhd/WO4O/t7LygEA5y3qtMtn7CWw7JYZVYg3HurHkYc3Z37qXt5SR0QyCR1K+UC7WOs707FVY5RXsUOtfKWwssiAxeKPFF43Yd7JJYvBmdHzcwGxHUd1S47ZCV7KOqm2bKLXVWMEGc02uMhReykEgYOVF75t7qwIWuOYqOqsNmttu1yQeU5yEHyQgC5spt2wUbOwgk9VCEZIsN0EEC6cs+68UHI+YdvVV5Pso1giIHunY6zgS246hNBBJM5xDOYMF3Ab27pTZryGuuEva1uEHu82ygEtcHB2RsnuSEhAGEr9woku5nF5Fr7gKMEYGP2UD2QCQbdCpkbAwIA23UXxYssf3Rex2ui97ZyhkGBbXABFlaXx+CGclnjZw6pcO+bFlBA5fLdMtlsTBF+XPVXu+9h8UPHM3Bb1WMQcjqlBF98qvvxsTBcS3luRk9UvN02S83pdSMqJ5BgYG3S6m4tlKw2O1/dNbNxg32Vq4IM08u4Dm9lN2k3bj0UvilhdaeJ8V+jha6gC4JeLBWJgwTc7gHG5CS+QUCR7WljXkMduO6UnGyWTyEZ5x5dkobubhMfD5PKXc/W6gAXvfmUxuAnYDFx2WTTuggdFVGQumjdzCO2Pqsdz72xyj0S+blNtkylhkM7U9VrNWnbLWyBxYOVoaLBoWvPmOxQ0CxumDT0JIVcm5vLIthLe90zW/VNy98hTygBT0yZFO+AmawveGhpJRYdD9EC7QTzH6I43AQ4EHltgeqPQJmjm2QdzkD1SyXkIn6qQzqVIt+EfVTf1QSCGBsoLrKC7spbGXZOArFEAoBccK5rA337qQA0YSl18BWxiK2S53QJFO2+6E7aXBMEI2QTZIT1KpbGJJVZN0E3Qqm8hBRuhSBYXKRsYPlFylJuUE3KEoQTNF8lAFz6JibBXQjkJDjbA3Tgcgt+I7+nooYOUcx+Y7enqpAWjjZC8kgJSb+yHHoNkpVEpEApCenRBPQKAOqyzkEkDqp2yfogdylc76lIEhzug3TNaGi53UNbYczt1O5TJEDcqQEAJ2tFrk2aNymSyAGtuL3s0blBPNgCzRsEE81sWaNgmAsLlXRj4QwBoGSmALz2CAObJw1Nk+UD6LVGKiELgCzdv3TBoaOZ35IxGO7khu43ci3gBLnF/oE8ULpNsN7qyODHPLgdlElRfyRYHdFRzvItjH3Id36IvcWTEWNikcLbK2XucpCubcE9Uh2VnMkIs70KoktyxFZBBUOuG2/JXG1rdUr7OZ6hK4jZKC7IKuaedvKdxsquVM029wqU8MYsBIK7j4aa0dJ4wbG59oa6F0Dx3Iy1cMTfPdXUtQ+lqoamM2dC8PB9ir4ywBbPJ2k+rVekcS1b4n85jeYpoztLHfF/pZaDWaWmEn2/T80k+eXrGeoWRrlSJNYFW0gtnjBPr/MLVxzuic9nzRv+Zvf1XQtxNJ+SObezMQuwBvbZZFPU+AHi3Mx7eVw9FXKxrTdhu3cKsjII6rLumDYqZuR0Bsn8MmPxAb8mD7dEEAbCylpLb22IsQqu0OSsWBSk5JCYdilxe4VUkFEtB36Ji5o3Gdj6peYjphDRzIJkDfCnluDb8P7IHbqEAkG4CmAhb5SPYppI3xPLZBY7+/qkF9rqxzpJGsa483Jge3ZPsQrtckbJLZsDsrjjACqO+2UrCPE98TwWOLXdCoIsSTucpTc7pxYmyH0DghufL+SblNjfdFupQc7FAKR0vCXBGr8X1EsWlta+RjSeW/otJqmmVek6pUadXwOhngdyvY4WstrwlxLqXCvEEGqabVOhexw5rHcLO464ndxXr41KeCJlQ5gD5GC3PYdbJpRWMo6Xp0z0/fF4kvHuccXOB8qglzrkp325iAlLSM9VQ0YMBfoBnoVLr5I36qAbnIx1C9GruFOD6rgaLWtD162osIE1FNcE46f+U8IuSNFVErU+3wecWxlbFuphmkf5f8A5fA43J8f8QusLl8oIwCkItsovhZm3FANgL57qQB+IWHRHlt5d+yM9c+iCQANyPRSHWII/CbgpetwjBNyPoEWAza7VK/Uiw11S6oLB5btAt+QWG0uc7lA5vRLcE4wpGM3I9kvc8kJJt5Rv+ygHofzUY+ndFgdjdTLANe+MIsSQBgoPS4UXNuvumyQuLX+HzeAQ0H5iEoBObp3TyysDJJS5o2agMdezRn0VmE3sD7itZny5WdpsdC/VIWarPJT0RzLJE3mcB2A7rGPM2zcX9EAYyT7p+32Jk2OtTaPPX20KkmpqJgAaJ3Xe8/1HJtfstaWnJAz1KkNuSVa6AsADj5j+EHZWJNoVtGPbsndflbdlh0wrOW1unumILzdzrn9lO0mTFNhjZFm72v2CvexrRh3MfRV8vqqnEKYhwLlL5n4AwrOW5ufyTgADsookyI2MDJyU5IG6gu6BRy2y8/RWqOORSPM84QbDAN/VBdfAwOyVByCkCnAFyoJA9Skc7qVU2MBPUqskkoJuVKqbyEFCFIFslI37BAC2SlJv7Icb7bIASjApAuUJwA0KyMchDDQhrb+d23Qd1AHObnDRun3PYDotSXahWwyTcocbYUk2Hqq1VKWNiAlJt7oJtlLuVlnIKAC6bfJ2UWvhDnAD0VISHOQ1v4nKGtJPMUxN/ZOkQMlSB+aAE7W362A3KZLIAa2+SbNG5QTzEYsBsEE81gBZo2CcANFyroxzshgAAFypDb+Z2yA2/mdt0CcAuP8wtSSisIJGXGw/wDCYuDBZuT3UOcAOVn5qGMc93K0XPfsj9ERLJAaXOsBdxWU2NkDeeQ3cgmOnbYeZ5VFnyvuck9EySju+S5RxyTJK+U9m9krjHA28l7nIYNz79ksk7Y/JDZ7/wCroPbv7rHDclzzdx3JVU7BXI2j2i9vyVbhhWMs5vITZw2KV2cHB6rSnk5RURhIe35K98TmcpPynZUvbY49wq5RwMmIRfKlo3BUkYuFG4SIcqcN0ud07r3ulBtgqlrccdvYpgq98BWAEWDsXTRQGZckxkpISTcxm30VZcNwq7EAt6OUjLbLXGW2BGS4322PRQLctigbWUYKVhDsodg4Re2DspsSg9wiHISuFlYcYQQ7wg4twdikccoJUcWIUjBTNZzApeU7KnGAjW/Ej8ViUAtuW3yos1PjKCFr9U7QNybXVkbY7FjnWB+V3Yqk9W7HZFbLJBix1xnB6p4aU1FXHCJRHznlDjsCoe0CFrmO+Y2I7FI3u474Kkkm8Doeto5qGslpalvLLGeVwHdVxgA3eMK2d75ZBJNI6R4Frk3JCqDjycpyEMY3IM2Nruch/mHQ9QlsTsFHKB0yE/4cYtsk5HRANjkIJTEs5b7OUBt2818enRHHgZFZPooIF8G4TDluQ4+xUhlwecgdlU0/BGVgHcC1uytjlDW2G/Xoqr/hv9UWIKEW1wT7FpdcBVWzdNe6AGm/M6x6WTPcUQWurGsMkgY3LnbZSdblMCQQRuNrIJrO4MLO50OvcEcRcN6bBqGr0Qgp6gAxvDw64IuNlzRN8fqtpX69rOpUcdJqGp1FTBGAGRySFwbbbcrVWse6ksPgss7G/wDj4FtkdE2APKpLcb3RYAYwUqiUkWtvuggg7fks7TNPn1KvbQ0oaZni45zYK3V9HrdF1N+n1zWiaPfw3hw/MJ8B7dsmu2tfITcpaAdgfVMB3I9lIbnaxViQpHKBsb/RS0ZwbJmjzWGVZG4sdflDj0urYpZFYlje23qnDHWycdkwa61+XrlXBrJLNY3kPUk7q2MExGysAbi10czgex9kxw8tx7p2h5bcNvbc2wEz2IK5vkDnW5j06qsAfiGPRWi3LzHY7eqQNPMbNDj69EHHcCYvISbgb7AJpA1to2sAP4idynbcHmIt2VTjnuSmUEkDO5XY32Chwv1x3TuAzj3VJN8m57XVT2HW4cwHyD6lKTc9ypsUGw3/ACVTkNgLKC62G/mlLiUhdbAVbeAkk2CTJKLdSpVbeQgoJ7IvdSBZI37DAAocb4Q53QJQLpQkhShM1vUp4xyElotkqMvdYbIN3HlblPYNHKM9z3WqK7VkVsMWDW7BTsLoSE3KWUsEAm5SkoKQm/sss5BQZJU+gRt7qdh69Vn5CQTYWCQDnN+iMvdYbJzgcoTJEAnoNlICgBO1pJsN/wBk4Aa2539ypJ5rAYaNvVBIPlb8o/VMBYXKujHwhkAFhcpgL+Z23QIAv5nbdAnALj2C1JKKwggAXHsEOdjlZsoc6/lbgJ4oi/JwwblHl4REskRxGQ2GANyrXytib4cQz3USTADw4hYBJysij8WY2adh1d7JtoFySiQ1lwZHuAA3ceioknMgMcN2x9Sd3e//AAokkfOQXeVg+Vg2CW9sBZp2ewjlkAA0Iyd9kAd8lNbuqORTOcDe43CkuDiHHfqoB5xcbhDGh0nLe110Is5o5lBiMbsjceiptzBS9pY4tdghQ0+qsbzsyJY4EODnYoIsbqwt5jjKW17t/pVLjgsTyVPHUbJbBzLdRsrC07Ksg3I2Krkt8jISxDrhZbJGS0xjcLPblp/ssQk7dlI7oQl2hayWl2AgE8ylrbtv0QcK7gA7W3Fh0yhrfPYnB2SMDnP8u+4U8xvsnzsAD/5U7BTYOjc8HzN39Qkb5hbqEFyEkgjJGequbUN+ySU7m3By09ikJBZyn5h+oSAAJuOACtPlt32UZO6Yi+QpIwkcRkzK0o0LdQa3Umk00g5Hkbt7EeyorIm09bPTNeHiN5aHD8Q6H6qm3fZSALeuyXxgJWG2GSmNgVIF9+ig2thJjYYbBGVIsWk2ukAIOTgpmg38uComRDXJAAGOhUAb3wQmDS4YPuFBaQb7+iYcXN7BFuU9+yZwOLfRTvtukkhkLy2yjJJ5BvuF2NDwDqmq8FVPE2mPZUR0hHjwD5mg/iXHZt5VMY2ZfOuUMd3kUstix9LqDzWFzspu53VGOqRrJWIBc2AU2PNy2yi5vj81ABLsG5SpYABBBNxY9lLi0tHK2x6piCT573StHM6+9t0XngAXBHmF+ygG2wsnaW3PMy7eh7JT+YQwAW3U7qRy8p3B9VFz3+iYeYWJHoFEQGODAQW8wKjl6jIP6JuVgw857NUYAF83TpAGY4xvDmkh3Rw3Cs53SEuke9x/qcbkqrBxumaCARkeqePIr4GawOBJ8oHUhQA7IJNlNy42J5grGjHM8G3QBMop8CtisAJ5ecX7qwtLRY2J9FLG8+ByA9ipc0sJGD7K5LCEbBuMHKcZJA+uFZSUlVXVUdHR00lRUSmzI423cV778M/gtBLWMreKQyaSECWWmNjDStxmQi4cfRYNb1OnRR+N5b4S5Zu0mgt1TfYtly/COE+H/wAJta4za7VKsnSuHqfzT10rbcw6hg3J9Vv/AIpVvDml8PUnDXCumx0tGwhzpuUeJUHALnO67L1LjzjeCtii0DRWtg0mlsxrYwGh5G5FunovnLjitNRrTYea4jGM9F5fSay7qXUIOTxCO+Fx/s9pqOiR6X0meqvXxy2X0z/f9DlgLWZfYJHEk2APL6dVLi69tx6JHPaLBtyF7tvc+dLgHOsLA56qkk97JnvPLytx3VXuFXKQyRZzC1iTyj8ykeeUjBue6sj5WDxX2/2juVVIXOcSTcpJcZGQpdjGEiPcpSb+gWdsYC4nAUWQApuB6lVP6jBtkpbkosSmwAlbyEALBI51/ZDnX9kAJQkAJkJmt6lPGOQg1vUocegQ51sBO1vILn5z+i1RikssDYAcgt+I7+nopAUAKHHoEJS8gBxvgbJShKT06rNKRCHHoEDGVAHVMO5WZvIwbZ6qtxJPKFLndtypaOQXO5RSIThosN0AIAzcpgP+yYhIBJGMnYJiQByNPue6D5Ryj5jue3opa3r0V0Y+ApA0WFymaL+Z2yAObJ+UJwC49gP0WuMe1BAAuPooc6/lbgIc6/lbgBWRRcw534YP1R3bwgpZCKLn8zsMH6qZJebyR4aFEkhkPIwWbthD3tpBy2D5zs3oz1PqmbUFhFu0UDjHTMDpBzPOWx/3KxHF8shklN3H9FGS4ve4uccklG/oFjnPJW3kL3wFIHZAH0CkmwVYA2Sl3ZFydk7Iy44/NMotkL2u5XKxxGHBVuHUIa7dpWtexzvqXSzeK0E/MBYnuqRugWUE2KbL5Cl4LWuLSHBdBw7pDdZ1eONguyTySDqPX91zYJOCt5wxrs/DXENLq0TedsLw57P6m3yPyTZyWV4Ulngxdc0mq0PW6vSqxnLNTyFh9exWsks5oeN9ivoT4/8ADdHqOl6D8TOH2iXS9SgZFO5gxG8Cwv7iw9wvnxzbXHdUxl3xyPbDslgp6pbea3dWBlwe4UYISNClkTrAtPVQCCcpRe90AD81ZGW2AYHy3LTY7hBkDyTax3skNzsoBI33RzhkwWt3Sgcm24RcOCsNiAeuxTpZAQM57ZR5SbjI6oI2I2Wwp6CGp0iaeKQCppjcs6vZ3+n91Yt2TwYBAaouAfQqbcw9EcoFvQ5RIh4aaarqBBTML5HNJDe9uioLSxxa4EEYIPRZdLUz0FfDWU7uSaF4e09iFn8T6hS61rTtXpKdtOaoc80TRYMkt5rDsTcquZYsYNLf0UcvQhMAOX0SuuNjjuq2iIgOFrEJxZV+YnO6ta24FhzE4AHVIkMiDl1wLd0Fp3Bz0WZLQ1cdJFVPppGwPJDZC0gXG491ita0uLeax6JuB8NcgQ98fOBcDcdlDS0dcqLkbGx2KkNAG90r3GRutH4j1TRRKygrHxMmHK9oOHBad555HWG7ifa6QnFwMKC65uDb2TObawy52SlFRb4I/RTy3GMhKb5LjdA7pUVhYGyj5SLH6rPi0zUKjTZNRhpJJKSJwa+VouGE7ArC5eZtsWQlBoLi1yTzuDd/Meqrz3sfRM42byg3AQ1xaSWWHuq3nIgpvvuptcXDgPQova9zkpd8BAAxB6C/qEgIvfqnby7vJaPRJv6j1RJkYA72smaeR12kA+qXIGHKL7pk8AHJBJJN79QnBda3Mq2gG5BAA7p2OABuLlOgMZubdFc1tgCeUW2WOMO7FZdNBPV1LKamifPNIbMjYLucfZWRkluxGm9kFgb3A9113C/AWr8SuFTYUGmt+esnFhbs0Xu4rq+HOANO0gR13FYbVVnzR6aw3aw9DISP0XqugaRqnFmpxUcNoKaMeaw5Y4Ge2y811Hrqi/S0m79/H8j2vSv4Wstr/F699la335ZRwFwRSQSHT+GadsFgDWaxUNHiBvUg2x7LO414upqCh/8ATHDjuSgiP30wN31D+pJ6hbXjHiSh0XSP/THDJDaaPFRUt+aZ3XI6LxKuqDJK6xx1XjpuU5uU3mT5f9kfTej9Mrl23OHbXH5Y/wD/AFL6+y8CVNefGL3fK3JXlepVZq9XnlvcXIC7DUat0dFVzNdhg5fcLz1hwXEXuV6zoNGJSs/keV/j/W90atMvq/7F/PYYGfU4Skkgm4S39EpN8WwvXZ2PkiQeYuthK49BY+qhxt0SkjsqJSLEhy91sjAUsbzk2H/AVX1JUtdynBxuQUinvuTAr7gosE7nc7ruN0hsThVye+wUQTfAUhvdTgJS4BVhJJACrJJKMnKYDsgEgBTt7qetgmDQ31KdRyQA22TuhxsPVSXBvqf2TNbyed+XnYHp7rVGGN2RshreQBzvmOw7eqPVGSbnKCbe6kpeRQJtgbpEKCepWaUgkE2SjJRklSB0CzN5GJ39glc6wUkgD0StHMeY7IJEBot5nKck3QTc+iYBOQAPyVnyC/4jt6KAA0cxHsO6kAk3OSdyrIoKQNanA5j2aEAcxsNupTAXs1uy2Qj2r6hJALjYYA/RDnY5W7IcbDkb9Smii5vM7DB+qbl4QUskxRBw534YP1Q95lcGMHl2AHVS95lcGMHl2AHVRLKKUGKIgznDnDaP0Hqi2orCLdooJJRSjw47OqOp6R/91hgWuSbk7nugANHclFs3Kxym2Vt5DfJTW7o290pKQBJKgAlS1pce5WQ1gZk5KsjDPJBGRdXYHZWj+loTNY5/oFc1oaLBa4VkbwY58psdkNaOdZVRAWOItg7FYZu0+yLWGcxPIz22d2Skd0xdzAd1B2slYyIBN7dVYHYVQwQeoT3F7KRGZ7b8PuN4ZPhTrXBOsjx6MfeRtfnkacG3seUryDUaWOCqkbE7njJ8p9FGn1r6Ko8Vmzmljx3B3VRd5pG8xLCbi/RWJRwzROzvrSfKMY4sQq8cxV7x1CqwSqWilEA5VrIeenfI3JjyR6JCBZNFI6Nxc3qLEdwgtnuF/Qr6FKci/UbqTi/6JCDdBhHbgqwY9QqRkgEqzLcJosBOb2VkbnsdzRvLXfv6Jdx6osbc35+ivWzFyM0crGtHRMGgvAvbolGAbb9FfLC+JrXPHleOZrh1CtSyQR0R5eYnLcEf3VOcq2znNJ5sj9UnLbr7qSjkKYlgBbZQALY2KsdGd90u11Q47jpiK6IiNzT63HoqwBkOxfqhoI3N+qVbPYZHY1XGVRU8Nv0R1IzwZYuWTANnjaRvY4H5Lj3ADpfurOZzsduqquW3N1JJFjm5ci3AcQeqkEtNtx+yXLnXKm5BuMqoYfmLWnAPcKnLTzW3TEuwQC5SW3jEhONiOyj3CQcDmvuouSNhhQbkiyN8pAmwodY1DT6aelpZ+WCo/wBSMjDlggG3K026pDcdCD2QSHCzsdkzk/IXJtJN7Il3lwUoHcoFxg5/so9Bkd1W9yski9uiABbOEEHdRfHmS+SEgkEFSTzZ7dkt7nH6qR3RISeZoyFFv17qTjNrhKSCMfW6DASDa3VMHG9h+SrBsCSeUDuV6Dw78PZJ6Vmr8TPdQaccshBHi1HsA64B7qm3Uwpj3TeDVpdJdq7VTRHukzQcO8M6pxLVmKhY1lOzM1VIQI4h9SLn0C9S0yk0jhmN1NoDTNVOHLNqMg8zvRoN7BTNVGWmZQUUIotOjwynjJF/U5yVueHOGq/WtRhoqOEukf2GGDuV5HW9Rs1HwraPt7n2Xov8KabpkPxWtalNb78L/JsOFeHa7iDVmU1O0ue480kjtmDq4lehcQ8Radwzo7uGeHJRYf8A3dW3Bkd1APZYmuaxQ8H6M7hfh2QPqXD/AK2sack9m+i8h1TUnOcWNJXIxj4Yndrpl1Oxai5YqXyx9/8A7P8Asv5lmp6mZZC1pXN6hVCCmc6/mdsndKclzvUrRVEzqyvZE3IvYDur6qt9zq6rUKirthy9kYevymDRoYL+eU83uFyuAAAFt+JanxdUEDXXjhbYDt6LS3v0XvOlwVemXu9z4H/FOqWp6jJReVDEV/LkcuAFrZSAi9ii/wBEhvzdVvlI8wOeQAksd6C6TAG6L9TdHNZuRc/sq2wg4t6Em3VL9FHsgWuqmyDNFyASApIF7NuoHpunaxzjYE/RFIhW4kbJbZyn5blSG2Q7WHItu+ApALtsBTy5ufyU2xcmwH6KxRIAFsNCCbHlbl3ogFzzyxjHdOOWMWYbu6u/4WiMUt2BshrRFk5f+yjJNyi3dSTy+6Dl7gAm3ukRuVBKzylkJBKQm5QTf2UgW91mlLIQ9Oqk4FvzRsPVVm7jyhKEPnd6BOew2R8o5QgBOiEgJ2gWuflG/qoa2539z2Uk8xAGGjYJ4ryRBlzrn/wnt+EbotbA3KYDlFhud1rhHG7GJt+Fv/lSTyjlGSdypPkH+4/oojjMjrdOp7Kz6IiWRoouc3Js0blTI8yERxjyjFh1UyPvaKPDRhRJJ9kb4bP/ALgjJ/8Awx/yi2oIu2igll+ygxRG9QRZzh/7Y7D1WGAGj1QBy+pKkDPcrHKTkVt5IH6ptlG3/Kgm+AkABN8BOyMuP900cV8nAVwBPlaFfCv3IQAGizRlWsi6v/JOyMNzuVdHE557DuttdTYspJCBpJs0XW00rRa/VtRhoNOo5a2smNmQwsLifp/dd78O/hFxDxzKypijOn6MHWkrpm/N3Ebfxn9B1PRfVPCvB/DHAOnfY9Aog6pc0Carks6Wb/5O7f7RYIXamuj4Y/FL29vuZJ27Z4R8FwyNqIPBefOBj1WHIwg2cLEYSguY+4NiCsuRzKiDn2kbv6qcmbhmCgm4UkWKW1lSy5EeiM49EXypuNwhEZlgI3TAqsHopurAIY5F1W4WN04NzZQdsoMKFHrslJIP7px2UW9EjQyIJuq3CxTXAwVDjcINhwKQWnKnmOEG5bYpi0CMOHsfQoEL2OD4uU4e35fUdkhLs2+qRrrnCt5gRYixC0xeUI1hkN2uVlmaSWjZTnzCJ3Mz07j2WJe5Cdr3Md5dwroPDAMWnmFv4EeGL/MmJxzbE9FWQXHJsrZYBkU8wdgqQ3lbzA39EOby9VA8wOcjKzNYZYnkUNaXAu2BUvLWy/dHmba4UktJCQt5cgJHxsMDXuBuPySnNyUXAOVBuXXKqZYgBxbog3GBupcQSLb9UWB2Nik42HQ4LGQkh3mO4VdgPnyOo7ot6XKjPML/AEUyFEyANtY3Z+EpWgG5LrEdO6CS0kEfRRfcEXSt7hIuX5cb22Un1wVJaWjmuCD0CC0kXvdLuQUm4UkNDRyuJPW6i4O6MpRSOvqg+u6m17AZUva02DRbvdKyEC5P91PmBzYqASMBRm9hkoN4INjvZX0lDU6hWxUVFTuqKmU2ZFHu4racN8L6txRqQo9MgLgMyTOB5Im9SSvXKBmkcE0j9P4ccJ9ReOWo1F17+rW+iwavX16eO+7O50joup6rb2Urby/CMLQ+DdG4Ljjr9cEeqa9vFSA3jpj0LrOyQr6uurNTqzU1sxlkOwvho7AdFi875ZC+RznvcblzjclbTTdOnqamOKKN0k0hsxjRkrxl1875903k+8dJ6Npej04rW/mT5f8AhGdomjVGpV8NLTQmWeU2awfuvUdVrqLgPQzoOkPZLrFQ3/qqptj4eNmnoqHy0vw30QNa5knEFUy5cP8A2B6eq8r1DVnzyyTyyF0jyS5xO5VW8dvJQoS6rZ6j/wDYjx/9n7//AKrx7hqdcA13mJc7JJOSVzMhc95de5KmoqXTSb3SGRsUTpX7NH5p4xwd1OKWPCMDUpvBh8Jp87t1r9PAjklq3GwiaSHHoVXPOZ53SOO+yNWlFBwuWbTVbrFvp3C6dNTlitcs8br9ao9+ql8sE2v7fmcbUTOqKqWocTd7iUoLeW5Jv0CgCzbFKbdyvaxSilFHwec3ZNzly9yehN0ubXugm/VTzeTlHXclBvIovMSg3JwjARi9yVWwgeYHKkXtYAI6YVjGgnOEUtyCWzayYYBsSAendMWC+Cbd1AGb3CtUSEtA2J/JS5rhbykA7XTWsQBgjKYGw6lx3KujDIpRt0z2UiMv8zzZv7+ysAzYNF/VQ42O9z3TdqiHJBcAORgsOyUb4U2UF3Qfmkb8shJIG26TdCglUSlkgEpCb46IJvgKAOqzylnYJIHVTtk/RHqdkrnfUpAkOJJsN1IAY31Q0coud1O5umSIACdoJIsM9FACc+Ucv4jue3onSyQg2+Ru3U9ymA5Rc7oaLC5TtH4iPYLVXDyxgA5Rc7n9Ewswcx36BAA+d23T1UDme8WFydgrmycksY6R9huf0VsjwxvhRfUocRCzw2Zedyou2liErxzSu/02H/8AMfRN8i+pcl2oHPFGwWF6hw8o/oHc+qwtrkm5OST1UkuLi95LnuNyT1UAZ9VinPuZW3kkD80bBGyjLjYJEAMuNgro4wBdylkYaLlXMYXm5wFphWQhrS82GAshrQ0WAUtbezWhddwZwJr/ABnqwodFpPEIt4s78RQju539tyt0a0l3SeEiqc8HO0dBUVdTFTwQSTzyuDY4o2lznk7AAZJ9F9K/Dn4BwUscOucfNa51g+LS2uw3t4pG5/2jHcnIXonAvw04b+HVKJoWDUNcey0lbIMi+4YPwN/U9T26eoqnPdzSO5ndANgsNuslZ8FGy9/L+3sc+69R55MiSpbHA2npmNp6eNoY1jBygNAsAANh6Ba6WpDWk3DGjclYVZqMcHzHnk6MC43WOJWRuLC7xpRtG0+VvuhptHKbxFHC1WtjWu6xnxs4c7eYbpWuLct+oTfI70Khwseduy2NHdFIBSEKw5F0hF1XJDoQiyBa+eqaxGCk9FVwyxbllrC4U4tcbKvmTXzjqrExRwR1+qHggpW5OVJv8pzZFhQWUHLtk73NLQRvsVbSeH49pPlcLFBRy8BzsY9m81+nZK9rQfKbgp5G8sjm72KrIF7gpHtsMVm43UgFM4XKgtc0pcBAGzlYTi6rAI9fRWCxFrKyPsRjtsdvyRkG+6vldC6KN8YtJs8evdUDe60oqH+YIcbiyXmItixTDLXfmFankhGOT1CUWA5uvUK5hZ4Lg4Z6KrFrnZJNeRkO8xvhFm2e39Qqr4sdk23ugNa545jYHCqe7LEUE+imzjYW837pntLHlp6KCXEg3+VUNDog7pmPDS4cgcCM/wDKUgk3OLqLDvZBoIEYGcpSc5ypNyNrKNwkYyZLhsSQb9Uuyk2IFt0v9krDkn5tsIt0Byi3fZMXjoLW6pV9QiWAwp9ijF73ypBv0wogEsJva1j3Ulp/7qQFaGjvYbe6OMgKfDJvtbuV0fDXCjtakFTX1X2DS2ZfO4G7x2bgr1D4VfA+s4nEXEfFLZNN0GMh7GPBa+cjO2F9GVGn6JJTU9BS6DSChphyxMdHew75XI1WoazCvk1aaMO9StTcfpsfPlNFV1dAzh7gTQZotNB80rWAPnPdzrLf6X8IOLKprHVb6TTmXyHnmd+X/Ze3QMMMQjhYyCMbNjbYLZUUDp5OVo5ieq4UtMpS7rG2z2cf4l1FFap0UFXFe27/AKnmWn/AtklhU8USc/8A/KiH8/Rb+l+EOs8Ozu1DQuIYaip5fI2qiA5fUeq9XooYqRgO7up7KqrmM9yXXHQKehWuEc+X8Q9TnlTtbT8NLB8hcYR8S6dr03/qeB7aiTzGT8JvtZcjVTl55WnC+pfi5pFPrHw9qql0bftMEd2OIyS3ovlKC0kQceqx3Vqt5R9S/hzrU+p6d1zSUo7bbIlgJK1mq1lyKaM4HzWWyq5m0tMXD5jhoXPMhlqJwxjHSSvOGtFyUaY9z7mauqal1R9GL55LKKnfU1McLGkl529FqOKNQFXqop4ifApRyN/uvV6DgCfS+DdQ4t4imNFTU8dooGH7xziMH2Xhb3GSWSU3Je4nK7/T6m7HY1wfL+v9UhKhaWl5y9/5cIjmv1Qci5IHoi1sKchuBv1XdPCiC18lBIJwVJt2UWA64/dAIC191JB5sgqCcgjBTtuTe+UqRCWtLnAWKzZ9PrKSJklRSTRMdaznsIBWz4X1Kh0PX6fVK6hFc2A8zYX/ACuPqtrx3x1qXG+qMqatkNPDE0MipoG8rGAbe5WiMMLJrjXX6TnKW/hHIH2SeYG4FlYGm1yAAOpKOS/m5mq1QbMgg5QNySpG2x+pQ7BsHXKgut0CbPaiYMuCidPG+ofLHBCzd7zuewHUrENm3ze+2FIeGxBjWhvcnJ+irD7Ova/ug5JEIcc2slVlnva5wbcDc9Aqr2WaT8gJJ7pCb+yh3MHAFpyLqd9/yWaUs8BIA6nZTv7I3UE9kgQJQ0fiKAFJTJEA5KkBACcAAcxGOg7pkskJHkAd+I7Dt6oa3ugAuJJ3KcC5sNhuVphDIwAc2T8oTgcxJOwUAcxsMAIcQfKPlC0MgOJefToFfiBmcyO/RQxoiZ4r/m/COyhjQQ6onJEbd7bn0HqmXw7vktisbsGhkUZqZ/MCbNb/AFn/AIWI975JHSym73fyyaWV08niPAaALNaNmjsq98/kFknPLEbyHr1U7I2UZcbBVJADLjYLIYwMFzuhjAwXO6vjjueZy1V1k4IZHzeZ2yyWMLzZoUxxl5sNu6+j/hT8C2ywwcSccUxiprCSn02TDpOzpew7N3PXGDrk4UQ77P8AyUTsOO+GHwZ1TjJ8ep6jz6foYNzM4WfUejAen+7b3X1RpenaPwxpEekcP0cdJSxDdoy49yep9SsmeqjjhbTwMbDAwcrWMFsDpboFqKqsZCznldYdGjquZOdmpfx7Lwjk36lLaJkzVNg481huXErndS1yKnic5sgjjG8h6+y0et8TNY4xM+8f0jacD3WhFFVV0oqdUkc0btiGDb/9kfquvp9DhKVmyPLarqWG4Vbv8kWVOqV2qyugoGuji/FITYkep6fukbDp+kQGpqpWFzd5ZNgf9o7/AKrW6txRQ6ZGaShYyaVuzGfIw+p6lcDX6nV6jOZaqYyu6dGt9AF3K6G1hLEf1ON2ynLvm8v98HkIByxwsQoB5SWnZZtVG2SMTxZI3ssP5xfquFJH0eLyLe2FB3U8qHCxVMkWJiuOLFRHyk2dsVJylIsVW/cdEWs8gqcB2RjqlNzkqSe6XOBi6OwLmu67FV83m9klzsgb3TuWUDBY7NrdVAJAIBsehQTcYQp5yMjMqablgjqozeOYbf0u6hYnJcHuM+4VrZX+A6EO8js29e6rJNgOvRNLD3AsrYrthKb2sc2T2KOU8nN9Cq8DCtaSOYHITNBvdJe2yYcxbumRBhYn9k17pGqxjgDe1x1Ctg98AZFj1Tx2LxzYBwlcbnGykZCuXIjGAs4tPQpuXmFmpCBe6nmsd7JvoFMU7WOC1Ja6tks6zjh37pM7dO6qa3HTE3Fje4SgXNibJ/MbutkJHXdk4VUl5LEyS5xbyYskIscoOLWRnruqWMAAOCbIDmNjc21ydj2QBc8t8qHA81v1SMYQbWO6YDOVAwbEXTeUW6pQi7lO2zSS5tx2UWzhWcrSOYO/NFIhVyi57FGx7K3lG6ydP0yt1XUIdP0+mfUVUzgGMYL9d0ktlkJRTwz1NRHT00D5p5DysjYLlxX058LvgbSaZFT8UcetbJLh9Pp+DnpzC66X4ZfCTSvh9p0Wta/Cys4hmaHRxusRB+m69BdJPV1BnqHlz3Z9AuPfqXL4YcF9ded2Zks0lZyN5GxQMAEcLAA1g9gmMMUUL5pXCKNgu552Clgigp3VFRI2KBgu57nBo9lraeAcUVrZK2rp6TR4nfdwOlaHTG+5G65spYNsK87+EXUZ1LXHO/yaIUtIMGrmbcv/APiLLdQUHEun0hMddSVnICXNdHykgeq6SlhpYqZjKURmNgsBEQQPyVGoP8OkeGnzPwotyty3wjSUerurYH+LH4ErCAQDglW+K6+dysMUzGNaGt5QM/VXxxvcAOpwoyHLfEqtbSfDLUHPNnO/0ifxHqP1XyXE4tis2GVxJ+UMK+i/itWyV9TT6FRODoqYiSYXwXXXAPfqsxIPgRRgbsYAhLTq1LLO70fq9vTHKVUc93ucHR8LanrMwkq3DT6a1wZPnI9AvReG+HdO018bdOpeaUmxnfl7j6dlVp9LUOlLpnh4G53+gXbaJHT0NNV6zW+WmoYjK/ocbWV0aoVrEUV63qep1knO6W3suDzf4/8AETKDRdM4OpHgyOHjTuac/wDxcvnS4G3TZb3i3iCp4p4t1DW6qQvM8h5D/tvhaMg9Cu/p6vTrSPL2T75ZFORclQb3zkph15rnsAlvYq5iEA90wsXXdew7KDe4vgqSf92OyGAgQCTygp2fVKTf8RP7JhzAjH6JoomSw4GRcqM+qeOQMcHOaH9gVEsrpHFzrXPZaEkkHJN4xDymO7z1J2Sg2FgbdsJBe/urBzAXFif2R+oBXkHAG2/qqifZM4HqVXub2VNkyEuA5R5ifVRfGMIJzdR+iocskLGyuLQx1y0dOiupaqKBzpzTNlkGIxILtaf6iOv7LFvbuoBBSuxhQSPfLI6SRxc5xuSeqOnooJF/7KL3yqCEta6RwY0EucbADcq+aFtP90SHy/isbhvokhmMTS5g5XuxzHcD0UEgBWLCRBThQB16oGclWNbcnNgNyotyA1osScNG5Rlzr7dh2QTzEACzRsE9rCw3KvhDOyCgt+Fu6cDZrVAHKLDJO6YnkFh8x/RatksIIONhyN+pTxMAHiP+UbDuoij5yS75Rue6fzVEojYMbAdEUv8AsyyMfLIa01Ehc93KxouXHZoVE83jvAa0shZ8jT+59U1RM14+zwn7lpu53/4h7+3ZY++Oiz2TzsCTyG/sp290KDk2CoFDLjYK9jAxtzuiOMNFzur44+Y8zlqrrJwTHHfzOWZT08lTM2KJjnucQ0NaLlxOwA6lTS0s1XURwQRPkkkcGNYxpLnOJsAANyV9dfCT4Q03BdLDxLxNCyXXnN5oKc2c2iB/eTufw7DutM5w08O6XPhe5nsswYXwl+C9Lw1BBxRxjTMl1bD6WheOZtJ2c8fik7DZvq75fW6yudI79m9vUqurrHyPOc/o1czrGuU+nwOJkHNsTub9h3K58YWaizunu/0OHqtXGMXvhIy9Q1OKjjc+R4LwLm5sB7rgq3WK7Wal0Gn83L+KU4sP7BUkVeuyGoqpHU9CDgdXn07n16LWa1xNR6TCaDTo2ukb+AG4ae7j1K9DptKq3hLMvyR5DUaueo2jtD83/hGdI/TNBpzUVEodN/W7JJ/2j+64jWeKquv5ooC6npz0B8z/AHK01ZXVNdUGWolMsh77D0C3ek8KTVLBV6m80tNvZ2HOH9l11CFXxTeWZYwSWOEaKjoazUqgQUkLpHHcDYepPRdnR8O6VokArdamZLKMhh+QH0H4klXxHp2j05otFp2EjHNbF+57lcnUVFZqU5nq5nPJ6n+wRxZbz8K/MZyS4PK4JPDfY/K7BVdTD4T+dg8h/RKFkRSAt8KTLTsV576H0F+6MEnKDkK2aHw326dFUcKmSxsWJ5IY4Nf5hjqiVtnGxuOiUjN0w2sVV9B/qV2NktlaME32SbFK0MmQNlGVIsCVBN0g4zVJKQb2Tt7KxPIBo7l1kx3ulvylMHcx90UQRxUZ5SOh3TOFt0l826KMJFrZUXsbBWWBCUjsEH7hFubqxpAIIVXmvsmGEIy3CX3G9kNB5rJWDqd1YBc2Jt2WyLyVgQBcd0cpaQXtvb9QoAySd+ylznmPGeVNkUHmNzrM+Xp6KGk8rsXHUJW5OAnB5Tj2KXncZPBXY4N7IcxvKbH6JrEA9kADd2Uo+RJOX7O3lHmByqdvUFZAdYmwBNrW7qoi17t36Kqcc7odMrtfbZMGgi/RKb39AthpWlalrdeyh0mikqqh5sGsF1m2XJYYPLg2H1URxvlcWwxvmPaNpd+y+k+CP8LmranHHX8VVoo6f5jE0ZI/nqF6drejfC74PcKzVNNp0VXXFhbGZQHEnv1PZYbNXBPthuy2FUpHw/ykE3wexUZHoey2WrVP2/V6vUPAbD9plMgiZsy/QKdF0LVOI9Zg0nSKZ9RUzODfKPlWpy7Y9zFxh4I0fSdR13VodL0qmdUVUzg0NaNvdfaHw3+G2jfDLR46yqjbWcRzt5jIRfwv036Kv4dfDvSfhborJZGMrOIqhgL5bX8K42C6+LxaiZ08zi+R5uSVw9TqnZ8MeDTXT5kJI2eqndPOS97upOyStqqLRtOfqOovMcDNgN5D2Czq6ro9I0uXUa+QRwRDqfmPQLiNO03UONdZZrOsROZRMd/0tGQLejiLbrnyl4R0aKVP4pbRQUlFrPHtdHPqYlpdHDrwUUZLS8d3Z2XqFDwLwpR04adIY53L5ueQ/wBlsNN09tFCAGjntuBayK6s8JhaHbbpFH35Jbc5vtr2ijlNb4c0+igdVcP1dRpdXAHSNDJCWOsMCyp4S4jqeJeGI6jUA37RAPDe9uzng5WBxTrTaTTZ7yhszmEtud1jfDuJ0HAjKgx+GayUyGMixY7qmWzBKP8Ax/FydiXggBY+ravFoehzajI4B9uSIHq5PDH4kuTZoF3E7ALyjjXiRusayYKd3/R0nkYL/Met08VllCjl4NNPO+qmknmIdJK4udc91jx0TJJA+WRuD5WDp6rG5i91uU79FmNAiszm87t79AtHBeomfGxmI42gtBt/8iuS+NfFLdB4SpeDqOS1bW2mqrfNGOg9iu3oqil03TqrX9RcyOi09hfd/wArnWw36r5N4n4hq+KOJ63Wqt7i6d55GuN+RvQD0WjTw755fCMupl2x7Uaq+LA7KARs4XCUEkbpTldlyOaMSL823p2RzWIJ/ZK0HJvjuj1JQz5CS9wd5gSCd0qNypI6XSNt7hJaTzCyck82bnuq2g/NewCkH8ynT2AWc18BoHqVlUFDPqFfDR07eeWVwaAsNrb9Qu24I1/h/hTU4uIK/S5dXrqY3p6cu8OIO/qed3e2Ezk8ZSyXVQUpYb2N9qPwU4u0qmNfXxw0emxMEktZUO5Imgi4sd3H0GV51VCCKZ7IH+JGDYPItzeq9c+J3xwrviHolPps1G2ljiN+SM2aR6rxZ9r2H6owdih/ycl+o9JJKtfchxz0ASmxO5sFOcC2eiC226raZiIONkmem62tO/SIdMe+aKapr3khjPlijHcndx9NlrLBosLAIOI2MByu8MvAJA3ICQkK2Wollaxjj5GCzWgWAVOVTJLOxA90AoAJue3VFs90pAzdMR3QD2/NSB+SdIhLGlx/c9kxIPlb8o/VBNxytFh+6tZGA3neLjoO/wD2V0IZ2QUKG8reYjJ2CkDlyfmP6KSSTzHLipFgOZ30WtJRWEEPkHMdzsERsdI+35nsoAdI8AZJVz3CNvhRnPUopZ3fA8Y53ZD3cxEMQNhjHVLUSCFjqWJ3nOJXD/8AKP7pnv8AskfK3/7l4/8A7Y7+5WFblFhuqbbPCDJh/tCkICglZhAJ6DdWxRgDmcoijv5nLJYznNzgBaK4EJjZzHmOyzKenlqZmQxRue55DWtaLlxOwA6lJHGXnlGAF9a/Bv4Rx8KUkPFvFNLbWXt5qSjkGaMHZzh/+Ke34B/uvy65zhRDvl/Je5nsswZXwi+ElPwXRxcS8SQNfr8jbwQOyKIEf/8AQ9T+HYdV6RV1b5ZDnP8A+VTV1b5ZCb5//KuL4g4iiooTFCeZ7sAA/N/2/dYaqrNRZ3S3b/I8/rNbGEW28JFuu8QwUEJYx93HADTlx9P+VyTKaSqeNS1g8sduaOAm2O57D91DYm0wdq2tvb4oHM2N+0Y6Ej9h/dcLxFxPPqkroonuZS3+snv/AML02m0yS7Yfzf8Ag8ffdPUSzNbeF/d/4NlxFxe+cupNOfyRgcplGMdm9guRpaWq1GpFPSxOke7f/uegWbpGh1WsS8w+5pmfPK7Yf8lbqr1mg0SlNDorRz2s+c7u/nf8u66KxD/jqW/75Ee273ZbDRaTwzEJq1zaqvtcM/CxaHVNfrtVlLA4tZ0Y3ACwD9prpueRzvMb+p/ndZ0dPDTR3fYAZOcD3KthUk+6W7KpzS559jFgo3HzOye52CyXupqSMyzyNaB+JxWor+I2Md4FAzxpNua2B7DqtQ+lq6yTxtQnd6N6j/hW88FsdNOfxWvtX5nEgpkmxUgryZ9CGe8ubY+yqAurcJCEGsk4F5QWEdRkJBblTkG1+qr2KpkixMDa10hHVWblKcJGOhLKDjIU+yg5yq2h0HYpwbZVd1N0qlgOB3HqhjrFABLbJCWsNnHKaUvIyRc4cwVZasikhq66QQ0dM+V5wLD+fz3C7LRPhRxZr0rbUr4o3HLiLWH8/T9arL4RWWx41yfBwnOxuCVYwPlB8KJz/UBfQ+jfATTaIMl12vaMXcCbG/8AP0+t++oOHvhXw3R8hijqZWAWFh/Pb8+medZ1WqG2Tq0dH1d+PTrb/kfLOkcB8Va6Oek06QM/qLbfz+etujm+CPHkFDLVihc7w2l/J1Ntx74P5W6Z+gdS+Iul6ZRGn4eoY4rbEN2t/Pz/AF4qv+JvEMunTR/ag24Nh/b9v4AuTPrMu74Fk9Xpv4K1dtXfbiP3PnJoLXuZI0tc08rmncEK3fDhhb3VdOn1OsqdUhcHVMji+Rn9Z6n3Wkbe/I5pa4dCvVaPVwvjlc+x4/qfSr+n2dtq28PwxPxb39e6m3VM5v0Ucw2JGF0TjFYbymwOCm5uV17X7qTyg3BCTmYDl4SZwEscSXcwH/dV3O6bnYNiT6WQGySH7qnlefRpQlJcjRKxYG/VSRcdytrR8L8Uak9raHQ6mQuNh5Cu50L4D/EbW3t5tP8AskRNi6TAb73/AL2WWWorjyy5RZwvDPDtTxTxNS6JTOax0zrFzjYAd19r8IaB8OPg/o8bKyto/wDNHNu977Eg29f5hcJwl/hnk0eri1HUuI/Aq2C48InHf1/ddZXfA7hXUauWp1TWK2tkceZ73ONh+Vv1C4Wt1MLX2xlsbKYr/sini74yRBsstPqMX2NguCx1y5fL3GnGldxbqzqqpe7wGG0TCf1sug+Jum8FcPao/SeFmyTytxJIXXF/0Xn2iaFqvE+uw6PpMLpqiV1iWi4YO6bS1Rr/AORl9+oylCCwg0TQ9U4m1yHSNIp3T1MzrXaLhg7lfaXw6+HOlfDHQ2+FGyfiCdo8acfg9Af2yo+Hvw+0n4aaMynpomVGuzN++qMO5D2B/wC66DW9d0/hqgdXanKHzuzHFe7nn27KjU6p3PtjwV11Y+KRdJTNjY+v1GdkLdzJKbLFg4j4R8TwxxFSXG+V898e8aT6jM6r4jrXxxH/AEaCI2x0vgLyio4pmdNzafp9PSxjALgC4qqvTSs4LZ2wh8zPsl+nS8Z8QxOfVU/+TUxvHG2QffH17hem6bpMdExvNHY2AbfYBfn1p3xA1uhlY8sjdy7GN7mOH1XqXDnx/wBRoGtjm1GrhA3bO3xGfn/5KrnpbIeB3fG2KjGX8j7BqHNigJbk7XXBcR6rDQUk1RUSeHFEC57yuP0b49aXqrmwV8dNIHWHiQScpH0KNYqdA4g1OOorNXli0qm+8fC6I2Ltxcjp6LP5wx4Rcd2cZVnU+J6yGGWJzTqkloaYkgthB/1Gle4U9C2ko6ehiF46dgYCBvZc3wbpv2yun4sq4mxibyUMIBDYowcOb2uuvrK2m02hlrqp3LHGL7/MewUFlY5HI8d61/kuh/YKZwFZWCx9G/2K8Z5ZC4MsT63W94g1Z+rapPqFQSebYf0t6LS09XSy3syazTY43WqMcIsjsjPpoWwwmoeCLYaD1UU8M9ZWMgiaXyyusB1Uy1PiBrfDLWgeUE7+pS6vrsPBXBVXxFM1hragOgomuHMC4ixPpa+6OG9kO5qKyzz/AONnF0cbIeA9In+5pvNXPYbc77fI4dbXXiIA7gLJqpp6ysmq6qR0k8zy97nG5JJ7qksXbpo9OODjTm5ybEIsL5t3SXVxaSL9AkI6K2UWIIBcgJiBfLgFIxk2uoLbDa6XteAkfVAF8XU2G5KkD3PsgoshAAvknCawv0RbrZGDtiysUcchGFhubJubtckqMgXOVLRf5iPZWImQAc84F0hdZ1wRZO52OW4AO4HVVkAtyRnoEspAIu97ibklSHduqA7lYQNj+qjNtlVkI2T7eqXw5Hus1rndbNCZg84Ltr5su81DjTRKDhFnDvCugx00rxer1WoAdUTn+kf0t/7o4TWWWQUX8zwefACyg5Kkm+5UWPTr1VD+ghG59k1sWQG23Vpc0N5Ix7u6n/gJlH3ISGtYy7rFx2b29T/wktcqQCeiyqSGJ0oNQ7ljbk23d6BWxh3bIhENM90Zmc20YNhfFz2Svfc4z/P2WVXVjqh4YGhkbRytjbs0dlhgWyf/ACteFHZBAAW5nbfujL3bXPQIySrhaBtzl5/RRLI8Y5A2gZyjMjtyou2mjE7xzSu/02Hr/uPohoYxhqZ8tvYN6vPb27rFkkfLI6WU3ce2w9AkssSWEPJ44FJcXF7yXPcbknqgIzf1QTYLHyVgTZNHHzG52SsYXuv0WU1tyGt2V1cM7kJY3nNhgBZUcfMQ1oUMZs1oyvoT4IfCOPU3Q8Z8U0wOlwu56OllbiqeD87gd4wdh+IjPlBDt2Y0w9SfH6/QpnPBvfgj8JI9OgpuOeKab76wl06jkHydWzOH9XVo6fNva3tVZWPlkObH/wDKnr610shz7X6evuuK4i1+Khp3RRu5pHYABy4/8d1grhZqbe6XL4Xsjz+t1kYRbbwkJxFxBHRwmCE873YDR+L/ALfuuW+70yN+r6vIDVfMGu/9rtj+rsOiC5mmRP1jV5B9qIu1rv8A2u2P6uw6LznXNcqNXquZ5LYgfu47/qfVen02lSXbHjy/f6fY8bdbO6ffL+S9vq/r+n3G17iCo1eoNyWU4N2R339SrtH0D7RF/mWqv8CibkXwZPQeiu0rRIKSmGr655Yt4oDvJ7+i1+r63VatUeHH5IW4axuA0Lor4vgr2S8/4K+NlyZescRGZgoNNZ4FK3ytY38XutRT0bpXeJMb9c7D/kq+mo2xN8SU59ev/AWs1HXrP+yaa3xZTjmAuG+yvjFQWEVx77H21/zZsa3UaPTIvO67zs0fM5c5NNX6weeV32el6Dv/AMqI6MNkNRWv8ec5sTdo9+6ufKXG5KsUc8m2qqFXy7v3/wAERsgpWcsDLHq85cUr5ABdxsFjyVAFwzJ7rAlqhfB53foFZwaoVSk8s5jfBUbFO5vUJbA74XjT2IHIwpAvuosQbFSdkUAVwsq3bK4i4VfKlkgoQKCLqetu6HbWVDRahSLBVjBt0T52KA25sqZDortcqTys+Y5VgDnyCKFhkkPQC69F4N+EOt8Qyx1daw09MPMeYdP5+voDfJbbGCyzRCuU3hHB6fp9dq1Q2no4XOLjbAXtHCnwImrIYq7W5PAiPmLXdh/Pzx0K9KotA4S+H9I1wbHJUtaBc5N+/wBPzvnfbl+IviPWVzHU9A7wYxgcvT+fzovP6rqva8Q3Pb9I/hbUazEmsL6nXUGlfD/gqPyxRSzsF85z/N/X9NVqHxOeZHRaTAyFgFrAW/b+bdgvJJ62oqJS+aVzie5UxSlrwWrgWaq6b+J7H07QfwvodLvJdz+p02qcRatqM5fPVPsegNlrPtkUZvNKTnusOSeSc+DSxmR5xhdpwt8L6vVQKvVHOZEehxf+fzqlrpldsbeo9X0vTK8LH2RyUlXLUt5aOnfL25QtVWaPxDJeRumTlp7NP8/ndfUGi8NcP6HGGxUrJX2tcj+fz6rfulhtZlFCG/8Ax2/n82W+vSRhyz57rP4wvtk1XHCPi6Oh1aKUA6dO1wz8pW1h4R1TiB4jj0qRkxPz8q+syKS936bTuP8A8Qr4q2KEkw0UMRPVrQFujFxalF4OXL+IbJ1uqdakn7ngej/4ZtY1KmZNW1zaYPF7O6fz+dl0UH+FTTmtH2rXQD6H+fzbsvXDX1kjrmdwHYKuSoqSMyu/NbPxeo/+R5WdMZPOMHmsf+F3hltjJrtx1/n89bLZ0v8Ahw4ApSHVNc+a3b+f9x6rtYpZObzvP5raQcrhZLLVXPmRX6EUcpS/B/4XUBFtOdOW9T/P+x7LeUnC3A+ni1Fw3T3GAXNBWzcBa9lQ5xHVUuycuZMZVx9jJZNFAzko6GmpmgW8jBt/OhUurKx9ued2MADCx2OBxuVa6wbd30CpZdhIuikJIDrlx7rzn4u/Eil4S4fk0uhla/UqlvL5TloP8/RbnjPi6i4O0CeuqJB9oLD4bL5K+M9b1nVeLuJnTu556upktGwZ5QT/AArZpdP3vvlwim2fbsuSqkotT4l1tlBRRPnrat/mLRexJyf1X2V8OPhpp/w34dY6SJs2uVDfvHuFzH6BYnwX+F9HwPoDNZ1aBkutVTQ5ocLmP+fsV2PEnENPo0b3yES1rgS2Psn1V/qPshwLXDfLNdxBr1DwrQuqqqQS10gJihJuSfX0Xy/xr8RZn6lNIZftWqPJAZe7IB7d/os3jjiys1nVJ6ShmdUVjiRLKDcQ+g9fouEZwtOWklrnk5Ljm5W7Q9Mssj3tbGDX9Up077HLc5mWWrrqt1VWSmWZxuXO/spMf1XQSaNLBgxke4WFNSuaLBpBXdjpHBYZwf8A8hGx5TNM8WNgcqA5wsAbLKfSua65vdI2FxkA/QrPKl5NsbljJLGvNnlhBGxGD+i9R+DukcQcWcZR6Y3UqoaRS/eVQ5rgC/7Lz5sUjyyGBpdLK4Rsba+ThfZXwx4Kh4C4Ep6aSMDVK5omqXWF23zYHtlcrqChVHGN2dHRynZLZ7HcsLG8sFOxrIYxysa3AAHYLy7jniUV1aaCCQ/ZKc2Njh7vVdfxVrDdD0JwBH2qpHKxvUDuvE6ipcXlz7uvkk9SuLVHO7O1gqnqPFdyc7RzH2VrbQsvcmwwLrFjYx84lLAXHYHonkeZJWwxtLjewA6laRja6PTCsqy+olEcLAXyvcbBrRvnovEviXxj/wCq+Kn/AGUlum0V4KZtrXAO5tg7LtvibxT/AOntAbwpp01q6tbzVj2nLWf0ELw0EWtsAujo6k36kv5GDU2b9iNpo2j1uv63SaTp8RkqaqQRsAF7X6lev/Fv4JxfD3hfSaqkfJVSTMtVTONwJOw9P+V3P+HXgCPTNNfx1qsFque8dEx4sWN6u7G69u490KLi74a6jpsrQ6UMMkRtkPAuku1rV6UX8KKo1/Dln52cgc29lS5tui2FXTvpNRqKSRvK+N5aR2IOQsd7fZd1xUllFBiBnMTkAJbW3WQWtsQLX6lRyNNzzAW7BK6w5KD7fqmbcdAp5SMAKWi34UkYbjBa/lIA+iXrg7Ky1uov7KbN7pnDJC+l0vUa+OaWjo5Z44Wl8j2NJawep2CxGjHqtsNf1dvD40BldIzTucyOhZ5Q9x/qIyfYrVcxAJsMpXHtC8bYI5G8hcXjOw6lIp/hQQOX5sn9FQ1kAt83BQPVNsL7noFFien5oKJCb3G5sOgVbsHNhdZcBg8eNtU57Yd3eG25t2CyK6q0+ofej04U8bQA0PdzH3PcpnUms5CasC56YTW7puX0/RZDaUeA6R8zGegyT6JI1sPBjX7BMBfAwpDA0YJKYbJ4w9wkgAD2Uxjku5uCfxI2CgkmzRsrkgoOtz9Ajc+v7KyKIyP5QbdST0HdZH3MXyC/L1PfufX06KxQb+w8YZ5Kw0QN53jz9B2SNaH800zi2Nu5G59B6oH3sjnPfysblzj0/wCSqJ5vFcGtHLG3DW9vU+qqssSWEO3jgWaV00nM4BoAs1o2aOyUC45jt0Q1nNcuNmDcoc65wLAbDssjedyrki6hrS91uiAC42CyWN5RYbp4RyQlrbeVu6yWM5RYZJURs5R6r0/4UfC6t4+1znn8Sm0WlcDV1TRn/wDpsvjnP6DPoehFRhFznskVzng3PwZ+E7+MdRGt65E6Ph2jf58lprHjPhNPRv8AURm2BYm4+qqupjZGynpo2RQxtDI42NDWtaBYWAwABgBVkUGk6ZT6PpNNHS0NKwRxQx4a1o/mSck3JyVzWt61Fp1K973/AHh/P/ysHx6qxPG3hHC1mrjCLy9lyyniDXYtOpnDm5pDjByT2H/PRcWHNo2P1zWHgTW5o2HaMdDbv2H13Rzgh2uaw4NaBeGJ2wH9R/t3Xn3EGvz6vVkkkQNPkYevqV6bS6VRXav5v+yPE33yvmpPjwv7v6+xXruu1Gr1Zc4kQg/dx3/U+q2Ol6VTaXSDWNabdxzDTndx7lJpenU+l0rdY1doLyOaCnO7v9x9FqK6vrNbrnPe48t7Y2A7BdLHf8MdooqbwNqWp1etVpc5x5L2AGzR2Utjp6GAyzODQ3JJ6f8AdLLLS6VS+JI4AjbufZc5NJU6vIJ6kmKkB8kY3d/O60JYWELCt3b8R9/ctrNSqtWkdBSEw0ow6Q9f52SxMhpI+SBuT8zzu5S57WsEcbQxjdmjYLDlqQ24afdxVqjg6EY7dkFhfvkukmaz5jnssCeq/qPs0LGkqHPdaO5J/EhlOB5pSbnp1Rz7GyFSjvIQmaoNgLN7D+6uZBGz5vO79Fa1pIsByt7BM50cLeZ7g0eqmPLHc/COXIsVW4WNwrvmCQjovHfU9MK1wc2x3CkeYX3SFtnYVrcG9sFFEYmyg+YX6qxzfMlI5Si+CFLmpTcq0i7lD7Rs5juss3hlq3KiABdysoaKt1aoFPRxOcSbXA2/n/C3vDHCOpcUagyGON3hXybY/nX8vr9OcM8A6FwJpP2qsYwzhv4skHr9b/qe4xx9ZrI0b5Opo9HZqJqEFls4r4b/AAlhoGR6vrzRG0eYh4yLf97j3v2JXZcT8eUemUx0/RWNj5erPyFv7fn2C5jivjuas5qWhPJEPL5cCwx/P/C8/dI+V5klcXOPdeN1Wsnc8Q4PtfQv4Tr06V2rWX7F+papW6lMZKiZzr+q1/NZPJ6LEdK1h8x+ix1xwsHt7ZQp2jshpHWueifT6eq1OrbT00bnAnJCu03Sq3WapkMMLuRxyQF7XwxwvScP0jXzRh0rsnC3Vad27y4PGdY69DSLFbzIzeB+B6DTaaOq1CJskrhzWI6/z+du5mdyt8OFoZGOgwtRT1T5HC5s3styLSxBwXTUVHZcHyTUaizUWOy15bMUeVyzIjzALGe3lTwc7nWaLAbk9E2CloukjBysN/Kx2bq2v13RNKYBV1IfJb5G5J/n83C0VZxppVLQS1zqKYNB5WEtwT0/n9xZMk3wJ3I38UU78hvK3ucK7keB5xcbBw2XiupcTcWcRyuMNR/ltCTgg2uP/H6ehxVpWvcX6JU//Tq12rwD/UhlG49L7/uNrq70ZPyTvPbgw3ysyB9hbYLR8L6/p/EumtroniHkcWTQvw6J43BBU0vF2hVvE8vDsE3LXsBIY78YHZUuL3WOCdyOlDuYXVFRZkT53nljYLklVVVXS6bTPqtQnbBCwXJcbLx/VeM9U+I3EjeGOEuaPT2PtNUjAI9/512QhByA3g9MpOI6LUmE6QTUBpLS4dD2Ky9R1KHQNFm1nV5msjjaSGuO57fzusHhzhLT+D6WSVldyUbW885ePxbkg9/+6+b/AIxfEybivVH6Tp0hj0yncWm2Oc7fz6K+mj1p4jwLZZ2Rz5OS4+45ruNeIXzgudTB3LBGOvqvefgZ8Jm6PSM4v4lp+aqfZ1PC8bYwbH+WK4z4GfCV2uV7eK9eiEem03nia8Hzn0/f819UOqII6Z9XK1sFHTj7uMYAA2WjVXKC9Gsoqi5Puka7iHX/APJ6F1RKQ6okFo2X+QL5h4744rtS1R+jaXKZKp5PjTA35PRdF8UOPJXvmfTPJmm+7hA/CNr/APK4fhXR/DAklHNUSnme8rV0zQO+XdLhHM6z1WOgpxH5mbjhvQYGQta9lnnMjzm5XrOiN4E07TXt1yjfNIcDwxdHCnBE+tt5KfliAGXEYKzeIuBKzSIXPlZzNA+dgwF6my7Tya0znh/TZnydvWtvXOHdH67o8q4rh0Op1B40SnkjpRf/AFRm/wCa4+TRy51vD5r7LtayDlmLXdDhdDwLpej1mvB+sG0DO+xWyfbVX3PLx/Urp1U5SSjtn+SPFa/QJIQSYyQNxbZaN9J4ZJcB6+i+k/iK3g+CJ0OiwufUX88l/LZeOafw5U8UcT02h6cwukqHgPc0EhjepNuixzshKn1msfc9LoL7bLPRby/pwdV8BuAzrnET+LtTj5dL0s/ctdbzyex3C+l56hgEuo1Z8OGMc1tsDoEmkaDRaBolFw3pjAylo2hrrH5n2z7hcV8R9c5Gs0Okfj5pS04PovAX2vUWuT4PqGmpVMFE4biXXZdZ1WWrkJ8MG0Y2sFzJd4jg65sNr9VdO3nObgJmMEURmdhoGLp0sGwolkFO2xI5nJp9VouHdDqOIKzltELQtcf9R/QLAiZJX1vM9wDBkk7ALy34gcTHXtXGn0Z5dNofIwDHO7qSE0Iucu1CWT9OOTldS1Or1nVqjU62R0k9Q8uJcdh0C6T4fcKT8Y8a0GjRgiFzw+ofy8wZGDm47Fcs1lslfU3+H7hYaVw1PxDPHasr3ckbiLPjZ/cHK3W2+lXsc6uHfLc9tgbT0dJTafRRtjpKRgiiY04AHZb7T6kPJpyfLILD3Wk8MAi2wV8DnRkHIINwuHyb8LGD46+OPDbuHfiNPURxeHTVri8dg7qP52XmZN9rZX2L/iH4SHEHBcet00d5Y/mI/C4L42gPM3lf5XNNnX6Fer6fd6leH4OZZHEhi0Bt8eyTlNt91kloLvKSfdI6NpNgD/yur2iFHINybFQcZvhWlhHTKh2XBpGB0CRxwMhAc+ZBsbnmFuwTfQut0Uu8ItAbzE9TsPZDASk32sFXc39uyvBLXYAzgE9FMgZz3Y7mA9LXVMo5IY5PSyCcbbdk5BIvcW7K2aodJGyPlDI4/la0WH/cqrtzuEot6I+gRc+yLjBFwb3BBslbxwQ6SThGro+GI9f1aqgoKeouKWF7w6ec9xGMhvqbfoubvyiysmnmqJfElldK+1i5zrn2VPKSUncyyTT+VBzXuDt1Q0222GwTtbYeqnkFr908Yt7igAXY/QLMq9OqKKOMVNo5ZBzCK4Lmju7t+6qaamiqmPDeR7RzDmbkdikkkfNI6SaQve83c4n9yr0kkOksbg1rQLuzZLfrbJQXiwDRYdEzS1jOd2XH5R/coOS4QBmvLG8t7E5NlXJIbYHsEjnqtzu6qna8YQzkBe7lDSb9bIa3mNr2AyT2StBc6wNiep6BM9wsGMuGD83HuVm53YuckvfezWizRsEliTYblTY9slXMZyjuSmjHuZCWN5BYbrIjZbJ3KiNnU5JXT8H8JarxlxLTaJpMPiTTG7nkeWJg+Z7j0A/7LoVwSWXskJOSSNv8N/h7qfH/ABIygpQYaOKz6qqIuIWX39XHoF9nUlDpPCnD9Nw/oVMIKWnbytaPme7q5x6uO5P/AGCxeHOHtH+H/CcOhaQ29vNPOR56iQ7uP7AbALAr9Qjghkqah4DRg53/ANo/uVhnJ6qax8q4Xv8AU4ur1Sgms/6K9V1WKgpX1E0gJ6f7v+37rg3SGue/WdWdy0kZJjjd+P19v32TzTv1yrkrqxxj0+A9ccx7D+YXEcT8RO1GYwQHkpIvK1rcc1ui9HpNL2/CufL9vovqeG1Gpeoln/r4Xv8AV/T2RjcR8Qy6tUOs4tpmnyt/q9UulUENJANZ1VoI3ggd+M/1H0VWk6dE6I6vqY/6VhtFFt4zh/8AsjqVi19bVa1XljXWYMEjAaOwXXUU/ghskUPbzv5YtZW1euag4l5LL5Pb0CmqqqXSaTpzWsANypqqql0ihsLXtYAbuK55rZaif7dXZecxxnZo7lXpeECuv1filtFfmQWzVswrK/beOH09U0suC5xsB/MKJpgAXvOD+ZWpqatz38rcu6AbBWpJHThW5v6FtTVgC2w6AblYXLLUG7vK3t0Tsha37yY3JVzWuktfyM6DqVOTYu2C+EWNjWYjFz1creVrBzPIA7lUzVUNM3lFnO/pC1ks81QbvdZvQBK5KI0a5T3eyM2fUWtu2Acx/qK173SSu5pHFxUtZ9Fa1luizzsybIwjDg1wPUKSOYeqqabbqwGy8wmdlogi4v1Chjs2KstfIVZHKVOAFuC2yrIuVMbgRbqrSA1hccJuUTyY0jgywAu47BdZwZwHqHFeoMBjd4JNybYt/P0WX8PeBKvi3Wow6MmIOzjHr/PQr61odH0bgHQ2lrWCfkucZ9P7H8l5zqHUI1Zjk6+h0VmosUK1ls0mlaBpPw74dbI5rBVMF7n5g7/kb+59MeVcU8V1esVbmskIh2ABwP5/PXK4x4nq9WrZGCQ+HewyuMLg1l3Lwmo1Er28vY/Qf8O9Aq6bSrLFmbKXNtcuWM+UB3K0F3stpp+m1mtVbKamjdZxtcBe3cI/CWlpoG1GqsBuOax/n8/eUUzt44G6z1+jp/Ly/Y8DpaCu1WYwUkTr7XI/n8wuq0j4aVstQH6hhvqvdavhbRdGe2qoYGgjDrDr0P8AP/Orqpnk+QWC69OlhHnk+cdR/ie/VPFWyNXpek6dosAZDE0v72WdLIZzzO27LEJ8+TdZEeRlbUsbHkpzlN903lltOXNkAOy6OhkDmeG3zO7LnY2STENiB9SqNR4vo+H3Ckpmfaa12A1uTf8An9z3QayK2dZXSUmn05qK+YRtHTqVyNRruqcQOdQ8PUzo4ybeLbFu/wDNz9LbHSeFdV4qc3U9fkdFTjIj2H6/X9fVdkyOi0qlFHplO2MN3cBkn+fzJQzgGWzndE4G0zTWms1yU1lWc2cb2/n89Nnq1JQ6tpk+mOpGMpZWclmjLexH1z+qd5c48z3FzkrX2whvnIMHjOsaFqOnVAg1dxjpY7hkjcCUA4K5+or9Qnb9l00tggvbmHzH+fzovfdX0Sj4i0p+l1znNjflrm7sPcLmtD4U4J0h75qvWopzSmzo3GzmkdCDn+dVsjemsvkqcXwc78OuCtYlqKrUKyufTUkjbyvebB9tj+ip431rhHhvVYtV0qQT6zTtsZGdd9/5+Sw/iP8AFcVcD9E4ZJp6Ng5XSMxcei844T4Y1PjXXGQRNd9nBvJM4XurIQcn6lmxG8bRM+Kp44+LOuGnklfDQOfdwbcNA6/z02XvvCPC2mcHacyg0+NolIvNMd/z/m5W40LhvTeFdFj0/To2iTls+S2SeuVwHxQ43h4W0KanpZAauVpFwc5/n6rO5O19kOB0lFd0jmfjR8SGmEcNaLUHY+M9v8/mV5n8Lvh7Wce8WwxeG8afA7nlkPX6/n+i5HRKLVuNOKo9PpQ+aoqH+d+9hf8An6r7r4T4a034ecHw6ZRxt+2PYPFf1J/lvyW2dsdLV2R5Znw7ZG5FLRaZQU2g6Y1rKaBoaQ3AJHX+d15V8S+NKeOF2l0s4bTwi8rwbX9F0fFuvnQdDc8OvWVIIaOoBXyTxZxBLrGqvoKeYuiabzOv8x7LDpandZguulGmpyZlfaX63rL9SluYmnliaf3XbaNK2ne11hfsvPqKpZCxrG4aFuGaz4Y8rrk7L6Npa4U1qCPk/VFbq7HJn0XwfxxFpJbEHANPzXK6PirjkV2jub4DPBdjmBvcL5eptclY4EvOVmVPE0kgbH45DW9L4Wa3p9E7VdjcwQs1tdL00ZfCzotVrWGpfbAJu3HRJFrMVBROc1wL3et1x0usyTG5yTi6wZqpzwXE2A6XW5tJGSHTm8KRm65xDJMXcp5W+nUr3/4NcHHhrho8S6nFbVtRH3TXDMTD1vfIK8Z+EXB7uNuOvtdU22j6WfFlN/mPTfcL6v8AEZUTGTlbFTRCzGtFg1o7LxXV9c7H6MXt5Pp3Q+lQogrGtynVtUg0TQpq+cgEA+G3q53ovAK+tlrqyapneTJK4ucV0fHfEx1nVTTwvvR0x5WgbOPdcX4oLrE+91xa44R61LA7WGWUYxssbVpgeWmYbAb2V8tVHTU7piBfZoC5eu1enoKSfVKt45IsgH8Tug7q0bODVcZ8RN0XRzpVHIPt1WLSEfgZ2IXNcC8CVXF1a5jPFZSQjnmna2/KFq9G0zVuP+M2QRB0k9S+7juImL6B4s4k0v4R8DQ8JaA1v+cVDQXuHzNHVz/foEs7pVr06vnZVGKsfqWfKjxzWOBKqm1mBlPp88VBNIGRumOZANyvsPhPTo6HhnTaWKzoo4QGlfJ+lfFPiE11HS6n4NXTeLZoLBcE4X11o7zDo2nl0ZiL4g50Z6X7KuxXRSVwzdL/APZN02mHUIfEGjHROyoY9g5XZSyScwVAqJ+yQazpNZodWAYqpha2/wCF3Qr4J494an4V44raGaMsaZCLEdV92RzOgqGv2sV5D/iM4KbrGgxcX0EQM0QDKnlGfRy6PT9R6VqT4ZRfXlZR8pcmdj9FDmuA8oOOqIX3ZyuFnNwVc8lzbkmw/Je2WGsowGLYAgk5SE3v67Kx1rE90NETjZxcLelyUjWdh0VkDlwfc33VVuwCucPc36JLEensFQ1uEg3OD0Sl3l5RbufVWB3K8EhrrdCke4vdzOySq2EqI7kD3Kg2vYHZPYn5Rv6JNiRv6qlkFI/NHKFNsXBTQME0zYvEZHf8TzYAdyqcZeAkNBJsPzsnIaAeUEd+6sn8CKUiCR0rRs5w5bnvbsqn1TjGImta0DflGXH1KtSUVuEloGLrKo9QfQ1BqY4ojK0EMdI0P5D3AOLrBBLzlKbc1737I+p28BRbLUPlldJI4yPcbkuNyT3Kr5i72UEHlvsP3TDpdVdzlyNgkBKXXOCmc7HK0e5VJNsBLKSWyAS42F/yVfVMTnOSgBZ22wALq2OMuJPQZJ7JWNuQBYe/RZJcAwRs+QZz+I9yrYRyErDQDcrIjjxzu26eqRjLm5Wwo6SorqqKmpoXyzSODI42C5cTsAFvqryLKWEZeh6LqOv6zTaTpdK+prKl4jjjYNz/AGA3J6L7W4A4G0v4acLGljLJ9VqQHVtXbMjhsxvZjeg6nJWq+FHw0pfh3oJ1PU2Mk4irI/vX7ilYc+Ew9/6nddtguir651TKbP5Wgcxcdmj+o/2H1WW6z136cPkXP1/0cnU6nsX1Kq+v53STTPLI2fM7t6D/AHH9FwNbVzcQV7o2u8Ggg+d3QDt7q/Vq+XWK0abQHkp2XLnHYDq4rlOI9bhpKb/KNMdyxs/1H9XHqSu5o9K44S+b9F/k8Hq9U9RJpP4F/wD6f+EYnE/EDJm/5dQHwqSHynl6rQ6Tpra9z66tvHp8Bs7vIf6G9z3VOnUL9Xq3cz/Co4fNNKfwj/krJ1fUjUOi03To/DgjHLHGOg7n17rtKKS9OH8/37mbdbvllWp6hPqtYKWmaGRtHK1rfljalnmpdHoDkXHXq4piafSaJznuBdu9/Ulc258moVH22qH3QP3UZ6+qvjFJYQtcPVeX8q/NgPFq5/t1YPWOM7AdylmnABe43/uiecWLnHH7rTzzvnk5GH3PZXpYOpXW5v2RM9RJNIWs379Aoa1sIAA5pD0UtHhWjjF5D17eqkujpmF7zdx69Sh9WbdsdsRg0NHizOFx32asKpr3PJjgwOrupVE08lS7swbAbKGRKidvhGiFSW8itrCTc5Pcq5sacABTkrM5Nl+QAARdMGEp2xj3S4YuTQFM09FHooXneNzuFwNkr84Q12E5bcKxPKK+ClmHXW10ign1rVoaKnYXczgMfz+YWoluBgZOLL6C/wAPnBI1DUW6nVREsbm5HT+fuFztbqfw9ba5NunqVjyz2vgLhSi4N4PjrJomMlMd7W/T9Lew9V5rxpxBVanqEgEh8O916t8RNXZDTt02mIaGi1hsPT+divE9ShLWOc7N83XyrVamWosbb4PtP8I9OhTH15rd8HLVTmhpc5VaRpFXr+pR08DHchdYkIZSVGqam2igueY2wvpDgPgqk0XSIqmeIeKRfIV+lo9R5fB6P+Iutrp9PZF/Ey/g3gjTtBoo5qiNplIvchdTWVRl8kflb6KqpmdI6wNgFTfFl6CKSWEfDb7bNRY7LXlmFUxh8L2PyCFyVXEY3OYRsu0laC0lc7qMF3k2VsREc24ZyrqdjpTe/KwbuOEksd3u5jZjdzsuE1ziyq1Gv/8AT/DzDK8nkc5u2f5+XuFZyFs2+vcX1Mda7SeGYftNR8pc0bn+fp+m2+G3Dmn6lXP1bU5P/qsXmmoJsPaepbfcfqB9LdbwB8P6XhnTG6pqrRNXSjmJeLnOf56W+uVxFw5QcQVH2+GV2matGbxVcR5ebtzW/dUtiJnVOrPHYI4wGRjHKMLDljBvYLiqLiys0esZpXG0P2aW/LHqcY+6l7c9vlP+7Y+i7ppa6FsrHtkjcLtkabghLjAxrXssSCqbWWdPHklYjha6YI0Z63XH8T/D7SteqpdTp3uptSe2xdfyyW2uusaCT2V4aSMD6oxk4vKA1nZni9D8IqiqrPE1hzaaBpy1p+bPf17/AN16poun6XoFKKPSqdsTQLFwGStjJAZR1cR0Wl1zWNN4YoHVepVDGyAEtjvlWynKzZjJRSyW8S8Q0ug6LNWVMgaQ3yjuvi/jHiLUeLeJn+EXTOlk5Y2D1Nguq+JHH1ZxHUOY17mU4NmsHVeif4efhLHXS/8ArTiOMClj80LHD5v5/f0WqKjRDufJknLveEdz8G/hvQ/D/hdvEGqxtfqtU0FocLlg3/v+pXeP1JsjZtXr3kU8N3C/4j/P3Ver1h1zWRR0x5aeLqMABef/ABG4npKGgfSxSNZR0jfMQcOd2/nRcyUnZLLN0K1CKPL/AIr8cSzTyFkn304LYmX+Vq8domvjBcSS9xu5xOSVZX10+t6vNqVQTyk2jaegTxYXqen0enHufJ53qV7tfauDKMrmsJvsrKOcueSTc9ljVBDWBvUrHa5zHhzTYhdrualk4noqUGjpo7vYQ2Tlk7FVCCpL+XlJJO9liU9ax4AlFz3C29PXCOxY4PA6OW1Ylvk5VkZ1tpItjpnQs8++5N1hPbVapqVNo2mxulq6t4jY1gJIud1dW6n9yXO8tt7dV7J8B+B2xQycfaxT800h5KGNwH/6Q7Fc3qWsjp68R5Zt6Xopai3us4R61wbwrTcF8GUfD1I0faHNElU9pPmecrD484gbpGkjSqR3/UziziDsF01bWR6VpU+pVZFwL56u7LwPV9Sn1LUZa2dxL5DgHoOy8Kvifcz6HCOFhGskdklxJPUnqVUJG7X97jZRI97jg4CxKuTwYDuHP9VcWGu1WtM8vIw2Y3A/5XlPFmryarqcel0nNJFE7lDW5L3f3XU8UauNP054iP8A1EoLWAbj1W8+CXw4fqeoN4u1uEGihefs7Xi/iPG5tuAMpLbFXHuYii7ZquJ3HCmnab8G/he/iXV2Rya7XtvDEbFxJGAAR06r5+1jV67W9XqNV1KYzVVQ7mcSTYeg7Bd98YeK5uI+M5adswdQ0P3cTWElriMF1jsV5i1ss87IIW80sjgxg7k4C2dO0+IfiLPml+hRrbMP0o8I9F+EPB8nF3HlP4jP/p1AfHqXlvMzGzT2vhfXU9U2SUiJvLE0crGg7AbLkvh9wfHwLwDSacWW1OtaJ6t5ADhfIbcbjZdMyLuFm1Nvqzb8INNfbHJkRzuDh6LYxzczLrWsYFkMDgbrMy4yiy4Jd0WVFBDq2k1ek1bPEhnjLHNPUFYjJbizrADdZNHVsbMyeI4Bx6hJxuTlYPhj4h8J1HBXG9XpsjSIC4uhd0c1cvzF1jf2X2X/AIg+DdK13gn/ANQCWOnqKexjcd3OP4F8bNhfG8xytLXDuvX9P1kbodje6MU6JqPqJfD7kEYsLpSwhhfsNh6q1wtcc26rmktZjQcd9yuo2sblBUT7oBAaRa7v2S825tko5i2nts0793KptBFJwq9zsSSoL+lgfdQXG9yc9FmlMhLxyute5G9jf6Kogl1rfRSCAc/kgW9lQ93sEi2M7KS7GwCCRbbAU4CmAiG9sqAExvfCA0nbJQbCLvi+P3UgX9FkwUs08jYoYnPkdgNaMqZoRBJ4Zc1zxh3LkA9rqdnllnY0u58FAAHr6qC5S65NkpF79h1St+wopcTjok9kwb1Jsot2VLAAwmAJUtb+asay5VkIZIQxmfVXsYT0UsZ0A/7rLiiJNgM/st9VOdgSlhBDAXENAuV9afBf4Us4XoIuL+JaYN1eZnNSU0gzSsOz3D+s9B0HqtH8EvhJHDHT8bcU0w5G/eUFJK35j0leD0/pH1XsWsas6eV0UbiRexscuPYev7KnUW979Cr+b/t/k5eo1Cgu5/yK9T1F9VN4UPmBJAF9+/0HX8lxWuam+WQaVp5Mr5HWc4fjd/wFla1qn2GF1LA4OqpRyvLfwjo0LltQro9AonlxDtRnbZx//Dafwj+636PTdqTS+y/v9jxOu1btk60//wBn/ZfVmLrepw6LQO0+kkD6mTMsg6n/AIC8+ihqdX1FtJT5c43e47AdSfQKauoqK+tEUYdLPM6wAySStxN4HD+mPoYnh1S8f9RIO/8AQF6KEOxdkeWcxbLua+yKdSrIKKjZpenZiadxvK/q4rEhjZQQOmmcPGcLvd/SOySnjLP+sqLCRw8jT+Ed1oq+sfqlWaWBxFOw+d/9S0RiksIWMHbJrO3lkTzv1WqMj7ikjOG/1FLNMDfNmje37BNK9sbRBELBotjotPV1FyI489AO5V6WEdOqvuwksJCVNQ6aTkZ9PQKGtEQEcYu8/wAuoA8Jo/FI79f+yta0RRlzzc7uPdA37JYRDnMpoi5xue/crVyPfUSF7zjoE80pnkuflGw7qWi3ustlnhGmuHbu+SGsAGfyTqQ0lWsjtsLlZ93uyxsrEZO+Fa1n9I+qtEYGXIMjRgZR4FbARgb5QXsbtlVl7ndVFlORTQOao3RE4Ecjj7KSLFcBo9AKMFXMdc2VW6lpscpFswNGfp1CdR1ympGAu53AEfz+ZX3d8OOH4+GOCxKQGvdHzXt6fw/kvkj4OaQzWviDBE4cxY4G3f8Al/1C+zOM9Ui0ThyOnje0WbYkfuvD/wARahxbSfB6PpVDunGqK3bPLtZqJNR1uVzzdocbLmtapyKeQgdFkv1mFvPKSLkrm9U4jbKHRjN14SlvG5930Wltg4xitkdj8JuGRV1j9TmjDmtN7/z3/Ve7SOaWiJgs0DYL5t4E+Ix4X8WinZeCZ12nsf5+69boviLp88TZHBuV67SODqSjyfNv4s0+rWvlO1fD4f0OpliAyFj4Cx4eKtIqhcuAusgVOnzWdDODfpdalseQSfBXIMYWpro+YYF7rdvY5zfKOYdwtfO0te0ujcQDnHRMmA8j+IuunTaJuj6d566p8oDel/5+XvZdT8Jvh/DoWlN1vVYhJVSebzjNzn/uf5fhNGpTrX+InUKLUWcwoxzBjhho/wCMH6NC98qa9gBhi8sUQsArJ8YEW7J1PUDI8czvotd4rZBvZa6SZ01QXE4GytLg9nKq8DYLKuCmrac01bCyogdgtcL2XNw6Vr3CrjUcJ1BrdPF+fS5jew7Rk/8A5T9F0MZsDG43cNj3Cuiv4sdjYuNvdTgODH0nivSNaP2fmOnV4NnUlR5c9mk/sVtZKaYkFsZI7jZc9xRS6HUUU1RrFGSYPmmiFpGjv62/suYhbxOdGdLwZxSzU6YgcsUzryM9O5I/MeqZRysoGcHooo6nmywNGck9t/yRVajomk0xl1TVIIw0X5Q7P8/mV816wfi5G+SasdUupwLu8EmwF/Tp6/stJQabVa1M6WvqKuWx8zZSR+n8HVXKjPkR2ZPX+JvjPTx89FwpRmd5FvGIx/P56LxjX6vWNYlfW6zVukeRcMvhq6X7NT0kRip42tAwT1K5XX3yzGKgpml9RUuDAB64WuFcYLJW5N8mL8POCavj7jiKERn/AC+mcDK7p7fzuvrDiDXKPRtHi4e0YCOCBgYSzFz1K0/CXDtN8NPhlDC1gGpVrPEleBY5z/f9fRcNrusNpqaWrlfkZBPUrn2Sdj+hporS+JnYHWW6TwhPPHK01dRgWOWjv/Oy+a+POIZNZrf8pp5OaCI3lcD8x7fzoV7vwrw5/nHDUg1gzNm1EEsAOYr7H+dl4rxx8Oda4I1V0c8bp6WZxdDVtB5JBfYnZp9FZpFD1czLNS5em1Dk4URhoDQMBSXCNwJKuc9jS4EFrxu07rG+ZxcchesjJf8AU8tKG+5LnOkk5jv0CCw3t16rNoJKeKXnqoy9lrC3RY0zw6Z7hflJx6KzOFuJ2ZewMaR1x6K5srgMO+hWE53qQoD5HObHG0ue8hrQBuSo9QoLLJ+G72djwPwtVcb8ZUmjRC1OHB9Q++A0dL9CvtrTqOlhigo6RoZQ0TBHHi17dT6rzP4T8Hf+jOC4jNGW6xqoDpSQeZjDnlPp2K7HizWxoOgfZ6d1qmZvK3uPVeR1molqLMnf02njTHCOS+IXEba/UP8ALKV//TU/zEfiP915vO/mBAOTt6K+rleAXE3cTc56rTMqKmSp5HAAEquMcI3rgyIYCXF7zdo6LR6tVNAkle4NjYFvNRqo4KcQsI5ivKeL9bMsrdNpCSSbOt1PZMhZSwslnC3DtV8R/iHDRBpFG115XHLWMB/S6+nuLXVHDvBTqfh2KOHwY/s8BcLcjepHdar4OcGN4T4Liq6iK2rarYnmGWMPQpfijrFKK6DQaZ33UDfvbZ83oVzNRL1bFFcI3dPh8W/LPlLUHzPrJxUvL5g887u5Xrf+H3gJvEPFT+J9RivpekeYEi4kl6CxXmdZp8+rcZDTNPHiS1EoibbIydzbZfbXDGh0nCXB1Bw3RN5WwMDpnDPO87m/UL0V9/ZUoR5Zx515tf0NjUHx6h8rhbmOANgOyQRgDIsrQR3uoLhe/Vcc0EBoGbJgoJsLlVF+VCFdfUcsTYRIGmU2ObGyanlaZWsaRmzRm2FhiBklW6rmPO63KwHIaFoOMtWqNK0J1JpbXS6tqIdFTxs3Yz8UhuMDsUGsIeuDnJRXk4L4l8b/AOf8SN0+kkvpumHkjAwJJOrsbrxPiyiMc3+YQN8jvnA6Fb1jZIppaea7ZY3EO9T1KufTiuoZKd1ibYv1XNo1kqbvUPtcuhUX9KWkr9sp/X3PNWzk2da5SvJd5icnYBWVdIaKrfCRgHHosdzz7L6JVcrYKxPZnwfUaeemsdVi3QHAvsUj3ggdQNkONtt+pVZ6YwmlPbBQRc32CcNc8E223J2CQuA6qA8tBANgVm7lncgwAtc7qBgg8t85F7YScwupuOW98lDuXgJnVtcaoRxRwRU0EQsyKIY9yTkk+qwebtlR0TtAuB+yXOdkNvJmVptG2u1CKmfN4bXEAutey+guHf8ADLqOtU8Opu1WOm0xzec1EgIsNzjqvOeEodB4dqaXW+I6Vsz2kPhpHOs+X1P9LfU79F2/Fn+I7izVbafpjYtP0yMcrYoBYEdj1srbK7IJdmPueip09VFSla45fvu0vt7/AH2OP48GgcNVkug8PtkljZ5Jak4dKfU9B6D6lebPcXEna/QdFttb12p1ytNXUsjEh35Ra6xafTKieikrncsNJGeUyyGwLv6Wjdx9B9bIttrBg12p/E25j8q4+xrzcAkYSXNgLq2RwP3cd3DvsqrC+VS0c1kDOSmA7qbG2MKxjNuqkYZAQ1qvYy5AQxlz7LMhhLyAAuhVS2CUsERRFzrAL6D+C3whbqxi4t4npyNJidzU1O8W+1uHU/7B+qwvg38If/U0rOJOIYnR6DA67GHBrHDoP9nc9V9FaxqrI420NC2OJjGBrWtFmRMGBjt2HVJqbnF/h6fm8v2/2czUXxjHulx+omtaxzk09O4Ma0AEtGGjoAO/YLltSrmaXTFzrfanDytvfwh/z3KvqqmPTacTy3dO65jY7JBO73ev7LkKipYGP1bUjzRA3iYf/dd39lbpNLFJbbfqzx2v1s5ScYv4n+SKqisbpkB1WtPNVSC8Ebvw/wC8+vZeb6tqU1VUOke4ukedt1l63rM1ZUPqJnXc75G9B6p9F05lND/neotvbMEbvxH+or0lcPTXc+X+8I4sUsfRfn9S2ipmcP0Brai3+Yzt8oP/ALLT/crURg1UhrajMTT5Gn8R7qyoml1itkkkefAabvcevotRrWq+GBS0o+8d5WtH4R3WuMe1b8kUZWz7Y8/oijVtRlqZ/sNK67nfO4dB2SBjKKmEMfznc9VFJTtoacyyHmnfkk91iVVR4bS8nzu2v09Vclg3wgtq4cL82UVlSI2mNpu4/MR+yw2tETTLLl5wB/ZQwcx8eU+UZF/3VsbC94meM/gb29UGzpJKCwPFG7mL3/6jt/8AaFiVc/O7wmfIN/VZFXP4TPBYfO75j2WA1t1ntsx8KLaYZfewa3qr2R9T+Slkee5V4DWC53WZLG7NDkQ2PqfyQZGtw1K55dgYCWyPJWSXOcosmDU7WE7BHAMlYBTBv1VojHVOABsE2BcnIkXyFaxwe2xPmH6qJYzG/wD2nYqsgg8zV51ex6TkcixUO6FWXD2cw36hVuGEJIB6B8IdbZonxDpp5HcrZWlt/Xt+X6gL23jHiufWal0PN5Qbb4XypTzy01QyeFxZJG4Oa4dCF2rOO3uja6YfeWs73HVeI670u3UWK2rdPk+i/wAI9R0OnbWr2kuGdnXyuaOUvsOuVppZ4I/NJIL+647UOKqiplPhk2WkqNRrJjYvIWGjoN0o5lse11f8d6Sj4aVlndVmuUUYsSD6rXO46rKU+HCSWBcaC9587iVkNDQ3bIXptJ0imrl7nzfrH8V6nqK7WsI7aj+JepwPFw7lW/pvi7Ww5Bd+a8wje0eUtBV7fC6sC6kemUvweTeutR7HSf4gNRpWgFhcB3/n8/NbmD/EiwxltRRAki17fz+fQrwJ7IrfIsd0cVieQWVc+lUrwFa+cuT0mT4umH4p0fGtFSDnjHg1UQwJo/8AlfTOg8Q6LxjpA1Xh+rbMx2ZICfPGexC+Fy1o+Vtlt+G+J9a4S1dmpaHWOgkabujv5XjqCFk1HT1KPwcotr1TT+Lg+2nM5dghpsuJ4E+LPD3HEMdHXPZpetDBY82bIfT/AIXcTRyQSBsjbXyCMhw9CuFOMovtksM6cZKSyhmgEgncK6/JJG4fhN1TEOfPZXOLQFWMVVhjqTKHsDmvFi07H0XD1/AtK15qdAq5dNqTu1jvKfS3ZdwR07qpzclPFtcAxk818XjrTXtpKmo8eDnB8Ubj+fy6w+Ia5hqfAihjjl5fO9gADvVd9rtazTtKkfJYulFgCvJ9Ql5g6Um7j1WqrfcSWEamuqmxRu5nWa3Lrrofg5wp/wCquMX8R18Z/wAt0/zAkYJH8/M+i841R1VqOq0uh0rS6apkDSB2v/P1X1NT0VNwJ8P6Lh+mAbUSxh0x6m46/n+qN9mF2orjHLNXxprDtT1J7Ij92w2aBsvLamin4g4spNHghdPDEfFma02uB/P3XV6hUiKKSpJu7Zg7ldjwFwuNK052s1Lb19b5gbZaPT+dSsrxGJrUnHg2nD0dBLTCtoZ2zQMBiZY3MZbgtcOhFrfRbbUKGh1bTZNO1SjirKSUWfFK3mHuOxWsrtDq6eufq+gSNirHD7+llJ8GqAvuBs71WTpmrw6iJITHJS1kOJqWYcsjD6DqPVVP6C92eTwfjz4FVlOyTUOEQ/VKIZNC8/fwD/ZYZHoV4TNQz09RJCWPL4zZ8bhaRn/yb0X6AgFpBaSD3C5zib4f8LcYwk6tp4iqwPJWU45JGm2+MH6rRTqrKXtwV2VQsXxI+HWPDhdpBASu83uV7jxd8A9e01r6rRnM1ymBveMiOoaPW/lOOy8crtMrNLqDBXwT0r72DKmJzD9O67devrsWHszny0jjut0awg7HZep/A/gccR8WnXdRi/8Apmm/eXIuHO6e4XAaPotbxDrlNommRGapqHhtmZsO6+zuHuF6Xg/hih4T08NdMQH1UrAMuO//AHCxazULHbFl1FW+Wb2le2SabUZWhkTBZjf6WheRcU62dT1iap57xMPLGL49wu6471lml6YzRqR1ppB57Y5QvFNTrfCjc4HmtgDuVzK453OghKupdI7laN8qqI+Ex873WsFg0r53MMslwXHAVOq1gip/Ba61xclXMbJznEevOgglmLruNw3ol+DfCD+MONf8z1Bpdp9C7xZSRcOd0BB6bLjdRNXxFr8OmUDHSOkkEcbWi9yTa9l9ecEcIQ8IcLUmg07QKhwD6h+/mO+Vmus7VsU/PPB0moavDo+k1evSgMZTs8OmYD16W7hfMXE3EkrHT1cjy6qqCSLYyeq9B+MHFcbZ49Ghk5aOhF322c/0K804F4C1z4ma0+tcXUujwutLVOBta/ys7n6pNHVFy9SfB1Z2vTVYXzS/JGf8LNIpA+u4jrtYi06qY0sp3uPnDztYbknGy9p4b1DjrTNKbPrmmP1GmdAXiZvzkXwS3cErfaJwPwpw5FCzS9IiM0YA+0TjnffvnZdG107SSJTkW+i2X3KyXwrY5UINcs1dLxFpVW50YqPs0rQ28c3lNytqWvFzbmANrtyFj12l6Tq8UjdQ09jnv5fvGCzhbqteOHNUopZZNA1txjdO13gVGQB2usw5tb3NkpyDmywZdUrKF7o9b0mSA+PyeLGLtI7q6LVNMqABT1sbiXlnK42OEUTORqienoqSasq5OSlgjMsrrbNH9155w9rFRW1lRxNqTXCTWAY6eA8wMFKD5bNOxPVP8Q6t+q1dJwjTyXp5R9r1KVoD2shbswkG4uVzgqXVNZHMGjw2tL2xte5nKxos1tj6K2C8sWW+yOG4kjp4+La4UsnNE12DaxHoV6J8NOB6evhOua/EXUsjS2lpzgvP9Z9B0XLcM8NT8U8TTPq2yNpGPMtTI4X8t8Nv3K906Rtgb4ccTQ2Ng2a0bBciuj1JuyS2PofU+tWaPR16DTy+LC7mv0PlX4scKVHDXEkji3mpJnc0UgGCOy843F9l9h/Frh1vEPw9nrIY2vlpQXSMOCB3BXx38pLL7L0fTLHGLpfg8H1Ccr2r5eQvm5z6JXOubkqTvlKc5sV1ZM5IG1sZ7+iXH09VLibBv6Jd9gqshwH6qR7CyLAEC4Psm5b5xYIpMgAXOT9VfDJ4D2yNtzDIJF7KkEAKLkp47DptboyZqqWaR0kkjpHuyXONyVSXE7JSCANhdKd7Jm2yOTe7GLsb2PdDpHuAa55IG1zsluhrbpd2DINvY5smDev5p2NbztaSBdbCsnpHRspqCndFC0ed8hvJM7qT0A7NG3Uk5N0YBSMAN7j6K9gsMDzHc9goYztkrNhpy4i+fRbqqHJiSkorcSCDmIxde2/B/wCEcvF9S3XNbifBw7TvsTsaxw/A3/aPxH6d1V8I/hLNxlVt1fVmvp+Had/meMOqnD8DPTu5fUVZVU9FRQ6bpsEdPTwsEUMEQs1jRsB6JNXqfR/4KPm8v2/3+hz7bljulx+pVqWoRUtNFp2mwxxRxs5IomCzI2j9gP1XOzyQ0FOamocZJHnmY128jv6j6dgr6meCigdVVTucuyB1kP8A/qFyFdWuq5pKqrk5I2/Mf6R/SPX9lTpNNt9P1PKa/WtPb5vH0KaupbUOl1DUZP8Ap2HzZ/1D/SPTuvPtf1yTUKgyyHlibiOMbALO1rVX6iHTH7nT4TyRsbjnPYLQabpsuuag7mPJSx5lf0A/pC9NTWoLul4/I86l3P8AX6j6JpR1Kd2o11xRRG+ceIew9E2q18mq1v2WmPJCzFxs0LL1vUg7k0nTG8sTPIA1aiqng0mgc3mu85e7q49gt0Iv5pc/oCUm2lH+Ri6rXxafRiCDAGGtG7itRQUpbzV9XmR2RfolpIZNRqnV1XiJvytKvqqjnOMMGAr0vJsjD016cefL/sU1NQMyv2GAP7LTPLqiUuefL1/4V1RKZXemwVAYZpPAZho+cj9lJPB0qoKCyM1vjv5jiFm3+4q6SUQRmRw85w0JncjBYYYwLWTSuqJj26DsqpS7VnyWQj6j+gvmkeXOySVkRx/mpii/7lWOcGDlbusnnL5NbfhE3bGO5VRJcblGSblMGqYEbIATtYTsnbH3VgHQJ0hWxQwDfKdMG902Aj9gCBpTBoCLqQ0lN2vyDKOYje2RnhSbrHkYY3lp26KSOYczd1cwtnj5H/MF5vk9LwYoJY/mG3VWWFrtyw9OyV7Sx5Y5Q27SQNihnwEg4NglsCM7psKskgpGiIYco2ChxucKLqCfzVb3JgBgq5hxlUb5TglGDxsRoyW/qr2ygtWI0guAvurrFrrFa0yhoyC8EXVTjcW2Sh5AxsoJJ/smbyIlgrcegVZNkzsZSkE9crPJFyIbI9kjZY3ujlYbte02IXsXA/x11TRWR6VxUw6lp/yiU/Mwd7/z6rxhzseoUXxbcHdc++mFqxJGquyUHlH3boWuaPxFp4r+H9QZVxOHM6O452e46+62DZNwd+xXwjouu6zw5qDa7Q6+Wllab2a42K+geDPj3p2p+Fp/F8Ao6rYVTBZrvU9vouFdpJw3W6OlXfGez2PcB3vlS1vM9re6xqOogrKdtVRVDKyncLiSI3x6hNX1cen6JU6i92zSGn1/n9lixvgvPN+NtT+1a99jjd93CMj1/n91wlZV8niSOPlYCT7LYVNQ+WWeqly+VxPsFyetyTTGDTaW5nq3hgtnC6UV2opbPRfgXwlHrXEdXxlqcfNS0d/CDtif5j8123FmrSV+syP5r3Nmj0XQaXQxcFfDXT9EhaGTSMD5e97fz9Vw2oStEVTXO2YLMv1P8/usLl3Sci2pY3K9Mojr3FVNpzBempyHynpf+fuV7bE1vKGtFmMHK0LgeA9Ck0zQP8wnBFXXO5jfcN/n913sE0LGRtllZGXHlbzGwce3uqpbseRaWdxla7UtFp9RLJg51NWxZiqovK9h9T1Hotw5pa4tcLEbg9EuAkEyco3VKzSphTcRQeGzZmoRD7l/Qcw3BXQRFkkTJonNfE4Xa9puHBZbg17Cx7WvY7Ba4XBWlk4dbBI6fQK1+kzOyYx5oXn1ajnJMmc9zhkGx7ha2uoKDU2GLUdPp6xhFiJYwSfqseXWNR0vycQ6U5jP/wCLohzxnO5b+HHqml4g0Vmly6pFqFPNDG3mAa8Ak9rHKPbkZM8742qOGPhlAyt4V0unoeIKnDOUWDRfe2FuOHfiBHUaYyu1TR6qhkMbntrJbFk7rbDO1149DHVfE74rxtlc59JG8yzO2DGA7XGxXc8da62vrItOoCY9OoR4cLBgEjF1pnVGOI+Ra5OTyaDW9ZlrqyetnkJkkNxfoOy5CpmdUTWFi0dVGr18lNygQGaR2MHZJA37hry3le7cdlOOC4tDuRvO64DdlxPEWpPdHMxjiScE9/QLo9ZrG01MY2us93rsj4YcKHjHi37VVR82k6a7xJXOB5Xv3AKDeBJM2HwX0Cn0fi2k1jiWn+zeMOWlM3l5HdDle/65qsOjaTUaq485s7wnRuHmKavpNG1ONkOp6ZFKxhbycosWgbWIXL6n8P8AStRENPTatqNLRNvzxNfe9zkDsuZqK52fKzXppVQadiPGqDhfVPihxz/l8D3M06J/i19XYhrRfLff2X07Qafp2iaRTaNo9M2mo6ZoaxgFi7/ce591yWvT03BHCdHRcOUYoaGSVrJZQQ1xPcndxXaxGSWmpJpBZ0kQdf8AqFt1qjtBR9iu2btsdjHaLbWViAy2EOuiVBzgbXwtPq7pq6spdGpZTC6T76oksRyMGwuNiVs5C2GGSeX5I2l7lq9FhkfTzapUC1RXO5gLEFsY2CKAzbMrqyE+GZBPCCCGyebbAWh4rOhUvD1VrNfp0dOKYmZz2O5OY2w2/crfNiBPNbPZcJxbMOIuL6Pg6F9qHTgK3U3NcRzO/BHYix9QovoKznNC4aqXcNT19UPC1DVz40mQTHH+Flx6dFq4TU0FYaWspvGnP3UTSDd5O23RepSStvYAAdgLWHZQyKKepZUmFomYLNkAyB7q1SaTQEsNMo0fS4tI0xlEx/iSE88zr/M8/wBhstzDAXvDGAuc42AHdVRxBruYCxWs4u4gZwtwfV6nzD7VKDBSttu84J36KiTUY59jTVCy+1RW8pM4D4mcVCuqH8JafUWoKY3qpG/+9J/Tt8o/dfMupxeBqs8YsfNu1eg/aJPF53Pc57iXOduSTuV57rMok1mocCN7XCTpU5PUSk/KPd/xNoNPoekU1Vr4k937vG5hEi9yUX62sl7Kfm2C9QfLSLmxFt0W/NTY3scEKRb6oJDDxwl93FzWNaMlxskcRc22U+5UEKzG2xCL+llJygAkpi03ueqKiwi5RbtlNa2ykAXz+QTdpBeUXsnDUzW+iuazy7b/AKq6FZCoAnYLJhp3PP6qQw3tZZUURP1W6qncSU1FBFAC7AuvZfhJ8Ip+Mqlus6yySm4ehflw8r6sjdjPTu78lkfCD4PT8XTM13Xo5Kfh+J2B8rqwjdreze5/4X1JNJTUNHHRUMMdPTwsEccUQ5WsaMBoHZZ9XrfS/wCGj5vL9v8Af6HPnZld0uDHmfS6fQw6dp1LHT00DBFDBCOVrGjYD0WhraqChgdVVbuYu2bsZD2HYKzU9Tp9OpzU1TrudhkY3eew7DuVxVVWT1cpr654uR92zowd/ZZtJpcrL4/U81r9dh4XP6fV/wBha6smq5n1VU8MsL+kbfb9guTrKk6sZPvDTaRSZll7/wC0d3FXSST8RVklPTzeBplP56mpdgW6/Vc1rWpDU5otK0mJ0enwnlhjG8jv63dyV6amrHwrn9P9nmvm+OXn8/8ARiTOn4h1WOko4vCgb5Y4xtG3v79ytlqtdT6TQN0nTbYw57d3uV0zoeG9MdRwkOr5R9+8fg/2rQeH4QNXVu+8cLgH8I7lboJPD8Lj/JVOXgraY6CnfU1Dh4hGT29FzJdNreo3N2wMz7BTXVk2r1raamBMd8evqVnER0VMKWA3P43dytSRshB0rL+d/kiKmaNkfgxeWJgsbdVpZ5zI4t2A39E1VUcx5WZA29T3WtllIIijHM8n8ymbUUdDT0YQ73PklEMIvI7r/SO6zWsZTwCNn59/VFPTtpYTzG8jsvd/ZYtTOc2+Z2w7Krj4mXfO+2PBTUSukcIYzjr6p4YQ0fuVEMNhzHc7lWOfjlasspZeTWkorCJc8NHK1VgIAVjGXP8AdBIDZDWkq5rAM9UwAGAnDepT4wIQGkpgAFN1IaTvsmUc8gbwLdMGk+iazWjKgyDoE2UuBM5JDQEF7Qqi4ncqErkRLJy0jDC/GWlKdw9hTwSCRphlz2KVzDC+xy07Fea+p6trwW2FRHc4eFjXzY7hWXLHB7Cne1szfEZh43HdF7icFB7pDk2G/RMldYJMobAh7IwW36oJu66gjlKqfuEj0UgnZDQHPybXUbX7hV5wNgsG17q0PcQM3sscH1TtNuqvhMrlEyOfldjPdF7qm+LgqQbi/RP3bidpJ3ulOOqf5hYKs5ACWREVOBBuq7m9lc7ex3VThY327LNItQ1rCyghrm2cAQluS65T9UoTf8N8b8T8I1LZdH1GTwQbmF5u0r2EfG6g4r4fj0zUov8ALtQDhzOHySf2/wDC+fiLhVFoO4v6rHbpoSfdjc0Qvktj6Mk5J4muhc2SO2HMNwth8JeGf/VXxKNdML0mnHmuRcXGf7X+gXz1pvEGsaY0x0lU97H+QRk337L7W+DekO4Y+Ez9Vq2BtZqPncSLHP8AP0C5+pzXHBqhNT2RbxrqP2nUphFhkfkYP0XIUtKdY4godGj/ANJhEk//AH/ndbXVZg98kjtm3flZ/AlAYNOqtZmb97UO5WE9v5/dc9LCN/Gx3nku2OIWjiAYwDsFr9Zo9O1GFmj6k1srJSHFvVpvhw7EW39Emo6xTcP6BPq1U6wjb5AepXmOjcZR6jDUaq6aSHV2vvGwnyuatmk0V2pTlWtkczWa6nSYVr3Z6dJV6hwrTxx18kmp6OwBjatoAlphj/UAy5vqt1TVtPWUsVXSTsnp5RdksZu1w9Cub0PieHUY4oJ2GlrJBYscPJJ7E/sshuiO06qkrOHnCAyG81C8/dSHu0n5T7LPfROqXbYsMuovhdBTreUdIHqecjK1VBqtNWufG3mhqWYfTS4e32v8w9Qs0yi2VmwXDT1IjYQ42FsgjC+d/i3rFCOampKNkM73coMIsZD9N17frPiv0uodTzNjLGElz9gOq8C4Y0+Difi+t4g1GTxNJ0dx5SSLSy9LHOey20KMU5sqllvtRstB0dnBHBjaZxadZ1RokqJGkEsYchu+37LR1L5C1xB5rDF1udSrH11bNVPcC6VxNhiw6Y6LRVrgyC1ySeiXOd2a4rCwcxKZ5a4tMZuTa/RZc9QyniycMHVM58gv0vsFodZrGQQOLnWa0ZUIaXUX1mr6pDptC0yVVW8RsaBe1+pX1bwlwrR8EcHU2jwhvjBofUSYu959RuF5j8B+DTLLN8QNWisweSga4bn+oH8l7TUF1TKb7XuVRJ5Yq33NW2OSadzyOVqzC3kZy2wVe2JrRhuyqeM7IFiPNvinpAr6Cj1AyPP2SVrmQl9myeh7r1bS3ibRNOLGOjAgbeN27MbLz7jFp1PVtH4baAWyyCeYPb5eUeo2K7Wmrmwfd2PIAGtF72ATNfCivybgAgdEjz7KtlZTS/JK32upe9gBeXDlGTYqsJq9Z/6r7PpYuBO7nlPLcBg9Rsti1zQAGDla0crR2CwKSB81TLXyts+XDenK1bBsZuBa5TMmDD1vWIdA4frdbqW8zKWPma3lLud/4W2GclcbwzQVWnaE6p1F5OqapIaysdd2CflbY9gr9fjdxNx7ScOhpOl6KBWVzuQ2fN+BnMD+i3NcRFFLUyAlrBzEfsMpkKt2YVO77RWugDXuDG8z3Ws0ei3EbLBY+kUUkNA2WqaG1FQfFeCBdoOwx6LZtZjAUbCVsBc8NGL4ucWXgPxM4j/9QcWmipZA6g028MdiCHP/ABOx+S9q4t1ZnDvCFdqZeGzub4MA5rEuK+Z4mOLy+RxLnHmcSdyufqrOInvf4P6b61z1U1tHZfcxK0spo+Yuy1pcc2XmsrzLPJK43L3E912XElby0klneaY8rc9FxwAA9F1ekUvtdj8mf+N9YrL4aWHEd393/oWw6qdlNlIwvQqB87IG1u/VTy90zs56lRgeqKiMWQvET+fw2vI+XmyAfbqlc50khe4lzibkqLDr+SduTgKxRIdBwlDwyNU+08VTTighHMYKceec9G3/AAjuUvFGs0mtao+XS9Jh0nT2eWGmiyGN9Sd3HqVoic2TyPLmgWs1u3qVaoov9ZqHYkUltt907G90NHXfurQ0cuRv0TRiZxvCa2MEu87tmjoPX/hWRhxdc2HqVDGZA6rLhh5jgfmtldbb2KpzUVuRFDzOwD9V7v8AB74Ly8UOi4k4kjfT6DGeaKIizq0joOzO56rO+DnwW/zoQ8UcXUpj0Zp5qelf5TWW6u7M/fK+lKqsjjibBTsbHFGAxjGCwaBsAAsGt13p5oofxeX7fb6/oY5S7vilwRPNT0lLHR0kTIKeFgYxjBZrGjYAdlyeu65TaVT+NUeeZ3+lCDlx7lHEHEMGkU93Hxap/wDpxX69yuHgp6isqHatqrzJI83aHbD29FRotEmvUs4/X9+55rqXUWpelV835RX1/wAE3qK2Z2q6s+7zljD8rAtBM6r4n1J+n0D/AAqRnmqKl2GtaNySsirlreJNT/ynS3WgbmefZrQP2C1XEGtUtDQHh3QXctIw/wDUTj5qh/8AwvS1wllJL4vyiv3wjzKw13S+X85MwuIdZpfszdB0Rpj02E+Z34qh3c+ix6bk0Ck+0vAOpTNvG0/+w0/iPr2WLSwtoo211Q0OncLwxO2H+4qtjPHc/UK55fHe45jmV3/C3xglHtXH6srnZl5f/gRrMfb6w8xcbxsd+I/1H0XJ6xqklfUGlpyXtJsSPxlZWv6zJNK6nid5nYdboOyooqVunQ+PNb7S4XAP4B/ytUI+Waaa1WlbNb+F/ceGBmm0xbcGoePO7t6Ba+rn5WlgN3O3PZNLUl95ScbN9Vq6iYNBJOepV3Cybaam5d0uSqeXlFh8xwFl0FJ4TftEgvIflv09VRQ0rppPHmG/yhbKeQRssPoqlu8s1Wzx/wAcf5mNUSWBz5Rv6lYbGc7jK/AUucJH3cfIP1Q5xcew6BZ7J5eEaK49iJc+/lbgKAEAK1jL77KpIdshjL+yvA6AIDb4GyfAGE6XhCAAB7qcnZS1pPsmJaxWJJCNgGgZKh0gGAkc4n2SpXIiTZJJJuVCgkDdUvqGtwMlVttliiXkhK6RrRcmywnTPcd7JCSTcm6GxYomhORcbhZMbxO3wpPmGxWMWlhv0RkEPabELzi2PTyjkt5XRO5X7HqoJcx12/RWteKmPkdh4yFSbscWPGE5U0K43eSMA9OyR47KxwAFwkGVXJBQjRbdEhuQmISEd1W+MBF2KDcG6ncX7KN1V9BiAVYHAj1VXWycAFt75UTZGi08vIHNOeoSjBslbt6qQeqscs4ZXjA5v0wj16qQLjOxTSR+GQL8wIuD3Vn1EKXZfzJSAfm2TkWwlN7WVTQ2So4JAN1OQAi1kEHYFJjAxO5uoc3GEC4wnbkgd0CG44M0mTWuOtI0xjS7xJmlwHa/8/NfeXEtTDQaVRaLTWbHTxtBDe9v59F8x/4buGTq3xAl1iSO9PRNvzW6/wA/f0XufE1aajWp3NO7rNsvP6yXdb2+x1dJDbJz+uvcNNcIz95UPEbP5/Nl32nRyUen6dooh5nMiDnN63/n7FcJpDP8/wDiZp+jszT0I8WY2uAd/wC36eq9QruWPjukmB5YKhnJFfYuH4Se+P1WT6GiyWJbHh/xc4rGp6nBw1p7Zo4qc3mZI0sdf2K5DTJ308rHBrXBtg1rhe47L6R4v4A0PjSDxZ4m0WqMH3VYxvmH+13cLx3TOHKfh/jBulcaRPp2tN4p2fI7/cO49F7bpGtoWmdUF8S5Xl/Y+f8AXtHfK9WSfwvz7fc7rX+JOHYuFdIjijbJI5oEhZiSF3fv2/JZfAXFx1sSaPXPvX0/ySn/AN5lv3wvPeP36bPqrNR0l7PswaI5Gs25rfN9bLl+HtUqNM4l0yqgcRL4wGOov/Ann02q7QtrPdu1nlP2M2k6jbTrlHZxeE8cP6n0rqGm0WpsaKljmys+SoiPJIw27jJUUsVXDCY6mr+12wyTlDXW9bLLkewyczcNe0PH1yqJqmnp4JauocGRQtL3O7WXhMZPovG55t8VtfqqfT6bhLR3F2qas4R+Ujma07kets+q0FdBTcNcPUfCenv5hC3xKp7T87z+4/ZTw7UnVdf1r4i6hZ8MRMFA1xNj2I/cFamrldUzyTS3Mkji5x9VpksJQRKF3ZmzXSScz+UHJ79FqdQmfzeHHJyhu5W1qP8Ap4TIMudgArQTseQel8uSmlmFPU+GxxJB7Fc5p+m1PGfHFBw5SA8kkgMzr2DW3znortZrfBgkeXABgXrPwK4TdQaJUcT1DWu1LUiWQt/Exn9xulkyt7vB69FFS6fp9NpGnsDKWjYI2gC1yNybKxjSBZJDF74xZZIZhVD4wUvOLm4CxnOAJLrgDJ9lkytNt91y3GOpnSuHZXR2+0VB8GEc3KS49iollkzg1+gEalxBqvEJN4+b7NC5rrggb4Oy6E+Z3LcgLXaTRDTdFpKFxJfGwF7nAXLjvcjdZ8VyCcKxgSLGsZbyMA6YQWOlqG0rXkC/M/PTsreYRxGU7NwBbcrK02Atu+UgvceZ3XPZI2Q2lPDaMbWHoqNb1Wm4d4frNaqPN9mZ92wWvJIflaAdzfotjdsbGsG+5Xn2tSjiv4i0Wg38XSNCArq0DleySb8DSPe3skW7EkzN4W0iXR+HhLXNH+a6m81la/k5Td2Wt32AstlLTQ1vJDIC6Jjud4x5j0CyKme7ZKh7Rc5tsL9AlpmGOFoebvd5nG/VOyY2MgAfKAB7LIjjJIHU4VTB3VWratBw/wAPV2t1JsyljJYM+Z52AslbwNGEpyUY8s8g+MOvtrdfp+Hqabmp9PbzShrsGQ+novMal3g0h5cPk8oVs1VUajqE1bUvL5qiQyPJJOSb9Vq9Zrm07ZJAfLC2zc7uXFblbZtyz73oNPX0rpyg9sLLf5s47XqjxtS8IG7IRy73ytY1tzg+5Q5zpJHSON3ONyotb3X0HTUqquMPY+B9Q1T1epnqH/2f5eA5c42UWucfonxZO2QxtdygB5/F1A9FpMRVgHzfkptc3A+ikm9gBYfupHrsokQgDpsU7NievfsoAJyQm5U6QCLXQWlp82w7qW3DrjcKwtvunUcgbFGdhZZUEbb80nmts3ulhju4bW7lZrIRzb4HdbqqcmeyztIjhBNzi+T2C+hfg38GhqbKfi3i2nMemNtJSUTxY1R6OcOjOtuuFPwc+DY1AQcW8X0hbpwPPSUMgsakj8bx0Z6dcr6Mqqov8jPKxvlAaLAegC52u13bmijny/b6L6mNyz8U+Aq60coiiAYxoDWtaLAAbABcnxBr8Wj09haWskFo4h09Sr9e1uHRqawAkrJBaOIdPVcjR6e6V0mta1ISXG9ju4/0hZdHpI49Sz5f1PP9Q6hPu9Gl/F5fiK/yYtNQy1ErtY1h5eXHyg/iPYei1ldVVuv6j/lOlizdpZBhsbR69lkajW1uuaiNM00AOIs5ww2Fi0eu69R6Lpr9B0KW98VNWPmlP9I9F6KuMnJbfF4XiK/f9TzOItPf4fL8yf7/AKC69rtHpGmu4d0B1mbVNUPmmd2B7LkKVsfMKmoZzgf6cf8AUfX0VEMT6h/iPBLb2DRu49lto6IkudO8NY3D3Dp/tb6rqQhGqOPfn3Zmttcn+9ipjDWSyVNU4+C0+d39Z/pHotDr2t8o8OIAOtaNg2aFka9rTIIvBis1rcNYNloNPozM52p6gbtvdrT+I/8AC0wj/wBmX0UrHq2cePqNQUfgM+31Y5pXZjaf3Kwq6rMspYXEgnzEfi9ArtS1AuLjfO1h+wWuYzw2+JJ/quH/AOiFbzsdSqDb9SznwE0pAudwMDoFi00Bq5fFffwWHH+4qQx9bN4bcRg+Y/2W5iiZFG2zbNb8o7pH8T+hpnP0o4XLCzYY7nBt+QWpqZjJJYdf0CyK2oyWA3PX1KwmgnJ3O6qsnj4UGivHxyABWAIDVcxlsndZ0jS2DGdSrQ2/spa3qU3oE6WdkKw2wFLW3yVIaGi5SuffAwn2XAjeRnPAwFVvuhI+RrBclVOWeBlEcmypkmazrnsFS+occNx6qhLnBco+475XPOTYdkiR0jW4uqnTOOG4Qw2WqJeXNbuVU6f+kKgu7lKX9kcJDqKMMOv5XJSCw+iscy/ulBuOVy860ejaIBLHB7DkLK5ftUPiNFnNwVh5abHZWwzvppOeOxBw5p2IUTxyVyj7Ck2u0hVC4esqodE9wfFhr82PQrFuQ69kkhUWiOQxGVrbtabOPZV2us3TdQFBWc8kQmp5ByyxnZ7Tv9VRVMjiqXCF/PCcxu7t6KbNZRMPJj7FIQb3Ce6m3UdVVKPsEpd3CLHlunc3KQ3F1UwktNinB3VY2unBzdGLFaLG3tY7K1rOb8V7dFUGnfopBt1yr4/UrZJBBv2SbuJTkEWzhKc7JmArcMpbWKsLdu6Q4VbQcha4uUA8rS89Nk7Bz2AXoXws4AqeO+MoKcRn7BTOD5X27Kq2ShByY8Vl4Poj4BaI/hz4UT6lUReHPWkloOCR/P1KKyXmqaipeSGQAyOP8/my7riDUNI4eZp3DsEjIWuj5IgTZriOnv8A8ryniuolp9DqIGEiaulEQAOcn98/qF5Zy75Skd6Fcq4JtcnTfCSjcaHVeJ5W2krJCyM+l+n5foO69HqaOm1Gi+x1kfPGbEEbtcNnA9CFquHtObpPC2laWwBoiiDnADqR/P0W6abKtvfJU9+TFg1OfTJI6LW5QY3eSDUDZrJBgBsgGzvXqsnXeH9L4k0w6fqcPOy12SN+aM92lNIGSwPgmYJYXizmO2ctQDqfD7eaibLqmkt3pyS6emHUsJPmHomhKUZKUXhoqnWpRcZLKZ4rxd8PNe4bL5Gxu1DTL3FRAMtH+4XWHwXwnX6vxLQVc8Bio43c4vjmXumpccaXTaZDVUBjrYHu5ZgSBIz0czdRw5Sfap6jiB8QghmHLTwgWFu9l6CXWtRLTuE1ztk4FfRNNXqFbDxvgz5ifEcb36D1Xkvxc4iqGx0PBmlSE12qSBsgabFrL5z09+69W1arg0vT6ivqXhrIWF55l8+cKPk13inWfiLqod4UJdDRMf32JH9/oVxqo4Xe/B3ZvuagvJ0Orvbp2nUHDVL/APb0MYMhAw553P8AyFpWkuORgZKmokmllfPI8mSR3O4nNyVg1VQ+OHwwBzv3I6JDckorCKKyYTzEgeRuAtJXyiKBzuYi6yZZOUWOw3IXIcSasIYHea/YXRyBvA2h6NU8Y8a0WhU2Yy8STu7MGSvqccN0bHUY0WU0MlDytiLD5TYWOF518EeGTonCkmu1kdtR1U+XmGWs/t7r2SCNrGA5uqZSyytLyzXQ18kD4abXKfwnnn/6mMeU9rrZCJr4mywvbLG5vMHMPRWPdG9vhzMEjOxWsl0uSDmm0eoMD/D5fCOWlJkOWXyM3G5Xneq2134gQ0bTzUWkt8STl8zS/oCF1Oq8TjR6CrqdaoJYHQxAiRg8pPv0XJ8DOhrKCerFTHLWajUOe4P8sgHQHurILG5G87HSFhd9TfZXRNJIAsOyazgbOBab2yiTmjiu35nYGFBiTyyTNJILGYaLbnutxRs/Eflbk4WppmG4Fybei3jmmOnZFkEi5SMJquItdh0PQ6vVJ3gCFhcAXcvM44aFoeD9IqNM4cFTqAJ1PVX/AG2qc8NLm82WtuOwWNqnLxRx5ScOh96DSrVlfZ4F3fgYQQuyla9wdKQAX5AAAsOyK2FzlmGAJZg0fIzJ9SstrbdLkqYacMYB3yVksiubBQgjWm+y8j+NmvWfQcK078Rj7RU25hcnYHovY3yQ0NLPXVBtDTRmV5IuMey+Sta1KfX+JK3VZiS+qlLgM4b0GfRYtTZ2x7fc9f8Awr0/8VrPVfEP18FEXkidMegwuN4kqTzR0odcnzvyu11G1LTtjcbBo5nXXmFZUGrrJahxvzHGeiv6Pp/Vv9R8R/U9f/GmvWm0S08XvPb+XkoAvm9lLi0/KLIsSoacEEZPVe4wfEwG1/2QATY2QTsLYHRMXOcc+w7BTCIABOP2V/2aZkInkjc2N2GuItze3ddp8PKjgvStRk1njSB1fT04+509oN6h3S56Ba7jXi1/FvED65lFFQUbByUtHCAGQMGwACiz3YxsaPTjGHdN7+Ecz7KWBzncrRdx7IHc/RX0zuUv5pHRxkWdyfM4f0hXJZZlKQ3ormMF1IaHOJDeUdAOiyYoeY2GFsrrM9liSJhjvtj+y+hfg38G/wDMxT8W8WU5bpzSH0dE8WNSej3D+kb264SfBb4OjWzDxZxTTFujxnmpqZ4satw6kf0fv9V9LzSh5EcYDGNHKGtFrDsFzNfr+zNFL38v2+i+pk+b45ceCuWQyEMjs1jRygNFgAOgC57X9cg0Sk5haWqfiOMd1kaxrVNpdG59+Y/KA3d7v6QuIcWtqXaprEgNURcRnLYR0HusOk03d8U1t7e5xdfrHH4K38Xv4S/z7BTUlnya3r0pL3eblO47BajUNRr9c1BtDQNs4iwGzYW9yirravWa2OGBpziNh/CP6j2Wr17V6TRaB+k6bIHSP/8AuagHLz1aD2Xo665OS2zLx7Jfv+p5duHa0niHl+ZP9/0MHXNag0fTpNI0eXyHFTWbOmd2b6LhYWSVk/M4HkB2/slllk1Cq6iNuAuo0+gbQUjaqced3+kzr7rsxhGiP1f5syWTb/fCGpqNlLHzSHkltkj/ANsdh6rQ69rUNLT8rPK0CzGDp/yVOt64yljewSAv3cR+y46nin1isNVUkiBpwP6vRPCG/dLkeijuXqT2ivzHoqV+oTmtrLiEHAP4v+yu1GuBabHliZgBX11Q2OLw2kMjaLWGw9Fzpc6unLjiBh2/qK0bnSqi7X3y2S4/fuNFd7vtMrcf+20/usd75qup+zwm5Pzu7K+oMj3iCH53Yx+ELOo6VlPH4ceXH5nd0X7I2Oagu58+B6amjgi5Rhjdz3VdVUiOIu2Jw0dlZNK0eUfK3f1Wnle+omLvwjZJOXatiqqt2S7pCgFzuZ25VzW3OEzI75Oyta3oFjSydBshrANslWAWyVIACkNLj6J0siN4DJOE+GC5UFwYLDdVkkm5TNpIXdkucXH0SoJssWWex5W791U3ksjEslmDMbnssRz3PddxSk9SVS+bo380OS+MS1zg0XJWO+UuwMBVufc5N0hcSpsi1RwMXAeqTmJQGkpw0BK5Fii2KGkpg0BI+eNm5uewWJJUPfgeUeirci+NZfg4KqezPqrAQ4KRkWO64vJ3ZRKQQ4crt0mWmx2Vj2Zxuow9tjulaKmiu3mwpOSosQbFSdkuBWhbdVLSCbHb9lNkmyr4ISRa4Q4jkBG/VM0Xbc7hFgcbIgwEMRnlDA4BxHlv37Kpw9MjdMLh29iFBvckm5JuUrSawQS35IHZTbGEAYwqsEwO24bg4TDG+6Xlc21xgi49Uzc39FZF+Ctosa0ua4g7JfUKRcHmabAqQLiwCuW+xW9isgk3KUtvsruVR3QwLkqaHBwDcueQ1vuvtz4R8Ms4E+FY1CoitVVrDI49Q22/0/5Xxhp7xBq9BP4PjGOdr/D/AKgD/P0XtPxK+NOo6lT0WkcPMdR00cTQRb5LC1j7bf8AC4vUFZNqqHB09F2J+pPhFfHPFFVxHr55JiYYH8reU2z3H8/ZbXhTUdS4r4v0nR9UdzO08h3jEgCUdA7/AHb/AMC8y4Yq3V2rnxbHwwZJO117t8L9DDdLrtYki55qx5a25zb0Pf8A7ry9dVkdQ458H0nqt+kn0iudcfO309z2UyXlc47bBZLHAgG65Wn1N+mytpNWk+4ceWGrdfB/ofjB9Vu3zup4y8jmP9I7d1u7Wng8ApJmy3CUu5SCDYjYquOYOY13cXUvPlJ6pGhjSatoWg1krtVr6Tkkhy58R5fE/wDkBgrcDUootNp5bCKMttGz+kLR6uX1lTTaTESA53PI4dAtRxZqbKGmdK54ZT0zLAjbC011ufapMzW2KCbicN8YeKqmtFLwppjz41c8Ndy5wmlhpdM0Og4epWhkFJGC/l2c6y5XhSJ+s8Q1vGNebtYTHTNdke9tlOqa5U0de91VQulhcbump/Nb3ar7mk/Thwg6WD7fUnyzayhrWGVxwNgtJOS7mkJycBTFq9FqkXNRVbJe7QbOH0SSOANs3HRUG3OTRai8xRnO2SuV4e0KfjX4gUukMBfTRu8WoIAIDR37re8R1LaWglmcbWH5leo/Bjgx+k8Hu1yqbau1Z1xfdrP3BSTeEK93g9J06ljiZGyJnJBC0RxtGwA7LctcbbqlkQjaGNFgFc0G+VQOwz3UtDicHZWBpPRZFPG3xA55DWN8zidgEAM5TjPxKx2l8MQ3kkrZA+cgB3LE3JuD0WvruGtHlqPHoYG0MscgLHQeUYFtlkULzqeu6nxPIPK4/ZKPmGzRu4OCzw253FgrFsIlndmqp5NYoWthqQyuhEpPOMODVkR6nQ1EsUfO+ncXEcsgwti2Popm06mq2WlhF73BAypkfgy9KpGPmjkcedlybsN0vEeqU+iaHXaxUAhkDC4XByegWq/ymoogJdO1GWHw3F5aTcWXAjijVeO+Iabg6eeKSgo5zPVTxOLeZjTflPQ7BRRzuLJnV8FadLpnC3+Yag50mo61IaycB3Nys/C3OR7Lc1mrmCtipxQuLnAOLpH8rGj36lWT1Ann524YAGsb2aMAJgI5Dzva3mGziLlFryKk0TTVtbMA80kMbXEm9ycdFmiZ9rPdg9Giy17qZ5L3Cpe5xtZpNmhZVBSOfM1j5OcXyLYslY2PLOJ+LmuHTODotIidy1Gpu81gbiMeq8Q0qna6pDnDysFyui+JWvDX+P6t0TgaWj/6eLlvY23OVonyii0hz9nzeUegXEvn3zZ9w/hrQ/g9BFyWJS3f8/8ARyvF2pksexjrOmdygA7NC4gDOcALP1ar+26lI8EljPK3Kwdtz+S9z0vTehQk+Xuz5L/E3Uvx+vlKL+GOy/kQbtuBuUpvbJTvcMAN5QPzPuk/ZdXyeYyAuUwNjdQ0gCwG6LeqOA9w4u43vZQDlS3lHzZ9EwGb2H0TqIHIkA9sK5jOyn/22tDQDuT1P/ZZNPESRcLbVUZ7LMBDBdw7r3v4LfCB3FFQziTiKBzNBp3XYx2DWPHQf7R1K1Xwd+FUvG2sfb9SY6HQaNw8eUYMzv8A8Np/c9F9byvpqSjioKCFlNR07RGyOMWaxo2AWDqOt9L/ANPS/i8v2/3+hkXx/HLj9SamojDGwU7GxQRgMaxgsGgbNA6BaKtr7c8UTuVrcSSDp/tb6qqvrpHOdBAeUtHnf/8Ahj/laGuqfssIDTyvIuxp/CP6j6rk0afg52q1fPsYOoStjq/tMjg6qAtEw/LTt9urlzkjKmtqY42MMrpD93H1ef6j2CyJnEt8aRpk8Q2jjJzKe59FVrWrxcMaa+GORsms1TfvJP8A8FvYDovRVKUcRjvJ8fv2X73PLWYtzKW0Vu/37v8Aexha7rFNw9SSabQSNkr5BaoqB+H/AGtXmFTPJWTljSTc5Pf0UVdXLVVBa1xc9xy47rr9E4ZjotPbqWqCznf6cHU+67cVDSwzLdv+rZkxK15SwlwvCX7/AKi6Lo0NJSsra1o5bXZH1ctNxNxB4T3taR4xFsbRjssziPX2UUZjY4GocMAbMC85eZq+ptcuLjfP7lNVXKcvVmXV0qXPH6lTIpdUrLyFwiBz3K3s8kVBTCJoDXAbf0D/AJTNgj0mkbzFvjuFw3+kdyuU1KvkqJvBiJcXH81sz5L4xepmkvlQtVVPrqnwIieXqewV92xMEMIuRgKuGA08QiYOaV3zHssynp7EHdx6p0mueTdOUYrC4QU1Pa9sk/M7qfQLKmd4TfCjHndueytJbBFfr0Wtnmc0nlN5HdeyWTwtzLHNsimpfc+Az/8AWKVkYaMj6KY4w0Yy47lWhoG6xNuTyzpRSisIgNvum2wFOTsE4AaLlOo+4G/YUM6lS54GGpHPLvQJUJSAlkEr3houSkklDBn8lhve55ufyVb+pdGI75nPOMBUucGjJSPlDcDJWM556m5Q53ZojEd8hd6BUl3ZQSSpDe6Dl7FiXhEAEpw0BTgBYstT+GP81W2XxryZD5GRtu4/RYUs75MDyt7KokuNyblRsqnLJojFIEXsq3SAKh0hKGCzBs8tNwn+YXG6ZzeYXCry04XI4Ow0OPMLHdVvbY3G6f5hcbqfmHqExTKJQXA56qC64vbKl7R0Sltsqt5QmANzsp5e6A4BX0vgTVsMdS/w4Xu5XutflB6/RDYMY5eCkGwyocOYXC2et6RUaLqjqKdzX3a2SORhu2Rh2cD/ADIK1oFsBBoDi4vDKnXKgWBVnLe/dVnb1VbA0T1sPosh9JU09LBVSxObBUt5o5LYd3F+4WKL7rewa88cI1HDdTTiWmdKKiCQfNBJ1+hBN0udwxS3yafxHOYI3ZDTj0Rsb3SAmw6FNfqiI0WDIxsrGA29VWxxG23ZWMBLbq2LK5RJDbi6gNuc4AyrwL77oMLnkMbgvcGj6lXduxnZ7L8BPhk/i7iA63qER/y+mva43P8AP1VHxQ4Aq+F+Ka2So5H00zy6mPVzex9bL6s+FOhU3Cvww06IRiLmiEsh74/n6r58+L+vjiLiSfkdempyQOy42h7tTrJSXypE19609Cjnds8W0WaDTtVbC53hNq3CJz//AMO/Ur7J4c02DTNG0/TYC17Y4g/nbkPxuD/P1Xw7WEyVcs7Thhx6r2T4V/E+Th18VBrssk2k1FgJCPNSO7i+7dsLn9TolCTurX3O3o9Y7aI6ax7Ldfz8H0lVabTanG6lqAC1wJdfYj1XH6TrjdGqH0mrzE6Y6bwKWrcb+E64AY8k5ab4Psuo1LVIKPh+bUIJ45nVLeWnfG4FsgPUH+fouWh0ttfV6Xpj/NHF9/UC2Cd8/wA6+i41eshKShymapaOSg7F4O6I5bODg5trgtNwtLxDxPQ8OU1NPqDiBO/kbboe62ElG5kbn0MphN/Kxxu1wXN6hTMrp2t1WmD3xG7Y3bD1C2Qim9zJKT7djMgq+SaaqkIM0o8pafw+i8x+JFdPqVbR8NUbvPUODpXN/C317LrtUqYNLoJtSlf4cMIwL7HoAvFptZrZtTm158ghqqi7YuceXkRs1ENPhyfJdpdFZq5NQXHJ1tT4NDRRUFEQyOnbygDqe656eGqbzSPe5z3dt0tFrH2ipbDqEf2aU/KXfJJ6grbShjGOmkHljFzfZXeCxrD7fY4XiLT6eGGOogcafVPmD4zbFuqr0Hig6g0UmpO5KsENEmwd0WBrFdJPLUVLieeUljB2C1ug0BqtXjs0uZCLnHXsg8JZZVupbG54i5qqR7WP5Y6P7x5I8pPZdTwd/iK1HT6Wn03iTSYquhhaI45YRyvY0H/hcRx3MzT6ePRIbePP97UO3Nugv1XCNx0wtWn08bYd0ii61xniJ90cOfEDgziqNrtK1qJkruY/Z6g8rhZdgKZ7Rctu3+oZB+q/O2FzopPEie6N4/Ew2K9C4Z+L3HPC7mNptUdVwNIJinPMDiyFnTnzWwR1X/yPtNseLhabiauko9IFBSuIrtRd4EQDg0gHci+Nrryvhn/Eloda1lPxRpbqObksZodr33su60KrbxfxDPxZppmk0akYY6bxW/6hI3sudOmdb+NGiM4y4ZsI6WOhp4aCBgbHTM5MN5bu6kja6tazHRQAA8tODfI9VksAteyQtFa226fm9VB79VZDCZHZ23PsgRHI/ETiAcO8E1MzHhtVUjwos2OeoXK/C3SnaVwjJqcxP2zVXcxPNnwx6W6rScb1buNviZRcO0r/APo4H8psTaw+Y42Xpp8ONrIKccsELRHGL3AAV+O2KQvLMiNxLrhZkZI6rDhG1ys6Nv6pWMXNaSRYLE4p1dnDXBGo6o54bM5hihvfLjjFltYIiXADJ2Xj/wAbNebLqtHw1TyXjpG+LMGuOXnYELJqLOyDZ1+j6J67Wwp8cv7I8rpo3zzjmu58jrkkk3J3Wv4t1NsEL44nfIPDZa+/Urawyikopqw4IHKz3XnGt1hqK8svdsf7rJ03TO/UJPhbs+sfxH1JdO0EuzlrC/ma4Y3Ucxv3CBdxsMkpdtjhfRUsH58ciSSSo62CLE7ArIp44XS/fPLIxl3LvbsE6jkXJQG3PqmDQLA7lM8tLncjS1pOATsEA2TpYA5DHl5sNwO6cAnZK0LKjiJIBFlphHuZVKeENFEXnZelfDH4c6hx7xG2ihvBQQWfWVdsRM7Du49AtHwbwhqnF/EdLoekwl80x8zyPLEzq93oF9xcM8MaVwRwvBw/ozAAwc085Hmmf1e7+wVeu1i0kOyHzv8AL6/4Mi/5Xv8AKjLoqDTeH9Ep9E0aBtLRUrAxrW9B3PclaqsqZHyeBAeV1rlx2jb3Pqsurme+RtPALyO2v09StFW1cFO0wwu8Uc2e8z//APULzdNbby92/wB5M+quWPZFFROynjDYhe+Y2u/Eer3Lm6uQPc6pqHF8YOAd5nd/ZZlTP5Xyzv5uY+Z39Z7D0H6rh+INc8xY11htYdB2XotJp3J4X7/f7+nk9bqcL9F+/wB/3sr+IWadJJVAtlrCLR/0x+v06LznUtRnq6iSWWQySvN3OJuSU1bVyTyOfe5OAsrQ9LNRqcTZW8xB5iDsPUr0UKoUxcjlQcpYUv6fU3fC+gR01ONV1Rh/qYw9eyOI+IzDG6Un7x3lijHQf8LZ65qcFPSuJfaCIW/+Z7BeYyGu17VT4bC97jYdmBU0wdr9Wz/wb1H/AKrjz9TXOFVqNa4m8srzc/zstxDFDo1L40zQ+d/yNPX19ltpxpug6cY4Rzyf+5J+KR3YdguD1LUZJpXyyPu93TsOy3xfcuNhlGV77I/KJquqPme4cxc5xye6x6KDwx4jheZ+w/pCx6SB9RP4jhcArfwU9jyjLt3O7J4pvc6NjjTH04lcMIGd+57rMaGxtLnJ2sAAIFm9PVYk8ocCTiNvX+op28GDLsZRVVFyXuPo1vdY0bCTzv3KkXkk8Rwx0CtAJWaTcjo1xUERgbJg0ndMAGi5SF5O2Ak2XA+Wxi4NFhuqySd1CVzw0XJsEjlngZR9xibLGkqADZuSqpJi/DcD91Q57WjJ+iTPsXxgM527nFY75iQQ3CR8hdk/kqSSVOOS9RwMXdku6kBMBZI5ZHSbIDVJIaLk2CSWVsTbnJ6BYL5HyG7j9FW5YNMIFk05k8rcN/dUKCQN1S+boFXyaEvYsdIGqh0pJSEknKhEbAXvuhQXdkqg2Df/ACn0UOHMLhQx1/K5Nlp9FyWjrlWWnCbccw3TOHNkKu5acbJeBWiXWcL2yqzlWn+oJX23bsVGVNFJA6JRurC3qEoA5r9FU0TBdJU1E7Io5pS9sLS1lzsN7KsFQRZ1gcKeYBymfcLyzb6Bp8Oqa9S6fO8RtqH+HznoTsrOMOE9T4O4km0fVIi2Ro5mPHyyMOzgeoWpjkfHI2SNxa9pBaRuCux4u43m4y4c0uHVow7VNNZ4LajrJH0B/JSSbWxohGE6nF7SW6/wcGXWx0KltwUObY3KkdyqTHgkgjKAc2CZoL8DdQBZFkwOG+UEbH9Fezex2VLQOXCtZk3RTwyKOTJYAXLZadEx+q0HOLN+0x3PbP8AD9FgRgHIWdE1wAcz5mkOafUG4WqMsrBVKnyfc3HevHQ+AtPoKQhss8DWjl6Cy+TOLdQFNG6AOvNKcr0XiD4hU2v8N6DUykslhpBE9lt3twfztf6rwjUa2bUdZkq5flvgLNoGtNp2kvibeTiazTTv1SnP5YrYy+H+HqjXtfo9HiBPiO5pD2C9U+I3BdLpumUddp9OIIoG+FNYYcbfMP1usv4B6E6qrq3XZow5zvu4sbev89F3PxQkpql9Hw5A5vJCOeYt7/z+yvr/AOTURqSyvP2M2tt9ODnnGP1PGODviDPoDDomtNkrtBLuYxc3mgOfPHj9F9E8ET01dR1OsUeoM1COpPLHO297f0uB2d/3XzpXcKSzeJPFFyxONmrG0TXNa4F1sVFBM5gH+pE7Mco7Ed/VcHqf8Oumb1OjWfePv9vqdzpf8Rw1EPw2pfPD/wAn2N4fKwNI2H5LWV1GJt2jmPXstDwN8QtM4voHO8UMq2/NA4+dnv3Hqs7jPWm6LoEkrbGeYckbfdeeWogoOb2xynyvoeh/C2O2NUd+7j2f1PHviNq1PWagdNE3LpmnjnqHHZ7h0/n/AAvK6fj+CoqpI67S2zaaTyRlvzsHf1U8b6i6okGiwSF3OfFqXA5Pp/P7LjvsxYy4GBgWWenSfjou/ULnj6L3+507tbLp8lRpX8vP1f8Ag9j0/wCy1OniejLNT0wi5hd80Z9OoK0/EFf/AJfproqWodJSyE/dyfPHnZea0WsajodUKnT6h0Thu2/ld7hZmq8RjiOIeNy01YBkA+V2EkatTpLUs90Pz/n/AJNctVo9dU212W4/k/sFXXtkHkPNbyxt9V6NwhpdPpHDtVxBqdhDSxmRxd+J3QLzXhLTptY4lhpAzm8Nwx6rv/i5rLNL0uh4KongFoEtSWkb9B/N12mnbKNcfJ52EuyLtl4PKNTr5tV1aq1KoN5Kh5d0wOgwsUA91HNnsguXo4xUUkjlOTbyxrgbbpuY+6rLr7XS3ynTwAscbjNwu14N+K3FXBdTG2CrfUUQbyGF5uA3phcM5zB3JSjOxSWxU1hoaLa3R9p8I/F3g3jiNsdVK3TNTfGLhxsC4brupqCqijE8JFTTlgeJIzcWX56Q8zJRLC50b2m4c02XpPCXxh404S8OKGuNXSsBZ4UuRylcizQvmBshf/8AI+vGDmOd+xWr4x1xnDvCNVV8wbLI0sYvOuHP8RXDuqvhp+I9M+xTOj5HTR7cwWJ8Vtc0Tiel0yLQeIaeUVQa2KHJdcmxBA/dYlTNSxJGlWRazkxvhXQTyt1HiypuJapxgp7ktPL1P75XpjGXPt3SUukjRdM07SY2BsdNTtHlddpcRkrLYQyM2AMp2b/yg3l5CtkXQx2zuVsYY7kFYVNzEDmJJGT7raRWFv1VcmDJdLV0+k6bVarVENhpIzIb3yQMDC+SNW1So13X6vU6hxfLVSl+STYXwMr3D4z68dP4VpdAp5OWo1B3PKA4ghgXgjC2njdM78Ix7rj6mfdPt9j6r/B2i9OmWrkt5cfZGNrtayCm8IEckDbn1K86LnPe6Rx8zzcre8Q1Zdy0/NdzzzPsVoBfoF6vommUKnY+WeQ/jPqP4jVrTxe0P1Y2Re2yL2NwNu6LkC6AM4GV6PB4NMYEnJUjqjlLT5iL9UDJtZTBMjAZAKawJwLAIDb7LIjiucK+EGytywNBCSQRv0W70rSavUdRgoKOB9TVVDxHHGzJc4rEpoSCL/mvrz4F/DFnDWlM4y16ntqlUz/pInjNPGfxejir9RdDR0+pLnwvdmNt2z7Udf8ADT4e0fw44XbCWtm1qsaHVc9tj/QP9oXQ11WI28jfO9x6fiKvrawMDnuPmPTt6LRVVX9hgNXKb1Mg+6afwD+oryMe+6bsnu3+/wCgL7Y1x7Y7Jfv+piarXCggkgEn/USC88g/AP6R6rnHOPKZpgWC1rX+Udh69ykje6uq3zvJMMZvzH8Tu61uqV7pHthgbzuceWNg/Ef+O671NHb8C58nlL9T3/8AI+PCNdrWqhkcjg7lDW9NmNXmlVPNXVJtfzfoF02stlra5ukUd53tdeZ42c/t7Ba+upKXS2GmjkEs3/uv7n+kegXodMo1pRXL/Q4lmZNzka2OnYzlLQXPOGC36rrKOhZpGn3mP/VVAu624HZa/RadsbHazXAeFHiNp/E5bCihqNVqZK+scY4Bm5GwUvn3beFz9/Yv09b5fL4+i9zlNUpK7XNQMbfuaOD5nn5W/wDJUE0+lUro6c8gAu5x3t6+q2+rarGAYqZoZC02Y0dT3K8+1rVA8OgY/mAN3u/qPZaalKSWVhFuHZL04ceWYGqak+omLi6zRhjew7rQnnqJg1o3OFM0he836rb6dQmNgleLPdsOy087I7KUdPXkvpKcQxtY0Z/us+NoPlB8o3P9RTsit5G//rEdFEz+UiGEeY/p6qzODlSm5spqJbksDrAfMe3otZK51Q8NGI27BXVDwXeDGbgfM7ukDmsbytConPwbaa+1ZJDABlQ54GGpCSTkqLhUORqUWySSd0pNkj5GtGTZY0k5dhmB3SP6lsY+xbLOG4GT+yxnvc/5iq3vawZ37LGfISbk47Icl8YFr5ujfzWM531KguJUWQbxwWpYDJUgdkAXKdV5yWKHuQBZUzVAZ5W5d+yWeo5fIw56nssP3SOXg0xh7jOc57i5xuSq3PASySADCx3OLkhekM+QuOFWhKTdEdIkmyXdCkAlK2NghSAT0TBtt0yrc/YGTdTQvidZw9j3StdfyuWcHtqGeG/DuhWHLC+N1nD2PdYDrh8p9FDm3Fwoa6/lcmy0+iDQCsC22yhw6dFYR+JqgjCUVoqIsldZWH1SualaBgQgtsTscgqC25umyWcvS/5I6pWgIkPsMbhQ51z6KMdFJPogmHApscJSbCyYiym3UjdIxWgZkAdU3IQTzboYMlMwOc7JwoBIZtuUYz+6ua2+UrW2KyI2n80pbGJZGNrLaUzcALBhZm3VbWmjIIwkc+01109xsmue/SjRAXYH+I3/AGnr+wWH/ktVX1LKejiu97g2/QXW0pY7EYwvU+EeC2z8Pz6hVl0Lnm7C3ceoXN6j1SrQ6d3WGqvpL1M1Hhe56lwNw9S8CfDxrpS0zth8RxPcheZtZUaxq81S8l0lTIRc9BdbCUcT6ZpL9OFZJq2nSHJNjLCP0uF2Pw84cZqcjKtga+BjfK8Hr6rf0Xqmks0tmrrsUm/6r7o8F/EfSNXVqoUSh8L8+Gb7hvgqj+zOlqoRJBFEfKRubLwTj/hqijlmqNPcXRF5ux27F9S64ZtA0dtPTXcyW/OerV838aVgqKuRocG2OSPxe63dJnbqLJWyezPM9TVekddNa+JcnhsVfqWh6oysoKl9PUxG7JGHI/5C9GrfirX8WaQwVWnuk1WkjtaEEtfj5rdDuuK16mjLXztHoABc3Xp/BHw9+x8MQ8kjHa9qfm8Em0kcdx5m9Dvtn9Vwf4l0WmqTvsjv9D3/APDfUL59tcXhfXweJtFRLUS1VS4unlcS4ncehUzWDOUY7let8TcItjrZNM1ARxamxv8A01ZGOVlULkcr27B2RleQVwkppnwTN5JGGz2noVzdFrKtRXmvx4OxqtNZTLM98+TTai7lYbdVqGNJcXHYLY1TjNJyjJOwV9FpctXW0lBEzmkqJGsAA7laHDuefBibPZvhLpEPD3BWpcdamA2OJp8HnIF3dLXXjOsatU65rVXq1U4mSpeXAHo3oF7N8ZdZi0ThrRfhtpb+VtNEJKwtI+YjINv4d14YfbAV3T6XLN0vPH2G1ViSjVHwRb80wxi6X8xdFrgnddnBhJcC3f8ARRsLm9+igE2yMKCQpsEPqp5fu+a+SouP6b+6kvOAShlBQzTYZKYOVYI6lMBc3P0UQRy0SfMATuux+F9K2b4oaM08wDZQeZouW57LkB6Beh/BhnifFvSz5xyOvzRi5b9FXcsVtjR3Z9d6w1n+dSk8jgAMsFgfotHXufC3xYKeSd5Nmtb1PqtjqtT4+u1bw5rhzW5mi1/oqoyXDluV5vhHSJoi800XixCOYC7wHXF1uKOPxJm81g3ck4sFgwx5S8Saq3h7grUtT5rTeGY4rOAPMcdVROSim2W1VSusjVDmTS/qeA/EXWzr/HldO1/PBTnwIgH8wAHZcBX1DQ4suAyMXcVtKqV0NO+eRxdK65JNrklcbrNSYaPwua8kxz7Lmaep6i1R92fctZZX0jp6guIR/wDH9WaCpndVVck5N+Y4Hoq9v+yj2TAN5bWyvpFVargox8H53vuldbK2fLeQvdABve9ima24JtgKc/VXJMpyG5TtBt6dlHIRYEq5kZc24GArowEbJY0krYU0NyMKqKE72Xonwy4BruPOK4dMiBioorSVdRbEcfX6nYLdHtqg7LHhIyWTbfbHk9B+BPwvHEGpN4q1uC+j0T/uWPGKmUf/ALI/nRfUFZVA3N7NbsAq6ekodG0mm0fS4BT0dKwRxxt6D19TuVrpiauoMIdaNmZH9AvHajUS1lzsltFcL2X+WO8Uw7Y7tmNJK1wfWVA+5YfK3+t3b2XI6hPPqteYmv3+Z3YdVs9f1EyPZS0otfyxMHQd1z+o1LdI07wWEGolHmd2C6WmqaxLG74+h5rV3KWYt/CuX7sp1Othpaf7HT4ijHnI3Pp7laGrfPSxgRM5tUrBaNo2gj7+ifTmvq6j7XKC6KM/dtP/ALj+59AsypcyDxJXDnkefO7q49G/zouqkqn2Lf3/AH+v9Dlxi716r2Xj7fvj+pz5DNDoHCF4fVSA3eeg6lc3S0rtR1AeM6zB5nE9AttrFQC8xg88p8zyNvQegCppaeQQtpmf6s2XkdB2XTg2odz5ZilHvs7V8qM1kf8Am1bHTwN8Ojhw0eg6lPxBqsNNSfYqVwEMeCf6ir6qePSNNMTCGvcPO8b+wXmOs6x40rz+BvTuegS01+rLu8Lj/JulmK9OPzPn/Bh6zqj3eVps548o7DuuUmkubA+3/KyKqZznOe913uOf+Fj01NJW1QibgbvPYLq4xsdCiqNUMsyNLovtEvjPH3bDj1K6DlI2b5jgBNBCyONscYs1osP+VY5zImGU56D1TJYRzrrnZLJXI/wIwweaR3T1WunqDGDFG68j/nd/ZPUTGMFzjeZ//wDiFgNFvMdz+aqnLHBoopT3Y4BaLE/koJslLvoFRJUAYbk91mf1Oko+xe54AybLHkqAMMye6xnyE+Z7lS6bHlCXPsXRgXOfm7nZWO+YnDcBUufne5SEkqbIuUUhi/PdLkqQE1gN0jkNzshQEwAPsi1/QIc5rG8zjYBV88l0Y4JwB2Cw5qguJbHgd+6SWd0mBhvZUOcAErl7GiMPckm2SqJJc2CiSQ7XyqUC5Ikkk3KUmyCeyVAZICboUgXTgAJJSwHIob3ToUgFUttg5IU8pUgWUqYDg2kcha4Z9is8SNnZ4T8OOxWsVkchaRn6rGmdgeWF8brOHse6Vrr+VyzmyNnZ4UmCdisSaF8Zs4exRAL8pt0UcwBtb2UtIcOV26UttuhgBOCttpegV+r0tSaWB0j4IzKLDcDJ/S/5LUNN7lejfCbjim4Q4wpzq1O2o0qpdyTNcL8l8cwVdvcoNxW5o06g7MT4Z5q5paSDi26Ui+F6v8ZuAqHhfih+pcP1MdRouoWmiDDmK+bEduxXlOx9Ulc1ZBSRXbU65uIzQ1rbn6pS4E2AwpAD3AE2uplY1luU3TNFQtsZQCS0Nti+FIzvumY0ucADuUrRMAPM4YsVYxvZBjLHljhZwNiFawWBHVIOojNbcbfVXtaTawUQg3vjO/qsuGO7ua2EjeDRCGS+niFweq3NNDcDGVh00YJvZdRoOlT6pqEdJAwuLjkjosN9sYRc5PZHc0un72kjbcJcPy6xq0UYYfAYbvK+h+H4oamug06CIOpoRykAYK5qj0en4c06KgpWg1UoHO7qF6LwjRso3MPLd7skr4z1rqL6hq4Rz8CZ3b4w0+mclz4/yazXeEKjTZnVdHd9OTduMt9CrdH07UNGpxregN5pjmt024DKgYu5gth4A+q9Vc1kkfI9oc0jIPVcrqVE/R3SVtLmI5A/pK6L0k+l2/itPvB8r9+Dzb18tdUqLvmXD9zm+JeIKLWdDi1KhkJhkby2d5XNd1a4HYhfN3F8p8Z+bXO69L4orpNN1KXVYYizTq93JVwt2jlubSAdL3XkPENTzyyOe4HlFye6+xfwrrqtXpe+p7rlex8s/ifpV2j1kZ2L4ZcP+38huAOGX8Ycb0lC9hdSU7vEltsbLtuOfs8dVWalSVrqWp093JRSxGxjt2HbGy2Hw+NPwP8ADCt4iquUahqZLIQT5gP5/deeazUy6gxznOJuS5w7krp1VfjbrJWfItvv7mK7UPRxrhW8S5N43jEfEPh2ag1JrKfiOgbzsc0gCoAPzD12XhHFNS+XV3yPFpCCJP8A5DdbSsrKzQOKqWuDXwviyQRYlhwR7KnijSqgtfr1QWsgrn88QHUndfPJ9Pj0/qEqaH8MuPp9D6Vp9ZLW6BTsW8TmqRoIMz9+i2ukazPoXENJrFPEyWalPMxkguObute3w2kAusANlTI8OeeW9vVewq00IQ7Z7nGlY28ozte1is17XKrV65339S7mIBw0dh6LVFvMcWTXN8pSLm9rhX9kYRUYrZFeW3lkBpva1z6qHC2MH2U4tskzfCRjIjqoPfoE/MQ2yeQtMDWNkJduRbAStZQyKb+oUAA3JdsiwRbpf3VeBiWi2e6dt7pR6FML2ViQGWgnfdepfAGndUfFeGVok+5aXc0XzN9fVeVDJAC9q/w205l+INVKGOf4URN2Gzmeo7qjUv8A4mPWviPoGQeLX1D+bmJkObWKzYozbAskij5pZXElxLzuLFZzI9mjC822dLI8MfMQvM/jNq93adw1C42YPHnFgfYL1qBscEclTMbRQMMjz2AXyvxTrj9U1zU9clOZ5C2K4AIaMBc3Vz2UF5Pa/wAH6JXa56mfy1rP8/ByupTeJUiEHysyfdcJqNQarUJJAbtb5WrotSqTTadJKT97L5WrlGst6+67vQtJlu5/ZFv8b9T7u3Sxe7+J/wBl/cjl/NMBb3ThuL9UWubdV6/twfLBRta+E/K4WFrXypaOqsAvlMogbBrfqVmwsPhguOBsAFTHGTstnBDcALdTXl5MttmEZ2i6PX61qtLpmn0zpqqpeGRsG5J/svufgLgyh+H/AAhDpFMGyVkln1c4GZZO3sNlwfwJ+HDOHtFHF2rwW1OtZ/0zHjMER/F/8j+36et1VQ1jXSvw1o2/svNdW1vr2fh6vljz9X/oaiHZH1Zcv9DErZ33bDFmaT5fQdXFafV66HTaB0DXeVo87urj2WdNN9khfUzEfaZRe39A6BcbzjVtQfNKf+jpTc/739lm01SfxP5V+/8AwczWXuPwx+aX5L98iwXhhk1WuxLILtafwN/7rkah82t6m6PmPh35pHDZreyz+JdVkqKlun04LnE2LW9+gWVR0MemULY3EeK/zPd3P/AXerXpR9SXzPj6I83JLUT9GPyR5fuySyKlpwA0NAFgOgHb+5XO6hUl7rMJLzkeg7+5WwrawSvIF+S17Dcjt9SuZ1CaVzmUkGaqpduPwjv/AGC0UVvOXyPfZt2x4MWOPxp3kWeyI3e7o53QD0C28Ij0+n+0T5nl+UHcBXUlDBTQBv8A7EG56vcuQ4p1o0/iODx48g5Wj+gLXHN0uxcFcYeks+TVcU6+Z6h0EL9sYXDyy87i4nyNTzSPlfbJe/8AZYNS7zeEPkZv6ldiEFCPajXVXvl8lZ55pQGNuXGzQukoKJtLTiIZe7L3LF0mhLQKmRv3j/lHYLbnfw2b7Ep0vJRqr8v048IMG4GGN3PdYVVUNYPEcPRjf7rIqZo4Y+S/lG/qVoKmofLI55N/RLKXairT0ux58AXF7zI91yc3VL52Nw3zFYctR0Lr/wC0LHdM4i17LE22d+FWDKkmuTzu+ix3TH8IsFjl/ZKSSl2L1FIsdJc3JuVXclFk4aUrkHIlk4b3wFOGpSScDKqct8eR4wct/BJIGwRbqUAW33Vcs7YwQDd3ZRLyy5JLZDvkbGLuKwJJXSOudugSucXOu43KpfJbbZK3ngvjHAznW23WO+Qk4KVzy72S7IFqQJSboJuoAug2OkCYN7qQ226ZUyn7EbI2UgXUgJkhEiALKUKQ3uikEhTypkJ0gGaW9QhKHFpsdkxHULkpnYHZIWkXOP2WwbK2ZnhSbnYrWJ2SFpF9lamQtmhdE+x+hVVyRYrN8VkrAyb6OCxHNLXuZuQd+6ZAFB8yckDIVZxlR0ugwG81HiCv1LS6WkqZnSCmb4Y5je7eg/b8lo3NtkJg5HVKklsi2yyVj7pPcrHz5RjmPMnxuQk5bm4StFeB7W326K2FrHP85s3v2VbbludlaxuLhEdIa5c4uOSMXVrGguz1UNaLYWRHGHG6rksGiMclkceRjHRbCCO5B2CqgivvstlTU5fI1rRcnYDqsdjxudCmrLSMyhpJKmojhiYS95sAAve+E9CpeEdGGoVgBq5BdoO4Wg4C4Tjoac61qrAGtF2hy3EtXPxDq/Kwn7PGbADay+Zde6q726aX8K5Z7XQaHEfi48/4Ol0NktdWmsnF+Y3b7L1DRac+LG0Bclo1GyCBh5bcoXo2gUxbD47xvsvFdNoeq1aXhHF6zqU08ccG9DLNA7KqogZNC+KRvMxwsQrHyNijdI82AWpk1qIQSSA7bL6HqdXRp49tr8Hi665zeYo8K+JEB0fUZKGoi54qhnKx1sOvtf1XjNHw9WazxBSaHHfxZpQCOoZdfQXF80WqS3rWNlYD5QensvPpIY9DrY9fpnltTSXc3/cLfKSvNdB67+D1Mlp8pS2x+h9A1HTKup9OjTqY/FHdP6/vk5n4qVbKfWoNAopf+k0uIMs04Lrfz9FynDGsS6lren8PV1I2pjqZ28szBZ7LHr36/qtfxPrQ1WvqdQOH1Uhe5p3au9+APDR1HiOs4rqmn7NpsZ8IkY5v5/buvty1H4bQJyeHj8z5FqOmqWqaazuct8cNHL+O5DDyiCiibE49BYd+v/Fl5bqmozagYYXOPgUreWNu4916p8XNYb9sqKRpBqauUvkt0F8fz6Lx47WAXI6RpnZBai5Zfg6+tsjViirZYWSkAA7bpHNvt+6ucQBcj2VbgSLXXf7Tl5Ks5FrpgA5rjy3PTKLY6JXC+BslewyFN7WNilsCdsJ8chuMpQ3okwOQRlAaSbG6zdO+wM1GJ2qRSy0bT52RO5XO+qs1eq0+q1SSo0rTzp9MbckJk57Y7pUt9xjWOBBt0UfRW2Lzb80paSbWvZK0TIoBv0TZd1TgYtgILQcXGEygDINABwQV71/hmhvxJqkvhiQtiPWzm+3deDgNaMZX0P8A4YqfxKjWZi1ruWM2BNnD1BWXWrFLLKt5HuETr8wuT5jvuthBH1IWFTRkknO/VbujpzI9jLZJsvLy2Ol9TjvifrB0X4fSQRi1RqTvBYOW/l6r5d1N/PKylZ8rN7d17B8Y9cZW8YOo4nNNPpcXIAAR5yvEKyqFPTTVTz5j8vuuTJStuxH7I+zdB08On9JVlu3dmUvt/wCDndaqPGrhCw/dwi2/Va0NOCBn1VuXOLnbk3JKB5rlfTdHp1RTGuPg+H9S10tdqp6mX/Z/l4EN+pyVLCQ09L7lNy9SnY0cwBF1tUG2c5sQN2J2V8cdztgKQ0ufci/9lnQRjkvbJ6rVXVuUTnhE08N7Fe2fBL4aHizXxrGqQH/JtOcHP5h/rydGD07rz7g7hev4r4mo9E02MumneAXWxG3q4+gX3Romi6fwnw1SaDpbA2GmZYuAy934nH1JWDq2t/DV+jX88vyXv/gppr9afdLhGbUyNaBGwANbgAYH/hakvbK41Uv+hEfIP63d1dUF00n2aM2LsyO/pb2Wi1zUYoIHNaeWKJtgAvJ0VOTUVyWam5Qi5S4X7/I0uu6hNVVDaOnN55zYW/COpWr1etg0bSRTwkcsY5R/vf1KyKRjqeKTUahwbVVAJF//AGo+65JjZOJ+IOTIoafc+n/JXpaKo8P5Y8/f97Hkb7p8r557L6L97szeHtPdyu1qsy95IhB/Uq7U6oCNznEgEZt0aNythqNTDT07nF4hp4W2HoAuWFX/AJjEHAERPdzWv+EbBXRcrZ+pLj97DdsaK1VH/wAv3MaSoZBRSVlR5S/IZ2b0H1WFoUE9VUS6hILyzHkZ/tCxtSlfqWox0UOW81rjYnqfousZHFp1A2KKzX25Geg6lb7H6cMeZfoYqV6k3LxH9TTa9qMWnUDze0cIsP8Ac5eLanXyVtW+omJOcD+y6TjPW21ld9kp33p4DYH+p3UrmKCA1E3jvbeKM2aD+Jy6Wlq7IZfLNfGbJFkUAp6Z085+9kFz/tCwKGD7fWGQt+5YfzV+qzPqKplDCbvcfOR0W4oqaOkpxG3AaMnuVsznZCysddfc/ml+ha4iJoY0ec7Dslkc2GIkuAsLuKtP3fmP+rJtfoFpdUqWvBhYbMG/qUG9jHVW7JJGDVVr55SR8vTsFqJpiXEF+B0CepcMMElh1tusMgXwMLDOxtnpqa4wjsHMVGSmDT7JuUBVZbL8iAeiYN7prgKCUraXJEnLgnAUFyUn80BpJu78lXmUuNkXxrUd2GXbYCnDQoc9rBdxssOWdzzZps1NhRRYk5Fs9RbyMOepWGTbJUOcAPVUPkz3KRvJfGOB3yLHc4uKgkk3KgmyhYkBICUm6EwbfdK3gbggAlOBYIUgXVEpZByCYBAFlKAUgUgXQB3TJ0ghayEJgO6jaQBbXTWClCrc2xsGRgixQHFhtuEqYG+CuXk64xFxdqhRcsPonsHC4TpgJa8txuE1/PzDZVXTBXJhJvcqHeilDxYhM+BcCi4HqrGjmYR+IbJHOwCpBykCMWktBSgG/omBd3wmBLQSBcHBRwMQLA2VzBbfYqprVaLmwSliRksHosqFmbLHjuFmRAi1lXI21LyZsLDcDovVfhzwY/U6tupV7OSlizc7Lk+DOHJ9f1aGMRnwGkFzjsvYuJ9epeHNGZo2m2bJy2PLuvDdd6hOT/B6f5nz9D1HTtLKTUvf95MfirXmzVLdH07yxM8vlXRcL6SKamY9wsTkkrhuENJmr677ZUAkE3JK9goImOLWMHlYvnHU+2iKpg9/J6fW2RoqVFf8zoNMpDUzshY3yjdeg08QhgbG0bBaPh2iDIPHc3J2W4raplJSPmkNrDC6/RtPHS6d6mzbP6Hy/X3O6304+DTcRakIYxTsdk7riKvUb/ctdZoy43RqmpOqJnyudcuOFx+s1zo2NpYXffSmxtuF43WamzX6h2Pj+x6npvTsRUfI9TOdU1Bwj/0o8XXjnxC4nI1J2nUb/JHhzgV6fr9bHwzwfJLcCokbZvdfNeoTvnqJJ5HEvkJcSV7f+EekxuuermvhjsvuaOpav0KuyvzsjXVtW94e47nGF9U6FxHwl8PP8PkVVTahT1VRVR83LG4FznkbEDbdfJszgbjqsKQudGGOe4sacMJwD7L63qNL+KioyeEj5zdZ2S7jL1bVajWdWqNTq3EvmcSB/SFrz67HsmABvzGxHdKW4uunCChFRjwjkTk5NyYj2hws049VXtgj2Vjvk5sgJHC7AD9Ci0RCu8Pw7Na4ydSThV2ueXZTYg2SZ3Bsq2MiCcW/ZLdu4JR749VGx8pwqWOhubujFt7lQSbdEWsFAgAmtborPumwgN5nSncnAHslvjZP2YBnIxIc0NDQB+6jkCsIi5GhpcXdSdlIybEq6MBci+HcGw2C+k/8M0FtJ1p/lJthj8EexXzldoabHovp7/DZAGcI6vMS3JsGPH7Fc/qa7dOy/T7zPYKSIBgvdZlfXw6Lodbq0xDW00RIJ72wkpWHlaSLe64H4zax9k0Oi4fhkAkqneLMA4g8o6LxF8+2LZ6jpeieu1lemXl7/byeC6/Xy1bpJZHl01ZKZXnmJ3ON15/rlR4lUykYfJELut1K6nVaxsbpqp3yxizR69Fwhc+SR0rz5nm5XS/h/RepZ60uI/qe4/jfqUdLpo6Gp7y5+kV/liW+ndOBewTlg5fXupDRm6+gqB8UbKyLnvZWMY47BMGC9nb9uyvjY57g0ZHorowK3ImKE77rZ01O57mta0ucTYAdSlhg8wDc2/de/fAb4cM1jVP/AFbq8HNp9C//AKeNwxNL39h/PR77oaSl3T8fm/Yxtytmq4nqnwc+H0fBHCn+ZahCBreotDpC4Zhj6MHb1/l+7qpywF+7jho7lZVVMPM5xsBuVqhKPPXTYYweQFfPJ2Tvsd1nL/eDpvFcVXH9/UorJxQ0hYTeeXLz/ZcRVStq6p0szr0lObu/3u7LN1bUJamqMcZJlkNh6eq0dbVU9JA91waai6//AIkv/ZdvS0uKy+X+/wDSPMa3UKbx/wBV+/8AbNZxJqFQ8s02DNZVEc7W/gb0atxQafHoukNpo/NM/Mju56rXcNae+SSbiHUWkySE+ED+6OJtej0jT3zlwNQ7EbP93/AXQnmTWnr8c/V/4Rh08cJ6u3zx9F/lnKcX6lJXalBoFH5nOcPFt+yu1GRml6aymhcBIW8gPbuVruFacyy1evVji5wJDXO6uO5WFXVEup6jaMEmV3JGOwXXrqXcq/Eefuc2614cvMuPsbPhmlD5JdRkHlYOVhKw+M+IPsNCYY3WqZ28rR/Qzv7ldBWPp9D0YROcBHTs5pD/AFO7Lw7W9Vm1LUZquZ2Xnb+lvQKymHr2O18Gymvsiq/6mEeerqhCwm7zk9gtzUyxabp3M3AYLMHUnul0miMNN9pmbaSbIv0atfVPGqasIWm1NBlx7rpsjass7f8ArHkfSKV4BrJW3lmOAd10AYyNl5dm5I7lYVK8GW7RZrB5R2TVVQ1rbE4blxRxtgy2uVlhhV9WWBxBtI/b0C5+okAYWl/KTtbdZNTUh73TyYHQLUSPD3uIBJPUrLbPwdvS09qEIZ0B9z1UYGysZBI/JHKPVH3Ue55z+izYOhyV5JsAhw5TY7odITgeUeirJ7ZKplPxEvhX5kMT3S3LjYbd1IaTlykkNHZRQ3yy7ONkAAGVXJM1g3yqJKm9wz81jOdbJTOSXAyg3yM97nu5nFVOeAMfmkfJjKpc4u9kn1ZckM5/Qfmq0JSbqDpAT2UbqQCU4FkkpYG4IDbZKZCYABUNtg5IDcXKZCkN7qJDEAXTAWUo3ViWAApA7qQFKrlP2CkCEJ2RvkNmi6r3Ywidsb3/ACtJWTHR5vIcdllgBosBYLRClv5hXI1xBBQrS0OFxgqoggriJnZGBBFiouWHGygJgehTAGsHC4UAFRlpuNk3MCMJ0yEh2yyJgxzGlvULF9U7Tdu+ytjLwyYDl6WumZGC05ypabEFNI5rn8zRZNgKEbvbqrWgE2OFXYjKYEk5RQ6Q/LjBynZ3O6ALbJ2juEGi6KMmEXt3XR8PaLPrGpxUsTCQ4+YrS6dSTVlZHTwMLnvNsL6A4a0ei4P0D7fVcoqXNvnovPdW6gtNX2w3m+DvdN0ctRNNrZG1YNN4I4d5Iw0VBbk9V5vAaziTXjUSXcC78lja5rlRr2qEAkx81gF6BwjpLdPomyvZd7h1XibYfgKXfZvZI93p4xgm48I67R6Vmn0LI42gOI6LutE0973RC3zm5XM6PSmqq2g5DV6fw7TDxTJbDBYLwareq1MYN8s851fVenFvydJAxlPTNZsGjK4XinWRPOaaN/kbvYrfcR6s2gonMY77x4svKqmpdNUFt7ucbkro9b1nclo6eFycPo+hdkvXmJV1TYmPqJHWYwXC0fD9O/WNYk1Kb/Rj2vsQsLiGsfV1UekUpvc+ay2fEmow8G8Bimb5KyoZYW7Ll0aWTUaor4pHt5/+noSXzT4+i8s8w+JvEI1PXHUUD708GMbXXldYRYna/RbKtqXyyPkkcS5xub9VpJ5bk3z6L7r0zRx0enhRHwvzPCdRv9R/RGsnda6xmvFzzC6yJuUk2wsJ1w/lG52Xeg8Hk7txri57dil5yHWaLk9FBc4OLXDPqluL3V/dtsYu0l5Pyuwe3RVA5t1TXBvnPUpLnp5Qkb3yFIkutgWI7qtxHTCa5z09Ql5S94aAC5xsAg5bBSFB8wOApcSSXY/JbnWeFtW0GlpKnUmRNZVAOYI5Q8gEXBNlqA1zwQ0iw7lJFdy2GacXhlfmObYU4Iwy31UgYsb3UgWyQjjACBvYmyYOvkbK5kksNM8NjYC/BcRmyxhjYJyF7OUnJITho3DgB6qkW5bluO6tbk9FdF+BGS75HWPRfWH+G6Iv4D1KO43vyPGPoV8qWHKQD0X1p/hiIfwfqkBIPXw3/wBiuZ1ZY0zZdp/nPY6CmbdnPZrR5nE9AF8y/EvXjrXGGoVcby6KN3gQ+YEADey+h+MNZZw1wFX1wcWzytMMQDhe5918g6zWingfPK65YCc28zivAahuxquHLPr/APBWljWrupXbRisZ/NnIa/Uc8zKNhwzzP9StNy4une90srpJDd7zcpmtJHZfUun6OOl08alyufufK+tdSl1LW2amXDe328CtZZtzv0v1TsZfG9s3RvgZ9U7Bi2910UjjNgxnpe6zoIiTjZVxRk7raUlO+R7Y4mF7nENa0DcnotMImS6zCOm4F4PreMuKqTRKFpDXnmmltiOMfMV9xafplDoGiUuj6ZEIqWmjEbABb3J9SuI+EPATOCeEhU1sbf8AN9QaJJ3WzG3drB/f+W7SuqSyMluXuw0LwnVtc9Xf6cPkjx9X7m3S1ejX6k+WYlQ81NT4DD5G5ef7LRcQ6kyJhgYbRxi7rdT2Wzqqhum0DnE3md+64aZ4rKxxmfaCL7yVxO6r0lKk+58Iwa69wj2L5mY75pKalNQR/wBZVnliB/A3qVqIqL/O9UjooiTQUZ+8d/8AiP6rFqq2s1fVbUws6b7uIf0M7rtaWlpdD0bwxZrY28z3HcnufddyxuhL/wCb/L/xwv5nnKIrVSf/AMI8/X/zy/pgxNZr6bTKIudYQ07cNHU9F4lq9dV69rTcF0j3cjGDYX6BbniziN2qVfgxG1Ow3t/UfVHB1JEySp4grG/c0jbR3/E89l1tLp/wlLtmviZn1Go/E29kdoL95Nhq4ZpOk0+iwuHMGjxSP1/VRwzRN8abVp23jgHLGD1ctRK+fVdT58ulmfYDt/4C6fU6mn0PRfDDgIaRl3f7nlPYnCCqXzS5/v8A4M1P/La7fC4/t/k4P4ga1zyN01j/APfL79AuA0+lOoagGn/Sj8zz/ZNqtdPW1ssz7ummfe3qdgt7R0jdM0xsRI8Z/mkPr2XVrrVcVBG+yfpV/wD2Zi6xW/ZqVwjw9/kYAtfSwmjowx/+rJ5n9/QLIZGK2skrJM09Nho/qcpjaZqkudkN8zvfsm5eSuOIQ7P5v/BkNcKalu4eY5IWkq6gyP8AD5tzdxWbqNTynkBvbJWmabh0j9ylm/CNOmq/7yCVschbcEhvqqnvii6AE9Aqpqnoz81iFxJuSsMpRhuzs11Sl9i2Sd77i9h2VJNt1Bd2UhnU7qh90+dkbYxjDgjLvQJgA0KHPa0eyxZai+GH6psKKGWZF8kzWD1WHJK5++AqnOtublVuebZNglcm9kWxgkO5/ZUukAPcpHPJ2wEiCLMEkkm5Sk2QT0CXdBvA6QEkpg2+6kNtumVUp+wckbJgL+ykN6lSqeSJBjogAnZSGki6YYFk6QQGPdCFIHdM2kDkALpgLIQqXJsbAKQCTYC5TMjfIbNbdZ8MDYhfd3dNCtyI3goZRuNi829FlsY1jeVosEyhzmtF3GwW2MIx4EzklQ57Wi7jZYzqsfgH5rGc5zzdxuU4Uh2P/NWEB4vsVQRlOx/QnK8sdohzSDZQCrrB4zuqnNsbJkyEg9Ci1jcJQmFymATg2TyROge0k3a4XBHUKu1inLnuZyk3aMgdkyCSDm/RWDOyqGPKVdHhpF8q2LGA3AuVI2Utz8yALFMOi5ti0d1bEx0kjY2NLnOwAqWYN+vZeocA8Iid41XUWcrBlocFl1eqjp63OR09FpJ6qxVw/mb7gDhVml0/+b6i0c1rtDlr+MOJZdSrXUkEhETTY2K2fF/EgpoPsNI4DFrDouN0XTpdRrQ517XuSV5Kip2SlrtT/I96q40duko+bz9Df8I6QamsEsrfI3K9bpm8rWtaPQBc/pFDHSUzWRixdhddpEInq2k/IxeH6xrXqbW1wdW2MaK+1cI6rRYjS0wIF5ZMBej0nJpWiGaU2Nrm65fhmg+1VZqJG/dR7XSca63ysNJC7yjBAXI0zWmhLUv5ntH/ACeA1cXrNSqI/dnN6/rpramSQO8rcBcvU17aHTJq2R1nnDQqJqgyzcjTdoOSuV1esk1fW4NHpSXMDgHW6qjT6V2z7p+N2e20ujhCKrWyXP2Om4I0812oSa1V/wClHd9yvOfiZxKdd4klbE69PTnlbbZeq8WV9NwZ8P20EBDaypba3UBfONTKXOPOfMTcle3/AIb0Pq2y1slstonB6hrFbOVi4ey+3+zW1LwQRfK080lyQs2qkybLVzOAIsb3X0mC2PD6me5TI4G9zssQu3Kvda5I27LHfbqLhaEciYpN7pHOPKRbHdQT5gbYvex6qySRrpedsYjFrco2TmdlQIt3UC98bdkWbe6g4F2m6AuAJN7HZGLAnObqCcXyf1VskTQxhbK1ziLlo6Jks7kIfM+UtMsj3kCw5jewSODb2CCLG4soAJda2Sj9AfUYBzjYKXM5CL3v7pbZsf0TuFrDIJTY2AIbk3NymZy2JLCT6lMI3OPl2CA3f03RjF5yQcEvIbcAD9EzRm7c22v1UcjgAdr7BSP1C0Ri/IrLRcAi/TOF9Tf4WpjJp2pUtw7GI3bj1C+WB1zuOq+kf8LFWIa7VC6xZFGXkH5m26juud1ffSyRdRvPY6X456259fQ8PRF3h048WQEAjm6L5i4hrftNd9mY77uI3d6uXo/xI4jFTrmq6s54dLNKYoRaxwvIg3zEvPM45J7lea/h3RO+16qa2XB9N/iXXLpfSaej0v45LM/574/n/YVozlWt5g0i1idymYxz3hjG3PRHKQSHAXBtgr6LFHyMjlJIasiOG5GcKuNtzeyzoWH8SthFMpsnhFkEOdrr334DfD0azq3/AKq1OC+m0DrQNcMTS9/UD+evl3BPCldxfxRSaJRNI8V15X9I2DdxX3HpemUHDug0uj6bEIqWlYGMA3Pcn1K4vWtd6FfoVv4pfkv9iaWn1p98uF+plVMt3ct8blad0gkldVSG0bBZt/3V9S9zx4QNnPy49gtFrVYIo/szDho81v2XkKKu54Ru1Nyiu5+DRa3qT5pDync2aFy+tzfZqYaWx9nuHi1T+w/pW6D2QxzarOOZkGI2/wBb+llqKfTn1mp+BVAudzCorH93H5Y/5/49LQo1/aP6/wCv1aPHanvue3Mv0/3+iNhwppPgQHUqhlpZh5Gn8DOg+q5z4icQ8gGkQPsT55yP0au31jUoNE0SeumIaGN8re56BfPWo6hNW1c1XO7mkkcXOJ7rX06p6m56mfC4/f0JrZR01EdLXy+f39TH5ZKmqbDGC58jg1oHUldtrD49P0+k4dpj5advPOR+J53utLwrBHTmo16pH3dILRA/jkO35KLz1lWA4801Q/P1Xffx2ZfEf1/0jiTl2Q7Fy/0/2dLw1Ssjim1aVvljHJELbnqVw3HWuOnn+wsfdkZ5322Luy9I1OaDStAcy4EVLHc/7nLwqcS6lqQjHmlnfc+l1VpF6k5XP+R0661CKi/HJZoVCZp3alUNvFEbMB/E5X6tVvc8QR5kkPKB6lbapEdFTNpobBkLbe57rTaTEarUptQkHMyn8rL/ANS3tlKn6k3dLhcf2LatjKKkhoox8gu634nKoltLSEuPm+Z3urpfvaxz3ZbHk+pWq1CYySthByTco8IeuLniL+7MKoLnM53HzSG9vRa6rl5RyXsAtlUEGW18NC0lQSZiVmtlhbHd00U8ZEJxcpcuKGtublMXADCxKOXl8nUz7E4aqpJgzBP0VMk+SG59ViufnuVHJLgeMG+SySUvOTYdlSX9kjndSqnPuLBJjyy9Lwh3PA9Sqi4ncqFBcBsj9x0iTYbpSbqMkpw3ukcsDcChpKcCylSG3ycBUSlkHJABJwnAt7o2wFIBJsEmA4IThtvm/JAs0437oViXuHIE3Ra6kC6ZCUscESIAspQma1z3WaLlVbtjEAEmwWTDSlx5pMN7d1kQU4iFzlyuWqFPmQjZAAaLAAKUr5GsHmKxJqgv8rcN/daQJZLZKkNNmZ9VivkdIbuKRCg6WAQpQpkJYQlIVhHQqCF5g64rXWwVbhwsVSQhruXBQwQZzbFQCQrQQRYqt7S0X6KZIQSSmDlWCb3Tl4d0sU6ZEOHXNuqeP5s4KqA2KsBubp0xkXjdNYbqsG+Tsum4W4dm1yua5zSKduSe6ay2NcHOXg2aeid9iqrWWzO4N4adqta2rqWEU0Zvkbr0LX+I4NHoRS0tm2FgAjUq2h4e0sU9PytIFsdSvKNQ1CbUK10jySCcBeZUZa+3vn8iPoTVXRtKoR3tkbCOWo1XUQ5xLnPK9R0HS20sDG8vmIuVy3BuinFZO23a67+CZkfOI8u2uuX1fVd//DXwjrdJ0c6q3db88jaRO++DGfK0W+q7PQ6N5jjiaLvkOVzGi0gkDpHi7R+q9V4T00RRHUajysYLtuvAaqKz2oydX1Maa2l+2dG6SHh/h3JDXlq8e1nVH1E0jy65ecLd8Z8SOraswwvtE3FguFmmDryudZjRdUKPrzWOFsjF0bp7ri77fmluYuq6izTdNllJ87hYeqy/hjonivm1+vHlF3guXB1U03EnEsNBDmFr826r0/i/V4eD+AmadTENqqhnLYbgLtT0kko6SHzT5+x0dde4VuuHMtv5eTy34jcTv13iWYiQmCE8rQvPp59x1KuqZnPLnE+Ym5N9ytTNLzAi1l9V0WjjpaY0QWyPB6y/LwuEUVT+bfZa1xveyyppLtsReyxHtIbzHAK6Cjg87dLLKCbm19kp5LO5weboQh+yrFz1/NOkYpMrfcZVVjdW36bhFmeHfnz/AElRrJSxM9QfonaGcrzIwk9LKGkggtwQhxcbuObopoRitwN09xa53SZJwCjmGzgcdkY7AY92uNnR2I7FI05I6INybjIUkbYJKj3eQBcg2B5U53vn3SOa5ps5uUNBJAAyivYgwI2uVY0i3W6qyHEYwrRcNvcX7K+GRWWsw65bz+5TG5PyAJY/9zrAdVJcCbglaVwVscC5AsLleqfCDiWg4eptYdXVDYo3xlvMTZzfbuvKW3ve2/dMOXI6KnU6VaqmVMnjJdRd6FsbMZw84NprmpO1XVpJmSOfTNcfC5uovutcM43UXBPVSD9Oyu0umr01Uaa+ENrtbdrr5ai95lItjL2cxBtfGFayB8rXOaPK3c9Aka0WAvzHqegWTFfw+Vx8u/KOq2pexzpPAsUdrNOVsaaF0kjWMaXOcbNA6lURREnbJXvXwG+HbdY1b/1Vq0N9OoHfcMIxNL/wP53A1F8NLS7p8L8zG+62ahHlnrPwg4CZwVwmKusjA1fUGiSYkZjZ0YP5/wB+6qZxdznHytyf+FdWVBAJByTb3K1YIkkIJ8kWXHu5fN52T1FkrrOWdnaqCrgVVVT9lpn1MmZHfKPXouKqJZa6uFPG7mcT5j0BWw13U+d5cw3a3yRjue6o06D7HQuqX/682GXXWoh6UO98vj9/Q89qbHfb6cflXP7+ph6k6OIRsZ5oqTEbP/xZT/wsnRaQwxHmPO7m5pH/ANbzv+SwJyZ6yOOLJB5Y/Undyz9WrotB4emnFrQss31ctUk+2NceX+/3/ozQa75Wy4j+/wB/7PNviXr32nUW6RA+8NNmSx+Z5XnLIpaqqjpom8z3uDQB3KvraiSoqZJ5Hc0j3FxJ6krYaC5tD42pEB00Y5IQRfznqvX1VLT0qEPH6nnLLXbY7J+Ta1rY4mw6NTOvT0Q+8cPxyHcrK4epLzy6m8WZFhl+6wBBJaOjZd1TObuPW5XU1P2bRtItzARwM5nHuR/yVRbLtgq1y/2/6i0x9Sx2PhHEcfaw5kUeltd5nfezd/QLneHKPwqObWJ2+Z92Qg9B1K1tVLUa9r1i4l9TJck9Grp9XnhpKSOlhAEUDQxoHU91ujDsiq1/M13zxFVrmRzesVRDPDYbvcbY6krOggfR6dHSRDzNbzyHsT3WBpdP/mOueI/MVPk+rl02piKlp46WM3kf95K7+yLl8WAyj2wUP5s5uoeKeAjc7k91omO56h8z/wAKzNSqC5xa03scrWOJbAGdXlWM20V4jn3K5JOYk9XH9FgTAc5KyHvBksOmFVVDw2gu3tf2WaaOtVtgxHPAHYLDkmJvbASyzXNr47LHy4rE3nZHVjDG7Jc4nASOcGjO/ZQ6TlNm5PdVZJuUuMFqWSXOLj/ZLgC5QXADG6WxJQbLEgJJQGkpg226ZVSmHPsQBYKQCdkwbfJwFOALBUttgwAAG+ShABJsFZyhnqVEhhQzq7ATEjYCwQSTuoViWAAmA7oAspVcp+wyQIRuVmwU2z5B7BCMHJ4RG8FEMDpXZw3qVnsiZGPKE4AAsBZQ5waLk2W2FaiI3klUSVLW3DclUzVBf5W4H7rHVgUhnOc93M43KVClQchSoQlyQEIRdK2kQzHsuqiCDYrNlidG8tc0tI3BGQqHNuvPYO3OEoS7ZFBCUhWFpCUhKViAlpt0TlxDe4KUhQLg26INBIGE1sXQRmygXG6CeCDAq1ipAytlpWmVGqVbYIWktJyU7morLLqq52TVcFlsztC0afWa5kTGnwgfMV6541BwtpHhR8ofy57lYdDRUfDOkeYgS2uSvPNd1qXU6t3nPhgrjz79XZ2r5UfRaaaeh6X1bN7ZD6vrE2q1TnvceS+As3hzRH6hWNke37tvdanSaKTUKxkMbSRfK9VpqaHSNNDGgc5H5p9VZGmHpVidE0dnUb3rNTukZYlbTxspYBa2MLa0EDjyst5nHK0umQulkM0guTsuv0+AscHFuTsvHa2SrPoF84wjhHY6Dp5qKiCjjbcEguXY8X6vFo2jM06BwB5bOsqeG6aPR9GfqVULPLfLdeZcS6y/U9TkeX3YDheT7HZJr3PCV0vqGty/kh+bNfUVcksty7LiuZ4o1sUlJ9jhd94/f0WfPVtpIZKmQ4AxdcZRUtRxJxIxoBcHOz6Bem6boYxzfZ8sT02pkq0oLk9H+FXD7WQz6/XtDYo2lwLl59x/xI/X+I5ntfeCElrACvTeOtZi4U4Di0KicGVM7bOt0C+f5X3G9zuSV3OhaZ6i6fULF9InhuoapvO/0X2/2UTS2OfqtfI/zmw8qyJSHH1PRYcpIuHXBHRe4gjyF1jZRIbXt1WM7a1yfRXyEHYWCpu3muTsru05k5ZKLFxPKMtyVUSX2BNgVY8u5ib29lUTlI0ZmxXgNJAPMB2SW5gnvdBaOYcpBKXt9hSA3dZ0unSs02OuaCYXGxcOix2Rkn+y9U+F2jwcT0Gr8K1TR4j43TQX9vMB+6Emq13S4NOnqVsu1nk5Y4HyqA2xuRhbys0aq0+uqtOqYy2opXmNwt26/ktXJG4Y6BaHFeCuzTzh8yMUg3LrDPQJeb8IuFY8Bu+CUhjkaA4tc0H+oWVMk0UYFFycHPqmBcDg+6l/KHDlIKhp8pAbclGOwrIbnorgLHoqbAG1spmjO17q2LxyKzKYCQGgNuUOuH2JH0UNY4gloDQOt0o+hWtMqGvu4qxrrtADVFwY2sDbdSUzS2+5J6BWJiMblIFtrp2tGyqJueydpAFynTQrRkA3s0bLKiaSQsWEczvlutrTQOcWixJJw0blaq1kx3T7UdPwXwpW8W8T0eiULCXTOBkktiNnVx+i+4NM0ug4d0Gk0bTYxHTUrAxv+49XH3XBfBjgMcI8JjVNQhDdV1Jge7mGYo+jfqu61Co/AHWvv6BeH6trXq7/AEoP4I/m/LNmlq9Gt2T5Zh1NSXO5mZJPKwevda7VKsUlGKSJ3nd8zv3KuErY431smGt8sQ/uuQ1KpkqZuUE+JMbezVTp6O6WPC/f5GDV6n04N+X+/wAyKSP/ADGvMrv/ALeHb1WfVP5xzc3JG1psezepRBGykpGUwIbcc8jj0atLrVaaiSn0qldaWscOa2SGLoxj6tiUeP7eWczKopcpcv8AN+EZ2jR+O+TUXtsHeWFvYLiviZq3NLDo8bgREPElAPXoF6LUSwaVpUkpHLDSR49Svn7V66Sur56qU3dI4vP9l0+mU+te7nxHgw9Qs9GmNC5luzUOHO/2/ddHo9GTGamX/QpRzZ2Luy0tJA+oqWRsF3OP6rtdShbQ0EGlQG78OkPdx6L0F0sYguX+hwsbN+wnD8Tpq6bUZxhl7X7rleN9edVXoIX2ivd1utl2mqyx6BwuyFptPKMnt3K8bq3v1DUBGzLpXWHsqdOlZN2vjhHRqrcEoP7s2XDlOYxLqLhYnysKwtWrjI97xlrMNHcrf1TG0WmtghIwOQWXNinFRq0FGcsh+8k91tyJS1ZY7Zcf2Rt9IjGnaYwuF5pTzuWLqdcTI7zc0hGT2WbVytY0uP4Rc/2C5iV5cJJ398IqK5Lqk7JOUjGlu+QMvc9fdYtRIA5xH4RYK3m5YzITkrBeS5wZ9Sizr1x3GgaL8zumSVg6jI6TO47dFmveGQHu4rXVrg5rWD6rLY9sG+lZlk1ZFyTfHdUvkJNm4CaZ9yWtOOpVWALlYnhcHWivLDbJSudfAUElxVjWdTt3VTkWCNYSdk4s3opv0GApawndUSmTkUAkpw0NyclSbDAUAEmwSYCkBN0zWEnOAnDGtyTcqCSSnSCTcDDRZKhMAi2kTGSAE1kIVLk2MCZjHPcGtFyrYIDI7OGhZ7I2MFmiyurqct2K2VRUzGWJyVejZY00/L5WHK2RiktheSySZseL3PZYT5HSOuT9EpNzcqEw6WAUowB6qEuQkqEISt+5ARdQhVOXsHAIQkMjR1ukyE9R1LTqfiKmFdpzmtqGYc1wtzeh9VxdVST0szop4nRvG7SFvKStqdMn8Wnd5T8zTsVvJo6Timjs0+BVw98/wLgJuH2PsOt0FPVIOcNrvbxL7ezPPHNBVLm2W41HS6rTp/CqY+Un5XDZw9FrnN9Fbs90fPNRprNPN12LDRjWUWyrHNttslHYpcGYg7XS2vlWWVsFNLUzNihaXOJ6JWPBOTUYrLCio5q6pbDC0m5Xrui6ZS8P6WJpreLa5usTh7QYNGoBWVTRz2vlczxJxFLW1LqeB1oxhc+blfLsjwfRNFpqeiab8Vqd7Hwg4i16XUalzGPPhg2XPRxvnmbFGCXOKVpJ9SV3HB+hgvNZVMwMi61ScdPV8JwtNC/resTlx5+iN9wzo0ekaeKqcDxHC+eiynTur6uw+RpWPqFc6olFLAfI3GFsNLpLWAHuV5+1tJ2T5Z9b09NdEFTUtkdJpUDeUEjAwF33D2jmvr4W8vlabnC5XTKXmLGNHp7r1ejbFw5w2+rlsJnt8t143WWucsHA6vqnBdlfzS2RpeOtdZBANLp3ABgsbLyiWYmSxNy7JWx1itfV1UtRK65JJXI11f8AZoJahxsdmrTo9J3YXlnQ0Gmho9Nh/dms4p1TxahtHA7yt3svRPhhpMWm6ZNr1awBrG3BcF5Zw3ps3EHEccTgT4j7lepfEjWoeGOFIeHqNwE8jbOscgLvdQryq+nUcvk83qdT6ubJcP8AQ8u454hk17iSoqC8mNriGi+y5F8nqofLzXLjnusV8nRe302mjp6o0w4SPC6vUudjkTIevdUSO58uNyO6HyHpsq3EEei2xicWyeSu7c8xz0KosSSRurHOub2sB+qR4JHOPyT9pkbK3WJsVS4E+UtGOqyGhhY9z3WePlHdUZ3QlEqbK7gDKZmB8t7qXAON+gWVR09HI4GrqnQs/wBoVcYtvYCJgjc5wtYD/dhe/fAnQWV/GdHWU8rmTwWMhAu0jt+S8t0ip+HumyNkrqSs1N4yG3sL/kV7jwB8btB0upbR6bwxBp1M0WdIT5nD6lZtZ6sqpQrjnJ6DpsIJPDTm1sj0rjz4IUOt1lRq2jBsdfMLOa/ZeBa58HNP4e55uK+LqWlDcmCm8zj6Yv8A2X1TR/E3QOIeFtR1HSZvEkpoiXxnB7L4n4z16m1yvqaiSN4m8R1+ZxNs7ZXL6Y9TZJ1yk0l/U3OyS08lq0vh4Xl/z9jS6pV8LUD3Q8P0ElQRj7RUdfX+FcpVVE1TJzyvHo0CwCtmIzm4WIbnK78opbJnlrrnN+y9kI5pDQcElS1xHRS61wLbKLX3wlUfYzNkCxJOcqwW3sQk5fVWloIABVkYiNg0i1hn3VgcQLYCQNtg5TWPY5VqyhHuMTfqSmF+psFABGFbFbnBLea2106TYHsTuLAWHcq6KMOIvlKBzOLnZKyoYrkXzdaYRM054RlU0N7E/kF7f8D/AIfjiTiH/PNSh/8ApWnODgCMSydAvM+FeHa/ibX6TRtPjLpah4bcfhb1JX3Pw7oFBwnwzSaJp0YbHTss53WR/Vx+q53WNd+Gp9Kv5pfkijTVevZ3S+VGwqpxHG4mwA6f2XNzvfUT+EHeZ5u49gszUKkEuN7tb+pWrlc6lojIf9ef5b9GryFEO1bcs2ai3uf0Rr9YrGE+FGbQQi3utNQx87311RgHIB6AKKsmqrmULDcXvIVgcU6m2g04UsLuWWbytAxysG5XeppeFVDmX6Hl79RHMr7OI/qazVuIxJUmCJ55HOu9w6gbBZfB0MtfW1Wv1N7X8KG/7rg4opq2ripKcF0s7gxp7DqV7FSQQaVpkNHEAIqaPJHW25XS1qhp6lVXy/0/2c3pjs1lzvt+WP6/6OP+JGsCChh0eFwDpPvJj1t0C8hlPM4DvkrecR6m7U9aqqyR12lxAzs0bLT6fTyV9Y2Ngy91vouzo6lp6FF/dmPVWu+6Vn9Dp+FaNkTZdWqG/dwjyDuVstPjNZqb66pd5WedxOwPZWVojp6SDTIRaOJvM+3U9AtbrlYNK0EwNIE8247LPKTsba5lsvsNCCUlniP6nK8Z6+7UKxwjdaJvkYPTutFw9Tl0suoPGG+WP3WsrJX1FTyNySeULsYKVlFQQUwFuVvM4jqV04wUIqEeC+6ThXvzIwNTqGxNMjz5Ym8x9StVoocaeWrk/wBSpdf6KjX53TPjpIz5pX5t0W0hjEEDY24EbQ36p0twKPZSveX6f+SmsL5i2CMXfIbewWk1p8cUzKGE4jw493LcmcUzZat+7G2YPVcd4zp63xHm5JvdB8m/SV539i+oNgyMdliDZzupwFdKfEncRs0Kh7vDYXH8Iv8AVMzpQW2DHnfzTtiGzd1r6p4dzBvthXOeWMdIfmcsR5Aba/usF0sHUphgw3DlJv0VWXG6sfd7trDoEwAjbtlYJSOgiAwNbc/kou5ykAvNyrAA0KhtsgoYBkoJvsjLirAwNF3bqJDCtjJycBPzACzQoc6+BhKnxggKQFIClLKfsHAAWQhOxhcQALkqvDbCKATssuCmuOZ+OwV0MDY25F3K5a66Ut2I2Q1oa2zRYKHPawZKSSZrGlYL3l7rlacYIlktlnc82abBUKVIAGSg2NwQgnsgm6hK2EEIUJHLBCbqEKCQBcqpvPISUrnhvukdJjyqpI5ewR3SF2NkiEKtsJ6C4+LyjlHNt7qtj6iiqBNTudG9u6xKaqD2hkjrPHU9Vsg/7RZkrwHD5XH9iuQ04n0vSaxTSknubinqKXiOlNFXsDJ2eZrmm1/Uf8Ll9Z0SfSpWh7hJE/5Hj9ismaGWGQOF2PGQQf2W603VIa2J1BrHK8H5HPG/17pd47rg7d1VHUoenftZ4l7/AEf+Tg3NN1U5i6nXuHzQvE9I18lK4XvvyLnCxxPKBk7K1NSWUeA13TrtHa6popjY6SURMBLivSuF9Ch0+nFdWtF7XsVruF+HmMZ/mFYLNbkXScRcTGQmkpTysbjCxyzZLtjwer6Xoqul0fjtZ83hF3E/ErqlzqWmdZgxcLhnkglxNyr+cvNybk7rIoNPk1CrbFGCRfJWrsjVHY81qtTqOralLlvhGdw5pj9QrWuc0+G03K7+urGUFE2kp7BxHRUQ08Gh6aAAA+36rX0bJNRrTK+9rrmTfqPufCPp3T9DHptEdLDeyXLNrpNK4jxX5c5djQ0/KGtAyd1q6CnAlY1rcBdjpNC+oqo42tuXFed19/duehm46ert9jreDtGNTUtqZBaKPOUnHWvCesFDA/7qIWNl0GpVsPDnD7YIrCZ7em68d1OrL5nyPdd7zcrz2npd0+5nmNBTLW6l6qfyrZf5MHUaxpDrutfAXE67WGeZsERu1v6lbHU6vxZ+VrvKzJKxOG9Kk1/iSOBrbsDru9l7LSUx01bvn4NnVbXtp4eefseh/DbSItI0mp4j1BoZHEwuaXdV5NxZr83EHENTXyvLmOcQwdgvUfinrrNI0Gn4YoHBtwPE5eq8LJte+y0dD08rZS11i3lx9jwvVNR2r04/tCvcRkql8hJwPqneXOaTa4CxyRy73C9bg8hbLJLnjl5QMpCTawOFWXhrbZupa8Xs5PEwykK8tBsCL9kvMXZOPQLbQapSxaFV6ZPQNnfO7niqPxwm2fpstO9j4wCc26hW7lcsbYYrw0ZLrlVhxBxa5xlZdXTup2wuLmvEreYFv91itF32uBbuk5KWQ5pD7HBWS2JjqGSfxGh7TbkIyVjk3cScovcBu4HdGOzFyMHkWzZZMUzo8tdb1WI0cxIvaygONrXsjkdTceDvuAeNJeG9fLZHE0VY0tkaTjsf0XO8VhtNxRVGB14J3czT0PYrSFxsLHY3Cuq6t1ZHG2X5oxYFUNYn3rzyanqpTp9Kb44MR7y73SgE7BFt0xFmgC4J6qYyYWTYFtvDAS28wFwLmwvsnuA3JBPRLYWsbEKxCmz1HTaKio6cwasyqqpAHPYxuGDsVfR8N6tXaNU6vDAxtJCCS97gOb0C0pHMCBi6yRVVTaFtEaqT7MDzCIO8t+9lF3eBu6L5QjQ3kbzENcf0TymK7Wxkm257lVAXzdM1pdc3sB3VuXwUjDP1V0bbnLrDrZVMZ1OVksaA1XQWSmb2LGDmIDW2HqtjTREkXWNTxczsi69o+Cfw/PFfFLdQrov/AKVp7hJJcG0jujVfZZDTVO6zhGCfdZJVw5Z7D8DeAP8A03w7/wCo9Si5dSr2/dtcMxR/2JXqFdU8rCBucBZdRI2OIMYA1oAAaMADoFoKucueS3zOJ5WDuV87stnq7ndZy/yOtJR09ariUBgqKkh5+5hHM8/2Wi1rUfDZJVO+Y+WMdluq1zaanbRNdY/PM71XFEP4g19tLFinj3cdg0bldHS1KTdkuF+n+zga6+UIqqHzS/X/AEV00rNP0ifWas5k8sdz8xXnOp6hJqFe+oldlxsPQLpeNtYZV1zaGhPLSU33cfr3K5CmpJtQ1CGgpmkyzuDAR0HUr1eiq7Yu6ezf5I8TrLHbYtNW8pbfd+WdjwJpniTS6zKzyt+7gv8AqVu+K610Gg1EULg10jfO8nZvb6rcxUsGkaVFSRi0cLLe/c/UrguOa4so4qYu88p53i3TouXCT1eqUvGfyR6aUI6HRutc4/Nnmla4NjDBYF5uV1HDFE2jo3ahMLEjy36Bc5R0smqawyEA8t8+jQu+dGwBkDcRMHM72GwXodTZhdnv+hwaIPn95MO5DjUTmxJ8R1/0C8+4p1U1VY9od5IxYepXT8Rar4MBjYfO/J9AvNK2QucQTdzjzOVmmqfzs11xTlhGXw9SGr1cSPF44fMfddJX1FopHk25jZJolF9h0MyvBEk2fUhavXqoQU1r5tstedyix+vdhccGlox9t1985F46cYv3W+eCIgOp8xWt0GmMeneK8WdM4uPstlqN6ajbz4km81uzUM4Ntke6fauFsc5rlV4dGIWnLyubifabfZZmp1BmrDc+WMLBpgX1TW9ylbzI7WnrUKtzYlvJBzHd2Vr6kklkV9/MVsatwMwjB+UZWoe+8skn0CeY9Cb+Ixp3Ay5+Vqw3O5nH1Vr3E43LlS35iVzL5ex2K1hEHlY2/wDCqw0uNyrS25uf/CgnlGN1znuzQiLho9VDWl5UsYSbu2VhcG4ARSGDDBZISSUEklACfZE5CykBTZCpcshwCkC6lrSTayy4KbPM8Y7JoQciNlUVO95BtYd1nMjYwWaEyR0gaN1thWo8CcjEgC5WNLUYs05VUsxd5WnCpVnAyRJJO5ugC6kDqUE9BslbGC4AxulQhKQEXUEoVbl7BwCFBNhcqt0nRqrbwEZzw3HVVOcXHKVCqbyEEKQCUwbbdK3ghAaUwAClCrbbIb9zb5G6yaaq5B4cpNuh7Inp3ROJAPL37LHLQfdZmk0ehxZp55Rv4po5IWxS5Ze7Xj8Krq6R0Thcgg5a4dVqIKh1OeVw5mFbukq45GBsp8SE992lZ5Rcd0ej0Wujau2XJmaRrP2JppKxpfC44O/L/wBls28NUEtc2qhLRGclvRaGro2tAkiu+Jww7ssen1SupI3QBzuUiwByPoqms7xPUVayntVerj3JcP2N5xJrcdJS/YKQ2AFsLz17i6QucclZdTJJLM50hJPqsUtucbrRGtRj9TwfV+pT11zf/VbJFtO10kgiYLklelaBpsGl0H2ma3ORfK53hvRj/wDdzNwM5Wz1KvkqJRSQmzRg2WKybsfYj2HQdBHp9P429fHL5UTVTy6pXljb+GCui02kEIa1rfdYekUDYYgSLkrp6Sls3m6lc3VWKPwR4PZ6CmUf/UW/MzaaTTtLiSMr1HhbS2U1O/UJwA1guLrjOGtMkq6pjA3yA3JXW8S6szTtPGl0rrG1nW6Lx2rm7LPTicjqlk77Vpq3u+fsc1xRq51CtkkLvu2YC8x1bUHeI5rT5nbei3Gr6kGtc0OwN1xFbU8rH1Eh9l39Bo8YyjsRUNFp/ZJGLWVBDRTs80shsvXeCdKg4Z4Vn1usAbIGF1yvM+BdEm17iBtZM0mCN30XVfFLiVtPTR8N0D7AD7zl/ZbdXCWptjoquPJ4uzUZjLVWeePt/s844j1mbXNbqK+R1w5x5R2C0L73PbqrOZY8hINx9V7OumNUFXBbI8Fqr3ZNzfkq5jYguI7Klw5TYm6scblUPPmPZWNHKnIkusDfKTmFrHdX01PLWVAghDTIWlwBO9hc2WNJu5pGWmxQM0gJAG/1Uh55OUqsADCZpa1vnFyf0VkXkpbILtyBf0KrOTYZCtt5VUARkDKDQMgT0/ZS32uENcRci3uoa4A3KXyBlwp5TGZvCf4Y3fbCrdttdZbNQq2ae6gbPamcS4stfKxeduTbbaycj+grg3HKSR1KQm3qrA15bzNsfQJACTY77ZSOIuSstPZMC4g3OPVWPjMbg3mBvk2Su+S2DdL2tEzkQHrhMLOKUD02Uix2CKyAc2BwArmPDWHyAuPU9Fj35dwpvfZOpitFh3snZGeTmseXuUgbfurgSSARgbBWRWWI2M0WGyyoY+tlSxjrA8vstjTwE2uFsriY7ZpI2/D2iVuu61SaRp8Rkqap4Y0NF9+q+7+D+FqHgrhGl0Wla3mjaHTSAf6knUrzL4DfDoaHpH/qvVYAK+sbana4Zij7+5Xr9ZPe4BwP1Xjuta78Rb+Hrfwx5+r/ANGrR1enH1pcvj7GJWzlx5Acnf0C17Htia+uk2YOWJvr3RK50s3gtyXfMey1mrV0cbTm0MIs0dysFVWcRRnvuxmb8Gj4h1MwUzoWuvPN83da+uqRwtwt4QIGp6i27u8bE+lQsr9QqNc1I2oKLzm/43dAuI17VJ9Y1WatmwHnyjo1vQL02m06nJVeI7y+/hHidZq5Ri7180to/ReX/PwaWaQySOkJJ9SvQeANA8GmfrlUy0kw5YAR8rep+q5Hh/R367rcVJY+CDzzHs0dF7BWPjpqRtNCAxoaGtaMWAWjqmo7UtPDl8/YPQtIm3qrOFx9zU18xmqGxtBNzYALy/jyb/6m6Fri97RZxPft9F6JHMQ+astzcl2RDoT3Xl1bEdV4jdC0lzWuJe/9yk6fBRsbfEUa+pTcoJLmTMrhrThS6eaqRv3k23o0LL1WcUenGV5s+bIHYdFtaWFksbAAGQgWaOzAuR4zr2yVzaZhsyMXIC2V5uvwzLKKrqyjitWq3TTuc84GVp9OpnahqjGuHlvzO9Amr5i9xaDlxyt9w1RctM6odgybf/ELv5UUK36VOfLNxVyBkccTe17dguC1iV1fqraZhuOYN9102rVvgRSzXu5wx7dFz2hUj6nUw8i7z+hKq4RNFDsTsfjg6nTaFr3RsOImDPYNC57iGu8WqlmvZv4R2aNl1VdKyi0xzIzZ0vkHsN15vrdRzOLP6unoq4fE3I6NUMyUTSyvJY5x3eblXaaB9ofKcBgWNIfKLrMY3wNLLvxyn9Fbjc68/kx7iPkLhJIeuy1shIjsPxFZU1xGGg5OFhTOtLy9GjCqsZfTAreQ0EDLjj2VIAATOO5O5S2uc9Fgs3OhFASAL/kO6VrCTzO/JOO5yUOdYeqyYLkQ51sDdV7lTupCDeA4ABShSBdUt5GIVscZe+w3TxQGQ4wO6zY42xtsPzV9dWd2I2LFA2M33KtJA3SlwCx5JwCQMlbFFJAxkeScNwsR7y83O3ZKSXG53Uht0Wx0sEAXTCzd8lFw0WCVJnIQJuVCEXSt4IChCFU5ZCCVzw0KHSAbKkkk3KrcsBJc8uSoUgE7KtsJCYN7qWtt7pkjl7EDZCEE2FyqyAlLwEjnk4GyRI5ew6ies1mm+K4ywEXOS07Fc5VUb2SO5WWI3b2XWwzte0cpz1CSpooqrzg8klt1jjNx2Z9Y1vToXxzHk4gjoQiOWSB12HB6FbStoHMmLTYPH5Fa1zCxxa4WIWhNNHib9PZp5+xutP1GzADYxn5mnosmuZSxwfaIyDftsuY8zHczCR7JpKmWSMMcff1VTq3yjo09UaqddiyymY88rn9ytnoelvrqxpLfIDlYEEDp5QwBd1pwi0ug5jYSEKXS7VhGvovTo6i717vlW5m6hJFp9EIIbXtbC1mmUZml8VwySqWmXUKvmdci66eipPDa1oGVzrMVR+rPoemg9Zf3tfBHg2dFAAA22Auk0+lNRM1jW+gWmpmm4a0XK9L4X0tkVOKqcbZF15nXXqEc+Tq6/ULT15/obujgg4f0J1S+wlLcLy7WtUfLLLM913OOPZdRxTrZqpDSxu8jF5Zrld5/CY65VHTtI5PvlyzndM0zgpai75mYNbUmeXl5sDdcxqMklfXR6fTZJNsLM1KtbR0hPN5ytx8ONDfW1x1eqbdjTcXXq046ep2Pxwcvq2pequjpK/vL7Hf6NBT8HcGPqpbMkay+errLwzU9Qm1HUJ62Zxc+VxOTsu5+I/FAr6v/ACmjf/08OH2OCV5o55Hv0Wro2kdcXqLPml+h4rrWsUp+hXxEYuJNlVITz2JUEuIx0VbstN916BnkpzEcb+lkj2u8IS28t7ILnXAFr/uq3uc4YNmjokfBkkxmuLbWJB6EbhRzkggjmBySd7pA4HfB/dRzZv0SZwVsnlKgA81+qy4Psz6Wb7Q4tkH+mQN/RUeG4AEq5RysoqbEN2uBt7hT4h5+Zg5fdX+CXUxlGbGxVHKPdqftaFZW89QLeyQb4VrvM4BuPdVm4dyH9FVJbkHuy2/nKQHl36qSANse6W9vMR7KEGuGv8px6Kea+wCruSbmxJ7KNjg2sky0AvAI9O63lHwpqeo6BUa7E6nZR04uS+QAn2C0TJCB5hdO2WRsBiD3thvfkBIF07WV8LJGST+JFI+XIseqL29EC5IA/ZM4u5rECwQeBSARuTf3UgEqBkq0NJUSyK2NGM5zZZDGNvlpSRxn2CzoYhi53WyqOTPZLBbFGXubcbdF698GuAH8XcVMqauI/wCV0JEkzjgPPRq860PSKvWdXptMoIXSVFQ8MYAL/VfdXBfClHwTwhTaPTtHihofPIPxvIysfV9b+Ep7IfPLj6fUzaer17N/lXJvZnsggbDCwMY1oa1o2aAtNVThrS4n2WVUS8zjc+/otQP+qndI7ETF4emGN2dG+x/LEV7/ALNSukP+rLt6BcTq9TLW1kenUgL5Hu5Rbv1K3uuak2KJz75Is0dlo6GRui6RU8R1gHjyAspmEZv3Xf0kHCPqNbvhfU8v1CxWS9FPEVvJ/T/ZgcW18en0UHDVE4BkA5qhw/E/sVwNTIRZgy45P/CyKmpfNLLUznmeXcziepW24J0c6xrn2qoF6amPO4nYnoF6SuMdJS5S8bv6s8lJz12oUYrnZfRHdcH6MND0IT1AtVVI5333A6BY+r1j3vbGy5lndysA6Dut1qNWOUi+P2C5Gjm+3anUag63hxfdxBeercrJyvs/fsj2dsY0Vw01X2/yzJ1WVtFo0gb+BvI0dz1K4alozAIoBb7XXHmcBksj/wC66XXahruWKQ8sEQ8ST1Wr0Bj6p1RrFQOUSHljB6NC6dCddTk/37f5OXfiy1RX79zYVcsdFRFxPK1rcY2aF49rNc6aaapeTzSuNr9l3HFGpGZhgjP+obW7NC8r1ao5pi1pwMBdnQU9kXN8szTfq2KC4RiwRvra9kLR8xt7Bd1Hy0+nkMwD5G+oC53h+kcKWWtI80h8OMn9Vu60kQtiYcAcoW2T7ngo1Mu6agvBy2rTOqKgMBwTb6LecN0vhxOlt5n+Vv8AcrTsgNRqXKBgHlH9yuhiqWUtFPODZrB4bLdSlsy44Rsi1FKJq9cqw+qcxh+7iHKP7rz6tmM1S518E2Hsuj1OZzYOUG8kq5KQkyu9MBN29qUTqaOGczYw+8ka0YubLY6hbxIaZmzG5usCJ7Yp2vfs3NlXNWOfI+Q5c7r2QckuTe65SmmvA0hAlsDcNF1rXOu5zupKsdI7ldY5O5VJOwCyWTyb66+0jdyQk55fzVlgGk9SqnENbZZZGlIL4sNuqNzlI052VgCyORZgAFKEwaq95MhACyYqcvHMcBNFTl1nOwFl3DQtddWN2I2DWhjQBgBK59r9kj5LAknCxHyufjYLTwFIaSYkkNwFVugAkp8MHqkchuCA2wu5QXXFhgILiUqX7kBCFCVywELoQlc4BVN+4xJIAuVU6S+Aoc8u9kircvYIIQmDe6rbwQA0lOBYIQq28kBCOlyqXOufRI3gKWR3PAGN1WSTuVCFW3kdLAIQhAJ6o6MtN2mxWVBVNIDXnld37rLlp2SXNrO7haySEhxBFisyamfdLtPKp5RsJIYalnLK0E9+q5+v07w5DzNJb+F4WziqjGAyQYHVZ4c17LOAc0oJuBzNRpa9RHDW5wkkbo3lrh9e6RsZe4BoyumrtLIDnRjmjJ26hUaXpoM5e/5W91f6ixk8jLpNnrqC4ZdplAyGLx5BYpaiZ9TUcrflCzKqXnPhRfKMKyhorvBIVD2XdI9rTpXPt0tOyXJm6XS+EA8hdLAzlIJWFSwjAtYBbqlp3PkAtdcPVWb5Z7mmmOmqUEbrQ9NNTVxi2L3K6/W9Vj0ugFJEQHWthYmmRx6VpxqpMPthcXq2oPq6iSeR2OgK89Ct6m7MuEcPses1GZfLExNQ1Hkjklc67nLjKifnc+d59VkalWmaQtacBcvq9fyR+BGcuXr9NQoxwh+o62Glqcvb9THEU2va9FSRXc0usfZeu6rVQcH8EmKKzZ3s5GjrdaT4ccPNpqV+r1jbOcLgu6Bcpx5rztY118UTyaanPK0IKv8AF6hVL5Y8niJ2PQ6Wept/9yw5l8z5XOkkcXOeSST3WO8nmt0UcyRxwTfC9bhY2Pn1lnc8sgutc9UB5IzYlVvcThIHcjr23Sp7mZsZzSHWGe6rIN8bqwFxvygk2ubZsFUCO3ukeCiQpHW1lFtimyT3VkJ5WufcX25SokmUsRt736nostn3g5Thw2VDW9VmU7CXC4yditFUcMR7m84S0gaxxB/kz8Oq4y2P/wCdrj9QtFW0MtBW1FFOwtkgeWkL0XgzRK53EWmVtJG58kUzSS3tdd98YvhZWUnEbuIqGkvR1jA94aPkcRcj9Sq7NRCGoVMn8y2+6NMaHKruXJ82ubbfdVkdbLdahQOgnc0t5bdCtS9oBtzC6acMGVlbjzWFrAKu+d/oVY4Ai2VWWkC52CpeckRJaXDDLKLG/LsVN7kG5HZS9pL7g3KiS5Ixbi+xU3cd3YQcbb+qATsQo9mKM3mBuHJ+XFiL+qhjLnbZWt3vlMlkVsenhhe175ZeS2A0C5JVkcdha5KWNuVksAuAr4QKpywO2OwDQMndZsERPsqo2XN7XJXqPwl4Bm4z4shjljI06lIkqJDe1h0V8pwog7bHhIwWOUn2x5Z7B8Afh63TdOPGOqwj7TOLUjXC/K3+r+fmvaayfJAzZXOENHSR0tMwRxRNDGNHQBameYAOkOQ3b1K+dX6iervd0/PH2OxCEaKlBfzMWqc97hTsPnflx7BYlfPHSw/ZmHAF3lZRd9kpn1Uv+rJ8oXFa7WvIbSRvvNOc26BatPV6klFcfv8AQ5OrvVMHN8mKxkmvayIxcU7Tdx9Auf4v1gV+pfY6WwpKQeGwDYnuujr6hvDvC7jGQKyrHIzOQO686ceSMyOdzOG1zu5eo0cFKXqrhbR/uzxPULXCPot/FLeX9kYc7HzTMpYhzOJAx1JXrui6azQuH4qQAeM8c0h7krk+BtE+01b9XqW3ihPk5h8zl2lbPcl3N6BUdRv9SaojwufudHo2l9OD1U+Xx9vc5/iOvdBRujY77yXyNsijhFHp0ULsWbzu91qHE6pxM1m8NPkm62dfUshppZnkBjRc37BI4dsY1rl7v+xpjPvnO58LZf3OX4gmfVVMOlwZlqHc0h7Dss7UZY9P06KghIAa2xt26rX6C11XW1WuVJNrlsd1q9frHyO5Gmz5jb2aunGvunGr/wCP6/6MHfiErf8A5cfY5/VqzmgnqzcD5GD0Xn8nPU1TY2i5ebABdPxDN5IaOPAtcrW8N0X2vXGOcAWxnmJPSy7cF2wySn4YuZ10VKylipaJgH3TAXW7rX6jLyMkeMuPlb7rbOfczz3tc8oXOVzy6o5G/LH+6EfYxVp5yymACmppZ3bgcrfdYk9Q58bIS7ys8xWRWEhkNMDho5nLVVXMWHlGDlXwXlm2K7ma+qk521FW7LWDlYPVc/GMXOSSttrDvBpYaUHfzO9VqOaw9gg+TvaaPwZXkpmdzTEDYKgjoExda56lVuusc2diCwhXX5CeiVoA3Vrngho/C1VXAYXfidsskvcuRW5xJPRVH16KXGxsovjuVllNlqRIP0Vg7BV2FxdWxjN1nw5PAeB2hZMMBJDnCzUQQ8zuZw8o/VZTnWGFtrrwJklx5QqJJOUcx/JRJIGi53WM95e65V/AUgfIXnOyhrbnOyZrM5Q51jYKty9hgJDRYbpCboJublQgEEXRdQq5S9gghQTZVueq2wkvfbAVRJJuVG5Qqm8hBSBdABKcCwSOWCAG2UoRa6rIChzmgb3KWR4+Vv1VSrcvYZIkuJ3KhCEg4IUZ6J2t6lBsgoBJsE4aAFIAClVt5Ie1kKt7GvFnC6ySA4Xaqi1c2M8H6iv0yktjVTU7mk8zbjoQqWSywm27ey3JFxYrCmpSAXNyOy2RmnszzOo0bi8xLo5WvbgghU1D2xNLWWHN2WD5oXczThOHPnkGE3Zvk5zbbwluW08XnzuV0VFTcrRjJWHp9JfzvC31PFbOwWHUXeEeq6fpfRj3SW5bFDYgALr9E04Nb9onFmDOVrNG081M4u3yA7rc61qDKOlFJCbG1jZed1M3OXpxBq7pWTVFfLMLW9TM7zBGbRtXCavXcsfI05K2NbWiOF13eYrlKiXxHPmkPlGy6Wj0/buWNR01WEa2sqW00DnuPmK1/Dmmy69rrOZpMYdcla7UaiSvrRDFkXthescMUFNw1w26vqQGv5eYk7rsXy9KGFyzwMLH1PWOT/8Aar/NlnF+tR8PaAzS6QhssjeXHQLxlz7yHmN3HN+62mvazNrOrS1cjrtvZg7BaV7tiOn6Lp6HS+hXvy+TyPWeo/i72o/LHZEubfI/JI15Fz3wQmkeH5GLj9VRfJtut7eDzc2STYpXFzneY+yguO/ZQ42AIN7pMlLNho+rT6LqrK+nhjmka0sMcg8rgdwVizyMlqZpWxiJsjy8MBuG3N7eyov1P5pjYMBJydwphcg7njBAIF7ZStAvndZMtUJqOCDwWAw3tIDlwJ2IWMTnCiRXL6GTGAdyB2K6vQ9I0OrkaK/iaGgJ3Dw7+zSuQY6zb5t+iyI5CAr1lrCeBOPB9Z/CLReDtH1mKoi4zpK+R2BEA4XP1aF9JV1DR6lp76apjZLTvb1Fxay/NrQdXdp2ow1JAIjN/UL6W+GHxjrdaOpcP19QOcQl1K8jI8uB+Yt9V5rqvTbpP8RGXdjn6f0N9NinhLZo0vxF0T4TaHqM7ZqeqrKgEl0cRDbH63Xgut6nw6ZnjRuHRBH0dPMXn8gAFuOMeJanVtXrG1buWdkhbcdcrgKh7i6xN16KnTquqPqScn9WZb7MzaSIlndJ+FkY7Nasd1y03OEFwPXKC8lgYQA3ujJpmQrFzgILeUbhMS0oBtnBCoawEUC5vupsL2AUnJucegUj0KiIOxpDTZ1gVawdingi8SJ0jpWsa3odypjaewWiMSlstibtlZbYxfBCriaDkhZsMdyMbrZXDJjtmkZ2k6bU6lqVPQUbDJPO8MY0dyvuj4f8HUvA/B1PpsbR9qe0SVMlsud2+i8s/wAP/wAOhTw/+s9VgtI4ctIx4yB/VY/9l7rX1NrtBXjet671rPwtT+Fc/V/6NWjq7V68+XwYlVLzP5R1/RYDQ2eYk4hiyT3RK5zrRg+d+/oFRWTMp4Ps7HWAF3lcmuHhDW2L5nwjW6vXtu6V55Y2DAJ2C57SKU19a/Uaryx7i5+VgUai99dUMpmk8rnXdb9lHFVe3Q+HmadTkNqakWNvwtXbqqaSqh80vyR5XUahSnK+fyw/N+DkOJNW/wA21qSRl/AiPhxNv0HVamloajVtTioKcHJsT2HUqmMm3lFz8rGgblelcN6OzQdKNVUAfa5xdxO4HQLv32x0lSjDnhHmtHpp9Qvc58cyf9jbQ0sVBp0Gm0os1gsT39Voddrm0dFLMDsOVi2zpj4JlcbvkwPRefcTVwrNWjoGO+5hzI6+AuLpKXZb8X3Z6vX3qmj4dvCNjw/AYtNkrH5lqDgkdFp+Kal88kGk0zuZ8h81ltWakyLSxO5wDbcsTPTutXw/F9u1Wo1WYczYsMx1XSrypzvn44+/g5rw64aaD3fP28mbNA2i0+DTYABYec/uuLrniWqknGRfw2ew3XV6vU8lPLNfzynw2W/VcjVeVryNoxyNv3O626NPl+SvV42jHhHI6m0ufNOd3HkaAtzw1SCj0iorDbxJPI3C11cGumDAfKwWue5XQc4joaWjYbNaOYgLq2PZRRnjP4MFdS4Q07Wk5aOY+60AZeRrn7k85utnVSGZzmN2cclairm5Wv5evlCaCAl4RTympqHHq829gqqtkTXhrMtB/NXQHw2ude1hYWWC95lle7ZrcK9cl0edjlNZcX1xc7/wtU598BZ+rPBri0bDqtcPM63TqqpPGT1mnjitFZF3JZMNA3JyfRM51ySFW44HcrFM6EUKSb+qU7XKlK8WdYdFnlsi1CPB3SAWwnJJFlJbZY5bssCNhe5ZdPFzP9OpStjMcAPVyyIiWx22WmFeEK3kvJDRytVL3hoyVLnhouViOJe66uexEgc4vdcp2sspa2wSufizfzVTeRgc+xsFWhCHAQUXRdCrcshBKTZQ51gqnOvhVt4CS55OyRCFU2EEwb3UhublMkciAhG6k2YLkqshGBubKp7yTjASucXG5UKtyyWJYBCFF+yUJKA0lMGd06RyIQGgBShCQgIUEgJSbqEPcnxugdcZBUgteLdVsJIr3Fr9wsGWAs88YPqFxIz9z9XJ4KnNI3CQhWtfzeVyhzLD0V8ZYKrKYzWUYUtM1+WixT0tK1hBIyrjgrJp4urlc7fhOdTooq3uaM2mZtjAW4o4DUStYwYWugjdI4RsG67DS6NtJB4slr2XGvtwbNVaqo7cmxY+LS6DmxzWXG6jWmeZ88jsdFm6tqJqJTG13lC5HU6u58Fh90NPRl9zM2mp9NO2fLMKsqXTSnOAuZ1nUeRn2eJ2Tus7Ua1tNA7PmK5/T6KfV9Ta1oJucr0lNahHvfCPFde6jO6f4LT7ylydNwNw8a2tFZO37tpuLrJ4/wBfD5m6RSSfdR4dZbrUdSg4X4c8CEgTubYAbryWeeSeZ80ri57zclTT1u+13T4XBxer3w6ZpI6Cl/E/mYc3RK7lEYffdKHADfKW4JLLX6g9iu9F52Pnc5AJLOBA2N1E8gkndKG8gdmw6JD/AOUrrnH6pJcFTeSbAneyXAd6FZNE+jZO77dG50TmEDlOWu6FYuxPuqk2B8DgcwJxcdEpBsL9FNuuU3L5b39wrOUVsq5rHB3TNOMZ9EhaQSCLFMAW9bHulTYDL+0SR0IpeWMxOPNkeYKsPbuMLHsb3J5ipvf2HRWqYjMpspB7Fbnh/XJtF4ho6+GQsLXcjrditHHHJJDJK3l5Y8EF1j+Sq5vLjcq1TysPgXdPKOi4tla/ieoqIsR1P3g+uf8Alc48knf81mVlR9ppoHON3sFvVYLhdp830SzeEkCW7yJzG+2e6YcwF3fkocSbAC1khN9ys3cDA4PUfkpOQMYUiGTw/EcAG97oI2spv5IDXW6qxlz6pWgXsRdW8pB6hWRTAxm72tssqNhcQLqqFo5sg2WwiYC7DbBbIRMls8FsMIxgr074U/D+bjXiqGB7CNOpyH1LyLgj+lcVoul1WqalT0FFC6WoneGMa0Xt6r7k4A4PpOCOEoNNiY37VI0PqJBkucel1i6trvwVHbD55cfT6mXT1fiLN/lXJ0rY6fT9PipKVgjggYGRsGwC0877kucfVZlTNzvt+Fu5WlrZ+VuMPft6DuvB0wb+7OrfYkvoiTMIWOmIBkfhoXO6nWEO8EOu45cVsnvbFTOqpNgLMH91y7/EqJwxovNOcegXY0tScnJ8I89r72oKEeWZukRMaZtUqTaKEXBK831/U5NX1iWpcSQ48rB2C7DjDU20Onx6JSECwvKVyGkaRU6lMOQfOeUH+kd139FFRT1Vm2ePseV18nOUdFVvjn6v/RtuDNFbV151Cob/ANNTfKD+Jy6PVtSbLXNp2G4Bysmrkp9A0JtNCQ0MFhn5ndSuC+2vleXtN5JXcjP7lZo51djufC2R18LQUR08fme7Om1HV2U2mz1xP3cQ5I/9zl5e+pkmnDHPJlqH8z7DYLZcTaoyWSHToXg09KPNy/ictNRXZHLqEgsflZddfQ6f0q3J8v8AaOL1DU+vYl4j+pm6nWySObTxkhrRyNaF2dJTf5boNPRtBEkg5nd1x/DFD/mevsc8B0cPncSuu1qqbBDNUki9uVgSavHdGiPjc2aCDUJXz8nN6nUievcGf6VMOVtzguWhr5Ws5YQbiMczrdSstr8EuzyAvfbutNVG0TpJTl5Lney2VRUdl4Kpty3fk1QPNXRtJyTzFbuQkNfM4km3KLrQaMTW6w+S9mNXUMh+0VTIgPK3zG61ySXIkotPBrpmeBTczt7bLnagl9UyL+kXK6PV5Gsdyg+pXM05MkksxyXGwur6+MlkFjLL32jpHPJ8x2CwX/dQAdSLlZtQQ6VkLTcNF3FaqtnDKWecmwAsFZxuXVRcml7nH1r+eslde+ViA4NuvVM8lxJJ+Y3VeLeixykezhDtikBB5QP6kjiC/wBArRd8mcABUusbnpdZ5miIRgOfn5W5VUhLnF3cp23II6HdVPdd1ugWO2W2C1IOtgrY288rWjKraLrLpY7S8xwAkqh3SSCy+ZtnNZbZV8wDjfJH6KwkulLrLHebAnqSuhPYCRDiXuTtbYKI24/dEjrDlCyt5GB7xblaqkIQ4CChCgmyqbyECbJHOsMqHOt7qsm5VblgYC4ndQhSATsq2yABcpw2yALBSqmyApAQB3SSvt5WpG8BSyS97Wjy7qkkncqEKtvI6WAQhSGknKVsJABJsnDQFNrKVW2QEIUE2QISl5lFyhQIIQhQJ9IyRBxuMFYkkebHdbItG4VT2Bw2yvPH6oUjTT0/NkAB37rGBdG7lkBW4kiscjCxZoGu3HsVZGWB0/KMSzHZWVCwyODWjCxWwSCQALeUMIbbGVLJ7Bc0lk2umUYYWuIysvVa8Q0/gsOTjCUTspqYuJzZc5V1Je90rzhYoVucss58a/Vs758Ixauq8GNz3HJXNT1WXzPKfUKx08xaD5Qub1KsNvCYcdV36KeEcHrXWIaatteOPuYdbUPq6rlbc3OAvQOGtPh0XS3V1VYOLebK53hXRhVz/bJx5GG4un4w18Pd/ltI+0bcOIV1ubJKmHB5Hp+NDRPqur+aXyo0Wv6vJq2pSTFx8MGzAtPfcFRdRzWuLb7LrVxUF2rg+f6nUT1FsrbHuwNsH80wc5oPKLh2FW1wDSFAdi17eqsTwzFIYtLbX+U9fVV33Q9ziPM+6C5tmhjbEDPqg37FYt3E75Ug4zdLtlGSbnJVeSGw0ygqtV1GDT6JniVNQ7kjb/UeynVtJ1HRNXl0zU6d0FXCbPYeix6SqnoqqGsppDHNC8PY4btIOCs3W9c1LiHVDqeq1Hj1TmhpeRuALJ4N5x4C+3s+pgTOe+QOfYEDp1VIsTYkocbOybpSST7Iye+Skd2DY2v3UytbHJyB4eP6gEvT1SWvcgWQyAbmO5J+ia5OQL+irHmz2TgcouCjHIrLGHykOH1VZAupaCRbmN+t0B9ibADuSreVuIxCSDa+6hzCCNiE5Atfa+6i1rEi19rqtw9yZJF7AEmw6XVrHFvy29yEjWnorRgWIVsYise3MbkAewTsZne6GtKzImNLAOTJ6rTCOSiUsBDHf2C2MMJ6i/sEkMGRheq/CL4fycZcUxunjP8AltI4PmednEZ5bq+dkNPU7bOEc6yTskoR5Z6p8BPh39gov/WGrwATyi1Kxw+Uf1ei9xqJvKbElxT8kNLTR01O0MiiaGMaMWAWC9xdIT269l8z1OpnrLndZ/L6I7ldaorUIlE72xxkuOBk+p7LRAPrqs3+QfN6DssnUqrmIhjzfAVcr49N010j/mtc+pWiuLjHPl8HMumpyefljyanXapvO2nDrNaLkAdFiUnJp+nzazVYe4WiB6BY9BDJq+pkyD7sHmkP9lruMdS8Z32KA2hjFiuxXVlx08f5/v6nn7b8RlrJ/wD9f8nIVcs2q6oeQOfJM+zV6ZpelR6XRRxYMgbd7rWstHwToeHa1VR9OWFrh+q2HGesDSNGdHG4faqjAHYK/V2u62Olq4X7/Iq6bp1paZa7Ucvf9/c4ninWnahqppYHfcxHluuYqa+SOU+E4tDG8ot0SteI2PmeeZx29StdUvLhyjHUr0tGmhXFQS2R5e7VWXWObfJTFHLWVLYW3JeclZmpSMj5aaLMcItjqVlUkI07TXVbxeeYWYOwWvpaeTUNVgpG3PO8XstCkt5vhBjByagvJ3XCdEaHQHVL8S1J7dFqOJq0GUQh1mR5PuuvrXR0NEI23DYWWyvMq2Q12oBjjcPdzuudguPpl6tkrpHptSlVVGmJIa77ExhFnTHmdc9Fotfl8KjLW4c/A9l0AkD2PmHU8jAB0XI6vIarU2wN2aQ0D1XXohlnOW817Gx4cpvsulvqD80hsMLqKWJtLpE1ZIbOkwFqmx+G2lomA3AGPVZXEdX4VNFRMd8jbW9Ulic5KPv+gynluRx2sVbntkc0/OeUWWJT2ZG1owGi5KWtPPVRxE4YLlQHhsRd3NgFviWKPwpBKS2Bz9i82+i0GvTeHQRwA2Lzey3tRc8jDuei5TXJvFry0EcrBZCXB0dDX3WI0r8JLZynIS3sCdysbPUpDNxG+R3sFS4WtdWvIa1jNzuVQ87uOSq7GsDpCjY+qrIu5WNuR7JbZXOsLUZNHF4s4FsBZjxaTlaAAqtPYQ10h6q05kc4rp6etRrT8sHkQm0bnfQLFe0lzWhZEpuWsGwyqQfvCkt32GQziGMsFTumcblIsr2CChCUnsqW8hSJJVbnAKHOsq1U2MSclQhO1vUqtsgobdOBYKUbqtvJATWDcuU2DclY8jy53okbwMkNJJc2acKpCFU2OCjfAUjJsnDQErZCGssblOhCRvJAQo2UE3QIBKhCFAghCEAghCFCH0nHKDt+Su8rvdayOXrexWVHLc2OCuC4n6pcfKLXMvusaSMi5WYHc2Cocy6QRPBhRRhz8BbOJoiFzusYWjz1WJU1hA5WnKGHJhacti6srOd/Jfyhc3qmoADwmFTX1wiYc+ZczUVBJL3ldOihYycXqPUIaeDjFiVdWI2HOStfp1FNqte1jQSL5KpeZK2pEUYJJNsLuqSCn4c0R1VKAJS363XQk+2OFyz5/pNM+q6iWoveKobsxda1KLQdKbQUxAmc22Oi86dI573Pe7mc43JWTqNZLX1r6qZxJccDsFhXsVbVV6a35Z5zrXVHrr8Q2hHZL6FnQHqps4tLgMBVEHmtdTc8pFyO62RZ5tkG10Oa4MD7eU7FQQQL9FJ25Qcb2RK2VnsFIOPRDhjuhuyRPDFHjYZJWxhwbzG1yiRhilfG7dptdRe4tsFIF/8AynSyKxGtuSO3RO0Z/mEouJL9O6sOHXJF0YrcUrc03zv0UWA8rhcrY1UdJPDE+ga4SNZ9+x2BfuFrt8qNbkksALnyhbOj0LVa/R6nVqWidLRUp++kb+DNshYAuAAQQe62NFrWq6bQ1VDRV8sFNWDlnha4hsg9R9EzhLHw8ippP4jWAA2tudinay7gJCQO6ZoaQRt9UwLb/wBitKgipsqe0tcRcEdD3S7YGfRXOF8AY6pDg4P5pZRwAg3cLEC3ZMbuADicbIHL1H5Jw09VO3IBWNNybY7qxoBzdPG0+ERflHZWMjxix9lbGIjY8bD2Wxp4gQCQVjQRm4W2gjccAEna1rrbXA519mEbDRdIq9a1im0rT4zJPUPDGgC9vUr7n4J4To+CuEqbSadg8blDp39XOXnHwL+HDdF0scU6vADXVA+5a4fI1eyVEm/6rw3XOo/ibPw9T+GPP1Zu0On9OPqz5ZiVEhJxucBa2uqBTw8gPmO5WXI8MY6Z+ANlzsjpK2q5QME/ouTRXl5fCDqbe1dseWNRRGWZ1VLsNrrnNe1J1dWtpKc8zGnlAHUrc8Qai2goxRU5+9cLEjoFqeHqJjGyavVN8kfyA9SuxSlGL1E19kef1MvUmtJB/WTM2Yx6DoYgaf8AqZRdy42m02TW9YZS3JjvzzO6W7LY6rXTVtU6S3MSbMaun0LTf8s08czR9omy89Vf3vTVuT+eX7/IpjUtbcoL/wBuP7/MzpHUunUBNgynp2fTC8N4i1mTW9ZlqCfu78sYvsF1/wAQeI8DRqSX1lc0/ovNS/kjL+pw1dXpGjcI+vPl8HI67r1ZNaar5Y8/cSol83K35WfurdJoHahqAa65jZ55D2AWAedxAAvn8yuoEX+UaAICQKmpHNIeoHZd2yXbHtjyzgVQ37nwjT6xVmeoc5p5Ym+SNvottwLp/iVs2pPZdsQsCSuYqPvpmtaLknlaF6jp9GzSOF4ITyiSbJtusuun6VKrjy9jsdLq9S31HwtzScUV4EPg82ZDc56LiBIfBfK02fO7w2ADosniXURPrDqWJzbjy3Gbd1jQuZJV3jLnRUzLA9OZWaer060X6ifdNyL62dlHRuttEywueq5jQojW6z4rvlYeYlZPENUGxMp7gvd5nALI4fg+yaXLWSkhz9gtkfhht5K4rEHL3N3Suaa+WpJPLH1PdaPUanxqpz3G5y4lZ7pHMoLOJBkNyPRc5WyuMbrY8Q2FuyWuPxZFiuEYH+o+SZ2S82Ci3PVNYNmBWEtiAvbyC+VTE4tgfMd3ZutSRrjvuJJIDPJK75I2rjaxz5nyTW8pK6Gskd9k8IfNKclanV+Snp4aVhA6ut1VVrwjtaGOH9zTOPKBbdQAXOa0bqHm7lk0LAZXyvIDWC+VlTy8He4WTGk8s7hbIWOckDfqrXP53vcCSXG91X3WWyWR4oi+LdSma259dkuxV9K0OlHMcBZku6SQ5nxDw4msA9ShouTc43KObmcT0ClvyOI2Xc2UcIVGK915XEdEkbfMcXKbv3JTCzQe6xS9xyh5sT3Vd0O3Lik5iQsM3uMkSSkcbBQ42CrVDYwI3UgXNgrGt5MndVtgIa22SpQpDSVU3kIAEpiWs3UOe1mFjOcXG5SNjJEueXE9kqFCryOSgAkqWtJOVYlbIQABspQhVsgKCbIJSqEAm6EIUCCEIQCCEIQICEIUIe3wVtmgGz29wtlFKHMBBuCuLimdG4FpI9Ft6auGPDfY/wBJWK2hrg/Ruh6pG1YZ1EU1tzcLJEo5b3uFpoKlr2ixAd1CyfFAaTeyxSgdz4ZrKJqJy4mxsFp6qtZC0+a7kahqDImkMOVzcsxmeXvOFrpo8yON1HqUdPHtg9yaicyOdI84WhqZ3TS8jPYWV1bV3PhtK3PDeh+PIKypFo25yujtBZPm0/W6tqfw9T28s2nD2jwUNE7Uq2wxcXXL8Q63JqlY5jCRTxmwHdbDinXfHlOn0Z5YWYNuq5LY2T01tvvkV9c6lXRUumaN/CuX7shwuLhU+XmyrweUm6qfYOW1o8IxHEuffogOJU9bdkhd5iQlbwIxycWOR+ylrC4Ejonjl5Y3s5Q4P3uNlXm+Cmz5EZIvfy7/ALpCLG+ycDspLDugwYFc0CxGxQWc3WwCzJqOSPT6erI8khLQbdR/5WMHhgIte6trcWGcHF4ZUSQLBSLDr9VDvKovYWI8qXh7lLHbIA1wPMCdiMJAOg6d0eUCzc3TMDS9offk62TrwKxnSue0B1rD0UAqZCwuIjvyDa6lg6D81as5K2OwhzSwtuehVsMngy+JyhzgCOVwwqm5/wBrh6os6+SCr0xHgZxLnl9gC43sFDRnofdSLFwaTYnqnfG6N/Kci17gotE+hAsT8qcAEeUYTMjcdgD6p7Em21kyQrwTBEJH8rn2A7q5sXI8i+E8TQASW5V7IyckLRCCwZbJ4LYYySPVex/Bf4eu4s4iZX1kR/yyidzuJGHuHS9l55wxw9W8R69S6RRRl0s7gCf6W9T6L7n4U4couEOGabRqJgBY0eK+2XO9Vx+tdQWlp9Kt/HL8kU6aj17O6Xyo3jjHBC2KJoZHGOVrRgALXSyFzuW++6umlBBN8Baqsqfs9OXbyPwAvAVwbeFydm2xRWXwjB1asBd4EZw3dY7XM07Tn1kt+cjF1VSwmeoMklgxpuT3Wm4j1J1TL9nhN2MwAOpXaqp7mqlx5PPX6j04u+XL4NVHHPrWsCPmJ53XcegC2uuVkTGM02mdywQixt1KupYm6DoTqmS32uoH1AXPU8c2pV7YGC5cbuPYLpRasl3/APWPH+TjuMqYKvmc+f8ABstC08VFT9tmH3Ufyg9StnxFrMej6RLUvd964csbVtGQw0lKIhZkUTbuPReN8X68/V9Vd4bv+mhPKwDYqvS1PXajL+VGzW3x6ZpO2PzyObqp5KuqkmlJL3nmcStfLL4klgfKMBX1LvDh5d3O3T6Lpk2ranDRQtuXkcx7Be0zGEcvZI8BXCVkvds3nC2ixzX1atH/AE8J8jT+Nyq4qq2idsDOUvd5nnt6LrNWqYNNiZp9OeSnomeY/wBT15TqFY+qqZKl7+Zz3YWLSqV9nrS48HXvjGqCojz5LqGZp1WHINjgFdfq/EVOyCR5kZanjsBe9yvNnVL4Xl7CAQN1pq2ulfCYy7mubk91vt0aumpS8GjSSlCLhHyK7UZJ9RlqCTzPdhddTN+z6bGJLAuHO4kritMgdUalDEBe5vZdTrc7mPZp8DfO4AOV1i4gi26K7kkakRv1TVHyk2jBsF01UBHHT0EV+7ljabSR0xYwn5BzPSfaXT1M9Vc8o8rUj3e3grb7uBqyS9wDe3lC0VQC+qAJwwLb38hfsGi5PqtLM7lhkmcT5tlZBYBHk1NZPz1DadmOc59VfVODY2QtxfFlg0X31fJUE3DMBXl3i1L5CcMVkX5Om4Yaj7GDP561rQLhuwWh1SXxK9wuDy4W+/FJJnAyVysrueeR1tys153NFDyV9z1WTTkimeAMu3WN+Eq1j+WnIBycBZk8M6fgx3GwIS7WUuxYJb5J7LHORYhiCTgXKyKdpjYXOFirqSACmM78udgBPMAyMN6lXV1Y/wCRhT8EM/0ySd0ziRBYdUpuIR0umd5mtaDhbIvKIU2AcAkccEqwgAFyx3HylU27bBRS8+XJVYva5TGxNlDzjlC5lj3LCsm5QBc2CACTYK4NDPdUNgIDQzPVQTdSTcqQ3FyqmwgG33Svk5cBRJJbDVSSSblI2OkBJJuVCFG+FWMCdrM3KkNAymSNgBCFGyQJKUnsgm6hQgIQhQYEI2QgQEIQgQEICECAhCFAno9iEzXkEG+R1TJS0dFc9z6TXc4PKNlT1xDhz4I6hZNTqnLDYOue60eWqmXmJycLO6Y5yd5dashVhclsszpXFzjha6qqg0FrSipqQyPlajStMm1KpBcCI+pV2Ull8HlLr79bb6FO8mZOiaQ/UaoSyC0bc3PVbziDWYdPoP8ALqEgPIsSOiTU9Up9EovsdLbxLWwuGmnknlMkriXuyhGPqPulwdDXauroum/B6Z5tl8z9iC4uJJNy7JKTdygFFzdbz55J5eWQb7lHMA0gi/ZM75eYhVEkexUewjF+iS1nEd1kxT+E17eQODxY3VbWxlp8S9js4dClxlFbKwTsEw3CUNIPcd0++31UTIM3LrWws6OnD4+dguBuqKWmnqH8tOwPd2vYrp9D0jURWxiTTajkcbOHJcEe4QssjCLk/Bp09ErZKKXJumaBLXfBSbU2MJ+wV29ujmn+7V5u5hacjK+5OGfhtA74NajpLICDWXlaCM36f3XyRxdwvU6BWmOZhB2t2K4PSurV6qyda5y2vqjra3R90HOt57Nn/k48gc1xn0S3u652Vpba991WB5v5lejkss80xD5TcpthcFMG3IwHC+xTfiuW8vsnwVsgAlt8YTRdj8vW24SnPT/umDXDNiArl7oQZ4AJ5Xc7ehARYWt+qjHQW/upZY+isQMDBuLAJ27gbrIoaOWtqRTU7R4jgTc7Y9VDoXRTPjfYuabEtOFckDYaNjeUu8Qgj8KdjSVDLEWtlZEURvgq1RKZPBdDF3WxggL3Na1he5xs1rRuVRBHmx2C91+B/wAN/wDP9XbxJqkJ/wAupDeIOHzu77I6jU16Sl22eDnNStn6cT074L/DpvCmgN1vUoh/mlY0OAIzG0jZepSvOQTlXSva0ANaGtAs1oGAFr5HlzrXyd18uvvnqbXdZyzvQrjTBQiJNI2xc75GrnqmU1VTYXybADoFn184deNrvI3f1WLC1tNTvrJjawxda6Y9ke7ycy+ffLt8LkxNWq2UFF9nixI4ZK0miULa2sNZUD/p4c3OxKqmM+ralyM/GfyCytbro9L01umUrhzEecjqutGDhFVR+aXJw52Rsm9RP5I8fVmn4i1X7bXlsbj4bDytAW/4d0/7DQ/aZR9/LtfcBc/w3pTtSrvtUzf+niN8/iK67U6+LT6GSrls1kbfKEdVJRS01ROnwcnLXX/yOW4614UWnjTaeT76b5yDsF5OS0EuOQP1K2Gp6jNqmoS1cpuXnyg9lgCF89Q2nYbd16fRadaalR8+TxfUdZLW6hz8cI18xfLJzEb7L0bhyjj4b4Zl1iqAFVUNtEHDYFavQ+GW1eoCoqRyUlP5nl2xVfE+vDUK3wqdvLSQeSNo2Pqkuf4iaohxzL/Bu00VpKvxFi3e0V/c0mtVzpIjGXEvkPM83XJVEvmuDZrdlsa+UuceZ2etlo53i9gMBduitRjgyV5m8sxauWzOUZc7daioN3AXWbO/zkuOStbM83cbLZg7VEMG14fkip6qWsmGGDGVvdLgNXPNqk97E+W642gilqquKjjPzu8y9Fq2so6GGggHmtY2WOxru25ZNQsP7mBU1Jio5HNJb4hsD3WJzhtLHC29zkrA1Sqc6sipGOON1nwMvK1t78oUS2yUTXbFDVjiylbEDYu3XO61UeHTiJpzay3VXJzVBcTcN2XJV73VeqNiB8rTlHwX6SHdPL4Rk0jRT6dzX8zt1LWltLcnLsq2Zt/DgaMDdJW4byjNhZWpYOhBdzz7muqpPD0+V97A4Fuq5W2Ce66PWHmKhZHcczlzxwB1KxXbyweg0scQyIRZikGzAT+SiQ2AHVITgLJJ4ZtSFdl10oaXvawC5cU2SVl6fF4lVzkeVmVmUXOaihuDOfZojgb+ELHqLeM1gN1kN88zn2wNljXvOXHoutZHbAq2K53+drOgVrDzNJWK43kc85PRZLRaNo2VFLzJjvgWXDQ0LEc4k2WaQDzOOwWvJJe43VOoYUKB5lBBcbD6pmi59FIIC5sxgDQ0JSblBJJUgWFys7YcAAALlJJJ0BUSPvgbKlVtjpATcoQoAJVbYwZKsDQFIAGEdUjYCUIUE2SBAmyUm6L3QoQEIQoMCNkbIQICEIQICnYI2ChAgIQhAIKFPRKoQ9NQhK54aFefQW8cg9waMrAqZg1pv9FliGecczB7EpoNGb4ni1Dy478o2CVtAWl1Go2rWE/Jh6do9RqM/iOaRH3W9rqyn0Wk8CnA8Qi2Fk1+qQabp7I6aOxcLbdVxFTPJPK6SVxJKtjV37s6Wr1Wn6DR6On+K6XL9jFqZZaid00zi5zu6oyr3AE5VRutHbg+a2Wysk5zeWxSeUpb5UuuMFKASlyV5LZZjIG3AHKLKl1iOygnsraU04qB9qaXRHBscpm8kz4Kr290B5DC38JTSCMPd4ZuwHyk9QkOUvArDtbCtPJyjlFndVUBmw3VmGjOUyFZZDNLBK2SF5Y4bEL1TgT4q6roFbDHWU1PXwcwB8SMF1vfdeTE9lk00hbI1wOxvdV2UQui4TWzNml1MqJZXHlH6Y8JcR0HEXDlPXUrWwh7A50X9OF4n8X9C+G+oVsh1WsfQ1ZF+aJoIJ/MLgPgbx7WR61W6XUzkwvpXcgvsQR/yuD4w4rk1+aop6p5dJFK5oJ9DZeC0vS9XHXejJ4UN+5c4fH+z0NEKalPURk+2S2Xv9H9jleIuH9I0+ZztJ1xlbFfDS0tcFzHJ5rk2ssuYNubAD+6xHG7vRfRoRcViTyeW1EoynmEcEbvJ2/up8ux2TMZI+7mi4ZlK9xL+a1ir/GTGyLC1rY6KRtYux2Ugi+W39EHzm4FgOidYFIcS11wN1a0YwLhBaOUea7uyZgPZWpbiMyKaaopy99PKY+YWOeiGWc6xOSb3KrDbutssljL7q6KEkxjHym4z2Ky4W3sLZSxR4HX0Wxo6WSaeOGBhfNK4NY0dSVfFeTDdZhHTcD8I1nF/EtNpNMwmMuBmeNmjt6FfcOkaVRcPaHT6RQxhkULQCQLXPdcR8I+BI+DOFGVNSz/AOpVbQ55O7Qc23XezS2Bz7r571jX/i7vTg/gj+b9zfo6PSh3y5ZTPL6+ywppCyIgHzu/RWPeSebqdgtVqVV4EZaMvK5lcO5pIa6ztTZTfxakRXwDdxWLq85qC2jp9hiw6qGl1LROne4iSTYJqJjaendX1QzuLrpxxF9/OOPuciXxL0+M8/YxHRxaBp75ngGoePyXF8tRrOqNhZcvkOT2Cydd1Z1fUuLXEtvZoHVdJwzpX+X0P2uYXqJRfPQLqLOmrds/nZxGvxt6or+SJuaWkh0+hjo4cBou4rzDjvXft1aNMppPuY/mscErsOLddGkaU5jHf9RMLC24Xj3iOc588mXE3PqVf0vTOUnqLP5fco69rlXBaOn+f+BSQzYjAXQcOaJNUO8d4PnNhhYWgaRLq1cCWnwmm7iV6DqNVTcPaI+fytcG8sbR3XT1eocWqYfMzi9N0SmnqbdoI5vizVo9MoRotA4NcReV4K85fMDdxdgbKdQrJKqpfPK8uklNysGV1mWGw3uunpdOqYKPnyUam6Wps7nx4+xiVc4F8XJWpkfzEkmzQraqQveTfC11TIGRiNt7nddWKNtFWEkY8jweZ+/Za2eTNicDdZc77NtewC1hBnmbE3LnmwTTl2o7VMPJ2fBFC0mbVJgC1g8t1uquoIbLVvxvZSyMaZoVLQRhofIA51lqdYnIibTs36rFFOT7jBOXqWN+DUaex9XqUtVITyg4ut8x3hQOePmdgFYtDAIaQAfM8qyqktIIwTZgVnLwJbLvlsYFXII43Ebgblc/p7PEq3zOznC2GqyllK7+pyp0qH7i9slNjc6NEe2pv3Mynj553SuGBsqZ2eLKB+G6zrNjidfJKx3C7wCbeybODXVHJyevyc1U2NjbALT382FsNYeH6i9rSSG7lawOysE3vk9HXHtikLIfN6pTvlS750oySSsMnuWona56BbfTorUb5DjmWn3IHcretcW0bI2gBbNFWnNyfgEuBHYYQPqsHmDQ49SsuV/LE4Ba0kkZKt1MlHYKJaOZ7R3WS91nWHQKmnF5C87BOLuu7uqKflyMM9wZSnqSsADy3WVUnlY1t1inYBZL5ZlgZIL2bhQB5clS7DLhKNgsM2OMLAXKrkk5hYbKHkuNgq3YwsrYUiEIQGlyqbHANJVgwLI2FggJWwApQoJSchAlKhChAQhAUGBTsi6hKQEIQBdQgAXUnAsi9sKECAhCEAgo6KTgJUSAhCECHphDj8rSVfFR+bmkIcOyy2MaxvK0WCZFybPsNPToRfdZuyGtawWaLBSS1jeZ5AA7owGlzjYBaHVdR8QmCI+QYJ3DlbXW5Mv1usq0FPqT58IxdSrjUzGxIjbsD0WsLsIe8XVRcSVvSSWEfJdVqZ6m122PLY+CCTuqTsrDslGHXcL+ihkZUckKL26JyLuJAsEpHXql8gKyOqW5GVLjlBzvsq8bgIGRfomHVQBb2THawTYIFgRcEFQB3XplRDwFU/BmGogPg8TwTAOHV7bi/wC682e223VCt9ybxwW3VOvD9yD5etypa4291SQ4G/VWtFyT6K1FCZ1vAmrHTOLIZQ6wex8f5tK1WrTX1qt5TvM43HqbrAoJ/s2pQzXwx11FVL4lbNJ/UbpFBKxz90dCWozpVV7P+wr3uJIKq626lSXA+wQfUY6LRg5rYXINwbeiUvDtxtsmd/pjzXclFgm34KmDXYsU4ABvsoa3JI3TM3GMKyPsxSxoa7Nh6FWNvY4uUSFrnDkFgrIh2weq0RW5W3sSwHZyzYm332VETLu7lbGCMEgLTCJltmkWRRtA5nYC+hvgR8NzW1LeLtYhtTxZp2O6+u682+GnAlVxtxXBTBh+wQODp5Nr26e6+2aalptL02DTqKNsdPA0NAb1sN153r3UVTD8NU/ifP0Qukpds/Unwh5pcYwALAdgtbI/mJJ2Ctlk5yWg+5WMSDdx+Rq8RCODrWS8FcsoiidM856Bc8xrq+uLjfw25Kya+d9VOIo7gXsAEVBbQ0baaI3lk3XSrj2r6s5Fs+958Ip8MahqHIP9CLc91peKNVaT9hp3Wa3BW2r6yPRdHI5h4zwvPGvl1CvEbTzSSuyuppKe+XqP5Y8HD6jqvTj6EPmlybbh3S/8w1D7TM28MW3qV2880UED55DyxxC6jT6BlBp8dNG2zrZXIcd6w2CmGl07vM7L7JW5azUKEeP7F9cYdM0bslz/AHOB4h1WXV9WknLrsB5WBa6GlmrayKggBc5xypsAeblu44Y3uV6Jwpw//ltJ9tqW3qpsgH8K9PbbDSVLH8jxGm09nUNQ2/O7Zt9H0un0rT2wtHyt5pHrzHjDXhqmqPZGb00B5WjuV2fGutnT9NGnU8g+0z/NbBAXkspPy3wMknqVn6bQ5t6izl8f5Ox1XURritJVwuTFe7zcxGT+iwKuoAaWhZFQ4tYXXydlo5nHmLnO2Xp64HHor7nliPILr9lrZXl0jn9AsqWS0Z7lYEpAaBf3WpLB2qomHUvuLXyVseFqA1uuR3tyx5N1qpHcziRsF3XB9K2k0ubUJi27/K1ZbpbG+yXZUzbVYYax8zmgiMWFlyk73VNcb4BK6XVJhFp3laLvzdcuwcrud3zOOEK1hHMhssm6hc1kZkG0YsFrXlzmueTl53WZUvMdJHCDYuyVraiS1m82GjZFe4K4ts0WquMtUyBoO63sMH2TT238rnCwWDpNH9t1Z0z8tYVtKp/j1vI0+VmEqludpLZQRhyu5Q1u5WP4oihmqX2wLAK6pPmdbPQLA1FzafSHEtuXbX6oSeUdHT17nG1L3STSPccuKx2EC5TvJIJPVVgWbYLny5OuhDcklHT1KlwsLBSBYqjG45MbOaZgJW2cTgDAAWDSM5py92AFlF/M51tl0tL8EG2K+SudwERtlYJwFk1LgGhoWMRkDqVi1Mu+Y6MqBnLAXEZKYA2AVpaGwtaFWTygn0WjHbFBRiTm8vsqXG5sExPNISUp9FyLJZbYwziGxgdVVuUXJdnojdZJSHIcQBhUndWPwkDbm5WZsZA1t8p9hYI2FgiyRsgKUJSUnIQJUIQiQEIQAlCAClF1CAQQhSBdQhAF1JNsBTeyVAgIQhAIIJsLIJthKiQEIQgQEIQoE9gUmzWlzjgZSSzRwMLnkXAvbqVztfqjpyWxu5Ywbg7FX11Nn2TX9Rp0EMzeZeEZGo6pz3igdZv9QO47LQSSdAofLe4CqW1JRWEfLtdr7dZY7LH/AKAkk5UgKAFOwUOcDj0CYC7fVQ1l/MVaALKxRAU8qTr6q923KFNM1oq4XPF2tcCfUKOOQrcwpMvvayi2F0XFMmn1Ooxy6dEI2+EA4DuAFVVUmjt0GGennLq4nzM6BT03lhcHlpPg0Yxuo3PYK3y8hB3SD1UwVDgAszhKdrIzbKZsbnXIaSBuUMZ2QeSo+YWTtBNmjF1BAv6rIhp5Z4pHxEXjFy07keiaMWiJFAbyT8p6Il/1LjYotnJz1UEi190MBfAFwNrNsUEnvgKLuATA3aTaxToqaFAyLC5Vha5tuZtikjvfex6K0Oe59nuufVFCNClpNjsrg2w5gEtiHW3VjWG1r4V0ORGSGg+6ujZm26Gx32WVCzYWuVrgtzPOWEPFH+S3ej6XVatqVPptFGZJ6hwaBba/dYEcfUA46DJK+p/gR8OBplD/AOqtYgH2mYfcscPlH5JNdq4aKh2y58fcwKDvn2I9M+HvB1HwTwnBQwsAqpGh0z+pNl0FRJnlByVdUT8oJJyVri4k33cV8ucpWzdtjy2d7ChFQiI838gPuVgVc4LTGw4H6rIqJeRpjYfMdysKNgv4svyN/Vaa1j4mY7ZN/CilobSRGpltzEYBWtjna+SSuqXDlbkXVmozuqpC0HljbuuJ17WHOH2SB1om7kdV1tNp5WvHl/kjhazVw08e58Lj7mJxBrL9QrXHm+6acBdDwVo5LXanUNsD8t+q4zR6GXWdZipogfDBu5ey8sOnUDYrhsULcna66PULI0VrT18s4vSaJaq+Wsu4Rh6vqUWladJVSOs+3lBXiWo1s9dWy1Ej78xv7LoOK9efqlcYmE+Cw2AC1Gj6RLq+ospox5Abvd6Lb0/Tx0tTts5Zzur6yWv1Cop3S4NxwdoP22o/zOsZ9xH8gOxK7evrYKGjkrJrBrB5Wq2KGOlp2UsADYoxa/dec8a64auq/wAugd9zH89tiViXfrtR9P0R22q+laPC+b+5yuq6hLqNfLWSuN3mzQegWlqCGgNvk7rMlcC69sdFqqqYAudiwXsaa1FJI8UnKyfdLlmBXVDW4G4WldIXvF75VlXO5zj6rEjf5i9zrALpRWEd2mrtiNO7zBo6LXTOyTdZE0gALjudlgSSXdZRnRpgNBEZ6mKEOsXuXayVXNNTaTRhrooQOchcXRGZ9aPBALzhuF3On0UdBTue8l0pHM9yyywnkOoaWEzD1ioMk7IASA3oFhUoEuoNbzYZ0VFRPzTy1DnEDpdXaQ7lp5qx9rdCeqEnhYKY17GTWTl1WbuFmhaqaQmN7r74v3UGoMpe+1+YrM06kfX6hDAAOUG5St9sS6FeGbLT6X7Dopldh0i18Qy+Qj6rf8QEQNZTAgBgsQFzc7/Dozg+ZV1vuj3e5uhHcxnuMjiAbAndaTiap8kdOxxsFu6duPEcMDIXH6xUGo1J5vhqM9kdmmODWFt8dkbBMQevVQd7LEzUivd11OALotuix2HVUt4LUZdP93TueRkoBcWW2ureTlp2i+Sq3nlbgLa32xSFW5RJYy27KGAumBthXQwGQ3Ox3VhYGSWCywg5S7mOi2TDQOyxZHBsRJ3KvlPlABWFVOAaAn1FnbEdIoBvcqDhl+qL+XCh+GgLjSe2QkNGLoJsLKOgUHoszYxBF8lF+yHHNlFlUwkqVCglJyECVFkAIKhAKEIsgELKeiOl1F0oQQhSBlQgAZUk2QTZKgQEIQgEEE2QTZKiQEIQgQEIQiEEIQgE6+qr3zuu55cAcDssBz3O3OEqF1S+26d0nOby2CkBACYBQpDZSG3Nz+SYBSnjHywABdST0CnYJfUpyE2Fso5rbdEhKjqm4JwS882VXYA3AymJS7HCXICs7obYnumI/JZ01IGUUcwhcx3U9Ckw8hUc5wYJGVa2olghfG1tmyDqFW4WCzKnUftGkw0LqdodCbiQbkdkU8METWAqxjnA4cWn0Vds36Jg70yEUwZMiUUwp2hgcKi/m7EKj2+qkkkZRsnaGe4the7vlUm18bdE3LcXH5KBY4spgRoA0g5BDlcwj8Yv6pmv53EyfNawUMB2Obp4rBXgcMIPN32VrRceUKIwRjcFZLGtvhaYxKZPARM/NZsMXmtbKWKPuN10vDPDlbxNrtPo9BG5z5T53AfK3qtiUYRc5PCRzLrG9kdz8HeAH8XcSsrKqL/6bRnmcSMOK+wQ2Glp2QQMEcMQ5WtAtYLTcJcL0XB3DUGk0jGh7W3kcOruqz6ibJAOAvmfUtc9df3L5VwdXTU+jDfllUspc65/JUSyCJn+4qQcGR+w2WukkdUT8jf/AAskI5ZLJY+47R4ryT8o3KxKyfxT4UWGDqr6iTw2ini3O5XNa/qrNOpvAideZ/UdFtpqdkkkc3UXRqrcpPZGt17VWxNNHTuF/wATguBq5nSy+HGb3NvcrMrKpxDhz3e7JKzuEtHdqmsse9l4ozcnoV66mENLU5y8Hzy+6zXahVx8ne8EaC3TNJ+2TstNKL53C0HGnEYc91BSyYHzELf8W8SQaTp/2GlcPFI5QB0XjtRUPqJi593PcfzWLp+llqLXq7v5HX6trI6ShaHTv7lkMU1XUthjBfI82C9U0TSodH00RAffPF3uWp4Q4f8AslMNSqmDxH/ICNl0VZUR08TnyPs1ou4peoar1Z+jXwvzZZ0bp609f4m7l/kjQ8T6u3TdNeI3WlkFmryKd77uc8nmceZxK3/EGrnU658vN9yw2YBsVy9W425Gm7jk+i7vTtN6FeH8z5OD1PVvVXfD8q4MaWcWLj7Cy0lfOXDwwbDqsupm5QRcWatFVTXBzcld+qAump3yYFTIBc3VUBu0l3yhJM7neGgKZHFjBG0W7rQd5RxFIpml53k/hGywi/JJ2VkzwGnKxReR7Y2i5cdlTNm6uGEdVwtRh7310wNm/LZbnVavwqXwmkh0m6mghbQ6TGzlLcXK5fUdQ8auLuYkDACz4y8nO3utbXCI1CQMhbG08zndFlVDnQaPHAG2L97LTsLqvU42OBsD0W41DkNRFE11gOijWWbe3twn9ypjBHA0AZsu+4S037PQy6hK0XtgnouPpKZ1TWxQtFxfK73VqyPTtDjo4sOIzZZNXl4rj5HrWXk5PVqgT17je5JwtJqUt5Y6drs9lmMeXySTutyt6laSKT7VqT5D8rTutUIqKS9jdRHLyZ1U9tLpzzubLhXB8j3vDckrrtVJqGspYb3dusCopoKZrYWC7wM37oTj3M68I7Ghip3PN3DDVQ7dxAsFt5rR0pAPmdvZal4seX81luSRakV4Dcpom887WgJLXKyaQecuWWC7pDeDNczme1ipqI/vGxN+qy6ccz3OOSksPGc+17LdOOVgEVuKGhot0G6ofbmv1KyHNNs9Vi1LxHYDdJOSiixIHkEhYNTl6czEuuq33c665VtnfwOhewVb8uVjdyq3fOsU9kEVx6KQBuUp3RlZwgTdyPVRsgm4VbCBKgBTZBSkIuhCmyAQsp6XQBdQ43KUIE3UIUgKEABSTZScBIgQEIQEAgFOAi4CREAIQhQIIQhQIIQhAIKwMtugNtlTdOkA3KkBSB2Thq6STYxACYCylCsUcABMMC5QBbJSkpiBfuoJuoUFPwECoKEpucBI2KRucKzl2UtaGptgpgAjgLrLNdVPojRvkDoug7LG5VBvf1TJDptcFZ7KshWutZIbdN0jQggF8KQ36FMci9sobdwKiITe4B5chDzzkYsmbgZUtjD3Ec3KnyMV2uLFAFtlNncxCYtAbcOuVEBkAG+N1kQsBkDXnlHVVxj9Fc22zlekVMsDbPIGR3WVE3IsqWDO1vRZ0DAfTutlccmO6WEZdLDLNLHDAwvnkPKxo6lfY/wc+HUHB+gM1Stj5tTqhzFxGWjovMPgZ8NXahqDeKNXhtTQ/wCixw3/APBX05NMGtNgABsALLyXX+pdz/CUvbz/AIE0lGX6s/5FVVPYEdVq3EyScoOOpRNMXv5QbkpSRGwkbLy8Y9qN8pZKK2flb4TNtlS0tpafnP8AqO6KG2llMj9gkkIPNPMbMYtSWFgxN5fczBrqxmn0UlVO7zkYC8vr66Sqnkq5TgnC23EWrv1PUDTxO+6YbYK5eteHPEUfytXq+n6X0490uX+SPBdZ6grJOEPlX5sqYH1VQ2NgJc82wvUqBkHC/DJmeQJ3tuuc4U0VkTHapXDlYzLbrTcVcRSajVuiid9yzACtui9XaqIfKuTNpJLQ0vU2fPLj/Jp9X1GWvrZKiR9yStrwboMmsamKidp+zQm5v1XPUVJNquoxUcLcvdk9l7fptDBoulRUMDQCB5z6q/qOqWlqVNfL/JB6RoZa2532/KvzZfUyxQQ+WzWtFmgLy7irX31MxoaaTyj53BbbjLiRtO00kDuaV2MdF5yeZ7+UOu52Xm+Vl6bosJXWfyOj1jqCb/D1v7kOcDeRzfI3A9StdXSsjYbC8j+vZXT1Pndy/IzZaKsqnu5pHZJ2XqKq8vJ5WEO6Wxr6yYXLb7brTVE1ybLIqZSb3GStfYyyhg26rppYR6GitRWWTE0tYZn47LElfuSclZVXILiJhwFrJXC57BR7G+qOd2UTPF+W62PD1E+u1ZnkJY03uFqwC8k73XofCtCzTtGm1ObyG1283VZrJYWS7UWenW0uWU8Q1YgaKSN+bWK4dz+aZzzsNlsNVrHVFRJMXXLzhakjlZYb9UMYQdNV2RM3SXkVZkBz6rcMDn1JleOY9FrdFpzJIXEfXst21rTMWs+Vv6p4ryS75sI22iRXqxI+4Az7qzXKvxpy1pJAxdRQnwaZ8rn5K1lRMHTG+bZ9lkaTs7hoRwjX6pUGnoPDAs53RYOnRFkXM7d2bJa0uq6y1zyt/JZsUkUFK52HOItfsrM5Ozp4JIxzKfHdI025eq18tyC4m5cckrIdIeQmwBPRYk5c5wbewCdbHQRjVT2shvbbZackm7itlWkusxqwZ4+RrQTlcy9uTCVNyLAZK2sEHhwA9SsGkZ4k7WgXAW5LOhxZWaeGV3EZUHeHGQ3r1SAhth1O6kgukDQEsjHMeLrQ2MkM/JHQLUVbiZiLrZuJdckrUTuBmNlzdZLbCLIlYNimvcJbJzZrFzY8BBos0kqlxu5WX8mSqtjhVz3CQQg7KTcqDsqWiCqTYAJb5TYvdUMJIAAuUhNzdM43wFCTIQspAQB1KC7FgoEgnOFCFICBAATdEJXHogQgm6EIQCClCUm6ICDkoQhAIIQhEIIQhAIK0NsgNACLp0gBdCEK5LATf2AUoRa66RATAW3RgBKTdTkIEpUIT4wQCoQo3NkrYrZGTsna0D3UgAKUBQCkZKj0TAWRHSJSusQmKrJUIxHNJPYKfCxcbI5gBcqxpD2XBx2TdopTy9lLWgBW8hso5TuUMYCkDGscHcxsRsqyO6ssFFjfZBj4IaCBhPyDdourRFaLxL/RQ3uE8RWgjaNirGsF+6GgHpZZDG3tda645M05YHjYCQDn1Xofwy4DquNeJIoGxk0MDrzOtg+n5LkNG0mq1jVqfS6CIyTzuDQAL2X3H8POC6TgfhOCijaDVSNDpX9ThYura9aGnth88uP8mGMPXsw+EdJRUVNpOlw6dRtDIYGhot1xusKsqiTytV9XUWBAOFqnOI85y52wXz2uLb7pcnRnNJYRYwWxfzHf0VVTL5eUfRSXcrT+ZKrY0vcZX7dAtCW+WZW87IljTyhp9yuS4y15tHT/AGGmdeR2DYrotV1CPTdNkqHmzyPKF4zVVT62ulrJ3E5uF2umaX1p+rPhHnOta78PX6MHuyXy+BAXOJ8V62HDmjSapWCSQERNN3OK1dJTVGq6g2NoJ5j+i7vUauDhvQxSQW8Z7ckbrvam2UEqq/nl+R5PSaeNrd9vyR/Nmr4r1pkEI0yicBG0WNl59KS53luXOOB3WVUzvlkfK99y7JJXTcF8OHUq3/MatpFPEbgEbrZFV6Gjul/5Zl/5epalRjx+iOh4K0FulUH+YVTP+olHlv2WZxJrsWk0D3l/3zxgdQtpqlbBp9G+plcGsYPK3uvDtd1uXWNQfNI4iMHygriaSieuvd1nH72PW6zUQ6dplRTz+9zFqauapqpKuc87nHARI/waQuP+pJ+YVDW3j8RzttgseV7nSDmft0XrFBbJcHiO5ybbKKlwZEGvfa+SVoqucPcbHytWbWS8z3E7BaGslsLAWv2W+qODpaWox55r3OFj+ZkJlJyqnEulAOwS1UxkIjAs0LQzuRhjCRjueC0uvclYsrrDlAyVe4i97YCxiSXlyrk/BugjN0uifW6hDTtaTzOzboux4q1GOlooNGpZfKxo5/daPRXf5dSyajISx5FmWWjrKp9RK+aR/M55vcqlxzJN+Chx9W3PhfqVOdzPJ6BJymV4Y3JKVpHL7rtdF4cfDpv+Y1DBzv8AkaRlLOaXJt+VGPQwCjoeVos8jN1dGOSLJF3HPqr6umfG1oeMu6BVhrRIxvLcjf0Uc9tjNjfLMqeUw0TcAE7LR1MpiiLibXz6lbGZ3j1IuCWt2C0GtVPIfDaRfqqVHCyzXVDueDWVNW5rfDY6xcclZ0Y5aRguS49FpIg6esaDkX2W9nJZG1tgMWQg+47UIdpSXAG5zZYcjyLudi+yzHNDYwLXJWvqHF0vLbATWPCLkVtAdJzEXWFWO5pT6LMaQ1rnuOei18ruYkrn3PCwhjN0xpBLhutmbBpJKwqBoEXZZbi0MJ/JaaniGAcsKVgdIXOVNSQZib4CuikDGOdZYb3FzvdM9ixCSOIgLjhag5cSthWyAMDAVrutlytU8ywMibXKiQ2sEwFjdI7LlklssBFcTZKN7lDigN7rLJhwSTYJCUzuygi5sq2EW2bqeiZ2GpOl1SwgE4HdK1Bd0CXBBnGwskQpAQCACayLKC62AgQHHolQhAIKUKCUQEEqEIQCCEIRICEIQGBWNaAMoaLDKknsnSAB3QhCuSwEEITtZm5RIb4C6CQAoLu2Eq6WPcJJJKhCLpiAoQi19krYrZGTgJwLIAsFKAoKdkbIA6lEZIkBShQSoMK4qp7+UKXv5RdY5PMbqyMc7ik3L3ZKyI7tyFXG2w9VaLAJ2FIvDg4ZwR1Rbr1WE+W5s1DJ3Mt+IeqrY8VkzAzJO6drBex2O5SQyNk+X8lsaenMjhizeqCNEa8mMWN5eXONkCLF1s6oQ+GIo2Dy/iWKGZsFbBZK7Y9pUxmfVZEcbrhrGlz3GzR3KZsdun1Xs/wU+Gj+JtXbrmpwEafTG7A4Ycb/ANitFt0NLU7bOEca1uUuyPJ6L8Cvhq3RtNHE+rQ/9XOAYg4ZaOn5L2mpqLXzkqyZ0dNA2KNoYxos1oWomlL3HK+b6i+esud1nk1Rgqo9qElfzEuccBYnMXyX69PRLNNzvEbMgKOZzSImZe7f0TRjhGaU8sf/AFJPCbsNyrnOYxtzhjAlYzwm8oyepXL8Wa2yipDTQutI7eyuqpd01CJRqL46et2TOX4v1x1dWGlideNhthcxbnLYwcHopLiXGWTzOct5o+kPNp5m3c7ZpXs0q9LUl7Hzebt1+ob9zP0ZjNNpH1ToxcD5rLltW1CWvrHzSXIvgLoOIawQwsoIcOtm3VcbM55kbDG0vkcbADdDRQ7m758v9C3qU8Rjpa+EZOkaVNrOqx0kIu293u6W7L2Wmp4dNoWUkIDIYW+YrWcI6C3RNGEsrf8Aqpxdx9FzPG/FbKaJ2nUUn3hw5wXM1Fk+oaj0avlX7yd/Raavpel9a35mc9x1xK7Uas0NO8iCPBsd1w4LXbnASySufITe5O5V9HCZ5g3l8g3PReupohpqlCPCPI6m6d9jslyzOY2KKjM0oGB5W91oqmoDQ51su6LY6jOx7vCjwxnRc7VTkk5wNldTB8srqh3MxqiYk8jVp6l5FycLOkcA0uJuStVOSX5wB0XQisHdogkUXdYnqsckknKvlfZtha5WM4ja6LOnBFUnqUU8TZZmsJ8vVQ+26Xm8JhI3KqZpXGxm6jWMfy08NxGwLUvdzOtbAUucSCbZKanp5aidkMbSXvNsKmTLa4KCwb7hHRpNX1lhLbQRG7iQvWKoQ4YQ0RRCwA2WDoOlR6FobInECaQXcSMrH1SqbHCY2X5nLnybsnlFMpZZp62SOese9oIa1a5rvM+S9rbBXTy8kRYz5juViPD+VkdwL5K2RiSKyOHiKnknJBJ6rhdTqHT1bvddPrVa2Gm8Fm4C4zL3kk3LikvlhYR1dLXhZNlpMTTK6Ugm3VZ8pL5eYnA2Cili8KnawYuMqiSTnmIaDytUh8KOih5ZGtBzt1WtlJGerlkkcz87BYsh8SblbsEljyMiuS/JnZYbt8brJqcENuqWsvIB+ZWSccsGTY0ocYgBssoxOdYbKaRoay9ttgsnl8pcVshDER0YM5DGBg+qxeheeiumPNJ6LDrJeWPlCqsl2rI5hTP53k3VQOUFQMC640pZeQoa6rNrphdKRlZ5McXdyk74Q3LlJtlUMglsqL5U91DRlK0Eh5JUWwmO6DsqWQS6AEwGEAJGyAAmAU2QTYJQkEgBIhCgQUoUE2UABOEqEKBBCEKEBCEKDArGNxcqGDqUxOEUgAT0CFAUq5LBAQhO1l8pgg1nVWqFKYhtkIUXXSCF0ITAJW8iNkAXUgWUoQAClCkDuiFIgDqUyEFQcglVPeGi6l7w0LGc4uNynjHIrZDnFxuUzG3Nyla3mKyGtsFbwREgKqWS/lHREkl/K1JyutflNj1skHSFUgXNlcyjqnglsLjbfCzKfS53cpeAxpzndRQk+EXwSXJOn0xe7xL2AxZbsODG2AthJHEIogxvQbpXNkIsoq5Pk1+pCCwhXnmOEzGZshrLe6z9L0yr1nVYNMoWF80zgMdAeq1xSisyOTqrtjoeA+DavjTiaDTqdh+ztcDNIBgNX2/o2jUPDehwaZRRNZHE0XsNzbK5j4bcD0XBPDcUfIDWyt5pXkZB6hdRV1N7tBXg+q69623sh8i/eSimvsXfLlmLVzF7znC1FTPyNsD5isqZ+5vgbrUPmbzOqJflbsFkqgUXWFnN4Mdz/qO2WXTx+Gzndl7lraRxqZTUSfKPlC2Tp2xMMsmwF1bNNfCuSqrD+J8GNq+oRabQvmeRzkYC8krZ6nVNQL7GQuOAuh1yoqtZ1PwYA5zb2AXS6Fw9S6ZTfaKlodNa+ei7NEoaGvvlvJnmtXC3qdzrjtCJyWl6AYrVNaLOGQwrdVEjKWlfUuHLYeUdlk1UraiscQAGjoFymv6kJphSRO8rd7K6PqamxdwrhVoqX2Ggq6h0r5aqQ5Jwul4B4adV1J1mvYeRp+7BGx/JaXS9Nfrerx0rW3hYbvPcL1PVNRo+FuHr3a3lbZnqVq6hqJQitNT80v0MnS9LGyctXf8AKjR8b8URaPRupqd7TO8WAHQLw2rqpKiZ0spLnvNyVk6xq0urahLVzvPmNwCdlrQ4/NuegXc6foY6SpL/ALPk5XUddPV2t/8AVcIkNyGN+YrZvm+yUfgxtHO4eYqWUX2aj+2VDeUu+VaaqrBGxzi4lzuhWxYte3COd2PZGNWVAHkacndaqR4J3uAmll5rnclURxyTzNijbckrfFKKOhVWooz6WGnFO+onsQBgLmayZs1U5zRZo2st9rEwo6dtIwDxLZsuZffZGG+5u0kG82PyUvO5JWOCCSSnmLieVqRzTblCLeTrxWxDTzE9gqZXFzrDACscTblbgLN0nRavWKkRU7CWj5nKqcklll0V5NWGkm/Rd/wPoQMn+aVQLWM+W/VYX/pUNr46Zp5wPnK7aQw6bpjKdhs0C1huVismpLEfJJz22LKmqNTUmx8jevZc9qdQ3nIZt3KyXT+HTl1jzO2C56sm8SflLvdCuO5SlknmBd4j7co2CWV7Y4nVDsm2PRYrZPGnDGnyjda7XNQbilhOdjZaJSSNtVedjUV9Q6qmdc4CroYeebnIw3ZWmEshAAu53VZUEfJG1uBfdUJOcss6kNlhGQ5wjgLiclYgPJGXnc7Kyd5fI2NuwVUp8wYB7lWuOWXoqeSyEuJ8xRBAWwmV25TOHPK1vLgLKnFqewxhI4Z3LEaR455yT0URtLpNrBO4NaDm91fTxkuBIsFQo5kVpZZs4GNjgDnHKrmkLmmxs1EkgDQwLCq5i1gaFplLCLkhQQ55N9lrKx/NLYFZXitZESdytc53M4lczU25WBkhSMJ2tLtgkcs2FoZTl5WCMe4YwfMHkKHEpySXEpHWDVTOOAitvkqcAIBs3ZV3JKoexBzhqgKDsgHCrbISbXSuKkC6RwyqmEYHCZuAoFgEJCDJHG5UkpUowKUIUACUm5QTcqFAghCFCAhCFAgmaMqGi5VuAEUiEHAUI3Uq1IgIQpa26cJLW3yrQLBAFgpTEBCErjYKEPq+X/C/TvmqjS8VO8EtvTl8IJDuz7Hb2VI/wuyeLT83E4EZYfGtDkO6Fvce699p6l0Lrtz3BW0gqmzG1uVy4Utbqo/9v0KozUj5Tl/wzcWsqaqOHVqB8TGc0Mh5h4p/pI/D7rD1H/DjxxSRU0lJNR1viW8VjX8roiTnf5h7L7AQguqaheV/QfY+Ov8A93Pj+1Rf7DzROAYPGxK09QbdOxRVf4dOPINRhp4TR1EEg/8AuGyWDDa9nA5HZfYqEf8A8rqPp/QbCPigfAf4k+LVRf5PHzU9iD4zeWX/AOB6rOqP8PHxJhr6emZQU80c4uJ2zDkZi9n9RnC+ygVdHM9pHmJHZF9Xv9kMsHyDp/8Aho48qjTmsmoqJr3ObLzP5jFbY2HzA+iqqf8ADdxrR+O6prKFsUbgI5GvJEoP/wCU+6+zmTsebC4PYp3MY9pa9oc09CLpF1fUZ3x/QftTPhLif4Ha/o1Ma2krotQgBALWMIe36dV53U6BV0bg2qY+J17HmbhfopqHDzJ5DLSubFj5OXBXlHFnw60rX5XSVsMkFQBYWFgSPRdnR9Wi/htRW1jk+QI6GJm5LsrLZS0hvdtr4sSu84l+HOr6OfFjonsh5uUuc4Fp7WK4mopaikkEdREY3HIv1Xp65VWrMNw4T4IjoaWKxbECQbgnKyAyMN5QwAdrLGZM5p8xuFeyRrxcfqrku3gG65LUJVN06kFfQEW7KR6FTewJPRRxTI5YRUWuLmtYOaR55WgdSvqH4H/DcaRp7eJNYgH2qdt4muHytI/5C4T4L/DKbiTWG6/qsJZp9ObsDvxndp/RfVMgjijEcbQyNgs1o2C8d1vqKX/pan9/8GRLvl3PgqqaotaTfJWqknO5OSpqZQ95JOAsF8haOc7rzddeELZZgirktHyXyd/ZaSYSVlU2BmI2nJ7rKmke95Y27nFZ1NTMgitbzHcrcsVrPk5rTul9AjY2GIN2DQsOolNQ/wAIXLNlbUyuceRmw3KKaCzechSPw/E+S6XxfBHgro9Pp6Z3MxgMh6qjV9Q5G/Z43XJ3WdVytpaZ0l7OOy4qaqdJUPlcbtbutFMHa/Ul4Mt840x7IlesaiNPoC0H76Tb0XEGaRziPmlkKt1evfVVr3ONw3FlvODtAfqNZ9tqhywRm93L01ajpKXZPk8bdOWu1HpV8I7XhDTYNF0R+pVZDQG85JOV5PxvxTLxBqz2xOIp4zZoGxC3nxB4xDnf5RpsnLDHh3Keq8ufOOm53Kv6XopOT1l/zPj6Iu6hqUoLSUfKufqO93McjAW64f037bMaue7aaHJK0tDTy6jXR0cAJ5j5rdAu11uaDR9Kj0qm5efl87h+JdXUWNtUw5f6HIjDtXczTa5qxqZHMjsImYaB1XGVkpceZwz0CzKqa2GuwOi1EjnPeSTha6alXHtRZTFt9zELm2ud1u9MgbT0Ula8+a2LrV0FG6sqfNiNuSSthrdQW0YhjNomCwPdPOWX2o0TXc1BHMVkzqiqfK51wTgLBfdrSbp3v5hc4WPKSRureFhHYrjjCK8i5SkkDfJR0vfCRzr5KDZsjEGRvmmZDHl7zYBex8PaSzRdDDj5JpBkjquU4F4cNXUf5lVt+5ZkAiy7mtqGyy+DEPu2YsuTqLO+XZEabwsIwmMhpw+pcM9yudnrH6jqJGfCYeiv17UC2P7PE76Ba+kIpqUuGHu7oxjhZKUi6tnIabGzWjC5uaZw534JOyzq+d7vKDg7rS1crWNu42AVsdkaa4iy1Qo6dz3H7x2y01I2SqrDI4c2bqioqHTyEkXHQLb6VFyxc9rHuq03OR04Q7UWyRc0oBFgOid7WwxmR2/RWMF5CScd1h1EnizctsDYLZjCL4oSPPNIRuquYukLrq+TyR8oCphaHOudgqmXpFsLCH33J6q2qBLA3YKYrAl9tlEpvGXO+iZywizGxqhHzz2GwWa1vKbA56pIIrkvV/IGtJKqUfJEsFNxcu6BaqokL5fQLYVMvhwkAbrT8xJJKyXzxsMRIS42uq+tk53S4C5stwoTk53gLImfyxhgRCy93FUyOLpVMdscjCWsEruyc3vlL+JUSZAIsxVqxxSmwws0uSCEEhSBhSbKCVWQYWAVZPmTAXRhVsIIvhQN0dUjIRuVKCbIGyUIJSVJKVQgIQhQII6KdgoUCCkC5UWurQAAokQnAS3ugnKArUiEoQgC5srAktFyrWtsFDW2TpiAhCgmwUIQ42CrJugm6hK2E/SJO15ByUiFwDlJ44NnBXcjA14Lh3utgx7ZGB7diudDiFkQzuY4Frj7KmdSe6NMLfDN4hY0VZHK4NILXFZKyuLXJpT9gReyEJR0xg7OMFXx1DmnzkuCxlIKXAyZsmSsk+U7Kqro4K2Hwp2ktvfBsQsQOIN2mx9FfHUlotJd3qput0Nn3OW1nhRtQx0P2VtZSnJY+xN15FxL8L6TUakzaeynhYBYwyA7+h6L6QZI2Rt2m4WBXaPSVcTuWNsUp2eAuhp9dZS9mBx8o+FtY4Nqqare2KPwOU8pZICLkdiVy9XST0U5hnbyuGcZC+3uIOFWz0jqSti+0QyD5owbj69F5PxB8NXtLXaRH9pZnnjmIu327r1ml6vGaxMTLXJ87tmcLA5CvbI1+xXV6xwgYdQlikDqOduHRcosCuZrNHraOUt8N0rB+NjTYruQthPhk2E26ruvhrwJW8bcRxMEZFDE7mkedjbNvyXNcK8N6jxPr0Ol00TjzOAebfKD1X25wXwtQcHcPQ0FLG0TFoMj7ZJtYrj9W6j+Fr7IfMyqScng3mnadRaJpMOmafEI4IW8osN1hVtQDdrTjqsmrqQ1lrrSvcZXXOGjcrwlcG33yFnLGyKJHc13OwwLXzT8xvew2CsrKnmd4bNgsaniMst3fIF0649q7mcm2bnLtiZlJBYeIRnuVdI/HIz6lQ5+ORhs0Lm+IOIodMpzHEQ6U4UrrndPCW5L769NX3TeEbKWphZO2G/M5bHxGMh5nm1hsuI4XdNX1D62pJtfqt/qFXysJv6Cy0X0dtirKNNqe+r1sc8GFq1c6aTkBydguT1vUYqGl8BjrzP3t2WXqWosoYHzSOvI7b0XCmSXUa3mLi58hwOy7ek0u3c/lR53qGt/6R+Zmy0TS5tY1JkdiW3u53ddhxfr9NwvoA0qiIbM5tnFp6LYaVTUvC/DT9QqeVspbdtzuV4VxHrcusarLUOeSy55QegV9EP/AMhqMv5IfmxVD8DRhfPI19RUvlmdLI8uc7JJKxec/VVl4eb32Wz0OgNfqkbTYMab3K9Y5KEc+xyWvc67hyCPQ9Jdqk1vHePuyua1DUZaueSeTJcduy2XEmoNe9tJAbRsFi0d1ydVUhjLDdZtNVlu2XLK2nNpFFRLzOLb5VcUb5pmwx5ceiRvMRzWu4rqNJoYqOgNdUDzOHl7ha7JquJsS7URTUjvJSRN8oF5O65zieriM4o4csZhdg9xo9MlqX2Ej8tcd15nWz+LUSSEXcTlZa25SyXaavMu4xXOu/lvcBUzPF+VQJBYuCoc6+StmTswgMXdFsdD0t+rarHAAeS+SFqmtdI4MZl7jYAL2DgvQW6RpRrpxyyvF+Vyy6i7sj9S9/Cjdy+BpOmR0NOACBYkLR1FQIIHSOdZxWRVzeNO4k4XNarU+I/wmE2CxVQ2+pm5e5rnyfaa3mcScq6eflFr3spp4RHGZHjyhaTUa8B5a0Y7LV25Hju9i7mMr3OIwOq5nVpyZvDHyroG1DYaBz3uGRsuTqHeLUOk6JLNkdGiG+WVsy9rRhdNTt5KMF/lbZc1E5onAt9VvIpXTgMuSxqNODfguMgbEXC4H7rHjNyXpKmYySiGO1humcCxmcABXORbGJTUSY5Qd1fDHyxDO617C6ap2uAttEwHNsBVxfcWpEu8rQ1u6rlD3NDAUznB0mBgJ4Y3SOLyLAIyRYhC3kYG3VMvS5VkjgZTjZY7vM/PRDOAtGBWuxYFa4XWXXSNMnK1YZGFzLnmQGRe5SnJsmGAoyXrG2FIyRysg3ysUncq1xBFlU4gBCcshEJ7pdipvdLY7rJJkJ3Kgi5Ug2S3JKqbCSbKCVNsKMWVUmEBsoUF2MIDkncQYBL1RzdEA5StkJtlQSpukKUgIQhEIKdkKFAghCsa3FyogktbYKCcqSVAF1YkAApQhWIIKxrbKGtzdWBOiApQhQhBNlWSpccpErYQQhMBdKQ/SBCELiHGBCEIDJljX23Oe6zIKx0eHkuatepDiCllFPkujY0dDHKyRoLTunWiilLHBzTYjotjBWB+H2aVlnU1waozTMxCgODtjdSqMFqYJge6XdCA2RwSDdpI9lfHUlos8F3qsUGyYEFAZM2TJGyNu38lq6zQqOpdJK0OZK7NwcXT5GQVdHUuYOUjmRTcd4jZT5OD1nhKJ8Dnajp8ErXY8SwJH13Xmlb8MXFxNDqFwT8sjNvTC+jmyxSts8D2csaooNPcPEfTsv3AsuhT1CyrYRx9jz/4dcDRcM0Tq+shZ/mEt2EgdAbgrt56rkBuclRPUBjd9hgLUTTOkf6lUzlPUWOywolLA75nTS8t/dY9bUNij8GIgk7queobTRWBu8rAuR9483e7YLVXXnfwcu67HwoAzmNj1ySs1reSOwHKO6mkpbN8ebc5DVo+ItbZSxOZG4c1rWCtUZXT7IFLnHT1uywo1zX4qCF0bHDnXmxqJtX1QNN3Fzv0VOqVstTKXucS4nZdJwbpbIi7UK0hrW7E9l6iqmGjpc3yeJ1Gon1HUqC+VHYUkEWk6SxhPLZvm9Vzepa9C0PeX4bsO61nFPFLqmY0tG7yNxcLiampc5l5HEkdLpdL0+U/+S3lmjV9UVf/AA0cIu1XVZq+oLiTyjYLsOCOHnzP/wAxrG8sbc5wtPwdw5JrVe2omaRC03F+q7TjfiGk4c0T/LaQhryOUgK3V2tyWko5fP0E0Ome+rv48HEfEfih1ZU/5bSSEQx4IB6ry6Z/LgHfdZVTVPklfNI7mc43Wte7mPM7deh0umjp61XEqnZK6bnInmcbNtvsuionjT6AyE2c4dDstFSML6gFwBHqsnUKrnIiYbWwbLRKPdsZ7E5SUEJNVl7nSEkk91rHOMkhLtkTPJIanpKd1VUsp4jlxtjomyorc11144NnomnSajWtsCImnLuy6ypYZKmOmaRZlgQ0brbUGmM0fSQ0AeK4Z9Vq6iobp8b6iQAyn5MLlO/1ZtrjwXzpaRqeLKiOloBThwBIwOy8xnJN85O5Xf8A+SVuvSyVtY7w497HsuU1ikhhq/stL5s2utenlFLszubKIqKNETbrhV3LnbX7ALcSaHW+DzeG4+llu+FuEqitr2TVbCImm6vlZCMXJvg3KSM/gbhL7TM3U6+MeCzLQQu31euaAKeLDG4ACz6uWOgoW00TQxrBbHVcrLUNLnTPdgdCuNGUr59748CzeOTHrJm09OScPctJFE6Vxlk2Vk0jq6qIB8g6KJXtaREx1g3ddOuONiiT9jH1Gblpzyu5WhcLV1L3VB5ThbrXdQb/AKLHZ9FzLnZvuSpZJLZHR0lW2ZDyVEjxylxt2VJOLWQXAe6W5WWUsnUjHHBDb84HUraipFPS8jSOY7rVDmvdPG0yzBuUsJ4eC5RybOiiLiZSDc9SorpeUcgOSssn7PTAbYWokJkl5jm/RaLNlgYzNPhucdVt3NDIw0blY1DGI4eY4WSwczi8lNWsIsiU8oBDepWVL9zS2GCVEfLz81rrGrJ/EfyjARk0WJGL5rE3yeqxZ5mwRHNyVkSO8mMBaSqk5pLLJbZ2oJUXF7y4pfmPognClovlc9vO4pBwlAN7pnHKNsLPJ7hI9Sq3FM9xtYKsgqqUgki3VK93QKSkIuVmkyDbBQgAqOqryQknCA26UlOw4Qe5BHt5UoTPuSosbKpoJGAgbosUBKQnqocblABUgZuUcEIshSSlvdQYEITtbcXKgQa3FymJsg4Cjcp0gAMlSjAQrUiAma2+VAF1aBiyZIIWTIQiQEjjlS49FWSgEFCFIFykIAFynGAgCwUE3wiQ/Rpr7CxVu6xAbJ2uzcLhnDUjIQkEgJsRZOoMRsMBSD9EKCAd1Bskpw/oVVctG1wmBuLoYHUscGdDVPjs24LVsYqhkmzgVoQ4jZXRylpu11iqZVpmiFhvQQdiputdDWWFnmx72Wa2QEXKzSg0aFJMtwVCgEHYqbqvBZkkEqbgqN0WQDkk42SPkszJwmz3WDUyE4BwmjHLBKSSMWomLnlYM0whaXE+ZWSPAuG791pKupBkN3XAXTqr7tjkX3qI7pS95lkz2CzqCB0p8eYeUbBa+ghdWzBzsRtWbqmqwafTFoIuBay1STb9OHJgjJJO2fAut6uykp3NaQH/ALLyfVK6SoqHPe4kXWfquqyVsr/Pg7rX0NCa6qHMSI2nzErv6PSx00O6XJ5LqOtnrLPThwU0VF4v/V1ItG3a6NQ1qWWI0tM7khAtjsp1vUWF4pKbyxtwbd1oJZAxpDTcnddSqp2YsmvsjkWWen/x1v7srlkDDzXueqjS6CbWtUZAwEsvYnssMNkqqhsEILi42wvX+EtAh0egE87R4xF3XTazUrTV5/7Pg19O0T1Fm/C5NxH9k4V4bLyGtLW3K+f+Jdcm1nVpZpXlzASB7LsfiPxSaioNBTS+RpsbdQvLXvJNr56pOk6Rwi77PmkdjXXKUlVD5YhI6/mvgLDMhLibeytmdccrTZVRsD3guHkC9CjHFJLLM6nJipzIbNJ3WM94BLnG5KJ6kHyN2CwpJrne4Q+pK623llou53kBc47BehcG8OzQsOpVsJYNwCN1zfBOmHUdYbM+O8cZyHbL1nVqsxQspILAMFvKLCy42u1DT9GHnk7GnoXzS8GsrZo3AyyXDWjy3XPMpPt9d40mY2n5e6zZOerm8JowN7q6UiCHwYRzP7hZo/AsLkk490tzE1irbTUJghHKbWsFxWmaX9q1XxJWcwJvldHXNdy+c+c91maJQmJpqH35fVaIyVVbxyxoRzIuq6WIRMic0XaLWA3WZTSw0FJaLlD3dFgVdS6aos3IbtZazUdQ8CPlHzlVKDkkmXt4ZdqVe58hYTnqVzFfWF7xAw4PULIc+QQulLsu7rUucGSc7hcnut9UVHgpeXuZnM2nhs353dVptTr2UsBHPd5V9XXxU1MXv+cjC4qrqn1UzpHnHRPKfb9zVRQ5vL4ElmMshkcb3VJIGSlJv7JSblZ3LJ2IwwTfN02d0g9k1ycKpsuSJOAs7T2tYTI/K1rzc2KzIQRHbm+iEMZyWLgyKqYzSYNmhJTRGWYW2CqeSXcjdytrRweFGC75ir08yGwZNjhg2VxaGx2vZQwBvq4piDfK052HSFLmsjJvZauSYvlNll1szWs5Rutax/Jd53WSyeByKuXkjtexK09uZxJysipldNIR0VVg1vqubZNyYBDZPcBtgq75V4YRHciyVbkMY35t1O26iwL90OI2VDIKclL1TXsElySqWEcAblQbBRc7INlXIgtzdRm6bFlCpZBSMpr4UbqOqVsIXUgqCEFIQCoAU9FA3QwEZL3KlxsEoFwoyCE3KYItZO1uMoBBrbi5THAUnAS7p0iBuVNrIAsi6sSICALoVjBYJ0ElosEwRZSiQFDjYIJsEhN1CEEpUISBJThtlDW9VJOFCAT0UAIAUopDH6Ise14u03CZapkr4/ldb0WbFUseAHGzlx5VtcHmYzT5MoFO15B3wqlINlUXJmQHtdsUyxweoKdshB82QoOmWpS3tgqQ4HYqVBhea2CmB6hFrpC0jIKmA5Lg89VfFO5pBDiR2WGHjqmB6gpWvctjNo3ENUHmw8p9VktkvutCH91kxVD4xYWcPVUSq9jRGw3AIOxTXWDHOx4HmAd2TPnMbLl2FQ4POC5TRbUTCNpF1qJJXSO9Ess7ppDnC1tfqMVJCWB13la6qXwuTn6jUKMW2U6jW+GDGw53utTBHJX1PKMRg3JWOwzV03Xlvus+srYNGoDYjnthddQ9NKEPmZ5/v9V+pN4ijK1DVKfSaPwmEcwC821jXJaqQ3f12usTVNXmq53SPebXwtXS09RqFUI4mlxJ/Rd/SaGNEe+fJ5zX9QnqJenXwZlLHUV1SIogXlxsSFvdUedE0z7KXWleLO9CtzBTUfCukGonDXVLhYf2XnGqarNqda+omO5va6epvVWZj8i/Mqsrjo6sS+d/kUSSmzpHG7jla+edzjYHPopmmJB7Lf8ACnDcurVrZ5WHwWm5v1C61lkaYucuEYNNp5XTUIrLZv8Agjh6zft9SzPQEdFuuL9fZpOlvYx48UjFuy31ZU0mg6VckNEbcDuvAOKtek1fUXuDj4YOPZef01c+oaj1Z/Kj2VijoaFTH5nyaOsq5KipknlcXEklYoJILrlIXFzrdAqnyc1mN3XsEsLCON25IuZJLWwrJHiOPlbulA8JmRlYc0uTY5TcFkY9zJe8DY5KmkppK+rZTQtLi42NlhFz3ODQCSTZewfD/hdtLTDUaqO8m4v1Cx6nUKmHczp009zwjecOaRFoWkN5mtMxbk98LF1Gp53lrXHmO4C3WpzBkbiMdh2XOwQOnldLITcbLhQfe3ZI3yiortiEQczlhiF3O3d1CypaWOhp3SvfzPIyraRkURMgAv1K1+oympm5OezB1RUnOWPBW4JLJpeV1XV85NmA3uVnTVj2QmJg8gFrqh80bn+EwBjW7nusGomYZLk8rW/qtmO57laWEZTpRT0rqiVwDbYXJvqTX1xe42jacFbWrZJWtB5i2EdFrJ/BiHJEOVo3KugsDYyE8rT18o6rUzS25pXOBa3YJqiphAucNauZ1DUnVLjFFhg7K7PaWV0ubKa+sfUzHPlHRa57rnawTufjlCpc7oFVKR2IQ7VhATfAQoBspJ9MqlsvSIvbZFyApcC1tyLJGnFykbGSIJsVmRm0eDlYQHnuVuaCi8QCR+wQhlvCLEsjUdGXHxpNls2NF72NhsmDG2AGAErpM8rVshHBakWsAF3uNgq3SA3IKpklOyqkfyRFPKWENgxauYc1uiwJZuYWGFEzy+U5wqXYwuXZLuYjFG90pybkpnGwVTnADKzvYBbCznkAGyy6o8kPLayqomFzrhRqD3DBT/LDITABFyUHJUNIIUrI2QDsl5rIcVHRVyYxHMbqc3QBlM61lUwCI2Slxui5VLZBgoQEAXKQIWJUOCsuAkJuUCAB5UNag4CZgKKCK/sgbKXbqcWUwEUNubpibIuLWCjcpkiBupAQBZSU6RAKhCZgublMElg6lOhTZNwQlCEjndFCEE3SkoJUJWwgmAuoAurNglIBNglRuVKZIKQIQhME++gQdlOyx2PBzexVoffdYnHB42M88mXFUuYOV2Qs1kjXtBBWqTNeWnBVEq0y+M2jbJge6w4qoEcpGyyQQ4XCzSi48miMk+CwGxuN1Y2TNnfmqASE1wUCxMybg7FCxwS03CsbJc2IsoMpe45aCkIc3bZWIUGEDx1Ttd1BSlgKrILd0MBTMoSWzskfM5/lvhUgm2+Fh1laynYQD5k0YdzwhLb+yO41fXx0kRDXDnK5zlfWSmSQm11YYpamQyy35fVEk8NOHPe4ANFwunXBVrEd2cK2x2vuntEyvGhoKQyOIaALhee67rb62pfY/dg4Vuua2+qlLGOtGCuaayWqm8KIEkru6LRqv/ls5PPa7Xux+jVwPBFNXVLYYmlxPZem6XpdFw5pRq6u3ikXF/ULG0HSKLQKH7fqBb4m4B9VyHFHE0uqVBjjcREMAD0Vdk562z0q9oLlmiimGhr9a3eb4XsYvEOuTatWvPN90MAey52V4tjZDpmtvlJTU82o1baenaXXIvZduuEKodq2SOPPvus7pbtmdomlT6xqTYo2ksBBJ9F7XSUlHw9o4BLW8jd+613DeiwaBpgkkA8TluXHtZcDx5xi6pe6ho5fIOoK8/bKfUL/AEq/lR63TUw6fR6k/nZqeNOLZdUrH08LyImnFiuAlffAyiaU8xubk5WM9/I0m+V6yiiFMFCHCOXKUrZd8uWRK/lHK1RHZg5nDKpB5nczlEk34QtHBYo+CJpnOODhY5ILv+E9ycDJ7L0Hg7gtlcW1moM+73AI3Wa++FUe6TNlNTk+2KOf4W4fqNS1SOUxExNObhe5xMipKNlOwW5BZU01HRUY8KghaxoxcBU1tUII3c2681qL3qJLC2OxVX6S35Mas++fa4I6rW1ErG2giFz3Cx5KySYkRb909NA4XeQXuKdR7FuV57nsPPUCmpuUW5zuCucmqZp5TDC053W3nppKmfkDbdyqKyWh0qmLWuD5bb9lbBqPCy2Fwb54NXNUxUkBjtdx3utdCx1ZIXOuGDusU1MtfW2a0EE5W0q5mUNHyfiI3Wz5dvLEjHP2MSunETfAicLDcBc9U1JN2gY63TzVJe4m5ueq0OqV7YYzGx/M47lXpdq3HjHveDX6pWOe/wAGM27rWE8rbA5KhxJPM43JVZvvdVOR04VqKwiXG3XKSx3RklSqnI0JCm9rrZaZQslvPUnlaNrrXNjM0rYxfdbmo56aiEfMLEdFI77sdI1tfM2SfkYPIFQ1t+mFAaXOJGyyaeF0sgY1DGWHBZRUbqiYf0hdAGNiaI2iw9FNPTspoLW83dLzgOvv6rRCHbuXJYJleGt5W7qjmIYeg7rGrKxrCQ3da6StmeOVpsEk7kthsmzDg5+DYd1i101hyArEE7mt3ysaRz3OyVnnZkGQaMkqLZyVJBDbnCq3OSszeAA45VZI2tdSSpjuZBi4VHLCja0UQ8G+y11dcynN1thK1tNygWNt1qJopHyFwBKut+VJEMcCwRYBOYngXsqua5WNprkhBFzdRmyckJNyq2QZg7oeQouQot3SMJDWqThAU46qtoAt1AOE1rqSLDCRoImSVIsiyAO6VIgxAReyLYQBlWJDEG5KnlsE4Ch2E2CC2sEAIvcJwFMEI6JVLjcqWi5RIDRcqwCyALITIJIUoUE2UIQTZJ0up3ylJxZBsJClQnaMJCEgWCgnKklQEUFApQhMEEIQiQ+61a2To5a2Ct53cslh6rMBBFwQUko45PAQmpbozGv9cKwEHqsJry3bZXNeDscqmUTRGZkK1kzmd/dY4d3TqpxL4y9jYsnaWi/5q4EEXBWpa4tNwsiOc3teyzSq9jRGz3NgD3U4KoZMCPMbFWg9QVQ00XKSY4JacFWCUdRZVA90WUHX0MgEHYocQBlY17dViVde2JpF8powcnhCytUVljVlYIGEN3OFrIozM4zTmzRnKVrvGk8WU4B6rW6nqfl8GF1ha110K6n8seTjX3LPfPj2Lq7Umc/gwmzQbErkdX1UFvgxuudiqK/UeVrmRuu53VaLlknlsLucSvQaXSKHxM8xrddKxdkfI4ZJUyBjQS4rttE0uk0elNfX25hsCsfR9Lh0+m+21tgRe11zfEXEL9QmMMTuWIYsPRPZKWpl6Vfy+WNpqoaWPq2rMvCG4i4jm1KodFG+0IwAuUnlsLA/VEjyD5du6xWslqZhFCC9xPRdSuqNUe2PBRKcrp90uWNCyarqWwQtLnHsvYeEOGYtLpRVVIBm3z2Ws4Q4XjoI21dW0GTex7LI4v4ri0ujdT07x4hGLFcPWaiepn+HoPS6HSQ08fxF38jC464xZBE6hpZAHEbheOVNSZJHSOdd7jdFfWyVdQ+eZ5JJuLrWuebk79l3dHpY6avsjyZLrJXz75DSTcueqo5r3c4pXHNyblVufc53XQyNGAznkjsFXknAuegUgEkAC7jsF6FwVwPLXzMr65hbCPM24WW++NUe6Rrppc32xI4J4Jl1CVtdWtLYh5m3G69XfHFBAKalHIxvZNLJBR04paQBjR2WsqZ3shPKSSV5e26eon3S4O5CqNUcLkeaqihaWtd5uq5+rmlq5eRvydSrTG+Ul0pIVzIuZoDRZo691bHENxGnLYSkpOchjCAOp7q2tqKeki8GIXccGyoq9Qjpo/Ch362XO12oeC0yPPM4900YSseWHtUVsZNbqJghPJIA87FcXqE75JLSOLnu7J5Kx1RKXuJz0ungpDzePM7yja66lcFWimWZMzdKiio6c1L7B/YrU6lWvqpiAbtT1laZD4bDgLWTzCmgdI43PZWwhh9zDj/qjC1CrZSwkbPK5SSTxnmR+6urax1TOS4+VYTnAmwKSUtzdVV2ok5KrOTa6Y7WCU2GxWeTNSRO3VQTYKPUrP0qhkq6kOt5B3QinJ4Q6Rn6PpvJEaucgtGbLB1GobNUFsZPKFtdVqhFCKeLy2FjZc9ynmvuSr5pRXahmSxhJDW7ldFptD4UQkeLkrF0zTzI8PeLhbuYiNnIwq2qryPGJTK4bdVg1EzYIz/Uslz2saXE5WjragPeQmtfasDMxJ5TLISUty1thugW3KYNvkhc1R7mAUB1r2VkUHMeZxsEzWF7uwCmaQNbyNN1a4JbsJRM4F3K3ZY7rAWVxADbndUmxN1mmkQTFkRktffonAFrlWQRmSUABUJNvYK3NrQwGptzfmtk+jhjZYgXRTBlNTjy2d3U83iAud+q6sKko5ZoUNss0WotLQQ1tgtOBd2VtdTlJfytN1rADa5XJ1EviwimRBACgKbXKk2WTAomSVBT3ASnJShFAU2wmCCCd0uCYIbZMSoAU2QwHBB2ShOQoFuZLgIZthDWnqrQAnIFsK1IhQAbodlSb3UZJQaIGBhT0wosbqyyXBBAzOU4FkIT4CCkIClAgKsm5UuNyo2F0AgcNskUk3QBcpSEtFymJsEbBRuVCIB3UoQmGBCEIkBCEKEPswFXw1DonXGVjoutLWT5ZGTTNxDUtlNiOUrIBsbhaFriDcLLgqiw+a5Ha6olX7GyF/iRuGydHK5r/W4WvinZLht79irg5zdis8oGyM88GaHApljNkB2NirQ7uqnEujMvZIW43CyI5jbyn6LDBUqqUcl0ZmybOPxCysbI07OWtbKRghJNOyNnMD5uypdWeC71ccmVW1zYY+UHzLSjnmcZZD5d1BvITLMfLdaPVNYDGmGF1sLoaehv4YcnL1WpjH45mZqusRwsMUbhhcZW6q5xLYz13WLW1bpHHzXvusKCGSpmEbBe/Veio0sKo5Z5LU6yy+WEXwtlqZg1oLiSupoaKm02D7RVkc9jgrFhkodGpOZ9nzObj0K5zUtVqK+YlziGXuAi4zvfbHaJZVGGnXdLeRm6/wARTVrjDCS2IW2XLuJIve3W6meZrSQD7qungnrZmwwNJubXW+uuFUMR2QG53SzLkQCWpmEMILiT0Xo/C3DDaOJtXVMvJ2KyuGOE4aGNtRVsDpCOq3Wta1R6PSOMhHOBYBcXV652v0aT0+h6fGqPrXGFxBr0Ok0D7OAlAwPReH6tqsuoVT5pXk5NhdZXEevzarWOe51mi4A9Fy8kxebdl1dDo1p4d0vmYNTc75YXCLHPLyeype8/K1VukdgBITY4vcrpZKYwGOBvlAa57w1g5nnYBdNw9wrNqw8ScOYwHsu20bgSioawzzP8QNN23thZLdVXXlN7m2vTzlvg1fBfA76l7K7UG2Z8zQV6sZIqOmEEADWDoFh/amQsEMOGDYBUmW7XPkJsM5XnL7J3y7p8HaqrjWsISZ4B8Z7sb5Won1eB83JG6/otLrutPdKaanJI9FGj6fI8ieYHORdXRpSh3SE7+6XajoIhzN8SQYOyxqyqdFEWxkNCyKiVlPEXuNrDZcfqGpOnlPK7lapTW5vL4LmsIunmaxrpZH+fsuO1fVm8xBfe3S6r1rXXMaYmOudly0YmrKjN3ZXWqqxuylrKwdRpU3iP8R9uXpdbCsqnytsBytHbqsOhpRBCB6KaiQOdyB2OyuwnIKr2MdtiS5wsB1K5rW68vkMbHbdludTrG01NyNO64uZ5llL3HKljwW1143EJNkp/VRncqMk5WCTZrSGPlG6QZKg3JR2HdVOQ6LoYnTzBjTZdXDHHQUXZ9t1rtJpGxt8R/wCabUqkHyA4C31RUI9z5LcYNbVSmWUucb5T0VK6aUHokhhMr98LcxNZTx2GClgu6WWBR3M+LlhjDGYKrlwb3yohuG87rFU1MzWMJK3OSii3GDBrZ2sYQTlaVzuZ1yramYyyHqFS0BzrWXIttc5YRWyxjb5OyuaOd3KEjnWHK1XNe2KIkjJVsMRWWFCzvELLDdYjPMS4pHuMsl74UnyiyzTscnkIPdc7pQLqA0uKa3QKlsgctyGhbzTaNjG878LApKdodzPW28ZvJyMwtengs5kX1w8ssnmBcGtF7KmpqPDgItYq6GMHzE5Wr1Scjyhab7FGOxbN4Rp55HSyk3SG9rI63UEm68/J5eTKACgqb4S2JSNhAqMKbXQQNlWwYAHOE5Dt7K2CNoycq2V8drAXKvhXlDIxA0kpywhWtta+yVzrnCZ14CVEYSdVaQoDLqhw9iEA23T819lBiNrpQCFMNEBxsgINlOwUwABupukuSU6gQCkKFKBCUjj0Q45woAvlKEAOqhxuVLj0CRKyEjJTgWUBtsqSeihCCboRZSmQwIQhEgIQhQgIQhQh9nWB3SlpCVr+hVgPZaeD5Xs+BFN0xaCkIIUBui1khbaxt6hZkNW4G0jrtWuumBsbhK4plsLGuDdsljf8jhdXNkIPmNwtGyQhwIwQstlY4fO0H1CplX7GyF68m3a++xVgcPZa5lQw5a6xV/jhou4iyzuDNSmjKdIGC5OFr5KhheXOOLrDqK4vdysPlutFqOpNiZ4YdlaKtM5vBj1GsVayZmr621rTFEVx89S5zy5zrkofM6Z99ymFOxreaUrvU1Qojg8xdbZqZdz4MRsT53bWCzftEdBFyx2L+6pdOOXljwBi609TVBrnXNytGHN78EhFR45LqmpdKS+R11rZ6u3laVjTVJcN1k6XpNTqVQ0NaeQ9VflQWXwaK6XNr3FoqOo1GoEcbSbm116vwzw5Bp8DZZGB0hGbjYo0Th+DT4WuLRz4K3UtWyCPljPmIXn9ZrHb8FfB63RdPVXx2cltXUiFh5SOY4svPeKJKb7O+WrfzO25SVutS1DwmPme/wAxGy8l4i1WWuqnAuNuwKbQaduWUadXalHDNDWTCaodyizQSAsIncLeafw9qequHgRFrCbElbmbgKpgiB8TmkO47L0D1NUX2tnOhRNrKRw1zcNaOYk2sF2/CfB01dK2qrGlsYOWlbXh7gmOCVtTqABP9JXfRuijYGRNDGtFsLBqdZj4K/6nRo02d5kU9LT0kHgwtDA0WJ7rWajrENIzwmPu4eqxtb1cwsMUXzbYK0+kaTUajU/aKgkxg5BWKMFj1LGa3L/pA6LTHy1P3slwNwUmu6gIoDBEbu7hZ8vhUlOIougstQaUSSeLLcqmGJS7nwWtNRwabTtLc+Y1E1zm4ut6+sgpoi7DQOixKmojhaQHBrR0XKarqbpCWg4C2qDue/BIxUFsZeq646d5aHeUeq47VtdZHGYotysPUa8sBax2Vz33lRNbdxXQjCMVhA3ZY0y1M2SSSV1Gm0IgjDnjz91RpmmNiaHuF3HoVtZZWwR2GXdlaXQh5YTziFnK35ysI+WMyymx7JXYBnldjoFqNQ1N0g5G4AUbwXdprtTm8SZ1nXatPcOcsmpeHC6xG73WG2zLDFDOwlIsg97qBnqszkWBkC6zdPpTNKHEeVY0Ub5pQ1oXS0sIpoflsVbTDueWWRQ00sdPByNxhaQgzzdwVm1PPNJthWRwshjud1rkm2P2kMYyBl+qtjBkPN0VIPivwcLIs1rQ0FFbFiWCzmIG9gtXXTlx5QbrKnkLW2BusFzQBzO3Vc5NrBGjCLb4tur2sETObdWMbd3MRhU1Erb8rTZZe3t3YmMFXMC8k4VUst8XUPdYWVAF3XWadhCxptlMLvKrzeyuZYWA3SRywonlPygLLjgYxnO8qyGJjGeI/wDVYlVVc7uVuy0ySrjlhwTJVlruVmyrFc9rhhY5IS4WJ3yzsHuZszqbgywOVgyzPmddxVdxZLdJO2UuQNtjEiyXCUklCpyAnF1N0oGd0EWQISClcLpglPok8hRbE1xFrrJELQ26xY3lqs8R7itVbwh9yXCxsEgbm6kkqQDuU7eQEOvsFfTx8xyFSLl1gLrZQM5Y7uwjXHJHwY9RGGt3WEAbrJqpOZ1mrHAIGVVY1nCIheXKcMuFAyVaAeVVkKCADZSMqHCxypbskZAOFBcodugBAiAC6kkAIOAkJukbCCZreqgC5TnAQIQThQAjdSmSCCEITBBCEKEBCEKEBCEKEPsZrw7ZOCRssAOLDYq9kvc4W9x9j5KpGWHA9cp791jhwOxTh/dVNFylnkct7JdinBvsVOCgRoS6ZriPVK5pBuBhJzA9SCjgieOS7xAd7tKR80jhYu8oO6Qva1hMhAAWh1LVvmiiOLq2upzeEhZ3qtZMuv1WOnjMcbruuuYlqZJ5OZ56qmSUveS43Kq8Q3IGbrrV1KtbHHtsldLc2UMscLS55yqJ6p0pObNWP9nmc3ndcAC611ZVhhMbDlNFJy2LlXJRxgvqKzkBYw/Vap8jpHENBc4rIoqGq1GZrY2khxtdeg6HwXFCGy1I5jZC7UV0L4nudDS6Gdr+FHK6JwtV6hM18rC1l+q9N03R6bS4Gtawcw3K2sFPDTRCOJoAtuAtfX1YY0tb+a8/dq56h4XB63TaGvTrPLFqq9sQLWFaCt1VtOxzy7O6SpnNy4G5WhqaaasmsL2VtVMV8xfY5NbGr1GtrtWnMVOHWJss3SOCQXiprzc9Wlb6gpKaji5rN57Zus51ey29z2C0y1EsdlSwiqOlXzWbsy4YIKWIMp4wwAWwsSokAeSBzOSPqpH7+ULDmrWx3APm6rLGDzlml8YRY+azCXuz2Wo1HXG08Raw2cRZYOoaqxgIidzP6LBoNOm1KoEtQCG3uLrdCtL4pFTb+VEUFPWaxWiR9wwnqu4i5aKmEYwQLH1VUP2ehp+RjQ3HRYE9Q+d5zZqpnJ3P6F0Idq+pkul8Z9ybBa7U9UZSQkB2dlg6hq0VLEW8wDrLhdR1oyOc4v5vRaKqMvfgdmzrdWLnFz3ewWhqa10gL72b2WtfV+K7me6w6BRIZaizWCzeq6UYqOyIk2YMz3TzFrBe632l6YyNgkkGT3VNFTQwyB2C5bkkAXBseyJfCoHytjHK3foscksaZZXZ6XTGzbySfktTW1Re4gHypm9ti7twU1tY+UnPKB0WqcxzyXuwAsogPPM/5QsCsqm28OMqiySSJgwqhwdJZvRV7BRm9ylJJOy5kpEDqixLuUDdTbsVsKKkcTzuFwhFOTGSyZWnU7Y2h7zYrPlmc7DVTykt5AMK6OBrBdzl1K12o0JEMHI3mcMrBqarmdyhWVtTy+RpWDGCTzPSzs8IJmQGwv1KyuXy8xOVRTtub2wsl5aOtkYvYdIxnNublUOBe63RPPN+EKu4jjLr5QckgPYrqJI4o7NOVqnP5nElNUTeJIQqSbDC5ttvcytsCbnCYEAWSc1hsjmACzZBga4BWfTRtA53LCiILrkXWRLMOTlbhX14iu5jcbE1VUHHkaLBYRIshzspd1nsscnuQm6jcqMbJgQ1ZyE8pUFtk3MbXSXJKDIQG5UkqeiWxuoQgkoCD7JmglRbhJ6KBumOFABO6OApBcJ2kBLi6bHdMngJPNc7KbOPRMwsGVaZohgBXLBETBEea5WVNL4cXKBlUsnYBgZVUshfurXJKOER7mOXF77lTfCmwSuwsLzncgNPmV17NWKHZVnNhFMmBXZOVICBkpnOAGEpCs5NlKgG5uoceiRkIcblQBcoAuVZsgQNgl3KCblCZIKRKEITBBCEKEBCEKEBCEKEBCEKEPsN8bXA4F+6x3sdGd1nFmcJCOhWuMz5ZOvJjMkN+xVzZL/Mq3w3JLTb0VQcW4IV20jO048mcHdirGvvvusFruoVzX3G4ukcBlPBl3WLVTxQsJNrpJ6psMRJOVy9fXOmeQHdVZTS5vcqvvUVtyXV+pueS1rlpZJC9xKY3kdYZKyqbTpZXAuFguulCqJzoxna9jEhppJ3gNBytk2jgpYvEncL2WW6Sl02DJHMuM1XVpqqTlYTZUJzte2yOpXVCpb7sytT1oWMMG1rYWLpWmT6lUgkG18qdI0Oor5ruaQ0EL07StIh0+EANF+6quvjRHtjydXS6OV0u6XBfoui09BALMBeDdb4StjsC7C1b6wM8rN9lX4ptzPd9FwJqdj7pHqKq41R7Yo2NTqUbGFrFzVZVOk5rG909TNG3mJfYLVv1ClhbcPBK0U1Y4RJPLIeXR+d5uOyx5tSANoWi6w6rUHVDuWIXCmCJrGiSXfst/ZhZkIvoXMkmlJfI4tG6yYpWk2Zkeq1sk3Mb/KGrR6pr4o4yxjrEJ1W5bIbZcm/1XXIKOPzPHMBsuHquLJZ6ksZhpXN6hqs1bKS5xtdYtK9rKgFxW6vTxgt92I1KTPTNE08VhFRM4kjOV1plgpoeRoAIXKaLqlO+lbHE4c1rYW6L2Mj8SocMLFYm5fEWpJcF8khf53u8oXPaxrkVMxzY3WK1+t8RMiaY4HXt2XCahqElQ+7nbq+FSxlhRkahq8tVK7mebLTS1RJsN1XJJYW6rN0zTXVUwe75d1b3exZCDkNQUUtUed4s3rdbeVzKaPwowCR1We5sdPAI2gA2sbLDbTte/nJ2Vq+pqVeFgrpYnF3OcXWa6QMF39FBexrCALALU1lVcljDhM5Fij2j1deXnlaVrSXTPs290ti93KMk9VnQweBH4j7XGUvcRLO5gVfPDDjrutI7LiStnX1HiSEN2WtJ6LHY9xJJZEyeqYXta2UzW3ws+koXPdc7KlQ7mSMWxKKkMrg5zVumxsY0NZhTEwRWa0J5HNY03GSujXUoo0RjgofI2PA3VEkp5DzHdLIxzjzbqBTPcOZ2yMsjGL4Re4udspseYNbkJ5SG+VqsgaLc3VUdm4yRfEfDZgZVUrzYkhO99hcrCdNzusEZPGw4zcuLjkLCrqkHyNwsieZrI7A2K07i577lYbrPCKpNEC+53QnFgFFliw2ViXyoLhe1lYQAFDLXuQk7dxjIgYQ3m6JJ5BewCl0+OVuFVubndaJSWMIBWMnKfCcMxeyQkXss0kTJFutlG52TZRewVYSFOUoJPRMgEjcoOFIv2UE5SshDWFzsBXkBjUrXcowlJc87K2OyCVm5dhML2TWsoygyZCyUi5TEnYK2KO5uVFFsKFbC4t3SmO26ynO5G2AWOeZxyUXHAUS2w2QSb5UWIRm6KZBwkeO6cbKt5KEkQQDOE/LYZQ0KXXVRBN0O7Jg0k4TOYGhEhSLgJg3FyjF1JKUAbJSbouShFIKQKUIRCCEIRICEIUICEIUICEIUICEIUIfZgcDsboIB3CxNk4kcOt1e4ex8xU15LCw9FW9gcCCrBMDuLIcGvF2kXRTa5A0mtjBewsd1t3Vb6jwxkrJneWMLXWuufrJi82bsttScuTm3SUXhFNdXmRxAdda9jJZ3+UFZMdG6V97YWc58FFESbXWzuUNolEKXY+6ZRDRiEeI8i4VlRq8cUXIzdaWs1V8riGHF1iQwy1MnKATdP6fcu6w1Rfb8NSCqlnrX2uT2C2ek8MPmk8SZvl3W+0fh5jAJZRc2uunZGyNgDQGi1lh1GtUfgrO/oemyfx2mNQ0MFKwNYwA2TzzH5QbWSz1TGMIacjquY1bW2QBzQ7Nlz4RlZLLPRKMa1hG6mrYIAeZw5loq/iSGEOLX3K4ys1qeoe5rHEeq01RUPDiC4uLl1K9LFfMUux+Dd1vElTUPLWuIBVlAypqXBzySCtZpVA6d7ZJG4K7SmbDTxta0DZXznGC7YoEK3J5ZZDAyFgNvMrHhhBkkdYb2SulYxviveAB0XI67xHG1pihdkYws0ISsexsUEkZWsa1TwscxjvNZefahXvqZCXHBVdTUyVDy57isQ7W3XThUoIihkixJyVkQR+JIG7eqqbHfJ2TGcRHylPnBaoI7rTv8u0ukE8kwL3Da/VabVuKaiqcYonWZtuuXkqpZMOeeXtdY5mtcBZnjOXuBwXgznzuJLnOLnLGe8HLiqDLYb5V1HTSVswbbB6pXPIFDfYso6SSrqBYEtByuxgpmUlOGgWNk9BQR0UAIALuqmoeNycp4myEO0w5C4u5nHHZVFxcbA2Cd7i4+YWCwqupZE3laU7YwVNTyjkG61ZvI+zd1PiPlPdZdPC0DmcLFItxcZJhiZAzneLrCq6qWUljAQFsHNL3f7Vi1clPCwtaBdM1sM1hGilJa4826pGThWzHndcq6jpDLIMWWJxy9ilJtl1FSeIeYhboRiNoaxTFCIoxYAFK9/4WjK2VxwjZGGENzeGM5Kokl5sEJyC1t3ZKpbl1yMK7uGwWRhgF3YWHV1YaC1pU1VS2NvKtLLJ4jjcqi23HAkpYMlkjpJL3W0isWgLTU484sVvYW8kXM7ZLXLO7DF5MSsPhsNtlpi9weS0rNr6gl3K3IWB0vsst0svYWUhZHOeclQAAMqboFtysbXkQj6ILgAhzhsFAHdDJBdzlTYJsIwq2ATAVsTW7uVRsThNc23slUsDFsrwBZqotm9lNs33RlLKWQAoKCUAZuqwjNt1UEjoEY7qcWUIKXBRcILQpDVEhiQmuBsiwCjcq3GAgL3QThTiyVLjJEABJV4cWhUtaU5JAVkdgkOcSUDCgAlSW23KVogFwQCEhsSpAVeQjlwsqiSSmNtlLWqckAGw2SkklWEAJbXKnaAsjOEkpKfmDW2CpcblCWwCB3KCCRcpgOpUONykQRVKEIhBCEIkBCEKEBCEKEBCEKEBCEKEBCEKEPsFCELYfLARe2UJXm0bj6IgexqquVznm7iqIIvGccYCJ3XJSOqvsdH4oAcSdluw8YiYIYcu6RfU1ENJEQ211ytbUS1D3G+LrIqap9TIXEWuVmUGmNqjdxxZXKMaY90i+ClfLtgaOnop6iXlY02XZaTpkdK0PkGbLJp6WKBoDWAdLqmrroqUXc8EjosVupdvwxPT6Lp0avinybv7ZHEwEYC01fr7QC1jrWK5XUOIXPuxhxdc7UanK4nlOSlq0ed5HZnYorCOnr+IyA5rTYkLkqyufVSHnesOSUyO5nuyraWilq5AGNO66ldUKkZm5TZWDI8hkTSScXW00/RnEiSp7re0WjRU8XNI3zLIkYTdrRYKmVqeyNcKPLMZjWxDw4ha3VWyTR0sRkkeLjKwqyuioozzHJC4fVNZnqXkB5DNkqhk0KBtNb4kdIXxwPNvRcnJK+Z5e43JVRJLu57p2MdIcLXW1FYQ6hkUG+6drb5IwoktF5XDKrNQfDsArHND9qQ0jyLBpVZjIHM4qG3vzHqllkJwFVKQMGPI4F1gbKoyWwApeLHuqgx8j+VuVjlIUugjdUSgDuu10qjbTQAkZ3utbo2k2tI8Wvlb91428vTZPCL5ZprhjcaWdw+TKp+cc0hsrIgyxN9lg6hVsa0tGFfnCLGiusqmNYWjp1Wkk5pX4N0j5HyvsDdbGipbDncCEFuVJNsWnpS0BxCvkcALLKfYA8ixC3mfdwVkUX9mCtxcGXaVpauQBxByVtqyQRsLWrSCN88uRfKrm87FUlnYWngfPIMeVdBDE2CLIyq6WFkLBy2unllsMlLGOCyEEtwdKXG2wTRtzg3VMb/EO2FkGVkTOytTLuRJWOB87rLGmnETCAbolme8kuOFqaufpdU2W9qFk8Ix6qpMjyFRzgDKTfJKmNpdIL5C57t7mZs5NjQxczuZ3yrMrKoRR8kbrhYonEENm9lr3vdK8uuVc7e1YQ6lhEkl7i4lRck7KLkYQSQNlnc8ickGwRa4UjOUw3ykyEUMCDboFba4wFHKBuoTAgAG6rdYnCd1lAA6qtsBAAAyFGCd03LzJHCyqewRrhISgNv1T8oskyQQAdSgqSEBqUhACCpKgNJOE0U2FIACUxBAVzYrDOEjwOhWhQwglNySmsbJgwlNyW3KnbkJXYhFzfCctPRKARuh2hSGCM3UX7BMMJkQYDCR+ExcVWblJJgEySmAPVMAg+yqSJkUHKtGAlaExynIKSSUAWTAWSk5QbCTvgKOSxuU7VJyFWyFbzYWVaZ4N0qCCCEIRICEIUICEIUICEIUICEIUICEIUICEIUIfYKEIWw+WAqqg2gcrVjVhtEAngsyRXY8RZo6uURMLyL2WjlkMj3G5seiztQqA5zoQDcHda1diuOFk5jfgZou4BdZpLOWnLvRctAOaZo9V1LKmChoGvnk5A7YlZNY329qO50qGZ5LdRrYqGjD5iQHG2FwmoVv2iVzmuJbdWalqdTVvfC+XnhDrtWrkNmFJp6PTjl8nrJSy9jBqZbOPItZLKea5dv0WZOcla2nHiVgByC5ak8ES7ng2enafLVyc1jygruaGkgpIrWHMtTSuZTQ2YALhZ0M4uHvdhUTcpHVqoUVk27WmY+bAWv1Ouho4LXF7LHrdbipobBw2XC6nrL6t5AJtdCuttlrWCjVNQfUzHJtdaZwN+6yeR0jrnZWRxxsf5tlscdthYxMeKmlkOBYLMEbKdhJsDbqsh08cUd2DNloq2tkmda9lU3gsbUQqqlssmwVHMA226xrEZKkuNsKr1CrOTI5sZKqe6+yrLjZSzme4Bouj35AIWuc7lAvdbzSNLc57ZnjHW6yNM0tpAe9vrlb7nigZyxiyaMM7sthU+WS+YQReGxouFgmSWV/nOFY6XnddwWNUVDY2kCxVuMGngmeq8Jllo5pZJnncp5ZHzSWGxWVTQMZZzh5uyr5FxkSjo7kOctq02HKAqm9gLBDpOXAyVdFYLFHAzyGjy5Koc8MaSU3+69j2VDzzZIT5IzAnHjOsMBWQRtYcDPdS9oe7y4Ch0gibZuVWxMGQ8sjGcOWO1jpn3uoY18zvMFmNa2Ntm4cpyMtyORsTNsql4D23ccK8h1ruWtq6gi7QbJJPtQX8KKqmZsbS1pWnkeXvN9k0zy5+6VrbDuuZbNyZmlLJW4WTR+XKex3skJ6LPwKhnP5jgqMDqoay5wrhF1cjlsYQNxchS1pc7ATltzYZV8bOUXsrIxfkbBWY2huQqbC6vlffCRoHVM4kAWASiJ8jvKn64V8ZAGN0yh7kwUOp+VvmNliuFnYOFlzyOdglYls7qieE9gNDgYSOb9UwNk26QUqDSEfVO4gJL+iRoYLIygXQUMEFySrGHlUNaT0VgZhWxQxDpXEWASAG9yU5sOijcpwoOY9E7QTuhrO6cvDRaybOCCnAVZF1JdzFMAkcvYgosFBKst2RyE7oAKrKVYWBKWpWiCbp2tHVRayYKYITygqeRM0JkGQrc1VELIIVbmpGiFQNk4KUhANkpCJHdgq1Y+yrQGBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEBCEKEP/Z";
- var MARQUEE_DATA="data:image/jpeg;base64,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";
-function createAstroCabinet(THREE, {screenTexture=null, lighting=false}={}) {
+function createAstroCabinet(THREE, {screenTexture=null, lighting=false, art=null}={}) {
  const root=new THREE.Group(); root.name='AstroBlaster3';
  const artMaterials=[];const mats={}; const mat=(n,c,m=.25,r=.45,e=0)=>mats[n]||(mats[n]=new THREE.MeshStandardMaterial({name:n,color:c,metalness:m,roughness:r,emissive:c,emissiveIntensity:e}));
  const white=mat('Ivory armor',0xd4d1cc,.48,.33),red=mat('Crimson chassis',0x9e1828,.45,.34),black=mat('Graphite',0x13161d,.35,.42),rubber=mat('Rubber seals',0x06080c,0,.8),silver=mat('Fasteners',0x888b96,.85,.24),orange=mat('Amber lamps',0xff5805,.2,.3,3),cyan=mat('Cyan lamps',0x00cfff,.2,.3,2.5),blue=mat('Blue buttons',0x009de7,.45,.22),buttonRed=mat('Red buttons',0xe71926,.35,.2);
@@ -18830,12 +23003,12 @@ function createAstroCabinet(THREE, {screenTexture=null, lighting=false}={}) {
  box('Power inlet',.07,.05,.02,[.22,.25,-.46],rubber);
  root.userData={version:'2.0',units:'metres',front:'+Z',screen:{width:.589,height:.640},design:'Reference-matched reconstruction; rear inferred'};
  const ready=Promise.all([
-  loadTex(THREE,SIDE_ART_DATA).then(texture=>{
-   texture.anisotropy=4;
+  (art&&art.side?loadTex(THREE,art.side):Promise.resolve(null)).then(texture=>{
+   if(!texture)return;texture.anisotropy=4;
    for(const material of artMaterials){material.map.dispose();material.map=texture;material.needsUpdate=true;}
   }),
-  loadTex(THREE,MARQUEE_DATA).then(texture=>{
-   texture.anisotropy=4;
+  (art&&art.marquee?loadTex(THREE,art.marquee):Promise.resolve(null)).then(texture=>{
+   if(!texture)return;texture.anisotropy=4;
    marqueeMaterial.map.dispose();marqueeMaterial.map=texture;marqueeMaterial.needsUpdate=true;
   }),
  ]);
@@ -20805,7 +24978,7 @@ function skinMat(t, glow){ return new THREE.MeshStandardMaterial({map:t, emissiv
    parametric cabinet. The model brings its own body, screen, controls and marquee; the hall gives it a screen canvas (portrait, the shape of the model's screen),
    puts its back at the slot's back like every other machine, and drives its start button. Everything else (focus, zoom into the screen, sound, collision) is shared. */
 function buildModelCabinet(game, i){
-  const spec=window.XA_CAB3D[game.id], cab=spec.build(THREE,{lighting:false});
+  const spec=window.XA_CAB3D[game.id], cab=spec.build(THREE,{lighting:false, art:game.def.cabinetArt||null});
   const group=new THREE.Group(); group.add(cab.group); cab.group.updateMatrixWorld(true);
   const bb=new THREE.Box3().setFromObject(cab.group); cab.group.position.z=-bb.min.z;   // back at z=0, front forward, the way the hall's own machines stand
   const D=bb.max.z-bb.min.z, w=bb.max.x-bb.min.x;
@@ -22122,7 +26295,7 @@ fontsReady.then(()=>{
 });
 })();
 
-` }, packSha: { engine: "b5a2c552158bc3d39b01898d443fd5594c6044e6eeff2d445838e1ea51d35ef5", hall: "3b61e5f8c12cd43e66e9a010000324a18d22e49a0463fabc76e6883e0bb184b2" }, fromBundle: ["assets", "three", "games"], ids: { version: "v2.0.0", bundleId: 3078, packs: {}, parts: {}, parentTokenId: 0 }, shell: `<!doctype html>
+` }, packSha: { engine: "56f1e64141e6c82c0da976088fbba49b8da3511e03b476cef2aefeea24d5b782", hall: "37ad62d125d26ac480b44ae41ef6cd3024da704249815459a2138ab913f8dbb7" }, fromBundle: ["assets", "three", "games"], ids: { version: "v2.0.0", bundleId: 3078, packs: {}, parts: {}, parentTokenId: 0 }, shell: `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -22578,7 +26751,7 @@ fontsReady.then(()=>{
 </script>
 </body>
 </html>
-`, shellSha: "ecdec15336853f432bf6f81a4981e1309f8fc8dd41c0050257f144f6b97791dc", partSha: { "fonts.css": "8306ea91702ae5a440d4e1124c8a20bf64032b10a0bd65a24c4cc46ad2519259", "room.css": "41eb410ba6f828844f25fed0a23b7d83ac69def4fdcbbcd149c71335a77112da", "hall.css": "ef69e5bb7b45e3643a279f5f772fbbaf4749291da447a4f0e994a943a576c9e3", "hall-body.html": "9e3d58fbf40a25d8ff82d405009132f1df86439971155b0d0ccc06f6f48c59d1", "arcade-kit.js": "6046eccb03c39fdc399b76fea10aa072055bfb2f2e102a664c10335ef02f1625", "arcade-music.js": "233b72d333d7d5b689155c38384fd7dbdeec32f0736b2e59799af4a77ee093ee", "score-client.js": "2c8f87165d455cfa17daa63a67d0d7cbba17fee000eee0fd919ae1bcd21d62b6", "arcade-replay.js": "3181864fb284f70bb76693e38d6e6138c276f5b5909f5827d98b4796e766fe48", "arcade-room.js": "0f3778035aa565ff077fabe0464bebb73b7484da8922f93845829ae5038e5405", "game-neon-snake.js": "2e260a6d0f67d8799b5c0e679069921e090be7ae23b99b5ab7cb0a07163c4fbf", "game-block-drop.js": "81521afcaf973e145bf6bd89e5c0adb87fbd6859a47480732e455ddddfdd7cb6", "game-cave-diver.js": "dcad97b4c5343958c37be696a88bb33439d940f063eeb869980dde5c3f4cf070", "game-orbit-merge.js": "777aa11626e9ada259948f744d053e205830007d60c1310687fdf73476c95aca", "game-block-runner.js": "42fc1f6738ff9df3e56b3902cc9f70bf8d4dfa6d7adaaaf1bf76876f0c097ae8", "game-brick-breaker.js": "2854d51f2313dba619ac9fd44c39f2c31643ee1db2cb8bcaa148f56c11daf81d", "game-rock-drift.js": "48fd57ee6dce83bbe04db7d1d05c0e12bbaed84262b7d07fff2c3d3986d97c04", "game-stack-tower.js": "a00ae5ad11552f7d9e4deaed6dbdf0569d209c7a300d48f6e4f7f2870c464500", "game-road-hopper.js": "802b779f828fd301b045a3f340cf916bf3990523749db3fed753297749596a05", "game-tile-tap.js": "7e721b38060706e468102732dc6eb9d965bb9386c419b35fd87748a296c0f0ca", "game-merge-2048.js": "f277aeeeb17653737d4101ff27c6825f3fb73205f002081b6f60ed5cba17bf02", "game-block-defence.js": "13ce92b3a962450e95a8c7044cd92725557e440cff691a3ddf4f7e5ee92f1bf4", "game-maze-muncher.js": "b7893e41fa7a057efb34bf5dbbf44f90042f2a79b1df2dee539797a1470e173d", "game-invader-wave.js": "632902cdea5117e68b4e9c91af8aa1381e0d4650cdb698252dfdd32066876240", "game-helix-drop.js": "eb695c93047706f00fd0127d1c2c710a26279ce3ce26f4639fc835f828257013", "game-bubble-pop.js": "3c76041886c8fd42a98be048c34f46376678e154caa8dfdcd97d24b2aaae3bfa", "game-swerve.js": "a59fec3d008eab452ecc290138bc92541af2bd06575af3b49714a4d3af00a811", "game-lunar-lander.js": "3252ba2264cf4b729af9e6e84f5ad5ab43f7cf7143937be8976db126f5fd6b6d", "game-reflex-tap.js": "acdee2ec516b1cbad81b5c6ce2be9cf503e3177dc6eb3d5f93e6e38ba5cd4067", "game-mine-sprint.js": "cbfacdcad186a0efc6a11762d468be8f5feaa6f273418a250ed671b0d47744df", "game-pong-streak.js": "f2e88bc9308337a9aa15661f3e41aa8cffe2a9d917114f19c72c7d78a13d7c7c", "games-registry.js": "1bc64a7dd863c8d31e38dd331d13d4e54c1e3fa13dd1faa74fc0d803bb71ffd1", "engine-boot.js": "e47841adab913ae00c19a410896b84fcf4a325fb562261a6cd06f22b36b2ee06", "three.js": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2", "hall-assets.js": "54ddcd97fa211f86ba5d3fc09e9a7a091f3bab1b5f8ae7944d71ac7695747c17", "world.js": "05a4da4caefaa25c7c027d43fe9df00d9188f81da4762a4179f06b5cb7e63081", "world2.js": "5626aede076ef8e5efe22d68cef0a72a81b941753024fc1e002ec34aa02fcb53", "curtain.js": "fccff71a98a9940f38f421b06b47741eb8fc109e73358472884171bff03a29e0", "doors.js": "7f7f63df614f18f76311be8f95d8ef088e31e069957d0e6a67da09d26ffa2e1b", "door-skins.js": "e74df6198c8e4546457c09da688d42ec6d266f9880fd0cc522cb0bba02898b52", "bays.js": "b85744fcb52a2306e63e9fc1880d62370376095f4f07c1d192c35104229b89e8", "screen.js": "eae588e1a2e2e67dea14f6d021a701fa47e1372bff51700b36d85ebef37c86ba", "cabinet-astro3.js": "499aee2e6a8481ec2d57a0f8c9631bb2f8ff6492aa43f3eb6aba179cb0665c08", "hall.js": "76132efa8ffa5da258e56e5720e00cb1883e69196d0dd524090f9a9de2cae456" }, single: `<!doctype html>
+`, shellSha: "ecdec15336853f432bf6f81a4981e1309f8fc8dd41c0050257f144f6b97791dc", partSha: { "fonts.css": "8306ea91702ae5a440d4e1124c8a20bf64032b10a0bd65a24c4cc46ad2519259", "room.css": "41eb410ba6f828844f25fed0a23b7d83ac69def4fdcbbcd149c71335a77112da", "hall.css": "ef69e5bb7b45e3643a279f5f772fbbaf4749291da447a4f0e994a943a576c9e3", "hall-body.html": "9e3d58fbf40a25d8ff82d405009132f1df86439971155b0d0ccc06f6f48c59d1", "arcade-kit.js": "6046eccb03c39fdc399b76fea10aa072055bfb2f2e102a664c10335ef02f1625", "arcade-music.js": "233b72d333d7d5b689155c38384fd7dbdeec32f0736b2e59799af4a77ee093ee", "score-client.js": "2c8f87165d455cfa17daa63a67d0d7cbba17fee000eee0fd919ae1bcd21d62b6", "arcade-replay.js": "3181864fb284f70bb76693e38d6e6138c276f5b5909f5827d98b4796e766fe48", "arcade-room.js": "0f3778035aa565ff077fabe0464bebb73b7484da8922f93845829ae5038e5405", "game-neon-snake.js": "2e260a6d0f67d8799b5c0e679069921e090be7ae23b99b5ab7cb0a07163c4fbf", "game-block-drop.js": "81521afcaf973e145bf6bd89e5c0adb87fbd6859a47480732e455ddddfdd7cb6", "game-cave-diver.js": "dcad97b4c5343958c37be696a88bb33439d940f063eeb869980dde5c3f4cf070", "game-orbit-merge.js": "777aa11626e9ada259948f744d053e205830007d60c1310687fdf73476c95aca", "game-block-runner.js": "42fc1f6738ff9df3e56b3902cc9f70bf8d4dfa6d7adaaaf1bf76876f0c097ae8", "game-brick-breaker.js": "2854d51f2313dba619ac9fd44c39f2c31643ee1db2cb8bcaa148f56c11daf81d", "game-rock-drift.js": "48fd57ee6dce83bbe04db7d1d05c0e12bbaed84262b7d07fff2c3d3986d97c04", "game-stack-tower.js": "a00ae5ad11552f7d9e4deaed6dbdf0569d209c7a300d48f6e4f7f2870c464500", "game-road-hopper.js": "802b779f828fd301b045a3f340cf916bf3990523749db3fed753297749596a05", "game-tile-tap.js": "7e721b38060706e468102732dc6eb9d965bb9386c419b35fd87748a296c0f0ca", "game-merge-2048.js": "f277aeeeb17653737d4101ff27c6825f3fb73205f002081b6f60ed5cba17bf02", "game-block-defence.js": "13ce92b3a962450e95a8c7044cd92725557e440cff691a3ddf4f7e5ee92f1bf4", "game-maze-muncher.js": "b7893e41fa7a057efb34bf5dbbf44f90042f2a79b1df2dee539797a1470e173d", "game-invader-wave.js": "632902cdea5117e68b4e9c91af8aa1381e0d4650cdb698252dfdd32066876240", "game-helix-drop.js": "eb695c93047706f00fd0127d1c2c710a26279ce3ce26f4639fc835f828257013", "game-bubble-pop.js": "3c76041886c8fd42a98be048c34f46376678e154caa8dfdcd97d24b2aaae3bfa", "game-swerve.js": "a59fec3d008eab452ecc290138bc92541af2bd06575af3b49714a4d3af00a811", "game-lunar-lander.js": "3252ba2264cf4b729af9e6e84f5ad5ab43f7cf7143937be8976db126f5fd6b6d", "game-reflex-tap.js": "acdee2ec516b1cbad81b5c6ce2be9cf503e3177dc6eb3d5f93e6e38ba5cd4067", "game-mine-sprint.js": "cbfacdcad186a0efc6a11762d468be8f5feaa6f273418a250ed671b0d47744df", "game-pong-streak.js": "f2e88bc9308337a9aa15661f3e41aa8cffe2a9d917114f19c72c7d78a13d7c7c", "games-registry.js": "6c23800ad82ccab69d3463fdc6ca0ef5086153c1af9e9cfb502af9fe4a459c0c", "engine-boot.js": "e47841adab913ae00c19a410896b84fcf4a325fb562261a6cd06f22b36b2ee06", "three.js": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2", "hall-assets.js": "54ddcd97fa211f86ba5d3fc09e9a7a091f3bab1b5f8ae7944d71ac7695747c17", "world.js": "05a4da4caefaa25c7c027d43fe9df00d9188f81da4762a4179f06b5cb7e63081", "world2.js": "5626aede076ef8e5efe22d68cef0a72a81b941753024fc1e002ec34aa02fcb53", "curtain.js": "fccff71a98a9940f38f421b06b47741eb8fc109e73358472884171bff03a29e0", "doors.js": "7f7f63df614f18f76311be8f95d8ef088e31e069957d0e6a67da09d26ffa2e1b", "door-skins.js": "e74df6198c8e4546457c09da688d42ec6d266f9880fd0cc522cb0bba02898b52", "bays.js": "b85744fcb52a2306e63e9fc1880d62370376095f4f07c1d192c35104229b89e8", "screen.js": "eae588e1a2e2e67dea14f6d021a701fa47e1372bff51700b36d85ebef37c86ba", "cabinet-astro3.js": "dd3d8bce72602478346dc059b77e3458b1db203624b14e88c3cc26395f38c4fe", "hall.js": "585023a34b0b15f802fcd485406fe1f1bff8da4fed5d3f6d83ae7beafd7f7cb0" }, single: `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -53886,7 +58059,10 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
 
   var KIND_CARTRIDGE = 1;
   var KIND_FRAMED = 2;                // a game that is its own page (an inscription): the hall gives it a cabinet and frames it when played
+  var KIND_MANIFEST = 3;              // a framed game described by a small picture (SVG) that names the real game's inscription and its hash, and carries the cabinet art
   var FRAMED_CAP = 16 * 1024 * 1024;  // the same limit as a room page
+  var MANIFEST_CAP = 4 * 1024 * 1024; // a manifest picture is small; this only bounds a mistake
+  var ART_CAP = 2 * 1024 * 1024;      // each embedded cabinet picture
   var MAX_ADDED = 64;                 // the contract's own cap; also a safety bound here
   var TIME_LIMIT_MS = 20000;          // the whole load, after which the hall starts with what it has
   var ID_OK = /^[a-z0-9_]{3,24}$/;
@@ -53935,12 +58111,33 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
     return true;
   }
 
+  // The manifest picture (an SVG): <metadata id="xtrata-game"> holds JSON { v:1, kind:"framed-game", game:{ id, hash, size }, board? }, and two <image> elements
+  // (id xa-cab-side, id xa-cab-marquee) hold the cabinet art as data URIs. The picture is only READ as text: it is never put in the page, never run.
+  function parseManifest(text, gameId, C) {
+    var m = /<metadata\\b[^>]*\\bid="xtrata-game"[^>]*>([\\s\\S]*?)<\\/metadata>/.exec(text);
+    if (!m) throw new Error('no game note in the picture');
+    var raw = m[1].replace(/^\\s*<!\\[CDATA\\[/, '').replace(/\\]\\]>\\s*$/, '');
+    var j;
+    try { j = JSON.parse(raw); } catch (e) { throw new Error('the game note is not valid'); }
+    var g = j && j.game;
+    if (!j || j.v !== 1 || j.kind !== 'framed-game' || !g) throw new Error('not a framed-game note');
+    if (!(Number.isSafeInteger(g.id) && g.id > 0) || !/^[0-9a-fA-F]{64}$/.test(String(g.hash || '')) || !(Number.isSafeInteger(g.size) && g.size > 0 && g.size <= FRAMED_CAP)) throw new Error('the game note is incomplete');
+    if (j.board !== undefined && j.board !== gameId) throw new Error('the note is for a different board');
+    function art(id) {
+      var tag = new RegExp('<image\\\\b[^>]*\\\\bid="' + id + '"[^>]*>').exec(text);
+      if (!tag) return null;
+      var h = /(?:xlink:)?href="(data:image\\/(?:jpeg|png|webp);base64,[A-Za-z0-9+\\/=]+)"/.exec(tag[0]);
+      return h && h[1].length <= ART_CAP ? h[1] : null;
+    }
+    return { game: { id: g.id, hash: C.hexToBytes(g.hash), size: g.size }, art: { side: art('xa-cab-side'), marquee: art('xa-cab-marquee') } };
+  }
+
   // The cabinet's neon colours, by game number, so every framed game looks different without anything else on chain.
   var COLOURS = ['#3be4ff', '#ff5cf0', '#ffb347', '#7dffb2', '#ff6b6b', '#a78bfa'];
 
   // A framed game is registered like any other game (so it gets a cabinet, a Top 10 on its screen, a place in the High scores list)
   // but it has no script of its own: def.framed says which inscription to frame, and the hall does the rest.
-  function registerFramed(g) {
+  function registerFramed(g, framed, art) {
     var XA = root.XA;
     var color = COLOURS[g.n % COLOURS.length];
     var title = g.title || g.id;
@@ -53948,9 +58145,9 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
       XA.registerGame({
         id: g.id, order: 1000 + g.n, title: title, tagline: 'Played straight from the chain', color: color,
         size: { w: 320, h: 240 }, controls: 'Opens the original game',
-        framed: { id: g.codeId, hash: g.codeHash, size: g.codeSize },
+        framed: framed, cabinetArt: art || null,
         create: function () { throw new Error('a framed game is played in its own frame'); },
-        attract: function (ctx, w, h, t) { drawFramedAttract(ctx, t || 0, w || 320, h || 240, title, color, g.codeId); }
+        attract: function (ctx, w, h, t) { drawFramedAttract(ctx, t || 0, w || 320, h || 240, title, color, framed.id); }
       });
     } catch (e) { return false; }
     return XA.games.some(function (x) { return x.id === g.id; });
@@ -54006,8 +58203,9 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
       var wanted = games.filter(function (g) {
         if (g.hidden) { skip(g.id, 'hidden'); return false; }
         if (!(g.liveAt <= height)) { skip(g.id, 'not live yet'); return false; }
-        if (g.kind !== KIND_CARTRIDGE && g.kind !== KIND_FRAMED) { skip(g.id, 'unknown kind'); return false; }
+        if (g.kind !== KIND_CARTRIDGE && g.kind !== KIND_FRAMED && g.kind !== KIND_MANIFEST) { skip(g.id, 'unknown kind'); return false; }
         if (g.kind === KIND_FRAMED && !(g.codeSize > 0 && g.codeSize <= FRAMED_CAP)) { skip(g.id, 'too big to frame'); return false; }
+        if (g.kind === KIND_MANIFEST && !(g.codeSize > 0 && g.codeSize <= MANIFEST_CAP)) { skip(g.id, 'manifest too big'); return false; }
         if (!(g.engineMin <= (R.ENGINE || 1))) { skip(g.id, 'needs a newer engine'); return false; }
         if (!ID_OK.test(g.id)) { skip(g.id, 'invalid id'); return false; }
         if (XA.games.some(function (x) { return x.id === g.id; }) || R.GAME_IDS.indexOf(g.id) >= 0 && R.GAME_IDS.indexOf(g.id) < (R.BUILT_IN || 21)) { skip(g.id, 'built-in id'); return false; }
@@ -54016,11 +58214,25 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
       });
       // A framed game is not run here: it gets a cabinet now and its page is fetched (and checked) only when someone plays it.
       var framed = wanted.filter(function (g) { return g.kind === KIND_FRAMED; });
-      wanted = wanted.filter(function (g) { return g.kind === KIND_CARTRIDGE; });
       framed.forEach(function (g) {
         if (closed) return;
-        if (!registerFramed(g)) { skip(g.id, 'could not make a cabinet'); return; }
+        if (!registerFramed(g, { id: g.codeId, hash: g.codeHash, size: g.codeSize }, null)) { skip(g.id, 'could not make a cabinet'); return; }
         state.loaded.push(g.id);
+      });
+      // A manifest game: the contract's inscription is a small picture (checked against the contract's hash) that names the real game's inscription,
+      // its hash and size, and carries the cabinet art. The real game is still fetched only when played, and must match the hash the picture names.
+      var manifests = wanted.filter(function (g) { return g.kind === KIND_MANIFEST; });
+      wanted = wanted.filter(function (g) { return g.kind === KIND_CARTRIDGE; });
+      var mfetched = await Promise.all(manifests.map(function (g) {
+        return S.getInscription(g.codeId, g.codeHash).then(function (bytes) {
+          if (bytes.length !== g.codeSize) throw new Error('size differs from the contract');
+          return parseManifest(new TextDecoder('utf-8').decode(bytes), g.id, C);
+        }).then(function (m) { return { g: g, m: m }; }, function (e) { skip(g.id, 'manifest: ' + ((e && e.message) || e)); return null; });
+      }));
+      mfetched.forEach(function (f) {
+        if (!f || closed) return;
+        if (!registerFramed(f.g, f.m.game, f.m.art)) { skip(f.g.id, 'could not make a cabinet'); return; }
+        state.loaded.push(f.g.id);
       });
       // Fetch every cartridge at once (gateway first, chain as fallback; the bytes must match the contract's hash).
       var fetched = await Promise.all(wanted.map(function (g) {
@@ -60219,7 +64431,7 @@ function skinMat(t, glow){ return new THREE.MeshStandardMaterial({map:t, emissiv
    parametric cabinet. The model brings its own body, screen, controls and marquee; the hall gives it a screen canvas (portrait, the shape of the model's screen),
    puts its back at the slot's back like every other machine, and drives its start button. Everything else (focus, zoom into the screen, sound, collision) is shared. */
 function buildModelCabinet(game, i){
-  const spec=window.XA_CAB3D[game.id], cab=spec.build(THREE,{lighting:false});
+  const spec=window.XA_CAB3D[game.id], cab=spec.build(THREE,{lighting:false, art:game.def.cabinetArt||null});
   const group=new THREE.Group(); group.add(cab.group); cab.group.updateMatrixWorld(true);
   const bb=new THREE.Box3().setFromObject(cab.group); cab.group.position.z=-bb.min.z;   // back at z=0, front forward, the way the hall's own machines stand
   const D=bb.max.z-bb.min.z, w=bb.max.x-bb.min.x;
@@ -61539,7 +65751,7 @@ fontsReady.then(()=>{
 </script>
 </body>
 </html>
-`, singleSha: "5532fa97b14ab20379b99b574103847d376cf24906690c7ee1ee1e2ac10dac6e", equivalentParents: [] }, releaseSha: "0d9eb221de32f1eb12eaa0cff272a38709e3b5bf0ead38930f1b350a0badef7c", networks: { mainnet: { root: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", treasury: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", core: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3", posterPublishers: [], hallPublisher: null, screenFeeRecipient: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", gamesDelay: 6, lockGamesDelay: true, parents: [55], bundleId: 3078, canDeployCore: false }, testnet: { root: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", treasury: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", core: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J.xtrata-v3-2-3", posterPublishers: [], hallPublisher: null, screenFeeRecipient: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", gamesDelay: 6, lockGamesDelay: false, parents: "stand-in", bundleId: "by-hash", canDeployCore: true } }, contracts: { mainnet: { "xtrata-posters-v1": ';; xtrata-posters-v1\n;;\n;; Poster registry for the Xtrata Arcade (and later rooms). Room-agnostic.\n;;\n;; - Append-only poster records. Hidden is the only way to take one down; history stays.\n;; - The hall computes the wall itself (deterministic rotation) from the pool this\n;;   contract serves: it reads `get-version`, then `get-live` + `get-posters`.\n;; - Bounded live set: at most 64 poster ids are "live" (not expired, not hidden), so the\n;;   hall\'s load cost does not grow with history. Older posters stay readable by id.\n;; - Start days are always in the future (day = burn-block-height / 144), so everyone\n;;   sees the same pool for a given day. Admin pins are the one immediate path.\n;; - Publishers (whitelist) add `community` posters within contract-enforced caps.\n;;   Only admin can place `core` posters, evergreen, pins, or suppress embedded posters.\n;; - Review lane: when on, publisher posters start hidden until admin releases them.\n;; - Instant stop: set-publisher off, set-hidden, or set-paused.\n;; - Successor pointer with a one-way lock; the read interface is frozen at v1.\n;;\n;; Kind values:   0 template, 1 image, 2 sheet, 3 live (art = binding key)\n;; Set values:    0 core, 1 community\n;; Action values: 0 none, 1 play inscription (act-id), 2 allowlisted path (act-text),\n;;                3 play playlist inscription (act-id)\n\n(define-constant ERR-NOT-AUTHORIZED (err u100))\n(define-constant ERR-PAUSED         (err u101))\n(define-constant ERR-NOT-FOUND      (err u102))\n(define-constant ERR-INVALID        (err u103))\n(define-constant ERR-WINDOW         (err u104))\n(define-constant ERR-WEIGHT         (err u105))\n(define-constant ERR-INSCRIPTION    (err u106))\n(define-constant ERR-CAP-DAY        (err u107))\n(define-constant ERR-CAP-LIVE       (err u108))\n(define-constant ERR-GAP            (err u109))\n(define-constant ERR-LIVE-FULL      (err u110))\n(define-constant ERR-NO-PENDING     (err u111))\n(define-constant ERR-LOCKED         (err u112))\n(define-constant ERR-PIN-FULL       (err u113))\n(define-constant ERR-SUPPRESS-FULL  (err u114))\n\n(define-constant DAY-BLOCKS u144)\n(define-constant MAX-LIVE u64)\n(define-constant MAX-COMMUNITY-LIVE u48)\n(define-constant MAX-WEIGHT-CORE u100)\n(define-constant MAX-WEIGHT-COMMUNITY u20)\n(define-constant MAX-SPAN-DAYS u3650)\n(define-constant MAX-IMAGE-BYTES u131072)\n(define-constant MAX-SHEET-BYTES u307200)\n(define-constant MAX-GENESIS-INDEX u159)\n\n(define-data-var admin principal tx-sender)\n(define-data-var pending-admin (optional principal) none)\n(define-data-var paused bool false)\n(define-data-var version uint u0)\n(define-data-var count uint u0)\n(define-data-var review-lane bool false)\n(define-data-var cap-per-day uint u24)\n(define-data-var cap-live-per-publisher uint u12)\n(define-data-var min-gap uint u1)\n(define-data-var successor (optional principal) none)\n(define-data-var successor-locked bool false)\n(define-data-var live (list 64 uint) (list))\n(define-data-var suppressed (list 160 uint) (list))\n\n;; scratch values used by filter/fold helpers (always set just before use)\n(define-data-var scratch-day uint u0)\n(define-data-var scratch-id uint u0)\n(define-data-var scratch-who principal tx-sender)\n\n(define-map Publishers principal bool)\n(define-map LastWrite principal uint)\n(define-map DayCount { who: principal, day: uint } uint)\n\n(define-map Posters uint\n  {\n    owner: principal,\n    set: uint,\n    kind: uint,\n    head: (string-ascii 48),\n    sub: (string-ascii 140),\n    foot: (string-ascii 32),\n    colour: (string-ascii 12),\n    art: (string-ascii 24),\n    image-id: uint,\n    image-hash: (buff 32),\n    image-size: uint,\n    cols: uint,\n    frames: uint,\n    fps: uint,\n    act-kind: uint,\n    act-id: uint,\n    act-text: (string-ascii 64),\n    weight: uint,\n    start-day: uint,\n    end-day: uint,\n    scope: (list 8 (string-ascii 24)),\n    hidden: bool,\n    evergreen: bool,\n    payout: (optional principal),\n    added-at: uint\n  })\n\n(define-map Pins (string-ascii 24)\n  (list 32 { spot: uint, poster: uint, from-day: uint, to-day: uint }))   ;; 32 pins: more than the hall has wall slots (27), so every poster can be programmed\n\n;; ---------------------------------------------------------------------------\n;; Helpers\n\n(define-private (caller-is (who principal))\n  (and (is-eq tx-sender who) (is-eq contract-caller who)))\n\n(define-private (is-admin) (caller-is (var-get admin)))\n\n(define-private (can-publish)\n  (or (is-admin) (and (caller-is tx-sender) (default-to false (map-get? Publishers tx-sender)))))\n\n(define-private (today) (/ burn-block-height DAY-BLOCKS))\n\n(define-private (bump)\n  (begin (var-set version (+ (var-get version) u1)) (var-get version)))\n\n(define-private (note (event (string-ascii 24)) (id uint))\n  (print { event: event, id: id, version: (bump) }))\n\n(define-private (inscription-ok? (id uint) (hash (buff 32)) (size uint) (who principal))\n  (and\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 inscription-exists id) (ok true)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 is-inscription-sealed id) (some true)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-hash id) (some hash)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-size id) (some size)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-creator id) (some who)) ;; @principal core\n  ))\n\n;; live-set filters (read scratch vars)\n(define-private (alive? (id uint))\n  (match (map-get? Posters id)\n    p (and (not (get hidden p))\n           (or (get evergreen p) (> (get end-day p) (var-get scratch-day))))\n    false))\n\n(define-private (not-scratch-id? (id uint)) (not (is-eq id (var-get scratch-id))))\n\n(define-private (owned-live-step (id uint) (n uint))\n  (match (map-get? Posters id)\n    p (if (is-eq (get owner p) (var-get scratch-who)) (+ n u1) n)\n    n))\n\n(define-private (community-step (id uint) (n uint))\n  (match (map-get? Posters id)\n    p (if (is-eq (get set p) u1) (+ n u1) n)\n    n))\n\n;; Prunes expired/hidden ids, then appends `id`. Errors if the set is full, or if a\n;; community poster would take the community share (48 of 64) past its limit.\n(define-private (live-add (id uint))\n  (begin\n    (var-set scratch-day (today))\n    (let ((kept (filter alive? (var-get live))))\n      (if (is-some (index-of? kept id))\n        (ok (var-set live kept))\n        (match (if (and (is-eq (get set (unwrap! (map-get? Posters id) ERR-NOT-FOUND)) u1)\n                        (>= (fold community-step kept u0) MAX-COMMUNITY-LIVE))\n                 none\n                 (as-max-len? (append kept id) u64))\n          next (ok (var-set live next))\n          ERR-LIVE-FULL)))))\n\n(define-private (live-remove (id uint))\n  (begin\n    (var-set scratch-id id)\n    (var-set live (filter not-scratch-id? (var-get live)))))\n\n(define-private (check-weight (set uint) (weight uint))\n  (and (>= weight u1)\n       (<= weight (if (is-eq set u0) MAX-WEIGHT-CORE MAX-WEIGHT-COMMUNITY))))\n\n;; ---------------------------------------------------------------------------\n;; Adding posters\n\n(define-private (add-one\n  (p {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  })\n  (acc (response uint uint)))\n  (match acc\n    n\n      (let (\n        (admin? (is-admin))\n        (day (today))\n        (id (var-get count))\n        (kind (get kind p))\n        (set (get set p))\n        (hidden (and (not admin?) (var-get review-lane)))\n        (day-key { who: tx-sender, day: day })\n        (used (default-to u0 (map-get? DayCount day-key))))\n        (asserts! (<= kind u3) ERR-INVALID)\n        (asserts! (<= set u1) ERR-INVALID)\n        (asserts! (or admin? (and (is-eq set u1) (not (get evergreen p)))) ERR-NOT-AUTHORIZED)\n        (asserts! (>= (len (get head p)) u1) ERR-INVALID)\n        (asserts! (<= (get act-kind p) u3) ERR-INVALID)\n        (asserts! (check-weight set (get weight p)) ERR-WEIGHT)\n        (asserts! (and (> (get start-day p) day)\n                       (> (get end-day p) (get start-day p))\n                       (<= (- (get end-day p) (get start-day p)) MAX-SPAN-DAYS)) ERR-WINDOW)\n        (asserts! (or (not (is-eq kind u3)) (> (len (get art p)) u0)) ERR-INVALID)\n        (if (or (is-eq kind u1) (is-eq kind u2))\n          (begin\n            (asserts! (<= (get image-size p) (if (is-eq kind u1) MAX-IMAGE-BYTES MAX-SHEET-BYTES)) ERR-INSCRIPTION)\n            (asserts! (inscription-ok? (get image-id p) (get image-hash p) (get image-size p) tx-sender) ERR-INSCRIPTION)\n            (asserts! (or (is-eq kind u1)\n                          (and (> (get cols p) u0) (> (get frames p) u0) (<= (get frames p) u64)\n                               (> (get fps p) u0) (<= (get fps p) u30))) ERR-INVALID)\n            true)\n          true)\n        (if admin?\n          true\n          (begin\n            (asserts! (< used (var-get cap-per-day)) ERR-CAP-DAY)\n            (var-set scratch-who tx-sender)\n            (var-set scratch-day day)\n            (asserts! (or hidden\n                          (< (fold owned-live-step (filter alive? (var-get live)) u0)\n                             (var-get cap-live-per-publisher))) ERR-CAP-LIVE)\n            (map-set DayCount day-key (+ used u1))\n            true))\n        (map-set Posters id {\n          owner: tx-sender, set: set, kind: kind,\n          head: (get head p), sub: (get sub p), foot: (get foot p),\n          colour: (get colour p), art: (get art p),\n          image-id: (get image-id p), image-hash: (get image-hash p), image-size: (get image-size p),\n          cols: (get cols p), frames: (get frames p), fps: (get fps p),\n          act-kind: (get act-kind p), act-id: (get act-id p), act-text: (get act-text p),\n          weight: (get weight p), start-day: (get start-day p), end-day: (get end-day p),\n          scope: (get scope p), hidden: hidden, evergreen: (get evergreen p),\n          payout: (get payout p), added-at: stacks-block-height })\n        (var-set count (+ id u1))\n        (if hidden true (begin (try! (live-add id)) true))\n        (note "poster-added" id)\n        (ok (+ n u1)))\n    e (err e)))\n\n(define-private (write-gate)\n  (begin\n    (asserts! (not (var-get paused)) ERR-PAUSED)\n    (asserts! (can-publish) ERR-NOT-AUTHORIZED)\n    (if (is-admin)\n      true\n      (begin\n        (asserts! (match (map-get? LastWrite tx-sender) last (>= burn-block-height (+ last (var-get min-gap))) true) ERR-GAP)\n        (map-set LastWrite tx-sender burn-block-height)\n        true))\n    (ok true)))\n\n(define-public (add-poster\n  (p {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  }))\n  (begin\n    (try! (write-gate))\n    (try! (add-one p (ok u0)))\n    (ok (- (var-get count) u1))))\n\n(define-public (add-posters\n  (ps (list 10 {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  })))\n  (begin\n    (try! (write-gate))\n    (fold add-one ps (ok u0))))\n\n;; ---------------------------------------------------------------------------\n;; Changing posters (never edits content)\n\n(define-private (unhide-one (id uint) (acc (response bool uint)))\n  (match acc\n    ok-v\n      (match (map-get? Posters id)\n        p (begin\n            (map-set Posters id (merge p { hidden: false }))\n            (var-set scratch-day (today))\n            (if (or (get evergreen p) (> (get end-day p) (today)))\n              (try! (live-add id))\n              true)\n            (ok true))\n        ERR-NOT-FOUND)\n    e (err e)))\n\n(define-private (refresh-live (id uint))\n  (match (map-get? Posters id)\n    p (if (and (not (get hidden p)) (or (get evergreen p) (> (get end-day p) (today))))\n        (begin (var-set scratch-day (today)) (live-add id))\n        (ok true))\n    ERR-NOT-FOUND))\n\n(define-public (set-hidden (id uint) (hidden bool))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (or (is-admin) (and hidden (is-eq tx-sender (get owner p)))) ERR-NOT-AUTHORIZED)\n    (if hidden\n      (begin\n        (map-set Posters id (merge p { hidden: true }))\n        (live-remove id)\n        (note "poster-hidden" id)\n        (ok true))\n      (begin\n        (try! (unhide-one id (ok true)))\n        (note "poster-released" id)\n        (ok true)))))\n\n;; Review lane: release a batch of hidden posters.\n(define-public (release-posters (ids (list 20 uint)))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (try! (fold unhide-one ids (ok true)))\n    (print { event: "posters-released", count: (len ids), version: (bump) })\n    (ok true)))\n\n(define-public (set-weight (id uint) (weight uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (check-weight (get set p) weight) ERR-WEIGHT)\n    (map-set Posters id (merge p { weight: weight }))\n    (note "poster-weight" id)\n    (ok true)))\n\n;; Window changes: end-day may always move (but stays after today); start-day only\n;; while the poster has not started, and only to a future day.\n(define-public (set-window (id uint) (start-day uint) (end-day uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)) (day (today)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (and (> end-day start-day) (> end-day day)\n                   (<= (- end-day start-day) MAX-SPAN-DAYS)) ERR-WINDOW)\n    (asserts! (or (is-eq start-day (get start-day p))\n                  (and (> (get start-day p) day) (> start-day day))) ERR-WINDOW)\n    (map-set Posters id (merge p { start-day: start-day, end-day: end-day }))\n    (try! (refresh-live id))\n    (note "poster-window" id)\n    (ok true)))\n\n(define-public (set-set (id uint) (set uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (<= set u1) ERR-INVALID)\n    (asserts! (check-weight set (get weight p)) ERR-WEIGHT)\n    (map-set Posters id (merge p { set: set }))\n    (note "poster-set" id)\n    (ok true)))\n\n(define-public (set-evergreen (id uint) (evergreen bool))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (map-set Posters id (merge p { evergreen: evergreen }))\n    (try! (refresh-live id))\n    (note "poster-evergreen" id)\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Pins (admin only; the one immediate path)\n\n(define-private (pin-keep? (pin { spot: uint, poster: uint, from-day: uint, to-day: uint }))\n  (and (>= (get to-day pin) (var-get scratch-day))\n       (not (is-eq (get spot pin) (var-get scratch-id)))))\n\n(define-public (set-pin (room (string-ascii 24)) (spot uint) (poster uint) (from-day uint) (to-day uint))\n  (let ((kept (begin\n                (var-set scratch-day (today))\n                (var-set scratch-id spot)\n                (filter pin-keep? (default-to (list) (map-get? Pins room))))))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (is-some (map-get? Posters poster)) ERR-NOT-FOUND)\n    (asserts! (and (>= to-day from-day) (>= to-day (today))) ERR-WINDOW)\n    (map-set Pins room\n      (unwrap! (as-max-len? (append kept { spot: spot, poster: poster, from-day: from-day, to-day: to-day }) u32)\n               ERR-PIN-FULL))\n    (print { event: "pin-set", room: room, spot: spot, poster: poster, from-day: from-day, to-day: to-day, version: (bump) })\n    (ok true)))\n\n(define-public (clear-pin (room (string-ascii 24)) (spot uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set scratch-day u0)\n    (var-set scratch-id spot)\n    (map-set Pins room (filter pin-keep? (default-to (list) (map-get? Pins room))))\n    (print { event: "pin-cleared", room: room, spot: spot, version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Suppressing embedded (genesis) posters by index\n\n(define-private (not-scratch-idx? (i uint)) (not (is-eq i (var-get scratch-id))))\n\n(define-public (suppress-genesis (idx uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (<= idx MAX-GENESIS-INDEX) ERR-INVALID)\n    (if (is-some (index-of? (var-get suppressed) idx))\n      (ok true)\n      (begin\n        (var-set suppressed (unwrap! (as-max-len? (append (var-get suppressed) idx) u160) ERR-SUPPRESS-FULL))\n        (print { event: "genesis-suppressed", idx: idx, version: (bump) })\n        (ok true)))))\n\n(define-public (unsuppress-genesis (idx uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set scratch-id idx)\n    (var-set suppressed (filter not-scratch-idx? (var-get suppressed)))\n    (print { event: "genesis-unsuppressed", idx: idx, version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Roles, caps, pause, hand-over, successor\n\n(define-public (set-publisher (who principal) (allowed bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (map-set Publishers who allowed)\n    (print { event: "publisher", who: who, allowed: allowed, version: (bump) })\n    (ok true)))\n\n(define-public (set-review-lane (on bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set review-lane on)\n    (print { event: "review-lane", on: on, version: (bump) })\n    (ok true)))\n\n(define-public (set-caps (per-day uint) (live-per-publisher uint) (gap uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (and (<= per-day u100) (<= live-per-publisher MAX-LIVE) (<= gap u144)) ERR-INVALID)\n    (var-set cap-per-day per-day)\n    (var-set cap-live-per-publisher live-per-publisher)\n    (var-set min-gap gap)\n    (print { event: "caps", per-day: per-day, live-per-publisher: live-per-publisher, gap: gap, version: (bump) })\n    (ok true)))\n\n(define-public (set-paused (value bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set paused value)\n    (print { event: "paused", value: value, version: (bump) })\n    (ok true)))\n\n(define-public (propose-admin (who principal))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set pending-admin (some who))\n    (ok true)))\n\n(define-public (accept-admin)\n  (let ((pending (unwrap! (var-get pending-admin) ERR-NO-PENDING)))\n    (asserts! (is-eq tx-sender pending) ERR-NOT-AUTHORIZED)\n    (var-set admin pending)\n    (var-set pending-admin none)\n    (print { event: "admin", who: pending, version: (bump) })\n    (ok true)))\n\n(define-public (set-successor (who (optional principal)))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (not (var-get successor-locked)) ERR-LOCKED)\n    (var-set successor who)\n    (print { event: "successor", who: who, version: (bump) })\n    (ok true)))\n\n(define-public (lock-successor)\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set successor-locked true)\n    (print { event: "successor-locked", version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Reads (frozen at v1: add new reads as new functions, never change these)\n\n(define-read-only (get-version) (var-get version))\n(define-read-only (get-count) (var-get count))\n(define-read-only (get-today) (today))\n(define-read-only (get-poster (id uint)) (map-get? Posters id))\n(define-read-only (get-posters (ids (list 10 uint))) (map get-poster ids))\n(define-read-only (get-page (start uint))\n  (map get-poster (list start (+ start u1) (+ start u2) (+ start u3) (+ start u4)\n                        (+ start u5) (+ start u6) (+ start u7) (+ start u8) (+ start u9))))\n(define-read-only (get-live) (var-get live))\n(define-read-only (get-pins (room (string-ascii 24))) (default-to (list) (map-get? Pins room)))\n(define-read-only (get-suppressed) (var-get suppressed))\n(define-read-only (get-successor) { successor: (var-get successor), locked: (var-get successor-locked) })\n(define-read-only (is-publisher (who principal)) (default-to false (map-get? Publishers who)))\n(define-read-only (get-config)\n  { admin: (var-get admin), pending-admin: (var-get pending-admin), paused: (var-get paused),\n    review-lane: (var-get review-lane), cap-per-day: (var-get cap-per-day),\n    cap-live-per-publisher: (var-get cap-live-per-publisher), min-gap: (var-get min-gap) })\n', "xtrata-world-v2": `;; xtrata-world-v2  (Xtrata World Standard XWS v1, "xws-1")
+`, singleSha: "787b8234b27e683e82d365efc439882cdf4ad8f62546b60c9ef407539cfd09e1", equivalentParents: [] }, releaseSha: "a670b1c389eeb38a59eb6feda4d99c4ad0fbfb39c806ef04ff3585f130797bfd", networks: { mainnet: { root: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", treasury: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", core: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3", posterPublishers: [], hallPublisher: null, screenFeeRecipient: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X", gamesDelay: 6, lockGamesDelay: true, parents: [55], bundleId: 3078, canDeployCore: false }, testnet: { root: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", treasury: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", core: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J.xtrata-v3-2-3", posterPublishers: [], hallPublisher: null, screenFeeRecipient: "ST3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQPAYDW7J", gamesDelay: 6, lockGamesDelay: false, parents: "stand-in", bundleId: "by-hash", canDeployCore: true } }, contracts: { mainnet: { "xtrata-posters-v1": ';; xtrata-posters-v1\n;;\n;; Poster registry for the Xtrata Arcade (and later rooms). Room-agnostic.\n;;\n;; - Append-only poster records. Hidden is the only way to take one down; history stays.\n;; - The hall computes the wall itself (deterministic rotation) from the pool this\n;;   contract serves: it reads `get-version`, then `get-live` + `get-posters`.\n;; - Bounded live set: at most 64 poster ids are "live" (not expired, not hidden), so the\n;;   hall\'s load cost does not grow with history. Older posters stay readable by id.\n;; - Start days are always in the future (day = burn-block-height / 144), so everyone\n;;   sees the same pool for a given day. Admin pins are the one immediate path.\n;; - Publishers (whitelist) add `community` posters within contract-enforced caps.\n;;   Only admin can place `core` posters, evergreen, pins, or suppress embedded posters.\n;; - Review lane: when on, publisher posters start hidden until admin releases them.\n;; - Instant stop: set-publisher off, set-hidden, or set-paused.\n;; - Successor pointer with a one-way lock; the read interface is frozen at v1.\n;;\n;; Kind values:   0 template, 1 image, 2 sheet, 3 live (art = binding key)\n;; Set values:    0 core, 1 community\n;; Action values: 0 none, 1 play inscription (act-id), 2 allowlisted path (act-text),\n;;                3 play playlist inscription (act-id)\n\n(define-constant ERR-NOT-AUTHORIZED (err u100))\n(define-constant ERR-PAUSED         (err u101))\n(define-constant ERR-NOT-FOUND      (err u102))\n(define-constant ERR-INVALID        (err u103))\n(define-constant ERR-WINDOW         (err u104))\n(define-constant ERR-WEIGHT         (err u105))\n(define-constant ERR-INSCRIPTION    (err u106))\n(define-constant ERR-CAP-DAY        (err u107))\n(define-constant ERR-CAP-LIVE       (err u108))\n(define-constant ERR-GAP            (err u109))\n(define-constant ERR-LIVE-FULL      (err u110))\n(define-constant ERR-NO-PENDING     (err u111))\n(define-constant ERR-LOCKED         (err u112))\n(define-constant ERR-PIN-FULL       (err u113))\n(define-constant ERR-SUPPRESS-FULL  (err u114))\n\n(define-constant DAY-BLOCKS u144)\n(define-constant MAX-LIVE u64)\n(define-constant MAX-COMMUNITY-LIVE u48)\n(define-constant MAX-WEIGHT-CORE u100)\n(define-constant MAX-WEIGHT-COMMUNITY u20)\n(define-constant MAX-SPAN-DAYS u3650)\n(define-constant MAX-IMAGE-BYTES u131072)\n(define-constant MAX-SHEET-BYTES u307200)\n(define-constant MAX-GENESIS-INDEX u159)\n\n(define-data-var admin principal tx-sender)\n(define-data-var pending-admin (optional principal) none)\n(define-data-var paused bool false)\n(define-data-var version uint u0)\n(define-data-var count uint u0)\n(define-data-var review-lane bool false)\n(define-data-var cap-per-day uint u24)\n(define-data-var cap-live-per-publisher uint u12)\n(define-data-var min-gap uint u1)\n(define-data-var successor (optional principal) none)\n(define-data-var successor-locked bool false)\n(define-data-var live (list 64 uint) (list))\n(define-data-var suppressed (list 160 uint) (list))\n\n;; scratch values used by filter/fold helpers (always set just before use)\n(define-data-var scratch-day uint u0)\n(define-data-var scratch-id uint u0)\n(define-data-var scratch-who principal tx-sender)\n\n(define-map Publishers principal bool)\n(define-map LastWrite principal uint)\n(define-map DayCount { who: principal, day: uint } uint)\n\n(define-map Posters uint\n  {\n    owner: principal,\n    set: uint,\n    kind: uint,\n    head: (string-ascii 48),\n    sub: (string-ascii 140),\n    foot: (string-ascii 32),\n    colour: (string-ascii 12),\n    art: (string-ascii 24),\n    image-id: uint,\n    image-hash: (buff 32),\n    image-size: uint,\n    cols: uint,\n    frames: uint,\n    fps: uint,\n    act-kind: uint,\n    act-id: uint,\n    act-text: (string-ascii 64),\n    weight: uint,\n    start-day: uint,\n    end-day: uint,\n    scope: (list 8 (string-ascii 24)),\n    hidden: bool,\n    evergreen: bool,\n    payout: (optional principal),\n    added-at: uint\n  })\n\n(define-map Pins (string-ascii 24)\n  (list 32 { spot: uint, poster: uint, from-day: uint, to-day: uint }))   ;; 32 pins: more than the hall has wall slots (27), so every poster can be programmed\n\n;; ---------------------------------------------------------------------------\n;; Helpers\n\n(define-private (caller-is (who principal))\n  (and (is-eq tx-sender who) (is-eq contract-caller who)))\n\n(define-private (is-admin) (caller-is (var-get admin)))\n\n(define-private (can-publish)\n  (or (is-admin) (and (caller-is tx-sender) (default-to false (map-get? Publishers tx-sender)))))\n\n(define-private (today) (/ burn-block-height DAY-BLOCKS))\n\n(define-private (bump)\n  (begin (var-set version (+ (var-get version) u1)) (var-get version)))\n\n(define-private (note (event (string-ascii 24)) (id uint))\n  (print { event: event, id: id, version: (bump) }))\n\n(define-private (inscription-ok? (id uint) (hash (buff 32)) (size uint) (who principal))\n  (and\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 inscription-exists id) (ok true)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 is-inscription-sealed id) (some true)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-hash id) (some hash)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-size id) (some size)) ;; @principal core\n    (is-eq (contract-call? \'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-creator id) (some who)) ;; @principal core\n  ))\n\n;; live-set filters (read scratch vars)\n(define-private (alive? (id uint))\n  (match (map-get? Posters id)\n    p (and (not (get hidden p))\n           (or (get evergreen p) (> (get end-day p) (var-get scratch-day))))\n    false))\n\n(define-private (not-scratch-id? (id uint)) (not (is-eq id (var-get scratch-id))))\n\n(define-private (owned-live-step (id uint) (n uint))\n  (match (map-get? Posters id)\n    p (if (is-eq (get owner p) (var-get scratch-who)) (+ n u1) n)\n    n))\n\n(define-private (community-step (id uint) (n uint))\n  (match (map-get? Posters id)\n    p (if (is-eq (get set p) u1) (+ n u1) n)\n    n))\n\n;; Prunes expired/hidden ids, then appends `id`. Errors if the set is full, or if a\n;; community poster would take the community share (48 of 64) past its limit.\n(define-private (live-add (id uint))\n  (begin\n    (var-set scratch-day (today))\n    (let ((kept (filter alive? (var-get live))))\n      (if (is-some (index-of? kept id))\n        (ok (var-set live kept))\n        (match (if (and (is-eq (get set (unwrap! (map-get? Posters id) ERR-NOT-FOUND)) u1)\n                        (>= (fold community-step kept u0) MAX-COMMUNITY-LIVE))\n                 none\n                 (as-max-len? (append kept id) u64))\n          next (ok (var-set live next))\n          ERR-LIVE-FULL)))))\n\n(define-private (live-remove (id uint))\n  (begin\n    (var-set scratch-id id)\n    (var-set live (filter not-scratch-id? (var-get live)))))\n\n(define-private (check-weight (set uint) (weight uint))\n  (and (>= weight u1)\n       (<= weight (if (is-eq set u0) MAX-WEIGHT-CORE MAX-WEIGHT-COMMUNITY))))\n\n;; ---------------------------------------------------------------------------\n;; Adding posters\n\n(define-private (add-one\n  (p {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  })\n  (acc (response uint uint)))\n  (match acc\n    n\n      (let (\n        (admin? (is-admin))\n        (day (today))\n        (id (var-get count))\n        (kind (get kind p))\n        (set (get set p))\n        (hidden (and (not admin?) (var-get review-lane)))\n        (day-key { who: tx-sender, day: day })\n        (used (default-to u0 (map-get? DayCount day-key))))\n        (asserts! (<= kind u3) ERR-INVALID)\n        (asserts! (<= set u1) ERR-INVALID)\n        (asserts! (or admin? (and (is-eq set u1) (not (get evergreen p)))) ERR-NOT-AUTHORIZED)\n        (asserts! (>= (len (get head p)) u1) ERR-INVALID)\n        (asserts! (<= (get act-kind p) u3) ERR-INVALID)\n        (asserts! (check-weight set (get weight p)) ERR-WEIGHT)\n        (asserts! (and (> (get start-day p) day)\n                       (> (get end-day p) (get start-day p))\n                       (<= (- (get end-day p) (get start-day p)) MAX-SPAN-DAYS)) ERR-WINDOW)\n        (asserts! (or (not (is-eq kind u3)) (> (len (get art p)) u0)) ERR-INVALID)\n        (if (or (is-eq kind u1) (is-eq kind u2))\n          (begin\n            (asserts! (<= (get image-size p) (if (is-eq kind u1) MAX-IMAGE-BYTES MAX-SHEET-BYTES)) ERR-INSCRIPTION)\n            (asserts! (inscription-ok? (get image-id p) (get image-hash p) (get image-size p) tx-sender) ERR-INSCRIPTION)\n            (asserts! (or (is-eq kind u1)\n                          (and (> (get cols p) u0) (> (get frames p) u0) (<= (get frames p) u64)\n                               (> (get fps p) u0) (<= (get fps p) u30))) ERR-INVALID)\n            true)\n          true)\n        (if admin?\n          true\n          (begin\n            (asserts! (< used (var-get cap-per-day)) ERR-CAP-DAY)\n            (var-set scratch-who tx-sender)\n            (var-set scratch-day day)\n            (asserts! (or hidden\n                          (< (fold owned-live-step (filter alive? (var-get live)) u0)\n                             (var-get cap-live-per-publisher))) ERR-CAP-LIVE)\n            (map-set DayCount day-key (+ used u1))\n            true))\n        (map-set Posters id {\n          owner: tx-sender, set: set, kind: kind,\n          head: (get head p), sub: (get sub p), foot: (get foot p),\n          colour: (get colour p), art: (get art p),\n          image-id: (get image-id p), image-hash: (get image-hash p), image-size: (get image-size p),\n          cols: (get cols p), frames: (get frames p), fps: (get fps p),\n          act-kind: (get act-kind p), act-id: (get act-id p), act-text: (get act-text p),\n          weight: (get weight p), start-day: (get start-day p), end-day: (get end-day p),\n          scope: (get scope p), hidden: hidden, evergreen: (get evergreen p),\n          payout: (get payout p), added-at: stacks-block-height })\n        (var-set count (+ id u1))\n        (if hidden true (begin (try! (live-add id)) true))\n        (note "poster-added" id)\n        (ok (+ n u1)))\n    e (err e)))\n\n(define-private (write-gate)\n  (begin\n    (asserts! (not (var-get paused)) ERR-PAUSED)\n    (asserts! (can-publish) ERR-NOT-AUTHORIZED)\n    (if (is-admin)\n      true\n      (begin\n        (asserts! (match (map-get? LastWrite tx-sender) last (>= burn-block-height (+ last (var-get min-gap))) true) ERR-GAP)\n        (map-set LastWrite tx-sender burn-block-height)\n        true))\n    (ok true)))\n\n(define-public (add-poster\n  (p {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  }))\n  (begin\n    (try! (write-gate))\n    (try! (add-one p (ok u0)))\n    (ok (- (var-get count) u1))))\n\n(define-public (add-posters\n  (ps (list 10 {\n    set: uint, kind: uint,\n    head: (string-ascii 48), sub: (string-ascii 140), foot: (string-ascii 32),\n    colour: (string-ascii 12), art: (string-ascii 24),\n    image-id: uint, image-hash: (buff 32), image-size: uint,\n    cols: uint, frames: uint, fps: uint,\n    act-kind: uint, act-id: uint, act-text: (string-ascii 64),\n    weight: uint, start-day: uint, end-day: uint,\n    scope: (list 8 (string-ascii 24)), evergreen: bool, payout: (optional principal)\n  })))\n  (begin\n    (try! (write-gate))\n    (fold add-one ps (ok u0))))\n\n;; ---------------------------------------------------------------------------\n;; Changing posters (never edits content)\n\n(define-private (unhide-one (id uint) (acc (response bool uint)))\n  (match acc\n    ok-v\n      (match (map-get? Posters id)\n        p (begin\n            (map-set Posters id (merge p { hidden: false }))\n            (var-set scratch-day (today))\n            (if (or (get evergreen p) (> (get end-day p) (today)))\n              (try! (live-add id))\n              true)\n            (ok true))\n        ERR-NOT-FOUND)\n    e (err e)))\n\n(define-private (refresh-live (id uint))\n  (match (map-get? Posters id)\n    p (if (and (not (get hidden p)) (or (get evergreen p) (> (get end-day p) (today))))\n        (begin (var-set scratch-day (today)) (live-add id))\n        (ok true))\n    ERR-NOT-FOUND))\n\n(define-public (set-hidden (id uint) (hidden bool))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (or (is-admin) (and hidden (is-eq tx-sender (get owner p)))) ERR-NOT-AUTHORIZED)\n    (if hidden\n      (begin\n        (map-set Posters id (merge p { hidden: true }))\n        (live-remove id)\n        (note "poster-hidden" id)\n        (ok true))\n      (begin\n        (try! (unhide-one id (ok true)))\n        (note "poster-released" id)\n        (ok true)))))\n\n;; Review lane: release a batch of hidden posters.\n(define-public (release-posters (ids (list 20 uint)))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (try! (fold unhide-one ids (ok true)))\n    (print { event: "posters-released", count: (len ids), version: (bump) })\n    (ok true)))\n\n(define-public (set-weight (id uint) (weight uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (check-weight (get set p) weight) ERR-WEIGHT)\n    (map-set Posters id (merge p { weight: weight }))\n    (note "poster-weight" id)\n    (ok true)))\n\n;; Window changes: end-day may always move (but stays after today); start-day only\n;; while the poster has not started, and only to a future day.\n(define-public (set-window (id uint) (start-day uint) (end-day uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)) (day (today)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (and (> end-day start-day) (> end-day day)\n                   (<= (- end-day start-day) MAX-SPAN-DAYS)) ERR-WINDOW)\n    (asserts! (or (is-eq start-day (get start-day p))\n                  (and (> (get start-day p) day) (> start-day day))) ERR-WINDOW)\n    (map-set Posters id (merge p { start-day: start-day, end-day: end-day }))\n    (try! (refresh-live id))\n    (note "poster-window" id)\n    (ok true)))\n\n(define-public (set-set (id uint) (set uint))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (<= set u1) ERR-INVALID)\n    (asserts! (check-weight set (get weight p)) ERR-WEIGHT)\n    (map-set Posters id (merge p { set: set }))\n    (note "poster-set" id)\n    (ok true)))\n\n(define-public (set-evergreen (id uint) (evergreen bool))\n  (let ((p (unwrap! (map-get? Posters id) ERR-NOT-FOUND)))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (map-set Posters id (merge p { evergreen: evergreen }))\n    (try! (refresh-live id))\n    (note "poster-evergreen" id)\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Pins (admin only; the one immediate path)\n\n(define-private (pin-keep? (pin { spot: uint, poster: uint, from-day: uint, to-day: uint }))\n  (and (>= (get to-day pin) (var-get scratch-day))\n       (not (is-eq (get spot pin) (var-get scratch-id)))))\n\n(define-public (set-pin (room (string-ascii 24)) (spot uint) (poster uint) (from-day uint) (to-day uint))\n  (let ((kept (begin\n                (var-set scratch-day (today))\n                (var-set scratch-id spot)\n                (filter pin-keep? (default-to (list) (map-get? Pins room))))))\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (is-some (map-get? Posters poster)) ERR-NOT-FOUND)\n    (asserts! (and (>= to-day from-day) (>= to-day (today))) ERR-WINDOW)\n    (map-set Pins room\n      (unwrap! (as-max-len? (append kept { spot: spot, poster: poster, from-day: from-day, to-day: to-day }) u32)\n               ERR-PIN-FULL))\n    (print { event: "pin-set", room: room, spot: spot, poster: poster, from-day: from-day, to-day: to-day, version: (bump) })\n    (ok true)))\n\n(define-public (clear-pin (room (string-ascii 24)) (spot uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set scratch-day u0)\n    (var-set scratch-id spot)\n    (map-set Pins room (filter pin-keep? (default-to (list) (map-get? Pins room))))\n    (print { event: "pin-cleared", room: room, spot: spot, version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Suppressing embedded (genesis) posters by index\n\n(define-private (not-scratch-idx? (i uint)) (not (is-eq i (var-get scratch-id))))\n\n(define-public (suppress-genesis (idx uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (<= idx MAX-GENESIS-INDEX) ERR-INVALID)\n    (if (is-some (index-of? (var-get suppressed) idx))\n      (ok true)\n      (begin\n        (var-set suppressed (unwrap! (as-max-len? (append (var-get suppressed) idx) u160) ERR-SUPPRESS-FULL))\n        (print { event: "genesis-suppressed", idx: idx, version: (bump) })\n        (ok true)))))\n\n(define-public (unsuppress-genesis (idx uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set scratch-id idx)\n    (var-set suppressed (filter not-scratch-idx? (var-get suppressed)))\n    (print { event: "genesis-unsuppressed", idx: idx, version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Roles, caps, pause, hand-over, successor\n\n(define-public (set-publisher (who principal) (allowed bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (map-set Publishers who allowed)\n    (print { event: "publisher", who: who, allowed: allowed, version: (bump) })\n    (ok true)))\n\n(define-public (set-review-lane (on bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set review-lane on)\n    (print { event: "review-lane", on: on, version: (bump) })\n    (ok true)))\n\n(define-public (set-caps (per-day uint) (live-per-publisher uint) (gap uint))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (and (<= per-day u100) (<= live-per-publisher MAX-LIVE) (<= gap u144)) ERR-INVALID)\n    (var-set cap-per-day per-day)\n    (var-set cap-live-per-publisher live-per-publisher)\n    (var-set min-gap gap)\n    (print { event: "caps", per-day: per-day, live-per-publisher: live-per-publisher, gap: gap, version: (bump) })\n    (ok true)))\n\n(define-public (set-paused (value bool))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set paused value)\n    (print { event: "paused", value: value, version: (bump) })\n    (ok true)))\n\n(define-public (propose-admin (who principal))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set pending-admin (some who))\n    (ok true)))\n\n(define-public (accept-admin)\n  (let ((pending (unwrap! (var-get pending-admin) ERR-NO-PENDING)))\n    (asserts! (is-eq tx-sender pending) ERR-NOT-AUTHORIZED)\n    (var-set admin pending)\n    (var-set pending-admin none)\n    (print { event: "admin", who: pending, version: (bump) })\n    (ok true)))\n\n(define-public (set-successor (who (optional principal)))\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (asserts! (not (var-get successor-locked)) ERR-LOCKED)\n    (var-set successor who)\n    (print { event: "successor", who: who, version: (bump) })\n    (ok true)))\n\n(define-public (lock-successor)\n  (begin\n    (asserts! (is-admin) ERR-NOT-AUTHORIZED)\n    (var-set successor-locked true)\n    (print { event: "successor-locked", version: (bump) })\n    (ok true)))\n\n;; ---------------------------------------------------------------------------\n;; Reads (frozen at v1: add new reads as new functions, never change these)\n\n(define-read-only (get-version) (var-get version))\n(define-read-only (get-count) (var-get count))\n(define-read-only (get-today) (today))\n(define-read-only (get-poster (id uint)) (map-get? Posters id))\n(define-read-only (get-posters (ids (list 10 uint))) (map get-poster ids))\n(define-read-only (get-page (start uint))\n  (map get-poster (list start (+ start u1) (+ start u2) (+ start u3) (+ start u4)\n                        (+ start u5) (+ start u6) (+ start u7) (+ start u8) (+ start u9))))\n(define-read-only (get-live) (var-get live))\n(define-read-only (get-pins (room (string-ascii 24))) (default-to (list) (map-get? Pins room)))\n(define-read-only (get-suppressed) (var-get suppressed))\n(define-read-only (get-successor) { successor: (var-get successor), locked: (var-get successor-locked) })\n(define-read-only (is-publisher (who principal)) (default-to false (map-get? Publishers who)))\n(define-read-only (get-config)\n  { admin: (var-get admin), pending-admin: (var-get pending-admin), paused: (var-get paused),\n    review-lane: (var-get review-lane), cap-per-day: (var-get cap-per-day),\n    cap-live-per-publisher: (var-get cap-live-per-publisher), min-gap: (var-get min-gap) })\n', "xtrata-world-v2": `;; xtrata-world-v2  (Xtrata World Standard XWS v1, "xws-1")
 ;;
 ;; One registry for every space and object in the Xtrata world.
 ;;
