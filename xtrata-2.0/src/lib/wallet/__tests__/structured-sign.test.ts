@@ -34,6 +34,19 @@ describe('requestStructuredSignature', () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it('the legacy request carries the app name and icon (Xverse on phones crashes without them)', async () => {
+    const legacy = vi.fn().mockResolvedValue({ signature: SIG });
+    mocks.id.mockReturnValue('XverseProviders.BitcoinProvider');
+    mocks.provider.mockReturnValue({ structuredDataSignatureRequest: legacy });
+    const payloadOf = (token: string) => JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+    await expect(requestStructuredSignature(params)).resolves.toBe(SIG);
+    const plain = payloadOf(legacy.mock.calls[0][0]);
+    expect(plain.appDetails.name).toBe('Xtrata');
+    expect(plain.appDetails.icon).toMatch(/\/favicons\/xtrata-apple-touch-icon\.png$/);
+    await expect(requestStructuredSignature({ ...params, appDetails: { name: 'ParallaX Casino', icon: 'https://xtrata.xyz/i.png' } })).resolves.toBe(SIG);
+    expect(payloadOf(legacy.mock.calls[1][0]).appDetails).toEqual({ name: 'ParallaX Casino', icon: 'https://xtrata.xyz/i.png' });
+  });
+
   it('a Leather build with only the legacy bridge still works', async () => {
     const legacy = vi.fn().mockResolvedValue({ signature: SIG });
     mocks.provider.mockReturnValue({ structuredDataSignatureRequest: legacy });

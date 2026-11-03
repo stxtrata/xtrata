@@ -14,6 +14,7 @@
     api: 'https://api.hiro.so',
     cutoff: '2026-10-01T00:00:00Z',
     draws: ['2026-10-07T22:59:59Z', '2026-10-14T22:59:59Z', '2026-10-21T22:59:59Z'],
+    frozenDraws: 1,                                // draws already held and paid keep the counts they were frozen with: wizard hand-overs only count for later draws
     fullEveryMs: 24 * 3600 * 1000,                 // rebuild from scratch at least this often, so any drift heals
     sources: [
       { kind: 'ins', label: 'Inscriptions', id: DEP + '.xtrata-v3-2-3', fns: ['seal-inscription', 'seal-inscription-batch', 'seal-recursive', 'seal-with-relationships', 'mint-single-tx', 'mint-single-tx-recursive', 'mint-single-tx-with-relationships'] },
@@ -50,9 +51,51 @@
     return [{ hash: hashOf(args[0]) }];
   }
 
+  function principalOf(arg) { var m = /^'?([A-Z0-9]{30,}(?:\.[A-Za-z][A-Za-z0-9-]*)?)$/.exec(String((arg && arg.repr) || '')); return m ? m[1] : null; }
+
+  // ---- Wizard inscriptions ----
+  // The inscription wizard mints from a throwaway wallet and then transfers the inscription to the person it was made for. The mint is
+  // credited to whoever ends up with it: a direct transfer by the minter within XFER_WINDOW_MS of the mint moves the tickets to the
+  // receiver. Needs the token ids a mint created, which only the NFT mint list shows (newest first, 50 a page).
+  var ATT = 1;                                                                          // bump when the way mints are credited changes: older saved states are then read again from scratch
+  var XFER_WINDOW_MS = 6 * 3600 * 1000, RC_KEEP_MS = 12 * 3600 * 1000;
+  async function attachIds(out, cfg, get) {
+    var need = {}, left = 0, off = 0, limit = 50, pages = 0, extra = 1, asset = encodeURIComponent(DEP + '.xtrata-v3-2-3::xtrata-inscription');
+    out.forEach(function (ev) { if (ev.items && !need[ev.tx]) { need[ev.tx] = []; left++; } });
+    if (!left) return;
+    try {
+      while ((left > 0 || extra-- > 0) && pages < 80) {                                // one page past the last one needed, in case a batch straddles a page
+        var j = await get(cfg.api + '/extended/v1/tokens/nft/mints?asset_identifier=' + asset + '&limit=' + limit + '&offset=' + off);
+        var rows = (j && j.results) || [];
+        if (!rows.length) break;
+        rows.forEach(function (m) { var id = uintOf(m.value), l = need[m.tx_id]; if (id != null && l && l.indexOf(id) < 0) { if (!l.length) left--; l.push(id); } });
+        off += limit; pages++;
+        if (rows.length < limit) break;
+      }
+    } catch (e) { return; }                                                             // no ids: the mints simply stay with the wallet that sent them
+    out.forEach(function (ev) { var ids = need[ev.tx]; if (ids && ids.length === ev.items.length) ev.ids = ids.slice().sort(function (a, b) { return a - b; }); });
+  }
+  function moveMint(by, rc, xf, drawMs, touched, frozen) {
+    for (var i = 0; i < rc.length; i++) {
+      var r = rc[i]; if (r.id !== xf.id || r.a !== xf.from) continue;
+      if (xf.ms < r.ms || xf.ms - r.ms > XFER_WINDOW_MS) return;
+      rc.splice(i, 1);
+      var from = by[r.a], to = by[xf.to] || (by[xf.to] = blank(xf.to, xf.ms, drawMs.length));
+      var sub = function (o) { if (!o) return; o.ins = (o.ins || 0) - 1; o.inp = (o.inp || 0) - r.p; if (r.u) o.inu = (o.inu || 0) - r.u; ['ins', 'inp', 'inu'].forEach(function (k) { if (o[k] != null && (o[k] <= 0 || !o.ins)) delete o[k]; }); };
+      var add = function (o) { o.ins = (o.ins || 0) + 1; o.inp = (o.inp || 0) + r.p; if (r.u) o.inu = (o.inu || 0) + r.u; };
+      sub(from.n); add(to.n);
+      drawMs.forEach(function (d, k) { if (k >= frozen && r.ms <= d && xf.ms <= d) { sub(from.w[k]); add(to.w[k]); } });
+      if (!from.n.ins) delete from.tx.ins;
+      if (!to.tx.ins) to.tx.ins = r.tx;
+      to.first = Math.min(to.first, r.ms); to.last = Math.max(to.last, xf.ms);
+      touched[r.a] = 1; touched[xf.to] = 1;
+      return;
+    }
+  }
+
   // Pull one source newest first. Stops at a transaction it has already seen (`known`) or at the cutoff.
   async function pullSource(src, cfg, get, known) {
-    var sizes = {}, out = [], heads = [], top = 0, off = 0, limit = 50, cutMs = Date.parse(cfg.cutoff), pages = 0, stop = false, sawKnown = false;
+    var sizes = {}, out = [], xfers = [], heads = [], top = 0, off = 0, limit = 50, cutMs = Date.parse(cfg.cutoff), pages = 0, stop = false, sawKnown = false;
     while (!stop && pages < 400) {
       var j = await get(cfg.api + '/extended/v1/address/' + src.id + '/transactions?limit=' + limit + '&offset=' + off);
       var rows = (j && j.results) || [];
@@ -73,6 +116,11 @@
           if (bh && bs != null) sizes[bh] = bs;
           continue;
         }
+        if (src.kind === 'ins' && cc.function_name === 'transfer') {                // a direct transfer by the minter may hand a wizard inscription over
+          var xid = uintOf(args[0]), xf = principalOf(args[1]), xt = principalOf(args[2]);
+          if (xid != null && xf && xt && xf === t.sender_address && xt !== xf) xfers.push({ id: xid, from: xf, to: xt, ms: ms, tx: t.tx_id });
+          continue;
+        }
         if (src.fns.indexOf(cc.function_name) < 0) continue;
         if (src.kind === 'lk' && cc.function_name === 'set-liked' && args[1] && String(args[1].repr) !== 'true') continue;   // an unlike is not a ticket
         var game = null;
@@ -85,19 +133,20 @@
       if (rows.length < limit) break;
       await sleep(100);
     }
+    if (src.kind === 'ins' && out.length) await attachIds(out, cfg, get);
     if (src.kind === 'ins') out.forEach(function (ev) {                             // sizes are all in by now, newest-first paging saw the seals first
       ev.items = ev.items.map(function (it) {
         var size = it.size != null ? it.size : (it.hash && (sizes[it.hash] != null ? sizes[it.hash] : (src.priorSizes || {})[it.hash]));
         return size != null ? { p: sizePoints(size) } : { p: 1, u: 1 };            // unseen size: 1 ticket, flagged
       });
     });
-    return { out: out, heads: heads, top: top, sawKnown: sawKnown, pages: pages, sizes: sizes };
+    return { out: out, xfers: xfers, heads: heads, top: top, sawKnown: sawKnown, pages: pages, sizes: sizes };
   }
 
   function blank(a, ms, nDraws) { return { addr: a, first: ms, last: ms, n: {}, w: Array.apply(null, Array(nDraws)).map(function () { return {}; }), tx: {}, g: {} }; }
 
   // Fold new events into the per-address records (works for a first full run and for later increments).
-  function apply(by, kind, ev, drawMs, touched) {
+  function apply(by, kind, ev, drawMs, touched, rc) {
     var a = by[ev.addr] || (by[ev.addr] = blank(ev.addr, ev.ms, drawMs.length));
     touched[ev.addr] = 1;
     a.first = Math.min(a.first, ev.ms); a.last = Math.max(a.last, ev.ms);
@@ -107,6 +156,7 @@
       var add = function (o) { o.ins = (o.ins || 0) + cnt; o.inp = (o.inp || 0) + pts; if (unk) o.inu = (o.inu || 0) + unk; };
       add(a.n); drawMs.forEach(function (d, i) { if (ev.ms <= d) add(a.w[i]); });
       if (!a.tx.ins) a.tx.ins = ev.tx;
+      if (rc && ev.ids) ev.items.forEach(function (it, k) { rc.push({ id: ev.ids[k], a: ev.addr, ms: ev.ms, p: it.p, u: it.u || 0, tx: ev.tx }); });
       return;
     }
     a.n[kind] = (a.n[kind] || 0) + 1;
@@ -122,7 +172,7 @@
 
   async function scan(cfg, get, prev) {
     var drawMs = cfg.draws.map(Date.parse), by = prev ? prev.addrs : {}, touched = {}, status = [], heads = {}, top = {}, calls = {}, needFull = false;
-    var queue = cfg.sources.slice(), results = [], sizes = Object.assign({}, prev && prev.sizes);
+    var queue = cfg.sources.slice(), results = [], sizes = Object.assign({}, prev && prev.sizes), rc = ((prev && prev.rc) || []).slice();
     cfg.sources.forEach(function (s) { s.priorSizes = sizes; });
     async function worker() {
       while (queue.length) {
@@ -145,28 +195,30 @@
       var x = results.filter(function (z) { return z.s === s; })[0];
       if (!x || x.err) { status.push({ kind: s.kind, label: s.label, ok: false, note: x ? x.err : 'not read' }); if (prev && prev.heads && prev.heads[s.id]) { heads[s.id] = prev.heads[s.id]; top[s.id] = prev.top[s.id]; calls[s.id] = (prev.calls || {})[s.id] || 0; } return; }
       if (x.r.sizes) Object.assign(sizes, x.r.sizes);
-      x.r.out.slice().reverse().forEach(function (ev) { if (ev.addr) apply(by, s.kind, ev, drawMs, touched); });   // oldest first
+      x.r.out.slice().reverse().forEach(function (ev) { if (ev.addr) apply(by, s.kind, ev, drawMs, touched, rc); });   // oldest first
+      (x.r.xfers || []).slice().reverse().forEach(function (xf) { moveMint(by, rc, xf, drawMs, touched, cfg.frozenDraws || 0); });          // after the mints, so a same-block transfer finds its mint
       var had = prev && prev.heads && prev.heads[s.id];
-      heads[s.id] = x.r.out.length || !had ? x.r.heads : prev.heads[s.id];
-      top[s.id] = x.r.out.length || !had ? x.r.top : prev.top[s.id];
+      heads[s.id] = x.r.out.length || (x.r.xfers || []).length || !had ? x.r.heads : prev.heads[s.id];
+      top[s.id] = x.r.out.length || (x.r.xfers || []).length || !had ? x.r.top : prev.top[s.id];
       calls[s.id] = ((prev && prev.calls && prev.calls[s.id]) || 0) + x.r.out.reduce(function (t, ev) { return t + (ev.items ? ev.items.length : 1); }, 0);   // an inscription batch counts each item
       var st = { kind: s.kind, label: s.label, ok: true, calls: calls[s.id] }; if (x.nf) st.note = 'not deployed'; status.push(st);
     });
     var failed = status.some(function (s) { return !s.ok; });
     Object.keys(touched).forEach(function (k) { finishChess(by[k], drawMs); });
-    return { by: by, touched: touched, status: status, heads: heads, top: top, calls: calls, failed: failed, sizes: sizes };
+    var keepFrom = Date.now() - RC_KEEP_MS;
+    return { by: by, touched: touched, status: status, heads: heads, top: top, calls: calls, failed: failed, sizes: sizes, rc: rc.filter(function (r) { return r.ms >= keepFrom; }) };
   }
 
   async function run(userCfg, fetchFn, prevState, opts) {
     var cfg = Object.assign({}, DEFAULT_CFG, userCfg || {}); cfg.sources = (userCfg && userCfg.sources ? userCfg.sources : DEFAULT_CFG.sources).map(function (x) { return Object.assign({}, x); });
     var get = fetchFn || async function (u) { var r = await fetch(u); if (!r.ok) throw new Error(u + ' -> ' + r.status); return r.json(); };
-    var now = Date.now(), mode = 'incremental', prev = prevState && prevState.v === 2 && prevState.cutoff === cfg.cutoff && JSON.stringify(prevState.draws || []) === JSON.stringify(cfg.draws || []) ? prevState : null;   // another cutoff or draw list means the saved counts no longer fit
+    var now = Date.now(), mode = 'incremental', prev = prevState && prevState.v === 2 && prevState.att === ATT && prevState.cutoff === cfg.cutoff && JSON.stringify(prevState.draws || []) === JSON.stringify(cfg.draws || []) ? prevState : null;   // another cutoff or draw list means the saved counts no longer fit
     if (prev && ((opts && opts.full) || now - Date.parse(prev.full) > cfg.fullEveryMs)) prev = null;
     var res = prev ? await scan(cfg, get, JSON.parse(JSON.stringify(prev))) : null;
     if (!res || res.needFull) { mode = 'full'; res = await scan(cfg, get, null); }
     var list = Object.keys(res.by).map(function (k) { var a = res.by[k]; return { addr: a.addr, first: a.first, last: a.last, n: a.n, w: a.w, tx: a.tx }; });
     list.sort(function (x, y) { return y.last - x.last; });
-    var state = { v: 2, cutoff: cfg.cutoff, draws: cfg.draws, at: new Date(now).toISOString(), full: mode === 'full' ? new Date(now).toISOString() : prev.full, heads: res.heads, top: res.top, calls: res.calls, sizes: res.sizes, addrs: res.by };
+    var state = { v: 2, att: ATT, cutoff: cfg.cutoff, draws: cfg.draws, at: new Date(now).toISOString(), full: mode === 'full' ? new Date(now).toISOString() : prev.full, heads: res.heads, top: res.top, calls: res.calls, sizes: res.sizes, rc: res.rc, addrs: res.by };
     var changed = mode === 'full' ? list.map(function (a) { return a.addr; }) : Object.keys(res.touched);
     return { at: new Date(now).toISOString(), mode: mode, cutoff: cfg.cutoff, draws: cfg.draws, status: res.status, failed: res.failed, addresses: list, changed: changed, state: res.failed ? (prevState || null) : state };
   }

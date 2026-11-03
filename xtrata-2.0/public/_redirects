@@ -3,6 +3,17 @@
 /arcade/ /x/3111 302
 /audionaut /audionaut/index.html 200
 /audionaut/ /audionaut/index.html 200
+# Artist portal: preserve published Audionaut links and cached page assets.
+/audionauts/royalties /music/artist/royalties/collections/audionauts-1-0/ 301
+/audionauts/royalties/ /music/artist/royalties/collections/audionauts-1-0/ 301
+/audionauts/royalties/index.html /music/artist/royalties/collections/audionauts-1-0/ 301
+/audionauts/royalties/page.js /music/artist/assets/audionauts.js 301
+/audionauts/royalties/style.css /music/artist/assets/style.css 301
+/music/artist /music/artist/ 301
+/music/artist/royalties /music/artist/royalties/ 301
+/music/artist/royalties/plays /music/artist/royalties/plays/ 301
+/music/artist/royalties/collections /music/artist/royalties/collections/ 301
+/music/artist/royalties/collections/audionauts-1-0 /music/artist/royalties/collections/audionauts-1-0/ 301
 # Forever Twins: registry-driven pages. Each key is read from /forever-twins/data/registry.v2.json
 # /forever-twins/collection/<key> and /forever-twins/community/<slug> are served by functions/forever-twins/ (a rewrite here loses the key).
 /kp-loops /kp-loops/index.html 200
@@ -68,6 +79,27 @@
 /bounty/zdao/tracker/1 /bounty/zdao/tracker/1/ 301
 
 /music /music/ 301
+# Music referral links: /m/<partner-slug> opens the normal music wizard with ?ref=<slug>.
+# The page only ever reads the slug; the payout address comes from music-partners.json.
+/m /music/ 302
+/m/ /music/ 302
+/m/:slug /music/?ref=:slug 302
+# Same for the Suno wizard (SUNO More): /s/<partner-slug> opens it with ?ref=<slug>.
+/s /wizard/suno 302
+/s/ /wizard/suno 302
+/s/:slug /wizard/suno?ref=:slug 302
 /radio/lounge /music/lounge 301
 /radio/lounge.html /music/lounge 301
 /music/lounge.html /music/lounge 301
+
+# NFT preservation checker: the page lives at /nftcheck/. Other spellings go there.
+# (The page's own data calls go to /checker/lookup and /checker/requests, which are Pages Functions and are not redirected.)
+/checker /nftcheck/ 302
+/checker/ /nftcheck/ 302
+/nft-checker /nftcheck/ 302
+/nft-checker/ /nftcheck/ 302
+/nftchecker /nftcheck/ 302
+/nftchecker/ /nftcheck/ 302
+/nft-check /nftcheck/ 302
+/nft-check/ /nftcheck/ 302
+/nftcheck /nftcheck/ 301

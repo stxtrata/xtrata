@@ -1,0 +1,124 @@
+{
+ "owner": "ST16K3GFJ2QNXGBQFGRZ4XCSN7NPEWQ1QN48MZW0E",
+ "contracts": {
+  "screen": "xtrata-screen-v1"
+ },
+ "steps": [
+  {
+   "as": "deployer",
+   "contract": "screen",
+   "fn": "set-publisher",
+   "args": [
+    {
+     "principal": "publisher"
+    },
+    {
+     "uint": 1
+    }
+   ]
+  },
+  {
+   "as": "deployer",
+   "contract": "screen",
+   "fn": "set-publisher",
+   "args": [
+    {
+     "principal": "reviewer"
+    },
+    {
+     "uint": 2
+    }
+   ]
+  },
+  {
+   "as": "deployer",
+   "contract": "screen",
+   "fn": "set-fee-recipient",
+   "args": [
+    {
+     "principal": "fees"
+    }
+   ]
+  },
+  {
+   "as": "deployer",
+   "contract": "screen",
+   "fn": "set-slots-enabled",
+   "args": [
+    {
+     "bool": true
+    }
+   ]
+  },
+  {
+   "as": "deployer",
+   "contract": "screen",
+   "fn": "post-item",
+   "args": [
+    {
+     "uint": 1
+    },
+    {
+     "ascii": "TESTNET ARCADE IS LIVE"
+    },
+    {
+     "ascii": "The centre screen is read from the xtrata-screen-v1 contract. Nothing here is on mainnet."
+    },
+    {
+     "uint": 0
+    },
+    {
+     "hex": ""
+    },
+    {
+     "uint": 0
+    },
+    {
+     "uint": 3
+    },
+    {
+     "uint": 0
+    },
+    {
+     "uint": 31300
+    }
+   ],
+   "note": "admin news"
+  },
+  {
+   "as": "deployer",
+   "contract": "screen",
+   "fn": "post-item",
+   "args": [
+    {
+     "uint": 0
+    },
+    {
+     "ascii": "WELCOME TO THE XTRATA ARCADE"
+    },
+    {
+     "ascii": ""
+    },
+    {
+     "uint": 0
+    },
+    {
+     "hex": ""
+    },
+    {
+     "uint": 0
+    },
+    {
+     "uint": 1
+    },
+    {
+     "uint": 0
+    },
+    {
+     "uint": 31300
+    }
+   ],
+   "note": "admin message"
+  }
+ ]
+}

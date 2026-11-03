@@ -9,6 +9,7 @@
 // theme variables (--panel, --line, --mut, --acc2) and the .btn class.
 
 import { unfinishedJobs } from './unfinished';
+import { INSCRIBE_LOCK, inscribeLockActive } from './inscribe-lock';
 
 // Asks the DOM, not a module flag: a flag would be true while the <style> it refers to
 // had been replaced, and the panel would render unstyled with no way to recover.
@@ -232,7 +233,8 @@ export function keepOpenBanner(opts: { job: any; status: string; mount: HTMLElem
   .xao-keepopen .xao-ko-notify{margin-top:8px;padding:5px 11px;font:inherit;font-size:11.5px;border-radius:8px;cursor:pointer;
     border:1px solid var(--line);background:transparent;color:var(--ink)}
   .xao-keepopen .xao-ko-notify[hidden]{display:none}
-  .xao-keepopen .xao-ko-warn{font-size:11.5px;margin-top:6px;color:var(--bad,#e0603f)}`);
+  .xao-keepopen .xao-ko-warn{font-size:11.5px;margin-top:6px;color:var(--bad,#e0603f)}
+  .xao-keepopen .xao-ko-warn.xao-ko-info{color:var(--mut)}`);
 
   if (!box) {
     box = document.createElement('div');
@@ -273,13 +275,14 @@ export function keepOpenBanner(opts: { job: any; status: string; mount: HTMLElem
   const agent = (window as any).XtrataAgent;
   let persistError: string | null = null;
   try { persistError = (agent && agent.getBytesPersistError && agent.getBytesPersistError()) || null; } catch { /* older bundle */ }
+  warn.classList.toggle('xao-ko-info', !persistError && opts.job?.storageDurability === 'refused');
 
   if (persistError) {
     warn.hidden = false;
     warn.textContent = `⚠ This browser would not save your file for resume (${persistError}). If you close this tab the job cannot resume and will refund instead.`;
   } else if (opts.job && opts.job.storageDurability === 'refused') {
     warn.hidden = false;
-    warn.textContent = '⚠ This browser declined to mark its storage as permanent, so it may clear the deposit key if disk space runs low. Try to leave this tab open until the job finishes.';
+    warn.textContent = 'Everything is fine — your inscription process is underway. Please keep this browser tab open until it finishes. Just so you know, your browser has not guaranteed permanent storage, so it may clear the deposit key if your device runs low on disk space.';
   } else {
     warn.hidden = true;
     warn.textContent = '';
@@ -380,9 +383,130 @@ export function unfinishedBanner(opts: { skipJobId?: string | null; mount?: HTML
   return job;
 }
 
+// ---------- support: "what was the page doing?" ----------
+
+/**
+ * The newest line of the job's log, as a sentence: how long ago, and what it says.
+ *
+ * A job that has gone quiet looks identical to one that is merely slow, so the card shows how old the last
+ * sign of life is. `stalled` is true past two minutes: every normal step logs or polls well inside that.
+ */
+export function lastActivity(job: any): { text: string; ageSec: number; stalled: boolean } | null {
+  const log: string[] = job && Array.isArray(job.log) ? job.log : [];
+  if (!log.length) return null;
+  const line = String(log[log.length - 1]);
+  const at = Date.parse(line.slice(0, 24));
+  if (!at) return null;
+  const ageSec = Math.max(0, Math.round((Date.now() - at) / 1000));
+  const ago = ageSec < 90 ? `${ageSec}s` : ageSec < 5400 ? `${Math.round(ageSec / 60)} min` : `${(ageSec / 3600).toFixed(1)} h`;
+  return { text: `Last activity ${ago} ago: ${line.slice(25, 165)}`, ageSec, stalled: ageSec > 120 };
+}
+
+/**
+ * Copy the plain-text diagnostics for a job (build, browser, timers, network counters, the step log).
+ * It never contains the deposit key. In-app browsers often refuse clipboard writes, so when copying fails
+ * the text is shown selected in a box that can be long-pressed instead of failing silently.
+ */
+export async function copyDiagnostics(jobId: string, el?: HTMLElement | null) {
+  let text = '';
+  try { text = await (window as any).XtrataAgent.getDiagnostics(jobId); }
+  catch (e: any) { text = `Could not build diagnostics: ${(e && e.message) || e}`; }
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch { /* fall through */ }
+  if (!ok) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      ok = document.execCommand('copy');
+      ta.remove();
+    } catch { /* fall through */ }
+  }
+  if (ok) {
+    if (el) { const was = el.textContent; el.textContent = 'Copied ✓'; setTimeout(() => { el.textContent = was; }, 2000); }
+    return true;
+  }
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px';
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#111;color:#eee;border:1px solid #333;border-radius:12px;padding:14px;max-width:560px;width:100%;max-height:85vh;display:flex;flex-direction:column;gap:10px;font:14px system-ui,sans-serif';
+  const head = document.createElement('div');
+  head.textContent = 'Diagnostics. Press and hold in the box, choose Select all, then Copy, and send it to support.';
+  const ta = document.createElement('textarea');
+  ta.readOnly = true; ta.value = text;
+  ta.style.cssText = 'flex:1;min-height:240px;width:100%;font:11px/1.4 ui-monospace,monospace;background:#0b0b0b;color:#ddd;border:1px solid #333;border-radius:8px;padding:8px';
+  const close = document.createElement('button');
+  close.type = 'button'; close.textContent = 'Close'; close.style.cssText = 'align-self:flex-start;padding:8px 16px;border-radius:8px;border:1px solid #555;background:#222;color:#eee';
+  close.onclick = () => box.remove();
+  card.append(head, ta, close); box.append(card); document.body.appendChild(box);
+  ta.focus(); ta.select();
+  return false;
+}
+
+// ---------- inscribe lock notice ----------
+// While the markup lock is on (see inscribe-lock.ts) the song/player pages cannot finish a
+// job, so they show why at the top of the page and keep their pay buttons off. The agent
+// refuses the job too (assertInscribeAllowed); this is the part the person actually sees.
+//   - song/player pages (they own #sbGo): every pay button is blocked, because everything they
+//     inscribe is an HTML player;
+//   - the general wizard (#inscribeBtn): notice only. Images, audio and JSON still go through;
+//     an HTML/CSS/SVG file is refused by the agent with the same explanation, before payment.
+export function inscribeLockNotice(): HTMLElement | null {
+  if (typeof document === 'undefined' || !inscribeLockActive()) return null;
+  const playerPage = !!document.getElementById('sbGo');
+  const wizardPage = !!document.getElementById('inscribeBtn');
+  if (!playerPage && !wizardPage) return null;
+  styleOnce('inscribe-lock', `
+.xao-lock{box-sizing:border-box;width:calc(100% - 36px);max-width:960px;margin:14px auto 0;padding:12px 14px;border-radius:12px;border:1px solid #d9a441;background:rgba(217,164,65,.12);color:inherit;font-size:13.5px;line-height:1.5}
+.xao-lock b{display:block;font-size:14.5px;margin-bottom:3px}
+.xao-lock .xao-lock-sub{opacity:.75;font-size:12px;margin-top:6px}`);
+  let box = document.querySelector('.xao-lock') as HTMLElement | null;
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'xao-lock';
+    box.setAttribute('role', 'status');
+    const t = document.createElement('b'); t.textContent = INSCRIBE_LOCK.title;
+    const m = document.createElement('div');
+    m.textContent = playerPage
+      ? INSCRIBE_LOCK.message
+      : 'HTML, style (CSS) and SVG files, and the optional on-chain receipt, are paused for now. The network gateway we send transactions through has started rejecting them, so a job would fail part-way and waste your fees. Nothing has been charged. Other file types are not affected by this pause. A job you already started will still refund on its own.';
+    const sub = document.createElement('div'); sub.className = 'xao-lock-sub';
+    sub.textContent = 'Locked since ' + INSCRIBE_LOCK.since + '. Your wallet, your existing inscriptions and any refund are unaffected.';
+    box.append(t, m, sub);
+    // Above <main>, not inside it: on the player pages <main> is a flex row and a child would be squeezed into a column.
+    const main = document.querySelector('main');
+    if (main && main.parentNode) main.parentNode.insertBefore(box, main); else document.body.insertBefore(box, document.body.firstChild);
+  }
+  if (playerPage) {
+    const gated = ['sbGo', 'go'];
+    const hold = () => {
+      for (const id of gated) {
+        const b = document.getElementById(id) as HTMLButtonElement | null;
+        if (!b) continue;
+        if (!b.disabled) b.disabled = true;
+        b.title = INSCRIBE_LOCK.title;
+      }
+    };
+    hold();
+    setInterval(hold, 800);   // the pages re-enable these as files are dropped
+    // Belt and braces for a button that slips through (cached page script, devtools).
+    document.addEventListener('click', (e) => {
+      const el = (e.target as HTMLElement | null)?.closest?.('#sbGo,#go');
+      if (!el) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      box!.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, true);
+  }
+  return box;
+}
+if (typeof document !== 'undefined') {
+  const arm = () => { try { inscribeLockNotice(); } catch { /* never block the page over a notice */ } };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm); else arm();
+}
+
 // Also exposed as a global for the two wizard pages, which are plain HTML with inline
 // scripts and cannot import.
 if (typeof window !== 'undefined') {
   const w = window as any;
-  w.XtrataUI = Object.assign(w.XtrataUI || {}, { confirmDanger, unfinishedBanner, dismissUnfinished, keepOpenBanner, setTitleProgress, enableFinishNotice, notifyAvailable });
+  w.XtrataUI = Object.assign(w.XtrataUI || {}, { confirmDanger, unfinishedBanner, dismissUnfinished, keepOpenBanner, setTitleProgress, enableFinishNotice, notifyAvailable, copyDiagnostics, lastActivity, inscribeLockNotice });
 }

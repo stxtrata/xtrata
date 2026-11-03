@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "partners": [
+    {
+      "slug": "fak-fun",
+      "name": "fak.fun",
+      "payoutAddress": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
+      "active": true,
+      "share": 0.5,
+      "selfReferral": true
+    }
+  ]
+}

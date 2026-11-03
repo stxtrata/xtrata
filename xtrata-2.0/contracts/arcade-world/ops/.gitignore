@@ -1,0 +1,5 @@
+# local operator output: previews, journals, kill switch
+out/
+KILL
+.run-*.json
+*.key

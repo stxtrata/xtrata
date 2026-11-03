@@ -1,0 +1,138 @@
+<head><script>
+/* PREVIEW ONLY. Nothing here is on chain: the contracts are not deployed.
+   It switches the hall's world reader on and feeds it sample data, so the poster overlay, the four bays
+   (curtain, sign, door with its skin, lamp, work sounds) and their scene changes can be seen and heard.
+   This head is the source: build/preview.mjs puts it on top of the current hall build to make public/arcade-world-preview/index.html. */
+window.XA_WORLD_CONFIG={posters:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-posters-v1',world:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-world-v1',roomId:'arcade-hall'};
+window.XA_ROOMS={casino:{src:'casino-room.html',title:'Royal Flush Casino',still:'casino-entry.jpg',depth:'casino-entry-depth.png'}};   // rooms that take the whole screen: the lobby's CASINO door opens this page (it sits beside this one)
+window.XA_TEST=1;   // preview only: lets the "go to" buttons move the camera
+(function(){
+  var chain=true, scene=['knock','open','enter','workshop'], curtain='closed', sound=true, lamp=true;
+  var skinKey=['oak','racing-green','brushed-steel','stained'], frame='', hw='', wear=-1;   // the finish of each bay's door (xtrata-door-skins-v1 tier 0)
+  var LOOKS={
+    1:{kind:1,name:'House curtain',tier:0,builtin:'curtain-house',hidden:false,approved:true},
+    2:{kind:2,name:'Sign board',tier:0,builtin:'sign-board',hidden:false,approved:true},
+    3:{kind:3,name:'Work site',tier:0,builtin:'work-site',hidden:false,approved:true},
+    4:{kind:4,name:'Flicker',tier:0,builtin:'light-flicker',hidden:false,approved:true},
+    5:{kind:2,name:'Caution tape',tier:0,builtin:'caution-tape',hidden:false,approved:true},
+    50:{kind:2,name:'Door skin',tier:0,builtin:'door-skin',hidden:false,approved:true},
+    6:{kind:4,name:'Steady',tier:0,builtin:'light-steady',hidden:false,approved:true},
+  };
+  var STYLES=['rect','tall','wide','arch','gothic','double','cathedral','circle','oval','hexagon','octagon','industrial','vintage','scifi'];
+  STYLES.forEach(function(n,i){LOOKS[20+i]={kind:0,name:n+' door',tier:0,builtin:'door-'+n,hidden:false,approved:true}});
+  var style=3;   // index into STYLES (arch)
+  function entry(id,head,sub,c,art){return {id:id,set:1,kind:0,head:head,sub:sub,foot:'SAMPLE · NOT ON CHAIN',c:c,art:art,imageId:0,imageHash:'',imageSize:0,cols:0,frames:0,fps:0,actKind:0,actId:0,actText:'',weight:40,start:0,end:0,evergreen:true,scope:[],hidden:false}}
+  var posters=[entry(1,'NEW GAME SOON','Registry poster A','gold','star'),entry(2,'TOURNAMENT FRIDAY','Registry poster B','orange','star'),entry(3,'SEASON 2 OPENS','Registry poster C','blue','star'),entry(4,'HIGH SCORE WEEK','Registry poster D','white','star')];
+  var pinned=entry(7,'PINNED BY ADMIN','Pin spot 2 · by the entrance','gold','star');
+  function L(slot,look,params,state){return {slot:slot,look:look,params:params||'{}',state:state||''}}
+  /* COMPOSE: every element of a bay is chosen on its own: the wall or door, the curtain in front of it, a sign (anywhere on the wall),
+     caution tape, the lamp and the work sounds. They are separate layers in the world contract, so any of them can sit on any door. */
+  var comp=[0,1,2,3].map(function(){return {door:true,inter:2,curtain:'off',cc:0,sign:true,txt:0,sx:0,sy:2.55,sw:2,front:false,tape:false,lamp:false,snd:false}});
+  var CCOL=['#7a1020','#1d3a6e','#1c5a3a','#4a2a6a'], CTXT=[['coming soon','back in three days','gold'],['staff only','knock and wait','orange'],['come in','mind the step','blue'],['lobby','through the door','gold']];
+  function custom(i){
+    var c=comp[i], ly=[];
+    if(c.curtain!=='off') ly.push(L(1,1,JSON.stringify({color:CCOL[c.cc]}),c.curtain));
+    if(c.sign){var t=CTXT[c.txt]; ly.push(L(2,2,JSON.stringify({text:t[0],sub:t[1],tone:t[2],x:c.sx,y:c.sy,w:c.sw,front:c.front})))}
+    if(c.tape) ly.push(L(2,5,'{"y":1.2}'));
+    if(c.snd) ly.push(L(3,3,'{"kinds":"hammer,clatter","volume":0.5,"radius":6,"gap":3}'));
+    if(c.lamp) ly.push(L(4,4,'{"tone":"white","rate":1}'));
+    return c.door?{base:'door',baseId:2,interaction:c.inter,doorLook:20+style,layers:ly,link:null,fromHeight:0}:{base:'wall',baseId:1,interaction:c.curtain==='off'?0:2,doorLook:null,layers:ly,link:null,fromHeight:0};
+  }
+  function sceneOf(kind,bi){
+    if(kind==='posters') return null;
+    if(kind==='custom') return custom(bi);
+    var layers=[], inter=2;
+    if(kind==='wall') return {base:'wall',baseId:1,interaction:0,doorLook:null,layers:[],link:null,fromHeight:0};
+    if(kind==='story'){
+      layers.push(L(1,1,'{"color":"#7a1020"}',curtain));
+      layers.push(L(2,2,'{"text":"coming soon","sub":"back in three days","tone":"gold"}'));
+      if(sound) layers.push(L(3,3,'{"kinds":"hammer,saw,drill,clatter","volume":0.6,"radius":7}'));
+      if(lamp) layers.push(L(4,4,'{"tone":"orange","rate":2}'));
+    } else if(kind==='workshop'){
+      layers.push(L(1,1,'{"color":"#1d3a6e","trim":"#c9a24b"}',curtain));
+      layers.push(L(2,2,'{"text":"workshop","sub":"hard hats on","tone":"blue"}'));
+      layers.push(L(2,5,'{"y":1.2}'));
+      if(sound) layers.push(L(3,3,'{"kinds":"drill,clatter","volume":0.5,"radius":7,"gap":2.5}'));
+      if(lamp) layers.push(L(4,4,'{"tone":"white","rate":1}'));
+    }
+    if(kind==='knock'){
+      layers=[L(2,2,'{"text":"staff only","sub":"knock and wait","tone":"orange"}')]; if(sound) layers.push(L(3,3,'{"kinds":"hammer,clatter","volume":0.5,"radius":6,"gap":3}')); if(lamp) layers.push(L(4,4,'{"tone":"orange","rate":1}'));
+      return {base:'door',baseId:2,interaction:1,doorLook:20+style,layers:layers,link:null,fromHeight:0};
+    }
+    if(kind==='open') return {base:'door',baseId:2,interaction:2,doorLook:20+style,layers:[L(2,2,'{"text":"come in","sub":"mind the step","tone":"blue"}')],link:null,fromHeight:0};
+    if(kind==='enter') return {base:'door',baseId:2,interaction:3,doorLook:20+style,layers:[L(2,2,'{"text":"lobby","sub":"through the door","tone":"gold"}')],link:{'target-room':'lobby','arrival-bay':0,path:''},fromHeight:0};
+    return kind==='story'
+      ? {base:'wall',baseId:1,interaction:inter,doorLook:null,layers:layers,link:null,fromHeight:0}      // the launch story: a plain wall behind the curtain
+      : {base:'door',baseId:2,interaction:inter,doorLook:20+style,layers:layers,link:null,fromHeight:0};
+  }
+  function skinsOk(k,st){var D=window.XADoorSkins; return !k||!D||!D.SKINS[k]||D.SKINS[k].styles.indexOf(STYLES[st])>=0}
+  function bay(i){
+    var sc=sceneOf(scene[i],i);
+    if(sc&&sc.base==='door'&&skinKey[i]) sc.layers.push(L(2,50,JSON.stringify({skin:skinKey[i],frame:frame,hardware:hw,wear:wear})));
+    return {scene:sc,nextHeight:null,height:0}
+  }
+  // the lobby's own two doorways (its back wall): CASINO, which opens the casino room, and a locked staff door
+  function lobbyBays(){
+    var casino={base:'door',baseId:2,interaction:3,doorLook:20+style,link:{'target-room':'casino','arrival-bay':0,path:''},fromHeight:0,
+      layers:[L(2,2,'{"text":"casino","sub":"royal flush","tone":"gold"}'),L(4,6,'{"tone":"gold","intensity":0.7}')].concat(skinsOk('oak',style)?[L(2,50,JSON.stringify({skin:'oak',hardware:'brass'}))]:[])};
+    var staff=sceneOf('knock',1);
+    return [{scene:casino,nextHeight:null,height:0},{scene:staff,nextHeight:null,height:0}];
+  }
+  function snap(){return {versions:{posters:1,world:1},at:0,posters:chain?posters:[],pins:chain?[{spot:2,poster:7,from:0,to:1e9}]:[],pinned:chain?{7:pinned}:{},suppressed:[],bays:[bay(0),bay(1),bay(2),bay(3)],rooms:{lobby:{bays:lobbyBays()}},looks:LOOKS}}
+  function apply(){var W=window.XAWorld; if(!W||!W._t) return; var st=W._t.state; st.snap=snap(); st.listeners.forEach(function(f){try{f(st.snap,'preview')}catch(e){}})}
+  var NAMES={posters:'posters (as #3111)',wall:'plain wall',story:'launch story',workshop:'workshop (door, curtain)',knock:'locked door (knock)',open:'unlocked door (open it)',enter:'door that leads to the lobby (walk in)',custom:'composed below'};
+  var ORDER=['posters','wall','story','workshop','knock','open','enter','custom'];
+  function goTo(i){
+    var intro=document.getElementById('intro'); if(intro&&!intro.hidden){var go=document.getElementById('go'); if(go) go.click()}
+    var s=window.XA&&window.XA.bayState&&window.XA.bayState(); if(!s||!window.XA.pose) return;
+    var p=s.bays[i].pos, side=p.x<0?-1:1; window.XA.pose(p.x-side*3.4,p.z,side<0?Math.PI/2:-Math.PI/2,0);
+  }
+  function ui(){
+    var d=document.createElement('div');
+    d.style.cssText='position:fixed;right:12px;bottom:12px;z-index:99999;background:rgba(10,12,24,.92);color:#dfe6ff;font:12px/1.4 ui-monospace,Menlo,monospace;padding:10px 12px;border:1px solid #3b4a8a;border-radius:6px;max-width:250px;max-height:92vh;overflow:auto';
+    d.innerHTML='<div style="letter-spacing:.08em;color:#ffcc55;margin-bottom:6px">WORLD PREVIEW · SAMPLE DATA</div>';
+    var sets=[];
+    function btn(label,get,flip,noapply){var b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;margin:3px 0;padding:6px 8px;background:#182049;color:#dfe6ff;border:1px solid #3b4a8a;border-radius:4px;font:inherit;cursor:pointer';function set(){b.textContent=get?label+': '+get():label} b.onclick=function(e){e.stopPropagation();flip();sets.forEach(function(f){f()});if(!noapply)apply();b.blur()};b.onkeydown=function(e){e.stopPropagation()};sets.push(set);set();d.appendChild(b);return b}
+    function h(t){var n=document.createElement('div');n.style.cssText='margin-top:8px;color:#8a93c4';n.textContent=t;d.appendChild(n)}
+    btn('Registry posters',function(){return chain?'ON':'OFF'},function(){chain=!chain});
+    var BN=['Far left bay','Far right bay','Near left bay (entrance)','Near right bay (entrance)'];
+    h('THE FOUR BAYS · click to change the scene');
+    [0,1,2,3].forEach(function(i){btn(BN[i],function(){return NAMES[scene[i]]},function(){scene[i]=ORDER[(ORDER.indexOf(scene[i])+1)%ORDER.length]})});
+    h('COMPOSE A BAY · each element on its own');
+    var cb=0, STEPX=[-1.2,-0.6,0,0.6,1.2], STEPY=[0.9,1.6,2.55], STEPW=[1,1.5,2];
+    function nx(a,v){return a[(a.indexOf(v)+1)%a.length]}
+    function cp(f){return function(){scene[cb]='custom';f(comp[cb])}}
+    btn('Compose bay',function(){return BN[cb]},function(){cb=(cb+1)%4;scene[cb]='custom'},false);
+    btn('· Wall or door',function(){return comp[cb].door?(comp[cb].inter===1?'door (locked)':'door (unlocked)'):'plain wall'},cp(function(c){if(!c.door){c.door=true;c.inter=1}else if(c.inter===1) c.inter=2; else c.door=false}));
+    btn('· Curtain in front',function(){return comp[cb].curtain==='off'?'none':comp[cb].curtain+' · '+CCOL[comp[cb].cc]},cp(function(c){if(c.curtain==='off') c.curtain='closed'; else if(c.curtain==='closed') c.curtain='half'; else if(c.curtain==='half') c.curtain='open'; else {c.curtain='off';c.cc=(c.cc+1)%CCOL.length}}));
+    btn('· Sign',function(){return comp[cb].sign?'"'+CTXT[comp[cb].txt][0]+'"':'none'},cp(function(c){if(!c.sign){c.sign=true;c.txt=0}else if(c.txt<CTXT.length-1) c.txt++; else c.sign=false}));
+    btn('· Sign across',function(){return comp[cb].sx},cp(function(c){c.sx=nx(STEPX,c.sx)}));
+    btn('· Sign height',function(){return comp[cb].sy},cp(function(c){c.sy=nx(STEPY,c.sy)}));
+    btn('· Sign width',function(){return comp[cb].sw},cp(function(c){c.sw=nx(STEPW,c.sw)}));
+    btn('· Sign sits',function(){return comp[cb].front?'in front of the curtain':'on the wall, behind it'},cp(function(c){c.front=!c.front}));
+    btn('· Caution tape',function(){return comp[cb].tape?'ON':'OFF'},cp(function(c){c.tape=!c.tape}));
+    btn('· Lamp',function(){return comp[cb].lamp?'ON':'OFF'},cp(function(c){c.lamp=!c.lamp}));
+    btn('· Work sounds',function(){return comp[cb].snd?'ON':'OFF'},cp(function(c){c.snd=!c.snd}));
+    h('SCENE SETTINGS');
+    btn('Door style',function(){return STYLES[style]},function(){style=(style+1)%STYLES.length;for(var i=0;i<4;i++) if(!skinsOk(skinKey[i],style)) skinKey[i]=''});
+    var D=window.XADoorSkins, KEYS=D?[''].concat(D.SKIN_KEYS):[''];
+    function skinName(k){return k?(D&&D.SKINS[k]?D.SKINS[k].name:k):'neon Threshold (no skin)'}
+    h('DOOR SKINS · one per bay (only skins that suit the door style)');
+    [0,1,2,3].forEach(function(i){btn('Skin · '+BN[i].split(' (')[0],function(){return skinName(skinKey[i])},function(){var j=KEYS.indexOf(skinKey[i]);for(var n=0;n<KEYS.length;n++){j=(j+1)%KEYS.length;if(skinsOk(KEYS[j],style)) break} skinKey[i]=KEYS[j]})});
+    var FR=['','none','wood','painted','stone','steel','brass','iron'], HW=['','brass','chrome','bronze','black-iron'], WR=[-1,0,35,70,100];
+    btn('Frame',function(){return frame||"skin's own"},function(){frame=FR[(FR.indexOf(frame)+1)%FR.length]});
+    btn('Hardware',function(){return hw||"skin's own"},function(){hw=HW[(HW.indexOf(hw)+1)%HW.length]});
+    btn('Wear',function(){return wear<0?"skin's own":wear},function(){wear=WR[(WR.indexOf(wear)+1)%WR.length]});
+    btn('Curtain',function(){return curtain},function(){curtain={closed:'half',half:'open',open:'closed'}[curtain]});
+    btn('Work sounds',function(){return sound?'ON':'OFF'},function(){sound=!sound});
+    btn('Lamp',function(){return lamp?'ON':'OFF'},function(){lamp=!lamp});
+    h('GO TO');
+    [0,1,2,3].forEach(function(i){btn(BN[i]+' ›',null,function(){goTo(i)},true)});
+    var n=document.createElement('div');n.style.cssText='margin-top:6px;color:#8a93c4';n.textContent='Scenes here are sample data for the bay engine. With peeking allowed (story, workshop) you can pull a closed curtain: look at it and hold the mouse, or press E. Doors: a locked door rattles and you can knock (E); an unlocked one opens with E or a click; the lobby door, once open, shows the bare lobby room right behind it: just walk in and walk back out, no loading and no button. The lobby has its own doors on the back wall: open CASINO and walk into it, and the casino room opens full screen (BACK TO THE LOBBY, or its own back door, returns you). Switch a scene from locked to unlocked while you watch. Sounds play when you are within about 7 m, after you press Walk in. Press Esc to free the mouse before clicking this panel.';d.appendChild(n);
+    d.addEventListener('pointerdown',function(e){e.stopPropagation()});
+    document.body.appendChild(d);
+  }
+  var tries=0,t=setInterval(function(){tries++;var W=window.XAWorld;if(W&&W._t&&W._t.state.listeners.length&&document.body){clearInterval(t);ui();apply()}else if(tries>600)clearInterval(t)},200);
+})();
+
+</script>

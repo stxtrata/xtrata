@@ -83,7 +83,7 @@ function tone(f,t0,d,type='square',vol=.05){ try{ XA.audio.tone(f,d,{delay:t0,ty
 const sfx = { coin(){tone(988,0,.08);tone(1319,.08,.4)}, click(){tone(160,0,.06,'triangle',.09)}, back(){tone(660,0,.07);tone(440,.07,.2)} };
 
 /* ---------- renderer / scene ---------- */
-const renderer = new THREE.WebGLRenderer({antialias:true});
+const renderer = new THREE.WebGLRenderer({antialias:true, stencil:true});   // the stencil is how a door's opening shows the room behind it
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputEncoding = THREE.sRGBEncoding;
@@ -94,14 +94,37 @@ $('stage').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x07060c);
 scene.fog = new THREE.Fog(0x07060c, 9, 34);
-const camera = new THREE.PerspectiveCamera(68, innerWidth/innerHeight, 0.04, 60);
+// How you walk and look. The casino room (a page of its own) uses exactly these numbers, so the two rooms feel the same under the hand;
+// tests/casino-walk.test.cjs checks that they agree. Touch: left thumb walks, right thumb looks at .005.
+const WALK = { fov:68, eye:1.6, speed:3, sprint:4.6, bobRate:9, bobAmp:.025, look:.0022, drag:.004, touchLook:.005, pitch:1.2 };
+const camera = new THREE.PerspectiveCamera(WALK.fov, innerWidth/innerHeight, 0.04, 60);
 camera.rotation.order = 'YXZ';
 
-const RW = 10, RH = 3.2, EYE = 1.6, GAP = 2.2;
-const NL = Math.ceil(GAMES.length/2), NR = GAMES.length - NL;       // cabinets down the left / right walls
+const RW = 10, RH = 3.2, HH = 4.2, EYE = WALK.eye, GAP = 2.2;
+/* Which wall each cabinet stands on, and where along it (0 = nearest the entrance). With 21 games or fewer this is the original split (left gets the
+   extra one). The 21 built-in games never move to the other wall: games added later (from the games contract) take the right wall first, then the
+   left, alternately, at the far end of each row, so the room grows at the back and every built-in game keeps its wall and its place in the row. */
+const BUILT_IN_GAMES = 21, BUILT_IN_LEFT = 11;
+const SIDE_OF = GAMES.map((_,i)=> GAMES.length<=BUILT_IN_GAMES ? (i<Math.ceil(GAMES.length/2) ? -1 : 1)
+  : i<BUILT_IN_GAMES ? (i<BUILT_IN_LEFT ? -1 : 1) : ((i-BUILT_IN_GAMES)%2===0 ? 1 : -1));
+const ROW = {'-1':[], '1':[]}; SIDE_OF.forEach((sd,i)=>ROW[sd].push(i));
+const SLOT_OF = GAMES.map((_,i)=>ROW[SIDE_OF[i]].indexOf(i));
+const NL = ROW['-1'].length, NR = ROW['1'].length;                   // cabinets down the left / right walls
 const RL = Math.max(16, Math.ceil(NL*GAP + 5.6));
 const player = {x:0, z:RL/2-1.4, yaw:0, pitch:-0.06, bob:0};
 const machines = [], pickables = [], boxes = [];
+/* The lobby: a bare room built for real behind the wall of a door that links to it (a bay scene with interaction 3 and target-room 'lobby').
+   It is always there, so when that door opens you see straight into it and walk in: no loading, no fade, no teleport. The door's opening
+   writes the stencil, and the walls on both sides skip those pixels (see portal() in doors.js). The lobby sits on the far side of the
+   hall wall at that bay, so it is the same room whichever bay holds the door; only one bay at a time can lead to it. */
+const LW = 8, LD = 10;                      // lobby width (along the hall wall) and depth (away from it), metres
+let HALL_BAYS = 4;                           // how many bays the hall itself has; the lobby's two come after them
+let lobbyG = null, lobbyBay = -1, lobbyPass = null, bayDefsAll = [];   // lobbyPass: {side, wallX, z}
+const WALL_T = 0.2;                         // the thickness of the wall between the rooms (a drywall cavity you see as the reveal of the doorway)
+function holeWall(m,bit){ m.stencilWrite=true; m.stencilRef=bit; m.stencilFuncMask=bit; m.stencilWriteMask=0; m.stencilFunc=THREE.NotEqualStencilFunc; m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp; return m }   // bit 1: this room's wall, bit 2: the lobby's
+const lobbyOpen = () => lobbyBay>=0 && !!bayEngine && bayEngine.portalOpen(lobbyBay);
+const inLobbyZone = () => !!lobbyPass && (lobbyPass.side<0 ? player.x < lobbyPass.wallX-.05 : player.x > lobbyPass.wallX+.05);
+let bayEngine = null, bayHint = null, bayHold = true, bayToast = null;   // the bay engine (only when the world reader is on); what the player is looking at in a bay
 
 /* ================================================================
    ROOM
@@ -145,12 +168,15 @@ function buildRoom(){
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(RW,RL), new THREE.MeshStandardMaterial({map:carpetTexture(), roughness:.95}));
   floor.rotation.x=-Math.PI/2; scene.add(floor);
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(RW,RL), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}));
-  ceil.rotation.x=Math.PI/2; ceil.position.y=RH; scene.add(ceil);
+  ceil.rotation.x=Math.PI/2; ceil.position.y=HH; scene.add(ceil);
 
   const wt=wallTexture();
   const wall=(w,pos,ry)=>{const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), new THREE.MeshStandardMaterial({map:t, roughness:.9}));
-    m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m)};
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,RH), holeWall(new THREE.MeshStandardMaterial({map:t, roughness:.9}),1));
+    m.position.set(pos[0],RH/2,pos[1]); m.rotation.y=ry; scene.add(m);
+    // above the doors and bays (RH) the wall is plain, up to the hall's higher ceiling (HH)
+    const up=new THREE.Mesh(new THREE.PlaneGeometry(w,HH-RH), new THREE.MeshStandardMaterial({color:0x17132a, roughness:.9}));
+    up.position.set(pos[0],(RH+HH)/2,pos[1]); up.rotation.y=ry; scene.add(up)};
   wall(RL,[-RW/2,0],Math.PI/2); wall(RL,[RW/2,0],-Math.PI/2); wall(RW,[0,-RL/2],0); wall(RW,[0,RL/2],Math.PI);
 
   // neon strips: pink high along the long walls, cyan skirting all round
@@ -169,6 +195,21 @@ function buildRoom(){
 
   buildLogoSign();
   buildPosters();
+  try{ if(window.XAWorld) XAWorld.start(()=>paintWall()) }catch(e){}   // off unless the contracts are configured
+  try{ if(window.XAScreen) XAScreen.start(()=>paintDayBoard(true)) }catch(e){}   // the centre screen's contract: off unless configured
+  if(window.XA_TEST) XA.bayDoor=(i,fn)=>{ const m=bayEngine&&bayEngine._model(i); return m?fn(m):null };   // tests only
+  if(window.XA_TEST) XA.bayHandle=(i)=>bayEngine?bayEngine._handle(i):null;   // tests only
+  if(window.XA_TEST) XA.bayCurtain=(i,fn)=>{ const c=bayEngine&&bayEngine._curtain(i); return c?fn(c):null };   // tests only
+  XA.roomState=()=>({state, room:roomId(), title:roomCur?roomCur.title:'', depth:roomStack.length, backLabel:roomUI?roomUI.back.textContent:'', sandbox:roomUI&&roomUI.frame?roomUI.frame.getAttribute('sandbox'):null, loading:!!(roomUI&&roomUI.load.style.display!=='none'), frame:!!(roomUI&&roomUI.frame), frameSrc:roomUI&&roomUI.frame?roomUI.frame.getAttribute('src'):null, frameDoc:roomUI&&roomUI.frame?roomUI.frame.hasAttribute('srcdoc'):false, back:!!(roomUI&&roomUI.back.style.display==='block'), still:!!(roomUI&&roomUI.still.style.display==='block'&&Number(roomUI.still.style.opacity)>0), glide:!!(roomUI&&roomUI.glide), ready:!!(roomUI&&roomUI.frame&&roomUI.frame.dataset.ready)});   // read-only, for tests
+  if(window.XA_TEST) XA.enterRoom=enterRoom, XA.leaveRoom=leaveRoom;
+  XA.doorway=(i)=>bayEngine?bayEngine.doorwayAt(i,player.x,player.z):null;
+  XA.doorFrame=(i)=>bayEngine&&bayEngine.frameOf?bayEngine.frameOf(i):null;   // read-only, for tests: where bay i's wall is and which way it faces   // read-only, for tests: where you are in bay i's open doorway
+  XA.walkCfg=()=>Object.assign({},WALK);   // read-only, for tests
+  XA.where=()=>({x:player.x, z:player.z, yaw:player.yaw, pitch:player.pitch});   // read-only, for tests
+  XA.lobbyState=()=>({bay:lobbyBay, open:lobbyOpen(), inside:inLobbyZone(), pass:lobbyPass, visible:!!(lobbyG&&lobbyG.visible), stencil:!!renderer.getContext().getContextAttributes().stencil});   // read-only, for tests
+  XA.bayState=()=>bayEngine ? {bays:bayEngine.debug(), voices:bayEngine.audio._voices(), log:bayEngine.audio._log()} : null;   // read-only, for tests
+  if(window.XA_TEST){ XA.pose=(x,z,yaw,pitch)=>{ player.x=x; player.z=z; player.yaw=yaw; player.pitch=pitch||0 }; XA.centreZ=()=>CENTRE_SCREEN.z }   // tests only: nothing sets XA_TEST in the shipped page
+  XA.wallState=()=>posterSlots.map(s=>({head:s.spec&&s.spec.head, chain:(s.spec&&s.spec.chainId)||0, shown:!s.group||s.group.visible!==false}));   // read-only, for tests
   buildDayBoard();
 
   // inlaid logo in the carpet
@@ -183,10 +224,81 @@ function buildRoom(){
   const panelMat=new THREE.MeshBasicMaterial({color:0xe8e2ff, toneMapped:false});
   const lz=[]; for(let z=-Math.floor((RL/2-3)/5)*5; z<=RL/2-3; z+=5) lz.push(z);
   for(const z of lz){
-    const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.5),panelMat); p.rotation.x=Math.PI/2; p.position.set(0,RH-.01,z); scene.add(p);
-    const l=new THREE.PointLight(0xcfc4ff,.55,10,2); l.position.set(0,RH-.3,z); scene.add(l);
+    const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.5),panelMat); p.rotation.x=Math.PI/2; p.position.set(0,HH-.01,z); scene.add(p);
+    const l=new THREE.PointLight(0xcfc4ff,.55,10,2); l.position.set(0,HH-.3,z); scene.add(l);
   }
   scene.add(new THREE.HemisphereLight(0x6a5cff,0x1a0a20,.45));
+}
+
+/* ---------- the lobby (bare) ---------- */
+// Built in its own frame: the wall with the opening is the plane z=0 facing +z, the room runs away from it along +z.
+function buildLobby(){
+  const g=lobbyG;
+  const face=(geo,mat,x,y,z,rx,ry)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.rotation.set(rx||0,ry||0,0); g.add(m); return m };
+  face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({map:carpetTexture(), roughness:.95}), 0,0,LD/2, -Math.PI/2,0);
+  face(new THREE.PlaneGeometry(LW,LD), new THREE.MeshStandardMaterial({color:0x0c0a14, roughness:1}), 0,RH,LD/2, Math.PI/2,0);
+  const wt=wallTexture();
+  const wall=(w,x,z,ry,hole)=>{ const t=wt.clone(); t.needsUpdate=true; t.repeat.set(w/2.2,1);
+    const m=new THREE.MeshStandardMaterial({map:t, roughness:.9}); face(new THREE.PlaneGeometry(w,RH), hole?holeWall(m,2):m, x,RH/2,z, 0,ry) };
+  wall(LW,0,0,0,true);                 // the wall with the opening: skips the pixels the door's opening has marked
+  wall(LW,0,LD,Math.PI); wall(LD,-LW/2,LD/2,Math.PI/2); wall(LD,LW/2,LD/2,-Math.PI/2);
+  const neon=(col)=>new THREE.MeshBasicMaterial({color:col, toneMapped:false}), pink=neon(0x3d86ff), cyan=neon(0xff8a2a);
+  for(const sd of [-1,1]){
+    face(new THREE.BoxGeometry(.04,.04,LD),pink, sd*(LW/2-.02),2.62,LD/2);
+    face(new THREE.BoxGeometry(.03,.03,LD),cyan, sd*(LW/2-.02),.07,LD/2);
+  }
+  face(new THREE.BoxGeometry(LW,.03,.03),cyan, 0,.07,LD-.02);
+  for(const z of [LD*.3,LD*.7]){
+    face(new THREE.PlaneGeometry(1.3,.5), new THREE.MeshBasicMaterial({color:0xe8e2ff, toneMapped:false}), 0,RH-.01,z, Math.PI/2,0);
+    const l=new THREE.PointLight(0xcfc4ff,.75,11,2); l.position.set(0,RH-.3,z); g.add(l);
+  }
+  const sign=(text,w,h,x,y,z,ry)=>face(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:signTexture(text,'72px Bungee',BRAND.orange,1024,Math.round(1024*h/w)), transparent:true, toneMapped:false}), x,y,z, 0,ry);
+  lobbySign=sign('LOBBY',3.6,.5,-LW/2+.03,2.3,LD/2,Math.PI/2);   // on the left wall: the back wall carries the lobby's doors (with doorways on the side walls too, it moves over the way in: lobbyLayout)
+  sign('BACK TO THE ARCADE',3,.4,0,2.8,.03,0);
+}
+/* The lobby's doorways, from how many it has (1 to 6, LIMITS.lobbyBays in world2.js): two on the back wall first, exactly where the two
+   always were (so a lobby with two looks as it always did), then the side walls, one on each in turn (left far, right far, left near, right
+   near). One doorway on its own sits in the middle of the back wall. The geometry follows the count; the bay engine moves its bays to it. */
+const LOBBY_MAX=6;
+function lobbyDefs(n){
+  n=Math.max(1,Math.min(LOBBY_MAX,n|0));
+  const back=(x)=>({parent:lobbyG, x, z:LD-.02, rot:Math.PI, width:3.4, side:0});
+  const out=n===1?[back(0)]:[back(-2.2),back(2.2)];
+  for(let k=2;k<n;k++){ const left=k%2===0, z=k<4?LD*.73:LD*.3; out.push({parent:lobbyG, x:left?-LW/2+.02:LW/2-.02, z, rot:left?Math.PI/2:-Math.PI/2, width:2.4, side:0}) }
+  return out;
+}
+let lobbyCount=2, lobbySign=null;
+function lobbyLayout(n){
+  n=n>=1?Math.min(LOBBY_MAX,n):2;               // no doorways at all: the two places stay as they were (empty)
+  if(!bayEngine || !bayEngine.layout) return;
+  if(n!==lobbyCount){
+    lobbyDefs(n).forEach((d,k)=>{ bayEngine.layout(HALL_BAYS+k,d); bayDefsAll[HALL_BAYS+k]=d });
+    lobbyCount=n;
+  }
+  if(lobbySign){ const side=n>=3; lobbySign.position.set(side?-2.75:-LW/2+.03, 2.3, side?.03:LD/2); lobbySign.rotation.set(0, side?0:Math.PI/2, 0); lobbySign.scale.setScalar(side?.6:1) }
+}
+// Put the lobby behind the wall of bay i (or take it away with -1). Only a bay whose door links to it counts.
+function setLobbyBay(i){
+  const d=i>=0 ? bayDefsAll[i] : null;
+  if(!d || !lobbyG){ i=-1 }
+  if(i===lobbyBay) return;
+  if(bayEngine){ if(lobbyBay>=0) bayEngine.setPortal(lobbyBay,false); if(i>=0) bayEngine.setPortal(i,true) }
+  lobbyBay=i;
+  if(i<0){ lobbyPass=null; if(lobbyG) lobbyG.visible=false; return }
+  lobbyPass={side:d.side, wallX:d.side*RW/2, z:d.z};
+  lobbyG.position.set(lobbyPass.wallX+d.side*WALL_T,0,d.z); lobbyG.rotation.y=d.side<0?-Math.PI/2:Math.PI/2; lobbyG.visible=true;
+}
+// A link to the hall's own lobby: from the registry, only the hall's live native lobby space (link.lobby); a scene without a space id (v1, the preview) names it 'lobby'.
+const isLobbyLink=(lk)=>!!lk && (lk.to ? lk.lobby===true : String(lk['target-room']||lk.targetRoom||lk.room||'').toLowerCase()==='lobby');
+const linksToLobby=(sc)=>!!(sc && sc.base==='door' && Number(sc.interaction)===3 && isLobbyLink(sc.link));
+// Where the player may stand while the lobby door is open: the hall, the doorway and the lobby, as rectangles [x0,x1,z0,z1].
+function lobbyRects(r){
+  const p=lobbyPass, sd=p.side, hw=Math.max(.3, bayEngine.doorHalfWidth(lobbyBay)-.1), wx=p.wallX;
+  return [
+    [-RW/2+r, RW/2-r, -RL/2+r, RL/2-r],
+    sd<0 ? [wx-WALL_T-LD+r, wx-WALL_T-r, p.z-LW/2+r, p.z+LW/2-r] : [wx+WALL_T+r, wx+WALL_T+LD-r, p.z-LW/2+r, p.z+LW/2-r],
+    sd<0 ? [wx-WALL_T-r, wx+r, p.z-hw, p.z+hw] : [wx-r, wx+WALL_T+r, p.z-hw, p.z+hw]   // the doorway, through the thickness of the wall
+  ];
 }
 
 /* ---------- the big flickering neon logo on the end wall ---------- */
@@ -1180,6 +1292,8 @@ let animImg=null; { const im=new Image(); im.onload=()=>{ animImg=im }; im.src=A
 function updateAnimPosters(t){
   const f=Math.floor(t*ANIM.fps)%ANIM.frames;
   for(const s of posterSlots) if(s.spec && s.spec.anim && (s.frame!==f || !s.drawn) && animImg){ s.frame=f; s.drawn=true; paintPoster(s,s.spec) }
+  for(const s of posterSlots) if(s.spec && s.spec.pic && s.spec.pic.sheet && s.spec.pic.img){
+    const e=s.spec.pic.entry, g=Math.floor(t*e.fps)%Math.max(1,e.frames); if(s.frame!==g){ s.frame=g; paintPoster(s,s.spec) } }
 }
 
 const posterSlots=[];
@@ -1205,6 +1319,14 @@ function paintPoster(slot, spec){
   y+=ss*.55; x.fillStyle=col; x.font=ss+'px VT323, monospace'; for(const l of sl){ x.fillText(l,W/2,y); y+=ss }
   if(spec.foot!==' ') x.fillRect(48,H-78,W-96,3);
   x.fillStyle='rgba(238,242,255,.75)'; fitFont(x,spec.foot||'XTRATA ARCADE',22,'Bungee, Impact, sans-serif',W-72); x.fillText(spec.foot||'XTRATA ARCADE',W/2,H-42);
+  if(spec.pic){
+    if(spec.pic.img){
+      const im=spec.pic.img;
+      if(spec.pic.sheet){ const e=spec.pic.entry, cw=Math.floor(im.width/Math.max(1,e.cols)), ch=cw>0 && e.frames>0 ? Math.floor(im.height/Math.ceil(e.frames/e.cols)) : 0, f=(slot.frame||0)%Math.max(1,e.frames);
+        if(cw>0 && ch>0) x.drawImage(im,(f%e.cols)*cw,Math.floor(f/e.cols)*ch,cw,ch,0,0,W,H) }
+      else x.drawImage(im,0,0,W,H);
+    } else ensurePic(spec);
+  }
   if(spec.play){   // playable: a PLAY tab in the top corner
     x.fillStyle=BTC_ORANGE; x.beginPath(); x.roundRect ? x.roundRect(W-120,30,88,30,15) : x.rect(W-120,30,88,30); x.fill();
     x.fillStyle='#0b0b10'; x.beginPath(); x.moveTo(W-106,38); x.lineTo(W-106,52); x.lineTo(W-94,45); x.closePath(); x.fill();
@@ -1249,7 +1371,97 @@ function wallForDay(day, nSlots){
 }
 function applyDay(day){
   const {wall, fresh}=wallForDay(day, posterSlots.length); chain.fresh=fresh;
-  posterSlots.forEach((s,i)=>{ const spec=ROTATION_POOL[wall[i]]; if(s.spec!==spec){ s.drawn=false; paintPoster(s,spec) } });
+  baseWall={day, wall};
+  paintWall();
+}
+/* The wall is the embedded rotation above (never changed). When the world contracts are on and have been read,
+   chain posters are laid over it (XAWorld.composeWall). With no contracts, or a failed read, the wall is the
+   embedded one exactly: that is the v1.3 hall. */
+let baseWall=null;
+/* Pin spots (the posters contract's set-pin `spot`) cover EVERY poster slot on the wall, 1 to the number of slots:
+   spots 1-4 are the four free slots nearest the entrance, 5-12 are the bays' posters (bay 0: 5,6  bay 1: 7,8  bay 2: 9,10  bay 3: 11,12),
+   then the rest in wall order. A bay whose scene is not "posters" hides its pinned posters (the scene wins; see applyBays). */
+function pinSlots(){
+  const first=[2,16,3,17];
+  for(const code of ['L','R','NL','NR']) posterSlots.forEach((s,i)=>{ if(s.bay===code) first.push(i) });
+  return window.XAWorld.pinSlotMap(posterSlots.length, first);
+}
+function paintWall(){
+  if(!baseWall) return;
+  const W=window.XAWorld, snap=W && W.enabled() ? W.snapshot() : null;
+  let items=null;
+  if(snap){
+    try{ items=W.composeWall(baseWall.wall,{day:baseWall.day, nEmbedded:ROTATION_POOL.length, weights:ROTATION_W, snapshot:snap,
+      overlaySlots:posterSlots.map((s,i)=>s.bay?-1:i).filter(i=>i>=0), pinSlots:pinSlots()}) }catch(e){ items=null }
+  }
+  posterSlots.forEach((s,i)=>{
+    const spec=items ? (items[i].src==='c' ? chainSpec(items[i].entry) : ROTATION_POOL[items[i].idx]) : ROTATION_POOL[baseWall.wall[i]];
+    if(s.spec!==spec){ s.drawn=false; paintPoster(s,spec) }
+  });
+  applyBays(snap);
+}
+/* Bays (the four wall areas at the ends of the rows: 0 far left, 1 far right, 2 near left, 3 near right, the contract's order).
+   Posters mode, or any failure, shows the bay's two posters as always.
+   Other scenes are drawn by the bay engine; until then a bay with another scene shows plain wall. */
+const BAY_INDEX={L:0, R:1, NL:2, NR:3};
+function applyBays(snap){
+  if(bayEngine){ try{
+    // the hall's bays, then the lobby's (snap.rooms.lobby.bays), in the engine's order
+    const lb=snap && snap.rooms && snap.rooms.lobby && snap.rooms.lobby.bays;
+    let n=0; if(Array.isArray(lb)) lb.slice(0,LOBBY_MAX).forEach((b,k)=>{ if(b) n=k+1 });   // as many doorways as the lobby's highest bay object
+    lobbyLayout(n);
+    const room=[]; for(let k=0;k<bayEngine.count()-HALL_BAYS;k++) room.push(k<lobbyCount && lb ? lb[k]||null : null);
+    const all=lb && snap.bays ? Object.assign({}, snap, {bays:snap.bays.slice(0,HALL_BAYS).concat(room)}) : snap;
+    bayEngine.apply(all,{instant:state==='intro'})
+  }catch(e){ console.error(e) } }
+  { let lb=-1; if(snap && snap.bays) for(let i=0;i<snap.bays.length && lb<0;i++) if(linksToLobby(snap.bays[i] && snap.bays[i].scene)) lb=i; setLobbyBay(lb) }
+  for(const s of posterSlots){
+    if(!s.bay) continue;
+    const i=BAY_INDEX[s.bay];
+    const bay=snap && snap.bays ? snap.bays[i] : null;
+    const show=bayEngine ? bayEngine.showPosters(i) : (!bay || !bay.scene || bay.scene.base==='posters');
+    if(s.group && s.group.visible!==show) s.group.visible=show;
+  }
+}
+/* A chain poster as a hall poster spec. Cached by id and content, so an unchanged poster keeps its identity
+   (and is not repainted). Everything on it is text and numbers; pictures are checked against their chain hash. */
+const chainSpecs=new Map();
+function safePath(p){ return typeof p==='string' && /^\/[A-Za-z0-9._~\-][A-Za-z0-9._~\-\/?=&%#]*$/.test(p) && p.length<=64 }
+function chainSpec(e){
+  const key=e.id+'|'+e.kind+'|'+e.head+'|'+e.sub+'|'+e.foot+'|'+e.c+'|'+e.art+'|'+e.imageId+'|'+e.actKind+'|'+e.actId+'|'+e.actText;
+  const old=chainSpecs.get(e.id); if(old && old.key===key) return old.spec;
+  const spec={head:e.head, sub:e.sub, foot:e.foot||'XTRATA ARCADE', c:e.c, art:e.art, chainId:e.id};
+  if(e.kind===3 && e.art==='blocks'){ spec.live=true }        // live posters: the only binding so far is the Bitcoin day board
+  if((e.kind===1 || e.kind===2) && e.imageHash) spec.pic={entry:e, sheet:e.kind===2, img:null, state:0};
+  if(e.actKind===1 && e.actId>0) spec.play={id:e.actId, title:e.head, note:e.sub};
+  else if(e.actKind===2 && safePath(e.actText)) spec.play={path:e.actText, title:e.head, note:e.sub};
+  else if(e.actKind===3 && e.actId>0) spec.play={playlist:e.actId, title:e.head, note:e.sub};
+  chainSpecs.set(e.id,{key,spec});
+  return spec;
+}
+/* Poster pictures: one at a time, only for posters on the wall. PNG, WebP or JPEG only (checked by their first bytes). */
+const picQueue=[]; let picBusy=false;
+function picMime(b){
+  if(b.length>12 && b[0]===0x89 && b[1]===0x50 && b[2]===0x4e && b[3]===0x47) return 'image/png';
+  if(b.length>12 && b[0]===0x52 && b[1]===0x49 && b[2]===0x46 && b[3]===0x46 && b[8]===0x57 && b[9]===0x45 && b[10]===0x42 && b[11]===0x50) return 'image/webp';
+  if(b.length>3 && b[0]===0xff && b[1]===0xd8 && b[2]===0xff) return 'image/jpeg';
+  return null;
+}
+function ensurePic(spec){
+  const pic=spec.pic; if(!pic || pic.state!==0 || !window.XAWorld) return;
+  pic.state=1; picQueue.push(spec); if(!picBusy) nextPic();
+}
+function nextPic(){
+  const spec=picQueue.shift(); if(!spec){ picBusy=false; return }
+  picBusy=true;
+  XAWorld.loadImageBytes(spec.pic.entry).then(bytes=>{
+    const mime=picMime(bytes); if(!mime) throw new Error('not a picture');
+    const url=URL.createObjectURL(new Blob([bytes],{type:mime})), im=new Image();
+    return new Promise((ok,bad)=>{ im.onload=()=>{ URL.revokeObjectURL(url); ok(im) }; im.onerror=()=>{ URL.revokeObjectURL(url); bad(new Error('bad picture')) }; im.src=url });
+  }).then(im=>{
+    spec.pic.img=im; spec.pic.state=2;
+    for(const s of posterSlots) if(s.spec===spec){ s.drawn=false; paintPoster(s,spec) }
+  }).catch(()=>{ spec.pic.state=3 }).then(()=>setTimeout(nextPic,150));
 }
 function repaintLivePosters(){ for(const s of posterSlots) if(s.spec && s.spec.live) paintPoster(s,s.spec) }
 if(STACKS_LOGO){ const im=new Image(); im.onload=()=>{ stacksImg=im; for(const s of posterSlots) if(s.spec && s.spec.art==='stacks') paintPoster(s,s.spec) }; im.src=STACKS_LOGO }
@@ -1258,21 +1470,46 @@ function buildPosters(){
   const frameMat=new THREE.MeshStandardMaterial({color:0x1b1b22, metalness:.7, roughness:.35});
   // a poster in every other gap between cabinets, alternating walls
   // one poster in every gap between machines, and two in the open wall at each end of each row
-  const spots=[];
+  const spots=[], bayDefs=[];
   for(const [side,n] of [[-1,NL],[1,NR]]){
     const zHi=cabZ(0,n)+.62, zLo=cabZ(n-1,n)-.62, wallEnd=RL/2-.35;
-    const endPair=(a,b)=>{ const mid=(a+b)/2; spots.push([side,mid+.52],[side,mid-.52]) };
-    endPair(zHi, wallEnd);
-    for(let k=0;k<n-1;k++) spots.push([side, cabZ(k,n)-GAP/2]);
-    endPair(-wallEnd, zLo);
+    const endPair=(a,b,bay)=>{ const mid=(a+b)/2; spots.push([side,mid+.52,bay],[side,mid-.52,bay]) };
+    endPair(zHi, wallEnd, side<0?'NL':'NR');   // entrance end: also a bay (2, 3)
+    bayDefs[side<0?2:3]={side, z:(zHi+wallEnd)/2, width:wallEnd-zHi};
+    for(let k=0;k<n-1;k++) spots.push([side, cabZ(k,n)-GAP/2, undefined, {gap:k, birth:ROW[side][k+1]}]);
+    endPair(-wallEnd, zLo, side<0?'L':'R');   // far end (bays 0, 1)
+    bayDefs[side<0?0:1]={side, z:(-wallEnd+zLo)/2, width:zLo+wallEnd};
   }
-  spots.forEach(([side,z])=>{
+  /* Poster slot numbers are permanent: pinned posters and the day's wall are keyed by slot index. With the built-in 21 games the slots are the
+     original 27, in the original order. When more games add more gaps between cabinets, those new slots go AFTER the original ones, in the order
+     the games were added, so no existing slot changes number. */
+  if(GAMES.length>BUILT_IN_GAMES){
+    const baseGap={'-1':BUILT_IN_LEFT-1, '1':BUILT_IN_GAMES-BUILT_IN_LEFT-1};
+    const isNew=(sp,side)=>sp[3] && sp[3].gap>=baseGap[side];
+    const keep=[], extra=[];
+    spots.forEach(sp=>{ (isNew(sp,sp[0]) ? extra : keep).push(sp) });
+    extra.sort((a,b)=>a[3].birth-b[3].birth);
+    spots.length=0; spots.push(...keep, ...extra);
+  }
+  bayDefsAll=bayDefs;
+  // the lobby has two doorways of its own, on its back wall (the hall's four come first, so the lobby's are bays 4 and 5). The lobby group exists
+  // from the start so they can hang in it; it is moved behind the right wall when a door links to the lobby.
+  lobbyG=new THREE.Group(); lobbyG.visible=false; scene.add(lobbyG);
+  HALL_BAYS=bayDefs.length;
+  bayDefs.push(...lobbyDefs(2));
+  spots.forEach(([side,z,bay])=>{
     const g=new THREE.Group(); g.position.set(side*(RW/2-.03),1.95,z); g.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
     g.add(new THREE.Mesh(new THREE.BoxGeometry(.84,1.22,.03),frameMat));
-    const slot=makePosterSlot(); slot.pos={x:side*(RW/2-.03), z};
+    const slot=makePosterSlot(); slot.pos={x:side*(RW/2-.03), z}; slot.group=g; if(bay) slot.bay=bay;
     const p=new THREE.Mesh(new THREE.PlaneGeometry(.76,1.14), new THREE.MeshBasicMaterial({map:slot.tex, color:0xdadada}));
     p.position.z=.017; p.userData.slot=slot; posterMeshes.push(p); g.add(p); scene.add(g);
   });
+  try{
+    if(window.XAWorld && window.XA_WORLD_CONFIG) XAWorld.configure(window.XA_WORLD_CONFIG);
+    if(window.XABays && window.XAWorld && XAWorld.enabled())
+      bayEngine=XABays.create({THREE, scene, camera, mkCanvas, tex, RW, RH, bays:bayDefs, wallT:WALL_T, listener:()=>player, stillFor:(lk)=>stillFor(lk)});
+    if(bayEngine) buildLobby();
+  }catch(e){ console.error(e); bayEngine=null }
   applyDay(Math.max(chain.day, ROTATION_START_DAY));
 }
 
@@ -1305,6 +1542,7 @@ async function fetchHeight(){
 }
 function setHeight(h, live){
   const prev=chain.height; chain.height=h; chain.live=live;
+  try{ if(window.XAWorld) XAWorld.onHeight(h) }catch(e){}   // a scene can start at this block
   const day=Math.floor(h/BLOCKS_PER_DAY);
   if(day!==chain.day){ const first=chain.day<0; chain.day=day; applyDay(day+devDayOffset); if(!first && state==='walk') sfx.coin() }
   else if(h!==prev) repaintLivePosters();
@@ -1313,37 +1551,60 @@ function setHeight(h, live){
 async function pollChain(){ const h=await fetchHeight(); if(h) setHeight(h,true); else if(!chain.live) setHeight(estHeight(),false) }
 function startChainClock(){ setHeight(estHeight(),false); pollChain(); setInterval(pollChain,60000) }
 
+/* ---------- the centre screen ----------
+   One 16:9 screen hung in the middle of the hall: the Bitcoin Day clock along the top, LATEST SCORERS from the score boards the
+   hall already reads, a rotating feature (news / ads / messages from xtrata-screen-v1) and a ticker. All the drawing and the
+   contract reader live in screen.js; this part only builds the panel, feeds it and repaints it. With no screen contract it is the
+   clock plus the latest scorers. It replaces the old Bitcoin Day board in the same spot. */
 let dayBoard=null;
+const CENTRE_SCREEN={W:3.2, H:1.8, cy:3.15, z:RL/2-6, px:1280, py:720, gapMs:120, animGapMs:40};
 function buildDayBoard(){
-  const cv=mkCanvas(1024,256), t=tex(cv), mat=new THREE.MeshBasicMaterial({map:t, toneMapped:false});
-  const g=new THREE.Group(); g.position.set(0,2.46,RL/2-6); scene.add(g);
-  const W=2.6, H=.65;
-  g.add(new THREE.Mesh(new THREE.BoxGeometry(W+.1,H+.1,.08), new THREE.MeshStandardMaterial({color:0x121118, metalness:.6, roughness:.4})));
-  const front=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); front.position.z=.042; g.add(front);
-  const back=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); back.position.z=-.042; back.rotation.y=Math.PI; g.add(back);
+  const S=CENTRE_SCREEN, cv=mkCanvas(S.px,S.py), t=tex(cv), mat=new THREE.MeshBasicMaterial({map:t, toneMapped:false});
+  const g=new THREE.Group(); g.position.set(0,S.cy,S.z); scene.add(g);
+  const W=S.W, H=S.H;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(W+.12,H+.12,.1), new THREE.MeshStandardMaterial({color:0x121118, metalness:.6, roughness:.4})));
+  const front=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); front.position.z=.052; g.add(front);
+  const back=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat); back.position.z=-.052; back.rotation.y=Math.PI; g.add(back);
   const rodMat=new THREE.MeshStandardMaterial({color:0x2a2a33, metalness:.8, roughness:.3});
-  for(const sx of [-1,1]){ const len=RH-(2.46+H/2+.05); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,len,6),rodMat); rod.position.set(sx*(W/2-.2),H/2+.05+len/2,0); g.add(rod) }
-  const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.12,.02,.1), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.06); g.add(edge);
-  dayBoard={cv, x:cv.getContext('2d'), tex:t};
-  paintDayBoard();
+  for(const sx of [-1,1]){ const len=HH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
+  const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.14,.025,.12), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.07); g.add(edge);
+  // no collider: its bottom edge (2.25 m) is above head height, so you walk under it
+  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], champions:[], scorersAt:-1e9};
+  paintDayBoard(true);
 }
-function paintDayBoard(){
+// Latest scorers: the newest top-10 entries across every board the hall has cached, whatever their age (the row shows how old), no extra reads.
+function screenScorers(){
+  const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; if(t && t.entries && t.entries.length) boards.push({game:g.title, colour:g.color, mode:b.mode, entries:t.entries}) }));
+  return window.XAScreen ? XAScreen.latestScorers(boards, chain.height, 0, fmtBoard, 8) : [];
+}
+// The number one on every board, from the same cache: a board not read yet is left out, a board read and empty is "NO #1 YET".
+function screenChampions(){
+  const boards=[]; GAMES.forEach(g=>boardsFor(g).forEach(b=>{ const t=TOP[b.board]; boards.push({game:g.title, variant:b.label==='TOP 10' ? '' : String(b.label).replace(/ TOP 10$/,''), colour:g.color, mode:b.mode, entries:t && Array.isArray(t.entries) ? t.entries : null}) }));
+  return window.XAScreen && XAScreen.champions ? XAScreen.champions(boards, chain.height, fmtBoard) : [];
+}
+function paintDayBoard(force){
   if(!dayBoard || chain.day<0) return;
-  const x=dayBoard.x, W=1024, H=256, h=chain.height, done=h%BLOCKS_PER_DAY, left=BLOCKS_PER_DAY-done;
-  x.save(); x.setTransform(1,0,0,1,0,0); x.globalAlpha=1;
-  x.fillStyle='#050408'; x.fillRect(0,0,W,H);
-  x.textBaseline='alphabetic'; x.textAlign='left';
-  x.font='30px Bungee, Impact, sans-serif'; x.fillStyle=BTC_ORANGE; x.shadowColor=BTC_ORANGE; x.shadowBlur=12; x.fillText('BITCOIN DAY',40,60);
-  x.font='150px VT323, monospace'; x.fillStyle='#ffc53d'; x.shadowColor='#ffb000'; x.shadowBlur=26; x.fillText(String(chain.day),34,186);
-  x.shadowBlur=0; x.textAlign='right'; x.font='40px VT323, monospace';
-  x.fillStyle='#eef2ff'; x.fillText('BLOCK '+(chain.live?'':'≈')+h.toLocaleString('en-US'),W-40,96);
-  x.fillStyle='#8fd3ff'; x.fillText((chain.live?'':'≈')+'NEXT DAY IN '+left+' BLOCK'+(left===1?'':'S'),W-40,158);
-  const segW=944/BLOCKS_PER_DAY;
-  for(let i=0;i<BLOCKS_PER_DAY;i++){ x.fillStyle=i<done?BTC_ORANGE:i===done?'#ffffff':'#1d1a24'; x.fillRect(40+i*segW,208,segW-1.6,24) }
-  x.fillStyle='rgba(0,0,0,.34)'; for(let yy=0;yy<H;yy+=4) x.fillRect(0,yy,W,1.4); for(let xx=0;xx<W;xx+=4) x.fillRect(xx,0,1.4,H);
-  x.restore();
+  const now=performance.now();
+  const gap=(window.XAScreen && XAScreen.animating && XAScreen.animating()) ? CENTRE_SCREEN.animGapMs : CENTRE_SCREEN.gapMs;   // a GIF or clip on show repaints at about 25 fps
+  if(!force && now-dayBoard.last<gap) return;
+  dayBoard.last=now;
+  if(now-dayBoard.scorersAt>2000){ dayBoard.scorersAt=now; try{ dayBoard.scorers=screenScorers() }catch(e){ dayBoard.scorers=[] } try{ dayBoard.champions=screenChampions() }catch(e){ dayBoard.champions=[] } }
+  const d={height:chain.height, day:chain.day, live:chain.live, blocksPerDay:BLOCKS_PER_DAY, t:now/1000, scorers:dayBoard.scorers, champions:dayBoard.champions,
+           items: window.XAScreen ? XAScreen.activeItems(XAScreen.items(), chain.height)   /* estimated height when the node is down, so a cached snapshot still expires */ : []};
+  if(window.XAScreen) XAScreen.paint(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);
+  else paintPlainClock(dayBoard.x, CENTRE_SCREEN.px, CENTRE_SCREEN.py, d);   // a release without screen.js: just the day clock
   dayBoard.tex.needsUpdate=true;
 }
+function paintPlainClock(x,W,H,d){
+  const left=d.blocksPerDay-(d.height%d.blocksPerDay);
+  x.save(); x.setTransform(1,0,0,1,0,0); x.fillStyle='#050408'; x.fillRect(0,0,W,H); x.textAlign='center'; x.textBaseline='alphabetic';
+  x.font='60px Bungee, Impact, sans-serif'; x.fillStyle=BTC_ORANGE; x.fillText('BITCOIN DAY',W/2,H*.3);
+  x.font='320px VT323, monospace'; x.fillStyle='#ffc53d'; x.fillText(String(d.day),W/2,H*.7);
+  x.font='64px VT323, monospace'; x.fillStyle='#8fd3ff'; x.fillText((d.live?'':'≈')+'NEXT DAY IN '+left+' BLOCK'+(left===1?'':'S'),W/2,H*.9);
+  x.restore();
+}
+// Per frame: the ticker and the rotation move, so repaint a few times a second while the screen is within sight.
+function tickCentreScreen(){ if(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11) paintDayBoard(); else if(window.XAScreen && XAScreen.idle) XAScreen.idle() }   // far from the screen: clips pause
 
 
 /* ==================== TEMPORARY DEV OVERRIDE — REMOVE BEFORE RELEASE ====================
@@ -1397,7 +1658,7 @@ const pray=new THREE.Raycaster(); pray.far=5;
 function posterAt(v){
   if(!posterMeshes.length) return null;
   pray.setFromCamera(v,camera);
-  const h=pray.intersectObjects(posterMeshes,false)[0];
+  const h=pray.intersectObjects(posterMeshes,false).find(x=>x.object.parent && x.object.parent.visible);
   const s=h && h.object.userData.slot;
   return s && s.spec && s.spec.play ? s : null;
 }
@@ -1409,6 +1670,14 @@ function chainUrl(id){ return XTRATA_BASE+'/i/'+id }
 function loadChainFrame(url){ const f=$('cpf'); f.src='about:blank'; setTimeout(()=>{ f.src=url }, 30); $('cpo').href=url }
 function openChain(play){
   if(!play || chainOpen || state!=='walk') return;
+  if(play.playlist && !play.tracks){   // a playlist poster: the track list is a small JSON inscription
+    const pl=play; fetch(XTRATA_BASE+'/i/'+pl.playlist+'?raw=1').then(r=>r.ok?r.json():Promise.reject()).then(j=>{
+      const t=Array.isArray(j.tracks) ? j.tracks.filter(x=>Array.isArray(x) && Number.isInteger(x[0]) && x[0]>0 && typeof x[1]==='string').slice(0,40).map(x=>[x[0],x[1].slice(0,60)]) : [];
+      if(t.length) pl.tracks=t;
+    }).catch(()=>{}).then(()=>{ if(pl.tracks) openChain(pl) });
+    return;
+  }
+  if(!play.tracks && !play.path && !play.id) return;
   chainOpen=true; if(document.pointerLockElement) document.exitPointerLock();
   try{ Room.pause() }catch(e){}
   $('cpt').textContent=play.title; $('cpn').textContent=play.note||'';
@@ -1434,6 +1703,158 @@ function closeChain(){
 $('cpx').addEventListener('click', closeChain);
 addEventListener('keydown', e=>{ if(chainOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); closeChain() } }, true);
 $('chainp').addEventListener('click', e=>{ if(e.target===$('chainp')) closeChain() });
+/* ================================================================
+   RADIO DOCK: music is part of the hall's own frame, so it is there in the hall, the lobby and every room.
+   One small button (bottom left). It opens Xtrata Radio (radio.xtrata.xyz/radio, the one origin the listening wallet trusts) in a panel:
+   free listening for everyone, and a holder unlocks their passkey wallet there to play the albums they hold. The panel is only HIDDEN when
+   you close it, never taken down, so an album keeps playing while you walk, play a game or go through a door. Nothing here touches money or
+   keys: the radio app does all of that in its own page. A room cannot see or reach this panel (rooms run in their own sandboxed frames).
+   ================================================================ */
+// The radio page the panel and the pop-out window show. ?dock=1 asks the radio for its compact one-screen layout (the standard radio
+// page is untouched without it). Always the live radio (your likes, playlists and paid plays are there). Only on a branch preview (*.pages.dev)
+// does the address ?radiobranch=1 swap in that branch's own radio page, to look at a layout change before it ships; the preview has no likes or wallet set up.
+const RADIO_BASE=(/\.pages\.dev$/.test(location.hostname) && /[?&]radiobranch=1(?:&|$)/.test(location.search)) ? location.protocol+'//'+location.host : 'https://radio.xtrata.xyz';
+const RADIO_URL=RADIO_BASE+'/radio?dock=1';
+let radioOpen=false, radioLoaded=false, radioPop=null, radioNow=null, npSig='', remoteOpen=false, rmSig='';   // radioNow: what the radio (panel or pop-out) says is playing
+function radioPopAlive(){ try{ return !!(radioPop && !radioPop.closed) }catch(e){ return false } }
+function radioPaint(){   // the button is there while you can walk or are in a room; games take the whole screen, so it steps aside (the music goes on)
+  const b=$('xa-radio-btn'); if(!b) return;
+  const show=(state==='walk' || state==='room') && !chainOpen;
+  if(b.hidden===show) b.hidden=!show;
+  b.classList.toggle('on',radioOpen || remoteOpen || radioPopAlive());
+  if(remoteOpen && (!radioPopAlive() || !radioNow || radioNow.src!=='pop' || !show)) remoteHide(true);   // the pop-out went away (or a game began): the remote has nothing to control
+  remotePaint();
+  // now playing: a small strip beside the button while the panel is shut and something is on (display and transport only)
+  if(radioNow && radioNow.src==='pop' && !radioPopAlive()) radioNow=null;
+  const np=$('xa-radio-np'), on=!!(show && !radioOpen && !remoteOpen && radioNow && (radioNow.title || radioNow.on));
+  if(np.hidden===on) np.hidden=!on;
+  if(on){
+    const sig=[radioNow.title,radioNow.artist,radioNow.playing,radioNow.busy].join('\u0001');
+    if(sig!==npSig){ npSig=sig;
+      const txt=(radioNow.title||'Tuning…')+(radioNow.artist?' · '+radioNow.artist:'');
+      $('xa-radio-np-t').textContent=txt; np.title=txt;
+      const pp=np.querySelector('[data-cmd=toggle]'); pp.innerHTML=radioNow.playing?'&#9208;':'&#9654;';
+      for(const x of np.querySelectorAll('button')) x.disabled=!!radioNow.busy;
+    }
+  }
+}
+function radioShow(){
+  if(radioOpen || chainOpen) return;
+  if(radioPopAlive()){
+    if(radioNow && radioNow.src==='pop'){ remoteShow(); return }   // the radio is playing in its pop-out and talking to us: our own remote (R toggles it)
+    try{ radioPop.focus() }catch(e){} return                       // an older radio that does not talk to us: bring the window forward
+  }   // the radio is playing in its own window: bring that forward instead of starting a second one
+  radioOpen=true;
+  if(document.pointerLockElement) document.exitPointerLock();
+  for(const k in keys) keys[k]=false;
+  const f=$('xa-radio-frame'), box=$('xa-radio');
+  if(!radioLoaded){   // the radio is loaded the first time it is asked for, not when the hall starts
+    radioLoaded=true;
+    f.setAttribute('allow','autoplay; fullscreen; clipboard-write; publickey-credentials-get '+RADIO_BASE+'; publickey-credentials-create '+RADIO_BASE);   // passkeys, to the radio's origin only (set with the address, so the empty frame does not name an origin it is not on)
+    f.src=RADIO_URL;
+    try{ if(Room.isOn()){ Room.toggle(); paintRoom() } }catch(e){}   // the machines' own music steps aside for the radio (the music button brings it back)
+  }
+  box.classList.remove('away'); box.removeAttribute('inert'); box.setAttribute('aria-hidden','false'); rdBarNote.textContent=rdBarText;
+  radioPaint(); try{ $('xa-radio-hide').focus({preventScroll:true}) }catch(e){}
+}
+function radioHide(){
+  if(!radioOpen) return;
+  radioOpen=false;
+  const box=$('xa-radio'); box.classList.add('away'); box.setAttribute('inert',''); box.setAttribute('aria-hidden','true');
+  try{ document.activeElement && document.activeElement.blur && document.activeElement.blur() }catch(e){}
+  radioPaint(); if(state==='walk') tryLock(); else if(state==='room' && roomUI && roomUI.frame){ try{ roomUI.frame.focus() }catch(e){} }
+}
+// Pop out: the radio in its own small window (a top-level page, so both wallets and the listening wallet's passkey work and paid plays count).
+// One radio at a time: the panel's copy is taken down; the RADIO button then brings the pop-out forward. If the browser blocks the window,
+// the link opens a new tab as it would anyway and the panel stays.
+$('xa-radio-open').href=RADIO_URL;
+function radioPopOut(){   // true if the window opened (the link then does not also open a tab)
+  let w=null; try{ w=window.open(RADIO_URL,'xaRadioPop','popup=yes,width=440,height=760') }catch(err){}
+  if(!w) return false;
+  radioPop=w; try{ w.focus() }catch(err){}
+  const f=$('xa-radio-frame'); f.src='about:blank'; f.removeAttribute('allow'); radioLoaded=false;   // really unload it (removing src would leave the page running, holding pay-per-play's one-tab lock and playing a second stream)
+  if(radioNow && radioNow.src==='panel') radioNow=null;
+  radioHide(); radioPaint(); return true;
+}
+$('xa-radio-open').addEventListener('click', e=>{ if(radioPopOut()) e.preventDefault() });
+// The radio and the hall talk by postMessage (only with the radio's ?dock=1 layout): the radio says what is playing and answers play/pause, next
+// and previous. Only the radio's own origin, and only from our panel or our pop-out window, is listened to. Nothing that spends money goes over it.
+// Inside the panel the passkey wallet cannot load, so a tap on the heart or a wallet control there asks us to open the pop-out instead.
+function radioCmd(cmd){
+  let t=null; try{ t=radioPopAlive() ? radioPop : (radioLoaded ? $('xa-radio-frame').contentWindow : null) }catch(e){}
+  if(t) try{ t.postMessage({xtrataHall:1, type:'cmd', cmd}, RADIO_BASE) }catch(e){}
+}
+for(const b of $('xa-radio-np').querySelectorAll('button')) b.addEventListener('click', ()=>radioCmd(b.dataset.cmd));
+const rdBarNote=$('xa-radio').querySelector('.rd-bar span'), rdBarText=rdBarNote.textContent;
+addEventListener('message', e=>{
+  const d=e.data; if(!d || d.xtrataRadio!==1 || e.origin!==RADIO_BASE) return;
+  const fromPop=radioPopAlive() && e.source===radioPop;
+  let fromPanel=false; try{ fromPanel=radioLoaded && e.source===$('xa-radio-frame').contentWindow }catch(x){}
+  if(!fromPop && !fromPanel) return;
+  const src=fromPop ? 'pop' : 'panel';
+  if(d.type==='ready'){ try{ e.source.postMessage({xtrataHall:1, type:'hello'}, RADIO_BASE) }catch(x){} }
+  else if(d.type==='state'){ radioNow={src, title:String(d.title||'').slice(0,120), artist:String(d.artist||'').slice(0,120), playing:!!d.playing, on:!!d.on, busy:!!d.busy, liked:!!d.liked, pending:!!d.pending} }
+  else if(d.type==='hide-request' && fromPanel){ radioHide() }
+  else if(d.type==='hide-request' && fromPop){   // R in the pop-out: back to the arcade (the pop-out keeps playing). Browsers may not let us take the window focus or the mouse without a click in this window.
+    try{ window.focus() }catch(x){}
+    if(state==='walk') tryLock(); else if(state==='room' && roomUI && roomUI.frame){ try{ roomUI.frame.focus() }catch(x){} }
+  }
+  else if(d.type==='bye'){ if(radioNow && radioNow.src===src) radioNow=null }
+  else if(d.type==='need-wallet' && fromPanel){
+    if(radioPopOut()) rdBarNote.textContent=rdBarText;
+    else { rdBarNote.textContent='Pop-up blocked: allow pop-ups, then click POP OUT'; toast('Allow pop-ups to use likes and paid plays') }
+  }
+  radioPaint();
+});
+$('xa-radio-btn').addEventListener('click', ()=>{ initAudio(); radioOpen ? radioHide() : remoteOpen ? remoteHide() : radioShow() });
+$('xa-radio-hide').addEventListener('click', radioHide);
+$('xa-radio').addEventListener('click', e=>{ if(e.target===$('xa-radio')) radioHide() });
+addEventListener('keydown', e=>{ if(radioOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); radioHide() } }, true);
+// The remote: while the radio plays in its pop-out window (and talks to us), R opens this small panel drawn by the hall. Play/pause, next, previous and the heart
+// are sent to the pop-out, which holds the wallet and does the paying. R, Esc, HIDE or a click outside close it and capture the mouse again.
+function remotePaint(){
+  const box=$('xa-remote'); if(!box || !remoteOpen || !radioNow) return;
+  const sig=[radioNow.title,radioNow.artist,radioNow.playing,radioNow.busy,radioNow.liked,radioNow.pending].join('\u0001');
+  if(sig===rmSig) return; rmSig=sig;
+  $('xa-remote-title').textContent=radioNow.title||'Tuning…'; $('xa-remote-artist').textContent=radioNow.artist||'';
+  box.querySelector('[data-cmd=toggle]').innerHTML=radioNow.playing?'&#9208;':'&#9654;';
+  const lk=$('xa-remote-like'); lk.classList.toggle('on',!!radioNow.liked && !radioNow.pending); lk.classList.toggle('pending',!!radioNow.pending);
+  lk.setAttribute('aria-pressed',String(!!radioNow.liked));
+  for(const x of box.querySelectorAll('.rm-ctl button')) x.disabled=!!radioNow.busy || (x.id==='xa-remote-like' && !!radioNow.pending);
+}
+function remoteShow(){
+  if(remoteOpen || chainOpen) return;
+  remoteOpen=true; rmSig='';
+  if(document.pointerLockElement) document.exitPointerLock();
+  for(const k in keys) keys[k]=false;
+  const box=$('xa-remote'); box.classList.remove('away'); box.removeAttribute('inert'); box.setAttribute('aria-hidden','false');
+  remotePaint(); radioPaint(); try{ $('xa-remote-hide').focus({preventScroll:true}) }catch(e){}
+}
+function remoteHide(quiet){
+  if(!remoteOpen) return;
+  remoteOpen=false;
+  const box=$('xa-remote'); box.classList.add('away'); box.setAttribute('inert',''); box.setAttribute('aria-hidden','true');
+  try{ document.activeElement && document.activeElement.blur && document.activeElement.blur() }catch(e){}
+  if(quiet) return;
+  radioPaint(); if(state==='walk') tryLock(); else if(state==='room' && roomUI && roomUI.frame){ try{ roomUI.frame.focus() }catch(e){} }
+}
+for(const b of $('xa-remote').querySelectorAll('.rm-ctl button')) b.addEventListener('click', ()=>radioCmd(b.dataset.cmd));
+$('xa-remote-hide').addEventListener('click', ()=>remoteHide());
+$('xa-remote-win').addEventListener('click', ()=>{ try{ radioPop.focus() }catch(e){} });
+$('xa-remote').addEventListener('click', e=>{ if(e.target===$('xa-remote')) remoteHide() });
+addEventListener('keydown', e=>{ if(remoteOpen && e.code==='Escape'){ e.preventDefault(); e.stopPropagation(); remoteHide() } }, true);
+// R: open the radio (this frees the mouse so you can use it); R again, or HIDE, puts you straight back into the hall with the mouse captured (no extra click).
+// Not while typing in a field, and not in a game (the game owns the keyboard). Inside the radio's own panel the radio page forwards R and Esc ("hide-request").
+addEventListener('keydown', e=>{
+  if(e.code!=='KeyR' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t=e.target; if(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+  if(radioOpen){ e.preventDefault(); e.stopPropagation(); radioHide(); return }
+  if(remoteOpen){ e.preventDefault(); e.stopPropagation(); remoteHide(); return }
+  if((state==='walk' || state==='room') && !chainOpen && !document.querySelector('#xa-root .xa-modal')){ e.preventDefault(); e.stopPropagation(); initAudio(); radioShow() }
+}, true);
+setInterval(radioPaint, 400);   // (not called here: `state` is declared further down)
+if(window.XA_TEST) XA.startGame=(i)=>startGame(i), XA.exitGame=()=>exitGame(), XA.hallState=()=>state;   // tests only
+if(window.XA_TEST) XA.radioState=()=>({open:radioOpen, loaded:radioLoaded, src:($('xa-radio-frame').getAttribute('src')==='about:blank'?null:$('xa-radio-frame').getAttribute('src')), shown:!$('xa-radio-btn').hidden, away:$('xa-radio').classList.contains('away'), sandbox:$('xa-radio-frame').getAttribute('sandbox'), allow:$('xa-radio-frame').getAttribute('allow'), np:{shown:!$('xa-radio-np').hidden, text:$('xa-radio-np-t').textContent, playing:$('xa-radio-np').querySelector('[data-cmd=toggle]').textContent}, now:radioNow, barNote:rdBarNote.textContent, remote:{open:remoteOpen, away:$('xa-remote').classList.contains('away'), title:$('xa-remote-title').textContent, play:$('xa-remote').querySelector('[data-cmd=toggle]').textContent, liked:$('xa-remote-like').classList.contains('on'), pending:$('xa-remote-like').classList.contains('pending')}});   // read-only, for tests
 /* ================================================================
    CABINETS — one generator, ten configs
    ================================================================ */
@@ -1520,7 +1941,24 @@ function skinTex(src){
   return t;
 }
 function skinMat(t, glow){ return new THREE.MeshStandardMaterial({map:t, emissive:0xffffff, emissiveMap:t, emissiveIntensity:glow==null?.35:glow, roughness:.55}) }
+/* A game with a hand-built cabinet model (window.XA_CAB3D[game id], a part of the hall such as cabinet-astro3.js) stands that model in its slot instead of the
+   parametric cabinet. The model brings its own body, screen, controls and marquee; the hall gives it a screen canvas (portrait, the shape of the model's screen),
+   puts its back at the slot's back like every other machine, and drives its start button. Everything else (focus, zoom into the screen, sound, collision) is shared. */
+function buildModelCabinet(game, i){
+  const spec=window.XA_CAB3D[game.id], cab=spec.build(THREE,{lighting:false, art:game.def.cabinetArt||null});
+  const group=new THREE.Group(); group.add(cab.group); cab.group.updateMatrixWorld(true);
+  const bb=new THREE.Box3().setFromObject(cab.group); cab.group.position.z=-bb.min.z;   // back at z=0, front forward, the way the hall's own machines stand
+  const D=bb.max.z-bb.min.z, w=bb.max.x-bb.min.x;
+  const SW=256, SH=Math.round(SW*spec.screen.h/spec.screen.w), sc=mkCanvas(SW,SH), sctx=sc.getContext('2d'), stex=tex(sc);
+  cab.setScreenTexture(stex); cab.screen.material.toneMapped=false;
+  const glow=new THREE.Mesh(new THREE.PlaneGeometry(w*1.9,1.25), new THREE.MeshBasicMaterial({map:glowTex(), color:game.color, transparent:true, opacity:.5, blending:THREE.AdditiveBlending, depthWrite:false, toneMapped:false}));
+  glow.rotation.x=-Math.PI/2; glow.position.set(0,.006,D+.5); glow.renderOrder=1;
+  group.traverse(o=>{ if(o.isMesh){ o.userData.cab=i; pickables.push(o) } });
+  return {i, game, cfg:Object.assign({}, CAB_DEFAULTS, {w, depth:D}), group, glow, screen:cab.screen, sw:spec.screen.w, sh:spec.screen.h, sctx, stex,
+    startBtn:new THREE.Object3D(), startMat:cab.startButton.material, frontLocal:new THREE.Vector3(0,0,D+.1), press:-1, fails:0, model:cab};
+}
 function buildCabinet(game, i){
+  if(window.XA_CAB3D && window.XA_CAB3D[game.id] && window.XA_CAB3D[game.id].build) return buildModelCabinet(game, i);
   const c = Object.assign({}, CAB_DEFAULTS, game.cabinet);
   const D=c.depth, t=THREE.MathUtils.degToRad(c.tilt), lean=THREE.MathUtils.degToRad(c.mLean);
   // side profile, z forward / y up
@@ -1640,7 +2078,7 @@ function glowTex(){ if(_glow) return _glow; const c=mkCanvas(128,128), x=c.getCo
   x.fillStyle=g; x.fillRect(0,0,128,128); return _glow=new THREE.CanvasTexture(c) }
 function placeCabinets(){
   GAMES.forEach((g,i)=>{
-    const m=buildCabinet(g,i), left=i<NL, z=left ? cabZ(i,NL) : cabZ(i-NL,NR);
+    const m=buildCabinet(g,i), left=SIDE_OF[i]<0, z=cabZ(SLOT_OF[i], left?NL:NR);
     m.group.position.set(left ? -RW/2+.16 : RW/2-.16, 0, z);
     m.group.rotation.y = left ? Math.PI/2 : -Math.PI/2;
     scene.add(m.group); m.group.updateMatrixWorld(true);
@@ -1736,7 +2174,7 @@ function scanOverlay(){ if(_scan) return _scan; const c=mkCanvas(256,192), x=c.g
   const v=x.createRadialGradient(128,96,192*.4,128,96,192*.85); v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(0,0,0,.55)');
   x.fillStyle=v; x.fillRect(0,0,256,192); return _scan=c }
 function drawAttract(m, t){
-  const x=m.sctx, W=256, H=192, col=m.game.color, on=focusIdx===m.i;
+  const x=m.sctx, W=x.canvas.width, H=x.canvas.height, col=m.game.color, on=focusIdx===m.i;   // 256x192, or the shape of a model cabinet's own screen
   x.save(); x.setTransform(1,0,0,1,0,0); x.globalAlpha=1; x.globalCompositeOperation='source-over';
   x.fillStyle='#03020a'; x.fillRect(0,0,W,H);
   if(m.fails<3){ try{ m.game.def.attract(x,W,H,t) }catch(e){ m.fails++ } }
@@ -1751,7 +2189,7 @@ function drawAttract(m, t){
     x.fillStyle='rgba(3,2,10,.7)'; x.fillRect(0,H-28,W,28);
     x.font='22px VT323, monospace'; x.fillStyle=on?'#ffc53d':'#f3eeff'; x.fillText(on?'▶ PRESS START':'PRESS START',W/2,H-14);
   }
-  x.drawImage(scanOverlay(),0,0);
+  x.drawImage(scanOverlay(),0,0,W,H);
   x.restore();
   m.stex.needsUpdate=true;
 }
@@ -1912,6 +2350,7 @@ const Room = (() => {
     master.connect(door); door.connect(comp); comp.connect(XA.audio.bus());   // through the shared master, so Mute silences it
     const conv = ctx.createConvolver(); conv.buffer = impulse(1.8, 2.6);
     wet = ctx.createGain(); wet.gain.value = ROOM_AUDIO.reverb; wet.connect(conv); conv.connect(master);
+    if (bayEngine) bayEngine.audio.attach({ ctx, master, wet });   // bay sounds ride the same bus (and Mute)
     setInterval(tick, 25);
     return true;
   }
@@ -1946,11 +2385,12 @@ const Room = (() => {
   }
   function killAll(secs) { for (const i of [...voices.keys()]) killVoice(i, secs) }
   function update(dt) {
-    if (!running || !ctx) return;
+    if (!running || !ctx) { if (bayEngine) bayEngine.audio.hush(); return }
     const t = ctx.currentTime, L = ctx.listener, p = camera.position;
     F.set(0, 0, -1).applyQuaternion(camera.quaternion); U.set(0, 1, 0).applyQuaternion(camera.quaternion);
     if (!setXYZ(L, 'position', p.x, p.y, p.z, t)) L.setPosition(p.x, p.y, p.z);
     if (L.forwardX) { setXYZ(L, 'forward', F.x, F.y, F.z, t); setXYZ(L, 'up', U.x, U.y, U.z, t) } else L.setOrientation(F.x, F.y, F.z, U.x, U.y, U.z);
+    if (bayEngine) bayEngine.audio.update(dt, { x: p.x, z: p.z }, on && !XA.audio.isMuted());
     // which machines should be playing: the nearest few in reach (with a little slack so edges don't flicker)
     if ((lastPick -= dt) <= 0) {
       lastPick = .25;
@@ -2015,7 +2455,7 @@ let state='intro', focusIdx=-1, locked=false, tween=null, saved=null, zoomTarget
 const ray=new THREE.Raycaster(); ray.far=2.8;
 const center=new THREE.Vector2(0,0);
 
-const modalOpen = () => chainOpen || !!document.querySelector('#xa-root .xa-modal');
+const modalOpen = () => chainOpen || radioOpen || remoteOpen || !!document.querySelector('#xa-root .xa-modal');
 addEventListener('keydown', e=>{
   if(state==='play' || modalOpen()) return;          // the engine owns the keyboard while a game or dialog is up
   keys[e.code]=true;
@@ -2023,10 +2463,11 @@ addEventListener('keydown', e=>{
   const onBtn = e.target && e.target.tagName==='BUTTON';
   if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx>=0){ e.preventDefault(); startGame(focusIdx) }
   else if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx<0 && posterFocus){ e.preventDefault(); openChain(posterFocus.spec.play) }
+  else if(e.code==='KeyE' && focusIdx<0 && !posterFocus && bayEngine && bayHint && !(bayToast && performance.now()<bayToast.until)){ e.preventDefault(); bayEngine.toggleFocused() }
   else if(e.code==='KeyQ' && focusIdx>=0 && GAMES[focusIdx].variants[0]){ startGame(focusIdx, GAMES[focusIdx].variants[0].key) }
   else if(e.code==='KeyT'){ openScores() }
   else if(e.code==='KeyM'){ toggleMute() }
-  else if(e.code==='KeyR'){ Room.toggle(); paintRoom() }
+  else if(e.code==='KeyN'){ Room.toggle(); paintRoom() }   // (R is the radio)
 });
 addEventListener('keyup', e=>{ keys[e.code]=false });
 addEventListener('blur', ()=>{ for(const k in keys) keys[k]=false });
@@ -2035,14 +2476,22 @@ const cvs=renderer.domElement;
 document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLockElement===cvs; updateHud() });
 function tryLock(){ if(isTouch) return; try{ const p=cvs.requestPointerLock(); if(p&&p.catch) p.catch(()=>{}) }catch(e){} }
 
-let drag=null;
-cvs.addEventListener('mousedown', e=>{ if(state!=='walk' || modalOpen()) return; initAudio(); drag={x:e.clientX,y:e.clientY,moved:0} });
+let drag=null, bayDrag=false, bayTouch=null, bayTouchPos={x:0,y:0};
+cvs.addEventListener('mousedown', e=>{
+  if(state!=='walk' || modalOpen()) return; initAudio();
+  if(bayEngine && focusIdx<0 && !posterFocus){   // grab a curtain you may pull
+    const nd = locked ? new THREE.Vector2(0,0) : new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+    if(bayEngine.grabStart(nd)){ bayDrag=true; drag=null; return }
+  }
+  drag={x:e.clientX,y:e.clientY,moved:0} });
 addEventListener('mousemove', e=>{
   if(state!=='walk') return;
-  if(locked){ look(e.movementX, e.movementY, .0022) }
-  else if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy); drag.x=e.clientX; drag.y=e.clientY; look(dx,dy,.004) }
+  if(bayDrag){ bayEngine.grabMove(e.movementX/(innerWidth/2), -e.movementY/(innerHeight/2)); return }
+  if(locked){ look(e.movementX, e.movementY, WALK.look) }
+  else if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy); drag.x=e.clientX; drag.y=e.clientY; look(dx,dy,WALK.drag) }
 });
 addEventListener('mouseup', e=>{
+  if(bayDrag){ bayDrag=false; bayEngine.grabEnd(); drag=null; return }
   if(!drag || state!=='walk'){ drag=null; return }
   const wasClick = drag.moved<5; drag=null; if(!wasClick) return;
   if(locked){ if(focusIdx>=0) startGame(focusIdx); else if(posterFocus) openChain(posterFocus.spec.play); return }
@@ -2050,7 +2499,7 @@ addEventListener('mouseup', e=>{
   if(hit>=0) startGame(hit);
   else { const ps=posterAt(new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1)); if(ps) openChain(ps.spec.play); else tryLock() }
 });
-function look(dx,dy,k){ player.yaw-=dx*k; player.pitch=clamp(player.pitch-dy*k,-1.2,1.2) }
+function look(dx,dy,k){ player.yaw-=dx*k; player.pitch=clamp(player.pitch-dy*k,-WALK.pitch,WALK.pitch) }
 function pickAt(cx,cy){
   const v=new THREE.Vector2(cx/innerWidth*2-1, -(cy/innerHeight)*2+1);
   ray.setFromCamera(v,camera); const h=ray.intersectObjects(pickables,false)[0];
@@ -2064,6 +2513,7 @@ cvs.addEventListener('touchstart', e=>{
   if(state!=='walk') return; initAudio();
   for(const t of e.changedTouches){
     if(t.clientX<innerWidth*.45 && joy.id===null){ joy.id=t.identifier; joy.ox=t.clientX; joy.oy=t.clientY; stick.style.left=t.clientX+'px'; stick.style.top=t.clientY+'px'; stick.hidden=false }
+    else if(bayEngine && bayTouch===null && bayEngine.grabStart(new THREE.Vector2(t.clientX/innerWidth*2-1, -(t.clientY/innerHeight)*2+1))){ bayTouch=t.identifier; bayTouchPos={x:t.clientX,y:t.clientY} }
     else if(lk.id===null){ lk.id=t.identifier; lk.x=t.clientX; lk.y=t.clientY; lk.moved=0 }
   }
 },{passive:true});
@@ -2072,12 +2522,14 @@ cvs.addEventListener('touchmove', e=>{
   for(const t of e.changedTouches){
     if(t.identifier===joy.id){ let dx=t.clientX-joy.ox, dy=t.clientY-joy.oy; const d=Math.hypot(dx,dy), mx=50; if(d>mx){dx*=mx/d; dy*=mx/d}
       joy.vx=dx/mx; joy.vy=dy/mx; knob.style.transform=`translate(${dx}px,${dy}px)` }
-    else if(t.identifier===lk.id){ const dx=t.clientX-lk.x, dy=t.clientY-lk.y; lk.moved+=Math.abs(dx)+Math.abs(dy); lk.x=t.clientX; lk.y=t.clientY; if(state==='walk') look(dx,dy,.005) }
+    else if(t.identifier===bayTouch){ bayEngine.grabMove((t.clientX-bayTouchPos.x)/(innerWidth/2), -(t.clientY-bayTouchPos.y)/(innerHeight/2)); bayTouchPos={x:t.clientX,y:t.clientY} }
+    else if(t.identifier===lk.id){ const dx=t.clientX-lk.x, dy=t.clientY-lk.y; lk.moved+=Math.abs(dx)+Math.abs(dy); lk.x=t.clientX; lk.y=t.clientY; if(state==='walk') look(dx,dy,WALK.touchLook) }
   }
 },{passive:false});
 const endTouch=e=>{
   for(const t of e.changedTouches){
     if(t.identifier===joy.id){ joy.id=null; joy.vx=joy.vy=0; stick.hidden=true; knob.style.transform='' }
+    else if(t.identifier===bayTouch){ bayEngine.grabEnd(); bayTouch=null }
     else if(t.identifier===lk.id){ lk.id=null; if(lk.moved<10 && state==='walk'){ const h=pickAt(t.clientX,t.clientY); if(h>=0) startGame(h); else { const ps=posterAt(new THREE.Vector2(t.clientX/innerWidth*2-1, -(t.clientY/innerHeight)*2+1)); if(ps) openChain(ps.spec.play) } } }
   }
 };
@@ -2108,12 +2560,14 @@ function updateHud(){
   $('tapalt').hidden = !(walking && isTouch && v); if(v) $('tapalt').textContent = v.label.toUpperCase();
   $('hallbar').hidden = !(walking || state==='intro');
   $('pprompt').hidden = !(walking && focusIdx<0 && posterFocus && !chainOpen);
+  if(!walking && bayHint){ bayHint=null; paintBayHint() }
   if(posterFocus) $('pptitle').textContent = posterFocus.spec.play.title;
 }
 
 /* Read-only look at the cabinet screens (tests and debugging). */
 window.XAHall = Object.freeze({
   screens: () => machines.map(m => ({ id: m.game.id, phase: m.phase || null, board: m.phaseBoard || null })),
+  layout: () => ({ room: { w: RW, l: RL }, left: NL, right: NR, cabinets: GAMES.map((g,i)=>({ id: g.id, side: SIDE_OF[i], slot: SLOT_OF[i], z: cabZ(SLOT_OF[i], SIDE_OF[i]<0?NL:NR) })), posterSlots: posterSlots.length, posterTags: posterSlots.map(sl=>(sl.pos.x<0?'L':'R')+(sl.bay||'-')) }),
   boards: () => Object.keys(TOP).map(k => ({ board: k, entries: TOP[k].entries.length })),
   screenImage: i => machines[i] && machines[i].sctx ? machines[i].sctx.canvas.toDataURL('image/png') : null
 });
@@ -2126,7 +2580,7 @@ function toggleFs(){ try{ if(document.fullscreenElement) document.exitFullscreen
 $('hscores').addEventListener('click', openScores);
 $('hwallet').addEventListener('click', ()=>{ freeMouse(); initAudio(); try{ XARoom.wallet() }catch(e){ console.error(e) } });
 $('hmute').addEventListener('click', toggleMute);
-function paintRoom(){ const b=$('hroom'); b.style.opacity=Room.isOn()?1:.45; b.title=Room.isOn()?'Room music on (R)':'Room music off (R)' }
+function paintRoom(){ const b=$('hroom'); b.style.opacity=Room.isOn()?1:.45; b.title=Room.isOn()?'Room music on (N)':'Room music off (N)' }
 $('hroom').addEventListener('click', ()=>{ initAudio(); Room.toggle(); paintRoom() }); paintRoom();
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) Room.pause(); else if(state==='walk'||state==='intro') Room.resume() });
 $('hfs').addEventListener('click', toggleFs);
@@ -2165,6 +2619,7 @@ function startGame(i, vkey){
 
 function openGame(i, vkey){
   state='play'; for(const k in keys) keys[k]=false;
+  if(GAMES[i].def.framed){ try{ openFramed(i) }catch(e){ console.error(e); exitFramed(); return } requestAnimationFrame(()=>{ $('flash').style.opacity=0 }); return }
   try{ XARoom.start(GAMES[i].id, vkey) }
   catch(e){ console.error(e); exitGame(); return }
   requestAnimationFrame(()=>{ $('flash').style.opacity=0 });
@@ -2183,6 +2638,138 @@ function exitGame(){
   tween={fromP:zoomTarget.to.clone(), fromQ:zoomTarget.toQ.clone(), toP:saved.pos, toQ:saved.quat, t:.05, dur:.9, fadeAt:99, faded:true,
     done:()=>{ state='walk'; activeIdx=-1; updateHud() }};
 }
+
+/* ---------- framed games (games registry, kind 2): a game that is its own page ----------
+   Some games already live on chain as a page of their own (Astro Blaster 3 is inscription #3075) and keep their own engine, replays and
+   score boards. The registry gives such a game a cabinet (its Top 10 on the screen like any other machine); playing it zooms into the
+   machine as usual and then FRAMES the game's inscription: fetched by id, checked against its chain hash and size (XAScores.getInscription),
+   and put in a sandboxed frame (allow-scripts allow-pointer-lock allow-downloads, never allow-same-origin) full screen, with BACK above it.
+   The game never signs anything and never sees the hall: it speaks the same two small hand-offs it speaks on xtrata.xyz, and the hall answers:
+     xtrata:arcade:submit   a finished run to post -> passed up to the Xtrata viewer (its own review dialog and wallet), or, with no viewer above
+                            the hall, opened as the xtrata.xyz /arcade/submit page. The hall checks the shape of the payload, nothing more.
+     xtrata:wallet:hello / request (stx_requestAccounts)   the pilot's address, only: from the wallet the hall is already connected to.
+   Messages are taken only from the open game's own window. */
+let fr=null;                                          // the open framed game: { i, def, frame, token }
+const framedCache=new Map();                          // game id -> Promise<html> (a failed fetch is forgotten, so the next try reads again)
+function framedHtml(def){
+  let p=framedCache.get(def.id);
+  if(p) return p;
+  const F=def.framed, S=window.XAScores;
+  p=Promise.resolve().then(async()=>{
+    if(!S || !S.getInscription) throw new Error('no reader');
+    if(!(F.size>0) || F.size>ROOM_CAP) throw new Error('too big to open here');
+    const bytes=await S.getInscription(F.id, F.hash);
+    if(!bytes || bytes.length!==F.size) throw new Error('the game is not the size the contract says');
+    return new TextDecoder('utf-8').decode(bytes);
+  });
+  p.catch(()=>{ if(framedCache.get(def.id)===p) framedCache.delete(def.id) });
+  framedCache.set(def.id,p);
+  return p;
+}
+let framedUI=null;
+function framedEls(){
+  if(framedUI) return framedUI;
+  const mk=(tag,css)=>{ const e=document.createElement(tag); e.style.cssText=css; return e };
+  const load=mk('div','position:fixed;inset:0;z-index:8100;background:radial-gradient(ellipse at 50% 40%,#1b1233,#05040a 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#e8e2ff;text-align:center');
+  load.innerHTML='<div class="fr-t" style="font:34px Bungee,Impact,sans-serif;letter-spacing:.08em;color:#3be4ff;text-shadow:0 0 18px rgba(60,230,255,.5)"></div><div class="fr-s" style="font:16px VT323,monospace;letter-spacing:.14em;opacity:.8"></div>';
+  const back=mk('button','position:fixed;top:max(10px,env(safe-area-inset-top));left:10px;z-index:9500;display:none;padding:7px 14px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer');
+  back.type='button'; back.id='xa-framed-back'; back.textContent='← BACK TO THE ARCADE';
+  back.addEventListener('click',e=>{ e.stopPropagation(); exitFramed() });
+  const note=mk('div','position:fixed;bottom:max(14px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:9500;display:none;max-width:min(92vw,560px);padding:8px 14px;font:15px VT323,monospace;letter-spacing:.1em;color:#ffd7a0;background:rgba(10,12,24,.94);border:1px solid #8a5a3b;border-radius:8px;text-align:center');
+  document.body.append(load,back,note);
+  framedUI={load,back,note,title:load.querySelector('.fr-t'),sub:load.querySelector('.fr-s')};
+  return framedUI;
+}
+function framedNote(text,link,ms){
+  const U=framedEls(); U.note.textContent='';
+  U.note.append(document.createTextNode(text));
+  if(link){ const a=document.createElement('a'); a.href=link; a.target='_blank'; a.rel='noopener'; a.textContent=' OPEN THE SUBMIT PAGE ↗'; a.style.cssText='color:#7dffb2;margin-left:8px'; U.note.append(a) }
+  U.note.style.display='block'; clearTimeout(framedNote.t); framedNote.t=setTimeout(()=>{ U.note.style.display='none' },ms||12000);
+}
+function framedPost(msg){ try{ if(fr && fr.frame && fr.frame.contentWindow) fr.frame.contentWindow.postMessage(msg,'*') }catch(e){} }
+function openFramed(i){
+  const g=GAMES[i], def=g.def, U=framedEls();
+  U.title.textContent=g.title; U.sub.textContent='OPENING THE GAME…'; U.load.style.display='flex'; U.back.style.display='block'; U.note.style.display='none';
+  const f=document.createElement('iframe'); f.title=g.title; f.setAttribute('sandbox',ROOM_SANDBOX); f.dataset.xaFramed=def.id; f.setAttribute('allow','autoplay; fullscreen');
+  f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden';
+  fr={i,def,frame:f,token:'xaf-'+Math.random().toString(36).slice(2)+Date.now().toString(36)};
+  document.body.appendChild(f);
+  const mine=fr;
+  framedHtml(def).then(html=>{
+    if(fr!==mine) return;                             // left while it was loading
+    f.addEventListener('load',()=>{ if(fr!==mine) return; f.dataset.loaded='1'; f.style.visibility='visible'; U.load.style.display='none'; try{ f.focus() }catch(e){} });
+    f.srcdoc=html;
+  }).catch(e=>{
+    if(fr!==mine) return;
+    f.dataset.failed='1'; f.dataset.why=String(e&&e.message||e||'');
+    U.sub.textContent='COULD NOT OPEN THE GAME · '+String(e&&e.message||e||'').toUpperCase().slice(0,60)+' · GO BACK AND TRY AGAIN';
+  });
+}
+function exitFramed(){
+  if(!fr) return;
+  const f=fr.frame; fr=null;
+  try{ f.src='about:blank' }catch(e){} f.remove();   // (about:blank first: removing the node alone can leave the game's audio running in some browsers)
+  const U=framedEls(); U.load.style.display='none'; U.back.style.display='none'; U.note.style.display='none';
+  exitGame();
+}
+// what the hall passes up to the viewer for a run to post; the viewer shows its own review, replays the run, and signs
+const FRAMED_ID=/^[A-Za-z0-9_-]{1,64}$/;
+function framedPayloadOk(def,pl){
+  if(!pl || typeof pl!=='object' || Array.isArray(pl)) return false;
+  const board=pl.board;
+  if(typeof board!=='string' || !/^[a-z0-9_-]{3,24}$/.test(board) || board.indexOf(def.id)!==0) return false;
+  if(!Number.isSafeInteger(pl.score) || pl.score<=0) return false;
+  if(typeof pl.name!=='string' || !/^[A-Za-z0-9 _.-]{3,12}$/.test(pl.name)) return false;
+  if(typeof pl.replay!=='string' || !/^[A-Za-z0-9_-]{8,}$/.test(pl.replay) || pl.replay.length>140000) return false;
+  return true;
+}
+function framedSubmit(id,pl){
+  if(!fr) return;
+  const mine=fr, S=window.XAScores;
+  if(!FRAMED_ID.test(id) || !framedPayloadOk(mine.def,pl)){ framedPost({type:'xtrata:arcade:submit-result', id, error:'This score could not be read.'}); return }
+  if(mine.sending){ framedPost({type:'xtrata:arcade:submit-result', id, error:'A score submission is already waiting for you.'}); return }
+  const link=S && S.submitLink ? S.submitLink(pl) : '';
+  const viaTab=()=>{                                  // no viewer above the hall: the xtrata.xyz submit page, in a tab
+    if(!link){ framedPost({type:'xtrata:arcade:submit-result', id, error:'This arcade cannot post scores from here.'}); return }
+    let w=null; try{ w=window.open(link,'_blank','noopener') }catch(e){ w=null }
+    framedPost({type:'xtrata:arcade:submit-opened', id});
+    if(!w) framedNote('Your browser blocked the new tab.', link, 20000);
+    else framedNote('The submit page opened in a new tab. Confirm there with your wallet.', link, 12000);
+  };
+  if(!S || !S.relaySubmit || !S.hasHost || !S.hasHost()){ viaTab(); return }
+  mine.sending=true;
+  S.relaySubmit(pl, ()=>framedPost({type:'xtrata:arcade:submit-opened', id})).then(r=>{
+    mine.sending=false;
+    if(fr!==mine) return;
+    if(r.txId) framedPost({type:'xtrata:arcade:submit-result', id, txId:r.txId});
+    else if(r.cancelled) framedPost({type:'xtrata:arcade:submit-result', id, cancelled:true});
+    else if(r.error) framedPost({type:'xtrata:arcade:submit-result', id, error:String(r.error).slice(0,200)});
+    else viaTab();                                    // the viewer never answered
+  });
+}
+function framedWallet(d){
+  const S=window.XAScores;
+  if(d.type==='xtrata:wallet:hello'){
+    if(typeof d.nonce!=='string' || d.nonce.length>80 || !S || !S.status || S.status().route==='none') return;   // no wallet reachable: say nothing, and the game offers to paste an address
+    framedPost({type:'xtrata:wallet:hello-ack', nonce:d.nonce, bridgeToken:fr.token});
+    return;
+  }
+  if(typeof d.requestId!=='string' || d.requestId.length>80 || d.bridgeToken!==fr.token) return;
+  const reply=(o)=>framedPost(Object.assign({type:'xtrata:wallet:response', requestId:d.requestId}, o));
+  if(d.method!=='stx_requestAccounts'){ reply({ok:false, error:{message:'This arcade shares the wallet address only.'}}); return }
+  const mine=fr;
+  Promise.resolve().then(async()=>{ const st=S.status(); return st.address || await S.connect() })
+    .then(a=>{ if(fr===mine) reply(a?{ok:true, result:{address:a}}:{ok:false, error:{message:'No wallet address.'}}) },
+          e=>{ if(fr===mine) reply({ok:false, error:{message:String(e&&e.message||'Wallet request refused.').slice(0,160)}}) });
+}
+window.addEventListener('message',e=>{
+  const d=e.data;
+  if(!fr || !fr.frame || e.source!==fr.frame.contentWindow || !d || typeof d!=='object' || typeof d.type!=='string') return;
+  if(d.type==='xtrata:arcade:submit') framedSubmit(d.id,d.payload);
+  else if(d.type==='xtrata:wallet:hello' || d.type==='xtrata:wallet:request') framedWallet(d);
+});
+if(window.XA_TEST) XA.framedState=()=>fr?{open:true, id:fr.def.id, loaded:fr.frame.dataset.loaded==='1', failed:fr.frame.dataset.failed==='1', why:fr.frame.dataset.why||'', sandbox:fr.frame.getAttribute('sandbox'), back:framedEls().back.style.display!=='none', note:framedEls().note.textContent}:{open:false};   // tests only
+
 window.XA_CONFIG = window.XA_CONFIG || {};
 window.XA_CONFIG.onExit = exitGame;
 
@@ -2194,13 +2781,24 @@ function move(dt){
   let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0) - joy.vy;
   let s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0) + joy.vx;
   const len=Math.hypot(f,s); if(len>1){f/=len; s/=len}
-  const sp=(keys.ShiftLeft?4.6:3)*dt, sy=Math.sin(player.yaw), cy=Math.cos(player.yaw);
+  const sp=(keys.ShiftLeft?WALK.sprint:WALK.speed)*dt, sy=Math.sin(player.yaw), cy=Math.cos(player.yaw);
+  const px=player.x, pz=player.z;
   player.x += (-sy*f + cy*s)*sp; player.z += (-cy*f - sy*s)*sp;
-  if(len>.05) player.bob+=dt*9*Math.min(1,len);
+  if(len>.05) player.bob+=dt*WALK.bobRate*Math.min(1,len);
   // collision
   const r=.32;
-  player.x=clamp(player.x,-RW/2+r,RW/2-r); player.z=clamp(player.z,-RL/2+r,RL/2-r);
-  for(const b of boxes){
+  if(lobbyPass && lobbyOpen()){   // the door is open onto the lobby: the hall, the doorway and the lobby are one space
+    const R=lobbyRects(r), ok=(x,z)=>R.some(a=>x>=a[0]&&x<=a[1]&&z>=a[2]&&z<=a[3]);
+    if(!ok(player.x,player.z)){
+      const nx=player.x, nz=player.z;
+      if(ok(nx,pz)) player.z=pz; else if(ok(px,nz)) player.x=px; else if(ok(px,pz)){ player.x=px; player.z=pz }
+      else { let bd=1e9; for(const a of R){ const cx=clamp(nx,a[0],a[1]), cz=clamp(nz,a[2],a[3]), d=(cx-nx)**2+(cz-nz)**2; if(d<bd){ bd=d; player.x=cx; player.z=cz } } }   // put somewhere (a jump): the nearest allowed spot
+    }
+  } else {
+    if(inLobbyZone()){ player.x=px; player.z=pz }   // (cannot happen: the door is held open while you are inside)
+    player.x=clamp(player.x,-RW/2+r,RW/2-r); player.z=clamp(player.z,-RL/2+r,RL/2-r);
+  }
+  if(Math.abs(player.x)<=RW/2) for(const b of boxes){
     const nx=clamp(player.x,b.min.x,b.max.x), nz=clamp(player.z,b.min.z,b.max.z);
     const dx=player.x-nx, dz=player.z-nz, d2=dx*dx+dz*dz;
     if(d2<r*r){ if(d2<1e-8){ player.x = player.x<(b.min.x+b.max.x)/2 ? b.min.x-r : b.max.x+r }
@@ -2222,19 +2820,408 @@ function findFocus(){
   return best;
 }
 
+/* What the player is looking at in a bay (a curtain they may pull). Cabinets and playable posters come first. */
+function updateBayFocus(){
+  if(!bayEngine || bayEngine.isGrabbing()) return;   // (no bay engine when the world reader is off)
+  let h=null, hold=true;
+  if(bayToast && performance.now()<bayToast.until){ h=bayToast.text; hold=false }
+  else if(state==='walk' && !chainOpen && focusIdx<0 && !posterFocus){ bayEngine.setScope(inLobbyZone() ? (i=>i>=HALL_BAYS) : (i=>i<HALL_BAYS)); const f=bayEngine.focus(); h=f?f.hint:null; hold=!!(f&&f.hold) }
+  if(h!==bayHint || hold!==bayHold){ bayHint=h; bayHold=hold; paintBayHint() }
+}
+/* ---------- rooms that take the whole screen (the casino, and any room in the world registry) ----------
+   A door leads to a SPACE in the world registry (scene.link.to). Where it goes is read from the chain when the door is used: the space's
+   slug, title, state, runtime and entry (XAWorld.registry().destination). The hall's own live, native lobby is built behind its door (above);
+   everything else is a PAGE: the space's entry inscription, fetched by id and checked against its Xtrata chain hash and size
+   (XAScores.getInscription: gateway first, the chain as fallback), and framed as srcdoc. No list of rooms lives in the hall or its parent.
+     live + entry        the room opens (a short loading screen, the page full screen, BACK above it)
+     live, no entry      THIS DOOR LEADS TO <TITLE> · NOT OPEN YET
+     draft / suspended / retired   THIS DOOR LEADS TO <TITLE> · CLOSED
+     the read failed     COULD NOT CHECK THE DOOR · TRY AGAIN   (never "not open": a failed read is not an answer)
+   Every room runs in a sandboxed frame (allow-scripts allow-pointer-lock allow-downloads, never allow-same-origin), whatever its runtime: it
+   cannot touch the hall's page, wallet or storage. It talks to the hall only through window.XA_ROOM, a small script the hall puts at the top
+   of the page (docs/room-bridge.md, protocol version 1): ready(), leave(), go(door), and for a HOSTED room (runtime 3) only, call() and account().
+   window.XA_ROOMS = { casino:{ src:'casino-room.html', title, still, depth } } is for the local preview only (a page beside the hall), never for
+   an inscribed room. A door's entry picture comes from the door's params (still/stillHash, depth/depthHash: inscription ids and chain hashes),
+   or for a preview room from XA_ROOMS: the open doorway shows it with parallax (doors.js windowTo) and walking in glides into it.
+   BACK works at any depth: the hall keeps where you came from; BACK re-opens the room before (read again: rooms are torn down when you leave
+   them) at the door you went through, or takes you back to the doorway in the hall. A destination whose entry or state changes while you are
+   inside changes nothing until you leave. */
+const ROOM_CAP=16*1024*1024;                          // a room page bigger than this is not opened here (it would not fit a viewer's frame well)
+const ROOM_SANDBOX='allow-scripts allow-pointer-lock allow-downloads';
+const roomCfg=(id)=>{ const r=window.XA_ROOMS && window.XA_ROOMS[String(id||'').toLowerCase()]; return r && typeof r.src==='string' && r.src ? r : null };   // local preview pages only
+const linkSlug=(lk)=>String((lk && (lk['target-room']||lk.targetRoom||lk.room))||'').toLowerCase();
+const signText=(s,max)=>String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9 .,!?:'&\/-]/g,' ').replace(/\s+/g,' ').trim().slice(0,max||32);   // what the hall shows of a chain title: the sign alphabet, as text
+const kb=(n)=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+let roomUI=null, roomBay=-1, roomT0=0, roomTimer=0, roomSlow=0, roomCur=null, roomStack=[], roomBusy=false, callBusy=false, enterSeq=0;
+const roomId=()=>roomCur?(roomCur.slug||''):'';
+
+/* where a door goes: read once per space for a short while (a failed read is never kept, so the next try reads again) */
+const destCache=new Map();
+function resolveDest(id,fresh){
+  const R=window.XAWorld && XAWorld.registry && XAWorld.registry();
+  if(!R) return Promise.resolve({ok:false, value:null, error:'no registry'});
+  const now=performance.now(), c=destCache.get(id);
+  if(!fresh && c && now-c.t<15000) return c.p;
+  const p=Promise.resolve().then(()=>R.destination(id)).catch(e=>({ok:false, value:null, error:String(e&&e.message||e)})).then(r=>{ if(!r.ok && destCache.get(id) && destCache.get(id).p===p) destCache.delete(id); return r });
+  destCache.set(id,{t:now,p}); return p;
+}
+// A resolved destination as the hall acts on it. kind: page | lobby | closed | soon | nowhere | unknown (the read failed) | big
+function targetOf(r){
+  if(!r || !r.ok) return {kind:'unknown', title:''};
+  const d=r.value; if(!d) return {kind:'nowhere', title:''};
+  const title=signText(d.title||d.slug,32);
+  if(d.lobby) return {kind:'lobby', title};
+  if(!d.open) return {kind:'closed', title};
+  if(!d.entry) return {kind:'soon', title};
+  if(d.entry.size>ROOM_CAP) return {kind:'big', title, size:d.entry.size};
+  return {kind:'page', title, space:d.id, slug:d.slug, runtime:d.runtime, entry:d.entry};
+}
+function doorSays(t){
+  if(t.kind==='unknown') return 'COULD NOT CHECK THE DOOR · TRY AGAIN';
+  const to=t.title?'THIS DOOR LEADS TO '+t.title+' · ':'';
+  if(t.kind==='closed') return (to||'THIS DOOR IS ')+'CLOSED';
+  if(t.kind==='big') return (to||'')+'TOO BIG TO OPEN HERE ('+kb(t.size)+', THE LIMIT IS 16 MB)';
+  return to?to+'NOT OPEN YET':'THIS DOOR IS NOT OPEN YET';
+}
+const hallSlug=()=>{ try{ const p=window.XAWorld && XAWorld.config().path; return Array.isArray(p)&&p.length?String(p[p.length-1]):'hall' }catch(e){ return 'hall' } };
+// what the room is told about how you came in (window.XA_ENTRY): the space you came from, the door you came through, where to put you
+function entryFrom(bay,lk){ const lob=bay>=HALL_BAYS; return {from:lob?'lobby':hallSlug(), door:'bay-'+(lob?bay-HALL_BAYS:bay), arrival:Number(lk&&lk.arrival)||0} }
+function withEntry(t,e){ t.xaEntry={from:String(e.from||''), door:String(e.door||''), arrival:Number(e.arrival)||0}; t.key=t.kind==='src'?'src:'+t.slug:'e:'+t.entry.id+':'+t.entry.hash+'|'+t.xaEntry.from+'|'+t.xaEntry.door+'|'+t.xaEntry.arrival; return t }
+// door link -> Promise<target>
+function doorTarget(lk,bay){
+  if(lk && lk.to) return resolveDest(lk.to).then(r=>{ const t=targetOf(r); if(t.kind==='page'){ withEntry(t,entryFrom(bay,lk)); t.view=stillFor(lk) } return t });
+  const slug=linkSlug(lk), cfg=roomCfg(slug);
+  if(cfg) return Promise.resolve(withEntry({kind:'src', title:signText(cfg.title||slug,32), label:String(cfg.title||slug), slug, cfg, runtime:2, view:stillFor(lk)}, entryFrom(bay,lk)));
+  return Promise.resolve({kind:'soon', title:signText(slug,32)});
+}
+
+/* a door's entry picture: from the chain (hash-checked, like a poster's), or a preview room's file */
+const picCache=new Map();
+function chainPic(p){
+  if(!p || !window.XAScores) return null;
+  const k=p.id+':'+p.hash; let c=picCache.get(k);
+  if(!c){ c={state:0,url:''}; picCache.set(k,c);
+    XAScores.getInscription(p.id, XAScores._codec.hexToBytes(p.hash)).then(b=>{ const mime=picMime(b); if(!mime) throw new Error('not a picture'); c.url=URL.createObjectURL(new Blob([b],{type:mime})); c.state=1 }).catch(()=>{ c.state=2 }) }
+  return c.state===1?c.url:null;
+}
+function stillFor(lk){
+  if(!lk || isLobbyLink(lk)) return null;
+  if(lk.to){ const s=lk.still?chainPic(lk.still):null; return s?{still:s, depth:(lk.depth&&chainPic(lk.depth))||''}:null }
+  const r=roomCfg(linkSlug(lk)); return r&&typeof r.still==='string'&&r.still?{still:r.still, depth:typeof r.depth==='string'?r.depth:''}:null;
+}
+
+/* three.js for a room: the arcade's own copy (r128) instead of a CDN. The room page asks with the cdnjs r128 tag (so it also opens on its own)
+   or with an empty <script data-xa-part="three.js"><\/script>. The text comes from the parent (window.XA_PARTS.threeText), or from the hall's own page. */
+const THREE_SLOT=/<script[^>]*\bdata-xa-part=["']three\.js["'][^>]*>\s*<\/script>/i, THREE_TAG=/<script[^>]*\bsrc="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/[^"]*"[^>]*><\/script>/i;
+function threeText(){
+  try{ if(window.XA_PARTS && typeof XA_PARTS.threeText==='function'){ const t=XA_PARTS.threeText(); if(typeof t==='string' && t) return t } }catch(e){}
+  const banner=/^\s*\/\*\*[\s\S]{0,40}@license[\s\S]{0,60}Three\.js Authors/;
+  for(const s of document.scripts){ const t=s.text||''; if(t.length>100000 && banner.test(t.slice(0,200))) return t.replace(/\n\/\/# sourceURL=[^\n]*\s*$/,'') }
+  return '';
+}
+function withThree(html){
+  const at=THREE_SLOT.test(html)?THREE_SLOT:THREE_TAG.test(html)?THREE_TAG:null; if(!at) return html;
+  const t=threeText(); if(!t) return html;
+  return html.replace(at,()=>'<script>'+t.replace(/<\/script/gi,'<\\/script')+'<\/script>');
+}
+/* window.XA_ROOM (protocol version 1, frozen: docs/room-bridge.md), put at the top of every room page the hall frames from the chain */
+function bridgeScript(t){
+  const sc=(window.XAScores && XAScores.config && XAScores.config())||{};
+  const info={v:1, title:t.title, slug:t.slug||'', runtime:t.runtime, network:sc.network==='testnet'?'testnet':'mainnet',
+    apiBases:(window.XAWorld && XAWorld.apiBases ? XAWorld.apiBases() : []).filter(b=>typeof b==='string'), entry:t.xaEntry};
+  const j=JSON.stringify(info).replace(/</g,'\\u003c').replace(/[\u2028\u2029]/g,c=>'\\u'+c.charCodeAt(0).toString(16));
+  return '<script>(function(I){"use strict";var P=window.parent,n=0,wait={};'
+    +'window.__XA_FROM_ARCADE=1;window.XA_ENTRY=Object.freeze({from:I.entry.from,door:I.entry.door,arrival:I.entry.arrival});'
+    +'function send(m){try{P.postMessage(m,"*")}catch(e){}}'
+    +'function ask(m){return new Promise(function(ok,no){var id="r"+(++n)+"-"+Date.now().toString(36);wait[id]={ok:ok,no:no};m.id=id;send(m)})}'
+    +'window.addEventListener("message",function(e){var d=e.data;if(e.source!==P||!d||d.xa!=="result"||typeof d.id!=="string"||!wait[d.id])return;var w=wait[d.id];delete wait[d.id];if(d.ok)w.ok(d);else{var x=new Error(String(d.error||"refused"));x.code=String(d.error||"refused");w.no(x)}});'
+    +'window.XA_ROOM=Object.freeze({version:1,title:I.title,slug:I.slug,runtime:I.runtime,network:I.network,apiBases:Object.freeze(I.apiBases.slice()),'
+    +'ready:function(){send({xa:"room-ready"})},leave:function(){send({xa:"leave-room"})},'
+    +'go:function(door){return ask({xa:"go",door:String(door==null?"":door)}).then(function(){return true})},'
+    +'call:function(o){o=o||{};return ask({xa:"call",contract:o.contract,fn:o.fn,args:o.args,postConditions:o.postConditions,maxStx:o.maxStx}).then(function(r){return r.txid})},'
+    +'account:function(){return ask({xa:"account"}).then(function(r){return r.address||null})}})'
+    +'})('+j+')<\/script>';
+}
+function withBridge(html,t){ const s=bridgeScript(t); return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i,m=>m+s) : s+html }
+// the room's page, ready to frame: its inscription, checked (chain hash, then size), three.js swapped, the bridge on top
+async function roomHtml(t){
+  const S=window.XAScores; if(!S || !S.getInscription) throw new Error('no reader');
+  const bytes=await S.getInscription(t.entry.id, S._codec.hexToBytes(t.entry.hash));
+  if(!bytes || bytes.length!==t.entry.size) throw new Error('the room is not the size its space says');
+  return withBridge(withThree(new TextDecoder('utf-8').decode(bytes)), t);
+}
+
+function roomEls(){
+  if(roomUI) return roomUI;
+  const mk=(css,html)=>{ const e=document.createElement('div'); e.style.cssText=css; if(html!=null) e.innerHTML=html; return e };
+  const load=mk('position:fixed;inset:0;z-index:9000;background:radial-gradient(ellipse at 50% 40%,#1b1233,#05040a 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#e8e2ff;text-align:center;opacity:0;transition:opacity .25s',
+    '<div class="rl-t" style="font:34px Bungee,Impact,sans-serif;letter-spacing:.08em;color:#ffb347;text-shadow:0 0 18px rgba(255,150,40,.55)"></div><div class="rl-s" style="font:16px VT323,monospace;letter-spacing:.14em;opacity:.8">OPENING THE ROOM…</div><div style="width:min(60vw,320px);height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden"><i class="rl-b" style="display:block;height:100%;width:35%;background:linear-gradient(90deg,#3d86ff,#ff8a2a);animation:rlbar 1.1s ease-in-out infinite alternate"></i></div>');
+  // the room's entry still: shown full screen from the moment you cross the threshold until the live room has drawn its first frames, so the doorway you were looking into simply becomes the room
+  const still=mk('position:fixed;inset:0;z-index:8900;background:#05040a center/cover no-repeat;display:none;opacity:0;transform:scale(1);will-change:transform,opacity');
+  const st=document.createElement('style'); st.textContent='@keyframes rlbar{from{transform:translateX(-30%)}to{transform:translateX(190%)}}'; document.head.appendChild(st);
+  const back=document.createElement('button'); back.type='button'; back.id='xa-room-back'; back.textContent='← BACK TO THE LOBBY';
+  back.style.cssText='position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9500;display:none;padding:9px 16px;font:15px VT323,monospace;letter-spacing:.12em;color:#e8e2ff;background:rgba(10,12,24,.88);border:1px solid #3b4a8a;border-radius:8px;cursor:pointer';
+  back.addEventListener('click',e=>{ e.stopPropagation(); roomBack() });
+  // a line over the room (a door the room asked for that is closed, or could not be checked)
+  const note=mk('position:fixed;top:calc(max(10px,env(safe-area-inset-top)) + 46px);left:50%;transform:translateX(-50%);z-index:9500;display:none;max-width:min(92vw,560px);padding:8px 14px;font:15px VT323,monospace;letter-spacing:.1em;color:#ffd7a0;background:rgba(10,12,24,.92);border:1px solid #8a5a3b;border-radius:8px;text-align:center');
+  document.body.append(still,load,back,note); roomUI={load,still,glide:null,back,note,frame:null,frameId:'',title:load.querySelector('.rl-t'),sub:load.querySelector('.rl-s')};
+  // Only the current room's frame is listened to, and only its own window.
+  window.addEventListener('message',e=>{
+    const f=roomUI&&roomUI.frame, d=e.data;
+    if(window.XA_TEST && d && typeof d==='object' && d.xa) (XA._msgs=XA._msgs||[]).push({xa:String(d.xa), mine:!!f && e.source===f.contentWindow, state, cur:!!roomCur});   // tests only
+    if(!f || e.source!==f.contentWindow || !d || typeof d!=='object') return;
+    if(d.xa==='room-ready'){ f.dataset.ready='1'; f.dispatchEvent(new Event('xa-room-ready')); return }   // at any time after it loads, even while it is still hidden behind the hall
+    if(state!=='room' || !roomCur) return;
+    if(d.xa==='leave-room'){ roomBack(); return }
+    if(d.xa==='go' || d.xa==='call' || d.xa==='account') roomAsk(f,d);
+  });
+  return roomUI;
+}
+function roomNote(text,ms){ const U=roomEls(); U.note.textContent=text; U.note.style.display='block'; clearTimeout(roomNote.t); roomNote.t=setTimeout(()=>{ U.note.style.display='none' },ms||4000) }
+function dropFrame(){ const U=roomUI; if(!U || !U.frame) return; try{ U.frame.src='about:blank' }catch(e){} U.frame.remove(); U.frame=null; U.frameId='' }
+// The room's page is loaded quietly as soon as its door is opened (hidden, behind the hall), so by the time you walk in there is little or nothing to wait for.
+// roomPrep makes it (keyed by the entry's id and hash, and how you come in); showRoom uses it (or makes it, if you got there first); roomDrop throws it away (the door shut, or you left the lobby).
+const roomSrc=(cfg)=>cfg.src+(cfg.src.indexOf('?')<0?'?':'&')+'from=arcade';   // a preview room: told it was entered from the arcade, it starts walking just inside its door
+function roomPrep(t){
+  const U=roomEls(), v=t.view;
+  if(v && v.still){ if(!roomPrep.im||roomPrep.im.u!==v.still){ const im=new Image(); im.src=v.still; roomPrep.im={u:v.still,im} } }   // the still is decoded before it is needed
+  if(U.frame && U.frameId===t.key) return U.frame;
+  dropFrame();
+  const f=document.createElement('iframe'); f.title=t.label||t.title||t.slug||'room'; f.setAttribute('sandbox',ROOM_SANDBOX); f.dataset.xaRoom='1'; f.setAttribute('allow','autoplay; fullscreen; clipboard-write');
+  f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:8000;background:#05040a;visibility:hidden;pointer-events:none';
+  f.dataset.loaded='';
+  U.frame=f; U.frameId=t.key;
+  if(t.kind==='page'){
+    // Insert first, then listen, so the empty frame's own load is not mistaken for the room.
+    document.body.appendChild(f);
+    const fail=(e)=>{ f.dataset.failed='1'; f.dataset.why=String(e&&e.message||e||''); f.dispatchEvent(new Event('xa-room-failed')) };
+    roomHtml(t).then(html=>{
+      if(roomUI.frame!==f) return;                       // dropped while it was loading
+      f.addEventListener('load',()=>{ f.dataset.loaded='1' });
+      f.srcdoc=html;
+    }).catch(fail);
+    return f;
+  }
+  f.addEventListener('load',()=>{ f.dataset.loaded='1' });
+  f.src=roomSrc(t.cfg); document.body.appendChild(f); return f;   // (src first: an empty frame fires a load of its own on insert)
+}
+function roomDrop(){ if(!roomUI || !roomUI.frame || state==='room') return; dropFrame() }
+function backLabel(){
+  const top=roomStack[roomStack.length-1];
+  if(!top || top.kind==='hall') return '← BACK TO '+(top && top.bay>=HALL_BAYS ? 'THE LOBBY' : 'THE HALL');
+  return '← BACK TO '+(top.t.title||'THE ROOM');
+}
+// Walking through a door into a room: from the hall (or the lobby).
+function enterRoom(t, bayIdx){
+  if(state!=='walk' || !t || (t.kind!=='page' && t.kind!=='src')) return;
+  roomBay=bayIdx==null?-1:bayIdx; roomStack=[{kind:'hall', bay:roomBay}];
+  roomEls(); state='room'; sfx.coin();
+  if(document.pointerLockElement) document.exitPointerLock();
+  for(const k in keys) keys[k]=false;
+  $('cross').hidden=true; $('prompt').hidden=true; $('tapstart').hidden=true; $('lockhint').hidden=true; $('hint').hidden=true; if($('bprompt')) $('bprompt').hidden=true;
+  try{ Room.enterGame() }catch(e){}                   // the hall's own sound closes behind you
+  const hb=$('hallbar'); if(hb) hb.style.visibility='hidden';   // and its buttons (scores, wallet, sound) stay out of the room's picture
+  showRoom(t,{door:true});
+}
+// Show room t full screen. opts.door: you walked in through a door of the hall (the entry still and the glide can play); otherwise a room
+// is replacing another (a door inside a room, or BACK): the loading screen covers the change.
+function showRoom(t, opts){
+  opts=opts||{};
+  const U=roomEls(); clearTimeout(roomTimer); clearTimeout(roomSlow); U.note.style.display='none';
+  if(!opts.door){ U.still.style.display='none'; U.still.style.opacity=0; if(U.glide){ U.glide.dispose(); U.glide=null } if(U.frameId!==t.key) dropFrame() }
+  const f=roomPrep(t); roomCur=t; roomT0=performance.now(); roomBusy=false;
+  U.back.textContent=backLabel(); U.back.style.zIndex='9500';
+  const ready=!!f.dataset.loaded, minWait=ready?250:700;   // a page that is already there still gets a beat of loading screen, never a flash
+  U.title.textContent=String(t.title||t.slug||'ROOM').toUpperCase(); U.sub.textContent='OPENING THE ROOM…'+(t.entry?' '+kb(t.entry.size):'');
+  const still=opts.door && t.view && t.view.still, depth=still && t.view.depth;
+  const showLoad=()=>{ U.load.style.display='flex'; void U.load.offsetWidth; U.load.style.opacity=1 };
+  // Best: the room has a depth map, so you glide forward from where you stand to where the room starts you, through the same view the doorway showed (a canvas of its own over the hall).
+  let glide=null;
+  if(still && depth && roomBay>=0 && bayEngine && bayEngine.glideInto){ try{ glide=bayEngine.glideInto(roomBay,{fov:camera.fov}) }catch(e){ glide=null; console.warn('room glide not available:',e) } }
+  if(glide){
+    U.glide=glide; document.body.appendChild(glide.dom); glide.render(performance.now()); void glide.dom.offsetWidth; glide.dom.style.transition='opacity .22s'; glide.dom.style.opacity=1;
+    let gw=innerWidth, gh=innerHeight;
+    const tick=(now)=>{ if(U.glide!==glide) return; if(innerWidth!==gw||innerHeight!==gh){ gw=innerWidth; gh=innerHeight; glide.resize(gw,gh) } glide.render(now); if(!glide.done) requestAnimationFrame(tick) };
+    requestAnimationFrame(tick);
+  } else if(still){   // else the doorway you were looking into fills the screen and moves in a little, as a step forward would; the loading screen only comes if the room is slow
+    const S=U.still; S.style.transition='none';   // (the picture is wider than the room's own view, 80 degrees up and down against 68, so it is shown at its middle)
+    S.style.backgroundImage='url("'+String(still).replace(/"/g,'%22')+'")'; S.style.backgroundSize='auto '+(100*Math.max(Math.tan(40*Math.PI/180)/Math.tan(34*Math.PI/180),(innerWidth/innerHeight)/(16/9))).toFixed(1)+'%'; S.style.transform='scale(1)'; S.style.opacity=0; S.style.display='block'; void S.offsetWidth;
+    S.style.transition='opacity .25s,transform 2.6s cubic-bezier(.25,.6,.35,1)'; S.style.opacity=1; S.style.transform='scale(1.035)';
+  } else showLoad();
+  f.style.pointerEvents='auto';
+  const done=()=>{ clearTimeout(roomTimer); const wait=Math.max(0,minWait-(performance.now()-roomT0));
+    setTimeout(()=>{ if(state!=='room' || roomUI.frame!==f) return; f.style.visibility='visible'; U.load.style.opacity=0; setTimeout(()=>{ if(state==='room' && roomUI.frame===f) U.load.style.display='none' },280); U.back.style.display='block'; try{ f.focus() }catch(e){} },wait) };
+  const failed=()=>{ if(roomUI.frame!==f) return; clearTimeout(roomTimer); clearTimeout(roomSlow); if(still) showLoad(); U.sub.textContent='THE ROOM COULD NOT BE LOADED. YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 };
+  if(f.dataset.failed) failed(); else f.addEventListener('xa-room-failed',failed,{once:true});
+  if(still){
+    // Ready = the room has said so ({xa:'room-ready'}, after its first frames), and the still has been up for a beat. A room that never says it is ready is shown 2.5 s after it loads.
+    let shown=false;
+    const reveal=()=>{ if(shown || state!=='room' || roomUI.frame!==f) return; shown=true; clearTimeout(roomSlow); clearTimeout(roomTimer);
+      f.style.visibility='visible'; U.still.style.opacity=0; U.load.style.opacity=0; if(U.glide){ const g=U.glide; U.glide=null; g.dom.style.transition='opacity .45s'; g.dom.style.opacity=0; setTimeout(()=>g.dispose(),520) } setTimeout(()=>{ if(state==='room' && roomUI.frame===f){ U.still.style.display='none'; U.load.style.display='none' } },450); U.back.style.display='block'; try{ f.focus() }catch(e){} };
+    const when=(ms)=>setTimeout(reveal,Math.max(0,ms-(performance.now()-roomT0)));
+    const MIN=glide?glide.ms+150:900;   // (a glide has to arrive before the live room, which starts where it ends, takes over)
+    if(f.dataset.ready) when(MIN); else f.addEventListener('xa-room-ready',()=>when(MIN),{once:true});
+    const late=()=>setTimeout(()=>when(MIN),2500); if(f.dataset.loaded) late(); else f.addEventListener('load',late,{once:true});
+    roomSlow=setTimeout(()=>{ if(!shown && state==='room' && roomUI.frame===f) showLoad() },3500);
+  } else if(ready) done(); else f.addEventListener('load',done,{once:true});
+  roomTimer=setTimeout(()=>{ if(state==='room' && roomUI.frame===f && f.style.visibility!=='visible'){ if(still) showLoad(); U.sub.textContent='THE ROOM IS TAKING A WHILE… YOU CAN GO BACK'; U.back.style.display='block'; U.back.style.zIndex=9600 } },20000);
+}
+// BACK (the button, or the room's own leave()): one step back. The room before is read again and re-opened at the door you went through;
+// at the bottom of the stack you are back in the hall, in front of the door you came in by.
+function roomBack(){
+  if(state!=='room') return;
+  const top=roomStack[roomStack.length-1];
+  if(!top || top.kind==='hall' || roomBusy){ if(!roomBusy) leaveRoom(); return }
+  roomBusy=true;
+  const cur=roomCur;
+  resolveDest(top.t.space,true).then(r=>{
+    if(state!=='room' || roomCur!==cur) return;
+    const t=targetOf(r);
+    roomStack.pop();
+    if(t.kind!=='page'){ roomBusy=false; leaveRoom(); bayToast={text:doorSays(t), until:performance.now()+4000}; updateBayFocus(); return }
+    withEntry(t,{from:cur.slug||'', door:top.door.name, arrival:top.door.id});
+    showRoom(t);
+  });
+}
+function leaveRoom(){
+  if(state!=='room' || !roomUI) return;
+  const U=roomUI; clearTimeout(roomTimer); clearTimeout(roomSlow); const hb=$('hallbar'); if(hb) hb.style.visibility=''; U.still.style.display='none'; U.still.style.opacity=0; if(U.glide){ U.glide.dispose(); U.glide=null }
+  dropFrame(); U.note.style.display='none';
+  U.load.style.opacity=0; U.load.style.display='none'; U.back.style.display='none';
+  state='out'; sfx.back(); try{ Room.exitGame() }catch(e){}
+  const fl=$('flash'); fl.style.transition='none'; fl.style.opacity=1; void fl.offsetWidth; fl.style.transition=''; requestAnimationFrame(()=>{ fl.style.opacity=0 });
+  for(const k in keys) keys[k]=false;
+  const b=roomStack.length && roomStack[0].kind==='hall' ? roomStack[0].bay : roomBay;
+  if(b>=0 && bayEngine && bayEngine.posOf && bayEngine.frameOf){   // you come out of the door: a step in front of it, facing away from it
+    const q=bayEngine.posOf(b), fr=bayEngine.frameOf(b);
+    if(q && fr){ player.x=q.x+fr.nx*1.2; player.z=q.z+fr.nz*1.2; player.yaw=Math.atan2(-fr.nx,-fr.nz); player.pitch=0 }
+  }
+  roomBay=-1; roomCur=null; roomStack=[]; roomBusy=false; inDoorway=-1; roomRested=true;
+  setTimeout(()=>{ if(state==='out'){ state='walk'; updateHud() } },120); tryLock();
+}
+/* ---------- the room bridge (hall side). Messages come only from the current room frame; each ask is answered {xa:'result', id, ok, …} ---------- */
+function roomReply(f,id,o){ if(roomUI && roomUI.frame===f && typeof id==='string') try{ f.contentWindow.postMessage(Object.assign({xa:'result', id}, o),'*') }catch(e){} }
+function roomAsk(f,d){
+  const id=typeof d.id==='string' && d.id.length<=64 ? d.id : null; if(!id) return;
+  const t=roomCur, hosted=!!t && t.kind==='page' && t.runtime===3;
+  if(d.xa==='account'){ const st=window.XAScores && XAScores.status ? XAScores.status() : {}; return roomReply(f,id, hosted?{ok:true, address:st.address||null}:{ok:false, error:'not-hosted'}) }
+  if(d.xa==='call') return roomCall(f,id,d,t);
+  // go(door): the door must be an object of this room's own space, with a portal; its destination follows the same rules as a hall door
+  if(!t || t.kind!=='page' || !t.space) return roomReply(f,id,{ok:false, error:'not-available'});
+  if(roomBusy) return roomReply(f,id,{ok:false, error:'busy'});
+  const R=window.XAWorld && XAWorld.registry && XAWorld.registry(); if(!R) return roomReply(f,id,{ok:false, error:'not-available'});
+  roomBusy=true;
+  const name=String(d.door||'');
+  R.door(t.space,name).then(r=>{
+    if(state!=='room' || roomCur!==t){ roomBusy=false; return null }
+    if(!r.ok){ roomBusy=false; roomNote('COULD NOT CHECK THE DOOR · TRY AGAIN'); roomReply(f,id,{ok:false, error:'could-not-check'}); return null }
+    const pt=r.value && r.value.portal;
+    if(!pt || !(pt.to>0)){ roomBusy=false; roomReply(f,id,{ok:false, error:'unknown-door'}); return null }
+    return resolveDest(pt.to,true).then(dr=>{
+      roomBusy=false;
+      if(state!=='room' || roomCur!==t) return;
+      const nt=targetOf(dr);
+      if(nt.kind==='lobby'){ roomReply(f,id,{ok:true}); leaveRoom(); return }   // the hall's own lobby: back into the 3D world
+      if(nt.kind!=='page'){ roomNote(doorSays(nt)); roomReply(f,id,{ok:false, error:nt.kind==='unknown'?'could-not-check':nt.kind==='closed'?'closed':nt.kind==='big'?'too-big':'not-open'}); return }
+      roomReply(f,id,{ok:true});
+      roomStack.push({kind:'room', t, door:{name, id:r.value.id}});
+      if(roomStack.length>16) roomStack.splice(1,1);           // a long walk forgets its oldest rooms, never the way back to the hall
+      showRoom(withEntry(nt,{from:t.slug||'', door:name, arrival:pt.arrival}));
+    });
+  });
+}
+// call({contract, fn, args, postConditions, maxStx}): only from a HOSTED room (runtime 3), only to a contract the registry approves at the
+// moment of the call (is-approved), only after the player says yes in the hall's own dialog, and signed through the hall's wallet path
+// (XAScores.callContract: deny mode, one STX post-condition capped at maxStx, no `sender`, an account mismatch aborts).
+// maxStx is STX as a decimal (up to 6 places). postConditions may only repeat that cap ({type:'stx', amount: micro-STX <= maxStx}).
+function cleanCall(d){
+  const contract=String(d.contract||''), fn=String(d.fn||'');
+  if(!/^S[0-9A-Z]{25,41}\.[a-zA-Z][a-zA-Z0-9-]{0,39}$/.test(contract)) return {why:'contract'};
+  if(!/^[a-zA-Z][a-zA-Z0-9!?_-]{0,127}$/.test(fn)) return {why:'fn'};
+  const args=d.args==null?[]:d.args;
+  if(!Array.isArray(args) || args.length>32 || !args.every(a=>typeof a==='string' && /^(0x)?([0-9a-fA-F]{2})+$/.test(a) && a.length<=131074)) return {why:'args'};
+  const m=/^([0-9]{1,9})(?:\.([0-9]{1,6}))?$/.exec(typeof d.maxStx==='number' && isFinite(d.maxStx) && d.maxStx>=0 ? d.maxStx.toFixed(6).replace(/\.?0+$/,'') : String(d.maxStx==null?'':d.maxStx));
+  if(!m) return {why:'maxStx'};
+  const maxUstx=BigInt(m[1])*1000000n+BigInt((m[2]||'').padEnd(6,'0')||'0');
+  const pcs=d.postConditions==null?[]:d.postConditions;
+  if(!Array.isArray(pcs) || pcs.length>4 || !pcs.every(p=>p && typeof p==='object' && p.type==='stx' && /^[0-9]{1,16}$/.test(String(p.amount)) && BigInt(String(p.amount))<=maxUstx)) return {why:'postConditions'};
+  return {ok:true, contract, fn, args, maxUstx:maxUstx.toString()};
+}
+async function roomCall(f,id,d,t){
+  if(!t || t.kind!=='page' || t.runtime!==3) return roomReply(f,id,{ok:false, error:'not-hosted'});
+  const c=cleanCall(d); if(!c.ok) return roomReply(f,id,{ok:false, error:'bad-request:'+c.why});
+  if(callBusy) return roomReply(f,id,{ok:false, error:'busy'});
+  const R=window.XAWorld && XAWorld.registry && XAWorld.registry(), S=window.XAScores;
+  if(!R || !S || !S.callContract || !window.XARoom || !XARoom.confirmCall) return roomReply(f,id,{ok:false, error:'not-available'});
+  callBusy=true;
+  try{
+    const ap=await R.approved(c.contract);
+    if(!ap.ok) return roomReply(f,id,{ok:false, error:'could-not-check'});
+    if(!ap.value) return roomReply(f,id,{ok:false, error:'not-approved'});
+    if(state!=='room' || roomCur!==t) return;
+    const who=(S.status()||{}).address||'';
+    if(document.pointerLockElement) document.exitPointerLock();
+    const yes=await XARoom.confirmCall({room:t.title, contract:c.contract, fn:c.fn, maxUstx:c.maxUstx, address:who});
+    if(!yes) return roomReply(f,id,{ok:false, error:'cancelled'});
+    if(state!=='room' || roomCur!==t) return;
+    const r=await S.callContract({contract:c.contract, fn:c.fn, args:c.args, maxUstx:c.maxUstx, expectAddress:who});
+    roomReply(f,id,{ok:true, txid:r.txid});
+  }catch(e){ roomReply(f,id,{ok:false, error:String((e&&e.code===4001)?'cancelled':(e&&e.message)||e).slice(0,200)}) }
+  finally{ callBusy=false }
+}
+// A door that leads somewhere: you walk into an open doorway to go through it (there is no button). The lobby is already there, behind its wall,
+// so walking in needs nothing; any other door is read from the chain (or a preview room in XA_ROOMS) and either opens its room or says why not.
+function toast(text,ms){ bayToast={text, until:performance.now()+(ms||3500)}; updateBayFocus() }
+function bayEnter(link, bayIdx){
+  if(isLobbyLink(link) && lobbyPass) return;
+  const seq=++enterSeq;
+  const slow=setTimeout(()=>{ if(seq===enterSeq && state==='walk') toast('CHECKING THE DOOR…',8000) },300);
+  doorTarget(link,bayIdx).then(t=>{
+    clearTimeout(slow);
+    if(seq!==enterSeq || state!=='walk') return;
+    if(t.kind==='page' || t.kind==='src'){ bayToast=null; enterRoom(t,bayIdx); return }
+    if(t.kind==='lobby') return;
+    toast(doorSays(t), t.kind==='unknown'?4500:3500);
+  });
+}
+// Walking into an open doorway (the door's own width, up against the wall) goes through it. It fires once per arrival, not every frame.
+let inDoorway=-1, roomWantT=0, roomRested=false, prepAt=0;   // roomRested: you have just come out of a room, so it is not loaded again until you have moved away or shut the door
+function checkDoorways(){
+  if(!bayEngine || !bayDefsAll.length) return;
+  const lob=inLobbyZone(), n=bayEngine.count?bayEngine.count():bayDefsAll.length; let hit=-1, link=null;
+  for(let i=0;i<n;i++){
+    if(lob ? i<HALL_BAYS : i>=HALL_BAYS) continue;
+    const d=bayEngine.doorwayAt(i,player.x,player.z);
+    if(d && d.interaction===3 && d.z<.6 && Math.abs(d.x)<d.half-.08){ hit=i; link=d.link; break }
+  }
+  if(hit!==inDoorway){ inDoorway=hit; if(hit>=0) bayEnter(link,hit) }
+  // a door to a room is open: start loading the room. It is dropped again when the door has been shut (or you have left) for a while.
+  const now=performance.now(); let want=null;
+  for(let i=lob?HALL_BAYS:0;i<(lob?n:HALL_BAYS) && !want;i++){
+    const d=bayEngine.doorwayAt(i,player.x,player.z), l=d&&d.link;
+    if(l && !isLobbyLink(l) && (l.to || roomCfg(linkSlug(l))) && d.z<6 && Math.abs(d.x)<4) want={bay:i, link:l};   // an open door to a room, and you are within a few steps of it
+  }
+  if(!want) roomRested=false;
+  else if(!roomRested){ roomWantT=now;
+    if(now-prepAt>500){ prepAt=now; doorTarget(want.link,want.bay).then(t=>{ if(state==='walk' && !roomRested && (t.kind==='page'||t.kind==='src') && (!roomUI||!roomUI.frame||roomUI.frameId!==t.key)) roomPrep(t) }) } }
+  if(!want && roomUI && roomUI.frame && now-roomWantT>8000) roomDrop();
+}
+function paintBayHint(){ const el=$('bprompt'); if(!el) return; el.hidden=!bayHint; if(bayHint){ $('bptext').textContent=bayHint; const a=$('bpalt'); if(a) a.hidden=!bayHold } }
+
 let last=performance.now(), time=0;
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000); last=now; time+=dt;
   requestAnimationFrame(frame);
-  if(state==='play') return;                       // game has the screen; the hall sleeps
+  if(state==='play' || state==='room') return;     // a game or a room (the casino) has the screen; the hall sleeps
 
   if(state==='walk' && !modalOpen()){ move(dt) }
   if(state==='walk' || state==='intro'){
-    camera.position.set(player.x, EYE+Math.sin(player.bob)*.025, player.z);
+    camera.position.set(player.x, EYE+Math.sin(player.bob)*WALK.bobAmp, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0);
     if(state==='intro') player.yaw = Math.sin(time*.15)*.18;
   }
-  if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud() } updatePosterFocus() }
+  if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud(); if(f>=0 && GAMES[f].def.framed) framedHtml(GAMES[f].def).catch(()=>{}) } updatePosterFocus() }   // a framed game's page is fetched as you walk up to its machine
+  if(state==='walk' || state==='intro') tickCentreScreen();
 
   if(tween){
     tween.t+=dt; const k=clamp(tween.t/tween.dur,0,1), e=easeIO(k);
@@ -2252,6 +3239,7 @@ function frame(now){
   }
 
   updateNeon(time,dt);
+  if(bayEngine){ if(lobbyBay>=0 && inLobbyZone()) bayEngine.doorOpen(lobbyBay); bayEngine.update(dt,time); updateBayFocus(); if(state==='walk') checkDoorways() }
 
   updateScreens(dt);
   updateAnimPosters(time);

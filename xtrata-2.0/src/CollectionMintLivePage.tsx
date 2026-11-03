@@ -3619,15 +3619,23 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     Boolean(resumeTargetAsset) ||
     mintRoute === 'staged' ||
     [beginState, uploadState, sealState].some((state) => state !== 'idle');
-  // Collapsed description: show everything down to the first link (e.g. the Ordinals
-  // inscription) so the key reference is never cut off; the rest sits behind "Read more".
-  // With no link, fall back to a four-line clamp.
-  const descriptionLinkMatch = /https?:\/\/\S+/.exec(collectionDescription);
-  const descriptionPreview = descriptionLinkMatch
-    ? collectionDescription.slice(0, descriptionLinkMatch.index + descriptionLinkMatch[0].length)
-    : null;
+  // Collapsed description. The artist can choose exactly where it is cut by putting
+  // [[more]] on its own line in the description: everything above it is always shown and
+  // everything below sits behind "Read more". With no marker, the cut falls just after the
+  // first link (so a key reference such as an Ordinals inscription stays visible), and
+  // with no link either, a four-line clamp is used.
+  const descriptionMoreMarker = /\s*\[\[more\]\]\s*/i.exec(collectionDescription);
+  const descriptionFull = descriptionMoreMarker
+    ? collectionDescription.replace(descriptionMoreMarker[0], '\n\n')
+    : collectionDescription;
+  const descriptionLinkMatch = descriptionMoreMarker ? null : /https?:\/\/\S+/.exec(collectionDescription);
+  const descriptionPreview = descriptionMoreMarker
+    ? collectionDescription.slice(0, descriptionMoreMarker.index)
+    : descriptionLinkMatch
+      ? collectionDescription.slice(0, descriptionLinkMatch.index + descriptionLinkMatch[0].length)
+      : null;
   const descriptionIsLong = descriptionPreview
-    ? collectionDescription.slice(descriptionPreview.length).trim().length > 0
+    ? descriptionFull.slice(descriptionPreview.length).trim().length > 0
     : collectionDescription.length > 260;
 
   const renderGalleryTile = (asset: (typeof mintedGallery)[number]) => {
@@ -3827,7 +3835,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 text={
                   descriptionIsLong && !descriptionExpanded && descriptionPreview
                     ? descriptionPreview
-                    : collectionDescription
+                    : descriptionFull
                 }
               />
             </p>

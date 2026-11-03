@@ -2,6 +2,7 @@ import {Cl,cvToJSON,deserializeCV,serializeCV,makeUnsignedContractCall,makeUnsig
 import {StacksMainnet} from '@stacks/network';
 import {RADIO_PLAYS_SHA256,inspectRadioPlaysConfig,RADIO_PLAYS_CORES} from '../lib/deploy/radio-plays';
 import {CONTRACT,type Entry} from './model';
+import {LIKES_CONTRACT} from '../lib/listening-wallet/tx';
 const [deployer,name]=CONTRACT.split('.');
 export const hex=(v:Uint8Array)=>Array.from(v,b=>b.toString(16).padStart(2,'0')).join('');
 export function bytes(v:string){if(!/^(?:[a-f0-9]{2})+$/i.test(v))throw Error('Invalid encoded data.');return Uint8Array.from(v.match(/../g)!,b=>parseInt(b,16));}
@@ -29,5 +30,8 @@ export function validateSaved(e:Entry){
  if(e.kind==='play'){
   const pc=tx.postConditions.values[0] as any;
   if(p.payloadType!==2||addressToString(p.contractAddress)+'.'+p.contractName.content!==CONTRACT||p.functionName.content!=='play'||p.functionArgs.length!==3||hex(serializeCV(p.functionArgs[0]))!==hex(serializeCV(Cl.uint(e.core)))||hex(serializeCV(p.functionArgs[1]))!==hex(serializeCV(Cl.uint(e.song)))||hex(serializeCV(p.functionArgs[2]))!==hex(serializeCV(Cl.buffer(bytes(e.id))))||e.amount!=='50'||tx.postConditionMode!==PostConditionMode.Deny||tx.postConditions.values.length!==1||pc.conditionType!==0||pc.amount!==50n||pc.conditionCode!==FungibleConditionCode.Equal||pc.principal.prefix!==2||addressToString(pc.principal.address)!==e.address)throw Error('Saved play protection or master does not match.');
+ }else if(e.kind==='like'){
+  // Moves nothing: Deny mode with no post-conditions on the likes contract's set-liked only.
+  if(p.payloadType!==2||addressToString(p.contractAddress)+'.'+p.contractName.content!==LIKES_CONTRACT||p.functionName.content!=='set-liked'||p.functionArgs.length!==2||hex(serializeCV(p.functionArgs[0]))!==hex(serializeCV(Cl.uint(e.song)))||typeof e.liked!=='boolean'||hex(serializeCV(p.functionArgs[1]))!==hex(serializeCV(Cl.bool(e.liked)))||e.amount!=='0'||tx.postConditionMode!==PostConditionMode.Deny||tx.postConditions.values.length!==0)throw Error('Saved like does not match.');
  }else if(p.payloadType!==0||cvToJSON(p.recipient).value!==e.recipient||p.amount!==BigInt(e.amount))throw Error('Saved withdrawal does not match.');
 }

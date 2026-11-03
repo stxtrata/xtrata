@@ -99,9 +99,12 @@ async function calibrate(song, file) {
     const proj = JSON.parse(fs.readFileSync(fp, "utf8"));
     const r = await render(browser, url, logs, `starters/${file}`, {});
     a = analyse(r.L, r.R);
-    if (Math.abs(a.peakDb - TARGET_PEAK_DB) < 0.4 && proj.masterVolume <= 1.5) break;
+    // Capped at MASTER_CAP: the library's headroom rule (starter-library.test.ts). A quiet mix is left a touch under the peak target rather than pushed past the cap.
+    const MASTER_CAP = 0.8;
+    if (Math.abs(a.peakDb - TARGET_PEAK_DB) < 0.4 && proj.masterVolume <= MASTER_CAP) break;
+    if (proj.masterVolume >= MASTER_CAP && a.peakDb < TARGET_PEAK_DB) break; // already at the cap, nothing left to gain
     const k = Math.pow(10, (TARGET_PEAK_DB - a.peakDb) / 20);
-    proj.masterVolume = +Math.max(0.1, Math.min(1.5, proj.masterVolume * k)).toFixed(3);
+    proj.masterVolume = +Math.max(0.1, Math.min(MASTER_CAP, proj.masterVolume * k)).toFixed(3);
     fs.writeFileSync(fp, JSON.stringify(proj));
   }
   const final = JSON.parse(fs.readFileSync(fp, "utf8"));

@@ -2,6 +2,8 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {mountPaidPlayReaders, PAID_PLAYS_CONTRACT} from '../../../public/radio/chain-activity.js';
 const event = (n:number) => ({event_type:'smart_contract_log',tx_id:'0x'+n.toString(16).padStart(64,'0'),contract_log:{contract_id:PAID_PLAYS_CONTRACT,topic:'print',value:{repr:`(tuple (amount u50) (core u3) (event "radio-paid-play") (id u315) (payer 'SP123) (recipient 'SP456) (total u${n}))`}}});
+// What /api/music-plays serves: plays from the paid-play index, already parsed.
+const play = (n:number) => ({txid:'0x'+n.toString(16).padStart(64,'0'),core:3,id:315,amount:50,total:n,payer:'SP123',recipient:'SP456'});
 function mount(){
  document.body.innerHTML='<section data-xtrata-chain-plays data-chain-history><button data-chain-refresh>Refresh</button><p data-chain-status></p><div data-chain-list></div></section>';
  mountPaidPlayReaders();
@@ -13,9 +15,11 @@ describe('automatic public history',()=>{
   vi.useFakeTimers();let newest=3;
   vi.stubGlobal('fetch',vi.fn(async(url:string)=>{
    if(url.includes('/radio/counts'))return {ok:true,json:async()=>({tracks:[]})};
-   const offset=Number(new URL(url,'https://xtrata.xyz').searchParams.get('offset'));
-   const events=Array.from({length:newest},(_,i)=>event(newest-i));
-   return {ok:true,json:async()=>({total:newest,results:events.slice(offset,offset+2)})};
+   const u=new URL(url,'https://xtrata.xyz');
+   expect(u.pathname).toBe('/api/music-plays'); // the site's index, never Hiro from the browser
+   const offset=Number(u.searchParams.get('offset'));
+   const plays=Array.from({length:newest},(_,i)=>play(newest-i));
+   return {ok:true,json:async()=>({total:newest,results:plays.slice(offset,offset+2)})};
   }));
   mount();await vi.advanceTimersByTimeAsync(1000);
   expect(document.querySelector('details')!.open).toBe(false);
@@ -44,7 +48,7 @@ describe('automatic public history',()=>{
   localStorage.setItem(`xtrata-paid-play-total-v1:${PAID_PLAYS_CONTRACT}`,JSON.stringify({count:1,checkedAt:1}));
   vi.stubGlobal('fetch',vi.fn(async(url:string)=>{
    if(url.includes('/radio/counts'))return {ok:true,json:async()=>({tracks:[]})};
-   if(url.includes('offset=0'))return {ok:true,json:async()=>({total:3,results:[event(3),event(2)]})};
+   if(url.includes('offset=0'))return {ok:true,json:async()=>({total:3,results:[play(3),play(2)]})};
    throw Error('offline');
   }));
   mount();await vi.advanceTimersByTimeAsync(1000);

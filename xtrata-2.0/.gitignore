@@ -69,6 +69,7 @@ scripts/wizard/.collection-v15/
 /public/radio/music-profile-wallet-v2.js
 public/radio/music-profile-wallet-v3.js
 public/audionaut/audionaut-gate.js
+public/audionauts/royalties/page.js
 
 # Audionauts V1 recursive item files (staged for upload via the collection studio, not source)
 _claude_scratch/audionauts-v1-recursive*
@@ -81,3 +82,16 @@ forever-twins/assets/xtrata-ft-large.js
 _claude_scratch/
 canaries/build/forever-twins-launch-*-canary.html
 forever-twins/ft-harness/results/fork-*.json
+
+# Generated artist portal bundles (rebuilt by prebuild)
+/music/artist/assets/artist.js
+/music/artist/assets/audionauts.js
+
+# Listening wallet origin build (separate Pages project)
+dist-listening-wallet
+
+# Audionaut gate sell layer: any local audio test files (music comes from inscription 3567)
+/public/audionaut/sell/_local/
+
+# Local Cloudflare state (wrangler dev / pages dev)
+.wrangler/

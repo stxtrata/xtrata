@@ -1,0 +1,1316 @@
+{
+ "machine": "ordinal-rush",
+ "generated": "2026-11-01",
+ "rule": "Every symbol is real Bitcoin material: inscriptions loaded from ordinals.com, or on-chain text records (Bitmap). Nothing is drawn by hand. Images were fetched from https://ordinals.com/content/<id> (or rendered by ordinals.com itself, for HTML and 3D inscriptions) in a browser on 2026-11-01.",
+ "images": [
+  {
+   "collection": "bitcoin-frogs",
+   "inscriptionId": "b1d25aa861bfd3eb84e000aeebd880bdf653598baaaadcb9b9907ec994773998i0",
+   "number": 407182,
+   "contentUrl": "https://ordinals.com/content/b1d25aa861bfd3eb84e000aeebd880bdf653598baaaadcb9b9907ec994773998i0",
+   "inscriptionPage": "https://ordinals.com/inscription/b1d25aa861bfd3eb84e000aeebd880bdf653598baaaadcb9b9907ec994773998i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/bitcoin-frogs/inscriptions.json",
+   "method": "image/webp inscription (576 x 576), an exact 8x upscale of a 72 x 72 pixel grid; stored at that grid, lossless PNG (centre of each block)",
+   "bytes": 4667,
+   "file": "images/bitcoin-frogs/407182.png",
+   "native": [
+    576,
+    576
+   ]
+  },
+  {
+   "collection": "bitcoin-frogs",
+   "inscriptionId": "7bbbe7683a393d0301a673b2fd5e57c67f5732be83d2cdc23f13c1fb8c03f3e7i0",
+   "number": 395542,
+   "contentUrl": "https://ordinals.com/content/7bbbe7683a393d0301a673b2fd5e57c67f5732be83d2cdc23f13c1fb8c03f3e7i0",
+   "inscriptionPage": "https://ordinals.com/inscription/7bbbe7683a393d0301a673b2fd5e57c67f5732be83d2cdc23f13c1fb8c03f3e7i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/bitcoin-frogs/inscriptions.json",
+   "method": "image/webp inscription (576 x 576), an exact 8x upscale of a 72 x 72 pixel grid; stored at that grid, lossless PNG (centre of each block)",
+   "bytes": 3923,
+   "file": "images/bitcoin-frogs/395542.png",
+   "native": [
+    576,
+    576
+   ]
+  },
+  {
+   "collection": "bitcoin-frogs",
+   "inscriptionId": "ea2b0e597b7c31555f1642df11ebee06c85a250190efcae66e51f238c93f9633i0",
+   "number": 402825,
+   "contentUrl": "https://ordinals.com/content/ea2b0e597b7c31555f1642df11ebee06c85a250190efcae66e51f238c93f9633i0",
+   "inscriptionPage": "https://ordinals.com/inscription/ea2b0e597b7c31555f1642df11ebee06c85a250190efcae66e51f238c93f9633i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/bitcoin-frogs/inscriptions.json",
+   "method": "image/webp inscription (576 x 576), an exact 8x upscale of a 72 x 72 pixel grid; stored at that grid, lossless PNG (centre of each block)",
+   "bytes": 5363,
+   "file": "images/bitcoin-frogs/402825.png",
+   "native": [
+    576,
+    576
+   ]
+  },
+  {
+   "collection": "bitcoin-frogs",
+   "inscriptionId": "28b127f9383d2a8afcbfd1f837040908b4d183e633e55f9f009979f7c99fb86ai0",
+   "number": 405080,
+   "contentUrl": "https://ordinals.com/content/28b127f9383d2a8afcbfd1f837040908b4d183e633e55f9f009979f7c99fb86ai0",
+   "inscriptionPage": "https://ordinals.com/inscription/28b127f9383d2a8afcbfd1f837040908b4d183e633e55f9f009979f7c99fb86ai0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/bitcoin-frogs/inscriptions.json",
+   "method": "image/webp inscription (576 x 576), an exact 8x upscale of a 72 x 72 pixel grid; stored at that grid, lossless PNG (centre of each block)",
+   "bytes": 5078,
+   "file": "images/bitcoin-frogs/405080.png",
+   "native": [
+    576,
+    576
+   ]
+  },
+  {
+   "collection": "bitcoin-frogs",
+   "inscriptionId": "2d9415ce23f65dde06c2cc7170cf0f3d06d997db985d3421d0b4c3123749e8bfi0",
+   "number": 408871,
+   "contentUrl": "https://ordinals.com/content/2d9415ce23f65dde06c2cc7170cf0f3d06d997db985d3421d0b4c3123749e8bfi0",
+   "inscriptionPage": "https://ordinals.com/inscription/2d9415ce23f65dde06c2cc7170cf0f3d06d997db985d3421d0b4c3123749e8bfi0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/bitcoin-frogs/inscriptions.json",
+   "method": "image/webp inscription (576 x 576), an exact 8x upscale of a 72 x 72 pixel grid; stored at that grid, lossless PNG (centre of each block)",
+   "bytes": 4532,
+   "file": "images/bitcoin-frogs/408871.png",
+   "native": [
+    576,
+    576
+   ]
+  },
+  {
+   "collection": "bitcoin-frogs",
+   "inscriptionId": "ae08ba8eba58fe12bef868a053fd2a0ab15b930639c95e23e3dc533692f83feei0",
+   "number": 411704,
+   "contentUrl": "https://ordinals.com/content/ae08ba8eba58fe12bef868a053fd2a0ab15b930639c95e23e3dc533692f83feei0",
+   "inscriptionPage": "https://ordinals.com/inscription/ae08ba8eba58fe12bef868a053fd2a0ab15b930639c95e23e3dc533692f83feei0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/bitcoin-frogs/inscriptions.json",
+   "method": "image/webp inscription (576 x 576), an exact 8x upscale of a 72 x 72 pixel grid; stored at that grid, lossless PNG (centre of each block)",
+   "bytes": 4855,
+   "file": "images/bitcoin-frogs/411704.png",
+   "native": [
+    576,
+    576
+   ]
+  },
+  {
+   "collection": "bitcoin-frogs",
+   "inscriptionId": "afacff6c313ac1fb70eb175b43a0b39523a837fee541b904340efef43e70a5d9i0",
+   "number": 410134,
+   "contentUrl": "https://ordinals.com/content/afacff6c313ac1fb70eb175b43a0b39523a837fee541b904340efef43e70a5d9i0",
+   "inscriptionPage": "https://ordinals.com/inscription/afacff6c313ac1fb70eb175b43a0b39523a837fee541b904340efef43e70a5d9i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/bitcoin-frogs/inscriptions.json",
+   "method": "image/webp inscription (576 x 576), an exact 8x upscale of a 72 x 72 pixel grid; stored at that grid, lossless PNG (centre of each block)",
+   "bytes": 4123,
+   "file": "images/bitcoin-frogs/410134.png",
+   "native": [
+    576,
+    576
+   ]
+  },
+  {
+   "collection": "bitcoin-frogs",
+   "inscriptionId": "1e44a83539f624b5e11d10f1df062e48c1d74661313e26df91d4096117a99df4i0",
+   "number": 411960,
+   "contentUrl": "https://ordinals.com/content/1e44a83539f624b5e11d10f1df062e48c1d74661313e26df91d4096117a99df4i0",
+   "inscriptionPage": "https://ordinals.com/inscription/1e44a83539f624b5e11d10f1df062e48c1d74661313e26df91d4096117a99df4i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/bitcoin-frogs/inscriptions.json",
+   "method": "image/webp inscription (576 x 576), an exact 8x upscale of a 72 x 72 pixel grid; stored at that grid, lossless PNG (centre of each block)",
+   "bytes": 4304,
+   "file": "images/bitcoin-frogs/411960.png",
+   "native": [
+    576,
+    576
+   ]
+  },
+  {
+   "collection": "bitcoin-puppets",
+   "inscriptionId": "db3953afa8d120a5ce51870c938565c2e30e1fef9cf58a94d6c2c43ee9cf8eefi0",
+   "number": 53105833,
+   "contentUrl": "https://ordinals.com/content/db3953afa8d120a5ce51870c938565c2e30e1fef9cf58a94d6c2c43ee9cf8eefi0",
+   "inscriptionPage": "https://ordinals.com/inscription/db3953afa8d120a5ce51870c938565c2e30e1fef9cf58a94d6c2c43ee9cf8eefi0",
+   "listSource": "https://ordiscan.com/collection/bitcoin-puppets",
+   "method": "image/webp inscription, original bytes unchanged (256 x 256)",
+   "bytes": 2528,
+   "file": "images/bitcoin-puppets/53105833.webp",
+   "native": [
+    256,
+    256
+   ]
+  },
+  {
+   "collection": "bitcoin-puppets",
+   "inscriptionId": "9a4e74444435604f9fbc0e742e379961574b6f3174bbf4c123cb81d418f1136bi0",
+   "number": 53105623,
+   "contentUrl": "https://ordinals.com/content/9a4e74444435604f9fbc0e742e379961574b6f3174bbf4c123cb81d418f1136bi0",
+   "inscriptionPage": "https://ordinals.com/inscription/9a4e74444435604f9fbc0e742e379961574b6f3174bbf4c123cb81d418f1136bi0",
+   "listSource": "https://ordiscan.com/collection/bitcoin-puppets",
+   "method": "image/webp inscription, original bytes unchanged (256 x 256)",
+   "bytes": 3828,
+   "file": "images/bitcoin-puppets/53105623.webp",
+   "native": [
+    256,
+    256
+   ]
+  },
+  {
+   "collection": "bitcoin-puppets",
+   "inscriptionId": "b589744c7ae4968066cd5f0845498efc47e5843c18395c0b99c9e93ba0c12119i0",
+   "number": 53105739,
+   "contentUrl": "https://ordinals.com/content/b589744c7ae4968066cd5f0845498efc47e5843c18395c0b99c9e93ba0c12119i0",
+   "inscriptionPage": "https://ordinals.com/inscription/b589744c7ae4968066cd5f0845498efc47e5843c18395c0b99c9e93ba0c12119i0",
+   "listSource": "https://ordiscan.com/collection/bitcoin-puppets",
+   "method": "image/webp inscription, original bytes unchanged (256 x 256)",
+   "bytes": 3468,
+   "file": "images/bitcoin-puppets/53105739.webp",
+   "native": [
+    256,
+    256
+   ]
+  },
+  {
+   "collection": "bitcoin-puppets",
+   "inscriptionId": "790088daaf0a16b756bacbb8f636dbefb76ce0b753ab18057f196ace902d5effi0",
+   "number": 53105626,
+   "contentUrl": "https://ordinals.com/content/790088daaf0a16b756bacbb8f636dbefb76ce0b753ab18057f196ace902d5effi0",
+   "inscriptionPage": "https://ordinals.com/inscription/790088daaf0a16b756bacbb8f636dbefb76ce0b753ab18057f196ace902d5effi0",
+   "listSource": "https://ordiscan.com/collection/bitcoin-puppets",
+   "method": "image/webp inscription, original bytes unchanged (256 x 256)",
+   "bytes": 2672,
+   "file": "images/bitcoin-puppets/53105626.webp",
+   "native": [
+    256,
+    256
+   ]
+  },
+  {
+   "collection": "bitcoin-puppets",
+   "inscriptionId": "6ea57dce1dd40ee731747e638b09e57ff9f73dd8975f1f38172f500216511a39i0",
+   "number": 53105820,
+   "contentUrl": "https://ordinals.com/content/6ea57dce1dd40ee731747e638b09e57ff9f73dd8975f1f38172f500216511a39i0",
+   "inscriptionPage": "https://ordinals.com/inscription/6ea57dce1dd40ee731747e638b09e57ff9f73dd8975f1f38172f500216511a39i0",
+   "listSource": "https://ordiscan.com/collection/bitcoin-puppets",
+   "method": "image/webp inscription, original bytes unchanged (256 x 256)",
+   "bytes": 3608,
+   "file": "images/bitcoin-puppets/53105820.webp",
+   "native": [
+    256,
+    256
+   ]
+  },
+  {
+   "collection": "bitcoin-puppets",
+   "inscriptionId": "6d30fbd67b5046fbee860dfa9c72cd48a1e7a4afef44235d25ea2390e1d40e30i0",
+   "number": 53105819,
+   "contentUrl": "https://ordinals.com/content/6d30fbd67b5046fbee860dfa9c72cd48a1e7a4afef44235d25ea2390e1d40e30i0",
+   "inscriptionPage": "https://ordinals.com/inscription/6d30fbd67b5046fbee860dfa9c72cd48a1e7a4afef44235d25ea2390e1d40e30i0",
+   "listSource": "https://ordiscan.com/collection/bitcoin-puppets",
+   "method": "image/webp inscription, original bytes unchanged (256 x 256)",
+   "bytes": 2496,
+   "file": "images/bitcoin-puppets/53105819.webp",
+   "native": [
+    256,
+    256
+   ]
+  },
+  {
+   "collection": "bitcoin-puppets",
+   "inscriptionId": "481f46ca3686a8d15a445b672645f3479bc93c0424a96ae16d069b0543ca76f3i0",
+   "number": 53105835,
+   "contentUrl": "https://ordinals.com/content/481f46ca3686a8d15a445b672645f3479bc93c0424a96ae16d069b0543ca76f3i0",
+   "inscriptionPage": "https://ordinals.com/inscription/481f46ca3686a8d15a445b672645f3479bc93c0424a96ae16d069b0543ca76f3i0",
+   "listSource": "https://ordiscan.com/collection/bitcoin-puppets",
+   "method": "image/webp inscription, original bytes unchanged (256 x 256)",
+   "bytes": 2508,
+   "file": "images/bitcoin-puppets/53105835.webp",
+   "native": [
+    256,
+    256
+   ]
+  },
+  {
+   "collection": "bitcoin-puppets",
+   "inscriptionId": "7da4e45efbf6464e3435131d7cc01fbb6c4616be3786470794c12bdf8ab4f46bi0",
+   "number": 53105824,
+   "contentUrl": "https://ordinals.com/content/7da4e45efbf6464e3435131d7cc01fbb6c4616be3786470794c12bdf8ab4f46bi0",
+   "inscriptionPage": "https://ordinals.com/inscription/7da4e45efbf6464e3435131d7cc01fbb6c4616be3786470794c12bdf8ab4f46bi0",
+   "listSource": "https://ordiscan.com/collection/bitcoin-puppets",
+   "method": "image/webp inscription, original bytes unchanged (256 x 256)",
+   "bytes": 2292,
+   "file": "images/bitcoin-puppets/53105824.webp",
+   "native": [
+    256,
+    256
+   ]
+  },
+  {
+   "collection": "omb",
+   "inscriptionId": "f9ccead93698e4124b0a04b46857a9ee49a326340f37187729627ab895119340i0",
+   "number": 89945,
+   "contentUrl": "https://ordinals.com/content/f9ccead93698e4124b0a04b46857a9ee49a326340f37187729627ab895119340i0",
+   "inscriptionPage": "https://ordinals.com/inscription/f9ccead93698e4124b0a04b46857a9ee49a326340f37187729627ab895119340i0",
+   "listSource": "https://ordiscan.com/collection/omb",
+   "method": "image/jpeg inscription (336 x 336); bundled copy at full size, WebP q92; the original loads live from ordinals.com",
+   "bytes": 37592,
+   "file": "images/omb/89945.webp",
+   "native": [
+    336,
+    336
+   ]
+  },
+  {
+   "collection": "omb",
+   "inscriptionId": "40e359170344787c8070bc0d300f21043a517e12da0f1818b1e2c026b0d8be2bi0",
+   "number": 103092,
+   "contentUrl": "https://ordinals.com/content/40e359170344787c8070bc0d300f21043a517e12da0f1818b1e2c026b0d8be2bi0",
+   "inscriptionPage": "https://ordinals.com/inscription/40e359170344787c8070bc0d300f21043a517e12da0f1818b1e2c026b0d8be2bi0",
+   "listSource": "https://ordiscan.com/collection/omb",
+   "method": "image/jpeg inscription (336 x 336); bundled copy at full size, WebP q92; the original loads live from ordinals.com",
+   "bytes": 14266,
+   "file": "images/omb/103092.webp",
+   "native": [
+    336,
+    336
+   ]
+  },
+  {
+   "collection": "omb",
+   "inscriptionId": "4bf5307a72b6f08026f8841eeca20a665295519caafc8faa5632803e4338af3fi0",
+   "number": 103387,
+   "contentUrl": "https://ordinals.com/content/4bf5307a72b6f08026f8841eeca20a665295519caafc8faa5632803e4338af3fi0",
+   "inscriptionPage": "https://ordinals.com/inscription/4bf5307a72b6f08026f8841eeca20a665295519caafc8faa5632803e4338af3fi0",
+   "listSource": "https://ordiscan.com/collection/omb",
+   "method": "image/jpeg inscription (336 x 336); bundled copy at full size, WebP q92; the original loads live from ordinals.com",
+   "bytes": 29612,
+   "file": "images/omb/103387.webp",
+   "native": [
+    336,
+    336
+   ]
+  },
+  {
+   "collection": "omb",
+   "inscriptionId": "03d499a9de427ba00e0132bd5b42e0ea02c2c442ad8f17564c6384cea1d1c75ai0",
+   "number": 103416,
+   "contentUrl": "https://ordinals.com/content/03d499a9de427ba00e0132bd5b42e0ea02c2c442ad8f17564c6384cea1d1c75ai0",
+   "inscriptionPage": "https://ordinals.com/inscription/03d499a9de427ba00e0132bd5b42e0ea02c2c442ad8f17564c6384cea1d1c75ai0",
+   "listSource": "https://ordiscan.com/collection/omb",
+   "method": "image/jpeg inscription (336 x 336); bundled copy at full size, WebP q92; the original loads live from ordinals.com",
+   "bytes": 24248,
+   "file": "images/omb/103416.webp",
+   "native": [
+    336,
+    336
+   ]
+  },
+  {
+   "collection": "omb",
+   "inscriptionId": "b111680d299da28e7f79c37e4335f416b030cddea8a13af57762600067b0302di0",
+   "number": 111814,
+   "contentUrl": "https://ordinals.com/content/b111680d299da28e7f79c37e4335f416b030cddea8a13af57762600067b0302di0",
+   "inscriptionPage": "https://ordinals.com/inscription/b111680d299da28e7f79c37e4335f416b030cddea8a13af57762600067b0302di0",
+   "listSource": "https://ordiscan.com/collection/omb",
+   "method": "image/jpeg inscription (336 x 336); bundled copy at full size, WebP q92; the original loads live from ordinals.com",
+   "bytes": 23866,
+   "file": "images/omb/111814.webp",
+   "native": [
+    336,
+    336
+   ]
+  },
+  {
+   "collection": "omb",
+   "inscriptionId": "9e7f2f4706940f828e9e830d3be497bf4db5b8076e8466063711789fa91cdaa3i0",
+   "number": 111815,
+   "contentUrl": "https://ordinals.com/content/9e7f2f4706940f828e9e830d3be497bf4db5b8076e8466063711789fa91cdaa3i0",
+   "inscriptionPage": "https://ordinals.com/inscription/9e7f2f4706940f828e9e830d3be497bf4db5b8076e8466063711789fa91cdaa3i0",
+   "listSource": "https://ordiscan.com/collection/omb",
+   "method": "image/jpeg inscription (336 x 336); bundled copy at full size, WebP q92; the original loads live from ordinals.com",
+   "bytes": 24154,
+   "file": "images/omb/111815.webp",
+   "native": [
+    336,
+    336
+   ]
+  },
+  {
+   "collection": "omb",
+   "inscriptionId": "3357eae0924f7f89f070b94f0b2966a31b62619002c092b399e0094095abdbeci0",
+   "number": 111816,
+   "contentUrl": "https://ordinals.com/content/3357eae0924f7f89f070b94f0b2966a31b62619002c092b399e0094095abdbeci0",
+   "inscriptionPage": "https://ordinals.com/inscription/3357eae0924f7f89f070b94f0b2966a31b62619002c092b399e0094095abdbeci0",
+   "listSource": "https://ordiscan.com/collection/omb",
+   "method": "image/jpeg inscription (336 x 336); bundled copy at full size, WebP q92; the original loads live from ordinals.com",
+   "bytes": 18542,
+   "file": "images/omb/111816.webp",
+   "native": [
+    336,
+    336
+   ]
+  },
+  {
+   "collection": "omb",
+   "inscriptionId": "c591abf263fea77f2c824412d906f0edb02d4e6181f6b8c72edc297b85ab4911i0",
+   "number": 111913,
+   "contentUrl": "https://ordinals.com/content/c591abf263fea77f2c824412d906f0edb02d4e6181f6b8c72edc297b85ab4911i0",
+   "inscriptionPage": "https://ordinals.com/inscription/c591abf263fea77f2c824412d906f0edb02d4e6181f6b8c72edc297b85ab4911i0",
+   "listSource": "https://ordiscan.com/collection/omb",
+   "method": "image/jpeg inscription (336 x 336); bundled copy at full size, WebP q92; the original loads live from ordinals.com",
+   "bytes": 17482,
+   "file": "images/omb/111913.webp",
+   "native": [
+    336,
+    336
+   ]
+  },
+  {
+   "collection": "taproot-wizards",
+   "inscriptionId": "c308627f85019137730ae0215f32bfd820006c3fdccfe3406c25bc8ea4f23ba5i0",
+   "number": 149385,
+   "contentUrl": "https://ordinals.com/content/c308627f85019137730ae0215f32bfd820006c3fdccfe3406c25bc8ea4f23ba5i0",
+   "inscriptionPage": "https://ordinals.com/inscription/c308627f85019137730ae0215f32bfd820006c3fdccfe3406c25bc8ea4f23ba5i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/taproot-wizards/inscriptions.json",
+   "method": "image/webp inscription (800 x 791); bundled copy 512 x 506 WebP q90 (high-quality downscale); the original loads live from ordinals.com",
+   "bytes": 61052,
+   "file": "images/taproot-wizards/149385.webp",
+   "native": [
+    800,
+    791
+   ]
+  },
+  {
+   "collection": "taproot-wizards",
+   "inscriptionId": "235212a8a6c3cfbc08e0526438736d78eecf7dea702da80c0c928039a0dc929di0",
+   "number": 149282,
+   "contentUrl": "https://ordinals.com/content/235212a8a6c3cfbc08e0526438736d78eecf7dea702da80c0c928039a0dc929di0",
+   "inscriptionPage": "https://ordinals.com/inscription/235212a8a6c3cfbc08e0526438736d78eecf7dea702da80c0c928039a0dc929di0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/taproot-wizards/inscriptions.json",
+   "method": "image/webp inscription (800 x 791); bundled copy 512 x 506 WebP q90 (high-quality downscale); the original loads live from ordinals.com",
+   "bytes": 21406,
+   "file": "images/taproot-wizards/149282.webp",
+   "native": [
+    800,
+    791
+   ]
+  },
+  {
+   "collection": "taproot-wizards",
+   "inscriptionId": "2fa2c01849de3e7fe921f7add7bbcb0c73334cf8aeb2f4f58636b0cc6dcfd549i0",
+   "number": 148496,
+   "contentUrl": "https://ordinals.com/content/2fa2c01849de3e7fe921f7add7bbcb0c73334cf8aeb2f4f58636b0cc6dcfd549i0",
+   "inscriptionPage": "https://ordinals.com/inscription/2fa2c01849de3e7fe921f7add7bbcb0c73334cf8aeb2f4f58636b0cc6dcfd549i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/taproot-wizards/inscriptions.json",
+   "method": "image/webp inscription (800 x 791); bundled copy 512 x 506 WebP q90 (high-quality downscale); the original loads live from ordinals.com",
+   "bytes": 35850,
+   "file": "images/taproot-wizards/148496.webp",
+   "native": [
+    800,
+    791
+   ]
+  },
+  {
+   "collection": "taproot-wizards",
+   "inscriptionId": "3ced650b3b32875f0030244a5ff3b350b8ef82ae9fd05db5400c94210c995700i0",
+   "number": 147866,
+   "contentUrl": "https://ordinals.com/content/3ced650b3b32875f0030244a5ff3b350b8ef82ae9fd05db5400c94210c995700i0",
+   "inscriptionPage": "https://ordinals.com/inscription/3ced650b3b32875f0030244a5ff3b350b8ef82ae9fd05db5400c94210c995700i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/taproot-wizards/inscriptions.json",
+   "method": "image/webp inscription (800 x 791); bundled copy 512 x 506 WebP q90 (high-quality downscale); the original loads live from ordinals.com",
+   "bytes": 27414,
+   "file": "images/taproot-wizards/147866.webp",
+   "native": [
+    800,
+    791
+   ]
+  },
+  {
+   "collection": "taproot-wizards",
+   "inscriptionId": "cdb56894d82157747797bc301775178eb31c5a0cd5ca2c8ca9792dfdaf5d5b2bi0",
+   "number": 148355,
+   "contentUrl": "https://ordinals.com/content/cdb56894d82157747797bc301775178eb31c5a0cd5ca2c8ca9792dfdaf5d5b2bi0",
+   "inscriptionPage": "https://ordinals.com/inscription/cdb56894d82157747797bc301775178eb31c5a0cd5ca2c8ca9792dfdaf5d5b2bi0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/taproot-wizards/inscriptions.json",
+   "method": "image/webp inscription (800 x 791); bundled copy 512 x 506 WebP q90 (high-quality downscale); the original loads live from ordinals.com",
+   "bytes": 27366,
+   "file": "images/taproot-wizards/148355.webp",
+   "native": [
+    800,
+    791
+   ]
+  },
+  {
+   "collection": "taproot-wizards",
+   "inscriptionId": "23aeab91a21911abee8126eece178f9ce7bd3d3f54eb76d97bf359fccd41d9b1i0",
+   "number": 149501,
+   "contentUrl": "https://ordinals.com/content/23aeab91a21911abee8126eece178f9ce7bd3d3f54eb76d97bf359fccd41d9b1i0",
+   "inscriptionPage": "https://ordinals.com/inscription/23aeab91a21911abee8126eece178f9ce7bd3d3f54eb76d97bf359fccd41d9b1i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/taproot-wizards/inscriptions.json",
+   "method": "image/webp inscription (800 x 791); bundled copy 512 x 506 WebP q90 (high-quality downscale); the original loads live from ordinals.com",
+   "bytes": 29230,
+   "file": "images/taproot-wizards/149501.webp",
+   "native": [
+    800,
+    791
+   ]
+  },
+  {
+   "collection": "taproot-wizards",
+   "inscriptionId": "62035d166efbe906e64c59a6a8ae2186c4cfe9497db6eedfb0376f6f7dae525ei0",
+   "number": 147895,
+   "contentUrl": "https://ordinals.com/content/62035d166efbe906e64c59a6a8ae2186c4cfe9497db6eedfb0376f6f7dae525ei0",
+   "inscriptionPage": "https://ordinals.com/inscription/62035d166efbe906e64c59a6a8ae2186c4cfe9497db6eedfb0376f6f7dae525ei0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/taproot-wizards/inscriptions.json",
+   "method": "image/webp inscription (800 x 792); bundled copy 512 x 507 WebP q90 (high-quality downscale); the original loads live from ordinals.com",
+   "bytes": 33516,
+   "file": "images/taproot-wizards/147895.webp",
+   "native": [
+    800,
+    792
+   ]
+  },
+  {
+   "collection": "taproot-wizards",
+   "inscriptionId": "9f74344c97e1454f20e53ef1da5cb011f301c696bde550fee4bdf521d2dba647i0",
+   "number": 148171,
+   "contentUrl": "https://ordinals.com/content/9f74344c97e1454f20e53ef1da5cb011f301c696bde550fee4bdf521d2dba647i0",
+   "inscriptionPage": "https://ordinals.com/inscription/9f74344c97e1454f20e53ef1da5cb011f301c696bde550fee4bdf521d2dba647i0",
+   "listSource": "https://github.com/ordinals-wallet/ordinals-collections/blob/main/collections/taproot-wizards/inscriptions.json",
+   "method": "image/webp inscription (800 x 792); bundled copy 512 x 507 WebP q90 (high-quality downscale); the original loads live from ordinals.com",
+   "bytes": 30436,
+   "file": "images/taproot-wizards/148171.webp",
+   "native": [
+    800,
+    792
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "b75ecef16910b8fea6f9aa80ae67132f652e96ef5221242165216df1fb12f921i0",
+   "number": 83555,
+   "contentUrl": "https://ordinals.com/content/b75ecef16910b8fea6f9aa80ae67132f652e96ef5221242165216df1fb12f921i0",
+   "inscriptionPage": "https://ordinals.com/inscription/b75ecef16910b8fea6f9aa80ae67132f652e96ef5221242165216df1fb12f921i0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 312,
+   "file": "images/nodemonkes/83555.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "23fc22e98f20d8e18a3d71f4e7a741de385e622357ec44d7f3b7d9cc86938106i0",
+   "number": 83529,
+   "contentUrl": "https://ordinals.com/content/23fc22e98f20d8e18a3d71f4e7a741de385e622357ec44d7f3b7d9cc86938106i0",
+   "inscriptionPage": "https://ordinals.com/inscription/23fc22e98f20d8e18a3d71f4e7a741de385e622357ec44d7f3b7d9cc86938106i0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 243,
+   "file": "images/nodemonkes/83529.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "b7e161d91fae64a0ac8c6e83a92eb15807b9fb54a13015172c8627ccfe65071ai0",
+   "number": 83552,
+   "contentUrl": "https://ordinals.com/content/b7e161d91fae64a0ac8c6e83a92eb15807b9fb54a13015172c8627ccfe65071ai0",
+   "inscriptionPage": "https://ordinals.com/inscription/b7e161d91fae64a0ac8c6e83a92eb15807b9fb54a13015172c8627ccfe65071ai0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 305,
+   "file": "images/nodemonkes/83552.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "8e530337416ff4b7ea893bb7d0376a4e79004726336213b9a50da56a9a2f0101i0",
+   "number": 83522,
+   "contentUrl": "https://ordinals.com/content/8e530337416ff4b7ea893bb7d0376a4e79004726336213b9a50da56a9a2f0101i0",
+   "inscriptionPage": "https://ordinals.com/inscription/8e530337416ff4b7ea893bb7d0376a4e79004726336213b9a50da56a9a2f0101i0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 257,
+   "file": "images/nodemonkes/83522.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "39d99772fb6b23eb0d5041ca52ac39ca1bc36e19db004c06d179df44d0730616i0",
+   "number": 83542,
+   "contentUrl": "https://ordinals.com/content/39d99772fb6b23eb0d5041ca52ac39ca1bc36e19db004c06d179df44d0730616i0",
+   "inscriptionPage": "https://ordinals.com/inscription/39d99772fb6b23eb0d5041ca52ac39ca1bc36e19db004c06d179df44d0730616i0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 269,
+   "file": "images/nodemonkes/83542.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "a599bfa1aa80bf68b83283acab211d0e8be01100d05bbc880f2b4e15d8c73916i0",
+   "number": 83543,
+   "contentUrl": "https://ordinals.com/content/a599bfa1aa80bf68b83283acab211d0e8be01100d05bbc880f2b4e15d8c73916i0",
+   "inscriptionPage": "https://ordinals.com/inscription/a599bfa1aa80bf68b83283acab211d0e8be01100d05bbc880f2b4e15d8c73916i0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 273,
+   "file": "images/nodemonkes/83543.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "84fe05b18b7f05f5d748a0d2420876f9cfeb4f15d9db4855b5dc5d0a612c0417i0",
+   "number": 83547,
+   "contentUrl": "https://ordinals.com/content/84fe05b18b7f05f5d748a0d2420876f9cfeb4f15d9db4855b5dc5d0a612c0417i0",
+   "inscriptionPage": "https://ordinals.com/inscription/84fe05b18b7f05f5d748a0d2420876f9cfeb4f15d9db4855b5dc5d0a612c0417i0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 262,
+   "file": "images/nodemonkes/83547.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "6627c3121a8a6e674c5cc483fb4ebdffedd37eb74583fddda886957459d19213i0",
+   "number": 83539,
+   "contentUrl": "https://ordinals.com/content/6627c3121a8a6e674c5cc483fb4ebdffedd37eb74583fddda886957459d19213i0",
+   "inscriptionPage": "https://ordinals.com/inscription/6627c3121a8a6e674c5cc483fb4ebdffedd37eb74583fddda886957459d19213i0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 260,
+   "file": "images/nodemonkes/83539.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "63812015b926b71e26a7355e1fb7d15dfc83f11a97b5d61da6c5d9c06108c72bi0",
+   "number": 83563,
+   "contentUrl": "https://ordinals.com/content/63812015b926b71e26a7355e1fb7d15dfc83f11a97b5d61da6c5d9c06108c72bi0",
+   "inscriptionPage": "https://ordinals.com/inscription/63812015b926b71e26a7355e1fb7d15dfc83f11a97b5d61da6c5d9c06108c72bi0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 252,
+   "file": "images/nodemonkes/83563.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "nodemonkes",
+   "inscriptionId": "814595ee37c14cee1775f7b0d14addb85a60b0be826b5f9d8f0d5d0e72b05d02i0",
+   "number": 83525,
+   "contentUrl": "https://ordinals.com/content/814595ee37c14cee1775f7b0d14addb85a60b0be826b5f9d8f0d5d0e72b05d02i0",
+   "inscriptionPage": "https://ordinals.com/inscription/814595ee37c14cee1775f7b0d14addb85a60b0be826b5f9d8f0d5d0e72b05d02i0",
+   "listSource": "https://ordiscan.com/collection/nodemonkes",
+   "method": "image/png inscription, original bytes unchanged (28 x 28)",
+   "bytes": 270,
+   "file": "images/nodemonkes/83525.png",
+   "native": [
+    28,
+    28
+   ]
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i729",
+   "number": -264997,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i729",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i729",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1790,
+   "file": "images/ocm-genesis/-264997.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i606",
+   "number": -264874,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i606",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i606",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 3153,
+   "file": "images/ocm-genesis/-264874.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i690",
+   "number": -264958,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i690",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i690",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1710,
+   "file": "images/ocm-genesis/-264958.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i693",
+   "number": -264961,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i693",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i693",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1790,
+   "file": "images/ocm-genesis/-264961.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i747",
+   "number": -265015,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i747",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i747",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1789,
+   "file": "images/ocm-genesis/-265015.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i678",
+   "number": -264946,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i678",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i678",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1507,
+   "file": "images/ocm-genesis/-264946.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i621",
+   "number": -264889,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i621",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i621",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 3231,
+   "file": "images/ocm-genesis/-264889.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i660",
+   "number": -264928,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i660",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i660",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1849,
+   "file": "images/ocm-genesis/-264928.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i723",
+   "number": -264991,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i723",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i723",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1930,
+   "file": "images/ocm-genesis/-264991.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i639",
+   "number": -264907,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i639",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i639",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1591,
+   "file": "images/ocm-genesis/-264907.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i717",
+   "number": -264985,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i717",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i717",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1648,
+   "file": "images/ocm-genesis/-264985.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i624",
+   "number": -264892,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i624",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i624",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 2600,
+   "file": "images/ocm-genesis/-264892.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i744",
+   "number": -265012,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i744",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i744",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1648,
+   "file": "images/ocm-genesis/-265012.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "ocm-genesis",
+   "inscriptionId": "39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i666",
+   "number": -264934,
+   "contentUrl": "https://ordinals.com/content/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i666",
+   "inscriptionPage": "https://ordinals.com/inscription/39626b736fd4fe49cf572c46e5e847c2c3e4780d4c076e4e5d1b5531b7fdf737i666",
+   "listSource": "https://ordiscan.com/collection/ocm-genesis",
+   "method": "text/html recursive inscription rendered on ordinals.com; it draws an inline SVG (viewBox 0 0 500 500), stored exactly as drawn. Vector: sharp at any size.",
+   "bytes": 1790,
+   "file": "images/ocm-genesis/-264934.svg",
+   "native": "vector 500 x 500"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i64",
+   "number": 56246233,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i64",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i64",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 6 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 6 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 14559,
+   "file": "images/pizza-ninjas/56246233.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i34",
+   "number": 56246203,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i34",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i34",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 6 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 6 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 14423,
+   "file": "images/pizza-ninjas/56246203.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i9",
+   "number": 56246178,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i9",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i9",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 7 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 7 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 22833,
+   "file": "images/pizza-ninjas/56246178.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i63",
+   "number": 56246232,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i63",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i63",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 6 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 6 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 19045,
+   "file": "images/pizza-ninjas/56246232.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i40",
+   "number": 56246209,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i40",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i40",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 8 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 8 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 23666,
+   "file": "images/pizza-ninjas/56246209.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i42",
+   "number": 56246211,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i42",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i42",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 5 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 5 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 10943,
+   "file": "images/pizza-ninjas/56246211.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i44",
+   "number": 56246213,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i44",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i44",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 4 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 4 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 11482,
+   "file": "images/pizza-ninjas/56246213.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i27",
+   "number": 56246196,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i27",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i27",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 5 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 5 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 15853,
+   "file": "images/pizza-ninjas/56246196.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i46",
+   "number": 56246215,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i46",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i46",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 4 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 4 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 11886,
+   "file": "images/pizza-ninjas/56246215.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i68",
+   "number": 56246237,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i68",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i68",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 5 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 5 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 16415,
+   "file": "images/pizza-ninjas/56246237.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i52",
+   "number": 56246221,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i52",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i52",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 5 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 5 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 12141,
+   "file": "images/pizza-ninjas/56246221.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "pizza-ninjas",
+   "inscriptionId": "39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i7",
+   "number": 56246176,
+   "contentUrl": "https://ordinals.com/content/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i7",
+   "inscriptionPage": "https://ordinals.com/inscription/39399e536443446eda3f26ce7038178ec3b69157f38eaed19caea4614aabaf62i7",
+   "listSource": "https://ordiscan.com/collection/pizza-ninjas",
+   "method": "text/html recursive inscription rendered on ordinals.com; its Ninja module paints an orange background and 7 SVG trait layers onto a 2000 x 2000 canvas. Stored as one SVG holding the same background and the same 7 layers in order (checked against the inscription's own canvas). Vector: sharp at any size.",
+   "bytes": 20572,
+   "file": "images/pizza-ninjas/56246176.svg",
+   "native": "vector 150 x 150 (canvas 2000 x 2000)"
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i10",
+   "number": 53785870,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i10",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i10",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 54308,
+   "file": "images/quantum-cats/53785870.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i26",
+   "number": 53785886,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i26",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i26",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 41496,
+   "file": "images/quantum-cats/53785886.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i32",
+   "number": 53785892,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i32",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i32",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 37588,
+   "file": "images/quantum-cats/53785892.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i21",
+   "number": 53785881,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i21",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i21",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 23518,
+   "file": "images/quantum-cats/53785881.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i3",
+   "number": 53785863,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i3",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i3",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 11 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 20934,
+   "file": "images/quantum-cats/53785863.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i2",
+   "number": 53785862,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i2",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i2",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 18964,
+   "file": "images/quantum-cats/53785862.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i16",
+   "number": 53785876,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i16",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i16",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 31626,
+   "file": "images/quantum-cats/53785876.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i14",
+   "number": 53785874,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i14",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i14",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 67298,
+   "file": "images/quantum-cats/53785874.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i47",
+   "number": 53785907,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i47",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i47",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 11 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 30086,
+   "file": "images/quantum-cats/53785907.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i42",
+   "number": 53785902,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i42",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i42",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 40736,
+   "file": "images/quantum-cats/53785902.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i30",
+   "number": 53785890,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i30",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i30",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 21668,
+   "file": "images/quantum-cats/53785890.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "quantum-cats",
+   "inscriptionId": "4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i22",
+   "number": 53785882,
+   "contentUrl": "https://ordinals.com/content/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i22",
+   "inscriptionPage": "https://ordinals.com/inscription/4b31771df21656d2a77e6fa18720a6dd94b04510b9065a7c67250d5c89ad2079i22",
+   "listSource": "https://ordiscan.com/collection/quantum-cats",
+   "method": "text/html recursive inscription rendered on ordinals.com; it composites 10 trait images onto its own 600 x 600 canvas. Still taken from that canvas at full size, high-quality downscale to 512 x 512, WebP q88.",
+   "bytes": 37958,
+   "file": "images/quantum-cats/53785882.webp",
+   "native": [
+    600,
+    600
+   ]
+  },
+  {
+   "collection": "runestone",
+   "inscriptionId": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+   "number": 63140674,
+   "contentUrl": "https://ordinals.com/content/ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+   "inscriptionPage": "https://ordinals.com/inscription/ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+   "listSource": "https://ordiscan.com/collection/runestone",
+   "method": "model/gltf+json inscription (3D model, 3.9 MB) rendered by the ordinals.com preview (model-viewer) at 1000 x 1000 with a fixed camera, cropped to the stone, 768 x 768 WebP q90 with transparency (the reel tile shows it on white, as ordinals.com does; the Airdrop rain uses the cut-out). Every Runestone child delegates its content to this inscription.",
+   "bytes": 21202,
+   "file": "images/runestone/63140674.webp",
+   "native": "3D model"
+  },
+  {
+   "collection": "inscription-0",
+   "inscriptionId": "6fb976ab49dcec017f1e201e84395983204ae1a7c2abf7ced0a85d692e442799i0",
+   "number": 0,
+   "contentUrl": "https://ordinals.com/content/6fb976ab49dcec017f1e201e84395983204ae1a7c2abf7ced0a85d692e442799i0",
+   "inscriptionPage": "https://ordinals.com/inscription/6fb976ab49dcec017f1e201e84395983204ae1a7c2abf7ced0a85d692e442799i0",
+   "listSource": "https://ordinals.com/inscription/0",
+   "method": "image/png inscription, original bytes unchanged (100 x 100)",
+   "bytes": 793,
+   "file": "images/inscription-0/0.png",
+   "native": [
+    100,
+    100
+   ]
+  }
+ ],
+ "records": [
+  {
+   "collection": "bitmap",
+   "inscriptionId": "d919d7d22bf03038baf081fc7636bc88ba271e13c0de03b3466745560755102ei0",
+   "number": 19114952,
+   "text": "800050.bitmap",
+   "contentUrl": "https://ordinals.com/content/d919d7d22bf03038baf081fc7636bc88ba271e13c0de03b3466745560755102ei0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "5fcf3e54e57d55b82a05a998d9f99b0ccb63edaa3b26edfa308bc02d71c4f206i0",
+   "number": 19142005,
+   "text": "800078.bitmap",
+   "contentUrl": "https://ordinals.com/content/5fcf3e54e57d55b82a05a998d9f99b0ccb63edaa3b26edfa308bc02d71c4f206i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "6b14c2fc7984694cfe0870b89ef09b3ce35399bac744455e215c1cb2e9806089i0",
+   "number": 19141916,
+   "text": "800080.bitmap",
+   "contentUrl": "https://ordinals.com/content/6b14c2fc7984694cfe0870b89ef09b3ce35399bac744455e215c1cb2e9806089i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "575f42ec09d1c18502a94bcd908f7d35d51bc75a301d59e33b0a899d8d40da22i0",
+   "number": 19281784,
+   "text": "800150.bitmap",
+   "contentUrl": "https://ordinals.com/content/575f42ec09d1c18502a94bcd908f7d35d51bc75a301d59e33b0a899d8d40da22i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "42b54fef19aea5b3bc3e8c8eb13a1e6d560e3f88c95e52cc5d9cf28e7479e827i0",
+   "number": 19511380,
+   "text": "800300.bitmap",
+   "contentUrl": "https://ordinals.com/content/42b54fef19aea5b3bc3e8c8eb13a1e6d560e3f88c95e52cc5d9cf28e7479e827i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "5155cd3e66071b3735376de609134f036201095ab9b9f3a2425b4013125c60e8i0",
+   "number": 19635331,
+   "text": "800379.bitmap",
+   "contentUrl": "https://ordinals.com/content/5155cd3e66071b3735376de609134f036201095ab9b9f3a2425b4013125c60e8i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "75f97efdf157e87f4a2a96383ac59180d5f833abf41aae756cb2159ff2e34b4ai0",
+   "number": 19635330,
+   "text": "800380.bitmap",
+   "contentUrl": "https://ordinals.com/content/75f97efdf157e87f4a2a96383ac59180d5f833abf41aae756cb2159ff2e34b4ai0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "46824578aa955f2ece8244f278237d9f4d3f78b77c6221758c9b309808abc45di0",
+   "number": 19698525,
+   "text": "800450.bitmap",
+   "contentUrl": "https://ordinals.com/content/46824578aa955f2ece8244f278237d9f4d3f78b77c6221758c9b309808abc45di0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "98f6d47e96e55bcb2474b185d37ee4488d5c001a25a3d168a95398943966764di0",
+   "number": 19755346,
+   "text": "800496.bitmap",
+   "contentUrl": "https://ordinals.com/content/98f6d47e96e55bcb2474b185d37ee4488d5c001a25a3d168a95398943966764di0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "c05ec9a347e1802982c9d515a6b354ebca7e1c51d00d5c345dff4160bff0c0b9i0",
+   "number": 19755348,
+   "text": "800497.bitmap",
+   "contentUrl": "https://ordinals.com/content/c05ec9a347e1802982c9d515a6b354ebca7e1c51d00d5c345dff4160bff0c0b9i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "771ac5c4e29d044a1d435dda7a9e6ba556c5eb4aae889a72ffdfcbe83a1c1bf1i0",
+   "number": 19755349,
+   "text": "800498.bitmap",
+   "contentUrl": "https://ordinals.com/content/771ac5c4e29d044a1d435dda7a9e6ba556c5eb4aae889a72ffdfcbe83a1c1bf1i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "e722222dbba56a31ce115fa51d358af3b3532e96856b8c7da94940254611b450i0",
+   "number": 19755347,
+   "text": "800499.bitmap",
+   "contentUrl": "https://ordinals.com/content/e722222dbba56a31ce115fa51d358af3b3532e96856b8c7da94940254611b450i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "19c7db46964969f8277b1155da4649c50717932c6db6a9b2ccfe672e41109f7ei0",
+   "number": 19863176,
+   "text": "800599.bitmap",
+   "contentUrl": "https://ordinals.com/content/19c7db46964969f8277b1155da4649c50717932c6db6a9b2ccfe672e41109f7ei0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "573b00b4cb37ddc130c9a1409d9b3d66435c80dbf3807b0198d7f8f42b9d204fi0",
+   "number": 19863172,
+   "text": "800600.bitmap",
+   "contentUrl": "https://ordinals.com/content/573b00b4cb37ddc130c9a1409d9b3d66435c80dbf3807b0198d7f8f42b9d204fi0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "ed921621115b621368d432539eba43de9e576bfe34ae7b211fb8701251c4c2d7i0",
+   "number": 19978392,
+   "text": "800700.bitmap",
+   "contentUrl": "https://ordinals.com/content/ed921621115b621368d432539eba43de9e576bfe34ae7b211fb8701251c4c2d7i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "8f3d4f53e9468ff33041bebd12be08f43058116c9c214e02caafed9d7b31113ei0",
+   "number": 20865284,
+   "text": "801200.bitmap",
+   "contentUrl": "https://ordinals.com/content/8f3d4f53e9468ff33041bebd12be08f43058116c9c214e02caafed9d7b31113ei0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "c2764edc873d21aafa8519e76ac20466538a387d34b41b51a653ae3f1e51e028i0",
+   "number": 21530469,
+   "text": "801789.bitmap",
+   "contentUrl": "https://ordinals.com/content/c2764edc873d21aafa8519e76ac20466538a387d34b41b51a653ae3f1e51e028i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "55df52169f0d98b00c85255c8b1db01b99ed98158e31b5ab1c9d015c7c6facb1i0",
+   "number": 21530481,
+   "text": "801800.bitmap",
+   "contentUrl": "https://ordinals.com/content/55df52169f0d98b00c85255c8b1db01b99ed98158e31b5ab1c9d015c7c6facb1i0"
+  },
+  {
+   "collection": "bitmap",
+   "inscriptionId": "38c042d4256883a50d05829df8f20f955a904eb471a7ecef736896fe0704cfa8i0",
+   "number": 21961139,
+   "text": "802000.bitmap",
+   "contentUrl": "https://ordinals.com/content/38c042d4256883a50d05829df8f20f955a904eb471a7ecef736896fe0704cfa8i0"
+  }
+ ],
+ "liveLoaded": "Image-type collections (Bitcoin Frogs, Bitcoin Puppets, NodeMonkes, OMB, Taproot Wizards) also load further items from manifest.json live from https://ordinals.com/content/<id> (served with Access-Control-Allow-Origin: *), and OMB and Taproot Wizards replace their bundled copy with the original file. Upscaled pixel art loaded live is reduced to its grid in the browser the same way.",
+ "logosNeedingPermission": [],
+ "communityPermissionNeeded": [
+  "Bitcoin Frogs",
+  "Pizza Ninjas",
+  "OnChainMonkey",
+  "Ordinal Maxi Biz (OMB)",
+  "Quantum Cats",
+  "NodeMonkes",
+  "Bitcoin Puppets",
+  "Runestone",
+  "Taproot Wizards",
+  "Bitmap"
+ ],
+ "brandAssets": [
+  "Xtrata mark: drawn on the cabinet door with the XLOGO vector code (the same trace as the bible SVG); the bible SVG is used as given on the test page",
+  "ParallaX Casino wordmark: the bible SVG, used as given, small, on the test page header only"
+ ],
+ "logosNote": "No project or token logos are used on this machine. Every symbol is an inscription (or a .bitmap text record); the communities whose art appears still need to agree before a public launch (communityPermissionNeeded).",
+ "sharpness": {
+  "pixel": "Pixel-art inscriptions are stored at their real pixel grid (an upscaled file such as a 576 x 576 Bitcoin Frog is checked block by block and reduced to its 72 x 72 grid, lossless). The game draws them only with nearest-neighbour scaling by a whole number, so every source pixel becomes an exact square at any size.",
+  "vector": "OnChainMonkey and Pizza Ninjas draw SVG; they are stored as SVG and drawn at the size shown, so they are sharp at any size.",
+  "raster": "Other images (Bitcoin Puppets, OMB, Taproot Wizards, Quantum Cats, the Runestone still) are stored at or near native size. When shown larger than their native size they are scaled pixel for pixel (nearest neighbour), as ordinals.com shows them; when shown smaller they use high-quality downscaling. Taproot Wizards and OMB load their original files live from ordinals.com.",
+  "screen": "Tiles are drawn straight onto the screen at the size they are shown, and in fullscreen the screen canvas matches the display's real pixels."
+ }
+}

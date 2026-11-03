@@ -1,0 +1,414 @@
+{
+ "schema": 1,
+ "generated": "2026-10-26T18:23:38Z",
+ "scale": {
+  "on_chain": {
+   "order": 0,
+   "label": "Stored on chain"
+  },
+  "solid": {
+   "order": 1,
+   "label": "Looks solid"
+  },
+  "one_host": {
+   "order": 2,
+   "label": "Works today, rests on one host"
+  },
+  "marketplace_broken": {
+   "order": 3,
+   "label": "Contract works, marketplace copy broken"
+  },
+  "marketplace_only": {
+   "order": 4,
+   "label": "Only the marketplace's copy still works"
+  },
+  "not_found": {
+   "order": 5,
+   "label": "We couldn't find the art"
+  },
+  "unclear": {
+   "order": 6,
+   "label": "We couldn't tell"
+  },
+  "not_art": {
+   "order": 7,
+   "label": "Not an art collection"
+  }
+ },
+ "caveats": [
+  "Sample-based: up to 4 tokens per collection through the contract and up to 16 through the marketplace image address.",
+  "One run on 13 Oct 2026 from one network; the collections that no longer reach their art through their contract were re-tested on 16 Oct 2026.",
+  "'Risk' here means the art or its metadata may stop being retrievable or may change. It does not mean custody, price or security of the tokens.",
+  "'Only Pinata answered' shows who holds the files today, not how long they will keep them.",
+  "'Has a setter' means a function for changing the token link was found by its usual name. It does not show the owner can still use it: the frozen flag is read separately."
+ ],
+ "sources": {
+  "census": {
+   "date": "2026-10-13",
+   "harness": "v1.3",
+   "collections": 250
+  },
+  "retest": {
+   "date": "2026-10-16",
+   "scope": "Every collection the census put in Lost, Failing or Walking dead (34) was re-tested through its own contract on 16 Oct 2026 and still failed. Marketplace results matched 13 Oct except the two below."
+  },
+  "frozen_flags": {
+   "read": false,
+   "collections": 0
+  }
+ },
+ "counts": "sample",
+ "collections": {
+  "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-nft": {
+   "id": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-nft",
+   "name": "Megapont Robots",
+   "chain": "stacks",
+   "tokens_approx": 1865,
+   "deployed": "2021-12-20",
+   "status": "not_found",
+   "census_bucket": "Lost",
+   "headline": "We couldn't find the art. The contract's link is dead and no marketplace copy loaded.",
+   "summary": "The contract points to Megapont's own API. The API still answers, but it no longer serves metadata or images, and the marketplace tiles are blank. We haven't found a public copy of the art.",
+   "evidence_level": "hand_checked",
+   "evidence": "Checked 13 Oct 2026 through the contract and through Gamma's image copy (0 of 16 loaded), and by eye on Gamma's collection page.",
+   "checked": {
+    "contract": "2026-10-16",
+    "marketplace": "2026-10-13"
+   },
+   "contract": {
+    "reaches_art": false,
+    "state": "dead"
+   },
+   "marketplace": {
+    "loaded": 0,
+    "sampled": 16,
+    "state": "none load",
+    "host": "web",
+    "single_pinata_account": false
+   },
+   "art": {
+    "storage": "own_server",
+    "hosts": null
+   },
+   "owner": {
+    "has_uri_setter": true,
+    "freeze_mentioned": true,
+    "frozen": null,
+    "frozen_state": null,
+    "frozen_read_at": null
+   },
+   "facts": [
+    "Megapont API answers but no longer serves metadata or images; Gamma tiles blank (checked by eye for Megapont Robots)"
+   ],
+   "helper": null,
+   "good": [
+    "The contract has a function for changing the token link, so the dead link may be repairable; we haven't yet checked whether it has been locked."
+   ],
+   "worry": [
+    "The contract's own link no longer reaches the art.",
+    "None of the 16 sampled marketplace images loaded."
+   ]
+  },
+  "SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles": {
+   "id": "SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles",
+   "name": "Satoshibles",
+   "chain": "stacks",
+   "tokens_approx": 5000,
+   "deployed": "2022-02-04",
+   "status": "one_host",
+   "census_bucket": "Fragile",
+   "headline": "The contract reaches the art today, but it rests on a single host or server.",
+   "summary": "Art and metadata are served by the creator's own servers. They work today; they depend on those servers staying up.",
+   "evidence_level": "hand_checked",
+   "evidence": "13 Oct 2026 census (16 of 16 marketplace images loaded).",
+   "checked": {
+    "contract": "2026-10-13",
+    "marketplace": "2026-10-13"
+   },
+   "contract": {
+    "reaches_art": true,
+    "state": "works"
+   },
+   "marketplace": {
+    "loaded": 16,
+    "sampled": 16,
+    "state": "all load",
+    "host": "web",
+    "single_pinata_account": false
+   },
+   "art": {
+    "storage": "own_server",
+    "hosts": null
+   },
+   "owner": {
+    "has_uri_setter": true,
+    "freeze_mentioned": true,
+    "frozen": null,
+    "frozen_state": null,
+    "frozen_read_at": null
+   },
+   "facts": [],
+   "helper": null,
+   "good": [
+    "The contract's own link still reaches the art.",
+    "Marketplace images loaded for all 16 sampled pieces."
+   ],
+   "worry": [
+    "The art is served from the project's own server.",
+    "The contract has a function for changing the token link, and we haven't yet checked whether it has been locked."
+   ]
+  },
+  "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds": {
+   "id": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds",
+   "name": "Bitcoin Birds",
+   "chain": "stacks",
+   "tokens_approx": 400,
+   "deployed": "2021-10-03",
+   "status": "marketplace_only",
+   "census_bucket": "Walking dead",
+   "headline": "The contract's link no longer reaches the art. It shows only because the marketplace kept a copy.",
+   "summary": "The contract points every token at one stacksart.com file that is now a web page. The marketplace shows the art from a Pinata IPFS folder that the contract never names.",
+   "evidence_level": "hand_checked",
+   "evidence": "13 Oct 2026 census; manifest built through a local IPFS node on 8 Oct (400 of 400 fetched).",
+   "checked": {
+    "contract": "2026-10-16",
+    "marketplace": "2026-10-13"
+   },
+   "contract": {
+    "reaches_art": false,
+    "state": "shared-file"
+   },
+   "marketplace": {
+    "loaded": 16,
+    "sampled": 16,
+    "state": "all load",
+    "host": "ipfs(pinata-gw)",
+    "single_pinata_account": true
+   },
+   "art": {
+    "storage": "none_per_token",
+    "hosts": "pinata_only"
+   },
+   "owner": {
+    "has_uri_setter": true,
+    "freeze_mentioned": false,
+    "frozen": null,
+    "frozen_state": null,
+    "frozen_read_at": null
+   },
+   "facts": [
+    "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+   ],
+   "helper": {
+    "state": "live",
+    "twins": 400,
+    "of": 400,
+    "note": "All 400 pieces were twinned on chain.",
+    "as_of": "2026-10-13"
+   },
+   "good": [
+    "Marketplace images loaded for all 16 sampled pieces.",
+    "The contract has a function for changing the token link, so the dead link may be repairable; we haven't yet checked whether it has been locked.",
+    "Every piece in this collection already has a permanent on-chain twin (as of 13 Oct 2026)."
+   ],
+   "worry": [
+    "The contract's own link no longer reaches the art.",
+    "What the marketplace shows comes from its own copy of the art, not from the contract.",
+    "The marketplace's copy is served from a single Pinata account.",
+    "When we tested, only Pinata held the art on the IPFS network. That shows who holds it today, not how long they will."
+   ]
+  },
+  "SPV8C2N59MA417HYQNG6372GCV0SEQE01EV4Z1RQ.stacks-invaders-v0": {
+   "id": "SPV8C2N59MA417HYQNG6372GCV0SEQE01EV4Z1RQ.stacks-invaders-v0",
+   "name": "Stacks Invaders",
+   "chain": "stacks",
+   "tokens_approx": 3494,
+   "deployed": "2024-06-08",
+   "status": "on_chain",
+   "census_bucket": "On chain",
+   "headline": "The art can be rebuilt from the contract itself.",
+   "summary": null,
+   "evidence_level": "sampled",
+   "evidence": null,
+   "checked": {
+    "contract": "2026-10-13",
+    "marketplace": "2026-10-13"
+   },
+   "contract": {
+    "reaches_art": true,
+    "state": "works"
+   },
+   "marketplace": {
+    "loaded": 16,
+    "sampled": 16,
+    "state": "all load",
+    "host": "ipfs(pinata-gw)",
+    "single_pinata_account": true
+   },
+   "art": {
+    "storage": "ipfs",
+    "hosts": "pinata_only"
+   },
+   "owner": {
+    "has_uri_setter": true,
+    "freeze_mentioned": true,
+    "frozen": null,
+    "frozen_state": null,
+    "frozen_read_at": null
+   },
+   "facts": [
+    "contract can rebuild the image on chain (SVG function)"
+   ],
+   "helper": null,
+   "good": [
+    "The contract can rebuild the image on chain, so the picture itself doesn't depend on an outside file.",
+    "The contract's own link still reaches the art.",
+    "Marketplace images loaded for all 16 sampled pieces."
+   ],
+   "worry": [
+    "The standard token link still points to a file on IPFS.",
+    "The contract has a function for changing the token link, and we haven't yet checked whether it has been locked."
+   ]
+  },
+  "SP13FGF6PCW49BG2FB64TQ6VG5HFJ39E5S98ZM07Q.project-indigo-equipment-series-2": {
+   "id": "SP13FGF6PCW49BG2FB64TQ6VG5HFJ39E5S98ZM07Q.project-indigo-equipment-series-2",
+   "name": "Project Indigo Equipment Series 2",
+   "chain": "stacks",
+   "tokens_approx": 979,
+   "deployed": "2023-04-06",
+   "status": "solid",
+   "census_bucket": "Healthy",
+   "headline": "The contract reaches the art and several independent hosts hold it.",
+   "summary": null,
+   "evidence_level": "sampled",
+   "evidence": null,
+   "checked": {
+    "contract": "2026-10-13",
+    "marketplace": "2026-10-13"
+   },
+   "contract": {
+    "reaches_art": true,
+    "state": "works"
+   },
+   "marketplace": {
+    "loaded": 16,
+    "sampled": 16,
+    "state": "all load",
+    "host": "ipfs(pinata-gw)",
+    "single_pinata_account": true
+   },
+   "art": {
+    "storage": "ipfs",
+    "hosts": "several"
+   },
+   "owner": {
+    "has_uri_setter": false,
+    "freeze_mentioned": false,
+    "frozen": null,
+    "frozen_state": null,
+    "frozen_read_at": null
+   },
+   "facts": [],
+   "helper": null,
+   "good": [
+    "The contract's own link still reaches the art.",
+    "Marketplace images loaded for all 16 sampled pieces.",
+    "When we tested, several independent hosts held the art on IPFS.",
+    "We didn't find a function for changing the token link."
+   ],
+   "worry": []
+  },
+  "SP000000000000000000002Q6VF78.bns": {
+   "id": "SP000000000000000000002Q6VF78.bns",
+   "name": "BNS: Bitcoin Name System (V1 - Legacy)",
+   "chain": "stacks",
+   "tokens_approx": null,
+   "deployed": null,
+   "status": "not_art",
+   "census_bucket": "Not artwork",
+   "headline": "This isn't an art collection, so there is no art to preserve here.",
+   "summary": null,
+   "evidence_level": "sampled",
+   "evidence": null,
+   "checked": {
+    "contract": "2026-10-13",
+    "marketplace": "2026-10-13"
+   },
+   "contract": {
+    "reaches_art": false,
+    "state": "uri-error"
+   },
+   "marketplace": {
+    "loaded": 10,
+    "sampled": 16,
+    "state": "partial",
+    "host": "ipfs(pinata-gw)",
+    "single_pinata_account": true
+   },
+   "art": {
+    "storage": null,
+    "hosts": "pinata_only"
+   },
+   "owner": {
+    "has_uri_setter": false,
+    "freeze_mentioned": false,
+    "frozen": null,
+    "frozen_state": null,
+    "frozen_read_at": null
+   },
+   "facts": [],
+   "helper": null,
+   "good": [],
+   "worry": []
+  },
+  "SP2MK912MX96JXJ5A6R92KV64P7J7ZWDWPZ9PJG6C.spacepepesbtc": {
+   "id": "SP2MK912MX96JXJ5A6R92KV64P7J7ZWDWPZ9PJG6C.spacepepesbtc",
+   "name": "Space Pepes",
+   "chain": "stacks",
+   "tokens_approx": 41,
+   "deployed": "2022-04-25",
+   "status": "marketplace_broken",
+   "census_bucket": "Marketplace copy broken",
+   "headline": "The contract still reaches the art, but the marketplace's copy is partly broken.",
+   "summary": null,
+   "evidence_level": "sampled",
+   "evidence": null,
+   "checked": {
+    "contract": "2026-10-13",
+    "marketplace": "2026-10-13"
+   },
+   "contract": {
+    "reaches_art": true,
+    "state": "works"
+   },
+   "marketplace": {
+    "loaded": 10,
+    "sampled": 16,
+    "state": "partial",
+    "host": "ipfs(pinata-gw)",
+    "single_pinata_account": true
+   },
+   "art": {
+    "storage": "ipfs",
+    "hosts": "pinata_only"
+   },
+   "owner": {
+    "has_uri_setter": true,
+    "freeze_mentioned": true,
+    "frozen": null,
+    "frozen_state": null,
+    "frozen_read_at": null
+   },
+   "facts": [],
+   "helper": null,
+   "good": [
+    "The contract's own link still reaches the art."
+   ],
+   "worry": [
+    "Marketplace images loaded for only 10 of 16 sampled pieces.",
+    "When we tested, only Pinata held the art on the IPFS network. That shows who holds it today, not how long they will.",
+    "The contract has a function for changing the token link, and we haven't yet checked whether it has been locked."
+   ]
+  }
+ }
+}

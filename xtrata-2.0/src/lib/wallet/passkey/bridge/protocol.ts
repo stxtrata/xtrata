@@ -34,14 +34,80 @@ export type WalletMethod =
   /** Pre-sign a session-wallet return for the server to hold. */
   | 'wallet.preSignReturn'
   /** Display the recovery phrase inside the iframe. Returns acknowledgement only. */
-  | 'wallet.revealPhrase';
+  | 'wallet.revealPhrase'
+  /*
+   * Temporary listening wallet (radio pay-per-play). Its key is derived from the
+   * passkey on unlock and never stored; see src/lib/listening-wallet/derive.ts.
+   */
+  /** Device state, address, linked main wallet and session summary. */
+  | 'listening.status'
+  /** Create or unlock with a passkey; the listener taps a button inside the frame. */
+  | 'listening.unlock'
+  /** Verify the main wallet's link signature and countersign with the listening key. */
+  | 'listening.link'
+  /** Ask the listener (inside the frame) to approve session spending terms. */
+  | 'listening.approveSession'
+  /** Sign one paid play within the approved session. Returns signed bytes only. */
+  | 'listening.signPlay'
+  /** Sign one radio like/unlike within the approved session (network fee only). */
+  | 'listening.signLike'
+  /** Show a return review inside the frame; sign only if the listener confirms. */
+  | 'listening.prepareReturn'
+  /** Address of one of this passkey's derived wallets (unlocked only; moves nothing). */
+  | 'listening.slotAddress'
+  /** Switch the open wallet to another of this passkey's wallets, without another passkey tap. */
+  | 'listening.openSlot'
+  /** Both the first wallet and the derived one sign that they belong together (no spending, no popup). */
+  | 'listening.bindSlot'
+  /** Withdraw a waiting panel, as if the listener pressed Cancel. Can never approve anything. */
+  | 'listening.cancel'
+  /** Stop paying but stay unlocked. */
+  | 'listening.stop'
+  /** Drop the key from memory. */
+  | 'listening.lock'
+  /*
+   * ParallaX Casino testnet wallet (casino-wallet.xtrata.xyz, a SEPARATE wallet origin from the radio's).
+   * See src/lib/casino-wallet/ and docs/plans/CASINO-PASSKEY-WALLET-PLAN.md. A radio box does not implement these,
+   * and the casino box implements only these.
+   */
+  /** Device state and, while open, the wallet's address. */
+  | 'casino.status'
+  /** Create, unlock or open the no-passkey wallet; the player taps a button inside the frame. Also approves buys. */
+  | 'casino.open'
+  /** Sign one 1-10 STX testnet transfer to the LAYR exchange. Returns signed bytes only. */
+  | 'casino.signBuy'
+  /** Sign the casino room's free sign-in sentence for the wallet's own address. Returns the signature only. */
+  | 'casino.signRoomJoin'
+  /** Withdraw a waiting panel, as if the player pressed Cancel. Can never approve anything. */
+  | 'casino.cancel'
+  /** Drop the key from memory. */
+  | 'casino.lock';
 
 export const WALLET_METHODS: readonly WalletMethod[] = [
   'wallet.status',
   'wallet.create',
   'wallet.sign',
   'wallet.preSignReturn',
-  'wallet.revealPhrase'
+  'wallet.revealPhrase',
+  'listening.status',
+  'listening.unlock',
+  'listening.link',
+  'listening.approveSession',
+  'listening.signPlay',
+  'listening.signLike',
+  'listening.prepareReturn',
+  'listening.slotAddress',
+  'listening.openSlot',
+  'listening.bindSlot',
+  'listening.cancel',
+  'listening.stop',
+  'listening.lock',
+  'casino.status',
+  'casino.open',
+  'casino.signBuy',
+  'casino.signRoomJoin',
+  'casino.cancel',
+  'casino.lock'
 ];
 
 export interface BridgeRequest {

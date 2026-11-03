@@ -93,6 +93,9 @@ function build() {
   if (Number(ids.bundleId) > 0 && existsSync(V13)) hashes[ids.bundleId] = sha(readFileSync(V13));
   for (const name of P.PACK_ORDER) if (Number(ids.packs?.[name]) > 0) hashes[ids.packs[name]] = manifest.packs[name].sha256;
   for (const [name, id] of Object.entries(ids.parts || {})) if (Number(id) > 0) hashes[id] = sha(parts[name]);
+  // Rooms are not part of the parent: a room is its own inscription, named by its space's entry in the world registry
+  // (set-space-entry: id, chain hash, size), and the hall reads it from there (docs/room-bridge.md).
+  if (ids.rooms) throw new Error('parent/ids.json: "rooms" is gone. A room is the entry of its space in the world registry (docs/room-bridge.md)');
   const config = R.parentConfig({ ...ids, hashes }, P.PACK_ORDER);
   const parent = R.fillParent(shell, config);
   writeFileSync(join(DIST, 'xtrata-arcade-parent.html'), parent);

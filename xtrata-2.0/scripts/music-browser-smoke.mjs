@@ -98,7 +98,7 @@ try {
   );
   await page.goto(base + '/music/');
   assert.equal(await page.locator('.music-format-card').count(), 3);
-  assert(await page.locator('input[name=musicReleaseFormat][value=details]').isChecked());
+  assert(await page.locator('input[name=musicReleaseFormat][value=artwork]').isChecked());
   await page.locator('input[name=musicReleaseFormat][value=audio]').check();
   assert(await page.locator('#musicAppearancePanel').isHidden());
   await page.locator('input[name=musicReleaseFormat][value=details]').check();
@@ -284,9 +284,10 @@ try {
     'studio',
     'studio'
   ]);
-  await page.locator('.sbrow button[title="Edit this track"]').first().click();
-  assert(await page.locator('#sbGo').isDisabled());
+  await page.locator('.sbrow button[title^="Edit every detail"]').first().click();
+  await page.locator('#trackEditor summary', { hasText: 'Player style and audio' }).click();
   await page.locator('#trackEditor [data-style="sleeve"]').click();
+  assert(await page.locator('#sbGo').isDisabled());
   await page.locator('#track-artist').fill('Batch artist');
   await page.locator('#shareTrack').click();
   await page.waitForFunction(() => !document.querySelector('#sbGo').disabled);

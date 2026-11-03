@@ -1,0 +1,162 @@
+{
+ "SPNWZ5V2TPWGQGVDR6T7B6RQ4XMGZ4PXTEE0VQ0S.monkey-coin": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SPNWZ5V2TPWGQGVDR6T7B6RQ4XMGZ4PXTEE0VQ0S.theopetra-knight": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SPNWZ5V2TPWGQGVDR6T7B6RQ4XMGZ4PXTEE0VQ0S.theopetra-king": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SPNWZ5V2TPWGQGVDR6T7B6RQ4XMGZ4PXTEE0VQ0S.theopetra-pawn": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SPNWZ5V2TPWGQGVDR6T7B6RQ4XMGZ4PXTEE0VQ0S.theopetra-rook": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.btc-sports-flags-nft": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SP3BRRCHKMPBR60V8ES9J5YF40VXWMABWXK4SEB9G.loop-isle": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SPQ5CEHETP8K4Q2FSNNK9ANMPAVBSA9NN86YSN59.stxstone": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SP3QT6SNEAB5CM96X37G9Q81NZQ981A5ETKHZ4FVF.rune-badge": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.indigo-act1-music": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SPKYZ54NDRA04F3HJA2HMCCYX9J63M6FFD3TKZ9M.acid-hearts": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SP1CSHTKVHMMQJ7PRQRFYW6SB4QAW6SR3XY2F81PA.crash-punks-vip-pass": {
+  "contract_state": "works",
+  "note": "art is a video (metadata \"video\" field); video file checked and loads"
+ },
+ "SPNWZ5V2TPWGQGVDR6T7B6RQ4XMGZ4PXTEE0VQ0S.stacculents": {
+  "contract_state": "works-template",
+  "note": "metadata uses \"imageUrl\"; image loads through public IPFS gateways"
+ },
+ "SP2Z2BST4Z2RFSDTF7GJ4D07VXCFRBRTR1JPCCE7J.spooky-staccs": {
+  "contract_state": "works-template",
+  "note": "metadata uses \"imageUrl\"; image loads through public IPFS gateways"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-giantpandas": {
+  "contract_state": "works-template",
+  "note": "contract points at a folder; metadata image link uses the dead stacksart.mypinata.cloud gateway, but the image is still on IPFS"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-skaters": {
+  "contract_state": "works-template",
+  "note": "contract points at a folder; metadata image link uses the dead stacksart.mypinata.cloud gateway, but the image is still on IPFS"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.shapes": {
+  "contract_state": "shared-file",
+  "note": "contract points at an IPFS folder; no per-token file found in it"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.genesis-64": {
+  "contract_state": "shared-file",
+  "note": "contract points at an IPFS folder; no per-token file found in it"
+ },
+ "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.odins-raven": {
+  "contract_state": "works",
+  "note": "metadata confirmed by a second fetch; some images on charisma.rocks fail to load"
+ },
+ "SP497E7RX3233ATBS2AB9G4WTHB63X5PBSP5VGAQ.boom-nfts": {
+  "contract_state": "uri-error",
+  "note": "contract has no standard get-token-uri function"
+ },
+ "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-nft": {
+  "contract_state": "dead",
+  "note": "Megapont API answers but no longer serves metadata or images; Gamma tiles blank (checked by eye for Megapont Robots)"
+ },
+ "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-component-nft": {
+  "contract_state": "dead",
+  "note": "Megapont API answers but no longer serves metadata or images; Gamma tiles blank (checked by eye for Megapont Robots)"
+ },
+ "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-expansion-nft": {
+  "contract_state": "dead",
+  "note": "Megapont API answers but no longer serves metadata or images; Gamma tiles blank (checked by eye for Megapont Robots)"
+ },
+ "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-robot-component-expansion-nft": {
+  "contract_state": "dead",
+  "note": "Megapont API answers but no longer serves metadata or images; Gamma tiles blank (checked by eye for Megapont Robots)"
+ },
+ "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-space-agency": {
+  "contract_state": "dead",
+  "note": "Megapont API answers but no longer serves metadata or images; Gamma tiles blank (checked by eye for Megapont Robots)"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.blocks": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page; full art set still on IPFS folder QmaXgEN3\u2026 (Gamma's Pinata only)"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.citadels": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.zombie-wabbits": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.funky-donuts": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-pops": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.phases-of-satoshi": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stx-jokers": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stx-youth": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.virtual-tulips": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.blue-ridge-biker": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.entangled-flowers": {
+  "contract_state": "shared-file",
+  "note": "every token points at one stacksart.com file, which now returns the Stacks Art web page"
+ },
+ "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3": {
+  "contract_state": "shared-file",
+  "note": "every token points at one collection-level punks.json; no per-token art in it"
+ },
+ "SP1QK1AZ24R132C0D84EEQ8Y2JDHARDR58R72E1ZW.boomboxes-cycle-16": {
+  "contract_state": "shared-file",
+  "note": "link written to cloudflare-ipfs.com, a gateway that has shut down; file not found elsewhere"
+ },
+ "SP1QK1AZ24R132C0D84EEQ8Y2JDHARDR58R72E1ZW.boomboxes-cycle-18": {
+  "contract_state": "shared-file",
+  "note": "link written to cloudflare-ipfs.com, a gateway that has shut down; file not found elsewhere"
+ }
+}

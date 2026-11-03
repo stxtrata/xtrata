@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liar's Dice · The Strata Club</title>
+<link rel="stylesheet" href="strata-club.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="dgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#e7dcc0"/></linearGradient></defs></svg>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>The Strata Club</h1><span>Liar's Dice</span></div>
+    <div class="purse" id="purse"></div>
+  </header>
+  <div class="tabs" role="tablist" aria-label="Mode">
+    <button class="tab" role="tab" id="tab-play" aria-selected="true" data-tab="play">Practice table</button>
+    <button class="tab" role="tab" id="tab-watch" aria-selected="false" data-tab="watch">Watch a testnet game</button>
+  </div>
+  <main id="app" aria-live="off"></main>
+  <div class="sr" id="live" aria-live="polite"></div>
+  <footer>
+    Practice mode runs the exact contract rules in your browser against a simulated chain and a bot opponent. Dice come from <code>sha256(seed ‖ block hash)</code>:
+    both seeds are committed first, then the deal block fixes the hash, so neither side can choose their dice. Test chips only.
+  </footer>
+</div>
+
+<script src="strata-dice-model.js"></script>
+<script>
+(() => {
+'use strict';
+const M = window.DiceModel, S = M.S;
+const $ = (s, r = document) => r.querySelector(s);
+const rand32 = () => crypto.getRandomValues(new Uint8Array(32));
+const fmt = (n) => n.toLocaleString('en-GB');
+const FACE_NAME = ['', 'ones', 'twos', 'threes', 'fours', 'fives', 'sixes'];
+const PIPS = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]], 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]], 6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]] };
+function dieSVG(n, cls = '', style = '') {
+  if (!n) return `<svg class="die ${cls}" style="${style}" viewBox="0 0 100 100" role="img" aria-label="hidden die"><rect x="4" y="4" width="92" height="92" rx="20" fill="#1c1514" stroke="#d4af37" stroke-width="3"/><text x="50" y="66" text-anchor="middle" font-family="Georgia,serif" font-size="46" fill="#d4af37">?</text></svg>`;
+  const pips = PIPS[n].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9.5" fill="${n === 1 ? '#8a2433' : '#1b1410'}"/>`).join('');
+  return `<svg class="die ${cls}" style="${style}" viewBox="0 0 100 100" role="img" aria-label="die showing ${n}"><rect x="4" y="4" width="92" height="92" rx="20" fill="url(#dgrad)" stroke="#bda46a" stroke-width="2.5"/>${pips}</svg>`;
+}
+
+// ---------------- simulated chain ----------------
+const BLOCK_MS = 3000;
+const sim = {
+  height: 1000, hashes: {}, queue: [], table: null, game: null, id: null,
+  me: 'YOU', bot: 'BOT', role: 'creator', mySeed: null, botSeed: null, botDice: null, myDice: null,
+  history: [], botTimer: null, botKey: '', banner: null, started: false, odds: true, pick: { q: 1, f: 2 }, lastRevealShown: false, rolled: false, wasMyTurn: false
+};
+function newTable() {
+  sim.table = M.createTable({ rakeBps: 200, rakeTo: 'HOUSE', balances: { YOU: 1000, BOT: 1000, HOUSE: 0 } });
+}
+newTable();
+const ctx = () => ({ time: Math.floor(Date.now() / 1000), height: sim.height, hashAt: (h) => sim.hashes[h] || null });
+const G = () => (sim.id ? sim.table.games.get(sim.id) : null);
+
+// calls are confirmed by the next block, like the real chain
+function submit(label, fn) {
+  return new Promise((resolve) => sim.queue.push({ label, fn, resolve }));
+}
+function tick() {
+  sim.height++;
+  sim.hashes[sim.height] = rand32();
+  const q = sim.queue; sim.queue = [];
+  for (const item of q) item.resolve(item.fn(ctx()));
+  botThink();
+  render();
+}
+setInterval(tick, BLOCK_MS);
+sim.hashes[sim.height] = rand32();
+
+// ---------------- bot ----------------
+function botKeyNow() { const g = G(); return g ? `${sim.id}:${g.state}:${g.qty}:${g.face}:${g.aToAct}:${!!g.diceB}` : ''; }
+function botDiceNow() {
+  const g = G(); if (!g || !sim.botSeed || ctx().height <= g.dealHeight) return null;
+  if (!sim.botDice) sim.botDice = M.deriveDice(sim.botSeed, sim.hashes[g.dealHeight]);
+  return sim.botDice;
+}
+function botThink() {
+  const g = G(); if (!g) return;
+  const key = botKeyNow();
+  if (key === sim.botKey) return;
+  sim.botKey = key; clearTimeout(sim.botTimer);
+  const delay = 1800 + Math.random() * 3200;
+  if (g.state === S.OPEN && sim.role === 'joiner') return;
+  if (g.state === S.BIDDING && ctx().height > g.dealHeight) {
+    const botIsA = g.a === sim.bot, botActs = (g.aToAct ? g.a : g.b) === sim.bot;
+    if (!botActs) return;
+    sim.botTimer = setTimeout(() => botAct(), delay);
+  } else if (g.state === S.REVEAL && !(botIsA(g) ? g.diceA : g.diceB)) {
+    sim.botTimer = setTimeout(() => submit('bot reveal', (c) => sim.table.reveal(c, sim.bot, sim.id, sim.botSeed)), 900 + Math.random() * 1800);
+  } else if (g.state === S.OPEN && sim.role === 'creator') {
+    sim.botTimer = setTimeout(() => submit('bot joins', (c) => { sim.botSeed = rand32(); return sim.table.join(c, sim.bot, sim.id, M.sha256(sim.botSeed)); }), 1500 + Math.random() * 1500);
+  }
+}
+const botIsA = (g) => g.a === sim.bot;
+function botAct() {
+  const g = G(); if (!g || g.state !== S.BIDDING) return;
+  const dice = botDiceNow(); if (!dice) return;
+  const opts = M.nextBids(g);
+  if (g.qty > 0) {
+    const p = M.oddsBidTrue(dice, g.qty, g.face);
+    const callThreshold = 0.22 + Math.random() * 0.12;
+    if (p < callThreshold || !opts.length) { submit('bot challenges', (c) => sim.table.challenge(c, sim.bot, sim.id)); return; }
+  }
+  // choose the safest raise, with an occasional bluff
+  const scored = opts.map(([q, f]) => ({ q, f, p: M.oddsBidTrue(dice, q, f) })).sort((a, b) => b.p - a.p || (a.q - b.q));
+  let pick = scored[0];
+  if (Math.random() < 0.18) pick = scored[Math.min(scored.length - 1, 2 + Math.floor(Math.random() * 3))];
+  if (g.qty === 0) { const best = scored.filter((x) => x.q <= 4); pick = best[Math.floor(Math.random() * Math.min(3, best.length))] || scored[0]; }
+  submit('bot bids', (c) => sim.table.bid(c, sim.bot, sim.id, pick.q, pick.f));
+}
+
+// ---------------- player actions ----------------
+async function startTable(role, stake, turn) {
+  newTable(); Object.assign(sim, { id: null, role, mySeed: rand32(), botSeed: rand32(), botDice: null, myDice: null, botKey: '', banner: null, started: true, rolled: false, pick: { q: 1, f: 2 }, wasMyTurn: false, lastRevealShown: false });
+  clearTimeout(sim.botTimer);
+  const open = 600;
+  if (role === 'creator') {
+    const r = await submit('create', (c) => sim.table.create(c, sim.me, { stake, turn, open, commit: M.sha256(sim.mySeed) }));
+    sim.id = r.ok;
+  } else {
+    const r = await submit('bot creates', (c) => sim.table.create(c, sim.bot, { stake, turn, open, commit: M.sha256(sim.botSeed) }));
+    sim.id = r.ok;
+    await submit('join', (c) => sim.table.join(c, sim.me, sim.id, M.sha256(sim.mySeed)));
+  }
+  say('Table opened. Waiting for the next block.');
+  render();
+}
+async function doBid() {
+  const g = G(); const { q, f } = sim.pick; busy(true);
+  const r = await submit('bid', (c) => sim.table.bid(c, sim.me, sim.id, q, f));
+  busy(false); if (r.err) say('That bid was refused (code ' + r.err + ').'); render();
+}
+async function doChallenge() { busy(true); const r = await submit('challenge', (c) => sim.table.challenge(c, sim.me, sim.id)); busy(false); if (r.err) say('Refused (code ' + r.err + ').'); render(); }
+async function doReveal() { busy(true); const r = await submit('reveal', (c) => sim.table.reveal(c, sim.me, sim.id, sim.mySeed)); busy(false); if (r.err) say('Refused (code ' + r.err + ').'); render(); }
+async function doClaim() { busy(true); const r = await submit('claim', (c) => sim.table.claimTimeout(c, sim.id)); busy(false); render(); }
+async function doCancel() { busy(true); await submit('cancel', (c) => sim.table.cancelOpen(c, sim.me, sim.id)); busy(false); render(); }
+let isBusy = false; const busy = (b) => { isBusy = b; render(); };
+function say(t) { const l = $('#live'); if (l) l.textContent = t; }
+
+// ---------------- derived view ----------------
+function myDiceNow() {
+  const g = G(); if (!g || ctx().height <= g.dealHeight || !g.dealHeight) return null;
+  const h = sim.hashes[g.dealHeight]; if (!h) return null;
+  if (!sim.myDice) { sim.myDice = M.deriveDice(sim.mySeed, h); sim.rolled = false; }
+  return sim.myDice;
+}
+function bidsFor(id) { return sim.table.log.filter((e) => e.event === 'bid' && e.id === id); }
+const pname = (p) => (p === sim.me ? 'You' : p === sim.bot ? 'Bot' : p);
+const clock = (s) => { s = Math.max(0, s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+// ---------------- rendering: play ----------------
+function renderPurse() {
+  const b = sim.table.bal;
+  $('#purse').innerHTML = `<span class="pill">Your chips <b>${fmt(b.YOU)}</b> LAYR</span><span class="pill">Rake pot <b>${fmt(b.HOUSE)}</b></span>`;
+}
+function renderLobby() {
+  return `<div class="lobby">
+    <section class="card"><h2>Open a table</h2><p>You post the stake and bid first. The bot sits down after a moment. Five dice each, ten in play, no wilds. Raise the bid or call the other player a liar.</p>
+      <div class="row"><label class="f">Stake (LAYR)<select id="stake"><option>10</option><option selected>50</option><option>100</option><option>250</option></select></label>
+      <label class="f">Turn clock<select id="turn"><option value="30">30 s</option><option value="60" selected>60 s</option><option value="90">90 s</option></select></label></div>
+      <div class="actions"><button class="btn" data-act="open">Open table</button></div></section>
+    <section class="card"><h2>Sit at the bot's table</h2><p>The bot has posted a stake. You match it and the bot bids first. Good for learning how the second seat feels.</p>
+      <div class="row"><label class="f">Stake (LAYR)<select id="stake2"><option>10</option><option selected>50</option><option>100</option></select></label>
+      <label class="f">Turn clock<select id="turn2"><option value="30">30 s</option><option value="60" selected>60 s</option><option value="90">90 s</option></select></label></div>
+      <div class="actions"><button class="btn ghost" data-act="sit">Take the seat</button></div></section>
+    <section class="card" style="grid-column:1/-1"><h2>The rules in a minute</h2>
+      <ol style="margin:0;padding-left:20px;color:var(--muted);font-size:14px;line-height:1.7">
+        <li>Each player locks in a secret seed. A block later, the chain deals both hands from it. Only you can see your five dice.</li>
+        <li>Take turns bidding how many dice of one face are on the table in total, yours and theirs together. Each bid must raise the last: a bigger number, or the same number of a higher face.</li>
+        <li>Think the last bid is too high? Call <b style="color:var(--cream)">Liar</b>. Both seeds are revealed and the dice are counted: if the bid holds, the bidder wins the pot, otherwise the caller does.</li>
+        <li>Run out of time and the other player takes the pot. A small rake goes to the house.</li>
+      </ol></section>
+  </div>`;
+}
+function ringSVG(frac) {
+  const r = 28, c = 2 * Math.PI * r;
+  return `<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="5"/><circle cx="32" cy="32" r="${r}" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - Math.max(0, Math.min(1, frac)))}"/></svg>`;
+}
+function statusText(g, c) {
+  const myTurn = (g.aToAct ? g.a : g.b) === sim.me;
+  switch (g.state) {
+    case S.OPEN: return sim.role === 'creator' ? 'Your stake is on the table. Waiting for an opponent.' : 'Waiting for the table to open.';
+    case S.BIDDING:
+      if (c.height <= g.dealHeight) return 'Both seeds are locked in. The dice are dealt from the next block.';
+      if (g.qty === 0) return myTurn ? 'Your dice are in. Make the opening bid.' : 'Bot is studying its dice.';
+      return myTurn ? 'Your turn. Raise the bid, or call liar.' : 'Bot is thinking.';
+    case S.REVEAL: return g.diceA && g.diceB ? 'Settling.' : 'Liar called. Both players reveal their seeds so the dice can be counted.';
+    case S.DONE: return '';
+    default: return 'Table closed.';
+  }
+}
+function validBid(g, q, f) { return q >= 1 && q <= 10 && f >= 1 && f <= 6 && (g.qty === 0 || q > g.qty || (q === g.qty && f > g.face)); }
+function nudgePick(g) {
+  const p = sim.pick;
+  if (!validBid(g, p.q, p.f)) {
+    const opts = M.nextBids(g); if (opts.length) {
+      const same = opts.find(([q, f]) => q === Math.max(g.qty, 1) && f >= p.f) || opts[0]; sim.pick = { q: same[0], f: same[1] };
+    }
+  }
+}
+function renderTable() {
+  const g = G(), c = ctx(); if (!g) return '';
+  const mine = myDiceNow(), me = sim.me;
+  const iAmA = g.a === me; const opp = iAmA ? g.b || sim.bot : g.a;
+  const oppRevealed = (iAmA ? g.diceB : g.diceA);
+  const myRevealed = (iAmA ? g.diceA : g.diceB);
+  const done = g.state === S.DONE || g.state === S.CANCELLED;
+  const myTurn = g.state === S.BIDDING && (g.aToAct ? g.a : g.b) === me && c.height > g.dealHeight;
+  const secs = g.deadline ? g.deadline - c.time : 0;
+  const frac = g.deadline && g.state >= S.BIDDING && g.state <= S.REVEAL ? secs / (g.state === S.REVEAL ? M.LIMITS.REVEAL_SECS : g.turn + (g.qty === 0 ? M.LIMITS.DEAL_GRACE : 0)) : 0;
+  const ringCls = secs <= 5 ? 'crit' : secs <= 10 ? 'low' : '';
+  const timerShown = g.state === S.BIDDING || g.state === S.REVEAL;
+  const showFaces = done && myRevealed && oppRevealed;
+  const hitFace = g.face;
+  const oppDice = showFaces ? oppRevealed : [0, 0, 0, 0, 0];
+  const myShown = mine ? (showFaces ? myRevealed : mine) : [0, 0, 0, 0, 0];
+  const rollCls = mine && !sim.rolled ? 'roll' : '';
+  const dice = (arr, who) => arr.map((d) => dieSVG(d, (done && d && d === hitFace && g.qty ? 'hit ' : '') + (who === 'me' ? rollCls : ''))).join('');
+  const bids = bidsFor(sim.id);
+  const hist = bids.length ? `<ol>${bids.map((b) => `<li class="${b.by === me ? 'me' : ''}"><span class="by">${pname(b.by)}</span><strong>${b.qty}</strong> × ${dieSVG(b.face)} <span style="color:var(--muted)">${FACE_NAME[b.face]}</span></li>`).join('')}</ol>` : `<div class="empty">No bids yet.</div>`;
+  const bigBid = g.qty ? `<div class="bigbid"><span>${g.qty}</span><span class="x">×</span>${dieSVG(g.face)}</div><div class="chain-tag">${pname(bids.length ? bids[bids.length - 1].by : '')} bid ${g.qty} ${FACE_NAME[g.face]}</div>` : `<div class="bigbid" style="color:var(--muted);font-size:28px">No bid yet</div>`;
+  let banner = '';
+  if (g.state === S.DONE) {
+    const youWon = g.winner === me, pot = g.stake * 2, take = pot - g.rake;
+    const count = showFaces ? M.countFace(g.diceA, g.face) + M.countFace(g.diceB, g.face) : null;
+    const how = showFaces ? `Found ${count} ${FACE_NAME[g.face]}; the bid was ${g.qty}. ${count >= g.qty ? 'The bid stands.' : 'The bid fell short.'}` : 'The other player did not reveal in time.';
+    banner = `<div class="banner ${youWon ? 'win' : 'lose'}">${youWon ? `You win ${fmt(take)} LAYR` : `You lose ${fmt(g.stake)} LAYR`}</div><div class="status" style="text-align:center;margin:0 auto">${how} Rake ${g.rake}.</div>`;
+  } else if (g.state === S.CANCELLED) banner = `<div class="banner void">Table closed. Stakes returned.</div>`;
+  const canRaise = myTurn && !isBusy && validBid(g, sim.pick.q, sim.pick.f);
+  const canCall = myTurn && !isBusy && g.qty > 0;
+  const expiredNow = (g.state === S.BIDDING || g.state === S.REVEAL) && g.deadline && c.time >= g.deadline;
+  const odds = mine && g.state === S.BIDDING ? M.oddsBidTrue(mine, sim.pick.q, sim.pick.f) : null;
+  const faceButtons = [1, 2, 3, 4, 5, 6].map((f) => {
+    const ok = validBid(g, sim.pick.q, f);
+    return `<button data-face="${f}" aria-pressed="${sim.pick.f === f}" aria-label="${FACE_NAME[f]}" ${myTurn && !isBusy ? '' : 'disabled'}>${dieSVG(f)}</button>`;
+  }).join('');
+  const controls = done ? `<div class="actions"><button class="btn" data-act="again">Play again</button></div>` : `
+    <div class="picker">
+      <div class="stepper" aria-label="Quantity"><button data-q="-1" ${myTurn && !isBusy && sim.pick.q > 1 ? '' : 'disabled'} aria-label="fewer">−</button><output aria-live="off">${sim.pick.q}</output><button data-q="1" ${myTurn && !isBusy && sim.pick.q < 10 ? '' : 'disabled'} aria-label="more">+</button></div>
+      <div class="faces" role="group" aria-label="Face">${faceButtons}</div>
+      ${odds !== null && sim.odds ? `<div class="hint">Chance this holds, from your dice: <span class="odds">${Math.round(odds * 100)}%</span></div>` : ''}
+    </div>
+    <div class="actions">
+      <button class="btn" data-act="bid" ${canRaise ? '' : 'disabled'}>Bid ${sim.pick.q} × ${FACE_NAME[sim.pick.f]}</button>
+      <button class="btn liar" data-act="liar" ${canCall ? '' : 'disabled'}>Liar!</button>
+      ${g.state === S.OPEN ? `<button class="btn ghost" data-act="cancel">Cancel table</button>` : ''}
+      ${expiredNow ? `<button class="btn ghost" data-act="claim">Claim timeout</button>` : ''}
+      ${g.state === S.REVEAL && !myRevealed ? `<button class="btn" data-act="reveal" ${isBusy ? 'disabled' : ''}>Reveal my dice</button>` : ''}
+    </div>`;
+  const fair = fairness(g, c);
+  sim.timer = timerShown ? { cls: ringCls, svg: ringSVG(frac), text: clock(secs) } : null;
+  return `<div class="table"><div class="felt">
+    <div class="seat opp"><div class="who"><span class="name">Bot</span><span class="meta">${g.b || g.a === sim.bot ? 'seated' : 'arriving…'} · ${iAmA ? 'joiner' : 'creator'}</span><span class="stake">Stake ${g.stake} LAYR</span></div><div class="dice" aria-label="Opponent dice">${dice(oppDice, 'opp')}</div></div>
+    <div class="centre">
+      <div class="board"><div class="phase">${['Open table', 'Bidding', 'Reveal', 'Settled', 'Closed'][g.state]}${g.state === S.BIDDING && c.height <= g.dealHeight ? ' · dealing' : ''}</div>${bigBid}
+        ${timerShown ? `<div class="ring" id="timer" style="color:var(--brass)" role="timer" aria-label="seconds left"></div>` : ''}
+        <div class="status">${statusText(g, c)}</div>${banner}</div>
+      <aside class="history" aria-label="Bids"><h3>Bids</h3>${hist}</aside>
+    </div>
+    <div><div class="seat"><div class="who"><span class="name">You</span><span class="meta">${iAmA ? 'creator · bids first' : 'joiner'}</span><span class="stake">Stake ${g.stake} LAYR</span></div><div class="dice" aria-label="Your dice">${dice(myShown, 'me')}</div></div>
+      <div class="controls" style="margin-top:12px">${controls}</div>
+      <div class="row" style="margin-top:8px"><label class="hint"><input type="checkbox" id="oddsTog" ${sim.odds ? 'checked' : ''}> Odds helper</label></div></div>
+  </div></div>${fair}`;
+}
+function hex(u8) { return M.toHex(u8); }
+function fairness(g, c) {
+  const rows = [];
+  rows.push(`<div>Your commitment <code>${hex(M.sha256(sim.mySeed))}</code></div>`);
+  { const oc = iAmAOf(g) ? g.commitB : g.commitA; if (oc) rows.push(`<div>Opponent commitment <code>${hex(oc)}</code></div>`); }
+  if (g.dealHeight) rows.push(`<div>Deal block <b>#${g.dealHeight}</b>${sim.hashes[g.dealHeight] ? ` · hash <code>${hex(sim.hashes[g.dealHeight])}</code>` : ' · not mined yet'}</div>`);
+  if (g.diceA && g.diceB) {
+    const mySeedHex = hex(sim.mySeed), botSeedHex = hex(sim.botSeed);
+    const ok1 = hex(M.sha256(sim.mySeed)) === hex(iAmAOf(g) ? g.commitA : g.commitB), ok2 = hex(M.sha256(sim.botSeed)) === hex(iAmAOf(g) ? g.commitB : g.commitA);
+    rows.push(`<div>Your seed <code>${mySeedHex}</code> <span class="${ok1 ? 'ok' : 'no'}">${ok1 ? '✓ matches commitment' : '✗'}</span></div>`);
+    rows.push(`<div>Bot seed <code>${botSeedHex}</code> <span class="${ok2 ? 'ok' : 'no'}">${ok2 ? '✓ matches commitment' : '✗'}</span></div>`);
+  }
+  rows.push(`<div>Dice for a player = five numbers from <code>sha256(seed ‖ deal block hash)</code>, four bytes each, mod 6, plus 1. Nobody knows the hash when they commit, so nobody can choose dice. If you lose your seed you cannot reveal and the other player takes the pot, so the real table keeps it in a saved vault.</div>`);
+  return `<details class="fair"><summary>Fairness check</summary><div class="in">${rows.join('')}</div></details>`;
+}
+const iAmAOf = (g) => g.a === sim.me;
+
+function renderPlay() {
+  if (!sim.started || !sim.id) return renderLobby();
+  return renderTable();
+}
+
+// ---------------- rendering: watch a testnet game ----------------
+const WATCH = { base: 'https://api.testnet.hiro.so', contract: 'ST1Y19C7FK3RP0QP68Z577W30GDEHAWEG27G9WKJ0.casino-liars-dice-v1', id: 1, out: '', loading: false };
+function renderWatch() {
+  return `<section class="card"><h2>Watch a testnet game</h2><p>Reads the liar's dice contract on Stacks testnet and replays one game from its event log. Dice appear once both players have revealed.</p>
+    <div class="row"><label class="f">Game number<input type="number" id="gid" min="1" value="${WATCH.id}"></label><button class="btn" data-act="load">Load game</button></div>
+    <div class="chain-tag">${WATCH.contract}</div></section><div id="watchout" class="spectate-out" style="margin-top:14px">${WATCH.out}</div>`;
+}
+async function loadWatch() {
+  const id = Number($('#gid').value) || 1; WATCH.id = id; WATCH.loading = true; $('#watchout').innerHTML = '<div class="card"><p>Loading from the chain…</p></div>';
+  try {
+    let events = [], off = 0;
+    for (let i = 0; i < 6; i++) {
+      const r = await fetch(`${WATCH.base}/extended/v1/contract/${WATCH.contract}/events?limit=50&offset=${off}`); if (!r.ok) throw new Error('node said ' + r.status);
+      const j = await r.json(); events = events.concat(j.results); if (j.results.length < 50) break; off += 50;
+    }
+    const rows = events.reverse().map((e) => ({ repr: e.contract_log.value.repr, tx: e.tx_id })).filter((e) => new RegExp(`\\(id u${id}\\)`).test(e.repr));
+    if (!rows.length) { WATCH.out = '<div class="card"><p>No events for that game number yet.</p></div>'; $('#watchout').innerHTML = WATCH.out; return; }
+    const get = (repr, k) => { const m = new RegExp(`\\(${k} ('?[A-Z0-9.]+|u\\d+|"[^"]*"|\\(list[^)]*\\))\\)`).exec(repr); return m ? m[1] : null; };
+    const short = (p) => (p ? p.replace(/^'/, '').slice(0, 6) + '…' + p.slice(-4) : '?');
+    let html = '', dice = {}, face = null, qty = null, winner = null, pot = null, rake = null;
+    const line = (k, t) => `<div><span class="k">${k}</span><span>${t}</span></div>`;
+    const tl = rows.map(({ repr, tx }) => {
+      const ev = (get(repr, 'event') || '').replace(/"/g, '');
+      if (ev === 'created') return line('created', `${short(get(repr, 'a'))} posts ${get(repr, 'stake').slice(1)} LAYR · turn ${get(repr, 'turn-secs').slice(1)} s`);
+      if (ev === 'joined') return line('joined', `${short(get(repr, 'b'))} matches the stake · deal block #${get(repr, 'deal-height').slice(1)}`);
+      if (ev === 'bid') { qty = get(repr, 'qty').slice(1); face = Number(get(repr, 'face').slice(1)); return line('bid', `${short(get(repr, 'by'))} · ${qty} × ${dieSVG(face, '', 'width:18px;height:18px;vertical-align:-3px')} ${FACE_NAME[face]}`); }
+      if (ev === 'challenged') return line('liar!', `${short(get(repr, 'by'))} calls the bid`);
+      if (ev === 'revealed') { const d = (get(repr, 'dice') || '').match(/u(\d)/g).map((x) => Number(x.slice(1))); dice[get(repr, 'by')] = d; return line('revealed', `${short(get(repr, 'by'))} · ${d.map((x) => dieSVG(x, '', 'width:22px;height:22px;vertical-align:-5px;margin-right:2px')).join('')}`); }
+      if (ev === 'timeout') return line('timeout', get(repr, 'state') === 'u1' ? 'A player ran out of time to act' : 'The reveal window closed');
+      if (ev === 'settled') { winner = get(repr, 'winner'); pot = get(repr, 'pot').slice(1); rake = get(repr, 'rake').slice(1); return line('settled', `${short(winner)} takes ${pot - rake} LAYR (rake ${rake})`); }
+      if (ev === 'refunded') return line('refunded', 'Nobody revealed. Both stakes returned.');
+      if (ev === 'cancelled') return line('cancelled', 'Creator reclaimed the stake');
+      return line(ev, repr);
+    });
+    const all = Object.values(dice); let verdict = '';
+    if (all.length === 2 && face && qty) { const n = all.flat().filter((x) => x === face).length; verdict = `<div class="card"><p>Count of ${FACE_NAME[face]} across both hands: <b style="color:var(--cream)">${n}</b>. The bid was ${qty}, so it ${n >= qty ? 'stood' : 'fell short'}.</p></div>`; }
+    WATCH.out = `<div class="card"><h2>Game ${id}</h2><div class="timeline">${tl.join('')}</div></div>${verdict}`;
+  } catch (e) { WATCH.out = `<div class="card"><p>Could not read the chain from this page (${e.message}). The Hiro testnet API may be blocking this origin.</p></div>`; }
+  WATCH.loading = false; $('#watchout').innerHTML = WATCH.out;
+}
+
+// ---------------- shell ----------------
+let tab = 'play', lastHTML = '';
+function render() {
+  renderPurse(); $('#purse').style.visibility = tab === 'watch' ? 'hidden' : 'visible';
+  const g = G();
+  if (tab === 'play' && g) { nudgePick(g); if (sim.myDice && !sim.rolled) setTimeout(() => (sim.rolled = true), 700); }
+  if (tab === 'watch') { if (!$('#gid')) { $('#app').innerHTML = renderWatch(); } return; }
+  const html = renderPlay();
+  const active = document.activeElement && document.activeElement.id;
+  if (html !== lastHTML) { const keep = $('#oddsTog') && document.activeElement === $('#oddsTog'); $('#app').innerHTML = html; lastHTML = html; if (keep) $('#oddsTog').focus(); }
+  const tm = $('#timer'); if (tm && sim.timer) { tm.className = 'ring ' + sim.timer.cls; tm.innerHTML = sim.timer.svg + '<div class="t">' + sim.timer.text + '</div>'; }
+}
+setInterval(() => { if (tab === 'play' && G()) render(); }, 1000);
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button, input'); if (!t) return;
+  if (t.dataset.tab) { tab = t.dataset.tab; document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab))); lastHTML = ''; $('#app').innerHTML = tab === 'watch' ? renderWatch() : ''; render(); return; }
+  const g = G();
+  if (t.dataset.face) { sim.pick.f = Number(t.dataset.face); if (g && !validBid(g, sim.pick.q, sim.pick.f)) { const o = M.nextBids(g).find(([q, f]) => f === sim.pick.f && q >= sim.pick.q); if (o) sim.pick.q = o[0]; } lastHTML = ''; render(); return; }
+  if (t.dataset.q) { sim.pick.q = Math.max(1, Math.min(10, sim.pick.q + Number(t.dataset.q))); lastHTML = ''; render(); return; }
+  const a = t.dataset.act; if (!a) return;
+  if (a === 'open') startTable('creator', Number($('#stake').value), Number($('#turn').value));
+  else if (a === 'sit') startTable('joiner', Number($('#stake2').value), Number($('#turn2').value));
+  else if (a === 'bid') doBid(); else if (a === 'liar') doChallenge(); else if (a === 'reveal') doReveal();
+  else if (a === 'claim') doClaim(); else if (a === 'cancel') doCancel();
+  else if (a === 'again') { sim.started = false; sim.id = null; lastHTML = ''; render(); }
+  else if (a === 'load') loadWatch();
+});
+document.addEventListener('change', (e) => { if (e.target.id === 'oddsTog') { sim.odds = e.target.checked; lastHTML = ''; render(); } });
+
+// auto-reveal when a challenge lands (the real table does the same: your wallet signs once for the reveal)
+setInterval(() => { const g = G(); if (!g || tab !== 'play') return; const mineRevealed = g.a === sim.me ? g.diceA : g.diceB; if (g.state === S.REVEAL && !mineRevealed && !isBusy && !sim.autoRev) { sim.autoRev = true; doReveal().finally(() => (sim.autoRev = false)); } }, 800);
+// a stalled opponent or clock: bot claims against you if your time runs out
+setInterval(() => { const g = G(); if (!g || tab !== 'play') return; const c = ctx(); if ((g.state === S.BIDDING || g.state === S.REVEAL) && g.deadline && c.time >= g.deadline + 1 && !sim.claiming) { sim.claiming = true; submit('anyone claims timeout', (cc) => sim.table.claimTimeout(cc, sim.id)).finally(() => (sim.claiming = false)); } }, 1500);
+
+window.__strata = { sim, M, tick, submit, ctx, G };
+$('#app').innerHTML = renderPlay(); renderPurse();
+})();
+</script>
+</body>
+</html>

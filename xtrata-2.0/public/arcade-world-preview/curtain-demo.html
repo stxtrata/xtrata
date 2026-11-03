@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curtain demo (phase 3a)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0811; color: #f7efe0; font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+  #bay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 512px; height: 580px; }
+  /* what the curtain hangs in front of: a stand-in for a locked door with a sign */
+  #behind { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 60% at 50% 40%, #6a5a48, #2a2118 70%, #130e0a); }
+  #door { position: absolute; left: 22%; right: 22%; top: 16%; bottom: 3%; border-radius: 6px 6px 0 0; background: linear-gradient(#4a3426, #2a1c13); box-shadow: inset 0 0 0 8px #1d130d, inset 0 0 0 10px #6b4a14; }
+  #door::after { content: "COMING SOON"; position: absolute; left: 50%; top: 22%; transform: translateX(-50%); padding: 6px 12px; background: #e0b862; color: #1a0f0b; font-weight: 800; letter-spacing: .12em; font-size: 13px; }
+  canvas { position: absolute; inset: 0; width: 512px; height: 580px; touch-action: none; cursor: default; }
+  #ui { position: fixed; left: 12px; top: 12px; display: flex; gap: 8px; z-index: 2; }
+  button { font: inherit; padding: 6px 12px; background: #1b1325; color: inherit; border: 1px solid #e0b862; border-radius: 4px; cursor: pointer; }
+  #info { position: fixed; left: 12px; bottom: 12px; opacity: .7; }
+</style>
+</head>
+<body>
+<div id="ui"><button id="o">Open</button><button id="c">Close</button><button id="t">Toggle</button></div>
+<div id="bay"><div id="behind"><div id="door"></div></div><canvas id="cv"></canvas></div>
+<div id="info"></div>
+<script src="curtain.js"></script>
+<script>
+(() => {
+  // ?state=closed|half|open|<0..1>   ?settle=<seconds to pre-run before the first frame>   ?color=%23rrggbb&trim=%23rrggbb
+  const q = new URLSearchParams(location.search);
+  const st = q.get('state') || 'closed';
+  const openness = st === 'half' ? 0.5 : st === 'open' ? 1 : st === 'closed' ? 0 : Number(st);
+  const params = { width: 512, height: 580, openness, color: q.get('color') || undefined, trim: q.get('trim') || undefined };
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cv = document.getElementById('cv');
+  cv.width = Math.round(params.width * dpr); cv.height = Math.round(params.height * dpr);
+  const sim = XACurtain.createCurtainSim(params);
+  const rend = XACurtain.createCurtainRenderer(sim, cv.getContext('2d'), { dpr });
+  if (q.get('settle')) sim.advance(Number(q.get('settle')));
+  rend.draw();
+  window.__curtain = { sim, rend, frames: 0 };
+
+  const info = document.getElementById('info');
+  let last = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = (now - last) / 1000 || 0.016; last = now;
+    if (sim.update(dt)) { rend.draw(); window.__curtain.frames++; }
+    info.textContent = (sim.isAsleep() ? 'asleep' : 'simulating') + ' | open ' + sim.getOpenAmount().toFixed(2);
+  }
+  requestAnimationFrame(frame);
+
+  // pointer -> cloth uv, as a raycast against the plane would give
+  const uv = e => { const r = cv.getBoundingClientRect(); return { u: (e.clientX - r.left) / r.width, v: (e.clientY - r.top) / r.height }; };
+  cv.addEventListener('pointerdown', e => { const p = uv(e); if (sim.grabUV(p.u, p.v)) { cv.setPointerCapture(e.pointerId); e.preventDefault(); } });
+  cv.addEventListener('pointermove', e => {
+    const p = uv(e);
+    if (sim.isDragging()) sim.moveGrabUV(p.u); else cv.style.cursor = sim.hitTestUV(p.u, p.v) ? 'grab' : 'default';
+  });
+  const up = () => sim.release();
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  document.getElementById('o').onclick = () => sim.open();
+  document.getElementById('c').onclick = () => sim.close();
+  document.getElementById('t').onclick = () => sim.toggle();
+})();
+</script>
+</body>
+</html>

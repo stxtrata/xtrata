@@ -108,3 +108,88 @@ node build/modular.mjs check
 node build/modular.mjs build
 CHROME_PATH=/path/to/chromium node tests/hall-parent.test.cjs [shotsDir]
 ```
+
+## The world preview page
+
+`public/arcade-world-preview/index.html` (live at `/arcade-world-preview/`) is the real hall plus a small head script of sample data, so the four bays and their skinned doors can be seen without any contract. It is a static file: it only changes when regenerated and merged.
+
+    node build/modular.mjs build     # src/ -> dist/
+    node build/preview.mjs           # dist + build/preview-head.html -> public/arcade-world-preview/index.html
+    node build/preview.mjs --check   # fails if the committed page is out of date
+
+Edit `build/preview-head.html` to change the sample scenes or the button panel.
+
+### The door latch
+
+Closing a door holds the handle down (the latch bolt stays pulled in) until the leaf is home, then lets it go so the bolt snaps into the frame. A leaf pushed into the last 4 degrees has its bolt pushed in by the strike the same way, and a catch spring pulls it shut, so a door never rests ajar with the bolt against the frame. The slam bounce is capped so it cannot leave that zone. Tests: `tests/doors.test.cjs`.
+
+The latch itself is a real bolt (3 cm long, bevelled, 1.8 cm throw) that slides out of a faceplate on the leaf's edge into a strike set in the frame: a keep (a block of the frame finish beside the leaf) with a metal strike plate and a dark mortise. The part of the bolt inside the keep is hidden by it, so it reads as going into the frame. Pulled back by the handle it sits fully inside the leaf. Double doors meet in the middle and have no keep. Test: `tests/hall-latch.test.cjs`.
+
+### Elements are separate layers
+
+A bay is made of independent elements, each its own layer in the world contract: the base (wall or door), a curtain (cover, kind 1) in front of it, signs and tape (overlays, kind 2), the lamp (kind 4) and work sounds (kind 3). Any curtain can hang in front of any door and any sign can go on any wall. A `sign-board` takes `x` (across the bay, in metres from its centre), `y` (height), `w` (width) and `front` (in front of the curtain, or on the wall behind it); they are clamped to the bay's wall. In the preview, "COMPOSE A BAY" picks each of these on its own.
+
+## The lobby (a room behind a door)
+
+A bay door whose scene has `interaction: 3` and a link to the hall's own lobby has a real, bare room built behind its wall (`buildLobby` in `src/parts/hall.js`). From the world registry that is a portal to the lobby space the hall reads its doorways from, when that space is live and native (`link.lobby`); a scene without a space id (the v1 contract, the preview) names it `target-room: "lobby"`. When the door opens its doorway is see-through (`portal()` in `doors.js`: the opening is cut out of the doorway picture and an invisible copy of it writes the stencil, which the wall materials on both sides skip), so you see the room and just walk in, with no loading, fade, teleport or button. While you are inside the door is held open, and looking back shows the hall through the same opening. The wall between the rooms has a thickness (`WALL_T`, 20 cm: a drywall cavity), so the doorway is a short tunnel; its sides are a plaster-coloured reveal built from the opening's outline. The two walls write separate stencil bits (1 for the hall's wall, 2 for the lobby's), so each skips only its own opening. Only one bay at a time can lead to the lobby. Test: `tests/hall-lobby.test.cjs`.
+
+### The lobby's doorways: one to six
+
+The lobby has as many doorways as its space's highest `bay-N` object says (`bay-0` … `bay-5`; `LIMITS.lobbyBays = 6` in `world2.js`). Two go on the back wall first, exactly where the two always were, so a lobby with two looks as it always did; then the side walls, one on each in turn (left far, right far, left near, right near); a single doorway sits in the middle of the back wall. With doorways on the side walls the LOBBY sign moves over the way in. The geometry comes from the count (`lobbyDefs` / `lobbyLayout` in `hall.js`); they are bays 4 and up of the same bay engine (the hall's four come first), placed in the lobby's own frame (`def.parent`) so they move with it, and `bayEngine.layout(i, def)` moves or adds them when the count changes. `setScope` limits what you can look at and use to the hall's bays or the lobby's, depending on which side of the wall you are. They are read from the world as the room `lobby` (`snap.rooms.lobby.bays`); if it has nothing for them or the read fails, they are plain walls and the hall is untouched. Test: `tests/hall-lobby.test.cjs` (two doorways in exactly the old places; six that are drawn and can each be walked through).
+
+### Rooms that take the whole screen
+
+Any other door leads to a room that is a page. **Nothing about rooms is listed in the hall or its parent**: the door's portal names a space in the world registry, and the hall reads it from the chain when the door is used (`XAWorld.registry().destination`: slug, title, state, runtime, entry). A live space with an entry opens: its entry inscription is fetched by id and checked against its Xtrata chain hash and its size (`XAScores.getInscription`: the gateway first, the chain as fallback; at most 16 MB), and framed as `srcdoc`. Doors say honestly why they do not open: `NOT OPEN YET` (live, no entry), `CLOSED` (draft, suspended or retired), `COULD NOT CHECK THE DOOR · TRY AGAIN` (the read failed: never "not open"). The door's prompt names the destination (`OPEN THE DOOR · ROYAL FLUSH CASINO`), as plain text in the sign alphabet.
+
+Every room runs in a sandboxed frame (`allow-scripts allow-pointer-lock allow-downloads`, never `allow-same-origin`), whatever its runtime, so it cannot touch the hall's page, wallet or storage. It talks to the hall through `window.XA_ROOM`, a small script the hall puts at the top of the page: `ready()`, `leave()`, `go(door)` (one of its own space's doors, resolved like a hall door), and for a hosted room (runtime 3) `call()` (a contract call the registry approves, after the hall's own dialog, signed through the hall's wallet path: deny mode, capped at `maxStx`) and `account()`. `window.XA_ENTRY` tells it where you came from. **The protocol is frozen at version 1: `docs/room-bridge.md`** (with a minimal room page). BACK works at any depth: it re-opens the room before (read again) at the door you went through, or takes you back to the doorway in the hall (`BACK TO <TITLE>`, `BACK TO THE LOBBY`, `BACK TO THE HALL`).
+
+There is no button at a doorway: you open the door (E or click, as any door) and walk into it. A door to a room starts loading that room's page quietly (hidden, behind the hall) as soon as it is open and you are within a few steps of it (keyed by the entry's id and hash), so by the time you walk in there is little or nothing to wait for. Walking into the open doorway then shows a short loading screen (at least 0.7 s, 0.25 s if the page was already loaded, so it never flashes; it shows the page's size), then the page in a full-screen frame with the BACK button above it. The hall sleeps and its sound is shut away while you are in the room. Going back removes the frame (the room frees what it built) and puts you a step in front of the door, facing away from it; the room is not preloaded again until you have moved away or shut the door. A room can also leave on its own (`XA_ROOM.leave()`, or `parent.postMessage({xa:'leave-room'}, '*')`, which is what the casino's back door does). A room's entry or state changing while you are inside changes nothing until you leave. Tests: `tests/hall-room.test.cjs` (H-M, on an in-memory registry: `tests/lib/mock-chain.cjs`) and `tests/hall-bridge.test.cjs` (call and account, with a mocked wallet).
+
+**Local preview only:** `window.XA_ROOMS = { casino: { src: 'casino-room.html', title: 'Royal Flush Casino', still, depth } }` names a page beside the hall for a door whose link names that slug and has no space id. It is never used for an inscribed room. The hall adds `?from=arcade` to `src` so the room knows to start walking, and frames it in the same sandbox.
+
+### The casino walks like the hall
+
+The casino is a page of its own, but it uses the hall's walking and looking numbers, so moving between the two feels the same: the hall's `WALK` constants (field of view 68, eye 1.6 m, walk 3 / run 4.6 m/s, step bob, mouse 0.0022 locked and 0.004 dragged per pixel, touch look 0.005, pitch limit 1.2 rad) are copied into the casino page as its own `WALK`, the camera is set straight from yaw and pitch (YXZ order), the mouse turns you from the first pixel and also while the camera settles after standing up, and with `?from=arcade` it starts walking just inside its door with no overview. If you change one, change the other: `tests/casino-walk.test.cjs` fails when they disagree, and when the same mouse drag turns the two differently.
+
+The casino's entrance wall has a real door with a velvet rope that is open in the middle (the way to the carpet). Walk up to it and it opens, walk through and the page tells the hall to leave; on its own (no parent page) it just says where the way out is.
+
+In the preview the lobby's first door is CASINO (gold sign, skinned door, `link: casino`) and the page is `build/rooms/casino-room.html`, copied beside the preview by `build/preview.mjs` (also checked by `--check`). That page loads three.js from a CDN. Tests: `tests/hall-room.test.cjs` (a stub page stands in for the casino) and `tests/casino-walk.test.cjs`, which runs the real casino page and needs a local three.js r128 (`THREE_JS=<three.min.js>`, see its header; it skips without it).
+
+**Walking into a room: the entry still, with depth.** A door may carry a colour picture and a depth map of the first view you get inside the room: on chain, the door object's params `still`/`stillHash` and `depth`/`depthHash` (inscription ids and chain hashes, fetched hash-checked like a poster's picture); in the preview, `still: 'casino-entry.jpg'` and `depth: 'casino-entry-depth.png'` in `window.XA_ROOMS`. `build/snap-room.cjs` takes both from the room's own page opened with `?from=arcade` (colour at 80° vfov, 2304x1296; depth 768x432, 12 bits packed in R and G over 0..32 m; glow, dust, sprites and instanced bits are left out of the depth pass). Re-run it, then `node build/preview.mjs`, whenever the room's entry view changes. The numbers in `snap-room.cjs` must equal `ROOM` in `doors.js` (test G checks). The hall uses the pair three ways. **In the doorway:** an open door shows a window (`doors.js windowTo`, driven from `bays.js update`): for every pixel of the opening a ray from your eye is marched (96 steps and a binary refine) through the depth map, so you get real parallax, and from the doorway it is exactly the room's own first view (eye 1.6 m, pitch -0.08, fov 68, the casino's `startAtDoor`). Rays that leave the picture continue over a carpet extension taken from its bottom row, the picture's edge fades softly, and a warm light spill lies on the hall floor in front of an open door. It is drawn raw (no tone mapping) because it is already a finished screen shot. **At the threshold, the glide** (`walkIn`): a second small WebGL canvas draws the same ray march while the camera glides from where you stand to the room's entry pose (`ROOM.glide` 1500 ms), and the live room, already loaded behind it, takes over when it posts `{xa:'room-ready'}` (the casino does after three frames; a room that never does is shown 2.5 s after it loads). **Fallbacks:** no depth map gives the flat CSS still that moves in a little; only a slow room (3.5 s) gets the loading screen. The hall's own buttons are hidden while you are in a room. Known limits: a heightfield smears thin things (rope stanchions) and very oblique angles show a flat carpet smear; the real-GPU cost of the 96-step march has not been measured. Ops: `--rooms "casino=casino-room.html|ROYAL FLUSH CASINO|casino-entry.jpg|casino-entry-depth.png"`. Tests: `tests/hall-room-still.test.cjs`.
+
+**The Strata Club tables (testnet rules).** The casino room has a `⛓ Strata Club` button (top bar) and two intro buttons that open the player-versus-player tables over the floor in a full-screen frame: `strata-holdem.html` and `strata-liars-dice.html`, with `strata-club.css` and the two rule models `strata-dice-model.js` / `strata-holdem-model.js` (all in `build/rooms/`, copied beside the preview with the room). The models are the JS twins of the testnet contracts `casino-liars-dice-v1` and `casino-holdem-v1` (same rules, error codes and order of checks), so the practice table (simulated chain, bot opponent) plays exactly what the contract would. Each page's "Watch a testnet game" tab reads the real contract's events from `api.testnet.hiro.so` and replays a game. `XA_STRATA.open('sc-th' | 'sc-td')` / `.close()` drive the overlay; Escape or "Back to the floor" closes it. **Not wired yet:** signing real chip moves from these pages (the table pages have no wallet code; the testnet games so far were played by the casino wizards through offline signing). Do that through the wallet playbook, not ad hoc. Test: `tests/strata-club.test.cjs` (no browser).
+
+## Network-fee warning on score posts
+
+Wallets estimate their own network (miner) fee for a score post and have suggested 0.5 STX. The post panel
+(`arcade-room.js`) now tells players to set the small figure from `networkFeeHintUstx` in `score-client.js`
+(3000 µSTX = 0.003 STX; one number, used by all the copy):
+
+- a red banner above the Post button, with "How do I change the fee?" steps for a custom fee;
+- a "Before your wallet opens" notice the first time in each session (`sessionStorage` flag `xa:feeNotice`,
+  plus an in-memory flag when storage is blocked); "Not now" backs out without opening the wallet;
+- a reminder line under the wallet message while the wallet is open.
+
+The two-approval long-run (inscribe) flow shows a warning without a fixed figure, because the network fee for a
+big transaction legitimately grows with its size. `networkFeePerByteUstx` (default 0, off) can scale the figure
+if measurement shows larger posts need it. The fee is not yet passed to the wallet: that is a separate wallet
+change (see `docs/WALLET-PLAYBOOK.md`). Test: `tests/long-replay.test.cjs` (needs `@stacks/transactions` v6).
+
+## The casino as its own inscription (rooms)
+
+A room that is its own page (the casino) is inscribed on its own and named by its space in the world registry, so the casino is on chain
+like everything else and is reached only through a door that portals to its space.
+
+- `build/rooms/casino-room.html` is inscribed as it is (about 231 KB). Then `set-space-entry(casino, { id, hash: <chain hash>, size })`,
+  runtime page (2), and the space live. Nothing goes in `parent/ids.json` (it has no `rooms`; the build refuses one).
+- **three.js is not fetched from a CDN.** The standalone room file has a cdnjs `<script>` for three.js r128 (so it still opens on its
+  own and in the preview); the hall swaps that tag (or an empty `<script data-xa-part="three.js"></script>`) for the arcade's own
+  three.js, which the parent hands over as `window.XA_PARTS.threeText()` (the `three` pack, or #3078's). Both are r128. The room runs in
+  its own frame with its own copy of the library.
+- The hall adds `window.__XA_FROM_ARCADE = 1` (and `XA_ROOM`, `XA_ENTRY`) to the room, so it starts walking just inside its door (a srcdoc
+  page has no `?from=arcade`). A room that cannot be loaded, or fails its hash or size, shows "THE ROOM COULD NOT BE LOADED" and BACK works.
+- **The registry is the switch.** The door, its sign and its portal come from the world registry's lobby room; the space's state and
+  entry decide whether it opens. Suspend the space (or clear its entry) to close it.
+
+Tests: `tests/hall-parent.test.cjs` (scenario 7: the real casino opened through the registry's lobby door, running in its sandboxed frame
+on the arcade's three.js; a tampered gateway copy refused) and `tests/hall-room.test.cjs` (H-M).

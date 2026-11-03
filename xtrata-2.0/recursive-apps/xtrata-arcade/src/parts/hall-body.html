@@ -1,17 +1,18 @@
 <div id="stage"></div>
 
 <div id="cross" class="hud"></div>
-<div id="hint" class="hud" hidden>WASD walk · mouse look · E start · Q alt mode · T scores · Esc frees mouse</div>
+<div id="hint" class="hud" hidden>WASD walk · mouse look · E start · Q alt mode · T scores · R radio · Esc frees mouse</div>
 <div id="lockhint" class="hud" hidden>Click to look around, or drag</div>
 <div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b>START</b> <span id="ptitle"></span></span><span class="alt" id="palt" hidden><span class="key">Q</span><b id="pvar"></b></span></div>
 <div id="pprompt" class="hud" hidden><span class="key">E</span><span class="t"><b>PLAY ON-CHAIN</b> <span id="pptitle"></span></span></div>
+<div id="bprompt" class="hud" hidden><span class="key">E</span><span class="t"><b id="bptext"></b> <span class="alt" id="bpalt">or hold click and drag</span></span></div>
 <button id="tapstart" class="hud" hidden aria-label="Start game">START</button>
 <button id="tapalt" class="hud" hidden aria-label="Start alternate mode"></button>
 <div id="hallbar" class="hud" hidden>
   <button id="hscores" type="button" title="High scores (T)">🏆<span class="wide"> SCORES</span></button>
   <button id="hwallet" type="button"><span class="dot"></span><span class="lbl">WALLET</span></button>
   <button id="hmute" type="button" aria-label="Toggle sound (M)">🔊</button>
-  <button id="hroom" type="button" aria-label="Toggle room music (R)">♫</button>
+  <button id="hroom" type="button" aria-label="Toggle room music (N)">♫</button>
   <button id="hfs" type="button" class="wide" aria-label="Fullscreen">⛶</button>
 </div>
 <div id="stick" class="hud" hidden><div id="knob"></div></div>
@@ -49,6 +50,29 @@
     <div id="cptracks" hidden></div>
     <iframe id="cpf" title="On-chain inscription" allow="autoplay; fullscreen; gamepad; clipboard-write" referrerpolicy="no-referrer"
       sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock allow-modals"></iframe>
+  </div>
+</div>
+<!-- Radio dock: part of the hall itself, so it is there in the hall, the lobby and every room. The panel is only hidden (never taken down)
+     once opened, so an album keeps playing while you walk, play a game or go through a door. -->
+<button id="xa-radio-btn" type="button" aria-haspopup="dialog" aria-label="Xtrata Radio and your albums" title="Xtrata Radio and your albums (R)" hidden><span aria-hidden="true">&#9834;</span><b>RADIO</b></button>
+<!-- Now playing: what the radio (panel or pop-out) says it is playing, with play/pause, next and previous. Display and transport only: likes and paid plays stay in the radio. -->
+<div id="xa-radio-np" role="group" aria-label="Now playing" hidden><button type="button" data-cmd="prev" aria-label="Previous song">&#9198;</button><button type="button" data-cmd="toggle" aria-label="Play or pause">&#9654;</button><button type="button" data-cmd="next" aria-label="Next song">&#9197;</button><span id="xa-radio-np-t"></span></div>
+<!-- Radio remote: while the radio plays in its pop-out window, R opens this (drawn by the hall, so R / Esc / HIDE close it and put the mouse straight back). Display and four buttons;
+     the pop-out holds the wallet and does the paying. -->
+<div id="xa-remote" class="away" role="dialog" aria-label="Xtrata Radio remote" aria-hidden="true" inert>
+  <div class="rm-box">
+    <div class="rm-bar"><b>XTRATA RADIO</b><span>Playing in the pop-out window</span><button id="xa-remote-win" type="button">OPEN WINDOW &#8599;</button><button id="xa-remote-hide" type="button">HIDE</button></div>
+    <div class="rm-song"><b id="xa-remote-title">&nbsp;</b><i id="xa-remote-artist"></i></div>
+    <div class="rm-ctl"><button type="button" data-cmd="prev" aria-label="Previous song">&#9198;</button><button type="button" data-cmd="toggle" aria-label="Play or pause">&#9654;</button><button type="button" data-cmd="next" aria-label="Next song">&#9197;</button><button type="button" data-cmd="like" id="xa-remote-like" aria-label="Like this song on-chain">&#9829;</button></div>
+    <p class="rm-hint">R or Esc puts you back in the arcade. The heart is paid from the pop-out window's wallet.</p>
+  </div>
+</div>
+<div id="xa-radio" class="away" role="dialog" aria-label="Xtrata Radio" aria-hidden="true" inert>
+  <div class="rd-box">
+    <div class="rd-bar"><b>XTRATA RADIO</b><span>Free here &middot; POP OUT to pay for plays</span>
+      <a id="xa-radio-open" target="xaRadioPop" title="Open the radio in its own window: needed for paid plays and for Xverse">POP OUT &#8599;</a><button id="xa-radio-hide" type="button">HIDE</button></div>
+    <iframe id="xa-radio-frame" title="Xtrata Radio" referrerpolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>
   </div>
 </div>
 <div id="xa-root"></div>

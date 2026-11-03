@@ -207,3 +207,116 @@ describe('animation detection', () => {
     expect(script.parseArgs(['--recheck-animated']).recheckAnimated).toBe(true);
   });
 });
+
+
+describe('extractSongFromHtml (song players)', () => {
+  const cover = fixture('png').toString('base64');
+  const player = (meta: unknown, img = `<img id="coverArt" src="data:image/png;base64,${cover}" alt="">`) =>
+    `<!doctype html><html><head><title>x</title></head><body><div class="art">${img}</div>` +
+    `<script type="application/json" id="xtrata-music-metadata">${JSON.stringify(meta)}</script></body></html>`;
+  const song = { schema: 'xtrata-music', schemaVersion: 1, assetType: 'song', title: 'Cool Cool Mama', artist: 'Rex Speedway and The Denim Avengers' };
+
+  it('reads the title, artist and embedded cover', () => {
+    const out = script.extractSongFromHtml(player(song));
+    expect(out.title).toBe('Cool Cool Mama');
+    expect(out.artist).toBe('Rex Speedway and The Denim Avengers');
+    expect(Buffer.from(out.cover).equals(fixture('png'))).toBe(true);
+  });
+  it('returns the song with no cover when the picture is missing or not embedded', () => {
+    expect(script.extractSongFromHtml(player(song, '<div class="placeholder"></div>')).cover).toBeNull();
+    expect(script.extractSongFromHtml(player(song, '<img id="coverArt" src="https://example.com/a.png">')).cover).toBeNull();
+  });
+  it('prefers the tagged cover over other pictures, and uses a lone untagged picture', () => {
+    const other = `<img src="data:image/jpeg;base64,${fixture('gifstill').toString('base64')}"><img id="coverArt" src="data:image/png;base64,${cover}">`;
+    expect(Buffer.from(script.extractSongFromHtml(player(song, other)).cover).equals(fixture('png'))).toBe(true);
+    const lone = `<img src="data:image/png;base64,${cover}">`;
+    expect(script.extractSongFromHtml(player(song, lone)).cover).not.toBeNull();
+  });
+  it('returns null for anything that is not a song player', () => {
+    expect(script.extractSongFromHtml('<html><body><canvas></canvas></body></html>')).toBeNull();
+    expect(script.extractSongFromHtml(player({ ...song, assetType: 'image' }))).toBeNull();
+    expect(script.extractSongFromHtml(player({ ...song, schema: 'other' }))).toBeNull();
+    expect(script.extractSongFromHtml('<script type="application/json" id="xtrata-music-metadata">{oops</script>')).toBeNull();
+  });
+  describe('opus player template (xtrataPlayerManifest)', () => {
+    const png64 = fixture('png').toString('base64');
+    const opus = (metadata: unknown, body: string) =>
+      `<!doctype html><html><head><title>x</title></head><body>${body}` +
+      `<script type="application/json" id="xtrataPlayerManifest">${JSON.stringify({ template: 'xtrata-opus-player-v6', metadata })}</script></body></html>`;
+    const frame = `<div id="xtrataCover" class="stage"><div class="cover-media"><img src="data:image/png;base64,${png64}"></div></div>`;
+    it('reads title, artist and the framed cover', () => {
+      const out = script.extractSongFromHtml(opus({ assetType: 'song', title: 'Let It Through', artist: '3ai3' }, frame));
+      expect(out.title).toBe('Let It Through');
+      expect(out.artist).toBe('3ai3');
+      expect(Buffer.from(out.cover).equals(fixture('png'))).toBe(true);
+    });
+    it('also reads metadata nested under template (the first template layout)', () => {
+      const html =
+        `<script type="application/json" id="xtrataPlayerManifest">${JSON.stringify({ template: { metadata: { assetType: 'song', title: 'A', artist: 'B' } } })}</script>` + frame;
+      expect(script.extractSongFromHtml(html).title).toBe('A');
+    });
+    it('does not guess when several pictures exist and none is the cover', () => {
+      const two = `<img src="data:image/png;base64,${png64}"><p>x</p><img src="data:image/png;base64,${png64}">`;
+      expect(script.extractSongFromHtml(opus({ assetType: 'song', title: 'T', artist: 'A' }, two)).cover).toBeNull();
+    });
+    it('only accepts songs, not stems or other assets', () => {
+      expect(script.extractSongFromHtml(opus({ assetType: 'stem', title: 'T' }, frame))).toBeNull();
+      expect(script.extractSongFromHtml(opus({ title: 'T' }, frame))).toBeNull();
+    });
+  });
+  it('makes a thumbnail from the extracted cover', async () => {
+    const out = script.extractSongFromHtml(player(song));
+    const thumb = await script.makeImageThumbnail(out.cover, sharp);
+    expect(thumb.width).toBeGreaterThan(0);
+    expect(thumb.bytes.length).toBeGreaterThan(0);
+  });
+});
+
+describe('html kind selection', () => {
+  it('is opt in: the default run still handles only pictures', () => {
+    expect(script.parseArgs([]).kinds).toEqual(['image', 'svg']);
+    expect(script.parseArgs(['--kinds', 'html']).kinds).toEqual(['html']);
+    expect(script.parseArgs([]).minHtmlBytes).toBe(200000);
+    expect(script.parseArgs(['--min-html-bytes', '0']).minHtmlBytes).toBe(0);
+    expect(() => script.parseArgs(['--min-html-bytes', '-1'])).toThrow();
+  });
+  it('asks for html rows only when html is selected', () => {
+    expect(script.buildMissingSql()).toContain("i.mime LIKE 'image/%'");
+    expect(script.buildMissingSql()).not.toContain('text/html');
+    const html = script.buildMissingSql({ kinds: ['html'] });
+    expect(html).toContain("i.mime LIKE 'text/html%'");
+    expect(html).not.toContain("'image/%'");
+    expect(script.buildMissingSql({ kinds: ['image', 'html'] })).toContain("OR i.mime LIKE 'text/html%'");
+  });
+});
+
+describe('songs whose artwork is another inscription', () => {
+  const meta = JSON.stringify({ schema: 'xtrata-music', assetType: 'song', title: 'Ref Song', artist: 'Me' });
+  const page = (img: string) =>
+    `<script id="xtrata-music-metadata" type="application/json">${meta}</script><img id="coverArt" src="${img}">`;
+
+  it('reports the referenced token instead of a cover', async () => {
+    const { extractSongFromHtml } = await import('../lib/song-cover.mjs');
+    const a = extractSongFromHtml(page('https://xtrata.xyz/inscription/3075'));
+    expect(a?.cover).toBeNull();
+    expect(a?.coverRef).toEqual({ tokenId: 3075, contractId: null });
+    const b = extractSongFromHtml(page('https://xtrata.xyz/i/12'));
+    expect(b?.coverRef).toEqual({ tokenId: 12, contractId: null });
+    const c = extractSongFromHtml(
+      page('https://xtrata.xyz/runtime/content?contractId=SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3&amp;tokenId=44&amp;network=mainnet')
+    );
+    expect(c?.coverRef).toEqual({
+      tokenId: 44,
+      contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3'
+    });
+  });
+
+  it('ignores links to other sites and has no reference when a picture is embedded', async () => {
+    const { extractSongFromHtml } = await import('../lib/song-cover.mjs');
+    expect(extractSongFromHtml(page('https://evil.example/inscription/5'))?.coverRef).toBeNull();
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const withCover = extractSongFromHtml(page(`data:image/png;base64,${png}`));
+    expect(withCover?.cover?.length).toBeGreaterThan(0);
+    expect(withCover?.coverRef).toBeNull();
+  });
+});

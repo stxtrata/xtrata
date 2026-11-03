@@ -6,137 +6,583 @@
 <title>Xtrata Radio — inscribed music, live from the chain</title>
 <meta name="description" content="A radio station whose entire catalogue lives on-chain. Every song is an inscription. Tune between curated, liked and full-chain bands." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<script>
+// Gift links carry their code after "#" (browsers never send it to a server). Move it to this device
+// at once and take it out of the address bar, so it is not bookmarked, shared or synced by accident.
+(function(){try{var m=/(?:^|[#&])gift=([A-Za-z0-9_-]{22})(?:&|$)/.exec(location.hash);if(!m)return;
+localStorage.setItem('xtrata.radio.gift.incoming.v1',JSON.stringify({code:m[1],at:Date.now()}));
+history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
+</script>
+<script>
+// Compact "dock" layout: only when the address carries ?dock=1 (the arcade's corner panel and its pop-out window).
+// Without it nothing below changes: every dock rule is scoped to html[data-dock].
+(function(){try{if(/[?&]dock=1(?:&|$)/.test(location.search))document.documentElement.setAttribute('data-dock','1');}catch(e){}})();
+</script>
 <style>
-  :root{color-scheme:dark;--bg:#07090f;--panel:#101623;--line:#243044;--ink:#e6edf6;--mut:#8b9bb4;
-    --acc:#3ea6ff;--acc2:#7c5cff;--cyan:#5ee9ff;--ok:#3ddc97;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  /* Xtrata Radio — a late-night FM receiver: dark glass, cyan display light, amber accents. */
+  :root{color-scheme:dark;--bg:#06080d;--panel:#0f1521;--panel2:#0b111b;--line:#223047;--ink:#e6edf6;--mut:#8b9bb4;
+    --acc:#3ea6ff;--acc2:#7c5cff;--cyan:#5ee9ff;--amber:#ffb547;--ok:#3ddc97;--heart:#ff5d7d;
+    --glow:94,233,255;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
   *{box-sizing:border-box}
+  [hidden]{display:none!important}
   body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-    background:radial-gradient(1200px 700px at 50% -12%,rgba(94,233,255,.10),transparent),
-      radial-gradient(900px 600px at 85% 110%,rgba(124,92,255,.12),transparent),var(--bg)}
-  header{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--line)}
-  header img{width:28px;height:28px;border-radius:7px}
-  .logo{font-weight:800;letter-spacing:.4px}.logo b{color:var(--acc)}.logo i{color:var(--cyan);font-style:normal}
-  .live{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--mut)}
+    background:radial-gradient(1100px 650px at 30% -10%,rgba(var(--glow),.13),transparent 70%),
+      radial-gradient(900px 600px at 90% 110%,rgba(124,92,255,.10),transparent),var(--bg);transition:background .8s}
+  button{font:inherit}
+  /* top bar: always visible, carries the pay-per-play button */
+  .topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 20px;
+    border-bottom:1px solid var(--line);background:rgba(6,8,13,.86);backdrop-filter:blur(10px)}
+  .logo{font-weight:800;letter-spacing:.4px;color:var(--ink);text-decoration:none;white-space:nowrap}.logo b{color:var(--acc)}.logo i{color:var(--cyan);font-style:normal}
+  .live{font-family:var(--mono);font-size:11px;color:var(--mut);white-space:nowrap;margin-right:auto}
   .live b{color:#ff5d5d;animation:blink 1.6s steps(2) infinite}
   @keyframes blink{50%{opacity:.25}}
-  main{max-width:1340px;margin:0 auto;padding:28px 24px 40px;display:grid;
-    grid-template-columns:minmax(280px,400px) minmax(330px,470px) minmax(250px,1fr);
-    gap:30px;align-items:start;align-content:center;justify-content:center;
-    min-height:calc(100vh - 140px)}
-  /* artwork */
-  .art{position:relative;aspect-ratio:1/1;border-radius:22px;overflow:hidden;border:1px solid var(--line);
-    background:linear-gradient(145deg,#0d1420,#0a0e17);box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px rgba(94,233,255,.05)}
-  .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
-  .art.has-cover img{display:block}
-  .art .fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
-  .art.has-cover .fallback{display:none}
-  .fallback img.mark{width:96px;height:96px;border-radius:22px;opacity:.9;position:static;display:block;object-fit:contain}
-  .eq{display:flex;gap:6px;height:42px;align-items:flex-end}
-  .eq i{width:7px;border-radius:3px;background:linear-gradient(180deg,var(--cyan),var(--acc2));opacity:.85;animation:eq 1.1s ease-in-out infinite}
-  .eq i:nth-child(2){animation-delay:.15s}.eq i:nth-child(3){animation-delay:.32s}.eq i:nth-child(4){animation-delay:.06s}
-  .eq i:nth-child(5){animation-delay:.24s}.eq i:nth-child(6){animation-delay:.4s}.eq i:nth-child(7){animation-delay:.12s}
-  @keyframes eq{0%,100%{height:22%}50%{height:96%}}
-  .paused .eq i{animation-play-state:paused;height:14%}
-  .fallback .fnote{font-family:var(--mono);font-size:12px;color:var(--mut);letter-spacing:.14em}
-  .chainlink{position:absolute;left:14px;bottom:14px;font-family:var(--mono);font-size:12px;background:rgba(7,9,15,.78);
-    border:1px solid var(--line);border-radius:999px;padding:7px 13px;color:var(--cyan);text-decoration:none;backdrop-filter:blur(6px)}
-  .chainlink:hover{border-color:var(--cyan)}
-  /* right column */
-  .vfd{border:1px solid #17323c;border-radius:16px;padding:18px 20px;background:linear-gradient(180deg,#04161c,#031014);
-    box-shadow:inset 0 0 30px rgba(94,233,255,.06);position:relative;overflow:hidden}
-  .vfd::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.22) 2px 3px)}
-  .stn{font-family:var(--mono);font-size:13px;letter-spacing:.28em;color:var(--cyan);opacity:.85}
-  .ttl{font-family:var(--mono);font-size:clamp(20px,3.2vw,30px);font-weight:700;color:var(--cyan);margin:8px 0 2px;
-    text-shadow:0 0 14px rgba(94,233,255,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .artst{font-family:var(--mono);font-size:15px;color:#9fd9e6;min-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* Reserve the row's height whether or not a track is showing. #idpill and .viewbtn
-     are both display-toggled, so an empty row collapsed to zero and every control
-     below it jumped up — the transport buttons visibly moved on each track change
-     and whenever a track had something to link to. min-height keeps the layout
-     identical in both states; 36px is the .viewbtn's own height (13px line +
-     2x8px padding, rounded up). */
-  /* Two separate causes of the same jump, both fixed here:
-     - the row collapsed to zero height when nothing was showing (min-height), and
-     - with both children showing it WRAPPED to a second line, doubling its height.
-     Either one shifted every control below it, so the transport buttons moved on
-     each track change. nowrap + a truncating pill keeps it exactly one line tall. */
-  .idrow{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:nowrap;min-height:36px}
-  /* The pill must not be able to widen its column either: an intrinsically sized
-     column grows when a track loads, and the control row below re-wraps to the new
-     width — which is the buttons moving, by a different route than the height. */
-  .idrow{min-width:0}
-  .idrow .idpill{min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .idrow .viewbtn{flex:none}
-  .idpill{font-family:var(--mono);font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
-  .viewbtn{font:inherit;font-size:13px;font-weight:700;color:#04161c;background:linear-gradient(180deg,#7ff0ff,#3ecbe8);
-    border:0;border-radius:999px;padding:8px 16px;cursor:pointer;text-decoration:none;display:none}
-  .viewbtn.show{display:inline-block}
-  /* controls */
-  .ctl{display:flex;gap:12px;align-items:center;margin-top:22px;flex-wrap:wrap}
-  .cbtn{width:56px;height:56px;border-radius:50%;border:1px solid var(--line);background:linear-gradient(180deg,#1a2334,#0e1522);
-    color:var(--ink);font-size:20px;cursor:pointer;transition:border-color .12s,transform .06s}
-  .cbtn:hover{border-color:var(--acc)} .cbtn:active{transform:scale(.94)}
-  .cbtn.big{width:74px;height:74px;font-size:26px;border-color:#2b3a55}
-  .cbtn.heart.on{color:#ff5d7d;border-color:#ff5d7d;box-shadow:0 0 18px rgba(255,93,125,.35)}
-  .power.on{color:var(--ok);border-color:var(--ok);box-shadow:0 0 18px rgba(61,220,151,.3)}
-  .grp{margin-top:26px}
-  .grp label{display:block;font-size:11px;font-weight:800;color:var(--mut);letter-spacing:.16em;margin-bottom:8px}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  .seg button{font:inherit;font-size:13px;font-weight:700;padding:10px 18px;background:transparent;color:var(--mut);border:0;cursor:pointer;font-family:var(--mono)}
-  .seg button+button{border-left:1px solid var(--line)}
-  .seg button.on{background:rgba(94,233,255,.12);color:var(--cyan)}
-  .preset{margin-left:14px}
-  /* likes */
-  .likes{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:16px 18px}
-  .likes h3{margin:0 0 4px;font-size:14px;letter-spacing:.08em}.likes .hint{font-size:12px;color:var(--mut)}
-  .lrow{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid rgba(36,48,68,.6);font-size:13.5px}
-  .lrow:last-child{border-bottom:0}
-  .lrow .lt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
-  .lrow .lt:hover{color:var(--cyan)} .lrow .la{color:var(--mut);font-size:12px}
-  .lrow button{background:none;border:1px solid var(--line);color:var(--mut);border-radius:7px;width:26px;height:26px;cursor:pointer}
-  .lrow button:hover{color:#ff5d7d;border-color:#ff5d7d}
-  .strap{margin-top:22px;font-size:13px;color:var(--mut)} .strap a{color:var(--acc)}
-  /* relatives of the playing song: songs are playable, the rest is context */
-  .relwrap{margin-top:16px}
-  .relwrap label{display:block;font-size:11px;font-weight:800;color:var(--mut);letter-spacing:.16em;margin-bottom:8px}
-  .relrow{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
-  .rtile{flex:none;width:56px;height:56px;border-radius:10px;overflow:hidden;border:1px solid var(--line);
-    background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-    color:var(--mut);object-fit:cover;padding:0;font:inherit}
-  .rtile span{font-size:18px;line-height:1}
-  .rtile i{font-style:normal;font-family:var(--mono);font-size:9px;opacity:.8}
-  .rtile.song{cursor:pointer;color:var(--cyan);border-color:rgba(94,233,255,.4);transition:border-color .12s,box-shadow .12s}
-  .rtile.song:hover{border-color:var(--cyan);box-shadow:0 0 12px rgba(94,233,255,.35)}
-  img.rtile{object-fit:cover}
-  /* the walnut receiver widget: hero-sized and bottom-right on this page */
-  .xtrata-radio{left:auto !important;right:18px}
-  .xtrata-radio__stage{width:min(520px,calc(100vw - 36px)) !important}
-  .xtrata-radio.is-min .xtrata-radio__stage{width:min(300px,calc(100vw - 36px)) !important}
-  @media(max-width:1120px){
-    main{grid-template-columns:minmax(260px,380px) minmax(0,1fr);align-content:start}
-    .col-station{grid-column:1/-1}
-    .xtrata-radio__stage{width:min(400px,calc(100vw - 36px)) !important}
-  }
-  @media(max-width:700px){
-    main{grid-template-columns:1fr;gap:24px;padding-bottom:120px}
-    .art{max-width:420px;margin:0 auto}
-    .ctl{justify-content:center}
-  }
-  header{flex-wrap:wrap}
-  .radio-wallet{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:100%;margin-left:auto;font-size:12px}
-  #radio-wallet-address{overflow-wrap:anywhere;max-width:100%;color:var(--mut);font-family:var(--mono)}
-  .radio-wallet button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+  .ppp-top[hidden]{display:none}
+  .ppp-top{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;letter-spacing:.02em;
+    color:#04121a;background:var(--cyan);border:1px solid var(--cyan);border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+  .ppp-top .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .ppp-top.is-on{background:transparent;color:var(--ok);border-color:var(--ok)}
+  .ppp-top.is-on .dot{box-shadow:0 0 8px var(--ok);animation:blink 1.6s steps(2) infinite}
+  .ppp-top.is-off,.ppp-top.is-quiet{background:transparent;color:var(--mut);border-color:var(--line)}
+  .ppp-top.is-warn{background:transparent;color:var(--amber);border-color:var(--amber)}
+  .radio-wallet{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px}
+  #radio-wallet-address{max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mut);font-family:var(--mono)}
+  .radio-wallet button{color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer}
   .radio-wallet button:disabled{opacity:.6;cursor:wait}
   #radio-wallet-message{flex-basis:100%;color:#ffb9b9;overflow-wrap:anywhere}
   #radio-wallet-message:empty{display:none}
-  @media(max-width:640px){.radio-wallet{width:100%;margin-left:0}.live{font-size:9px}}
+  .ppp-flash{animation:pppflash 1.2s ease-out}
+  @keyframes pppflash{0%{box-shadow:0 0 0 3px var(--cyan)}100%{box-shadow:0 0 0 0 transparent}}
+
+  main{max-width:1240px;margin:0 auto;padding:24px 20px 140px;display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,360px);gap:24px;align-items:start}
+  label.cap,.cap{display:block;font-size:11px;font-weight:800;color:var(--mut);letter-spacing:.16em;margin:0 0 8px}
+
+  /* the receiver: artwork + display, glowing with the artwork's colour */
+  .receiver{display:grid;grid-template-columns:minmax(150px,240px) minmax(0,1fr);gap:18px;padding:18px;border-radius:22px;
+    border:1px solid rgba(var(--glow),.22);background:linear-gradient(160deg,rgba(var(--glow),.08),rgba(255,255,255,.015) 40%,rgba(0,0,0,.25)),var(--panel2);
+    box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 60px rgba(var(--glow),.10),inset 0 1px 0 rgba(255,255,255,.04);transition:border-color .8s,box-shadow .8s}
+  .art{position:relative;aspect-ratio:1/1;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:linear-gradient(145deg,#0d1420,#0a0e17)}
+  .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .art.has-cover img{display:block}
+  .art .fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:10px}
+  .art.has-cover .fallback{display:none}
+  .artflip{position:absolute;top:8px;right:8px;z-index:2;width:30px;height:30px;border-radius:15px;border:0;background:rgba(8,12,14,.55);color:#f2f0ea;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+  .artflip[hidden],.artpaused[hidden]{display:none}
+  .artpaused{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:2;padding:5px 12px;border-radius:999px;background:rgba(8,12,14,.72);color:#f2f0ea;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;pointer-events:none;animation:artfade .25s .5s both}
+  .art.is-paused img{filter:brightness(.55)}
+  @keyframes artfade{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.artpaused{animation:none}}
+  .fallback img.mark{width:64px;height:64px;border-radius:16px;opacity:.9;position:static;display:block;object-fit:contain}
+  .fallback .fnote{font-family:var(--mono);font-size:10.5px;color:var(--mut);letter-spacing:.12em}
+  .chainlink{position:absolute;left:10px;bottom:10px;font-family:var(--mono);font-size:11px;background:rgba(7,9,15,.78);
+    border:1px solid var(--line);border-radius:999px;padding:5px 10px;color:var(--cyan);text-decoration:none;backdrop-filter:blur(6px)}
+  .display{display:flex;flex-direction:column;min-width:0;gap:12px}
+  .vfd{border:1px solid #17323c;border-radius:14px;padding:14px 16px;background:linear-gradient(180deg,#04161c,#031014);
+    box-shadow:inset 0 0 30px rgba(94,233,255,.06);position:relative;overflow:hidden;min-width:0}
+  .vfd::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.22) 2px 3px)}
+  .stn{font-family:var(--mono);font-size:12px;letter-spacing:.28em;color:var(--cyan);opacity:.85}
+  .ttl{font-family:var(--mono);font-size:clamp(20px,2.6vw,30px);font-weight:700;color:var(--cyan);margin:6px 0 2px;
+    text-shadow:0 0 14px rgba(94,233,255,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .artst{font-family:var(--mono);font-size:14px;color:#9fd9e6;min-height:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .idrow{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:nowrap;min-height:32px;min-width:0}
+  .idpill{font-family:var(--mono);font-size:11.5px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:4px 10px;
+    min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .counts{flex:none;display:inline-flex;gap:6px;font-family:var(--mono);font-size:11.5px}
+  .counts>span{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:3px 9px;color:var(--mut);white-space:nowrap}
+  .counts b{color:var(--ink);font-weight:700}
+  .counts .c-like{color:var(--heart);border-color:rgba(255,93,125,.35)}
+  html[data-ppp=on] .counts .c-play{color:#e9b949;border-color:rgba(233,185,73,.45)} html[data-ppp=on] .counts b{color:#ffe3a0}
+  .viewbtn{flex:none;font-size:12.5px;font-weight:700;color:#04161c;background:linear-gradient(180deg,#7ff0ff,#3ecbe8);
+    border:0;border-radius:999px;padding:6px 13px;cursor:pointer;text-decoration:none;display:none}
+  .viewbtn.show{display:inline-block}
+  .spectrum{display:block;width:100%;height:64px;border-radius:10px;background:rgba(0,0,0,.25);border:1px solid rgba(var(--glow),.12)}
+
+  /* controls */
+  .ctl{display:flex;gap:12px;align-items:center;margin-top:18px;flex-wrap:wrap}
+  .ctl .grow{flex:1}
+  .cbtn{width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:linear-gradient(180deg,#1a2334,#0e1522);
+    color:var(--ink);font-size:19px;cursor:pointer;transition:border-color .12s,transform .06s}
+  .cbtn:disabled,.cbtn:disabled:hover,#presetBtn:disabled,#bands button:disabled{opacity:.35;cursor:progress;border-color:var(--line);filter:grayscale(.6)}
+  .tuner.waiting{opacity:.4;pointer-events:none}
+  .cbtn:hover{border-color:var(--acc)} .cbtn:active{transform:scale(.94)}
+  .cbtn.big{width:72px;height:72px;font-size:26px;border-color:#2b3a55}
+  .cbtn.heart.on{color:var(--heart);border-color:var(--heart);box-shadow:0 0 18px rgba(255,93,125,.35)}
+  .cbtn.heart.pending{color:#ff9a2e;border-color:#ff9a2e;box-shadow:0 0 18px rgba(255,154,46,.35);animation:likepend 1.2s ease-in-out infinite}
+  @keyframes likepend{50%{opacity:.55}}
+  .power.on{color:var(--ok);border-color:var(--ok);box-shadow:0 0 18px rgba(61,220,151,.3)}
+  .chip{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--mut);background:transparent;border:1px solid var(--line);border-radius:999px;padding:8px 13px;cursor:pointer}
+  .chip.on{color:var(--cyan);border-color:rgba(94,233,255,.5);background:rgba(94,233,255,.08)}
+
+  /* timeline: the song's waveform, played part lit, tap or drag to jump */
+  .timeline{display:flex;align-items:center;gap:10px;margin-top:14px}
+  .tl-t{flex:none;min-width:38px;font-family:var(--mono);font-size:11.5px;color:var(--mut);text-align:center}
+  .tl-wave{position:relative;flex:1;min-width:0;height:48px;border-radius:10px;border:1px solid var(--line);background:rgba(0,0,0,.28);cursor:pointer;touch-action:none;outline:none}
+  .tl-wave:focus-visible{border-color:var(--cyan)}
+  .tl-wave canvas{display:block;width:100%;height:100%}
+  .tl-hover{position:absolute;top:-22px;transform:translateX(-50%);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--bg);background:var(--ink);border-radius:5px;padding:1px 6px;pointer-events:none;white-space:nowrap}
+  html[data-ppp=on] .tl-wave{border-color:#6b4f14;background:rgba(20,12,0,.5)}
+  html[data-ppp=off] .tl-wave{border-color:#22272e;background:#0b0d10}
+
+  /* tuning strip: every song, by inscription number */
+  .tuner{position:relative;margin-top:18px;height:74px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#0b111b,#080c14);
+    cursor:pointer;touch-action:none;outline:none;overflow:hidden}
+  .tuner:focus-visible{border-color:var(--cyan)}
+  .ticks{position:absolute;left:16px;right:16px;top:12px;height:30px}
+  .ticks i{position:absolute;bottom:0;width:2px;margin-left:-1px;height:12px;background:#2c3c55;border-radius:1px}
+  .ticks i.liked{background:var(--heart);height:18px}
+  .ticks i.major{height:22px;background:#3a4c69}
+  .needle{position:absolute;top:6px;height:40px;width:2px;margin-left:-1px;background:var(--amber);box-shadow:0 0 10px var(--amber);left:16px;transition:left .35s ease;pointer-events:none}
+  .tuner.dragging .needle{transition:none}
+  .tunerLabel{position:absolute;left:16px;right:16px;bottom:8px;display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:11px;color:var(--mut);pointer-events:none}
+  .tunerLabel b{color:var(--amber);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* stations */
+  .stations{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px}
+  .stations button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:11px 13px;border-radius:12px;
+    border:1px solid var(--line);background:var(--panel);color:var(--mut);cursor:pointer;min-width:0}
+  .stations button b{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:14px;color:var(--ink);letter-spacing:.1em}
+  .stations button span{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .lamp{width:9px;height:9px;border-radius:50%;background:#253247;flex:none}
+  .stations button.on{border-color:rgba(94,233,255,.55);background:rgba(94,233,255,.07)}
+  .stations button.on .lamp{background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+
+  /* also on this frequency */
+  .relwrap{margin-top:18px}
+  .relrow{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+  .rtile{flex:none;width:92px;height:92px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--mut);object-fit:cover;padding:6px}
+  .rtile span{font-size:22px;line-height:1}
+  .rtile i{font-style:normal;font-family:var(--mono);font-size:10px;opacity:.85;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rtile.song{cursor:pointer;color:var(--cyan);border-color:rgba(94,233,255,.4)}
+  .rtile.song:hover{border-color:var(--cyan);box-shadow:0 0 12px rgba(94,233,255,.35)}
+
+  /* your station (likes): collapsible, filterable, reorderable */
+  .side{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .likes{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:12px 14px}
+  .likes>summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:800;letter-spacing:.08em}
+  .likes>summary::-webkit-details-marker{display:none}
+  .likes>summary::after{content:"▾";margin-left:auto;color:var(--mut);transition:transform .15s}
+  .likes:not([open])>summary::after{transform:rotate(-90deg)}
+  .likes .count{font-family:var(--mono);font-size:11px;color:var(--mut);font-weight:400;letter-spacing:0}
+  .likesTools{display:flex;gap:8px;margin:12px 0 8px}
+  .likesTools input{flex:1;min-width:0;font:inherit;font-size:13px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+  .likesTools button,.likesFoot button{font-size:12px;color:var(--cyan);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer;white-space:nowrap}
+  .likes .hint{font-size:12px;color:var(--mut);margin:4px 0}
+  .likesList{list-style:none;margin:0;padding:0;max-height:420px;overflow:auto}
+  .lrow{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(34,48,71,.6);font-size:13px}
+  .lrow:last-child{border-bottom:0}
+  .lrow.now .lt{color:var(--cyan)}
+  .lrow.drag-over{box-shadow:inset 0 2px 0 var(--cyan)}
+  .lrow .grip{cursor:grab;color:#46597a;font-size:14px;line-height:1;padding:0 2px;user-select:none}
+  .lrow .lt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;background:none;border:0;color:var(--ink);text-align:left;padding:0}
+  .lrow .lt:hover{color:var(--cyan)} .lrow .la{color:var(--mut);font-size:11.5px;max-width:34%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lrow .mv{background:none;border:1px solid var(--line);color:var(--mut);border-radius:6px;width:24px;height:24px;cursor:pointer;padding:0;font-size:11px}
+  .lrow .mv:hover{color:var(--cyan);border-color:var(--cyan)} .lrow .mv.rm:hover{color:var(--heart);border-color:var(--heart)}
+  .lrow .mv:disabled{opacity:.3;cursor:default}
+  .likes.filtering .grip,.likes.filtering .mv.up,.likes.filtering .mv.down{display:none}
+  .likesFoot{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11.5px;color:var(--mut)}
+  .strap{font-size:12.5px;color:var(--mut);margin:0} .strap a{color:var(--acc)}
+
+  /* The corner widget is not used on this page: the receiver above is the radio. The engine from
+     /xtrata-radio.js still runs (this page drives it through window.XtrataRadio), only its floating
+     widget is hidden. */
+  .xtrata-radio{display:none !important}
+  @media(max-width:980px){
+    main{grid-template-columns:1fr}
+    /* One column. Once there is music (playing, or plays on their way) the receiver comes first, then the album's
+       songs, then the Xtrata Music panel, then likes and links. While something needs setting up (passkey, unlock,
+       link, a gift link) src/radio-ppp/page.ts sets html[data-ppp-first] and the panel goes to the very top, where
+       the tap is. CSS order only: the wallet box is never moved in the page, so it never reloads. */
+    .side{display:contents}
+    .albumlist{order:1}
+    .ppp{order:2}
+    #likesBox{order:3}
+    html[data-ppp-first] .ppp{order:-1}
+    .strap{order:10}
+  }
+  @media(max-width:640px){
+    .topbar{padding:8px 12px;gap:8px}
+    .live{display:none}
+    .ppp-top{padding:7px 11px;font-size:12px;margin-left:auto}
+    .logo{margin-right:auto}
+    #radio-wallet-address{display:none}
+    .radio-wallet button{padding:6px 9px}
+    .idpill{display:none}
+    main{padding:16px 12px 150px;gap:18px}
+    .receiver{grid-template-columns:96px minmax(0,1fr);gap:12px;padding:12px;border-radius:18px}
+    .art{border-radius:12px}
+    .art .fallback .fnote,.chainlink{display:none}
+    .ttl{font-size:19px}
+    .spectrum{height:44px}
+    .ctl{justify-content:center;gap:10px}
+    .ctl .grow{flex-basis:100%;height:0}
+    .cbtn{width:50px;height:50px}.cbtn.big{width:64px;height:64px}
+    .stations{gap:8px}
+    .stations button{padding:9px 10px}
+    .stations button span{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){.cbtn.heart.pending,.ppp-top.is-on .dot,.live b{animation:none}.needle{transition:none}}
+
+  /* ===== Two looks, set by pay-per-play on <html data-ppp> (src/radio-ppp/page.ts) ===== */
+  .onair{position:absolute;top:10px;right:12px;z-index:1;display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none}
+  .onair b{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;padding:3px 8px 3px 10px;border-radius:5px;border:1px solid #3a3f48;color:#4a505a;background:#0b0d11}
+  .onair-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+  html[data-ppp=on] .vfd .stn,html[data-ppp=off] .vfd .stn{padding-right:118px}
+  .nudge{display:flex;align-items:center;gap:12px;margin-top:14px;padding:10px 12px 10px 14px;border-radius:12px;
+    border:1px dashed rgba(255,106,61,.65);background:linear-gradient(90deg,rgba(255,80,40,.10),rgba(255,154,46,.04));color:#ffb08a;font-size:12.5px;line-height:1.4}
+  .nudge-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .nudge-t{color:#ff6a4d;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;font-family:var(--mono);animation:nudgepulse 2.4s ease-in-out infinite}
+  @keyframes nudgepulse{50%{color:#ffa04d}}
+  .nudge button{flex:none;font-weight:800;font-size:12.5px;color:#1a0904;background:linear-gradient(180deg,#ffb15c,#ff7a3d);border:0;border-radius:999px;padding:8px 14px;cursor:pointer;box-shadow:0 0 16px rgba(255,122,61,.35)}
+
+  /* The free player (the main site's /radio): the same note, friendly: cyan, calm, no pulse. */
+  .nudge.is-free{border:1px solid rgba(94,233,255,.4);background:linear-gradient(90deg,rgba(94,233,255,.10),rgba(124,92,255,.06));color:#b9c8dc}
+  .nudge.is-free .nudge-t{color:var(--cyan);animation:none}
+  .nudge.is-free button{color:#04101a;background:linear-gradient(180deg,#8ad7ff,#5ee9ff);box-shadow:0 0 16px rgba(94,233,255,.3)}
+
+  /* Paying: a gold-trimmed receiver, warm amber display, lit ON AIR lamp. */
+  html[data-ppp=on] body{background:radial-gradient(1100px 650px at 30% -10%,rgba(233,185,73,.16),transparent 70%),
+    radial-gradient(900px 600px at 90% 110%,rgba(255,110,40,.10),transparent),var(--bg)}
+  html[data-ppp=on] .receiver{position:relative;border:2px solid transparent;
+    background:linear-gradient(160deg,rgba(255,214,120,.07),rgba(0,0,0,.28) 55%) padding-box,
+      repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px) padding-box,
+      linear-gradient(#14110b,#0c0a07) padding-box,
+      linear-gradient(135deg,#fff3c4,#d9a93a 18%,#7d5612 40%,#f6d57e 58%,#a8771b 78%,#fff0b8) border-box;
+    box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 70px rgba(233,185,73,.20),inset 0 0 0 1px rgba(255,231,160,.10),inset 0 2px 0 rgba(255,240,190,.10)}
+  html[data-ppp=on] .receiver::before{content:"";position:absolute;inset:7px;pointer-events:none;border-radius:16px;
+    --screw:radial-gradient(circle,#fff6d0 0 1.2px,#c8972c 1.6px 3.4px,#5d410c 3.8px 4.4px,transparent 4.8px);
+    background:var(--screw) left top/10px 10px no-repeat,var(--screw) right top/10px 10px no-repeat,
+      var(--screw) left bottom/10px 10px no-repeat,var(--screw) right bottom/10px 10px no-repeat}
+  html[data-ppp=on] .receiver::after{content:"";position:absolute;inset:-2px;border-radius:22px;pointer-events:none;
+    background:linear-gradient(115deg,transparent 40%,rgba(255,240,190,.16) 50%,transparent 60%) -200% 0/250% 100% no-repeat;animation:sheen 7s ease-in-out infinite}
+  @keyframes sheen{0%,55%{background-position:-200% 0}100%{background-position:200% 0}}
+  html[data-ppp=on] .art{border:2px solid #b8892a;box-shadow:0 0 0 3px #1a140a,0 0 0 4px rgba(233,185,73,.5)}
+  html[data-ppp=on] .vfd{border-color:#6b4f14;background:linear-gradient(180deg,#1d1404,#120c02);box-shadow:inset 0 0 34px rgba(255,180,60,.10),0 0 0 1px rgba(233,185,73,.25)}
+  html[data-ppp=on] .stn{color:#e9b949}
+  html[data-ppp=on] .ttl{color:#ffd36e;text-shadow:0 0 16px rgba(255,190,80,.55)}
+  html[data-ppp=on] .artst{color:#e8c584}
+  html[data-ppp=on] .spectrum{border-color:rgba(233,185,73,.35);background:rgba(20,12,0,.5)}
+  html[data-ppp=on] .onair b{color:#fff;background:#d6261c;border-color:#ff7a6a;box-shadow:0 0 14px rgba(255,60,40,.75),0 0 3px #ff9b8f inset;text-shadow:0 0 6px #fff}
+  html[data-ppp=on] .onair-sub{color:#e9b949}
+  html[data-ppp=on] .cbtn{border-color:#5f4a1c;background:radial-gradient(circle at 35% 30%,#3a2f18,#15110a 70%)}
+  html[data-ppp=on] .cbtn:hover{border-color:#e9b949}
+  html[data-ppp=on] .cbtn.big{border:2px solid #e9b949;color:#ffe3a0;box-shadow:0 0 22px rgba(233,185,73,.35),inset 0 0 12px rgba(233,185,73,.15)}
+  html[data-ppp=on] .power.on{color:#ffd36e;border-color:#e9b949;box-shadow:0 0 18px rgba(233,185,73,.4)}
+  html[data-ppp=on] .tuner{border-color:#6b4f14;background:linear-gradient(180deg,#171106,#0e0a04)}
+  html[data-ppp=on] .ticks i{background:#5a4620} html[data-ppp=on] .ticks i.major{background:#7a5f2a}
+  html[data-ppp=on] .ticks i.liked{background:var(--heart)}
+  html[data-ppp=on] .needle{background:#ff4b33;box-shadow:0 0 12px #ff4b33}
+  html[data-ppp=on] .tunerLabel b{color:#ffd36e}
+  html[data-ppp=on] .stations button.on{border-color:rgba(233,185,73,.7);background:rgba(233,185,73,.08)}
+  html[data-ppp=on] .stations button.on .lamp{background:#ffcf5a;box-shadow:0 0 10px #ffb02e}
+  html[data-ppp=on] .ppp{border-color:rgba(233,185,73,.45);box-shadow:0 0 30px rgba(233,185,73,.08)}
+  html[data-ppp=on] .live b{color:#ff4b33}
+
+  /* Not paying: the same radio, switched to drab. Small orange nudges say why. */
+  html[data-ppp=off] body{background:var(--bg)}
+  html[data-ppp=off] .receiver{border-color:#262b33;background:#0d1015;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+  html[data-ppp=off] .art img{filter:grayscale(.85) brightness(.75) contrast(.9)}
+  html[data-ppp=off] .vfd{border-color:#252a31;background:#0c0e11;box-shadow:none}
+  html[data-ppp=off] .stn{color:#5d6672}
+  html[data-ppp=off] .ttl{color:#8c96a2;text-shadow:none}
+  html[data-ppp=off] .artst{color:#6f7985}
+  html[data-ppp=off] .spectrum{border-color:#22272e}
+  html[data-ppp=off] .onair b{color:#5a4a44;border-color:#3d2a24}
+  html[data-ppp=off] .onair-sub{color:#ff7a45;animation:nudgepulse 2.4s ease-in-out infinite}
+  html[data-ppp=off] .cbtn{background:#12151a;border-color:#262b33;color:#9aa3ad}
+  html[data-ppp=off] .tuner{background:#0b0d10;border-color:#22272e}
+  html[data-ppp=off] .needle{background:#7d8590;box-shadow:none}
+  html[data-ppp=off] .tunerLabel b{color:#8c96a2}
+  html[data-ppp=off] .stations button.on{border-color:#3a414b;background:#13161b}
+  html[data-ppp=off] .stations button.on .lamp{background:#7d8590;box-shadow:none}
+  html[data-ppp=off] .live::after{content:" · ARTISTS UNPAID";color:#ff7a45}
+  html[data-ppp=off] .ppp-top.is-off{color:#ff8a5c;border-color:#ff8a5c}
+  html[data-ppp=off] .ppp-state--mute{color:#ff8a5c}
+  @media(max-width:640px){
+    .onair{top:8px;right:8px}.onair b{font-size:9.5px;padding:2px 6px 2px 8px}.onair-sub{display:none}
+    html[data-ppp=on] .vfd .stn,html[data-ppp=off] .vfd .stn{padding-right:70px}
+    .nudge{gap:10px;padding:9px 10px 9px 12px}.nudge button{padding:7px 12px;font-size:12px}
+  }
+  @media (prefers-reduced-motion:reduce){html[data-ppp=on] .receiver::after,.nudge-t,html[data-ppp=off] .onair-sub{animation:none}}
+  /* pay-per-play (src/radio-ppp) */
+  .ppp [hidden]{display:none!important}
+  .ppp{margin-top:18px;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel)}
+  .ppp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
+  .ppp h3{margin:0}
+  .ppp-badge{display:inline-block;white-space:nowrap;font-size:10px;letter-spacing:.6px;color:var(--bg);background:var(--cyan);border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:middle}
+  .ppp-state{font-size:11px;font-weight:700;letter-spacing:.6px;border-radius:999px;padding:3px 9px;border:1px solid currentColor;white-space:nowrap}
+  .ppp-state--ok{color:var(--ok)}.ppp-state--warn{color:#ffcf8a}.ppp-state--bad{color:#ff8a8a}.ppp-state--mute{color:var(--mut)}
+  .ppp-steps{display:flex;flex-wrap:wrap;gap:4px;list-style:none;padding:0;margin:0 0 6px;font-size:10.5px;color:var(--mut)}
+  .ppp-steps li{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:2px 7px 2px 3px;white-space:nowrap}
+  .ppp-steps .n{display:inline-grid;place-items:center;min-width:16px;height:16px;border-radius:50%;border:1px solid currentColor;font-size:10px;font-weight:700}
+  .ppp-steps li.done{color:var(--ok);border-color:var(--ok)}
+  .ppp-steps li.now{color:var(--cyan);border-color:var(--cyan);font-weight:700}
+  .ppp-steps li.now .n{background:var(--cyan);color:#05121a;border-color:var(--cyan)}
+  .ppp-steps li.blocked{color:#ff8a8a;border-color:#ff8a8a}.ppp-steps li.blocked .n{background:#ff8a8a;border-color:#ff8a8a}
+  .ppp-stage{margin:0 0 10px;font-size:12px;font-weight:600}.ppp-cyan{color:var(--cyan)}
+  .ppp-facts{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);font-size:12.5px}
+  .ppp-facts dt{color:var(--cyan);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;align-self:center;white-space:nowrap}
+  .ppp-facts dd{margin:0;color:var(--ink);overflow-wrap:anywhere;align-self:center}
+  .ppp-addr-short{font-family:var(--mono);font-size:12px}
+  .ppp-addr-full{font-family:var(--mono);font-size:12px;word-break:break-all;user-select:all}
+  .ppp-pick{margin:6px 0}
+  .ppp .ppp-lowbox{border:1px solid rgba(255,207,138,.45);border-radius:8px;background:rgba(255,207,138,.06);padding:10px 12px;margin:8px 0}
+  #tuner.locked{opacity:.35;cursor:not-allowed}
+  .ppp-shelf-tools{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.ppp-shelf-tools input{flex:1 1 11em;min-width:0}
+  .ppp-shelf-list{list-style:none;margin:6px 0;padding:0}.ppp-shelf-list li{position:relative;display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:10px;border-bottom:1px solid var(--line,rgba(255,255,255,.08));touch-action:manipulation;transition:background .12s}.ppp-shelf-list li:has(.ppp-pick:not(:disabled)){cursor:pointer}.ppp-shelf-list li:has(.ppp-pick:not(:disabled)):hover,.ppp-shelf-list li:focus-within{background:rgba(0,229,255,.08)}.ppp-shelf-list li.now{background:rgba(0,229,255,.05)}.ppp-shelf-list .ppp-pick::after{content:'';position:absolute;inset:0;border-radius:10px}.ppp-shelf-list .ppp-pick:focus-visible{outline:none}.ppp-shelf-list li:has(.ppp-pick:focus-visible){outline:2px solid var(--cyan);outline-offset:-2px}.ppp-shelf-list li>button:not(.ppp-pick){position:relative;z-index:1}.ppp-shelf-list li.now{color:var(--cyan)}.ppp-shelf-list .t{font-weight:600}.ppp-shelf-list li button:last-child{margin-left:auto}.ppp-shelf-art{flex:0 0 52px;width:52px;height:52px;border-radius:8px;overflow:hidden;background:#143a40;display:grid;place-items:center;font-size:22px}.ppp-shelf-art img{width:100%;height:100%;object-fit:cover;display:block}.ppp-shelf-txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}.ppp-shelf-list .ppp-mute{font-size:11.5px}
+  .ppp .ppp-lowtitle{font-weight:700;letter-spacing:.6px;margin:0 0 6px}
+  .ppp-pick input{font-family:var(--mono);font-size:12px;width:min(100%,26em);padding:6px 8px;box-sizing:border-box}
+  .ppp p{margin:6px 0;font-size:13px;line-height:1.45;color:var(--ink)}
+  .ppp .ppp-how{margin:6px 0 0}.ppp .ppp-how summary{cursor:pointer;font-size:12.5px;color:var(--cyan)}.ppp .ppp-how p{margin:6px 0 0;font-size:12.5px}
+  .ppp .ppp-ok{color:var(--ok)}.ppp .ppp-warn{color:#ffcf8a}.ppp .ppp-bad{color:#ff8a8a}.ppp .ppp-mute{color:var(--mut)}
+  .ppp-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .ppp button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
+  .ppp button.primary{background:var(--cyan);color:#04121a;border-color:var(--cyan);font-weight:700}
+  .ppp-open-row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .ppp a.ppp-open-in{display:inline-flex;align-items:center;font-size:13px;background:var(--cyan);color:#04121a;border:1px solid var(--cyan);border-radius:8px;padding:8px 12px;min-height:40px;font-weight:700;text-decoration:none}
+  .ppp button.quiet{color:var(--mut)}
+  .ppp button.tiny{min-height:0;padding:2px 8px;font-size:11px;color:var(--cyan)}
+  .ppp-topup{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
+  .ppp-switch{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px}
+  .ppp-switch button.ppp-all-albums{flex:1 0 100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--cyan);border-radius:10px;background:rgba(34,211,238,.08);color:var(--cyan);font-size:13px;font-weight:700;text-align:left;cursor:pointer}
+  .ppp-switch button.ppp-all-albums::before{content:'💿'}
+  .ppp-switch button.ppp-all-albums::after{content:'▾';margin-left:auto;opacity:.8}
+  .ppp-switch button.ppp-all-albums[aria-expanded="true"]::after{content:'▴'}
+  .ppp-shelf{margin:0 0 10px}.ppp-shelf>summary{display:none}
+  html[data-view=album][data-sheet=music] .ppp-shelf>summary{display:list-item}
+  .ppp-switch button.ppp-tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 10px;border-radius:10px}
+  .ppp-switch button.ppp-tab .tt{font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ppp-switch button.ppp-tab .ts{font-size:11px;opacity:.75}
+  .ppp-switch button.ppp-tab[aria-pressed="true"]{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--cyan);background:rgba(34,211,238,.10)}
+  .ppp button.tiny.primary{color:#04121a} /* the album Play button was cyan text on a cyan fill: invisible */
+  .ppp button:disabled{opacity:.55;cursor:wait}
+  /* every panel button answers a press; copy and share say what happened (src/radio-ppp/feedback.ts) */
+  .ppp button{transition:transform .08s,background-color .2s,border-color .2s,color .2s}
+  .ppp button:active:not(:disabled){transform:scale(.95)}
+  .ppp button.is-done{color:var(--ok)!important;border-color:var(--ok)!important;background:rgba(61,220,151,.12)!important}
+  .ppp button.primary.is-done{color:#04121a!important;background:var(--ok)!important}
+  .ppp button.is-failed{color:#ff8a8a!important;border-color:#ff8a8a!important;background:rgba(255,138,138,.1)!important}
+  .ppp button.is-pop{animation:ppppop .35s ease-out}
+  @keyframes ppppop{0%{transform:scale(.92)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+  @media (prefers-reduced-motion:reduce){.ppp button.is-pop{animation:none}.ppp button:active:not(:disabled){transform:none}}
+  .ppp-frame-label{margin:12px 0 6px!important;font-size:10.5px!important;letter-spacing:.6px;text-transform:uppercase;color:var(--cyan)!important}
+  .ppp-frame iframe{display:block;width:100%;height:340px;border:1px solid var(--line);border-radius:10px;background:#0b0f14}
+  /* At rest (nothing to approve) the wallet box shrinks to nothing; it is never moved, so it never reloads. */
+  .ppp-frame--rest iframe{height:0;border:0}
+  .ppp-frame-label button{margin-left:6px}
+  .ppp-folds{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+  .ppp-fold{margin:0;font-size:12.5px;color:var(--mut)}
+  .ppp-recent-list{list-style:none;margin:4px 0 8px;padding:0}
+  .ppp-recent-list li{display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid rgba(34,48,71,.5)}
+  .ppp-recent-list li:last-child{border-bottom:0}
+  .ppp-recent-list .t{flex:1;min-width:0;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ppp-recent-list .d{width:7px;height:7px;border-radius:50%;flex:none;align-self:center;background:var(--mut)}
+  .ppp-recent-list .d.ok{background:var(--ok)}.ppp-recent-list .d.warn{background:#ffcf8a}.ppp-recent-list .d.bad{background:#ff8a8a}
+  .ppp-recent-list a{color:var(--cyan);text-decoration:none;font-size:11.5px}
+  .ppp-fold>summary{cursor:pointer;color:var(--cyan);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;margin:4px 0}
+  .ppp-fold[open]>summary{margin-bottom:8px}
+  .ppp-key p{margin:4px 0 8px}
+  .ppp-msg{color:var(--cyan)!important;font-size:12px!important;min-height:1em}.ppp-err{color:#ff8a8a!important;font-size:12px!important;overflow-wrap:anywhere}
+  .ppp-err:empty,.ppp-msg:empty{display:none}
+  .ppp-msg.is-warn{color:#ffcf8a!important}
+  .ppp .ppp-gift{color:#ffd36e;font-weight:600}
+  .ppp .ppp-wait{margin:6px 0 8px}.ppp .ppp-wait-t{margin:0 0 5px;color:#ffcf8a;font-size:12px;font-weight:600}
+  .ppp .ppp-wait-track{height:6px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}
+  .ppp .ppp-wait-fill{height:100%;width:4%;border-radius:999px;background:linear-gradient(90deg,#ffb347,#ffd36e);transition:width .9s linear}
+  .ppp .ppp-wait.is-long .ppp-wait-fill{width:35%;animation:pppwait 1.6s ease-in-out infinite alternate;background:linear-gradient(90deg,#ff6b6b,#ff8a8a)}
+  .ppp .ppp-wait.is-long .ppp-wait-t{color:#ff8a8a}
+  @keyframes pppwait{from{margin-left:0}to{margin-left:65%}}
+  @media (prefers-reduced-motion:reduce){.ppp .ppp-wait.is-long .ppp-wait-fill{animation:none;width:100%;opacity:.6}}
+  .ppp-gift-fold input[type=range]{width:100%;accent-color:#e9b949}
+  .ppp-gift-amount{font-size:12px!important;color:var(--ink)!important}
+  .ppp-gift-list{list-style:none;margin:8px 0;padding:0}
+  .ppp-gift-list li{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(34,48,71,.5);font-size:12px}
+  .ppp-gift-list .t{flex:1;color:var(--ink)}
+  .ppp-gift-admin{margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .ppp-gift-admin p{flex-basis:100%;margin:2px 0!important}
+  .ppp-gift-admin input{font:inherit;font-size:12px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:80px}
+  .ppp-gift-admin label{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--mut)}
+  .ppp-gift-admin>input{flex:1;min-width:140px;width:auto}
+  .ppp-gift-admin textarea{flex-basis:100%;font-family:var(--mono);font-size:11px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px}
+  .ppp-gift-check{margin:6px 0}
+  .ppp-history{margin-top:10px;font-size:12px;color:var(--mut)}
+  .ppp-history summary{cursor:pointer;color:var(--cyan);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase}
+  .ppp-row{margin:6px 0;overflow-wrap:anywhere;line-height:1.5}
+  .ppp-song{color:var(--ink)}
+  .ppp-status{display:inline-block;min-width:76px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .ppp-history a{color:var(--cyan)}
+
+  /* ---- Album First (src/radio-ppp/album.ts): a listener who was sent an album sees a player. Everything else stays
+     in the page, hidden, and opens as a sheet from "More" or "My music". Nothing moves in the DOM (the wallet box
+     would reload), only how it is shown. ---- */
+  .album{display:none}
+  html[data-view=album] body{background:#0b0d10}
+  html[data-view=album] .topbar,html[data-view=album] .rx,html[data-view=album] #likesBox,html[data-view=album] .strap{display:none!important}
+  html[data-view=album] main{display:block;max-width:560px;padding:0 20px 28px}
+  html[data-view=album] .album{display:block}
+  html[data-view=album] .side{display:none!important}
+  /* the existing panel, as a sheet: My music, This device, Send music, or the wallet box when it needs a tap */
+  html[data-view=album][data-sheet=music] .side,html[data-view=album][data-sheet=device] .side,html[data-view=album][data-sheet=gifts] .side,
+  html[data-view=album][data-asking] .side{display:flex!important;position:fixed;left:0;right:0;bottom:0;z-index:60;max-height:86vh;overflow:auto;
+    background:#15181d;border-radius:22px 22px 0 0;padding:10px 18px 28px;box-shadow:0 0 0 100vmax rgba(0,0,0,.55),0 -12px 40px rgba(0,0,0,.55);max-width:620px;margin:0 auto;gap:12px}
+  .sheet-bar,.sheet-extra{display:none}
+  html[data-view=album][data-sheet] .sheet-bar{display:flex;align-items:center;justify-content:space-between;position:sticky;top:-10px;background:#15181d;padding:6px 0;z-index:2}
+  html[data-view=album][data-sheet=music] .sheet-extra{display:block}
+  .sheet-bar b{font-size:20px}
+  .sheet-bar button{width:44px;height:44px;border:0;background:none;color:#c9ced6;font-size:24px;cursor:pointer;border-radius:12px}
+  html[data-view=album][data-sheet] .ppp,html[data-view=album][data-asking] .ppp{display:block!important;border:0;background:none;padding:0;box-shadow:none}
+  html[data-view=album][data-sheet] .ppp>*:not(.ppp-folds):not(.ppp-shelf):not(.ppp-msg):not(.ppp-err),
+  html[data-view=album][data-asking] .ppp>*:not(.ppp-frame):not(.ppp-msg):not(.ppp-err){display:none!important}
+  html[data-view=album][data-sheet=device] .ppp>.ppp-frame:not([hidden]){display:block!important}
+  html[data-view=album][data-asking] .ppp-folds,html[data-view=album][data-asking] .sheet-bar{display:none!important}
+  html[data-view=album][data-sheet] .ppp-fold{display:none}
+  html[data-view=album][data-sheet=music] .ppp-shelf:not([hidden]),html[data-view=album][data-sheet=gifts] .ppp-gifts:not([hidden]),
+  html[data-view=album][data-sheet=device] .ppp-wallets:not([hidden]),html[data-view=album][data-sheet=device] .ppp-recent:not([hidden]),
+  html[data-view=album][data-sheet=device] .ppp-more:not([hidden]){display:block}
+  .album,.albumlist{color:#f2f0ea;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  .album button,.albumlist button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+  .album button:disabled,.albumlist button:disabled{cursor:default;opacity:.4}
+  .album button:focus-visible,.albumlist button:focus-visible{outline:2px solid #7fe3f5;outline-offset:2px;border-radius:10px}
+  /* an open album: its songs stand in for Your Station */
+  .albumlist{margin:0 0 14px;padding:12px 14px 4px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+  .albumlist[hidden]{display:none}
+  html[data-albumlist] #likesBox{display:none}
+  .albumlist .al-listhead{margin-top:0}
+  .al-top{height:56px;display:flex;align-items:center;justify-content:space-between}
+  .al-brand{font-weight:700;font-size:15px;letter-spacing:.02em;color:#f2f0ea;text-decoration:none}.al-brand b{color:#7fe3f5;font-weight:700}
+  .al-icon{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;color:#c9ced6;border-radius:12px}
+  .al-icon.is-on{color:#ff5d7d}
+  .al-icon--big{width:52px;height:52px;color:#f2f0ea}
+  .al-body{display:flex;flex-direction:column;min-height:calc(100vh - 84px)}
+  .al-from{display:flex;align-items:center;gap:8px;margin:14px 0 0;font-size:14px;color:#c9ced6}.al-from span:first-child{color:#f2b661;display:inline-flex}
+  .al-cover{width:min(100%,320px,40vh);aspect-ratio:1/1;margin:14px auto 0;border-radius:12px;overflow:hidden;background:#143a40;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+  .al-cover--small{width:min(70%,250px,30vh)}
+  .al-cover{position:relative;display:block}
+  .al-cover img,.al-cover .al-cover-fallback{transition:filter .25s}
+  .al-cover.is-paused img,.al-cover.is-paused .al-cover-fallback{filter:brightness(.55)}
+  .al-paused{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(8,12,14,.72);color:#f2f0ea;font-size:12px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;animation:al-fade .25s .5s both}
+  .al-paused i{display:inline-flex}
+  .al-flip{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:14px;background:rgba(8,12,14,.55);color:#f2f0ea;display:inline-flex;align-items:center;justify-content:center;opacity:.85}
+  @keyframes al-fade{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.al-paused{animation:none}.al-cover img,.al-cover .al-cover-fallback{transition:none}}
+  .al-cover img{width:100%;height:100%;object-fit:cover;display:block}
+  .al-cover-fallback{height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:22px}
+  .al-cover-fallback b{font-size:clamp(34px,10vw,60px);line-height:.95;letter-spacing:-.03em;font-weight:800;color:#e9f6f4;overflow-wrap:anywhere}
+  .al-cover-fallback span{margin-top:8px;color:#a9d3cf}
+  .al-intro{text-align:center;margin-top:20px}
+  .al-intro h1{margin:0;font-size:28px;letter-spacing:-.02em;line-height:1.15}
+  .al-artist{margin:4px 0 0;color:#a3aab5;font-size:15px}
+  .al-songline{margin:12px 0 0;color:#8f97a3;font-size:13px;line-height:1.5}
+  .al-chip{display:inline-block;font-family:var(--mono);font-size:12px;color:#0b0d10;background:#ddf6fb;border-radius:999px;padding:4px 11px;white-space:nowrap}
+  .al-intro .al-chip{margin-top:14px}
+  .al-chip--low{background:#ffe2b3}.al-chip--out{background:#f2b661}.al-chip--quiet{background:#262b33;color:#c9ced6}
+  .al-status{margin-top:14px;font-size:14px;text-align:center}.al-status p{margin:6px 0}
+  .al-status .ppp-bad{color:#ff8a8a}.al-status .ppp-warn{color:#ffcf8a}.al-status .ppp-cyan,.al-status .ppp-ok{color:#7fe3f5}.al-status .ppp-mute{color:#8f97a3}
+  .al-status button{margin-top:6px;min-height:40px;padding:0 14px!important;border:1px solid #343b46!important;border-radius:10px}
+  .al-status a{color:#7fe3f5}
+  .al-grow{flex:1;min-height:16px}
+  .al-primary{width:100%;height:56px;border-radius:14px;background:#7fe3f5!important;color:#0b0d10!important;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;gap:10px}
+  .al-hint{margin:10px 0 0;font-size:12px;color:#8f97a3;text-align:center;line-height:1.5}
+  .al-hint--ask{font-size:15px;color:#7fe3f5}
+  .al-link{min-height:44px;margin:6px auto 0;display:block;font-size:13px;color:#c9ced6!important;text-decoration:underline;text-underline-offset:3px}
+  .al-now{display:flex;align-items:center;gap:12px;margin-top:20px}
+  .al-now-t{flex:1;min-width:0}
+  .al-song{font-weight:700;font-size:22px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .al-now .al-artist{margin-top:3px;font-size:14px}
+  .al-prog{margin-top:12px}
+  .al-bar{height:4px;border-radius:2px;background:#262b33;overflow:hidden}.al-bar i{display:block;height:4px;background:#f2f0ea;width:0}
+  .al-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:#8f97a3;margin-top:6px}
+  .al-ctl{display:flex;align-items:center;justify-content:center;gap:28px;margin-top:6px}
+  .al-ctl.is-off{opacity:.35}
+  .al-play{width:64px;height:64px;border-radius:32px;background:#7fe3f5!important;color:#0b0d10!important;display:inline-flex;align-items:center;justify-content:center}
+  .al-listhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;padding-bottom:8px;border-bottom:1px solid #1e232a;font-size:13px;color:#a3aab5}
+  .al-listhead b{color:#f2f0ea}
+  .al-tracks{list-style:none;margin:0;padding:0}
+  .al-track{width:100%;min-height:58px;display:flex;align-items:center;gap:12px;text-align:left;border-bottom:1px solid #15191f!important}
+  .al-th{position:relative;flex:none;width:42px;height:42px;border-radius:8px;overflow:hidden;background:#143a40;display:inline-flex;align-items:center;justify-content:center}
+  .al-th img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  .al-th.is-blank img{opacity:.3}
+  .al-th .al-n{position:relative;width:auto}
+  .al-th .al-eq{position:absolute;inset:0;align-items:center;justify-content:center;background:rgba(8,12,14,.6)}
+  .al-track.is-on .al-th{box-shadow:0 0 0 2px #7fe3f5}
+  .al-n{width:20px;font-family:var(--mono);font-size:12px;color:#cfe9ee}
+  .al-tt{flex:1;font-size:15px;color:#e4e1da}
+  .al-track.is-on .al-tt{color:#7fe3f5;font-weight:600}
+  .al-eq{color:#7fe3f5;display:inline-flex}
+  .al-more{height:48px;margin-top:14px;border:1px solid #262b33!important;border-radius:12px;display:flex;align-items:center;justify-content:space-between;padding:0 16px!important;color:#c9ced6;font-size:14px}
+  .al-mute{color:#8f97a3}.al-small{font-size:12px;margin:10px 0 0}.al-mono{font-family:var(--mono);font-size:12px;color:#a3aab5}
+  .al-out{margin-top:18px;background:#1e1a12;border:1px solid #4a3a1c;border-radius:16px;padding:18px;text-align:center}
+  .al-out p{margin:0}.al-out-k{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#f2b661}
+  .al-out-t{font-size:16px;font-weight:600;margin-top:6px!important}.al-out-s{font-size:13px;color:#b3ab9c;margin-top:4px!important}
+  .al-topups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+  .al-topups--primary{display:block}
+  .al-topup{height:46px;border-radius:12px;border:1px solid #343b46!important;font-weight:700;font-size:15px}
+  .al-topups--primary .al-topup{width:100%;height:50px;background:#f2b661!important;color:#0b0d10!important;border:0!important;font-size:16px}
+  .al-scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50}
+  .al-sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;max-width:620px;margin:0 auto;max-height:86vh;overflow:auto;background:#15181d;border-radius:22px 22px 0 0;padding:10px 18px 24px;box-shadow:0 -12px 40px rgba(0,0,0,.5)}
+  .al-sheet-h{display:flex;align-items:center;justify-content:space-between;padding:4px 0 6px}.al-sheet-h b{font-size:20px}
+  .al-card{background:#1c2027;border-radius:14px;padding:14px}
+  .al-card-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .al-rows{margin-top:6px}
+  .al-row{width:100%;min-height:58px;display:flex;align-items:center;gap:14px;text-align:left;border-bottom:1px solid #20252c!important}
+  .al-row-i{width:36px;height:36px;border-radius:10px;background:#1f242b;display:inline-flex;align-items:center;justify-content:center;color:#c9ced6;flex-shrink:0}
+  .al-row-t{flex:1;min-width:0;display:flex;flex-direction:column}.al-row-t b{font-size:15px;font-weight:500}.al-row-t small{font-size:12px;color:#8f97a3;margin-top:2px}
+  .al-row-go{color:#6f7783;display:inline-flex}
+  .al-how.is-open p{padding:0 4px 12px}
+  .sheet-extra .al-row{background:none;border:0;border-bottom:1px solid #20252c;color:#f2f0ea;font:inherit;cursor:pointer;padding:0}
+  @media(max-width:420px){html[data-view=album] main{padding:0 16px 24px}.al-ctl{gap:20px}}
+
+  /* ---- Dock layout (?dock=1 only): the whole front panel fits one small window (about 440 x 600) with no sideways scroll.
+     Top bar, receiver, waveform, controls and tuning strip are on one screen; the wallet box, your station and links are below. ---- */
+  html[data-dock],html[data-dock] body{overflow-x:hidden}
+  html[data-dock] body{min-height:0}
+  html[data-dock] .topbar{padding:6px 10px;gap:8px;flex-wrap:nowrap}
+  html[data-dock] .live,html[data-dock] .idpill,html[data-dock] #radio-wallet-address{display:none}
+  html[data-dock] .logo{margin-right:auto;font-size:14px}
+  html[data-dock] .ppp-top{padding:5px 10px;font-size:11.5px}
+  html[data-dock] .radio-wallet{flex-wrap:nowrap;gap:6px;min-width:0}
+  html[data-dock] .radio-wallet button{padding:5px 8px;font-size:12px;white-space:nowrap}
+  html[data-dock] #radio-wallet-message{position:absolute;left:10px;right:10px;top:100%;z-index:31;flex-basis:auto;padding:4px 8px;border-radius:8px;background:#1a0f12;font-size:11.5px}
+  html[data-dock] main{grid-template-columns:minmax(0,1fr);gap:10px;padding:8px 10px 24px;max-width:none}
+  html[data-dock] main>*{min-width:0}
+  html[data-dock] .side{display:contents}
+  html[data-dock] .rx{order:0} html[data-dock] .ppp{order:1} html[data-dock] #likesBox,html[data-dock] .albumlist{order:2} html[data-dock] .strap{order:3}
+  html[data-dock] .receiver{grid-template-columns:84px minmax(0,1fr);gap:10px;padding:10px;border-radius:16px}
+  html[data-dock] .art{border-radius:10px}
+  html[data-dock] .art .fallback{gap:4px;padding:4px}
+  html[data-dock] .art .fallback .fnote,html[data-dock] .chainlink{display:none}
+  html[data-dock] .art .mark{width:34px;height:34px}
+  html[data-dock] .display{gap:6px}
+  html[data-dock] .vfd{padding:8px 10px;border-radius:10px}
+  html[data-dock] .stn{font-size:10px;letter-spacing:.2em}
+  html[data-dock] .ttl{font-size:17px;margin:3px 0 1px}
+  html[data-dock] .artst{font-size:12.5px;min-height:0}
+  html[data-dock] .idrow{margin-top:6px;min-height:0;gap:6px}
+  html[data-dock] .viewbtn{padding:4px 10px;font-size:11.5px}
+  html[data-dock] .spectrum{height:26px}
+  html[data-dock] .nudge{margin-top:8px;padding:7px 8px 7px 10px;gap:8px}
+  html[data-dock] .nudge-s{font-size:11.5px;line-height:1.3}
+  html[data-dock] .timeline{margin-top:8px;gap:6px}
+  html[data-dock] .tl-wave{height:32px}
+  html[data-dock] .tl-t{min-width:32px;font-size:10.5px}
+  html[data-dock] .ctl{margin-top:10px;gap:8px;flex-wrap:nowrap;justify-content:center}
+  html[data-dock] .ctl .grow{flex:1;flex-basis:auto;height:auto}
+  html[data-dock] .cbtn{width:44px;height:44px;font-size:17px;flex:none}
+  html[data-dock] .cbtn.big{width:54px;height:54px;font-size:22px}
+  html[data-dock] .chip{padding:7px 10px;font-size:11px;white-space:nowrap;flex:none}
+  html[data-dock] .tuner{margin-top:10px;height:56px}
+  html[data-dock] .stations{gap:6px}
+  html[data-dock] .stations button{padding:7px 8px}
+  html[data-dock] .stations button span{display:none}
+  /* an album as the music: the same player, the same window (its own rules already fit the window height) */
+  html[data-dock][data-view=album] main{padding:0 12px 16px;max-width:none}
 </style>
 </head>
 <body>
-<header>
-  <a href="/" title="Xtrata home"><img src="/favicon.svg" alt="Xtrata" /></a>
-  <div class="logo"><b>XTRATA</b> <i>RADIO</i></div>
-  <div class="live"><b>●</b> BROADCASTING FROM THE CHAIN</div>
+<header class="topbar">
+  <a class="logo" href="/radio"><b>XTRATA</b> <i>RADIO</i></a>
+  <div class="live"><b>●</b> ON AIR FROM THE CHAIN</div>
+  <!-- Pay-per-play's next step, always in reach: set up, unlock, or its live state (src/radio-ppp). -->
+  <button class="ppp-top" id="ppp-top" type="button" hidden></button>
   <div class="radio-wallet" aria-label="Wallet controls">
     <span id="radio-wallet-address">Wallet not connected</span>
     <button id="radio-wallet-connect" type="button">Connect wallet</button>
@@ -145,116 +591,438 @@
   </div>
 </header>
 <main class="paused" id="stage">
-  <div>
-    <div class="art" id="art">
-      <img id="cover" alt="Inscription artwork" />
-      <div class="fallback">
-        <img class="mark" src="/favicon.svg" alt="" />
-        <span class="eq"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
-        <span class="fnote" id="fnote">PRESS POWER TO TUNE IN</span>
+  <!-- Album First (src/radio-ppp/album.ts): shown instead of the receiver and panel while an album is the music. -->
+  <section class="album" id="album" hidden aria-label="Album"></section>
+  <section class="rx" aria-label="Receiver">
+    <div class="receiver" id="receiver">
+      <div class="art" id="art">
+        <img id="cover" alt="Inscription artwork" />
+        <div class="fallback">
+          <img class="mark" src="/favicon.svg" alt="" />
+          <span class="fnote" id="fnote">PRESS POWER TO TUNE IN</span>
+        </div>
+        <a class="chainlink" id="artLink" target="_blank" rel="noopener" style="display:none">VIEW ↗</a>
+        <!-- An album song with artwork of its own: tap to swap that artwork and the album's cover. -->
+        <button class="artflip" id="artFlip" type="button" hidden aria-label="Show the album cover"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></button>
+        <span class="artpaused" id="artPaused" hidden>Paused</span>
       </div>
-      <a class="chainlink" id="artLink" target="_blank" rel="noopener" style="display:none">VIEW INSCRIPTION ↗</a>
-    </div>
-    <div class="relwrap" id="relWrap" style="display:none">
-      <label>RELATED INSCRIPTIONS</label>
-      <div class="relrow" id="relRow"></div>
-    </div>
-  </div>
-  <div>
-    <div class="vfd">
-      <div class="stn" id="stn">XTRATA FM</div>
-      <div class="ttl" id="ttl">— OFF AIR —</div>
-      <div class="artst" id="artst"></div>
-      <div class="artst" id="album" hidden></div>
-      <div class="idrow">
-        <span class="idpill" id="idpill" style="display:none"></span>
-        <a class="viewbtn" id="viewbtn" target="_blank" rel="noopener">View inscription ↗</a>
+      <div class="display">
+        <div class="vfd">
+          <!-- Pay-per-play's lamp (src/radio-ppp): lit while it pays artists, dark while it does not. -->
+          <div class="onair" id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div>
+          <div class="stn" id="stn">XTRATA FM</div>
+          <div class="ttl" id="ttl">— OFF AIR —</div>
+          <div class="artst" id="artst"></div>
+          <div class="artst" id="albumName" hidden></div>
+          <div class="idrow">
+            <span class="idpill" id="idpill" style="display:none"></span>
+            <!-- This song on-chain: likes on the likes contract, paid plays on the paid-plays contract. -->
+            <span class="counts" id="songCounts" hidden><span class="c-like" id="cLikes" hidden>♥ <b></b></span><span class="c-play" id="cPlays" hidden>▶ <b></b></span></span>
+            <a class="viewbtn" id="viewbtn" target="_blank" rel="noopener">View inscription ↗</a>
+          </div>
+        </div>
+        <canvas class="spectrum" id="spectrum" aria-hidden="true"></canvas>
       </div>
+    </div>
+    <div class="nudge" id="pppNudge" role="note" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>
+    <!-- The song's whole waveform: the played part lights up; tap or drag to jump. -->
+    <div class="timeline" id="timeline" hidden>
+      <span class="tl-t" id="tCur">0:00</span>
+      <div class="tl-wave" id="tlWave" role="slider" tabindex="0" aria-label="Position in this song" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00"><canvas id="wave" aria-hidden="true"></canvas><b class="tl-hover" id="tlHover" hidden></b></div>
+      <span class="tl-t" id="tDur">–:––</span>
     </div>
     <div class="ctl">
       <button class="cbtn power" id="power" title="Power">⏻</button>
       <button class="cbtn" id="prev" title="Previous">⏮</button>
       <button class="cbtn big" id="pp" title="Play / pause">▶</button>
       <button class="cbtn" id="next" title="Next">⏭</button>
-      <button class="cbtn heart" id="heart" title="Like — saves to your station">♥</button>
+      <button class="cbtn heart" id="heart" title="Like on-chain">♥</button>
+      <span class="grow"></span>
+      <button class="chip" id="presetBtn" type="button" title="FM: curated songs only, or curated plus new on-chain music">FM: ALL</button>
     </div>
-    <div class="grp">
-      <label>BAND</label>
-      <span class="seg" id="bands">
-        <button data-b="fm">FM</button><button data-b="liked">LIKED</button><button data-b="chain">CHAIN</button>
-      </span>
-      <span class="seg preset" id="presetSeg" title="FM preset"><button id="presetBtn">PRESET: ALL</button></span>
+    <div class="tuner" id="tuner" role="slider" tabindex="0" aria-label="Tuning strip: every song by inscription number" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" hidden>
+      <div class="ticks" id="ticks"></div>
+      <div class="needle" id="needle"></div>
+      <div class="tunerLabel"><span id="tunerFrom"></span><b id="tunerNow">Tap or drag to tune</b><span id="tunerTo"></span></div>
     </div>
-  </div>
-  <div class="col-station">
-    <div class="likes">
-      <h3>♥ YOUR STATION</h3>
-      <button id="refreshLikes" type="button" style="float:right;font:inherit;font-size:12px;background:transparent;color:var(--cyan);border:1px solid var(--line);border-radius:6px;padding:4px 8px;cursor:pointer">Refresh likes</button>
-      <div class="hint" id="likesHint">Like songs while they play — they get their own band, and play first when you tune in.</div>
-      <div id="likesList"></div>
+    <div class="stations" id="bands" role="group" aria-label="Stations">
+      <button type="button" data-b="fm"><b><i class="lamp"></i>FM</b><span>Curated + new on-chain</span></button>
+      <button type="button" data-b="liked"><b><i class="lamp"></i>LIKED</b><span>Your likes, your order</span></button>
+      <button type="button" data-b="chain"><b><i class="lamp"></i>CHAIN</b><span>Every song by number</span></button>
     </div>
+    <div class="relwrap" id="relWrap" style="display:none">
+      <span class="cap">ALSO ON THIS FREQUENCY</span>
+      <div class="relrow" id="relRow"></div>
+    </div>
+  </section>
+  <aside class="side">
+    <div class="sheet-bar"><b id="sheetTitle"></b><button type="button" id="sheetClose" aria-label="Close">×</button></div>
+    <div class="sheet-extra" id="sheetExtra"></div>
+    <!-- Pay-per-play first: the wallet box (and its unlock) stays near the top, whatever the likes list holds. -->
+    <section class="ppp" id="ppp" hidden aria-label="Xtrata Music">
+      <div class="ppp-head"><h3>♪ XTRATA MUSIC<span class="ppp-badge" hidden>SETUP</span></h3><span class="ppp-state" hidden></span></div>
+      <ol class="ppp-steps" hidden aria-label="Setup stages"></ol>
+      <p class="ppp-stage" hidden></p>
+      <!-- Top to bottom: what to do now, the wallet box when it needs a tap, buttons; details folded below. -->
+      <div class="ppp-switch" hidden></div>
+      <!-- My albums, right under the switcher: opened by the "View all albums" button (its own summary is hidden). -->
+      <details class="ppp-fold ppp-shelf" hidden><summary>♪ My albums</summary><div class="ppp-shelf-body"></div></details>
+      <div class="ppp-key"></div>
+      <p class="ppp-frame-label" hidden><span>Listening wallet · approvals happen in this box</span></p>
+      <div class="ppp-frame" hidden></div>
+      <div class="ppp-actions"></div>
+      <p class="ppp-msg" role="status"></p>
+      <p class="ppp-err" role="alert"></p>
+      <!-- Nothing to read unless you want to: three small folds. -->
+      <div class="ppp-folds">
+        <details class="ppp-fold ppp-recent" hidden><summary>♪ Recently played</summary><ol class="ppp-recent-list"></ol><details class="ppp-history" hidden></details></details>
+        <details class="ppp-fold ppp-wallets" hidden><summary>◎ This device</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
+        <details class="ppp-fold ppp-more" hidden><summary>? How plays work</summary><div class="ppp-body"></div></details>
+        <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Albums (admin)</summary><div class="ppp-gift-body"></div></details>
+      </div>
+    </section>
+    <!-- An open album's songs, with their artwork and plays left (src/radio-ppp/album.ts, list mode). Stands in for Your Station. -->
+    <section class="albumlist" id="albumList" hidden aria-label="Album songs"></section>
+    <details class="likes" id="likesBox" open>
+      <summary><span>♥ YOUR STATION</span><span class="count" id="likesCount"></span></summary>
+      <div class="likesTools">
+        <input type="search" id="likesFilter" placeholder="Filter by title, artist or #" aria-label="Filter your likes" />
+        <button type="button" id="likesPlay" title="Play the LIKED station in your order">Play</button>
+        <button type="button" id="refreshLikes" title="Re-read your likes from the chain">Refresh</button>
+      </div>
+      <div class="hint" id="likesHint"></div>
+      <ol class="likesList" id="likesList"></ol>
+      <div class="likesFoot" id="likesFoot" hidden><span id="likesNote">Drag ⋮⋮ or use ↑ ↓ to set the LIKED station's order.</span><button type="button" id="likesReset" hidden>Reset order</button></div>
+    </details>
     <p class="strap">Every song on this station is an inscription — full audio files living permanently on-chain.
       <a href="/wizard/" target="_blank" rel="noopener">Inscribe your own →</a>
       · <a href="/music/lounge">Music Support · listening room →</a>
       · <a href="/radio/guide.html">Listening guide →</a>
       · <a href="/radio/share.html" target="_blank" rel="noopener">Embed the radio →</a></p>
-  </div>
+  </aside>
 </main>
 <script>
 (function(){
   var $=function(id){return document.getElementById(id)};
   var api=null, state=null;
-  function esc(t){var d=document.createElement('span');d.textContent=t==null?'':String(t);return d.innerHTML}
+  function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+  function wallet(){try{var s=JSON.parse(localStorage.getItem('xtrata.v15.1.wallet.session')||'null');return s&&s.isConnected&&s.address||''}catch(e){return ''}}
+
+  /* ---- catalogue: every playable song, for the tuning strip and names ---- */
+  var catalogue=[], byId={};
+  fetch('/radio/counts?range=all&chainLikes=0',{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(d){
+    var t=(d&&Array.isArray(d.tracks)?d.tracks:[]).filter(function(x){return Number.isSafeInteger(Number(x.id))});
+    t.sort(function(a,b){return Number(a.id)-Number(b.id)});
+    catalogue=t;byId={};t.forEach(function(x){byId[String(x.id)]=x});
+    buildTicks();if(state)render(state);
+  }).catch(function(){});
+  function nameOf(id){var t=byId[String(id)];return t&&t.title&&!/^(?:Inscription )?#\d+$/.test(t.title)?t.title:'#'+id}
+
+  /* ---- tuning strip ---- */
+  var tuneIndex=-1;
+  function buildTicks(){
+    var box=$('ticks');box.innerHTML='';
+    $('tuner').hidden=catalogue.length<2;
+    if(catalogue.length<2)return;
+    catalogue.forEach(function(t,i){
+      var tick=document.createElement('i');tick.style.left=(i/(catalogue.length-1)*100)+'%';tick.dataset.id=String(t.id);
+      if(i%10===0)tick.className='major';
+      box.appendChild(tick);
+    });
+    $('tunerFrom').textContent='#'+catalogue[0].id;$('tunerTo').textContent='#'+catalogue[catalogue.length-1].id;
+    $('tuner').setAttribute('aria-valuemax',String(catalogue.length-1));
+  }
+  function placeNeedle(i){
+    if(i<0||!catalogue.length){$('needle').style.opacity='0';return}
+    $('needle').style.opacity='1';
+    $('needle').style.left='calc(16px + (100% - 32px) * '+(i/(catalogue.length-1))+')';
+    $('tuner').setAttribute('aria-valuenow',String(i));
+    $('tuner').setAttribute('aria-valuetext',nameOf(catalogue[i].id)+' · #'+catalogue[i].id);
+  }
+  function indexAt(clientX){
+    var r=$('ticks').getBoundingClientRect();var f=Math.min(1,Math.max(0,(clientX-r.left)/r.width));
+    return Math.round(f*(catalogue.length-1));
+  }
+  function preview(i){if(state&&state.giftLocked)return;tuneIndex=i;placeNeedle(i);var t=catalogue[i];$('tunerNow').textContent=nameOf(t.id)+' · #'+t.id}
+  function tuneTo(i){if(!api||!catalogue[i]||(state&&state.giftLocked))return;preview(i);api.playToken(catalogue[i].id)}
+  (function(){
+    var tuner=$('tuner'),dragging=false;
+    tuner.addEventListener('pointerdown',function(e){if(!catalogue.length)return;dragging=true;tuner.classList.add('dragging');tuner.setPointerCapture(e.pointerId);preview(indexAt(e.clientX))});
+    tuner.addEventListener('pointermove',function(e){if(dragging)preview(indexAt(e.clientX))});
+    tuner.addEventListener('pointerup',function(e){if(!dragging)return;dragging=false;tuner.classList.remove('dragging');tuneTo(indexAt(e.clientX))});
+    tuner.addEventListener('pointercancel',function(){dragging=false;tuner.classList.remove('dragging');if(state)render(state)});
+    tuner.addEventListener('keydown',function(e){
+      if(!catalogue.length)return;
+      var i=tuneIndex<0?0:tuneIndex;
+      if(e.key==='ArrowRight'||e.key==='ArrowUp'){e.preventDefault();preview(Math.min(catalogue.length-1,i+1))}
+      else if(e.key==='ArrowLeft'||e.key==='ArrowDown'){e.preventDefault();preview(Math.max(0,i-1))}
+      else if(e.key==='Enter'||e.key===' '){e.preventDefault();tuneTo(i)}
+    });
+  })();
+
+  /* ---- live spectrum from the radio's own analyser (still when paused or unavailable) ---- */
+  var spec=$('spectrum'),sctx=spec.getContext('2d'),bins=null,levels=new Float32Array(32),frame=0;
+  function sizeCanvas(){var r=spec.getBoundingClientRect(),d=window.devicePixelRatio||1;spec.width=Math.max(1,Math.round(r.width*d));spec.height=Math.max(1,Math.round(r.height*d))}
+  function drawSpectrum(){
+    frame=0;
+    var playing=state&&state.playing, live=false;
+    if(api&&api.getSpectrum&&playing){
+      var n=api.spectrumSize?api.spectrumSize():0;
+      if(n){if(!bins||bins.length!==n)bins=new Uint8Array(n);live=api.getSpectrum(bins)}
+    }
+    var W=spec.width,H=spec.height,N=levels.length,gap=Math.max(1,Math.round(W/N*0.28)),bw=(W-gap*(N+1))/N;
+    for(var i=0;i<N;i++){
+      var target=0;
+      if(live){var a=Math.floor(Math.pow(i/N,1.7)*bins.length*0.8),b=Math.max(a+1,Math.floor(Math.pow((i+1)/N,1.7)*bins.length*0.8)),sum=0;for(var k=a;k<b;k++)sum+=bins[k];target=sum/(b-a)/255}
+      levels[i]=target>levels[i]?target:levels[i]*0.9;
+    }
+    sctx.clearRect(0,0,W,H);
+    var mode=document.documentElement.dataset.ppp;
+    var rgb=mode==='on'?'255,196,84':mode==='off'?'118,128,142':(getComputedStyle(document.documentElement).getPropertyValue('--glow').trim()||'94,233,255');
+    for(var j=0;j<N;j++){
+      var h=Math.max(2,levels[j]*(H-6));
+      sctx.fillStyle='rgba('+rgb+','+(0.35+levels[j]*0.6)+')';
+      sctx.fillRect(gap+j*(bw+gap),H-3-h,bw,h);
+    }
+    var moving=live||levels.some(function(v){return v>0.01});
+    if((playing||moving)&&!document.hidden)frame=requestAnimationFrame(drawSpectrum);
+  }
+  function kickSpectrum(){if(!frame)frame=requestAnimationFrame(drawSpectrum)}
+  window.addEventListener('resize',function(){sizeCanvas();kickSpectrum()});
+  document.addEventListener('visibilitychange',kickSpectrum);
+
+  /* ---- glow from the artwork's colour ---- */
+  var glowFor='';
+  function glowFrom(img){
+    try{
+      var c=document.createElement('canvas');c.width=c.height=8;var x=c.getContext('2d');x.drawImage(img,0,0,8,8);
+      var d=x.getImageData(0,0,8,8).data,r=0,g=0,b=0,n=0;
+      for(var i=0;i<d.length;i+=4){var mx=Math.max(d[i],d[i+1],d[i+2]),mn=Math.min(d[i],d[i+1],d[i+2]);var w=1+(mx-mn)/32;r+=d[i]*w;g+=d[i+1]*w;b+=d[i+2]*w;n+=w}
+      r=r/n;g=g/n;b=b/n;var m=Math.max(r,g,b)||1,k=200/m; // keep it bright enough to glow
+      return Math.min(255,Math.round(r*k))+','+Math.min(255,Math.round(g*k))+','+Math.min(255,Math.round(b*k));
+    }catch(e){return ''}
+  }
+  $('cover').addEventListener('load',function(){var c=glowFrom($('cover'));document.documentElement.style.setProperty('--glow',c||'94,233,255')});
+
+  /* ---- your station: collapse, filter, reorder ---- */
+  var orderKey=function(){var w=wallet();return w?'xtrata.radio.likeorder.v1:'+w:''};
+  function savedOrder(){var k=orderKey();if(!k)return [];try{var v=JSON.parse(store(k)||'[]');return Array.isArray(v)?v.map(String):[]}catch(e){return []}}
+  function ordered(likes){
+    var order=savedOrder();if(!order.length)return likes.slice();
+    var rank={};order.forEach(function(id,i){rank[id]=i});
+    return likes.map(function(l,i){return [l,rank[l.tokenId]!==undefined?rank[l.tokenId]:-likes.length+i]}).sort(function(a,b){return a[1]-b[1]}).map(function(x){return x[0]});
+  }
+  function setOrder(ids){var k=orderKey();if(k)store(k,JSON.stringify(ids));if(api&&api.setLikedOrder)api.setLikedOrder(ids);if(state)render(state)}
+  function move(ids,from,to){var a=ids.slice();var x=a.splice(from,1)[0];a.splice(to,0,x);return a}
+  var dragFrom=-1,lastLikesSig='';
+  function renderLikes(s){
+    var likes=ordered(s.likes||[]),q=($('likesFilter').value||'').trim().toLowerCase();
+    var ids=likes.map(function(l){return l.tokenId});
+    if(api&&api.setLikedOrder)api.setLikedOrder(ids);
+    var shown=q?likes.filter(function(l){return (l.title+' '+(l.artist||'')+' #'+l.tokenId).toLowerCase().indexOf(q)>=0}):likes;
+    var np=s.nowPlaying?String(s.nowPlaying.tokenId):'';
+    var sig=JSON.stringify([ids,q,np,shown.length]);
+    $('likesCount').textContent=likes.length?(q?shown.length+' of '+likes.length:String(likes.length)):'';
+    $('likesBox').classList.toggle('filtering',!!q);
+    $('likesFoot').hidden=likes.length<2;
+    $('likesReset').hidden=!savedOrder().length;
+    $('likesNote').textContent=q?'Clear the filter to change the order.':'Drag ⋮⋮ or use ↑ ↓ to set the LIKED station’s order.';
+    if(sig===lastLikesSig)return;lastLikesSig=sig;
+    var list=$('likesList');list.innerHTML='';
+    shown.forEach(function(l){
+      var i=ids.indexOf(l.tokenId);
+      var row=document.createElement('li');row.className='lrow'+(l.tokenId===np?' now':'');row.draggable=!q;
+      var grip=document.createElement('span');grip.className='grip';grip.textContent='⋮⋮';grip.title='Drag to reorder';
+      var t=document.createElement('button');t.type='button';t.className='lt';t.title='Play now';t.textContent=l.title||nameOf(l.tokenId);
+      var a=document.createElement('span');a.className='la';a.textContent=l.artist||('#'+l.tokenId);
+      var up=document.createElement('button');up.type='button';up.className='mv up';up.textContent='↑';up.title='Move up';up.disabled=i===0;
+      var dn=document.createElement('button');dn.type='button';dn.className='mv down';dn.textContent='↓';dn.title='Move down';dn.disabled=i===ids.length-1;
+      var rm=document.createElement('button');rm.type='button';rm.className='mv rm';rm.textContent='✕';rm.title='Unlike';
+      t.addEventListener('click',function(){api.playToken(l.tokenId)});
+      up.addEventListener('click',function(){setOrder(move(ids,i,i-1))});
+      dn.addEventListener('click',function(){setOrder(move(ids,i,i+1))});
+      rm.addEventListener('click',function(){api.unlike(l.tokenId)});
+      row.addEventListener('dragstart',function(e){dragFrom=i;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',l.tokenId)}catch(x){}});
+      row.addEventListener('dragover',function(e){if(dragFrom<0)return;e.preventDefault();row.classList.add('drag-over')});
+      row.addEventListener('dragleave',function(){row.classList.remove('drag-over')});
+      row.addEventListener('drop',function(e){e.preventDefault();row.classList.remove('drag-over');if(dragFrom>=0&&dragFrom!==i)setOrder(move(ids,dragFrom,i));dragFrom=-1});
+      row.addEventListener('dragend',function(){dragFrom=-1});
+      row.append(grip,t,a,up,dn,rm);list.appendChild(row);
+    });
+  }
+  $('artFlip').addEventListener('click',function(){var np=state&&state.nowPlaying;albumFace=albumFace?'':(np?String(np.tokenId):'');render(state)});
+  $('likesFilter').addEventListener('input',function(){lastLikesSig='';if(state)render(state)});
+  $('likesReset').addEventListener('click',function(){var k=orderKey();if(k)try{localStorage.removeItem(k)}catch(e){}lastLikesSig='';if(api&&api.setLikedOrder)api.setLikedOrder([]);if(state)render(state)});
+  $('likesPlay').addEventListener('click',function(){if(!api)return;api.setBand('liked');if(!api.isOn())api.switchOn()});
+  if(store('xtrata.radio.likes.open')==='0')$('likesBox').open=false;
+  $('likesBox').addEventListener('toggle',function(){store('xtrata.radio.likes.open',$('likesBox').open?'1':'0')});
+
+  var albumStarted={}, albumFace='';
   function render(s){
     state=s;
     var np=s.nowPlaying, stage=$('stage');
+    // Plays on their way: every control rests (greyed out, not clickable) until they land. Nothing is wrong.
+    var gw=!!s.giftWait;
+    ['power','prev','pp','next','heart','presetBtn'].forEach(function(id){var b=$(id);if(b)b.disabled=gw});
+    Array.prototype.forEach.call($('bands').children,function(b){b.disabled=gw});
+    $('tuner').classList.toggle('waiting',gw);
+    stage.classList.toggle('arriving',gw);
+    $('tuner').classList.toggle('locked',!!s.giftLocked);
+    $('tuner').title=s.giftLocked?'This album plays only its own songs':'';
     $('stn').textContent=(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
     $('ttl').textContent=np?np.title:(s.on?'TUNING…':'— OFF AIR —');
     $('artst').textContent=np&&np.artist?np.artist:'';
-    $('album').textContent=np&&np.album?'Album: '+np.album:'';
-    $('album').title=np&&np.album?np.album:'';
-    $('album').hidden=!(np&&np.album);
+    $('albumName').textContent=np&&np.album?'Album: '+np.album:'';
+    $('albumName').title=np&&np.album?np.album:'';
+    $('albumName').hidden=!(np&&np.album);
     $('power').classList.toggle('on',!!s.on);
-    var playing=(typeof s.playing==='boolean')?s.playing:s.on;   // real audio state (fallback for old bundles)
+    var playing=(typeof s.playing==='boolean')?s.playing:s.on;
     $('pp').textContent=playing?'⏸':'▶';
     $('pp').title=playing?'Pause':'Play';
     stage.classList.toggle('paused',!playing);
-    $('fnote').textContent=s.on?(np?'NO ARTWORK IN THIS INSCRIPTION':'TUNING…'):'PRESS POWER TO TUNE IN';
+    $('fnote').textContent=s.on?(np?'NO ARTWORK':'TUNING…'):'PRESS POWER TO TUNE IN';
     var art=$('art');
-    if(np&&np.cover){$('cover').src=np.cover;art.classList.add('has-cover');}
-    else{art.classList.remove('has-cover');$('cover').removeAttribute('src');}
+    // An album: its cover until something has played, then each song's own artwork (kept while paused, so you can see
+    // which song you are on). A tap on the flip button swaps the song's artwork and the album cover; the next song puts it back.
+    var own=np&&np.cover||'', album=s.albumCover, gid=s.gift?s.gift.id:'';
+    if(gid&&np&&playing)albumStarted[gid]=1;
+    var started=!!(gid&&albumStarted[gid]&&np), flippable=started&&!!own&&!!album, tok=np?String(np.tokenId):'';
+    if(!flippable||albumFace!==tok)albumFace='';
+    var coverUrl=gid&&album&&(!started||albumFace===tok)?album.url:own||(album?album.url:'');
+    $('artFlip').hidden=!flippable;
+    $('artFlip').setAttribute('aria-label',albumFace?'Show this song’s artwork':'Show the album cover');
+    var paused=started&&!playing;
+    art.classList.toggle('is-paused',paused);
+    $('artPaused').hidden=!paused;
+    if(coverUrl){if($('cover').getAttribute('src')!==coverUrl)$('cover').src=coverUrl;art.classList.add('has-cover');}
+    else{art.classList.remove('has-cover');$('cover').removeAttribute('src');document.documentElement.style.setProperty('--glow','94,233,255');}
     var pill=$('idpill'),vb=$('viewbtn'),al=$('artLink');
-    if(np){pill.style.display='';pill.textContent='INSCRIPTION #'+np.tokenId;
-      vb.classList.add('show');vb.href=np.href;al.style.display='';al.href=np.href;}
+    if(np){pill.style.display='';pill.textContent='INSCRIPTION #'+np.tokenId;vb.classList.add('show');vb.href=np.href;al.style.display='';al.href=np.href;}
     else{pill.style.display='none';vb.classList.remove('show');al.style.display='none';}
-    var liked=!!(np&&s.likes.some(function(l){return l.tokenId===String(np.tokenId)}));
-    $('heart').classList.toggle('on',liked);
-    Array.prototype.forEach.call($('bands').children,function(b){b.classList.toggle('on',b.dataset.b===s.band)});
-    $('presetBtn').textContent='PRESET: '+(s.preset==='music'?'MUSIC':'ALL');
-    var list=$('likesList');list.innerHTML='';
+    if(np)songStats(np.tokenId,s.heart?(s.heart.pending?'pending':String(s.heart.liked)):'');else{statsFor='';statsSig='';showStats(null)}
+    // A like on its way is orange and ignores taps; then 3 s locked after it confirms.
+    var hv=s.heart, liked=hv?hv.liked:!!(np&&s.likes.some(function(l){return l.tokenId===String(np.tokenId)}));
+    $('heart').classList.toggle('on',liked&&!(hv&&hv.pending));
+    $('heart').classList.toggle('pending',!!(hv&&hv.pending));
+    $('heart').title=hv&&hv.pending?'On its way to the chain — waiting to confirm':hv&&hv.locked?'Confirmed on-chain':liked?'Liked on-chain — tap to unlike':'Like on-chain';
+    Array.prototype.forEach.call($('bands').children,function(b){b.classList.toggle('on',b.dataset.b===s.band);b.setAttribute('aria-pressed',String(b.dataset.b===s.band))});
+    $('presetBtn').textContent='FM: '+(s.preset==='music'?'CURATED':'ALL');
+    $('presetBtn').classList.toggle('on',s.preset==='music');
+    // tuning strip: needle on the playing song, likes marked
+    var likedIds={};(s.likes||[]).forEach(function(l){likedIds[l.tokenId]=1});
+    Array.prototype.forEach.call($('ticks').children,function(t){t.classList.toggle('liked',!!likedIds[t.dataset.id])});
+    if(!$('tuner').classList.contains('dragging')){
+      var idx=np?catalogue.findIndex(function(t){return String(t.id)===String(np.tokenId)}):-1;
+      tuneIndex=idx;placeNeedle(idx);
+      $('tunerNow').textContent=idx>=0?nameOf(np.tokenId)+' · #'+np.tokenId:(catalogue.length?'Tap or drag to tune':'');
+    }
+    // likes
     var likesStatus=s.likesStatus||'disconnected';
     $('likesHint').style.display=likesStatus==='ready'&&s.likes.length?'none':'';
-    $('likesHint').textContent=likesStatus==='loading'?'Refreshing this wallet’s on-chain likes…':likesStatus==='partial'||likesStatus==='unavailable'?'Some likes could not be refreshed. Showing previously confirmed likes where available; retrying automatically.':likesStatus==='disconnected'?'Connect your wallet to see its on-chain likes.':'No confirmed on-chain likes for this wallet yet.';
-    s.likes.forEach(function(l){
-      var row=document.createElement('div');row.className='lrow';
-      row.innerHTML='<span class="lt" title="Play now">'+esc(l.title)+'</span><span class="la">'+esc(l.artist||('#'+l.tokenId))+'</span><button title="Remove">✕</button>';
-      row.querySelector('.lt').addEventListener('click',function(){api.playToken(l.tokenId)});
-      row.querySelector('button').addEventListener('click',function(){api.unlike(l.tokenId)});
-      list.appendChild(row);
-    });
+    $('likesHint').textContent=likesStatus==='loading'?'Refreshing this wallet’s on-chain likes…':likesStatus==='partial'||likesStatus==='unavailable'?'Some likes could not be refreshed. Showing previously confirmed likes; retrying automatically.':likesStatus==='paused'?'The chain service is busy, so on-chain likes are paused'+(s.likesRetryAt?' until about '+new Date(s.likesRetryAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'')+'. Your likes are safe on-chain. Retrying automatically, or press Refresh.':likesStatus==='disconnected'?'Connect your wallet to see its on-chain likes.':'No confirmed on-chain likes for this wallet yet. Tap ♥ while a song plays.';
+    renderLikes(s);
     renderRelatives(s.relatives||[]);
+    kickSpectrum();
+    kickTimeline();
+  }
+
+  /* ---- timeline: the whole song's waveform, played part lit; tap, drag or arrow keys to jump ---- */
+  var wave=$('wave'),wctx=wave.getContext('2d'),tl=$('tlWave'),peaks=null,peaksFor='',waveCache={},waveBusy='',seekPreview=null,tlFrame=0,tlLast=0;
+  var BARS=160;
+  function clock(t){if(!isFinite(t)||t<0)return '–:––';t=Math.floor(t);var h=Math.floor(t/3600),m=Math.floor(t/60)%60,s=t%60;return (h?h+':'+(m<10?'0':''):'')+m+':'+(s<10?'0':'')+s}
+  function sizeWave(){var r=wave.getBoundingClientRect(),d=window.devicePixelRatio||1;wave.width=Math.max(1,Math.round(r.width*d));wave.height=Math.max(1,Math.round(r.height*d))}
+  // Peaks from the song itself, decoded once at a low sample rate and then let go. Big files,
+  // low-memory devices and anything that will not decode keep a plain bar instead.
+  function loadPeaks(id){
+    if(waveCache[id]){peaks=waveCache[id];return}
+    if(waveBusy===id||!api.currentSource)return;
+    var src=api.currentSource(),OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+    if(!src||!OAC||(navigator.deviceMemory&&navigator.deviceMemory<2))return;
+    waveBusy=id;
+    fetch(src).then(function(r){if(!r.ok||Number(r.headers.get('content-length'))>20e6)throw 0;return r.arrayBuffer()}).then(function(buf){
+      if(buf.byteLength>20e6)throw 0;
+      var ctx;try{ctx=new OAC(1,1,8000)}catch(e){ctx=new OAC(1,1,22050)}
+      return new Promise(function(ok,no){var p=ctx.decodeAudioData(buf,ok,no);if(p&&p.then)p.then(ok,no)});
+    }).then(function(ab){
+      var out=new Float32Array(BARS),n=ab.length,step=Math.max(1,Math.floor(n/BARS)),top=0;
+      for(var c=0;c<Math.min(2,ab.numberOfChannels);c++){var d=ab.getChannelData(c);
+        for(var i=0;i<BARS;i++){var a=i*step,b=Math.min(n,a+step),m=0;for(var k=a;k<b;k+=4){var v=d[k];if(v<0)v=-v;if(v>m)m=v}if(m>out[i])out[i]=m}}
+      for(var j=0;j<BARS;j++)if(out[j]>top)top=out[j];
+      if(top>0)for(var q=0;q<BARS;q++)out[q]=Math.pow(out[q]/top,0.7);
+      waveCache[id]=out;if(peaksFor===id)peaks=out;drawTimeline();
+    }).catch(function(){}).then(function(){if(waveBusy===id)waveBusy=''});
+  }
+  function drawTimeline(){
+    if(!api||!api.getPosition)return;
+    var pos=api.getPosition(),np=state&&state.nowPlaying,box=$('timeline');
+    box.hidden=!np||!pos.duration;
+    if(box.hidden)return;
+    var id=String(np.tokenId);
+    if(peaksFor!==id){peaksFor=id;peaks=waveCache[id]||null}
+    if(!peaks&&pos.current>1.5)loadPeaks(id); // once the song is really going, not mid-tune
+    var wr=wave.getBoundingClientRect(),dpr=window.devicePixelRatio||1;if(Math.abs(wave.width-Math.round(wr.width*dpr))>1||Math.abs(wave.height-Math.round(wr.height*dpr))>1)sizeWave();
+    var shown=seekPreview!=null?seekPreview:pos.current,frac=Math.max(0,Math.min(1,shown/pos.duration));
+    $('tCur').textContent=clock(shown);$('tDur').textContent=clock(pos.duration);
+    tl.setAttribute('aria-valuemax',String(Math.round(pos.duration)));tl.setAttribute('aria-valuenow',String(Math.round(shown)));tl.setAttribute('aria-valuetext',clock(shown)+' of '+clock(pos.duration));
+    var W=wave.width,H=wave.height,mode=document.documentElement.dataset.ppp,
+      lit=mode==='on'?'255,196,84':mode==='off'?'150,160,172':'94,233,255',dim=mode==='on'?'120,92,40':mode==='off'?'52,58,66':'44,62,84';
+    wctx.clearRect(0,0,W,H);
+    var gap=Math.max(1,Math.round(W/BARS*0.3)),bw=Math.max(1,(W-gap*(BARS+1))/BARS),mid=H/2,px=frac*W;
+    for(var i=0;i<BARS;i++){
+      var x=gap+i*(bw+gap),h=peaks?Math.max(2,peaks[i]*(H-8)):Math.max(2,H*0.12);
+      wctx.fillStyle='rgba('+(x+bw<=px?lit+',.95':dim+',1')+')';
+      wctx.fillRect(x,mid-h/2,bw,h);
+    }
+    wctx.fillStyle='rgba(255,255,255,.9)';wctx.fillRect(Math.min(W-2,Math.max(0,px-1)),2,2,H-4);
+  }
+  function tickTimeline(ts){
+    tlFrame=0;
+    if(ts-tlLast>100){tlLast=ts;drawTimeline()}
+    if(state&&state.playing&&!document.hidden)tlFrame=requestAnimationFrame(tickTimeline);
+  }
+  function kickTimeline(){drawTimeline();if(!tlFrame)tlFrame=requestAnimationFrame(tickTimeline)}
+  function timeAt(x){var r=tl.getBoundingClientRect(),p=api.getPosition();return p.duration?Math.max(0,Math.min(1,(x-r.left)/r.width))*p.duration:null}
+  function hoverAt(x,t){var r=tl.getBoundingClientRect(),h=$('tlHover');if(t==null){h.hidden=true;return}h.hidden=false;h.textContent=clock(t);h.style.left=Math.max(18,Math.min(r.width-18,x-r.left))+'px'}
+  var seeking=false;
+  tl.addEventListener('pointerdown',function(e){if(!api||!api.seek)return;var t=timeAt(e.clientX);if(t==null)return;seeking=true;tl.setPointerCapture(e.pointerId);seekPreview=t;hoverAt(e.clientX,t);drawTimeline()});
+  tl.addEventListener('pointermove',function(e){var t=timeAt(e.clientX);hoverAt(e.clientX,t);if(seeking&&t!=null){seekPreview=t;drawTimeline()}});
+  tl.addEventListener('pointerleave',function(){if(!seeking)hoverAt(0,null)});
+  tl.addEventListener('pointerup',function(e){if(!seeking)return;seeking=false;var t=timeAt(e.clientX);seekPreview=null;hoverAt(0,null);if(t!=null)api.seek(t);kickTimeline()});
+  tl.addEventListener('pointercancel',function(){seeking=false;seekPreview=null;hoverAt(0,null);drawTimeline()});
+  tl.addEventListener('keydown',function(e){
+    if(!api||!api.seek)return;var p=api.getPosition();if(!p.duration)return;
+    var t=e.key==='ArrowRight'?p.current+5:e.key==='ArrowLeft'?p.current-5:e.key==='Home'?0:e.key==='End'?p.duration-1:null;
+    if(t==null)return;e.preventDefault();api.seek(t);kickTimeline();
+  });
+  window.addEventListener('resize',function(){sizeWave();drawTimeline()});
+
+  /* ---- this song's on-chain likes and paid plays (/radio/song-stats) ---- */
+  var statsSig='',statsFor='';
+  function fmtCount(n){return n>=10000?(n/1000).toFixed(n>=100000?0:1).replace(/\.0$/,'')+'k':n.toLocaleString()}
+  function showStats(d){
+    var likes=d&&typeof d.likes==='number'?d.likes:null,plays=d&&typeof d.plays==='number'?d.plays:null;
+    $('cLikes').hidden=likes===null;$('cPlays').hidden=plays===null;$('songCounts').hidden=likes===null&&plays===null;
+    if(likes!==null){$('cLikes').querySelector('b').textContent=fmtCount(likes);$('cLikes').title=likes.toLocaleString()+' on-chain like'+(likes===1?'':'s')}
+    if(plays!==null){$('cPlays').querySelector('b').textContent=fmtCount(plays);$('cPlays').title=plays.toLocaleString()+' paid play'+(plays===1?'':'s')+' on-chain'}
+  }
+  // Asked again on every song change and once a like or unlike confirms (the heart stops pending).
+  function songStats(id,heartSig){
+    var sig=id+'|'+heartSig;if(sig===statsSig)return;statsSig=sig;
+    if(String(id)!==statsFor){statsFor=String(id);showStats(null)}
+    fetch('/radio/song-stats?id='+encodeURIComponent(id),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(statsFor===String(id)&&d)showStats(d)}).catch(function(){});
   }
   var relSig='';
   function renderRelatives(rels){
-    var sig=rels.map(function(r){return r.id+r.kind+(r.playable?'1':'0')}).join(',');
+    var sig=rels.map(function(r){return r.id+r.kind+(r.playable?'1':'0')}).join(',')+'|'+catalogue.length;
     if(sig===relSig)return; relSig=sig;
     var wrap=$('relWrap'),row=$('relRow');row.innerHTML='';
     wrap.style.display=rels.length?'':'none';
     rels.forEach(function(r){
       if(r.playable){
         var b=document.createElement('button');b.type='button';b.className='rtile song';
-        b.title='Play inscription #'+r.id;
-        b.innerHTML='<span>♪</span><i>#'+esc(r.id)+'</i>';
+        b.title='Play '+nameOf(r.id)+' (#'+r.id+')';
+        var s1=document.createElement('span');s1.textContent='♪';var i1=document.createElement('i');i1.textContent=nameOf(r.id);var i2=document.createElement('i');i2.textContent='#'+r.id;
+        b.append(s1,i1,i2);
         b.addEventListener('click',function(){api.playToken(r.id)});
         row.appendChild(b);
       }else if(r.kind==='image'){
@@ -263,15 +1031,14 @@
         img.addEventListener('error',function(){img.remove()});
         row.appendChild(img);
       }else{
-        var t=document.createElement('span');t.className='rtile';
-        t.title='Related inscription #'+r.id;
-        t.innerHTML='<span>◇</span><i>#'+esc(r.id)+'</i>';
-        row.appendChild(t);
+        var t=document.createElement('span');t.className='rtile';t.title='Related inscription #'+r.id;
+        var s2=document.createElement('span');s2.textContent='◇';var i3=document.createElement('i');i3.textContent='#'+r.id;
+        t.append(s2,i3);row.appendChild(t);
       }
     });
   }
   function boot(a){
-    api=a;a.subscribe(render);
+    api=a;sizeCanvas();a.subscribe(render);
     $('refreshLikes').addEventListener('click',function(){if(api.refreshLikes)void api.refreshLikes()});
     $('power').addEventListener('click',function(){api.isOn()?api.switchOff():api.switchOn()});
     $('pp').addEventListener('click',function(){api.playPause()});
@@ -287,7 +1054,95 @@
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js" defer></script>
+<script src="/xtrata-radio.js?v=42275606a109" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
+<script>
+// On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
+// else there is sandboxed. Send links to the rest of Xtrata to the main site instead.
+(function(){
+  if(!/^radio\./.test(location.hostname))return;
+  document.addEventListener('click',function(e){
+    var a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;
+    var u=new URL(a.getAttribute('href'),location.href);
+    if(u.origin===location.origin&&!/^\/radio(\.html|\/|$)/.test(u.pathname)){a.href='https://xtrata.xyz'+u.pathname+u.search+u.hash;}
+  },true);
+})();
+</script>
+<script type="module">
+// Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=86b585be4285')}).catch(function(){});
+</script>
+<script>
+// Arcade dock bridge: runs ONLY with ?dock=1 (the arcade's corner panel and its pop-out window). Without that flag this block does nothing.
+// 1. A hall page that is one of the allowed Xtrata origins can pair with this page (it answers our "ready" with a "hello"). Once paired we
+//    tell it what is playing (title, artist, playing, liked) and it can send play/pause, next, previous and like (like only in the pop-out window, which
+//    holds the passkey wallet and pays as its own heart does). Only an Xtrata origin that opened us can pair; nothing else can send anything.
+// 2. Inside the hall's small panel (framed, no opener) the passkey wallet cannot load, so a tap on the heart or on the wallet / pay-per-play
+//    controls asks the hall to open the pop-out window instead (where they work), and does not start the action here.
+(function(){
+  var root=document.documentElement; if(!root.hasAttribute('data-dock'))return;
+  var HALL=/^https:\/\/(?:www\.)?xtrata\.xyz$|^https:\/\/(?:[a-z0-9-]+\.)?xtrata\.pages\.dev$/;
+  var embedded=false,opener=null,parentWin=null;
+  try{if(window.opener&&window.opener!==window)opener=window.opener}catch(e){}
+  try{if(window.parent&&window.parent!==window)parentWin=window.parent}catch(e){}
+  embedded=!!parentWin&&!opener;
+  var peers=[opener,parentWin].filter(Boolean), paired=null, api=null, last='';
+  function say(win,origin,msg){msg.xtrataRadio=1;try{win.postMessage(msg,origin)}catch(e){}}
+  function ready(){peers.forEach(function(w){say(w,'*',{type:'ready'})})}   // carries nothing: only tells the hall a radio page is here
+  function snapshot(s){var np=s&&s.nowPlaying,hv=s&&s.heart;
+    var liked=hv?!!hv.liked:!!(np&&s.likes&&s.likes.some(function(l){return l.tokenId===String(np.tokenId)}));
+    return {type:'state',title:np?np.title:'',artist:np&&np.artist?np.artist:'',playing:!!(typeof s.playing==='boolean'?s.playing:s.on),on:!!s.on,busy:!!s.giftWait,liked:liked,pending:!!(hv&&hv.pending)}}
+  function push(s){
+    if(!paired)return; var m=snapshot(s), sig=JSON.stringify(m); if(sig===last)return; last=sig;
+    say(paired.win,paired.origin,m);
+  }
+  addEventListener('message',function(e){
+    var d=e.data; if(!d||d.xtrataHall!==1)return;
+    var from=null; peers.forEach(function(w){if(w===e.source)from=w}); if(!from)return;      // only the page that opened or framed us
+    if(!HALL.test(e.origin))return;                                                          // and only an Xtrata origin
+    if(d.type==='hello'){paired={win:from,origin:e.origin};last='';if(api&&api.getState)try{push(api.getState())}catch(x){}return}
+    if(!paired||from!==paired.win||e.origin!==paired.origin||!api)return;
+    if(d.type==='cmd'){try{if(d.cmd==='toggle')api.playPause();else if(d.cmd==='next')api.next();else if(d.cmd==='prev')api.prev();
+      else if(d.cmd==='like'&&!embedded)api.toggleLike()}catch(x){}}   // like only in the pop-out window (the one that holds the wallet); it does what a tap on this page's own heart does
+  });
+  addEventListener('pagehide',function(){if(paired)say(paired.win,paired.origin,{type:'bye'})});
+  var tries=0,t=setInterval(function(){
+    if(window.XtrataRadio){clearInterval(t);api=window.XtrataRadio;api.subscribe(push);ready();
+      setInterval(function(){if(!paired)ready()},4000)}     // a hall that was reloaded pairs again on the next beat
+    else if(++tries>100)clearInterval(t);
+  },120);
+  // in the pop-out window: R asks the hall to take over again (and tries to bring the hall window forward; browsers may refuse that, in which case one click in the hall is needed)
+  if(opener&&!embedded){
+    document.addEventListener('keydown',function(e){
+      if(e.code!=='KeyR'||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;
+      var t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;
+      peers.forEach(function(w){say(w,'*',{type:'hide-request'})});
+      try{opener.focus()}catch(x){}
+    });
+  }
+  if(!embedded)return;
+  // inside the panel: the wallet-needing controls hand over to the pop-out
+  var note=null,noteTimer=0;
+  function show(text){
+    if(!note){note=document.createElement('div');note.setAttribute('role','status');
+      note.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:80;padding:10px 12px;border-radius:12px;background:#10261f;border:1px solid #2f7d5c;color:#d7fbe8;font:13px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+      document.body.appendChild(note)}
+    note.textContent=text;note.hidden=false;clearTimeout(noteTimer);noteTimer=setTimeout(function(){note.hidden=true},6000);
+  }
+  // R and Esc inside the panel: the hall cannot see keys typed in this frame, so ask it to close the panel (not while typing in a field)
+  document.addEventListener('keydown',function(e){
+    if((e.code!=='KeyR'&&e.code!=='Escape')||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;
+    var t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;
+    peers.forEach(function(w){say(w,'*',{type:'hide-request'})});
+  });
+  document.addEventListener('click',function(e){
+    var el=e.target&&e.target.closest?e.target.closest('#heart,#ppp-top,#radio-wallet-connect,#ppp button'):null;
+    if(!el)return; e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+    var why=el.id==='heart'?'like':'wallet';
+    peers.forEach(function(w){say(w,'*',{type:'need-wallet',why:why})});
+    show(why==='like'?'Likes are paid with your passkey wallet, which works in the pop-out window. Opening it…':'Your wallet and paid plays work in the pop-out window. Opening it…');
+  },true);
+})();
+</script>
 </body>
 </html>

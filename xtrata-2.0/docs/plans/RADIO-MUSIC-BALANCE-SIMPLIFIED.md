@@ -1,5 +1,9 @@
 # Music Balance: simple local wizard plan
 
+> **2026-10-12:** superseded for the web radio by docs/radio/PAY-PER-PLAY.md (passkey listening
+> wallet on its own origin, no installation, no stored key). The 1 STX and return rules below
+> carried over. The desktop Music App keeps its own wallet.
+
 Status: current direction, 17 September 2026, following the user's request to
 simplify around the original wizard and a small 1 STX balance. This supersedes
 the architecture and launch gates in RADIO-MUSIC-BALANCE-INTEGRATION.md and
