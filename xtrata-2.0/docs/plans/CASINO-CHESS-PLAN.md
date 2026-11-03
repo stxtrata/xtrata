@@ -164,3 +164,31 @@ pawn then a square, tap the knight by its head, drag the bishop, an illegal drop
 and more moves played by tapping only. The two-player and watching tests pass with every move made by clicking pieces (the watcher sees
 the queen take on f7 behind the knight on f6, mate).
 
+## 9. Seats, looking around, and the iPad board (added 2026-11-03)
+
+Jim, after a three-device test (Mac white, iPad black, iPhone watching): it works; the sofa player sat inside the sofa; seated or
+standing at any table you should be free to look around (except the overhead view); and on the iPad the board's squares were black.
+
+**Seats.** The room's seated figures are built for a 0.57 m bar stool, and the sofa's cushion is at 0.71 m, so the sofa player sank
+15 cm into it, sitting deep enough that the shins went inside the sofa's front. Now:
+- The two lounge sofas stand **15 cm further back** (`chess.js` says where; the page draws them there); the coffee table and the
+  armchair stay where they were.
+- A seat can say how high it is (`h`): the sofa 0.70 m, the armchair 0.50 m. Seated figures (other players, your own figure in the
+  behind view, the house player) are raised or lowered to it.
+- The sofa place is near the cushion's front edge (the stool pose has the legs straight down from the knee), so the feet are on the
+  floor in front of the sofa, with about 20 cm to the table.
+
+**Looking around (every table).** Seated or standing, drag the room to turn your view, with touch or the mouse; it eases. Choosing a
+view (Table, Seated) again re-centres it, and sitting somewhere else starts centred. The overhead view stays put. At the chess table
+a press on one of your pieces still picks it up and drags it; a drag that starts anywhere else looks around, and is never also a tap
+(nothing is selected or moved). While you look away, the picture is not shifted to keep the felt clear of the controls. While you
+sit anywhere, the browser may not pan or zoom the page under your finger. A tip says so the first time you sit.
+
+**The iPad board.** iPad Safari has a fixed budget for the drawing canvases a page makes, and the room already spends most of it,
+so the board's 1024 px painted texture came out empty: a black board (pieces, frame and highlights, which use no canvas, showed).
+The squares are now **64 tiles** (two meshes), with a thin gold line round them; only the coordinates are painted, on a small canvas
+that is turned into an image at once, giving its canvas memory back.
+
+Files: `public/casino/chess.js` (`c4`), and step 4 of `scripts/patch-casino-chess.py` for `public/casino/index.html` (the sofa
+positions, seat heights for seated figures, the look, touch handling while seated).
+

@@ -23,9 +23,14 @@
   const ENGINE_URLS = ['/i/' + ENGINE_ID, HERE + 'xchess-engine-3049.js'];
   const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   const PROTOCOL = 'replay-v3';                 // XChess replay-v3: engine 1.1.0, legal en passant in the repetition key
-  const TABLE_Z = 1.25, TABLE_R = 0.5;          // the coffee table, in front of each sofa (sofa-local z), and its radius
+  const SOFA_BACK = 0.15;                      // the sofas stand 15 cm further back than the room first had them: room for the player on the sofa
+  const TABLE_Z = 1.25 + SOFA_BACK, TABLE_R = 0.5;   // the coffee table, in front of each sofa (sofa-local z), and its radius
+  // table-local; h: the seat's height (cushion top). The sofa seat is near the cushion's front edge: the room's seated figures are
+  // posed for a bar stool, legs straight down from the knee, so sitting deeper would put their shins inside the sofa's front.
+  const SOFA_SEAT = { z: TABLE_Z - 0.25, h: 0.7 }, CHAIR_SEAT = { z: -0.97, h: 0.5 };
   const SOFAS = [{ id: 'chess1', name: 'Chess · west lounge', x: -8.1, z: 8.1, ry: 0.25, side: -1, person: 'f2' },
-                 { id: 'chess2', name: 'Chess · east lounge', x: 8.1, z: 8.1, ry: -0.25, side: 1, person: 'm2' }];
+                 { id: 'chess2', name: 'Chess · east lounge', x: 8.1, z: 8.1, ry: -0.25, side: 1, person: 'm2' }]
+    .map((d) => Object.assign(d, { x: d.x - Math.sin(d.ry) * SOFA_BACK, z: d.z - Math.cos(d.ry) * SOFA_BACK }));
   const PVP_BASE = 600, PVP_INC = 3;            // seconds
   const PVP_STAKES = [0, 1000, 10000];          // 0 is a friendly
   const STORE_KEY = 'parallax.chess.v1';
@@ -195,20 +200,28 @@
     geo.hitH = 1.75 * SQ; geo.hit = new THREE.CylinderGeometry(0.47 * SQ, 0.47 * SQ, geo.hitH, 10);
     return geo;
   }
-  function boardTexture(THREE) {
-    const N = 1024, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
-    const m = Math.round(N * (0.025 / (SQ * 8 + 0.05))), s = (N - 2 * m) / 8;
-    g.fillStyle = '#081627'; g.fillRect(0, 0, N, N);
-    g.strokeStyle = '#d4a83a'; g.lineWidth = 6; g.strokeRect(8, 8, N - 16, N - 16); g.lineWidth = 3; g.strokeRect(m - 6, m - 6, N - 2 * m + 12, N - 2 * m + 12);
+  // The squares are tiles (geometry), not a painted texture: iPad Safari has a fixed budget for the page's drawing canvases and
+  // the room already spends much of it, so a 1024 px board canvas came out empty there (a black board). Only the coordinates
+  // a-h / 1-8 are drawn on a small canvas, which is turned into an image straight away so its canvas memory is given back.
+  function squaresGeometry(THREE, light) {
+    const pos = [], nor = [], idx = [];
     for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
-      const light = (r + f) % 2 === 1, x = m + f * s, y = m + (7 - r) * s;
-      g.fillStyle = light ? '#e8dec6' : '#16385e'; g.fillRect(x, y, s, s);
-      g.fillStyle = light ? 'rgba(120,100,70,.06)' : 'rgba(150,190,255,.05)';
-      for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(x, y + Math.random() * s); g.bezierCurveTo(x + s * 0.3, y + Math.random() * s, x + s * 0.7, y + Math.random() * s, x + s, y + Math.random() * s); g.lineWidth = 1 + Math.random() * 2; g.strokeStyle = g.fillStyle; g.stroke(); }
+      if (((r + f) % 2 === 1) !== light) continue;
+      const x0 = (f - 4) * SQ, z0 = (3 - r) * SQ, k = pos.length / 3;
+      pos.push(x0, 0, z0, x0 + SQ, 0, z0, x0 + SQ, 0, z0 + SQ, x0, 0, z0 + SQ); nor.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
+      idx.push(k, k + 2, k + 1, k, k + 3, k + 2);
     }
-    g.fillStyle = '#d9b26a'; g.font = '600 ' + Math.round(m * 0.55) + 'px Georgia,serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setIndex(idx);
+    return g;
+  }
+  function labelsTexture(THREE, W) {
+    const N = 512, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
+    const t = new THREE.CanvasTexture(c); if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+    if (!g) return t;
+    const m = N * (0.025 / W), s = (N - 2 * m) / 8;
+    g.fillStyle = '#d9b26a'; g.font = '600 ' + Math.round(m * 0.62) + 'px Georgia,serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let i = 0; i < 8; i++) { g.fillText('abcdefgh'[i], m + (i + 0.5) * s, N - m / 2); g.fillText(String(i + 1), m / 2, m + (7 - i + 0.5) * s); }
-    const t = new THREE.CanvasTexture(c); t.anisotropy = 4; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+    try { c.toBlob((b) => { if (!b) return; const img = new Image(); img.onload = () => { t.image = img; t.needsUpdate = true; c.width = c.height = 0; }; img.src = URL.createObjectURL(b); }, 'image/png'); } catch (_) { }
     return t;
   }
   let GEO = null, HIT_MAT = null;
@@ -217,8 +230,17 @@
     const root = new THREE.Group(); root.position.y = BOARD_Y; parent.add(root);
     const gold = ctx.GOLDM(), W = SQ * 8 + 0.05;
     ctx.box(W + 0.012, 0.016, W + 0.012, gold, 0, 0.008, 0, root);
-    const top = new THREE.Mesh(new THREE.PlaneGeometry(W, W), new THREE.MeshStandardMaterial({ map: boardTexture(THREE), roughness: 0.32, metalness: 0.08, envMap: ctx.envTex ? ctx.envTex() : null, envMapIntensity: 0.35 }));
+    const env = ctx.envTex ? ctx.envTex() : null;
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(W, W), new THREE.MeshStandardMaterial({ color: 0x081627, roughness: 0.4, metalness: 0.1, envMap: env, envMapIntensity: 0.3 }));
     top.rotation.x = -Math.PI / 2; top.position.y = 0.0165; top.name = 'chess board'; root.add(top);
+    for (const light of [true, false]) {
+      const sq = new THREE.Mesh(squaresGeometry(THREE, light), new THREE.MeshStandardMaterial({ color: light ? 0xe8dec6 : 0x16385e, roughness: light ? 0.38 : 0.3, metalness: light ? 0.04 : 0.12, envMap: env, envMapIntensity: 0.35 }));
+      sq.position.y = 0.0168; sq.receiveShadow = true; sq.userData.noShadow = true; root.add(sq);
+    }
+    // a fine gold line round the squares, and the coordinates
+    [[0, -HALF - 0.003, W - 0.034, 0.003], [0, HALF + 0.003, W - 0.034, 0.003], [-HALF - 0.003, 0, 0.003, W - 0.034], [HALF + 0.003, 0, 0.003, W - 0.034]].forEach(([x, z, w, d]) => { const l = ctx.box(w, 0.0012, d, gold, x, 0.0172, z, root); l.userData.noShadow = true; });
+    const labels = new THREE.Mesh(new THREE.PlaneGeometry(W, W), new THREE.MeshBasicMaterial({ map: labelsTexture(THREE, W), transparent: true, depthWrite: false }));
+    labels.rotation.x = -Math.PI / 2; labels.position.y = 0.0171; labels.userData.noShadow = true; root.add(labels);
     const mats = { w: ctx.M(0xeee2c4, { roughness: 0.3, metalness: 0.06 }), b: ctx.M(0x15171e, { roughness: 0.2, metalness: 0.42 }) };
     const pieceRoot = new THREE.Group(); pieceRoot.position.y = 0.0165; root.add(pieceRoot);
     // highlights: a small pool of flat squares and dots just above the board
@@ -430,7 +452,7 @@
     const g = new THREE.Group(); g.name = def.id;
     const board = makeBoard(ctx, g);
     makeArmchair(ctx, g, -0.97);
-    const SEATS = [{ x: 0, z: 1.2, sofa: true, stand: { x: def.side * 1.95, z: 0.9 } }, { x: 0, z: -0.97, stand: { x: def.side * 0.95, z: -0.8 } }];
+    const SEATS = [{ x: 0, z: SOFA_SEAT.z, h: SOFA_SEAT.h, sofa: true, stand: { x: def.side * 1.95, z: 1.05 } }, { x: 0, z: CHAIR_SEAT.z, h: CHAIR_SEAT.h, stand: { x: def.side * 0.95, z: -0.8 } }];
     const lobby = ctx.lobby({ tb: def.id, kind: 'chess', label: 'Chess' });
     const saved = store.get();
     // house game state (this browser only)
@@ -614,6 +636,7 @@
           refresh(); return;
         }
         if (g.from) { if (g.wasSel === g.from) { sel = null; targets = []; refresh(); } return; }   // picked up on press; tapping it again puts it down
+        if (Math.hypot(ev.clientX - g.x, ev.clientY - g.y) > 12) return;   // a swipe, not a tap
         tapRes(g.res);
       },
       cancel() { if (!grab) return; grab = null; board.held = null; board.hover(null); board.home(); }
@@ -731,10 +754,12 @@
         ctx.audio(); return tapRes(resolve(r));
       },
       pointer(kind, ev) { return pointer[kind](ev); },
+      holding() { return !!(grab && grab.from); },                 // a piece is in your hand: a drag moves it, not the view
+      lookStart() { if (grab && !grab.from) grab = null; },        // the page took the drag to look around: that press is no tap
       update(t) {
         board.update(); lobby.frame(ctx.focus() === st);
         if (!grab) board.home();
-        if (ctx.focus() === st) attachPointer(ctx); touchMode(ctx.focus() === st ? st : null, st);
+        if (ctx.focus() === st) attachPointer(ctx); if (!ctx.ownsTouch) touchMode(ctx.focus() === st ? st : null, st);
         if (engine.api && (t - (st.specT || 0) > 0.5)) {
           st.specT = t; const here = specFrame();
           if (here && !ctx.focus() && showR()) { chipOwner = def.id; specChip('♟ ' + R.wn + ' vs ' + R.bn + (R.result ? ' · ' + R.result : '') + ' · tap the table to watch'); }
@@ -860,12 +885,13 @@
     const x = s.x + Math.sin(s.ry) * TABLE_Z, z = s.z + Math.cos(s.ry) * TABLE_Z;
     placement[s.id] = [x, z, s.ry + Math.PI];
     TAGS[s.id] = ['CHESS', 'powered by XChess'];
-    SEATS_OUT[s.id] = [{ x: 0, z: 1.2, stand: { x: s.side * 1.95, z: 0.9 } }, { x: 0, z: -0.97, stand: { x: s.side * 0.95, z: -0.8 } }];
+    SEATS_OUT[s.id] = [{ x: 0, z: SOFA_SEAT.z, h: SOFA_SEAT.h, stand: { x: s.side * 1.95, z: 1.05 } }, { x: 0, z: CHAIR_SEAT.z, h: CHAIR_SEAT.h, stand: { x: s.side * 0.95, z: -0.8 } }];
     VERB[s.id] = 'PLAY';
   });
   let built = [];
   root.PXChess = {
-    version: 'c3', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
+    version: 'c4', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
+    sofas: SOFAS.map((d) => [d.x, d.z, d.ry]),   // where the page draws the two lounge sofas
     placement, TAGS, SEATS: SEATS_OUT, VERB, engine, loadEngine, ask, houseList, makeRelayTable, makeSession,
     makeStations(ctx) {
       // the station's seats must be the very objects in the page's SEATS (the room maps a seat to its spot by identity)
@@ -879,8 +905,8 @@
     addHosts(hosts) {
       built.forEach((st, i) => {
         const def = SOFAS[i], wear = { shirt: 0x14141c, trousers: 0x191b20 };
-        hosts.add({ group: st.group, x: 0, z: -0.97, yaw: 0, person: def.person, wear, seat: { h: 0.47 }, noLook: false, showWhen: () => st.houseShown('chair') });
-        hosts.add({ group: st.group, x: 0, z: 1.2, yaw: Math.PI, person: def.person, wear, seat: { h: 0.66 }, showWhen: () => st.houseShown('sofa') });
+        hosts.add({ group: st.group, x: 0, z: CHAIR_SEAT.z, yaw: 0, person: def.person, wear, seat: { h: CHAIR_SEAT.h }, noLook: false, showWhen: () => st.houseShown('chair') });
+        hosts.add({ group: st.group, x: 0, z: SOFA_SEAT.z, yaw: Math.PI, person: def.person, wear, seat: { h: SOFA_SEAT.h }, showWhen: () => st.houseShown('sofa') });
       });
     },
     // a `spec` message from the room (watching a game): to the table it names

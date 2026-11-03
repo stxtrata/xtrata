@@ -108,14 +108,89 @@ INPUT_MARK = 'chess.js?v=c3'
 INPUT_PATCHES = [('chess.js?v=c2"', 'chess.js?v=c3"')]
 
 
+# Step 4 (2026-11-03): the sofas move back (chess.js says where), seated figures sit at their seat's height, and free look at
+# every table: drag to look around while seated or standing (not in the overhead view), never stealing a chess piece or a tap.
+LOOK_MARK = 'seatLookReset'
+LOOK_PATCHES = [
+    ("sofa(-8.1,8.1,.25);sofa(8.1,8.1,-.25);",
+     "(window.PXChess && PXChess.sofas ? PXChess.sofas : [[-8.1,8.1,.25],[8.1,8.1,-.25]]).forEach((a) => sofa(a[0], a[1], a[2]));   // the lounge sofas (chess.js moves them back to make room)"),
+    # a seat can say how high it is (the sofa is higher than a stool): the figure sitting there is raised to it
+    ("return { x: w.x, z: w.z, yaw: s.group.rotation.y + Math.atan2(-seat.x, -seat.z), stand: !!seat.pad };",
+     "return { x: w.x, z: w.z, yaw: s.group.rotation.y + Math.atan2(-seat.x, -seat.z), stand: !!seat.pad, h: seat.h || 0 };"),
+    ("const w = wearOf(p.key), s = e.spec; s.x = pl.x; s.z = pl.z; s.yaw = pl.yaw; s.wear = w;\n      const c = s.ctrl; if (c) { c.object.position.set(pl.x, 0, pl.z);",
+     "const w = wearOf(p.key), s = e.spec, lift = !pl.stand && pl.h ? pl.h - 0.57 : 0; s.x = pl.x; s.z = pl.z; s.y = lift; s.yaw = pl.yaw; s.wear = w;   // seated figures are built for a 0.57 m stool\n      const c = s.ctrl; if (c) { c.object.position.set(pl.x, lift, pl.z);"),
+    ("e.tag.sp.position.set(pl.x, pl.stand ? 2.02 : 1.6, pl.z);",
+     "e.tag.sp.position.set(pl.x, pl.stand ? 2.02 : 1.6 + lift, pl.z);"),
+    ("c.object.position.set(h.x, 0, h.z); c.object.rotation.y = h.yaw || 0;",
+     "c.object.position.set(h.x, h.y || 0, h.z); c.object.rotation.y = h.yaw || 0;"),
+    ("function mePose(spec, x, z, yaw) { spec.x = x; spec.z = z; spec.yaw = yaw; const c = spec.ctrl; if (c) { c.object.position.set(x, 0, z);",
+     "function mePose(spec, x, z, yaw, y) { spec.x = x; spec.z = z; spec.yaw = yaw; spec.y = y || 0; const c = spec.ctrl; if (c) { c.object.position.set(x, y || 0, z);"),
+    ("else { sit = true; mePose(me.sit, pl.x, pl.z, pl.yaw); }",
+     "else { sit = true; mePose(me.sit, pl.x, pl.z, pl.yaw, pl.h ? pl.h - 0.57 : 0); }"),
+    # free look: the state, the drag, and a drag never also counting as a click
+    ("canvas.addEventListener('pointerleave',()=>setPvpHover(null));",
+     "canvas.addEventListener('pointerleave',()=>setPvpHover(null));\n"
+     "  // ---- looking around at a table (Jim, 2026-11-03): seated or standing, a drag turns your view; the overhead view stays put.\n"
+     "  // A drag that starts on one of your chess pieces moves the piece instead (focus.holding), and a drag is never also a tap.\n"
+     "  var seatLook = { yaw: 0, pitch: 0, ty: 0, tp: 0, drag: null, swallow: 0 };\n"
+     "  function seatLookReset() { if (!seatLook) return; seatLook.ty = 0; seatLook.tp = 0; seatLook.drag = null; }\n"
+     "  canvas.addEventListener('pointerdown', (ev) => { if (!focus || tableView === 'overhead' || (ev.button || 0) > 0 || barUI?.isOpen || machineOpen) return; seatLook.drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, on: false, mouse: ev.pointerType === 'mouse' }; }, true);\n"
+     "  window.addEventListener('pointermove', (ev) => {\n"
+     "    const d = seatLook.drag; if (!d || ev.pointerId !== d.id) return;\n"
+     "    if (!focus || tableView === 'overhead' || (focus.holding && focus.holding())) { seatLook.drag = null; return; }\n"
+     "    const dx = ev.clientX - d.x, dy = ev.clientY - d.y;\n"
+     "    if (!d.on) { if (Math.hypot(dx, dy) < 9) return; d.on = true; if (focus.lookStart) focus.lookStart(); }\n"
+     "    d.x = ev.clientX; d.y = ev.clientY; const k = d.mouse ? 0.0028 : 0.0045;\n"
+     "    seatLook.ty += dx * k; seatLook.tp = Math.max(-1.1, Math.min(1.1, seatLook.tp + dy * k));\n"
+     "  });\n"
+     "  const endLook = (ev) => { const d = seatLook.drag; if (!d || ev.pointerId !== d.id) return; if (d.on) seatLook.swallow = performance.now(); seatLook.drag = null; };\n"
+     "  window.addEventListener('pointerup', endLook); window.addEventListener('pointercancel', endLook);"),
+    ("canvas.addEventListener('click', (ev) => {if(reviewPickServing(ev))return;",
+     "canvas.addEventListener('click', (ev) => {if(seatLook&&performance.now()-seatLook.swallow<350)return; if(reviewPickServing(ev))return;"),
+    # the camera turns by the look, easing; the picture is not shifted to the felt while you look away
+    ("camera.position.set(camPos.x + (par ? px * 0.9 : 0), camPos.y + (par ? -py * 0.3 : 0), camPos.z); camera.lookAt(look);",
+     "camera.position.set(camPos.x + (par ? px * 0.9 : 0), camPos.y + (par ? -py * 0.3 : 0), camPos.z);\n"
+     "      if (seatLook) { const e = Math.min(1, dt * 12); seatLook.yaw += (seatLook.ty - seatLook.yaw) * e; seatLook.pitch += (seatLook.tp - seatLook.pitch) * e; }\n"
+     "      if (seatLook && focus && (Math.abs(seatLook.yaw) > 1e-4 || Math.abs(seatLook.pitch) > 1e-4)) {\n"
+     "        const d = look.clone().sub(camera.position), r = d.length() || 1, yw = Math.atan2(d.x, d.z) + seatLook.yaw;\n"
+     "        const pt = Math.max(-1.35, Math.min(1.25, Math.asin(Math.max(-1, Math.min(1, d.y / r))) + seatLook.pitch));\n"
+     "        camera.lookAt(camera.position.x + Math.sin(yw) * Math.cos(pt) * r, camera.position.y + Math.sin(pt) * r, camera.position.z + Math.cos(yw) * Math.cos(pt) * r);\n"
+     "      } else camera.lookAt(look);"),
+    ("if (!focus || machineOpen || !p.classList.contains('on') || !W || !H) return;",
+     "if (!focus || machineOpen || !p.classList.contains('on') || !W || !H || (seatLook && (Math.abs(seatLook.ty) > 0.05 || Math.abs(seatLook.tp) > 0.05))) return;"),
+    # back to centre when you sit somewhere else or choose a view (choosing the current view again re-centres it); a tip, once
+    ("const prev = focus; focus = s; if (prev !== s) { tableView = 'table'; miniPick = null; }",
+     "const prev = focus; focus = s; if (prev !== s) { tableView = 'table'; miniPick = null; seatLookReset(); if (s && !store.get('parallax.lookhint.v1')) { store.set('parallax.lookhint.v1', 1); setTimeout(() => { if (focus === s) toast('Tip: drag the view to look around'); }, 2600); } }"),
+    ("tableView = view;\n    const [p, l] = camTargets(focus, curSeat);",
+     "tableView = view; seatLookReset();\n    const [p, l] = camTargets(focus, curSeat);"),
+    # seated anywhere, a drag on the room is yours (no page pan, zoom or press menu); the page decides this now, not chess.js
+    ("if (focus) camera.layers.disable(2); else camera.layers.enable(2);",
+     "if (focus) camera.layers.disable(2); else camera.layers.enable(2);\n    { const ta = focus ? 'none' : ''; if (canvas.style.touchAction !== ta) { canvas.style.touchAction = ta; canvas.style.webkitTouchCallout = focus ? 'none' : ''; } }"),
+    ("roomSend: (m) => shared.send(m), roomHas: (f) => shared.feat.has(f), roomMe: () => shared.me,",
+     "roomSend: (m) => shared.send(m), roomHas: (f) => shared.feat.has(f), roomMe: () => shared.me, ownsTouch: true,"),
+    ('chess.js?v=c3"', 'chess.js?v=c4"'),
+    # the test hook that settles the camera settles the look too
+    ("snap: () => { camPos.copy(tgtPos); look.copy(tgtLook); returning = false;",
+     "snap: () => { camPos.copy(tgtPos); look.copy(tgtLook); returning = false; if (seatLook) { seatLook.yaw = seatLook.ty; seatLook.pitch = seatLook.tp; }"),
+]
+
+
+def chess_version(s):
+    import re
+    m = re.search(r'chess\.js\?v=c(\d+)"', s)
+    return int(m.group(1)) if m else 0
+
+
 def apply(s):
     done = []
     if 'chess.js?v=' not in s:
         s = run(s, PATCHES); done.append('chess tables')
     if WATCH_MARK not in s:
         s = run(s, WATCH_PATCHES); done.append('watching')
-    if INPUT_MARK not in s:
+    if chess_version(s) < 3:
         s = run(s, INPUT_PATCHES); done.append('touch and drag')
+    if LOOK_MARK not in s:
+        s = run(s, LOOK_PATCHES); done.append('sofas, seat heights, free look')
     return s, done
 
 
