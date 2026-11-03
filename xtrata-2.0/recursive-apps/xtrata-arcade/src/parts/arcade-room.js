@@ -396,7 +396,7 @@
         h('span', { class: 'xa-rank', text: '#' + e.rank }),
         h('span', { class: 'xa-who' }, [h('b', { text: e.name }), h('small', { text: S.shortAddress(e.player) + (you ? ' · you' : '') })]),
         h('span', { class: 'xa-pts', text: fmtVal(mode, e.score) }),
-        game ? h('span', { class: 'xa-tools' }, [watchButton(game, mode, e), saveButton(game, mode, e), verifyButton(game, mode, e)]) : null
+        game && !game.framed ? h('span', { class: 'xa-tools' }, [watchButton(game, mode, e), saveButton(game, mode, e), verifyButton(game, mode, e)]) : null
       ]);
     }));
   }
@@ -440,6 +440,7 @@
     closeModal();
     var game = XA.games.filter(function (g) { return g.id === id; })[0];
     if (!game) return;
+    if (game.framed) { openInfo(game.title, game.title + ' is played in a window of its own, which only the 3D hall can open. Walk up to its cabinet in the hall to play it.'); return; }
     var variant = variantOf(game, variantKey);
     var mode = variant ? variant.mode : game.mode;
     endSession(true);
