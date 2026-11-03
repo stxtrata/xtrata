@@ -212,7 +212,7 @@ What the hall reads from the picture file:
 
 The hall checks the file against the contract's hash and size, reads it only as bytes, and registers the game as in kind 2, with the game named by the note. The real game is fetched only when played and must have exactly the hash and size in the note; if it differs, the game is not opened. A file that is not an image, has no note, has a bad note or a note for another board is skipped and the rest of the hall carries on. The file must be at most 1 MiB (the contract's limit).
 
-Make the picture with `contracts/arcade-world/ops/framed-manifest.mjs` (offline; the poster's pixels are untouched; it prints the `add-game` values). Astro Blaster 3's is `recursive-apps/astro-blaster-3/cabinet/astro-blaster-3-cabinet.webp`, made from `cabinet-poster.webp` and `cabinet-marquee.png`.
+Make the picture with `contracts/arcade-world/ops/framed-manifest.mjs` (offline; the poster's pixels are untouched; it prints the `add-game` values). Astro Blaster 3's is `recursive-apps/astro-blaster-3/cabinet/astro-blaster-3-cabinet.webp`, made from `cabinet-poster.webp` and `cabinet-marquee.webp`.
 
 Tests: `tests/hall-framed.test.cjs` (F1-F7). Pre-flight before `add-game`: `contracts/arcade-world/ops/framed-check.mjs` (kind 2) or `framed-manifest.mjs` (kind 3).
 

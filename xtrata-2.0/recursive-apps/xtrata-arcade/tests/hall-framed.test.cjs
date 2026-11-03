@@ -296,7 +296,7 @@ const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   r = await open('/games.html', chainWith([mItem(9606)]));
   g = await look(r.page);
   const real = await r.page.evaluate(() => { const d = window.XA.games.find((x) => x.id === 'astro3'); return d && { id: d.framed.id, size: d.framed.size, side: (d.cabinetArt.side || '').slice(0, 22), marquee: (d.cabinetArt.marquee || '').slice(0, 22) }; });
-  check(real && real.id === 3075 && real.size === MAN[3075].length && /^data:image\/webp/.test(real.side) && /^data:image\/png/.test(real.marquee), 'F7: the real poster (webp) is read: it names #3075 and carries the marquee (' + JSON.stringify(real) + ')');
+  check(real && real.id === 3075 && real.size === MAN[3075].length && /^data:image\/webp/.test(real.side) && /^data:image\/webp/.test(real.marquee), 'F7: the real poster (webp) is read: it names #3075 and carries the marquee (' + JSON.stringify(real) + ')');
   await r.page.click('#go'); await r.page.waitForTimeout(800);
   await r.page.waitForFunction(() => window.XA.hallState() === 'walk', null, { timeout: 120000 });
   if (process.env.SHOTS) {                      // the cabinet wearing the real poster and marquee
