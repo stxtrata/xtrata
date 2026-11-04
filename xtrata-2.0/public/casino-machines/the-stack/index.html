@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07070b"><meta name="color-scheme" content="dark">
+<title>The Stack — test page</title>
+<meta name="description" content="Standalone test page for The Stack machine: 3D studio, the real packed cabinet and game, a stub LAYR account, the Bonus Lab and a test panel. Not part of the casino.">
+<style>
+:root{color-scheme:dark;--acc:#fc6432;--acc2:#ff9d72;--bg:#07070b;--line:#ffffff1c;--cond:"DIN Condensed","Bahnschrift Condensed","Barlow Condensed","Roboto Condensed","Arial Narrow","DejaVu Sans Condensed",sans-serif;--mono:"SF Mono",Menlo,"DejaVu Sans Mono",Consolas,monospace}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:#e7e5ff;font-family:"Helvetica Neue",Arial,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;-webkit-tap-highlight-color:transparent}button:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+#studio{position:fixed;inset:0;touch-action:none;cursor:grab}#studio.dragging{cursor:grabbing}#studio.hot{cursor:pointer}#studio canvas{display:block;width:100%;height:100%}
+header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:linear-gradient(#07070bee,#07070b00);z-index:5;pointer-events:none}header>*{pointer-events:auto}
+.brand{font:800 22px var(--cond);letter-spacing:4px;color:var(--acc);margin-right:8px;cursor:default;text-shadow:0 0 14px #8f84ff66}.brand small{font:11px var(--mono);letter-spacing:2px;color:#9d9bbd;margin-left:8px}
+.pill{display:inline-flex;border:1px solid var(--line);border-radius:30px;padding:3px;background:#0d0d16cc}.pill button{padding:0 14px;min-height:44px;border-radius:30px;font:12px var(--mono);color:#d4d2ee}.pill button.on{background:#fc643233;color:#fff}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:30px;padding:0 6px 0 14px;min-height:44px;background:#0d0d16cc;font:11px var(--mono);letter-spacing:1.2px;color:#9d9bbd}.chip b{font:800 18px var(--cond);color:var(--acc2);letter-spacing:0;font-variant-numeric:tabular-nums}
+.btn{min-height:44px;padding:0 16px;border:1px solid #fc643266;border-radius:30px;background:#0d0d16cc;font:12px var(--mono);letter-spacing:1px}.btn:hover{background:#fc643224}
+#hint{position:fixed;left:0;right:0;bottom:10px;text-align:center;font:11px var(--mono);letter-spacing:1.4px;color:#8b89a8;pointer-events:none;z-index:4;padding:0 16px}
+#overlay{position:fixed;inset:0;z-index:8;pointer-events:none}#overlay>*{pointer-events:auto}
+#back{position:absolute;inset:0;background:#040407c9;backdrop-filter:blur(6px);display:none}
+#modalHost{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none}#modalHost>*{pointer-events:auto}
+#featHost{position:absolute;left:0;right:0;bottom:36px;display:flex;justify-content:center;padding:0 12px;pointer-events:none}#featHost>*{pointer-events:auto}
+#test{position:fixed;left:12px;bottom:40px;width:min(420px,calc(100vw - 24px));max-height:72vh;overflow:auto;background:#0d0d16f2;border:1px solid #fc643266;border-radius:8px;padding:14px;z-index:9;display:none;box-shadow:0 20px 60px #000a}
+#test h3{margin:0 0 10px;font:700 11px var(--mono);letter-spacing:2px;color:var(--acc2)}#test .g{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}#test .g button{min-height:44px;border:1px solid #fc643255;border-radius:4px;font:12px var(--mono);padding:4px 6px}#test .g button:hover{background:#fc643224}
+#test pre{font:11px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;color:#e7e5ff;background:#060609;border:1px solid var(--line);border-radius:4px;padding:8px;margin:0;max-height:180px;overflow:auto}
+#test .n{display:flex;gap:6px;align-items:center;margin-bottom:12px;font-size:12px}#test input{width:110px;min-height:44px;background:#060609;color:#fff;border:1px solid #fc643255;border-radius:4px;padding:0 8px;font:inherit}
+#loadErr{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;line-height:1.7;z-index:20;background:var(--bg)}
+#fallbackNote{position:fixed;top:64px;left:0;right:0;text-align:center;font:11px var(--mono);color:#ffb3aa;z-index:4;display:none;pointer-events:none}
+@media(max-width:700px){.brand small{display:none}.pill button{padding:0 10px}#hint{font-size:10px}}
+</style></head><body>
+<div id="studio" aria-label="Interactive 3D cabinet of The Stack. Drag to orbit, scroll or pinch to zoom, pull the lever or press the deck buttons."></div>
+<header><span class="brand" id="brand">THE STACK<small>TEST PAGE</small></span>
+<span class="pill" role="group" aria-label="Camera view"><button data-view="cabinet" class="on">Cabinet</button><button data-view="screen">Screen</button><button data-view="topper">Topper</button><button data-view="orbit">Orbit</button></span>
+<button class="btn" id="fsBtn" aria-label="Game full screen (F)">⛶ Full screen · F</button>
+<span class="chip">PLAY BALANCE <b id="bal">0</b><button class="btn" id="resetBtn" style="min-height:44px;padding:0 14px">Reset</button></span>
+<button class="btn" id="spinBtn">Stack · Space</button><button class="btn" id="labBtn">Bonus Lab · L</button><button class="btn" id="testToggle">Test · T</button></header>
+<div id="hint">DRAG TO ORBIT · SCROLL TO ZOOM · PULL THE LEVER OR PRESS THE DECK BUTTONS · TAP THE SCREEN · SPACE STACKS · F FULL SCREEN · L BONUS LAB · T TEST PANEL</div>
+<div id="fallbackNote">NO WEBGL ON THIS DEVICE · SHOWING THE MACHINE'S SCREEN ONLY</div>
+<div id="overlay"><div id="back"></div><div id="modalHost"></div><div id="featHost"></div></div>
+<aside id="test" aria-label="Test panel"><h3>TEST PANEL · PLAY MONEY</h3>
+<div class="g" id="labItems"></div>
+<div class="g"><button data-k="runall">Run all (auto)</button><button data-k="leave">Leave the Lab</button><button data-k="twins:none">Twins: none</button><button data-k="twins:some">Twins: some</button><button data-k="twins:all">Twins: all</button><button data-k="twins:live">Twins: live</button><button data-k="chain:stale">Chain: stale</button><button data-k="chain:near">Chain: 3 blocks left</button><button data-k="chain:block">New Stacks block</button><button data-k="chain:live">Chain: live</button><button data-k="reduced">Reduced motion</button><button data-k="state">Show state</button></div>
+<div class="n"><input id="simN" type="number" value="1000000" min="1000" step="1000" aria-label="Spins to simulate"><button class="btn" id="simBtn" style="min-height:44px">Run RTP sim</button></div><pre id="out">Ready.</pre></aside>
+<div id="loadErr"><div><h2 style="font:800 26px var(--cond);color:#ff9d72;letter-spacing:2px">THE PAGE NEEDS A WEB SERVER.</h2><p id="loadMsg" style="color:#d4d2ee;max-width:520px"></p></div></div>
+<script src="vendor/three.js"></script>
+<script>
+/* ------------------------------------------------------------------------------------------------
+   TEST STUB of ParallaxLAYRAccount. Same surface the game uses (acquire, ready, error, balance, machine, openGame, saveGame),
+   same transaction rules as the casino's account: the balance can only change inside a committed engine call.
+   Play balance only. Stored in this page's localStorage; Reset puts it back to the start balance.
+   ------------------------------------------------------------------------------------------------ */
+window.STACK_TEST_PAGE = !/[?&]prod\b/.test(location.search); /* ?prod mimics the casino: no test hooks; the Lab then needs ?lab=1 */
+(() => {
+  const KEY = 'thestack.testpage.account.v1', START = 10000; let acct = null, owned = false, draft = null; const metadata = new WeakMap(), listeners = new Set();
+  try { acct = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!acct || typeof acct.bank !== 'number' || typeof acct.games !== 'object') acct = { bank: START, games: {} };
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(acct)); } catch (e) {} };
+  const copy = v => JSON.parse(JSON.stringify(v)), money = v => { if (!Number.isFinite(v) || v < 0) throw Error('Invalid LAYR amount.'); return Math.round(v * 100) / 100; };
+  const balance = () => draft ? draft.bank : acct.bank, ready = () => owned;
+  const serialize = s => { const o = copy(s); delete o.balance; return o; };
+  function attach(state, id, revision = 0) { delete state.balance; Object.defineProperty(state, 'balance', { configurable: true, enumerable: false, get: balance, set(v) { if (!draft || draft.state !== state) throw Error('Only a committed game action can change the shared LAYR balance.'); draft.bank = money(v); } }); metadata.set(state, { id, revision }); return state; }
+  function commit(state, bank) { const m = metadata.get(state); if (!m) throw Error('Machine is not linked to the LAYR account.'); const prev = acct.games[m.id]; if ((prev ? prev.revision : 0) !== m.revision) throw Error('Machine state changed. Reload the test page.'); m.revision++; acct.games[m.id] = { revision: m.revision, state: serialize(state) }; acct.bank = money(bank); persist(); listeners.forEach(f => f()); }
+  function transact(state, fn) { if (!owned) throw Error('The LAYR account is not connected.'); if (draft) throw Error('A LAYR transaction is already running.'); const before = serialize(state); draft = { state, bank: balance() }; try { const r = fn(), next = draft.bank; draft = null; commit(state, next); return r; } catch (e) { draft = null; for (const k of Object.keys(state)) delete state[k]; Object.assign(state, before); throw e; } }
+  window.ParallaxLAYRAccount = Object.freeze({ version: 'test-stub-1', mode: 'test-stub', onChainConnected: false,
+    async acquire() { owned = true; return true; }, ready, error: () => '', balance,
+    machine(id, engine) { const api = { ...engine }; api.fresh = () => attach(engine.fresh(), id); api.load = raw => attach(engine.load ? engine.load(raw) : { ...engine.fresh(), ...(raw || {}) }, id);
+      for (const n of ['start', 'settle', 'pick', 'respin', 'collect', 'endFree', 'gamble']) if (typeof engine[n] === 'function') api[n] = (s, ...a) => transact(s, () => engine[n](s, ...a)); return Object.freeze(api); },
+    openGame(id, engine) { const saved = acct.games[id]; return attach(engine.load(saved && saved.state), id, saved ? saved.revision : 0); },
+    saveGame(state) { if (!owned) return false; if (draft) return true; commit(state, balance()); return true; },
+    saveRoom() { return true; }, bindRoom() {}, subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }, release() { owned = false; } });
+  window.STACK_RESET = () => { acct = { bank: START, games: {} }; persist(); };
+  window.STACK_START_BALANCE = START;
+})();
+</script>
+<script>
+(async () => {
+'use strict';
+const $ = id => document.getElementById(id), fmt = n => (Math.round(n * 100) / 100).toLocaleString('en-GB', { maximumFractionDigits: 2 });
+const fail = m => { $('loadMsg').innerHTML = m; $('loadErr').style.display = 'flex'; };
+const unpack = async b64 => new Response(new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+let pack;
+try { pack = await (await fetch('pack.json', { cache: 'no-cache' })).json(); } catch (e) { fail('Could not load <code>pack.json</code>. Open this page through a local web server (for example <code>npx serve public</code>, then <code>/casino-machines/the-stack/</code>), not from a file.'); return; }
+const [modelText, gameHtml] = await Promise.all([unpack(pack.model), unpack(pack.game)]); const data = JSON.parse(modelText);
+const THREE = window.THREE, LITE = /[?&]lite\b/.test(location.search);
+/* ---------- Game in a hidden frame, exactly like the room: its canvas is the screen texture ---------- */
+const frame = document.createElement('iframe'); frame.className = 'pxLogicFrame'; frame.title = 'The Stack game logic'; frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1;
+frame.style.cssText = 'position:fixed;left:-4000px;top:0;width:1400px;height:960px;border:0;opacity:0;pointer-events:none';
+frame.allow = 'fullscreen'; frame.setAttribute('allowfullscreen', ''); frame.srcdoc = gameHtml; document.body.appendChild(frame);
+await new Promise(r => frame.addEventListener('load', r, { once: true }));
+let engine = null; for (let i = 0; i < 200 && !(engine = frame.contentWindow.PX_CASINO_ENGINE); i++) await new Promise(r => setTimeout(r, 50));
+if (!engine) { fail('The game did not start.'); return; }
+/* ---------- 3D studio built from the packed model (or the screen alone where WebGL is missing) ---------- */
+const studio = $('studio'), NOSTUDIO = /[?&]nostudio\b/.test(location.search);
+let renderer = null; if (!NOSTUDIO) { try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch (e) { renderer = null; } }
+const FALLBACK = !renderer;
+const images = FALLBACK ? [] : await Promise.all(data.textures.map(t => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = t.image; })));
+const env = document.createElement('canvas'); env.width = 1024; env.height = 512; { const g = env.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 512); ['#d6d4ec', '#2c2a44', '#07070b', '#16142a'].forEach((c, i) => gr.addColorStop(i / 3, c)); g.fillStyle = gr; g.fillRect(0, 0, 1024, 512); g.fillStyle = '#f2f0ff'; g.fillRect(150, 90, 70, 290); g.fillRect(700, 90, 70, 290); g.fillStyle = '#5546ff'; g.fillRect(400, 10, 220, 50); g.fillStyle = '#fc6432'; g.fillRect(860, 30, 90, 40); }
+const parts = { edge: [], edge2: [], lit: [], caps: [], slabs: [], tickers: [], core: null, lever: null, screen: null, pot: null };
+let model = null, scene = null, camera = null, screenTex = null, topperTex = null, tickerTex = null, glow = null, key = null, edgeMat = null, edge2Mat = null;
+if (!FALLBACK) {
+  const envTex = new THREE.CanvasTexture(env); envTex.mapping = THREE.EquirectangularReflectionMapping;
+  const geos = data.geometries.map(g => { const o = new THREE.BufferGeometry(); for (const [k, a] of Object.entries(g.attributes)) o.setAttribute(k, new THREE.BufferAttribute(new Float32Array(a.array), a.size)); if (g.index) o.setIndex(g.index); o.computeBoundingSphere(); return o; });
+  const textures = data.textures.map((t, i) => { const o = new THREE.Texture(images[i]); o.wrapS = t.wrapS; o.wrapT = t.wrapT; o.repeat.fromArray(t.repeat); o.offset.fromArray(t.offset); o.flipY = t.flipY; o.anisotropy = 8; o.needsUpdate = true; return o; });
+  const mats = data.materials.map(m => { const p = { color: m.color, map: m.map == null ? null : textures[m.map], transparent: m.transparent, opacity: m.opacity, side: m.side, depthWrite: m.depthWrite, alphaTest: m.alphaTest }; if (m.type === 'basic') return new THREE.MeshBasicMaterial(p); return new THREE.MeshStandardMaterial(Object.assign(p, { roughness: m.roughness, metalness: m.metalness, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, flatShading: m.flatShading, envMap: envTex, envMapIntensity: .7 })); });
+  edgeMat = new THREE.MeshBasicMaterial({ color: 0x6a5cff }); edge2Mat = new THREE.MeshBasicMaterial({ color: 0xfc6432 }); // the purple and orange edge lights
+  function node(n) { const o = n.g == null ? new THREE.Group() : new THREE.Mesh(geos[n.g], Array.isArray(n.m) ? n.m.map(i => mats[i]) : mats[n.m]); o.position.fromArray(n.p); o.quaternion.fromArray(n.q); o.scale.fromArray(n.s); o.visible = n.visible;
+    if (n.role) { o.name = 'px-' + n.role; if (n.role === 'edge') { o.material = edgeMat; parts.edge.push(o); } else if (n.role === 'edge2') { o.material = edge2Mat; parts.edge2.push(o); } else if (n.role === 'slab') { o.material = o.material.clone(); parts.slabs.push(o); } else if (n.role === 'potBoard') parts.pot = o; else if (n.role === 'tickerPanel') parts.tickers.push(o); else if (n.role === 'lit') parts.lit.push(o); else if (n.role === 'buttonCap') parts.caps.push(o); else parts[n.role === 'screenMesh' ? 'screen' : n.role] = o; } if (n.action) o.userData.pxMachineAction = n.action; n.children.forEach(c => o.add(node(c))); return o; }
+  model = node(data.root);
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); renderer.setClearColor(0x07070b); studio.appendChild(renderer.domElement);
+  scene = new THREE.Scene(); scene.environment = envTex; scene.add(model);
+  scene.add(new THREE.HemisphereLight(0xe2e0f6, 0x0a0a10, .5)); key = new THREE.SpotLight(0xf6f2ff, 1.05, 40, .6, .6, 1); key.position.set(3, 8, 6); key.target.position.set(0, 2.5, 0); scene.add(key, key.target);
+  const rim = new THREE.DirectionalLight(0x8f84ff, .45); rim.position.set(-6, 5, -4); scene.add(rim);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x0c0c12, roughness: .4, metalness: .35 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  glow = new THREE.PointLight(0xfc6432, .5, 6); glow.position.set(0, .15, 2.6); scene.add(glow);
+  camera = new THREE.PerspectiveCamera(32, 1, .1, 100);
+  screenTex = new THREE.CanvasTexture(engine.screen); screenTex.anisotropy = 8; if (parts.screen) { parts.screen.material = parts.screen.material.clone(); parts.screen.material.map = screenTex; parts.screen.material.needsUpdate = true; }
+  // The topper's display shows the game's live Floor Pot and cycle countdown (engine.topper) on the potBoard part, and both side
+  // panels show the live block ticker (engine.ticker) on the tickerPanel parts; the room can do the same.
+  if (engine.topper && parts.pot) { topperTex = new THREE.CanvasTexture(engine.topper); topperTex.anisotropy = 8; parts.pot.material = parts.pot.material.clone(); parts.pot.material.map = topperTex; parts.pot.material.needsUpdate = true; }
+  if (engine.ticker && parts.tickers.length) { tickerTex = new THREE.CanvasTexture(engine.ticker); tickerTex.anisotropy = 8; parts.tickers.forEach(o => { o.material = o.material.clone(); o.material.map = tickerTex; o.material.needsUpdate = true; }); }
+  parts.lit.forEach(o => { o.material = o.material.clone(); });
+} else {
+  // WebGL-less fallback: draw the machine's own screen canvas in 2D, and route taps to it.
+  $('fallbackNote').style.display = 'block'; const c = document.createElement('canvas'); studio.appendChild(c); renderer = { domElement: c, fallback: true, ctx: c.getContext('2d') };
+}
+/* ---------- Camera: drag to orbit, wheel/pinch to zoom, preset views ---------- */
+const VIEWS = { cabinet: { yaw: 0, pitch: .06, dist: 12.2, ty: 3.25 }, screen: { yaw: 0, pitch: .02, dist: 3.15, ty: 2.86 }, topper: { yaw: .25, pitch: .08, dist: 5.2, ty: 5.45 }, orbit: { yaw: .75, pitch: .16, dist: 12.6, ty: 3.2 } };
+let cam = { ...VIEWS.cabinet }, goal = { ...VIEWS.cabinet }, curView = 'cabinet';
+function setView(name) { curView = name; goal = { ...VIEWS[name] }; document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === name)); }
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view));
+function fit() { const w = innerWidth, h = innerHeight; if (FALLBACK) { renderer.domElement.width = w * (devicePixelRatio || 1); renderer.domElement.height = h * (devicePixelRatio || 1); return; } renderer.setSize(w, h); camera.aspect = w / h; camera.fov = w / h < .9 ? 52 : 32; camera.updateProjectionMatrix();
+  VIEWS.screen = screenView(); if (curView === 'screen') goal = { ...VIEWS.screen }; }
+/* The Screen view frames the screen with its bezel readout and the deck buttons underneath, so the machine can still be played
+   from its own buttons; it fits that box between the top bar and the hint line at any window size. (Full screen is the game's own
+   mode that fills the view with the screen and puts every control on its bottom bar.) */
+function screenView() {
+  const fallbackView = { yaw: 0, pitch: .02, dist: 3.15, ty: 2.86 }; if (FALLBACK || !model || !parts.screen) return fallbackView;
+  model.updateMatrixWorld(true); const box = new THREE.Box3(), b = new THREE.Box3(), under = (o, p) => { for (; o; o = o.parent) if (o === p) return true; return false; };
+  b.setFromObject(parts.screen); box.copy(b); const screenTop = b.max.y;
+  model.traverse(o => { if (o.isMesh && o.userData.pxMachineAction && !under(o, parts.lever)) { b.setFromObject(o); box.union(b); } }); // the deck buttons, not the lever
+  box.max.y = Math.max(box.max.y, screenTop + .3); // the bezel strip above the glass (STACKS · BLOCKS ▸ LIVE)
+  const w = innerWidth, h = innerHeight, hd = document.querySelector('header'), hint = $('hint');
+  const topPx = (hd ? hd.getBoundingClientRect().bottom : 70) + 10, botPx = h - (hint ? hint.getBoundingClientRect().top : h - 30) + 10;
+  const yTop = 1 - 2 * topPx / h, yBot = -1 + 2 * botPx / h, xLim = 1 - 2 * 14 / w, want = (yTop + yBot) / 2, pitch = .02;
+  const c = new THREE.PerspectiveCamera(camera.fov, w / h, .1, 100), v = new THREE.Vector3(), tanH = Math.tan(camera.fov * Math.PI / 360);
+  const pts = []; for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) pts.push(new THREE.Vector3(x, y, z));
+  const extent = (dist, ty) => { c.position.set(0, ty + Math.sin(pitch) * dist, Math.cos(pitch) * dist); c.lookAt(0, ty, 0); c.updateMatrixWorld(); const e = { x0: 9, x1: -9, y0: 9, y1: -9 }; for (const p of pts) { v.copy(p).project(c); e.x0 = Math.min(e.x0, v.x); e.x1 = Math.max(e.x1, v.x); e.y0 = Math.min(e.y0, v.y); e.y1 = Math.max(e.y1, v.y); } return e; };
+  const centred = dist => { let ty = (box.min.y + box.max.y) / 2, e; for (let k = 0; k < 8; k++) { e = extent(dist, ty); ty += ((e.y0 + e.y1) / 2 - want) * dist * tanH; } return { ty, e: extent(dist, ty) }; };
+  const fits = dist => { const { e } = centred(dist); return e.y1 <= yTop && e.y0 >= yBot && e.x1 <= xLim && e.x0 >= -xLim; };
+  let lo = 1.2, hi = 30; for (let k = 0; k < 32; k++) { const mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; }
+  return { yaw: 0, pitch, dist: hi, ty: centred(hi).ty };
+}
+addEventListener('resize', fit); fit();
+const pts = new Map(); let drag = null, pinch = 0;
+const ray = FALLBACK ? null : new THREE.Raycaster(), mouse = FALLBACK ? null : new THREE.Vector2();
+function fbRect() { const c = renderer.domElement, W = c.width, H = c.height, k = Math.min(W / 1400, (H - 140 * (devicePixelRatio || 1)) / 960), w = 1400 * k, h = 960 * k; return { x: (W - w) / 2, y: (H - h) / 2 + 30 * (devicePixelRatio || 1), w, h, k }; }
+function pick(ev) {
+  if (FALLBACK) { const r = fbRect(), d = devicePixelRatio || 1, x = (ev.clientX * d - r.x) / r.k, y = (ev.clientY * d - r.y) / r.k; return x >= 0 && y >= 0 && x <= 1400 && y <= 960 ? { tap: [x, y] } : null; }
+  const r = renderer.domElement.getBoundingClientRect(); mouse.set((ev.clientX - r.left) / r.width * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mouse, camera); const hits = ray.intersectObject(model, true); for (const h of hits) { if (!h.object.visible) continue; let o = h.object; while (o) { if (o.userData && o.userData.pxMachineAction) return { action: o.userData.pxMachineAction }; if (o === parts.screen) return { screen: h }; o = o.parent; } if (h.object.material && !h.object.material.transparent) return null; } return null; }
+studio.addEventListener('pointerdown', e => { studio.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); drag = { x: e.clientX, y: e.clientY, moved: 0 }; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); } });
+studio.addEventListener('pointermove', e => {
+  const p = pts.get(e.pointerId);
+  if (!p) { const h = pick(e); studio.classList.toggle('hot', !!h); return; }
+  if (FALLBACK) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); goal.dist = cam.dist = Math.max(Math.min(3, VIEWS.screen.dist * .85), Math.min(22, cam.dist * pinch / d)); pinch = d; return; }
+  if (drag) { drag.moved += Math.abs(dx) + Math.abs(dy); if (drag.moved > 5) { studio.classList.add('dragging'); goal.yaw = cam.yaw = cam.yaw - dx * .006; goal.pitch = cam.pitch = Math.max(-.2, Math.min(1.1, cam.pitch + dy * .005)); if (curView !== 'orbit') { curView = 'orbit'; document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === 'orbit')); } } }
+});
+studio.addEventListener('pointerup', e => { const was = drag && drag.moved <= 5 && pts.size === 1; pts.delete(e.pointerId); studio.classList.remove('dragging'); if (was) clickAt(e); drag = null; });
+studio.addEventListener('pointercancel', e => { pts.delete(e.pointerId); drag = null; studio.classList.remove('dragging'); });
+studio.addEventListener('wheel', e => { e.preventDefault(); if (FALLBACK) return; goal.dist = cam.dist = Math.max(Math.min(3, VIEWS.screen.dist * .85), Math.min(22, cam.dist * Math.exp(e.deltaY * .001))); }, { passive: false });
+function clickAt(e) { const h = pick(e); if (!h) return; if (h.tap) engine.tap(h.tap[0], h.tap[1]); else if (h.action) engine.action(h.action); else if (h.screen && h.screen.uv) engine.tap(h.screen.uv.x * 1400, (1 - h.screen.uv.y) * 960); }
+/* ---------- Frame loop: the lever, the turning slab stack, edge lights that pulse with each spin and each new Stacks block,
+   the live screen, topper display and side tickers (idle capped near 30 fps) ---------- */
+let lastRev = -1, lastTop = -1, lastTick = -1, t0 = performance.now(), lastRender = 0, lastNow = performance.now(), renderCost = 8;
+const EDGE_DIM = new THREE.Color(0x2a2280), EDGE_HOT = new THREE.Color(0xa99fff), EDGE2_DIM = new THREE.Color(0x6a2408), EDGE2_HOT = new THREE.Color(0xffa070), BTC_HOT = new THREE.Color(0xf7931a);
+function frameLoop(now) {
+  requestAnimationFrame(frameLoop);
+  let m = null; try { m = engine.mechanics(); } catch (e) {}
+  const rv = engine.revision(), tr = engine.topperRevision ? engine.topperRevision() : 0, kr = engine.tickerRevision ? engine.tickerRevision() : 0;
+  if (FALLBACK) { if (rv !== lastRev) { lastRev = rv; const g = renderer.ctx, c = renderer.domElement, r = fbRect(); g.fillStyle = '#07070b'; g.fillRect(0, 0, c.width, c.height); g.drawImage(engine.screen, r.x, r.y, r.w, r.h); } return; }
+  const moving = Object.keys(goal).some(k => Math.abs(goal[k] - cam[k]) > 1e-3) || drag || (m && (m.lever && m.lever.elapsed < m.lever.duration || m.bonus || m.leds > 0 || m.newBlock > 0)) || rv !== lastRev || tr !== lastTop || kr !== lastTick || (m && m.buttons && Object.values(m.buttons).some(v => v > 0));
+  if (now - lastRender < Math.max(moving ? 0 : 33, renderCost * 1.2)) return; lastNow = now; lastRender = now; const rs = performance.now();
+  for (const n of ['yaw', 'pitch', 'dist', 'ty']) cam[n] += (goal[n] - cam[n]) * .14;
+  camera.position.set(Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist, cam.ty + Math.sin(cam.pitch) * cam.dist, Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist); camera.lookAt(0, cam.ty, 0);
+  // the room swings the lever with sin(u·π)·angle
+  if (parts.lever) { const L = m && m.lever, u = L ? Math.min(1, L.elapsed / L.duration) : 1; parts.lever.rotation.x = L && u < 1 ? Math.sin(u * Math.PI) * L.angle : 0; }
+  const t = (now - t0) / 1000, jp = m && m.jackpot, nb = m ? m.newBlock || 0 : 0;
+  if (parts.core) parts.core.rotation.y = t * (jp ? 2.6 : .32);
+  // the deck's push buttons: each cap sinks into its collar while pressed (the game reports how far, 0–1, per action)
+  const B = m && m.buttons; if (B) { parts.caps.forEach(o => { const h = o.userData.homeZ ??= o.position.z; o.position.z = h - .03 * (B[o.userData.pxMachineAction] || 0); });
+    if (parts.spinPhysical) { const o = parts.spinPhysical, h = o.userData.homeZ ??= o.position.z; o.position.z = Number.isFinite(m.spinZ) ? h + m.spinZ : h; } }
+  // edge lights: purple breathes slowly, flares with each spin and with each new Stacks block; orange follows wins and the jackpot
+  const L = m ? m.leds : 0, breathe = .22 + .1 * Math.sin(t * 1.6);
+  edgeMat.color.copy(EDGE_DIM).lerp(EDGE_HOT, jp ? .5 + .5 * Math.sin(t * 12) : Math.min(1, Math.max(breathe, L, nb)));
+  edge2Mat.color.copy(EDGE2_DIM).lerp(jp ? BTC_HOT : EDGE2_HOT, jp ? .5 + .5 * Math.sin(t * 9) : Math.max(.25, m && m.win ? .6 + .4 * Math.sin(t * 8) : L * .8));
+  parts.slabs.forEach((o, i) => { o.material.emissiveIntensity = .75 + .35 * Math.sin(t * 1.4 + i * 1.1) + (jp ? .8 : nb * .6 + L * .4); });
+  glow.intensity = jp ? .9 + .5 * Math.sin(t * 7) : (m && m.win ? .8 : .5);
+  if (rv !== lastRev) { lastRev = rv; screenTex.needsUpdate = true; }
+  if (topperTex && tr !== lastTop) { lastTop = tr; topperTex.needsUpdate = true; }
+  if (tickerTex && kr !== lastTick) { lastTick = kr; tickerTex.needsUpdate = true; }
+  if (!LITE || (frameLoop.n = (frameLoop.n || 0) + 1) % 30 === 0) renderer.render(scene, camera);
+  renderCost = renderCost * .8 + (performance.now() - rs) * .2; // adaptive pacing: leave the page time to answer between frames
+}
+requestAnimationFrame(frameLoop);
+/* ---------- The room's HTML port: the game's dialog and bonus bar are drawn here, and clicks go back through the engine ---------- */
+// Each port lives in its own shadow root (kept in place, so the game's own stylesheet applies inside it).
+const portCss = `${pack.css.replace(/:root/g, ':host')}\n:host{display:contents;--ink:#e7e5ff}.port{font-family:"Helvetica Neue",Arial,sans-serif;color:#e7e5ff}dialog{position:static;display:block;margin:0;max-height:86vh;overflow:auto}#featureBar{margin:0 auto;max-width:min(980px,96vw)}`;
+function makePort(container) { const h = document.createElement('div'); container.appendChild(h); const sr = h.attachShadow({ mode: 'open' }); sr.innerHTML = `<style>${portCss}</style><div class="port"></div>`; return sr.querySelector('.port'); }
+const mEl = makePort($('modalHost')), fEl = makePort($('featHost'));
+let lastModal = '', lastFeat = '';
+function syncUI() {
+  let u; try { u = engine.ui(); } catch (e) { return; }
+  $('bal').textContent = fmt(u.balance) + (u.lab ? ' (LAB)' : '');
+  if (u.modal !== lastModal) { lastModal = u.modal; mEl.innerHTML = u.modal; $('back').style.display = u.modal ? 'block' : 'none'; $('modalHost').style.display = u.modal ? 'flex' : 'none'; }
+  if (u.feature !== lastFeat) { lastFeat = u.feature; fEl.innerHTML = u.feature; const fb = fEl.querySelector('#featureBar'); if (fb) fb.removeAttribute('hidden'); }
+}
+setInterval(syncUI, 100);
+const tokenOf = el => { const s = el.closest && el.closest('[data-px-source]'); return s ? { el: s, token: s.getAttribute('data-px-source') } : null; };
+for (const root of [mEl, fEl]) {
+  root.addEventListener('click', e => { const t = tokenOf(e.target); if (!t) return; const tag = t.el.tagName; if (tag === 'BUTTON' || tag === 'A' || t.el.getAttribute('role') === 'button') { e.preventDefault(); engine.click(t.token); } });
+  for (const ev of ['input', 'change']) root.addEventListener(ev, e => { const t = tokenOf(e.target); if (!t) return; const el = e.target; if (el.matches('input,select,textarea')) engine.input(t.token, el.value, !!el.checked, ev); });
+}
+$('back').onclick = () => engine.closeModal();
+/* ---------- Header, keys, test panel ---------- */
+$('fsBtn').onclick = () => engine.fullscreen.toggle(); $('spinBtn').onclick = () => engine.action('spin'); $('labBtn').onclick = () => engine.action('lab');
+$('resetBtn').onclick = () => { try { engine.deactivate(); } catch (e) {} window.STACK_RESET(); location.reload(); };
+addEventListener('keydown', e => { if (e.target.matches && e.target.matches('input,textarea,select')) return; if (e.code === 'Space') { e.preventDefault(); engine.action('spin'); } else if (e.key.toLowerCase() === 'f') engine.fullscreen.toggle(); else if (e.key.toLowerCase() === 'l') engine.action('lab'); else if (e.key.toLowerCase() === 't') toggleTest(); else if (e.key === 'Escape') engine.closeModal(); });
+const testEl = $('test'); const toggleTest = () => { testEl.style.display = testEl.style.display === 'block' ? 'none' : 'block'; };
+$('testToggle').onclick = toggleTest; if (/[?&]test\b/.test(location.search)) toggleTest();
+const LAB = [['free', 'Stacking Season'], ['free_re', 'Season + retrigger'], ['vault', 'Reward Slots'], ['chain', 'Fast Blocks'], ['chain_full', 'Fast Blocks full grid'], ['jackpot', 'Bitcoin Finality'], ['gamble_win', 'Gamble · win'], ['gamble_lose', 'Gamble · loss'], ['scatter3', 'Scatter ×3'], ['scatter4', 'Scatter ×4'], ['scatter5', 'Scatter ×5'], ['turnover', 'Cycle Turnover'], ['snapshot', 'Cycle Snapshot']];
+$('labItems').innerHTML = LAB.map(([k, t]) => `<button data-k="lab:${k}">${t}</button>`).join('');
+const out = s => { $('out').textContent = typeof s === 'string' ? s : JSON.stringify(s, null, 1); };
+testEl.addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k, T = engine.test; if (!T) { out('Test hooks are off (?prod).'); return; }
+  if (k.startsWith('lab:')) out('lab ' + k.slice(4) + ': ' + T.lab(k.slice(4), { auto: false })); else if (k === 'runall') out('run all: ' + T.runAll(100, 7)); else if (k === 'leave') out('leave: ' + T.exitLab());
+  else if (k.startsWith('twins:')) out(T.setTwins(k.slice(6))); else if (k.startsWith('chain:')) out(T.setChain(k.slice(6))); else if (k === 'reduced') { const on = !T.state().reduced; T.setReduced(on); out('Reduced motion ' + (on ? 'on' : 'off')); } else if (k === 'state') out(T.state()); });
+$('simBtn').onclick = async () => { const n = Math.max(1000, Number($('simN').value) || 1e6), t = performance.now(); out('Running ' + fmt(n) + ' spins…'); const r = await engine.test.sim(n, 1, (d, tot, rtp) => { out(`${fmt(d)} / ${fmt(tot)} spins · running RTP ${(rtp * 100).toFixed(3)}%`); }); out(`${fmt(r.spins)} spins · RTP ${(r.rtp * 100).toFixed(3)}% (design 94.38%) · ${((performance.now() - t) / 1000).toFixed(1)}s`); };
+/* ---------- Connect the account and start ---------- */
+try { await engine.activate(); } catch (e) { fail(String(e.message || e)); return; }
+window.__stack = { engine, THREE, model, camera, scene, parts, setView, views: VIEWS, cam: () => cam, ui: () => engine.ui(), toggleTest, frame, renderer, fallback: FALLBACK };
+document.documentElement.setAttribute('data-ready', '1');
+})();
+</script></body></html>

@@ -1,0 +1,506 @@
+{
+ "machine": "The Stack",
+ "about": "Where every image and record on The Stack comes from. Every symbol is a real project's official logo file, the public-domain Bitcoin mark, or a real record read from the Stacks chain through the Hiro API. No NFT or inscription appears on these reels. Nothing was drawn or imitated by hand.",
+ "generated": "2026-11-02T11:23Z",
+ "logoFiles": {
+  "how": "The official files as the projects' own ecosystem packages bundle them, taken from the npm registry and embedded byte for byte (sha256 below). @leather.io/ui is Leather's own design package (MIT); it carries the dapp logos Leather shows its users. @stacks/connect-ui is the Stacks Connect wallet modal (MIT). Projects' websites were not reachable from the build machines, so their press kits could not be compared; swap in a press-kit file any time and record it here.",
+  "package": "https://registry.npmjs.org/@leather.io/ui/-/ui-1.111.2.tgz"
+ },
+ "cabinet": {
+  "xtrataMark": "tools/the-stack/model/assets/xtrata.svg, the brand SVG supplied in the build prompt, embedded as supplied on the lower door (house mark)",
+  "parallaxWordmark": "tools/the-stack/model/assets/parallax-wordmark.svg, the wordmark supplied in the build prompt, embedded small at the marquee foot (house mark)",
+  "stacksLogo": "art/logos/stacks.svg (official Stacks logo as bundled in @leather.io/ui): on the marquee as supplied, and its path is extruded (never redrawn) into the three topper slabs",
+  "bitcoinMark": "art/bitcoin-mark.svg (Bitcoin.org, public domain): on the lower door",
+  "everythingElse": "Black glass, edge lights, slab bars, buttons and labels are procedural textures written by tools/the-stack/model/textures.py; no third-party artwork."
+ },
+ "twins": {
+  "what": "The Floor Pot's twin count (display only)",
+  "source": "https://xtrata.xyz/forever-twins/data/registry.v2.json and each live helper's contract events via https://xtrata.xyz/hiro/mainnet (fallback https://api.hiro.so). A failed read is shown as unknown, never as zero."
+ },
+ "symbols": {
+  "cherry": {
+   "name": "Leather",
+   "kind": "Official logo",
+   "logo": "leather",
+   "items": [],
+   "file": "art/logos/leather.svg",
+   "sha256": "c2745672f72d4b86b9d8fe43c9a4478d8ee59cf52c18d9a8d6fc0f374a6032fb",
+   "source": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-leather-40-40.svg (Leather's own package, MIT)",
+   "project": "https://leather.io",
+   "permission": "Permission to appear: not yet asked (Trust Machines / Leather).",
+   "alternative": "@stacks/connect-ui 6.6.0 · dist/connect-ui/assets/leather-logo.svg (art/logos/leather-connect.svg)"
+  },
+  "lemon": {
+   "name": "Xverse",
+   "kind": "Official logo",
+   "logo": "xverse",
+   "items": [],
+   "file": "art/logos/xverse.svg",
+   "sha256": "85c2f2b92841e47d6fbdeac003bd08970da1b76b53f23bf87ce1c60bcc07dde3",
+   "source": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-xverse-40-40.svg (MIT)",
+   "project": "https://www.xverse.app",
+   "permission": "Permission to appear: not yet asked (Secret Key Labs / Xverse).",
+   "alternative": "@stacks/connect-ui 6.6.0 · dist/connect-ui/assets/xverse-wallet-logo.svg (art/logos/xverse-connect.svg)"
+  },
+  "chip": {
+   "name": "Bitflow",
+   "kind": "Official logo",
+   "logo": "bitflow",
+   "items": [],
+   "file": "art/logos/bitflow.svg",
+   "sha256": "5938fe1de461f7d409c880473f8bbe7819b4dc55c213dbec158d9b8bf1305c50",
+   "source": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-bitflow-40-40.svg (MIT)",
+   "project": "https://www.bitflow.finance",
+   "permission": "Permission to appear: not yet asked (Bitflow)."
+  },
+  "block": {
+   "name": "Zest Protocol",
+   "kind": "Official logo",
+   "logo": "zest",
+   "items": [],
+   "file": "art/logos/zest.svg",
+   "sha256": "9c7f9fb15f31ff1059f904e228038bd6e1e724b6f6936a87d14c54a235a825a5",
+   "source": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-zest-40-40.svg (MIT)",
+   "project": "https://www.zestprotocol.com",
+   "permission": "Permission to appear: not yet asked (Zest Protocol)."
+  },
+  "artifact": {
+   "name": "sBTC",
+   "kind": "Official logo",
+   "logo": "sbtc",
+   "items": [],
+   "file": "art/logos/sbtc.svg",
+   "sha256": "6645cd90c8f3a4a56f10e03d5aee841c67c82b55519af6b48e16f628118be4bd",
+   "source": "@leather.io/ui 1.111.2 · dist-web/assets/icons/sbtc.svg (MIT); the sBTC token's own metadata image is https://ipfs.io/ipfs/bafkreiffe46h5voimvulxm2s4ddszdm4uli4rwcvx34cgzz3xkfcc2hiwi (not reachable from the build machines)",
+   "project": "https://www.stacks.co/sbtc",
+   "permission": "Permission to appear: not yet asked (Stacks Foundation, for sBTC)."
+  },
+  "bitcoin": {
+   "name": "Bitcoin ₿ (jackpot symbol)",
+   "kind": "The Bitcoin logo (public domain)",
+   "source": "Bitcoin.org repository, img/icons/logotop.svg (https://github.com/bitcoin-dot-org/Bitcoin.org/blob/master/img/icons/logotop.svg), as saved by The Halving build in art/bitcoin-mark.svg. Bitcoin.org states the logo is in the public domain.",
+   "items": []
+  },
+  "wild": {
+   "name": "Stacks (STX)",
+   "kind": "Official logo",
+   "logo": "stacks",
+   "items": [],
+   "file": "art/logos/stacks.svg",
+   "sha256": "08b6a2781188fd04e39f1bde893c0a6b92d06f1eea9cb607c57f626892be13d9",
+   "source": "@leather.io/ui 1.111.2 · dist-web/assets/icons/stacks.svg (MIT)",
+   "project": "https://www.stacks.co",
+   "permission": "Permission to appear: not yet asked (Stacks Foundation brand guidelines). Also used on the marquee and extruded for the topper slabs."
+  },
+  "scatter": {
+   "name": "Stacking cycle",
+   "kind": "On-chain record",
+   "source": "https://api.hiro.so/v2/pox (current cycle) and https://api.hiro.so/extended/v2/pox/cycles (stacked STX, signers); the cycle shown live is computed from the Bitcoin tip: floor((tip − 666,050) ÷ 2,100)",
+   "items": [
+    {
+     "cycle": 146,
+     "startBlock": 9273998,
+     "stackedUstx": 493352376805177,
+     "signers": 35,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/146"
+    },
+    {
+     "cycle": 145,
+     "startBlock": 9144823,
+     "stackedUstx": 493445944980927,
+     "signers": 34,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/145"
+    },
+    {
+     "cycle": 144,
+     "startBlock": 9051704,
+     "stackedUstx": 448279555393867,
+     "signers": 31,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/144"
+    },
+    {
+     "cycle": 143,
+     "startBlock": 8951681,
+     "stackedUstx": 441526003760845,
+     "signers": 29,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/143"
+    },
+    {
+     "cycle": 142,
+     "startBlock": 8845193,
+     "stackedUstx": 421493794927560,
+     "signers": 26,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/142"
+    },
+    {
+     "cycle": 141,
+     "startBlock": 8740160,
+     "stackedUstx": 392447554847960,
+     "signers": 24,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/141"
+    },
+    {
+     "cycle": 140,
+     "startBlock": 8651159,
+     "stackedUstx": 446872894990056,
+     "signers": 25,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/140"
+    },
+    {
+     "cycle": 139,
+     "startBlock": 8539812,
+     "stackedUstx": 552431751986668,
+     "signers": 35,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/139"
+    },
+    {
+     "cycle": 138,
+     "startBlock": 8417947,
+     "stackedUstx": 581990011616796,
+     "signers": 34,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/138"
+    },
+    {
+     "cycle": 137,
+     "startBlock": 8281516,
+     "stackedUstx": 589664825995228,
+     "signers": 35,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/137"
+    },
+    {
+     "cycle": 136,
+     "startBlock": 8121991,
+     "stackedUstx": 504262340623865,
+     "signers": 33,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/136"
+    },
+    {
+     "cycle": 135,
+     "startBlock": 7957529,
+     "stackedUstx": 566006788752782,
+     "signers": 37,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/135"
+    },
+    {
+     "cycle": 134,
+     "startBlock": 7803555,
+     "stackedUstx": 566974040032170,
+     "signers": 36,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/134"
+    },
+    {
+     "cycle": 133,
+     "startBlock": 7615063,
+     "stackedUstx": 609923899342905,
+     "signers": 38,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/133"
+    },
+    {
+     "cycle": 132,
+     "startBlock": 7429340,
+     "stackedUstx": 608402355620139,
+     "signers": 39,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/132"
+    },
+    {
+     "cycle": 131,
+     "startBlock": 7207298,
+     "stackedUstx": 556818144541266,
+     "signers": 35,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/131"
+    },
+    {
+     "cycle": 130,
+     "startBlock": 6896295,
+     "stackedUstx": 561612798240993,
+     "signers": 33,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/130"
+    },
+    {
+     "cycle": 129,
+     "startBlock": 6585641,
+     "stackedUstx": 447079530294787,
+     "signers": 20,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/129"
+    },
+    {
+     "cycle": 128,
+     "startBlock": 6279606,
+     "stackedUstx": 588781157588682,
+     "signers": 34,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/128"
+    },
+    {
+     "cycle": 127,
+     "startBlock": 5936311,
+     "stackedUstx": 525030438717826,
+     "signers": 33,
+     "source": "https://api.hiro.so/extended/v2/pox/cycles/127"
+    }
+   ],
+   "pox": {
+    "contract": "SP000000000000000000002Q6VF78.pox-5",
+    "cycle": 146,
+    "nextCycle": 147,
+    "rewardCycleLength": 2100,
+    "prepareLength": 100,
+    "firstBurnHeight": 666050,
+    "burnAtRead": 974246,
+    "nextPrepareStart": 974650,
+    "nextRewardStart": 974750,
+    "stackedUstx": 493402397305177,
+    "nextStackedUstx": 431507989968597,
+    "minThresholdUstx": 50000000000,
+    "source": "https://api.hiro.so/v2/pox"
+   }
+  },
+  "vault": {
+   "name": "StackingDAO",
+   "kind": "Official logo",
+   "logo": "stackingdao",
+   "items": [],
+   "file": "art/logos/stackingdao.svg",
+   "sha256": "ec152b0fb0b229b51c1f57e7cfbb35d984baae3f23590c05c148c04ade64042c",
+   "source": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-stacking-dao-40-40.svg (MIT)",
+   "project": "https://www.stackingdao.com",
+   "permission": "Permission to appear: not yet asked (StackingDAO)."
+  },
+  "chain": {
+   "name": "Fast block",
+   "kind": "On-chain record",
+   "source": "https://api.hiro.so/extended/v1/block (latest Stacks blocks, each with the Bitcoin block it anchored to), cross-checked hash for hash against https://api.hiro.so/extended/v2/burn-blocks",
+   "items": [
+    {
+     "height": 9394845,
+     "hash": "0xd61a7764ac5e1dcfd4e5b43400c1676c9c2e26b37cbcf30e85939cd5cefe499d",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0xd61a7764ac5e1dcfd4e5b43400c1676c9c2e26b37cbcf30e85939cd5cefe499d?chain=mainnet"
+    },
+    {
+     "height": 9394844,
+     "hash": "0x34ff2e1801ea5fd2a2882b9c927ea3469fd3c597070dcc57ff5cb5be2386fc6d",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0x34ff2e1801ea5fd2a2882b9c927ea3469fd3c597070dcc57ff5cb5be2386fc6d?chain=mainnet"
+    },
+    {
+     "height": 9394843,
+     "hash": "0xa281815039536f56e474acc55bf1eab1506f53994966000e8b972ef9d778f074",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0xa281815039536f56e474acc55bf1eab1506f53994966000e8b972ef9d778f074?chain=mainnet"
+    },
+    {
+     "height": 9394842,
+     "hash": "0xa4164166fc5e443b9efd71d099126ac4e0b653fd493e1b0a4c281777df4d11c6",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0xa4164166fc5e443b9efd71d099126ac4e0b653fd493e1b0a4c281777df4d11c6?chain=mainnet"
+    },
+    {
+     "height": 9394841,
+     "hash": "0xd33694a135072126f69d778c3ed1482b211e729938790878dd06763ea2f8e4e6",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0xd33694a135072126f69d778c3ed1482b211e729938790878dd06763ea2f8e4e6?chain=mainnet"
+    },
+    {
+     "height": 9394840,
+     "hash": "0x55f4db8adcf70c0b0f75784ef270ca8c26276b9bf2cb4e6f513d4b3614384045",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0x55f4db8adcf70c0b0f75784ef270ca8c26276b9bf2cb4e6f513d4b3614384045?chain=mainnet"
+    },
+    {
+     "height": 9394839,
+     "hash": "0x01fbe118d480bdb5d79ce2ac917a864288114897ffe0bac6131aaf7518d6f93e",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0x01fbe118d480bdb5d79ce2ac917a864288114897ffe0bac6131aaf7518d6f93e?chain=mainnet"
+    },
+    {
+     "height": 9394838,
+     "hash": "0xcfe27cd4d0228c79c76d27f4a777a3b88a487edadb99741589a857914d135ea9",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0xcfe27cd4d0228c79c76d27f4a777a3b88a487edadb99741589a857914d135ea9?chain=mainnet"
+    },
+    {
+     "height": 9394837,
+     "hash": "0x98f9b81949f95ae1cec58f6b4f87a7e1df9614f4b89181adc55fc76eadf38d4b",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0x98f9b81949f95ae1cec58f6b4f87a7e1df9614f4b89181adc55fc76eadf38d4b?chain=mainnet"
+    },
+    {
+     "height": 9394836,
+     "hash": "0x4262cb5f00ede3691654b3d35d341f70ed21e0824c43d6b5c84bc7a9a7ba180f",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0x4262cb5f00ede3691654b3d35d341f70ed21e0824c43d6b5c84bc7a9a7ba180f?chain=mainnet"
+    },
+    {
+     "height": 9394835,
+     "hash": "0x7ad72db2f9d239351415c32e63038ad2d35ac53261f7bde13bf4823c9d2ae684",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0x7ad72db2f9d239351415c32e63038ad2d35ac53261f7bde13bf4823c9d2ae684?chain=mainnet"
+    },
+    {
+     "height": 9394834,
+     "hash": "0x09533dfd4d0bb039c35cb763fb331ed94a21fb5509b5d0746409b1b67d299f1b",
+     "burn": 974247,
+     "time": "2026-11-02T10:48:20Z",
+     "source": "https://explorer.hiro.so/block/0x09533dfd4d0bb039c35cb763fb331ed94a21fb5509b5d0746409b1b67d299f1b?chain=mainnet"
+    },
+    {
+     "height": 9394833,
+     "hash": "0x102c90f57b3baf6afd72ad01e3f453bbea623abf0c104de26e355901e632e8c0",
+     "burn": 974245,
+     "time": "2026-11-02T10:42:58Z",
+     "source": "https://explorer.hiro.so/block/0x102c90f57b3baf6afd72ad01e3f453bbea623abf0c104de26e355901e632e8c0?chain=mainnet"
+    },
+    {
+     "height": 9394832,
+     "hash": "0x4ce495f4587b641fb86a9cbf3e59695cb8fe08aef5050ba4ef4d1aa23f885ed3",
+     "burn": 974245,
+     "time": "2026-11-02T10:42:58Z",
+     "source": "https://explorer.hiro.so/block/0x4ce495f4587b641fb86a9cbf3e59695cb8fe08aef5050ba4ef4d1aa23f885ed3?chain=mainnet"
+    },
+    {
+     "height": 9394831,
+     "hash": "0x415d800db6c9483865c08b28687d86c94b40205941d40297183fb60608cf33b4",
+     "burn": 974245,
+     "time": "2026-11-02T10:42:58Z",
+     "source": "https://explorer.hiro.so/block/0x415d800db6c9483865c08b28687d86c94b40205941d40297183fb60608cf33b4?chain=mainnet"
+    },
+    {
+     "height": 9394830,
+     "hash": "0x436146dbac55bb0246a9c3bc241e34580cdb50cfa782a84d21e877506f53e01a",
+     "burn": 974245,
+     "time": "2026-11-02T10:42:58Z",
+     "source": "https://explorer.hiro.so/block/0x436146dbac55bb0246a9c3bc241e34580cdb50cfa782a84d21e877506f53e01a?chain=mainnet"
+    },
+    {
+     "height": 9394829,
+     "hash": "0x28117259c44796c1f15e83d792093aa6fc1fbdaa2f072f0a18d0368a92f36868",
+     "burn": 974245,
+     "time": "2026-11-02T10:42:58Z",
+     "source": "https://explorer.hiro.so/block/0x28117259c44796c1f15e83d792093aa6fc1fbdaa2f072f0a18d0368a92f36868?chain=mainnet"
+    },
+    {
+     "height": 9394828,
+     "hash": "0xcddbb7c0f3b1820ba42880b066fb33a922948e70fc04c672dcb6abb2a421c7ff",
+     "burn": 974245,
+     "time": "2026-11-02T10:42:58Z",
+     "source": "https://explorer.hiro.so/block/0xcddbb7c0f3b1820ba42880b066fb33a922948e70fc04c672dcb6abb2a421c7ff?chain=mainnet"
+    },
+    {
+     "height": 9394827,
+     "hash": "0xf2a7cf2062909d83251afd392dd02c31ad6b977ba4ce97b67129d60ce51ab93c",
+     "burn": 974245,
+     "time": "2026-11-02T10:42:58Z",
+     "source": "https://explorer.hiro.so/block/0xf2a7cf2062909d83251afd392dd02c31ad6b977ba4ce97b67129d60ce51ab93c?chain=mainnet"
+    },
+    {
+     "height": 9394826,
+     "hash": "0x8d804f7cebe5a2f6580800291455ab975fd549b9e509e2822fef09bc20538898",
+     "burn": 974245,
+     "time": "2026-11-02T10:42:58Z",
+     "source": "https://explorer.hiro.so/block/0x8d804f7cebe5a2f6580800291455ab975fd549b9e509e2822fef09bc20538898?chain=mainnet"
+    }
+   ],
+   "anchors": [
+    {
+     "height": 974245,
+     "hash": "0x00000000000000000000d6ca93c32805774847dccf88537500f9365534cdfe98",
+     "time": "2026-11-02T10:42:58Z",
+     "txs": 94,
+     "source": "https://mempool.space/block/00000000000000000000d6ca93c32805774847dccf88537500f9365534cdfe98"
+    },
+    {
+     "height": 974243,
+     "hash": "0x00000000000000000000b2fb561dc4e588cba76d80c2b809eedf6190757ffc65",
+     "time": "2026-11-02T10:27:07Z",
+     "txs": 320,
+     "source": "https://mempool.space/block/00000000000000000000b2fb561dc4e588cba76d80c2b809eedf6190757ffc65"
+    },
+    {
+     "height": 974242,
+     "hash": "0x0000000000000000000078a99967374680cde990f74b1ce6a42f9cc68f3b85ac",
+     "time": "2026-11-02T10:01:33Z",
+     "txs": 321,
+     "source": "https://mempool.space/block/0000000000000000000078a99967374680cde990f74b1ce6a42f9cc68f3b85ac"
+    },
+    {
+     "height": 974241,
+     "hash": "0x00000000000000000001340b9411c2fc22054a5268e02522f9a258508c528019",
+     "time": "2026-11-02T09:52:39Z",
+     "txs": 236,
+     "source": "https://mempool.space/block/00000000000000000001340b9411c2fc22054a5268e02522f9a258508c528019"
+    },
+    {
+     "height": 974238,
+     "hash": "0x0000000000000000000110bb9878005d5648bd1f91defee3e56d40d58b9d85f5",
+     "time": "2026-11-02T09:32:33Z",
+     "txs": 442,
+     "source": "https://mempool.space/block/0000000000000000000110bb9878005d5648bd1f91defee3e56d40d58b9d85f5"
+    },
+    {
+     "height": 974237,
+     "hash": "0x00000000000000000001c9a3d4ebcef919865b8889a2884e3ed045263e0167aa",
+     "time": "2026-11-02T09:21:52Z",
+     "txs": 201,
+     "source": "https://mempool.space/block/00000000000000000001c9a3d4ebcef919865b8889a2884e3ed045263e0167aa"
+    }
+   ]
+  }
+ },
+ "logosNeedingPermission": [
+  {
+   "logo": "Leather",
+   "where": "reels",
+   "ask": "https://leather.io",
+   "status": "not yet asked"
+  },
+  {
+   "logo": "Xverse",
+   "where": "reels",
+   "ask": "https://www.xverse.app",
+   "status": "not yet asked"
+  },
+  {
+   "logo": "Bitflow",
+   "where": "reels",
+   "ask": "https://www.bitflow.finance",
+   "status": "not yet asked"
+  },
+  {
+   "logo": "Zest Protocol",
+   "where": "reels",
+   "ask": "https://www.zestprotocol.com",
+   "status": "not yet asked"
+  },
+  {
+   "logo": "sBTC",
+   "where": "reels",
+   "ask": "https://www.stacks.co/sbtc",
+   "status": "not yet asked"
+  },
+  {
+   "logo": "StackingDAO",
+   "where": "reels",
+   "ask": "https://www.stackingdao.com",
+   "status": "not yet asked"
+  },
+  {
+   "logo": "Stacks (STX)",
+   "where": "reels · marquee · topper slabs",
+   "ask": "https://www.stacks.co",
+   "status": "not yet asked"
+  }
+ ],
+ "permissionNotes": "Every project logo on the reels and marquee is another project's mark. Each needs that project's OK before The Stack goes on a public floor (bible: 'Logos of other projects go on a public machine only with that project's OK'). Until a project agrees, the file stays on the testnet build; if one says no, swap its slot for another Stacks project (ALEX, Hiro, Gamma, Velar…) keeping one logo per slot, or show its name in type. The Bitcoin mark is public domain; the Xtrata mark and ParallaX Casino wordmark are house marks.",
+ "readVia": "Hiro API (api.hiro.so), read 2 Nov 2026 10:45–10:49 UTC; Stacks blocks cross-checked hash-for-hash against /extended/v2/burn-blocks"
+}

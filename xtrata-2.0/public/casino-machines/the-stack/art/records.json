@@ -1,0 +1,413 @@
+{
+ "generated": "2026-11-02T10:48Z",
+ "readVia": "Hiro API (api.hiro.so), read 2 Nov 2026 10:45\u201310:49 UTC; Stacks blocks cross-checked hash-for-hash against /extended/v2/burn-blocks",
+ "pox": {
+  "contract": "SP000000000000000000002Q6VF78.pox-5",
+  "cycle": 146,
+  "nextCycle": 147,
+  "rewardCycleLength": 2100,
+  "prepareLength": 100,
+  "firstBurnHeight": 666050,
+  "burnAtRead": 974246,
+  "nextPrepareStart": 974650,
+  "nextRewardStart": 974750,
+  "stackedUstx": 493402397305177,
+  "nextStackedUstx": 431507989968597,
+  "minThresholdUstx": 50000000000,
+  "source": "https://api.hiro.so/v2/pox"
+ },
+ "tip": {
+  "stacks": 9394845,
+  "burn": 974247,
+  "time": "2026-11-02T10:48:20Z",
+  "source": "https://api.hiro.so/extended/v1/block?limit=20"
+ },
+ "blocks": [
+  {
+   "height": 9394845,
+   "hash": "0xd61a7764ac5e1dcfd4e5b43400c1676c9c2e26b37cbcf30e85939cd5cefe499d",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 2,
+   "source": "https://explorer.hiro.so/block/0xd61a7764ac5e1dcfd4e5b43400c1676c9c2e26b37cbcf30e85939cd5cefe499d?chain=mainnet"
+  },
+  {
+   "height": 9394844,
+   "hash": "0x34ff2e1801ea5fd2a2882b9c927ea3469fd3c597070dcc57ff5cb5be2386fc6d",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 4,
+   "source": "https://explorer.hiro.so/block/0x34ff2e1801ea5fd2a2882b9c927ea3469fd3c597070dcc57ff5cb5be2386fc6d?chain=mainnet"
+  },
+  {
+   "height": 9394843,
+   "hash": "0xa281815039536f56e474acc55bf1eab1506f53994966000e8b972ef9d778f074",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 2,
+   "source": "https://explorer.hiro.so/block/0xa281815039536f56e474acc55bf1eab1506f53994966000e8b972ef9d778f074?chain=mainnet"
+  },
+  {
+   "height": 9394842,
+   "hash": "0xa4164166fc5e443b9efd71d099126ac4e0b653fd493e1b0a4c281777df4d11c6",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 2,
+   "source": "https://explorer.hiro.so/block/0xa4164166fc5e443b9efd71d099126ac4e0b653fd493e1b0a4c281777df4d11c6?chain=mainnet"
+  },
+  {
+   "height": 9394841,
+   "hash": "0xd33694a135072126f69d778c3ed1482b211e729938790878dd06763ea2f8e4e6",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 2,
+   "source": "https://explorer.hiro.so/block/0xd33694a135072126f69d778c3ed1482b211e729938790878dd06763ea2f8e4e6?chain=mainnet"
+  },
+  {
+   "height": 9394840,
+   "hash": "0x55f4db8adcf70c0b0f75784ef270ca8c26276b9bf2cb4e6f513d4b3614384045",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 2,
+   "source": "https://explorer.hiro.so/block/0x55f4db8adcf70c0b0f75784ef270ca8c26276b9bf2cb4e6f513d4b3614384045?chain=mainnet"
+  },
+  {
+   "height": 9394839,
+   "hash": "0x01fbe118d480bdb5d79ce2ac917a864288114897ffe0bac6131aaf7518d6f93e",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 2,
+   "source": "https://explorer.hiro.so/block/0x01fbe118d480bdb5d79ce2ac917a864288114897ffe0bac6131aaf7518d6f93e?chain=mainnet"
+  },
+  {
+   "height": 9394838,
+   "hash": "0xcfe27cd4d0228c79c76d27f4a777a3b88a487edadb99741589a857914d135ea9",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 3,
+   "source": "https://explorer.hiro.so/block/0xcfe27cd4d0228c79c76d27f4a777a3b88a487edadb99741589a857914d135ea9?chain=mainnet"
+  },
+  {
+   "height": 9394837,
+   "hash": "0x98f9b81949f95ae1cec58f6b4f87a7e1df9614f4b89181adc55fc76eadf38d4b",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 1,
+   "source": "https://explorer.hiro.so/block/0x98f9b81949f95ae1cec58f6b4f87a7e1df9614f4b89181adc55fc76eadf38d4b?chain=mainnet"
+  },
+  {
+   "height": 9394836,
+   "hash": "0x4262cb5f00ede3691654b3d35d341f70ed21e0824c43d6b5c84bc7a9a7ba180f",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 1,
+   "source": "https://explorer.hiro.so/block/0x4262cb5f00ede3691654b3d35d341f70ed21e0824c43d6b5c84bc7a9a7ba180f?chain=mainnet"
+  },
+  {
+   "height": 9394835,
+   "hash": "0x7ad72db2f9d239351415c32e63038ad2d35ac53261f7bde13bf4823c9d2ae684",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 6,
+   "source": "https://explorer.hiro.so/block/0x7ad72db2f9d239351415c32e63038ad2d35ac53261f7bde13bf4823c9d2ae684?chain=mainnet"
+  },
+  {
+   "height": 9394834,
+   "hash": "0x09533dfd4d0bb039c35cb763fb331ed94a21fb5509b5d0746409b1b67d299f1b",
+   "burn": 974247,
+   "time": "2026-11-02T10:48:20Z",
+   "txs": 2,
+   "source": "https://explorer.hiro.so/block/0x09533dfd4d0bb039c35cb763fb331ed94a21fb5509b5d0746409b1b67d299f1b?chain=mainnet"
+  },
+  {
+   "height": 9394833,
+   "hash": "0x102c90f57b3baf6afd72ad01e3f453bbea623abf0c104de26e355901e632e8c0",
+   "burn": 974245,
+   "time": "2026-11-02T10:42:58Z",
+   "txs": 3,
+   "source": "https://explorer.hiro.so/block/0x102c90f57b3baf6afd72ad01e3f453bbea623abf0c104de26e355901e632e8c0?chain=mainnet"
+  },
+  {
+   "height": 9394832,
+   "hash": "0x4ce495f4587b641fb86a9cbf3e59695cb8fe08aef5050ba4ef4d1aa23f885ed3",
+   "burn": 974245,
+   "time": "2026-11-02T10:42:58Z",
+   "txs": 2,
+   "source": "https://explorer.hiro.so/block/0x4ce495f4587b641fb86a9cbf3e59695cb8fe08aef5050ba4ef4d1aa23f885ed3?chain=mainnet"
+  },
+  {
+   "height": 9394831,
+   "hash": "0x415d800db6c9483865c08b28687d86c94b40205941d40297183fb60608cf33b4",
+   "burn": 974245,
+   "time": "2026-11-02T10:42:58Z",
+   "txs": 2,
+   "source": "https://explorer.hiro.so/block/0x415d800db6c9483865c08b28687d86c94b40205941d40297183fb60608cf33b4?chain=mainnet"
+  },
+  {
+   "height": 9394830,
+   "hash": "0x436146dbac55bb0246a9c3bc241e34580cdb50cfa782a84d21e877506f53e01a",
+   "burn": 974245,
+   "time": "2026-11-02T10:42:58Z",
+   "txs": 13,
+   "source": "https://explorer.hiro.so/block/0x436146dbac55bb0246a9c3bc241e34580cdb50cfa782a84d21e877506f53e01a?chain=mainnet"
+  },
+  {
+   "height": 9394829,
+   "hash": "0x28117259c44796c1f15e83d792093aa6fc1fbdaa2f072f0a18d0368a92f36868",
+   "burn": 974245,
+   "time": "2026-11-02T10:42:58Z",
+   "txs": 3,
+   "source": "https://explorer.hiro.so/block/0x28117259c44796c1f15e83d792093aa6fc1fbdaa2f072f0a18d0368a92f36868?chain=mainnet"
+  },
+  {
+   "height": 9394828,
+   "hash": "0xcddbb7c0f3b1820ba42880b066fb33a922948e70fc04c672dcb6abb2a421c7ff",
+   "burn": 974245,
+   "time": "2026-11-02T10:42:58Z",
+   "txs": 1,
+   "source": "https://explorer.hiro.so/block/0xcddbb7c0f3b1820ba42880b066fb33a922948e70fc04c672dcb6abb2a421c7ff?chain=mainnet"
+  },
+  {
+   "height": 9394827,
+   "hash": "0xf2a7cf2062909d83251afd392dd02c31ad6b977ba4ce97b67129d60ce51ab93c",
+   "burn": 974245,
+   "time": "2026-11-02T10:42:58Z",
+   "txs": 1,
+   "source": "https://explorer.hiro.so/block/0xf2a7cf2062909d83251afd392dd02c31ad6b977ba4ce97b67129d60ce51ab93c?chain=mainnet"
+  },
+  {
+   "height": 9394826,
+   "hash": "0x8d804f7cebe5a2f6580800291455ab975fd549b9e509e2822fef09bc20538898",
+   "burn": 974245,
+   "time": "2026-11-02T10:42:58Z",
+   "txs": 3,
+   "source": "https://explorer.hiro.so/block/0x8d804f7cebe5a2f6580800291455ab975fd549b9e509e2822fef09bc20538898?chain=mainnet"
+  }
+ ],
+ "cycles": [
+  {
+   "cycle": 146,
+   "startBlock": 9273998,
+   "hash": "0x60e339f6574b70b99769495f1a58612b172265e1e6f8a7bf1376d2c836601cad",
+   "weight": 4000,
+   "stackedUstx": 493352376805177,
+   "signers": 35,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/146"
+  },
+  {
+   "cycle": 145,
+   "startBlock": 9144823,
+   "hash": "0xcf90dccf666f393d0e45cfcc0e1dc363f48c95a357eb8030033f1b0b4b5670a6",
+   "weight": 4000,
+   "stackedUstx": 493445944980927,
+   "signers": 34,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/145"
+  },
+  {
+   "cycle": 144,
+   "startBlock": 9051704,
+   "hash": "0x95a2754d165e51464396940b3e5f2ee80db8748c593f851c9bf20a9bbd4f58d2",
+   "weight": 4000,
+   "stackedUstx": 448279555393867,
+   "signers": 31,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/144"
+  },
+  {
+   "cycle": 143,
+   "startBlock": 8951681,
+   "hash": "0x87a99d5f23f2b876d2f54d5a43ebf2b240eac4815f55ec9343c7c97426af4ca3",
+   "weight": 4000,
+   "stackedUstx": 441526003760845,
+   "signers": 29,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/143"
+  },
+  {
+   "cycle": 142,
+   "startBlock": 8845193,
+   "hash": "0x87a15bd48602e59d46b01be06c5ef90af2ff7c11a0e58917d0272007a738a974",
+   "weight": 4000,
+   "stackedUstx": 421493794927560,
+   "signers": 26,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/142"
+  },
+  {
+   "cycle": 141,
+   "startBlock": 8740160,
+   "hash": "0x158a7068d715b997f28128761e65c75af44d9bdb961a22a8dce4f76f27cb458e",
+   "weight": 4000,
+   "stackedUstx": 392447554847960,
+   "signers": 24,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/141"
+  },
+  {
+   "cycle": 140,
+   "startBlock": 8651159,
+   "hash": "0x74ee33e3faf97bf5784530ff9c7683b330e918d0cf76d895a7990b6ed08dd9f8",
+   "weight": 3712,
+   "stackedUstx": 446872894990056,
+   "signers": 25,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/140"
+  },
+  {
+   "cycle": 139,
+   "startBlock": 8539812,
+   "hash": "0x0464552aa056ff1ea3b7ed0a17823bcba9df10d2e8610587ae9fbd57a378407a",
+   "weight": 3930,
+   "stackedUstx": 552431751986668,
+   "signers": 35,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/139"
+  },
+  {
+   "cycle": 138,
+   "startBlock": 8417947,
+   "hash": "0xfffdf60ebd2d0ba4cb92371fe62801a166162294368d225fcfdd2624285f1e55",
+   "weight": 3866,
+   "stackedUstx": 581990011616796,
+   "signers": 34,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/138"
+  },
+  {
+   "cycle": 137,
+   "startBlock": 8281516,
+   "hash": "0xa0947ee712deb7d2c6fac0587e301266fbe97f8b21f1ff823fb65a9f24d60fff",
+   "weight": 3915,
+   "stackedUstx": 589664825995228,
+   "signers": 35,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/137"
+  },
+  {
+   "cycle": 136,
+   "startBlock": 8121991,
+   "hash": "0x8a6400f43a8bf7b85b64d2ec1a9d3a94cd945934863ac10af20a083df098c0bd",
+   "weight": 3862,
+   "stackedUstx": 504262340623865,
+   "signers": 33,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/136"
+  },
+  {
+   "cycle": 135,
+   "startBlock": 7957529,
+   "hash": "0xf42a49ce5f1f762e1c215948f892d738dc05ac6cab5c9e47bfe91d9da9edcc03",
+   "weight": 3757,
+   "stackedUstx": 566006788752782,
+   "signers": 37,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/135"
+  },
+  {
+   "cycle": 134,
+   "startBlock": 7803555,
+   "hash": "0x5c0d083b20cb665aafad5dcff1aa05deccdbf3dc8c85d50e39d782fed58cab06",
+   "weight": 3764,
+   "stackedUstx": 566974040032170,
+   "signers": 36,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/134"
+  },
+  {
+   "cycle": 133,
+   "startBlock": 7615063,
+   "hash": "0x822121d3b596ab01586de08f3f6d268948523ca954d42c0da4bee85ad3b1889f",
+   "weight": 3794,
+   "stackedUstx": 609923899342905,
+   "signers": 38,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/133"
+  },
+  {
+   "cycle": 132,
+   "startBlock": 7429340,
+   "hash": "0x2b70512ed680f09c36965ca7d73a5273ee0d92bca7e26c76620f2c1e8f56bc4d",
+   "weight": 3785,
+   "stackedUstx": 608402355620139,
+   "signers": 39,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/132"
+  },
+  {
+   "cycle": 131,
+   "startBlock": 7207298,
+   "hash": "0x2a5561caf3cb1d1edf11db78f6831fd20d7baa5b0ee694d6c99850e703f8f3ab",
+   "weight": 3962,
+   "stackedUstx": 556818144541266,
+   "signers": 35,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/131"
+  },
+  {
+   "cycle": 130,
+   "startBlock": 6896295,
+   "hash": "0x1905d5c5cd2a4c60975c6a53a8ee7cae71bad6ad69fda00316a995625fad8193",
+   "weight": 3731,
+   "stackedUstx": 561612798240993,
+   "signers": 33,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/130"
+  },
+  {
+   "cycle": 129,
+   "startBlock": 6585641,
+   "hash": "0x19ab1ea74b14404bfdf4dd1e83ac99cd38b76092b9d69736bd941366b15cb4d8",
+   "weight": 3715,
+   "stackedUstx": 447079530294787,
+   "signers": 20,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/129"
+  },
+  {
+   "cycle": 128,
+   "startBlock": 6279606,
+   "hash": "0xe59fe1bfc64f766212f4c46fb1f5b0a0aee7e2fd232266f53f3d89428e5654e0",
+   "weight": 3912,
+   "stackedUstx": 588781157588682,
+   "signers": 34,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/128"
+  },
+  {
+   "cycle": 127,
+   "startBlock": 5936311,
+   "hash": "0xc33b7e937a5db35e0abe33db8632c7688b7e194f36069626f6efb098199240a0",
+   "weight": 3736,
+   "stackedUstx": 525030438717826,
+   "signers": 33,
+   "source": "https://api.hiro.so/extended/v2/pox/cycles/127"
+  }
+ ],
+ "burn": [
+  {
+   "height": 974245,
+   "hash": "0x00000000000000000000d6ca93c32805774847dccf88537500f9365534cdfe98",
+   "time": "2026-11-02T10:42:58Z",
+   "txs": 94,
+   "source": "https://mempool.space/block/00000000000000000000d6ca93c32805774847dccf88537500f9365534cdfe98"
+  },
+  {
+   "height": 974243,
+   "hash": "0x00000000000000000000b2fb561dc4e588cba76d80c2b809eedf6190757ffc65",
+   "time": "2026-11-02T10:27:07Z",
+   "txs": 320,
+   "source": "https://mempool.space/block/00000000000000000000b2fb561dc4e588cba76d80c2b809eedf6190757ffc65"
+  },
+  {
+   "height": 974242,
+   "hash": "0x0000000000000000000078a99967374680cde990f74b1ce6a42f9cc68f3b85ac",
+   "time": "2026-11-02T10:01:33Z",
+   "txs": 321,
+   "source": "https://mempool.space/block/0000000000000000000078a99967374680cde990f74b1ce6a42f9cc68f3b85ac"
+  },
+  {
+   "height": 974241,
+   "hash": "0x00000000000000000001340b9411c2fc22054a5268e02522f9a258508c528019",
+   "time": "2026-11-02T09:52:39Z",
+   "txs": 236,
+   "source": "https://mempool.space/block/00000000000000000001340b9411c2fc22054a5268e02522f9a258508c528019"
+  },
+  {
+   "height": 974238,
+   "hash": "0x0000000000000000000110bb9878005d5648bd1f91defee3e56d40d58b9d85f5",
+   "time": "2026-11-02T09:32:33Z",
+   "txs": 442,
+   "source": "https://mempool.space/block/0000000000000000000110bb9878005d5648bd1f91defee3e56d40d58b9d85f5"
+  },
+  {
+   "height": 974237,
+   "hash": "0x00000000000000000001c9a3d4ebcef919865b8889a2884e3ed045263e0167aa",
+   "time": "2026-11-02T09:21:52Z",
+   "txs": 201,
+   "source": "https://mempool.space/block/00000000000000000001c9a3d4ebcef919865b8889a2884e3ed045263e0167aa"
+  }
+ ]
+}

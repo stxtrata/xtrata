@@ -1,0 +1,67 @@
+{
+ "leather": {
+  "name": "Leather",
+  "slot": "cherry",
+  "file": "art/logos/leather.svg",
+  "from": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-leather-40-40.svg (Leather's own package, MIT)",
+  "alt": "@stacks/connect-ui 6.6.0 · dist/connect-ui/assets/leather-logo.svg (art/logos/leather-connect.svg)",
+  "url": "https://leather.io",
+  "permission": "Permission to appear: not yet asked (Trust Machines / Leather).",
+  "sha256": "c2745672f72d4b86b9d8fe43c9a4478d8ee59cf52c18d9a8d6fc0f374a6032fb"
+ },
+ "xverse": {
+  "name": "Xverse",
+  "slot": "lemon",
+  "file": "art/logos/xverse.svg",
+  "from": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-xverse-40-40.svg (MIT)",
+  "alt": "@stacks/connect-ui 6.6.0 · dist/connect-ui/assets/xverse-wallet-logo.svg (art/logos/xverse-connect.svg)",
+  "url": "https://www.xverse.app",
+  "permission": "Permission to appear: not yet asked (Secret Key Labs / Xverse).",
+  "sha256": "85c2f2b92841e47d6fbdeac003bd08970da1b76b53f23bf87ce1c60bcc07dde3"
+ },
+ "bitflow": {
+  "name": "Bitflow",
+  "slot": "chip",
+  "file": "art/logos/bitflow.svg",
+  "from": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-bitflow-40-40.svg (MIT)",
+  "url": "https://www.bitflow.finance",
+  "permission": "Permission to appear: not yet asked (Bitflow).",
+  "sha256": "5938fe1de461f7d409c880473f8bbe7819b4dc55c213dbec158d9b8bf1305c50"
+ },
+ "zest": {
+  "name": "Zest Protocol",
+  "slot": "block",
+  "file": "art/logos/zest.svg",
+  "from": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-zest-40-40.svg (MIT)",
+  "url": "https://www.zestprotocol.com",
+  "permission": "Permission to appear: not yet asked (Zest Protocol).",
+  "sha256": "9c7f9fb15f31ff1059f904e228038bd6e1e724b6f6936a87d14c54a235a825a5"
+ },
+ "sbtc": {
+  "name": "sBTC",
+  "slot": "artifact",
+  "file": "art/logos/sbtc.svg",
+  "from": "@leather.io/ui 1.111.2 · dist-web/assets/icons/sbtc.svg (MIT); the sBTC token's own metadata image is https://ipfs.io/ipfs/bafkreiffe46h5voimvulxm2s4ddszdm4uli4rwcvx34cgzz3xkfcc2hiwi (not reachable from the build machines)",
+  "url": "https://www.stacks.co/sbtc",
+  "permission": "Permission to appear: not yet asked (Stacks Foundation, for sBTC).",
+  "sha256": "6645cd90c8f3a4a56f10e03d5aee841c67c82b55519af6b48e16f628118be4bd"
+ },
+ "stackingdao": {
+  "name": "StackingDAO",
+  "slot": "vault",
+  "file": "art/logos/stackingdao.svg",
+  "from": "@leather.io/ui 1.111.2 · dist-web/assets/icons/logos/dapps/logo-stacking-dao-40-40.svg (MIT)",
+  "url": "https://www.stackingdao.com",
+  "permission": "Permission to appear: not yet asked (StackingDAO).",
+  "sha256": "ec152b0fb0b229b51c1f57e7cfbb35d984baae3f23590c05c148c04ade64042c"
+ },
+ "stacks": {
+  "name": "Stacks (STX)",
+  "slot": "wild",
+  "file": "art/logos/stacks.svg",
+  "from": "@leather.io/ui 1.111.2 · dist-web/assets/icons/stacks.svg (MIT)",
+  "url": "https://www.stacks.co",
+  "permission": "Permission to appear: not yet asked (Stacks Foundation brand guidelines). Also used on the marquee and extruded for the topper slabs.",
+  "sha256": "08b6a2781188fd04e39f1bde893c0a6b92d06f1eea9cb607c57f626892be13d9"
+ }
+}

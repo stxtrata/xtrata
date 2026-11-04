@@ -1,0 +1,34 @@
+{
+ "machine": "The Stack",
+ "about": "Where every image and record on The Stack comes from. Every symbol is a real project's official logo file, the public-domain Bitcoin mark, or a real record read from the Stacks chain through the Hiro API. No NFT or inscription appears on these reels. Nothing was drawn or imitated by hand.",
+ "generated": "",
+ "logoFiles": {
+  "how": "The official files as the projects' own ecosystem packages bundle them, taken from the npm registry and embedded byte for byte (sha256 below). @leather.io/ui is Leather's own design package (MIT); it carries the dapp logos Leather shows its users. @stacks/connect-ui is the Stacks Connect wallet modal (MIT). Projects' websites were not reachable from the build machines, so their press kits could not be compared; swap in a press-kit file any time and record it here.",
+  "package": "https://registry.npmjs.org/@leather.io/ui/-/ui-1.111.2.tgz"
+ },
+ "cabinet": {
+  "xtrataMark": "tools/the-stack/model/assets/xtrata.svg, the brand SVG supplied in the build prompt, embedded as supplied on the lower door (house mark)",
+  "parallaxWordmark": "tools/the-stack/model/assets/parallax-wordmark.svg, the wordmark supplied in the build prompt, embedded small at the marquee foot (house mark)",
+  "stacksLogo": "art/logos/stacks.svg (official Stacks logo as bundled in @leather.io/ui): on the marquee as supplied, and its path is extruded (never redrawn) into the three topper slabs",
+  "bitcoinMark": "art/bitcoin-mark.svg (Bitcoin.org, public domain): on the lower door",
+  "everythingElse": "Black glass, edge lights, slab bars, buttons and labels are procedural textures written by tools/the-stack/model/textures.py; no third-party artwork."
+ },
+ "twins": {
+  "what": "The Floor Pot's twin count (display only)",
+  "source": "https://xtrata.xyz/forever-twins/data/registry.v2.json and each live helper's contract events via https://xtrata.xyz/hiro/mainnet (fallback https://api.hiro.so). A failed read is shown as unknown, never as zero."
+ },
+ "symbols": {
+  "cherry": { "name": "Leather", "kind": "Official logo", "logo": "leather", "items": [] },
+  "lemon": { "name": "Xverse", "kind": "Official logo", "logo": "xverse", "items": [] },
+  "chip": { "name": "Bitflow", "kind": "Official logo", "logo": "bitflow", "items": [] },
+  "block": { "name": "Zest Protocol", "kind": "Official logo", "logo": "zest", "items": [] },
+  "artifact": { "name": "sBTC", "kind": "Official logo", "logo": "sbtc", "items": [] },
+  "bitcoin": { "name": "Bitcoin ₿ (jackpot symbol)", "kind": "The Bitcoin logo (public domain)", "source": "Bitcoin.org repository, img/icons/logotop.svg (https://github.com/bitcoin-dot-org/Bitcoin.org/blob/master/img/icons/logotop.svg), as saved by The Halving build in art/bitcoin-mark.svg. Bitcoin.org states the logo is in the public domain.", "items": [] },
+  "wild": { "name": "Stacks (STX)", "kind": "Official logo", "logo": "stacks", "items": [] },
+  "scatter": { "name": "Stacking cycle", "kind": "On-chain record", "source": "https://api.hiro.so/v2/pox (current cycle) and https://api.hiro.so/extended/v2/pox/cycles (stacked STX, signers); the cycle shown live is computed from the Bitcoin tip: floor((tip − 666,050) ÷ 2,100)", "items": [] },
+  "vault": { "name": "StackingDAO", "kind": "Official logo", "logo": "stackingdao", "items": [] },
+  "chain": { "name": "Fast block", "kind": "On-chain record", "source": "https://api.hiro.so/extended/v1/block (latest Stacks blocks, each with the Bitcoin block it anchored to), cross-checked hash for hash against https://api.hiro.so/extended/v2/burn-blocks", "items": [] }
+ },
+ "logosNeedingPermission": [],
+ "permissionNotes": "Every project logo on the reels and marquee is another project's mark. Each needs that project's OK before The Stack goes on a public floor (bible: 'Logos of other projects go on a public machine only with that project's OK'). Until a project agrees, the file stays on the testnet build; if one says no, swap its slot for another Stacks project (ALEX, Hiro, Gamma, Velar…) keeping one logo per slot, or show its name in type. The Bitcoin mark is public domain; the Xtrata mark and ParallaX Casino wordmark are house marks."
+}
