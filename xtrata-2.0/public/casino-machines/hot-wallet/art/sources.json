@@ -1,0 +1,533 @@
+{
+ "machine": "hot-wallet",
+ "retrieved": "2026-11-02",
+ "facts": [
+  {
+   "title": "Wikipedia: Bitstamp",
+   "url": "https://en.wikipedia.org/wiki/Bitstamp",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:cherry",
+    "timeline:Bitstamp 2015",
+    "lesson:cold"
+   ]
+  },
+  {
+   "title": "Help Net Security: Bitstamp suspends service in wake of compromise",
+   "url": "https://www.helpnetsecurity.com/?p=38106",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:cherry",
+    "exhibit:wild",
+    "timeline:Bitstamp 2015",
+    "lesson:cold",
+    "lesson:pause"
+   ]
+  },
+  {
+   "title": "Coinspeaker: Bitstamp claims 18,866 BTC lost in hot wallet hack",
+   "url": "https://coinspeaker.com/bitcoin-exchange-bitstamp-claims-18866-btc-lost-in-hot-wallet-hack",
+   "retrieved": "2026-11-02",
+   "kind": "listing",
+   "backs": [
+    "exhibit:cherry",
+    "timeline:Bitstamp 2015"
+   ]
+  },
+  {
+   "title": "Wikipedia: Cryptopia",
+   "url": "https://en.wikipedia.org/wiki/Cryptopia",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:lemon",
+    "timeline:Cryptopia (New Zealand) 2019"
+   ]
+  },
+  {
+   "title": "Wikipedia: Bitfinex",
+   "url": "https://en.wikipedia.org/wiki/Bitfinex",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:chip",
+    "timeline:Bitfinex 2016",
+    "lesson:multisig",
+    "lesson:trace"
+   ]
+  },
+  {
+   "title": "The Record: DOJ seizes $3.6 billion from 2016 Bitfinex hack",
+   "url": "https://therecord.media/doj-seizes-3-6-billion-from-2016-bitfinex-hack-arrests-new-york-couple/",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:chip",
+    "timeline:Bitfinex 2016",
+    "lesson:trace"
+   ]
+  },
+  {
+   "title": "Wikipedia: Coincheck",
+   "url": "https://en.wikipedia.org/wiki/Coincheck",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:block",
+    "timeline:Coincheck 2018",
+    "lesson:makewhole"
+   ]
+  },
+  {
+   "title": "Security Affairs: Coincheck refunds customers (58 billion yen, 523 million NEM, 46.3 billion yen refund)",
+   "url": "https://securityaffairs.com/68341/cyber-crime/coincheck-refunds-customers.html",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:block",
+    "timeline:Coincheck 2018",
+    "lesson:makewhole"
+   ]
+  },
+  {
+   "title": "FBI IC3 PSA I-022625: North Korea responsible for the Bybit theft",
+   "url": "https://ic3.gov/psa/2025/psa250226",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:artifact",
+    "timeline:Bybit 2025",
+    "glossary:Attribution"
+   ]
+  },
+  {
+   "title": "Wikipedia: Bybit",
+   "url": "https://en.wikipedia.org/wiki/Bybit",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:artifact",
+    "timeline:Bybit 2025",
+    "lesson:verify"
+   ]
+  },
+  {
+   "title": "The Record: Hackers drained Bybit crypto exchange (21 Feb 2025)",
+   "url": "https://therecord.media/hackers-drained-bybit-crypto-exchange-hack",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:artifact",
+    "timeline:Bybit 2025",
+    "lesson:verify"
+   ]
+  },
+  {
+   "title": "Wikipedia: 2026 Binance hack",
+   "url": "https://en.wikipedia.org/wiki/2026_Binance_hack",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:bitcoin",
+    "timeline:Binance 2026",
+    "lesson:reserves",
+    "lesson:devices",
+    "lesson:freeze",
+    "glossary:Proof of reserves",
+    "glossary:Stablecoin freeze"
+   ]
+  },
+  {
+   "title": "The Register: FBI pins $6.3B Binance crypto heist on North Korean hackers (2 Nov 2026)",
+   "url": "https://www.theregister.com/security/2026/11/02/fbi-pins-63b-binance-crypto-heist-on-north-korean-hackers/5306889",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:bitcoin",
+    "timeline:Binance 2026",
+    "lesson:freeze",
+    "glossary:Attribution"
+   ]
+  },
+  {
+   "title": "NPR: A simple explainer of the massive $6.3 billion crypto heist at Binance (31 Oct 2026)",
+   "url": "https://www.npr.org/2026/10/31/nx-s1-6024426/binance-crypto-heist-cyber-criminals-north-korea",
+   "retrieved": "2026-11-02",
+   "kind": "listing",
+   "backs": [
+    "exhibit:bitcoin",
+    "timeline:Binance 2026"
+   ]
+  },
+  {
+   "title": "CNBC: Binance's $6.3 billion hack, what we know and what comes next (30 Oct 2026)",
+   "url": "https://www.cnbc.com/2026/10/30/billions-in-crypto-frozen-in-binance-hack-heres-what-happens-next-.html",
+   "retrieved": "2026-11-02",
+   "kind": "listing",
+   "backs": [
+    "exhibit:bitcoin",
+    "timeline:Binance 2026"
+   ]
+  },
+  {
+   "title": "Wikipedia: Cryptocurrency wallet",
+   "url": "https://en.wikipedia.org/wiki/Cryptocurrency_wallet",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:wild",
+    "lesson:cold",
+    "glossary:Hot wallet",
+    "glossary:Cold wallet"
+   ]
+  },
+  {
+   "title": "Wikipedia: Multisignature",
+   "url": "https://en.wikipedia.org/wiki/Multisignature",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:wild",
+    "lesson:multisig",
+    "glossary:Multi-signature"
+   ]
+  },
+  {
+   "title": "Wikipedia: Mt. Gox",
+   "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:scatter",
+    "timeline:Mt. Gox (first breach) 2011",
+    "timeline:Mt. Gox (collapse) 2014",
+    "lesson:keys"
+   ]
+  },
+  {
+   "title": "Wikipedia: QuadrigaCX",
+   "url": "https://en.wikipedia.org/wiki/QuadrigaCX",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "exhibit:vault",
+    "timeline:QuadrigaCX (Canada) 2019",
+    "lesson:reserves"
+   ]
+  },
+  {
+   "title": "CoinDesk: Zaif hacked in $60 million bitcoin theft",
+   "url": "https://coindesk.com/crypto-exchange-zaif-hacked-in-60-million-6000-bitcoin-theft/",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "timeline:Zaif (Japan) 2018"
+   ]
+  },
+  {
+   "title": "Cointelegraph: Japanese exchange hacked, $59 million in losses reported",
+   "url": "https://cointelegraph.com/news/japanese-cryptocurrency-exchange-hacked-59-million-in-losses-reported",
+   "retrieved": "2026-11-02",
+   "kind": "listing",
+   "backs": [
+    "timeline:Zaif (Japan) 2018"
+   ]
+  },
+  {
+   "title": "Wikipedia: Bithumb",
+   "url": "https://en.wikipedia.org/wiki/Bithumb",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "timeline:Bithumb (South Korea) 2019",
+    "lesson:insiders"
+   ]
+  },
+  {
+   "title": "Finance Magnates: Bithumb hacked for $19 million, insider job suspected",
+   "url": "https://www.financemagnates.com/cryptocurrency/news/bithumb-hacked-for-19-million-insider-job-suspected",
+   "retrieved": "2026-11-02",
+   "kind": "listing",
+   "backs": [
+    "timeline:Bithumb (South Korea) 2019",
+    "lesson:insiders"
+   ]
+  },
+  {
+   "title": "Cointelegraph: Hackers withdraw 7,000 bitcoins in Binance security breach (May 2019)",
+   "url": "https://cointelegraph.com/news/hackers-withdraw-7-000-bitcoins-in-binance-crypto-exchange-security-breach",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "timeline:Binance 2019",
+    "lesson:segregate",
+    "lesson:reimburse",
+    "lesson:pause"
+   ]
+  },
+  {
+   "title": "Wikipedia: Binance",
+   "url": "https://en.wikipedia.org/wiki/Binance",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "timeline:Binance 2019"
+   ]
+  },
+  {
+   "title": "Wikipedia: Upbit",
+   "url": "https://en.wikipedia.org/wiki/Upbit",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "timeline:Upbit (South Korea) 2019"
+   ]
+  },
+  {
+   "title": "CoinDesk: Upbit confirms theft of $49M in ether",
+   "url": "https://www.coindesk.com/markets/2019/11/27/crypto-exchange-upbit-confirms-theft-of-49m-in-ether",
+   "retrieved": "2026-11-02",
+   "kind": "listing",
+   "backs": [
+    "timeline:Upbit (South Korea) 2019"
+   ]
+  },
+  {
+   "title": "Wikipedia: KuCoin",
+   "url": "https://en.wikipedia.org/wiki/KuCoin",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "timeline:KuCoin 2020",
+    "lesson:insurance"
+   ]
+  },
+  {
+   "title": "Decrypt: Hacked exchange KuCoin recovers $236 million of stolen funds",
+   "url": "https://decrypt.co/47868",
+   "retrieved": "2026-11-02",
+   "kind": "listing",
+   "backs": [
+    "timeline:KuCoin 2020"
+   ]
+  },
+  {
+   "title": "BleepingComputer: FBI links North Korean hackers to $308 million crypto heist",
+   "url": "https://www.bleepingcomputer.com/news/security/fbi-links-north-korean-hackers-to-308-million-crypto-heist",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "timeline:DMM Bitcoin (Japan) 2024",
+    "lesson:devices",
+    "glossary:Attribution"
+   ]
+  },
+  {
+   "title": "Wikipedia: WazirX",
+   "url": "https://en.wikipedia.org/wiki/WazirX",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "timeline:WazirX (India) 2024",
+    "lesson:multisig"
+   ]
+  },
+  {
+   "title": "Wikipedia: Tether (cryptocurrency)",
+   "url": "https://en.wikipedia.org/wiki/Tether_(cryptocurrency)",
+   "retrieved": "2026-11-02",
+   "kind": "read",
+   "backs": [
+    "lesson:freeze",
+    "glossary:Stablecoin freeze"
+   ]
+  }
+ ],
+ "images": [
+  {
+   "file": "art/coins/btc-logo_ios.png",
+   "source": "https://raw.githubusercontent.com/bitcoin/bitcoin.org/master/img/icons/logo_ios.png",
+   "coin": "BTC",
+   "note": "Official bitcoin.org icon (114x114 PNG, the orange B coin), used unmodified. btc-logotop.svg is the full bitcoin.org logo (coin plus wordmark), kept for reference; never crop or recolour. The repository is MIT-licensed; the logo's own terms were not stated in the repo."
+  },
+  {
+   "file": "art/coins/eth-diamond-black.svg",
+   "source": "https://raw.githubusercontent.com/ethereum/ethereum-org-website/dev/public/images/assets/svgs/eth-diamond-black.svg",
+   "coin": "ETH",
+   "note": "Official ethereum.org logo asset (the diamond, black), used unmodified. The repository is MIT-licensed; brand-asset terms on ethereum.org were not read."
+  },
+  {
+   "file": "art/coins/btc-logotop.svg",
+   "source": "https://raw.githubusercontent.com/bitcoin/bitcoin.org/master/img/icons/logotop.svg",
+   "coin": "BTC",
+   "note": "full official logo, reference copy"
+  }
+ ],
+ "logos": [
+  {
+   "key": "mtgox",
+   "name": "Mt. Gox",
+   "file": "art/logos/mtgox.png",
+   "suppliedAs": "MtGOX.jpg",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "bitstamp",
+   "name": "Bitstamp",
+   "file": "art/logos/bitstamp.png",
+   "suppliedAs": "Bitstamp-vector-logo_(cropped).svg",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "bitfinex",
+   "name": "Bitfinex",
+   "file": "art/logos/bitfinex.png",
+   "suppliedAs": "Bitfinex Logo.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "coincheck",
+   "name": "Coincheck",
+   "file": "art/logos/coincheck.png",
+   "suppliedAs": "Coincheck.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "zaif",
+   "name": "Zaif",
+   "file": "art/logos/zaif.png",
+   "suppliedAs": "Zaif.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "cryptopia",
+   "name": "Cryptopia",
+   "file": "art/logos/cryptopia.png",
+   "suppliedAs": "Cryptopia.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "quadriga",
+   "name": "QuadrigaCX",
+   "file": "art/logos/quadriga.png",
+   "suppliedAs": "quadrigacx-e1551432579383.jpg",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "bithumb",
+   "name": "Bithumb",
+   "file": "art/logos/bithumb.png",
+   "suppliedAs": "bithumb.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "binance",
+   "name": "Binance",
+   "file": "art/logos/binance.png",
+   "suppliedAs": "Binance_logo.svg",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "upbit",
+   "name": "Upbit",
+   "file": "art/logos/upbit.png",
+   "suppliedAs": "UpBit.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "kucoin",
+   "name": "KuCoin",
+   "file": "art/logos/kucoin.png",
+   "suppliedAs": "Kucoin.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "dmm",
+   "name": "DMM Bitcoin",
+   "file": "art/logos/dmm.png",
+   "suppliedAs": "DMM-Bitcoin.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "wazirx",
+   "name": "WazirX",
+   "file": "art/logos/wazirx.png",
+   "suppliedAs": "Wazirx.webp",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "bybit",
+   "name": "Bybit",
+   "file": "art/logos/bybit.png",
+   "suppliedAs": "BYBIT.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "bitgo",
+   "name": "BitGo",
+   "file": "art/logos/bitgo.png",
+   "suppliedAs": "bitgo.png",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  },
+  {
+   "key": "ey",
+   "name": "EY",
+   "file": "art/logos/ey.png",
+   "suppliedAs": "Ernst_&_Young_Corporate_Logo.svg.webp",
+   "suppliedBy": "Jim (Xtrata), from his Downloads/Logos folder, 2 November 2026"
+  }
+ ],
+ "logosNeedingPermission": [
+  "Bitstamp",
+  "Cryptopia",
+  "Bitfinex",
+  "Coincheck",
+  "Bybit",
+  "Binance",
+  "Mt. Gox",
+  "QuadrigaCX",
+  "Zaif",
+  "Bithumb",
+  "Upbit",
+  "KuCoin",
+  "DMM Bitcoin",
+  "WazirX",
+  "BitGo",
+  "EY"
+ ],
+ "logosMissing": [
+  {
+   "coin": "NEM",
+   "note": "No official NEM symbol file was reachable from the build network (nem.io was blocked and no GitHub repo path was found). Shows \"NEM\" set in type."
+  },
+  {
+   "coin": "NZD",
+   "note": "A currency, not a coin: shows \"NZ$\" in type."
+  },
+  {
+   "coin": "FIAT",
+   "note": "Canadian dollars (QuadrigaCX): shows \"C$\" in type."
+  },
+  {
+   "coin": "MULTI",
+   "note": "Several assets (Binance 2026: ETH, BTC, TRX, XRP, SOL and more; Cold Storage): shows the chain count or a keyhole drawn as vector shapes by the game (not a logo)."
+  },
+  {
+   "coin": "XRP",
+   "note": "Used only inside headlines/data text; no symbol file needed."
+  },
+  {
+   "coin": "EOS",
+   "note": "Used only inside headlines/data text; no symbol file needed."
+  }
+ ],
+ "notes": [
+  "Company logos (art/logos, trimmed from the files Jim supplied; colours and shapes untouched) are shown on the reel tiles, the Timeline clippings, the panels and the cabinet's evidence cases. They are the companies' trademarks and none of the companies has given permission or endorsed the machine: see logosNeedingPermission, and the panel says so. The FBI and US Department of Justice seals and the Wikipedia logo were in the folder but are not used (official seals, and Wikipedia is a source, not a company in the game).",
+  "\"kind\":\"listing\" means only the headline or search listing of that page was seen (the page itself could not be read); those sources back a figure only together with a \"read\" source, and are flagged so they can be re-checked.",
+  "BleepingComputer, NPR, CNBC, CBC and Wikipedia pages for Zaif, DMM Bitcoin and the list of exchange hacks could not be fetched on the build network (robots or errors); see FACTS-NOTES.md.",
+  "Coin symbol files: only BTC and ETH official files were reachable; the rest show the ticker set in type. Nothing was drawn or recreated by hand.",
+  "Binance 2026 is still unfolding: label \"as reported, 2 November 2026\", keep the attribution as alleged, and re-check every figure at build time."
+ ]
+}

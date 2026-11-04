@@ -1,0 +1,130 @@
+{
+ "mtgox": {
+  "file": "logos/mtgox.png",
+  "w": 420,
+  "h": 122,
+  "bg": "#ffffff",
+  "name": "Mt. Gox",
+  "source": "MtGOX.jpg"
+ },
+ "bitstamp": {
+  "file": "logos/bitstamp.png",
+  "w": 420,
+  "h": 102,
+  "bg": "#ffffff",
+  "name": "Bitstamp",
+  "source": "Bitstamp-vector-logo_(cropped).svg"
+ },
+ "bitfinex": {
+  "file": "logos/bitfinex.png",
+  "w": 400,
+  "h": 52,
+  "bg": "#06020e",
+  "name": "Bitfinex",
+  "source": "Bitfinex Logo.png"
+ },
+ "coincheck": {
+  "file": "logos/coincheck.png",
+  "w": 420,
+  "h": 82,
+  "bg": "#ffffff",
+  "name": "Coincheck",
+  "source": "Coincheck.png"
+ },
+ "zaif": {
+  "file": "logos/zaif.png",
+  "w": 215,
+  "h": 84,
+  "bg": "#ffffff",
+  "name": "Zaif",
+  "source": "Zaif.png"
+ },
+ "cryptopia": {
+  "file": "logos/cryptopia.png",
+  "w": 420,
+  "h": 107,
+  "bg": "#ffffff",
+  "name": "Cryptopia",
+  "source": "Cryptopia.png"
+ },
+ "quadriga": {
+  "file": "logos/quadriga.png",
+  "w": 420,
+  "h": 228,
+  "bg": "#ffffff",
+  "name": "QuadrigaCX",
+  "source": "quadrigacx-e1551432579383.jpg"
+ },
+ "bithumb": {
+  "file": "logos/bithumb.png",
+  "w": 420,
+  "h": 107,
+  "bg": "#ffffff",
+  "name": "Bithumb",
+  "source": "bithumb.png"
+ },
+ "binance": {
+  "file": "logos/binance.png",
+  "w": 420,
+  "h": 84,
+  "bg": "#0b0e11",
+  "name": "Binance",
+  "source": "Binance_logo.svg"
+ },
+ "upbit": {
+  "file": "logos/upbit.png",
+  "w": 420,
+  "h": 250,
+  "bg": "#ffffff",
+  "name": "Upbit",
+  "source": "UpBit.png"
+ },
+ "kucoin": {
+  "file": "logos/kucoin.png",
+  "w": 284,
+  "h": 284,
+  "bg": "#0e0e0e",
+  "name": "KuCoin",
+  "source": "Kucoin.png"
+ },
+ "dmm": {
+  "file": "logos/dmm.png",
+  "w": 420,
+  "h": 71,
+  "bg": "#ffffff",
+  "name": "DMM Bitcoin",
+  "source": "DMM-Bitcoin.png"
+ },
+ "wazirx": {
+  "file": "logos/wazirx.png",
+  "w": 420,
+  "h": 413,
+  "bg": "#ffffff",
+  "name": "WazirX",
+  "source": "Wazirx.webp"
+ },
+ "bybit": {
+  "file": "logos/bybit.png",
+  "w": 204,
+  "h": 74,
+  "bg": "#090a09",
+  "name": "Bybit",
+  "source": "BYBIT.png"
+ },
+ "bitgo": {
+  "file": "logos/bitgo.png",
+  "w": 420,
+  "h": 143,
+  "bg": "#ffffff",
+  "name": "BitGo",
+  "source": "bitgo.png"
+ },
+ "ey": {
+  "file": "logos/ey.png",
+  "w": 420,
+  "h": 305,
+  "bg": "#ffffff",
+  "name": "EY",
+  "source": "Ernst_&_Young_Corporate_Logo.svg.webp"
+ }
+}

@@ -1,0 +1,1114 @@
+{
+ "asOf": "2 November 2026",
+ "machine": "hot-wallet",
+ "exhibits": {
+  "cherry": {
+   "slot": "cherry",
+   "name": "BITSTAMP",
+   "year": 2015,
+   "dateText": "January 2015",
+   "place": "Founded in Slovenia, registered in Luxembourg",
+   "taken": "18,866 BTC",
+   "takenLong": "Just under 19,000 BTC (18,866) from one operational wallet",
+   "usdText": "about $5 million at the time",
+   "coin": "BTC",
+   "how": "One of the exchange's operational (hot) wallets was compromised on 4 January 2015.",
+   "lesson": "Keep only a small share of customer coins online and the rest offline.",
+   "outcome": "Trading paused, then reopened nearly a week later; offline reserves covered customers.",
+   "caveat": "",
+   "note": "Now considered the world's longest-running crypto exchange (Wikipedia, uncited there). The exact 18,866 BTC figure is from the Coinspeaker headline; Wikipedia says \"less than 19,000\" and gives the ~$5M only in cited headlines.",
+   "sources": [
+    {
+     "title": "Wikipedia: Bitstamp",
+     "url": "https://en.wikipedia.org/wiki/Bitstamp",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Help Net Security: Bitstamp suspends service in wake of compromise",
+     "url": "https://www.helpnetsecurity.com/?p=38106",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Coinspeaker: Bitstamp claims 18,866 BTC lost in hot wallet hack",
+     "url": "https://coinspeaker.com/bitcoin-exchange-bitstamp-claims-18866-btc-lost-in-hot-wallet-hack",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    }
+   ]
+  },
+  "lemon": {
+   "slot": "lemon",
+   "name": "CRYPTOPIA",
+   "year": 2019,
+   "dateText": "January 2019",
+   "place": "Christchurch, New Zealand",
+   "taken": "NZ$24M",
+   "takenLong": "About NZ$24 million (roughly 10% of its assets), mostly Ethereum and ERC-20 tokens, from hot wallets; up to 900,000 users affected",
+   "usdText": "about NZ$24 million at the time",
+   "coin": "NZD",
+   "how": "Suspicious hot-wallet activity pointed to a compromised private key; the theft ran on for weeks.",
+   "lesson": "A hot wallet is a target: keep its balance small and watched.",
+   "outcome": "The firm went into liquidation in May 2019; liquidators began returning funds in December 2024.",
+   "caveat": "",
+   "note": "NZ$24M is Elementus's estimate as quoted by Wikipedia. Up to 900,000 users is an upper bound.",
+   "sources": [
+    {
+     "title": "Wikipedia: Cryptopia",
+     "url": "https://en.wikipedia.org/wiki/Cryptopia",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  "chip": {
+   "slot": "chip",
+   "name": "BITFINEX",
+   "year": 2016,
+   "dateText": "August 2016",
+   "place": "British Virgin Islands-registered exchange",
+   "taken": "119,756 BTC",
+   "takenLong": "119,756 BTC taken from users' segregated wallets (a Justice Department-based report gives 119,754)",
+   "usdText": "about $72 million at the time",
+   "coin": "BTC",
+   "how": "Coins left users' segregated wallets even though BitGo multi-signature security was in use.",
+   "lesson": "Multi-signature only helps if the whole signing setup is sound.",
+   "outcome": "In 2022 US authorities seized about 94,000 BTC (then $3.6B); two people later pleaded guilty to laundering.",
+   "caveat": "",
+   "note": "Wikipedia says 119,756 BTC; The Record says 119,754. How the signing was bypassed is not explained in either source, so the card does not say.",
+   "sources": [
+    {
+     "title": "Wikipedia: Bitfinex",
+     "url": "https://en.wikipedia.org/wiki/Bitfinex",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "The Record: DOJ seizes $3.6 billion from 2016 Bitfinex hack",
+     "url": "https://therecord.media/doj-seizes-3-6-billion-from-2016-bitfinex-hack-arrests-new-york-couple/",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  "block": {
+   "slot": "block",
+   "name": "COINCHECK",
+   "year": 2018,
+   "dateText": "January 2018",
+   "place": "Tokyo, Japan",
+   "taken": "523M NEM",
+   "takenLong": "About 523 million NEM sent out of one Coincheck NEM address",
+   "usdText": "about $400 to $530 million at the time (58 billion yen)",
+   "coin": "NEM",
+   "how": "About 523 million NEM tokens were sent out of one of the exchange's NEM addresses in a single night.",
+   "lesson": "An exchange that can repay users from its own funds keeps its customers.",
+   "outcome": "Coincheck repaid all 260,000 affected users in yen from its own funds, about 46.3 billion yen.",
+   "caveat": "",
+   "note": "Wikipedia says \"approximately 500 million NEM\"; the AFP-based report quotes the exchange's 523 million. USD varies with the NEM price: $400M to $530M. Whether the coins sat in a hot wallet without multi-sig is widely reported but not stated in the fetched sources, so the card does not say.",
+   "sources": [
+    {
+     "title": "Wikipedia: Coincheck",
+     "url": "https://en.wikipedia.org/wiki/Coincheck",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Security Affairs: Coincheck refunds customers (58 billion yen, 523 million NEM, 46.3 billion yen refund)",
+     "url": "https://securityaffairs.com/68341/cyber-crime/coincheck-refunds-customers.html",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  "artifact": {
+   "slot": "artifact",
+   "name": "BYBIT",
+   "year": 2025,
+   "dateText": "February 2025",
+   "place": "Dubai, UAE",
+   "taken": "~400,000 ETH",
+   "takenLong": "About 400,000 ETH (Bybit's chief executive said 401,000) taken during a cold-to-warm wallet transfer",
+   "usdText": "roughly $1.4 to $1.5 billion at the time",
+   "coin": "ETH",
+   "how": "A wallet signing screen was manipulated, so approvers saw the right address while the code did something else.",
+   "lesson": "Check what you are really signing, not just what the screen shows.",
+   "outcome": "The FBI attributed it to North Korea-linked actors. It was the record until October 2026.",
+   "caveat": "",
+   "note": "The FBI alert states only \"approximately $1.5 billion\". The 400,000 ETH figure comes from Wikipedia (\"about 400,000 ETH\") and Bybit's CEO (401,000 ETH). Bybit replacing the stolen funds is widely reported but is not in the fetched sources, so the card does not say it. \"A third party's signing tool (Safe{Wallet}) was compromised\" is Wikipedia's account, Bybit's own first report did not name it.",
+   "sources": [
+    {
+     "title": "FBI IC3 PSA I-022625: North Korea responsible for the Bybit theft",
+     "url": "https://ic3.gov/psa/2025/psa250226",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: Bybit",
+     "url": "https://en.wikipedia.org/wiki/Bybit",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "The Record: Hackers drained Bybit crypto exchange (21 Feb 2025)",
+     "url": "https://therecord.media/hackers-drained-bybit-crypto-exchange-hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  "bitcoin": {
+   "slot": "bitcoin",
+   "name": "BINANCE",
+   "year": 2026,
+   "dateText": "29 October 2026",
+   "place": "Global exchange; ten blockchains",
+   "taken": "~$6.3B",
+   "takenLong": "About $6.3 billion across ten blockchains, the largest crypto heist on record",
+   "usdText": "about $6.3 billion as reported (other counts: $6.36B and $6.43B)",
+   "coin": "MULTI",
+   "how": "As reported: attackers drained hot wallets on ten chains in minutes; Binance first blamed a staff laptop.",
+   "lesson": "Freeze fast, absorb the loss, and show proof of reserves.",
+   "outcome": "About $3B in stablecoins was frozen; withdrawals reopened 1 Nov; Binance says users will not bear the loss.",
+   "caveat": "as reported, 2 November 2026",
+   "note": "Attribution to North Korea-linked actors is by the FBI and TRM Labs and is described in Wikipedia as alleged: keep \"alleged\". Still unfolding; the cause is not settled (laptop first; \"other issues later found\"; the EIP-7702 description is inconsistent). Frozen: ~$3B per Wikipedia (range $2.7 to $3B), Elliptic verified $2.85B frozen or seized per The Register. Replenished: 90% on 31 Oct (Wikipedia), ~95% by 2 Nov (The Register). Re-check at build time.",
+   "sources": [
+    {
+     "title": "Wikipedia: 2026 Binance hack",
+     "url": "https://en.wikipedia.org/wiki/2026_Binance_hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "The Register: FBI pins $6.3B Binance crypto heist on North Korean hackers (2 Nov 2026)",
+     "url": "https://www.theregister.com/security/2026/11/02/fbi-pins-63b-binance-crypto-heist-on-north-korean-hackers/5306889",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "NPR: A simple explainer of the massive $6.3 billion crypto heist at Binance (31 Oct 2026)",
+     "url": "https://www.npr.org/2026/10/31/nx-s1-6024426/binance-crypto-heist-cyber-criminals-north-korea",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    },
+    {
+     "title": "CNBC: Binance's $6.3 billion hack, what we know and what comes next (30 Oct 2026)",
+     "url": "https://www.cnbc.com/2026/10/30/billions-in-crypto-frozen-in-binance-hack-heres-what-happens-next-.html",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    }
+   ]
+  },
+  "wild": {
+   "slot": "wild",
+   "name": "COLD STORAGE",
+   "year": 0,
+   "dateText": "",
+   "place": "Offline, out of reach of the internet",
+   "taken": "",
+   "takenLong": "A sealed cold wallet: keys kept offline",
+   "usdText": "",
+   "coin": "MULTI",
+   "how": "The defence: a cold wallet is kept offline, so its keys cannot be taken from a connected server.",
+   "lesson": "Keys that never touch the internet cannot be stolen over it.",
+   "outcome": "Why exchanges keep most customer coins offline and only a small float in hot wallets.",
+   "caveat": "",
+   "note": "Wikipedia: a cold wallet \"remains offline and disconnected from the internet\"; cold storage means \"keeping the private keys out of reach of hackers\". Bybit 2025 shows cold wallets can still be tricked at signing.",
+   "sources": [
+    {
+     "title": "Wikipedia: Cryptocurrency wallet",
+     "url": "https://en.wikipedia.org/wiki/Cryptocurrency_wallet",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: Multisignature",
+     "url": "https://en.wikipedia.org/wiki/Multisignature",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Help Net Security: Bitstamp suspends service in wake of compromise",
+     "url": "https://www.helpnetsecurity.com/?p=38106",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  "scatter": {
+   "slot": "scatter",
+   "name": "MT. GOX",
+   "year": 2014,
+   "dateText": "February 2014",
+   "place": "Tokyo, Japan",
+   "taken": "~850,000 BTC",
+   "takenLong": "About 850,000 BTC (almost 750,000 customers' and about 100,000 its own), roughly 7% of all bitcoin then in existence; 200,000 were later found, leaving about 650,000",
+   "usdText": "about 7% of all bitcoin then in existence",
+   "coin": "BTC",
+   "how": "Cause still debated: withdrawals froze 7 February 2014; it filed for bankruptcy on 28 February.",
+   "lesson": "Not your keys, not your coins.",
+   "outcome": "Once handling over 70% of all bitcoin trades, it was bankrupt within weeks of halting withdrawals.",
+   "caveat": "",
+   "note": "No USD figure for 2014 is stated in the fetched sources, so none is shown; the share of all bitcoin is used instead. The 2011 first breach: accounts worth more than $8.75M affected, price briefly fell to one cent on 19 June 2011.",
+   "sources": [
+    {
+     "title": "Wikipedia: Mt. Gox",
+     "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  "vault": {
+   "slot": "vault",
+   "name": "QUADRIGACX",
+   "year": 2019,
+   "dateText": "January 2019",
+   "place": "Vancouver-founded, run from Nova Scotia, Canada",
+   "taken": "C$250M",
+   "takenLong": "About C$250 million owed to about 115,000 customers, missing or inaccessible (C$215.7M liabilities at the April 2019 bankruptcy filing)",
+   "usdText": "about C$250 million (about US$190 million)",
+   "coin": "FIAT",
+   "how": "Not a hack: the founder died in December 2018, and its cold wallets had held nothing since April 2018.",
+   "lesson": "Ask for proof of reserves: empty vaults look full until someone checks.",
+   "outcome": "In June 2020 the Ontario Securities Commission concluded it was a fraud and a Ponzi scheme.",
+   "caveat": "",
+   "note": "Wikipedia: the five cold-wallet addresses examined by Ernst & Young had contained no cryptocurrency since April 2018; the OSC called it \"an old-fashioned fraud wrapped in modern technology\". The collapse became public in January 2019. Wikipedia does not call it a hack.",
+   "sources": [
+    {
+     "title": "Wikipedia: QuadrigaCX",
+     "url": "https://en.wikipedia.org/wiki/QuadrigaCX",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  }
+ },
+ "timeline": [
+  {
+   "year": 2011,
+   "month": 6,
+   "exchange": "Mt. Gox (first breach)",
+   "taken": "accounts worth over $8.75M",
+   "usdText": "more than $8.75 million; price briefly fell to one cent",
+   "how": "A flood of fraudulent trades hit the exchange's market on 19 June 2011.",
+   "lesson": "One weak exchange can move the whole market.",
+   "headline": "BITCOIN PRICE CRASHES TO ONE CENT ON MT. GOX",
+   "verified": true,
+   "note": "Wikipedia gives \"more than $8,750,000\" and the date 19 June 2011.",
+   "sources": [
+    {
+     "title": "Wikipedia: Mt. Gox",
+     "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2014,
+   "month": 2,
+   "exchange": "Mt. Gox (collapse)",
+   "taken": "about 850,000 BTC, later 650,000",
+   "usdText": "about 7% of all bitcoin then in existence",
+   "how": "Cause still debated; withdrawals froze 7 Feb 2014 and bankruptcy was filed 28 Feb.",
+   "lesson": "Not your keys, not your coins.",
+   "headline": "MT. GOX FILES FOR BANKRUPTCY, 850,000 BTC MISSING",
+   "verified": true,
+   "note": "200,000 BTC found in an old wallet on 20 March 2014 brought the total lost down to about 650,000.",
+   "sources": [
+    {
+     "title": "Wikipedia: Mt. Gox",
+     "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2015,
+   "month": 1,
+   "exchange": "Bitstamp",
+   "taken": "18,866 BTC",
+   "usdText": "about $5 million",
+   "how": "An operational (hot) wallet was compromised on 4 January 2015.",
+   "lesson": "Keep a small float online and the rest offline.",
+   "headline": "BITSTAMP SUSPENDS SERVICE AFTER WALLET COMPROMISE",
+   "verified": true,
+   "note": "Exact BTC figure from Coinspeaker headline; Wikipedia says \"less than 19,000\".",
+   "sources": [
+    {
+     "title": "Wikipedia: Bitstamp",
+     "url": "https://en.wikipedia.org/wiki/Bitstamp",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Help Net Security: Bitstamp suspends service in wake of compromise",
+     "url": "https://www.helpnetsecurity.com/?p=38106",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Coinspeaker: Bitstamp claims 18,866 BTC lost in hot wallet hack",
+     "url": "https://coinspeaker.com/bitcoin-exchange-bitstamp-claims-18866-btc-lost-in-hot-wallet-hack",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    }
+   ]
+  },
+  {
+   "year": 2016,
+   "month": 8,
+   "exchange": "Bitfinex",
+   "taken": "119,756 BTC",
+   "usdText": "about $72 million",
+   "how": "Coins left users' segregated wallets despite BitGo multi-signature security.",
+   "lesson": "Multi-sig only helps if the whole setup is sound.",
+   "headline": "BITFINEX HALTS TRADING AFTER MAJOR SECURITY BREACH",
+   "verified": true,
+   "note": "Wikipedia: 119,756 BTC; The Record: 119,754 BTC. Seizure of about 94,000 BTC in Feb 2022.",
+   "sources": [
+    {
+     "title": "Wikipedia: Bitfinex",
+     "url": "https://en.wikipedia.org/wiki/Bitfinex",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "The Record: DOJ seizes $3.6 billion from 2016 Bitfinex hack",
+     "url": "https://therecord.media/doj-seizes-3-6-billion-from-2016-bitfinex-hack-arrests-new-york-couple/",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2018,
+   "month": 1,
+   "exchange": "Coincheck",
+   "taken": "523M NEM",
+   "usdText": "about $400 to $530 million",
+   "how": "About 523 million NEM were sent out of one Coincheck NEM address.",
+   "lesson": "An exchange with capital can make users whole.",
+   "headline": "COINCHECK TO REPAY 260,000 CUSTOMERS AFTER NEM THEFT",
+   "verified": true,
+   "note": "USD range reflects NEM price differences between reports (58 billion yen quoted).",
+   "sources": [
+    {
+     "title": "Wikipedia: Coincheck",
+     "url": "https://en.wikipedia.org/wiki/Coincheck",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Security Affairs: Coincheck refunds customers (58 billion yen, 523 million NEM, 46.3 billion yen refund)",
+     "url": "https://securityaffairs.com/68341/cyber-crime/coincheck-refunds-customers.html",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2018,
+   "month": 9,
+   "exchange": "Zaif (Japan)",
+   "taken": "5,966 BTC plus other coins",
+   "usdText": "about $59 to $60 million (6.7 billion yen)",
+   "how": "Attackers gained unauthorised access to the exchange's hot wallets.",
+   "lesson": "Hot wallets must be small, watched and rate-limited.",
+   "headline": "ZAIF HOT WALLETS HIT: 5,966 BTC AND ALTCOINS GONE",
+   "verified": true,
+   "note": "Coins also taken: BCH and MonaCoin (BCH amount unknown). 14 September 2018. The how-line is CoinDesk's; it does not say how access was gained.",
+   "sources": [
+    {
+     "title": "CoinDesk: Zaif hacked in $60 million bitcoin theft",
+     "url": "https://coindesk.com/crypto-exchange-zaif-hacked-in-60-million-6000-bitcoin-theft/",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Cointelegraph: Japanese exchange hacked, $59 million in losses reported",
+     "url": "https://cointelegraph.com/news/japanese-cryptocurrency-exchange-hacked-59-million-in-losses-reported",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    }
+   ]
+  },
+  {
+   "year": 2019,
+   "month": 1,
+   "exchange": "Cryptopia (New Zealand)",
+   "taken": "about NZ$24 million",
+   "usdText": "about NZ$24 million (up to 900,000 users affected)",
+   "how": "Suspicious hot-wallet activity pointed to a compromised private key; theft ran on for weeks.",
+   "lesson": "Watch hot wallets around the clock.",
+   "headline": "CRYPTOPIA HACKED: CHRISTCHURCH EXCHANGE GOES OFFLINE",
+   "verified": true,
+   "note": "First noticed 14 January 2019. Liquidation began May 2019; first distributions December 2024.",
+   "sources": [
+    {
+     "title": "Wikipedia: Cryptopia",
+     "url": "https://en.wikipedia.org/wiki/Cryptopia",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2019,
+   "month": 1,
+   "exchange": "QuadrigaCX (Canada)",
+   "taken": "about C$250 million owed",
+   "usdText": "about C$250 million; ruled a fraud, not a hack",
+   "how": "Not a hack: the founder died in December 2018 and its cold wallets had been empty since April 2018.",
+   "lesson": "Ask for proof of reserves.",
+   "headline": "QUADRIGACX LOCKS OUT USERS; COLD WALLETS FOUND EMPTY",
+   "verified": true,
+   "note": "OSC concluded fraud and Ponzi scheme in June 2020. Owed ~C$250M to ~115,000 customers per the affidavit; C$215.7M liabilities at the April 2019 bankruptcy filing.",
+   "sources": [
+    {
+     "title": "Wikipedia: QuadrigaCX",
+     "url": "https://en.wikipedia.org/wiki/QuadrigaCX",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2019,
+   "month": 3,
+   "exchange": "Bithumb (South Korea)",
+   "taken": "about $19 million in EOS and XRP",
+   "usdText": "about $19 million (reports up to nearly $20 million)",
+   "how": "Bithumb said it was hacked and blamed insiders.",
+   "lesson": "Insiders and access control matter as much as outsiders.",
+   "headline": "BITHUMB LOSES EOS AND XRP IN SECOND HACK, BLAMES INSIDERS",
+   "verified": true,
+   "note": "Wikipedia: 29 March 2019, \"nearly $20 million in EOS and Ripple tokens\", insiders blamed. $19M from headline-level sources. Token counts (3M EOS, 20M XRP) not confirmed. An earlier June 2018 hack of about $32 million is a separate event.",
+   "sources": [
+    {
+     "title": "Wikipedia: Bithumb",
+     "url": "https://en.wikipedia.org/wiki/Bithumb",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Finance Magnates: Bithumb hacked for $19 million, insider job suspected",
+     "url": "https://www.financemagnates.com/cryptocurrency/news/bithumb-hacked-for-19-million-insider-job-suspected",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    }
+   ]
+  },
+  {
+   "year": 2019,
+   "month": 5,
+   "exchange": "Binance",
+   "taken": "7,000 BTC",
+   "usdText": "over $40 million",
+   "how": "Hackers used phishing, viruses and stolen codes and keys to drain hot wallets, Binance said.",
+   "lesson": "Keep hot wallets small (here about 2% of holdings) and insure users.",
+   "headline": "BINANCE HALTS WITHDRAWALS AFTER 7,000 BTC THEFT",
+   "verified": true,
+   "note": "Cointelegraph: 7,000 BTC, $40.7M at press time, hot wallets held about 2% of its bitcoin, SAFU covers it, withdrawals paused up to a week. The prompt's 7,074 BTC is NOT confirmed by any fetched source. 7 May 2019.",
+   "sources": [
+    {
+     "title": "Cointelegraph: Hackers withdraw 7,000 bitcoins in Binance security breach (May 2019)",
+     "url": "https://cointelegraph.com/news/hackers-withdraw-7-000-bitcoins-in-binance-crypto-exchange-security-breach",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: Binance",
+     "url": "https://en.wikipedia.org/wiki/Binance",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2019,
+   "month": 11,
+   "exchange": "Upbit (South Korea)",
+   "taken": "342,000 ETH",
+   "usdText": "about $48.5 to $49 million (58 billion won)",
+   "how": "342,000 ETH was moved out of the exchange's wallets to an unknown address.",
+   "lesson": "Moving stolen coins is easier than getting them back.",
+   "headline": "UPBIT SAYS 342,000 ETHER STOLEN, SUSPENDS TRANSFERS",
+   "verified": true,
+   "note": "27 November 2019. Wikipedia: about US$48.5M; South Korea's investigators later attributed it to North Korean groups (Nov 2024). The wallet type is in Upbit's statement, not read in full here.",
+   "sources": [
+    {
+     "title": "Wikipedia: Upbit",
+     "url": "https://en.wikipedia.org/wiki/Upbit",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "CoinDesk: Upbit confirms theft of $49M in ether",
+     "url": "https://www.coindesk.com/markets/2019/11/27/crypto-exchange-upbit-confirms-theft-of-49m-in-ether",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    }
+   ]
+  },
+  {
+   "year": 2020,
+   "month": 9,
+   "exchange": "KuCoin",
+   "taken": "about $281 million in many tokens",
+   "usdText": "about $281 million (first reports said over $150 million)",
+   "how": "Private keys to its hot wallets were exposed, the exchange said.",
+   "lesson": "Have an insurance fund and a plan to track and freeze coins.",
+   "headline": "KUCOIN HACKED; MOST OF THE LOSS LATER RECOVERED",
+   "verified": true,
+   "note": "Wikipedia: $281M; 78% recovered with partners, 6% with law enforcement, 16% (about $45.55M) covered by the insurance fund. The prompt's \"over $150 million\" is the first-day figure and was revised upward.",
+   "sources": [
+    {
+     "title": "Wikipedia: KuCoin",
+     "url": "https://en.wikipedia.org/wiki/KuCoin",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Decrypt: Hacked exchange KuCoin recovers $236 million of stolen funds",
+     "url": "https://decrypt.co/47868",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    }
+   ]
+  },
+  {
+   "year": 2024,
+   "month": 5,
+   "exchange": "DMM Bitcoin (Japan)",
+   "taken": "4,502.9 BTC",
+   "usdText": "about $308 million at the time",
+   "how": "A staff member of a wallet-software supplier was tricked with a fake job test; attackers later altered a real transaction.",
+   "lesson": "Protect the people and laptops that can sign.",
+   "headline": "DMM BITCOIN LOSES 4,502.9 BTC IN MAY HEIST",
+   "verified": true,
+   "note": "BleepingComputer: 4,502.9 BTC, $308M, attributed by the FBI to North Korea-linked actors. The prompt's \"about 4,500 BTC (verify)\" is confirmed as 4,502.9. Day of the month not given in the fetched text, so none is shown.",
+   "sources": [
+    {
+     "title": "BleepingComputer: FBI links North Korean hackers to $308 million crypto heist",
+     "url": "https://www.bleepingcomputer.com/news/security/fbi-links-north-korean-hackers-to-308-million-crypto-heist",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2024,
+   "month": 7,
+   "exchange": "WazirX (India)",
+   "taken": "about $235 million",
+   "usdText": "about $234.9 million",
+   "how": "Assets were taken from one of its multi-signature wallets, which was managed with a third-party custodian.",
+   "lesson": "Multi-sig is only as strong as every signer's screen.",
+   "headline": "WAZIRX MULTISIG WALLET DRAINED, $235 MILLION GONE",
+   "verified": true,
+   "note": "18 July 2024. Wikipedia: blockchain analysts attributed it to the North Korea-linked Lazarus Group; it does not say that WazirX or authorities confirmed it. Keep as \"linked by analysts\".",
+   "sources": [
+    {
+     "title": "Wikipedia: WazirX",
+     "url": "https://en.wikipedia.org/wiki/WazirX",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2025,
+   "month": 2,
+   "exchange": "Bybit",
+   "taken": "about 400,000 ETH",
+   "usdText": "about $1.4 to $1.5 billion",
+   "how": "A wallet signing screen was manipulated during a cold-to-warm transfer.",
+   "lesson": "Verify what you sign.",
+   "headline": "BYBIT LOSES $1.5 BILLION IN ETHER; FBI BLAMES N. KOREA",
+   "verified": true,
+   "note": "FBI PSA of 26 Feb 2025: about $1.5B, North Korea-linked actors, theft on or about 21 Feb 2025. ETH count from Wikipedia and Bybit's CEO.",
+   "sources": [
+    {
+     "title": "FBI IC3 PSA I-022625: North Korea responsible for the Bybit theft",
+     "url": "https://ic3.gov/psa/2025/psa250226",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: Bybit",
+     "url": "https://en.wikipedia.org/wiki/Bybit",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "The Record: Hackers drained Bybit crypto exchange (21 Feb 2025)",
+     "url": "https://therecord.media/hackers-drained-bybit-crypto-exchange-hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "year": 2026,
+   "month": 10,
+   "exchange": "Binance",
+   "taken": "about $6.3 billion, ten chains",
+   "usdText": "about $6.3 billion as reported",
+   "how": "As reported: hot wallets were drained across ten blockchains; Binance first blamed a staff laptop.",
+   "lesson": "Freeze fast; absorb the loss; show proof of reserves.",
+   "headline": "BINANCE HACK: $6.3 BILLION, LARGEST CRYPTO HEIST ON RECORD",
+   "verified": true,
+   "note": "As reported, 2 November 2026. Attribution (North Korea-linked actors) is alleged. About $3B frozen; withdrawals reopened 1 Nov.",
+   "sources": [
+    {
+     "title": "Wikipedia: 2026 Binance hack",
+     "url": "https://en.wikipedia.org/wiki/2026_Binance_hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "The Register: FBI pins $6.3B Binance crypto heist on North Korean hackers (2 Nov 2026)",
+     "url": "https://www.theregister.com/security/2026/11/02/fbi-pins-63b-binance-crypto-heist-on-north-korean-hackers/5306889",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "NPR: A simple explainer of the massive $6.3 billion crypto heist at Binance (31 Oct 2026)",
+     "url": "https://www.npr.org/2026/10/31/nx-s1-6024426/binance-crypto-heist-cyber-criminals-north-korea",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    },
+    {
+     "title": "CNBC: Binance's $6.3 billion hack, what we know and what comes next (30 Oct 2026)",
+     "url": "https://www.cnbc.com/2026/10/30/billions-in-crypto-frozen-in-binance-hack-heres-what-happens-next-.html",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    }
+   ]
+  }
+ ],
+ "lessons": [
+  {
+   "id": "keys",
+   "title": "NOT YOUR KEYS",
+   "line": "Not your keys, not your coins: coins on an exchange are a promise, not property.",
+   "from": "Mt. Gox 2014",
+   "sources": [
+    {
+     "title": "Wikipedia: Mt. Gox",
+     "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "cold",
+   "title": "COLD STORAGE",
+   "line": "Keep most coins offline; only a small float should ever sit in a hot wallet.",
+   "from": "Bitstamp 2015",
+   "sources": [
+    {
+     "title": "Wikipedia: Bitstamp",
+     "url": "https://en.wikipedia.org/wiki/Bitstamp",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Help Net Security: Bitstamp suspends service in wake of compromise",
+     "url": "https://www.helpnetsecurity.com/?p=38106",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: Cryptocurrency wallet",
+     "url": "https://en.wikipedia.org/wiki/Cryptocurrency_wallet",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "multisig",
+   "title": "MULTI-SIG",
+   "line": "Several signers beat one, but every signer must trust what they approve.",
+   "from": "Bitfinex 2016",
+   "sources": [
+    {
+     "title": "Wikipedia: Bitfinex",
+     "url": "https://en.wikipedia.org/wiki/Bitfinex",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: Multisignature",
+     "url": "https://en.wikipedia.org/wiki/Multisignature",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: WazirX",
+     "url": "https://en.wikipedia.org/wiki/WazirX",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "reserves",
+   "title": "PROOF OF RESERVES",
+   "line": "A public check that the coins exist would have shown empty vaults early.",
+   "from": "QuadrigaCX 2019",
+   "sources": [
+    {
+     "title": "Wikipedia: QuadrigaCX",
+     "url": "https://en.wikipedia.org/wiki/QuadrigaCX",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: 2026 Binance hack",
+     "url": "https://en.wikipedia.org/wiki/2026_Binance_hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "verify",
+   "title": "VERIFY WHAT YOU SIGN",
+   "line": "A screen can show the right address while the code does something else.",
+   "from": "Bybit 2025",
+   "sources": [
+    {
+     "title": "The Record: Hackers drained Bybit crypto exchange (21 Feb 2025)",
+     "url": "https://therecord.media/hackers-drained-bybit-crypto-exchange-hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: Bybit",
+     "url": "https://en.wikipedia.org/wiki/Bybit",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "segregate",
+   "title": "SEGREGATE HOT AND COLD",
+   "line": "A hot wallet holding about 2% of the total caps the damage of one breach.",
+   "from": "Binance 2019",
+   "sources": [
+    {
+     "title": "Cointelegraph: Hackers withdraw 7,000 bitcoins in Binance security breach (May 2019)",
+     "url": "https://cointelegraph.com/news/hackers-withdraw-7-000-bitcoins-in-binance-crypto-exchange-security-breach",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "devices",
+   "title": "PROTECT SIGNER DEVICES",
+   "line": "One tricked employee or laptop can open the door to the whole wallet system.",
+   "from": "DMM Bitcoin 2024",
+   "sources": [
+    {
+     "title": "BleepingComputer: FBI links North Korean hackers to $308 million crypto heist",
+     "url": "https://www.bleepingcomputer.com/news/security/fbi-links-north-korean-hackers-to-308-million-crypto-heist",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: 2026 Binance hack",
+     "url": "https://en.wikipedia.org/wiki/2026_Binance_hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "reimburse",
+   "title": "REIMBURSE FUND",
+   "line": "A reserve set aside from fees lets an exchange repay users after a theft.",
+   "from": "Binance 2019",
+   "sources": [
+    {
+     "title": "Cointelegraph: Hackers withdraw 7,000 bitcoins in Binance security breach (May 2019)",
+     "url": "https://cointelegraph.com/news/hackers-withdraw-7-000-bitcoins-in-binance-crypto-exchange-security-breach",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "makewhole",
+   "title": "MAKE USERS WHOLE",
+   "line": "An exchange with capital can repay every customer from its own funds.",
+   "from": "Coincheck 2018",
+   "sources": [
+    {
+     "title": "Wikipedia: Coincheck",
+     "url": "https://en.wikipedia.org/wiki/Coincheck",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Security Affairs: Coincheck refunds customers (58 billion yen, 523 million NEM, 46.3 billion yen refund)",
+     "url": "https://securityaffairs.com/68341/cyber-crime/coincheck-refunds-customers.html",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "insurance",
+   "title": "INSURANCE FUND",
+   "line": "An insurance fund covered a slice of the loss while most coins were tracked down.",
+   "from": "KuCoin 2020",
+   "sources": [
+    {
+     "title": "Wikipedia: KuCoin",
+     "url": "https://en.wikipedia.org/wiki/KuCoin",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "freeze",
+   "title": "FREEZE FAST",
+   "line": "Stablecoin issuers can freeze stolen tokens, so speed decides what is recovered.",
+   "from": "Binance 2026",
+   "sources": [
+    {
+     "title": "Wikipedia: 2026 Binance hack",
+     "url": "https://en.wikipedia.org/wiki/2026_Binance_hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "The Register: FBI pins $6.3B Binance crypto heist on North Korean hackers (2 Nov 2026)",
+     "url": "https://www.theregister.com/security/2026/11/02/fbi-pins-63b-binance-crypto-heist-on-north-korean-hackers/5306889",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: Tether (cryptocurrency)",
+     "url": "https://en.wikipedia.org/wiki/Tether_(cryptocurrency)",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "trace",
+   "title": "THE CHAIN REMEMBERS",
+   "line": "Stolen coins are traceable, and years later the authorities can still seize them.",
+   "from": "Bitfinex 2016",
+   "sources": [
+    {
+     "title": "The Record: DOJ seizes $3.6 billion from 2016 Bitfinex hack",
+     "url": "https://therecord.media/doj-seizes-3-6-billion-from-2016-bitfinex-hack-arrests-new-york-couple/",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: Bitfinex",
+     "url": "https://en.wikipedia.org/wiki/Bitfinex",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "pause",
+   "title": "PAUSE AND CHECK",
+   "line": "Halting withdrawals while investigating limits a run and a second theft.",
+   "from": "Binance 2019",
+   "sources": [
+    {
+     "title": "Cointelegraph: Hackers withdraw 7,000 bitcoins in Binance security breach (May 2019)",
+     "url": "https://cointelegraph.com/news/hackers-withdraw-7-000-bitcoins-in-binance-crypto-exchange-security-breach",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Help Net Security: Bitstamp suspends service in wake of compromise",
+     "url": "https://www.helpnetsecurity.com/?p=38106",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "id": "insiders",
+   "title": "WATCH INSIDER ACCESS",
+   "line": "Bithumb blamed insiders: staff access needs limits and logs.",
+   "from": "Bithumb 2019",
+   "sources": [
+    {
+     "title": "Wikipedia: Bithumb",
+     "url": "https://en.wikipedia.org/wiki/Bithumb",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Finance Magnates: Bithumb hacked for $19 million, insider job suspected",
+     "url": "https://www.financemagnates.com/cryptocurrency/news/bithumb-hacked-for-19-million-insider-job-suspected",
+     "retrieved": "2026-11-02",
+     "kind": "listing"
+    }
+   ]
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Hot wallet",
+   "line": "A wallet connected to the internet so an exchange can pay withdrawals fast. Convenient, and the usual target.",
+   "sources": [
+    {
+     "title": "Wikipedia: Cryptocurrency wallet",
+     "url": "https://en.wikipedia.org/wiki/Cryptocurrency_wallet",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "term": "Cold wallet",
+   "line": "A wallet kept offline and disconnected from the internet, so its keys are out of reach of online attackers.",
+   "sources": [
+    {
+     "title": "Wikipedia: Cryptocurrency wallet",
+     "url": "https://en.wikipedia.org/wiki/Cryptocurrency_wallet",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "term": "Multi-signature",
+   "line": "A wallet that needs a set number of independent keys to approve each transaction.",
+   "sources": [
+    {
+     "title": "Wikipedia: Multisignature",
+     "url": "https://en.wikipedia.org/wiki/Multisignature",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "term": "Proof of reserves",
+   "line": "A public check that an exchange really holds the coins it owes customers. Binance said it would show its on 2 November 2026.",
+   "sources": [
+    {
+     "title": "Wikipedia: 2026 Binance hack",
+     "url": "https://en.wikipedia.org/wiki/2026_Binance_hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ],
+   "note": "General definition written for this machine; no dedicated reference page was reachable. The 2 November 2026 statement is from the Binance 2026 article."
+  },
+  {
+   "term": "Attribution",
+   "line": "Naming who is behind a theft. An investigator's attribution, such as the FBI's to North Korea-linked actors, is shown as alleged unless a court has ruled. The museum names no attackers.",
+   "sources": [
+    {
+     "title": "FBI IC3 PSA I-022625: North Korea responsible for the Bybit theft",
+     "url": "https://ic3.gov/psa/2025/psa250226",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "BleepingComputer: FBI links North Korean hackers to $308 million crypto heist",
+     "url": "https://www.bleepingcomputer.com/news/security/fbi-links-north-korean-hackers-to-308-million-crypto-heist",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "The Register: FBI pins $6.3B Binance crypto heist on North Korean hackers (2 Nov 2026)",
+     "url": "https://www.theregister.com/security/2026/11/02/fbi-pins-63b-binance-crypto-heist-on-north-korean-hackers/5306889",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  },
+  {
+   "term": "Stablecoin freeze",
+   "line": "A stablecoin issuer can block tokens at a given address, which is how about $3 billion was frozen after the Binance hack.",
+   "sources": [
+    {
+     "title": "Wikipedia: Tether (cryptocurrency)",
+     "url": "https://en.wikipedia.org/wiki/Tether_(cryptocurrency)",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    },
+    {
+     "title": "Wikipedia: 2026 Binance hack",
+     "url": "https://en.wikipedia.org/wiki/2026_Binance_hack",
+     "retrieved": "2026-11-02",
+     "kind": "read"
+    }
+   ]
+  }
+ ],
+ "coins": {
+  "BTC": {
+   "status": "file",
+   "file": "art/coins/btc-logo_ios.png",
+   "extra": "art/coins/btc-logotop.svg",
+   "source": "https://raw.githubusercontent.com/bitcoin/bitcoin.org/master/img/icons/logo_ios.png",
+   "note": "Official bitcoin.org icon (114x114 PNG, the orange B coin), used unmodified. btc-logotop.svg is the full bitcoin.org logo (coin plus wordmark), kept for reference; never crop or recolour. The repository is MIT-licensed; the logo's own terms were not stated in the repo."
+  },
+  "ETH": {
+   "status": "file",
+   "file": "art/coins/eth-diamond-black.svg",
+   "source": "https://raw.githubusercontent.com/ethereum/ethereum-org-website/dev/public/images/assets/svgs/eth-diamond-black.svg",
+   "note": "Official ethereum.org logo asset (the diamond, black), used unmodified. The repository is MIT-licensed; brand-asset terms on ethereum.org were not read."
+  },
+  "NEM": {
+   "status": "type",
+   "source": "",
+   "note": "No official NEM symbol file was reachable from the build network (nem.io was blocked and no GitHub repo path was found). Shows \"NEM\" set in type."
+  },
+  "NZD": {
+   "status": "type",
+   "source": "",
+   "note": "A currency, not a coin: shows \"NZ$\" in type."
+  },
+  "FIAT": {
+   "status": "type",
+   "source": "",
+   "note": "Canadian dollars (QuadrigaCX): shows \"C$\" in type."
+  },
+  "MULTI": {
+   "status": "type",
+   "source": "",
+   "note": "Several assets (Binance 2026: ETH, BTC, TRX, XRP, SOL and more; Cold Storage): shows the chain count or a keyhole drawn as vector shapes by the game (not a logo)."
+  },
+  "XRP": {
+   "status": "type",
+   "source": "",
+   "note": "Used only inside headlines/data text; no symbol file needed."
+  },
+  "EOS": {
+   "status": "type",
+   "source": "",
+   "note": "Used only inside headlines/data text; no symbol file needed."
+  }
+ },
+ "rules": [
+  "Amounts are \"at the time\" and ranges are shown where sources disagree.",
+  "No individual hacker is named or shown; attribution is shown as alleged where sources say so.",
+  "Each \"how\" line is one plain sentence of cause, never instructions.",
+  "No hacked exchange's logo is used."
+ ]
+}
