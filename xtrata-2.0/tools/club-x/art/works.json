@@ -1,0 +1,151 @@
+{
+  "_about": "Chemical X works used on the Club X reels. Edit this file and rebuild (python3 tools/club-x/build.py). Jim confirms the list; entries marked status:'needed' are waiting on information only Jim / This Is Number One can supply. Nothing here is drawn or imitated by hand: the game loads each token's own art (Hiro metadata API -> cached image or IPFS gateway), or uses the bundle written by tools/club-x/fetch_art.py when it exists.",
+  "wallet": "SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3",
+  "walletNote": "The deployer of brandx, xlove, love-hirsts, cx-tokens and chemical-x-cxlo, found via the Hiro address-transactions API on 2 Nov 2026. Taken to be Chemical X's own wallet; Jim to confirm.",
+  "works": [
+    {
+      "key": "official",
+      "slot": "artifact",
+      "name": "Chemical X",
+      "contract": null,
+      "official": true,
+      "ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "titles": [
+        "Pill Smiley",
+        "Pill Heart",
+        "Love Marquee",
+        "Yellow Head CX",
+        "Rainbow Rings X",
+        "Pill Skull",
+        "Currency X",
+        "Pink Head CX",
+        "Pill Grid",
+        "Smiley Sun",
+        "Pill X",
+        "Chrome Head CX",
+        "Pill Love",
+        "Pill Ball",
+        "Pill Bottle",
+        "Black Head CX"
+      ],
+      "colour": "#ffffff",
+      "status": "supplied",
+      "verified": "16 official Chemical X images supplied by Jim on 2 Nov 2026 as a contact sheet; cut into art/official/cx-01..16.jpg and bundled into the game. Titles are working descriptions. Not on-chain tokens, so no Xtrata id and no cameo royalty.",
+      "source": "Supplied by Jim"
+    },
+    {
+      "key": "brandx",
+      "slot": "artifact",
+      "name": "BrandX",
+      "contract": "SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3.brandx",
+      "ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "titles": [
+        "Love & Death in Disneyland",
+        "Exxon One",
+        "Coke Head"
+      ],
+      "colourways": 3,
+      "colour": "#ffffff",
+      "status": "contract-verified",
+      "verified": "Contract found on stacks.gamma.io/collections/brandx; token 1 read through the Hiro metadata API (name Exxon_One_green, image ipfs://ipfs/QmV78nb9A4eCz8v4Srx4tCZ5saA9r2d2PfsaDZyu2agxf2/images/Exxon_One_green.png). Tokens 2-9 are the other eight pieces of the series (3 artworks x 3 colourways) and were not individually read from here.",
+      "source": "https://thisisnumberone.com/collection/brandx/",
+      "gamma": "https://stacks.gamma.io/collections/brandx"
+    },
+    {
+      "key": "xlove",
+      "slot": "artifact",
+      "name": "XLove",
+      "contract": "SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3.xlove",
+      "ids": [
+        1,
+        5,
+        10,
+        15,
+        20,
+        25,
+        30,
+        40,
+        50
+      ],
+      "titles": [
+        "XLove"
+      ],
+      "colour": "#ffffff",
+      "status": "contract-verified",
+      "verified": "Contract found on stacks.gamma.io/collections/xlove (image .../images/XLove_17.png). 50 unique colourways per thisisnumberone.com; these nine token ids are a sample for the reels and are checked at load time (a token that does not resolve falls back to a name tile).",
+      "source": "https://thisisnumberone.com/collection/xlove/",
+      "gamma": "https://stacks.gamma.io/collections/xlove"
+    },
+    {
+      "key": "genesis",
+      "slot": "bitcoin",
+      "name": "This Is Number One",
+      "contract": null,
+      "ids": [],
+      "titles": [
+        "This Is Number One"
+      ],
+      "colour": "#e6ff00",
+      "status": "needed",
+      "verified": "thisisnumberone.com/collection/the-genesis-collection lists five Genesis pieces (This Is Number One, Mine, So Why Try Harder, Now Is Not Enough (For), Channel #1) credited to Chemical X with Cara Delevingne, Fatboy Slim, Dave Stewart and Orbital; it does not say which is Chemical X's and gives no contract or token ids. JIM: set contract and ids for Chemical X's Genesis piece, then rebuild. Until then the jackpot symbol shows the name set in type on a tile.",
+      "source": "https://thisisnumberone.com/collection/the-genesis-collection/"
+    }
+  ],
+  "alsoFound": [
+    {
+      "contract": "SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3.love-hirsts",
+      "note": "Love Hirsts (MDMA): the #1 Loyalty holder series. Not used: Jim to say whether it belongs on the reels."
+    },
+    {
+      "contract": "SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3.cx-tokens",
+      "note": "Appears as a call target on the wallet; type unknown (likely the $EX Y / access tokens). Not used."
+    },
+    {
+      "contract": "SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3.chemical-x-cxlo",
+      "note": "Appears as a call target on the wallet; type unknown. Not used."
+    },
+    {
+      "collection": "$EX Y (sexy)",
+      "note": "100 colourways, thisisnumberone.com/collection/sexy. Contract not found from here."
+    },
+    {
+      "collection": "The Smiley Collection",
+      "note": "333 animated smileys, thisisnumberone.com/collection/the-smiley-collection. Contract not found from here."
+    },
+    {
+      "collection": "Singularity",
+      "note": "With Pris. thisisnumberone.com/collection/singularity. Contract not found from here."
+    }
+  ],
+  "pfp": {
+    "status": "not supplied",
+    "note": "A Chemical X PFP or masked self-portrait is used for the wild only if Jim supplies it with Chemical X's OK. Until then the wild is the original plain white mask with an X on its forehead. To add: put the file in tools/club-x/art/supplied/mask.png and set \"pfp\" here to its filename, then rebuild."
+  }
+}

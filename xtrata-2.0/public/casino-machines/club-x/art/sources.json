@@ -1,0 +1,285 @@
+{
+ "machine": "Club X",
+ "about": "Every image on the Club X reels and its source. Chemical X's works are loaded from the chain as he made them and never redrawn. The X marks, the Mask, the Midnight door, the wristband and the tag are original art drawn in code for this machine (the agreed exception for his signature subject); nothing is copied from his works.",
+ "symbols": {
+  "cherry": {
+   "name": "Chalk X on a warehouse door",
+   "kind": "original art, drawn in code (p3_art.js)",
+   "source": "none: original"
+  },
+  "lemon": {
+   "name": "Stencil X, sprayed on a wall",
+   "kind": "original art, drawn in code",
+   "source": "none: original"
+  },
+  "chip": {
+   "name": "Neon X",
+   "kind": "original art, drawn in code",
+   "source": "none: original"
+  },
+  "block": {
+   "name": "Laser X in green beams",
+   "kind": "original art, drawn in code",
+   "source": "none: original"
+  },
+  "artifact": {
+   "name": "Chemical X works (BrandX, XLove)",
+   "kind": "Stacks NFTs, loaded from the chain via the Hiro metadata API and the token's own image",
+   "source": "see works[] below"
+  },
+  "bitcoin": {
+   "name": "This Is Number One (jackpot)",
+   "kind": "Stacks NFT from the 2021 Genesis Collection",
+   "source": "Tile shows the real This Is Number One logo (art/brand). The Genesis Collection piece itself is NOT YET SUPPLIED: Jim to give the contract and token id (see works[] genesis)."
+  },
+  "wild": {
+   "name": "The Mask",
+   "kind": "original art: a plain white mask with an X on its forehead",
+   "source": "none: original. A Chemical X PFP or masked self-portrait is used only if Jim supplies it with Chemical X's OK."
+  },
+  "scatter": {
+   "name": "Midnight: the warehouse door with its X, opening",
+   "kind": "original art, drawn in code",
+   "source": "none: original"
+  },
+  "vault": {
+   "name": "Wristband stamped with an X",
+   "kind": "original art, drawn in code",
+   "source": "none: original"
+  },
+  "chain": {
+   "name": "Tag: an X sprayed on a spot on a night map",
+   "kind": "original art, drawn in code. District names are labels only; no map product is copied.",
+   "source": "none: original"
+  }
+ },
+ "brand": [
+  {
+   "item": "Xtrata mark",
+   "source": "supplied in the build prompt, used as given (vector, never redrawn)",
+   "permission": "own brand"
+  },
+  {
+   "item": "ParallaX Casino wordmark",
+   "source": "supplied in the build prompt, used as given",
+   "permission": "own brand"
+  },
+  {
+   "item": "This Is Number One logo (the pixel 1)",
+   "source": "https://thisisnumberone.com/wp-content/themes/thisisnumberone/files/images/thisisnumberone/1-colour.svg, read from the live site on 2 Nov 2026 (2,084 bytes, saved byte for byte as art/brand/this-is-number-one-logo.svg, never redrawn). Used on the jackpot symbol tile.",
+   "permission": "This Is Number One's own logo: needs the platform's OK for use on a public machine"
+  }
+ ],
+ "needsPermission": [
+  "Chemical X's works (BrandX, XLove, and the Genesis piece): shown exactly as he made them on a public machine; needs Chemical X's OK.",
+  "The This Is Number One name and logo (taken from thisisnumberone.com), and its Genesis Collection piece: need the platform's and Chemical X's OK.",
+  "Any Chemical X PFP or self-portrait for the wild: only as supplied by Jim with Chemical X's OK (none supplied yet).",
+  "No other project's logo is used. The Ministry of Sound logo (which Chemical X is credited with) is NOT used or imitated."
+ ],
+ "notDrawn": "No pills or drug imagery are drawn by this machine.",
+ "generated": "2026-11-02T17:43Z",
+ "wallet": "SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3",
+ "works": [
+  {
+   "key": "official",
+   "name": "Chemical X",
+   "contract": null,
+   "tokenIds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16
+   ],
+   "status": "supplied",
+   "source": "Supplied by Jim",
+   "gamma": null,
+   "imageSource": "Hiro metadata API get-token-uri -> the token's own image (IPFS gateway); bundled copies in bundle.json when fetch_art.py has been run"
+  },
+  {
+   "key": "brandx",
+   "name": "BrandX",
+   "contract": "SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3.brandx",
+   "tokenIds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "status": "contract-verified",
+   "source": "https://thisisnumberone.com/collection/brandx/",
+   "gamma": "https://stacks.gamma.io/collections/brandx",
+   "imageSource": "Hiro metadata API get-token-uri -> the token's own image (IPFS gateway); bundled copies in bundle.json when fetch_art.py has been run"
+  },
+  {
+   "key": "xlove",
+   "name": "XLove",
+   "contract": "SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3.xlove",
+   "tokenIds": [
+    1,
+    5,
+    10,
+    15,
+    20,
+    25,
+    30,
+    40,
+    50
+   ],
+   "status": "contract-verified",
+   "source": "https://thisisnumberone.com/collection/xlove/",
+   "gamma": "https://stacks.gamma.io/collections/xlove",
+   "imageSource": "Hiro metadata API get-token-uri -> the token's own image (IPFS gateway); bundled copies in bundle.json when fetch_art.py has been run"
+  },
+  {
+   "key": "genesis",
+   "name": "This Is Number One",
+   "contract": null,
+   "tokenIds": [],
+   "status": "needed",
+   "source": "https://thisisnumberone.com/collection/the-genesis-collection/",
+   "gamma": null,
+   "imageSource": "Hiro metadata API get-token-uri -> the token's own image (IPFS gateway); bundled copies in bundle.json when fetch_art.py has been run"
+  }
+ ],
+ "bundledArt": true,
+ "bundle": {
+  "official:1": {
+   "name": "Pill Smiley",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-01.jpg)",
+   "metadata": null
+  },
+  "official:2": {
+   "name": "Pill Heart",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-02.jpg)",
+   "metadata": null
+  },
+  "official:3": {
+   "name": "Love Marquee",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-03.jpg)",
+   "metadata": null
+  },
+  "official:4": {
+   "name": "Yellow Head CX",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-04.jpg)",
+   "metadata": null
+  },
+  "official:5": {
+   "name": "Rainbow Rings X",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-05.jpg)",
+   "metadata": null
+  },
+  "official:6": {
+   "name": "Pill Skull",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-06.jpg)",
+   "metadata": null
+  },
+  "official:7": {
+   "name": "Currency X",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-07.jpg)",
+   "metadata": null
+  },
+  "official:8": {
+   "name": "Pink Head CX",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-08.jpg)",
+   "metadata": null
+  },
+  "official:9": {
+   "name": "Pill Grid",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-09.jpg)",
+   "metadata": null
+  },
+  "official:10": {
+   "name": "Smiley Sun",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-10.jpg)",
+   "metadata": null
+  },
+  "official:11": {
+   "name": "Pill X",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-11.jpg)",
+   "metadata": null
+  },
+  "official:12": {
+   "name": "Chrome Head CX",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-12.jpg)",
+   "metadata": null
+  },
+  "official:13": {
+   "name": "Pill Love",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-13.jpg)",
+   "metadata": null
+  },
+  "official:14": {
+   "name": "Pill Ball",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-14.jpg)",
+   "metadata": null
+  },
+  "official:15": {
+   "name": "Pill Bottle",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-15.jpg)",
+   "metadata": null
+  },
+  "official:16": {
+   "name": "Black Head CX",
+   "source": "Supplied by Jim: official Chemical X image (art/official/cx-16.jpg)",
+   "metadata": null
+  }
+ },
+ "officialArt": {
+  "about": "Official Chemical X images supplied by Jim on 2 Nov 2026 as one 4x4 contact sheet (1254px). Cut into 16 tiles, 6px inset to drop the sheet's gutters, scaled to 320px. Titles are working descriptions only: Jim / Chemical X to supply the real titles. Not on-chain tokens: they carry no contract, token id or Xtrata id, so they never take part in the Forever Twins cameo.",
+  "source": "Supplied by Jim (jimdotbtc), described as official Chemical X images",
+  "files": [
+   "art/official/cx-01.jpg",
+   "art/official/cx-02.jpg",
+   "art/official/cx-03.jpg",
+   "art/official/cx-04.jpg",
+   "art/official/cx-05.jpg",
+   "art/official/cx-06.jpg",
+   "art/official/cx-07.jpg",
+   "art/official/cx-08.jpg",
+   "art/official/cx-09.jpg",
+   "art/official/cx-10.jpg",
+   "art/official/cx-11.jpg",
+   "art/official/cx-12.jpg",
+   "art/official/cx-13.jpg",
+   "art/official/cx-14.jpg",
+   "art/official/cx-15.jpg",
+   "art/official/cx-16.jpg"
+  ],
+  "titles": {
+   "cx-01.jpg": "Pill Smiley",
+   "cx-02.jpg": "Pill Heart",
+   "cx-03.jpg": "Love Marquee",
+   "cx-04.jpg": "Yellow Head CX",
+   "cx-05.jpg": "Rainbow Rings X",
+   "cx-06.jpg": "Pill Skull",
+   "cx-07.jpg": "Currency X",
+   "cx-08.jpg": "Pink Head CX",
+   "cx-09.jpg": "Pill Grid",
+   "cx-10.jpg": "Smiley Sun",
+   "cx-11.jpg": "Pill X",
+   "cx-12.jpg": "Chrome Head CX",
+   "cx-13.jpg": "Pill Love",
+   "cx-14.jpg": "Pill Ball",
+   "cx-15.jpg": "Pill Bottle",
+   "cx-16.jpg": "Black Head CX"
+  },
+  "note": "Supplied by Jim as official Chemical X images. Several pieces are pill mosaics and one is a bottle silhouette; Club X's own drawn art has no pills or drug imagery. Four are character portraits (CX hoodie), a candidate for the Wild."
+ }
+}

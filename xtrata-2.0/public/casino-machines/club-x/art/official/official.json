@@ -1,0 +1,102 @@
+{
+ "_about": "Official Chemical X images supplied by Jim on 2 Nov 2026 as one 4x4 contact sheet (1254px). Cut into 16 tiles, 6px inset to drop the sheet's gutters, scaled to 320px. Titles are working descriptions only: Jim / Chemical X to supply the real titles. Not on-chain tokens: they carry no contract, token id or Xtrata id, so they never take part in the Forever Twins cameo.",
+ "source": "Supplied by Jim (jimdotbtc), described as official Chemical X images",
+ "tiles": [
+  {
+   "n": 1,
+   "file": "cx-01.jpg",
+   "title": "Pill Smiley",
+   "kind": "art"
+  },
+  {
+   "n": 2,
+   "file": "cx-02.jpg",
+   "title": "Pill Heart",
+   "kind": "art"
+  },
+  {
+   "n": 3,
+   "file": "cx-03.jpg",
+   "title": "Love Marquee",
+   "kind": "art"
+  },
+  {
+   "n": 4,
+   "file": "cx-04.jpg",
+   "title": "Yellow Head CX",
+   "kind": "pfp"
+  },
+  {
+   "n": 5,
+   "file": "cx-05.jpg",
+   "title": "Rainbow Rings X",
+   "kind": "art"
+  },
+  {
+   "n": 6,
+   "file": "cx-06.jpg",
+   "title": "Pill Skull",
+   "kind": "art"
+  },
+  {
+   "n": 7,
+   "file": "cx-07.jpg",
+   "title": "Currency X",
+   "kind": "art"
+  },
+  {
+   "n": 8,
+   "file": "cx-08.jpg",
+   "title": "Pink Head CX",
+   "kind": "pfp"
+  },
+  {
+   "n": 9,
+   "file": "cx-09.jpg",
+   "title": "Pill Grid",
+   "kind": "art"
+  },
+  {
+   "n": 10,
+   "file": "cx-10.jpg",
+   "title": "Smiley Sun",
+   "kind": "art"
+  },
+  {
+   "n": 11,
+   "file": "cx-11.jpg",
+   "title": "Pill X",
+   "kind": "art"
+  },
+  {
+   "n": 12,
+   "file": "cx-12.jpg",
+   "title": "Chrome Head CX",
+   "kind": "pfp"
+  },
+  {
+   "n": 13,
+   "file": "cx-13.jpg",
+   "title": "Pill Love",
+   "kind": "art"
+  },
+  {
+   "n": 14,
+   "file": "cx-14.jpg",
+   "title": "Pill Ball",
+   "kind": "art"
+  },
+  {
+   "n": 15,
+   "file": "cx-15.jpg",
+   "title": "Pill Bottle",
+   "kind": "art"
+  },
+  {
+   "n": 16,
+   "file": "cx-16.jpg",
+   "title": "Black Head CX",
+   "kind": "pfp"
+  }
+ ]
+}
