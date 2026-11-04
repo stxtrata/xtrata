@@ -12642,11 +12642,13 @@ function applyTestnetFunding(proof){
       const css = document.createElement('style');
       css.textContent = `#pxBubbles{position:fixed;inset:0;pointer-events:none;z-index:9;overflow:hidden}
 .pxb{position:absolute;left:0;top:0;transform:translate(-50%,-100%);max-width:min(240px,60vw);padding:5px 10px;border-radius:14px;background:rgba(12,9,14,.9);color:#f6ead0;font:600 13px/1.3 system-ui,-apple-system,Segoe UI,sans-serif;border:1px solid rgba(227,184,74,.65);text-align:center;transition:opacity .35s;overflow-wrap:anywhere;will-change:transform}
-.pxb.emo{font-size:28px;line-height:1;padding:4px 8px;background:rgba(12,9,14,.5);border-color:rgba(227,184,74,.35)}
+.pxb.emo{font-size:48px;line-height:1;padding:0;background:none;border:0;max-width:none;transform-origin:50% 100%;text-shadow:0 2px 3px rgba(0,0,0,.65),0 0 14px rgba(0,0,0,.55);animation:pxpop .5s cubic-bezier(.2,1.5,.4,1)}
+@keyframes pxpop{0%{scale:.2}60%{scale:1.3}100%{scale:1}}
+@media(prefers-reduced-motion:reduce){.pxb.emo{animation:none}}
 .pxb.gift{border-color:#d9a8f5}.pxb.table{border-color:#7fb8e0}
-#pxReactBtn{font:inherit}#pxReact{position:fixed;z-index:41;width:min(330px,calc(100vw - 20px));box-sizing:border-box;padding:12px 14px;border-radius:12px;background:rgba(12,9,14,.97);color:#f6ead0;border:1px solid #e3b84a;box-shadow:0 10px 40px rgba(0,0,0,.55);font:13px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+#pxReactBtn{font:inherit}#pxReact{position:fixed;z-index:41;width:min(330px,calc(100vw - 20px));max-height:calc(100vh - 130px);max-height:calc(100dvh - 130px);overflow-y:auto;overscroll-behavior:contain;touch-action:manipulation;box-sizing:border-box;padding:12px 14px;border-radius:12px;background:rgba(12,9,14,.97);color:#f6ead0;border:1px solid #e3b84a;box-shadow:0 10px 40px rgba(0,0,0,.55);font:13px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
 #pxReact[hidden]{display:none}#pxReact h4{margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#e3b84a}
-#pxReact .emos{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:10px}#pxReact .emos button{font-size:22px;padding:6px 0;background:rgba(227,184,74,.08);border:1px solid rgba(227,184,74,.35);border-radius:8px;cursor:pointer}
+#pxReact .emos{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:10px}#pxReact .emos button{font-size:24px;min-height:44px;padding:6px 0;touch-action:manipulation;background:rgba(227,184,74,.08);border:1px solid rgba(227,184,74,.35);border-radius:8px;cursor:pointer}
 #pxReact .emos button:hover{background:rgba(227,184,74,.25)}#pxReact .row{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}#pxReact .row button{flex:1 1 45%;font:inherit;font-size:12px;padding:8px;border-radius:8px;background:rgba(227,184,74,.12);color:#f6ead0;border:1px solid rgba(227,184,74,.6);cursor:pointer}
 #pxReact .row button:disabled{opacity:.45;cursor:default}#pxReact p{margin:0 0 6px;color:#c9b894;font-size:12px}#pxReact ol{margin:0;padding:0;list-style:none;font-size:12px}#pxReact li{padding:3px 0;border-top:1px solid rgba(227,184,74,.15)}#pxReact li b{color:#e3b84a}
 #pxReact .pick{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 10px}#pxReact .pick button{font:inherit;font-size:12px;padding:7px;border-radius:8px;background:rgba(217,168,245,.12);color:#f6ead0;border:1px solid #c58ee6;cursor:pointer;text-align:left}
@@ -12654,7 +12656,7 @@ function applyTestnetFunding(proof){
 #pxWinBanner.on{opacity:1;transform:translate(-50%,0)}
 #pxInvite{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:46;padding:12px 16px;border-radius:10px;background:rgba(12,9,14,.97);border:1px solid #e3b84a;color:#f6ead0;font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 24px)}
 #pxInvite button{font:inherit;padding:8px 12px;border-radius:8px;background:rgba(227,184,74,.2);color:#f6ead0;border:1px solid #e3b84a;cursor:pointer}
-@media(max-width:620px){#pxWinBanner{top:118px;font-size:13px}#pxReact .emos button{font-size:19px}}`;
+@media(max-width:620px){#pxWinBanner{top:118px;font-size:13px}#pxReact{padding:12px}#pxReact .emos{grid-template-columns:repeat(4,1fr);gap:8px}#pxReact .emos button{font-size:30px;min-height:52px}#pxReact .row button{flex:1 1 100%;min-height:44px;font-size:13px}#pxReact .pick button{min-height:44px;font-size:13px}}`;
       document.head.append(css);
       const layer = document.createElement('div'); layer.id = 'pxBubbles'; document.body.append(layer);
       const winEl = document.createElement('div'); winEl.id = 'pxWinBanner'; winEl.setAttribute('role', 'status'); document.body.append(winEl);
@@ -12685,19 +12687,28 @@ function applyTestnetFunding(proof){
         if (!key) return;
         let b = bubbles.get(key);
         if (!b) { const el = document.createElement('div'); el.className = 'pxb'; layer.append(el); b = { el, until: 0 }; bubbles.set(key, b); }
-        b.el.className = 'pxb' + (cls ? ' ' + cls : ''); b.el.textContent = text; b.until = performance.now() + (ms || 3500); b.el.style.opacity = '0';
+        b.el.className = 'pxb' + (cls ? ' ' + cls : ''); b.el.textContent = text; b.until = performance.now() + (ms || 3500); b.el.style.opacity = '0'; if (cls === 'emo') { b.el.style.animation = 'none'; void b.el.offsetWidth; b.el.style.animation = ''; }   // pop in again for a repeat reaction
       }
       const tmp = V3();
       function bubbleFrame(now) {
         if (!bubbles.size) return;
-        const W = innerWidth, H = innerHeight, cp = camera.position;
+        const W = innerWidth, H = innerHeight, cp = camera.position, small = Math.min(W, H) < 620;
+        const f = H / (2 * Math.tan(camera.fov * Math.PI / 360));            // pixels per metre at one metre away
         for (const [key, b] of bubbles) {
           if (now > b.until) { b.el.remove(); bubbles.delete(key); continue; }
+          const emo = b.el.classList.contains('emo');
+          if (emo && key === 'me' && !behind()) {                               // first person: your own figure is out of view, so show it big in front of you
+            b.el.style.transform = `translate(${(W / 2).toFixed(1)}px,${(H * 0.6).toFixed(1)}px) translate(-50%,-100%) scale(${((small ? 68 : 88) / 48).toFixed(3)})`;
+            b.el.style.opacity = String(Math.min(1, (b.until - now) / 400)); continue;
+          }
           const p = headOf(key);
-          if (!p || cp.distanceTo(p) > 20) { b.el.style.opacity = '0'; continue; }
+          if (!p || cp.distanceTo(p) > (emo ? 26 : 20)) { b.el.style.opacity = '0'; continue; }
+          if (emo) p.y -= 0.1;                                                  // right above the head, just over the name tag
+          const d = Math.max(1, cp.distanceTo(p));
           tmp.copy(p).project(camera);
           if (tmp.z > 1 || tmp.z < -1 || Math.abs(tmp.x) > 1.2 || Math.abs(tmp.y) > 1.2) { b.el.style.opacity = '0'; continue; }
-          b.el.style.transform = `translate(${((tmp.x + 1) / 2 * W).toFixed(1)}px,${((1 - tmp.y) / 2 * H).toFixed(1)}px) translate(-50%,-100%)`;
+          const k = emo ? Math.max(small ? 40 : 36, Math.min(small ? 80 : 96, 0.62 * f / d)) / 48 : 1;   // about 0.6 m tall in the room, never tiny, never huge
+          b.el.style.transform = `translate(${((tmp.x + 1) / 2 * W).toFixed(1)}px,${((1 - tmp.y) / 2 * H).toFixed(1)}px) translate(-50%,-100%)` + (emo ? ` scale(${k.toFixed(3)})` : '');
           b.el.style.opacity = String(Math.min(1, (b.until - now) / 400));
         }
       }
