@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Rare Pepe Directory · test build</title>
+<meta name="description" content="Standalone test page for the Rare Pepe Directory machine: the cabinet in a small 3D studio, the real game code, a test LAYR balance and a test panel.">
+<style>
+:root{--bg:#07110a;--panel:#0f1d13;--line:#1f4a2a;--ink:#f1ead4;--muted:#9bb39f;--acc:#3fb950;--acc2:#a6e3a1}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 Arial,Helvetica,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+#studio{position:fixed;inset:0;touch-action:none}#studio canvas{display:block;width:100%;height:100%}
+#top{position:fixed;left:0;right:0;top:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));background:linear-gradient(#07110af2,#07110a00);z-index:5}
+#top .brand{display:flex;align-items:center;gap:12px;margin-right:auto;min-width:0}#top .brand img{height:30px;width:auto}#top .brand b{font:900 16px Georgia,serif;color:var(--acc2);letter-spacing:1px;white-space:nowrap}#top .brand small{display:block;font-size:10px;color:var(--muted);letter-spacing:1.5px}
+.btn{min-height:44px;min-width:44px;padding:0 14px;border:1px solid #2f7a41;border-radius:10px;background:#12231a;font-weight:800;font-size:12px;letter-spacing:.6px}.btn[aria-pressed=true]{border-color:var(--acc);color:var(--acc2)}.btn.primary{background:linear-gradient(120deg,#a6e3a1,#2f9e44);color:#04140a;border-color:#e6ffe0}
+.bal{padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:#0a140d;font-weight:800}.bal small{display:block;font-size:9px;color:var(--muted);letter-spacing:1px}
+#hint{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);font-size:11px;color:var(--muted);letter-spacing:1px;z-index:4;text-align:center;pointer-events:none;width:92vw}
+#deck{position:fixed;left:50%;bottom:calc(40px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;z-index:5;flex-wrap:wrap;justify-content:center;max-width:96vw}
+#port{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:#020100b0;padding:16px}#port.on{display:flex}
+#featPort{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;max-width:96vw}
+#testPanel{position:fixed;right:12px;top:72px;width:min(380px,calc(100vw - 24px));max-height:calc(100vh - 90px);overflow:auto;background:var(--panel);border:1px solid #2f7a41;border-radius:14px;padding:16px;z-index:30;box-shadow:0 30px 80px #000c}#testPanel[hidden]{display:none}
+#testPanel h2{font:400 24px Georgia,serif;color:var(--acc2);margin:0 0 6px}#testPanel h3{font-size:11px;letter-spacing:1.5px;color:var(--acc2);margin:16px 0 8px}#testPanel .row{display:flex;flex-wrap:wrap;gap:8px}#testPanel p{color:var(--muted);font-size:12px;margin:6px 0}
+#game{position:fixed;left:-10000px;top:0;width:1280px;height:800px;border:0;opacity:0;pointer-events:none}#game.fs{left:0;top:0;width:100vw;height:100vh;opacity:1;pointer-events:auto;z-index:100;background:#000}
+#err{position:fixed;inset:auto 12px 12px 12px;z-index:50;background:#3a0d0d;border:1px solid #a33;border-radius:10px;padding:10px;display:none}
+@media(max-width:640px){#top .brand img{display:none}#top{gap:6px}.btn{padding:0 10px;font-size:11px}#deck .btn{flex:1 1 28%}#featPort{bottom:calc(170px + env(safe-area-inset-bottom))}#hint{display:none}}
+</style>
+</head>
+<body>
+<div id="studio" aria-label="Rare Pepe Directory cabinet. Drag to orbit, scroll or pinch to zoom, tap the buttons or the lever to play."></div>
+<header id="top">
+  <div class="brand"><img src="vendor/brand/parallax-casino-wordmark.svg" alt="ParallaX Casino"><div><b>RARE PEPE DIRECTORY</b><small>STANDALONE TEST BUILD · TEST LAYR</small></div></div>
+  <div class="bal"><small>TEST LAYR</small><span id="bal">—</span></div>
+  <button class="btn" id="vCab" aria-pressed="true">Cabinet</button><button class="btn" id="vScr" aria-pressed="false">Screen</button>
+  <button class="btn" id="fsBtn">Full screen</button><button class="btn" id="testBtn" aria-expanded="false">Test</button>
+</header>
+<nav id="deck" aria-label="Deck buttons"><button class="btn" data-a="pays">DIRECTORY</button><button class="btn" data-a="betDown">−PEPECASH</button><button class="btn" data-a="betUp">+PEPECASH</button><button class="btn" data-a="auto">AUTO-TRADE</button><button class="btn primary" data-a="spin" id="spinBtn">TRADE</button><button class="btn" id="labBtn" title="Bonus Lab (L)">LAB</button></nav>
+<div id="featPort"></div>
+<div id="hint">DRAG TO ORBIT · SCROLL OR PINCH TO ZOOM · CLICK THE LEVER OR TRADE · SPACE SPINS · F FULL SCREEN · L BONUS LAB</div>
+<div id="port" role="dialog" aria-modal="true"></div>
+<aside id="testPanel" hidden aria-label="Test panel">
+  <h2>Test panel</h2><p>Forced spins are real engine rounds with fixed reel stops. Test LAYR only; the casino balance is never touched.</p>
+  <h3>TRIGGER</h3><div class="row"><button class="btn" data-t="free">PEPECASH Rain</button><button class="btn" data-t="vault">Open a Pack</button><button class="btn" data-t="chain">The Directory</button><button class="btn" data-t="jackpot">Series 1, Card 1</button><button class="btn" data-t="gamble">Rare or Fake</button></div>
+  <h3>TWINS (BITCOIN PEPES AND ORDINAL PEPE)</h3><div class="row"><button class="btn" data-w="default">As loaded</button><button class="btn" data-w="none">None</button><button class="btn" data-w="some">Some</button><button class="btn" data-w="all">All</button></div><p>Twins not yet forevered show greyed with NOT YET FOREVER. The Ordinal Pepe wild stays greyed until its helper is live.</p>
+  <h3>LINKED HOLDERS</h3><div class="row"><button class="btn" data-h="none">None</button><button class="btn" data-h="some">Some</button><button class="btn" data-h="all">All</button></div><p>Switches the Holder Pot's linked-card count shown on the screen header.</p>
+  <h3>BONUS LAB</h3><div class="row"><button class="btn" id="tLab">Open the Bonus Lab (L)</button></div><p>Practice play on a separate LAB balance: every bonus, the jackpot and the gamble can be dealt on demand, seeded or random.</p>
+  <h3>MOTION</h3><div class="row"><button class="btn" id="tReduced" aria-pressed="false">Reduced motion</button><button class="btn" id="tTurbo" aria-pressed="false">Turbo</button></div>
+  <h3>RTP SIMULATION</h3><div class="row"><button class="btn" data-sim="200000">200k</button><button class="btn" data-sim="1000000">1M</button><button class="btn" data-sim="5000000">5M</button></div><p id="simOut">Exact model: 94.380% (all 33,554,432 reel positions).</p>
+  <h3>TEST BALANCE</h3><div class="row"><button class="btn" id="resetBal">Reset to 100,000</button><button class="btn" id="resetMachine">Reset machine state</button></div>
+</aside>
+<div id="err" role="alert"></div>
+<iframe id="game" title="Rare Pepe Directory game" allow="fullscreen; autoplay" aria-hidden="true" tabindex="-1"></iframe>
+<script>window.PX_STANDALONE_TEST = true; // tells the game frame that test hooks are allowed here; the casino never sets this
+(() => { const k = 'xtrata.parallax.test.rare-pepe-directory.layr.v1'; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); if (!r.bank) { r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } } catch (e) {} })();</script>
+<script src="vendor/layr-test-stub.js"></script>
+<script src="vendor/three-subset.js"></script>
+<script src="vendor/software-renderer.js"></script>
+<script src="pack.js"></script>
+<script>
+(async () => {
+'use strict';
+const $ = id => document.getElementById(id), PACK = window.RPD_PACK, LAYR = window.ParallaxLAYRAccount, fmt = n => (Math.round(n * 100) / 100).toLocaleString('en-GB');
+const fail = m => { $('err').style.display = 'block'; $('err').textContent = m; };
+const gunzip = async b64 => { const raw = atob(b64), bytes = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i); return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); };
+if (!PACK) { fail('pack.js is missing: run tools/build.mjs.'); return; }
+if (!await LAYR.acquire()) fail(LAYR.error() || 'Test LAYR account is open in another tab.');
+const paintBal = () => { $('bal').textContent = fmt(LAYR.balance()); }; LAYR.subscribe(paintBal); paintBal();
+
+/* ---- the 3D studio: dark floor, soft lights, the floor glow, the packed cabinet ---- */
+const host = $('studio'); let renderer, software = false;
+try { renderer = new THREE.WebGLRenderer({ antialias: true }); if (!renderer.getContext()) throw Error('no gl'); } catch (e) { renderer = new SoftwareRenderer(); software = true; }
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.75)); if (!software) { renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; } host.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#07110a'); scene.fog = new THREE.FogExp2(0x07110a, .07);
+const camera = new THREE.PerspectiveCamera(36, 1, .05, 60);
+const env = document.createElement('canvas'); env.width = 512; env.height = 256; { const g = env.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#ffe6c0'); gr.addColorStop(.45, '#3a2a1a'); gr.addColorStop(1, '#0d0906'); g.fillStyle = gr; g.fillRect(0, 0, 512, 256); }
+const envTex = new THREE.CanvasTexture(env); envTex.mapping = THREE.EquirectangularReflectionMapping; envTex.colorSpace = THREE.SRGBColorSpace;
+scene.add(new THREE.HemisphereLight(0xffead7, 0x1a1410, 1.1)); const key = new THREE.SpotLight(0xffe0b8, 70, 20, .6, .6, 1.4); key.position.set(2.5, 5.5, 4.5); key.target.position.set(0, 1.2, 0); scene.add(key, key.target);
+const rim = new THREE.PointLight(0x3fb950, 8, 8, 2); rim.position.set(0, 3.2, -1.6); scene.add(rim);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: '#0f0d0b', roughness: .35, metalness: .4, envMap: envTex, envMapIntensity: .3 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const glowC = document.createElement('canvas'); glowC.width = glowC.height = 256; { const g = glowC.getContext('2d'), r = g.createRadialGradient(128, 128, 0, 128, 128, 128); r.addColorStop(0, PACK.accent + 'cc'); r.addColorStop(.5, PACK.accent + '44'); r.addColorStop(1, PACK.accent + '00'); g.fillStyle = r; g.fillRect(0, 0, 256, 256); }
+const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(glowC), transparent: true, depthWrite: false, opacity: .55 })); glow.rotation.x = -Math.PI / 2; glow.position.set(0, .01, .75); scene.add(glow);
+// The same packed-cabinet loader the casino uses (packedCabinet), so this is how the room will see the model.
+const data = JSON.parse(await gunzip(PACK.model));
+const imgs = await Promise.all(data.textures.map(t => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = t.image; })));
+const geos = data.geometries.map(g => { const o = new THREE.BufferGeometry(); for (const [k, a] of Object.entries(g.attributes)) o.setAttribute(k, new THREE.BufferAttribute(new Float32Array(a.array), a.size)); if (g.index) o.setIndex(g.index); for (const gr of g.groups || []) o.addGroup(gr.start, gr.count, gr.materialIndex); o.computeBoundingSphere(); return o; });
+const texs = data.textures.map((t, i) => { const o = new THREE.CanvasTexture(imgs[i]); o.wrapS = t.wrapS; o.wrapT = t.wrapT; o.repeat.fromArray(t.repeat); o.offset.fromArray(t.offset); o.flipY = t.flipY; o.colorSpace = THREE.SRGBColorSpace; o.anisotropy = 8; o.needsUpdate = true; return o; });
+const mats = data.materials.map(m => { const p = { color: m.color, map: m.map == null ? null : texs[m.map], transparent: m.transparent, opacity: m.opacity, side: m.side, depthWrite: m.depthWrite, alphaTest: m.alphaTest }; return m.type === 'basic' ? new THREE.MeshBasicMaterial(p) : new THREE.MeshStandardMaterial(Object.assign(p, { roughness: m.roughness, metalness: m.metalness, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, flatShading: m.flatShading, envMap: envTex, envMapIntensity: .65 })); });
+const node = n => { const o = n.g == null ? new THREE.Group() : new THREE.Mesh(geos[n.g], Array.isArray(n.m) ? n.m.map(i => mats[i]) : mats[n.m]); o.position.fromArray(n.p); o.quaternion.fromArray(n.q); o.scale.fromArray(n.s); o.visible = n.visible; if (n.role) o.name = 'px-' + n.role; if (n.action) o.userData.pxMachineAction = n.action; n.children.forEach(c => o.add(node(c))); return o; };
+const model = node(data.root); model.updateMatrixWorld(true);
+let minY = 1e9, maxY = -1e9; const v = new THREE.Vector3(); model.traverse(o => { if (!o.isMesh) return; const p = o.geometry.getAttribute('position'); for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); } });
+const S = 2.6 / (maxY - minY); model.scale.multiplyScalar(S); model.position.y = -minY * S; scene.add(model); model.updateMatrixWorld(true);
+const part = r => model.getObjectByName('px-' + r), crest = part('crest'), leverO = part('lever'), spinO = part('spinPhysical'), screenMesh = part('screenMesh');
+const crestBase = crest.rotation.y, leverBase = leverO.rotation.x;
+
+/* ---- the game frame: the real pack, hosted exactly like the casino does (canvas-and-controls API) ---- */
+// The casino's frame pump (pxRafShim): browsers pause animation frames in hidden frames, so the host drives them.
+const RAF_SHIM = '<script>(function(){var w=window,nat=w.requestAnimationFrame&&w.requestAnimationFrame.bind(w),natC=w.cancelAnimationFrame&&w.cancelAnimationFrame.bind(w);if(!nat||w.__pxPump)return;var q=new Map(),n=0,h=0,since=0,driven=false;function run(t){h=0;since=0;var list=Array.from(q.values());q.clear();for(var i=0;i<list.length;i++){try{list[i](t)}catch(e){(function(e){setTimeout(function(){throw e})})(e)}}}w.requestAnimationFrame=function(cb){var id=++n;q.set(id,cb);if(!since)since=performance.now();if(!h&&!driven)h=nat(run);return id};w.cancelAnimationFrame=function(id){q.delete(id)};w.__pxPump=function(){if(!q.size)return;var now=performance.now();if(!driven&&now-since<120)return;driven=true;if(h){natC(h);h=0}run(now)}})();<\/script>';
+const withShim = h => { const m = /<head[^>]*>/i.exec(h); return m ? h.slice(0, m.index + m[0].length) + RAF_SHIM + h.slice(m.index + m[0].length) : RAF_SHIM + h; };
+const frame = $('game'), gameHTML = withShim(await gunzip(PACK.game));
+const api = await new Promise((res, rej) => { const t = setTimeout(() => rej(Error('Machine did not become ready')), 30000); frame.onload = () => { clearTimeout(t); const a = frame.contentWindow.PX_CASINO_ENGINE; a ? res(a) : rej(Error('Game engine API missing')); }; frame.srcdoc = gameHTML; }).catch(e => { fail(e.message); throw e; });
+const OR = frame.contentWindow.RarePepeDirectory;
+await api.activate();
+const screenTex = new THREE.CanvasTexture(api.screen); screenTex.colorSpace = THREE.SRGBColorSpace; screenTex.minFilter = screenTex.magFilter = THREE.LinearFilter; screenTex.generateMipmaps = false;
+screenMesh.material = screenMesh.material.clone(); screenMesh.material.map = screenTex; screenMesh.material.color.setHex(0xffffff); screenMesh.material.needsUpdate = true;
+let lastRev = -1, leverPull = null, lastLeverId = 0;
+
+/* ---- fullscreen hand-over: the page shows the frame full-viewport and calls the browser API with its own gesture ---- */
+let fsOn = false;
+async function enterFs() { if (fsOn) return; fsOn = true; frame.classList.add('fs'); frame.removeAttribute('aria-hidden'); frame.tabIndex = 0; try { if (frame.requestFullscreen) await frame.requestFullscreen({ navigationUI: 'hide' }); } catch (e) { /* CSS full-viewport fallback (iPhone Safari) */ } api.fullscreen(true); frame.focus(); }
+async function exitFs() { if (!fsOn) return; fsOn = false; try { if (document.fullscreenElement) await document.exitFullscreen(); } catch (e) {} api.fullscreen(false); frame.classList.remove('fs'); frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1; }
+api.fullscreenHost(on => on ? enterFs() : exitFs());
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && fsOn) exitFs(); });
+$('fsBtn').onclick = () => enterFs();
+
+/* ---- the game's panels and feature bar, shown on this page the way the casino ports them ---- */
+const portRoot = $('port').attachShadow({ mode: 'open' }), featRoot = $('featPort').attachShadow({ mode: 'open' });
+const portCSS = `<style>${PACK.css}\n:host{all:initial}dialog{position:static;display:block;margin:0;max-height:86vh;overflow:auto}#featureBar{position:static!important;transform:none!important;display:flex!important}</style>`;
+let lastModal = null, lastFeat = null;
+function wirePort(root) { root.addEventListener('click', e => { const el = e.target.closest('[data-px-source]'); if (!el) return; e.preventDefault(); api.click(el.getAttribute('data-px-source')); syncUI(true); }); root.addEventListener('input', e => { const el = e.target.closest('[data-px-source]'); if (el) api.input(el.getAttribute('data-px-source'), el.value, el.checked, 'input'); }); root.addEventListener('change', e => { const el = e.target.closest('[data-px-source]'); if (el) api.input(el.getAttribute('data-px-source'), el.value, el.checked, 'change'); }); }
+wirePort(portRoot); wirePort(featRoot);
+$('port').addEventListener('click', e => { if (e.target === $('port')) { api.closeModal(); syncUI(true); } });
+function syncUI(force) { const u = api.ui(); paintBal(); $('spinBtn').textContent = u.button; $('spinBtn').disabled = u.spinDisabled && !u.scene;
+  if (fsOn) { $('port').classList.remove('on'); return; }
+  if (force || u.modal !== lastModal) { lastModal = u.modal; $('port').classList.toggle('on', !!u.modal); portRoot.innerHTML = u.modal ? portCSS + u.modal : ''; }
+  if (force || u.feature !== lastFeat) { lastFeat = u.feature; featRoot.innerHTML = u.feature ? portCSS + u.feature : ''; } }
+setInterval(syncUI, 150);
+
+/* ---- controls: deck buttons, the lever, the screen, keys ---- */
+const act = a => { api.action(a); syncUI(true); };
+document.querySelectorAll('#deck [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let drag = null, moved = false;
+renderer.domElement.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; moved = false; renderer.domElement.setPointerCapture(e.pointerId); });
+renderer.domElement.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) moved = true; if (moved && view === 'cabinet') { goal.yaw -= dx * .006; goal.pitch = Math.max(-.1, Math.min(.6, goal.pitch + dy * .004)); } drag = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', e => { const wasDrag = moved; drag = null; if (wasDrag) return; const r = renderer.domElement.getBoundingClientRect(); ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(ptr, camera);
+  const hit = ray.intersectObject(model, true).find(h => h.object.visible); if (!hit) return; if (hit.object === screenMesh && hit.uv) { api.tap(hit.uv.x * 1400, (1 - hit.uv.y) * 960); syncUI(true); return; }
+  let o = hit.object; while (o && !o.userData.pxMachineAction) o = o.parent; if (o) act(o.userData.pxMachineAction); });
+renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); goal.dist = Math.max(2.2, Math.min(9, goal.dist + e.deltaY * .004)); }, { passive: false });
+addEventListener('keydown', e => { if (e.repeat || e.target.matches('input,textarea,select') || fsOn) return; const k = e.key.toLowerCase();
+  if (e.code === 'Space') { e.preventDefault(); act('spin'); } else if (/^[1-9]$/.test(e.key)) { api.key('Digit' + e.key, e.key); syncUI(true); } else if (k === 'f') enterFs(); else if (k === 's') act('skip'); else if (k === 'l' || k === 'r' || k === 'k') { api.key('Key' + e.key.toUpperCase(), k); syncUI(true); } else if (k === 'escape') { api.closeModal(); syncUI(true); } });
+
+/* ---- views: cabinet (drag to orbit) and the zoomed screen ---- */
+let view = 'cabinet'; const goal = { yaw: .25, pitch: .12, dist: 6.2, ty: 1.45 }, cur = { ...goal };
+const screenPos = new THREE.Vector3(); screenMesh.getWorldPosition(screenPos);
+function setView(vw) { view = vw; $('vCab').setAttribute('aria-pressed', String(vw === 'cabinet')); $('vScr').setAttribute('aria-pressed', String(vw === 'screen')); if (vw === 'screen') Object.assign(goal, { yaw: 0, pitch: 0, dist: fitScreenDist(), ty: screenPos.y }); else Object.assign(goal, { yaw: .25, pitch: .12, dist: camera.aspect < .8 ? 8.4 : 6.2, ty: 1.45 }); }
+const fitScreenDist = () => { const w = .8 * 1.08, h = .55 * 1.15; const vf = 2 * Math.tan(camera.fov * Math.PI / 360); return Math.max(h / vf, w / (vf * camera.aspect)) + .25; };
+$('vCab').onclick = () => setView('cabinet'); $('vScr').onclick = () => setView('screen');
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); setView(view); }
+addEventListener('resize', resize); resize();
+
+/* ---- test panel: everything goes through the game's own test hooks ---- */
+$('testBtn').onclick = () => { const p = $('testPanel'); p.hidden = !p.hidden; $('testBtn').setAttribute('aria-expanded', String(!p.hidden)); };
+document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { if (!OR.test.play(b.dataset.t)) { const s = OR.test.scene(); alert(s ? `Finish the ${s.kind} scene first.` : 'Finish the current spin or bonus first.'); } syncUI(true); });
+document.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { OR.test.twins(b.dataset.w); document.querySelectorAll('[data-w]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
+$('labBtn').onclick = $('tLab').onclick = () => { $('testPanel').hidden = true; api.key('KeyL', 'l'); syncUI(true); };
+document.querySelectorAll('[data-h]').forEach(b => b.onclick = () => { OR.test.linkedHolders(b.dataset.h); document.querySelectorAll('[data-h]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
+$('tReduced').onclick = () => $('tReduced').setAttribute('aria-pressed', String(OR.test.setReduced($('tReduced').getAttribute('aria-pressed') !== 'true')));
+$('tTurbo').onclick = () => $('tTurbo').setAttribute('aria-pressed', String(OR.test.setTurbo($('tTurbo').getAttribute('aria-pressed') !== 'true')));
+document.querySelectorAll('[data-sim]').forEach(b => b.onclick = async () => { const out = $('simOut'); out.textContent = 'Running…'; try { const r = await OR.test.simulate(Number(b.dataset.sim), 20261101, p => { out.textContent = `Running… ${Math.round(p * 100)}%`; }); out.textContent = `${fmt(r.spins)} spins, seed ${r.seed}: RTP ${r.rtp.toFixed(2)}% · PEPECASH Rain 1 in ${r.freeEvery.toFixed(0)} · Pack 1 in ${r.pickEvery.toFixed(0)} · Directory 1 in ${r.holdEvery.toFixed(0)} · ${r.jackpots} jackpots. Exact: 94.380%.`; } catch (e) { out.textContent = e.message; } });
+$('resetBal').onclick = () => { const k = 'xtrata.parallax.test.rare-pepe-directory.layr.v1'; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } catch (e) {} api.refreshAccount(); paintBal(); };
+$('resetMachine').onclick = () => { if (!confirm('Reset the test machine (jackpot meters, Holder Pot, history) and reload?')) return; const k = 'xtrata.parallax.test.rare-pepe-directory.layr.v1'; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); delete (r.layrGames || {})['rare-pepe-directory']; r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } catch (e) {} api.deactivate(); location.reload(); };
+window.RPDTest = { api, OR, frame, setView, enterFs, exitFs, model, camera, renderer };
+
+/* ---- loop: the screen texture, the turning coin, the lever and spin button, the floor glow; idle capped near 30 fps ---- */
+let last = 0; const t0 = performance.now();
+function loop(now) { requestAnimationFrame(loop); try { frame.contentWindow.__pxPump && frame.contentWindow.__pxPump(); } catch (e) {} if (now - last < 32) return; last = now; if (fsOn) return; // the game covers the page in fullscreen: no need to draw the studio
+  const t = (now - t0) / 1000, m = api.mechanics();
+  const rev = api.revision(); if (rev !== lastRev) { lastRev = rev; screenTex.needsUpdate = true; }
+  const show = m.show, hot = show && show.stage !== 'outro';
+  crest.rotation.y = crestBase + t * (hot ? 1.6 : .4);
+  if (m.lever && m.lever.id !== lastLeverId) { lastLeverId = m.lever.id; leverPull = { start: now - m.lever.elapsed, d: m.lever.duration, a: m.lever.angle }; }
+  if (leverPull) { const u = (now - leverPull.start) / leverPull.d; leverO.rotation.x = leverBase + (u < 1 ? Math.sin(u * Math.PI) * leverPull.a : 0); if (u >= 1) leverPull = null; }
+  if (m.spinZ != null) spinO.position.z = m.spinZ;
+  glow.material.opacity = hot ? .55 + .35 * Math.abs(Math.sin(now / (show.kind === 'jackpot' ? 120 : 260))) : .55; rim.intensity = hot ? 14 : 8;
+  const k = .12; cur.yaw += (goal.yaw - cur.yaw) * k; cur.pitch += (goal.pitch - cur.pitch) * k; cur.dist += (goal.dist - cur.dist) * k; cur.ty += (goal.ty - cur.ty) * k;
+  const cx = screenPos.x * (view === 'screen' ? 1 : 0), cz = view === 'screen' ? screenPos.z : 0, cp = Math.cos(cur.pitch);
+  camera.position.set(cx + Math.sin(cur.yaw) * cur.dist * cp, cur.ty + Math.sin(cur.pitch) * cur.dist, cz + Math.cos(cur.yaw) * cur.dist * cp); camera.lookAt(cx, cur.ty, cz);
+  renderer.render(scene, camera); }
+requestAnimationFrame(loop);
+})().catch(e => { console.error(e); const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = 'The test page could not start: ' + e.message; });
+</script>
+</body>
+</html>

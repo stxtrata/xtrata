@@ -1,0 +1,402 @@
+{
+ "generated": "2026-11-01",
+ "note": "What is real and what is a stand-in in this build. Real: every asset name, series and card number on the Rare Pepe and Fake Rare cards (taken from the public Counterparty asset lists in art/data and checked against 31 external Series/Card anchors, below), the 14 Bitcoin Pepes images (the on-chain twins), the helper contract for live Bitcoin Pepes, and the card pictures and the PEPECASH and Rare Pepe Wallet logos in art/cards and art/logos (collected from public pages by the project; every one is listed in art/cards-sources.csv with its source and a permission status of unconfirmed). Stand-ins: cards without a picture, and the Ordinal Pepe GIF, show the real asset name or project name set in type on a card face; nothing is drawn or imitated.",
+ "core": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+ "collections": {
+  "rare-pepe-directory": {
+   "what": "Rare Pepe Directory: Counterparty assets in 36 series, 50 cards a series (Series 36 holds the last 24)",
+   "cards": 1774,
+   "order": "directory order; series = floor(index/50)+1, card = index%50+1",
+   "listSource": "art/data/rare-pepe-assets.txt (compare-v3, jonacarbi, commit 42cf03ad6d3b2dd7edbdf2ea9c028126de0cf71c)",
+   "pictures": "225 bundled in art/cards (provenance in art/cards-sources.csv, permission unconfirmed)"
+  },
+  "fake-rares": {
+   "what": "Fake Rares: Counterparty assets",
+   "cards": 869,
+   "listSource": "art/data/fake-rares-assets.txt (same repo and commit); names filtered to A–Z only, 3 to 13 letters",
+   "pictures": "57 bundled in art/cards"
+  },
+  "bitcoin-pepes": {
+   "helperContract": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
+   "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json",
+   "inscribedCountAtBuild": 2089,
+   "note": "bundled 14; more load live once a player connects (Hiro events, 6-hour cache)"
+  },
+  "ordinal-pepe": {
+   "status": "Xtrata helper contract not deployed yet: shown greyed with NOT YET FOREVER until it is live. All 100 share one GIF (not bundled)."
+  },
+  "pepecash": {
+   "status": "PEPECASH icon bundled (art/logos/pepecash.png, 48 px, from RarePepeWallet.wtf; permission unconfirmed)"
+  },
+  "rare-pepe-wallet": {
+   "status": "Rare Pepe Wallet logo bundled (art/logos/wallet.png, 200 px; permission unconfirmed)"
+  }
+ },
+ "twins": [
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 1889,
+   "xtrataId": "2576",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2576",
+   "file": "art/img/bitcoin-pepes_1889.png",
+   "sha256": "7bdbc2a99635dda7165de210dd174c4b611188ebe23bee52335d12b626d017fd",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 1897,
+   "xtrataId": "2584",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2584",
+   "file": "art/img/bitcoin-pepes_1897.png",
+   "sha256": "9ea75a2d2bcb29f879341acc76ce55e2c4dccb538bd3b9bab2cd0530fb3edce5",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 1903,
+   "xtrataId": "2590",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2590",
+   "file": "art/img/bitcoin-pepes_1903.png",
+   "sha256": "f1d9bb978775469aa72fbbd59aecd0d7f097646e6758ab5d3b99c59b6069de16",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 1937,
+   "xtrataId": "2619",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2619",
+   "file": "art/img/bitcoin-pepes_1937.png",
+   "sha256": "2c94f42b64925bfe92fae206cfe636661b9ae826e7d30dd52b999abef78bf696",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 1999,
+   "xtrataId": "2653",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2653",
+   "file": "art/img/bitcoin-pepes_1999.png",
+   "sha256": "cc4329a38e944c026146a7105813ed10b1b78783983f890da33e08409563a1a1",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 2013,
+   "xtrataId": "2666",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2666",
+   "file": "art/img/bitcoin-pepes_2013.png",
+   "sha256": "b27a4e435c9f8619e090ca240d8462e9febdafd36209b991d101b1c1106be281",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 2021,
+   "xtrataId": "2673",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2673",
+   "file": "art/img/bitcoin-pepes_2021.png",
+   "sha256": "f86da4b38b787043dd9598618437bb5430ddcf82bd5523a82c39469333b061df",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 2037,
+   "xtrataId": "2688",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2688",
+   "file": "art/img/bitcoin-pepes_2037.png",
+   "sha256": "acea06dcc32828959fa3ad7d4a56f2bfe09f6d71bb9de86d77ba2aee3904cbce",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 2043,
+   "xtrataId": "2694",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2694",
+   "file": "art/img/bitcoin-pepes_2043.png",
+   "sha256": "6320b871cb93fcbacbe06d72556c75ce74e4ba756693ef0b944f09c056143347",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 2050,
+   "xtrataId": "2701",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2701",
+   "file": "art/img/bitcoin-pepes_2050.png",
+   "sha256": "e2ce842475f489ccb7ff8e6dbe68c929a6d5513afe28efff2c88cfd5f09fecc8",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 2057,
+   "xtrataId": "2708",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2708",
+   "file": "art/img/bitcoin-pepes_2057.png",
+   "sha256": "c43ee0443f867710a82a72cce2b9942eb0486e7675ea12b339cb820d36ccddc1",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 2072,
+   "xtrataId": "2723",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2723",
+   "file": "art/img/bitcoin-pepes_2072.png",
+   "sha256": "659219e77b9ecd7dee9cf81815e477626ef6018853cd997652fcb8611542c877",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 2078,
+   "xtrataId": "2729",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2729",
+   "file": "art/img/bitcoin-pepes_2078.png",
+   "sha256": "47a8a30f5e25a2a2689b1ee58d56fab566a64aaa6291aeca0ed23be08b6f7ef7",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  },
+  {
+   "symbol": "artifact",
+   "collection": "bitcoin-pepes",
+   "tokenId": 2084,
+   "xtrataId": "2735",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2735",
+   "file": "art/img/bitcoin-pepes_2084.png",
+   "sha256": "c07de5c2d0276ea452c6d224ab9447b17f1891f04faaf6d12b6a53b39dd64bd1",
+   "format": "PNG",
+   "size": [
+    760,
+    760
+   ],
+   "note": "native 38px pixel art, inscribed at 20x; the Stacks NFT with a permanent Xtrata twin",
+   "forever": true
+  }
+ ],
+ "anchors": {
+  "RAREPEPE": [
+   1,
+   1
+  ],
+  "PEPECASH": [
+   1,
+   11
+  ],
+  "RPEPELIGHTER": [
+   4,
+   38
+  ],
+  "GUARDSPEPE": [
+   5,
+   3
+  ],
+  "RAREPEPENEWS": [
+   6,
+   46
+  ],
+  "PEPEMOON": [
+   7,
+   9
+  ],
+  "PEPETHUGLIFE": [
+   7,
+   17
+  ],
+  "SIXTYSIXPEPE": [
+   7,
+   24
+  ],
+  "MASTROPEPE": [
+   8,
+   37
+  ],
+  "THEPEPE": [
+   9,
+   4
+  ],
+  "PEPEDEX": [
+   9,
+   24
+  ],
+  "PEPEREPUBLIC": [
+   10,
+   1
+  ],
+  "LIKEPEPEBRO": [
+   10,
+   24
+  ],
+  "PEPEMEETUPBK": [
+   11,
+   9
+  ],
+  "CSAT": [
+   11,
+   29
+  ],
+  "MINIONPEPE": [
+   13,
+   12
+  ],
+  "RICHPEPE": [
+   14,
+   11
+  ],
+  "PEPEFREEDOM": [
+   15,
+   5
+  ],
+  "PEPEPAMPERS": [
+   15,
+   9
+  ],
+  "MEDICINEPEPE": [
+   16,
+   34
+  ],
+  "PEPESPIDER": [
+   17,
+   20
+  ],
+  "SPIRITPEPE": [
+   18,
+   15
+  ],
+  "PEPEZENMSTR": [
+   19,
+   37
+  ],
+  "NEUROPEPE": [
+   20,
+   24
+  ],
+  "PEPELETTERA": [
+   26,
+   22
+  ],
+  "SODAPEPENSKI": [
+   27,
+   9
+  ],
+  "PEPEGRAM": [
+   27,
+   17
+  ],
+  "PEPESAILORV": [
+   27,
+   24
+  ],
+  "PEPESINLOVE": [
+   32,
+   8
+  ],
+  "CLUBSPEPE": [
+   32,
+   37
+  ],
+  "CERSEIPEPE": [
+   32,
+   48
+  ]
+ },
+ "anchorCheck": "tools/make-manifest.py asserts that all 31 anchors (a card that external indexes place at a known Series and Card number) match index//50+1 and index%50+1 in the list order",
+ "missing": [
+  {
+   "what": "Pictures for every Rare Pepe and Fake Rare not in art/cards (the machine shows the asset name in type)",
+   "howToAdd": "python3 tools/fetch-art.py on a computer with internet access, or drop art/cards/<ASSETNAME>.png|jpg|webp|gif, then python3 tools/make-art.py and node tools/build.mjs"
+  },
+  {
+   "what": "Ordinal Pepe GIF (shared by all 100)",
+   "why": "no verified project source; the Xtrata helper is not deployed yet"
+  }
+ ],
+ "logos": {
+  "xtrata-mark": "vendor/brand/xtrata-mark.svg, used exactly as supplied",
+  "parallax-wordmark": "vendor/brand/parallax-casino-wordmark.svg, exactly as supplied"
+ }
+}

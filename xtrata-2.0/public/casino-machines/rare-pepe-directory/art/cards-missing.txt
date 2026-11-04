@@ -1,0 +1,5 @@
+ordinal-pepe.gif — Could not establish a project-owned source for the exact animated GIF shared by a 100-item Ordinal Pepe collection. Searches returned distinct projects (including OPEPE token, Inscribed Pepes and Ordinals Pepe) with incompatible supplies. No substitute downloaded.
+
+No requested Rare Pepe card is missing: 225/225. No selected Fake Rare card is missing: 60/60. Wallet and PEPECASH logos are present.
+
+Source access notes: pepe.wtf timed out; www.pepe.wtf, tokenscan.io, xchain.io and xcp.io returned HTTP 403; rarepepedirectory.com returned an HTML challenge; pepecash.com and ordinalpepe.com returned HTTP 503. Used RarePepes.com series pages, the Fake Rare Directory public card API and its linked official GitHub CDN, and RarePepeWallet.wtf instead.
