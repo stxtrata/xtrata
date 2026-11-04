@@ -1,0 +1,484 @@
+{
+ "machine": "Mempool Madness",
+ "snapshotTakenAt": "2026-11-02T10:27:14Z",
+ "api": "https://mempool.space/api",
+ "note": "Every symbol is an original data tile drawn from the figures below. No images, no third-party logos and none of mempool.space's own design or logo are used.",
+ "endpoints": {
+  "tipHeight": "/blocks/tip/height",
+  "tipHash": "/blocks/tip/hash",
+  "fees": "/v1/fees/recommended",
+  "projectedBlocks": "/v1/fees/mempool-blocks",
+  "mempool": "/mempool (count, vsize, fee_histogram)",
+  "recentBlocks": "/v1/blocks",
+  "blockTxs": "/block/<hash>/txs/<start>",
+  "mempoolTxids": "/mempool/txids",
+  "tx": "/tx/<txid>",
+  "txTimes": "/v1/transaction-times",
+  "recent": "/mempool/recent"
+ },
+ "definitions": {
+  "whale": "sum of output values >= 100 BTC (coinbase excluded); found by scanning 3,727 transactions of the 10 newest blocks (heights 974242 and 974241 produced all 24 hits; 20 are bundled)",
+  "stuck": "unconfirmed at snapshot time, drawn at random from /mempool/txids, fee rate <= 1 sat/vB, with its first-seen time from /v1/transaction-times",
+  "pending": "unconfirmed at snapshot time; the stuck set plus the ten newest from /mempool/recent (their fee rates computed as fee / vsize)",
+  "feeBands": "queued vsize at or above each rate, from /mempool fee_histogram"
+ },
+ "counts": {
+  "whales": 20,
+  "stuck": 24,
+  "pending": 34,
+  "recentBlocks": 15,
+  "projectedBlocks": 6
+ },
+ "txids": {
+  "whales": [
+   {
+    "txid": "d49bad734f18ea7e9835e102ea0240d6924c35fcd71776eeb28f4458398b92c5",
+    "btc": 122.76058847,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/d49bad734f18ea7e9835e102ea0240d6924c35fcd71776eeb28f4458398b92c5"
+   },
+   {
+    "txid": "d23da13d9ed742910fedb986030342a70df593e39f540d45e22a907c2fe41944",
+    "btc": 153.29323636,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/d23da13d9ed742910fedb986030342a70df593e39f540d45e22a907c2fe41944"
+   },
+   {
+    "txid": "5169aca544bb15cfb2580e7801dfdbd3ec8d6655729dccf97891f4ec51ef54a7",
+    "btc": 139.48022797,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/5169aca544bb15cfb2580e7801dfdbd3ec8d6655729dccf97891f4ec51ef54a7"
+   },
+   {
+    "txid": "18f488beda675079ac3403e51537f32d6e70acffdd2350f227316c313dfea410",
+    "btc": 213.98690829,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/18f488beda675079ac3403e51537f32d6e70acffdd2350f227316c313dfea410"
+   },
+   {
+    "txid": "560bc98ccc6ab78912f854690800f8dfd6dba9ddb22a7af8a0a1366876132229",
+    "btc": 100.99999831,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/560bc98ccc6ab78912f854690800f8dfd6dba9ddb22a7af8a0a1366876132229"
+   },
+   {
+    "txid": "e2a7410f37ab2c1414bacff1e703dabb5e53a006a0ee8fd0b9880993ceb66639",
+    "btc": 498.99999831,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/e2a7410f37ab2c1414bacff1e703dabb5e53a006a0ee8fd0b9880993ceb66639"
+   },
+   {
+    "txid": "c51f0a2e536ca0805c6b7d028320a07d9868a60fc80068618deec447a73f6ca8",
+    "btc": 110.91245632,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/c51f0a2e536ca0805c6b7d028320a07d9868a60fc80068618deec447a73f6ca8"
+   },
+   {
+    "txid": "e3487d8e47a6fd9aac93f7f58042d7870c5bcbb54dc07d1e58e5cef94f07bf2c",
+    "btc": 178.09580725,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/e3487d8e47a6fd9aac93f7f58042d7870c5bcbb54dc07d1e58e5cef94f07bf2c"
+   },
+   {
+    "txid": "c060a5df07e672e1b9d19211daa6e0ed7ff35bf235fcaf5a45a44456762b823c",
+    "btc": 812.73666025,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/c060a5df07e672e1b9d19211daa6e0ed7ff35bf235fcaf5a45a44456762b823c"
+   },
+   {
+    "txid": "b2c98244476262d35fe62fb17387713aac86c4e40335d6019b2a717f0079933b",
+    "btc": 227.12351526,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/b2c98244476262d35fe62fb17387713aac86c4e40335d6019b2a717f0079933b"
+   },
+   {
+    "txid": "09ecdaaebdaf35f61c69b766c554da6132a4ea29b1cc948eb9f004fdd0138580",
+    "btc": 227.64387378,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/09ecdaaebdaf35f61c69b766c554da6132a4ea29b1cc948eb9f004fdd0138580"
+   },
+   {
+    "txid": "d24cf6bab9f7507976483ea94d16d3ea938e6b98e8ef129271cc5f90bd31f2ac",
+    "btc": 114.61349107,
+    "block": 974242,
+    "url": "https://mempool.space/api/tx/d24cf6bab9f7507976483ea94d16d3ea938e6b98e8ef129271cc5f90bd31f2ac"
+   },
+   {
+    "txid": "9493c06b38d71588284f070d918c1739f8e5dcafc9c3cf928d00cd21c7ebd16e",
+    "btc": 281.99818,
+    "block": 974241,
+    "url": "https://mempool.space/api/tx/9493c06b38d71588284f070d918c1739f8e5dcafc9c3cf928d00cd21c7ebd16e"
+   },
+   {
+    "txid": "6fb0227469e14e4ab3291ace139339ed3493739488041b5627aa856fafff3788",
+    "btc": 1153.27606385,
+    "block": 974241,
+    "url": "https://mempool.space/api/tx/6fb0227469e14e4ab3291ace139339ed3493739488041b5627aa856fafff3788"
+   },
+   {
+    "txid": "baf4892bd3c2f4d058cea467611d137899ae8d248d14274aa9a38704f7283c84",
+    "btc": 113.19452006,
+    "block": 974241,
+    "url": "https://mempool.space/api/tx/baf4892bd3c2f4d058cea467611d137899ae8d248d14274aa9a38704f7283c84"
+   },
+   {
+    "txid": "0bc9b6bdd8b4efaaf3ea6a659c4a53afedbfd6c1e4b8a83d5e303bfc9ae91f4f",
+    "btc": 113.19395156,
+    "block": 974241,
+    "url": "https://mempool.space/api/tx/0bc9b6bdd8b4efaaf3ea6a659c4a53afedbfd6c1e4b8a83d5e303bfc9ae91f4f"
+   },
+   {
+    "txid": "88d4c383234bde5ed4d4a41a23596c5379e3bc92075cef26daaf991b1b158d7c",
+    "btc": 114.62425613,
+    "block": 974241,
+    "url": "https://mempool.space/api/tx/88d4c383234bde5ed4d4a41a23596c5379e3bc92075cef26daaf991b1b158d7c"
+   },
+   {
+    "txid": "27dfd18beb5411c1c66fa10b5dbc5b3431eb997e79dd465be39b3cb479c9414d",
+    "btc": 129.79287732,
+    "block": 974241,
+    "url": "https://mempool.space/api/tx/27dfd18beb5411c1c66fa10b5dbc5b3431eb997e79dd465be39b3cb479c9414d"
+   },
+   {
+    "txid": "e1e6fc40191e712a9a0f1408ad9d7bfe1cb33f07839dfca01e55657271a4aa72",
+    "btc": 504.38721968,
+    "block": 974241,
+    "url": "https://mempool.space/api/tx/e1e6fc40191e712a9a0f1408ad9d7bfe1cb33f07839dfca01e55657271a4aa72"
+   },
+   {
+    "txid": "fba6c975ff406e8879d05aea0011feeb2e2203d3c8d7b4fbda42772579d667cb",
+    "btc": 227.12623332,
+    "block": 974241,
+    "url": "https://mempool.space/api/tx/fba6c975ff406e8879d05aea0011feeb2e2203d3c8d7b4fbda42772579d667cb"
+   }
+  ],
+  "stuck": [
+   {
+    "txid": "e6d40a3627f7ee49d303e189a692fc97dfdd90f821180250353712ce1af62e48",
+    "feeRate": 0.1,
+    "firstSeen": 1778448928,
+    "url": "https://mempool.space/api/tx/e6d40a3627f7ee49d303e189a692fc97dfdd90f821180250353712ce1af62e48"
+   },
+   {
+    "txid": "22e423cbc7b55675a031e3c38e567bdf05aa342459db6f8ed07ae6fea3734e01",
+    "feeRate": 0.1,
+    "firstSeen": 1778448886,
+    "url": "https://mempool.space/api/tx/22e423cbc7b55675a031e3c38e567bdf05aa342459db6f8ed07ae6fea3734e01"
+   },
+   {
+    "txid": "57f4b9e349466872447be0beddaf05daf46351f421912493a18de83999712391",
+    "feeRate": 0.1,
+    "firstSeen": 1778448946,
+    "url": "https://mempool.space/api/tx/57f4b9e349466872447be0beddaf05daf46351f421912493a18de83999712391"
+   },
+   {
+    "txid": "752d1d828edea572c744d732606cca480a323ce393d660262fb67a9838457163",
+    "feeRate": 0.12,
+    "firstSeen": 1793588699,
+    "url": "https://mempool.space/api/tx/752d1d828edea572c744d732606cca480a323ce393d660262fb67a9838457163"
+   },
+   {
+    "txid": "16cd1806c29dd6a0fb5d68e92976d753789e0142090a1e02988baedab13b4fdc",
+    "feeRate": 0.1,
+    "firstSeen": 1775809498,
+    "url": "https://mempool.space/api/tx/16cd1806c29dd6a0fb5d68e92976d753789e0142090a1e02988baedab13b4fdc"
+   },
+   {
+    "txid": "c452dcb54c338e8c49b2e62b37faacc8a3a0f2b59e4870a023cc33877dde65b2",
+    "feeRate": 0.1,
+    "firstSeen": 1778449036,
+    "url": "https://mempool.space/api/tx/c452dcb54c338e8c49b2e62b37faacc8a3a0f2b59e4870a023cc33877dde65b2"
+   },
+   {
+    "txid": "952579ec0caa8fcf9541b955af2c93488096001f4fe10b39428d2ac6165f71f0",
+    "feeRate": 0.1,
+    "firstSeen": 1778449135,
+    "url": "https://mempool.space/api/tx/952579ec0caa8fcf9541b955af2c93488096001f4fe10b39428d2ac6165f71f0"
+   },
+   {
+    "txid": "4d6af62ba95460ee06b89b7724d622b7f480df19ad38314e01603a2ae39ebfa2",
+    "feeRate": 0.1,
+    "firstSeen": 1778449056,
+    "url": "https://mempool.space/api/tx/4d6af62ba95460ee06b89b7724d622b7f480df19ad38314e01603a2ae39ebfa2"
+   },
+   {
+    "txid": "0ffe2dc1dda3d95bdac19326aca8b54d1ec031935327c587187a94b3f3d24503",
+    "feeRate": 0.12,
+    "firstSeen": 1793549922,
+    "url": "https://mempool.space/api/tx/0ffe2dc1dda3d95bdac19326aca8b54d1ec031935327c587187a94b3f3d24503"
+   },
+   {
+    "txid": "48093bff43eb37defaf4f7103f76c396fe89214c4be96f2a03fd504037a4b3db",
+    "feeRate": 0.1,
+    "firstSeen": 1775809390,
+    "url": "https://mempool.space/api/tx/48093bff43eb37defaf4f7103f76c396fe89214c4be96f2a03fd504037a4b3db"
+   },
+   {
+    "txid": "5f25761610e1b52ec9655adcd1785e06e9869ad66a1533c18b273ff5ca210060",
+    "feeRate": 0.1,
+    "firstSeen": 1775815860,
+    "url": "https://mempool.space/api/tx/5f25761610e1b52ec9655adcd1785e06e9869ad66a1533c18b273ff5ca210060"
+   },
+   {
+    "txid": "1b00c0a8a2df4ee07d131742dd62e27f61801b7682515af45cbf187ad65d6717",
+    "feeRate": 0.1,
+    "firstSeen": 1775810577,
+    "url": "https://mempool.space/api/tx/1b00c0a8a2df4ee07d131742dd62e27f61801b7682515af45cbf187ad65d6717"
+   },
+   {
+    "txid": "7e0fe8cd4b283a9220c508e28980fc36d4db0c3eddd8cdb622a8ac3fc8d282e5",
+    "feeRate": 0.14,
+    "firstSeen": 1793612525,
+    "url": "https://mempool.space/api/tx/7e0fe8cd4b283a9220c508e28980fc36d4db0c3eddd8cdb622a8ac3fc8d282e5"
+   },
+   {
+    "txid": "2bc33363dd552c923eaf72100cf7855c34496231ae6763d5a5161f73fbcaf4c7",
+    "feeRate": 0.1,
+    "firstSeen": 1778448841,
+    "url": "https://mempool.space/api/tx/2bc33363dd552c923eaf72100cf7855c34496231ae6763d5a5161f73fbcaf4c7"
+   },
+   {
+    "txid": "b2c7e0e713e6e29724e5bfccf564f902151476853205b70eaa9a4902600f3227",
+    "feeRate": 0.12,
+    "firstSeen": 1793573261,
+    "url": "https://mempool.space/api/tx/b2c7e0e713e6e29724e5bfccf564f902151476853205b70eaa9a4902600f3227"
+   },
+   {
+    "txid": "61b1c4f8a1542a8771408e70414812fb9cbd06f71726283531768f0a3cf47444",
+    "feeRate": 0.1,
+    "firstSeen": 1778449056,
+    "url": "https://mempool.space/api/tx/61b1c4f8a1542a8771408e70414812fb9cbd06f71726283531768f0a3cf47444"
+   },
+   {
+    "txid": "1bf4d007739d5bd6b7c54890f0f2cce9085f9985032a2cd2558f9b67a8ae2022",
+    "feeRate": 0.12,
+    "firstSeen": 1793573243,
+    "url": "https://mempool.space/api/tx/1bf4d007739d5bd6b7c54890f0f2cce9085f9985032a2cd2558f9b67a8ae2022"
+   },
+   {
+    "txid": "29fd138eaf11d4509117ba5a5daabe292f4228c46ffa33b577fb5a04a39a1fe9",
+    "feeRate": 0.1,
+    "firstSeen": 1778448890,
+    "url": "https://mempool.space/api/tx/29fd138eaf11d4509117ba5a5daabe292f4228c46ffa33b577fb5a04a39a1fe9"
+   },
+   {
+    "txid": "a9e66d7e8db9c0695f24c0c687f549836a2551e7f1678ffcd6ff52504362e1f0",
+    "feeRate": 0.12,
+    "firstSeen": 1793517453,
+    "url": "https://mempool.space/api/tx/a9e66d7e8db9c0695f24c0c687f549836a2551e7f1678ffcd6ff52504362e1f0"
+   },
+   {
+    "txid": "a1a1a27fbf4e7b257fff0f5ead31c0a40cd9c7b36f476e65aeef11c8fcccd288",
+    "feeRate": 0.1,
+    "firstSeen": 1778448946,
+    "url": "https://mempool.space/api/tx/a1a1a27fbf4e7b257fff0f5ead31c0a40cd9c7b36f476e65aeef11c8fcccd288"
+   },
+   {
+    "txid": "4d30f9b08c1781c5b3faae54b7edbc0aedf0e941fa4fce8d38912e0a7c77043e",
+    "feeRate": 0.12,
+    "firstSeen": 1793517475,
+    "url": "https://mempool.space/api/tx/4d30f9b08c1781c5b3faae54b7edbc0aedf0e941fa4fce8d38912e0a7c77043e"
+   },
+   {
+    "txid": "436865a8aeb3039d7b60801a09828e15208cd2ab162505636955c83a91411207",
+    "feeRate": 0.12,
+    "firstSeen": 1793517487,
+    "url": "https://mempool.space/api/tx/436865a8aeb3039d7b60801a09828e15208cd2ab162505636955c83a91411207"
+   },
+   {
+    "txid": "ae96c14c02b8c1b16d886163bb3d1170e82299ff52c7510a35ded54c8f555d7c",
+    "feeRate": 0.12,
+    "firstSeen": 1793517479,
+    "url": "https://mempool.space/api/tx/ae96c14c02b8c1b16d886163bb3d1170e82299ff52c7510a35ded54c8f555d7c"
+   },
+   {
+    "txid": "9710ea68efa180eb334b7d590a398dd53d4f0358b9421733e81d9656c24ae144",
+    "feeRate": 0.12,
+    "firstSeen": 1793588680,
+    "url": "https://mempool.space/api/tx/9710ea68efa180eb334b7d590a398dd53d4f0358b9421733e81d9656c24ae144"
+   }
+  ],
+  "pending": [
+   {
+    "txid": "e6d40a3627f7ee49d303e189a692fc97dfdd90f821180250353712ce1af62e48",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/e6d40a3627f7ee49d303e189a692fc97dfdd90f821180250353712ce1af62e48"
+   },
+   {
+    "txid": "22e423cbc7b55675a031e3c38e567bdf05aa342459db6f8ed07ae6fea3734e01",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/22e423cbc7b55675a031e3c38e567bdf05aa342459db6f8ed07ae6fea3734e01"
+   },
+   {
+    "txid": "57f4b9e349466872447be0beddaf05daf46351f421912493a18de83999712391",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/57f4b9e349466872447be0beddaf05daf46351f421912493a18de83999712391"
+   },
+   {
+    "txid": "752d1d828edea572c744d732606cca480a323ce393d660262fb67a9838457163",
+    "feeRate": 0.12,
+    "url": "https://mempool.space/api/tx/752d1d828edea572c744d732606cca480a323ce393d660262fb67a9838457163"
+   },
+   {
+    "txid": "16cd1806c29dd6a0fb5d68e92976d753789e0142090a1e02988baedab13b4fdc",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/16cd1806c29dd6a0fb5d68e92976d753789e0142090a1e02988baedab13b4fdc"
+   },
+   {
+    "txid": "c452dcb54c338e8c49b2e62b37faacc8a3a0f2b59e4870a023cc33877dde65b2",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/c452dcb54c338e8c49b2e62b37faacc8a3a0f2b59e4870a023cc33877dde65b2"
+   },
+   {
+    "txid": "952579ec0caa8fcf9541b955af2c93488096001f4fe10b39428d2ac6165f71f0",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/952579ec0caa8fcf9541b955af2c93488096001f4fe10b39428d2ac6165f71f0"
+   },
+   {
+    "txid": "4d6af62ba95460ee06b89b7724d622b7f480df19ad38314e01603a2ae39ebfa2",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/4d6af62ba95460ee06b89b7724d622b7f480df19ad38314e01603a2ae39ebfa2"
+   },
+   {
+    "txid": "0ffe2dc1dda3d95bdac19326aca8b54d1ec031935327c587187a94b3f3d24503",
+    "feeRate": 0.12,
+    "url": "https://mempool.space/api/tx/0ffe2dc1dda3d95bdac19326aca8b54d1ec031935327c587187a94b3f3d24503"
+   },
+   {
+    "txid": "48093bff43eb37defaf4f7103f76c396fe89214c4be96f2a03fd504037a4b3db",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/48093bff43eb37defaf4f7103f76c396fe89214c4be96f2a03fd504037a4b3db"
+   },
+   {
+    "txid": "5f25761610e1b52ec9655adcd1785e06e9869ad66a1533c18b273ff5ca210060",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/5f25761610e1b52ec9655adcd1785e06e9869ad66a1533c18b273ff5ca210060"
+   },
+   {
+    "txid": "1b00c0a8a2df4ee07d131742dd62e27f61801b7682515af45cbf187ad65d6717",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/1b00c0a8a2df4ee07d131742dd62e27f61801b7682515af45cbf187ad65d6717"
+   },
+   {
+    "txid": "7e0fe8cd4b283a9220c508e28980fc36d4db0c3eddd8cdb622a8ac3fc8d282e5",
+    "feeRate": 0.14,
+    "url": "https://mempool.space/api/tx/7e0fe8cd4b283a9220c508e28980fc36d4db0c3eddd8cdb622a8ac3fc8d282e5"
+   },
+   {
+    "txid": "2bc33363dd552c923eaf72100cf7855c34496231ae6763d5a5161f73fbcaf4c7",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/2bc33363dd552c923eaf72100cf7855c34496231ae6763d5a5161f73fbcaf4c7"
+   },
+   {
+    "txid": "b2c7e0e713e6e29724e5bfccf564f902151476853205b70eaa9a4902600f3227",
+    "feeRate": 0.12,
+    "url": "https://mempool.space/api/tx/b2c7e0e713e6e29724e5bfccf564f902151476853205b70eaa9a4902600f3227"
+   },
+   {
+    "txid": "61b1c4f8a1542a8771408e70414812fb9cbd06f71726283531768f0a3cf47444",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/61b1c4f8a1542a8771408e70414812fb9cbd06f71726283531768f0a3cf47444"
+   },
+   {
+    "txid": "1bf4d007739d5bd6b7c54890f0f2cce9085f9985032a2cd2558f9b67a8ae2022",
+    "feeRate": 0.12,
+    "url": "https://mempool.space/api/tx/1bf4d007739d5bd6b7c54890f0f2cce9085f9985032a2cd2558f9b67a8ae2022"
+   },
+   {
+    "txid": "29fd138eaf11d4509117ba5a5daabe292f4228c46ffa33b577fb5a04a39a1fe9",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/29fd138eaf11d4509117ba5a5daabe292f4228c46ffa33b577fb5a04a39a1fe9"
+   },
+   {
+    "txid": "a9e66d7e8db9c0695f24c0c687f549836a2551e7f1678ffcd6ff52504362e1f0",
+    "feeRate": 0.12,
+    "url": "https://mempool.space/api/tx/a9e66d7e8db9c0695f24c0c687f549836a2551e7f1678ffcd6ff52504362e1f0"
+   },
+   {
+    "txid": "a1a1a27fbf4e7b257fff0f5ead31c0a40cd9c7b36f476e65aeef11c8fcccd288",
+    "feeRate": 0.1,
+    "url": "https://mempool.space/api/tx/a1a1a27fbf4e7b257fff0f5ead31c0a40cd9c7b36f476e65aeef11c8fcccd288"
+   },
+   {
+    "txid": "4d30f9b08c1781c5b3faae54b7edbc0aedf0e941fa4fce8d38912e0a7c77043e",
+    "feeRate": 0.12,
+    "url": "https://mempool.space/api/tx/4d30f9b08c1781c5b3faae54b7edbc0aedf0e941fa4fce8d38912e0a7c77043e"
+   },
+   {
+    "txid": "436865a8aeb3039d7b60801a09828e15208cd2ab162505636955c83a91411207",
+    "feeRate": 0.12,
+    "url": "https://mempool.space/api/tx/436865a8aeb3039d7b60801a09828e15208cd2ab162505636955c83a91411207"
+   },
+   {
+    "txid": "ae96c14c02b8c1b16d886163bb3d1170e82299ff52c7510a35ded54c8f555d7c",
+    "feeRate": 0.12,
+    "url": "https://mempool.space/api/tx/ae96c14c02b8c1b16d886163bb3d1170e82299ff52c7510a35ded54c8f555d7c"
+   },
+   {
+    "txid": "9710ea68efa180eb334b7d590a398dd53d4f0358b9421733e81d9656c24ae144",
+    "feeRate": 0.12,
+    "url": "https://mempool.space/api/tx/9710ea68efa180eb334b7d590a398dd53d4f0358b9421733e81d9656c24ae144"
+   },
+   {
+    "txid": "63504910b8b0a14ec1c3b8ea975fefdbbb77dfad583f0b71c4639d01df5dd653",
+    "feeRate": 5.03,
+    "url": "https://mempool.space/api/tx/63504910b8b0a14ec1c3b8ea975fefdbbb77dfad583f0b71c4639d01df5dd653"
+   },
+   {
+    "txid": "336fb9d181690e5ab9bf2aded78e33535435a8ae6666838106caa27984a436cf",
+    "feeRate": 1,
+    "url": "https://mempool.space/api/tx/336fb9d181690e5ab9bf2aded78e33535435a8ae6666838106caa27984a436cf"
+   },
+   {
+    "txid": "0bb4841512af2df7e1f05286006ee06bb761e5016fd09d6ae0f7106546e36ad2",
+    "feeRate": 3.01,
+    "url": "https://mempool.space/api/tx/0bb4841512af2df7e1f05286006ee06bb761e5016fd09d6ae0f7106546e36ad2"
+   },
+   {
+    "txid": "897b3411b10d6dd554a39bdfd86b4749f7840e2b016de6c754da33f74e3773d6",
+    "feeRate": 1,
+    "url": "https://mempool.space/api/tx/897b3411b10d6dd554a39bdfd86b4749f7840e2b016de6c754da33f74e3773d6"
+   },
+   {
+    "txid": "ae03105c0cf8fdf539899b3642996ac9a13b5ffffdb4537f05f685401977c0e4",
+    "feeRate": 5.01,
+    "url": "https://mempool.space/api/tx/ae03105c0cf8fdf539899b3642996ac9a13b5ffffdb4537f05f685401977c0e4"
+   },
+   {
+    "txid": "314ab99bde3092b60eccf63efe64caa690d9ddb46367137a53f8a8f4476d55d0",
+    "feeRate": 3.01,
+    "url": "https://mempool.space/api/tx/314ab99bde3092b60eccf63efe64caa690d9ddb46367137a53f8a8f4476d55d0"
+   },
+   {
+    "txid": "de2fd98defef22fe7c5ff88d3938081f054ec18369a3defc0c93ac9ae6c3195e",
+    "feeRate": 4.01,
+    "url": "https://mempool.space/api/tx/de2fd98defef22fe7c5ff88d3938081f054ec18369a3defc0c93ac9ae6c3195e"
+   },
+   {
+    "txid": "e5f0039926f1140ef5c18f5b58b9d9acac5aad67105b07366db27332aa42120c",
+    "feeRate": 3.3,
+    "url": "https://mempool.space/api/tx/e5f0039926f1140ef5c18f5b58b9d9acac5aad67105b07366db27332aa42120c"
+   },
+   {
+    "txid": "0be46ab419297c2c6d7ac3b0a2f9a71658cb4785c8a0945d4e91dc2839dc95d1",
+    "feeRate": 3.25,
+    "url": "https://mempool.space/api/tx/0be46ab419297c2c6d7ac3b0a2f9a71658cb4785c8a0945d4e91dc2839dc95d1"
+   },
+   {
+    "txid": "ea64400c49a8d05002a948507d4de0c45c6cdd9bc03244c32ea0f2178c426691",
+    "feeRate": 3.44,
+    "url": "https://mempool.space/api/tx/ea64400c49a8d05002a948507d4de0c45c6cdd9bc03244c32ea0f2178c426691"
+   }
+  ]
+ },
+ "honestyNotes": [
+  "The fee histogram has no bucket above 10 sat/vB, so the 20 and 50 sat/vB band tiles cannot show a queued figure for those rates; they show the top of the projected next block instead.",
+  "Fee band tiles show queued vsize (virtual bytes at or above the rate), not a transaction count, because the histogram is in vsize.",
+  "At snapshot time the mempool was quiet (recommended fees 1 to 3 sat/vB), so most sampled \"stuck\" transactions sit at 0.1 to 0.14 sat/vB, below the 1 sat/vB default minimum relay rate shown by older nodes. Some had been waiting for months (see firstSeen). They are real, listed as found.",
+  "Whale means the sum of a transaction's outputs is 100 BTC or more; change outputs are included in that sum, so it is a size of movement, not proof that one owner sent that much.",
+  "Live top-up: the game re-reads the API about every 30 seconds and swaps these figures for fresh ones; if a read fails it goes back to this snapshot and shows a SNAPSHOT badge. Results never depend on either."
+ ],
+ "logosNeedingPermission": [],
+ "logosMissing": [],
+ "thirdPartyArt": false
+}
