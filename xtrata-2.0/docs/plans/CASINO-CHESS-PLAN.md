@@ -276,3 +276,12 @@ in the Salon lobby, `roomNow`, six new cases in the social switch, `chess.js?v=c
 
 **Tests:** `scripts/test-casino-chain.cjs` (no browser: lost moves, catch-up, resume, message sizes and rate, the three time-out cases)
 and `scripts/test-casino-betting.mts` (three browsers and a stand-in room).
+
+**Watching a game against a house player (chess.js `c8`, 2026-11-04).** A house game is played in one page, so it used to be invisible to
+the room: a second player at the table saw "Nobody is playing here now". Now the player's page announces it with the same `spec`
+snapshot, with the house player as one side: `d.w` or `d.b` is `house:<profile id>` (lowercase letters, digits, hyphens, up to 24) and
+`d.h` is that profile id; the other side is the sender, `d.on` is the house player's name, there is no `gid`, `st` is 0 and nothing is
+staked. Watchers see the board, moves and result, with "<name> · house player" on the bot's side. There are no bets on these games: the
+room never opens betting without a `gid`, and only one page could report the result, so a rigged game against the easiest bot could be
+farmed. The room needs one rule: a snapshot whose second side is `house:<id>` is accepted from a seated player (see
+`claude/chess-betting-page-done.md`). Test: `scripts/test-casino-house-watch.mts`.

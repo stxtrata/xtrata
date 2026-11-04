@@ -325,6 +325,10 @@ def apply(s):
         s = run(s, BET_PATCHES); done.append('results from the room, the leaving rule, spectator bets')
     if XVIEW_MARK not in s:
         s = run(s, XVIEW_PATCHES); done.append('the X-Chess view')
+    if chess_version(s) == 7:   # c8: a game against a house player can be watched too (chess.js only; the page needs nothing new)
+        if s.count('chess.js?v=c7"') != 1:
+            raise SystemExit('chess.js?v=c7 found %d times (want 1)' % s.count('chess.js?v=c7"'))
+        s = s.replace('chess.js?v=c7"', 'chess.js?v=c8"'); done.append('chess.js?v=c8 (watching house games)')
     return s, done
 
 

@@ -1085,11 +1085,41 @@
       const d = snapshot(); if (!d) return;
       specSent = { key, at: now }; ctx.roomSend({ t: 'spec', tb: def.id, d });
     }
+    // a game against a house player is played in this page alone, but the table can still be watched: the same snapshot, with the
+    // house player as one side ("house:<profile id>", and d.h = the profile id). There is no game id, so the room neither holds
+    // stakes nor opens bets on it, and a house game is always friendly.
+    function houseSnapshot() {
+      const me0 = ctx.roomMe(); if (!H || !me0 || !/^[a-z0-9-]{1,24}$/.test(H.profile)) return null;
+      const prof = houseList().find((x) => x.id === H.profile); if (!prof) return null;
+      const hid = 'house:' + H.profile, m = packMoves(H.uci), white = H.me === 'w';
+      const d = { k: 1, w: white ? me0 : hid, b: white ? hid : me0, h: H.profile, on: String(prof.name).slice(0, 40), f: H.pos.fen(), l: H.uci.length ? H.uci[H.uci.length - 1] : '', st: 0 };
+      if (m.length <= 900) d.m = m;
+      if (H.over && RESULT_RE.test(H.over.result)) { d.r = H.over.result; d.tm = H.over.termination; }
+      return d;
+    }
+    let houseSent = { key: '', at: 0 };
+    function houseSend(force) {
+      if (S || !H || ctx.focus() !== st || !ctx.roomHas('spec')) return;
+      const key = H.profile + '|' + H.uci.length + '|' + (H.over ? H.over.result : ''), now = Date.now();
+      if (!force && key === houseSent.key && now - houseSent.at < SPEC_BEAT) return;
+      if (H.over && key === houseSent.key && !force) return;   // a finished game is announced once (and to anyone who asks)
+      const d = houseSnapshot(); if (!d) return;
+      houseSent = { key, at: now }; ctx.roomSend({ t: 'spec', tb: def.id, d });
+    }
     const onSpec = (m) => {
-      if (m.ask) { if (S && S.chain.host && Date.now() - specAnswerAt > 1000) { specAnswerAt = Date.now(); specSend(true); } return; }
-      if (S) return;                                       // you are playing at this table: your own copy is the truth
+      if (m.ask) {
+        if (S && S.chain.host && Date.now() - specAnswerAt > 1000) { specAnswerAt = Date.now(); specSend(true); }
+        else if (!S && H && ctx.focus() === st && Date.now() - specAnswerAt > 1000) { specAnswerAt = Date.now(); houseSend(true); }
+        return;
+      }
+      if (S || (H && ctx.focus() === st)) return;          // you are playing at this table: your own copy is the truth
       const d = m.d, E = engine.api;
       if (!E || !d || typeof d !== 'object' || typeof d.f !== 'string' || typeof d.w !== 'string' || typeof d.b !== 'string' || (m.a !== d.w && m.a !== d.b)) return;
+      // a house player is a side called "house:<profile id>" (d.h): the other side must be the sender, and nothing about it is staked
+      const hs = typeof d.h === 'string' && /^[a-z0-9-]{1,24}$/.test(d.h) ? d.h : null;
+      const houseSide = hs && d.w === 'house:' + hs ? 'w' : hs && d.b === 'house:' + hs ? 'b' : null;
+      if ((d.w.startsWith('house:') || d.b.startsWith('house:')) && !houseSide) return;
+      if (houseSide && (houseSide === 'w' ? d.b : d.w) !== m.a) return;
       const me0 = ctx.roomMe(); if (me0 && (d.w === me0 || d.b === me0) && lobby.match) return;
       // the moves are replayed with XChess and must reach the position sent; without them, the position alone is shown
       let p = null, uci = null; const moves = d.m !== undefined ? unpackMoves(d.m) : null;
@@ -1099,9 +1129,10 @@
       const key = d.w + '|' + d.b, same = R && R.key === key && (!uci || !R.uci || uci.length >= R.uci.length);
       const l = typeof d.l === 'string' && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(d.l) ? [d.l.slice(0, 2), d.l.slice(2, 4)] : null;
       const c = Array.isArray(d.c) && d.c.length === 2 && d.c.every((x) => Number.isFinite(x) && x >= 0 && x < 1e5) ? { w: d.c[0], b: d.c[1] } : null;
-      const was = R, gid = typeof d.gid === 'string' && HEX16.test(d.gid) ? d.gid : null;
+      const was = R, gid = !houseSide && typeof d.gid === 'string' && HEX16.test(d.gid) ? d.gid : null;
       R = { key, gid, w: d.w, b: d.b, wn: name(senderIsWhite ? m.n : d.on) || 'White', bn: name(senderIsWhite ? d.on : m.n) || 'Black', pos: p, uci, last: l, clocks: c, rx: Date.now(),
-            result: typeof d.r === 'string' && /^(1-0|0-1|1\/2-1\/2)$/.test(d.r) ? d.r : null, term: typeof d.tm === 'string' ? d.tm.slice(0, 24) : null, stake: Number.isSafeInteger(d.st) && d.st > 0 ? d.st : 0, offer: d.of === 'w' || d.of === 'b' ? d.of : null };
+            result: typeof d.r === 'string' && /^(1-0|0-1|1\/2-1\/2)$/.test(d.r) ? d.r : null, term: typeof d.tm === 'string' ? d.tm.slice(0, 24) : null, stake: !houseSide && Number.isSafeInteger(d.st) && d.st > 0 ? d.st : 0, house: houseSide ? hs : null, offer: d.of === 'w' || d.of === 'b' ? d.of : null };
+      if (houseSide) { if (houseSide === 'w') R.wn = R.wn + ' · house player'; else R.bn = R.bn + ' · house player'; }
       if (!was || was.gid !== R.gid) { B = null; goneInfo = null; askBets(true); }
       if (showR()) { if (!same) { sel = null; targets = []; rv = null; rvNew = false; stopPlay(); board.clear(); } paint(!same); if (was && !was.result && R.result) ctx.sfx('win'); }
       if (ctx.focus() === st) ctx.render();
@@ -1115,6 +1146,7 @@
     function specFrame() {
       const now = Date.now();
       if (S) { specSend(false); return; }
+      if (H && ctx.focus() === st) { houseSend(false); return; }   // your own game against a house player: people at the table can watch it too
       // standing by (or sitting to watch) a table where other people sit: ask the host for the game, unless it is already showing
       const here = ctx.watching() === def.id, taken = ctx.taken().filter((x) => x.split('.')[0] === def.id).length;
       if (!here) hereSince = 0; else if (!hereSince) hereSince = now;
@@ -1452,7 +1484,7 @@
     // the page says when you choose a view: the X-Chess view opens or closes at once, and the choice is remembered in this browser
     st.onView = (v) => { const sv = store.get(); sv.view = v === 'xchess' ? 'xchess' : '3d'; store.set(sv); st.lastView = v; ovKey = ''; paint2d(); };   // the X-Chess view's board hands its presses to the table that owns it
     // for tests and bug reports (scripts/test-casino-chess.mjs): what the table holds now
-    st.debug = () => { const p = pos(), g = S && S.table.g; return { rv, rvNew, view2d: view2d(), mat: matOf(), mode: S ? 'pvp' : showR() ? 'watch' : H ? 'house' : 'idle', sel, targets: targets.map((t) => t.sq), watch: R ? { wn: R.wn, bn: R.bn, moves: R.uci ? R.uci.length : null, result: R.result, clocks: watchClocks(), seat: watchingHere() } : null, fen: p ? p.fen() : null, uci: H ? H.uci.slice() : g ? g.uci.slice() : [], me: p ? me() : null, over: H ? H.over : g && g.result ? { result: g.result, termination: g.term } : null, verified: H ? H.verified : null, thinking: !!(H && H.thinking), legal: p ? p.movesUci() : [], flip: board.flip, seed: H ? H.seed : null, clocks: S ? S.clocks() : null, stake: S ? S.stake : 0, host: S ? !!S.chain.host : null, gid: S ? S.gid() : R ? R.gid : null, roomHeld: S ? S.roomHeld : null, final: S ? S.final : null, bets: B ? { pool: B.pool, my: B.my, closes: B.closes, closed: B.closed, n: B.n } : null, gone: goneInfo, msg }; };
+    st.debug = () => { const p = pos(), g = S && S.table.g; return { rv, rvNew, view2d: view2d(), mat: matOf(), mode: S ? 'pvp' : showR() ? 'watch' : H ? 'house' : 'idle', sel, targets: targets.map((t) => t.sq), watch: R ? { house: R.house, wn: R.wn, bn: R.bn, moves: R.uci ? R.uci.length : null, result: R.result, clocks: watchClocks(), seat: watchingHere() } : null, fen: p ? p.fen() : null, uci: H ? H.uci.slice() : g ? g.uci.slice() : [], me: p ? me() : null, over: H ? H.over : g && g.result ? { result: g.result, termination: g.term } : null, verified: H ? H.verified : null, thinking: !!(H && H.thinking), legal: p ? p.movesUci() : [], flip: board.flip, seed: H ? H.seed : null, clocks: S ? S.clocks() : null, stake: S ? S.stake : 0, host: S ? !!S.chain.host : null, gid: S ? S.gid() : R ? R.gid : null, roomHeld: S ? S.roomHeld : null, final: S ? S.final : null, bets: B ? { pool: B.pool, my: B.my, closes: B.closes, closed: B.closed, n: B.n } : null, gone: goneInfo, msg }; };
     st.debugMove = (mv) => (S ? S.send(mv) : null); st.debugSession = () => S; st.debugCall = (m) => onRoomMsg(m);   // tests: play a move without the mouse, reach the session
     st.debugPick = (x, y) => { const r = board.pickAt(ctx.ray({ clientX: x, clientY: y })); return { ...r, res: resolve(r), myTurn: myTurn(), sel }; };
     st.squareFromPoint = (x, y) => board.pick(ctx.ray({ clientX: x, clientY: y }));
