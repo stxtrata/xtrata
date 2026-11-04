@@ -99,6 +99,20 @@ const opusGeneratorHeadersPlugin = {
   }
 };
 
+// Leaves the casino machines' working folders (checks, build, notes, src ...) out of dist/.
+const pruneCasinoMachinesPlugin = {
+  name: 'prune-casino-machines',
+  apply: 'build' as const,
+  configResolved(config: { root: string; build: { outDir: string } }) {
+    (pruneCasinoMachinesPlugin as { outDir?: string }).outDir = resolve(config.root, config.build.outDir);
+  },
+  async closeBundle() {
+    const { pruneCasinoMachines } = await import('./scripts/prune-casino-machines-dist.mjs');
+    const r = pruneCasinoMachines((pruneCasinoMachinesPlugin as { outDir?: string }).outDir || resolve(process.cwd(), 'dist'));
+    console.log(`[prune-casino-machines] removed ${r.removed.length} build-only folders from dist/casino-machines`);
+  }
+};
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const hiroApiKey = env.HIRO_API_KEY || env.VITE_HIRO_API_KEY;
@@ -116,7 +130,8 @@ export default defineConfig(({ mode }) => {
       opusGeneratorHeadersPlugin,
       wizardDevAliasPlugin,
       contractStudioDevAliasPlugin,
-      collectionManagerDevAliasPlugin
+      collectionManagerDevAliasPlugin,
+      pruneCasinoMachinesPlugin
     ],
     define: {
       __XSTRATA_HAS_HIRO_KEY__: JSON.stringify(hasHiroApiKey),
