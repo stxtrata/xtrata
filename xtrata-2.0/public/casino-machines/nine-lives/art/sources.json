@@ -1,0 +1,1400 @@
+{
+ "machine": "nine-lives",
+ "rule": "Every symbol on the reels is real Stacks or Bitcoin material. Nothing is drawn or imitated by hand except the Full Moon and lit-window frames, which are built from real cats. A cat with no Forever Twins twin is shown desaturated with a NOT YET FOREVER stamp.",
+ "collection": {
+  "name": "LEO Cats",
+  "contract": "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats",
+  "size": 10000,
+  "note": "Registry entry: community fakfun, status live, interface v1, group G2, theme accent #12b5a6. The registry says the art host has not been recorded, so it is unrated there. Creator and mint date are not stated in the registry and are not claimed here."
+ },
+ "tiers": {
+  "method": "Rarity score = information content of a cat's six traits (Background, Base, Cloth, Eyes, Hat, Mouth): the sum over traits of ln(10000 / number of cats sharing that trait value), computed across all 10,000 cats from the collection's own IPFS metadata JSON (attributes[].trait / value). Rarest 1% = Gold, next 4% = Silver, the remaining 95% split into three equal tiers (Tier I rarest of the three).",
+  "counts": {
+   "G": 100,
+   "S": 400,
+   "3": 3166,
+   "2": 3166,
+   "1": 3168
+  },
+  "frames": {
+   "G": "gold frame \u00b7 jackpot symbol (bitcoin slot)",
+   "S": "silver frame (artifact slot)",
+   "3": "Tier I \u00b7 violet frame (block slot)",
+   "2": "Tier II \u00b7 blue frame (chip slot)",
+   "1": "Tier III \u00b7 teal frame (lemon slot)"
+  },
+  "tierStringFile": "art/nine-lives-art.json (tierString: one character per token id)",
+  "metadataSource": "collection IPFS metadata JSON (key `trait`, not `trait_type`)",
+  "imageSource": "Twin art: https://xtrata.xyz/inscription/mainnet/<core address>/<core name>/<xtrataId>. Untwinned cats are loaded live: Hiro token-metadata thumbnail, then IPFS gateways."
+ },
+ "logos": [
+  {
+   "symbol": "cherry ($LEO)",
+   "name": "$LEO token logo",
+   "file": "tools/nine-lives/art/logos/leo-token-144.webp (also embedded as a data URI)",
+   "source": "The $LEO token's own metadata image, read 2 Nov 2026 and re-encoded at 144 px. sha256 of the bundled file: 92bdeded53e2a209d8297ad4bda54acd5a4d31fb6f2161b38d48059063240e0e. The exact metadata URL was not recorded at fetch time: confirm it before release.",
+   "usedAs": "Cherry symbol. Used as supplied.",
+   "permission": "NEEDED: confirm with the $LEO team before the machine goes on the public floor."
+  },
+  {
+   "symbol": "scatter (Night Prowl)",
+   "name": "Fak.fun logo",
+   "file": "embedded as a data URI in the game",
+   "source": "The Forever Twins asset set on xtrata.xyz (Fak.fun community). The exact asset URL was not recorded at fetch time: confirm it before release.",
+   "usedAs": "Scatter symbol. Used as supplied.",
+   "permission": "NEEDED: ask Fak.fun before the machine goes on the public floor."
+  },
+  {
+   "symbol": "vault (If It Fits)",
+   "name": "LEO Cats Forever Twin logo",
+   "file": "embedded as a data URI in the game",
+   "source": "https://xtrata.xyz/forever-twins/assets/leo-cat-forever-twin-logo-1.jpg (registry theme.logo for leo-cats)",
+   "usedAs": "Vault symbol and the If It Fits backdrop. Used as supplied.",
+   "permission": "Xtrata's own Forever Twins asset. Confirm that LEO Cats / Fak.fun are fine with it on the public floor."
+  }
+ ],
+ "brandAssets": [
+  {
+   "name": "Xtrata mark",
+   "file": "tools/nine-lives/model/assets/xtrata.svg (unmodified, sha256 2de985cf\u20264667ec)",
+   "usedAs": "Lower door of the cabinet. Used exactly as given.",
+   "permission": "Own brand"
+  },
+  {
+   "name": "ParallaX Casino wordmark",
+   "file": "tools/nine-lives/model/assets/parallax.svg",
+   "usedAs": "Marquee foot, smaller than the machine name.",
+   "permission": "Own brand"
+  }
+ ],
+ "onChainRecords": [
+  {
+   "symbol": "chain (lit window)",
+   "what": "A cat's Xtrata inscription id once twinned, otherwise its token number",
+   "source": "Read live from the Forever Twins registry (https://xtrata.xyz/forever-twins/data/registry.v2.json) and the LEO Cats helper contract SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata (event log). 101 twins are bundled as a snapshot taken 2 Nov 2026; the count only ever rises, so the snapshot is a safe floor if Xtrata cannot be read."
+  }
+ ],
+ "live": {
+  "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json",
+  "cache": "6 hours, localStorage key xtrata.ninelives.twins.v1",
+  "failedRead": "A failed or empty read is shown as unknown, never as no twins. While unknown, the bundled snapshot (101) keeps the cabinet open."
+ },
+ "generated": "2026-11-02T11:28Z",
+ "twinSnapshot": "2026-11-02",
+ "twinImageCount": 101,
+ "twins": [
+  {
+   "tokenId": 62,
+   "xtrataId": 983,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/62",
+   "inscriptionTx": "0xf0b53bcb2a67ffad21099c5f53d5826474bbb951a8adc76044eef9eee179bbf0",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/983",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1208,
+   "xtrataId": 955,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1208",
+   "inscriptionTx": "0x451b4c651ba63e0425553842bc373a46cd98f2794fc46e5873238054edc4f9c8",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/955",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1286,
+   "xtrataId": 1034,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1286",
+   "inscriptionTx": "0xc78cc3163a4064a0b71483012ea7ea939b7fb57891704ada17812437336f74d2",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1034",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1289,
+   "xtrataId": 1038,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1289",
+   "inscriptionTx": "0xa488a605c025ab26e59faa8dd8d518c2cd2ed4c05cad324aa6ebdb055d593c58",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1038",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1381,
+   "xtrataId": 986,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1381",
+   "inscriptionTx": "0xe6737502ad9ae0e5a4a2d291a60a6db8058357c836afe7571e19230a3f63c176",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/986",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1383,
+   "xtrataId": 1023,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1383",
+   "inscriptionTx": "0x98fe794b703c268d82994297e4e4908921900cc53fb1f7ef14d582966682c701",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1023",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1461,
+   "xtrataId": 966,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1461",
+   "inscriptionTx": "0xb116a4dc075e32ab6a162809650f49d0151393453ce8ede535a18c6c9510b1bf",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/966",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1949,
+   "xtrataId": 982,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1949",
+   "inscriptionTx": "0x41b154fccc0568392a2ee7752c27ecd96d039ee0b1f0d8f482dc2eea6eba0ee1",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/982",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3421,
+   "xtrataId": 1018,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3421",
+   "inscriptionTx": "0x40dc689f7718375f5a1055c9aec2644fa344c39117bb5bfeaa3c359332ac2b36",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1018",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3668,
+   "xtrataId": 1011,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3668",
+   "inscriptionTx": "0x17a9cf51f98c6876fd4b0f2826c0006759c1443d5c4482be065a4c4882569e2c",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1011",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3742,
+   "xtrataId": 950,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3742",
+   "inscriptionTx": "0xe9794f5c3f03b306c0c9f06063ff7d74db2e0996204e1b6323e6f5f6ab16a3f8",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/950",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3946,
+   "xtrataId": 977,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3946",
+   "inscriptionTx": "0x6e94c8a57322956bf80afffb079dfde13355fad4b20257315f453c9919a9f308",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/977",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3986,
+   "xtrataId": 962,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3986",
+   "inscriptionTx": "0x7eb160c7a2fb27d1bbe91aa20ba4e79d19ba47bfb7aba7ed33e61a57fc10706d",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/962",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4708,
+   "xtrataId": 1007,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/4708",
+   "inscriptionTx": "0x5dde4e69e857cf281b254fad359d23900ed14f32f5243a7513a3e5cb0be3e851",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1007",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5944,
+   "xtrataId": 1025,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/5944",
+   "inscriptionTx": "0xc3609b29e4c1e39534421f893542d22067f6de91eb22d1bdf2bfa8f7ed8f5b4a",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1025",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5946,
+   "xtrataId": 1006,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/5946",
+   "inscriptionTx": "0xd3dc5680559df529e4684bae41b82917e4adf16dd0e1da2b40845e73915c1b22",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1006",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 6699,
+   "xtrataId": 975,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/6699",
+   "inscriptionTx": "0x55357fc139ceac3d3b2b408e2389b7d9698c5dc75e2d4f0d823cad31201ee26a",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/975",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7002,
+   "xtrataId": 1021,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7002",
+   "inscriptionTx": "0x968d82e0f3cbb7630055c26d1e6b2e5f67b2dab07075b5d516e401e82cf72f27",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1021",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7644,
+   "xtrataId": 956,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7644",
+   "inscriptionTx": "0x95335e294a3943aa8405cae0457541409eab6c25b9ec1b44a20dd8c64763cc94",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/956",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7696,
+   "xtrataId": 989,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7696",
+   "inscriptionTx": "0x68c005c3e7636f9e9d8542dbb5fffb06fad830e1b92a90a9824213f4a151c2b6",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/989",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7917,
+   "xtrataId": 1037,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7917",
+   "inscriptionTx": "0xcae5a866e8674b82fe47902cbccfbac87899c6df0acbd12013cff9a957ab3296",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1037",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7935,
+   "xtrataId": 998,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7935",
+   "inscriptionTx": "0x2ddeac3afebc1f648931ffd10d46f6e2740cb3823ad60100898145ef19c65418",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/998",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 8001,
+   "xtrataId": 951,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/8001",
+   "inscriptionTx": "0xac71baa408c5f1b6066a986f649203e58a338555fe129173059558bdbbfcd60b",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/951",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 8185,
+   "xtrataId": 957,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/8185",
+   "inscriptionTx": "0xed63f6730a9b967b393dc38983c9022733249e0daa405b6cbcbb75894cff6c4a",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/957",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 8633,
+   "xtrataId": 997,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/8633",
+   "inscriptionTx": "0xf0bfbedbb2e40ccf0e0e13cd6b66fe5f3531c155f174f3cb7e5437efdbe7742b",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/997",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 9585,
+   "xtrataId": 958,
+   "tier": "1",
+   "tierName": "Tier III (teal frame)",
+   "engineSlot": "lemon",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/9585",
+   "inscriptionTx": "0xde98e3874497636cfbedf71428e642585a6a740b57f4cf571d4feb3a8bffdc71",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/958",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 998,
+   "xtrataId": 987,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/998",
+   "inscriptionTx": "0xde6007c126968bacc40eff1dd945dc9f22fc038e5903775928534e38b7fc207f",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/987",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1104,
+   "xtrataId": 1009,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1104",
+   "inscriptionTx": "0x64d6e8cd3d8ce66cb3fb73a56da88e2031de324f4eafb9ecf8ef2e0b3e5f8559",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1009",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1288,
+   "xtrataId": 1036,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1288",
+   "inscriptionTx": "0x25d4c1f589d109b0dfe5658464fc99c186add9e6c9c512f3043c2aeeb477e41c",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1036",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1292,
+   "xtrataId": 1032,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1292",
+   "inscriptionTx": "0x212b341ef2199236e01ed04d5576cc52b0d8f4159373227666fc06d615c7f33c",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1032",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1951,
+   "xtrataId": 981,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1951",
+   "inscriptionTx": "0xf7ffc13ac28e23ebc1d2f7e5b895abbd0f35ec6ea3885a94c1dcefa81956c50e",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/981",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2040,
+   "xtrataId": 1016,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2040",
+   "inscriptionTx": "0x399e53e695d82d51a2b46dc2ef7d5a5b1ecba135c7cf33e287941e9ebe03bb1c",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1016",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2098,
+   "xtrataId": 1042,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2098",
+   "inscriptionTx": "0x7aaad288a9d08b862a852ea8a79624c1d12bb94bddfba1f0ff50d6a7897a7131",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1042",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2489,
+   "xtrataId": 1039,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2489",
+   "inscriptionTx": "0x847600998f6ee73634137b45520b6c3bf7c08220be3b98820e408d57a4f69b7b",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1039",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2872,
+   "xtrataId": 984,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2872",
+   "inscriptionTx": "0xcbdaa0a168f8c78cfae56948cbfee0ec0d3bbd847bfbf085b2af7fb7037ade7e",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/984",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3103,
+   "xtrataId": 1031,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3103",
+   "inscriptionTx": "0x75bad669b487c4843a0841f526a7fe4d38c73ba326edf64f50bb7fee8b8fe107",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1031",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3337,
+   "xtrataId": 995,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3337",
+   "inscriptionTx": "0xdaf88c27950ba1b09b0d6c60bbe15ce589c97edcac5f635909b3d2880279e484",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/995",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3355,
+   "xtrataId": 2752,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3355",
+   "inscriptionTx": "0xe88aca1120d7faea7bf3d83e0de2544c788a6eede42882012605782152215ea1",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2752",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3464,
+   "xtrataId": 1005,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3464",
+   "inscriptionTx": "0x6c230420c91d4824dbbf702e660ade25674c7e0f0802a7ed377b2c5f93d47fc8",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1005",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3645,
+   "xtrataId": 926,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3645",
+   "inscriptionTx": "0x002eb47c76ea75e7c3cef660114403475259f6d0cac7d357afa7578b80fc057e",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/926",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3664,
+   "xtrataId": 1040,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3664",
+   "inscriptionTx": "0x2106d8bd80205c10f5b8890c13ee2cf2e947a06a07828df8a0d7f6a688c36425",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1040",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3667,
+   "xtrataId": 1017,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3667",
+   "inscriptionTx": "0x369f73ab286180400fcb6542aaf661427b60af65d62788ead8c14f090d36ce53",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1017",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3909,
+   "xtrataId": 961,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3909",
+   "inscriptionTx": "0x0d60a7db05960126462626174a15872153ac52c7fac7aae9dc7214b37863e68c",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/961",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4386,
+   "xtrataId": 1041,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/4386",
+   "inscriptionTx": "0x5ef05262a1ea5d61e2c3589b7f024aa13530f59fef5609668cbfdc9262994c59",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1041",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4608,
+   "xtrataId": 967,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/4608",
+   "inscriptionTx": "0x4b803edf1bb6859bea6062fef86424741e3abdba4997efdccc9cd08c1efab3f1",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/967",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4727,
+   "xtrataId": 974,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/4727",
+   "inscriptionTx": "0xe3797115f57b09c15080e7bb3bc5c0d91e6e9768615b5852bd9cdab2a869bebe",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/974",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5254,
+   "xtrataId": 978,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/5254",
+   "inscriptionTx": "0x5d64f0e900c4e074d93bee557c8a256b5153bdeed6a91b321c29644b0a43e463",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/978",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5314,
+   "xtrataId": 970,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/5314",
+   "inscriptionTx": "0xa5dc5ea98bc268d26cc3b4e1c6159fa0aebb411c8489f6a8ad67a86e9e6b187d",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/970",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 6798,
+   "xtrataId": 973,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/6798",
+   "inscriptionTx": "0x50c85374a9bcd6136f102f9b2f1cd0f2a1022f6a60d8e72b68c93f0284b62572",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/973",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7636,
+   "xtrataId": 1003,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7636",
+   "inscriptionTx": "0xc6c9d7df60cbffff8ff996ac63ccec560fd31bd1cd658ded281a15d781ef2182",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1003",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7687,
+   "xtrataId": 996,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7687",
+   "inscriptionTx": "0xd2fda67aa6122446119c327855010983137fb187841c387e4357a264a610eb0d",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/996",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7870,
+   "xtrataId": 994,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7870",
+   "inscriptionTx": "0xd537b46c49b62150d9999e1cde3193e696318aec31fc386dd49e9e913a2809c6",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/994",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7893,
+   "xtrataId": 1014,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7893",
+   "inscriptionTx": "0x3edaff72914b13bef5175551d400728ebaedbed6df1c305834b028e9fd777f03",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1014",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 8953,
+   "xtrataId": 1020,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/8953",
+   "inscriptionTx": "0xb574183b014c9156e5cb3d53c9fdc65d7d149a64b7bf56ec66e1163631c72f71",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1020",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 9233,
+   "xtrataId": 971,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/9233",
+   "inscriptionTx": "0xbe9fe81add183832b2ce9a343f48171582378c4f33068d1192aaa4c54ac38bae",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/971",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 9392,
+   "xtrataId": 959,
+   "tier": "2",
+   "tierName": "Tier II (blue frame)",
+   "engineSlot": "chip",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/9392",
+   "inscriptionTx": "0xd7831865f65ab05fec38e30642addbab05e27fcd319710cd4bf251bb0b0a935b",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/959",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1,
+   "xtrataId": 949,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1",
+   "inscriptionTx": "0x226505bffb7db60422c7bba659ea478c4c239c805cd58aca3f1c8fdbb3dd2bec",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/949",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 381,
+   "xtrataId": 968,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/381",
+   "inscriptionTx": "0x0d1a4d0f505fe07fefd95e8869105e36f43f8fb8f79c5b3a04fae7da0579395e",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/968",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 564,
+   "xtrataId": 992,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/564",
+   "inscriptionTx": "0xaf81087b99d421042f42db1a0070b23e10e2bc5a579515bad4e58ae21d1fca27",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/992",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1285,
+   "xtrataId": 1035,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1285",
+   "inscriptionTx": "0x02bd8fb670a2a0ce0b409800581dcc9f366caaa133cddfdabcebb31bd250adc6",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1035",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1287,
+   "xtrataId": 1033,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1287",
+   "inscriptionTx": "0xb877cb461378be4d0c51334d9863050266b74370edf986318f970ec5d95c9877",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1033",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1294,
+   "xtrataId": 1030,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1294",
+   "inscriptionTx": "0x07e7a767b87ad36fd04686dc88d38e2e4982d1a3a1558c62e184e3c62d9a8005",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1030",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1747,
+   "xtrataId": 948,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1747",
+   "inscriptionTx": "0xfd46f1b517db016b3874af853b9adcabfd9b9556be18f4b65a81bf4c0eac38fe",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/948",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 1952,
+   "xtrataId": 980,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/1952",
+   "inscriptionTx": "0x6fbd0e816918efbdca9229360a5f5be5db8ce1d1d186403fa9f69e5d80102fd5",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/980",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2141,
+   "xtrataId": 1015,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2141",
+   "inscriptionTx": "0x2ce51594465d341d80b9804b1b01e5694a48db29ed5367bcd16c33d4a13e8e80",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1015",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2787,
+   "xtrataId": 1019,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2787",
+   "inscriptionTx": "0x52d9f93e463e820b323d8bac01ea4234a17361e159720eb38e63c2b2d7904775",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1019",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2842,
+   "xtrataId": 1010,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2842",
+   "inscriptionTx": "0xf18449c379f3ac0bb5a854c0b28288bbaa0774b2184d1f34991a56401a7c7812",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1010",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2873,
+   "xtrataId": 985,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2873",
+   "inscriptionTx": "0x03199e7f19ebcc9eea6518440ca6f677c5b6345daec12e8801c4ddf69fd8441d",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/985",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3003,
+   "xtrataId": 1022,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3003",
+   "inscriptionTx": "0x7cdc6339d81e466446ced1b3182dca4b94df730b982d398b40418e1281d09eee",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1022",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3076,
+   "xtrataId": 1001,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3076",
+   "inscriptionTx": "0xd06f39d51efb36b93e6af6546fd7e91978d9c8c23b7c3c3cbb89a68136efa1fc",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1001",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3203,
+   "xtrataId": 976,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3203",
+   "inscriptionTx": "0x488f79445e0bcb5e3143f9cbbf2c6f0a2a5549d0e89bf25430cf67605d6f3d79",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/976",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3219,
+   "xtrataId": 964,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3219",
+   "inscriptionTx": "0xdeadc73b446cf0b8b93fc4916f0f61a058c2ff092c956ad45ced9cb77e7062a6",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/964",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3320,
+   "xtrataId": 1029,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3320",
+   "inscriptionTx": "0x8969568da8a54f516c9529f4ade9e92522e110ad2b5d35cdde5f1c405b0b2bbf",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1029",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3670,
+   "xtrataId": 946,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3670",
+   "inscriptionTx": "0xa00f2d83c461b95099ce86b94cb5d8f6ab5e260f3e5c7ad7d9ad0ea250998151",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/946",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3922,
+   "xtrataId": 1043,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3922",
+   "inscriptionTx": "0x7e136753fa3c889e147c5fdbaebb0261dc030277231d36853693a8f35a3628d9",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1043",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4258,
+   "xtrataId": 1027,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/4258",
+   "inscriptionTx": "0xf9f8423a9acaf2b0a0c4e2e8ce87e654a43790b15f5c76f7673bfad3fd381136",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1027",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4867,
+   "xtrataId": 1024,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/4867",
+   "inscriptionTx": "0x70845f273bd7c2df63eaa1a4f2ca6614825e68c327a3e3b8f2bcb91a942c3c7b",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1024",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4900,
+   "xtrataId": 965,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/4900",
+   "inscriptionTx": "0x714610b85ed679f9e9ac79b57b24a3ba00e56511f254aa6dee85ec5b9d12b1e4",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/965",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5106,
+   "xtrataId": 979,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/5106",
+   "inscriptionTx": "0xce5b0f200d3f13074fe8fef90a47a14186f4ac884e07ae9d62ee5d4e9b4d84f5",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/979",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5507,
+   "xtrataId": 999,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/5507",
+   "inscriptionTx": "0x832dc0d13fbdbea35838b66f8fb44d2791f9a97f748de2f04e08079bb17d51a2",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/999",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 6572,
+   "xtrataId": 1008,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/6572",
+   "inscriptionTx": "0x1eb0148107eacbba4e50debc981e4cdc7e3d02f891d764f02b1f5d0aa3536527",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1008",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7475,
+   "xtrataId": 988,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7475",
+   "inscriptionTx": "0xc714e1649c34f0e009c6d1b34fb5e450c51103233930a15430e82f69d9b0103a",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/988",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7570,
+   "xtrataId": 947,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7570",
+   "inscriptionTx": "0x8302146279a39e940f3ca05d75ecfec34308663109bf04b39e34d0c0cf82270f",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/947",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 8453,
+   "xtrataId": 1026,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/8453",
+   "inscriptionTx": "0x5e64ec226d92016ca34a0aa5400ecdc8866cd114c136bda9b9a40498e0f1c3ae",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1026",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 8609,
+   "xtrataId": 1012,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/8609",
+   "inscriptionTx": "0xb7be6f991149cec5e071cd8f1122ae935b8fb4e7f1df2dd39d95676c76503964",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1012",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 9065,
+   "xtrataId": 954,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/9065",
+   "inscriptionTx": "0x691b3f7e7308d5775725a43e2638a80ce04ce4b0252f103741a847b15a5ef216",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/954",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 9191,
+   "xtrataId": 990,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/9191",
+   "inscriptionTx": "0xa8cfb03c76c3f530de83a29486b923d3f1ef245fd631e4996599e5ea1bd2177f",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/990",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 9338,
+   "xtrataId": 993,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/9338",
+   "inscriptionTx": "0x9d5f041b59905981261a7058f9fd3b782fbeeba9560a3cee857777353d83c9c5",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/993",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 9355,
+   "xtrataId": 991,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/9355",
+   "inscriptionTx": "0xb1f1d37b4ec8f6e13fc62d1312f437d53ff7a2d6e15d2b437c73cdd7e30a91ff",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/991",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 9999,
+   "xtrataId": 1013,
+   "tier": "3",
+   "tierName": "Tier I (violet frame)",
+   "engineSlot": "block",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/9999",
+   "inscriptionTx": "0x6781c0c74643f74b6b742063a697ef88fb9fa825d6f8d7946bd5ba33709042fb",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1013",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2026,
+   "xtrataId": 969,
+   "tier": "S",
+   "tierName": "Silver (silver frame)",
+   "engineSlot": "artifact",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2026",
+   "inscriptionTx": "0xf0ee60c874096d894f6dcf5a29ff8dceed1dc21b702f3cab65ef779b93d72a29",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/969",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2386,
+   "xtrataId": 1002,
+   "tier": "S",
+   "tierName": "Silver (silver frame)",
+   "engineSlot": "artifact",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2386",
+   "inscriptionTx": "0xca103a054917cdbfc55e93b13bd0407819afec7cf73a0915df25e536cff89e39",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1002",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2579,
+   "xtrataId": 1000,
+   "tier": "S",
+   "tierName": "Silver (silver frame)",
+   "engineSlot": "artifact",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2579",
+   "inscriptionTx": "0xa8c9bdb5607491c3485782299903fb750e5eb206c38fe2a89a905c73848acd4f",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1000",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 3788,
+   "xtrataId": 1028,
+   "tier": "S",
+   "tierName": "Silver (silver frame)",
+   "engineSlot": "artifact",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/3788",
+   "inscriptionTx": "0xd65167fc41d315297b4321f083a354addabaafcdabae2c24f0e895cc488642c2",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1028",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 4012,
+   "xtrataId": 963,
+   "tier": "S",
+   "tierName": "Silver (silver frame)",
+   "engineSlot": "artifact",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/4012",
+   "inscriptionTx": "0xf32ccc466836e730ee49ec45cc5cc12e04d0e49f185b63f32e6be23d9c3eaf60",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/963",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 5679,
+   "xtrataId": 972,
+   "tier": "S",
+   "tierName": "Silver (silver frame)",
+   "engineSlot": "artifact",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/5679",
+   "inscriptionTx": "0x49734da874c27ba1cc956d10fb1d45f1b6c87ac30decb2968992b74efdfae5ef",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/972",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 7918,
+   "xtrataId": 953,
+   "tier": "S",
+   "tierName": "Silver (silver frame)",
+   "engineSlot": "artifact",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/7918",
+   "inscriptionTx": "0x1fc20f90013cb493d8349ef1dc40cd6e3bf48d9e52d828de65b48fa6db13ed36",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/953",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 8912,
+   "xtrataId": 960,
+   "tier": "S",
+   "tierName": "Silver (silver frame)",
+   "engineSlot": "artifact",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/8912",
+   "inscriptionTx": "0xd84538e8ffe2bc70e9f544e49ed8cd8912892f00938b52215c5e2cbb7e92170d",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/960",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2077,
+   "xtrataId": 945,
+   "tier": "G",
+   "tierName": "Gold (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2077",
+   "inscriptionTx": "0x5a375081887bece25004a6f08f8581ead77168c0902194b9e213d6955719e4e3",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/945",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 2444,
+   "xtrataId": 1004,
+   "tier": "G",
+   "tierName": "Gold (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/2444",
+   "inscriptionTx": "0x6e23ad596854805a2ec98d6ecc9fdd934e39c9b7583e0f971e152dac7765286a",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1004",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  },
+  {
+   "tokenId": 8910,
+   "xtrataId": 952,
+   "tier": "G",
+   "tierName": "Gold (gold frame, jackpot symbol)",
+   "engineSlot": "bitcoin",
+   "tokenUri": "https://api.hiro.so/metadata/v1/nft/SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats/8910",
+   "inscriptionTx": "0x92f252f077b163b8d34b827b44f3e52152427ae055db73dffcaf5c08520957d4",
+   "image": {
+    "twinArt": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/952",
+    "bundledAs": "webp data URI inside art/nine-lives-art.json and the game"
+   }
+  }
+ ]
+}

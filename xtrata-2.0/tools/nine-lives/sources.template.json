@@ -1,0 +1,82 @@
+{
+ "machine": "nine-lives",
+ "rule": "Every symbol on the reels is real Stacks or Bitcoin material. Nothing is drawn or imitated by hand except the Full Moon and lit-window frames, which are built from real cats. A cat with no Forever Twins twin is shown desaturated with a NOT YET FOREVER stamp.",
+ "collection": {
+  "name": "LEO Cats",
+  "contract": "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats",
+  "size": 10000,
+  "note": "Registry entry: community fakfun, status live, interface v1, group G2, theme accent #12b5a6. The registry says the art host has not been recorded, so it is unrated there. Creator and mint date are not stated in the registry and are not claimed here."
+ },
+ "tiers": {
+  "method": "Rarity score = information content of a cat's six traits (Background, Base, Cloth, Eyes, Hat, Mouth): the sum over traits of ln(10000 / number of cats sharing that trait value), computed across all 10,000 cats from the collection's own IPFS metadata JSON (attributes[].trait / value). Rarest 1% = Gold, next 4% = Silver, the remaining 95% split into three equal tiers (Tier I rarest of the three).",
+  "counts": {
+   "G": 100,
+   "S": 400,
+   "3": 3166,
+   "2": 3166,
+   "1": 3168
+  },
+  "frames": {
+   "G": "gold frame \u00b7 jackpot symbol (bitcoin slot)",
+   "S": "silver frame (artifact slot)",
+   "3": "Tier I \u00b7 violet frame (block slot)",
+   "2": "Tier II \u00b7 blue frame (chip slot)",
+   "1": "Tier III \u00b7 teal frame (lemon slot)"
+  },
+  "tierStringFile": "art/nine-lives-art.json (tierString: one character per token id)",
+  "metadataSource": "collection IPFS metadata JSON (key `trait`, not `trait_type`)",
+  "imageSource": "Twin art: https://xtrata.xyz/inscription/mainnet/<core address>/<core name>/<xtrataId>. Untwinned cats are loaded live: Hiro token-metadata thumbnail, then IPFS gateways."
+ },
+ "logos": [
+  {
+   "symbol": "cherry ($LEO)",
+   "name": "$LEO token logo",
+   "file": "tools/nine-lives/art/logos/leo-token-144.webp (also embedded as a data URI)",
+   "source": "The $LEO token's own metadata image, read 2 Nov 2026 and re-encoded at 144 px. sha256 of the bundled file: 92bdeded53e2a209d8297ad4bda54acd5a4d31fb6f2161b38d48059063240e0e. The exact metadata URL was not recorded at fetch time: confirm it before release.",
+   "usedAs": "Cherry symbol. Used as supplied.",
+   "permission": "NEEDED: confirm with the $LEO team before the machine goes on the public floor."
+  },
+  {
+   "symbol": "scatter (Night Prowl)",
+   "name": "Fak.fun logo",
+   "file": "embedded as a data URI in the game",
+   "source": "The Forever Twins asset set on xtrata.xyz (Fak.fun community). The exact asset URL was not recorded at fetch time: confirm it before release.",
+   "usedAs": "Scatter symbol. Used as supplied.",
+   "permission": "NEEDED: ask Fak.fun before the machine goes on the public floor."
+  },
+  {
+   "symbol": "vault (If It Fits)",
+   "name": "LEO Cats Forever Twin logo",
+   "file": "embedded as a data URI in the game",
+   "source": "https://xtrata.xyz/forever-twins/assets/leo-cat-forever-twin-logo-1.jpg (registry theme.logo for leo-cats)",
+   "usedAs": "Vault symbol and the If It Fits backdrop. Used as supplied.",
+   "permission": "Xtrata's own Forever Twins asset. Confirm that LEO Cats / Fak.fun are fine with it on the public floor."
+  }
+ ],
+ "brandAssets": [
+  {
+   "name": "Xtrata mark",
+   "file": "tools/nine-lives/model/assets/xtrata.svg (unmodified, sha256 2de985cf\u20264667ec)",
+   "usedAs": "Lower door of the cabinet. Used exactly as given.",
+   "permission": "Own brand"
+  },
+  {
+   "name": "ParallaX Casino wordmark",
+   "file": "tools/nine-lives/model/assets/parallax.svg",
+   "usedAs": "Marquee foot, smaller than the machine name.",
+   "permission": "Own brand"
+  }
+ ],
+ "onChainRecords": [
+  {
+   "symbol": "chain (lit window)",
+   "what": "A cat's Xtrata inscription id once twinned, otherwise its token number",
+   "source": "Read live from the Forever Twins registry (https://xtrata.xyz/forever-twins/data/registry.v2.json) and the LEO Cats helper contract SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata (event log). 101 twins are bundled as a snapshot taken 2 Nov 2026; the count only ever rises, so the snapshot is a safe floor if Xtrata cannot be read."
+  }
+ ],
+ "live": {
+  "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json",
+  "cache": "6 hours, localStorage key xtrata.ninelives.twins.v1",
+  "failedRead": "A failed or empty read is shown as unknown, never as no twins. While unknown, the bundled snapshot (101) keeps the cabinet open."
+ }
+}

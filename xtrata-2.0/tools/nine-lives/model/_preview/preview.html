@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Nine Lives cabinet preview</title>
+<style>html,body{margin:0;background:#0b0612;height:100%;overflow:hidden}canvas{display:block}</style></head>
+<body>
+<!-- Scratch preview for the Nine Lives packed model: same loader as the Snow Crash test page, same studio lights.
+     Open through a web server from tools/nine-lives/model/_preview/ (needs ../nine-lives-model.json and ../../vendor/three.js).
+     Query: ?cam=x,y,z&look=x,y,z&fov=32&lever=0..1&crest=deg&flicker=1 -->
+<script src="../../vendor/three.js"></script>
+<script>
+(async () => {
+  const q = new URLSearchParams(location.search), num = (k, d) => q.has(k) ? q.get(k).split(',').map(Number) : d;
+  const data = await (await fetch('../nine-lives-model.json')).json(), THREE = window.THREE;
+  const images = await Promise.all(data.textures.map(t => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = t.image; })));
+  const geos = data.geometries.map(g => { const o = new THREE.BufferGeometry(); for (const [k, a] of Object.entries(g.attributes)) o.setAttribute(k, new THREE.BufferAttribute(new Float32Array(a.array), a.size)); if (g.index) o.setIndex(g.index); o.computeBoundingSphere(); return o; });
+  const env = document.createElement('canvas'); env.width = 1024; env.height = 512; { const g = env.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 512); ['#cfe6ff', '#1a2a40', '#0a0612', '#12303a'].forEach((c, i) => gr.addColorStop(i / 3, c)); g.fillStyle = gr; g.fillRect(0, 0, 1024, 512); g.fillStyle = '#bff6ee'; g.fillRect(150, 90, 70, 290); g.fillRect(700, 90, 70, 290); g.fillStyle = '#fff'; g.fillRect(400, 10, 220, 60); }
+  const envTex = new THREE.CanvasTexture(env); envTex.mapping = THREE.EquirectangularReflectionMapping;
+  const textures = data.textures.map((t, i) => { const o = new THREE.Texture(images[i]); o.wrapS = t.wrapS; o.wrapT = t.wrapT; o.repeat.fromArray(t.repeat); o.offset.fromArray(t.offset); o.flipY = t.flipY; o.anisotropy = 8; o.needsUpdate = true; return o; });
+  const mats = data.materials.map(m => { const p = { color: m.color, map: m.map == null ? null : textures[m.map], transparent: m.transparent, opacity: m.opacity, side: m.side, depthWrite: m.depthWrite, alphaTest: m.alphaTest };
+    return m.type === 'basic' ? new THREE.MeshBasicMaterial(p) : new THREE.MeshStandardMaterial(Object.assign(p, { roughness: m.roughness, metalness: m.metalness, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, envMap: envTex, envMapIntensity: .65 })); });
+  const parts = {};
+  function node(n) { const o = n.g == null ? new THREE.Group() : new THREE.Mesh(geos[n.g], Array.isArray(n.m) ? n.m.map(i => mats[i]) : mats[n.m]); o.position.fromArray(n.p); o.quaternion.fromArray(n.q); o.scale.fromArray(n.s); o.visible = n.visible;
+    if (n.role) { o.name = 'px-' + n.role; parts[n.role] = o; } if (n.action) o.userData.pxMachineAction = n.action; n.children.forEach(c => o.add(node(c))); return o; }
+  const model = node(data.root);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer.setPixelRatio(1); renderer.setClearColor(0x0b0612); renderer.setSize(innerWidth, innerHeight); document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene(); scene.environment = envTex; scene.add(model);
+  scene.add(new THREE.HemisphereLight(0xd9ffff, 0x0a1220, .6)); const key = new THREE.SpotLight(0xffffff, .9, 40, .6, .6, 1); key.position.set(3, 8, 6); key.target.position.set(0, 2.5, 0); scene.add(key, key.target);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x0a1018, roughness: .35, metalness: .35 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  const glow = new THREE.PointLight(0x12b5a6, 1.1, 14); glow.position.set(0, .6, 3.2); scene.add(glow);
+  const camera = new THREE.PerspectiveCamera(num('fov', [32])[0], innerWidth / innerHeight, .05, 100);
+  const [cx, cy, cz] = num('cam', [0, 2.75 + .06 * 10.6, 10.6]), [lx, ly, lz] = num('look', [0, 2.75, 0]); camera.position.set(cx, cy, cz); camera.lookAt(lx, ly, lz);
+  if (parts.lever) parts.lever.rotation.x = num('lever', [0])[0]; if (parts.crest) parts.crest.rotation.y = num('crest', [0])[0] * Math.PI / 180;
+  if (q.get('flicker') === '1') for (const k of Object.keys(parts)) if (/^win\d+$/.test(k)) parts[k].visible = !parts[k].visible;
+  renderer.render(scene, camera); window.__ready = true;
+  window.__info = { roles: Object.keys(parts), size: new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).toArray() };
+})();
+</script></body></html>
