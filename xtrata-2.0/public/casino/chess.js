@@ -103,6 +103,19 @@
     return { id: p.id, name: p.name, description: p.description, stars: s >= 250 ? 5 : s >= 175 ? 4 : s >= 160 ? 3 : s >= 120 ? 2 : 1 };
   }).sort((a, b) => a.stars - b.stars || a.name.localeCompare(b.name));
 
+  // ======================================================================= results, game ids, hashes (CASINO-CHESS-BETTING-PLAN)
+  const HEX16 = /^[0-9a-f]{16}$/;
+  // 16 hex characters from a string (two 32-bit mixes, cyrb-style): the room compares two pages' copies of a game by this hash of the
+  // move list, without seeing the moves
+  function hash16(str) {
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+  }
+  const RESULT_RE = /^(1-0|0-1|1\/2-1\/2)$/;
+
   // ======================================================================= the relay table (player against player)
   // Run by both browsers on their own copy: the host applies calls in its blocks, the guest replays the same blocks. Every rule is
   // XChess's Position; this only adds seats, clocks (from block time, in seconds) and the XChess game events resgn, draw? and draw!.
@@ -111,13 +124,13 @@
     const side = (who) => (!T.g ? null : who === T.g.white ? 'w' : who === T.g.black ? 'b' : null);
     const turn = () => (T.pos.turn === 0 ? 'w' : 'b');
     const end = (result, term) => { T.g.result = result; T.g.term = term; T.g.winner = result === '1-0' ? 'w' : result === '0-1' ? 'b' : null; };
-    const flagFell = (ctx) => { const g = T.g, s = turn(); if (ctx.time - g.last <= g.clock[s]) return false; g.clock[s] = 0; end(s === 'w' ? '0-1' : '1-0', 'timeout'); return true; };
+    const flagFell = (ctx) => { const g = T.g, s = turn(); if (ctx.time - g.last <= g.clock[s]) return false; g.flagLeft = g.clock[s]; g.clock[s] = 0; end(s === 'w' ? '0-1' : '1-0', 'timeout'); return true; };
     const int = (v, lo, hi, d) => (Number.isSafeInteger(v) && v >= lo && v <= hi ? v : d);
     T.create = (ctx, who, o) => {
       if (T.g || !o || typeof o.white !== 'string' || typeof o.black !== 'string' || o.white === o.black || (who !== o.white && who !== o.black)) return { err: 1 };
       const base = int(o.base, 60, 3600, PVP_BASE), inc = int(o.inc, 0, 30, PVP_INC);
       T.pos = new E.Position(START, 'legal-en-passant');
-      T.g = { white: o.white, black: o.black, stake: int(o.stake, 0, 1e9, 0), base, inc, clock: { w: base, b: base }, last: ctx.time, seenAt: Date.now(), uci: [], san: [], offer: null, result: null, term: null, winner: null, lastMove: null };
+      T.g = { gid: HEX16.test(o.gid) ? o.gid : null, flagLeft: null, white: o.white, black: o.black, stake: int(o.stake, 0, 1e9, 0), base, inc, clock: { w: base, b: base }, last: ctx.time, seenAt: Date.now(), uci: [], san: [], offer: null, result: null, term: null, winner: null, lastMove: null };
       return { ok: 1 };
     };
     T.act = (ctx, who, mv) => {
@@ -135,16 +148,165 @@
       return { ok: 1 };
     };
     T.claimTimeout = (ctx) => { if (!T.g || T.g.result) return { err: 2 }; flagFell(ctx); return { ok: 1 }; };
+    // the room's word (cend) ends a game this page's copy has not ended: a forfeit, or '*' for a game that is called off
+    T.force = (result, term) => { if (!T.g || T.g.result) return false; end(result, term); return true; };
     return T;
   }
-  // A player-against-player game on a relay chain (PvpCore.makeRelayChain), shaped like the Salon's sessions for the lobby.
+  // ---- the chess relay chain: the Salon's relay chain (PvpCore.makeRelayChain in the page) plus what a leaving rule needs.
+  // The host makes a block every 1.5 s; the guest's calls go to the host and come back in a block; both browsers run the same calls with
+  // the block's own time. Added here, for chess only (Hold'em and Liar's Dice keep the page's chain):
+  //  - catch-up: a page that sees a gap, or has just reloaded, asks the other page for the blocks it is missing (d.k 'resend'); the
+  //    answer ('blocks') carries only the calls, one short row each, in a few small pieces sent a little apart (the room allows 30 `pvp`
+  //    messages per 10 s per sender and 1,500 bytes each); the receiver fills in the empty blocks itself;
+  //  - the guest sends a call again until it sees it in a block, and the host drops a repeat by its id;
+  //  - the calls so far are kept in this browser, so a reload carries on (the other page fills in what was missed).
+  const CHAIN_METHODS = { create: 1, act: 1, claimTimeout: 1 };
+  const LIVE_KEY = 'pxChessLive', LIVE_MAX_AGE = 25 * 60 * 1000;
+  const okOp = (o) => o && typeof o.id === 'string' && o.id.length <= 80 && CHAIN_METHODS[o.m] === 1 && Array.isArray(o.args) && o.args.length >= 1 && o.args.length <= 3;
+  // one call as a short row: [kind, value, who, seq]; who 0 is the writer of the rows, 1 the other player; the id is address:seq
+  function encOp(op, self) {
+    const k = op.id.lastIndexOf(':'), by = op.id.slice(0, k), seq = +op.id.slice(k + 1) || 0, who = by === self ? 0 : 1;
+    return op.m === 'act' ? ['a', op.args[1], who, seq] : op.m === 'claimTimeout' ? ['c', 0, who, seq] : ['n', op.args[1], who, seq];
+  }
+  function decOp(r, A, B) {
+    if (!Array.isArray(r) || r.length !== 6 || !Number.isSafeInteger(r[0]) || r[0] < 0 || !Number.isSafeInteger(r[1]) || !Number.isSafeInteger(r[5]) || (r[4] !== 0 && r[4] !== 1)) return null;
+    const who = r[4] ? B : A, id = who + ':' + r[5];
+    if (r[2] === 'a') return typeof r[3] === 'string' && r[3].length <= 5 ? { dh: r[0], dt: r[1], op: { id, m: 'act', args: [who, r[3]] } } : null;
+    if (r[2] === 'c') return { dh: r[0], dt: r[1], op: { id, m: 'claimTimeout', args: [who] } };
+    if (r[2] === 'n') return r[3] && typeof r[3] === 'object' && !Array.isArray(r[3]) ? { dh: r[0], dt: r[1], op: { id, m: 'create', args: [who, r[3]] } } : null;
+    return null;
+  }
+  // blocks (height, time, calls) to rows with the heights and times as steps from the one before: [dh, dt, kind, value, who, seq]
+  function encRows(blocks, h0, t0, self) {
+    const rows = []; let h = h0, t = t0;
+    for (const [bh, bt, ops] of blocks) { ops.forEach((op, i) => { const e = encOp(op, self); rows.push([i ? 0 : bh - h, i ? 0 : bt - t, e[0], e[1], e[2], e[3]]); }); h = bh; t = bt; }
+    return rows;
+  }
+  function decRows(rows, h0, t0, A, B) {
+    const groups = []; let h = h0, t = t0;
+    for (const r of rows) {
+      const x = decOp(r, A, B); if (!x) return null;
+      h += x.dh; t += x.dt; let g = groups[groups.length - 1];
+      if (!g || g.h !== h) { if (x.dh === 0 && g) return null; g = { h, t, ops: [] }; groups.push(g); }
+      g.ops.push(x.op);
+    }
+    return groups;
+  }
+  function makeChain({ host, me, other, send, blockMs, resume }) {
+    const now0 = Date.now();
+    const c = { height: 1000, listeners: [], blockMs: blockMs || 1500, table: null, waiting: new Map(), pending: new Map(), seq: 0, lastBlockAt: now0, dead: false, relay: true, host, kind: 'chess',
+      queue: [], ids: new Set(), log: [], syncing: false, askAt: 0, arrivedAt: now0, streakFrom: now0, catchingUp: false, sending: null, resumeFrom: resume || null, logDirty: false, onSave: null };
+    c.ctx = () => ({ time: Math.floor(Date.now() / 1000), height: c.height, hashAt: () => null });
+    const run = (op, ctx) => { const f = c.table && c.table[op.m]; if (typeof f !== 'function') return { err: -1 }; try { return f(ctx, ...op.args); } catch (e) { console.warn('[chess] a relayed call failed:', op.m, e); return { err: -2 }; } };
+    const notify = () => c.listeners.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+    function applyBlock(h, t, ops) {
+      c.height = h; const ctx = { time: t, height: h, hashAt: () => null };
+      for (const op of ops) { c.ids.add(op.id); const r = run(op, ctx); c.pending.delete(op.id); const w = c.waiting.get(op.id); if (w) { c.waiting.delete(op.id); w(r); } }
+      if (ops.length) { c.log.push([h, t, ops]); c.logDirty = true; }
+    }
+    c.submit = () => Promise.resolve({ err: -3 });
+    c.call = (label, m, args) => new Promise((resolve) => {
+      if (c.dead) { resolve({ err: -4 }); return; }
+      const id = me + ':' + (++c.seq);
+      c.waiting.set(id, resolve);
+      if (host) { c.ids.add(id); c.queue.push({ id, m, args }); }
+      else { c.pending.set(id, { m, args, at: Date.now(), tries: 1 }); send({ k: 'op', id, m, args }); }
+      if (c.onSave) c.onSave();
+    });
+    // host: the other player's call, checked (nobody can play as someone else); a call it has already seen is dropped
+    c.fromGuest = (d) => {
+      if (!host || c.dead || typeof d.m !== 'string' || !Array.isArray(d.args) || typeof d.id !== 'string' || d.id.length > 80 || !d.id.startsWith(other + ':')) return;
+      if (CHAIN_METHODS[d.m] !== 1 || d.m === 'create' || d.args.length > 3) return;
+      if (d.m === 'act' && d.args[0] !== other) return;
+      if (c.ids.has(d.id)) return;
+      c.ids.add(d.id); c.queue.push({ id: d.id, m: d.m, args: d.args });
+    };
+    c.tick = () => {
+      if (!host || c.dead || c.syncing) return;
+      const t = Math.floor(Date.now() / 1000), q = c.queue; c.queue = [];
+      applyBlock(c.height + 1, t, q);
+      send({ k: 'block', h: c.height, hash: rand(32), t, ops: q.map((o) => ({ id: o.id, m: o.m, args: o.args })) });   // (hash: pages before c7 insist on one)
+      c.lastBlockAt = Date.now();
+      notify();
+    };
+    // guest: a block from the host, in order; a block from further on means one was missed, and the host is asked for the rest
+    c.fromHost = (d) => {
+      if (host || c.dead || !d || !Number.isSafeInteger(d.h) || !Number.isSafeInteger(d.t) || !Array.isArray(d.ops) || d.ops.length > 20 || !d.ops.every(okOp)) return;
+      const now = Date.now();
+      if (now - c.arrivedAt > 6000) c.streakFrom = now;       // this page was away or the host went quiet: its own count of a turn is not to be trusted
+      c.arrivedAt = now; c.lastBlockAt = now;
+      if (d.h <= c.height) return;
+      if (d.h !== c.height + 1) { c.streakFrom = now; c.ask(); return; }
+      applyBlock(d.h, d.t, d.ops.map((o) => ({ id: o.id, m: o.m, args: o.args })));
+      notify();
+    };
+    c.ask = () => { const now = Date.now(); if (c.dead || now - c.askAt < 2500) return; c.askAt = now; send({ k: 'resend', from: c.height }); };
+    // the other page's catch-up messages
+    c.onPeer = (d) => {
+      if (c.dead || !d) return;
+      if (d.k === 'resend') {
+        const from = d.from; if (!Number.isSafeInteger(from) || from < 1000) return;
+        const now = Date.now(); if (c.sending && now < c.sending.end && from >= c.sending.from) return;     // that one is already on its way
+        const items = c.log.filter((e) => e[0] > from), chunks = [];
+        let a = from, h = from, t = 0, t0 = 0, rows = [], size = 0;
+        for (const e of items) {
+          const part = encRows([e], h, t, me), len = JSON.stringify(part).length;
+          if (rows.length && size + len > 900) { chunks.push({ a, z: h, t0, b: rows }); a = h; t0 = t; rows = []; size = 0; }
+          rows.push(...encRows([e], h, t, me)); size += len; h = e[0]; t = e[1];
+        }
+        chunks.push({ a, z: Math.max(c.height, from), t0, b: rows });
+        c.sending = { from, end: now + 500 * chunks.length + 1500 };
+        chunks.forEach((ch, i) => setTimeout(() => { if (!c.dead) send({ k: 'blocks', a: ch.a, z: ch.z, t0: ch.t0, b: ch.b }); }, i * 500));
+        return;
+      }
+      if (d.k === 'blocks') {
+        if (!Number.isSafeInteger(d.a) || !Number.isSafeInteger(d.z) || !Number.isSafeInteger(d.t0) || !Array.isArray(d.b) || d.b.length > 80) return;
+        if (c.syncing) { c.syncing = false; clearTimeout(c.syncTimer); }
+        if (d.a > c.height) return;                               // not the next piece: it will be asked for again
+        const groups = decRows(d.b, d.a, d.t0, other, me); if (!groups) return;
+        c.streakFrom = Date.now(); c.catchingUp = true;
+        try { for (const g of groups) if (g.h > c.height) applyBlock(g.h, g.t, g.ops); if (d.z > c.height) c.height = d.z; c.lastBlockAt = c.arrivedAt = Date.now(); notify(); } finally { c.catchingUp = false; }
+      }
+    };
+    // what this browser keeps so that a reload carries on
+    c.exportLog = () => ({ rows: encRows(c.log, 1000, 0, me), height: c.height, seq: c.seq });
+    c.start = () => {            // called once the table is attached: replay what was kept, then ask the other page what came after
+      const r = c.resumeFrom; if (!r) return; c.resumeFrom = null;
+      const groups = decRows(r.rows || [], 1000, 0, me, other);
+      c.catchingUp = true;
+      try { for (const g of groups || []) applyBlock(g.h, g.t, g.ops); if (Number.isSafeInteger(r.height) && r.height > c.height) c.height = r.height; c.seq = Math.max(c.seq, (+r.seq || 0) + 20); } finally { c.catchingUp = false; }
+      c.syncing = true; c.syncTimer = setTimeout(() => { c.syncing = false; }, 5000);       // the other page may be gone: carry on without it
+      c.streakFrom = Date.now(); c.askAt = 0; c.ask();
+    };
+    c.timer = host ? setInterval(c.tick, c.blockMs) : 0;
+    c.rtimer = setInterval(() => {      // a call not yet seen in a block is sent again; a quiet host is asked
+      if (c.dead) return; const now = Date.now();
+      if (!host) {
+        for (const [id, p] of c.pending) if (now - p.at > 3000 && p.tries < 10) { p.at = now; p.tries++; send({ k: 'op', id, m: p.m, args: p.args }); }
+        if (now - c.lastBlockAt > 5000) c.ask();
+      } else if (c.syncing) c.ask();
+    }, 1000);
+    c.stop = (why) => { c.dead = why || 'stopped'; clearInterval(c.timer); clearInterval(c.rtimer); clearTimeout(c.syncTimer); for (const w of c.waiting.values()) w({ err: -4 }); c.waiting.clear(); c.pending.clear(); };
+    return c;
+  }
+  // The saved game of this browser (only a game the room holds the stakes for): where to carry on after a reload
+  const live = {
+    get() { try { const r = JSON.parse(localStorage.getItem(LIVE_KEY)); return r && r.v === 1 && Date.now() - r.at < LIVE_MAX_AGE && HEX16.test(r.gid) ? r : null; } catch (_) { return null; } },
+    set(r) { try { localStorage.setItem(LIVE_KEY, JSON.stringify(r)); } catch (_) { } },
+    clear(gid) { try { const r = JSON.parse(localStorage.getItem(LIVE_KEY)); if (!gid || !r || r.gid === gid) localStorage.removeItem(LIVE_KEY); } catch (_) { try { localStorage.removeItem(LIVE_KEY); } catch (__) { } } }
+  };
+
+  // A player-against-player game on a relay chain, shaped like the Salon's sessions for the lobby.
+  // opts: me, opp, oppName, buyin, tb (the table), host, roomHeld (the room holds the stakes and decides the result: cres)
   function makeSession(chain, opts) {
     if (!engine.api) throw new Error('The XChess engine is not loaded yet.');
     const T = makeRelayTable(engine.api); chain.table = T;
-    const S = { kind: 'chess', chain, table: T, me: opts.me, opp: opts.opp, oppName: opts.oppName || 'Opponent', stake: opts.buyin || opts.stake || 0, settled: false, claiming: 0, onSettle: null, onChange: null };
+    const S = { kind: 'chess', chain, table: T, me: opts.me, opp: opts.opp, oppName: opts.oppName || 'Opponent', stake: opts.buyin || opts.stake || 0, tb: opts.tb || null, roomHeld: !!opts.roomHeld,
+      settled: false, final: null, claiming: 0, onSettle: null, onChange: null, onStall: null, dispute: null, stalled: false, moveN: -1, turnLocal: 0 };
+    S.gid = () => (T.g && T.g.gid) || null;
     S.open = () => {
       const white = crypto.getRandomValues(new Uint8Array(1))[0] & 1 ? S.me : S.opp;
-      return chain.call('create', 'create', [S.me, { white, black: white === S.me ? S.opp : S.me, stake: S.stake, base: PVP_BASE, inc: PVP_INC }]);
+      return chain.call('create', 'create', [S.me, { white, black: white === S.me ? S.opp : S.me, stake: S.stake, base: PVP_BASE, inc: PVP_INC, gid: rand(8) }]);
     };
     S.send = (mv) => chain.call('act', 'act', [S.me, mv]);
     S.myColour = () => (T.g ? (T.g.white === S.me ? 'w' : 'b') : null);
@@ -155,13 +317,35 @@
       if (!g.result) { const s = T.pos.turn === 0 ? 'w' : 'b'; c[s] = Math.max(0, g.clock[s] - (Date.now() - g.seenAt) / 1000); }
       return c;
     };
-    S.dispose = () => { };
+    // what this page's copy says, for the room (cres): the result, and a hash of the move list
+    S.report = () => { const g = T.g; if (!g || !g.gid) return null; return { gid: g.gid, r: S.dispute ? '*' : g.result || '*', n: g.uci.length, h: hash16(g.uci.join(' ')), ...(S.dispute ? { tm: 'dispute' } : g.result ? { tm: g.term } : {}) }; };
+    // the room's word ends the game on this page too (a forfeit, or a game called off)
+    S.end = (result, term) => { S.settled = true; T.force(result, term); if (S.onChange) try { S.onChange(); } catch (e) { console.error(e); } };
+    // keep the calls so far in this browser, for a reload (only while the room holds the stakes)
+    S.save = () => {
+      if (!S.roomHeld || !T.g || !T.g.gid || S.final) return;
+      const e = chain.exportLog(); live.set({ v: 1, tb: S.tb, gid: T.g.gid, host: !!chain.host, me: S.me, other: S.opp, otherName: S.oppName, stake: S.stake, at: Date.now(), rows: e.rows, height: e.height, seq: e.seq });
+    };
+    chain.onSave = S.save;
+    S.dispose = () => { if (S.roomHeld && (S.final || (T.g && T.g.result))) live.clear(S.gid()); };
     chain.listeners.push(() => {
       const g = T.g;
+      if (g && g.uci.length !== S.moveN) { S.moveN = g.uci.length; S.turnLocal = chain.catchingUp ? -1 : Date.now(); }   // when this page saw the turn begin (-1: late, by catch-up)
+      if (chain.logDirty) { chain.logDirty = false; S.save(); }
       if (g && g.result && !S.settled) {
         S.settled = true;
+        // a time-out the host flagged long before this page's own count of the turn says it was due: the guest calls it a dispute
+        if (!chain.host && g.term === 'timeout' && g.flagLeft != null && S.turnLocal > 0 && chain.streakFrom <= S.turnLocal) {
+          const left = g.flagLeft, real = (Date.now() - S.turnLocal) / 1000;
+          if (real < left - (5 + 0.05 * left)) S.dispute = { real, left };
+        }
         const mine = S.myColour(), net = g.winner === null ? 0 : g.winner === mine ? S.stake : -S.stake;
         if (S.onSettle) try { S.onSettle(net, g); } catch (e) { console.error(e); }
+      }
+      // the host's clock stopped moving while the real turn went on: the guest, by its own count, says the host has run out of time
+      if (!chain.host && g && !g.result && !S.stalled && S.turnLocal > 0 && chain.streakFrom <= S.turnLocal) {
+        const s = T.pos.turn === 0 ? 'w' : 'b', hostSide = g.white === S.opp ? 'w' : 'b';
+        if (s === hostSide) { const left = g.clock[s], real = (Date.now() - S.turnLocal) / 1000; if (real > left + 5 + 0.05 * left) { S.stalled = true; if (S.onStall) try { S.onStall(); } catch (e) { console.error(e); } } }
       }
       // the host calls the flag: the side to move has run out of time
       if (chain.host && g && !g.result && Date.now() > S.claiming) {
@@ -170,6 +354,7 @@
       }
       if (S.onChange) try { S.onChange(); } catch (e) { console.error(e); }
     });
+    if (chain.start) chain.start();       // a game being resumed after a reload replays here
     return S;
   }
 
@@ -449,6 +634,7 @@
 .pxc .rv{gap:4px}.pxc .rv button{all:unset;cursor:pointer;min-width:34px;min-height:34px;box-sizing:border-box;text-align:center;padding:6px 8px;border-radius:8px;border:1px solid rgba(212,168,58,.45);background:rgba(8,18,32,.8);color:#f1e3b8;font:700 13px system-ui,sans-serif}
 .pxc .rv button:disabled{opacity:.35;cursor:default}.pxc .rv button.live{padding:6px 12px;border-color:#d4a83a;color:#ffd86b}.pxc .rv button.live.go{background:#d4a83a;color:#170c04;animation:pxcGo 1.2s ease-in-out infinite}
 @keyframes pxcGo{50%{box-shadow:0 0 0 4px rgba(255,216,107,.25)}}
+.pxc-bets{display:flex;flex-direction:column;gap:5px;padding:7px 9px;border-radius:10px;border:1px solid rgba(212,168,58,.35);background:rgba(8,18,32,.6)}.pxc-bets b{color:#ffd86b}.pxc-bets .gone{color:#ff9a7a}
 .pxc .promo button{all:unset;cursor:pointer;font-size:28px;line-height:1;padding:6px 10px;border-radius:8px;border:1px solid rgba(212,168,58,.5);background:rgba(8,18,32,.8);color:#f1e3b8;min-width:28px;text-align:center}`;
     document.head.appendChild(st);
   }
@@ -549,6 +735,7 @@
     const WATCH_SEAT = { x: 1.08, z: 0.12, pad: true, watch: true, stand: { x: 1.45, z: 0.35 } };
     let pick = { profile: saved.profile || 'gambit', colour: saved.colour || 'w', stake: 0 };
     let sel = null, targets = [], promo = null, hint = null, hintUntil = 0, msg = '', tone = '', busy = false, lastSec = -1, S = null, result = null;
+    let B = null, betAmt = 100, goneInfo = null, resumeTry = 0, askBetAt = 0;   // the bets on the game being watched; a player who has left (cgone); the saved game to carry on
     // move review (CASINO-CHESS-NEXT-PLAN section 2): null is the live game, a number the position after that many half-moves
     let rv = null, rvNew = false, rvTimer = 0, rvLen = 0;
     const watchingHere = () => ctx.focus() === st && !!(ctx.seat() && ctx.seat().watch);
@@ -882,9 +1069,10 @@
     function snapshot() {
       const g = S && S.table.g; if (!g) return null;
       const c = S.clocks(), m = packMoves(g.uci);
-      const d = { k: 1, w: g.white, b: g.black, on: S.oppName, f: S.table.pos.fen(), l: g.uci.length ? g.uci[g.uci.length - 1] : '', c: [Math.round(c.w), Math.round(c.b)], st: S.stake };
-      if (m.length <= 1000) d.m = m;          // a very long game sends the position only
-      if (g.result) { d.r = g.result; d.tm = g.term; }
+      const d = { k: 1, w: g.white, b: g.black, on: S.oppName, f: S.table.pos.fen(), l: g.uci.length ? g.uci[g.uci.length - 1] : '', c: [Math.round(c.w), Math.round(c.b)], st: S.stake, sk: S.stake };
+      if (g.gid) d.gid = g.gid;               // the room opens the bets on the first snapshot of a game id
+      if (m.length <= 900) d.m = m;           // a very long game sends the position only
+      if (g.result && RESULT_RE.test(g.result)) { d.r = g.result; d.tm = g.term; }
       if (g.offer) d.of = g.offer;
       return d;
     }
@@ -897,11 +1085,41 @@
       const d = snapshot(); if (!d) return;
       specSent = { key, at: now }; ctx.roomSend({ t: 'spec', tb: def.id, d });
     }
+    // a game against a house player is played in this page alone, but the table can still be watched: the same snapshot, with the
+    // house player as one side ("house:<profile id>", and d.h = the profile id). There is no game id, so the room neither holds
+    // stakes nor opens bets on it, and a house game is always friendly.
+    function houseSnapshot() {
+      const me0 = ctx.roomMe(); if (!H || !me0 || !/^[a-z0-9-]{1,24}$/.test(H.profile)) return null;
+      const prof = houseList().find((x) => x.id === H.profile); if (!prof) return null;
+      const hid = 'house:' + H.profile, m = packMoves(H.uci), white = H.me === 'w';
+      const d = { k: 1, w: white ? me0 : hid, b: white ? hid : me0, h: H.profile, on: String(prof.name).slice(0, 40), f: H.pos.fen(), l: H.uci.length ? H.uci[H.uci.length - 1] : '', st: 0 };
+      if (m.length <= 900) d.m = m;
+      if (H.over && RESULT_RE.test(H.over.result)) { d.r = H.over.result; d.tm = H.over.termination; }
+      return d;
+    }
+    let houseSent = { key: '', at: 0 };
+    function houseSend(force) {
+      if (S || !H || ctx.focus() !== st || !ctx.roomHas('spec')) return;
+      const key = H.profile + '|' + H.uci.length + '|' + (H.over ? H.over.result : ''), now = Date.now();
+      if (!force && key === houseSent.key && now - houseSent.at < SPEC_BEAT) return;
+      if (H.over && key === houseSent.key && !force) return;   // a finished game is announced once (and to anyone who asks)
+      const d = houseSnapshot(); if (!d) return;
+      houseSent = { key, at: now }; ctx.roomSend({ t: 'spec', tb: def.id, d });
+    }
     const onSpec = (m) => {
-      if (m.ask) { if (S && S.chain.host && Date.now() - specAnswerAt > 1000) { specAnswerAt = Date.now(); specSend(true); } return; }
-      if (S) return;                                       // you are playing at this table: your own copy is the truth
+      if (m.ask) {
+        if (S && S.chain.host && Date.now() - specAnswerAt > 1000) { specAnswerAt = Date.now(); specSend(true); }
+        else if (!S && H && ctx.focus() === st && Date.now() - specAnswerAt > 1000) { specAnswerAt = Date.now(); houseSend(true); }
+        return;
+      }
+      if (S || (H && ctx.focus() === st)) return;          // you are playing at this table: your own copy is the truth
       const d = m.d, E = engine.api;
       if (!E || !d || typeof d !== 'object' || typeof d.f !== 'string' || typeof d.w !== 'string' || typeof d.b !== 'string' || (m.a !== d.w && m.a !== d.b)) return;
+      // a house player is a side called "house:<profile id>" (d.h): the other side must be the sender, and nothing about it is staked
+      const hs = typeof d.h === 'string' && /^[a-z0-9-]{1,24}$/.test(d.h) ? d.h : null;
+      const houseSide = hs && d.w === 'house:' + hs ? 'w' : hs && d.b === 'house:' + hs ? 'b' : null;
+      if ((d.w.startsWith('house:') || d.b.startsWith('house:')) && !houseSide) return;
+      if (houseSide && (houseSide === 'w' ? d.b : d.w) !== m.a) return;
       const me0 = ctx.roomMe(); if (me0 && (d.w === me0 || d.b === me0) && lobby.match) return;
       // the moves are replayed with XChess and must reach the position sent; without them, the position alone is shown
       let p = null, uci = null; const moves = d.m !== undefined ? unpackMoves(d.m) : null;
@@ -911,9 +1129,11 @@
       const key = d.w + '|' + d.b, same = R && R.key === key && (!uci || !R.uci || uci.length >= R.uci.length);
       const l = typeof d.l === 'string' && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(d.l) ? [d.l.slice(0, 2), d.l.slice(2, 4)] : null;
       const c = Array.isArray(d.c) && d.c.length === 2 && d.c.every((x) => Number.isFinite(x) && x >= 0 && x < 1e5) ? { w: d.c[0], b: d.c[1] } : null;
-      const was = R;
-      R = { key, w: d.w, b: d.b, wn: name(senderIsWhite ? m.n : d.on) || 'White', bn: name(senderIsWhite ? d.on : m.n) || 'Black', pos: p, uci, last: l, clocks: c, rx: Date.now(),
-            result: typeof d.r === 'string' && /^(1-0|0-1|1\/2-1\/2)$/.test(d.r) ? d.r : null, term: typeof d.tm === 'string' ? d.tm.slice(0, 24) : null, stake: Number.isSafeInteger(d.st) && d.st > 0 ? d.st : 0, offer: d.of === 'w' || d.of === 'b' ? d.of : null };
+      const was = R, gid = !houseSide && typeof d.gid === 'string' && HEX16.test(d.gid) ? d.gid : null;
+      R = { key, gid, w: d.w, b: d.b, wn: name(senderIsWhite ? m.n : d.on) || 'White', bn: name(senderIsWhite ? d.on : m.n) || 'Black', pos: p, uci, last: l, clocks: c, rx: Date.now(),
+            result: typeof d.r === 'string' && /^(1-0|0-1|1\/2-1\/2)$/.test(d.r) ? d.r : null, term: typeof d.tm === 'string' ? d.tm.slice(0, 24) : null, stake: !houseSide && Number.isSafeInteger(d.st) && d.st > 0 ? d.st : 0, house: houseSide ? hs : null, offer: d.of === 'w' || d.of === 'b' ? d.of : null };
+      if (houseSide) { if (houseSide === 'w') R.wn = R.wn + ' · house player'; else R.bn = R.bn + ' · house player'; }
+      if (!was || was.gid !== R.gid) { B = null; goneInfo = null; askBets(true); }
       if (showR()) { if (!same) { sel = null; targets = []; rv = null; rvNew = false; stopPlay(); board.clear(); } paint(!same); if (was && !was.result && R.result) ctx.sfx('win'); }
       if (ctx.focus() === st) ctx.render();
     };
@@ -926,6 +1146,7 @@
     function specFrame() {
       const now = Date.now();
       if (S) { specSend(false); return; }
+      if (H && ctx.focus() === st) { houseSend(false); return; }   // your own game against a house player: people at the table can watch it too
       // standing by (or sitting to watch) a table where other people sit: ask the host for the game, unless it is already showing
       const here = ctx.watching() === def.id, taken = ctx.taken().filter((x) => x.split('.')[0] === def.id).length;
       if (!here) hereSince = 0; else if (!hereSince) hereSince = now;
@@ -941,10 +1162,17 @@
     // ---- player against player
     lobby.busy = () => !!(H && !H.over && H.uci.length > 0);
     lobby.onStart = (session) => {
-      S = session; H = null; R = null; specSent = { key: '', at: 0 }; sel = null; targets = []; promo = null; hint = null; result = null; rv = null; rvNew = false; stopPlay(); board.clear();
+      S = session; H = null; R = null; B = null; goneInfo = null; specSent = { key: '', at: 0 }; sel = null; targets = []; promo = null; hint = null; result = null; rv = null; rvNew = false; stopPlay(); board.clear();
       S.onChange = () => { if (S === session) { specSend(false); refresh(); } };
+      S.onStall = () => { if (S !== session) return; const win = S.myColour() === 'w' ? '1-0' : '0-1'; msg = 'Your opponent\'s clock has run out by this page\'s count. Waiting for the room…'; tone = ''; sendReport({ r: win, tm: 'timeout' }, true); refresh(); };
       S.onSettle = (net, gm) => {
         const mine = S.myColour(), won = gm.winner === mine, draw = gm.winner === null;
+        if (S.roomHeld) {
+          // the room holds the stakes and decides: say what this page's copy shows, send it to the room, and wait for cend
+          result = { won, draw, term: gm.term, res: gm.result, pending: true };
+          msg = (draw ? 'Draw' : won ? 'You win' : S.oppName + ' wins') + ' · ' + gm.result + ' by ' + (TERM[gm.term] || gm.term) + '. Waiting for the room to confirm…'; tone = '';
+          sendReport(null, true); return;
+        }
         if (S.stake > 0) ctx.setBank(ctx.bank() + (draw ? S.stake : won ? 2 * S.stake : 0));
         result = { won, draw, term: gm.term, res: gm.result };
         msg = (draw ? 'Draw' : won ? 'You win' : S.oppName + ' wins') + ' · ' + gm.result + ' by ' + (TERM[gm.term] || gm.term) + (S.stake > 0 ? (draw ? '. Stakes returned.' : won ? '. You take ' + ctx.money(2 * S.stake) + '.' : '.') : '.');
@@ -954,14 +1182,132 @@
       msg = 'Game on against ' + S.oppName + '. Colours are being drawn…'; tone = '';
       paint(true); if (ctx.focus() === st) ctx.render();
     };
-    lobby.onEnd = () => { S = null; result = null; sel = null; targets = []; rv = null; rvNew = false; stopPlay(); board.clear(); paint(true); msg = ''; if (ctx.focus() === st) ctx.render(); };
+    lobby.onEnd = () => { stopReports(); S = null; result = null; goneInfo = null; sel = null; targets = []; rv = null; rvNew = false; stopPlay(); board.clear(); paint(true); msg = ''; if (ctx.focus() === st) ctx.render(); };
+
+    // ---- the room decides (cres): this page reports what its copy of the game says, the room compares the two and answers with cend
+    const emit = (m) => ctx.roomSend(Object.assign({ tb: def.id }, m));
+    let repTimer = 0, repLast = null, repTries = 0;
+    function stopReports() { clearInterval(repTimer); repTimer = 0; repLast = null; repTries = 0; }
+    function sendReport(extra, keep) {
+      if (!S || !S.roomHeld || !ctx.roomHas('cres')) return; const rp = S.report(); if (!rp) return;
+      repLast = Object.assign(rp, extra || {}); emit(Object.assign({ t: 'cres' }, repLast));
+      if (keep && !repTimer) { repTries = 0; repTimer = setInterval(() => { if (!S || S.final || ++repTries > 6) { stopReports(); return; } emit(Object.assign({ t: 'cres' }, repLast)); }, 15000); }
+    }
+    const cleanName = (a) => (S && a === S.opp ? S.oppName : R && a === R.w ? R.wn : R && a === R.b ? R.bn : 'A player');
+    function onCend(m) {
+      const gid = typeof m.gid === 'string' ? m.gid : null, r = typeof m.r === 'string' ? m.r : '*', how = typeof m.how === 'string' ? m.how : 'void', tm = typeof m.tm === 'string' ? m.tm : '';
+      if (!S || (S.gid() && gid && S.gid() !== gid)) {
+        // a game this page is not running (it was reloaded, or the room decided while the player was away): say how it ended
+        const live0 = live.get(); if (live0 && (!gid || live0.gid === gid)) live.clear(live0.gid);
+        if (R && R.gid === gid) { ctx.render(); return; }
+        if (how === 'forfeit' && m.a && m.a === ctx.roomMe()) ctx.toast('Your chess game ended while you were away: it counted as a resignation.');
+        else if (how === 'forfeit') ctx.toast('Your opponent left your chess game: you win ' + (r === '1-0' ? '1-0' : r === '0-1' ? '0-1' : '') + ' by forfeit.');
+        else if (how === 'agreed' || how === 'unchallenged') ctx.toast('Your chess game ended ' + r + '.');
+        else ctx.toast('Your chess game was called off and the stakes were returned.');
+        return;
+      }
+      stopReports(); const mine = S.myColour(), winner = r === '1-0' ? 'w' : r === '0-1' ? 'b' : null, off = how === 'disputed' || how === 'expired' || how === 'void' || r === '*';
+      const won = !off && winner === mine, draw = !off && winner === null, net = off || draw ? 0 : won ? S.stake : -S.stake, stake = S.stake;
+      S.final = { r, tm, how, a: m.a || null }; S.end(off ? '*' : r, off ? how : tm || (how === 'forfeit' ? 'resignation' : 'agreement'));
+      result = { won, draw, off, term: tm, res: r };
+      const left = how === 'forfeit' && m.a === S.me, they = how === 'forfeit' && m.a && m.a !== S.me;
+      if (how === 'disputed') msg = 'The two copies of the game did not match, so the room called it off.' + (stake ? ' Your stake was returned.' : '');
+      else if (how === 'expired') msg = 'The room could not confirm a result in time, so the game was called off.' + (stake ? ' Your stake was returned.' : '');
+      else if (off) msg = 'The game could not be started by the room' + (stake ? ' (a stake could not be covered), so it was called off and nothing was taken.' : ', so it was called off.');
+      else if (left) msg = 'You were away too long, so the game counted as a resignation.' + (stake ? ' ' + S.oppName + ' takes ' + ctx.money(2 * stake) + '.' : '');
+      else if (they) msg = S.oppName + ' left the game, so you win by forfeit' + (stake ? '. You take ' + ctx.money(2 * stake) + '.' : '.');
+      else msg = (draw ? 'Draw' : won ? 'You win' : S.oppName + ' wins') + ' · ' + r + ' by ' + (TERM[tm] || tm || 'agreement') + (stake > 0 ? (draw ? '. Stakes returned.' : won ? '. You take ' + ctx.money(2 * stake) + '.' : '.') : '.');
+      tone = off || draw ? '' : won ? 'win' : 'lose'; ctx.sfx(won ? 'win' : draw ? 'move' : 'lose');
+      if (stake > 0 && !off && !draw) ctx.outcome(st, net, stake);          // the look of it only: the room has already paid, through bal
+      live.clear(S.gid()); goneInfo = null; refresh();
+    }
+    function onGone(m) {
+      const g = S ? S.gid() : R && R.gid; if (!g || m.gid !== g) return;
+      goneInfo = m.back ? null : { a: m.a, until: m.until, at: Date.now() };
+      if (!m.back && S && m.a === S.opp) ctx.toast(S.oppName + ' has left the table. If they do not come back in about 90 seconds, you win.');
+      if (ctx.focus() === st) ctx.render();
+    }
+    const SIDE = { w: 'White', b: 'Black' };
+    function askBets(first) {
+      if (!ctx.roomHas('cbet') || !R || !R.gid) return; const me0 = ctx.roomMe(); if (!me0 || me0 === R.w || me0 === R.b) return;
+      const now = Date.now(); if (!first && now - askBetAt < 6000) return; askBetAt = now; emit({ t: 'cbet', gid: R.gid, ask: true });
+    }
+    const BET_ERR = { closed: 'Bets on this game are closed.', self: 'You cannot bet on a game you are playing.', min: 'The smallest bet is 100 LAYR.', max: 'That is over the largest bet (10,000 LAYR on a game).', full: 'This game already has as many people betting as it can take.', side: 'You have backed the other side in this game.', funds: 'Not enough LAYR for that bet.', off: 'Betting is switched off right now.', 'not-here': 'Stand or sit at this table to bet on its game.', 'too-fast': 'One bet at a time.' };
+    function onBet(m) {
+      const g = R && R.gid; if (!g || (m.gid && m.gid !== g)) return;
+      if (!B || B.gid !== g) B = { gid: g, pool: { w: 0, b: 0 }, n: 0, closes: 0, my: null, closed: false };
+      if (m.err) { if (m.err === 'closed') B.closed = true; ctx.toast(BET_ERR[m.err] || 'The room did not take that bet.'); }
+      else if (m.ok) { B.my = { side: m.side, amt: m.amt }; ctx.toast('Your bet: ' + ctx.money(m.amt) + ' on ' + SIDE[m.side] + ' (play money).'); }
+      if (m.pool && Number.isFinite(m.pool.w) && Number.isFinite(m.pool.b)) B.pool = { w: m.pool.w, b: m.pool.b };
+      if (Number.isFinite(m.closes) && m.closes > 0) B.closes = m.closes;
+      if (ctx.focus() === st) ctx.render();
+    }
+    function onPool(m) {
+      const g = (S && S.gid()) || (R && R.gid); if (!g || m.gid !== g) return;
+      if (!B || B.gid !== g) B = { gid: g, pool: { w: 0, b: 0 }, n: 0, closes: 0, my: null, closed: false };
+      if (m.pool && Number.isFinite(m.pool.w) && Number.isFinite(m.pool.b)) B.pool = { w: m.pool.w, b: m.pool.b };
+      if (Number.isFinite(m.n)) B.n = m.n; if (Number.isFinite(m.closes) && m.closes > 0) B.closes = m.closes;
+      if (ctx.focus() === st) ctx.render();
+    }
+    function onPay(m) {
+      const won = Number.isFinite(m.won) ? m.won : 0, stake = Number.isFinite(m.stake) ? m.stake : 0, side = SIDE[m.side] || '';
+      if (won > stake) { ctx.toast('You won ' + ctx.money(won) + ' on ' + side + ' (play money).'); ctx.sfx('win'); }
+      else if (won > 0) ctx.toast('Your ' + ctx.money(stake) + ' bet on ' + side + ' was returned.');
+      else ctx.toast('You lost ' + ctx.money(stake) + ' on ' + side + ' (play money).');
+      B = null; if (ctx.focus() === st) ctx.render();
+    }
+    // the room's messages about this table's game (PXChess.onRoom hands them over by table)
+    const onRoomMsg = (m) => {
+      if (m.t === 'cres') {            // the room asks for this page's copy
+        if (m.ask && S && S.roomHeld && S.gid() && m.gid === S.gid()) { const rp = S.report(); if (rp) emit(Object.assign({ t: 'cres' }, rp)); }
+        return;
+      }
+      if (m.t === 'cend') return onCend(m);
+      if (m.t === 'cgone') return onGone(m);
+      if (m.t === 'cbet') return onBet(m);
+      if (m.t === 'cpool') return onPool(m);
+      if (m.t === 'cpay') return onPay(m);
+    };
+    // the bets panel for people watching (the two players do not see the buttons)
+    function betsView() {
+      const none = { html: '', actions: [] };
+      if (!ctx.roomHas('cbet') || !R || !R.gid || R.result) return none;
+      const me0 = ctx.roomMe(), isPlayer = !!me0 && (me0 === R.w || me0 === R.b), b = B && B.gid === R.gid ? B : null;
+      const left = b && b.closes ? (b.closes - (ctx.roomNow ? ctx.roomNow() : Date.now())) / 1000 : null, open = !(b && b.closed) && (left === null || left > 0);
+      const pool = b ? b.pool : { w: 0, b: 0 };
+      const head = `<div class="row"><span class="who">Bets</span><span class="dim">${open ? (left === null ? 'open' : 'close in ' + clock(left)) : 'closed'} · play money</span></div>`;
+      const pools = `<div class="row"><span>White <b>${ctx.money(pool.w)}</b></span><span>Black <b>${ctx.money(pool.b)}</b></span>${b && b.n ? `<span class="dim">· ${b.n} backing</span>` : ''}</div>`;
+      if (isPlayer) return { html: open ? '' : `<div class="pxc-bets">${head}${pools}</div>`, actions: [] };
+      const mine = b && b.my ? `<div class="who">Your bet: ${ctx.money(b.my.amt)} on ${SIDE[b.my.side]}</div>` : '';
+      const amts = [100, 500, 1000, 5000].map((v) => `<button data-a="betamt" data-v="${v}" aria-pressed="${betAmt === v}">${v >= 1000 ? v / 1000 + 'k' : v}</button>`).join('');
+      const picker = open ? `<div class="row"><span class="dim">Bet</span><span class="pxc-seg">${amts}</span><span class="dim">LAYR (100 to 10,000)</span></div>` : '';
+      const acts = open ? ['w', 'b'].map((sd) => ({ id: 'cbet:' + sd, label: 'Back ' + SIDE[sd] + ' · ' + ctx.money(betAmt), dis: !!(b && b.my && b.my.side !== sd) || ctx.bank() < betAmt })) : [];
+      return { html: `<div class="pxc-bets">${head}${pools}${mine}${picker}</div>`, actions: acts };
+    }
+    // the two players see what is riding on the game once the betting has closed
+    function poolsLine() {
+      if (!S || !B || B.gid !== S.gid() || !B.closes || (ctx.roomNow ? ctx.roomNow() : Date.now()) < B.closes) return '';
+      return `<div class="pxc-bets"><div class="row"><span class="who">Spectator bets</span><span class="dim">closed · play money</span></div><div class="row"><span>White <b>${ctx.money(B.pool.w)}</b></span><span>Black <b>${ctx.money(B.pool.b)}</b></span></div></div>`;
+    }
+    function goneLine() {
+      if (!goneInfo || S && S.final) return '';
+      if (S) return goneInfo.a === S.opp ? `<div class="who gone">${esc(S.oppName)} has left the table. If they do not come back in about 90 seconds, you win.</div>` : '';
+      if (!R) return ''; const gn = cleanName(goneInfo.a), other = goneInfo.a === R.w ? R.bn : R.wn;
+      return `<div class="who gone">${esc(gn)} has left the table. If they do not come back in about 90 seconds, ${esc(other)} wins.</div>`;
+    }
+    // a game of this browser that was on when the page reloaded: carry on once the room knows who you are again (cres only)
+    function tryResume() {
+      if (S || H || !engine.api || !lobby.resume || !ctx.roomHas('cres') || Date.now() - resumeTry < 1500) return; resumeTry = Date.now();
+      const r = live.get(); if (!r || r.tb !== def.id || ctx.roomMe() !== r.me || !lobby.available()) return;
+      if (lobby.resume(r)) ctx.toast('Your chess game against ' + (r.otherName || 'your opponent') + ' is still on. Sit back down at the table to carry on.');
+    }
 
     // ---- the station
     const st = {
       id: def.id, name: def.name, group: g, noStools: true, chipMode: 'none', board, lobby,
       cam: { off: new THREE.Vector3(0, 1.3, 0.8), look: new THREE.Vector3(0, 0.55, -0.04) },
       frameCentre: new THREE.Vector3(0, 0.56, 0),
-      rules: { title: 'Chess', steps: ['Play one of the ten XChess house players for free, or a player in the room. Pick a house player and a colour, then Play.', 'Tap one of your pieces, then a glowing square to move it. Castling, en passant and promotion all work; you choose the promotion piece.', 'Checkmate, stalemate, threefold repetition, the fifty-move rule and insufficient material end the game, exactly as in XChess.', 'Against a player: 10 minutes each plus 3 seconds a move. Friendly, or a LAYR stake where the winner takes both. Leaving or losing the connection voids the game and returns stakes.', 'House moves come from XChess engine inscription #3049 with a seed fixed at the start. After each house game the whole game is replayed with the engine to check every house move.', 'The pieces each side has taken, and +N for the side ahead (pawn 1, knight and bishop 3, rook 5, queen 9), are shown by each name. |◀ ◀ ▶ ▶| (or the arrow keys) look back through the moves; Back to the game returns, and so does touching the board.', 'X-Chess, under View, gives a flat board in the X-Chess style, the easiest way to see the position. Tap or drag the pieces there in the same way; Esc goes back to the room.'] },
+      rules: { title: 'Chess', steps: ['Play one of the ten XChess house players for free, or a player in the room. Pick a house player and a colour, then Play.', 'Tap one of your pieces, then a glowing square to move it. Castling, en passant and promotion all work; you choose the promotion piece.', 'Checkmate, stalemate, threefold repetition, the fifty-move rule and insufficient material end the game, exactly as in XChess.', 'Against a player: 10 minutes each plus 3 seconds a move. Friendly, or a LAYR stake where the winner takes both. Leaving the room, or going silent for about 90 seconds, counts as resigning: your opponent takes the stakes. A short drop is fine; the game catches up when you come back (sit at the table again). People watching can back a side with play money before the game is 90 seconds old.', 'House moves come from XChess engine inscription #3049 with a seed fixed at the start. After each house game the whole game is replayed with the engine to check every house move.', 'The pieces each side has taken, and +N for the side ahead (pawn 1, knight and bishop 3, rook 5, queen 9), are shown by each name. |◀ ◀ ▶ ▶| (or the arrow keys) look back through the moves; Back to the game returns, and so does touching the board.', 'X-Chess, under View, gives a flat board in the X-Chess style, the easiest way to see the position. Tap or drag the pieces there in the same way; Esc goes back to the room.'] },
       seats: SEATS,
       camFor(seat, view, asp) {
         if (view === 'xchess') view = 'overhead';   // behind the X-Chess view, the room keeps the top-down shot
@@ -983,7 +1329,7 @@
       },
       canLeave() { return !(S && S.table.g && !S.table.g.result) && !busy; },
       leaveCash() { },
-      held() { return S && !S.settled ? S.stake : 0; },
+      held() { return S && !S.settled && !S.roomHeld ? S.stake : 0; },
       pickClick(ev) {
         if (ctx.focus() !== st) return false;
         if (performance.now() - lastHandled < 800) return true;              // the same tap, already handled as a pointer
@@ -995,7 +1341,7 @@
       lookStart() { if (grab && !grab.from) grab = null; },        // the page took the drag to look around: that press is no tap
       aim() { return aimOn; },                                     // the dot (mouse captured) is on something you can pick up or move to
       update(t) {
-        board.update(); lobby.frame(ctx.focus() === st);
+        board.update(); lobby.frame(ctx.focus() === st); tryResume(); if (R && R.gid && !S) askBets(false);
         if (!grab) board.home();
         if (ctx.focus() === st) {
           const cv = ctx.canvasEl(); if (cv && cv.clientWidth) OUTLINES.forEach((m) => { m.uniforms.res.value.set(cv.clientWidth, cv.clientHeight); m.uniforms.px.value = cv.clientWidth < 700 ? 2.0 : 1.7; });
@@ -1042,6 +1388,7 @@
           game = `<div class="pxc"><div class="row">${ck('b', R.bn)}</div><div class="row">${ck('w', R.wn)}<span class="dim">· ${R.stake ? ctx.money(R.stake) + ' each' : 'friendly'}</span></div>${mv}${R.offer && !R.result ? `<div class="dim">${esc(R.offer === 'w' ? R.wn : R.bn)} has offered a draw.</div>` : ''}</div>`;
           msg = R.result ? (R.result === '1/2-1/2' ? 'Drawn' : (R.result === '1-0' ? R.wn : R.bn) + ' wins') + ' · ' + R.result + ' by ' + (TERM[R.term] || R.term || 'agreement') + '.' : 'Watching · ' + (turn === 'w' ? R.wn : R.bn) + ' to move' + (R.pos.inCheck() ? ' (check!)' : '') + '.';
           tone = '';
+          const bv = betsView(); game = game.replace(/<\/div>$/, goneLine() + bv.html + '</div>'); a.push(...bv.actions);
           return { msg, tone, hint: '', game, actions: a, chips: null, lock: false, canGetLAYR: false };
         }
         if (!S && watchingHere()) {
@@ -1053,7 +1400,7 @@
           else {
             const turn = p.turn === 0 ? 'w' : 'b', theirs = mine === 'w' ? 'b' : 'w';
             const ck = (s, who) => `<span class="clk ${!gm.result && turn === s ? 'on' : ''} ${c[s] < 30 ? 'low' : ''}">${clock(c[s])}</span> <span class="who">${esc(who)} ${s === 'w' ? '♔' : '♚'}</span>${matHtml(s)}`;
-            game = `<div class="pxc"><div class="row">${ck(theirs, S.oppName)}</div><div class="row">${ck(mine, 'You')}${S.stake ? `<span class="dim">· ${ctx.money(S.stake)} each</span>` : '<span class="dim">· friendly</span>'}</div>${promoHtml}${movesHtml()}${reviewHtml()}${gm.offer && gm.offer !== mine && !gm.result ? `<div class="who">${esc(S.oppName)} offers a draw.</div>` : ''}</div>`;
+            game = `<div class="pxc"><div class="row">${ck(theirs, S.oppName)}</div><div class="row">${ck(mine, 'You')}${S.stake ? `<span class="dim">· ${ctx.money(S.stake)} each</span>` : '<span class="dim">· friendly</span>'}</div>${promoHtml}${movesHtml()}${reviewHtml()}${gm.offer && gm.offer !== mine && !gm.result ? `<div class="who">${esc(S.oppName)} offers a draw.</div>` : ''}${goneLine()}${poolsLine()}</div>`;
             if (!gm.result) {
               if (gm.offer && gm.offer !== mine) a.push({ id: 'drawyes', label: 'Accept draw', kind: 'primary' });
               else a.push({ id: 'drawoffer', label: gm.offer === mine ? 'Draw offered' : 'Offer draw', dis: !!gm.offer || busy });
@@ -1102,6 +1449,8 @@
         if (id === 'play' || id === 'again') { if (id === 'again') pick.profile = H.profile; msg = ''; await startHouse(); return; }
         if (id === 'newgame') { H = null; result = null; msg = ''; rv = null; rvNew = false; stopPlay(); board.clear(); paint(true); saveHouse(); return; }
         if (id === 'promo' && promo) { tryMove(promo.from, promo.to, d.p); return; }
+        if (id === 'betamt') { betAmt = [100, 500, 1000, 5000].includes(+d.v) ? +d.v : 100; return; }
+        if (id === 'cbet:w' || id === 'cbet:b') { if (!R || !R.gid || !ctx.roomHas('cbet')) return; if (ctx.bank() < betAmt) { ctx.toast('Not enough LAYR for that bet.'); return; } emit({ t: 'cbet', gid: R.gid, side: id.slice(5), amt: betAmt }); return; }
         if (id === 'rv') { stopPlay(); rvGo(+d.to); return; }
         if (id === 'rvlive') { rvGo(Infinity); return; }
         if (id === 'rvplay') {
@@ -1130,12 +1479,13 @@
     // a house game left unfinished in this browser carries on where it was
     const resume = saved.games && saved.games[def.id];
     loadEngine().then(() => { if (resume && !H && !S) startHouse(resume); else paint(true); }).catch(() => { });
-    st.onSpec = onSpec; st.watchSeat = watchSeat;
+    st.onSpec = onSpec; st.onRoom = onRoomMsg; st.watchSeat = watchSeat;
     Object.assign(st, { down2d, move2d, up2d, cancel2d });
     // the page says when you choose a view: the X-Chess view opens or closes at once, and the choice is remembered in this browser
     st.onView = (v) => { const sv = store.get(); sv.view = v === 'xchess' ? 'xchess' : '3d'; store.set(sv); st.lastView = v; ovKey = ''; paint2d(); };   // the X-Chess view's board hands its presses to the table that owns it
     // for tests and bug reports (scripts/test-casino-chess.mjs): what the table holds now
-    st.debug = () => { const p = pos(), g = S && S.table.g; return { rv, rvNew, view2d: view2d(), mat: matOf(), mode: S ? 'pvp' : showR() ? 'watch' : H ? 'house' : 'idle', sel, targets: targets.map((t) => t.sq), watch: R ? { wn: R.wn, bn: R.bn, moves: R.uci ? R.uci.length : null, result: R.result, clocks: watchClocks(), seat: watchingHere() } : null, fen: p ? p.fen() : null, uci: H ? H.uci.slice() : g ? g.uci.slice() : [], me: p ? me() : null, over: H ? H.over : g && g.result ? { result: g.result, termination: g.term } : null, verified: H ? H.verified : null, thinking: !!(H && H.thinking), legal: p ? p.movesUci() : [], flip: board.flip, seed: H ? H.seed : null, clocks: S ? S.clocks() : null, stake: S ? S.stake : 0, host: S ? !!S.chain.host : null, msg }; };
+    st.debug = () => { const p = pos(), g = S && S.table.g; return { rv, rvNew, view2d: view2d(), mat: matOf(), mode: S ? 'pvp' : showR() ? 'watch' : H ? 'house' : 'idle', sel, targets: targets.map((t) => t.sq), watch: R ? { house: R.house, wn: R.wn, bn: R.bn, moves: R.uci ? R.uci.length : null, result: R.result, clocks: watchClocks(), seat: watchingHere() } : null, fen: p ? p.fen() : null, uci: H ? H.uci.slice() : g ? g.uci.slice() : [], me: p ? me() : null, over: H ? H.over : g && g.result ? { result: g.result, termination: g.term } : null, verified: H ? H.verified : null, thinking: !!(H && H.thinking), legal: p ? p.movesUci() : [], flip: board.flip, seed: H ? H.seed : null, clocks: S ? S.clocks() : null, stake: S ? S.stake : 0, host: S ? !!S.chain.host : null, gid: S ? S.gid() : R ? R.gid : null, roomHeld: S ? S.roomHeld : null, final: S ? S.final : null, bets: B ? { pool: B.pool, my: B.my, closes: B.closes, closed: B.closed, n: B.n } : null, gone: goneInfo, msg }; };
+    st.debugMove = (mv) => (S ? S.send(mv) : null); st.debugSession = () => S; st.debugCall = (m) => onRoomMsg(m);   // tests: play a move without the mouse, reach the session
     st.debugPick = (x, y) => { const r = board.pickAt(ctx.ray({ clientX: x, clientY: y })); return { ...r, res: resolve(r), myTurn: myTurn(), sel }; };
     st.squareFromPoint = (x, y) => board.pick(ctx.ray({ clientX: x, clientY: y }));
     st.squareAt = (sq) => { const [x, z] = sqPos(sq); return board.root.localToWorld(new THREE.Vector3(x, 0.017, z)); };
@@ -1152,15 +1502,16 @@
     SEATS_OUT[s.id] = [{ x: 0, z: SOFA_SEAT.z, h: SOFA_SEAT.h, stand: { x: s.side * 1.95, z: 1.05 } }, { x: 0, z: CHAIR_SEAT.z, h: CHAIR_SEAT.h, stand: { x: s.side * 0.95, z: -0.8 } }];
     VERB[s.id] = 'PLAY';
   });
-  let built = [];
+  let built = [], lastCtx = null;
   root.PXChess = {
-    version: 'c6', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
+    version: 'c7', ENGINE_ID, ENGINE_SHA256, TABLE_Z, TABLE_R, START,
     sofas: SOFAS.map((d) => [d.x, d.z, d.ry]),   // where the page draws the two lounge sofas
-    placement, TAGS, SEATS: SEATS_OUT, VERB, engine, loadEngine, ask, houseList, makeRelayTable, makeSession,
+    placement, TAGS, SEATS: SEATS_OUT, VERB, engine, loadEngine, ask, houseList, makeRelayTable, makeSession, makeChain, hash16,
+    roomSettles() { return !!(lastCtx && lastCtx.roomHas('cres')); },     // the room holds chess stakes and decides results (the page skips its own bank for chess)
     makeStations(ctx) {
       // the station's seats must be the very objects in the page's SEATS (the room maps a seat to its spot by identity)
       // the room hooks are optional: a page without them simply never shows other people's games
-      ctx = Object.assign({ roomSend: () => { }, roomHas: () => false, roomMe: () => null, watching: () => null, taken: () => [], canvasEl: () => document.getElementById('gl') }, ctx);
+      ctx = Object.assign({ roomSend: () => { }, roomHas: () => false, roomMe: () => null, roomNow: () => Date.now(), watching: () => null, taken: () => [], canvasEl: () => document.getElementById('gl') }, ctx); lastCtx = ctx;
       built = SOFAS.map((def) => { const st = makeStation(ctx, def); return st; });
       built.forEach((st) => { SEATS_OUT[st.id] = st.seats; });
       return built;
@@ -1175,6 +1526,12 @@
     },
     // a `spec` message from the room (watching a game): to the table it names
     onSpec(m) { const st = built.find((s) => s.id === (m && m.tb)); if (st && st.onSpec) try { st.onSpec(m); } catch (e) { console.warn('[chess] a snapshot failed', e); } },
+    // the room's messages about a game (cres ask, cend, cgone, cbet, cpool, cpay, and the refusals cres-* / cbet-*): to the table they name
+    onRoom(m) {
+      if (!m) return;
+      if (m.t === 'err') { const T = { 'cbet-too-fast': 'One bet at a time.', 'cbet-bad': 'The room did not understand that bet.', 'cres-too-fast': '' }; if (lastCtx && /^c(bet|res)-/.test(m.code || '') && T[m.code] !== '') lastCtx.toast(T[m.code] || 'The room refused that (' + String(m.code).slice(0, 24) + ').'); return; }
+      const st = built.find((x) => x.id === m.tb); if (st && st.onRoom) try { st.onRoom(m); } catch (e) { console.warn('[chess] a room message failed', e); }
+    },
     packMoves, unpackMoves, material,
     input: () => ({ pointerOn, touch: !!touchOwner }),   // for tests
     stations: () => built

@@ -1,0 +1,26 @@
+{
+  "name": "ParallaX Casino",
+  "short_name": "ParallaX",
+  "description": "ParallaX Casino: the LAYR Lounge. Tables, fruit machines and play-money LAYR.",
+  "id": "/casino/",
+  "start_url": "/casino/",
+  "scope": "/casino/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#0c0609",
+  "theme_color": "#0c0609",
+  "icons": [
+    {
+      "src": "/favicons/xtrata-apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

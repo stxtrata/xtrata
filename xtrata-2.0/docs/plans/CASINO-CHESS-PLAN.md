@@ -228,3 +228,60 @@ Jim's son's notes after playing, planned and built in `CASINO-CHESS-NEXT-PLAN.md
 - |◀ ◀ ▶ ▶| and Back to the game for looking through the moves;
 - 3D pieces with outlines, graphite black pieces and more defined shapes;
 - an X-Chess view under View: a flat 2D board in the X-Chess style with chess.com-like pieces of our own.
+
+## 12. Results the room decides, the leaving rule and spectator bets (added 2026-11-04)
+
+Agreed with the room session on 4 Nov (`claude/chess-betting-messages.md`, `claude/chess-betting-room-answers.md`). Play money only; testnet.
+chess.js `c7`; page patch step 7. The room's side (Worker, `functions/lib` rules, `cres` and `cbet` features, room.js) is the room session's.
+
+**What the page does**
+- **A game id.** The host picks a random 16-hex `gid` when it opens the table. It rides in the opening call, so both pages and the room
+  share it. The host's `spec` snapshot carries `gid` and `sk` (the stake); the room treats the first snapshot of a `gid` as the start of
+  the game and opens betting. The moves in a snapshot are now sent up to 900 characters (450 half-moves), then the position only.
+- **Both pages report.** When a page's copy of the game has a result it sends `cres` `{gid, r, tm, n, h}`; `h` is 16 hex characters of a
+  hash of the move list, so the room compares two copies without the moves. A page that is asked (`cres` with `ask`) answers with its
+  copy, or `r: '*'` if it has no result. Until `cend` arrives a report is sent again every 15 s (at most six times).
+- **The room's word is final** (when the room lists `cres`). The page shows what its copy says and "Waiting for the room to confirm…",
+  then settles from `cend`: `agreed` / `unchallenged` (the result), `forfeit` (the player in `a` left), `disputed`, `expired`, `void`
+  (called off, stakes returned). The page never moves chess money: it does not take the stake at the start (the room holds both stakes
+  from the first snapshot) and does not credit anything on `cend`, `cbet` or `cpay`. The balance changes arrive as `bal` messages,
+  which the page already applies. An older room (no `cres`) keeps today's behaviour: the pages take, settle and refund the stakes,
+  and leaving voids the game.
+- **Time-outs.** Both pages already agree on a time-out (the flag is a call in a block, judged by the block's own time). The risk is a
+  host whose block times lie. The guest counts each turn on its own clock, from the block that made the move: a time-out that arrives
+  with more than 5 s + 5% of the flagged clock still left by that count is reported as `tm: 'dispute'` (`r: '*'`); a host whose clock
+  never runs down while the guest's count says it should (by 5 s + 5%) is reported as a win on time by the guest, and the host's page
+  answers `'*'`, so the room calls the game off. The guest's count is only trusted when the blocks around the turn arrived live; after
+  a catch-up, or a gap of more than 6 s between blocks (a locked phone), nothing is disputed.
+- **Leaving.** With `cres`, leaving the room or going silent for about 90 s counts as resigning. The page no longer voids and refunds on
+  `leave` or after 20 s without blocks; it shows "<name> has left the table. If they do not come back in about 90 seconds, you win."
+  (no to-the-second countdown: the room checks about every 60 s, and a connection that dies without closing takes up to 90 s to be
+  noticed, so a forfeit can take up to about four minutes). `cgone` with `back: true` clears the notice. A player who returns after the
+  decision is told by `cend`: "You were away too long, so the game counted as a resignation."
+- **Catch-up and resume (chess only).** The page's `makeRelayChain` is still used by Hold'em and Liar's Dice. Chess uses `PXChess.makeChain`:
+  - the guest sends a call again every 3 s until it sees it in a block (up to ten times), and the host drops a repeat by its id;
+  - a guest that sees a block beyond the next, or hears nothing for 5 s, asks `{k:'resend', from}`; the other page answers with
+    `{k:'blocks', a, z, t0, b}`, one short row per call (`[dh, dt, kind, value, who, seq]`, about 30 bytes), in pieces of at most
+    900 bytes sent 0.5 s apart; the receiver fills in the empty blocks. A 120-half-move game is 5 messages and 3 KB; a minute cut both
+    ways produced at most 11 messages in any 10 s (the room's limit is 30);
+  - the calls so far are kept in this browser (`pxChessLive`, while the room holds the stakes, for up to 25 minutes). After a reload the page
+    replays them, asks the other page for what came after, and carries on; the player sits at the table again.
+- **Bets (the `cbet` feature).** A person at the table (a seat there, or the table last named in `watch`) who is not playing sees a panel:
+  both pools, how many are backing, "Bets close in 0:45 · play money", their own bet, 100 / 500 / 1k / 5k, and Back White / Back Black.
+  The two players see the pools only after betting has closed. Results: a toast on `cpay` ("You won 1,400 LAYR on White (play money)", or
+  returned, or lost). Defaults are the room's: 100 to 10,000 LAYR per game, 90 s window, parimutuel, no cut.
+
+**Files:** `public/casino/chess.js` (`c7`); step 7 of `scripts/patch-casino-chess.py` (begin / abandon / frame / leave / dispatch / resume
+in the Salon lobby, `roomNow`, six new cases in the social switch, `chess.js?v=c7`); `room.js` is not touched by this session.
+
+**Tests:** `scripts/test-casino-chain.cjs` (no browser: lost moves, catch-up, resume, message sizes and rate, the three time-out cases)
+and `scripts/test-casino-betting.mts` (three browsers and a stand-in room).
+
+**Watching a game against a house player (chess.js `c8`, 2026-11-04).** A house game is played in one page, so it used to be invisible to
+the room: a second player at the table saw "Nobody is playing here now". Now the player's page announces it with the same `spec`
+snapshot, with the house player as one side: `d.w` or `d.b` is `house:<profile id>` (lowercase letters, digits, hyphens, up to 24) and
+`d.h` is that profile id; the other side is the sender, `d.on` is the house player's name, there is no `gid`, `st` is 0 and nothing is
+staked. Watchers see the board, moves and result, with "<name> · house player" on the bot's side. There are no bets on these games: the
+room never opens betting without a `gid`, and only one page could report the result, so a rigged game against the easiest bot could be
+farmed. The room needs one rule: a snapshot whose second side is `house:<id>` is accepted from a seated player (see
+`claude/chess-betting-page-done.md`). Test: `scripts/test-casino-house-watch.mts`.
