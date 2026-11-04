@@ -1,0 +1,30 @@
+{
+  "spins": 5000000,
+  "seed": 7,
+  "seconds": 259.57,
+  "rtp": 94.4547,
+  "target": 94.38,
+  "withinTolerance": true,
+  "parts": {
+    "lines": "59.754%",
+    "scatters": "1.553%",
+    "free": "8.490%",
+    "pick": "11.884%",
+    "hold": "10.427%",
+    "jackpot": "2.346%"
+  },
+  "published": {
+    "lines": "59.7%",
+    "scatters": "1.5%",
+    "free": "8.5%",
+    "pick": "11.9%",
+    "hold": "10.3%",
+    "jackpot": "2.4%"
+  },
+  "frequency": {
+    "moonshot": "1 in 138.7",
+    "mooneyBags": "1 in 140.0",
+    "spellIt": "1 in 288.3",
+    "jackpots": 37
+  }
+}

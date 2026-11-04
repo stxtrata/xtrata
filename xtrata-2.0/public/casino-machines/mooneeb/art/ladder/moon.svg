@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240"><title>Moon (Mooneeb ladder, rung 3) — original illustration of a full moon</title>
+<defs>
+<radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset=".62" stop-color="#fff2b8" stop-opacity=".55"/><stop offset="1" stop-color="#fff2b8" stop-opacity="0"/></radialGradient>
+<radialGradient id="body" cx=".38" cy=".34" r=".72"><stop offset="0" stop-color="#fffbe6"/><stop offset=".55" stop-color="#ffe9a0"/><stop offset="1" stop-color="#f4c95a"/></radialGradient>
+</defs>
+<circle cx="120" cy="120" r="112" fill="url(#glow)"/>
+<circle cx="120" cy="120" r="84" fill="url(#body)" stroke="#2a1150" stroke-width="8"/>
+<g fill="#eeba45" stroke="#c99230" stroke-width="3">
+<circle cx="88" cy="94" r="17"/><circle cx="150" cy="80" r="10"/><circle cx="152" cy="140" r="22"/><circle cx="96" cy="152" r="9"/><circle cx="122" cy="116" r="6"/><circle cx="72" cy="128" r="6"/>
+</g>
+<g fill="#fff8d6" opacity=".9"><path d="M80 86 a10 10 0 0 1 14 -2 a14 14 0 0 0 -14 2z"/><path d="M140 128 a14 14 0 0 1 18 -3 a18 18 0 0 0 -18 3z"/></g>
+<path d="M66 92 A60 60 0 0 1 104 56" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" opacity=".75"/>
+<g fill="#fff3a6" stroke="#2a1150" stroke-width="3" stroke-linejoin="round">
+<path d="M206 34 l5 11 11 5 -11 5 -5 11 -5 -11 -11 -5 11 -5z"/>
+<path d="M30 190 l4 8 8 4 -8 4 -4 8 -4 -8 -8 -4 8 -4z"/>
+</g>
+</svg>

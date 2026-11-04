@@ -1,0 +1,212 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>Mooneeb · test build</title>
+<style>
+:root{--accent:#c084fc;--gold:#ffd76a;--ink:#f4ecff;--muted:#b7a6d6;--panel:#170b30}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#07020f;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;-webkit-tap-highlight-color:transparent}button:disabled{opacity:.35;cursor:not-allowed}button:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+#stage{position:fixed;inset:0;touch-action:none}#stage canvas{display:block;width:100%;height:100%}
+.pxLogicFrame{position:fixed;left:-10000px;top:0;width:1400px;height:960px;border:0;opacity:0;pointer-events:none}
+#topbar{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:8px;padding:10px max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));background:linear-gradient(#07020fee,#07020f00);z-index:5;flex-wrap:wrap}
+#topbar h1{font-size:14px;letter-spacing:3px;margin:0 8px 0 0;font-weight:900}#topbar h1 em{font-style:normal;color:var(--accent)}
+.tb{min-height:44px;min-width:44px;padding:0 14px;border:1px solid #c084fc66;border-radius:12px;font-size:12px;letter-spacing:1px;background:#170b30cc}.tb[aria-pressed=true]{border-color:var(--gold);color:var(--gold)}
+.stub{margin-left:auto;display:flex;align-items:center;gap:8px;border:1px dashed #ff5c8a;border-radius:12px;padding:4px 6px 4px 12px;font-size:11px;color:#ffb3c7;background:#2a0a1acc}.stub b{color:#fff;font-size:14px}
+body.sv #hud{background:linear-gradient(#07020ffc,#07020f)}
+#hud{position:fixed;left:0;right:0;bottom:0;z-index:5;padding:10px max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:linear-gradient(#07020f00,#07020ff2 30%);display:flex;flex-direction:column;gap:8px}
+.info{display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap}.info div{display:flex;flex-direction:column}.info small{font-size:10px;letter-spacing:1.4px;color:var(--muted)}.info b{font-size:20px;font-variant-numeric:tabular-nums}
+#status{flex:1;min-width:200px;font-size:12px;letter-spacing:1px;color:#e9dcff;text-align:right}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cb{min-height:48px;min-width:56px;padding:0 12px;border-radius:12px;border:1px solid #c084fc66;background:#1d0d3a;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}.cb b{font-size:13px;letter-spacing:1px}.cb small{font-size:9px;color:#bba8e0;margin-top:3px;text-transform:uppercase}
+.cb[hidden]{display:none}.cb.spin{min-width:140px;background:linear-gradient(180deg,#ffe27a,#f5a524);color:#2a1150;border-color:var(--gold)}.cb.spin small{color:#5a3a12}.cb[aria-pressed=true]{border-color:var(--gold);color:var(--gold)}.cb.gold{border-color:var(--gold);background:#3a2408}
+#portFeature{position:fixed;left:50%;transform:translateX(-50%);bottom:150px;z-index:6;width:min(980px,94vw)}#portFeature[hidden]{display:none}
+#portModal{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:#07021099;backdrop-filter:blur(6px);padding:12px}#portModal[hidden]{display:none}
+#fallback2d{position:fixed;left:50%;top:50%;transform:translate(-50%,-55%);width:min(92vw,1000px);aspect-ratio:1400/960;border-radius:14px;box-shadow:0 0 0 6px #3b1d8f,0 0 0 9px var(--accent);z-index:2}#fallback2d[hidden]{display:none}
+#hint{position:fixed;top:64px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:1px;color:#9f8cc9;z-index:4;text-align:center;pointer-events:none}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#07020f;z-index:40;letter-spacing:3px;font-size:12px}#loading[hidden]{display:none}
+@media(max-width:700px){#topbar h1 span{display:none}.stub{margin-left:0}.info{gap:12px}.info b{font-size:16px}#status{text-align:left;flex-basis:100%}#portFeature{bottom:200px}#hint{display:none}.cb{min-width:52px;padding:0 8px}.cb[hidden]{display:none}.cb.spin{min-width:110px;flex:1}}
+</style></head><body>
+<div id="stage" aria-label="Mooneeb cabinet in a 3D studio. Drag to orbit, scroll or pinch to zoom, click the lever or buttons."></div>
+<canvas id="fallback2d" width="1400" height="960" hidden aria-label="Mooneeb screen (2D fallback)"></canvas>
+<header id="topbar"><h1>MOONEEB <em>/ TEST BUILD</em> <span>· STANDALONE</span></h1>
+<button class="tb" id="vCab" aria-pressed="true">Cabinet</button><button class="tb" id="vScr" aria-pressed="false">Screen</button><button class="tb" id="fsBtn" title="F">Fullscreen</button><button class="tb" id="labBtn" title="L">Bonus Lab</button><button class="tb" id="testBtn">Test panel</button>
+<div class="stub" title="Clearly marked test stub of window.ParallaxLAYRAccount. Not the casino's account.">TEST STUB · PLAY LAYR <b id="stubBal">—</b><button class="tb" id="stubReset">Reset</button></div></header>
+<div id="hint">DRAG TO ORBIT · CLICK THE LEVER OR THE DECK · SPACE SPINS · F FULLSCREEN · L LAB</div>
+<section id="portFeature" hidden></section><section id="portModal" hidden></section>
+<footer id="hud"><div class="info"><div><small>BALANCE</small><b id="hBal">—</b></div><div><small>BET</small><b id="hBet">—</b></div><div><small>LAST WIN</small><b id="hWin">—</b></div><div id="status" aria-live="polite">Loading the cabinet…</div></div>
+<div class="controls"><button class="cb" data-act="pays"><b>MOONMAP</b><small>Pays</small></button><button class="cb" data-act="betDown"><b>−MOO</b><small>Bet −</small></button><button class="cb" data-act="betUp"><b>+MOO</b><small>Bet +</small></button><button class="cb" data-act="auto" id="cAuto"><b>AUTO-MOO</b><small>Auto</small></button><button class="cb spin" data-act="spin" id="cSpin"><b>MOO</b><small>Spin</small></button><button class="cb gold" data-act="moo" id="cMoo" hidden><b>MOO</b><small>Gamble</small></button><button class="cb gold" data-act="moon" id="cMoon" hidden><b>MOON</b><small>Gamble</small></button><button class="cb" data-act="skip" id="cSkip" hidden><b>SKIP</b><small>Skip bonus</small></button><button class="cb" data-act="turbo" id="cTurbo"><b>TURBO</b><small>Turbo</small></button><button class="cb" data-act="sound" id="cSound"><b>SOUND</b><small>Sound</small></button><button class="cb" data-act="fairplay"><b>FAIR</b><small>Fair play</small></button><button class="cb" data-act="history"><b>HISTORY</b><small>History</small></button><button class="cb" data-act="settings"><b>⚙</b><small>Settings</small></button></div></footer>
+<div id="loading"><b>MOONEEB</b><span>BUILDING THE STUDIO…</span></div>
+
+<script>
+/* ===================== TEST STUB — window.ParallaxLAYRAccount =====================
+   A clearly marked stand-in for the casino's shared LAYR account, for this standalone test page only.
+   Same interface as the room's account (acquire, ready, machine, openGame, saveGame…), its own storage key,
+   a play balance and a reset. The casino supplies the real account; the game code is unchanged either way. */
+(() => {
+  const KEY = 'mooneeb.test.layr.v1', START = 100000, listeners = new Set(), meta = new WeakMap();
+  let draft = null;
+  const amount = v => { if (!Number.isFinite(v) || v < 0) throw Error('Invalid LAYR amount.'); return Math.round(v * 100) / 100; };
+  const read = () => { let r = null; try { r = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {} if (!r || typeof r !== 'object') r = { bank: START, layrGames: {} }; r.bank = typeof r.bank === 'number' ? r.bank : START; r.layrGames = r.layrGames || {}; return r; };
+  const write = r => { r.bank = amount(r.bank); r.layrMode = 'test-stub'; localStorage.setItem(KEY, JSON.stringify(r)); };
+  const publish = () => listeners.forEach(fn => { try { fn(); } catch (e) {} });
+  const balance = () => draft ? draft.bank : read().bank;
+  const serialize = st => { const s = JSON.parse(JSON.stringify(st)); delete s.balance; return s; };
+  function attach(state, id, revision = 0) { delete state.balance; Object.defineProperty(state, 'balance', { configurable: true, enumerable: false, get: balance, set(v) { if (!draft || draft.state !== state) throw Error('Only a committed game action can change the LAYR balance.'); draft.bank = amount(v); } }); meta.set(state, { id, revision }); return state; }
+  function commit(state, r, bank) { const m = meta.get(state); r.layrGames[m.id] = { revision: ++m.revision, state: serialize(state) }; r.bank = bank; write(r); publish(); }
+  function transact(state, fn) { if (draft) throw Error('A LAYR transaction is already running.'); const before = serialize(state), r = read(); draft = { state, bank: balance() }; try { const out = fn(), next = draft.bank; draft = null; commit(state, r, next); return out; } catch (e) { draft = null; for (const k of Object.keys(state)) delete state[k]; Object.assign(state, before); throw e; } }
+  window.ParallaxLAYRAccount = Object.freeze({
+    version: 'test-stub-1', mode: 'test-stub', onChainConnected: false, testStub: true,
+    acquire: async () => true, ready: () => true, error: () => '', balance,
+    machine(id, engine) { const api = { ...engine }; api.fresh = () => attach(engine.fresh(), id); api.load = raw => attach(engine.load(raw), id); for (const n of ['start', 'settle', 'pick', 'respin', 'collect', 'endFree', 'gamble']) if (typeof engine[n] === 'function') api[n] = (st, ...a) => transact(st, () => engine[n](st, ...a)); return Object.freeze(api); },
+    openGame(id, engine) { const saved = read().layrGames[id]; return attach(engine.load(saved && saved.state), id, saved ? saved.revision : 0); },
+    saveGame(state) { if (draft) return true; commit(state, read(), balance()); return true; },
+    saveRoom(values) { const r = read(); Object.assign(r, values); write(r); publish(); return true; },
+    bindRoom() {}, subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    roomState() { const r = read(); return { bank: r.bank, hands: 0, net: 0 }; },
+    snapshot() { return { balance: balance(), currency: 'LAYR', mode: 'test-stub', onChainConnected: false, available: true, games: Object.keys(read().layrGames) }; },
+    testReset() { const r = read(); r.bank = START; write(r); publish(); }
+  });
+})();
+window.PX_DEV_LAB = true;   // the standalone test page always offers the Bonus Lab and the test panel
+</script>
+<script src="vendor/three.r128.min.js"></script>
+<script src="src/software.js"></script>
+<script src="pack.js"></script>
+<script>
+(async () => {
+'use strict';
+const $ = id => document.getElementById(id), fmt = n => Number(n || 0).toLocaleString('en-GB', { maximumFractionDigits: 2 });
+const PACK = window.MOONEEB_PACK;
+async function decodePXGzip(encoded) { const raw = atob(encoded), bytes = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i); return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); }
+
+/* ----- Renderer: WebGL, or the existing SoftwareRenderer path if WebGL isn't available ----- */
+let renderer, webglOK = true;
+// Same colour pipeline as the room: ACES tone mapping at 1.15, linear output. ?lite=1 for slow devices and automated checks.
+const LITE = /[?&]lite=1\b/.test(location.search);
+try { renderer = new THREE.WebGLRenderer({ antialias: !LITE }); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.shadowMap.enabled = !LITE; }
+catch (e) { webglOK = false; renderer = new SoftwareRenderer(); }
+renderer.setPixelRatio(LITE ? 1 : Math.min(devicePixelRatio || 1, 1.75)); $('stage').appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#07020f'); scene.fog = new THREE.FogExp2(0x07020f, .05);
+const camera = new THREE.PerspectiveCamera(36, 1, .05, 80);
+const env = document.createElement('canvas'); env.width = 512; env.height = 256; { const g = env.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#e9dcff'); gr.addColorStop(.45, '#3b1d8f'); gr.addColorStop(1, '#0b0418'); g.fillStyle = gr; g.fillRect(0, 0, 512, 256); g.fillStyle = '#fff'; g.fillRect(90, 40, 40, 120); g.fillRect(380, 40, 40, 120); }
+const envTex = new THREE.CanvasTexture(env); envTex.mapping = THREE.EquirectangularReflectionMapping;
+
+/* ----- The packed cabinet, built exactly as the room builds it (packedCabinet from casino/index.html) ----- */
+const data = JSON.parse(await decodePXGzip(PACK.model));
+data.images = await Promise.all(data.textures.map(t => new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = t.image; })));
+function packedCabinet(data){
+  const geos=data.geometries.map(g=>{const out=new THREE.BufferGeometry();for(const [key,a] of Object.entries(g.attributes))out.setAttribute(key,new THREE.BufferAttribute(new Float32Array(a.array),a.size));if(g.index)out.setIndex(g.index);for(const group of g.groups||[])out.addGroup(group.start,group.count,group.materialIndex);out.computeBoundingSphere();return out;});
+  const textures=data.textures.map((t,i)=>{const out=new THREE.Texture(data.images[i]);out.wrapS=t.wrapS;out.wrapT=t.wrapT;out.repeat.fromArray(t.repeat);out.offset.fromArray(t.offset);out.flipY=t.flipY;out.anisotropy=16;out.needsUpdate=true;return out;});
+  const mats=data.materials.map(m=>{const props={color:m.color,map:m.map==null?null:textures[m.map],transparent:m.transparent,opacity:m.opacity,side:m.side,depthWrite:m.depthWrite,alphaTest:m.alphaTest};if(m.type==='basic')return new THREE.MeshBasicMaterial(props);return new THREE.MeshStandardMaterial(Object.assign(props,{roughness:m.roughness,metalness:m.metalness,emissive:m.emissive,emissiveIntensity:m.emissiveIntensity,flatShading:m.flatShading,envMap:envTex,envMapIntensity:.65}));});
+  function node(n){const out=n.g==null?new THREE.Group():new THREE.Mesh(geos[n.g],Array.isArray(n.m)?n.m.map(id=>mats[id]):mats[n.m]);out.position.fromArray(n.p);out.quaternion.fromArray(n.q);out.scale.fromArray(n.s);out.visible=n.visible;if(n.role)out.name='px-'+n.role;if(n.action)out.userData.pxMachineAction=n.action;out.castShadow=!!out.isMesh;out.receiveShadow=!!out.isMesh;n.children.forEach(c=>out.add(node(c)));return out;}
+  const out=node(data.root);out.updateMatrixWorld(true);return out;
+}
+// The room scales every cabinet to 2.6 m tall and stands it on the floor.
+const model = packedCabinet(data), bb = new THREE.Box3().setFromObject(model), size = bb.getSize(new THREE.Vector3()), k = 2.6 / size.y;
+model.scale.multiplyScalar(k); model.position.y -= bb.min.y * k; const cabinet = new THREE.Group(); cabinet.add(model); scene.add(cabinet);
+const animations = []; for (const role of ['crest', 'recordGroup', 'core', 'lever', 'spinPhysical', 'armPivot']) { const o = model.getObjectByName('px-' + role); if (o) animations.push({ o, role, base: o.rotation.clone(), homePosition: o.position.clone() }); }
+const rungs = []; model.traverse(o => { const m = /^px-rung(\d)$/.exec(o.name || ''); if (m) { o.material = o.material.clone(); rungs.push({ o, i: Number(m[1]) }); } });
+const glows = []; model.traverse(o => { if (o.isMesh && o.material && o.material.isMeshBasicMaterial && !o.material.map) { o.material = o.material.clone(); glows.push({ o, base: o.material.color.clone() }); } });
+/* ----- Studio: dark floor, soft lights, the machine's floor glow ----- */
+scene.add(new THREE.HemisphereLight(0xe9dcff, 0x140828, 1.1));
+const key = new THREE.SpotLight(0xfff2e0, 2.4, 20, .55, .6, 1); key.position.set(2.2, 5.5, 4); key.target.position.set(0, 1.3, 0); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); scene.add(key, key.target);
+const rimL = new THREE.PointLight(0xc084fc, 1.4, 9), rimR = new THREE.PointLight(0xc084fc, 1.4, 9); rimL.position.set(-2.2, 2.4, -.6); rimR.position.set(2.2, 2.4, -.6); scene.add(rimL, rimR);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: '#0b0418', roughness: .35, metalness: .4 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const gc = document.createElement('canvas'); gc.width = gc.height = 256; { const g = gc.getContext('2d'), gr = g.createRadialGradient(128, 128, 4, 128, 128, 128); gr.addColorStop(0, PACK.accent + 'cc'); gr.addColorStop(.5, PACK.accent + '44'); gr.addColorStop(1, PACK.accent + '00'); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); }
+const floorGlow = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gc), transparent: true, depthWrite: false })); floorGlow.rotation.x = -Math.PI / 2; floorGlow.position.set(0, .01, .9); scene.add(floorGlow);
+
+/* ----- The game, in a hidden frame, through the same canvas-and-controls API the room uses ----- */
+const html = await decodePXGzip(PACK.game), frame = document.createElement('iframe'); frame.className = 'pxLogicFrame'; frame.title = 'Mooneeb game logic'; frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1; frame.allow = 'fullscreen'; document.body.appendChild(frame);
+const api = await new Promise((resolve, reject) => { const t = setTimeout(() => reject(Error('Machine did not become ready')), 20000); frame.onload = () => { clearTimeout(t); const a = frame.contentWindow.PX_CASINO_ENGINE; a ? resolve(a) : reject(Error('Game engine API missing')); }; frame.srcdoc = html; });
+await api.activate();
+const screenMesh = model.getObjectByName('px-screenMesh'); const texture = new THREE.CanvasTexture(api.screen); texture.minFilter = texture.magFilter = THREE.LinearFilter; texture.generateMipmaps = false; texture.anisotropy = 16;
+screenMesh.material = screenMesh.material.clone(); screenMesh.material.map = texture; screenMesh.material.color.setHex(0xffffff); screenMesh.material.needsUpdate = true;
+if (!webglOK) $('fallback2d').hidden = false;
+$('loading').hidden = true;
+
+/* ----- Camera: cabinet view (drag to orbit) and screen view ----- */
+const orbit = { yaw: .3, pitch: .12, dist: 6.4, target: new THREE.Vector3(0, 1.45, 0) }, goal = { yaw: .3, pitch: .12, dist: 6.4, target: new THREE.Vector3(0, 1.45, 0) }; let view = 'cabinet';
+const sp = new THREE.Vector3(); function screenTarget() { screenMesh.getWorldPosition(sp); return sp.clone(); }
+cabinet.updateMatrixWorld(true); const screenBox = new THREE.Box3().setFromObject(screenMesh), screenSize = screenBox.getSize(new THREE.Vector3());
+// Screen view: straight on, zoomed so the top of the screen sits under the top bar and the deck buttons sit on the bottom edge
+// of the view (just above the controls), with nothing of the cabinet showing below them.
+const deckBox = new THREE.Box3(); model.traverse(o => { if (o.isMesh && (o.userData.pxMachineAction || /spinPhysical/.test(o.name) || (o.parent && (o.parent.userData.pxMachineAction || /spinPhysical/.test(o.parent.name))))) deckBox.expandByObject(o); });
+function fitDist(cab) { const a = innerWidth / innerHeight; return a < .75 ? 9.2 : a < 1.1 ? 7.4 : 6.2; }
+// Solved numerically with a test camera: a player's-eye view from slightly above, looking down over the deck.
+const SV_PITCH = .16, svCam = new THREE.PerspectiveCamera();
+function svProject(p, ty, dist, tx, tz) { const cp = Math.cos(SV_PITCH); svCam.position.set(tx, ty + Math.sin(SV_PITCH) * dist, tz + dist * cp); svCam.lookAt(tx, ty, tz); svCam.updateMatrixWorld(); return p.clone().project(svCam); }
+function screenGoal() {
+  const H = innerHeight, W = innerWidth; svCam.fov = camera.fov; svCam.aspect = W / H; svCam.near = camera.near; svCam.far = camera.far; svCam.updateProjectionMatrix();
+  const topPx = Math.max($('topbar').getBoundingClientRect().bottom, $('hint').offsetParent ? $('hint').getBoundingClientRect().bottom : 0) + 10, botPx = $('hud').getBoundingClientRect().top;
+  const nT = 1 - 2 * topPx / H, nB = 1 - 2 * botPx / H, tx = (screenBox.min.x + screenBox.max.x) / 2, tz = screenBox.getCenter(new THREE.Vector3()).z;
+  const topP = new THREE.Vector3(tx, screenBox.max.y, screenBox.max.z), botP = new THREE.Vector3(tx, deckBox.min.y, deckBox.max.z);
+  const halfW = Math.max(screenBox.max.x - screenBox.min.x, deckBox.max.x - deckBox.min.x) / 2 * 1.04, sideP = new THREE.Vector3(tx + halfW, (deckBox.min.y + screenBox.max.y) / 2, Math.max(screenBox.max.z, deckBox.max.z));
+  const tyFor = dist => { let lo = -5, hi = 10; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (svProject(botP, m, dist, tx, tz).y > nB) lo = m; else hi = m; } return (lo + hi) / 2; };   // the deck's front bottom edge on the bottom line
+  let lo = .3, hi = 30;
+  for (let i = 0; i < 40; i++) { const d = (lo + hi) / 2, ty = tyFor(d), fitsTop = svProject(topP, ty, d, tx, tz).y <= nT, fitsSide = svProject(sideP, ty, d, tx, tz).x <= .98; if (fitsTop && fitsSide) hi = d; else lo = d; }
+  const dist = hi; return { target: new THREE.Vector3(tx, tyFor(dist), tz), dist, pitch: SV_PITCH };
+}
+function setView(v) { view = v; document.body.classList.toggle('sv', v === 'screen'); $('vCab').setAttribute('aria-pressed', String(v === 'cabinet')); $('vScr').setAttribute('aria-pressed', String(v === 'screen')); if (v === 'screen') { const sgoal = screenGoal(); goal.yaw = 0; goal.pitch = sgoal.pitch; goal.dist = sgoal.dist; goal.target.copy(sgoal.target); } else { goal.yaw = .3; goal.pitch = .12; goal.dist = fitDist(true); goal.target.set(0, 1.45, 0); } }
+$('vCab').onclick = () => setView('cabinet'); $('vScr').onclick = () => setView('screen');
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); setView(view); }
+addEventListener('resize', resize); resize(); Object.assign(orbit, { yaw: goal.yaw, pitch: goal.pitch, dist: goal.dist }); orbit.target.copy(goal.target);
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null, dragged = false;
+renderer.domElement.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; dragged = false; renderer.domElement.setPointerCapture(e.pointerId); });
+renderer.domElement.addEventListener('pointermove', e => { if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y; if (Math.hypot(dx, dy) > 6) dragged = true; if (dragged) { goal.yaw -= dx * .006; goal.pitch = Math.max(-.15, Math.min(.7, goal.pitch + dy * .004)); down = { x: e.clientX, y: e.clientY }; } });
+renderer.domElement.addEventListener('pointerup', e => { const was = down; down = null; if (!was || dragged) return; const r = renderer.domElement.getBoundingClientRect(); ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(ptr, camera); const hit = ray.intersectObject(model, true).find(h => h.object.visible); if (!hit) return; const o = hit.object; let a = o.userData.pxMachineAction, p = o; while (!a && p.parent) { p = p.parent; a = p.userData.pxMachineAction; } if (a) { act(a); return; } if (o === screenMesh && hit.uv) { api.tap(hit.uv.x * 1400, (1 - hit.uv.y) * 960); sync(true); } });
+renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); goal.dist = Math.max(1.2, Math.min(14, goal.dist + e.deltaY * .004)); }, { passive: false });
+function act(a) { try { api.action(a); } catch (e) { console.error(e); } sync(true); }
+document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
+$('fsBtn').onclick = () => { api.fullscreen(true); };
+$('labBtn').onclick = () => act('lab'); $('testBtn').onclick = () => act('test');
+$('stubReset').onclick = () => { ParallaxLAYRAccount.testReset(); api.refreshAccount(); sync(true); };
+window.PXMachineFullscreenChanged = on => { document.body.classList.toggle('machine-fs', on); sync(true); };
+addEventListener('keydown', e => { if (e.repeat || e.target.matches('input,select,textarea')) return; if (!$('portModal').hidden) { if (e.key === 'Escape') { api.closeModal(); sync(true); } return; }
+  const map = { Space: 'spin', BracketLeft: 'betDown', BracketRight: 'betUp', KeyT: 'turbo', KeyM: 'sound', KeyL: 'lab', KeyS: 'skip' }[e.code];
+  if (e.code === 'KeyF') { e.preventDefault(); api.fullscreen(true); } else if (map) { e.preventDefault(); act(map); } else if (/^Digit[1-9]$/.test(e.code)) api.key(e.code, e.key); });
+
+/* ----- Ported UI: the game's dialogs and feature bar shown here, like the room's portMachineUI ----- */
+const ports = { modal: '', feature: '' };
+function port(kind, htmlText) {
+  const host = $(kind === 'modal' ? 'portModal' : 'portFeature'); host.hidden = !htmlText; if (!htmlText) { ports[kind] = ''; return; } if (ports[kind] === htmlText) return; ports[kind] = htmlText;
+  const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
+  if (!root.pxBound) { root.pxBound = true; root.addEventListener('click', ev => { const b = ev.target.closest('button,a'); if (!b) return; if (b.tagName === 'A') return; ev.preventDefault(); const t = b.getAttribute('data-px-source'); if (t) { api.click(t); sync(true); } }); for (const n of ['input', 'change']) root.addEventListener(n, ev => { const t = ev.target.getAttribute('data-px-source'); if (t) api.input(t, ev.target.value, ev.target.checked, n); }); }
+  root.innerHTML = '<style>' + PACK.css.replaceAll(':root', ':host') + '\n:host{font-family:Arial,sans-serif;color:#f4ecff}*{box-sizing:border-box}#featureBar{position:relative!important;inset:auto!important;transform:none!important;width:100%!important;max-width:none!important;margin:0!important;left:auto!important;bottom:auto!important}dialog{position:relative!important;display:block!important;margin:0 auto!important;max-height:86vh!important}</style>' + htmlText.replace('<dialog', '<dialog open');
+}
+let lastUI = 0, revision = -1, labelSpin = '';
+function sync(force) {
+  const now = performance.now(); if (!force && now - lastUI < 90) return; lastUI = now;
+  const ui = api.ui();
+  $('hBal').textContent = fmt(ui.balance) + (ui.lab ? ' (LAB)' : ''); $('hBet').textContent = fmt(ui.bet); $('hWin').textContent = fmt(ui.win); $('status').textContent = ui.status; $('stubBal').textContent = fmt(ParallaxLAYRAccount.balance());
+  $('cSpin').querySelector('b').textContent = ui.button; $('cSpin').disabled = ui.spinDisabled; document.querySelector('[data-act=betDown]').disabled = ui.betDownDisabled; document.querySelector('[data-act=betUp]').disabled = ui.betUpDisabled;
+  $('cAuto').setAttribute('aria-pressed', String(ui.auto)); $('cTurbo').setAttribute('aria-pressed', String(ui.turbo)); $('cSound').querySelector('b').textContent = ui.muted ? 'MUTED' : 'SOUND';
+  const g = !!ui.gamble || /^gamble:intro/.test(ui.scene); $('cMoo').hidden = !g; $('cMoon').hidden = !g; $('cSkip').hidden = !ui.scene || /^gamble/.test(ui.scene);
+  port('modal', ui.modal); port('feature', ui.feature);
+}
+setInterval(sync, 120);
+
+/* ----- Frame loop: the cabinet's own mechanics, the light show, idle frames capped near 30 fps ----- */
+let leverPull = null, lastLever = 0, lastRender = 0;
+function frameLoop(now) {
+  requestAnimationFrame(frameLoop);
+  const rev = api.revision(); if (rev !== revision) { revision = rev; texture.needsUpdate = true; if (!webglOK) $('fallback2d').getContext('2d').drawImage(api.screen, 0, 0, 1400, 960); }
+  const mech = api.mechanics(), t = now / 1000;
+  if (mech.lever && mech.lever.id !== lastLever) { lastLever = mech.lever.id; leverPull = { start: now - mech.lever.elapsed, duration: mech.lever.duration, angle: mech.lever.angle }; }
+  const kick = mech.lights || 0;
+  for (const a of animations) {
+    if (a.role === 'lever') { const u = leverPull ? Math.max(0, Math.min(1, (now - leverPull.start) / leverPull.duration)) : 1; a.o.rotation.x = a.base.x + (leverPull && u < 1 ? Math.sin(u * Math.PI) * leverPull.angle : 0); if (u >= 1) leverPull = null; }
+    else if (a.role === 'spinPhysical') a.o.position.z = a.homePosition.z - (/spin/i.test(mech.scene) ? 0 : 0);
+    else a.o.rotation.y = a.base.y + t * (.4 + kick * 1.6);   // the crest turns on its own clock, faster when the machine is excited
+  }
+  // Light show: the neon ladder rungs follow the game's ladder; trims pulse with wins; the jackpot strobes the floor glow.
+  for (const r of rungs) { const v = mech.ladder ? mech.ladder[r.i] : 0; r.o.material.color.setRGB(.54 + .46 * v, .45 + .55 * v, .72 + .28 * v); }
+  for (const gl of glows) { const p = kick ? .75 + .25 * Math.sin(t * (mech.jackpot ? 14 : 6)) : 1; gl.o.material.color.copy(gl.base).multiplyScalar(p); }
+  floorGlow.material.opacity = mech.jackpot ? .6 + .4 * Math.abs(Math.sin(t * 5)) : .85; rimL.intensity = rimR.intensity = 1.4 + kick * 2.2 * (mech.jackpot ? Math.abs(Math.sin(t * 7)) : 1);
+  const kk = 1 - Math.exp(-Math.min(.06, 1 / 60) * 7); orbit.yaw += (goal.yaw - orbit.yaw) * kk; orbit.pitch += (goal.pitch - orbit.pitch) * kk; orbit.dist += (goal.dist - orbit.dist) * kk; orbit.target.lerp(goal.target, kk);
+  const cp = Math.cos(orbit.pitch); camera.position.set(orbit.target.x + Math.sin(orbit.yaw) * orbit.dist * cp, orbit.target.y + Math.sin(orbit.pitch) * orbit.dist, orbit.target.z + Math.cos(orbit.yaw) * orbit.dist * cp); camera.lookAt(orbit.target);
+  const busy = mech.lever || mech.scene || kick > .01 || Math.abs(goal.yaw - orbit.yaw) + Math.abs(goal.dist - orbit.dist) > 1e-3 || down;
+  if (document.body.classList.contains('machine-fs')) return;
+  if (busy || now - lastRender >= (LITE ? 66 : 32)) { renderer.render(scene, camera); lastRender = now; }
+}
+requestAnimationFrame(frameLoop); sync(true);
+window.MooneebTest = { api, setView, model, camera, webglOK, frame, snap: () => { Object.assign(orbit, { yaw: goal.yaw, pitch: goal.pitch, dist: goal.dist }); orbit.target.copy(goal.target); } };
+})().catch(e => { document.getElementById('loading').innerHTML = '<b>Could not start the test page</b><span style="letter-spacing:0;max-width:520px;text-align:center">' + String(e && e.message || e) + '</span>'; console.error(e); });
+</script>
+</body></html>

@@ -1,0 +1,52 @@
+{
+ "m": {
+  "file": "art/ladder/pop/m.jpg",
+  "from": "art/supplied/popart/letter-m.png",
+  "bytes": 18575
+ },
+ "moo": {
+  "file": "art/ladder/pop/moo.jpg",
+  "from": "art/supplied/popart/cow-face.png",
+  "bytes": 30818
+ },
+ "moon": {
+  "file": "art/ladder/pop/moon.jpg",
+  "from": "art/supplied/popart/moon-full.png",
+  "bytes": 29671
+ },
+ "mooney": {
+  "file": "art/ladder/pop/mooney.jpg",
+  "from": "art/supplied/popart/cow-over-moon.png",
+  "bytes": 30000
+ },
+ "rocket": {
+  "file": "art/ladder/pop/rocket.jpg",
+  "from": "art/supplied/popart/rocket.png",
+  "bytes": 31309
+ },
+ "mooBurst": {
+  "file": "art/ladder/pop/mooBurst.jpg",
+  "from": "art/supplied/popart/moo-burst.png",
+  "bytes": 32481
+ },
+ "astronaut": {
+  "file": "art/ladder/pop/astronaut.jpg",
+  "from": "art/supplied/popart/astronaut.png",
+  "bytes": 39586
+ },
+ "herd": {
+  "file": "art/ladder/pop/herd.jpg",
+  "from": "art/supplied/popart/cows-herd.png",
+  "bytes": 49335
+ },
+ "crescent": {
+  "file": "art/ladder/pop/crescent.jpg",
+  "from": "art/supplied/popart/moon-crescent.png",
+  "bytes": 24208
+ },
+ "field": {
+  "file": "art/ladder/pop/field.jpg",
+  "from": "art/supplied/mooney-mooney/pop-pink.png",
+  "bytes": 86207
+ }
+}

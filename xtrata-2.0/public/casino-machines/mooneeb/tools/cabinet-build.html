@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Mooneeb cabinet builder</title><style>html,body{margin:0;background:#07020f}canvas{display:block}</style></head><body>
+<script src="../vendor/three.r128.min.js"></script>
+<script src="../src/xlogo.js"></script>
+<script src="../src/cabinet.js"></script>
+<script>
+// Builds the cabinet, renders preview views, and exposes the packed model for tools/build-cabinet.py.
+const load = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+window.buildAll = async (screenData) => {
+  const wordmark = await load('../art/brand/parallax-casino-wordmark.svg');
+  const screenImage = screenData ? await load(screenData) : null;
+  const { machine } = buildMooneebCabinet(THREE, { xtrataLogo, wordmark, screenImage });
+  window.__machine = machine;
+  return JSON.stringify(packCabinet(THREE, machine));
+};
+window.preview = (yaw = .35, pitch = .12, dist = 10.5, ty = 2.7, w = 900, h = 1100) => {
+  const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(w, h); r.setPixelRatio(1); r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.05; document.body.innerHTML = ''; document.body.appendChild(r.domElement);
+  const scene = new THREE.Scene(); scene.background = new THREE.Color('#07020f'); scene.add(new THREE.HemisphereLight(0xe9dcff, 0x140828, 1.3));
+  const key = new THREE.SpotLight(0xfff2e0, 2.2, 30, .6, .5, 1); key.position.set(4, 9, 7); scene.add(key); const rim = new THREE.PointLight(0xc084fc, 1.6, 14); rim.position.set(-4, 4, -1); scene.add(rim); const rim2 = new THREE.PointLight(0xc084fc, 1.2, 14); rim2.position.set(4, 3, 2); scene.add(rim2);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: '#0d0620', roughness: .4, metalness: .3 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  scene.add(window.__machine);
+  const cam = new THREE.PerspectiveCamera(36, w / h, .1, 100); cam.position.set(Math.sin(yaw) * dist * Math.cos(pitch), ty + Math.sin(pitch) * dist, Math.cos(yaw) * dist * Math.cos(pitch)); cam.lookAt(0, ty, 0);
+  r.render(scene, cam); return r.domElement.toDataURL('image/png');
+};
+</script></body></html>

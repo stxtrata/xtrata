@@ -1,0 +1,14 @@
+{
+ "desktop": {
+  "buttons": 18,
+  "under44px": [],
+  "noHorizontalScroll": true,
+  "errors": []
+ },
+ "phone": {
+  "buttons": 16,
+  "under44px": [],
+  "noHorizontalScroll": true,
+  "errors": []
+ }
+}

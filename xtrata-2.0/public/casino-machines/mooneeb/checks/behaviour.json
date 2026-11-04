@@ -1,0 +1,153 @@
+[
+ {
+  "check": "Skip keeps the same total: chain",
+  "ok": true,
+  "info": {
+   "played": 1600,
+   "skipped": 1600
+  }
+ },
+ {
+  "check": "Skip keeps the same total: free",
+  "ok": true,
+  "info": {
+   "played": 1340,
+   "skipped": 1340
+  }
+ },
+ {
+  "check": "Skip keeps the same total: chain-full",
+  "ok": true,
+  "info": {
+   "played": 54302,
+   "skipped": 54302
+  }
+ },
+ {
+  "check": "Skip on Mooney Bags goes straight to the summary and pays it",
+  "ok": true,
+  "info": {
+   "stage": {
+    "kind": "vault",
+    "stage": "outro",
+    "picks": [
+     0,
+     1,
+     2
+    ]
+   },
+   "net": 600
+  }
+ },
+ {
+  "check": "Reduced motion keeps particles to a handful",
+  "ok": true,
+  "info": {
+   "maxParticles": 3
+  }
+ },
+ {
+  "check": "Climb the ladder lights every rung",
+  "ok": true,
+  "info": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ]
+ },
+ {
+  "check": "Moonshot twins earn cameo records {tokenId, collection, lineWin}",
+  "ok": true,
+  "info": [
+   {
+    "tokenId": 5507,
+    "collection": "leo-cats",
+    "xtrataId": "999",
+    "lineWin": 90
+   },
+   {
+    "tokenId": 3986,
+    "collection": "leo-cats",
+    "xtrataId": "962",
+    "lineWin": 60
+   },
+   {
+    "tokenId": 8953,
+    "collection": "leo-cats",
+    "xtrataId": "1020",
+    "lineWin": 70
+   },
+   {
+    "tokenId": 2872,
+    "collection": "leo-cats",
+    "xtrataId": "984",
+    "lineWin": 200
+   }
+  ]
+ },
+ {
+  "check": "Lab leaves the real balance, meters, pot and stats unchanged",
+  "ok": true,
+  "info": {
+   "before": {
+    "bal": 100000,
+    "jp": {
+     "20": 10000,
+     "40": 20000,
+     "100": 50000,
+     "200": 100000,
+     "500": 250000
+    },
+    "pot": 0,
+    "spins": 0
+   },
+   "after": {
+    "bal": 100000,
+    "jp": {
+     "20": 10000,
+     "40": 20000,
+     "100": 50000,
+     "200": 100000,
+     "500": 250000
+    },
+    "pot": 0,
+    "spins": 0
+   }
+  }
+ },
+ {
+  "check": "Holder Pot grows by 1% of a paid bet",
+  "ok": true,
+  "info": {
+   "before": 0,
+   "after": 1,
+   "bet": 100
+  }
+ },
+ {
+  "check": "Reload mid-spin settles the saved result once, no reroll, no double credit",
+  "ok": true,
+  "info": {
+   "before": {
+    "bal": 99900,
+    "spins": 1,
+    "bet": 100
+   },
+   "savedRound": "1f4f9bc25bbda77e4c55859fee63ce0f",
+   "after": {
+    "bal": 99800,
+    "spins": 2,
+    "pending": null
+   },
+   "settledRound": "1f4f9bc25bbda77e4c55859fee63ce0f",
+   "win": 0
+  }
+ },
+ {
+  "check": "No page errors",
+  "ok": true,
+  "info": []
+ }
+]

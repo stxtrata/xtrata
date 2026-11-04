@@ -1,0 +1,622 @@
+{
+ "desktop": {
+  "viewport": {
+   "width": 1366,
+   "height": 900
+  },
+  "steps": [
+   {
+    "step": "enter fullscreen (frame fills the view)",
+    "ok": true,
+    "info": {
+     "w": 1366,
+     "h": 900,
+     "x": 0,
+     "y": 0,
+     "pos": "fixed",
+     "api": true
+    }
+   },
+   {
+    "step": "bar touch targets >= 44px",
+    "ok": true,
+    "info": [
+     [
+      "fs_spin",
+      96,
+      52
+     ],
+     [
+      "fs_betDown",
+      54,
+      52
+     ],
+     [
+      "fs_bet",
+      84,
+      52
+     ],
+     [
+      "fs_betUp",
+      54,
+      52
+     ],
+     [
+      "fs_auto",
+      87,
+      52
+     ],
+     [
+      "fs_pays",
+      84,
+      52
+     ],
+     [
+      "fs_fair",
+      83,
+      52
+     ],
+     [
+      "fs_turbo",
+      62,
+      52
+     ],
+     [
+      "fs_sound",
+      62,
+      52
+     ],
+     [
+      "fsb vol",
+      106,
+      52
+     ],
+     [
+      "fs_history",
+      73,
+      52
+     ],
+     [
+      "fs_holder",
+      53,
+      52
+     ],
+     [
+      "fs_settings",
+      61,
+      52
+     ],
+     [
+      "fs_balance",
+      84,
+      52
+     ],
+     [
+      "fs_lab",
+      67,
+      52
+     ],
+     [
+      "fs_test",
+      70,
+      52
+     ],
+     [
+      "fs_exit",
+      75,
+      52
+     ]
+    ]
+   },
+   {
+    "step": "bar fits: one row on desktop, wraps on a phone",
+    "ok": true,
+    "info": {
+     "top": 831,
+     "bottom": 900,
+     "h": 900,
+     "w": 1366,
+     "scrollW": 1366,
+     "clientW": 1366,
+     "rows": 1
+    }
+   },
+   {
+    "step": "bet \u2212 / + from the bar",
+    "ok": true,
+    "info": [
+     100,
+     500,
+     100
+    ]
+   },
+   {
+    "step": "spin from the bar",
+    "ok": true,
+    "info": [
+     0,
+     1
+    ]
+   },
+   {
+    "step": "pays opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "MOONMAP",
+     "box": [
+      63,
+      837,
+      900
+     ]
+    }
+   },
+   {
+    "step": "fair opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "FAIR PLAY",
+     "box": [
+      125,
+      775,
+      900
+     ]
+    }
+   },
+   {
+    "step": "history opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "HISTORY",
+     "box": [
+      244,
+      656,
+      900
+     ]
+    }
+   },
+   {
+    "step": "settings opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "SETTINGS",
+     "box": [
+      144,
+      756,
+      900
+     ]
+    }
+   },
+   {
+    "step": "holder opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "HOLDER POT",
+     "box": [
+      94,
+      806,
+      900
+     ]
+    }
+   },
+   {
+    "step": "lab opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "BONUS LAB \u00b7 TESTING ONLY",
+     "box": [
+      63,
+      837,
+      900
+     ]
+    }
+   },
+   {
+    "step": "test opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "TEST PANEL",
+     "box": [
+      137,
+      763,
+      900
+     ]
+    }
+   },
+   {
+    "step": "auto starts and stops from the bar",
+    "ok": true,
+    "info": [
+     8,
+     0
+    ]
+   },
+   {
+    "step": "turbo toggles from the bar",
+    "ok": true,
+    "info": [
+     false,
+     true
+    ]
+   },
+   {
+    "step": "sound toggles from the bar",
+    "ok": true,
+    "info": [
+     false,
+     true
+    ]
+   },
+   {
+    "step": "free played from trigger to summary with the bar",
+    "ok": true,
+    "info": [
+     "free:trigger",
+     "free:intro",
+     "free:play",
+     "chain:trigger",
+     "chain:intro",
+     "chain:play",
+     "chain:outro",
+     "free:outro"
+    ]
+   },
+   {
+    "step": "vault played from trigger to summary with the bar",
+    "ok": true,
+    "info": [
+     "vault:trigger",
+     "vault:intro",
+     "vault:play",
+     "vault:outro"
+    ]
+   },
+   {
+    "step": "chain played from trigger to summary with the bar",
+    "ok": true,
+    "info": [
+     "chain:trigger",
+     "chain:intro",
+     "chain:play",
+     "chain:outro"
+    ]
+   },
+   {
+    "step": "jackpot played from trigger to summary with the bar",
+    "ok": true,
+    "info": [
+     "jackpot:trigger",
+     "jackpot:intro",
+     "jackpot:play",
+     "jackpot:outro"
+    ]
+   },
+   {
+    "step": "gamble-win played from trigger to summary with the bar",
+    "ok": true,
+    "info": [
+     "gamble:trigger",
+     "gamble:intro",
+     "gamble:play",
+     "gamble:outro"
+    ]
+   },
+   {
+    "step": "exit fullscreen restores the cabinet view",
+    "ok": true,
+    "info": {
+     "w": 1400,
+     "x": -10000,
+     "inset": null
+    }
+   },
+   {
+    "step": "no page errors",
+    "ok": true,
+    "info": []
+   }
+  ],
+  "bagTaps": [
+   {
+    "pos": [
+     392.93749999999994,
+     266.203125
+    ],
+    "picksAfterTap": 1
+   }
+  ],
+  "errors": []
+ },
+ "phone": {
+  "viewport": {
+   "width": 390,
+   "height": 844
+  },
+  "steps": [
+   {
+    "step": "enter fullscreen (frame fills the view)",
+    "ok": true,
+    "info": {
+     "w": 390,
+     "h": 844,
+     "x": 0,
+     "y": 0,
+     "pos": "fixed",
+     "api": true
+    }
+   },
+   {
+    "step": "bar touch targets >= 44px",
+    "ok": true,
+    "info": [
+     [
+      "fs_spin",
+      96,
+      52
+     ],
+     [
+      "fs_betDown",
+      58,
+      52
+     ],
+     [
+      "fs_bet",
+      96,
+      52
+     ],
+     [
+      "fs_betUp",
+      58,
+      52
+     ],
+     [
+      "fs_auto",
+      89,
+      52
+     ],
+     [
+      "fs_pays",
+      86,
+      52
+     ],
+     [
+      "fs_fair",
+      85,
+      52
+     ],
+     [
+      "fs_turbo",
+      64,
+      52
+     ],
+     [
+      "fs_sound",
+      64,
+      52
+     ],
+     [
+      "fsb vol",
+      108,
+      52
+     ],
+     [
+      "fs_history",
+      75,
+      52
+     ],
+     [
+      "fs_holder",
+      58,
+      52
+     ],
+     [
+      "fs_settings",
+      63,
+      52
+     ],
+     [
+      "fs_balance",
+      96,
+      52
+     ],
+     [
+      "fs_lab",
+      69,
+      52
+     ],
+     [
+      "fs_test",
+      72,
+      52
+     ],
+     [
+      "fs_exit",
+      77,
+      52
+     ]
+    ]
+   },
+   {
+    "step": "bar fits: one row on desktop, wraps on a phone",
+    "ok": true,
+    "info": {
+     "top": 551,
+     "bottom": 844,
+     "h": 844,
+     "w": 390,
+     "scrollW": 390,
+     "clientW": 390,
+     "rows": 5
+    }
+   },
+   {
+    "step": "bet \u2212 / + from the bar",
+    "ok": true,
+    "info": [
+     100,
+     500,
+     100
+    ]
+   },
+   {
+    "step": "spin from the bar",
+    "ok": true,
+    "info": [
+     0,
+     1
+    ]
+   },
+   {
+    "step": "pays opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "MOONMAP",
+     "box": [
+      59,
+      785,
+      844
+     ]
+    }
+   },
+   {
+    "step": "fair opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "FAIR PLAY",
+     "box": [
+      59,
+      785,
+      844
+     ]
+    }
+   },
+   {
+    "step": "history opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "HISTORY",
+     "box": [
+      211,
+      633,
+      844
+     ]
+    }
+   },
+   {
+    "step": "settings opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "SETTINGS",
+     "box": [
+      99,
+      745,
+      844
+     ]
+    }
+   },
+   {
+    "step": "holder opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "HOLDER POT",
+     "box": [
+      59,
+      785,
+      844
+     ]
+    }
+   },
+   {
+    "step": "lab opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "BONUS LAB \u00b7 TESTING ONLY",
+     "box": [
+      59,
+      785,
+      844
+     ]
+    }
+   },
+   {
+    "step": "test opens and closes inside fullscreen",
+    "ok": true,
+    "info": {
+     "tag": "TEST PANEL",
+     "box": [
+      59,
+      785,
+      844
+     ]
+    }
+   },
+   {
+    "step": "auto starts and stops from the bar",
+    "ok": true,
+    "info": [
+     8,
+     0
+    ]
+   },
+   {
+    "step": "turbo toggles from the bar",
+    "ok": true,
+    "info": [
+     false,
+     true
+    ]
+   },
+   {
+    "step": "sound toggles from the bar",
+    "ok": true,
+    "info": [
+     false,
+     true
+    ]
+   },
+   {
+    "step": "vault played from trigger to summary with the bar",
+    "ok": true,
+    "info": [
+     "vault:trigger",
+     "vault:intro",
+     "vault:play",
+     "vault:outro"
+    ]
+   },
+   {
+    "step": "gamble-loss played from trigger to summary with the bar",
+    "ok": true,
+    "info": [
+     "gamble:trigger",
+     "gamble:intro",
+     "gamble:play",
+     "gamble:outro"
+    ]
+   },
+   {
+    "step": "exit fullscreen restores the cabinet view",
+    "ok": true,
+    "info": {
+     "w": 1400,
+     "x": -10000,
+     "inset": null
+    }
+   },
+   {
+    "step": "no page errors",
+    "ok": true,
+    "info": []
+   }
+  ],
+  "bagTaps": [
+   {
+    "pos": [
+     103.19999999999999,
+     228.25227864583331
+    ],
+    "picksAfterTap": 1
+   }
+  ],
+  "errors": []
+ }
+}

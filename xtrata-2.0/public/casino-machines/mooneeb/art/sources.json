@@ -1,0 +1,273 @@
+{
+  "machine": "Mooneeb",
+  "builtAt": "2026-11-02T20:23:32.460Z",
+  "rule": "Every image is listed here. Ladder pieces are original illustrations, the machine's one agreed exception to the nothing-generic rule.",
+  "ladder": [
+    {
+      "key": "m",
+      "file": "art/ladder/pop/m.jpg",
+      "croppedFrom": "art/supplied/popart/letter-m.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "cherry (M)"
+    },
+    {
+      "key": "moo",
+      "file": "art/ladder/pop/moo.jpg",
+      "croppedFrom": "art/supplied/popart/cow-face.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "lemon (Moo)"
+    },
+    {
+      "key": "moon",
+      "file": "art/ladder/pop/moon.jpg",
+      "croppedFrom": "art/supplied/popart/moon-full.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "chip (Moon)"
+    },
+    {
+      "key": "mooney",
+      "file": "art/ladder/pop/mooney.jpg",
+      "croppedFrom": "art/supplied/popart/cow-over-moon.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "block (Mooney)"
+    },
+    {
+      "key": "rocket",
+      "file": "art/ladder/pop/rocket.jpg",
+      "croppedFrom": "art/supplied/popart/rocket.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "scatter (Moonshot)"
+    },
+    {
+      "key": "bag",
+      "file": "art/ladder/bag.svg",
+      "slot": "vault (Mooney bag)",
+      "kind": "Original illustration drawn for this machine (until a supplied image replaces it)"
+    },
+    {
+      "key": "mooBurst",
+      "file": "art/ladder/pop/mooBurst.jpg",
+      "croppedFrom": "art/supplied/popart/moo-burst.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "big-win and Moo gamble burst"
+    },
+    {
+      "key": "astronaut",
+      "file": "art/ladder/pop/astronaut.jpg",
+      "croppedFrom": "art/supplied/popart/astronaut.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "Moonshot intro"
+    },
+    {
+      "key": "herd",
+      "file": "art/ladder/pop/herd.jpg",
+      "croppedFrom": "art/supplied/popart/cows-herd.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "Full Mooneeb jackpot backdrop"
+    },
+    {
+      "key": "crescent",
+      "file": "art/ladder/pop/crescent.jpg",
+      "croppedFrom": "art/supplied/popart/moon-crescent.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "moon over the Mooney Bags field"
+    },
+    {
+      "key": "field",
+      "file": "art/ladder/pop/field.jpg",
+      "croppedFrom": "art/supplied/mooney-mooney/pop-pink.png",
+      "kind": "Pop-art image supplied by Jim (2 November 2026), picked from his grid",
+      "slot": "Mooney Bags field: Mooney Mooney, NSW (map, pink pop style)"
+    }
+  ],
+  "supplied": {
+    "grids": [
+      "art/supplied/grid-popart.png",
+      "art/supplied/grid-mooney-mooney.png"
+    ],
+    "note": "Supplied by Jim on 2 November 2026; every tile is cropped into art/supplied/. Unused tiles are kept for later."
+  },
+  "drawnInCode": [
+    {
+      "slot": "chain (letter tile)",
+      "kind": "Original letter tiles M, O, N, E, B drawn in canvas code"
+    },
+    {
+      "slot": "bitcoin (Mooneeb)",
+      "kind": "Pop-art portrait of Muneeb Ali supplied by Jim (art/muneeb/portrait-hd.jpg)",
+      "approval": "Approved by Jim (jim.btc), who supplied the image and asked for it on the Mooneeb tiles on 2026-11-02. Shown on the Mooneeb (jackpot) tiles at Jim's request. The series rule also asks for Muneeb's own OK before a public launch: record it here (who, when, where) once given."
+    },
+    {
+      "slot": "Xtrata mark",
+      "kind": "XLOGO vector code (same trace as every machine)"
+    },
+    {
+      "slot": "ParallaX Casino wordmark (souvenir ticket header)",
+      "kind": "Brand SVG used as given",
+      "file": "art/brand/parallax-casino-wordmark.svg"
+    },
+    {
+      "slot": "Xtrata mark (brand file kept for reference)",
+      "kind": "Brand SVG as given",
+      "file": "art/brand/xtrata-mark.svg"
+    }
+  ],
+  "logos": [
+    {
+      "slot": "wild (STX)",
+      "name": "Stacks / STX",
+      "status": "fallback: name set in type on a Stacks-purple tile",
+      "source": "Official file to come from the Stacks brand resources (stacks.co/brand). Not reachable from the build sandbox.",
+      "permission": "Needs the Stacks Foundation OK before public use"
+    },
+    {
+      "slot": "artifact (Leopold, $LEO)",
+      "name": "$LEO token",
+      "status": "fallback: name set in type on an orange tile; the game also tries the official image live from the token metadata",
+      "source": "leo-token metadata (SP1AY6K3PQV5MRT6R4S671NWW2FRVPKM0BR162CT6.leo-token) → image_canonical_uri https://token-meta.s3.eu-central-1.amazonaws.com/icon.png. Blocked by the build sandbox's network policy.",
+      "permission": "Needs the $LEO team's OK before public use"
+    }
+  ],
+  "twins": {
+    "collection": "LEO Cats",
+    "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata",
+    "sourceContract": "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats",
+    "core": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+    "readAt": "2026-11-02T10:30:16.768Z",
+    "inscribedCountAtBuild": 101,
+    "items": [
+      {
+        "file": "art/twins/leo-cat-4900.png",
+        "tokenId": 4900,
+        "xtrataId": "965",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/965",
+        "swapTx": "0x714610b85ed679f9e9ac79b57b24a3ba00e56511f254aa6dee85ec5b9d12b1e4"
+      },
+      {
+        "file": "art/twins/leo-cat-4608.png",
+        "tokenId": 4608,
+        "xtrataId": "967",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/967",
+        "swapTx": "0x4b803edf1bb6859bea6062fef86424741e3abdba4997efdccc9cd08c1efab3f1"
+      },
+      {
+        "file": "art/twins/leo-cat-8910.png",
+        "tokenId": 8910,
+        "xtrataId": "952",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/952",
+        "swapTx": "0x92f252f077b163b8d34b827b44f3e52152427ae055db73dffcaf5c08520957d4"
+      },
+      {
+        "file": "art/twins/leo-cat-7644.png",
+        "tokenId": 7644,
+        "xtrataId": "956",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/956",
+        "swapTx": "0x95335e294a3943aa8405cae0457541409eab6c25b9ec1b44a20dd8c64763cc94"
+      },
+      {
+        "file": "art/twins/leo-cat-1104.png",
+        "tokenId": 1104,
+        "xtrataId": "1009",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1009",
+        "swapTx": "0x64d6e8cd3d8ce66cb3fb73a56da88e2031de324f4eafb9ecf8ef2e0b3e5f8559"
+      },
+      {
+        "file": "art/twins/leo-cat-1288.png",
+        "tokenId": 1288,
+        "xtrataId": "1036",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1036",
+        "swapTx": "0x25d4c1f589d109b0dfe5658464fc99c186add9e6c9c512f3043c2aeeb477e41c"
+      },
+      {
+        "file": "art/twins/leo-cat-1951.png",
+        "tokenId": 1951,
+        "xtrataId": "981",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/981",
+        "swapTx": "0xf7ffc13ac28e23ebc1d2f7e5b895abbd0f35ec6ea3885a94c1dcefa81956c50e"
+      },
+      {
+        "file": "art/twins/leo-cat-2872.png",
+        "tokenId": 2872,
+        "xtrataId": "984",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/984",
+        "swapTx": "0xcbdaa0a168f8c78cfae56948cbfee0ec0d3bbd847bfbf085b2af7fb7037ade7e"
+      },
+      {
+        "file": "art/twins/leo-cat-2040.png",
+        "tokenId": 2040,
+        "xtrataId": "1016",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1016",
+        "swapTx": "0x399e53e695d82d51a2b46dc2ef7d5a5b1ecba135c7cf33e287941e9ebe03bb1c"
+      },
+      {
+        "file": "art/twins/leo-cat-1949.png",
+        "tokenId": 1949,
+        "xtrataId": "982",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/982",
+        "swapTx": "0x41b154fccc0568392a2ee7752c27ecd96d039ee0b1f0d8f482dc2eea6eba0ee1"
+      },
+      {
+        "file": "art/twins/leo-cat-4258.png",
+        "tokenId": 4258,
+        "xtrataId": "1027",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1027",
+        "swapTx": "0xf9f8423a9acaf2b0a0c4e2e8ce87e654a43790b15f5c76f7673bfad3fd381136"
+      },
+      {
+        "file": "art/twins/leo-cat-7570.png",
+        "tokenId": 7570,
+        "xtrataId": "947",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/947",
+        "swapTx": "0x8302146279a39e940f3ca05d75ecfec34308663109bf04b39e34d0c0cf82270f"
+      },
+      {
+        "file": "art/twins/leo-cat-4708.png",
+        "tokenId": 4708,
+        "xtrataId": "1007",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1007",
+        "swapTx": "0x5dde4e69e857cf281b254fad359d23900ed14f32f5243a7513a3e5cb0be3e851"
+      },
+      {
+        "file": "art/twins/leo-cat-8633.png",
+        "tokenId": 8633,
+        "xtrataId": "997",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/997",
+        "swapTx": "0xf0bfbedbb2e40ccf0e0e13cd6b66fe5f3531c155f174f3cb7e5437efdbe7742b"
+      },
+      {
+        "file": "art/twins/leo-cat-3986.png",
+        "tokenId": 3986,
+        "xtrataId": "962",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/962",
+        "swapTx": "0x7eb160c7a2fb27d1bbe91aa20ba4e79d19ba47bfb7aba7ed33e61a57fc10706d"
+      },
+      {
+        "file": "art/twins/leo-cat-564.png",
+        "tokenId": 564,
+        "xtrataId": "992",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/992",
+        "swapTx": "0xaf81087b99d421042f42db1a0070b23e10e2bc5a579515bad4e58ae21d1fca27"
+      },
+      {
+        "file": "art/twins/leo-cat-1381.png",
+        "tokenId": 1381,
+        "xtrataId": "986",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/986",
+        "swapTx": "0xe6737502ad9ae0e5a4a2d291a60a6db8058357c836afe7571e19230a3f63c176"
+      },
+      {
+        "file": "art/twins/leo-cat-998.png",
+        "tokenId": 998,
+        "xtrataId": "987",
+        "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/987",
+        "swapTx": "0xde6007c126968bacc40eff1dd945dc9f22fc038e5903775928534e38b7fc207f"
+      }
+    ]
+  },
+  "needsPermission": [
+    "Stacks (STX) logo — Stacks Foundation",
+    "$LEO token logo — the $LEO team",
+    "Muneeb Ali — his OK and an image he is happy with",
+    "LEO Cats art in the Moonshot starfield — the LEO Cats community (shown as Forever Twins, the same use as Forever Twins itself)"
+  ]
+}

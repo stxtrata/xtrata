@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240"><title>Mooney (Mooneeb ladder, rung 4) — original illustration: the cow jumping over a gold-coin moon, after the traditional nursery rhyme</title>
+<defs>
+<radialGradient id="gold" cx=".38" cy=".32" r=".75"><stop offset="0" stop-color="#fff4b0"/><stop offset=".5" stop-color="#ffcd3c"/><stop offset="1" stop-color="#d9901a"/></radialGradient>
+<radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset=".6" stop-color="#ffd54a" stop-opacity=".5"/><stop offset="1" stop-color="#ffd54a" stop-opacity="0"/></radialGradient>
+<clipPath id="cowbody"><ellipse cx="110" cy="64" rx="44" ry="24" transform="rotate(-14 110 64)"/></clipPath>
+</defs>
+<g transform="translate(120 182) scale(.82) translate(-120 -160)"><!-- the moon as a gold coin -->
+<circle cx="120" cy="160" r="86" fill="url(#glow)"/>
+<circle cx="120" cy="160" r="66" fill="url(#gold)" stroke="#2a1150" stroke-width="8"/>
+<circle cx="120" cy="160" r="52" fill="none" stroke="#b5741a" stroke-width="4" stroke-dasharray="3 6"/>
+<path d="M136 128 A34 34 0 1 0 136 192 A27 27 0 1 1 136 128 Z" fill="#e8a52a" stroke="#9a5f12" stroke-width="4" stroke-linejoin="round"/>
+<path d="M78 136 A50 50 0 0 1 108 110" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+</g>
+<!-- motion arc -->
+<path d="M22 132 Q40 40 120 30 Q196 30 222 104" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-dasharray="2 13" opacity=".75"/>
+<!-- the cow, mid-leap -->
+<g stroke="#2a1150" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+<path d="M76 74 L52 96" fill="none"/><path d="M84 80 L66 104" fill="none"/>
+<path d="M138 72 L166 86" fill="none"/><path d="M132 78 L156 98" fill="none"/>
+<path d="M68 60 C56 58 50 50 48 40" fill="none"/>
+</g>
+<g fill="#2a1150"><circle cx="52" cy="97" r="5"/><circle cx="66" cy="105" r="5"/><circle cx="167" cy="87" r="5"/><circle cx="157" cy="99" r="5"/><path d="M44 36 l8 2 -2 9z"/></g>
+<ellipse cx="110" cy="64" rx="44" ry="24" transform="rotate(-14 110 64)" fill="#fffaf0"/>
+<g clip-path="url(#cowbody)" fill="#24173d"><path d="M80 44 C96 40 104 52 98 66 C92 78 74 76 68 66 Z"/><path d="M122 56 C134 50 148 56 146 70 C140 80 126 78 122 68 Z"/></g>
+<ellipse cx="110" cy="64" rx="44" ry="24" transform="rotate(-14 110 64)" fill="none" stroke="#2a1150" stroke-width="6"/>
+<ellipse cx="120" cy="84" rx="9" ry="6" fill="#ffb8cb" stroke="#2a1150" stroke-width="4"/>
+<!-- head -->
+<g stroke="#2a1150" stroke-width="6" stroke-linejoin="round">
+<path d="M154 30 C148 20 150 12 158 8 C160 16 164 20 170 22 Z" fill="#fff1c9"/>
+<path d="M146 40 C134 38 128 30 128 24 C138 24 146 28 152 34 Z" fill="#fffaf0"/>
+<path d="M150 32 C166 22 186 28 190 44 C194 58 184 68 170 68 C156 68 146 56 148 44 Z" fill="#fffaf0"/>
+<ellipse cx="182" cy="56" rx="16" ry="12" fill="#ffb8cb"/>
+</g>
+<circle cx="164" cy="42" r="5" fill="#2a1150"/><circle cx="165.5" cy="40.5" r="1.8" fill="#fff"/>
+<circle cx="184" cy="54" r="2.6" fill="#c4527f"/><circle cx="190" cy="58" r="2.6" fill="#c4527f"/>
+<g fill="#fff3a6" stroke="#2a1150" stroke-width="3" stroke-linejoin="round"><path d="M214 140 l4 8 8 4 -8 4 -4 8 -4 -8 -8 -4 8 -4z"/></g>
+</svg>

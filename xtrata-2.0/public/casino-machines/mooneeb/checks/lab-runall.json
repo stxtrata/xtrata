@@ -1,0 +1,87 @@
+{
+ "seconds": 419,
+ "items": {
+  "free": [
+   "free:trigger",
+   "free:intro",
+   "free:play",
+   "free:outro"
+  ],
+  "free-retrigger": [
+   "free:trigger",
+   "free:intro",
+   "free:play",
+   "retrigger:trigger",
+   "free:play",
+   "free:outro"
+  ],
+  "vault": [
+   "vault:trigger",
+   "vault:intro",
+   "vault:play",
+   "vault:outro"
+  ],
+  "chain": [
+   "chain:trigger",
+   "chain:intro",
+   "chain:play",
+   "chain:outro"
+  ],
+  "chain-full": [
+   "chain:trigger",
+   "chain:intro",
+   "chain:play",
+   "chain:outro",
+   "jackpot:trigger",
+   "jackpot:intro",
+   "jackpot:play",
+   "jackpot:outro"
+  ],
+  "jackpot": [
+   "jackpot:trigger",
+   "jackpot:intro",
+   "jackpot:play",
+   "jackpot:outro"
+  ],
+  "gamble-win": [
+   "gamble:trigger",
+   "gamble:intro",
+   "gamble:play",
+   "gamble:outro"
+  ],
+  "gamble-loss": [
+   "gamble:trigger",
+   "gamble:intro",
+   "gamble:play",
+   "gamble:outro"
+  ],
+  "scatter3": [
+   "free:trigger",
+   "free:intro",
+   "free:play",
+   "free:outro"
+  ],
+  "scatter4": [
+   "free:trigger",
+   "free:intro",
+   "free:play",
+   "free:outro"
+  ],
+  "scatter5": [
+   "free:trigger",
+   "free:intro",
+   "free:play",
+   "free:outro"
+  ],
+  "ladder": [],
+  "cameo": [
+   "free:trigger",
+   "free:intro",
+   "free:play",
+   "free:outro"
+  ]
+ },
+ "labHistoryRounds": 71,
+ "labTagged": true,
+ "errors": []
+}

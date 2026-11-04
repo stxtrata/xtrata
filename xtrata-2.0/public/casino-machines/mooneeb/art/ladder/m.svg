@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240"><title>M (Mooneeb ladder, rung 1) — original illustration</title>
+<defs>
+<linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9d8cff"/><stop offset=".45" stop-color="#6c5cff"/><stop offset="1" stop-color="#4a36e8"/></linearGradient>
+<linearGradient id="side" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a24b8"/><stop offset="1" stop-color="#22127a"/></linearGradient>
+</defs>
+<g stroke="#2a1150" stroke-width="9" stroke-linejoin="round">
+<path transform="translate(10 12)" fill="url(#side)" d="M38 196 L38 52 L82 52 L120 116 L158 52 L202 52 L202 196 L160 196 L160 122 L130 170 L110 170 L80 122 L80 196 Z"/>
+<path fill="url(#face)" d="M38 196 L38 52 L82 52 L120 116 L158 52 L202 52 L202 196 L160 196 L160 122 L130 170 L110 170 L80 122 L80 196 Z"/>
+</g>
+<path d="M50 64 L78 64 L84 74 L50 74 Z" fill="#ffffff" opacity=".55"/>
+<path d="M162 64 L190 64 L190 74 L156 74 Z" fill="#ffffff" opacity=".45"/>
+<circle cx="56" cy="88" r="5" fill="#ffffff" opacity=".7"/>
+</svg>
