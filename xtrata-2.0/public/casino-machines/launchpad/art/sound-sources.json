@@ -1,0 +1,22 @@
+{
+  "machine": "Launchpad",
+  "build_date": "2026-11-03",
+  "implementation": "../src/game.js :: sound(kind)",
+  "method": "Procedural WebAudio fallback; oscillators, gain envelopes and generated noise.",
+  "external_recordings": [],
+  "recording_licenses": [],
+  "mission_control_voice": "Not supplied; no voice or chatter recording is bundled.",
+  "licensing_note": "No external sound recording is included or represented as CC0. Procedural implementation belongs to the project source; no separate blanket licence is assigned here.",
+  "cues": [
+    {"id": "click", "use": "Console and deck click", "source": "460 Hz sine, 45 ms envelope"},
+    {"id": "stop", "use": "Reel stop", "source": "750 Hz sine, 80 ms envelope"},
+    {"id": "lock", "use": "Seat reveal and curve lock", "source": "280 Hz sine, 150 ms envelope"},
+    {"id": "count", "use": "Countdown and trigger signal", "source": "1080 Hz sine, 120 ms envelope"},
+    {"id": "launch", "use": "Rocket and spin launch", "source": "110 Hz sawtooth falling to 55 Hz over 650 ms, plus 700 ms generated decaying noise through a 480 Hz low-pass filter"},
+    {"id": "win", "use": "Win fanfare, feature summaries and successful gamble", "source": "660 Hz sine plus delayed 825, 990 and 1320 Hz triangle tones"},
+    {"id": "lose", "use": "Failed gamble", "source": "190 Hz sine, 450 ms envelope"}
+  ],
+  "controls": "AudioContext begins on interaction; master mute and volume are available in the host and fullscreen game.",
+  "status": "listening sign-off owed",
+  "verification_limit": "Code and browser state checks do not establish perceived loudness, timbre, clipping or device audio behavior."
+}

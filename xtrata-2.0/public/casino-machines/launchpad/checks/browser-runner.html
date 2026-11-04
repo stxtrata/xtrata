@@ -1,0 +1,91 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Launchpad — Browser checks</title><style>
+:root{font:14px/1.45 Arial,sans-serif;color:#e7eee9;background:#0c1720;color-scheme:dark}*{box-sizing:border-box}body{margin:0;padding:20px}h1{margin:0 0 7px;font-size:25px}p{color:#9fb3bc;max-width:1000px;margin:8px 0 15px}button,select{min-height:44px;min-width:44px;border:1px solid #47606c;border-radius:6px;padding:10px 15px;background:#172d39;color:#fff;font:inherit;cursor:pointer}button.primary{background:#f97316;color:#111b22;border-color:#ff9d55;font-weight:bold}button:disabled{opacity:.4}button:focus-visible,select:focus-visible{outline:3px solid #ffb779;outline-offset:2px}.toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:16px 0}.status{padding:11px 14px;background:#17312c;border:1px solid #426c60;border-radius:6px;min-height:44px}.frame-wrap{overflow:auto;border:1px solid #455560;background:#060c12;padding:0;max-width:100%;margin:15px 0}iframe{display:block;border:0;width:1440px;height:900px;background:#0d151b}.report{display:grid;grid-template-columns:minmax(460px,1fr) minmax(360px,1fr);gap:18px}pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.5 monospace;background:#07121a;border:1px solid #293e4b;padding:15px;max-height:700px;overflow:auto}table{border-collapse:collapse;width:100%;font-size:11px}td,th{text-align:left;padding:8px;border-bottom:1px solid #30434b}th{color:#ffb16f}details{padding:10px 0}summary{cursor:pointer;font-weight:bold;padding:10px 0}.pass{color:#95deb3}.fail{color:#ffad98}@media(max-width:850px){.report{grid-template-columns:1fr}body{padding:12px}}
+</style></head><body><h1>Launchpad / Five-size browser checks</h1><p>This harness loads the embedded, unchanged standalone build into a real iframe at each required viewport. It operates the visible Screen view and physical deck controls through their DOM handlers, reads the studio’s read-only diagnostics, and uses isolated QA play accounts. It never forces a reel result or calls engine internals. Raycast hit accuracy and real GPU appearance require the separate manual cabinet pass.</p><div class="toolbar"><label>Viewport <select id="viewport"><option value="1440,900">1440 × 900</option><option value="1366,768">1366 × 768</option><option value="1024,768">1024 × 768</option><option value="390,844">390 × 844</option><option value="844,390">844 × 390</option></select></label><button id="loadViewport">Load viewport</button><button id="run" class="primary">Run five-size checks</button><button id="presentations">Run presentation suite</button><button id="captures">Capture all stages</button><button id="reduced">Check reduced motion</button><button id="flows">Run reload / Run all checks</button><button id="download" disabled>Download report</button><span id="status" class="status" role="status">Ready</span></div><div class="report"><section><h2>Results</h2><pre id="report" aria-live="polite">No run yet.</pre></section><section><h2>Visible button sizes</h2><p>These are DOM touch targets in the standalone studio. Physical mesh bounds and expanded targets are recorded separately in the JSON.</p><div id="buttons">No measurements yet.</div></section></div><details open><summary>Live test viewport</summary><div class="frame-wrap"><iframe id="testFrame" title="Launchpad at selected validation viewport" allow="autoplay; fullscreen"></iframe></div></details><script src="./presentation-runner.js"></script><script src="./browser-flow-runner.js"></script><script>
+(() => {
+ 'use strict';
+ const STANDALONE_HTML=new TextDecoder().decode(Uint8Array.from(atob("__STANDALONE_HTML__"),c=>c.charCodeAt(0)));
+ const sizes=[[1440,900],[1366,768],[1024,768],[390,844],[844,390]],$=id=>document.getElementById(id);
+ let frame=$('testFrame');
+ let report=null,running=false,serial=0;
+ const pause=ms=>new Promise(r=>setTimeout(r,ms));
+ const runId=()=>Date.now().toString(36)+'-'+(++serial);
+ const clean=n=>Math.round(n*100)/100;
+ async function waitFor(fn,timeout=35000){const t=performance.now();while(performance.now()-t<timeout){try{const result=fn();if(result)return result;}catch(_){}await pause(75);}throw Error('Timed out waiting for the standalone game.');}
+ async function load(size,suffix='layout'){
+  const [w,h]=size,qa='layout-'+runId()+'-'+w+'x'+h+'-'+suffix,current=frame;
+  if(!/^<!doctype html/i.test(STANDALONE_HTML))throw Error('Build the embedded checks page before running this source harness.');
+  try{const old=current.contentWindow?.document.getElementById('gameFrame')?.contentWindow?.PX_CASINO_ENGINE;old?.stopAuto?.();old?.deactivate?.();}catch(_){}
+  current.dataset.qa=qa;current.style.width=w+'px';current.style.height=h+'px';
+  $('status').textContent='Loading embedded '+w+' × '+h+' / '+suffix+'…';
+  const loaded=new Promise((resolve,reject)=>{
+   const t=setTimeout(()=>reject(Error('Embedded iframe timed out at '+w+' × '+h+' / '+suffix)),60000);
+   current.onload=()=>{clearTimeout(t);resolve();};
+  });
+  // No network navigation: another concurrent project can replace the shared
+  // preview server without changing any machine used by this validation run.
+  current.srcdoc=STANDALONE_HTML;await loaded;
+  $('status').textContent='Initialising '+w+' × '+h+' / '+suffix+'…';
+  const win=await waitFor(()=>{const a=current.contentWindow?.PX_STUDIO;return a?.diagnostics().ready?current.contentWindow:null;},60000);
+  win.document.getElementById('screenView').click();
+  await waitFor(()=>win.PX_STUDIO.viewBounds().view==='screen');await pause(180);
+  return win;
+ }
+ function closePanel(win){const game=win.document.getElementById('gameFrame')?.contentWindow;const close=game?.document.getElementById('closePanel');if(close&&game.document.getElementById('panelLayer')?.hidden===false)close.click();}
+ function physical(win,action){const b=win.document.querySelector('[data-physical-action="'+action+'"]');if(!b)throw Error('Missing physical target: '+action);if(b.hidden||b.disabled)throw Error('Physical target unavailable: '+action);return b;}
+ function clickCount(win,action){const before=win.PX_STUDIO.diagnostics().actions[action]||0;physical(win,action).click();const after=win.PX_STUDIO.diagnostics().actions[action]||0;return {before,after,pass:after===before+1};}
+ function readBet(win){return Number(win.document.getElementById('betValue').textContent.replace(/,/g,''));}
+ function buttonTable(win,size){
+  return [...win.document.querySelectorAll('button')].filter(b=>{const r=b.getBoundingClientRect(),s=win.getComputedStyle(b);return !b.hidden&&r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden';}).map(b=>{const r=b.getBoundingClientRect();return {viewport:size.join('×'),label:b.getAttribute('aria-label')||b.textContent.trim().replace(/\s+/g,' '),action:b.dataset.action||b.dataset.physicalAction||b.id,width:clean(r.width),height:clean(r.height),minimum44:r.width>=43.99&&r.height>=43.99,left:clean(r.left),right:clean(r.right)};});
+ }
+ function showTable(rows){$('buttons').innerHTML='<table><thead><tr><th>Viewport / control</th><th>W × H</th><th>44px</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+r.viewport+' / '+r.label.replace(/[<>]/g,'')+'</td><td>'+r.width+' × '+r.height+'</td><td class="'+(r.minimum44?'pass':'fail')+'">'+(r.minimum44?'PASS':'FAIL')+'</td></tr>').join('')+'</tbody></table>';}
+ function publish(){ $('report').textContent=JSON.stringify(report,(key,value)=>typeof value==='string'&&value.startsWith('data:image/')?'[Image capture: '+value.length+' characters; retained in download]':value,2);$('download').disabled=!report; }
+ function within(r,w,h,bottom){return r.left>=-.5&&r.right<=w+.5&&r.top>=-.5&&r.bottom<=Math.min(h,bottom)+.5;}
+ async function one(size){
+  const [w,h]=size;let win=await load(size),b=win.PX_STUDIO.viewBounds();
+  const checks={viewportMatches:win.innerWidth===w&&win.innerHeight===h,solver40:b.iterations===40,pitch016:Math.abs(b.pitch-.16)<1e-8,screenBelowTopbar:b.screen.top>=b.topbarBottom+8,
+   screenInsideViewport:within(b.screen,w,h,b.controlsTop),deckNearControls:b.controlsTop-b.deck.bottom>=6&&b.controlsTop-b.deck.bottom<=10.5,allDeckMeshesInside:b.buttons.every(x=>within(x,w,h,b.controlsTop)),allDeckTargetsInside:b.buttons.every(x=>x.target&&within(x.target,w,h,b.controlsTop)),
+   physicalTargets44:b.buttons.every(x=>x.target&&x.target.width>=43.99&&x.target.height>=43.99),noSidewaysScroll:win.document.documentElement.scrollWidth<=w};
+  const measured=buttonTable(win,size);checks.allVisibleButtons44=measured.every(x=>x.minimum44);
+  const events={};const beforeBet=readBet(win);events.betUp=clickCount(win,'betUp');await pause(120);const upBet=readBet(win);events.betDown=clickCount(win,'betDown');await pause(120);const downBet=readBet(win);
+  checks.bet100to200to100=beforeBet===100&&upBet===200&&downBet===100;
+  for(const action of ['pays','lab']){events[action]=clickCount(win,action);await pause(120);closePanel(win);await pause(120);}
+  // Spin and auto are deliberately the last actions in their own fresh QA
+  // frames, so a random bonus cannot poison another viewport's control test.
+  events.spin=clickCount(win,'spin');await pause(160);
+  win=await load(size,'auto');events.auto=clickCount(win,'auto');await pause(100);const autoAgain=clickCount(win,'auto');events.auto.stop=autoAgain;
+  checks.allPhysicalActionsDispatch=Object.values(events).every(e=>e.pass)&&autoAgain.pass;
+  return {viewport:{width:w,height:h},pass:Object.values(checks).every(Boolean),checks,betSequence:[beforeBet,upBet,downBet],events,bounds:b,visibleButtons:measured};
+ }
+ $('loadViewport').onclick=async()=>{if(running)return;try{$('status').textContent='Loading viewport…';const size=$('viewport').value.split(',').map(Number),win=await load(size);showTable(buttonTable(win,size));$('status').textContent='Viewport ready · '+size.join(' × ');}catch(e){$('status').textContent=e.message;}};
+ $('run').onclick=async()=>{
+  if(running)return;running=true;$('run').disabled=true;$('loadViewport').disabled=true;
+  report={suite:'Launchpad standalone browser layout / physical-target dispatch',runAt:new Date().toISOString(),testMethod:'Real iframe dimensions; visible DOM controls; read-only PX_STUDIO diagnostics; independent QA play account per frame. No engine forcing. Does not certify raycast hit areas or real GPU rendering.',results:[]};publish();
+  const allButtons=[];
+  for(const size of sizes){$('viewport').value=size.join(',');$('status').textContent='Checking '+size.join(' × ')+'…';try{const r=await one(size);report.results.push(r);allButtons.push(...r.visibleButtons);}catch(e){report.results.push({viewport:{width:size[0],height:size[1]},pass:false,error:e.message});}publish();showTable(allButtons);}
+  report.pass=report.results.length===5&&report.results.every(r=>r.pass);report.passed=report.results.filter(r=>r.pass).length;report.finishedAt=new Date().toISOString();publish();
+  $('status').textContent=report.pass?'PASS · all five viewports':report.passed+'/5 passed · inspect report';$('status').className='status '+(report.pass?'pass':'fail');
+  running=false;$('run').disabled=false;$('loadViewport').disabled=false;
+ };
+ $('presentations').onclick=async()=>{if(running)return;if(typeof window.runPresentationChecks!=='function'){$('status').textContent='Presentation runner not loaded.';return;}running=true;$('run').disabled=$('presentations').disabled=$('loadViewport').disabled=true;try{$('status').textContent='Preparing presentation suite…';await load([1440,900],'presentation');report=await window.runPresentationChecks(frame,event=>{$('status').textContent=typeof event==='string'?event:JSON.stringify(event);});publish();$('status').textContent='Presentation suite complete · inspect report';}catch(e){report={suite:'presentation',pass:false,error:e.message,stack:e.stack};publish();$('status').textContent='Presentation suite failed: '+e.message;}finally{running=false;$('run').disabled=$('presentations').disabled=$('loadViewport').disabled=false;}};
+ $('captures').onclick=async()=>{
+  if(running)return;running=true;['run','presentations','captures','flows','loadViewport'].forEach(id=>$(id).disabled=true);
+  try{await load([1440,900],'stage-captures');report=await window.runPresentationChecks(frame,event=>{$('status').textContent=JSON.stringify(event);},{captureOnly:true});publish();$('status').textContent='Stage capture suite complete · inspect report';}
+  catch(e){report={suite:'stage-capture',pass:false,error:e.message};publish();$('status').textContent=e.message;}
+  finally{running=false;['run','presentations','captures','flows','loadViewport'].forEach(id=>$(id).disabled=false);}
+ };
+ $('reduced').onclick=async()=>{
+  if(running)return;running=true;['run','presentations','captures','reduced','flows','loadViewport'].forEach(id=>$(id).disabled=true);
+  try{await load([1440,900],'reduced-motion');report=await window.runBrowserFlowChecks(frame,event=>{$('status').textContent=JSON.stringify(event);},{reducedOnly:true});publish();$('status').textContent='Reduced-motion check complete · inspect report';}
+  catch(e){report={suite:'reduced-motion',pass:false,error:e.message};publish();$('status').textContent=e.message;}
+  finally{running=false;['run','presentations','captures','reduced','flows','loadViewport'].forEach(id=>$(id).disabled=false);}
+ };
+ $('flows').onclick=async()=>{
+  if(running)return;if(typeof window.runBrowserFlowChecks!=='function'){$('status').textContent='Flow runner not loaded.';return;}
+  running=true;['run','presentations','flows','loadViewport'].forEach(id=>$(id).disabled=true);
+  try{await load([1440,900],'flow');report=await window.runBrowserFlowChecks(frame,event=>{$('status').textContent=typeof event==='string'?event:JSON.stringify(event);});publish();$('status').textContent='Browser flow checks complete · inspect report';}
+  catch(e){report={suite:'browser-flow',pass:false,error:e.message};publish();$('status').textContent=e.message;}
+  finally{running=false;['run','presentations','flows','loadViewport'].forEach(id=>$(id).disabled=false);}
+ };
+ $('download').onclick=()=>{if(!report)return;const u=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download=report.suite&&/presentation/i.test(report.suite)?'launchpad-browser-presentations.json':report.suite&&/flow/i.test(report.suite)?'launchpad-browser-flow.json':'launchpad-browser-views.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};
+})();
+</script></body></html>

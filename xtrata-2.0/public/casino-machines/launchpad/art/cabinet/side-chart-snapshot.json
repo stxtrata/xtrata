@@ -1,0 +1,68 @@
+{
+  "title": "CAPY \u00b7 HISTORIC BUY PRICES",
+  "subtitle": "SNAPSHOT 2026-11-03",
+  "x_label": "Observed successful buys, oldest to newest",
+  "y_label": "STX per CAPY, including fee",
+  "points": [
+    {
+      "time": "2025-01-06T16:49:45.000Z",
+      "block": 429155,
+      "price": 0.000674387049610609,
+      "stx": 0.001,
+      "tokens": 1.482828,
+      "tx_id": "0x344d616f33a8b5e41c482560423ba98c3a45ecc605042ec26a96cb84fcfda33e"
+    },
+    {
+      "time": "2025-01-06T16:51:17.000Z",
+      "block": 429159,
+      "price": 0.000674387049610609,
+      "stx": 0.001,
+      "tokens": 1.482828,
+      "tx_id": "0xbbb6c2876f2b0902a04383fecdcc58b4d808cf2eda701bbb63f0516c0478ae5b"
+    },
+    {
+      "time": "2025-01-10T12:20:39.000Z",
+      "block": 446703,
+      "price": 0.000654276663512124,
+      "stx": 2.0,
+      "tokens": 3056.810844,
+      "tx_id": "0x841190c276e7f25aad423188d931ac4a0c756c0c4e91a59a95b4df72167cc56c"
+    },
+    {
+      "time": "2025-01-10T12:21:52.000Z",
+      "block": 446710,
+      "price": 0.0006545620385292627,
+      "stx": 2.0,
+      "tokens": 3055.47814,
+      "tx_id": "0x092bc43bdd95d38cdb3d552ef7b5dff89dd85ff15e2324e235afbae095205309"
+    },
+    {
+      "time": "2025-01-14T18:59:18.000Z",
+      "block": 463935,
+      "price": 0.0006540524942767365,
+      "stx": 5.0,
+      "tokens": 7644.64633,
+      "tx_id": "0xb745cf7617edec9b863c60616496eb030171b7f4d13836281e9c097fd8aa54fa"
+    },
+    {
+      "time": "2025-01-15T02:30:30.000Z",
+      "block": 465096,
+      "price": 0.0006547659260614035,
+      "stx": 5.0,
+      "tokens": 7636.316737,
+      "tx_id": "0xcb8ee5425f3b53da3250e76c50f7d6aae1075e50df976e13273922b000d07236"
+    },
+    {
+      "time": "2025-02-03T16:34:39.000Z",
+      "block": 553449,
+      "price": 0.0005202972959872886,
+      "stx": 60.0,
+      "tokens": 115318.685034,
+      "tx_id": "0x7147cc4b394bdab850897253201973f416212314c55f99cdb81a823be21718ea"
+    }
+  ],
+  "source": "Hiro transaction records, 7 successful buys among the latest 50 returned contract transactions",
+  "source_url": "https://api.hiro.so/extended/v1/address/SPBKM76FM8T8DEAQ11C9CF9WJKTSMKE140M0VXFM.capy-stxcity-dex/transactions?limit=50",
+  "calculation": "Decoded buy stx-amount / decoded (ok token-amount) result, adjusting both for six decimals.",
+  "limitation": "Historical execution prices, not a live quote, not the entire history, and not a simulated bonding-curve formula."
+}

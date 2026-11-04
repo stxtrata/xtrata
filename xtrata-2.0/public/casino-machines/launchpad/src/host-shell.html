@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d151b">
+  <title>Launchpad — ParallaX Casino</title>
+  <style>/*__CSS__*/</style>
+</head>
+<body>
+<main id="studio">
+  <header id="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">↗</span><div><strong>LAUNCH<span>PAD</span></strong><small>MISSION CONTROL <i>/</i> MISSION 022</small></div></div>
+    <nav class="view-switch" aria-label="Machine view">
+      <button id="cabinetView" class="selected" aria-pressed="true">Cabinet</button>
+      <button id="screenView" aria-pressed="false">Screen</button>
+    </nav>
+    <div class="top-actions"><span class="test-badge">STANDALONE · PLAY CHIPS</span><button id="fullTop" data-action="fullscreen" title="Fullscreen (F)">Fullscreen <span aria-hidden="true">⛶</span></button></div>
+  </header>
+  <section id="stage" aria-label="Launchpad three-dimensional fruit machine">
+    <div id="boot"><div class="boot-icon">↗</div><strong>PREPARING LAUNCHPAD</strong><p>Loading the cabinet and verified engine…</p><span id="bootDetail"></span></div>
+    <aside class="stage-label" aria-hidden="true"><span class="tiny-label">ORBITAL ENTERTAINMENT DIVISION</span><h1>FROM CURVE<br>TO POOL.</h1><p>A mission-control fruit machine.<br>Pull the guarded launch key or press LAUNCH.</p><div class="accent-rule"></div><span class="serial">22 / STX.CITY + FAKTORY</span></aside>
+    <div id="screenMask" aria-hidden="true"></div>
+    <div id="hitTargets" aria-label="Physical deck controls"></div>
+    <div id="orbitHint">Drag to orbit <span>·</span> Pull the launch key <span>·</span> Space to launch</div>
+    <div id="stageStatus"><span class="status-lamp"></span><span id="statusText">INITIALISING</span></div>
+    <div id="rendererNote"></div>
+  </section>
+  <footer id="controlStrip">
+    <div class="ledger">
+      <div><small>PLAY BALANCE</small><strong id="balance">—</strong><span>LAYR</span></div>
+      <div><small>LAUNCH COST</small><strong id="betValue">100</strong><span>LAYR</span></div>
+      <div><small>LAST RETURN</small><strong id="winValue">0</strong><span>LAYR</span></div>
+      <p id="practiceNotice" hidden>BONUS PREVIEW<br><b>PRACTICE CHIPS, NOT REAL LAYR</b></p>
+    </div>
+    <div class="control-bank primary-controls">
+      <button data-action="betDown" aria-label="−STX: decrease bet"><b>−STX</b><small>BET DOWN</small></button>
+      <button data-action="spin" class="launch-button"><b>LAUNCH</b><small>SPIN · SPACE</small></button>
+      <button data-action="betUp" aria-label="+STX: increase bet"><b>+STX</b><small>BET UP</small></button>
+      <button data-action="auto"><b>AUTO-APE</b><small>AUTO SPIN</small></button>
+      <button data-action="pays"><b>CURVE</b><small>PAYS + RULES</small></button>
+      <button id="featureAction" data-action="feature" hidden><b>CONTINUE</b><small>BONUS ACTION</small></button>
+    </div>
+    <div class="control-bank secondary-controls">
+      <button data-action="fair">Fair play</button>
+      <button data-action="turbo" aria-pressed="false">Turbo</button>
+      <button data-action="sound" aria-pressed="false">Sound</button>
+      <label class="volume-control"><span>Volume</span><input id="hostVolume" aria-label="Sound volume" type="range" min="0" max="1" value="0.4" step="0.05"></label>
+      <button data-action="history">History</button>
+      <button data-action="fund">Fund</button>
+      <button data-action="preview">Bonus preview</button>
+      <button data-action="lab">Lab</button>
+      <button data-action="test">Test</button>
+    </div>
+  </footer>
+</main>
+<iframe id="gameFrame" title="Launchpad game, panels and fullscreen controls" allow="autoplay; fullscreen" aria-hidden="true"></iframe>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>/*__THREE__*/</script>
+<script>/*__SOFTWARE__*/</script>
+<script>window.PX_STANDALONE_TEST=true;/*__ACCOUNT__*/</script>
+<script>const PACK=/*__PACK__*/;const MODEL=/*__MODEL__*/;</script>
+<script>/*__HOST__*/</script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+class CasinoCanvasEngineRenderer{constructor(){this.domElement=document.createElement('canvas');this.software=true;this.shadowMap={};this.capabilities={getMaxAnisotropy:()=>16};this.info={render:{calls:0,triangles:0}};}setPixelRatio(){}setSize(){}setClearColor(){}render(){}compileAsync(){return Promise.resolve();}}

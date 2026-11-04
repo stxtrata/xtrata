@@ -1,0 +1,75 @@
+{
+  "format": "ParallaX packed root/geometries/materials/textures",
+  "frontAxis": "+z",
+  "upAxis": "+y",
+  "nominalHeight": 6.04,
+  "screen": {
+    "name": "screenMesh",
+    "role": "screenMesh",
+    "center": [
+      0,
+      2.81,
+      0.776
+    ],
+    "width": 2.38,
+    "height": 1.632,
+    "bezelAllowance": 0.13
+  },
+  "deck": {
+    "center": [
+      0,
+      1.78,
+      0.72
+    ],
+    "rotationX": -0.62,
+    "width": 2.66,
+    "height": 0.65,
+    "capAxis": "local z",
+    "travel": 0.035
+  },
+  "lever": {
+    "name": "lever",
+    "axis": "x",
+    "baseRotation": 0,
+    "angle": 1.05,
+    "pivot": [
+      1.66,
+      1.64,
+      0.49
+    ]
+  },
+  "crest": {
+    "name": "crest",
+    "axis": "y",
+    "position": [
+      0,
+      5.0,
+      -0.06
+    ],
+    "rpm": 0.7,
+    "winLift": 0.22
+  },
+  "labels": {
+    "pays": "CURVE",
+    "betDown": "\u2212STX",
+    "spin": "LAUNCH",
+    "betUp": "+STX",
+    "auto": "AUTO-APE",
+    "lab": "LAB"
+  },
+  "dynamicSurfaces": [
+    "jackpotMeter",
+    "fundMeter"
+  ],
+  "sourceNotes": [
+    "Cabinet is new, reference format from verified Forever Twins pack; DOG Army source unavailable.",
+    "Xtrata mark is 3D vector geometry from exact supplied XLOGO path coordinates and colors.",
+    "Side panels plot seven real historic CAPY execution prices (Jan\u2013Feb 2025), with a 3 Nov 2026 snapshot label and partial-history/live-quote limits.",
+    "Lettered project names are plain type, not imitated project logos."
+  ],
+  "counts": {
+    "geometries": 49,
+    "materials": 54,
+    "textures": 16
+  }
+}
