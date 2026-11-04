@@ -1,0 +1,474 @@
+{
+  "generated": "2026-11-02T10:57:28Z",
+  "twins": {
+    "miami": {
+      "bundled": [
+        {
+          "city": "miami",
+          "tokenId": 406,
+          "xtrataId": 1047,
+          "forever": true,
+          "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1047",
+          "obtained": "HTTP GET from xtrata.xyz inscription endpoint (image/png), resized lanczos, WebP q80",
+          "status": "ok",
+          "webpBytes": 4008
+        }
+      ],
+      "unfetched": [
+        {
+          "tokenId": 1,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/1.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 20,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/20.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 39,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/39.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 58,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/58.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 77,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/77.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 96,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/96.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 115,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/115.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 134,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/134.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 153,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/153.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 172,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/172.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 191,
+          "reason": "metadata lookup failed: HTTP Error 404: Not Found"
+        },
+        {
+          "tokenId": 210,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/210.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 229,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/229.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 248,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/248.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 267,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/267.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 286,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/286.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 305,
+          "ipfs": null,
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 324,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/324.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 343,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/343.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 362,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/362.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 381,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/381.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 400,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/400.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 420,
+          "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/420.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        }
+      ]
+    },
+    "nyc": {
+      "bundled": [
+        {
+          "city": "nyc",
+          "tokenId": 1,
+          "xtrataId": 3095,
+          "forever": true,
+          "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3095",
+          "obtained": "HTTP GET from xtrata.xyz inscription endpoint (image/png), resized lanczos, WebP q80",
+          "status": "ok",
+          "webpBytes": 3414
+        },
+        {
+          "city": "nyc",
+          "tokenId": 174,
+          "xtrataId": 3098,
+          "forever": true,
+          "source": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3098",
+          "obtained": "HTTP GET from xtrata.xyz inscription endpoint (image/png), resized lanczos, WebP q80",
+          "status": "ok",
+          "webpBytes": 3458
+        }
+      ],
+      "unfetched": [
+        {
+          "tokenId": 2,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/2.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 22,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/22.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 42,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/42.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 62,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/62.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 81,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/81.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 101,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/101.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 121,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/121.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 141,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/141.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 161,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/161.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 182,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/182.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 202,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/202.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 221,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/221.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 241,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/241.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 261,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/261.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 281,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/281.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 301,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/301.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 321,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/321.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 341,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/341.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 360,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/360.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 380,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/380.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 400,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/400.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        },
+        {
+          "tokenId": 420,
+          "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/420.png",
+          "reason": "no reachable IPFS gateway from this machine"
+        }
+      ]
+    }
+  },
+  "logos": {
+    "mia": {
+      "name": "MiamiCoin token icon",
+      "source": "https://raw.githubusercontent.com/citycoins/cdn/main/cdn/logos/miamicoin.png",
+      "page": "https://github.com/citycoins/cdn/blob/main/cdn/logos/miamicoin.png",
+      "status": "ok",
+      "webpBytes": 5164,
+      "px": 128
+    },
+    "nyc": {
+      "name": "NYCCoin token icon",
+      "source": "https://raw.githubusercontent.com/citycoins/cdn/main/cdn/logos/newyorkcitycoin.png",
+      "page": "https://github.com/citycoins/cdn/blob/main/cdn/logos/newyorkcitycoin.png",
+      "status": "ok",
+      "webpBytes": 4234,
+      "px": 128
+    },
+    "citycoins": {
+      "name": "CityCoins logo",
+      "source": "https://raw.githubusercontent.com/citycoins/cdn/main/cdn/logos/citycoin.png",
+      "page": "https://github.com/citycoins/cdn/blob/main/cdn/logos/citycoin.png",
+      "status": "ok",
+      "webpBytes": 3384,
+      "px": 128
+    },
+    "miamiDegens": {
+      "name": "Miami Degens collection logo",
+      "source": "https://xtrata.xyz/forever-twins/assets/miami-degens-forever-twin-logo.jpg",
+      "page": "https://xtrata.xyz/forever-twins/miami-degens/",
+      "status": "ok",
+      "webpBytes": 4288,
+      "px": 192
+    }
+  },
+  "gatewayProbe": {
+    "miami": {
+      "working": null,
+      "tried": [
+        {
+          "gateway": "ipfs.io",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "dweb.link",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "cloudflare-ipfs.com",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "w3s.link",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "nftstorage.link",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "gateway.pinata.cloud",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "ipfs.filebase.io",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "stxnft.mypinata.cloud",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "gateway.ipfs.io",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "4everland.io",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        }
+      ]
+    },
+    "nyc": {
+      "working": null,
+      "tried": [
+        {
+          "gateway": "ipfs.io",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "dweb.link",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "cloudflare-ipfs.com",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "w3s.link",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "nftstorage.link",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "gateway.pinata.cloud",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "ipfs.filebase.io",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "stxnft.mypinata.cloud",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "gateway.ipfs.io",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        },
+        {
+          "gateway": "4everland.io",
+          "ok": false,
+          "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+        }
+      ]
+    }
+  },
+  "logosMissing": [
+    {
+      "key": "nycDegens",
+      "name": "NYC Degens collection logo",
+      "searched": [
+        "registry.v2.json community \"nyc-dgens\" (links: [], no logo)",
+        "registry collection \"nyc-degens\" theme.logo = null",
+        "xtrata.xyz/forever-twins/community/nyc-dgens and /collection/nyc-degens (no logo asset)",
+        "xtrata.xyz/ft/nyc-degens/<id>.json and the manifest (twin art only)",
+        "X/Twitter, Gamma and other hosts are blocked from the build machine"
+      ],
+      "howToFix": "Drop the official file at art/src-cache/logos/nycDegens.png (or .jpg) and set its URL in LOGOS, or ask the NYC Degens team for it."
+    }
+  ],
+  "logosNeedingPermission": [
+    {
+      "key": "mia",
+      "name": "MiamiCoin token icon",
+      "source": "https://raw.githubusercontent.com/citycoins/cdn/main/cdn/logos/miamicoin.png",
+      "owner": "CityCoins (MiamiCoin / CityCoins DAO)",
+      "why": "Third-party brand mark. The citycoins/cdn repo has no licence file, so reuse rights are not stated.",
+      "ask": "CityCoins team via citycoins.co or the CityCoins Discord / GitHub org (github.com/citycoins)."
+    },
+    {
+      "key": "nyc",
+      "name": "NYCCoin token icon",
+      "source": "https://raw.githubusercontent.com/citycoins/cdn/main/cdn/logos/newyorkcitycoin.png",
+      "owner": "CityCoins (NewYorkCityCoin / CityCoins DAO)",
+      "why": "Third-party brand mark. The citycoins/cdn repo has no licence file, so reuse rights are not stated.",
+      "ask": "CityCoins team via citycoins.co or the CityCoins Discord / GitHub org (github.com/citycoins)."
+    },
+    {
+      "key": "citycoins",
+      "name": "CityCoins logo",
+      "source": "https://raw.githubusercontent.com/citycoins/cdn/main/cdn/logos/citycoin.png",
+      "owner": "CityCoins",
+      "why": "Third-party brand mark. No licence file in the source repo.",
+      "ask": "CityCoins team via citycoins.co or the CityCoins Discord / GitHub org (github.com/citycoins)."
+    },
+    {
+      "key": "miamiDegens",
+      "name": "Miami Degens collection logo",
+      "source": "https://xtrata.xyz/forever-twins/assets/miami-degens-forever-twin-logo.jpg",
+      "owner": "Miami Degens artist / Fak.fun (collection creators); hosted by the Xtrata Forever Twins site",
+      "why": "Collection artwork made by another project. Hosting it on xtrata.xyz does not by itself grant reuse in a game.",
+      "ask": "Fak.fun / the Miami Degens artist."
+    },
+    {
+      "key": "nycDegens",
+      "name": "NYC Degens collection logo",
+      "source": null,
+      "owner": "NYC Degens team / community (NYC DGENs)",
+      "why": "Not found. Whatever file is used will be another project's artwork, so permission is needed too.",
+      "ask": "NYC Degens team / community admins."
+    }
+  ],
+  "note": "Twin art is the holders' collection artwork (Miami Degens / NYC Degens); it is shown in-game as the collection display, with unforevered tokens desaturated and stamped NOT YET FOREVER."
+}

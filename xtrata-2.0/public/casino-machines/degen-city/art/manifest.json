@@ -1,0 +1,274 @@
+{
+  "miami": {
+    "name": "Miami Degens",
+    "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata",
+    "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens",
+    "tokenCount": 420,
+    "inscribedCount": 1,
+    "twinned": [
+      {
+        "tokenId": 406,
+        "xtrataId": 1047
+      }
+    ],
+    "bundled": [
+      406
+    ],
+    "eventsRead": 1,
+    "bundledForever": 1,
+    "bundledUnforevered": 0,
+    "unfetched": [
+      {
+        "tokenId": 1,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/1.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 20,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/20.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 39,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/39.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 58,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/58.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 77,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/77.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 96,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/96.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 115,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/115.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 134,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/134.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 153,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/153.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 172,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/172.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 191,
+        "reason": "metadata lookup failed: HTTP Error 404: Not Found"
+      },
+      {
+        "tokenId": 210,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/210.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 229,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/229.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 248,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/248.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 267,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/267.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 286,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/286.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 305,
+        "ipfs": null,
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 324,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/324.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 343,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/343.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 362,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/362.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 381,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/381.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 400,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/400.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 420,
+        "ipfs": "ipfs://QmStnniaoVgxzDiNmqhQR66wMLRH9wMAC62P5RcUFNttGd/420.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      }
+    ]
+  },
+  "nyc": {
+    "name": "NYC Degens",
+    "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens",
+    "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens",
+    "tokenCount": 420,
+    "inscribedCount": 2,
+    "twinned": [
+      {
+        "tokenId": 1,
+        "xtrataId": 3095
+      },
+      {
+        "tokenId": 174,
+        "xtrataId": 3098
+      }
+    ],
+    "bundled": [
+      1,
+      174
+    ],
+    "eventsRead": 5,
+    "manifestCount": 420,
+    "bundledForever": 2,
+    "bundledUnforevered": 0,
+    "unfetched": [
+      {
+        "tokenId": 2,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/2.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 22,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/22.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 42,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/42.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 62,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/62.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 81,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/81.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 101,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/101.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 121,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/121.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 141,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/141.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 161,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/161.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 182,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/182.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 202,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/202.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 221,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/221.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 241,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/241.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 261,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/261.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 281,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/281.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 301,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/301.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 321,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/321.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 341,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/341.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 360,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/360.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 380,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/380.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 400,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/400.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      },
+      {
+        "tokenId": 420,
+        "ipfs": "ipfs://QmSpu1tFB4zamGqKp9urEQsYpZ3ztq64vigXSdpBAFS4qi/420.png",
+        "reason": "no reachable IPFS gateway from this machine"
+      }
+    ]
+  }
+}
