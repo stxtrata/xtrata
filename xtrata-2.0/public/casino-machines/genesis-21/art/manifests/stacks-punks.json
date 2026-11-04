@@ -1,0 +1,144 @@
+{
+ "collection": "Stacks Punks (v3)",
+ "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3",
+ "assetName": "stacks-punks",
+ "verifiedOnChain": {
+  "blockHeight": 26664,
+  "canonical": true,
+  "deployedUtc": "2021-08-20T16:36:48.000Z",
+  "txId": "0x9f0b6777365d4d04fbe9f6c68cbdb84e41bb8c023adca8e38ebe48c6c2d685e2"
+ },
+ "totalSupplyLastTokenId": 9523,
+ "tokenUriTemplateOrExample": "https://www.stackspunks.com/assets/punks.json",
+ "imageHostsUsed": [],
+ "tokens": [],
+ "candidateTokens": [
+  {
+   "tokenId": 1,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/1.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 454,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/454.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 908,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/908.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 1361,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/1361.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 1815,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/1815.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 2268,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/2268.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 2722,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 3175,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/3175.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 3628,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/3628.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 4082,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 4535,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/4535.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 4989,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/4989.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 5442,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/5442.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 5896,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 6349,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/6349.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 6802,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/6802.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 7256,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/7256.png",
+   "name": "StacksPunks"
+  },
+  {
+   "tokenId": 7709,
+   "tokenUri": "https://www.stackspunks.com/assets/punks.json",
+   "imageUrl": "https://www.stackspunks.com/assets/punks.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3/7709.png",
+   "name": "StacksPunks"
+  }
+ ],
+ "notes": "Gamma collection \"stacks-punks-v3\". v1 (stacks-punks, block 24299) and v2 also exist under the same deployer; v3 is the one Gamma lists. On-chain get-token-uri returns one shared URL (https://www.stackspunks.com/assets/punks.json) for every id; per-token art path below is the pattern seen on the Gamma page for punk0 (UNVERIFIED for other ids). NO IMAGES SAVED: every image/metadata host is blocked from this sandbox (see SUMMARY.md)."
+}

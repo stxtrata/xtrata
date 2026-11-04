@@ -1,0 +1,144 @@
+{
+ "collection": "This Is #1 (thisisnumberone-v2)",
+ "contract": "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.thisisnumberone-v2",
+ "assetName": "my-nft",
+ "verifiedOnChain": {
+  "blockHeight": 15309,
+  "canonical": true,
+  "deployedUtc": "2021-05-16T09:32:12.000Z",
+  "txId": "0x7fda9151a5749a1c2e763ed773002ac5b46186ae09e8e3c523541fcae20c9a66"
+ },
+ "totalSupplyLastTokenId": 1196,
+ "tokenUriTemplateOrExample": "https://thisisnumberone.com/nfts/",
+ "imageHostsUsed": [],
+ "tokens": [],
+ "candidateTokens": [
+  {
+   "tokenId": 0,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 57,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 114,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 171,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 228,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 285,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 342,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 399,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 456,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 513,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 570,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 626,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 683,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 740,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 797,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 854,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 911,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 968,
+   "tokenUri": "https://thisisnumberone.com/nfts/",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  }
+ ],
+ "notes": "Chosen because it is the platform's own early (2021) multi-artist contract with 1197 mints and sits at the deployer address that also minted Crash Punks. Candidates: (B) SP3N4AJFZZYC4BK99H53XP8KDGXFGQ2PRSQP2HGT6.thisisnumberone = official Gamma \"thisisnumberone\" collection, only 5 tokens, deployed ~Mar 2022; (C) SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.thisisnumberone-v1 = 5 early tokens. Token URI base is https://thisisnumberone.com/nfts/ (per-token JSON/image path unknown, host unreachable). NO IMAGES SAVED: every image/metadata host is blocked from this sandbox (see SUMMARY.md)."
+}

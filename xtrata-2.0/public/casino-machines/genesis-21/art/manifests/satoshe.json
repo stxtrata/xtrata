@@ -1,0 +1,152 @@
+{
+ "collection": "SatoSHE (UNVERIFIED mapping to HeyLayer collection #1)",
+ "contract": "SP248HH800501WYSG7Z2SS1ZWHQW1GGH85ME34NT2.layer-v1-1",
+ "assetName": "Layer-NFT",
+ "verifiedOnChain": {
+  "blockHeight": 40649,
+  "canonical": true,
+  "deployedUtc": "2021-12-07T15:21:48.000Z",
+  "txId": "0x8584bbe8238a791767f7f5a80ad3ac4519098031fda168d6189439759c76ea6e",
+  "totalMintsInContract": 6183
+ },
+ "totalSupplyLastTokenId": 10000002104,
+ "tokenUriTemplateOrExample": "ipfs://QmNtLCJo7DzgEyFCdxbNkn1TFrsRR6cmD9bUWjzM7nHLtw",
+ "imageHostsUsed": [],
+ "tokens": [],
+ "candidateTokens": [
+  {
+   "tokenId": 10000000001,
+   "tokenUri": "ipfs://QmNtLCJo7DzgEyFCdxbNkn1TFrsRR6cmD9bUWjzM7nHLtw",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000002,
+   "tokenUri": "ipfs://QmSQUMZNCccKGEZJ669WgzKEzR52wbPd42bTAnEWe4udN5",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000003,
+   "tokenUri": "ipfs://QmYhTqUUdaKKv9nwARE16wehCCZdToFi2Uk441hHwJPoe5",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000004,
+   "tokenUri": "ipfs://QmcWtkfNRQxwXeu5R1vwdjpEiEQSHsHazhts9RFcdmHJL8",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000005,
+   "tokenUri": "ipfs://QmYPkAo2hkmy3CheeBXrXZcjY1R8Gi3VKLzMhwex2qtxP6",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000006,
+   "tokenUri": "ipfs://QmQk3W8TKwgzDrfE3oLUMezCervGjcNCLvQtnznMoDaE2u",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000007,
+   "tokenUri": "ipfs://QmSrx5iZvAudhX8hd632WoCDch84XTpKw2egp4EDp57Z4C",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000008,
+   "tokenUri": "ipfs://QmNmG71iWZpQeKAmUvxzRSRnLwaH1EXyeeEbhYdegqTgFJ",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000009,
+   "tokenUri": "ipfs://QmNmG71iWZpQeKAmUvxzRSRnLwaH1EXyeeEbhYdegqTgFJ",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000010,
+   "tokenUri": "ipfs://QmYrxhgSK2a5CCQMQZf8bFt1rHYoJzKiJ91PPJ9weBwifr",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000011,
+   "tokenUri": "ipfs://QmT2FAvijPChiH3JUGcsvAKFvXs3Qe8cAuuxUvjSzKrcop",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000013,
+   "tokenUri": "ipfs://QmfV4jR99S1ooLepGWwW3n9FcAU5J6tAcWAnvjMBkneuT7",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000014,
+   "tokenUri": "ipfs://QmcFsa1QwkyFzZg8FviNfpujeH5rD7BfyzFYFuhkkr9zCc",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000015,
+   "tokenUri": "ipfs://QmYEHHDJdJV3EEYEXiXUyfyyKJ1sZeDJT9cDrGws4Uvi9c",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000016,
+   "tokenUri": "ipfs://QmSiVF1nYUoTqVCf8jnrJwygjBCoCpzHWxvKDkVn87SQ4p",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000017,
+   "tokenUri": "ipfs://QmRnEoBtXUNHLRxnzgYqeTQYWiLCjWDs2sc8YFhkiM12Fq",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000018,
+   "tokenUri": "ipfs://QmWqhQ1fLCaMJg6gvoDinQbaUkMcXZCAqYahvvDYepBtGP",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000019,
+   "tokenUri": "ipfs://QmYe8Gj95yauDckYvFMGkwouVQcVV1ikMfBVkps8x1n7p7",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10000000020,
+   "tokenUri": "ipfs://QmQ3UrYLbvQBVnmEsAsL6kWeWHMvy3UE9Mu5aUn2yqyvfg",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  }
+ ],
+ "notes": "No SatoSHE contract principal could be found in any public source reachable here. marketplace.heylayer.com/collection/1 is 'SatoSHE' (Stacks, SIP-009, IPFS media, 'female artists ... genesis collection'). HeyLayer's marketplace contract is the multi-collection SP248HH800501WYSG7Z2SS1ZWHQW1GGH85ME34NT2.layer-v1-1 (deployed 2021-12-07; its deployer also deployed layer-v2-1 on 2022-04-18). Token ids in that contract are collection*10^10 + n, so collection 1 = ids 10000000001.. (earliest mints, 2021-12-10). The SatoSHE<->collection-1 link is an INFERENCE (heylayer URL number + id scheme), NOT verified, because token metadata JSON is on IPFS (blocked) and Hiro's metadata API has not indexed this contract. Token 10000000012 is the placeholder 'ipfs://sample_ipfs_string' and was excluded. Tokens 8 and 9 share the same URI. NO IMAGES SAVED."
+}

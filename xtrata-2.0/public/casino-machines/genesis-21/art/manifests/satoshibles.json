@@ -1,0 +1,144 @@
+{
+ "collection": "Satoshibles",
+ "contract": "SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles",
+ "assetName": "Satoshibles",
+ "verifiedOnChain": {
+  "blockHeight": 47486,
+  "canonical": true,
+  "deployedUtc": "2022-02-04T01:41:53.000Z",
+  "txId": "0x4e5eea8be2c5b956bba7d767498d9bf4fdb1723563d2b2fedc7f45f1a2ec08ca"
+ },
+ "totalSupplyLastTokenId": 5000,
+ "tokenUriTemplateOrExample": "https://api.satoshibles.com/token/btc/{id}",
+ "imageHostsUsed": [],
+ "tokens": [],
+ "candidateTokens": [
+  {
+   "tokenId": 1,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/1/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/1.png",
+   "name": "Satoshible #1"
+  },
+  {
+   "tokenId": 239,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/239/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/239.png",
+   "name": "Satoshible #239"
+  },
+  {
+   "tokenId": 477,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/477/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/477.png",
+   "name": "Satoshible #477"
+  },
+  {
+   "tokenId": 715,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/715/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/715.png",
+   "name": "Satoshible #715"
+  },
+  {
+   "tokenId": 953,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/953/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/953.png",
+   "name": "Satoshible #953"
+  },
+  {
+   "tokenId": 1191,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/1191/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/1191.png",
+   "name": "Satoshible #1191"
+  },
+  {
+   "tokenId": 1429,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/1429/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/1429.png",
+   "name": "Satoshible #1429"
+  },
+  {
+   "tokenId": 1667,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/1667/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/1667.png",
+   "name": "Satoshible #1667"
+  },
+  {
+   "tokenId": 1905,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/1905/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/1905.png",
+   "name": "Satoshible #1905"
+  },
+  {
+   "tokenId": 2143,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/2143/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/2143.png",
+   "name": "Satoshible #2143"
+  },
+  {
+   "tokenId": 2381,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/2381/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/2381.png",
+   "name": "Satoshible #2381"
+  },
+  {
+   "tokenId": 2620,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/2620/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/2620.png",
+   "name": "Satoshible #2620"
+  },
+  {
+   "tokenId": 2858,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/2858/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/2858.png",
+   "name": "Satoshible #2858"
+  },
+  {
+   "tokenId": 3096,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/3096/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/3096.png",
+   "name": "Satoshible #3096"
+  },
+  {
+   "tokenId": 3334,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/3334/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/3334.png",
+   "name": "Satoshible #3334"
+  },
+  {
+   "tokenId": 3572,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/3572/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/3572.png",
+   "name": "Satoshible #3572"
+  },
+  {
+   "tokenId": 3810,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/3810/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/3810.png",
+   "name": "Satoshible #3810"
+  },
+  {
+   "tokenId": 4048,
+   "tokenUri": "https://api.satoshibles.com/token/btc/{id}",
+   "imageUrl": "https://satoshibles.com/token/btc/4048/image.png",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles/4048.png",
+   "name": "Satoshible #4048"
+  }
+ ],
+ "notes": "Contract principal confirmed by stacks.gamma.io/collections/satoshibles and verified on-chain; on-chain token URI template is https://api.satoshibles.com/token/btc/{id}. NO IMAGES SAVED: every image/metadata host is blocked from this sandbox (see SUMMARY.md)."
+}

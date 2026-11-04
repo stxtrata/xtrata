@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Genesis 21 · test page</title>
+<meta name="description" content="Stand-alone test page for the Genesis 21 machine (ParallaX Casino). Plays only this machine, with a stub LAYR account.">
+<style>
+:root{--accent:#5546ff;--ink:#0b0a14;--panel:#14112e;--cream:#f3ead6;--lav:#b9adff;--gold:#f6c453;--safe-t:env(safe-area-inset-top);--safe-b:env(safe-area-inset-bottom);--safe-l:env(safe-area-inset-left);--safe-r:env(safe-area-inset-right)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--cream);font-family:Arial,Helvetica,sans-serif;overflow:hidden;overscroll-behavior:none}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#gl.drag{cursor:grabbing}#gl.hot{cursor:pointer}
+#top{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:calc(8px + var(--safe-t)) calc(12px + var(--safe-r)) 8px calc(12px + var(--safe-l));background:linear-gradient(#0b0a14ee,#0b0a1400);z-index:5;pointer-events:none}
+#top>*{pointer-events:auto}
+#brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+#brand b{font-size:24px;letter-spacing:.14em;font-weight:900}
+#brand img{height:20px;width:auto;display:block;opacity:.95}
+#brand small{display:block;font-size:11px;letter-spacing:.12em;color:var(--lav)}
+.btn{min-height:44px;min-width:44px;padding:6px 14px;border-radius:12px;border:1px solid #8d83ff77;background:#1d1566cc;color:var(--cream);font:700 12px/1.1 Arial,sans-serif;letter-spacing:.1em;cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;-webkit-tap-highlight-color:transparent}
+.btn small{font-size:9px;letter-spacing:.1em;color:var(--lav);font-weight:600}
+.btn:hover{border-color:var(--gold)}.btn:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.btn[aria-pressed=true]{border-color:var(--gold);color:var(--gold)}
+.btn.main{background:linear-gradient(#6a5bff,#4636e0);border-color:#fff4d8aa;width:116px;min-width:116px;flex:none}
+.btn.main b{font-size:15px;white-space:nowrap}
+/* The MINT button never moves: its width is fixed, and Odd/Even Block share one reserved slot with the win readout at the end of the row. */
+#deck .btn{flex:none;height:52px;min-height:0;padding-top:0;padding-bottom:0;white-space:nowrap}#deck .btn b,#deck .btn small{white-space:nowrap}#dSlot .btn{padding-left:4px;padding-right:4px}#dSlot .btn b{font-size:11px}#dSlot{display:flex;gap:8px;width:216px;flex:none}#dSlot>*{flex:1;min-width:0}#dSlot #dGamble{display:flex;gap:8px}#dSlot #dGamble .btn{flex:1;min-width:0}
+#dWinBox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:52px;border:1px dashed #8d83ff55;border-radius:12px;color:var(--gold)}#dWinBox small{font:600 9px Arial;letter-spacing:.1em;color:var(--lav)}#dWinBox b{font:700 18px Arial;font-variant-numeric:tabular-nums}
+#dAuto{width:112px}
+#dWinBox[hidden]{display:none!important}
+#bal{display:flex;flex-direction:column;align-items:flex-end;min-width:96px;color:var(--gold);font-weight:900;font-size:18px}
+#bal small{font-size:9px;letter-spacing:.12em;color:var(--lav);font-weight:600}
+#testBtn{min-height:44px;opacity:.55;font-size:10px}#testBtn:hover,#testBtn:focus-visible{opacity:1}
+#deck{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:8px calc(12px + var(--safe-r)) calc(10px + var(--safe-b)) calc(12px + var(--safe-l));background:linear-gradient(#0b0a1400,#0b0a14ee);pointer-events:none}
+#deck>*{pointer-events:auto}
+#hint{position:fixed;left:0;right:0;bottom:calc(76px + var(--safe-b));text-align:center;font-size:12px;color:var(--lav);z-index:4;pointer-events:none;padding:0 12px;text-shadow:0 1px 4px #000}
+#status{position:fixed;left:50%;top:calc(66px + var(--safe-t));transform:translateX(-50%);z-index:4;font-size:12px;letter-spacing:.1em;color:var(--lav);background:#0b0a14cc;border:1px solid #8d83ff44;border-radius:999px;padding:6px 14px;max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+#loading{position:fixed;inset:0;z-index:50;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
+#loading b{font-size:28px;letter-spacing:.2em}#loading p{margin:0;color:var(--lav);font-size:14px;max-width:420px}
+#loading.err p{color:#ffb3a8}
+#dGamble[hidden]{display:none!important}
+body.v-screen #status,body.v-screen #hint{display:none!important}
+#modalWrap{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:#05040be0;padding:calc(12px + var(--safe-t)) 12px calc(12px + var(--safe-b))}
+#modalWrap.on{display:flex}
+#modalHost{display:block;max-width:100%;max-height:100%;overflow:auto;border-radius:14px}
+#featWrap{position:fixed;left:0;right:0;bottom:calc(64px + var(--safe-b));z-index:6;display:none;justify-content:center;padding:0 12px}
+#featWrap.on{display:flex}#featHost{display:block;width:min(900px,100%)}
+/* The game page: kept alive but off-screen, so its canvas keeps rendering. In full screen it becomes the whole view. */
+#game{position:fixed;left:-12000px;top:0;width:1400px;height:900px;border:0;background:#0d0a24}
+#game.fs{left:0;top:0;width:100vw;height:100vh;height:100dvh;z-index:100}
+@media(max-width:720px){#brand b{font-size:19px}#brand img{height:16px}.btn{padding:6px 10px}#hint{font-size:11px;bottom:calc(118px + var(--safe-b))}#featWrap{bottom:calc(110px + var(--safe-b))}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="Genesis 21 cabinet in a test studio. Drag to orbit, scroll to zoom."></canvas>
+<header id="top">
+  <div id="brand"><div><b>GENESIS 21</b><small>TEST PAGE · THIS MACHINE ONLY · PLAY BALANCE</small></div><img id="wm" alt="ParallaX Casino" src="__WORDMARK__"></div>
+  <button class="btn" id="vCab" aria-pressed="true" type="button"><b>CABINET</b><small>View</small></button>
+  <button class="btn" id="vScr" aria-pressed="false" type="button"><b>SCREEN</b><small>View</small></button>
+  <button class="btn" id="vFs" type="button"><b>FULLSCREEN</b><small>Key F</small></button>
+  <div id="bal"><small>LAYR (PLAY)</small><span id="balV">0</span></div>
+  <button class="btn" id="rst" type="button"><b>RESET</b><small>Balance</small></button>
+  <button class="btn" id="testBtn" type="button"><b>TEST</b><small>Panel</small></button>
+</header>
+<div id="status" role="status" aria-live="polite"></div>
+<div id="hint">Drag to orbit · scroll or pinch to zoom · click the lever or the deck buttons · Space spins · F full screen</div>
+<div id="featWrap"><div id="featHost"></div></div>
+<div id="deck" role="toolbar" aria-label="Machine controls">
+  <button class="btn" data-a="betDown" type="button"><b>−STX</b><small>Bet −</small></button>
+  <button class="btn main" data-a="spin" id="dSpin" type="button"><b>MINT</b><small>Spin</small></button>
+  <button class="btn" data-a="betUp" type="button"><b>+STX</b><small>Bet +</small></button>
+  <button class="btn" data-a="auto" id="dAuto" type="button"><b>AUTO-STACK</b><small>Auto</small></button>
+  <button class="btn" data-a="pays" type="button"><b>ROADMAP</b><small>Pays</small></button>
+  <button class="btn" data-a="turbo" id="dTurbo" type="button"><b>TURBO</b><small>Turbo</small></button>
+  <button class="btn" data-a="sound" id="dSound" type="button"><b>SOUND</b><small>Sound</small></button>
+  <button class="btn" data-a="history" type="button"><b>HISTORY</b><small>Session</small></button>
+  <div id="dSlot"><div id="dWinBox"><small>WIN</small><b id="dWin">0</b></div><span id="dGamble" hidden><button class="btn" data-g="odd" type="button"><b>ODD BLOCK</b><small>Gamble</small></button><button class="btn" data-g="even" type="button"><b>EVEN BLOCK</b><small>Gamble</small></button></span></div>
+</div>
+<div id="modalWrap"><div id="modalHost"></div></div>
+<div id="loading" role="status"><b>GENESIS 21</b><p id="loadMsg">Unpacking the cabinet…</p></div>
+<iframe id="game" title="Genesis 21 game" allow="fullscreen; autoplay" allowfullscreen></iframe>
+
+<script type="application/json" id="pack">__PACK__</script>
+<script>
+/*__THREE__*/
+</script>
+<script>
+/*__SOFTWARE__*/
+</script>
+<script>
+/* Genesis 21 stand-alone test page.
+   It plays only this machine: it decodes pack.json's model and game (gzip + base64), puts the game page in an iframe, shows the model in a small 3D studio
+   (dark floor, soft lights, floor glow), draws the game's live screen canvas on the cabinet, and supplies a STUB LAYR account with a play balance.
+   The game talks to this page the way it talks to the casino room: window.parent.ParallaxLAYRAccount, PX_CASINO_ENGINE (screen, ui, action, tap, click, input, ...). */
+(() => {
+'use strict';
+const $ = id => document.getElementById(id), T = THREE;
+const PACK = JSON.parse($('pack').textContent);
+const say = t => { $('status').textContent = t || ''; $('status').style.display = t ? '' : 'none'; };
+const fail = e => { console.error(e); const l = $('loading'); l.classList.add('err'); l.style.display = 'flex'; $('loadMsg').textContent = 'The test page could not start: ' + (e && e.message || e); };
+
+/* ---------- STUB LAYR account (test only): a play balance of 100,000 LAYR, in memory and localStorage. Not a real account, nothing leaves the browser. ---------- */
+const START = 100000, KEY = 'g21.test.account.v1';
+function createStub() {
+  let draft = null, mem = null; const listeners = new Set(), meta = new WeakMap();
+  const load = () => { try { const r = JSON.parse(localStorage.getItem(KEY)); if (r && typeof r === 'object' && typeof r.bank === 'number') return r; } catch (e) {} return { bank: START, layrGames: {} }; };
+  mem = load();
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch (e) {} };
+  const amount = v => { if (!Number.isFinite(v) || v < 0) throw Error('Invalid LAYR amount.'); return Math.round(v * 100) / 100; };
+  const balance = () => draft ? draft.bank : amount(mem.bank), publish = () => listeners.forEach(f => { try { f(); } catch (e) {} });
+  const copy = v => JSON.parse(JSON.stringify(v));
+  const serialize = s => { const o = copy(s); for (const k of ['balance', 'cashouts', 'previewPaid', 'freePreview']) delete o[k]; return o; };
+  function attach(state, id, revision = 0) {
+    delete state.balance;
+    Object.defineProperty(state, 'balance', { configurable: true, enumerable: false, get: balance, set(v) { if (!draft || draft.state !== state) throw Error('Only a committed game action can change the shared LAYR balance.'); draft.bank = amount(v); } });
+    meta.set(state, { id, revision }); return state;
+  }
+  function commit(state, next) {
+    const m = meta.get(state); if (!m) throw Error('Machine is not linked to the LAYR account.');
+    const prev = mem.layrGames[m.id]; if (((prev && prev.revision) || 0) !== m.revision) throw Error('Machine state changed. Reload the test page.');
+    const revision = m.revision + 1; mem.layrGames[m.id] = { revision, state: serialize(state) }; mem.bank = amount(next); persist(); m.revision = revision; publish();
+  }
+  function transact(state, fn) {
+    if (draft) throw Error('A LAYR transaction is already running.');
+    const before = serialize(state); draft = { state, bank: balance() };
+    try { const result = fn(), next = draft.bank; draft = null; commit(state, next); return result; }
+    catch (e) { draft = null; for (const k of Object.keys(state)) delete state[k]; Object.assign(state, before); throw e; }
+  }
+  const machine = (id, engine) => {
+    const api = { ...engine };
+    api.fresh = () => attach(engine.fresh(), id);
+    api.load = raw => attach(engine.load ? engine.load(raw) : { ...engine.fresh(), ...(raw || {}) }, id);
+    for (const n of ['start', 'settle', 'pick', 'respin', 'collect', 'endFree', 'gamble']) if (typeof engine[n] === 'function') api[n] = (state, ...a) => transact(state, () => engine[n](state, ...a));
+    return Object.freeze(api);
+  };
+  return {
+    version: '1.0.0-test-stub', mode: 'test-stub', onChainConnected: false,
+    acquire: async () => true, ready: () => true, error: () => '', balance, machine,
+    openGame(id, engine) { const saved = mem.layrGames[id]; return attach(engine.load(saved && saved.state), id, (saved && saved.revision) || 0); },
+    saveGame(state) { if (draft) return true; commit(state, balance()); return true; },
+    saveRoom(v) { Object.assign(mem, v); persist(); publish(); return true; }, bindRoom() {},
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    roomState() { return { bank: mem.bank, hands: mem.hands || 0, net: mem.net || 0 }; },
+    snapshot() { return { balance: balance(), currency: 'LAYR', mode: 'test-stub', onChainConnected: false, available: true, games: Object.keys(mem.layrGames) }; },
+    wipe() { mem = { bank: START, layrGames: {} }; persist(); publish(); }
+  };
+}
+const STUB = createStub();
+window.G21_TEST_BUILD = true;                 // the game's Test panel and test hooks check this flag; the casino never sets it
+window.ParallaxLAYRAccount = Object.freeze({ ...STUB, reset() { STUB.wipe(); setTimeout(() => boot().catch(fail), 0); } });
+window.G21Stub = { reset: () => window.ParallaxLAYRAccount.reset() };
+
+/* ---------- unpack ---------- */
+async function unpack(b64) { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); return new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); }
+const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(Error('A cabinet texture could not be decoded.')); i.src = src; });
+
+/* ---------- 3D studio ---------- */
+const canvas = $('gl');
+let renderer, soft = false;
+try { renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); if (!renderer.getContext()) throw 0; }
+catch (e) { try { renderer = new SoftwareRenderer(); soft = true; canvas.replaceWith(renderer.domElement); renderer.domElement.id = 'gl'; renderer.domElement.setAttribute('aria-label', canvas.getAttribute('aria-label')); } catch (e2) { fail(Error('No WebGL and no canvas renderer.')); } }
+const GL = renderer.domElement;
+const LOW = /[?&]q=low\b/.test(location.search);   // ?q=low: half resolution, no shadows (for slow GPUs and software rendering)
+if (!soft) { renderer.setPixelRatio(LOW ? .5 : Math.min(devicePixelRatio || 1, 2)); renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.shadowMap.enabled = !LOW; renderer.shadowMap.type = T.PCFSoftShadowMap; renderer.setClearColor(0x07060f, 1); } else renderer.setPixelRatio(1);
+const scene = new T.Scene(); scene.fog = new T.FogExp2(0x07060f, .075);
+const camera = new T.PerspectiveCamera(38, 1, .05, 80);
+function equirectEnv() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#2a2470'); gr.addColorStop(.45, '#7a70d8'); gr.addColorStop(.52, '#e9e2ff'); gr.addColorStop(.6, '#2b2560'); gr.addColorStop(1, '#0a0820'); g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
+  g.fillStyle = '#fff'; for (const x of [60, 190, 330, 450]) g.fillRect(x, 60, 36, 70);
+  const t = new T.CanvasTexture(c); t.mapping = T.EquirectangularReflectionMapping; return t;
+}
+const envTex = soft ? null : equirectEnv();
+scene.add(new T.HemisphereLight(0x9a90ff, 0x120d2a, .85));
+const key = new T.SpotLight(0xfff1d6, 3.2, 20, .55, .6, 1.2); key.position.set(2.6, 5.4, 4.8); key.target.position.set(0, 1.2, 0); key.castShadow = !soft && !LOW; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -.0004; scene.add(key, key.target);
+const rim = new T.PointLight(0x5546ff, 14, 9, 1.6); rim.position.set(-2.6, 1.8, -2.2); scene.add(rim);
+const fill = new T.PointLight(0x8d83ff, 6, 8, 1.6); fill.position.set(2.2, .5, 3.1); scene.add(fill);
+const floorMat = new T.MeshStandardMaterial({ color: 0x0b0a16, roughness: .42, metalness: .55, envMap: envTex, envMapIntensity: .35 });
+const floor = new T.Mesh(new T.PlaneGeometry(160, 160), floorMat); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+function glowTexture() { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), r = g.createRadialGradient(128, 128, 0, 128, 128, 128); r.addColorStop(0, 'rgba(120,104,255,.95)'); r.addColorStop(.35, 'rgba(85,70,255,.45)'); r.addColorStop(1, 'rgba(85,70,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 256, 256); return new T.CanvasTexture(c); }
+const glow = new T.Mesh(new T.PlaneGeometry(4.4, 4.4), new T.MeshBasicMaterial({ map: glowTexture(), transparent: true, depthWrite: false, opacity: .9 })); glow.rotation.x = -Math.PI / 2; glow.position.y = .006; scene.add(glow);
+const machineGroup = new T.Group(); scene.add(machineGroup);
+let cab = null, screenMesh = null, parts = {}, screenTex = null, hitTargets = [];
+
+function buildModel(data, images) {
+  const geos = data.geometries.map(g => { const out = new T.BufferGeometry(); for (const [k, a] of Object.entries(g.attributes)) out.setAttribute(k, new T.BufferAttribute(new Float32Array(a.array), a.size)); if (g.index) out.setIndex(g.index); for (const grp of g.groups || []) out.addGroup(grp.start, grp.count, grp.materialIndex); out.computeBoundingSphere(); return out; });
+  const textures = data.textures.map((t, i) => { const c = document.createElement('canvas'); c.width = images[i].naturalWidth; c.height = images[i].naturalHeight; c.getContext('2d').drawImage(images[i], 0, 0); const out = new T.CanvasTexture(c); out.wrapS = t.wrapS; out.wrapT = t.wrapT; out.repeat.fromArray(t.repeat); out.offset.fromArray(t.offset); out.flipY = t.flipY; out.anisotropy = 8; out.needsUpdate = true; return out; });
+  const mats = data.materials.map(m => { const p = { color: m.color, map: m.map == null ? null : textures[m.map], transparent: m.transparent, opacity: m.opacity, side: m.side, depthWrite: m.depthWrite, alphaTest: m.alphaTest }; if (m.type === 'basic') return new T.MeshBasicMaterial(p); return new T.MeshStandardMaterial(Object.assign(p, { roughness: m.roughness, metalness: m.metalness, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, flatShading: m.flatShading, envMap: envTex, envMapIntensity: .65 })); });
+  function node(n) { const o = n.g == null ? new T.Group() : new T.Mesh(geos[n.g], Array.isArray(n.m) ? n.m.map(id => mats[id]) : mats[n.m]); o.position.fromArray(n.p); o.quaternion.fromArray(n.q); o.scale.fromArray(n.s); o.visible = n.visible; if (n.role) o.name = 'px-' + n.role; if (n.action) o.userData.pxMachineAction = n.action; o.castShadow = !!o.isMesh; o.receiveShadow = !!o.isMesh; n.children.forEach(c => o.add(node(c))); return o; }
+  const out = node(data.root); out.updateMatrixWorld(true); return out;
+}
+/* world-space bounds of a node, without Box3 (the bundled three.js is a subset) */
+function bounds(obj) { const mn = new T.Vector3(1e9, 1e9, 1e9), mx = new T.Vector3(-1e9, -1e9, -1e9), v = new T.Vector3(); obj.updateMatrixWorld(true); obj.traverse(o => { if (!o.isMesh || !o.visible) return; const p = o.geometry.getAttribute('position'); for (let i = 0; i < p.count; i += 3) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); mn.min(v); mx.max(v); } }); return { mn, mx }; }
+function placeModel(model) {
+  machineGroup.clear(); const b = bounds(model), size = b.mx.clone().sub(b.mn), s = 2.6 / size.y;   // the room scales every cabinet to 2.6 m
+  model.scale.multiplyScalar(s); model.position.y -= b.mn.y * s; machineGroup.add(model); machineGroup.updateMatrixWorld(true);
+  const b2 = bounds(model); orbit.target.set((b2.mn.x + b2.mx.x) / 2, 1.3, (b2.mn.z + b2.mx.z) / 2); glow.position.x = orbit.target.x; glow.position.z = orbit.target.z + .25;
+  cab = model; screenMesh = model.getObjectByName('px-screenMesh'); hitTargets = [];
+  parts = {}; for (const role of ['crest', 'recordGroup', 'core', 'lever', 'spinPhysical', 'armPivot']) { const o = model.getObjectByName('px-' + role); if (o) parts[role] = { o, base: o.rotation.clone(), home: o.position.clone() }; }
+}
+
+/* ---------- camera: drag to orbit, wheel / pinch to zoom, two preset views ---------- */
+const CAB_R = 5.1, orbit = { theta: .42, phi: 1.3, r: CAB_R, target: new T.Vector3(0, 1.3, 0), goal: null };
+function applyCamera() { const o = orbit, sp = Math.sin(o.phi); camera.position.set(o.target.x + o.r * sp * Math.sin(o.theta), o.target.y + o.r * Math.cos(o.phi), o.target.z + o.r * sp * Math.cos(o.theta)); camera.lookAt(o.target); }
+function screenGoal() {
+  if (!screenMesh) return null; const b = bounds(screenMesh), c = b.mn.clone().add(b.mx).multiplyScalar(.5), h = b.mx.y - b.mn.y, w = Math.hypot(b.mx.x - b.mn.x, b.mx.z - b.mn.z), asp = camera.aspect, tn = Math.tan(camera.fov * Math.PI / 360);
+  const r = Math.max(h * 1.3 / 2 / tn, w * 1.12 / 2 / (tn * asp)) + .12; return { theta: 0, phi: Math.PI / 2 - .04, r, target: c };
+}
+let view = 'cabinet';
+function setView(v) {
+  view = v; document.body.classList.toggle('v-screen', v === 'screen'); $('vCab').setAttribute('aria-pressed', String(v === 'cabinet')); $('vScr').setAttribute('aria-pressed', String(v === 'screen'));
+  const g = v === 'screen' ? screenGoal() : { theta: .42, phi: 1.3, r: Math.max(CAB_R, 2.9 / Math.min(1, camera.aspect)), target: new T.Vector3(orbit.target.x, 1.3, orbit.target.z) };
+  if (!g) return; if (v === 'screen' && cab) { g.theta = 0; } orbit.goal = { ...g, t0: performance.now(), from: { theta: orbit.theta, phi: orbit.phi, r: orbit.r, target: orbit.target.clone() } };
+}
+const lerp = (a, b, t) => a + (b - a) * t, ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function stepCamera(now) {
+  const g = orbit.goal; if (!g) return; const u = Math.min(1, (now - g.t0) / 650), k = ease(u); let dt = g.theta - g.from.theta; dt = Math.atan2(Math.sin(dt), Math.cos(dt));
+  orbit.theta = g.from.theta + dt * k; orbit.phi = lerp(g.from.phi, g.phi, k); orbit.r = lerp(g.from.r, g.r, k); orbit.target.copy(g.from.target).lerp(g.target, k); if (u >= 1) orbit.goal = null;
+}
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); GL.style.width = w + 'px'; GL.style.height = h + 'px'; camera.aspect = w / h; camera.updateProjectionMatrix(); if (!orbit.goal && view === 'cabinet') orbit.r = Math.max(orbit.r, 2.9 / Math.min(1, camera.aspect)); }
+addEventListener('resize', () => { resize(); if (view === 'screen') setView('screen'); });
+
+/* ---------- pointer: orbit, pinch, and click on lever / deck buttons / screen ---------- */
+const ray = new T.Raycaster(), ndc = new T.Vector2(), pts = new Map(); let down = null, pinch = 0;
+function pick(cx, cy) {
+  if (!cab) return null; const r = GL.getBoundingClientRect(); ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObject(cab, true).find(h => h.object.visible && (h.object.name === 'px-screenMesh' || h.object.userData.pxMachineAction || ancestorLever(h.object)));
+  if (!hit) return null; if (hit.object.userData.pxMachineAction) return { action: hit.object.userData.pxMachineAction }; if (ancestorLever(hit.object)) return { action: 'spin', lever: true };
+  if (hit.object.name === 'px-screenMesh' && hit.uv) return { tap: [hit.uv.x * 1400, (1 - hit.uv.y) * 960] }; return null;
+}
+function ancestorLever(o) { for (let p = o; p; p = p.parent) { if (p.name === 'px-lever' || p.name === 'px-armPivot') return true; } return false; }
+GL.addEventListener('pointerdown', e => { GL.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); down = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId }; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); } orbit.goal = null; });
+GL.addEventListener('pointermove', e => {
+  const p = pts.get(e.pointerId);
+  if (!p) { GL.classList.toggle('hot', !!pick(e.clientX, e.clientY)); return; }
+  if (pts.size === 2) { p.x = e.clientX; p.y = e.clientY; const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch) orbit.r = Math.min(12, Math.max(1.1, orbit.r * pinch / d)); pinch = d; if (down) down.moved = 99; return; }
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; if (down) { down.moved += Math.abs(dx) + Math.abs(dy); if (down.moved > 6) GL.classList.add('drag'); }
+  if (down && down.moved > 6) { orbit.theta -= dx * .0065; orbit.phi = Math.min(1.75, Math.max(.4, orbit.phi - dy * .005)); }
+});
+function up(e) { const was = down; pts.delete(e.pointerId); if (pts.size < 2) pinch = 0; GL.classList.remove('drag'); if (was && was.id === e.pointerId) { down = null; if (was.moved <= 6) clickAt(e.clientX, e.clientY); } }
+GL.addEventListener('pointerup', up); GL.addEventListener('pointercancel', e => { pts.delete(e.pointerId); down = null; GL.classList.remove('drag'); });
+GL.addEventListener('wheel', e => { e.preventDefault(); orbit.goal = null; orbit.r = Math.min(12, Math.max(1.1, orbit.r * Math.exp(e.deltaY * .0012))); }, { passive: false });
+function clickAt(x, y) { const h = pick(x, y); if (!h || !api) return; if (h.action) api.action(h.action); else if (h.tap) api.tap(h.tap[0], h.tap[1]); }
+
+/* ---------- the game ---------- */
+/* Phones and tablets (and ?q=low) draw the screen at half size, exactly as the casino room does for touch devices (pxLiteDocument): the game draws in 1400x960 units and scales them 2x. */
+const LITE = LOW || (matchMedia && matchMedia('(pointer:coarse)').matches), LITE_RE = /const screen *= *canvas\(2800, *1920\), *sg *= *screen\.getContext\('2d'\); *sg\.setTransform\(2, *0, *0, *2, *0, *0\);/;
+const liteHtml = h => LITE && LITE_RE.test(h) ? h.replace(LITE_RE, "const screen=canvas(1400,960),sg=screen.getContext('2d');sg.setTransform(1,0,0,1,0,0);") : h;
+const frame = $('game'); let api = null, gameHtml = '', modelData = null, modelImages = null, bootSeq = 0;
+function frameApi() { return new Promise((res, rej) => { /* Do not wait for the frame's load event: live art downloads can hold it up for a minute on a slow network. The engine object appears once the game script has finished starting. */
+  const t0 = Date.now(); let done = false; const get = () => { try { return frame.contentWindow && frame.contentWindow.PX_CASINO_ENGINE; } catch (e) { return null; } };
+  const end = (fn, v) => { if (done) return; done = true; clearInterval(iv); fn(v); };
+  const iv = setInterval(() => { const a = get(); if (a) end(res, a); else if (Date.now() - t0 > 90000) end(rej, Error('The game page did not start. Open the browser console for the reason.')); }, 120);
+  frame.onload = () => { const a = get(); if (a) end(res, a); else if (frame.srcdoc) setTimeout(() => { const b = get(); if (!b) end(rej, Error('The game page loaded without its engine. Check the console.')); }, 400); };
+  frame.srcdoc = liteHtml(gameHtml); }); }
+async function boot() {
+  const seq = ++bootSeq; $('loading').style.display = 'flex'; $('loading').classList.remove('err'); $('loadMsg').textContent = 'Starting Genesis 21…'; api = null; closeModal(true);
+  if (!gameHtml) { $('loadMsg').textContent = 'Unpacking the cabinet and the game…'; const [m, g] = await Promise.all([unpack(PACK.model), unpack(PACK.game)]); gameHtml = g; modelData = JSON.parse(m); modelImages = await Promise.all(modelData.textures.map(t => loadImg(t.image))); }
+  if (!cab) { placeModel(buildModel(modelData, modelImages)); setView(view); }
+  const a = await frameApi(); if (seq !== bootSeq) return; await a.activate(); if (seq !== bootSeq) return; api = a;
+  screenTex = new T.CanvasTexture(a.screen); screenTex.minFilter = screenTex.magFilter = T.LinearFilter; screenTex.generateMipmaps = false; screenTex.anisotropy = 8;
+  if (screenMesh) { screenMesh.material = screenMesh.material.clone(); screenMesh.material.map = screenTex; screenMesh.material.color.setHex(0xffffff); screenMesh.material.needsUpdate = true; }
+  lastRev = -1; leverSig = 0; $('loading').style.display = 'none'; say('');
+}
+let lastRev = -1, leverSig = 0, leverPull = null, lastUi = 0, modalHtml = '', featHtml = '';
+
+/* The game's menus and bonus bar are ported here the way the casino room ports them: HTML from ui(), clicks and inputs routed back by token. */
+const css = () => (PACK.css || '').replaceAll(':root', ':host') + '\n:host{font-family:Arial,sans-serif;color:#f5ebdc}*{box-sizing:border-box}#featureBar{position:relative!important;inset:auto!important;transform:none!important;width:100%!important;max-width:none!important;margin:0!important;border-radius:6px!important;flex-wrap:wrap!important;gap:12px!important}#fbBody{display:flex;flex-wrap:wrap;gap:7px}.fb-head{min-width:160px}dialog[open]{position:relative!important;inset:auto!important;margin:0!important;display:block!important;width:min(680px,94vw)!important;max-height:78dvh!important;overflow:auto!important}dialog::backdrop{display:none}button{min-height:44px}';
+function bindPort(host) { const root = host.shadowRoot || host.attachShadow({ mode: 'open' }); if (!root.bound) { root.bound = true; root.addEventListener('click', e => { const b = e.target.closest('button,a'); if (!b) return; e.preventDefault(); const t = b.getAttribute('data-px-source'); if (t && api) api.click(t); }); for (const n of ['input', 'change']) root.addEventListener(n, e => { const i = e.target, t = i.getAttribute('data-px-source'); if (t && api) api.input(t, i.value, i.checked, n); }); } return root; }
+function port(host, html) { const root = bindPort(host); root.innerHTML = html ? '<style>' + css() + '</style>' + html : ''; }
+function closeModal(silent) { $('modalWrap').classList.remove('on'); modalHtml = ''; port($('modalHost'), ''); if (!silent && api) api.closeModal(); }
+$('modalWrap').addEventListener('pointerdown', e => { if (e.target === $('modalWrap')) closeModal(); });
+function syncUi(now) {
+  if (!api || now - lastUi < 90) return; lastUi = now; let ui; try { ui = api.ui(); } catch (e) { return; }
+  $('balV').textContent = Number(ui.balance || 0).toLocaleString('en-GB', { maximumFractionDigits: 2 });
+  $('dSpin').querySelector('b').textContent = ui.spinning && !/COLLECT|RESPIN|OPEN|CONTINUE|START|LAUNCH|CLAIM/i.test(ui.button) ? 'WAIT' : (ui.button || 'MINT'); $('dSpin').querySelector('small').textContent = ui.spinning ? 'Spinning' : 'Spin';
+  $('dAuto').setAttribute('aria-pressed', String(!!ui.auto)); $('dTurbo').setAttribute('aria-pressed', String(!!ui.turbo)); $('dSound').setAttribute('aria-pressed', String(!ui.muted));
+  const g = !!ui.gamble && !ui.spinning; $('dGamble').hidden = !g; $('dWinBox').hidden = g; $('dWin').textContent = Number(ui.win || 0).toLocaleString('en-GB', { maximumFractionDigits: 2 }); if (ui.status && !ui.modal) say(ui.status); else if (!ui.modal) say('');
+  if (ui.modal !== modalHtml) { modalHtml = ui.modal; port($('modalHost'), ui.modal); $('modalWrap').classList.toggle('on', !!ui.modal); if (ui.modal) { const f = $('modalHost').shadowRoot.querySelector('button,input,select'); f && f.focus({ preventScroll: true }); } }
+  if (ui.feature !== featHtml) { featHtml = ui.feature; port($('featHost'), ui.feature); $('featWrap').classList.toggle('on', !!ui.feature); }
+}
+/* controls: deck strip, top buttons, keys */
+document.querySelectorAll('#deck [data-a]').forEach(b => b.addEventListener('click', () => api && api.action(b.dataset.a)));
+document.querySelectorAll('#deck [data-g]').forEach(b => b.addEventListener('click', () => { if (!api) return; api.action('gamble'); setTimeout(() => { try { const w = frame.contentWindow; w.document.querySelector('#scBtns') && [...w.document.querySelectorAll('#scBtns button')].find(x => x.textContent.toUpperCase().startsWith(b.dataset.g.toUpperCase()))?.click(); } catch (e) {} }, 1800); }));
+$('vCab').onclick = () => setView('cabinet'); $('vScr').onclick = () => setView('screen');
+$('vFs').onclick = () => toggleFs(); $('rst').onclick = () => window.G21Stub.reset(); $('testBtn').onclick = () => api && api.openTest();
+function toggleFs() { if (!api) return; api.fullscreen(!api.isFullscreen()); }
+addEventListener('message', e => { if (!e.data || e.data.type !== 'px-fullscreen' || e.data.machine !== 'genesis-21') return; frame.classList.toggle('fs', !!e.data.on); if (e.data.on) setTimeout(() => frame.focus(), 50); else { setTimeout(() => GL.focus && GL.focus(), 50); } });
+addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,select,textarea')) return;
+  if (e.code === 'KeyF' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); toggleFs(); }
+  else if (e.code === 'Space' && !e.repeat && api) { e.preventDefault(); if ($('modalWrap').classList.contains('on')) return; api.key('Space', ' '); }
+  else if (e.key === 'Escape' && $('modalWrap').classList.contains('on')) closeModal();
+  else if (e.key === 'ArrowLeft') orbit.theta -= .08; else if (e.key === 'ArrowRight') orbit.theta += .08;
+});
+
+/* ---------- frame loop ---------- */
+const t0 = performance.now();
+function frameLoop(now) {
+  requestAnimationFrame(frameLoop); stepCamera(now); applyCamera();
+  if (api && screenTex) { try { const rev = api.revision(); if (rev !== lastRev) { lastRev = rev; screenTex.needsUpdate = true; } } catch (e) {} syncUi(now); mechanics(now); }
+  rim.intensity = 12 + Math.sin(now / 900) * 2.5; glow.material.opacity = .78 + Math.sin(now / 1100) * .12;
+  if (!frame.classList.contains('fs')) renderer.render(scene, camera);   // the 3D view is hidden behind the full-screen game, so stop drawing it
+}
+function mechanics(now) {
+  const t = (now - t0) / 1000; let live = null; try { live = api.mechanics(); } catch (e) {}
+  if (live && live.lever && live.lever.id !== leverSig) { leverSig = live.lever.id; if (live.lever.elapsed < live.lever.duration) leverPull = { start: now - live.lever.elapsed, duration: live.lever.duration, angle: live.lever.angle }; }
+  for (const [role, a] of Object.entries(parts)) {
+    if (role === 'lever') { const u = leverPull ? Math.max(0, Math.min(1, (now - leverPull.start) / leverPull.duration)) : 1; a.o.rotation.x = a.base.x + (leverPull && u < 1 ? Math.sin(u * Math.PI) * leverPull.angle : 0); if (u >= 1) leverPull = null; }
+    else if (role === 'spinPhysical') a.o.position.z = (live && live.spinZ != null) ? live.spinZ : a.home.z;
+    else if (role === 'armPivot') a.o.rotation.z += (((live && live.armZ != null) ? live.armZ : a.base.z) - a.o.rotation.z) * .2;
+    else if (role === 'recordGroup') a.o.rotation.z = a.base.z - t * .25; else a.o.rotation.y = a.base.y + t * (role === 'core' ? .32 : .4);
+  }
+}
+window.G21Test = { get api() { return api; }, get frame() { return frame; }, get view() { return view; }, setView, toggleFs, orbit, camera, scene, soft, pick, clickAt, get cab() { return cab; }, get screen() { return screenMesh; } };
+resize(); applyCamera(); requestAnimationFrame(frameLoop);
+boot().catch(fail);
+})();
+</script>
+</body>
+</html>

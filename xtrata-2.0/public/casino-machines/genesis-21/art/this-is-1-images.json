@@ -1,0 +1,327 @@
+{
+ "source": "https://thisisnumberone.com (collection pages)",
+ "items": [
+  {
+   "collection": "the-genesis-collection",
+   "collectionTitle": "The Genesis Collection",
+   "name": "Channel #1",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/Orbital_Cover_1080-1024x1024.jpg",
+   "power": true,
+   "type": "image/jpeg",
+   "kb": 30,
+   "w": 1024,
+   "h": 1024
+  },
+  {
+   "collection": "the-genesis-collection",
+   "collectionTitle": "The Genesis Collection",
+   "name": "This Is Number One",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/CX_Cover_1080-1024x1024.jpg",
+   "power": true,
+   "type": "image/jpeg",
+   "kb": 307,
+   "w": 1024,
+   "h": 1024
+  },
+  {
+   "collection": "the-genesis-collection",
+   "collectionTitle": "The Genesis Collection",
+   "name": "Mine",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/Cara_Cover_1080-1024x1024.jpg",
+   "power": true,
+   "type": "image/jpeg",
+   "kb": 82,
+   "w": 1024,
+   "h": 1024
+  },
+  {
+   "collection": "the-genesis-collection",
+   "collectionTitle": "The Genesis Collection",
+   "name": "So Why Try Harder",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/Fatboy_Slim_Cover_1080-1024x1024.jpg",
+   "power": true,
+   "type": "image/jpeg",
+   "kb": 45,
+   "w": 1024,
+   "h": 1024
+  },
+  {
+   "collection": "the-genesis-collection",
+   "collectionTitle": "The Genesis Collection",
+   "name": "Now Is Not Enough (For)",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/Dave_Stewart_Cover_1080-1024x1024.jpg",
+   "power": true,
+   "type": "image/jpeg",
+   "kb": 95,
+   "w": 1024,
+   "h": 1024
+  },
+  {
+   "collection": "no1-smiley",
+   "collectionTitle": "No.1 Smiley",
+   "name": "No.1 Smiley",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/No1._Smiley-1024x1024.jpg",
+   "power": false,
+   "type": "image/jpeg",
+   "kb": 172,
+   "w": 1024,
+   "h": 1024
+  },
+  {
+   "collection": "hash_1",
+   "collectionTitle": "Hash One Collection",
+   "name": "Hash One #5",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_5.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 16,
+   "w": 2000,
+   "h": 2000
+  },
+  {
+   "collection": "hash_1",
+   "collectionTitle": "Hash One Collection",
+   "name": "Hash One #14",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_14.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 16,
+   "w": 2000,
+   "h": 2000
+  },
+  {
+   "collection": "hash_1",
+   "collectionTitle": "Hash One Collection",
+   "name": "Hash One #18",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_18.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 16,
+   "w": 2000,
+   "h": 2000
+  },
+  {
+   "collection": "hash_1",
+   "collectionTitle": "Hash One Collection",
+   "name": "Hash One #23",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_23.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 16,
+   "w": 2000,
+   "h": 2000
+  },
+  {
+   "collection": "hash_1",
+   "collectionTitle": "Hash One Collection",
+   "name": "Hash One #27",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_27.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 16,
+   "w": 2000,
+   "h": 2000
+  },
+  {
+   "collection": "love-hirsts-mdma",
+   "collectionTitle": "Love Hirsts MDMA",
+   "name": "Love Hirsts MDMA #1",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Love_Hirsts_MDMA_0001.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 339,
+   "w": 1080,
+   "h": 1080
+  },
+  {
+   "collection": "love-hirsts-mdma",
+   "collectionTitle": "Love Hirsts MDMA",
+   "name": "Love Hirsts MDMA #2",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Love_Hirsts_MDMA_0002.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 128,
+   "w": 1080,
+   "h": 1080
+  },
+  {
+   "collection": "zoom",
+   "collectionTitle": "Zoom",
+   "name": "Zoom #1",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Copy-of-1.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 343,
+   "w": 1984,
+   "h": 1984
+  },
+  {
+   "collection": "zoom",
+   "collectionTitle": "Zoom",
+   "name": "Zoom #2",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Copy-of-2.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 370,
+   "w": 1984,
+   "h": 1984
+  },
+  {
+   "collection": "face-your-head",
+   "collectionTitle": "Face Your Head",
+   "name": "Face Your Head #24",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Copy-of-Expressions-of-Change-24.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 493,
+   "w": 2000,
+   "h": 2000
+  },
+  {
+   "collection": "feel-up",
+   "collectionTitle": "Feel Up",
+   "name": "Feel Up #4",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Grace-NFT-4.jpg",
+   "power": false,
+   "type": "image/jpeg",
+   "kb": 128,
+   "w": 1000,
+   "h": 1000
+  },
+  {
+   "collection": "sexy",
+   "collectionTitle": "$€X¥",
+   "name": "$€X¥",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/EX%C2%A5_011-1024x1024.jpg",
+   "power": false,
+   "type": "image/jpeg",
+   "kb": 42,
+   "w": 1024,
+   "h": 1024
+  },
+  {
+   "collection": "brandx",
+   "collectionTitle": "BrandX Series",
+   "name": "BrandX",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/07/BrandX.jpg",
+   "power": false,
+   "type": "image/jpeg",
+   "kb": 169,
+   "w": 800,
+   "h": 800
+  },
+  {
+   "collection": "xlove",
+   "collectionTitle": "XLove",
+   "name": "XLove",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/XLove_28-1024x1024.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 333,
+   "w": 1024,
+   "h": 1024
+  },
+  {
+   "collection": "game-on",
+   "collectionTitle": "Game On",
+   "name": "Game On",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/09/GameOnFinal02.jpg",
+   "power": false,
+   "type": "image/jpeg",
+   "kb": 147,
+   "w": 800,
+   "h": 800
+  },
+  {
+   "collection": "crash_punks",
+   "collectionTitle": "Crash Punks",
+   "name": "Crash Punks",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/2279.png",
+   "power": false,
+   "type": "image/png",
+   "kb": 529,
+   "w": 1024,
+   "h": 1024
+  },
+  {
+   "collection": "singularity",
+   "collectionTitle": "Singularity",
+   "name": "Singularity",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/Singularity_X1.jpg",
+   "power": false,
+   "type": "image/jpeg",
+   "kb": 79,
+   "w": 400,
+   "h": 400
+  },
+  {
+   "collection": "the-genesis-collection",
+   "collectionTitle": "The Genesis Collection",
+   "name": "The Genesis Collection",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/09/Genesis.jpg",
+   "power": false,
+   "type": "image/jpeg",
+   "kb": 134,
+   "w": 800,
+   "h": 800
+  },
+  {
+   "collection": "narcotix",
+   "collectionTitle": "NarcotiX",
+   "name": "NarcotiX",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2023/02/NarcotiX_800.gif",
+   "power": false,
+   "type": "image/gif",
+   "kb": 4081,
+   "w": 800,
+   "h": 800
+  }
+ ],
+ "notLoaded": [
+  {
+   "collection": "the-smiley-collection",
+   "collectionTitle": "The Smiley Collection",
+   "name": "Smiley X Yellow",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/03/Smiley_X_Yellow_1.gif",
+   "type": "image/gif",
+   "kb": 4097,
+   "reason": "animated GIF of several MB: too heavy to load on the reels"
+  },
+  {
+   "collection": "the-smiley-collection",
+   "collectionTitle": "The Smiley Collection",
+   "name": "Smiley Twist White",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/09/Smiley_Twist_White.gif",
+   "type": "image/gif",
+   "kb": 3325,
+   "reason": "animated GIF of several MB: too heavy to load on the reels"
+  },
+  {
+   "collection": "the-smiley-collection",
+   "collectionTitle": "The Smiley Collection",
+   "name": "Smiley Tile Red",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/03/Smiley_Tile_Red_1.gif",
+   "type": "image/gif",
+   "kb": 4236,
+   "reason": "animated GIF of several MB: too heavy to load on the reels"
+  },
+  {
+   "collection": "dyle_one",
+   "collectionTitle": "DYLE_ONE",
+   "name": "DYLE_ONE",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2022/09/dyle_one_promo_900x900_10fps.gif",
+   "type": "image/gif",
+   "kb": 3180,
+   "reason": "animated GIF of several MB: too heavy to load on the reels"
+  },
+  {
+   "collection": "zoom",
+   "collectionTitle": "Zoom",
+   "name": "Zoom (animated cover)",
+   "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Pinky-Placeholder.gif",
+   "type": "image/gif",
+   "kb": 1418,
+   "reason": "animated GIF of several MB: too heavy to load on the reels"
+  }
+ ]
+}

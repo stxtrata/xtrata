@@ -1,0 +1,6 @@
+Block Fortune v2 engine (src/engine/bf-engine.js) sha256 7f619182ada01119a713c64874eb1a7e024d7c210e0dca0ec2e8afc05c143168
+
+engine text contained verbatim in the room pack 1_Forever_Twins: True
+engine text contained verbatim in the room pack 3_Block_Fortune: True
+engine text contained verbatim in the room pack 0_The_Drop: True
+engine text contained verbatim in the Genesis 21 game: True

@@ -1,0 +1,227 @@
+{
+ "collection": "Boomboxes (cycle 12)",
+ "contract": "SP497E7RX3233ATBS2AB9G4WTHB63X5PBSP5VGAQ.boomboxes-cycle-12",
+ "assetName": "b-12",
+ "verifiedOnChain": {
+  "blockHeight": 20185,
+  "canonical": true,
+  "deployedUtc": "2021-07-01T15:51:04.000Z",
+  "txId": "0x5d8f968111be4556a13d8d0d25f39d998a749a982d673ae6ba7180ee7ccf1f62"
+ },
+ "totalSupplyLastTokenId": 96,
+ "tokenUriTemplateOrExample": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+ "imageHostsUsed": [],
+ "tokens": [],
+ "candidateTokens": [
+  {
+   "tokenId": 1,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 6,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 10,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 15,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 19,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 24,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 28,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 33,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 37,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 42,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 46,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 51,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 55,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 60,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 64,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 69,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 73,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 78,
+   "tokenUri": "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  }
+ ],
+ "notes": "Boomboxes are per-stacking-cycle NFT contracts from boomcrypto/boom-contracts (repo README: \"Boombox NFTs ... represent future stacking rewards\"). Cycle 6 (block 9760), 12 (20185), 14 (24567) are SP497E7...; 16,17,18,20 are SP1QK1AZ24R132C0D84EEQ8Y2JDHARDR58R72E1ZW. Cycle 12 chosen: 96 tokens, token URI is an IPFS JSON. Cycle 14 is an equally valid alternative (96 tokens). NO IMAGES SAVED: every image/metadata host is blocked from this sandbox (see SUMMARY.md). IMPORTANT: within one cycle contract get-token-uri returns the SAME IPFS JSON for every token id, so a single contract gives one artwork; for varied reels use one image per cycle contract (see boomboxCycleContracts).",
+ "boomboxCycleContracts": [
+  {
+   "contract": "SP497E7RX3233ATBS2AB9G4WTHB63X5PBSP5VGAQ.boomboxes-cycle-6",
+   "block": 9760,
+   "deployedUtc": "2021-04-03T20:19:21.000Z",
+   "lastTokenId": 27,
+   "distinctTokenUrisSampled": [
+    "none"
+   ]
+  },
+  {
+   "contract": "SP497E7RX3233ATBS2AB9G4WTHB63X5PBSP5VGAQ.boomboxes-cycle-12",
+   "block": 20185,
+   "deployedUtc": "2021-07-01T15:51:04.000Z",
+   "lastTokenId": 96,
+   "distinctTokenUrisSampled": [
+    "https://cloudflare-ipfs.com/ipfs/bafkreidmfmsjiqunj4tkln57ozw2yhazufqv63j5zohhsqchwol6lznsfy"
+   ]
+  },
+  {
+   "contract": "SP497E7RX3233ATBS2AB9G4WTHB63X5PBSP5VGAQ.boomboxes-cycle-14",
+   "block": 24567,
+   "deployedUtc": "2021-08-05T11:27:29.000Z",
+   "lastTokenId": 96,
+   "distinctTokenUrisSampled": [
+    "https://cloudflare-ipfs.com/ipfs/bafkreihjmmwgqi6aapcbqxroguz5j2pal623t22g4uuw2s5v6kdbavks2q"
+   ]
+  },
+  {
+   "contract": "SP1QK1AZ24R132C0D84EEQ8Y2JDHARDR58R72E1ZW.boomboxes-cycle-16",
+   "block": 27725,
+   "deployedUtc": "2021-08-28T19:04:08.000Z",
+   "lastTokenId": 261,
+   "distinctTokenUrisSampled": [
+    "https://cloudflare-ipfs.com/ipfs/QmTYvatj7HFT3zsFCAz52DLERvr1jtuSfQsXXZbxLjW2Hz"
+   ]
+  },
+  {
+   "contract": "SP1QK1AZ24R132C0D84EEQ8Y2JDHARDR58R72E1ZW.boomboxes-cycle-17",
+   "block": 30680,
+   "deployedUtc": "2021-09-20T21:15:01.000Z",
+   "lastTokenId": 3,
+   "distinctTokenUrisSampled": [
+    "https://cloudflare-ipfs.com/ipfs/bafkreih6k4kynovy2yb5kxtu2dedwq7fjiagyn5uqvinzabtrbsclwjwju"
+   ]
+  },
+  {
+   "contract": "SP1QK1AZ24R132C0D84EEQ8Y2JDHARDR58R72E1ZW.boomboxes-cycle-18",
+   "block": 31426,
+   "deployedUtc": "2021-09-27T00:33:13.000Z",
+   "lastTokenId": 309,
+   "distinctTokenUrisSampled": [
+    "https://cloudflare-ipfs.com/ipfs/bafkreifoptedewjxd4vk4hhnd7teewwpauifowgzktkmmpif4wejd36jr4"
+   ]
+  },
+  {
+   "contract": "SP1QK1AZ24R132C0D84EEQ8Y2JDHARDR58R72E1ZW.boomboxes-cycle-20",
+   "block": 34770,
+   "deployedUtc": "2021-10-22T17:03:37.000Z",
+   "lastTokenId": 0,
+   "distinctTokenUrisSampled": [
+    "https://cloudflare-ipfs.com/ipfs/bafkreifuc3tdrddmrzh4neuqwri3vlxb5v5pwuvxaoayu2tz4zm7ziuety"
+   ]
+  },
+  {
+   "contract": "SP1QK1AZ24R132C0D84EEQ8Y2JDHARDR58R72E1ZW.boomboxes-cycle-20-v1",
+   "block": 34784,
+   "deployedUtc": "2021-10-22T19:04:28.000Z",
+   "lastTokenId": 304,
+   "distinctTokenUrisSampled": [
+    "https://cloudflare-ipfs.com/ipfs/bafkreifuc3tdrddmrzh4neuqwri3vlxb5v5pwuvxaoayu2tz4zm7ziuety"
+   ]
+  },
+  {
+   "contract": "SP1QK1AZ24R132C0D84EEQ8Y2JDHARDR58R72E1ZW.boomboxes-cycle-20-v2",
+   "block": 36229,
+   "deployedUtc": "2021-11-02T12:42:29.000Z",
+   "lastTokenId": 6,
+   "distinctTokenUrisSampled": [
+    "https://cloudflare-ipfs.com/ipfs/bafkreifuc3tdrddmrzh4neuqwri3vlxb5v5pwuvxaoayu2tz4zm7ziuety"
+   ]
+  }
+ ]
+}

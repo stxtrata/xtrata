@@ -1,0 +1,117 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0a24"><meta name="color-scheme" content="dark"><title>Genesis 21 — Xtrata Arcade machine</title><meta name="description" content="Genesis 21: a fruit machine for the Xtrata Arcade. A time capsule of the first NFTs on Stacks, January 2021. Uses the existing shared casino LAYR account."><style>:root{color-scheme:dark;--ink:#f6eeff;--muted:#a393b5;--gold:#6739ff;--orange:#6739ff;--line:#ffffff17;--panel:#120b19}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}
+body{background:#09050c;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+button,a{-webkit-tap-highlight-color:transparent}button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,a:focus-visible{outline:2px solid var(--orange);outline-offset:4px}button:disabled{opacity:.35;cursor:not-allowed}button:hover:not(:disabled){filter:brightness(1.2)}
+#scene{position:fixed;left:0;right:0;top:94px;bottom:132px;touch-action:none}#scene canvas{display:block;width:100%;height:100%}
+.vignette{position:fixed;inset:0;pointer-events:none;background:linear-gradient(90deg,#09050cee,#09050cb0 20%,transparent 34%,transparent 70%,#09050cb0 82%,#09050cee)}
+header{position:fixed;top:0;left:0;right:0;height:94px;padding:0 4%;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);z-index:3;background:#09050c}
+.brand{font-size:15px;font-weight:700;letter-spacing:3px;text-decoration:none;color:inherit;display:flex;align-items:center;gap:15px}.brandmark{font-size:29px;font-weight:900;color:var(--orange);font-style:italic}.arcade{font-weight:400;font-size:11px;letter-spacing:2px;color:#aa9abd;margin-left:12px}
+.top-right{display:flex;align-items:center;gap:14px}.pill{border:1px solid #442a8660;border-radius:30px;padding:8px 13px;font-size:10px;letter-spacing:1.4px;color:#b29fff}
+.pill i,.live-dot{display:inline-block;border-radius:50%;background:#6739ff;width:5px;height:5px;margin-right:7px;vertical-align:middle}
+.icon{font-size:19px;width:36px;height:36px;color:#dccfee;border:1px solid #ffffff18;border-radius:50%}
+#viewbar{position:fixed;top:108px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:3px;padding:4px;border:1px solid #ffffff16;border-radius:30px;background:#110a17c8;z-index:2;white-space:nowrap}
+.view-btn{font-size:12px;color:#b7a7cb;border-radius:20px;padding:8px 14px}.view-btn.active{background:#d7bfff1f;color:#eee9ff}#viewHint{font-size:10px;color:#907fa5;letter-spacing:1px;margin:0 12px}
+main{position:fixed;inset:94px 0 132px;pointer-events:none;z-index:1}
+.intro{position:absolute;left:4%;top:7%;width:255px;pointer-events:auto;transition:opacity .3s}
+.eyebrow{font-size:10px;letter-spacing:2px;color:#aa9abd;font-weight:600;line-height:1.8;margin:0}
+h1{font-size:clamp(35px,4.1vw,64px);line-height:.98;letter-spacing:-2.6px;font-weight:500;margin:22px 0;color:#f6eeff}h1 em{font-family:Georgia,serif;font-weight:400;color:var(--gold)}
+.tagline{font-family:Georgia,serif;font-size:17px;line-height:1.55;color:#c6b9d7}
+.edition{font-size:10px;letter-spacing:2px;color:#7d5fff;margin:24px 0 28px;display:flex;align-items:center;gap:9px}.edition span{width:22px;height:1px;background:#602fef}
+.feature-list{border-top:1px solid var(--line)}.feature-list button{display:flex;width:100%;align-items:center;text-align:left;border-bottom:1px solid var(--line);padding:14px 0;gap:13px}
+.feature-list b{font-size:10px;color:#815ff5;font-weight:400}.feature-list span{font-size:13px}.feature-list small{display:block;color:#9e8eb2;font-size:11px;margin-top:6px}.feature-list i{font-style:normal;font-size:14px;color:#8e7ea2;margin-left:auto}
+.text-button{padding:0;font-size:11px;letter-spacing:.3px;color:#bcadd0}.intro>.text-button{margin-top:20px}
+.session{position:absolute;right:4%;top:12%;width:178px;pointer-events:auto;transition:opacity .3s}.session>.eyebrow{margin-bottom:18px}
+.session-row{display:flex;justify-content:space-between;font-size:12px;margin:14px 0;color:#a393b5}.session-row b{font-weight:400;color:#e7dcf5;font-variant-numeric:tabular-nums}
+.session-rule{height:1px;background:var(--line);margin:22px 0}.meter{font:28px Georgia,serif;color:var(--gold);margin:8px 0 20px;font-variant-numeric:tabular-nums}
+.layr-note{font-family:Georgia,serif;font-size:13px;line-height:1.7;color:#b8a8cb}.session .text-button{margin-top:10px}
+body.close-view .intro,body.close-view .session{opacity:0;pointer-events:none}
+.machine-caption{position:absolute;bottom:10px;left:25%;width:50%;text-align:center;font-size:11px;letter-spacing:1.6px;color:#b29fff;line-height:1.6;transition:opacity .2s}
+body.feature-on .machine-caption{opacity:0}
+#featureBar{position:fixed;left:50%;bottom:146px;transform:translateX(-50%);z-index:4;background:#120b19f4;border:1px solid #6739ff66;border-radius:12px;padding:14px 18px;display:flex;gap:20px;align-items:center;max-width:94vw;box-shadow:0 20px 60px #000a;backdrop-filter:blur(10px)}
+#featureBar[hidden]{display:none}.fb-head{display:flex;flex-direction:column;gap:4px;min-width:170px}.fb-head strong{font:22px Georgia,serif;color:#846fff;font-weight:400}.fb-head span:last-child{font-size:12px;color:#c1b2d4}
+#fbBody{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pick{width:40px;height:40px;border:1px solid #602fef90;border-radius:7px;color:#d4c9ff;background:#1c0d30;font-size:13px;font-weight:700}.pick.picked{background:#6739ff33;border-color:#8f7fff;color:#ffffff}
+.bar-cta{background:linear-gradient(120deg,#8f7fff,#541be8);color:#0d0021;padding:12px 18px;border-radius:6px;font-weight:700;font-size:12px;letter-spacing:1px;box-shadow:0 3px 0 #300b80}
+.console{position:fixed;bottom:0;left:0;right:0;min-height:132px;background:#110a17f2;border-top:1px solid #6739ff2e;display:flex;align-items:center;padding:20px 4%;gap:3.2%;backdrop-filter:blur(18px);z-index:3}
+.console label{display:block;font-size:10px;letter-spacing:1.4px;color:#aa9abd;margin-bottom:9px}.console strong{font-size:29px;font-weight:400;letter-spacing:-.8px;font-variant-numeric:tabular-nums}.console small{font-size:10px;letter-spacing:1px;color:#a393b7;margin-left:8px}
+.credit{min-width:160px}.credit label button{border:1px solid #664d9370;margin-left:8px;width:20px;height:20px;border-radius:50%;font-size:13px;padding:0;line-height:1}
+.bet{border-left:1px solid var(--line);padding-left:3.2%;min-width:170px}.bet label span{font-size:9px;color:#7f6f96;margin-left:8px}
+.stepper{display:flex;align-items:center;gap:18px}.stepper strong{font-size:23px;min-width:45px;text-align:center}.stepper button{border:1px solid #593f8666;border-radius:50%;width:30px;height:30px;color:#e3d6f7;font-size:16px}
+.last{min-width:150px;border-left:1px solid var(--line);padding-left:3.2%}.last strong{color:#846fff}
+.gamble-btn{display:block;margin-top:6px;padding:5px 10px;border:1px solid #602fef;border-radius:4px;color:#d4c9ff;background:#1c0a3c;font-size:10px;letter-spacing:1px;font-weight:700;animation:pulse 1.4s ease-in-out infinite}.gamble-btn[hidden]{display:none}
+.actions{display:flex;gap:10px;margin-left:auto;align-items:center}
+.secondary{height:54px;border:1px solid #664d9360;border-radius:5px;font-size:10px;letter-spacing:1px;width:72px;color:#e3d8f6}.secondary[aria-pressed=true]{border-color:#6739ff;color:#c3b8ff;background:#6739ff14}
+.spin{background:linear-gradient(120deg,#8f7fff,#541be8);color:#0d0021;width:170px;height:63px;border-radius:6px;box-shadow:0 4px 0 #300b80,0 0 35px #541be814;font-size:14px;letter-spacing:2px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:24px}
+.spin .spin-icon{font-size:26px;font-weight:400}.spin:active{transform:translateY(3px);box-shadow:0 1px 0 #300b80}.spin.spinning .spin-icon{animation:rotate .7s linear infinite}.spin.small{font-size:12px;letter-spacing:1px}
+.utility{display:flex;flex-direction:column;gap:13px}.utility button{font-size:10px;letter-spacing:.7px;color:#b2a2c6;text-align:left;white-space:nowrap}
+#toast{position:fixed;bottom:160px;left:50%;transform:translate(-50%,15px);opacity:0;background:#6739ff;color:#0d0021;border-radius:6px;padding:13px 20px;font-size:13px;pointer-events:none;transition:.2s;z-index:12;max-width:90vw;text-align:center}#toast.show{opacity:1;transform:translate(-50%,0)}
+#celebration{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:5}.coin{position:absolute;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#d1c9ff,#4f17da 70%);border:2px solid #cabfff;animation:fall 2.4s ease-in both;box-shadow:0 0 12px #6739ff40}
+dialog{border:1px solid #3d247066;background:var(--panel);color:#ece3f9;border-radius:15px;width:min(720px,94vw);max-height:86vh;padding:26px 28px;box-shadow:0 35px 120px #000a}dialog::backdrop{background:#050208c9;backdrop-filter:blur(10px)}
+.modal-head{display:flex;align-items:center;justify-content:space-between}.modal-head button{font-size:28px;color:#b0a0c4}
+dialog h2{font:34px Georgia,serif;color:#846fff;margin:16px 0;font-weight:400}dialog p,dialog li{font-size:13px;color:#c3b6d4;line-height:1.75}dialog h3{font-size:12px;letter-spacing:1.5px;color:#dccdfc;margin-top:26px}
+.cta{background:#6739ff;color:#0d0021;padding:13px 20px;border-radius:6px;font-weight:700;font-size:12px;margin:12px 8px 0 0;display:inline-block}.outline{border:1px solid #593f8685;padding:12px 18px;border-radius:5px;font-size:12px;margin:8px 8px 0 0;display:inline-block}
+.paytable{width:100%;border-collapse:collapse;font-size:12px}.paytable th{color:#a393b7;font-weight:400;font-size:10px;text-align:left;letter-spacing:1px}.paytable td,.paytable th{padding:9px;border-bottom:1px solid #ffffff12}
+.pay-icon{width:30px;height:30px;vertical-align:middle;margin-right:8px}
+.rule-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.line-card{border:1px solid #ffffff14;padding:8px;text-align:center;font-size:10px;color:#9a8ab0;border-radius:4px}.line-card svg{width:100%;height:32px}
+.bonus-total{font-size:40px;color:#846fff;font-family:Georgia,serif;margin:12px 0}
+.lab-options{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.lab-options button{border:1px solid #602fef60;border-radius:8px;padding:22px 10px;color:#d4c9ff;font-size:13px}.lab-options small{display:block;font-size:11px;color:#a393b7;margin-top:8px}
+.stat-cards{display:flex;gap:10px;margin:18px 0}.stat-cards>div{padding:14px;border:1px solid #ffffff16;border-radius:8px;flex:1}.stat-cards span{display:block;font-size:11px;color:#b8a9cb}.stat-cards strong{display:block;font-size:22px;margin-top:8px;font-weight:400;color:#846fff}
+.setting{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:15px 0;border-bottom:1px solid #ffffff15;font-size:13px}.setting input[type=range]{width:45%;accent-color:#6739ff}.setting input[type=checkbox]{accent-color:#6739ff;width:18px;height:18px}
+.setting select{background:#110818;color:#eee6fb;border:1px solid #412b68;border-radius:6px;padding:7px 10px;font:inherit;font-size:13px}
+.history-wrap{max-height:330px;overflow:auto}.fine{font-size:11px!important;color:#9b8bb0!important}
+.hash{font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;word-break:break-all;color:#e9dcff;background:#0b0610;border:1px solid #ffffff14;border-radius:6px;padding:12px}.hash b{color:#735fff;font-size:16px}
+.ticket{background:#ebe3cc;color:#262622;padding:24px;text-align:center;border-radius:5px;margin:14px 0}.ticket h4{font:40px Georgia,serif;margin:10px 0}.ticket p{color:#5f5a4e!important;font-size:11px!important;margin:6px 0}.barcode{height:34px;background:repeating-linear-gradient(90deg,#222 0 2px,transparent 2px 5px,#222 5px 6px,transparent 6px 9px);margin-top:12px}
+#loading{position:fixed;inset:0;background:#09050c;z-index:50;display:flex;align-items:center;justify-content:center;flex-direction:column;transition:opacity .5s}.loader-mark{width:180px;height:115px}#loading p{font-size:11px;letter-spacing:3px;margin-top:28px}#loading small{font-size:11px;color:#907fa5}
+.error-panel{max-width:520px;padding:0 24px;text-align:center;line-height:1.7}.error-panel h2{font-weight:400;font-size:24px;color:#846fff;margin:0 0 10px}.error-panel p{font-size:13px;letter-spacing:0;color:#c8c3ba;margin:6px 0}
+.noscript{position:fixed;inset:0;z-index:60;margin:0;display:flex;align-items:center;justify-content:center;background:#09050c;color:#eee}
+@keyframes rotate{to{transform:rotate(360deg)}}@keyframes pulse{50%{box-shadow:0 0 14px #6739ff55}}@keyframes fall{0%{transform:translateY(-30px) rotateY(0);opacity:0}10%{opacity:1}100%{transform:translateY(100vh) rotateY(900deg);opacity:0}}
+@media(min-width:1600px){.intro{width:300px}.session{width:200px}}
+@media(max-height:820px) and (min-width:1000px){.intro{top:4%}h1{font-size:46px;margin:12px 0}.edition{margin:14px 0}.feature-list button{padding:10px 0}.tagline{font-size:14px}.session{top:8%}}
+@media(max-width:1250px){.intro{width:205px}.session{right:3%;width:150px}.console{gap:2.4%;padding:18px 3%}.bet,.last{padding-left:2.4%}.credit{min-width:135px}.bet{min-width:150px}.spin{width:140px}.utility{display:none}.secondary{width:60px}h1{font-size:44px}}
+@media(max-width:1000px){.intro,.session{display:none}#viewHint{display:none}}
+@media(max-width:850px){header{height:72px;padding:0 5%}.arcade,.pill{display:none}.top-right{gap:8px}.icon{width:32px;height:32px;font-size:16px}.brand{font-size:12px;gap:8px}.brandmark{width:28px;height:28px}
+#scene{top:72px;bottom:200px}main{top:72px;bottom:200px}#viewbar{top:82px}.view-btn{font-size:11px;padding:7px 12px}
+.console{min-height:200px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px 10px;padding:14px 5%}.credit,.bet,.last{min-width:0}.bet,.last{padding-left:12px}.console strong{font-size:22px}.console small{display:none}.console label{font-size:9px;letter-spacing:.8px;margin-bottom:7px}
+.stepper{gap:8px}.stepper strong{font-size:19px;min-width:30px}.stepper button{width:28px;height:28px}.last{text-align:right}.gamble-btn{margin-left:auto;font-size:9px}
+.actions{grid-column:1/4;grid-row:2;margin:0;width:100%}#maxBet{display:none}.spin{flex:1;height:52px;font-size:13px;gap:14px}.secondary{height:52px;width:64px;flex-shrink:0}
+.utility{display:flex;flex-direction:row;grid-column:1/4;grid-row:3;justify-content:space-between;gap:8px}.utility button{font-size:9px}
+#featureBar{bottom:206px;left:10px;right:10px;transform:none;max-width:none;flex-wrap:wrap;gap:8px 12px;padding:10px 12px}.fb-head{min-width:0;flex:1 1 150px;gap:2px}.fb-head .eyebrow{font-size:9px}.fb-head strong{font-size:17px}#fbBody{gap:5px}.pick{width:31px;height:34px;font-size:12px}.bar-cta{padding:11px 14px}
+#toast{bottom:auto;top:150px}.vignette{background:radial-gradient(ellipse at 50% 45%,transparent 55%,#09050c99)}.machine-caption{left:5%;width:90%;font-size:10px}dialog{padding:18px}.lab-options{grid-template-columns:1fr}.lab-options button{padding:14px}.rule-grid{grid-template-columns:repeat(4,1fr)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+body.close-view .machine-caption{opacity:0}body.feature-on #toast{bottom:250px}
+.pick.capsule{border-radius:10px;background:linear-gradient(180deg,#230f46,#0f061c);border-color:#6739ff99;color:#d4c9ff}.pick.capsule.picked{background:#6739ff;color:#0d0021}
+.twins-table td{vertical-align:middle}.swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+.ab{display:inline-flex;gap:10px}.ab .cta{min-width:130px}
+.coin.inf{background:none;border:0;box-shadow:none;width:auto;height:auto;font-size:26px;color:#735fff;text-shadow:0 0 12px #6739ff}
+.live-src{font-size:10px;letter-spacing:1px;color:#a37fff;margin-top:6px}
+@media(max-width:850px){body.feature-on #toast{bottom:auto;top:150px}}
+h1{font-size:clamp(34px,3.6vw,56px);margin:16px 0}.edition{margin:16px 0 18px}.intro .feature-list button{padding:10px 0}.tagline{margin:10px 0}
+@media(max-height:820px) and (min-width:1000px){.intro .feature-list button{padding:7px 0}.feature-list small{margin-top:3px}h1{font-size:42px;margin:8px 0}}
+
+:root{--gold:#f6c453;--orange:#f6c453;--panel:#15103a}
+h1 em{color:#f6c453}.edition{color:#b9adff}.edition span{background:#8d83ff}
+.cta,.bar-cta{background:#5546ff;color:#fff4d8;box-shadow:0 3px 0 #2a1f7a}
+.spin{background:linear-gradient(120deg,#6a5bff,#4636e0);color:#fff4d8;box-shadow:0 4px 0 #2a1f7a,0 0 35px #5546ff33}
+.spin:active{box-shadow:0 1px 0 #2a1f7a}
+#toast{background:#5546ff;color:#fff4d8}
+.coin.inf{background:none;border:0;box-shadow:none;width:auto;height:auto;font-size:22px;color:#f6c453;text-shadow:0 0 12px #f0b429}
+.meter,.bonus-total{color:#f6c453}.fb-head strong,dialog h2,.last strong{color:#f3ead6}
+.gamble-btn{border-color:#f6c453;color:#f6c453;background:#2a1f7a}
+.pick.capsule.picked{background:#f6c453;color:#2a1f00}
+.twins-table small{color:#93a6b5;font-size:10px}
+</style></head><body>
+<div id="scene" aria-label="Genesis 21 screen"></div>
+<header><a class="brand" href="#" aria-label="Genesis 21"><canvas class="brandmark" id="brandmark" width="68" height="68" aria-hidden="true"></canvas> XTRATA <span class="arcade">/ ARCADE</span></a><div class="top-right"><span class="pill"><i></i> LAYR PLAY</span><button id="sound" class="icon" aria-label="Mute sound" aria-pressed="true">♫</button><button id="help" class="icon" aria-label="Roadmap and pays">?</button><button id="fullscreen" class="icon" aria-label="Toggle fullscreen">⛶</button><button id="settings" class="icon" aria-label="Settings">⚙</button></div></header>
+<main><section class="intro"><p class="eyebrow">THE FIRST NFTs ON STACKS &nbsp; / &nbsp; JAN 2021</p><h1>GENESIS<br><em>21</em></h1><p class="tagline">Where Bitcoin NFTs on Stacks began.<br>Light up your collection.</p><div class="edition"><span></span> LIVE FROM XTRATA</div><div class="feature-list"><button data-info="free"><b>01</b><span>Mainnet Launch<small>8 free spins · all wins 2×</small></span><i>↗</i></button><button data-info="vault"><b>02</b><span>Stacking Boombox<small>Open 3 of 9 Boomboxes</small></span><i>↗</i></button><button data-info="chain"><b>03</b><span>Proof of Transfer<small>Anchor Bitcoin blocks. Respin.</small></span><i>↗</i></button><button data-info="genesis"><b>04</b><span>Jackpot: Number One<small>5 This Is #1 on the centre line</small></span><i>↗</i></button><button id="twinsInfo"><b>05</b><span>Hall of Twins<small id="twinsSmall">Reading the chain…</small></span><i>↗</i></button></div></section>
+<aside class="session"><p class="eyebrow">YOUR SESSION</p><div class="session-row"><span>Spins</span><b id="spins">0</b></div><div class="session-row"><span>Total played</span><b id="wagered">0</b></div><div class="session-row"><span>Total paid out</span><b id="paidOut">0</b></div><div class="session-rule"></div><p class="eyebrow">JACKPOT: NUMBER ONE</p><p class="meter" id="meterSide">10,000</p><p class="eyebrow">HOLDER POT</p><p class="meter" id="potSide">0</p><button class="text-button" id="pot">The Holder Pot ↗</button><p class="layr-note">Permanent art. One LAYR account.<br>Shared casino balance.</p><p class="live-src" id="liveSrc">CONNECTING TO XTRATA…</p><button class="text-button" id="history">Session history ↗</button></aside>
+<div class="machine-caption"><span class="live-dot"></span> <span id="status" role="status" aria-live="polite">WHERE BITCOIN NFTs ON STACKS BEGAN</span></div></main>
+<section id="featureBar" hidden aria-live="polite" aria-label="Bonus feature"><div class="fb-head"><span class="eyebrow" id="fbTag">FEATURE</span><strong id="fbTitle"></strong><span id="fbInfo"></span></div><div id="fbBody"></div></section>
+<footer class="console"><div class="credit"><label>LAYR BALANCE <button id="account" aria-label="View shared LAYR account">LAYR account</button></label><strong id="balance">0</strong><small>LAYR</small></div><div class="bet"><label>TOTAL BET <span>20 LINES</span></label><div class="stepper"><button id="minus" aria-label="Decrease bet">−</button><strong id="bet">100</strong><button id="plus" aria-label="Increase bet">+</button></div></div><div class="last"><label id="winLabel">LAST WIN</label><strong id="lastWin">0</strong><small id="freeCount">LAYR</small><button id="gamble" class="gamble-btn" hidden>ODD / EVEN BLOCK ›</button></div><div class="actions"><button id="auto" class="secondary" aria-pressed="false">AUTO-STACK</button><button id="maxBet" class="secondary">MAX BET</button><button id="spin" class="spin"><span id="spinText">MINT</span> <span class="spin-icon">■</span></button><button id="turbo" class="secondary" aria-pressed="false">TURBO</button></div><div class="utility"><button id="rules">ROADMAP / PAYS</button><button id="historyLink">SESSION HISTORY</button></div></footer>
+<div id="toast" role="status"></div><div id="celebration" aria-hidden="true"></div>
+<dialog id="modal"><div class="modal-head"><span class="eyebrow" id="modalTag">XTRATA ARCADE</span><button id="close" aria-label="Close dialog">×</button></div><div id="modalContent"></div></dialog>
+<div id="loading" role="status"><canvas class="loader-mark" id="loaderMark" width="360" height="230" aria-hidden="true"></canvas><p id="loadMsg">MINTING GENESIS 21</p><small>Genesis 21 · Xtrata Arcade</small></div><noscript><p class="noscript">Genesis 21 needs JavaScript to run.</p></noscript>
+
+<!--SCRIPT-->
+</body></html>

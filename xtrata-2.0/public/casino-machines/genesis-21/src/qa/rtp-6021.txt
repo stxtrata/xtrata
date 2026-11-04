@@ -1,0 +1,1 @@
+{"spins":5000000,"seed":6021,"wagered":860000000,"paidOut":810467476,"rtp":94.24,"freeTriggers":35476,"oneInFree":140.9,"vaultTriggers":37754,"oneInVault":132.4,"chainTriggers":18325,"oneInChain":272.9,"jackpots":48,"secs":122.514}

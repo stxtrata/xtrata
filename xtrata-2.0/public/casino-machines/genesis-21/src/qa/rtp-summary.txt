@@ -1,0 +1,11 @@
+Genesis 21: seeded RTP runs (node qa/sim.mjs 5000000 <seed>), 5,000,000 spins each, design RTP 94.38%
+
+seed    21  RTP 93.932%  free 1 in 140.8  boombox 1 in 133.4  anchor 1 in 273.4  jackpots 31
+seed  1021  RTP 94.117%  free 1 in 140.7  boombox 1 in 133.6  anchor 1 in 273.1  jackpots 42
+seed  2021  RTP 94.471%  free 1 in 140.7  boombox 1 in 133.3  anchor 1 in 272  jackpots 50
+seed  3021  RTP 94.478%  free 1 in 139.7  boombox 1 in 132.2  anchor 1 in 271.1  jackpots 42
+seed  4021  RTP 94.137%  free 1 in 141  boombox 1 in 133.6  anchor 1 in 273.9  jackpots 46
+seed  5021  RTP 94.308%  free 1 in 139  boombox 1 in 133.1  anchor 1 in 274.6  jackpots 50
+seed  6021  RTP 94.240%  free 1 in 140.9  boombox 1 in 132.4  anchor 1 in 272.9  jackpots 48
+
+7 runs, 35 million spins, mean RTP 94.240%

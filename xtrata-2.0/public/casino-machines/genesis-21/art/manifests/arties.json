@@ -1,0 +1,144 @@
+{
+ "collection": "Arties (Open Art Source)",
+ "contract": "SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties",
+ "assetName": "arties",
+ "verifiedOnChain": {
+  "blockHeight": 35466,
+  "canonical": true,
+  "deployedUtc": "2021-10-27T20:38:26.000Z",
+  "txId": "0x0c6e900abbb06197bf58ca37ca2d42a08bad6411ef599dae86f6b6283aeba0e1"
+ },
+ "totalSupplyLastTokenId": 2604,
+ "tokenUriTemplateOrExample": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+ "imageHostsUsed": [],
+ "tokens": [],
+ "candidateTokens": [
+  {
+   "tokenId": 1,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/1.png",
+   "name": "Artie #10895"
+  },
+  {
+   "tokenId": 125,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/125.png",
+   "name": "Artie #10411"
+  },
+  {
+   "tokenId": 249,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/249.png",
+   "name": "Artie #2747"
+  },
+  {
+   "tokenId": 373,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/373.png",
+   "name": "Artie #7063"
+  },
+  {
+   "tokenId": 497,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/497.png",
+   "name": "Artie #9809"
+  },
+  {
+   "tokenId": 621,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/621.png",
+   "name": "Artie #117"
+  },
+  {
+   "tokenId": 745,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 869,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/869.png",
+   "name": "Artie #8914"
+  },
+  {
+   "tokenId": 993,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/993.png",
+   "name": "Artie #11079"
+  },
+  {
+   "tokenId": 1117,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/1117.png",
+   "name": "Artie #9198"
+  },
+  {
+   "tokenId": 1241,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/1241.png",
+   "name": "Artie #8658"
+  },
+  {
+   "tokenId": 1364,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/1364.png",
+   "name": "Artie #7780"
+  },
+  {
+   "tokenId": 1488,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/1488.png",
+   "name": "Artie #7704"
+  },
+  {
+   "tokenId": 1612,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/1612.png",
+   "name": "Artie #3815"
+  },
+  {
+   "tokenId": 1736,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/1736.png",
+   "name": "Artie #5281"
+  },
+  {
+   "tokenId": 1860,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": null,
+   "hiroCachedImage": null,
+   "name": null
+  },
+  {
+   "tokenId": 1984,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/1984.png",
+   "name": "Artie #919"
+  },
+  {
+   "tokenId": 2108,
+   "tokenUri": "ipfs://ipfs/QmWhLJ7D3xEGKUpDymxCWZRUj2VCZxaBC8Yfx6kZ5hLjBL/$TOKEN_ID.json",
+   "imageUrl": "ipfs://ipfs/Qmc3CRxZEf6ayPpJUyYUbrbN3gCqFekJpgiUoGYoRGaB7k",
+   "hiroCachedImage": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties/2108.png",
+   "name": "Artie #7128"
+  }
+ ],
+ "notes": "Contract principal taken from stacks.gamma.io/collections/arties and verified on-chain. Two other contracts named \"arties\" exist (SP3QSCWJWKBS1RT8BGFZTDY94VMNDP4P8SAC28SVD, SPBPHQQW8KBMS8B69RMSJWNM10WGBW21P0DV85NY, both ~block 35081/35463, just before this one); not used. NO IMAGES SAVED: every image/metadata host is blocked from this sandbox (see SUMMARY.md)."
+}

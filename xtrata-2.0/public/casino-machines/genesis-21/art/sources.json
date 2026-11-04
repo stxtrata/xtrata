@@ -1,0 +1,907 @@
+{
+ "generated": "2026-11-01T23:03Z",
+ "twins": [
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 354,
+   "xtrataId": "3483",
+   "file": "bitcoin-birds/354-3483.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/354-3483.png",
+   "originalSha256": "13e061f5a4601893024ac061f73291ebdfdef618724364f4fb4582b42b506f33",
+   "originalBytes": 2173,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3483",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 250,
+   "xtrataId": "3379",
+   "file": "bitcoin-birds/250-3379.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/250-3379.png",
+   "originalSha256": "933a4f127e1159943cd1038adb3bb178952461e8bfb8d2773f6a9dc5ef213d51",
+   "originalBytes": 6033,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3379",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 357,
+   "xtrataId": "3486",
+   "file": "bitcoin-birds/357-3486.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/357-3486.png",
+   "originalSha256": "760a9d193435be056d4ac9807f9857ee3a6d5436839c599701a89a943552f893",
+   "originalBytes": 2570,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3486",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 372,
+   "xtrataId": "3501",
+   "file": "bitcoin-birds/372-3501.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/372-3501.png",
+   "originalSha256": "c1fb3c24109fc9122f68521b6cce523569e88a6a97a17136cd3de563ab940cd6",
+   "originalBytes": 4112,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3501",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 59,
+   "xtrataId": "3188",
+   "file": "bitcoin-birds/59-3188.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/59-3188.png",
+   "originalSha256": "5687ab84775f046259851a0508d4017734705ff8900640bfa98eb6b7cd42cc77",
+   "originalBytes": 1904,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3188",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 193,
+   "xtrataId": "3322",
+   "file": "bitcoin-birds/193-3322.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/193-3322.png",
+   "originalSha256": "a37d9abf9d837d43f27208a18a0955c8d410e8e05a85a8681a71378a5d56a86e",
+   "originalBytes": 4623,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3322",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 385,
+   "xtrataId": "3514",
+   "file": "bitcoin-birds/385-3514.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/385-3514.png",
+   "originalSha256": "8e08c97d138799dd7078b220b55228a7fe7a93abe03194e7e7aeeb9a041c796f",
+   "originalBytes": 3849,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3514",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 397,
+   "xtrataId": "3526",
+   "file": "bitcoin-birds/397-3526.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/397-3526.png",
+   "originalSha256": "b65dd1ca761ba0956b3a8d3ec149cf9df3486380e6491b7d365bb6c39e9c88a4",
+   "originalBytes": 1964,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3526",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 158,
+   "xtrataId": "3287",
+   "file": "bitcoin-birds/158-3287.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/158-3287.png",
+   "originalSha256": "b01598d82fa2a6778e561594c054e1797d4f8247bab5ebff99e4b221e61296ef",
+   "originalBytes": 2070,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3287",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 244,
+   "xtrataId": "3373",
+   "file": "bitcoin-birds/244-3373.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/244-3373.png",
+   "originalSha256": "09a5138b9476863d8056484d7c2c25bef695350ade069a2a92360011c60d9200",
+   "originalBytes": 6176,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3373",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 210,
+   "xtrataId": "3339",
+   "file": "bitcoin-birds/210-3339.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/210-3339.png",
+   "originalSha256": "5503c6358ee5d0ed5a2736ba3a7d82d879609af0ef46dd8f06ea2de128896c66",
+   "originalBytes": 4758,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3339",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 191,
+   "xtrataId": "3320",
+   "file": "bitcoin-birds/191-3320.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/191-3320.png",
+   "originalSha256": "5dd5eec09c6337d48236a2bbbe20c14b2be56d225c71465d86254e039419a918",
+   "originalBytes": 4684,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3320",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 253,
+   "xtrataId": "3382",
+   "file": "bitcoin-birds/253-3382.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/253-3382.png",
+   "originalSha256": "9ef88dfd5a3f1b315871daa62a9eb1281e0a433984306f1c097c7705ce139cda",
+   "originalBytes": 2264,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3382",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 226,
+   "xtrataId": "3355",
+   "file": "bitcoin-birds/226-3355.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/226-3355.png",
+   "originalSha256": "afaf99630b750752fe71fdc2dc4ceab8a84a6a289e9a62265b2412cd025a163a",
+   "originalBytes": 4591,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3355",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 370,
+   "xtrataId": "3499",
+   "file": "bitcoin-birds/370-3499.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/370-3499.png",
+   "originalSha256": "1ae8626e420c3c32d01d06c7df247257d32f4fa503ba652da0982722d268fe4f",
+   "originalBytes": 2289,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3499",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 217,
+   "xtrataId": "3346",
+   "file": "bitcoin-birds/217-3346.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/217-3346.png",
+   "originalSha256": "0f401146447f71062714568126629596610c21119635f0c2d07b6deea6c660ed",
+   "originalBytes": 5201,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3346",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 236,
+   "xtrataId": "3365",
+   "file": "bitcoin-birds/236-3365.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/236-3365.png",
+   "originalSha256": "4a7267f275513959cb19c9886d570f5422b18a9da11e90304012993cd3a26a03",
+   "originalBytes": 6157,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3365",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Bitcoin Birds",
+   "tokenId": 241,
+   "xtrataId": "3370",
+   "file": "bitcoin-birds/241-3370.webp",
+   "format": "lossless",
+   "originalFile": "bitcoin-birds/241-3370.png",
+   "originalSha256": "ad7206b601fc9e273bc7dd04fd7c6504c9daac6fb3490fdada46eaf27ef10f83",
+   "originalBytes": 6114,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3370",
+   "srcSize": [
+    100,
+    100
+   ]
+  },
+  {
+   "collection": "Megapont Ape Club",
+   "tokenId": 3,
+   "xtrataId": "3104",
+   "file": "megapont-ape-club/3-3104.webp",
+   "format": "lossy q90",
+   "originalFile": "megapont-ape-club/3-3104.jpg",
+   "originalSha256": "9882ab2cad9b1c30ac2453c31c23ef0e79cb391e59a2190c8b9f61fee1fa96f6",
+   "originalBytes": 5598,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3104",
+   "srcSize": [
+    400,
+    400
+   ]
+  },
+  {
+   "collection": "Megapont Ape Club",
+   "tokenId": 4,
+   "xtrataId": "3107",
+   "file": "megapont-ape-club/4-3107.webp",
+   "format": "lossy q90",
+   "originalFile": "megapont-ape-club/4-3107.jpg",
+   "originalSha256": "d44783cc571cb05e2d7d63f016fa2e95e39ef03f9ea65120cd4211d65691ed24",
+   "originalBytes": 5892,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3107",
+   "srcSize": [
+    400,
+    400
+   ]
+  },
+  {
+   "collection": "Megapont Ape Club",
+   "tokenId": 871,
+   "xtrataId": "3544",
+   "file": "megapont-ape-club/871-3544.webp",
+   "format": "lossy q90",
+   "originalFile": "megapont-ape-club/871-3544.jpg",
+   "originalSha256": "3029d6573e826cea1f0a4815613f830733b815d2818afe1febadb72dc5d84070",
+   "originalBytes": 5315,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3544",
+   "srcSize": [
+    400,
+    400
+   ]
+  },
+  {
+   "collection": "Megapont Ape Club",
+   "tokenId": 5,
+   "xtrataId": "3108",
+   "file": "megapont-ape-club/5-3108.webp",
+   "format": "lossy q90",
+   "originalFile": "megapont-ape-club/5-3108.jpg",
+   "originalSha256": "921e56466be743d1cfe09d10182a769b394f9515180a1354ed83d7c4260b52a6",
+   "originalBytes": 4272,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3108",
+   "srcSize": [
+    400,
+    400
+   ]
+  },
+  {
+   "collection": "Megapont Ape Club",
+   "tokenId": 1,
+   "xtrataId": "3106",
+   "file": "megapont-ape-club/1-3106.webp",
+   "format": "lossy q90",
+   "originalFile": "megapont-ape-club/1-3106.jpg",
+   "originalSha256": "ccf950949d56edab4eaa7f5083a4a2fa0f27d0ee193d97b0d05f6566115ff6fa",
+   "originalBytes": 4967,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3106",
+   "srcSize": [
+    400,
+    400
+   ]
+  },
+  {
+   "collection": "Megapont Ape Club",
+   "tokenId": 2,
+   "xtrataId": "3105",
+   "file": "megapont-ape-club/2-3105.webp",
+   "format": "lossy q90",
+   "originalFile": "megapont-ape-club/2-3105.jpg",
+   "originalSha256": "0fea2eb84bc0288a4f2b9424e6a6a441c039184355a074b3d98fe9ee34664fe2",
+   "originalBytes": 4975,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3105",
+   "srcSize": [
+    400,
+    400
+   ]
+  },
+  {
+   "collection": "Bitcoin Monkeys",
+   "tokenId": 1295,
+   "xtrataId": "3116",
+   "file": "bitcoin-monkeys/1295-3116.webp",
+   "format": "lossy q90",
+   "originalFile": "bitcoin-monkeys/1295-3116.jpg",
+   "originalSha256": "98fc738aea950fcbd400683556713b59264c8b9c815a8c7bc921bd5f77870008",
+   "originalBytes": 6351,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3116",
+   "srcSize": [
+    1794,
+    1794
+   ]
+  },
+  {
+   "collection": "Bitcoin Monkeys",
+   "tokenId": 1282,
+   "xtrataId": "3115",
+   "file": "bitcoin-monkeys/1282-3115.webp",
+   "format": "lossy q90",
+   "originalFile": "bitcoin-monkeys/1282-3115.jpg",
+   "originalSha256": "6ba94a1f853bf039a167ad6daa90ca99385b625ebb8e920304cde59d18c05572",
+   "originalBytes": 5845,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3115",
+   "srcSize": [
+    1794,
+    1794
+   ]
+  },
+  {
+   "collection": "Bitcoin Monkeys",
+   "tokenId": 1296,
+   "xtrataId": "3117",
+   "file": "bitcoin-monkeys/1296-3117.webp",
+   "format": "lossy q90",
+   "originalFile": "bitcoin-monkeys/1296-3117.jpg",
+   "originalSha256": "db5d7c629a4ffe0f2b81b38f627e417af6b3164411afb50b0303e3f14b4ddcf7",
+   "originalBytes": 6534,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3117",
+   "srcSize": [
+    1794,
+    1794
+   ]
+  },
+  {
+   "collection": "Bitcoin Monkeys",
+   "tokenId": 1012,
+   "xtrataId": "3114",
+   "file": "bitcoin-monkeys/1012-3114.webp",
+   "format": "lossy q90",
+   "originalFile": "bitcoin-monkeys/1012-3114.jpg",
+   "originalSha256": "30b1e2efcd018c4704441cb6b07ae0eb8f8c8d48e58609bc7492d00544cd0725",
+   "originalBytes": 7079,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3114",
+   "srcSize": [
+    1794,
+    1794
+   ]
+  },
+  {
+   "collection": "Bitcoin Monkeys",
+   "tokenId": 378,
+   "xtrataId": "3118",
+   "file": "bitcoin-monkeys/378-3118.webp",
+   "format": "lossy q90",
+   "originalFile": "bitcoin-monkeys/378-3118.jpg",
+   "originalSha256": "ddf09cc6c71d9593521ad52e1fcd9e3e766df4d3fdfe59c43a812d15769c21db",
+   "originalBytes": 6401,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3118",
+   "srcSize": [
+    1794,
+    1794
+   ]
+  },
+  {
+   "collection": "Bitcoin Monkeys",
+   "tokenId": 2,
+   "xtrataId": "3113",
+   "file": "bitcoin-monkeys/2-3113.webp",
+   "format": "lossy q90",
+   "originalFile": "bitcoin-monkeys/2-3113.jpg",
+   "originalSha256": "d13a8fbdbe530c587a7fc0fc7b882465b8ac0e2bddbc2516f08e72e1a7d0cc50",
+   "originalBytes": 6153,
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3113",
+   "srcSize": [
+    1794,
+    1794
+   ]
+  }
+ ],
+ "nftCandidates": {
+  "arties": {
+   "contract": "SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties",
+   "verifiedOnChain": {
+    "blockHeight": 35466,
+    "canonical": true,
+    "deployedUtc": "2021-10-27T20:38:26.000Z",
+    "txId": "0x0c6e900abbb06197bf58ca37ca2d42a08bad6411ef599dae86f6b6283aeba0e1"
+   },
+   "tokens": 18
+  },
+  "satoshe": {
+   "contract": "SP248HH800501WYSG7Z2SS1ZWHQW1GGH85ME34NT2.layer-v1-1",
+   "verifiedOnChain": {
+    "blockHeight": 40649,
+    "canonical": true,
+    "deployedUtc": "2021-12-07T15:21:48.000Z",
+    "txId": "0x8584bbe8238a791767f7f5a80ad3ac4519098031fda168d6189439759c76ea6e",
+    "totalMintsInContract": 6183
+   },
+   "tokens": 19
+  },
+  "satoshibles": {
+   "contract": "SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles",
+   "verifiedOnChain": {
+    "blockHeight": 47486,
+    "canonical": true,
+    "deployedUtc": "2022-02-04T01:41:53.000Z",
+    "txId": "0x4e5eea8be2c5b956bba7d767498d9bf4fdb1723563d2b2fedc7f45f1a2ec08ca"
+   },
+   "tokens": 18
+  },
+  "stacks-punks": {
+   "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3",
+   "verifiedOnChain": {
+    "blockHeight": 26664,
+    "canonical": true,
+    "deployedUtc": "2021-08-20T16:36:48.000Z",
+    "txId": "0x9f0b6777365d4d04fbe9f6c68cbdb84e41bb8c023adca8e38ebe48c6c2d685e2"
+   },
+   "tokens": 18
+  },
+  "this-is-1": {
+   "contract": "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.thisisnumberone-v2",
+   "verifiedOnChain": {
+    "blockHeight": 15309,
+    "canonical": true,
+    "deployedUtc": "2021-05-16T09:32:12.000Z",
+    "txId": "0x7fda9151a5749a1c2e763ed773002ac5b46186ae09e8e3c523541fcae20c9a66"
+   },
+   "tokens": 18
+  },
+  "boomboxes": {
+   "contract": "SP497E7RX3233ATBS2AB9G4WTHB63X5PBSP5VGAQ.boomboxes-cycle-12",
+   "verifiedOnChain": {
+    "blockHeight": 20185,
+    "canonical": true,
+    "deployedUtc": "2021-07-01T15:51:04.000Z",
+    "txId": "0x5d8f968111be4556a13d8d0d25f39d998a749a982d673ae6ba7180ee7ccf1f62"
+   },
+   "tokens": 18
+  }
+ },
+ "chain": {
+  "source": "https://xtrata.xyz/hiro/mainnet/extended/v2/blocks/<height>",
+  "fetchedAt": "2026-11-01T15:56:58.253Z",
+  "blocks": 150,
+  "note": "Stacks blocks 1-150 from the Hiro API via xtrata.xyz/hiro proxy"
+ },
+ "logosNeedingPermission": [],
+ "imagesNotFound": [
+  {
+   "collection": "Arties (Open Art Source)",
+   "contract": "SP2BE8TZATXEVPGZ8HAFZYE5GKZ02X0YDKAN7ZTGW.arties",
+   "reason": "image/metadata hosts blocked from the build sandbox; resolved live in the browser at runtime, placeholder tile until then"
+  },
+  {
+   "collection": "SatoSHE (UNVERIFIED mapping to HeyLayer collection #1)",
+   "contract": "SP248HH800501WYSG7Z2SS1ZWHQW1GGH85ME34NT2.layer-v1-1",
+   "reason": "image/metadata hosts blocked from the build sandbox; resolved live in the browser at runtime, placeholder tile until then"
+  },
+  {
+   "collection": "Satoshibles",
+   "contract": "SP6P4EJF0VG8V0RB3TQQKJBHDQKEF6NVRD1KZE3C.satoshibles",
+   "reason": "image/metadata hosts blocked from the build sandbox; resolved live in the browser at runtime, placeholder tile until then"
+  },
+  {
+   "collection": "Stacks Punks (v3)",
+   "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.stacks-punks-v3",
+   "reason": "image/metadata hosts blocked from the build sandbox; resolved live in the browser at runtime, placeholder tile until then"
+  },
+  {
+   "collection": "This Is #1 (thisisnumberone-v2)",
+   "contract": "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.thisisnumberone-v2",
+   "reason": "image/metadata hosts blocked from the build sandbox; resolved live in the browser at runtime, placeholder tile until then"
+  },
+  {
+   "collection": "Boomboxes (cycle 12)",
+   "contract": "SP497E7RX3233ATBS2AB9G4WTHB63X5PBSP5VGAQ.boomboxes-cycle-12",
+   "reason": "image/metadata hosts blocked from the build sandbox; resolved live in the browser at runtime, placeholder tile until then"
+  }
+ ],
+ "twinsFolder": "art/twins/ (each \"file\" in \"twins\" is relative to it). All twin images are WebP: the PNG pixel art is lossless (pixel-identical, checked), the JPEG art is lossy q90. originalFile/originalSha256 record the file as fetched from xtrata.xyz.",
+ "brand": [
+  {
+   "file": "art/brand/xtrata-logo.svg",
+   "use": "Xtrata mark on the cabinet door texture and in the game header",
+   "origin": "Brand assets in the series bible (claude/machine-series/brand/xtrata-logo.svg), used exactly as supplied: not redrawn, recoloured, stretched or cropped",
+   "permission": "Jim's own mark, no permission needed"
+  },
+  {
+   "file": "art/brand/parallax-casino-wordmark.svg",
+   "use": "Small wordmark in the test page header only (smaller than the machine name)",
+   "origin": "Brand assets in the series bible (claude/machine-series/brand/parallax-casino-wordmark.svg), exactly as supplied",
+   "permission": "Jim's own mark, no permission needed"
+  },
+  {
+   "file": "art/brand/this-is-1-logo.svg",
+   "use": "The #1 logo: the face of the This Is #1 symbol until its token art loads, and on the Jackpot: Number One intro",
+   "origin": "https://thisisnumberone.com/wp-content/themes/thisisnumberone/files/images/thisisnumberone/1-colour.svg, byte for byte (2,084 bytes), not redrawn, recoloured, stretched or cropped",
+   "permission": "Jim says it may be used (This Is #1 is his collection); confirmed in chat 2026-11-01"
+  }
+ ],
+ "thisIs1": {
+  "about": "Real This Is #1 art, loaded live by the game from thisisnumberone.com (the site allows cross-origin image loading; checked from another origin on 2026-11-01, each file returned 200 with the sizes below). Not bundled in the file: they load when the game starts. The five Genesis NFTs are the power symbols (drawn 8x as often as the rest). Shown grey with NOT YET FOREVER like any Stacks NFT without a twin.",
+  "pageList": "https://thisisnumberone.com/collections/",
+  "loadedLive": [
+   {
+    "collection": "the-genesis-collection",
+    "collectionTitle": "The Genesis Collection",
+    "name": "Channel #1",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/Orbital_Cover_1080-1024x1024.jpg",
+    "power": true,
+    "type": "image/jpeg",
+    "kb": 30,
+    "w": 1024,
+    "h": 1024
+   },
+   {
+    "collection": "the-genesis-collection",
+    "collectionTitle": "The Genesis Collection",
+    "name": "This Is Number One",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/CX_Cover_1080-1024x1024.jpg",
+    "power": true,
+    "type": "image/jpeg",
+    "kb": 307,
+    "w": 1024,
+    "h": 1024
+   },
+   {
+    "collection": "the-genesis-collection",
+    "collectionTitle": "The Genesis Collection",
+    "name": "Mine",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/Cara_Cover_1080-1024x1024.jpg",
+    "power": true,
+    "type": "image/jpeg",
+    "kb": 82,
+    "w": 1024,
+    "h": 1024
+   },
+   {
+    "collection": "the-genesis-collection",
+    "collectionTitle": "The Genesis Collection",
+    "name": "So Why Try Harder",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/Fatboy_Slim_Cover_1080-1024x1024.jpg",
+    "power": true,
+    "type": "image/jpeg",
+    "kb": 45,
+    "w": 1024,
+    "h": 1024
+   },
+   {
+    "collection": "the-genesis-collection",
+    "collectionTitle": "The Genesis Collection",
+    "name": "Now Is Not Enough (For)",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/04/Dave_Stewart_Cover_1080-1024x1024.jpg",
+    "power": true,
+    "type": "image/jpeg",
+    "kb": 95,
+    "w": 1024,
+    "h": 1024
+   },
+   {
+    "collection": "no1-smiley",
+    "collectionTitle": "No.1 Smiley",
+    "name": "No.1 Smiley",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/No1._Smiley-1024x1024.jpg",
+    "power": false,
+    "type": "image/jpeg",
+    "kb": 172,
+    "w": 1024,
+    "h": 1024
+   },
+   {
+    "collection": "hash_1",
+    "collectionTitle": "Hash One Collection",
+    "name": "Hash One #5",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_5.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 16,
+    "w": 2000,
+    "h": 2000
+   },
+   {
+    "collection": "hash_1",
+    "collectionTitle": "Hash One Collection",
+    "name": "Hash One #14",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_14.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 16,
+    "w": 2000,
+    "h": 2000
+   },
+   {
+    "collection": "hash_1",
+    "collectionTitle": "Hash One Collection",
+    "name": "Hash One #18",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_18.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 16,
+    "w": 2000,
+    "h": 2000
+   },
+   {
+    "collection": "hash_1",
+    "collectionTitle": "Hash One Collection",
+    "name": "Hash One #23",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_23.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 16,
+    "w": 2000,
+    "h": 2000
+   },
+   {
+    "collection": "hash_1",
+    "collectionTitle": "Hash One Collection",
+    "name": "Hash One #27",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/HASH_ONE_27.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 16,
+    "w": 2000,
+    "h": 2000
+   },
+   {
+    "collection": "love-hirsts-mdma",
+    "collectionTitle": "Love Hirsts MDMA",
+    "name": "Love Hirsts MDMA #1",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Love_Hirsts_MDMA_0001.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 339,
+    "w": 1080,
+    "h": 1080
+   },
+   {
+    "collection": "love-hirsts-mdma",
+    "collectionTitle": "Love Hirsts MDMA",
+    "name": "Love Hirsts MDMA #2",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Love_Hirsts_MDMA_0002.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 128,
+    "w": 1080,
+    "h": 1080
+   },
+   {
+    "collection": "zoom",
+    "collectionTitle": "Zoom",
+    "name": "Zoom #1",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Copy-of-1.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 343,
+    "w": 1984,
+    "h": 1984
+   },
+   {
+    "collection": "zoom",
+    "collectionTitle": "Zoom",
+    "name": "Zoom #2",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Copy-of-2.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 370,
+    "w": 1984,
+    "h": 1984
+   },
+   {
+    "collection": "face-your-head",
+    "collectionTitle": "Face Your Head",
+    "name": "Face Your Head #24",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Copy-of-Expressions-of-Change-24.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 493,
+    "w": 2000,
+    "h": 2000
+   },
+   {
+    "collection": "feel-up",
+    "collectionTitle": "Feel Up",
+    "name": "Feel Up #4",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Grace-NFT-4.jpg",
+    "power": false,
+    "type": "image/jpeg",
+    "kb": 128,
+    "w": 1000,
+    "h": 1000
+   },
+   {
+    "collection": "sexy",
+    "collectionTitle": "$\u20acX\u00a5",
+    "name": "$\u20acX\u00a5",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/EX%C2%A5_011-1024x1024.jpg",
+    "power": false,
+    "type": "image/jpeg",
+    "kb": 42,
+    "w": 1024,
+    "h": 1024
+   },
+   {
+    "collection": "brandx",
+    "collectionTitle": "BrandX Series",
+    "name": "BrandX",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/07/BrandX.jpg",
+    "power": false,
+    "type": "image/jpeg",
+    "kb": 169,
+    "w": 800,
+    "h": 800
+   },
+   {
+    "collection": "xlove",
+    "collectionTitle": "XLove",
+    "name": "XLove",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/XLove_28-1024x1024.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 333,
+    "w": 1024,
+    "h": 1024
+   },
+   {
+    "collection": "game-on",
+    "collectionTitle": "Game On",
+    "name": "Game On",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/09/GameOnFinal02.jpg",
+    "power": false,
+    "type": "image/jpeg",
+    "kb": 147,
+    "w": 800,
+    "h": 800
+   },
+   {
+    "collection": "crash_punks",
+    "collectionTitle": "Crash Punks",
+    "name": "Crash Punks",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/2279.png",
+    "power": false,
+    "type": "image/png",
+    "kb": 529,
+    "w": 1024,
+    "h": 1024
+   },
+   {
+    "collection": "singularity",
+    "collectionTitle": "Singularity",
+    "name": "Singularity",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/05/Singularity_X1.jpg",
+    "power": false,
+    "type": "image/jpeg",
+    "kb": 79,
+    "w": 400,
+    "h": 400
+   },
+   {
+    "collection": "the-genesis-collection",
+    "collectionTitle": "The Genesis Collection",
+    "name": "The Genesis Collection",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/09/Genesis.jpg",
+    "power": false,
+    "type": "image/jpeg",
+    "kb": 134,
+    "w": 800,
+    "h": 800
+   },
+   {
+    "collection": "narcotix",
+    "collectionTitle": "NarcotiX",
+    "name": "NarcotiX",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2023/02/NarcotiX_800.gif",
+    "power": false,
+    "type": "image/gif",
+    "kb": 4081,
+    "w": 800,
+    "h": 800
+   }
+  ],
+  "foundButNotLoaded": [
+   {
+    "collection": "the-smiley-collection",
+    "collectionTitle": "The Smiley Collection",
+    "name": "Smiley X Yellow",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/03/Smiley_X_Yellow_1.gif",
+    "type": "image/gif",
+    "kb": 4097,
+    "reason": "animated GIF of several MB: too heavy to load on the reels"
+   },
+   {
+    "collection": "the-smiley-collection",
+    "collectionTitle": "The Smiley Collection",
+    "name": "Smiley Twist White",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/09/Smiley_Twist_White.gif",
+    "type": "image/gif",
+    "kb": 3325,
+    "reason": "animated GIF of several MB: too heavy to load on the reels"
+   },
+   {
+    "collection": "the-smiley-collection",
+    "collectionTitle": "The Smiley Collection",
+    "name": "Smiley Tile Red",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/03/Smiley_Tile_Red_1.gif",
+    "type": "image/gif",
+    "kb": 4236,
+    "reason": "animated GIF of several MB: too heavy to load on the reels"
+   },
+   {
+    "collection": "dyle_one",
+    "collectionTitle": "DYLE_ONE",
+    "name": "DYLE_ONE",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2022/09/dyle_one_promo_900x900_10fps.gif",
+    "type": "image/gif",
+    "kb": 3180,
+    "reason": "animated GIF of several MB: too heavy to load on the reels"
+   },
+   {
+    "collection": "zoom",
+    "collectionTitle": "Zoom",
+    "name": "Zoom (animated cover)",
+    "url": "https://thisisnumberone.com/wp-content/uploads/2023/04/Pinky-Placeholder.gif",
+    "type": "image/gif",
+    "kb": 1418,
+    "reason": "animated GIF of several MB: too heavy to load on the reels"
+   }
+  ]
+ },
+ "logosNote": "Logos used: the Xtrata mark and ParallaX wordmark (Jim's own) and the #1 logo (Jim says it may be used). No Stacks, Bitcoin, Gamma, Boom or other collection logos are used anywhere. The reels show token art only; names are set in plain type. If Jim adds another logo later it must be listed here first."
+}
