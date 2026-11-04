@@ -252,6 +252,57 @@ XVIEW_PATCHES = [
 ]
 
 
+# Step 7 (2026-11-04, CASINO-CHESS-PLAN section 12): results the room decides, the leaving rule, spectator bets. Applied after step 6, only once.
+# Chess only; the Salon's Hold'em and Liar's Dice keep their chain and their rules. With a room that lists `cres`, the room holds the
+# stakes, so this page takes nothing from its bank for a chess game and does not refund one; an older room keeps today's behaviour.
+BET_MARK = 'PXChess.onRoom'
+BET_PATCHES = [
+    # a game starts: chess uses its own chain (chess.js: catch-up, resend, resume), and a room-held stake is not taken from the bank here
+    ("    function begin({ host, other, otherName, stake }) {\n"
+     "      if (bank < stake) { toast('Not enough LAYR for that game.'); if (host) tell(other, { k: 'busy' }); return null; }\n"
+     "      setBank(bank - stake);\n"
+     "      const chain = PvpCore.makeRelayChain({ host, me: me(), other, send: (d) => tell(other, d), blockMs: kind === 'chess' ? 1500 : undefined });\n"
+     "      const opts = kind === 'dice' ? { me: me(), opp: other, oppName: otherName, stake } : { me: me(), opp: other, oppName: otherName, buyin: stake };\n",
+     "    function begin({ host, other, otherName, stake, resume }) {\n"
+     "      // chess with a room that holds the stakes and decides the result (cres): this page takes nothing from its bank; the room does, and says so in bal\n"
+     "      const held = kind === 'chess' && !!window.PXChess && PXChess.roomSettles();\n"
+     "      if (!resume && bank < stake) { toast('Not enough LAYR for that game.'); if (host) tell(other, { k: 'busy' }); return null; }\n"
+     "      if (!held) setBank(bank - stake);\n"
+     "      const chain = kind === 'chess' ? PXChess.makeChain({ host, me: me(), other, send: (d) => tell(other, d), blockMs: 1500, resume }) : PvpCore.makeRelayChain({ host, me: me(), other, send: (d) => tell(other, d) });\n"
+     "      const opts = kind === 'dice' ? { me: me(), opp: other, oppName: otherName, stake } : kind === 'chess' ? { me: me(), opp: other, oppName: otherName, buyin: stake, tb, host, roomHeld: held } : { me: me(), opp: other, oppName: otherName, buyin: stake };\n"),
+    ("      if (host) (kind === 'dice' ? session.open({ stake, turn: 60 })",
+     "      if (host && !resume) (kind === 'dice' ? session.open({ stake, turn: 60 })"),
+    # nothing of ours to give back when the room holds the stake
+    ("    function abandon(why) {\n      const m = L.match; if (!m) return;\n",
+     "    function abandon(why) {\n      const m = L.match; if (!m) return;\n"
+     "      if (m.session.roomHeld) { L.refunded = true; if (why) toast(why); finish(); return; }   // chess, room-held stakes: nothing to return from here\n"),
+    # the leaving rule is the room's: the chain catches up by itself, and the room decides if someone has gone for good
+    ("      if (m.chain.dead === 'gap') abandon('The connection to your opponent broke.');",
+     "      if (m.session.roomHeld) { } else if (m.chain.dead === 'gap') abandon('The connection to your opponent broke.');"),
+    ("if (L.match && L.match.other === m.a) abandon('Your opponent left the room.');",
+     "if (L.match && L.match.other === m.a && !L.match.session.roomHeld) abandon('Your opponent left the room.');"),
+    ("if (L.match && L.match.other === from) abandon('Your opponent left the game.');",
+     "if (L.match && L.match.other === from && !L.match.session.roomHeld) abandon('Your opponent left the game.');"),
+    # chess's catch-up messages (resend, blocks) go to its own chain
+    ("      else if (d.k === 'block') L.match.chain.fromHost(d);\n    });",
+     "      else if (d.k === 'block') L.match.chain.fromHost(d);\n      else if (L.match.chain.onPeer) L.match.chain.onPeer(d);\n    });"),
+    # carry on a chess game after a reload (chess.js keeps the calls so far in this browser)
+    ("    L.finish = finish; L.abandon = abandon;",
+     "    L.finish = finish; L.abandon = abandon;\n"
+     "    L.resume = (r) => { if (kind !== 'chess' || !live() || L.match || !window.PXChess || !PXChess.roomSettles() || me() !== r.me) return null; return begin({ host: !!r.host, other: r.other, otherName: r.otherName || 'Opponent', stake: r.stake || 0, resume: r }); };"),
+    # the room's clock, for the bets countdown
+    ("roomMe: () => shared.me, ownsTouch: true,",
+     "roomMe: () => shared.me, roomNow: () => shared.now(), ownsTouch: true,"),
+    # the room's messages about a chess game (results, leaving, bets) go to chess.js
+    ("          case 'spec': if (window.PXChess) PXChess.onSpec(m); return;   // a chess game being watched (chess.js)",
+     "          case 'spec': if (window.PXChess) PXChess.onSpec(m); return;   // a chess game being watched (chess.js)\n"
+     "          case 'cres': case 'cgone': case 'cend': case 'cbet': case 'cpool': case 'cpay': if (window.PXChess && PXChess.onRoom) PXChess.onRoom(m); return;   // results, leaving and spectator bets (chess.js)"),
+    ("            shared.err(m.code);\n            return;",
+     "            if (/^c(bet|res)-/.test(m.code || '') && window.PXChess && PXChess.onRoom) PXChess.onRoom(m);\n            shared.err(m.code);\n            return;"),
+    ('chess.js?v=c6"', 'chess.js?v=c7"'),
+]
+
+
 def chess_version(s):
     import re
     m = re.search(r'chess\.js\?v=c(\d+)"', s)
@@ -270,6 +321,8 @@ def apply(s):
         s = run(s, LOOK_PATCHES); done.append('sofas, seat heights, free look')
     if AIM_MARK not in s:
         s = run(s, AIM_PATCHES); done.append('look direction, mouse aim at chess')
+    if BET_MARK not in s:
+        s = run(s, BET_PATCHES); done.append('results from the room, the leaving rule, spectator bets')
     if XVIEW_MARK not in s:
         s = run(s, XVIEW_PATCHES); done.append('the X-Chess view')
     return s, done
