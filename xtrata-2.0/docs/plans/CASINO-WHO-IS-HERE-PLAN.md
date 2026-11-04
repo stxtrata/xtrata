@@ -56,12 +56,15 @@ Three cases, three fixes:
    nothing), and notes the time. Whenever the room is awake it closes any connection not heard from for 90 seconds; a check once a
    minute (an alarm, only while someone is connected) makes sure this also happens in a quiet room. Result: a vanished player
    disappears from everyone's room within about 1½ minutes, and their seat or machine is free again.
-2. **The tab is in the background** (another app, another tab, a locked phone that still runs). After 5 minutes hidden, the page
-   leaves the room itself: seat freed, name tag gone, listed as gone. When the player comes back, it rejoins straight away with
-   the same session (no new signature for 4 hours) and they can sit down again.
-3. **The tab is open but nobody is using it.** After 20 minutes with no touch, click, key or walking, the player is marked
-   "away" (shown in the list, name tag dimmed) and stood up from any seat or machine. After 30 minutes they leave the room, with a
-   "You were away. Rejoin" message waiting for them. Playing a machine on autoplay counts as using it.
+2. **The tab is in the background** (another app, another tab, a locked phone that still runs). *Changed 2026-11-04 (Jim: someone
+   standing in the room with the tab open should stay seen and be messageable).* A signed-in player is marked "away" after 5 minutes
+   hidden (dimmed tag, stood up so no seat is held) and stays in the room; coming back clears it. A guest (nobody sees them) still
+   leaves the room after 5 minutes hidden. Before 2026-11-04 every tab left after 5 minutes hidden.
+3. **The tab is open but nobody is using it.** After 20 minutes with no touch, click, key or walking, a signed-in player is marked
+   "away" (shown in the list, name tag dimmed) and stood up from any seat or machine, and stays visible. They leave the room only
+   after **4 hours** with no activity at all (about the length of the sign-in session, so coming back may ask them to sign in
+   again), with a "You were away. Rejoin" message waiting. A guest leaves after 30 minutes idle. (Before 2026-11-04 everyone left
+   after 30 minutes.) Playing a machine on autoplay counts as using it.
 
 The player's own Leave button and closing the tab work exactly as now (immediately).
 
@@ -89,8 +92,9 @@ wakes the room for a few milliseconds: about 1,440 short wakes a day at most. No
 
 ## 5. Decisions for Jim
 
-1. **Timings:** gone after 90 s without a heartbeat; leave after **5 minutes** in the background; away after **20 minutes** idle
-   and leave after **30** (recommended). Shorter or longer?
+1. **Timings:** gone after 90 s without a heartbeat; away after **5 minutes** in the background or **20 minutes** idle; leave
+   after **4 hours** without activity (signed in; guests 5 minutes hidden / 30 idle). Decided by Jim 2026-11-04. Open: raise the 90 s
+   heartbeat limit (about 3 minutes) so a long-hidden tab whose timers the browser slows is not dropped by mistake (a worker change).
 2. **Your name on the Room button** (recommended), or only inside the panel?
 3. **Here now in the Room panel** (recommended), or a separate always-visible list down the side of the screen (busier, and on a
    phone it would cover the room)?

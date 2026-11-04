@@ -119,11 +119,12 @@ const S = {
   introSeen: false                    // the welcome card has shown while the room was on: no separate arrival panel
 };
 
-/** Heartbeat, leave after this long in the background, away after this long idle, leave after this long idle. `?roomtimes=a,b,c,d`
- *  (milliseconds) shortens them for a test. */
+/** Heartbeat; away after this long in the background; away after this long idle on a visible tab; leave after this long without any
+ *  activity (signed-in players: they stay visible, dimmed and stood up, until then; Jim, 2026-11-04); and how long a guest (nobody can
+ *  see them) may sit in the background or idle before the tab leaves. `?roomtimes=a,b,c,d` (milliseconds) shortens them for a test. */
 const HERE = (() => {
-  const t = { beat: 30_000, hide: 5 * 60_000, away: 20 * 60_000, leave: 30 * 60_000 };
-  try { const m = /[?&]roomtimes=(\d+),(\d+),(\d+),(\d+)/.exec(location.search); if (m) { t.beat = +m[1]; t.hide = +m[2]; t.away = +m[3]; t.leave = +m[4]; } } catch { /* no location */ }
+  const t = { beat: 30_000, hide: 5 * 60_000, away: 20 * 60_000, leave: 4 * 60 * 60_000, guest: 30 * 60_000 };
+  try { const m = /[?&]roomtimes=(\d+),(\d+),(\d+),(\d+)/.exec(location.search); if (m) { t.beat = +m[1]; t.hide = +m[2]; t.away = +m[3]; t.leave = +m[4]; t.guest = Math.min(t.guest, +m[4]); } } catch { /* no location */ }
   return t;
 })();
 
@@ -346,10 +347,16 @@ const hereTick = () => {
     try { S.ws.send('ping'); } catch { /* closing */ }     // a bare ping: the room answers it without waking
   }
   if (S.parked) return;
-  if (document.hidden) { if (S.hiddenAt && now - S.hiddenAt > HERE.hide) park('hidden'); return; }
   const idle = now - S.lastActive, signedIn = !!(S.signed && S.you && !S.you.guest);
+  const hiddenFor = document.hidden && S.hiddenAt ? now - S.hiddenAt : 0;
+  if (!signedIn) {                    // a guest is seen by nobody: the tab leaves after a while in the background, or idle
+    if (hiddenFor > HERE.hide) park('hidden'); else if (idle > HERE.guest) park('idle');
+    return;
+  }
+  // signed in: stays in the room, visible. Away (dimmed, stood up, so no seat is held) after a while in the background or idle; the
+  // tab only leaves after a long time without any activity (the session is about that long, so coming back may ask to sign in again)
   if (idle > HERE.leave) park('idle');
-  else if (signedIn && !S.away && idle > HERE.away && S.features.includes('here')) setAway(true);
+  else if (!S.away && S.features.includes('here') && (hiddenFor > HERE.hide || idle > HERE.away)) setAway(true);
 };
 
 const retry = () => {

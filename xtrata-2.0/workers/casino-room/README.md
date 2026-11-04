@@ -303,10 +303,10 @@ The Salon (player-versus-player Hold'em and Liar's Dice, behind the arch) is for
 - **Away.** `{t:'away', on}` from a signed-in player: `on` stands them up and marks them away; everyone who can see the room gets
   `{t:'away', a, on}`, and `players` in the `room` message carries `aw: true`. A player counts as away only while every tab of
   theirs is. Refusal: `away-sign-in-first`.
-- **The client** (room.js) sends the heartbeat; marks the player away after 20 minutes without a tap, key, step or spin (the page
-  stands them up, and everyone sees their tag go grey with "away"); leaves the room after 30 minutes idle or 5 minutes in the
-  background; and rejoins with the same session (no new signature) as soon as they are back. `?roomtimes=beat,hide,away,leave`
-  (milliseconds) shortens these for a test. The Room button shows the name you are in as; the Room panel shows "Connected as" and
+- **The client** (room.js) sends the heartbeat; marks a signed-in player away after 20 minutes without a tap, key, step or spin, or 5 minutes
+  in the background (the page stands them up, and everyone sees their tag go grey with "away"; they stay in the room); leaves the
+  room after 4 hours without activity (a guest: 5 minutes in the background or 30 idle); and rejoins with the same session (no new
+  signature while it lasts) as soon as they are back. `?roomtimes=beat,hide,away,leave` (milliseconds) shortens these for a test. The Room button shows the name you are in as; the Room panel shows "Connected as" and
   Here now (everyone signed in and where they are; a tap opens their card).
 - Tests: `functions/lib/__tests__/casino-room-here.test.ts`, and the "who is here" cases in `functions/__tests__/casino-room-e2e.test.ts`
   (they run when `ROOM_E2E_STALE_MS` is set to the Worker's `CASINO_ROOM_STALE_MS`, for example 3000).
