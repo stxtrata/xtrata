@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ROTATION_MACHINES } from '../casino-machines';
 import {
   CASINO_COLUMNS,
   CASINO_INSERT_SQL,
@@ -142,7 +143,7 @@ describe('validateEvent: spin', () => {
   });
 
   it('accepts every game machine', () => {
-    for (const m of ['bf', 'drop', 'twins', 'ds', 'nv']) {
+    for (const m of ['bf', 'drop', 'twins', 'ds', 'nv', ...ROTATION_MACHINES]) {
       expect(validateEvent(spin({ m }))?.machine).toBe(m);
     }
   });

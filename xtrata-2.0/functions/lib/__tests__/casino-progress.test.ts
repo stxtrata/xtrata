@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DAY_MS } from '../casino-social';
+import { ROTATION_MACHINES } from '../casino-machines';
 import {
   ALL_MISSIONS_BONUS, BADGES, DEFAULT_SCHEDULE, JACKPOT_SEED, TOURNEY_PRIZES, TOURNEY_SPINS, addXp, advanceMissions, applyBalance,
   applyLog, awardBadges, creditBalance, emptyBoards, feedJackpot, happyHour, jackpotStep, joinTourney, lastFinishedTourney,
@@ -181,6 +182,30 @@ describe('the progressive jackpot', () => {
     resetJackpot(j, { a: A, g: 'nv', w: 100011 }, T0);
     expect(j.v).toBe(JACKPOT_SEED); expect(j.hits).toBe(1); expect(j.last?.a).toBe(A);
     expect(jackpotStep(100499, 100500)).toBe(true); expect(jackpotStep(100500, 100990)).toBe(false);
+  });
+});
+
+describe('the rotation machines and the progressive jackpot', () => {
+  it('accepts a spin on any rotation machine and feeds the one jackpot', () => {
+    for (const g of ROTATION_MACHINES) {
+      expect(parseProgressMessage({ t: 'log', k: 'spin', g, bet: 100, won: 0 })).toEqual({ ok: true, msg: log({ k: 'spin', g, bet: 100, won: 0 }) });
+    }
+    const j = loadJackpot(null);
+    expect(feedJackpot(j, log({ k: 'spin', g: 'ordinal-rush', bet: 1000 }), 0.5).hit).toBe(false);
+    expect(j.v).toBe(JACKPOT_SEED + 10);
+    expect(feedJackpot(j, log({ k: 'spin', g: 'ordinal-rush', bet: 1000, free: true }), 0).hit).toBe(false);
+    const r = feedJackpot(j, log({ k: 'spin', g: 'hot-wallet', bet: 40 }), 0.00001);
+    expect(r.hit).toBe(true);
+  });
+
+  it('keeps missions, the tournament rotation and the Slot fan badge on the five core machines', () => {
+    const rotation = new Set<string>(ROTATION_MACHINES);
+    for (let d = 0; d < 40; d++) expect(rotation.has(tourneyAt(T0 + d * DAY_MS).g)).toBe(false);
+    const p = newProfile();
+    applyLog(p, 'who', log({ k: 'spin', g: 'sat-hunter', bet: 100, won: 0 }), T0, false);
+    expect(p.st.g).toContain('sat-hunter');
+    expect(BADGES.find((b) => b.id === 'slot-fan')!.test({ ...p.st, g: ['drop', 'twins', 'ds', 'bf'] } as never)).toBe(false);
+    expect(BADGES.find((b) => b.id === 'slot-fan')!.test({ ...p.st, g: ['drop', 'twins', 'ds', 'bf', 'nv'] } as never)).toBe(true);
   });
 });
 

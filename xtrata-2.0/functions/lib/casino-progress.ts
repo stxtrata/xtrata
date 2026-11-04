@@ -10,13 +10,20 @@
  * record. Nothing here moves STX or touches a contract.
  */
 import { DAY_MS, TABLES, dayOf } from './casino-social';
+import { CORE_MACHINES, isAnyMachine } from './casino-machines';
 
 export const PROGRESS_FEATURES = ['progress', 'missions', 'boards', 'tourney', 'jackpot', 'bal', 'friends', 'hh'] as const;
 
-export const MACHINES = ['drop', 'twins', 'ds', 'bf', 'nv'] as const;
+/**
+ * The five core machines: the ones the daily missions, the slot tournament rotation and the Slot fan badge are built from. The
+ * series machines that can be rotated onto the floor (casino-machines.ts) are not in this list on purpose.
+ */
+export const MACHINES = CORE_MACHINES;
 export type Machine = (typeof MACHINES)[number];
 export const isMachine = (v: unknown): v is Machine => typeof v === 'string' && (MACHINES as readonly string[]).includes(v);
-const isGame = (v: unknown): v is string => isMachine(v) || (typeof v === 'string' && (TABLES as readonly string[]).includes(v));
+/** Any machine whose spins the room accepts: the core five and every rotation machine. Their spins feed the progressive jackpot. */
+export const isSpinMachine = (v: unknown): v is string => isAnyMachine(v);
+const isGame = (v: unknown): v is string => isSpinMachine(v) || (typeof v === 'string' && (TABLES as readonly string[]).includes(v));
 const short = (a: string) => (a.length <= 12 ? a : `${a.slice(0, 5)}…${a.slice(-4)}`);
 const addressLike = (v: unknown): v is string => typeof v === 'string' && /^S[0-9A-Z]{4,63}$/.test(v);
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -80,7 +87,7 @@ export const parseProgressMessage = (value: any): { ok: true; msg: ProgressMessa
     case 'log': {
       const { k, g, bet, won } = value;
       if ((k !== 'hand' && k !== 'spin') || !isGame(g)) return { ok: false, code: 'log-bad' };
-      if (k === 'spin' && !isMachine(g)) return { ok: false, code: 'log-bad' };
+      if (k === 'spin' && !isSpinMachine(g)) return { ok: false, code: 'log-bad' };
       if (typeof bet !== 'number' || !Number.isFinite(bet) || bet <= 0 || bet > MAX_BET) return { ok: false, code: 'log-bad' };
       if (typeof won !== 'number' || !Number.isFinite(won) || won < 0 || won > MAX_WIN) return { ok: false, code: 'log-bad' };
       return { ok: true, msg: { t: 'log', k, g, bet: r2(bet), won: r2(won), free: value.free === true, sh: value.sh === true } };
