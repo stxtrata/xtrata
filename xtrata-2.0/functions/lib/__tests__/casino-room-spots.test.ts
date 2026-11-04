@@ -17,6 +17,8 @@ const machBlock = /const MACH = window\.PX_FLOOR_KEYS\.slice\(\)/.exec(html);
 const rotationJs = readFileSync(join(__dirname, '../../../public/casino/machine-rotation.js'), 'utf8');
 const rotation = new Function('window', `${rotationJs}; return window.PX_MACHINE_ROTATION;`)({}) as {
   floor: string[];
+  layout: string | null;
+  layouts: Record<string, { slots: Array<{ id: string; x: number; z: number; face: string }> }>;
   catalog: Array<{ id: string; name: string }>;
 };
 
@@ -48,6 +50,21 @@ describe('casino room spots match the /casino page', () => {
   it('puts the five original machines on the floor by default, and never more than five', () => {
     expect(rotation.floor).toEqual([...CORE_MACHINES]);
     expect(rotation.floor.length).toBeLessThanOrEqual(5);
+  });
+
+  it('keeps every hand-placed layout inside the room, with at most two cabinets of a design', () => {
+    for (const [name, layout] of Object.entries(rotation.layouts)) {
+      const per = new Map<string, number>();
+      for (const s of layout.slots) {
+        expect(ALL_MACHINES as readonly string[], `${name}: ${s.id}`).toContain(s.id);
+        expect(['N', 'S', 'E', 'W'], `${name}: ${s.id} face`).toContain(s.face);
+        expect(Math.abs(s.x), `${name}: ${s.id} x`).toBeLessThanOrEqual(12.5);
+        expect(Math.abs(s.z), `${name}: ${s.id} z`).toBeLessThanOrEqual(10.6);
+        per.set(s.id, (per.get(s.id) ?? 0) + 1);
+      }
+      for (const [id, n] of per) expect(n, `${name}: ${id}`).toBeLessThanOrEqual(2);
+    }
+    if (rotation.layout) expect(rotation.layouts).toHaveProperty(rotation.layout);
   });
 
   // The lounge chess tables add their seats at run time (public/casino/chess.js: a sofa and an armchair each).
