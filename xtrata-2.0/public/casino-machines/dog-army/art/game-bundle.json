@@ -1,0 +1,68 @@
+{
+  "builtAt": "2026-11-03T01:43:53.513Z",
+  "dataJson": true,
+  "bundledImages": [
+    "audio/kick0.mp3",
+    "audio/kick1.mp3",
+    "audio/roll0.mp3",
+    "audio/roll1.mp3",
+    "audio/snare0.mp3",
+    "audio/snare1.mp3",
+    "audio/snare2.mp3",
+    "audio/snare3.mp3",
+    "audio/snare4.mp3",
+    "audio/tap0.mp3",
+    "audio/tap1.mp3",
+    "audio/tpt_stac_C5.mp3",
+    "audio/tpt_stac_F4.mp3",
+    "audio/tpt_sus_A4.mp3",
+    "audio/tpt_sus_C5.mp3",
+    "audio/tpt_sus_D4.mp3",
+    "img/alex-runes-dog.png",
+    "img/dog-logo-black.png",
+    "img/dog-logo-white.png",
+    "img/dog-rune-icon.jpg",
+    "img/pontis-dog.png",
+    "img/runestone/63140674.jpg",
+    "img/runestone/64369172.jpg",
+    "img/runestone/64375508.jpg",
+    "img/runestone/64383025.jpg",
+    "img/runestone/64390474.jpg",
+    "img/runestone/64399598.jpg",
+    "img/runestone/64408352.jpg",
+    "img/runestone/64416035.jpg",
+    "img/runestone/64423168.jpg",
+    "img/runestone/64431097.jpg",
+    "img/runestone/64437510.jpg",
+    "img/runestone/64445915.jpg",
+    "img/runestone/64452452.jpg",
+    "img/runestone/64459612.jpg",
+    "img/runestone/64471002.jpg",
+    "img/runestone/64480875.jpg",
+    "img/runestone/64489081.jpg",
+    "img/runestone/64499083.jpg",
+    "img/runestone/64531524.jpg",
+    "img/runestone/64543066.jpg",
+    "img/runestone/_shared-render.jpg",
+    "img/supplied/leonidas-pfp.jpg"
+  ],
+  "dataDone": true,
+  "cabinetDone": true,
+  "drawnInCode": [
+    "Block, rune, supply and transfer tiles (black / white / khaki-brass, 480 px)",
+    "Leonidas wild fallback (used only if his PFP file is missing): name card with an original Spartan crest",
+    "Snapshot parachute crate",
+    "Dog tags, ranks of silhouettes, tents, cargo plane, parade ground (generic military imagery)",
+    "Xtrata mark (XLOGO vector code)"
+  ],
+  "supplied": [
+    {
+      "file": "art/supplied/leonidas-pfp.jpg",
+      "what": "Leonidas (@LeonidasNFT) profile picture, circle-cropped from a screenshot supplied by Jim, 448 px",
+      "needsPermission": "Leonidas should OK it before a public build"
+    }
+  ],
+  "notDrawn": [
+    "The DOG mascot and the $DOG logo are never drawn: only the official files, when supplied (art/dog/img/dog-logo-*.png)"
+  ]
+}

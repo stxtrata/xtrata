@@ -1,0 +1,35 @@
+{
+  "fetchedAt": "2026-11-03T01:23:58.402Z",
+  "tokens": {
+    "alex": {
+      "contract": "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog",
+      "name": "DOG GO TO THE MOON (RUNES)",
+      "symbol": "DOG",
+      "decimals": 8,
+      "supplyMetadataApi": "1042104986737162",
+      "supplyReadOnlyCall": "931810233672709",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog/1.png",
+      "image_thumbnail_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog/1-thumb.png",
+      "token_uri": "https://cdn.alexlab.co/metadata/runes-dog.json",
+      "sources": [
+        "https://xtrata.xyz/hiro/mainnet/metadata/v1/ft/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog",
+        "https://xtrata.xyz/hiro/mainnet/v2/contracts/call-read/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9/runes-dog/get-total-supply"
+      ]
+    },
+    "pontis": {
+      "contract": "SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG",
+      "name": "DOG.GO.TO.THE.MOON",
+      "symbol": "DOG",
+      "decimals": 5,
+      "supplyMetadataApi": "3109984779010",
+      "supplyReadOnlyCall": "3109984779010",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG/1.png",
+      "image_thumbnail_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG/1-thumb.png",
+      "token_uri": "https://ipfs.io/ipfs/QmaNeuPd44FGFKxmxtYboSvUh4eZus18iQTkEA6poyYkij",
+      "sources": [
+        "https://xtrata.xyz/hiro/mainnet/metadata/v1/ft/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG",
+        "https://xtrata.xyz/hiro/mainnet/v2/contracts/call-read/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG/pontis-bridge-DOG/get-total-supply"
+      ]
+    }
+  }
+}

@@ -1,0 +1,431 @@
+{
+ "fetchedAt": "2026-11-02T00:00:00Z",
+ "fixture": true,
+ "halving": {
+  "height": 840000,
+  "hash": "0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
+  "time": "2024-04-20T00:09:27Z",
+  "status": "verified"
+ },
+ "rune": {
+  "id": "840000:3",
+  "number": 3,
+  "name": "DOGGOTOTHEMOON",
+  "spacedName": "DOG\u2022GO\u2022TO\u2022THE\u2022MOON",
+  "symbol": "D",
+  "supply": 100000000000,
+  "status": "verified"
+ },
+ "snapshot": {
+  "height": null,
+  "status": "unconfirmed",
+  "candidates": [
+   840249,
+   840269
+  ]
+ },
+ "runestone": {
+  "perHolderDOG": 889806,
+  "recipients": 112383,
+  "status": "verified"
+ },
+ "stacks": {
+  "alex": {
+   "contract": "FIXTURE",
+   "image": "img/alex-runes-dog.png",
+   "status": "verified"
+  },
+  "pontis": {
+   "status": "brief-only"
+  }
+ },
+ "transfers": [
+  {
+   "txid": "f0",
+   "block": 840100,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "250",
+   "from": "bc1q..0",
+   "to": "bc1p..0",
+   "status": "verified"
+  },
+  {
+   "txid": "f1",
+   "block": 841077,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "889806",
+   "from": "bc1q..1",
+   "to": "bc1p..1",
+   "status": "verified"
+  },
+  {
+   "txid": "f2",
+   "block": 842054,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "1",
+   "from": "bc1q..2",
+   "to": "bc1p..2",
+   "status": "verified"
+  },
+  {
+   "txid": "f3",
+   "block": 843031,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "889806",
+   "from": "bc1q..3",
+   "to": "bc1p..3",
+   "status": "verified"
+  },
+  {
+   "txid": "f4",
+   "block": 844008,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "1",
+   "from": "bc1q..4",
+   "to": "bc1p..4",
+   "status": "verified"
+  },
+  {
+   "txid": "f5",
+   "block": 844985,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "250",
+   "from": "bc1q..5",
+   "to": "bc1p..5",
+   "status": "verified"
+  },
+  {
+   "txid": "f6",
+   "block": 845962,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "250",
+   "from": "bc1q..6",
+   "to": "bc1p..6",
+   "status": "verified"
+  },
+  {
+   "txid": "f7",
+   "block": 846939,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "1",
+   "from": "bc1q..7",
+   "to": "bc1p..7",
+   "status": "verified"
+  },
+  {
+   "txid": "f8",
+   "block": 847916,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "250",
+   "from": "bc1q..8",
+   "to": "bc1p..8",
+   "status": "verified"
+  },
+  {
+   "txid": "f9",
+   "block": 848893,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "889806",
+   "from": "bc1q..9",
+   "to": "bc1p..9",
+   "status": "verified"
+  },
+  {
+   "txid": "f10",
+   "block": 849870,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "889806",
+   "from": "bc1q..10",
+   "to": "bc1p..10",
+   "status": "verified"
+  },
+  {
+   "txid": "f11",
+   "block": 850847,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "889806",
+   "from": "bc1q..11",
+   "to": "bc1p..11",
+   "status": "verified"
+  },
+  {
+   "txid": "f12",
+   "block": 851824,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "889806",
+   "from": "bc1q..12",
+   "to": "bc1p..12",
+   "status": "verified"
+  },
+  {
+   "txid": "f13",
+   "block": 852801,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "12000",
+   "from": "bc1q..13",
+   "to": "bc1p..13",
+   "status": "verified"
+  },
+  {
+   "txid": "f14",
+   "block": 853778,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "5.5",
+   "from": "bc1q..14",
+   "to": "bc1p..14",
+   "status": "verified"
+  },
+  {
+   "txid": "f15",
+   "block": 854755,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "1",
+   "from": "bc1q..15",
+   "to": "bc1p..15",
+   "status": "verified"
+  },
+  {
+   "txid": "f16",
+   "block": 855732,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "1",
+   "from": "bc1q..16",
+   "to": "bc1p..16",
+   "status": "verified"
+  },
+  {
+   "txid": "f17",
+   "block": 856709,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "1000000",
+   "from": "bc1q..17",
+   "to": "bc1p..17",
+   "status": "verified"
+  },
+  {
+   "txid": "f18",
+   "block": 857686,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "5.5",
+   "from": "bc1q..18",
+   "to": "bc1p..18",
+   "status": "verified"
+  },
+  {
+   "txid": "f19",
+   "block": 858663,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "5.5",
+   "from": "bc1q..19",
+   "to": "bc1p..19",
+   "status": "verified"
+  },
+  {
+   "txid": "f20",
+   "block": 859640,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "889806",
+   "from": "bc1q..20",
+   "to": "bc1p..20",
+   "status": "verified"
+  },
+  {
+   "txid": "f21",
+   "block": 860617,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "5.5",
+   "from": "bc1q..21",
+   "to": "bc1p..21",
+   "status": "verified"
+  },
+  {
+   "txid": "f22",
+   "block": 861594,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "5.5",
+   "from": "bc1q..22",
+   "to": "bc1p..22",
+   "status": "verified"
+  },
+  {
+   "txid": "f23",
+   "block": 862571,
+   "time": "2024-05-01T00:00:00Z",
+   "amount": "5.5",
+   "from": "bc1q..23",
+   "to": "bc1p..23",
+   "status": "verified"
+  }
+ ],
+ "milestones": [
+  {
+   "id": "0",
+   "label": "HOLDERS",
+   "value": "112,383",
+   "status": "verified"
+  },
+  {
+   "id": "1",
+   "label": "SUPPLY",
+   "value": "100B",
+   "status": "verified"
+  },
+  {
+   "id": "2",
+   "label": "AIRDROP BLOCKS",
+   "value": "840,000",
+   "status": "verified"
+  },
+  {
+   "id": "3",
+   "label": "PER WALLET",
+   "value": "889,806",
+   "status": "verified"
+  },
+  {
+   "id": "4",
+   "label": "FIRST DAY",
+   "value": "74,000",
+   "status": "verified"
+  },
+  {
+   "id": "5",
+   "label": "RUNE NUMBER",
+   "value": "#3",
+   "status": "verified"
+  },
+  {
+   "id": "6",
+   "label": "NO PRESALE",
+   "value": "0",
+   "status": "verified"
+  },
+  {
+   "id": "7",
+   "label": "TEAM",
+   "value": "0",
+   "status": "brief-only"
+  },
+  {
+   "id": "8",
+   "label": "LISTINGS",
+   "value": "12",
+   "status": "brief-only"
+  }
+ ],
+ "runestones": [
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000000i0",
+   "number": 1234567,
+   "img": "img/runestone/1234567.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000001i0",
+   "number": 2345678,
+   "img": "img/runestone/2345678.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000002i0",
+   "number": 3456789,
+   "img": "img/runestone/3456789.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000003i0",
+   "number": 4567890,
+   "img": "img/runestone/4567890.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000004i0",
+   "number": 5678901,
+   "img": "img/runestone/5678901.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000005i0",
+   "number": 6789012,
+   "img": "img/runestone/6789012.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000006i0",
+   "number": 7890123,
+   "img": "img/runestone/7890123.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000007i0",
+   "number": 8901234,
+   "img": "img/runestone/8901234.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000008i0",
+   "number": 9012345,
+   "img": "img/runestone/9012345.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000009i0",
+   "number": 1122334,
+   "img": "img/runestone/1122334.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "000000000000000000000000000000000000000000000000000000000000000ai0",
+   "number": 2233445,
+   "img": "img/runestone/2233445.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "000000000000000000000000000000000000000000000000000000000000000bi0",
+   "number": 3344556,
+   "img": "img/runestone/3344556.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "000000000000000000000000000000000000000000000000000000000000000ci0",
+   "number": 4455667,
+   "img": "img/runestone/4455667.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "000000000000000000000000000000000000000000000000000000000000000di0",
+   "number": 5566778,
+   "img": "img/runestone/5566778.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "000000000000000000000000000000000000000000000000000000000000000ei0",
+   "number": 6677889,
+   "img": "img/runestone/6677889.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "000000000000000000000000000000000000000000000000000000000000000fi0",
+   "number": 7788990,
+   "img": "img/runestone/7788990.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000010i0",
+   "number": 8899001,
+   "img": "img/runestone/8899001.png",
+   "source": "FIXTURE"
+  },
+  {
+   "inscriptionId": "0000000000000000000000000000000000000000000000000000000000000011i0",
+   "number": 9900112,
+   "img": "img/runestone/9900112.png",
+   "source": "FIXTURE"
+  }
+ ],
+ "logos": {
+  "dogBlack": "img/dog-logo-black.png",
+  "dogWhite": null,
+  "status": "unconfirmed"
+ }
+}

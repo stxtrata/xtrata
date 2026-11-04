@@ -1,0 +1,8 @@
+DOG Army cabinet: build/model.json is final.
+
+Part names present (room sees them as px-<name>): crest, lever, lowerBody, marqueeBulbs, moonLogoBack, moonLogoFront, screenMesh, searchBeam, spinPhysical, tag0, tag1, tag2, tag3, tag4, tag5, tag6, tag7, tagChain
+Deck button actions: auto x3, betDown x3, betUp x3, pays x3, spin x18 (spin also sits on the lever parts and spinPhysical)
+Dog tag rows: px-tag0 (bottom) .. px-tag7 (top); every row is two meshes (left and right side column), 16 meshes with 16 separate materials (MeshStandardMaterial, emissive #c07a1c, base emissiveIntensity 0.12). Suggested drive: emissiveIntensity = 0.12 + 0.75 * glow (higher washes the stamped text out); `color` can also be multiplied as Mooneeb did.
+Model: 3177 KB uncompressed JSON (105 geometries, 66 materials, 30 textures; same root/geometries/materials/textures format as Mooneeb).
+TYPESET FALLBACK: art/dog/img/dog-logo-black.png / dog-logo-white.png not found, so the moon carries "$DOG" in plain type. Re-run tools/build-cabinet.py when the official file appears (it is picked up automatically).
+Missing required parts: none

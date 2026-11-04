@@ -1,0 +1,123 @@
+{
+ "licence": "CC0 1.0 Universal (public domain dedication)",
+ "library": "VS Chamber Orchestra: Community Edition (VSCO 2 CE)",
+ "by": "Recorded by Sam Gossner and Simon Dalzell; sample cutting by Elan Hickler/Soundemote (Versilian Studios)",
+ "repo": "https://github.com/sgossner/VSCO-2-CE",
+ "licenceFile": "LICENSE in the repo root (CC0 1.0 Universal)",
+ "processing": "Stereo WAV summed to mono, trimmed, short fades, level-matched per velocity layer, encoded as mono mp3 (22.05-32 kHz). No other change.",
+ "note": "CC0 needs no attribution or permission; credit is given here anyway.",
+ "files": {
+  "snare0": {
+   "src": "Percussion/Snare2-HitSN_v1_rr1_Sum.wav",
+   "start": 0,
+   "dur": 0.75,
+   "gainDb": 27.9,
+   "bytes": 6669
+  },
+  "snare1": {
+   "src": "Percussion/Snare2-HitSN_v3_rr1_Sum.wav",
+   "start": 0,
+   "dur": 0.75,
+   "gainDb": 19.9,
+   "bytes": 6669
+  },
+  "snare2": {
+   "src": "Percussion/Snare2-HitSN_v5_rr1_Sum.wav",
+   "start": 0,
+   "dur": 0.75,
+   "gainDb": 10.8,
+   "bytes": 6669
+  },
+  "snare3": {
+   "src": "Percussion/Snare2-HitSN_v7_rr1_Sum.wav",
+   "start": 0,
+   "dur": 0.75,
+   "gainDb": 0.6,
+   "bytes": 6669
+  },
+  "snare4": {
+   "src": "Percussion/Snare2-HitSN_v9_rr1_Sum.wav",
+   "start": 0,
+   "dur": 0.75,
+   "gainDb": 0.5,
+   "bytes": 6669
+  },
+  "tap0": {
+   "src": "Percussion/Snare2-taps_v2_rr1_Sum.wav",
+   "start": 0,
+   "dur": 0.3,
+   "gainDb": 16.3,
+   "bytes": 3213
+  },
+  "tap1": {
+   "src": "Percussion/Snare2-taps_v3_rr1_Sum.wav",
+   "start": 0,
+   "dur": 0.3,
+   "gainDb": 12.7,
+   "bytes": 3213
+  },
+  "roll0": {
+   "src": "Percussion/Snare2-rollSN_v5_rr1_Sum.wav",
+   "start": 0.3,
+   "dur": 2.6,
+   "gainDb": 13.1,
+   "bytes": 21645
+  },
+  "roll1": {
+   "src": "Percussion/Snare2-rollSN_v3_rr1_Sum.wav",
+   "start": 0.3,
+   "dur": 1.4,
+   "gainDb": 21.4,
+   "bytes": 11853
+  },
+  "kick0": {
+   "src": "Percussion/BDrumNewhit_v3_rr1_Sum.wav",
+   "start": 0,
+   "dur": 1.5,
+   "gainDb": 15.5,
+   "bytes": 11198
+  },
+  "kick1": {
+   "src": "Percussion/BDrumNewhit_v5_rr1_Sum.wav",
+   "start": 0,
+   "dur": 1.5,
+   "gainDb": 8.1,
+   "bytes": 11198
+  },
+  "tpt_stac_F4": {
+   "src": "Brass/Trumpet/stac/Sum_SHTrumpet_stac_F4_v2_rr1.wav",
+   "start": 0,
+   "dur": 1.0,
+   "gainDb": 12.8,
+   "bytes": 8685
+  },
+  "tpt_stac_C5": {
+   "src": "Brass/Trumpet/stac/Sum_SHTrumpet_stac_C5_v2_rr1.wav",
+   "start": 0,
+   "dur": 0.85,
+   "gainDb": 7.6,
+   "bytes": 7533
+  },
+  "tpt_sus_D4": {
+   "src": "Brass/Trumpet/sus/Sum_SHTrumpet_sus_D4_v3_rr1.wav",
+   "start": 0.05,
+   "dur": 1.5,
+   "gainDb": 1.5,
+   "bytes": 12717
+  },
+  "tpt_sus_A4": {
+   "src": "Brass/Trumpet/sus/Sum_SHTrumpet_sus_A4_v3_rr1.wav",
+   "start": 0.05,
+   "dur": 1.5,
+   "gainDb": 0.7,
+   "bytes": 12717
+  },
+  "tpt_sus_C5": {
+   "src": "Brass/Trumpet/sus/Sum_SHTrumpet_sus_C5_v3_rr1.wav",
+   "start": 0.05,
+   "dur": 1.5,
+   "gainDb": 2.8,
+   "bytes": 12717
+  }
+ }
+}

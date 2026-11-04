@@ -1,0 +1,12 @@
+# Findings from the the previous machine build (carried over; read before touching scenes, fullscreen or the cabinet)
+- The room patches each pack's game HTML by exact text. Keep, exactly once each: the `/* One existing LAYR account` script, `GAME_ID='<id>', LAYR=window.ParallaxLAYRAccount, E=LAYR.machine(GAME_ID,BF)`, `const screen=canvas(2800,1920),sg=…setTransform(2,0,0,2,0,0);`, `connect(ac.destination)` and `window.PX_CASINO_ENGINE={`. build-pack.mjs checks this. Add the new id to INTEGRATION.md for `pxRlPatch`'s round-log map.
+- The room uses THREE r128 with ACES tone mapping at 1.15 and linear output; preview cabinets with the same settings or colours look washed out.
+- Forever Twins' rounded `box()` helper grows each box by its bevel; correct for it or side panels get swallowed.
+- `Box3.setFromObject` only updates the object's own world matrix: call `updateMatrixWorld(true)` on the cabinet after scaling it.
+- A close-up camera from below sees the marquee overhang's underside, which hides the top of the screen; frame close-ups from slightly above.
+- Reel tiles are 240 px canvases drawn at 352 device px on the room's 2x screen; for supplied photos or portraits draw the tile at 480 px so it stays sharp.
+- The room overlays its bonus strip at y~780-872 and turbo/gamble buttons at y~890 on every machine screen, so scene buttons belong INSIDE the reel window.
+- In fullscreen, don't float a button over the bottom of the screen: balance, bet and win readouts live there.
+- Headless test harnesses must re-read the scene after each screenshot and finish any real bonus before starting a Lab item, or they press stale buttons and report false failures. Headless Chromium can mis-composite a fully opaque fixed bar over a WebGL canvas; use a near-opaque colour.
+- The build sandbox blocks api.hiro.so, assets.hiro.so, ordinals.com, mempool.space, doggotothemoon.io and S3. `https://xtrata.xyz/hiro/mainnet/…` works for Stacks (not Runes/Ordinals) Hiro reads (e.g. /metadata/v1/ft/<contract>).
+- the previous machine fullscreen belongs to the game: it lifts its own logic frame to a fixed full-viewport layer and requests fullscreen on it; one bottom bar holds every control except the lever. Keep this design.

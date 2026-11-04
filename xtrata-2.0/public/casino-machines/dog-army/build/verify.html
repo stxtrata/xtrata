@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset="utf-8"><title>DOG Army model check</title><style>html,body{margin:0;background:#0b0b0a}</style></head><body>
+<script src="../vendor/three.r128.min.js"></script>
+<script>
+// Decodes build/model.json exactly as the room's packedCabinet does (copied from index.html), lists the named parts and renders it.
+window.run = async (opts = {}) => {
+  const data = await (await fetch('model.json')).json();
+  data.images = await Promise.all(data.textures.map(t => new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = t.image; })));
+  function packedCabinet(data){
+    const geos=data.geometries.map(g=>{const out=new THREE.BufferGeometry();for(const [key,a] of Object.entries(g.attributes))out.setAttribute(key,new THREE.BufferAttribute(new Float32Array(a.array),a.size));if(g.index)out.setIndex(g.index);for(const group of g.groups||[])out.addGroup(group.start,group.count,group.materialIndex);out.computeBoundingSphere();return out;});
+    const textures=data.textures.map((t,i)=>{const out=new THREE.Texture(data.images[i]);out.wrapS=t.wrapS;out.wrapT=t.wrapT;out.repeat.fromArray(t.repeat);out.offset.fromArray(t.offset);out.flipY=t.flipY;out.anisotropy=16;out.needsUpdate=true;return out;});
+    const mats=data.materials.map(m=>{const props={color:m.color,map:m.map==null?null:textures[m.map],transparent:m.transparent,opacity:m.opacity,side:m.side,depthWrite:m.depthWrite,alphaTest:m.alphaTest};if(m.type==='basic')return new THREE.MeshBasicMaterial(props);return new THREE.MeshStandardMaterial(Object.assign(props,{roughness:m.roughness,metalness:m.metalness,emissive:m.emissive,emissiveIntensity:m.emissiveIntensity,flatShading:m.flatShading}));});
+    function node(n){const out=n.g==null?new THREE.Group():new THREE.Mesh(geos[n.g],Array.isArray(n.m)?n.m.map(id=>mats[id]):mats[n.m]);out.position.fromArray(n.p);out.quaternion.fromArray(n.q);out.scale.fromArray(n.s);out.visible=n.visible;if(n.role)out.name='px-'+n.role;if(n.action)out.userData.pxMachineAction=n.action;n.children.forEach(c=>out.add(node(c)));return out;}
+    const out=node(data.root);out.updateMatrixWorld(true);return out;
+  }
+  const model = packedCabinet(data), bb = new THREE.Box3().setFromObject(model), size = bb.getSize(new THREE.Vector3()), k = 2.6 / size.y;
+  model.scale.multiplyScalar(k); model.position.y -= bb.min.y * k; const cabinet = new THREE.Group(); cabinet.add(model); cabinet.updateMatrixWorld(true);
+  const names = {}; const actions = {}; const tagMats = new Set(); let tagCount = 0;
+  model.traverse(o => { if (o.name) names[o.name] = (names[o.name] || 0) + 1; const a = o.userData.pxMachineAction; if (a) actions[a] = (actions[a] || 0) + 1; if (/^px-tag\d$/.test(o.name)) { tagCount++; tagMats.add(o.material.uuid); } });
+  const box = new THREE.Box3().setFromObject(model);
+  const info = { size: size.toArray().map(v => +v.toFixed(3)), scaledHeight: +(box.max.y - box.min.y).toFixed(3), scaledWidth: +(box.max.x - box.min.x).toFixed(3), scaledDepth: +(box.max.z - box.min.z).toFixed(3), names, actions, tagMeshes: tagCount, tagMaterials: tagMats.size, geometries: data.geometries.length, materials: data.materials.length, textures: data.textures.length, rootKeys: Object.keys(data) };
+  // render
+  const w = opts.w || 900, h = opts.h || 1100; const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(w, h); r.setPixelRatio(1); r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.15; document.body.appendChild(r.domElement);
+  const scene = new THREE.Scene(); scene.background = new THREE.Color('#0b0b0a'); scene.add(cabinet);
+  scene.add(new THREE.HemisphereLight(0xf2eee4, 0x141210, 1.1)); const key = new THREE.SpotLight(0xfff2e0, 2.4, 30, .6, .6, 1); key.position.set(2.2, 5.5, 4); key.target.position.set(0, 1.3, 0); scene.add(key, key.target);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: '#12110f', roughness: .4, metalness: .4 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  const lever = model.getObjectByName('px-lever'), crest = model.getObjectByName('px-crest'); if (opts.lever) lever.rotation.x = opts.lever; crest.rotation.y = opts.crest || 0;
+  model.traverse(o => { if (/^px-tag(\d)$/.test(o.name)) { const i = +o.name.slice(-1), side = o.position.x > 0; o.material.emissiveIntensity = .12 + (opts.tags ? .75 * (i % 2 ? 1 : .3) : 0); } });
+  const cam = new THREE.PerspectiveCamera(36, w / h, .05, 80), yaw = opts.yaw ?? .45, pitch = .12, dist = opts.dist || 6.4, tgt = new THREE.Vector3(0, 1.45, 0); cam.position.set(Math.sin(yaw) * dist * Math.cos(pitch), tgt.y + Math.sin(pitch) * dist, Math.cos(yaw) * dist * Math.cos(pitch)); cam.lookAt(tgt);
+  r.render(scene, cam); info.png = r.domElement.toDataURL('image/png'); return info;
+};
+</script></body></html>

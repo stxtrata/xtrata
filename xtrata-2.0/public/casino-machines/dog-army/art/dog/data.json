@@ -1,0 +1,1003 @@
+{
+ "fetchedAt": "2026-11-03T01:30:00Z",
+ "halving": {
+  "height": 840000,
+  "hash": "0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
+  "time": "2024-04-20T00:09:27Z",
+  "prevHash": "0000000000000000000172014ba58d66455762add0512355ad651207918494ab",
+  "txCount": 3050,
+  "source": [
+   "https://mempool.space/api/block-height/840000",
+   "https://mempool.space/api/block/0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
+   "https://ordinals.com/block/840000"
+  ],
+  "fetchedAt": "2026-11-02T22:12:25Z",
+  "status": "verified"
+ },
+ "rune": {
+  "id": "840000:3",
+  "number": 3,
+  "name": "DOGGOTOTHEMOON",
+  "spacedName": "DOG•GO•TO•THE•MOON",
+  "symbol": "🐕",
+  "divisibility": 5,
+  "supply": "100000000000",
+  "premine": "100000000000",
+  "burned": "24406807.17188",
+  "etchingTx": "e79134080a83fe3e0e06ed6990c5a9b63b362313341745707a2bff7d788a1375",
+  "etchedBlock": 840000,
+  "etchedTime": "2024-04-20T00:09:27Z",
+  "etchingInscription": {
+   "id": "e79134080a83fe3e0e06ed6990c5a9b63b362313341745707a2bff7d788a1375i0",
+   "number": 70279590,
+   "delegate": "618ffb4e23e19566c7567841187a1c424dfd775e4f8cb633a7a3d4836784835fi0",
+   "delegateNumber": 67521835,
+   "delegateContentType": "image/webp",
+   "delegateImage": "img/dog-rune-icon.jpg",
+   "needsPermission": true
+  },
+  "holders": 86286,
+  "holdersFetchedAt": "2026-11-03T01:09:04Z",
+  "holdersSource": "https://unisat.io/runes/detail/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON",
+  "source": [
+   "https://ordinals.com/rune/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON",
+   "https://ordiscan.com/rune/DOGGOTOTHEMOON"
+  ],
+  "fetchedAt": "2026-11-02T22:11:00Z",
+  "status": "verified"
+ },
+ "snapshot": {
+  "height": null,
+  "status": "unconfirmed",
+  "candidates": [
+   840249,
+   840269
+  ],
+  "blockHash": null,
+  "time": null,
+  "candidateBlocks": {
+   "840249": {
+    "hash": "000000000000000000028ab1628e428328609ee4fb1d449d1a1a99a7c2e6104b",
+    "time": "2024-04-21T20:43:45Z"
+   },
+   "840269": {
+    "hash": "0000000000000000000090d7ab9e2915f46195fbd4dbec09a088d2e168d667dd",
+    "time": "2024-04-22T00:01:30Z"
+   }
+  },
+  "notes": "Not confirmed to a single block. The height is not recorded on chain as such and Leonidas's announcement on X could not be read. On-chain test (see evidence): block 840,249 is contradicted by the data, 840,269 is consistent with it. Keep height null and show 840,269 only as the likely one if the game must name a block. The DOG airdrop itself began in block 840,647.",
+  "evidence": {
+   "likely": 840269,
+   "refuted": [
+    840249
+   ],
+   "lowerBound": "state after the sales in block 840,268",
+   "upperBoundProven": false,
+   "method": "31 Runestone sales were read in blocks 840,250 to 840,269 (ordiscan tx pages, full addresses). Each seller spent a Runestone output created in a reveal tx (blocks ~834,7xx to 835,8xx) straight from the reveal, so the seller held it continuously until the sale. 11 of those sales (blocks 840,250 to 840,255) had their prevout block checked on mempool.space. The seller address was then matched against the 75,488 airdrop recipient addresses.",
+   "result": "29 of 31 sellers in blocks 840,250 to 840,268 are NOT airdrop recipients, and 30 of 31 buyers ARE. A holder at block 840,249 would have been paid if the snapshot were 840,249, so 840,249 is contradicted. Sellers up to block 840,268 were not paid, so the snapshot was taken at or after block 840,268. The 2 sellers that were paid (blocks 840,251 and 840,269) may hold other Runestones, so no upper bound is proven; the data does not reach past block 840,269.",
+   "caveats": "Assumes the recipient list (176 txs, 75,488 addresses, found by walking the airdrop tree) is complete and that a seller who shows no airdrop did not hold at the snapshot.",
+   "txsChecked": 31,
+   "sellersNotPaid": 29,
+   "buyersPaid": 30,
+   "prevoutChecked": 11
+  },
+  "sources": [
+   "https://mempool.space/api/block-height/840249",
+   "https://mempool.space/api/block-height/840269",
+   "https://ordiscan.com/tx/f588787e2d35b21a34198df7196f3ae4ac5c71c06d576e3dbddbe47b87d25522",
+   "https://ordiscan.com/tx/316382676de4e04ff26823ee41c4077d82a605dbb189241cf6da20720c0c8cb7"
+  ]
+ },
+ "runestone": {
+  "perHolderDOG": 889806,
+  "recipients": 112383,
+  "firstDayWallets": 74000,
+  "statusByField": {
+   "perHolderDOG": "verified",
+   "recipients": "verified",
+   "firstDayWallets": "brief-only"
+  },
+  "airdropWallets": 75488,
+  "airdropTxs": 176,
+  "airdropFirstBlock": 840647,
+  "airdropLastBigBlock": 840658,
+  "childInscriptions": 112384,
+  "parentInscription": "fdb2df5d2b16db1ebcbf09e2d23b3f4e417db44b58e712c99b61f26b52c7cbb5i0",
+  "modelInscription": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+  "sources": [
+   "https://doggotothemoon.io/runestone/",
+   "https://ordiscan.com/collection/runestone",
+   "https://ordinals.com/r/children/fdb2df5d2b16db1ebcbf09e2d23b3f4e417db44b58e712c99b61f26b52c7cbb5i0/0",
+   "https://ordiscan.com/tx/e0eb5c572fc70658d6039f342ae9ffbcf4d077bd11b411491e3e1f4afad1bca9"
+  ],
+  "status": "verified"
+ },
+ "stacks": {
+  "alex": {
+   "contract": "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog",
+   "name": "DOG GO TO THE MOON (RUNES)",
+   "symbol": "DOG",
+   "decimals": 8,
+   "supply": "931810233672709",
+   "supplyDOG": "9318102.33672709",
+   "supplyMetadataApi": "1042104986737162",
+   "supplyNote": "supply = get-total-supply read-only call (base units). The Hiro metadata cache can lag behind it.",
+   "image": "img/alex-runes-dog.png",
+   "imageSource": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog/1.png",
+   "status": "verified",
+   "source": [
+    "https://xtrata.xyz/hiro/mainnet/metadata/v1/ft/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog",
+    "https://xtrata.xyz/hiro/mainnet/v2/contracts/call-read/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9/runes-dog/get-total-supply"
+   ],
+   "fetchedAt": "2026-11-03T01:23:58.402Z"
+  },
+  "pontis": {
+   "contract": "SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG",
+   "name": "DOG.GO.TO.THE.MOON",
+   "symbol": "DOG",
+   "decimals": 5,
+   "supply": "3109984779010",
+   "supplyDOG": "31099847.7901",
+   "supplyMetadataApi": "3109984779010",
+   "supplyNote": "supply = get-total-supply read-only call (base units). The Hiro metadata cache can lag behind it.",
+   "image": "img/pontis-dog.png",
+   "imageSource": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG/1.png",
+   "status": "verified",
+   "source": [
+    "https://xtrata.xyz/hiro/mainnet/metadata/v1/ft/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG",
+    "https://xtrata.xyz/hiro/mainnet/v2/contracts/call-read/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG/pontis-bridge-DOG/get-total-supply"
+   ],
+   "fetchedAt": "2026-11-03T01:23:58.402Z"
+  }
+ },
+ "transfers": [
+  {
+   "txid": "e0eb5c572fc70658d6039f342ae9ffbcf4d077bd11b411491e3e1f4afad1bca9",
+   "block": 840853,
+   "time": "2024-04-25T19:30:54Z",
+   "amount": "889806",
+   "from": "bc1p9p8p…nrakuy",
+   "to": "bc1pvhv8…pp8f3s",
+   "fromFull": "bc1p9p8py56xctydpj9xdfm4yw0jahkyhplku7wygldhdv3lcp8snu2qnrakuy",
+   "toFull": "bc1pvhv8gxngfp023jxzs952cqz7udzev4xk957wksd66ezj8gtgscgspp8f3s",
+   "source": "https://ordiscan.com/tx/e0eb5c572fc70658d6039f342ae9ffbcf4d077bd11b411491e3e1f4afad1bca9",
+   "blockSource": "https://mempool.space/api/block/0000000000000000000282d1de8a0afe53c8035bed2a018119dbcbc8a3c3cdc8",
+   "status": "verified"
+  },
+  {
+   "txid": "9fe47487749c86b50dab2552971330e5036c2fc84de118d0aa8a52a07c04922e",
+   "block": 841488,
+   "time": "2024-04-30T09:28:32Z",
+   "amount": "889806",
+   "from": "bc1p07u3…jcajds",
+   "to": "bc1pt8dt…n8857w",
+   "fromFull": "bc1p07u35a09ppr807qhnvf6nveexjfhuzqjvqr2z2umqdwqszjfceysjcajds",
+   "toFull": "bc1pt8dt9nvqhm0xqdykjpnna53geep237a69x3sqs0uyf9ru8zvs39sn8857w",
+   "source": "https://ordiscan.com/tx/9fe47487749c86b50dab2552971330e5036c2fc84de118d0aa8a52a07c04922e",
+   "blockSource": "https://mempool.space/api/block/00000000000000000001433bbbffcaac103d549cf33d19f757d388ea34060093",
+   "status": "verified"
+  },
+  {
+   "txid": "391ac689c7b538592729fd0446d3411f26fb8a95843217d7ca74e4f056c3df92",
+   "block": 845834,
+   "time": "2024-05-31T00:02:07Z",
+   "amount": "889806",
+   "from": "bc1pvkca…lt28g8",
+   "to": "bc1p29pq…q7225v",
+   "fromFull": "bc1pvkca9aasgcxp5w78m6lfur6ws9yy5z3l4juhk79he8qpgu9vpx4qlt28g8",
+   "toFull": "bc1p29pqscn879j5tmrudfyuvq5q4umsuf40a22vsva4j0ghnlgpyc7qq7225v",
+   "source": "https://ordiscan.com/tx/391ac689c7b538592729fd0446d3411f26fb8a95843217d7ca74e4f056c3df92",
+   "blockSource": "https://mempool.space/api/block/00000000000000000001dc4e4ba33cab49869a598c9b6dd1fc4c8c09b77867ef",
+   "status": "verified"
+  },
+  {
+   "txid": "28e2456b0032b05193d5b5728a4b1ca2dd5a9e9c4b53aa0519f98d6e9d3a024e",
+   "block": 849034,
+   "time": "2024-06-22T12:17:04Z",
+   "amount": "889806",
+   "from": "bc1p5spg…u9xzug",
+   "to": "bc1pd720…uvfa3s",
+   "fromFull": "bc1p5spga9e9ujrjutukvnmdcvx4htp9w2adhh3s2hux426ktucf4lyqu9xzug",
+   "toFull": "bc1pd720sm53a3x6hkr6q32f0sl6wsgq348qns2tgke3uhv8w5rmhhesuvfa3s",
+   "source": "https://ordiscan.com/tx/28e2456b0032b05193d5b5728a4b1ca2dd5a9e9c4b53aa0519f98d6e9d3a024e",
+   "blockSource": "https://mempool.space/api/block/00000000000000000001e5a43c6ce9d99588db2540d7029da15962e4b0e77a30",
+   "status": "verified"
+  },
+  {
+   "txid": "276ce1e9aac1ad6b14feb985da7342a7acb44e436d8b634f026f7e1f53c4bcb2",
+   "block": 854837,
+   "time": "2024-07-31T18:00:31Z",
+   "amount": "889806",
+   "from": "bc1pr3vh…ypqe3n",
+   "to": "bc1pk2h7…h4mgkd",
+   "fromFull": "bc1pr3vhgm6665kzmxczexwduzwh8lrll0s38mwuajl4cm8duuh2zamqypqe3n",
+   "toFull": "bc1pk2h74wtpzpluh3frz7dhzs4t79afh3naa6wzwarjlkafn6ymzcvqh4mgkd",
+   "source": "https://ordiscan.com/tx/276ce1e9aac1ad6b14feb985da7342a7acb44e436d8b634f026f7e1f53c4bcb2",
+   "blockSource": "https://mempool.space/api/block/000000000000000000030224688c216d4efc4b1f0e157238ea8b045227a21576",
+   "status": "verified"
+  },
+  {
+   "txid": "022f2362b31c38199ad47d0326a5a44cd0e1ed3534c7358fb867149dee34625d",
+   "block": 856414,
+   "time": "2024-08-12T05:30:11Z",
+   "amount": "889806",
+   "from": "bc1pyrez…y42xqs",
+   "to": "bc1p2kf2…meeefp",
+   "fromFull": "bc1pyrezf4zgv2qvpmwhzrks0eth6l0r7nymzgnwhs4902zslxt0ne8sy42xqs",
+   "toFull": "bc1p2kf2ed6jtym9tu9h73cg0jvjuxwtjexdscguvamr7vpl2jey87jqmeeefp",
+   "source": "https://ordiscan.com/tx/022f2362b31c38199ad47d0326a5a44cd0e1ed3534c7358fb867149dee34625d",
+   "blockSource": "https://mempool.space/api/block/00000000000000000001f325ea64a05448522ee58a457b4a96dd7235c1e4e67b",
+   "status": "verified"
+  },
+  {
+   "txid": "b61f1413f0febe5fea8be235f554cdfd411b1d2dbc8bf4b57d250c091727dfc7",
+   "block": 861460,
+   "time": "2024-09-15T18:20:51Z",
+   "amount": "889806",
+   "from": "bc1pd2ds…r8hux2",
+   "to": "bc1pcksn…sqd0zs",
+   "fromFull": "bc1pd2dsd759uefv4wt5dwqxmednyz3560p93u7eyq4v0y67nwh3mhgsr8hux2",
+   "toFull": "bc1pcksnluq2ddq8zpam28nnc6uqmjqltpve7jytvgmzf6f4dj9z0jzssqd0zs",
+   "source": "https://ordiscan.com/tx/b61f1413f0febe5fea8be235f554cdfd411b1d2dbc8bf4b57d250c091727dfc7",
+   "blockSource": "https://mempool.space/api/block/00000000000000000002947d1ef174f53ac9a85ab61ed667095750c824b94330",
+   "status": "verified"
+  },
+  {
+   "txid": "a8d493406d992abc4f684ae9ff12b0d27e883d6eb8b8a7e364682c19a211f2d8",
+   "block": 865700,
+   "time": "2024-10-15T05:34:11Z",
+   "amount": "889806",
+   "from": "bc1p2eu6…nc02se",
+   "to": "bc1pxrwj…schrvl",
+   "fromFull": "bc1p2eu6zew7gpq3pnxj7caln2jfn46pe73u3aukmdka9m67802rn0gqnc02se",
+   "toFull": "bc1pxrwj43ugmmwhu3vtvkuqum4xxdlx4k856ljtu8e33ywsy8nmrs6qschrvl",
+   "source": "https://ordiscan.com/tx/a8d493406d992abc4f684ae9ff12b0d27e883d6eb8b8a7e364682c19a211f2d8",
+   "blockSource": "https://mempool.space/api/block/00000000000000000002a82a6dee77c45ecd5a072a6ad9fe31d818ff62f0d16b",
+   "status": "verified"
+  },
+  {
+   "txid": "851bb7e719d6344a1b27e8f1b9351ec7f2bf5b9d05d016e7924a63b1fbe920fb",
+   "block": 875207,
+   "time": "2024-12-17T22:22:52Z",
+   "amount": "296600",
+   "from": "bc1pkxae…nmmz4l",
+   "to": "bc1pn6gr…daaayp",
+   "fromFull": "bc1pkxaeqv0tet9265vl6pfjdvsyv63umvmmu3gmgmk83pe8evwarx9qnmmz4l",
+   "toFull": "bc1pn6gruaman2ukk0m32tuc6mnkmjlzv2aeazpygtka2wlt8x5fvmmsdaaayp",
+   "source": "https://ordiscan.com/tx/851bb7e719d6344a1b27e8f1b9351ec7f2bf5b9d05d016e7924a63b1fbe920fb",
+   "blockSource": "https://mempool.space/api/block/0000000000000000000193c28fc754ed787da5033114231d6dc17fbcce01d623",
+   "status": "verified"
+  },
+  {
+   "txid": "489c7dd60f791eb02e6b45c2bcd972dc89ba1094fd3b7541ccb21a3240e8c759",
+   "block": 887603,
+   "time": "2025-03-13T08:47:40Z",
+   "amount": "889806",
+   "from": "bc1p9398…vrgkg5",
+   "to": "bc1p98ca…4s3yem",
+   "fromFull": "bc1p9398eva6wlgvntd9auxm836z7hl6gk5l7zm3aldqjx5sykjvvylsvrgkg5",
+   "toFull": "bc1p98ca02jkmk7rl359aw9xr4jjkn8f52kgzqtg53t4etm5sfqrsdcq4s3yem",
+   "source": "https://ordiscan.com/tx/489c7dd60f791eb02e6b45c2bcd972dc89ba1094fd3b7541ccb21a3240e8c759",
+   "blockSource": "https://mempool.space/api/block/00000000000000000001fdb069588afd3ea03dc9498ce865a673cec458446d41",
+   "status": "verified"
+  },
+  {
+   "txid": "1c8c8dc5af3d785bd4869795bceef3af43c5326bbee66f42b3d3671d1d197107",
+   "block": 890363,
+   "time": "2025-04-01T07:22:34Z",
+   "amount": "889806",
+   "from": "bc1p08hp…a5vsa4",
+   "to": "bc1px64u…4mma4t",
+   "fromFull": "bc1p08hpk5wxl33uhfmxtr7w0n3dp86540hds56kzgw7zxggz38ejhyqa5vsa4",
+   "toFull": "bc1px64u24w2nv6tzm6p04dpaus253uq3j7754dqje0rkzfd52894jyq4mma4t",
+   "source": "https://ordiscan.com/tx/1c8c8dc5af3d785bd4869795bceef3af43c5326bbee66f42b3d3671d1d197107",
+   "blockSource": "https://mempool.space/api/block/00000000000000000000707f95efaea5452d455bf9ddbd922674108728efac39",
+   "status": "verified"
+  },
+  {
+   "txid": "0e2bfc52b09c6b069d18be9b6b19dfc4c074ab8416b8cee7ea518a118b366d33",
+   "block": 896139,
+   "time": "2025-05-10T16:09:15Z",
+   "amount": "889806",
+   "from": "bc1pd99l…2d83yu",
+   "to": "bc1pxhvr…zf4hrs",
+   "fromFull": "bc1pd99ldnzv7yp7jgsmz4w2mzexsjej0n7h74pgxm36877za4gqexnq2d83yu",
+   "toFull": "bc1pxhvrw8fr8xjhytk3jjdev8njgml4fydcuahfssq38ufn88pn4xjqzf4hrs",
+   "source": "https://ordiscan.com/tx/0e2bfc52b09c6b069d18be9b6b19dfc4c074ab8416b8cee7ea518a118b366d33",
+   "blockSource": "https://mempool.space/api/block/0000000000000000000008744531967c2b040f769d09e86577f6075cfce936c5",
+   "status": "verified"
+  },
+  {
+   "txid": "e50af8b57e143158e0ef3e3adb790bc51ef715330550e4c2ef1e86931e1d3817",
+   "block": 897939,
+   "time": "2025-05-23T04:39:37Z",
+   "amount": "806",
+   "from": "bc1p0dnf…ymgwlk",
+   "to": "bc1p2yga…4dx8rq",
+   "fromFull": "bc1p0dnfhxn5jahvuq6caxs32zl9c7dgvzd80juu6scz8edq2vff2mmsymgwlk",
+   "toFull": "bc1p2ygawc245jlq2zjl330k9ren2trkcyyu5vkg2zvhzu8pncxnsunq4dx8rq",
+   "source": "https://ordiscan.com/tx/e50af8b57e143158e0ef3e3adb790bc51ef715330550e4c2ef1e86931e1d3817",
+   "blockSource": "https://mempool.space/api/block/00000000000000000001221db961ae23837688f735cea8a8929ac0a27f57b0e6",
+   "status": "verified"
+  },
+  {
+   "txid": "9cb4ac1e56bc8b35383d950ba01a35a7d52535d0a261aaeb697e53409c173633",
+   "block": 908698,
+   "time": "2025-08-05T08:30:25Z",
+   "amount": "889806",
+   "from": "bc1qwfpg…3c4mty",
+   "to": "bc1q4yw3…uzfv93",
+   "fromFull": "bc1qwfpgd3huyy48munwe04nzujl7zvyf5kx3c4mty",
+   "toFull": "bc1q4yw3l6cul7wqa07mpp3s20xdkyvvkgy7uzfv93",
+   "source": "https://ordiscan.com/tx/9cb4ac1e56bc8b35383d950ba01a35a7d52535d0a261aaeb697e53409c173633",
+   "blockSource": "https://mempool.space/api/block/00000000000000000001c8354c48eb1c5546e10f8d90f42e05ac37cf740ac89e",
+   "status": "verified"
+  },
+  {
+   "txid": "98b0c7824b552e33c0188e7afaef922c595564ca84410bcb585c6a6a36edf3ad",
+   "block": 909626,
+   "time": "2025-08-11T23:24:03Z",
+   "amount": "889806",
+   "from": "bc1pngh8…sgla22",
+   "to": "bc1prfu8…3f9vpp",
+   "fromFull": "bc1pngh88q48866nchcpy8ta5fh9uhkakv6fgawaxxpf4zcanlgkneqqsgla22",
+   "toFull": "bc1prfu8w9j9gl2jclncdk7wj0ey2n607wvsafsz3mu24cggefnp6j6s3f9vpp",
+   "source": "https://ordiscan.com/tx/98b0c7824b552e33c0188e7afaef922c595564ca84410bcb585c6a6a36edf3ad",
+   "blockSource": "https://mempool.space/api/block/000000000000000000021ad823a9d973eb0e7b85e6b8fa63c10ed7fda179ff64",
+   "status": "verified"
+  },
+  {
+   "txid": "80075debf0954e19b5ba422fa7644f17c7f9664b53bedec2c4a6b4c758d7c427",
+   "block": 917757,
+   "time": "2025-10-05T12:14:13Z",
+   "amount": "889806",
+   "from": "bc1pcmf4…cehe8v",
+   "to": "bc1pdr9k…fenplp",
+   "fromFull": "bc1pcmf4pjwzu53ydrz37qey45q5u0ejlvc2y4l8ydgh4x0rx6v4dwascehe8v",
+   "toFull": "bc1pdr9kehs8hsrwpg2mzhpxnk7e7t0mzemvmahtxj83lyxktx8wzpwqfenplp",
+   "source": "https://ordiscan.com/tx/80075debf0954e19b5ba422fa7644f17c7f9664b53bedec2c4a6b4c758d7c427",
+   "blockSource": "https://mempool.space/api/block/00000000000000000001c909fc284675374c0903a19fd2518dd4ace293100d01",
+   "status": "verified"
+  },
+  {
+   "txid": "1b390744311f3e0855158a7dcdc782ce3671b2fcceaa2dff2b6cd265932e507a",
+   "block": 924090,
+   "time": "2025-11-18T01:20:22Z",
+   "amount": "889806",
+   "from": "bc1pjym4…z30828",
+   "to": "bc1pkazc…3d6863",
+   "fromFull": "bc1pjym4dqm9hpje5sglggrz2gyng6rp3zgdpw5urvllxw0s4nm37zuqz30828",
+   "toFull": "bc1pkazc6sasv5tquvm03wa5g2rths7wzk7jxxdmtta45klhc3ua0vyq3d6863",
+   "source": "https://ordiscan.com/tx/1b390744311f3e0855158a7dcdc782ce3671b2fcceaa2dff2b6cd265932e507a",
+   "blockSource": "https://mempool.space/api/block/000000000000000000003bf4e55a7585dc0f06eca81182a4d2f79285f90c1881",
+   "status": "verified"
+  },
+  {
+   "txid": "b8945bcff4e37cacb257fbbcf9f7817f9b99b01e4379eb61103eb1cf942ed783",
+   "block": 927867,
+   "time": "2025-12-14T15:15:37Z",
+   "amount": "889806",
+   "from": "bc1php07…udtt6c",
+   "to": "bc1p3ayl…tyl39g",
+   "fromFull": "bc1php07mhlyhxznrug7tf0lqzrluuzpz4jf58uza65t8ddgq4vr2h4qudtt6c",
+   "toFull": "bc1p3ayldv3wpx09lf6p63tzmjsd85nyr78pmjwqwuhnc2m9zgkwqypqtyl39g",
+   "source": "https://ordiscan.com/tx/b8945bcff4e37cacb257fbbcf9f7817f9b99b01e4379eb61103eb1cf942ed783",
+   "blockSource": "https://mempool.space/api/block/00000000000000000000beb8a4e8bac13e28597a29ef212e6a957a20a1d65969",
+   "status": "verified"
+  },
+  {
+   "txid": "0031a67549ad409a6dc4640fd3a21219c40a511ce37fa66fe5d8fd52812a1118",
+   "block": 934068,
+   "time": "2026-01-28T08:48:59Z",
+   "amount": "889806",
+   "from": "bc1pvy0a…95jjdc",
+   "to": "bc1pp6e3…l54z85",
+   "fromFull": "bc1pvy0akr0ye2ehl8sr0958q7yzdd7a3quj300pxr84r4qaklg4pens95jjdc",
+   "toFull": "bc1pp6e32wsr6h4r3qaa8yr37m82cqpdpwkerfjs4vae95yjqdpglhrsl54z85",
+   "source": "https://ordiscan.com/tx/0031a67549ad409a6dc4640fd3a21219c40a511ce37fa66fe5d8fd52812a1118",
+   "blockSource": "https://mempool.space/api/block/0000000000000000000154021798e45b785626438d8e04c4440dfdbb7bd9b372",
+   "status": "verified"
+  },
+  {
+   "txid": "ba0a131e674728fa4e45d2996e6591a1010e39af2d0a0b1cc3800577bfe8f224",
+   "block": 934993,
+   "time": "2026-02-04T13:39:46Z",
+   "amount": "80000",
+   "from": "bc1p64av…0s7ef4",
+   "to": "bc1pws2m…9gq5dr",
+   "fromFull": "bc1p64avty7uphu2pul0qzwtg930awvtssgmgw62pnq5zngnce6xh3ls0s7ef4",
+   "toFull": "bc1pws2mskdr5xw7wc03uu3ussmjmxxcm942qwnm50vc6zkgreanp4wq9gq5dr",
+   "source": "https://ordiscan.com/tx/ba0a131e674728fa4e45d2996e6591a1010e39af2d0a0b1cc3800577bfe8f224",
+   "blockSource": "https://mempool.space/api/block/000000000000000000009818eb4d99bf90f9feaf2cbab924943cc59ec36a604b",
+   "status": "verified"
+  },
+  {
+   "txid": "da4e4761b967ad646643040a23e06bb5587c70abf43d5c868a9aa99db721cd7f",
+   "block": 935097,
+   "time": "2026-02-05T08:18:09Z",
+   "amount": "889806",
+   "from": "bc1p7lyg…79gsla",
+   "to": "bc1pl95s…f6k4hx",
+   "fromFull": "bc1p7lyg275gysgf9h5d08p6lwnv8fcc974w4wllu94c487tufu87nkq79gsla",
+   "toFull": "bc1pl95sqdcslrdsvdvuxhzwu627t5hjk9gtcs8cfl6hfzxpjlefe4qsf6k4hx",
+   "source": "https://ordiscan.com/tx/da4e4761b967ad646643040a23e06bb5587c70abf43d5c868a9aa99db721cd7f",
+   "blockSource": "https://mempool.space/api/block/000000000000000000003d6ca9d862a4b4f68bbb402cbe98c3a313ae00942974",
+   "status": "verified"
+  },
+  {
+   "txid": "590cfa58804700ccd645fc6380fe57b13532b218ad8bcc75495f9a14329be847",
+   "block": 940319,
+   "time": "2026-03-11T22:42:57Z",
+   "amount": "889806",
+   "from": "bc1pz825…27epv7",
+   "to": "bc1pe4rg…738jus",
+   "fromFull": "bc1pz825r5458a3wkytfsn8as0hl0ygunsvt8vywsh7l0w7gplgnspaq27epv7",
+   "toFull": "bc1pe4rgdcskk7xke82259p0sqm44cgxz5tk63w5xkphgsjk7xldk9js738jus",
+   "source": "https://ordiscan.com/tx/590cfa58804700ccd645fc6380fe57b13532b218ad8bcc75495f9a14329be847",
+   "blockSource": "https://mempool.space/api/block/000000000000000000009d8fa69a28db67971cb534bd7f78f8aed9061c1629f8",
+   "status": "verified"
+  },
+  {
+   "txid": "75b5650a3edc371ffaddc70a661cd59c02ef9abd891875c5c2bb5f5250e324ad",
+   "block": 943745,
+   "time": "2026-04-05T10:16:55Z",
+   "amount": "889806",
+   "from": "bc1pjyey…zaczfl",
+   "to": "bc1p7zh4…c6j79h",
+   "fromFull": "bc1pjyey03pyw97qdd3qvszmnl0g36hhegak8hc9plp83cdcp9g97wdszaczfl",
+   "toFull": "bc1p7zh4kdn2jk6sxue5lr33jha93wcaf04yth9gqt8rez66x5q0ysnsc6j79h",
+   "source": "https://ordiscan.com/tx/75b5650a3edc371ffaddc70a661cd59c02ef9abd891875c5c2bb5f5250e324ad",
+   "blockSource": "https://mempool.space/api/block/0000000000000000000183300e88035b318c856910dca0a744e0f5fe467cff81",
+   "status": "verified"
+  },
+  {
+   "txid": "41163941fedc4d7372826df84fa478cd8b6b9b2b6569b90ae9ecdba9712b5221",
+   "block": 948033,
+   "time": "2026-05-05T14:01:40Z",
+   "amount": "100",
+   "from": "bc1pra6h…hhlxks",
+   "to": "bc1ppha6…jgvjfk",
+   "fromFull": "bc1pra6hha9xvrfxp0haavhlhgcjc2leq2pwvepq9kv5lk0fhsnteaxqhhlxks",
+   "toFull": "bc1ppha6v337y5u37p0jptchvs99egxeg9w8q4mlzs4yzsr60zc7fmdsjgvjfk",
+   "source": "https://ordiscan.com/tx/41163941fedc4d7372826df84fa478cd8b6b9b2b6569b90ae9ecdba9712b5221",
+   "blockSource": "https://mempool.space/api/block/0000000000000000000091efa41a0c60f6d00b331303d96c196ec16ffd2f4477",
+   "status": "verified"
+  },
+  {
+   "txid": "510d48bafdcfdca1feece72ea5a7c2ce1b309cca17dfd8df5b3d99bae5362e39",
+   "block": 955508,
+   "time": "2026-06-26T15:24:27Z",
+   "amount": "889806",
+   "from": "bc1p8tpv…mhp9c9",
+   "to": "bc1pwt4m…uztzdu",
+   "fromFull": "bc1p8tpvc4w9swun7h6pmypn2mstfa8w5ln097ahl5dmfarzhu7zwdgsmhp9c9",
+   "toFull": "bc1pwt4me04yetagy92q3v9dz8tlsv4hsn0tzhd7mf0hv0h7pwts084quztzdu",
+   "source": "https://ordiscan.com/tx/510d48bafdcfdca1feece72ea5a7c2ce1b309cca17dfd8df5b3d99bae5362e39",
+   "blockSource": "https://mempool.space/api/block/00000000000000000000e1087a4b31992d158433bfbc3dfcb2a8f88622d03649",
+   "status": "verified"
+  },
+  {
+   "txid": "2110186a48d4ebf5a10461545a3c279b3f31cc42ce74782780ff2b8f069989f5",
+   "block": 957744,
+   "time": "2026-07-12T19:15:44Z",
+   "amount": "444903",
+   "from": "bc1px3dh…dwvxx0",
+   "to": "bc1pv2ek…ktjauk",
+   "fromFull": "bc1px3dhwyql7mdsejskxq0ngd6ggfekslrrfpy7dlhl0vjce2amyudsdwvxx0",
+   "toFull": "bc1pv2ek2hyt0sn3xc6x9q68kzrxuuy6esntkdrw9gku00sgd2e2ashsktjauk",
+   "source": "https://ordiscan.com/tx/2110186a48d4ebf5a10461545a3c279b3f31cc42ce74782780ff2b8f069989f5",
+   "blockSource": "https://mempool.space/api/block/0000000000000000000189a7a2349a1636d978f705bf352f6767cf56c91ce1d3",
+   "status": "verified"
+  },
+  {
+   "txid": "bec6798d118f8bb25b234b11f783b9a831209ea55c2c7c4296ff29ae08cdbea0",
+   "block": 963861,
+   "time": "2026-08-24T13:38:32Z",
+   "amount": "600000",
+   "from": "bc1ptces…6ex995",
+   "to": "bc1px0vp…5a6kzm",
+   "fromFull": "bc1ptces7nz8zca2wgn2h639vcu6x3848y59ddhnfm3yumcmr7km2gas6ex995",
+   "toFull": "bc1px0vp36jvsx24t65as2ery5gv5x5lqrse3hdmnnnuu7wn0rk7a4xq5a6kzm",
+   "source": "https://ordiscan.com/tx/bec6798d118f8bb25b234b11f783b9a831209ea55c2c7c4296ff29ae08cdbea0",
+   "blockSource": "https://mempool.space/api/block/00000000000000000001fe1e5104369fc34608adc2d517459eec1f0c0df56f67",
+   "status": "verified"
+  },
+  {
+   "txid": "40b95847461268f4b6b528d2f796a43f3b47e9fa8a3d25f8ab2c098df523fb0e",
+   "block": 969275,
+   "time": "2026-09-30T07:29:40Z",
+   "amount": "106",
+   "from": "bc1p9ddh…g0c223",
+   "to": "bc1pe7r6…nngrsx",
+   "fromFull": "bc1p9ddhawv2htcfepk50nzsd3y3ete49tdc4f5uke2ndx6kzetne6qqg0c223",
+   "toFull": "bc1pe7r64a7yg4mte45um4t7yxq4w47kezkx57jcluejgx7nqturjt6snngrsx",
+   "source": "https://ordiscan.com/tx/40b95847461268f4b6b528d2f796a43f3b47e9fa8a3d25f8ab2c098df523fb0e",
+   "blockSource": "https://mempool.space/api/block/000000000000000000004fc847324500b7f29da0a39b7df51eaf9c49afb38858",
+   "status": "verified"
+  },
+  {
+   "txid": "3baf9e6a54557affb2aa9442ddb58ab1a97a5a1defbe4218dec8abfe380b7765",
+   "block": 971557,
+   "time": "2026-10-15T10:57:46Z",
+   "amount": "89806",
+   "from": "bc1p8d46…etjycl",
+   "to": "bc1qr7zn…hpglj6",
+   "fromFull": "bc1p8d46ulyxf9jhmf2ggzreec3gc7xdmgxw75hh7en0ydjg0ac6q8gqetjycl",
+   "toFull": "bc1qr7zn8eh6fmeclgj749v3uvjyctxj3jrzhpglj6",
+   "source": "https://ordiscan.com/tx/3baf9e6a54557affb2aa9442ddb58ab1a97a5a1defbe4218dec8abfe380b7765",
+   "blockSource": "https://mempool.space/api/block/0000000000000000000080b388fbc2c4fdf88297cc75741c6b0b3da53717162a",
+   "status": "verified"
+  }
+ ],
+ "milestones": [
+  {
+   "id": "supply",
+   "label": "TOTAL SUPPLY",
+   "value": "100,000,000,000 DOG",
+   "detail": "Rune #3 DOG•GO•TO•THE•MOON: supply 100 billion, all premined (100%), not mintable.",
+   "source": "https://ordinals.com/rune/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON",
+   "status": "verified"
+  },
+  {
+   "id": "etched",
+   "label": "ETCHED BLOCK 840,000",
+   "value": "2024-04-20 00:09 UTC",
+   "detail": "Rune id 840000:3, etched in the halving block by tx e7913408…788a1375.",
+   "source": [
+    "https://ordinals.com/rune/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON",
+    "https://mempool.space/api/tx/e79134080a83fe3e0e06ed6990c5a9b63b362313341745707a2bff7d788a1375"
+   ],
+   "status": "verified"
+  },
+  {
+   "id": "fee",
+   "label": "ETCHING FEE",
+   "value": "290,773,010 sats",
+   "detail": "The etching transaction paid 290,773,010 sats (about 2.9 BTC) in fees, read from the etching tx.",
+   "source": "https://mempool.space/api/tx/e79134080a83fe3e0e06ed6990c5a9b63b362313341745707a2bff7d788a1375",
+   "status": "verified"
+  },
+  {
+   "id": "per-runestone",
+   "label": "DOG PER RUNESTONE",
+   "value": "889,806 DOG",
+   "detail": "Airdrop transfers move exact multiples of 889,806 DOG (one Runestone each). 100B ÷ 112,384 Runestone inscriptions, rounded down, is 889,806.",
+   "source": "https://ordiscan.com/tx/e0eb5c572fc70658d6039f342ae9ffbcf4d077bd11b411491e3e1f4afad1bca9",
+   "status": "verified"
+  },
+  {
+   "id": "runestones",
+   "label": "RUNESTONE INSCRIPTIONS",
+   "value": "112,384",
+   "detail": "112,384 child inscriptions of the Runestone parent were listed from ordinals.com. The Runestone site says 112,383 inscriptions were airdropped (one is the model source).",
+   "source": [
+    "https://ordinals.com/r/children/fdb2df5d2b16db1ebcbf09e2d23b3f4e417db44b58e712c99b61f26b52c7cbb5i0/0",
+    "https://doggotothemoon.io/runestone/"
+   ],
+   "status": "verified"
+  },
+  {
+   "id": "first-move",
+   "label": "FIRST DOG MOVE: BLOCK 840,647",
+   "value": "2024-04-24 11:07 UTC",
+   "detail": "The 100B DOG sat untouched for 647 blocks, then tx 1107d847…fd713224 spent the etching output and the airdrop began.",
+   "source": "https://mempool.space/api/tx/e79134080a83fe3e0e06ed6990c5a9b63b362313341745707a2bff7d788a1375/outspends",
+   "status": "verified"
+  },
+  {
+   "id": "airdrop-wallets",
+   "label": "AIRDROP WALLETS",
+   "value": "75,488",
+   "detail": "75,488 distinct addresses each received a 546-sat airdrop output, across 176 transactions: 175 in blocks 840,647 to 840,658 (24 April 2024) and one small later one in block 850,677.",
+   "source": "https://mempool.space/api/tx/1107d8477c6067fb47ff34aaea37ceb84842db07e4e829817964fcddfd713224/outspends",
+   "status": "verified"
+  },
+  {
+   "id": "burned",
+   "label": "DOG BURNED",
+   "value": "24,406,807 DOG",
+   "detail": "24,406,807.17188 DOG has been burned (about 0.024% of supply).",
+   "source": [
+    "https://ordinals.com/rune/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON",
+    "https://unisat.io/runes/detail/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON"
+   ],
+   "status": "verified"
+  },
+  {
+   "id": "holders",
+   "label": "HOLDERS NOW",
+   "value": "86,286",
+   "detail": "Holder count read live from UniSat on 2026-11-03 01:09 UTC.",
+   "source": "https://unisat.io/runes/detail/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON",
+   "status": "verified"
+  },
+  {
+   "id": "top-holder",
+   "label": "LARGEST HOLDER",
+   "value": "13.70% of supply",
+   "detail": "The largest wallet (bc1plzs2…0swdhspn) holds 13,704,491,785.65923 DOG, read live from UniSat on 2026-11-03.",
+   "source": "https://unisat.io/runes/detail/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON",
+   "status": "verified"
+  },
+  {
+   "id": "top10",
+   "label": "TOP 10 HOLD",
+   "value": "29.19% of supply",
+   "detail": "The ten largest wallets together hold 29,193,540,452 DOG (29.19% of 100B), summed from the UniSat holder list on 2026-11-03.",
+   "source": "https://unisat.io/runes/detail/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON",
+   "status": "verified"
+  },
+  {
+   "id": "stacks-alex",
+   "label": "DOG ON STACKS (ALEX)",
+   "value": "9,318,102.34 DOG",
+   "detail": "ALEX runes-dog token total supply, 8 decimals, read with get-total-supply.",
+   "source": [
+    "https://xtrata.xyz/hiro/mainnet/metadata/v1/ft/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog",
+    "https://xtrata.xyz/hiro/mainnet/v2/contracts/call-read/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9/runes-dog/get-total-supply"
+   ],
+   "status": "verified"
+  },
+  {
+   "id": "stacks-pontis",
+   "label": "DOG ON STACKS (PONTIS)",
+   "value": "31,099,847.79 DOG",
+   "detail": "Pontis bridge DOG total supply, 5 decimals, read with get-total-supply.",
+   "source": [
+    "https://xtrata.xyz/hiro/mainnet/metadata/v1/ft/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG",
+    "https://xtrata.xyz/hiro/mainnet/v2/contracts/call-read/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG/pontis-bridge-DOG/get-total-supply"
+   ],
+   "status": "verified"
+  },
+  {
+   "id": "runestone-parent",
+   "label": "RUNESTONE PARENT BURNED",
+   "value": "1A1zP1…DivfNa",
+   "detail": "The Runestone parent inscription (#63,026,232) sits at the first-ever Bitcoin address, 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.",
+   "source": "https://ordinals.com/r/inscription/fdb2df5d2b16db1ebcbf09e2d23b3f4e417db44b58e712c99b61f26b52c7cbb5i0",
+   "status": "verified"
+  },
+  {
+   "id": "etch-art",
+   "label": "ETCHING CARRIES ART",
+   "value": "Inscription #70,279,590",
+   "detail": "The etching tx also inscribes #70,279,590, which delegates to image inscription #67,521,835, the pup picture shown for DOG on Ordinals.",
+   "source": "https://ordinals.com/r/inscription/e79134080a83fe3e0e06ed6990c5a9b63b362313341745707a2bff7d788a1375i0",
+   "status": "verified"
+  },
+  {
+   "id": "first-day",
+   "label": "FIRST DAY: 74,000+ WALLETS",
+   "value": "74,000+ wallets",
+   "detail": "From Jim's brief: more than 74,000 wallets held DOG on the first day. Not independently read as a day-one holder count (the airdrop-wallets milestone is the on-chain figure).",
+   "source": "brief (part 4 of the DOG Army prompt)",
+   "status": "brief-only"
+  }
+ ],
+ "runestones": [
+  {
+   "inscriptionId": "ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+   "number": 63140674,
+   "img": "img/runestone/63140674.jpg",
+   "genesisHeight": 832947,
+   "genesisTime": "2024-03-03T08:34:40Z",
+   "ownerNow": "bc1pq5up…qnsg82",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "model-source (parent of the shared 3D model; not one of the airdropped Runestones)",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+   "metaSource": "https://ordinals.com/r/inscription/ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+   "contentSource": "https://ordinals.com/content/ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "42cd33b8b697c73a2c4759255188aa27f878ca24afbb272699d8246001708682i314",
+   "number": 64369172,
+   "img": "img/runestone/64369172.jpg",
+   "genesisHeight": 834715,
+   "genesisTime": "2024-03-14T21:25:31Z",
+   "ownerNow": "bc1p2e52…q7z38g",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/42cd33b8b697c73a2c4759255188aa27f878ca24afbb272699d8246001708682i314",
+   "metaSource": "https://ordinals.com/r/inscription/42cd33b8b697c73a2c4759255188aa27f878ca24afbb272699d8246001708682i314",
+   "contentSource": "https://ordinals.com/content/42cd33b8b697c73a2c4759255188aa27f878ca24afbb272699d8246001708682i314",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "453e34032316ec1eaaf15ae23f702dbe5599b00943f1786c6cc935edbbf6b22ci629",
+   "number": 64375508,
+   "img": "img/runestone/64375508.jpg",
+   "genesisHeight": 834719,
+   "genesisTime": "2024-03-14T21:59:17Z",
+   "ownerNow": "bc1pkvtw…6htqwd",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/453e34032316ec1eaaf15ae23f702dbe5599b00943f1786c6cc935edbbf6b22ci629",
+   "metaSource": "https://ordinals.com/r/inscription/453e34032316ec1eaaf15ae23f702dbe5599b00943f1786c6cc935edbbf6b22ci629",
+   "contentSource": "https://ordinals.com/content/453e34032316ec1eaaf15ae23f702dbe5599b00943f1786c6cc935edbbf6b22ci629",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "58db843bee38bd1bbcdea70566c94ae68a06f78fdc45c1b3b41ed46671b73c10i944",
+   "number": 64383025,
+   "img": "img/runestone/64383025.jpg",
+   "genesisHeight": 834729,
+   "genesisTime": "2024-03-15T00:19:53Z",
+   "ownerNow": "bc1pffnl…arug20",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/58db843bee38bd1bbcdea70566c94ae68a06f78fdc45c1b3b41ed46671b73c10i944",
+   "metaSource": "https://ordinals.com/r/inscription/58db843bee38bd1bbcdea70566c94ae68a06f78fdc45c1b3b41ed46671b73c10i944",
+   "contentSource": "https://ordinals.com/content/58db843bee38bd1bbcdea70566c94ae68a06f78fdc45c1b3b41ed46671b73c10i944",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "29a373979e833b9e6712b5ed1548b0016e77e1a00902db158bff0a56bf2b474fi1259",
+   "number": 64390474,
+   "img": "img/runestone/64390474.jpg",
+   "genesisHeight": 834735,
+   "genesisTime": "2024-03-15T01:26:58Z",
+   "ownerNow": "bc1p9ur4…mk5l9w",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/29a373979e833b9e6712b5ed1548b0016e77e1a00902db158bff0a56bf2b474fi1259",
+   "metaSource": "https://ordinals.com/r/inscription/29a373979e833b9e6712b5ed1548b0016e77e1a00902db158bff0a56bf2b474fi1259",
+   "contentSource": "https://ordinals.com/content/29a373979e833b9e6712b5ed1548b0016e77e1a00902db158bff0a56bf2b474fi1259",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "fa05d7a410075f4c872e9550bd38ad9ab5f5df8554b8ea3ea46ce783f2919a18i173",
+   "number": 64399598,
+   "img": "img/runestone/64399598.jpg",
+   "genesisHeight": 834740,
+   "genesisTime": "2024-03-15T02:10:47Z",
+   "ownerNow": "bc1pa2p3…xh3nmh",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/fa05d7a410075f4c872e9550bd38ad9ab5f5df8554b8ea3ea46ce783f2919a18i173",
+   "metaSource": "https://ordinals.com/r/inscription/fa05d7a410075f4c872e9550bd38ad9ab5f5df8554b8ea3ea46ce783f2919a18i173",
+   "contentSource": "https://ordinals.com/content/fa05d7a410075f4c872e9550bd38ad9ab5f5df8554b8ea3ea46ce783f2919a18i173",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "4f4e4f4cf7e8477f26aecf5fc8dc737e8812e6287361b37c42cd1fa3588cdb2di488",
+   "number": 64408352,
+   "img": "img/runestone/64408352.jpg",
+   "genesisHeight": 834745,
+   "genesisTime": "2024-03-15T03:14:32Z",
+   "ownerNow": "bc1p7hhh…cg0z86",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/4f4e4f4cf7e8477f26aecf5fc8dc737e8812e6287361b37c42cd1fa3588cdb2di488",
+   "metaSource": "https://ordinals.com/r/inscription/4f4e4f4cf7e8477f26aecf5fc8dc737e8812e6287361b37c42cd1fa3588cdb2di488",
+   "contentSource": "https://ordinals.com/content/4f4e4f4cf7e8477f26aecf5fc8dc737e8812e6287361b37c42cd1fa3588cdb2di488",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "e8527ab078a2d3c54c889cb15ea9f97a2a1da6272a688a9658e48404b4ebd347i803",
+   "number": 64416035,
+   "img": "img/runestone/64416035.jpg",
+   "genesisHeight": 834749,
+   "genesisTime": "2024-03-15T04:08:28Z",
+   "ownerNow": "bc1qs7wm…30zaqu",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/e8527ab078a2d3c54c889cb15ea9f97a2a1da6272a688a9658e48404b4ebd347i803",
+   "metaSource": "https://ordinals.com/r/inscription/e8527ab078a2d3c54c889cb15ea9f97a2a1da6272a688a9658e48404b4ebd347i803",
+   "contentSource": "https://ordinals.com/content/e8527ab078a2d3c54c889cb15ea9f97a2a1da6272a688a9658e48404b4ebd347i803",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "a7aa10ca3274b0ae7f2522957e56e07eb4b9578401e75f09f314308ef991dea3i1118",
+   "number": 64423168,
+   "img": "img/runestone/64423168.jpg",
+   "genesisHeight": 834758,
+   "genesisTime": "2024-03-15T06:27:03Z",
+   "ownerNow": "bc1prf58…hzqw4z",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/a7aa10ca3274b0ae7f2522957e56e07eb4b9578401e75f09f314308ef991dea3i1118",
+   "metaSource": "https://ordinals.com/r/inscription/a7aa10ca3274b0ae7f2522957e56e07eb4b9578401e75f09f314308ef991dea3i1118",
+   "contentSource": "https://ordinals.com/content/a7aa10ca3274b0ae7f2522957e56e07eb4b9578401e75f09f314308ef991dea3i1118",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "a19b1b4606c8af7fd8f7ee5a0d703b0f3566cfece03e78aa5a52b1158d072c53i33",
+   "number": 64431097,
+   "img": "img/runestone/64431097.jpg",
+   "genesisHeight": 834763,
+   "genesisTime": "2024-03-15T07:11:59Z",
+   "ownerNow": "bc1pffeq…qet9hp",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/a19b1b4606c8af7fd8f7ee5a0d703b0f3566cfece03e78aa5a52b1158d072c53i33",
+   "metaSource": "https://ordinals.com/r/inscription/a19b1b4606c8af7fd8f7ee5a0d703b0f3566cfece03e78aa5a52b1158d072c53i33",
+   "contentSource": "https://ordinals.com/content/a19b1b4606c8af7fd8f7ee5a0d703b0f3566cfece03e78aa5a52b1158d072c53i33",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "2223a7072697ffdeab8cb03c7a4bdf72b4647ebacbdd3c06d26b7a1c370e2411i348",
+   "number": 64437510,
+   "img": "img/runestone/64437510.jpg",
+   "genesisHeight": 834767,
+   "genesisTime": "2024-03-15T08:11:56Z",
+   "ownerNow": "bc1pqdff…v6aj9a",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/2223a7072697ffdeab8cb03c7a4bdf72b4647ebacbdd3c06d26b7a1c370e2411i348",
+   "metaSource": "https://ordinals.com/r/inscription/2223a7072697ffdeab8cb03c7a4bdf72b4647ebacbdd3c06d26b7a1c370e2411i348",
+   "contentSource": "https://ordinals.com/content/2223a7072697ffdeab8cb03c7a4bdf72b4647ebacbdd3c06d26b7a1c370e2411i348",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "d1c61dfd50106a74c962848087e80cfb0e21b872f335fae0fa71e879c9e1b49ai663",
+   "number": 64445915,
+   "img": "img/runestone/64445915.jpg",
+   "genesisHeight": 834775,
+   "genesisTime": "2024-03-15T08:58:41Z",
+   "ownerNow": "bc1pw8dx…gku2qp",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/d1c61dfd50106a74c962848087e80cfb0e21b872f335fae0fa71e879c9e1b49ai663",
+   "metaSource": "https://ordinals.com/r/inscription/d1c61dfd50106a74c962848087e80cfb0e21b872f335fae0fa71e879c9e1b49ai663",
+   "contentSource": "https://ordinals.com/content/d1c61dfd50106a74c962848087e80cfb0e21b872f335fae0fa71e879c9e1b49ai663",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "21808696d650a1b0070b558769155e4ed1768d8f9e69a5a97c4f746081f0631ei978",
+   "number": 64452452,
+   "img": "img/runestone/64452452.jpg",
+   "genesisHeight": 834780,
+   "genesisTime": "2024-03-15T10:08:18Z",
+   "ownerNow": "bc1pqjr3…upepwg",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/21808696d650a1b0070b558769155e4ed1768d8f9e69a5a97c4f746081f0631ei978",
+   "metaSource": "https://ordinals.com/r/inscription/21808696d650a1b0070b558769155e4ed1768d8f9e69a5a97c4f746081f0631ei978",
+   "contentSource": "https://ordinals.com/content/21808696d650a1b0070b558769155e4ed1768d8f9e69a5a97c4f746081f0631ei978",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "2ed6228125512e2941f914f8fb068fe49202e6812734bab968b434d65b85acfbi1293",
+   "number": 64459612,
+   "img": "img/runestone/64459612.jpg",
+   "genesisHeight": 834785,
+   "genesisTime": "2024-03-15T11:06:01Z",
+   "ownerNow": "bc1pn6f6…mhjt6y",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/2ed6228125512e2941f914f8fb068fe49202e6812734bab968b434d65b85acfbi1293",
+   "metaSource": "https://ordinals.com/r/inscription/2ed6228125512e2941f914f8fb068fe49202e6812734bab968b434d65b85acfbi1293",
+   "contentSource": "https://ordinals.com/content/2ed6228125512e2941f914f8fb068fe49202e6812734bab968b434d65b85acfbi1293",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "0cc69391b65134bd8b3ea28b7404cc8a2908ed6562426a2f70952a1b7c828d7bi208",
+   "number": 64471002,
+   "img": "img/runestone/64471002.jpg",
+   "genesisHeight": 834790,
+   "genesisTime": "2024-03-15T11:27:23Z",
+   "ownerNow": "bc1q9al3…pt6shy",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/0cc69391b65134bd8b3ea28b7404cc8a2908ed6562426a2f70952a1b7c828d7bi208",
+   "metaSource": "https://ordinals.com/r/inscription/0cc69391b65134bd8b3ea28b7404cc8a2908ed6562426a2f70952a1b7c828d7bi208",
+   "contentSource": "https://ordinals.com/content/0cc69391b65134bd8b3ea28b7404cc8a2908ed6562426a2f70952a1b7c828d7bi208",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "38165c2a5a2b573196d079acbccccc3723534da4271f4be49f78e9d7ef4d5dd6i522",
+   "number": 64480875,
+   "img": "img/runestone/64480875.jpg",
+   "genesisHeight": 834794,
+   "genesisTime": "2024-03-15T11:57:49Z",
+   "ownerNow": "bc1psl5j…wwj8ay",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/38165c2a5a2b573196d079acbccccc3723534da4271f4be49f78e9d7ef4d5dd6i522",
+   "metaSource": "https://ordinals.com/r/inscription/38165c2a5a2b573196d079acbccccc3723534da4271f4be49f78e9d7ef4d5dd6i522",
+   "contentSource": "https://ordinals.com/content/38165c2a5a2b573196d079acbccccc3723534da4271f4be49f78e9d7ef4d5dd6i522",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "eb53811af7f5f72f73d2f4e916def263aaad806dbd2897138ee4f333fd39b2b5i837",
+   "number": 64489081,
+   "img": "img/runestone/64489081.jpg",
+   "genesisHeight": 834798,
+   "genesisTime": "2024-03-15T12:18:17Z",
+   "ownerNow": "bc1pyauk…suvms5",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/eb53811af7f5f72f73d2f4e916def263aaad806dbd2897138ee4f333fd39b2b5i837",
+   "metaSource": "https://ordinals.com/r/inscription/eb53811af7f5f72f73d2f4e916def263aaad806dbd2897138ee4f333fd39b2b5i837",
+   "contentSource": "https://ordinals.com/content/eb53811af7f5f72f73d2f4e916def263aaad806dbd2897138ee4f333fd39b2b5i837",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "2e0b42eb62ce446471f95cb6ceb3c6448e5178f76d92a50698ac5c6cc585b6e1i1152",
+   "number": 64499083,
+   "img": "img/runestone/64499083.jpg",
+   "genesisHeight": 834802,
+   "genesisTime": "2024-03-15T13:10:34Z",
+   "ownerNow": "bc1pj52l…97r9xv",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/2e0b42eb62ce446471f95cb6ceb3c6448e5178f76d92a50698ac5c6cc585b6e1i1152",
+   "metaSource": "https://ordinals.com/r/inscription/2e0b42eb62ce446471f95cb6ceb3c6448e5178f76d92a50698ac5c6cc585b6e1i1152",
+   "contentSource": "https://ordinals.com/content/2e0b42eb62ce446471f95cb6ceb3c6448e5178f76d92a50698ac5c6cc585b6e1i1152",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "7cb7934acd4bef0f98d7c1359854953608fdc8ee4370d34233df8cb88c2d06e8i67",
+   "number": 64531524,
+   "img": "img/runestone/64531524.jpg",
+   "genesisHeight": 834851,
+   "genesisTime": "2024-03-15T23:48:18Z",
+   "ownerNow": "bc1pvsek…y3zv9e",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/7cb7934acd4bef0f98d7c1359854953608fdc8ee4370d34233df8cb88c2d06e8i67",
+   "metaSource": "https://ordinals.com/r/inscription/7cb7934acd4bef0f98d7c1359854953608fdc8ee4370d34233df8cb88c2d06e8i67",
+   "contentSource": "https://ordinals.com/content/7cb7934acd4bef0f98d7c1359854953608fdc8ee4370d34233df8cb88c2d06e8i67",
+   "status": "verified"
+  },
+  {
+   "inscriptionId": "38cfb784afb23cf031509523f1b22890fdafbee153e031598777e09769b251d9i382",
+   "number": 64543066,
+   "img": "img/runestone/64543066.jpg",
+   "genesisHeight": 834865,
+   "genesisTime": "2024-03-16T02:10:40Z",
+   "ownerNow": "bc1pmp6s…gcudux",
+   "ownerFetched": "2026-11-03T01:09:22Z",
+   "role": "airdropped Runestone child",
+   "contentType": "model/gltf+json",
+   "source": "https://ordinals.com/inscription/38cfb784afb23cf031509523f1b22890fdafbee153e031598777e09769b251d9i382",
+   "metaSource": "https://ordinals.com/r/inscription/38cfb784afb23cf031509523f1b22890fdafbee153e031598777e09769b251d9i382",
+   "contentSource": "https://ordinals.com/content/38cfb784afb23cf031509523f1b22890fdafbee153e031598777e09769b251d9i382",
+   "status": "verified"
+  }
+ ],
+ "logos": {
+  "dogBlack": "img/dog-logo-black.png",
+  "dogWhite": "img/dog-logo-white.png",
+  "dogRuneIcon": "img/dog-rune-icon.jpg",
+  "files": {
+   "dog-logo-black.png": {
+    "bytes": 21162,
+    "sha256": "c7c72c2c0d49bbe8226796def3bef73229c83ba4693d44afdfab617e32ef7ae0",
+    "px": "240x77"
+   },
+   "dog-logo-white.png": {
+    "bytes": 7112,
+    "sha256": "dbb2c4eb3654ae6de834c358d94f764837bcbb433072680dd9de60683f990aec",
+    "px": "240x77"
+   }
+  },
+  "status": "verified",
+  "source": [
+   "https://doggotothemoon.io/wp-content/uploads/2024/11/DOG-logo-black.png",
+   "https://doggotothemoon.io/wp-content/uploads/2024/11/DOG-logo-white.png"
+  ],
+  "fetchedAt": "2026-11-03T01:00:22Z",
+  "needsPermission": true
+ }
+}

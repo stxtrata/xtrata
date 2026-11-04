@@ -1,0 +1,44 @@
+DOG ARMY - ART STREAM - DATA-DONE
+Written 2026-11-03. Every fact below has a source URL and fetch time in art/dog/data.json and art/sources.json.
+
+FILES
+art/dog/data.json            47,877 bytes   contract schema (fetchedAt, halving, rune, snapshot, runestone, stacks, transfers, milestones, runestones, logos)
+art/dog/stacks.json           1,913 bytes   from tools/fetch-dog-stacks.mjs (ALEX runes-dog and Pontis pontis-bridge-DOG only)
+art/dog/img/dog-logo-black.png   21,162   240x77, byte-identical to doggotothemoon.io
+art/dog/img/dog-logo-white.png    7,112   240x77
+art/dog/img/alex-runes-dog.png   77,526   192 px copy of the Hiro token image
+art/dog/img/pontis-dog.png       76,112   192 px copy of the Hiro token image
+art/dog/img/dog-rune-icon.jpg    15,782   256 px copy of the etching inscription's delegate image
+art/dog/img/runestone/*.jpg       5,574 each, 20 files + _shared-render.jpg (see TREAT AS MISSING)
+art/sources.json             12,605 bytes   (gameBundle key from the game stream kept; art and needsPermission added)
+tools/fetch-dog-data.md, tools/fetch-dog-stacks.mjs
+
+VERIFIED (read from a real source)
+- Halving: block 840,000, hash and time (mempool.space, ordinals.com).
+- Rune DOG*GO*TO*THE*MOON 840000:3, supply 100,000,000,000, burned 24,406,807.17188, etching tx and fee, etching inscription and its delegate.
+- Holders now: 86,286 (UniSat, 2026-11-03T01:09:04Z). Top holder 13.70%, top 10 29.19% (computed from the UniSat holder list).
+- Runestone: 112,384 child inscriptions across 82 reveal txs; 889,806 DOG per Runestone and 112,383 recipients (perHolderDOG, recipients).
+- Airdrop: started in block 840,647 (2024-04-24), 176 txs, 75,488 distinct recipient wallets.
+- Stacks: ALEX and Pontis supplies, decimals, images. ALEX note: live get-total-supply is 9,318,102.33672709 but the Hiro metadata cache says 10,421,049.86737162; data.json uses the live read.
+- 29 transfers (blocks 840,853 to 971,557, Apr 2024 to Oct 2026), each from an ordiscan tx page.
+- 16 milestones (15 verified, 1 brief-only).
+- 20 Runestone inscriptions (id, number, height, time, owner) and their thumbnail.
+- Logos (sha256 in data.json).
+
+BRIEF-ONLY (stated in the brief, no source reachable)
+- "74,000+ wallets on day one" (runestone.firstDayWallets, milestone first-day). The chain count of airdrop wallets is 75,488, which is consistent with it but is a different measure.
+
+UNCONFIRMED
+- Snapshot block. status "unconfirmed", height null, candidates 840,249 and 840,269 kept. On-chain test of 31 Runestone sales in blocks 840,250 to 840,269 against the airdrop recipient list: 29 of 31 sellers were not paid and 30 of 31 buyers were, so 840,249 is contradicted by the data and 840,269 is consistent with it; the snapshot is at or after block 840,268. No upper bound is proven. Details in data.json snapshot.evidence and tools/fetch-dog-data.md.
+
+UNAVAILABLE
+- Leonidas's profile picture: not fetched, needs Jim (art/supplied/leonidas-pfp.jpg is the game stream's item).
+- Hiro Runes API (api.hiro.so/runes) is gone; holders, balances and transfers came from UniSat, ordiscan and ordinals.com instead.
+- Magic Eden pages: behind a Cloudflare challenge, not bypassed.
+- Leonidas's snapshot announcement on X: not readable here.
+- Per-Runestone distinct artwork: does not exist. All 112,384 children delegate to one glTF model.
+
+TREAT AS MISSING / SPECIAL (the game should handle these)
+- art/dog/img/runestone/*.jpg are all the same picture (one shared 3D model rendered once). Do not present them as 20 different artworks.
+- Leonidas picture: treat as missing unless the game stream's art/supplied file is present.
+- Images that need permission before public use (needsPermission in sources.json): the DOG logos, ALEX and Pontis token images, rune icon, Runestone render, Leonidas picture.

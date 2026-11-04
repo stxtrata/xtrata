@@ -1,0 +1,280 @@
+{
+  "gameBundle": {
+    "builtAt": "2026-11-03T01:43:53.513Z",
+    "dataJson": true,
+    "bundledImages": [
+      "audio/kick0.mp3",
+      "audio/kick1.mp3",
+      "audio/roll0.mp3",
+      "audio/roll1.mp3",
+      "audio/snare0.mp3",
+      "audio/snare1.mp3",
+      "audio/snare2.mp3",
+      "audio/snare3.mp3",
+      "audio/snare4.mp3",
+      "audio/tap0.mp3",
+      "audio/tap1.mp3",
+      "audio/tpt_stac_C5.mp3",
+      "audio/tpt_stac_F4.mp3",
+      "audio/tpt_sus_A4.mp3",
+      "audio/tpt_sus_C5.mp3",
+      "audio/tpt_sus_D4.mp3",
+      "img/alex-runes-dog.png",
+      "img/dog-logo-black.png",
+      "img/dog-logo-white.png",
+      "img/dog-rune-icon.jpg",
+      "img/pontis-dog.png",
+      "img/runestone/63140674.jpg",
+      "img/runestone/64369172.jpg",
+      "img/runestone/64375508.jpg",
+      "img/runestone/64383025.jpg",
+      "img/runestone/64390474.jpg",
+      "img/runestone/64399598.jpg",
+      "img/runestone/64408352.jpg",
+      "img/runestone/64416035.jpg",
+      "img/runestone/64423168.jpg",
+      "img/runestone/64431097.jpg",
+      "img/runestone/64437510.jpg",
+      "img/runestone/64445915.jpg",
+      "img/runestone/64452452.jpg",
+      "img/runestone/64459612.jpg",
+      "img/runestone/64471002.jpg",
+      "img/runestone/64480875.jpg",
+      "img/runestone/64489081.jpg",
+      "img/runestone/64499083.jpg",
+      "img/runestone/64531524.jpg",
+      "img/runestone/64543066.jpg",
+      "img/runestone/_shared-render.jpg",
+      "img/supplied/leonidas-pfp.jpg"
+    ],
+    "dataDone": true,
+    "cabinetDone": true,
+    "drawnInCode": [
+      "Block, rune, supply and transfer tiles (black / white / khaki-brass, 480 px)",
+      "Leonidas wild fallback (used only if his PFP file is missing): name card with an original Spartan crest",
+      "Snapshot parachute crate",
+      "Dog tags, ranks of silhouettes, tents, cargo plane, parade ground (generic military imagery)",
+      "Xtrata mark (XLOGO vector code)"
+    ],
+    "supplied": [
+      {
+        "file": "art/supplied/leonidas-pfp.jpg",
+        "what": "Leonidas (@LeonidasNFT) profile picture, circle-cropped from a screenshot supplied by Jim, 448 px",
+        "needsPermission": "Leonidas should OK it before a public build"
+      }
+    ],
+    "notDrawn": [
+      "The DOG mascot and the $DOG logo are never drawn: only the official files, when supplied (art/dog/img/dog-logo-*.png)"
+    ]
+  },
+  "art": {
+    "generatedBy": "ART stream",
+    "images": [
+      {
+        "file": "art/dog/img/dog-logo-black.png",
+        "kind": "project logo",
+        "what": "Official $DOG logo, black, 240x77, byte-identical to the site file",
+        "source": "https://doggotothemoon.io/wp-content/uploads/2024/11/DOG-logo-black.png",
+        "fetched": "2026-11-03T01:00:22Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch() from the doggotothemoon.io origin, saved untouched; sha256 c7c72c2c…ef7ae0",
+        "status": "verified",
+        "needsPermission": true
+      },
+      {
+        "file": "art/dog/img/dog-logo-white.png",
+        "kind": "project logo",
+        "what": "Official $DOG logo, white, 240x77, byte-identical to the site file",
+        "source": "https://doggotothemoon.io/wp-content/uploads/2024/11/DOG-logo-white.png",
+        "fetched": "2026-11-03T01:00:22Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch() from the doggotothemoon.io origin, saved untouched; sha256 dbb2c4eb…990aec",
+        "status": "verified",
+        "needsPermission": true
+      },
+      {
+        "file": "art/dog/img/alex-runes-dog.png",
+        "kind": "token image",
+        "what": "ALEX runes-dog token image (the DOG pup mascot), 192x192 downscale of the 1024x1024 original",
+        "source": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog/1.png",
+        "metadataSource": "https://xtrata.xyz/hiro/mainnet/metadata/v1/ft/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.runes-dog",
+        "fetched": "2026-11-03T01:03:00Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch() (from the doggotothemoon.io origin), canvas downscale to 256 then Pillow LANCZOS to 192; original 1,752,092 bytes sha256 793d19c6…aaf235c",
+        "status": "verified",
+        "needsPermission": true
+      },
+      {
+        "file": "art/dog/img/pontis-dog.png",
+        "kind": "token image",
+        "what": "Pontis bridge DOG token image (the same pup picture), 192x192 downscale of the 400x400 original",
+        "source": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG/1.png",
+        "metadataSource": "https://xtrata.xyz/hiro/mainnet/metadata/v1/ft/SP14NS8MVBRHXMM96BQY0727AJ59SWPV7RMHC0NCG.pontis-bridge-DOG",
+        "fetched": "2026-11-03T01:03:00Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch(), canvas downscale to 256 then Pillow LANCZOS to 192; original 392,091 bytes sha256 8be26270…dcf",
+        "status": "verified",
+        "needsPermission": true
+      },
+      {
+        "file": "art/dog/img/dog-rune-icon.jpg",
+        "kind": "ordinals inscription",
+        "what": "Image inscription #67,521,835 (1024x1024 webp) that the DOG etching inscription #70,279,590 delegates to: the pup picture used as the rune icon. 256 px JPEG downscale.",
+        "source": "https://ordinals.com/content/618ffb4e23e19566c7567841187a1c424dfd775e4f8cb633a7a3d4836784835fi0",
+        "metadataSource": "https://ordinals.com/r/inscription/618ffb4e23e19566c7567841187a1c424dfd775e4f8cb633a7a3d4836784835fi0",
+        "fetched": "2026-11-03T01:03:00Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch(), canvas downscale; original 76,214 bytes sha256 e33b4a1e…a27ade",
+        "status": "verified",
+        "needsPermission": true
+      },
+      {
+        "file": "art/dog/img/runestone/_shared-render.jpg and art/dog/img/runestone/<number>.jpg (20 identical copies)",
+        "kind": "ordinals inscription",
+        "what": "Render of the Runestone 3D model (glTF crystal). Every Runestone child delegates to one model inscription (ed76bf35…a0i0, 3,967,899 bytes, sha256 prefix 6dd550b83d72…), so all 112,384 Runestones show the same art; the 20 files are identical copies, one per listed inscription number.",
+        "source": "https://ordinals.com/content/ed76bf35918948b8b78be0e6397ad4916d926dd3d65679a8b7e67d8699a672a0i0",
+        "fetched": "2026-11-03T01:03:00Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch(): model-viewer 3.1.1 (the viewer ordinals.com uses for model previews) loaded the model from ordinals.com, canvas export, 256 px JPEG on #0c0a09. Rendered, not drawn.",
+        "status": "verified",
+        "needsPermission": true
+      }
+    ],
+    "records": [
+      {
+        "kind": "block",
+        "what": "Block 840,000 (halving), 840,249 and 840,269 hashes and times",
+        "source": "https://mempool.space/api/block-height/840000 (and /840249, /840269)",
+        "fetched": "2026-11-02T22:12:25Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch() from the mempool.space origin",
+        "status": "verified"
+      },
+      {
+        "kind": "rune",
+        "what": "Rune #3 entry (id, number, premine, burned, symbol, etching tx, timestamp)",
+        "source": "https://ordinals.com/rune/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON (JSON)",
+        "fetched": "2026-11-02T22:11:00Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch() from the ordinals.com origin",
+        "status": "verified"
+      },
+      {
+        "kind": "rune",
+        "what": "Rune page cross-check (supply, etching block, etching date)",
+        "source": "https://ordiscan.com/rune/DOGGOTOTHEMOON",
+        "fetched": "2026-11-02T22:18:00Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch(), page text and __NEXT_DATA__",
+        "status": "verified"
+      },
+      {
+        "kind": "holders",
+        "what": "Holder count 86,286, top 20 holders and shares, burned amount",
+        "source": "https://unisat.io/runes/detail/DOG%E2%80%A2GO%E2%80%A2TO%E2%80%A2THE%E2%80%A2MOON",
+        "fetched": "2026-11-03T01:09:04Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch(), page text of the rune detail page",
+        "status": "verified"
+      },
+      {
+        "kind": "airdrop",
+        "what": "Airdrop tree: 176 txs, 75,488 distinct recipient addresses, from the etching output through blocks 840,647 to 840,658 (+850,677)",
+        "source": "https://mempool.space/api/tx/<txid> and /outspends, starting at the etching tx e7913408…",
+        "fetched": "2026-11-03T01:22:11Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch(), breadth-first walk; raw tree kept outside the game folder",
+        "status": "verified"
+      },
+      {
+        "kind": "transfers",
+        "what": "29 DOG transfers, Apr 2024 to Oct 2026, amounts read from the transaction pages",
+        "source": "https://ordiscan.com/tx/<txid> (each record carries its own URL); block times from mempool.space",
+        "fetched": "2026-11-02T22:15:00Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch() (hidden same-origin iframes on ordiscan.com, DOM text), candidates found by walking spends of airdrop outputs on mempool.space",
+        "status": "verified"
+      },
+      {
+        "kind": "runestone list",
+        "what": "112,384 Runestone child inscription ids, 20 shown in data.json (evenly spaced, plus the model source)",
+        "source": "https://ordinals.com/r/children/fdb2df5d2b16db1ebcbf09e2d23b3f4e417db44b58e712c99b61f26b52c7cbb5i0/<page>",
+        "fetched": "2026-11-03T01:09:22Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch(), all 1,131 pages; per-inscription metadata from /r/inscription/<id>",
+        "status": "verified"
+      },
+      {
+        "kind": "runestone claim",
+        "what": "112,383 inscriptions airdropped (official site statement)",
+        "source": "https://doggotothemoon.io/runestone/",
+        "fetched": "2026-11-03T01:01:00Z",
+        "method": "built-in browser on Jim's Mac (Claude desktop), page-context fetch(), page text",
+        "status": "verified"
+      },
+      {
+        "kind": "stacks token",
+        "what": "ALEX runes-dog and Pontis pontis-bridge-DOG metadata and get-total-supply",
+        "source": "https://xtrata.xyz/hiro/mainnet/metadata/v1/ft/<contract> and /v2/contracts/call-read/<addr>/<name>/get-total-supply",
+        "fetched": "2026-11-03T01:23:58.402Z",
+        "method": "curl from the cloud container via the xtrata.xyz proxy (tools/fetch-dog-stacks.mjs)",
+        "status": "verified"
+      },
+      {
+        "kind": "snapshot",
+        "what": "Airdrop snapshot block 840,249 vs 840,269",
+        "source": "blocks read from mempool.space; 31 sales in blocks 840,250 to 840,269 read from ordiscan.com/tx pages and matched to the airdrop recipient list; announcement on X not readable",
+        "fetched": "2026-11-03T02:30:00Z",
+        "method": "see tools/fetch-dog-data.md (Snapshot block)",
+        "status": "unconfirmed",
+        "note": "840,249 contradicted by the data, 840,269 consistent; not proven to a single block"
+      },
+      {
+        "kind": "brief claim",
+        "what": "74,000+ wallets on day one",
+        "source": "Jim's brief",
+        "fetched": null,
+        "method": "none",
+        "status": "brief-only"
+      }
+    ]
+  },
+  "needsPermission": [
+    {
+      "item": "$DOG logos (black and white)",
+      "files": [
+        "art/dog/img/dog-logo-black.png",
+        "art/dog/img/dog-logo-white.png"
+      ],
+      "owner": "$DOG project (doggotothemoon.io)",
+      "why": "Another project's logo on a public machine needs that project's OK"
+    },
+    {
+      "item": "ALEX runes-dog token image",
+      "files": [
+        "art/dog/img/alex-runes-dog.png"
+      ],
+      "owner": "ALEX / the DOG pup artwork owners",
+      "why": "Token logo of another project"
+    },
+    {
+      "item": "Pontis bridge DOG token image",
+      "files": [
+        "art/dog/img/pontis-dog.png"
+      ],
+      "owner": "Pontis / the DOG pup artwork owners",
+      "why": "Token logo of another project"
+    },
+    {
+      "item": "DOG rune icon (pup inscription #67,521,835)",
+      "files": [
+        "art/dog/img/dog-rune-icon.jpg"
+      ],
+      "owner": "DOG community artwork",
+      "why": "Official mascot art; shown as supplied, never redrawn"
+    },
+    {
+      "item": "Runestone artwork (3D crystal model, rendered)",
+      "files": [
+        "art/dog/img/runestone/"
+      ],
+      "owner": "Runestone / Leonidas",
+      "why": "Another project's artwork on a public machine"
+    },
+    {
+      "item": "Leonidas PFP",
+      "files": [
+        "art/supplied/leonidas-pfp.jpg"
+      ],
+      "owner": "Leonidas (@LeonidasNFT)",
+      "why": "The ART stream was supplied nothing; the file now present was supplied by Jim and is recorded by the game stream. Needs Leonidas's OK before a public build."
+    }
+  ]
+}

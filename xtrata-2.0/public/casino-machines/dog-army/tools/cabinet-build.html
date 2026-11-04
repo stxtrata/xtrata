@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><title>DOG Army cabinet builder</title><style>html,body{margin:0;background:#0b0b0a}canvas{display:block}</style></head><body>
+<script src="../vendor/three.r128.min.js"></script>
+<script src="../src/xlogo.js"></script>
+<script src="../src/cabinet.js"></script>
+<script>
+// Builds the cabinet, renders preview views, and exposes the packed model for tools/build-cabinet.py.
+// The official $DOG logo is picked up automatically from art/dog/img/dog-logo-black.png (preferred on the pale moon) or dog-logo-white.png.
+const load = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+const tryLoad = src => load(src + (src.includes('?') ? '&' : '?') + 't=' + Date.now()).catch(() => null);
+window.buildAll = async (screenData) => {
+  const wordmark = await load('../art/brand/parallax-casino-wordmark.svg');
+  const screenImage = screenData ? await load(screenData) : null;
+  let logo = null;
+  for (const kind of ['black', 'white']) { const img = await tryLoad(`${window.LOGO_DIR || new URLSearchParams(location.search).get('logodir') || '../art/dog/img'}/dog-logo-${kind}.png`); if (img) { logo = { img, kind }; break; } }
+  window.__logo = logo ? { kind: logo.kind, w: logo.img.naturalWidth, h: logo.img.naturalHeight } : null;
+  const built = buildDogArmyCabinet(THREE, { xtrataLogo, wordmark, screenImage, logo });
+  window.__machine = built.machine; window.__built = built;
+  return JSON.stringify(packCabinet(THREE, built.machine));
+};
+window.logoInfo = () => window.__logo;
+// Same colour pipeline as the room: ACES tone mapping at 1.15, linear output (no sRGB encoding), and the test page's studio lights.
+let R;
+window.preview = (yaw = .35, pitch = .12, dist = 10.5, ty = 2.7, w = 900, h = 1100, tx = 0, tz = 0, fov = 36, crestAngle = 0.5) => {
+  if (!R) { R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); R.setPixelRatio(1); R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.15; }
+  const r = R; r.setSize(w, h); document.body.innerHTML = ''; document.body.appendChild(r.domElement);
+  const scene = new THREE.Scene(); scene.background = new THREE.Color('#0b0b0a'); scene.add(new THREE.HemisphereLight(0xf2eee4, 0x141210, 1.1));
+  const key = new THREE.SpotLight(0xfff2e0, 2.4, 30, .6, .6, 1); key.position.set(2.2, 6.5, 6); key.target.position.set(0, 1.6, 0); scene.add(key, key.target);
+  const rimL = new THREE.PointLight(0xe7e5e4, 1.2, 12), rimR = new THREE.PointLight(0xe7e5e4, 1.2, 12); rimL.position.set(-2.4, 2.4, -.6); rimR.position.set(2.4, 2.4, -.6); scene.add(rimL, rimR);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: '#12110f', roughness: .4, metalness: .4 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  window.__machine.getObjectByProperty('type', 'Group'); const crest = window.__built.crest; crest.rotation.y = crestAngle;
+  scene.add(window.__machine);
+  const cam = new THREE.PerspectiveCamera(fov, w / h, .05, 100); cam.position.set(tx + Math.sin(yaw) * dist * Math.cos(pitch), ty + Math.sin(pitch) * dist, tz + Math.cos(yaw) * dist * Math.cos(pitch)); cam.lookAt(tx, ty, tz);
+  r.render(scene, cam); return r.domElement.toDataURL('image/png');
+};
+// light every tag row (v 0..1) the way a host would: emissiveIntensity .12 + .75 v
+window.setTags = v => { for (const m of window.__built.tags) m.material.emissiveIntensity = .12 + .75 * v; };
+</script></body></html>
