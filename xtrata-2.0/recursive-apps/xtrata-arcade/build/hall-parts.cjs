@@ -150,7 +150,10 @@
   function assembleRelease(skeleton, parts) {
     return skeleton.replace(/@@part:([A-Za-z0-9._-]+)@@/g, function (_, name) {
       if (name === 'hall.js') return inlineAssets(parts['hall.js'], parts['hall-assets.js']);
-      if (typeof parts[name] !== 'string') throw new Error('missing part ' + name);
+      if (typeof parts[name] !== 'string') {
+        if (OPTIONAL.indexOf(name) >= 0) return '';   // a part an older release does not have
+        throw new Error('missing part ' + name);
+      }
       return parts[name];
     });
   }
