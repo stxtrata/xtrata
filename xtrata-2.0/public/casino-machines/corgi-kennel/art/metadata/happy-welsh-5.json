@@ -1,0 +1,34 @@
+{
+  "name": "Happy Welsh #5",
+  "collection": "Happy Welsh",
+  "image": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/5.png",
+  "dna": "0212273441854",
+  "edition": 5,
+  "date": 1638864616127,
+  "attributes": [
+    {
+      "trait_type": "Background",
+      "value": "Blue"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Pattern"
+    },
+    {
+      "trait_type": "Eye",
+      "value": "Frog Eyes"
+    },
+    {
+      "trait_type": "Neck",
+      "value": "Yellow Scarf"
+    },
+    {
+      "trait_type": "Hair",
+      "value": "Raccoon Hat"
+    },
+    {
+      "trait_type": "Mouse",
+      "value": "Open Mouth"
+    }
+  ]
+}

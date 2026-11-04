@@ -1,0 +1,914 @@
+{
+  "snapshotDate": "2026-11-03",
+  "symbols": {
+    "cherry": {
+      "key": "babywelsh",
+      "name": "Baby Welshcorgicoin",
+      "symbol": "BABYWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.tokensoft-token-v4kjvtr37ht/1.png",
+      "image_canonical_uri": "https://s3-us-east-2.amazonaws.com/stackswap-launchpad/2ef36455-de1f-4b3f-b68f-d49a9b42607f.png",
+      "token_uri": "https://stackswap-launchpad.s3.amazonaws.com/5cf0eee2-ce4a-455a-a7db-35e96c880eaa.json",
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.tokensoft-token-v4kjvtr37ht/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        },
+        {
+          "uri": "https://s3-us-east-2.amazonaws.com/stackswap-launchpad/2ef36455-de1f-4b3f-b68f-d49a9b42607f.png",
+          "error": "HTTP Error 404: Not Found"
+        }
+      ],
+      "contract": "SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.tokensoft-token-v4kjvtr37ht",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.tokensoft-token-v4kjvtr37ht",
+      "image": null,
+      "availability": "missing",
+      "displayNotice": "ART UNAVAILABLE"
+    },
+    "lemon": {
+      "key": "generational-welsh",
+      "name": "Generational Welsh",
+      "symbol": "gWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.generational-welsh/1.png",
+      "image_canonical_uri": "https://charisma.rocks/sip10/generational-welsh/logo.png",
+      "token_uri": "https://charisma.rocks/sip10/generational-welsh/metadata.json",
+      "retrieved_from": "https://charisma.rocks/sip10/generational-welsh/logo.png",
+      "sha256": "07cd03bfc279895155432f5ce19affa9150eefd11e7df25ccd025f6cf6187b2c",
+      "width": 1024,
+      "height": 1024,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.generational-welsh/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.generational-welsh",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.generational-welsh",
+      "image": "art/generational-welsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "bb98f4e1c9bc63401babf2695a8f3eb5d37c103622eadbb1728d3e3fe62f4c85",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    "chip": {
+      "key": "phoenix-welsh",
+      "name": "Phoenix Welsh",
+      "symbol": "PWEL",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3S2565C4DP2MGR3CMANMGYDCDA314Q258CG2R7C.phoenix-welsh-faktory/1.png",
+      "image_canonical_uri": "https://szigdtxfspmofhxoytra.supabase.co/storage/v1/object/public/token_logo/2dvdjwxc-phoenix-logo.svg",
+      "token_uri": "https://szigdtxfspmofhxoytra.supabase.co/storage/v1/object/public/uri/t1n7saj6-metadata.json",
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3S2565C4DP2MGR3CMANMGYDCDA314Q258CG2R7C.phoenix-welsh-faktory/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        },
+        {
+          "uri": "https://szigdtxfspmofhxoytra.supabase.co/storage/v1/object/public/token_logo/2dvdjwxc-phoenix-logo.svg",
+          "error": "HTTP Error 400: Bad Request"
+        }
+      ],
+      "contract": "SP3S2565C4DP2MGR3CMANMGYDCDA314Q258CG2R7C.phoenix-welsh-faktory",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP3S2565C4DP2MGR3CMANMGYDCDA314Q258CG2R7C.phoenix-welsh-faktory",
+      "image": null,
+      "availability": "missing",
+      "displayNotice": "ART UNAVAILABLE"
+    },
+    "block": {
+      "key": "swelsh",
+      "name": "Liquid Staked Welsh v2",
+      "symbol": "sWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh-v2/1.png",
+      "image_canonical_uri": "https://charisma.rocks/liquid-staked-welshcorgicoin.png",
+      "token_uri": "https://charisma.rocks/liquid-staked-welshcorgicoin.json",
+      "retrieved_from": "https://charisma.rocks/liquid-staked-welshcorgicoin.png",
+      "sha256": "f3dd82c29a6e1f31375c469328e78a01d6d9fa28a9cf8f9391e0e9516764f40f",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh-v2/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh-v2",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh-v2",
+      "image": "art/swelsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "6d9d6c59f39d6f2e238c99adb55b4873146ef1632deef1668ec634861325d380",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    "artifact": {
+      "key": "cvlt",
+      "name": "ANONYMOUS WELSH CVLT",
+      "symbol": "CVLT",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt/1.png",
+      "image_canonical_uri": "https://kghatiwehgh3dclz.public.blob.vercel-storage.com/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt-1734485587555-OYki3BGwYEuRsjzWUTpcgXk9DoPxBb.png",
+      "token_uri": "https://charisma.rocks/api/v0/metadata/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt",
+      "retrieved_from": "https://kghatiwehgh3dclz.public.blob.vercel-storage.com/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt-1734485587555-OYki3BGwYEuRsjzWUTpcgXk9DoPxBb.png",
+      "sha256": "5b002aecf613e00f154a964a7704cb133d5dc61a1932f205ae095b1f4f455a6a",
+      "width": 1024,
+      "height": 1024,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt",
+      "image": "art/cvlt.webp",
+      "availability": "bundled",
+      "bundledSha256": "919d557f49afc94f48756c9fe66a954c832992fe10f75f6e4cbe97f0f124f93b",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    "bitcoin": {
+      "key": "welsh",
+      "name": "Welshcorgicoin",
+      "symbol": "WELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token/1.png",
+      "image_canonical_uri": "https://raw.githubusercontent.com/Welshcorgicoin/Welshcorgicoin/main/logos/welsh_tokenlogo.png",
+      "token_uri": "https://raw.githubusercontent.com/Welshcorgicoin/Welshcorgicoin/main/packages/welshcorgicoin.json",
+      "retrieved_from": "https://raw.githubusercontent.com/Welshcorgicoin/Welshcorgicoin/main/logos/welsh_tokenlogo.png",
+      "sha256": "1153065f38d2bae1bfeb738557e00119ce8314b7cfa1cdfc7b9ff0c4e78b84fd",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token",
+      "image": "art/welsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "c98787a5bbb2df06cea0179e18bea44101f5830805f8dcc11d479feb9304f315",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    "wild": {
+      "key": "happy-welsh-1",
+      "name": "Happy Welsh #1",
+      "symbol": "HAPPY",
+      "token_id": 1,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-1.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/1.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/1.json",
+      "metadataSource": "https://api.hiro.so/metadata/v1/nft/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh/1",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/1.png",
+      "sha256": "879b6b29d746baf1719dcd6ceb7e13cf65dabb5307ae90e6334d7508f4f78bbe",
+      "bundledSha256": "406b507afd2ad045812f3d7a28cff2bdb50695ad423ff5612d44cb039f247b85",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    "vault": {
+      "key": "leo-welsh",
+      "name": "LEO-WELSH Liquidity Pool",
+      "symbol": "LEO-WELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP22KATK6MJF40987KB2KSZQ6E027HQ0CPP73C9Y.leo-welsh-v1/1.png",
+      "image_canonical_uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAAXNSR0IArs4c6QAAAEhJREFUGFdjPHP27H++HQUMn9wnMPDvKGBgvNVq8x/CKWT46NHPwAhSwb89n+Gj50QG/h35DIy3Wmz/f/boZ+DdUcDw2WMCAwAslR4CLZs5ZQAAAABJRU5ErkJggg==",
+      "token_uri": "https://metadata.charisma.rocks/api/v1/metadata/SP22KATK6MJF40987KB2KSZQ6E027HQ0CPP73C9Y.leo-welsh-v1",
+      "retrieved_from": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAAXNSR0IArs4c6QAAAEhJREFUGFdjPHP27H++HQUMn9wnMPDvKGBgvNVq8x/CKWT46NHPwAhSwb89n+Gj50QG/h35DIy3Wmz/f/boZ+DdUcDw2WMCAwAslR4CLZs5ZQAAAABJRU5ErkJggg==",
+      "sha256": "952a443c806ec78cfdf26d9c2386a728b0b0a9546a08de084f35943bcb5c471f",
+      "width": 4,
+      "height": 4,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP22KATK6MJF40987KB2KSZQ6E027HQ0CPP73C9Y.leo-welsh-v1/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP22KATK6MJF40987KB2KSZQ6E027HQ0CPP73C9Y.leo-welsh-v1",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP22KATK6MJF40987KB2KSZQ6E027HQ0CPP73C9Y.leo-welsh-v1",
+      "image": "art/leo-welsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "5081fa519e13b7669726816317e4195f49fadeb27be7029df6397cb19f7cabb2",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    }
+  },
+  "family": [
+    {
+      "key": "family-00",
+      "name": "ANONYMOUS WELSH CVLT",
+      "symbol": "CVLT",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt/1.png",
+      "image_canonical_uri": "https://kghatiwehgh3dclz.public.blob.vercel-storage.com/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt-1734485587555-OYki3BGwYEuRsjzWUTpcgXk9DoPxBb.png",
+      "token_uri": "https://charisma.rocks/api/v0/metadata/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt",
+      "retrieved_from": "https://kghatiwehgh3dclz.public.blob.vercel-storage.com/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt-1734485587555-OYki3BGwYEuRsjzWUTpcgXk9DoPxBb.png",
+      "sha256": "5b002aecf613e00f154a964a7704cb133d5dc61a1932f205ae095b1f4f455a6a",
+      "width": 1024,
+      "height": 1024,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.anonymous-welsh-cvlt",
+      "image": "art/cvlt.webp",
+      "availability": "bundled",
+      "bundledSha256": "919d557f49afc94f48756c9fe66a954c832992fe10f75f6e4cbe97f0f124f93b",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-06",
+      "name": "Charisma Virtual Welsh",
+      "symbol": "cvWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-virtual-welsh/1.png",
+      "image_canonical_uri": "https://charisma.rocks/sip10/charisma-virtual-welsh/logo.png",
+      "token_uri": "https://charisma.rocks/sip10/charisma-virtual-welsh/metadata.json",
+      "retrieved_from": "https://charisma.rocks/sip10/charisma-virtual-welsh/logo.png",
+      "sha256": "b28b7658b53f2675e3e6ed6be0c5c0b2b68dae9b2122fca64daee5d3fa2a6203",
+      "width": 1024,
+      "height": 1024,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-virtual-welsh/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-virtual-welsh",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-virtual-welsh",
+      "image": "art/family-06.webp",
+      "availability": "bundled",
+      "bundledSha256": "7970b57cd810006ffc78d760532e79698776ea4b49427e23b0f5054fafebfce9",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-09",
+      "name": "Generational Welsh",
+      "symbol": "gWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.generational-welsh/1.png",
+      "image_canonical_uri": "https://charisma.rocks/sip10/generational-welsh/logo.png",
+      "token_uri": "https://charisma.rocks/sip10/generational-welsh/metadata.json",
+      "retrieved_from": "https://charisma.rocks/sip10/generational-welsh/logo.png",
+      "sha256": "07cd03bfc279895155432f5ce19affa9150eefd11e7df25ccd025f6cf6187b2c",
+      "width": 1024,
+      "height": 1024,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.generational-welsh/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.generational-welsh",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.generational-welsh",
+      "image": "art/generational-welsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "bb98f4e1c9bc63401babf2695a8f3eb5d37c103622eadbb1728d3e3fe62f4c85",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-13",
+      "name": "Liquid Staked Babywelsh",
+      "symbol": "sBABYWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-babywelsh/1.png",
+      "image_canonical_uri": "https://charisma.rocks/liquid-staked-babywelsh.png",
+      "token_uri": "https://charisma.rocks/liquid-staked-babywelsh.json",
+      "retrieved_from": "https://charisma.rocks/liquid-staked-babywelsh.png",
+      "sha256": "251fdce7674bd7aef1fbb3fa5f110898db5d3683605aafcbdd7580415df77da5",
+      "width": 400,
+      "height": 400,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-babywelsh/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-babywelsh",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-babywelsh",
+      "image": "art/family-13.webp",
+      "availability": "bundled",
+      "bundledSha256": "13fc0252a95d9abdc213b8a6f9b94c9283fc63ede6f03f68194ee64218bb83f3",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-14",
+      "name": "Liquid Staked Welsh",
+      "symbol": "sWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh/1.png",
+      "image_canonical_uri": "https://charisma.rocks/liquid-staked-welshcorgicoin.png",
+      "token_uri": "https://charisma.rocks/liquid-staked-welshcorgicoin.json",
+      "retrieved_from": "https://charisma.rocks/liquid-staked-welshcorgicoin.png",
+      "sha256": "f3dd82c29a6e1f31375c469328e78a01d6d9fa28a9cf8f9391e0e9516764f40f",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh",
+      "image": "art/swelsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "6d9d6c59f39d6f2e238c99adb55b4873146ef1632deef1668ec634861325d380",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-15",
+      "name": "Liquid Staked Welshcorgicoin",
+      "symbol": "lsWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP1VGCMHKXYGZ4Y0DWZR6449M0EJY3PZV2XX61EMH.dme020-liquid-staked-welsh/1.png",
+      "image_canonical_uri": "https://charisma.rocks/liquid-staked-welshcorgicoin.png",
+      "token_uri": "https://charisma.rocks/liquid-staked-welshcorgicoin.json",
+      "retrieved_from": "https://charisma.rocks/liquid-staked-welshcorgicoin.png",
+      "sha256": "f3dd82c29a6e1f31375c469328e78a01d6d9fa28a9cf8f9391e0e9516764f40f",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP1VGCMHKXYGZ4Y0DWZR6449M0EJY3PZV2XX61EMH.dme020-liquid-staked-welsh/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP1VGCMHKXYGZ4Y0DWZR6449M0EJY3PZV2XX61EMH.dme020-liquid-staked-welsh",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP1VGCMHKXYGZ4Y0DWZR6449M0EJY3PZV2XX61EMH.dme020-liquid-staked-welsh",
+      "image": "art/swelsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "6d9d6c59f39d6f2e238c99adb55b4873146ef1632deef1668ec634861325d380",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-16",
+      "name": "Liquid Staked Welsh v2",
+      "symbol": "sWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh-v2/1.png",
+      "image_canonical_uri": "https://charisma.rocks/liquid-staked-welshcorgicoin.png",
+      "token_uri": "https://charisma.rocks/liquid-staked-welshcorgicoin.json",
+      "retrieved_from": "https://charisma.rocks/liquid-staked-welshcorgicoin.png",
+      "sha256": "f3dd82c29a6e1f31375c469328e78a01d6d9fa28a9cf8f9391e0e9516764f40f",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh-v2/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh-v2",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.liquid-staked-welsh-v2",
+      "image": "art/swelsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "6d9d6c59f39d6f2e238c99adb55b4873146ef1632deef1668ec634861325d380",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-18",
+      "name": "Recovery Welsh",
+      "symbol": "rWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.recovery-welsh-dexterity/1.png",
+      "image_canonical_uri": "https://charisma.rocks/welsh-logo.png",
+      "token_uri": "https://charisma.rocks/api/v0/indexes/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.recovery-welsh-dexterity",
+      "retrieved_from": "https://charisma.rocks/welsh-logo.png",
+      "sha256": "1153065f38d2bae1bfeb738557e00119ce8314b7cfa1cdfc7b9ff0c4e78b84fd",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.recovery-welsh-dexterity/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.recovery-welsh-dexterity",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.recovery-welsh-dexterity",
+      "image": "art/welsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "c98787a5bbb2df06cea0179e18bea44101f5830805f8dcc11d479feb9304f315",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-19",
+      "name": "Redemption Welsh",
+      "symbol": "rWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.redemption-welsh-dexterity/1.png",
+      "image_canonical_uri": "https://charisma.rocks/welsh-logo.png",
+      "token_uri": "https://charisma.rocks/api/v0/indexes/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.redemption-welsh-dexterity",
+      "retrieved_from": "https://charisma.rocks/welsh-logo.png",
+      "sha256": "1153065f38d2bae1bfeb738557e00119ce8314b7cfa1cdfc7b9ff0c4e78b84fd",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.redemption-welsh-dexterity/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.redemption-welsh-dexterity",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.redemption-welsh-dexterity",
+      "image": "art/welsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "c98787a5bbb2df06cea0179e18bea44101f5830805f8dcc11d479feb9304f315",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-27",
+      "name": "Synthetic Welsh",
+      "symbol": "iouWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.synthetic-welsh/1.png",
+      "image_canonical_uri": "https://charisma.rocks/welsh-logo.png",
+      "token_uri": "https://charisma.rocks/api/v0/tokens/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.synthetic-welsh",
+      "retrieved_from": "https://charisma.rocks/welsh-logo.png",
+      "sha256": "1153065f38d2bae1bfeb738557e00119ce8314b7cfa1cdfc7b9ff0c4e78b84fd",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.synthetic-welsh/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.synthetic-welsh",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.synthetic-welsh",
+      "image": "art/welsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "c98787a5bbb2df06cea0179e18bea44101f5830805f8dcc11d479feb9304f315",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-32",
+      "name": "Virtual Welsh",
+      "symbol": "vWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.virtual-welsh-dexterity/1.png",
+      "image_canonical_uri": "https://charisma.rocks/welsh-logo.png",
+      "token_uri": "https://charisma.rocks/api/v0/indexes/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.virtual-welsh-dexterity",
+      "retrieved_from": "https://charisma.rocks/welsh-logo.png",
+      "sha256": "1153065f38d2bae1bfeb738557e00119ce8314b7cfa1cdfc7b9ff0c4e78b84fd",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.virtual-welsh-dexterity/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.virtual-welsh-dexterity",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.virtual-welsh-dexterity",
+      "image": "art/welsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "c98787a5bbb2df06cea0179e18bea44101f5830805f8dcc11d479feb9304f315",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-35",
+      "name": "Welsh Community LP",
+      "symbol": "STX-WELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-community-lp/1.png",
+      "image_canonical_uri": "https://kghatiwehgh3dclz.public.blob.vercel-storage.com/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-community-lp-1734444867488-jMsQNrQe3wPsmjRcs2DS0KlubgNqaO.png",
+      "token_uri": "https://charisma.rocks/api/v0/metadata/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-community-lp",
+      "retrieved_from": "https://kghatiwehgh3dclz.public.blob.vercel-storage.com/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-community-lp-1734444867488-jMsQNrQe3wPsmjRcs2DS0KlubgNqaO.png",
+      "sha256": "69ffbbb8e44586ba0d326faa2a23ad9fcbb6302a3eba18f95fed682821528901",
+      "width": 1024,
+      "height": 1024,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-community-lp/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-community-lp",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-community-lp",
+      "image": "art/family-35.webp",
+      "availability": "bundled",
+      "bundledSha256": "56b2094ada32ae7d31e10761d0de16415d9b4f6ebe12167fb1634c80b9efbd5f",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-36",
+      "name": "Welsh Community Pool",
+      "symbol": "vlSTXWELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.vlistx-welsh/1.png",
+      "image_canonical_uri": "https://charisma.rocks/sip10/vlistx-welsh/logo.png",
+      "token_uri": "https://charisma.rocks/sip10/vlistx-welsh/metadata.json",
+      "retrieved_from": "https://charisma.rocks/sip10/vlistx-welsh/logo.png",
+      "sha256": "e8e15bfa810dfc123fc6223215edca5910c602b2e57a1e95827af3c220a0522d",
+      "width": 170,
+      "height": 170,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.vlistx-welsh/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.vlistx-welsh",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.vlistx-welsh",
+      "image": "art/family-36.webp",
+      "availability": "bundled",
+      "bundledSha256": "e87f56571ae1492d7272be76f900b77e53282804da0525f98f412f6c9ee1b084",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-39",
+      "name": "Welshcorgicoin",
+      "symbol": "WELSH",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token/1.png",
+      "image_canonical_uri": "https://raw.githubusercontent.com/Welshcorgicoin/Welshcorgicoin/main/logos/welsh_tokenlogo.png",
+      "token_uri": "https://raw.githubusercontent.com/Welshcorgicoin/Welshcorgicoin/main/packages/welshcorgicoin.json",
+      "retrieved_from": "https://raw.githubusercontent.com/Welshcorgicoin/Welshcorgicoin/main/logos/welsh_tokenlogo.png",
+      "sha256": "1153065f38d2bae1bfeb738557e00119ce8314b7cfa1cdfc7b9ff0c4e78b84fd",
+      "width": 500,
+      "height": 500,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token",
+      "image": "art/welsh.webp",
+      "availability": "bundled",
+      "bundledSha256": "c98787a5bbb2df06cea0179e18bea44101f5830805f8dcc11d479feb9304f315",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-53",
+      "name": "Welsh Street Credit",
+      "symbol": "CREDIT",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2A7PT3DMWVT2BHHMKQ2T0Y4AA05NST96SDM2FCE.credit-token/1.png",
+      "image_canonical_uri": "https://gateway.lighthouse.storage/ipfs/bafkreicxdhvgagftckl4dqjtaoypa6tlnkhv4qa6ze5sgp5hpvg7i7p4bq",
+      "token_uri": "https://gateway.lighthouse.storage/ipfs/bafkreielnxwkpvkmu7ldbc6jf5g6lwqff66ebyo7px7c2adv6rcpw2ge4a",
+      "retrieved_from": "https://gateway.lighthouse.storage/ipfs/bafkreicxdhvgagftckl4dqjtaoypa6tlnkhv4qa6ze5sgp5hpvg7i7p4bq",
+      "sha256": "5719ea6018b31297c1c13303b0f07a6b6a8f5e401ec93b233fa77d4df47dfc0c",
+      "width": 420,
+      "height": 420,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2A7PT3DMWVT2BHHMKQ2T0Y4AA05NST96SDM2FCE.credit-token/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2A7PT3DMWVT2BHHMKQ2T0Y4AA05NST96SDM2FCE.credit-token",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2A7PT3DMWVT2BHHMKQ2T0Y4AA05NST96SDM2FCE.credit-token",
+      "image": "art/family-53.webp",
+      "availability": "bundled",
+      "bundledSha256": "fed6c3a1b82f5fa65f7962b43452d1b84347eaccb2ed107fb5564682bd6b1f10",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-54",
+      "name": "Welsh Street Token",
+      "symbol": "STREET",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2A7PT3DMWVT2BHHMKQ2T0Y4AA05NST96SDM2FCE.street-token/1.png",
+      "image_canonical_uri": "https://gateway.lighthouse.storage/ipfs/bafkreid6dibxasf55pkiwe4aupbyllblyee2j4oe46uy6jkthg3by2ovra",
+      "token_uri": "https://gateway.lighthouse.storage/ipfs/bafkreicumllhuvaggdlvghrg5zli4yzb2h3rp2ualepq24av7ivcp2s7em",
+      "retrieved_from": "https://gateway.lighthouse.storage/ipfs/bafkreid6dibxasf55pkiwe4aupbyllblyee2j4oe46uy6jkthg3by2ovra",
+      "sha256": "7e1a037048bdebd48b1380a3c385ac2bc109a4f1c4e7a98f255339b61c69d588",
+      "width": 420,
+      "height": 420,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2A7PT3DMWVT2BHHMKQ2T0Y4AA05NST96SDM2FCE.street-token/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2A7PT3DMWVT2BHHMKQ2T0Y4AA05NST96SDM2FCE.street-token",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2A7PT3DMWVT2BHHMKQ2T0Y4AA05NST96SDM2FCE.street-token",
+      "image": "art/family-54.webp",
+      "availability": "bundled",
+      "bundledSha256": "1843dc91993fc61682c8ce4f881b96bc4dad6fd12ad226bb1fda5b4c55f28e95",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    },
+    {
+      "key": "family-57",
+      "name": "Welsh Unleashed",
+      "symbol": "WXL",
+      "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-unleashed-dexterity/1.png",
+      "image_canonical_uri": "https://charisma.rocks/indexes/welsh-unleashed.jpeg",
+      "token_uri": "https://charisma.rocks/api/v0/indexes/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-unleashed-dexterity",
+      "retrieved_from": "https://charisma.rocks/indexes/welsh-unleashed.jpeg",
+      "sha256": "f17c6b5c480eda0007dc9992132398f51443c8dec1ff10212b5b927392b687b0",
+      "width": 1024,
+      "height": 1024,
+      "attempt_errors": [
+        {
+          "uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-unleashed-dexterity/1.png",
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-unleashed-dexterity",
+      "permission": "Project / artist permission required before public use",
+      "snapshotDate": "2026-11-03",
+      "metadataSource": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.welsh-unleashed-dexterity",
+      "image": "art/family-57.webp",
+      "availability": "bundled",
+      "bundledSha256": "1a91673250a68f8b30ab4396c63b3946632d3a29df76a133ec94cdc48bc510b6",
+      "processing": "Proportional fit within 480\u00d7480, no crop, no redraw or recolour; lossless WebP encoding. Original source SHA-256 recorded."
+    }
+  ],
+  "happyWelsh": [
+    {
+      "key": "happy-welsh-1",
+      "name": "Happy Welsh #1",
+      "symbol": "HAPPY",
+      "token_id": 1,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-1.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/1.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/1.json",
+      "metadataSource": "https://api.hiro.so/metadata/v1/nft/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh/1",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/1.png",
+      "sha256": "879b6b29d746baf1719dcd6ceb7e13cf65dabb5307ae90e6334d7508f4f78bbe",
+      "bundledSha256": "406b507afd2ad045812f3d7a28cff2bdb50695ad423ff5612d44cb039f247b85",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    {
+      "key": "happy-welsh-3",
+      "name": "Happy Welsh #3",
+      "symbol": "HAPPY",
+      "token_id": 3,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-3.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/3.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/3.json",
+      "metadataSource": "https://ipfs.filebase.io/ipfs/QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/3.json",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/3.png",
+      "sha256": "bf44cf67f533e9f3b747e3212468cbfefaffc69ae36d431bcdfb12529f68b01d",
+      "bundledSha256": "17cba30c238b72ccf710a3ace3ad15017b8b83130f09efea0bd4cc8988090780",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    {
+      "key": "happy-welsh-4",
+      "name": "Happy Welsh #4",
+      "symbol": "HAPPY",
+      "token_id": 4,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-4.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/4.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/4.json",
+      "metadataSource": "https://ipfs.filebase.io/ipfs/QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/4.json",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/4.png",
+      "sha256": "0abce1cf314a0fbdbfae435522c1b1dfee52b95c62b9e92072cea0428b38c78b",
+      "bundledSha256": "3ddc00e70d8db30673eb50813505af386bf0d7a0f6e319112b93738cdd75cf29",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    {
+      "key": "happy-welsh-5",
+      "name": "Happy Welsh #5",
+      "symbol": "HAPPY",
+      "token_id": 5,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-5.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/5.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/5.json",
+      "metadataSource": "https://ipfs.filebase.io/ipfs/QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/5.json",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/5.png",
+      "sha256": "67d0daed195234461364e83bccb68464a281eaf60b3db0a45e97ec5352799b79",
+      "bundledSha256": "c5bf0f13268353551eb15bd5857bf8ac6bdaefae9aa22ee53365c9ed5bebf42a",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    {
+      "key": "happy-welsh-7",
+      "name": "Happy Welsh #7",
+      "symbol": "HAPPY",
+      "token_id": 7,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-7.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/7.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/7.json",
+      "metadataSource": "https://ipfs.filebase.io/ipfs/QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/7.json",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/7.png",
+      "sha256": "c289a7883bbb5b9d4ff1e004db80e4d4caec2800cded3d462332082b166d43cb",
+      "bundledSha256": "7dc7c9115841101697bf85182603ea179b01e647376d2be6f4df4bf14049a7fd",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    {
+      "key": "happy-welsh-8",
+      "name": "Happy Welsh #8",
+      "symbol": "HAPPY",
+      "token_id": 8,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-8.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/8.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/8.json",
+      "metadataSource": "https://ipfs.filebase.io/ipfs/QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/8.json",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/8.png",
+      "sha256": "b979d3017baa5c2714e01ff84ad3c9be818b48fe5152bbdcf64a8f5d69b10d76",
+      "bundledSha256": "e635738e139c6113ceccc51ad0d917c1853e7dbe0bf48c5e8fa2b84aa378752c",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    {
+      "key": "happy-welsh-11",
+      "name": "Happy Welsh #11",
+      "symbol": "HAPPY",
+      "token_id": 11,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-11.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/11.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/11.json",
+      "metadataSource": "https://api.hiro.so/metadata/v1/nft/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh/11",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/11.png",
+      "sha256": "37670dac14be55f7ef76dca073967e8ae831526cd9b9a98af66535fe6558bb41",
+      "bundledSha256": "137d2c276c6c603047c5eedea077dc17f1c224133e2c91dade640fd654c97c21",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    {
+      "key": "happy-welsh-12",
+      "name": "Happy Welsh #12",
+      "symbol": "HAPPY",
+      "token_id": 12,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-12.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/12.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/12.json",
+      "metadataSource": "https://ipfs.filebase.io/ipfs/QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/12.json",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/12.png",
+      "sha256": "f372814c92219c65f41c742f58996c1ab9901b5d2aae2568a257e4b8bb0bfad3",
+      "bundledSha256": "4e0bfa75786dd3f935352525e96c2a359a1ecc3f9b53bd92832dd535368dbed9",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    {
+      "key": "happy-welsh-13",
+      "name": "Happy Welsh #13",
+      "symbol": "HAPPY",
+      "token_id": 13,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-13.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/13.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/13.json",
+      "metadataSource": "https://ipfs.filebase.io/ipfs/QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/13.json",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/13.png",
+      "sha256": "aedb41f765d6dfd9cbc2b04e795d6bb614e738b0b1907a32aa15eb7926247ac1",
+      "bundledSha256": "1fcc18e241779814857b1cb846b270fd59463860d2aece334b8577bc9da88ac5",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    },
+    {
+      "key": "happy-welsh-18",
+      "name": "Happy Welsh #18",
+      "symbol": "HAPPY",
+      "token_id": 18,
+      "contract": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh",
+      "image": "art/happy-welsh-18.webp",
+      "image_uri": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/18.png",
+      "token_uri": "ipfs://QmTZ7BtjVrxGnELvzb2HXv3K7mf6PQ4Mvgz7nvpWdFKtCQ/18.json",
+      "metadataSource": "https://api.hiro.so/metadata/v1/nft/SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.happy-welsh/18",
+      "retrieved_from": "https://ipfs.filebase.io/ipfs/QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/18.png",
+      "sha256": "267db779210eeb0aa5a97bc6839fb3e9cb4b6078d65ea9dadc65a1534af9ef36",
+      "bundledSha256": "702cf3c32816461106a935e0697a734b7fe43299ea74e5b145a01499f227afd3",
+      "availability": "bundled",
+      "snapshotDate": "2026-11-03",
+      "foreverStatus": "not-yet-forever",
+      "foreverStatusBasis": "Official source registry snapshot retrieved 2026-11-03; no Happy Welsh helper",
+      "permission": "Happy Welsh artwork permission required before public build",
+      "processing": "Proportional downsample to 480\u00d7480; no crop/redraw/recolour; lossless WebP encoding"
+    }
+  ],
+  "dayOne": {
+    "txId": "0x51a1069fc2b9ed446136a5bacff92710fa42206893ace3d9d423337f50e1e355",
+    "contract": "SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token",
+    "blockHeight": 39013,
+    "burnBlockHeight": 711078,
+    "date": "2021-11-24T06:14:54.000Z",
+    "source": "https://api.hiro.so/extended/v1/tx/0x51a1069fc2b9ed446136a5bacff92710fa42206893ace3d9d423337f50e1e355",
+    "explorer": "https://explorer.hiro.so/txid/0x51a1069fc2b9ed446136a5bacff92710fa42206893ace3d9d423337f50e1e355?chain=mainnet",
+    "status": "verified",
+    "snapshotDate": "2026-11-03"
+  },
+  "registry": {
+    "status": "snapshot-verified",
+    "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/forever-twins/data/registry.v2.json",
+    "snapshotDate": "2026-11-03",
+    "sha256": "89ca1958a57fc8753f8c704332ae072dd0d1e9a14708a6fb4c5dbca3edebad0b",
+    "liveEndpoint": "https://xtrata.xyz/forever-twins/data/registry.v2.json",
+    "liveEndpointRead": "HTTP 403",
+    "happyWelshHelper": false,
+    "happyWelshListed": false,
+    "note": "Official source-repository registry snapshot lists no Happy Welsh collection/helper. This is a registry snapshot, not a live eligibility count."
+  },
+  "notes": [
+    "Tokens are art only. Their holders earn nothing from this machine by virtue of these tokens.",
+    "The exact LEO-WELSH token metadata supplies a 4\u00d74 pixel image; this is its genuine published art, not an error. Use pixelated scaling, with the token name alongside it.",
+    "Hiro cached image endpoints all returned 403. Successful artwork came from the canonical URI given in Hiro exact-contract metadata.",
+    "15+ pedigree requirement: 17 distinct metadata-verified contracts with successfully retrieved logos, examined for offensive material. Multiple distinct tokens legitimately use the same WELSH artwork."
+  ],
+  "audio": {
+    "bark": {
+      "name": "Dog barking mono",
+      "creator": "Brandon Morris (submitted by HaelDB)",
+      "source": "https://opengameart.org/content/dog-barking-mono",
+      "download": "https://opengameart.org/sites/default/files/dog_barking_mono.wav",
+      "image": null,
+      "file": "art/audio/bark.mp3",
+      "durationSeconds": 0.32,
+      "processing": "First bark, 0.32 s; 4 ms fade-in, 40 ms fade-out; mono 44.1 kHz MP3 64 kbit/s.",
+      "originalSha256": "bbd0f908b3514dd3bd7d2bc04dcf64f8d360a161e7f43cac5d6761e7add79451",
+      "sha256": "723cf59bb80194f41e646ee7a1a6b58b8d925fb9349c1c6cebb180f4828a8740",
+      "licence": "CC0 1.0",
+      "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "checkedAt": "2026-11-03",
+      "permission": "CC0 option explicitly offered on original author submission page; no separate permission required for this licence.",
+      "encodedDurationSeconds": 0.365714
+    },
+    "applause": {
+      "name": "Applause in a large hall or church",
+      "creator": "eXpl0it3r",
+      "source": "https://opengameart.org/content/applause-in-a-large-hall-or-church",
+      "download": "https://opengameart.org/sites/default/files/applause-clapping-church-crowd-immersive.wav",
+      "file": "art/audio/applause.mp3",
+      "durationSeconds": 4.5,
+      "processing": "First 4.5 s; 120 ms fade-in, 1.1 s fade-out; stereo 44.1 kHz MP3 96 kbit/s.",
+      "originalSha256": "0d3bfde5a050f3c5e6685bd7f1efc7ab1d289fbad65c88c1ce9b4691228c69c9",
+      "sha256": "ff1115b4c3955ce026c01383e23584a7be8a8b8b042e0f08b3bede692c106944",
+      "licence": "CC0 1.0",
+      "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "checkedAt": "2026-11-03",
+      "permission": "CC0 option explicitly offered on original author submission page; no separate permission required for this licence.",
+      "encodedDurationSeconds": 4.545306
+    }
+  }
+}

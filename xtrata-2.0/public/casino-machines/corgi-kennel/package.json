@@ -1,0 +1,18 @@
+{
+  "name": "parallax-corgi-kennel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Corgi Kennel standalone Series Bible 2.1 machine; no install required to play index.html",
+  "scripts": {
+    "build": "node tools/build-cabinet.mjs && node tools/build-pack.mjs",
+    "check": "node tools/check-engine.mjs && node tools/check-lab.mjs && node tools/check-controller.mjs && node tools/check-lease.mjs",
+    "rtp": "node tools/rtp.mjs 5000000"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "0.1.100"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

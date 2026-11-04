@@ -1,0 +1,27 @@
+[
+  {
+    "sound": "dog",
+    "author": "Brandon Morris (submitted by HaelDB)",
+    "declaredLicences": [
+      "OGA-BY 3.0",
+      "CC0 1.0"
+    ],
+    "chosenLicence": "CC0 1.0",
+    "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "sourcePage": "https://opengameart.org/content/dog-barking-mono",
+    "pageSha256": "c15b6087d8880d85fa0635d26a50263d32cfcb372ce4f02e0ba447e16d632495",
+    "retrievedAt": "2026-11-03"
+  },
+  {
+    "sound": "applause",
+    "author": "eXpl0it3r",
+    "declaredLicences": [
+      "CC0 1.0"
+    ],
+    "chosenLicence": "CC0 1.0",
+    "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "sourcePage": "https://opengameart.org/content/applause-in-a-large-hall-or-church",
+    "pageSha256": "c20a738c4622c8d7d0f2f0462b8070cb6199a2c02ca7ca0b10af4289ddc31cc2",
+    "retrievedAt": "2026-11-03"
+  }
+]

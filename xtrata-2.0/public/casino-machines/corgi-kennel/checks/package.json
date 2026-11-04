@@ -1,0 +1,6 @@
+{
+  "name": "corgi-kennel-controller-checks",
+  "private": true,
+  "description": "Node DOM and IndexedDB harness dependencies only; the standalone game needs no installation.",
+  "dependencies": { "linkedom": "0.18.12", "fake-indexeddb": "6.2.4" }
+}

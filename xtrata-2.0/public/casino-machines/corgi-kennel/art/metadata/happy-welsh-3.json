@@ -1,0 +1,34 @@
+{
+  "name": "Happy Welsh #3",
+  "collection": "Happy Welsh",
+  "image": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/3.png",
+  "dna": "0112243842155",
+  "edition": 3,
+  "date": 1638864615193,
+  "attributes": [
+    {
+      "trait_type": "Background",
+      "value": "Green"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Pattern"
+    },
+    {
+      "trait_type": "Eye",
+      "value": "Frown Eyes"
+    },
+    {
+      "trait_type": "Neck",
+      "value": "Blue Collar"
+    },
+    {
+      "trait_type": "Hair",
+      "value": "Arch Wizard Hat"
+    },
+    {
+      "trait_type": "Mouse",
+      "value": "Mustache"
+    }
+  ]
+}

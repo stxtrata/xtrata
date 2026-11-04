@@ -1,0 +1,34 @@
+{
+  "name": "Happy Welsh #13",
+  "collection": "Happy Welsh",
+  "image": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/13.png",
+  "dna": "02112113241152",
+  "edition": 13,
+  "date": 1638864620033,
+  "attributes": [
+    {
+      "trait_type": "Background",
+      "value": "Blue"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Plain"
+    },
+    {
+      "trait_type": "Eye",
+      "value": "Laser"
+    },
+    {
+      "trait_type": "Neck",
+      "value": "Red Bowtie"
+    },
+    {
+      "trait_type": "Hair",
+      "value": "Okcoin Ballcap"
+    },
+    {
+      "trait_type": "Mouse",
+      "value": "Tongue"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "three": "128",
+  "geometries": 76,
+  "materials": 36,
+  "textures": 16,
+  "meshes": 196,
+  "triangles": 29194,
+  "min": [
+    -1.48,
+    -0.055,
+    -0.735
+  ],
+  "max": [
+    1.8,
+    6.44638,
+    1.14923
+  ],
+  "size": [
+    3.28,
+    6.50138,
+    1.88423
+  ],
+  "bytes": 2115115,
+  "welshLogo": "art/welsh.webp"
+}

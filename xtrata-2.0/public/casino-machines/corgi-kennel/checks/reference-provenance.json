@@ -1,0 +1,115 @@
+{
+  "retrievedAt": "2026-11-03T15:40:33.576935+00:00",
+  "repository": "https://github.com/stxtrata/xtrata",
+  "ref": "main",
+  "files": [
+    {
+      "path": "xtrata-2.0/public/casino/index.html",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino/index.html",
+      "bytes": 24224362,
+      "sha256": "e7e83b2d888aaae700cb1a29c4d80f8642d9b37e87c4ed769792e4cade3719f4"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/INTEGRATION.md",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/INTEGRATION.md",
+      "bytes": 9095,
+      "sha256": "f93be837750ac720d0259c4f9c06be2e6d12f4cf79b48a4d6db957a40e893a01"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/README.md",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/README.md",
+      "bytes": 8087,
+      "sha256": "8f62ed0a8d2ae68f2d9450f161640f338a66f5d15c39eb62866ef4c8c243453a"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/index.html",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/index.html",
+      "bytes": 26828,
+      "sha256": "b8bf79b64d7a0b3b3259cb586da0e295fec44a501aede381da719da259ce9bf8"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/src/cabinet.js",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/src/cabinet.js",
+      "bytes": 17922,
+      "sha256": "5fe51747c70e3792a31e3439a30d12fde14f4e519714240bfa663310f03bfd29"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/src/game.js",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/src/game.js",
+      "bytes": 120633,
+      "sha256": "036b38469402c87c5ab8c19647ef83098ec8039d2f570a8bc091eb7b739f24c3"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/tools/build-cabinet.mjs",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/tools/build-cabinet.mjs",
+      "bytes": 5770,
+      "sha256": "9ab31dd3f081cfd665b7300dda34e338d6af11c6079c4451ff5c669c4fc437ca"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/tools/build.mjs",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/tools/build.mjs",
+      "bytes": 15547,
+      "sha256": "244a5fc3bfcda3397c6c914bc68de4495edd98ac583a295d6476401b861aff55"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/tools/rtp-sim.cjs",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/tools/rtp-sim.cjs",
+      "bytes": 2809,
+      "sha256": "ad16371ea099386cd55436227172304f99329eb2fbaacc4de4ef3be4c4fa45de"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/vendor/brand/parallax-casino-wordmark.svg",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/vendor/brand/parallax-casino-wordmark.svg",
+      "bytes": 11013,
+      "sha256": "a6d24ced3c718ac89d4c754fd53693cd8686412d3b4b312d965c1c4eaed0a7f1"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/vendor/layr-test-stub.js",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/vendor/layr-test-stub.js",
+      "bytes": 10078,
+      "sha256": "0aeeca95bd810f2832a13ec3e9fc8bf4c38a3eb97df3ab4427213a0ad1710775"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/vendor/software-renderer.js",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/vendor/software-renderer.js",
+      "bytes": 5023,
+      "sha256": "f7ff6c2e134c09cb1ec06706a420c749f76541ff7e05a699ab95fdccda1a3370"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/vendor/three-subset.js",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/vendor/three-subset.js",
+      "bytes": 521223,
+      "sha256": "6ac8a11e9bfb6bf6a3964520aa57424eac9b631fbc4aa74ef1560738557fb01c"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/ordinal-rush/vendor/xlogo.js",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/ordinal-rush/vendor/xlogo.js",
+      "bytes": 2227,
+      "sha256": "3580ecfc8d515c7f31e2d3f6222aa1b7e7c6832262fc080e92b2ac8340cb5dea"
+    },
+    {
+      "path": "xtrata-2.0/public/casino-machines/snow-crash/INTEGRATION.md",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/public/casino-machines/snow-crash/INTEGRATION.md",
+      "bytes": 11360,
+      "sha256": "f32ca990f280444b7bb481739b9d1154e54721510d373b236d2cbe389ab2afda"
+    },
+    {
+      "path": "xtrata-2.0/tools/snow-crash/src/bf-engine.js",
+      "source": "https://raw.githubusercontent.com/stxtrata/xtrata/main/xtrata-2.0/tools/snow-crash/src/bf-engine.js",
+      "bytes": 11784,
+      "sha256": "7f619182ada01119a713c64874eb1a7e024d7c210e0dca0ec2e8afc05c143168"
+    }
+  ],
+  "engineVerification": {
+    "characters": 11429,
+    "sha256": "203f8735007d8df9c2058be24c8e65fe269abac341438c0217128baef69f9bed",
+    "identicalTo": [
+      "public-packs/forever-twins/engine.js",
+      "public-packs/the-drop/engine.js",
+      "public-packs/block-fortune/engine.js"
+    ]
+  },
+  "unavailable": [
+    "xtrata-2.0/public/casino-machines/dog-army/ (absent in public main tree on retrieval)"
+  ]
+}

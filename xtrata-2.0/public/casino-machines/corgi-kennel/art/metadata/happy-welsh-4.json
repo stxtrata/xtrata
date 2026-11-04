@@ -1,0 +1,34 @@
+{
+  "name": "Happy Welsh #4",
+  "collection": "Happy Welsh",
+  "image": "ipfs://QmajLS1WEMdBCNPwFh3yRKPxSiYQnfiZqooSyreGsXtzX1/4.png",
+  "dna": "01122831341254",
+  "edition": 4,
+  "date": 1638864615633,
+  "attributes": [
+    {
+      "trait_type": "Background",
+      "value": "Green"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Pattern"
+    },
+    {
+      "trait_type": "Eye",
+      "value": "Shy"
+    },
+    {
+      "trait_type": "Neck",
+      "value": "Bone Necklace"
+    },
+    {
+      "trait_type": "Hair",
+      "value": "M Ballcap"
+    },
+    {
+      "trait_type": "Mouse",
+      "value": "Open Mouth"
+    }
+  ]
+}

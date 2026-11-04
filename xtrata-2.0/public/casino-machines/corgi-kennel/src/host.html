@@ -1,0 +1,30 @@
+<div id="studio" aria-label="Interactive Corgi Kennel cabinet"></div>
+<div id="screenLowerMask" aria-hidden="true"></div>
+<header id="topbar">
+  <div class="brand"><span class="edition" aria-hidden="true">21</span><div><p class="eyebrow">PARALLAX · KENNEL CLUB EDITION</p><h1>Corgi Kennel</h1></div></div>
+  <nav class="views" aria-label="Machine view"><button id="viewCabinet" class="view active" aria-pressed="true">Cabinet</button><button id="viewScreen" class="view" aria-pressed="false">Screen</button><button id="viewFullscreen" class="fullscreen-button" aria-label="Enter fullscreen">⛶ <span>Fullscreen</span></button></nav>
+  <div class="wallet"><span>PLAY CHIPS</span><strong id="hostBalance">10,000</strong></div>
+</header>
+<div id="introNote"><span class="rule"></span><span>Every dog has its day.</span><span class="rule"></span></div>
+<div id="cabinetHint"><span class="hint-mark">↔</span> Drag to turn · Pull the brass lead to play</div>
+<div id="deckHitAreas" aria-label="Physical deck controls"></div>
+<footer id="controlStrip">
+  <div class="play-controls">
+    <div class="bet-group"><button data-action="betDown" title="Fewer treats · Bet down" aria-label="Fewer treats, decrease bet">−</button><div><span>TREATS / BET</span><strong id="hostBet">100</strong></div><button data-action="betUp" title="More treats · Bet up" aria-label="More treats, increase bet">+</button></div>
+    <button data-action="spin" id="hostFetch" class="fetch"><span>FETCH</span><small>SPIN · SPACE</small></button>
+    <button data-action="auto" id="hostAuto" class="named"><span>AUTO-WALK</span><small>AUTO</small></button>
+    <span class="control-divider"></span>
+    <button data-action="pays" class="named"><span>PEDIGREE</span><small>PAYS & RULES</small></button>
+    <button data-action="fair" class="named"><span>FAIR PLAY</span><small>ODDS & RETURN</small></button>
+    <button data-action="fund" class="named"><span>THE FUND</span><small>FOREVER TWINS</small></button>
+    <button data-action="history" class="named"><span>HISTORY</span><small>YOUR ROUNDS</small></button>
+    <button data-action="lab" class="named lab-control"><span>BONUS LAB</span><small>PRACTICE · L</small></button>
+    <button data-action="sound" id="hostSound" class="icon-button" aria-label="Toggle sound" title="Toggle sound">♪</button>
+    <button data-action="turbo" id="hostTurbo" class="icon-button" aria-label="Toggle turbo" title="Toggle turbo">»</button>
+    <button data-action="test" id="hostTest" class="named test-only"><span>TEST</span><small>DEVELOPER</small></button>
+  </div>
+  <div class="statusline"><span><i></i> STANDALONE · PLAY CHIPS ONLY</span><span id="hostState">Opening the show…</span><span class="keyboard-hint">SPACE TO FETCH · F FOR FULLSCREEN</span></div>
+</footer>
+<iframe id="gameFrame" title="Corgi Kennel game and panels" allow="autoplay; fullscreen" tabindex="-1" aria-hidden="true"></iframe>
+<div id="loading"><div class="loading-rosette">21</div><p class="eyebrow">THE SHOW IS ABOUT TO BEGIN</p><h2>Corgi Kennel</h2><div class="loading-line"><span></span></div><p id="loadingMessage">Preparing the cabinet…</p></div>
+<div id="hostError" role="alert" hidden></div>
