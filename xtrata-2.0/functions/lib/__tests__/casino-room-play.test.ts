@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ALL_MACHINES, CORE_MACHINES, ROTATION_MACHINES } from '../casino-machines';
 import {
   MACHINE_IDS,
   MAX_BET,
@@ -27,11 +28,18 @@ const peer = (id: string, a: string | null, now = 1000): Peer => newPeer(id, a, 
 const play = (extra: Record<string, unknown> = {}) => JSON.stringify({ t: 'play', spot: 'drop.1', s: [3, 41, 0, 17, 9], b: 100, f: false, ...extra });
 
 describe('spin replay: what counts as a spin', () => {
-  it('knows the ten cabinets and nothing else', () => {
+  it('knows the core ten cabinets, then two for every rotation machine, and nothing else', () => {
     const cabinets = SPOTS.filter((s) => isMachineSpot(s));
-    expect(cabinets).toEqual(['drop.1', 'drop.2', 'twins.1', 'twins.2', 'ds.1', 'ds.2', 'bf.1', 'bf.2', 'nv.1', 'nv.2']);
-    expect(MACHINE_IDS.length).toBe(5);
-    for (const notACabinet of ['blackjack.1', 'roulette.pad', 'bar.1', 'drop.3', 'drop', '', null, 7]) expect(isMachineSpot(notACabinet)).toBe(false);
+    expect(cabinets.slice(0, 10)).toEqual(['drop.1', 'drop.2', 'twins.1', 'twins.2', 'ds.1', 'ds.2', 'bf.1', 'bf.2', 'nv.1', 'nv.2']);
+    expect(cabinets.slice(10)).toEqual(ROTATION_MACHINES.flatMap((id) => [`${id}.1`, `${id}.2`]));
+    expect(cabinets.length).toBe(ALL_MACHINES.length * 2);
+    expect(MACHINE_IDS.length).toBe(CORE_MACHINES.length + ROTATION_MACHINES.length);
+    for (const notACabinet of ['blackjack.1', 'roulette.pad', 'bar.1', 'drop.3', 'drop', 'hot-wallet.3', 'hot-wallet', '', null, 7]) expect(isMachineSpot(notACabinet)).toBe(false);
+    expect(isMachineSpot('hot-wallet.2')).toBe(true);
+  });
+
+  it('accepts a spin from a rotation machine cabinet', () => {
+    expect(parseClientMessage(play({ spot: 'ordinal-rush.1' }))).toMatchObject({ ok: true, msg: { spot: 'ordinal-rush.1' } });
   });
 
   it('parses a spin', () => {

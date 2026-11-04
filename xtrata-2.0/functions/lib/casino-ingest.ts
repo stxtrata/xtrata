@@ -11,6 +11,8 @@
  * Validation is strict and silent: a bad envelope drops the whole request, a bad event drops only that event.
  * Nothing here ever throws on hostile input.
  */
+import { ROTATION_MACHINES } from './casino-machines';
+
 export const MAX_EVENTS = 50;
 export const MAX_BODY_BYTES = 64_000;
 export const MAX_DETAIL_CHARS = 400;
@@ -26,7 +28,7 @@ export const SAMPLE_CAUTION =
   "Small samples swing widely. A slot machine's real return only settles near its design figure after about a million paid spins (plus or minus 1%). Before that, a high or low reading is mostly luck.";
 
 export const PAGES = ['casino', 'casino-b'] as const;
-export const GAME_MACHINES = ['bf', 'drop', 'twins', 'ds', 'nv'] as const;
+export const GAME_MACHINES = ['bf', 'drop', 'twins', 'ds', 'nv', ...ROTATION_MACHINES] as const;
 export const MACHINES = [...GAME_MACHINES, 'ex', 'bank'] as const;
 export const KINDS = ['spin', 'bonus', 'gamble', 'buy', 'move'] as const;
 
