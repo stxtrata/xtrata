@@ -1,0 +1,233 @@
+[
+ {
+  "project": "CityCoins / MiamiCoin",
+  "contractName": "miamicoin-core-v1",
+  "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-core-v1",
+  "blockHeight": 24341,
+  "txId": "0x224eb853ab072591c382b1c917136dcdd6590df80ab646bfed432d779612258f",
+  "deployedAt": "2021-08-03T16:43:22Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-core-v1",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x224eb853ab072591c382b1c917136dcdd6590df80ab646bfed432d779612258f"
+ },
+ {
+  "project": "CityCoins / MiamiCoin",
+  "contractName": "miamicoin-token",
+  "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token",
+  "blockHeight": 24339,
+  "txId": "0xc513b769c261233865c43f101438bd6359636ecacfe34576e6424d6c2629174e",
+  "deployedAt": "2021-08-03T16:27:26Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xc513b769c261233865c43f101438bd6359636ecacfe34576e6424d6c2629174e"
+ },
+ {
+  "project": "CityCoins / MiamiCoin",
+  "contractName": "miamicoin-auth",
+  "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-auth",
+  "blockHeight": 24338,
+  "txId": "0x3c9303ada7f0dbf6f814722cb4a6c13752f187bde0b800bd6f84a342505e006b",
+  "deployedAt": "2021-08-03T16:14:18Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-auth",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x3c9303ada7f0dbf6f814722cb4a6c13752f187bde0b800bd6f84a342505e006b"
+ },
+ {
+  "project": "CityCoins",
+  "contractName": "citycoin-vrf",
+  "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-vrf",
+  "blockHeight": 24334,
+  "txId": "0x6e18dbc3a687270a7015ebef73a590d4f066538b41bf7cb7c8d7d891b6442964",
+  "deployedAt": "2021-08-03T15:39:12Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-vrf",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x6e18dbc3a687270a7015ebef73a590d4f066538b41bf7cb7c8d7d891b6442964"
+ },
+ {
+  "project": "CityCoins",
+  "contractName": "citycoin-core-trait",
+  "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-core-trait",
+  "blockHeight": 24334,
+  "txId": "0x9751f503896ca13ba797e119d1b62d990b854bee3a63301e737fa9d3ebf8ffa6",
+  "deployedAt": "2021-08-03T15:39:12Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-core-trait",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x9751f503896ca13ba797e119d1b62d990b854bee3a63301e737fa9d3ebf8ffa6"
+ },
+ {
+  "project": "CityCoins",
+  "contractName": "citycoin-token-trait",
+  "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-token-trait",
+  "blockHeight": 24334,
+  "txId": "0xf64fedb420622d0403154465c176e06ecbbed306ec2337f9fb8f7bbe6c6a8575",
+  "deployedAt": "2021-08-03T15:39:12Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-token-trait",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xf64fedb420622d0403154465c176e06ecbbed306ec2337f9fb8f7bbe6c6a8575"
+ },
+ {
+  "project": "CityCoins / NewYorkCityCoin",
+  "contractName": "newyorkcitycoin-auth",
+  "principal": "SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-auth",
+  "blockHeight": 37206,
+  "txId": "0x7df54b8594149b20567120f25663885cf798526951b956cc160f2ec908723bb3",
+  "deployedAt": "2021-11-09T22:46:14Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-auth",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x7df54b8594149b20567120f25663885cf798526951b956cc160f2ec908723bb3"
+ },
+ {
+  "project": "CityCoins / NewYorkCityCoin",
+  "contractName": "newyorkcitycoin-token",
+  "principal": "SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-token",
+  "blockHeight": 37207,
+  "txId": "0x9c8ddc44fcfdfc67af5425c4174833fc5814627936d573fe38fc29a46ba746e6",
+  "deployedAt": "2021-11-09T22:54:31Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-token",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x9c8ddc44fcfdfc67af5425c4174833fc5814627936d573fe38fc29a46ba746e6"
+ },
+ {
+  "project": "CityCoins / NewYorkCityCoin",
+  "contractName": "newyorkcitycoin-core-v1",
+  "principal": "SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-core-v1",
+  "blockHeight": 37208,
+  "txId": "0x1cc470bc57e8e662055872f2eaeb33ed9aec0a5e46a9f6bf17851447ab1ff84c",
+  "deployedAt": "2021-11-09T22:59:42Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-core-v1",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x1cc470bc57e8e662055872f2eaeb33ed9aec0a5e46a9f6bf17851447ab1ff84c"
+ },
+ {
+  "project": "CityCoins",
+  "contractName": "citycoin-vrf-v2",
+  "principal": "SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.citycoin-vrf-v2",
+  "blockHeight": 58898,
+  "txId": "0xb58da1de638d96a75f5ad86276ce23d65b9237e035887697e3bf9cc61d9f5457",
+  "deployedAt": "2022-05-06T01:30:17Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.citycoin-vrf-v2",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xb58da1de638d96a75f5ad86276ce23d65b9237e035887697e3bf9cc61d9f5457"
+ },
+ {
+  "project": "CityCoins / MiamiCoin",
+  "contractName": "miamicoin-auth-v2",
+  "principal": "SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-auth-v2",
+  "blockHeight": 58902,
+  "txId": "0xe0e8c09bb1cef16f90e37d86222973b6f16bb30c8fede1be580ee6a0ad75189c",
+  "deployedAt": "2022-05-06T01:53:29Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-auth-v2",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xe0e8c09bb1cef16f90e37d86222973b6f16bb30c8fede1be580ee6a0ad75189c"
+ },
+ {
+  "project": "CityCoins / NewYorkCityCoin",
+  "contractName": "newyorkcitycoin-token-v2",
+  "principal": "SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-token-v2",
+  "blockHeight": 58903,
+  "txId": "0x969192220b1c478ef9d18d1cd413d7c79fe02937a9b33af63d441bd5519d1715",
+  "deployedAt": "2022-05-06T02:20:15Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-token-v2",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x969192220b1c478ef9d18d1cd413d7c79fe02937a9b33af63d441bd5519d1715"
+ },
+ {
+  "project": "CityCoins / NewYorkCityCoin",
+  "contractName": "newyorkcitycoin-auth-v2",
+  "principal": "SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-auth-v2",
+  "blockHeight": 58903,
+  "txId": "0x141eba8f232d29e11d99962bc6680231062b068b4050f1eda5314012d53afdd8",
+  "deployedAt": "2022-05-06T02:20:15Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-auth-v2",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x141eba8f232d29e11d99962bc6680231062b068b4050f1eda5314012d53afdd8"
+ },
+ {
+  "project": "CityCoins / MiamiCoin",
+  "contractName": "miamicoin-core-v1-patch",
+  "principal": "SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-core-v1-patch",
+  "blockHeight": 58907,
+  "txId": "0x578ff84833986d217a4349b2c1c335800b18035740ee3b9677c8f952fb8207c8",
+  "deployedAt": "2022-05-06T03:01:53Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-core-v1-patch",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x578ff84833986d217a4349b2c1c335800b18035740ee3b9677c8f952fb8207c8"
+ },
+ {
+  "project": "CityCoins / MiamiCoin",
+  "contractName": "miamicoin-token-v2",
+  "principal": "SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-token-v2",
+  "blockHeight": 58908,
+  "txId": "0xa80a44790929467693ccb33a212cf50878a6ad572c4c5b8e7d9a5de794fbefa2",
+  "deployedAt": "2022-05-06T03:25:02Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-token-v2",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xa80a44790929467693ccb33a212cf50878a6ad572c4c5b8e7d9a5de794fbefa2"
+ },
+ {
+  "project": "CityCoins / NewYorkCityCoin",
+  "contractName": "newyorkcitycoin-core-v2",
+  "principal": "SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-core-v2",
+  "blockHeight": 58909,
+  "txId": "0xe5706652008341abdf358e490bfb8af3165074fc00e2dc1dce2b3d132c337a13",
+  "deployedAt": "2022-05-06T03:29:03Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-core-v2",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xe5706652008341abdf358e490bfb8af3165074fc00e2dc1dce2b3d132c337a13"
+ },
+ {
+  "project": "CityCoins / MiamiCoin",
+  "contractName": "miamicoin-core-v2",
+  "principal": "SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-core-v2",
+  "blockHeight": 58911,
+  "txId": "0x789129104dfeaed1fcc186b3b93574c10a201da254d2561ba76315e4aecb1d3f",
+  "deployedAt": "2022-05-06T03:45:34Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-core-v2",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x789129104dfeaed1fcc186b3b93574c10a201da254d2561ba76315e4aecb1d3f"
+ },
+ {
+  "project": "CityCoins (community tool)",
+  "contractName": "citycoin-tardis-v2",
+  "principal": "SP2NS7CNBBN3S9J6M4JJHT7WNBETRSBZ9KPVRENBJ.citycoin-tardis-v2",
+  "blockHeight": 54760,
+  "txId": "0xc91bf66aa4282533a3b392c0e22071d5bdf26ac6b8eb62392a307961ba0d723e",
+  "deployedAt": "2022-04-03T15:48:57Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP2NS7CNBBN3S9J6M4JJHT7WNBETRSBZ9KPVRENBJ.citycoin-tardis-v2",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xc91bf66aa4282533a3b392c0e22071d5bdf26ac6b8eb62392a307961ba0d723e"
+ },
+ {
+  "project": "StackSwap",
+  "contractName": "stsw-token-v4a",
+  "principal": "SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stsw-token-v4a",
+  "blockHeight": 33556,
+  "txId": "0x3edffbd025ca2c29cfde8c583c0e0babacd4aa21075d10307d37c64ae78d579e",
+  "deployedAt": "2021-10-13T08:13:19Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stsw-token-v4a",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x3edffbd025ca2c29cfde8c583c0e0babacd4aa21075d10307d37c64ae78d579e"
+ },
+ {
+  "project": "StackSwap",
+  "contractName": "stackswap-dao-v5k",
+  "principal": "SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stackswap-dao-v5k",
+  "blockHeight": 37533,
+  "txId": "0x6f613495f0409977ed734f66aed7c126804c29dc2092004a854788dfcb784016",
+  "deployedAt": "2021-11-12T09:35:06Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stackswap-dao-v5k",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x6f613495f0409977ed734f66aed7c126804c29dc2092004a854788dfcb784016"
+ },
+ {
+  "project": "StackSwap",
+  "contractName": "stackswap-swap-v5k",
+  "principal": "SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stackswap-swap-v5k",
+  "blockHeight": 37537,
+  "txId": "0x4fafa2de98fa3686ff1b0862146d1b28efcfcad9d87782df0cc6cf90c7af9d9f",
+  "deployedAt": "2021-11-12T10:15:09Z",
+  "canonical": true,
+  "source": "https://api.hiro.so/extended/v1/contract/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stackswap-swap-v5k",
+  "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x4fafa2de98fa3686ff1b0862146d1b28efcfcad9d87782df0cc6cf90c7af9d9f"
+ }
+]

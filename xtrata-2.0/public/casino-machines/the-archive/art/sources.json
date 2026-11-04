@@ -1,0 +1,521 @@
+{
+ "machine": "the-archive",
+ "generated": "2026-11-01T23:07:43Z",
+ "about": "Where every image used by The Archive came from. Nothing here is redrawn: logo files are shown fitted inside a card, never recoloured, stretched or cropped. Fields are copied from the research files (logos.json, ledger.json, degens.json, degens.sources.json); null means the research found nothing.",
+ "brand": [
+  {
+   "name": "Xtrata mark",
+   "file": "art/brand/xtrata.svg",
+   "source": "supplied in the series bible, unmodified",
+   "sha256": "2de985cf5c2ce68e6fbb45b93333294708919cc1c42d820d3b2f67587f4667ec"
+  },
+  {
+   "name": "ParallaX Casino wordmark",
+   "file": "art/brand/parallax-casino-wordmark.svg",
+   "source": "supplied in the series bible, unmodified",
+   "sha256": "a6d24ced3c718ac89d4c754fd53693cd8686412d3b4b312d965c1c4eaed0a7f1"
+  }
+ ],
+ "logos": [
+  {
+   "key": "stacksart",
+   "name": "StacksArt",
+   "status": "missing",
+   "file": null,
+   "bytes": null,
+   "sha256": null,
+   "pixels": null,
+   "sourceUrl": null,
+   "commitOrDate": null,
+   "eraCorrect": "unknown",
+   "note": "No official GitHub org/user or repo found for StacksArt (search for org/user/repo returned nothing relevant). Archive snapshots unreachable from this environment.",
+   "usedOn": "none (period-type tile that says LOGO FILE NOT FOUND, shown on reel symbol 'cherry')"
+  },
+  {
+   "key": "stackswap",
+   "name": "StackSwap",
+   "status": "found",
+   "file": "art/images/logo-stackswap.png",
+   "bytes": 11013,
+   "sha256": "19ef5e8112e0477761694749769e622fd30fc56b70882d8a22d031883a6e3c9d",
+   "pixels": [
+    200,
+    200
+   ],
+   "sourceUrl": "https://raw.githubusercontent.com/stackswap/stackswap_contract_v1/HEAD/assets/blockchains/STX/assets/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stsw-token-v4a/logo.png",
+   "commitOrDate": "a935015735 (2023-03-10)",
+   "eraCorrect": "unknown",
+   "note": "STSW token logo (200x200) from the official stackswap GitHub account repo; the account avatar (avatars.githubusercontent.com) was unreachable. The file was committed 2023-03-10 so it is the StackSwap token mark, not verified as the 2021 platform logo.",
+   "usedOn": "reel symbol 'lemon'"
+  },
+  {
+   "key": "appmining",
+   "name": "App Mining",
+   "status": "missing",
+   "file": null,
+   "bytes": null,
+   "sha256": null,
+   "pixels": null,
+   "sourceUrl": null,
+   "commitOrDate": null,
+   "eraCorrect": "unknown",
+   "note": "stacks-archive/app-mining contains no image files; stacks-archive/app.co has only generic app.co logos and platform icons, no App Mining logo. Not substituting app.co logo.",
+   "usedOn": "none (period-type tile that says LOGO FILE NOT FOUND, shown on reel symbol 'chip')"
+  },
+  {
+   "key": "stxnft",
+   "name": "STXNFT",
+   "status": "missing",
+   "file": null,
+   "bytes": null,
+   "sha256": null,
+   "pixels": null,
+   "sourceUrl": null,
+   "commitOrDate": null,
+   "eraCorrect": "unknown",
+   "note": "github.com/stxnft org has only forks (ordinals/ord, stacks-blockchain-docker); the ord logo is ordinals project art, not STXNFT. Org avatar host avatars.githubusercontent.com was unreachable.",
+   "usedOn": "none (period-type tile that says LOGO FILE NOT FOUND, shown on reel symbol 'block')"
+  },
+  {
+   "key": "hirowallet",
+   "name": "Hiro Wallet",
+   "status": "found",
+   "file": "art/images/logo-hirowallet.png",
+   "bytes": 9058,
+   "sha256": "9c0a9ee0b21d83d0de932f569eace27833c70fda3b0c383a56c46b010fcb0bfb",
+   "pixels": [
+    256,
+    256
+   ],
+   "sourceUrl": "https://raw.githubusercontent.com/leather-io/extension/86e1ddbae9d69cbf4475d58f490b532aceedc575/public/assets/connect-logo/Stacks512w.png",
+   "commitOrDate": "86e1ddbae9d (2022-08-30)",
+   "eraCorrect": true,
+   "note": "Extension icon (512x512) declared in the manifest generator of the Hiro Wallet release (manifest name \"Hiro Wallet\", author \"Hiro PBC\") at that commit, i.e. before the Leather rebrand. Repo was hirosystems/stacks-wallet-web, now leather-io/extension.",
+   "usedOn": "reel symbol 'artifact'"
+  },
+  {
+   "key": "blockstack",
+   "name": "Blockstack",
+   "status": "found",
+   "file": "art/images/logo-blockstack.png",
+   "bytes": 4080,
+   "sha256": "e45cee57f2a0a8eaf62a802c8858e43a54cfba8bb104d1a94f1e89d31aff6752",
+   "pixels": [
+    256,
+    130
+   ],
+   "sourceUrl": "https://raw.githubusercontent.com/stacks-archive/blockstack-browser/fce7772fb8/app/images/blockstack-logo-vertical.svg",
+   "commitOrDate": "fce7772fb8 (2017-07-11)",
+   "eraCorrect": true,
+   "note": "Official Blockstack wordmark SVG (430x218) from the blockstack-browser repo, now archived under github.com/stacks-archive (the old blockstack org). Dark artwork on transparent background: needs a light backing. Rasterised to 256x130.",
+   "usedOn": "reel symbol 'bitcoin'"
+  },
+  {
+   "key": "blockstackbrowser",
+   "name": "Blockstack Browser",
+   "status": "found",
+   "file": "art/images/logo-blockstackbrowser.png",
+   "bytes": 18021,
+   "sha256": "dfdcad45b8a82c301ef83d155b6de4c4b9a471f8a5838c660cfb7e3d1282fb72",
+   "pixels": [
+    256,
+    256
+   ],
+   "sourceUrl": "https://raw.githubusercontent.com/stacks-archive/blockstack-browser/9faebf6358/native/macos/Blockstack/Blockstack/Assets.xcassets/AppIcon.appiconset/blockstack-bug-rounded-512w.png",
+   "commitOrDate": "9faebf6358 (2017-02-26)",
+   "eraCorrect": true,
+   "note": "macOS app icon (512x512, rounded Blockstack bug) of Blockstack Browser from its own repo.",
+   "usedOn": "reel symbol 'scatter'"
+  },
+  {
+   "key": "miamicoin",
+   "name": "MiamiCoin",
+   "status": "found",
+   "file": "art/images/logo-miamicoin.png",
+   "bytes": 19498,
+   "sha256": "a173dca5ef43d80c65258c620b94acd4b42397680b130e22abd6df9d75a4b839",
+   "pixels": [
+    256,
+    256
+   ],
+   "sourceUrl": "https://raw.githubusercontent.com/citycoins/cdn/50ebea77e3/cdn/brand/MIA_Miami/Coins/SVG/MiamiCoin_StandAlone_Coin.svg",
+   "commitOrDate": "50ebea77e3 (2021-11-05)",
+   "eraCorrect": true,
+   "note": "Official CityCoins brand-kit standalone coin SVG, rasterised to 256x256.",
+   "usedOn": "City Mining vault tile (MiamiCoin and NYCCoin alternate down the reel)"
+  },
+  {
+   "key": "nycoin",
+   "name": "NYCCoin",
+   "status": "found",
+   "file": "art/images/logo-nycoin.png",
+   "bytes": 16407,
+   "sha256": "887070a3b1e14d9be53de33029d91b6fc7477f045bc176cff655a2e598726fb7",
+   "pixels": [
+    256,
+    256
+   ],
+   "sourceUrl": "https://raw.githubusercontent.com/citycoins/cdn/15ee008614/cdn/brand/NYC_NewYorkCity/Coins/SVG/CC_NYCCoin_StandAloneCoin.svg",
+   "commitOrDate": "15ee008614 (2021-11-05)",
+   "eraCorrect": true,
+   "note": "Official CityCoins brand-kit standalone coin SVG, rasterised to 256x256.",
+   "usedOn": "City Mining vault tile (MiamiCoin and NYCCoin alternate down the reel)"
+  }
+ ],
+ "ledgerCards": [
+  {
+   "project": "CityCoins / MiamiCoin",
+   "contractName": "miamicoin-core-v1",
+   "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-core-v1",
+   "deployBlock": 24341,
+   "deployedAt": "2021-08-03T16:43:22Z",
+   "txId": "0x224eb853ab072591c382b1c917136dcdd6590df80ab646bfed432d779612258f",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-core-v1",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x224eb853ab072591c382b1c917136dcdd6590df80ab646bfed432d779612258f"
+  },
+  {
+   "project": "CityCoins / MiamiCoin",
+   "contractName": "miamicoin-token",
+   "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token",
+   "deployBlock": 24339,
+   "deployedAt": "2021-08-03T16:27:26Z",
+   "txId": "0xc513b769c261233865c43f101438bd6359636ecacfe34576e6424d6c2629174e",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xc513b769c261233865c43f101438bd6359636ecacfe34576e6424d6c2629174e"
+  },
+  {
+   "project": "CityCoins / MiamiCoin",
+   "contractName": "miamicoin-auth",
+   "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-auth",
+   "deployBlock": 24338,
+   "deployedAt": "2021-08-03T16:14:18Z",
+   "txId": "0x3c9303ada7f0dbf6f814722cb4a6c13752f187bde0b800bd6f84a342505e006b",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-auth",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x3c9303ada7f0dbf6f814722cb4a6c13752f187bde0b800bd6f84a342505e006b"
+  },
+  {
+   "project": "CityCoins",
+   "contractName": "citycoin-vrf",
+   "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-vrf",
+   "deployBlock": 24334,
+   "deployedAt": "2021-08-03T15:39:12Z",
+   "txId": "0x6e18dbc3a687270a7015ebef73a590d4f066538b41bf7cb7c8d7d891b6442964",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-vrf",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x6e18dbc3a687270a7015ebef73a590d4f066538b41bf7cb7c8d7d891b6442964"
+  },
+  {
+   "project": "CityCoins",
+   "contractName": "citycoin-core-trait",
+   "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-core-trait",
+   "deployBlock": 24334,
+   "deployedAt": "2021-08-03T15:39:12Z",
+   "txId": "0x9751f503896ca13ba797e119d1b62d990b854bee3a63301e737fa9d3ebf8ffa6",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-core-trait",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x9751f503896ca13ba797e119d1b62d990b854bee3a63301e737fa9d3ebf8ffa6"
+  },
+  {
+   "project": "CityCoins",
+   "contractName": "citycoin-token-trait",
+   "principal": "SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-token-trait",
+   "deployBlock": 24334,
+   "deployedAt": "2021-08-03T15:39:12Z",
+   "txId": "0xf64fedb420622d0403154465c176e06ecbbed306ec2337f9fb8f7bbe6c6a8575",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.citycoin-token-trait",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xf64fedb420622d0403154465c176e06ecbbed306ec2337f9fb8f7bbe6c6a8575"
+  },
+  {
+   "project": "CityCoins / NewYorkCityCoin",
+   "contractName": "newyorkcitycoin-auth",
+   "principal": "SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-auth",
+   "deployBlock": 37206,
+   "deployedAt": "2021-11-09T22:46:14Z",
+   "txId": "0x7df54b8594149b20567120f25663885cf798526951b956cc160f2ec908723bb3",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-auth",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x7df54b8594149b20567120f25663885cf798526951b956cc160f2ec908723bb3"
+  },
+  {
+   "project": "CityCoins / NewYorkCityCoin",
+   "contractName": "newyorkcitycoin-token",
+   "principal": "SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-token",
+   "deployBlock": 37207,
+   "deployedAt": "2021-11-09T22:54:31Z",
+   "txId": "0x9c8ddc44fcfdfc67af5425c4174833fc5814627936d573fe38fc29a46ba746e6",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-token",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x9c8ddc44fcfdfc67af5425c4174833fc5814627936d573fe38fc29a46ba746e6"
+  },
+  {
+   "project": "CityCoins / NewYorkCityCoin",
+   "contractName": "newyorkcitycoin-core-v1",
+   "principal": "SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-core-v1",
+   "deployBlock": 37208,
+   "deployedAt": "2021-11-09T22:59:42Z",
+   "txId": "0x1cc470bc57e8e662055872f2eaeb33ed9aec0a5e46a9f6bf17851447ab1ff84c",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-core-v1",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x1cc470bc57e8e662055872f2eaeb33ed9aec0a5e46a9f6bf17851447ab1ff84c"
+  },
+  {
+   "project": "CityCoins",
+   "contractName": "citycoin-vrf-v2",
+   "principal": "SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.citycoin-vrf-v2",
+   "deployBlock": 58898,
+   "deployedAt": "2022-05-06T01:30:17Z",
+   "txId": "0xb58da1de638d96a75f5ad86276ce23d65b9237e035887697e3bf9cc61d9f5457",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.citycoin-vrf-v2",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xb58da1de638d96a75f5ad86276ce23d65b9237e035887697e3bf9cc61d9f5457"
+  },
+  {
+   "project": "CityCoins / MiamiCoin",
+   "contractName": "miamicoin-auth-v2",
+   "principal": "SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-auth-v2",
+   "deployBlock": 58902,
+   "deployedAt": "2022-05-06T01:53:29Z",
+   "txId": "0xe0e8c09bb1cef16f90e37d86222973b6f16bb30c8fede1be580ee6a0ad75189c",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-auth-v2",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xe0e8c09bb1cef16f90e37d86222973b6f16bb30c8fede1be580ee6a0ad75189c"
+  },
+  {
+   "project": "CityCoins / NewYorkCityCoin",
+   "contractName": "newyorkcitycoin-token-v2",
+   "principal": "SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-token-v2",
+   "deployBlock": 58903,
+   "deployedAt": "2022-05-06T02:20:15Z",
+   "txId": "0x969192220b1c478ef9d18d1cd413d7c79fe02937a9b33af63d441bd5519d1715",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-token-v2",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x969192220b1c478ef9d18d1cd413d7c79fe02937a9b33af63d441bd5519d1715"
+  },
+  {
+   "project": "CityCoins / NewYorkCityCoin",
+   "contractName": "newyorkcitycoin-auth-v2",
+   "principal": "SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-auth-v2",
+   "deployBlock": 58903,
+   "deployedAt": "2022-05-06T02:20:15Z",
+   "txId": "0x141eba8f232d29e11d99962bc6680231062b068b4050f1eda5314012d53afdd8",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-auth-v2",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x141eba8f232d29e11d99962bc6680231062b068b4050f1eda5314012d53afdd8"
+  },
+  {
+   "project": "CityCoins / MiamiCoin",
+   "contractName": "miamicoin-core-v1-patch",
+   "principal": "SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-core-v1-patch",
+   "deployBlock": 58907,
+   "deployedAt": "2022-05-06T03:01:53Z",
+   "txId": "0x578ff84833986d217a4349b2c1c335800b18035740ee3b9677c8f952fb8207c8",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-core-v1-patch",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x578ff84833986d217a4349b2c1c335800b18035740ee3b9677c8f952fb8207c8"
+  },
+  {
+   "project": "CityCoins / MiamiCoin",
+   "contractName": "miamicoin-token-v2",
+   "principal": "SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-token-v2",
+   "deployBlock": 58908,
+   "deployedAt": "2022-05-06T03:25:02Z",
+   "txId": "0xa80a44790929467693ccb33a212cf50878a6ad572c4c5b8e7d9a5de794fbefa2",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-token-v2",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xa80a44790929467693ccb33a212cf50878a6ad572c4c5b8e7d9a5de794fbefa2"
+  },
+  {
+   "project": "CityCoins / NewYorkCityCoin",
+   "contractName": "newyorkcitycoin-core-v2",
+   "principal": "SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-core-v2",
+   "deployBlock": 58909,
+   "deployedAt": "2022-05-06T03:29:03Z",
+   "txId": "0xe5706652008341abdf358e490bfb8af3165074fc00e2dc1dce2b3d132c337a13",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SPSCWDV3RKV5ZRN1FQD84YE1NQFEDJ9R1F4DYQ11.newyorkcitycoin-core-v2",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xe5706652008341abdf358e490bfb8af3165074fc00e2dc1dce2b3d132c337a13"
+  },
+  {
+   "project": "CityCoins / MiamiCoin",
+   "contractName": "miamicoin-core-v2",
+   "principal": "SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-core-v2",
+   "deployBlock": 58911,
+   "deployedAt": "2022-05-06T03:45:34Z",
+   "txId": "0x789129104dfeaed1fcc186b3b93574c10a201da254d2561ba76315e4aecb1d3f",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-core-v2",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x789129104dfeaed1fcc186b3b93574c10a201da254d2561ba76315e4aecb1d3f"
+  },
+  {
+   "project": "CityCoins (community tool)",
+   "contractName": "citycoin-tardis-v2",
+   "principal": "SP2NS7CNBBN3S9J6M4JJHT7WNBETRSBZ9KPVRENBJ.citycoin-tardis-v2",
+   "deployBlock": 54760,
+   "deployedAt": "2022-04-03T15:48:57Z",
+   "txId": "0xc91bf66aa4282533a3b392c0e22071d5bdf26ac6b8eb62392a307961ba0d723e",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP2NS7CNBBN3S9J6M4JJHT7WNBETRSBZ9KPVRENBJ.citycoin-tardis-v2",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0xc91bf66aa4282533a3b392c0e22071d5bdf26ac6b8eb62392a307961ba0d723e"
+  },
+  {
+   "project": "StackSwap",
+   "contractName": "stsw-token-v4a",
+   "principal": "SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stsw-token-v4a",
+   "deployBlock": 33556,
+   "deployedAt": "2021-10-13T08:13:19Z",
+   "txId": "0x3edffbd025ca2c29cfde8c583c0e0babacd4aa21075d10307d37c64ae78d579e",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stsw-token-v4a",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x3edffbd025ca2c29cfde8c583c0e0babacd4aa21075d10307d37c64ae78d579e"
+  },
+  {
+   "project": "StackSwap",
+   "contractName": "stackswap-dao-v5k",
+   "principal": "SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stackswap-dao-v5k",
+   "deployBlock": 37533,
+   "deployedAt": "2021-11-12T09:35:06Z",
+   "txId": "0x6f613495f0409977ed734f66aed7c126804c29dc2092004a854788dfcb784016",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stackswap-dao-v5k",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x6f613495f0409977ed734f66aed7c126804c29dc2092004a854788dfcb784016"
+  },
+  {
+   "project": "StackSwap",
+   "contractName": "stackswap-swap-v5k",
+   "principal": "SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stackswap-swap-v5k",
+   "deployBlock": 37537,
+   "deployedAt": "2021-11-12T10:15:09Z",
+   "txId": "0x4fafa2de98fa3686ff1b0862146d1b28efcfcad9d87782df0cc6cf90c7af9d9f",
+   "canonical": true,
+   "sourceApi": "https://api.hiro.so/extended/v1/contract/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stackswap-swap-v5k",
+   "verifiedWith": "https://api.hiro.so/extended/v1/tx/0x4fafa2de98fa3686ff1b0862146d1b28efcfcad9d87782df0cc6cf90c7af9d9f"
+  }
+ ],
+ "twins": [
+  {
+   "collection": "miami-degens",
+   "collectionName": "Miami Degens",
+   "tokenId": 406,
+   "xtrataId": "1047",
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1047",
+   "origSize": [
+    512,
+    512
+   ],
+   "twinHelperContract": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata",
+   "inscribedTwinsInCollection": 1,
+   "file": "art/images/twin-miami-degens-406.png",
+   "bytes": 28906,
+   "sha256": "c4de118fbc7aaaa6c0e5e66a398844a2f3c0275af751cc5fbb923ec6a6b5c7b6",
+   "note": "Image of the Xtrata inscription linked in sourceUrl, stored here as the game uses it."
+  },
+  {
+   "collection": "nyc-degens",
+   "collectionName": "NYC Degens",
+   "tokenId": 174,
+   "xtrataId": "3098",
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3098",
+   "origSize": [
+    512,
+    512
+   ],
+   "twinHelperContract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens",
+   "inscribedTwinsInCollection": 2,
+   "file": "art/images/twin-nyc-degens-174.png",
+   "bytes": 27083,
+   "sha256": "51e1b0cdeaadbcb6e6041bef8566d8afe090ab253987a67c16e7abe50bf9381c",
+   "note": "Image of the Xtrata inscription linked in sourceUrl, stored here as the game uses it."
+  },
+  {
+   "collection": "nyc-degens",
+   "collectionName": "NYC Degens",
+   "tokenId": 1,
+   "xtrataId": "3095",
+   "sourceUrl": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3095",
+   "origSize": [
+    512,
+    512
+   ],
+   "twinHelperContract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens",
+   "inscribedTwinsInCollection": 2,
+   "file": "art/images/twin-nyc-degens-1.png",
+   "bytes": 27031,
+   "sha256": "0ea9539184cd69efcb31aa0e81ca879c2548f2eb9baf3a64dad723b0d79938c4",
+   "note": "Image of the Xtrata inscription linked in sourceUrl, stored here as the game uses it."
+  }
+ ],
+ "needsPermission": [
+  {
+   "name": "Blockstack",
+   "why": "Blockstack PBC wordmark (the company that became Hiro and the Stacks Foundation).",
+   "file": "art/images/logo-blockstack.png",
+   "sourceUrl": "https://raw.githubusercontent.com/stacks-archive/blockstack-browser/fce7772fb8/app/images/blockstack-logo-vertical.svg",
+   "eraCorrect": true
+  },
+  {
+   "name": "Blockstack Browser",
+   "why": "Blockstack Browser app icon.",
+   "file": "art/images/logo-blockstackbrowser.png",
+   "sourceUrl": "https://raw.githubusercontent.com/stacks-archive/blockstack-browser/9faebf6358/native/macos/Blockstack/Blockstack/Assets.xcassets/AppIcon.appiconset/blockstack-bug-rounded-512w.png",
+   "eraCorrect": true
+  },
+  {
+   "name": "Hiro Wallet",
+   "why": "Hiro Wallet icon (Hiro PBC; now the Leather brand).",
+   "file": "art/images/logo-hirowallet.png",
+   "sourceUrl": "https://raw.githubusercontent.com/leather-io/extension/86e1ddbae9d69cbf4475d58f490b532aceedc575/public/assets/connect-logo/Stacks512w.png",
+   "eraCorrect": true
+  },
+  {
+   "name": "StackSwap",
+   "why": "StackSwap token mark; era unverified (committed 2023-03-10, the 2021 platform logo was not found).",
+   "file": "art/images/logo-stackswap.png",
+   "sourceUrl": "https://raw.githubusercontent.com/stackswap/stackswap_contract_v1/HEAD/assets/blockchains/STX/assets/SP1Z92MPDQEWZXW36VX71Q25HKF5K2EPCJ304F275.stsw-token-v4a/logo.png",
+   "eraCorrect": "unknown"
+  },
+  {
+   "name": "MiamiCoin",
+   "why": "MiamiCoin mark from the CityCoins brand kit.",
+   "file": "art/images/logo-miamicoin.png",
+   "sourceUrl": "https://raw.githubusercontent.com/citycoins/cdn/50ebea77e3/cdn/brand/MIA_Miami/Coins/SVG/MiamiCoin_StandAlone_Coin.svg",
+   "eraCorrect": true
+  },
+  {
+   "name": "NYCCoin",
+   "why": "NYCCoin mark from the CityCoins brand kit.",
+   "file": "art/images/logo-nycoin.png",
+   "sourceUrl": "https://raw.githubusercontent.com/citycoins/cdn/15ee008614/cdn/brand/NYC_NewYorkCity/Coins/SVG/CC_NYCCoin_StandAloneCoin.svg",
+   "eraCorrect": true
+  }
+ ],
+ "missing": [
+  {
+   "name": "StacksArt",
+   "status": "missing",
+   "note": "No official GitHub org/user or repo found for StacksArt (search for org/user/repo returned nothing relevant). Archive snapshots unreachable from this environment.",
+   "shownAs": "period-type tile, labelled LOGO FILE NOT FOUND (no logo drawn)"
+  },
+  {
+   "name": "App Mining",
+   "status": "missing",
+   "note": "stacks-archive/app-mining contains no image files; stacks-archive/app.co has only generic app.co logos and platform icons, no App Mining logo. Not substituting app.co logo.",
+   "shownAs": "period-type tile, labelled LOGO FILE NOT FOUND (no logo drawn)"
+  },
+  {
+   "name": "STXNFT",
+   "status": "missing",
+   "note": "github.com/stxnft org has only forks (ordinals/ord, stacks-blockchain-docker); the ord logo is ordinals project art, not STXNFT. Org avatar host avatars.githubusercontent.com was unreachable.",
+   "shownAs": "period-type tile, labelled LOGO FILE NOT FOUND (no logo drawn)"
+  }
+ ],
+ "alsoWorthChecking": [
+  "Miami Degens / NYC Degens artwork is creators' NFT art read from Xtrata inscriptions, not a project logo: confirm with the collections before this is public.",
+  "The Ledger cards use contract names and deploy blocks only (no logos).",
+  "The Xtrata mark and the ParallaX Casino wordmark are the supplied files and need no permission."
+ ],
+ "notFoundNote": "The research host could not reach web.archive.org, api.hiro.so (from the shell) or IPFS, so no Internet Archive snapshots were used."
+}

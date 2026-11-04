@@ -1,0 +1,32 @@
+[
+ {
+  "collection": "miami-degens",
+  "tokenId": 406,
+  "xtrataId": "1047",
+  "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1047",
+  "origSize": [
+   512,
+   512
+  ]
+ },
+ {
+  "collection": "nyc-degens",
+  "tokenId": 174,
+  "xtrataId": "3098",
+  "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3098",
+  "origSize": [
+   512,
+   512
+  ]
+ },
+ {
+  "collection": "nyc-degens",
+  "tokenId": 1,
+  "xtrataId": "3095",
+  "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3095",
+  "origSize": [
+   512,
+   512
+  ]
+ }
+]
