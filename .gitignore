@@ -53,7 +53,7 @@ xtrata-2.0/comms/canary/index.html
 # Generated inscription canary page (4MB, rebuilt on demand)
 /DeGrants/somewhere-else-inscribe-canary.html
 
-# Secrets and keys: never commit these (a wallet mnemonic in Huge-Sphinx/.env.aibtc was public for months)
+# Secrets and keys: never commit these (Huge-Sphinx/.env.aibtc, which holds wallet details, had been tracked)
 .env.*
 *.env
 !.env.example
