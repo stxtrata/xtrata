@@ -1,0 +1,215 @@
+<script>/* Xtrata machines engine (Block Fortune v2 rules). Pure game logic: no DOM, no timers. Every random draw goes
+   through the rng argument (defaults to crypto with rejection sampling), so tests can be seeded and a future
+   on-chain version can supply block-hash randomness. Exported for Node tests via module.exports.
+   BF is the standard engine. BF.create({ pays, cascade }) makes a variant on the same strips and features:
+   its own pay table, and optionally the Layer Cascade rule (winning symbols are removed, the strip above
+   drops into the gaps, and each further win pays a rising multiplier). */
+function makeEngine(options) {
+  'use strict';
+  const cfg = options || {};
+  const STATE_VERSION = 2;
+  const CODE = { C: 'cherry', L: 'lemon', M: 'chip', K: 'block', I: 'artifact', B: 'bitcoin', W: 'wild', S: 'scatter', V: 'vault', N: 'chain' };
+  // Five weighted 32-stop strips. A spin picks one stop per reel; the window shows that stop and the
+  // next two (wrapping). One confirmation and one vault key per reel, so a reel never shows two of
+  // either. Chain nodes sit in N.N pairs (N..N on reel 3), so a reel shows at most two.
+  const stripCodes = [
+    'NCNLLCWILBSIMKCKIBKMLVCCBMMLKMIC',
+    'NWNLBIMKILSICMCMCKLKBVKCBLLMIKLM',
+    'NCMNWCILKCSCIMLBKKKMMVIIMCKMLBBL',
+    'NBNCCBLKMLSKLLIKIICMIVCLCBLKMWMK',
+    'NCNIMLCIKCSLKLMLBKICBVIWMCKMBMLC'
+  ];
+  const strips = Object.freeze(stripCodes.map(s => Object.freeze([...s].map(c => CODE[c]))));
+  const symbols = ['cherry', 'lemon', 'chip', 'block', 'artifact', 'bitcoin', 'wild', 'scatter', 'vault', 'chain'];
+  const NAMES = { cherry: 'Cherry', lemon: 'Lemon', chip: 'Mining chip', block: 'Block', artifact: 'Inscription', bitcoin: 'Bitcoin', wild: 'Wild', scatter: 'Confirmation', vault: 'Vault key', chain: 'Chain node' };
+  // Multiples of the line bet (total bet / 20) for 3, 4 and 5 of a kind.
+  const DEFAULT_PAYS = { cherry: [6, 16, 50], lemon: [7, 20, 60], chip: [9, 28, 90], block: [13, 38, 140], artifact: [20, 80, 300], bitcoin: [35, 150, 700], wild: [80, 400, 2500] };
+  if (cfg.pays && !Object.keys(DEFAULT_PAYS).every(k => Array.isArray(cfg.pays[k]) && cfg.pays[k].length === 3 && cfg.pays[k].every(v => Number.isInteger(v) && v > 0))) throw Error('Invalid pay table');
+  const pays = Object.freeze(Object.fromEntries(Object.keys(DEFAULT_PAYS).map(k => [k, Object.freeze([...(cfg.pays || DEFAULT_PAYS)[k]])])));
+  // Layer Cascade: ladder[k] multiplies the k-th drop's line wins (k = 0 is the spin itself); the last rung repeats.
+  const cascade = cfg.cascade ? Object.freeze({ ladder: Object.freeze([...cfg.cascade.ladder]), maxDrops: cfg.cascade.maxDrops || 30 }) : null;
+  if (cascade && (!cascade.ladder.length || cascade.ladder[0] !== 1 || !cascade.ladder.every(Number.isInteger))) throw Error('Invalid cascade ladder');
+  const lines = [[1,1,1,1,1],[0,0,0,0,0],[2,2,2,2,2],[0,1,2,1,0],[2,1,0,1,2],[0,0,1,2,2],[2,2,1,0,0],[1,0,0,0,1],[1,2,2,2,1],[0,1,1,1,0],[2,1,1,1,2],[1,0,1,2,1],[1,2,1,0,1],[0,1,0,1,0],[2,1,2,1,2],[1,1,0,1,1],[1,1,2,1,1],[0,2,0,2,0],[2,0,2,0,2],[0,2,1,2,0]];
+  const bets = [20, 40, 100, 200, 500];
+  const scatterPays = { 3: 2, 4: 5, 5: 10 };          // x total bet, doubled in free spins
+  const vaultPrizes = [1, 2, 2, 3, 4, 5, 8, 10, 15];  // x total bet, each tile drawn independently
+  const chainValues = [1, 2, 3, 5, 10];               // x total bet, each node drawn independently
+  const CHAIN_ODDS = 25;                              // each empty cell locks with chance 1/25 (4%) per respin
+  const FREE_SPINS = 8, RETRIGGER = 4, FREE_CAP = 24, FREE_MULT = 2;
+  const JACKPOT_RATE = 0.02, JACKPOT_SEED = 500;      // Genesis Block: seed 500x bet, +2% of each paid bet at that level
+
+  function randomInt(n) {
+    if (!Number.isInteger(n) || n < 1) throw Error('Invalid random range');
+    const a = new Uint32Array(1), cap = Math.floor(4294967296 / n) * n;
+    do { crypto.getRandomValues(a); } while (a[0] >= cap);
+    return a[0] % n;
+  }
+  const windowAt = (c, stop) => [0, 1, 2].map(r => strips[c][(stop + r) % strips[c].length]);
+  function spinReels(rng = randomInt) {
+    const stops = strips.map(s => rng(s.length));
+    return { stops, grid: stops.map((s, c) => windowAt(c, s)) };
+  }
+  function evaluate(g, bet, mult = 1) {
+    if (!bets.includes(bet)) throw Error('Invalid bet');
+    const wins = []; let lineTotal = 0;
+    lines.forEach((line, index) => {
+      let best = null;
+      for (const [sym, p] of Object.entries(pays)) {
+        let count = 0;
+        for (let x = 0; x < 5; x++) { const id = g[x][line[x]]; if (id === sym || (id === 'wild' && sym !== 'wild')) count++; else break; }
+        if (count >= 3) { const amount = p[count - 3] * (bet / 20) * mult; if (!best || amount > best.amount) best = { line: index, symbol: sym, count, amount }; }
+      }
+      if (best) { wins.push(best); lineTotal += best.amount; }
+    });
+    const flat = g.flat(), count = s => flat.filter(x => x === s).length;
+    const scatters = count('scatter'), vaults = count('vault'), chains = count('chain');
+    const scatterPay = scatters >= 3 ? scatterPays[Math.min(5, scatters)] * bet * mult : 0;
+    return { wins, lineTotal, scatters, vaults, chains, scatterPay, total: lineTotal + scatterPay,
+      triggers: { chain: chains >= 5, vault: vaults >= 3, free: scatters >= 3 },
+      jackpot: g.every(col => col[1] === 'bitcoin') };
+  }
+  // Runs the Layer Cascade from a landed spin. Each step removes every cell on a winning line; the cells above
+  // fall into the gaps and the strip above the window fills the top, exactly as if the reel slid down.
+  // Scatters, bonus triggers and the jackpot are read from the landed grid only (step 0).
+  function cascadeOf(stops, grid, bet, mult = 1) {
+    const steps = []; let g = grid.map(c => c.slice()), top = stops.slice(), lineTotal = 0;
+    const rungs = cascade ? cascade.ladder : [1], limit = cascade ? cascade.maxDrops : 0;
+    for (let k = 0; ; k++) {
+      const m = rungs[Math.min(k, rungs.length - 1)] * mult, e = evaluate(g, bet, m);
+      const removed = []; const hit = new Set();
+      e.wins.forEach(w => { const line = lines[w.line]; for (let x = 0; x < w.count; x++) hit.add(x * 3 + line[x]); });
+      hit.forEach(i => removed.push([Math.floor(i / 3), i % 3]));
+      steps.push({ grid: g, wins: e.wins, multiplier: m, pay: e.lineTotal, removed });
+      lineTotal += e.lineTotal;
+      if (!cascade || !e.wins.length || k >= limit) break;
+      g = g.map((col, c) => {
+        const keep = col.filter((_, r) => !hit.has(c * 3 + r)), n = 3 - keep.length; if (!n) return col.slice();
+        const L = strips[c].length, fresh = Array.from({ length: n }, (_, i) => strips[c][((top[c] - n + i) % L + L) % L]);
+        top[c] = ((top[c] - n) % L + L) % L; return [...fresh, ...keep];
+      });
+    }
+    return { steps, lineTotal, finalGrid: g, finalStops: top, drops: steps.length - 1 };
+  }
+  const seedFor = bet => bet * JACKPOT_SEED;
+  const freshJackpots = () => Object.fromEntries(bets.map(b => [b, seedFor(b)]));
+  const meter = (state, bet) => (state.jackpots && state.jackpots[bet] != null) ? state.jackpots[bet] : seedFor(bet);
+  function claimJackpot(state, bet) { const win = Math.floor(meter(state, bet) + 1e-6); state.jackpots[bet] = seedFor(bet); return win; }
+  function makeVault(bet, free, rng) {
+    return { type: 'vault', bet, free, awards: Array.from({ length: 9 }, () => vaultPrizes[rng(vaultPrizes.length)]), picks: [] };
+  }
+  function makeChain(g, bet, free, rng) {
+    let cells = Array(15).fill(0);
+    g.forEach((col, x) => col.forEach((s, y) => { if (s === 'chain') cells[y * 5 + x] = chainValues[rng(chainValues.length)]; }));
+    const frames = [{ cells: [...cells], left: 3, added: [] }]; let left = 3;
+    while (left && cells.includes(0)) {
+      const added = [];
+      cells = cells.map((v, i) => { if (v || rng(CHAIN_ODDS) !== 0) return v; added.push(i); return chainValues[rng(chainValues.length)]; });
+      left = added.length ? 3 : left - 1;
+      frames.push({ cells: [...cells], left, added });
+    }
+    return { type: 'chain', bet, free, frames, index: 0, sum: cells.reduce((a, v) => a + v, 0), full: cells.every(Boolean) };
+  }
+  
+  const roundId = rng => Array.from({ length: 16 }, () => rng(256).toString(16).padStart(2, '0')).join('');
+  function busy(state) { return !!state.pending || state.features.length > 0; }
+  function start(state, rng = randomInt) {
+    if (busy(state)) throw Error('Finish the current spin or feature first');
+    const free = state.free > 0, bet = free ? state.freeBet : state.bet;
+    if (!bets.includes(bet)) throw Error('Invalid bet');
+    if (!free && state.balance < bet) throw Error('Insufficient LAYR in the shared account');
+    state.gamble = 0; state.lastWin = 0;
+    if (!state.jackpots) state.jackpots = freshJackpots();
+    if (free) state.free--;
+    else { state.balance -= bet; state.wagered += bet; state.jackpots[bet] = Math.round((meter(state, bet) + bet * JACKPOT_RATE) * 1e4) / 1e4; }
+    const spin = spinReels(rng);
+    const ev = evaluate(spin.grid, bet, free ? FREE_MULT : 1), features = [];
+    if (ev.triggers.chain) features.push(makeChain(spin.grid, bet, free, rng));
+    if (ev.triggers.vault) features.push(makeVault(bet, free, rng));
+    state.pending = { id: roundId(rng), time: Date.now(), grid: spin.grid, stops: spin.stops, bet, free, features };
+    return state.pending;
+  }
+  function credit(state, amount) { state.balance += amount; state.paidOut += amount; }
+  function settle(state) {
+    const p = state.pending; if (!p) return null;
+    state.pending = null;
+    const r = evaluate(p.grid, p.bet, p.free ? FREE_MULT : 1);
+    let finalGrid = p.grid, finalStops = p.stops;
+    if (cascade) { const c = cascadeOf(p.stops, p.grid, p.bet, p.free ? FREE_MULT : 1); r.cascade = c; r.lineTotal = c.lineTotal; r.total = c.lineTotal + r.scatterPay; r.firstWins = r.wins; r.wins = c.steps.at(-1).wins; finalGrid = c.finalGrid; finalStops = c.finalStops; }
+    r.jackpotWin = r.jackpot ? claimJackpot(state, p.bet) : 0;
+    r.total += r.jackpotWin;
+    credit(state, r.total);
+    state.grid = finalGrid; state.stops = finalStops; state.lastWin = r.total;
+    state.spins++;
+    if (p.free) { state.freeTotal += r.total; state.freeCount++; }
+    r.freeAward = 0;
+    if (r.triggers.free) {
+      if (!state.freeActive) { state.freeActive = true; state.freeAwarded = 0; state.freeTotal = 0; state.freeCount = 0; state.freeBet = p.bet; }
+      const add = state.freeAwarded === 0 ? FREE_SPINS : Math.min(RETRIGGER, FREE_CAP - state.freeAwarded);
+      state.free += add; state.freeAwarded += add; r.freeAward = add;
+    }
+    for (const f of p.features) { f.roundId = p.id; state.features.push(f); }
+    state.gamble = (!p.free && !p.features.length && !r.triggers.free && r.total > 0) ? r.total : 0;
+    const feature = [r.jackpotWin ? 'GENESIS BLOCK' : '', ...p.features.map(f => f.type === 'chain' ? 'CHAIN' : 'VAULT'), r.triggers.free ? (p.free ? 'RETRIGGER' : 'FREE SPINS') : ''].filter(Boolean).join(' + ');
+    state.history.unshift({ id: p.id, time: p.time, bet: p.free ? 0 : p.bet, win: r.total, kind: p.free ? 'Free spin' : 'Spin', feature, grid: p.grid });
+    state.history = state.history.slice(0, 50);
+    r.round = p;
+    return r;
+  }
+  const feature = state => state.features[0] || null;
+  function pick(state, index) {
+    const f = feature(state);
+    if (!f || f.type !== 'vault' || f.picks.length >= 3 || f.picks.includes(index) || !(index >= 0 && index < 9)) return null;
+    f.picks.push(index); return { multiple: f.awards[index], amount: f.awards[index] * f.bet };
+  }
+  function respin(state) {
+    const f = feature(state);
+    if (!f || f.type !== 'chain' || f.index >= f.frames.length - 1) return null;
+    f.index++; return f.frames[f.index];
+  }
+  function featureDone(f) { return f.type === 'vault' ? f.picks.length === 3 : f.index === f.frames.length - 1; }
+  function collect(state) {
+    const f = feature(state); if (!f || !featureDone(f)) return null;
+    let amount = f.type === 'vault' ? f.picks.reduce((a, i) => a + f.awards[i], 0) * f.bet : f.sum * f.bet;
+    const jackpotWin = f.type === 'chain' && f.full ? claimJackpot(state, f.bet) : 0;
+    amount += jackpotWin;
+    credit(state, amount);
+    state.lastWin += amount;
+    if (f.free) state.freeTotal += amount;
+    const h = state.history.find(x => x.id === f.roundId); if (h) h.win += amount;
+    state.features.shift();
+    return { type: f.type, amount, jackpotWin };
+  }
+  function endFree(state) {
+    if (!state.freeActive || state.free || busy(state)) return null;
+    state.freeActive = false; state.freeAwarded = 0;
+    return { total: state.freeTotal, count: state.freeCount };
+  }
+  function gamble(state, choice, rng = randomInt) {
+    if (!state.gamble || busy(state) || state.free || !['odd', 'even'].includes(choice)) return null;
+    const stake = state.gamble, odd = rng(2) === 1, win = (choice === 'odd') === odd;
+    const digits = odd ? '13579bdf' : '02468ace';
+    const hash = Array.from({ length: 63 }, () => '0123456789abcdef'[rng(16)]).join('') + digits[rng(8)];
+    state.balance += win ? stake : -stake; state.gambleNet += win ? stake : -stake;
+    state.lastWin = win ? stake * 2 : 0; state.gamble = 0;
+    return { win, hash, parity: odd ? 'odd' : 'even', amount: win ? stake * 2 : 0, stake };
+  }
+  function fresh() {
+    const stops = [1, 2, 13, 5, 16];
+    return { version: STATE_VERSION, bet: 100, lastWin: 0, spins: 0, wagered: 0, paidOut: 0, gambleNet: 0,
+      free: 0, freeBet: 100, freeAwarded: 0, freeTotal: 0, freeCount: 0, freeActive: false, 
+      jackpots: freshJackpots(), stops, grid: stops.map((s, c) => windowAt(c, s)), pending: null, features: [], gamble: 0,
+      history: [], muted: false, volume: 0.4, ambient: false, turbo: false, reduced: false, showLines: false, quality: 'auto', notes: [] };
+  }
+  function load(raw) {
+    const base = fresh();
+    if (!raw || raw.version !== STATE_VERSION || !bets.includes(raw.bet) || !Array.isArray(raw.grid) || raw.grid.length !== 5) return base;
+    return { ...base, ...raw, jackpots: { ...base.jackpots, ...(raw.jackpots || {}) }, features: raw.features || [], history: raw.history || [], notes: [] };
+  }
+  const weights = symbols.map(sym => strips.map(st => st.filter(x => x === sym).length));
+  return { STATE_VERSION, symbols, NAMES, strips, stripCodes, weights, pays, lines, bets, scatterPays, vaultPrizes, chainValues, CHAIN_ODDS,
+    FREE_SPINS, RETRIGGER, FREE_CAP, FREE_MULT, JACKPOT_RATE, JACKPOT_SEED, cascade, randomInt, windowAt, spinReels, evaluate, cascadeOf, meter, seedFor,
+    fresh, load, start, settle, feature, featureDone, pick, respin, collect, endFree, gamble, busy, create: makeEngine };
+}
+const BF = makeEngine();
+if (typeof module !== 'undefined') module.exports = BF;
+</script>

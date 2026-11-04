@@ -1,0 +1,9 @@
+<script>/* Deep Strata rules: the shared engine's strips and features, with the Layer Cascade and a pay table scaled so the
+   cascade-inclusive line return equals the standard machines' (59.729% exact vs 59.726%; total RTP 94.38%).
+   Worked out with tools/cascade-model.mjs, which walks all 32^5 reel positions. */
+const DEEP_STRATA_RULES = Object.freeze({
+  pays: { cherry: [3, 9, 30], lemon: [4, 12, 35], chip: [5, 16, 50], block: [8, 22, 80], artifact: [12, 45, 175], bitcoin: [20, 85, 400], wild: [50, 250, 1500] },
+  cascade: { ladder: [1, 2, 3, 5], maxDrops: 30 }
+});
+if (typeof module !== 'undefined') module.exports = DEEP_STRATA_RULES;
+</script>
