@@ -1,0 +1,28 @@
+{
+  "symbol": "ALEX",
+  "contract": "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token",
+  "url": "https://api.hiro.so/metadata/v1/ft/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token",
+  "read_at": "2026-11-03T15:39:44.773517+00:00",
+  "metadata": {
+    "tx_id": "0x460353087a14a6570647ef3892e3e888b2384b74b5b695c852230a49180816ea",
+    "sender_address": "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9",
+    "asset_identifier": "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token::alex",
+    "name": "ALEX Token",
+    "symbol": "ALEX",
+    "decimals": 8,
+    "total_supply": "38367073753723989",
+    "token_uri": "https://cdn.alexlab.co/metadata/token-alex.json",
+    "description": "Bring your Bitcoin to Life: launch new projects, earn interest, rewrite finance, reinvent culture",
+    "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token/1.png",
+    "image_thumbnail_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token/1-thumb.png",
+    "image_canonical_uri": "https://cdn.alexlab.co/logos/ALEX_Token.png",
+    "metadata": {
+      "sip": 16,
+      "name": "ALEX Token",
+      "description": "Bring your Bitcoin to Life: launch new projects, earn interest, rewrite finance, reinvent culture",
+      "image": "https://cdn.alexlab.co/logos/ALEX_Token.png",
+      "cached_image": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token/1.png",
+      "cached_thumbnail_image": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token/1-thumb.png"
+    }
+  }
+}

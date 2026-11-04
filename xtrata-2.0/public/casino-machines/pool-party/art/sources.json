@@ -1,0 +1,173 @@
+{
+  "snapshotDate": "2026-11-03",
+  "assets": [
+    {
+      "symbol": "USDA",
+      "file": "art/usda.svg",
+      "source_url": "https://raw.githubusercontent.com/arkadiko-dao/arkadiko/master/web/public/assets/tokens/usda.svg",
+      "downloaded_at": "2026-11-03T15:40:50Z",
+      "sha256": "38afc079e5fdebbef197ee0d327e12ed4eccb4f9274f8a9ea23effa9df0a49d6",
+      "size_bytes": 2448,
+      "modified": false,
+      "permission_required_before_public_build": true,
+      "permission_status": "not requested",
+      "contract": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.usda-token",
+      "metadata_url": "https://api.hiro.so/metadata/v1/ft/SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.usda-token",
+      "metadata_snapshot": "data/raw/USDA-hiro.json",
+      "provenance_note": "Exact-contract Hiro metadata was fetched; token_uri returned HTTP 404. Official Arkadiko repository file used."
+    },
+    {
+      "symbol": "DIKO",
+      "file": "art/diko.svg",
+      "source_url": "https://raw.githubusercontent.com/arkadiko-dao/arkadiko/master/web/public/assets/tokens/diko.svg",
+      "downloaded_at": "2026-11-03T15:40:50Z",
+      "sha256": "9b3b04ee1783db612cc629e6be9777a15c6561dbac753ec4b614b78bf17752de",
+      "size_bytes": 643,
+      "modified": false,
+      "permission_required_before_public_build": true,
+      "permission_status": "not requested",
+      "contract": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.arkadiko-token",
+      "metadata_url": "https://api.hiro.so/metadata/v1/ft/SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.arkadiko-token",
+      "metadata_snapshot": "data/raw/DIKO-hiro.json",
+      "provenance_note": "Exact-contract Hiro metadata was fetched; token_uri returned HTTP 404. Official Arkadiko repository file used."
+    },
+    {
+      "symbol": "CHA",
+      "file": "art/cha.png",
+      "source_url": "https://charisma.rocks/charisma-logo-square.png",
+      "downloaded_at": "2026-11-03T15:40:50Z",
+      "sha256": "544c8212fd08dd9d3300b5da8aba5d84303d2fed44f4cfc2a503a7aa9c2173c0",
+      "size_bytes": 1829,
+      "modified": false,
+      "permission_required_before_public_build": true,
+      "permission_status": "not requested",
+      "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token",
+      "metadata_url": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token",
+      "metadata_snapshot": "data/raw/CHA-hiro.json",
+      "provenance_note": "Canonical image URI from exact-contract Hiro token metadata. Hiro cached image_uri returned HTTP 403; original publisher-hosted image succeeded.",
+      "pixel_dimensions": [
+        320,
+        320
+      ]
+    },
+    {
+      "symbol": "VELAR",
+      "file": "art/velar.svg",
+      "source_url": "https://raw.githubusercontent.com/Velar-co/Velar-assets/refs/heads/master/Token/velar-logo-icon.svg",
+      "downloaded_at": "2026-11-03T15:40:50Z",
+      "sha256": "86411a77975bd33313fc126e6fdd6bff3f328d555d4de85841f3cf7391d58fa4",
+      "size_bytes": 3418,
+      "modified": false,
+      "permission_required_before_public_build": true,
+      "permission_status": "not requested",
+      "contract": "SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token",
+      "metadata_url": "https://api.hiro.so/metadata/v1/ft/SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token",
+      "metadata_snapshot": "data/raw/VELAR-hiro.json",
+      "provenance_note": "Canonical image URI from exact-contract Hiro token metadata. Hiro cached image_uri returned HTTP 403; original publisher-hosted image succeeded."
+    },
+    {
+      "symbol": "ALEX",
+      "file": "art/alex.png",
+      "source_url": "https://cdn.alexlab.co/logos/ALEX_Token.png",
+      "downloaded_at": "2026-11-03T15:40:50Z",
+      "sha256": "436edfe40a207dd1449cc3058373bb1555f1bf8d6abcc5b59a7b7df3932a783e",
+      "size_bytes": 155562,
+      "modified": false,
+      "permission_required_before_public_build": true,
+      "permission_status": "not requested",
+      "contract": "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token",
+      "metadata_url": "https://api.hiro.so/metadata/v1/ft/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token",
+      "metadata_snapshot": "data/raw/ALEX-hiro.json",
+      "provenance_note": "Canonical image URI from exact-contract Hiro token metadata. Hiro cached image_uri returned HTTP 403; original publisher-hosted image succeeded.",
+      "pixel_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "symbol": "STX",
+      "file": "art/stx.svg",
+      "source_url": "https://cdn.prod.website-files.com/618b0aafa4afde65f2fe38fe/65dbdd6c87cf20baca9ac049_stacks-logo-navbar.svg",
+      "downloaded_at": "2026-11-03T15:40:50Z",
+      "sha256": "c2a828ba0f643741369a12ff76657d849c5fc45661f5086597d34bd459d7ec9a",
+      "size_bytes": 2185,
+      "modified": false,
+      "permission_required_before_public_build": true,
+      "permission_status": "not requested",
+      "provenance_note": "Official SVG linked as Stacks in navigation of https://www.stacks.co/. Exact mark, unmodified; original fill #141414."
+    },
+    {
+      "symbol": "Xtrata",
+      "file": "art/xtrata.svg",
+      "source": "Verbatim SVG supplied in 23-pool-party-prompt.md, Part 5",
+      "modified": false,
+      "sha256": "caf69bc4aebfaea0ff0bccc1bd2c63039687e9d93ca61ff24676a09e794f335c",
+      "permission_status": "supplied by user"
+    },
+    {
+      "symbol": "ParallaX Casino",
+      "file": "art/brand/parallax-casino-wordmark.svg",
+      "source": "Canonical user-supplied DOG Army source: reference/dog-army/art/brand/parallax-casino-wordmark.svg",
+      "modified": false,
+      "sha256": "a6d24ced3c718ac89d4c754fd53693cd8686412d3b4b312d965c1c4eaed0a7f1",
+      "size_bytes": 11013,
+      "permission_status": "supplied by user for this project"
+    }
+  ],
+  "permissionRequired": [
+    "Arkadiko USDA",
+    "Arkadiko DIKO",
+    "Charisma CHA",
+    "Velar VELAR",
+    "ALEX",
+    "Stacks STX"
+  ],
+  "dataSources": [
+    {
+      "url": "https://invest.charisma.rocks/api/v1/vaults?type=POOL",
+      "docs": "https://docs.charisma.rocks/docs/data-apis/invest-api",
+      "records": 155
+    },
+    {
+      "url": "https://invest.charisma.rocks/api/v1/tokens/all?type=lp",
+      "docs": "https://docs.charisma.rocks/docs/data-apis/invest-api",
+      "records": 74
+    },
+    {
+      "url": "https://api.velar.co/pools",
+      "docs": "https://docs.velar.com/velar/developers/velar-api",
+      "records": 50
+    }
+  ],
+  "readLog": "data/read-log.json",
+  "missing": [
+    "No verified APR obtained: ALEX official APR endpoints returned HTTP 403; Velar API returns stats.apy rather than APR. Display APR UNAVAILABLE."
+  ],
+  "notes": [
+    "Logos copied intact from primary publishers, not drawn or imitated.",
+    "No permission request was sent.",
+    "No fetched rate changes payout maths.",
+    "No imagery is represented as a Forever Twin."
+  ],
+  "paths_relative_to": "package root",
+  "audio": {
+    "source_file": "src/game.a.js",
+    "type": "Original procedural Web Audio synthesis",
+    "sample_files": [],
+    "sample_licenses_required": false,
+    "synthesis": "Sine and triangle oscillators with amplitude/pitch envelopes; generated noise through low-pass filters; layered water splashes and droplets; electric-piano-like harmonic chords, synthesized kick and short noise percussion, a quiet three-tone ambience, and an original four-chord poolside lounge loop.",
+    "functions": [
+      "tone",
+      "noise",
+      "splash",
+      "brass",
+      "snare",
+      "kick",
+      "sound",
+      "ambient",
+      "music"
+    ],
+    "listening_signoff": "pending",
+    "note": "Internal inherited helper names do not identify imported samples. No recorded audio, melody sample, external sound font or third-party sound file is included."
+  }
+}

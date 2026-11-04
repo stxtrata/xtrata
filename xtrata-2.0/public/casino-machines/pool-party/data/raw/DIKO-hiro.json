@@ -1,0 +1,16 @@
+{
+  "symbol": "DIKO",
+  "contract": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.arkadiko-token",
+  "url": "https://api.hiro.so/metadata/v1/ft/SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.arkadiko-token",
+  "read_at": "2026-11-03T15:39:44.768539+00:00",
+  "metadata": {
+    "tx_id": "0x81ce000866e5a61ed46ced874ebb453cb9b4de8b9ba1e14ed810221a1dff238b",
+    "sender_address": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR",
+    "asset_identifier": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.arkadiko-token::diko",
+    "name": "Arkadiko Token",
+    "symbol": "DIKO",
+    "decimals": 6,
+    "total_supply": "95495592850593",
+    "token_uri": "https://arkadiko.finance/metadata/diko-token.json"
+  }
+}

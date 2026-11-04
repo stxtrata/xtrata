@@ -1,0 +1,28 @@
+{
+  "symbol": "CHA",
+  "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token",
+  "url": "https://api.hiro.so/metadata/v1/ft/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token",
+  "read_at": "2026-11-03T15:39:44.770873+00:00",
+  "metadata": {
+    "tx_id": "0x640b547ac91e5f44890ba757370f8254680f7b973f5ea2f256d350120a394bc0",
+    "sender_address": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS",
+    "asset_identifier": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token::charisma",
+    "name": "Charisma",
+    "symbol": "CHA",
+    "decimals": 6,
+    "total_supply": "132474657470",
+    "token_uri": "https://charisma.rocks/api/metadata/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token.json",
+    "description": "The primary token of the Charisma ecosystem.",
+    "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token/1.png",
+    "image_thumbnail_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token/1-thumb.png",
+    "image_canonical_uri": "https://charisma.rocks/charisma-logo-square.png",
+    "metadata": {
+      "sip": 16,
+      "name": "Charisma",
+      "description": "The primary token of the Charisma ecosystem.",
+      "image": "https://charisma.rocks/charisma-logo-square.png",
+      "cached_image": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token/1.png",
+      "cached_thumbnail_image": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token/1-thumb.png"
+    }
+  }
+}

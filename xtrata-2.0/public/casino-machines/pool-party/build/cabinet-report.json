@@ -1,0 +1,88 @@
+{
+  "machine": "pool-party",
+  "modelBytes": 2353466,
+  "geometries": 89,
+  "materials": 60,
+  "textures": 24,
+  "roles": {
+    "tag0": 2,
+    "tag1": 2,
+    "tag2": 2,
+    "tag3": 2,
+    "tag4": 2,
+    "tag5": 2,
+    "tag6": 2,
+    "tag7": 2,
+    "marqueeMeter": 1,
+    "waterJet": 1,
+    "crest": 1,
+    "screenMesh": 1,
+    "deckSurface": 1,
+    "btn-pays": 1,
+    "btnface-pays": 1,
+    "btn-betDown": 1,
+    "btnface-betDown": 1,
+    "btn-betUp": 1,
+    "btnface-betUp": 1,
+    "btn-auto": 1,
+    "btnface-auto": 1,
+    "spinPhysical": 1,
+    "lever": 1
+  },
+  "actions": {
+    "pays": 3,
+    "betDown": 3,
+    "betUp": 3,
+    "auto": 3,
+    "spin": 23
+  },
+  "logos": {
+    "symbols": [
+      "DIKO",
+      "CHA",
+      "USDA",
+      "ALEX",
+      "STX",
+      "VELAR"
+    ],
+    "official": true,
+    "source": "art/sources.json",
+    "liveScreen": true
+  },
+  "bounds": {
+    "min": [
+      -1.381999999433756,
+      5.960464483090178e-10,
+      -0.7749999761581421
+    ],
+    "max": [
+      1.6668482530117035,
+      6.116335157013519,
+      0.9396070769104
+    ],
+    "size": [
+      3.0488482524454597,
+      6.116335156417472,
+      1.714607053068542
+    ]
+  },
+  "layout": {
+    "screen": {
+      "x": 0,
+      "y": 2.94,
+      "z": 0.455,
+      "w": 1.98,
+      "h": 1.36
+    },
+    "deck": {
+      "x": 0,
+      "y": 1.82,
+      "z": 0.62,
+      "pitch": -0.72
+    },
+    "lintelAllowance": 0.2
+  },
+  "rendering": "Chromium SwiftShader; real GPU Safari/Chrome sign-off outstanding",
+  "errors": [],
+  "missing": []
+}

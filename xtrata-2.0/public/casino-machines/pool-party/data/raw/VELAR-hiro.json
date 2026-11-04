@@ -1,0 +1,28 @@
+{
+  "symbol": "VELAR",
+  "contract": "SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token",
+  "url": "https://api.hiro.so/metadata/v1/ft/SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token",
+  "read_at": "2026-11-03T15:39:44.771668+00:00",
+  "metadata": {
+    "tx_id": "0x1c8596844d869cdafdb7e9dd2f22d6b6625166ddcfc839aae5068dad7c92d74f",
+    "sender_address": "SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1",
+    "asset_identifier": "SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token::velar",
+    "name": "Velar",
+    "symbol": "VELAR",
+    "decimals": 6,
+    "total_supply": "1000000000000000",
+    "token_uri": "https://velar.co/metadata/velar-token.json",
+    "description": "DeFi Liquidity Protocol on Bitcoin",
+    "image_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token/1.png",
+    "image_thumbnail_uri": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token/1-thumb.png",
+    "image_canonical_uri": "https://raw.githubusercontent.com/Velar-co/Velar-assets/refs/heads/master/Token/velar-logo-icon.svg",
+    "metadata": {
+      "sip": 16,
+      "name": "Velar",
+      "description": "DeFi Liquidity Protocol on Bitcoin",
+      "image": "https://raw.githubusercontent.com/Velar-co/Velar-assets/refs/heads/master/Token/velar-logo-icon.svg",
+      "cached_image": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token/1.png",
+      "cached_thumbnail_image": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token/1-thumb.png"
+    }
+  }
+}

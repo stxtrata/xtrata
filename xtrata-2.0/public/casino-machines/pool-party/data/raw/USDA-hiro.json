@@ -1,0 +1,16 @@
+{
+  "symbol": "USDA",
+  "contract": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.usda-token",
+  "url": "https://api.hiro.so/metadata/v1/ft/SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.usda-token",
+  "read_at": "2026-11-03T15:39:44.766528+00:00",
+  "metadata": {
+    "tx_id": "0x9a6d4df548c6f85138e09ec46c013664c18aeab5004aa2f62c984c54a81ce931",
+    "sender_address": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR",
+    "asset_identifier": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.usda-token::usda",
+    "name": "USDA",
+    "symbol": "USDA",
+    "decimals": 6,
+    "total_supply": "562140464454",
+    "token_uri": "https://arkadiko.finance/metadata/usda-token.json"
+  }
+}

@@ -1,0 +1,546 @@
+{
+  "machine": "Pool Party",
+  "edition": "Series Bible 2.1 standalone",
+  "releaseVersion": "2.1.1",
+  "releaseDate": "2026-11-03",
+  "correction": "Schedule offscreen game animation on the visible host window using game-local time.",
+  "node": "v24.22.1",
+  "files": [
+    {
+      "path": "pool-party/DESIGN.md",
+      "bytes": 4878,
+      "sha256": "326932210e95858a64d31e22d9a53c7752db94e0c59cc7cb655f41bf5665debc"
+    },
+    {
+      "path": "pool-party/INTEGRATION.md",
+      "bytes": 9881,
+      "sha256": "eec602e6abd308d0c39889bce187fea746f96f8d6eb1a09776f671f6d728bed6"
+    },
+    {
+      "path": "pool-party/README.md",
+      "bytes": 11519,
+      "sha256": "e8815ec6e932809d5da4249898b969705a0f85c1e2c0034821c8d06716edcc5c"
+    },
+    {
+      "path": "pool-party/RESULTS.md",
+      "bytes": 14434,
+      "sha256": "e33b7dffbb6619103080007e0876b068d33ac0b6b064280e35d4217fdb7efe5b"
+    },
+    {
+      "path": "pool-party/art/alex.png",
+      "bytes": 155562,
+      "sha256": "436edfe40a207dd1449cc3058373bb1555f1bf8d6abcc5b59a7b7df3932a783e"
+    },
+    {
+      "path": "pool-party/art/brand/parallax-casino-wordmark.svg",
+      "bytes": 11013,
+      "sha256": "a6d24ced3c718ac89d4c754fd53693cd8686412d3b4b312d965c1c4eaed0a7f1"
+    },
+    {
+      "path": "pool-party/art/brand/xtrata-mark.svg",
+      "bytes": 2916,
+      "sha256": "2de985cf5c2ce68e6fbb45b93333294708919cc1c42d820d3b2f67587f4667ec"
+    },
+    {
+      "path": "pool-party/art/cha.png",
+      "bytes": 1829,
+      "sha256": "544c8212fd08dd9d3300b5da8aba5d84303d2fed44f4cfc2a503a7aa9c2173c0"
+    },
+    {
+      "path": "pool-party/art/diko.svg",
+      "bytes": 643,
+      "sha256": "9b3b04ee1783db612cc629e6be9777a15c6561dbac753ec4b614b78bf17752de"
+    },
+    {
+      "path": "pool-party/art/sources.json",
+      "bytes": 7797,
+      "sha256": "815619f3bc58d697b5897235d22c7da571e2c3584ac44763e87f189ca06f13d6"
+    },
+    {
+      "path": "pool-party/art/stx.svg",
+      "bytes": 2185,
+      "sha256": "c2a828ba0f643741369a12ff76657d849c5fc45661f5086597d34bd459d7ec9a"
+    },
+    {
+      "path": "pool-party/art/usda.svg",
+      "bytes": 2448,
+      "sha256": "38afc079e5fdebbef197ee0d327e12ed4eccb4f9274f8a9ea23effa9df0a49d6"
+    },
+    {
+      "path": "pool-party/art/velar.svg",
+      "bytes": 3418,
+      "sha256": "86411a77975bd33313fc126e6fdd6bff3f328d555d4de85841f3cf7391d58fa4"
+    },
+    {
+      "path": "pool-party/art/xtrata.svg",
+      "bytes": 2917,
+      "sha256": "caf69bc4aebfaea0ff0bccc1bd2c63039687e9d93ca61ff24676a09e794f335c"
+    },
+    {
+      "path": "pool-party/build/cabinet-report.json",
+      "bytes": 1533,
+      "sha256": "6229513e12b6a257f85040b04fd75d1b6d2fdf965d3ebea7b2a95354196cadd2"
+    },
+    {
+      "path": "pool-party/build/model.json",
+      "bytes": 2353466,
+      "sha256": "8e3923f47980c34cd4c50a059610bbc92078c75cf7ab494f69a124d6604b2148"
+    },
+    {
+      "path": "pool-party/checks/CHECKS.md",
+      "bytes": 4790,
+      "sha256": "cf1c6abdc3c03d3651514e66e8b489da9940a5b579220fdbba970e0ccd4e1bfc"
+    },
+    {
+      "path": "pool-party/checks/banner-pool.py",
+      "bytes": 6560,
+      "sha256": "8fe8f04af79de1419f64f232a3c356298e6ebb37771dad87e276bfe55ff61892"
+    },
+    {
+      "path": "pool-party/checks/behaviour-pool.py",
+      "bytes": 19626,
+      "sha256": "cd60f8101d1240473004f5b0a3a54b97495b0c1c063c434839ff77e9c83e120d"
+    },
+    {
+      "path": "pool-party/checks/engine-data-art.mjs",
+      "bytes": 5640,
+      "sha256": "2cb689b0379e9cfbab95eee5876b94825e544a123ed201836d4de46028f7a082"
+    },
+    {
+      "path": "pool-party/checks/engine-data.mjs",
+      "bytes": 10661,
+      "sha256": "d31c5520e44baa5f4b708789c7d9e7fc2d65105c73954236cb0765a6ed7ecdcf"
+    },
+    {
+      "path": "pool-party/checks/fallback-pool.py",
+      "bytes": 12068,
+      "sha256": "456ca4eb879a3424bcf1356c744587768020ab980d9601d7276f19cfd3aec439"
+    },
+    {
+      "path": "pool-party/checks/fullscreen-pool.py",
+      "bytes": 15975,
+      "sha256": "bb63f68e7d9ce3570f6a1ab9c88f96434c09bfb7ce5a962a245fec9ff03524f1"
+    },
+    {
+      "path": "pool-party/checks/lab-all-pool.py",
+      "bytes": 11736,
+      "sha256": "dfdb9ee3d7dad39dce3e45c1ba70266d80554a5974d524544b5e77fcc7da9099"
+    },
+    {
+      "path": "pool-party/checks/mechanics-pool.py",
+      "bytes": 5271,
+      "sha256": "43cfe93079ee28b02db64d0e9731dbead897d23cac568bbcd5b04a193ba73e56"
+    },
+    {
+      "path": "pool-party/checks/mechanics-source.mjs",
+      "bytes": 7486,
+      "sha256": "65cc47e483ec6a6f402766ba83b9bf1579d338d3610c9eb7bc1eb66aaecbd3c2"
+    },
+    {
+      "path": "pool-party/checks/production-pool.py",
+      "bytes": 7116,
+      "sha256": "e16c9ee40dae36d1a584d14369b5276ed3469db704554f20b9f304ada67f5f12"
+    },
+    {
+      "path": "pool-party/checks/reels-clock.mjs",
+      "bytes": 5341,
+      "sha256": "9b5350a9275a71cc267968e4f8cc7d809bab0bd83f389e9124937b30f8226cda"
+    },
+    {
+      "path": "pool-party/checks/reels-direct-pool.py",
+      "bytes": 3848,
+      "sha256": "2f84fee21a443da1a84ebf7b0f05f2f48f8a462cce65cf3a6f838528e2ba03c6"
+    },
+    {
+      "path": "pool-party/checks/reels-motion-pool.py",
+      "bytes": 9703,
+      "sha256": "cf54a5d2c85178a9a5d0d91147d59913a4e8f3b433d2603b79df2124449abe20"
+    },
+    {
+      "path": "pool-party/checks/results/art-data.json",
+      "bytes": 5825,
+      "sha256": "db952858544cbd8ff60c96b2f0aed39bd521824c1ba3240724cb3fec5294963e"
+    },
+    {
+      "path": "pool-party/checks/results/banner.json",
+      "bytes": 2085,
+      "sha256": "00d976389c5acce24e02649145a5de3a43ea3617e5f8f039dc210c193f61eb37"
+    },
+    {
+      "path": "pool-party/checks/results/behavior-pending-free.json",
+      "bytes": 874,
+      "sha256": "c84c67924efb93c5fb2c3a61049b9ed7ca03bfb6813dc62eee757b0eff9bd0a7"
+    },
+    {
+      "path": "pool-party/checks/results/behavior-pool.json",
+      "bytes": 10009,
+      "sha256": "7293c3f615fae38df87adbbba893c3f7235cd5785f32699ae703178a1b1885b7"
+    },
+    {
+      "path": "pool-party/checks/results/build.json",
+      "bytes": 951,
+      "sha256": "2a8cde8d28dc063428783283a336c2973812e37b71ee7a81ab3c1b9649bcf72d"
+    },
+    {
+      "path": "pool-party/checks/results/engine-data.json",
+      "bytes": 2751,
+      "sha256": "e373e724a65c97c2a66b63e4e5fca1bc5bc9b3c3513229ef66dedad1f73aaf7d"
+    },
+    {
+      "path": "pool-party/checks/results/engine-source.json",
+      "bytes": 1292,
+      "sha256": "d518547168ca962e980402e4cac2c94efa0dd833210b02ab948394afaba634ff"
+    },
+    {
+      "path": "pool-party/checks/results/engine.json",
+      "bytes": 3476,
+      "sha256": "9c8950bb3aefbc4b75b7f4c327fd7658d43121d25258a3f055d27064fc3cd323"
+    },
+    {
+      "path": "pool-party/checks/results/fallback.json",
+      "bytes": 10934,
+      "sha256": "d9e08b86fcde5180494c2263db31fdb9d39dd7ba5811cf2bd54d51b863f1c025"
+    },
+    {
+      "path": "pool-party/checks/results/fullscreen-layout.json",
+      "bytes": 38462,
+      "sha256": "f29b658db3ec711dff3f5e5e5fde258372bf3f63a1b88f34ef21a76e70a90f12"
+    },
+    {
+      "path": "pool-party/checks/results/fullscreen-pool.json",
+      "bytes": 48050,
+      "sha256": "e3cc79d39b3668959bcd3a0f2f0cce13b18d0152f4018b04b754cdfda3c6af67"
+    },
+    {
+      "path": "pool-party/checks/results/fullscreen-retest.json",
+      "bytes": 10803,
+      "sha256": "d81f33c0e240a4264bd35556300aa393b619f31816823f42a43861731d70a14c"
+    },
+    {
+      "path": "pool-party/checks/results/fullscreen-summary.json",
+      "bytes": 4261,
+      "sha256": "91d33ec82ca4610ab34c411f5d3f52635e83f4b4a7adb310be2a87c26c7fce5b"
+    },
+    {
+      "path": "pool-party/checks/results/lab-all.json",
+      "bytes": 80154,
+      "sha256": "d4aff617c03203dc1749c8db96c08f9db07fd601a6848029193691a93b027da9"
+    },
+    {
+      "path": "pool-party/checks/results/mechanics-source.json",
+      "bytes": 6442,
+      "sha256": "1701110b5cc13c0059d94f10cdc80b148394aa97aed56bb71b55d83649bd88e0"
+    },
+    {
+      "path": "pool-party/checks/results/mechanics.json",
+      "bytes": 2539,
+      "sha256": "ae6ee78513c872fc5ebfd5f9c10dcfac9185460bf415bc419d21f503f96f38d3"
+    },
+    {
+      "path": "pool-party/checks/results/production-pool.json",
+      "bytes": 1855,
+      "sha256": "febe730d92b2ccf7b6966fe97f532869f91292c5f6e8876d7283d836f19119ae"
+    },
+    {
+      "path": "pool-party/checks/results/reel-clock-source.json",
+      "bytes": 1469,
+      "sha256": "00923a47bc37aec3b54f52e65eff4577c908b9cc55b6780b4176e63d8d6956f7"
+    },
+    {
+      "path": "pool-party/checks/results/reels-clock.json",
+      "bytes": 1624,
+      "sha256": "641fe84d0ee98bfa09fe118605f4a0c0ff586c8f3c1d349c20d19d1fff2cc5a7"
+    },
+    {
+      "path": "pool-party/checks/results/reels-motion-direct.json",
+      "bytes": 13815,
+      "sha256": "4424b7d73dd096421baf99b1daa8160ba0fe50199e726a623c656136e6f85137"
+    },
+    {
+      "path": "pool-party/checks/results/reels-motion-fixed-native.json",
+      "bytes": 92073,
+      "sha256": "7c81b3b93ea509e537b6bb6da7e11bcc8702f3d3d145b2bb21be47f64d471109"
+    },
+    {
+      "path": "pool-party/checks/results/reels-motion-fixed-starved-software.json",
+      "bytes": 15731,
+      "sha256": "cf2569d20e805d6974a734b8b02379a181862af475c8380e4c96aaa6bd0bccc9"
+    },
+    {
+      "path": "pool-party/checks/results/reels-motion-fixed-starved.json",
+      "bytes": 1350,
+      "sha256": "90586a06404b50e5b987f14ce290fe5f9ccd5c3a614d65227569412b12bf3484"
+    },
+    {
+      "path": "pool-party/checks/results/reels-motion-original-starved.json",
+      "bytes": 20827,
+      "sha256": "0d7e68bd291266aa8cd8133b036485b89890fc4ee07adb2da9cab17becf6ce7d"
+    },
+    {
+      "path": "pool-party/checks/results/reference-integrity.json",
+      "bytes": 1307,
+      "sha256": "6453a4710e4094c35b6ecdbb6c29a1942ff71f96abe89b451afb6d463802bd35"
+    },
+    {
+      "path": "pool-party/checks/results/rtp-5000000-seed-20261102.json",
+      "bytes": 1486,
+      "sha256": "34b7c68ef01532add0c68e3f8257ad3e6345337de7d909d56fb7225778837fe5"
+    },
+    {
+      "path": "pool-party/checks/results/rtp-5000000-seed-7.json",
+      "bytes": 1481,
+      "sha256": "b290c9f3219021de53a65db8e0a6990777fa362759415c354c70d56daf00e282"
+    },
+    {
+      "path": "pool-party/checks/results/views.json",
+      "bytes": 11903,
+      "sha256": "03d2ab9c873d1652247bc67740eee68a7f0bd001784c314c9d4217b33d58029c"
+    },
+    {
+      "path": "pool-party/checks/run-browser-checks.py",
+      "bytes": 1345,
+      "sha256": "69ad56e33a8b8817e2aa587ca13bc7622cc29152f49de0fbacd422aef6fc48f8"
+    },
+    {
+      "path": "pool-party/checks/views-pool.py",
+      "bytes": 4005,
+      "sha256": "b65936bcd702abae21b4cb9cc0d5304800b7633e0d05ad782d0f331486c81bae"
+    },
+    {
+      "path": "pool-party/data/pool-party-snapshots.json",
+      "bytes": 39673,
+      "sha256": "c53238f668b0379de881bbe14fc9cb9a99e679ad890f79db352f44fc69873c33"
+    },
+    {
+      "path": "pool-party/data/raw/ALEX-hiro.json",
+      "bytes": 1785,
+      "sha256": "d17f7a0eb55fad0c00d85f94b81e0e8989913ebef82868fb5de9f014f50ae319"
+    },
+    {
+      "path": "pool-party/data/raw/ALEX-token-uri.json",
+      "bytes": 209,
+      "sha256": "98469be472720069708934c42f5435ecaa9ae38b891e1ee67f14e89797fa4d1f"
+    },
+    {
+      "path": "pool-party/data/raw/CHA-hiro.json",
+      "bytes": 1667,
+      "sha256": "dd2905a58be66686b30659e2a1ffcc1b68260b27a4aa77ac485538e306d5488a"
+    },
+    {
+      "path": "pool-party/data/raw/CHA-token-uri.json",
+      "bytes": 266,
+      "sha256": "54b699e09c5f5737436880e07f21183f96e38df42559348b44bd8267ea44275b"
+    },
+    {
+      "path": "pool-party/data/raw/DIKO-hiro.json",
+      "bytes": 688,
+      "sha256": "4360d3ca1c77eb640f8c098bcf2401cc5dcd5afcf50dc5d3d4b1c9a9e9c3992f"
+    },
+    {
+      "path": "pool-party/data/raw/USDA-hiro.json",
+      "bytes": 664,
+      "sha256": "b0266328eb65d6c8346631a1bd0dc9a8c3f4c7b339bb3e4ad9765e9bf2f3d53d"
+    },
+    {
+      "path": "pool-party/data/raw/VELAR-hiro.json",
+      "bytes": 1674,
+      "sha256": "7028cff7c5d75cbe9ac576a3e8ed4620fb15db45e55d905e8b36e2ce47b0adc9"
+    },
+    {
+      "path": "pool-party/data/raw/VELAR-token-uri.json",
+      "bytes": 260,
+      "sha256": "99f689a1adbcd699730aa7a99f2a2826990ac03713eb3421a33d4cb17dbcd517"
+    },
+    {
+      "path": "pool-party/data/raw/alex-transactions.json",
+      "bytes": 204042,
+      "sha256": "4828f722ae5097e0ffaf28927b21a6320e907d2bf959fb8c7eedfbeb4f384383"
+    },
+    {
+      "path": "pool-party/data/raw/arkadiko-transactions.json",
+      "bytes": 598880,
+      "sha256": "5dbf7e8406f9d4b6caca4c60e9f6cfee21848e44aa044db96d15c68a6ee167fd"
+    },
+    {
+      "path": "pool-party/data/raw/charisma-lp.json",
+      "bytes": 60082,
+      "sha256": "1454019d1adfe88f7e1e4e66de42dbb34c01cccb97d9cf3fbec48a9ed38d7277"
+    },
+    {
+      "path": "pool-party/data/raw/charisma-transactions.json",
+      "bytes": 311159,
+      "sha256": "d6a0c0563e90d9b8c744ac99c0ee4e4efdbf4fcca0a332acc1d204481e90e5cf"
+    },
+    {
+      "path": "pool-party/data/raw/charisma-vaults.json",
+      "bytes": 255613,
+      "sha256": "ff898a20a71147c3fcfc744475cd111a42c8cceeadce083a71a1844673935cc7"
+    },
+    {
+      "path": "pool-party/data/raw/velar-pools.json",
+      "bytes": 32392,
+      "sha256": "fc48037471e7b504b02078c893a9d5633380b52c93ed3147b5e5dfb6da6ba141"
+    },
+    {
+      "path": "pool-party/data/raw/velar-transactions.json",
+      "bytes": 683901,
+      "sha256": "9f52f4207b20e5ddaad44d4174fd15d3a7a7d204fd402509a4f61fbfaa283348"
+    },
+    {
+      "path": "pool-party/data/read-log.json",
+      "bytes": 21111,
+      "sha256": "34b2a711cd0b1c40a835fc22a57c4d8b69f4107df92bb485b4b8a475b04e2e06"
+    },
+    {
+      "path": "pool-party/dist/game.html",
+      "bytes": 467722,
+      "sha256": "8ad450d4d23855ab720eb6f625443cda3611b643d3c352c81978da364c845b70"
+    },
+    {
+      "path": "pool-party/fund.json",
+      "bytes": 123,
+      "sha256": "267a1c025b75da3c42c7b6d1cbddccca2520a2e8e91b06a255b69d633b3a895d"
+    },
+    {
+      "path": "pool-party/index.html",
+      "bytes": 2210744,
+      "sha256": "cd5f0f39aa0743239b840c57153574bb970a7e059f6cab7ededed265f0c621ab"
+    },
+    {
+      "path": "pool-party/notes/art-contract.md",
+      "bytes": 1552,
+      "sha256": "973656c6146d9578e5929a5d549637ad162823eb0f402b313e2b3a515ff64511"
+    },
+    {
+      "path": "pool-party/notes/room-and-rendering-findings.md",
+      "bytes": 2161,
+      "sha256": "0b0cd4c6dd2b95606a7ddd6406c1861ba63ee51a0d59f49b4b03cd4bffca7a9e"
+    },
+    {
+      "path": "pool-party/pack.json",
+      "bytes": 1564769,
+      "sha256": "e741f477757fdd603b6e3d26122fa7ba138f1a4d7587240ef7ecec21c6c99eed"
+    },
+    {
+      "path": "pool-party/src/cabinet.js",
+      "bytes": 20933,
+      "sha256": "8235582d92b1f4b684fa0a23956929673ed35300c999d1494cf205120264b265"
+    },
+    {
+      "path": "pool-party/src/canvasengine.js",
+      "bytes": 316,
+      "sha256": "aaef8c28b4c3ffe7529bf83f035c93c4dc09ec4f68a4e7aed6dd878fd37aaf0e"
+    },
+    {
+      "path": "pool-party/src/compat.js",
+      "bytes": 1842,
+      "sha256": "67e15844b0be5bf00673880a1e709c57fa64926045ea711026901fa982dd8538"
+    },
+    {
+      "path": "pool-party/src/engine.js",
+      "bytes": 11784,
+      "sha256": "7f619182ada01119a713c64874eb1a7e024d7c210e0dca0ec2e8afc05c143168"
+    },
+    {
+      "path": "pool-party/src/engine.sha256",
+      "bytes": 65,
+      "sha256": "f0ff85feab21c6b30de654fc09459fbd36e568037faf6b567413ad4abb02a4c3"
+    },
+    {
+      "path": "pool-party/src/game-body.html",
+      "bytes": 2921,
+      "sha256": "ce0f92fdade733517cc13c760f1b890983da8f8fa95b0c94807201b74091b3bc"
+    },
+    {
+      "path": "pool-party/src/game.a.js",
+      "bytes": 7813,
+      "sha256": "1d685e0ae999c8efcef1a15c9f22781e2242da9938c77736d07e16665543ea4a"
+    },
+    {
+      "path": "pool-party/src/game.b.js",
+      "bytes": 14147,
+      "sha256": "85037ce28af1e6b847402ddeb3dc329d3da4cd93a31d2a05985f0d5ffbb73cb1"
+    },
+    {
+      "path": "pool-party/src/game.c.js",
+      "bytes": 12987,
+      "sha256": "8eee6d5a322917b43981a874484284559088d7aeca6ef40d753ee7ccb2a05b5e"
+    },
+    {
+      "path": "pool-party/src/game.css",
+      "bytes": 15317,
+      "sha256": "0fd9433b9d28492d4d6ff4efef0a075c8894efb2a14647225377580b9e6cb261"
+    },
+    {
+      "path": "pool-party/src/game.d.js",
+      "bytes": 29011,
+      "sha256": "6855f8d5723743aa5954031ac929469cfbc734d3606c18bf493fcf4a4bfc1c04"
+    },
+    {
+      "path": "pool-party/src/game.e.js",
+      "bytes": 56772,
+      "sha256": "1e294d42645d49e189a23bcbb80e4bdf557921500826586eee311f6449824ae9"
+    },
+    {
+      "path": "pool-party/src/game.scenes.js",
+      "bytes": 18685,
+      "sha256": "e2043d4830b4f53dfd170a7089f1895f47e02e5f2f075e89ddac527762237376"
+    },
+    {
+      "path": "pool-party/src/host.html",
+      "bytes": 37515,
+      "sha256": "ad9240ee02ef143d5f8d45d572a51c6dd380457cdc21338c017f13918d6c3f69"
+    },
+    {
+      "path": "pool-party/src/layr.js",
+      "bytes": 9572,
+      "sha256": "659bea0c6afc283fd851b9cd1d25573c4fc58d4a7968f7c94e3f6ee77882eed4"
+    },
+    {
+      "path": "pool-party/src/software.js",
+      "bytes": 5023,
+      "sha256": "f7ff6c2e134c09cb1ec06706a420c749f76541ff7e05a699ab95fdccda1a3370"
+    },
+    {
+      "path": "pool-party/src/xlogo.js",
+      "bytes": 2227,
+      "sha256": "3580ecfc8d515c7f31e2d3f6222aa1b7e7c6832262fc080e92b2ac8340cb5dea"
+    },
+    {
+      "path": "pool-party/tools/build-cabinet.py",
+      "bytes": 4386,
+      "sha256": "2b2fa4201010022dcb72cf40f19f79c9b8d9e5377bfc6493c3a72fbe64c48300"
+    },
+    {
+      "path": "pool-party/tools/build-pack.mjs",
+      "bytes": 5071,
+      "sha256": "3badb49461fca903cb0690401af2cdcfb9e08b40552e0ec2c3d3fcbec31aac51"
+    },
+    {
+      "path": "pool-party/tools/cabinet-build.html",
+      "bytes": 3611,
+      "sha256": "e7e19166ab4e3612cd3a9a2e6b609b810d2c6b4afa48e3bb37f16ba3d609142a"
+    },
+    {
+      "path": "pool-party/tools/check-engine.mjs",
+      "bytes": 5502,
+      "sha256": "9163a49dc2b07415632109717074101cb9c0fa6f2d292ad2037fd2cf3efeb186"
+    },
+    {
+      "path": "pool-party/tools/fetch-pool-sources.py",
+      "bytes": 2449,
+      "sha256": "78243799f1b65afb6a18a00b3e84d58c19f38c6e08484fde304d593ffc8b7058"
+    },
+    {
+      "path": "pool-party/tools/rtp.mjs",
+      "bytes": 4563,
+      "sha256": "960977a550ee33f453ab0a16453772d03babd58b24c94d72738072acc23f0851"
+    },
+    {
+      "path": "pool-party/vendor/three.r128.min.js",
+      "bytes": 603447,
+      "sha256": "ba0c6cb529517d7e286dadcd68d37ff5220aa638e4ac2cd7fcb316aae580924d"
+    }
+  ],
+  "visualEvidence": "Earlier visual gallery is unchanged. Reel-animation regression evidence is in checks/results/reels-*.json."
+}

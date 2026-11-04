@@ -1,0 +1,588 @@
+[
+  {
+    "file": "art/usda.svg",
+    "url": "https://raw.githubusercontent.com/arkadiko-dao/arkadiko/master/web/public/assets/tokens/usda.svg",
+    "read_at": "2026-11-03T15:40:23.758060+00:00",
+    "status": 200,
+    "size": 2448,
+    "type": "image/svg+xml"
+  },
+  {
+    "file": "art/diko.svg",
+    "url": "https://raw.githubusercontent.com/arkadiko-dao/arkadiko/master/web/public/assets/tokens/diko.svg",
+    "read_at": "2026-11-03T15:40:23.760244+00:00",
+    "status": 200,
+    "size": 643,
+    "type": "image/svg+xml"
+  },
+  {
+    "file": "art/cha.png",
+    "url": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-token/1.png",
+    "read_at": "2026-11-03T15:40:23.762624+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "art/velar.png",
+    "url": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.velar-token/1.png",
+    "read_at": "2026-11-03T15:40:23.766175+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "art/alex.png",
+    "url": "https://assets.hiro.so/api/mainnet/token-metadata-api/SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token/1.png",
+    "read_at": "2026-11-03T15:40:23.768650+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "art/velar.svg",
+    "url": "https://raw.githubusercontent.com/Velar-co/Velar-assets/refs/heads/master/Token/velar-logo-icon.svg",
+    "read_at": "2026-11-03T15:40:23.770432+00:00",
+    "status": 200,
+    "size": 3418,
+    "type": "image/svg+xml"
+  },
+  {
+    "file": "data/charisma-vaults.json",
+    "url": "https://invest.charisma.rocks/api/v1/vaults?type=POOL",
+    "read_at": "2026-11-03T15:40:23.771872+00:00",
+    "status": 200,
+    "size": 255613,
+    "type": "application/json"
+  },
+  {
+    "file": "data/charisma-lp.json",
+    "url": "https://invest.charisma.rocks/api/v1/tokens/all?type=lp",
+    "read_at": "2026-11-03T15:40:23.774693+00:00",
+    "status": 200,
+    "size": 60082,
+    "type": "application/json"
+  },
+  {
+    "file": "data/charisma-stats.json",
+    "url": "https://swap.charisma.rocks/api/v1/stats",
+    "read_at": "2026-11-03T15:40:23.775916+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "data/stacks-home.html",
+    "url": "https://www.stacks.co/",
+    "read_at": "2026-11-03T15:40:23.778345+00:00",
+    "status": 200,
+    "size": 108408,
+    "type": "text/html; charset=utf-8"
+  },
+  {
+    "file": "data/velar-docs.md",
+    "url": "https://docs.velar.com/velar/developers/api.md",
+    "read_at": "2026-11-03T15:40:26.863010+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "data/arkadiko-info.html",
+    "url": "https://info.arkadiko.finance/",
+    "read_at": "2026-11-03T15:40:26.868666+00:00",
+    "status": 200,
+    "size": 2422,
+    "type": "text/html; charset=UTF-8"
+  },
+  {
+    "file": "data/alex-pools.html",
+    "url": "https://app.alexlab.co/pool",
+    "read_at": "2026-11-03T15:40:26.870495+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "art/cha.png",
+    "url": "https://charisma.rocks/charisma-logo-square.png",
+    "read_at": "2026-11-03T15:40:50.717379+00:00",
+    "status": 200,
+    "size": 1829,
+    "type": "image/png"
+  },
+  {
+    "file": "art/alex.png",
+    "url": "https://cdn.alexlab.co/logos/ALEX_Token.png",
+    "read_at": "2026-11-03T15:40:50.722744+00:00",
+    "status": 200,
+    "size": 155562,
+    "type": "image/png"
+  },
+  {
+    "file": "art/stx-navbar.svg",
+    "url": "https://cdn.prod.website-files.com/618b0aafa4afde65f2fe38fe/65dbdd6c87cf20baca9ac049_stacks-logo-navbar.svg",
+    "read_at": "2026-11-03T15:40:50.723453+00:00",
+    "status": 200,
+    "size": 2185,
+    "type": "image/svg+xml"
+  },
+  {
+    "file": "data/velar-pools.json",
+    "url": "https://api.velar.co/pools",
+    "read_at": "2026-11-03T15:40:50.725288+00:00",
+    "status": 200,
+    "size": 32392,
+    "type": "application/json; charset=utf-8"
+  },
+  {
+    "file": "data/alex-allswaps.json",
+    "url": "https://api.alexgo.io/v1/allswaps",
+    "read_at": "2026-11-03T15:40:50.728412+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "data/alex-pairs.json",
+    "url": "https://api.alexgo.io/v1/pairs",
+    "read_at": "2026-11-03T15:40:50.738501+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "data/alex-swaps-1.json",
+    "url": "https://api.alexgo.io/v1/historical_swaps/1?limit=20",
+    "read_at": "2026-11-03T15:40:50.740277+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "data/alex-stats-1.json",
+    "url": "https://api.alexgo.io/v1/pool_stats/1?limit=1",
+    "read_at": "2026-11-03T15:40:50.747821+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "data/alex-pool-stats.json",
+    "url": "https://api.alexgo.io/v1/public/amm-pool-stats",
+    "read_at": "2026-11-03T15:40:50.770666+00:00",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "file": "data/stacks-docs-tree.json",
+    "url": "https://api.github.com/repos/stacks-network/docs/git/trees/master?recursive=1",
+    "read_at": "2026-11-03T15:40:50.772759+00:00",
+    "status": 200,
+    "size": 334840,
+    "type": "application/json; charset=utf-8"
+  },
+  {
+    "protocol": "charisma",
+    "url": "https://api.hiro.so/extended/v1/address/SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop/transactions?limit=50",
+    "read_at": "2026-11-03T15:41:41.210478+00:00",
+    "status": 200,
+    "total": 36902,
+    "results": 50,
+    "calls": [
+      {
+        "txid": "0x46712b4f9c9e0af9eae069f6762475d89b189c342390c597b064bfbf477afe7e",
+        "status": "success",
+        "block": 9404971,
+        "at": "2026-11-03T15:38:56.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-4"
+      },
+      {
+        "txid": "0x50998a42042e40d0b839d6bc4a1296bea37c00411cef4c43ce628db568968366",
+        "status": "abort_by_post_condition",
+        "block": 9404963,
+        "at": "2026-11-03T15:37:17.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-4"
+      },
+      {
+        "txid": "0xd12935f22989b2877f33ed305fe6cb2e17e0363d9d004b949761ef170fb546ce",
+        "status": "abort_by_post_condition",
+        "block": 9404957,
+        "at": "2026-11-03T15:35:46.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-4"
+      },
+      {
+        "txid": "0x19cbd445d1b4cafc7d2d9d6248aa82ac250db19a9da11fb73f7b6974c573fa6f",
+        "status": "abort_by_post_condition",
+        "block": 9404950,
+        "at": "2026-11-03T15:34:15.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-4"
+      },
+      {
+        "txid": "0x1e1873042d705c77f71369d7fce036bbacbce34a5b73569b2f3bf2d05101cc94",
+        "status": "success",
+        "block": 9404942,
+        "at": "2026-11-03T15:32:51.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-4"
+      },
+      {
+        "txid": "0x95e9b73c6089fad6f25818847788def5276aeb11c356f4da624caa310da7995a",
+        "status": "abort_by_post_condition",
+        "block": 9404933,
+        "at": "2026-11-03T15:31:13.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0xedd7743804cace751b33bfdd70b2cbaf8000f720dc9d996c110ade2878ff8ae7",
+        "status": "abort_by_post_condition",
+        "block": 9404925,
+        "at": "2026-11-03T15:29:37.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0x50d9a08f42ab7c0b6057e2881e7f4ad336c13f0ae198bc5e64468dcbb1c29399",
+        "status": "abort_by_post_condition",
+        "block": 9404919,
+        "at": "2026-11-03T15:28:09.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0xe7101bdca21a85899e35a386aca4f1c7c6406676a4c4cd7f876e3d0af7f11ee0",
+        "status": "abort_by_post_condition",
+        "block": 9404911,
+        "at": "2026-11-03T15:26:42.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0x276080e238aaf6b89b7eb4f3d1dea9fb2b5b3aefa974596eb6e38c05c48ff0da",
+        "status": "success",
+        "block": 9404902,
+        "at": "2026-11-03T15:25:09.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0x449a2837729fa1d162db832212f48712df3f5f25c0de08da6238d151ead271b7",
+        "status": "abort_by_post_condition",
+        "block": 9404893,
+        "at": "2026-11-03T15:23:37.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0x3ff8fc069c1be43459f3d32c7b2497455389b391919f0619a82a81f2537baf2d",
+        "status": "abort_by_post_condition",
+        "block": 9404884,
+        "at": "2026-11-03T15:22:08.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      }
+    ]
+  },
+  {
+    "protocol": "arkadiko",
+    "url": "https://api.hiro.so/extended/v1/address/SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.arkadiko-swap-v2-1/transactions?limit=50",
+    "read_at": "2026-11-03T15:41:41.211755+00:00",
+    "status": 200,
+    "total": 233219,
+    "results": 50,
+    "calls": [
+      {
+        "txid": "0x88767936f2cb40e8c459893800df5ed0ddaf39e2b3da6907eacc788885cca25c",
+        "status": "success",
+        "block": 9404964,
+        "at": "2026-11-03T15:37:28.000Z",
+        "contract": "SP5KCQ6CQAS73AMM002HMK94CCYEA4P3C94VX3K4.bog",
+        "function": "ry"
+      },
+      {
+        "txid": "0xcd7f2ca8325f20096ed2d201a590964a4891ae64c10354ef06179937520d4afc",
+        "status": "success",
+        "block": 9404922,
+        "at": "2026-11-03T15:28:57.000Z",
+        "contract": "SP5KCQ6CQAS73AMM002HMK94CCYEA4P3C94VX3K4.cain",
+        "function": "ry"
+      },
+      {
+        "txid": "0x88d9698ca654d28a878bdd88cf34825ec96dd2bcd751528104ca693833b1db2a",
+        "status": "success",
+        "block": 9404763,
+        "at": "2026-11-03T14:59:29.000Z",
+        "contract": "SP11Z1TJ2GY0HPJM0WSX0D8ZA2D092WMB12NAZHRW.robin-kapow",
+        "function": "bg"
+      },
+      {
+        "txid": "0xc173cfa732f341c2fc599495d52da0b43170857321f1f00732a7ee4b6bbf0ceb",
+        "status": "success",
+        "block": 9404728,
+        "at": "2026-11-03T14:51:30.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0x36038af45979d94b92000b55a314cb8c0785214e9e83d15ef15ca7631e4ca834",
+        "status": "success",
+        "block": 9404723,
+        "at": "2026-11-03T14:49:52.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0xb2497699e396f8a2113c8adbe2dddbb26d075b7c7c8b7b8b42ca4d3b065aaed2",
+        "status": "success",
+        "block": 9404716,
+        "at": "2026-11-03T14:48:21.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0x25b2afc421bd5bf627292ef9bba1d655c57c8df5e32f9feead5d80f3bb718019",
+        "status": "success",
+        "block": 9404709,
+        "at": "2026-11-03T14:46:58.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0xae4235ce6ec85797fe66a2e7a6b11a4e7579b0b9f5b3aa7395f1e90a31e6271d",
+        "status": "success",
+        "block": 9404692,
+        "at": "2026-11-03T14:43:15.000Z",
+        "contract": "SP5KCQ6CQAS73AMM002HMK94CCYEA4P3C94VX3K4.cope",
+        "function": "rs"
+      },
+      {
+        "txid": "0x15f20504b51b00a7c60a05747251e2d7d19a833fe770808711fb234d9dc8713c",
+        "status": "success",
+        "block": 9404652,
+        "at": "2026-11-03T14:34:32.000Z",
+        "contract": "SP11Z1TJ2GY0HPJM0WSX0D8ZA2D092WMB12NAZHRW.robin-kapow",
+        "function": "bg"
+      },
+      {
+        "txid": "0xafc1abc88b167eada5915e50524be8e84048c27ca6b2197429f065d527faf052",
+        "status": "success",
+        "block": 9404477,
+        "at": "2026-11-03T13:59:23.000Z",
+        "contract": "SP2EXSJGGDT6ZV2Z09VGTNA44X4VVVT6CM7F66E7P.multi-entry-v164",
+        "function": "b4"
+      },
+      {
+        "txid": "0x063bcba2a8354319b5416d8847566285c00a0f3af21231189a32e80f2a431c0a",
+        "status": "success",
+        "block": 9404391,
+        "at": "2026-11-03T13:39:52.000Z",
+        "contract": "SP5KCQ6CQAS73AMM002HMK94CCYEA4P3C94VX3K4.late",
+        "function": "rn"
+      },
+      {
+        "txid": "0xfac1cae6c0c4663b027cb3fc3f9d889e658f90acbd0b5c436a615901dca0f388",
+        "status": "success",
+        "block": 9404344,
+        "at": "2026-11-03T13:28:06.000Z",
+        "contract": "SP2EXSJGGDT6ZV2Z09VGTNA44X4VVVT6CM7F66E7P.multi-entry-v63",
+        "function": "b38"
+      }
+    ]
+  },
+  {
+    "protocol": "velar",
+    "url": "https://api.hiro.so/extended/v1/address/SP1Y5YSTAHZ88XYK1VPDH24GY0HPX5J4JECTMY4A1.univ2-core/transactions?limit=50",
+    "read_at": "2026-11-03T15:41:41.212424+00:00",
+    "status": 200,
+    "total": 379773,
+    "results": 50,
+    "calls": [
+      {
+        "txid": "0x14f5900d0fa384b30d3d356775ec1c47b34fea2de5d0cf47d96c21fc04fad980",
+        "status": "success",
+        "block": 9404907,
+        "at": "2026-11-03T15:26:01.000Z",
+        "contract": "SP3B8F1ERXWHQ7FSZB6RSJA1S12DBQZZNYYHTPBFF.agg-d-v-1-sh-0",
+        "function": "swap-dgd"
+      },
+      {
+        "txid": "0x276080e238aaf6b89b7eb4f3d1dea9fb2b5b3aefa974596eb6e38c05c48ff0da",
+        "status": "success",
+        "block": 9404902,
+        "at": "2026-11-03T15:25:09.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0x308b80ea1d440c22f8a08a28dd32e0b8781884670c5921530e9324d07f333711",
+        "status": "success",
+        "block": 9404901,
+        "at": "2026-11-03T15:24:59.000Z",
+        "contract": "SP2EXSJGGDT6ZV2Z09VGTNA44X4VVVT6CM7F66E7P.multi-entry-v54",
+        "function": "b52"
+      },
+      {
+        "txid": "0xd87181971f49840048bad80563dcd9aef2bdb2fa997479ef3884fa6b12695a21",
+        "status": "success",
+        "block": 9404890,
+        "at": "2026-11-03T15:23:06.000Z",
+        "contract": "SP11Z1TJ2GY0HPJM0WSX0D8ZA2D092WMB12NAZHRW.robin-kapow",
+        "function": "bg"
+      },
+      {
+        "txid": "0x4b9b86e7ef70e22d4cfd41435803c181a25a56302305d101606f8acfe418faa1",
+        "status": "success",
+        "block": 9404874,
+        "at": "2026-11-03T15:20:36.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-3"
+      },
+      {
+        "txid": "0x8681af77c1e0e3ac53b77023dbb66ad0cf59faaec3f5b8a38ff84e72a74a7543",
+        "status": "success",
+        "block": 9404859,
+        "at": "2026-11-03T15:18:07.000Z",
+        "contract": "SP11Z1TJ2GY0HPJM0WSX0D8ZA2D092WMB12NAZHRW.robin-kapow",
+        "function": "bg"
+      },
+      {
+        "txid": "0x4719f3b0fb49ac5f9d46980da20118b3b43c34777d31d37013dd003bafca93ed",
+        "status": "success",
+        "block": 9404858,
+        "at": "2026-11-03T15:17:57.000Z",
+        "contract": "SP3B8F1ERXWHQ7FSZB6RSJA1S12DBQZZNYYHTPBFF.agg-d-v-1-sh-0",
+        "function": "swap-dgd"
+      },
+      {
+        "txid": "0x69d0978fa9e3bd7ba73ff556fa4a19a5f82667a03e5b29e196359b75ce2064b4",
+        "status": "success",
+        "block": 9404791,
+        "at": "2026-11-03T15:05:19.000Z",
+        "contract": "SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.multihop",
+        "function": "swap-4"
+      },
+      {
+        "txid": "0x7cf764bf24f875a8d0b7532db0bce0621299395065b04e2c09357d0db233df31",
+        "status": "success",
+        "block": 9404780,
+        "at": "2026-11-03T15:03:06.000Z",
+        "contract": "SP5KCQ6CQAS73AMM002HMK94CCYEA4P3C94VX3K4.kayn",
+        "function": "r2"
+      },
+      {
+        "txid": "0x0734fe325f8736473257e446d9788f11b2b47f5328e09f4b2f37667b72f00296",
+        "status": "success",
+        "block": 9404778,
+        "at": "2026-11-03T15:02:39.000Z",
+        "contract": "SP2EXSJGGDT6ZV2Z09VGTNA44X4VVVT6CM7F66E7P.multi-entry-v164",
+        "function": "b102"
+      },
+      {
+        "txid": "0x80dc3b0fb100714bc2546cd59509973d2f6f9566c17ff6400c3963c0d76e2c25",
+        "status": "success",
+        "block": 9404778,
+        "at": "2026-11-03T15:02:39.000Z",
+        "contract": "SP11Z1TJ2GY0HPJM0WSX0D8ZA2D092WMB12NAZHRW.hush",
+        "function": "s39"
+      },
+      {
+        "txid": "0x70a2c6f8af07155a612f384861dc345e490ee891ebb47ef3d81a949bd08c13c7",
+        "status": "success",
+        "block": 9404778,
+        "at": "2026-11-03T15:02:39.000Z",
+        "contract": "SP3EWCDA3V8HCP64CSETSNYXZ25WC4AJ95EC0ZEST.split-router-v1",
+        "function": "swap"
+      }
+    ]
+  },
+  {
+    "protocol": "alex",
+    "url": "https://api.hiro.so/extended/v1/address/SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-vault-v2-01/transactions?limit=50",
+    "read_at": "2026-11-03T15:41:41.214627+00:00",
+    "status": 200,
+    "total": 617076,
+    "results": 50,
+    "calls": [
+      {
+        "txid": "0x88767936f2cb40e8c459893800df5ed0ddaf39e2b3da6907eacc788885cca25c",
+        "status": "success",
+        "block": 9404964,
+        "at": "2026-11-03T15:37:28.000Z",
+        "contract": "SP5KCQ6CQAS73AMM002HMK94CCYEA4P3C94VX3K4.bog",
+        "function": "ry"
+      },
+      {
+        "txid": "0xdced8ca82ea86df5cd05d6896ca1b8240c33e464be1e083ba4a68431af76bafb",
+        "status": "success",
+        "block": 9404922,
+        "at": "2026-11-03T15:28:57.000Z",
+        "contract": "SP2EXSJGGDT6ZV2Z09VGTNA44X4VVVT6CM7F66E7P.multi-entry-v164",
+        "function": "b5"
+      },
+      {
+        "txid": "0xcd7f2ca8325f20096ed2d201a590964a4891ae64c10354ef06179937520d4afc",
+        "status": "success",
+        "block": 9404922,
+        "at": "2026-11-03T15:28:57.000Z",
+        "contract": "SP5KCQ6CQAS73AMM002HMK94CCYEA4P3C94VX3K4.cain",
+        "function": "ry"
+      },
+      {
+        "txid": "0xc630eca81355a4596e7c0673c668e596e89bd5f28d147054d23d73a48910e091",
+        "status": "success",
+        "block": 9404895,
+        "at": "2026-11-03T15:24:00.000Z",
+        "contract": "SP2H674PRTZV6YW56K0FMR7GDGZE4ZC5HMYZ3CDEV.milo",
+        "function": "rr"
+      },
+      {
+        "txid": "0xb412e8d5b653e53cbfd60b6e44c8ab68c47b366797f971352e9cf68362c50d81",
+        "status": "success",
+        "block": 9404893,
+        "at": "2026-11-03T15:23:37.000Z",
+        "contract": "SP5KCQ6CQAS73AMM002HMK94CCYEA4P3C94VX3K4.rest",
+        "function": "r3"
+      },
+      {
+        "txid": "0x462bb54431a25ac96ec2c3f26db501704e305f8301503fa7683a2cce11de02e5",
+        "status": "success",
+        "block": 9404892,
+        "at": "2026-11-03T15:23:28.000Z",
+        "contract": "SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01",
+        "function": "swap-helper"
+      },
+      {
+        "txid": "0x45be4bc2dce5d9d065767098be0284405f928b431724f328b4697a67065689aa",
+        "status": "success",
+        "block": 9404891,
+        "at": "2026-11-03T15:23:17.000Z",
+        "contract": "SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01",
+        "function": "swap-helper"
+      },
+      {
+        "txid": "0x2290684c728069a75b7f780b40f64ceeede4b5cb9d27659977d90f699ca3f0b9",
+        "status": "success",
+        "block": 9404890,
+        "at": "2026-11-03T15:23:06.000Z",
+        "contract": "SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01",
+        "function": "swap-helper"
+      },
+      {
+        "txid": "0xd87181971f49840048bad80563dcd9aef2bdb2fa997479ef3884fa6b12695a21",
+        "status": "success",
+        "block": 9404890,
+        "at": "2026-11-03T15:23:06.000Z",
+        "contract": "SP11Z1TJ2GY0HPJM0WSX0D8ZA2D092WMB12NAZHRW.robin-kapow",
+        "function": "bg"
+      },
+      {
+        "txid": "0x89a2deba926fba3fb38cb0c0043c48d257ca3fb7478bea360519390ae71603aa",
+        "status": "success",
+        "block": 9404890,
+        "at": "2026-11-03T15:23:06.000Z",
+        "contract": "SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01",
+        "function": "swap-helper"
+      },
+      {
+        "txid": "0x9183cb8ebbd912364c4ecc7caf11a2815a28f272b303a24a31ef41f9d0f6bcd3",
+        "status": "success",
+        "block": 9404889,
+        "at": "2026-11-03T15:22:55.000Z",
+        "contract": "SP5KCQ6CQAS73AMM002HMK94CCYEA4P3C94VX3K4.kink",
+        "function": "ru"
+      },
+      {
+        "txid": "0x6058742f7086feff4a59a400f6cbcf2e97dd2f3d2c3dfeb76df22921f6569eb4",
+        "status": "success",
+        "block": 9404889,
+        "at": "2026-11-03T15:22:55.000Z",
+        "contract": "SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01",
+        "function": "swap-helper"
+      }
+    ]
+  }
+]

@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Pool Party cabinet builder</title><style>html,body{margin:0;background:#061e29}canvas{display:block}</style></head><body>
+<script src="../vendor/three.r128.min.js"></script><script src="../src/xlogo.js"></script><script src="../src/cabinet.js"></script>
+<script>
+const load=src=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(Error('Image unavailable: '+src));i.src=src});
+window.buildAll=async payload=>{const screenData=typeof payload==='string'?payload:payload?.screen,topperData=typeof payload==='object'?payload?.topper:null;
+ const names={USDA:'usda.svg',DIKO:'diko.svg',CHA:'cha.png',VELAR:'velar.svg',ALEX:'alex.png',STX:'stx.svg'},logos={};
+ await Promise.all(Object.entries(names).map(async([name,file])=>{logos[name]=await load('../art/'+file)}));
+ const wordmark=await load('../art/brand/parallax-casino-wordmark.svg'),screenImage=screenData?await load(screenData):null,topperImage=topperData?await load(topperData):null;
+ const built=buildPoolPartyCabinet(THREE,{xtrataLogo,wordmark,screenImage,topperImage,logos});window.__machine=built.machine;window.__built=built;
+ window.__logo={symbols:Object.keys(logos),official:true,source:'art/sources.json',liveScreen:!!screenImage};
+ return JSON.stringify(packCabinet(THREE,built.machine));
+};
+window.logoInfo=()=>window.__logo;
+window.modelInfo=()=>{const b=new THREE.Box3().setFromObject(window.__machine);return {bounds:{min:b.min.toArray(),max:b.max.toArray(),size:b.getSize(new THREE.Vector3()).toArray()},layout:window.__built.bounds}};
+let R,envTex;
+window.preview=(yaw=.35,pitch=.12,dist=10.5,ty=2.9,w=900,h=1100,tx=0,tz=0,fov=36,crestAngle=.3)=>{
+ if(!R){R=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});R.setPixelRatio(1);R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.15;
+  const e=document.createElement('canvas');e.width=512;e.height=256;const g=e.getContext('2d'),gr=g.createLinearGradient(0,0,0,256);gr.addColorStop(0,'#edfafa');gr.addColorStop(.5,'#426475');gr.addColorStop(1,'#071b29');g.fillStyle=gr;g.fillRect(0,0,512,256);g.fillStyle='#fff';g.fillRect(70,25,60,160);g.fillRect(350,30,65,150);envTex=new THREE.CanvasTexture(e);envTex.mapping=THREE.EquirectangularReflectionMapping;
+ }
+ const r=R;r.setSize(w,h);document.body.innerHTML='';document.body.appendChild(r.domElement);const scene=new THREE.Scene();scene.background=new THREE.Color('#071e2b');scene.add(new THREE.HemisphereLight(0xe6f8f5,0x0b2430,1.1));
+ const key=new THREE.SpotLight(0xfff2e0,2.4,30,.6,.6,1);key.position.set(2.2,6.5,6);key.target.position.set(0,1.6,0);scene.add(key,key.target);
+ for(const side of [-1,1]){const l=new THREE.PointLight(0x06b6d4,1.2,12);l.position.set(side*2.4,2.4,-.6);scene.add(l)}
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({color:'#092633',roughness:.3,metalness:.4}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+ window.__machine.traverse(o=>{if(o.isMesh){for(const m of Array.isArray(o.material)?o.material:[o.material])if(m.isMeshStandardMaterial){m.envMap=envTex;m.envMapIntensity=.65}}});
+ window.__built.crest.rotation.y=crestAngle;scene.add(window.__machine);const cam=new THREE.PerspectiveCamera(fov,w/h,.05,100);cam.position.set(tx+Math.sin(yaw)*dist*Math.cos(pitch),ty+Math.sin(pitch)*dist,tz+Math.cos(yaw)*dist*Math.cos(pitch));cam.lookAt(tx,ty,tz);r.render(scene,cam);return r.domElement.toDataURL('image/png');
+};
+window.setTags=v=>{for(const m of window.__built.tags)m.material.emissiveIntensity=.15+.75*v};
+</script></body></html>
