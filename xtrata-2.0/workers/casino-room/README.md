@@ -13,12 +13,12 @@ The room never handles money. A seat in the room does not give a seat at a contr
 loaded as a module so a failure there cannot stop the page). It looks the room up on load; if the room answers "offline" or cannot be
 reached it does nothing at all (no button, no figures), which is why **production is unchanged until its binding is switched on**.
 When the room is on, a **Room** button joins the top-right buttons: a guest watches, one free signature joins, and sitting at a table
-or standing at a machine puts that person's Adrian (with a BNS-or-short-address name tag) there for everybody.
+or standing at a machine puts that person's avatar (with a BNS-or-short-address name tag) there for everybody.
 
 | Piece | Where |
 | --- | --- |
 | Client: sign-in, WebSocket, button and panel, BNS names | `src/casino-room/main.ts`, `src/casino-room/wallet.ts` |
-| Page side (figures, name tags, seat detection, "take another seat if this one is taken") | one block in `public/casino/index.html` just before `window.__casino =` (search `PXRoomHost`), plus two one-line hooks (`steer` in `setFocus`, `freezeBeyond` in the Adrian update loop) |
+| Page side (figures, name tags, seat detection, "take another seat if this one is taken") | one block in `public/casino/index.html` just before `window.__casino =` (search `PXRoomHost`), plus two one-line hooks (`steer` in `setFocus`, `freezeBeyond` in the avatar update loop) |
 | The contract between them | `window.PXRoomHost`: `currentSpot()`, `setPeople(list)`, `steer(station, seat)`, `mount()`, `debug()` |
 | Spot ids (14 seats, 10 cabinets, 4 reserved bar stools) | `SPOTS` in `functions/lib/casino-room.ts`; `functions/lib/__tests__/casino-room-spots.test.ts` reads the page and fails if the two disagree |
 

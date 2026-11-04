@@ -9391,7 +9391,7 @@ const Pl = (t) => {
   return e.append(...t), e;
 }, Tl = (t) => {
   const e = [
-    or("Be seen", t ? "Sit at a table or a machine and everyone sees your Adrian and name there." : "Signed in, sit at a table or a machine and everyone sees your Adrian and name there. Watching shows you to nobody."),
+    or("Be seen", t ? "Sit at a table or a machine and everyone sees your avatar and name there." : "Signed in, sit at a table or a machine and everyone sees your avatar and name there. Watching shows you to nobody."),
     or("Seats", "One person per seat or machine. If yours is taken you get a free one at the same table."),
     or("Chat", "Talk to the room, or tap a name to message, block or report someone. Not secret; cleared when you leave.")
   ];

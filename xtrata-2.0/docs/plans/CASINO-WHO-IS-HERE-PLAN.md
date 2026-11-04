@@ -11,7 +11,7 @@ automatically when they leave without pressing Leave.
 - **You.** The Room button says "In the room · 4" (on a phone just the dot and the 4). Your name only appears inside the Room
   panel ("Others see you at your seat as jim.btc"), so you have to open it to see which wallet is connected.
 - **Everyone else.** The room already sends the full list of signed-in people (`players`: address, name, spot) and announces
-  arrivals and departures. The page draws them as Adrians, and the chat column has a "Here now (3)" list. Nothing on the main
+  arrivals and departures. The page draws them as avatars, and the chat column has a "Here now (3)" list. Nothing on the main
   screen lists them, and the Room panel only gives counts ("4 signed in, 2 watching").
 - **Leaving.** The room tidies up only when a connection closes. Closing a tab or navigating away closes it properly, so that
   person goes at once. But the connection is not always closed:

@@ -36,7 +36,7 @@ Test hooks: `window.__casinoView.table` (`sit`, `view`, `act`, `chip`, `setView`
 Measured on the desktop page (`__casinoView.table.gl`): about 360 MB of textures, ~2,300 draw calls a frame, 6 shadow-casting
 lights (each draws the room again into its shadow map) and the planar floor reflection (the whole room drawn a second time).
 
-- **Black faces and hands on iPad:** the Adrian figures' textures were made with `createImageBitmap`, which on WebKit (every
+- **Black faces and hands on iPad:** the figures' textures were made with `createImageBitmap`, which on WebKit (every
   iPad/iPhone browser) can come out black under memory pressure. They are now `<img>` elements (as three.js's own GLTFLoader
   does on Safari).
 - LITE: the floor reflection starts off (Ambience panel can turn it on); shadow maps redraw every fourth frame; no texture

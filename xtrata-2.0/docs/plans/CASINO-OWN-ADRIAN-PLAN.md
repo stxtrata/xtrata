@@ -1,4 +1,4 @@
-# ParallaX Casino: your own Adrian, a "behind me" view, and personal space (plan)
+# ParallaX Casino: your own avatar, a "behind me" view, and personal space (plan)
 
 Written 2026-10-31. **Status: BUILT 2026-10-31** (steps 1-4; the phone pass, step 5, is still to do on real devices).
 Decisions in section 8 (Jim, 2026-10-31: behind you is the DEFAULT, first person by V or the 👤 button).
@@ -13,24 +13,24 @@ from the frame loop through `meFrameHook` just before the frame is drawn), walke
 Browser checks V and P in `scripts/test-casino-wallet-browser.mjs`.
 
 Goals (Jim, 2026-10-31):
-1. The player has their own Adrian, and can switch the view so the camera sits behind them: they see themselves walk the
+1. The player has their own avatar, and can switch the view so the camera sits behind them: they see themselves walk the
    floor, sit at tables and play machines.
-2. Personal space: you cannot walk through other players' Adrians; you walk round them. The only exception is a visitor who
+2. Personal space: you cannot walk through other players' avatars; you walk round them. The only exception is a visitor who
    is not signed into the room: they are invisible to everyone, so they are no obstacle, and nobody is an obstacle to them.
 
 ## 0. The plan in eight lines
 
 1. Everything needed already exists in `public/casino/index.html`: first-person walking (`player`, `walkMove`, `collide`),
-   one camera loop, the Adrian figures (`XA_HOSTS`, `adrian.glb`) drawn for other players, and clothes chosen from the address
-   (`wearOf`), so your own Adrian can look exactly the way everyone else already sees you.
-2. **Own Adrian:** two figure specs (standing/walking and seated), driven every frame from `player` and `mySpot()`, with the
+   one camera loop, the figures (`XA_HOSTS`, `adrian.glb`) drawn for other players, and clothes chosen from the address
+   (`wearOf`), so your own avatar can look exactly the way everyone else already sees you.
+2. **Own avatar:** two figure specs (standing/walking and seated), driven every frame from `player` and `mySpot()`, with the
    same Walk/Idle switching the walkers use. Drawn only in the behind view (in first person the camera is inside its head).
-3. **Behind view:** a second camera mode. The camera hangs on a short boom behind and above your Adrian, follows your facing,
+3. **Behind view:** a second camera mode. The camera hangs on a short boom behind and above your avatar, follows your facing,
    and shortens when a wall or table is in the way. Toggle with **V** or a HUD button; remembered per browser.
-4. **Tables and machines:** in the behind view, a seat gets an over-the-shoulder shot of your Adrian and the table; a machine's
+4. **Tables and machines:** in the behind view, a seat gets an over-the-shoulder shot of your avatar and the table; a machine's
    play close-up stays as it is (you need the reels), with the wider shot showing you at the cabinet when you step back.
 5. **Personal space:** players walking the floor become obstacles in the existing collider list (`solids`), in the same way
-   players standing at machines already are. Each client stops its own player at someone else's Adrian, so it works both ways
+   players standing at machines already are. Each client stops its own player at someone else's avatar, so it works both ways
    with no server change.
 6. It applies only while you are signed into the room (visible). Signed out, you are invisible and pass through, and with
    anonymous watching off you do not see anyone anyway.
@@ -48,7 +48,7 @@ Goals (Jim, 2026-10-31):
 | Camera | Frame loop: while walking, `camera.position = eyePos()`, rotation straight from the mouse; otherwise `camPos/look` ease towards `tgtPos/tgtLook` | One camera, several targets |
 | Tables | `setFocus(s, seat)`, `camTargets(s, seat)`, `tableView` buttons | Seated views |
 | Machines | `setMachineView(closeup)`, `machineReturn` | Play close-up and step-back views |
-| Other people seated / at machines | Presence block: `pool`, `makeEntry(stand)`, `place(spot)`, `show()`; standing entries already have a collider `e.col` active while shown | Each is an `XA_HOSTS` spec (163-bone skinned Adrian) |
+| Other people seated / at machines | Presence block: `pool`, `makeEntry(stand)`, `place(spot)`, `show()`; standing entries already have a collider `e.col` active while shown | Each is an `XA_HOSTS` spec (163-bone skinned avatar) |
 | Other people walking | `walkers`, `wpool`, `makeWalker()`, `walkFrame()` (450 ms behind, interpolated, Walk/Idle by speed); comment: they "never block the visitor" | No collider today |
 | Your own walking, sent to the room | `ownMoveFrame()` → `px-room-move` (only when signed in, room.js decides) | Others already see you walk |
 | Looks | `wearOf(address)`: shirt and trousers from the address hash, `recolour()` | Same for everyone who sees you |
@@ -57,7 +57,7 @@ Goals (Jim, 2026-10-31):
 The visitor is never drawn today: `applyPeople` even skips anyone in the visitor's own seat "(the camera would sit inside
 their head)".
 
-## 2. Your own Adrian
+## 2. Your own avatar
 
 - `makeSelf()`: two specs added once with `XA_HOSTS.add` (when it has not failed), like `makeEntry(true)` (standing, for the
   floor, machines and pads) and `makeEntry(false)` (seated, `seat: { h: 0.57 }`). Not part of `pool`, so it never takes a
@@ -88,7 +88,7 @@ their head)".
 ## 4. Tables and machines in the behind view
 
 - Seated: `camTargets()` gets a behind variant: camera 1.3 m behind and 1.9 m above the seat, looking at the table centre,
-  so you see your Adrian's back and shoulders and the table. The table-view buttons still switch to the existing table views.
+  so you see your avatar's back and shoulders and the table. The table-view buttons still switch to the existing table views.
   Card and game panels are HTML overlays, so they are unaffected.
 - Machines: the play close-up (`setMachineView(true)`) stays exactly as it is. The step-back view (`machineReturn`, when you
   walk away from the screen) uses the behind camera, so you see yourself at the cabinet.
@@ -102,7 +102,7 @@ their head)".
   about 0.6 m apart, centre to centre.
 - Players standing at machines and pads already block (their `e.col`); seated players are behind their stool colliders.
 - `personalSpace()` is true only while the visitor is signed into the room: then they are visible, and others' clients stop
-  their players at the visitor's Adrian too. Signed out, they are invisible and walk through everyone (and with anonymous
+  their players at the visitor's avatar too. Signed out, they are invisible and walk through everyone (and with anonymous
   watching off, they do not see anyone anyway).
 - How the page knows: `room.js` adds one call to the `PXRoomHost` contract, `self({ signed: boolean, address })`, made when
   the session starts, ends or runs out. Older pages ignore it; a page without it treats the visitor as signed out.
@@ -119,7 +119,7 @@ their head)".
 | # | Step | Where | Ships alone? |
 | --- | --- | --- | --- |
 | 1 | Personal space: walker colliders + `personalSpace()` + `PXRoomHost.self()` in room.js | page walkers block, room.js | Yes |
-| 2 | Own Adrian figures (hidden until the behind view exists) | presence block | Yes |
+| 2 | Own avatar figures (hidden until the behind view exists) | presence block | Yes |
 | 3 | Behind view while walking: toggle, boom, collision, crosshair | walking block, frame loop | Yes |
 | 4 | Behind view at tables, pads and machines | `camTargets`, machine views | Yes |
 | 5 | Phone pass: 7 figures, boom on small screens, the toggle button size | | |
@@ -140,6 +140,6 @@ Room.js is rebuilt with `npm run build:casino-room` (its `?v=` bumped in the pag
 
 1. **Default view: first person** (Jim, 2026-11-04; it was behind you from 2026-10-31), with V / the 👤 button for behind you. The choice is remembered per browser.
 2. **At tables in the behind view:** over the shoulder by default, with the table-view buttons still there. (Or keep today's
-   table cameras and show your Adrian only while walking.)
+   table cameras and show your avatar only while walking.)
 3. **Personal space size.** Default: about 0.6 m between centres (`r: 0.3` + `PR`).
 4. **Your look.** Default: the clothes everyone already sees on you (from your address). Choosing your own outfit: later.

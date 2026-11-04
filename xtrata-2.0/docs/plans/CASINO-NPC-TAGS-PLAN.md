@@ -59,7 +59,7 @@ computer players.") and in the casino guide.
    players keep the current look exactly.
 3. **NPC tags.** A small list: the three Hold'em bots and the machine guest, each with a name and the figure to follow. Each
    frame the tag sits above that figure's head (seated 1.60 m, standing 2.02 m, as the presence tags), fades with distance, and
-   hides under the rules in section 3. Built after the Adrian figures exist; if a figure is missing, its tag is skipped.
+   hides under the rules in section 3. Built after the figures exist; if a figure is missing, its tag is skipped.
 4. **Guest yields to a real player.** When the room lists someone at the guest's cabinet (`machineSpot(guestMachine)`), hide
    the guest figure and tag; show them again when the spot is free.
 5. **The key.** One more fact line in the Room panel (`src/casino-room/main.ts`, rebuild `room.js` and bump its `?v=`), and one

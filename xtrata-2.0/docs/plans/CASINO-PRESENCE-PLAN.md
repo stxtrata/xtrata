@@ -1,14 +1,14 @@
 # ParallaX Casino: people in the room (presence plan)
 
-Status: plan only, written 2026-10-29. Nothing is built, deployed or signed. Request came from Steve via Jim: players should be able to connect so that they are actually *seen* in the room, as an Adrian sitting where they signed in (a table, the bar, a machine) with a name tag, and other players can click them and send messages. Aim: people feel they are in a shared space.
+Status: plan only, written 2026-10-29. Nothing is built, deployed or signed. Request came from Steve via Jim: players should be able to connect so that they are actually *seen* in the room, as an avatar sitting where they signed in (a table, the bar, a machine) with a name tag, and other players can click them and send messages. Aim: people feel they are in a shared space.
 
-Pages this applies to: `/casino` and `/casino-b` (both already contain the room, Adrian, the bar, the tables and the machines). Related plans: `CASINO-ONCHAIN-LAYR-PLAN.md` (chips and sessions), `CASINO-ROUND-LOG.md` (the logger, a separate thing), `casino-pvp-design.md` in the Project docs (the two player-versus-player tables).
+Pages this applies to: `/casino` and `/casino-b` (both already contain the room, the avatars, the bar, the tables and the machines). Related plans: `CASINO-ONCHAIN-LAYR-PLAN.md` (chips and sessions), `CASINO-ROUND-LOG.md` (the logger, a separate thing), `casino-pvp-design.md` in the Project docs (the two player-versus-player tables).
 
 ---
 
 ## 1. The short answer
 
-**Use a wallet signature, not a transaction.** A signature is made by the wallet in a few seconds, costs nothing, and does not wait for a block. The 10 to 30 seconds you describe is the cost of a *transaction* (wallet approval, broadcast, inclusion in a block); a signature skips all of it. The server checks the signature, learns which Stacks address is really behind the browser, and puts that person's Adrian at the spot they picked.
+**Use a wallet signature, not a transaction.** A signature is made by the wallet in a few seconds, costs nothing, and does not wait for a block. The 10 to 30 seconds you describe is the cost of a *transaction* (wallet approval, broadcast, inclusion in a block); a signature skips all of it. The server checks the signature, learns which Stacks address is really behind the browser, and puts that person's avatar at the spot they picked.
 
 **What stays on chain:** who you are (your address and BNS name, which the signature proves), what you hold, and anything that moves money (chips, PvP table stakes, tips). **What does not go on chain:** where you are sitting right now. Writing a seat to the chain would cost a fee and a wallet prompt every time someone sat down or stood up, would leave "ghosts" (nobody pays a fee to leave), and would publish every visit permanently. That is the clunky version, and there is no benefit to the player.
 
@@ -16,7 +16,7 @@ Pages this applies to: `/casino` and `/casino-b` (both already contain the room,
 1. Everyone can walk the room and *see* the people sitting in it without signing (guests are invisible to others).
 2. A visible "Join the room" button asks for **one signature per visit**. After that, sitting down, standing up, moving to another seat and messaging are free clicks with no further wallet prompts.
 3. A small live service (a Cloudflare Durable Object, already chosen for messaging) holds who sits where and relays messages. State is tiny (about 20 to 30 spots, not 30-times-a-second positions), so it is cheap and simple.
-4. Each seated person is an Adrian, static (seated or standing pose, no movement needed), with a name tag. If they move seat, the figure simply appears at the new spot (optionally walks there from the door).
+4. Each seated person is an avatar, static (seated or standing pose, no movement needed), with a name tag. If they move seat, the figure simply appears at the new spot (optionally walks there from the door).
 5. Click a person: a small card with their name, **Message**, and later **Buy a drink** and **Send LAYR**.
 
 ---
@@ -25,7 +25,7 @@ Pages this applies to: `/casino` and `/casino-b` (both already contain the room,
 
 | Thing | Where | Why it matters |
 |---|---|---|
-| Adrian, the one character | `XA_HOSTS` in both pages (`window.XA_HOSTS = {...}`); `ONE_CHARACTER = 'm1'` (a switch back to six personas exists); skeleton-aware clones; 15 baked clips | Remote players reuse this. Seat pose `seat:{h:0.57}`, `person` (persona) and `wear:{shirt,trousers}` already exist, so a player's colours can be set per person. `XA_HOSTS.add(spec)` takes `group, x, z, yaw, person, wear, seat, fig, showWhen`. The part I read exposes `add`, `cue`, `update`, `hosts`, `ready`; **I did not confirm a remove, move or re-tint call**, so those are P1 work (or use a fixed pool of spare figures whose `showWhen` and position are changed). |
+| The one shared character model | `XA_HOSTS` in both pages (`window.XA_HOSTS = {...}`); `ONE_CHARACTER = 'm1'` (a switch back to six personas exists); skeleton-aware clones; 15 baked clips | Remote players reuse this. Seat pose `seat:{h:0.57}`, `person` (persona) and `wear:{shirt,trousers}` already exist, so a player's colours can be set per person. `XA_HOSTS.add(spec)` takes `group, x, z, yaw, person, wear, seat, fig, showWhen`. The part I read exposes `add`, `cue`, `update`, `hosts`, `ready`; **I did not confirm a remove, move or re-tint call**, so those are P1 work (or use a fixed pool of spare figures whose `showWhen` and position are changed). |
 | Seats | `SEATS` in `/casino` (about line 7469): `blackjack` 2, `baccarat` 2, `holdem` 2, `roulette` 1 pad, `videopoker` 1 pad, `pvpholdem` 3, `liars` 3, plus one standing pad per machine (`FM.list`: the five fruit machines and the LAYR Exchange) | This is almost exactly the "spots" list. Each has a world position (`seatWorld`, `standWorld`) and a facing. `/casino-b` has its own layout and its own SEATS table; the spot list is per page. |
 | NPC people | In `/casino`: dealers, a greeter, a bartender (`room.barPos`) and NPC players seated at the Hold'em table; the standing-patron list (`patrons`) is **empty** in this build. `/casino-b` has its own cast, including an NPC guest at one machine. `showWhen` can hide a figure | A real person who takes a spot an NPC occupies hides the NPC. The room is quite empty of "customers" today, which is part of why shared presence would help; NPC patrons could also be brought back as filler when few real people are online (decision for Jim, not in this plan's phases). |
 | Bar | bartender and bar are dressing; **there are no bar-stool spots yet** | Bar seats are new work (a few stool positions). |
@@ -39,12 +39,12 @@ Pages this applies to: `/casino` and `/casino-b` (both already contain the room,
 
 ## 3. What the player sees
 
-1. **Arrive.** Walk in as today. You can see seated Adrians with name tags. Nobody sees you. A small badge in a corner: "You are watching. Join the room".
+1. **Arrive.** Walk in as today. You can see seated avatars with name tags. Nobody sees you. A small badge in a corner: "You are watching. Join the room".
 2. **Join.** Click it. The wallet asks for one signature. The prompt shows the app name ("ParallaX Casino"), what it is for ("room entry") and an expiry. No fee, no transaction.
-3. **Sit.** Walk up to any free spot and press the usual SIT/PLAY (or click a glowing ring, as today). Your Adrian appears there (fade in, or walk in from the door), with your tag. Others see you appear.
+3. **Sit.** Walk up to any free spot and press the usual SIT/PLAY (or click a glowing ring, as today). Your avatar appears there (fade in, or walk in from the door), with your tag. Others see you appear.
 4. **Be seen.** Your tag floats over your head: BNS name if you have one, otherwise a short address like `SP3J…X743`. Until you pick your own look (section 4.4), your clothes and hair come from your address (stable, so people learn to recognise you).
 5. **Talk.** Anyone clicks you: a card with your name and **Message**. Messages open a small chat window. They are temporary (see section 7).
-6. **Leave.** Stand up, close the tab, or go quiet for a minute: your Adrian disappears. Come back within the session window and you are signed in again with no prompt.
+6. **Leave.** Stand up, close the tab, or go quiet for a minute: your avatar disappears. Come back within the session window and you are signed in again with no prompt.
 
 Optional later: a wave or raise-glass emote (the 15 baked clips already include gestures), drinks, tips, a profile picture badge.
 
@@ -79,7 +79,7 @@ Optional later: a wave or raise-glass emote (the 15 baked clips already include 
 
 ### 4.4 Player look ("PFP") and customisation
 
-Jim wants good, simple, cheap options. "Cheap" here means: uses what the Adrian code already supports, needs no new 3D models, nothing to upload, nothing to moderate, and costs the player nothing. What the code supports today (read in `public/casino/index.html`): six body/hair personas (`m1 m2 m3 f1 f2 f3`; the page currently locks everybody to `m1` through `ONE_CHARACTER`, so remote players need that switch made per person), own-clothes tint (`wear: {shirt, trousers}`), hair colour and hair-do per persona, skin tint, and the existing gestures (`greet`, `nod`, `win`, `lose`, `deal`, `reveal`). **Not supported:** hats, glasses, jewellery or any accessory; those would need new modelled parts and are not cheap.
+Jim wants good, simple, cheap options. "Cheap" here means: uses what the character code already supports, needs no new 3D models, nothing to upload, nothing to moderate, and costs the player nothing. What the code supports today (read in `public/casino/index.html`): six body/hair personas (`m1 m2 m3 f1 f2 f3`; the page currently locks everybody to `m1` through `ONE_CHARACTER`, so remote players need that switch made per person), own-clothes tint (`wear: {shirt, trousers}`), hair colour and hair-do per persona, skin tint, and the existing gestures (`greet`, `nod`, `win`, `lose`, `deal`, `reveal`). **Not supported:** hats, glasses, jewellery or any accessory; those would need new modelled parts and are not cheap.
 
 **The menu (a "Look" panel, free, instant, changeable any time):**
 
@@ -100,17 +100,17 @@ Players do not get the staff waistcoats (house liveries), so a player never look
 
 **Where it is stored:** off chain, in the room service, against the player's address, as a handful of small numbers (for example `{p:2, s:7, t:3, h:1, k:4, i:6, g:1, d:2}`, under 40 bytes). The server only accepts values from the fixed lists above, so nobody can send odd colours or text. Changing look is a free message, no wallet prompt. Until a player chooses, their look comes from a hash of their address, so everyone looks different from the first visit. An optional "make my look permanent" step on chain (a small contract write) could come later if Jim wants it to follow players across apps; it is not needed for the room.
 
-**A real picture:** Jim wants players to *wear* an NFT image on their Adrian's clothes, like a PFP printed on the shirt. That is option 10 and has its own section (4.5).
+**A real picture:** Jim wants players to *wear* an NFT image on their avatar's clothes, like a PFP printed on the shirt. That is option 10 and has its own section (4.5).
 
 **Recommendation:** ship options 1 to 6 with the first version of the room (they are almost all colour and list work), add 7 to 10 next.
 
 ### 4.5 Wearing an NFT on your shirt (Jim, 2026-10-29)
 
-**Idea:** a player picks an NFT they own; its image appears printed on the front, the back, or both, of their Adrian's shirt, like a PFP worn as clothing. Other players see it from across the room.
+**Idea:** a player picks an NFT they own; its image appears printed on the front, the back, or both, of their avatar's shirt, like a PFP worn as clothing. Other players see it from across the room.
 
 **Why the back matters most:** seated players face their table, so anyone walking up behind sees their back. A back print is what people will actually see; the front is seen by the dealer, the opposite seat and anyone looking across the table.
 
-**Is it feasible with the Adrian model? Yes, with a decal, not by editing the shirt.** What I checked in `adrian.glb` (read from the copy embedded in `/casino`): the shirt is its own skinned mesh (`Tailored_shirt`) with the material "Ivory cotton", which is **a flat colour with no texture image**, so there is no print area to paint into without redoing the shirt's texture layout. The skeleton has torso bones (`spine01` to `spine05`, `clavicle_L/R`). A **decal** is a thin, slightly curved square attached to a torso bone, a few millimetres in front of (or behind) the shirt surface; it follows the pose, and one extra small draw per worn print. Its position is found automatically (a ray from in front or behind hits the shirt in the bind pose, and the decal is parented to the bone at that point), so no hand-tuned numbers per body shape. The model also has a hidden chest "Xtrata woven insignia" badge mesh for staff; that stays hidden for players. **Not yet tried:** fitting on all six personas, how the decal looks while seated, and what it costs on a weak GPU (a 128 x 128 picture per worn print is small).
+**Is it feasible with the character model? Yes, with a decal, not by editing the shirt.** What I checked in `adrian.glb` (read from the copy embedded in `/casino`): the shirt is its own skinned mesh (`Tailored_shirt`) with the material "Ivory cotton", which is **a flat colour with no texture image**, so there is no print area to paint into without redoing the shirt's texture layout. The skeleton has torso bones (`spine01` to `spine05`, `clavicle_L/R`). A **decal** is a thin, slightly curved square attached to a torso bone, a few millimetres in front of (or behind) the shirt surface; it follows the pose, and one extra small draw per worn print. Its position is found automatically (a ray from in front or behind hits the shirt in the bind pose, and the decal is parented to the bone at that point), so no hand-tuned numbers per body shape. The model also has a hidden chest "Xtrata woven insignia" badge mesh for staff; that stays hidden for players. **Not yet tried:** fitting on all six personas, how the decal looks while seated, and what it costs on a weak GPU (a 128 x 128 picture per worn print is small).
 
 **Where the picture comes from (the hard part is trust, not drawing):**
 1. **Xtrata inscriptions the player owns.** Ownership is a chain read by the room service when the look is saved (and again when the player joins), using the checked-read style the repo requires (a failed read is not "doesn't own it"). The picture is the inscription's thumbnail from the existing `/thumb` pipeline (cached WebP), which is same-origin, so no cross-site image problems.
@@ -188,7 +188,7 @@ A fixed list per page (`blackjack.1`, `blackjack.2`, `holdem.1`, `pvpholdem.1`, 
 
 ## 7. Work inside the two pages
 
-- **Remote figures:** a pool of at most N Adrian clones (suggest 16 on desktop, 6 on phones), each given the spot's position, the person's colours and a `showWhen`. People beyond the cap show as a name tag and a simple marker. Static people need no animation updates (frozen pose), which keeps cost near the cost of drawing them.
+- **Remote figures:** a pool of at most N avatar clones (suggest 16 on desktop, 6 on phones), each given the spot's position, the person's colours and a `showWhen`. People beyond the cap show as a name tag and a simple marker. Static people need no animation updates (frozen pose), which keeps cost near the cost of drawing them.
 - **Name tags:** a sprite with a canvas texture above the head (the pages already use sprites for glows). Hidden beyond a distance; clamped size.
 - **Click a person:** raycast against the figure; open the card. Needs to coexist with pointer lock and touch (the pages already handle both for seats).
 - **Message window:** one small panel; unread dot; mute/block menu.
@@ -202,7 +202,7 @@ A fixed list per page (`blackjack.1`, `blackjack.2`, `holdem.1`, `pvpholdem.1`, 
 | Phase | What ships | Gate to pass |
 |---|---|---|
 | **P0. Spike** | Read `docs/WALLET-PLAYBOOK.md` in full first (its section 10 is the ship checklist for any wallet change). Then a throwaway Worker with the Durable Object, Pages Functions that forward a WebSocket to it, and a hidden test page `/casino-room-spike/` (nothing is added to `/casino`). **Built; see 8.1.** | (a) WebSocket forwarding from a Pages Function works (the Cloudflare pages I read do not say either way; if not, put the Worker on a subdomain like `room.xtrata.xyz`, as `radio.` and `wallet.` already are). (b) Leather and Xverse, desktop **and** mobile, return a signature the server accepts. (c) Hibernation works and a deploy reconnects cleanly. |
-| **P1. Seen** | Sign-in, spot map, static Adrians with name tags on both pages; guests can watch; NPC patrons yield to real people. **Built on `/casino` only (branch `claude/casino-presence-p1`); see 8.2.** | Two real browsers see each other; refresh keeps you seated; closing the tab clears you within about a minute; fail-open verified by killing the service; frame time with 16 figures checked on the slow headless renderer and on a real GPU/phone. |
+| **P1. Seen** | Sign-in, spot map, static avatars with name tags on both pages; guests can watch; NPC patrons yield to real people. **Built on `/casino` only (branch `claude/casino-presence-p1`); see 8.2.** | Two real browsers see each other; refresh keeps you seated; closing the tab clears you within about a minute; fail-open verified by killing the service; frame time with 16 figures checked on the slow headless renderer and on a real GPU/phone. |
 | **P2. Talk** | Click-a-person card, private messages, mute/block/report, rate limits. | Abuse tests (spam, links, oversize, replayed challenge, forged header, second tab). |
 | **P3. Look** | The Look panel (section 4.4: options 1 to 6 first, then 7 to 9), bar stools, walk-in animation. The picture badge from an owned inscription (allowlist) is a separate, later decision. | Visual review with Jim; badge fetch cannot block rendering. |
 | **P4. Give** | Drinks, tips, hand LAYR via `layr` transfers. | Depends on the on-chain LAYR plan P1; real post-conditions; conservation checks. |
@@ -234,9 +234,9 @@ Tests, in the style of the rest of the repo: the room logic (spots, limits, bans
 
 ### 8.2 P1 results (branch `claude/casino-presence-p1`, 2026-10-29, `/casino` only)
 
-**What it does.** `/casino` loads `room.js` (source `src/casino-room/`). A **Room** button joins the top-right buttons. A guest watches; one free signature joins (Leather or Xverse, either network); then sitting at a table or standing at a cabinet puts that person's Adrian there for everyone, with a name tag (BNS name if the key has one, otherwise a short address) and clothes chosen from the address, so a person looks the same to everybody. Fourteen table seats and ten cabinets are places; the bar is not yet (its four ids are reserved). If somebody already has the seat you walk up to, you are given a free seat at the same table; if every seat is taken you keep yours and nobody is drawn on top of you. The room never touches chips, STX or the casino's game state, and **production is unchanged** until its binding is switched on: with the room off (503) or unreachable `room.js` draws nothing and adds no button.
+**What it does.** `/casino` loads `room.js` (source `src/casino-room/`). A **Room** button joins the top-right buttons. A guest watches; one free signature joins (Leather or Xverse, either network); then sitting at a table or standing at a cabinet puts that person's avatar there for everyone, with a name tag (BNS name if the key has one, otherwise a short address) and clothes chosen from the address, so a person looks the same to everybody. Fourteen table seats and ten cabinets are places; the bar is not yet (its four ids are reserved). If somebody already has the seat you walk up to, you are given a free seat at the same table; if every seat is taken you keep yours and nobody is drawn on top of you. The room never touches chips, STX or the casino's game state, and **production is unchanged** until its binding is switched on: with the room off (503) or unreachable `room.js` draws nothing and adds no button.
 
-**Where it lives.** Client `src/casino-room/main.ts` and `wallet.ts` (bundle `public/casino/room.js`, `npm run build:casino-room`). Page side: one block in `public/casino/index.html` just before `window.__casino =`, wrapped in try/catch so it can never stop the casino, plus two one-line hooks (`steer` in `setFocus`, a far-away freeze in the Adrian update loop). The two halves meet at `window.PXRoomHost` (`currentSpot`, `setPeople`, `steer`, `mount`, `debug`). The server seat list is `SPOTS`; a unit test reads the page and fails if the two disagree. Changing `SPOTS` means redeploying the room Worker.
+**Where it lives.** Client `src/casino-room/main.ts` and `wallet.ts` (bundle `public/casino/room.js`, `npm run build:casino-room`). Page side: one block in `public/casino/index.html` just before `window.__casino =`, wrapped in try/catch so it can never stop the casino, plus two one-line hooks (`steer` in `setFocus`, a far-away freeze in the avatar update loop). The two halves meet at `window.PXRoomHost` (`currentSpot`, `setPeople`, `steer`, `mount`, `debug`). The server seat list is `SPOTS`; a unit test reads the page and fails if the two disagree. Changing `SPOTS` means redeploying the room Worker.
 
 | Gate | Result |
 |---|---|
@@ -244,7 +244,7 @@ Tests, in the style of the rest of the repo: the room logic (spots, limits, bans
 | Refresh | A refresh keeps you **signed in** (the cookie; no new signature) but the casino starts again at the floor, so you are not seated until you sit; the casino itself has never restored a seat either. |
 | Closing the tab clears you | The seat is freed at once on a light page (0.3 s) and about 20 s after closing the heavy casino page in the software renderer (the browser takes that long to let go of the socket). **Not covered:** a phone that loses signal without closing the socket. The room has no timers by design, so that seat could stay until the connection is dropped. The fix is a client ping every 30 s and the room dropping anyone silent for 90 s, checked when the next message arrives; about 30 lines, one more Worker deploy, a small amount of extra wake-ups. Not built; decision for Jim. |
 | Fail-open | **Passes.** Room off (503) or unreachable: no button, no figures, no errors, casino runs. Room Worker stopped while people are watching (what a deploy does): the page drops everyone it was drawing (no stale people), keeps playing, and reconnects by itself 7 to 35 s after the Worker is back, and the seated player is back in their seat without clicking. |
-| Frame time with 16 figures | **Cost measured, GPU speed not.** One Adrian is 15 skinned meshes, 44,543 triangles and 163 bones, so 16 is about 710,000 triangles on top of the roughly sixteen the room already draws. The JavaScript cost of animating them is small (about 3 ms a frame in the headless run). The headless renderer is software and takes 4 to 5 seconds a frame with or without them, so it cannot say what a GPU does. `https://<preview>/casino/?roomdemo=16` draws 16 made-up people and prints frames per second; compare with `?roomdemo=0` on a laptop and a phone. Phones are capped at 6 figures, desktops at 16, figures are built one every 120 ms, and anyone 12 m away stands still. If a phone struggles the cap drops or far figures are hidden. |
+| Frame time with 16 figures | **Cost measured, GPU speed not.** One avatar is 15 skinned meshes, 44,543 triangles and 163 bones, so 16 is about 710,000 triangles on top of the roughly sixteen the room already draws. The JavaScript cost of animating them is small (about 3 ms a frame in the headless run). The headless renderer is software and takes 4 to 5 seconds a frame with or without them, so it cannot say what a GPU does. `https://<preview>/casino/?roomdemo=16` draws 16 made-up people and prints frames per second; compare with `?roomdemo=0` on a laptop and a phone. Phones are capped at 6 figures, desktops at 16, figures are built one every 120 ms, and anyone 12 m away stands still. If a phone struggles the cap drops or far figures are hidden. |
 
 **Found while building.**
 - The first browser test that clicked buttons the usual way timed out, because the software renderer delivers frames seconds apart and Playwright waits for the button to stop moving. The tests now click through the page. Nothing in the product changed for that.
@@ -302,7 +302,7 @@ its own clock, and passes `move {a, x, z, r, at}` or `move {a, off, at}` to ever
 room client forwards that only when the room supports it and the player is signed in; after a reconnect it resends the
 last position.
 
-**Drawing (page).** Each walker is an Adrian (the address picks the clothes, as for seated people) with the same gold name
+**Drawing (page).** Each walker is an avatar (the address picks the clothes, as for seated people) with the same gold name
 tag. The page keeps the last few positions and draws each walker 0.45 s in the past, gliding between the two positions
 around that moment (estimated against the room's clock, so network jitter does not make them stutter); a gap over 5 m is
 a jump, not a glide. Moving faster than 0.25 m/s plays the model's Walk loop (speeded up with pace, capped) and faces the
@@ -319,7 +319,7 @@ outgoing are free). The paid plan's 1 million included requests cover about 2,80
 
 **Tests.** Unit tests for the message, bounds, limits, routing, seat interplay and the room view; an end-to-end test
 against a local room; and the real `/casino` page with the real `room.js` in a headless browser against a stand-in room:
-the Adrians load, a remote walker appears with a tag, walks and stops, a player sitting removes them, and the page sends
+the figures load, a remote walker appears with a tag, walks and stops, a player sitting removes them, and the page sends
 its own position while walking and `off` when it stops being on the floor, with no page errors.
 
 **Deploy order:** room Worker first, then the site.
@@ -339,7 +339,7 @@ At this design's traffic (a seat change or message is a few events per player pe
 - **Testnet versus mainnet addresses: answered by P0.** A player's identity is the address their wallet returns for the casino's network (`ST…` while the casino is on testnet, `SP…` once it is on mainnet). The room accepts both, with the SIP-018 chain id following the address, and also stores the public-key hash, which is identical for the `SP…` and `ST…` form of one key (unit tested). The room page must use the casino's own wallet connect, not the app's mainnet-only adapter. BNS names are a mainnet lookup, so on testnet the tag is the short address.
 - **Deploys restart the object** and drop everyone for a moment. Clients must reconnect and re-sit automatically.
 - **`XA_HOSTS` changes:** a remove / reposition / re-tint call is probably needed (see section 2).
-- **Performance** of many skinned Adrians: measured in P1 (section 8.2): 44,543 triangles each, small JavaScript cost, GPU speed still to be read on a real laptop and phone with `?roomdemo=16`. The cap (16 desktop, 6 phone), far-away freeze and one-at-a-time building are the mitigation.
+- **Performance** of many skinned avatars: measured in P1 (section 8.2): 44,543 triangles each, small JavaScript cost, GPU speed still to be read on a real laptop and phone with `?roomdemo=16`. The cap (16 desktop, 6 phone), far-away freeze and one-at-a-time building are the mitigation.
 - **Privacy:** addresses and BNS names are public data, but listing "who is in the casino now" is still a new disclosure. Guest mode and a clear sign-in prompt are the answer; Jim to confirm the wording.
 - **Abuse:** any open chat will be tested. Links are off, rate limits are on, but moderation takes someone's time.
 
@@ -349,7 +349,7 @@ At this design's traffic (a seat change or message is a few events per player pe
 
 1. Signing method: **A** (one signature per visit), with C later? (Recommended.)
 2. Name tag: BNS name or short address only (recommended), or allow nicknames?
-3. PFP: Adrian colours only, or also an owned-inscription badge from an allowlist?
+3. PFP: avatar colours only, or also an owned-inscription badge from an allowlist?
 4. Can guests (not signed in) see the room's people? (Recommended: yes, invisibly.)
 5. Cap on figures drawn (16 desktop, 6 phone suggested) and total room size (300 suggested).
 6. Messages: private one-to-one only, or also a public bar chat? (Recommended: private first.)

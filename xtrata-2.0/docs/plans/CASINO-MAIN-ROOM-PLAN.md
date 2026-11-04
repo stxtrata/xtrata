@@ -122,7 +122,7 @@ Deploy order as before: the room Worker first, then the site.
 
 - Unit tests for the new round table (seed to dice, payouts, bet keys); the existing room, social, progress and wallet suites; the
   end-to-end suite against a local room.
-- The real page in a browser: the Adrians load; the main room has exactly the three dealers, the new game's dealer and the
+- The real page in a browser: the figures load; the main room has exactly the three dealers, the new game's dealer and the
   bartender; no greeter, no bar guests; all ten cabinets playable; the new game plays a round with two players seeing the same
   roll; the bot Hold'em table plays a hand in the Salon; the Salon still closes without a name and opens with one; walking
   around all three Salon tables works; ordering at the bar works; no page errors.

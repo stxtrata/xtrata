@@ -12,11 +12,11 @@ Worker must be redeployed for any of it to appear (the page only uses what the r
 
 | Feature | What happens | Where |
 | --- | --- | --- |
-| Reactions | A 😊 button (top right, signed-in players) opens a tray of 8 reactions: wave, cheer, clap, thumbs up, laugh, wow, "nooo", raise a glass. Everyone in the room sees the emoji over the player's head and their Adrian makes the matching gesture | room `react`; page `social` |
+| Reactions | A 😊 button (top right, signed-in players) opens a tray of 8 reactions: wave, cheer, clap, thumbs up, laugh, wow, "nooo", raise a glass. Everyone in the room sees the emoji over the player's head and their avatar makes the matching gesture | room `react`; page `social` |
 | Speech bubbles | Every chat line also appears for a few seconds over the speaker's head (blue for table chat) | page `social` (`say`) |
 | Big wins | A win of 10x the bet or more (any table, or a machine spin) is announced: a banner for everyone ("Mia just won 35x on roulette · +3,500 LAYR"), a 🎉 over the winner, and the house regulars cheer. The last 8 big wins are kept by the room and listed in the tray, so a new arrival sees people winning | room `win` (feed in storage `wins`); page `outcome()` and the machines' `settle` hook |
 | Daily drop | Sign in once a day (UTC) for free LAYR: 5,000 on the first day, then 7,500, 10,000, 15,000, 20,000, 30,000 and 50,000 from the seventh day in a row; missing a day starts again. One per player (by key), shown as a "DAILY DROP" banner | room `daily` (storage `d:<key>`) |
-| House regulars | When fewer than 3 people are in the room (or the room is off), up to three Adrians sit at the machines, labelled "Mia · house regular", react now and then, cheer big wins and (on desktop) play their machines. They move every few minutes and give way to real players. `?regulars=0` turns them off | page `social` |
+| House regulars | When fewer than 3 people are in the room (or the room is off), up to three characters sit at the machines, labelled "Mia · house regular", react now and then, cheer big wins and (on desktop) play their machines. They move every few minutes and give way to real players. `?regulars=0` turns them off | page `social` |
 | Usage counters | Per UTC day, with no address or message kept: connections, sign-ins (new / returning), peak connections, chat lines, reactions, big wins, bets, drinks, daily drops, Salon messages. `GET /casino/room/stats` | room storage `c:<date>`; `functions/casino/room/stats.ts` |
 
 ### Phase 2: play together

@@ -355,7 +355,7 @@ const roomButton = (page, text) => page.locator('#pxroom-panel button', { hasTex
   console.log('ok R2 · Not now keeps them invisible; Play now at the exchange signs them into the room automatically');
 }
 
-// ---- V. first person is the default; V puts your own Adrian on screen behind you, and the choice is remembered ----
+// ---- V. first person is the default; V puts your own avatar on screen behind you, and the choice is remembered ----
 const view = (page) => page.evaluate(() => { const v = window.__casinoView; return { mode: v.mode, behind: v.behind, camera: v.camera, player: v.player, boom: v.boom, me: v.me }; });
 {
   const { context, page, errors } = await newPlayer();
@@ -366,11 +366,11 @@ const view = (page) => page.evaluate(() => { const v = window.__casinoView; retu
   const stored = () => page.evaluate(() => localStorage.getItem('xtrata.parallax.view'));
   await page.goto(SITE + '/casino/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await boot();
-  // Nothing saved yet: first person, your own Adrian hidden, and merely loading the page saves nothing.
+  // Nothing saved yet: first person, your own avatar hidden, and merely loading the page saves nothing.
   let v = await view(page);
   assert.equal(v.mode, 'first', 'first person is the default');
   assert.equal(await stored(), null, 'loading the page saves no choice');
-  assert.ok(!v.me.some((m) => m.on), 'your own Adrian is hidden in first person');
+  assert.ok(!v.me.some((m) => m.on), 'your own avatar is hidden in first person');
   assert.ok(Math.hypot(v.camera[0] - v.player.x, v.camera[2] - v.player.z) < 0.05, 'first person: the camera is at your eyes');
   // Out on the open floor (at the door the wall is right behind you and the boom is short, as it should be).
   await page.evaluate(() => window.__casinoView.standAt(0, 3));
@@ -405,7 +405,7 @@ const view = (page) => page.evaluate(() => { const v = window.__casinoView; retu
   assert.ok(v.camera[2] < 11 - 0.3, `the camera stays inside the room (z ${v.camera[2].toFixed(2)})`);
   assert.deepEqual(errors, []);
   await context.close();
-  console.log('ok V · first person by default, V for your own Adrian behind you, each choice remembered after a reload, the boom stops at walls');
+  console.log('ok V · first person by default, V for your own avatar behind you, each choice remembered after a reload, the boom stops at walls');
 }
 
 // ---- P. personal space: other players are solid while you are signed in, and you pass through them while you are not ----
