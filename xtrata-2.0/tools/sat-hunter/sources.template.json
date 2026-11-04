@@ -1,0 +1,138 @@
+{
+ "machine": "Sat Hunter",
+ "about": "Where every number, record and image on Sat Hunter comes from. Every symbol is a real Bitcoin sat (or a real transaction fact) drawn as a specimen coin in the machine's own style. Sat numbers are computed offline from Bitcoin's issuance schedule with ordinal theory's numbering; each one carries a check link to ordinals.com. A sat whose verified flag is false is shown on the machine as 'not yet checked'. No NFT, inscription or third-party project logo appears on these reels, and the machine reads nothing from the network while it runs.",
+ "generated": "",
+ "rules": {
+  "subsidy": {
+   "what": "The Bitcoin block subsidy: 50 BTC at block 0, halving every 210,000 blocks (shifted right by one bit per epoch), which makes the first sat of block h equal to the sum of all earlier subsidies in satoshis.",
+   "source": "Bitcoin Core, src/validation.cpp, GetBlockSubsidy(), with consensus parameter nSubsidyHalvingInterval = 210000 (src/kernel/chainparams.cpp)",
+   "link": "https://github.com/bitcoin/bitcoin/blob/master/src/validation.cpp",
+   "supply": "2,099,999,997,690,000 sats: the sum of every block subsidy over 33 epochs, ord's Sat::SUPPLY. Self-checked by build_records.py and again by verify.py."
+  },
+  "satNumbering": {
+   "what": "Ordinal theory: every sat is numbered in the order it was mined (sat 0 is the first sat of the genesis block). Rarity: mythic = sat 0; legendary = first sat of a cycle (block divisible by 1,260,000); epic = first sat of a halving epoch (block divisible by 210,000); rare = first sat of a difficulty adjustment period (block divisible by 2,016); uncommon = first sat of a block. Decimal and degree notation: block.offset and cycle°halving-index′difficulty-index″offset‴.",
+   "source": "Ordinal Theory Handbook, Sat Rarity and Sat Notation chapters (docs.ordinals.com)",
+   "link": "https://docs.ordinals.com/overview.html"
+  },
+  "satNaming": {
+   "what": "The sat name algorithm: x = SUPPLY - n; repeatedly take (x - 1) mod 26 as a letter a to z and set x = (x - 1) div 26, writing letters from the right. Sat 0 is named nvtdijuwxlp.",
+   "source": "Ordinal Theory Handbook, Sat Names chapter, and ord's Sat::name() in src/sat.rs",
+   "link": "https://docs.ordinals.com/overview.html#sat-names",
+   "check": "build_records.py asserts the name of sat 0; verify.py recomputes the name, block, offset and degree of every sat in the pack"
+  },
+  "communityTerms": {
+   "what": "Black sat (the last sat of a block), palindrome sat (a number that reads the same both ways) and vintage sat (a sat from the first 1,000 blocks; some indexes count the first 10,000) are community terms, not ord rarities. The machine says so in the RARITY panel."
+  }
+ },
+ "symbols": {
+  "cherry": {
+   "name": "Uncommon sat",
+   "kind": "The first sat of a block",
+   "source": "Computed from the subsidy schedule; check link per sat on ordinals.com",
+   "items": []
+  },
+  "lemon": {
+   "name": "Black sat",
+   "kind": "The last sat of a block (community term)",
+   "source": "Computed from the subsidy schedule; check link per sat on ordinals.com",
+   "items": []
+  },
+  "chip": {
+   "name": "Palindrome sat",
+   "kind": "A sat whose decimal number is a palindrome, inside a real block's range",
+   "source": "Computed (next palindrome inside the block's range); check link per sat on ordinals.com",
+   "items": []
+  },
+  "block": {
+   "name": "Vintage sat",
+   "kind": "A sat from the first 1,000 blocks",
+   "source": "Computed from the subsidy schedule; check link per sat on ordinals.com",
+   "items": []
+  },
+  "artifact": {
+   "name": "Pizza sat",
+   "kind": "The pizza purchase of 22 May 2010: 10,000 BTC for two pizzas, confirmed in block 57,043. Until the sat ranges are read from a full ord index the tiles carry only the verified transaction facts and say SAT RANGE: PENDING INDEX.",
+   "source": "Transaction a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d in block 57,043 (hash 00000000152340ca42227603908689183edc47355204e7aca59383b0aaac1fd8, time 1274552191), read from mempool.space during the Plebs & Legends build and carried over unchanged (public/casino-machines/plebs-legends/art/sources.json). Sat ranges: tools/sat-hunter/fetch_pizza.py on a machine that can reach ordinals.com.",
+   "link": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+   "items": []
+  },
+  "bitcoin": {
+   "name": "Epic sat (the jackpot symbol)",
+   "kind": "The first sat of a halving epoch. Epochs not yet reached are real sat numbers, marked NOT YET MINED with the expected year.",
+   "source": "Computed from the subsidy schedule; the dates of the first four halvings are public record (Nov 2012, Jul 2016, May 2020, Apr 2024)",
+   "items": []
+  },
+  "wild": {
+   "name": "Rare sat (the wild)",
+   "kind": "The first sat of a difficulty adjustment period (block divisible by 2,016)",
+   "source": "Computed from the subsidy schedule; check link per sat on ordinals.com",
+   "items": []
+  },
+  "scatter": {
+   "name": "Nakamoto sat (the scatter)",
+   "kind": "A sat from a block in the Patoshi pattern, the blocks believed to have been mined by Satoshi",
+   "source": "Patoshi block list: github.com/bensig/patoshi-addresses at commit 414637ce52aa4819926bf1934b2235ed182a0280. The mining pattern was discovered by Sergio Demian Lerner; the dataset is curated by Jameson Lopp. The machine uses the first 26 heights of the 59-height subset carried in tools/who-is-satoshi/art/records.json (block 9 excluded: it has its own symbol).",
+   "link": "https://github.com/bensig/patoshi-addresses",
+   "items": []
+  },
+  "vault": {
+   "name": "Block 9 sat",
+   "kind": "A sat from block 9, whose coinbase was spent in the first Bitcoin transaction (block 170, 12 January 2009): the oldest sats known to have moved",
+   "source": "Computed from the subsidy schedule; the history of block 9 and block 170 is public record; which output a particular sat followed is set by ordinal theory's first-in, first-out rule, so each sat has a check link",
+   "items": []
+  },
+  "chain": {
+   "name": "Sat range",
+   "kind": "A real block's full range, first sat to last sat, with the sats found in it during The Hunt (the first sat, the last sat and palindromes inside the range)",
+   "source": "Computed from the subsidy schedule; block page per range on ordinals.com",
+   "items": []
+  }
+ },
+ "bitcoin": {
+  "genesisBlock": {
+   "hash": "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+   "coinbaseTx": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+   "headline": "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks",
+   "timeUnix": 1231006505,
+   "timeUtc": "2009-01-03 18:15:05",
+   "source": "mempool.space block and coinbase scriptSig, hex decoded (read during the Plebs & Legends build; public/casino-machines/plebs-legends/art/sources.json). The genesis block coinbase output cannot be spent, which is why the Mythic screen says so."
+  },
+  "pizzaDay": {
+   "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+   "block": 57043,
+   "blockHash": "00000000152340ca42227603908689183edc47355204e7aca59383b0aaac1fd8",
+   "timeUnix": 1274552191,
+   "date": "22 May 2010",
+   "source": "mempool.space, read during the Plebs & Legends build"
+  }
+ },
+ "timeline": "The Satoshi's Stash timeline uses block numbers and dates of 2009 only where public record gives them (genesis 3 Jan 2009, block 1, block 9, the first transaction in block 170 on 12 Jan 2009); other early blocks show a block number and no date.",
+ "gamble": "Odd Sat or Even Sat shows one of 68 real sat numbers whose parity matches the result the engine dealt first. The number is for the story; it never decides anything.",
+ "cabinet": {
+  "xtrataMark": "tools/sat-hunter/model/assets/xtrata.svg, the Xtrata brand SVG, embedded as supplied on the lower door (the owner's own mark)",
+  "parallaxWordmark": "tools/sat-hunter/model/assets/parallax-wordmark.svg, the ParallaX Casino wordmark, embedded small at the marquee foot (the owner's own mark)",
+  "everythingElse": "Oak grain, brushed brass, felt, specimen glass, sample tubes, rivets and labels are procedural textures written by tools/sat-hunter/model/textures.py; no third-party artwork."
+ },
+ "holderLayer": {
+  "what": "Version 1 is a meter and a display only. The Holder Pot is 1% of every paid bet, kept in the game state; the period is one UTC week (Monday 00:00 UTC to Monday 00:00 UTC) taken from the device clock. Wallet linking and the sat index read need a server and are stubs (linkBitcoinWallet, readWalletSats). The machine shows WALLET LINKING: NOT LIVE YET and SHARE PER WALLET: UNKNOWN, never 0 wallets. No NFTs are on the reels, so recordCameos() returns an empty list."
+ },
+ "network": "None at runtime. Every record is bundled in the game. The build-time sources above were read or computed once, offline.",
+ "logosNeedingPermission": [
+  {
+   "item": "Xverse rare-sat badges (Epic, Rare, Uncommon, Palindrome, Vintage, Nakamoto, Block 9, Pizza)",
+   "owner": "Xverse",
+   "source": "support.xverse.app rare sats article",
+   "files": "art/official/{epic,rare,uncommon,palindrome,vintage,nakamoto,block9,pizza}.png",
+   "status": "permission or confirmation of licence needed before public release"
+  },
+  {
+   "item": "Magic Eden 'Black sats' category tile",
+   "owner": "Magic Eden",
+   "source": "community.magiceden.io/learn/rare-sats-guide",
+   "files": "art/official/black.png",
+   "status": "permission or confirmation of licence needed before public release"
+  }
+ ],
+ "permissionNotes": "The reference set the owner supplied is third-party artwork (Xverse badges and a Magic Eden tile), so it is listed above and must be cleared or credited before the machine goes public. The Xtrata mark and the ParallaX Casino wordmark are the owner's own, used as supplied. Ordinals.com and Bitcoin Core are cited as sources in text only, with no logo. Names of people (Satoshi Nakamoto, Sergio Demian Lerner, Jameson Lopp, Laszlo Hanyecz, Hal Finney) appear as plain text credits for public facts.",
+ "officialRarityArt": "tools/sat-hunter/art/official/*.png, cut from the owner's reference sheet (RARE SATS: EXISTING PLATFORM IMAGES). Epic, Rare, Uncommon, Palindrome, Vintage, Nakamoto, Block 9 and Pizza are the Xverse rare-sat badges (support.xverse.app, 'original badges'); the Black sat uses the Magic Eden 'Black sats' category tile (community.magiceden.io/learn/rare-sats-guide). They are third-party artwork, used only as the emblem on the matching sat's coin, unaltered apart from cutting out the background and enlarging. Mythic, Legendary and Sat range have no official art in that set and keep the machine's own engraving."
+}

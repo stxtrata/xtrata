@@ -1,0 +1,2684 @@
+{
+ "machine": "Sat Hunter",
+ "about": "Where every number, record and image on Sat Hunter comes from. Every symbol is a real Bitcoin sat (or a real transaction fact) drawn as a specimen coin in the machine's own style. Sat numbers are computed offline from Bitcoin's issuance schedule with ordinal theory's numbering; each one carries a check link to ordinals.com. A sat whose verified flag is false is shown on the machine as 'not yet checked'. No NFT, inscription or third-party project logo appears on these reels, and the machine reads nothing from the network while it runs.",
+ "generated": "2026-11-02T11:33Z",
+ "rules": {
+  "subsidy": {
+   "what": "The Bitcoin block subsidy: 50 BTC at block 0, halving every 210,000 blocks (shifted right by one bit per epoch), which makes the first sat of block h equal to the sum of all earlier subsidies in satoshis.",
+   "source": "Bitcoin Core, src/validation.cpp, GetBlockSubsidy(), with consensus parameter nSubsidyHalvingInterval = 210000 (src/kernel/chainparams.cpp)",
+   "link": "https://github.com/bitcoin/bitcoin/blob/master/src/validation.cpp",
+   "supply": "2,099,999,997,690,000 sats: the sum of every block subsidy over 33 epochs, ord's Sat::SUPPLY. Self-checked by build_records.py and again by verify.py."
+  },
+  "satNumbering": {
+   "what": "Ordinal theory: every sat is numbered in the order it was mined (sat 0 is the first sat of the genesis block). Rarity: mythic = sat 0; legendary = first sat of a cycle (block divisible by 1,260,000); epic = first sat of a halving epoch (block divisible by 210,000); rare = first sat of a difficulty adjustment period (block divisible by 2,016); uncommon = first sat of a block. Decimal and degree notation: block.offset and cycle°halving-index′difficulty-index″offset‴.",
+   "source": "Ordinal Theory Handbook, Sat Rarity and Sat Notation chapters (docs.ordinals.com)",
+   "link": "https://docs.ordinals.com/overview.html"
+  },
+  "satNaming": {
+   "what": "The sat name algorithm: x = SUPPLY - n; repeatedly take (x - 1) mod 26 as a letter a to z and set x = (x - 1) div 26, writing letters from the right. Sat 0 is named nvtdijuwxlp.",
+   "source": "Ordinal Theory Handbook, Sat Names chapter, and ord's Sat::name() in src/sat.rs",
+   "link": "https://docs.ordinals.com/overview.html#sat-names",
+   "check": "build_records.py asserts the name of sat 0; verify.py recomputes the name, block, offset and degree of every sat in the pack"
+  },
+  "communityTerms": {
+   "what": "Black sat (the last sat of a block), palindrome sat (a number that reads the same both ways) and vintage sat (a sat from the first 1,000 blocks; some indexes count the first 10,000) are community terms, not ord rarities. The machine says so in the RARITY panel."
+  }
+ },
+ "symbols": {
+  "cherry": {
+   "name": "Uncommon sat",
+   "kind": "The first sat of a block",
+   "source": "Computed from the subsidy schedule; check link per sat on ordinals.com",
+   "items": [
+    {
+     "sat": "5000000000",
+     "block": 1,
+     "degree": "0°1′1″0‴",
+     "name": "nvtcsezkbth",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon",
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/5000000000",
+     "verified": false
+    },
+    {
+     "sat": "10000000000",
+     "block": 2,
+     "degree": "0°2′2″0‴",
+     "name": "nvtccadxgaz",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon",
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/10000000000",
+     "verified": false
+    },
+    {
+     "sat": "15000000000",
+     "block": 3,
+     "degree": "0°3′3″0‴",
+     "name": "nvtblvikkir",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon",
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/15000000000",
+     "verified": false
+    },
+    {
+     "sat": "45000000000",
+     "block": 9,
+     "degree": "0°9′9″0‴",
+     "name": "nvsxssjlkcv",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon",
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45000000000",
+     "verified": false
+    },
+    {
+     "sat": "390000000000",
+     "block": 78,
+     "degree": "0°78′78″0‴",
+     "name": "nvrgtxijunp",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon",
+      "vintage",
+      "block78"
+     ],
+     "check": "https://ordinals.com/sat/390000000000",
+     "verified": false
+    },
+    {
+     "sat": "850000000000",
+     "block": 170,
+     "degree": "0°170′170″0‴",
+     "name": "nvpbmvgyzth",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon",
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/850000000000",
+     "verified": false
+    },
+    {
+     "sat": "5000000000000",
+     "block": 1000,
+     "degree": "0°1000′1000″0‴",
+     "name": "nuveutdgdhx",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/5000000000000",
+     "verified": false
+    },
+    {
+     "sat": "25000000000000",
+     "block": 5000,
+     "degree": "0°5000′968″0‴",
+     "name": "nrdksekratd",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/25000000000000",
+     "verified": false
+    },
+    {
+     "sat": "50000000000000",
+     "block": 10000,
+     "degree": "0°10000′1936″0‴",
+     "name": "nmnsbzalear",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/50000000000000",
+     "verified": false
+    },
+    {
+     "sat": "285215000000000",
+     "block": 57043,
+     "degree": "0°57043′595″0‴",
+     "name": "lvfiqvowwbx",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/285215000000000",
+     "verified": false
+    },
+    {
+     "sat": "500000000000000",
+     "block": 100000,
+     "degree": "0°100000′1216″0‴",
+     "name": "khquwfyjlgj",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/500000000000000",
+     "verified": false
+    },
+    {
+     "sat": "750000000000000",
+     "block": 150000,
+     "degree": "0°150000′816″0‴",
+     "name": "inpqqeacsdt",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/750000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1000000000000000",
+     "block": 200000,
+     "degree": "0°200000′416″0‴",
+     "name": "gtomkcbvzbd",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1000000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1150000000000000",
+     "block": 250000,
+     "degree": "0°40000′16″0‴",
+     "name": "fryeqvsmsuj",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1150000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1275000000000000",
+     "block": 300000,
+     "degree": "0°90000′1632″0‴",
+     "name": "euxpnutjjgb",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1275000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1400000000000000",
+     "block": 350000,
+     "degree": "0°140000′1232″0‴",
+     "name": "dxxaktufzrt",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1400000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1525000000000000",
+     "block": 400000,
+     "degree": "0°190000′832″0‴",
+     "name": "dawlhsvcqdl",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1525000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1612500000000000",
+     "block": 450000,
+     "degree": "0°30000′432″0‴",
+     "name": "cktlczyibqv",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1612500000000000",
+     "verified": false
+    },
+    {
+     "sat": "1675000000000000",
+     "block": 500000,
+     "degree": "0°80000′32″0‴",
+     "name": "bzgdomltjwr",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1675000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1737500000000000",
+     "block": 550000,
+     "degree": "0°130000′1648″0‴",
+     "name": "bnsvzyzescn",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1737500000000000",
+     "verified": false
+    },
+    {
+     "sat": "1800000000000000",
+     "block": 600000,
+     "degree": "0°180000′1248″0‴",
+     "name": "bcfollmqaij",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1800000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1850000000000000",
+     "block": 650000,
+     "degree": "0°20000′848″0‴",
+     "name": "atadfasegxl",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1850000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1881250000000000",
+     "block": 700000,
+     "degree": "0°70000′448″0‴",
+     "name": "angmktywyaj",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1881250000000000",
+     "verified": false
+    },
+    {
+     "sat": "1912500000000000",
+     "block": 750000,
+     "degree": "0°120000′48″0‴",
+     "name": "ahmvqnfppdh",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1912500000000000",
+     "verified": false
+    },
+    {
+     "sat": "1943750000000000",
+     "block": 800000,
+     "degree": "0°170000′1664″0‴",
+     "name": "abtewgmiggf",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1943750000000000",
+     "verified": false
+    },
+    {
+     "sat": "1971875000000000",
+     "block": 850000,
+     "degree": "0°10000′1264″0‴",
+     "name": "woneakoqll",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon"
+     ],
+     "check": "https://ordinals.com/sat/1971875000000000",
+     "verified": false
+    }
+   ]
+  },
+  "lemon": {
+   "name": "Black sat",
+   "kind": "The last sat of a block (community term)",
+   "source": "Computed from the subsidy schedule; check link per sat on ordinals.com",
+   "items": [
+    {
+     "sat": "9999999999",
+     "block": 1,
+     "degree": "0°1′1″4999999999‴",
+     "name": "nvtccadxgba",
+     "rarity": "common",
+     "tags": [
+      "black",
+      "palindrome",
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/9999999999",
+     "verified": false
+    },
+    {
+     "sat": "14999999999",
+     "block": 2,
+     "degree": "0°2′2″4999999999‴",
+     "name": "nvtblvikkis",
+     "rarity": "common",
+     "tags": [
+      "black",
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/14999999999",
+     "verified": false
+    },
+    {
+     "sat": "19999999999",
+     "block": 3,
+     "degree": "0°3′3″4999999999‴",
+     "name": "nvtavqmxoqk",
+     "rarity": "common",
+     "tags": [
+      "black",
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/19999999999",
+     "verified": false
+    },
+    {
+     "sat": "49999999999",
+     "block": 9,
+     "degree": "0°9′9″4999999999‴",
+     "name": "nvsxcnnyoko",
+     "rarity": "common",
+     "tags": [
+      "black",
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/49999999999",
+     "verified": false
+    },
+    {
+     "sat": "394999999999",
+     "block": 78,
+     "degree": "0°78′78″4999999999‴",
+     "name": "nvrgdsmwyvi",
+     "rarity": "common",
+     "tags": [
+      "black",
+      "vintage",
+      "block78"
+     ],
+     "check": "https://ordinals.com/sat/394999999999",
+     "verified": false
+    },
+    {
+     "sat": "854999999999",
+     "block": 170,
+     "degree": "0°170′170″4999999999‴",
+     "name": "nvpawqlmeba",
+     "rarity": "common",
+     "tags": [
+      "black",
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/854999999999",
+     "verified": false
+    },
+    {
+     "sat": "5004999999999",
+     "block": 1000,
+     "degree": "0°1000′1000″4999999999‴",
+     "name": "nuveeohthpq",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/5004999999999",
+     "verified": false
+    },
+    {
+     "sat": "25004999999999",
+     "block": 5000,
+     "degree": "0°5000′968″4999999999‴",
+     "name": "nrdkbzpefaw",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/25004999999999",
+     "verified": false
+    },
+    {
+     "sat": "50004999999999",
+     "block": 10000,
+     "degree": "0°10000′1936″4999999999‴",
+     "name": "nmnrlueyiik",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/50004999999999",
+     "verified": false
+    },
+    {
+     "sat": "285219999999999",
+     "block": 57043,
+     "degree": "0°57043′595″4999999999‴",
+     "name": "lvfiaqtkajq",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/285219999999999",
+     "verified": false
+    },
+    {
+     "sat": "500004999999999",
+     "block": 100000,
+     "degree": "0°100000′1216″4999999999‴",
+     "name": "khqugbcwpoc",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/500004999999999",
+     "verified": false
+    },
+    {
+     "sat": "750004999999999",
+     "block": 150000,
+     "degree": "0°150000′816″4999999999‴",
+     "name": "inppzzepwlm",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/750004999999999",
+     "verified": false
+    },
+    {
+     "sat": "1000004999999999",
+     "block": 200000,
+     "degree": "0°200000′416″4999999999‴",
+     "name": "gtoltxgjdiw",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/1000004999999999",
+     "verified": false
+    },
+    {
+     "sat": "1275002499999999",
+     "block": 300000,
+     "degree": "0°90000′1632″2499999999‴",
+     "name": "euxpfsipyjy",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/1275002499999999",
+     "verified": false
+    },
+    {
+     "sat": "1525002499999999",
+     "block": 400000,
+     "degree": "0°190000′832″2499999999‴",
+     "name": "dawkzqkjfhi",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/1525002499999999",
+     "verified": false
+    },
+    {
+     "sat": "1675001249999999",
+     "block": 500000,
+     "degree": "0°80000′32″1249999999‴",
+     "name": "bzgdklgjrlq",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/1675001249999999",
+     "verified": false
+    },
+    {
+     "sat": "1800001249999999",
+     "block": 600000,
+     "degree": "0°180000′1248″1249999999‴",
+     "name": "bcfohkhghxi",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/1800001249999999",
+     "verified": false
+    },
+    {
+     "sat": "1881250624999999",
+     "block": 700000,
+     "degree": "0°70000′448″624999999‴",
+     "name": "angmitjfbuw",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/1881250624999999",
+     "verified": false
+    },
+    {
+     "sat": "1943750624999999",
+     "block": 800000,
+     "degree": "0°170000′1664″624999999‴",
+     "name": "abteufwqkas",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/1943750624999999",
+     "verified": false
+    },
+    {
+     "sat": "1971875312499999",
+     "block": 850000,
+     "degree": "0°10000′1264″312499999‴",
+     "name": "wondacssis",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/1971875312499999",
+     "verified": false
+    },
+    {
+     "sat": "161279999999999",
+     "block": 32255,
+     "degree": "0°32255′2015″4999999999‴",
+     "name": "msaveilwkqs",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/161279999999999",
+     "verified": false
+    },
+    {
+     "sat": "1049999999999999",
+     "block": 209999,
+     "degree": "0°209999′335″4999999999‴",
+     "name": "gkjbdrhkfqg",
+     "rarity": "common",
+     "tags": [
+      "black"
+     ],
+     "check": "https://ordinals.com/sat/1049999999999999",
+     "verified": false
+    }
+   ]
+  },
+  "chip": {
+   "name": "Palindrome sat",
+   "kind": "A sat whose decimal number is a palindrome, inside a real block's range",
+   "source": "Computed (next palindrome inside the block's range); check link per sat on ordinals.com",
+   "items": [
+    {
+     "sat": "5000110005",
+     "block": 1,
+     "degree": "0°1′1″110005‴",
+     "name": "nvtcsezdvai",
+     "rarity": "common",
+     "tags": [
+      "palindrome",
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/5000110005",
+     "verified": false
+    },
+    {
+     "sat": "45001010054",
+     "block": 9,
+     "degree": "0°9′9″1010054‴",
+     "name": "nvsxsshfxyp",
+     "rarity": "common",
+     "tags": [
+      "palindrome",
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45001010054",
+     "verified": false
+    },
+    {
+     "sat": "390008800093",
+     "block": 78,
+     "degree": "0°78′78″8800093‴",
+     "name": "nvrgtwpdcqm",
+     "rarity": "common",
+     "tags": [
+      "palindrome",
+      "vintage",
+      "block78"
+     ],
+     "check": "https://ordinals.com/sat/390008800093",
+     "verified": false
+    },
+    {
+     "sat": "850018810058",
+     "block": 170,
+     "degree": "0°170′170″18810058‴",
+     "name": "nvpbmtruufn",
+     "rarity": "common",
+     "tags": [
+      "palindrome",
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/850018810058",
+     "verified": false
+    },
+    {
+     "sat": "2708111118072",
+     "block": 541,
+     "degree": "0°541′541″3111118072‴",
+     "name": "nvgedwstvvt",
+     "rarity": "common",
+     "tags": [
+      "palindrome",
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/2708111118072",
+     "verified": false
+    },
+    {
+     "sat": "5000105010005",
+     "block": 1000,
+     "degree": "0°1000′1000″105010005‴",
+     "name": "nuveukhlnbo",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/5000105010005",
+     "verified": false
+    },
+    {
+     "sat": "10080211208001",
+     "block": 2016,
+     "degree": "0°2016′0″211208001‴",
+     "name": "ntwwhllneaq",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/10080211208001",
+     "verified": false
+    },
+    {
+     "sat": "25000533500052",
+     "block": 5000,
+     "degree": "0°5000′968″533500052‴",
+     "name": "nrdkqlnfdmj",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/25000533500052",
+     "verified": false
+    },
+    {
+     "sat": "50001055010005",
+     "block": 10000,
+     "degree": "0°10000′1936″1055010005‴",
+     "name": "nmnryoftoiu",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/50001055010005",
+     "verified": false
+    },
+    {
+     "sat": "161280888082161",
+     "block": 32256,
+     "degree": "0°32256′0″888082161‴",
+     "name": "msavblsmhqm",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/161280888082161",
+     "verified": false
+    },
+    {
+     "sat": "285215979512582",
+     "block": 57043,
+     "degree": "0°57043′595″979512582‴",
+     "name": "lvfinrdkszb",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/285215979512582",
+     "verified": false
+    },
+    {
+     "sat": "500000474000005",
+     "block": 100000,
+     "degree": "0°100000′1216″474000005‴",
+     "name": "khquusbcvuy",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/500000474000005",
+     "verified": false
+    },
+    {
+     "sat": "750000717000057",
+     "block": 150000,
+     "degree": "0°150000′816″717000057‴",
+     "name": "inpqnvrclem",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/750000717000057",
+     "verified": false
+    },
+    {
+     "sat": "1000000990000001",
+     "block": 200000,
+     "degree": "0°200000′416″990000001‴",
+     "name": "gtomgwtleaa",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/1000000990000001",
+     "verified": false
+    },
+    {
+     "sat": "1150001221000511",
+     "block": 250000,
+     "degree": "0°40000′16″1221000511‴",
+     "name": "fryemwyozag",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/1150001221000511",
+     "verified": false
+    },
+    {
+     "sat": "1275000220005721",
+     "block": 300000,
+     "degree": "0°90000′1632″220005721‴",
+     "name": "euxpncfxyzo",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/1275000220005721",
+     "verified": false
+    },
+    {
+     "sat": "1525000660005251",
+     "block": 400000,
+     "degree": "0°190000′832″660005251‴",
+     "name": "dawlfpgvdac",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/1525000660005251",
+     "verified": false
+    },
+    {
+     "sat": "1675000550005761",
+     "block": 500000,
+     "degree": "0°80000′32″550005761‴",
+     "name": "bzgdmseejwy",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/1675000550005761",
+     "verified": false
+    },
+    {
+     "sat": "1800000440000081",
+     "block": 600000,
+     "degree": "0°180000′1248″440000081‴",
+     "name": "bcfokaltwqi",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/1800000440000081",
+     "verified": false
+    },
+    {
+     "sat": "1881250220521881",
+     "block": 700000,
+     "degree": "0°70000′448″220521881‴",
+     "name": "angmkbkiefo",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/1881250220521881",
+     "verified": false
+    },
+    {
+     "sat": "1943750110573491",
+     "block": 800000,
+     "degree": "0°170000′1664″110573491‴",
+     "name": "abtevxejbzq",
+     "rarity": "common",
+     "tags": [
+      "palindrome"
+     ],
+     "check": "https://ordinals.com/sat/1943750110573491",
+     "verified": false
+    }
+   ]
+  },
+  "block": {
+   "name": "Vintage sat",
+   "kind": "A sat from the first 1,000 blocks",
+   "source": "Computed from the subsidy schedule; check link per sat on ordinals.com",
+   "items": [
+    {
+     "sat": "5000007920",
+     "block": 1,
+     "degree": "0°1′1″7920‴",
+     "name": "nvtcsezjqar",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/5000007920",
+     "verified": false
+    },
+    {
+     "sat": "10000015839",
+     "block": 2,
+     "degree": "0°2′2″15839‴",
+     "name": "nvtccadwipu",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/10000015839",
+     "verified": false
+    },
+    {
+     "sat": "15000023758",
+     "block": 3,
+     "degree": "0°3′3″23758‴",
+     "name": "nvtblvijbex",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/15000023758",
+     "verified": false
+    },
+    {
+     "sat": "25000039596",
+     "block": 5,
+     "degree": "0°5′5″39596‴",
+     "name": "nvtaflrimjd",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/25000039596",
+     "verified": false
+    },
+    {
+     "sat": "45000071272",
+     "block": 9,
+     "degree": "0°9′9″71272‴",
+     "name": "nvsxssjhirp",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45000071272",
+     "verified": false
+    },
+    {
+     "sat": "50000079191",
+     "block": 10,
+     "degree": "0°10′10″79191‴",
+     "name": "nvsxcnnubgs",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/50000079191",
+     "verified": false
+    },
+    {
+     "sat": "105000166300",
+     "block": 21,
+     "degree": "0°21′21″166300‴",
+     "name": "nvsqgmldxqz",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/105000166300",
+     "verified": false
+    },
+    {
+     "sat": "250000395951",
+     "block": 50,
+     "degree": "0°50′50″395951‴",
+     "name": "nvryfcliqni",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/250000395951",
+     "verified": false
+    },
+    {
+     "sat": "390000617683",
+     "block": 78,
+     "degree": "0°78′78″617683‴",
+     "name": "nvrgtxhaquo",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "block78"
+     ],
+     "check": "https://ordinals.com/sat/390000617683",
+     "verified": false
+    },
+    {
+     "sat": "500000791901",
+     "block": 100,
+     "degree": "0°100′100″791901‴",
+     "name": "nvqtbvbujpc",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/500000791901",
+     "verified": false
+    },
+    {
+     "sat": "850001346231",
+     "block": 170,
+     "degree": "0°170′170″1346231‴",
+     "name": "nvpbmveakhe",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/850001346231",
+     "verified": false
+    },
+    {
+     "sat": "1000001583801",
+     "block": 200,
+     "degree": "0°200′200″1583801‴",
+     "name": "nvoivgirvsq",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/1000001583801",
+     "verified": false
+    },
+    {
+     "sat": "1250001979751",
+     "block": 250,
+     "degree": "0°250′250″1979751‴",
+     "name": "nvndryzdouk",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/1250001979751",
+     "verified": false
+    },
+    {
+     "sat": "1605002542000",
+     "block": 321,
+     "degree": "0°321′321″2542000‴",
+     "name": "nvllmufwibp",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/1605002542000",
+     "verified": false
+    },
+    {
+     "sat": "2000003167601",
+     "block": 400,
+     "degree": "0°400′400″3167601‴",
+     "name": "nvjoicwmtzs",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/2000003167601",
+     "verified": false
+    },
+    {
+     "sat": "2500003959501",
+     "block": 500,
+     "degree": "0°500′500″3959501‴",
+     "name": "nvhebodkgdg",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/2500003959501",
+     "verified": false
+    },
+    {
+     "sat": "3000004751401",
+     "block": 600,
+     "degree": "0°600′600″4751401‴",
+     "name": "nvetuzkhsgu",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/3000004751401",
+     "verified": false
+    },
+    {
+     "sat": "3330005274055",
+     "block": 666,
+     "degree": "0°666′666″5274055‴",
+     "name": "nvdessuowqk",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/3330005274055",
+     "verified": false
+    },
+    {
+     "sat": "3750005939251",
+     "block": 750,
+     "degree": "0°750′750″5939251‴",
+     "name": "nvbeldhqxmc",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/3750005939251",
+     "verified": false
+    },
+    {
+     "sat": "4000006335201",
+     "block": 800,
+     "degree": "0°800′800″6335201‴",
+     "name": "nuzzhvycqnw",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/4000006335201",
+     "verified": false
+    },
+    {
+     "sat": "4500007127101",
+     "block": 900,
+     "degree": "0°900′900″7127101‴",
+     "name": "nuxpbhfacrk",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/4500007127101",
+     "verified": false
+    },
+    {
+     "sat": "4995007911082",
+     "block": 999,
+     "degree": "0°999′999″7911082‴",
+     "name": "nuvfkxhkwfv",
+     "rarity": "common",
+     "tags": [
+      "vintage"
+     ],
+     "check": "https://ordinals.com/sat/4995007911082",
+     "verified": false
+    }
+   ]
+  },
+  "artifact": {
+   "name": "Pizza sat",
+   "kind": "The pizza purchase of 22 May 2010: 10,000 BTC for two pizzas, confirmed in block 57,043. Until the sat ranges are read from a full ord index the tiles carry only the verified transaction facts and say SAT RANGE: PENDING INDEX.",
+   "source": "Transaction a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d in block 57,043 (hash 00000000152340ca42227603908689183edc47355204e7aca59383b0aaac1fd8, time 1274552191), read from mempool.space during the Plebs & Legends build and carried over unchanged (public/casino-machines/plebs-legends/art/sources.json). Sat ranges: tools/sat-hunter/fetch_pizza.py on a machine that can reach ordinals.com.",
+   "link": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+   "items": [
+    {
+     "label": "THE PURCHASE",
+     "fact": "10,000 BTC for two pizzas",
+     "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "block": 57043,
+     "date": "22 May 2010",
+     "satStatus": "pending",
+     "check": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "verified": false
+    },
+    {
+     "label": "THE TRANSACTION",
+     "fact": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "block": 57043,
+     "date": "22 May 2010",
+     "satStatus": "pending",
+     "check": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "verified": false
+    },
+    {
+     "label": "THE BLOCK",
+     "fact": "Confirmed in block 57,043",
+     "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "block": 57043,
+     "date": "22 May 2010",
+     "satStatus": "pending",
+     "check": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "verified": false
+    },
+    {
+     "label": "THE BLOCK HASH",
+     "fact": "00000000152340ca42227603908689183edc47355204e7aca59383b0aaac1fd8",
+     "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "block": 57043,
+     "date": "22 May 2010",
+     "satStatus": "pending",
+     "check": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "verified": false
+    },
+    {
+     "label": "THE BUYER",
+     "fact": "Laszlo Hanyecz, on bitcointalk.org",
+     "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "block": 57043,
+     "date": "22 May 2010",
+     "satStatus": "pending",
+     "check": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "verified": false
+    },
+    {
+     "label": "THE DATE",
+     "fact": "22 May 2010: Bitcoin Pizza Day",
+     "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "block": 57043,
+     "date": "22 May 2010",
+     "satStatus": "pending",
+     "check": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "verified": false
+    },
+    {
+     "label": "THE PRICE",
+     "fact": "The first known purchase of goods with bitcoin",
+     "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "block": 57043,
+     "date": "22 May 2010",
+     "satStatus": "pending",
+     "check": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "verified": false
+    },
+    {
+     "label": "THE ORDER",
+     "fact": "Two pizzas, ordered for him by another forum user",
+     "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "block": 57043,
+     "date": "22 May 2010",
+     "satStatus": "pending",
+     "check": "https://ordinals.com/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+     "verified": false
+    }
+   ]
+  },
+  "bitcoin": {
+   "name": "Epic sat (the jackpot symbol)",
+   "kind": "The first sat of a halving epoch. Epochs not yet reached are real sat numbers, marked NOT YET MINED with the expected year.",
+   "source": "Computed from the subsidy schedule; the dates of the first four halvings are public record (Nov 2012, Jul 2016, May 2020, Apr 2024)",
+   "items": [
+    {
+     "sat": "1050000000000000",
+     "block": 210000,
+     "degree": "0°0′336″0‴",
+     "name": "gkjbdrhkfqf",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/1050000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1575000000000000",
+     "block": 420000,
+     "degree": "0°0′672″0‴",
+     "name": "crrabiaqwsn",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/1575000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1837500000000000",
+     "block": 630000,
+     "degree": "0°0′1008″0‴",
+     "name": "avhzndkhfgr",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/1837500000000000",
+     "verified": false
+    },
+    {
+     "sat": "1968750000000000",
+     "block": 840000,
+     "degree": "0°0′1344″0‴",
+     "name": "xdmgbccjnt",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/1968750000000000",
+     "verified": false
+    },
+    {
+     "sat": "2034375000000000",
+     "block": 1050000,
+     "degree": "0°0′1680″0‴",
+     "name": "lbfpmxzyrh",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2034375000000000",
+     "verified": false
+    },
+    {
+     "sat": "2083593750000000",
+     "block": 1470000,
+     "degree": "1°0′336″0‴",
+     "name": "bznqchydnl",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2083593750000000",
+     "verified": false
+    },
+    {
+     "sat": "2091796875000000",
+     "block": 1680000,
+     "degree": "1°0′672″0‴",
+     "name": "amghnnxvrd",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2091796875000000",
+     "verified": false
+    },
+    {
+     "sat": "2095898437500000",
+     "block": 1890000,
+     "degree": "1°0′1008″0‴",
+     "name": "spqgdxrsz",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2095898437500000",
+     "verified": false
+    },
+    {
+     "sat": "2097949218750000",
+     "block": 2100000,
+     "degree": "1°0′1344″0‴",
+     "name": "iuhplxptx",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2097949218750000",
+     "verified": false
+    },
+    {
+     "sat": "2098974609270000",
+     "block": 2310000,
+     "degree": "1°0′1680″0‴",
+     "name": "dwqhddocv",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2098974609270000",
+     "verified": false
+    },
+    {
+     "sat": "2099743652160000",
+     "block": 2730000,
+     "degree": "2°0′336″0‴",
+     "name": "aewujomwn",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2099743652160000",
+     "verified": false
+    },
+    {
+     "sat": "2099871825870000",
+     "block": 2940000,
+     "degree": "2°0′672″0‴",
+     "name": "oxwpeyzp",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2099871825870000",
+     "verified": false
+    },
+    {
+     "sat": "2099935912620000",
+     "block": 3150000,
+     "degree": "2°0′1008″0‴",
+     "name": "gyksgejp",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2099935912620000",
+     "verified": false
+    },
+    {
+     "sat": "2099967955890000",
+     "block": 3360000,
+     "degree": "2°0′1344″0‴",
+     "name": "cyrtztkb",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2099967955890000",
+     "verified": false
+    },
+    {
+     "sat": "2099983977420000",
+     "block": 3570000,
+     "degree": "2°0′1680″0‴",
+     "name": "ayvicnft",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2099983977420000",
+     "verified": false
+    },
+    {
+     "sat": "2099995993410000",
+     "block": 3990000,
+     "degree": "3°0′336″0‴",
+     "name": "lxznocf",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2099995993410000",
+     "verified": false
+    },
+    {
+     "sat": "2099997995970000",
+     "block": 4200000,
+     "degree": "3°0′672″0‴",
+     "name": "fllijft",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2099997995970000",
+     "verified": false
+    },
+    {
+     "sat": "2099998997250000",
+     "block": 4410000,
+     "degree": "3°0′1008″0‴",
+     "name": "cfeftun",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2099998997250000",
+     "verified": false
+    },
+    {
+     "sat": "2099999497890000",
+     "block": 4620000,
+     "degree": "3°0′1344″0‴",
+     "name": "aparmbx",
+     "rarity": "epic",
+     "tags": [
+      "epic"
+     ],
+     "check": "https://ordinals.com/sat/2099999497890000",
+     "verified": false
+    }
+   ]
+  },
+  "wild": {
+   "name": "Rare sat (the wild)",
+   "kind": "The first sat of a difficulty adjustment period (block divisible by 2,016)",
+   "source": "Computed from the subsidy schedule; check link per sat on ordinals.com",
+   "items": [
+    {
+     "sat": "10080000000000",
+     "block": 2016,
+     "degree": "0°2016′0″0‴",
+     "name": "ntwwidfrzxh",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/10080000000000",
+     "verified": false
+    },
+    {
+     "sat": "20160000000000",
+     "block": 4032,
+     "degree": "0°4032′0″0‴",
+     "name": "nsaphwqnciz",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/20160000000000",
+     "verified": false
+    },
+    {
+     "sat": "161280000000000",
+     "block": 32256,
+     "degree": "0°32256′0″0‴",
+     "name": "msaveilwkqr",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/161280000000000",
+     "verified": false
+    },
+    {
+     "sat": "252000000000000",
+     "block": 50400,
+     "degree": "0°50400′0″0‴",
+     "name": "mbikcbfegrx",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/252000000000000",
+     "verified": false
+    },
+    {
+     "sat": "504000000000000",
+     "block": 100800,
+     "degree": "0°100800′0″0‴",
+     "name": "kgxqvsplpyf",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/504000000000000",
+     "verified": false
+    },
+    {
+     "sat": "756000000000000",
+     "block": 151200,
+     "degree": "0°151200′0″0‴",
+     "name": "immxpjzszen",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/756000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1008000000000000",
+     "block": 201600,
+     "degree": "0°201600′0″0‴",
+     "name": "gscejbkaikv",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1008000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1155000000000000",
+     "block": 252000,
+     "degree": "0°42000′0″0‴",
+     "name": "fragdfavyqr",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1155000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1281000000000000",
+     "block": 302400,
+     "degree": "0°92400′0″0‴",
+     "name": "etuwnaszqgv",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1281000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1407000000000000",
+     "block": 352800,
+     "degree": "0°142800′0″0‴",
+     "name": "dwpmwwldhwz",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1407000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1533000000000000",
+     "block": 403200,
+     "degree": "0°193200′0″0‴",
+     "name": "czkdgsdgznd",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1533000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1617000000000000",
+     "block": 453600,
+     "degree": "0°33600′0″0‴",
+     "name": "cjxwvxyatxx",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1617000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1680000000000000",
+     "block": 504000,
+     "degree": "0°84000′0″0‴",
+     "name": "byifavucpsz",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1680000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1743000000000000",
+     "block": 554400,
+     "degree": "0°134400′0″0‴",
+     "name": "bmsnftqelob",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1743000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1806000000000000",
+     "block": 604800,
+     "degree": "0°184800′0″0‴",
+     "name": "bbcvkrmghjd",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1806000000000000",
+     "verified": false
+    },
+    {
+     "sat": "1853250000000000",
+     "block": 655200,
+     "degree": "0°25200′0″0‴",
+     "name": "askoojjhrfl",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1853250000000000",
+     "verified": false
+    },
+    {
+     "sat": "1884750000000000",
+     "block": 705600,
+     "degree": "0°75600′0″0‴",
+     "name": "ampsqvhipcz",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1884750000000000",
+     "verified": false
+    },
+    {
+     "sat": "1916250000000000",
+     "block": 756000,
+     "degree": "0°126000′0″0‴",
+     "name": "aguwthfjnan",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1916250000000000",
+     "verified": false
+    },
+    {
+     "sat": "1947750000000000",
+     "block": 806400,
+     "degree": "0°176400′0″0‴",
+     "name": "abaavtdkkyb",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1947750000000000",
+     "verified": false
+    },
+    {
+     "sat": "1974000000000000",
+     "block": 856800,
+     "degree": "0°16800′0″0‴",
+     "name": "weipdbtwer",
+     "rarity": "rare",
+     "tags": [
+      "rare"
+     ],
+     "check": "https://ordinals.com/sat/1974000000000000",
+     "verified": false
+    }
+   ]
+  },
+  "scatter": {
+   "name": "Nakamoto sat (the scatter)",
+   "kind": "A sat from a block in the Patoshi pattern, the blocks believed to have been mined by Satoshi",
+   "source": "Patoshi block list: github.com/bensig/patoshi-addresses at commit 414637ce52aa4819926bf1934b2235ed182a0280. The mining pattern was discovered by Sergio Demian Lerner; the dataset is curated by Jameson Lopp. The machine uses the first 26 heights of the 59-height subset carried in tools/who-is-satoshi/art/records.json (block 9 excluded: it has its own symbol).",
+   "link": "https://github.com/bensig/patoshi-addresses",
+   "items": [
+    {
+     "sat": "16000314187",
+     "block": 3,
+     "degree": "0°3′3″1000314187‴",
+     "name": "nvtbipdktqc",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/16000314187",
+     "verified": false
+    },
+    {
+     "sat": "21000418916",
+     "block": 4,
+     "degree": "0°4′4″1000418916‴",
+     "name": "nvtaskhryzt",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/21000418916",
+     "verified": false
+    },
+    {
+     "sat": "26000523645",
+     "block": 5,
+     "degree": "0°5′5″1000523645‴",
+     "name": "nvtacflzejk",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/26000523645",
+     "verified": false
+    },
+    {
+     "sat": "31000628374",
+     "block": 6,
+     "degree": "0°6′6″1000628374‴",
+     "name": "nvszmaqgjtb",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/31000628374",
+     "verified": false
+    },
+    {
+     "sat": "36000733103",
+     "block": 7,
+     "degree": "0°7′7″1000733103‴",
+     "name": "nvsyvvunpcs",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/36000733103",
+     "verified": false
+    },
+    {
+     "sat": "41000837832",
+     "block": 8,
+     "degree": "0°8′8″1000837832‴",
+     "name": "nvsyfqyuumj",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/41000837832",
+     "verified": false
+    },
+    {
+     "sat": "51001047290",
+     "block": 10,
+     "degree": "0°10′10″1001047290‴",
+     "name": "nvswzhhjffr",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/51001047290",
+     "verified": false
+    },
+    {
+     "sat": "56001152019",
+     "block": 11,
+     "degree": "0°11′11″1001152019‴",
+     "name": "nvswjclqkpi",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/56001152019",
+     "verified": false
+    },
+    {
+     "sat": "66001361477",
+     "block": 13,
+     "degree": "0°13′13″1001361477‴",
+     "name": "nvsvcsueviq",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/66001361477",
+     "verified": false
+    },
+    {
+     "sat": "71001466206",
+     "block": 14,
+     "degree": "0°14′14″1001466206‴",
+     "name": "nvsumnymash",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/71001466206",
+     "verified": false
+    },
+    {
+     "sat": "76001570935",
+     "block": 15,
+     "degree": "0°15′15″1001570935‴",
+     "name": "nvstwjctgby",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/76001570935",
+     "verified": false
+    },
+    {
+     "sat": "81001675664",
+     "block": 16,
+     "degree": "0°16′16″1001675664‴",
+     "name": "nvstgehallp",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/81001675664",
+     "verified": false
+    },
+    {
+     "sat": "86001780393",
+     "block": 17,
+     "degree": "0°17′17″1001780393‴",
+     "name": "nvsspzlhqvg",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/86001780393",
+     "verified": false
+    },
+    {
+     "sat": "91001885122",
+     "block": 18,
+     "degree": "0°18′18″1001885122‴",
+     "name": "nvsrzupowex",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/91001885122",
+     "verified": false
+    },
+    {
+     "sat": "96001989851",
+     "block": 19,
+     "degree": "0°19′19″1001989851‴",
+     "name": "nvsrjptwboo",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/96001989851",
+     "verified": false
+    },
+    {
+     "sat": "101002094580",
+     "block": 20,
+     "degree": "0°20′20″1002094580‴",
+     "name": "nvsqtkydgyf",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/101002094580",
+     "verified": false
+    },
+    {
+     "sat": "106002199309",
+     "block": 21,
+     "degree": "0°21′21″1002199309‴",
+     "name": "nvsqdgckmhw",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/106002199309",
+     "verified": false
+    },
+    {
+     "sat": "111002304038",
+     "block": 22,
+     "degree": "0°22′22″1002304038‴",
+     "name": "nvspnbgrrrn",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/111002304038",
+     "verified": false
+    },
+    {
+     "sat": "116002408767",
+     "block": 23,
+     "degree": "0°23′23″1002408767‴",
+     "name": "nvsowwkyxbe",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/116002408767",
+     "verified": false
+    },
+    {
+     "sat": "121002513496",
+     "block": 24,
+     "degree": "0°24′24″1002513496‴",
+     "name": "nvsogrpgckv",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/121002513496",
+     "verified": false
+    },
+    {
+     "sat": "126002618225",
+     "block": 25,
+     "degree": "0°25′25″1002618225‴",
+     "name": "nvsnqmtnhum",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/126002618225",
+     "verified": false
+    },
+    {
+     "sat": "131002722954",
+     "block": 26,
+     "degree": "0°26′26″1002722954‴",
+     "name": "nvsnahxuned",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/131002722954",
+     "verified": false
+    },
+    {
+     "sat": "136002827683",
+     "block": 27,
+     "degree": "0°27′27″1002827683‴",
+     "name": "nvsmkdcbsnu",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/136002827683",
+     "verified": false
+    },
+    {
+     "sat": "3556074462319",
+     "block": 711,
+     "degree": "0°711′711″1074462319‴",
+     "name": "nvccoxprana",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/3556074462319",
+     "verified": false
+    },
+    {
+     "sat": "7461156255668",
+     "block": 1492,
+     "degree": "0°1492′1492″1156255668‴",
+     "name": "nujkjrcdjmr",
+     "rarity": "common",
+     "tags": [
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/7461156255668",
+     "verified": false
+    },
+    {
+     "sat": "11111232707838",
+     "block": 2222,
+     "degree": "0°2222′206″1232707838‴",
+     "name": "ntrxxxemenz",
+     "rarity": "common",
+     "tags": [
+      "nakamoto"
+     ],
+     "check": "https://ordinals.com/sat/11111232707838",
+     "verified": false
+    }
+   ]
+  },
+  "vault": {
+   "name": "Block 9 sat",
+   "kind": "A sat from block 9, whose coinbase was spent in the first Bitcoin transaction (block 170, 12 January 2009): the oldest sats known to have moved",
+   "source": "Computed from the subsidy schedule; the history of block 9 and block 170 is public record; which output a particular sat followed is set by ordinal theory's first-in, first-out rule, so each sat has a check link",
+   "items": [
+    {
+     "sat": "45000000000",
+     "block": 9,
+     "degree": "0°9′9″0‴",
+     "name": "nvsxssjlkcv",
+     "rarity": "uncommon",
+     "tags": [
+      "uncommon",
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45000000000",
+     "verified": false
+    },
+    {
+     "sat": "45000000001",
+     "block": 9,
+     "degree": "0°9′9″1‴",
+     "name": "nvsxssjlkcu",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45000000001",
+     "verified": false
+    },
+    {
+     "sat": "45000777777",
+     "block": 9,
+     "degree": "0°9′9″777777‴",
+     "name": "nvsxsshtdoi",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45000777777",
+     "verified": false
+    },
+    {
+     "sat": "45010000000",
+     "block": 9,
+     "degree": "0°9′9″10000000‴",
+     "name": "nvsxsrnolfl",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45010000000",
+     "verified": false
+    },
+    {
+     "sat": "45123456789",
+     "block": 9,
+     "degree": "0°9′9″123456789‴",
+     "name": "nvsxshzhfsu",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45123456789",
+     "verified": false
+    },
+    {
+     "sat": "45500000000",
+     "block": 9,
+     "degree": "0°9′9″500000000‴",
+     "name": "nvsxrchhndp",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45500000000",
+     "verified": false
+    },
+    {
+     "sat": "45999999999",
+     "block": 9,
+     "degree": "0°9′9″999999999‴",
+     "name": "nvsxpmfdqek",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/45999999999",
+     "verified": false
+    },
+    {
+     "sat": "46000000000",
+     "block": 9,
+     "degree": "0°9′9″1000000000‴",
+     "name": "nvsxpmfdqej",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/46000000000",
+     "verified": false
+    },
+    {
+     "sat": "46618033988",
+     "block": 9,
+     "degree": "0°9′9″1618033988‴",
+     "name": "nvsxnmescsj",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/46618033988",
+     "verified": false
+    },
+    {
+     "sat": "47000000000",
+     "block": 9,
+     "degree": "0°9′9″2000000000‴",
+     "name": "nvsxmgavwfx",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/47000000000",
+     "verified": false
+    },
+    {
+     "sat": "47222222222",
+     "block": 9,
+     "degree": "0°9′9″2222222222‴",
+     "name": "nvsxlniojdj",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/47222222222",
+     "verified": false
+    },
+    {
+     "sat": "47718281828",
+     "block": 9,
+     "degree": "0°9′9″2718281828‴",
+     "name": "nvsxjxpardt",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/47718281828",
+     "verified": false
+    },
+    {
+     "sat": "48141592653",
+     "block": 9,
+     "degree": "0°9′9″3141592653‴",
+     "name": "nvsxinysbse",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/48141592653",
+     "verified": false
+    },
+    {
+     "sat": "48333333333",
+     "block": 9,
+     "degree": "0°9′9″3333333333‴",
+     "name": "nvsxhxvcvqq",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/48333333333",
+     "verified": false
+    },
+    {
+     "sat": "48500000000",
+     "block": 9,
+     "degree": "0°9′9″3500000000‴",
+     "name": "nvsxhjukfif",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/48500000000",
+     "verified": false
+    },
+    {
+     "sat": "49000000000",
+     "block": 9,
+     "degree": "0°9′9″4000000000‴",
+     "name": "nvsxftsgiiz",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/49000000000",
+     "verified": false
+    },
+    {
+     "sat": "49200000000",
+     "block": 9,
+     "degree": "0°9′9″4200000000‴",
+     "name": "nvsxfcwpejh",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/49200000000",
+     "verified": false
+    },
+    {
+     "sat": "49500000000",
+     "block": 9,
+     "degree": "0°9′9″4500000000‴",
+     "name": "nvsxedqcljt",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/49500000000",
+     "verified": false
+    },
+    {
+     "sat": "49700000000",
+     "block": 9,
+     "degree": "0°9′9″4700000000‴",
+     "name": "nvsxdmulhkb",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/49700000000",
+     "verified": false
+    },
+    {
+     "sat": "49900000000",
+     "block": 9,
+     "degree": "0°9′9″4900000000‴",
+     "name": "nvsxcvyudkj",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/49900000000",
+     "verified": false
+    },
+    {
+     "sat": "49999999998",
+     "block": 9,
+     "degree": "0°9′9″4999999998‴",
+     "name": "nvsxcnnyokp",
+     "rarity": "common",
+     "tags": [
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/49999999998",
+     "verified": false
+    },
+    {
+     "sat": "49999999999",
+     "block": 9,
+     "degree": "0°9′9″4999999999‴",
+     "name": "nvsxcnnyoko",
+     "rarity": "common",
+     "tags": [
+      "black",
+      "vintage",
+      "nakamoto",
+      "block9"
+     ],
+     "check": "https://ordinals.com/sat/49999999999",
+     "verified": false
+    }
+   ]
+  },
+  "chain": {
+   "name": "Sat range",
+   "kind": "A real block's full range, first sat to last sat, with the sats found in it during The Hunt (the first sat, the last sat and palindromes inside the range)",
+   "source": "Computed from the subsidy schedule; block page per range on ordinals.com",
+   "items": [
+    {
+     "block": 1,
+     "firstSat": "5000000000",
+     "lastSat": "9999999999",
+     "event": "the first block after genesis",
+     "check": "https://ordinals.com/block/1",
+     "verified": false
+    },
+    {
+     "block": 2,
+     "firstSat": "10000000000",
+     "lastSat": "14999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/2",
+     "verified": false
+    },
+    {
+     "block": 3,
+     "firstSat": "15000000000",
+     "lastSat": "19999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/3",
+     "verified": false
+    },
+    {
+     "block": 9,
+     "firstSat": "45000000000",
+     "lastSat": "49999999999",
+     "event": "a block whose coinbase was spent in the first Bitcoin transaction",
+     "check": "https://ordinals.com/block/9",
+     "verified": false
+    },
+    {
+     "block": 21,
+     "firstSat": "105000000000",
+     "lastSat": "109999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/21",
+     "verified": false
+    },
+    {
+     "block": 78,
+     "firstSat": "390000000000",
+     "lastSat": "394999999999",
+     "event": "a block mined by Hal Finney, the first block not mined by Satoshi",
+     "check": "https://ordinals.com/block/78",
+     "verified": false
+    },
+    {
+     "block": 100,
+     "firstSat": "500000000000",
+     "lastSat": "504999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/100",
+     "verified": false
+    },
+    {
+     "block": 170,
+     "firstSat": "850000000000",
+     "lastSat": "854999999999",
+     "event": "the block of the first Bitcoin transaction, 12 Jan 2009",
+     "check": "https://ordinals.com/block/170",
+     "verified": false
+    },
+    {
+     "block": 250,
+     "firstSat": "1250000000000",
+     "lastSat": "1254999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/250",
+     "verified": false
+    },
+    {
+     "block": 400,
+     "firstSat": "2000000000000",
+     "lastSat": "2004999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/400",
+     "verified": false
+    },
+    {
+     "block": 541,
+     "firstSat": "2705000000000",
+     "lastSat": "2709999999999",
+     "event": "home of the palindrome sat 2708111118072",
+     "check": "https://ordinals.com/block/541",
+     "verified": false
+    },
+    {
+     "block": 600,
+     "firstSat": "3000000000000",
+     "lastSat": "3004999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/600",
+     "verified": false
+    },
+    {
+     "block": 800,
+     "firstSat": "4000000000000",
+     "lastSat": "4004999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/800",
+     "verified": false
+    },
+    {
+     "block": 1000,
+     "firstSat": "5000000000000",
+     "lastSat": "5004999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/1000",
+     "verified": false
+    },
+    {
+     "block": 5000,
+     "firstSat": "25000000000000",
+     "lastSat": "25004999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/5000",
+     "verified": false
+    },
+    {
+     "block": 10000,
+     "firstSat": "50000000000000",
+     "lastSat": "50004999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/10000",
+     "verified": false
+    },
+    {
+     "block": 32256,
+     "firstSat": "161280000000000",
+     "lastSat": "161284999999999",
+     "event": "an early difficulty adjustment",
+     "check": "https://ordinals.com/block/32256",
+     "verified": false
+    },
+    {
+     "block": 57043,
+     "firstSat": "285215000000000",
+     "lastSat": "285219999999999",
+     "event": "the block that confirmed the 22 May 2010 pizza purchase",
+     "check": "https://ordinals.com/block/57043",
+     "verified": false
+    },
+    {
+     "block": 100000,
+     "firstSat": "500000000000000",
+     "lastSat": "500004999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/100000",
+     "verified": false
+    },
+    {
+     "block": 150000,
+     "firstSat": "750000000000000",
+     "lastSat": "750004999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/150000",
+     "verified": false
+    },
+    {
+     "block": 200000,
+     "firstSat": "1000000000000000",
+     "lastSat": "1000004999999999",
+     "event": "",
+     "check": "https://ordinals.com/block/200000",
+     "verified": false
+    }
+   ]
+  }
+ },
+ "bitcoin": {
+  "genesisBlock": {
+   "hash": "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+   "coinbaseTx": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+   "headline": "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks",
+   "timeUnix": 1231006505,
+   "timeUtc": "2009-01-03 18:15:05",
+   "source": "mempool.space block and coinbase scriptSig, hex decoded (read during the Plebs & Legends build; public/casino-machines/plebs-legends/art/sources.json). The genesis block coinbase output cannot be spent, which is why the Mythic screen says so."
+  },
+  "pizzaDay": {
+   "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+   "block": 57043,
+   "blockHash": "00000000152340ca42227603908689183edc47355204e7aca59383b0aaac1fd8",
+   "timeUnix": 1274552191,
+   "date": "22 May 2010",
+   "source": "mempool.space, read during the Plebs & Legends build"
+  }
+ },
+ "timeline": "The Satoshi's Stash timeline uses block numbers and dates of 2009 only where public record gives them (genesis 3 Jan 2009, block 1, block 9, the first transaction in block 170 on 12 Jan 2009); other early blocks show a block number and no date.",
+ "gamble": "Odd Sat or Even Sat shows one of 68 real sat numbers whose parity matches the result the engine dealt first. The number is for the story; it never decides anything.",
+ "cabinet": {
+  "xtrataMark": "tools/sat-hunter/model/assets/xtrata.svg, the Xtrata brand SVG, embedded as supplied on the lower door (the owner's own mark)",
+  "parallaxWordmark": "tools/sat-hunter/model/assets/parallax-wordmark.svg, the ParallaX Casino wordmark, embedded small at the marquee foot (the owner's own mark)",
+  "everythingElse": "Oak grain, brushed brass, felt, specimen glass, sample tubes, rivets and labels are procedural textures written by tools/sat-hunter/model/textures.py; no third-party artwork."
+ },
+ "holderLayer": {
+  "what": "Version 1 is a meter and a display only. The Holder Pot is 1% of every paid bet, kept in the game state; the period is one UTC week (Monday 00:00 UTC to Monday 00:00 UTC) taken from the device clock. Wallet linking and the sat index read need a server and are stubs (linkBitcoinWallet, readWalletSats). The machine shows WALLET LINKING: NOT LIVE YET and SHARE PER WALLET: UNKNOWN, never 0 wallets. No NFTs are on the reels, so recordCameos() returns an empty list."
+ },
+ "network": "None at runtime. Every record is bundled in the game. The build-time sources above were read or computed once, offline.",
+ "logosNeedingPermission": [
+  {
+   "item": "Xverse rare-sat badges (Epic, Rare, Uncommon, Palindrome, Vintage, Nakamoto, Block 9, Pizza)",
+   "owner": "Xverse",
+   "source": "support.xverse.app rare sats article",
+   "files": "art/official/{epic,rare,uncommon,palindrome,vintage,nakamoto,block9,pizza}.png",
+   "status": "permission or confirmation of licence needed before public release"
+  },
+  {
+   "item": "Magic Eden 'Black sats' category tile",
+   "owner": "Magic Eden",
+   "source": "community.magiceden.io/learn/rare-sats-guide",
+   "files": "art/official/black.png",
+   "status": "permission or confirmation of licence needed before public release"
+  }
+ ],
+ "permissionNotes": "The reference set the owner supplied is third-party artwork (Xverse badges and a Magic Eden tile), so it is listed above and must be cleared or credited before the machine goes public. The Xtrata mark and the ParallaX Casino wordmark are the owner's own, used as supplied. Ordinals.com and Bitcoin Core are cited as sources in text only, with no logo. Names of people (Satoshi Nakamoto, Sergio Demian Lerner, Jameson Lopp, Laszlo Hanyecz, Hal Finney) appear as plain text credits for public facts.",
+ "officialRarityArt": "tools/sat-hunter/art/official/*.png, cut from the owner's reference sheet (RARE SATS: EXISTING PLATFORM IMAGES). Epic, Rare, Uncommon, Palindrome, Vintage, Nakamoto, Block 9 and Pizza are the Xverse rare-sat badges (support.xverse.app, 'original badges'); the Black sat uses the Magic Eden 'Black sats' category tile (community.magiceden.io/learn/rare-sats-guide). They are third-party artwork, used only as the emblem on the matching sat's coin, unaltered apart from cutting out the background and enlarging. Mythic, Legendary and Sat range have no official art in that set and keep the machine's own engraving.",
+ "hunts": {
+  "ranges": 21,
+  "findsPerRange": [
+   19
+  ],
+  "blocks": [
+   1,
+   2,
+   3,
+   9,
+   21,
+   78,
+   100,
+   170,
+   250,
+   400,
+   541,
+   600,
+   800,
+   1000,
+   5000,
+   10000,
+   32256,
+   57043,
+   100000,
+   150000,
+   200000
+  ]
+ },
+ "mythic": {
+  "sat": "0",
+  "name": "nvtdijuwxlp",
+  "genesis": {
+   "hash": "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+   "coinbaseTx": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+   "headline": "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks",
+   "timeUnix": 1231006505,
+   "timeUtc": "2009-01-03 18:15:05",
+   "source": "Plebs & Legends build: mempool.space block and coinbase scriptsig"
+  }
+ },
+ "verification": {
+  "records": 618,
+  "checkedOnOrdinalsCom": 0,
+  "note": "verified=false means the sat was computed offline by the numbering rules and has not yet been opened on ordinals.com; the machine says \"not yet checked\" next to it."
+ }
+}

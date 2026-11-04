@@ -1,0 +1,36 @@
+<div id="stage"><canvas id="view" width="1400" height="960" aria-label="The Sat Hunter game screen. Tap the buttons on the screen, or use the control bar."></canvas><div class="side-meters" aria-hidden="true"><span>SPINS <b id="spins">0</b></span><span>PLAYED <b id="wagered">0</b></span><span>PAID <b id="paidOut">0</b></span><span>MYTHIC JACKPOT <b id="meterSide">0</b></span><span>HOLDER POT <b id="potSide">0</b></span><span>PERIOD ENDS IN <b id="leftSide">—</b></span></div><p id="statusLine"><span id="status" role="status" aria-live="polite">THE LAMPS ARE LIT</span><span class="src"> · <span id="liveSrc">OFFLINE · EVERY SAT IS IN THE CASE</span> · <span id="twinsSmall">WALLET LINKING: NOT LIVE YET</span></span></p></div>
+<div id="fsbar" role="toolbar" aria-label="Sat Hunter controls">
+<section id="featureBar" hidden aria-live="polite" aria-label="Bonus feature"><div class="fb-head"><span class="eyebrow" id="fbTag">FEATURE</span><strong id="fbTitle"></strong><span id="fbInfo"></span></div><div id="fbBody"></div></section>
+<div class="row main">
+<div class="read"><label>LAYR BALANCE</label><strong id="balance">0</strong></div>
+<div class="read"><label>SATS · TOTAL BET</label><div class="stepper"><button id="minus" aria-label="Fewer sats: decrease bet"><span>−</span></button><strong id="bet">100</strong><button id="plus" aria-label="More sats: increase bet"><span>+</span></button></div></div>
+<div class="read win"><label id="winLabel">LAST WIN</label><strong id="lastWin">0</strong><small id="freeCount">LAYR</small></div>
+<button id="maxBet" class="deck"><b>MAX SATS</b><i>highest bet</i></button>
+<button id="auto" class="deck" aria-pressed="false"><b>AUTO-HUNT</b><i>auto-spin</i></button>
+<button id="turbo" class="deck" aria-pressed="false"><b>TURBO</b><i>faster reels</i></button>
+<button id="gamble" class="deck hot" hidden><b>ODD OR EVEN</b><i>double or nothing</i></button>
+<button id="gYes" class="deck hot" hidden><b>EVEN SAT</b><i>call the number</i></button>
+<button id="gNo" class="deck hot" hidden><b>ODD SAT</b><i>call the number</i></button>
+<button id="collect" class="deck" hidden><b>COLLECT</b><i>keep your win</i></button>
+<button id="spin" class="spin"><span id="spinText">HUNT</span><small id="spinSub">spin the reels</small><svg class="spin-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l6 6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+</div>
+<div class="row menu" id="menuRow">
+<button id="rules" class="deck"><b>RARITY</b><i>pays &amp; rules</i></button>
+<button id="fair" class="deck"><b>FAIR PLAY</b><i>odds &amp; proof</i></button>
+<button id="records" class="deck"><b>SATS</b><i>the real sats</i></button>
+<button id="pot" class="deck"><b>HOLDER POT</b><i>weekly pot</i></button>
+<button id="history" class="deck"><b>LOG</b><i>history</i></button>
+<button id="account" class="deck"><b>LAYR</b><i>your account</i></button>
+<button id="settings" class="deck"><b>SETTINGS</b><i>sound &amp; motion</i></button>
+<button id="sound" class="deck" aria-pressed="true"><b>SOUND</b><i>mute or unmute</i></button>
+<label class="deck vol"><b>VOLUME</b><input id="vol" type="range" min="0" max="1" step=".05" aria-label="Volume"></label>
+<span id="extra" style="display:contents"></span>
+<button id="labBtn" class="deck" hidden><b>LAB</b><i>bonus lab</i></button>
+<button id="testBtn" class="deck" hidden><b>TEST</b><i>test tools</i></button>
+<button id="fsBtn" class="deck"><b>FULL SCREEN</b><i>fill the view</i></button>
+<button id="fsExit" class="deck"><b>EXIT</b><i>leave full screen</i></button>
+</div>
+</div>
+<div id="toast" role="status"></div><div id="celebration" aria-hidden="true"></div>
+<dialog id="modal"><div class="modal-head"><span class="eyebrow" id="modalTag">SAT HUNTER</span><button id="close" aria-label="Close dialog">×</button></div><div id="modalContent"></div></dialog>
+<div id="loading" role="status"><div class="lens" aria-hidden="true"><i></i></div><b>SAT HUNTER</b><p id="loadMsg">WARMING THE LAMPS</p><small>ParallaX Casino · EVERY SAT HAS A STORY</small></div><noscript><p class="noscript">Sat Hunter needs JavaScript to run.</p></noscript>
