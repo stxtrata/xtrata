@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Plebs &amp; Legends · test page</title>
+<meta name="description" content="Stand-alone test page for the Plebs &amp; Legends cabinet. It plays only this machine. Not part of the casino.">
+<style>
+:root{--bg:#0c0505;--panel:#190b0b;--ink:#ffeeee;--muted:#b59393;--accent:#ff2b2b;--line:#ffffff1c;--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);--safe-l:env(safe-area-inset-left,0px);--safe-r:env(safe-area-inset-right,0px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.4;cursor:not-allowed}
+#top{position:fixed;left:0;right:0;top:0;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:calc(6px + var(--safe-t)) calc(12px + var(--safe-r)) 6px calc(12px + var(--safe-l));background:linear-gradient(#0c0505,#0c0505ee 70%,#0c050500)}
+#title{display:flex;flex-direction:column;gap:3px;margin-right:auto;min-width:0}
+#title b{font-size:18px;letter-spacing:.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#title b em{font-style:normal;color:var(--accent)}
+#title img{height:12px;width:auto;max-width:170px;object-fit:contain;object-position:left;opacity:.85;display:block}
+.stat{display:flex;flex-direction:column;align-items:flex-end;font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;min-width:64px}
+.stat strong{font-size:16px;color:var(--ink);letter-spacing:0;font-variant-numeric:tabular-nums}
+.chip{min-height:44px;min-width:44px;padding:0 14px;border:1px solid var(--line);border-radius:22px;background:#ffffff0a;font-size:13px;letter-spacing:.6px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:#ff2b2b24;color:#ffd0d0}
+#stage{position:fixed;inset:0;touch-action:none}
+#stage canvas{display:block;width:100%;height:100%;outline:none}
+#status{position:fixed;left:0;right:0;bottom:calc(104px + var(--safe-b));z-index:4;text-align:center;font-size:13px;color:#e8c9c9;padding:0 16px;pointer-events:none;text-shadow:0 1px 3px #000}
+#deck{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;justify-content:center;gap:8px;padding:8px calc(10px + var(--safe-r)) calc(8px + var(--safe-b)) calc(10px + var(--safe-l));background:linear-gradient(#0c050500,#0c0505f2 40%)}
+#deck button{flex:1 1 0;max-width:150px;min-width:56px;min-height:60px;border:1px solid #ff2b2b55;border-radius:10px;background:#190b0bee;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px}
+#deck button b{font-size:13px;letter-spacing:1px;color:#fff}
+#deck button small{font-size:10.5px;color:var(--muted);letter-spacing:.3px}
+#deck button.go{background:#ff2b2b;border-color:#ff6b6b}
+#deck button.go small{color:#ffe0e0}
+#deck button[aria-pressed="true"]{outline:2px solid var(--accent)}
+#load{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--bg);color:var(--muted);text-align:center;padding:24px}
+#load b{color:var(--ink);font-size:20px}
+#load.err b{color:#ff8a8a}
+#pxFeature{position:fixed;left:0;right:0;bottom:calc(76px + var(--safe-b));z-index:6;padding:0 calc(10px + var(--safe-r)) 0 calc(10px + var(--safe-l));max-width:900px;margin:0 auto}
+#pxFeature[hidden],#pxModal[hidden]{display:none}
+#pxModal{position:fixed;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;background:#000a;padding:calc(10px + var(--safe-t)) 10px calc(10px + var(--safe-b))}
+#test{position:fixed;right:calc(10px + var(--safe-r));top:calc(64px + var(--safe-t));z-index:8;width:min(260px,calc(100vw - 20px));max-height:calc(100dvh - 190px);overflow:auto;border:1px solid #ff2b2b66;border-radius:10px;background:#190b0bf5;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#test[hidden]{display:none}
+#test h2{grid-column:1/-1;margin:2px 0;font-size:11px;letter-spacing:1.6px;color:var(--muted);text-transform:uppercase;font-weight:400}
+#test button{min-height:44px;border:1px solid var(--line);border-radius:8px;background:#ffffff0d;font-size:12.5px;padding:4px 6px}
+#test button.wide{grid-column:1/-1}
+#hint{position:fixed;left:calc(12px + var(--safe-l));top:calc(60px + var(--safe-t));z-index:3;font-size:11px;color:#8d7070;pointer-events:none;max-width:44ch}
+body.vscreen #status,body.vscreen #hint{display:none}
+@media (max-width:560px){#hint{display:none}#title b{font-size:15px}.stat{min-width:52px}.chip{padding:0 10px}}
+@media (max-height:480px){#deck button{min-height:48px}#deck button small{display:none}#status{bottom:calc(60px + var(--safe-b))}#pxFeature{bottom:calc(60px + var(--safe-b))}#hint{display:none}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+iframe#logic{position:fixed;left:0;top:0;width:2px;height:2px;border:0;opacity:.01;pointer-events:none;z-index:-1}
+body.gfs iframe#logic{width:100vw;height:100vh;height:100dvh;opacity:1;pointer-events:auto;z-index:2147483000}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="gl" tabindex="0" aria-label="Plebs and Legends cabinet. Drag to turn it, scroll or pinch to zoom, tap the screen, the lever or the deck buttons."></canvas></div>
+<header id="top">
+  <div id="title"><b id="ttl">Plebs <em>&amp;</em> Legends</b><img id="wm" alt="ParallaX Casino" src="art/parallax-casino-wordmark.svg"></div>
+  <div class="stat">Balance<strong id="bal">0</strong></div>
+  <div class="stat">Bet<strong id="bet">0</strong></div>
+  <div class="stat">Win<strong id="win">0</strong></div>
+  <button class="chip" id="viewBtn" aria-pressed="false" title="V">Screen view</button>
+  <button class="chip" id="bonusBtn" title="Try every bonus round">Bonus test</button>
+  <button class="chip" id="fsBtn" title="F">Fullscreen</button>
+</header>
+<div id="hint">Drag to turn the cabinet · scroll or pinch to zoom · tap the screen, the lever or a deck button · F fullscreen · V view · Space spin</div>
+<div id="status" role="status" aria-live="polite"></div>
+<div id="pxFeature" hidden aria-label="Machine bonus"></div>
+<div id="pxModal" hidden role="dialog" aria-modal="true" aria-label="Machine options"></div>
+<aside id="test" hidden aria-label="Test panel">
+  <button class="wide" data-hide="1">Hide this panel (T)</button>
+  <h2>Trigger (real engine, fixed seeds)</h2>
+  <button data-force="win">Line win</button><button data-force="free">Whitepaper</button>
+  <button data-force="pick">Pizza Day</button><button data-force="hold">Signed</button>
+  <button data-force="jackpot" class="wide">Block 0 jackpot</button>
+  <button data-act="test" class="wide">Open the machine's Test panel</button>
+  <h2>LAYR (play money, this page only)</h2>
+  <button data-bank="100000">+100,000</button><button data-bank="reset">Reset 1,000,000</button>
+  <button data-bank="empty" class="wide">Set to 20 (try running out)</button>
+</aside>
+<nav id="deck" aria-label="Deck buttons">
+  <button data-act="pays"><b>BIOS</b><small>pay table</small></button>
+  <button data-act="betDown"><b>−HYPE</b><small>lower bet</small></button>
+  <button data-act="spin" class="go"><b>GO LIVE</b><small>spin</small></button>
+  <button data-act="betUp"><b>+HYPE</b><small>raise bet</small></button>
+  <button data-act="auto" id="autoBtn" aria-pressed="false"><b>AUTO-POST</b><small>auto spin</small></button>
+</nav>
+<script src="vendor/three.r128.min.js"></script>
+<div id="load"><b>Plebs &amp; Legends</b><span id="loadMsg">Opening the cabinet…</span></div>
+<script>
+/* ===== The LAYR account stub =====
+   The room supplies window.ParallaxLAYRAccount; the game uses the parent's copy when it has one. This page has no room, so it
+   supplies the same interface here: the game's own local account adapter, copied unchanged except for its storage key and a
+   1,000,000 play-money starting balance. It is test scaffolding and is not part of the machine. */
+(() => {
+  'use strict';
+  const KEY = 'plebs-legends.testpage.account.v1', LEGACY_KEY='plebs-legends.testpage.none', LOCK = 'plebs-legends.testpage.account.v1';
+  let owned = false, acquiring = null, releaseLock = null, room = null, draft = null, fault = '';
+  const LEASE_KEY='plebs-legends.testpage.lease.v1',LEASE_MS=60000;
+  let leaseDB=null,leaseToken=null,leaseTimer=null,leaseFallback=false;
+  const metadata = new WeakMap(), listeners = new Set();
+  const copy = value => JSON.parse(JSON.stringify(value));
+  function amount(value) {
+    if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(Math.round(value * 100))) throw Error('Invalid LAYR amount.');
+    return Math.round(value * 100) / 100;
+  }
+  function read() {
+    const raw = localStorage.getItem(KEY),legacy=raw===null?localStorage.getItem(LEGACY_KEY):null,r = raw ? JSON.parse(raw) : legacy ? JSON.parse(legacy) : {};
+    if (!r || typeof r !== 'object' || Array.isArray(r)) throw Error('The shared LAYR account could not be read.');
+    // Preserve an existing room balance; a new installation starts at zero.
+    r.bank = typeof r.bank === 'number' ? amount(r.bank) : 1000000;
+    r.layrGames = r.layrGames && typeof r.layrGames === 'object' && !Array.isArray(r.layrGames) ? r.layrGames : {};
+    return r;
+  }
+  function ready(){
+    if(!owned)return false;
+    if(!leaseFallback)return true;
+    try{const lease=JSON.parse(localStorage.getItem(LEASE_KEY)||'null');return !!lease&&lease.id===leaseToken&&lease.expires>Date.now()+5000;}catch(_){return false;}
+  }
+  function assertOwned() { if (!ready()) throw Error(fault || 'The LAYR account is active in another tab or its lease has paused. Reconnect before playing.'); }
+  function publish() { for (const fn of listeners) { try { fn(); } catch (e) { console.warn('LAYR display could not refresh.', e); } } }
+  function write(r) {
+    assertOwned();
+    r.bank = amount(r.bank); r.layrSchema = 1; r.layrMode = 'local';
+    delete r.cashier; // The former STX faucet and unverified exchange receipts are retired.
+    localStorage.setItem(KEY, JSON.stringify(r));
+  }
+  function balance() {
+    try { return draft ? draft.bank : amount(room ? room.available() : read().bank); }
+    catch (e) { fault = e.message; return 0; }
+  }
+  async function openLeaseDB(){
+    if(leaseDB)return leaseDB;
+    if(!window.indexedDB)throw Error('Shared LAYR storage is unavailable in this browser.');
+    leaseDB=await new Promise((resolve,reject)=>{
+      const request=indexedDB.open('plebs-legends-testpage-lock',1);
+      request.onupgradeneeded=()=>request.result.createObjectStore('leases');
+      request.onsuccess=()=>resolve(request.result);
+      request.onerror=()=>reject(request.error);
+    });
+    return leaseDB;
+  }
+  async function leaseOperation(release=false){
+    const db=await openLeaseDB();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction('leases','readwrite'),store=tx.objectStore('leases'),request=store.get(LOCK);let next=null,accepted=false;
+      request.onsuccess=()=>{
+        const current=request.result,now=Date.now();
+        if(release){if(current?.id===leaseToken){store.delete(LOCK);accepted=true;}return;}
+        // IndexedDB serializes simultaneous acquisition and renewal attempts.
+        if(current&&current.id!==leaseToken&&current.expires>now)return;
+        next={id:leaseToken,expires:now+LEASE_MS};store.put(next,LOCK);accepted=true;
+      };
+      tx.oncomplete=()=>{
+        if(accepted){
+          try{
+            if(release){const mirror=JSON.parse(localStorage.getItem(LEASE_KEY)||'null');if(mirror?.id===leaseToken)localStorage.removeItem(LEASE_KEY);}
+            else localStorage.setItem(LEASE_KEY,JSON.stringify(next));
+          }catch(e){reject(e);return;}
+        }
+        resolve(accepted);
+      };
+      tx.onerror=tx.onabort=()=>reject(tx.error||Error('LAYR account lock failed.'));
+    });
+  }
+  async function acquireFallback(){
+    try{
+      read();leaseFallback=true;
+      if(!leaseToken)leaseToken=Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16)).join('-');
+      if(!await leaseOperation()){fault='The LAYR account is active in another tab. Close it, then reload or reconnect.';return false;}
+      owned=true;
+      if(!leaseTimer)leaseTimer=setInterval(()=>{
+        if(!owned)return;
+        leaseOperation().then(ok=>{if(!ok){owned=false;fault='The LAYR account moved to another tab. Reconnect before playing.';publish();}}).catch(e=>{owned=false;fault=e.message;publish();});
+      },10000);
+      publish();return true;
+    }catch(e){fault=e.message;owned=false;return false;}
+  }
+  async function acquire() {
+    if (ready()) return true;
+    if (acquiring) return acquiring;
+    fault = '';
+    if(!navigator.locks){acquiring=acquireFallback().finally(()=>{acquiring=null;});return acquiring;}
+    acquiring = new Promise(resolve => {
+      navigator.locks.request(LOCK, { ifAvailable: true }, async lock => {
+        if (!lock) { fault = 'The LAYR account is active in another tab. Close it, then reload or reconnect.'; resolve(false); return; }
+        try { read(); } catch (e) { fault = e.message; resolve(false); return; }
+        owned = true;
+        const held = new Promise(done => { releaseLock = done; });
+        resolve(true); publish(); await held;
+        owned = false; releaseLock = null;
+      }).catch(e => { fault = e.message; resolve(false); });
+    }).finally(() => { acquiring = null; });
+    return acquiring;
+  }
+  function serialize(state) {
+    const saved = copy(state);
+    for (const key of ['balance', 'cashouts', 'previewPaid', 'freePreview']) delete saved[key];
+    return saved;
+  }
+  function attach(state, id, revision = 0) {
+    delete state.balance;
+    Object.defineProperty(state, 'balance', { configurable: true, enumerable: false,
+      get: balance,
+      set(value) {
+        if (!draft || draft.state !== state) throw Error('Only a committed game action can change the shared LAYR balance.');
+        draft.bank = amount(value);
+      }
+    });
+    metadata.set(state, { id, revision });
+    return state;
+  }
+  function commitState(state, r, nextBank) {
+    const meta = metadata.get(state); if (!meta) throw Error('Machine is not linked to the LAYR account.');
+    const previous = r.layrGames[meta.id];
+    if ((previous?.revision || 0) !== meta.revision) throw Error('Machine state changed. Disconnect and reconnect before playing.');
+    const revision = meta.revision + 1;
+    r.layrGames[meta.id] = { revision, state: serialize(state) };
+    r.bank = amount(nextBank + (room ? room.held() : 0));
+    // Funds and the resulting pending/settled game state are one storage write.
+    write(r); meta.revision = revision;
+    if (room) { try { room.changed(nextBank); } catch (e) { console.warn('LAYR room display could not refresh.', e); } }
+    publish();
+  }
+  function transact(state, fn) {
+    assertOwned(); if (draft) throw Error('A LAYR transaction is already running.');
+    const before = serialize(state), r = read();
+    draft = { state, bank: balance() };
+    try {
+      const result = fn(), next = draft.bank;
+      draft = null;
+      commitState(state, r, next);
+      return result;
+    } catch (e) {
+      draft = null;
+      for (const key of Object.keys(state)) delete state[key];
+      Object.assign(state, before);
+      throw e;
+    }
+  }
+  function saveGame(state) {
+    if (!ready()) return false;
+    if (draft) return true;
+    commitState(state, read(), balance()); return true;
+  }
+  function machine(id, engine) {
+    const api = { ...engine };
+    api.fresh = () => attach(engine.fresh(), id);
+    api.load = raw => attach(engine.load ? engine.load(raw) : { ...engine.fresh(), ...(raw || {}) }, id);
+    for (const name of ['start', 'settle', 'pick', 'respin', 'collect', 'endFree', 'gamble']) {
+      if (typeof engine[name] === 'function') api[name] = (state, ...args) => transact(state, () => engine[name](state, ...args));
+    }
+    return Object.freeze(api);
+  }
+  function openGame(id, engine) {
+    const saved = read().layrGames[id], state = engine.load(saved?.state);
+    return attach(state, id, saved?.revision || 0);
+  }
+  function saveRoom(values) {
+    if (!ready()) return false;
+    const r = read(); Object.assign(r, values); write(r); publish(); return true;
+  }
+  window.ParallaxLAYRAccount = Object.freeze({
+    version: '1.0.0', mode: 'local', onChainConnected: false,
+    acquire, ready, error: () => fault, balance, machine, openGame, saveGame, saveRoom,
+    bindRoom(callbacks) { room = callbacks; },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    roomState(){const r=read();return {bank:r.bank,hands:r.hands||0,net:r.net||0};},
+    snapshot() { const r = read(); return { balance: balance(), currency: 'LAYR', mode: 'local', onChainConnected: false, available: ready(), games: Object.keys(r.layrGames) }; }
+  });
+  addEventListener('pagehide', () => { owned=false;if(releaseLock)releaseLock();if(leaseFallback){clearInterval(leaseTimer);leaseOperation(true).catch(()=>{});} });
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&leaseFallback&&owned)leaseOperation().then(ok=>{if(!ok){owned=false;publish();}}).catch(()=>{owned=false;publish();});});
+})();
+
+</script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const NAME = 'plebs-legends';
+const PX_RAF_SHIM = '<script>(function(){var w=window,nat=w.requestAnimationFrame&&w.requestAnimationFrame.bind(w),natC=w.cancelAnimationFrame&&w.cancelAnimationFrame.bind(w);if(!nat||w.__pxPump)return;var q=new Map(),n=0,h=0,since=0,driven=false;function run(t){h=0;since=0;var list=Array.from(q.values());q.clear();for(var i=0;i<list.length;i++){try{list[i](t)}catch(e){(function(e){setTimeout(function(){throw e})})(e)}}}w.requestAnimationFrame=function(cb){var id=++n;q.set(id,cb);if(!since)since=performance.now();if(!h&&!driven)h=nat(run);return id};w.cancelAnimationFrame=function(id){q.delete(id)};w.__pxPump=function(){if(!q.size)return;var now=performance.now();if(!driven&&now-since<120)return;driven=true;if(h){natC(h);h=0}run(now)}})();<\/script>';
+const touch = (() => { try { return !!(window.matchMedia && matchMedia('(pointer:coarse)').matches) || 'ontouchstart' in window; } catch (_) { return false; } })();
+function say(msg, err) { const l = $('load'); $('loadMsg').textContent = msg; l.classList.toggle('err', !!err); if (err) l.querySelector('b').textContent = 'The cabinet could not open'; }
+async function gunzip(b64) {
+  const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  return new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
+async function loadPack() {
+  try { const r = await fetch('pack.json', { cache: 'no-cache' }); if (!r.ok) throw 0; return await r.json(); }
+  catch (_) {
+    await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'pack.js'; s.onload = ok; s.onerror = () => no(new Error('pack.json and pack.js could not be read.')); document.head.appendChild(s); });
+    return window.PL_TEST_PACK;
+  }
+}
+/* The same document changes the casino room makes before it hosts a game: no hidden 3D view, half-size screen canvas on touch. */
+function liteDocument(html) {
+  let out = html;
+  if (touch) {
+    const re = /const screen *= *canvas\(2800, *1920\), *sg *= *screen\.getContext\('2d'\); *sg\.setTransform\(2, *0, *0, *2, *0, *0\);/g;
+    if ((out.match(re) || []).length === 1) out = out.replace(re, "const screen=canvas(1400,960),sg=screen.getContext('2d');sg.setTransform(1,0,0,1,0,0);");
+  }
+  const re2 = /renderer\.render\(\s*scene\s*,\s*camera\s*\)/g;
+  if ((out.match(re2) || []).length === 2) out = out.replace(re2, '(window.__pxHidden||renderer.render(scene,camera))');
+  else throw new Error('The game text was not as expected (render calls).');
+  const inject = '<script>window.__pxHidden=true;' + (params.has('test') ? 'window.__PL_TEST__=true;' : '') + '<\/script>' + PX_RAF_SHIM;
+  const m = /<head[^>]*>/i.exec(out);
+  return m ? out.slice(0, m.index + m[0].length) + inject + out.slice(m.index + m[0].length) : inject + out;
+}
+
+let frame, api, T, pack;
+let renderer, scene, camera, model, screenMesh, screenTex, raycaster, envTex;
+const anim = {}; let lamps = [], lastRev = -1, leverPull = null, lastLeverId = null, lastMech = performance.now();
+const view = { mode: 'cabinet', yaw: .32, pitch: .1, dist: 7, tx: 0, ty: 1.3, tz: 0, g: { yaw: .32, pitch: .1, dist: 7, tx: 0, ty: 1.3, tz: 0 } };
+let screenFit = null, cabFit = 7, gfs = false;
+
+async function start() {
+  say('Reading the cabinet…');
+  pack = await loadPack();
+  if (!pack || !pack.model || !pack.game) throw new Error('The pack is incomplete.');
+  say('Starting the game…');
+  const gameHtml = await gunzip(pack.game);
+  frame = document.createElement('iframe'); frame.id = 'logic'; frame.title = 'Plebs & Legends game logic';
+  frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1; frame.setAttribute('allow', 'fullscreen'); frame.setAttribute('allowfullscreen', '');
+  document.body.appendChild(frame);
+  api = await new Promise((resolve, reject) => {
+    const to = setTimeout(() => reject(new Error('The game did not become ready.')), 25000);
+    frame.onload = () => { const a = frame.contentWindow.PX_CASINO_ENGINE; clearTimeout(to); a ? resolve(a) : reject(new Error('The game has no PX_CASINO_ENGINE.')); };
+    frame.srcdoc = liteDocument(gameHtml);
+  });
+  T = window.THREE; if (!T) throw new Error('The 3D library (vendor/three.r128.min.js) did not load.');
+  say('Signing in to the play-money account…');
+  await api.activate();
+  say('Building the cabinet…');
+  await buildScene(JSON.parse(await gunzip(pack.model)));
+  bindUI();
+  $('load').remove();
+  requestAnimationFrame(loop);
+}
+
+/* ===== The cabinet: same node/geometry/material format the room's packedCabinet reads ===== */
+function loadImage(src) { return new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('A cabinet texture failed to load.')); i.src = src; }); }
+async function buildScene(data) {
+  const canvas = $('gl');
+  renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, touch ? 2 : 2));
+  scene = new T.Scene(); scene.background = new T.Color(0x0c0505); scene.fog = new T.Fog(0x0c0505, 12, 28);
+  camera = new T.PerspectiveCamera(34, 1, .1, 60);
+  raycaster = new T.Raycaster();
+  // a small studio environment so the metal on the cabinet has something to reflect
+  const pm = new T.PMREMGenerator(renderer), es = new T.Scene(); es.background = new T.Color(0x1a0d0d);
+  const panel = (c, w, h, x, y, z, ry) => { const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: c, side: T.DoubleSide })); m.position.set(x, y, z); m.rotation.y = ry || 0; es.add(m); return m; };
+  panel(0xfff1e0, 8, 3, 0, 6, 0, 0).rotation.x = Math.PI / 2; panel(0xff4a4a, 3, 6, -7, 2, 0, Math.PI / 2); panel(0xffd9b0, 3, 6, 7, 2, 2, -Math.PI / 2); panel(0x8a4040, 8, 4, 0, 2, -7, 0);
+  envTex = pm.fromScene(es, .04).texture;
+  const geos = data.geometries.map(g => { const o = new T.BufferGeometry(); for (const [k, a] of Object.entries(g.attributes)) o.setAttribute(k, new T.BufferAttribute(new Float32Array(a.array), a.size)); if (g.index) o.setIndex(g.index); for (const gr of g.groups || []) o.addGroup(gr.start, gr.count, gr.materialIndex); o.computeBoundingSphere(); return o; });
+  const imgs = await Promise.all(data.textures.map(t => loadImage(t.image)));
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  const texs = data.textures.map((t, i) => { const o = new T.Texture(imgs[i]); o.wrapS = t.wrapS; o.wrapT = t.wrapT; o.repeat.fromArray(t.repeat); o.offset.fromArray(t.offset); o.flipY = t.flipY; o.anisotropy = Math.min(16, maxAniso); o.needsUpdate = true; return o; });
+  const mats = data.materials.map(m => {
+    const p = { color: m.color, map: m.map == null ? null : texs[m.map], transparent: m.transparent, opacity: m.opacity, side: m.side, depthWrite: m.depthWrite, alphaTest: m.alphaTest };
+    if (m.type === 'basic') return new T.MeshBasicMaterial(p);
+    return new T.MeshStandardMaterial(Object.assign(p, { roughness: m.roughness, metalness: m.metalness, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, flatShading: m.flatShading, envMap: envTex, envMapIntensity: .65 }));
+  });
+  const node = n => {
+    const o = n.g == null ? new T.Group() : new T.Mesh(geos[n.g], Array.isArray(n.m) ? n.m.map(id => mats[id]) : mats[n.m]);
+    o.position.fromArray(n.p); o.quaternion.fromArray(n.q); o.scale.fromArray(n.s); o.visible = n.visible;
+    if (n.role) o.name = 'px-' + n.role; if (n.action) o.userData.pxMachineAction = n.action;
+    o.castShadow = !!o.isMesh; o.receiveShadow = !!o.isMesh; n.children.forEach(c => o.add(node(c))); return o;
+  };
+  const raw = node(data.root); raw.updateMatrixWorld(true);
+  const bb = new T.Box3().setFromObject(raw), size = bb.getSize(new T.Vector3()), s = 2.6 / size.y;
+  raw.scale.multiplyScalar(s); raw.position.y -= bb.min.y * s;
+  const group = new T.Group(); group.add(raw); scene.add(group); model = group; group.updateMatrixWorld(true);
+  for (const role of ['crest', 'recordGroup', 'core', 'lever', 'spinPhysical', 'armPivot']) { const o = raw.getObjectByName('px-' + role); if (o) anim[role] = { o, base: o.rotation.clone(), home: o.position.clone() }; }
+  // the live screen
+  screenMesh = raw.getObjectByName('px-screenMesh');
+  if (!screenMesh) throw new Error('The cabinet has no screen mesh.');
+  screenTex = new T.CanvasTexture(api.screen); screenTex.minFilter = screenTex.magFilter = T.LinearFilter; screenTex.generateMipmaps = false; screenTex.anisotropy = Math.min(16, maxAniso);
+  screenMesh.material = screenMesh.material.clone(); screenMesh.material.map = screenTex; screenMesh.material.color.setHex(0xffffff); screenMesh.material.needsUpdate = true;
+  // the ON AIR lamp: its own materials, so the other parts do not glow with it
+  const onAir = raw.getObjectByName('px-onAir');
+  if (onAir) onAir.traverse(o => { if (!o.isMesh) return; const list = Array.isArray(o.material) ? o.material : [o.material], cl = list.map(m => m.clone()); o.material = Array.isArray(o.material) ? cl : cl[0]; for (const m of cl) lamps.push({ m, c: m.color.clone(), ei: m.emissiveIntensity }); });
+  // room: floor and lights
+  const floor = new T.Mesh(new T.CircleGeometry(14, 64), new T.MeshStandardMaterial({ color: 0x140909, roughness: .55, metalness: .2, envMap: envTex, envMapIntensity: .3 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  const grid = new T.GridHelper(28, 28, 0x3a1515, 0x241010); grid.position.y = .004; scene.add(grid);
+  scene.add(new T.HemisphereLight(0xffe6d6, 0x2a1010, .9));
+  const key = new T.DirectionalLight(0xfff0e0, 1.1); key.position.set(3.5, 7, 6); key.castShadow = true; key.shadow.mapSize.set(touch ? 1024 : 2048, touch ? 1024 : 2048);
+  Object.assign(key.shadow.camera, { left: -5, right: 5, top: 6, bottom: -2, near: 1, far: 20 }); key.shadow.bias = -.0004; scene.add(key);
+  const rim = new T.PointLight(0xff2b2b, 1.1, 14); rim.position.set(-3.2, 3.2, -2.2); scene.add(rim);
+  const glow = new T.PointLight(0xff2b2b, .7, 7); glow.position.set(0, .4, 2.2); scene.add(glow);
+  // framing
+  const sb = new T.Box3().setFromObject(screenMesh), sc = sb.getCenter(new T.Vector3()), ss = sb.getSize(new T.Vector3());
+  screenFit = { c: sc, w: ss.x, h: ss.y };
+  resize(); addEventListener('resize', resize); addEventListener('orientationchange', () => setTimeout(resize, 200));
+  setView('cabinet', true);
+  if (params.has('test')) window.__plDebug = { renderer, scene, camera, view, key, rim, glow, model, api, frame };   // test hook only
+}
+function fitDist(radius_w, radius_h) {   // distance at which a box (half-width, half-height) fits the window
+  const vf = camera.fov * Math.PI / 180, tv = Math.tan(vf / 2), th = tv * camera.aspect;
+  return Math.max(radius_h / tv, radius_w / th);
+}
+function resize() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  cabFit = fitDist(1.45, h < 480 ? 1.9 : 1.72);
+  if (screenFit) { const compact = h < 480; screenFit.dist = fitDist(screenFit.w / 2 * 1.12, screenFit.h / 2 * (compact ? 1.9 : 1.55)); }
+  setView(view.mode, false);
+}
+function setView(mode, snap) {
+  view.mode = mode; const g = view.g;
+  if (mode === 'screen' && screenFit) { g.tx = screenFit.c.x; g.ty = screenFit.c.y; g.tz = screenFit.c.z; g.yaw = 0; g.pitch = 0; g.dist = screenFit.dist; }
+  else { g.tx = 0; g.ty = 1.3; g.tz = 0; g.dist = cabFit; if (snap || view.mode === 'cabinet') { g.yaw = Math.max(-.9, Math.min(.9, g.yaw)); g.pitch = Math.max(-.05, Math.min(.6, g.pitch || .1)); } }
+  if (snap) Object.assign(view, g, { mode });
+  document.body.classList.toggle('vscreen', mode === 'screen');
+  const b = $('viewBtn'); if (b) { b.textContent = mode === 'screen' ? 'Cabinet view' : 'Screen view'; b.setAttribute('aria-pressed', String(mode === 'screen')); }
+}
+function placeCamera() {
+  const v = view, cp = Math.cos(v.pitch);
+  camera.position.set(v.tx + v.dist * Math.sin(v.yaw) * cp, v.ty + v.dist * Math.sin(v.pitch), v.tz + v.dist * Math.cos(v.yaw) * cp);
+  camera.lookAt(v.tx, v.ty, v.tz);
+}
+/* ===== frame loop ===== */
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(.1, (now - lastMech) / 1000); lastMech = now;
+  try { frame.contentWindow.__pxPump && frame.contentWindow.__pxPump(); } catch (_) {}
+  const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+  // camera easing
+  const k = reduce ? 1 : 1 - Math.exp(-dt * 7);
+  for (const key of ['yaw', 'pitch', 'dist', 'tx', 'ty', 'tz']) view[key] += (view.g[key] - view[key]) * k;
+  placeCamera();
+  // mechanics
+  let live = null; try { live = api.mechanics(); } catch (_) {}
+  if (live && live.lever && live.lever.id !== lastLeverId) { lastLeverId = live.lever.id; if (live.lever.elapsed < live.lever.duration) leverPull = { start: now - live.lever.elapsed, duration: live.lever.duration, angle: live.lever.angle }; }
+  const t = now / 1000;
+  if (anim.crest) anim.crest.o.rotation.y = anim.crest.base.y + t * .4;
+  if (anim.recordGroup) anim.recordGroup.o.rotation.z = anim.recordGroup.base.z - t * .25;
+  if (anim.core) anim.core.o.rotation.y = anim.core.base.y + t * .32;
+  if (anim.lever) { const u = leverPull ? Math.max(0, Math.min(1, (now - leverPull.start) / leverPull.duration)) : 1; anim.lever.o.rotation.x = anim.lever.base.x + (leverPull && u < 1 ? Math.sin(u * Math.PI) * leverPull.angle : 0); if (u >= 1) leverPull = null; }
+  if (anim.spinPhysical) anim.spinPhysical.o.position.z = (live && live.spinZ != null) ? live.spinZ : anim.spinPhysical.home.z;
+  if (anim.armPivot) anim.armPivot.o.rotation.z += (((live && live.armZ != null) ? live.armZ : anim.armPivot.base.z) - anim.armPivot.o.rotation.z) * (1 - Math.exp(-dt * 12));
+  const lit = !!(live && live.lamp);
+  for (const l of lamps) { const f = lit ? 1 : .22; if (l.m.color) l.m.color.copy(l.c).multiplyScalar(f); if (l.m.emissiveIntensity != null) l.m.emissiveIntensity = lit ? Math.max(l.ei, 1.2) : l.ei * .15; }
+  // screen texture
+  const rev = api.revision(); if (rev !== lastRev) { lastRev = rev; screenTex.needsUpdate = true; }
+  renderer.render(scene, camera);
+  syncUI(now);
+}
+
+/* ===== picking: same rule as the room (a deck button, or the screen, whichever the ray meets first) ===== */
+const ptr = new Map(); let drag = null, pinch = null;
+function actionOf(obj) {
+  for (let o = obj; o; o = o.parent) { if (o.userData && o.userData.pxMachineAction) return o.userData.pxMachineAction; if (o.name === 'px-lever' || o.name === 'px-spinPhysical') return 'spin'; }
+  return null;
+}
+function leverRect() {   // the lever is thin: give it a generous touch area (its projected box, plus 18 px)
+  const lv = anim.lever && anim.lever.o; if (!lv) return null;
+  const box = new T.Box3().setFromObject(lv), r = $('gl').getBoundingClientRect(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    const v = new T.Vector3(x, y, z).project(camera), sx = r.left + (v.x + 1) / 2 * r.width, sy = r.top + (1 - v.y) / 2 * r.height;
+    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+  }
+  return { x0: x0 - 18, y0: y0 - 18, x1: x1 + 18, y1: y1 + 18 };
+}
+function pick(cx, cy) {
+  const lr = view.mode === 'cabinet' ? leverRect() : null;
+  if (lr && cx >= lr.x0 && cx <= lr.x1 && cy >= lr.y0 && cy <= lr.y1) { api.action('spin'); syncUI(performance.now(), true); return; }
+  const r = $('gl').getBoundingClientRect();
+  raycaster.setFromCamera(new T.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), camera);
+  const hit = raycaster.intersectObject(model, true).find(h => h.object.visible && (h.object.name === 'px-screenMesh' || actionOf(h.object)));
+  if (!hit) return;
+  const a = actionOf(hit.object);
+  if (a) { api.action(a); syncUI(performance.now(), true); }
+  else if (hit.uv) { api.tap(hit.uv.x * 1400, (1 - hit.uv.y) * 960); syncUI(performance.now(), true); }
+}
+function bindPointer() {
+  const c = $('gl');
+  c.addEventListener('pointerdown', e => {
+    c.setPointerCapture(e.pointerId); ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptr.size === 1) drag = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
+    else if (ptr.size === 2) { drag = null; const [a, b] = [...ptr.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), dist: view.g.dist }; }
+  });
+  c.addEventListener('pointermove', e => {
+    if (!ptr.has(e.pointerId)) return; const p = ptr.get(e.pointerId), dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+    if (pinch && ptr.size >= 2) { const [a, b] = [...ptr.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); zoomTo(pinch.dist * pinch.d / Math.max(20, d)); return; }
+    if (!drag) return; drag.moved += Math.abs(dx) + Math.abs(dy);
+    if (drag.moved > 8 && view.mode === 'cabinet') { view.g.yaw = Math.max(-1.3, Math.min(1.3, view.g.yaw - dx * .006)); view.g.pitch = Math.max(-.05, Math.min(.9, view.g.pitch + dy * .005)); }
+  });
+  const up = e => {
+    const had = ptr.has(e.pointerId); ptr.delete(e.pointerId); if (ptr.size < 2) pinch = null;
+    if (had && drag && ptr.size === 0 && e.type === 'pointerup' && drag.moved <= 8 && performance.now() - drag.t < 700) pick(e.clientX, e.clientY);
+    if (ptr.size === 0) drag = null;
+  };
+  c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+  c.addEventListener('wheel', e => { e.preventDefault(); zoomTo(view.g.dist * Math.exp(e.deltaY * .0012)); }, { passive: false });
+}
+function zoomTo(d) { const lo = view.mode === 'screen' ? screenFit.dist * .6 : 2.6, hi = view.mode === 'screen' ? screenFit.dist * 1.6 : 14; view.g.dist = Math.max(lo, Math.min(hi, d)); }
+
+/* ===== the machine's own menus and bonus bar, ported the way the room does it (pack css inside a shadow root) ===== */
+const ported = { modal: '', feature: '' };
+function port(kind, html) {
+  const host = $(kind === 'modal' ? 'pxModal' : 'pxFeature'); host.hidden = !html;
+  if (!html) { ported[kind] = ''; return; }
+  if (ported[kind] === html) return; ported[kind] = html;
+  const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
+  if (!root.pxBound) {
+    root.pxBound = true;
+    root.addEventListener('click', ev => { const b = ev.target.closest('button,a'); if (!b) return; ev.preventDefault(); const tk = b.getAttribute('data-px-source'); if (tk) { api.click(tk); syncUI(performance.now(), true); } });
+    for (const n of ['input', 'change']) root.addEventListener(n, ev => { const i = ev.target, tk = i.getAttribute && i.getAttribute('data-px-source'); if (tk) api.input(tk, i.value, i.checked, n); });
+  }
+  root.innerHTML = '<style>' + pack.css.replaceAll(':root', ':host') + '\n:host{font-family:Arial,sans-serif;color:#f5ebdc}*{box-sizing:border-box}#featureBar{position:relative!important;inset:auto!important;transform:none!important;width:100%!important;max-width:none!important;margin:0!important;border-radius:4px!important;flex-wrap:wrap!important;gap:12px!important}#fbBody{display:flex;flex-wrap:wrap;gap:7px}.fb-head{min-width:160px}dialog[open]{position:relative!important;inset:auto!important;margin:0!important;display:block!important;width:min(680px,94vw)!important;max-height:78dvh!important;overflow:auto!important}dialog::backdrop{display:none}label:has(#setQuality),label:has(#qualitySetting){display:none}</style>' + html;
+  if (kind === 'modal') { const f = root.querySelector('button,input,select'); f && f.focus({ preventScroll: true }); }
+}
+const fmt = v => Number(v || 0).toLocaleString('en-GB', { maximumFractionDigits: 2 });
+let lastUI = 0;
+function syncUI(now, force) {
+  if (!force && now - lastUI < 90) return; lastUI = now;
+  let u; try { u = api.ui(); } catch (_) { return; }
+  const set = (id, v) => { const el = $(id); if (el.textContent !== v) el.textContent = v; };
+  set('bal', fmt(u.balance)); set('bet', fmt(u.bet)); set('win', fmt(u.win)); set('status', u.status || '');
+  $('autoBtn').setAttribute('aria-pressed', String(!!u.auto));
+  document.querySelector('#deck [data-act="spin"] b').textContent = /stop|auto/i.test(u.button || '') ? u.button : 'GO LIVE';
+  document.querySelector('#deck [data-act="betDown"]').disabled = !!u.betDownDisabled; document.querySelector('#deck [data-act="betUp"]').disabled = !!u.betUpDisabled;
+  port('modal', u.modal); port('feature', u.feature);
+}
+
+/* ===== fullscreen: the game owns it; the page only gives the logic frame the whole window when the game says so ===== */
+function setFs(on) {
+  gfs = !!on; document.body.classList.toggle('gfs', gfs); $('fsBtn').textContent = gfs ? 'Exit fullscreen' : 'Fullscreen';
+  try { gfs ? frame.contentWindow.focus() : $('gl').focus({ preventScroll: true }); } catch (_) {}
+}
+addEventListener('message', e => { const d = e.data; if (d && d.type === 'px-fullscreen' && d.machine === NAME && e.source === frame.contentWindow) setFs(d.on); });
+function toggleFs() { try { api.fullscreen.toggle(); } catch (err) { $('status').textContent = 'Fullscreen is not available here.'; } }
+
+/* ===== buttons, keys, hidden Test panel ===== */
+function bindUI() {
+  bindPointer();
+  $('viewBtn').onclick = () => setView(view.mode === 'screen' ? 'cabinet' : 'screen', false);
+  $('fsBtn').onclick = toggleFs;
+  $('bonusBtn').onclick = () => { api.action('bonusTest'); syncUI(performance.now(), true); };
+  document.querySelectorAll('#deck [data-act]').forEach(b => b.onclick = () => { api.action(b.dataset.act); syncUI(performance.now(), true); });
+  $('pxModal').addEventListener('click', e => { if (e.target === $('pxModal')) { api.closeModal(); syncUI(performance.now(), true); } });
+  const dock = $('test');
+  const showTest = on => { dock.hidden = !on; if (on) try { frame.contentWindow.__PL_TEST__ = true; } catch (_) {} };
+  if (params.has('test')) showTest(true);
+  let taps = 0, tt = 0; $('ttl').addEventListener('click', () => { const n = performance.now(); taps = n - tt < 600 ? taps + 1 : 1; tt = n; if (taps >= 3) { taps = 0; showTest(dock.hidden); } });
+  dock.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.hide) { showTest(false); return; }
+    if (b.dataset.force) { const ok = frame.contentWindow.PlebsLegends && frame.contentWindow.PlebsLegends.test.force(b.dataset.force); $('status').textContent = ok ? '' : 'Finish the current round first.'; }
+    else if (b.dataset.act) { api.action(b.dataset.act); }
+    else if (b.dataset.bank) { const A = window.ParallaxLAYRAccount, v = b.dataset.bank; A.saveRoom({ bank: v === 'reset' ? 1000000 : v === 'empty' ? 20 : Math.round((A.balance() + Number(v)) * 100) / 100 }); }
+    syncUI(performance.now(), true);
+  });
+  addEventListener('keydown', e => {
+    if (e.target.closest && e.target.closest('input,textarea,select')) return;
+    if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); toggleFs(); return; }
+    if (e.code === 'KeyV') { setView(view.mode === 'screen' ? 'cabinet' : 'screen', false); return; }
+    if (e.code === 'KeyT' && !e.ctrlKey && !e.metaKey) { showTest(dock.hidden); return; }
+    if (e.code === 'Escape') { if (gfs) { api.fullscreen.exit(); return; } if ($('pxModal').hidden === false) { api.closeModal(); syncUI(performance.now(), true); } return; }
+    if (e.target === document.body || e.target === $('gl')) { if (e.code === 'Space') e.preventDefault(); api.key(e.code, e.key); }
+  });
+}
+
+start().catch(err => { console.error(err); say(String(err && err.message || err), true); });
+})();
+</script>
+</body>
+</html>

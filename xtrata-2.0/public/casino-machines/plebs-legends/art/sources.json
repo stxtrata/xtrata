@@ -1,0 +1,733 @@
+{
+ "generated": "2026-11-01",
+ "note": "Every picture on the reels is real material: twins inscribed on Bitcoin via Xtrata, or type-set from verified Bitcoin facts. Nothing is hand-drawn or imitated.",
+ "twins": [
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 2057,
+   "xtrataId": "2708",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2708",
+   "sha256": "c43ee0443f867710a82a72cce2b9942eb0486e7675ea12b339cb820d36ccddc1",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 1897,
+   "xtrataId": "2584",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2584",
+   "sha256": "9ea75a2d2bcb29f879341acc76ce55e2c4dccb538bd3b9bab2cd0530fb3edce5",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 2050,
+   "xtrataId": "2701",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2701",
+   "sha256": "e2ce842475f489ccb7ff8e6dbe68c929a6d5513afe28efff2c88cfd5f09fecc8",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 1903,
+   "xtrataId": "2590",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2590",
+   "sha256": "f1d9bb978775469aa72fbbd59aecd0d7f097646e6758ab5d3b99c59b6069de16",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 2037,
+   "xtrataId": "2688",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2688",
+   "sha256": "acea06dcc32828959fa3ad7d4a56f2bfe09f6d71bb9de86d77ba2aee3904cbce",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 1999,
+   "xtrataId": "2653",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2653",
+   "sha256": "cc4329a38e944c026146a7105813ed10b1b78783983f890da33e08409563a1a1",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 2084,
+   "xtrataId": "2735",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2735",
+   "sha256": "c07de5c2d0276ea452c6d224ab9447b17f1891f04faaf6d12b6a53b39dd64bd1",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 2043,
+   "xtrataId": "2694",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2694",
+   "sha256": "6320b871cb93fcbacbe06d72556c75ce74e4ba756693ef0b944f09c056143347",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 2021,
+   "xtrataId": "2673",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2673",
+   "sha256": "f86da4b38b787043dd9598618437bb5430ddcf82bd5523a82c39469333b061df",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 1937,
+   "xtrataId": "2619",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2619",
+   "sha256": "2c94f42b64925bfe92fae206cfe636661b9ae826e7d30dd52b999abef78bf696",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 2078,
+   "xtrataId": "2729",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2729",
+   "sha256": "47a8a30f5e25a2a2689b1ee58d56fab566a64aaa6291aeca0ed23be08b6f7ef7",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 1889,
+   "xtrataId": "2576",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2576",
+   "sha256": "7bdbc2a99635dda7165de210dd174c4b611188ebe23bee52335d12b626d017fd",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 2072,
+   "xtrataId": "2723",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2723",
+   "sha256": "659219e77b9ecd7dee9cf81815e477626ef6018853cd997652fcb8611542c877",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "bitcoin-pepes",
+   "seat": 5,
+   "symbol": "cherry",
+   "tokenId": 2013,
+   "xtrataId": "2666",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/2666",
+   "sha256": "b27a4e435c9f8619e090ca240d8462e9febdafd36209b991d101b1c1106be281",
+   "format": "PNG",
+   "originalSize": [
+    760,
+    760
+   ],
+   "bundle": "native 38px pixel art (inscribed at 20x), lossless"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 2444,
+   "xtrataId": "1004",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1004",
+   "sha256": "d6f54a91fe79019945808ed32257e04283000d604ac5d83d602c80c150c6c33a",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 3909,
+   "xtrataId": "961",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/961",
+   "sha256": "0e5abc71916ad8c9d869049eb805ad464675ce02973ff9312da4a3199b416237",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 8001,
+   "xtrataId": "951",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/951",
+   "sha256": "d6ade96dfb503722f63922f852923b4a5eff364d1db8ae345215f71aa1aab7ff",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 2098,
+   "xtrataId": "1042",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1042",
+   "sha256": "a3e008bf83fb7acd1e29eb9abdd64e5a1d4bc356d5b7a65abc2713ae2208d7b3",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 3986,
+   "xtrataId": "962",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/962",
+   "sha256": "5cab80e7412edc453d42fbcddafef9e01e4f45a00a12bcd39c4f78c62189450c",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 2787,
+   "xtrataId": "1019",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1019",
+   "sha256": "e70c2467ad139e8318dfcd7fab65bb63fe2d4062dd072cfc5b30c1fd909775c9",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 9999,
+   "xtrataId": "1013",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1013",
+   "sha256": "8f4ccbbe19db2798c3f63c9b04a05556b8aa14a55f1ebdfc52ac19b7d811f6bd",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 1288,
+   "xtrataId": "1036",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1036",
+   "sha256": "0047bc7a2ec6bcef22b63aa9d8abaece45f1c0ee9874c4123bb8d271ad4f646d",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 4386,
+   "xtrataId": "1041",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1041",
+   "sha256": "529389af0878c962b55a9d0a6666442e3d75750c9c222048260eb932f04b5435",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 5314,
+   "xtrataId": "970",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/970",
+   "sha256": "455354b9f4817d8db1aa41aaf7144d4f9c188307c2454aeb56fd5877c503c593",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 1747,
+   "xtrataId": "948",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/948",
+   "sha256": "3fe8c65f9b1810ca0d87f15dd5468fb960236c23a5804bca8d9b4179dce8e471",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "leo-cats",
+   "seat": 4,
+   "symbol": "lemon",
+   "tokenId": 4867,
+   "xtrataId": "1024",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1024",
+   "sha256": "b3c1e2651e2c1089115417cce150643cc72f8816b273cd74d9d790492f15fb9d",
+   "format": "PNG",
+   "originalSize": [
+    750,
+    800
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "miami-degens",
+   "seat": 3,
+   "symbol": "chip",
+   "tokenId": 406,
+   "xtrataId": "1047",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/1047",
+   "sha256": "a00299a43178059ffdeec1bccb7452ac31b1a1bda2499056cb5bb518f74aaa83",
+   "format": "PNG",
+   "originalSize": [
+    512,
+    512
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "nyc-degens",
+   "seat": 3,
+   "symbol": "chip",
+   "tokenId": 174,
+   "xtrataId": "3098",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3098",
+   "sha256": "71d57e9558dc1a4ed6df6cf43e86b159a7487069a46150a0267ed9a51b53cd1a",
+   "format": "PNG",
+   "originalSize": [
+    512,
+    512
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "nyc-degens",
+   "seat": 3,
+   "symbol": "chip",
+   "tokenId": 1,
+   "xtrataId": "3095",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3095",
+   "sha256": "08ffd6c382031397da01f0f2c4537e9f77cc5dbff1c59f49f28d0cd420e245e5",
+   "format": "PNG",
+   "originalSize": [
+    512,
+    512
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "megapont-ape-club",
+   "seat": 1,
+   "symbol": "artifact",
+   "tokenId": 3,
+   "xtrataId": "3104",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3104",
+   "sha256": "096a5c2678c20f98a6accda9069edc448a0571e8970c7d50ac312e8b058225ea",
+   "format": "PNG",
+   "originalSize": [
+    400,
+    400
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "megapont-ape-club",
+   "seat": 1,
+   "symbol": "artifact",
+   "tokenId": 1,
+   "xtrataId": "3106",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3106",
+   "sha256": "8f44868964fe6fecbbe6a3df3f38422ea02912137a141e8af0c4292b90e77d33",
+   "format": "PNG",
+   "originalSize": [
+    400,
+    400
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "megapont-ape-club",
+   "seat": 1,
+   "symbol": "artifact",
+   "tokenId": 5,
+   "xtrataId": "3108",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3108",
+   "sha256": "ba8826ed36d920b8189b60b4217165965db9d5884e83244f12c0781624a724bf",
+   "format": "PNG",
+   "originalSize": [
+    400,
+    400
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "megapont-ape-club",
+   "seat": 1,
+   "symbol": "artifact",
+   "tokenId": 871,
+   "xtrataId": "3544",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3544",
+   "sha256": "f61373569b632def21082438fd130546c22f870b1d33ee1cb14022c972b3bb13",
+   "format": "PNG",
+   "originalSize": [
+    400,
+    400
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "megapont-ape-club",
+   "seat": 1,
+   "symbol": "artifact",
+   "tokenId": 2,
+   "xtrataId": "3105",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3105",
+   "sha256": "5f176058f6735dfd7f0b3d7338d047524535988fa700a05bfb38de5e3c8bccd1",
+   "format": "PNG",
+   "originalSize": [
+    400,
+    400
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "megapont-ape-club",
+   "seat": 1,
+   "symbol": "artifact",
+   "tokenId": 4,
+   "xtrataId": "3107",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3107",
+   "sha256": "75bdaabdebc60f83aa9abbaca13eeadbc2ba3d7188ff49fc4f49ee0cb6442a8c",
+   "format": "PNG",
+   "originalSize": [
+    400,
+    400
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL"
+  },
+  {
+   "collection": "bitcoin-monkeys",
+   "seat": 2,
+   "symbol": "block",
+   "tokenId": 1296,
+   "xtrataId": "3117",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3117",
+   "sha256": "3e424d3dcb2265e85f43db0eefc6f25cd1e0a421190d83237fc1793e55208daa",
+   "format": "PNG",
+   "originalSize": [
+    1794,
+    1794
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "bitcoin-monkeys",
+   "seat": 2,
+   "symbol": "block",
+   "tokenId": 378,
+   "xtrataId": "3118",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3118",
+   "sha256": "0ebae0d332d00c85b563e9f90f797e7c6400eb534b0aef080cdf5853b19d4bb1",
+   "format": "PNG",
+   "originalSize": [
+    1794,
+    1794
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "bitcoin-monkeys",
+   "seat": 2,
+   "symbol": "block",
+   "tokenId": 2,
+   "xtrataId": "3113",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3113",
+   "sha256": "ea1e908c19aba411b883741ab37973a9636cde05356c7b8cde39c12ae0dc6358",
+   "format": "PNG",
+   "originalSize": [
+    1794,
+    1794
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "bitcoin-monkeys",
+   "seat": 2,
+   "symbol": "block",
+   "tokenId": 1012,
+   "xtrataId": "3114",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3114",
+   "sha256": "55e7407cff1245ea047b34386454248b1effb9dfd2c34e93e09a25a3793f9892",
+   "format": "PNG",
+   "originalSize": [
+    1794,
+    1794
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "bitcoin-monkeys",
+   "seat": 2,
+   "symbol": "block",
+   "tokenId": 1295,
+   "xtrataId": "3116",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3116",
+   "sha256": "d211a9664f6063cc8694f97cdf99eca2918e769bd93d96fea061c2c9c83ab47b",
+   "format": "PNG",
+   "originalSize": [
+    1794,
+    1794
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  },
+  {
+   "collection": "bitcoin-monkeys",
+   "seat": 2,
+   "symbol": "block",
+   "tokenId": 1282,
+   "xtrataId": "3115",
+   "url": "https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3115",
+   "sha256": "be6d979aa40de9ddedd0020d4bd1dd0604670a864db54df3c889534af5925036",
+   "format": "PNG",
+   "originalSize": [
+    1794,
+    1794
+   ],
+   "bundle": "downscaled to 256px max for the bundle; original is at the inscription URL; palette-reduced"
+  }
+ ],
+ "collections": {
+  "bitcoin-pepes": {
+   "helperContract": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
+   "inscribedCountAtBuild": 2089,
+   "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json"
+  },
+  "leo-cats": {
+   "helperContract": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata",
+   "inscribedCountAtBuild": 101,
+   "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json"
+  },
+  "miami-degens": {
+   "helperContract": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata",
+   "inscribedCountAtBuild": 1,
+   "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json"
+  },
+  "nyc-degens": {
+   "helperContract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens",
+   "inscribedCountAtBuild": 2,
+   "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json"
+  },
+  "megapont-ape-club": {
+   "helperContract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-megapont-ape-club",
+   "inscribedCountAtBuild": 6,
+   "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json"
+  },
+  "bitcoin-monkeys": {
+   "helperContract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys",
+   "inscribedCountAtBuild": 6,
+   "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json"
+  }
+ },
+ "core": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+ "untwinned": {
+  "status": "mechanism built, no bundled images",
+  "why": "Untwinned originals sit on IPFS, which the build environment could not reach. The game loads up to two per manifest collection at runtime, desaturated with a NOT YET FOREVER stamp, and skips them if the gateway is unreachable."
+ },
+ "bitcoin": {
+  "genesisBlock": {
+   "hash": "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+   "coinbaseTx": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+   "headline": "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks",
+   "timeUnix": 1231006505,
+   "timeUtc": "2009-01-03 18:15:05",
+   "verifiedVia": "mempool.space block + coinbase scriptsig (hex decoded)"
+  },
+  "pizzaDay": {
+   "tx": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+   "block": 57043,
+   "blockHash": "00000000152340ca42227603908689183edc47355204e7aca59383b0aaac1fd8",
+   "timeUnix": 1274552191,
+   "date": "22 May 2010",
+   "verifiedVia": "mempool.space"
+  },
+  "whitepaper": {
+   "title": "Bitcoin: A Peer-to-Peer Electronic Cash System",
+   "author": "Satoshi Nakamoto",
+   "date": "31 Oct 2008",
+   "verifiedVia": "NOT fetched; written from knowledge. Please check."
+  },
+  "recentBlocks": [
+   {
+    "height": 974142,
+    "hash": "00000000000000000001dba35b0fb03f5d58e0b40e4f09b774ff2987f6cf1f1b"
+   },
+   {
+    "height": 974140,
+    "hash": "00000000000000000001c2b26dc57808ef7fa5fd009f7822ca1a8b7d90f9e1f5"
+   },
+   {
+    "height": 974139,
+    "hash": "000000000000000000004a0fe6e115c1dd2efbe70140f19d8feaaf51682ad4d9"
+   },
+   {
+    "height": 974137,
+    "hash": "00000000000000000001b3e85f6c5affaf44096385da969cf8a618f598b46ca8"
+   },
+   {
+    "height": 974135,
+    "hash": "000000000000000000015f6318d2a1252e9c07e7edaf574c1bf2cb1929883161"
+   },
+   {
+    "height": 974134,
+    "hash": "000000000000000000006608e30a841e01ab0e22cf40f9d7e57c845e4b4d79e9"
+   },
+   {
+    "height": 974132,
+    "hash": "000000000000000000011b6a803e1243afabd67c081262f6c1d6d4a8afadd4c6"
+   },
+   {
+    "height": 974130,
+    "hash": "00000000000000000001d3171c11d11e3e615c9a544016a61e136cecce6ae02a"
+   },
+   {
+    "height": 974129,
+    "hash": "00000000000000000000bd890814afe21e20fc30fd063ec8d27c8466b22fd90a"
+   },
+   {
+    "height": 974127,
+    "hash": "0000000000000000000111295015a097997b88c60c12bf278350ce09eb07f356"
+   },
+   {
+    "height": 974125,
+    "hash": "0000000000000000000026ccb86655669c77d08fa5bf74fe0e83043deafdb773"
+   },
+   {
+    "height": 974124,
+    "hash": "00000000000000000000f588af58f9181600f5c2d1a4c2e26e024f5d98e58a95"
+   }
+  ],
+  "recentBlocksVia": "https://xtrata.xyz/hiro/mainnet/extended/v2/burn-blocks (burn_block_hash)"
+ }
+}

@@ -1,0 +1,4 @@
+{
+ "comment": "Opt-in seats. Entry shape: {handle, address, signature, pfp}. Ships with none seated. A seated pleb appears on the Wall of Plebs, as the Laser Eyes wild, and on Signed tiles with their consent signature.",
+ "seats": []
+}
