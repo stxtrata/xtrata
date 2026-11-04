@@ -505,7 +505,21 @@ const CSS = `
 #pxroom-panel .here .at{color:var(--dim,#b7a587);font-size:12px;white-space:nowrap}
 #pxroom-panel .here .away .nm,#pxroom-panel .here .away .at{color:#8a8f98;font-style:italic}
 #pxroom-panel{position:fixed;top:max(64px,calc(env(safe-area-inset-top) + 54px));right:10px;width:min(320px,calc(100vw - 20px));z-index:40;box-sizing:border-box;padding:14px 16px;border-radius:12px;background:rgba(12,9,14,.98);backdrop-filter:blur(6px);color:var(--ink,#f6ead0);border:1px solid var(--gold,#e3b84a);box-shadow:0 10px 40px rgba(0,0,0,.55);font-size:13px;line-height:1.45;pointer-events:auto}
+#pxroom-panel{overflow-y:auto;overscroll-behavior:contain}
 #pxroom-panel[hidden]{display:none}
+#pxroom-panel .top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 2px}
+#pxroom-panel .top h3{margin:0}
+#pxroom-panel button.x{flex:none;width:28px;height:28px;padding:0;border-radius:50%;font-size:18px;line-height:1;background:transparent;border-color:rgba(227,184,74,.4)}
+#pxroom-panel .who{font-size:16px;margin:0 0 2px}
+#pxroom-panel p.sub{font-size:12px;margin:0 0 12px}
+#pxroom-panel h3:not(:first-child){margin-top:4px}
+#pxroom-panel details.fold{margin:0 0 8px;border:1px solid rgba(227,184,74,.22);border-radius:8px;padding:0 10px}
+#pxroom-panel details.fold summary{cursor:pointer;padding:9px 0;color:var(--ink,#f6ead0);font-weight:600;list-style:none;display:flex;justify-content:space-between}
+#pxroom-panel details.fold summary::-webkit-details-marker{display:none}
+#pxroom-panel details.fold summary:after{content:'+';color:var(--gold,#e3b84a);font-weight:400}
+#pxroom-panel details.fold[open] summary:after{content:'–'}
+#pxroom-panel details.fold[open]{padding-bottom:4px}
+#pxroom-panel .foot{position:sticky;bottom:-14px;display:flex;gap:8px;margin:10px -16px -14px;padding:10px 16px 14px;background:rgba(12,9,14,.98);border-top:1px solid rgba(227,184,74,.2)}
 #pxroom-panel h3{margin:0 0 6px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold,#e3b84a);font-weight:700}
 #pxroom-panel p{margin:0 0 10px;color:var(--dim,#b7a587)}
 #pxroom-panel .row{display:flex;gap:8px;flex-wrap:wrap}
@@ -619,8 +633,10 @@ function buildUi() {
 function placePanel() {
   if (!btn || !panel) return;
   const r = btn.getBoundingClientRect();
-  const top = r.height ? Math.round(r.bottom + 8) : 64;
-  panel.style.top = `${Math.min(top, Math.max(64, window.innerHeight - 220))}px`;
+  const below = r.height ? Math.round(r.bottom + 8) : 64;
+  const at = Math.min(below, Math.max(64, window.innerHeight - 220));
+  panel.style.top = `${at}px`;
+  panel.style.maxHeight = `${Math.max(200, window.innerHeight - at - 12)}px`;     // scrolls inside rather than running off the screen
 }
 
 /** Tells the page whether the visitor is visible in the room (signed in) and as which address: personal space and their own look. */
@@ -814,6 +830,38 @@ function paintIntro() {
   slot.replaceChildren(...parts);
 }
 
+/** The panel's heading with a close button (a tap outside or Escape also closes it). */
+const top = (title: string) => {
+  const h = el('div', undefined, 'top');
+  const x = el('button', '×', 'x'); x.type = 'button'; x.setAttribute('aria-label', 'Close');
+  x.onclick = () => { S.open = false; paint(); };
+  h.append(el('h3', title), x);
+  return h;
+};
+/** A section that opens on a tap; it stays open or closed across repaints. */
+const openFolds = new Set<string>();
+const fold = (key: string, title: string, body: HTMLElement[]) => {
+  const d = el('details', undefined, 'fold');
+  d.open = openFolds.has(key);
+  d.append(el('summary', title), ...body);
+  d.addEventListener('toggle', () => { if (d.open) openFolds.add(key); else openFolds.delete(key); });
+  return d;
+};
+/** The panel's last row, kept in view at the bottom while the rest scrolls. */
+const foot = (...buttons: HTMLElement[]) => { const f = el('div', undefined, 'foot'); f.append(...buttons); return f; };
+/** What the room does, one short line each. */
+const howItWorks = (signed: boolean) => {
+  const list = [
+    fact('Be seen', signed ? 'Sit at a table or a machine and everyone sees your Adrian and name there.' : 'Signed in, sit at a table or a machine and everyone sees your Adrian and name there. Watching shows you to nobody.'),
+    fact('Seats', 'One person per seat or machine. If yours is taken you get a free one at the same table.'),
+    fact('Chat', 'Talk to the room, or tap a name to message, block or report someone. Not secret; cleared when you leave.')
+  ];
+  if (S.features.includes('rounds')) list.push(fact('Play together', 'Roulette, baccarat and Sic Bo deal one shared round for everyone at the table. In the Salon you can play another player.'));
+  if (S.features.includes('react')) list.push(fact('React', '😊 for reactions, drinks and invites. Sign in each day for a free LAYR drop.'));
+  list.push(el('p', 'Nothing here moves any money.', 'fact'));
+  return list;
+};
+
 function paint() {
   tellSelf();
   tellSalon();
@@ -840,37 +888,24 @@ function paint() {
     const b = el('button', 'Use this tab instead'); b.onclick = () => { reconnect(); paint(); };
     parts.push(b);
   } else if (signed) {
-    parts.push(el('h3', 'Connected as'), el('p', me!, 'who'));
-    const via: Record<string, string> = { leather: 'Leather', xverse: 'Xverse', casino: 'your casino wallet' };
-    parts.push(el('p', (S.wallet ? `With ${via[S.wallet.kind] || S.wallet.kind}. ` : '') + 'Others see this name on your tag.', 'fact'));
+    // Who you are and Leave the room first; the details fold away (Jim, 2026-11-03: the panel was taller than the screen).
+    parts.push(top('Connected as'), el('p', me!, 'who'));
+    const via: Record<string, string> = { leather: 'Leather', xverse: 'Xverse', casino: 'Casino wallet' };
+    parts.push(el('p', (S.wallet ? `${via[S.wallet.kind] || S.wallet.kind} · ` : '') + 'others see this name on your tag', 'sub'));
     if (S.away) {
-      parts.push(el('p', 'You are marked away (idle for a while), so you were stood up. Do anything to come back.', 'err'));
+      parts.push(el('p', 'You are marked away (idle), so you were stood up.', 'err'));
       const back = el('button', "I'm back"); back.onclick = () => active(); parts.push(back);
     }
-    parts.push(el('p', 'Your address (tap Copy to share it, say for someone to send you a BNS name):'), addressBlock(S.signed!.address, mainnetOf));
     hereNow(parts);
-    parts.push(fact('Be seen', 'Sit at a table or connect to a machine and your Adrian and name tag appear there for everyone in the room. Stand up or walk away and they go too.'));
-    parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
-    parts.push(fact('Live chat', 'Press Chat to talk to the room and scroll back through this session. Tap a name, or Here now, to send someone a direct message, block or report them. Messages are not secret; this session\'s chat is kept in this tab only and cleared when you leave the room.'));
-    if (S.features.includes('rounds')) parts.push(fact('Play together', 'Roulette and baccarat are shared tables: everyone there plays the same spin or hand, dealt by the room on a timer and checked by your own browser. In the Strata Salon you can take on another player instead of the house bot.'));
-    if (S.features.includes('react')) parts.push(fact('React', 'Press 😊 to react, buy your table a round, send someone a drink or invite a friend. Table chat (the Table button in Chat) reaches only the people at your table. Sign in each day for a free daily drop of LAYR.'));
-    parts.push(el('p', 'Nothing here moves any money.', 'fact'));
-    const b = el('button', 'Leave the room'); b.onclick = () => { void leave(); };
-    parts.push(b);
+    parts.push(fold('addr', 'Your address', [el('p', 'To share, or for someone to send you a BNS name.', 'fact'), addressBlock(S.signed!.address, mainnetOf)]));
+    parts.push(fold('how', 'How the room works', howItWorks(true)));
+    const leaveBtn = el('button', 'Leave the room'); leaveBtn.onclick = () => { void leave(); };
+    parts.push(foot(leaveBtn));
   } else {
-    parts.push(el('h3', 'Join the room'));
-    parts.push(el('p', !S.connected
-      ? 'Connecting to the room…'
-      : S.watch
-        ? `You are watching: ${S.joined} signed in, ${S.guests} watching.`
-        : `${S.joined} ${S.joined === 1 ? 'person is' : 'people are'} in the room. Sign in to join them.`));
-    parts.push(fact('Be seen', S.watch
-      ? 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Watching alone shows you to nobody.'
-      : 'Join, then sit at a table or connect to a machine. Everyone in the room sees your Adrian there, with a name tag (your BNS name, or a short version of your address). Until you join you are invisible, and the room is hidden from you; the casino still plays as normal.'));
-    if (S.connected && S.watch) hereNow(parts);
-    parts.push(fact('Spaces', 'Each seat and machine holds one person. If someone already has the seat you choose, you are given a free one at the same table.'));
-    parts.push(fact('Live chat', 'Signed-in players can chat with the room and send each other direct messages. Messages are not secret and are not saved.'));
-    parts.push(fact('Free', 'One signature. It sends no transaction, costs no fee and gives no permission to spend anything.'));
+    parts.push(top('Join the room'));
+    parts.push(el('p', !S.connected ? 'Connecting to the room…'
+      : S.watch ? `${S.joined} signed in · ${S.guests} watching. Sign in to be seen, chat and play together.`
+        : `${S.joined} ${S.joined === 1 ? 'person is' : 'people are'} in the room. Sign in to join them.`, 'sub'));
     const row = el('div', undefined, 'row');
     const ui = casinoWalletUi();
     const names: Record<WalletKind, string> = { leather: 'Leather', xverse: 'Xverse', casino: ui ? ui.describe().label : 'Casino wallet' };
@@ -883,11 +918,18 @@ function paint() {
       if (S.busy) break;
     }
     parts.push(row);
-    if (ui && !ui.describe().has) parts.push(el('p', 'Casino wallet: use your casino passkey from any of your devices, or make one free with Face ID or your fingerprint (500 free testnet STX and your first 1,000,000 LAYR).', 'fact'));
+    parts.push(el('p', 'One free signature: no transaction, no fee, no permission to spend.', 'fact'));
+    if (ui && !ui.describe().has) parts.push(el('p', 'Casino wallet: made free with Face ID or your fingerprint, with 500 testnet STX and your first 1,000,000 LAYR.', 'fact'));
     if (S.error) parts.push(el('p', S.error, 'err'));
-    if (!S.busy) { const later = el('button', 'Not now'); later.onclick = () => { S.open = false; paint(); }; parts.push(later); }
+    if (S.connected && S.watch) hereNow(parts);
+    parts.push(fold('how', 'How the room works', howItWorks(false)));
+    if (!S.busy) { const later = el('button', 'Not now'); later.onclick = () => { S.open = false; paint(); }; parts.push(foot(later)); }
   }
+  // Keep the reader's place: the panel is rebuilt whenever the room changes.
+  const keep = panel.scrollTop, keepList = panel.querySelector('.here')?.scrollTop ?? 0;
   panel.replaceChildren(...parts);
+  panel.scrollTop = keep;
+  const list = panel.querySelector('.here'); if (list) list.scrollTop = keepList;
 }
 
 // ------------------------------------------------------------------ start
