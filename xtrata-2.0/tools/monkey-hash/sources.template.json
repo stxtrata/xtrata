@@ -1,0 +1,45 @@
+{
+ "machine": "monkey-hash",
+ "rule": "Every symbol on the reels is real Bitcoin or Stacks material. Nothing is drawn or imitated by hand. A Bitcoin Monkey with no Forever Twins twin is shown desaturated with a NOT YET FOREVER stamp.",
+ "collection": {
+  "name": "Bitcoin Monkeys",
+  "contract": "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys",
+  "lastTokenId": 2500,
+  "note": "2,500 monkeys. Ids with no metadata from the metadata API are not in any tier (shown as stone-frame records when they appear)."
+ },
+ "tiers": {
+  "method": "Rarity score = sum over a monkey's (trait type, value) of ln(N / frequency), N = monkeys with metadata. The rarest 5% wear the gold frame (jackpot symbol, engine slot bitcoin); the rest wear the stone frame (engine slot artifact).",
+  "metadataSource": "https://xtrata.xyz/hiro/mainnet/metadata/v1/nft/<contract>/<id> (a pass-through of the Hiro metadata API), read 2026-11-02",
+  "imageSource": "IPFS QmYCnfeseno5cLpC75rmy6LQhsNYQCJabiuwqNUXMaA3Fo/<id>.png (one folder holds every monkey), through the Gamma resizing CDN https://images.gamma.io/cdn-cgi/image/width=160,height=160,format=webp/https://stxnft.mypinata.cloud/ipfs/<cid>/<id>.png, with public IPFS gateways as fallbacks"
+ },
+ "symbols": [
+  { "slot": "cherry", "is": "BANANA token", "source": "Token logo: see logos below. Until the logo file is supplied the tile shows the name BANANA set in type." },
+  { "slot": "lemon", "is": "Serum MM1", "source": "Collection bitcoin-monkeys-labs (SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys-labs), token ids 1 to 3500, art folder QmaELQUAgrcjvokrKmH6ns5QvbipfWGNEWPV57GbSS3N34" },
+  { "slot": "chip", "is": "Serum, second batch (the brief calls it MM3; on chain the second batch is MM2)", "source": "Same contract, token ids 3501 to 5000, art folder Qmd5b6m7N9FQatcLBipDXd1b2E2tBwTY7z9fWBirry4KSJ. The tile reads SERUM MM2 because that is what the chain says." },
+  { "slot": "block", "is": "Mutant Monkey", "source": "Contract SP125J1ADVYWGWB9NQRCVGKYAG73R17ZNMV17XEJ7.mutant-monkeys (5,000 max), from the series contracts sheet and confirmed live on Hiro. Hiro holds only a token_uri for it (an off-chain metadata host), so the picture is loaded best-effort by fetch_art.py and by the browser; until a picture resolves the tile shows MUTANT set in type." },
+  { "slot": "artifact", "is": "Bitcoin Monkey, stone frame", "source": "Original monkeys' own pictures; twinned monkeys show their Xtrata inscription (https://xtrata.xyz/i/<xtrata id>)" },
+  { "slot": "bitcoin", "is": "Bitcoin Monkey, gold frame (rarest 5%)", "source": "As above" },
+  { "slot": "wild", "is": "Idol Monkey", "source": "A twinned monkey in a gold-leaf idol frame drawn by the machine (frame only; the monkey is the real inscription)" },
+  { "slot": "scatter", "is": "Bitcoin Monkeys logo", "source": "See logos below" },
+  { "slot": "vault", "is": "Monkey Store", "source": "See logos below" },
+  { "slot": "chain", "is": "Forever vine", "source": "A twinned monkey and its Xtrata inscription id, read from the Forever Twins helper" }
+ ],
+ "logos": [
+  { "symbol": "cherry (BANANA)", "name": "BANANA token logo", "file": null, "source": "Not found. The token has no image in its metadata and no official logo file could be located. Nothing was drawn or traced.", "usedAs": "Typed tile: the name BANANA set on a gold tile.", "permission": "NEEDED: the official logo file and the project's OK. Drop it at tools/monkey-hash/art/logos/banana.svg (or .png/.webp) and rebuild." },
+  { "symbol": "scatter (Jungle Drums)", "name": "Bitcoin Monkeys logo", "file": null, "source": "Not found from the tools available.", "usedAs": "Typed tile: the name BITCOIN MONKEYS.", "permission": "NEEDED: the official logo file and the creators' OK. Drop it at tools/monkey-hash/art/logos/bitcoin-monkeys.svg and rebuild." },
+  { "symbol": "vault (Monkey Store)", "name": "Monkey Store logo", "file": null, "source": "Not found from the tools available.", "usedAs": "Typed tile: the name MONKEY STORE.", "permission": "NEEDED: the official logo file and the project's OK. Drop it at tools/monkey-hash/art/logos/monkey-store.svg and rebuild." }
+ ],
+ "brandAssets": [
+  { "name": "Xtrata mark", "file": "model/assets/xtrata.svg (series bible, Brand assets)", "usedAs": "Lower door of the cabinet, the souvenir ticket and the Forever vine. Used exactly as given.", "permission": "Own brand" },
+  { "name": "ParallaX Casino wordmark", "file": "model/assets/parallax.svg (series bible, Brand assets)", "usedAs": "Marquee foot. Used exactly as given, smaller than the machine name.", "permission": "Own brand" }
+ ],
+ "onChainRecords": [
+  { "symbol": "chain (Forever Vines)", "what": "A Bitcoin Monkey's Xtrata inscription id once twinned, otherwise its token number", "source": "Read live from the Forever Twins registry (https://xtrata.xyz/forever-twins/data/registry.v2.json) and the collection's helper contract SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys" }
+ ],
+ "twins": { "found": 6, "note": "At build time six monkeys had a Forever Twin: #2 (xtrata 3113), #378 (3118), #1012 (3114), #1282 (3115), #1295 (3116), #1296 (3117). Their pictures are saved from https://xtrata.xyz/i/<id> and bundled." },
+ "live": {
+  "registry": "https://xtrata.xyz/forever-twins/data/registry.v2.json",
+  "cache": "6 hours, localStorage key xtrata.monkeyhash.twins",
+  "failedRead": "A failed or empty read is shown as unknown, never as no twins."
+ }
+}

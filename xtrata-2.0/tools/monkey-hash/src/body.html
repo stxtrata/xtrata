@@ -1,0 +1,35 @@
+<div id="stage"><canvas id="view" width="1400" height="960" aria-label="Monkey Hash game screen. Tap the glowing buttons on the screen, or use the control bar."></canvas><div class="side-meters" aria-hidden="true"><span>SPINS <b id="spins">0</b></span><span>PLAYED <b id="wagered">0</b></span><span>PAID <b id="paidOut">0</b></span><span>BLOCK REWARD <b id="meterSide">0</b></span><span>HOLDER POT <b id="potSide">0</b></span></div><p id="statusLine"><span id="status" role="status" aria-live="polite">WELCOME TO THE TEMPLE</span> · <span id="liveSrc">CONNECTING TO XTRATA…</span> · <span id="twinsSmall"></span></p></div>
+<div id="fsbar" role="toolbar" aria-label="Monkey Hash controls">
+<section id="featureBar" hidden aria-live="polite" aria-label="Bonus feature"><div class="fb-head"><span class="eyebrow" id="fbTag">FEATURE</span><strong id="fbTitle"></strong><span id="fbInfo"></span></div><div id="fbBody"></div></section>
+<div class="row main">
+<div class="read"><label>LAYR BALANCE</label><strong id="balance">0</strong></div>
+<div class="read"><label>TOTAL BET</label><div class="stepper"><button id="minus" class="deck" aria-label="Decrease bet"><b>−BANANAS</b><i>lower the bet</i></button><strong id="bet">100</strong><button id="plus" class="deck" aria-label="Increase bet"><b>+BANANAS</b><i>raise the bet</i></button></div></div>
+<div class="read win"><label id="winLabel">LAST WIN</label><strong id="lastWin">0</strong><small id="freeCount">LAYR</small></div>
+<button id="maxBet" class="deck"><b>MAX BET</b><i>highest bet</i></button>
+<button id="auto" class="deck" aria-pressed="false"><b>AUTO-SWING</b><i>auto-spin</i></button>
+<button id="turbo" class="deck" aria-pressed="false"><b>TURBO</b><i>faster reels</i></button>
+<button id="gamble" class="deck hot" hidden><b>LEFT OR RIGHT</b><i>double or nothing</i></button>
+<button id="gLeft" class="deck hot" hidden><b>LEFT VINE</b><i>call the vine</i></button>
+<button id="gRight" class="deck hot" hidden><b>RIGHT VINE</b><i>call the vine</i></button>
+<button id="collect" class="deck" hidden><b>COLLECT</b><i>keep your win</i></button>
+<button id="spin" class="spin"><span id="spinText">SWING</span><small id="spinSub">spin the reels</small><span class="spin-icon">🍌</span></button>
+</div>
+<div class="row menu" id="menuRow">
+<button id="rules" class="deck"><b>MAP</b><i>pays &amp; how to play</i></button>
+<button id="fair" class="deck"><b>FAIR</b><i>odds &amp; proof</i></button>
+<button id="monkeys" class="deck"><b>MONKEYS</b><i>the art</i></button>
+<button id="pot" class="deck"><b>POT</b><i>holder pot</i></button>
+<button id="history" class="deck"><b>LOG</b><i>past spins</i></button>
+<button id="account" class="deck"><b>LAYR</b><i>your account</i></button>
+<button id="settings" class="deck"><b>SETTINGS</b><i>sound &amp; motion</i></button>
+<button id="sound" class="deck" aria-pressed="true"><b>SOUND</b><i>mute or unmute</i></button>
+<span id="extra" style="display:contents"></span>
+<button id="labBtn" class="deck" hidden><b>LAB</b><i>bonus lab</i></button>
+<button id="testBtn" class="deck" hidden><b>TEST</b><i>test tools</i></button>
+<button id="fsBtn" class="deck"><b>FULL SCREEN</b><i>fill the view</i></button>
+<button id="fsExit" class="deck"><b>EXIT</b><i>leave full screen</i></button>
+</div>
+</div>
+<div id="toast" role="status"></div><div id="celebration" aria-hidden="true"></div>
+<dialog id="modal"><div class="modal-head"><span class="eyebrow" id="modalTag">MONKEY HASH</span><button id="close" aria-label="Close dialog">×</button></div><div id="modalContent"></div></dialog>
+<div id="loading" role="status"><b>MONKEY HASH</b><p id="loadMsg">WAKING THE TEMPLE</p><small>Bitcoin Monkeys · ParallaX Casino</small></div><noscript><p class="noscript">Monkey Hash needs JavaScript to run.</p></noscript>
