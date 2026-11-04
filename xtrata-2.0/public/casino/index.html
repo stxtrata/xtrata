@@ -113,7 +113,7 @@ button:hover:not(:disabled){background:#273345;border-color:#d9b477}button:focus
 @media(max-width:620px){#houseBrand strong{font-size:13px;letter-spacing:.14em}#houseBrand small{font-size:6px;letter-spacing:.35em}#houseBrand img{width:28px;height:28px}#tools{top:65px;left:12px;right:12px;justify-content:space-between;gap:5px}#bankpill{order:0;min-width:128px}#tools button{font-size:10px;padding:9px}#tools #back{order:1}#tools .rt{order:2}#tools .rt button{width:34px;padding:9px 0;overflow:hidden}#modebtn{width:70px!important}#intro{left:12px;right:12px;bottom:16px;width:auto;max-height:calc(100dvh - 170px);padding:18px}#intro:before{font-size:7px;margin-bottom:10px}#intro h1{font-size:30px}#intro p{font-size:11px;margin-bottom:12px}#intro .btns{grid-template-columns:repeat(3,1fr)}#intro .btns button{font-size:10px;padding:9px 6px}#intro .btns button:nth-child(5){grid-column:auto}#intro .btns small{font-size:8px}#intro .btns:last-child{grid-template-columns:1fr 1fr!important}#venueInfo{display:none}#quickNav{top:19px;bottom:auto;right:13px}#quickNav button{padding:8px;font-size:9px}#viewLounge,#viewSalon{display:none}#panel{width:calc(100vw - 20px);bottom:10px;padding:14px;max-height:64dvh}#pTitle{font-size:19px}#pChips{gap:8px}.chip{width:46px;height:46px}#pActions button{padding:11px 8px;min-width:76px;font-size:11px}.pxmodal{right:12px;left:12px;top:124px;width:auto;max-height:calc(100dvh - 145px)}#fallbackNotice{top:123px;max-width:94vw;font-size:9px}#fallbackHands{top:24%;max-width:95vw;width:max-content;padding:8px;gap:9px}.fallbackcard{width:30px;height:42px;font-size:15px}}
 
 #houseBrand>#brandlogo{display:none}#houseBrand strong{display:flex;align-items:center;gap:1px;white-space:nowrap}#houseBrand strong .pxWordX{display:inline-block;width:1.27em;height:1.27em;object-fit:contain;margin-left:-.08em;margin-right:-.16em}#houseBrand small{margin-top:0}
-#machinesPanel{width:min(710px,calc(100vw - 60px))}#machinesPanel .machine-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}#machinesPanel .machine-choice{position:relative;display:flex;min-height:132px;flex-direction:column;align-items:flex-start;justify-content:flex-end;text-align:left;padding:16px;overflow:hidden;background:linear-gradient(135deg,var(--machine-color),#09131f 60%);border-color:#d9b47740}#machinesPanel .machine-choice:before{content:'';position:absolute;top:12px;left:14px;right:14px;height:2px;background:var(--machine-accent);box-shadow:0 0 14px var(--machine-accent)}#machinesPanel .machine-choice b{font:400 20px Georgia;position:relative}#machinesPanel .machine-choice small{color:#a5b3c4;font-size:10px;margin-top:8px;line-height:1.5}#machinesPanel .machine-choice em{font-style:normal;font-size:9px;color:#e9c891;letter-spacing:.15em;margin-top:13px}
+#machinesPanel{width:min(710px,calc(100vw - 60px))}#machinesPanel .machine-grid{max-height:min(62vh,640px);overflow-y:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}#machinesPanel .machine-choice{position:relative;display:flex;min-height:132px;flex-direction:column;align-items:flex-start;justify-content:flex-end;text-align:left;padding:16px;overflow:hidden;background:linear-gradient(135deg,var(--machine-color),#09131f 60%);border-color:#d9b47740}#machinesPanel .machine-choice:before{content:'';position:absolute;top:12px;left:14px;right:14px;height:2px;background:var(--machine-accent);box-shadow:0 0 14px var(--machine-accent)}#machinesPanel .machine-choice b{font:400 20px Georgia;position:relative}#machinesPanel .machine-choice small{color:#a5b3c4;font-size:10px;margin-top:8px;line-height:1.5}#machinesPanel .machine-choice em{font-style:normal;font-size:9px;color:#e9c891;letter-spacing:.15em;margin-top:13px}
 #browseMachinesIntro{width:100%;margin-top:13px;font-size:11px;background:#c69f5a12;border-color:#d9b47750}#machinesPanel p{max-width:550px}
 #machineStage{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;background:#060b12}#machineStage[hidden]{display:none!important}#machineStageHeader{display:flex;gap:18px;align-items:center;padding:12px 18px;background:linear-gradient(100deg,#0b1420,#141b25);border-bottom:1px solid #d9b47755;min-height:59px}#machineStageHeader button{font-size:12px;flex:none}#machineTitle{font:400 22px Georgia;color:#ead4ae}#machineStatus{margin-left:auto;color:#a5b2c5;font-size:9px;letter-spacing:.12em}#machineFrame{width:100%;flex:1;min-height:0;border:0;background:#080e16}
 @media(max-width:620px){#houseBrand strong{font-size:14px}#machineStageHeader{padding:9px 11px;gap:11px;min-height:52px}#machineStageHeader button{font-size:10px;padding:9px}#machineTitle{font-size:16px}#machineStatus{font-size:7px;letter-spacing:0;max-width:80px;text-align:right}#machinesPanel{width:auto}#machinesPanel .machine-grid{grid-template-columns:repeat(2,1fr)}#machinesPanel .machine-choice{padding:13px;min-height:125px}#machinesPanel .machine-choice b{font-size:18px}#machinesPanel .machine-choice small{font-size:9px}}
@@ -7954,10 +7954,14 @@ function applyTestnetFunding(proof){
     const R=window.PX_MACHINE_ROTATION||{},base=R.base||'../casino-machines/',catalog=Array.isArray(R.catalog)?R.catalog:[];
     const coreKeys=['drop','twins','ds','bf','nv'],coreGames=['the-drop','forever-twins','deep-strata','block-fortune','neon-vault'];
     const core=window.PX_MACHINE_PACKS.map((pack,i)=>({key:coreKeys[i],gameId:coreGames[i],pack})),coreByKey=new Map(core.map(f=>[f.key,f])),names=new Map(catalog.map(c=>[c.id,c.name]));
-    let want=Array.isArray(R.floor)?R.floor.slice():coreKeys.slice();
-    try{const q=new URLSearchParams(location.search).get('floor');if(q)want=q.split(',').map(k=>k.trim());}catch(_){}      // ?floor=a,b,c previews a floor in this browser only
-    want=want.filter((k,i)=>typeof k==='string'&&/^[a-z0-9-]{1,40}$/.test(k)&&(coreByKey.has(k)||names.has(k))&&want.indexOf(k)===i).slice(0,5);
-    if(!want.length)want=coreKeys.slice();
+    let want=Array.isArray(R.floor)?R.floor.slice():coreKeys.slice(),layoutName=R.layout||null;
+    try{const q=new URLSearchParams(location.search),f=q.get('floor'),l=q.get('layout');if(f)want=f.split(',').map(k=>k.trim());if(l)layoutName=l;}catch(_){}      // ?floor=a,b,c or ?layout=name previews in this browser only
+    // A LAYOUT (machine-rotation.js, `layouts`) places every cabinet by hand: one machine per slot, any number of designs.
+    let layout=layoutName&&R.layouts&&R.layouts[layoutName]&&Array.isArray(R.layouts[layoutName].slots)?R.layouts[layoutName]:null;
+    if(layout)want=layout.slots.map(s=>s&&s.id);
+    const maxDesigns=layout?16:5;
+    want=want.filter((k,i)=>typeof k==='string'&&/^[a-z0-9-]{1,40}$/.test(k)&&(coreByKey.has(k)||names.has(k))&&want.indexOf(k)===i).slice(0,maxDesigns);
+    if(!want.length){want=coreKeys.slice();layout=null;}
     const loaded=await Promise.all(want.map(async k=>{
       if(coreByKey.has(k))return coreByKey.get(k);
       try{
@@ -7969,20 +7973,22 @@ function applyTestnetFunding(proof){
         return {key:k,gameId:k,pack};
       }catch(e){console.warn('[floor] could not load '+k+'; a built-in machine stands in',e);return null;}
     }));
-    const floor=loaded.filter(Boolean);
-    for(const f of core){if(floor.length>=want.length)break;if(!floor.some(x=>x.key===f.key))floor.push(f);}
+    const floor=loaded.filter(Boolean),alias={};
+    want.forEach((k,i)=>{if(loaded[i])return;const f=core.find(c=>!floor.some(x=>x.key===c.key));if(f){floor.push(f);alias[k]=f.key;}});   // a pack that would not load: a built-in machine stands in
     window.PX_MACHINE_PACKS=floor.map(f=>f.pack);                                         // the floor, in wall order
     window.PX_FLOOR_KEYS=floor.map(f=>f.key);                                             // the short id the room service knows each one by
     window.PX_FLOOR_BY_GAME=Object.fromEntries(floor.map(f=>[f.gameId,f.key]));           // the game id inside each pack -> that short id
     window.PX_MACHINE_NAMES=Object.fromEntries(names);                                    // short id -> name, for every machine that could be on a floor
+    // The slots, with any machine that failed to load swapped for the built-in that stood in for it (a slot with no stand-in stays empty).
+    window.PX_FLOOR_LAYOUT=layout?{name:layoutName,dispensers:layout.dispensers||null,slots:layout.slots.map(s=>({...s,id:alias[s.id]||s.id})).filter(s=>floor.some(f=>f.key===s.id))}:null;
     return floor;
   })();
   (function(){
     const panel=document.getElementById('machinesPanel'),grid=panel&&panel.querySelector('.machine-grid');if(!grid)return;
     const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),n=window.PX_MACHINE_PACKS.length;
     grid.innerHTML=window.PX_MACHINE_PACKS.map((p,i)=>'<button class="machine-choice" data-machine-type="'+i+'" style="--machine-color:'+esc(p.color||'#2a2420')+';--machine-accent:'+esc(p.accent)+'"><b>'+esc(p.name)+'</b><small>'+esc(p.description||'')+'</small><em>PLAY THE MACHINE ↗</em></button>').join('');
-    const intro=panel.querySelector('p'),w=['Zero','One','Two','Three','Four','Five'],c=['Zero','Two','Four','Six','Eight','Ten'];
-    if(intro&&n>=1&&n<=5&&window.PX_FLOOR_KEYS.some(k=>!['drop','twins','ds','bf','nv'].includes(k)||n!==5))intro.textContent=intro.textContent.replace(/^Five original machines\. Ten cabinets/,w[n]+(n===1?' machine. ':' machines. ')+c[n]+' cabinets');
+    const intro=panel.querySelector('p'),cab=window.PX_FLOOR_LAYOUT?window.PX_FLOOR_LAYOUT.slots.length:n*2;
+    if(intro&&(window.PX_FLOOR_LAYOUT||n!==5||window.PX_FLOOR_KEYS.some(k=>!['drop','twins','ds','bf','nv'].includes(k))))intro.textContent=intro.textContent.replace(/^Five original machines\. Ten cabinets/,n+(n===1?' machine. ':' machines. ')+cab+' cabinets');
   })();
   const pxPreparedMachines=await Promise.all(window.PX_MACHINE_PACKS.map(async p=>{
     const data=JSON.parse(await decodePXGzip(p.model));
@@ -8358,15 +8364,22 @@ function applyTestnetFunding(proof){
     room.machines=[];
     const zPositions=[-7.6,-4.2,-.8,2.6,6];
     const templates=pxPreparedMachines.map(d=>packedCabinet(d));
-    [-1,1].forEach(side=>templates.forEach((template,type)=>{
+    // Where each cabinet stands: x, z, the way it faces (yaw), which copy of its design it is, and where its floor glow sits.
+    const places=[],LY=window.PX_FLOOR_LAYOUT;
+    if(LY){const seen={};for(const sl of LY.slots){const type=window.PX_FLOOR_KEYS.indexOf(sl.id);if(type<0)continue;seen[type]=(seen[type]||0)+1;
+      if(seen[type]>2){console.warn('[floor] '+sl.id+' has more than two cabinets in the layout; the room service knows two places per machine, so the extra one is left out');continue;}
+      const ry={S:0,N:Math.PI,E:Math.PI/2,W:-Math.PI/2}[sl.face]||0;places.push({type,x:sl.x,z:sl.z,ry,copy:seen[type],gx:sl.x+Math.sin(ry)*.5,gz:sl.z+Math.cos(ry)*.5});}}
+    else [-1,1].forEach((side,si)=>templates.forEach((t,type)=>places.push({type,x:side*(W/2-.67),z:zPositions[type],ry:-side*Math.PI/2,copy:si+1,gx:side*(W/2-1),gz:zPositions[type]})));
+    places.forEach(pl=>{
+      const type=pl.type,template=templates[type];
       const group=new THREE.Group(),model=template.clone(true),bb=new THREE.Box3().setFromObject(model),size=bb.getSize(V3(0,0,0)),scale=2.6/size.y;
       model.scale.multiplyScalar(scale);model.position.y-=bb.min.y*scale;group.add(model);
-      const z=zPositions[type];group.position.set(side*(W/2-.67),.012,z);group.rotation.y=-side*Math.PI/2;group.name='ParallaX · '+window.PX_MACHINE_PACKS[type].name;scene.add(group);
+      group.position.set(pl.x,.012,pl.z);group.rotation.y=pl.ry;group.name='ParallaX · '+window.PX_MACHINE_PACKS[type].name;scene.add(group);
       const animations=[];for(const role of ['crest','recordGroup','core','lever','spinPhysical','armPivot']){const o=model.getObjectByName('px-'+role);if(o)animations.push({o,role,base:o.rotation.clone(),homePosition:o.position.clone()});}
-      const item={type,index:room.machines.length,name:window.PX_MACHINE_PACKS[type].name,group,model,animations,occupied:false};room.machines.push(item);
+      const item={type,index:room.machines.length,copy:pl.copy,name:window.PX_MACHINE_PACKS[type].name,group,model,animations,occupied:false};room.machines.push(item);
       const plaque=pxSign(group,0,2.94,0,1.52,.27,item.name,item.occupied?'I N   U S E':'P L A Y   ↗',false);plaque.name='Machine name';
-      glowSprite(side*(W/2-1),1.5,z,1.5,(parseInt(String(window.PX_MACHINE_PACKS[type].accent||'#e4b457').slice(1),16)||0xe4b457),.11);
-    }));
+      glowSprite(pl.gx,1.5,pl.gz,1.5,(parseInt(String(window.PX_MACHINE_PACKS[type].accent||'#e4b457').slice(1),16)||0xe4b457),.11);
+    });
   }
   // One renderer, one casino. Embedded game logic supplies only live canvas pixels and controls.
   let machineOpen=false,machineLoading=false,machineType=-1,activeCabinet=null,machineCloseup=false,machineReturn=null,machineHere=true,machineSession=0,machineConnectedAt=0,machineOutOfRange=false;
@@ -8594,11 +8607,11 @@ function applyTestnetFunding(proof){
   }
   async function createCasinoEngine(type){
     if(machineEngines.has(type))return machineEngines.get(type);
-    const html=pxRafShim(pxLiteDocument(pxRlPatch(await decodePXGzip(window.PX_MACHINE_PACKS[type].game)),pxTouch())),frame=document.createElement('iframe');frame.className=pxTouch()?'pxLogicFrame pxLite':'pxLogicFrame';frame.title=window.PX_MACHINE_PACKS[type].name+' game logic';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
+    const html=pxRafShim(pxLiteDocument(pxRlPatch(await decodePXGzip(window.PX_MACHINE_PACKS[type].game)),pxTouch())),frame=document.createElement('iframe');frame.className=pxTouch()?'pxLogicFrame pxLite':'pxLogicFrame';frame.title=window.PX_MACHINE_PACKS[type].name+' game logic';frame.allow='fullscreen; autoplay';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
     const api=await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Machine did not become ready')),20000);frame.onload=()=>{const api=frame.contentWindow.PX_CASINO_ENGINE;if(!api){clearTimeout(timeout);reject(new Error('Game engine API missing'));return;}clearTimeout(timeout);resolve(api);};frame.srcdoc=html;});
     const texture=new THREE.CanvasTexture(api.screen);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=false;texture.anisotropy=16;
     for(const m of room.machines.filter(m=>m.type===type&&!m.occupied&&!m.pxSpect)){const screen=m.model.getObjectByName('px-screenMesh');if(screen){screen.material=screen.material.clone();screen.material.map=texture;screen.material.color.setHex(0xffffff);screen.material.needsUpdate=true;}}
-    const engine={api,frame,texture,revision:-1,css:window.PX_MACHINE_PACKS[type].css};machineEngines.set(type,engine);return engine;
+    const engine={api,frame,texture,revision:-1,css:window.PX_MACHINE_PACKS[type].css,fsKind:pxFsKind(api),fsHostOn:false,hostReg:false};machineEngines.set(type,engine);return engine;
   }
   async function openCasinoMachine(selection,view='here'){
     const m=typeof selection==='object'?selection:room.machines.find(m=>m.type===selection&&!m.occupied);if(!m)return;
@@ -8616,7 +8629,7 @@ function applyTestnetFunding(proof){
     catch(error){if(session!==machineSession)return;machineLoading=true;$('pxMachineSpin').textContent='Reconnect';$('pxMachineStatus').textContent=error.message||'The cabinet could not connect. Disconnect and try again.';console.warn(error);}
   }
   function returnFromMachine(){
-    if(!machineOpen)return true;const e=getActiveEngine();e?.api.stopAuto?.();if(e&&!e.api.deactivate()){$('pxMachineStatus').textContent='Let this spin finish before disconnecting.';return false;}
+    if(!machineOpen)return true;const e=getActiveEngine();if(e&&e.fsKind!=='none'&&pxFsActive(e))pxExitFs(e);e?.api.stopAuto?.();if(e&&!e.api.deactivate()){$('pxMachineStatus').textContent='Let this spin finish before disconnecting.';return false;}
     const wasHere=machineHere;machineOpen=false;machineLoading=false;machineType=-1;activeCabinet=null;machineOutOfRange=false;machineSession++;
     document.body.classList.remove('machine-connected','machine-floor');$('pxCabinetControls').hidden=true;$('pxFallbackMachine').hidden=true;$('pxMachineModal').hidden=true;$('pxMachineFeature').hidden=true;$('pxMachineMore').hidden=true;
     restoreMachinePeople();
@@ -8762,9 +8775,65 @@ function applyTestnetFunding(proof){
     const hit=ray.intersectObject(activeCabinet.model,true).find(h=>h.object.visible&&(h.object.name==='px-screenMesh'||h.object.userData.pxMachineAction));if(!hit)return;
     if(hit.object.userData.pxMachineAction)cabinetAction(hit.object.userData.pxMachineAction);else if(hit.uv){const sx=hit.uv.x*1400,sy=(1-hit.uv.y)*960,ov=pxScreenOv.get(activeCabinet),bx=ov&&ov.at(sx,sy);if(bx){ov.click(bx);updateConnectedMachine(0,true);return;}getActiveEngine()?.api.tap(sx,sy);}
   }
+  // ---- GAME FULL SCREEN. The same four kinds of game as the Fruit Machine Room (public/fruit-machine-room/room.js):
+  //   'obj'  the game owns it: PX_CASINO_ENGINE.fullscreen.enter() / exit() / active()      (Club X, Snow Crash, The Halving ...)
+  //   'host' the game asks the page to show its frame full-window: fullscreenHost(cb) + fullscreen(on)   (Hot Wallet, Ordinal Rush ...)
+  //   'fn'   fullscreen(on) only                                                              (Genesis 21, Plebs & Legends, Dog Army ...)
+  //   'none' no game full screen (the five original machines): the page itself goes full screen instead, as before.
+  // A game's own full screen keeps every menu and option reachable; the page's full screen cannot show the game's menus.
+  function pxFsKind(api){return api.fullscreen&&typeof api.fullscreen.enter==='function'?'obj':typeof api.fullscreenHost==='function'?'host':typeof api.fullscreen==='function'?'fn':'none';}
+  function pxFrameFull(e,on){
+    const f=e.frame;
+    if(on){f.style.cssText=['position:fixed','inset:0','left:0','top:0','width:100vw','height:100vh','visibility:visible','pointer-events:auto','z-index:2147483000','border:0','background:#000'].map(x=>x+'!important').join(';');f.removeAttribute('aria-hidden');f.tabIndex=0;}
+    else{f.style.cssText='';f.setAttribute('aria-hidden','true');f.tabIndex=-1;}
+  }
+  // Genesis 21 and Plebs & Legends ({type:'px-fullscreen',on}) and The Archive ({px:'archive-fullscreen',on}) tell the page when they want it.
+  window.addEventListener('message',ev=>{
+    const d=ev.data;if(!d||typeof d!=='object')return;
+    const on=d.type==='px-fullscreen'?!!d.on:d.px==='archive-fullscreen'?!!d.on:null;if(on===null)return;
+    let e=null;for(const x of machineEngines.values())if(x.frame.contentWindow===ev.source)e=x;if(!e)return;
+    pxFrameFull(e,on);
+    if(on){clearMachineMovement();freeMouse();setTimeout(()=>{try{e.frame.focus();}catch(_){}},60);}
+    else{try{canvas.focus();}catch(_){}updateConnectedMachine(0,true);}
+  });
+  function pxFsActive(e){
+    if(!e)return false;
+    try{
+      if(e.fsKind==='host')return e.fsHostOn;
+      if(e.fsKind==='obj')return !!e.api.fullscreen.active();
+      if(typeof e.api.isFullscreen==='function')return !!e.api.isFullscreen();
+      return !!(e.api.ui()||{}).fullscreen;
+    }catch(_){return false;}
+  }
+  async function pxEnterFs(e){
+    if(!e||pxFsActive(e))return;const f=e.frame;
+    try{
+      if(e.fsKind==='host'){
+        if(!e.hostReg){e.hostReg=true;e.api.fullscreenHost(on=>(on?pxEnterFs(e):pxExitFs(e)));}
+        e.fsHostOn=true;pxFrameFull(e,true);
+        try{if(f.requestFullscreen)await f.requestFullscreen({navigationUI:'hide'});}catch(_){/* the fixed full-window frame is the fallback (iPhone Safari) */}
+        e.api.fullscreen(true);
+      }else if(e.fsKind==='obj')e.api.fullscreen.enter();
+      else if(e.fsKind==='fn')e.api.fullscreen(true);
+    }catch(err){console.warn('fullscreen',err);}
+    clearMachineMovement();freeMouse();setTimeout(()=>{try{f.focus();}catch(_){}},60);portMachineUI('modal','');portMachineUI('feature','');
+  }
+  async function pxExitFs(e){
+    if(!e)return;const f=e.frame;
+    try{
+      if(e.fsKind==='host'){if(!e.fsHostOn)return;e.fsHostOn=false;try{if(document.fullscreenElement)await document.exitFullscreen();}catch(_){}e.api.fullscreen(false);pxFrameFull(e,false);}
+      else if(e.fsKind==='obj'){if(e.api.fullscreen.active())e.api.fullscreen.exit();}
+      else if(e.fsKind==='fn'){e.api.fullscreen(false);}
+      if(document.fullscreenElement&&e.fsKind!=='host'){try{await document.exitFullscreen();}catch(_){}}
+    }catch(err){console.warn('exit fullscreen',err);}
+    setTimeout(()=>{if(!pxFsActive(e)&&e.fsKind!=='host'){f.style.cssText='';f.setAttribute('aria-hidden','true');f.tabIndex=-1;}try{canvas.focus();}catch(_){}if(machineOpen)updateConnectedMachine(0,true);},120);
+  }
+  document.addEventListener('fullscreenchange',()=>{const e=getActiveEngine();if(!document.fullscreenElement&&e&&e.fsKind!=='none'&&pxFsActive(e))pxExitFs(e);});
+  // Full screen button / F: the game's own full screen when it has one. Returns false for the machines that do not.
+  function pxToggleGameFs(){const e=getActiveEngine();if(!e||e.fsKind==='none'||machineLoading||machineOutOfRange)return false;pxFsActive(e)?pxExitFs(e):pxEnterFs(e);return true;}
   function bindConnectedCabinets(){
     $('pxMachineLeave').onclick=returnFromMachine;$('pxMachineHere').onclick=()=>chooseMachineView('here');$('pxMachineView').onclick=()=>chooseMachineView(machineHere||machineCloseup?'cabinet':'screen');
-    $('pxMachineFullscreen').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen?.();else document.documentElement.requestFullscreen?.().catch(()=>toast('Use your browser’s full screen control.'));};
+    $('pxMachineFullscreen').onclick=()=>{if(pxToggleGameFs())return;if(document.fullscreenElement)document.exitFullscreen?.();else document.documentElement.requestFullscreen?.().catch(()=>toast('Use your browser’s full screen control.'));};
     $('pxMachineMoreButton').onclick=()=>$('pxMachineMore').hidden=!$('pxMachineMore').hidden;
     document.querySelectorAll('[data-cabinet-action]').forEach(b=>b.onclick=()=>{$('pxMachineMore').hidden=true;cabinetAction(b.dataset.cabinetAction);});
     $('pxFallbackScreen').onclick=event=>{const r=event.currentTarget.getBoundingClientRect();getActiveEngine()?.api.tap((event.clientX-r.left)/r.width*1400,(event.clientY-r.top)/r.height*960);};
@@ -11868,7 +11937,7 @@ function applyTestnetFunding(proof){
     room.dispensers=[];
     const gold=M(0xd5a54f,{metalness:1,roughness:.18,envMap:envTex,envMapIntensity:1.2}),navy=M(0x0a1424,{metalness:.55,roughness:.23,envMap:envTex}),black=M(0x05090f,{metalness:.35,roughness:.23}),light=new THREE.MeshBasicMaterial({color:0xffdba3});
     const chipArt=canvasTex(512,512,(c)=>printChip(c,512,25000,'#c8973a'));
-    for(const spec of [{id:'LAYR-01',label:'Grand entrance',x:4.25,z:9.45,yaw:Math.PI},{id:'LAYR-02',label:'The lounge',x:1.15,z:-9.45,yaw:0}]){
+    for(const spec of [{id:'LAYR-01',label:'Grand entrance',x:4.25,z:9.45,yaw:Math.PI},{id:'LAYR-02',label:'The lounge',x:1.15,z:-9.45,yaw:0}].map(sp=>{const mv=window.PX_FLOOR_LAYOUT&&window.PX_FLOOR_LAYOUT.dispensers&&window.PX_FLOOR_LAYOUT.dispensers[sp.id];return mv?{...sp,...mv}:sp;})){
       const g=new THREE.Group();g.position.set(spec.x,.012,spec.z);g.rotation.y=spec.yaw;g.name='LAYR dispenser · '+spec.id;scene.add(g);
       const d={...spec,group:g,screen:null,chips:[],ticket:null,light:null,animationStart:0,dispensed:0};room.dispensers.push(d);
       box(1.42,.12,.89,gold,0,.06,0,g);box(1.28,2.43,.7,navy,0,1.33,0,g);box(1.34,.08,.75,gold,0,2.58,0,g);
@@ -12205,7 +12274,7 @@ function applyTestnetFunding(proof){
     const MAXP = isTouch ? 6 : 16;                              // most people drawn at once (each is a 163-bone skinned figure)
     const stationById = {}; stations.forEach((s) => (stationById[s.id] = s));
     const seatSpot = (s, seat) => { const l = SEATS[s.id], i = l ? l.indexOf(seat) : -1; return i < 0 ? null : seat.pad ? s.id + '.pad' : s.id + '.' + (i + 1); };
-    const machineSpot = (m) => MACH[m.type] + '.' + (m.index < window.PX_MACHINE_PACKS.length ? 1 : 2);     // left wall (.1) then right wall (.2), as buildSlots made them
+    const machineSpot = (m) => MACH[m.type] + '.' + m.copy;     // left wall (.1) then right wall (.2), as buildSlots made them
     // where the visitor is right now: at a cabinet, or in a seat at a table
     function mySpot() {
       if (machineOpen && activeCabinet && machineHere && !machineOutOfRange) return machineSpot(activeCabinet);
@@ -12216,7 +12285,7 @@ function applyTestnetFunding(proof){
     function place(spot) {
       const parts = String(spot).split('.'), id = parts[0], idx = parts[1];
       if (MACH.includes(id)) {
-        const m = room.machines.find((k) => MACH[k.type] === id && String(k.index < window.PX_MACHINE_PACKS.length ? 1 : 2) === idx); if (!m) return null;
+        const m = room.machines.find((k) => MACH[k.type] === id && String(k.copy) === idx); if (!m) return null;
         const w = m.group.localToWorld(V3(0, 0, 1.0));
         return { x: w.x, z: w.z, yaw: m.group.rotation.y + Math.PI, stand: true };
       }
@@ -12372,7 +12441,7 @@ function applyTestnetFunding(proof){
     }
     const cabinetAt = (spot) => {
       const parts = String(spot).split('.'), id = parts[0], idx = parts[1];
-      return MACH.includes(id) ? room.machines.find((k) => MACH[k.type] === id && String(k.index < window.PX_MACHINE_PACKS.length ? 1 : 2) === idx) || null : null;
+      return MACH.includes(id) ? room.machines.find((k) => MACH[k.type] === id && String(k.copy) === idx) || null : null;
     };
     const cabinetDistance = (m) => { m.group.updateWorldMatrix(true, false); return m.group.localToWorld(V3(0, 1.45, .35)).distanceTo(camera.position); };
     // The guest player's document, plus a hook that hands the next spin our stops (the engine draws its reels from the first numbers).

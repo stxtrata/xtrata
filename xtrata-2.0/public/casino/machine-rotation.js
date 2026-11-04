@@ -9,6 +9,7 @@
  *           ('drop', 'twins', 'ds', 'bf', 'nv') or the folder name of a series machine ('ordinal-rush', 'hot-wallet' ...).
  *           Unknown ids are ignored. If a machine's pack cannot be loaded, the next built-in machine stands in, so a bad
  *           deploy never leaves an empty wall.
+ *   ?layout= a link such as /casino/?layout=top14 previews a hand-placed layout (see `layouts` below), also in your own browser only.
  *   ?floor=  a link such as /casino/?floor=ordinal-rush,snow-crash,hot-wallet,drop,twins previews a floor in your own browser
  *           only. It changes nothing for anyone else.
  *
@@ -25,8 +26,54 @@ window.PX_MACHINE_ROTATION = {
   version: 1,
   base: '../casino-machines/',
 
+  // THE LAYOUT. null keeps the classic room (the floor below, two cabinets of each, one on each side wall). A name from `layouts` replaces it.
+  layout: null,
+
   // THE FLOOR. This is the line to edit to rotate machines. These are the five that are on the floor today.
   floor: ['drop', 'twins', 'ds', 'bf', 'nv'],
+
+  // LAYOUTS. A layout places every cabinet by hand: one machine per slot, any mix of designs, at most TWO cabinets of any design (the room
+  // service knows two places for each machine). x and z are metres from the middle of the 26 x 22 m floor (x to the right, z towards the
+  // entrance, which is at z = +11); `face` is the wall the screen faces: 'N' towards the back wall, 'S' towards the entrance, 'E' / 'W'.
+  // Preview one with /casino/?layout=<name>. To make one the room's own, set `layout: '<name>'` above. `dispensers` moves the LAYR exchanges.
+  layouts: {
+    // TEST LAYOUT, top 14: 14 designs twice each. Side walls 8 + 8, back wall 3, one beside the door, and two pods of four (back to back)
+    // either side of the grand approach. LAYR-01 moves to the entrance wall to make room for the right-hand pod.
+    top14: {
+      name: 'Top 14 (test)',
+      dispensers: { 'LAYR-01': { x: 6.9, z: 10.45 } },
+      slots: [
+      { id: 'twins', x: -12.33, z: -7.4, face: 'E' },
+      { id: 'who-is-satoshi', x: -12.33, z: -5.55, face: 'E' },
+      { id: 'dog-army', x: -12.33, z: -3.7, face: 'E' },
+      { id: 'drop', x: -12.33, z: -1.1, face: 'E' },
+      { id: 'rune-pit', x: -12.33, z: 0.75, face: 'E' },
+      { id: 'club-x', x: -12.33, z: 2.6, face: 'E' },
+      { id: 'the-stack', x: -12.33, z: 5.9, face: 'E' },
+      { id: 'mempool-madness', x: -12.33, z: 7.75, face: 'E' },
+      { id: 'rune-pit', x: 12.33, z: -7.4, face: 'W' },
+      { id: 'mempool-madness', x: 12.33, z: -5.55, face: 'W' },
+      { id: 'rare-pepe-directory', x: 12.33, z: -3.7, face: 'W' },
+      { id: 'the-stack', x: 12.33, z: -1.1, face: 'W' },
+      { id: 'twins', x: 12.33, z: 0.75, face: 'W' },
+      { id: 'the-halving', x: 12.33, z: 2.6, face: 'W' },
+      { id: 'who-is-satoshi', x: 12.33, z: 5.9, face: 'W' },
+      { id: 'dog-army', x: 12.33, z: 7.75, face: 'W' },
+      { id: 'the-halving', x: -8.95, z: -10.55, face: 'S' },
+      { id: 'rare-pepe-directory', x: -3.45, z: -10.55, face: 'S' },
+      { id: 'club-x', x: -1.55, z: -10.55, face: 'S' },
+      { id: 'drop', x: -4.6, z: 10.55, face: 'N' },
+      { id: 'ordinal-rush', x: -5.1, z: 7.45, face: 'N' },
+      { id: 'ordinal-rush', x: -3.3, z: 7.45, face: 'N' },
+      { id: 'hot-wallet', x: -5.1, z: 8.35, face: 'S' },
+      { id: 'hot-wallet', x: -3.3, z: 8.35, face: 'S' },
+      { id: 'snow-crash', x: 3.3, z: 7.45, face: 'N' },
+      { id: 'snow-crash', x: 5.1, z: 7.45, face: 'N' },
+      { id: 'plebs-legends', x: 3.3, z: 8.35, face: 'S' },
+      { id: 'plebs-legends', x: 5.1, z: 8.35, face: 'S' }
+      ]
+    }
+  },
 
   // Every machine that can be put on the floor, with the name the win banner uses when someone else wins on it.
   catalog: [
