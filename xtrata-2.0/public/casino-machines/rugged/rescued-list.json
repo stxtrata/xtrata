@@ -1,0 +1,28 @@
+{
+  "list": "Rugged rescued list",
+  "version": 1,
+  "rule": "A collection is listed only when Jim approves it, and only on facts anyone can check: (a) the art link in the collection's token metadata no longer serves the art, or (b) the creator's wallet and channels have been silent for 12 months or more. The machine never calls a listed project a scam; on the machine every listed collection is 'Rescued'.",
+  "how_to_add": "Add an entry with approved:false, its evidence (contract reads, URLs, dates) and the reason code. Jim flips approved to true. Then run: python3 tools/fetch-art.py && node tools/make-art.mjs && node tools/build.mjs. An approved entry with no helper shows desaturated with NOT YET FOREVER and counts towards STILL AT RISK.",
+  "collections": [
+    {
+      "key": "bitcoin-birds",
+      "name": "Bitcoin Birds",
+      "approved": true,
+      "approvedBy": "Jim (named as the default example in machine-series/18-rugged-prompt.md)",
+      "reason": "dead-art-link",
+      "source": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-birds",
+      "supply": 400,
+      "evidence": [
+        "Contract read SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds::get-token-uri(u1) (and every token above 0) returns https://www.stacksart.com/assets/birds.json (read 2026-11-02 through xtrata.xyz/hiro/mainnet).",
+        "get-token-uri(u0) returns https://stacksart.mypinata.cloud/ipfs/QmNcUCdjFK39Pk5iRrKY7Ez6hmqBcdnuxDZDAjTmeoxUqZ, an IPFS folder of images, not token metadata.",
+        "Forever Twins registry (xtrata.xyz/forever-twins/data/registry.v2.json, bitcoin-birds.info.about): 'that link (stacksart.com/assets/birds.json) now returns an ordinary web page, not token data. The pictures themselves are kept in a single IPFS folder ... Nothing on the chain names that folder.'",
+        "Rescue: all 400 twinned by the Xtrata team at no charge; helper inscribed-count u400 (forever-twin-bitcoin-birds events); every twin image matches the manifest SHA-256.",
+        "The build host could not reach stacksart.com itself (blocked by its network), so the 'returns a web page' observation is the registry's, recorded as such in art/sources.json."
+      ],
+      "deadLinkShown": "https://www.stacksart.com/assets/birds.json",
+      "tiers": "No trait metadata exists (twin manifest metadataUri is null), so tiers follow mint order: Tier I #0-99, II #100-199, III #200-299, IV #300-399."
+    }
+  ],
+  "proposed": []
+}
