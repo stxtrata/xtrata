@@ -1,0 +1,119 @@
+{
+ "machine": "Who Is Satoshi?",
+ "generated": null,
+ "rule": "Every symbol is a real record: a public court record, published works (title, author line and year only, never the text), a published PGP key fingerprint, dated forum posts and real block heights. The people appear only as Jim's own pop-art prints (see 'prints'), never as photographs, and nobody is named as Satoshi.",
+ "symbols": {
+  "cherry": {
+   "name": "The Forgery",
+   "kind": "Public court record, shown as Jim's prints of the case (COPA v Wright, Mr Justice Mellor) and a typed case-file card",
+   "record": "COPA v Wright [2024] EWHC 1198 (Ch), Mr Justice Mellor, written judgment 20 May 2024; declaration 14 March 2024",
+   "wording": [
+    "Found: not the author of the Bitcoin White Paper",
+    "Found: documents forged \"on a grand scale\"",
+    "Declared 14 March 2024 · reasons given 20 May 2024"
+   ],
+   "sources": [
+    "https://www.judiciary.uk/judgments/copa-v-wright/",
+    "https://www.twobirds.com/en/news-and-deals/2024/uk/written-judgment-delivered-in-copa-v-wright-trial"
+   ]
+  },
+  "lemon": {
+   "name": "RPOW",
+   "kind": "Historic document with its author's print (Jim's own pop-art print)",
+   "record": "RPOW: Reusable Proofs of Work, Hal Finney, 2004",
+   "source": "https://nakamotoinstitute.org/finney/rpow/"
+  },
+  "chip": {
+   "name": "Bit Gold",
+   "kind": "Historic document with its author's print (Jim's own pop-art print)",
+   "record": "Bit Gold, Nick Szabo, 2005",
+   "source": "https://nakamotoinstitute.org/library/bit-gold/"
+  },
+  "block": {
+   "name": "b-money",
+   "kind": "Historic document with its author's print (Jim's own pop-art print)",
+   "record": "b-money, Wei Dai, 1998; reference [1] of the Bitcoin whitepaper",
+   "source": "http://www.weidai.com/bmoney.txt"
+  },
+  "artifact": {
+   "name": "Hashcash",
+   "kind": "Historic document with its author's print (Jim's own pop-art print)",
+   "record": "Hashcash, Adam Back, 1997; reference [6] of the Bitcoin whitepaper (the 2002 paper)",
+   "source": "http://www.hashcash.org/papers/"
+  },
+  "bitcoin": {
+   "name": "Satoshi's Key",
+   "kind": "Public record",
+   "record": "PGP key fingerprint DE4E FCA3 E1AB 9E41 CE96 CECB 18C0 9E86 5EC9 48A1 (key ID 5EC948A1)",
+   "publishedAt": "http://www.bitcoin.org/Satoshi_Nakamoto.asc",
+   "archive": "https://web.archive.org/web/20110228054007/http://www.bitcoin.org/Satoshi_Nakamoto.asc",
+   "verifiedFrom": "https://github.com/pmlaw/The-Bitcoin-Foundation-Legal-Repo/blob/master/Bylaws/Bylaws_of_The_Bitcoin_Foundation.md",
+   "note": "The Internet Archive and bitcoin.org copies of the key file could not be fetched from the build machine; the fingerprint was taken from the Bitcoin Foundation bylaws on GitHub, which quote the same key."
+  },
+  "wild": {
+   "name": "The Whitepaper",
+   "kind": "Historic document with Satoshi's print (a hood and ₿, no face)",
+   "record": "Bitcoin: A Peer-to-Peer Electronic Cash System, Satoshi Nakamoto, 31 October 2008",
+   "source": "https://bitcoin.org/bitcoin.pdf"
+  },
+  "scatter": {
+   "name": "Forum post",
+   "kind": "Public record",
+   "note": "15 short, widely quoted lines with dates, from the Satoshi Nakamoto Institute archive (dates as the archive gives them).",
+   "items": []
+  },
+  "vault": {
+   "name": "Sealed envelope",
+   "kind": "Machine prop holding real evidence",
+   "note": "Drawn envelope with a wax seal bearing the ₿ glyph; inside are the published works above."
+  },
+  "chain": {
+   "name": "Patoshi block",
+   "kind": "On-chain record",
+   "source": "https://github.com/bensig/patoshi-addresses",
+   "commit": "414637ce52aa4819926bf1934b2235ed182a0280",
+   "credit": "Pattern discovered by Sergio Demian Lerner; dataset curated by Jameson Lopp",
+   "dataset": {
+    "blocks": 21953,
+    "btc": 1097652.49,
+    "firstHeight": 3,
+    "lastHeight": 49973
+   },
+   "items": []
+  }
+ },
+ "glyphs": {
+  "₿": "The Bitcoin symbol, public domain, set in type (TeX Gyre Pagella / Georgia)."
+ },
+ "brandAssets": {
+  "xtrataMark": "model/assets/xtrata.svg, exactly as supplied in the build prompt (part 5); on the lower door",
+  "parallaxWordmark": "model/assets/parallax-wordmark.svg, exactly as supplied; small, at the marquee foot"
+ },
+ "fonts": {
+  "cabinet": "TeX Gyre Pagella and DejaVu Sans Mono (open fonts), rasterised with CairoSVG at build time",
+  "screen": "Georgia and Courier New from the player's system, with open fallbacks"
+ },
+ "logosNeedingPermission": [],
+ "logosNote": "No other project's logo appears on this machine. The only marks are the house marks (Xtrata, ParallaX Casino) and the public-domain ₿ glyph.",
+ "openQuestions": [
+  "The Forgery wording follows the judgment as reported (bible open question: confirm you are happy with it).",
+  "The key fingerprint was taken from the Bitcoin Foundation bylaws on GitHub because the Internet Archive and bitcoin.org copies of Satoshi_Nakamoto.asc could not be fetched from the build machine; compare against the archived key before launch.",
+  "Real people now appear on the reels as Jim's prints. Szabo, Back and Dai have publicly denied being Satoshi, and the Wright print sits on the Forgery symbol with a NOT SATOSHI stamp; worth a check before the machine goes on the public floor."
+ ],
+ "prints": {
+  "madeBy": "Jim (jim.btc), ParallaX Casino: his own pop-art prints, supplied as one 4x4 grid on 2 Nov 2026 (art/prints/source-grid.jpg) and cut into 16 tiles of 240 px",
+  "note": "No photograph of anyone is used in the game; these prints are the only images of people.",
+  "where": {
+   "finney-a, finney-b": "Hal Finney · RPOW (2004) symbol",
+   "szabo-a, szabo-b": "Nick Szabo · Bit Gold (2005) symbol",
+   "dai-a, dai-b": "Wei Dai · b-money (1998) symbol",
+   "back-a, back-b": "Adam Back · Hashcash (1997) symbol",
+   "satoshi-a, satoshi-b": "Satoshi Nakamoto (a hood and ₿, no face) · the Whitepaper wild",
+   "wright": "COPA v Wright · the Forgery symbol, with a NOT SATOSHI · HIGH COURT stamp in the corner",
+   "mellor": "Mr Justice Mellor · the Forgery symbol",
+   "lerner-a, lerner-b": "Sergio Demian Lerner (found the Patoshi pattern) · top-left of The Patoshi Pattern and the Evidence panel",
+   "lopp-a, lopp-b": "Jameson Lopp (curated the dataset) · top-right of The Patoshi Pattern and the Evidence panel"
+  },
+  "alsoShown": "The same prints come out of the envelopes in Unmask Satoshi and are the symbol icons in CASE FILE and EVIDENCE."
+ }
+}

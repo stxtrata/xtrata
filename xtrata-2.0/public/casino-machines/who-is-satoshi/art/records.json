@@ -1,0 +1,249 @@
+{
+ "generated": "2026-11-01",
+ "documents": {
+  "lemon": {
+   "title": "RPOW",
+   "subtitle": "Reusable Proofs of Work",
+   "author": "Hal Finney",
+   "year": "2004",
+   "note": "",
+   "source": "https://nakamotoinstitute.org/finney/rpow/"
+  },
+  "chip": {
+   "title": "Bit Gold",
+   "subtitle": "",
+   "author": "Nick Szabo",
+   "year": "2005",
+   "note": "",
+   "source": "https://nakamotoinstitute.org/library/bit-gold/"
+  },
+  "block": {
+   "title": "b-money",
+   "subtitle": "",
+   "author": "Wei Dai",
+   "year": "1998",
+   "note": "CITED IN THE WHITEPAPER [1]",
+   "source": "http://www.weidai.com/bmoney.txt"
+  },
+  "artifact": {
+   "title": "Hashcash",
+   "subtitle": "",
+   "author": "Adam Back",
+   "year": "1997",
+   "note": "CITED IN THE WHITEPAPER [6]",
+   "source": "http://www.hashcash.org/papers/"
+  },
+  "wild": {
+   "title": "Bitcoin",
+   "subtitle": "A Peer-to-Peer Electronic Cash System",
+   "author": "Satoshi Nakamoto",
+   "year": "31 October 2008",
+   "note": "THE WHITEPAPER",
+   "source": "https://bitcoin.org/bitcoin.pdf"
+  }
+ },
+ "forgery": {
+  "stamp": "NOT SATOSHI",
+  "court": "HIGH COURT, 20 MAY 2024",
+  "case": "COPA v WRIGHT",
+  "citation": "[2024] EWHC 1198 (Ch)",
+  "judge": "Mr Justice Mellor",
+  "findings": [
+   "Found: not the author of the Bitcoin White Paper",
+   "Found: documents forged \"on a grand scale\"",
+   "Declared 14 March 2024 \u00b7 reasons given 20 May 2024"
+  ],
+  "sources": [
+   "https://www.judiciary.uk/judgments/copa-v-wright/",
+   "https://www.twobirds.com/en/news-and-deals/2024/uk/written-judgment-delivered-in-copa-v-wright-trial"
+  ]
+ },
+ "key": {
+  "fingerprint": "DE4E FCA3 E1AB 9E41 CE96 CECB 18C0 9E86 5EC9 48A1",
+  "keyId": "5EC948A1",
+  "published": "http://www.bitcoin.org/Satoshi_Nakamoto.asc",
+  "archive": "https://web.archive.org/web/20110228054007/http://www.bitcoin.org/Satoshi_Nakamoto.asc",
+  "verifiedFrom": "https://github.com/pmlaw/The-Bitcoin-Foundation-Legal-Repo/blob/master/Bylaws/Bylaws_of_The_Bitcoin_Foundation.md",
+  "note": "The Internet Archive and bitcoin.org copies of the key file could not be fetched from the build machine; the fingerprint was taken from the Bitcoin Foundation bylaws on GitHub, which quote the same key."
+ },
+ "posts": [
+  {
+   "text": "No mint or other trusted parties.",
+   "date": "1 Nov 2008",
+   "where": "Cryptography Mailing List",
+   "url": "https://satoshi.nakamotoinstitute.org/emails/cryptography/1/"
+  },
+  {
+   "text": "Participants can be anonymous.",
+   "date": "1 Nov 2008",
+   "where": "Cryptography Mailing List",
+   "url": "https://satoshi.nakamotoinstitute.org/emails/cryptography/1/"
+  },
+  {
+   "text": "It's very attractive to the libertarian viewpoint if we can explain it properly.",
+   "date": "13 Nov 2008",
+   "where": "Cryptography Mailing List",
+   "url": "https://satoshi.nakamotoinstitute.org/emails/cryptography/12/"
+  },
+  {
+   "text": "I'm better with code than with words though.",
+   "date": "13 Nov 2008",
+   "where": "Cryptography Mailing List",
+   "url": "https://satoshi.nakamotoinstitute.org/emails/cryptography/12/"
+  },
+  {
+   "text": "It's completely decentralized with no server or central authority.",
+   "date": "9 Jan 2009",
+   "where": "Cryptography Mailing List",
+   "url": "https://satoshi.nakamotoinstitute.org/emails/cryptography/16/"
+  },
+  {
+   "text": "Total circulation will be 21,000,000 coins.",
+   "date": "9 Jan 2009",
+   "where": "Cryptography Mailing List",
+   "url": "https://satoshi.nakamotoinstitute.org/emails/cryptography/16/"
+  },
+  {
+   "text": "It might make sense just to get some in case it catches on.",
+   "date": "17 Jan 2009",
+   "where": "Cryptography Mailing List",
+   "url": "https://satoshi.nakamotoinstitute.org/emails/cryptography/17/"
+  },
+  {
+   "text": "The root problem with conventional currency is all the trust that's required to make it work.",
+   "date": "11 Feb 2009",
+   "where": "P2P Foundation",
+   "url": "https://satoshi.nakamotoinstitute.org/posts/p2pfoundation/1/"
+  },
+  {
+   "text": "How does everyone feel about the B symbol with the two lines through the outside?",
+   "date": "26 Feb 2010",
+   "where": "BitcoinTalk",
+   "url": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/83/"
+  },
+  {
+   "text": "Much more of the work was designing than coding.",
+   "date": "18 Jun 2010",
+   "where": "BitcoinTalk",
+   "url": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/127/"
+  },
+  {
+   "text": "Lost coins only make everyone else's coins worth slightly more.",
+   "date": "21 Jun 2010",
+   "where": "BitcoinTalk",
+   "url": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/131/"
+  },
+  {
+   "text": "Writing a description for this thing for general audiences is bloody hard.",
+   "date": "5 Jul 2010",
+   "where": "BitcoinTalk",
+   "url": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/167/"
+  },
+  {
+   "text": "Escape the arbitrary inflation risk of centrally managed currencies!",
+   "date": "6 Jul 2010",
+   "where": "BitcoinTalk",
+   "url": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/168/"
+  },
+  {
+   "text": "More like a collectible or commodity.",
+   "date": "27 Aug 2010",
+   "where": "BitcoinTalk",
+   "url": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/427/"
+  },
+  {
+   "text": "Bitcoin is a small beta community in its infancy.",
+   "date": "5 Dec 2010",
+   "where": "BitcoinTalk",
+   "url": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/523/"
+  }
+ ],
+ "patoshi": {
+  "heights": [
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   711,
+   1492,
+   2222,
+   3092,
+   3986,
+   4838,
+   5636,
+   6373,
+   7165,
+   7961,
+   8795,
+   9590,
+   10352,
+   11160,
+   11991,
+   12800,
+   13685,
+   14586,
+   15379,
+   16170,
+   16992,
+   17900,
+   18909,
+   19774,
+   20824,
+   21865,
+   22712,
+   23644,
+   24981,
+   27297,
+   29125,
+   32117,
+   35807,
+   40507,
+   45089
+  ],
+  "blocks": 21953,
+  "btc": 1097652.49,
+  "first": 3,
+  "last": 49973,
+  "source": "https://github.com/bensig/patoshi-addresses",
+  "commit": "414637ce52aa4819926bf1934b2235ed182a0280",
+  "credit": "Pattern discovered by Sergio Demian Lerner; dataset curated by Jameson Lopp"
+ },
+ "clues": [
+  {
+   "date": "31 Oct 2008",
+   "what": "Whitepaper posted"
+  },
+  {
+   "date": "3 Jan 2009",
+   "what": "Genesis block"
+  },
+  {
+   "date": "Dec 2010",
+   "what": "Last forum post"
+  },
+  {
+   "date": "Apr 2011",
+   "what": "Last known email"
+  }
+ ]
+}

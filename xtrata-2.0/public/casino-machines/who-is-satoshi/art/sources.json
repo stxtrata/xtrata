@@ -1,0 +1,270 @@
+{
+ "machine": "Who Is Satoshi?",
+ "generated": "2026-11-02T11:10Z",
+ "rule": "Every symbol is a real record: a public court record, published works (title, author line and year only, never the text), a published PGP key fingerprint, dated forum posts and real block heights. The people appear only as Jim's own pop-art prints (see 'prints'), never as photographs, and nobody is named as Satoshi.",
+ "symbols": {
+  "cherry": {
+   "name": "The Forgery",
+   "kind": "Public court record, shown as Jim's prints of the case (COPA v Wright, Mr Justice Mellor) and a typed case-file card",
+   "record": "COPA v Wright [2024] EWHC 1198 (Ch), Mr Justice Mellor, written judgment 20 May 2024; declaration 14 March 2024",
+   "wording": [
+    "Found: not the author of the Bitcoin White Paper",
+    "Found: documents forged \"on a grand scale\"",
+    "Declared 14 March 2024 · reasons given 20 May 2024"
+   ],
+   "sources": [
+    "https://www.judiciary.uk/judgments/copa-v-wright/",
+    "https://www.twobirds.com/en/news-and-deals/2024/uk/written-judgment-delivered-in-copa-v-wright-trial"
+   ]
+  },
+  "lemon": {
+   "name": "RPOW",
+   "kind": "Historic document with its author's print (Jim's own pop-art print)",
+   "record": "RPOW: Reusable Proofs of Work, Hal Finney, 2004",
+   "source": "https://nakamotoinstitute.org/finney/rpow/"
+  },
+  "chip": {
+   "name": "Bit Gold",
+   "kind": "Historic document with its author's print (Jim's own pop-art print)",
+   "record": "Bit Gold, Nick Szabo, 2005",
+   "source": "https://nakamotoinstitute.org/library/bit-gold/"
+  },
+  "block": {
+   "name": "b-money",
+   "kind": "Historic document with its author's print (Jim's own pop-art print)",
+   "record": "b-money, Wei Dai, 1998; reference [1] of the Bitcoin whitepaper",
+   "source": "http://www.weidai.com/bmoney.txt"
+  },
+  "artifact": {
+   "name": "Hashcash",
+   "kind": "Historic document with its author's print (Jim's own pop-art print)",
+   "record": "Hashcash, Adam Back, 1997; reference [6] of the Bitcoin whitepaper (the 2002 paper)",
+   "source": "http://www.hashcash.org/papers/"
+  },
+  "bitcoin": {
+   "name": "Satoshi's Key",
+   "kind": "Public record",
+   "record": "PGP key fingerprint DE4E FCA3 E1AB 9E41 CE96 CECB 18C0 9E86 5EC9 48A1 (key ID 5EC948A1)",
+   "publishedAt": "http://www.bitcoin.org/Satoshi_Nakamoto.asc",
+   "archive": "https://web.archive.org/web/20110228054007/http://www.bitcoin.org/Satoshi_Nakamoto.asc",
+   "verifiedFrom": "https://github.com/pmlaw/The-Bitcoin-Foundation-Legal-Repo/blob/master/Bylaws/Bylaws_of_The_Bitcoin_Foundation.md",
+   "note": "The Internet Archive and bitcoin.org copies of the key file could not be fetched from the build machine; the fingerprint was taken from the Bitcoin Foundation bylaws on GitHub, which quote the same key."
+  },
+  "wild": {
+   "name": "The Whitepaper",
+   "kind": "Historic document with Satoshi's print (a hood and ₿, no face)",
+   "record": "Bitcoin: A Peer-to-Peer Electronic Cash System, Satoshi Nakamoto, 31 October 2008",
+   "source": "https://bitcoin.org/bitcoin.pdf"
+  },
+  "scatter": {
+   "name": "Forum post",
+   "kind": "Public record",
+   "note": "15 short, widely quoted lines with dates, from the Satoshi Nakamoto Institute archive (dates as the archive gives them).",
+   "items": [
+    {
+     "text": "No mint or other trusted parties.",
+     "date": "1 Nov 2008",
+     "where": "Cryptography Mailing List",
+     "source": "https://satoshi.nakamotoinstitute.org/emails/cryptography/1/"
+    },
+    {
+     "text": "Participants can be anonymous.",
+     "date": "1 Nov 2008",
+     "where": "Cryptography Mailing List",
+     "source": "https://satoshi.nakamotoinstitute.org/emails/cryptography/1/"
+    },
+    {
+     "text": "It's very attractive to the libertarian viewpoint if we can explain it properly.",
+     "date": "13 Nov 2008",
+     "where": "Cryptography Mailing List",
+     "source": "https://satoshi.nakamotoinstitute.org/emails/cryptography/12/"
+    },
+    {
+     "text": "I'm better with code than with words though.",
+     "date": "13 Nov 2008",
+     "where": "Cryptography Mailing List",
+     "source": "https://satoshi.nakamotoinstitute.org/emails/cryptography/12/"
+    },
+    {
+     "text": "It's completely decentralized with no server or central authority.",
+     "date": "9 Jan 2009",
+     "where": "Cryptography Mailing List",
+     "source": "https://satoshi.nakamotoinstitute.org/emails/cryptography/16/"
+    },
+    {
+     "text": "Total circulation will be 21,000,000 coins.",
+     "date": "9 Jan 2009",
+     "where": "Cryptography Mailing List",
+     "source": "https://satoshi.nakamotoinstitute.org/emails/cryptography/16/"
+    },
+    {
+     "text": "It might make sense just to get some in case it catches on.",
+     "date": "17 Jan 2009",
+     "where": "Cryptography Mailing List",
+     "source": "https://satoshi.nakamotoinstitute.org/emails/cryptography/17/"
+    },
+    {
+     "text": "The root problem with conventional currency is all the trust that's required to make it work.",
+     "date": "11 Feb 2009",
+     "where": "P2P Foundation",
+     "source": "https://satoshi.nakamotoinstitute.org/posts/p2pfoundation/1/"
+    },
+    {
+     "text": "How does everyone feel about the B symbol with the two lines through the outside?",
+     "date": "26 Feb 2010",
+     "where": "BitcoinTalk",
+     "source": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/83/"
+    },
+    {
+     "text": "Much more of the work was designing than coding.",
+     "date": "18 Jun 2010",
+     "where": "BitcoinTalk",
+     "source": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/127/"
+    },
+    {
+     "text": "Lost coins only make everyone else's coins worth slightly more.",
+     "date": "21 Jun 2010",
+     "where": "BitcoinTalk",
+     "source": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/131/"
+    },
+    {
+     "text": "Writing a description for this thing for general audiences is bloody hard.",
+     "date": "5 Jul 2010",
+     "where": "BitcoinTalk",
+     "source": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/167/"
+    },
+    {
+     "text": "Escape the arbitrary inflation risk of centrally managed currencies!",
+     "date": "6 Jul 2010",
+     "where": "BitcoinTalk",
+     "source": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/168/"
+    },
+    {
+     "text": "More like a collectible or commodity.",
+     "date": "27 Aug 2010",
+     "where": "BitcoinTalk",
+     "source": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/427/"
+    },
+    {
+     "text": "Bitcoin is a small beta community in its infancy.",
+     "date": "5 Dec 2010",
+     "where": "BitcoinTalk",
+     "source": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/523/"
+    }
+   ]
+  },
+  "vault": {
+   "name": "Sealed envelope",
+   "kind": "Machine prop holding real evidence",
+   "note": "Drawn envelope with a wax seal bearing the ₿ glyph; inside are the published works above."
+  },
+  "chain": {
+   "name": "Patoshi block",
+   "kind": "On-chain record",
+   "source": "https://github.com/bensig/patoshi-addresses",
+   "commit": "414637ce52aa4819926bf1934b2235ed182a0280",
+   "credit": "Pattern discovered by Sergio Demian Lerner; dataset curated by Jameson Lopp",
+   "dataset": {
+    "blocks": 21953,
+    "btc": 1097652.49,
+    "firstHeight": 3,
+    "lastHeight": 49973
+   },
+   "items": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    711,
+    1492,
+    2222,
+    3092,
+    3986,
+    4838,
+    5636,
+    6373,
+    7165,
+    7961,
+    8795,
+    9590,
+    10352,
+    11160,
+    11991,
+    12800,
+    13685,
+    14586,
+    15379,
+    16170,
+    16992,
+    17900,
+    18909,
+    19774,
+    20824,
+    21865,
+    22712,
+    23644,
+    24981,
+    27297,
+    29125,
+    32117,
+    35807,
+    40507,
+    45089
+   ]
+  }
+ },
+ "glyphs": {
+  "₿": "The Bitcoin symbol, public domain, set in type (TeX Gyre Pagella / Georgia)."
+ },
+ "brandAssets": {
+  "xtrataMark": "model/assets/xtrata.svg, exactly as supplied in the build prompt (part 5); on the lower door",
+  "parallaxWordmark": "model/assets/parallax-wordmark.svg, exactly as supplied; small, at the marquee foot"
+ },
+ "fonts": {
+  "cabinet": "TeX Gyre Pagella and DejaVu Sans Mono (open fonts), rasterised with CairoSVG at build time",
+  "screen": "Georgia and Courier New from the player's system, with open fallbacks"
+ },
+ "logosNeedingPermission": [],
+ "logosNote": "No other project's logo appears on this machine. The only marks are the house marks (Xtrata, ParallaX Casino) and the public-domain ₿ glyph.",
+ "openQuestions": [
+  "The Forgery wording follows the judgment as reported (bible open question: confirm you are happy with it).",
+  "The key fingerprint was taken from the Bitcoin Foundation bylaws on GitHub because the Internet Archive and bitcoin.org copies of Satoshi_Nakamoto.asc could not be fetched from the build machine; compare against the archived key before launch.",
+  "Real people now appear on the reels as Jim's prints. Szabo, Back and Dai have publicly denied being Satoshi, and the Wright print sits on the Forgery symbol with a NOT SATOSHI stamp; worth a check before the machine goes on the public floor."
+ ],
+ "prints": {
+  "madeBy": "Jim (jim.btc), ParallaX Casino: his own pop-art prints, supplied as one 4x4 grid on 2 Nov 2026 (art/prints/source-grid.jpg) and cut into 16 tiles of 240 px",
+  "note": "No photograph of anyone is used in the game; these prints are the only images of people.",
+  "where": {
+   "finney-a, finney-b": "Hal Finney · RPOW (2004) symbol",
+   "szabo-a, szabo-b": "Nick Szabo · Bit Gold (2005) symbol",
+   "dai-a, dai-b": "Wei Dai · b-money (1998) symbol",
+   "back-a, back-b": "Adam Back · Hashcash (1997) symbol",
+   "satoshi-a, satoshi-b": "Satoshi Nakamoto (a hood and ₿, no face) · the Whitepaper wild",
+   "wright": "COPA v Wright · the Forgery symbol, with a NOT SATOSHI · HIGH COURT stamp in the corner",
+   "mellor": "Mr Justice Mellor · the Forgery symbol",
+   "lerner-a, lerner-b": "Sergio Demian Lerner (found the Patoshi pattern) · top-left of The Patoshi Pattern and the Evidence panel",
+   "lopp-a, lopp-b": "Jameson Lopp (curated the dataset) · top-right of The Patoshi Pattern and the Evidence panel"
+  },
+  "alsoShown": "The same prints come out of the envelopes in Unmask Satoshi and are the symbol icons in CASE FILE and EVIDENCE."
+ }
+}
