@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>ParallaX Casino · Fruit Machine Room</title>
+<meta name="description" content="Standalone fruit machine room: every ParallaX Casino fruit machine in one hall, on a shared test LAYR balance.">
+<style>
+:root{--bg:#060b12;--panel:#0b121c;--line:#5b4524;--gold:#d9ba80;--ink:#fff0d0;--muted:#a89570;--acc:#eaa443;--blue:#092752}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 Arial,Helvetica,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+#view{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none;outline:0}
+[hidden]{display:none!important}
+
+/* top bar */
+#top{position:fixed;left:0;right:0;top:0;z-index:10;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));background:linear-gradient(#060b12ee,#060b1200);pointer-events:none}
+#top>*{pointer-events:auto}
+#top .brand{display:flex;align-items:center;gap:12px;margin-right:auto;min-width:0}
+#top .brand img{height:32px;width:auto;display:block}
+#top .brand b{display:block;font:300 17px Georgia,serif;letter-spacing:3px;color:var(--ink);white-space:nowrap;text-shadow:0 0 14px #eaa44388}
+#top .brand small{display:block;font-size:10px;color:var(--muted);letter-spacing:1.6px;white-space:nowrap}
+.btn{min-height:42px;min-width:42px;padding:0 14px;border:1px solid #7d6238;border-radius:10px;background:#0d1520e6;font-weight:800;font-size:12px;letter-spacing:.6px;color:var(--ink);backdrop-filter:blur(4px)}
+.btn:hover:not(:disabled){border-color:var(--acc);background:#14202f}
+.btn[aria-pressed=true]{border-color:var(--acc);color:#ffe3a6;background:#1b2434}
+.btn.primary{background:linear-gradient(120deg,#f2b755,#c47d1c);color:#1a1004;border-color:#fff0d0}
+.btn.primary:hover:not(:disabled){background:linear-gradient(120deg,#ffd07d,#d58b25)}
+.btn.warn{border-color:#b04a4a}
+.bal{padding:5px 12px;border:1px solid var(--line);border-radius:10px;background:#060b12d9;font-weight:800;min-width:110px}
+.bal small{display:block;font-size:9px;color:var(--muted);letter-spacing:1.2px}
+
+/* walking hints */
+#prompt{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:8;padding:10px 18px;border:1px solid var(--acc);border-radius:999px;background:#060b12ea;color:#ffe3a6;font-weight:800;letter-spacing:.8px;pointer-events:auto;cursor:pointer}
+#hint{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;font-size:11px;color:var(--muted);letter-spacing:1px;text-align:center;pointer-events:none;width:94vw;text-shadow:0 1px 4px #000}
+#cross{position:fixed;left:50%;top:50%;width:8px;height:8px;margin:-4px;border-radius:50%;background:rgba(255,255,255,.55);z-index:14;pointer-events:none;transition:.15s}
+#cross.on{width:16px;height:16px;margin:-8px;background:transparent;border:2px solid var(--gold);box-shadow:0 0 12px rgba(227,184,74,.7)}
+#lockhint{position:fixed;left:50%;bottom:calc(46px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;padding:6px 12px;border-radius:3px;background:#060d17eb;border:1px solid var(--line);color:var(--muted);font-size:11px;letter-spacing:.4px;pointer-events:none;white-space:nowrap;max-width:94vw}
+#joy{position:fixed;left:max(18px,env(safe-area-inset-left));bottom:calc(30px + env(safe-area-inset-bottom));width:124px;height:124px;border-radius:50%;border:1px solid #d9ba8066;background:#060b1266;z-index:9;touch-action:none;display:none}
+#joy i{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:#d9ba8099;border:1px solid #fff0d0aa}
+body.touch #joy{display:block}
+body.touch #hint{display:none}
+body.view #joy,body.view #hint,body.view #cross,body.view #prompt,body.view #lockhint{display:none!important}
+
+/* machines list */
+#dir{position:fixed;left:12px;top:64px;bottom:12px;width:min(340px,calc(100vw - 24px));z-index:30;display:flex;flex-direction:column;background:#0b121cf5;border:1px solid #7d6238;border-radius:14px;box-shadow:0 30px 80px #000c;overflow:hidden}
+#dir header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
+#dir h2{margin:0;font:300 18px Georgia,serif;letter-spacing:2px}
+#dir ol{list-style:none;margin:0;padding:6px;overflow:auto;flex:1}
+#dir li button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border:1px solid transparent;border-radius:10px;background:none}
+#dir li button:hover{background:#14202f;border-color:#5b4524}
+#dir .no{flex:0 0 34px;font:800 12px Arial;color:var(--muted);letter-spacing:1px}
+#dir .sw{flex:0 0 10px;height:10px;border-radius:50%;box-shadow:0 0 8px currentColor;background:currentColor}
+#dir .nm{flex:1;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dir .st{font-size:10px;color:var(--muted);letter-spacing:1px}
+#dir li.here .nm{color:#ffe3a6}
+
+/* seated cabinet controls */
+#cab{position:fixed;left:0;right:0;bottom:0;z-index:12;padding:10px max(12px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:linear-gradient(#060b1200,#060b12f2 38%);display:flex;flex-direction:column;align-items:center;gap:8px}
+#cabInfo{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 18px;font-size:12px}
+#cabInfo b.name{font:300 16px Georgia,serif;letter-spacing:2px;color:var(--ink)}
+#cabInfo .kv{color:var(--muted);letter-spacing:1px}
+#cabInfo .kv span{color:var(--ink);font-weight:800;margin-left:4px}
+#cabStatus{max-width:min(720px,94vw);text-align:center;color:#ffe3a6;min-height:1.4em;font-size:12px}
+#cabBtns{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:min(1240px,98vw)}
+#cabBtns .btn{min-height:42px;padding:0 11px}
+#gamble{border-color:#ffd76a;color:#ffe9a8}
+#cHere[aria-pressed=true]{border-color:#e0be83;background:#b58d4930;color:#f3d8ac}
+#cMore{display:none}
+/* Play here: the casino's compact controls, bottom right, the room stays walkable (body.machine-floor in the casino) */
+body.floor #cab{left:auto;right:20px;bottom:18px;width:min(460px,calc(100vw - 30px));padding:13px 15px;background:linear-gradient(115deg,#0c1522e6,#101a28cc);border:1px solid #d9b47770;border-top:2px solid #d9b477;border-radius:5px;box-shadow:0 8px 34px #0006;backdrop-filter:blur(3px);gap:6px}
+body.floor #cabInfo{gap:4px 16px;justify-content:flex-start;width:100%}
+body.floor #cabInfo b.name{flex-basis:100%;font-size:18px}
+body.floor #cabStatus{text-align:left;width:100%;font-size:10px;min-height:13px}
+body.floor #cabBtns{flex-wrap:wrap;justify-content:flex-start;width:100%;gap:6px;max-width:none}
+body.floor #cabBtns .btn{min-height:36px;padding:0 10px;font-size:10px}
+body.floor #cabBtns #cSpin{flex:1;min-width:90px}
+body.floor #cMore{display:inline-flex;align-items:center;justify-content:center}
+body.floor:not(.more) #cabBtns .opt{display:none}
+body.floor #featPort{left:auto;right:20px;transform:none;bottom:290px;width:min(600px,calc(100vw - 30px));max-height:46vh;overflow:auto}
+body.floor #prompt{left:20px;bottom:26px;transform:none}
+body.floor #cross:not([hidden]){display:block!important}
+body.floor #lockhint{left:20px;transform:none;bottom:128px}
+body.floor #hint{left:20px;transform:none;bottom:84px;text-align:left;width:auto;max-width:calc(100vw - 520px)}
+
+/* game ports (modals + feature bar shown from the game's own markup) */
+#port{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:#02050abd;padding:16px}
+#port.on{display:flex}
+#featPort{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:13;width:min(900px,96vw)}
+#port,#featPort{-webkit-user-select:text;user-select:text}
+
+/* the game frame: kept out of sight and drawn by the room; the game takes the whole window in full screen */
+.fmFrame{position:fixed!important;left:-10000px!important;top:0!important;width:1000px!important;height:850px!important;visibility:hidden!important;border:0!important;pointer-events:none!important}   /* as the casino's .pxLogicFrame: a game in full screen overrides these with its own inline !important styles */
+
+/* test + help panels */
+.sheet{position:fixed;z-index:50;right:12px;top:64px;width:min(400px,calc(100vw - 24px));max-height:calc(100vh - 80px);overflow:auto;background:#0b121cf8;border:1px solid #7d6238;border-radius:14px;padding:16px;box-shadow:0 30px 80px #000c}
+.sheet h2{font:300 20px Georgia,serif;letter-spacing:2px;margin:0 0 6px}
+.sheet h3{font-size:11px;letter-spacing:1.5px;color:var(--gold);margin:16px 0 8px}
+.sheet p,.sheet li{color:var(--muted);font-size:12px;margin:6px 0}
+.sheet .row{display:flex;flex-wrap:wrap;gap:8px}
+.sheet .close{position:absolute;right:10px;top:10px;min-height:32px;min-width:32px;padding:0 8px}
+.sheet kbd{display:inline-block;min-width:22px;padding:1px 6px;border:1px solid #7d6238;border-radius:5px;background:#14202f;color:var(--ink);font:700 11px Arial;text-align:center}
+#stats{font:11px/1.5 ui-monospace,Menlo,monospace;color:#9fb4c8;white-space:pre-wrap}
+
+/* intro + loading */
+#intro{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#0b121cdd,#02050af2);padding:16px}
+#intro .card{width:min(560px,100%);padding:26px 26px 22px;border:1px solid #7d6238;border-radius:16px;background:#0b121cf2;box-shadow:0 30px 90px #000;text-align:center}
+#intro img{height:64px;max-width:90%}
+#intro h1{margin:14px 0 4px;font:300 26px Georgia,serif;letter-spacing:4px}
+#intro p{color:var(--muted);margin:8px 0}
+#intro ul{list-style:none;margin:14px 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;text-align:left;color:#cdbb95;font-size:12px}
+#intro .bar{height:6px;border-radius:3px;background:#14202f;overflow:hidden;margin:16px 0 4px}
+#intro .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#c47d1c,#ffd07d);transition:width .2s}
+#err{position:fixed;left:12px;right:12px;bottom:12px;z-index:90;background:#3a0d0d;border:1px solid #a33;border-radius:10px;padding:10px;display:none}
+#toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:80;padding:10px 16px;border-radius:10px;background:#0b121cf2;border:1px solid var(--acc);color:#ffe3a6;font-weight:700;max-width:92vw;text-align:center;display:none}
+@media(max-width:700px){
+  #top .brand img{display:none}.btn{padding:0 10px;font-size:11px}#cabBtns .btn{flex:1 1 30%}
+  #featPort{bottom:calc(210px + env(safe-area-inset-bottom))}
+}
+</style>
+</head>
+<body>
+<canvas id="view" tabindex="0" aria-label="The Fruit Machine Room. Walk with W A S D, look by dragging, press E at a cabinet to play."></canvas>
+
+<header id="top">
+  <div class="brand"><img src="vendor/brand/parallax-casino-wordmark.svg" alt="ParallaX Casino"><div><b>FRUIT MACHINE ROOM</b><small id="sub">STANDALONE · TEST LAYR</small></div></div>
+  <div class="bal"><small>TEST LAYR</small><span id="bal">—</span></div>
+  <button class="btn" id="bDir" aria-pressed="false">Machines (G)</button>
+  <button class="btn" id="bHelp" aria-pressed="false">Help (H)</button>
+  <button class="btn" id="bTest" aria-pressed="false">Test</button>
+</header>
+
+<div id="cross" hidden></div>
+<div id="lockhint" hidden>Click to look around, or drag</div>
+<button id="prompt" hidden></button>
+<div id="hint" hidden>WASD WALK · MOUSE LOOK · SHIFT RUNS · E OR CLICK A CABINET TO PLAY · G MACHINES · TAB OR ESC FREES THE MOUSE</div>
+<div id="joy"><i></i></div>
+
+<aside id="dir" hidden aria-label="Machines in the room"><header><h2>MACHINES</h2><button class="btn" id="dirClose">Close</button></header><ol id="dirList"></ol></aside>
+
+<section id="cab" hidden aria-label="Cabinet controls">
+  <div id="cabInfo"><b class="name" id="cabName"></b><span class="kv">BALANCE<span id="cBal">—</span></span><span class="kv">BET<span id="cBet">—</span></span><span class="kv">WIN<span id="cWin">—</span></span></div>
+  <div id="cabStatus"></div>
+  <div id="cabBtns">
+    <button class="btn" id="cBetDown" title="Lower bet ( [ )">− BET</button>
+    <button class="btn primary" id="cSpin" title="Space">SPIN</button>
+    <button class="btn" id="cBetUp" title="Raise bet ( ] )">+ BET</button>
+    <button class="btn opt" id="cAuto" aria-pressed="false" title="A (A walks while you are playing here; use this button)">AUTO</button>
+    <button class="btn opt" id="cTurbo" aria-pressed="false" title="T">TURBO</button>
+    <button class="btn" id="cGamble" hidden></button>
+    <button class="btn opt" id="cSound" title="M">SOUND</button>
+    <button class="btn opt" id="cPays" title="Guide / pay table">GUIDE</button>
+    <button class="btn opt" id="cLab" title="Bonus Lab / test panel (L)">BONUS LAB</button>
+    <button class="btn" id="cHere" aria-pressed="true" title="Stay where you stand and keep walking and looking">PLAY HERE</button>
+    <button class="btn opt" id="cView" title="V">CABINET VIEW</button>
+    <button class="btn opt" id="cFs" title="F">FULL SCREEN</button>
+    <button class="btn" id="cMore" title="Q: more controls and free the mouse">MORE</button>
+    <button class="btn warn" id="cLeave" title="E or Esc">WALK AWAY</button>
+  </div>
+</section>
+<div id="featPort"></div>
+<div id="port" role="dialog" aria-modal="true"></div>
+
+<aside class="sheet" id="test" hidden aria-label="Test panel">
+  <button class="btn close" data-close="test">✕</button>
+  <h2>TEST PANEL</h2>
+  <p>This room is a stand-alone test build. Every cabinet plays on one shared <b>test</b> LAYR balance that is kept in this browser only. The casino's real balance is never touched, and the Bonus Lab is switched on for every machine.</p>
+  <h3>BONUS LAB</h3>
+  <div class="row"><button class="btn" id="tLab">Open the Bonus Lab here</button><button class="btn" id="tFs">Full screen (every menu)</button></div>
+  <p id="tLabNote">Sit at a cabinet first. The Lab lets you pick any bonus round or special event and play it now, on a separate lab balance.</p>
+  <h3>TEST BALANCE</h3>
+  <div class="row"><button class="btn" id="tResetBal">Reset balance to 100,000</button><button class="btn" id="tResetMachine">Reset this machine's state</button><button class="btn warn" id="tResetAll">Reset every machine</button></div>
+  <h3>ROOM</h3>
+  <div class="row"><button class="btn" id="tSprint">Walk faster</button><button class="btn" id="tTourStart">Go to the first cabinet</button><button class="btn" id="tTourEnd">Go to the last cabinet</button></div>
+  <h3>STATS</h3>
+  <div id="stats"></div>
+</aside>
+
+<aside class="sheet" id="help" hidden aria-label="Help">
+  <button class="btn close" data-close="help">✕</button>
+  <h2>HOW TO MOVE</h2>
+  <ul>
+    <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys walk, <kbd>Shift</kbd> runs. Click the room once and the mouse looks around by itself (the pointer disappears). <kbd>Esc</kbd> or <kbd>Q</kbd> gives the pointer back for the buttons; click the room to look again.</li>
+    <li>Same as the casino: <kbd>E</kbd>, <kbd>Enter</kbd> or a click on a cabinet connects you to it where you stand. You can keep walking and looking, and you disconnect when you walk away (<kbd>E</kbd> or WALK AWAY too).</li>
+    <li><kbd>G</kbd> opens the list of machines and walks you to any of them.</li>
+  </ul>
+  <h2>AT A CABINET</h2>
+  <ul>
+    <li><kbd>Space</kbd> spins, <kbd>[</kbd> <kbd>]</kbd> change the bet, <kbd>T</kbd> turbo, <kbd>M</kbd> sound, <kbd>1</kbd>–<kbd>9</kbd> picks in a bonus. <kbd>Q</kbd> or MORE shows every other control (auto, guide, Bonus Lab, full screen) and frees the pointer.</li>
+    <li>Put the crosshair on the cabinet's own buttons, lever or screen and click. Turbo, gamble and bonus buttons are also drawn on the screen itself.</li>
+    <li><kbd>V</kbd> or CABINET VIEW looks at the whole cabinet, then a close-up of the screen, with the pointer free; PLAY HERE takes you back to where you stood.</li>
+    <li><kbd>F</kbd> or FULL SCREEN fills the window with the game's own layout, with every menu, panel and setting on its bottom bar.</li>
+    <li><kbd>L</kbd> or BONUS LAB opens the machine's Bonus Lab (or its test panel) so you can pick any bonus round and play it now.</li>
+  </ul>
+</aside>
+
+<div id="intro">
+  <div class="card">
+    <img src="vendor/brand/parallax-casino-sign.svg" alt="ParallaX Casino">
+    <h1>FRUIT MACHINE ROOM</h1>
+    <p id="introCount">Setting up the hall…</p>
+    <ul>
+      <li>WASD / arrows · walk</li><li>Mouse · look (click once)</li>
+      <li>E or click · play a cabinet here</li><li>G · list of machines</li>
+      <li>F · full screen at a cabinet</li><li>L · Bonus Lab at a cabinet</li>
+    </ul>
+    <div class="bar"><i id="introBar"></i></div>
+    <button class="btn primary" id="introGo" disabled style="margin-top:12px;min-width:200px">ENTER THE ROOM</button>
+    <p style="font-size:11px">Stand-alone test room · shared test LAYR balance · not linked to the casino yet</p>
+  </div>
+</div>
+<div id="err" role="alert"></div>
+<div id="toast" role="status"></div>
+
+<script>
+/* Test flags. They tell the games hosted in this room that they are on a test page, which turns on every Bonus Lab and test panel.
+   They exist ONLY in this stand-alone room: the casino must never set any of them. */
+Object.assign(window, { PX_STANDALONE_TEST: true, PX_DEV_LAB: true, CLUBX_TEST_PAGE: true, MH_TEST_PAGE: true, NL_TEST_PAGE: true, SC_TEST_PAGE: true,
+  SAT_TEST_PAGE: true, HALVING_TEST_PAGE: true, STACK_TEST_PAGE: true, WIS_TEST_PAGE: true, XO_TEST_PAGE: true, G21_TEST_BUILD: true });
+(() => { const k = 'xtrata.parallax.test.fruit-room.layr.v1'; try { const r = JSON.parse(localStorage.getItem(k) || '{}'); if (!r.bank) { r.bank = 100000; localStorage.setItem(k, JSON.stringify(r)); } } catch (e) {} })();
+</script>
+<script src="layr-room-account.js"></script>
+<script src="vendor/three.r128.min.js"></script>
+<script src="registry.js"></script>
+<script src="room.js"></script>
+</body>
+</html>
