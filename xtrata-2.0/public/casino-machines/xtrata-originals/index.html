@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#05070b"><meta name="color-scheme" content="dark">
+<title>Xtrata Originals — test page</title>
+<meta name="description" content="Standalone test page for Xtrata Originals: a small 3D studio, the real packed cabinet and game, a test LAYR account, the Bonus Lab and a test panel. Not part of the casino.">
+<style>
+:root{color-scheme:dark;--acc:#4675b6;--acc2:#f2aa5a;--bg:#05070b;--line:#ffffff1c}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:#eef2f6;font-family:Arial,Helvetica,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;-webkit-tap-highlight-color:transparent}button:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+#studio{position:fixed;inset:0;touch-action:none;cursor:grab}#studio.dragging{cursor:grabbing}#studio.hot{cursor:pointer}#studio canvas{display:block;width:100%;height:100%}
+header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:linear-gradient(#07040dee,#07040d00);z-index:5;pointer-events:none}header>*{pointer-events:auto}
+.brand{font:20px Georgia,serif;letter-spacing:4px;color:var(--acc);margin-right:8px;cursor:default;text-shadow:0 0 14px #4675b666}.brand small{font:11px Arial;letter-spacing:2px;color:#8f9bb0;margin-left:8px}
+.pill{display:inline-flex;border:1px solid var(--line);border-radius:30px;padding:3px;background:#0b0f16cc}.pill button{padding:0 14px;min-height:44px;border-radius:30px;font-size:12px;color:#d6e2f2}.pill button.on{background:#4675b633;color:#fff}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:30px;padding:0 6px 0 14px;min-height:44px;background:#0b0f16cc;font-size:11px;letter-spacing:1.2px;color:#8f9bb0}.chip b{font-size:16px;font-weight:400;color:var(--acc2);letter-spacing:0;font-variant-numeric:tabular-nums}
+.btn{min-height:44px;padding:0 16px;border:1px solid #4675b666;border-radius:30px;background:#0b0f16cc;font-size:12px;letter-spacing:1px}.btn:hover{background:#4675b624}
+#hint{position:fixed;left:0;right:0;bottom:10px;text-align:center;font-size:11px;letter-spacing:1.4px;color:#7d889b;pointer-events:none;z-index:4;padding:0 16px}
+#overlay{position:fixed;inset:0;z-index:8;pointer-events:none}#overlay>*{pointer-events:auto}
+#back{position:absolute;inset:0;background:#020306c9;backdrop-filter:blur(6px);display:none}
+#modalHost{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none}#modalHost>*{pointer-events:auto}
+#featHost{position:absolute;left:0;right:0;bottom:36px;display:flex;justify-content:center;padding:0 12px;pointer-events:none}#featHost>*{pointer-events:auto}
+#test{position:fixed;left:12px;bottom:40px;width:min(380px,calc(100vw - 24px));max-height:70vh;overflow:auto;background:#0b0f16f2;border:1px solid #4675b666;border-radius:12px;padding:14px;z-index:9;display:none;box-shadow:0 20px 60px #000a}
+#test h3{margin:0 0 10px;font-size:11px;letter-spacing:2px;color:var(--acc2);font-weight:700}#test .g{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}#test .g button{min-height:44px;border:1px solid #4675b655;border-radius:8px;font-size:12px;padding:4px 6px}#test .g button:hover{background:#4675b624}
+#test pre{font:11px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;color:#cfd8e6;background:#05070b;border:1px solid var(--line);border-radius:6px;padding:8px;margin:0;max-height:180px;overflow:auto}
+#test .n{display:flex;gap:6px;align-items:center;margin-bottom:12px;font-size:12px}#test input{width:110px;min-height:44px;background:#05070b;color:#fff;border:1px solid #4675b655;border-radius:8px;padding:0 8px;font:inherit}
+#loadErr{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;line-height:1.7;z-index:20;background:var(--bg)}
+@media(max-width:700px){.brand small{display:none}.pill button{padding:0 10px}#hint{font-size:10px}}
+</style></head><body>
+<div id="studio" aria-label="Interactive 3D Xtrata Originals cabinet. Drag to orbit, scroll or pinch to zoom, click the lever or the deck buttons."></div>
+<header><span class="brand" id="brand">XTRATA ORIGINALS<small>TEST PAGE</small></span>
+<span class="pill" role="group" aria-label="Camera view"><button data-view="cabinet" class="on">Cabinet</button><button data-view="screen">Screen</button><button data-view="orbit">Orbit</button></span>
+<button class="btn" id="fsBtn" aria-label="Game full screen (F)">⛶ Full screen · F</button>
+<span class="chip">PLAY BALANCE <b id="bal">0</b><button class="btn" id="resetBtn" style="min-height:44px;padding:0 14px">Reset</button></span>
+<button class="btn" id="labBtn">Bonus Lab · L</button><button class="btn" id="testToggle">Test panel · T</button><button class="btn" id="spinBtn">Inscribe · Space</button></header>
+<div id="hint">DRAG TO ORBIT · SCROLL TO ZOOM · PULL THE LEVER OR PRESS THE DECK BUTTONS · TAP THE SCREEN · SPACE INSCRIBES · F FULL SCREEN · L BONUS LAB · T TEST PANEL</div>
+<div id="overlay"><div id="back"></div><div id="modalHost"></div><div id="featHost"></div></div>
+<aside id="test" aria-label="Test panel"><h3>TEST PANEL · PLAY MONEY</h3>
+<p style="font-size:11px;color:#8f9bb0;margin:0 0 8px">Forces each bonus through the real engine on the test account. For a separate balance, every bet level, seeds, Replay and Run all, open the Bonus Lab (L).</p>
+<div class="g"><button data-k="free">Session Mode</button><button data-k="vault">The Chorus</button><button data-k="chain">Layers</button><button data-k="chain-full">Layers · full tower</button><button data-k="jackpot">The X</button><button data-k="gamble-win">Win → gamble</button><button data-k="cameo">Audionaut cameo</button><button data-k="callisto">CALLISTO ×5</button><button data-k="twins:none">Holders: unknown</button><button data-k="twins:some">Holders: minted</button><button data-k="twins:all">Holders: all 111</button><button data-k="reduced">Reduced motion</button><button data-k="lab">Bonus Lab</button><button data-k="runall">Lab · Run all</button><button data-k="reset">Reset balance</button><button data-k="state">Show state</button></div>
+<div class="n"><input id="simN" type="number" value="1000000" min="1000" step="1000" aria-label="Spins to simulate"><button class="btn" id="simBtn" style="min-height:44px">Run RTP sim</button></div><pre id="out">Ready.</pre></aside>
+<div id="loadErr"><div><h2 style="font:24px Georgia,serif;color:#f2aa5a;font-weight:400">The machine could not start.</h2><p id="loadMsg" style="color:#b6c0cf;max-width:520px"></p></div></div>
+<script src="vendor/three.js"></script>
+<script src="vendor/software-renderer.js"></script>
+<script>
+/* ------------------------------------------------------------------------------------------------
+   Stub ParallaxLAYRAccount. Same surface the game uses (acquire, ready, error, balance, machine, openGame, saveGame),
+   same transaction rules as the casino's account: the balance can only change inside a committed engine call.
+   Play balance only. Stored in this page's localStorage; Reset puts it back to the start balance.
+   ------------------------------------------------------------------------------------------------ */
+window.XO_TEST_PAGE = !/[?&]prod\b/.test(location.search); /* ?prod mimics the casino: the game gets no test hooks, so only the in-game Bonus lab is available */
+(() => {
+  const KEY = 'xtrata-originals.testpage.account.v1', START = 10000; let acct = null, owned = false, draft = null; const metadata = new WeakMap(), listeners = new Set();
+  try { acct = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!acct || typeof acct.bank !== 'number' || typeof acct.games !== 'object') acct = { bank: START, games: {} };
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(acct)); } catch (e) {} };
+  const copy = v => JSON.parse(JSON.stringify(v)), money = v => { if (!Number.isFinite(v) || v < 0) throw Error('Invalid LAYR amount.'); return Math.round(v * 100) / 100; };
+  const balance = () => draft ? draft.bank : acct.bank, ready = () => owned;
+  const serialize = s => { const o = copy(s); delete o.balance; return o; };
+  function attach(state, id, revision = 0) { delete state.balance; Object.defineProperty(state, 'balance', { configurable: true, enumerable: false, get: balance, set(v) { if (!draft || draft.state !== state) throw Error('Only a committed game action can change the shared LAYR balance.'); draft.bank = money(v); } }); metadata.set(state, { id, revision }); return state; }
+  function commit(state, bank) { const m = metadata.get(state); if (!m) throw Error('Machine is not linked to the LAYR account.'); const prev = acct.games[m.id]; if ((prev ? prev.revision : 0) !== m.revision) throw Error('Machine state changed. Reload the test page.'); m.revision++; acct.games[m.id] = { revision: m.revision, state: serialize(state) }; acct.bank = money(bank); persist(); listeners.forEach(f => f()); }
+  function transact(state, fn) { if (!owned) throw Error('The LAYR account is not connected.'); if (draft) throw Error('A LAYR transaction is already running.'); const before = serialize(state); draft = { state, bank: balance() }; try { const r = fn(), next = draft.bank; draft = null; commit(state, next); return r; } catch (e) { draft = null; for (const k of Object.keys(state)) delete state[k]; Object.assign(state, before); throw e; } }
+  window.ParallaxLAYRAccount = Object.freeze({ version: 'test-stub-1', mode: 'test-stub', onChainConnected: false,
+    async acquire() { owned = true; return true; }, ready, error: () => '', balance,
+    machine(id, engine) { const api = { ...engine }; api.fresh = () => attach(engine.fresh(), id); api.load = raw => attach(engine.load ? engine.load(raw) : { ...engine.fresh(), ...(raw || {}) }, id);
+      for (const n of ['start', 'settle', 'pick', 'respin', 'collect', 'endFree', 'gamble']) if (typeof engine[n] === 'function') api[n] = (s, ...a) => transact(s, () => engine[n](s, ...a)); return Object.freeze(api); },
+    openGame(id, engine) { const saved = acct.games[id]; return attach(engine.load(saved && saved.state), id, saved ? saved.revision : 0); },
+    saveGame(state) { if (!owned) return false; if (draft) return true; commit(state, balance()); return true; },
+    saveRoom() { return true; }, bindRoom() {}, subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }, release() { owned = false; } });
+  window.XO_RESET = () => { acct = { bank: START, games: {} }; persist(); };
+  window.XO_START_BALANCE = START;
+})();
+</script>
+<script>
+(async () => {
+'use strict';
+const $ = id => document.getElementById(id), fmt = n => (Math.round(n * 100) / 100).toLocaleString('en-GB', { maximumFractionDigits: 2 });
+const fail = m => { $('loadMsg').innerHTML = m; $('loadErr').style.display = 'flex'; };
+const unpack = async b64 => new Response(new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+let pack;
+try { pack = await (await fetch('pack.json', { cache: 'no-cache' })).json(); } catch (e) { pack = await new Promise(res => { const sc = document.createElement('script'); sc.src = 'pack.js'; sc.onload = () => res(window.XO_PACK || null); sc.onerror = () => res(null); document.head.appendChild(sc); }); } // pack.js lets the page open from disk too
+if (!pack) { fail('Could not load <code>pack.json</code> or <code>pack.js</code> next to this page.'); return; }
+const [modelText, gameHtml] = await Promise.all([unpack(pack.model), unpack(pack.game)]); const data = JSON.parse(modelText);
+const THREE = window.THREE, LITE = /[?&]lite\b/.test(location.search); // lite: the studio renders 1 frame in 30 (automated runs only)
+/* ---------- Game in a hidden frame, exactly like the room: its canvas is the screen texture ---------- */
+const frame = document.createElement('iframe'); frame.className = 'pxLogicFrame'; frame.title = 'Xtrata Originals game logic'; frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1;
+frame.style.cssText = 'position:fixed;left:-4000px;top:0;width:1400px;height:960px;border:0;opacity:0;pointer-events:none';
+frame.allow = 'fullscreen'; frame.setAttribute('allowfullscreen', ''); frame.srcdoc = gameHtml; document.body.appendChild(frame);
+await new Promise(r => frame.addEventListener('load', r, { once: true }));
+let engine = null; for (let i = 0; i < 200 && !(engine = frame.contentWindow.PX_CASINO_ENGINE); i++) await new Promise(r => setTimeout(r, 50));
+if (!engine) { fail('The game did not start.'); return; }
+/* ---------- 3D studio built from the packed model ---------- */
+const images = await Promise.all(data.textures.map(t => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = t.image; })));
+const geos = data.geometries.map(g => { const o = new THREE.BufferGeometry(); for (const [k, a] of Object.entries(g.attributes)) o.setAttribute(k, new THREE.BufferAttribute(new Float32Array(a.array), a.size)); if (g.index) o.setIndex(g.index); o.computeBoundingSphere(); return o; });
+const env = document.createElement('canvas'); env.width = 1024; env.height = 512; { const g = env.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 512); ['#cfdcff', '#1a2233', '#07090d', '#141a26'].forEach((c, i) => gr.addColorStop(i / 3, c)); g.fillStyle = gr; g.fillRect(0, 0, 1024, 512); g.fillStyle = '#cfe0ff'; g.fillRect(150, 90, 70, 290); g.fillRect(700, 90, 70, 290); g.fillStyle = '#fff'; g.fillRect(400, 10, 220, 60); }
+const envTex = new THREE.CanvasTexture(env); envTex.mapping = THREE.EquirectangularReflectionMapping;
+const textures = data.textures.map((t, i) => { const o = new THREE.Texture(images[i]); o.wrapS = t.wrapS; o.wrapT = t.wrapT; o.repeat.fromArray(t.repeat); o.offset.fromArray(t.offset); o.flipY = t.flipY; o.anisotropy = 8; o.needsUpdate = true; return o; });
+const mats = data.materials.map(m => { const p = { color: m.color, map: m.map == null ? null : textures[m.map], transparent: m.transparent, opacity: m.opacity, side: m.side, depthWrite: m.depthWrite, alphaTest: m.alphaTest }; if (m.type === 'basic') return new THREE.MeshBasicMaterial(p); return new THREE.MeshStandardMaterial(Object.assign(p, { roughness: m.roughness, metalness: m.metalness, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, flatShading: m.flatShading, envMap: envTex, envMapIntensity: .65 })); });
+const parts = { crest: null, lever: null, screen: null, spinPhysical: null, portraits: [], glows: [] };
+function node(n) { const o = n.g == null ? new THREE.Group() : new THREE.Mesh(geos[n.g], Array.isArray(n.m) ? n.m.map(i => mats[i]) : mats[n.m]); o.position.fromArray(n.p); o.quaternion.fromArray(n.q); o.scale.fromArray(n.s); o.visible = n.visible;
+  if (n.role) { o.name = 'px-' + n.role; if (n.role === 'portrait') parts.portraits.push(o); else if (n.role === 'edgeGlow') parts.glows.push(o); else parts[n.role === 'screenMesh' ? 'screen' : n.role] = o; } if (n.action) o.userData.pxMachineAction = n.action; n.children.forEach(c => o.add(node(c))); return o; }
+const model = node(data.root);
+function makeRenderer() { try { const c = document.createElement('canvas'); if (!(c.getContext('webgl2') || c.getContext('webgl'))) throw Error('no webgl'); return new THREE.WebGLRenderer({ antialias: true }); } catch (e) { window.__xoSoftware = true; return new SoftwareRenderer(); } } // a WebGL-less browser still draws the cabinet (the casino's SoftwareRenderer path)
+const studio = $('studio'), NOSTUDIO = /[?&]nostudio\b/.test(location.search), renderer = NOSTUDIO ? { domElement: document.createElement('canvas'), setPixelRatio() {}, setClearColor() {}, setSize() {}, render() {} } : makeRenderer(); renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); renderer.setClearColor(0x07090d); studio.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.environment = envTex; scene.add(model);
+scene.add(new THREE.HemisphereLight(0xcfdcff, 0x0a0d14, .6)); const key = new THREE.SpotLight(0xffffff, .9, 40, .6, .6, 1); key.position.set(3, 8, 6); key.target.position.set(0, 2.5, 0); scene.add(key, key.target);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x080a10, roughness: .35, metalness: .35 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+{ const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128); gr.addColorStop(0, 'rgba(70,117,182,.75)'); gr.addColorStop(.45, 'rgba(70,117,182,.25)'); gr.addColorStop(1, 'rgba(70,117,182,0)'); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); const fg = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 3.4), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })); fg.rotation.x = -Math.PI / 2; fg.position.set(0, .01, 1.5); scene.add(fg); } // the machine's floor glow, in its accent
+const glow = new THREE.PointLight(0x4675b6, 1.2, 14); glow.position.set(0, .6, 3.2); scene.add(glow);
+const camera = new THREE.PerspectiveCamera(32, 1, .1, 100);
+const screenTex = new THREE.CanvasTexture(engine.screen); screenTex.anisotropy = 8; if (parts.screen) { parts.screen.material.map = screenTex; parts.screen.material.needsUpdate = true; }
+/* ---------- Camera: drag to orbit, wheel/pinch to zoom, three presets ---------- */
+const VIEWS = { cabinet: { yaw: 0, pitch: .06, dist: 12.2, ty: 3.05 }, screen: { yaw: 0, pitch: .02, dist: 4.9, ty: 2.85 }, orbit: { yaw: .75, pitch: .16, dist: 11.4, ty: 2.7 } };
+let cam = { ...VIEWS.cabinet }, goal = { ...VIEWS.cabinet }, curView = 'cabinet';
+function setView(name) { curView = name; goal = { ...VIEWS[name] }; document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === name)); }
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view));
+function fit() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.fov = w / h < .9 ? 52 : 32; camera.updateProjectionMatrix(); }
+addEventListener('resize', fit); fit();
+const pts = new Map(); let drag = null, pinch = 0;
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+function pick(ev) { const r = renderer.domElement.getBoundingClientRect(); mouse.set((ev.clientX - r.left) / r.width * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mouse, camera); const hits = ray.intersectObject(model, true); for (const h of hits) { if (!h.object.visible) continue; let o = h.object; while (o) { if (o.userData && o.userData.pxMachineAction) return { action: o.userData.pxMachineAction }; if (o === parts.screen) return { screen: h }; o = o.parent; } if (h.object.material && !h.object.material.transparent) return null; } return null; }
+studio.addEventListener('pointerdown', e => { studio.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); drag = { x: e.clientX, y: e.clientY, moved: 0 }; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); } });
+studio.addEventListener('pointermove', e => {
+  const p = pts.get(e.pointerId);
+  if (!p) { const h = pick(e); studio.classList.toggle('hot', !!h); return; }
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); goal.dist = cam.dist = Math.max(3, Math.min(22, cam.dist * pinch / d)); pinch = d; return; }
+  if (drag) { drag.moved += Math.abs(dx) + Math.abs(dy); if (drag.moved > 5) { studio.classList.add('dragging'); goal.yaw = cam.yaw = cam.yaw - dx * .006; goal.pitch = cam.pitch = Math.max(-.2, Math.min(1.1, cam.pitch + dy * .005)); if (curView !== 'orbit') { curView = 'orbit'; document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === 'orbit')); } } }
+});
+studio.addEventListener('pointerup', e => { const was = drag && drag.moved <= 5 && pts.size === 1; pts.delete(e.pointerId); studio.classList.remove('dragging'); if (was) clickAt(e); drag = null; });
+studio.addEventListener('pointercancel', e => { pts.delete(e.pointerId); drag = null; studio.classList.remove('dragging'); });
+studio.addEventListener('wheel', e => { e.preventDefault(); goal.dist = cam.dist = Math.max(3, Math.min(22, cam.dist * Math.exp(e.deltaY * .001))); }, { passive: false });
+function clickAt(e) { const h = pick(e); if (!h) return; if (h.action) engine.action(h.action); else if (h.screen && h.screen.uv) engine.tap(h.screen.uv.x * 1400, (1 - h.screen.uv.y) * 960); }
+/* ---------- Frame loop: lever, rain, hologram, screen texture ---------- */
+let lastRev = -1, t0 = performance.now(), crestAngle = 0;
+if (parts.spinPhysical) parts.spinPhysical.userData.z0 = parts.spinPhysical.position.z; parts.glows.forEach(g => { if (g.material && g.material.color) { g.material = g.material.clone(); g.userData.c0 = g.material.color.getHex(); } });
+// Side dressing: the framed Audionauts fill in as the game's bundled portraits load (the packed model carries them too, so the room shows them without this).
+const portraitMats = parts.portraits.map(p => { const m = p.material.clone(); m.userData.lit = 0; p.material = m; m.color.setHex(0x111418); return m; });
+function fillPortraits(now) { let n = 0; try { n = (frame.contentWindow.XtrataOriginals.pools().artifact || 0); } catch (e) {} portraitMats.forEach((m, i) => { const want = i < n ? 1 : 0; if (m.userData.lit < want) { m.userData.lit = Math.min(1, m.userData.lit + .04); const v = Math.round(17 + m.userData.lit * 238); m.color.setRGB(v / 255, v / 255, v / 255); } }); }
+function leverCurve(p) { p = Math.max(0, Math.min(1, p)); if (p < .3) return 1 - Math.pow(1 - p / .3, 2); if (p < .45) return 1; const x = (p - .45) / .55; return 1 - x * x * (3 - 2 * x); }
+function frameLoop(now) {
+  requestAnimationFrame(frameLoop);
+  for (const n of ['yaw', 'pitch', 'dist', 'ty']) cam[n] += (goal[n] - cam[n]) * .14;
+  camera.position.set(Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist, cam.ty + Math.sin(cam.pitch) * cam.dist, Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist); camera.lookAt(0, cam.ty, 0);
+  let m = null; try { m = engine.mechanics(); } catch (e) {}
+  if (parts.lever) { const L = m && m.lever; parts.lever.rotation.x = L ? L.angle * leverCurve(L.elapsed / L.duration) : 0; }
+  const jack = m && m.jackpot, win = m && m.win, bonus = m && m.bonus;
+  crestAngle += (now - (frameLoop.last || now)) / 1000 * (jack ? 4.2 : bonus ? 1.6 : .45); frameLoop.last = now; if (parts.crest) parts.crest.rotation.y = crestAngle; // the topper turns on its own clock and reacts to bonuses
+  if (parts.spinPhysical) parts.spinPhysical.position.z = parts.spinPhysical.userData.z0 - (m && m.lever && m.lever.elapsed < 220 ? .03 : 0);
+  glow.intensity = jack ? 2.4 + Math.sin(now / 90) : bonus ? 1.7 + .4 * Math.sin(now / 220) : win ? 1.6 : 1.2; parts.glows.forEach((g, i) => { if (g.material && g.material.color) g.material.color.setHex(jack ? [0xffffff, 0x6593cf, 0xf2aa5a][Math.floor(now / 140 + i) % 3] : bonus ? (Math.floor(now / 300 + i) % 2 ? 0x6593cf : 0xe28c3b) : g.userData.c0); });
+  fillPortraits(now);
+  const rv = engine.revision(); if (rv !== lastRev) { lastRev = rv; screenTex.needsUpdate = true; }
+  if (!LITE || (frameLoop.n = (frameLoop.n || 0) + 1) % 30 === 0) renderer.render(scene, camera);
+}
+requestAnimationFrame(frameLoop);
+/* ---------- The room's HTML port: the game's dialog and bonus bar are drawn here, and clicks go back through the engine ---------- */
+const host = document.createElement('div'); const sh = host.attachShadow({ mode: 'open' });
+sh.innerHTML = `<style>${pack.css.replace(/:root/g, ':host')}\n:host{display:contents;--ink:#eef2f6}#m,#f{font-family:Arial,Helvetica,sans-serif;color:#eef2f6}dialog{position:static;display:block;margin:0;max-height:86vh;overflow:auto}#f #featureBar{margin:0 auto;max-width:min(980px,96vw)}</style><div id="m"></div><div id="f"></div>`;
+document.body.appendChild(host);
+const mEl = sh.getElementById('m'), fEl = sh.getElementById('f');
+$('modalHost').appendChild(mEl); $('featHost').appendChild(fEl);
+let lastModal = '', lastFeat = '';
+function syncUI() {
+  let u; try { u = engine.ui(); } catch (e) { return; }
+  $('bal').textContent = fmt(u.balance);
+  if (u.modal !== lastModal) { lastModal = u.modal; mEl.innerHTML = u.modal; $('back').style.display = u.modal ? 'block' : 'none'; $('modalHost').style.display = u.modal ? 'flex' : 'none'; }
+  if (u.feature !== lastFeat) { lastFeat = u.feature; fEl.innerHTML = u.feature; const fb = fEl.querySelector('#featureBar'); if (fb) fb.removeAttribute('hidden'); }
+}
+setInterval(syncUI, 100);
+const tokenOf = el => { const s = el.closest && el.closest('[data-px-source]'); return s ? { el: s, token: s.getAttribute('data-px-source') } : null; };
+for (const root of [mEl, fEl]) {
+  root.addEventListener('click', e => { const t = tokenOf(e.target); if (!t) return; const tag = t.el.tagName; if (tag === 'BUTTON' || tag === 'A' || t.el.getAttribute('role') === 'button') { e.preventDefault(); engine.click(t.token); } });
+  for (const ev of ['input', 'change']) root.addEventListener(ev, e => { const t = tokenOf(e.target); if (!t) return; const el = e.target; if (el.matches('input,select,textarea')) engine.input(t.token, el.value, !!el.checked, ev); });
+}
+$('back').onclick = () => engine.closeModal();
+/* ---------- Header, keys, test panel ---------- */
+$('fsBtn').onclick = () => engine.fullscreen.toggle(); $('spinBtn').onclick = () => engine.action('spin'); $('labBtn').onclick = () => engine.lab && engine.lab.open(); $('testToggle').onclick = () => toggleTest();
+$('resetBtn').onclick = () => { try { engine.deactivate(); } catch (e) {} window.XO_RESET(); location.reload(); };
+addEventListener('keydown', e => { if (e.target.matches && e.target.matches('input,textarea,select')) return; if (e.code === 'Space') { e.preventDefault(); engine.action('spin'); } else if (e.key.toLowerCase() === 'f') engine.fullscreen.toggle(); else if (e.key.toLowerCase() === 'l') { if (engine.lab) engine.lab.open(); } else if (e.key.toLowerCase() === 't') toggleTest(); else if (e.key === 'Escape') engine.closeModal(); });
+const testEl = $('test'); const toggleTest = () => { testEl.style.display = testEl.style.display === 'block' ? 'none' : 'block'; };
+$('brand').addEventListener('click', e => { if (e.detail >= 3) toggleTest(); }); if (/[?&]test\b/.test(location.search)) toggleTest();
+const out = s => { $('out').textContent = typeof s === 'string' ? s : JSON.stringify(s, null, 1); };
+testEl.addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k, T = engine.test; if (!T) { out('Test hooks are off.'); return; }
+  if (k.startsWith('twins:')) out(T.setTwins(k.slice(6))); else if (k === 'lab') { engine.lab.open(); out('Bonus Lab open.'); } else if (k === 'runall') out('Run all: ' + engine.lab.runAll()); else if (k === 'reset') { try { engine.deactivate(); } catch (e) {} window.XO_RESET(); location.reload(); } else if (k === 'reduced') { const on = !T.state().reduced; T.setReduced(on); out('Reduced motion ' + (on ? 'on' : 'off')); } else if (k === 'state') out(T.state()); else out('force ' + k + ': ' + T.force(k)); });
+$('simBtn').onclick = async () => { const n = Math.max(1000, Number($('simN').value) || 1e6), t = performance.now(); out('Running ' + fmt(n) + ' spins…'); const r = await engine.test.sim(n, 1, (d, tot, rtp) => { out(`${fmt(d)} / ${fmt(tot)} spins · running RTP ${(rtp * 100).toFixed(3)}%`); }); out(`${fmt(r.spins)} spins · RTP ${(r.rtp * 100).toFixed(3)}% (design 94.38%) · ${((performance.now() - t) / 1000).toFixed(1)}s`); };
+/* ---------- Connect the account and start ---------- */
+try { await engine.activate(); } catch (e) { fail(String(e.message || e)); return; }
+window.XOTest = { engine, renderer, software: !!window.__xoSoftware, THREE, model, camera, scene, parts, setView, cam: () => cam, ui: () => engine.ui(), toggleTest, frame };
+document.documentElement.setAttribute('data-ready', '1');
+})();
+</script></body></html>

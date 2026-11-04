@@ -1,0 +1,930 @@
+{
+ "machine": "xtrata-originals",
+ "generated": "2026-11-02T01:23Z",
+ "rule": "Every symbol on the reels is real Xtrata-inscribed work, an Xtrata asset or a real on-chain record. Nothing is drawn or imitated by hand. Nothing here needs twinning: it was born on chain, so nothing is shown NOT YET FOREVER. Art is chosen with Math.random only after the engine has fixed each result.",
+ "core": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+ "readVia": "https://xtrata.xyz/i/<id>?contractId=<core>&network=mainnet and https://xtrata.xyz/hiro/mainnet/... (the Xtrata proxy of the Hiro API), read 1 November 2026",
+ "symbols": {
+  "cherry": {
+   "name": "Astro Blaster 3",
+   "kind": "frames captured from the inscribed game",
+   "source": "Inscription #3074 (Astro Blaster 3 v3.0.1, held by jim.btc), rendered in headless Chromium; the title screen and eight attract-mode frames of its own canvas (#cv)",
+   "capture": "art-src/astro2.cjs"
+  },
+  "lemon": {
+   "name": "Audionals",
+   "kind": "official logo",
+   "source": null,
+   "status": "MISSING: the official Audionals logo file was not found in the repo, on xtrata.xyz, or anywhere reachable from the build. The reels show the name AUDIONALS set in type on a tile in the Audional orange (#ef7410 / #ffb23c, from The Audionaut lockup) until Jim supplies the file. Possible lead: layer inscription #172 (xtrata.btc, image/webp) shows a headphone 'A' mark; confirm whether it is the Audionals logo before using it."
+  },
+  "chip": {
+   "name": "Cicada",
+   "kind": "rendered from the collection's generator by seed",
+   "source": "Cicada.btc master engine v11.3.6 from Jim's cicada-v3 folder (renderCicada with interactive:false, framing offsets xOffset/yOffset set to 0, traits untouched), 3,301 seeds. Assumed to be the STRIDULA/TYMBAL generator line: confirm with Jim. Not found inscribed on Xtrata (the inscribed Cicada Generator #287 on xtrata-v2-1-0 is not seed-based).",
+   "capture": "art-src/render_cicadas.cjs"
+  },
+  "block": {
+   "name": "Forever Twins ∞",
+   "kind": "Xtrata asset",
+   "source": "xtrata-2.0/forever-twins/assets/forever-twins-logo.webp, resized to 360 px, otherwise as supplied",
+   "file": "art/images/forever-twins-logo.webp"
+  },
+  "artifact": {
+   "name": "Audionaut",
+   "kind": "Audionauts inscriptions",
+   "source": "Every collection-minted event on SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX.xtrata-collection-audionauts-1-3c855746 (30 minted of 111 on 1 Nov 2026); each token's HTML read from /i/<tokenId> for its edition and seed; the portrait canvas (#art, 768 px) drawn by master player inscription #3060 with that seed, captured without any user gesture so no audio ever started. The star songs are never played, revealed or extracted.",
+   "capture": "art-src/render_auds.cjs"
+  },
+  "bitcoin": {
+   "name": "The Xtrata mark (jackpot symbol)",
+   "kind": "brand asset",
+   "source": "Series bible part 5, the SVG exactly as given (art/xtrata-mark.svg, data URI in art/xtrata-mark.datauri.txt). The jackpot scene draws its three bands with the house XLOGO vector code, the same trace."
+  },
+  "wild": {
+   "name": "CALLISTO",
+   "kind": "Audionauts inscription",
+   "source": "Audionaut 029 'Callisto', Xtrata token #3082 (the first Audionaut minted, held by jim.btc), seed 3252916666, rendered by master #3060, set in a starfield frame drawn by the machine."
+  },
+  "scatter": {
+   "name": "The Audionaut work-space-station",
+   "kind": "official title lockup",
+   "source": "The SVG lockup in public/audionaut/daw.html (svg.lockup, title 'The Audionaut: Audional Sequencer. Blockchain Audional Work(space)Station'), as supplied. Its subtitle still reads 'Audional Sequencer'.",
+   "file": "art/images/the-audionaut-lockup.svg"
+  },
+  "vault": {
+   "name": "Cicada call",
+   "kind": "STRIDULA/TYMBAL specimens",
+   "source": "Nine of the cicada seeds above, each with its signature call rendered by renderSignatureCall(seed, tier) from the same engine (6.5 s, 44.1 kHz, the seed fingerprinted into the sound), encoded to MP3 40 kbps; the tile's waveform is the call's real 72-bin RMS envelope."
+  },
+  "chain": {
+   "name": "Layer",
+   "kind": "real on-chain record",
+   "source": "Inscription IDs held by xtrata.btc (SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X, 209 held) and jim.btc (SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7, 88 held), from /extended/v1/tokens/nft/holdings; 36 spread across both lists bundled with mime type, size and the block of the holding transfer; image inscriptions carry a thumbnail. Up to 24 more are read live in play."
+  }
+ },
+ "sound": {
+  "sessionMode": "Analog Kit pack (CC0-1.0) from the Audionaut sample library, audionaut-library/packs/analogkit.audpack, extracted with art-src/extract-analogkit.mjs. Credits travel with the pack: Big Rusty Drums, Swirly Drums, Unruly Drums (Karoryfer Samples); VCSL and Virtuosity Drums (Versilian Studios).",
+  "chorus": "The cicadas' own signature calls (above).",
+  "reelStops": "Short slices of the same cicada calls, plus a rim hit and a click.",
+  "jackpot": "A layered synth swell made in Web Audio, over the kit."
+ },
+ "permissions": {
+  "needed": [
+   {
+    "what": "Audionals logo",
+    "why": "not found; supply the file (it is Jim's own project, so only the file is needed)"
+   },
+   {
+    "what": "STRIDULA/TYMBAL / Cicada.btc art and calls",
+    "why": "used from Jim's own cicada-v3 source, not yet inscribed; confirm this is the right generator and that it may go on a public machine"
+   }
+  ],
+  "ownProjects": "Every logo on this machine is an Xtrata, Audionals, Audionaut or Forever Twins asset (Jim's own), so no third-party logo permission is needed. Bitcoin is shown only as the ₿ sign and the word STACKS is set in type on the gamble coin: no third-party logo file is used."
+ },
+ "brandAssets": [
+  {
+   "name": "Xtrata mark",
+   "usedAs": "jackpot symbol, the topper bands, the lower door (drawn with the XLOGO vector code), the ticket",
+   "permission": "own"
+  },
+  {
+   "name": "ParallaX Casino wordmark",
+   "usedAs": "small, on the souvenir ticket header and the marquee foot",
+   "permission": "own"
+  }
+ ],
+ "images": {
+  "audionauts": [
+   {
+    "edition": 2,
+    "name": "Ember",
+    "tokenId": 3103,
+    "seed": 808909,
+    "mintTx": "0xdc60da75901f4f5024d5d917356b770ea76fe676b4a9eef46d0b4cd575c04402",
+    "file": "art/images/audionaut-002-3103.webp"
+   },
+   {
+    "edition": 5,
+    "name": "Mirage",
+    "tokenId": 3084,
+    "seed": 1984,
+    "mintTx": "0xbd6b62b755950966ed25eb22c7f8f66c472088097341fdd7920b3e34f3853ac1",
+    "file": "art/images/audionaut-005-3084.webp"
+   },
+   {
+    "edition": 11,
+    "name": "Sol",
+    "tokenId": 3547,
+    "seed": 606060,
+    "mintTx": "0x266ae9c00e78391f0d371e333e5b4c149040a107930ba59e39081beb065e450e",
+    "file": "art/images/audionaut-011-3547.webp"
+   },
+   {
+    "edition": 15,
+    "name": "Aphelion",
+    "tokenId": 3087,
+    "seed": 2702512613,
+    "mintTx": "0xa5e622751e823b8ac11e16dae193cd806fc1a6dcff95fc8c60c21c2497babeba",
+    "file": "art/images/audionaut-015-3087.webp"
+   },
+   {
+    "edition": 21,
+    "name": "Astra",
+    "tokenId": 3579,
+    "seed": 963177658,
+    "mintTx": "0x7b14dc2ccef49fdaa336de48579599bf2eb575694deb3a958991ca4d60049598",
+    "file": "art/images/audionaut-021-3579.webp"
+   },
+   {
+    "edition": 22,
+    "name": "Atlas",
+    "tokenId": 3592,
+    "seed": 3207700871,
+    "mintTx": "0x571fe7fe547cd452281fd2cc4e35049933994dbc5a23ee565cd61a537d466e29",
+    "file": "art/images/audionaut-022-3592.webp"
+   },
+   {
+    "edition": 25,
+    "name": "Beacon",
+    "tokenId": 3085,
+    "seed": 3874244697,
+    "mintTx": "0xf643b5896456a6aa7f0daa2d4363ef9723db307b0c9d77ee42807a376d959e04",
+    "file": "art/images/audionaut-025-3085.webp"
+   },
+   {
+    "edition": 29,
+    "name": "Callisto",
+    "tokenId": 3082,
+    "seed": 3252916666,
+    "mintTx": "0xde9d3103437771592464c032d2392a32b442915112659c366e41e0e805251d0e",
+    "file": "art/images/audionaut-029-3082.webp"
+   },
+   {
+    "edition": 31,
+    "name": "Capella",
+    "tokenId": 3083,
+    "seed": 734091384,
+    "mintTx": "0x5ac4a0285a5dc8fcf12f0c9797dc34407e28201401faff7ffbfa11dfa73aefe9",
+    "file": "art/images/audionaut-031-3083.webp"
+   },
+   {
+    "edition": 33,
+    "name": "Castor",
+    "tokenId": 3096,
+    "seed": 142092889,
+    "mintTx": "0xaf71f126fbc2ff6c662bb76d1d5eb2fa71de34c21b718b662cacfaa62cabb2dd",
+    "file": "art/images/audionaut-033-3096.webp"
+   },
+   {
+    "edition": 34,
+    "name": "Celeste",
+    "tokenId": 3120,
+    "seed": 659868901,
+    "mintTx": "0x320cc59dcfa67bf9439566c23aae5a2ead66ea8f32a21bd3f3f34b65fb1cfb42",
+    "file": "art/images/audionaut-034-3120.webp"
+   },
+   {
+    "edition": 39,
+    "name": "Cygnus",
+    "tokenId": 3608,
+    "seed": 41286540,
+    "mintTx": "0x02febc95b4c6c28c9b4f6da493c53708f6dd80612a175c615f25df0d87d068f9",
+    "file": "art/images/audionaut-039-3608.webp"
+   },
+   {
+    "edition": 42,
+    "name": "Dione",
+    "tokenId": 3569,
+    "seed": 1333493947,
+    "mintTx": "0x1e3aae3ba79b6574b7675832e9c6ad63e097724760982491e7d2cad7b7cdcff0",
+    "file": "art/images/audionaut-042-3569.webp"
+   },
+   {
+    "edition": 55,
+    "name": "Halley",
+    "tokenId": 3603,
+    "seed": 1776933078,
+    "mintTx": "0xbabea41b3ef7dec2c0f033df15324b0da0853d1856feb62f991d032fc6ff54af",
+    "file": "art/images/audionaut-055-3603.webp"
+   },
+   {
+    "edition": 58,
+    "name": "Hyperion",
+    "tokenId": 3097,
+    "seed": 1681794096,
+    "mintTx": "0xe17936d2fb1feaa1736a335c3dab4da5d46d2f88547935d08d1b2fa4b0a6184b",
+    "file": "art/images/audionaut-058-3097.webp"
+   },
+   {
+    "edition": 60,
+    "name": "Indra",
+    "tokenId": 3128,
+    "seed": 1298188416,
+    "mintTx": "0x2d86d18823ac52b020f84f5ea361c2e45d8aab771302b27c2b1ba3598b07dafc",
+    "file": "art/images/audionaut-060-3128.webp"
+   },
+   {
+    "edition": 70,
+    "name": "Mira",
+    "tokenId": 3596,
+    "seed": 825221198,
+    "mintTx": "0xf64da17136cf7da98cfa8f78e856db30fb7087ed97807ac4ea6077c4d50e15c2",
+    "file": "art/images/audionaut-070-3596.webp"
+   },
+   {
+    "edition": 72,
+    "name": "Neptune",
+    "tokenId": 3597,
+    "seed": 1406138844,
+    "mintTx": "0xd76d578767af4bbebc35666d4fa88430e1cfe6b8d8ccfaefa4f653f2969e0c8a",
+    "file": "art/images/audionaut-072-3597.webp"
+   },
+   {
+    "edition": 76,
+    "name": "Orion",
+    "tokenId": 3086,
+    "seed": 874837766,
+    "mintTx": "0xd23fdaddcd235ef0de38c9d86541a5e80c51caa3dedece8b75405efccfd70d01",
+    "file": "art/images/audionaut-076-3086.webp"
+   },
+   {
+    "edition": 79,
+    "name": "Pegasus",
+    "tokenId": 3574,
+    "seed": 3189361945,
+    "mintTx": "0x2dae255025b464812ce6b3757a4f467b120b1d252f4ef3c087db064327a89d4a",
+    "file": "art/images/audionaut-079-3574.webp"
+   },
+   {
+    "edition": 80,
+    "name": "Perseus",
+    "tokenId": 3548,
+    "seed": 3775601381,
+    "mintTx": "0xd458f5f501137a627c64e8163aa5f70486234952e9aa11ed03d38f9908741660",
+    "file": "art/images/audionaut-080-3548.webp"
+   },
+   {
+    "edition": 82,
+    "name": "Phoenix",
+    "tokenId": 3593,
+    "seed": 2287983252,
+    "mintTx": "0x0ea641e87afc51e84b9c7f3967c12677bd5b00bdac0ec0c2237e79f06ce55598",
+    "file": "art/images/audionaut-082-3593.webp"
+   },
+   {
+    "edition": 83,
+    "name": "Pioneer",
+    "tokenId": 3124,
+    "seed": 4043032601,
+    "mintTx": "0xe7d5a6f67d39332c2414664012a857d24659589ab84c5a95f8f6739c1b3f287d",
+    "file": "art/images/audionaut-083-3124.webp"
+   },
+   {
+    "edition": 84,
+    "name": "Polaris",
+    "tokenId": 3099,
+    "seed": 136478061,
+    "mintTx": "0xc46c5e68ca8a8a155e20144994912ae52fa4edc3e96284771c47c11a6c565ad6",
+    "file": "art/images/audionaut-084-3099.webp"
+   },
+   {
+    "edition": 93,
+    "name": "Selene",
+    "tokenId": 3615,
+    "seed": 1748064074,
+    "mintTx": "0xdf54cd65278e9e4833f98cd0a45eacdbd3b009369bdd04de24be415df3757de2",
+    "file": "art/images/audionaut-093-3615.webp"
+   },
+   {
+    "edition": 95,
+    "name": "Solstice",
+    "tokenId": 3100,
+    "seed": 4001416501,
+    "mintTx": "0xa1cd49341a2d6db532b88e3b28a6a5e8b0368d0354328adccb8253d7ba2c97a6",
+    "file": "art/images/audionaut-095-3100.webp"
+   },
+   {
+    "edition": 100,
+    "name": "Tethys",
+    "tokenId": 3102,
+    "seed": 1230001428,
+    "mintTx": "0xe1f77fd78e241bad78f307d9818c494478a00e781ae795d65b58cdab8f44d939",
+    "file": "art/images/audionaut-100-3102.webp"
+   },
+   {
+    "edition": 101,
+    "name": "Titan",
+    "tokenId": 3595,
+    "seed": 1501876640,
+    "mintTx": "0x480865b91c3d0fd02cad734b0bb453db488a1fd9f1ea0add350fd90d3300a587",
+    "file": "art/images/audionaut-101-3595.webp"
+   },
+   {
+    "edition": 102,
+    "name": "Triton",
+    "tokenId": 3594,
+    "seed": 2856635224,
+    "mintTx": "0xc43981b60ab5d8c029ac1310b2b7994265a7c63be1602a09053f5191fc921fb2",
+    "file": "art/images/audionaut-102-3594.webp"
+   },
+   {
+    "edition": 108,
+    "name": "Venus",
+    "tokenId": 3546,
+    "seed": 1079535215,
+    "mintTx": "0xcdf235601e2282ee4269008fad168c04b70790c30b2b543000a08cf6167c7f32",
+    "file": "art/images/audionaut-108-3546.webp"
+   }
+  ],
+  "cicadas": [
+   {
+    "seed": 1639,
+    "rank": 1,
+    "tier": "Mythic",
+    "family": "Thin Canopy Singer",
+    "bark": "maple",
+    "color": "cyan",
+    "file": "art/images/cicada-seed-1639.webp"
+   },
+   {
+    "seed": 2710,
+    "rank": 2,
+    "tier": "Mythic",
+    "family": "Thin Canopy Singer",
+    "bark": "willow",
+    "color": "cyan",
+    "file": "art/images/cicada-seed-2710.webp"
+   },
+   {
+    "seed": 2654,
+    "rank": 4,
+    "tier": "Legendary",
+    "family": "Nervous Fence Caller",
+    "bark": "acacia",
+    "color": "cyan",
+    "file": "art/images/cicada-seed-2654.webp"
+   },
+   {
+    "seed": 1854,
+    "rank": 10,
+    "tier": "Legendary",
+    "family": "Warm Dog-day Solo",
+    "bark": "angophora",
+    "color": "cyan",
+    "file": "art/images/cicada-seed-1854.webp"
+   },
+   {
+    "seed": 3188,
+    "rank": 25,
+    "tier": "Legendary",
+    "family": "Fast Tymbal Chatterer",
+    "bark": "birch",
+    "color": "rainbow",
+    "file": "art/images/cicada-seed-3188.webp"
+   },
+   {
+    "seed": 443,
+    "rank": 60,
+    "tier": "Epic",
+    "family": "Thin Canopy Singer",
+    "bark": "poplar",
+    "color": "purple",
+    "file": "art/images/cicada-seed-443.webp"
+   },
+   {
+    "seed": 597,
+    "rank": 120,
+    "tier": "Epic",
+    "family": "Needle Drone Male",
+    "bark": "maple",
+    "color": "red",
+    "file": "art/images/cicada-seed-597.webp"
+   },
+   {
+    "seed": 151,
+    "rank": 250,
+    "tier": "Rare",
+    "family": "Heavy Abdomen Resonator",
+    "bark": "birch",
+    "color": "orange",
+    "file": "art/images/cicada-seed-151.webp"
+   },
+   {
+    "seed": 1046,
+    "rank": 400,
+    "tier": "Rare",
+    "family": "Needle Drone Male",
+    "bark": "dogwood",
+    "color": "red",
+    "file": "art/images/cicada-seed-1046.webp"
+   },
+   {
+    "seed": 682,
+    "rank": 700,
+    "tier": "Uncommon",
+    "family": "Dry Bark Rattler",
+    "bark": "maple",
+    "color": "orange",
+    "file": "art/images/cicada-seed-682.webp"
+   },
+   {
+    "seed": 1629,
+    "rank": 1000,
+    "tier": "Uncommon",
+    "family": "Thin Canopy Singer",
+    "bark": "birch",
+    "color": "orange",
+    "file": "art/images/cicada-seed-1629.webp"
+   },
+   {
+    "seed": 401,
+    "rank": 1300,
+    "tier": "Uncommon",
+    "family": "Heavy Abdomen Resonator",
+    "bark": "willow",
+    "color": "orange",
+    "file": "art/images/cicada-seed-401.webp"
+   },
+   {
+    "seed": 2829,
+    "rank": 1700,
+    "tier": "Common",
+    "family": "Needle Drone Male",
+    "bark": "birch",
+    "color": "red",
+    "file": "art/images/cicada-seed-2829.webp"
+   },
+   {
+    "seed": 2453,
+    "rank": 2100,
+    "tier": "Common",
+    "family": "Fast Tymbal Chatterer",
+    "bark": "casuarina",
+    "color": "red",
+    "file": "art/images/cicada-seed-2453.webp"
+   },
+   {
+    "seed": 1889,
+    "rank": 2500,
+    "tier": "Common",
+    "family": "Thin Canopy Singer",
+    "bark": "oak",
+    "color": "orange",
+    "file": "art/images/cicada-seed-1889.webp"
+   },
+   {
+    "seed": 3137,
+    "rank": 2900,
+    "tier": "Common",
+    "family": "Fast Tymbal Chatterer",
+    "bark": "oak",
+    "color": "orange",
+    "file": "art/images/cicada-seed-3137.webp"
+   },
+   {
+    "seed": 2741,
+    "rank": 3200,
+    "tier": "Common",
+    "family": "Thin Canopy Singer",
+    "bark": "elm",
+    "color": "blue",
+    "file": "art/images/cicada-seed-2741.webp"
+   },
+   {
+    "seed": 1753,
+    "rank": 3301,
+    "tier": "Common",
+    "family": "Soft Evening Caller",
+    "bark": "pear-cherry",
+    "color": "orange",
+    "file": "art/images/cicada-seed-1753.webp"
+   }
+  ],
+  "cicadaCalls": [
+   {
+    "seed": 1639,
+    "tier": "Mythic",
+    "family": "Thin Canopy Singer",
+    "seconds": 6.5,
+    "file": "art/images/cicada-call-seed-1639.mp3"
+   },
+   {
+    "seed": 1854,
+    "tier": "Legendary",
+    "family": "Warm Dog-day Solo",
+    "seconds": 6.5,
+    "file": "art/images/cicada-call-seed-1854.mp3"
+   },
+   {
+    "seed": 3188,
+    "tier": "Legendary",
+    "family": "Fast Tymbal Chatterer",
+    "seconds": 6.5,
+    "file": "art/images/cicada-call-seed-3188.mp3"
+   },
+   {
+    "seed": 2654,
+    "tier": "Legendary",
+    "family": "Nervous Fence Caller",
+    "seconds": 6.5,
+    "file": "art/images/cicada-call-seed-2654.mp3"
+   },
+   {
+    "seed": 443,
+    "tier": "Epic",
+    "family": "Thin Canopy Singer",
+    "seconds": 6.5,
+    "file": "art/images/cicada-call-seed-443.mp3"
+   },
+   {
+    "seed": 597,
+    "tier": "Epic",
+    "family": "Needle Drone Male",
+    "seconds": 6.5,
+    "file": "art/images/cicada-call-seed-597.mp3"
+   },
+   {
+    "seed": 151,
+    "tier": "Rare",
+    "family": "Heavy Abdomen Resonator",
+    "seconds": 6.5,
+    "file": "art/images/cicada-call-seed-151.mp3"
+   },
+   {
+    "seed": 682,
+    "tier": "Uncommon",
+    "family": "Dry Bark Rattler",
+    "seconds": 6.5,
+    "file": "art/images/cicada-call-seed-682.mp3"
+   },
+   {
+    "seed": 1753,
+    "tier": "Common",
+    "family": "Soft Evening Caller",
+    "seconds": 6.5,
+    "file": "art/images/cicada-call-seed-1753.mp3"
+   }
+  ],
+  "astroBlaster3": [
+   {
+    "frame": "title",
+    "file": "art/images/astro-blaster-3-title.webp"
+   },
+   {
+    "frame": "attract-0",
+    "file": "art/images/astro-blaster-3-attract-0.webp"
+   },
+   {
+    "frame": "attract-1",
+    "file": "art/images/astro-blaster-3-attract-1.webp"
+   },
+   {
+    "frame": "attract-2",
+    "file": "art/images/astro-blaster-3-attract-2.webp"
+   },
+   {
+    "frame": "attract-3",
+    "file": "art/images/astro-blaster-3-attract-3.webp"
+   },
+   {
+    "frame": "attract-4",
+    "file": "art/images/astro-blaster-3-attract-4.webp"
+   },
+   {
+    "frame": "attract-5",
+    "file": "art/images/astro-blaster-3-attract-5.webp"
+   },
+   {
+    "frame": "attract-6",
+    "file": "art/images/astro-blaster-3-attract-6.webp"
+   },
+   {
+    "frame": "attract-7",
+    "file": "art/images/astro-blaster-3-attract-7.webp"
+   }
+  ],
+  "layers": [
+   {
+    "id": 0,
+    "wallet": "xtrata.btc",
+    "mime": "image/jpeg",
+    "bytes": 530270,
+    "block": 8226948,
+    "tx": "0xf24628ccc713477b45d53625f88e8734c31e75c8d0acc65b24988dc6e3ea41fe"
+   },
+   {
+    "id": 14,
+    "wallet": "xtrata.btc",
+    "mime": "image/png",
+    "bytes": 72264,
+    "block": 8222992,
+    "tx": "0x0c5beca625e75e551328446d93f53a32ecfce4141478a4edbac78e112310585f",
+    "file": "art/images/layer-14.webp"
+   },
+   {
+    "id": 48,
+    "wallet": "xtrata.btc",
+    "mime": "text/javascript",
+    "bytes": 16478,
+    "block": 8227699,
+    "tx": "0xa4f5dd3ed4f41b315471e337f952ba9f9c4a50449e1646fa2a380f3bd2aec713"
+   },
+   {
+    "id": 123,
+    "wallet": "xtrata.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 9139064,
+    "tx": "0x2bedf6e44160a6ede729c6c6972f00ba537a7b128c767fa895198c95e25e68f2"
+   },
+   {
+    "id": 172,
+    "wallet": "xtrata.btc",
+    "mime": "image/webp",
+    "bytes": 448588,
+    "block": 8227752,
+    "tx": "0xcaaa5a84fcd96a16ffb999a24dfd2c82d3b6feea71ce36b7ca6b09f60b8446e2",
+    "file": "art/images/layer-172.webp"
+   },
+   {
+    "id": 202,
+    "wallet": "xtrata.btc",
+    "mime": "application/json",
+    "bytes": 347,
+    "block": 9139060,
+    "tx": "0xb30952cd7659937a0213745cab690fb25c83df54215a4b22ca8d2ea0adf1a107"
+   },
+   {
+    "id": 214,
+    "wallet": "xtrata.btc",
+    "mime": "application/json",
+    "bytes": 5689,
+    "block": 9139058,
+    "tx": "0xe9ec60681ac806413438994699f2e815c8146fb4e92752caacf51ddcf60a4c52"
+   },
+   {
+    "id": 226,
+    "wallet": "xtrata.btc",
+    "mime": "application/javascript",
+    "bytes": 16567,
+    "block": 9139054,
+    "tx": "0xa2629f0c44f7dcf8521ae77a4902149fcf0e35afe2a40f82f5b6eb9fde9e3964"
+   },
+   {
+    "id": 237,
+    "wallet": "xtrata.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 9139052,
+    "tx": "0xc28a9f654e58ea88a71b9be102d888e312d83d4f6ac7e3f25ee61152c385245d"
+   },
+   {
+    "id": 249,
+    "wallet": "xtrata.btc",
+    "mime": "application/json",
+    "bytes": 4258,
+    "block": 9139046,
+    "tx": "0x4553b754bdf3ea21c3c6b7ca455666401542eb3af72863c516b363fe62119135"
+   },
+   {
+    "id": 261,
+    "wallet": "xtrata.btc",
+    "mime": "application/json",
+    "bytes": 3122,
+    "block": 9138968,
+    "tx": "0x9d787f8be0629f2b238a3c7aecc4182abe5a1909466331125f225826601ff576"
+   },
+   {
+    "id": 1093,
+    "wallet": "xtrata.btc",
+    "mime": "image/svg+xml",
+    "bytes": 787,
+    "block": 8430402,
+    "tx": "0xcfa39d90228390467e9e7fa68e50803cee9d76355087f6b9737aa0c698e21f8d"
+   },
+   {
+    "id": 1107,
+    "wallet": "xtrata.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 8440668,
+    "tx": "0x9f72329d9639f70021e5d1ef81612385c6dd37070f9ef33cb7a50fa0859f6430"
+   },
+   {
+    "id": 2982,
+    "wallet": "xtrata.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 8712406,
+    "tx": "0xe50e783ebc5c31177a0a803a04dad45bae79b360f0477cf7d179d7bdcf1a00df"
+   },
+   {
+    "id": 3034,
+    "wallet": "xtrata.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 8820159,
+    "tx": "0xbfd3e9874dfb58979fe788ce9e1610c8923563e6f631a2d1d64f100ba878e5a7"
+   },
+   {
+    "id": 3049,
+    "wallet": "xtrata.btc",
+    "mime": "text/javascript",
+    "bytes": 25170,
+    "block": 9242693,
+    "tx": "0x8fd008bdc9bb761e1e18fb5ed437a62355ff4a546575507f72cbeb75a9fbd627"
+   },
+   {
+    "id": 3072,
+    "wallet": "xtrata.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 9069575,
+    "tx": "0x2b66b2715efa8074d0653eb614964096b7b1350203fe6064567f54101ac4acf9"
+   },
+   {
+    "id": 3533,
+    "wallet": "xtrata.btc",
+    "mime": "image/png",
+    "bytes": 10529,
+    "block": 9155207,
+    "tx": "0xeb0d42a3a5bbb7ef72ce6b74047c75778a6ee0ea9463479393c74c2b7064788c",
+    "file": "art/images/layer-3533.webp"
+   },
+   {
+    "id": 10,
+    "wallet": "jim.btc",
+    "mime": "image/png",
+    "bytes": 1325,
+    "block": 8524242,
+    "tx": "0xeea60ae5b4c067e19d8280851dea284492e9e3e7797f035169f5cba105bd81a8",
+    "file": "art/images/layer-10.webp"
+   },
+   {
+    "id": 44,
+    "wallet": "jim.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 8460777,
+    "tx": "0x1d8d862b621c2297e83ef5b3c191e468cc6e35a3f4bafd131a1ae5c56839c1f7"
+   },
+   {
+    "id": 72,
+    "wallet": "jim.btc",
+    "mime": "text/javascript",
+    "bytes": 118415,
+    "block": 8524273,
+    "tx": "0xce867f24dab1ac73723a1c5229bbc9c721f550903322ead8afcc8c4d527feda4"
+   },
+   {
+    "id": 77,
+    "wallet": "jim.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 8524288,
+    "tx": "0x6a0594b9c0e5f2942b3949e2a3914785c12eab5a6e0b2d36b565ee9bc56042ee"
+   },
+   {
+    "id": 82,
+    "wallet": "jim.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 8524306,
+    "tx": "0x62d50fc2293d4f6734ac16f2216060e1f6e131f56a313076e9f780e031b1d492"
+   },
+   {
+    "id": 89,
+    "wallet": "jim.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 9235772,
+    "tx": "0x04873fa14246eeb56d2128e3eb5f09a5d4dddc9f89fc162e387c9a42446db109"
+   },
+   {
+    "id": 97,
+    "wallet": "jim.btc",
+    "mime": "image/png",
+    "bytes": 990,
+    "block": 9235842,
+    "tx": "0xb1089aa219800ddd96a093be8e7f8fcffe91ffc3228cb351cab3d568ca670d8f",
+    "file": "art/images/layer-97.webp"
+   },
+   {
+    "id": 190,
+    "wallet": "jim.btc",
+    "mime": "text/javascript",
+    "bytes": 176645,
+    "block": 9235890,
+    "tx": "0xae6ce09f9a26f60f2e3636152027e1792a4c26d0891bcca6af80f9fc05cd4dfc"
+   },
+   {
+    "id": 311,
+    "wallet": "jim.btc",
+    "mime": "text/plain",
+    "bytes": 14,
+    "block": 9236004,
+    "tx": "0x83dbf31f68bb49bb3ff584fb74008f69cb5844692c09e932dc246df6d0c2d5e1"
+   },
+   {
+    "id": 368,
+    "wallet": "jim.btc",
+    "mime": "image/jpeg",
+    "bytes": 1140757,
+    "block": 8247652,
+    "tx": "0x4590ba8ef415511db1031630cfcff8597a6b2ecc8b3e810572723e17d4b299b1",
+    "file": "art/images/layer-368.webp"
+   },
+   {
+    "id": 1117,
+    "wallet": "jim.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 8452681,
+    "tx": "0xbb27a68c3817acea4d80d62edc544b47564ef07eb6efe33acb99f9ce525260a6"
+   },
+   {
+    "id": 2746,
+    "wallet": "jim.btc",
+    "mime": "text/plain",
+    "bytes": 16,
+    "block": 8502942,
+    "tx": "0xe502961de5afc2d3ecda9659f9d4645f9524799c48d72782784570fab56d717a"
+   },
+   {
+    "id": 2789,
+    "wallet": "jim.btc",
+    "mime": "text/javascript",
+    "bytes": 162571,
+    "block": 8566092,
+    "tx": "0x3b94b88c6f2746bdc1ce1d96e1727e1aa71c0fc4d3a04ddd6c07bd357d55eebc"
+   },
+   {
+    "id": 2799,
+    "wallet": "jim.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 8574515,
+    "tx": "0x0b0d999a22c3d20b927bfa7700a3d2efee878495f34ca47f5d9e5a833a82831e"
+   },
+   {
+    "id": 2804,
+    "wallet": "jim.btc",
+    "mime": "text/javascript",
+    "bytes": 169919,
+    "block": 8575404,
+    "tx": "0x893ebcf3fed0229efea0aad3a5e03ebe676b1ca1f4757496119bd46f8d6937a5"
+   },
+   {
+    "id": 2839,
+    "wallet": "jim.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 8629769,
+    "tx": "0x9a355423bdf1a08c45c29d0f04b215a47221327d46bb505e3c7b5d5181d75d90"
+   },
+   {
+    "id": 2955,
+    "wallet": "jim.btc",
+    "mime": "image/svg+xml",
+    "bytes": 1867,
+    "block": 8711091,
+    "tx": "0x2cc3aefd5ad55749d91b9e5861dd1ee6c09acf40c95106e6f73be94aaa63eeaa"
+   },
+   {
+    "id": 3073,
+    "wallet": "jim.btc",
+    "mime": "text/html",
+    "bytes": 0,
+    "block": 9080665,
+    "tx": "0x49b76311f6d656ed865f9020ecda5184fe5bb17dfacfbbce2d5b952bef2b1757"
+   }
+  ],
+  "sessionKit": [
+   {
+    "part": "kick",
+    "soundId": "analogkit-kicks-unruly-20in-unruly-20in-clean-hard@hit@1",
+    "file": "art/images/kit-kick.mp3"
+   },
+   {
+    "part": "snare",
+    "soundId": "analogkit-snares-standard-14in-modern-a@hit@1",
+    "file": "art/images/kit-snare.mp3"
+   },
+   {
+    "part": "hat",
+    "soundId": "analogkit-hi-hats-closed-rusty-tight@hit@1",
+    "file": "art/images/kit-hat.mp3"
+   },
+   {
+    "part": "open",
+    "soundId": "analogkit-hi-hats-open-swirly-open@hit@1",
+    "file": "art/images/kit-open.mp3"
+   },
+   {
+    "part": "rim",
+    "soundId": "analogkit-rim-and-stick-jazz-cross-stick-hard@hit@1",
+    "file": "art/images/kit-rim.mp3"
+   }
+  ]
+ }
+}

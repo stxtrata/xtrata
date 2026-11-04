@@ -1,0 +1,468 @@
+[
+ {
+  "name": "studio renders with WebGL (SoftwareRenderer fallback present)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "clicking the lever spins",
+  "ok": true,
+  "detail": "0 -> 1"
+ },
+ {
+  "name": "the +LAYR deck button raises the bet",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "the INSCRIBE deck button spins",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "Space spins",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "test panel: holders unknown shows unknown, never zero",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "test panel: all 111",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "studio: no page errors",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "lab free: full presentation free",
+  "ok": true,
+  "detail": "free:trigger,free:intro,free:play,free:summary \u00b7 gained 3540 \u00b7 LAB true"
+ },
+ {
+  "name": "lab free-retrigger: full presentation free",
+  "ok": true,
+  "detail": "free:trigger,free:intro,free:play,free:summary \u00b7 gained 1170 \u00b7 LAB true"
+ },
+ {
+  "name": "lab free-retrigger: retrigger happened",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "lab vault: full presentation vault",
+  "ok": true,
+  "detail": "vault:trigger,vault:intro,vault:play,vault:summary \u00b7 gained 2100 \u00b7 LAB true"
+ },
+ {
+  "name": "lab chain: full presentation chain",
+  "ok": true,
+  "detail": "chain:trigger,chain:intro,chain:play,chain:summary \u00b7 gained 3800 \u00b7 LAB true"
+ },
+ {
+  "name": "lab chain-full: full presentation chain+jackpot",
+  "ok": true,
+  "detail": "chain:trigger,chain:intro,chain:play,chain:summary,jackpot:trigger,jackpot:intro,jackpot:play,jackpot:summary \u00b7 gained 58910 \u00b7 LAB true"
+ },
+ {
+  "name": "lab chain-full: The X follows a full tower",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "lab jackpot: full presentation jackpot",
+  "ok": true,
+  "detail": "jackpot:trigger,jackpot:intro,jackpot:play,jackpot:summary \u00b7 gained 56902 \u00b7 LAB true"
+ },
+ {
+  "name": "lab gamble-win: full presentation gamble",
+  "ok": true,
+  "detail": "gamble:trigger,gamble:intro,gamble:play,gamble:summary \u00b7 gained 1030 \u00b7 LAB true"
+ },
+ {
+  "name": "lab gamble-lose: full presentation gamble",
+  "ok": true,
+  "detail": "gamble:trigger,gamble:intro,gamble:play,gamble:summary \u00b7 gained -100 \u00b7 LAB true"
+ },
+ {
+  "name": "lab scatter3: full presentation free",
+  "ok": true,
+  "detail": "free:trigger,free:intro,free:play,free:summary \u00b7 gained 430 \u00b7 LAB true"
+ },
+ {
+  "name": "lab scatter4: full presentation free",
+  "ok": true,
+  "detail": "free:trigger,free:intro,free:play,free:summary \u00b7 gained 1680 \u00b7 LAB true"
+ },
+ {
+  "name": "lab scatter5: full presentation free",
+  "ok": true,
+  "detail": "free:trigger,free:intro,free:play,free:summary \u00b7 gained 1770 \u00b7 LAB true"
+ },
+ {
+  "name": "lab cameo: full presentation base win",
+  "ok": true,
+  "detail": " \u00b7 gained 465 \u00b7 LAB true"
+ },
+ {
+  "name": "lab cameo: an Audionaut cameo is recorded",
+  "ok": true,
+  "detail": "[{\"tokenId\":3082,\"collection\":\"audionauts\",\"edition\":29,\"name\":\"Callisto\",\"lineWin\":100},{\"tokenId\":3594,\"collection\":\"audionauts\",\"edition\":102,\"name\":\"Triton\",\"lineWin\":100},{\"tokenId\":3082,\"collection\":\"audionauts\",\"edition\":29,\"name\":\"Callisto\",\"lineWin\":65},{\"tokenId\":3082,\"collection\":\"audionauts\",\"edition\":29,\"name\":\"Callisto\",\"lineWin\":300}]"
+ },
+ {
+  "name": "lab callisto: full presentation base win",
+  "ok": true,
+  "detail": " \u00b7 gained 13210 \u00b7 LAB true"
+ },
+ {
+  "name": "lab never touched the real LAYR account",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "Skip pays the same total (seeded full tower + The X)",
+  "ok": true,
+  "detail": "56562 / 56562"
+ },
+ {
+  "name": "Skip pays the same total (seeded The X)",
+  "ok": true,
+  "detail": "56902 / 56902"
+ },
+ {
+  "name": "reduced motion: free plays to its summary",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "reduced motion: vault plays to its summary",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "reduced motion: chain plays to its summary",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "reduced motion: jackpot plays to its summary",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "reduced motion: gamble-win plays to its summary",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "skip: free jumps to its summary",
+  "ok": true,
+  "detail": "gained 630"
+ },
+ {
+  "name": "skip: vault jumps to its summary",
+  "ok": true,
+  "detail": "gained 300"
+ },
+ {
+  "name": "skip: chain jumps to its summary",
+  "ok": true,
+  "detail": "gained 1300"
+ },
+ {
+  "name": "skip: jackpot jumps to its summary",
+  "ok": true,
+  "detail": "gained 53475"
+ },
+ {
+  "name": "skip: gamble-lose keeps the win (Skip on the offer = keep, straight to the outro)",
+  "ok": false,
+  "detail": "gained -40",
+  "note": "False negative in the test itself: it measured the balance from before the bet (60 win \u2212 100 bet = \u221240). Re-checked separately (dbg run, seeds 556\u2013558): Skip on the offer keeps the whole win (net after the spin = win: 60, 65, 800; gamble cleared, no coin flip). The assertion is fixed in test-page.cjs."
+ },
+ {
+  "name": "Run all completes every item",
+  "ok": true,
+  "detail": "390 s"
+ },
+ {
+  "name": "desktop lab run: no page errors",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: header controls >= 44 px and on screen",
+  "ok": true,
+  "detail": "0"
+ },
+ {
+  "name": "desktop: F enters fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: bar touch targets >= 44 px",
+  "ok": true,
+  "detail": "[[\"vol\",96,20]]"
+ },
+ {
+  "name": "desktop: bar fits (131 px tall)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: bar \u2212LAYR / +LAYR change the bet",
+  "ok": true,
+  "detail": "40"
+ },
+ {
+  "name": "desktop: bar INSCRIBE spins",
+  "ok": true,
+  "detail": "0 -> 1"
+ },
+ {
+  "name": "desktop: rules opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: fair opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: work opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: pot opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: history opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: account opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: settings opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: AUTO-LAYER menu opens",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: AUTO-LAYER runs and stops from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: TURBO toggles",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: SOUND toggles",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: volume slider on the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: LAB opens the Bonus Lab menu inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: The Chorus played from the bar at bet 200",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: chain played from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: free played from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: jackpot played from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: Bitcoin or Stacks called from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: gamble choices appear on the bar after a win",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: Exit leaves fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop: no page errors",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: F enters fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: bar touch targets >= 44 px",
+  "ok": true,
+  "detail": "[[\"vol\",96,20]]"
+ },
+ {
+  "name": "phone: bar fits (195 px tall)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: bar \u2212LAYR / +LAYR change the bet",
+  "ok": true,
+  "detail": "40"
+ },
+ {
+  "name": "phone: bar INSCRIBE spins",
+  "ok": true,
+  "detail": "0 -> 1"
+ },
+ {
+  "name": "phone: rules opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: fair opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: work opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: pot opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: history opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: account opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: settings opens inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: AUTO-LAYER menu opens",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: AUTO-LAYER runs and stops from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: TURBO toggles",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: SOUND toggles",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: volume slider on the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: LAB opens the Bonus Lab menu inside fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: The Chorus played from the bar at bet 200",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: chain played from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: free played from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: jackpot played from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: Bitcoin or Stacks called from the bar",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: gamble choices appear on the bar after a win",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: Exit leaves fullscreen",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "phone: no page errors",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "re-check: Skip on the Bitcoin or Stacks offer keeps the whole win (3 seeded runs)",
+  "ok": true,
+  "detail": "net 60/65/800 = win 60/65/800, gamble cleared, no play stage"
+ }
+]
