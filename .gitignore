@@ -52,3 +52,18 @@ xtrata-2.0/comms/canary/index.html
 
 # Generated inscription canary page (4MB, rebuilt on demand)
 /DeGrants/somewhere-else-inscribe-canary.html
+
+# Secrets and keys: never commit these (a wallet mnemonic in Huge-Sphinx/.env.aibtc was public for months)
+.env.*
+*.env
+!.env.example
+!.env.*.example
+!.env.sample
+!.env.*.sample
+!.env.template
+*.pem
+*.p12
+*.keystore
+
+# One-off wallet rescue tool; keep it out of the repo
+/rescue-nfts/
