@@ -1,0 +1,26 @@
+{
+ "machine": "The Halving",
+ "about": "Where every record and image on The Halving comes from. Every symbol is a real Bitcoin record drawn as a data tile in the machine's style, or the Bitcoin mark. No NFT, inscription or third-party project logo appears on these reels.",
+ "generated": "",
+ "symbols": {
+  "cherry": { "name": "Block 210,000 (the first halving, 50 → 25 BTC)", "kind": "On-chain record: block height, hash, date, pool and coinbase text", "source": "mempool.space API, /api/v1/blocks/210000 (read 2 Nov 2026)", "items": [] },
+  "lemon": { "name": "Block 420,000 (25 → 12.5 BTC)", "kind": "On-chain record", "source": "mempool.space API, /api/v1/blocks/420000", "items": [] },
+  "chip": { "name": "Block 630,000 (12.5 → 6.25 BTC)", "kind": "On-chain record", "source": "mempool.space API, /api/v1/blocks/630000", "items": [] },
+  "block": { "name": "Block 840,000 (6.25 → 3.125 BTC; the block Runes launched in)", "kind": "On-chain record", "source": "mempool.space API, /api/v1/blocks/840000; hash cross-checked with the Hiro API burn-block record", "items": [] },
+  "artifact": { "name": "Block 1,050,000 (the next halving)", "kind": "Live on-chain record: 1,050,000 minus the live tip height", "source": "Live: https://mempool.space/api/blocks/tip/height, falling back to the Hiro API (https://xtrata.xyz/hiro/mainnet/extended/v2/burn-blocks?limit=1, then https://api.hiro.so). Bundled fallback: tip 974,196 at build (75,804 blocks to go). A failed read shows the last known value marked STALE.", "items": [] },
+  "bitcoin": { "name": "21,000,000 (the supply cap)", "kind": "On-chain rule: the sum of every block subsidy (50 BTC halving every 210,000 blocks)", "source": "Bitcoin consensus rules (src/validation.cpp GetBlockSubsidy in Bitcoin Core); set in type", "items": [] },
+  "wild": { "name": "₿", "kind": "The Bitcoin logo (public domain)", "source": "Bitcoin.org repository, img/icons/logotop.svg (https://github.com/bitcoin-dot-org/Bitcoin.org/blob/master/img/icons/logotop.svg): the coin mark taken from it as supplied, saved as art/bitcoin-mark.svg. Bitcoin.org states the logo is in the public domain.", "items": [] },
+  "scatter": { "name": "Subsidy coin: 50, 25, 12.5, 6.25 or 3.125 BTC", "kind": "On-chain rule: the block subsidy of each era", "source": "Bitcoin consensus rules (GetBlockSubsidy); coin faces drawn in the machine's style from the amounts", "items": [] },
+  "vault": { "name": "Coinbase message", "kind": "On-chain record: readable text decoded from the coinbase script (scriptSig) of historic blocks, with its height", "source": "mempool.space API extras.coinbaseRaw for each block; decoded by tools/the-halving/build_records.py (each coinbase's BIP34 height push is checked against the block height)", "items": [] },
+  "chain": { "name": "Mined block", "kind": "Live on-chain record: a recent block height with the name of the pool that mined it", "source": "Live: https://mempool.space/api/v1/blocks. Bundled fallback: blocks 974,161–974,190 read at build; hashes of 974,175, 974,176 and 974,190 cross-checked against the Hiro API. Pool names appear as text only.", "items": [] }
+ },
+ "cabinet": {
+  "xtrataMark": "tools/the-halving/model/assets/xtrata.svg, the brand SVG supplied in the build prompt, embedded as supplied on the lower door (house mark)",
+  "parallaxWordmark": "tools/the-halving/model/assets/parallax-wordmark.svg, the wordmark supplied in the build prompt, embedded small at the marquee foot (house mark)",
+  "bitcoinMark": "art/bitcoin-mark.svg (Bitcoin.org, public domain), on the marquee",
+  "everythingElse": "Concrete, steel, fan grilles, split-flap boards, hazard stripes, buttons and labels are procedural textures written by tools/the-halving/model/textures.py; no third-party artwork."
+ },
+ "twins": { "what": "The Epoch Pot's twin count (display only)", "source": "https://xtrata.xyz/forever-twins/data/registry.v2.json and each live helper's contract events via https://xtrata.xyz/hiro/mainnet (fallback https://api.hiro.so). A failed read is shown as unknown, never as zero." },
+ "logosNeedingPermission": [],
+ "permissionNotes": "None needed. The only logos are the Xtrata mark and ParallaX Casino wordmark (house marks) and the Bitcoin mark (public domain, from Bitcoin.org). Mining-pool names appear as plain text from block data; no pool logo is used. If pool logos are ever added, each needs the pool's official file and its permission."
+}

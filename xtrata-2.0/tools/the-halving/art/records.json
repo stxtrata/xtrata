@@ -1,0 +1,427 @@
+{
+ "generated": "2026-11-02T01:00Z",
+ "source": "mempool.space API (blocks, coinbase scripts, pools); Hiro API via xtrata.xyz (tip height, cross-checks)",
+ "halvings": [
+  {
+   "height": 210000,
+   "hash": "000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e",
+   "date": "2012-11-28",
+   "when": "28 Nov 2012",
+   "from": 50,
+   "to": 25,
+   "pool": "Braiins Pool",
+   "coinbase": "/P2SH/ · /slush/",
+   "source": "https://mempool.space/block/000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e",
+   "note": ""
+  },
+  {
+   "height": 420000,
+   "hash": "000000000000000002cce816c0ab2c5c269cb081896b7dcb34b8422d6b74ffa1",
+   "date": "2016-07-09",
+   "when": "9 Jul 2016",
+   "from": 25,
+   "to": 12.5,
+   "pool": "F2Pool",
+   "coinbase": "七彩神仙鱼 · Chandler Guo loves YangYang Jin. · 🐟 · Mined by zzhhzz",
+   "source": "https://mempool.space/block/000000000000000002cce816c0ab2c5c269cb081896b7dcb34b8422d6b74ffa1",
+   "note": ""
+  },
+  {
+   "height": 630000,
+   "hash": "000000000000000000024bead8df69990852c202db0e0097c1a12ea637d7e96d",
+   "date": "2020-05-11",
+   "when": "11 May 2020",
+   "from": 12.5,
+   "to": 6.25,
+   "pool": "AntPool",
+   "coinbase": "Mined by AntPool119",
+   "source": "https://mempool.space/block/000000000000000000024bead8df69990852c202db0e0097c1a12ea637d7e96d",
+   "note": ""
+  },
+  {
+   "height": 840000,
+   "hash": "0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
+   "date": "2024-04-20",
+   "when": "20 Apr 2024",
+   "from": 6.25,
+   "to": 3.125,
+   "pool": "ViaBTC",
+   "coinbase": "/ViaBTC/Mined by buzz120/",
+   "source": "https://mempool.space/block/0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
+   "note": "the block Runes launched in"
+  }
+ ],
+ "next": {
+  "height": 1050000,
+  "tipAtBuild": 974196,
+  "leftAtBuild": 75804,
+  "buildTime": "2026-11-02T01:02:08Z",
+  "subsidyAfter": 1.5625
+ },
+ "subsidies": [
+  {
+   "era": 1,
+   "btc": 50,
+   "from": 0,
+   "to": 209999
+  },
+  {
+   "era": 2,
+   "btc": 25,
+   "from": 210000,
+   "to": 419999
+  },
+  {
+   "era": 3,
+   "btc": 12.5,
+   "from": 420000,
+   "to": 629999
+  },
+  {
+   "era": 4,
+   "btc": 6.25,
+   "from": 630000,
+   "to": 839999
+  },
+  {
+   "era": 5,
+   "btc": 3.125,
+   "from": 840000,
+   "to": 1049999
+  }
+ ],
+ "cap": {
+  "btc": 21000000,
+  "note": "the sum of every subsidy: 210,000 blocks × (50 + 25 + 12.5 + …) BTC, slightly under 21,000,000 once rounded to whole satoshis"
+ },
+ "messages": [
+  {
+   "height": 0,
+   "hash": "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+   "date": "2009-01-03",
+   "when": "3 Jan 2009",
+   "pool": "Unknown",
+   "text": "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks",
+   "why": "The genesis block",
+   "hex": "04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73",
+   "source": "https://mempool.space/block/000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+  },
+  {
+   "height": 210000,
+   "hash": "000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e",
+   "date": "2012-11-28",
+   "when": "28 Nov 2012",
+   "pool": "Braiins Pool",
+   "text": "/P2SH/ · /slush/",
+   "why": "The first halving",
+   "hex": "03503403062f503253482f04ac2cb6500808003a0201000002072f736c7573682f",
+   "source": "https://mempool.space/block/000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e"
+  },
+  {
+   "height": 420000,
+   "hash": "000000000000000002cce816c0ab2c5c269cb081896b7dcb34b8422d6b74ffa1",
+   "date": "2016-07-09",
+   "when": "9 Jul 2016",
+   "pool": "F2Pool",
+   "text": "七彩神仙鱼 · Chandler Guo loves YangYang Jin. · 🐟 · Mined by zzhhzz",
+   "why": "The second halving",
+   "hex": "03a068060fe4b883e5bda9e7a59ee4bb99e9b1bc204368616e646c65722047756f206c6f7665732059616e6759616e67204a696e2e04f09f909f0f4d696e6564206279207a7a68687a7a0000000000000000000000000000000000000000000000000000",
+   "source": "https://mempool.space/block/000000000000000002cce816c0ab2c5c269cb081896b7dcb34b8422d6b74ffa1"
+  },
+  {
+   "height": 481824,
+   "hash": "0000000000000000001c8018d9cb3b742ef25114f27563e3fc4a1902167f9893",
+   "date": "2017-08-24",
+   "when": "24 Aug 2017",
+   "pool": "BTCC",
+   "text": "/BTCC/ Support /NYA/",
+   "why": "The block SegWit activated in",
+   "hex": "03205a07f4d3f9da09acf878c2c9c96c410d69758f0eae0e479184e0564589052e832c42899c867100010000000000000000db9901006052ce25d80acfde2f425443432f20537570706f7274202f4e59412f000000000000000000000000000000000000",
+   "source": "https://mempool.space/block/0000000000000000001c8018d9cb3b742ef25114f27563e3fc4a1902167f9893"
+  },
+  {
+   "height": 500000,
+   "hash": "00000000000000000024fb37364cbf81fd49cc2d51c09c75c35433c3a1945d04",
+   "date": "2017-12-18",
+   "when": "18 Dec 2017",
+   "pool": "BTC.com",
+   "text": "/BTC.COM/",
+   "why": "Block 500,000",
+   "hex": "0320a107046f0a385a632f4254432e434f4d2ffabe6d6dbdd0ee86f9a1badfd0aa1b3c9dac8d90840cf973f7b2590d6c9adde1a6e0974a010000000000000001283da9a172020000000000",
+   "source": "https://mempool.space/block/00000000000000000024fb37364cbf81fd49cc2d51c09c75c35433c3a1945d04"
+  },
+  {
+   "height": 629999,
+   "hash": "0000000000000000000d656be18bb095db1b23bd797266b0ac3ba720b1962b1e",
+   "date": "2020-05-11",
+   "when": "11 May 2020",
+   "pool": "F2Pool",
+   "text": "🐟NYTimes 09/Apr/2020 With $2.3T Injection, Fed's Plan Far Exceeds 2008 Rescue · Mined",
+   "why": "The last block before the third halving",
+   "hex": "03ef9c0952f09f909f4e5954696d65732030392f4170722f3230323020576974682024322e335420496e6a656374696f6e2c20466564277320506c616e2046617220457863656564732032303038205265736375652020144d696e6564200500ba5e4800",
+   "source": "https://mempool.space/block/0000000000000000000d656be18bb095db1b23bd797266b0ac3ba720b1962b1e"
+  },
+  {
+   "height": 630000,
+   "hash": "000000000000000000024bead8df69990852c202db0e0097c1a12ea637d7e96d",
+   "date": "2020-05-11",
+   "when": "11 May 2020",
+   "pool": "AntPool",
+   "text": "Mined by AntPool119",
+   "why": "The third halving",
+   "hex": "03f09c091b4d696e656420627920416e74506f6f6c313139ae006f20074d6528fabe6d6d2ab1948d50b3d991e2a0821df74358ed9c2553af00c7a61f97771ca0acee106e0400000000000000cbec00802461f905",
+   "source": "https://mempool.space/block/000000000000000000024bead8df69990852c202db0e0097c1a12ea637d7e96d"
+  },
+  {
+   "height": 709632,
+   "hash": "0000000000000000000687bca986194dc2c1f949318629b44bb54ec0a94d8244",
+   "date": "2021-11-14",
+   "when": "14 Nov 2021",
+   "pool": "F2Pool",
+   "text": "🐟 · /F2Pool/",
+   "why": "The block Taproot activated in",
+   "hex": "0300d40a2cfabe6d6db2182a1a8634a5b5c8e4c9102f69b795db3d02e80064a0b007408cca80f68dc110000000f09f909f082f4632506f6f6c2f0000000000000000000000000000000000000000000000000000000000000000000000000500de920100",
+   "source": "https://mempool.space/block/0000000000000000000687bca986194dc2c1f949318629b44bb54ec0a94d8244"
+  },
+  {
+   "height": 767430,
+   "hash": "000000000000000000029730547464f056f8b6e2e0a02eaf69c24389983a04f5",
+   "date": "2022-12-14",
+   "when": "14 Dec 2022",
+   "pool": "Foundry USA",
+   "text": "Foundry USA Pool #dropgold/",
+   "why": "The block holding inscription 0",
+   "hex": "03c6b50b04c1329a632f466f756e6472792055534120506f6f6c202364726f70676f6c642f03f294a76401000000000000",
+   "source": "https://mempool.space/block/000000000000000000029730547464f056f8b6e2e0a02eaf69c24389983a04f5"
+  },
+  {
+   "height": 840000,
+   "hash": "0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
+   "date": "2024-04-20",
+   "when": "20 Apr 2024",
+   "pool": "ViaBTC",
+   "text": "/ViaBTC/Mined by buzz120/",
+   "why": "The fourth halving, and the block Runes launched in",
+   "hex": "0340d10c192f5669614254432f4d696e65642062792062757a7a3132302f2cfabe6d6d144b553283a6e1a150c9989428c0695e3a1bef7d482ed1f829bbe25897fd37dc10000000000000001058a4c9000cc3a31889b38ae08249000000000000",
+   "source": "https://mempool.space/block/0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5"
+  }
+ ],
+ "recent": [
+  {
+   "height": 974190,
+   "hash": "000000000000000000001b5f5d73ab6b8ba6ba5b4413a506f24b1daff7846692",
+   "time": 1793574781,
+   "pool": "Foundry USA",
+   "txs": 7239
+  },
+  {
+   "height": 974189,
+   "hash": "0000000000000000000161944dad71482f883973bac2d0826d4ba7abd1b4e564",
+   "time": 1793574701,
+   "pool": "MARA Pool",
+   "txs": 3087
+  },
+  {
+   "height": 974188,
+   "hash": "00000000000000000001203a28483de1f96e7a55c83c9a695e8a183d0e97e620",
+   "time": 1793573169,
+   "pool": "OCEAN",
+   "txs": 7070
+  },
+  {
+   "height": 974187,
+   "hash": "00000000000000000001e4b76358830cd68da6dda7d95fb9ebf1b621a189cf01",
+   "time": 1793572996,
+   "pool": "Luxor",
+   "txs": 6247
+  },
+  {
+   "height": 974186,
+   "hash": "00000000000000000000aae5b5261cfefc3aed6c8258f639990ca26dacd2e9d0",
+   "time": 1793572484,
+   "pool": "ViaBTC",
+   "txs": 5480
+  },
+  {
+   "height": 974185,
+   "hash": "000000000000000000003556449c73906fa053477b678bd11311ac49ff2b9ca3",
+   "time": 1793572180,
+   "pool": "AntPool",
+   "txs": 4616
+  },
+  {
+   "height": 974184,
+   "hash": "00000000000000000001a9b23d085e024533651be56bf0bcf9dc8cb2929d81a6",
+   "time": 1793571354,
+   "pool": "ViaBTC",
+   "txs": 7652
+  },
+  {
+   "height": 974183,
+   "hash": "000000000000000000009916fc10644c85a0174ae98d4d06b7559a91f5210626",
+   "time": 1793571307,
+   "pool": "AntPool",
+   "txs": 4692
+  },
+  {
+   "height": 974182,
+   "hash": "00000000000000000000860bc276be36c7f9421a0c27127b15816490ac2127ff",
+   "time": 1793570460,
+   "pool": "ViaBTC",
+   "txs": 3845
+  },
+  {
+   "height": 974181,
+   "hash": "00000000000000000001855d9ceac4756aebf29729042701d8267134d6e2cad2",
+   "time": 1793570065,
+   "pool": "Unknown",
+   "txs": 3012
+  },
+  {
+   "height": 974180,
+   "hash": "000000000000000000008a163ee0232f0d0911abc212c6b1d7f672a3d89a7242",
+   "time": 1793568628,
+   "pool": "Foundry USA",
+   "txs": 5913
+  },
+  {
+   "height": 974179,
+   "hash": "0000000000000000000194104814195131b92cea0f15a00e5872f1886a7f935f",
+   "time": 1793568426,
+   "pool": "AntPool",
+   "txs": 3973
+  },
+  {
+   "height": 974178,
+   "hash": "000000000000000000012cdfea915a142cbc439066c8f41566ea04e4df6e619c",
+   "time": 1793567093,
+   "pool": "Foundry USA",
+   "txs": 3332
+  },
+  {
+   "height": 974177,
+   "hash": "000000000000000000004a904601c79442dad4f3ca4f6962211d2905a9f23618",
+   "time": 1793566428,
+   "pool": "ViaBTC",
+   "txs": 1
+  },
+  {
+   "height": 974176,
+   "hash": "00000000000000000001e50d6be086a438cf1eff2c9fe5a92a5b925b813f76ec",
+   "time": 1793566416,
+   "pool": "F2Pool",
+   "txs": 6595
+  },
+  {
+   "height": 974175,
+   "hash": "00000000000000000001792a43053a390bf6d28d8936f322a2b1ad386bd5e761",
+   "time": 1793566440,
+   "pool": "AntPool",
+   "txs": 4657
+  },
+  {
+   "height": 974174,
+   "hash": "000000000000000000016d80977ce7d97466744da70c4f2727e5dcb8693b619b",
+   "time": 1793565087,
+   "pool": "F2Pool",
+   "txs": 6456
+  },
+  {
+   "height": 974173,
+   "hash": "00000000000000000000e08967c602663b10ae1fee6dec6292e4f785b9d78070",
+   "time": 1793564880,
+   "pool": "SpiderPool",
+   "txs": 7860
+  },
+  {
+   "height": 974172,
+   "hash": "000000000000000000006e38ea42eeb0dbba4966108924968274723f69d2bc84",
+   "time": 1793564872,
+   "pool": "ViaBTC",
+   "txs": 6138
+  },
+  {
+   "height": 974171,
+   "hash": "0000000000000000000085b30c247fd98a49f04c35bd40181dce1db7e4b6b14a",
+   "time": 1793564618,
+   "pool": "MARA Pool",
+   "txs": 6392
+  },
+  {
+   "height": 974170,
+   "hash": "00000000000000000000f78ac28442b90ea9c308a0d593d850d6ac469ebe5b3c",
+   "time": 1793564366,
+   "pool": "Foundry USA",
+   "txs": 4595
+  },
+  {
+   "height": 974169,
+   "hash": "0000000000000000000075cceb507b815ce7cc06bd8517f32694a448b8060b58",
+   "time": 1793563946,
+   "pool": "Foundry USA",
+   "txs": 2600
+  },
+  {
+   "height": 974168,
+   "hash": "00000000000000000001093cf626e8d877f9380bf6885cea8830d493291c6eef",
+   "time": 1793562775,
+   "pool": "ViaBTC",
+   "txs": 3436
+  },
+  {
+   "height": 974167,
+   "hash": "0000000000000000000093c34da4b27b6b3b802574bed4469ddae10daf4854e8",
+   "time": 1793561634,
+   "pool": "F2Pool",
+   "txs": 4490
+  },
+  {
+   "height": 974166,
+   "hash": "00000000000000000000931a497e52c47996c00c141cc71bd5bc98d40dea6bb4",
+   "time": 1793561360,
+   "pool": "F2Pool",
+   "txs": 3664
+  },
+  {
+   "height": 974165,
+   "hash": "000000000000000000006c8da3782137e1976d1310e98dea04742848dcf395b8",
+   "time": 1793559783,
+   "pool": "SECPOOL",
+   "txs": 6165
+  },
+  {
+   "height": 974164,
+   "hash": "0000000000000000000171fdda2e4c723942293b81dd5b57e46ee068398db630",
+   "time": 1793559554,
+   "pool": "Foundry USA",
+   "txs": 4952
+  },
+  {
+   "height": 974163,
+   "hash": "00000000000000000000888b82a93d377cbafc8697f20852eda4c5e1d10548ed",
+   "time": 1793559356,
+   "pool": "F2Pool",
+   "txs": 3429
+  },
+  {
+   "height": 974162,
+   "hash": "000000000000000000007097c7b9bfafcd15c4e926a92743f6b8c58ce4f749ca",
+   "time": 1793557838,
+   "pool": "SECPOOL",
+   "txs": 7157
+  },
+  {
+   "height": 974161,
+   "hash": "0000000000000000000066b931d5b96de84225eabfeec9e25811c256791dba03",
+   "time": 1793557768,
+   "pool": "Luxor",
+   "txs": 4475
+  }
+ ],
+ "epoch": {
+  "length": 2016,
+  "tipAtBuild": 974196,
+  "leftAtBuild": 1548,
+  "next": 975744
+ }
+}

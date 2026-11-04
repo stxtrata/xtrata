@@ -1,0 +1,377 @@
+{
+ "machine": "The Halving",
+ "about": "Where every record and image on The Halving comes from. Every symbol is a real Bitcoin record drawn as a data tile in the machine's style, or the Bitcoin mark. No NFT, inscription or third-party project logo appears on these reels.",
+ "generated": "2026-11-02T10:42Z",
+ "symbols": {
+  "cherry": {
+   "name": "Block 210,000 (the first halving, 50 → 25 BTC)",
+   "kind": "On-chain record: block height, hash, date, pool and coinbase text",
+   "source": "mempool.space API, /api/v1/blocks/210000 (read 2 Nov 2026)",
+   "items": [
+    {
+     "height": 210000,
+     "hash": "000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e",
+     "date": "2012-11-28",
+     "pool": "Braiins Pool",
+     "coinbase": "/P2SH/ · /slush/",
+     "source": "https://mempool.space/block/000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e"
+    }
+   ]
+  },
+  "lemon": {
+   "name": "Block 420,000 (25 → 12.5 BTC)",
+   "kind": "On-chain record",
+   "source": "mempool.space API, /api/v1/blocks/420000",
+   "items": [
+    {
+     "height": 420000,
+     "hash": "000000000000000002cce816c0ab2c5c269cb081896b7dcb34b8422d6b74ffa1",
+     "date": "2016-07-09",
+     "pool": "F2Pool",
+     "coinbase": "七彩神仙鱼 · Chandler Guo loves YangYang Jin. · 🐟 · Mined by zzhhzz",
+     "source": "https://mempool.space/block/000000000000000002cce816c0ab2c5c269cb081896b7dcb34b8422d6b74ffa1"
+    }
+   ]
+  },
+  "chip": {
+   "name": "Block 630,000 (12.5 → 6.25 BTC)",
+   "kind": "On-chain record",
+   "source": "mempool.space API, /api/v1/blocks/630000",
+   "items": [
+    {
+     "height": 630000,
+     "hash": "000000000000000000024bead8df69990852c202db0e0097c1a12ea637d7e96d",
+     "date": "2020-05-11",
+     "pool": "AntPool",
+     "coinbase": "Mined by AntPool119",
+     "source": "https://mempool.space/block/000000000000000000024bead8df69990852c202db0e0097c1a12ea637d7e96d"
+    }
+   ]
+  },
+  "block": {
+   "name": "Block 840,000 (6.25 → 3.125 BTC; the block Runes launched in)",
+   "kind": "On-chain record",
+   "source": "mempool.space API, /api/v1/blocks/840000; hash cross-checked with the Hiro API burn-block record",
+   "items": [
+    {
+     "height": 840000,
+     "hash": "0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
+     "date": "2024-04-20",
+     "pool": "ViaBTC",
+     "coinbase": "/ViaBTC/Mined by buzz120/",
+     "source": "https://mempool.space/block/0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5"
+    }
+   ]
+  },
+  "artifact": {
+   "name": "Block 1,050,000 (the next halving)",
+   "kind": "Live on-chain record: 1,050,000 minus the live tip height",
+   "source": "Live: https://mempool.space/api/blocks/tip/height, falling back to the Hiro API (https://xtrata.xyz/hiro/mainnet/extended/v2/burn-blocks?limit=1, then https://api.hiro.so). Bundled fallback: tip 974,196 at build (75,804 blocks to go). A failed read shows the last known value marked STALE.",
+   "items": []
+  },
+  "bitcoin": {
+   "name": "21,000,000 (the supply cap)",
+   "kind": "On-chain rule: the sum of every block subsidy (50 BTC halving every 210,000 blocks)",
+   "source": "Bitcoin consensus rules (src/validation.cpp GetBlockSubsidy in Bitcoin Core); set in type",
+   "items": []
+  },
+  "wild": {
+   "name": "₿",
+   "kind": "The Bitcoin logo (public domain)",
+   "source": "Bitcoin.org repository, img/icons/logotop.svg (https://github.com/bitcoin-dot-org/Bitcoin.org/blob/master/img/icons/logotop.svg): the coin mark taken from it as supplied, saved as art/bitcoin-mark.svg. Bitcoin.org states the logo is in the public domain.",
+   "items": []
+  },
+  "scatter": {
+   "name": "Subsidy coin: 50, 25, 12.5, 6.25 or 3.125 BTC",
+   "kind": "On-chain rule: the block subsidy of each era",
+   "source": "Bitcoin consensus rules (GetBlockSubsidy); coin faces drawn in the machine's style from the amounts",
+   "items": []
+  },
+  "vault": {
+   "name": "Coinbase message",
+   "kind": "On-chain record: readable text decoded from the coinbase script (scriptSig) of historic blocks, with its height",
+   "source": "mempool.space API extras.coinbaseRaw for each block; decoded by tools/the-halving/build_records.py (each coinbase's BIP34 height push is checked against the block height)",
+   "items": [
+    {
+     "height": 0,
+     "hash": "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+     "text": "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks",
+     "coinbaseHex": "04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73",
+     "pool": "Unknown",
+     "source": "https://mempool.space/block/000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+    },
+    {
+     "height": 210000,
+     "hash": "000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e",
+     "text": "/P2SH/ · /slush/",
+     "coinbaseHex": "03503403062f503253482f04ac2cb6500808003a0201000002072f736c7573682f",
+     "pool": "Braiins Pool",
+     "source": "https://mempool.space/block/000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e"
+    },
+    {
+     "height": 420000,
+     "hash": "000000000000000002cce816c0ab2c5c269cb081896b7dcb34b8422d6b74ffa1",
+     "text": "七彩神仙鱼 · Chandler Guo loves YangYang Jin. · 🐟 · Mined by zzhhzz",
+     "coinbaseHex": "03a068060fe4b883e5bda9e7a59ee4bb99e9b1bc204368616e646c65722047756f206c6f7665732059616e6759616e67204a696e2e04f09f909f0f4d696e6564206279207a7a68687a7a0000000000000000000000000000000000000000000000000000",
+     "pool": "F2Pool",
+     "source": "https://mempool.space/block/000000000000000002cce816c0ab2c5c269cb081896b7dcb34b8422d6b74ffa1"
+    },
+    {
+     "height": 481824,
+     "hash": "0000000000000000001c8018d9cb3b742ef25114f27563e3fc4a1902167f9893",
+     "text": "/BTCC/ Support /NYA/",
+     "coinbaseHex": "03205a07f4d3f9da09acf878c2c9c96c410d69758f0eae0e479184e0564589052e832c42899c867100010000000000000000db9901006052ce25d80acfde2f425443432f20537570706f7274202f4e59412f000000000000000000000000000000000000",
+     "pool": "BTCC",
+     "source": "https://mempool.space/block/0000000000000000001c8018d9cb3b742ef25114f27563e3fc4a1902167f9893"
+    },
+    {
+     "height": 500000,
+     "hash": "00000000000000000024fb37364cbf81fd49cc2d51c09c75c35433c3a1945d04",
+     "text": "/BTC.COM/",
+     "coinbaseHex": "0320a107046f0a385a632f4254432e434f4d2ffabe6d6dbdd0ee86f9a1badfd0aa1b3c9dac8d90840cf973f7b2590d6c9adde1a6e0974a010000000000000001283da9a172020000000000",
+     "pool": "BTC.com",
+     "source": "https://mempool.space/block/00000000000000000024fb37364cbf81fd49cc2d51c09c75c35433c3a1945d04"
+    },
+    {
+     "height": 629999,
+     "hash": "0000000000000000000d656be18bb095db1b23bd797266b0ac3ba720b1962b1e",
+     "text": "🐟NYTimes 09/Apr/2020 With $2.3T Injection, Fed's Plan Far Exceeds 2008 Rescue · Mined",
+     "coinbaseHex": "03ef9c0952f09f909f4e5954696d65732030392f4170722f3230323020576974682024322e335420496e6a656374696f6e2c20466564277320506c616e2046617220457863656564732032303038205265736375652020144d696e6564200500ba5e4800",
+     "pool": "F2Pool",
+     "source": "https://mempool.space/block/0000000000000000000d656be18bb095db1b23bd797266b0ac3ba720b1962b1e"
+    },
+    {
+     "height": 630000,
+     "hash": "000000000000000000024bead8df69990852c202db0e0097c1a12ea637d7e96d",
+     "text": "Mined by AntPool119",
+     "coinbaseHex": "03f09c091b4d696e656420627920416e74506f6f6c313139ae006f20074d6528fabe6d6d2ab1948d50b3d991e2a0821df74358ed9c2553af00c7a61f97771ca0acee106e0400000000000000cbec00802461f905",
+     "pool": "AntPool",
+     "source": "https://mempool.space/block/000000000000000000024bead8df69990852c202db0e0097c1a12ea637d7e96d"
+    },
+    {
+     "height": 709632,
+     "hash": "0000000000000000000687bca986194dc2c1f949318629b44bb54ec0a94d8244",
+     "text": "🐟 · /F2Pool/",
+     "coinbaseHex": "0300d40a2cfabe6d6db2182a1a8634a5b5c8e4c9102f69b795db3d02e80064a0b007408cca80f68dc110000000f09f909f082f4632506f6f6c2f0000000000000000000000000000000000000000000000000000000000000000000000000500de920100",
+     "pool": "F2Pool",
+     "source": "https://mempool.space/block/0000000000000000000687bca986194dc2c1f949318629b44bb54ec0a94d8244"
+    },
+    {
+     "height": 767430,
+     "hash": "000000000000000000029730547464f056f8b6e2e0a02eaf69c24389983a04f5",
+     "text": "Foundry USA Pool #dropgold/",
+     "coinbaseHex": "03c6b50b04c1329a632f466f756e6472792055534120506f6f6c202364726f70676f6c642f03f294a76401000000000000",
+     "pool": "Foundry USA",
+     "source": "https://mempool.space/block/000000000000000000029730547464f056f8b6e2e0a02eaf69c24389983a04f5"
+    },
+    {
+     "height": 840000,
+     "hash": "0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
+     "text": "/ViaBTC/Mined by buzz120/",
+     "coinbaseHex": "0340d10c192f5669614254432f4d696e65642062792062757a7a3132302f2cfabe6d6d144b553283a6e1a150c9989428c0695e3a1bef7d482ed1f829bbe25897fd37dc10000000000000001058a4c9000cc3a31889b38ae08249000000000000",
+     "pool": "ViaBTC",
+     "source": "https://mempool.space/block/0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5"
+    }
+   ]
+  },
+  "chain": {
+   "name": "Mined block",
+   "kind": "Live on-chain record: a recent block height with the name of the pool that mined it",
+   "source": "Live: https://mempool.space/api/v1/blocks. Bundled fallback: blocks 974,161–974,190 read at build; hashes of 974,175, 974,176 and 974,190 cross-checked against the Hiro API. Pool names appear as text only.",
+   "items": [
+    {
+     "height": 974190,
+     "hash": "000000000000000000001b5f5d73ab6b8ba6ba5b4413a506f24b1daff7846692",
+     "pool": "Foundry USA",
+     "source": "https://mempool.space/block/000000000000000000001b5f5d73ab6b8ba6ba5b4413a506f24b1daff7846692"
+    },
+    {
+     "height": 974189,
+     "hash": "0000000000000000000161944dad71482f883973bac2d0826d4ba7abd1b4e564",
+     "pool": "MARA Pool",
+     "source": "https://mempool.space/block/0000000000000000000161944dad71482f883973bac2d0826d4ba7abd1b4e564"
+    },
+    {
+     "height": 974188,
+     "hash": "00000000000000000001203a28483de1f96e7a55c83c9a695e8a183d0e97e620",
+     "pool": "OCEAN",
+     "source": "https://mempool.space/block/00000000000000000001203a28483de1f96e7a55c83c9a695e8a183d0e97e620"
+    },
+    {
+     "height": 974187,
+     "hash": "00000000000000000001e4b76358830cd68da6dda7d95fb9ebf1b621a189cf01",
+     "pool": "Luxor",
+     "source": "https://mempool.space/block/00000000000000000001e4b76358830cd68da6dda7d95fb9ebf1b621a189cf01"
+    },
+    {
+     "height": 974186,
+     "hash": "00000000000000000000aae5b5261cfefc3aed6c8258f639990ca26dacd2e9d0",
+     "pool": "ViaBTC",
+     "source": "https://mempool.space/block/00000000000000000000aae5b5261cfefc3aed6c8258f639990ca26dacd2e9d0"
+    },
+    {
+     "height": 974185,
+     "hash": "000000000000000000003556449c73906fa053477b678bd11311ac49ff2b9ca3",
+     "pool": "AntPool",
+     "source": "https://mempool.space/block/000000000000000000003556449c73906fa053477b678bd11311ac49ff2b9ca3"
+    },
+    {
+     "height": 974184,
+     "hash": "00000000000000000001a9b23d085e024533651be56bf0bcf9dc8cb2929d81a6",
+     "pool": "ViaBTC",
+     "source": "https://mempool.space/block/00000000000000000001a9b23d085e024533651be56bf0bcf9dc8cb2929d81a6"
+    },
+    {
+     "height": 974183,
+     "hash": "000000000000000000009916fc10644c85a0174ae98d4d06b7559a91f5210626",
+     "pool": "AntPool",
+     "source": "https://mempool.space/block/000000000000000000009916fc10644c85a0174ae98d4d06b7559a91f5210626"
+    },
+    {
+     "height": 974182,
+     "hash": "00000000000000000000860bc276be36c7f9421a0c27127b15816490ac2127ff",
+     "pool": "ViaBTC",
+     "source": "https://mempool.space/block/00000000000000000000860bc276be36c7f9421a0c27127b15816490ac2127ff"
+    },
+    {
+     "height": 974181,
+     "hash": "00000000000000000001855d9ceac4756aebf29729042701d8267134d6e2cad2",
+     "pool": "Unknown",
+     "source": "https://mempool.space/block/00000000000000000001855d9ceac4756aebf29729042701d8267134d6e2cad2"
+    },
+    {
+     "height": 974180,
+     "hash": "000000000000000000008a163ee0232f0d0911abc212c6b1d7f672a3d89a7242",
+     "pool": "Foundry USA",
+     "source": "https://mempool.space/block/000000000000000000008a163ee0232f0d0911abc212c6b1d7f672a3d89a7242"
+    },
+    {
+     "height": 974179,
+     "hash": "0000000000000000000194104814195131b92cea0f15a00e5872f1886a7f935f",
+     "pool": "AntPool",
+     "source": "https://mempool.space/block/0000000000000000000194104814195131b92cea0f15a00e5872f1886a7f935f"
+    },
+    {
+     "height": 974178,
+     "hash": "000000000000000000012cdfea915a142cbc439066c8f41566ea04e4df6e619c",
+     "pool": "Foundry USA",
+     "source": "https://mempool.space/block/000000000000000000012cdfea915a142cbc439066c8f41566ea04e4df6e619c"
+    },
+    {
+     "height": 974177,
+     "hash": "000000000000000000004a904601c79442dad4f3ca4f6962211d2905a9f23618",
+     "pool": "ViaBTC",
+     "source": "https://mempool.space/block/000000000000000000004a904601c79442dad4f3ca4f6962211d2905a9f23618"
+    },
+    {
+     "height": 974176,
+     "hash": "00000000000000000001e50d6be086a438cf1eff2c9fe5a92a5b925b813f76ec",
+     "pool": "F2Pool",
+     "source": "https://mempool.space/block/00000000000000000001e50d6be086a438cf1eff2c9fe5a92a5b925b813f76ec"
+    },
+    {
+     "height": 974175,
+     "hash": "00000000000000000001792a43053a390bf6d28d8936f322a2b1ad386bd5e761",
+     "pool": "AntPool",
+     "source": "https://mempool.space/block/00000000000000000001792a43053a390bf6d28d8936f322a2b1ad386bd5e761"
+    },
+    {
+     "height": 974174,
+     "hash": "000000000000000000016d80977ce7d97466744da70c4f2727e5dcb8693b619b",
+     "pool": "F2Pool",
+     "source": "https://mempool.space/block/000000000000000000016d80977ce7d97466744da70c4f2727e5dcb8693b619b"
+    },
+    {
+     "height": 974173,
+     "hash": "00000000000000000000e08967c602663b10ae1fee6dec6292e4f785b9d78070",
+     "pool": "SpiderPool",
+     "source": "https://mempool.space/block/00000000000000000000e08967c602663b10ae1fee6dec6292e4f785b9d78070"
+    },
+    {
+     "height": 974172,
+     "hash": "000000000000000000006e38ea42eeb0dbba4966108924968274723f69d2bc84",
+     "pool": "ViaBTC",
+     "source": "https://mempool.space/block/000000000000000000006e38ea42eeb0dbba4966108924968274723f69d2bc84"
+    },
+    {
+     "height": 974171,
+     "hash": "0000000000000000000085b30c247fd98a49f04c35bd40181dce1db7e4b6b14a",
+     "pool": "MARA Pool",
+     "source": "https://mempool.space/block/0000000000000000000085b30c247fd98a49f04c35bd40181dce1db7e4b6b14a"
+    },
+    {
+     "height": 974170,
+     "hash": "00000000000000000000f78ac28442b90ea9c308a0d593d850d6ac469ebe5b3c",
+     "pool": "Foundry USA",
+     "source": "https://mempool.space/block/00000000000000000000f78ac28442b90ea9c308a0d593d850d6ac469ebe5b3c"
+    },
+    {
+     "height": 974169,
+     "hash": "0000000000000000000075cceb507b815ce7cc06bd8517f32694a448b8060b58",
+     "pool": "Foundry USA",
+     "source": "https://mempool.space/block/0000000000000000000075cceb507b815ce7cc06bd8517f32694a448b8060b58"
+    },
+    {
+     "height": 974168,
+     "hash": "00000000000000000001093cf626e8d877f9380bf6885cea8830d493291c6eef",
+     "pool": "ViaBTC",
+     "source": "https://mempool.space/block/00000000000000000001093cf626e8d877f9380bf6885cea8830d493291c6eef"
+    },
+    {
+     "height": 974167,
+     "hash": "0000000000000000000093c34da4b27b6b3b802574bed4469ddae10daf4854e8",
+     "pool": "F2Pool",
+     "source": "https://mempool.space/block/0000000000000000000093c34da4b27b6b3b802574bed4469ddae10daf4854e8"
+    },
+    {
+     "height": 974166,
+     "hash": "00000000000000000000931a497e52c47996c00c141cc71bd5bc98d40dea6bb4",
+     "pool": "F2Pool",
+     "source": "https://mempool.space/block/00000000000000000000931a497e52c47996c00c141cc71bd5bc98d40dea6bb4"
+    },
+    {
+     "height": 974165,
+     "hash": "000000000000000000006c8da3782137e1976d1310e98dea04742848dcf395b8",
+     "pool": "SECPOOL",
+     "source": "https://mempool.space/block/000000000000000000006c8da3782137e1976d1310e98dea04742848dcf395b8"
+    },
+    {
+     "height": 974164,
+     "hash": "0000000000000000000171fdda2e4c723942293b81dd5b57e46ee068398db630",
+     "pool": "Foundry USA",
+     "source": "https://mempool.space/block/0000000000000000000171fdda2e4c723942293b81dd5b57e46ee068398db630"
+    },
+    {
+     "height": 974163,
+     "hash": "00000000000000000000888b82a93d377cbafc8697f20852eda4c5e1d10548ed",
+     "pool": "F2Pool",
+     "source": "https://mempool.space/block/00000000000000000000888b82a93d377cbafc8697f20852eda4c5e1d10548ed"
+    },
+    {
+     "height": 974162,
+     "hash": "000000000000000000007097c7b9bfafcd15c4e926a92743f6b8c58ce4f749ca",
+     "pool": "SECPOOL",
+     "source": "https://mempool.space/block/000000000000000000007097c7b9bfafcd15c4e926a92743f6b8c58ce4f749ca"
+    },
+    {
+     "height": 974161,
+     "hash": "0000000000000000000066b931d5b96de84225eabfeec9e25811c256791dba03",
+     "pool": "Luxor",
+     "source": "https://mempool.space/block/0000000000000000000066b931d5b96de84225eabfeec9e25811c256791dba03"
+    }
+   ]
+  }
+ },
+ "cabinet": {
+  "xtrataMark": "tools/the-halving/model/assets/xtrata.svg, the brand SVG supplied in the build prompt, embedded as supplied on the lower door (house mark)",
+  "parallaxWordmark": "tools/the-halving/model/assets/parallax-wordmark.svg, the wordmark supplied in the build prompt, embedded small at the marquee foot (house mark)",
+  "bitcoinMark": "art/bitcoin-mark.svg (Bitcoin.org, public domain), on the marquee",
+  "everythingElse": "Concrete, steel, fan grilles, split-flap boards, hazard stripes, buttons and labels are procedural textures written by tools/the-halving/model/textures.py; no third-party artwork."
+ },
+ "twins": {
+  "what": "The Epoch Pot's twin count (display only)",
+  "source": "https://xtrata.xyz/forever-twins/data/registry.v2.json and each live helper's contract events via https://xtrata.xyz/hiro/mainnet (fallback https://api.hiro.so). A failed read is shown as unknown, never as zero."
+ },
+ "logosNeedingPermission": [],
+ "permissionNotes": "None needed. The only logos are the Xtrata mark and ParallaX Casino wordmark (house marks) and the Bitcoin mark (public domain, from Bitcoin.org). Mining-pool names appear as plain text from block data; no pool logo is used. If pool logos are ever added, each needs the pool's official file and its permission."
+}
