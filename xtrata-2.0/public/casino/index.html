@@ -11162,11 +11162,12 @@ function applyTestnetFunding(proof){
   const eyePos = () => V3(player.x, EYE + Math.sin(player.bob) * WALK.bobAmp, player.z);
   const aimDir = () => V3(-Math.sin(player.yaw) * Math.cos(player.pitch), Math.sin(player.pitch), -Math.cos(player.yaw) * Math.cos(player.pitch));
   // ---------------- the "behind you" view (docs/plans/CASINO-OWN-ADRIAN-PLAN.md) ----------------
-  // The default: the camera hangs on a short boom behind your own Adrian, so you see yourself walk, sit and play. V or the 👤
-  // button switches to first person (the arcade hall's view, unchanged). Walking itself is the same either way: the mouse and
-  // the joystick still turn and move `player`; only where the camera sits changes.
+  // Behind you: the camera hangs on a short boom behind your own Adrian, so you see yourself walk, sit and play. First person
+  // (the arcade hall's view, unchanged) is the default since 2026-11-04; V or the 👤 button switches, and the choice is kept in
+  // localStorage (read in a try/catch, so blocked storage just means first person). Walking itself is the same either way: the
+  // mouse and the joystick still turn and move `player`; only where the camera sits changes.
   const VIEW_KEY = 'xtrata.parallax.view';
-  let viewMode = (() => { try { return localStorage.getItem(VIEW_KEY) === 'first' ? 'first' : 'behind'; } catch (e) { return 'behind'; } })();
+  let viewMode = (() => { try { return localStorage.getItem(VIEW_KEY) === 'behind' ? 'behind' : 'first'; } catch (e) { return 'first'; } })();
   const behind = () => viewMode === 'behind' && webglOK;
   const BOOM = { back: 2.6, up: 0.55, head: 1.55, min: 0.55, clear: 0.22, steps: 10 };
   let boomLen = BOOM.back, meFrameHook = null;

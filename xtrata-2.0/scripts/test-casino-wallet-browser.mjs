@@ -355,38 +355,57 @@ const roomButton = (page, text) => page.locator('#pxroom-panel button', { hasTex
   console.log('ok R2 · Not now keeps them invisible; Play now at the exchange signs them into the room automatically');
 }
 
-// ---- V. your own Adrian and the behind view (the default), and first person by V ----
+// ---- V. first person is the default; V puts your own Adrian on screen behind you, and the choice is remembered ----
 const view = (page) => page.evaluate(() => { const v = window.__casinoView; return { mode: v.mode, behind: v.behind, camera: v.camera, player: v.player, boom: v.boom, me: v.me }; });
 {
   const { context, page, errors } = await newPlayer();
+  const boot = async () => {
+    await page.waitForFunction(() => window.__casinoView && window.XA_HOSTS?.ready, null, { timeout: 120000 });
+    await page.evaluate(() => window.__casino.startAtDoor());
+  };
+  const stored = () => page.evaluate(() => localStorage.getItem('xtrata.parallax.view'));
   await page.goto(SITE + '/casino/', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForFunction(() => window.__casinoView && window.XA_HOSTS?.ready, null, { timeout: 120000 });
-  await page.evaluate(() => window.__casino.startAtDoor());
-  await page.waitForFunction(() => window.__casinoView.me.some((m) => !m.seated && m.on && m.built), null, { timeout: 60000 });
+  await boot();
+  // Nothing saved yet: first person, your own Adrian hidden, and merely loading the page saves nothing.
+  let v = await view(page);
+  assert.equal(v.mode, 'first', 'first person is the default');
+  assert.equal(await stored(), null, 'loading the page saves no choice');
+  assert.ok(!v.me.some((m) => m.on), 'your own Adrian is hidden in first person');
+  assert.ok(Math.hypot(v.camera[0] - v.player.x, v.camera[2] - v.player.z) < 0.05, 'first person: the camera is at your eyes');
   // Out on the open floor (at the door the wall is right behind you and the boom is short, as it should be).
   await page.evaluate(() => window.__casinoView.standAt(0, 3));
-  // The boom eases back out after the door; this test browser draws a frame only every 4 s, so that takes a while here.
+  await page.keyboard.press('KeyV');
+  await page.waitForFunction(() => window.__casinoView.mode === 'behind' && window.__casinoView.me.some((m) => !m.seated && m.on && m.built), null, { timeout: 60000 });
+  // The boom eases back out after the switch; this test browser draws a frame only every 4 s, so that takes a while here.
   await page.waitForFunction(() => window.__casinoView.boom > 2.4, null, { timeout: 180000 });
-  let v = await view(page);
-  assert.equal(v.mode, 'behind', 'behind you is the default');
+  v = await view(page);
   const [cx, cy, cz] = v.camera, back = Math.hypot(cx - v.player.x, cz - v.player.z);
   assert.ok(back > 1.5 && back < 2.8 && cz > v.player.z && cy > 1.6, `camera behind and above you (${back.toFixed(2)} m back, ${cy.toFixed(2)} m up)`);
   if (shots) await page.screenshot({ path: `${shots}/8-behind-you.png`, timeout: 120000, animations: 'disabled' });
+  assert.equal(await stored(), 'behind', 'the choice of behind you is remembered');
+  // A reload keeps the chosen view.
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 120000 });
+  await boot();
+  assert.equal((await view(page)).mode, 'behind', 'behind you is still chosen after a reload');
+  // And back to first person, also remembered across a reload.
   await page.keyboard.press('KeyV');
   await page.waitForFunction(() => window.__casinoView.mode === 'first' && !window.__casinoView.me.some((m) => m.on), null, { timeout: 20000 });
   v = await view(page);
   assert.ok(Math.hypot(v.camera[0] - v.player.x, v.camera[2] - v.player.z) < 0.05, 'first person: the camera is at your eyes');
-  assert.equal(await page.evaluate(() => localStorage.getItem('xtrata.parallax.view')), 'first', 'the choice is remembered');
+  assert.equal(await stored(), 'first', 'the choice of first person is remembered');
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 120000 });
+  await boot();
+  assert.equal((await view(page)).mode, 'first', 'first person is still chosen after a reload');
+  // Back to behind you, to check that against the back wall the boom shortens instead of going through it.
   await page.keyboard.press('KeyV');
   await page.waitForFunction(() => window.__casinoView.mode === 'behind' && window.__casinoView.me.some((m) => m.on), null, { timeout: 20000 });
-  // Against the back wall the boom shortens instead of going through it.
   await page.evaluate(() => { window.__casinoView.standAt(0, 9.0); });
   await page.waitForTimeout(9000);
   v = await view(page);
   assert.ok(v.camera[2] < 11 - 0.3, `the camera stays inside the room (z ${v.camera[2].toFixed(2)})`);
   assert.deepEqual(errors, []);
   await context.close();
-  console.log('ok V · behind you by default (own Adrian shown), V for first person (remembered), the boom stops at walls');
+  console.log('ok V · first person by default, V for your own Adrian behind you, each choice remembered after a reload, the boom stops at walls');
 }
 
 // ---- P. personal space: other players are solid while you are signed in, and you pass through them while you are not ----
