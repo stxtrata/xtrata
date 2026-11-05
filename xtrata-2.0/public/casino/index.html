@@ -8065,7 +8065,7 @@ function applyTestnetFunding(proof){
     // A LAYOUT (machine-rotation.js, `layouts`) places every cabinet by hand: one machine per slot, any number of designs.
     let layout=layoutName&&R.layouts&&R.layouts[layoutName]&&Array.isArray(R.layouts[layoutName].slots)?R.layouts[layoutName]:null;
     if(layout)want=layout.slots.map(s=>s&&s.id);
-    const maxDesigns=layout?16:5;
+    const maxDesigns=layout?30:5;
     want=want.filter((k,i)=>typeof k==='string'&&/^[a-z0-9-]{1,40}$/.test(k)&&(coreByKey.has(k)||names.has(k))&&want.indexOf(k)===i).slice(0,maxDesigns);
     if(!want.length){want=coreKeys.slice();layout=null;}
     const loaded=await Promise.all(want.map(async k=>{
@@ -8088,7 +8088,7 @@ function applyTestnetFunding(proof){
     window.PX_FLOOR_BY_GAME=Object.fromEntries(floor.map(f=>[f.gameId,f.key]));           // the game id inside each pack -> that short id
     window.PX_MACHINE_NAMES=Object.fromEntries(names);                                    // short id -> name, for every machine that could be on a floor
     // The slots, with any machine that failed to load swapped for the built-in that stood in for it (a slot with no stand-in stays empty).
-    window.PX_FLOOR_LAYOUT=layout?{name:layoutName,dispensers:layout.dispensers||null,greeter:layout.greeter||null,slots:layout.slots.map(s=>({...s,id:alias[s.id]||s.id})).filter(s=>floor.some(f=>f.key===s.id))}:null;
+    window.PX_FLOOR_LAYOUT=layout?{name:layoutName,houseChips:layout.houseChips,dispensers:layout.dispensers||null,greeter:layout.greeter||null,slots:layout.slots.map(s=>({...s,id:alias[s.id]||s.id})).filter(s=>floor.some(f=>f.key===s.id))}:null;
     return floor;
   })();
   (function(){
@@ -8713,12 +8713,15 @@ function applyTestnetFunding(proof){
       return s.head+"(()=>{const X="+s.engine+";try{window.parent.PXRoundLog.hook(X,'"+id+"',()=>state)}catch(e){}try{window.parent.PXSpinCast&&window.parent.PXSpinCast.hook(X,'"+id+"')}catch(e){}return X})())"+s.tail;
     }catch(e){return html;}
   }
+  // One game engine serves a design, but only the cabinet being played shows its live screen: its twin keeps its idle screen and
+  // does not roll with it. (Each cabinet has its own lever, which already followed the active cabinet only.)
+  function pxBindScreen(m,e){const sc=m&&e&&m.model.getObjectByName('px-screenMesh');if(!sc)return;if(!sc.userData.pxOrig)sc.userData.pxOrig=sc.material;sc.material=sc.userData.pxOrig.clone();sc.material.map=e.texture;sc.material.color.setHex(0xffffff);sc.material.needsUpdate=true;}
+  function pxUnbindScreen(m){const sc=m&&m.model.getObjectByName('px-screenMesh');if(sc&&sc.userData.pxOrig){sc.material=sc.userData.pxOrig;sc.material.needsUpdate=true;}}
   async function createCasinoEngine(type){
     if(machineEngines.has(type))return machineEngines.get(type);
     const html=pxRafShim(pxLiteDocument(pxRlPatch(await pxPackText(window.PX_MACHINE_PACKS[type],'game')),pxTouch())),frame=document.createElement('iframe');frame.className=pxTouch()?'pxLogicFrame pxLite':'pxLogicFrame';frame.setAttribute('allow','fullscreen; autoplay');frame.allowFullscreen=true;frame.title=window.PX_MACHINE_PACKS[type].name+' game logic';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;document.body.appendChild(frame);
     const api=await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Machine did not become ready')),20000);frame.onload=()=>{const api=frame.contentWindow.PX_CASINO_ENGINE;if(!api){clearTimeout(timeout);reject(new Error('Game engine API missing'));return;}clearTimeout(timeout);resolve(api);};frame.srcdoc=html;});
     const texture=new THREE.CanvasTexture(api.screen);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.generateMipmaps=false;texture.anisotropy=16;
-    for(const m of room.machines.filter(m=>m.type===type&&!m.occupied&&!m.pxSpect)){const screen=m.model.getObjectByName('px-screenMesh');if(screen){screen.material=screen.material.clone();screen.material.map=texture;screen.material.color.setHex(0xffffff);screen.material.needsUpdate=true;}}
     const engine={api,frame,texture,revision:-1,css:window.PX_MACHINE_PACKS[type].css,fsKind:pxFsKind(api),fsHostOn:false,hostReg:false};machineEngines.set(type,engine);return engine;
   }
   async function openCasinoMachine(selection,view='here'){
@@ -8733,7 +8736,7 @@ function applyTestnetFunding(proof){
     document.body.classList.add('machine-connected');$('pxCabinetControls').hidden=false;$('pxMachineName').textContent=m.name;$('pxMachineStatus').textContent='Connecting to the cabinet…';
     $('pxFallbackMachine').hidden=webglOK;machineLastUI=0;machineLastRevision=-1;machinePorts={modal:'',feature:''};$('pxMachineMore').hidden=true;$('pxMachineModal').hidden=true;$('pxMachineFeature').hidden=true;$('pxMachineGamble').hidden=true;$('pxMachineSpin').textContent='Connecting…';$('pxMachineSpin').disabled=true;
     paintMachineView();if(view!=='here')chooseMachineView(view);
-    try{const e=await loadCasinoEngine(m.type);if(!machineOpen||session!==machineSession)return;await e.api.activate();if(!machineOpen||session!==machineSession){if(!machineOpen||getActiveEngine()!==e)e.api.deactivate();return;}m.lastLeverSignal=e.api.mechanics?.().lever?.id||0;machineLoading=false;updateConnectedMachine(0,true);queueMicrotask(()=>{if(machineOpen&&activeCabinet===m)showReviewMachineRules(m.type,true);});}
+    try{const e=await loadCasinoEngine(m.type);if(!machineOpen||session!==machineSession)return;pxBindScreen(m,e);await e.api.activate();if(!machineOpen||session!==machineSession){if(!machineOpen||getActiveEngine()!==e)e.api.deactivate();return;}m.lastLeverSignal=e.api.mechanics?.().lever?.id||0;machineLoading=false;updateConnectedMachine(0,true);queueMicrotask(()=>{if(machineOpen&&activeCabinet===m)showReviewMachineRules(m.type,true);});}
     catch(error){if(session!==machineSession)return;machineLoading=true;$('pxMachineSpin').textContent='Reconnect';$('pxMachineStatus').textContent=error.message||'The cabinet could not connect. Disconnect and try again.';console.warn(error);}
   }
   function returnFromMachine(){
@@ -8741,7 +8744,7 @@ function applyTestnetFunding(proof){
     if(e&&e.fsKind&&e.fsKind!=='none'&&pxFsActive(e)){pxExitFs(e);machineFsOn=false;}   // a game's own full screen gives the view back first
     else if(machineFsOn){try{if(typeof e?.api.fullscreen==='function')e.api.fullscreen(false);}catch(_){}machineFsOn=false;}
     if(e&&!e.api.deactivate()){$('pxMachineStatus').textContent='Let this spin finish before disconnecting.';return false;}
-    const wasHere=machineHere;machineOpen=false;machineLoading=false;machineType=-1;activeCabinet=null;machineOutOfRange=false;machineSession++;
+    const wasHere=machineHere;pxUnbindScreen(activeCabinet);machineOpen=false;machineLoading=false;machineType=-1;activeCabinet=null;machineOutOfRange=false;machineSession++;
     exitPseudoFs();   // the larger view belongs to the machine; walking away returns to the room as it was (browser full screen is left as the player set it)
     document.body.classList.remove('machine-connected','machine-floor');$('pxCabinetControls').hidden=true;$('pxFallbackMachine').hidden=true;$('pxMachineModal').hidden=true;$('pxMachineFeature').hidden=true;$('pxMachineMore').hidden=true;
     restoreMachinePeople();
@@ -12079,6 +12082,7 @@ function applyTestnetFunding(proof){
     const colors={1:'#e8e2d4',5:'#142331',10:'#24252a',25:'#3e5368',100:'#eee6d7',500:'#1759b8',1000:'#e47723',5000:'#111820',25000:'#c8973a'};
     let css='';Object.entries(colors).forEach(([v,col])=>{const can=document.createElement('canvas');can.width=can.height=256;printChip(can.getContext('2d'),256,+v,col);css+=`.chip.c${v}{background-image:url(${can.toDataURL()})!important}`;if(chipMat[v]){for(const m of [chipMat[v][1]]){m.map.image.getContext('2d').clearRect(0,0,m.map.image.width,m.map.image.height);printChip(m.map.image.getContext('2d'),m.map.image.width,+v,col);m.map.needsUpdate=true;}}if([10,100,500,1000,5000,25000].includes(+v)){const d=document.createElement('div');d.append(can);const b=document.createElement('b');b.textContent=(+v).toLocaleString('en-GB')+' LAYR';d.append(b);d.append(document.createTextNode(({10:'Black',100:'Ivory',500:'Blue',1000:'Orange',5000:'Obsidian',25000:'Gold'})[v]));$('chipCollection').append(d);}});
     const style=document.createElement('style');style.textContent=css;document.head.append(style);
+    if(window.PX_FLOOR_LAYOUT&&window.PX_FLOOR_LAYOUT.houseChips===false)return;   // a layout can drop this display when its cabinets stand where it hangs
     const props=new THREE.Group();props.position.set(3,1.4,9.35);scene.add(props);[100,500,1000,5000,25000].forEach((v,i)=>{for(let k=0;k<5;k++){const m=new THREE.Mesh(CHIP_GEO,chipMat[v]);m.position.set((i-2)*.12,k*.009,0);props.add(m);}});
   }
   dressHouseChips();
