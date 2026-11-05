@@ -22,12 +22,9 @@
 (function(){
 var A=window.PX_ASSETS,bar=document.getElementById('pxBootBar'),txt=document.getElementById('pxBootTxt'),sub=document.getElementById('pxBootSub'),box=document.getElementById('pxBoot'),retry=document.getElementById('pxBootRetry');
 var got={},fin={},eager=[],total=0,pending={},t0=Date.now(),tA=0,last=.04,done=false,failed=false,k;
-/* A custom floor (?layout= or ?floor=) may not use the five built-in machines: their models are then fetched only if the floor does. */
-var qs=location.search,touch=(function(){var m=/[?&]lite=([01])/.exec(qs);return m?m[1]==='1':(!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches)||'ontouchstart' in window)})();
-/* A custom floor (?layout= or ?floor=) may not use the five built-in machines, and a touch device gets a floor of its own (see the floor code in the page): their models are then fetched only if the floor uses them. Forever Twins (m1model) is on the touch floor, so it still starts now. */
-var touchFloor=touch&&!/[?&]floor=/.test(qs)&&(!/[?&]layout=/.test(qs)||/[?&]layout=slot-hall/.test(qs)),custom=/[?&](layout|floor)=/.test(qs)||touch;
+/* Only Forever Twins' model (m1model) is on the standard floor, so it is the only built-in model fetched ahead; the others are fetched only if a floor uses them. */
 
-for(k in A){if(A[k].e&&!(custom&&/^m\dmodel$/.test(k)&&!(touchFloor&&k==='m1model'))){eager.push(k);total+=A[k].n;got[k]=0}}
+for(k in A){if(A[k].e&&!(/^m\dmodel$/.test(k)&&k!=='m1model')){eager.push(k);total+=A[k].n;got[k]=0}}
 function mb(n){return (n/1048576).toFixed(1)}
 /* One download, with progress. Tries three times: a dropped connection should not leave the casino half built. */
 function load(key,tries){
