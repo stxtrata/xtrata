@@ -127,8 +127,11 @@ const poll = (root) => {
     });
 };
 
+// The page may carry the full hero, the thin top bar, or both. Whichever exists drives the polling.
+const findRoot = () => document.getElementById('giveawayHero') || document.getElementById('giveBar');
+
 export const initGiveawayHero = () => {
-  const root = document.getElementById('giveawayHero');
+  const root = findRoot();
   if (!root || !stopped) return;
   stopped = false;
   drawn = 0;
@@ -138,7 +141,7 @@ export const initGiveawayHero = () => {
 };
 
 const onVisible = () => {
-  const root = document.getElementById('giveawayHero');
+  const root = findRoot();
   if (root && !stopped && !document.hidden) poll(root);
 };
 

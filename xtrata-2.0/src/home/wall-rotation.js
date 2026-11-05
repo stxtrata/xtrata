@@ -7,6 +7,11 @@
 //   song-1, song-2 1x1 each, songs.
 //   wide           2x1, drawn from the pool.
 //   tall           1x2, drawn from the pool.
+//
+// During the "Today on Xtrata" campaign a `daily` tile (kind 'daily', see today-schedule.js) is
+// passed in. It always takes the first slot, big-a, the arcade moves to big-b, and nothing the
+// daily card lists in `avoid` / `avoidSongs` appears anywhere else on the wall. Without `daily`
+// everything behaves exactly as before.
 
 export const WALL_SLOT_ORDER = Object.freeze(['big-a', 'big-b', 'chess', 'song-1', 'song-2', 'wide', 'tall']);
 
@@ -45,8 +50,12 @@ const idsOnWall = (slots) => new Set(Object.values(slots).map((tile) => tile.id)
  * Returns { slots, order } where `slots` maps slot name to a tile (with size and slot set) and
  * `order` is the same tiles in DOM order.
  */
-export const pickWall = ({ rotation, songs, rng = Math.random, recent = {} }) => {
+export const pickWall = ({ rotation, songs, rng = Math.random, recent = {}, daily = null }) => {
   const used = new Set([rotation.pinned.id, rotation.chess.id]);
+  if (daily) {
+    used.add(daily.id);
+    (daily.avoid || []).forEach((id) => used.add(id));
+  }
   const slots = {};
   const forced = {};
 
@@ -60,8 +69,11 @@ export const pickWall = ({ rotation, songs, rng = Math.random, recent = {} }) =>
   // Campaign tiles are guaranteed one slot. Which slot is itself random, by weight.
   for (const id of rotation.campaign) {
     const entry = rotation.pool.find((candidate) => candidate.tile.id === id);
-    if (!entry) continue;
-    const options = rotation.campaignSlots.filter((option) => entry.weights[option.slot] > 0 && !forced[option.slot]);
+    if (!entry || used.has(id)) continue;
+    // With a daily card both big slots are taken, so a campaign tile can only be a tall or a wide one.
+    const options = rotation.campaignSlots.filter(
+      (option) => entry.weights[option.slot] > 0 && !forced[option.slot] && !(daily && option.slot === 'big')
+    );
     const chosen = weightedPick(options, (option) => option.weight, rng);
     if (chosen) {
       forced[chosen.slot] = entry;
@@ -70,14 +82,15 @@ export const pickWall = ({ rotation, songs, rng = Math.random, recent = {} }) =>
   }
 
   const draw = (kind, recentId) => forced[kind] || weightedPick(available(kind, recentId), (entry) => entry.weights[kind], rng);
-  const other = draw('big', recent.big);
+  const other = daily ? null : draw('big', recent.big);
   if (other) used.add(other.tile.id);
   const tall = draw('tall', recent.tall);
   if (tall) used.add(tall.tile.id);
   const wide = draw('wide', recent.wide);
   if (wide) used.add(wide.tile.id);
 
-  const arcadeFirst = rng() < 0.5;
+  const arcadeFirst = daily ? false : rng() < 0.5;
+  if (daily) slots['big-a'] = { ...daily, size: 'big', slot: 'big-a' };
   slots[arcadeFirst ? 'big-a' : 'big-b'] = { ...rotation.pinned, size: 'big', slot: arcadeFirst ? 'big-a' : 'big-b' };
   const otherSlot = arcadeFirst ? 'big-b' : 'big-a';
   if (other) slots[otherSlot] = poolTile(other, otherSlot);
@@ -87,8 +100,10 @@ export const pickWall = ({ rotation, songs, rng = Math.random, recent = {} }) =>
 
   // Two distinct songs, avoiding the ones shown last time when there are enough others.
   const seen = new Set(recent.songs || []);
-  const fresh = songs.filter((song) => !seen.has(song.id));
-  const pool = fresh.length >= 2 ? fresh : songs;
+  const skip = new Set((daily?.avoidSongs || []).map(String));
+  const eligible = songs.filter((song) => !skip.has(String(song.id)));
+  const fresh = eligible.filter((song) => !seen.has(song.id));
+  const pool = fresh.length >= 2 ? fresh : eligible.length >= 2 ? eligible : songs;
   const first = weightedPick(pool, () => 1, rng);
   const second = weightedPick(pool.filter((song) => song !== first), () => 1, rng) || first;
   if (first) slots['song-1'] = songTile(first, 'song-1');
@@ -105,22 +120,25 @@ export const pickWall = ({ rotation, songs, rng = Math.random, recent = {} }) =>
  */
 export const pickSwap = ({ rotation, slots, songs, rng = Math.random, lastSlot = null, blocked = [] }) => {
   const onWall = idsOnWall(slots);
+  const dailyTile = Object.values(slots).find((tile) => tile.kind === 'daily') || null;
+  const avoidIds = new Set(dailyTile?.avoid || []);
+  const avoidSongs = new Set((dailyTile?.avoidSongs || []).map(String));
   const campaignLeft = (without) =>
     rotation.campaign.filter((id) => onWall.has(id) && id !== without).length;
 
   const candidatesFor = (slot) => {
     const tile = slots[slot];
-    if (!tile || tile.id === rotation.pinned.id || tile.id === rotation.chess.id) return [];
+    if (!tile || tile.id === rotation.pinned.id || tile.id === rotation.chess.id || tile.kind === 'daily') return [];
     if (blocked.includes(slot) || slot === lastSlot) return [];
     if (slot.startsWith('song-')) {
       const shownSongs = new Set(Object.values(slots).filter((t) => t.kind === 'song').map((t) => t.tokenId));
-      return songs.filter((song) => !shownSongs.has(song.id)).map((song) => ({ tile: songTile(song, slot), weight: 1 }));
+      return songs.filter((song) => !shownSongs.has(song.id) && !avoidSongs.has(String(song.id))).map((song) => ({ tile: songTile(song, slot), weight: 1 }));
     }
     const kind = POOL_KIND_OF_SLOT[slot];
     const keepsCampaign = !rotation.campaign.includes(tile.id) || campaignLeft(tile.id) > 0;
     if (!keepsCampaign) return [];
     return rotation.pool
-      .filter((entry) => entry.weights[kind] > 0 && !onWall.has(entry.tile.id))
+      .filter((entry) => entry.weights[kind] > 0 && !onWall.has(entry.tile.id) && !avoidIds.has(entry.tile.id))
       .map((entry) => ({ tile: poolTile(entry, slot), weight: entry.weights[kind] }));
   };
 

@@ -9136,3 +9136,38 @@
     .home-supbar--give[data-state="live"] { border-color: rgba(126, 226, 199, 0.55); }
     .home-supbar--give[data-state="live"] .home-supbar__tag { color: #7ee2c7; }
     .home-supbar--give .home-supbar__text { color: var(--home-ink); }
+
+/* Today on Xtrata: the daily card that holds the first big slot of the Living Wall during the campaign. */
+.home-tile--daily { cursor: default; display: flex; flex-direction: column; justify-content: flex-end; border-color: var(--tone, rgba(255, 255, 255, 0.3)); }
+.home-tile--daily:hover,
+.home-tile--daily:focus-within { transform: none; }
+.home-tile--daily .home-tile__art { position: absolute; inset: 0; }
+.home-tile--daily .home-tile__art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(rgba(5, 5, 5, 0.55), rgba(5, 5, 5, 0.96) 55%); }
+.home-tile__art--motif { background: radial-gradient(circle at 30% 20%, rgba(240, 163, 91, 0.35), transparent 55%), repeating-linear-gradient(90deg, #1b1410 0 46px, #241a13 46px 92px); }
+.home-tile__daily-body { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 16px; }
+.home-tile--daily .home-tile__eyebrow { color: var(--tone, #f0a35b); }
+.home-tile__feature { font-size: 12px; font-weight: 700; color: rgba(238, 243, 249, 0.7); }
+.home-tile--daily .home-tile__title { font-size: 26px; line-height: 1.12; }
+.home-tile--daily .home-tile__sub { font-size: 14px; max-width: 46ch; }
+.home-tile__credit { font-size: 12px; color: rgba(238, 243, 249, 0.6); }
+.home-tile__daily-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 8px; }
+.home-tile__daily-cta { gap: 8px; background: var(--tone, #f0a35b); border-color: transparent; color: #0b0b0b; }
+.home-tile__daily-cta .home-play-badge { position: static; width: 22px; height: 22px; background: rgba(0, 0, 0, 0.25); }
+.home-tile__daily-also { color: #f8fafc; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.home-tile__chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 0; padding: 0; list-style: none; counter-reset: trk; }
+.home-tile__chip-item { counter-increment: trk; }
+.home-tile__chip { max-width: 15ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 28px; padding: 0 9px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 999px; background: rgba(0, 0, 0, 0.4); color: #f8fafc; font: 600 11px/1 inherit; font-family: inherit; cursor: pointer; }
+.home-tile__chip::before { content: counter(trk) ' · '; opacity: 0.6; }
+.home-tile__chip.is-playing,
+.home-tile__chip[aria-pressed='true'] { background: var(--tone, #f0a35b); color: #0b0b0b; }
+.home-tile__daily-cta:focus-visible,
+.home-tile__daily-also:focus-visible,
+.home-tile__chip:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@media (max-width: 720px) {
+  .home-tile--daily { min-height: 340px; }
+  .home-tile--daily .home-tile__title { font-size: 22px; }
+  .home-tile__daily-body { padding: 14px; }
+  .home-tile__daily-cta { width: 100%; }
+}
+.home-tile--daily.home-tone--cyan { --tone: #4ee6ff; }
+.home-tile--daily.home-tone--pink { --tone: #ffb3df; }
