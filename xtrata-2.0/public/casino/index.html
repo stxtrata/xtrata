@@ -4,8 +4,9 @@
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="ParallaX Casino"><meta name="theme-color" content="#0c0609">
 <link rel="manifest" href="/casino/manifest.webmanifest"><link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png"></head><body>
 <!-- Boot screen: painted first, while the rest of this page streams in and runs. It also starts the downloads of the big model files
-     (public/casino-assets/, see scripts/casino-externalise-assets.mjs), so its bar shows real bytes. The page asks it for them with
-     window.pxAsset(key), and the room tells it to go (window.pxBootDone) when it has drawn its first frame. -->
+     (public/casino-assets/, see scripts/casino-externalise-assets.mjs and scripts/split-casino-packs-dist.mjs), so its bar shows real
+     bytes. The page asks it for files with window.pxAsset(key) / window.pxAssetUrl(url, bytes, counted), and the room tells it to go
+     (window.pxBootDone) when it has drawn its first frame. -->
 <style>
 #pxBoot .px-track{position:relative;width:min(78vw,320px);height:4px;border-radius:4px;background:rgba(227,184,74,.18);overflow:hidden;margin-top:6px}
 #pxBoot .px-fill{position:absolute;inset:0;border-radius:4px;background:linear-gradient(90deg,#b8891f,#e3b84a,#f6dc8a);transform-origin:0 50%;transform:scaleX(.03);transition:transform .5s ease-out}
@@ -25,8 +26,10 @@
 <script>window.PX_ASSETS={"adrian":{"u":"/casino-assets/adrian-glb-gz.8651725ab5.bin","n":3642835,"e":1,"z":1},"m0model":{"u":"/casino-assets/machine-the-drop-model.045ef29823.bin","n":1382189,"e":1},"m0game":{"u":"/casino-assets/machine-the-drop-game.9094dd185c.bin","n":183051},"m1model":{"u":"/casino-assets/machine-forever-twins-model.2d0c99616b.bin","n":1145182,"e":1},"m1game":{"u":"/casino-assets/machine-forever-twins-game.603f0ffe30.bin","n":223788},"m2model":{"u":"/casino-assets/machine-deep-strata-model.44dae57803.bin","n":1318998,"e":1},"m2game":{"u":"/casino-assets/machine-deep-strata-game.02997366e5.bin","n":182432},"m3model":{"u":"/casino-assets/machine-block-fortune-model.389963e76c.bin","n":1354847,"e":1},"m3game":{"u":"/casino-assets/machine-block-fortune-game.10a7ce24e4.bin","n":175150},"m4model":{"u":"/casino-assets/machine-neon-vault-model.81d50d9953.bin","n":1138314,"e":1},"m4game":{"u":"/casino-assets/machine-neon-vault-game.8975420308.bin","n":167188}};
 (function(){
 var A=window.PX_ASSETS,bar=document.getElementById('pxBootBar'),txt=document.getElementById('pxBootTxt'),sub=document.getElementById('pxBootSub'),box=document.getElementById('pxBoot'),retry=document.getElementById('pxBootRetry');
-var got={},eager=[],total=0,pending={},t0=Date.now(),tA=0,done=false,failed=false,k;
-for(k in A){if(A[k].e){eager.push(k);total+=A[k].n;got[k]=0}}
+var got={},fin={},eager=[],total=0,pending={},t0=Date.now(),tA=0,last=.04,done=false,failed=false,k;
+/* A custom floor (?layout= or ?floor=) may not use the five built-in machines: their models are then fetched only if the floor does. */
+var custom=/[?&](layout|floor)=/.test(location.search);
+for(k in A){if(A[k].e&&!(custom&&/^m\dmodel$/.test(k))){eager.push(k);total+=A[k].n;got[k]=0}}
 function mb(n){return (n/1048576).toFixed(1)}
 /* One download, with progress. Tries three times: a dropped connection should not leave the casino half built. */
 function load(key,tries){
@@ -44,20 +47,29 @@ function load(key,tries){
     return new Promise(function(res){setTimeout(res,900)}).then(function(){return load(key,tries-1)});
   });
 }
+/* A file stored gzipped (z) is handed to the page already unpacked. */
+function gunzip(buf){return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()}
 /* The page's way to get a file: shared, so a file is only ever downloaded once per visit (and the browser keeps it between visits). */
 window.pxAsset=function(key){
   if(!A[key])return Promise.reject(new Error('unknown asset '+key));
-  return pending[key]||(pending[key]=load(key,2).then(function(buf){return A[key].z?gunzip(buf):buf}));
+  return pending[key]||(pending[key]=load(key,2).then(function(buf){fin[key]=1;return A[key].z?gunzip(buf):buf}));
 };
-/* A file stored gzipped (z) is handed to the page already unpacked. */
-function gunzip(buf){return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()}
+/* The same for a file the page learns about later (a machine loaded from its pack): `counted` adds it to the progress bar. */
+window.pxAssetUrl=function(url,bytes,counted){
+  var key='u:'+url;
+  if(!A[key]){A[key]={u:url,n:bytes||0};if(counted){eager.push(key);total+=bytes||0;got[key]=0}}
+  var p=window.pxAsset(key);
+  if(counted)p.catch(fail);
+  return p;
+};
 function sum(){var s=0;for(var i=0;i<eager.length;i++)s+=got[eager[i]];return s}
 function paint(){
-  if(done)return;
-  var e=Date.now()-t0,p;
-  if(failed){return}
-  if(!tA){var s=sum(),f=total?Math.min(1,s/total):1;p=.04+.76*f;txt.textContent=f>=1?'Building the room…':'Loading the casino… '+mb(s)+' of '+mb(total)+' MB'}
-  else{p=.8+.17*(1-Math.exp(-(Date.now()-tA)/6000));txt.textContent='Building the room…'}
+  if(done||failed)return;
+  var e=Date.now()-t0,open=false,p,i;
+  for(i=0;i<eager.length;i++)if(!fin[eager[i]]){open=true;break}
+  if(open){tA=0;var s=sum(),f=total?Math.min(1,s/total):1;p=.04+.76*f;txt.textContent='Loading the casino… '+mb(s)+' of '+mb(total)+' MB'}
+  else{if(!tA)tA=Date.now();p=.8+.17*(1-Math.exp(-(Date.now()-tA)/6000));txt.textContent='Building the room…'}
+  if(p<last)p=last;last=p; /* the bar only ever moves forward, even when more files turn up */
   bar.style.transform='scaleX('+p.toFixed(3)+')';
   if(e>45000)sub.textContent='Taking longer than usual. Please keep this tab open.';
   else if(e>20000)sub.textContent='Still working. Thanks for waiting.';
@@ -75,7 +87,7 @@ function finish(){
 }
 window.pxBootDone=finish;
 /* Start the big downloads now, while the rest of the page is still arriving. */
-Promise.all(eager.map(function(key){return window.pxAsset(key)})).then(function(){tA=Date.now()},fail);
+eager.slice().forEach(function(key){window.pxAsset(key).catch(fail)});
 /* Safety: the room failed to start for some other reason; never leave the cover over the page for ever. */
 setTimeout(function(){if(!failed)finish()},90000);
 paint();
@@ -8033,11 +8045,12 @@ function applyTestnetFunding(proof){
     const raw=atob(encoded),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
     return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
   }
-  // A pack's model or game as text: from its own file (built-in machines, fetched once and kept) or inline (packs loaded from pack.json).
+  // A pack's model or game as text: from its own file (built-in machines: modelKey / gameKey; slim packs from the deploy step:
+  // modelUrl / gameUrl; each fetched once and kept) or inline (a pack.json loaded as it is).
   async function pxPackText(pack,field){
-    const key=pack&&pack[field+'Key'];
-    if(!key)return decodePXGzip(pack[field]);
-    const buf=await window.pxAsset(key);
+    const key=pack&&pack[field+'Key'],url=pack&&pack[field+'Url'];
+    if(!key&&!url)return decodePXGzip(pack[field]);
+    const buf=await (key?window.pxAsset(key):window.pxAssetUrl(url,pack[field+'Bytes'],false));
     return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
   }
   // ---- THE FLOOR (public/casino/machine-rotation.js): which five machine designs stand in the room. By default the five built into this
@@ -8059,10 +8072,12 @@ function applyTestnetFunding(proof){
       if(coreByKey.has(k))return coreByKey.get(k);
       try{
         const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),30000);
-        const res=await fetch(base+k+'/pack.json',{signal:ctl.signal});clearTimeout(timer);
-        if(!res.ok)throw Error('HTTP '+res.status);
-        const pack=await res.json();
-        if(!pack||typeof pack.name!=='string'||typeof pack.model!=='string'||typeof pack.game!=='string'||!/^#[0-9a-fA-F]{6}$/.test(pack.accent||''))throw Error('not a machine pack');
+        let pack=null;
+        try{const r=await fetch(base+k+'/pack.slim.json',{signal:ctl.signal});if(r.ok)pack=await r.json();}catch(_){pack=null;}   // the deploy writes this slim copy (model and game as separate, cached files)
+        if(!pack||typeof pack.modelUrl!=='string'){const res=await fetch(base+k+'/pack.json',{signal:ctl.signal});if(!res.ok)throw Error('HTTP '+res.status);pack=await res.json();}   // no slim copy: the full pack
+        clearTimeout(timer);
+        if(!pack||typeof pack.name!=='string'||!(typeof pack.model==='string'||typeof pack.modelUrl==='string')||!(typeof pack.game==='string'||typeof pack.gameUrl==='string')||!/^#[0-9a-fA-F]{6}$/.test(pack.accent||''))throw Error('not a machine pack');
+        if(typeof pack.modelUrl==='string'&&window.pxAssetUrl)window.pxAssetUrl(pack.modelUrl,pack.modelBytes,true);   // start the model downloading now (the game waits until someone plays)
         return {key:k,gameId:k,pack};
       }catch(e){console.warn('[floor] could not load '+k+'; a built-in machine stands in',e);return null;}
     }));
