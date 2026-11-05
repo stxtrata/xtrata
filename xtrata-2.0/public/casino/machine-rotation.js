@@ -41,6 +41,7 @@ window.PX_MACHINE_ROTATION = {
     // either side of the grand approach. LAYR-01 moves to the entrance wall to make room for the right-hand pod.
     top14: {
       name: 'Top 14 (test)',
+      houseChips: false,   // the chip display that hangs at (3, 1.4, 9.35) would float in front of the pods
       greeter: { x: 1.3, z: 8.4 },   // in the aisle, clear of the pods
       dispensers: { 'LAYR-01': { hide: true }, 'LAYR-02': { x: 2.0, z: -10.0 } },   // the entrance exchange is taken out of this plan (it sat in the chess lounge)
       slots: [
@@ -71,6 +72,45 @@ window.PX_MACHINE_ROTATION = {
       { id: 'snow-crash', x: 5.1, z: 7.45, face: 'N' },
       { id: 'plebs-legends', x: 3.3, z: 8.35, face: 'S' },
       { id: 'plebs-legends', x: 5.1, z: 8.35, face: 'S' }
+      ]
+    },
+
+    // SLOT HALL (single machines): the same walls-and-pods floor, but every cabinet is a different machine, none twinned. 27 designs.
+    // The five originals are all on it. Corgi Kennel, Launchpad and Pool Party are left out for now (no holder layer yet).
+    // The real separate slot hall room of plan C comes later behind this same name.
+    'slot-hall': {
+      name: 'Slot hall (single machines)',
+      houseChips: false,
+      greeter: { x: 1.3, z: 8.4 },
+      dispensers: { 'LAYR-01': { hide: true }, 'LAYR-02': { x: 2.0, z: -10.0 } },
+      slots: [
+      { id: 'twins', x: -12.33, z: -7.4, face: 'E' },
+      { id: 'who-is-satoshi', x: -12.33, z: -5.55, face: 'E' },
+      { id: 'dog-army', x: -12.33, z: -3.7, face: 'E' },
+      { id: 'drop', x: -12.33, z: -1.1, face: 'E' },
+      { id: 'rune-pit', x: -12.33, z: 0.75, face: 'E' },
+      { id: 'club-x', x: -12.33, z: 2.6, face: 'E' },
+      { id: 'the-stack', x: -12.33, z: 5.9, face: 'E' },
+      { id: 'mempool-madness', x: -12.33, z: 7.75, face: 'E' },
+      { id: 'ds', x: 12.33, z: -7.4, face: 'W' },
+      { id: 'bf', x: 12.33, z: -5.55, face: 'W' },
+      { id: 'rare-pepe-directory', x: 12.33, z: -3.7, face: 'W' },
+      { id: 'nv', x: 12.33, z: -1.1, face: 'W' },
+      { id: 'genesis-21', x: 12.33, z: 0.75, face: 'W' },
+      { id: 'the-halving', x: 12.33, z: 2.6, face: 'W' },
+      { id: 'the-archive', x: 12.33, z: 5.9, face: 'W' },
+      { id: 'robot-factory', x: 12.33, z: 7.75, face: 'W' },
+      { id: 'monkey-hash', x: 0.35, z: -10.55, face: 'S' },
+      { id: 'nine-lives', x: -3.45, z: -10.55, face: 'S' },
+      { id: 'degen-city', x: -1.55, z: -10.55, face: 'S' },
+      { id: 'ordinal-rush', x: -5.1, z: 7.45, face: 'N' },
+      { id: 'xtrata-originals', x: -3.3, z: 7.45, face: 'N' },
+      { id: 'hot-wallet', x: -5.1, z: 8.35, face: 'S' },
+      { id: 'mooneeb', x: -3.3, z: 8.35, face: 'S' },
+      { id: 'snow-crash', x: 3.3, z: 7.45, face: 'N' },
+      { id: 'rugged', x: 5.1, z: 7.45, face: 'N' },
+      { id: 'plebs-legends', x: 3.3, z: 8.35, face: 'S' },
+      { id: 'sat-hunter', x: 5.1, z: 8.35, face: 'S' }
       ]
     }
   },
