@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { summarise } from '../giveaway-hero.js';
-import { HOMEPAGE_STRIP_SLIDES } from '../homepage-content.js';
+import { HOMEPAGE_STRIP_SLIDES, HOMEPAGE_WALL_ROTATION } from '../homepage-content.js';
 
 const indexHtml = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
 
@@ -20,7 +20,8 @@ describe('homepage hero: the free album giveaway', () => {
     expect(summarise({ state: 'done', held: 0, claimed: 100, left: 0 }).total).toBe(100);
   });
 
-  it('is still advertised in the rotating strip, leading to /giveaway', () => {
-    expect(HOMEPAGE_STRIP_SLIDES.find((s) => s.id === 'giveaway')).toMatchObject({ href: '/giveaway' });
+  it('is no longer advertised in the rotating strip or on the wall', () => {
+    expect(HOMEPAGE_STRIP_SLIDES.find((s) => s.id === 'giveaway')).toBeUndefined();
+    expect(HOMEPAGE_WALL_ROTATION.pool.some((entry: { tile: { id: string } }) => entry.tile.id === 'giveaway')).toBe(false);
   });
 });
