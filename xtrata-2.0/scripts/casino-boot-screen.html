@@ -1,0 +1,77 @@
+<!-- Boot screen: painted first, while the rest of this page streams in and runs. It also starts the downloads of the big model files
+     (public/casino-assets/, see scripts/casino-externalise-assets.mjs), so its bar shows real bytes. The page asks it for them with
+     window.pxAsset(key), and the room tells it to go (window.pxBootDone) when it has drawn its first frame. -->
+<style>
+#pxBoot .px-track{position:relative;width:min(78vw,320px);height:4px;border-radius:4px;background:rgba(227,184,74,.18);overflow:hidden;margin-top:6px}
+#pxBoot .px-fill{position:absolute;inset:0;border-radius:4px;background:linear-gradient(90deg,#b8891f,#e3b84a,#f6dc8a);transform-origin:0 50%;transform:scaleX(.03);transition:transform .5s ease-out}
+#pxBoot .px-shine{position:absolute;top:0;bottom:0;left:0;width:30%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);animation:pxShine 1.4s linear infinite;will-change:transform}
+@keyframes pxShine{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+@media (prefers-reduced-motion:reduce){#pxBoot .px-shine{animation:none;opacity:0}}
+#pxBoot button{font:13px system-ui,-apple-system,sans-serif;color:#0c0609;background:#e3b84a;border:0;border-radius:6px;padding:8px 18px;cursor:pointer}
+</style>
+<div id="pxBoot" role="status" aria-live="polite" style="position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(ellipse at 50% 40%,#2a1018 0%,#0c0609 70%);color:#f6ead0;font-family:Georgia,'Times New Roman',serif;text-align:center;padding:24px;transition:opacity .6s ease">
+<div style="font-size:clamp(22px,5vw,34px);letter-spacing:.28em;color:#e3b84a;text-indent:.28em">PARALLAX CASINO</div>
+<div style="font-size:12px;letter-spacing:.3em;color:#b7a587;text-indent:.3em">THE LAYR LOUNGE</div>
+<div class="px-track"><div class="px-fill" id="pxBootBar"></div><div class="px-shine"></div></div>
+<div id="pxBootTxt" style="font:13px/1.4 system-ui,-apple-system,sans-serif;color:#b7a587;min-height:1.4em">Opening the doors…</div>
+<div id="pxBootSub" style="font:11px/1.4 system-ui,-apple-system,sans-serif;color:#7d6f58">First visit takes a little longer. After that it is much quicker.</div>
+<button id="pxBootRetry" hidden onclick="location.reload()">Reload</button>
+</div>
+<script>window.PX_ASSETS=__MANIFEST__;
+(function(){
+var A=window.PX_ASSETS,bar=document.getElementById('pxBootBar'),txt=document.getElementById('pxBootTxt'),sub=document.getElementById('pxBootSub'),box=document.getElementById('pxBoot'),retry=document.getElementById('pxBootRetry');
+var got={},eager=[],total=0,pending={},t0=Date.now(),tA=0,done=false,failed=false,k;
+for(k in A){if(A[k].e){eager.push(k);total+=A[k].n;got[k]=0}}
+function mb(n){return (n/1048576).toFixed(1)}
+/* One download, with progress. Tries three times: a dropped connection should not leave the casino half built. */
+function load(key,tries){
+  return fetch(A[key].u).then(function(r){
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    if(!r.body||!r.body.getReader)return r.arrayBuffer().then(function(b){got[key]=b.byteLength;return b});
+    var rd=r.body.getReader(),parts=[],len=0;
+    return (function pump(){return rd.read().then(function(x){
+      if(x.done){var out=new Uint8Array(len),o=0;for(var i=0;i<parts.length;i++){out.set(parts[i],o);o+=parts[i].length}return out.buffer}
+      parts.push(x.value);len+=x.value.length;got[key]=len;return pump();
+    })})();
+  }).catch(function(e){
+    if(tries<=0)throw e;
+    got[key]=0;
+    return new Promise(function(res){setTimeout(res,900)}).then(function(){return load(key,tries-1)});
+  });
+}
+/* The page's way to get a file: shared, so a file is only ever downloaded once per visit (and the browser keeps it between visits). */
+window.pxAsset=function(key){
+  if(!A[key])return Promise.reject(new Error('unknown asset '+key));
+  return pending[key]||(pending[key]=load(key,2).then(function(buf){return A[key].z?gunzip(buf):buf}));
+};
+/* A file stored gzipped (z) is handed to the page already unpacked. */
+function gunzip(buf){return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()}
+function sum(){var s=0;for(var i=0;i<eager.length;i++)s+=got[eager[i]];return s}
+function paint(){
+  if(done)return;
+  var e=Date.now()-t0,p;
+  if(failed){return}
+  if(!tA){var s=sum(),f=total?Math.min(1,s/total):1;p=.04+.76*f;txt.textContent=f>=1?'Building the room…':'Loading the casino… '+mb(s)+' of '+mb(total)+' MB'}
+  else{p=.8+.17*(1-Math.exp(-(Date.now()-tA)/6000));txt.textContent='Building the room…'}
+  bar.style.transform='scaleX('+p.toFixed(3)+')';
+  if(e>45000)sub.textContent='Taking longer than usual. Please keep this tab open.';
+  else if(e>20000)sub.textContent='Still working. Thanks for waiting.';
+  setTimeout(paint,150);
+}
+function fail(){
+  if(failed)return;failed=true;
+  txt.textContent='Some of the casino did not download. Check your connection and reload.';
+  sub.textContent='';bar.style.background='#d5344c';retry.hidden=false;
+}
+function finish(){
+  if(done||failed)return;done=true;
+  bar.style.transform='scaleX(1)';txt.textContent='Welcome.';
+  setTimeout(function(){box.style.opacity='0';box.style.pointerEvents='none';setTimeout(function(){if(box.parentNode)box.parentNode.removeChild(box)},700)},200);
+}
+window.pxBootDone=finish;
+/* Start the big downloads now, while the rest of the page is still arriving. */
+Promise.all(eager.map(function(key){return window.pxAsset(key)})).then(function(){tA=Date.now()},fail);
+/* Safety: the room failed to start for some other reason; never leave the cover over the page for ever. */
+setTimeout(function(){if(!failed)finish()},90000);
+paint();
+})();/*px-boot-end*/</script>

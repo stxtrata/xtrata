@@ -167,6 +167,12 @@
 /casino-status.json
   Cache-Control: no-store
 
+# The casino's big model files (public/casino-assets/, made by scripts/casino-externalise-assets.mjs). The hash of each file's
+# content is in its name, so a changed file is a new name: cache them for a year and a return visit downloads none of them.
+# Deliberately NOT under /casino/*: that rule says no-cache, and two matching rules would join their values.
+/casino-assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
 # Pay-per-play radio host (functions/lib/radio-host.ts, docs/radio/PAY-PER-PLAY.md).
 # The listening wallet trusts this origin, so nothing except the radio's own pages may run here:
 # every other static page is served sandboxed (opaque origin, no scripts). Function routes that
