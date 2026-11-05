@@ -91,11 +91,12 @@ function replaceOnce(from, to, label) {
   const dec = 'async function decodePXGzip(encoded){';
   const d = once(dec, 'decodePXGzip');
   const close = html.indexOf('\n  }\n', d) + '\n  }\n'.length;
-  const helper = `  // A pack's model or game as text: from its own file (built-in machines, fetched once and kept) or inline (packs loaded from pack.json).
+  const helper = `  // A pack's model or game as text: from its own file (built-in machines: modelKey / gameKey; slim packs from the deploy step:
+  // modelUrl / gameUrl; each fetched once and kept) or inline (a pack.json loaded as it is).
   async function pxPackText(pack,field){
-    const key=pack&&pack[field+'Key'];
-    if(!key)return decodePXGzip(pack[field]);
-    const buf=await window.pxAsset(key);
+    const key=pack&&pack[field+'Key'],url=pack&&pack[field+'Url'];
+    if(!key&&!url)return decodePXGzip(pack[field]);
+    const buf=await (key?window.pxAsset(key):window.pxAssetUrl(url,pack[field+'Bytes'],false));
     return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
   }
 `;
@@ -104,6 +105,29 @@ function replaceOnce(from, to, label) {
   replaceOnce('await decodePXGzip(window.PX_MACHINE_PACKS[machine.type].game)', "await pxPackText(window.PX_MACHINE_PACKS[machine.type],'game')", 'game call 1');
   replaceOnce('await decodePXGzip(window.PX_MACHINE_PACKS[type].game)', "await pxPackText(window.PX_MACHINE_PACKS[type],'game')", 'game call 2');
   replaceOnce('await decodePXGzip(window.PX_MACHINE_PACKS[m.type].game)', "await pxPackText(window.PX_MACHINE_PACKS[m.type],'game')", 'game call 3');
+}
+
+// ---- 2b. Machines loaded from public/casino-machines/<id>/pack.json: use pack.slim.json (written by the deploy step, see
+//          scripts/split-casino-packs-dist.mjs) when there is one, and start each model downloading as soon as its pack is known --------
+{
+  const re = /const res=await fetch\(base\+k\+'\/pack\.json',\{signal:ctl\.signal\}\);clearTimeout\(timer\);\s*if\(!res\.ok\)throw Error\('HTTP '\+res\.status\);\s*const pack=await res\.json\(\);/;
+  const m = re.exec(html);
+  if (!m) throw new Error('pack fetch code not as expected');
+  const code = `let pack=null;
+        try{const r=await fetch(base+k+'/pack.slim.json',{signal:ctl.signal});if(r.ok)pack=await r.json();}catch(_){pack=null;}   // the deploy writes this slim copy (model and game as separate, cached files)
+        if(!pack||typeof pack.modelUrl!=='string'){const res=await fetch(base+k+'/pack.json',{signal:ctl.signal});if(!res.ok)throw Error('HTTP '+res.status);pack=await res.json();}   // no slim copy: the full pack
+        clearTimeout(timer);`;
+  html = html.slice(0, m.index) + code + html.slice(m.index + m[0].length);
+  replaceOnce(
+    "typeof pack.model!=='string'||typeof pack.game!=='string'||!/^#[0-9a-fA-F]{6}$/.test(pack.accent||'')",
+    "!(typeof pack.model==='string'||typeof pack.modelUrl==='string')||!(typeof pack.game==='string'||typeof pack.gameUrl==='string')||!/^#[0-9a-fA-F]{6}$/.test(pack.accent||'')",
+    'pack validation'
+  );
+  replaceOnce(
+    "throw Error('not a machine pack');\n        return {key:k,gameId:k,pack};",
+    "throw Error('not a machine pack');\n        if(typeof pack.modelUrl==='string'&&window.pxAssetUrl)window.pxAssetUrl(pack.modelUrl,pack.modelBytes,true);   // start the model downloading now (the game waits until someone plays)\n        return {key:k,gameId:k,pack};",
+    'pack prefetch'
+  );
 }
 
 // ---- 3. Bar atlas ---------------------------------------------------------------------------------------------------------

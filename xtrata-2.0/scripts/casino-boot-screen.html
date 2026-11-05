@@ -1,6 +1,7 @@
 <!-- Boot screen: painted first, while the rest of this page streams in and runs. It also starts the downloads of the big model files
-     (public/casino-assets/, see scripts/casino-externalise-assets.mjs), so its bar shows real bytes. The page asks it for them with
-     window.pxAsset(key), and the room tells it to go (window.pxBootDone) when it has drawn its first frame. -->
+     (public/casino-assets/, see scripts/casino-externalise-assets.mjs and scripts/split-casino-packs-dist.mjs), so its bar shows real
+     bytes. The page asks it for files with window.pxAsset(key) / window.pxAssetUrl(url, bytes, counted), and the room tells it to go
+     (window.pxBootDone) when it has drawn its first frame. -->
 <style>
 #pxBoot .px-track{position:relative;width:min(78vw,320px);height:4px;border-radius:4px;background:rgba(227,184,74,.18);overflow:hidden;margin-top:6px}
 #pxBoot .px-fill{position:absolute;inset:0;border-radius:4px;background:linear-gradient(90deg,#b8891f,#e3b84a,#f6dc8a);transform-origin:0 50%;transform:scaleX(.03);transition:transform .5s ease-out}
@@ -20,8 +21,10 @@
 <script>window.PX_ASSETS=__MANIFEST__;
 (function(){
 var A=window.PX_ASSETS,bar=document.getElementById('pxBootBar'),txt=document.getElementById('pxBootTxt'),sub=document.getElementById('pxBootSub'),box=document.getElementById('pxBoot'),retry=document.getElementById('pxBootRetry');
-var got={},eager=[],total=0,pending={},t0=Date.now(),tA=0,done=false,failed=false,k;
-for(k in A){if(A[k].e){eager.push(k);total+=A[k].n;got[k]=0}}
+var got={},fin={},eager=[],total=0,pending={},t0=Date.now(),tA=0,last=.04,done=false,failed=false,k;
+/* A custom floor (?layout= or ?floor=) may not use the five built-in machines: their models are then fetched only if the floor does. */
+var custom=/[?&](layout|floor)=/.test(location.search);
+for(k in A){if(A[k].e&&!(custom&&/^m\dmodel$/.test(k))){eager.push(k);total+=A[k].n;got[k]=0}}
 function mb(n){return (n/1048576).toFixed(1)}
 /* One download, with progress. Tries three times: a dropped connection should not leave the casino half built. */
 function load(key,tries){
@@ -39,20 +42,29 @@ function load(key,tries){
     return new Promise(function(res){setTimeout(res,900)}).then(function(){return load(key,tries-1)});
   });
 }
+/* A file stored gzipped (z) is handed to the page already unpacked. */
+function gunzip(buf){return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()}
 /* The page's way to get a file: shared, so a file is only ever downloaded once per visit (and the browser keeps it between visits). */
 window.pxAsset=function(key){
   if(!A[key])return Promise.reject(new Error('unknown asset '+key));
-  return pending[key]||(pending[key]=load(key,2).then(function(buf){return A[key].z?gunzip(buf):buf}));
+  return pending[key]||(pending[key]=load(key,2).then(function(buf){fin[key]=1;return A[key].z?gunzip(buf):buf}));
 };
-/* A file stored gzipped (z) is handed to the page already unpacked. */
-function gunzip(buf){return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()}
+/* The same for a file the page learns about later (a machine loaded from its pack): `counted` adds it to the progress bar. */
+window.pxAssetUrl=function(url,bytes,counted){
+  var key='u:'+url;
+  if(!A[key]){A[key]={u:url,n:bytes||0};if(counted){eager.push(key);total+=bytes||0;got[key]=0}}
+  var p=window.pxAsset(key);
+  if(counted)p.catch(fail);
+  return p;
+};
 function sum(){var s=0;for(var i=0;i<eager.length;i++)s+=got[eager[i]];return s}
 function paint(){
-  if(done)return;
-  var e=Date.now()-t0,p;
-  if(failed){return}
-  if(!tA){var s=sum(),f=total?Math.min(1,s/total):1;p=.04+.76*f;txt.textContent=f>=1?'Building the room…':'Loading the casino… '+mb(s)+' of '+mb(total)+' MB'}
-  else{p=.8+.17*(1-Math.exp(-(Date.now()-tA)/6000));txt.textContent='Building the room…'}
+  if(done||failed)return;
+  var e=Date.now()-t0,open=false,p,i;
+  for(i=0;i<eager.length;i++)if(!fin[eager[i]]){open=true;break}
+  if(open){tA=0;var s=sum(),f=total?Math.min(1,s/total):1;p=.04+.76*f;txt.textContent='Loading the casino… '+mb(s)+' of '+mb(total)+' MB'}
+  else{if(!tA)tA=Date.now();p=.8+.17*(1-Math.exp(-(Date.now()-tA)/6000));txt.textContent='Building the room…'}
+  if(p<last)p=last;last=p; /* the bar only ever moves forward, even when more files turn up */
   bar.style.transform='scaleX('+p.toFixed(3)+')';
   if(e>45000)sub.textContent='Taking longer than usual. Please keep this tab open.';
   else if(e>20000)sub.textContent='Still working. Thanks for waiting.';
@@ -70,7 +82,7 @@ function finish(){
 }
 window.pxBootDone=finish;
 /* Start the big downloads now, while the rest of the page is still arriving. */
-Promise.all(eager.map(function(key){return window.pxAsset(key)})).then(function(){tA=Date.now()},fail);
+eager.slice().forEach(function(key){window.pxAsset(key).catch(fail)});
 /* Safety: the room failed to start for some other reason; never leave the cover over the page for ever. */
 setTimeout(function(){if(!failed)finish()},90000);
 paint();

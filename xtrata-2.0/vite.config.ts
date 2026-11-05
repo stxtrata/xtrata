@@ -113,6 +113,25 @@ const pruneCasinoMachinesPlugin = {
   }
 };
 
+// Writes each casino machine's model and game as separate cached files, and a slim pack.slim.json beside its pack.json
+// (scripts/split-casino-packs-dist.mjs). dist/ only; never fails a deploy: the casino falls back to pack.json.
+const splitCasinoPacksPlugin = {
+  name: 'split-casino-packs',
+  apply: 'build' as const,
+  configResolved(config: { root: string; build: { outDir: string } }) {
+    (splitCasinoPacksPlugin as { outDir?: string }).outDir = resolve(config.root, config.build.outDir);
+  },
+  async closeBundle() {
+    try {
+      const { splitCasinoPacks } = await import('./scripts/split-casino-packs-dist.mjs');
+      const r = splitCasinoPacks((splitCasinoPacksPlugin as { outDir?: string }).outDir || resolve(process.cwd(), 'dist'));
+      console.log(`[split-casino-packs] ${r.done.length} machine packs split into cached files` + (r.skipped.length ? `; skipped: ${r.skipped.join(', ')}` : ''));
+    } catch (e) {
+      console.warn('[split-casino-packs] skipped (the casino uses the full pack.json files):', e);
+    }
+  }
+};
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const hiroApiKey = env.HIRO_API_KEY || env.VITE_HIRO_API_KEY;
@@ -131,7 +150,8 @@ export default defineConfig(({ mode }) => {
       wizardDevAliasPlugin,
       contractStudioDevAliasPlugin,
       collectionManagerDevAliasPlugin,
-      pruneCasinoMachinesPlugin
+      pruneCasinoMachinesPlugin,
+      splitCasinoPacksPlugin
     ],
     define: {
       __XSTRATA_HAS_HIRO_KEY__: JSON.stringify(hasHiroApiKey),
