@@ -113,3 +113,12 @@ describe('homepage wiring', () => {
     expect(src).toContain("tile.kind !== 'daily'");
   });
 });
+
+describe('casino beta bar', () => {
+  const html = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
+  it('links to the slot hall beta, above the free album bar', () => {
+    expect(html).toContain('href="https://xtrata.xyz/casino/?layout=slot-hall"');
+    expect(html.indexOf('id="betaBar"')).toBeGreaterThan(-1);
+    expect(html.indexOf('id="betaBar"')).toBeLessThan(html.indexOf('id="giveBar"'));
+  });
+});
