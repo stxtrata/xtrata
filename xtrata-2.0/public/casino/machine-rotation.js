@@ -41,6 +41,7 @@ window.PX_MACHINE_ROTATION = {
     // either side of the grand approach. LAYR-01 moves to the entrance wall to make room for the right-hand pod.
     top14: {
       name: 'Top 14 (test)',
+      greeter: { x: 1.3, z: 8.4 },   // in the aisle, clear of the pods
       dispensers: { 'LAYR-01': { hide: true }, 'LAYR-02': { x: 2.0, z: -10.0 } },   // the entrance exchange is taken out of this plan (it sat in the chess lounge)
       slots: [
       { id: 'twins', x: -12.33, z: -7.4, face: 'E' },
