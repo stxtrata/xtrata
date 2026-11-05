@@ -9172,7 +9172,7 @@
 .home-tile--daily.home-tone--cyan { --tone: #4ee6ff; }
 .home-tile--daily.home-tone--pink { --tone: #ffb3df; }
 
-/* ParallaX casino beta bar, above the Free album bar. */
+/* ParallaX casino beta bar, above the Music Supporters bar. */
 .home-supbar--beta { margin-top: 10px; border-color: rgba(240, 163, 91, 0.5); }
 .home-supbar--beta .home-supbar__tag { color: #f0a35b; }
 .home-supbar--beta .home-sup-dot { background: #f0a35b; }

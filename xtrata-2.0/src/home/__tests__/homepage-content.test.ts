@@ -94,14 +94,14 @@ describe('homepage content configuration', () => {
     expect(validateHomepageContent()).toEqual([]);
   });
 
-  it('leads the strip with the live bounty and links its PDFs', () => {
-    expect(HOMEPAGE_STRIP_SLIDES[0]).toMatchObject({ id: 'bounty', href: HOMEPAGE_BOUNTY.guideHref });
+  it('keeps the bounty out of the strip and still links its PDFs', () => {
+    expect(HOMEPAGE_STRIP_SLIDES.some((s) => s.id.startsWith('bounty'))).toBe(false);
     expect(HOMEPAGE_BOUNTY.guideHref).toBe('/bounty/xtrata-bounty-at-a-glance.pdf');
     expect(HOMEPAGE_BOUNTY.rulesHref).toBe('/bounty/xtrata-bounty-full-rules.pdf');
     expect(indexHtml).not.toContain('id="homeBounty"');
   });
 
-  it('links the live bounty ticket tracker from the strip and the bounty panel, in the same tab', () => {
+  it('links the bounty ticket tracker, in the same tab', () => {
     expect(BOUNTY_TRACKER_HREF).toBe('/bounty/zdao/tracker/1/');
     const link = bountyTrackerLink(Date.parse('2026-10-05T12:00:00Z'));
     expect(link).toMatchObject({
@@ -110,11 +110,6 @@ describe('homepage content configuration', () => {
       label: 'Check your tickets',
       line: 'Live raffle tickets for #XtrataBounty'
     });
-    // The bounty slide keeps the lead; the tracker slide sits right after it and opens in the same tab.
-    expect(HOMEPAGE_STRIP_SLIDES[0].id).toBe('bounty');
-    const slide = HOMEPAGE_STRIP_SLIDES[1];
-    expect(slide).toMatchObject({ id: 'bounty-tickets', href: HOMEPAGE_BOUNTY.tracker.href, cta: HOMEPAGE_BOUNTY.tracker.label });
-    expect(slide.newTab).toBeFalsy();
     expect(HOMEPAGE_BOUNTY.tracker.href.endsWith('/')).toBe(true);
     // The bounty panel renders it through the shared action helper, without newTab, from the config.
     expect(homepageSource).toContain("'bounty:tickets'");

@@ -71,18 +71,6 @@ export const HOMEPAGE_BOUNTY = Object.freeze({
 
 export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   Object.freeze({
-    id: 'bounty', tag: 'Live', tone: 'lime',
-    title: '500 STX bounty: Create. Inscribe. Share.',
-    line: 'Open 1 to 21 October. Inscribe something new and share it on X.',
-    cta: 'See how to enter', href: '/bounty/xtrata-bounty-at-a-glance.pdf', newTab: true
-  }),
-  // Same-tab link to the live ticket tracker (no newTab). Reads as the final results after 21 Oct.
-  Object.freeze({
-    id: 'bounty-tickets', tag: HOMEPAGE_BOUNTY.tracker.tag, tone: 'lime',
-    title: HOMEPAGE_BOUNTY.tracker.title, line: HOMEPAGE_BOUNTY.tracker.line,
-    cta: HOMEPAGE_BOUNTY.tracker.label, href: HOMEPAGE_BOUNTY.tracker.href
-  }),
-  Object.freeze({
     id: 'giveaway', tag: 'Live', tone: 'violet',
     title: 'Free album: one copy every ten minutes.',
     line: 'Be first to claim the live copy and it is yours to keep. Your face or fingerprint is the only sign-up.',
