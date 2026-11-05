@@ -3,6 +3,33 @@
 <!-- Home screen: opened from the home screen the casino runs with no browser toolbars (the only true full screen on iPhone). -->
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="ParallaX Casino"><meta name="theme-color" content="#0c0609">
 <link rel="manifest" href="/casino/manifest.webmanifest"><link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png"></head><body>
+<!-- Boot screen: painted first, while the rest of this page streams in and runs. Removed by its own script once the page has loaded. -->
+<div id="pxBoot" role="status" aria-live="polite" style="position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(ellipse at 50% 40%,#2a1018 0%,#0c0609 70%);color:#f6ead0;font-family:Georgia,'Times New Roman',serif;text-align:center;padding:24px;transition:opacity .6s ease">
+<div style="font-size:clamp(22px,5vw,34px);letter-spacing:.28em;color:#e3b84a;text-indent:.28em">PARALLAX CASINO</div>
+<div style="font-size:12px;letter-spacing:.3em;color:#b7a587;text-indent:.3em">THE LAYR LOUNGE</div>
+<div style="width:min(78vw,320px);height:4px;border-radius:4px;background:rgba(227,184,74,.18);overflow:hidden;margin-top:6px"><div id="pxBootBar" style="height:100%;width:3%;border-radius:4px;background:linear-gradient(90deg,#b8891f,#e3b84a,#f6dc8a);transition:width .4s ease-out"></div></div>
+<div id="pxBootTxt" style="font:13px/1.4 system-ui,-apple-system,sans-serif;color:#b7a587;min-height:1.4em">Opening the doors…</div>
+<div style="font:11px/1.4 system-ui,-apple-system,sans-serif;color:#7d6f58">First visit takes a little longer. It's quicker next time.</div>
+</div>
+<script>(function(){
+var bar=document.getElementById('pxBootBar'),txt=document.getElementById('pxBootTxt'),box=document.getElementById('pxBoot');
+if(!bar||!box)return;
+var t0=Date.now(),pct=3,done=false,steps=[[0,'Opening the doors…'],[3500,'Laying the marble…'],[8000,'Lighting the chandeliers…'],[15000,'Still loading. Thanks for waiting…'],[30000,'Taking longer than usual. Please keep this tab open.']];
+function tick(){if(done)return;var e=Date.now()-t0;
+/* eases toward 92% and never reaches it by itself: honest "working" feedback, not a fake finish */
+pct=92-(92-3)*Math.exp(-e/7000);bar.style.width=pct.toFixed(1)+'%';
+for(var i=steps.length-1;i>=0;i--){if(e>=steps[i][0]){txt.textContent=steps[i][1];break}}
+setTimeout(tick,250)}
+function finish(){if(done)return;done=true;bar.style.width='100%';txt.textContent='Welcome.';
+setTimeout(function(){box.style.opacity='0';box.style.pointerEvents='none';setTimeout(function(){if(box.parentNode)box.parentNode.removeChild(box)},700)},250)}
+window.pxBootDone=finish;
+/* page fully parsed and its scripts run: wait two painted frames so the first 3D frame is up */
+function ready(){var n=0;(function f(){if(++n>=3)finish();else requestAnimationFrame(f)})()}
+if(document.readyState==='complete')ready();else window.addEventListener('load',ready);
+/* safety: never trap the screen */
+setTimeout(finish,60000);
+tick();
+})();</script>
 <title>ParallaX Casino · The LAYR Lounge</title>
 <style>
 :root{color-scheme:dark;--bg:#0c0609;--panel:rgba(16,8,12,.88);--ink:#f6ead0;--dim:#b7a587;--gold:#e3b84a;--red:#d5344c;--green:#2fae66;--line:rgba(227,184,74,.3)}
