@@ -28,8 +28,11 @@
 var A=window.PX_ASSETS,bar=document.getElementById('pxBootBar'),txt=document.getElementById('pxBootTxt'),sub=document.getElementById('pxBootSub'),box=document.getElementById('pxBoot'),retry=document.getElementById('pxBootRetry');
 var got={},fin={},eager=[],total=0,pending={},t0=Date.now(),tA=0,last=.04,done=false,failed=false,k;
 /* A custom floor (?layout= or ?floor=) may not use the five built-in machines: their models are then fetched only if the floor does. */
-var custom=/[?&](layout|floor)=/.test(location.search);
-for(k in A){if(A[k].e&&!(custom&&/^m\dmodel$/.test(k))){eager.push(k);total+=A[k].n;got[k]=0}}
+var qs=location.search,touch=(function(){var m=/[?&]lite=([01])/.exec(qs);return m?m[1]==='1':(!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches)||'ontouchstart' in window)})();
+/* A custom floor (?layout= or ?floor=) may not use the five built-in machines, and a touch device gets a floor of its own (see the floor code in the page): their models are then fetched only if the floor uses them. Forever Twins (m1model) is on the touch floor, so it still starts now. */
+var touchFloor=touch&&!/[?&]floor=/.test(qs)&&(!/[?&]layout=/.test(qs)||/[?&]layout=slot-hall/.test(qs)),custom=/[?&](layout|floor)=/.test(qs)||touch;
+
+for(k in A){if(A[k].e&&!(custom&&/^m\dmodel$/.test(k)&&!(touchFloor&&k==='m1model'))){eager.push(k);total+=A[k].n;got[k]=0}}
 function mb(n){return (n/1048576).toFixed(1)}
 /* One download, with progress. Tries three times: a dropped connection should not leave the casino half built. */
 function load(key,tries){
@@ -8062,6 +8065,12 @@ function applyTestnetFunding(proof){
     const core=window.PX_MACHINE_PACKS.map((pack,i)=>({key:coreKeys[i],gameId:coreGames[i],pack})),coreByKey=new Map(core.map(f=>[f.key,f])),names=new Map(catalog.map(c=>[c.id,c.name]));
     let want=Array.isArray(R.floor)?R.floor.slice():coreKeys.slice(),layoutName=R.layout||null;
     try{const q=new URLSearchParams(location.search),f=q.get('floor'),l=q.get('layout');if(f)want=f.split(',').map(k=>k.trim());if(l)layoutName=l;}catch(_){}      // ?floor=a,b,c or ?layout=name previews in this browser only
+    // TABLETS AND PHONES (2026-11-05): until the heavy rooms are streamed by distance, a touch device gets the classic room with a lighter floor of five
+    // designs (Forever Twins, Who Is Satoshi, Hot Wallet, Snow Crash, Ordinal Rush; edit `mobileFloor` in machine-rotation.js) when it asked for nothing,
+    // and also when it asked for the Slot hall (27 designs, about 650 MB of textures even after the LITE shrink: an iPad Air 4 ran out of memory
+    // walking it). Any other ?layout= (top14 ...) and any ?floor= are honoured. ?lite=0 turns this off (same switch as LITE below). The touch test is LITE's.
+    try{const q=new URLSearchParams(location.search),lq=q.get('lite'),touch=(lq==='0'||lq==='1')?lq==='1':(!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches)||'ontouchstart' in window);
+      if(touch&&!q.get('floor')&&(!layoutName||layoutName==='slot-hall')){layoutName=null;want=(Array.isArray(R.mobileFloor)?R.mobileFloor:['twins','who-is-satoshi','hot-wallet','snow-crash','ordinal-rush']).slice();window.PX_TOUCH_LAYOUT='mobile-floor';}}catch(_){}
     // A LAYOUT (machine-rotation.js, `layouts`) places every cabinet by hand: one machine per slot, any number of designs.
     let layout=layoutName&&R.layouts&&R.layouts[layoutName]&&Array.isArray(R.layouts[layoutName].slots)?R.layouts[layoutName]:null;
     if(layout)want=layout.slots.map(s=>s&&s.id);
