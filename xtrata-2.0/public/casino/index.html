@@ -7990,7 +7990,7 @@ function applyTestnetFunding(proof){
     window.PX_FLOOR_BY_GAME=Object.fromEntries(floor.map(f=>[f.gameId,f.key]));           // the game id inside each pack -> that short id
     window.PX_MACHINE_NAMES=Object.fromEntries(names);                                    // short id -> name, for every machine that could be on a floor
     // The slots, with any machine that failed to load swapped for the built-in that stood in for it (a slot with no stand-in stays empty).
-    window.PX_FLOOR_LAYOUT=layout?{name:layoutName,dispensers:layout.dispensers||null,slots:layout.slots.map(s=>({...s,id:alias[s.id]||s.id})).filter(s=>floor.some(f=>f.key===s.id))}:null;
+    window.PX_FLOOR_LAYOUT=layout?{name:layoutName,dispensers:layout.dispensers||null,greeter:layout.greeter||null,slots:layout.slots.map(s=>({...s,id:alias[s.id]||s.id})).filter(s=>floor.some(f=>f.key===s.id))}:null;
     return floor;
   })();
   (function(){
@@ -11287,7 +11287,7 @@ function applyTestnetFunding(proof){
     XA_HOSTS.add({ group: byId.sicbo.group, x: 0, z: -1.33, yaw: 0, person: 'm3', livery: 'vermilion', rest: { kind: 'table', y: 0.975, fwd: 0.35 }, fig: figOf.get(byId.sicbo.group) });
     XA_HOSTS.add({ group: byId.pvpholdem.group, x: 0, z: -1.33, yaw: 0, person: 'm3', livery: 'ink', rest: { kind: 'table', y: 0.975, fwd: 0.35 } });
     XA_HOSTS.add({ group: byId.liars.group, x: 0, z: -1.17, yaw: 0, person: 'f3', livery: 'teal', rest: { kind: 'table', y: 0.975, fwd: 0.31 } });
-    XA_HOSTS.add({ group: scene, x: 2.5, z: 7.9, yaw: Math.atan2(-2.5, 3.0), person: 'm1', livery: 'midnight', role: 'greeter', rest: 'back' });
+    { const gp = (window.PX_FLOOR_LAYOUT && window.PX_FLOOR_LAYOUT.greeter) || { x: 2.5, z: 7.9 }; XA_HOSTS.add({ group: scene, x: gp.x, z: gp.z, yaw: Math.atan2(-gp.x, 10.9 - gp.z), person: 'm1', livery: 'midnight', role: 'greeter', rest: 'back' }); }   // a layout can move him out of the way of its cabinets
     solidsExtra.push({ k: 'c', x: 2.5, z: 7.9, r: 0.36 });
     dedicatedBarHost=XA_HOSTS.add({ group: scene, x: room.barPos.x, z: room.barPos.z - 0.35, yaw: 0, person: 'm1', livery: 'midnight', rest: {kind:'table',y:1.2,fwd:.38,surface:room.barModel.counter}, fig: bartender });
     if (window.PXChess) PXChess.addHosts(XA_HOSTS);   // the XChess house player across the lounge table, during a house game
