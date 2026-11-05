@@ -120,13 +120,6 @@
       <span class="home-supbar__go">Join the beta &rarr;</span>
     </a>
 
-    <!-- Free album drop bar: live count or countdown, filled by src/home/giveaway-hero.js from GET /radio/giveaway. -->
-    <a id="giveBar" class="home-supbar home-supbar--give home-only" href="/giveaway" data-home-action="giveaway:bar" data-state="loading">
-      <span class="home-supbar__tag"><span class="home-sup-dot" aria-hidden="true"></span><span class="home-supbar__tag-word">Free album</span></span>
-      <span class="home-supbar__text" data-givebar="text">One copy every ten minutes, free to keep</span>
-      <span class="home-supbar__go" data-givebar="go">See the drop &rarr;</span>
-    </a>
-
     <!-- Music Supporters banner. Filled by src/home/music-supporters.js from /api/music-stats.
          Hidden by the script when the totals cannot be read, so it never shows a false zero. -->
     <a class="home-supbar home-only" id="musicBanner" href="/music/heroes" target="_blank" rel="noopener" data-sup-root data-state="loading" data-home-action="supporters:banner">
@@ -142,15 +135,6 @@
         <span class="section-kicker section-kicker--live" id="registryModeBadge">On Xtrata this week</span>
         <h1 class="living-hero__title" id="registryIntroTitle">Everything here <em>is alive, and on-chain.</em></h1>
         <p class="living-hero__lead" id="registryIntroLead">Every tile is a real inscription. Press one to play it, hear it or open it.</p>
-        <a class="hero-champ" id="heroChampion" href="/i/3075" target="_blank" rel="noopener" hidden aria-label="Astro Blaster 3 reigning champion">
-          <span class="hero-champ__crown" aria-hidden="true">&#9819;</span>
-          <span class="hero-champ__body">
-            <span class="hero-champ__kicker">Astro Blaster 3 &middot; Reigning champion</span>
-            <span class="hero-champ__name" data-champ="name">&hellip;</span>
-            <span class="hero-champ__score" data-champ="score"></span>
-          </span>
-          <span class="hero-champ__go" data-champ="go">Think you can beat it? Take the crown &rarr;</span>
-        </a>
         <div class="living-hero__actions">
           <button class="btn hero-btn hero-btn--lime" id="introPrepareButton" type="button" data-home-action="hero:create">Create yours</button>
           <a class="btn secondary hero-btn" href="#fresh" target="_self" data-home-action="hero:fresh">See everything new</a>
@@ -170,8 +154,6 @@
       <svg id="audionautWordmark" viewBox="0 0 1400 250" aria-hidden="true" focusable="false"><g class="aud-banner__mark" fill="#fff"></g></svg>
       <span class="aud-banner__sub"><span>Audional Sequencer &middot; Blockchain Audional Work(space)Station</span><b>Open the studio &rarr;</b></span>
     </a>
-
-    <section class="home-panel home-bounty home-only" id="homeBounty" aria-label="The Create, Inscribe, Share bounty"></section>
 
     <section class="home-panel home-sup home-only" id="musicSupporters" aria-labelledby="homeSupTitle" data-sup-root data-state="loading">
       <div class="home-sup__top">

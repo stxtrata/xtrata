@@ -71,24 +71,6 @@ export const HOMEPAGE_BOUNTY = Object.freeze({
 
 export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   Object.freeze({
-    id: 'bounty', tag: 'Live', tone: 'lime',
-    title: '500 STX bounty: Create. Inscribe. Share.',
-    line: 'Open 1 to 21 October. Inscribe something new and share it on X.',
-    cta: 'See how to enter', href: '/bounty/xtrata-bounty-at-a-glance.pdf', newTab: true
-  }),
-  // Same-tab link to the live ticket tracker (no newTab). Reads as the final results after 21 Oct.
-  Object.freeze({
-    id: 'bounty-tickets', tag: HOMEPAGE_BOUNTY.tracker.tag, tone: 'lime',
-    title: HOMEPAGE_BOUNTY.tracker.title, line: HOMEPAGE_BOUNTY.tracker.line,
-    cta: HOMEPAGE_BOUNTY.tracker.label, href: HOMEPAGE_BOUNTY.tracker.href
-  }),
-  Object.freeze({
-    id: 'giveaway', tag: 'Live', tone: 'violet',
-    title: 'Free album: one copy every ten minutes.',
-    line: 'Be first to claim the live copy and it is yours to keep. Your face or fingerprint is the only sign-up.',
-    cta: 'See the live copy', href: '/giveaway'
-  }),
-  Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
     title: 'New: make a Stacks wallet with Face ID.',
     line: 'Tap a link on your phone. No app, no seed phrase. Every song you hear pays its holder.',
@@ -189,12 +171,12 @@ const WALL_AUDIONAUTS = Object.freeze({
   // Once the mint is live every tile and banner goes to the collection page.
   href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
 });
-const WALL_GIVEAWAY = Object.freeze({
-  // The free album drop: one copy goes live every ten minutes. Leads to the page with the details and the claim.
-  id: 'giveaway', kind: 'image', tone: 'pink',
-  eyebrow: 'Free · limited edition', title: 'Free album drop', subtitle: 'One copy every ten minutes. Be first.',
-  image: '/home/wall/giveaway-drop.webp', position: 'center',
-  href: '/giveaway'
+const WALL_RADIO = Object.freeze({
+  // Keeps the rotation pool deep enough for the tall and wide slots. Opens Xtrata Radio.
+  id: 'xtrata-radio', kind: 'image', tone: 'violet',
+  eyebrow: 'Listen', title: 'Xtrata Radio', subtitle: 'Songs that live on Bitcoin. Press play.',
+  image: '/radio/artwork?id=3570', position: 'center',
+  href: '/radio'
 });
 const WALL_FOREVER_TWINS = Object.freeze({
   // The Forever Twins campaign: one twin from each of the three newest collections.
@@ -249,7 +231,7 @@ export const HOMEPAGE_WALL_ROTATION = Object.freeze({
     Object.freeze({ tile: WALL_ASTRO, weights: Object.freeze({ big: 3 }) }),
     Object.freeze({ tile: WALL_KP_LOOPS, weights: Object.freeze({ big: 2, tall: 2 }) }),
     Object.freeze({ tile: WALL_AUDIONAUTS, weights: Object.freeze({ big: 2, wide: 3 }) }),
-    Object.freeze({ tile: WALL_GIVEAWAY, weights: Object.freeze({ big: 2, tall: 2, wide: 3 }) }),
+    Object.freeze({ tile: WALL_RADIO, weights: Object.freeze({ big: 1, tall: 2, wide: 3 }) }),
     Object.freeze({ tile: WALL_FOREVER_TWINS, weights: Object.freeze({ big: 3, tall: 3, wide: 2 }) })
   ]),
   // Milliseconds between swaps (random in this range) and how long a crossfade takes.
