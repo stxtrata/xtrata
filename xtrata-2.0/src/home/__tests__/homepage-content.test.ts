@@ -98,7 +98,7 @@ describe('homepage content configuration', () => {
     expect(HOMEPAGE_STRIP_SLIDES[0]).toMatchObject({ id: 'bounty', href: HOMEPAGE_BOUNTY.guideHref });
     expect(HOMEPAGE_BOUNTY.guideHref).toBe('/bounty/xtrata-bounty-at-a-glance.pdf');
     expect(HOMEPAGE_BOUNTY.rulesHref).toBe('/bounty/xtrata-bounty-full-rules.pdf');
-    expect(indexHtml).toContain('id="homeBounty"');
+    expect(indexHtml).not.toContain('id="homeBounty"');
   });
 
   it('links the live bounty ticket tracker from the strip and the bounty panel, in the same tab', () => {
