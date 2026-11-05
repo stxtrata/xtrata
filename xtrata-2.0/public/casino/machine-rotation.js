@@ -41,7 +41,7 @@ window.PX_MACHINE_ROTATION = {
     // either side of the grand approach. LAYR-01 moves to the entrance wall to make room for the right-hand pod.
     top14: {
       name: 'Top 14 (test)',
-      dispensers: { 'LAYR-01': { x: 6.9, z: 10.45 } },
+      dispensers: { 'LAYR-01': { hide: true }, 'LAYR-02': { x: 2.0, z: -10.0 } },   // the entrance exchange is taken out of this plan (it sat in the chess lounge)
       slots: [
       { id: 'twins', x: -12.33, z: -7.4, face: 'E' },
       { id: 'who-is-satoshi', x: -12.33, z: -5.55, face: 'E' },
@@ -59,10 +59,9 @@ window.PX_MACHINE_ROTATION = {
       { id: 'the-halving', x: 12.33, z: 2.6, face: 'W' },
       { id: 'who-is-satoshi', x: 12.33, z: 5.9, face: 'W' },
       { id: 'dog-army', x: 12.33, z: 7.75, face: 'W' },
-      { id: 'the-halving', x: -8.95, z: -10.55, face: 'S' },
+      { id: 'the-halving', x: 0.35, z: -10.55, face: 'S' },
       { id: 'rare-pepe-directory', x: -3.45, z: -10.55, face: 'S' },
       { id: 'club-x', x: -1.55, z: -10.55, face: 'S' },
-      { id: 'drop', x: -4.6, z: 10.55, face: 'N' },
       { id: 'ordinal-rush', x: -5.1, z: 7.45, face: 'N' },
       { id: 'ordinal-rush', x: -3.3, z: 7.45, face: 'N' },
       { id: 'hot-wallet', x: -5.1, z: 8.35, face: 'S' },

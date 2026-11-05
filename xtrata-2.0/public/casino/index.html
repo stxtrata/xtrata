@@ -12031,7 +12031,7 @@ function applyTestnetFunding(proof){
     room.dispensers=[];
     const gold=M(0xd5a54f,{metalness:1,roughness:.18,envMap:envTex,envMapIntensity:1.2}),navy=M(0x0a1424,{metalness:.55,roughness:.23,envMap:envTex}),black=M(0x05090f,{metalness:.35,roughness:.23}),light=new THREE.MeshBasicMaterial({color:0xffdba3});
     const chipArt=canvasTex(512,512,(c)=>printChip(c,512,25000,'#c8973a'));
-    for(const spec of [{id:'LAYR-01',label:'Grand entrance',x:4.25,z:9.45,yaw:Math.PI},{id:'LAYR-02',label:'The lounge',x:1.15,z:-9.45,yaw:0}].map(sp=>{const mv=window.PX_FLOOR_LAYOUT&&window.PX_FLOOR_LAYOUT.dispensers&&window.PX_FLOOR_LAYOUT.dispensers[sp.id];return mv?{...sp,...mv}:sp;})){
+    for(const spec of [{id:'LAYR-01',label:'Grand entrance',x:4.25,z:9.45,yaw:Math.PI},{id:'LAYR-02',label:'The lounge',x:1.15,z:-9.45,yaw:0}].map(sp=>{const mv=window.PX_FLOOR_LAYOUT&&window.PX_FLOOR_LAYOUT.dispensers&&window.PX_FLOOR_LAYOUT.dispensers[sp.id];return mv?{...sp,...mv}:sp;}).filter(sp=>!sp.hide)){
       const g=new THREE.Group();g.position.set(spec.x,.012,spec.z);g.rotation.y=spec.yaw;g.name='LAYR dispenser · '+spec.id;scene.add(g);
       const d={...spec,group:g,screen:null,chips:[],ticket:null,light:null,animationStart:0,dispensed:0};room.dispensers.push(d);
       box(1.42,.12,.89,gold,0,.06,0,g);box(1.28,2.43,.7,navy,0,1.33,0,g);box(1.34,.08,.75,gold,0,2.58,0,g);
@@ -12062,6 +12062,7 @@ function applyTestnetFunding(proof){
       g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.userData.layrDispenserId=spec.id;}});
       drawDispenserScreen(d);
     }
+    {const sel=$('layrDispenserSelect');if(sel)sel.innerHTML=room.dispensers.map((d,i)=>'<option value="'+i+'">'+d.label+' · '+d.id+'</option>').join('');}   // the list follows the exchanges that are really in the room
   }
   function updateLAYRDispensers(){
     const now=performance.now();
