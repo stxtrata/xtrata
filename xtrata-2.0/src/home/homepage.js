@@ -13,6 +13,9 @@ import {
   validateHomepageContent
 } from './homepage-content.js';
 import { pickSwap as pickWallSwap, pickWall } from './wall-rotation.js';
+import { msUntilNextUkMidnight, previewDay, todayEntry } from './today-on-xtrata.js';
+import { buildTodayCard } from './today-card.js';
+import { TODAY_DAYS } from './today-schedule.js';
 import { initMusicSupporters, stopMusicSupporters } from './music-supporters.js';
 import { initAudionautBanner, stopAudionautBanner } from './audionaut-banner.js';
 import { initArcadeChampion, stopArcadeChampion } from './arcade-champion.js';
@@ -441,6 +444,7 @@ const wallCaption = (item) => {
 const WALL_STORE_KEY = 'xtrata:home:wall:v1';
 let wallState = null;
 let wallTimer = null;
+let wallMidnightTimer = null;
 let wallBusy = false;
 let wallSongPool = [];
 
@@ -458,7 +462,7 @@ const readWallRecent = () => {
 
 const writeWallRecent = (slots) => {
   try {
-    const bigs = ['big-a', 'big-b'].map((name) => slots[name]).filter((tile) => tile && tile.id !== HOMEPAGE_WALL_ROTATION.pinned.id);
+    const bigs = ['big-a', 'big-b'].map((name) => slots[name]).filter((tile) => tile && tile.kind !== 'daily' && tile.id !== HOMEPAGE_WALL_ROTATION.pinned.id);
     window.localStorage.setItem(
       WALL_STORE_KEY,
       JSON.stringify({
@@ -474,6 +478,9 @@ const writeWallRecent = (slots) => {
 };
 
 const buildWallTile = (item, i = 99) => {
+  if (item.kind === 'daily') {
+    return buildTodayCard(item, { element, image, songButton, actionLink, playBadge }, { total: TODAY_DAYS, eager: i < 4 });
+  }
   const classes = `home-tile home-tile--${item.kind} home-tile--${item.size || 'one'} home-tone--${item.tone || 'plain'}${item.scrim ? ' home-tile--scrim' : ''}`;
   let node;
   if (item.kind === 'song') {
@@ -608,10 +615,14 @@ const renderWall = () => {
     return;
   }
   window.clearTimeout(wallTimer);
+  window.clearTimeout(wallMidnightTimer);
   wallBusy = false;
   wallSongPool = fallbackSongPool();
   // A fresh mix on every load. The arcade always holds one of the two big slots.
-  const { slots, order } = pickWall({ rotation: HOMEPAGE_WALL_ROTATION, songs: wallSongPool, recent: readWallRecent() });
+  // During the Today on Xtrata campaign the first big slot is the day's feature (same for everyone).
+  const entry = todayEntry(Date.now(), { day: previewDay(window.location.search) });
+  const daily = entry ? { ...entry, kind: 'daily' } : null;
+  const { slots, order } = pickWall({ rotation: HOMEPAGE_WALL_ROTATION, songs: wallSongPool, recent: readWallRecent(), daily });
   wallState = { slots, lastSlot: null };
   mount.replaceChildren(...order.map((item, i) => buildWallTile(item, i)));
   writeWallRecent(slots);
@@ -623,6 +634,12 @@ const renderWall = () => {
     }
   });
   scheduleWallSwap();
+  // At UK midnight the day changes: draw the whole wall again (a no-op if previewing with ?today=N).
+  if (!previewDay(window.location.search)) {
+    wallMidnightTimer = window.setTimeout(() => {
+      if (document.documentElement.dataset.page === 'home') renderWall();
+    }, Math.min(msUntilNextUkMidnight(Date.now()) + 1000, 2147483000));
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -1068,6 +1085,8 @@ const clearHomepage = () => {
   stripTimer = null;
   window.clearTimeout(wallTimer);
   wallTimer = null;
+  window.clearTimeout(wallMidnightTimer);
+  wallMidnightTimer = null;
   wallState = null;
   HOME_MOUNT_IDS.forEach((id) => {
     const node = document.getElementById(id);

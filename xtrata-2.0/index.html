@@ -113,6 +113,13 @@
 
     <!-- One rotating strip replaces the Collections banner and the campaign cards.
          Slides live in HOMEPAGE_STRIP_SLIDES (src/home/homepage-content.js). -->
+    <!-- ParallaX casino beta bar. Static link, no script. -->
+    <a id="betaBar" class="home-supbar home-supbar--beta home-only" href="https://xtrata.xyz/casino/?layout=slot-hall" target="_blank" rel="noopener" data-home-action="casino:beta-bar">
+      <span class="home-supbar__tag"><span class="home-sup-dot" aria-hidden="true"></span><span class="home-supbar__tag-word">Beta testing</span></span>
+      <span class="home-supbar__text">ParallaX Casino is open. Take a spin, play money only</span>
+      <span class="home-supbar__go">Join the beta &rarr;</span>
+    </a>
+
     <!-- Free album drop bar: live count or countdown, filled by src/home/giveaway-hero.js from GET /radio/giveaway. -->
     <a id="giveBar" class="home-supbar home-supbar--give home-only" href="/giveaway" data-home-action="giveaway:bar" data-state="loading">
       <span class="home-supbar__tag"><span class="home-sup-dot" aria-hidden="true"></span><span class="home-supbar__tag-word">Free album</span></span>
@@ -163,27 +170,6 @@
       <svg id="audionautWordmark" viewBox="0 0 1400 250" aria-hidden="true" focusable="false"><g class="aud-banner__mark" fill="#fff"></g></svg>
       <span class="aud-banner__sub"><span>Audional Sequencer &middot; Blockchain Audional Work(space)Station</span><b>Open the studio &rarr;</b></span>
     </a>
-
-    <!-- Free album drop: the live giveaway (GET /radio/giveaway). Discs, counts and the claim link are filled in by giveaway-hero.js. -->
-    <section class="give-hero home-only" id="giveawayHero" data-state="loading" aria-labelledby="giveHeroTitle">
-      <div class="give-hero__copy">
-        <span class="give-hero__kicker" data-give="kicker">Free album drop &middot; limited edition</span>
-        <h2 class="give-hero__title" id="giveHeroTitle"><span data-give="total">Limited edition.</span> Free. <em>Gone one every ten minutes.</em></h2>
-        <p class="give-hero__lead" data-give="lead">A new copy goes live here on a timer. Be first to claim it and it is yours to keep, with only your face or fingerprint to sign up.</p>
-        <div class="give-hero__actions">
-          <a class="give-hero__cta" data-give="cta" href="/giveaway" data-home-action="hero:giveaway">Watch the drop &rarr;</a>
-          <span class="give-hero__status" data-give="status" hidden></span>
-        </div>
-      </div>
-      <div class="give-hero__run" aria-live="off">
-        <div class="give-hero__discs" data-give="discs" role="img" aria-label="Every copy in the edition" hidden></div>
-        <div class="give-hero__legend" aria-hidden="true">
-          <span><i class="is-done"></i>Claimed</span>
-          <span><i class="is-now"></i>Live now</span>
-          <span><i></i>Still to come</span>
-        </div>
-      </div>
-    </section>
 
     <section class="home-panel home-bounty home-only" id="homeBounty" aria-label="The Create, Inscribe, Share bounty"></section>
 

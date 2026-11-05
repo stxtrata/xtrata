@@ -4,18 +4,12 @@ import { summarise } from '../giveaway-hero.js';
 import { HOMEPAGE_STRIP_SLIDES } from '../homepage-content.js';
 
 const indexHtml = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
-const start = indexHtml.indexOf('id="giveawayHero"');
-const hero = indexHtml.slice(start, indexHtml.indexOf('</section>', start));
 
 describe('homepage hero: the free album giveaway', () => {
-  it('replaces the passkey-wallet hero and still reads well before any data arrives', () => {
-    expect(start).toBeGreaterThan(0);
+  it('has no big hero any more, only the thin top bar, and the bar still works on its own', () => {
     expect(indexHtml).not.toContain('id="heroMusic"');
-    expect(hero).toContain('Free.');
-    expect(hero).toContain('href="/giveaway"');
-    expect(hero).toContain('data-home-action="hero:giveaway"');
-    for (const key of ['kicker', 'total', 'lead', 'cta', 'status', 'discs']) expect(hero).toContain(`data-give="${key}"`);
-    expect(hero).not.toMatch(/<(audio|video)\b/);
+    expect(indexHtml).not.toContain('id="giveawayHero"');
+    expect(indexHtml).toContain('id="giveBar"');
   });
 
   it('turns the endpoint payload into counts, and only trusts a well-formed claim code', () => {
