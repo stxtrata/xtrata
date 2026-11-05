@@ -310,3 +310,19 @@ The Salon (player-versus-player Hold'em and Liar's Dice, behind the arch) is for
   Here now (everyone signed in and where they are; a tap opens their card).
 - Tests: `functions/lib/__tests__/casino-room-here.test.ts`, and the "who is here" cases in `functions/__tests__/casino-room-e2e.test.ts`
   (they run when `ROOM_E2E_STALE_MS` is set to the Worker's `CASINO_ROOM_STALE_MS`, for example 3000).
+
+## Chess results, stakes and spectator bets (2026-11-04)
+
+The room compares the two pages' result reports for a player-versus-player chess game, holds the players' stakes and spectators' bets (play
+money, in the balances the room already keeps), runs the leaving rule and pays out. It never reads a move. Rules: `functions/lib/casino-bets.ts`;
+storage and messages: `functions/lib/casino-chess-room.ts`; hooks: this Worker (`desk`). Messages and the rules are in `claude/chess-betting-messages.md`
+and `claude/chess-betting-room-answers.md` (project docs).
+
+- **Features:** `cres` (agreed results, the leaving rule, held stakes) and `cbet` (spectator bets). Old pages ignore both and keep today's behaviour.
+- **Switches** (Worker variables, set to `1`): `CASINO_BETS_DISABLED` stops new bets; `CASINO_CHESS_RES_DISABLED` stops new games being tracked (and bets with them). Both leave games already tracked to finish. A page that reconnects after a switch changes sees the new feature list.
+- **Storage:** `cg:<gid>` the game (kept 7 days, removed lazily once an hour); `ct:<table>` the live game at a table; `cu:<key>` a player's latest game (so a returning player is told how it ended). Everything for one event is one `put`, so a game is never half paid.
+- **No timers:** deadlines are checked on connect, on any chess message and by the existing once-a-minute check. A forfeit therefore lands up to about 4 minutes after a connection dies without closing (90 s to notice + 90 s grace + up to 60 s for the check), and about 90 to 150 s after a tab closes.
+- **Counters:** `cg` games tracked and `cd` games voided by a dispute (`/casino/room/stats`). A `cd` above zero means the two pages disagreed about a game: look at it.
+- **Tests:** `npx vitest run functions/lib/__tests__/casino-bets.test.ts functions/lib/__tests__/casino-chess-room.test.ts` and `node scripts/test-casino-chess-room.mjs` (the real Worker code, four connections, a hand-moved clock).
+- **Deploy:** room Worker first (`npx wrangler deploy --config workers/casino-room/wrangler.toml`), then the site. No migration, no new binding.
+

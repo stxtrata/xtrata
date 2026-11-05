@@ -19,6 +19,11 @@
  * - Walking: a signed-in player on the floor sends `move {x, z, r}` a couple of times a second (or `move {off}`); the room keeps
  *   each connection's last position (in its attachment, so it survives hibernation), passes it to everyone else and lists the
  *   walkers in the `room` message. Moves have their own limit too. Still no timers: the room hibernates between messages.
+ * - Chess (docs/plans/CASINO-CHESS-PLAN.md, section 12; functions/lib/casino-bets.ts and casino-chess-room.ts): the room compares the two
+ *   pages' result reports, holds the players' stakes and spectators' bets (play money, through the balances it already keeps), runs
+ *   the leaving rule (90 s grace) and pays out. It never reads a move. No new timers or alarms: deadlines are checked when someone
+ *   connects, sends a chess message, or the existing once-a-minute check runs. Switches: CASINO_BETS_DISABLED (no new bets),
+ *   CASINO_CHESS_RES_DISABLED (no new games tracked; games already tracked still finish).
  * - Guests (not signed in) see the room only when the Pages Function says so (`x-px-watch: 1`, from the Pages variable
  *   CASINO_ROOM_GUESTS). Otherwise they get the head count and nothing else: no seats, walkers, spins or arrivals
  *   (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md, step 6). Signed-in players always see everything.
@@ -82,6 +87,8 @@ import {
   type WinEntry
 } from '../../functions/lib/casino-social';
 import { ROUND_TABLES, roundInfo } from '../../functions/lib/casino-rounds';
+import { CHESS_FEATURES } from '../../functions/lib/casino-bets';
+import { ChessDesk, type Conn, type DeskStore } from '../../functions/lib/casino-chess-room';
 import {
   ALL_MISSIONS_BONUS,
   JACKPOT_ODDS,
@@ -125,7 +132,8 @@ import {
 } from '../../functions/lib/casino-progress';
 
 /** Everything this room can do; a client only uses what is listed (an older client ignores what it does not know). */
-const FEATURES = [...ROOM_FEATURES, ...SOCIAL_FEATURES, ...PROGRESS_FEATURES] as const;
+const FEATURES = [...ROOM_FEATURES, ...SOCIAL_FEATURES, ...PROGRESS_FEATURES, ...CHESS_FEATURES] as const;
+const switchedOn = (v: unknown) => v === '1' || v === 'true' || v === 1 || v === true;
 
 interface Env { [key: string]: unknown }
 
@@ -159,6 +167,29 @@ export class CasinoRoom extends DurableObject<Env> {
     // Who is here (docs/plans/CASINO-WHO-IS-HERE-PLAN.md): a bare "ping" is answered "pong" without waking the room, and the
     // time of the answer is kept per connection (getWebSocketAutoResponseTimestamp), so heartbeats cost nothing.
     try { ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong')); } catch { /* a stand-in runtime (tests) */ }
+    const store: DeskStore = {
+      get: (key) => ctx.storage.get(key) as Promise<any>,
+      put: (entries) => ctx.storage.put(entries),
+      delete: (keys) => ctx.storage.delete(keys),
+      list: (options) => ctx.storage.list(options) as Promise<Map<string, any>>
+    };
+    this.desk = new ChessDesk(store, {
+      on: () => !switchedOn(this.env.CASINO_CHESS_RES_DISABLED),
+      betsOn: () => !switchedOn(this.env.CASINO_BETS_DISABLED) && !switchedOn(this.env.CASINO_CHESS_RES_DISABLED),
+      count: (k) => { void this.count([k]); }
+    });
+  }
+
+  /** The chess desk (functions/lib/casino-chess-room.ts): results, held stakes, bets and the leaving rule. */
+  private readonly desk: ChessDesk;
+  /** What this room offers: bets are left out while CASINO_BETS_DISABLED is set, and chess entirely while CASINO_CHESS_RES_DISABLED is. */
+  private features() {
+    const noRes = switchedOn(this.env.CASINO_CHESS_RES_DISABLED), noBets = noRes || switchedOn(this.env.CASINO_BETS_DISABLED);
+    return FEATURES.filter((f) => !(noRes && f === 'cres') && !(noBets && f === 'cbet'));
+  }
+  /** Connections as the chess desk sees them (the desk sends through them and may note rate limits on their peer; callers save). */
+  private conns(entries: Array<{ ws: WebSocket; peer: Peer }>): Conn[] {
+    return entries.map((e) => ({ id: e.peer.id, peer: e.peer, send: (m: unknown) => this.send(e.ws, m) }));
   }
 
   // ------------------------------------------------------------------ who is here: closing connections that have gone quiet
@@ -189,6 +220,8 @@ export class CasinoRoom extends DurableObject<Env> {
   async alarm() {
     const now = Date.now();
     await this.sweep(now);
+    // The chess deadlines (the wait for the other page's report, a player's grace, a game that never ended) fall due here too, at no extra cost.
+    try { await this.desk.tick(this.conns(this.peers()), now); } catch (e) { console.warn('[casino-room] chess deadlines failed', e); }
     if (this.peers().length) { try { await this.ctx.storage.setAlarm(now + this.sweepMs()); } catch { /* ignore */ } }
   }
 
@@ -241,7 +274,7 @@ export class CasinoRoom extends DurableObject<Env> {
 
   /** The `room` message, plus the social layer: the win feed, everyone's bets on the current shared rounds, and Salon seekers. */
   private async welcome(peers: Peer[], me: Peer, now: number) {
-    const base = roomMessage(peers, me, now, FEATURES) as Record<string, unknown>;
+    const base = roomMessage(peers, me, now, this.features()) as Record<string, unknown>;
     if (base.watch === false) return base;
     const wins = (await this.ctx.storage.get<WinEntry[]>(WINS_KEY)) || [];
     const bets: Record<string, unknown> = {};
@@ -497,6 +530,12 @@ export class CasinoRoom extends DurableObject<Env> {
     try { await this.settleDue(live, now); } catch (e) { console.warn('[casino-room] tournament settling failed', e); }
     const view = deriveView(live.map((e) => e.peer));
     this.send(server, await this.welcome(live.map((e) => e.peer), peer, now));
+    // Chess: a player coming back is welcomed into their game (or told how it ended while they were away), and anything due is settled.
+    try {
+      const cs = this.conns(live), self = cs.find((c) => c.id === peer.id);
+      if (self) await this.desk.onConnect(cs, self, now);
+      await this.desk.tick(cs, now);
+    } catch (e) { console.warn('[casino-room] chess welcome failed', e); }
     void this.counted(peer, live.length);
     const others = live.filter((e) => e.ws !== server);
     // A second tab of someone already here is not a new person.
@@ -636,6 +675,22 @@ export class CasinoRoom extends DurableObject<Env> {
       this.save([mine]);
       if (!r.ok) { this.send(ws, { t: 'err', code: r.code }); return; }
       this.deliver(entries, r.out);
+      // The first snapshot of a new game opens it (holds the stakes, opens betting); the room never reads the rest of it.
+      if ('d' in parsed.msg) {
+        try { await this.desk.onSnapshot(this.conns(entries), parsed.msg.tb, parsed.msg.d, now); } catch (e) { console.warn('[casino-room] chess snapshot failed', e); }
+      }
+      return;
+    }
+    // Chess results and bets: their own limits, and never counted against the seat and chat limit.
+    if (parsed.ok && (parsed.msg.t === 'cres' || parsed.msg.t === 'cbet')) {
+      const cs = this.conns(entries), me = cs.find((c) => c.id === mine.peer.id);
+      if (!me) return;
+      try {
+        await this.desk.tickTable(cs, parsed.msg.tb, now);
+        if (parsed.msg.t === 'cres') await this.desk.onReport(cs, me, parsed.msg, now);
+        else await this.desk.onBet(cs, me, parsed.msg, now);
+      } catch (e) { console.warn('[casino-room] chess message failed', e); this.send(ws, { t: 'err', code: parsed.msg.t + '-failed' }); }
+      this.save([mine]);
       return;
     }
     if (!takeRate(mine.peer, now)) {
@@ -741,6 +796,8 @@ export class CasinoRoom extends DurableObject<Env> {
       }
       case 'seek': {
         const r = applySeek(peers, mine.peer, parsed.msg, now);
+        // The stake of a chess game is checked against a seek the players made (casino-chess-room.ts), so the last one is remembered.
+        if (r.ok && !('off' in parsed.msg)) mine.peer.ls = { tb: parsed.msg.tb, stake: parsed.msg.stake, at: now };
         this.save([mine]);
         if (!r.ok) { this.send(ws, { t: 'err', code: r.code }); return; }
         this.deliver(entries, r.out);
@@ -840,6 +897,8 @@ export class CasinoRoom extends DurableObject<Env> {
         if (peer.sk) this.broadcast(entries, { t: 'seek', a: peer.a, off: true, at: Date.now() });
         this.broadcast(entries, { t: 'leave', a: peer.a });
       }
+      // Chess: a player in a game who has no connection left starts the 90-second grace (the opponent and the table are told).
+      try { await this.desk.onGone(this.conns(entries), peer, Date.now()); } catch (e) { console.warn('[casino-room] chess leaving failed', e); }
     }
     this.broadcast(entries, { t: 'count', ...this.counts(entries) }, true);
   }

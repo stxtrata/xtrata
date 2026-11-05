@@ -239,7 +239,7 @@ const hs = {
   output: Fu
 };
 /*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-const us = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), Gt = (t, e) => t << 32 - e | t >>> e, Mu = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
+const us = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), Vt = (t, e) => t << 32 - e | t >>> e, Mu = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
 if (!Mu)
   throw new Error("Non little-endian hardware is not supported");
 Array.from({ length: 256 }, (t, e) => e.toString(16).padStart(2, "0"));
@@ -462,12 +462,12 @@ let Yl = class extends wi {
     for (let l = 0; l < 16; l++, n += 4)
       de[l] = e.getUint32(n, !1);
     for (let l = 16; l < 64; l++) {
-      const b = de[l - 15], p = de[l - 2], g = Gt(b, 7) ^ Gt(b, 18) ^ b >>> 3, w = Gt(p, 17) ^ Gt(p, 19) ^ p >>> 10;
+      const b = de[l - 15], p = de[l - 2], g = Vt(b, 7) ^ Vt(b, 18) ^ b >>> 3, w = Vt(p, 17) ^ Vt(p, 19) ^ p >>> 10;
       de[l] = w + de[l - 7] + g + de[l - 16] | 0;
     }
     let { A: r, B: o, C: s, D: i, E: a, F: c, G: h, H: u } = this;
     for (let l = 0; l < 64; l++) {
-      const b = Gt(a, 6) ^ Gt(a, 11) ^ Gt(a, 25), p = u + b + Yu(a, c, h) + Qu[l] + de[l] | 0, w = (Gt(r, 2) ^ Gt(r, 13) ^ Gt(r, 22)) + Zu(r, o, s) | 0;
+      const b = Vt(a, 6) ^ Vt(a, 11) ^ Vt(a, 25), p = u + b + Yu(a, c, h) + Qu[l] + de[l] | 0, w = (Vt(r, 2) ^ Vt(r, 13) ^ Vt(r, 22)) + Zu(r, o, s) | 0;
       u = h, h = c, c = a, a = i + p | 0, i = s, s = o, o = r, r = p + w | 0;
     }
     r = r + this.A | 0, o = o + this.B | 0, s = s + this.C | 0, i = i + this.D | 0, a = a + this.E | 0, c = c + this.F | 0, h = h + this.G | 0, u = u + this.H | 0, this.set(r, o, s, i, a, c, h, u);
@@ -683,7 +683,7 @@ const Z = BigInt(0), at = BigInt(1), Me = BigInt(2), cr = BigInt(3), Na = BigInt
       throw new Error("splitScalarEndo: Endomorphism failed, k=" + t);
     return { k1neg: l, k1: h, k2neg: b, k2: u };
   }
-}, Rt = 32, on = 32, tf = 32, xo = Rt + 1, wo = 2 * Rt + 1;
+}, zt = 32, on = 32, tf = 32, xo = zt + 1, wo = 2 * zt + 1;
 function Da(t) {
   const { a: e, b: n } = ot, r = I(t * t), o = I(r * t);
   return I(o + e * t + n);
@@ -841,12 +841,12 @@ class tt {
     return a.assertValidity(), a;
   }
   static fromUncompressedHex(e) {
-    const n = Lt(e.subarray(1, Rt + 1)), r = Lt(e.subarray(Rt + 1, Rt * 2 + 1)), o = new tt(n, r);
+    const n = Lt(e.subarray(1, zt + 1)), r = Lt(e.subarray(zt + 1, zt * 2 + 1)), o = new tt(n, r);
     return o.assertValidity(), o;
   }
   static fromHex(e) {
     const n = Zt(e), r = n.length, o = n[0];
-    if (r === Rt)
+    if (r === zt)
       return this.fromCompressedHex(n);
     if (r === xo && (o === 2 || o === 3))
       return this.fromCompressedHex(n);
@@ -1230,7 +1230,7 @@ function Bi(t, e, n = !1) {
   return r.assertValidity(), r.multiply(sn(t)).toRawBytes(n);
 }
 function of(t) {
-  const e = t.length > Rt ? t.slice(0, Rt) : t;
+  const e = t.length > zt ? t.slice(0, zt) : t;
   return Lt(e);
 }
 function Nd(t) {
@@ -1245,10 +1245,10 @@ function af(t, e, n) {
     throw new Error(`sign: expected valid message hash, not "${t}"`);
   const r = Zt(t), o = sn(e), s = [sf(o), Nd(r)];
   if (n != null) {
-    n === !0 && (n = ct.randomBytes(Rt));
+    n === !0 && (n = ct.randomBytes(zt));
     const c = Zt(n);
-    if (c.length !== Rt)
-      throw new Error(`sign: Expected ${Rt} bytes of extra data`);
+    if (c.length !== zt)
+      throw new Error(`sign: Expected ${zt} bytes of extra data`);
     s.push(c);
   }
   const i = Te(...s), a = of(r);
@@ -3757,7 +3757,7 @@ const tn = {
   output: Nb
 };
 /*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-const gs = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), Vt = (t, e) => t << 32 - e | t >>> e, Pb = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
+const gs = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), Kt = (t, e) => t << 32 - e | t >>> e, Pb = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
 if (!Pb)
   throw new Error("Non little-endian hardware is not supported");
 Array.from({ length: 256 }, (t, e) => e.toString(16).padStart(2, "0"));
@@ -3965,12 +3965,12 @@ let qf = class extends Di {
     for (let l = 0; l < 16; l++, n += 4)
       me[l] = e.getUint32(n, !1);
     for (let l = 16; l < 64; l++) {
-      const b = me[l - 15], p = me[l - 2], g = Vt(b, 7) ^ Vt(b, 18) ^ b >>> 3, w = Vt(p, 17) ^ Vt(p, 19) ^ p >>> 10;
+      const b = me[l - 15], p = me[l - 2], g = Kt(b, 7) ^ Kt(b, 18) ^ b >>> 3, w = Kt(p, 17) ^ Kt(p, 19) ^ p >>> 10;
       me[l] = w + me[l - 7] + g + me[l - 16] | 0;
     }
     let { A: r, B: o, C: s, D: i, E: a, F: c, G: h, H: u } = this;
     for (let l = 0; l < 64; l++) {
-      const b = Vt(a, 6) ^ Vt(a, 11) ^ Vt(a, 25), p = u + b + Fb(a, c, h) + Rb[l] + me[l] | 0, w = (Vt(r, 2) ^ Vt(r, 13) ^ Vt(r, 22)) + Mb(r, o, s) | 0;
+      const b = Kt(a, 6) ^ Kt(a, 11) ^ Kt(a, 25), p = u + b + Fb(a, c, h) + Rb[l] + me[l] | 0, w = (Kt(r, 2) ^ Kt(r, 13) ^ Kt(r, 22)) + Mb(r, o, s) | 0;
       u = h, h = c, c = a, a = i + p | 0, i = s, s = o, o = r, r = p + w | 0;
     }
     r = r + this.A | 0, o = o + this.B | 0, s = s + this.C | 0, i = i + this.D | 0, a = a + this.E | 0, c = c + this.F | 0, h = h + this.G | 0, u = u + this.H | 0, this.set(r, o, s, i, a, c, h, u);
@@ -5290,7 +5290,7 @@ const en = {
   output: jg
 };
 /*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-const ms = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), Kt = (t, e) => t << 32 - e | t >>> e, qg = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
+const ms = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), jt = (t, e) => t << 32 - e | t >>> e, qg = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
 if (!qg)
   throw new Error("Non little-endian hardware is not supported");
 Array.from({ length: 256 }, (t, e) => e.toString(16).padStart(2, "0"));
@@ -5498,12 +5498,12 @@ let Bh = class extends Gi {
     for (let l = 0; l < 16; l++, n += 4)
       ve[l] = e.getUint32(n, !1);
     for (let l = 16; l < 64; l++) {
-      const b = ve[l - 15], p = ve[l - 2], g = Kt(b, 7) ^ Kt(b, 18) ^ b >>> 3, w = Kt(p, 17) ^ Kt(p, 19) ^ p >>> 10;
+      const b = ve[l - 15], p = ve[l - 2], g = jt(b, 7) ^ jt(b, 18) ^ b >>> 3, w = jt(p, 17) ^ jt(p, 19) ^ p >>> 10;
       ve[l] = w + ve[l - 7] + g + ve[l - 16] | 0;
     }
     let { A: r, B: o, C: s, D: i, E: a, F: c, G: h, H: u } = this;
     for (let l = 0; l < 64; l++) {
-      const b = Kt(a, 6) ^ Kt(a, 11) ^ Kt(a, 25), p = u + b + Xg(a, c, h) + Zg[l] + ve[l] | 0, w = (Kt(r, 2) ^ Kt(r, 13) ^ Kt(r, 22)) + Yg(r, o, s) | 0;
+      const b = jt(a, 6) ^ jt(a, 11) ^ jt(a, 25), p = u + b + Xg(a, c, h) + Zg[l] + ve[l] | 0, w = (jt(r, 2) ^ jt(r, 13) ^ jt(r, 22)) + Yg(r, o, s) | 0;
       u = h, h = c, c = a, a = i + p | 0, i = s, s = o, o = r, r = p + w | 0;
     }
     r = r + this.A | 0, o = o + this.B | 0, s = s + this.C | 0, i = i + this.D | 0, a = a + this.E | 0, c = c + this.F | 0, h = h + this.G | 0, u = u + this.H | 0, this.set(r, o, s, i, a, c, h, u);
@@ -6225,7 +6225,7 @@ const Es = {
   output: fx
 };
 /*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-const As = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), jt = (t, e) => t << 32 - e | t >>> e, hx = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
+const As = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), qt = (t, e) => t << 32 - e | t >>> e, hx = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
 if (!hx)
   throw new Error("Non little-endian hardware is not supported");
 Array.from({ length: 256 }, (t, e) => e.toString(16).padStart(2, "0"));
@@ -6396,12 +6396,12 @@ let Ph = class extends ji {
     for (let l = 0; l < 16; l++, n += 4)
       Le[l] = e.getUint32(n, !1);
     for (let l = 16; l < 64; l++) {
-      const b = Le[l - 15], p = Le[l - 2], g = jt(b, 7) ^ jt(b, 18) ^ b >>> 3, w = jt(p, 17) ^ jt(p, 19) ^ p >>> 10;
+      const b = Le[l - 15], p = Le[l - 2], g = qt(b, 7) ^ qt(b, 18) ^ b >>> 3, w = qt(p, 17) ^ qt(p, 19) ^ p >>> 10;
       Le[l] = w + Le[l - 7] + g + Le[l - 16] | 0;
     }
     let { A: r, B: o, C: s, D: i, E: a, F: c, G: h, H: u } = this;
     for (let l = 0; l < 64; l++) {
-      const b = jt(a, 6) ^ jt(a, 11) ^ jt(a, 25), p = u + b + bx(a, c, h) + xx[l] + Le[l] | 0, w = (jt(r, 2) ^ jt(r, 13) ^ jt(r, 22)) + gx(r, o, s) | 0;
+      const b = qt(a, 6) ^ qt(a, 11) ^ qt(a, 25), p = u + b + bx(a, c, h) + xx[l] + Le[l] | 0, w = (qt(r, 2) ^ qt(r, 13) ^ qt(r, 22)) + gx(r, o, s) | 0;
       u = h, h = c, c = a, a = i + p | 0, i = s, s = o, o = r, r = p + w | 0;
     }
     r = r + this.A | 0, o = o + this.B | 0, s = s + this.C | 0, i = i + this.D | 0, a = a + this.E | 0, c = c + this.F | 0, h = h + this.G | 0, u = u + this.H | 0, this.set(r, o, s, i, a, c, h, u);
@@ -7002,7 +7002,7 @@ const Bs = {
   output: Aw
 };
 /*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-const $s = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), qt = (t, e) => t << 32 - e | t >>> e, vw = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
+const $s = (t) => new DataView(t.buffer, t.byteOffset, t.byteLength), Wt = (t, e) => t << 32 - e | t >>> e, vw = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
 if (!vw)
   throw new Error("Non little-endian hardware is not supported");
 Array.from({ length: 256 }, (t, e) => e.toString(16).padStart(2, "0"));
@@ -7225,12 +7225,12 @@ class Yh extends Qi {
     for (let l = 0; l < 16; l++, n += 4)
       Ue[l] = e.getUint32(n, !1);
     for (let l = 16; l < 64; l++) {
-      const b = Ue[l - 15], p = Ue[l - 2], g = qt(b, 7) ^ qt(b, 18) ^ b >>> 3, w = qt(p, 17) ^ qt(p, 19) ^ p >>> 10;
+      const b = Ue[l - 15], p = Ue[l - 2], g = Wt(b, 7) ^ Wt(b, 18) ^ b >>> 3, w = Wt(p, 17) ^ Wt(p, 19) ^ p >>> 10;
       Ue[l] = w + Ue[l - 7] + g + Ue[l - 16] | 0;
     }
     let { A: r, B: o, C: s, D: i, E: a, F: c, G: h, H: u } = this;
     for (let l = 0; l < 64; l++) {
-      const b = qt(a, 6) ^ qt(a, 11) ^ qt(a, 25), p = u + b + Nw(a, c, h) + Dw[l] + Ue[l] | 0, w = (qt(r, 2) ^ qt(r, 13) ^ qt(r, 22)) + Pw(r, o, s) | 0;
+      const b = Wt(a, 6) ^ Wt(a, 11) ^ Wt(a, 25), p = u + b + Nw(a, c, h) + Dw[l] + Ue[l] | 0, w = (Wt(r, 2) ^ Wt(r, 13) ^ Wt(r, 22)) + Pw(r, o, s) | 0;
       u = h, h = c, c = a, a = i + p | 0, i = s, s = o, o = r, r = p + w | 0;
     }
     r = r + this.A | 0, o = o + this.B | 0, s = s + this.C | 0, i = i + this.D | 0, a = a + this.E | 0, c = c + this.F | 0, h = h + this.G | 0, u = u + this.H | 0, this.set(r, o, s, i, a, c, h, u);
@@ -8763,14 +8763,14 @@ const w3 = (t) => t.length <= 12 ? t : `${t.slice(0, 5)}…${t.slice(-4)}`, sa =
 }, p0 = () => {
   var t;
   !f.features.includes("move") || f.service !== "ok" || !f.connected || !f.signed || !f.you || f.you.guest || ((t = f.ws) == null ? void 0 : t.readyState) === WebSocket.OPEN && (f.ownMove ? (f.ws.send(JSON.stringify({ t: "move", ...f.ownMove })), f.ownSent = !0) : f.ownSent && (f.ws.send(JSON.stringify({ t: "move", off: !0 })), f.ownSent = !1));
-}, Wt = (t) => {
+}, Rt = (t) => {
   var e, n;
   try {
     (n = (e = f.host) == null ? void 0 : e.on) == null || n.call(e, t);
   } catch (r) {
     console.warn("[room] the page could not take a room message", r);
   }
-}, m3 = /^(react|win|daily|round|gift|pvp|table|no-table|log|bal|board|friends|tourney|card|mission)/, wr = () => {
+}, m3 = /^(react|win|daily|round|gift|pvp|table|no-table|log|bal|board|friends|tourney|card|mission|cres|cbet)/, wr = () => {
   var n;
   if (!f.host || f.service !== "ok") return;
   const t = ((n = f.you) == null ? void 0 : n.a) ?? null, e = Object.entries(f.spots).filter(([, r]) => r.a !== t).map(([r, o]) => ({ key: o.a, spot: r, label: Yt(o.a), since: o.since }));
@@ -8820,7 +8820,7 @@ const w3 = (t) => t.length <= 12 ? t : `${t.slice(0, 5)}…${t.slice(-4)}`, sa =
         for (const c of Array.isArray(n.walkers) ? n.walkers : []) c && typeof c.a == "string" && f.walk.set(c.a, { x: +c.x, z: +c.z, r: +c.r, at: +c.at });
         Uo(), f.ownSent = !1, p0(), f.standSent = null, f.signed && ((r = f.you) != null && r.guest) && (f.signed = null), z == null || z.room(n.players, !!(f.you && !f.you.guest)), f.players = /* @__PURE__ */ new Map();
         for (const c of Array.isArray(n.players) ? n.players : []) c && typeof c.a == "string" && f.players.set(c.a, { a: c.a, aw: c.aw === !0 });
-        ar(), f.features.includes("here") && ((o = f.ws) == null ? void 0 : o.readyState) === WebSocket.OPEN && (f.ws.send(JSON.stringify({ t: "here" })), f.away && f.signed && f.you && !f.you.guest && f.ws.send(JSON.stringify({ t: "away", on: !0 }))), Wt({
+        ar(), f.features.includes("here") && ((o = f.ws) == null ? void 0 : o.readyState) === WebSocket.OPEN && (f.ws.send(JSON.stringify({ t: "here" })), f.away && f.signed && f.you && !f.you.guest && f.ws.send(JSON.stringify({ t: "away", on: !0 }))), Rt({
           t: "room",
           features: f.features.slice(),
           wins: n.wins || [],
@@ -8854,13 +8854,13 @@ const w3 = (t) => t.length <= 12 ? t : `${t.slice(0, 5)}…${t.slice(-4)}`, sa =
         break;
       case "say":
       case "dm":
-        z == null || z.heard(n), n.t === "say" && Wt(n);
+        z == null || z.heard(n), n.t === "say" && Rt(n);
         return;
       case "join":
-        n.who && typeof n.who.a == "string" && f.players.set(n.who.a, { a: n.who.a }), z == null || z.joined(n.who), Wt(n), Q();
+        n.who && typeof n.who.a == "string" && f.players.set(n.who.a, { a: n.who.a }), z == null || z.joined(n.who), Rt(n), Q();
         return;
       case "leave":
-        f.players.delete(n.a), ar(), z == null || z.left(n.a), f.walk.has(n.a) && fo(n.a, null), Wt(n), Q();
+        f.players.delete(n.a), ar(), z == null || z.left(n.a), f.walk.has(n.a) && fo(n.a, null), Rt(n), Q();
         return;
       case "away":
         typeof n.a == "string" && (f.players.set(n.a, { a: n.a, aw: n.on === !0 }), ar());
@@ -8874,7 +8874,15 @@ const w3 = (t) => t.length <= 12 ? t : `${t.slice(0, 5)}…${t.slice(-4)}`, sa =
       case "seek":
       case "pvp":
       case "spec":
-        Wt(n);
+        Rt(n);
+        return;
+      case "cres":
+      case "cgone":
+      case "cend":
+      case "cbet":
+      case "cpool":
+      case "cpay":
+        Rt(n);
         return;
       case "me":
       case "hh":
@@ -8889,7 +8897,7 @@ const w3 = (t) => t.length <= 12 ? t : `${t.slice(0, 5)}…${t.slice(-4)}`, sa =
       case "jp":
       case "jackpot":
       case "card":
-        Wt(n);
+        Rt(n);
         return;
       case "reported":
         z == null || z.reported();
@@ -8906,7 +8914,7 @@ const w3 = (t) => t.length <= 12 ? t : `${t.slice(0, 5)}…${t.slice(-4)}`, sa =
         typeof n.a == "string" && (n.off ? fo(n.a, null) : [n.x, n.z, n.r, n.at].every((c) => typeof c == "number" && Number.isFinite(c)) && fo(n.a, { x: n.x, z: n.z, r: n.r, at: n.at }));
         return;
       case "err":
-        if (typeof n.code == "string" && (n.code.startsWith("play-") || n.code.startsWith("move-")) || typeof n.code == "string" && m3.test(n.code) && (Wt({ t: "err", code: n.code }), n.code !== "no-table"))
+        if (typeof n.code == "string" && (n.code.startsWith("play-") || n.code.startsWith("move-")) || typeof n.code == "string" && m3.test(n.code) && (Rt({ t: "err", code: n.code }), n.code !== "no-table"))
           return;
         n.code === "no-such-spot" || typeof n.code == "string" && n.code.startsWith("salon-") ? f.badSpot = f.want : Qm(n.code) && (z != null && z.failed(n.code)) || n.code === "slow-down" && (f.lastSent = Date.now() + 3e3);
         return;
@@ -8995,9 +9003,9 @@ const ar = () => {
   }
   Jo();
 };
-let zt = 0;
+let Gt = 0;
 const pi = () => new Error("Sign-in cancelled.");
-async function x0(t, e = zt) {
+async function x0(t, e = Gt) {
   const { res: n, body: r } = await yr(`/casino/room/challenge?address=${encodeURIComponent(t.address)}`);
   if (!n.ok) throw new Error((r == null ? void 0 : r.error) || `The room answered ${n.status}.`);
   const o = r.challenge, { domain: s, message: i } = Fm(o);
@@ -9012,9 +9020,9 @@ async function x0(t, e = zt) {
       appDetails: { name: "ParallaX Casino", icon: `${location.origin}/favicons/xtrata-apple-touch-icon.png` }
     });
   } catch (u) {
-    throw e !== zt ? pi() : new Error("The wallet did not sign: " + Io(u));
+    throw e !== Gt ? pi() : new Error("The wallet did not sign: " + Io(u));
   }
-  if (e !== zt) throw pi();
+  if (e !== Gt) throw pi();
   const { res: c, body: h } = await yr("/casino/room/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -9026,22 +9034,22 @@ async function x0(t, e = zt) {
 async function w0(t) {
   var r, o;
   if (f.busy) return;
-  const e = ++zt;
+  const e = ++Gt;
   f.error = "", f.busy = "connect", f.trying = t, Q();
   const n = t === "casino" && !((r = zn()) != null && r.describe().has);
   try {
     const s = await qm(t);
-    if (e !== zt) throw pi();
+    if (e !== Gt) throw pi();
     f.wallet = s, c0(t), await x0(s, e), f.open = !1, n && ((o = zn()) == null || o.fundNew().catch(() => {
     }));
   } catch (s) {
-    e === zt && (f.error = /cancel/i.test(Io(s)) ? "" : Io(s));
+    e === Gt && (f.error = /cancel/i.test(Io(s)) ? "" : Io(s));
   } finally {
-    e === zt && (f.busy = "", f.trying = null), Q();
+    e === Gt && (f.busy = "", f.trying = null), Q();
   }
 }
 const E3 = () => {
-  zt++, f.busy = "", f.trying = null, f.error = "", Q();
+  Gt++, f.busy = "", f.trying = null, f.error = "", Q();
 };
 async function A3(t) {
   var o;
@@ -9049,15 +9057,15 @@ async function A3(t) {
   if (!e || typeof e.address != "string" || f.service !== "ok" || f.busy || ((o = f.signed) == null ? void 0 : o.address) === e.address) return;
   const n = e.kind === "casino" || e.kind === "leather" || e.kind === "xverse" ? e.kind : null;
   if (!n) return;
-  const r = ++zt;
+  const r = ++Gt;
   f.error = "", f.busy = "sign", f.trying = n, Q();
   try {
     f.wallet = { kind: n, address: e.address, network: e.address.startsWith("SP") ? "mainnet" : "testnet", via: "page" }, c0(n), await x0(f.wallet, r), f.open = !1;
   } catch (s) {
     const i = Io(s);
-    r === zt && !/cancel/i.test(i) && (f.error = i, f.open = !B0());
+    r === Gt && !/cancel/i.test(i) && (f.error = i, f.open = !B0());
   } finally {
-    r === zt && (f.busy = "", f.trying = null), Q();
+    r === Gt && (f.busy = "", f.trying = null), Q();
   }
 }
 const v3 = 2e3, B3 = () => {
@@ -9249,9 +9257,9 @@ const k3 = async () => {
     Is = !0;
     try {
       const { res: t, body: e } = await yr("/casino/room/bns", { method: "POST" });
-      Wt({ t: "bns-check", ok: t.ok, bns: (e == null ? void 0 : e.bns) ?? null, bnsChecked: (e == null ? void 0 : e.bnsChecked) === !0, failed: !t.ok || (e == null ? void 0 : e.failed) === !0, error: t.ok ? null : (e == null ? void 0 : e.error) || `The room answered ${t.status}.` }), t.ok && _r();
+      Rt({ t: "bns-check", ok: t.ok, bns: (e == null ? void 0 : e.bns) ?? null, bnsChecked: (e == null ? void 0 : e.bnsChecked) === !0, failed: !t.ok || (e == null ? void 0 : e.failed) === !0, error: t.ok ? null : (e == null ? void 0 : e.error) || `The room answered ${t.status}.` }), t.ok && _r();
     } catch {
-      Wt({ t: "bns-check", ok: !1, bns: null, bnsChecked: !1, failed: !0, error: "Could not reach the room." });
+      Rt({ t: "bns-check", ok: !1, bns: null, bnsChecked: !1, failed: !0, error: "Could not reach the room." });
     } finally {
       Is = !1;
     }
@@ -9473,6 +9481,8 @@ const O3 = (t) => {
   seek: "pvp",
   pvp: "pvp",
   spec: "spec",
+  cres: "cres",
+  cbet: "cbet",
   log: "progress",
   mission: "missions",
   card: "progress",
@@ -9484,9 +9494,9 @@ const O3 = (t) => {
   var o;
   const e = t.detail;
   if (!e || typeof e.t != "string" || !Fl[e.t]) return;
-  const n = e.t === "round" || e.t === "watch" || e.t === "spec" && e.ask === !0;
+  const n = e.t === "round" || e.t === "watch" || (e.t === "spec" || e.t === "cbet") && e.ask === !0;
   if (!(f.service === "ok" && f.connected && f.features.includes(Fl[e.t]) && (n || !!(f.signed && f.you && !f.you.guest))) || ((o = f.ws) == null ? void 0 : o.readyState) !== WebSocket.OPEN) {
-    Wt({ t: "unsent", msg: e });
+    Rt({ t: "unsent", msg: e });
     return;
   }
   f.ws.send(JSON.stringify(e));

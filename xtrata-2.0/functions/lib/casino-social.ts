@@ -27,6 +27,10 @@ export type SocialPeer = {
   rx?: number[]; wn?: number[]; gl?: number[]; pv?: number[];
   /** Recent times for the chess spectator limits: snapshots sent (`sp`) and asks (`sa`). */
   sp?: number[]; sa?: number[];
+  /** Chess results and bets (casino-bets.ts): recent times for `cres`, `cbet` and `cbet ask`, and the last seek (table, stake, time),
+   *  which a game's stake is checked against. */
+  cq?: number[]; cr?: number[]; ca?: number[];
+  ls?: { tb: string; stake: number; at: number } | null;
   /** The Salon's rule: the primary BNS name read at sign-in, and whether it was checked (see salonRefusal). */
   bn?: string | null; bc?: boolean;
 };
@@ -109,7 +113,9 @@ export type SocialMessage =
   | { t: 'spec'; tb: ChessTable; d: unknown }
   | { t: 'spec'; tb: ChessTable; ask: true };
 
-const addressLike = (v: unknown): v is string => typeof v === 'string' && /^S[0-9A-Z]{4,63}$/.test(v);
+export const addressLike = (v: unknown): v is string => typeof v === 'string' && /^S[0-9A-Z]{4,63}$/.test(v);
+/** A chess game's id: 16 lowercase hex characters, chosen by the host at `create` so both pages and the room share it. */
+export const isGid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v);
 /** What a player may name as a game in a win: a table, or a machine's short id. */
 const GAMES = new Set<string>([...TABLES, ...ALL_MACHINES]);
 
@@ -299,7 +305,33 @@ export const routeRelay = (peers: SocialPeer[], me: SocialPeer, msg: { to: strin
  * reads `d`; each watcher's page replays the moves with the XChess engine before showing them. Nothing is stored.
  */
 const mayWatch = (p: SocialPeer) => !!p.a || p.w !== false;
-const seatedAt = (p: SocialPeer, table: string) => !!p.spot && p.spot.split('.')[0] === table;
+export const seatedAt = (p: SocialPeer, table: string) => !!p.spot && p.spot.split('.')[0] === table;
+
+/**
+ * What a snapshot may claim about its players. With a `gid` (a player-versus-player game the room tracks): `w` and `b` must be the
+ * two people seated at that table and the sender one of them. Against a house player (no `gid`): exactly one side is
+ * `house:<id>`, `d.h` is that same id, and the other side is the sender. Older shapes with no `gid` and no house player: if they
+ * name `w` and `b`, the sender must be one of them; anything else is passed on as before (the room never reads the rest of `d`).
+ */
+const HOUSE = /^house:[a-z0-9-]{1,24}$/;
+export const snapshotRefusal = (peers: SocialPeer[], me: SocialPeer, table: string, d: unknown): string | null => {
+  if (!d || typeof d !== 'object') return null;
+  const o = d as Record<string, unknown>;
+  const hasGid = o.gid !== undefined;
+  if (hasGid && !isGid(o.gid)) return 'spec-bad-gid';
+  const w = o.w, b = o.b;
+  if (!hasGid && !(typeof w === 'string' && typeof b === 'string')) return null;
+  if (typeof w !== 'string' || typeof b !== 'string') return 'spec-bad-players';
+  const hw = HOUSE.test(w) ? w.slice(6) : null, hb = HOUSE.test(b) ? b.slice(6) : null;
+  if (hw || hb) {
+    if (hasGid || (hw && hb)) return 'spec-bad-players';
+    return o.h === (hw || hb) && (hw ? b : w) === me.a ? null : 'spec-bad-players';
+  }
+  if (!addressLike(w) || !addressLike(b) || w === b || (me.a !== w && me.a !== b)) return 'spec-bad-players';
+  if (!hasGid) return null;
+  const seated = new Set(peers.filter((p) => p.a && seatedAt(p, table)).map((p) => p.a));
+  return seated.has(w) && seated.has(b) ? null : 'spec-bad-players';
+};
 export const routeSpec = (peers: SocialPeer[], me: SocialPeer, msg: { tb: ChessTable; d: unknown } | { tb: ChessTable; ask: true }, now: number): Result => {
   if (tableOf(me) !== msg.tb) return { ok: false, code: 'spec-not-here' };
   const from = me.a;
@@ -313,6 +345,8 @@ export const routeSpec = (peers: SocialPeer[], me: SocialPeer, msg: { tb: ChessT
   }
   if (!from) return { ok: false, code: 'spec-sign-in-first' };
   if (!seatedAt(me, msg.tb)) return { ok: false, code: 'spec-not-seated' };
+  const bad = snapshotRefusal(peers, me, msg.tb, msg.d);
+  if (bad) return { ok: false, code: bad };
   const lim = takeLimit(me.sp, now, 0, 40, 10_000); me.sp = lim.list;
   if (!lim.ok) return { ok: false, code: 'spec-too-fast' };
   const to = peers.filter((p) => visible(p) && tableOf(p) === msg.tb).map((p) => p.id);
@@ -345,9 +379,10 @@ export const claimDaily = (record: DailyRecord | null | undefined, now: number) 
 /**
  * What the room counts, per day, with no address or message kept: connections (`v`), players who signed in (`s`), of whom
  * returning from an earlier day (`r`) or new (`nw`), the most connections at once (`pk`), chat lines (`ch`), reactions (`rx`),
- * big wins (`w`), shared-round bets (`b`), drinks given (`g`), daily drops (`dd`) and Salon relay messages (`pv`).
+ * big wins (`w`), shared-round bets (`b`), drinks given (`g`), daily drops (`dd`) and Salon relay messages (`pv`); and for chess, games the
+ * room tracked (`cg`) and games voided by a dispute (`cd`: if this is ever not zero, the two pages disagreed).
  */
-export const COUNTERS = ['v', 's', 'r', 'nw', 'pk', 'ch', 'rx', 'w', 'b', 'g', 'dd', 'pv'] as const;
+export const COUNTERS = ['v', 's', 'r', 'nw', 'pk', 'ch', 'rx', 'w', 'b', 'g', 'dd', 'pv', 'cg', 'cd'] as const;
 export type Counter = (typeof COUNTERS)[number];
 export type DayCounts = Partial<Record<Counter, number>>;
 export const counterKey = (now: number) => `c:${new Date(dayOf(now) * DAY_MS).toISOString().slice(0, 10)}`;

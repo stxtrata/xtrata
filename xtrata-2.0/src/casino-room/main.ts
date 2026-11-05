@@ -173,7 +173,7 @@ const tellPage = (m: Record<string, unknown>) => {
   try { S.host?.on?.(m); } catch (e) { console.warn('[room] the page could not take a room message', e); }
 };
 /** Refusals of the page's own social messages (they go back to the page, never into the chat column). */
-const PAGE_CODES = /^(react|win|daily|round|gift|pvp|table|no-table|log|bal|board|friends|tourney|card|mission)/;
+const PAGE_CODES = /^(react|win|daily|round|gift|pvp|table|no-table|log|bal|board|friends|tourney|card|mission|cres|cbet)/;
 
 const pushPeople = () => {
   if (!S.host || S.service !== 'ok') return;
@@ -258,6 +258,8 @@ const connect = () => {
       case 'leave': S.players.delete(m.a); tellAway(); chat?.left(m.a); if (S.walk.has(m.a)) walkOne(m.a, null); tellPage(m); paint(); return;
       case 'away': if (typeof m.a === 'string') { S.players.set(m.a, { a: m.a, aw: m.on === true }); tellAway(); } break;
       case 'react': case 'win': case 'daily': case 'round': case 'bet': case 'gift': case 'seek': case 'pvp': case 'spec': tellPage(m); return;
+      // chess results, stakes and spectator bets (functions/lib/casino-bets.ts): the page's chess layer does the showing
+      case 'cres': case 'cgone': case 'cend': case 'cbet': case 'cpool': case 'cpay': tellPage(m); return;
       // phase 3 (functions/lib/casino-progress.ts)
       case 'me': case 'hh': case 'lvl': case 'badge': case 'mission-done': case 'bal': case 'board': case 'friends': case 'tourney': case 'tourney-end': case 'jp': case 'jackpot': case 'card': tellPage(m); return;
       case 'reported': chat?.reported(); return;
@@ -968,12 +970,13 @@ const onOwnMove = (event: Event) => {
  */
 const FEATURE_OF: Record<string, string> = {
   react: 'react', win: 'win', daily: 'daily', watch: 'table', round: 'rounds', bet: 'rounds', gift: 'gift', seek: 'pvp', pvp: 'pvp', spec: 'spec',
+  cres: 'cres', cbet: 'cbet',
   log: 'progress', mission: 'missions', card: 'progress', board: 'boards', tjoin: 'tourney', bal: 'bal', friends: 'friends'
 };
 const onPageSend = (event: Event) => {
   const msg = (event as CustomEvent).detail as Record<string, unknown> | undefined;
   if (!msg || typeof msg.t !== 'string' || !FEATURE_OF[msg.t]) return;
-  const anyone = msg.t === 'round' || msg.t === 'watch' || (msg.t === 'spec' && msg.ask === true);   // a guest may watch a chess game
+  const anyone = msg.t === 'round' || msg.t === 'watch' || ((msg.t === 'spec' || msg.t === 'cbet') && msg.ask === true);   // a guest may watch a chess game and its pool
   const ok = S.service === 'ok' && S.connected && S.features.includes(FEATURE_OF[msg.t]) && (anyone || !!(S.signed && S.you && !S.you.guest));
   if (!ok || S.ws?.readyState !== WebSocket.OPEN) { tellPage({ t: 'unsent', msg }); return; }
   S.ws.send(JSON.stringify(msg));     // directly: social messages must not hold back the seat updates

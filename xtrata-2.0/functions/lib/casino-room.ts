@@ -10,6 +10,7 @@
 import { isInSalon, isSalonSpot, parseSocialMessage, salonRefusal, type GameTable, type SocialMessage } from './casino-social';
 import { ALL_MACHINES, ROTATION_MACHINES } from './casino-machines';
 import { parseProgressMessage, type ProgressMessage } from './casino-progress';
+import { parseChessMessage, type ChessMessage } from './casino-bets';
 import type { Bets, RoundTable } from './casino-rounds';
 
 
@@ -127,6 +128,9 @@ export type Peer = {
   /** Who is here (STALE_MS above): `hb` the client sends heartbeats, `hd` when the room last heard from it, `aw` the player is away
    *  (idle on an open tab: stood up, name tag grey). Optional: older connections lack them. */
   hb?: boolean; hd?: number; aw?: boolean;
+  /** Chess results and bets (casino-bets.ts, casino-social.ts SocialPeer): recent times for the limits, and the last seek. */
+  cq?: number[]; cr?: number[]; ca?: number[];
+  ls?: { tb: string; stake: number; at: number } | null;
 };
 
 export const newPeer = (id: string, address: string | null, hash160: string | null, now: number, watch = true,
@@ -267,7 +271,8 @@ export type ClientMessage =
   | { t: 'move'; x: number; z: number; r: number }
   | { t: 'move'; off: true }
   | SocialMessage
-  | ProgressMessage;
+  | ProgressMessage
+  | ChessMessage;
 
 export type ParseResult = { ok: true; msg: ClientMessage } | { ok: false; code: string };
 
@@ -333,7 +338,7 @@ export const parseClientMessage = (raw: unknown): ParseResult => {
       const round = (n: number, k: number) => Math.round(n * k) / k;
       return { ok: true, msg: { t: 'move', x: round(x, 100), z: round(z, 100), r: round(facing, 1000) } };
     }
-    default: return parseSocialMessage(value) ?? parseProgressMessage(value) ?? { ok: false, code: 'bad-message' };
+    default: return parseSocialMessage(value) ?? parseProgressMessage(value) ?? parseChessMessage(value) ?? { ok: false, code: 'bad-message' };
   }
 };
 
