@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SPOTS, isSpot } from '../casino-room';
-import { ALL_MACHINES, CORE_MACHINES } from '../casino-machines';
+import { ALL_MACHINES } from '../casino-machines';
 
 // The room server accepts only the spot ids in SPOTS, and the casino page makes its ids from its own SEATS table and machine
 // list. If the two drift apart, people would silently stop appearing, so this reads the page and checks them against each other.
@@ -47,9 +47,11 @@ describe('casino room spots match the /casino page', () => {
     expect(rotation.catalog.map((c) => c.id)).toEqual([...ALL_MACHINES]);
   });
 
-  it('puts the five original machines on the floor by default, and never more than five', () => {
-    expect(rotation.floor).toEqual([...CORE_MACHINES]);
+  it('puts at most five designs on the default floor, each one the room service accepts', () => {
+    // The default floor was the five original machines (CORE_MACHINES); since 2026-11-05 it is a newer mix (see machine-rotation.js).
+    expect(rotation.floor.length).toBeGreaterThan(0);
     expect(rotation.floor.length).toBeLessThanOrEqual(5);
+    for (const id of rotation.floor) expect(ALL_MACHINES as readonly string[], id).toContain(id);
   });
 
   it('keeps every hand-placed layout inside the room, with at most two cabinets of a design', () => {

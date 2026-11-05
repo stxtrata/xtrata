@@ -29,8 +29,11 @@ window.PX_MACHINE_ROTATION = {
   // THE LAYOUT. null keeps the classic room (the floor below, two cabinets of each, one on each side wall). A name from `layouts` replaces it.
   layout: null,
 
-  // THE FLOOR. This is the line to edit to rotate machines. These are the five that are on the floor today.
-  floor: ['drop', 'twins', 'ds', 'bf', 'nv'],
+  // THE FLOOR. This is the line to edit to rotate machines. These are the five that are on the floor today (2026-11-05): Forever Twins, Who Is Satoshi,
+  // Hot Wallet, Snow Crash (the Crash Punks machine) and Ordinal Rush. Tablets and phones use this floor too. The five that stood here before
+  // were ['drop', 'twins', 'ds', 'bf', 'nv']; they can still be reached with ?floor=drop,twins,ds,bf,nv. The daily missions, the slot tournament
+  // and the Slot fan badge are still built from those original five (functions/lib/casino-machines.ts), whichever five are on the floor.
+  floor: ['twins', 'who-is-satoshi', 'hot-wallet', 'snow-crash', 'ordinal-rush'],
 
   // LAYOUTS. A layout places every cabinet by hand: one machine per slot, any mix of designs, at most TWO cabinets of any design (the room
   // service knows two places for each machine). x and z are metres from the middle of the 26 x 22 m floor (x to the right, z towards the
