@@ -8,6 +8,7 @@
  * is a small record the Durable Object keeps as the connection's "attachment", which survives hibernation.
  */
 import { isInSalon, isSalonSpot, parseSocialMessage, salonRefusal, type GameTable, type SocialMessage } from './casino-social';
+import { ALL_MACHINES, ROTATION_MACHINES } from './casino-machines';
 import { parseProgressMessage, type ProgressMessage } from './casino-progress';
 import { parseChessMessage, type ChessMessage } from './casino-bets';
 import type { Bets, RoundTable } from './casino-rounds';
@@ -25,13 +26,15 @@ export const SPOTS = [
   'liars.1', 'liars.2', 'liars.3',
   'chess1.1', 'chess1.2', 'chess2.1', 'chess2.2',   // the lounge chess tables (sofa, armchair): public/casino/chess.js
   'drop.1', 'drop.2', 'twins.1', 'twins.2', 'ds.1', 'ds.2', 'bf.1', 'bf.2', 'nv.1', 'nv.2',
-  'bar.1', 'bar.2', 'bar.3', 'bar.4'
+  'bar.1', 'bar.2', 'bar.3', 'bar.4',
+  // the series machines that can be rotated onto the floor: two cabinets each, left wall then right wall (casino-machines.ts)
+  ...ROTATION_MACHINES.flatMap((id) => [`${id}.1`, `${id}.2`])
 ] as const;
 const SPOT_SET = new Set<string>(SPOTS);
 export const isSpot = (value: unknown): value is string => typeof value === 'string' && SPOT_SET.has(value);
 
-/** The five machines, in PX_MACHINE_PACKS order. Their ten cabinets ('drop.1' … 'nv.2') are the only spots that can send spins. */
-export const MACHINE_IDS = ['drop', 'twins', 'ds', 'bf', 'nv'] as const;
+/** Every machine that can stand on the floor: the core five ('drop.1' … 'nv.2') and the rotation machines. Their cabinets are the only spots that can send spins. */
+export const MACHINE_IDS = ALL_MACHINES;
 export const isMachineSpot = (value: unknown): value is string =>
   isSpot(value) && (MACHINE_IDS as readonly string[]).includes(value.split('.')[0]);
 

@@ -6,6 +6,7 @@
  * Nothing here moves money. LAYR chips are play money kept in each player's browser, so a daily drop, a gift or a shared round
  * tells the player's own page what to credit or charge; the room only decides who may do what, when, and who hears about it.
  */
+import { ALL_MACHINES } from './casino-machines';
 import { cleanBets, isRoundTable, betsOpen, roundAt, type Bets, type RoundTable } from './casino-rounds';
 
 /** Features the room offers on top of casino-room's ROOM_FEATURES (the client only uses what the room lists). */
@@ -116,7 +117,7 @@ export const addressLike = (v: unknown): v is string => typeof v === 'string' &&
 /** A chess game's id: 16 lowercase hex characters, chosen by the host at `create` so both pages and the room share it. */
 export const isGid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v);
 /** What a player may name as a game in a win: a table, or a machine's short id. */
-const GAMES = new Set<string>([...TABLES, 'drop', 'twins', 'ds', 'bf', 'nv']);
+const GAMES = new Set<string>([...TABLES, ...ALL_MACHINES]);
 
 /** Parses the social messages (the room's other messages are casino-room.ts's). Null: not one of these. */
 export const parseSocialMessage = (value: any): { ok: true; msg: SocialMessage } | { ok: false; code: string } | null => {

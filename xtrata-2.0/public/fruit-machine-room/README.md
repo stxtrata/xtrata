@@ -88,6 +88,17 @@ surface and the on-screen turbo / gamble / bonus buttons are ported from `public
   (`window.ParallaxLAYRAccount`), so in the casino the real adapter is used and `layr-room-account.js` is simply not loaded.
 * Remove the test flags from `index.html` for any build that is not a test build.
 
+### Putting series machines on the /casino floor (done)
+
+Any of the machines in `public/casino-machines/<id>/pack.json` can stand on the floor of `/casino`. Edit `floor` in
+`public/casino/machine-rotation.js` (up to five ids; the default is the five built into the page), or preview with
+`/casino/?floor=ordinal-rush,hot-wallet,drop,bf,nv`. A rotated-in machine uses the casino's LAYR balance, shows up in the room
+service like the original five, and its paid spins feed (and can win) the one progressive jackpot. The room service accepts every
+machine at all times (`functions/lib/casino-machines.ts`), so rotating needs no server deploy. The five originals still drive the
+daily missions, the slot tournament and the Slot fan badge. A machine's own centre-row jackpot meters stay inside its unchanged
+engine (they are part of the 94.38% return). The casino's LAYR is the local balance in the browser; the on-chain token is not built.
+Note that machines 21 to 23 (Corgi Kennel, Launchpad, Pool Party) do have packs.
+
 ## Known limits
 
 * The room has a single player and no other visitors, chat or spin cast.
