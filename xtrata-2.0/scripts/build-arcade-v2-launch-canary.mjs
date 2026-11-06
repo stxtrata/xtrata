@@ -275,6 +275,29 @@ const launch = {
     if (hall.errors.length) fail('doors hall: ' + hall.errors.join('; '));
     return { placeholder: PH, calls: [...lobby.steps, ...hall.steps].map((c) => ({ fn: c.fn, args: c.args, note: c.note })), manifest: hall.manifest };
   })(),
+  // The testnet-only `screenreel` / `screentext` steps: small test pictures and clips (made by scripts/make-screen-reel-assets.py) posted to the
+  // screen contract as the admin: real Forever Twins, Astro Blaster 3, HTML ads rendered to a clip and a GIF, a silent music-player clip, plus news and messages.
+  reel: (() => {
+    const d = resolve(root, 'canaries/arcade-v2-launch/reel-assets'), A = (f, mime) => ({ mime, b64: readFileSync(resolve(d, f)).toString('base64') });
+    const assets = { twins: A('forever-twins.gif', 'image/gif'), wall: A('forever-twins-wall.png', 'image/png'), astro: A('astro-blaster.png', 'image/png'), rent: A('rent-slot.png', 'image/png'),
+      htmlclip: A('html-ad.webm', 'video/webm'), htmlgif: A('html-ad.gif', 'image/gif'), player: A('radio-player.webm', 'video/webm') };
+    // kind 0 message, 1 news, 2 ad; layout 0 standard, 1 full-screen only; days = how long it runs
+    const items = [
+      { kind: 2, head: 'FOREVER TWINS', body: 'Real Bitcoin Pepes and Birds, forevered on Xtrata.', asset: 'twins', weight: 6, layout: 0 },
+      { kind: 2, head: 'FOREVER TWINS WALL', body: 'Sixteen real twins. Full-screen slot.', asset: 'wall', weight: 4, layout: 1 },
+      { kind: 2, head: 'ASTRO BLASTER 3', body: 'Fly, shoot, post your score. Top 10 on Bitcoin.', asset: 'astro', weight: 5, layout: 0 },
+      { kind: 2, head: 'HTML AD AS A CLIP', body: 'A web page rendered to WebM. The screen plays pictures and clips, not live HTML.', asset: 'htmlclip', weight: 3, layout: 0 },
+      { kind: 2, head: 'HTML AD AS A GIF', body: 'The same page rendered to an animated GIF.', asset: 'htmlgif', weight: 3, layout: 0 },
+      { kind: 2, head: 'XTRATA RADIO PLAYER', body: 'A silent music-player clip. Full-screen slot.', asset: 'player', weight: 3, layout: 1 },
+      { kind: 2, head: 'THIS SLOT IS FOR RENT', body: '5 STX a day. Paid on-chain.', asset: 'rent', weight: 2, layout: 0 },
+      { kind: 1, head: 'REEL TEST: THE SCREEN CONTRACT IS LIVE ON TESTNET', body: 'News, messages and ads all come from xtrata-screen-v1.', weight: 4, layout: 0 },
+      { kind: 1, head: 'ASTRO BLASTER 3 JOINS THE ARCADE', body: 'The first manifest game, in its own cabinet.', weight: 3, layout: 0 },
+      { kind: 1, head: 'DOORS OPEN WHEN CONTRACTS SAY SO', body: 'A curtain, a locked door and a lobby, all written to the registry.', weight: 3, layout: 0 },
+      { kind: 0, head: 'WALK UNDER THE SCREEN. EVERY SCORE IS ON-CHAIN.', body: '', weight: 3, layout: 0 },
+      { kind: 0, head: 'PRESS R FOR XTRATA RADIO', body: '', weight: 3, layout: 0 }
+    ].map((i) => ({ ...i, days: 30 }));
+    return { assets, items };
+  })(),
   // the hall's own registry reader, run by the canary against the registry before anything is inscribed
   reader: Object.fromEntries(['score-client.js', 'world.js', 'world2.js'].map((n) => [n, parts[n]]))
 };
