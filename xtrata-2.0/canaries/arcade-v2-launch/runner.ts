@@ -141,6 +141,14 @@ export async function main(argv: string[]): Promise<number> {
       return H.readHall({ read: H.networkRead({ apiBase: E.chain.bases[E.chain.bases.length - 1] }), registry });
     }
   };
+  // adbuy: an ad picture from a file on this computer (XA_AD_FILE, with XA_AD_HEAD, XA_AD_BODY, XA_AD_DAYS, XA_AD_KIND 0/1/2, XA_AD_LAYOUT 0/1)
+  if (process.env.XA_AD_FILE) {
+    const f = resolve(process.env.XA_AD_FILE), ext = f.toLowerCase().replace(/^.*\./, ''), mimes: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', webm: 'video/webm', mp4: 'video/mp4' };
+    if (!mimes[ext]) { console.error(`REFUSED: ${f}: the screen plays png, jpg, gif, webp, webm and mp4 only`); return 2; }
+    const bytes = readFileSync(f);
+    if (bytes.length > 2097152) { console.error(`REFUSED: ${f} is ${bytes.length} bytes; the screen contract takes 2 MB at most`); return 2; }
+    (globalThis as any).XA_AD = { bytes: new Uint8Array(bytes), mime: mimes[ext], name: f.replace(/^.*\//, ''), head: process.env.XA_AD_HEAD || '', body: process.env.XA_AD_BODY || '', days: Number(process.env.XA_AD_DAYS || 3), kind: Number(process.env.XA_AD_KIND || 2), layout: Number(process.env.XA_AD_LAYOUT || 0) };
+  }
   try {
     E.init('testnet', host);
     if (a.forget) { E.forget(); console.log('local progress forgotten: every step re-reads the chain'); }
