@@ -75161,6 +75161,40 @@ Next your wallet sends it about ${stx(target)} for network fees (what is unspent
       const b2 = m.objects["hall/bay-2"].id, b3 = m.objects["hall/bay-3"].id;
       return `${done.length ? done.length + " calls sent" : "everything was already on chain: nothing sent"} \xB7 lobby space #${m.spaces.lobby} live \xB7 hall bay-2 (#${b2}): curtain + locked knock door \xB7 hall bay-3 (#${b3}): enter door to the lobby \xB7 verifyManifest: ${v.checked} items match`;
     }
+  },
+  {
+    id: "hidegames",
+    testnetOnly: true,
+    title: "Hide the two test games (Sat Catcher, Arrow Sprint)",
+    who: "Web wallet \xB7 up to 2 signatures (none if already hidden)",
+    intro: "Testnet only. Switches the two test games off with the games contract hide switch (set-hidden): the hall stops loading them. Nothing is deleted; boards and replays stay, and set-hidden false brings a game back. Other games, such as Astro Blaster 3, are not touched.",
+    action: "Hide the test games",
+    run: async () => {
+      const w = requireRoot();
+      const ga = await gread("get-admin");
+      if (ga !== w.address) throw new Error(`${NAMES.games} admin is ${ga}, not the root wallet.`);
+      const out = [];
+      for (const g of launch_default.testGames) {
+        const n = await gread("get-game-number", [(0, import_transactions2.stringAsciiCV)(g.id)]);
+        if (n === null) {
+          out.push(`${g.title}: not listed`);
+          continue;
+        }
+        const num = BigInt(String(n).replace(/^u/, ""));
+        const hidden = async () => {
+          const r = await gread("get-game", [(0, import_transactions2.uintCV)(num)]);
+          return r && String(r.hidden) === "true";
+        };
+        if (await hidden()) {
+          out.push(`${g.title} (game ${num}): already hidden`);
+          continue;
+        }
+        await runTx("hidegames", `set-hidden ${num} true (${g.title})`, () => rootCall(cid(NAMES.games), "set-hidden", [(0, import_transactions2.uintCV)(num), (0, import_transactions2.boolCV)(true)]));
+        await eventually(`${g.title} hidden`, async () => await hidden() ? null : "not hidden yet");
+        out.push(`${g.title} (game ${num}): hidden`);
+      }
+      return out.join(" \xB7 ");
+    }
   }
 ];
 var steps = () => STEPS.filter((s) => !s.testnetOnly || network === "testnet");
