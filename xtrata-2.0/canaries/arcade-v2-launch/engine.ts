@@ -628,13 +628,31 @@ const judge = async (c: Call, m: any, x: Ctx): Promise<{ done: boolean; problem?
     case 'create-object': {
       const space = c.args[0].uint, name = c.args[3].ascii;
       const slug = Object.keys(m.spaces).find((k) => m.spaces[k] === space)!;
-      const want = m.objects[`${slug}/${name}`];
+      const parentId = c.args[1].uint;
+      const want = Object.values<any>(m.objects).find((q: any) => q.space === slug && q.name === name && (q.parent ? m.objects[q.parent].id : 0) === parentId);
+      if (!want) return { done: false, problem: `the plan has no object ${slug}/${name} under #${parentId}` };
       const o = (x.objs[space] || []).find((r) => r.object.name === name && r.object.parent === c.args[1].uint);
       if (!o) return { done: false };
       if (o.id !== want.id) return { done: true, problem: `${slug}/${name} is #${o.id}; the plan expects #${want.id}` };
       if (o.object.kind !== c.args[2].uint) return { done: true, problem: `${slug}/${name} (#${o.id}) is kind #${o.object.kind}, not #${c.args[2].uint}` };
       if (o.object.state >= 2) return { done: true, problem: `${slug}/${name} (#${o.id}) is retired or moderated (state ${o.object.state})` };
       return { done: true };
+    }
+    case 'set-portal': {
+      const obj = c.args[0].uint, o = Object.values(x.objs).flat().find((r) => r.id === obj);
+      if (!o) return { done: false };
+      const p = o.object.portal;
+      if (!p) return { done: false };
+      const t = c.args[1].some.tuple;
+      return p['to-space'] === t['to-space'].uint ? { done: true } : { done: true, problem: `object #${obj} has a portal to space #${p['to-space']}, not #${t['to-space'].uint}` };
+    }
+    case 'add-state': case 'add-states': {
+      const sts = c.fn === 'add-state' ? [c.args[0]] : c.args[0].list;
+      const need: Record<number, number> = {};
+      for (const st of sts) need[st.tuple.obj.uint] = (need[st.tuple.obj.uint] || 0) + 1;
+      let all = true;
+      for (const [o, n] of Object.entries(need)) if ((await stateCount(Number(o))) < n) all = false;
+      return { done: all };
     }
     default: return { done: false, problem: `the plan has a call this canary does not know how to check: ${c.fn}` };
   }
@@ -1620,6 +1638,40 @@ const STEPS: Step[] = [
       }
       const h = await gread('get-height');
       return `${g.id}: game ${String(n).replace(/^u/, '')}, kind 3, picture #${picIns.id} (${picUp.bytes.length} bytes, hash 0x${toHex(picUp.hash)}), game #${gameIns.id} (${gameUp.bytes.length} bytes) · burn height now ${String(h).replace(/^u/, '')}, live at ${String(rec['live-at']).replace(/^u/, '')} (delay ${NET().gamesDelay} blocks)`;
+    }
+  }
+  ,{
+    id: 'doortest', testnetOnly: true, title: 'Test the registry: a curtained locked door and a door into a lobby', who: 'Web wallet · about 14 signatures (fewer for what is already done)',
+    intro: 'Testnet only. Proves the world registry does more than the four launch posters: it creates a Lobby room under the arcade (live), puts a CURTAIN (closed) and a LOCKED door (knock only, "staff only") on hall bay 2, and an ENTER door on hall bay 3 whose portal leads to the lobby. Everything is planned by the same planners the real tools use; nothing is sent twice.',
+    action: 'Build the doors and the lobby',
+    run: async () => {
+      const w = requireRoot(), world = cid(NAMES.world), D = (LAUNCH as any).doors;
+      const sub = (v: any): any => JSON.parse(JSON.stringify(v).split(D.placeholder).join(w.address));
+      const calls: Call[] = sub(D.calls), m = sub(D.manifest);
+      const { manifest: lm } = launchPlan();
+      for (const slug of Object.keys(lm.spaces)) if (m.spaces[slug] !== lm.spaces[slug]) throw new Error('The door plan and the launch plan disagree about ' + slug + '.');
+      let x = await readCtx(m);
+      if (x.k.problems.length) throw new Error(x.k.problems.join('; '));
+      const hall = x.spaces.hall;
+      if (!hall?.id) throw new Error('The hall is not built yet: run the hall step first.');
+      const done: string[] = [];
+      for (const c of calls) {
+        let j = await judge(c, m, x);
+        if (j.problem) throw new Error(`${j.problem}. Nothing more was sent.`);
+        if (j.done) continue;
+        await quiet(w.address);
+        x = await readCtx(m);
+        j = await judge(c, m, x);
+        if (j.problem) throw new Error(`${j.problem}. Nothing more was sent.`);
+        if (j.done) continue;
+        await runTx('doortest', c.note, () => rootCall(world, c.fn, c.args.map(cvArg)));
+        await eventually(c.note, async () => { x = await readCtx(m); const r = await judge(c, m, x); return r.problem ? `${r.problem} (stop and check)` : r.done ? null : 'not on chain yet'; });
+        done.push(c.note);
+      }
+      const v = await V2.verifyManifest(m, planRead);
+      if (!v.ok) throw new Error(`verifyManifest stopped at ${v.what}: expected ${JSON.stringify(v.expected)}, the chain has ${JSON.stringify(v.got)}.`);
+      const b2 = m.objects['hall/bay-2'].id, b3 = m.objects['hall/bay-3'].id;
+      return `${done.length ? done.length + ' calls sent' : 'everything was already on chain: nothing sent'} · lobby space #${m.spaces.lobby} live · hall bay-2 (#${b2}): curtain + locked knock door · hall bay-3 (#${b3}): enter door to the lobby · verifyManifest: ${v.checked} items match`;
     }
   }
 ];

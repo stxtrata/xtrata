@@ -32,6 +32,7 @@ const P = require(resolve(XA, 'build/hall-parts.cjs'));
 const R = require(resolve(XA, 'build/parent-render.cjs'));
 const { toLive, CORE: LIVE_CORE } = await import(pathToFileURL(resolve(AW, 'scripts/make-live.mjs')).href);
 const { lookRegistry } = await import(pathToFileURL(resolve(AW, 'ops/lib/catalogue.mjs')).href);
+const V2N = await import(pathToFileURL(resolve(AW, 'ops/lib/v2.mjs')).href);
 
 const sha = (buf) => createHash('sha256').update(buf).digest('hex');
 const fail = (msg) => { console.error(msg); process.exit(1); };
@@ -260,6 +261,19 @@ const launch = {
   astro: (() => {
     const d = resolve(root, 'recursive-apps/astro-blaster-3'), b64 = (f) => readFileSync(resolve(d, f)).toString('base64');
     return { id: 'astro3', title: 'Astro Blaster 3', game: b64('release/astro-blaster-3-inscribed-3075.html'), poster: b64('cabinet/cabinet-poster.webp'), marquee: b64('cabinet/cabinet-marquee.webp') };
+  })(),
+  // The testnet-only `doortest` step: a lobby room, a curtained locked door (knock only) on hall bay 2 and an enter door into the lobby on
+  // hall bay 3. Planned here with the real planners (they need Node) on top of the launch plan, the owner a placeholder the step swaps for the root wallet.
+  doors: (() => {
+    const PH = 'ST1QRDCKK2BXBWBZJM55CZG51ASTS4P4Y1CP3BYGD', ex = resolve(AW, 'ops/examples');
+    const rd = (f) => JSON.parse(readFileSync(resolve(ex, f), 'utf8'));
+    const base = V2N.launchCalls({ network: 'testnet', owner: PH });
+    if (base.errors.length) fail('doors: ' + base.errors.join('; '));
+    const lobby = V2N.planLobby(base.manifest, [rd('testnet-doors-lobby.scene.json')], { owner: PH });
+    if (lobby.errors.length) fail('doors lobby: ' + lobby.errors.join('; '));
+    const hall = V2N.planSeed([rd('testnet-doors-hall.scene.json')], { manifest: lobby.manifest, owner: PH, rooms: ['arcade-hall'] });
+    if (hall.errors.length) fail('doors hall: ' + hall.errors.join('; '));
+    return { placeholder: PH, calls: [...lobby.steps, ...hall.steps].map((c) => ({ fn: c.fn, args: c.args, note: c.note })), manifest: hall.manifest };
   })(),
   // the hall's own registry reader, run by the canary against the registry before anything is inscribed
   reader: Object.fromEntries(['score-client.js', 'world.js', 'world2.js'].map((n) => [n, parts[n]]))
