@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Advertise on the arcade screen (TESTNET)</title>
+<style>
+:root{--bg:#0b0d1a;--card:#141830;--ink:#e8ecff;--mut:#8a93bd;--acc:#00dcff;--gold:#ffc800;--bad:#ff5a7a;--ok:#4ade80}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,Segoe UI,sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 60px}h1{font-size:24px;margin:0 0 4px}h2{font-size:16px;margin:0 0 10px;color:var(--acc);letter-spacing:.04em;text-transform:uppercase}
+.badge{display:inline-block;background:#3a1b00;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:1px 8px;font-size:12px;font-weight:700}
+.card{background:var(--card);border:1px solid #232a52;border-radius:10px;padding:16px;margin:14px 0}
+label{display:block;margin:10px 0 3px;color:var(--mut);font-size:13px}input,select,textarea{width:100%;background:#0b0e20;color:var(--ink);border:1px solid #2b3366;border-radius:6px;padding:8px;font:inherit}
+textarea{height:64px}button{background:var(--acc);color:#001018;border:0;border-radius:6px;padding:9px 16px;font:inherit;font-weight:700;cursor:pointer}button.s{background:#232a52;color:var(--ink);padding:5px 10px;font-weight:600}button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:600px){.row{grid-template-columns:1fr}}
+.mut{color:var(--mut)}.bad{color:var(--bad)}.ok{color:var(--ok)}.gold{color:var(--gold)}.mono{font-family:ui-monospace,monospace;font-size:13px;word-break:break-all}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:6px 4px;border-bottom:1px solid #232a52;vertical-align:top}
+a{color:var(--acc)}
+</style></head><body><main>
+<h1>Advertise on the arcade screen <span class="badge">TESTNET</span></h1>
+<p class="mut">Rent a slot on the centre screen. Your payment is held in escrow by the contract and earned block by block while the ad runs. Test STX only; nothing here touches mainnet.
+ <a href="/arcade-world-preview/testnet-astro.html">Back to the testnet arcade</a></p>
+
+<div class="card" id="wallet"><h2>1. Wallet</h2>
+ <div id="wstat" class="mut">Not connected.</div>
+ <p><button id="wbtn">Connect wallet</button></p>
+ <div class="mut" style="font-size:13px">Use Leather or Xverse set to <b>Stacks testnet</b>. Test STX: the Hiro testnet faucet. A mainnet account is refused.</div>
+</div>
+
+<div class="card"><h2>2. The screen right now</h2><div id="cfg" class="mut">Reading the contract…</div></div>
+
+<div class="card" id="form"><h2>3. Your ad</h2>
+ <div class="row"><div><label>Type</label><select id="kind"><option value="2">Ad (feature panel, 5 STX/day)</option><option value="1">News (2 STX/day)</option><option value="0">Message (1 STX/day)</option></select></div>
+ <div><label>Layout</label><select id="layout"><option value="0">Standard (also takes its turn full-screen if it has a picture)</option><option value="1">Full-screen only (premium, needs a picture)</option></select></div></div>
+ <label>Headline (ASCII, up to 80)</label><input id="head" maxlength="80" placeholder="MY TEST AD">
+ <label>Text (ASCII, up to 240, optional)</label><textarea id="body" maxlength="240" placeholder="A line or two about it. A short address like XTRATA.XYZ can go here as plain text."></textarea>
+ <div class="row"><div><label>Picture: inscription id on testnet (optional; must be inscribed by the connected wallet)</label><input id="img" inputmode="numeric" placeholder="e.g. 123"></div>
+ <div><label>Days</label><input id="days" type="number" min="1" value="3"></div></div>
+ <div id="imgchk" class="mut" style="margin-top:6px"></div>
+ <p style="margin-top:12px">Price: <b id="price" class="gold">–</b> <span id="pricenote" class="mut"></span></p>
+ <p><button id="buy" disabled>Pay and submit for review</button> <span id="buymsg"></span></p>
+ <div class="mut" style="font-size:13px">After you submit, the ad waits as <b>pending</b> until the admin approves it. Approval starts the run: it lasts days × 144 blocks (about a day each). If it is rejected you are refunded in full; you can also cancel while it is pending.</div>
+</div>
+
+<div class="card"><h2>4. Slots</h2><div id="admin" style="display:none;margin-bottom:10px"></div><div id="items" class="mut">Reading…</div>
+ <p><button class="s" id="refresh">Refresh</button> <span class="mut" id="height"></span></p></div>
+</main>
+
+<script>@@SCORE_CLIENT@@</script>
+<script>
+(function () {
+  var SCREEN = '@@SCREEN@@', CORE = '@@CORE@@', ROOT = '@@ROOT@@';
+  XAScores.configure({ network: 'testnet', apiBases: ['https://api.testnet.hiro.so'], readSender: ROOT });
+  var C = XAScores._codec, $ = function (id) { return document.getElementById(id); };
+  var cfg = null, admin = '', me = '', height = 0;
+  function plain(cv) {
+    if (!cv) return null;
+    switch (cv.type) {
+      case 'uint': case 'int': return Number(cv.value);
+      case 'ok': case 'some': return plain(cv.value);
+      case 'none': return null;
+      case 'err': throw new Error('contract error ' + JSON.stringify(plain(cv.value)));
+      case 'list': return cv.value.map(plain);
+      case 'tuple': var o = {}; Object.keys(cv.value).forEach(function (k) { o[k] = plain(cv.value[k]); }); return o;
+      case 'buffer': return C.bytesToHex(cv.value);
+      default: return cv.value;
+    }
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function stx(u) { return (u / 1e6).toLocaleString('en-GB', { maximumFractionDigits: 6 }) + ' STX'; }
+  var KIND = ['message', 'news', 'ad'];
+  var read = function (fn, args, contract) { return XAScores.read(fn, args || [], contract || SCREEN).then(plain); };
+
+  async function loadConfig() {
+    try {
+      cfg = await read('get-config'); admin = await read('get-admin'); height = await read('get-height');
+      var p = cfg.prices;
+      $('cfg').innerHTML = (cfg['slots-enabled'] ? '<b class="ok">Paid slots are ON</b>' : '<b class="bad">Paid slots are OFF</b> — the admin has to switch them on first (Terminal: run-testnet-v5.command adadmin)') +
+        '<br>Prices per day: message <b>' + stx(p.message) + '</b> · news <b>' + stx(p.news) + '</b> · ad <b>' + stx(p.ad) + '</b> · full-screen-only slots cost <b>' + cfg['premium-percent'] + '%</b>' +
+        '<br>Days allowed: ' + cfg['min-days'] + ' to ' + cfg['max-days'] + ' · review window ' + cfg['review-window'] + ' blocks · max paid ads live ' + cfg['max-paid-live'] + ' · paused: ' + (cfg.paused ? 'yes' : 'no') +
+        '<br>Admin: <span class="mono">' + esc(admin) + '</span>';
+      $('days').max = cfg['max-days']; $('days').min = cfg['min-days'];
+      $('height').textContent = 'burn block ' + height;
+    } catch (e) { $('cfg').innerHTML = '<span class="bad">Could not read the contract: ' + esc(e.message) + '</span>'; }
+    quote();
+  }
+  function quote() {
+    var kind = +$('kind').value, layout = +$('layout').value, days = +$('days').value, msg = [];
+    if (!cfg) { $('price').textContent = '–'; return null; }
+    var per = cfg.prices[KIND[kind]]; if (layout === 1) per = Math.floor(per * cfg['premium-percent'] / 100);
+    var ok = days >= cfg['min-days'] && days <= cfg['max-days'] && Number.isInteger(days);
+    var total = ok ? per * days : 0;
+    $('price').textContent = ok ? stx(total) : '–'; $('pricenote').textContent = ok ? '(' + stx(per) + ' a day × ' + days + ')' : 'days must be ' + cfg['min-days'] + ' to ' + cfg['max-days'];
+    return ok ? total : null;
+  }
+  var picture = { id: 0, hash: new Uint8Array(0), size: 0, ok: true };
+  var chk = Promise.resolve(), lastChecked = null;
+  function checkPicture(force) {
+    var v = $('img').value.trim();
+    if (!force && v === lastChecked && !/^$/.test(v)) return chk;     // blur after typing re-fires change: do not re-check (and flicker the button) for the same value
+    lastChecked = v; chk = doCheck(); return chk;
+  }
+  async function doCheck() {
+    var v = $('img').value.trim(); picture = { id: 0, hash: new Uint8Array(0), size: 0, ok: true };
+    if (!v) { $('imgchk').textContent = 'No picture: a text-only slot.'; return updateBuy(); }
+    if (!/^\d+$/.test(v)) { picture.ok = false; $('imgchk').innerHTML = '<span class="bad">Use the inscription number only.</span>'; return updateBuy(); }
+    var id = +v; picture.ok = false; $('imgchk').textContent = 'Checking inscription #' + id + ' on the core…'; updateBuy();
+    try {
+      var uid = C.cvUint(id);
+      var sealed = await read('is-inscription-sealed', [uid], CORE), creator = await read('get-inscription-creator', [uid], CORE),
+          hash = await read('get-inscription-hash', [uid], CORE), size = await read('get-inscription-size', [uid], CORE);
+      var why = !sealed ? 'is not sealed yet' : !creator ? 'was not found' : (me && creator !== me) ? 'was inscribed by ' + creator + ', not your connected wallet (the contract only accepts a picture the buyer inscribed)' : !me ? 'cannot be checked against your wallet until you connect' : size > 2097152 ? 'is over the 2 MB limit' : '';
+      if (why) { $('imgchk').innerHTML = '<span class="bad">#' + id + ' ' + esc(why) + '.</span>'; return updateBuy(); }
+      picture = { id: id, hash: C.hexToBytes(hash), size: size, ok: true };
+      $('imgchk').innerHTML = '<span class="ok">#' + id + ' is sealed, yours, ' + size.toLocaleString('en-GB') + ' bytes.</span>';
+    } catch (e) { $('imgchk').innerHTML = '<span class="bad">Could not read #' + id + ': ' + esc(e.message) + '</span>'; }
+    updateBuy();
+  }
+  function updateBuy() {
+    var price = quote(), head = $('head').value.trim(), layout = +$('layout').value;
+    var why = !me ? 'Connect your wallet first.' : !cfg ? '' : !cfg['slots-enabled'] ? 'Paid slots are off.' : cfg.paused ? 'The screen is paused.' : !head ? 'Add a headline.' : price === null ? 'Check the days.' :
+      (layout === 1 && !picture.id) ? 'Full-screen-only needs a picture.' : !picture.ok ? 'Fix the picture.' : !/^[\x20-\x7e]*$/.test(head + $('body').value) ? 'ASCII text only.' : '';
+    $('buy').disabled = !!why; $('buymsg').innerHTML = '<span class="mut">' + esc(why) + '</span>'; return !why;
+  }
+  async function buy() {
+    await chk;
+    if (!updateBuy()) return; var price = quote(), kind = +$('kind').value, layout = +$('layout').value, days = +$('days').value;
+    $('buy').disabled = true; $('buymsg').innerHTML = '<span class="mut">Waiting for your wallet…</span>';
+    try {
+      var args = [C.cvUint(kind), C.cvAscii($('head').value.trim()), C.cvAscii($('body').value.trim()), C.cvUint(picture.id), C.cvBuff(picture.hash), C.cvUint(picture.size), C.cvUint(days), C.cvUint(layout), C.cvUint(price)];
+      var r = await XAScores.callContract({ contract: SCREEN, fn: 'buy-slot', args: args, maxUstx: String(price), expectAddress: me });
+      $('buymsg').innerHTML = '<span class="ok">Sent.</span> <a target="_blank" rel="noopener" href="https://explorer.hiro.so/txid/' + esc(r.txid) + '?chain=testnet">transaction</a> · it shows below as pending after the next block (3 to 4 minutes on testnet).';
+      setTimeout(loadItems, 20000);
+    } catch (e) { $('buymsg').innerHTML = '<span class="bad">' + esc(e.message || e) + '</span>'; updateBuy(); }
+  }
+  async function loadItems() {
+    try {
+      var count = await read('get-count'), rows = [], from = Math.max(0, count - 40); height = await read('get-height'); $('height').textContent = 'burn block ' + height;
+      for (var i = count - 1; i >= from; i--) { var it = await read('get-item', [C.cvUint(i)]); if (it) rows.push([i, it]); }
+      var mine = me;
+      $('items').innerHTML = rows.length ? '<table><tr><th>#</th><th>Type</th><th>Headline</th><th>State</th><th>Paid</th><th></th></tr>' + rows.map(function (r) {
+        var i = r[0], it = r[1], st = it.status === 0 ? '<b class="gold">pending</b>' : it.status === 1 ? (it['ends-at'] > height ? '<b class="ok">live</b> · ' + (it['ends-at'] - height) + ' blocks left' : 'finished') : 'ended';
+        var paid = it.paid ? stx(it.price) + ' · ' + it.days + ' day' + (it.days === 1 ? '' : 's') : 'free';
+        var acts = '';
+        if (it.status === 0 && mine && mine === it.buyer) acts += '<button class="s" data-a="cancel" data-i="' + i + '">Cancel</button> ';
+        if (it.status === 0 && mine && mine === admin) acts += '<button class="s" data-a="approve" data-i="' + i + '">Approve</button> <button class="s" data-a="reject" data-i="' + i + '">Reject</button>';
+        return '<tr><td>' + i + '</td><td>' + KIND[it.kind] + (it.layout ? ' · full-screen' : '') + '</td><td>' + esc(it.head) + (it['image-size'] ? ' <span class="mut">(picture #' + it['image-id'] + ')</span>' : '') + '</td><td>' + st + '</td><td>' + paid + '</td><td>' + acts + '</td></tr>';
+      }).join('') + '</table>' : 'Nothing posted yet.';
+      Array.prototype.forEach.call($('items').querySelectorAll('button[data-a]'), function (b) { b.onclick = function () { act(b.dataset.a, +b.dataset.i, b); }; });
+    } catch (e) { $('items').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+  }
+  async function act(a, id, btn) {
+    btn.disabled = true;
+    try {
+      var args = [C.cvUint(id)]; if (a === 'reject') args.push(C.cvUint(1));
+      var r = await XAScores.callContract({ contract: SCREEN, fn: a, args: args, maxUstx: '0', expectAddress: me });
+      btn.parentNode.innerHTML = '<span class="ok">sent</span> <a target="_blank" rel="noopener" href="https://explorer.hiro.so/txid/' + esc(r.txid) + '?chain=testnet">tx</a>';
+      setTimeout(loadItems, 20000);
+    } catch (e) { btn.disabled = false; alert(e.message || e); }
+  }
+  async function connect() {
+    try { await XAScores.connect(); } catch (e) { $('wstat').innerHTML = '<span class="bad">' + esc(e.message || e) + '</span>'; }
+  }
+  XAScores.onChange(function (s) {
+    me = s.address || ''; var main = me && /^S[PM]/.test(me);
+    $('wstat').innerHTML = !me ? 'Not connected.' : main ? '<span class="bad">That is a mainnet account (' + esc(me) + '). Switch your wallet to testnet.</span>' : 'Connected: <span class="mono">' + esc(me) + '</span>' + (me === admin ? ' <b class="gold">(admin)</b>' : '');
+    $('wbtn').textContent = me ? 'Reconnect' : 'Connect wallet'; if (main) me = '';
+    updateBuy(); checkPicture(true); if (cfg) loadItems();
+  });
+  $('wbtn').onclick = connect; $('buy').onclick = buy; $('refresh').onclick = function () { loadConfig(); loadItems(); };
+  ['kind', 'layout', 'days', 'head', 'body'].forEach(function (id) { $(id).addEventListener('input', updateBuy); });
+  $('img').addEventListener('change', function () { checkPicture(false); }); $('img').addEventListener('input', function () { clearTimeout(this._t); this._t = setTimeout(function () { checkPicture(false); }, 500); });
+  loadConfig().then(loadItems); checkPicture(true);
+  window.XA_ADS_TEST = { plain: plain, quote: quote, updateBuy: updateBuy, state: function () { return { me: me, cfg: cfg, picture: picture }; } };
+})();
+</script></body></html>

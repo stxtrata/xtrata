@@ -15,6 +15,11 @@ if (!world || !posters) die('usage: node ops/view.mjs --world ST...xtrata-world-
 let html;
 const rooms = {}; for (const p of String(args.rooms || '').split(',').filter(Boolean)) { const [slug, rest] = p.split('='); const [src, title, still, depth] = String(rest || '').split('|'); rooms[slug] = { src, title, ...(still ? { still } : {}), ...(depth ? { depth } : {}) }; }
 try { html = buildTestnetViewHtml({ rooms, world, posters, screen: args.screen || process.env.XA_SCREEN || '', scores: args.scores || process.env.XA_SCORES || '', registry: args.registry || process.env.XA_REGISTRY || '', games: args.games || process.env.XA_GAMES || '', core: args.core || process.env.XA_CORE || '', roomId: args.room || 'arcade-hall', ...(args.hall ? { hallHtml: readFileSync(args.hall, 'utf8') } : {}) }); } catch (e) { die(e.message); }
+// a way into the ad-renting page when the screen contract is shown (a link outside the hall; the hall itself is unchanged)
+if (args.screen || process.env.XA_SCREEN) {
+  const btn = '<a id="xa-ads-link" href="/arcade-world-preview/testnet-ads.html" style="position:fixed;left:12px;bottom:12px;z-index:2147483000;background:#00dcff;color:#001018;font:700 14px system-ui,sans-serif;padding:9px 14px;border-radius:8px;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.5)">TESTNET: advertise on the screen</a>';
+  html = html.includes('</body>') ? html.replace('</body>', () => btn + '</body>') : html + btn;
+}
 const out = args.out || join(dirname(fileURLToPath(import.meta.url)), 'out', 'testnet-view.html');
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, html);
