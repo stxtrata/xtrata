@@ -143,6 +143,18 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   const txB = C.S.rawBySender[addr] || 0;
   r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,astrotest']);
   check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txB, 'running it again sends nothing (' + (txB - txA) + ' transactions the first time)');
+  // The doors step: a lobby room, a curtain + locked knock door on hall bay 2, an enter door to the lobby on bay 3.
+  check(!R.FULL_EXTRA_STEPS.includes('doortest') && !R.DEFAULT_STEPS.includes('doortest'), 'the doors step is only run when asked for');
+  const txD = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,doortest']);
+  if (r.code !== 0) console.log(r.out.split('\n').filter((l) => /FAIL|!!|rror/.test(l)).join('\n').slice(0, 1800));
+  check(r.code === 0 && /PASS doortest/.test(r.out), 'the doortest step passes');
+  const WORLD = `${addr}.xtrata-world-v2`;
+  const lobbyId = C.pp(C.readOnly(WORLD, 'resolve-path', [C.Cl.list([C.Cl.stringAscii('arcade'), C.Cl.stringAscii('lobby')])]));
+  check(/u\d+/.test(lobbyId), 'the lobby resolves under the arcade (' + lobbyId.replace(/\s+/g, ' ') + ')');
+  const txE = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,doortest']);
+  check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txE, 'running the doors again sends nothing (' + (txE - txD) + ' transactions the first time)');
   check(C.S.violations.length === 0, 'every STX movement was still covered by a deny-mode post-condition');
 
   fs.rmSync(tmp, { recursive: true, force: true });

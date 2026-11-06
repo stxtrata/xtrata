@@ -1,0 +1,8 @@
+{
+  "format": "arcade-scene-file/1",
+  "room": "lobby",
+  "scenes": [
+    { "bay": 0, "at": 0, "base": "wall", "interaction": "none",
+      "layers": [ { "look": "sign-board", "params": { "text": "welcome", "sub": "you came through the door", "tone": "gold" } } ] }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "format": "arcade-scene-file/1",
+  "room": "arcade-hall",
+  "scenes": [
+    {
+      "bay": 2, "at": 0, "base": "door", "door": "door-gothic", "interaction": "knock",
+      "layers": [
+        { "look": "curtain-house", "params": { "color": "#7a1020" }, "state": "closed" },
+        { "look": "sign-board", "params": { "text": "staff only", "sub": "knock and wait", "tone": "orange" } },
+        { "look": "light-steady", "params": { "tone": "orange" } }
+      ]
+    },
+    {
+      "bay": 3, "at": 0, "base": "door", "door": "door-arch", "interaction": "enter",
+      "layers": [ { "look": "sign-board", "params": { "text": "lobby", "sub": "through the door", "tone": "gold" } } ],
+      "link": { "room": "lobby", "arrivalBay": 0 }
+    }
+  ]
+}
