@@ -1696,6 +1696,68 @@ const STEPS: Step[] = [
       return out.join(' · ');
     }
   }
+  ,{
+    id: 'screenreel', testnetOnly: true, title: 'Post the test reel to the screen (ads, news, messages)', who: 'Web wallet · about 30 signatures (fewer for what is already done)',
+    intro: 'Testnet only. Inscribes small test pictures and clips (real Forever Twins, Astro Blaster 3, an HTML ad rendered to a WebM clip and to a GIF, a silent music-player clip, a rent-this-slot card) and posts them to xtrata-screen-v1 as the admin: 7 ads (two of them full-screen-only), 3 news items and 2 messages. Posts go live straight away and run for 30 days. Items that are already live with the same headline are skipped, so it is safe to press again.',
+    action: 'Post the reel',
+    run: async () => {
+      const w = requireRoot(), screen = cid(NAMES.screen), R = (LAUNCH as any).reel;
+      const sa = await sread('get-admin');
+      if (sa !== w.address) throw new Error(`${NAMES.screen} admin is ${sa}, not the root wallet.`);
+      const n = (x: any) => Number(String(x).replace(/^u/, ''));
+      const clean = (x: any) => String(x ?? '').replace(/^"|"$/g, '');
+      const liveHeads = async () => {
+        const out = new Set<string>(), count = n(await sread('get-count'));
+        for (let i = 0; i < count; i++) { const it: any = await sread('get-item', [uintCV(i)]); if (it && n(it.status) < 2) out.add(`${n(it.kind)}|${clean(it.head)}`); }
+        return out;
+      };
+      const posted: string[] = [], skipped: string[] = [], up: Record<string, { id: number; up: Upload }> = {};
+      let have = await liveHeads();
+      for (const it of R.items as any[]) {
+        const key = `${it.kind}|${it.head}`;
+        if (have.has(key)) { skipped.push(it.head); continue; }
+        let imageId = 0n, hash = new Uint8Array(0), size = 0;
+        if (it.asset) {
+          if (!up[it.asset]) {
+            const a = R.assets[it.asset], bytes = b64bytes(a.b64), u = makeUploadBytes(`reel-${it.asset}`, `Screen reel: ${it.asset}`, a.mime, bytes);
+            const ins = await inscribe('screenreel', u, [], []);
+            up[it.asset] = { id: Number(ins.id), up: u };
+          }
+          imageId = BigInt(up[it.asset].id); hash = up[it.asset].up.hash; size = up[it.asset].up.bytes.length;
+        }
+        const height = n(await sread('get-height'));
+        await runTx('screenreel', `post-item ${it.head}`, () => rootCall(screen, 'post-item', [uintCV(it.kind), stringAsciiCV(it.head), stringAsciiCV(it.body), uintCV(imageId), bufferCV(hash), uintCV(size), uintCV(it.weight), uintCV(0), uintCV(height + it.days * 144), uintCV(it.layout)]));
+        await eventually(it.head, async () => { have = await liveHeads(); return have.has(key) ? null : 'not on the screen contract yet'; });
+        posted.push(it.head);
+      }
+      const live = (await sread('get-live')) as any[];
+      return `${posted.length} posted${posted.length ? ' (' + posted.join(', ') + ')' : ''}, ${skipped.length} already live · ${live.length} items live on the screen · the hall picks changes up on reload`;
+    }
+  }
+  ,{
+    id: 'screentext', testnetOnly: true, title: 'Update the reel text (a fresh message each press)', who: 'Web wallet · 1 or 2 signatures',
+    intro: 'Testnet only. Retires the previous "REEL UPDATE" message and posts a new one with the current burn block and UK time, so you can watch the text on the screen change after a reload. It is meant to be pressed again whenever you want to see an update.',
+    action: 'Post a fresh message',
+    run: async () => {
+      const w = requireRoot(), screen = cid(NAMES.screen);
+      const sa = await sread('get-admin');
+      if (sa !== w.address) throw new Error(`${NAMES.screen} admin is ${sa}, not the root wallet.`);
+      const n = (x: any) => Number(String(x).replace(/^u/, ''));
+      const clean = (x: any) => String(x ?? '').replace(/^"|"$/g, '');
+      const count = n(await sread('get-count')); let retired = 0;
+      for (let i = 0; i < count; i++) {
+        const it: any = await sread('get-item', [uintCV(i)]);
+        if (it && n(it.status) < 2 && n(it.kind) === 0 && clean(it.head).startsWith('REEL UPDATE')) {
+          await runTx('screentext', `retire #${i}`, () => rootCall(screen, 'retire', [uintCV(i)])); retired++;
+        }
+      }
+      const height = n(await sread('get-height')), uk = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
+      const head = `REEL UPDATE - BLOCK ${height} - ${uk} UK`;
+      await runTx('screentext', `post-item ${head}`, () => rootCall(screen, 'post-item', [uintCV(0), stringAsciiCV(head), stringAsciiCV(''), uintCV(0), bufferCV(new Uint8Array(0)), uintCV(0), uintCV(8), uintCV(0), uintCV(height + 288), uintCV(0)]));
+      await eventually(head, async () => (((await sread('get-live')) as any[]).length ? null : 'not live yet'));
+      return `posted "${head}" (${retired} older update${retired === 1 ? '' : 's'} retired) · reload the testnet page to see it`;
+    }
+  }
 ];
 export const steps = () => STEPS.filter((s) => !s.testnetOnly || network === 'testnet');
 /**

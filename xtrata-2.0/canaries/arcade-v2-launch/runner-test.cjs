@@ -163,6 +163,25 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   const txH = C.S.rawBySender[addr] || 0;
   r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,hidegames']);
   check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txH, 'hiding again sends nothing');
+  // the screen reel: pictures, clips, news and messages posted to xtrata-screen-v1, then a text update
+  check(!R.FULL_EXTRA_STEPS.includes('screenreel') && !R.DEFAULT_STEPS.includes('screenreel'), 'the screen reel is only run when asked for');
+  const SCREEN = `${addr}.xtrata-screen-v1`;
+  const txR = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,screenreel']);
+  if (r.code !== 0) console.log(r.out.split('\n').filter((l) => /FAIL|!!|rror/.test(l)).join('\n').slice(0, 1800));
+  check(r.code === 0 && /PASS screenreel/.test(r.out) && /12 posted/.test(r.out), 'the screenreel step passes and posts 12 items');
+  check(/u12/.test(C.pp(C.readOnly(SCREEN, 'get-count', []))) , 'the screen contract holds 12 items');
+  const live = C.pp(C.readOnly(SCREEN, 'get-live', []));
+  check((live.match(/u\d+/g) || []).length === 12, 'all 12 are live (' + live.replace(/\s+/g, ' ') + ')');
+  const it1 = C.pp(C.readOnly(SCREEN, 'get-item', [C.Cl.uint(1)]));
+  check(/layout: u1/.test(it1) && /image-size: u\d+/.test(it1), 'item 1 (the twins wall) is a full-screen-only slot with a picture');
+  const txR2 = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,screenreel']);
+  check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txR2, 'posting the reel again sends nothing (' + (txR2 - txR) + ' transactions the first time)');
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,screentext']);
+  check(r.code === 0 && /PASS screentext/.test(r.out) && /REEL UPDATE/.test(r.out), 'the screentext step posts a REEL UPDATE message');
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,screentext']);
+  check(r.code === 0 && /1 older update retired/.test(r.out), 'pressing it again retires the previous update and posts a new one');
   check(C.S.violations.length === 0, 'every STX movement was still covered by a deny-mode post-condition');
 
   fs.rmSync(tmp, { recursive: true, force: true });
