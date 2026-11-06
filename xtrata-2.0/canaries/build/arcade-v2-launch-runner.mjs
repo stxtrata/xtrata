@@ -75336,6 +75336,15 @@ Next your wallet sends it about ${stx(target)} for network fees (what is unspent
         await runTx("adbuy", "set-slots-enabled true", () => rootCall(screen, "set-slots-enabled", [(0, import_transactions2.boolCV)(true)]));
         await eventually("slots on", async () => String((await sread("get-config"))["slots-enabled"]) === "true" ? null : "not on yet");
       }
+      const clean1 = (x) => String(x ?? "").replace(/^"|"$/g, ""), retired = [];
+      for (let i = 0, cnt = n(await sread("get-count")); i < cnt; i++) {
+        const old = await sread("get-item", [(0, import_transactions2.uintCV)(i)]);
+        if (old && n(old.status) < 2 && n(old.kind) === A.kind && clean1(old.head) === A.head) {
+          await runTx("adbuy", `retire #${i} (same headline, replaced)`, () => rootCall(screen, "retire", [(0, import_transactions2.uintCV)(i)]));
+          await eventually(`#${i} retired`, async () => n((await sread("get-item", [(0, import_transactions2.uintCV)(i)])).status) >= 2 ? null : "not retired yet");
+          retired.push(i);
+        }
+      }
       const up = makeUploadBytes("adbuy", `Screen ad: ${A.name}`, A.mime, A.bytes);
       const ins = await inscribe("adbuy", up, [], []);
       const prices = cfg.prices, perDay = n([prices.message, prices.news, prices.ad][A.kind]) * (A.layout === 1 ? n(cfg["premium-percent"]) / 100 : 1), price = Math.floor(perDay) * A.days;
@@ -75355,7 +75364,7 @@ Next your wallet sends it about ${stx(target)} for network fees (what is unspent
       await runTx("adbuy", `approve #${id}`, () => rootCall(screen, "approve", [(0, import_transactions2.uintCV)(id)]));
       await eventually("approved", async () => n((await sread("get-item", [(0, import_transactions2.uintCV)(id)])).status) === 1 ? null : "not approved yet");
       const it = await sread("get-item", [(0, import_transactions2.uintCV)(id)]);
-      return `"${A.head}": slot #${id}, ${A.days} day${A.days === 1 ? "" : "s"}, ${A.layout ? "full-screen only" : "standard"}, picture #${ins.id} (${up.bytes.length} bytes), ${stx(BigInt(price))} held in escrow and earned as it runs \xB7 live from block ${n(it["starts-at"])} to ${n(it["ends-at"])}`;
+      return `${retired.length ? "replaced " + retired.map((r) => "#" + r).join(", ") + " \xB7 " : ""}"${A.head}": slot #${id}, ${A.days} day${A.days === 1 ? "" : "s"}, ${A.layout ? "full-screen only" : "standard"}, picture #${ins.id} (${up.bytes.length} bytes), ${stx(BigInt(price))} held in escrow and earned as it runs \xB7 live from block ${n(it["starts-at"])} to ${n(it["ends-at"])}`;
     }
   }
 ];
