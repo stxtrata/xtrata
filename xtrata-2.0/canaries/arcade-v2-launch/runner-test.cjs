@@ -155,6 +155,14 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); 
   const txE = C.S.rawBySender[addr] || 0;
   r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,doortest']);
   check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txE, 'running the doors again sends nothing (' + (txE - txD) + ' transactions the first time)');
+  // hide the two test games (set-hidden), leave Astro Blaster 3
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,hidegames']);
+  check(r.code === 0 && /PASS hidegames/.test(r.out), 'the hidegames step passes');
+  const hid = (n) => /hidden: true/.test(C.pp(C.readOnly(GAMES, 'get-game', [C.Cl.uint(n)])));
+  check(hid(0) && hid(1) && !hid(2), 'games 0 and 1 are hidden, Astro Blaster 3 (2) is not');
+  const txH = C.S.rawBySender[addr] || 0;
+  r = await run(['--network', 'testnet', '--execute', '--key-file', keyFile, '--state-dir', stateDir, '--yes', '--steps', 'connect,hidegames']);
+  check(r.code === 0 && (C.S.rawBySender[addr] || 0) === txH, 'hiding again sends nothing');
   check(C.S.violations.length === 0, 'every STX movement was still covered by a deny-mode post-condition');
 
   fs.rmSync(tmp, { recursive: true, force: true });

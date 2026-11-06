@@ -1674,6 +1674,28 @@ const STEPS: Step[] = [
       return `${done.length ? done.length + ' calls sent' : 'everything was already on chain: nothing sent'} · lobby space #${m.spaces.lobby} live · hall bay-2 (#${b2}): curtain + locked knock door · hall bay-3 (#${b3}): enter door to the lobby · verifyManifest: ${v.checked} items match`;
     }
   }
+  ,{
+    id: 'hidegames', testnetOnly: true, title: 'Hide the two test games (Sat Catcher, Arrow Sprint)', who: 'Web wallet · up to 2 signatures (none if already hidden)',
+    intro: 'Testnet only. Switches the two test games off with the games contract hide switch (set-hidden): the hall stops loading them. Nothing is deleted; boards and replays stay, and set-hidden false brings a game back. Other games, such as Astro Blaster 3, are not touched.',
+    action: 'Hide the test games',
+    run: async () => {
+      const w = requireRoot();
+      const ga = await gread('get-admin');
+      if (ga !== w.address) throw new Error(`${NAMES.games} admin is ${ga}, not the root wallet.`);
+      const out: string[] = [];
+      for (const g of LAUNCH.testGames) {
+        const n = await gread('get-game-number', [stringAsciiCV(g.id)]);
+        if (n === null) { out.push(`${g.title}: not listed`); continue; }
+        const num = BigInt(String(n).replace(/^u/, ''));
+        const hidden = async () => { const r: any = await gread('get-game', [uintCV(num)]); return r && String(r.hidden) === 'true'; };
+        if (await hidden()) { out.push(`${g.title} (game ${num}): already hidden`); continue; }
+        await runTx('hidegames', `set-hidden ${num} true (${g.title})`, () => rootCall(cid(NAMES.games), 'set-hidden', [uintCV(num), boolCV(true)]));
+        await eventually(`${g.title} hidden`, async () => ((await hidden()) ? null : 'not hidden yet'));
+        out.push(`${g.title} (game ${num}): hidden`);
+      }
+      return out.join(' · ');
+    }
+  }
 ];
 export const steps = () => STEPS.filter((s) => !s.testnetOnly || network === 'testnet');
 /**
