@@ -1807,6 +1807,16 @@ const STEPS: Step[] = [
         await runTx('adbuy', 'set-slots-enabled true', () => rootCall(screen, 'set-slots-enabled', [boolCV(true)]));
         await eventually('slots on', async () => (String(((await sread('get-config')) as any)['slots-enabled']) === 'true' ? null : 'not on yet'));
       }
+      // a re-run with the same headline REPLACES the earlier slot: it is retired first (a paid run is settled, the part not yet earned goes back to the buyer)
+      const clean1 = (x: any) => String(x ?? '').replace(/^"|"$/g, ''), retired: number[] = [];
+      for (let i = 0, cnt = n(await sread('get-count')); i < cnt; i++) {
+        const old: any = await sread('get-item', [uintCV(i)]);
+        if (old && n(old.status) < 2 && n(old.kind) === A.kind && clean1(old.head) === A.head) {
+          await runTx('adbuy', `retire #${i} (same headline, replaced)`, () => rootCall(screen, 'retire', [uintCV(i)]));
+          await eventually(`#${i} retired`, async () => ((n(((await sread('get-item', [uintCV(i)])) as any).status) >= 2) ? null : 'not retired yet'));
+          retired.push(i);
+        }
+      }
       const up = makeUploadBytes('adbuy', `Screen ad: ${A.name}`, A.mime, A.bytes);
       const ins = await inscribe('adbuy', up, [], []);
       const prices = cfg.prices as any, perDay = n([prices.message, prices.news, prices.ad][A.kind]) * (A.layout === 1 ? n(cfg['premium-percent']) / 100 : 1), price = Math.floor(perDay) * A.days;
@@ -1818,7 +1828,7 @@ const STEPS: Step[] = [
       await runTx('adbuy', `approve #${id}`, () => rootCall(screen, 'approve', [uintCV(id)]));
       await eventually('approved', async () => ((n(((await sread('get-item', [uintCV(id)])) as any).status) === 1) ? null : 'not approved yet'));
       const it: any = await sread('get-item', [uintCV(id)]);
-      return `"${A.head}": slot #${id}, ${A.days} day${A.days === 1 ? '' : 's'}, ${A.layout ? 'full-screen only' : 'standard'}, picture #${ins.id} (${up.bytes.length} bytes), ${stx(BigInt(price))} held in escrow and earned as it runs · live from block ${n(it['starts-at'])} to ${n(it['ends-at'])}`;
+      return `${retired.length ? 'replaced ' + retired.map((r) => '#' + r).join(', ') + ' · ' : ''}"${A.head}": slot #${id}, ${A.days} day${A.days === 1 ? '' : 's'}, ${A.layout ? 'full-screen only' : 'standard'}, picture #${ins.id} (${up.bytes.length} bytes), ${stx(BigInt(price))} held in escrow and earned as it runs · live from block ${n(it['starts-at'])} to ${n(it['ends-at'])}`;
     }
   }
 ];

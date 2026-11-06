@@ -24,4 +24,9 @@ with sync_playwright() as p:
 if errs: print('page errors:', errs)
 gif = os.path.join(D, 'astro-blaster-3-flyaround.gif')
 subprocess.check_call(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', '12', '-i', os.path.join(tmp, 'f%03d.png'), '-vf', f'split[a][b];[a]palettegen=max_colors={colors}:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4', '-loop', '0', gif])
+# a WebM of the same frames: far smaller than the GIF (the hall plays a clip as a muted looping video) and smoother, 24 fps over 72 frames = a 3 s loop
+webm = os.path.join(D, 'astro-blaster-3-flyaround.webm')
+if os.environ.get('XA_WEBM'):
+    subprocess.check_call(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', '24', '-i', os.path.join(tmp, 'f%03d.png'), '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', os.environ.get('XA_WEBM_CRF', '40'), '-pix_fmt', 'yuv420p', '-an', webm])
+    print('webm', os.path.getsize(webm))
 print('html', os.path.getsize(out_html), 'gif', os.path.getsize(gif), f'{W}x{H}', frames, 'frames')
