@@ -579,6 +579,7 @@ export const launchPlan = () => {
   if (r.errors.length) throw new Error(`The registry planner refused: ${r.errors.join('; ')}`);
   return r as { contract: string; calls: Call[]; manifest: any };
 };
+const clean0 = (x: any) => String(x ?? '').replace(/^"|"$/g, '');
 const cvArg = (a: any) => V2.clarityArg(a, Cl) as ClarityValue;
 /** A read in the planner's form (relay-steps args in, plain JS out), for verifyManifest(). */
 const planRead = async (fn: string, args: any[]) => plain(await chain.read(cid(NAMES.world), fn, args.map(cvArg)));
@@ -1698,7 +1699,7 @@ const STEPS: Step[] = [
   }
   ,{
     id: 'screenreel', testnetOnly: true, title: 'Post the test reel to the screen (ads, news, messages)', who: 'Web wallet · about 30 signatures (fewer for what is already done)',
-    intro: 'Testnet only. Inscribes small test pictures and clips (real Forever Twins, Astro Blaster 3, an HTML ad rendered to a WebM clip and to a GIF, a silent music-player clip, a rent-this-slot card) and posts them to xtrata-screen-v1 as the admin: 7 ads (two of them full-screen-only), 3 news items and 2 messages. Posts go live straight away and run for 30 days. Items that are already live with the same headline are skipped, so it is safe to press again.',
+    intro: 'Testnet only. Inscribes small test pictures and clips (real Forever Twins, Astro Blaster 3, an HTML ad rendered to a WebM clip and to a GIF, a silent music-player clip, a rent-this-slot card) and posts them to xtrata-screen-v1 as the admin: 5 ads (two of them full-screen-only), 3 news items and 2 messages, leaving 3 of the 8 ad places on the screen free to rent. Posts go live straight away and run for 30 days. Items that are already live with the same headline are skipped, so it is safe to press again.',
     action: 'Post the reel',
     run: async () => {
       const w = requireRoot(), screen = cid(NAMES.screen), R = (LAUNCH as any).reel;
@@ -1756,6 +1757,68 @@ const STEPS: Step[] = [
       await runTx('screentext', `post-item ${head}`, () => rootCall(screen, 'post-item', [uintCV(0), stringAsciiCV(head), stringAsciiCV(''), uintCV(0), bufferCV(new Uint8Array(0)), uintCV(0), uintCV(8), uintCV(0), uintCV(height + 288), uintCV(0)]));
       await eventually(head, async () => (((await sread('get-live')) as any[]).length ? null : 'not live yet'));
       return `posted "${head}" (${retired} older update${retired === 1 ? '' : 's'} retired) · reload the testnet page to see it`;
+    }
+  }
+  ,{
+    id: 'adadmin', testnetOnly: true, title: 'Screen ads: switch paid slots on and approve what is waiting', who: 'Web wallet · 1 signature to switch on, then 1 per pending slot',
+    intro: 'Testnet only. The admin side of renting a slot: switches paid slots on if they are off, then approves every pending paid slot (the run starts at approval and lasts days x 144 blocks). Press it again after someone buys a slot. A slot that is too old for its review window is skipped (sweep refunds it).',
+    action: 'Switch on and approve',
+    run: async () => {
+      const w = requireRoot(), screen = cid(NAMES.screen);
+      const sa = await sread('get-admin');
+      if (sa !== w.address) throw new Error(`${NAMES.screen} admin is ${sa}, not the root wallet.`);
+      const n = (x: any) => Number(String(x).replace(/^u/, ''));
+      const out: string[] = [];
+      const cfg: any = await sread('get-config');
+      if (String(cfg['slots-enabled']) !== 'true') {
+        await runTx('adadmin', 'set-slots-enabled true', () => rootCall(screen, 'set-slots-enabled', [boolCV(true)]));
+        await eventually('slots on', async () => (String(((await sread('get-config')) as any)['slots-enabled']) === 'true' ? null : 'not on yet'));
+        out.push('paid slots switched ON');
+      } else out.push('paid slots already on');
+      const count = n(await sread('get-count')); let approved = 0;
+      for (let i = 0; i < count; i++) {
+        const it: any = await sread('get-item', [uintCV(i)]);
+        if (!it || n(it.status) !== 0 || String(it.paid) !== 'true') continue;
+        try {
+          await runTx('adadmin', `approve #${i} (${clean0(it.head)})`, () => rootCall(screen, 'approve', [uintCV(i)]));
+          await eventually(`#${i} live`, async () => ((n((await sread('get-item', [uintCV(i)]) as any).status) === 1) ? null : 'not approved yet'));
+          approved++; out.push(`approved #${i} ${clean0(it.head)} (${n(it.days)} day${n(it.days) === 1 ? '' : 's'})`);
+        } catch (e) { out.push(`could not approve #${i}: ${errText(e)}`); }
+      }
+      if (!approved) out.push('nothing pending to approve');
+      return out.join(' · ');
+    }
+  }
+  ,{
+    id: 'adbuy', testnetOnly: true, title: 'Screen ads: rent a slot for a picture of your choice (root wallet buys, then approves)', who: 'Web wallet · about 4 to 12 signatures (the picture, the purchase, the approval)',
+    intro: 'Testnet only. Walks the whole renting process with ONE wallet playing buyer and admin: switches paid slots on, inscribes your picture from the file you name (XA_AD_FILE), buys a slot for the days you choose with buy-slot (payment goes into escrow), then approves it. The ad then runs for days x 144 blocks. Run it through run-testnet-v5.command buyad <file> "HEADLINE" <days> [full].',
+    action: 'Rent the slot',
+    run: async () => {
+      const w = requireRoot(), screen = cid(NAMES.screen), A = (globalThis as any).XA_AD;
+      if (!A) throw new Error('No picture given. Run: bash run-testnet-v5.command buyad <picture file> "HEADLINE" <days> [full]');
+      const sa = await sread('get-admin');
+      if (sa !== w.address) throw new Error(`${NAMES.screen} admin is ${sa}, not the root wallet.`);
+      const n = (x: any) => Number(String(x).replace(/^u/, ''));
+      if (!A.head || !/^[\x20-\x7e]+$/.test(A.head) || A.head.length > 80) throw new Error('The headline must be 1 to 80 printable ASCII characters.');
+      if (!/^[\x20-\x7e]*$/.test(A.body) || A.body.length > 240) throw new Error('The text must be printable ASCII, up to 240 characters.');
+      const cfg: any = await sread('get-config');
+      if (!Number.isInteger(A.days) || A.days < n(cfg['min-days']) || A.days > n(cfg['max-days'])) throw new Error(`Days must be ${n(cfg['min-days'])} to ${n(cfg['max-days'])}.`);
+      if (String(cfg['slots-enabled']) !== 'true') {
+        await runTx('adbuy', 'set-slots-enabled true', () => rootCall(screen, 'set-slots-enabled', [boolCV(true)]));
+        await eventually('slots on', async () => (String(((await sread('get-config')) as any)['slots-enabled']) === 'true' ? null : 'not on yet'));
+      }
+      const up = makeUploadBytes('adbuy', `Screen ad: ${A.name}`, A.mime, A.bytes);
+      const ins = await inscribe('adbuy', up, [], []);
+      const prices = cfg.prices as any, perDay = n([prices.message, prices.news, prices.ad][A.kind]) * (A.layout === 1 ? n(cfg['premium-percent']) / 100 : 1), price = Math.floor(perDay) * A.days;
+      const before = n(await sread('get-count'));
+      try { await runTx('adbuy', `buy-slot "${A.head}" ${A.days} days for ${stx(BigInt(price))}`, () => rootCall(screen, 'buy-slot',
+        [uintCV(A.kind), stringAsciiCV(A.head), stringAsciiCV(A.body), uintCV(BigInt(ins.id)), bufferCV(up.hash), uintCV(up.bytes.length), uintCV(A.days), uintCV(A.layout), uintCV(price)], payAtMost(BigInt(price)))); } catch (e) { throw new Error(errText(e) + (/u406/.test(errText(e)) ? ' (u406 = no room: the screen holds at most 8 live ads, 12 news and 16 messages, and at most 8 paid items; retire one first)' : '')); }
+      await eventually('purchase', async () => (n(await sread('get-count')) > before ? null : 'not on the screen contract yet'));
+      const id = before;
+      await runTx('adbuy', `approve #${id}`, () => rootCall(screen, 'approve', [uintCV(id)]));
+      await eventually('approved', async () => ((n(((await sread('get-item', [uintCV(id)])) as any).status) === 1) ? null : 'not approved yet'));
+      const it: any = await sread('get-item', [uintCV(id)]);
+      return `"${A.head}": slot #${id}, ${A.days} day${A.days === 1 ? '' : 's'}, ${A.layout ? 'full-screen only' : 'standard'}, picture #${ins.id} (${up.bytes.length} bytes), ${stx(BigInt(price))} held in escrow and earned as it runs · live from block ${n(it['starts-at'])} to ${n(it['ends-at'])}`;
     }
   }
 ];
