@@ -355,6 +355,22 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-switch button.ppp-tab[aria-pressed="true"]{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--cyan);background:rgba(34,211,238,.10)}
   .ppp button.tiny.primary{color:#04121a} /* the album Play button was cyan text on a cyan fill: invisible */
   .ppp button:disabled{opacity:.55;cursor:wait}
+  /* Connect pop-up: Xtrata Music Wallet (passkey on this device) first, then Xverse or Leather. */
+  .ppp-connect{width:min(380px,calc(100vw - 32px));padding:20px;border:1px solid var(--line);border-radius:16px;
+    background:var(--panel);color:var(--ink);box-shadow:0 24px 64px rgba(0,0,0,.6)}
+  .ppp-connect::backdrop{background:rgba(3,5,9,.72);backdrop-filter:blur(3px)}
+  .ppp-connect__title{margin:0 0 14px;font-size:17px;font-weight:800}
+  .ppp-connect__opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;margin:0 0 10px;
+    padding:13px 14px;text-align:left;font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);
+    border-radius:12px;cursor:pointer;min-height:56px;transition:border-color .2s,transform .08s}
+  .ppp-connect__opt b{font-size:15px}
+  .ppp-connect__opt span{font-size:12.5px;color:var(--mut)}
+  .ppp-connect__opt.is-music{border-color:var(--cyan);background:rgba(var(--glow),.08)}
+  .ppp-connect__opt.is-music b{color:var(--cyan)}
+  .ppp-connect__opt:hover:not(:disabled),.ppp-connect__opt:focus-visible{border-color:var(--cyan);outline:none}
+  .ppp-connect__opt:active:not(:disabled){transform:scale(.98)}
+  .ppp-connect__opt:disabled{opacity:.6;cursor:not-allowed}
+  .ppp-connect__cancel{display:block;margin:4px auto 0;font:inherit;font-size:13px;color:var(--mut);background:none;border:0;padding:8px 12px;cursor:pointer}
   /* every panel button answers a press; copy and share say what happened (src/radio-ppp/feedback.ts) */
   .ppp button{transition:transform .08s,background-color .2s,border-color .2s,color .2s}
   .ppp button:active:not(:disabled){transform:scale(.95)}
@@ -1055,7 +1071,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 })();
 </script>
 <script src="/xtrata-radio.js?v=42275606a109" defer></script>
-<script type="module" src="/radio/wallet.js"></script>
+<script type="module" src="/radio/wallet.js?v=b028d2e8a552"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
 // else there is sandboxed. Send links to the rest of Xtrata to the main site instead.
@@ -1070,7 +1086,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=86b585be4285')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=6b20b01af229')}).catch(function(){});
 </script>
 <script>
 // Arcade dock bridge: runs ONLY with ?dock=1 (the arcade's corner panel and its pop-out window). Without that flag this block does nothing.

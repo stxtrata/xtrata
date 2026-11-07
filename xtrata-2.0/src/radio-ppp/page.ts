@@ -24,6 +24,7 @@ import { createAlbumView, type AlbumInput } from './album';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
+import { musicWalletOption } from './connect-choice';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -361,16 +362,66 @@ function start(root: HTMLElement) {
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     root.classList.remove('ppp-flash'); void root.offsetWidth; root.classList.add('ppp-flash');
   };
+  /** Straight to the Stacks wallet chooser (Xverse, Leather), skipping the Xtrata Music Wallet pop-up. */
+  const connectStacks = () => {
+    const direct = (window as any).XtrataRadioConnectStacks as (() => void) | undefined;
+    if (direct) direct(); else (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click();
+  };
   /** The next step, from the top bar or a nudge: connect, open the pay-per-play radio, or unlock. */
   const go = () => {
     const s = ppp.snapshot();
-    if (s.step === 'connect' || s.step === 'wrong-wallet') { (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(); return; }
+    if (s.step === 'connect' || s.step === 'wrong-wallet') { connectStacks(); return; }
     if (s.step === 'elsewhere' && s.gate?.radioUrl) { location.href = s.gate.radioUrl; return; }
     if (s.step === 'locked' && !s.armed && !s.busy) void ppp.unlock();
     if (s.step === 'ready' && !s.payingOn && !s.busy) void ppp.switchOn();
     focusPanel();
   };
   if (top) top.onclick = go;
+
+  /**
+   * The connect pop-up (src/radio-likes/wallet.ts asks for it before opening the Stacks wallet chooser):
+   * "Xtrata Music Wallet" first, then Xverse or Leather. Resolves 'stacks' to carry on to the Stacks chooser,
+   * 'music' once the Xtrata Music Wallet has been started here, or null if the visitor closed the pop-up.
+   * Where no passkey-only wallet is possible it resolves 'stacks' straight away, so nothing changes there.
+   */
+  let chooserOpen: Promise<'stacks' | 'music' | null> | null = null;
+  const chooseConnect = (): Promise<'stacks' | 'music' | null> => {
+    const option = musicWalletOption(ppp.snapshot());
+    if (!option) return Promise.resolve('stacks');
+    if (chooserOpen) return chooserOpen;
+    chooserOpen = new Promise((resolve) => {
+      const dialog = el('dialog', '', 'ppp-connect') as HTMLDialogElement;
+      dialog.setAttribute('aria-labelledby', 'ppp-connect-title');
+      let picked: 'stacks' | 'music' | null = null;
+      const close = (choice: 'stacks' | 'music' | null) => { picked = choice; dialog.close(); };
+      dialog.addEventListener('close', () => { dialog.remove(); chooserOpen = null; resolve(picked); });
+      dialog.addEventListener('click', (e) => { if (e.target === dialog) close(null); }); // tap outside the card
+      const row = (title: string, detail: string, cls: string, run: () => void, disabled = false) => {
+        const b = el('button', '', 'ppp-connect__opt ' + cls) as HTMLButtonElement;
+        b.type = 'button'; b.disabled = disabled; b.onclick = run;
+        b.append(el('b', title), el('span', detail));
+        return b;
+      };
+      const head = el('h2', 'Connect', 'ppp-connect__title'); head.id = 'ppp-connect-title';
+      const music = row(option.label, option.detail, 'is-music', () => {
+        close('music');
+        // Ask again at the tap: the wallet box may have answered since the pop-up opened.
+        const now = musicWalletOption(ppp.snapshot());
+        if (now?.action === 'create') void ppp.create();
+        else if (now?.action === 'unlock') void ppp.unlock();
+        // The passkey prompt is a tap inside the wallet box, so bring it into view.
+        focusPanel();
+      }, !!option.disabled);
+      const stacks = row('Xverse or Leather', 'A Stacks wallet you already have.', 'is-stacks', () => close('stacks'));
+      const cancel = button('Cancel', () => close(null), 'quiet ppp-connect__cancel');
+      dialog.append(head, music, stacks, cancel);
+      document.body.appendChild(dialog);
+      dialog.showModal();
+      if (!option.disabled) music.focus();
+    });
+    return chooserOpen;
+  };
+  (window as any).XtrataRadioConnectChooser = chooseConnect;
   function renderTop(s: Snapshot) {
     if (!top) return;
     const set = (text: string, tone: string, title: string) => {
@@ -750,7 +801,7 @@ function start(root: HTMLElement) {
         key.push(el('p', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`, 'ppp-warn'));
         lines.push(el('p', `You are connected as ${who(s.main)}. Listening is still free, and nothing is paid from the listening wallet while this wallet is connected.`));
         lines.push(el('p', 'The listening wallet box is updating. Once it has, each wallet address gets its own listening wallet on this device.', 'ppp-mute'));
-        actions.push(button('Switch wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(), 'primary'));
+        actions.push(button('Switch wallet', connectStacks, 'primary'));
         break;
       case 'not-invited':
         key.push(el('p', 'Coming soon. Listening is free.', 'ppp-mute'));
@@ -777,8 +828,8 @@ function start(root: HTMLElement) {
         // wallet (e.g. synced from another device) can still unlock it, or put the gift aside for now.
         const gift = gifts.liveGift();
         actions.push(button(gift ? 'Claim my gift · no wallet needed' : s.solo ? 'Start listening · no wallet needed' : s.others.length && s.main ? `Set up for ${who(s.main)}` : 'Start listening', () => void ppp.create(), 'primary'));
-        if (!gift && !s.solo && s.main && s.others.length) actions.push(button('Switch wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
-        if (!gift && s.solo) actions.push(button('I have a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
+        if (!gift && !s.solo && s.main && s.others.length) actions.push(button('Switch wallet', connectStacks));
+        if (!gift && s.solo) actions.push(button('I have a Stacks wallet', connectStacks));
         actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
         if (gift) actions.push(button('Not now', () => gifts.setAside(), 'quiet'));
         break;

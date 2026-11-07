@@ -5,7 +5,7 @@
 // four-hour-old radio or pay-per-play script inside a freshly loaded page. The pages themselves are
 // served with max-age=0, so a hash in the URL guarantees the page always loads the matching script.
 //
-// Runs after `build:radio` and `build:radio-ppp`. Deterministic: rerunning on unchanged bundles
+// Runs after `build:radio`, `build:radio-ppp` and `build:radio-wallet`. Deterministic: rerunning on unchanged bundles
 // changes nothing.
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -13,7 +13,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const root = new URL('../public/', import.meta.url);
 const hash = (path) => createHash('sha256').update(readFileSync(new URL(path, root))).digest('hex').slice(0, 12);
 
-const assets = { '/xtrata-radio.js': hash('xtrata-radio.js'), '/radio/ppp.js': hash('radio/ppp.js') };
+// radio/wallet.js (the top bar's connect button) is stamped too: it and ppp.js share the connect pop-up,
+// so a page must never pair a fresh one with a four-hour-old other.
+const assets = { '/xtrata-radio.js': hash('xtrata-radio.js'), '/radio/ppp.js': hash('radio/ppp.js'), '/radio/wallet.js': hash('radio/wallet.js') };
 const pages = ['radio.html', 'radio/browser-lounge.html', 'bip110.html'];
 
 for (const page of pages) {
