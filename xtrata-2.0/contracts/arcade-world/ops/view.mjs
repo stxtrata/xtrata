@@ -17,7 +17,7 @@ const rooms = {}; for (const p of String(args.rooms || '').split(',').filter(Boo
 try { html = buildTestnetViewHtml({ rooms, world, posters, screen: args.screen || process.env.XA_SCREEN || '', scores: args.scores || process.env.XA_SCORES || '', registry: args.registry || process.env.XA_REGISTRY || '', games: args.games || process.env.XA_GAMES || '', core: args.core || process.env.XA_CORE || '', roomId: args.room || 'arcade-hall', ...(args.hall ? { hallHtml: readFileSync(args.hall, 'utf8') } : {}) }); } catch (e) { die(e.message); }
 // a way into the ad-renting page when the screen contract is shown (a link outside the hall; the hall itself is unchanged)
 if (args.screen || process.env.XA_SCREEN) {
-  const btn = '<a id="xa-ads-link" href="/arcade-world-preview/testnet-ads.html" style="position:fixed;left:12px;bottom:12px;z-index:2147483000;background:#00dcff;color:#001018;font:700 14px system-ui,sans-serif;padding:9px 14px;border-radius:8px;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.5)">TESTNET: advertise on the screen</a>';
+  const btn = '<a id="xa-ads-link" href="/arcade-world-preview/testnet-ads.html" title="Rent a slot on the arcade screen (testnet)" style="position:fixed;right:10px;bottom:4px;z-index:2147483000;color:#8fa7b0;opacity:.55;font:11px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.04em;padding:2px 4px;text-decoration:none;text-shadow:0 1px 2px #000" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">Advertise on screen \u2013 click here</a>';
   html = html.includes('</body>') ? html.replace('</body>', () => btn + '</body>') : html + btn;
 }
 const out = args.out || join(dirname(fileURLToPath(import.meta.url)), 'out', 'testnet-view.html');
