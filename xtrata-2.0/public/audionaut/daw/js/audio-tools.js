@@ -1,5 +1,5 @@
 import { sustainDuration, sampleLoop } from "./onboard-library.js";
-import { store, stepObj } from "./state.js";
+import { store } from "./state.js";
 import { engine } from "./engine.js";
 import {
   audioAnalysis,
@@ -68,7 +68,7 @@ export function openAudioTools({ ch = 0, step = null } = {}) {
         label: "Sample inscription",
       },
     ]);
-    buffer = engine.buffers[+channel.value];
+    buffer = engine.bufferOf(+channel.value);
     report.replaceChildren();
     exportWav.disabled = exportCsv.disabled = !buffer;
     if (!buffer) {
@@ -78,7 +78,7 @@ export function openAudioTools({ ch = 0, step = null } = {}) {
     }
     const c = store.channel(+channel.value),
       over =
-        step !== null ? stepObj(store.seq.steps[+channel.value]?.[step]) : null;
+        step !== null ? store.cellRegions(+channel.value, step)[0] || null : null;
     params = {
       start: (over?.trimStart ?? c.trimStart) * buffer.duration,
       end: (over?.trimEnd ?? c.trimEnd) * buffer.duration,
