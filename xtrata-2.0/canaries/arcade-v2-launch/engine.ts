@@ -19,7 +19,7 @@
 import { sha256 } from '@noble/hashes/sha256';
 import {
   addressFromVersionHash, AddressVersion, addressToString, AnchorMode, boolCV, Cl, createAddress, bufferCV, ClarityType, cvToString, FungibleConditionCode, getAddressFromPrivateKey, hexToCV,
-  intCV, listCV, makeContractCall, makeRandomPrivKey, makeSTXTokenTransfer, makeStandardSTXPostCondition,
+  intCV, listCV, makeContractCall, makeContractSTXPostCondition, makeRandomPrivKey, makeSTXTokenTransfer, makeStandardSTXPostCondition,
   PostConditionMode, principalCV, privateKeyToString, someCV, stringAsciiCV, TransactionVersion, tupleCV, uintCV,
   type ClarityValue, type PostCondition
 } from '@stacks/transactions';
@@ -231,6 +231,14 @@ export const requireRoot = () => {
   if (!signer) throw new Error('Connect your wallet first (step 1).');
   if (signer.address !== rootAddr()) throw new Error(`The connected wallet is ${signer.address}, not the root owner. ${H1()}`);
   return signer;
+};
+// STX that leaves a CONTRACT (a refund or a settlement from the screen's escrow) needs its own post-condition in deny mode: "this contract sends at most X".
+const contractPays = (contractId: string, amount: bigint): PostCondition[] => { const [a, nm] = contractId.split('.'); return [makeContractSTXPostCondition(a, nm, FungibleConditionCode.LessEqual, amount)]; };
+// Retire a screen item. A paid item that is still holding escrow pays out (earned part to the fee recipient, the rest to the buyer), so the call carries a contract post-condition for exactly the escrow.
+const retireCall = async (screen: string, id: number) => {
+  const it: any = await sread('get-item', [uintCV(id)]);
+  const esc = it && String(it.paid) === 'true' ? BigInt(String(it.escrow).replace(/^u/, '')) : 0n;
+  return rootCall(screen, 'retire', [uintCV(id)], esc > 0n ? contractPays(screen, esc) : []);
 };
 const payAtMost = (amount: bigint): PostCondition[] => [makeStandardSTXPostCondition(requireRoot().address, FungibleConditionCode.LessEqual, amount)];
 const rootCall = (target: string, fn: string, args: ClarityValue[], pcs: PostCondition[] = []) => requireRoot().call(target, fn, args, pcs);
@@ -1749,7 +1757,7 @@ const STEPS: Step[] = [
       for (let i = 0; i < count; i++) {
         const it: any = await sread('get-item', [uintCV(i)]);
         if (it && n(it.status) < 2 && n(it.kind) === 0 && clean(it.head).startsWith('REEL UPDATE')) {
-          await runTx('screentext', `retire #${i}`, () => rootCall(screen, 'retire', [uintCV(i)])); retired++;
+          await runTx('screentext', `retire #${i}`, () => retireCall(screen, i)); retired++;
         }
       }
       const height = n(await sread('get-height')), uk = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
@@ -1812,7 +1820,7 @@ const STEPS: Step[] = [
       for (let i = 0, cnt = n(await sread('get-count')); i < cnt; i++) {
         const old: any = await sread('get-item', [uintCV(i)]);
         if (old && n(old.status) < 2 && n(old.kind) === A.kind && clean1(old.head) === A.head) {
-          await runTx('adbuy', `retire #${i} (same headline, replaced)`, () => rootCall(screen, 'retire', [uintCV(i)]));
+          await runTx('adbuy', `retire #${i} (same headline, replaced)`, () => retireCall(screen, i));
           await eventually(`#${i} retired`, async () => ((n(((await sread('get-item', [uintCV(i)])) as any).status) >= 2) ? null : 'not retired yet'));
           retired.push(i);
         }
@@ -1859,7 +1867,7 @@ const STEPS: Step[] = [
       for (let i = 0, cnt = n(await sread('get-count')); i < cnt; i++) {
         const old: any = await sread('get-item', [uintCV(i)]);
         if (old && n(old.status) < 2 && n(old.kind) === NEWS && clean(old.head) === HEAD) {
-          await runTx('screenv2', uniq('screenv2', `retire #${i} (earlier test slot)`), () => rootCall(screen, 'retire', [uintCV(i)]));
+          await runTx('screenv2', uniq('screenv2', `retire #${i} (earlier test slot)`), () => retireCall(screen, i));
           await eventually(`#${i} retired`, async () => ((n(((await sread('get-item', [uintCV(i)])) as any).status) >= 2) ? null : 'not retired yet'));
         }
       }
@@ -1890,7 +1898,7 @@ const STEPS: Step[] = [
       await eventually('weight 9', async () => ((n(((await sread('get-item', [uintCV(id)])) as any).weight) === 9) ? null : 'not 9 yet'));
       out.push('weight changed to 9');
       // 5. clean up: end the run (the unearned part goes back), drop the partner, restore the limit
-      await runTx('screenv2', uniq('screenv2', `retire #${id}`), () => rootCall(screen, 'retire', [uintCV(id)]));
+      await runTx('screenv2', uniq('screenv2', `retire #${id}`), () => retireCall(screen, id));
       await eventually('retired', async () => ((n(((await sread('get-item', [uintCV(id)])) as any).status) === 2) ? null : 'not retired yet'));
       it = await sread('get-item', [uintCV(id)]);
       if (n(it.escrow) !== 0) throw new Error(`Escrow left on the retired slot: ${n(it.escrow)}.`);

@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
-const ROOT = 'ST3KCQKMMQJSEKD0C8DE0ED4T7E0W7135TDYP7VK3';
+const ROOT = 'ST3XASJRRT6A01QQZ67S1B29DZXFX5KRNNZS2Z8GR';
 const SCREEN = arg('screen', ROOT + '.xtrata-screen-v1'), CORE = arg('core', ROOT + '.xtrata-v3-2-3');
 const out = arg('out', path.join(__dirname, '..', '..', '..', 'public', 'arcade-world-preview', 'testnet-ads.html'));
 const scoreClient = fs.readFileSync(path.join(__dirname, '..', 'src', 'parts', 'score-client.js'), 'utf8');
