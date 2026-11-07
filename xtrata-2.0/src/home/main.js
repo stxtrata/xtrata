@@ -10192,6 +10192,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       setStatus(dom.walletGridStatus, '<strong>Grid</strong> loading latest inscriptions', 'loading', 'blue');
       renderTokenGridPlaceholders('...');
 
+      // Read before the token is selected: selecting rewrites the address bar.
+      const wantFullscreen = new URLSearchParams(window.location.search).get('fullscreen') === '1';
       try {
         await refreshExplorerLatestTokenId();
         const requestedTokenId = state.explorerInitialTokenId;
@@ -10224,6 +10226,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           scrollToPreview: initialSelectTokenId !== null,
           selectLatestOnPage: initialSelectTokenId === null
         });
+        // /x/<id>?fullscreen=1 opens straight into the fullscreen viewer (the arcade link uses this).
+        if (
+          initialSelectTokenId !== null &&
+          wantFullscreen &&
+          getSelectedToken()?.id === initialSelectTokenId
+        ) {
+          await openFullscreenViewer();
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         state.walletPageIds = [];
