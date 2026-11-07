@@ -57,9 +57,10 @@ const NETWORKS = {
     hallPublisher: null,
     screenFeeRecipient: MAINNET_ROOT,
     // the games contract's wait before a new game goes live (burn blocks; 6 = about an hour, 144 = about a day) and whether the canary locks it for ever.
-    // Jim, 29 Oct 2026: one hour on mainnet, locked. The contract starts at 144, so the launch sends set-delay 6 and then lock-delay 6.
+    // Jim, 29 Oct 2026: one hour on mainnet. The contract starts at 144, so the launch sends set-delay 6.
+    // Jim, 7 Nov 2026: leave it OPEN (no lock-delay) so the wait can still be changed; lock it later with a single call if wanted.
     gamesDelay: 6,
-    lockGamesDelay: true,
+    lockGamesDelay: false,
     parents: [55],
     bundleId: 3078,
     canDeployCore: false
