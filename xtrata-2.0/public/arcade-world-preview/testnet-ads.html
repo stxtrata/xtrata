@@ -1036,7 +1036,7 @@ a{color:var(--acc)}
 </script>
 <script>
 (function () {
-  var SCREEN = 'ST3KCQKMMQJSEKD0C8DE0ED4T7E0W7135TDYP7VK3.xtrata-screen-v1', CORE = 'ST3KCQKMMQJSEKD0C8DE0ED4T7E0W7135TDYP7VK3.xtrata-v3-2-3', ROOT = 'ST3KCQKMMQJSEKD0C8DE0ED4T7E0W7135TDYP7VK3';
+  var SCREEN = 'ST3XASJRRT6A01QQZ67S1B29DZXFX5KRNNZS2Z8GR.xtrata-screen-v1', CORE = 'ST3XASJRRT6A01QQZ67S1B29DZXFX5KRNNZS2Z8GR.xtrata-v3-2-3', ROOT = 'ST3XASJRRT6A01QQZ67S1B29DZXFX5KRNNZS2Z8GR';
   XAScores.configure({ network: 'testnet', apiBases: ['https://api.testnet.hiro.so'], readSender: ROOT });
   var C = XAScores._codec, $ = function (id) { return document.getElementById(id); };
   var cfg = null, admin = '', me = '', height = 0, partner = null;
@@ -1151,8 +1151,8 @@ a{color:var(--acc)}
         var i = r[0], it = r[1], st = it.status === 0 ? '<b class="gold">pending</b>' : it.status === 1 ? (it['ends-at'] > height ? '<b class="ok">live</b> · ' + (it['ends-at'] - height) + ' blocks left' : 'finished') : 'ended';
         var paid = it.paid ? stx(it.price) + ' · ' + it.days + ' day' + (it.days === 1 ? '' : 's') : 'free'; if (it.turns > 1) paid += ' · ' + it.turns + ' turns (' + (it.turns * 12) + ' s)'; if (it.status === 1 && it['starts-at'] > height) paid += ' · starts in ' + (it['starts-at'] - height) + ' blocks';
         var acts = '';
-        if (it.status === 0 && mine && mine === it.buyer) acts += '<button class="s" data-a="cancel" data-i="' + i + '">Cancel</button> ';
-        if (it.status === 0 && mine && mine === admin) acts += '<button class="s" data-a="approve" data-i="' + i + '">Approve</button> <button class="s" data-a="reject" data-i="' + i + '">Reject</button>';
+        if (it.status === 0 && mine && mine === it.buyer) acts += '<span class="mut">cancel: not in this test page yet</span> ';
+        if (it.status === 0 && mine && mine === admin) acts += '<button class="s" data-a="approve" data-i="' + i + '">Approve</button>';
         return '<tr><td>' + i + '</td><td>' + KIND[it.kind] + (it.layout ? ' · full-screen' : '') + '</td><td>' + esc(it.head) + (it['image-size'] ? ' <span class="mut">(picture #' + it['image-id'] + ')</span>' : '') + (it.link ? ' <span class="mut">(link: ' + esc(it.link) + ')</span>' : '') + '</td><td>' + st + '</td><td>' + paid + '</td><td>' + acts + '</td></tr>';
       }).join('') + '</table>' : 'Nothing posted yet.';
       Array.prototype.forEach.call($('items').querySelectorAll('button[data-a]'), function (b) { b.onclick = function () { act(b.dataset.a, +b.dataset.i, b); }; });

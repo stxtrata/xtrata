@@ -59,9 +59,20 @@ function createMockChain(opts = {}) {
   };
   // Deny mode: every STX the sender moves must be covered by a "send at most" post-condition (the canary uses no others).
   function checkPcs(label, events, sender, pcs) {
+    // what the sender moves must be covered by a standard-principal "send at most"; what a CONTRACT sends out (refunds, settlements)
+    // needs a contract-principal "send at most" for that contract (on a real chain, deny mode aborts the call otherwise)
+    const isContractPc = (p) => !!(p.principal && p.principal.contractName && p.principal.contractName.content);
     const sent = stxSent(events, sender);
-    const cap = pcs.filter((p) => p.conditionCode === T.FungibleConditionCode.LessEqual).reduce((n, p) => n + BigInt(p.amount), 0n);
-    if (sent > 0n && (!pcs.length || sent > cap)) S.violations.push(`${label}: sent ${sent} µSTX, post-conditions allow ${pcs.length ? cap : 'nothing'}`);
+    const std = pcs.filter((p) => !isContractPc(p) && p.conditionCode === T.FungibleConditionCode.LessEqual);
+    const cap = std.reduce((n, p) => n + BigInt(p.amount), 0n);
+    if (sent > 0n && (!std.length || sent > cap)) S.violations.push(`${label}: sent ${sent} µSTX, post-conditions allow ${std.length ? cap : 'nothing'}`);
+    const senders = new Set(events.filter((e) => e.event === 'stx_transfer_event').map((e) => e.data.sender));
+    for (const who of senders) {
+      if (who === sender) continue;
+      const out = stxSent(events, who), name = String(who).split('.')[1];
+      const ccap = pcs.filter((p) => isContractPc(p) && p.principal.contractName.content === name && p.conditionCode === T.FungibleConditionCode.LessEqual).reduce((n, p) => n + BigInt(p.amount), 0n);
+      if (out > 0n && out > ccap) S.violations.push(`${label}: contract ${who} sent ${out} µSTX, contract post-conditions allow ${ccap || 'nothing'}`);
+    }
   }
   function exec(contract, fn, argsV7, sender, pcs, label) {
     S.calls.push({ step: S.current, sender, fn: `${contract.split('.')[1]}.${fn}` });
