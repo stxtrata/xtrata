@@ -4608,7 +4608,9 @@ export default function MintScreen(props: MintScreenProps) {
               {duplicateMatch.id.toString()} already matches this content
               {duplicateMatch.owner
                 ? ` (owner ${duplicateMatch.owner}).`
-                : '.'}
+                : '.'}{' '}
+              You can reference it as a dependency instead; proceeding stores a
+              second full copy on-chain.
             </div>
             {!disableDuplicateOverride ? (
               !allowDuplicate ? (

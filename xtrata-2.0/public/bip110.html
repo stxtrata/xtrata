@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>What BIP-110 means for on-chain media · Xtrata</title>
-<meta name="description" content="A fair explainer of BIP-110, how Ordinals are adapting, what it costs — and where permanent media goes next. With a live cost calculator." />
+<title>What BIP-110 meant for on-chain media · Xtrata</title>
+<meta name="description" content="A fair look back at BIP-110: what it proposed, why it did not activate, what it would have cost, and why block space still deserves respect. With a cost calculator." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <style>
   :root{color-scheme:dark;--bg:#0b0e14;--panel:#121723;--line:#243044;--ink:#e6edf6;--mut:#8b9bb4;--acc:#3ea6ff;--acc2:#7c5cff;--ok:#3ddc97;--warn:#ffb454;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -39,11 +39,11 @@
   <div class="logo"><b>XTRATA</b> · BIP-110 &amp; the future of on-chain media</div>
 </header>
 <main>
-  <h1>What BIP-110 means for on-chain media — honestly</h1>
-  <p><strong>The short version:</strong> BIP-110 is a proposed Bitcoin rule change that would make storing data on Bitcoin L1 much harder: data pushes capped at 256 bytes, and the script trick behind today's Ordinals envelope disabled. It is a <em>proposal</em>, not an active rule — and nothing already inscribed is affected either way. Your existing inscriptions live in blocks that are permanent history.</p>
+  <h1>What BIP-110 meant for on-chain media — honestly</h1>
+  <p><strong>The short version:</strong> BIP-110 was a proposed Bitcoin rule change that would have made storing data on Bitcoin L1 much harder: data pushes capped at 256 bytes, and the script trick behind today's Ordinals envelope disabled. It did not activate. Its mandatory signalling window opened on 8 August 2026 with almost no miner support, a small minority chain stalled after two blocks, and Bitcoin carried on without it. Nothing already inscribed was ever at risk: existing inscriptions live in blocks that are permanent history.</p>
 
-  <h2>Ordinals aren't dying — they're adapting</h2>
-  <p>The ord developers have already drafted a replacement envelope that works within BIP-110's limits: data split into ≤256-byte pushes that are immediately dropped from the stack (<a href="https://github.com/ordinals/ord/pull/4545" rel="noopener" target="_blank">ord PR #4545</a>). Even the <a href="https://bips.dev/110/" rel="noopener" target="_blank">BIP-110 text</a> concedes that data can't be stopped entirely — only made harder and more expensive. That's the real question this page answers: <strong>how much more expensive?</strong></p>
+  <h2>The question it raised is still a good one</h2>
+  <p>BIP-110 failed, but the worry behind it was real. Every byte written to Bitcoin is carried by every node, for ever, on behalf of everyone who comes after, and anyone with enough money for fees can fill blocks with whatever they like. The ord developers drafted an envelope that would have worked within BIP-110's limits (<a href="https://github.com/ordinals/ord/pull/4545" rel="noopener" target="_blank">ord PR #4545</a>), and the <a href="https://bips.dev/110/" rel="noopener" target="_blank">BIP-110 text</a> itself conceded that data can only be made harder and more expensive to store, not stopped. The calculator below shows <strong>how much more expensive</strong> it would have been.</p>
 
   <div class="card">
     <h2 style="margin-top:0">Cost calculator</h2>
@@ -56,7 +56,7 @@
       <thead><tr><th>Destination</th><th>Chunks</th><th>Transactions</th><th>Cost</th></tr></thead>
       <tbody>
         <tr><td>Bitcoin L1 today (classic envelope)</td><td class="num" id="c-chunks">—</td><td class="num" id="c-txs">—</td><td class="num" id="c-cost">—</td></tr>
-        <tr class="warnrow"><td>Bitcoin L1 after BIP-110 (256B push-drop)</td><td class="num" id="p-chunks">—</td><td class="num" id="p-txs">—</td><td class="num" id="p-cost">—</td></tr>
+        <tr class="warnrow"><td>Bitcoin L1 under BIP-110 rules (256B push-drop)</td><td class="num" id="p-chunks">—</td><td class="num" id="p-txs">—</td><td class="num" id="p-cost">—</td></tr>
         <tr><td><strong>Xtrata</strong> (full file, Bitcoin-anchored via Stacks)</td><td class="num">1 file</td><td class="num" id="x-txs">—</td><td class="num hl" id="x-cost">—</td></tr>
       </tbody>
     </table>
@@ -65,8 +65,8 @@
   </div>
 
   <h2>Where Xtrata stands</h2>
-  <p>We think Bitcoin Core's instinct is defensible: L1 is for money. That's exactly why Xtrata exists — full media files, recursive references and composable records on a layer <em>built</em> for them, with every transaction still anchored to Bitcoin's finality through Stacks. No 256-byte chunks, no governance risk to your use case, and costs measured in cents.</p>
-  <p>And because we come from the Ordinals world ourselves (Xtrata's founder built <strong>Audionals</strong> on Bitcoin L1), we're keeping the L1 door open too: if BIP-110 activates, our chunking-and-batching pipeline — the same tech behind Xtrata's large-file inscriptions — will support the new ord envelope, so inscribing to Bitcoin stays painless for those who want it. Either layer. Your choice. Permanent either way.</p>
+  <p>We think Bitcoin Core's instinct is defensible: L1 is for money. That's a big part of why Xtrata exists: full media files, recursive references and composable records on a layer <em>built</em> for them, with every transaction anchored to Bitcoin's finality through Stacks. That isn't a licence to store everything. Stacks block space is shared too, so we compress what we inscribe, reuse existing inscriptions instead of uploading them again, and are exploring storage chains such as Arweave for the heaviest media, with the fingerprint and the record that ties each file to its token kept on Stacks.</p>
+  <p>We come from the Ordinals world ourselves (Xtrata's founder built <strong>Audionals</strong> on Bitcoin L1, squeezing whole songs into a few kilobytes), and small, carefully made work still has a place there. We'd just rather make every byte count, on either layer, than look for ways around the people asking us to use fewer of them.</p>
   <p><a class="cta" href="/wizard/">Inscribe on Xtrata today →</a></p>
 
   <h2>Does my existing Ordinals work disappear?</h2>
@@ -101,7 +101,7 @@
     document.getElementById('p-cost').textContent=(p.sats/1e8).toFixed(5)+' BTC · '+usd(pUsd);
     document.getElementById('x-txs').textContent='handled for you';
     document.getElementById('x-cost').textContent='~'+xStx.toFixed(2)+' STX · '+usd(xUsd);
-    document.getElementById('verdict').innerHTML='Post-BIP-110, this file costs <strong>'+usd(pUsd)+'</strong> on L1 ('+((pUsd/cUsd-1)*100).toFixed(0)+'% over today) versus <strong>'+usd(xUsd)+'</strong> on Xtrata — roughly <strong>'+Math.round(pUsd/Math.max(xUsd,0.01)).toLocaleString()+'× cheaper</strong>, still anchored to Bitcoin.';
+    document.getElementById('verdict').innerHTML='Under BIP-110 rules this file would have cost <strong>'+usd(pUsd)+'</strong> on L1 ('+((pUsd/cUsd-1)*100).toFixed(0)+'% more than today) and about <strong>'+usd(xUsd)+'</strong> on Xtrata. On any layer, the smaller the file, the less every node has to carry.';
   }
   ['size','fee','btc'].forEach(function(id){document.getElementById(id).addEventListener('input',calc);});
   calc();

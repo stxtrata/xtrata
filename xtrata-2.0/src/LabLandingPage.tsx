@@ -97,9 +97,9 @@ const LAB_PILLARS: readonly LabPillar[] = [
 
 const LAB_VALUE_CARDS: readonly LabValueCard[] = [
   {
-    title: 'Permanent by default',
+    title: 'Permanent where it counts',
     description:
-      'Store app assets, records, media, and reusable modules on-chain instead of depending on a fragile backend or disappearing host.'
+      'Put the parts that must last (records, media, reusable modules) on-chain instead of depending on a fragile backend or disappearing host, and keep what changes often off it.'
   },
   {
     title: 'Verifiable and reconstructable',
