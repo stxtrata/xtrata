@@ -114,7 +114,12 @@ export type PageMeta = {
   contentType: string | null;
 };
 
-export function buildMeta(id: string, head: HeadInfo | null, contentType: string | null): PageMeta {
+export function buildMeta(
+  id: string,
+  head: HeadInfo | null,
+  contentType: string | null,
+  canonical = `${SITE}/a/${id}`
+): PageMeta {
   const article = findArticle(id);
   const isImage = !!contentType && /^image\//i.test(contentType);
   const title = article?.title ?? head?.title ?? `Inscription #${id}`;
@@ -129,7 +134,7 @@ export function buildMeta(id: string, head: HeadInfo | null, contentType: string
       : isImage
         ? `${SITE}/i/${id}`
         : null;
-  return { id, title, description, image, canonical: `${SITE}/a/${id}`, article, contentType };
+  return { id, title, description, image, canonical, article, contentType };
 }
 
 const fmtDate = (iso: string) => {
@@ -194,9 +199,9 @@ footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);color:v
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 `;
 
-function headTags(m: PageMeta) {
+export function headTags(m: PageMeta, titleOverride?: string) {
   const a = m.article;
-  const t = a ? `${a.title} · by ${a.author}` : m.title;
+  const t = titleOverride ?? (a ? `${a.title} · by ${a.author}` : m.title);
   const tags = [
     `<title>${esc(t)}</title>`,
     `<meta name="description" content="${esc(m.description)}">`,
@@ -381,4 +386,38 @@ ${header('Articles')}
 </section>
 </body>
 </html>`;
+}
+
+/**
+ * Link-preview crawlers. Only these get server-written previews on /i/ and /x/, so people and
+ * every other client keep getting exactly what they got before.
+ */
+const PREVIEW_BOT =
+  /\b(Twitterbot|facebookexternalhit|Facebot|LinkedInBot|Discordbot|Slackbot|Slack-ImgProxy|TelegramBot|WhatsApp|redditbot|Embedly|SkypeUriPreview|Pinterestbot|Mastodon|Bluesky Cardyb|Iframely|vkShare|Applebot|Google-PageRenderer|bingbot|Googlebot)\b/i;
+
+export const isPreviewBot = (userAgent: string | null | undefined) => !!userAgent && PREVIEW_BOT.test(userAgent);
+
+/** A tiny page for crawlers only: the preview tags and a link to the thing itself. */
+export function renderPreview(m: PageMeta, titleOverride?: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+${headTags(m, titleOverride)}
+</head>
+<body><p><a href="${esc(m.canonical)}">${esc(titleOverride ?? m.title)}</a></p><p>${esc(m.description)}</p></body>
+</html>`;
+}
+
+/** Put a page's own title, description and preview tags into the app shell's <head>. */
+export function injectMeta(shell: string, m: PageMeta, title: string): string {
+  const tags = headTags(m, title)
+    .split('\n')
+    .filter((t) => !/^<title>|name="description"/.test(t))
+    .join('\n');
+  let out = shell.replace(/<title>[\s\S]*?<\/title>/i, `<title>${esc(title)}</title>`);
+  out = /<meta\s+name=["']description["'][^>]*>/i.test(out)
+    ? out.replace(/<meta\s+name=["']description["'][^>]*>/i, `<meta name="description" content="${esc(m.description)}" />`)
+    : out;
+  return out.replace(/<\/head>/i, `${tags}\n</head>`);
 }

@@ -38,6 +38,7 @@
 /x-board/ /recursive-apps/x-board/xboard-version-testing/ 302
 /x-board/:version /recursive-apps/x-board/xboard-version-testing/:version.html 200
 /x-board/:version.html /recursive-apps/x-board/xboard-version-testing/:version.html 200
+# /x/<id> is served by functions/x/[[path]].ts (the same app shell, plus link previews for crawlers). Functions take precedence; this line is the fallback.
 /x/* / 200
 /xplorer / 200
 /xplorer/ / 200
