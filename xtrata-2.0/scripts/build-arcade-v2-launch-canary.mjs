@@ -87,13 +87,13 @@ const NETWORKS = {
 const PINS = {
   'xtrata-posters-v1': '3e9bdfc500c97a166804e15bda29df852e7f0dbea2fe2ebe97048f67399618fb',
   'xtrata-world-v2': 'a72774e95967b81d33c339779e49a7313d864382caed9fe0f08b3761ed9cbc39',
-  'xtrata-screen-v1': 'b11e5cb0ae3de95213c6a8d565b5f1081a9349f853b0b427367a4b77bdcd1dfc',
+  'xtrata-screen-v1': '1d4c9b5340d866075ac75f7c1423b0ab1cdcefa8b4c93abc3b2bcbe19b771315',
   'xtrata-games-v1': '21aeb87eda099e21b776527a35e43a1d451654e86d06c29affaf4903f2727e25',
   'xtrata-arcade-scores-v2': 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5',
   'xtrata-v1-1-1': '1f9ee448262d982017f69479718628689af4a660c28905492b4bad84096d74fd',
   'xtrata-v2-1-0': '3f632b0adc44788366c1cce87a497e0dc789bc99fdd7fd9024a5c47b7df05e2c',
   'xtrata-v3-2-3': '4d5ed9db022bb345d712ceadbd75d8d9540bd0a5b4d9122017c770b8d00a8ac7',
-  release: '92fe2151949e9eac172361d9095a03eefb86fd003270ea0eda015b188489464c'
+  release: '7eb8a00545b7e9daa81156becab96d2dcafbd32bd4dd7c7434ce237e2d98a596'
 };
 const NEW_CONTRACTS = ['xtrata-posters-v1', 'xtrata-world-v2', 'xtrata-screen-v1', 'xtrata-games-v1'];
 // The core and the two contracts it reads from (deployed by the canary on testnet only, with the testnet SIP-009 trait).
