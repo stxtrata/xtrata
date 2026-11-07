@@ -10,7 +10,7 @@ const assert = require('assert');
 const { execFileSync } = require('child_process');
 const out = path.join(require('os').tmpdir(), 'xa-testnet-ads.html');
 execFileSync('node', [path.join(__dirname, '..', 'build', 'testnet-ads.cjs'), '--out', out]);
-const ROOT = 'ST3XASJRRT6A01QQZ67S1B29DZXFX5KRNNZS2Z8GR', BUYER = 'ST3N1VYG563049PE8C2Z24QY6ANW222Y1TQG583X9', OTHER = 'ST18222E20QGZPCEAJ7W88G9EGZJNVFCGZBRQG0F3', PARTNER = 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG';
+const ROOT = 'STVAM4JVX5ES4MV18S00VCAQMPR8928FAHRNMAJ9', BUYER = 'ST3N1VYG563049PE8C2Z24QY6ANW222Y1TQG583X9', OTHER = 'ST18222E20QGZPCEAJ7W88G9EGZJNVFCGZBRQG0F3', PARTNER = 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG';
 const U = (n) => T.uintCV(n), A = (s) => T.stringAsciiCV(s), B = (b) => T.bufferCV(b), P = (a) => T.principalCV(a);
 const HASH = Buffer.alloc(32, 7);
 let slotsOn = true;
@@ -79,7 +79,7 @@ function answer(contract, fn, args) {
   await pg.fill('#startd', '31'); assert(await pg.isDisabled('#buy'), 'a start more than 30 days ahead blocks buying'); await pg.fill('#startd', '1');
   await pg.click('#buy'); await pg.waitForFunction(() => window.__calls.length === 1, null, { timeout: 6000 }).catch(async (e) => { console.log('BUYMSG:', await pg.textContent('#buymsg')); throw e; });
   const c = await pg.evaluate(() => window.__calls[0]);
-  assert.strictEqual(c.contract, 'ST3XASJRRT6A01QQZ67S1B29DZXFX5KRNNZS2Z8GR.xtrata-screen-v1'); assert.strictEqual(c.functionName, 'buy-slot'); assert.strictEqual(c.network, 'testnet'); assert.strictEqual(c.postConditionMode, 'deny');
+  assert.strictEqual(c.contract, 'STVAM4JVX5ES4MV18S00VCAQMPR8928FAHRNMAJ9.xtrata-screen-v1'); assert.strictEqual(c.functionName, 'buy-slot'); assert.strictEqual(c.network, 'testnet'); assert.strictEqual(c.postConditionMode, 'deny');
   assert(c.functionArgs.every((a) => !/^0x/.test(a)) && !('sender' in c), 'bare hex, no sender');
   const dec = c.functionArgs.map((h) => T.cvToValue(T.hexToCV(h)));
   const v = (x) => (x && x.value !== undefined ? x.value : x);
