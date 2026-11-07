@@ -107,7 +107,9 @@ async function route(r) {
     }
     return { failed: null };
   };
-  const ids = await page.$$eval('[data-step]', (els) => els.map((e) => e.getAttribute('data-step')));
+  // the rehearsal page test runs the launch steps (plus the two test games); the other testnet-only extras (doors, reel, ads, Astro...) are exercised by runner-test.cjs
+  const TESTNET_STEPS = ['connect', 'preflight', 'core', 'fixtures', 'deploy', 'kinds', 'hall', 'setup', 'registry', 'pack-engine', 'pack-hall', 'parent', 'release', 'board', 'submit', 'fund', 'copy', 'sweep', 'close', 'boardwallet', 'handover', 'production', 'handback', 'ownership', 'audit', 'boards26', 'testgames'];
+  const ids = (await page.$$eval('[data-step]', (els) => els.map((e) => e.getAttribute('data-step')))).filter((i) => !TESTNET || TESTNET_STEPS.includes(i));
   console.log(`steps (${ids.length}): ${ids.join(', ')}`);
 
   // ---- 1. the wrong wallet is refused at preflight ----
@@ -125,9 +127,6 @@ async function route(r) {
   await page.reload(); await page.waitForTimeout(800);
   }
 
-  // the testnet-only adbuy step needs a picture (the runner reads one from XA_AD_FILE; the page gets a tiny one here, kept across reloads)
-  const setAd = () => { window.XA_AD = { bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68, 65, 84, 8, 215, 99, 248, 207, 192, 0, 0, 3, 1, 1, 0, 24, 221, 141, 176, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130]), mime: 'image/png', name: 'test.png', head: 'TEST AD', body: 'Rented by the page test', days: 1, kind: 2, layout: 0, turns: 1, startDays: 0, link: '' }; };
-  if (TESTNET) { await page.addInitScript(setAd); await page.evaluate(setAd); }
   // ---- 2. a fresh run ----
   console.log('-- 2. a fresh run from the root wallet');
   const t2 = Date.now();
