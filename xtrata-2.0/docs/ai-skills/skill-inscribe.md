@@ -50,8 +50,9 @@ If the request is a coordinated drop of multiple files, hand off to
 
 Xtrata is a contract-native inscription protocol on Stacks (Bitcoin L2). Data is
 split into fixed 16,384-byte chunks, uploaded on-chain, then sealed into a
-SIP-009 NFT. Content is deduplicated by hash — identical data always resolves to
-one canonical token.
+SIP-009 NFT. The hash index is advisory on v3-2-3: `get-id-by-hash` finds the
+first token with identical data, but duplicates are not blocked. Check it before
+uploading and reference the existing token instead of storing a second copy.
 
 ## 3. Contract Reference
 

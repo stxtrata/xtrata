@@ -4705,7 +4705,7 @@
 
       if (state.duplicateId !== null) {
         dom.duplicateText.textContent =
-          `Existing inscription found at ${formatTokenId(state.duplicateId)}. This content is already safely on-chain.`;
+          `Existing inscription found at ${formatTokenId(state.duplicateId)}. This content is already safely on-chain, so you can add it as a dependency instead of storing it again.`;
         dom.duplicateWarning.classList.add('on');
       } else {
         dom.duplicateWarning.classList.remove('on');

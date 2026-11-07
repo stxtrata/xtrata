@@ -2,7 +2,8 @@
 
 > Xtrata is a contract-native inscription protocol on Stacks (Bitcoin L2).
 > Files are split into 16,384-byte chunks, uploaded on-chain, and sealed into
-> SIP-009 NFTs, deduplicated by an incremental SHA-256 hash chain. The
+> SIP-009 NFTs, indexed by an incremental SHA-256 hash chain so duplicates can
+> be found before upload (check get-id-by-hash and reference, not re-upload). The
 > TypeScript SDK (@xtrata/sdk + @xtrata/reconstruction) provides read clients,
 > mint/collection/market workflow planners with deny-mode spend caps, a
 > sponsored-transaction client (zero-STX buys via a relayer), multi-asset

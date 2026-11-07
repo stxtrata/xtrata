@@ -174,7 +174,7 @@ const WALL_AUDIONAUTS = Object.freeze({
 const WALL_RADIO = Object.freeze({
   // Keeps the rotation pool deep enough for the tall and wide slots. Opens Xtrata Radio.
   id: 'xtrata-radio', kind: 'image', tone: 'violet',
-  eyebrow: 'Listen', title: 'Xtrata Radio', subtitle: 'Songs that live on Bitcoin. Press play.',
+  eyebrow: 'Listen', title: 'Xtrata Radio', subtitle: 'Songs that live on chain, anchored to Bitcoin. Press play.',
   image: '/radio/artwork?id=3570', position: 'center',
   href: '/radio'
 });

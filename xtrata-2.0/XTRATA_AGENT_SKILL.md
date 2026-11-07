@@ -40,7 +40,7 @@ description: >
 # Xtrata Inscription Skill
 
 ## Overview
-Xtrata is a contract-native inscription protocol on Stacks (Bitcoin L2). Data is split into fixed 16,384-byte chunks, uploaded on-chain, then sealed into a SIP-009 NFT. Content is deduplicated by a canonical hash, uploads are resumable, and sealed data is immutable.
+Xtrata is a contract-native inscription protocol on Stacks (Bitcoin L2). Data is split into fixed 16,384-byte chunks, uploaded on-chain, then sealed into a SIP-009 NFT. Content has an advisory hash index (`get-id-by-hash`), uploads are resumable, and sealed data is immutable. On v3-2-3 duplicates are not blocked, so check the index first and reference an existing token rather than storing the same bytes again.
 
 Current production contract:
 - Address: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X`
@@ -86,7 +86,7 @@ npm install @stacks/transactions @stacks/network @noble/hashes
    - Standard staged route: `begin-or-get` (or `begin-inscription`) -> one or more `add-chunk-batch` -> `seal-inscription` (or `seal-recursive` / `seal-inscription-batch`)
 2. Chunking is fixed at 16,384 bytes. Maximum file size is 32 MiB (2,048 chunks).
 3. Hashing is incremental SHA-256 chain hashing, not a single hash of full bytes.
-4. Dedupe is native: `HashToId` guarantees one canonical token per final hash.
+4. Dedupe is advisory on v3-2-3: `HashToId` records the first token for each final hash, but duplicate uploads are not blocked. Call `get-id-by-hash` before uploading; if it returns a token, reference it as a dependency instead of re-inscribing. Re-uploading stores a second full copy that every node then carries.
 5. Default route selection for first-party-compatible agents:
    - Use helper route only when helper deployment is available, chunk count is `1..30`, and there is no active upload session to resume.
    - Use staged route for `>30` chunks, legacy core contracts, or whenever a partial upload already exists.
@@ -94,6 +94,7 @@ npm install @stacks/transactions @stacks/network @noble/hashes
 7. Helper-route retries restart the entire single call; staged-route retries can resume from the next missing chunk.
 8. Always use `PostConditionMode.Deny` for fee-paying calls.
 9. Transfers and reads still work while writes are paused.
+10. Block space is shared: every byte you inscribe is carried by every node, for good. Compress media before inscribing, reuse existing inscriptions as dependencies, and run tests and bulk experiments on testnet rather than mainnet.
 
 ## Contract and Network Reference
 
