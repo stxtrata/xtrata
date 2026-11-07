@@ -7,6 +7,7 @@
 // Sandboxed inscriptions cannot open tabs or use the clipboard, so signing
 // here is the primary path. Opening the top-level /arcade/submit page stays
 // available as a fallback.
+import { leaveFullscreenForDialog, restoreFullscreenAfterDialog } from './dialog-fullscreen';
 import type { WalletSession } from '../wallet/types';
 import { hexToCV, cvToValue } from '@stacks/transactions';
 import { ARCADE_BOARDS, ARCADE_GAME, ARCADE_SCORES_CONTRACT_ID, formatArcadeScore, isArcadeBoard } from '../../arcade-submit/arcade-boards';
@@ -143,6 +144,7 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
       settle(outcome);
       if (dialog.open) dialog.close();
       dialog.remove();
+      restoreFullscreenAfterDialog(doc);
     };
     cancel.onclick = () => { if (!signing) close(null); };
     dialog.addEventListener('cancel', (event) => { event.preventDefault(); if (!signing) close(null); });
@@ -155,6 +157,7 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
     };
 
     facts.textContent = `${label}\nBoard: ${info.board}\nScore: ${info.scoreText}`;
+    leaveFullscreenForDialog(doc);
     doc.body.append(dialog);
     dialog.showModal();
     armIdle();

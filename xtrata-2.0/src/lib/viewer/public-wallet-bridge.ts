@@ -1,5 +1,6 @@
 import { GAME_SAVE_METHODS, type SaveReview } from './game-save';
 import { arcadeCallToPayload, type ArcadeOutcome } from './arcade-submit-host';
+import { leaveFullscreenForDialog, restoreFullscreenAfterDialog } from './dialog-fullscreen';
 import { isArcadeInscriptionLabel } from '../../arcade-submit/arcade-boards';
 import { validateStacksAddress } from '@stacks/transactions';
 import type { WalletAdapter, WalletSession } from '../wallet/types';
@@ -488,6 +489,7 @@ function reviewConnect(label: string): Promise<boolean> {
       clearTimeout(timer);
       dialog.close();
       dialog.remove();
+      restoreFullscreenAfterDialog(document);
       resolve(allowed);
     };
     // Stay inside the game's 120-second response window before wallet approval.
@@ -495,6 +497,7 @@ function reviewConnect(label: string): Promise<boolean> {
     cancel.onclick = () => finish(false);
     approve.onclick = () => finish(true);
     dialog.addEventListener('cancel', (event) => { event.preventDefault(); finish(false); });
+    leaveFullscreenForDialog(document);
     document.body.append(dialog);
     dialog.showModal();
     approve.focus();
@@ -537,6 +540,7 @@ export function reviewPublicWalletRequest(request: WalletReview): Promise<boolea
       clearTimeout(timer);
       dialog.close();
       dialog.remove();
+      restoreFullscreenAfterDialog(document);
       resolve(allowed);
     };
     // Stay inside the game's 120-second response window before wallet approval.
@@ -559,6 +563,7 @@ export function reviewPublicWalletRequest(request: WalletReview): Promise<boolea
       dialog.append(details);
     }
     dialog.append(cancel, approve);
+    leaveFullscreenForDialog(document);
     document.body.append(dialog);
     dialog.showModal();
     cancel.focus();
