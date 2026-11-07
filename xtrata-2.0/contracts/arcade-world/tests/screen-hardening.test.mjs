@@ -19,7 +19,7 @@ async function screen() {
   const bal = (who) => simnet.getAssetsMap().get('STX').get(who) ?? 0n;
   const me = `${deployer}.xtrata-screen-v1`;
   const buy = (sender, o = {}) => call('buy-slot', [
-    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(''), U(0), Cl.buffer(new Uint8Array(0)), U(0), U(o.days ?? 1), U(0), U(o.max ?? 1000000000000),
+    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(''), U(0), Cl.buffer(new Uint8Array(0)), U(0), U(o.days ?? 1), U(0), U(o.max ?? 1000000000000), U(o.turns ?? 1), U(o.startAfter ?? 0), S(o.link ?? ''),
   ], sender);
   const item = (id) => ro('get-item', [U(id)]).value.value;
   const idOf = (r) => Number(r.result.value.value);
