@@ -69,6 +69,13 @@ describe('Today on Xtrata schedule', () => {
     expect(await fetchClockOffset((async () => { throw new Error('offline'); }) as never)).toBe(0);
   });
 
+  it('gives the album day a title and a play order that matches its chips', () => {
+    const album = TODAY_SCHEDULE[11] as unknown as { albumTitle: string; tracks: Array<{ tokenId: number }>; action: { tokenId: number } };
+    expect(album.albumTitle).toBe('Audionals - The Opera');
+    expect(album.tracks.map((t) => t.tokenId)).toEqual([2883, 2895, 2910, 2896, 2892, 2885, 2889]);
+    expect(album.action.tokenId).toBe(album.tracks[0].tokenId);
+  });
+
   it('has a primary action with a real destination on every day', () => {
     TODAY_SCHEDULE.forEach((entry) => {
       const a = entry.action as { type: string; href?: string; tokenId?: number };
@@ -119,6 +126,9 @@ describe('homepage wiring', () => {
   it('passes the day to the wall, redraws at UK midnight and keeps daily out of the recent list', () => {
     expect(src).toContain('todayEntry(nowMs()');
     expect(src).toContain('fetchClockOffset');
+    // album days: playing a track from the card puts the radio in album mode, in the card's order
+    expect(src).toContain('api.setGiftPlayer({ id: wallAlbum.id');
+    expect(src).toContain('api.setGiftPlayer(null)');
     expect(src).toContain('msUntilNextUkMidnight');
     expect(src).toContain("tile.kind !== 'daily'");
   });

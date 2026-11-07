@@ -157,6 +157,11 @@ const radioApi = () =>
 const isSongPlaying = (tokenId) =>
   Boolean(radioSnapshot?.playing && String(radioSnapshot?.nowPlaying?.tokenId) === String(tokenId));
 
+// The album on today's card (Today on Xtrata, album days), or null. Playing any of its songs puts the
+// radio into album mode, so the record plays in the card's order and then goes round again.
+let wallAlbum = null;
+let wallAlbumLoaded = null;
+
 const playSong = (tokenId) => {
   const api = radioApi();
   if (!api) {
@@ -166,6 +171,18 @@ const playSong = (tokenId) => {
   if (radioSnapshot?.on && String(radioSnapshot?.nowPlaying?.tokenId) === String(tokenId)) {
     api.playPause();
     return;
+  }
+  const inWallAlbum = Boolean(wallAlbum && wallAlbum.tracks.includes(String(tokenId)));
+  if (inWallAlbum && wallAlbumLoaded !== wallAlbum.id) {
+    api.setGiftPlayer({ id: wallAlbum.id, title: wallAlbum.title, subtitle: wallAlbum.subtitle, tracks: wallAlbum.tracks });
+    wallAlbumLoaded = wallAlbum.id;
+    // Loading an album starts it at its first song; a chip further down the list then jumps to its own song.
+    // If the radio is already playing, loading the album has just started that first song, so do not restart it.
+    if (String(tokenId) === wallAlbum.tracks[0] && radioSnapshot?.on && radioSnapshot?.playing) return;
+  } else if (!inWallAlbum && wallAlbumLoaded) {
+    // Any song from outside the album ends album mode, so the radio goes back to its normal mix.
+    api.setGiftPlayer(null);
+    wallAlbumLoaded = null;
   }
   api.playToken(tokenId);
 };
@@ -626,6 +643,9 @@ const renderWall = () => {
   // During the Today on Xtrata campaign the first big slot is the day's feature (same for everyone).
   const entry = todayEntry(nowMs(), { day: previewDay(window.location.search) });
   const daily = entry ? { ...entry, kind: 'daily' } : null;
+  wallAlbum = entry?.tracks?.length > 1
+    ? { id: entry.id, title: entry.albumTitle || entry.title, subtitle: entry.credit || '', tracks: entry.tracks.map((track) => String(track.tokenId)) }
+    : null;
   const { slots, order } = pickWall({ rotation: HOMEPAGE_WALL_ROTATION, songs: wallSongPool, recent: readWallRecent(), daily });
   wallState = { slots, lastSlot: null };
   mount.replaceChildren(...order.map((item, i) => buildWallTile(item, i)));

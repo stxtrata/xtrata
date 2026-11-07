@@ -21,7 +21,9 @@
 //                { type: 'song', label, tokenId, title, artist }   plays the song on the site radio
 //                { type: 'champion', label, href, fallbackCopy }    link, copy filled from /api/arcade-champion
 //   also       optional second, quieter link { label, href, newTab? }
-//   tracks     optional list of songs shown as numbered play chips (the rest of an album)
+//   tracks     optional list of songs shown as numbered play chips (the rest of an album). Playing any of them
+//              puts the site radio in album mode so the songs play in this order, then loop
+//   albumTitle optional name shown on the radio while the album plays
 //   avoid      wall tile ids that must not appear anywhere on the wall that day, so the same
 //              feature is never shown twice (wall tile ids: astro-blaster, audionauts-stream,
 //              forever-twins, kp-loops, giveaway, xtrata-arcade, chess)
@@ -150,6 +152,7 @@ export const TODAY_SCHEDULE = Object.freeze([
     credit: 'by Audionals',
     tone: 'amber', image: '/radio/artwork?id=2883',
     action: { type: 'song', label: 'Start the album', tokenId: 2883, title: 'Let The Score Remember All', artist: 'Audionals' },
+    albumTitle: 'Audionals - The Opera',
     tracks: [
       { tokenId: 2883, title: 'Let The Score Remember All', artist: 'Audionals' },
       { tokenId: 2895, title: 'It Was Only Midnight', artist: 'Audionals' },
