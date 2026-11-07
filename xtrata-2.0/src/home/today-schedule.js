@@ -152,15 +152,15 @@ export const TODAY_SCHEDULE = Object.freeze([
     action: { type: 'song', label: 'Start the album', tokenId: 2883, title: 'Let The Score Remember All', artist: 'Audionals' },
     tracks: [
       { tokenId: 2883, title: 'Let The Score Remember All', artist: 'Audionals' },
-      { tokenId: 2885, title: 'NEVER ENEMIES', artist: 'Audionals' },
-      { tokenId: 2889, title: 'Where Every Note Remains', artist: 'Audionals' },
-      { tokenId: 2892, title: 'A Thousand Small Percentages', artist: 'Audionals' },
       { tokenId: 2895, title: 'It Was Only Midnight', artist: 'Audionals' },
+      { tokenId: 2910, title: 'MORE LIKE THIS', artist: 'Audionals' },
       { tokenId: 2896, title: 'When the Server Falls', artist: 'Audionals' },
-      { tokenId: 2910, title: 'MORE LIKE THIS', artist: 'Audionals' }
+      { tokenId: 2892, title: 'A Thousand Small Percentages', artist: 'Audionals' },
+      { tokenId: 2885, title: 'NEVER ENEMIES', artist: 'Audionals' },
+      { tokenId: 2889, title: 'Where Every Note Remains', artist: 'Audionals' }
     ],
     avoidSongs: [2883, 2885, 2889, 2892, 2895, 2896, 2910],
-    note: 'EDITORIAL: track order is by inscription number because the songs carry no track numbers. Confirm the running order. Plays one song at a time on the site radio; public albums have no deep link yet.'
+    note: 'Running order confirmed by Jim on 7 Nov from the album list (Audionals - The Opera, 1st Edition, 7 songs). Plays one song at a time on the free site radio; public albums have no deep link yet.'
   }),
   Object.freeze({
     day: 13, id: 'today-parallax', feature: 'ParallaX Casino',
