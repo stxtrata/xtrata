@@ -47,6 +47,19 @@
   function enabled() { return !!(CFG.contract && root.XAWorld && root.XAWorld.read); }
 
   /* ------------------------------------------------------------ pure helpers */
+  // A click-through link is only ever an https:// address of plain URL characters (the contract checks the same; the hall never trusts it).
+  function safeLink(s) {
+    s = typeof s === 'string' ? s : '';
+    if (s.length < 9 || s.length > 100 || s.indexOf('https://') !== 0) return '';
+    if (!/^[A-Za-z0-9\-._~:\/?#\[\]@!$&*+,;=%()]+$/.test(s)) return '';
+    var auth = /^https:\/\/([^\/?#]*)/.exec(s)[1];                 // the host part: no user@ tricks, no ports, not empty
+    return auth && !/[@:]/.test(auth) ? s : '';
+  }
+  // The host a link leads to, for showing on the screen ('' when there is no safe link).
+  function linkHost(s) {
+    var l = safeLink(s), m = l && /^https:\/\/([^\/?#]+)/.exec(l);
+    return m ? m[1].toLowerCase().slice(0, 40) : '';
+  }
   function normalizeItem(id, t) {
     t = t || {};
     var kind = Number(t.kind);
@@ -56,6 +69,8 @@
       imageId: Number(t['image-id'] || 0), imageHash: t['image-hash'] || null, imageSize: Number(t['image-size'] || 0),
       layout: Number(t.layout) === 1 ? 1 : 0,     // 0 standard, 1 full-screen only (premium)
       weight: Math.max(1, Math.min(10, Number(t.weight) || 1)),
+      turns: Math.max(1, Math.min(5, Math.floor(Number(t.turns)) || 1)),       // consecutive 12-second turns each time it comes round
+      link: safeLink(t.link),
       paid: !!t.paid, status: Number(t.status), hidden: !!t.hidden,
       startsAt: Number(t['starts-at'] || 0), endsAt: Number(t['ends-at'] || 0)
     };
@@ -75,7 +90,8 @@
     if (!list.length) return null;
     var layers = [], max = 0; list.forEach(function (it) { if (it.weight > max) max = it.weight; });
     for (var w = 1; w <= max; w++) layers.push(list.filter(function (it) { return it.weight >= w; }).sort(function (a, b) { return a.id - b.id; }));
-    var order = []; layers.forEach(function (l) { order = order.concat(l); });
+    // each entry holds `turns` consecutive slots (a longer ad plays back to back)
+    var order = []; layers.forEach(function (l) { l.forEach(function (it) { for (var r = 0; r < Math.max(1, it.turns || 1); r++) order.push(it); }); });
     var n = order.length;
     return order[((k % n) + n) % n];
   }
@@ -136,7 +152,7 @@
   }
 
   /* ------------------------------------------------------------ the reader */
-  var state = { snap: null, version: null, timer: null, busy: false, listeners: [], pics: {}, animating: false };
+  var state = { current: null, snap: null, version: null, timer: null, busy: false, listeners: [], pics: {}, animating: false };
   function emit(why) { state.listeners.forEach(function (fn) { try { fn(state.snap, why); } catch (e) {} }); }
 
   async function load() {
@@ -320,6 +336,7 @@
     var px = 460 * u, pw = W - px - 28 * u, py = top, ph = bottom - top;
     x.fillStyle = '#0d0b16'; x.fillRect(px, py, pw, ph);
     var slot = slotAt(d.items, d.t || 0, d.rotateSecs || CFG.rotateSecs, d.fullEvery), it = slot.item;
+    state.current = it;
     tendMedia(it);
     // look one slot ahead: if the next slot is a full-screen one, start fetching its picture now so it is ready when its turn comes
     var nx = slotAt(d.items, (d.t || 0) + (d.rotateSecs || CFG.rotateSecs), d.rotateSecs || CFG.rotateSecs, d.fullEvery);
@@ -367,6 +384,11 @@
     x.fillStyle = '#c9c4ee'; x.font = Math.round(36 * u) + 'px VT323, monospace';
     var body = wrapText(function (s) { return x.measureText(s).width; }, it.body, textW, Math.max(1, Math.floor((py + ph - y - 24 * u) / (38 * u))));
     y += 8 * u; body.forEach(function (l) { x.fillText(l, px + pad, y); y += 38 * u; });
+    var host = linkHost(it.link);
+    if (host) {                                           // where the link leads (text only); opening it is the visitor's click
+      x.font = Math.round(30 * u) + 'px VT323, monospace'; x.fillStyle = col; x.textAlign = 'left';
+      x.fillText('\u2197 ' + host, px + pad, py + ph - 20 * u);
+    }
   }
   // The picture fills a rectangle (the whole screen face above the ticker): fitted whole, never cropped or stretched, with a small
   // label top-left and the headline along the bottom edge so an ad is always attributable and readable.
@@ -386,6 +408,12 @@
       x.fillStyle = 'rgba(0,0,0,.66)'; x.fillRect(rx, ry + rh - 62 * u, rw, 62 * u);
       x.fillStyle = col; x.fillRect(rx, ry + rh - 62 * u, rw, 3 * u);
       x.fillStyle = '#ffffff'; x.fillText(line, rx + 32 * u, ry + rh - 18 * u);
+    }
+    var host = linkHost(it.link);
+    if (host) {
+      x.font = Math.round(30 * u) + 'px VT323, monospace'; var hw = x.measureText('\u2197 ' + host).width + 28 * u;
+      x.fillStyle = 'rgba(0,0,0,.62)'; x.fillRect(rx + rw - hw - 16 * u, ry + 16 * u, hw, 42 * u);
+      x.fillStyle = col; x.textAlign = 'left'; x.fillText('\u2197 ' + host, rx + rw - hw - 2 * u, ry + 46 * u);
     }
   }
   function paintIdle(x, d, px, py, pw, ph, u) {
@@ -467,6 +495,15 @@
     onChange: function (fn) { state.listeners.push(fn); },
     items: function () { return state.snap ? state.snap.items : []; },
     paint: paint, latestScorers: latestScorers, champions: champions, orderChampions: orderChampions, leftPhase: leftPhase, slotAt: slotAt, sniffMedia: sniffMedia, idle: function () { tendMedia(null); }, animating: function () { return !!state.animating; },
+    safeLink: safeLink, linkHost: linkHost,
+    // the item on the screen at the last paint, and the safe link to open for it ('' when it has none)
+    current: function () { return state.current; },
+    currentLink: function () { return state.current ? safeLink(state.current.link) : ''; },
+    openLink: function () {
+      var l = state.current ? safeLink(state.current.link) : '';
+      if (!l || !root.open) return false;
+      try { root.open(l, '_blank', 'noopener,noreferrer'); return true; } catch (e) { return false; }
+    },
     normalizeItem: normalizeItem, isActive: isActive, activeItems: activeItems, featureAt: featureAt,
     wrapText: wrapText, tickerText: tickerText, ago: ago, hasPicture: hasPicture,
     _t: { state: state, load: load, restore: restore, save: save }

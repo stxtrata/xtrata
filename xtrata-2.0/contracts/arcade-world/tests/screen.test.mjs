@@ -22,10 +22,10 @@ async function screen() {
   const h = () => simnet.burnBlockHeight;
   const post = (sender, o = {}) => call('post-item', [
     U(o.kind ?? 0), S(o.head ?? 'HELLO'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size),
-    U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100), U(o.layout ?? 0),
+    U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100), U(o.layout ?? 0), U(o.turns ?? 1), S(o.link ?? ''),
   ], sender);
   const buy = (sender, o = {}) => call('buy-slot', [
-    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0), U(o.max ?? 1000000000000),
+    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0), U(o.max ?? 1000000000000), U(o.turns ?? 1), U(o.startAfter ?? 0), S(o.link ?? ''),
   ], sender);
   const live = () => ro('get-live').value.map((x) => Number(x.value));
   const item = (id) => ro('get-item', [U(id)]).value.value;
@@ -531,4 +531,149 @@ test('review fix L-1: an item cannot be parked to start more than a year ahead',
   assert.equal(R(s.post(deployer, { from: far, to: far + 100 })), err(404));
   assert.equal(R(s.post(deployer, { from: now + 52560, to: now + 52560 + 100 })).startsWith('(ok u'), true);   // exactly a year ahead is fine
   assert.equal(R(s.post(deployer, { from: 4000000000, to: 4000000100 })), err(404));
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// 7 Nov upgrade: turns, start date, click-through link, set-weight, partners
+
+async function slots() {
+  const s = await screen();
+  s.call('set-slots-enabled', [Cl.bool(true)]);
+  s.call('set-prices', [U(2_000_000), U(5_000_000), U(10_000_000)]);
+  s.call('set-publisher', [P(s.W[1]), U(2)]);
+  s.call('set-fee-recipient', [P(s.W[5])]);
+  return s;
+}
+
+test('turns: price is per-day x days x turns; the public limit is 3 by default; free items take 1 to 5', async () => {
+  const s = await slots();
+  const { W } = s;
+  assert.equal(pp(s.ro('get-config').value['max-turns']), 'u3');
+  const b0 = s.bal(W[0]);
+  const id = s.idOf(s.buy(W[0], { kind: 2, days: 2, turns: 3 }));            // 10 STX x 2 days x 3 turns
+  assert.equal(b0 - s.bal(W[0]), 60_000_000n);
+  assert.equal(s.item(id).turns.value, 3n);
+  assert.equal(R(s.buy(W[0], { kind: 2, days: 1, turns: 4 })), err(403));    // over the public limit
+  assert.equal(R(s.buy(W[0], { kind: 2, days: 1, turns: 0 })), err(403));   // zero turns
+  // admin raises the public limit (1..5 only)
+  assert.equal(R(s.call('set-max-turns', [U(6)])), err(403));
+  assert.equal(R(s.call('set-max-turns', [U(0)])), err(403));
+  assert.equal(R(s.call('set-max-turns', [U(4)], W[0])), err(400));
+  assert.equal(R(s.call('set-max-turns', [U(5)])), OK);
+  assert.equal(R(s.buy(W[1], { kind: 2, days: 1, turns: 5 })).startsWith('(ok u'), true);
+  // the escrow is exactly what was paid, and cancel refunds all of it
+  assert.equal(R(s.call('cancel', [U(id)], W[0])), OK);
+  assert.equal(s.bal(W[0]), b0);
+  // free items: 1..5 turns
+  assert.equal(R(s.post(s.deployer, { turns: 5 })).startsWith('(ok u'), true);
+  assert.equal(R(s.post(s.deployer, { turns: 6 })), err(403));
+  assert.equal(R(s.post(s.deployer, { turns: 0 })), err(403));
+});
+
+test('start date: the run begins at approval or at the chosen block, whichever is later; nothing is earned before it; bounded to 30 days', async () => {
+  const s = await slots();
+  const { W, h } = s;
+  const b0 = s.bal(W[0]);
+  const startAt = h() + 500;
+  const id = s.idOf(s.buy(W[0], { kind: 1, days: 1, startAfter: startAt }));
+  assert.equal(R(s.buy(W[0], { startAfter: h() + 4321 })), err(404));          // more than 30 days ahead
+  assert.equal(pp(s.ro('get-paid-status', [U(id)]).value.value['start-after']), `u${startAt}`);
+  assert.equal(R(s.call('approve', [U(id)], W[1])), OK);
+  const it = s.item(id);
+  assert.equal(it['starts-at'].value, BigInt(startAt));
+  assert.equal(it['ends-at'].value, BigInt(startAt + 144));
+  // nothing earned while it waits to start
+  s.simnet.mineEmptyBurnBlocks(100);
+  assert.equal(R(s.call('settle', [U(id)], W[3])), '(ok u5000000)');
+  // retired before it starts: the whole price goes back
+  assert.equal(R(s.call('retire', [U(id)], W[1])), OK);
+  assert.equal(s.bal(W[0]), b0);
+  assert.equal(s.ro('get-escrow-total').value, 0n);
+  // a start date already in the past, or 0, means "at approval"
+  const j = s.idOf(s.buy(W[0], { kind: 1, days: 1, startAfter: 1 }));
+  assert.equal(R(s.call('approve', [U(j)], W[1])), OK);
+  assert.equal(s.item(j)['starts-at'].value, BigInt(s.h()));
+});
+
+test('link: empty or https:// with URL characters only, at most 100; free and bought items', async () => {
+  const s = await slots();
+  const { W, deployer } = s;
+  const ok_ = 'https://xtrata.xyz/arcade?x=1&y=2#top';
+  assert.equal(R(s.post(deployer, { link: ok_ })).startsWith('(ok u'), true);
+  assert.equal(R(s.post(deployer, { link: '' })).startsWith('(ok u'), true);
+  for (const bad of ['http://xtrata.xyz', 'ftp://x.y/z', 'javascript:alert(1)', 'https://', 'xtrata.xyz', 'https://a b.c', 'https://a.c/"x', 'https://a.c/<x>', 'https://a.c/\\x', "https://a.c/'x"]) {
+    assert.equal(R(s.post(deployer, { link: bad })), err(403), bad);
+    assert.equal(R(s.buy(W[0], { link: bad })), err(403), bad);
+  }
+  assert.equal(R(s.post(deployer, { link: 'https://' + 'a'.repeat(92) })).startsWith('(ok u'), true);   // exactly 100
+  const id = s.idOf(s.buy(W[0], { link: ok_ }));
+  assert.equal(s.item(id).link.value, ok_);
+  assert.equal(R(s.call('approve', [U(id)], W[1])), OK);
+  assert.equal(s.item(id).link.value, ok_);                                      // unchanged by approval
+});
+
+test('set-weight: a reviewer or the admin changes the order weight of any open item; nobody else', async () => {
+  const s = await slots();
+  const { W, deployer } = s;
+  const f = s.idOf(s.post(deployer, { weight: 1 }));
+  assert.equal(R(s.call('set-weight', [U(f), U(7)], W[0])), err(400));
+  assert.equal(R(s.call('set-weight', [U(f), U(7)], W[1])), OK);               // a reviewer
+  assert.equal(s.item(f).weight.value, 7n);
+  assert.equal(R(s.call('set-weight', [U(f), U(10)])), OK);                    // the admin
+  assert.equal(R(s.call('set-weight', [U(f), U(0)])), err(403));
+  assert.equal(R(s.call('set-weight', [U(f), U(11)])), err(403));
+  assert.equal(R(s.call('set-weight', [U(999), U(1)])), err(402));
+  const v0 = s.ro('get-version').value;
+  s.call('set-weight', [U(f), U(3)]);
+  assert.equal(s.ro('get-version').value > v0, true, 'the hall is told to re-read');
+  // a bought slot, pending or running
+  const id = s.idOf(s.buy(W[0], { kind: 2, layout: 0 }));
+  assert.equal(R(s.call('set-weight', [U(id), U(4)], W[1])), OK);
+  assert.equal(R(s.call('approve', [U(id)], W[1])), OK);
+  assert.equal(s.item(id).weight.value, 4n);
+  // closed items cannot be changed
+  s.call('retire', [U(f)]);
+  assert.equal(R(s.call('set-weight', [U(f), U(2)])), err(409));
+});
+
+test('partners: discount and own limits, set and removed by the admin only; money stays exact', async () => {
+  const s = await slots();
+  const { W, deployer } = s;
+  assert.equal(pp(s.ro('get-partner', [P(W[2])])), 'none');
+  assert.equal(R(s.call('set-partner', [P(W[2]), U(50), U(30), U(5)], W[1])), err(400));      // not even a reviewer
+  assert.equal(R(s.call('set-partner', [P(W[2]), U(91), U(30), U(5)])), err(403));
+  assert.equal(R(s.call('set-partner', [P(W[2]), U(50), U(0), U(5)])), err(403));
+  assert.equal(R(s.call('set-partner', [P(W[2]), U(50), U(91), U(5)])), err(403));
+  assert.equal(R(s.call('set-partner', [P(W[2]), U(50), U(30), U(6)])), err(403));
+  assert.equal(R(s.call('set-partner', [P(W[2]), U(50), U(30), U(0)])), err(403));
+  assert.equal(R(s.call('set-partner', [P(W[2]), U(50), U(30), U(5)])), OK);
+  // half price, 30 days, 5 turns: an ad is 10 STX/day x 20 days x 5 turns = 1000 STX, half = 500
+  const b0 = s.bal(W[2]);
+  const id = s.idOf(s.buy(W[2], { kind: 2, days: 20, turns: 5 }));
+  assert.equal(b0 - s.bal(W[2]), 500_000_000n);
+  assert.equal(s.item(id).escrow.value, 500_000_000n);
+  assert.equal(s.item(id).price.value, 500_000_000n);
+  // others still get the full price and the public limits
+  assert.equal(R(s.buy(W[3], { kind: 2, days: 20 })), err(404));
+  assert.equal(R(s.buy(W[3], { kind: 2, days: 1, turns: 5 })), err(403));
+  const c0 = s.bal(W[3]); s.idOf(s.buy(W[3], { kind: 2, days: 1 }));
+  assert.equal(c0 - s.bal(W[3]), 10_000_000n);
+  // refunds are exactly what was escrowed
+  assert.equal(R(s.call('cancel', [U(id)], W[2])), OK);
+  assert.equal(s.bal(W[2]), b0);
+  // a running discounted slot: pulled halfway, the rest of the discounted price goes back
+  const j = s.idOf(s.buy(W[2], { kind: 2, days: 2, turns: 1 }));              // 10 x 2 x 1 / 2 = 10 STX
+  s.call('approve', [U(j)], W[1]);
+  s.simnet.mineEmptyBurnBlocks(144);
+  const f0 = s.bal(W[5]), r0 = s.bal(W[2]);
+  assert.equal(R(s.call('retire', [U(j)], W[1])), OK);
+  assert.equal((s.bal(W[5]) - f0) + (s.bal(W[2]) - r0), 10_000_000n, 'earned + refunded = the escrow, to the uSTX');
+  assert.equal(s.ro('get-escrow-total').value, 10_000_000n, 'only the other buyer\'s pending slot is still escrowed');
+  // removing a partner: later purchases at the public terms; unknown partner is an error
+  assert.equal(R(s.call('remove-partner', [P(W[2])], W[1])), err(400));
+  assert.equal(R(s.call('remove-partner', [P(W[2])])), OK);
+  assert.equal(R(s.call('remove-partner', [P(W[2])])), err(402));
+  assert.equal(pp(s.ro('get-partner', [P(W[2])])), 'none');
+  assert.equal(R(s.buy(W[2], { kind: 2, days: 20 })), err(404));
+  void deployer;
 });

@@ -31,6 +31,15 @@
 ;;   buying and approving, never refunds, settling or retiring.
 ;; - Successor pointer with a one-way lock; the read interface is frozen at v1.
 ;;
+;; - Turns: an item may take 1 to 5 CONSECUTIVE 12-second turns each time it comes round (a 36-second ad = 3 turns). A bought slot's
+;;   price is price-per-day x days x turns. The public may buy up to `max-turns` (admin setting, default 3); partners up to their own limit.
+;; - Start date: a buyer may name the earliest block the run may begin (at most 30 days ahead). The run starts at approval or at that
+;;   block, whichever is later, and lasts days x 144 blocks from then; nothing is earned before it starts.
+;; - Click-through link: an optional https:// link (at most 100 characters, URL characters only). The hall shows where it leads and opens it
+;;   only when a visitor clicks. Reviewers see the link before approving a paid item and can hide or retire any item.
+;; - Order: items come round by weight (1 to 10), then by id. A reviewer or the admin can change an item's weight at any time (`set-weight`).
+;; - Partners: the admin can give an address a discount (0 to 90%) and higher limits (days, turns). Nobody is a partner until the admin says so.
+;;
 ;; Layout values: 0 standard (panel, plus its turn in the full-screen rotation if it has a picture), 1 full-screen only (premium, needs a picture)
 ;; Kind values:   0 message, 1 news, 2 ad
 ;; Status values: 0 pending (awaiting review), 1 approved (live or scheduled), 2 closed
@@ -63,6 +72,12 @@
 (define-constant MIN-PREMIUM-PERCENT u100)
 (define-constant MAX-PREMIUM-PERCENT u1000)
 (define-constant MAX-DAYS-LIMIT u90)
+(define-constant MAX-TURNS-LIMIT u5)            ;; five 12-second turns = a minute
+(define-constant MAX-BOOK-AHEAD u4320)          ;; a paid run may be booked to start at most 30 days ahead
+(define-constant MAX-DISCOUNT u90)
+(define-constant LINK-MAX u100)
+(define-constant LINK-PREFIX "https://")
+(define-constant URL-CHARS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~:/?#[]@!$&*+,;=%()")
 (define-constant MAX-PAID-LIVE-LIMIT u16)
 (define-constant MAX-PENDING-LIMIT u8)
 (define-constant MIN-REVIEW-WINDOW u144)
@@ -86,6 +101,7 @@
 (define-data-var premium-percent uint u200)   ;; a full-screen-only slot costs this % of the kind's price (100 = no premium)
 (define-data-var min-days uint u1)
 (define-data-var max-days uint u14)
+(define-data-var max-turns uint u3)           ;; the most consecutive turns the public can buy (partners may have more)
 (define-data-var max-paid-live uint u8)
 (define-data-var max-pending-per-buyer uint u2)
 (define-data-var review-window uint u432)
@@ -104,6 +120,10 @@
 (define-map PendingCount principal uint)
 ;; a paid item's review deadline (burn height), fixed when it is bought
 (define-map Deadlines uint uint)
+;; a paid item's earliest start (burn height), 0 = at approval
+(define-map StartAfter uint uint)
+;; partners: a discount in % off, and their own limits (days, consecutive turns)
+(define-map Partners principal { discount: uint, max-days: uint, max-turns: uint })
 
 (define-map Items uint
   {
@@ -114,6 +134,8 @@
     image-hash: (buff 32),
     image-size: uint,
     layout: uint,
+    turns: uint,
+    link: (string-ascii 100),
     weight: uint,
     publisher: principal,
     paid: bool,
@@ -171,6 +193,25 @@
   (if (is-eq size u0)
     (and (is-eq id u0) (is-eq (len hash) u0))
     (and (<= size MAX-IMAGE-BYTES) (inscription-ok? id hash size who))))
+
+;; An optional click-through link: empty, or https:// followed by URL characters only (no spaces, quotes or angle brackets), at most 100 long.
+(define-private (url-char-ok? (c (string-ascii 1)) (acc bool))
+  (and acc (is-some (index-of? URL-CHARS c))))
+(define-private (link-ok? (link (string-ascii 100)))
+  (or (is-eq (len link) u0)
+      (and (> (len link) (len LINK-PREFIX))
+           (is-eq (slice? link u0 (len LINK-PREFIX)) (some LINK-PREFIX))
+           (fold url-char-ok? link true))))
+
+(define-private (partner-of (who principal))
+  (map-get? Partners who))
+;; the discount (%), the most days and the most turns this buyer may book
+(define-private (discount-of (who principal))
+  (match (partner-of who) p (get discount p) u0))
+(define-private (days-limit-of (who principal))
+  (match (partner-of who) p (umax (var-get max-days) (get max-days p)) (var-get max-days)))
+(define-private (turns-limit-of (who principal))
+  (match (partner-of who) p (umax (var-get max-turns) (get max-turns p)) (var-get max-turns)))
 
 ;; How an item is shown: 0 standard, 1 FULL-SCREEN ONLY (a premium slot). A standard item with a picture is shown in the feature panel
 ;; and also takes its turn in the hall's full-screen rotation, so everything with a picture gets the whole screen now and then.
@@ -243,7 +284,7 @@
 ;; rounded down, so the unearned part is rounded up (any rounding goes the buyer's way) and the two
 ;; always add up to the price: no uSTX is lost. The approval block itself charges nothing.
 (define-private (unearned (it { kind: uint, head: (string-ascii 80), body: (string-ascii 240), image-id: uint,
-    image-hash: (buff 32), image-size: uint, layout: uint, weight: uint, publisher: principal, paid: bool,
+    image-hash: (buff 32), image-size: uint, layout: uint, turns: uint, link: (string-ascii 100), weight: uint, publisher: principal, paid: bool,
     buyer: (optional principal), days: uint, price: uint, escrow: uint, status: uint, hidden: bool,
     starts-at: uint, ends-at: uint, added-at: uint, closed-reason: uint }))
   (let (
@@ -278,7 +319,7 @@
 (define-public (post-item
   (kind uint) (head (string-ascii 80)) (body (string-ascii 240))
   (image-id uint) (image-hash (buff 32)) (image-size uint)
-  (weight uint) (starts-at uint) (ends-at uint) (layout uint))
+  (weight uint) (starts-at uint) (ends-at uint) (layout uint) (turns uint) (link (string-ascii 100)))
   (let (
     (id (var-get count))
     (admin? (is-admin))
@@ -293,9 +334,11 @@
     (asserts! (<= from (+ burn-block-height MAX-SPAN)) ERR-WINDOW)   ;; cannot be parked to start in the far future
     (asserts! (image-valid? image-id image-hash image-size tx-sender) ERR-INSCRIPTION)
     (asserts! (layout-ok? layout image-size) ERR-INVALID)
+    (asserts! (and (>= turns u1) (<= turns MAX-TURNS-LIMIT)) ERR-INVALID)
+    (asserts! (link-ok? link) ERR-INVALID)
     (map-set Items id {
       kind: kind, head: head, body: body,
-      image-id: image-id, image-hash: image-hash, image-size: image-size, layout: layout,
+      image-id: image-id, image-hash: image-hash, image-size: image-size, layout: layout, turns: turns, link: link,
       weight: weight, publisher: tx-sender, paid: false, buyer: none, days: u0, price: u0, escrow: u0,
       status: status, hidden: false, starts-at: from, ends-at: ends-at,
       added-at: burn-block-height, closed-reason: u0 })
@@ -353,19 +396,25 @@
 
 (define-public (buy-slot
   (kind uint) (head (string-ascii 80)) (body (string-ascii 240))
-  (image-id uint) (image-hash (buff 32)) (image-size uint) (days uint) (layout uint) (max-price uint))
+  (image-id uint) (image-hash (buff 32)) (image-size uint) (days uint) (layout uint) (max-price uint)
+  (turns uint) (start-after uint) (link (string-ascii 100)))
   (let (
     (buyer tx-sender)
     (id (var-get count))
     (per-day (if (is-eq layout u1) (/ (* (price-of kind) (var-get premium-percent)) u100) (price-of kind)))
-    (price (if (and (>= days (var-get min-days)) (<= days (var-get max-days))) (* per-day days) u0))
+    (full (if (and (>= days (var-get min-days)) (<= days (days-limit-of tx-sender)) (>= turns u1) (<= turns (turns-limit-of tx-sender)))
+              (* (* per-day days) turns) u0))
+    (price (/ (* full (- u100 (discount-of tx-sender))) u100))
     (pend (default-to u0 (map-get? PendingCount tx-sender))))
     (asserts! (not (var-get paused)) ERR-PAUSED)
     (asserts! (var-get slots-enabled) ERR-SLOTS-OFF)
     (asserts! (is-eq contract-caller tx-sender) ERR-NOT-AUTHORIZED)
     (asserts! (<= kind u2) ERR-INVALID)
     (asserts! (> (len head) u0) ERR-INVALID)
-    (asserts! (and (>= days (var-get min-days)) (<= days (var-get max-days))) ERR-WINDOW)
+    (asserts! (and (>= days (var-get min-days)) (<= days (days-limit-of buyer))) ERR-WINDOW)
+    (asserts! (and (>= turns u1) (<= turns (turns-limit-of buyer))) ERR-INVALID)
+    (asserts! (<= start-after (+ burn-block-height MAX-BOOK-AHEAD)) ERR-WINDOW)
+    (asserts! (link-ok? link) ERR-INVALID)
     (asserts! (> price u0) ERR-PRICE)
     (asserts! (<= price max-price) ERR-PRICE-MOVED)
     (asserts! (< pend (var-get max-pending-per-buyer)) ERR-CAP-PENDING)
@@ -376,17 +425,18 @@
     (var-set total-escrow (+ (var-get total-escrow) price))
     (map-set Items id {
       kind: kind, head: head, body: body,
-      image-id: image-id, image-hash: image-hash, image-size: image-size, layout: layout,
+      image-id: image-id, image-hash: image-hash, image-size: image-size, layout: layout, turns: turns, link: link,
       weight: (if (is-eq layout u1) PREMIUM-WEIGHT u1), publisher: buyer, paid: true, buyer: (some buyer), days: days, price: price, escrow: price,
       status: u0, hidden: false, starts-at: u0, ends-at: u0,
       added-at: burn-block-height, closed-reason: u0 })
     (map-set PendingCount buyer (+ pend u1))
     (map-set Deadlines id (+ burn-block-height (var-get review-window)))
+    (if (> start-after u0) (map-set StartAfter id start-after) true)
     (var-set count (+ id u1))
-    (print { event: "slot-bought", id: id, buyer: buyer, kind: kind, days: days, price: price, version: (var-get version) })
+    (print { event: "slot-bought", id: id, buyer: buyer, kind: kind, days: days, turns: turns, start-after: start-after, price: price, version: (var-get version) })
     (ok id)))
 
-;; Approve a pending item (admin or reviewer). A paid item's run starts now (its escrow stays here
+;; Approve a pending item (admin or reviewer). A paid item's run starts now, or at the buyer's chosen start block if that is later (its escrow stays here
 ;; and is earned block by block, see settle); a free item from the review lane goes live in its own window.
 (define-public (approve (id uint))
   (let (
@@ -396,10 +446,12 @@
     (asserts! (is-reviewer) ERR-NOT-AUTHORIZED)
     (asserts! (is-eq (get status it) u0) ERR-STATUS)
     (if (get paid it)
-      (let ((ends (+ now (* (get days it) DAY-BLOCKS))))
+      (let (
+        (start (umax now (default-to u0 (map-get? StartAfter id))))
+        (ends (+ start (* (get days it) DAY-BLOCKS))))
         ;; a stale request waits no longer than its review window; sweep refunds it
         (asserts! (<= now (deadline-of id it)) ERR-WINDOW)
-        (map-set Items id (merge it { status: u1, starts-at: now, ends-at: ends }))
+        (map-set Items id (merge it { status: u1, starts-at: start, ends-at: ends }))
         (try! (add-live id))
         (match (get buyer it) b (dec-pending b) false)
         true)
@@ -456,7 +508,7 @@
     (settle-run id false)))
 
 (define-private (deadline-of (id uint) (it { kind: uint, head: (string-ascii 80), body: (string-ascii 240), image-id: uint,
-    image-hash: (buff 32), image-size: uint, layout: uint, weight: uint, publisher: principal, paid: bool,
+    image-hash: (buff 32), image-size: uint, layout: uint, turns: uint, link: (string-ascii 100), weight: uint, publisher: principal, paid: bool,
     buyer: (optional principal), days: uint, price: uint, escrow: uint, status: uint, hidden: bool,
     starts-at: uint, ends-at: uint, added-at: uint, closed-reason: uint }))
   (default-to (+ (get added-at it) (var-get review-window)) (map-get? Deadlines id)))
@@ -524,6 +576,43 @@
     (var-set kind-caps { message: message, news: news, ad: ad })
     (var-set cap-live-per-publisher per-publisher)
     (note "caps" u0)
+    (ok true)))
+
+;; Change an item's weight (admin or reviewer), i.e. how often it comes round, for any item that is not closed. Not for the
+;; buyer: a bought full-screen slot starts at weight 2 and a reviewer may raise or lower it.
+(define-public (set-weight (id uint) (weight uint))
+  (let ((it (unwrap! (map-get? Items id) ERR-NOT-FOUND)))
+    (asserts! (is-reviewer) ERR-NOT-AUTHORIZED)
+    (asserts! (< (get status it) u2) ERR-STATUS)
+    (asserts! (and (>= weight u1) (<= weight u10)) ERR-INVALID)
+    (map-set Items id (merge it { weight: weight }))
+    (print { event: "item-weight", id: id, weight: weight, version: (bump) })
+    (ok true)))
+
+;; The most consecutive turns the public can buy.
+(define-public (set-max-turns (n uint))
+  (begin
+    (asserts! (is-admin) ERR-NOT-AUTHORIZED)
+    (asserts! (and (>= n u1) (<= n MAX-TURNS-LIMIT)) ERR-INVALID)
+    (var-set max-turns n)
+    (note "max-turns" n)
+    (ok true)))
+
+;; Partners: a discount (0 to 90 % off) and their own limits. Replaces any earlier entry. Applies to purchases made after it.
+(define-public (set-partner (who principal) (discount uint) (days uint) (turns uint))
+  (begin
+    (asserts! (is-admin) ERR-NOT-AUTHORIZED)
+    (asserts! (and (<= discount MAX-DISCOUNT) (>= days u1) (<= days MAX-DAYS-LIMIT) (>= turns u1) (<= turns MAX-TURNS-LIMIT)) ERR-INVALID)
+    (map-set Partners who { discount: discount, max-days: days, max-turns: turns })
+    (print { event: "partner-set", who: who, discount: discount, max-days: days, max-turns: turns, version: (var-get version) })
+    (ok true)))
+
+(define-public (remove-partner (who principal))
+  (begin
+    (asserts! (is-admin) ERR-NOT-AUTHORIZED)
+    (asserts! (is-some (map-get? Partners who)) ERR-NOT-FOUND)
+    (map-delete Partners who)
+    (print { event: "partner-removed", who: who, version: (var-get version) })
     (ok true)))
 
 ;; Earned escrow is paid at settlement to whoever is the recipient at that moment, so call
@@ -594,6 +683,7 @@
 (define-read-only (get-items (ids (list 10 uint))) (map get-item ids))
 (define-read-only (get-live) (var-get live))
 (define-read-only (get-publisher (who principal)) (default-to u0 (map-get? Publishers who)))
+(define-read-only (get-partner (who principal)) (map-get? Partners who))
 (define-read-only (get-pending-count (who principal)) (default-to u0 (map-get? PendingCount who)))
 (define-read-only (is-paused) (var-get paused))
 (define-read-only (get-successor) { successor: (var-get successor), locked: (var-get successor-locked) })
@@ -601,7 +691,7 @@
 (define-read-only (get-config)
   {
     paused: (var-get paused), review-lane: (var-get review-lane), slots-enabled: (var-get slots-enabled),
-    prices: (var-get prices), premium-percent: (var-get premium-percent), min-days: (var-get min-days), max-days: (var-get max-days),
+    prices: (var-get prices), premium-percent: (var-get premium-percent), min-days: (var-get min-days), max-days: (var-get max-days), max-turns: (var-get max-turns),
     max-paid-live: (var-get max-paid-live), max-pending-per-buyer: (var-get max-pending-per-buyer),
     review-window: (var-get review-window), fee-recipient: (var-get fee-recipient),
     kind-caps: (var-get kind-caps), cap-live-per-publisher: (var-get cap-live-per-publisher),
@@ -611,7 +701,7 @@
 ;; A paid item's review deadline (fixed at purchase) and, while it runs, what is still unearned.
 (define-read-only (get-paid-status (id uint))
   (match (map-get? Items id)
-    it (some { deadline: (deadline-of id it), escrow: (get escrow it),
+    it (some { deadline: (deadline-of id it), escrow: (get escrow it), start-after: (default-to u0 (map-get? StartAfter id)),
                unearned: (if (and (get paid it) (is-eq (get status it) u1)) (umin (unearned it) (get escrow it)) u0) })
     none))
 ;; STX held that belongs to no item (gifts sent straight to the contract). It cannot be withdrawn.
