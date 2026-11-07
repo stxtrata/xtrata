@@ -46,6 +46,10 @@ a{color:var(--acc)}
  <div class="mut" style="font-size:13px;margin-bottom:6px">Only shown to the admin wallet. Free items need no payment and go live straight away. Use one to point visitors at this page.</div>
  <div class="row"><div><label>Type</label><select id="fkind"><option value="2" selected>Ad (feature panel)</option><option value="1">News</option><option value="0">Message</option></select></div>
  <div><label>Days on the screen (1 to 365)</label><input id="fdays" type="number" min="1" max="365" value="365"></div></div>
+ <div class="row"><div><label>Picture or clip: inscription id (optional; must be inscribed by this admin wallet; PNG, JPEG, GIF, WebP, MP4 or WebM up to 2 MB)</label><input id="fimg" inputmode="numeric" placeholder="e.g. 3700"></div>
+ <div><label>Layout</label><select id="flayout"><option value="0">Standard (also takes its turn full-screen if it has a picture)</option><option value="1">Full-screen only (needs a picture)</option></select></div></div>
+ <div id="fimgchk" class="mut" style="margin-top:6px"></div>
+ <div class="row"><div><label>Turns in a row (12 seconds each)</label><select id="fturns"><option value="1">1 turn</option><option value="2">2 turns</option><option value="3">3 turns</option></select></div><div></div></div>
  <label>Headline (ASCII, up to 80)</label><input id="fhead" maxlength="80" value="ADVERTISE HERE">
  <label>Text (ASCII, up to 240)</label><textarea id="fbody" maxlength="240">Put your own message or ad on this screen. Details at xtrata.xyz/arcade/advertise</textarea>
  <label>Click-through link (https:// only)</label><input id="flink" maxlength="100" value="https://xtrata.xyz/arcade/advertise">
@@ -1187,14 +1191,32 @@ a{color:var(--acc)}
       setTimeout(loadItems, 20000);
     } catch (e) { btn.disabled = false; alert(e.message || e); }
   }
+  var fpic = { id: 0, hash: new Uint8Array(0), size: 0, ok: true }, fchk = Promise.resolve();
+  async function checkFreePic() {
+    var v = $('fimg').value.trim(); fpic = { id: 0, hash: new Uint8Array(0), size: 0, ok: true };
+    if (!v) { $('fimgchk').textContent = 'No picture: a text-only item.'; return; }
+    if (!/^\d+$/.test(v)) { fpic.ok = false; $('fimgchk').innerHTML = '<span class="bad">Use the inscription number only.</span>'; return; }
+    var id = +v; fpic.ok = false; $('fimgchk').textContent = 'Checking inscription #' + id + ' on the core…';
+    try {
+      var uid = C.cvUint(id), sealed = await read('is-inscription-sealed', [uid], CORE), creator = await read('get-inscription-creator', [uid], CORE),
+          hash = await read('get-inscription-hash', [uid], CORE), size = await read('get-inscription-size', [uid], CORE);
+      var why = !sealed ? 'is not sealed yet' : !creator ? 'was not found' : creator !== me ? 'was inscribed by ' + creator + ', not the connected admin wallet' : size > 2097152 ? 'is over the 2 MB limit' : '';
+      if (why) { $('fimgchk').innerHTML = '<span class="bad">#' + id + ' ' + esc(why) + '.</span>'; return; }
+      fpic = { id: id, hash: C.hexToBytes(hash), size: size, ok: true };
+      $('fimgchk').innerHTML = '<span class="ok">#' + id + ' is sealed, yours, ' + size.toLocaleString('en-GB') + ' bytes.</span>';
+    } catch (e) { $('fimgchk').innerHTML = '<span class="bad">Could not read #' + id + ': ' + esc(e.message) + '</span>'; }
+  }
   async function postFree() {
+    await checkFreePic();   // always re-check on click: never trust the typing debounce
     var head = $('fhead').value.trim(), days = +$('fdays').value, link = $('flink').value.trim(), body = $('fbody').value.trim();
     var bad = !head ? 'Add a headline.' : !(Number.isInteger(days) && days >= 1 && days <= 365) ? 'Days must be 1 to 365.' : !/^[\x20-\x7e]*$/.test(head + body) ? 'ASCII text only.' : (link && (!/^https:\/\//.test(link) || link.length > 100 || !URL_RE.test(link))) ? 'The link must be https:// and under 100 characters.' : '';
+    if (!bad && !fpic.ok) bad = 'Fix the picture.';
+    if (!bad && +$('flayout').value === 1 && !fpic.id) bad = 'Full-screen only needs a picture.';
     if (bad) { $('fmsg').innerHTML = '<span class="bad">' + esc(bad) + '</span>'; return; }
     $('fpost').disabled = true; $('fmsg').innerHTML = '<span class="mut">Waiting for your wallet…</span>';
     try {
       height = await read('get-height');
-      var args = [C.cvUint(+$('fkind').value), C.cvAscii(head), C.cvAscii(body), C.cvUint(0), C.cvBuff(new Uint8Array(0)), C.cvUint(0), C.cvUint(1), C.cvUint(0), C.cvUint(height + days * 144), C.cvUint(0), C.cvUint(1), C.cvAscii(link)];
+      var args = [C.cvUint(+$('fkind').value), C.cvAscii(head), C.cvAscii(body), C.cvUint(fpic.id), C.cvBuff(fpic.hash), C.cvUint(fpic.size), C.cvUint(1), C.cvUint(0), C.cvUint(height + days * 144), C.cvUint(+$('flayout').value), C.cvUint(+$('fturns').value), C.cvAscii(link)];
       var r = await XAScores.callContract({ contract: SCREEN, fn: 'post-item', args: args, maxUstx: '0', expectAddress: me });
       $('fmsg').innerHTML = '<span class="ok">Sent.</span> <a target="_blank" rel="noopener" href="https://explorer.hiro.so/txid/' + esc(r.txid) + EXPLORER + '">transaction</a>';
       setTimeout(loadItems, 20000);
@@ -1208,10 +1230,10 @@ a{color:var(--acc)}
     me = s.address || ''; var wrong = me && (/^S[PM]/.test(me) !== MAIN);
     $('wstat').innerHTML = !me ? 'Not connected.' : wrong ? '<span class="bad">That is a ' + (MAIN ? 'testnet' : 'mainnet') + ' account (' + esc(me) + '). Switch your wallet to ' + NET + '.</span>' : 'Connected: <span class="mono">' + esc(me) + '</span>' + (me === admin ? ' <b class="gold">(admin)</b>' : '');
     $('wbtn').textContent = me ? 'Reconnect' : 'Connect wallet'; if (wrong) me = '';
-    $('freecard').style.display = me && me === admin ? '' : 'none';
+    $('freecard').style.display = me && me === admin ? '' : 'none'; if (me && me === admin) fchk = checkFreePic();
     updateBuy(); checkPicture(true); loadPartner(); if (cfg) loadItems();
   });
-  $('fpost').onclick = postFree; $('wbtn').onclick = connect; $('buy').onclick = buy; $('refresh').onclick = function () { loadConfig(); loadItems(); };
+  $('fpost').onclick = postFree; $('fimg').addEventListener('input', function () { clearTimeout(this._t); this._t = setTimeout(function () { fchk = checkFreePic(); }, 500); }); $('wbtn').onclick = connect; $('buy').onclick = buy; $('refresh').onclick = function () { loadConfig(); loadItems(); };
   ['kind', 'layout', 'days', 'head', 'body', 'turns', 'startd', 'link'].forEach(function (id) { $(id).addEventListener('input', updateBuy); });
   $('img').addEventListener('change', function () { checkPicture(false); }); $('img').addEventListener('input', function () { clearTimeout(this._t); this._t = setTimeout(function () { checkPicture(false); }, 500); });
   loadConfig().then(function () { return loadPartner(); }).then(loadItems); checkPicture(true);

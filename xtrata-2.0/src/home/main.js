@@ -208,6 +208,12 @@
     import { runGameSave } from '/src/lib/viewer/game-save.ts';
     import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
     import { runArcadeSubmit } from '/src/lib/viewer/arcade-submit-host.ts';
+    import { isArcadeInscriptionLabel } from '/src/arcade-submit/arcade-boards.ts';
+    // The arcade opens the link shown on its big screen with window.open on a key press or click. A sandboxed frame cannot open tabs
+    // unless it is allowed to; the new tab must escape the sandbox or the destination site would load broken. Arcade frames only.
+    const INSCRIPTION_SANDBOX = 'allow-scripts allow-pointer-lock allow-downloads';
+    const inscriptionSandbox = (label) =>
+      isArcadeInscriptionLabel(label || '') ? INSCRIPTION_SANDBOX + ' allow-popups allow-popups-to-escape-sandbox' : INSCRIPTION_SANDBOX;
     import { resolveInscriptionMimeType } from '/src/lib/mint/mime.ts';
     import {
       mergeDependencySources,
@@ -3660,7 +3666,7 @@
         const isPdf =
           previewMimeType?.trim().toLowerCase() === 'application/pdf';
         if (!isPdf) {
-          frame.sandbox = 'allow-scripts allow-pointer-lock allow-downloads';
+          frame.sandbox = inscriptionSandbox(options.walletLabel);
           frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (options.htmlDoc && !isPdf) {
@@ -6233,7 +6239,7 @@
         frame.loading = 'lazy';
         const isPdf = fullscreenMimeType === 'application/pdf';
         if (!isPdf) {
-          frame.sandbox = 'allow-scripts allow-pointer-lock allow-downloads';
+          frame.sandbox = inscriptionSandbox(`Inscription #${token.id.toString()}`);
           frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (htmlDoc && !isPdf) {

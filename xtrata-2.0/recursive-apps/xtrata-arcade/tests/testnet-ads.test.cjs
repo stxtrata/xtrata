@@ -35,7 +35,7 @@ function answer(contract, fn, args) {
   } else {
     const id = Number(arg(0).value ?? arg(0));
     if (fn === 'is-inscription-sealed') return T.someCV(T.trueCV());
-    if (fn === 'get-inscription-creator') return id === 77 ? T.someCV(P(BUYER)) : id === 88 ? T.someCV(P(OTHER)) : T.noneCV();
+    if (fn === 'get-inscription-creator') return id === 99 ? T.someCV(P(ROOT)) : id === 77 ? T.someCV(P(BUYER)) : id === 88 ? T.someCV(P(OTHER)) : T.noneCV();
     if (fn === 'get-inscription-hash') return T.someCV(B(HASH));
     if (fn === 'get-inscription-size') return T.someCV(U(5000));
   }
@@ -114,10 +114,14 @@ function answer(contract, fn, args) {
   ({ pg, errors } = await open(ROOT)); await pg.click('#wbtn'); await pg.waitForSelector('button[data-a=approve]');
   await pg.evaluate(() => { window.confirm = () => true; }); await pg.click('button[data-a=reject]'); await pg.waitForFunction(() => window.__calls.length === 1);
   const rj = await pg.evaluate(() => window.__calls.shift()); assert.strictEqual(rj.functionName, 'reject'); assert.strictEqual(rj.postConditions.length, 2, 'reject (a refund) carries the contract post-condition too');
-  assert(await pg.isVisible('#freecard'), 'the admin sees the free-post card'); await pg.click('#fpost'); await pg.waitForFunction(() => window.__calls.length === 1);
+  assert(await pg.isVisible('#freecard'), 'the admin sees the free-post card');
+  await pg.fill('#fimg', '77'); await pg.waitForFunction(() => /not the connected admin wallet/.test(document.getElementById('fimgchk').textContent)); await pg.click('#fpost'); await pg.waitForTimeout(300); assert.strictEqual(await pg.evaluate(() => window.__calls.map((c) => c.functionName).join()), '', "someone else's picture is refused: nothing sent");
+  await pg.fill('#fimg', ''); await pg.click('#fpost'); await pg.waitForFunction(() => window.__calls.length === 1);
+  const fp0 = await pg.evaluate(() => window.__calls.shift()); assert.strictEqual(fp0.functionName, 'post-item'); assert.strictEqual(String(T.cvToValue(T.hexToCV(fp0.functionArgs[3])).value ?? T.cvToValue(T.hexToCV(fp0.functionArgs[3]))), '0', 'text-only free post has no picture');
+  await pg.fill('#fimg', '99'); await pg.waitForFunction(() => /sealed, yours/.test(document.getElementById('fimgchk').textContent)); await pg.selectOption('#fturns', '2'); await pg.click('#fpost'); await pg.waitForFunction(() => window.__calls.length === 1);
   const fp = await pg.evaluate(() => window.__calls.shift()); assert.strictEqual(fp.functionName, 'post-item'); assert.strictEqual(fp.postConditions.length, 1, 'a free post moves no STX');
   const fa = fp.functionArgs.map((h) => T.cvToValue(T.hexToCV(h))).map((x) => String(x && x.value !== undefined ? x.value : x));
-  assert.deepStrictEqual([fa[0], fa[1], fa[3], fa[5], fa[6], fa[7], fa[8], fa[9], fa[10], fa[11]], ['2', 'ADVERTISE HERE', '0', '0', '1', '0', String(1000 + 365 * 144), '0', '1', 'https://xtrata.xyz/arcade/advertise'], 'post-item arguments: ' + fa.join('|'));
+  assert.deepStrictEqual([fa[0], fa[1], fa[3], fa[4], fa[5], fa[6], fa[7], fa[8], fa[9], fa[10], fa[11]], ['2', 'ADVERTISE HERE', '99', '0x' + HASH.toString('hex'), '5000', '1', '0', String(1000 + 365 * 144), '0', '2', 'https://xtrata.xyz/arcade/advertise'], 'post-item arguments: ' + fa.join('|'));
   await pg.click('button[data-a=approve]'); await pg.waitForFunction(() => window.__calls.length === 1);
   assert.strictEqual((await pg.evaluate(() => window.__calls[0])).postConditions.length, 1, 'approve moves no STX: one post-condition only');
   const a = await pg.evaluate(() => window.__calls[0]); assert.strictEqual(a.functionName, 'approve'); assert.strictEqual(String(T.cvToValue(T.hexToCV(a.functionArgs[0])).value ?? T.cvToValue(T.hexToCV(a.functionArgs[0]))), '1'); await pg.close();

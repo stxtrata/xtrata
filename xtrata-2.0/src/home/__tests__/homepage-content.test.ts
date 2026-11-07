@@ -329,15 +329,18 @@ describe('inscription iframe permissions', () => {
     // against the sandbox sites themselves: "inscription-preview" names both viewers and
     // thumbnails, so it is far too ambiguous to assert on.
     // Opened viewers may also allow pointer lock (3D mouse-look) and downloads (saving replays); thumbnails never do.
-    const sites = [...homeMainSource.matchAll(/frame\.sandbox = 'allow-scripts( allow-pointer-lock allow-downloads)?';/g)];
-    expect(sites.filter((m) => m[1]).every((m) =>
-      homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 160).includes('INSCRIPTION_FRAME_ALLOW'))).toBe(true);
+    // Two opened viewers take their sandbox from inscriptionSandbox(label), which adds popups for the arcade ONLY (its screen link opens a tab).
+    const sites = [...homeMainSource.matchAll(/frame\.sandbox = (?:'allow-scripts( allow-pointer-lock allow-downloads)?';|(inscriptionSandbox)\()/g)];
+    expect(homeMainSource.match(/allow-popups/g)?.length).toBe(2); // only the arcade helper line (allow-popups, allow-popups-to-escape-sandbox)
+    expect(homeMainSource).toContain("isArcadeInscriptionLabel(label || '') ? INSCRIPTION_SANDBOX + ' allow-popups allow-popups-to-escape-sandbox' : INSCRIPTION_SANDBOX");
+    expect(sites.filter((m) => m[1] || m[2]).every((m) =>
+      homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 240).includes('INSCRIPTION_FRAME_ALLOW'))).toBe(true);
     expect(sites.length).toBe(5);
     // The sixth thumbnail kind, the explorer grid tiles, lives in the live-frame manager: sandboxed, and never granted.
     expect([...liveFrameSource.matchAll(/frame\.sandbox = 'allow-scripts';/g)].length).toBe(1);
     expect(liveFrameSource).not.toMatch(/INSCRIPTION_FRAME_ALLOW|autoplay|\.allow\s*=/);
     const granting = sites.filter((m) =>
-      homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 120).includes('INSCRIPTION_FRAME_ALLOW')
+      homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 240).includes('INSCRIPTION_FRAME_ALLOW')
     );
     expect(granting.length).toBe(3);
     // The two market-thumbnail frames are named, so pin those explicitly as ungranted.
