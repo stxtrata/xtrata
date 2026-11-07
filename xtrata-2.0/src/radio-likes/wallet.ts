@@ -17,8 +17,10 @@ const soloMark=()=>document.documentElement.dataset.pppSolo;
 function render(){
  const session=adapter.getSession(),connected=session.isConnected&&!!session.address;
  const solo=connected?undefined:soloMark();
- address.textContent=connected?(names.get(session.network==='mainnet'?session.address:undefined)??session.address!):solo?(solo==='new'?'No wallet needed':'Listening wallet · '+solo):'Wallet not connected';
- address.title=connected?'Connected wallet · '+session.network+' · '+session.address:solo?'A passkey listening wallet on this device. A Stacks wallet is optional.':'';
+ // A linked Xtrata Music Wallet open without its Stacks wallet (src/radio-ppp): named by the wallet it counts for.
+ const as=connected?undefined:document.documentElement.dataset.pppAs;
+ address.textContent=connected?(names.get(session.network==='mainnet'?session.address:undefined)??session.address!):as?'♪ '+as:solo?(solo==='new'?'No wallet needed':'Listening wallet · '+solo):'Wallet not connected';
+ address.title=connected?'Connected wallet · '+session.network+' · '+session.address:as?'A passkey listening wallet on this device. Plays and likes count for '+as+'.':solo?'A passkey listening wallet on this device. A Stacks wallet is optional.':'';
  if(lastAddress!==session.address){lastAddress=session.address;window.dispatchEvent(new Event('xtrata:wallet-changed'));}
  // No wallet yet on a passkey-only radio: "Connect wallet" opens the pop-up with Xtrata Music Wallet first.
  // An Xtrata Music Wallet already in use here: the button is only for adding a Stacks wallet.

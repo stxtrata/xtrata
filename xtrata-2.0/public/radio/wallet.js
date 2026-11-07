@@ -7155,8 +7155,8 @@ const Hr = Gp({ appName: "Xtrata Radio", appIcon: "/favicon.svg" }), bc = docume
 let me = !1, xc;
 const Eb = Ab((t) => Sb({ address: t, network: "mainnet" }), () => ve()), Zl = () => document.documentElement.dataset.pppSolo;
 function ve() {
-  const t = Hr.getSession(), e = t.isConnected && !!t.address, n = e ? void 0 : Zl();
-  bc.textContent = e ? Eb.get(t.network === "mainnet" ? t.address : void 0) ?? t.address : n ? n === "new" ? "No wallet needed" : "Listening wallet · " + n : "Wallet not connected", bc.title = e ? "Connected wallet · " + t.network + " · " + t.address : n ? "A passkey listening wallet on this device. A Stacks wallet is optional." : "", xc !== t.address && (xc = t.address, window.dispatchEvent(new Event("xtrata:wallet-changed"))), Cs.textContent = me ? "Please wait…" : e ? "Switch wallet" : n && n !== "new" ? document.documentElement.dataset.pppWalletInstalled === "1" ? "Use a Stacks wallet instead" : "I have a Stacks wallet" : "Connect wallet", Cs.disabled = me, Hs.hidden = !e, Hs.disabled = me;
+  const t = Hr.getSession(), e = t.isConnected && !!t.address, n = e ? void 0 : Zl(), r = e ? void 0 : document.documentElement.dataset.pppAs;
+  bc.textContent = e ? Eb.get(t.network === "mainnet" ? t.address : void 0) ?? t.address : r ? "♪ " + r : n ? n === "new" ? "No wallet needed" : "Listening wallet · " + n : "Wallet not connected", bc.title = e ? "Connected wallet · " + t.network + " · " + t.address : r ? "A passkey listening wallet on this device. Plays and likes count for " + r + "." : n ? "A passkey listening wallet on this device. A Stacks wallet is optional." : "", xc !== t.address && (xc = t.address, window.dispatchEvent(new Event("xtrata:wallet-changed"))), Cs.textContent = me ? "Please wait…" : e ? "Switch wallet" : n && n !== "new" ? document.documentElement.dataset.pppWalletInstalled === "1" ? "Use a Stacks wallet instead" : "I have a Stacks wallet" : "Connect wallet", Cs.disabled = me, Hs.hidden = !e, Hs.disabled = me;
 }
 async function Ql(t) {
   if (!me) {
