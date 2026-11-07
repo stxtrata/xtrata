@@ -1,6 +1,6 @@
 /*
  * Xtrata Arcade extra game (test) - SAT CATCHER
- * Contract game-id: xa_test_catcher   (score board, higher wins)
+ * Contract game-id: test_catcher   (score board, higher wins)
  *
  * Sats fall from the top. Slide the basket under them. Gold sats score 10, rare big ones 30. A missed sat or a
  * caught red bomb costs a heart; three hearts. It speeds up as you score.
@@ -116,7 +116,7 @@
   }
 
   XA.registerGame({
-    id: 'xa_test_catcher', order: 1000, title: 'Sat Catcher', tagline: 'Catch the falling sats. Dodge the bombs.', color: COLOR,
+    id: 'test_catcher', order: 1000, title: 'Sat Catcher', tagline: 'Catch the falling sats. Dodge the bombs.', color: COLOR,
     size: { w: W, h: H }, touch: 'hint', touchHint: 'DRAG TO MOVE', controls: 'Left / right (A / D) · drag on mobile',
     modeLabel: 'Points', create: create, attract: attract
   });

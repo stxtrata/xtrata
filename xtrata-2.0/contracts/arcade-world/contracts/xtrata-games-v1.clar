@@ -19,9 +19,11 @@
 ;;   `lock-delay` (one-way), which the launch procedure does straight after deployment.
 ;; - The score board for a game is created separately on the scores contract by its owner. Do that first;
 ;;   the delay gives time for it.
-;; - Ids: 3 to 24 characters of a-z, 0-9 and _. An id may not BEGIN with a built-in id: that would be the
-;;   built-in itself, or a name that could be confused with one of its extra score boards (a built-in's
-;;   variant boards are named `<built-in id>_<key>`).
+;; - Ids: 3 to 24 characters of a-z, 0-9 and _. The prefix `xa_` is reserved for the built-in games, so no
+;;   added id can be, or be confused with, a built-in or one of its extra score boards (variant boards are
+;;   named `<id>_<key>`). In the same way, an added id may not equal the `_`-prefix of another added id, nor
+;;   have one: "pong" and "pong_hard" can never both be games, so one game's variant board is never another
+;;   game's main board.
 ;; - Kind: 1 = a cartridge script that calls XA.registerGame. Other kinds are reserved: the hall ignores a
 ;;   kind it does not know. `engine-min` is the lowest replay engine version the game needs; the hall skips
 ;;   a game that needs a newer engine than it has.
@@ -80,6 +82,8 @@
   })
 
 (define-map ById (string-ascii 24) uint)
+;; Every `_`-prefix (3+ characters) of every added id, so a later id cannot equal one of them.
+(define-map Prefixes (string-ascii 24) bool)
 
 ;; ---------------------------------------------------------------------------
 ;; Helpers
@@ -119,6 +123,33 @@
 (define-private (built-in? (id (string-ascii 24)))
   (begin (var-set scratch-id id) (fold same-id? BUILT-IN false)))
 
+;; The "xa_" prefix belongs to the built-in games (all of them start with it).
+(define-private (reserved? (id (string-ascii 24)))
+  (is-eq (slice? id u0 u3) (some "xa_")))
+
+(define-constant PREFIX-LENS (list u3 u4 u5 u6 u7 u8 u9 u10 u11 u12 u13 u14 u15 u16 u17 u18 u19 u20 u21 u22 u23))
+
+;; True if scratch-id has a `_` at position l (so its first l characters are a variant-style prefix).
+(define-private (cut-at? (l uint))
+  (and (< l (len (var-get scratch-id))) (is-eq (element-at? (var-get scratch-id) l) (some "_"))))
+
+(define-private (prefix-clash? (l uint) (found bool))
+  (or found
+      (and (cut-at? l)
+           (is-some (map-get? ById (unwrap-panic (slice? (var-get scratch-id) u0 l)))))))
+
+(define-private (prefix-store (l uint) (ignore bool))
+  (begin
+    (if (cut-at? l)
+        (map-set Prefixes (unwrap-panic (slice? (var-get scratch-id) u0 l)) true)
+        false)
+    true))
+
+;; True if the new id equals a prefix of an earlier id, or an earlier id is a `_`-prefix of it.
+(define-private (collides? (id (string-ascii 24)))
+  (begin (var-set scratch-id id)
+    (or (is-some (map-get? Prefixes id)) (fold prefix-clash? PREFIX-LENS false))))
+
 ;; ---------------------------------------------------------------------------
 ;; Add
 
@@ -134,8 +165,9 @@
     (asserts! (< n MAX-ADDED) ERR-FULL)
     (asserts! (id-valid? id) ERR-INVALID)
     (asserts! (> (len title) u0) ERR-INVALID)
-    (asserts! (not (built-in? id)) ERR-BUILT-IN)
+    (asserts! (not (or (reserved? id) (built-in? id))) ERR-BUILT-IN)
     (asserts! (is-none (map-get? ById id)) ERR-TAKEN)
+    (asserts! (not (collides? id)) ERR-TAKEN)
     (asserts! (<= kind u9) ERR-INVALID)
     (asserts! (and (>= engine-min u1) (<= engine-min u255)) ERR-INVALID)
     (asserts! (and (> code-size u0) (<= code-size MAX-CODE-BYTES)) ERR-INVALID)
@@ -146,6 +178,8 @@
         code-id: code-id, code-hash: code-hash, code-size: code-size,
         added-at: burn-block-height, live-at: (+ burn-block-height (var-get delay)), hidden: false })
     (map-set ById id n)
+    (var-set scratch-id id)
+    (fold prefix-store PREFIX-LENS true)
     (var-set count (+ n u1))
     (print { event: "game-added", n: n, index: (+ GENESIS-COUNT n), id: id, live-at: (+ burn-block-height (var-get delay)),
              version: (bump) })

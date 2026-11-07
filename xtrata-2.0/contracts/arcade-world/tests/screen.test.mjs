@@ -510,3 +510,25 @@ test('config and reads: defaults, successor lock, interface is frozen at v1', as
   assert.equal(s.ro('get-successor').value.locked.type, 'true');
   assert.equal(s.ro('get-items', [Cl.list([U(0), U(5)])]).value.every((x) => x.type === 'none'), true);
 });
+
+test('review fix L-2: the outgoing admin loses any publisher role when the hand-over is accepted', async () => {
+  const s = await screen();
+  const { W, deployer } = s;
+  assert.equal(R(s.call('set-publisher', [P(deployer), U(2)])), OK);
+  assert.equal(pp(s.ro('get-publisher', [P(deployer)])), 'u2');
+  assert.equal(R(s.call('propose-admin', [P(W[2])])), OK);
+  assert.equal(R(s.call('accept-admin', [], W[2])), OK);
+  assert.equal(pp(s.ro('get-publisher', [P(deployer)])), 'u0');
+  assert.equal(R(s.post(deployer)), err(400));                      // can no longer post
+  assert.equal(R(s.call('set-publisher', [P(W[3]), U(1)], W[2])), OK); // the new admin works as before
+});
+
+test('review fix L-1: an item cannot be parked to start more than a year ahead', async () => {
+  const s = await screen();
+  const { deployer } = s;
+  const now = s.h();
+  const far = now + 52560 + 1;
+  assert.equal(R(s.post(deployer, { from: far, to: far + 100 })), err(404));
+  assert.equal(R(s.post(deployer, { from: now + 52560, to: now + 52560 + 100 })).startsWith('(ok u'), true);   // exactly a year ahead is fine
+  assert.equal(R(s.post(deployer, { from: 4000000000, to: 4000000100 })), err(404));
+});

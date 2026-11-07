@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Pre-flight check for a new Arcade game cartridge, before it is inscribed and added to xtrata-games-v1. Offline; sends nothing.
 //   node ops/games-check.mjs path/to/cartridge.js [--title "Game Title"] [--engine-min 1] [--kit path/to/arcade-kit.js]
+//                                   [--existing id,id,...] [--boards id,id,...]
+//   --existing  the ids already added to xtrata-games-v1 (for the prefix rule); --boards  the board ids already on the scores contract
 //
 // It runs the cartridge against the real arcade kit in an empty sandbox and checks what the games contract and the hall will check:
 //   - it registers exactly ONE game, with a valid id (3-24 of a-z 0-9 _), not one of the 21 built-in ids, and all the required fields
@@ -15,7 +17,7 @@ import vm from 'node:vm';
 import { parseArgs, die } from './lib/cli.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const args = parseArgs(process.argv.slice(2), { title: 'value', engineMin: 'value', kit: 'value' });
+const args = parseArgs(process.argv.slice(2), { title: 'value', engineMin: 'value', kit: 'value', existing: 'value', boards: 'value' });
 const file = args._[0];
 if (!file) die('usage: node ops/games-check.mjs <cartridge.js> [--title "Game Title"] [--engine-min 1] [--kit path/to/arcade-kit.js]');
 
@@ -85,8 +87,19 @@ const g = registered[0];
 let boards = [];
 if (g) {
   if (!ID_OK.test(g.id)) bad(`the game id "${g.id}" must be 3-24 characters of a-z, 0-9 and _ (the contract and the score boards allow no more)`);
+  if (g.id.startsWith('xa_')) bad(`the game id "${g.id}" begins with "xa_", which the games contract reserves for the built-in games`);
   const clash = BUILT_IN.find((b) => g.id.startsWith(b));
   if (clash) bad(`the game id "${g.id}" ${g.id === clash ? 'is' : 'begins with'} the built-in id "${clash}" (the games contract refuses any id that begins with a built-in id)`);
+  // Added-vs-added: an id may not equal a "_"-prefix of another added id, nor have one (same rule as the contract).
+  const csv = (v) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const existing = csv(args.existing), existingBoards = csv(args.boards);
+  const underscorePrefixes = (id) => { const out = []; for (let i = 3; i < id.length; i++) if (id[i] === '_') out.push(id.slice(0, i)); return out; };
+  for (const e of existing) {
+    if (e === g.id) bad(`the game id "${g.id}" is already added to the games contract`);
+    else if (underscorePrefixes(e).includes(g.id)) bad(`the game id "${g.id}" is the prefix of the existing game "${e}" (the contract refuses it: its variant boards would collide)`);
+    else if (underscorePrefixes(g.id).includes(e)) bad(`the existing game "${e}" is a prefix of "${g.id}" (the contract refuses it: this game's boards would look like variants of "${e}")`);
+  }
+  if (!args.existing) notes.push('no --existing list given: the prefix rule against games already added was NOT checked (pass --existing id,id,... from the games contract)');
   for (const f of ['title', 'tagline', 'color', 'size', 'create', 'attract']) if (!g[f]) bad(`the game has no "${f}"`);
   if (g.title && String(g.title).length > 32) bad(`the title is ${String(g.title).length} characters; add-game takes at most 32`);
   if (g.size && !(g.size.w > 0 && g.size.h > 0)) bad('size must be { w, h } with positive numbers');
@@ -96,6 +109,8 @@ if (g) {
   const modeNum = (m) => (m === 'time' ? 1 : 0);
   boards.push({ id: g.id, mode: modeNum(g.mode), label: g.title });
   for (const v of g.variants || []) boards.push({ id: `${g.id}_${v.key}`, mode: modeNum(v.mode), label: `${g.title} · ${v.label}` });
+  for (const b of boards) if (existingBoards.includes(b.id)) bad(`the board "${b.id}" already exists on the scores contract; creating it again would fail or share a board with another game`);
+  if (!args.boards) notes.push('no --boards list given: board ids already on the scores contract were NOT checked (pass --boards id,id,...)');
   for (const b of boards) if (b.id.length > 24) bad(`the board id "${b.id}" is ${b.id.length} characters; the scores contract allows at most 24. Shorten the game id or the variant key.`);
   // A smoke run: create(), then 1800 steps (30 s) of update() and render() with a few button presses, to catch an immediate crash.
   // (The full replay checks are the hall's own test-suite's job: see tests/hall-games.test.cjs.)

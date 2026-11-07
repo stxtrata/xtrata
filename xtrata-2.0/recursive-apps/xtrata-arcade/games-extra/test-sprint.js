@@ -1,6 +1,6 @@
 /*
  * Xtrata Arcade extra game (test) - ARROW SPRINT
- * Contract game-id: xa_test_sprint   (time board, LOWEST wins)
+ * Contract game-id: test_sprint   (time board, LOWEST wins)
  *
  * An arrow is shown. Press that direction (arrow keys / WASD, or swipe / the pad) as fast as you can. 20 right answers
  * finish the run; each wrong press adds half a second. The score is your time in hundredths of a second.
@@ -80,7 +80,7 @@
   }
 
   XA.registerGame({
-    id: 'xa_test_sprint', order: 1001, title: 'Arrow Sprint', tagline: 'Hit the arrows. Beat the clock.', color: COLOR,
+    id: 'test_sprint', order: 1001, title: 'Arrow Sprint', tagline: 'Hit the arrows. Beat the clock.', color: COLOR,
     size: { w: W, h: H }, mode: 'time', touch: 'dpad', controls: 'Arrow keys / WASD · swipe on mobile',
     modeLabel: 'Time', create: create, attract: attract
   });
