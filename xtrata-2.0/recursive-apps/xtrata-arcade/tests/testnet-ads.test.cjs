@@ -8,9 +8,14 @@ const path = require('path');
 const fs = require('fs');
 const assert = require('assert');
 const { execFileSync } = require('child_process');
-const out = path.join(require('os').tmpdir(), 'xa-testnet-ads.html');
-execFileSync('node', [path.join(__dirname, '..', 'build', 'testnet-ads.cjs'), '--out', out]);
-const ROOT = 'STVAM4JVX5ES4MV18S00VCAQMPR8928FAHRNMAJ9', BUYER = 'ST3N1VYG563049PE8C2Z24QY6ANW222Y1TQG583X9', OTHER = 'ST18222E20QGZPCEAJ7W88G9EGZJNVFCGZBRQG0F3', PARTNER = 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG';
+// XA_NET=mainnet runs the same checks against the MAINNET page (build/mainnet-ads.cjs) with mainnet-format addresses and a testnet account refused.
+const MAIN = process.env.XA_NET === 'mainnet', NET = MAIN ? 'mainnet' : 'testnet';
+const c32 = require('c32check');
+const toMain = (a) => c32.c32address(22, c32.c32addressDecode(a)[1]);
+const out = path.join(require('os').tmpdir(), 'xa-' + NET + '-ads.html');
+execFileSync('node', [path.join(__dirname, '..', 'build', MAIN ? 'mainnet-ads.cjs' : 'testnet-ads.cjs'), '--out', out]);
+const fix = (a) => (MAIN ? toMain(a) : a);
+const ROOT = MAIN ? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X' : 'STVAM4JVX5ES4MV18S00VCAQMPR8928FAHRNMAJ9', BUYER = fix('ST3N1VYG563049PE8C2Z24QY6ANW222Y1TQG583X9'), OTHER = fix('ST18222E20QGZPCEAJ7W88G9EGZJNVFCGZBRQG0F3'), PARTNER = fix('ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG');
 const U = (n) => T.uintCV(n), A = (s) => T.stringAsciiCV(s), B = (b) => T.bufferCV(b), P = (a) => T.principalCV(a);
 const HASH = Buffer.alloc(32, 7);
 let slotsOn = true;
@@ -65,7 +70,16 @@ function answer(contract, fn, args) {
   assert(await pg.isDisabled('#buy'), 'buy disabled before connecting');
   assert(/MY PENDING/.test(await pg.textContent('#items')) && /LIVE ONE/.test(await pg.textContent('#items')) && /pending/.test(await pg.textContent('#items')), 'slots listed');
   await pg.click('#wbtn'); await pg.waitForFunction(() => /Connected/.test(document.getElementById('wstat').textContent));
-  await pg.waitForFunction(() => /cancel: not in this test page yet/.test(document.getElementById('items').textContent)); assert(!(await pg.$('button[data-a=approve]')) && !(await pg.$('button[data-a=cancel]')), 'a buyer sees no Approve, and no Cancel button (a refund needs a contract post-condition the wallet call cannot carry yet)');
+  await pg.waitForSelector('button[data-a=cancel]'); assert(!(await pg.$('button[data-a=approve]')) && !(await pg.$('button[data-a=reject]')), 'a buyer sees Cancel, but no Approve or Reject');
+  // cancel = a refund: the wallet caps what the buyer spends at 0 AND the contract may pay out at most the held escrow (second post-condition, contract principal)
+  await pg.evaluate(() => { window.confirm = () => true; }); await pg.click('button[data-a=cancel]'); await pg.waitForFunction(() => window.__calls.length === 1);
+  const cc = await pg.evaluate(() => window.__calls.shift()); assert.strictEqual(cc.functionName, 'cancel'); assert.strictEqual(cc.postConditionMode, 'deny'); assert.strictEqual(cc.postConditions.length, 2, 'cancel carries two post-conditions');
+  const pcs = cc.postConditions.map((h) => Buffer.from(h, 'hex')); const own = pcs[0], ctr = pcs[1];
+  assert.strictEqual(own[1], 2, 'first is the buyer (standard principal)'); assert.strictEqual(Number(BigInt('0x' + own.slice(own.length - 8).toString('hex'))), 0, 'buyer may spend 0 on a cancel');
+  assert.strictEqual(ctr[0], 0, 'STX post-condition'); assert.strictEqual(ctr[1], 3, 'second is the CONTRACT principal'); const nlen = ctr[23]; assert.strictEqual(ctr.slice(24, 24 + nlen).toString('ascii'), 'xtrata-screen-v1', 'contract name');
+  assert.strictEqual(ctr[24 + nlen], 5, 'less-than-or-equal'); assert.strictEqual(Number(BigInt('0x' + ctr.slice(25 + nlen).toString('hex'))), 1e6, 'contract may pay out at most the 1 STX held');
+  assert.strictEqual(c32.c32address(ctr[2], ctr.slice(3, 23).toString('hex')), ROOT, 'contract address is the screen contract deployer');
+  assert.strictEqual(c32.c32address(own[2], own.slice(3, 23).toString('hex')), BUYER, 'first post-condition is the connected buyer');
   await pg.fill('#head', 'TEST AD'); assert(!(await pg.isDisabled('#buy')), 'text-only ad can be bought');
   await pg.fill('#img', '88'); await pg.waitForFunction(() => /not your connected wallet/.test(document.getElementById('imgchk').textContent)); assert(await pg.isDisabled('#buy'), "someone else's picture refused");
   await pg.fill('#img', '77'); await pg.waitForFunction(() => /sealed, yours/.test(document.getElementById('imgchk').textContent)); assert(!(await pg.isDisabled('#buy')), 'own picture accepted');
@@ -79,12 +93,13 @@ function answer(contract, fn, args) {
   await pg.fill('#startd', '31'); assert(await pg.isDisabled('#buy'), 'a start more than 30 days ahead blocks buying'); await pg.fill('#startd', '1');
   await pg.click('#buy'); await pg.waitForFunction(() => window.__calls.length === 1, null, { timeout: 6000 }).catch(async (e) => { console.log('BUYMSG:', await pg.textContent('#buymsg')); throw e; });
   const c = await pg.evaluate(() => window.__calls[0]);
-  assert.strictEqual(c.contract, 'STVAM4JVX5ES4MV18S00VCAQMPR8928FAHRNMAJ9.xtrata-screen-v1'); assert.strictEqual(c.functionName, 'buy-slot'); assert.strictEqual(c.network, 'testnet'); assert.strictEqual(c.postConditionMode, 'deny');
+  assert.strictEqual(c.contract, ROOT + '.xtrata-screen-v1'); assert.strictEqual(c.functionName, 'buy-slot'); assert.strictEqual(c.network, NET); assert.strictEqual(c.postConditionMode, 'deny');
   assert(c.functionArgs.every((a) => !/^0x/.test(a)) && !('sender' in c), 'bare hex, no sender');
   const dec = c.functionArgs.map((h) => T.cvToValue(T.hexToCV(h)));
   const v = (x) => (x && x.value !== undefined ? x.value : x);
   assert.deepStrictEqual(dec.slice(0, 12).map((x) => String(v(x))), ['2', 'TEST AD', '', '77', '0x' + HASH.toString('hex'), '5000', '3', '1', '60000000', '2', '1144', 'https://xtrata.xyz/arcade?x=1'], 'buy-slot arguments: ' + dec.map(v).map(String).join('|'));
   assert.strictEqual(c.postConditions.length, 1, 'one STX post-condition (the price)');
+  assert(!(await pg.isVisible('#freecard')), 'a normal buyer never sees the admin card');
   await pg.close(); assert.deepStrictEqual(errors, []);
   // a partner: discount and their own limits shown and applied, sent as the computed price
   ({ pg, errors } = await open(PARTNER)); await pg.click('#wbtn'); await pg.waitForFunction(() => /PARTNER RATE/.test(document.getElementById('wstat').textContent));
@@ -97,10 +112,17 @@ function answer(contract, fn, args) {
   await pg.close(); assert.deepStrictEqual(errors, []);
   // admin sees Approve/Reject; slots off blocks buying; a mainnet account is refused
   ({ pg, errors } = await open(ROOT)); await pg.click('#wbtn'); await pg.waitForSelector('button[data-a=approve]');
+  await pg.evaluate(() => { window.confirm = () => true; }); await pg.click('button[data-a=reject]'); await pg.waitForFunction(() => window.__calls.length === 1);
+  const rj = await pg.evaluate(() => window.__calls.shift()); assert.strictEqual(rj.functionName, 'reject'); assert.strictEqual(rj.postConditions.length, 2, 'reject (a refund) carries the contract post-condition too');
+  assert(await pg.isVisible('#freecard'), 'the admin sees the free-post card'); await pg.click('#fpost'); await pg.waitForFunction(() => window.__calls.length === 1);
+  const fp = await pg.evaluate(() => window.__calls.shift()); assert.strictEqual(fp.functionName, 'post-item'); assert.strictEqual(fp.postConditions.length, 1, 'a free post moves no STX');
+  const fa = fp.functionArgs.map((h) => T.cvToValue(T.hexToCV(h))).map((x) => String(x && x.value !== undefined ? x.value : x));
+  assert.deepStrictEqual([fa[0], fa[1], fa[3], fa[5], fa[6], fa[7], fa[8], fa[9], fa[10], fa[11]], ['2', 'ADVERTISE HERE', '0', '0', '1', '0', String(1000 + 365 * 144), '0', '1', 'https://xtrata.xyz/arcade/advertise'], 'post-item arguments: ' + fa.join('|'));
   await pg.click('button[data-a=approve]'); await pg.waitForFunction(() => window.__calls.length === 1);
+  assert.strictEqual((await pg.evaluate(() => window.__calls[0])).postConditions.length, 1, 'approve moves no STX: one post-condition only');
   const a = await pg.evaluate(() => window.__calls[0]); assert.strictEqual(a.functionName, 'approve'); assert.strictEqual(String(T.cvToValue(T.hexToCV(a.functionArgs[0])).value ?? T.cvToValue(T.hexToCV(a.functionArgs[0]))), '1'); await pg.close();
   slotsOn = false; ({ pg } = await open(BUYER)); await pg.click('#wbtn'); await pg.fill('#head', 'X'); assert(await pg.isDisabled('#buy') && /Paid slots are OFF/.test(await pg.textContent('#cfg')), 'off = cannot buy'); await pg.close(); slotsOn = true;
-  ({ pg } = await open('SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X')); await pg.click('#wbtn').catch(() => {}); await pg.waitForTimeout(500);
-  assert(/mainnet account/.test(await pg.textContent('#wstat')) || /testnet/.test(await pg.textContent('#wstat')), 'mainnet refused: ' + await pg.textContent('#wstat')); assert(await pg.isDisabled('#buy'), 'cannot buy with a mainnet account'); await pg.close();
-  await br.close(); console.log('testnet ads page: all checks passed');
+  ({ pg } = await open(MAIN ? 'ST3N1VYG563049PE8C2Z24QY6ANW222Y1TQG583X9' : 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X')); await pg.click('#wbtn').catch(() => {}); await pg.waitForTimeout(500);
+  assert(/mainnet account|testnet account|Switch your wallet/.test(await pg.textContent('#wstat')), 'mainnet refused: ' + await pg.textContent('#wstat')); assert(await pg.isDisabled('#buy'), 'cannot buy with a mainnet account'); await pg.close();
+  await br.close(); console.log(NET + ' ads page: all checks passed');
 })().catch((e) => { console.error('FAIL', e.message, (e.stack || '').split('\n').filter((l) => /testnet-ads.test/.test(l)).slice(0, 2).join(' ')); process.exit(1); });

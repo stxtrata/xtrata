@@ -82,6 +82,10 @@
   Cache-Control: no-cache
 /arcade/submit
   Cache-Control: no-cache
+/arcade/advertise
+  Cache-Control: no-cache
+/arcade/advertise.html
+  Cache-Control: no-cache
 /radio/endorse
   Cache-Control: no-cache
 
