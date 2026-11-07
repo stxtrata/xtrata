@@ -87,8 +87,8 @@ const NETWORKS = {
 const PINS = {
   'xtrata-posters-v1': '3e9bdfc500c97a166804e15bda29df852e7f0dbea2fe2ebe97048f67399618fb',
   'xtrata-world-v2': 'a72774e95967b81d33c339779e49a7313d864382caed9fe0f08b3761ed9cbc39',
-  'xtrata-screen-v1': '80dda1331f3d42ba6b0fb24d01cc146963ba256abec98f7c32cb0b24ab3c34e7',
-  'xtrata-games-v1': '0768b467c33d7384236aaaafeda3de7beee866119269f808c6292c27684aa53e',
+  'xtrata-screen-v1': 'b11e5cb0ae3de95213c6a8d565b5f1081a9349f853b0b427367a4b77bdcd1dfc',
+  'xtrata-games-v1': '21aeb87eda099e21b776527a35e43a1d451654e86d06c29affaf4903f2727e25',
   'xtrata-arcade-scores-v2': 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5',
   'xtrata-v1-1-1': '1f9ee448262d982017f69479718628689af4a660c28905492b4bad84096d74fd',
   'xtrata-v2-1-0': '3f632b0adc44788366c1cce87a497e0dc789bc99fdd7fd9024a5c47b7df05e2c',
@@ -253,8 +253,8 @@ const launch = {
   boards,
   // two small test games for the games contract (testnet only: the `testgames` step); the sources are the files in recursive-apps/xtrata-arcade/games-extra
   testGames: [
-    { id: 'xa_test_catcher', title: 'Sat Catcher', file: 'test-catcher.js', mode: 0, max: 100000 },
-    { id: 'xa_test_sprint', title: 'Arrow Sprint', file: 'test-sprint.js', mode: 1, max: 360000 }
+    { id: 'test_catcher', title: 'Sat Catcher', file: 'test-catcher.js', mode: 0, max: 100000 },
+    { id: 'test_sprint', title: 'Arrow Sprint', file: 'test-sprint.js', mode: 1, max: 360000 }
   ].map((g) => ({ ...g, source: readFileSync(resolve(XA, 'games-extra', g.file), 'utf8') })),
   // Astro Blaster 3 for the testnet rehearsal (the `astrotest` step): the game exactly as inscribed on mainnet (#3075, v3.0.2) and the cabinet poster and marquee.
   // The step inscribes the game, then builds the manifest picture around the testnet id the game gets (the note names it), then calls add-game kind 3.

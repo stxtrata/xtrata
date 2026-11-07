@@ -117,8 +117,8 @@ const chainWith = (items, extra) => MC.createChain(Object.assign({ games: { heig
   const hallParts = { bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} };
   const HASH = (b) => { let h = Buffer.alloc(32); for (let i = 0; i < b.length; i += CHUNK) h = crypto.createHash('sha256').update(Buffer.concat([h, b.subarray(i, i + CHUNK)])).digest(); return h; };
   const items = [
-    item({ id: 'xa_test_catcher', title: 'Sat Catcher', index: 21, codeId: 9400 }),
-    item({ id: 'xa_test_sprint', title: 'Arrow Sprint', index: 22, codeId: 9401 }),
+    item({ id: 'test_catcher', title: 'Sat Catcher', index: 21, codeId: 9400 }),
+    item({ id: 'test_sprint', title: 'Arrow Sprint', index: 22, codeId: 9401 }),
   ];
   // Plays one ranked run with a scripted driver; returns the replay (hex), the score and whether the game said it completed.
   async function play(page, gameId, driverName, maxSteps) {
@@ -165,36 +165,36 @@ const chainWith = (items, extra) => MC.createChain(Object.assign({ games: { heig
   r = await open('/games.html', { chain: chainWith(items), gateway: 'serve' });
   check(!r.loadErr, 'T1: the hall loads with the two test games on the contract (' + (r.loadErr || 'no error') + ')');
   const g = await look(r.page);
-  check(JSON.stringify(g.status.loaded) === JSON.stringify(['xa_test_catcher', 'xa_test_sprint']) && !g.status.skipped.length, 'T1: both games were read from the contract and added (' + g.status.loaded.join(', ') + '); skipped: ' + JSON.stringify(g.status.skipped));
-  check(g.ids.length === 23 && g.ids[21] === 'xa_test_catcher' && g.ids[22] === 'xa_test_sprint', 'T1: 23 games in the hall, the new ones after the 21');
-  check(g.idx[21] === 'xa_test_catcher' && g.idx[22] === 'xa_test_sprint', 'T1: replay numbers 21 and 22');
+  check(JSON.stringify(g.status.loaded) === JSON.stringify(['test_catcher', 'test_sprint']) && !g.status.skipped.length, 'T1: both games were read from the contract and added (' + g.status.loaded.join(', ') + '); skipped: ' + JSON.stringify(g.status.skipped));
+  check(g.ids.length === 23 && g.ids[21] === 'test_catcher' && g.ids[22] === 'test_sprint', 'T1: 23 games in the hall, the new ones after the 21');
+  check(g.idx[21] === 'test_catcher' && g.idx[22] === 'test_sprint', 'T1: replay numbers 21 and 22');
   check(g.layout.cabinets.length === 23, 'T1: 23 cabinets (' + g.layout.left + ' on the left wall, ' + g.layout.right + ' on the right); room ' + base0.layout.room.l + ' m to ' + g.layout.room.l + ' m; poster slots ' + base0.layout.posterSlots + ' to ' + g.layout.posterSlots);
-  const defs = await r.page.evaluate(() => window.XA.games.filter((x) => /^xa_test_/.test(x.id)).map((x) => ({ id: x.id, mode: x.mode, title: x.title, board: window.XA.replay.boardFor(x) })));
-  check(defs.find((d) => d.id === 'xa_test_catcher').mode === 'score' && defs.find((d) => d.id === 'xa_test_sprint').mode === 'time', 'T1: Sat Catcher is a score game and Arrow Sprint is a time game (lower wins)');
+  const defs = await r.page.evaluate(() => window.XA.games.filter((x) => /^test_/.test(x.id)).map((x) => ({ id: x.id, mode: x.mode, title: x.title, board: window.XA.replay.boardFor(x) })));
+  check(defs.find((d) => d.id === 'test_catcher').mode === 'score' && defs.find((d) => d.id === 'test_sprint').mode === 'time', 'T1: Sat Catcher is a score game and Arrow Sprint is a time game (lower wins)');
   check(JSON.stringify(g.ids.slice(0, 21)) === JSON.stringify(base0.ids) && JSON.stringify(g.idx.slice(0, 21)) === JSON.stringify(BUILT_IN), 'T2: the 21 built-in games are first, in the same order, with the same replay numbers');
   check(BUILT_IN.every((id) => { const a = base0.layout.cabinets.find((c) => c.id === id), b = g.layout.cabinets.find((c) => c.id === id); return a.side === b.side && a.slot === b.slot; }), 'T2: and each stands on the same wall in the same place in its row');
 
   /* ------------------------------------------------ play and verify */
-  const cat = await play(r.page, 'xa_test_catcher', 'sweep', 6000);
+  const cat = await play(r.page, 'test_catcher', 'sweep', 6000);
   check(cat.idx === 21 && cat.over && !cat.completed, 'T3: Sat Catcher: a ranked run carries replay number 21 and ends when the hearts run out (' + cat.steps + ' steps, score ' + cat.score + ')');
   check(cat.score > 0, 'T3: and the sweeping basket caught something (score ' + cat.score + ')');
-  const catV = await verify(r.page, cat.hex, 'xa_test_catcher');
-  check(catV.ok && catV.score === cat.score && catV.game === 'xa_test_catcher', 'T3: Sat Catcher: the replay is verified by running the game again (score ' + catV.score + ')');
-  const spr = await play(r.page, 'xa_test_sprint', 'cycle', 6000);
+  const catV = await verify(r.page, cat.hex, 'test_catcher');
+  check(catV.ok && catV.score === cat.score && catV.game === 'test_catcher', 'T3: Sat Catcher: the replay is verified by running the game again (score ' + catV.score + ')');
+  const spr = await play(r.page, 'test_sprint', 'cycle', 6000);
   check(spr.idx === 22 && spr.over && spr.completed, 'T3: Arrow Sprint: a ranked run carries replay number 22 and finishes (time ' + (spr.score / 100).toFixed(2) + ' s, ' + spr.steps + ' steps)');
-  const sprV = await verify(r.page, spr.hex, 'xa_test_sprint');
-  check(sprV.ok && sprV.score === spr.score && sprV.game === 'xa_test_sprint', 'T3: Arrow Sprint: the replay is verified by running the game again');
-  const crossA = await verify(r.page, cat.hex, 'xa_test_sprint'), crossB = await verify(r.page, spr.hex, 'xa_test_catcher');
+  const sprV = await verify(r.page, spr.hex, 'test_sprint');
+  check(sprV.ok && sprV.score === spr.score && sprV.game === 'test_sprint', 'T3: Arrow Sprint: the replay is verified by running the game again');
+  const crossA = await verify(r.page, cat.hex, 'test_sprint'), crossB = await verify(r.page, spr.hex, 'test_catcher');
   check(!crossA.ok && !crossB.ok, 'T3: each replay is refused on the other game\'s board');
-  const mash = await play(r.page, 'xa_test_sprint', 'mash', 6000);
-  const mashV = await verify(r.page, mash.hex, 'xa_test_sprint');
+  const mash = await play(r.page, 'test_sprint', 'mash', 6000);
+  const mashV = await verify(r.page, mash.hex, 'test_sprint');
   check(mash.completed && mashV.ok && mash.score > spr.score, 'T3: Arrow Sprint: wrong presses cost half a second each (pressing every arrow in turn: ' + (mash.score / 100).toFixed(2) + ' s against ' + (spr.score / 100).toFixed(2) + ' s for a clean run), and that replay verifies too');
-  const nothing = await play(r.page, 'xa_test_sprint', 'none', 6000);
+  const nothing = await play(r.page, 'test_sprint', 'none', 6000);
   check(nothing.over && !nothing.completed && nothing.steps > 3500, 'T3: Arrow Sprint with no input is a did-not-finish after 60 seconds (' + nothing.steps + ' steps)');
   const tamper = await r.page.evaluate(async (hex) => {
     const bytes = new Uint8Array(hex.match(/../g).map((x) => parseInt(x, 16)));
     bytes[bytes.length >> 1] ^= 0x55;
-    return window.XA.replay.verify(bytes, { board: 'xa_test_sprint' });
+    return window.XA.replay.verify(bytes, { board: 'test_sprint' });
   }, spr.hex);
   check(!tamper.ok, 'T3: a tampered replay is refused (' + tamper.reason + ')');
 
@@ -206,7 +206,7 @@ const chainWith = (items, extra) => MC.createChain(Object.assign({ games: { heig
   const rv = await open('/view.html', { chain: chainWith(items), gateway: 'serve', host: 'https://api.testnet.hiro.so' });
   await rv.page.waitForFunction(() => window.XAHall && window.XAHall.layout && window.XAGamesRegistry && window.XAGamesRegistry.status().done, null, { timeout: 90000 });
   const gv = await rv.page.evaluate(() => ({ ids: window.XA.games.map((x) => x.id), st: window.XAGamesRegistry.status(), cfg: window.XAScores.config().contentContractId, cabs: window.XAHall.layout().cabinets.length }));
-  check(!rv.loadErr && gv.st.ok && gv.st.loaded.join() === 'xa_test_catcher,xa_test_sprint', 'T4: the testnet view page read the games contract and loaded both games (' + gv.st.loaded.join(', ') + (gv.st.error ? ', error ' + gv.st.error : '') + ')');
+  check(!rv.loadErr && gv.st.ok && gv.st.loaded.join() === 'test_catcher,test_sprint', 'T4: the testnet view page read the games contract and loaded both games (' + gv.st.loaded.join(', ') + (gv.st.error ? ', error ' + gv.st.error : '') + ')');
   check(gv.ids.length === 23 && gv.cabs === 23 && gv.cfg === TN + '.xtrata-v3-2-3', 'T4: so the testnet view page has 23 games and 23 cabinets, and reads cartridges from the testnet core');
   check(!rv.errors.length, 'T4: no page errors in the view page ' + rv.errors.slice(0, 2).join(' | '));
   await rv.ctx.close();
@@ -219,7 +219,7 @@ const chainWith = (items, extra) => MC.createChain(Object.assign({ games: { heig
   /* ------------------------------------------------ pictures */
   const shots = process.env.XA_SHOTS || path.join(__dirname, 'out');
   fs.mkdirSync(shots, { recursive: true });
-  for (const [id, drv, steps] of [['xa_test_catcher', 'sweep', 300], ['xa_test_sprint', 'cycle', 90]]) {
+  for (const [id, drv, steps] of [['test_catcher', 'sweep', 300], ['test_sprint', 'cycle', 90]]) {
     const png = await r.page.evaluate(async ([gid, d, n]) => {
       const XA = window.XA, U = XA.util, game = XA.games.find((x) => x.id === gid);
       const c = document.createElement('canvas'); c.width = game.size.w; c.height = game.size.h; const ctx = c.getContext('2d');
@@ -245,7 +245,7 @@ const chainWith = (items, extra) => MC.createChain(Object.assign({ games: { heig
     }, [id, drv, steps]);
     fs.writeFileSync(path.join(shots, id + '.png'), Buffer.from(png.split(',')[1], 'base64'));
   }
-  check(fs.statSync(path.join(shots, 'xa_test_catcher.png')).size > 3000 && fs.statSync(path.join(shots, 'xa_test_sprint.png')).size > 3000, 'T5: pictures of both games saved to ' + shots);
+  check(fs.statSync(path.join(shots, 'test_catcher.png')).size > 3000 && fs.statSync(path.join(shots, 'test_sprint.png')).size > 3000, 'T5: pictures of both games saved to ' + shots);
   check(!r.errors.length, 'T5: no page errors in the hall ' + r.errors.slice(0, 2).join(' | '));
   await r.ctx.close();
   await browser.close();

@@ -97,8 +97,28 @@ test('no new id may begin with a built-in id: it could be mistaken for that game
   const s = await games();
   const i = s.insc(1);
   for (const b of ['xa_tile_tap_rush', 'xa_tile_tap2', 'xa_swerve_x', 'xa_block_drop_hard']) assert.equal(R(s.add(b, i)), err(507), b);
-  // names that merely look similar are fine: the test games and anything not starting with a built-in id
-  for (const [n, ok_] of [['xa_test_catcher', 'u0'], ['xa_tile', 'u1'], ['my_xa_swerve', 'u2'], ['xa_swerv', 'u3']]) assert.equal(R(s.add(n, i)), ok(ok_), n);
+  // the whole xa_ prefix is reserved now, so look-alikes in it are refused too
+  for (const n of ['xa_test_catcher', 'xa_tile', 'xa_swerv', 'xa_anything']) assert.equal(R(s.add(n, i)), err(507), n);
+  // names that merely look similar but do not start with xa_ are fine
+  for (const [n, ok_] of [['my_xa_swerve', 'u0'], ['xb_swerve', 'u1']]) assert.equal(R(s.add(n, i)), ok(ok_), n);
+});
+
+test('added ids cannot shadow each other: no id may equal or extend another added id by "_" (variant boards stay separate)', async () => {
+  const s = await games();
+  const i = s.insc(1);
+  assert.equal(R(s.add('pong_hard', i)), ok('u0'));
+  assert.equal(R(s.add('pong', i)), err(506));          // "pong" is a prefix of an existing game
+  assert.equal(R(s.add('pong_hard_x', i)), err(506));   // extends an existing game id
+  assert.equal(R(s.add('pong_hard', i)), err(506));     // exact repeat
+  assert.equal(R(s.add('pongo', i)), ok('u1'));         // not a "_" prefix: fine
+  assert.equal(R(s.add('neon', i)), ok('u2'));
+  assert.equal(R(s.add('neon_pop', i)), err(506));      // extends an earlier game
+  assert.equal(R(s.add('neon_pop_two', i)), err(506));
+  assert.equal(R(s.add('abc_def_ghi', i)), ok('u3'));
+  assert.equal(R(s.add('abc_def', i)), err(506));       // inner prefix of an existing id
+  assert.equal(R(s.add('abc', i)), err(506));
+  assert.equal(R(s.add('abc_xyz', i)), ok('u4'));       // sibling, no relation
+  assert.equal(pp(s.ro('get-count')), 'u5');
 });
 
 test('a hand-over proposed by mistake can be cancelled; the pending admin can be read', async () => {

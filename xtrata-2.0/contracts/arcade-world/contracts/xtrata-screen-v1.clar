@@ -290,6 +290,7 @@
     (asserts! (> (len head) u0) ERR-INVALID)
     (asserts! (and (>= weight u1) (<= weight u10)) ERR-INVALID)
     (asserts! (and (> ends-at from) (<= (- ends-at from) MAX-SPAN)) ERR-WINDOW)
+    (asserts! (<= from (+ burn-block-height MAX-SPAN)) ERR-WINDOW)   ;; cannot be parked to start in the far future
     (asserts! (image-valid? image-id image-hash image-size tx-sender) ERR-INSCRIPTION)
     (asserts! (layout-ok? layout image-size) ERR-INVALID)
     (map-set Items id {
@@ -561,6 +562,7 @@
 (define-public (accept-admin)
   (let ((pending (unwrap! (var-get pending-admin) ERR-NO-PENDING)))
     (asserts! (caller-is pending) ERR-NOT-AUTHORIZED)
+    (map-delete Publishers (var-get admin))   ;; the outgoing admin keeps no publisher role
     (var-set admin pending)
     (var-set pending-admin none)
     (print { event: "admin-set", who: pending, version: (bump) })
