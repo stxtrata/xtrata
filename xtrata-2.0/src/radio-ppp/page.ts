@@ -24,7 +24,7 @@ import { createAlbumView, type AlbumInput } from './album';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
-import { musicWalletOption } from './connect-choice';
+import { musicWalletOptions } from './connect-choice';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -379,15 +379,23 @@ function start(root: HTMLElement) {
   if (top) top.onclick = go;
 
   /**
+   * A button that pays from the main wallet. While a linked listening wallet runs on its own (no Stacks wallet
+   * connected) there is nothing to pay from yet, so the button connects that wallet first.
+   */
+  const fromMain = (s: Snapshot, label: string, run: () => void, cls = '') =>
+    s.standIn && !s.mainConnected ? button(`Connect ${who(s.standIn)} to add STX`, connectStacks, cls) : button(label, run, cls);
+  /** Open the device's listening wallet for `main` without its Stacks wallet, then bring the passkey tap into view. */
+  const openLinked = (main: string) => { void ppp.useLinked(main).then(() => focusPanel()); };
+  /**
    * The connect pop-up (src/radio-likes/wallet.ts asks for it before opening the Stacks wallet chooser):
-   * "Xtrata Music Wallet" first, then Xverse or Leather. Resolves 'stacks' to carry on to the Stacks chooser,
-   * 'music' once the Xtrata Music Wallet has been started here, or null if the visitor closed the pop-up.
-   * Where no passkey-only wallet is possible it resolves 'stacks' straight away, so nothing changes there.
+   * Xtrata Music Wallet rows first (connect-choice.ts), then Xverse or Leather. Resolves 'stacks' to carry on to the
+   * Stacks chooser, 'music' once an Xtrata Music Wallet has been started here, or null if the visitor closed it.
+   * Where no Xtrata Music Wallet can be offered it resolves 'stacks' straight away, so nothing changes there.
    */
   let chooserOpen: Promise<'stacks' | 'music' | null> | null = null;
   const chooseConnect = (): Promise<'stacks' | 'music' | null> => {
-    const option = musicWalletOption(ppp.snapshot());
-    if (!option) return Promise.resolve('stacks');
+    const options = musicWalletOptions(ppp.snapshot(), who);
+    if (!options.length) return Promise.resolve('stacks');
     if (chooserOpen) return chooserOpen;
     chooserOpen = new Promise((resolve) => {
       const dialog = el('dialog', '', 'ppp-connect') as HTMLDialogElement;
@@ -403,21 +411,22 @@ function start(root: HTMLElement) {
         return b;
       };
       const head = el('h2', 'Connect', 'ppp-connect__title'); head.id = 'ppp-connect-title';
-      const music = row(option.label, option.detail, 'is-music', () => {
+      const rows = options.map((option) => row(option.label, option.detail, 'is-music', () => {
         close('music');
+        if (option.action === 'linked' && option.main) { openLinked(option.main); return; }
         // Ask again at the tap: the wallet box may have answered since the pop-up opened.
-        const now = musicWalletOption(ppp.snapshot());
+        const now = musicWalletOptions(ppp.snapshot(), who).find((o) => o.action !== 'linked');
         if (now?.action === 'create') void ppp.create();
         else if (now?.action === 'unlock') void ppp.unlock();
         // The passkey prompt is a tap inside the wallet box, so bring it into view.
         focusPanel();
-      }, !!option.disabled);
+      }, !!option.disabled));
       const stacks = row('Xverse or Leather', 'A Stacks wallet you already have.', 'is-stacks', () => close('stacks'));
       const cancel = button('Cancel', () => close(null), 'quiet ppp-connect__cancel');
-      dialog.append(head, music, stacks, cancel);
+      dialog.append(head, ...rows, stacks, cancel);
       document.body.appendChild(dialog);
       dialog.showModal();
-      if (!option.disabled) music.focus();
+      rows.find((b) => !b.disabled)?.focus();
     });
     return chooserOpen;
   };
@@ -539,9 +548,12 @@ function start(root: HTMLElement) {
     const root = document.documentElement;
     const mark = s.solo && !s.main ? (s.listening ? short(s.listening) : 'new') : '';
     const installed = hasInstalledStacksWallet() ? '1' : '';
-    if (`${mark}|${installed}` === headerMark) return;
-    headerMark = `${mark}|${installed}`;
+    // A linked listening wallet used without its Stacks wallet: the top bar says whose it is.
+    const as = s.standIn && !s.mainConnected ? who(s.standIn) : '';
+    if (`${mark}|${installed}|${as}` === headerMark) return;
+    headerMark = `${mark}|${installed}|${as}`;
     if (mark) root.dataset.pppSolo = mark; else delete root.dataset.pppSolo;
+    if (as) root.dataset.pppAs = as; else delete root.dataset.pppAs;
     if (installed) root.dataset.pppWalletInstalled = installed; else delete root.dataset.pppWalletInstalled;
     window.dispatchEvent(new Event('xtrata:ppp-header'));
   };
@@ -593,7 +605,7 @@ function start(root: HTMLElement) {
     row.append(copyButton('copy-likes-address', 'Copy address', () => f.address, 'primary', () => render(ppp.snapshot())));
     if (f.main && !s.solo) {
       const room = TARGET - (f.balance ?? 0n);
-      if (room > 0n) row.append(button(`Pay ${stx(room)} STX from my wallet`, () => void ppp.topUpLikes(), 'primary'));
+      if (room > 0n) row.append(fromMain(s, `Pay ${stx(room)} STX from my wallet`, () => void ppp.topUpLikes(), 'primary'));
     }
     box.append(row);
     box.append(el('p', 'Send STX to that address from any Stacks wallet or an exchange. Likes carry on by themselves once it arrives.', 'ppp-mute'));
@@ -788,9 +800,10 @@ function start(root: HTMLElement) {
           // This device has a listening wallet for a Stacks wallet: connect it to keep paying. Any other wallet gets its own.
           const mine = [s.linked, ...s.others];
           key.push(el('p', mine.length > 1
-            ? `This device has listening wallets for ${whoList(mine)}. Connect one of them to keep paying artists.`
-            : `This device's listening wallet is linked to ${who(s.linked)}. Connect that wallet to keep paying artists.`));
-          lines.push(el('p', 'Connect a different wallet instead and it gets a listening wallet of its own: each address keeps its own plays, likes and funds. Listening is always free.'));
+            ? `This device has listening wallets for ${whoList(mine)}.`
+            : `This device has a listening wallet for ${who(s.linked)}.`));
+          lines.push(el('p', 'Open it with Face ID or your fingerprint: no Stacks wallet needed, and plays and likes still count for that wallet. Or connect a different wallet and it gets a listening wallet of its own. Listening is always free.'));
+          mine.slice(0, 3).forEach((m, i) => actions.push(button(`Open ${who(m)}`, () => openLinked(m), i === 0 ? 'primary' : '')));
         } else {
           key.push(el('p', 'Connect your wallet to pay artists as you listen.'));
           lines.push(el('p', 'Every payment is recorded on-chain. Listening is always free.'));
@@ -841,7 +854,9 @@ function start(root: HTMLElement) {
           key.push(el('p', 'Locked.', 'ppp-mute'));
           actions.push(button('Unlock', () => void ppp.unlock(), 'primary'));
         }
-        more.push(button('Use a different listening wallet', () => void ppp.unlock(true), 'quiet'));
+        // Standing in for a Stacks wallet: another of the device's wallets is picked from the connect pop-up (by name).
+        if (s.standIn) more.push(button('Use a different listening wallet', () => void chooseConnect().then((c) => { if (c === 'stacks') connectStacks(); }), 'quiet'));
+        else more.push(button('Use a different listening wallet', () => void ppp.unlock(true), 'quiet'));
         break;
       case 'link':
         key.push(el('p', `Link to ${who(s.main)} · free`));
@@ -871,7 +886,7 @@ function start(root: HTMLElement) {
         } else lines.push(el('p', `Or send STX from an exchange to the listening wallet address (Copy above).`, 'ppp-mute'));
         if (s.depositPending && s.depositTxid) { const p = el('p', 'Funds on their way · paying starts by itself when they land. ', 'ppp-warn'); p.append(link('View', explorer(s.depositTxid))); key.push(p); }
         // No deposit button while plays (a gift, or a deposit) are on their way: a button that cannot be pressed only confuses, so there is none.
-        else if (s.allowance > 0n && !s.solo && !s.depositPending) actions.push(button(`Deposit ${stx(s.allowance)} STX from my wallet`, () => void ppp.deposit(), 'primary'));
+        else if (s.allowance > 0n && !s.solo && !s.depositPending) actions.push(fromMain(s, `Deposit ${stx(s.allowance)} STX from my wallet`, () => void ppp.deposit(), 'primary'));
         break;
       }
       case 'over':
@@ -896,7 +911,7 @@ function start(root: HTMLElement) {
         if (s.queued) key.push(el('p', s.queued === 1 ? '1 song waiting to be paid · sends as soon as the last transaction confirms' : `${s.queued} songs waiting to be paid · sent one at a time as each transaction confirms`, 'ppp-warn'));
         if (s.balanceState === 'low') key.push(el('p', 'Running low on plays', 'ppp-warn'));
         if (s.depositPending) key.push(el('p', 'Plays on their way…', 'ppp-warn'));
-        else if (s.allowance > 0n && s.balanceState !== 'ok' && !s.solo) actions.push(button(`Top up ${stx(s.allowance)} STX`, () => void ppp.deposit()));
+        else if (s.allowance > 0n && s.balanceState !== 'ok' && !s.solo) actions.push(fromMain(s, `Top up ${stx(s.allowance)} STX`, () => void ppp.deposit()));
         break;
     }
     if (s.solo && s.walletCannotSolo)

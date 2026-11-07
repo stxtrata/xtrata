@@ -68,7 +68,8 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
   const ppp = createPppController({
     now: () => time,
     main: () => main,
-    config: async () => ({ ...gate, allowed: gate.allowed && !!main }),
+    // Like the server: the allowlist is checked for the address the page asks about (connected, or a linked stand-in).
+    config: async (m) => ({ ...gate, allowed: gate.allowed && !!m }),
     links: async (m) => savedLinks.filter((l) => !l.main || l.main === m).map((l) => ({ listening: l.listening, issued: l.issued, mainSignature: l.mainSignature })),
     saveLink: async (body) => { savedLinks.push(body); },
     // `oldWallet`: a wallet box built before `features`, `listening.cancel` and `listening.signLike`.
@@ -996,6 +997,57 @@ describe('passkey-only listening (no Stacks wallet)', () => {
     s.setMain(MAIN);
     await s.ppp.forceRefresh();
     expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', solo: false });
+  });
+
+  it('a linked listening wallet can run without its Stacks wallet, credited to it, and asks for the wallet only to pay from it', async () => {
+    const s = setup({ passkeyOnly: true });
+    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit();
+    s.mineAll(); await s.ppp.forceRefresh();
+    const listening = s.ppp.snapshot().listening;
+    s.setMain(undefined); // later: the same device, no Stacks wallet connected
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'connect', linked: MAIN });
+    // The connect pop-up's "Xtrata Music Wallet · <MAIN>": the device's wallet for MAIN, no Stacks wallet needed.
+    await s.ppp.useLinked(MAIN);
+    let snap = s.ppp.snapshot();
+    expect(snap).toMatchObject({ standIn: MAIN, main: MAIN, mainConnected: false, solo: false, linked: MAIN, listening });
+    expect(['locked', 'ready']).toContain(snap.step);
+    if (snap.step === 'locked') await s.ppp.unlock();
+    // Leaving the connected wallet stopped the paying session; switching on approves a new one, in the box.
+    if (!s.ppp.snapshot().session) await s.ppp.switchOn();
+    snap = s.ppp.snapshot();
+    expect(snap.session).not.toBeNull();
+    expect(snap).toMatchObject({ step: 'ready', standIn: MAIN, linked: MAIN, returnTo: MAIN, returnToKind: 'linked' });
+    // It pays as you listen, from the listening wallet only.
+    const before = s.chain.broadcasts.length;
+    await s.ppp.onListened({ song: 7, id: rid(41) });
+    expect(s.chain.broadcasts.length).toBe(before + 1);
+    // Anything from the Stacks wallet itself asks for it; nothing is sent.
+    const deposits = s.chain.deposits.length;
+    await s.ppp.deposit();
+    expect(s.chain.deposits.length).toBe(deposits);
+    expect(s.ppp.snapshot().error).toMatch(/Connect your main wallet/);
+    // Connecting the Stacks wallet takes over as before; disconnecting goes back to the stand-in.
+    s.setMain(MAIN); await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', standIn: undefined, mainConnected: true, main: MAIN });
+    s.setMain(undefined); await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ standIn: MAIN, main: MAIN });
+    // And back to asking for a Stacks wallet.
+    await s.ppp.useLinked(null);
+    expect(s.ppp.snapshot()).toMatchObject({ standIn: undefined, step: 'connect' });
+  });
+
+  it('a stand-in never opens another address\'s wallet and ignores anything that is not an address', async () => {
+    const s = setup({ passkeyOnly: true });
+    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link();
+    s.setMain(undefined);
+    await s.ppp.useLinked('not-an-address');
+    expect(s.ppp.snapshot().standIn).toBeUndefined();
+    // OTHER_MAIN has no wallet on this device: the box offers to make one, never MAIN's.
+    await s.ppp.useLinked(OTHER_MAIN);
+    const snap = s.ppp.snapshot();
+    expect(snap.standIn).toBe(OTHER_MAIN);
+    expect(snap.linked === MAIN && snap.step !== 'wrong-wallet').toBe(false);
   });
 
   it('a wallet linked to another main wallet is not offered passkey-only either', async () => {

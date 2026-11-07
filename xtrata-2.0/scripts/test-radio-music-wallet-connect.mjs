@@ -5,7 +5,7 @@
 //   VITE_LISTENING_WALLET_PARENTS=https://radio.xtrata.test npm run build:listening-wallet
 //   CHROME_PATH=/usr/bin/google-chrome node scripts/test-radio-music-wallet-connect.mjs [screenshot-dir]
 import assert from 'node:assert/strict';
-import { addAuthenticator, makeMock, SITE, startWorld } from './claim-harness/lib/world.mjs';
+import { addAuthenticator, makeMock, SITE, startWorld, WALLET } from './claim-harness/lib/world.mjs';
 import { panelNow, walletFrame } from './claim-harness/lib/person.mjs';
 
 const shots = process.argv[2];
@@ -78,4 +78,98 @@ async function run(device) {
   } finally { await world.browser.close(); }
 }
 
+/**
+ * A device whose listening wallet is linked to a Stacks wallet, with that Stacks wallet NOT connected: the pop-up names
+ * it ("Xtrata Music Wallet · SP…"), and choosing it unlocks it and runs it, credited to that wallet.
+ */
+const LINKED_MAIN = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7';
+async function runLinked(device) {
+  const world = await startWorld({ device, mock: makeMock(), record });
+  const page = await world.context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  // Like the server with RADIO_PPP_ALLOWLIST=all: open to any main wallet the page names.
+  await page.route('**/radio/listening-wallet/config*', async (route) => {
+    const main = new URL(route.request().url()).searchParams.get('main');
+    await route.fulfill({ json: {
+      enabled: true, allowed: !!main, here: true, radioUrl: SITE + '/radio.html', canary: true, walletOrigin: WALLET, passkeyOnly: true,
+      limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 },
+      gifts: { enabled: true, treasury: world.mock.treasury, turnstileSiteKey: null, admin: false, fee: '3000' }
+    } });
+  });
+  // The server's record of verified links (public): this device's wallet is linked to LINKED_MAIN.
+  let linkedListening = '';
+  await page.route('**/radio/listening-wallet/link*', (route) => route.fulfill({ json: { links: linkedListening ? [{ listening: linkedListening, main: LINKED_MAIN, issued: 1, mainSignature: '00' }] : [] } }));
+  const auth = await addAuthenticator(world.context, page, record);
+  const dialog = page.locator('dialog.ppp-connect');
+  const connect = page.locator('#radio-wallet-connect');
+  const tapPanels = async (until, ms = 30000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if (await until()) return true;
+      const panel = await panelNow(page);
+      if (panel?.enabled) {
+        const frame = await walletFrame(page);
+        if (/\(new tab\)/.test(panel.label)) {
+          await frame.locator('#p-ok').click();
+          const tab = page.frameLocator('#harness-newtab');
+          await tab.getByRole('button', { name: 'Create passkey' }).click({ timeout: 8000 });
+          await tab.getByText('Passkey saved ✓').waitFor({ timeout: 8000 });
+          await page.evaluate(() => document.getElementById('harness-newtab')?.remove());
+        } else await frame.locator('#p-ok').click();
+        await page.waitForTimeout(1200);
+      } else await page.waitForTimeout(250);
+    }
+    return until();
+  };
+  try {
+    // A wallet made here, then linked to a Stacks wallet (the link is set in the wallet box's own record, as linking would).
+    await page.goto(SITE + '/radio.html');
+    await page.waitForFunction(() => /Start listening/.test(document.querySelector('#ppp')?.textContent ?? ''), null, { timeout: 15000 });
+    await connect.click();
+    await dialog.getByRole('button', { name: /^Xtrata Music Wallet/ }).click();
+    assert.ok(await tapPanels(async () => (await page.evaluate(() => document.documentElement.dataset.pppSolo ?? '')).startsWith('SP')), `${device}: wallet made`);
+    const frame = await walletFrame(page);
+    linkedListening = await frame.evaluate((main) => {
+      const k = 'xtrata.listening-wallet.v1', v = JSON.parse(localStorage.getItem(k));
+      v.wallets[0].link = { main, issued: 1, mainSignature: '00' };
+      localStorage.setItem(k, JSON.stringify(v));
+      return v.wallets[0].address;
+    }, LINKED_MAIN);
+
+    // Later visit, no Stacks wallet connected.
+    await page.reload();
+    await page.waitForFunction(() => /This device has a listening wallet for/.test(document.querySelector('#ppp')?.textContent ?? ''), null, { timeout: 15000 });
+    assert.equal(await connect.textContent(), 'Connect wallet');
+    await connect.click();
+    await dialog.waitFor({ timeout: 5000 });
+    const rows = await dialog.locator('.ppp-connect__opt b').allTextContents();
+    assert.equal(rows.length, 2, `${device}: one linked row + Stacks`);
+    assert.match(rows[0], /^Xtrata Music Wallet · SP10/, `${device}: linked row named by its wallet`);
+    assert.equal(rows[1], 'Xverse or Leather');
+    if (shots) await page.screenshot({ path: `${shots}/linked-connect-${device}.png` });
+    await dialog.getByRole('button', { name: /^Xtrata Music Wallet · / }).click();
+    // One passkey tap in the box, then it runs credited to the linked wallet, with no Stacks wallet connected.
+    const running = async () => page.evaluate(() => {
+      const as = document.documentElement.dataset.pppAs ?? '';
+      const label = document.getElementById('radio-wallet-address')?.textContent ?? '';
+      const t = document.querySelector('#ppp')?.textContent ?? '';
+      const top = document.getElementById('ppp-top')?.textContent ?? '';
+      return !!as && label === '♪ ' + as && !/This device has a listening wallet for/.test(t) && /Add plays|plays left|Plays off/.test(top);
+    });
+    if (!(await tapPanels(running))) {
+      const why = await page.evaluate(() => ({ as: document.documentElement.dataset.pppAs, label: document.getElementById('radio-wallet-address')?.textContent, top: document.getElementById('ppp-top')?.textContent, ppp: (document.querySelector('#ppp')?.textContent ?? '').slice(0, 400) }));
+      if (shots) await page.screenshot({ path: `${shots}/linked-fail-${device}.png` });
+      assert.fail(`${device}: linked wallet open without its Stacks wallet: ${JSON.stringify(why)} panel=${JSON.stringify(await panelNow(page))}`);
+    }
+    const session = await page.evaluate(() => JSON.parse(localStorage.getItem('xtrata.wallet.session') || 'null'));
+    assert.ok(!session?.isConnected, `${device}: no Stacks wallet was connected`);
+    assert.equal((await auth.credentials()).length, 1, `${device}: still one passkey`);
+    if (shots) await page.screenshot({ path: `${shots}/linked-open-${device}.png` });
+    assert.deepEqual(errors, [], `${device}: page errors`);
+    console.log(`ok linked ${device}`);
+  } finally { await world.browser.close(); }
+}
+
 for (const device of ['desktop', 'iphone']) await run(device);
+for (const device of ['desktop', 'iphone']) await runLinked(device);
