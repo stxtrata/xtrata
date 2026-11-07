@@ -20,7 +20,9 @@ function render(){
  address.textContent=connected?(names.get(session.network==='mainnet'?session.address:undefined)??session.address!):solo?(solo==='new'?'No wallet needed':'Listening wallet · '+solo):'Wallet not connected';
  address.title=connected?'Connected wallet · '+session.network+' · '+session.address:solo?'A passkey listening wallet on this device. A Stacks wallet is optional.':'';
  if(lastAddress!==session.address){lastAddress=session.address;window.dispatchEvent(new Event('xtrata:wallet-changed'));}
- connect.textContent=busy?'Please wait…':connected?'Switch wallet':solo?(document.documentElement.dataset.pppWalletInstalled==='1'?'Use a Stacks wallet instead':'I have a Stacks wallet'):'Connect wallet';
+ // No wallet yet on a passkey-only radio: "Connect wallet" opens the pop-up with Xtrata Music Wallet first.
+ // An Xtrata Music Wallet already in use here: the button is only for adding a Stacks wallet.
+ connect.textContent=busy?'Please wait…':connected?'Switch wallet':solo&&solo!=='new'?(document.documentElement.dataset.pppWalletInstalled==='1'?'Use a Stacks wallet instead':'I have a Stacks wallet'):'Connect wallet';
  connect.disabled=busy;disconnect.hidden=!connected;disconnect.disabled=busy;
 }
 async function act(action:()=>Promise<unknown>){
@@ -28,7 +30,22 @@ async function act(action:()=>Promise<unknown>){
  try{await action();}catch(error){message.textContent=error instanceof Error?error.message:'Wallet action failed. Please try again.';}
  finally{busy=false;render();}
 }
-connect.onclick=()=>void act(()=>adapter.connect());
+const connectStacks=()=>void act(()=>adapter.connect());
+// The radio's pay-per-play page (src/radio-ppp/page.ts) offers its connect pop-up: Xtrata Music Wallet first,
+// then Xverse or Leather. It answers 'stacks' straight away wherever a passkey-only wallet is not possible.
+type Chooser=()=>Promise<'stacks'|'music'|null>;
+connect.onclick=async()=>{
+ if(busy)return;
+ const session=adapter.getSession(),connected=session.isConnected&&!!session.address,solo=soloMark();
+ const choose=(window as unknown as {XtrataRadioConnectChooser?:Chooser}).XtrataRadioConnectChooser;
+ if(!connected&&(!solo||solo==='new')&&choose){
+  let choice:'stacks'|'music'|null='stacks';
+  try{choice=await choose();}catch{choice='stacks';}
+  if(choice!=='stacks')return;
+ }
+ connectStacks();
+};
+(window as unknown as {XtrataRadioConnectStacks?:()=>void}).XtrataRadioConnectStacks=connectStacks;
 disconnect.onclick=()=>void act(()=>adapter.disconnect());
 window.addEventListener('focus',render);
 window.addEventListener('xtrata:ppp-header',render);
