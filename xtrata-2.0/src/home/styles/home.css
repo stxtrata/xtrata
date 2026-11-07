@@ -2769,6 +2769,52 @@
       height: 100%;
     }
 
+    /* Opened with ?fullscreen=1 (the arcade links): the piece fills the whole window like a raw /i/ page,
+       with only a small Close button left in the corner. Still the viewer, so the wallet bridge works. */
+    .fullscreen-viewer--immersive {
+      display: block;
+      background: #020604;
+    }
+    .fullscreen-viewer--immersive .fullscreen-viewer__stage {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .fullscreen-viewer--immersive .fullscreen-viewer__rel,
+    .fullscreen-viewer--immersive .fullscreen-viewer__mark,
+    .fullscreen-viewer--immersive .fullscreen-viewer__title,
+    .fullscreen-viewer--immersive .fullscreen-viewer__id,
+    .fullscreen-viewer--immersive #fullscreenPrevButton,
+    .fullscreen-viewer--immersive #fullscreenNextButton,
+    .fullscreen-viewer--immersive #fullscreenRawLink {
+      display: none;
+    }
+    .fullscreen-viewer--immersive .fullscreen-viewer__chrome {
+      position: absolute;
+      z-index: 3;
+      left: 8px;
+      bottom: 8px;
+      padding: 0;
+      border: 0;
+      background: none;
+      box-shadow: none;
+      min-height: 0;
+    }
+    .fullscreen-viewer--immersive #fullscreenCloseButton {
+      opacity: 0.55;
+      font-size: 12px;
+      padding: 4px 10px;
+      background: rgba(2, 6, 4, 0.7);
+    }
+    .fullscreen-viewer--immersive #fullscreenCloseButton:hover,
+    .fullscreen-viewer--immersive #fullscreenCloseButton:focus-visible {
+      opacity: 1;
+    }
+
     .fullscreen-viewer__stage audio {
       width: min(560px, 86vw);
     }
