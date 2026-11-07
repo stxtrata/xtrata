@@ -40,7 +40,7 @@ export const ARTICLES: ArticleEntry[] = [
     date: '2026-11-06',
     description:
       "I checked where the 250 biggest Stacks NFT collections keep their art. 34 can't reach it any more. One of them is mine. The full article, and all 24 of its images, are inscribed on Stacks.",
-    card: '/a/cards/3654.jpg',
+    card: '/a/cards/3654-v2.jpg',
     sha256: 'cd4eed375e9d0628fe7478c67c1cf3fdb848a0e67f399751f3500d69adcbea10',
     bytes: 49122,
     images: 24

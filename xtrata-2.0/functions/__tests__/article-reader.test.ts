@@ -49,9 +49,9 @@ describe('article reader', () => {
   it('uses the registry for a registered article', () => {
     const m = buildMeta('3654', null, 'text/html');
     expect(m.article?.title).toBe('Somewhere Else');
-    expect(m.image).toBe('https://xtrata.xyz/a/cards/3654.jpg');
+    expect(m.image).toBe('https://xtrata.xyz/a/cards/3654-v2.jpg');
     const html = renderReader(m);
-    expect(html).toContain('<meta property="og:image" content="https://xtrata.xyz/a/cards/3654.jpg">');
+    expect(html).toContain('<meta property="og:image" content="https://xtrata.xyz/a/cards/3654-v2.jpg">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(html).toContain('<meta name="twitter:creator" content="@jimdotbtc">');
     expect(html).toContain('href="/i/3654"');
@@ -125,7 +125,7 @@ describe('link previews', () => {
   it('uses the registered card for #3654 on /i/', async () => {
     const out = await linkPreviewGuard({ request: req('/i/3654', TWITTERBOT), env: {}, next: async () => html('<title>Somewhere Else</title>') });
     const text = await out.text();
-    expect(text).toContain('https://xtrata.xyz/a/cards/3654.jpg');
+    expect(text).toContain('https://xtrata.xyz/a/cards/3654-v2.jpg');
     expect(text).toContain('<meta property="og:url" content="https://xtrata.xyz/i/3654">');
   });
 
