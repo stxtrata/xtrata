@@ -124,11 +124,12 @@ describe('homepage wiring', () => {
   });
 });
 
-describe('casino beta bar', () => {
+describe('casino tile', () => {
   const html = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
-  it('links to the slot hall beta, above the music supporters bar', () => {
-    expect(html).toContain('id="betaBar" class="home-supbar home-supbar--beta home-only" href="/casino/"');
-    expect(html.indexOf('id="betaBar"')).toBeGreaterThan(-1);
-    expect(html.indexOf('id="betaBar"')).toBeLessThan(html.indexOf('id="musicBanner"'));
+  it('is in the rotation pool, the top beta bar is gone, and Day 13 keeps the tile off the wall', () => {
+    expect(html).not.toContain('id="betaBar"');
+    const pool = ROTATION.pool.find((entry: { tile: { id: string } }) => entry.tile.id === 'casino');
+    expect(pool?.tile).toMatchObject({ href: '/casino/', kind: 'image' });
+    expect(TODAY_SCHEDULE[12].avoid).toContain('casino');
   });
 });

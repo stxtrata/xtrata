@@ -146,7 +146,7 @@ export const TODAY_SCHEDULE = Object.freeze([
   Object.freeze({
     day: 12, id: 'today-album', feature: 'Xtrata Music',
     title: 'One album, front to back.',
-    copy: 'Silence. Sound. Memory., the Audionals opera in seven songs. Start at track one, or jump to any song below.',
+    copy: 'Audionals - The Opera in seven songs. Start at track one, or jump to any song below.',
     credit: 'by Audionals',
     tone: 'amber', image: '/radio/artwork?id=2883',
     action: { type: 'song', label: 'Start the album', tokenId: 2883, title: 'Let The Score Remember All', artist: 'Audionals' },
@@ -168,6 +168,7 @@ export const TODAY_SCHEDULE = Object.freeze([
     copy: 'The ParallaX casino has a fresh set of slot machines. Walk in, pick one and take a spin.',
     tone: 'amber',
     action: { type: 'link', label: 'Play the machine', href: '/casino/', newTab: true },
+    avoid: ['casino'],
     note: 'Opens the regular casino (/casino/), which now has the simple setup with the new slot machines. Not a deep link to one cabinet. No screenshot art (the casino needs WebGL), so the card uses a CSS slot motif.'
   }),
   Object.freeze({

@@ -178,6 +178,13 @@ const WALL_RADIO = Object.freeze({
   image: '/radio/artwork?id=3570', position: 'center',
   href: '/radio'
 });
+const WALL_CASINO = Object.freeze({
+  // The ParallaX casino. Opens /casino/ in a new tab. Image is a screenshot of the casino floor.
+  id: 'casino', kind: 'image', tone: 'amber',
+  eyebrow: 'Play money', title: 'ParallaX Casino', subtitle: 'Walk in, pick a machine and take a spin.',
+  image: '/home/wall/casino-floor.webp', position: 'center',
+  href: '/casino/', newTab: true
+});
 const WALL_FOREVER_TWINS = Object.freeze({
   // The Forever Twins campaign: one twin from each of the three newest collections.
   id: 'forever-twins', kind: 'twins', tone: 'orange',
@@ -231,6 +238,7 @@ export const HOMEPAGE_WALL_ROTATION = Object.freeze({
     Object.freeze({ tile: WALL_ASTRO, weights: Object.freeze({ big: 3 }) }),
     Object.freeze({ tile: WALL_KP_LOOPS, weights: Object.freeze({ big: 2, tall: 2 }) }),
     Object.freeze({ tile: WALL_AUDIONAUTS, weights: Object.freeze({ big: 2, wide: 3 }) }),
+    Object.freeze({ tile: WALL_CASINO, weights: Object.freeze({ big: 2, tall: 2, wide: 3 }) }),
     Object.freeze({ tile: WALL_RADIO, weights: Object.freeze({ big: 1, tall: 2, wide: 3 }) }),
     Object.freeze({ tile: WALL_FOREVER_TWINS, weights: Object.freeze({ big: 3, tall: 3, wide: 2 }) })
   ]),
