@@ -22,10 +22,10 @@ async function screen() {
   const h = () => simnet.burnBlockHeight;
   const post = (sender, o = {}) => call('post-item', [
     U(o.kind ?? 0), S(o.head ?? 'HELLO'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size),
-    U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100), U(o.layout ?? 0),
+    U(o.weight ?? 1), U(o.from ?? 0), U(o.to ?? h() + 100), U(o.layout ?? 0), U(o.turns ?? 1), S(o.link ?? ''),
   ], sender);
   const buy = (sender, o = {}) => call('buy-slot', [
-    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0), U(o.max ?? 1000000000000),
+    U(o.kind ?? 0), S(o.head ?? 'PAID'), S(o.body ?? ''), U((o.img ?? NONE).id), Cl.buffer((o.img ?? NONE).hash), U((o.img ?? NONE).size), U(o.days ?? 1), U(o.layout ?? 0), U(o.max ?? 1000000000000), U(o.turns ?? 1), U(o.startAfter ?? 0), S(o.link ?? ''),
   ], sender);
   const live = () => ro('get-live').value.map((x) => Number(x.value));
   const item = (id) => ro('get-item', [U(id)]).value.value;

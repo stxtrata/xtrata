@@ -153,6 +153,13 @@ mainnet boards will be) and `testgames` (inscribes the two test games in `recurs
 boards and adds them to the games contract: 32 more transactions), so the testnet clone looks like the mainnet launch with two extra games.
 Both can also be run alone (`--steps connect,boards26,testgames`) and resume from the chain.
 
+Testnet-only screen steps (run alone with `--steps connect,<step>`; none of them is part of `--full` or touches mainnet):
+`screenreel` posts the test reel (11 items; one 3-turn ad with a click-through link, one news item booked to start a day later),
+`screentext` posts a fresh REEL UPDATE message, `adadmin` / `adbuy` run the ad-renting flow (`adbuy` also reads `XA_AD_TURNS`, `XA_AD_START_DAYS`
+and `XA_AD_LINK`), and `screenv2` checks the screen upgrade end to end with the one root wallet: raises the public turn limit, makes the root a
+partner (50% off, 30 days, 5 turns), buys a 20-day 5-turn linked news slot at half price, approves it, changes its order weight with `set-weight`,
+reads each effect back, then retires it (the unearned part comes back), removes the partner and restores the limit. It can be run again.
+
 It runs connect, preflight, the testnet core and fixtures, the deploys, the registry (kinds through the temporary KINDS admin,
 the hall, setup, the read-back with `ops/lib/hallread.mjs`, the hall's own reader in a vm), the packs, the parent, the release
 check (without the boot, which needs a browser) and the ownership check: 34 transactions from the root key on a fresh testnet.
