@@ -34,9 +34,13 @@ a{color:var(--acc)}
  <div class="row"><div><label>Picture: inscription id on testnet (optional; must be inscribed by the connected wallet)</label><input id="img" inputmode="numeric" placeholder="e.g. 123"></div>
  <div><label>Days</label><input id="days" type="number" min="1" value="3"></div></div>
  <div id="imgchk" class="mut" style="margin-top:6px"></div>
+ <div class="row"><div><label>Turns in a row (each turn is 12 seconds on the screen)</label><select id="turns"><option value="1">1 turn · 12 s</option><option value="2">2 turns · 24 s</option><option value="3">3 turns · 36 s</option><option value="4">4 turns · 48 s</option><option value="5">5 turns · 60 s</option></select></div>
+ <div><label>Start in … days (0 = as soon as approved; at most 30)</label><input id="startd" type="number" min="0" max="30" value="0"></div></div>
+ <label>Click-through link (optional): https:// only, up to 100 characters. Visitors see where it leads and choose whether to open it.</label><input id="link" maxlength="100" placeholder="https://xtrata.xyz/">
+ <div id="linkchk" class="mut" style="margin-top:4px"></div>
  <p style="margin-top:12px">Price: <b id="price" class="gold">–</b> <span id="pricenote" class="mut"></span></p>
  <p><button id="buy" disabled>Pay and submit for review</button> <span id="buymsg"></span></p>
- <div class="mut" style="font-size:13px">After you submit, the ad waits as <b>pending</b> until the admin approves it. Approval starts the run: it lasts days × 144 blocks (about a day each). If it is rejected you are refunded in full; you can also cancel while it is pending.</div>
+ <div class="mut" style="font-size:13px">After you submit, the ad waits as <b>pending</b> until the admin approves it. Approval starts the run (or your chosen start day, if later): it lasts days × 144 blocks (about a day each). Each time your ad comes round it takes its turns back to back, so a 3-turn ad plays for 36 seconds. If it is rejected you are refunded in full; you can also cancel while it is pending.</div>
 </div>
 
 <div class="card"><h2>4. Slots</h2><div id="admin" style="display:none;margin-bottom:10px"></div><div id="items" class="mut">Reading…</div>
@@ -1035,7 +1039,8 @@ a{color:var(--acc)}
   var SCREEN = 'ST3KCQKMMQJSEKD0C8DE0ED4T7E0W7135TDYP7VK3.xtrata-screen-v1', CORE = 'ST3KCQKMMQJSEKD0C8DE0ED4T7E0W7135TDYP7VK3.xtrata-v3-2-3', ROOT = 'ST3KCQKMMQJSEKD0C8DE0ED4T7E0W7135TDYP7VK3';
   XAScores.configure({ network: 'testnet', apiBases: ['https://api.testnet.hiro.so'], readSender: ROOT });
   var C = XAScores._codec, $ = function (id) { return document.getElementById(id); };
-  var cfg = null, admin = '', me = '', height = 0;
+  var cfg = null, admin = '', me = '', height = 0, partner = null;
+  var URL_RE = /^https:\/\/[A-Za-z0-9\-._~:\/?#\[\]@!$&*+,;=%()]+$/;
   function plain(cv) {
     if (!cv) return null;
     switch (cv.type) {
@@ -1060,21 +1065,41 @@ a{color:var(--acc)}
       var p = cfg.prices;
       $('cfg').innerHTML = (cfg['slots-enabled'] ? '<b class="ok">Paid slots are ON</b>' : '<b class="bad">Paid slots are OFF</b> — the admin has to switch them on first (Terminal: run-testnet-v5.command adadmin)') +
         '<br>Prices per day: message <b>' + stx(p.message) + '</b> · news <b>' + stx(p.news) + '</b> · ad <b>' + stx(p.ad) + '</b> · full-screen-only slots cost <b>' + cfg['premium-percent'] + '%</b>' +
-        '<br>Days allowed: ' + cfg['min-days'] + ' to ' + cfg['max-days'] + ' · review window ' + cfg['review-window'] + ' blocks · max paid ads live ' + cfg['max-paid-live'] + ' · paused: ' + (cfg.paused ? 'yes' : 'no') +
+        '<br>Days allowed: ' + cfg['min-days'] + ' to ' + cfg['max-days'] + ' · up to ' + cfg['max-turns'] + ' turns in a row (' + (cfg['max-turns'] * 12) + ' s) · start up to 30 days ahead · review window ' + cfg['review-window'] + ' blocks · max paid ads live ' + cfg['max-paid-live'] + ' · paused: ' + (cfg.paused ? 'yes' : 'no') +
         '<br>Admin: <span class="mono">' + esc(admin) + '</span>';
-      $('days').max = cfg['max-days']; $('days').min = cfg['min-days'];
+      $('days').min = cfg['min-days'];
       $('height').textContent = 'burn block ' + height;
     } catch (e) { $('cfg').innerHTML = '<span class="bad">Could not read the contract: ' + esc(e.message) + '</span>'; }
     quote();
   }
+  function limits() {
+    var d = cfg['max-days'], t = cfg['max-turns'], pct = 0;
+    if (partner) { d = Math.max(d, partner['max-days']); t = Math.max(t, partner['max-turns']); pct = partner.discount; }
+    return { days: d, turns: t, discount: pct };
+  }
   function quote() {
-    var kind = +$('kind').value, layout = +$('layout').value, days = +$('days').value, msg = [];
+    var kind = +$('kind').value, layout = +$('layout').value, days = +$('days').value, turns = +$('turns').value;
     if (!cfg) { $('price').textContent = '–'; return null; }
-    var per = cfg.prices[KIND[kind]]; if (layout === 1) per = Math.floor(per * cfg['premium-percent'] / 100);
-    var ok = days >= cfg['min-days'] && days <= cfg['max-days'] && Number.isInteger(days);
-    var total = ok ? per * days : 0;
-    $('price').textContent = ok ? stx(total) : '–'; $('pricenote').textContent = ok ? '(' + stx(per) + ' a day × ' + days + ')' : 'days must be ' + cfg['min-days'] + ' to ' + cfg['max-days'];
-    return ok ? total : null;
+    var L = limits(), per = cfg.prices[KIND[kind]]; if (layout === 1) per = Math.floor(per * cfg['premium-percent'] / 100);
+    var okDays = Number.isInteger(days) && days >= cfg['min-days'] && days <= L.days, okTurns = Number.isInteger(turns) && turns >= 1 && turns <= L.turns;
+    var full = okDays && okTurns ? per * days * turns : 0, total = Math.floor(full * (100 - L.discount) / 100);
+    var note = !okDays ? 'days must be ' + cfg['min-days'] + ' to ' + L.days : !okTurns ? 'turns must be 1 to ' + L.turns : '(' + stx(per) + ' a day × ' + days + ' day' + (days === 1 ? '' : 's') + ' × ' + turns + ' turn' + (turns === 1 ? '' : 's') + (L.discount ? ', less your ' + L.discount + '% partner discount' : '') + ')';
+    $('price').textContent = okDays && okTurns ? stx(total) : '–'; $('pricenote').textContent = note;
+    $('pricenote').title = partner ? 'Partner: ' + partner.discount + '% off, up to ' + partner['max-days'] + ' days and ' + partner['max-turns'] + ' turns' : '';
+    return okDays && okTurns && total > 0 ? total : null;
+  }
+  function startAfter() { var d = +$('startd').value; return d > 0 ? height + d * 144 : 0; }
+  function linkProblem() {
+    var v = $('link').value.trim(); if (!v) return '';
+    return !/^https:\/\//.test(v) ? 'The link must start with https://' : v.length > 100 ? 'The link is longer than 100 characters.' : !URL_RE.test(v) ? 'The link has a character that is not allowed (no spaces, quotes or angle brackets).' : '';
+  }
+  async function loadPartner() {
+    partner = null;
+    if (me) { try { partner = await read('get-partner', [C.cvPrincipal(me)]); } catch (e) { partner = null; } }
+    var L = cfg ? limits() : null;
+    $('wstat').dataset.partner = partner ? '1' : '';
+    if (partner && !$('wstat').querySelector('.partnerline')) $('wstat').innerHTML += ' <b class="gold partnerline">PARTNER RATE: ' + partner.discount + '% off, up to ' + partner['max-days'] + ' days and ' + partner['max-turns'] + ' turns</b>';
+    if (L) $('days').max = L.days; quote(); updateBuy();
   }
   var picture = { id: 0, hash: new Uint8Array(0), size: 0, ok: true };
   var chk = Promise.resolve(), lastChecked = null;
@@ -1100,17 +1125,18 @@ a{color:var(--acc)}
     updateBuy();
   }
   function updateBuy() {
-    var price = quote(), head = $('head').value.trim(), layout = +$('layout').value;
-    var why = !me ? 'Connect your wallet first.' : !cfg ? '' : !cfg['slots-enabled'] ? 'Paid slots are off.' : cfg.paused ? 'The screen is paused.' : !head ? 'Add a headline.' : price === null ? 'Check the days.' :
+    var price = quote(), head = $('head').value.trim(), layout = +$('layout').value, sd = +$('startd').value, lp = linkProblem();
+    $('linkchk').innerHTML = lp ? '<span class="bad">' + esc(lp) + '</span>' : $('link').value.trim() ? '<span class="ok">Link looks fine.</span>' : '';
+    var why = !me ? 'Connect your wallet first.' : !cfg ? '' : !cfg['slots-enabled'] ? 'Paid slots are off.' : cfg.paused ? 'The screen is paused.' : !head ? 'Add a headline.' : price === null ? 'Check the days and turns.' : !(Number.isInteger(sd) && sd >= 0 && sd <= 30) ? 'Start must be 0 to 30 days ahead.' : lp ? lp :
       (layout === 1 && !picture.id) ? 'Full-screen-only needs a picture.' : !picture.ok ? 'Fix the picture.' : !/^[\x20-\x7e]*$/.test(head + $('body').value) ? 'ASCII text only.' : '';
     $('buy').disabled = !!why; $('buymsg').innerHTML = '<span class="mut">' + esc(why) + '</span>'; return !why;
   }
   async function buy() {
     await chk;
-    if (!updateBuy()) return; var price = quote(), kind = +$('kind').value, layout = +$('layout').value, days = +$('days').value;
+    if (!updateBuy()) return; height = await read('get-height'); var price = quote(), kind = +$('kind').value, layout = +$('layout').value, days = +$('days').value, turns = +$('turns').value, sa = startAfter(), link = $('link').value.trim();
     $('buy').disabled = true; $('buymsg').innerHTML = '<span class="mut">Waiting for your wallet…</span>';
     try {
-      var args = [C.cvUint(kind), C.cvAscii($('head').value.trim()), C.cvAscii($('body').value.trim()), C.cvUint(picture.id), C.cvBuff(picture.hash), C.cvUint(picture.size), C.cvUint(days), C.cvUint(layout), C.cvUint(price)];
+      var args = [C.cvUint(kind), C.cvAscii($('head').value.trim()), C.cvAscii($('body').value.trim()), C.cvUint(picture.id), C.cvBuff(picture.hash), C.cvUint(picture.size), C.cvUint(days), C.cvUint(layout), C.cvUint(price), C.cvUint(turns), C.cvUint(sa), C.cvAscii(link)];
       var r = await XAScores.callContract({ contract: SCREEN, fn: 'buy-slot', args: args, maxUstx: String(price), expectAddress: me });
       $('buymsg').innerHTML = '<span class="ok">Sent.</span> <a target="_blank" rel="noopener" href="https://explorer.hiro.so/txid/' + esc(r.txid) + '?chain=testnet">transaction</a> · it shows below as pending after the next block (3 to 4 minutes on testnet).';
       setTimeout(loadItems, 20000);
@@ -1123,11 +1149,11 @@ a{color:var(--acc)}
       var mine = me;
       $('items').innerHTML = rows.length ? '<table><tr><th>#</th><th>Type</th><th>Headline</th><th>State</th><th>Paid</th><th></th></tr>' + rows.map(function (r) {
         var i = r[0], it = r[1], st = it.status === 0 ? '<b class="gold">pending</b>' : it.status === 1 ? (it['ends-at'] > height ? '<b class="ok">live</b> · ' + (it['ends-at'] - height) + ' blocks left' : 'finished') : 'ended';
-        var paid = it.paid ? stx(it.price) + ' · ' + it.days + ' day' + (it.days === 1 ? '' : 's') : 'free';
+        var paid = it.paid ? stx(it.price) + ' · ' + it.days + ' day' + (it.days === 1 ? '' : 's') : 'free'; if (it.turns > 1) paid += ' · ' + it.turns + ' turns (' + (it.turns * 12) + ' s)'; if (it.status === 1 && it['starts-at'] > height) paid += ' · starts in ' + (it['starts-at'] - height) + ' blocks';
         var acts = '';
         if (it.status === 0 && mine && mine === it.buyer) acts += '<button class="s" data-a="cancel" data-i="' + i + '">Cancel</button> ';
         if (it.status === 0 && mine && mine === admin) acts += '<button class="s" data-a="approve" data-i="' + i + '">Approve</button> <button class="s" data-a="reject" data-i="' + i + '">Reject</button>';
-        return '<tr><td>' + i + '</td><td>' + KIND[it.kind] + (it.layout ? ' · full-screen' : '') + '</td><td>' + esc(it.head) + (it['image-size'] ? ' <span class="mut">(picture #' + it['image-id'] + ')</span>' : '') + '</td><td>' + st + '</td><td>' + paid + '</td><td>' + acts + '</td></tr>';
+        return '<tr><td>' + i + '</td><td>' + KIND[it.kind] + (it.layout ? ' · full-screen' : '') + '</td><td>' + esc(it.head) + (it['image-size'] ? ' <span class="mut">(picture #' + it['image-id'] + ')</span>' : '') + (it.link ? ' <span class="mut">(link: ' + esc(it.link) + ')</span>' : '') + '</td><td>' + st + '</td><td>' + paid + '</td><td>' + acts + '</td></tr>';
       }).join('') + '</table>' : 'Nothing posted yet.';
       Array.prototype.forEach.call($('items').querySelectorAll('button[data-a]'), function (b) { b.onclick = function () { act(b.dataset.a, +b.dataset.i, b); }; });
     } catch (e) { $('items').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
@@ -1148,12 +1174,12 @@ a{color:var(--acc)}
     me = s.address || ''; var main = me && /^S[PM]/.test(me);
     $('wstat').innerHTML = !me ? 'Not connected.' : main ? '<span class="bad">That is a mainnet account (' + esc(me) + '). Switch your wallet to testnet.</span>' : 'Connected: <span class="mono">' + esc(me) + '</span>' + (me === admin ? ' <b class="gold">(admin)</b>' : '');
     $('wbtn').textContent = me ? 'Reconnect' : 'Connect wallet'; if (main) me = '';
-    updateBuy(); checkPicture(true); if (cfg) loadItems();
+    updateBuy(); checkPicture(true); loadPartner(); if (cfg) loadItems();
   });
   $('wbtn').onclick = connect; $('buy').onclick = buy; $('refresh').onclick = function () { loadConfig(); loadItems(); };
-  ['kind', 'layout', 'days', 'head', 'body'].forEach(function (id) { $(id).addEventListener('input', updateBuy); });
+  ['kind', 'layout', 'days', 'head', 'body', 'turns', 'startd', 'link'].forEach(function (id) { $(id).addEventListener('input', updateBuy); });
   $('img').addEventListener('change', function () { checkPicture(false); }); $('img').addEventListener('input', function () { clearTimeout(this._t); this._t = setTimeout(function () { checkPicture(false); }, 500); });
-  loadConfig().then(loadItems); checkPicture(true);
-  window.XA_ADS_TEST = { plain: plain, quote: quote, updateBuy: updateBuy, state: function () { return { me: me, cfg: cfg, picture: picture }; } };
+  loadConfig().then(function () { return loadPartner(); }).then(loadItems); checkPicture(true);
+  window.XA_ADS_TEST = { plain: plain, quote: quote, updateBuy: updateBuy, state: function () { return { me: me, cfg: cfg, picture: picture, partner: partner }; } };
 })();
 </script></body></html>

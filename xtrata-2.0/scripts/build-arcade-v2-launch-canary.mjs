@@ -281,19 +281,20 @@ const launch = {
     const d = resolve(root, 'canaries/arcade-v2-launch/reel-assets'), A = (f, mime) => ({ mime, b64: readFileSync(resolve(d, f)).toString('base64') });
     const assets = { twins: A('forever-twins.gif', 'image/gif'), wall: A('forever-twins-wall.png', 'image/png'), astro: A('astro-blaster.png', 'image/png'), rent: A('rent-slot.png', 'image/png'),
       htmlclip: A('html-ad.webm', 'video/webm'), htmlgif: A('html-ad.gif', 'image/gif'), player: A('radio-player.webm', 'video/webm') };
-    // kind 0 message, 1 news, 2 ad; layout 0 standard, 1 full-screen only; days = how long it runs
+    // kind 0 message, 1 news, 2 ad; layout 0 standard, 1 full-screen only; days = how long it runs; turns = consecutive 12 s turns; link = click-through; startDays = starts that many days from posting
     const items = [
-      { kind: 2, head: 'FOREVER TWINS', body: 'Real Bitcoin Pepes and Birds, forevered on Xtrata.', asset: 'twins', weight: 6, layout: 0 },
+      { kind: 2, head: 'FOREVER TWINS', body: 'Real Bitcoin Pepes and Birds, forevered on Xtrata.', asset: 'twins', weight: 6, layout: 0, turns: 3, link: 'https://xtrata.xyz/' },
       { kind: 2, head: 'FOREVER TWINS WALL', body: 'Sixteen real twins. Full-screen slot.', asset: 'wall', weight: 4, layout: 1 },
-      { kind: 2, head: 'ASTRO BLASTER 3', body: 'Fly, shoot, post your score. Top 10 on Bitcoin.', asset: 'astro', weight: 5, layout: 0 },
+      { kind: 2, head: 'ASTRO BLASTER 3', body: 'Fly, shoot, post your score. Top 10 on Bitcoin.', asset: 'astro', weight: 5, layout: 0, link: 'https://xtrata.xyz/arcade' },
       { kind: 2, head: 'HTML AD AS A CLIP', body: 'A web page rendered to WebM. The screen plays pictures and clips, not live HTML.', asset: 'htmlclip', weight: 3, layout: 0 },
       { kind: 2, head: 'XTRATA RADIO PLAYER', body: 'A silent music-player clip. Full-screen slot.', asset: 'player', weight: 3, layout: 1 },
       { kind: 1, head: 'REEL TEST: THE SCREEN CONTRACT IS LIVE ON TESTNET', body: 'News, messages and ads all come from xtrata-screen-v1.', weight: 4, layout: 0 },
       { kind: 1, head: 'ASTRO BLASTER 3 JOINS THE ARCADE', body: 'The first manifest game, in its own cabinet.', weight: 3, layout: 0 },
+      { kind: 1, head: 'SCHEDULED: THIS NEWS STARTS TOMORROW', body: 'A start date is honoured: it is booked now and appears 144 blocks later.', weight: 3, layout: 0, startDays: 1 },
       { kind: 1, head: 'DOORS OPEN WHEN CONTRACTS SAY SO', body: 'A curtain, a locked door and a lobby, all written to the registry.', weight: 3, layout: 0 },
       { kind: 0, head: 'WALK UNDER THE SCREEN. EVERY SCORE IS ON-CHAIN.', body: '', weight: 3, layout: 0 },
       { kind: 0, head: 'PRESS R FOR XTRATA RADIO', body: '', weight: 3, layout: 0 }
-    ].map((i) => ({ ...i, days: 30 }));
+    ].map((i) => ({ turns: 1, link: '', startDays: 0, ...i, days: 30 }));
     return { assets, items };
   })(),
   // the hall's own registry reader, run by the canary against the registry before anything is inscribed

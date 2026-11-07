@@ -147,7 +147,7 @@ export async function main(argv: string[]): Promise<number> {
     if (!mimes[ext]) { console.error(`REFUSED: ${f}: the screen plays png, jpg, gif, webp, webm and mp4 only`); return 2; }
     const bytes = readFileSync(f);
     if (bytes.length > 2097152) { console.error(`REFUSED: ${f} is ${bytes.length} bytes; the screen contract takes 2 MB at most`); return 2; }
-    (globalThis as any).XA_AD = { bytes: new Uint8Array(bytes), mime: mimes[ext], name: f.replace(/^.*\//, ''), head: process.env.XA_AD_HEAD || '', body: process.env.XA_AD_BODY || '', days: Number(process.env.XA_AD_DAYS || 3), kind: Number(process.env.XA_AD_KIND || 2), layout: Number(process.env.XA_AD_LAYOUT || 0) };
+    (globalThis as any).XA_AD = { bytes: new Uint8Array(bytes), mime: mimes[ext], name: f.replace(/^.*\//, ''), head: process.env.XA_AD_HEAD || '', body: process.env.XA_AD_BODY || '', days: Number(process.env.XA_AD_DAYS || 3), kind: Number(process.env.XA_AD_KIND || 2), layout: Number(process.env.XA_AD_LAYOUT || 0), turns: Number(process.env.XA_AD_TURNS || 1), startDays: Number(process.env.XA_AD_START_DAYS || 0), link: process.env.XA_AD_LINK || '' };
   }
   try {
     E.init('testnet', host);

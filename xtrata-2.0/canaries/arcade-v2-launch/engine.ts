@@ -1727,7 +1727,7 @@ const STEPS: Step[] = [
           imageId = BigInt(up[it.asset].id); hash = up[it.asset].up.hash; size = up[it.asset].up.bytes.length;
         }
         const height = n(await sread('get-height'));
-        await runTx('screenreel', `post-item ${it.head}`, () => rootCall(screen, 'post-item', [uintCV(it.kind), stringAsciiCV(it.head), stringAsciiCV(it.body), uintCV(imageId), bufferCV(hash), uintCV(size), uintCV(it.weight), uintCV(0), uintCV(height + it.days * 144), uintCV(it.layout)]));
+        await runTx('screenreel', `post-item ${it.head}`, () => rootCall(screen, 'post-item', [uintCV(it.kind), stringAsciiCV(it.head), stringAsciiCV(it.body), uintCV(imageId), bufferCV(hash), uintCV(size), uintCV(it.weight), uintCV(it.startDays ? height + it.startDays * 144 : 0), uintCV(height + (it.startDays || 0) * 144 + it.days * 144), uintCV(it.layout), uintCV(it.turns || 1), stringAsciiCV(it.link || '')]));
         await eventually(it.head, async () => { have = await liveHeads(); return have.has(key) ? null : 'not on the screen contract yet'; });
         posted.push(it.head);
       }
@@ -1754,7 +1754,7 @@ const STEPS: Step[] = [
       }
       const height = n(await sread('get-height')), uk = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
       const head = `REEL UPDATE - BLOCK ${height} - ${uk} UK`;
-      await runTx('screentext', `post-item ${head}`, () => rootCall(screen, 'post-item', [uintCV(0), stringAsciiCV(head), stringAsciiCV(''), uintCV(0), bufferCV(new Uint8Array(0)), uintCV(0), uintCV(8), uintCV(0), uintCV(height + 288), uintCV(0)]));
+      await runTx('screentext', `post-item ${head}`, () => rootCall(screen, 'post-item', [uintCV(0), stringAsciiCV(head), stringAsciiCV(''), uintCV(0), bufferCV(new Uint8Array(0)), uintCV(0), uintCV(8), uintCV(0), uintCV(height + 288), uintCV(0), uintCV(1), stringAsciiCV('')]));
       await eventually(head, async () => (((await sread('get-live')) as any[]).length ? null : 'not live yet'));
       return `posted "${head}" (${retired} older update${retired === 1 ? '' : 's'} retired) · reload the testnet page to see it`;
     }
@@ -1819,16 +1819,87 @@ const STEPS: Step[] = [
       }
       const up = makeUploadBytes('adbuy', `Screen ad: ${A.name}`, A.mime, A.bytes);
       const ins = await inscribe('adbuy', up, [], []);
-      const prices = cfg.prices as any, perDay = n([prices.message, prices.news, prices.ad][A.kind]) * (A.layout === 1 ? n(cfg['premium-percent']) / 100 : 1), price = Math.floor(perDay) * A.days;
+      const prices = cfg.prices as any, perDay = n([prices.message, prices.news, prices.ad][A.kind]) * (A.layout === 1 ? n(cfg['premium-percent']) / 100 : 1);
+      const turns = A.turns || 1, link = A.link || '', startDays = A.startDays || 0, height0 = n(await sread('get-height')), startAfter = startDays ? height0 + startDays * 144 : 0;
+      if (!Number.isInteger(turns) || turns < 1 || turns > 5) throw new Error('Turns must be 1 to 5 (each is a 12-second turn).');
+      if (turns > n(cfg['max-turns'])) throw new Error(`The public limit is ${n(cfg['max-turns'])} turns (partners may have more); the root is the admin, so raise it first with set-max-turns, or use fewer turns.`);
+      if (link && !/^https:\/\/[A-Za-z0-9\-._~:\/?#\[\]@!$&*+,;=%()]+$/.test(link)) throw new Error('The link must start with https:// and use URL characters only (no spaces or quotes).');
+      if (link.length > 100) throw new Error('The link is at most 100 characters.');
+      if (startDays < 0 || startDays > 30) throw new Error('Start must be 0 to 30 days ahead.');
+      const price = Math.floor(perDay) * A.days * turns;
       const before = n(await sread('get-count'));
       try { await runTx('adbuy', `buy-slot "${A.head}" ${A.days} days for ${stx(BigInt(price))}`, () => rootCall(screen, 'buy-slot',
-        [uintCV(A.kind), stringAsciiCV(A.head), stringAsciiCV(A.body), uintCV(BigInt(ins.id)), bufferCV(up.hash), uintCV(up.bytes.length), uintCV(A.days), uintCV(A.layout), uintCV(price)], payAtMost(BigInt(price)))); } catch (e) { throw new Error(errText(e) + (/u406/.test(errText(e)) ? ' (u406 = no room: the screen holds at most 8 live ads, 12 news and 16 messages, and at most 8 paid items; retire one first)' : '')); }
+        [uintCV(A.kind), stringAsciiCV(A.head), stringAsciiCV(A.body), uintCV(BigInt(ins.id)), bufferCV(up.hash), uintCV(up.bytes.length), uintCV(A.days), uintCV(A.layout), uintCV(price), uintCV(turns), uintCV(startAfter), stringAsciiCV(link)], payAtMost(BigInt(price)))); } catch (e) { throw new Error(errText(e) + (/u406/.test(errText(e)) ? ' (u406 = no room: the screen holds at most 8 live ads, 12 news and 16 messages, and at most 8 paid items; retire one first)' : '')); }
       await eventually('purchase', async () => (n(await sread('get-count')) > before ? null : 'not on the screen contract yet'));
       const id = before;
       await runTx('adbuy', `approve #${id}`, () => rootCall(screen, 'approve', [uintCV(id)]));
       await eventually('approved', async () => ((n(((await sread('get-item', [uintCV(id)])) as any).status) === 1) ? null : 'not approved yet'));
       const it: any = await sread('get-item', [uintCV(id)]);
       return `${retired.length ? 'replaced ' + retired.map((r) => '#' + r).join(', ') + ' · ' : ''}"${A.head}": slot #${id}, ${A.days} day${A.days === 1 ? '' : 's'}, ${A.layout ? 'full-screen only' : 'standard'}, picture #${ins.id} (${up.bytes.length} bytes), ${stx(BigInt(price))} held in escrow and earned as it runs · live from block ${n(it['starts-at'])} to ${n(it['ends-at'])}`;
+    }
+  }
+  ,{
+    id: 'screenv2', testnetOnly: true, title: 'Screen upgrade check: turns, start date, link, partner rate, order weight', who: 'Web wallet · about 10 signatures',
+    intro: 'Testnet only. With the ONE root wallet playing admin, partner and buyer: raises the public turn limit, makes the root a partner (50% off, 30 days, 5 turns), buys a 20-day, 5-turn news slot with a click-through link at the half price (the public could not book that), approves it, changes its order weight with set-weight, reads every effect back, then retires it (the unearned part comes back), removes the partner and puts the turn limit back.',
+    action: 'Run the screen upgrade check',
+    run: async () => {
+      const w = requireRoot(), screen = cid(NAMES.screen);
+      const sa = await sread('get-admin');
+      if (sa !== w.address) throw new Error(`${NAMES.screen} admin is ${sa}, not the root wallet.`);
+      const n = (x: any) => Number(String(x).replace(/^u/, ''));
+      const clean = (x: any) => String(x ?? '').replace(/^"|"$/g, '');
+      const HEAD = 'PARTNER RATE TEST', LINK = 'https://xtrata.xyz/', NEWS = 1, DAYS = 20, TURNS = 5;
+      const cfg0: any = await sread('get-config');
+      if (!('max-turns' in cfg0)) throw new Error(`${screen} has no max-turns setting: it is not the upgraded screen contract.`);
+      if (String(cfg0['slots-enabled']) !== 'true') {
+        await runTx('screenv2', uniq('screenv2', 'set-slots-enabled true'), () => rootCall(screen, 'set-slots-enabled', [boolCV(true)]));
+        await eventually('slots on', async () => (String(((await sread('get-config')) as any)['slots-enabled']) === 'true' ? null : 'not on yet'));
+      }
+      // a re-run replaces an earlier test slot
+      for (let i = 0, cnt = n(await sread('get-count')); i < cnt; i++) {
+        const old: any = await sread('get-item', [uintCV(i)]);
+        if (old && n(old.status) < 2 && n(old.kind) === NEWS && clean(old.head) === HEAD) {
+          await runTx('screenv2', uniq('screenv2', `retire #${i} (earlier test slot)`), () => rootCall(screen, 'retire', [uintCV(i)]));
+          await eventually(`#${i} retired`, async () => ((n(((await sread('get-item', [uintCV(i)])) as any).status) >= 2) ? null : 'not retired yet'));
+        }
+      }
+      const out: string[] = [];
+      // 1. the public turn limit
+      await runTx('screenv2', uniq('screenv2', 'set-max-turns 4'), () => rootCall(screen, 'set-max-turns', [uintCV(4)]));
+      await eventually('max-turns 4', async () => ((n(((await sread('get-config')) as any)['max-turns']) === 4) ? null : 'not 4 yet'));
+      out.push('public limit raised to 4 turns');
+      // 2. the partner entry
+      await runTx('screenv2', uniq('screenv2', `set-partner ${w.address} 50% 30 days 5 turns`), () => rootCall(screen, 'set-partner', [principalCV(w.address), uintCV(50), uintCV(30), uintCV(5)]));
+      await eventually('partner set', async () => { const p: any = await sread('get-partner', [principalCV(w.address)]); return p && n(p.discount) === 50 && n(p['max-days']) === 30 && n(p['max-turns']) === 5 ? null : 'not set yet'; });
+      out.push('partner 50% / 30 days / 5 turns');
+      // 3. a purchase the public could not make (20 days, 5 turns): half of news x 20 x 5
+      const cfg: any = await sread('get-config'), perDay = n((cfg.prices as any).news), price = Math.floor(perDay * DAYS * TURNS * 50 / 100);
+      const before = n(await sread('get-count'));
+      await runTx('screenv2', uniq('screenv2', `buy-slot "${HEAD}" ${DAYS} days x ${TURNS} turns for ${stx(BigInt(price))}`), () => rootCall(screen, 'buy-slot',
+        [uintCV(NEWS), stringAsciiCV(HEAD), stringAsciiCV('Partner price, five turns, a link.'), uintCV(0), bufferCV(new Uint8Array(0)), uintCV(0), uintCV(DAYS), uintCV(0), uintCV(price), uintCV(TURNS), uintCV(0), stringAsciiCV(LINK)], payAtMost(BigInt(price))));
+      await eventually('purchase', async () => (n(await sread('get-count')) > before ? null : 'not on the screen contract yet'));
+      const id = before;
+      let it: any = await sread('get-item', [uintCV(id)]);
+      if (n(it.price) !== price || n(it.escrow) !== price) throw new Error(`The slot cost ${n(it.price)} µSTX, expected the half price ${price}.`);
+      if (n(it.turns) !== TURNS || clean(it.link) !== LINK) throw new Error(`Turns/link read back wrong: ${n(it.turns)} / ${clean(it.link)}.`);
+      out.push(`slot #${id}: ${stx(BigInt(price))} (half price), ${TURNS} turns, link ${LINK}`);
+      // 4. approve, then the order weight
+      await runTx('screenv2', uniq('screenv2', `approve #${id}`), () => rootCall(screen, 'approve', [uintCV(id)]));
+      await eventually('approved', async () => ((n(((await sread('get-item', [uintCV(id)])) as any).status) === 1) ? null : 'not approved yet'));
+      await runTx('screenv2', uniq('screenv2', `set-weight #${id} 9`), () => rootCall(screen, 'set-weight', [uintCV(id), uintCV(9)]));
+      await eventually('weight 9', async () => ((n(((await sread('get-item', [uintCV(id)])) as any).weight) === 9) ? null : 'not 9 yet'));
+      out.push('weight changed to 9');
+      // 5. clean up: end the run (the unearned part goes back), drop the partner, restore the limit
+      await runTx('screenv2', uniq('screenv2', `retire #${id}`), () => rootCall(screen, 'retire', [uintCV(id)]));
+      await eventually('retired', async () => ((n(((await sread('get-item', [uintCV(id)])) as any).status) === 2) ? null : 'not retired yet'));
+      it = await sread('get-item', [uintCV(id)]);
+      if (n(it.escrow) !== 0) throw new Error(`Escrow left on the retired slot: ${n(it.escrow)}.`);
+      await runTx('screenv2', uniq('screenv2', `remove-partner ${w.address}`), () => rootCall(screen, 'remove-partner', [principalCV(w.address)]));
+      await eventually('partner removed', async () => (((await sread('get-partner', [principalCV(w.address)])) === null) ? null : 'still a partner'));
+      await runTx('screenv2', uniq('screenv2', 'set-max-turns 3'), () => rootCall(screen, 'set-max-turns', [uintCV(3)]));
+      await eventually('max-turns 3', async () => ((n(((await sread('get-config')) as any)['max-turns']) === 3) ? null : 'not 3 yet'));
+      out.push('slot retired and refunded, partner removed, limit back to 3');
+      return out.join(' · ');
     }
   }
 ];
