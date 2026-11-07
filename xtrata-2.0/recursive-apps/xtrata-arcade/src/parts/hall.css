@@ -16,6 +16,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);overflow:hi
 #stage canvas{display:block;width:100%;height:100%}
 .hud{position:fixed;pointer-events:none;z-index:5}
 #cross{left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:var(--ink);opacity:.5;box-shadow:0 0 6px var(--cyan);transition:transform .15s,background .15s}
+#cross.link{background:transparent;opacity:1;transform:scale(3.4);border:2px solid var(--cyan);box-shadow:0 0 12px var(--cyan)}
 #cross.on{background:var(--amber);opacity:1;transform:scale(1.8)}
 #prompt{left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 16px 8px 8px;background:var(--panel);border:1px solid rgba(255,197,61,.45);border-radius:6px;font-size:24px;letter-spacing:.04em;white-space:nowrap;max-width:calc(100vw - 32px);box-sizing:border-box}
 #prompt .key{font-family:var(--f-label);font-size:14px;color:#1a1204;background:var(--amber);padding:6px 9px;border-radius:4px;box-shadow:0 3px 0 var(--amber-deep)}
@@ -77,11 +78,11 @@ body.flat #stage, body.flat #intro, body.flat .hud{display:none!important}
 body.touch #hallbar .wide{display:none}
 @media (max-width:560px){#hallbar .wide{display:none}}
 
-#pprompt,#bprompt{left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 16px 8px 8px;background:var(--panel);border:1px solid rgba(247,147,26,.6);border-radius:6px;font-size:24px;letter-spacing:.04em;white-space:nowrap;max-width:calc(100vw - 32px);box-sizing:border-box}
-#pprompt .key,#bprompt .key{font-family:var(--f-label);font-size:14px;color:#1a1204;background:#f7931a;padding:6px 9px;border-radius:4px;box-shadow:0 3px 0 #a85d08}
-#pprompt .t,#bprompt .t{overflow:hidden;text-overflow:ellipsis}
-#pprompt b,#bprompt b{color:#f7931a;font-weight:400}
-body.touch #pprompt .key,body.touch #bprompt .key{display:none}
+#pprompt,#bprompt,#sprompt{left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 16px 8px 8px;background:var(--panel);border:1px solid rgba(247,147,26,.6);border-radius:6px;font-size:24px;letter-spacing:.04em;white-space:nowrap;max-width:calc(100vw - 32px);box-sizing:border-box}
+#pprompt .key,#bprompt .key,#sprompt .key{font-family:var(--f-label);font-size:14px;color:#1a1204;background:#f7931a;padding:6px 9px;border-radius:4px;box-shadow:0 3px 0 #a85d08}
+#pprompt .t,#bprompt .t,#sprompt .t{overflow:hidden;text-overflow:ellipsis}
+#pprompt b,#bprompt b,#sprompt b{color:#f7931a;font-weight:400}
+body.touch #pprompt .key,body.touch #bprompt .key,body.touch #sprompt .key{display:none}
 #bprompt .alt{opacity:.65;font-size:.8em;margin-left:6px}
 #chainp{position:fixed;inset:0;z-index:40;background:rgba(3,3,10,.86);display:flex;align-items:center;justify-content:center;padding:max(12px,env(safe-area-inset-top,0px)) 12px 12px}
 #chainp[hidden]{display:none}
