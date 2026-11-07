@@ -1,7 +1,7 @@
 <div id="stage"></div>
 
 <div id="cross" class="hud"></div>
-<div id="hint" class="hud" hidden>WASD walk · mouse look · E start · Q alt mode · T scores · R radio · Esc frees mouse</div>
+<div id="hint" class="hud" hidden>WASD walk · mouse look · E start · Q alt mode · T scores · R radio · L open the screen's link · Esc frees mouse</div>
 <div id="lockhint" class="hud" hidden>Click to look around, or drag</div>
 <div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b>START</b> <span id="ptitle"></span></span><span class="alt" id="palt" hidden><span class="key">Q</span><b id="pvar"></b></span></div>
 <div id="pprompt" class="hud" hidden><span class="key">E</span><span class="t"><b>PLAY ON-CHAIN</b> <span id="pptitle"></span></span></div>
@@ -9,6 +9,7 @@
 <button id="tapstart" class="hud" hidden aria-label="Start game">START</button>
 <button id="tapalt" class="hud" hidden aria-label="Start alternate mode"></button>
 <div id="hallbar" class="hud" hidden>
+  <button id="hlink" type="button" hidden title="Open the link on the screen (L)">OPEN LINK ↗</button>
   <button id="hscores" type="button" title="High scores (T)">🏆<span class="wide"> SCORES</span></button>
   <button id="hwallet" type="button"><span class="dot"></span><span class="lbl">WALLET</span></button>
   <button id="hmute" type="button" aria-label="Toggle sound (M)">🔊</button>
@@ -28,6 +29,7 @@
       <dt>E / CLICK</dt><dd>press START on the machine you face</dd>
       <dt>Q</dt><dd>play the alternate mode (sprints, races)</dd>
       <dt>T / M</dt><dd>high scores / sound</dd>
+      <dt>L</dt><dd>open the link the big screen is showing (when it has one)</dd>
       <dt>◀ BACK</dt><dd>leave the game, back to the hall</dd>
     </dl>
     <dl class="keys only-touch">

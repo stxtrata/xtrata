@@ -1604,7 +1604,13 @@ function paintPlainClock(x,W,H,d){
   x.restore();
 }
 // Per frame: the ticker and the rotation move, so repaint a few times a second while the screen is within sight.
-function tickCentreScreen(){ if(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11) paintDayBoard(); else if(window.XAScreen && XAScreen.idle) XAScreen.idle() }   // far from the screen: clips pause
+function tickCentreScreen(){
+  const near=!!(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11);
+  if(near) paintDayBoard(); else if(window.XAScreen && XAScreen.idle) XAScreen.idle();   // far from the screen: clips pause
+  // OPEN LINK shows only while the screen is in sight and the item on it has a link (the link is re-checked: https only)
+  const hl=$('hlink'); if(hl){ const show=!!(near && window.XAScreen && XAScreen.currentLink && XAScreen.currentLink()); if(hl.hidden===show) hl.hidden=!show }
+}
+function openScreenLink(){ if(window.XAScreen && XAScreen.openLink) return XAScreen.openLink(); return false }
 
 
 /* ==================== TEMPORARY DEV OVERRIDE — REMOVE BEFORE RELEASE ====================
@@ -2466,6 +2472,7 @@ addEventListener('keydown', e=>{
   else if(e.code==='KeyE' && focusIdx<0 && !posterFocus && bayEngine && bayHint && !(bayToast && performance.now()<bayToast.until)){ e.preventDefault(); bayEngine.toggleFocused() }
   else if(e.code==='KeyQ' && focusIdx>=0 && GAMES[focusIdx].variants[0]){ startGame(focusIdx, GAMES[focusIdx].variants[0].key) }
   else if(e.code==='KeyT'){ openScores() }
+  else if(e.code==='KeyL'){ if(window.XAScreen && XAScreen.currentLink && XAScreen.currentLink()) openScreenLink() }
   else if(e.code==='KeyM'){ toggleMute() }
   else if(e.code==='KeyN'){ Room.toggle(); paintRoom() }   // (R is the radio)
 });
@@ -2578,6 +2585,7 @@ function paintMute(){ $('hmute').textContent = XA.audio.isMuted() ? '🔇' : '�
 function toggleMute(){ XA.audio.setMuted(!XA.audio.isMuted()); XA.audio.unlock(); paintMute() }
 function toggleFs(){ try{ if(document.fullscreenElement) document.exitFullscreen(); else { const el=document.documentElement, p=(el.requestFullscreen||el.webkitRequestFullscreen).call(el); if(p&&p.catch) p.catch(()=>{}) } }catch(e){} }
 $('hscores').addEventListener('click', openScores);
+if($('hlink')) $('hlink').addEventListener('click', openScreenLink);
 $('hwallet').addEventListener('click', ()=>{ freeMouse(); initAudio(); try{ XARoom.wallet() }catch(e){ console.error(e) } });
 $('hmute').addEventListener('click', toggleMute);
 function paintRoom(){ const b=$('hroom'); b.style.opacity=Room.isOn()?1:.45; b.title=Room.isOn()?'Room music on (N)':'Room music off (N)' }

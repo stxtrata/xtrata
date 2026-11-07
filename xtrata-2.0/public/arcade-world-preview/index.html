@@ -565,7 +565,7 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
 <div id="stage"></div>
 
 <div id="cross" class="hud"></div>
-<div id="hint" class="hud" hidden>WASD walk · mouse look · E start · Q alt mode · T scores · R radio · Esc frees mouse</div>
+<div id="hint" class="hud" hidden>WASD walk · mouse look · E start · Q alt mode · T scores · R radio · L open the screen's link · Esc frees mouse</div>
 <div id="lockhint" class="hud" hidden>Click to look around, or drag</div>
 <div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b>START</b> <span id="ptitle"></span></span><span class="alt" id="palt" hidden><span class="key">Q</span><b id="pvar"></b></span></div>
 <div id="pprompt" class="hud" hidden><span class="key">E</span><span class="t"><b>PLAY ON-CHAIN</b> <span id="pptitle"></span></span></div>
@@ -573,6 +573,7 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
 <button id="tapstart" class="hud" hidden aria-label="Start game">START</button>
 <button id="tapalt" class="hud" hidden aria-label="Start alternate mode"></button>
 <div id="hallbar" class="hud" hidden>
+  <button id="hlink" type="button" hidden title="Open the link on the screen (L)">OPEN LINK ↗</button>
   <button id="hscores" type="button" title="High scores (T)">🏆<span class="wide"> SCORES</span></button>
   <button id="hwallet" type="button"><span class="dot"></span><span class="lbl">WALLET</span></button>
   <button id="hmute" type="button" aria-label="Toggle sound (M)">🔊</button>
@@ -592,6 +593,7 @@ body.touch #pprompt .key,body.touch #bprompt .key{display:none}
       <dt>E / CLICK</dt><dd>press START on the machine you face</dd>
       <dt>Q</dt><dd>play the alternate mode (sprints, races)</dd>
       <dt>T / M</dt><dd>high scores / sound</dd>
+      <dt>L</dt><dd>open the link the big screen is showing (when it has one)</dd>
       <dt>◀ BACK</dt><dd>leave the game, back to the hall</dd>
     </dl>
     <dl class="keys only-touch">
@@ -35447,6 +35449,19 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   function enabled() { return !!(CFG.contract && root.XAWorld && root.XAWorld.read); }
 
   /* ------------------------------------------------------------ pure helpers */
+  // A click-through link is only ever an https:// address of plain URL characters (the contract checks the same; the hall never trusts it).
+  function safeLink(s) {
+    s = typeof s === 'string' ? s : '';
+    if (s.length < 9 || s.length > 100 || s.indexOf('https://') !== 0) return '';
+    if (!/^[A-Za-z0-9\-._~:\/?#\[\]@!$&*+,;=%()]+$/.test(s)) return '';
+    var auth = /^https:\/\/([^\/?#]*)/.exec(s)[1];                 // the host part: no user@ tricks, no ports, not empty
+    return auth && !/[@:]/.test(auth) ? s : '';
+  }
+  // The host a link leads to, for showing on the screen ('' when there is no safe link).
+  function linkHost(s) {
+    var l = safeLink(s), m = l && /^https:\/\/([^\/?#]+)/.exec(l);
+    return m ? m[1].toLowerCase().slice(0, 40) : '';
+  }
   function normalizeItem(id, t) {
     t = t || {};
     var kind = Number(t.kind);
@@ -35456,6 +35471,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       imageId: Number(t['image-id'] || 0), imageHash: t['image-hash'] || null, imageSize: Number(t['image-size'] || 0),
       layout: Number(t.layout) === 1 ? 1 : 0,     // 0 standard, 1 full-screen only (premium)
       weight: Math.max(1, Math.min(10, Number(t.weight) || 1)),
+      turns: Math.max(1, Math.min(5, Math.floor(Number(t.turns)) || 1)),       // consecutive 12-second turns each time it comes round
+      link: safeLink(t.link),
       paid: !!t.paid, status: Number(t.status), hidden: !!t.hidden,
       startsAt: Number(t['starts-at'] || 0), endsAt: Number(t['ends-at'] || 0)
     };
@@ -35475,7 +35492,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     if (!list.length) return null;
     var layers = [], max = 0; list.forEach(function (it) { if (it.weight > max) max = it.weight; });
     for (var w = 1; w <= max; w++) layers.push(list.filter(function (it) { return it.weight >= w; }).sort(function (a, b) { return a.id - b.id; }));
-    var order = []; layers.forEach(function (l) { order = order.concat(l); });
+    // each entry holds `turns` consecutive slots (a longer ad plays back to back)
+    var order = []; layers.forEach(function (l) { l.forEach(function (it) { for (var r = 0; r < Math.max(1, it.turns || 1); r++) order.push(it); }); });
     var n = order.length;
     return order[((k % n) + n) % n];
   }
@@ -35536,7 +35554,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
   }
 
   /* ------------------------------------------------------------ the reader */
-  var state = { snap: null, version: null, timer: null, busy: false, listeners: [], pics: {}, animating: false };
+  var state = { current: null, snap: null, version: null, timer: null, busy: false, listeners: [], pics: {}, animating: false };
   function emit(why) { state.listeners.forEach(function (fn) { try { fn(state.snap, why); } catch (e) {} }); }
 
   async function load() {
@@ -35720,6 +35738,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     var px = 460 * u, pw = W - px - 28 * u, py = top, ph = bottom - top;
     x.fillStyle = '#0d0b16'; x.fillRect(px, py, pw, ph);
     var slot = slotAt(d.items, d.t || 0, d.rotateSecs || CFG.rotateSecs, d.fullEvery), it = slot.item;
+    state.current = it;
     tendMedia(it);
     // look one slot ahead: if the next slot is a full-screen one, start fetching its picture now so it is ready when its turn comes
     var nx = slotAt(d.items, (d.t || 0) + (d.rotateSecs || CFG.rotateSecs), d.rotateSecs || CFG.rotateSecs, d.fullEvery);
@@ -35767,6 +35786,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     x.fillStyle = '#c9c4ee'; x.font = Math.round(36 * u) + 'px VT323, monospace';
     var body = wrapText(function (s) { return x.measureText(s).width; }, it.body, textW, Math.max(1, Math.floor((py + ph - y - 24 * u) / (38 * u))));
     y += 8 * u; body.forEach(function (l) { x.fillText(l, px + pad, y); y += 38 * u; });
+    var host = linkHost(it.link);
+    if (host) {                                           // where the link leads (text only); opening it is the visitor's click
+      x.font = Math.round(30 * u) + 'px VT323, monospace'; x.fillStyle = col; x.textAlign = 'left';
+      x.fillText('\u2197 ' + host, px + pad, py + ph - 20 * u);
+    }
   }
   // The picture fills a rectangle (the whole screen face above the ticker): fitted whole, never cropped or stretched, with a small
   // label top-left and the headline along the bottom edge so an ad is always attributable and readable.
@@ -35786,6 +35810,12 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
       x.fillStyle = 'rgba(0,0,0,.66)'; x.fillRect(rx, ry + rh - 62 * u, rw, 62 * u);
       x.fillStyle = col; x.fillRect(rx, ry + rh - 62 * u, rw, 3 * u);
       x.fillStyle = '#ffffff'; x.fillText(line, rx + 32 * u, ry + rh - 18 * u);
+    }
+    var host = linkHost(it.link);
+    if (host) {
+      x.font = Math.round(30 * u) + 'px VT323, monospace'; var hw = x.measureText('\u2197 ' + host).width + 28 * u;
+      x.fillStyle = 'rgba(0,0,0,.62)'; x.fillRect(rx + rw - hw - 16 * u, ry + 16 * u, hw, 42 * u);
+      x.fillStyle = col; x.textAlign = 'left'; x.fillText('\u2197 ' + host, rx + rw - hw - 2 * u, ry + 46 * u);
     }
   }
   function paintIdle(x, d, px, py, pw, ph, u) {
@@ -35867,6 +35897,15 @@ if (typeof module !== 'undefined' && module.exports) module.exports = API;
     onChange: function (fn) { state.listeners.push(fn); },
     items: function () { return state.snap ? state.snap.items : []; },
     paint: paint, latestScorers: latestScorers, champions: champions, orderChampions: orderChampions, leftPhase: leftPhase, slotAt: slotAt, sniffMedia: sniffMedia, idle: function () { tendMedia(null); }, animating: function () { return !!state.animating; },
+    safeLink: safeLink, linkHost: linkHost,
+    // the item on the screen at the last paint, and the safe link to open for it ('' when it has none)
+    current: function () { return state.current; },
+    currentLink: function () { return state.current ? safeLink(state.current.link) : ''; },
+    openLink: function () {
+      var l = state.current ? safeLink(state.current.link) : '';
+      if (!l || !root.open) return false;
+      try { root.open(l, '_blank', 'noopener,noreferrer'); return true; } catch (e) { return false; }
+    },
     normalizeItem: normalizeItem, isActive: isActive, activeItems: activeItems, featureAt: featureAt,
     wrapText: wrapText, tickerText: tickerText, ago: ago, hasPicture: hasPicture,
     _t: { state: state, load: load, restore: restore, save: save }
@@ -37602,7 +37641,13 @@ function paintPlainClock(x,W,H,d){
   x.restore();
 }
 // Per frame: the ticker and the rotation move, so repaint a few times a second while the screen is within sight.
-function tickCentreScreen(){ if(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11) paintDayBoard(); else if(window.XAScreen && XAScreen.idle) XAScreen.idle() }   // far from the screen: clips pause
+function tickCentreScreen(){
+  const near=!!(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11);
+  if(near) paintDayBoard(); else if(window.XAScreen && XAScreen.idle) XAScreen.idle();   // far from the screen: clips pause
+  // OPEN LINK shows only while the screen is in sight and the item on it has a link (the link is re-checked: https only)
+  const hl=$('hlink'); if(hl){ const show=!!(near && window.XAScreen && XAScreen.currentLink && XAScreen.currentLink()); if(hl.hidden===show) hl.hidden=!show }
+}
+function openScreenLink(){ if(window.XAScreen && XAScreen.openLink) return XAScreen.openLink(); return false }
 
 
 /* ==================== TEMPORARY DEV OVERRIDE — REMOVE BEFORE RELEASE ====================
@@ -38464,6 +38509,7 @@ addEventListener('keydown', e=>{
   else if(e.code==='KeyE' && focusIdx<0 && !posterFocus && bayEngine && bayHint && !(bayToast && performance.now()<bayToast.until)){ e.preventDefault(); bayEngine.toggleFocused() }
   else if(e.code==='KeyQ' && focusIdx>=0 && GAMES[focusIdx].variants[0]){ startGame(focusIdx, GAMES[focusIdx].variants[0].key) }
   else if(e.code==='KeyT'){ openScores() }
+  else if(e.code==='KeyL'){ if(window.XAScreen && XAScreen.currentLink && XAScreen.currentLink()) openScreenLink() }
   else if(e.code==='KeyM'){ toggleMute() }
   else if(e.code==='KeyN'){ Room.toggle(); paintRoom() }   // (R is the radio)
 });
@@ -38576,6 +38622,7 @@ function paintMute(){ $('hmute').textContent = XA.audio.isMuted() ? '🔇' : '�
 function toggleMute(){ XA.audio.setMuted(!XA.audio.isMuted()); XA.audio.unlock(); paintMute() }
 function toggleFs(){ try{ if(document.fullscreenElement) document.exitFullscreen(); else { const el=document.documentElement, p=(el.requestFullscreen||el.webkitRequestFullscreen).call(el); if(p&&p.catch) p.catch(()=>{}) } }catch(e){} }
 $('hscores').addEventListener('click', openScores);
+if($('hlink')) $('hlink').addEventListener('click', openScreenLink);
 $('hwallet').addEventListener('click', ()=>{ freeMouse(); initAudio(); try{ XARoom.wallet() }catch(e){ console.error(e) } });
 $('hmute').addEventListener('click', toggleMute);
 function paintRoom(){ const b=$('hroom'); b.style.opacity=Room.isOn()?1:.45; b.title=Room.isOn()?'Room music on (N)':'Room music off (N)' }
