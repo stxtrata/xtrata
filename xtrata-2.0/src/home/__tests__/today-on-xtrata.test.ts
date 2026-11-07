@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { HOMEPAGE_MUSIC, HOMEPAGE_WALL_ROTATION as ROTATION } from '../homepage-content.js';
-import { championCopy, fetchChampion, msUntilNextUkMidnight, previewDay, todayDayNumber, todayEntry, validateTodaySchedule } from '../today-on-xtrata.js';
+import { championCopy, fetchChampion, fetchClockOffset, msUntilNextUkMidnight, previewDay, todayDayNumber, todayEntry, validateTodaySchedule } from '../today-on-xtrata.js';
 import { TODAY_DAYS, TODAY_LAUNCH_DATE, TODAY_SCHEDULE } from '../today-schedule.js';
 import { pickSwap, pickWall } from '../wall-rotation.js';
 
@@ -60,6 +60,15 @@ describe('Today on Xtrata schedule', () => {
     expect(championCopy(null, 'fallback')).toBe('fallback');
   });
 
+  it('reads the server clock from the Date header, and ignores bad or missing ones', async () => {
+    const ahead = async () => ({ headers: { get: () => new Date(Date.now() + 5 * 3600000).toUTCString() } });
+    const off = await fetchClockOffset(ahead as never);
+    expect(Math.abs(off - 5 * 3600000)).toBeLessThan(2000);
+    expect(await fetchClockOffset((async () => ({ headers: { get: () => null } })) as never)).toBe(0);
+    expect(await fetchClockOffset((async () => ({ headers: { get: () => new Date(Date.now() + 30 * 86400000).toUTCString() } })) as never)).toBe(0);
+    expect(await fetchClockOffset((async () => { throw new Error('offline'); }) as never)).toBe(0);
+  });
+
   it('has a primary action with a real destination on every day', () => {
     TODAY_SCHEDULE.forEach((entry) => {
       const a = entry.action as { type: string; href?: string; tokenId?: number };
@@ -108,7 +117,8 @@ describe('wall rotation with a daily feature', () => {
 describe('homepage wiring', () => {
   const src = readFileSync(new URL('../homepage.js', import.meta.url), 'utf8');
   it('passes the day to the wall, redraws at UK midnight and keeps daily out of the recent list', () => {
-    expect(src).toContain('todayEntry(Date.now()');
+    expect(src).toContain('todayEntry(nowMs()');
+    expect(src).toContain('fetchClockOffset');
     expect(src).toContain('msUntilNextUkMidnight');
     expect(src).toContain("tile.kind !== 'daily'");
   });
@@ -117,7 +127,7 @@ describe('homepage wiring', () => {
 describe('casino beta bar', () => {
   const html = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
   it('links to the slot hall beta, above the music supporters bar', () => {
-    expect(html).toContain('href="https://xtrata.xyz/casino/?layout=slot-hall"');
+    expect(html).toContain('id="betaBar" class="home-supbar home-supbar--beta home-only" href="/casino/"');
     expect(html.indexOf('id="betaBar"')).toBeGreaterThan(-1);
     expect(html.indexOf('id="betaBar"')).toBeLessThan(html.indexOf('id="musicBanner"'));
   });

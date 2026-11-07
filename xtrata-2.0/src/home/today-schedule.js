@@ -136,12 +136,12 @@ export const TODAY_SCHEDULE = Object.freeze([
   Object.freeze({
     day: 11, id: 'today-reuse', feature: 'Inscriptions',
     title: 'One inscription, two ways to use it.',
-    copy: 'Inscription #8 is just audio. Player #319 borrows it and becomes the song Russian Rampage. Open both.',
-    tone: 'orange', image: '/radio/artwork?id=319',
-    action: { type: 'link', label: 'See what it became', href: '/i/319', newTab: true },
-    also: { label: 'See the source (#8)', href: '/i/8', newTab: true },
-    avoidSongs: [319],
-    note: 'Verified: #8 is raw audio (video/webm), #319 is the player that links to it (covered by the radio source tests). Day 9 also shows reuse, as artwork; if that feels repetitive, swap this day.'
+    copy: 'Audionaut 029 is a page under 1 KB. It borrows the shared engine (#3060) that powers every explorer. Open both.',
+    credit: 'by Audionals',
+    tone: 'orange', image: '/home/daily/audionaut-aphelion-3087.webp',
+    action: { type: 'link', label: 'See what it became', href: '/i/3082', newTab: true },
+    also: { label: 'See the engine (#3060)', href: '/i/3060', newTab: true },
+    note: 'Verified: #3082 is "Audionaut 029", a ~1 KB page whose only script is /i/3060 (same pattern verified on #3087). #3060 serves text/javascript. Replaces the earlier audio example (#8 into #319) so Day 9 (artwork) and Day 11 (code) are different kinds of reuse. EDITORIAL: the card reuses Aphelion artwork; swap for a #3082 screenshot if you want its own picture.'
   }),
   Object.freeze({
     day: 12, id: 'today-album', feature: 'Xtrata Music',
@@ -165,10 +165,10 @@ export const TODAY_SCHEDULE = Object.freeze([
   Object.freeze({
     day: 13, id: 'today-parallax', feature: 'ParallaX Casino',
     title: 'One spin.',
-    copy: 'The ParallaX casino is open for beta testing. Walk the slot hall, take one spin and tell us what breaks. Play money only.',
+    copy: 'The ParallaX casino has a fresh set of slot machines. Walk in, pick one and take a spin.',
     tone: 'amber',
-    action: { type: 'link', label: 'Play the machine', href: 'https://xtrata.xyz/casino/?layout=slot-hall', newTab: true },
-    note: 'Link supplied by you for beta testing. The page loads (200) and accepts ?layout=. It opens the slot hall, not one specific cabinet. EDITORIAL: confirm you want this beta promoted on the homepage. No screenshot art (the casino needs WebGL), so the card uses a CSS slot motif.'
+    action: { type: 'link', label: 'Play the machine', href: '/casino/', newTab: true },
+    note: 'Opens the regular casino (/casino/), which now has the simple setup with the new slot machines. Not a deep link to one cabinet. No screenshot art (the casino needs WebGL), so the card uses a CSS slot motif.'
   }),
   Object.freeze({
     day: 14, id: 'today-crown-check', feature: 'Astro Blaster 3',

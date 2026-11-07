@@ -13,7 +13,7 @@ import {
   validateHomepageContent
 } from './homepage-content.js';
 import { pickSwap as pickWallSwap, pickWall } from './wall-rotation.js';
-import { msUntilNextUkMidnight, previewDay, todayEntry } from './today-on-xtrata.js';
+import { fetchClockOffset, msUntilNextUkMidnight, previewDay, todayEntry } from './today-on-xtrata.js';
 import { buildTodayCard } from './today-card.js';
 import { TODAY_DAYS } from './today-schedule.js';
 import { initMusicSupporters, stopMusicSupporters } from './music-supporters.js';
@@ -445,6 +445,10 @@ const WALL_STORE_KEY = 'xtrata:home:wall:v1';
 let wallState = null;
 let wallTimer = null;
 let wallMidnightTimer = null;
+// Server time minus device time (ms). Read once per page load so a wrong device clock cannot change the day.
+let clockOffset = 0;
+let clockChecked = false;
+const nowMs = () => Date.now() + clockOffset;
 let wallBusy = false;
 let wallSongPool = [];
 
@@ -620,7 +624,7 @@ const renderWall = () => {
   wallSongPool = fallbackSongPool();
   // A fresh mix on every load. The arcade always holds one of the two big slots.
   // During the Today on Xtrata campaign the first big slot is the day's feature (same for everyone).
-  const entry = todayEntry(Date.now(), { day: previewDay(window.location.search) });
+  const entry = todayEntry(nowMs(), { day: previewDay(window.location.search) });
   const daily = entry ? { ...entry, kind: 'daily' } : null;
   const { slots, order } = pickWall({ rotation: HOMEPAGE_WALL_ROTATION, songs: wallSongPool, recent: readWallRecent(), daily });
   wallState = { slots, lastSlot: null };
@@ -638,7 +642,23 @@ const renderWall = () => {
   if (!previewDay(window.location.search)) {
     wallMidnightTimer = window.setTimeout(() => {
       if (document.documentElement.dataset.page === 'home') renderWall();
-    }, Math.min(msUntilNextUkMidnight(Date.now()) + 1000, 2147483000));
+    }, Math.min(msUntilNextUkMidnight(nowMs()) + 1000, 2147483000));
+  }
+  // Once per page load, ask the server what time it is. If that changes today's feature, redraw.
+  if (!clockChecked && !previewDay(window.location.search)) {
+    clockChecked = true;
+    void fetchClockOffset().then((offset) => {
+      if (!offset || document.documentElement.dataset.page !== 'home') return;
+      const before = todayEntry(nowMs())?.id || null;
+      clockOffset = offset;
+      if ((todayEntry(nowMs())?.id || null) !== before) renderWall();
+      else if (wallMidnightTimer) {
+        window.clearTimeout(wallMidnightTimer);
+        wallMidnightTimer = window.setTimeout(() => {
+          if (document.documentElement.dataset.page === 'home') renderWall();
+        }, Math.min(msUntilNextUkMidnight(nowMs()) + 1000, 2147483000));
+      }
+    });
   }
 };
 

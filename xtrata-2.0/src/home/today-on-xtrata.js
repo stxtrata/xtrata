@@ -114,3 +114,26 @@ export const validateTodaySchedule = (schedule = TODAY_SCHEDULE, days = TODAY_DA
   });
   return errors;
 };
+
+/**
+ * How far this device's clock is from the server's, in ms (server minus device), read from the HTTP Date
+ * header of a tiny same-origin request. Returns 0 when it cannot be read or looks wrong, so the device
+ * clock is used as before. A wrong device clock then cannot show the wrong day.
+ */
+export const fetchClockOffset = async (fetchImpl = globalThis.fetch, url = '/favicon.svg', timeoutMs = 4000) => {
+  try {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    const sent = Date.now();
+    const response = await fetchImpl(url, { method: 'HEAD', cache: 'no-store', signal: controller?.signal });
+    const received = Date.now();
+    if (timer) clearTimeout(timer);
+    const header = response.headers?.get?.('date');
+    const server = header ? Date.parse(header) : NaN;
+    if (!Number.isFinite(server)) return 0;
+    const offset = server - (sent + received) / 2;
+    return Math.abs(offset) <= 3 * 86400000 ? Math.round(offset) : 0;
+  } catch {
+    return 0;
+  }
+};

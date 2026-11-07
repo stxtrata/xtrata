@@ -246,7 +246,8 @@ export const HOMEPAGE_MUSIC = Object.freeze({
   artworkUrl: (id) => `/radio/artwork?id=${encodeURIComponent(id)}`,
   limit: 8,
   // The Lounge is retired from the homepage: every music link goes to the radio page.
-  loungeHref: 'https://radio.xtrata.xyz/radio',
+  // Fallback when the on-page player is not ready: the free radio page, no wallet needed.
+  loungeHref: '/radio',
   fallback: Object.freeze([
     { id: 3062, title: 'Neon Portal Bloom', artist: 'BotCupid' },
     { id: 3061, title: 'Swamp Pop Riot', artist: 'BotCupid' },
