@@ -6621,6 +6621,7 @@
       }
       state.fullscreenOpen = false;
       state.fullscreenSource = null;
+      dom.fullscreenViewer.classList.remove('fullscreen-viewer--immersive');
       dom.fullscreenViewer.hidden = true;
       dom.fullscreenViewer.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('fullscreen-viewer-open');
@@ -10232,6 +10233,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           wantFullscreen &&
           getSelectedToken()?.id === initialSelectTokenId
         ) {
+          dom.fullscreenViewer.classList.add('fullscreen-viewer--immersive');
           await openFullscreenViewer();
         }
       } catch (error) {
