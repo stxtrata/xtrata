@@ -115,6 +115,12 @@ function answer(contract, fn, args) {
   await pg.evaluate(() => { window.confirm = () => true; }); await pg.click('button[data-a=reject]'); await pg.waitForFunction(() => window.__calls.length === 1);
   const rj = await pg.evaluate(() => window.__calls.shift()); assert.strictEqual(rj.functionName, 'reject'); assert.strictEqual(rj.postConditions.length, 2, 'reject (a refund) carries the contract post-condition too');
   assert(await pg.isVisible('#freecard'), 'the admin sees the free-post card');
+  assert(/Earned payments go to/.test(await pg.textContent('#cfg')), 'the page says where earned payments go');
+  assert(/the admin wallet/.test(await pg.textContent('#sltxt')), 'admin card: says payments go to the admin wallet');
+  const wasOn = /Paid slots are ON/.test(await pg.textContent('#cfg')); assert.strictEqual(/off$/.test(await pg.textContent('#fslots')), wasOn, 'the switch offers the opposite of the current state');
+  await pg.click('#fslots'); assert.strictEqual(await pg.evaluate(() => window.__calls.length), 0, 'the first press only asks to confirm: nothing sent');
+  await pg.click('#fslots'); await pg.waitForFunction(() => window.__calls.length === 1);
+  const sw = await pg.evaluate(() => window.__calls.shift()); assert.strictEqual(sw.functionName, 'set-slots-enabled'); assert.deepStrictEqual(sw.functionArgs, [wasOn ? '04' : '03'], 'a Clarity bool'); assert.strictEqual(sw.postConditions.length, 1, 'moves no STX');
   await pg.fill('#fimg', '77'); await pg.waitForFunction(() => /not the connected admin wallet/.test(document.getElementById('fimgchk').textContent)); await pg.click('#fpost'); await pg.waitForTimeout(300); assert.strictEqual(await pg.evaluate(() => window.__calls.map((c) => c.functionName).join()), '', "someone else's picture is refused: nothing sent");
   await pg.fill('#fimg', ''); await pg.click('#fpost'); await pg.waitForFunction(() => window.__calls.length === 1);
   const fp0 = await pg.evaluate(() => window.__calls.shift()); assert.strictEqual(fp0.functionName, 'post-item'); assert.strictEqual(String(T.cvToValue(T.hexToCV(fp0.functionArgs[3])).value ?? T.cvToValue(T.hexToCV(fp0.functionArgs[3]))), '0', 'text-only free post has no picture');
