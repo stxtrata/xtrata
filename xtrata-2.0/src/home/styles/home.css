@@ -2793,38 +2793,19 @@
     .fullscreen-viewer--immersive #fullscreenRawLink {
       display: none;
     }
+    /* full-window arcade: no Close button (it sat on top of the hall's RADIO button); the browser Back button leaves.
+       The chrome bar itself stays only to hold the Advertise button, which is positioned on its own. */
     .fullscreen-viewer--immersive .fullscreen-viewer__chrome {
       position: absolute;
       z-index: 3;
-      left: 8px;
-      bottom: 8px;
       padding: 0;
       border: 0;
       background: none;
       box-shadow: none;
       min-height: 0;
     }
-    .fullscreen-viewer--immersive #fullscreenAdvertiseLink {
-      position: fixed;
-      z-index: 4;
-      right: 10px;
-      bottom: 10px;
-      font-size: 13px;
-      padding: 6px 14px;
-      background: rgba(2, 6, 4, 0.85);
-      border: 1px solid #f7931a;
-      color: #ffc53d;
-      text-decoration: none;
-    }
     .fullscreen-viewer--immersive #fullscreenCloseButton {
-      opacity: 0.55;
-      font-size: 12px;
-      padding: 4px 10px;
-      background: rgba(2, 6, 4, 0.7);
-    }
-    .fullscreen-viewer--immersive #fullscreenCloseButton:hover,
-    .fullscreen-viewer--immersive #fullscreenCloseButton:focus-visible {
-      opacity: 1;
+      display: none;
     }
 
     .fullscreen-viewer__stage audio {
