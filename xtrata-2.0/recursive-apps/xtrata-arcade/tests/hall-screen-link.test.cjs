@@ -45,14 +45,16 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
   const waitFrames = () => page.waitForTimeout(1500);
 
   // intro state first (the hall bar is already on screen): the real mouse click
-  await setItems([null]); await waitFrames();
-  check(!(await btnShown()), 'A: no link on the screen, the button is hidden');
-  await setItems(['https://xtrata.xyz/arcade']); await waitFrames();
-  check(await btnShown(), 'B: the item on the screen has a link, the OPEN LINK button shows');
-  check(/OPEN LINK/.test(await page.evaluate(() => document.getElementById('hlink').textContent)), 'B: the button says OPEN LINK');
+  // the top-bar button is permanent: ADVERTISE, whatever is on the screen, and it only opens the booking page
+  for (const item of [null, 'https://example.com/other', 'javascript:alert(1)']) {
+    await setItems([item]); await waitFrames();
+    check(await btnShown(), 'A: the ADVERTISE button shows while the screen item is ' + item);
+  }
+  check(/ADVERTISE/.test(await page.evaluate(() => document.getElementById('hlink').textContent)), 'B: the button says ADVERTISE');
+  await setItems(['https://example.com/other']); await waitFrames();
   await page.click('#hlink');
   let o = await page.evaluate(() => window.__opened);
-  check(o.length === 1 && o[0][0] === 'https://xtrata.xyz/arcade' && o[0][1] === '_blank' && /noopener/.test(o[0][2]), 'C: clicking opens the https link in a new tab with noopener');
+  check(o.length === 1 && o[0][0] === 'https://xtrata.xyz/arcade/advertise' && o[0][1] === '_blank' && /noopener/.test(o[0][2]), 'C: clicking opens the advertising page (not the screen link) in a new tab with noopener');
   // then walking: the L key
   await walk();
   await setItems([null]); await waitFrames();
@@ -64,7 +66,6 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
   check(o.length === 2 && o[1][0] === 'https://xtrata.xyz/arcade', 'C: walking, pressing L opens the link');
 
   await setItems(['javascript:alert(1)']); await waitFrames();
-  check(!(await btnShown()), 'D: an unsafe link never shows the button');
   const before = await page.evaluate(() => window.__opened.length);
   await page.keyboard.press('KeyL');
   check((await page.evaluate(() => window.__opened.length)) === before, 'D: and pressing L opens nothing');

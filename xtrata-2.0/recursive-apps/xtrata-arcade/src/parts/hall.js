@@ -1607,8 +1607,6 @@ function paintPlainClock(x,W,H,d){
 function tickCentreScreen(){
   const near=!!(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11);
   if(near) paintDayBoard(); else if(window.XAScreen && XAScreen.idle) XAScreen.idle();   // far from the screen: clips pause
-  // OPEN LINK shows only while the screen is in sight and the item on it has a link (the link is re-checked: https only)
-  const hl=$('hlink'); if(hl){ const show=!!(near && window.XAScreen && XAScreen.currentLink && XAScreen.currentLink()); if(hl.hidden===show) hl.hidden=!show }
 }
 function openScreenLink(){ if(window.XAScreen && XAScreen.openLink) return XAScreen.openLink(); return false }
 
@@ -2585,7 +2583,10 @@ function paintMute(){ $('hmute').textContent = XA.audio.isMuted() ? 'ðŸ”‡' : 'ðŸ
 function toggleMute(){ XA.audio.setMuted(!XA.audio.isMuted()); XA.audio.unlock(); paintMute() }
 function toggleFs(){ try{ if(document.fullscreenElement) document.exitFullscreen(); else { const el=document.documentElement, p=(el.requestFullscreen||el.webkitRequestFullscreen).call(el); if(p&&p.catch) p.catch(()=>{}) } }catch(e){} }
 $('hscores').addEventListener('click', openScores);
-if($('hlink')) $('hlink').addEventListener('click', openScreenLink);
+// ADVERTISE: a permanent button in the top bar that only opens the advertising booking page (fixed https address, new tab)
+const ADVERTISE_URL='https://xtrata.xyz/arcade/advertise';
+function openAdvertise(){ try{ window.open(ADVERTISE_URL,'_blank','noopener,noreferrer') }catch(e){} }
+if($('hlink')) $('hlink').addEventListener('click', openAdvertise);
 $('hwallet').addEventListener('click', ()=>{ freeMouse(); initAudio(); try{ XARoom.wallet() }catch(e){ console.error(e) } });
 $('hmute').addEventListener('click', toggleMute);
 function paintRoom(){ const b=$('hroom'); b.style.opacity=Room.isOn()?1:.45; b.title=Room.isOn()?'Room music on (N)':'Room music off (N)' }
