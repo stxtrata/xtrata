@@ -74,7 +74,7 @@ describe('homepage content configuration', () => {
     );
     const tile = HOMEPAGE_WALL.find((item) => item.kind === 'twins');
     expect(tile).toMatchObject({ id: 'forever-twins', size: 'tall', href: '/forever-twins/' });
-    expect(tile.twins.map((twin) => twin.key)).toEqual(['nyc-degens', 'megapont-ape-club', 'bitcoin-monkeys']);
+    expect(tile.twins.map((twin) => twin.key)).toEqual(['nyc-degens', 'megapont-ape-club', 'bitcoin-birds']);
     for (const twin of tile.twins) {
       const entry = registry.collections.find((c) => c.key === twin.key);
       expect(entry.status).toBe('live');
@@ -89,7 +89,7 @@ describe('homepage content configuration', () => {
       const copy = JSON.stringify(text);
       expect(copy).toContain('NYC Degens');
       expect(copy).toContain('Megapont Ape Club');
-      expect(copy).toContain('Bitcoin Monkeys');
+      expect(copy).toContain('Bitcoin Birds');
       expect(copy).toContain('/forever-twins/');
     }
     expect(validateHomepageContent()).toEqual([]);

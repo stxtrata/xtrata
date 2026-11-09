@@ -53,17 +53,6 @@
       "collections": [
         "megapont-ape-club"
       ]
-    },
-    {
-      "slug": "bitcoin-monkeys",
-      "name": "Bitcoin Monkeys",
-      "status": "live",
-      "blurb": "The Bitcoin Monkeys community page. The record is finalised: anyone can fund a twin, and holders can swap whenever they like. Larger files use the large-file route.",
-      "accent": "#d9a300",
-      "links": [],
-      "collections": [
-        "bitcoin-monkeys"
-      ]
     }
   ],
   "collections": [
@@ -340,75 +329,6 @@
             ]
           ],
           "asOf": "5 Oct 2026; hosting checked 22 Oct 2026"
-        }
-      }
-    },
-    {
-      "key": "bitcoin-monkeys",
-      "name": "Bitcoin Monkeys",
-      "itemNoun": "Bitcoin Monkey",
-      "community": "bitcoin-monkeys",
-      "status": "live",
-      "interface": "v3",
-      "group": "G1",
-      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys",
-      "source": "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys",
-      "sourceAsset": "bitcoin-monkeys",
-      "legacyPage": null,
-      "theme": {
-        "logo": null,
-        "accent": "#d9a300",
-        "heroTwin": {
-          "tokenId": 2,
-          "xtrataId": 3113
-        }
-      },
-      "blurb": "Bitcoin Monkeys holders can give their Monkey a permanent on-chain twin, or swap which side stays liquid. Deployed and finalised from the Xtrata wallet: all 2,500 canonical records are sealed on-chain. Files under 512 KB are twinned in one step; the 283 larger ones use the large-file route, which uploads the file in several transactions from a temporary wallet.",
-      "twinTokenUri": "https://xtrata.xyz/ft/bitcoin-monkeys/{id}.json",
-      "manifest": {
-        "url": "/ft/data/bitcoin-monkeys.manifest.json",
-        "sha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
-        "count": 2500
-      },
-      "coverage": {
-        "recovered": 2500,
-        "of": 2500,
-        "asOf": "block 9,133,680, 6 Oct 2026"
-      },
-      "largeOnDemand": true,
-      "helperSourceSha256": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f",
-      "info": {
-        "about": [
-          "Bitcoin Monkeys is a Stacks collection of 2,500 monkeys, all minted. Most files are small, but 283 are larger than 512 KB (the largest is about 1.6 MB), so they are twinned through the large-file route.",
-          "All 2,500 canonical records are sealed on-chain in the helper, so each file can only be twinned with exactly the art that was recorded."
-        ],
-        "technical": [
-          "The collection’s metadata points to an IPFS folder (QmXPHz…), and the contract builds each token’s link from stored lookups. The metadata is not frozen, so the owner can still call set-root-uri.",
-          "Files over 512 KB cannot fit in one transaction. The large-file route uploads them in several transactions from a one-use temporary wallet that the visitor funds.",
-          "The helper for this collection includes the large-file code, which was fork-tested but has not had an independent audit."
-        ],
-        "risk": {
-          "level": "medium",
-          "headline": "The art is on IPFS and the contract’s metadata is not frozen. Public gateways serve it; Pinata holds it and at least one other provider holds the art.",
-          "points": [
-            [
-              "Art lives at",
-              "IPFS folder QmXPHz…, files named bitcoin_monkeys_<n>."
-            ],
-            [
-              "Contract points to",
-              "ipfs://QmXPHz…/ plus a per-token name."
-            ],
-            [
-              "Can the pointer change?",
-              "Yes. metadata-frozen is false and the owner can still repoint it."
-            ],
-            [
-              "How widely hosted?",
-              "Checked 22 Oct 2026: 7 of 7 sampled art files (including the 1.4 MB #1 and large-file token #378) and 7 of 7 metadata files matched the manifest hashes through gateway.pinata.cloud, ipfs.filebase.io and stxnft.mypinata.cloud. Large files were slow on Filebase (up to 37 s). A 13 Oct lookup found the art held by Pinata and others (3 provider records), the metadata by Pinata only. We also fetched all 2,500 files through our own IPFS node."
-            ]
-          ],
-          "asOf": "6 Oct 2026; hosting checked 22 Oct 2026"
         }
       }
     },
