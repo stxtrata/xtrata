@@ -297,8 +297,24 @@ await check('fetchArt fails clearly when no image field', async () => {
 section('E. drift against the other lists');
 const read = (p) => readFileSync(p, 'utf8');
 const v1 = JSON.parse(read(resolve(FT, 'ft-harness/registry/registry.v1.json')));
+// Collections taken off the Forever Twins pages on purpose (bitcoin-monkeys, 9 Nov 2026, at Jim's request).
+// They stay in registry.v1.json (the deployed helper stays verifiable), in src/lib/twins/registry.ts (twins
+// already inscribed keep resolving in the app) and in functions/ft/collections.json (those twins' token URIs
+// point at the resolver). They must NOT appear in registry.v2.json, its communities or the hub.
+const DELISTED = ['bitcoin-monkeys'];
+await check('delisted collections are off v2, its communities and the hub, but still served by the resolver', () => {
+  const resolver = JSON.parse(read(resolve(FT, '..', 'functions/ft/collections.json')));
+  for (const k of DELISTED) {
+    assert.ok(!R.getCollection(reg, k), `${k} is still listed in registry.v2.json`);
+    assert.ok(!reg.communities.some((c) => c.slug === k || (c.collections || []).includes(k)), `${k} still has a community page`);
+    assert.ok(!read(resolve(FT, 'index.html')).includes(`/forever-twins/collection/${k}`), `${k} is still on the hub`);
+    const r = resolver.collections[k]; assert.ok(r, `${k} was removed from the resolver: its existing twins would lose their metadata`);
+    assert.equal(r.manifestStatus, 'final', `${k} resolver entry is not final`);
+    assert.ok(existsSync(resolve(FT, '..', 'public', r.manifestPath.replace(/^\//, ''))), `${k} manifest file is missing`);
+  }
+});
 await check('every v1 helper in registry.v1.json is in v2 with the same helper, source and group', () => {
-  for (const h of v1.helpers) { const c = R.getCollection(reg, h.key); assert.ok(c, `${h.key} missing from v2`); assert.equal(c.helper, h.helper, `${h.key} helper`); assert.equal(c.source, h.source, `${h.key} source`); assert.equal(c.group, h.group, `${h.key} group`); assert.equal(c.interface, h.interface, `${h.key} interface`); }
+  for (const h of v1.helpers.filter((x) => !DELISTED.includes(x.key))) { const c = R.getCollection(reg, h.key); assert.ok(c, `${h.key} missing from v2`); assert.equal(c.helper, h.helper, `${h.key} helper`); assert.equal(c.source, h.source, `${h.key} source`); assert.equal(c.group, h.group, `${h.key} group`); assert.equal(c.interface, h.interface, `${h.key} interface`); }
 });
 await check('every live v2 collection is in registry.v1.json (no live collection is unverified)', () => {
   for (const c of reg.collections.filter((x) => x.status === 'live')) assert.ok(v1.helpers.some((h) => h.key === c.key), `${c.key} is live in v2 but not in registry.v1.json`);
@@ -316,7 +332,7 @@ await check('src/lib/twins/registry.ts lists the same helper, source and asset f
 });
 await check('registry.ts has no live collection that v2 does not know', () => {
   const keys = [...read(tsPath).matchAll(/^\s+key: '([a-z0-9-]+)'/gm)].map((m) => m[1]);
-  for (const k of keys) assert.ok(R.getCollection(reg, k), `${k} is in registry.ts but not in registry.v2.json`);
+  for (const k of keys.filter((x) => !DELISTED.includes(x))) assert.ok(R.getCollection(reg, k), `${k} is in registry.ts but not in registry.v2.json`);
 });
 const hub = read(resolve(FT, 'index.html'));
 await check('hub COLLECTIONS entries match v2 (helper address+name, source address+name)', () => {
@@ -356,7 +372,7 @@ await check('heroImage: logo wins, else the first inscribed twin route, else nul
 });
 await check('hub twin banners use the same twin ids as registry heroTwin', () => {
   const hub = read(resolve(FT, 'index.html'));
-  for (const k of ['nyc-degens', 'megapont-ape-club', 'bitcoin-monkeys']) { const c = R.getCollection(reg, k); assert.ok(hub.includes(`xtrata-v3-2-3/${c.theme.heroTwin.xtrataId}"`), `${k}: hub banner does not use heroTwin ${c.theme.heroTwin.xtrataId}`); }
+  for (const k of ['nyc-degens', 'megapont-ape-club']) { const c = R.getCollection(reg, k); assert.ok(hub.includes(`xtrata-v3-2-3/${c.theme.heroTwin.xtrataId}"`), `${k}: hub banner does not use heroTwin ${c.theme.heroTwin.xtrataId}`); }
 });
 await check('manifest configs for planned v3 collections agree with v2 (source, asset, token URI)', () => {
   for (const c of reg.collections.filter((x) => x.interface === 'v3')) {

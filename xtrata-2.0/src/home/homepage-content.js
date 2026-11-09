@@ -120,7 +120,7 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   Object.freeze({
     id: 'forever-twins', tag: 'New', tone: 'orange',
     title: 'Forever Twins: three new collections.',
-    line: 'NYC Degens, Megapont Ape Club and Bitcoin Monkeys now have a fully on-chain twin.',
+    line: 'NYC Degens, Megapont Ape Club and Bitcoin Birds now have a fully on-chain twin.',
     cta: 'See the new twins', href: '/forever-twins/'
   })
 ]);
@@ -134,7 +134,7 @@ const foreverTwin = (key, name, tokenId, xtrataId) => Object.freeze({
 export const HOMEPAGE_FOREVER_TWINS = Object.freeze([
   foreverTwin('nyc-degens', 'NYC Degens', 1, 3095),
   foreverTwin('megapont-ape-club', 'Megapont Ape Club', 3, 3104),
-  foreverTwin('bitcoin-monkeys', 'Bitcoin Monkeys', 2, 3113)
+  foreverTwin('bitcoin-birds', 'Bitcoin Birds', 0, 3129)
 ]);
 
 // The Living Wall beside the hero headline. Every tile is written once here, without a size.
@@ -334,7 +334,7 @@ export const HOMEPAGE_PROGRAMMES = Object.freeze([
     actions: [{ label: 'Try it on your phone', href: 'https://radio.xtrata.xyz/radio', primary: true }, { label: 'Put your music on', href: '/music/' }] },
   { id: 'radio', tone: 'amber', image: '/radio-face.jpg', tag: 'Radio · in your browser', title: 'Xtrata Radio', copy: "Press play and hear what's on-chain. Embed it on your own site too.",
     actions: [{ label: 'Tune in', radio: true, primary: true }, { label: 'Embed', href: '/radio/share' }] },
-  { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · new contracts', title: 'Forever Twins', copy: 'NYC Degens, Megapont Ape Club and Bitcoin Monkeys now have Forever Twin contracts. Holders can give their piece a self-contained, fully on-chain twin.',
+  { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · new contracts', title: 'Forever Twins', copy: 'NYC Degens, Megapont Ape Club and Bitcoin Birds now have Forever Twin contracts. Holders can give their piece a self-contained, fully on-chain twin.',
     actions: [{ label: 'See the twins', href: '/forever-twins/', primary: true }] },
   { id: 'collections', tone: 'lime', art: 'soon', tag: 'Coming soon', title: 'Xtrata Collections', copy: 'Upload a whole collection, set a price, and let collectors mint each piece.',
     actions: [{ label: 'Follow for launch news', href: 'https://x.com/XtrataLayers' }] }
