@@ -42,7 +42,10 @@ a{color:var(--acc)}
  <div class="mut" style="font-size:13px">After you submit, the ad waits as <b>pending</b> until the admin approves it. Approval starts the run (or your chosen start day, if later): it lasts days × 144 blocks (about a day each). Each time your ad comes round it takes its turns back to back, so a 3-turn ad plays for 36 seconds. If it is rejected you are refunded in full; you can also cancel while it is pending.</div>
 </div>
 
-<div class="card" id="freecard" style="display:none"><h2>Admin: post a free item</h2>
+<div class="card" id="freecard" style="display:none"><h2>Admin</h2>
+ <div id="slotbox" style="border:1px solid var(--line,#444);border-radius:8px;padding:10px 12px;margin-bottom:12px"><div id="sltxt"></div>
+ <p><button id="fslots">Switch paid slots on</button> <span id="slmsg"></span></p></div>
+ <h2 style="margin-top:6px">Post a free item</h2>
  <div class="mut" style="font-size:13px;margin-bottom:6px">Only shown to the admin wallet. Free items need no payment and go live straight away. Use one to point visitors at this page.</div>
  <div class="row"><div><label>Type</label><select id="fkind"><option value="2" selected>Ad (feature panel)</option><option value="1">News</option><option value="0">Message</option></select></div>
  <div><label>Days on the screen (1 to 365)</label><input id="fdays" type="number" min="1" max="365" value="365"></div></div>
@@ -1087,7 +1090,9 @@ a{color:var(--acc)}
       $('cfg').innerHTML = (cfg['slots-enabled'] ? '<b class="ok">Paid slots are ON</b>' : '<b class="bad">Paid slots are OFF</b> — ' + OFF) +
         '<br>Prices per day: message <b>' + stx(p.message) + '</b> · news <b>' + stx(p.news) + '</b> · ad <b>' + stx(p.ad) + '</b> · full-screen-only slots cost <b>' + cfg['premium-percent'] + '%</b>' +
         '<br>Days allowed: ' + cfg['min-days'] + ' to ' + cfg['max-days'] + ' · up to ' + cfg['max-turns'] + ' turns in a row (' + (cfg['max-turns'] * 12) + ' s) · start up to 30 days ahead · review window ' + cfg['review-window'] + ' blocks · max paid ads live ' + cfg['max-paid-live'] + ' · paused: ' + (cfg.paused ? 'yes' : 'no') +
+        '<br>Earned payments go to: <span class="mono">' + esc(cfg['fee-recipient']) + '</span>' +
         '<br>Admin: <span class="mono">' + esc(admin) + '</span>';
+      paintSlots();
       $('days').min = cfg['min-days'];
       $('kind').options[0].text = 'Ad (feature panel, ' + stx(p.ad) + '/day)'; $('kind').options[1].text = 'News (' + stx(p.news) + '/day)'; $('kind').options[2].text = 'Message (' + stx(p.message) + '/day)';
       $('height').textContent = 'burn block ' + height;
@@ -1206,6 +1211,24 @@ a{color:var(--acc)}
       $('fimgchk').innerHTML = '<span class="ok">#' + id + ' is sealed, yours, ' + size.toLocaleString('en-GB') + ' bytes.</span>';
     } catch (e) { $('fimgchk').innerHTML = '<span class="bad">Could not read #' + id + ': ' + esc(e.message) + '</span>'; }
   }
+  var slArmed = false, slTimer = 0;
+  function paintSlots() {
+    if (!cfg || !$('sltxt')) return; var on = !!cfg['slots-enabled']; slArmed = false;
+    $('sltxt').innerHTML = 'Paid slots are <b class="' + (on ? 'ok' : 'bad') + '">' + (on ? 'ON' : 'OFF') + '</b>. Earned payments go to <span class="mono">' + esc(cfg['fee-recipient']) + '</span>' + (cfg['fee-recipient'] === admin ? ' (the admin wallet).' : ' (not the admin wallet: check this is intended).');
+    $('fslots').textContent = on ? 'Switch paid slots off' : 'Switch paid slots on';
+  }
+  async function toggleSlots() {
+    var on = !cfg['slots-enabled'];
+    if (!slArmed) { slArmed = true; $('fslots').textContent = on ? 'Confirm: let anyone buy paid slots' : 'Confirm: stop new paid purchases'; $('slmsg').innerHTML = '<span class="mut">Press again within 8 seconds to send.</span>'; clearTimeout(slTimer); slTimer = setTimeout(function () { paintSlots(); $('slmsg').textContent = ''; }, 8000); return; }
+    clearTimeout(slTimer); slArmed = false; $('fslots').disabled = true; $('slmsg').innerHTML = '<span class="mut">Waiting for your wallet…</span>';
+    try {
+      // a Clarity bool is one byte: 0x03 true, 0x04 false. Moves no STX. Switching off never touches paid items already bought or running.
+      var r = await XAScores.callContract({ contract: SCREEN, fn: 'set-slots-enabled', args: [on ? '03' : '04'], maxUstx: '0', expectAddress: me });
+      $('slmsg').innerHTML = '<span class="ok">Sent.</span> <a target="_blank" rel="noopener" href="https://explorer.hiro.so/txid/' + esc(r.txid) + EXPLORER + '">transaction</a> · this page updates once it confirms.';
+      var tries = 0, iv = setInterval(async function () { tries++; try { var c = await read('get-config'); if (!!c['slots-enabled'] === on) { cfg = c; clearInterval(iv); paintSlots(); loadItems(); } } catch (e) {} if (tries > 30) clearInterval(iv); }, 6000);
+    } catch (e) { $('slmsg').innerHTML = '<span class="bad">' + esc(e.message || e) + '</span>'; paintSlots(); }
+    $('fslots').disabled = false;
+  }
   async function postFree() {
     await checkFreePic();   // always re-check on click: never trust the typing debounce
     var head = $('fhead').value.trim(), days = +$('fdays').value, link = $('flink').value.trim(), body = $('fbody').value.trim();
@@ -1233,7 +1256,7 @@ a{color:var(--acc)}
     $('freecard').style.display = me && me === admin ? '' : 'none'; if (me && me === admin) fchk = checkFreePic();
     updateBuy(); checkPicture(true); loadPartner(); if (cfg) loadItems();
   });
-  $('fpost').onclick = postFree; $('fimg').addEventListener('input', function () { clearTimeout(this._t); this._t = setTimeout(function () { fchk = checkFreePic(); }, 500); }); $('wbtn').onclick = connect; $('buy').onclick = buy; $('refresh').onclick = function () { loadConfig(); loadItems(); };
+  $('fslots').onclick = toggleSlots; $('fpost').onclick = postFree; $('fimg').addEventListener('input', function () { clearTimeout(this._t); this._t = setTimeout(function () { fchk = checkFreePic(); }, 500); }); $('wbtn').onclick = connect; $('buy').onclick = buy; $('refresh').onclick = function () { loadConfig(); loadItems(); };
   ['kind', 'layout', 'days', 'head', 'body', 'turns', 'startd', 'link'].forEach(function (id) { $(id).addEventListener('input', updateBuy); });
   $('img').addEventListener('change', function () { checkPicture(false); }); $('img').addEventListener('input', function () { clearTimeout(this._t); this._t = setTimeout(function () { checkPicture(false); }, 500); });
   loadConfig().then(function () { return loadPartner(); }).then(loadItems); checkPicture(true);
