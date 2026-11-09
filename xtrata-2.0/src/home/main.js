@@ -559,6 +559,7 @@
       fullscreenRelations: $('fullscreenRelations'),
       fullscreenStage: $('fullscreenStage'),
       fullscreenRawLink: $('fullscreenRawLink'),
+      fullscreenAdvertiseLink: $('fullscreenAdvertiseLink'),
       fullscreenPrevButton: $('fullscreenPrevButton'),
       fullscreenNextButton: $('fullscreenNextButton'),
       fullscreenCloseButton: $('fullscreenCloseButton'),
@@ -6158,6 +6159,10 @@
     const renderFullscreenContent = ({ token, bytes, mimeType, sourceUrl, htmlDoc }) => {
       revokeFullscreenPreview();
       setFullscreenMeta(token, mimeType);
+      // permanent Advertise button around the arcade only (host-side: the inscribed hall is untouched)
+      if (dom.fullscreenAdvertiseLink) {
+        dom.fullscreenAdvertiseLink.hidden = !isArcadeInscriptionLabel(`Inscription #${token.id.toString()}`);
+      }
       dom.fullscreenRawLink.hidden = true;
       dom.fullscreenRawLink.removeAttribute('href');
       dom.fullscreenRawLink.removeAttribute('download');

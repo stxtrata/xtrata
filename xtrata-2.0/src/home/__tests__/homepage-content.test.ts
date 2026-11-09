@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   BOUNTY_ENDS_AT,
@@ -413,5 +414,14 @@ describe('primary navigation', () => {
     );
     expect(fn).toContain('SMALL_MINT_HELPER_MAX_CHUNKS');
     expect(fn).toContain('notice.hidden = false');
+  });
+});
+
+describe('arcade viewer advertise button', () => {
+  it('has a host-side Advertise link to the booking page, shown only for arcade inscriptions', () => {
+    const html = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
+    const main = readFileSync(resolve(__dirname, '../main.js'), 'utf8');
+    expect(html).toMatch(/id="fullscreenAdvertiseLink" href="\/arcade\/advertise" target="_blank" rel="noopener" hidden/);
+    expect(main).toMatch(/fullscreenAdvertiseLink\.hidden = !isArcadeInscriptionLabel\(/);
   });
 });
