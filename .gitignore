@@ -71,3 +71,5 @@ xtrata-2.0/comms/canary/index.html
 # Editor temp files and local wallet build output
 *.ijedBS
 xtrata-2.0/dist-casino-wallet/
+
+*.mp4
