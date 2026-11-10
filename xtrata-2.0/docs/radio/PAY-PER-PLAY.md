@@ -4,9 +4,10 @@ Status (2026-10-12): built and tested with mocks and Chrome's virtual authentica
 No mainnet transaction has been made with it.** Off by default: nothing appears on /radio until the
 variables below are set.
 
-Pay-per-play is optional. People turn it on to do the right thing, because it feels good and leaves
-a permanent on-chain record that they paid the artist. Listening is always free, for everyone, and
-any failure means that song plays free.
+The standalone radio at `radio.xtrata.xyz/radio` requires a funded listening wallet and an active
+approval before playback. It starts locked even when a previous song was saved. If support is
+switched off, the wallet locks, or the available plays run out, the radio pauses. After resolving
+the wallet state, press Play to continue. The paid radio has no free playback option in its UI.
 
 Pay-per-play runs only on its own radio address, **radio.xtrata.xyz** (see "Why a separate radio
 address"). The radio on xtrata.xyz keeps working as before and its panel links there.
@@ -40,8 +41,8 @@ The panel shows every gate as a numbered track, always visible, with a "Stage N 
    the earlier `xtrata:radio-audible-start` event still fires at audible start for the lounge.
 
 Paying stays on until the listener presses **Switch off** (remembered on that device until they
-press **Switch on**) or the wallet runs out (songs then play free, and paying carries on by itself
-after a top-up confirms). One approval covers up to 1 STX of plays; after that, or after 7 days in
+press **Switch on**) or the wallet runs out (playback pauses until a top-up confirms). One approval
+covers up to 1 STX of plays; after that, or after 7 days in
 one open tab, the wallet asks again. Closing the page drops the key; the next visit is one passkey
 tap. When a locked wallet has paying switched on, the radio opens its "Unlock and keep paying"
 confirm inside the wallet box as soon as the page loads, moved up under the stages, so the
@@ -150,7 +151,8 @@ the summary; the return-address confirm and return review keep the full address 
   failed. After 30 minutes unseen, the listener can clear it. Each new listen first catches up on
   confirmations and the kill switch, so background tabs keep working. One tab at a time (Web Locks).
 - **Passkey PRF must be proven stable** (two matching results) before an address is shown for
-  funding, and again the first time a (synced) passkey is used on a new device. Devices without PRF get "pay-per-play isn't available here; listening stays free". There
+  funding, and again the first time a (synced) passkey is used on a new device. Devices without PRF
+  need a supported browser to use the paid radio. There
   is deliberately no password fallback: the address is public, so a password-derived key could be
   brute-forced offline.
 
@@ -308,7 +310,7 @@ wallets).
 - [ ] Desktop Chrome on radio.xtrata.xyz/radio: create, link, deposit 1 STX, approve first play, confirm on explorer.
 - [ ] The holder received exactly 50 microSTX; the fee matches what was approved.
 - [ ] Lock, reload, unlock: same address, link restored, no new wallet popup.
-- [ ] Second tab: shows "already running in another tab", plays free.
+- [ ] Second tab: shows that support is running elsewhere and blocks playback there.
 - [ ] Send 0.5 STX extra from another wallet: radio shows the over-1-STX warning; Return excess
       leaves exactly 1 STX; Return all leaves 0. Both land in the linked main wallet.
 - [x] iPhone Safari (iOS 26), 13 Oct: unlock and PRF inside the frame work; creating inside the frame does not, so the

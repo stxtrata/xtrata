@@ -216,7 +216,7 @@ export interface Snapshot {
    * A default of the radio page, not security. `known` is false until the answer has been read (the radio then waits).
    */
   albumLock: { locked: boolean; known: boolean } | null;
-  /** Why a gift player is silent right now. Null while it may play. Transient failures never set it. */
+  /** Why the paid radio is blocked. Null while it may play. */
   giftStop: { reason: GiftStopReason; text: string } | null;
   /** How a gifted wallet's balance will go back, worked out from the chain on request. */
   returnPlan: ReturnPlanView;
@@ -233,7 +233,7 @@ export interface Snapshot {
   walletCannotAlbums: boolean;
   likeFunds: { address: string; balance?: bigint; low: boolean; album: boolean; pending: boolean; txid?: string; main?: string } | null;
 }
-export type GiftStopReason = 'connect' | 'locked' | 'link' | 'over' | 'arriving' | 'out' | 'off' | 'tab';
+export type GiftStopReason = 'connect' | 'setup' | 'checking' | 'unavailable' | 'locked' | 'link' | 'over' | 'arriving' | 'out' | 'off' | 'tab';
 export type ReturnPlanView =
   | { state: 'none' }
   | { state: 'ready'; steps: { to: string | null; kind: ReturnStep['kind']; send: string }[]; kept: number; excess: string | null }
@@ -448,23 +448,21 @@ export function createPppController(deps: PppDeps) {
   }
   const OUT_TEXT = 'OUT OF PLAYS — ADD MORE TO KEEP LISTENING';
   const WALLET_EMPTY_TEXT = 'EMPTY — ADD STX TO PLAY';
-  /**
-   * A gift player has no free mode: it plays only while paid plays are available. Anything that is merely
-   * unknown (the balance is still loading, a read failed) is never a reason to stop.
-   */
   function giftStop(): Snapshot['giftStop'] {
-    // Any passkey wallet (the first wallet too) is paid-only. A visitor with no wallet yet keeps the free radio.
-    const holder = status?.state === 'known' || status?.state === 'unlocked';
-    if (!giftNow()?.player && !holder) return null;
+    if (!gate?.here) return null;
     const stop = (reason: GiftStopReason, text: string) => ({ reason, text });
     switch (step()) {
       case 'connect': case 'wrong-wallet': return stop('connect', 'CONNECT YOUR WALLET TO LISTEN');
+      case 'intro': return stop('setup', 'SET UP YOUR PLAYER TO LISTEN');
+      case 'loading': return stop('checking', 'CHECKING YOUR LISTENING WALLET');
+      case 'unsupported': return stop('unavailable', 'OPEN IN A BROWSER THAT SUPPORTS PASSKEYS');
+      case 'not-invited': case 'off': return stop('unavailable', 'PAID RADIO IS UNAVAILABLE');
       case 'locked': return stop('locked', 'UNLOCK TO LISTEN');
       case 'link': return stop('link', 'FINISH SETUP TO LISTEN');
       case 'over': return stop('over', 'OVER 1 STX — RETURN THE EXCESS');
       case 'fund': return arrivalExpected() ? stop('arriving', 'YOUR PLAYS ARE ARRIVING') : stop('out', albumOpen() ? OUT_TEXT : WALLET_EMPTY_TEXT);
       case 'ready':
-        if (!payingOn() || !status?.session || status.session.playsLeft < 1) return stop('off', 'PAYING IS OFF — SWITCH ON TO LISTEN');
+        if (!payingOn() || !status?.session || status.session.playsLeft < 1 || status.session.expires <= deps.now()) return stop('off', 'SWITCH ON MUSIC SUPPORT TO LISTEN');
         if (!lockHeld) return stop('tab', 'PLAYING IN ANOTHER TAB');
         return playsLeftNow() < 1 ? stop('out', albumOpen() ? OUT_TEXT : WALLET_EMPTY_TEXT) : null;
       default: return null;
@@ -591,8 +589,8 @@ export function createPppController(deps: PppDeps) {
 
   // The bridge itself only needs `open`: the page must read which wallet the listener is linked to before it can know.
   async function ensureBridge() {
-    if (!open()) throw new Error('Pay-per-play is not open to this wallet yet. Listening stays free.');
-    if (!gate?.walletOrigin) throw new Error('Pay-per-play is switched off right now. Listening stays free.');
+    if (!open()) throw new Error('Pay-per-play is not open to this wallet yet.');
+    if (!gate?.walletOrigin) throw new Error('Pay-per-play is switched off right now.');
     bridge ??= await deps.bridge(gate.walletOrigin);
     return bridge;
   }
@@ -881,7 +879,7 @@ export function createPppController(deps: PppDeps) {
     lockHeld ||= await deps.tabLock(status.address);
     if (!lockHeld) {
       await bridge?.request('listening.stop').catch(() => undefined);
-      throw new Error('Pay-per-play is already running in another tab. This tab plays free.');
+      throw new Error('Pay-per-play is already running in another tab. Listen from that tab.');
     }
     return true;
   }
@@ -1200,7 +1198,7 @@ export function createPppController(deps: PppDeps) {
       forgetQueue();
       await bridge?.request('listening.stop');
       setPayingOn(false);
-      say('Paying is off. Music stays free.');
+      say('Music support is off. Playback is paused.');
     }),
 
     lock: () => task('Locking…', async () => {

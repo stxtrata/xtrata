@@ -30,6 +30,8 @@ const root = document.getElementById('ppp');
 if (root) start(root);
 
 function start(root: HTMLElement) {
+  const paidHost = document.documentElement.dataset.radioPaidOnly === 'true';
+  const paidStatus = document.getElementById('paidRadioStatus');
   const sessionStore = createWalletSessionStore();
   const $ = (sel: string) => root.querySelector(sel) as HTMLElement;
   const frameWrap = $('.ppp-frame');
@@ -60,7 +62,7 @@ function start(root: HTMLElement) {
       frame.referrerPolicy = 'no-referrer';
       const loaded = new Promise<void>((resolve, reject) => {
         frame!.addEventListener('load', () => resolve(), { once: true });
-        setTimeout(() => reject(new Error('The listening wallet did not load. Listening stays free.')), 15000);
+        setTimeout(() => reject(new Error('The listening wallet did not load.')), 15000);
       });
       frame.src = origin + '/';
       frameWrap.replaceChildren(frame);
@@ -73,7 +75,7 @@ function start(root: HTMLElement) {
         ? client.request<T>(method as never, params)
         : Promise.race([
           client.request<T>(method as never, params),
-          new Promise<T>((_, reject) => setTimeout(() => reject(new Error('The listening wallet is not answering. Listening stays free.')), 10000))
+          new Promise<T>((_, reject) => setTimeout(() => reject(new Error('The listening wallet is not answering.')), 10000))
         ]);
       // A frame blocked by its own headers still fires load; prove it answers before relying on it.
       await request('listening.status');
@@ -221,10 +223,13 @@ function start(root: HTMLElement) {
   };
 
   // A gifted wallet's album becomes a band on the radio; when its paid plays run out the radio stops (no free mode).
-  let giftPushed = '', stopPushed: string | null = null, lockPushed = false, waitPushed = false;
+  let giftPushed = '', stopPushed: string | null | undefined, lockPushed = false, waitPushed = false;
   const syncGift = (raw: Snapshot, s: Snapshot) => {
     const radio = (window as any).XtrataRadio;
     if (!radio?.setGiftPlayer || !radio?.setGiftStop) return; // pushed again at the next render, once the radio is there
+    const gs = s.depositPending && raw.step === 'fund' && raw.giftStop?.reason === 'out' ? { reason: 'arriving', text: 'YOUR PLAYS ARE ARRIVING' } : raw.giftStop;
+    const stop = gs?.text ?? (paidHost && (!raw.gate?.here || raw.step === 'off') ? 'PAID RADIO IS UNAVAILABLE' : null);
+    if (stop && stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
     const p = raw.step === 'off' || raw.step === 'elsewhere' ? null : raw.gift?.player ?? null;
     const id = p ? p.id + ':' + p.cover + ':' + p.tracks.map((t) => t.id).join(',') : '';
     if (id !== giftPushed) {
@@ -232,8 +237,6 @@ function start(root: HTMLElement) {
       giftPushed = id;
     }
     // Plays on their way (as the panel sees it): the radio says so, never "out of plays".
-    const gs = s.depositPending && raw.step === 'fund' && raw.giftStop?.reason === 'out' ? { reason: 'arriving', text: 'YOUR PLAYS ARE ARRIVING' } : raw.giftStop;
-    const stop = gs?.text ?? null; // any passkey wallet is paid-only, not just a gifted album
     if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
     // Plays on their way: the radio greys its controls and says so, instead of looking broken.
     const wait = gs?.reason === 'arriving';
@@ -373,7 +376,7 @@ function start(root: HTMLElement) {
     if (s.step === 'connect' || s.step === 'wrong-wallet') { connectStacks(); return; }
     if (s.step === 'elsewhere' && s.gate?.radioUrl) { location.href = s.gate.radioUrl; return; }
     if (s.step === 'locked' && !s.armed && !s.busy) void ppp.unlock();
-    if (s.step === 'ready' && !s.payingOn && !s.busy) void ppp.switchOn();
+    if (s.step === 'ready' && s.giftStop?.reason === 'off' && !s.busy) void ppp.switchOn();
     focusPanel();
   };
   if (top) top.onclick = go;
@@ -444,7 +447,7 @@ function start(root: HTMLElement) {
       case 'off': case 'not-invited': case 'unsupported': top.hidden = true; return;
       case 'elsewhere': return set('Xtrata Music', 'quiet', 'Open Xtrata Music');
       case 'connect': top.hidden = true; return; // "Connect wallet" sits right beside it
-      case 'intro': return set('Start listening', '', 'Make your player with your face or fingerprint: no app or account needed');
+      case 'intro': return set('Set up your player', '', 'Create a passkey listening wallet');
       case 'wrong-wallet': return set(`Connect ${who(s.linked)}`, 'warn', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`);
       case 'locked': return set('Unlock', '', 'One tap with your face or fingerprint');
       case 'link': return set('Finish setup', 'warn', 'Link the listening wallet to your main wallet');
@@ -453,7 +456,7 @@ function start(root: HTMLElement) {
       case 'over': return set('Too much in your player', 'warn', 'Return the extra to keep counting plays');
       case 'loading': return set('Xtrata Music', 'quiet', 'Checking your player');
       case 'ready':
-        return s.payingOn && left > 0
+        return s.payingOn && left > 0 && !s.giftStop
           ? set(`${left.toLocaleString()} plays left`, 'on', 'Every play counts for the song’s owner')
           : set('Plays off · switch on', 'off', 'Plays are switched off');
     }
@@ -465,28 +468,28 @@ function start(root: HTMLElement) {
   const onair = document.getElementById('onair');
   nudge?.querySelector('button')?.addEventListener('click', () => go());
   const NOT_PAYING: Partial<Record<Snapshot['step'], string>> = {
-    connect: 'Plays are not counted',
-    intro: 'Plays are not counted',
-    locked: 'Locked · plays are not counted',
-    'wrong-wallet': 'Wrong wallet connected · plays are not counted',
-    link: 'Plays are not counted yet',
+    connect: 'Connect your wallet to listen',
+    intro: 'Set up your player to listen',
+    locked: 'Unlock your player to listen',
+    'wrong-wallet': 'Switch wallets to listen',
+    link: 'Finish setup to listen',
     fund: 'No plays yet',
-    over: 'Paused · plays are not counted',
-    ready: 'Plays are off'
+    over: 'Return the excess to listen',
+    ready: 'Music support is paused'
   };
   const NUDGE_ACTION: Partial<Record<Snapshot['step'], string>> = {
-    elsewhere: 'Open', connect: 'Connect', 'wrong-wallet': 'Switch wallet', intro: 'Start', locked: 'Unlock',
+    elsewhere: 'Open', connect: 'Connect', 'wrong-wallet': 'Switch wallet', intro: 'Set up', locked: 'Unlock',
     link: 'Finish setup', fund: 'Add plays', over: 'Fix it', ready: 'Switch on'
   };
   function renderMode(s: Snapshot) {
     if (s.step === 'loading') return; // keep the last look while it checks
     const left = s.session ? Math.min(s.session.playsLeft, s.playsLeft) : 0;
-    const paying = s.step === 'ready' && s.payingOn && left > 0;
+    const paying = s.step === 'ready' && s.payingOn && left > 0 && !s.giftStop;
     // Funds already on their way (a deposit or a gift): nothing has gone wrong, so no "artists unpaid" warning.
     const waiting = s.step === 'fund' && s.depositPending;
     // The free player (this page on the main site, where nothing is paid): not a warning, an invitation, so no drab
     // "artists unpaid" look and no orange: the radio keeps its normal look and a friendly note says what this is.
-    const free = s.step === 'elsewhere';
+    const free = s.step === 'elsewhere' && !paidHost;
     const warning = paying || waiting || free ? '' : NOT_PAYING[s.step] ?? '';
     const mode = paying ? 'on' : free ? 'free' : warning ? 'off' : '';
     if (mode) document.documentElement.dataset.ppp = mode;
@@ -504,7 +507,7 @@ function start(root: HTMLElement) {
         nudge.querySelector('button')!.textContent = 'Get a player';
       } else if (mode === 'off') {
         nudge.querySelector('.nudge-t')!.textContent = warning;
-        nudge.querySelector('.nudge-s')!.textContent = 'Every play you count goes to the song’s owner, on-chain.';
+        nudge.querySelector('.nudge-s')!.textContent = 'This radio requires a funded listening wallet with music support on.';
         nudge.querySelector('button')!.textContent = NUDGE_ACTION[s.step] ?? 'Start';
       }
     }
@@ -695,6 +698,10 @@ function start(root: HTMLElement) {
     if (!giftWait && gifts.inProgress(raw)) return;
     renderTop(s);
     renderMode(s);
+    if (paidHost && paidStatus) {
+      paidStatus.hidden = !['off', 'elsewhere', 'loading'].includes(s.step);
+      paidStatus.textContent = s.step === 'loading' || !s.gate ? 'Checking your listening wallet…' : 'Paid radio is unavailable. Reload to check again.';
+    }
     root.hidden = s.step === 'off';
     if (root.hidden) return;
     const [pill, tone] = statePill(s);
@@ -785,7 +792,7 @@ function start(root: HTMLElement) {
     const actions: HTMLElement[] = [];
     const more: HTMLElement[] = []; // quieter buttons, in the fold
     const cost = costPerPlay(BigInt(s.gate?.limits.playFee ?? '300'));
-    const payLine = `Each song you listen to for 30 seconds sends ${stx(HOLDER_PAYMENT)} STX to whoever holds it, plus a ${stx(cost - HOLDER_PAYMENT)} STX network fee. It is optional and leaves a permanent on-chain record that you paid the artist.`;
+    const payLine = `After 30 seconds of audible listening (half the length for songs under a minute), an eligible play sends ${stx(HOLDER_PAYMENT)} STX to the song holder, plus a ${stx(cost - HOLDER_PAYMENT)} STX network fee.`;
     const busy = !!s.busy;
 
     switch (s.step) {
@@ -802,22 +809,22 @@ function start(root: HTMLElement) {
           key.push(el('p', mine.length > 1
             ? `This device has listening wallets for ${whoList(mine)}.`
             : `This device has a listening wallet for ${who(s.linked)}.`));
-          lines.push(el('p', 'Open it with Face ID or your fingerprint: no Stacks wallet needed, and plays and likes still count for that wallet. Or connect a different wallet and it gets a listening wallet of its own. Listening is always free.'));
+          lines.push(el('p', 'Open it with your passkey, or connect a different Stacks wallet to set up a separate player.'));
           mine.slice(0, 3).forEach((m, i) => actions.push(button(`Open ${who(m)}`, () => openLinked(m), i === 0 ? 'primary' : '')));
         } else {
           key.push(el('p', 'Connect your wallet to pay artists as you listen.'));
-          lines.push(el('p', 'Every payment is recorded on-chain. Listening is always free.'));
+          lines.push(el('p', 'Every payment is recorded on-chain.'));
         }
         break;
       case 'wrong-wallet':
         // Only with a wallet box older than one-listening-wallet-per-address (it cannot offer this address its own).
         key.push(el('p', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`, 'ppp-warn'));
-        lines.push(el('p', `You are connected as ${who(s.main)}. Listening is still free, and nothing is paid from the listening wallet while this wallet is connected.`));
+        lines.push(el('p', `You are connected as ${who(s.main)}. Switch to the linked wallet to continue listening.`));
         lines.push(el('p', 'The listening wallet box is updating. Once it has, each wallet address gets its own listening wallet on this device.', 'ppp-mute'));
         actions.push(button('Switch wallet', connectStacks, 'primary'));
         break;
       case 'not-invited':
-        key.push(el('p', 'Coming soon. Listening is free.', 'ppp-mute'));
+        key.push(el('p', 'Paid radio access is unavailable for this wallet.', 'ppp-mute'));
         break;
       case 'unsupported':
         key.push(el('p', 'Needs a passkey this browser cannot make. Try Chrome or Safari.', 'ppp-warn'));
@@ -825,7 +832,7 @@ function start(root: HTMLElement) {
       case 'intro':
         key.push(el('p', 'Every play counts for the song’s owner, on-chain.'));
         lines.push(el('p', payLine));
-        lines.push(el('p', 'Once it has funds, every song you listen to for 30 seconds pays automatically until you switch it off or the wallet runs out. No popups while you listen.', 'ppp-ok'));
+        lines.push(el('p', 'Once your wallet is funded and music support is on, eligible plays pay automatically.', 'ppp-ok'));
         lines.push(el('p', s.solo
           ? 'You get a small listening wallet made from a passkey on this device: no app or Stacks wallet needed, and no key stored anywhere. Keep no more than 1 STX in it. Anything left can be sent back to whoever funded it.'
           : 'You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.', 'ppp-warn'));
@@ -873,8 +880,7 @@ function start(root: HTMLElement) {
         else if (s.gift?.player) key.push(el('p', 'Out of plays · add more to keep listening', 'ppp-bad'));
         else if (s.entries.length) key.push(el('p', 'No plays left · add plays to keep counting', 'ppp-bad'));
         else key.push(el('p', `Add plays · 1 STX ≈ ${Math.floor(Number(1_000_000n / cost)).toLocaleString()} plays`));
-        if (s.gift?.player) lines.push(el('p', 'This player has no free mode: it carries on by itself once the plays arrive.'));
-        else if (s.entries.length) lines.push(el('p', 'Songs play free until you top up. Paying carries on by itself once the top-up confirms.'));
+        if (s.entries.length) lines.push(el('p', 'Playback is paused until your top-up confirms.'));
         if (s.payingOn && !s.entries.length) lines.push(el('p', 'Paying is switched on. Once funds arrive it starts with the next song you listen to for 30 seconds.', 'ppp-ok'));
         if (giftWait) lines.push(el('p', 'Your gift is on its way, so there is nothing to add. STX is only needed once these plays are used up.', 'ppp-mute'));
         else if (s.depositPending) lines.push(el('p', 'Nothing to add: your plays are on their way. Add STX only once they are used up.', 'ppp-mute'));
@@ -898,14 +904,14 @@ function start(root: HTMLElement) {
         if (!s.solo || s.returnTo) actions.push(button('Return excess', () => void ppp.returnFunds('excess'), 'primary'), button('Return all', () => void ppp.returnFunds('all')));
         break;
       case 'ready':
-        if (s.payingOn && s.session && s.session.playsLeft > 0) {
+        if (s.payingOn && s.session && s.session.playsLeft > 0 && s.giftStop?.reason !== 'off') {
           // Whichever runs out first: the approval or the balance. A new approval brings the same figures back.
           const left = Math.min(s.session.playsLeft, s.playsLeft);
           key.push(el('p', `${left.toLocaleString()} plays left`, 'ppp-ok'));
-          lines.push(el('p', 'Each song pays its holder once you have heard 30 seconds of it. Skips stay free. The heart likes or unlikes from this wallet for 0.0002 STX.'));
+          lines.push(el('p', payLine + ' The heart likes or unlikes from this wallet for 0.0002 STX.'));
           actions.push(button('Switch off', () => void ppp.switchOff()));
         } else {
-          key.push(el('p', 'Plays are off. Music stays free.', 'ppp-mute'));
+          key.push(el('p', 'Switch on music support to listen.', 'ppp-mute'));
           actions.push(button('Switch plays on', () => void ppp.switchOn(), 'primary'));
         }
         if (s.queued) key.push(el('p', s.queued === 1 ? '1 song waiting to be paid · sends as soon as the last transaction confirms' : `${s.queued} songs waiting to be paid · sent one at a time as each transaction confirms`, 'ppp-warn'));
@@ -1179,6 +1185,6 @@ function start(root: HTMLElement) {
   });
   window.addEventListener('xtrata:wallet-changed', () => void ppp.refresh());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void ppp.refresh(); });
-  setInterval(() => { if (!document.hidden && ppp.snapshot().step !== 'off') void ppp.refresh(); }, 15000);
+  setInterval(() => { if (!document.hidden && (paidHost || ppp.snapshot().step !== 'off')) void ppp.refresh(); }, 15000);
   void ppp.refresh();
 }

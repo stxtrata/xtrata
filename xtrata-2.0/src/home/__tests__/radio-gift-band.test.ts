@@ -23,6 +23,25 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const album = { id: 'abc', title: 'Proof of Sound', subtitle: 'Someone', tracks: [11, 12, 13] };
 
+it('starts paid radio locked even with saved playback, then plays only after the gate opens', async () => {
+  localStorage.setItem('xtrata.radio.v1', JSON.stringify({ on: true, tokenId: '7777', position: 20, savedAt: Date.now() }));
+  const api = initXtrataRadio({ tokenIds: ['7777'], initialPlaybackStop: 'CHECKING YOUR LISTENING WALLET' })!;
+  api.playPause();
+  api.playToken('7777');
+  api.next();
+  expect(asked).toEqual([]);
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  api.setGiftStop(null);
+  api.playToken('7777');
+  await vi.waitFor(() => expect(api.getState().nowPlaying?.tokenId).toBe('7777'));
+  api.setGiftStop('SWITCH ON MUSIC SUPPORT TO LISTEN');
+  expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+  vi.mocked(HTMLMediaElement.prototype.play).mockClear();
+  api.playToken('7777');
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  api.switchOff();
+});
+
 it('loading a player makes it the active band and the album plays in order, then loops', async () => {
   const api = initXtrataRadio({ tokenIds: ['7777'] })!;
   api.setGiftPlayer(album);
