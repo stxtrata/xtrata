@@ -17,7 +17,7 @@ describe('NFT delivery is transient-aware', () => {
     // The only bare `await sendNft(` left in the file is the one inside sendNftRetry.
     expect((agentSource.match(/await sendNft\(/g) || []).length).toBe(1);
     // The critical delivery hand-off uses the retrying wrapper.
-    expect(agentSource).toContain('const deliverTx = await sendNftRetry(dep.key, dep.address, String(job.tokenId)');
+    expect(agentSource).toContain('deliverTx = await sendNftRetry(dep.key, dep.address, String(job.tokenId), deliverTo)');
   });
 
   it('preserves the broadcast reason for diagnosability', () => {

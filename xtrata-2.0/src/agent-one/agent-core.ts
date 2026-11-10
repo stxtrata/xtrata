@@ -688,7 +688,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-11-03.1';
+export const AGENT_BUILD = '2026-11-10.1';
 const LOG_KEEP = 300;   // lines kept per job; a 36-batch upload writes ~8 per batch, and the START of a run is what explains a stall
 // Why this exists: a job that wrote nothing could not be told apart from one that was merely slow, and a
 // failed localStorage write used to vanish into an empty catch. Counting both makes "the page could not
@@ -2089,7 +2089,7 @@ async function findReferralTransfer(from: string, to: string, amount: bigint, me
 /** Send the wizard fee. Unreferred jobs: exactly the old single transfer to Xtrata. Returns the Xtrata tx id. */
 async function payWizardFee(job: any, dep: { key: string; address: string }, agentFee: bigint, payer: string | null): Promise<any> {
   const xtrataTo = job.agentFeeAddress || AGENT_FEE_ADDRESS;
-  if (!referralActive(job)) return sendStxRetry(dep.key, agentFee, xtrataTo, REFUND_TX_FEE);
+  if (!referralActive(job)) return sendXtrataFeeOnce(job, dep, agentFee, xtrataTo);
   const partner = frozenPartner(job);
   const plan = planPayout({ agentFee, partner, payer });
   const memo = referralMemo(partner.slug);
@@ -2128,7 +2128,69 @@ async function payWizardFee(job: any, dep: { key: string; address: string }, age
   job.referralSplit = { agentFee: agentFee.toString(), partner: partnerPaid.toString(), xtrata: xtrataAmount.toString(), rebate: plan.rebateToPayer.toString() };
   writeJob(job);
   if (xtrataAmount <= 0n) return null;
-  return sendStxRetry(dep.key, xtrataAmount, xtrataTo, REFUND_TX_FEE);
+  return sendXtrataFeeOnce(job, dep, xtrataAmount, xtrataTo);
+}
+/**
+ * The Xtrata share of the wizard fee, sent at most once per job.
+ *
+ * A delivery can be resumed after the page died, and this transfer sits between the inscription and the
+ * change sweep — so a run that died after paying it would pay it again on resume. The intent is recorded
+ * before sending; a resume (or any job resumed from an older build, which never recorded intent) looks for
+ * an earlier transfer first. A lookup that FAILS throws, and deliver() defers the fee rather than guess —
+ * the deferred amount goes home with the change, so being unsure only ever costs Xtrata, never the user.
+ */
+async function sendXtrataFeeOnce(job: any, dep: { key: string; address: string }, amount: bigint, to: string): Promise<any> {
+  if (job.agentFeeTx) return job.agentFeeTx;
+  if (job.agentFeeIntent || job.deliveryResumed) {
+    const found = await findStxTransfer(dep.address, to, amount);
+    if (found) { job.agentFeeTx = found; writeJob(job); xaoLog(job.jobId, `wizard fee already paid by an earlier run (${found}) — not paying again`); return found; }
+  }
+  job.agentFeeIntent = { to, amountUstx: amount.toString(), at: new Date().toISOString() }; writeJob(job);
+  const tx = await sendStxRetry(dep.key, amount, to, REFUND_TX_FEE);
+  job.agentFeeTx = tx; writeJob(job);
+  return tx;
+}
+/** Any non-aborted STX transfer from → to of exactly this amount, pending or mined. Throws on a failed read. */
+async function findStxTransfer(from: string, to: string, amount: bigint): Promise<string | null> {
+  const match = (tx: any) => tx && tx.tx_type === 'token_transfer' && tx.sender_address === from && tx.token_transfer
+    && tx.token_transfer.recipient_address === to && String(tx.token_transfer.amount) === amount.toString()
+    && !/abort/.test(String(tx.tx_status || ''));
+  for (const path of [`/extended/v1/address/${from}/mempool?limit=50`, `/extended/v1/address/${from}/transactions?limit=50`]) {
+    const r = await hfetch(path);
+    if (!r.ok) throw new Error(`transaction lookup failed (HTTP ${r.status})`);
+    const d: any = await r.json();
+    if (!Array.isArray(d?.results)) throw new Error('transaction lookup returned no results');
+    const hit = d.results.find(match);
+    if (hit) return String(hit.tx_id).replace(/^0x/, '');
+  }
+  return null;
+}
+/**
+ * Before (re)sending the inscription: where is it now?
+ *  - 'send'      the deposit wallet holds it and nothing of ours is queued → send it.
+ *  - 'delivered' it is already with the recipient → an earlier run sent it; adopt that.
+ * Anything else throws. A failed read or a queued transaction is TRANSIENT (the job retries shortly and, past
+ * the retry ceiling, parks as NEEDS_RECOVERY with the key kept). An inscription that is somewhere it should
+ * never be is 'unrecoverable' (FATAL): stop and return the STX rather than pay for a transfer that cannot work.
+ */
+async function deliveryState(job: any, depositAddr: string, to: string): Promise<'send' | 'delivered'> {
+  const id = String(job.tokenId);
+  const held = await heldBy(id, depositAddr);
+  if (held === 'unknown') throw new Error(`could not confirm where #${id} is right now — will check again shortly`);
+  if (held === 'no') {
+    const o = await ownerOfChecked(id);
+    if (!o.ok) throw new Error(`could not confirm who holds #${id} — will check again shortly`);
+    if (o.owner === to) return 'delivered';
+    throw new Error(`unrecoverable: #${id} is held by ${o.owner || 'nobody'}, not the deposit wallet or ${to} — stopping delivery`);
+  }
+  // Held here. A resumed run may have a transfer still waiting in the mempool; sending again would
+  // only produce a second transfer that aborts once the first mines (and still pays its fee).
+  if (job.deliverStartedAt || job.deliveryResumed || job.retryCount) {
+    let pending: any[];
+    try { pending = await pendingQueue(depositAddr); } catch (e) { throw new Error(`could not check for a pending delivery (${errMsg(e)}) — will check again shortly`); }
+    if (pending.length) throw new Error(`an earlier transaction from the deposit wallet is still pending (nonce ${pending[0].nonce}) — waiting for it before sending #${id}`);
+  }
+  return 'send';
 }
 async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd: number | null) {
   const minted = job.items.filter((i: any) => i.tokenId);
@@ -2213,7 +2275,34 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
   return { receipt };
 }
 
+/**
+ * One delivery per job across every open tab. PROCESSING only knows about runs in THIS tab, so without
+ * this a second wizard tab's watcher could take an in-flight delivery for an orphan and run it again.
+ * The browser drops a Web Lock the moment its tab closes or crashes, which is exactly the signal the
+ * watcher needs: lock free = nobody is delivering this job any more.
+ */
+const deliverLockName = (id: string) => `xao-deliver:${id}`;
 async function deliver(job: any) {
+  const locks = (globalThis as any).navigator?.locks;
+  if (!locks?.request) return deliverInner(job);
+  return locks.request(deliverLockName(job.jobId), { ifAvailable: true }, async (lock: any) => {
+    if (!lock) { xaoLog(job.jobId, 'deliver: another tab is already delivering this job — leaving it to that tab'); return { deferred: true }; }
+    return deliverInner(job);
+  });
+}
+/** true = another tab holds this job's delivery lock; false = nobody does; null = this browser cannot tell. */
+async function deliveryLockHeld(id: string): Promise<boolean | null> {
+  const locks = (globalThis as any).navigator?.locks;
+  if (!locks?.query) return null;
+  try {
+    const q = await locks.query();
+    return [...(q.held || []), ...(q.pending || [])].some((l: any) => l && l.name === deliverLockName(id));
+  } catch { return null; }
+}
+// Without Web Locks, "nobody is delivering" can only be inferred from silence. A live run can sit inside one
+// confirmation wait for up to CONFIRM_WALL_MS without touching the job record, so wait that out and more.
+const DELIVERY_ORPHAN_NOLOCK_MS = CONFIRM_WALL_MS + 120_000;
+async function deliverInner(job: any) {
   if (!job.tokenId) throw new Error('no tokenId yet — run the inscribe step first');
   const managed = readMusicFees(job.jobId);
   if (managed) await musicFundingGate(job.jobId);
@@ -2252,15 +2341,36 @@ async function deliver(job: any) {
   const receiptDeps = idDep ? [String(job.tokenId), String(idDep)] : [String(job.tokenId)];
   // On-chain receipt is optional. When off we skip the extra mint entirely (saving its
   // protocol+miner cost, which then returns as change) but still build+save the HTML below.
-  let receiptTokenId: string | null = null;
-  if (job.receipt !== false) {
-    prog('building your on-chain receipt');
-    const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(prelim), `xtrata:receipt/${job.jobId}`, receiptDeps);
-    receiptTokenId = r.tokenId;
+  // RE-ENTRANT (10 Nov 2026): a run can die anywhere below — page closed, phone locked, a fetch that never
+  // came back — and the watcher resumes it. Every step therefore records what it did the moment it did it,
+  // and on a resume looks at the chain before spending anything again.
+  let receiptTokenId: string | null = job.receiptTokenId ? String(job.receiptTokenId) : null;
+  if (job.receipt !== false && !receiptTokenId) {
+    if (job.receiptMintStartedAt) {
+      // An earlier run started the receipt but never recorded its token. The receipt is optional; a second
+      // one would be paid twice. Skip it — the HTML copy is still built and saved below.
+      xaoLog(job.jobId, 'deliver: an earlier run started the receipt but never recorded it — not minting a second one');
+    } else {
+      job.receiptMintStartedAt = new Date().toISOString(); writeJob(job);
+      prog('building your on-chain receipt');
+      const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(prelim), `xtrata:receipt/${job.jobId}`, receiptDeps);
+      receiptTokenId = r.tokenId;
+      job.receiptTokenId = receiptTokenId; writeJob(job);
+    }
   }
-  prog('sending your inscription to your wallet');
-  const deliverTx = await sendNftRetry(dep.key, dep.address, String(job.tokenId), job.recipient || job.user);   // inscription → recipient (defaults to payer); CRITICAL: if this fails the job failed → throw
-  job.deliverTx = deliverTx; job.inscriptionDelivered = true; writeJob(job);              // SUCCESS commit point
+  const deliverTo = job.recipient || job.user;
+  let deliverTx: any = job.deliverTx || null;
+  if (!job.inscriptionDelivered) {
+    const where = await deliveryState(job, dep.address, deliverTo);
+    if (where === 'delivered') {
+      xaoLog(job.jobId, `deliver: #${job.tokenId} is already with ${deliverTo} — an earlier run sent it; carrying on from there`);
+    } else {
+      prog('sending your inscription to your wallet');
+      job.deliverStartedAt = new Date().toISOString(); writeJob(job);
+      deliverTx = await sendNftRetry(dep.key, dep.address, String(job.tokenId), deliverTo);   // inscription → recipient (defaults to payer); CRITICAL: if this fails the job failed → throw
+    }
+    job.deliverTx = deliverTx; job.inscriptionDelivered = true; writeJob(job);              // SUCCESS commit point
+  }
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0'; const notes: string[] = [];
   // Parent(s) go home FIRST — the user's own inscription(s) are the most valuable thing in this wallet.
   const parentReturnTxs: any[] = [];
@@ -2279,7 +2389,18 @@ async function deliver(job: any) {
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
   { const n0 = notes.length; await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes); if (notes.length > n0) holdFunds = true; }
-  if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
+  receiptDeliverTx = job.receiptDeliverTx || null;
+  if (receiptTokenId && !receiptDeliverTx) {
+    try {
+      const here = await heldBy(String(receiptTokenId), dep.address);
+      if (here === 'unknown') throw new Error('could not confirm where the receipt is');
+      if (here === 'yes') {
+        prog('sending your on-chain receipt');
+        receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, deliverTo);
+        job.receiptDeliverTx = receiptDeliverTx; writeJob(job);
+      }
+    } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); }
+  }
   try { if (agentFee > 0n) agentFeeTx = await payWizardFee(job, dep, agentFee, refundTo); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   if (holdFunds) notes.push('change kept in the deposit wallet to pay for returning the inscription — the page will finish this automatically');
   else { prog('returning your change');
@@ -2744,6 +2865,36 @@ async function watchTick() {
     // A page close/reload can interrupt the browser-held recovery between
     // transactions. Never strand the job in a non-actionable state: preserve
     // the key and require an explicit click to continue from a fresh inventory.
+    // A delivery interrupted by a page close/reload. PROCESSING lives in memory, so after a reload nothing
+    // owns a DELIVERING job: the card spun for ever, the watcher skipped it, and the change sat in the deposit
+    // wallet (job-1794301042013, 10 Nov 2026 — inscription delivered, ~2.15 STX of change never returned).
+    // deliver() is re-entrant, so hand it back to the deliver-only resume below. Anything deliver() cannot
+    // safely re-enter is parked where the Recover button is, with the key kept.
+    if (j.status === 'DELIVERING' && !j.mock) {
+      const elsewhere = await deliveryLockHeld(j.jobId);
+      if (elsewhere === true) continue;   // another tab is delivering it right now
+      if (elsewhere === null && Date.now() - (Date.parse(j.progressAt || '') || 0) < DELIVERY_ORPHAN_NOLOCK_MS) continue;
+      let d: any; try { d = readJob(j.jobId); } catch { continue; }
+      if (d.status !== 'DELIVERING' || PROCESSING.has(d.jobId)) continue;   // changed while we looked
+      const now = new Date().toISOString();
+      if (d.items || !d.tokenId || !d.ephemeralMnemonic) {
+        d.status = 'NEEDS_RECOVERY';
+        d.keepKey = true;
+        d.keepKeyReason = 'delivery was interrupted — verify the latest holdings and recover';
+        d.progress = d.keepKeyReason;
+        d.progressAt = now;
+        writeJob(d);
+        xaoLog(d.jobId, 'delivery was interrupted and cannot be resumed safely here — parked as NEEDS_RECOVERY');
+        continue;
+      }
+      d.status = 'INSCRIBED';
+      d.deliveryResumed = true;
+      d.progress = 'delivery was interrupted — checking the chain and finishing it';
+      d.progressAt = now;   // restarts the reaper's idle window: an interrupted delivery is not an abandoned job
+      writeJob(d);
+      xaoLog(d.jobId, `delivery of #${d.tokenId} was interrupted — resuming it (every step checks the chain first)`);
+      continue;
+    }
     if (j.status === 'RECOVERING') {
       j.status = 'NEEDS_RECOVERY';
       j.keepKey = true;
@@ -2813,6 +2964,9 @@ async function reapTick() {
     // Reaping it would refund and wipe the key — the exact outcome that state exists
     // to prevent — and strand chunks that are already paid for.
     if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY', 'EXPIRED', 'NEEDS_FUNDS', 'FEE_WAITING'].includes(j.status)) continue;
+    // DELIVERING means the inscription may already be with the user. Refunding here would cancel a delivered
+    // job and mint a "refunded" receipt out of their change. The watcher resumes it instead.
+    if (j.status === 'DELIVERING') continue;
     const last = Date.parse(j.progressAt || j.createdAt || '') || 0;
     // Payments can take many minutes to confirm — give AWAITING_DEPOSIT 12× the normal window.
     const win = j.status === 'AWAITING_DEPOSIT' ? WINDOW_MS * 12 : WINDOW_MS;
