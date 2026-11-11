@@ -8,6 +8,7 @@ import {
 import {
   callReadOnly,
   fetchContractPrintEvents,
+  readMapUint,
   tupleBool,
   tuplePrincipal,
   tupleUint,
@@ -94,6 +95,36 @@ export const buildReverseIndex = (
   reverseIndexCache.set(collection.key, promise);
   promise.catch(() => reverseIndexCache.delete(collection.key));
   return promise;
+};
+
+/**
+ * Original (local) token id for an Xtrata inscription held by, or bound to, this
+ * collection's helper. Returns null when the helper has no twin with that id.
+ *
+ * Helpers that keep an on-chain xtrata-id -> local-id map (`reverseMap`, e.g.
+ * `BoundTwins` on the FACFUN Monkeys helper) are answered with a single read,
+ * which is authoritative: "no entry" means the id is not one of its twins and no
+ * event scan is run. If that read FAILS we fall back to the event index, so a
+ * throttled node never turns a real twin into "not a twin". Throws only when the
+ * fallback scan itself fails, so callers can tell "unknown" from "could not check".
+ */
+export const resolveLocalTokenId = async (
+  collection: ForeverTwinCollection,
+  xtrataId: bigint
+): Promise<bigint | null> => {
+  if (collection.reverseMap) {
+    const direct = await readMapUint({
+      contractId: collection.helperContractId,
+      mapName: collection.reverseMap,
+      key: xtrataId,
+      network: collection.network
+    });
+    if (direct.ok) {
+      return direct.value;
+    }
+  }
+  const index = await buildReverseIndex(collection);
+  return index.get(xtrataKey(xtrataId)) ?? null;
 };
 
 /** Read the live binding for a local token id from the helper contract. */
@@ -194,16 +225,14 @@ export const resolveTwinByXtrataId = async (
   xtrataId: bigint,
   options?: { masterContractId?: string | null }
 ): Promise<TwinBinding | null> => {
-  const key = xtrataKey(xtrataId);
   for (const collection of candidateCollections(options?.masterContractId)) {
-    let index: ReverseIndex;
+    let localTokenId: bigint | null;
     try {
-      index = await buildReverseIndex(collection);
+      localTokenId = await resolveLocalTokenId(collection, xtrataId);
     } catch {
       continue;
     }
-    const localTokenId = index.get(key);
-    if (localTokenId === undefined) {
+    if (localTokenId === null) {
       continue;
     }
     const binding = await getBinding(collection, localTokenId).catch(() => null);
@@ -241,11 +270,11 @@ export const resolveTwinOwnership = async (params: {
 
   let binding: TwinBinding | null = null;
   if (helperCollection) {
-    const index = await buildReverseIndex(helperCollection).catch(
-      () => null as ReverseIndex | null
-    );
-    const localTokenId = index?.get(xtrataKey(params.xtrataId));
-    if (localTokenId !== undefined) {
+    const localTokenId = await resolveLocalTokenId(
+      helperCollection,
+      params.xtrataId
+    ).catch(() => null);
+    if (localTokenId !== null) {
       binding =
         (await getBinding(helperCollection, localTokenId).catch(() => null)) ?? {
           collection: helperCollection,

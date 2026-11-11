@@ -170,6 +170,8 @@ export const PEPE_ESCROW_RESOLVERS = new Map(
       sourceAssetName: collection.sourceAssetName,
       collectionName: collection.name,
       itemNoun: collection.itemNoun,
+      // On-chain xtrata-id -> local-id data map, when the helper keeps one.
+      reverseMap: collection.reverseMap ?? null,
       label: TWIN_HOLDER_LABELS[collection.key] ?? `${collection.itemNoun} holder`
     }
   ])

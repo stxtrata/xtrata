@@ -58,6 +58,15 @@ export type ForeverTwinCollection = {
    * "view on …" affordances.
    */
   readonly claimUrl?: string;
+  /**
+   * Optional name of an on-chain data map on the helper that goes straight from
+   * Xtrata id to local token id (value: uint), e.g. `BoundTwins` on the FACFUN
+   * helpers. When set, the Explorer resolves a twin's original id with one
+   * `map_entry` read instead of paging through every `inscribed` print event
+   * (29 requests at 1,421 twins, about 51 at 2,500). The event scan remains the
+   * fallback when the map read fails, and for helpers that have no such map.
+   */
+  readonly reverseMap?: string;
 };
 
 const XTRATA_MASTER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
@@ -128,6 +137,26 @@ export const FOREVER_TWIN_COLLECTIONS: readonly ForeverTwinCollection[] = [
       'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys',
     sourceContractId: 'SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys',
     sourceAssetName: 'bitcoin-monkeys'
+  },
+  // Bitcoin Monkeys, second helper: Rapha's fak.fun contract, which is the one
+  // being filled with the whole collection. Same source NFT as the entry above,
+  // a different helper, so the same Monkey can have a twin in each (#2, #378,
+  // #1012, #1282, #1295 and #1296 do). The key must stay distinct: twin indexes
+  // are cached per key and each helper is looked up by the token's owner.
+  // Explorer-only: not listed on the Forever Twins pages (registry.v2.json).
+  {
+    key: 'bitcoin-monkeys-fakfun',
+    name: 'Bitcoin Monkeys',
+    itemNoun: 'Bitcoin Monkey',
+    network: 'mainnet',
+    masterContractId: XTRATA_MASTER,
+    helperContractId:
+      'SP2P8BYKPPREPTW7N4CZ4ZHP1VTHKCJGXECRAKA4C.btc-monkeys-fakfun-x',
+    sourceContractId: 'SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys',
+    sourceAssetName: 'bitcoin-monkeys',
+    // BoundTwins: xtrata-id -> monkey id, written by both `inscribe` and
+    // `bind-staged`. No read-only getter exists, so it is read via map_entry.
+    reverseMap: 'BoundTwins'
   },
   {
     key: 'bitcoin-birds',

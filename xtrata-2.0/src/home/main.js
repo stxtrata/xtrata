@@ -101,6 +101,7 @@
     } from '/src/lib/drops/sponsored-claim.ts';
     import { campaignHexToBytes } from '/src/lib/drops/campaign-attestation.ts';
     import { getDropsCollectionLockForDrop } from '/src/lib/drops/collection-lock.ts';
+    import { readMapUint } from '/src/lib/twins/hiro.ts';
     import { loadDropsActivity, isClaimActivity } from '/src/lib/drops/history.ts';
     import {
       applyDropGalleryOwners,
@@ -1935,17 +1936,17 @@
         let offset = 0;
         let seen = 0;
         while (seen < maxEvents) {
-          let page;
-          try {
-            page = await fetchHiroJson(
-              `/extended/v1/contract/${encodeURIComponent(
-                resolver.helperContractId
-              )}/events?limit=${pageSize}&offset=${offset}`,
-              state.contract.network
-            );
-          } catch (error) {
-            break;
-          }
+          // A failed page must fail the whole scan. Stopping here would hand back
+          // a truncated index that is then cached for the session, and every twin
+          // on the missing pages would read as "not a twin" until a reload.
+          // Callers already catch a rejection, and the rejected promise is
+          // evicted from the cache below so the next click retries.
+          const page = await fetchHiroJson(
+            `/extended/v1/contract/${encodeURIComponent(
+              resolver.helperContractId
+            )}/events?limit=${pageSize}&offset=${offset}`,
+            state.contract.network
+          );
           const results = page?.results ?? [];
           if (results.length === 0) {
             break;
@@ -2348,15 +2349,33 @@
         return cached;
       }
       // Reverse-resolve the original (local) collection token id for this
-      // Xtrata inscription using the helper's inscribed events.
-      const reverseIndex = await buildTwinReverseIndex(resolver).catch(() => null);
-      let sourceTokenId =
-        reverseIndex?.get(token.id.toString()) ?? null;
+      // Xtrata inscription. Helpers that keep an on-chain xtrata-id -> local-id
+      // map (reverseMap, e.g. BoundTwins on the FACFUN Monkeys helper) answer in
+      // one read, and that answer is authoritative: "no entry" means this is not
+      // one of the helper's twins, so no scan or history lookup is attempted.
+      // If the read fails we fall through to the event scan below.
+      let sourceTokenId = null;
+      let answeredByMap = false;
+      if (resolver.reverseMap) {
+        const direct = await readMapUint({
+          contractId: resolver.helperContractId,
+          mapName: resolver.reverseMap,
+          key: token.id,
+          network: state.contract.network
+        });
+        answeredByMap = direct.ok;
+        sourceTokenId = direct.value;
+      }
+      // Otherwise use the helper's inscribed events.
+      if (!answeredByMap) {
+        const reverseIndex = await buildTwinReverseIndex(resolver).catch(() => null);
+        sourceTokenId = reverseIndex?.get(token.id.toString()) ?? null;
+      }
 
       // Fallback: recover the local id from the escrow-deposit transaction
       // (covers tokens swapped back into escrow if events are unavailable).
       let escrowTxId = null;
-      if (sourceTokenId === null) {
+      if (sourceTokenId === null && !answeredByMap) {
         const coreAssetId = `${getTokenCacheContractId(token)}::xtrata-inscription`;
         const coreHistory = await fetchHiroJson(
           `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(coreAssetId)}` +
