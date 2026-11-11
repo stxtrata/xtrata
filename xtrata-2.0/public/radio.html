@@ -7,6 +7,10 @@
 <meta name="description" content="A radio station whose entire catalogue lives on-chain. Every song is an inscription. Tune between curated, liked and full-chain bands." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <script>
+// Set before the audio engine loads so a slow or unavailable wallet check cannot open playback.
+if (location.hostname === 'radio.xtrata.xyz') document.documentElement.dataset.radioPaidOnly = 'true';
+</script>
+<script>
 // Gift links carry their code after "#" (browsers never send it to a server). Move it to this device
 // at once and take it out of the address bar, so it is not bookmarked, shared or synced by accident.
 (function(){try{var m=/(?:^|[#&])gift=([A-Za-z0-9_-]{22})(?:&|$)/.exec(location.hash);if(!m)return;
@@ -226,6 +230,9 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .onair{position:absolute;top:10px;right:12px;z-index:1;display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none}
   .onair b{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;padding:3px 8px 3px 10px;border-radius:5px;border:1px solid #3a3f48;color:#4a505a;background:#0b0d11}
   .onair-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+  #paidRadioStatus{display:none}
+  html[data-radio-paid-only=true] #paidRadioStatus:not([hidden]){display:block}
+  html[data-radio-paid-only=true] .free-radio-share{display:none}
   html[data-ppp=on] .vfd .stn,html[data-ppp=off] .vfd .stn{padding-right:118px}
   .nudge{display:flex;align-items:center;gap:12px;margin-top:14px;padding:10px 12px 10px 14px;border-radius:12px;
     border:1px dashed rgba(255,106,61,.65);background:linear-gradient(90deg,rgba(255,80,40,.10),rgba(255,154,46,.04));color:#ffb08a;font-size:12.5px;line-height:1.4}
@@ -294,7 +301,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   html[data-ppp=off] .tunerLabel b{color:#8c96a2}
   html[data-ppp=off] .stations button.on{border-color:#3a414b;background:#13161b}
   html[data-ppp=off] .stations button.on .lamp{background:#7d8590;box-shadow:none}
-  html[data-ppp=off] .live::after{content:" · ARTISTS UNPAID";color:#ff7a45}
+  html[data-ppp=off] .live::after{content:" · SUPPORT PAUSED";color:#ff7a45}
   html[data-ppp=off] .ppp-top.is-off{color:#ff8a5c;border-color:#ff8a5c}
   html[data-ppp=off] .ppp-state--mute{color:#ff8a5c}
   @media(max-width:640px){
@@ -607,6 +614,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   </div>
 </header>
 <main class="paused" id="stage">
+  <p id="paidRadioStatus" role="status">Checking your listening wallet…</p>
   <!-- Album First (src/radio-ppp/album.ts): shown instead of the receiver and panel while an album is the music. -->
   <section class="album" id="album" hidden aria-label="Album"></section>
   <section class="rx" aria-label="Receiver">
@@ -714,7 +722,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <a href="/wizard/" target="_blank" rel="noopener">Inscribe your own →</a>
       · <a href="/music/lounge">Music Support · listening room →</a>
       · <a href="/radio/guide.html">Listening guide →</a>
-      · <a href="/radio/share.html" target="_blank" rel="noopener">Embed the radio →</a></p>
+      <span class="free-radio-share"> · <a href="/radio/share.html" target="_blank" rel="noopener">Embed the radio →</a></span></p>
   </aside>
 </main>
 <script>
@@ -896,7 +904,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     $('pp').textContent=playing?'⏸':'▶';
     $('pp').title=playing?'Pause':'Play';
     stage.classList.toggle('paused',!playing);
-    $('fnote').textContent=s.on?(np?'NO ARTWORK':'TUNING…'):'PRESS POWER TO TUNE IN';
+    $('fnote').textContent=s.giftStop||(s.on?(np?'NO ARTWORK':'TUNING…'):'PRESS POWER TO TUNE IN');
     var art=$('art');
     // An album: its cover until something has played, then each song's own artwork (kept while paused, so you can see
     // which song you are on). A tap on the flip button swaps the song's artwork and the album cover; the next song puts it back.
@@ -1070,7 +1078,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=42275606a109" defer></script>
+<script src="/xtrata-radio.js?v=6373837ac027" defer></script>
 <script type="module" src="/radio/wallet.js?v=8a27a580ad6c"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -1085,8 +1093,19 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 })();
 </script>
 <script type="module">
-// Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=8d31f5ee2f13')}).catch(function(){});
+const paidHost = document.documentElement.dataset.radioPaidOnly === 'true';
+function showUnavailable(){
+  if (!paidHost) return;
+  const status = document.getElementById('paidRadioStatus');
+  status.textContent = 'Paid radio is unavailable. Reload to check again.';
+  window.XtrataRadio?.setGiftStop('PAID RADIO IS UNAVAILABLE');
+}
+fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
+  .then(function(r){return r.ok?r.json():{}})
+  .then(function(c){
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=f651ac8b2083');
+    showUnavailable();
+  }).catch(showUnavailable);
 </script>
 <script>
 // Arcade dock bridge: runs ONLY with ?dock=1 (the arcade's corner panel and its pop-out window). Without that flag this block does nothing.

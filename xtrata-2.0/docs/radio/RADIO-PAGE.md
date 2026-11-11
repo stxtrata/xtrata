@@ -65,6 +65,16 @@ a listen or a paid play.
 
 ## Play and pause
 
+On `radio.xtrata.xyz/radio`, playback starts locked while the listening wallet is checked.
+Setup, funding and approval unlock the Play controls. The engine blocks playback even if the
+configuration or wallet bundle fails to load, and pauses when the wallet can no longer pay.
+The existing audible threshold determines when an eligible play is charged.
+
+Verification for this change covered 183 focused tests and a Chromium check of the built page
+with saved playback. With the paid-radio configuration disabled or returning HTTP 503, playback
+stayed locked. The main site's radio still resumed with the same saved state. A separate album
+layout assertion also fails against the previous revision.
+
 The radio plays when the listener presses play (or picks a song: a tuning-strip tick, a liked
 song, "Play" on the likes list) and keeps playing in a background tab. Once stopped, by the pause
 button, media keys, headphones or the OS, it stays stopped until play is pressed again: the stuck

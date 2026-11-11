@@ -10,5 +10,6 @@ import { CURATED_GALLERIES } from './config.js';
 initXtrataRadio({
   tokenIds: CURATED_GALLERIES.find((gallery) => gallery.id === 'jim-music')?.tokenIds ?? [],
   stationName: 'XTRATA FM',
-  resumePlayback: document.documentElement.dataset.radioEmbed !== 'true'
+  resumePlayback: document.documentElement.dataset.radioEmbed !== 'true',
+  initialPlaybackStop: document.documentElement.dataset.radioPaidOnly === 'true' ? 'CHECKING YOUR LISTENING WALLET' : null
 });

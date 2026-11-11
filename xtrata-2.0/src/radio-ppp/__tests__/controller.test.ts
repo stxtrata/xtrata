@@ -121,6 +121,20 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
 }
 
 describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', () => {
+  it('blocks a new visitor until their passkey wallet is funded and approved', async () => {
+    const s = setup({ passkeyOnly: true });
+    s.setMain();
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'intro', giftStop: { reason: 'setup' } });
+    await s.ppp.create();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', giftStop: { reason: 'out' } });
+    s.chain.balance = 100_000n;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', giftStop: null });
+    await s.ppp.switchOff();
+    expect(s.ppp.snapshot()).toMatchObject({ giftStop: { reason: 'off' } });
+  });
+
   it('turns on once and then pays for every new song, with no extra step after the first', async () => {
     const s = setup();
     await s.ppp.forceRefresh();

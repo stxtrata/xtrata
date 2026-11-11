@@ -51,7 +51,7 @@ const saveState = (state) => {
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* noop */ }
 };
 
-export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = true, hiddenTrackSilenceMs = 60000 } = {}) => {
+export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = true, initialPlaybackStop = null, hiddenTrackSilenceMs = 60000 } = {}) => {
   if (!tokenIds.length || typeof document === 'undefined') {
     return null;
   }
@@ -718,7 +718,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   let giftPlayer = null;                   // {id,title,subtitle,tracks:[tokenId strings],hidden:tokenId string|null,cover}
   let giftLock = false;                    // a curated album is the only band until the listener funds a wallet of their own
   let giftWait = false;                    // plays are on their way: the controls rest, greyed out, until they land
-  let giftStop = null;                     // null, or the text to show when playback is refused
+  let giftStop = initialPlaybackStop;      // null, or the text to show when playback is refused
   let preset = 'all';                      // within FM: 'music' | 'all'
   // Shuffle is OFF by default: the dial plays in order (likes/curated/chain
   // sequence per band). Neither shuffle nor loop persists across visits —
@@ -1647,6 +1647,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
             player.addEventListener('playing', () => window.clearTimeout(timer), { once: true });
           })
         ]);
+        if (token !== tuneToken || !on) { endTune(); return; }
         setNow('', true);
         startTicker(track);
         void fetchRelatives(track.tokenId);
@@ -1663,6 +1664,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         endTune();
         return;
       } catch (error) {
+        if (token !== tuneToken || !on) { endTune(); return; }
         radioLog(`play FAILED #${track.tokenId}`, { error: String(error), mediaError: player.error && player.error.code, ready: player.readyState, net: player.networkState }, track.tokenId);
         try { pauseOwn(); player.removeAttribute('src'); player.load(); } catch { /* reset for next attempt */ }
         trackCache.delete(track.tokenId); // stalled stream: retry later, don't dud
@@ -1815,10 +1817,10 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     applyVolume();
     renderKnob();
   }
-  if (resumePlayback && saved && saved.on && saved.tokenId) {
+  if (resumePlayback && !giftStop && saved && saved.on && saved.tokenId) {
     const resume = async () => {
       const track = await resolveTrack(String(saved.tokenId));
-      if (!track) return;
+      if (!track || giftStop) return;
       on = true;
       firstTune = false;
       toggleButton.setAttribute('aria-pressed', 'true');
@@ -1947,12 +1949,16 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       if (giftLock && giftPlayer && band !== 'gift') setBand('gift'); else emit();
       if (giftLock) enterAlbum();
     },
-    /** Refuse to start or advance (a gift player whose paid plays are used up). Pass null to allow playback again. */
+    /** Block playback until the paid radio is ready. Pass null to allow playback again. */
     setGiftStop: (text) => {
-      const next = typeof text === 'string' && text ? text.slice(0, 40) : null;
+      const next = typeof text === 'string' && text ? text.slice(0, 80) : null;
       if (next === giftStop) return;
       giftStop = next;
-      if (giftStop && on) refuseForGift(); else emit();
+      if (giftStop && on) {
+        tuneToken += 1;
+        tuneInFlight = false;
+        refuseForGift();
+      } else emit();
     },
     /** Plays are on their way (a gift is landing): the controls rest, greyed out, until they arrive. */
     setGiftWait: (on) => {
