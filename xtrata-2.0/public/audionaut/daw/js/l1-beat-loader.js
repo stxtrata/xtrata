@@ -180,13 +180,14 @@ export async function loadBeatPreset(preset, options = {}) {
     channel.solo = false;
     if (channel.mute) engine.silenceChannel(i);
   }
-  for (
-    let i = 0;
-    i < project.instruments.length && exclusive;
-    i++
-  ) {
-    project.instruments[i].mute = true;
+  // Mute only the synth instruments that actually carry notes (those are the leftovers); an
+  // instrument with nothing sequenced has nothing to leak, so it stays audible for the keyboards.
+  const hasNotes = (i) =>
+    project.sequences.some((seq) => seq.notes?.[i]?.length > 0);
+  for (let i = 0; i < project.instruments.length && exclusive; i++) {
+    project.instruments[i].mute = hasNotes(i);
     project.instruments[i].solo = false;
+    engine.setInstrumentVolume?.(i, project.instruments[i].volume);
     store.emit("instrument", { i });
   }
   // Unload what the previous beat left on channels this beat does not use, in every collection:
@@ -198,7 +199,7 @@ export async function loadBeatPreset(preset, options = {}) {
     i < (project.lastPresetChannels || 0) && i < store.numChannels;
     i++
   ) {
-    sequence.steps[i].fill(0);
+    store.clearChannelRegions(i, store.project.sequences.indexOf(sequence), { quiet: true });
     unloadChannelSample(i);
   }
   prepared.forEach(({ def, result, steps, trimStart, trimEnd }, i) => {
@@ -218,7 +219,10 @@ export async function loadBeatPreset(preset, options = {}) {
       fx: { ...def.fx }, // preset FX are written in the old object form…
     });
     normalizeOwner(store.channel(i)); // …and become plugin chain slots here
-    sequence.steps[i] = steps;
+    store.writePattern(i, steps, {
+      seqIndex: store.project.sequences.indexOf(sequence),
+      quiet: true,
+    });
     engine.rebuildInserts?.(i);
     store.emit("channel", { ch: i });
   });

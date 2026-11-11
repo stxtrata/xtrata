@@ -233,7 +233,7 @@ export function buildChannels() {
       else if (s % 4 === 0) b.classList.add("beat-start");
       b.addEventListener("click", (e) => {
         if (e.altKey) {
-          if (!stepVal(store.seq.steps[ch][s])) store.cycleStep(ch, s);
+          if (!stepVal(store.stepAt(ch, s))) store.cycleStep(ch, s);
           openStepEditorInternal(ch, s);
         } else {
           store.cycleStep(ch, s, e.shiftKey);
@@ -292,7 +292,7 @@ export function buildChannels() {
     const c = store.channel(last);
     const hasContent =
       c.sampleName ||
-      store.project.sequences.some((s) => s.steps[last]?.some((v) => v));
+      store.project.sequences.some((s) => s.regions[last]?.length);
     if (
       hasContent &&
       !confirm(
@@ -301,8 +301,7 @@ export function buildChannels() {
     )
       return;
     if (store.removeChannel()) {
-      engine.buffers[last] = null;
-      engine.reverseBuffers[last] = null;
+      engine.pruneBuffers();
       buildChannels();
       setStatus(`Channel ${last + 1} removed.`);
     }
@@ -503,17 +502,23 @@ export function drawInstStrip(i) {
     c.fillStyle = "#26303d";
     c.fillRect((s * strip.width) / 4, 0, 1, strip.height);
   }
-  const notes = store.seq.notes?.[i] || [];
-  if (!notes.length) return;
-  const pitches = notes.map((n) => n.pitch);
-  const lo = Math.min(...pitches),
-    hi = Math.max(...pitches, lo + 1);
-  c.fillStyle = synth.color;
   const cw = strip.width / 64;
-  for (const n of notes) {
-    const y =
-      strip.height - 3 - ((n.pitch - lo) / (hi - lo)) * (strip.height - 6);
-    c.fillRect(n.step * cw, y, Math.max(2, n.dur * cw - 1), 3);
+  const notes = store.seq.notes?.[i] || [];
+  if (notes.length) {
+    const pitches = notes.map((n) => n.pitch);
+    const lo = Math.min(...pitches),
+      hi = Math.max(...pitches, lo + 1);
+    c.fillStyle = synth.color;
+    for (const n of notes) {
+      const y =
+        strip.height - 3 - ((n.pitch - lo) / (hi - lo)) * (strip.height - 6);
+      c.fillRect(n.step * cw, y, Math.max(2, n.dur * cw - 1), 3);
+    }
+  }
+  // playback position: the same green step highlight the audio strips draw
+  if (lastPlayheadStep >= 0) {
+    c.fillStyle = "rgba(67,255,164,0.25)";
+    c.fillRect(lastPlayheadStep * cw, 0, cw, strip.height);
   }
 }
 
@@ -627,7 +632,7 @@ export function renderPattern() {
   const seq = store.seq;
   for (let ch = 0; ch < stepButtons.length; ch++) {
     for (let s = 0; s < NUM_STEPS; s++) {
-      paintStep(stepButtons[ch][s], seq.steps[ch][s]);
+      paintStep(stepButtons[ch][s], store.stepAt(ch, s, seq));
     }
   }
 }
@@ -655,6 +660,8 @@ export function movePlayhead(step) {
       `${Math.floor(step / 16) + 1}.${Math.floor((step % 16) / 4) + 1}`;
   }
   lastPlayheadStep = step;
+  // instrument rows show the position on their note strips too
+  for (let i = 0; i < NUM_INSTRUMENTS; i++) drawInstStrip(i);
 }
 
 // ---------------------------------------------------------------- sequences
@@ -1107,7 +1114,7 @@ function editorParams() {
       sampleMidi: c.sampleMidi,
     };
   }
-  const raw = store.seq.steps[editorScope.ch][editorScope.step];
+  const raw = store.stepAt(editorScope.ch, editorScope.step);
   const o = raw && typeof raw === "object" ? raw : {};
   return {
     trimStart: o.trimStart ?? c.trimStart,
@@ -1141,7 +1148,7 @@ function editorApply(p) {
       ...(p.gateSteps != null && { gateSteps: p.gateSteps }),
       ...(p.sampleMidi != null && { sampleMidi: p.sampleMidi }),
     });
-    updateStep(ch, step, store.seq.steps[ch][step]);
+    updateStep(ch, step, store.stepAt(ch, step));
   }
 }
 
@@ -1155,7 +1162,7 @@ function drawWaveform(playFrac = -1) {
   ctx2d.fillStyle = "#0b0f14";
   ctx2d.fillRect(0, 0, W, H);
 
-  const buffer = engine.buffers[ch];
+  const buffer = engine.bufferOf(ch);
   const c = store.channel(ch);
   if (buffer) {
     const data = buffer.getChannelData(0);
@@ -1215,7 +1222,7 @@ function trimStartPlayback() {
   engine.ensureContext();
   const ch = editorScope.ch;
   const p = editorParams();
-  const buffer = p.rev ? engine.getReverseBuffer(ch) : engine.buffers[ch];
+  const buffer = p.rev ? engine.getReverseBuffer(ch) : engine.bufferOf(ch);
   if (!buffer) return;
   const src = engine.ctx.createBufferSource();
   src.buffer = buffer;
@@ -1301,7 +1308,7 @@ function openTrim(ch, step = null) {
       : `Root ${midiName(root)} · ${p.pitch.toFixed(3)}× · notes change playback length${c.soundMetadata?.voicing ? " · whole chord transposes" : ""}`;
   $("#trim-xfade").value = p.xfade || 0;
   $("#trim-xfade-wrap").style.display = step == null ? "none" : "";
-  const duration = engine.buffers[ch]?.duration || 0;
+  const duration = engine.bufferOf(ch)?.duration || 0;
   $("#trim-start-seconds").value = String(p.trimStart * duration);
   $("#trim-end-seconds").value = String(p.trimEnd * duration);
   $("#modal-trim").classList.remove("hidden");
@@ -1375,7 +1382,7 @@ export function initTrimModal() {
     ["#trim-end-seconds", "trimEnd"],
   ])
     $(sel).addEventListener("change", () => {
-      const duration = engine.buffers[editorScope.ch]?.duration;
+      const duration = engine.bufferOf(editorScope.ch)?.duration;
       if (!duration) return;
       const value = $(sel).valueAsNumber,
         p = editorParams();
@@ -1408,7 +1415,7 @@ export function initTrimModal() {
   $("#trim-reset-step").addEventListener("click", () => {
     const { ch, step } = editorScope;
     if (step == null) return;
-    const raw = store.seq.steps[ch][step];
+    const raw = store.stepAt(ch, step);
     const v = raw && typeof raw === "object" ? raw.v || 1 : raw || 1;
     store.setStep(ch, step, v); // strip overrides, keep on/accent state
     openTrim(ch, step);
