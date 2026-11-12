@@ -3,7 +3,7 @@ import {
   explicitSongs, featuredPlayers, giftForWallet, giftStatus, hiroGiftChain, nextSlot, runSweep, shelfFor, sweepAuthorised, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
 } from '../../lib/radio-gifts';
 import { checkSongsNow } from '../../lib/radio-metadata';
-import { advance } from '../../lib/radio-giveaway';
+import { advance, GIVEAWAY_LISTS } from '../../lib/radio-giveaway';
 
 /**
  * Radio gift wallets (functions/lib/radio-gifts.ts):
@@ -41,7 +41,7 @@ export async function onRequest(context: Ctx) {
   // The giveaway (public/giveaway.html) moves on when a claimed link's funds have arrived: the sweep is what notices.
   const sweepAndGiveaway = async () => {
     const out = await runSweep(env, deps());
-    if (env.RADIO_GIFT_ENABLED === '1') await advance(env, Date.now()).catch(() => undefined);
+    if (env.RADIO_GIFT_ENABLED === '1') for (const list of GIVEAWAY_LISTS) await advance(env, Date.now(), Math.random, list).catch(() => undefined);
     return out;
   };
   try {

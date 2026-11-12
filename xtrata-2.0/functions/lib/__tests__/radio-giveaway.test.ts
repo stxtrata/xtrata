@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { ensureGiftTables, type GiftEnv } from '../radio-gifts';
-import { advance, codesIn, giveawayAdmin, giveawayAuthorised, giveawayView, type GiveawayEnv } from '../radio-giveaway';
+import { advance, codesIn, giveawayAdmin, giveawayAuthorised, giveawayList, giveawayView, type GiveawayEnv } from '../radio-giveaway';
+import { PLAYERS_URL, playersPage } from '../players-page';
 import { GIFT_EXPIRY_MS, giftCodeHash, newGiftCode } from '../../../src/lib/listening-wallet/gifts';
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
 
@@ -358,5 +359,53 @@ describe('radio giveaway', () => {
     expect((await call([], { method: 'POST' })).status).toBe(405);
     expect((await call(['nothing'])).status).toBe(404);
     expect((await call([], {}, setup({ RADIO_GIFT_ENABLED: '0' }).env)).status).toBe(404);
+  });
+  it('keeps each list to itself: the album drop and the free players run side by side', async () => {
+    const s = setup();
+    const albums = await s.gifts(3, { player: 'p1' });
+    const players = await s.gifts(2);
+    await giveawayAdmin(s.env, { action: 'add', text: s.list(albums) }, T0);
+    const added = await giveawayAdmin(s.env, { action: 'add', list: 'players', text: s.list(players) }, T0);
+    expect(added).toMatchObject({ list: 'players', added: 2, total: 2 });
+    const main = await giveawayView(s.env, T0);
+    const mine = await giveawayView(s.env, T0, Math.random, 'players');
+    expect(main).toMatchObject({ state: 'live', code: albums[0], left: 3, kind: 'album' });
+    expect(mine).toMatchObject({ state: 'live', code: players[0], left: 2, kind: 'player' });
+    // Pausing, pacing and archiving one list leaves the other exactly as it was.
+    await giveawayAdmin(s.env, { action: 'pause', list: 'players' }, T0);
+    expect((await giveawayView(s.env, T0, Math.random, 'players')).state).toBe('paused');
+    expect((await giveawayView(s.env, T0)).state).toBe('live');
+    await giveawayAdmin(s.env, { action: 'resume', list: 'players' }, T0);
+    const gone = await giveawayAdmin(s.env, { action: 'archive', list: 'players' }, T0 + 1000);
+    expect(gone).toMatchObject({ list: 'players', withdrawn: 2, total: 0 });
+    expect(await giveawayView(s.env, T0 + 2000)).toMatchObject({ state: 'live', code: albums[0], left: 3 });
+    expect(await giveawayView(s.env, T0 + 2000, Math.random, 'players')).toMatchObject({ state: 'done', claimed: 0, left: 0 });
+    // A claim in one list moves only that list on.
+    s.setStatus(albums[0], 'claimed', { claimed_at: T0 + 3000, claimed_by: 'SP3JNSAAAAAAAAAAAAAAAAAAAAAAAAAAAX743X' });
+    expect((await giveawayView(s.env, T0 + 4000)).claimed).toBe(1);
+    expect((await giveawayView(s.env, T0 + 4000, Math.random, 'players')).claimed).toBe(0);
+  });
+
+  it('has only the lists it was built with', async () => {
+    const s = setup();
+    expect(giveawayList(undefined)).toBe('main');
+    expect(giveawayList('players')).toBe('players');
+    expect(giveawayList('anything-else')).toBeNull();
+    await expect(giveawayAdmin(s.env, { action: 'status', list: 'nope' }, T0)).rejects.toThrow(/Unknown list/);
+  });
+
+  it('turns the giveaway page into the players page, and says so if it no longer can', () => {
+    const html = readFileSync('public/giveaway.html', 'utf8');
+    const out = playersPage(html)!;
+    expect(out).toContain('<html lang="en" data-list="players">');
+    expect(out).toContain('<title>1,000 Free Music Players · Xtrata Music</title>');
+    expect(out).toContain(`<link rel="canonical" href="${PLAYERS_URL}" />`);
+    expect(out).toContain(`<meta property="og:url" content="${PLAYERS_URL}" />`);
+    expect(out).not.toContain('Free Album Drop · Xtrata Music</title>');
+    expect(out.length).toBeGreaterThan(html.length - 400);
+    expect(playersPage('<html><head></head></html>')).toBeNull();
+    // The page's script reads that mark to pick its list and its own address.
+    expect(html).toContain("getAttribute('data-list')==='players'");
+    expect(html).toContain("fetch('/radio/giveaway'+(LIST?'/'+LIST:'')");
   });
 });

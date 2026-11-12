@@ -108,6 +108,8 @@ panel for a gift without an album, and the wallet box's own screens (a separate 
   order shape, one-way order states, tests) but OFF. They switch on per deployment through `gate.restock`
   (`/radio/listening-wallet/config`), which nothing sets yet, and they need a restock service that takes the payment
   and sends STX from a float. That service is not built: no route, no treasury code.
+- **Two addresses**: `/giveaway` is the album drop; `/players` is the 1,000 free players, a separate list (`players`) read
+  from `GET /radio/giveaway/players` and run with `"list":"players"` on the operator route. See `docs/radio/GIVEAWAY.md`.
 - **Giveaway page** (`public/giveaway.html`): one page for both kinds of drop. `GET /radio/giveaway` now also returns
   `kind` (`album` | `player`) and `plays`; the page words itself from them and sends a starter claim to
   `radio.html?novice=1#gift=…`. Still one link on show at a time. A tap-to-hold wall is not built.

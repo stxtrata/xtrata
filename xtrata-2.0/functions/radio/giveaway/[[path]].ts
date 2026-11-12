@@ -1,11 +1,12 @@
 import { GiftError, hiroGiftChain, sweepGifts, type GiftDeps } from '../../lib/radio-gifts';
 import { checkSongsNow } from '../../lib/radio-metadata';
-import { giveawayAdmin, giveawayAuthorised, giveawayView, type GiveawayEnv } from '../../lib/radio-giveaway';
+import { giveawayAdmin, giveawayAuthorised, giveawayList, giveawayView, type GiveawayEnv } from '../../lib/radio-giveaway';
 
 /**
  * The free-album giveaway (functions/lib/radio-giveaway.ts, page: public/giveaway.html):
  *   GET  /radio/giveaway          what the public sees: the one link on show (if any) and the counts. Never the list.
- *   POST /radio/giveaway/admin    the operator: {action: status | add | pause | resume | gap | skip | now, …};
+ *   GET  /radio/giveaway/players  the same for the free-player giveaway (page: /players), a list of its own
+ *   POST /radio/giveaway/admin    the operator: {action: status | add | pause | resume | gap | skip | now | archive, list?, …};
  *                                 needs `Authorization: Bearer <RADIO_GIVEAWAY_SECRET>` (anything else: 404)
  * Reading it also nudges the gift sweep along (a claimed link only counts once its funds have arrived).
  */
@@ -28,14 +29,16 @@ export async function onRequest(context: Ctx) {
       try { body = JSON.parse(text || '{}'); } catch { return reply({ error: 'Invalid JSON' }, 400); }
       return reply(await giveawayAdmin(env, body ?? {}, Date.now()));
     }
-    if (action !== '') return reply({ error: 'Not found' }, 404);
+    // The album drop has no name in its address; any other list is named, and `main` is not an address of its own.
+    const list = action === 'main' ? null : giveawayList(action);
+    if (!list) return reply({ error: 'Not found' }, 404);
     if (request.method !== 'GET') return reply({ error: 'GET required' }, 405);
     if (env.RADIO_GIFT_ENABLED !== '1') return reply({ error: 'The giveaway is not running.' }, 404);
     const cache = (globalThis as { caches?: { default?: Cache } }).caches?.default;
-    const key = new Request(new URL('/radio/giveaway?edge=1', request.url).toString());
+    const key = new Request(new URL(`/radio/giveaway?edge=1&list=${list}`, request.url).toString());
     const hit = await cache?.match(key).catch(() => undefined);
     if (hit) return hit;
-    const out = reply(await giveawayView(env, Date.now()), 200, { 'cache-control': `public, max-age=0, s-maxage=${EDGE_TTL_S}` });
+    const out = reply(await giveawayView(env, Date.now(), Math.random, list), 200, { 'cache-control': `public, max-age=0, s-maxage=${EDGE_TTL_S}` });
     if (cache) context.waitUntil?.(cache.put(key, out.clone()).catch(() => undefined));
     const deps: GiftDeps = { chain: hiroGiftChain(env), now: Date.now(), checkSongs: (ids) => checkSongsNow(env, ids) };
     context.waitUntil?.(sweepGifts(env, deps).catch(() => undefined));
