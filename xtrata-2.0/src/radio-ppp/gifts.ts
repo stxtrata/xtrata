@@ -551,7 +551,8 @@ export function createGifts(deps: GiftDeps) {
 
   const batchPlayer = el('select') as HTMLSelectElement; batchPlayer.setAttribute('aria-label', 'Batch album');
   const batchPreset = el('select') as HTMLSelectElement; batchPreset.setAttribute('aria-label', 'Plays per copy');
-  for (const n of PLAY_PRESETS) batchPreset.append(opt(`${n.toLocaleString()} plays`, String(n)));
+  // The starter-player classes first (tiers.ts: Classic 50, Bronze 100, Silver 250, Gold 500, Diamond 1,000), then the album sizes.
+  for (const n of [...new Set([50, 100, 250, ...PLAY_PRESETS])].sort((a, b) => a - b)) batchPreset.append(opt(`${n.toLocaleString()} plays`, String(n)));
   batchPreset.append(opt('Max (1 STX)', 'max'));
   const batchCount = el('input') as HTMLInputElement; batchCount.type = 'number'; batchCount.min = '1'; batchCount.max = String(BATCH_MAX_COPIES); batchCount.value = '10'; batchCount.setAttribute('aria-label', 'Copies');
   const batchLabel = el('input') as HTMLInputElement; batchLabel.maxLength = 40; batchLabel.placeholder = 'Label, e.g. Opera launch'; batchLabel.setAttribute('aria-label', 'Batch label');
