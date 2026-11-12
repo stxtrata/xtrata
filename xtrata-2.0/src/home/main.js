@@ -2030,25 +2030,41 @@
 
     // Determine the Xtrata twin ids that are escrowed on behalf of a wallet:
     // the wallet holds the original Pepe/Leo while the twin sits in the helper.
+    const DIRECT_BINDING_READ_LIMIT = 150;
     const computeEscrowedTwinIdsForWallet = async (walletAddress, network) => {
       const seen = new Set();
       const out = [];
       const resolvers = [...PEPE_ESCROW_RESOLVERS.values()];
       for (const resolver of resolvers) {
         let sourceIds = [];
-        let forward = new Map();
         try {
-          [sourceIds, forward] = await Promise.all([
-            fetchWalletSourceTokenIds(walletAddress, resolver, network),
-            buildTwinForwardIndex(resolver)
-          ]);
+          sourceIds = await fetchWalletSourceTokenIds(walletAddress, resolver, network);
         } catch (error) {
           continue;
         }
-        // Candidate twins: source tokens the wallet holds that have a binding.
+        if (sourceIds.length === 0) {
+          continue;
+        }
+        // A wallet holding a few originals asks the helper about each one
+        // (get-binding returns the twin's Xtrata id): a handful of reads. Reading
+        // the helper's whole event history first costs one request per 50 events
+        // (about 40 for the Monkeys helper, one page at a time) and one failed page
+        // used to lose every twin of that collection. Only a big holder falls back
+        // to the event index, where one scan is cheaper than hundreds of reads.
+        let forward = null;
+        if (sourceIds.length > DIRECT_BINDING_READ_LIMIT) {
+          try {
+            forward = await buildTwinForwardIndex(resolver);
+          } catch (error) {
+            continue;
+          }
+        }
         const candidates = sourceIds
-          .map((localId) => ({ localId, xtrataId: forward.get(localId.toString()) ?? null }))
-          .filter((entry) => entry.xtrataId !== null);
+          .map((localId) => ({
+            localId,
+            xtrataId: forward ? forward.get(localId.toString()) ?? null : null
+          }))
+          .filter((entry) => !forward || entry.xtrataId !== null);
         // Confirm each twin is currently escrowed via the live binding.
         await runLimited(candidates, 4, async (entry) => {
           try {
@@ -2060,7 +2076,12 @@
             });
             const tuple = unwrapBindingTuple(json);
             const escrowed = tuple?.['xtrata-escrowed']?.value === true;
-            const xtrataId = entry.xtrataId;
+            const boundRaw = tuple?.['xtrata-id']?.value;
+            const xtrataId =
+              entry.xtrataId ??
+              (typeof boundRaw === 'string' && /^\d+$/.test(boundRaw)
+                ? BigInt(boundRaw)
+                : null);
             if (escrowed && xtrataId !== null && !seen.has(xtrataId.toString())) {
               seen.add(xtrataId.toString());
               out.push(xtrataId);
