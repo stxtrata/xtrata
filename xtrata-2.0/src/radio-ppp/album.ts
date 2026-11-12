@@ -245,7 +245,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps, opts: { lis
           art ? h('img', { src: art, alt: '', decoding: 'async' }) : albumThumb ? h('img', { src: albumThumb, alt: '', decoding: 'async' }) : null,
           art ? null : h('span', { class: 'al-n' }, String(n + 1)),
           on ? h('span', { class: 'al-eq', html: ICON.eq }) : null),
-        h('span', { class: 'al-tt' }, t.title || `#${t.id}`)));
+        h('span', { class: 'al-tt' }, t.title || `#${t.id}`, t.explicit ? h('span', { class: 'exp', title: 'Explicit lyrics: only plays when you choose it' }, 'E') : null)));
     })));
     return nodes;
   }

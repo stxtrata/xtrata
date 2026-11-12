@@ -375,6 +375,18 @@ body.is-live .chip i{background:#ff4d4d;animation:pulse 1.2s ease-in-out infinit
 .claim:hover{filter:brightness(1.08)}
 .claim:focus-visible{outline:2px solid #fff;outline-offset:3px}
 body[data-kind=player] .k-album,body[data-kind=album] .k-player{display:none!important}
+/* Player classes in a lottery drop (src/lib/listening-wallet/tiers.ts). */
+.d.t-diamond{opacity:1;border-color:#e8fbff;background:conic-gradient(#8fd8ff,#fff,#ffc9f3,#b9ffe0,#8fd8ff);box-shadow:0 0 10px rgba(143,216,255,.9)}
+.d.t-gold{opacity:1;border-color:#ffe9a3;background:conic-gradient(#c8922a,#ffe9a3,#c8922a,#ffe9a3,#c8922a);box-shadow:0 0 8px rgba(255,214,102,.7)}
+.d.t-silver{opacity:1;border-color:#f4f6fa;background:conic-gradient(#9aa5b5,#f4f6fa,#9aa5b5,#f4f6fa,#9aa5b5)}
+.d.t-bronze{opacity:1;border-color:#f0b98a;background:conic-gradient(#a05f2c,#f0b98a,#a05f2c,#f0b98a,#a05f2c)}
+.d.t-neon{opacity:1;border-color:#ff5fd2;background:conic-gradient(#ff5fd2,#ffe45c,#38f0c8,#6aa8ff,#ff5fd2)}
+.d.t-classic{opacity:1;border-color:var(--muted);background:radial-gradient(circle,var(--hm-teal) 0 2.2px,#11151b 3.2px)}
+.prizes{margin:16px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.prizes li{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);font-size:13px}
+.prizes .d{width:22px;height:22px}
+.prizes b{display:block;font-size:14px}.prizes span{color:var(--muted)}
+.prizes li.gone{opacity:.45}
 .friend-msg{margin-top:22px;padding:18px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);max-width:640px}
 .friend-msg .lbl{margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .friend-msg blockquote{margin:0 0 14px;font-size:16px;line-height:1.5}
@@ -504,7 +516,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
         <div class="k-player">
         <p class="kicker">Free for new listeners</p>
         <h1>Your first plays are <em>on us.</em></h1>
-        <p class="lead">Grab a free music player. No app, no account, no password: just your face or fingerprint. <strong><span class="plays-txt">Your first plays</span> are already paid for</strong>, it plays any song on Xtrata, and every play pays the artist. There are <span class="total-inline">100</span> to give away.</p>
+        <p class="lead">Grab a free music player. No app, no account, no password: just your face or fingerprint. <strong><span class="plays-txt">Your first plays</span>, already paid for</strong>. It plays any song on Xtrata, and every play pays the artist. There are <span class="total-inline">100</span> to give away.</p>
         <ol class="pills" aria-label="How it works">
           <li><b>1</b>Tap the live player</li>
           <li><b>2</b>Face or fingerprint</li>
@@ -564,6 +576,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
     <div class="run" id="run" hidden>
       <div class="run-head"><h3>The run</h3><p id="run-text"></p></div>
       <div class="discs" id="discs" role="img" aria-label="Every one in this drop"></div>
+      <ul class="prizes" id="prizes" hidden aria-label="What is still to be won"></ul>
       <div class="legend"><span id="legend-held" hidden><i class="d held"></i>Set aside</span><span><i class="d done"></i>Claimed</span><span><i class="d now"></i>Live now</span><span><i class="d"></i>Still to come</span></div>
     </div>
 
@@ -579,7 +592,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
       <ol class="cards k-player">
         <li class="card"><b class="n">1</b><strong>Tap the live player</strong><span>When one is live, the button above opens it. One person gets each one.</span></li>
         <li class="card"><b class="n">2</b><strong>Use your face or fingerprint</strong><span>That&rsquo;s the whole sign-up. Your phone makes your own private player in a few seconds. No password, nothing to download.</span></li>
-        <li class="card"><b class="n">3</b><strong>Press play</strong><span>Hear anything on Xtrata. <span class="plays-txt">Your first plays</span> are already covered, and each one pays the artist.</span></li>
+        <li class="card"><b class="n">3</b><strong>Press play</strong><span>Hear anything on Xtrata. Your first plays are already covered, and each one pays the artist.</span></li>
       </ol>
     </section>
 
@@ -589,7 +602,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
       <ul class="cards k-player">
         <li class="card"><strong>It pays the artist.</strong><span>Every song you hear for 30 seconds sends a small payment straight to whoever owns it. Nobody in the middle, and anyone can check it.</span></li>
         <li class="card"><strong>It&rsquo;s yours.</strong><span>Your player lives on your device, opened by your face or fingerprint. No account to lose, no password to forget, nothing to install.</span></li>
-        <li class="card"><strong>It keeps your taste.</strong><span>Like a song and it joins your own station. Your likes sit on a public record that no company can switch off or sell back to the artist.</span></li>
+        <li class="card"><strong>Likes build your playlist.</strong><span>Tap ♥ on a song and it joins your own station, in your order. Your likes sit on a public record that no company can switch off or sell back to the artist.</span></li>
       </ul>
       <p class="note k-player" style="margin-top:16px">When your free plays run out your player stays yours. Adding more takes a minute, from inside the player.</p>
       <p class="sec-kicker k-album">Why be quick</p>
@@ -679,13 +692,36 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
   // answered, the last answer seen on this device stands.
   var kind=(function(){try{return localStorage.getItem('xtrata.giveaway.kind')==='album'?'album':'player';}catch(e){return 'player';}})();
   var plays=0;
+  // A lottery drop: players hold different numbers of plays, and which one is live is a surprise until it is claimed.
+  var lottery=null;
+  var TIER_NAME={diamond:'Diamond',gold:'Gold',silver:'Silver',bronze:'Bronze',neon:'Neon',classic:'Classic'};
   document.body.dataset.kind=kind;
   function noun(){return kind==='player'?'player':'copy';}
-  function playsText(cap){return plays>0?plays.toLocaleString()+' plays':(cap?'Your first plays':'your first plays');}
-  function friendText(){return 'I found a free music player. You tap it, use Face ID or your fingerprint, and '+(plays>0?plays.toLocaleString()+' plays':'the first plays')+' are on the house. Every play pays the artist. Takes a minute:';}
-  function setKind(k,p){
+  function range(){return lottery.min.toLocaleString()+' to '+lottery.max.toLocaleString()+' plays';}
+  function playsText(cap){return lottery?(cap?'Between ':'between ')+lottery.min.toLocaleString()+' and '+lottery.max.toLocaleString()+' plays':plays>0?plays.toLocaleString()+' plays':(cap?'Your first plays':'your first plays');}
+  function friendText(){return 'I found a free music player. You tap it, use Face ID or your fingerprint, and '+(lottery?'you get '+range()+' (it’s a lucky dip, a few are Diamond)':plays>0?plays.toLocaleString()+' plays are on the house':'the first plays are on the house')+'. Every play pays the artist. Takes a minute:';}
+  function okLottery(l){
+    if(!l||typeof l.min!=='number'||typeof l.max!=='number'||!(l.max>l.min)||!Array.isArray(l.tiers)||!Array.isArray(l.won))return null;
+    var tiers=l.tiers.filter(function(t){return t&&TIER_NAME[t.id]&&t.plays>0&&t.total>0&&t.left>=0;});
+    return tiers.length>1?{min:Math.floor(l.min),max:Math.floor(l.max),tiers:tiers,won:l.won.filter(function(w){return !!TIER_NAME[w];})}:null;
+  }
+  function prizes(){
+    var box=$('prizes');
+    if(!lottery||kind!=='player'){box.hidden=true;box.textContent='';return;}
+    box.hidden=false;box.textContent='';
+    lottery.tiers.forEach(function(t){
+      var li=document.createElement('li');if(t.left<1)li.className='gone';
+      var d=document.createElement('i');d.className='d t-'+t.id;
+      var w=document.createElement('div');var b=document.createElement('b');b.textContent=TIER_NAME[t.id]+' · '+t.plays.toLocaleString()+' plays';
+      var sp=document.createElement('span');sp.textContent=t.left>0?t.left.toLocaleString()+' of '+t.total.toLocaleString()+' still out there':'All '+t.total.toLocaleString()+' found';
+      w.appendChild(b);w.appendChild(sp);li.appendChild(d);li.appendChild(w);box.appendChild(li);
+    });
+  }
+  function setKind(k,p,l){
     if(k==='album'||k==='player'){kind=k;try{localStorage.setItem('xtrata.giveaway.kind',k);}catch(e){}}
     plays=typeof p==='number'&&p>0&&isFinite(p)?Math.floor(p):0;
+    lottery=kind==='player'?okLottery(l):null;
+    prizes();
     document.body.dataset.kind=kind;
     document.querySelectorAll('.plays-txt').forEach(function(e,i){e.textContent=playsText(true);});
     $('friend-text').textContent=friendText()+' xtrata.xyz/giveaway';
@@ -741,7 +777,9 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
     }
     var nodes=box.children;
     for(var j=0;j<nodes.length;j++){
-      nodes[j].className='d'+(j<held?' held':(j<held+claimed?' done':(state==='live'&&j===held+claimed?' now':'')));
+      // In a lottery each claimed disc takes the colours of the class it turned out to be.
+      var won=lottery&&j>=held&&j<held+claimed?lottery.won[j-held]:'';
+      nodes[j].className='d'+(j<held?' held':(j<held+claimed?(won?' t-'+won:' done'):(state==='live'&&j===held+claimed?' now':'')));
     }
     $('run-text').textContent=(held+claimed)+' of '+total+' gone'+(left>0&&state!=='done'?', '+left+' still to come':'');
     $('legend-held').hidden=!(held>0);
@@ -754,16 +792,16 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
     var state=v.state;
     var code=typeof v.code==='string'&&/^[A-Za-z0-9_-]{22}$/.test(v.code)?v.code:'';
     if(state==='live'&&!code)state='waiting';
-    setKind(v.kind,v.plays);
+    setKind(v.kind,v.plays,v.lottery);
     show(state);
     liveCode='';
     if(state==='live'){
       var a=v.album||{};
       $('title').textContent=a.title||(kind==='player'?'A free Xtrata Music player':'A free album');
-      $('subtitle').textContent=a.subtitle||(kind==='player'?playsText(true)+' included · plays any song':'');
+      $('subtitle').textContent=a.subtitle||(kind==='player'?(lottery?'A mystery player: '+range()+'. Claim it to see which.':playsText(true)+' included · plays any song'):'');
       var ul=$('songs');ul.textContent='';
       (a.songs||[]).slice(0,10).forEach(function(s){var li=document.createElement('li');var b=document.createElement('b');b.textContent=s.title;li.appendChild(b);if(s.artist)li.appendChild(document.createTextNode(' · '+s.artist));ul.appendChild(li);});
-      var to=(kind==='player'?RADIO_PLAYER:RADIO_ALBUM)+code;
+      var to=(kind==='player'?(lottery?RADIO_PLAYER.replace('?novice=1','?novice=1&mystery=1'):RADIO_PLAYER):RADIO_ALBUM)+code;
       $('claim').href=to;
       $('follow-a').href=to;
       liveCode=code;

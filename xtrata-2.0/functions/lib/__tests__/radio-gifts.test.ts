@@ -10,7 +10,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
   BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
-  adminAddresses, giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv,
+  adminAddresses, explicitSongs, featuredPlayers, giftStatus, playerView, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv,
   batchesFor, batchStatus, confirmBatch, createBatch, MAX_PENDING_BATCHES, REFUND_GROUP_MAX, runSweep, sweepAuthorised, SCAN_EVERY_MS, SCAN_WHILE_EXPECTING_MS
 } from '../radio-gifts';
 import { batchDeposit, batchRequestHash, type BatchRequest } from '../../../src/lib/listening-wallet/batches';
@@ -461,7 +461,39 @@ describe('radio gift players', () => {
     const signature = signMessageHashRsv({ messageHash: bytesToHex(sha256(encodeStructuredData(playerData(request)))), privateKey: createStacksPrivateKey(k) }).data;
     return { definition: def, request, signature };
   };
+  const giftPlayerTitle = async (s: ReturnType<typeof setup>, id: string) => ((await (s.env as any).DB.prepare('SELECT title FROM radio_gift_players WHERE id=?').bind(id).first()) as { title: string }).title;
   const make = (s: ReturnType<typeof setup>, def = definition(), k = s.adminKey) => createPlayer(s.env, signed(s, def, k), s.deps(), s.request);
+  it('featured albums: the players named by the deployment, public, in order, without a hidden track', async () => {
+    const s = setup(); catalogue(s);
+    expect(await featuredPlayers(s.env)).toEqual({ players: [] }); // nothing set: nothing featured
+    const out = await make(s);
+    (s.env as GiftEnv).RADIO_FEATURED_PLAYERS = `${out.id}, not-an-id, ${'0'.repeat(16)}, ${out.id}`;
+    const { players } = await featuredPlayers(s.env);
+    expect(players).toHaveLength(1); // unknown ids and repeats are left out
+    expect(players[0]).toMatchObject({ id: out.id, title: 'Proof of Sound' });
+    expect(players[0].tracks.length).toBeGreaterThan(0);
+    expect(players[0].tracks.some((t) => t.hidden)).toBe(false);
+    // A name to show in this list only: the album's own stored title is untouched.
+    (s.env as GiftEnv).RADIO_FEATURED_PLAYERS = `${out.id}: Proof of Sound - The Opera `;
+    expect((await featuredPlayers(s.env)).players[0]).toMatchObject({ id: out.id, title: 'Proof of Sound - The Opera' });
+    expect(await giftPlayerTitle(s, out.id)).toBe('Proof of Sound');
+  });
+
+  it('explicit songs: the creator’s marks are stored, shown on the album and served with Xtrata’s own list', async () => {
+    const s = setup(); catalogue(s);
+    expect((await explicitSongs(s.env)).ids).toEqual([3590]); // Xtrata's list alone, even before any album exists
+    const marked = SONGS[1];
+    const out = await make(s, definition({ explicit: [marked] }));
+    const view = await playerView(s.env, out.id);
+    expect(view!.tracks.filter((t) => t.explicit).map((t) => t.id)).toEqual([marked]);
+    expect((await explicitSongs(s.env)).ids).toEqual([marked, 3590].sort((x, y) => x - y));
+    // An album without marks is a different album (the marks are signed), and has none.
+    const plain = await make(s);
+    expect(plain.id).not.toBe(out.id);
+    expect((await playerView(s.env, plain.id))!.tracks.some((t) => t.explicit)).toBe(false);
+    await expect(make(s, definition({ explicit: [424242] }))).rejects.toMatchObject({ status: 400 });
+  });
+
   it('the admin signs a definition once; only its hash is signed and the catalogue supplies every title and artist', async () => {
     const s = setup(); catalogue(s);
     const out = await make(s);

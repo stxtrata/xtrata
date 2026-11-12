@@ -40,7 +40,7 @@ import { queryAll, run } from './db';
 import { applyHiroApiKey, getHiroApiKeys, isTransientHiroStatus, shouldRetryWithNextHiroKey } from './hiro-keys';
 import { checkSlotBinding, ensureSlotTable, gate, type PppEnv, type SlotSubmission } from './radio-listening-wallet';
 import { isMainnetStandardAddress } from '../../src/lib/listening-wallet/link';
-import { radioArtist, radioTitle } from '../../src/lib/radio/artist-credits.mjs';
+import { EXPLICIT_SONGS, isExplicitSong, radioArtist, radioTitle } from '../../src/lib/radio/artist-credits.mjs';
 import {
   isPlayerId, playerData, playerHash, validatePlayer, validatePlayerRequest, verifyPlayerSignature, type PlayerDefinition, type PlayerRequest, type PlayerView
 } from '../../src/lib/listening-wallet/gift-players';
@@ -57,6 +57,11 @@ export type GiftEnv = PppEnv & {
   RADIO_GIFT_TREASURY_KEY?: string;
   RADIO_GIFT_ADMIN?: string;
   RADIO_GIFT_ESCROW_CAP?: string;
+  /**
+   * Albums every player can load: gift player ids separated by commas, each optionally `id:Name to show`
+   * (the name is only for this list; the album's own stored title is untouched). Unset: none.
+   */
+  RADIO_FEATURED_PLAYERS?: string;
   /** Shared secret for the scheduled sweep (workers/radio-gift-sweep). Unset: the sweep endpoint does not exist. */
   RADIO_GIFT_SWEEP_SECRET?: string;
   RADIO_GIFT_TURNSTILE_SITE_KEY?: string;
@@ -292,6 +297,8 @@ export async function ensureGiftTables(env: GiftEnv) {
   await run(env, `CREATE TABLE IF NOT EXISTS radio_gift_players(
     id TEXT PRIMARY KEY, hash TEXT NOT NULL UNIQUE, owner TEXT NOT NULL, title TEXT NOT NULL, subtitle TEXT NOT NULL DEFAULT '',
     tracks TEXT NOT NULL, cover INTEGER, status TEXT NOT NULL DEFAULT 'active', created_at INTEGER NOT NULL)`);
+  // Added with explicit marks: the songs the album's creator marked as explicit (a JSON list; null for every earlier album).
+  await run(env, 'ALTER TABLE radio_gift_players ADD COLUMN explicit TEXT').catch(() => undefined);
   // Added with gift players: the player a link opens (null for every earlier gift).
   await run(env, 'ALTER TABLE radio_gifts ADD COLUMN player_id TEXT').catch(() => undefined);
   // Added with derived wallets: a gift claimed into one of a passkey's numbered wallets records which passkey (its first
@@ -601,15 +608,56 @@ async function catalogueSongs(env: GiftEnv, ids: number[]) {
 
 /** A player as a recipient sees it. Titles and artists come from the catalogue, never from whoever made the player. */
 export async function playerView(env: GiftEnv, id: string): Promise<PlayerView | null> {
-  const p = await one<{ id: string; title: string; subtitle: string; tracks: string; cover: number | null; status: string }>(env, 'SELECT * FROM radio_gift_players WHERE id=?', [id]);
+  const p = await one<{ id: string; title: string; subtitle: string; tracks: string; cover: number | null; status: string; explicit?: string | null }>(env, 'SELECT * FROM radio_gift_players WHERE id=?', [id]);
   if (!p || p.status !== 'active') return null;
   const ids = JSON.parse(p.tracks) as number[];
   const songs = await catalogueSongs(env, ids);
+  // Explicit: marked by Xtrata (artist-credits) or by the album's creator when it was made.
+  const marked = new Set<number>(parseMarks(p.explicit));
   return {
     id: p.id, title: p.title, subtitle: p.subtitle,
-    tracks: ids.filter((n) => songs.has(n)).map((n) => ({ id: n, ...songs.get(n)! })),
+    tracks: ids.filter((n) => songs.has(n)).map((n) => ({ id: n, ...songs.get(n)!, ...(marked.has(n) || isExplicitSong(n) ? { explicit: true as const } : {}) })),
     cover: p.cover ?? null, paidOnly: true
   };
+}
+
+const parseMarks = (text: string | null | undefined): number[] => {
+  try { const v = JSON.parse(text || '[]'); return Array.isArray(v) ? v.filter((n) => Number.isSafeInteger(n) && n > 0) : []; } catch { return []; }
+};
+/**
+ * Every song marked explicit (GET /radio/gift/explicit): Xtrata's own list plus the songs album creators marked.
+ * The radio fetches this once and never plays one of these by itself. If the albums cannot be read, Xtrata's list
+ * alone is still served: a missing table must never unmark a song.
+ */
+export async function explicitSongs(env: GiftEnv): Promise<{ ids: number[] }> {
+  const ids = new Set<number>(EXPLICIT_SONGS as readonly number[]);
+  try {
+    const rows = await all<{ explicit: string | null }>(env, "SELECT explicit FROM radio_gift_players WHERE status='active' AND explicit IS NOT NULL");
+    for (const r of rows) for (const n of parseMarks(r.explicit)) ids.add(n);
+  } catch { /* Xtrata's list only */ }
+  return { ids: [...ids].sort((a, b) => a - b) };
+}
+
+/** How many albums a deployment may feature. */
+export const FEATURED_MAX = 6;
+/**
+ * The albums every player comes loaded with (GET /radio/gift/featured): the gift players named in
+ * RADIO_FEATURED_PLAYERS, in that order (`id` or `id:Name to show`). Public: title, artist line, cover and listed songs only (a hidden track stays
+ * hidden). They are playlists, not wallets: a listener plays them from their own player's plays, and each play pays the
+ * song's holder as any play does. An id that is unknown or retired is left out.
+ */
+export async function featuredPlayers(env: GiftEnv): Promise<{ players: PlayerView[] }> {
+  const wanted = new Map<string, string>(); // id -> the name to show ('' = the album's own title)
+  for (const entry of String(env.RADIO_FEATURED_PLAYERS ?? '').split(/[,\n]+/)) {
+    const m = /^\s*([0-9a-f]{16})\s*(?::\s*(.*?))?\s*$/.exec(entry);
+    if (m && !wanted.has(m[1]) && wanted.size < FEATURED_MAX) wanted.set(m[1], (m[2] ?? '').slice(0, 60));
+  }
+  const players: PlayerView[] = [];
+  for (const [id, name] of wanted) {
+    const p = await playerView(env, id).catch(() => null);
+    if (p) players.push({ ...p, title: name || p.title, tracks: p.tracks.filter((t) => !t.hidden) });
+  }
+  return { players };
 }
 
 /** Every song must be held by this wallet right now. A song held by a contract (for example listed for sale) does not count. */
@@ -654,8 +702,8 @@ export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefin
   catch (e) { if (isConstraint(e)) throw new GiftError('That request was already used. Sign a new one.', 409); throw e; }
   const id = randomId().slice(0, 16);
   if (!isPlayerId(id)) throw new GiftError('Could not make a player id. Try again.', 500);
-  await run(env, `INSERT INTO radio_gift_players(id, hash, owner, title, subtitle, tracks, cover, status, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
-    [id, hash, admin, def.title, def.subtitle, JSON.stringify(def.tracks), def.cover, deps.now]);
+  await run(env, `INSERT INTO radio_gift_players(id, hash, owner, title, subtitle, tracks, cover, status, created_at, explicit) VALUES(?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+    [id, hash, admin, def.title, def.subtitle, JSON.stringify(def.tracks), def.cover, deps.now, def.explicit?.length ? JSON.stringify(def.explicit) : null]);
   return { id, title: def.title, tracks: def.tracks.length, existing: false };
 }
 

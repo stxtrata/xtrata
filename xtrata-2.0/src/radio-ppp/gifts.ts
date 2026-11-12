@@ -416,12 +416,13 @@ export function createGifts(deps: GiftDeps) {
   const playersKey = (main: string) => 'xtrata.radio.gift.players.v1:' + main;
   const loadPlayers = (main: string): MadePlayer[] => { try { const v = JSON.parse(deps.store.get(playersKey(main)) || '[]'); return Array.isArray(v) ? v.filter((x) => x && /^[0-9a-f]{16}$/.test(x.id)) : []; } catch { return []; } };
 
-  async function makePlayer(main: string, def: { title: string; subtitle: string; tracks: string; cover?: string }) {
+  async function makePlayer(main: string, def: { title: string; subtitle: string; tracks: string; cover?: string; explicit?: string }) {
     if (working) return;
     working = 'Checking the player…'; note = ''; deps.changed();
     try {
       const tracks = def.tracks.split(/[\s,]+/).filter(Boolean).map((t) => Number(t.replace(/^#/, '')));
-      const definition = validatePlayer({ title: def.title.trim(), subtitle: def.subtitle.trim(), tracks, cover: def.cover?.trim() ? Number(def.cover.trim().replace(/^#/, '')) : null });
+      const explicit = (def.explicit ?? '').split(/[\s,]+/).map((x) => x.replace(/^#/, '')).filter(Boolean).map(Number);
+      const definition = validatePlayer({ title: def.title.trim(), subtitle: def.subtitle.trim(), tracks, cover: def.cover?.trim() ? Number(def.cover.trim().replace(/^#/, '')) : null, ...(explicit.length ? { explicit } : {}) });
       working = 'Sign in your wallet…'; deps.changed();
       const request = { admin: main, hash: playerHash(definition), issued: deps.now() };
       const signature = await deps.sign(main, playerData(request));
@@ -545,6 +546,7 @@ export function createGifts(deps: GiftDeps) {
   const playerTitle = el('input') as HTMLInputElement; playerTitle.maxLength = 60; playerTitle.placeholder = 'Title, e.g. Proof of Sound'; playerTitle.setAttribute('aria-label', 'Player title');
   const playerSubtitle = el('input') as HTMLInputElement; playerSubtitle.maxLength = 80; playerSubtitle.placeholder = 'Artist (optional)'; playerSubtitle.setAttribute('aria-label', 'Player subtitle');
   const playerTracks = el('textarea') as HTMLTextAreaElement; playerTracks.rows = 3; playerTracks.placeholder = 'Radio song numbers in play order, e.g. 1021, 1022, 1023'; playerTracks.setAttribute('aria-label', 'Songs');
+  const playerExplicit = el('input') as HTMLInputElement; playerExplicit.placeholder = 'Explicit songs (optional): their numbers, e.g. 1022. Never played unless asked for, with a warning'; playerExplicit.setAttribute('aria-label', 'Explicit songs');
   const playerCover = el('input') as HTMLInputElement; playerCover.inputMode = 'numeric'; playerCover.placeholder = 'Cover inscription number (optional), shown when the album loads'; playerCover.setAttribute('aria-label', 'Cover inscription');
 
   const batchPlayer = el('select') as HTMLSelectElement; batchPlayer.setAttribute('aria-label', 'Batch album');
@@ -575,8 +577,8 @@ export function createGifts(deps: GiftDeps) {
         const made = loadPlayers(main);
         box.append(
           el('p', 'Gift players (admin) · an album that comes with the gift', 'ppp-cyan'),
-          playerTitle, playerSubtitle, playerTracks, playerCover,
-          button('Sign and make player', () => void makePlayer(main, { title: playerTitle.value, subtitle: playerSubtitle.value, tracks: playerTracks.value, cover: playerCover.value }))
+          playerTitle, playerSubtitle, playerTracks, playerCover, playerExplicit,
+          button('Sign and make player', () => void makePlayer(main, { title: playerTitle.value, subtitle: playerSubtitle.value, tracks: playerTracks.value, cover: playerCover.value, explicit: playerExplicit.value }))
         );
         // Prefunded batches: the creator pays for every copy up front.
         const gobtn = button('Sign, pay and make links', () => { void makeBatch(main, batchPlan(), batchLabel.value.trim(), batchPlayer.value || undefined); });

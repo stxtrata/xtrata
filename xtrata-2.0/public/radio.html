@@ -520,6 +520,55 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .al-welcome .al-welcome-note{font-size:13px;color:#8f97a3}
   .al-welcome .al-welcome-wait{font-size:14px;color:#8f97a3}
   .al-welcome .al-primary{margin-top:28px}
+  .find-artists{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
+  .find-chip{font:inherit;font-size:12px;color:var(--ink);background:none;border:1px solid var(--line);border-radius:999px;padding:5px 10px;cursor:pointer;min-height:30px}
+  .find-chip.is-on{border-color:var(--cyan);color:var(--cyan);background:rgba(var(--glow),.1)}
+  .find-chip:hover,.find-chip:focus-visible{border-color:var(--cyan);outline:none}
+  .find-by{flex:none;font-size:11.5px;color:var(--mut);max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .find-list{max-height:340px}
+  #findBox .hint button{font:inherit;font-size:12px;color:var(--cyan);background:none;border:1px solid var(--line);border-radius:8px;padding:3px 8px;cursor:pointer}
+  html[data-view=album] #findBox{display:none!important}
+  @media (max-width:900px){#findBox{order:3}}
+  html[data-dock] #findBox{order:2}
+  .ppp-featured{margin:10px 0 0;display:grid;gap:8px}
+  .ppp-featured__h{margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+  .ppp-featured__a{font:inherit;color:inherit;text-align:left;background:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-height:48px}
+  .ppp-featured__a b{font-size:14px}.ppp-featured__a span{font-size:12px;color:var(--mut)}
+  .ppp-featured__a.is-on{border-color:var(--cyan);background:rgba(var(--glow),.1)}
+  .ppp-featured__a:hover:not(:disabled),.ppp-featured__a:focus-visible{border-color:var(--cyan);outline:none}
+  .al-album{width:100%;margin-top:8px;min-height:52px;border:1px solid #2a313b!important;border-radius:12px;padding:10px 14px!important;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;color:#f2f0ea!important}
+  .al-album b{font-size:15px}.al-album span{font-size:12.5px;color:#a3aab5}
+  .ppp-yours-item{border-top:1px solid var(--line);padding:2px 0}
+  .ppp-yours-item summary{cursor:pointer;padding:9px 0;font-size:13.5px;font-weight:700}
+  .ppp-yours-item p{margin:0 0 9px;font-size:13px;line-height:1.5}
+  /* Player classes from the giveaway (src/lib/listening-wallet/tiers.ts). Looks only. */
+  :root{--tier-a:#7fe3f5;--tier-b:#0b0d10;--tier-ink:#0b0d10}
+  [data-tier=diamond]{--tier-a:#e8fbff;--tier-b:#8fd8ff;--tier-ink:#06202e}
+  [data-tier=gold]{--tier-a:#ffe9a3;--tier-b:#c8922a;--tier-ink:#2e1f02}
+  [data-tier=silver]{--tier-a:#f4f6fa;--tier-b:#9aa5b5;--tier-ink:#1b222c}
+  [data-tier=bronze]{--tier-a:#f0b98a;--tier-b:#a05f2c;--tier-ink:#2a1405}
+  [data-tier=neon]{--tier-a:#ff5fd2;--tier-b:#38f0c8;--tier-ink:#12021a}
+  [data-tier=classic]{--tier-a:#3a424e;--tier-b:#11151b;--tier-ink:#e6edf6}
+  .ppp-tier{display:inline-block;white-space:nowrap;font-size:10px;font-weight:800;letter-spacing:.7px;border-radius:999px;padding:3px 9px;margin-left:6px;vertical-align:middle;
+    color:var(--tier-ink);background:linear-gradient(110deg,var(--tier-b) 0%,var(--tier-a) 38%,#fff 50%,var(--tier-a) 62%,var(--tier-b) 100%);background-size:220% 100%;animation:tier-sheen 5s linear infinite}
+  .ppp-tier[data-tier=diamond]{background-image:linear-gradient(110deg,#8fd8ff,#e8fbff 30%,#ffd6f7 45%,#fff 50%,#c9ffe9 55%,#e8fbff 70%,#8fd8ff)}
+  .ppp-tier[data-tier=neon]{background-image:linear-gradient(110deg,#ff5fd2,#ffe45c 35%,#38f0c8 65%,#6aa8ff)}
+  .ppp-tier[data-tier=classic]{background-image:linear-gradient(110deg,#11151b,#3a424e 50%,#11151b);border:1px solid #4a5462}
+  @keyframes tier-sheen{from{background-position:220% 0}to{background-position:0 0}}
+  html[data-tier]:not([data-tier=classic]) .ppp{border-color:var(--tier-b);box-shadow:0 0 34px -14px var(--tier-a)}
+  .tier-disc{position:relative;width:64px;aspect-ratio:1;border-radius:50%;margin:0 auto;display:grid;place-items:center;
+    background:radial-gradient(circle,var(--tier-ink) 0 7%,var(--tier-a) 8% 26%,transparent 27%),repeating-radial-gradient(circle,rgba(0,0,0,.22) 0 1px,transparent 1px 4px),conic-gradient(from 20deg,var(--tier-b),var(--tier-a),var(--tier-b),var(--tier-a),var(--tier-b));
+    box-shadow:0 0 0 2px rgba(255,255,255,.08),0 14px 40px -6px var(--tier-a)}
+  .tier-disc--big{width:min(210px,56vw);margin-bottom:22px;animation:tier-spin 14s linear infinite}
+  .tier-disc[data-tier=diamond]{background:radial-gradient(circle,#06202e 0 7%,#fff 8% 26%,transparent 27%),repeating-radial-gradient(circle,rgba(0,40,70,.18) 0 1px,transparent 1px 4px),conic-gradient(from 0deg,#8fd8ff,#fff,#ffc9f3,#e8fbff,#b9ffe0,#fff,#b7c8ff,#8fd8ff);box-shadow:0 0 0 2px rgba(255,255,255,.5),0 0 60px 4px rgba(143,216,255,.75)}
+  .tier-disc[data-tier=neon]{background:radial-gradient(circle,#12021a 0 7%,#ffe45c 8% 26%,transparent 27%),repeating-radial-gradient(circle,rgba(0,0,0,.25) 0 1px,transparent 1px 4px),conic-gradient(from 0deg,#ff5fd2,#ffe45c,#38f0c8,#6aa8ff,#ff5fd2);box-shadow:0 0 50px 0 rgba(255,95,210,.55)}
+  .tier-disc[data-tier=classic]{background:radial-gradient(circle,#0b0d10 0 7%,#7fe3f5 8% 26%,transparent 27%),repeating-radial-gradient(circle,rgba(255,255,255,.07) 0 1px,transparent 1px 4px),#11151b;box-shadow:0 0 0 2px #2a313b,0 14px 34px -10px #000}
+  .tier-disc__mark{font-size:0}
+  .tier-disc--big .tier-disc__mark{font-size:0}
+  @keyframes tier-spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.ppp-tier,.tier-disc--big{animation:none}}
+  .al-tt .exp{margin-left:6px}
+  .exp{display:inline-block;font-size:9.5px;font-weight:800;line-height:1;padding:2px 4px;border-radius:3px;background:var(--mut);color:var(--bg);vertical-align:middle;letter-spacing:0}
   .howto{margin:12px 0 0;border:1px solid var(--line);border-radius:12px;padding:0 14px}
   .howto summary{cursor:pointer;padding:11px 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
   .howto dl{margin:0 0 12px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;line-height:1.45}
@@ -705,7 +754,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <button class="cbtn" id="prev" title="Previous song" aria-label="Previous song">⏮</button>
       <button class="cbtn big" id="pp" title="Play or pause" aria-label="Play or pause">▶</button>
       <button class="cbtn" id="next" title="Next song. Skipping is free: a song only counts once you have heard 30 seconds of it." aria-label="Next song">⏭</button>
-      <button class="cbtn heart" id="heart" title="Like this song: it joins your station and is saved on the public record">♥</button>
+      <button class="cbtn heart" id="heart" title="Like this song: it joins your playlist (the LIKED station) and is saved on the public record">♥</button>
       <span class="grow"></span>
       <button class="chip" id="presetBtn" type="button" title="What FM plays. ALL: hand-picked songs plus everything new. CURATED: hand-picked songs only. Tap to switch.">FM: ALL</button>
     </div>
@@ -723,11 +772,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <summary>What do these do?</summary>
       <dl>
         <dt>FM</dt><dd>Xtrata’s own mix: hand-picked songs and new arrivals. Start here to discover music. The <b>FM: ALL / CURATED</b> button chooses between everything and hand-picked only.</dd>
-        <dt>LIKED</dt><dd>Your own station. Tap ♥ on any song and it joins this list, in your order.</dd>
+        <dt>LIKED</dt><dd>Your own playlist. Tap ♥ on any song and it joins this list; drag them into your order.</dd>
         <dt>CHAIN</dt><dd>The whole catalogue, every song in the order it was added. Good for digging.</dd>
         <dt>The strip of lines</dt><dd>Every song side by side. Tap or drag to jump straight to one.</dd>
         <dt>⏭ Next</dt><dd>Skip whenever you like. A song only counts as a play once you have heard 30 seconds of it.</dd>
-        <dt>♥ Like</dt><dd>Saves the song to your station and to the public record, where the artist can see it too.</dd>
+        <dt>♥ Like</dt><dd>Adds the song to your playlist (LIKED) and saves it on the public record, where the artist can see it too. Tap again to take it off.</dd>
+        <dt>🔎 Find music</dt><dd>Search every song by title, artist or number, or pick an artist to see all their songs.</dd>
       </dl>
     </details>
     <div class="relwrap" id="relWrap" style="display:none">
@@ -748,6 +798,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <!-- My albums, right under the switcher: opened by the "View all albums" button (its own summary is hidden). -->
       <details class="ppp-fold ppp-shelf" hidden><summary>♪ My albums</summary><div class="ppp-shelf-body"></div></details>
       <div class="ppp-key"></div>
+      <div class="ppp-featured" hidden></div>
       <p class="ppp-frame-label" hidden><span>Listening wallet · approvals happen in this box</span></p>
       <div class="ppp-frame" hidden></div>
       <div class="ppp-actions"></div>
@@ -758,13 +809,18 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
         <details class="ppp-fold ppp-recent" hidden><summary>♪ Recently played</summary><ol class="ppp-recent-list"></ol><details class="ppp-history" hidden></details></details>
         <details class="ppp-fold ppp-wallets" hidden><summary>◎ This device</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
         <details class="ppp-fold ppp-more" hidden><summary>? How plays work</summary><div class="ppp-body"></div></details>
+        <details class="ppp-fold ppp-yours" hidden><summary>✦ Make it yours</summary><div class="ppp-yours-body"></div></details>
         <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Albums (admin)</summary><div class="ppp-gift-body"></div></details>
       </div>
     </section>
     <!-- An open album's songs, with their artwork and plays left (src/radio-ppp/album.ts, list mode). Stands in for Your Station. -->
     <section class="albumlist" id="albumList" hidden aria-label="Album songs"></section>
+    <details class="likes" id="findBox">
+      <summary title="Search every song on Xtrata by title, artist or number, or browse by artist"><span>🔎 FIND MUSIC</span></summary>
+      <div id="findBody"></div>
+    </details>
     <details class="likes" id="likesBox" open>
-      <summary><span>♥ YOUR STATION</span><span class="count" id="likesCount"></span></summary>
+      <summary title="Your own playlist: every song you ♥ joins it, in your order, saved on the public record"><span>♥ YOUR STATION</span><span class="count" id="likesCount"></span></summary>
       <div class="likesTools">
         <input type="search" id="likesFilter" placeholder="Filter by title, artist or #" aria-label="Filter your likes" />
         <button type="button" id="likesPlay" title="Play the LIKED station in your order">Play</button>
@@ -913,7 +969,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       var i=ids.indexOf(l.tokenId);
       var row=document.createElement('li');row.className='lrow'+(l.tokenId===np?' now':'');row.draggable=!q;
       var grip=document.createElement('span');grip.className='grip';grip.textContent='⋮⋮';grip.title='Drag to reorder';
-      var t=document.createElement('button');t.type='button';t.className='lt';t.title='Play now';t.textContent=l.title||nameOf(l.tokenId);
+      var t=document.createElement('button');t.type='button';t.className='lt';t.title='Play now';t.textContent=l.title||nameOf(l.tokenId);if(api&&api.isExplicit&&api.isExplicit(l.tokenId)){var ex=document.createElement('span');ex.className='exp';ex.textContent='E';ex.title='Explicit lyrics';t.appendChild(document.createTextNode(' '));t.appendChild(ex);}
       var a=document.createElement('span');a.className='la';a.textContent=l.artist||('#'+l.tokenId);
       var up=document.createElement('button');up.type='button';up.className='mv up';up.textContent='↑';up.title='Move up';up.disabled=i===0;
       var dn=document.createElement('button');dn.type='button';dn.className='mv down';dn.textContent='↓';dn.title='Move down';dn.disabled=i===ids.length-1;
@@ -999,7 +1055,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     // likes
     var likesStatus=s.likesStatus||'disconnected';
     $('likesHint').style.display=likesStatus==='ready'&&s.likes.length?'none':'';
-    $('likesHint').textContent=likesStatus==='loading'?'Refreshing this wallet’s on-chain likes…':likesStatus==='partial'||likesStatus==='unavailable'?'Some likes could not be refreshed. Showing previously confirmed likes; retrying automatically.':likesStatus==='paused'?'The chain service is busy, so on-chain likes are paused'+(s.likesRetryAt?' until about '+new Date(s.likesRetryAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'')+'. Your likes are safe on-chain. Retrying automatically, or press Refresh.':likesStatus==='disconnected'?'Connect your wallet to see its on-chain likes.':'No confirmed on-chain likes for this wallet yet. Tap ♥ while a song plays.';
+    $('likesHint').textContent=likesStatus==='loading'?'Refreshing this wallet’s on-chain likes…':likesStatus==='partial'||likesStatus==='unavailable'?'Some likes could not be refreshed. Showing previously confirmed likes; retrying automatically.':likesStatus==='paused'?'The chain service is busy, so on-chain likes are paused'+(s.likesRetryAt?' until about '+new Date(s.likesRetryAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'')+'. Your likes are safe on-chain. Retrying automatically, or press Refresh.':likesStatus==='disconnected'?'Connect your wallet to see its on-chain likes.':'Your playlist starts here. Tap ♥ while a song plays and it joins this list, saved on the public record under your player. Drag them into your order.';
     renderLikes(s);
     renderRelatives(s.relatives||[]);
     kickSpectrum();
@@ -1134,7 +1190,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=6373837ac027" defer></script>
+<script src="/xtrata-radio.js?v=bd7e9d8df19c" defer></script>
 <script type="module" src="/radio/wallet.js?v=8a27a580ad6c"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -1159,7 +1215,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=7c673588782b');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=6104936efc0a');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
@@ -1233,6 +1289,34 @@ fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.time
     peers.forEach(function(w){say(w,'*',{type:'need-wallet',why:why})});
     show(why==='like'?'Likes are paid with your passkey wallet, which works in the pop-out window. Opening it…':'Your wallet and paid plays work in the pop-out window. Opening it…');
   },true);
+})();
+</script>
+<script>
+/* Explicit songs. The radio never plays one by itself (src/home/radio.js). This page fetches the full list (Xtrata's
+   marks plus album creators'), and shows the warning when a listener asks for one. Accepting is remembered on the device. */
+(function(){
+  var tries=0,t=setInterval(function(){
+    var api=window.XtrataRadio;
+    if(!api){if(++tries>100)clearInterval(t);return}
+    clearInterval(t);
+    if(!api.setExplicit)return;
+    fetch('/radio/gift/explicit',{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(d&&Array.isArray(d.ids))api.setExplicit(d.ids)}).catch(function(){});
+    var open=null;
+    window.XtrataRadioExplicitHandler=function(d){
+      if(open||!d||!/^\d{1,9}$/.test(String(d.id)))return;
+      var dlg=document.createElement('dialog');dlg.className='ppp-connect';dlg.setAttribute('aria-labelledby','explicit-title');open=dlg;
+      var h=document.createElement('h2');h.className='ppp-connect__title';h.id='explicit-title';h.textContent='Explicit lyrics';
+      var p=document.createElement('p');p.style.cssText='margin:0 0 14px;font-size:14px;line-height:1.5';p.textContent='This song has explicit lyrics. It only plays when you choose it. Play it?';
+      var yes=document.createElement('button');yes.type='button';yes.className='ppp-connect__opt is-music';yes.innerHTML='<b>Play it</b><span>Songs marked E will play when you choose them on this device.</span>';
+      var no=document.createElement('button');no.type='button';no.className='quiet ppp-connect__cancel';no.textContent='Not now';
+      yes.onclick=function(){dlg.close();api.allowExplicit(true);api.playToken(d.id)};
+      no.onclick=function(){dlg.close()};
+      dlg.addEventListener('close',function(){dlg.remove();open=null});
+      dlg.addEventListener('click',function(e){if(e.target===dlg)dlg.close()});
+      dlg.append(h,p,yes,no);document.body.appendChild(dlg);
+      if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');
+    };
+  },120);
 })();
 </script>
 </body>

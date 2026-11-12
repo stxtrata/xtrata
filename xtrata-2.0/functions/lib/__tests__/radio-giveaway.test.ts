@@ -263,6 +263,34 @@ describe('radio giveaway', () => {
     expect(await giveawayView(s.env, T0 + 4 * 3600_000)).not.toHaveProperty('plays');
   });
 
+  it('a lottery: never says what the link on show holds, only the range, what is left of each tier and who won what', async () => {
+    const s = setup();
+    const amount = (code: string, micro: number) => s.sql.prepare('UPDATE radio_gifts SET amount=? WHERE code_hash=?').run(micro, giftCodeHash(code));
+    const codes = await s.gifts(4);
+    amount(codes[0], 10_000); amount(codes[1], 353_000); amount(codes[2], 10_000); amount(codes[3], 38_000); // 20, 1000, 20, 100 plays
+    await giveawayAdmin(s.env, { action: 'add', text: s.list(codes) }, T0);
+    const v = await giveawayView(s.env, T0);
+    expect(v).toMatchObject({ state: 'live', kind: 'player', code: codes[0] });
+    expect(v).not.toHaveProperty('plays');
+    expect(v.lottery).toEqual({ min: 20, max: 1000, won: [], tiers: [
+      { id: 'diamond', plays: 1000, total: 1, left: 1 }, { id: 'bronze', plays: 100, total: 1, left: 1 }, { id: 'classic', plays: 20, total: 2, left: 2 }] });
+    s.setStatus(codes[0], 'claimed', { claimed_at: T0 + 1000, claimed_by: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7' });
+    const later = await giveawayView(s.env, T0 + 3600_000);
+    expect(later.lottery!.won).toEqual(['classic']);
+    expect(later.lottery!.tiers.find((x) => x.id === 'classic')).toMatchObject({ total: 2, left: 1 });
+    expect(later.lottery!.tiers.find((x) => x.id === 'diamond')).toMatchObject({ total: 1, left: 1 }); // still out there
+  });
+
+  it('add with shuffle puts the links in in a random order and still adds every one exactly once', async () => {
+    const s = setup();
+    const codes = await s.gifts(40);
+    const r = await giveawayAdmin(s.env, { action: 'add', text: s.list(codes), shuffle: true }, T0);
+    expect(r).toMatchObject({ added: 40, duplicates: 0 });
+    const stored = (s.sql.prepare('SELECT code FROM radio_giveaway_links ORDER BY pos').all() as { code: string }[]).map((x) => x.code);
+    expect([...stored].sort()).toEqual([...codes].sort());
+    expect(stored).not.toEqual(codes); // 40 links landing in their original order by chance: 1 in 40!
+  });
+
   it('advance alone (the sweep) is enough to move it on', async () => {
     const s = setup();
     const codes = await s.gifts(2);

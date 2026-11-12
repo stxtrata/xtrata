@@ -111,6 +111,33 @@ panel for a gift without an album, and the wallet box's own screens (a separate 
 - **Giveaway page** (`public/giveaway.html`): one page for both kinds of drop. `GET /radio/giveaway` now also returns
   `kind` (`album` | `player`) and `plays`; the page words itself from them and sends a starter claim to
   `radio.html?novice=1#gift=…`. Still one link on show at a time. A tap-to-hold wall is not built.
+- **Player classes** (`src/lib/listening-wallet/tiers.ts`): Diamond 1,000+ plays, Gold 500+, Silver 250+, Bronze 100+,
+  Classic below. Worked out from a starter gift's amount each time, never stored on a server; looks only. Shown as a
+  badge on the panel, a coloured record on the welcome screens (the reveal when plays land, and on every return) and
+  remembered on the device while locked. Suggested drop of 1,000, none under 50 plays: 5 / 10 / 20 / 100 / 865, which
+  is 29.8875 STX including the 0.003 STX fee per player (locked by `tiers.test.ts`).
+- **Albums every player comes loaded with**: `RADIO_FEATURED_PLAYERS` (gift player ids) → `GET /radio/gift/featured`.
+  They are playlists, not wallets: opened from "Albums in your player" (or the "You're in" screen), played from the
+  listener's own plays, never locked, never shown over an album wallet's own album. Unset: nothing shows. An entry
+  may be `id:Name to show` to give the album a different name in this list only (the stored title is untouched).
+- **Explicit songs**: one flag, two ways to set it. Xtrata marks a song in `EXPLICIT_SONGS`
+  (`src/lib/radio/artist-credits.mjs`, a code change and deploy). An album's creator marks songs when making the album
+  ("Explicit songs" in the admin box → `PlayerDefinition.explicit`, part of what they sign; albums without marks hash as
+  before). `GET /radio/gift/explicit` serves both together and the radio page hands it to the engine. The engine
+  (`src/home/radio.js`) never picks an explicit song itself on any band; `playToken` asks the page first
+  (`window.XtrataRadioExplicitHandler`, a warning pop-up in `public/radio.html`), and with no page to ask it is not
+  played. Accepting is remembered per device (`xtrata.radio.explicit.ok.v1`); after that an album run or the listener's
+  LIKED station may include it, FM and CHAIN still never bring one up. Marked songs show an "E".
+- **Find music** (`find.ts`, the 🔎 box above Your Station): search by song, artist or number and browse by artist,
+  over `/radio/counts` with `artist-credits.mjs` corrections applied. The catalogue feed has no album field, so
+  "by album" today means the featured albums.
+- **Lottery drop**: make one batch per class, then `add` them all with `"shuffle": true`. When the list holds players
+  of different sizes, `GET /radio/giveaway` omits `plays` and returns `lottery` (range, what is left of each class,
+  the class of each player already claimed). The page keeps the live one a mystery, colours claimed discs by class,
+  and sends the claim with `&mystery=1` so the radio reveals the class only when the plays land.
+- **Make it yours** (panel fold, passkey-only listeners): what a .btc name is with a link to BNS One, linking to a
+  Stacks wallet they already have, bringing a friend. Each item closed until opened. Note: the wallet box cannot buy
+  or register a name itself; a name has to be sent to the player's address from another wallet.
 - **Radio controls**: hover text on every control and a "What do these do?" fold under the stations.
 
 ## 5. Where the Music Overhaul plan stands

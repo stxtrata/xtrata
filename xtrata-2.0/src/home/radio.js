@@ -1,7 +1,7 @@
 import { attachAudibleStart } from '../lib/radio/audible-start.js';
 import { attachAudibleListen } from '../lib/radio/audible-listen';
 import { createLikeTracker } from '../lib/radio/like-tracker';
-import {radioArtist,radioTitle} from '../lib/radio/artist-credits.mjs';
+import {EXPLICIT_SONGS,radioArtist,radioTitle} from '../lib/radio/artist-credits.mjs';
 import { audioMime, hiddenTrackRange, linkedAudioId, linkedImageId, webmAudioOnly, HIDDEN_TRAILER_BYTES, MEDIA_HEAD_BYTES } from '../lib/radio/song-sources.mjs';
 // Xtrata Radio — a little embedded radio station for the homepage soundtrack.
 // Toggling on makes a radio-tuning noise (WebAudio, no assets) and then plays a
@@ -1219,9 +1219,39 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     return [...playlist, ...known.filter((id) => !curatedSet.has(id))];
   };
 
+  // ---- explicit songs ----
+  // A song marked explicit (by Xtrata in artist-credits, or by its album's creator: the page passes those in with
+  // setExplicit) is never chosen by the radio itself. It plays only when the listener asks for that song and has
+  // accepted the warning on this device (the page shows it; see playToken). Once accepted, an album run or the
+  // listener's own LIKED station may include it; FM and CHAIN still never bring one up unasked.
+  const EXPLICIT_OK_KEY = 'xtrata.radio.explicit.ok.v1';
+  const explicitIds = new Set(EXPLICIT_SONGS.map(String));
+  let explicitAllowed = (() => { try { return window.localStorage.getItem(EXPLICIT_OK_KEY) === '1'; } catch { return false; } })();
+  const isExplicit = (id) => explicitIds.has(String(id));
+  const skipExplicit = (id) => isExplicit(id) && !(explicitAllowed && (band === 'gift' || band === 'liked'));
+
+  /** The page is asked before an explicit song plays on a device that has not accepted the warning. True: not played now. */
+  const askExplicit = (id) => {
+    if (!isExplicit(id) || explicitAllowed) return false;
+    const ask = window.XtrataRadioExplicitHandler;
+    if (typeof ask === 'function') { try { ask({ id: String(id) }); } catch (_) { /* the page's dialog */ } }
+    else writeScreen('EXPLICIT LYRICS — NOT PLAYED HERE');
+    return true;
+  };
+
   const pickNext = () => {
     let choice;
     if (forcedNext) { choice = forcedNext; forcedNext = null; recent.push(choice); if (recent.length > 8) recent.shift(); return choice; }
+    // The radio's own choice is never an explicit song (a song the listener asked for, above, is theirs to hear).
+    for (let tries = 0; tries < 12; tries += 1) {
+      choice = pickUnasked();
+      if (!choice || !skipExplicit(choice)) return choice;
+    }
+    // Twelve picks in a row were explicit: the pool holds little else. Go round again rather than fall silent.
+    return choice;
+  };
+  const pickUnasked = () => {
+    let choice;
     if (!shuffleMode) {
       // IN-ORDER MODE: walk the fixed running order onward from the current
       // song, skipping known duds AND any song that has already aired in this
@@ -1243,6 +1273,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
             const candidate = pool[(start + step) % pool.length];
             if (trackCache.get(candidate) === null) continue;      // known dud
             if (isCoolingDown(candidate)) continue;                 // resting after a transient failure
+            if (skipExplicit(candidate)) continue;                  // explicit: only when asked for
             if (candidate === cur && playableCount > 1) continue;  // never the current song while others remain
             if (skipPlayed && played.has(candidate)) continue;     // already aired this cycle
             return candidate;
@@ -1273,8 +1304,10 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     // FM = curated (+ discovery unless preset MUSIC).
     likes = chainState ? chainState.snapshot().likes.slice() : [];
     if (band === 'gift' && giftPlayer) {
-      const pool = giftPlayer.tracks.filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
-      choice = (pool.length ? pool : giftPlayer.tracks)[Math.floor(Math.random() * (pool.length || giftPlayer.tracks.length))];
+      const clean = giftPlayer.tracks.filter((id) => !skipExplicit(id));
+      const pool = clean.filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
+      const from = pool.length ? pool : clean.length ? clean : giftPlayer.tracks;
+      choice = from[Math.floor(Math.random() * from.length)];
       recent.push(choice);
       if (recent.length > 8) recent.shift();
       return choice;
@@ -1590,6 +1623,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       // Keep the queue topped up in the background.
       window.setTimeout(() => { void preloadNextTrack(); }, 300);
       if (token !== tuneToken || !on) { endTune(); return; }
+      // A cued song that has since been marked explicit (the list arrived after it was cued) is dropped, not played.
+      if (track && !requestedId && skipExplicit(track.tokenId)) {
+        radioLog(`skipped #${track.tokenId}`, 'explicit: played only when asked for', track.tokenId);
+        for (let i = preloadQueue.length - 1; i >= 0; i -= 1) if (skipExplicit(preloadQueue[i].tokenId)) preloadQueue.splice(i, 1);
+        continue;
+      }
       if (track && !allowed(track.tokenId)) {
         radioLog(`blocked #${track.tokenId}`, 'the open album is locked: only its own songs play', track.tokenId);
         trackOverride = null;
@@ -1949,6 +1988,19 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       if (giftLock && giftPlayer && band !== 'gift') setBand('gift'); else emit();
       if (giftLock) enterAlbum();
     },
+    /** More songs to treat as explicit (ids), on top of Xtrata's own list. Anything cued that is now explicit is dropped. */
+    setExplicit: (ids) => {
+      (Array.isArray(ids) ? ids : []).forEach((id) => { if (/^\d{1,9}$/.test(String(id))) explicitIds.add(String(id)); });
+      for (let i = preloadQueue.length - 1; i >= 0; i -= 1) if (skipExplicit(preloadQueue[i].tokenId)) preloadQueue.splice(i, 1);
+      emit();
+    },
+    isExplicit: (id) => isExplicit(id),
+    /** The listener accepted (or withdrew) the explicit-lyrics warning on this device. */
+    allowExplicit: (ok) => {
+      explicitAllowed = ok !== false;
+      try { if (explicitAllowed) window.localStorage.setItem(EXPLICIT_OK_KEY, '1'); else window.localStorage.removeItem(EXPLICIT_OK_KEY); } catch (_) { /* this visit only */ }
+    },
+    explicitAllowed: () => explicitAllowed,
     /** Block playback until the paid radio is ready. Pass null to allow playback again. */
     setGiftStop: (text) => {
       const next = typeof text === 'string' && text ? text.slice(0, 80) : null;
@@ -2282,6 +2334,10 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   listeners.add(updateStats);
   updateStats(stateSnapshot());
 
+  // Explicit songs: every request for a specific song goes through playToken, so this is the one gate. On a device
+  // that has not accepted the warning the page is asked first (it calls allowExplicit, then playToken again).
+  const playAsked = api.playToken;
+  api.playToken = (id) => { if (allowed(id) && askExplicit(id)) return; playAsked(id); };
   window.XtrataRadio = api;
   // Compile-time preview only. No discovery, signing or payment hook is enabled.
   if (import.meta.env.VITE_RADIO_SUPPORT_PREVIEW === 'true') {

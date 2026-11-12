@@ -52,6 +52,12 @@ export function radioArtist(id, fallback = "") {
  return Object.hasOwn(ARTIST_CREDITS, key) ? ARTIST_CREDITS[key] : Object.hasOwn(CONFIRMED_ARTISTS, key) ? CONFIRMED_ARTISTS[key] : fallback;
 }
 
+// Songs with explicit lyrics, marked by Xtrata. The radio never plays one by itself: only when the listener asks for
+// that song and accepts a warning (src/home/radio.js). An album's creator can mark more when making the album
+// (PlayerDefinition.explicit); GET /radio/gift/explicit serves both lists together.
+export const EXPLICIT_SONGS = Object.freeze([3590]);
+export const isExplicitSong = (id) => EXPLICIT_SONGS.includes(Number(id));
+
 const TITLES = Object.freeze({139: 'Subterranean (Extended Mix with Phil Hartnoll)', 312: 'Smalltalk', 315: 'Entertainment'});
 export function radioTitle(id, fallback = '') {
  return Object.hasOwn(TITLES, String(id)) ? TITLES[String(id)] : fallback;

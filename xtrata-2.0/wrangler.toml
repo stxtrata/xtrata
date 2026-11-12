@@ -13,6 +13,10 @@ RUNTIME_CONTENT_CACHE_LIMIT_BYTES = "5368709120"
 # The same goes for the optional RADIO_PPP_PASSKEY_ONLY secret ("1" lets listeners without a Stacks wallet use a passkey wallet alone).
 RADIO_PPP_HOST = "radio.xtrata.xyz"
 RADIO_LISTENING_WALLET_ORIGIN = "https://wallet.xtrata.xyz"
+# Albums every player comes loaded with (GET /radio/gift/featured), in the order shown: `id` or `id:Name to show`,
+# separated by commas. Gift player ids:
+# 33cebe5b6f4f60c2 = "Audionals - The Opera (1st Edition)" (7 songs), 6cf1f30c68c8a59f = "2007 EP: Reload (Limited Edition)" (14 songs).
+RADIO_FEATURED_PLAYERS = "33cebe5b6f4f60c2:Audionals - The Opera,6cf1f30c68c8a59f"
 # Content isolation (functions/lib/content-isolation.ts, CONTENT-ORIGIN-SPLIT-PLAN.md).
 # Deliberately NOT defined here so it can be switched per environment from the dashboard without a push:
 #   INSCRIPTION_SANDBOX         "1" sandboxes direct loads of raw HTML/SVG at /i/, /inscription/ and

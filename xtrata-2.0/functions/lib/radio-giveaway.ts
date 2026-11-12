@@ -19,6 +19,7 @@ import type { GiftEnv } from './radio-gifts';
 import { GiftError, playerView } from './radio-gifts';
 import { giftCodeHash, giftPlays, isGiftCode } from '../../src/lib/listening-wallet/gifts';
 import { listedTracks } from '../../src/lib/listening-wallet/gift-players';
+import { tierOfPlays, type TierId } from '../../src/lib/listening-wallet/tiers';
 
 export type GiveawayEnv = GiftEnv & { RADIO_GIVEAWAY_SECRET?: string };
 
@@ -139,13 +140,44 @@ export type GiveawayView = {
   kind?: 'album' | 'player';
   /** Paid plays each link of this kind carries. Omitted when it cannot be read: never shown as zero. */
   plays?: number;
+  /**
+   * A lottery: the players in the list carry different numbers of plays, so what the link on show holds is NOT told
+   * (`plays` is omitted). Instead: the smallest and largest, how many of each tier there are and how many are still to
+   * be won, and the tier of every player already claimed, in the order they went (the wall colours them in).
+   */
+  lottery?: { min: number; max: number; tiers: { id: TierId; plays: number; total: number; left: number }[]; won: TierId[] };
 };
 
 /** The public answer: counts, and the one link on show. Never the list, never an upcoming code, never a time. */
 export async function giveawayView(env: GiveawayEnv, now: number, rand: () => number = Math.random): Promise<GiveawayView> {
   const { s, link, gift } = await advance(env, now, rand);
-  const v = { ...(await viewOf(env, now, s, link, gift)), ...(await dropOf(env)) };
+  const v: GiveawayView = { ...(await viewOf(env, now, s, link, gift)), ...(await dropOf(env)) };
+  const lottery = v.kind === 'player' ? await lotteryOf(env) : null;
+  if (lottery) { delete v.plays; v.lottery = lottery; }
   return s.held > 0 ? { ...v, held: s.held } : v;
+}
+
+/**
+ * The lottery picture, or null when every player in the list carries the same plays (or it cannot be read). Counts
+ * and past winners only: nothing here says which link holds what.
+ */
+async function lotteryOf(env: GiveawayEnv): Promise<GiveawayView['lottery'] | null> {
+  try {
+    const groups = await q<{ amount: number; total: number; left: number }>(env,
+      `SELECT g.amount AS amount, COUNT(*) AS total, SUM(CASE WHEN l.ended_at IS NULL THEN 1 ELSE 0 END) AS left
+       FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash WHERE g.player_id IS NULL GROUP BY g.amount`);
+    const rows = groups.map((r) => ({ plays: giftPlays(BigInt(Number(r.amount))), total: Number(r.total), left: Number(r.left) })).filter((r) => r.plays > 0);
+    if (rows.length < 2) return null;
+    rows.sort((a, b) => b.plays - a.plays);
+    const won = await q<{ amount: number }>(env,
+      `SELECT g.amount AS amount FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash
+       WHERE l.outcome='claimed' AND g.player_id IS NULL ORDER BY l.ended_at, l.pos LIMIT 2000`);
+    return {
+      min: rows[rows.length - 1].plays, max: rows[0].plays,
+      tiers: rows.map((r) => ({ id: tierOfPlays(r.plays).id, ...r })),
+      won: won.map((w) => tierOfPlays(giftPlays(BigInt(Number(w.amount)))).id)
+    };
+  } catch { return null; }
 }
 
 /** What kind of gift this list is giving away, and the plays it carries: from the link on show or next up, else the last one. */
@@ -211,7 +243,7 @@ export function giveawayAuthorised(env: GiveawayEnv, header: string | null): boo
  * Operator actions. `add` takes `text`, any blob with links or codes in it; only codes that are real, live gifts are
  * kept (a typo cannot sit in the list unnoticed) and the report says what was left out. No action ever returns a code.
  */
-export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; text?: unknown; minSeconds?: unknown; maxSeconds?: unknown; count?: unknown }, now: number) {
+export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; text?: unknown; minSeconds?: unknown; maxSeconds?: unknown; count?: unknown; shuffle?: unknown }, now: number) {
   await ensureGiveawayTables(env);
   const act = String(body.action ?? 'status');
   if (act === 'add') {
@@ -219,11 +251,24 @@ export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; t
     const codes = codesIn(body.text);
     let added = 0, duplicates = 0;
     const notFound: number[] = [], notLive: number[] = [];
+    const good: { code: string; hash: string }[] = [];
     for (const [i, code] of codes.entries()) {
       const hash = giftCodeHash(code);
       const g = await giftOf(env, hash);
       if (!g) { notFound.push(i + 1); continue; }
       if (!isFree(g, now)) { notLive.push(i + 1); continue; }
+      good.push({ code, hash });
+    }
+    // `shuffle: true` (a lottery): the links go in in a random order, so nobody can tell from the batch they were made
+    // in which one holds what. Drawn with the platform's secure random source.
+    if (body.shuffle === true) {
+      for (let i = good.length - 1; i > 0; i--) {
+        const r = new Uint32Array(1); crypto.getRandomValues(r);
+        const j = r[0] % (i + 1);
+        [good[i], good[j]] = [good[j], good[i]];
+      }
+    }
+    for (const { code, hash } of good) {
       const n = await exec(env, 'INSERT OR IGNORE INTO radio_giveaway_links(code, code_hash, added_at) VALUES(?,?,?)', [code, hash, now]);
       if (n) added++; else duplicates++;
     }

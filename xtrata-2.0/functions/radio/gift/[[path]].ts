@@ -1,6 +1,6 @@
 import {
   batchesFor, batchStatus, claimGift, confirmBatch, confirmFriendGift, createBatch, createFriendGift, createPlayer, GiftError,
-  giftForWallet, giftStatus, hiroGiftChain, nextSlot, runSweep, shelfFor, sweepAuthorised, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
+  explicitSongs, featuredPlayers, giftForWallet, giftStatus, hiroGiftChain, nextSlot, runSweep, shelfFor, sweepAuthorised, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
 } from '../../lib/radio-gifts';
 import { checkSongsNow } from '../../lib/radio-metadata';
 import { advance } from '../../lib/radio-giveaway';
@@ -11,6 +11,8 @@ import { advance } from '../../lib/radio-giveaway';
  *   GET  /radio/gift?id=…          a friend gift's status (the friend who paid for it)
  *   GET  /radio/gift/for?wallet=…  was this listening wallet gifted, and where do returns go
  *   GET  /radio/gift/slots?root=…  the next free numbered-wallet number for a passkey (its first wallet is the root)
+ *   GET  /radio/gift/explicit      every song marked explicit (by Xtrata or by an album's creator): the radio never plays one by itself
+ *   GET  /radio/gift/featured      the albums every player can load (RADIO_FEATURED_PLAYERS): public playlists, never a code
  *   GET  /radio/gift/shelf?root=…&after=…&limit=…   the albums in a passkey's numbered wallets, a page at a time
  *   POST /radio/gift/claim         {code, wallet, turnstile?, binding?}   fund a brand-new listening wallet (binding: an album into a numbered wallet)
  *   POST /radio/gift/create        {gifter, amount}             start a friend gift
@@ -48,6 +50,8 @@ export async function onRequest(context: Ctx) {
       // The recipient's page asks this while its gift is on its way, which also keeps the sends moving.
       if (action === 'for') { const r = reply(await giftForWallet(env, q.get('wallet') ?? '')); later(); return r; }
       if (action === 'slots') return reply(await nextSlot(env, q.get('root') ?? ''));
+      if (action === 'featured') return reply(await featuredPlayers(env));
+      if (action === 'explicit') return reply(await explicitSongs(env));
       if (action === 'shelf') return reply(await shelfFor(env, q.get('root') ?? '', Number(q.get('after') ?? 0), Number(q.get('limit') ?? 50)));
       if (action === '') { const r = reply(await giftStatus(env, { id: q.get('id') })); later(); return r; }
       if (action === 'batch') { const r = reply(await batchStatus(env, q.get('id') ?? '')); later(); return r; }
