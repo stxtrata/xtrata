@@ -50,6 +50,8 @@ call '{"action":"gap","minSeconds":600,"maxSeconds":600}'   # pause between link
 call '{"action":"pause"}'   ;   call '{"action":"resume"}'  # the page says "taking a short break"
 call '{"action":"skip"}'                                    # retire the link on show, never offer it again
 call '{"action":"now"}'                                     # show the next link without waiting out the pause
+call '{"action":"archive"}'                                 # close the drop in the list: withdraw what is left, reset the counts and the wall
+jq -Rs '{action:"add", shuffle:true, text:.}' links.txt | ...   # load in a random order (a lottery of player classes)
 ```
 
 `add` keeps only codes that are real, live gifts and tells you the positions (1 = first in what you pasted) of any it left
@@ -63,3 +65,13 @@ Adding links shows the first one straight away unless you `pause` first.
 - Gifts expire 30 days after they were made. A link that expires before it is shown is skipped.
 - When the list runs out the page says it is all done and shows the final counts.
 - A link `skip`ped or lost still belongs to its gift: the funds go back to the treasury by the usual expiry path.
+
+## Starting a new drop
+
+`archive` closes whatever drop is in the list. Links not yet given away are withdrawn from the page; the claimed
+count, the wall and "held" go back to nothing; nothing is deleted. The gifts themselves are untouched: a link
+someone already holds still works, and an unclaimed one refunds to whoever paid for it when it expires. An archived
+link cannot be added again. With nothing loaded the page says the players are on their way.
+
+The page is the free-player giveaway (see docs/music/HANDBOOK.md, section 4a). `GET /radio/giveaway` also returns
+`kind`, `plays`, and for a lottery `lottery` (range, what is left of each class, the class of each claimed player).

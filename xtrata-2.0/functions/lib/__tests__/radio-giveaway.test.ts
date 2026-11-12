@@ -291,6 +291,30 @@ describe('radio giveaway', () => {
     expect(stored).not.toEqual(codes); // 40 links landing in their original order by chance: 1 in 40!
   });
 
+  it('archive closes the drop in the list and the next one starts from nothing; the old gifts are left alone', async () => {
+    const s = setup();
+    const old = await s.gifts(4, { player: 'aaaaaaaaaaaaaaaa' });
+    await giveawayAdmin(s.env, { action: 'add', text: s.list(old) }, T0);
+    await giveawayAdmin(s.env, { action: 'held', count: 5 }, T0);
+    s.setStatus(old[0], 'claimed', { claimed_at: T0 + 1000, claimed_by: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7' });
+    expect(await giveawayView(s.env, T0 + 3600_000)).toMatchObject({ claimed: 1, left: 3, held: 5 });
+    const r = await giveawayAdmin(s.env, { action: 'archive' }, T0 + 3600_000);
+    expect(r).toMatchObject({ archived: 4, withdrawn: 3, total: 0, claimed: 0, unseen: 0, held: 0, onShow: null });
+    const empty = await giveawayView(s.env, T0 + 3600_001);
+    expect(empty).toMatchObject({ state: 'done', claimed: 0, left: 0 });
+    expect(empty).not.toHaveProperty('kind');
+    expect(empty).not.toHaveProperty('held');
+    expect(JSON.stringify(empty)).not.toContain(old[1]);
+    // The gifts themselves are untouched: a withdrawn link is still a live gift for whoever holds it.
+    expect((s.sql.prepare("SELECT COUNT(*) AS n FROM radio_gifts WHERE status='live'").get() as { n: number }).n).toBe(3);
+    // A new drop: its own counts, its own kind, nothing carried over.
+    const fresh = await s.gifts(2);
+    await giveawayAdmin(s.env, { action: 'add', text: s.list(fresh) }, T0 + 3600_002);
+    expect(await giveawayView(s.env, T0 + 3600_003)).toMatchObject({ state: 'live', code: fresh[0], claimed: 0, left: 2, kind: 'player', plays: 277 });
+    // An archived link cannot be slipped back into the new drop.
+    expect(await giveawayAdmin(s.env, { action: 'add', text: s.list([old[1]]) }, T0 + 3600_004)).toMatchObject({ added: 0, duplicates: 1 });
+  });
+
   it('advance alone (the sweep) is enough to move it on', async () => {
     const s = setup();
     const codes = await s.gifts(2);
