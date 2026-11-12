@@ -1569,7 +1569,7 @@ function buildDayBoard(){
   for(const sx of [-1,1]){ const len=HH-(S.cy+H/2+.06); const rod=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,len,6),rodMat); rod.position.set(sx*(W/2-.25),H/2+.06+len/2,0); g.add(rod) }
   const edge=new THREE.Mesh(new THREE.BoxGeometry(W+.14,.025,.12), new THREE.MeshBasicMaterial({color:BTC_ORANGE, toneMapped:false})); edge.position.y=-(H/2+.07); g.add(edge);
   // no collider: its bottom edge (2.25 m) is above head height, so you walk under it
-  dayBoard={cv, x:cv.getContext('2d'), tex:t, last:0, scorers:[], champions:[], scorersAt:-1e9};
+  dayBoard={cv, front, x:cv.getContext('2d'), tex:t, last:0, scorers:[], champions:[], scorersAt:-1e9};
   paintDayBoard(true);
 }
 // Latest scorers: the newest top-10 entries across every board the hall has cached, whatever their age (the row shows how old), no extra reads.
@@ -1608,7 +1608,8 @@ function tickCentreScreen(){
   const near=!!(dayBoard && Math.abs(player.z-CENTRE_SCREEN.z)<11);
   if(near) paintDayBoard(); else if(window.XAScreen && XAScreen.idle) XAScreen.idle();   // far from the screen: clips pause
   // OPEN LINK shows only while the screen is in sight and the item on it has a link (the link is re-checked: https only)
-  const hl=$('hlink'); if(hl){ const show=!!(near && window.XAScreen && XAScreen.currentLink && XAScreen.currentLink()); if(hl.hidden===show) hl.hidden=!show }
+  const hl=$('hlink'); if(hl){ const show=!!(near && window.XAScreen && XAScreen.currentLink && XAScreen.currentLink()); if(hl.hidden===show) hl.hidden=!show
+    if(show){ const lab=screenLinkLabel(), host=XAScreen.linkHost(XAScreen.currentLink()); if(hl._lab!==lab){ hl._lab=lab; hl.textContent='OPEN: '+lab+' ↗'; hl.title='Opens '+host+' in a new tab (L)' } } }
 }
 function openScreenLink(){ if(window.XAScreen && XAScreen.openLink) return XAScreen.openLink(); return false }
 
@@ -1667,6 +1668,19 @@ function posterAt(v){
   const h=pray.intersectObjects(posterMeshes,false).find(x=>x.object.parent && x.object.parent.visible);
   const s=h && h.object.userData.slot;
   return s && s.spec && s.spec.play ? s : null;
+}
+// The big screen is clickable too: aim the dot at it while the item showing has a link, and E / click / Enter opens that link.
+let screenFocus=false; const sray=new THREE.Raycaster(); sray.far=16;
+function screenLinkNow(){ return !!(window.XAScreen && XAScreen.currentLink && XAScreen.currentLink()) }
+function screenHit(v){ if(!dayBoard || !dayBoard.front || !screenLinkNow()) return false; sray.setFromCamera(v,camera); return sray.intersectObject(dayBoard.front,false).length>0 }
+function screenLinkLabel(){   // what the link is called: the item's headline, else the site it goes to
+  const it=window.XAScreen && XAScreen.current && XAScreen.current(), host=XAScreen.linkHost ? XAScreen.linkHost(XAScreen.currentLink()) : '';
+  const head=it && it.head ? String(it.head).replace(/\s+/g,' ').trim().toUpperCase() : '';
+  return (head ? (head.length>26 ? head.slice(0,25)+'…' : head) : host.toUpperCase()) }
+function updateScreenFocus(){
+  const f=state==='walk' && !chainOpen && focusIdx<0 && !posterFocus && screenHit(center);
+  if(f!==screenFocus){ screenFocus=f; updateHud() }
+  else if(f){ const sp=$('sprompt'), t=screenLinkLabel()+' · '+XAScreen.linkHost(XAScreen.currentLink()); if(sp && sp._t!==t){ sp._t=t; $('sptitle').textContent=t } }   // the screen rotates: keep the name current
 }
 function updatePosterFocus(){
   const s=state==='walk' && !chainOpen ? posterAt(center) : null;
@@ -2469,6 +2483,7 @@ addEventListener('keydown', e=>{
   const onBtn = e.target && e.target.tagName==='BUTTON';
   if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx>=0){ e.preventDefault(); startGame(focusIdx) }
   else if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx<0 && posterFocus){ e.preventDefault(); openChain(posterFocus.spec.play) }
+  else if((e.code==='KeyE'||(!onBtn&&(e.code==='Enter'||e.code==='Space'))) && focusIdx<0 && !posterFocus && screenFocus){ e.preventDefault(); openScreenLink() }
   else if(e.code==='KeyE' && focusIdx<0 && !posterFocus && bayEngine && bayHint && !(bayToast && performance.now()<bayToast.until)){ e.preventDefault(); bayEngine.toggleFocused() }
   else if(e.code==='KeyQ' && focusIdx>=0 && GAMES[focusIdx].variants[0]){ startGame(focusIdx, GAMES[focusIdx].variants[0].key) }
   else if(e.code==='KeyT'){ openScores() }
@@ -2501,10 +2516,10 @@ addEventListener('mouseup', e=>{
   if(bayDrag){ bayDrag=false; bayEngine.grabEnd(); drag=null; return }
   if(!drag || state!=='walk'){ drag=null; return }
   const wasClick = drag.moved<5; drag=null; if(!wasClick) return;
-  if(locked){ if(focusIdx>=0) startGame(focusIdx); else if(posterFocus) openChain(posterFocus.spec.play); return }
+  if(locked){ if(focusIdx>=0) startGame(focusIdx); else if(posterFocus) openChain(posterFocus.spec.play); else if(screenFocus) openScreenLink(); return }
   const hit=pickAt(e.clientX,e.clientY);
   if(hit>=0) startGame(hit);
-  else { const ps=posterAt(new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1)); if(ps) openChain(ps.spec.play); else tryLock() }
+  else { const ps=posterAt(new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1)); if(ps) openChain(ps.spec.play); else if(screenHit(new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1))) openScreenLink(); else tryLock() }
 });
 function look(dx,dy,k){ player.yaw-=dx*k; player.pitch=clamp(player.pitch-dy*k,-WALK.pitch,WALK.pitch) }
 function pickAt(cx,cy){
@@ -2552,6 +2567,7 @@ function updateHud(){
   const walking = state==='walk';
   $('cross').hidden = !walking;
   $('cross').classList.toggle('on', focusIdx>=0);
+  $('cross').classList.toggle('link', screenFocus && focusIdx<0);
   $('prompt').hidden = !(walking && focusIdx>=0);
   if(focusIdx>=0) $('ptitle').textContent = GAMES[focusIdx].title;
   // Say before you sit down whether this run can be posted (a run is bound to the wallet it starts with).
@@ -2569,6 +2585,7 @@ function updateHud(){
   $('pprompt').hidden = !(walking && focusIdx<0 && posterFocus && !chainOpen);
   if(!walking && bayHint){ bayHint=null; paintBayHint() }
   if(posterFocus) $('pptitle').textContent = posterFocus.spec.play.title;
+  const sp=$('sprompt'); if(sp){ sp.hidden = !(walking && focusIdx<0 && !posterFocus && screenFocus && !chainOpen); if(!sp.hidden){ $('sptitle').textContent = screenLinkLabel()+' · '+XAScreen.linkHost(XAScreen.currentLink()) } }
 }
 
 /* Read-only look at the cabinet screens (tests and debugging). */
@@ -3228,7 +3245,7 @@ function frame(now){
     camera.rotation.set(player.pitch, player.yaw, 0);
     if(state==='intro') player.yaw = Math.sin(time*.15)*.18;
   }
-  if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud(); if(f>=0 && GAMES[f].def.framed) framedHtml(GAMES[f].def).catch(()=>{}) } updatePosterFocus() }   // a framed game's page is fetched as you walk up to its machine
+  if(state==='walk'){ const f=findFocus(); if(f!==focusIdx){ focusIdx=f; updateHud(); if(f>=0 && GAMES[f].def.framed) framedHtml(GAMES[f].def).catch(()=>{}) } updatePosterFocus(); updateScreenFocus() }   // a framed game's page is fetched as you walk up to its machine
   if(state==='walk' || state==='intro') tickCentreScreen();
 
   if(tween){
