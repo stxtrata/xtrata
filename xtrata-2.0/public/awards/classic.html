@@ -14,21 +14,24 @@ body{display:grid;place-items:center}
 .fl{width:220em;height:220em;left:-110em;top:-110em;transform:rotateX(-90deg) translateZ(38em);background:repeating-linear-gradient(0deg,color-mix(in srgb,var(--e) 45%,transparent) 0 .15em,transparent .15em 11em),repeating-linear-gradient(90deg,color-mix(in srgb,var(--e) 45%,transparent) 0 .15em,transparent .15em 11em);-webkit-mask:radial-gradient(circle,#000 15%,transparent 62%);mask:radial-gradient(circle,#000 15%,transparent 62%)}
 .em{width:13em;height:13em;left:-6.5em;top:-33em}
 .w{width:38em;height:38em;left:-19em;top:-20em;animation:h 6s ease-in-out infinite}
+/* The record has two identical faces, back to back, so it looks the same from either side of the case. */
 .r,.rm{position:absolute;inset:0;border-radius:50%}
-.rm{background:#1b2029;transform:translateZ(-.5em)}
-.r{overflow:hidden;transform:translateZ(.01em)}
-.gl{position:absolute;inset:-4.5em;border-radius:50%;transform:translateZ(-1em);background:radial-gradient(circle,color-mix(in srgb,var(--t) 55%,transparent) 48%,transparent 71%);opacity:.75}
+.rm{background:#1b2029}
+.r{overflow:hidden;transform:translateZ(.3em);backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.r+.r{transform:rotateY(180deg) translateZ(.3em)}
+.gl{position:absolute;inset:-4.5em;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--t) 55%,transparent) 48%,transparent 71%);opacity:.75}
 .r>*{position:absolute;inset:0;border-radius:50%}
 .s{background:conic-gradient(#050608,#2b313b,#0b0d11,#050608,#3a414d,#0b0d11,#050608,#2b313b,#050608);animation:s 14s linear infinite}
 .g{background:repeating-radial-gradient(circle,rgba(255,255,255,.07) 0 .16em,transparent .26em .62em);-webkit-mask:radial-gradient(circle,transparent 19%,#000 20%);mask:radial-gradient(circle,transparent 19%,#000 20%)}
 .h{background:conic-gradient(from 20deg,transparent 0 8%,#fff7 12%,transparent 17% 58%,#fff5 62%,transparent 67%);mix-blend-mode:screen;animation:s 9s linear infinite reverse}
 .l{inset:34%!important;background:radial-gradient(circle,#7df0e8 0 20%,#2bb8b0 55%,#167a75);box-shadow:0 0 0 .35em #0005,inset 0 0 1.2em #0006;color:#06302e;display:grid;place-items:center}
 .l svg{width:70%;height:70%}
-.k{mix-blend-mode:multiply;opacity:.55}
+.k{width:100%;height:100%;mix-blend-mode:multiply;opacity:.55}
 .q{width:22em;height:6.4em;left:-11em;top:24em;transform:translateZ(13em);backface-visibility:hidden;-webkit-backface-visibility:hidden;box-sizing:border-box;border:.2em solid var(--t);border-radius:.4em;background:#0a0c12cc;color:var(--t);display:grid;place-items:center}
 .q b{font:700 2.6em/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.12em}
 .q svg{width:5em;height:5em}
 .o{--cw:currentColor;--cb:currentColor;--co:currentColor}
+
 @keyframes s{to{transform:rotate(1turn)}}
 @keyframes h{50%{transform:translateY(-1.2em)}}
 @media (prefers-reduced-motion:reduce){.w,.s,.h{animation:none}}
@@ -37,13 +40,16 @@ body{display:grid;place-items:center}
 <div class="a" id="a" tabindex="0" role="img" aria-label="Classic record award. Drag to turn it.">
 <div class="m" id="m"><div class="fl"></div><div class="pl"></div><div class="f bk"></div><div class="f lf"></div><div class="f rt"></div><div class="f tp"></div><div class="f bt"></div>
 <svg class="em"><use href="#x"/></svg>
-<div class="w"><div class="gl"></div><div class="rm"></div><div class="r"><div class="s"></div><div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div></div>
+<div class="w"><div class="gl"></div><div class="rm"></div><div class="r"><div class="s"></div><div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div><div class="r"><div class="s"></div><div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div></div>
 <div class="q" id="q"><svg class="o"><use href="#x"/></svg></div>
 <div class="f fr"></div></div>
 </div>
 <script>/* ?n=412 engraves the player's number on the plaque. Drag, swipe or use the arrow keys to turn the model. */
 var n=(new URLSearchParams(location.search).get('n')||'').replace(/\D/g,'').slice(0,6),a=document.getElementById('a'),m=document.getElementById('m');
 if(n)document.getElementById('q').innerHTML='<b>No. '+n.padStart(4,'0')+'</b>';
+/* The sparkles: the same every time (a fixed seed), scattered through the case, some turned to face the sides. */
+for(var i=0,z=7,C=['#fff'],R=function(){return(z=z*16807%2147483647)/2147483647};i<0;i++){var e=document.createElement('i');e.className='sp';
+e.style.cssText='--c:'+C[i%C.length]+';--s:'+(.35+R()*.9)+';transform:translate3d('+(R()*46-23)+'em,'+(R()*64-32)+'em,'+(R()*27-13.5)+'em) rotateY('+(i%3?0:90)+'deg);animation-delay:-'+R()*5+'s;animation-duration:'+(1.8+R()*3)+'s';m.appendChild(e)}
 var rx=-8,ry=-18,v=0,d=0,px,py,still=matchMedia('(prefers-reduced-motion:reduce)').matches;
 a.onpointerdown=function(e){d=1;px=e.clientX;py=e.clientY;v=0;a.setPointerCapture(e.pointerId)};
 a.onpointermove=function(e){if(!d)return;v=(e.clientX-px)*.45;ry+=v;rx=Math.max(-40,Math.min(40,rx-(e.clientY-py)*.3));px=e.clientX;py=e.clientY};
