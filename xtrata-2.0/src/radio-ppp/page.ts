@@ -25,6 +25,8 @@ import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
 import { musicWalletOptions } from './connect-choice';
+import { hasBannedWord, markPreviewed, newPreview, PLAIN_CHECKING, PLAIN_LABEL, PLAIN_NUDGE, plainLines, plainStop, previewedAlbums, previewLive, readNovice, stepPreview } from './novice';
+import type { GiftStopReason } from './controller';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -169,7 +171,17 @@ function start(root: HTMLElement) {
   // Off by default: an album opens inside the normal player (its tab, its plays left, its song list where Your Station
   // was). Switch the separate page on with `?albumpage=1` or localStorage `xtrata.radio.albumpage` = 1, to keep it
   // available for albums that bring a player of their own.
-  const albumPage = (() => { try { return /[?&]albumpage=1\b/.test(location.search) || localStorage.getItem('xtrata.radio.albumpage') === '1'; } catch { return false; } })();
+  // Novice mode (src/radio-ppp/novice.ts, docs/music/HANDBOOK.md): off by default. Plain wording on the main path, the
+  // album page for anyone who arrives with an album, and (only with `?novice=preview`) one unpaid first song.
+  const flagStore = {
+    get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+    set: (k: string, v: string | null) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* a convenience */ } }
+  };
+  const novice = readNovice(location.search, flagStore);
+  if (novice.on) document.documentElement.dataset.novice = novice.preview ? 'preview' : '1';
+  /** Plain wording applies to a listener with no Stacks wallet in play; anyone who connected one keeps the classic page. */
+  const plainFor = (s: Snapshot) => novice.on && s.solo;
+  const albumPage = novice.on || (() => { try { return /[?&]albumpage=1\b/.test(location.search) || localStorage.getItem('xtrata.radio.albumpage') === '1'; } catch { return false; } })();
   const albumMount = albumPage ? document.getElementById('album') : null;
   const albumDeps = {
     radio: () => (window as any).XtrataRadio ?? null,
@@ -222,15 +234,40 @@ function start(root: HTMLElement) {
     void (window as any).XtrataRadio?.refreshLikes?.();
   };
 
+  // ---- the free first song (only with `?novice=preview`) ----
+  let preview = newPreview();
+  /** The shared album the radio may play right now as a preview, worked out once per render. */
+  let previewNow: PlayerView | null = null;
+  const readPreview = (s: Snapshot): PlayerView | null => {
+    const inc = novice.preview && !inApp && s.step === 'intro' ? gifts.incomingAlbum() : null;
+    if (!inc) { preview = stepPreview(preview, { kind: 'withdraw' }); return null; }
+    preview = stepPreview(preview, { kind: 'offer', album: inc.player.id, already: previewedAlbums(flagStore).includes(inc.player.id) });
+    return previewLive(preview) ? inc.player : null;
+  };
+  /** Feed the preview what the radio reports; when it ends, remember that on this device and redraw. */
+  const advancePreview = (ev: Parameters<typeof stepPreview>[1]) => {
+    const before = preview.phase;
+    preview = stepPreview(preview, ev);
+    if (preview.phase === before) return;
+    // Remembered from the moment it starts: a reload part-way through does not start the free song again.
+    if (preview.album && (preview.phase === 'playing' || preview.phase === 'done')) markPreviewed(flagStore, preview.album);
+    render(ppp.snapshot());
+  };
+  setInterval(() => { if (preview.phase === 'playing') advancePreview({ kind: 'tick', at: Date.now() }); }, 5000);
+
   // A gifted wallet's album becomes a band on the radio; when its paid plays run out the radio stops (no free mode).
   let giftPushed = '', stopPushed: string | null | undefined, lockPushed = false, waitPushed = false;
   const syncGift = (raw: Snapshot, s: Snapshot) => {
     const radio = (window as any).XtrataRadio;
     if (!radio?.setGiftPlayer || !radio?.setGiftStop) return; // pushed again at the next render, once the radio is there
     const gs = s.depositPending && raw.step === 'fund' && raw.giftStop?.reason === 'out' ? { reason: 'arriving', text: 'YOUR PLAYS ARE ARRIVING' } : raw.giftStop;
-    const stop = gs?.text ?? (paidHost && (!raw.gate?.here || raw.step === 'off') ? 'PAID RADIO IS UNAVAILABLE' : null);
+    // The free first song (novice preview): the shared album is handed to the radio before a player exists, and
+    // nothing else may play. It is unpaid, once per album per device, and ends by itself (novice.ts, stepPreview).
+    const pre = previewNow;
+    const said = gs ? (plainFor(raw) ? plainStop(gs.reason as GiftStopReason, gs.text) : gs.text) : null;
+    const stop = pre ? null : said ?? (paidHost && (!raw.gate?.here || raw.step === 'off') ? 'PAID RADIO IS UNAVAILABLE' : null);
     if (stop && stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
-    const p = raw.step === 'off' || raw.step === 'elsewhere' ? null : raw.gift?.player ?? null;
+    const p = raw.step === 'off' || raw.step === 'elsewhere' ? null : raw.gift?.player ?? pre ?? null;
     const id = p ? p.id + ':' + p.cover + ':' + p.tracks.map((t) => t.id).join(',') : '';
     if (id !== giftPushed) {
       radio.setGiftPlayer(p ? { id: p.id, title: p.title, subtitle: p.subtitle, tracks: listedTracks(p).map((t) => t.id), hidden: hiddenTrack(p)?.id ?? null, cover: p.cover } : null);
@@ -241,7 +278,7 @@ function start(root: HTMLElement) {
     // Plays on their way: the radio greys its controls and says so, instead of looking broken.
     const wait = gs?.reason === 'arriving';
     if (wait !== waitPushed) { radio.setGiftWait?.(wait); waitPushed = wait; }
-    const lock = !!p && !!raw.albumLock?.locked;
+    const lock = !!p && (!!pre || !!raw.albumLock?.locked);
     if (lock !== lockPushed) { radio.setGiftLock?.(lock); lockPushed = lock; }
     // Per-wallet song memory lasts only while this passkey stays unlocked on this page.
     if (['locked', 'intro', 'wrong-wallet', 'unsupported', 'connect', 'not-invited', 'off', 'elsewhere'].includes(raw.step)) radio.forgetWallets?.();
@@ -507,7 +544,7 @@ function start(root: HTMLElement) {
         nudge.querySelector('button')!.textContent = 'Get a player';
       } else if (mode === 'off') {
         nudge.querySelector('.nudge-t')!.textContent = warning;
-        nudge.querySelector('.nudge-s')!.textContent = 'This radio requires a funded listening wallet with music support on.';
+        nudge.querySelector('.nudge-s')!.textContent = plainFor(s) ? (s.step === 'intro' ? PLAIN_NUDGE : '') : 'This radio requires a funded listening wallet with music support on.';
         nudge.querySelector('button')!.textContent = NUDGE_ACTION[s.step] ?? 'Start';
       }
     }
@@ -690,6 +727,7 @@ function start(root: HTMLElement) {
     // A like refused only because the main listener wallet is empty is a note, not an error: the album is still playing.
     const softError = s.error === OUT_OF_LIKES;
     syncIdentity(s);
+    previewNow = readPreview(raw);
     syncGift(raw, s);
     syncOrder(s);
     syncHeader(s);
@@ -700,7 +738,7 @@ function start(root: HTMLElement) {
     renderMode(s);
     if (paidHost && paidStatus) {
       paidStatus.hidden = !['off', 'elsewhere', 'loading'].includes(s.step);
-      paidStatus.textContent = s.step === 'loading' || !s.gate ? 'Checking your listening wallet…' : 'Paid radio is unavailable. Reload to check again.';
+      paidStatus.textContent = s.step === 'loading' || !s.gate ? (novice.on ? PLAIN_CHECKING : 'Checking your listening wallet…') : novice.on ? 'Xtrata Music is unavailable here. Reload to check again.' : 'Paid radio is unavailable. Reload to check again.';
     }
     root.hidden = s.step === 'off';
     if (root.hidden) return;
@@ -729,7 +767,9 @@ function start(root: HTMLElement) {
     const deviceHeard = (() => { try { return localStorage.getItem(HEARD_KEY) === '1'; } catch { return false; } })();
     if (!deviceHeard && s.entries.some((e) => e.kind === 'play')) { try { localStorage.setItem(HEARD_KEY, '1'); } catch { /* a convenience */ } }
     const heard = deviceHeard || (s.slot > 0 && ((s.likeFunds?.balance ?? 0n) > 0n || shelf.count() > 1));
-    const setup = showSteps({ ...s, heard }, stage);
+    const plain = plainFor(s);
+    // Novice mode has no setup track: its steps name things a newcomer does not need (a wallet, 1 STX).
+    const setup = !plain && showSteps({ ...s, heard }, stage);
     $('.ppp-badge').hidden = !setup;
     const progress = $('.ppp-steps'), caption = $('.ppp-stage');
     progress.hidden = caption.hidden = !setup;
@@ -949,11 +989,22 @@ function start(root: HTMLElement) {
     // While the wallet box is asking for a tap it is the only thing to press: page buttons step aside.
     if (busy) actions.length = 0;
     // The balance is the one wallet detail a listener needs at a glance: on the same line once set up.
-    if (s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step) && !(s.step === 'fund' && s.depositPending && s.balance === 0n) && !s.gift?.player) {
+    if (!plain && s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step) && !(s.step === 'fund' && s.depositPending && s.balance === 0n) && !s.gift?.player) {
       const tone = s.balanceState === 'ok' ? 'ppp-ok' : s.balanceState === 'low' ? 'ppp-warn' : 'ppp-bad';
       const first = key.at(0);
       if (s.step === 'ready' && first) first.append(el('span', ` · ${stxShort(s.balance)} STX`, tone));
       else key.push(el('p', `Balance ${stxShort(s.balance)} STX`, tone));
+    }
+    // Novice mode: the main path (the lines and buttons outside the folds) never says STX, wallet, address, seed or
+    // sign. Nothing is removed: a line or button that does is moved into its fold ("How plays work", "This device").
+    if (plain) {
+      for (const a of [...actions, ...more]) { const t = PLAIN_LABEL[a.textContent ?? '']; if (t) a.textContent = t; }
+      for (let i = key.length - 1; i >= 0; i--) if (hasBannedWord(key[i].textContent)) lines.unshift(...key.splice(i, 1));
+      for (let i = actions.length - 1; i >= 0; i--) if (hasBannedWord(actions[i].textContent)) more.unshift(...actions.splice(i, 1));
+      const played = s.entries.some((e) => e.kind === 'play');
+      const said = plainLines(s.step, { played, arriving: s.depositPending });
+      if (said.length && key.length) said.shift(); // the classic line that stayed already says where things stand
+      key.push(...said.map((t) => el('p', t, 'ppp-mute')));
     }
     // Gift edition: the interface speaks in plays, not STX. Whatever the radio is doing, the meter says how many are left.
     if (s.gift?.player && ['fund', 'ready', 'over', 'locked', 'link', 'loading'].includes(s.step)) {
@@ -1138,14 +1189,25 @@ function start(root: HTMLElement) {
     else if (s.notice) status.push(el('p', s.notice, 'ppp-warn'));
     if (a.mode === 'open' && likeTried && s.likeFunds?.album && s.likeFunds.low && !s.likeFunds.pending)
       status.push(el('p', 'Likes are paused: My player needs a few plays to sign them.', 'ppp-warn'));
-    const hint = 'Kept on this device with Face ID or your passkey. No app or account needed.';
+    let hint = 'Kept on this device with Face ID or your passkey. No app or account needed.';
     let primary: AlbumInput['primary'] = null, secondary: AlbumInput['secondary'] = null;
     if (a.mode === 'locked') {
       primary = { label: 'Continue listening', run: () => { resumeAlbum = readLastAlbum(); void ppp.unlock(); } };
       secondary = { label: 'Use a different passkey', run: () => { resumeAlbum = null; void ppp.unlock(true); } };
     } else if (a.mode === 'arrive') {
-      if (s.step === 'intro') {
-        primary = { label: 'Open album', run: () => void ppp.create() };
+      if (s.step === 'intro' && previewLive(preview) && preview.album === a.player.id) {
+        // The free first song: play before anything is set up. Making the player is the second button, never a gate.
+        const radio = (window as any).XtrataRadio;
+        const first = listedTracks(a.player)[0];
+        const going = preview.phase === 'playing';
+        const sounding = going && !!radio?.getState?.()?.playing;
+        primary = { label: sounding ? 'Pause' : going ? 'Carry on' : 'Play the first song', run: () => { if (going) radio?.playPause?.(); else if (first) radio?.playToken?.(first.id); } };
+        secondary = { label: 'Make my player and hear it all', run: () => void ppp.create() };
+        hint = 'The first song is free. Nothing to set up yet.';
+      } else if (s.step === 'intro') {
+        const heardFirst = preview.phase === 'done' && preview.album === a.player.id;
+        if (heardFirst && !status.length) status.push(el('p', 'That was the first song. Make your player to hear the rest: one tap with Face ID or your fingerprint.', 'ppp-cyan'));
+        primary = { label: heardFirst ? 'Keep listening' : 'Open album', run: () => void ppp.create() };
         secondary = { label: "I've used Xtrata Music here before", run: () => void ppp.unlock(true) };
       } else if (s.step === 'locked') {
         primary = { label: 'Open album', run: () => void ppp.unlock() };
@@ -1164,12 +1226,18 @@ function start(root: HTMLElement) {
 
   // Song titles and artists from the radio itself, for history and messages.
   const titles = new Map<number, { title?: string; artist?: string }>();
+  let previewSounding = false;
   const watchRadio = () => {
     const api = (window as any).XtrataRadio;
     if (!api?.subscribe) return false;
     api.subscribe((st: any) => {
       const np = st?.nowPlaying;
       if (np && Number.isSafeInteger(Number(np.tokenId))) titles.set(Number(np.tokenId), { title: np.title || undefined, artist: np.artist || undefined });
+      if (previewLive(preview)) {
+        const sounding = !!st?.playing;
+        advancePreview({ kind: 'now', track: np && np.tokenId != null ? String(np.tokenId) : null, playing: sounding, at: Date.now() });
+        if (sounding !== previewSounding) { previewSounding = sounding; render(ppp.snapshot()); } // the button follows play / pause
+      }
     });
     return true;
   };
@@ -1181,6 +1249,7 @@ function start(root: HTMLElement) {
   // A play is 30 seconds of audible listening (half of a shorter song); skips stay free.
   window.addEventListener('xtrata:radio-listened', (e) => {
     const d = (e as CustomEvent).detail;
+    if (previewLive(preview)) advancePreview({ kind: 'listened', at: Date.now() });
     if (d && Number.isSafeInteger(d.song) && typeof d.id === 'string' && /^[0-9a-f]{32}$/.test(d.id)) { loadCatalogue(); const n = songName(d.song, titles.get(d.song)); void ppp.onListened({ song: d.song, id: d.id, title: n.title || undefined, artist: n.artist || undefined }); }
   });
   window.addEventListener('xtrata:wallet-changed', () => void ppp.refresh());
