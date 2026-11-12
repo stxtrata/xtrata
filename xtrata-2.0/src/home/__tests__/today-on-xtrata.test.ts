@@ -124,7 +124,8 @@ describe('wall rotation with a daily feature', () => {
 describe('homepage wiring', () => {
   const src = readFileSync(new URL('../homepage.js', import.meta.url), 'utf8');
   it('passes the day to the wall, redraws at UK midnight and keeps daily out of the recent list', () => {
-    expect(src).toContain('todayEntry(nowMs()');
+    expect(src).toContain('todayEntry(now');
+    expect(src).toContain('wallRefreshDelay');
     expect(src).toContain('fetchClockOffset');
     // album days: playing a track from the card puts the radio in album mode, in the card's order
     expect(src).toContain('api.setGiftPlayer({ id: wallAlbum.id');

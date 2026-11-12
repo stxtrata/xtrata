@@ -72,7 +72,7 @@ export function plainLines(step: Step, o: { played: boolean; arriving: boolean }
       if (o.arriving) return [];
       return [
         o.played ? 'Out of plays.' : 'No plays yet.',
-        'Plays come with music someone shares with you. Paying by card is on its way; other ways to add plays are under “This device”.'
+        'Tap “Add plays” to top up, or open an album someone shares with you.'
       ];
     case 'over':
       return ['Your player is holding more than it should, so plays are paused. Open “This device” below to send the extra back.'];

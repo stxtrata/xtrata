@@ -32,6 +32,8 @@ export interface GateConfig {
   limits: { playFee: string; returnFee: string; maxSessionPlays: number; sessionHours: number };
   /** Gift wallets (functions/lib/radio-gifts.ts): off unless the deployment has a gift treasury. */
   gifts?: { enabled: boolean; treasury: string | null; turnstileSiteKey: string | null; admin: boolean; fee: string };
+  /** Ways to add plays beyond sending STX (src/lib/listening-wallet/restock.ts). Absent: STX only. */
+  restock?: { sbtc?: boolean; card?: boolean };
 }
 /** What the server knows about a gifted listening wallet (GET /radio/gift/for). */
 export interface GiftInfo {

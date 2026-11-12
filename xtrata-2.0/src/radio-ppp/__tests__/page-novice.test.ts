@@ -67,7 +67,7 @@ const mainPath = (root: Element) => [root.querySelector('.ppp-key'), root.queryS
 const buttons = (root: Element | null) => [...(root?.querySelectorAll('button') ?? [])].map((b) => b.textContent);
 const say = (st: { playing: boolean; nowPlaying: any }) => { h.state = st; for (const fn of h.feeds) fn(st); };
 
-beforeEach(() => { vi.unstubAllGlobals(); delete (window as any).XtrataRadio; localStorage.clear(); h.route = null; });
+beforeEach(() => { vi.unstubAllGlobals(); delete (window as any).XtrataRadio; localStorage.clear(); sessionStorage.clear(); h.route = null; document.querySelectorAll('dialog').forEach((d) => d.remove()); for (const k of ['view', 'welcome', 'asking', 'noviceBoot']) delete document.documentElement.dataset[k]; });
 
 const STEPS: [string, object][] = [
   ['a new listener', { step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null, giftStop: { reason: 'setup', text: 'SET UP YOUR PLAYER TO LISTEN' } }],
@@ -183,5 +183,192 @@ describe('novice preview: one free first song from a shared album', () => {
     h.changed();
     expect(h.radio.setGiftStop).toHaveBeenLastCalledWith('YOUR PLAYS ARE ARRIVING');
     expect(h.radio.setGiftLock).toHaveBeenLastCalledWith(false);
+  });
+});
+
+describe('novice welcome: a newcomer sees one short page, not the whole radio', () => {
+  const NEW = { step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null, giftStop: { reason: 'setup', text: 'SET UP YOUR PLAYER TO LISTEN' } };
+  const page = () => document.getElementById('album')!;
+  const named = (re: RegExp) => [...page().querySelectorAll('button')].find((b) => re.test(b.textContent || '')) as HTMLButtonElement | undefined;
+  const html = () => document.documentElement;
+
+  it('no player on this device: one button makes it, and nothing on the page is a crypto word', async () => {
+    await open(NEW);
+    expect(html().dataset.view).toBe('album'); // the radio and the panel are hidden behind it
+    expect(html().dataset.welcome).toBe('new');
+    expect(text(page())).toContain('Music that pays the artist');
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+    expect(buttons(page())).toEqual(['Make my player', 'I’ve listened here before', 'Look around first']);
+    named(/Make my player/)!.click();
+    expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1);
+    named(/listened here before/)!.click();
+    expect(h.calls.filter(([n]) => n === 'unlock')).toEqual([['unlock', [true]]]);
+  });
+
+  it('while the box asks for a tap the page points to it, and a cancelled passkey is said plainly', async () => {
+    await open({ ...NEW, busy: 'Waiting for your passkey…' });
+    expect(html().dataset.asking).toBe('1');
+    expect(text(page())).toContain('Continue in the box below.');
+    expect(named(/Make my player/)).toBeUndefined();
+    h.snap = { ...h.snap, busy: null, error: 'The passkey request was cancelled or timed out. Try again when ready.' };
+    h.changed();
+    expect(html().dataset.asking).toBeUndefined();
+    expect(text(page())).toContain('cancelled or timed out');
+    expect(named(/Make my player/)).toBeTruthy();
+  });
+
+  it('"Look around first" opens the full radio for this visit', async () => {
+    await open(NEW);
+    named(/Look around first/)!.click();
+    expect(html().dataset.view).toBeUndefined();
+    expect(html().dataset.welcome).toBeUndefined();
+    expect(page().hidden).toBe(true);
+    expect(sessionStorage.getItem('xtrata.radio.novice.full')).toBe('1');
+  });
+
+  it('a locked player: welcome back, one tap to unlock', async () => {
+    await open({ step: 'locked', balance: undefined, session: null, giftStop: { reason: 'locked', text: 'UNLOCK TO LISTEN' } });
+    expect(html().dataset.welcome).toBe('back');
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+    named(/Unlock my player/)!.click();
+    expect(h.calls.filter(([n]) => n === 'unlock')).toEqual([['unlock', []]]);
+  });
+
+  it('a player with no plays says so and leads to "Add plays"', async () => {
+    await open({ step: 'fund', balance: 0n, playsLeft: 0, session: null, giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } });
+    expect(html().dataset.welcome).toBe('empty');
+    expect(text(page())).toContain('Your player is ready');
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+    expect(buttons(page())).toEqual(['Add plays', 'Look around the radio']);
+    named(/Add plays/)!.click();
+    const sheet = document.querySelector('dialog.ppp-restock')!;
+    expect(text(sheet)).toContain('Your player is out of plays.');
+    expect(text(sheet)).toContain(ME);
+  });
+
+  it('holds a quiet screen until it knows who this is, then gets out of the way for a listener with plays', async () => {
+    await open({ step: 'off', gate: null, solo: false });
+    expect(html().dataset.welcome).toBe('checking');
+    expect(text(page())).toContain('One moment');
+    h.snap = { ...base, entries: PLAYED };
+    h.changed();
+    expect(html().dataset.welcome).toBeUndefined();
+    expect(html().dataset.view).toBeUndefined();
+  });
+
+  it('never shows for a listener who connected a Stacks wallet', async () => {
+    await open({ step: 'connect', solo: false, listening: undefined, balance: undefined, session: null });
+    expect(html().dataset.welcome).toBeUndefined();
+    expect(html().dataset.view).toBeUndefined();
+  });
+
+  // Checked on this page's own mount, not on <html>: pages opened by earlier tests are still alive (their timers
+  // redraw from the shared fake) and write to the same document element, but only this page owns this mount.
+  it('never shows with the flag off', async () => {
+    await open(NEW, null);
+    expect(page().hidden).toBe(true);
+    expect(page().childElementCount).toBe(0);
+    expect(text(document.getElementById('ppp'))).toContain('Start listening'); // the classic panel, as before
+  });
+});
+
+describe('a free starter player: claimed, arriving, landed', () => {
+  const NEW = { step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null, giftStop: { reason: 'setup', text: 'SET UP YOUR PLAYER TO LISTEN' } };
+  const page = () => document.getElementById('album')!;
+  const named = (re: RegExp) => [...page().querySelectorAll('button')].find((b) => re.test(b.textContent || '')) as HTMLButtonElement | undefined;
+  const html = () => document.documentElement;
+  const starter = (status = 'live') => {
+    localStorage.setItem('xtrata.radio.gift.incoming.v1', JSON.stringify({ code: 'ABCDEFGHJKMNPQRSTVWXYZ', at: Date.now() }));
+    h.route = (url) => (url.endsWith('/radio/gift/status') ? new Response(JSON.stringify({ status, amount: '100000', source: 'batch', from: null, label: '', expires: 0, player: null })) : undefined);
+  };
+
+  it('the link opens on one screen: how many plays, what a player is, one button', async () => {
+    starter();
+    await open(NEW);
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
+    expect(text(page())).toContain('Your free player is waiting');
+    expect(text(page())).toContain('277 plays');
+    expect(text(page())).toContain('Play any song you like');
+    expect(text(page())).toContain('It pays the artist');
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+    named(/Claim my player/)!.click();
+    expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1);
+  });
+
+  it('after the tap it waits calmly for the plays, then says "You’re in" and starts the music', async () => {
+    starter();
+    await open(NEW);
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
+    // The player now exists and is empty: the gift is on its way.
+    h.snap = { ...base, step: 'fund', balance: 0n, playsLeft: 0, session: null, createdHere: true, giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } };
+    h.changed();
+    expect(html().dataset.welcome).toBe('arriving');
+    expect(text(page())).toContain('Your player is made');
+    expect(page().querySelector('.ppp-bad')).toBeNull(); // never looks failed while it is on its way
+    expect(text(page())).not.toMatch(/No plays|out of plays|Add plays/i);
+    // The plays land.
+    h.snap = { ...base, step: 'ready', balance: 100_000n, playsLeft: 277, gift: { player: null, from: null, source: 'batch', amount: '100000' }, giftPlays: 277 };
+    localStorage.removeItem('xtrata.radio.gift.incoming.v1');
+    h.changed();
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('landed'));
+    expect(text(page())).toContain('You’re in');
+    expect(text(page())).toContain('277 plays');
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+    named(/Start listening/)!.click();
+    expect(h.radio.playPause).toHaveBeenCalledTimes(1);
+    expect(html().dataset.view).toBeUndefined(); // the radio itself
+  });
+
+  it('someone who already has a player is asked, kindly, to pass it on', async () => {
+    starter();
+    const root = await open({ entries: PLAYED, createdHere: false });
+    await vi.waitFor(() => expect(text(root.querySelector('.ppp-key'))).toContain('You already have a player'));
+    expect(text(root.querySelector('.ppp-key'))).toContain('Pass it on and bring them in');
+    expect(buttons(root.querySelector('.ppp-key'))).toEqual(expect.arrayContaining(['Copy the link to pass on', 'Forget this gift link here']));
+    expect(text(root.querySelector('.ppp-key'))).not.toMatch(/brand-new listening wallets/);
+  });
+});
+
+describe('"Add plays": where running out leads', () => {
+  const sheet = () => document.querySelector('dialog.ppp-restock');
+  const OUT = { step: 'fund', balance: 3_100n, playsLeft: 0, session: null, entries: PLAYED, createdHere: false, giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } };
+  const press = (root: Element, re: RegExp) => ([...root.querySelectorAll('button')].find((b) => re.test(b.textContent || '')) as HTMLButtonElement).click();
+
+  it('a played-out player has one primary button, with packs in plays and exactly what to send', async () => {
+    const root = await open(OUT);
+    expect(buttons(root.querySelector('.ppp-actions:not(.ppp-actions2)'))![0]).toBe('Add plays');
+    press(root, /^Add plays$/);
+    expect(text(sheet())).toContain('Your player is out of plays.');
+    expect(text(sheet())).toContain('So far your player has paid for 1 play to 1 artist');
+    expect(buttons(sheet()).slice(0, 4)).toEqual(['100plays', '250plays', '500plays', '1,000plays']);
+    expect(text(sheet())).toContain('Send 0.0875 STX to your player'); // 250 plays, chosen to start with
+    expect(text(sheet())).toContain(ME);
+    press(sheet()!, /^1,000plays$/);
+    expect(text(sheet())).toContain('Send 0.35 STX to your player');
+  });
+
+  it('card and Bitcoin are there but off until the deployment switches them on', async () => {
+    const root = await open(OUT);
+    press(root, /^Add plays$/);
+    const ways = [...sheet()!.querySelectorAll('.ppp-restock__way')] as HTMLButtonElement[];
+    expect(ways.map((b) => [b.querySelector('b')!.textContent, b.disabled])).toEqual([['STX', false], ['Card', true], ['Bitcoin', true]]);
+    expect(ways.slice(1).every((b) => /Soon/.test(b.textContent || ''))).toBe(true);
+  });
+
+  it('says so when plays are already on their way, or when the balance cannot be read', async () => {
+    const root = await open({ step: 'ready', balanceState: 'low', balance: 20_000n, playsLeft: 48, entries: PLAYED });
+    press(root, /^Add plays$/);
+    expect(text(sheet())).toContain('Your player has 48 plays left.');
+    h.snap = { ...h.snap, depositPending: true };
+    h.changed();
+    expect(text(sheet())).toContain('already on their way');
+    expect(sheet()!.querySelector('.ppp-restock__packs')).toBeNull();
+  });
+
+  it('a pack that would take the player over its limit cannot be chosen', async () => {
+    const root = await open({ step: 'ready', balance: 800_000n, playsLeft: 2277, entries: PLAYED });
+    press(root, /^Add plays$/);
+    const packs = [...sheet()!.querySelectorAll('.ppp-restock__pack')] as HTMLButtonElement[];
+    expect(packs.map((b) => b.disabled)).toEqual([false, false, false, true]);
   });
 });

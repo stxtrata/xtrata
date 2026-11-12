@@ -69,3 +69,27 @@ export const buildTodayCard = (item, helpers, { total = 14, eager = true } = {})
   }
   return card;
 };
+
+// The Bitcoin Monkeys announcement (bitcoin-monkeys-feature.js): the whole square poster, never cropped, with the
+// plain-text statement and the one link in a separate band underneath so both stay readable on any screen.
+export const buildPosterTile = (item, helpers, { eager = true } = {}) => {
+  const { element, image, actionLink } = helpers;
+  const card = element('article', `home-tile home-tile--big home-tile--poster home-tone--${item.tone || 'violet'}`);
+  card.dataset.daily = 'poster';
+  card.dataset.wallSlot = item.slot || '';
+  card.dataset.wallId = item.id;
+  card.setAttribute('aria-label', item.statement);
+
+  const art = element('div', 'home-tile__poster');
+  art.append(image(item.image, item.alt, 'home-tile__poster-img', { eager }));
+
+  const band = element('div', 'home-tile__poster-band');
+  const words = element('div', 'home-tile__poster-words');
+  words.append(element('span', 'home-tile__eyebrow', item.kicker), element('p', 'home-tile__poster-copy', item.statement));
+  band.append(
+    words,
+    actionLink(item.cta.href, item.cta.label, 'home-btn home-btn--solid home-tile__poster-cta', `feature:${item.id}`, { newTab: true })
+  );
+  card.append(art, band);
+  return card;
+};

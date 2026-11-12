@@ -12,6 +12,9 @@
 // passed in. It always takes the first slot, big-a, the arcade moves to big-b, and nothing the
 // daily card lists in `avoid` / `avoidSongs` appears anywhere else on the wall. Without `daily`
 // everything behaves exactly as before.
+//
+// The same slot also takes the Bitcoin Monkeys announcement (bitcoin-monkeys-feature.js): it is passed as `daily`
+// too (kind 'daily', with its own `avoid` list), so it is pinned in big-a and never swapped away.
 
 export const WALL_SLOT_ORDER = Object.freeze(['big-a', 'big-b', 'chess', 'song-1', 'song-2', 'wide', 'tall']);
 

@@ -116,6 +116,19 @@ export function createGifts(deps: GiftDeps) {
     if (!v?.player || !liveGift()) return null;
     return { player: v.player, from: fromLabel(v), plays: giftPlays(BigInt(v.amount)) };
   };
+  /** A live gift link with no album: a free starter player (plays for any music), before it is claimed. */
+  const incomingStarter = () => {
+    const v = incoming?.view;
+    if (!v || v.player || !liveGift()) return null;
+    return { plays: giftPlays(BigInt(v.amount)), from: v.from ? deps.who(v.from) : null };
+  };
+  /** The link to pass on when this device cannot use the gift itself. */
+  const passOn = (): HTMLElement[] => {
+    const code = incoming?.code;
+    if (!code) return [];
+    const url = `${location.origin}${location.pathname}#gift=${code}`;
+    return [copyButton('gift-pass-on', 'Copy the link to pass on', () => url, 'primary', deps.changed)];
+  };
   /**
    * "Not now": forget the link on this device without touching the gift itself. It stays unclaimed on the
    * server, so opening the same link again brings it back (until it is claimed or expires).
@@ -278,7 +291,10 @@ export function createGifts(deps: GiftDeps) {
     const out: HTMLElement[] = [];
     if (incoming!.claiming || incoming!.waiting) out.push(el('p', incoming!.waiting ? 'Another gift is on its way out first. Yours is next…' : sending, 'ppp-cyan'));
     else if (incoming!.retry) out.push(el('p', incoming!.retry.text, 'ppp-warn'), button('Try now', () => { clearTimeout(retryTimer); incoming!.retry = undefined; void claim(s); }, 'quiet'));
-    if (incoming!.error) out.push(el('p', incoming!.error, 'ppp-bad'), button('Try again', () => { incoming!.error = undefined; void claim(s); }));
+    // Already theirs (the server allows one copy of an album per passkey): not a failure. This copy can go to a friend.
+    if (incoming!.error && /already have this album/i.test(incoming!.error))
+      out.push(el('p', 'You already have this album: it is in My albums. This copy is still free, so pass it on to a friend who would love it.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet'));
+    else if (incoming!.error) out.push(el('p', incoming!.error, 'ppp-bad'), button('Try again', () => { incoming!.error = undefined; void claim(s); }));
     return out;
   }
 
@@ -313,12 +329,12 @@ export function createGifts(deps: GiftDeps) {
     // so it does not read as if this wallet were the gift.
     const notNew = !!s.listening && (!(s.createdHere || s.brandNew) || !!s.linked || !!s.creditedTo || (s.balance ?? 0n) > 0n || s.entries.length > 0);
     if (notNew)
-      return [el('p', '🎁 A gift link is also waiting on this device. Gifts are for brand-new listening wallets, not this one: share the link with someone new.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet')];
+      return [el('p', '🎁 You already have a player, so this free one is for someone new. Know a friend or someone in your family who loves music? Pass it on and bring them in.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet')];
     const amount = BigInt(v.amount);
     const plays = giftPlays(amount).toLocaleString();
     const head = el('p',
       `🎁 ${fromLabel(v)} sent you ${stxNice(amount)} STX of on-chain music: about ${plays} paid plays.`, 'ppp-gift');
-    const out: HTMLElement[] = [head];
+    const out: HTMLElement[] = opts.bare ? [] : [head];
     // Only a brand-new, empty wallet with no main wallet linked takes a gift automatically. A listener who
     // unlocks a wallet they already had (e.g. one linked to their Stacks wallet) keeps the gift link for later.
     const ready = !!s.listening && (s.createdHere || s.brandNew) && !s.linked && !s.creditedTo && s.step === 'fund' && (s.balance ?? 1n) === 0n && !s.depositPending && !s.entries.length;
@@ -327,9 +343,9 @@ export function createGifts(deps: GiftDeps) {
       if (siteKey && !turnstile.token) { out.push(el('p', 'One quick check and it is yours:', 'ppp-mute'), turnstileBox(siteKey)); }
       else if (!incoming.claiming && !incoming.error && !incoming.waiting && !incoming.retry) later(() => claim(s));
       out.push(...claimLines(s, 'Sending your gift…'));
-    } else if (s.step === 'intro') out.push(el('p', 'Tap below and use your face or fingerprint. Your gift arrives in a few seconds.', 'ppp-mute'));
-    else if (s.listening && s.linked) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one is linked to a Stacks wallet. The link still works for someone new.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet'));
-    else if (s.listening && (s.balance ?? 0n) > 0n) out.push(el('p', 'Gifts are for brand-new listening wallets, and this one already has funds. Share the link with someone new instead.', 'ppp-mute'), button('Forget this gift link here', setAside, 'quiet'));
+    } else if (s.step === 'intro') { if (!opts.bare) out.push(el('p', 'Tap below and use your face or fingerprint. Your gift arrives in a few seconds.', 'ppp-mute')); }
+    else if (s.listening && s.linked) out.push(el('p', 'You already have a player linked to your Stacks wallet, so this free one is for someone new. Know a friend who loves music? Pass it on and bring them in.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet'));
+    else if (s.listening && (s.balance ?? 0n) > 0n) out.push(el('p', 'Your player already has plays, so this free one is for someone new. Know a friend or someone in your family who loves music? Pass it on and bring them in.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet'));
     return out;
   }
 
@@ -604,5 +620,5 @@ export function createGifts(deps: GiftDeps) {
 
   /** The gift code still waiting on this device (to carry it to another browser), or null. */
   const pendingCode = () => (incoming && !incoming.done && (!incoming.view || incoming.view.status === 'live') ? incoming.code : null);
-  return { banner, funder, renderFold, liveGift, incomingAlbum, setAside, pendingCode, inProgress };
+  return { banner, funder, renderFold, liveGift, incomingAlbum, incomingStarter, setAside, pendingCode, inProgress };
 }

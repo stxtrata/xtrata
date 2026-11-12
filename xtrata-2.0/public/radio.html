@@ -9,6 +9,16 @@
 <script>
 // Set before the audio engine loads so a slow or unavailable wallet check cannot open playback.
 if (location.hostname === 'radio.xtrata.xyz') document.documentElement.dataset.radioPaidOnly = 'true';
+// Novice mode (src/radio-ppp/novice.ts, off unless asked for): hold the page blank until the panel knows whether this
+// visitor gets the one-button welcome screen, so the full radio never flashes by first. Released after 10 s regardless.
+try {
+  var nv = new URLSearchParams(location.search).get('novice');
+  if (nv !== '0' && /^(1|preview)$/.test(nv === '1' || nv === 'preview' ? nv : localStorage.getItem('xtrata.radio.novice') || '') && sessionStorage.getItem('xtrata.radio.novice.full') !== '1') {
+    var de = document.documentElement;
+    de.dataset.view = 'album'; de.dataset.noviceBoot = '1';
+    setTimeout(function () { if (de.dataset.noviceBoot) { delete de.dataset.noviceBoot; delete de.dataset.view; } }, 10000);
+  }
+} catch (e) { /* storage blocked: the classic page */ }
 </script>
 <script>
 // Gift links carry their code after "#" (browsers never send it to a server). Move it to this device
@@ -503,6 +513,41 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .al-status button{margin-top:6px;min-height:40px;padding:0 14px!important;border:1px solid #343b46!important;border-radius:10px}
   .al-status a{color:#7fe3f5}
   .al-grow{flex:1;min-height:16px}
+  .al-body--welcome{justify-content:center;min-height:calc(100vh - 140px)}
+  .al-welcome{text-align:center;max-width:440px;margin:0 auto;width:100%}
+  .al-welcome h1{margin:0;font-size:30px;letter-spacing:-.02em;line-height:1.15;color:#f2f0ea}
+  .al-welcome>p{margin:12px 0 0;color:#a3aab5;font-size:16px;line-height:1.5}
+  .al-welcome .al-welcome-note{font-size:13px;color:#8f97a3}
+  .al-welcome .al-welcome-wait{font-size:14px;color:#8f97a3}
+  .al-welcome .al-primary{margin-top:28px}
+  .howto{margin:12px 0 0;border:1px solid var(--line);border-radius:12px;padding:0 14px}
+  .howto summary{cursor:pointer;padding:11px 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+  .howto dl{margin:0 0 12px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;line-height:1.45}
+  .howto dt{font-weight:800;white-space:nowrap}.howto dd{margin:0;color:var(--mut)}
+  @media (max-width:520px){.howto dl{grid-template-columns:1fr}.howto dd{margin-bottom:6px}}
+  .al-welcome-points{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:10px;text-align:left}
+  .al-welcome-points li{border:1px solid #262c35;border-radius:12px;padding:12px 14px;background:#12151a}
+  .al-welcome-points b{display:block;font-size:15px;color:#f2f0ea}
+  .al-welcome-points span{display:block;margin-top:2px;font-size:13.5px;line-height:1.45;color:#a3aab5}
+  .al-welcome .al-status .ppp-wait{margin:8px 0 0}
+  .ppp-restock{width:min(440px,calc(100vw - 24px));max-height:calc(100vh - 32px);overflow:auto}
+  .ppp-restock p{margin:0 0 10px;font-size:14px;line-height:1.5}
+  .ppp-restock__left{font-size:15px!important;font-weight:700}
+  .ppp-restock__done{color:var(--cyan)}
+  .ppp-restock__wait,.ppp-restock__note,.ppp-restock__why{color:var(--mut)}
+  .ppp-restock__packs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:14px 0 10px}
+  .ppp-restock__pack,.ppp-restock__way{font:inherit;color:inherit;background:none;border:1px solid var(--line);border-radius:12px;cursor:pointer;min-height:56px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+  .ppp-restock__pack b{font-size:17px}.ppp-restock__pack span,.ppp-restock__way span{font-size:11.5px;color:var(--mut)}
+  .ppp-restock__ways{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 14px}
+  .ppp-restock__way b{font-size:14px}
+  .ppp-restock__pack.is-on,.ppp-restock__way.is-on{border-color:var(--cyan);background:rgba(var(--glow),.1)}
+  .ppp-restock__pack:disabled,.ppp-restock__way:disabled{opacity:.5;cursor:not-allowed}
+  .ppp-restock__pack:focus-visible,.ppp-restock__way:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .ppp-restock__pay{border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 12px}
+  .ppp-restock__amount b{font-size:17px;color:var(--cyan)}
+  .ppp-restock__addr{word-break:break-all;font-size:12.5px!important}
+  .ppp-restock__row{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+  @media (max-width:380px){.ppp-restock__packs{grid-template-columns:repeat(2,minmax(0,1fr))}}
   .al-primary{width:100%;height:56px;border-radius:14px;background:#7fe3f5!important;color:#0b0d10!important;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;gap:10px}
   .al-hint{margin:10px 0 0;font-size:12px;color:#8f97a3;text-align:center;line-height:1.5}
   .al-hint--ask{font-size:15px;color:#7fe3f5}
@@ -656,13 +701,13 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <span class="tl-t" id="tDur">–:––</span>
     </div>
     <div class="ctl">
-      <button class="cbtn power" id="power" title="Power">⏻</button>
-      <button class="cbtn" id="prev" title="Previous">⏮</button>
-      <button class="cbtn big" id="pp" title="Play / pause">▶</button>
-      <button class="cbtn" id="next" title="Next">⏭</button>
-      <button class="cbtn heart" id="heart" title="Like on-chain">♥</button>
+      <button class="cbtn power" id="power" title="Switch the radio on or off" aria-label="Power">⏻</button>
+      <button class="cbtn" id="prev" title="Previous song" aria-label="Previous song">⏮</button>
+      <button class="cbtn big" id="pp" title="Play or pause" aria-label="Play or pause">▶</button>
+      <button class="cbtn" id="next" title="Next song. Skipping is free: a song only counts once you have heard 30 seconds of it." aria-label="Next song">⏭</button>
+      <button class="cbtn heart" id="heart" title="Like this song: it joins your station and is saved on the public record">♥</button>
       <span class="grow"></span>
-      <button class="chip" id="presetBtn" type="button" title="FM: curated songs only, or curated plus new on-chain music">FM: ALL</button>
+      <button class="chip" id="presetBtn" type="button" title="What FM plays. ALL: hand-picked songs plus everything new. CURATED: hand-picked songs only. Tap to switch.">FM: ALL</button>
     </div>
     <div class="tuner" id="tuner" role="slider" tabindex="0" aria-label="Tuning strip: every song by inscription number" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" hidden>
       <div class="ticks" id="ticks"></div>
@@ -670,10 +715,21 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <div class="tunerLabel"><span id="tunerFrom"></span><b id="tunerNow">Tap or drag to tune</b><span id="tunerTo"></span></div>
     </div>
     <div class="stations" id="bands" role="group" aria-label="Stations">
-      <button type="button" data-b="fm"><b><i class="lamp"></i>FM</b><span>Curated + new on-chain</span></button>
-      <button type="button" data-b="liked"><b><i class="lamp"></i>LIKED</b><span>Your likes, your order</span></button>
-      <button type="button" data-b="chain"><b><i class="lamp"></i>CHAIN</b><span>Every song by number</span></button>
+      <button type="button" data-b="fm" title="Xtrata’s own mix: hand-picked songs and new arrivals. The place to discover music."><b><i class="lamp"></i>FM</b><span>Curated + new on-chain</span></button>
+      <button type="button" data-b="liked" title="Your own station: only the songs you have liked, in your order."><b><i class="lamp"></i>LIKED</b><span>Your likes, your order</span></button>
+      <button type="button" data-b="chain" title="The whole catalogue: every song ever added, in the order it was added."><b><i class="lamp"></i>CHAIN</b><span>Every song by number</span></button>
     </div>
+    <details class="howto" id="howto">
+      <summary>What do these do?</summary>
+      <dl>
+        <dt>FM</dt><dd>Xtrata’s own mix: hand-picked songs and new arrivals. Start here to discover music. The <b>FM: ALL / CURATED</b> button chooses between everything and hand-picked only.</dd>
+        <dt>LIKED</dt><dd>Your own station. Tap ♥ on any song and it joins this list, in your order.</dd>
+        <dt>CHAIN</dt><dd>The whole catalogue, every song in the order it was added. Good for digging.</dd>
+        <dt>The strip of lines</dt><dd>Every song side by side. Tap or drag to jump straight to one.</dd>
+        <dt>⏭ Next</dt><dd>Skip whenever you like. A song only counts as a play once you have heard 30 seconds of it.</dd>
+        <dt>♥ Like</dt><dd>Saves the song to your station and to the public record, where the artist can see it too.</dd>
+      </dl>
+    </details>
     <div class="relwrap" id="relWrap" style="display:none">
       <span class="cap">ALSO ON THIS FREQUENCY</span>
       <div class="relrow" id="relRow"></div>
@@ -1103,7 +1159,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=ab45a5996f66');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=7c673588782b');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
