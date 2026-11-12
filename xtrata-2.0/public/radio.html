@@ -567,6 +567,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .tier-disc--big .tier-disc__mark{font-size:0}
   @keyframes tier-spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.ppp-tier,.tier-disc--big{animation:none}}
+  .al-tt .exp{margin-left:6px}
+  .exp{display:inline-block;font-size:9.5px;font-weight:800;line-height:1;padding:2px 4px;border-radius:3px;background:var(--mut);color:var(--bg);vertical-align:middle;letter-spacing:0}
   .howto{margin:12px 0 0;border:1px solid var(--line);border-radius:12px;padding:0 14px}
   .howto summary{cursor:pointer;padding:11px 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
   .howto dl{margin:0 0 12px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;line-height:1.45}
@@ -967,7 +969,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       var i=ids.indexOf(l.tokenId);
       var row=document.createElement('li');row.className='lrow'+(l.tokenId===np?' now':'');row.draggable=!q;
       var grip=document.createElement('span');grip.className='grip';grip.textContent='⋮⋮';grip.title='Drag to reorder';
-      var t=document.createElement('button');t.type='button';t.className='lt';t.title='Play now';t.textContent=l.title||nameOf(l.tokenId);
+      var t=document.createElement('button');t.type='button';t.className='lt';t.title='Play now';t.textContent=l.title||nameOf(l.tokenId);if(api&&api.isExplicit&&api.isExplicit(l.tokenId)){var ex=document.createElement('span');ex.className='exp';ex.textContent='E';ex.title='Explicit lyrics';t.appendChild(document.createTextNode(' '));t.appendChild(ex);}
       var a=document.createElement('span');a.className='la';a.textContent=l.artist||('#'+l.tokenId);
       var up=document.createElement('button');up.type='button';up.className='mv up';up.textContent='↑';up.title='Move up';up.disabled=i===0;
       var dn=document.createElement('button');dn.type='button';dn.className='mv down';dn.textContent='↓';dn.title='Move down';dn.disabled=i===ids.length-1;
@@ -1188,7 +1190,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=6373837ac027" defer></script>
+<script src="/xtrata-radio.js?v=bd7e9d8df19c" defer></script>
 <script type="module" src="/radio/wallet.js?v=8a27a580ad6c"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -1213,7 +1215,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=bbb947316628');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=6104936efc0a');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
@@ -1287,6 +1289,34 @@ fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.time
     peers.forEach(function(w){say(w,'*',{type:'need-wallet',why:why})});
     show(why==='like'?'Likes are paid with your passkey wallet, which works in the pop-out window. Opening it…':'Your wallet and paid plays work in the pop-out window. Opening it…');
   },true);
+})();
+</script>
+<script>
+/* Explicit songs. The radio never plays one by itself (src/home/radio.js). This page fetches the full list (Xtrata's
+   marks plus album creators'), and shows the warning when a listener asks for one. Accepting is remembered on the device. */
+(function(){
+  var tries=0,t=setInterval(function(){
+    var api=window.XtrataRadio;
+    if(!api){if(++tries>100)clearInterval(t);return}
+    clearInterval(t);
+    if(!api.setExplicit)return;
+    fetch('/radio/gift/explicit',{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(d&&Array.isArray(d.ids))api.setExplicit(d.ids)}).catch(function(){});
+    var open=null;
+    window.XtrataRadioExplicitHandler=function(d){
+      if(open||!d||!/^\d{1,9}$/.test(String(d.id)))return;
+      var dlg=document.createElement('dialog');dlg.className='ppp-connect';dlg.setAttribute('aria-labelledby','explicit-title');open=dlg;
+      var h=document.createElement('h2');h.className='ppp-connect__title';h.id='explicit-title';h.textContent='Explicit lyrics';
+      var p=document.createElement('p');p.style.cssText='margin:0 0 14px;font-size:14px;line-height:1.5';p.textContent='This song has explicit lyrics. It only plays when you choose it. Play it?';
+      var yes=document.createElement('button');yes.type='button';yes.className='ppp-connect__opt is-music';yes.innerHTML='<b>Play it</b><span>Songs marked E will play when you choose them on this device.</span>';
+      var no=document.createElement('button');no.type='button';no.className='quiet ppp-connect__cancel';no.textContent='Not now';
+      yes.onclick=function(){dlg.close();api.allowExplicit(true);api.playToken(d.id)};
+      no.onclick=function(){dlg.close()};
+      dlg.addEventListener('close',function(){dlg.remove();open=null});
+      dlg.addEventListener('click',function(e){if(e.target===dlg)dlg.close()});
+      dlg.append(h,p,yes,no);document.body.appendChild(dlg);
+      if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');
+    };
+  },120);
 })();
 </script>
 </body>

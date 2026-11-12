@@ -40,6 +40,11 @@ export interface PlayerDefinition {
   tracks: number[];
   /** A catalogue token whose artwork fronts the player; defaults to the first track's. */
   cover: number | null;
+  /**
+   * Songs in `tracks` the creator marks as having explicit lyrics. The radio never plays a marked song by itself: only
+   * when the listener asks for it and accepts a warning. Optional; an album with none is exactly as before.
+   */
+  explicit?: number[];
 }
 
 /** No control characters, no angle brackets (the page uses textContent, this is belt and braces). */
@@ -63,12 +68,19 @@ export function validatePlayer(def: PlayerDefinition): PlayerDefinition {
     seen.add(id);
   }
   if (def.cover !== null && def.cover !== undefined && (!Number.isSafeInteger(def.cover) || def.cover < 1)) throw new Error('Cover is a catalogue token number.');
-  return { title: def.title, subtitle: def.subtitle ?? '', tracks: [...def.tracks], cover: def.cover ?? null };
+  const explicit = def.explicit ?? [];
+  if (!Array.isArray(explicit)) throw new Error('Explicit songs: a list of song numbers from the album.');
+  for (const id of explicit) if (!seen.has(id)) throw new Error('An explicit song must be one of the album’s songs.');
+  const marked = [...new Set(explicit)].sort((a, b) => a - b);
+  return { title: def.title, subtitle: def.subtitle ?? '', tracks: [...def.tracks], cover: def.cover ?? null, ...(marked.length ? { explicit: marked } : {}) };
 }
 
 /** The same definition always hashes the same, whatever key order it arrived in. */
-export const playerHash = (def: PlayerDefinition) =>
-  bytesToHex(sha256(new TextEncoder().encode(JSON.stringify({ title: def.title, subtitle: def.subtitle ?? '', tracks: def.tracks, cover: def.cover ?? null }))));
+export const playerHash = (def: PlayerDefinition) => {
+  // `explicit` joins the hash only when a song is marked, so every album made before the mark existed hashes as it did.
+  const marked = [...new Set(def.explicit ?? [])].sort((a, b) => a - b);
+  return bytesToHex(sha256(new TextEncoder().encode(JSON.stringify({ title: def.title, subtitle: def.subtitle ?? '', tracks: def.tracks, cover: def.cover ?? null, ...(marked.length ? { explicit: marked } : {}) }))));
+};
 
 /** What the admin signs: the hash of the definition, so the signature covers every song and word. */
 export interface PlayerRequest {
@@ -117,7 +129,7 @@ export interface PlayerView {
    * Resolved from the catalogue by the server: titles and artists are never typed in by the creator. `hidden`: a
    * hidden track, not listed, played only after a silence when the album ran start to finish without a skip.
    */
-  tracks: { id: number; title: string; artist: string; hidden?: true }[];
+  tracks: { id: number; title: string; artist: string; hidden?: true; explicit?: true }[];
   cover: number | null;
   /** True: when the paid plays run out the radio stops instead of carrying on for free. */
   paidOnly: true;

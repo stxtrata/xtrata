@@ -118,7 +118,16 @@ panel for a gift without an album, and the wallet box's own screens (a separate 
   is 29.8875 STX including the 0.003 STX fee per player (locked by `tiers.test.ts`).
 - **Albums every player comes loaded with**: `RADIO_FEATURED_PLAYERS` (gift player ids) → `GET /radio/gift/featured`.
   They are playlists, not wallets: opened from "Albums in your player" (or the "You're in" screen), played from the
-  listener's own plays, never locked, never shown over an album wallet's own album. Unset: nothing shows.
+  listener's own plays, never locked, never shown over an album wallet's own album. Unset: nothing shows. An entry
+  may be `id:Name to show` to give the album a different name in this list only (the stored title is untouched).
+- **Explicit songs**: one flag, two ways to set it. Xtrata marks a song in `EXPLICIT_SONGS`
+  (`src/lib/radio/artist-credits.mjs`, a code change and deploy). An album's creator marks songs when making the album
+  ("Explicit songs" in the admin box → `PlayerDefinition.explicit`, part of what they sign; albums without marks hash as
+  before). `GET /radio/gift/explicit` serves both together and the radio page hands it to the engine. The engine
+  (`src/home/radio.js`) never picks an explicit song itself on any band; `playToken` asks the page first
+  (`window.XtrataRadioExplicitHandler`, a warning pop-up in `public/radio.html`), and with no page to ask it is not
+  played. Accepting is remembered per device (`xtrata.radio.explicit.ok.v1`); after that an album run or the listener's
+  LIKED station may include it, FM and CHAIN still never bring one up. Marked songs show an "E".
 - **Find music** (`find.ts`, the 🔎 box above Your Station): search by song, artist or number and browse by artist,
   over `/radio/counts` with `artist-credits.mjs` corrections applied. The catalogue feed has no album field, so
   "by album" today means the featured albums.

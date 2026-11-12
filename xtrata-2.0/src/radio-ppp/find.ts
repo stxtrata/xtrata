@@ -73,6 +73,8 @@ export interface FindDeps {
   play(id: number): void;
   /** The song on air, to mark it in the list. */
   current(): number | null;
+  /** Is this song marked explicit? Such a song is shown with an E and asks before it plays. */
+  explicit?(id: number): boolean;
   /** An album that plays only its own songs is open: finding other music is off until the listener leaves it. */
   locked(): boolean;
 }
@@ -126,6 +128,7 @@ export function createFindBox(mount: HTMLElement, deps: FindDeps) {
       const b = el('button', 'lt', s.title) as HTMLButtonElement;
       b.type = 'button'; b.title = `Play “${s.title}”${s.artist ? ` by ${s.artist}` : ''}`;
       b.onclick = () => deps.play(s.id);
+      if (deps.explicit?.(s.id)) { const e = el('span', 'exp', 'E'); e.title = 'Explicit lyrics: only plays when you choose it'; b.append(' ', e); }
       li.append(b, el('span', 'find-by', `${s.artist ? s.artist + ' · ' : ''}#${s.id}`));
       return li;
     }));

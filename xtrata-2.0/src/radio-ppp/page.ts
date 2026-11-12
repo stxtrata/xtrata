@@ -1431,7 +1431,8 @@ function start(root: HTMLElement) {
       .then((d) => buildSongs(d?.tracks, (id, raw) => ({ title: radioTitle(id, placeholder(raw.title) ? '' : raw.title!), artist: radioArtist(id, raw.artist || '') }))),
     play: (id) => { (window as any).XtrataRadio?.playToken?.(id); },
     current: () => { const n = Number((window as any).XtrataRadio?.getState?.()?.nowPlaying?.tokenId); return Number.isSafeInteger(n) ? n : null; },
-    locked: () => !!ppp.snapshot().albumLock?.locked
+    locked: () => !!ppp.snapshot().albumLock?.locked,
+    explicit: (id) => !!(window as any).XtrataRadio?.isExplicit?.(id)
   }) : null;
   findBox?.addEventListener('toggle', () => { if (findBox.open) find?.load(); });
   let findSeen = '';
