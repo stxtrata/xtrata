@@ -36,6 +36,20 @@ radio's own. The claim button opens `https://radio.xtrata.xyz/radio.html#gift=CO
 
 ## Running it
 
+## Two giveaways, two addresses
+
+| Address | What it gives away | List name |
+|---|---|---|
+| `xtrata.xyz/giveaway` | the album drop | (none: leave `list` out) |
+| `xtrata.xyz/players` | the 1,000 free starter players | `players` |
+
+They are separate: each has its own links, counts, wall, pace and pause, and nothing done to one touches the other.
+Every operator action below works on the album drop unless it says `"list":"players"`, for example
+`call '{"action":"status","list":"players"}'` or
+`jq -Rs '{action:"add", list:"players", shuffle:true, text:.}' links.txt | curl ... -d @-`.
+The public reads are `GET /radio/giveaway` and `GET /radio/giveaway/players`. `/players` is the same page file
+(`public/giveaway.html`) served by `functions/players.ts` with its own title and share card.
+
 All operator actions are one POST. Without the right secret the route answers 404 like any other missing page.
 
 ```bash

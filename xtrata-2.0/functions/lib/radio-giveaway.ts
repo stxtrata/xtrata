@@ -29,6 +29,21 @@ export const DEFAULT_GAP_MAX_S = 600;
 /** Longest pause an operator can ask for between links: a day. */
 export const MAX_GAP_S = 24 * 60 * 60;
 
+/**
+ * The lists. Each is its own giveaway with its own page, counts, pace and pause: `main` is the album drop
+ * (public/giveaway.html at /giveaway), `players` is the free starter-player giveaway (the same page at /players).
+ * A name not in here does not exist: nothing a visitor sends can make a list.
+ */
+export const GIVEAWAY_LISTS = ['main', 'players'] as const;
+export type GiveawayList = typeof GIVEAWAY_LISTS[number];
+/** The list a request names (`main` when it names none), or null for a name that is not a list. */
+export const giveawayList = (v: unknown): GiveawayList | null =>
+  v == null || v === '' ? 'main' : (GIVEAWAY_LISTS as readonly string[]).includes(String(v)) ? (String(v) as GiveawayList) : null;
+/** Where a list's state row lives: `main` keeps its original one-row table, the others share a table keyed by name. */
+const st = (list: GiveawayList) => list === 'main'
+  ? { t: 'radio_giveaway_state', w: 'id=1', b: [] as unknown[] }
+  : { t: 'radio_giveaway_lists', w: 'name=?', b: [list] as unknown[] };
+
 type Link = { pos: number; code: string; code_hash: string; added_at: number; shown_at: number | null; ended_at: number | null; outcome: string | null };
 type State = { current: number | null; next_at: number; paused: number; gap_min: number; gap_max: number; held: number };
 type GiftRow = { status: string; expires_at: number; claimed_at: number | null; claimed_by: string | null; player_id: string | null };
@@ -54,9 +69,19 @@ export async function ensureGiveawayTables(env: GiveawayEnv) {
   // counts and its wall from nothing. Archived rows are kept as a record and never counted or shown again.
   await exec(env, 'ALTER TABLE radio_giveaway_links ADD COLUMN archived INTEGER NOT NULL DEFAULT 0').catch(() => undefined);
   await exec(env, 'INSERT OR IGNORE INTO radio_giveaway_state(id) VALUES(1)');
+  // Added with lists: more than one giveaway at a time. Every link belongs to one list (those from before: `main`).
+  await exec(env, "ALTER TABLE radio_giveaway_links ADD COLUMN list TEXT NOT NULL DEFAULT 'main'").catch(() => undefined);
+  await exec(env, `CREATE TABLE IF NOT EXISTS radio_giveaway_lists(
+    name TEXT PRIMARY KEY, current INTEGER, next_at INTEGER NOT NULL DEFAULT 0, paused INTEGER NOT NULL DEFAULT 0,
+    gap_min INTEGER NOT NULL DEFAULT ${DEFAULT_GAP_MIN_S}, gap_max INTEGER NOT NULL DEFAULT ${DEFAULT_GAP_MAX_S},
+    held INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL DEFAULT 0)`);
+  for (const name of GIVEAWAY_LISTS) if (name !== 'main') await exec(env, 'INSERT OR IGNORE INTO radio_giveaway_lists(name) VALUES(?)', [name]);
 }
 
-const readState = async (env: GiveawayEnv) => (await first<State>(env, 'SELECT current, next_at, paused, gap_min, gap_max, held FROM radio_giveaway_state WHERE id=1'))!;
+const readState = async (env: GiveawayEnv, list: GiveawayList = 'main') => {
+  const x = st(list);
+  return (await first<State>(env, `SELECT current, next_at, paused, gap_min, gap_max, held FROM ${x.t} WHERE ${x.w}`, x.b))!;
+};
 const giftOf = (env: GiveawayEnv, hash: string) =>
   first<GiftRow>(env, 'SELECT status, expires_at, claimed_at, claimed_by, player_id FROM radio_gifts WHERE code_hash=?', [hash]);
 
@@ -75,10 +100,11 @@ const gapMs = (s: Pick<State, 'gap_min' | 'gap_max'>, rand: () => number) => Mat
  * Brings the giveaway up to date and says what the public should see. Each pass changes at most one thing; a link that
  * can never be claimed is stepped over at once, so a few dead links in the list cost nothing.
  */
-export async function advance(env: GiveawayEnv, now: number, rand: () => number = Math.random) {
+export async function advance(env: GiveawayEnv, now: number, rand: () => number = Math.random, list: GiveawayList = 'main') {
   await ensureGiveawayTables(env);
+  const x = st(list);
   for (let pass = 0; pass < 12; pass++) {
-    let s = await readState(env);
+    let s = await readState(env, list);
     if (s.paused) return { s, link: s.current ? await first<Link>(env, 'SELECT * FROM radio_giveaway_links WHERE pos=?', [s.current]) : null, gift: null as GiftRow | null };
     if (s.current) {
       const link = await first<Link>(env, 'SELECT * FROM radio_giveaway_links WHERE pos=?', [s.current]);
@@ -90,8 +116,8 @@ export async function advance(env: GiveawayEnv, now: number, rand: () => number 
           const at = gift.claimed_at ?? now;
           if (s.next_at < at) {
             const next = at + gapMs(s, rand);
-            if (await exec(env, 'UPDATE radio_giveaway_state SET next_at=?, updated_at=? WHERE id=1 AND current=? AND next_at=?', [next, now, s.current, s.next_at])) s = { ...s, next_at: next };
-            else s = await readState(env);
+            if (await exec(env, `UPDATE ${x.t} SET next_at=?, updated_at=? WHERE ${x.w} AND current=? AND next_at=?`, [next, now, ...x.b, s.current, s.next_at])) s = { ...s, next_at: next };
+            else s = await readState(env, list);
           }
         }
         return { s, link, gift };
@@ -100,22 +126,22 @@ export async function advance(env: GiveawayEnv, now: number, rand: () => number 
       // (drawn here if a sweep first sees it already settled); a dead link carries none.
       const claimed = !!gift && gift.status === 'claimed';
       const settledAt = gift?.claimed_at ?? now;
-      const won = await exec(env, 'UPDATE radio_giveaway_state SET current=NULL, next_at=?, updated_at=? WHERE id=1 AND current=?',
-        [claimed && s.next_at < settledAt ? settledAt + gapMs(s, rand) : s.next_at, now, s.current]);
+      const won = await exec(env, `UPDATE ${x.t} SET current=NULL, next_at=?, updated_at=? WHERE ${x.w} AND current=?`,
+        [claimed && s.next_at < settledAt ? settledAt + gapMs(s, rand) : s.next_at, now, ...x.b, s.current]);
       if (won) await exec(env, 'UPDATE radio_giveaway_links SET ended_at=?, outcome=? WHERE pos=? AND ended_at IS NULL', [now, claimed ? 'claimed' : 'lost', s.current]);
       continue;
     }
     if (now < s.next_at) return { s, link: null, gift: null };
-    const next = await first<Link>(env, 'SELECT * FROM radio_giveaway_links WHERE shown_at IS NULL AND ended_at IS NULL ORDER BY pos LIMIT 1');
+    const next = await first<Link>(env, 'SELECT * FROM radio_giveaway_links WHERE list=? AND shown_at IS NULL AND ended_at IS NULL ORDER BY pos LIMIT 1', [list]);
     if (!next) return { s, link: null, gift: null };
     const gift = await giftOf(env, next.code_hash);
     if (isDead(gift, now)) { await exec(env, "UPDATE radio_giveaway_links SET ended_at=?, outcome='lost' WHERE pos=? AND ended_at IS NULL", [now, next.pos]); continue; }
     // Not free but not dead either (someone claimed it before it was ever shown): counts as given away, no pause.
     if (!isFree(gift, now)) { await exec(env, "UPDATE radio_giveaway_links SET ended_at=?, outcome='claimed' WHERE pos=? AND ended_at IS NULL", [now, next.pos]); continue; }
-    const won = await exec(env, 'UPDATE radio_giveaway_state SET current=?, updated_at=? WHERE id=1 AND current IS NULL', [next.pos, now]);
+    const won = await exec(env, `UPDATE ${x.t} SET current=?, updated_at=? WHERE ${x.w} AND current IS NULL`, [next.pos, now, ...x.b]);
     if (won) await exec(env, 'UPDATE radio_giveaway_links SET shown_at=? WHERE pos=?', [now, next.pos]);
   }
-  const s = await readState(env);
+  const s = await readState(env, list);
   return { s, link: null, gift: null };
 }
 
@@ -152,10 +178,10 @@ export type GiveawayView = {
 };
 
 /** The public answer: counts, and the one link on show. Never the list, never an upcoming code, never a time. */
-export async function giveawayView(env: GiveawayEnv, now: number, rand: () => number = Math.random): Promise<GiveawayView> {
-  const { s, link, gift } = await advance(env, now, rand);
-  const v: GiveawayView = { ...(await viewOf(env, now, s, link, gift)), ...(await dropOf(env)) };
-  const lottery = v.kind === 'player' ? await lotteryOf(env) : null;
+export async function giveawayView(env: GiveawayEnv, now: number, rand: () => number = Math.random, list: GiveawayList = 'main'): Promise<GiveawayView> {
+  const { s, link, gift } = await advance(env, now, rand, list);
+  const v: GiveawayView = { ...(await viewOf(env, now, s, link, gift, list)), ...(await dropOf(env, list)) };
+  const lottery = v.kind === 'player' ? await lotteryOf(env, list) : null;
   if (lottery) { delete v.plays; v.lottery = lottery; }
   return s.held > 0 ? { ...v, held: s.held } : v;
 }
@@ -164,17 +190,17 @@ export async function giveawayView(env: GiveawayEnv, now: number, rand: () => nu
  * The lottery picture, or null when every player in the list carries the same plays (or it cannot be read). Counts
  * and past winners only: nothing here says which link holds what.
  */
-async function lotteryOf(env: GiveawayEnv): Promise<GiveawayView['lottery'] | null> {
+async function lotteryOf(env: GiveawayEnv, list: GiveawayList): Promise<GiveawayView['lottery'] | null> {
   try {
     const groups = await q<{ amount: number; total: number; left: number }>(env,
       `SELECT g.amount AS amount, COUNT(*) AS total, SUM(CASE WHEN l.ended_at IS NULL THEN 1 ELSE 0 END) AS left
-       FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash WHERE l.archived=0 AND g.player_id IS NULL GROUP BY g.amount`);
+       FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash WHERE l.list=? AND l.archived=0 AND g.player_id IS NULL GROUP BY g.amount`, [list]);
     const rows = groups.map((r) => ({ plays: giftPlays(BigInt(Number(r.amount))), total: Number(r.total), left: Number(r.left) })).filter((r) => r.plays > 0);
     if (rows.length < 2) return null;
     rows.sort((a, b) => b.plays - a.plays);
     const won = await q<{ amount: number }>(env,
       `SELECT g.amount AS amount FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash
-       WHERE l.archived=0 AND l.outcome='claimed' AND g.player_id IS NULL ORDER BY l.ended_at, l.pos LIMIT 2000`);
+       WHERE l.list=? AND l.archived=0 AND l.outcome='claimed' AND g.player_id IS NULL ORDER BY l.ended_at, l.pos LIMIT 2000`, [list]);
     return {
       min: rows[rows.length - 1].plays, max: rows[0].plays,
       tiers: rows.map((r) => ({ id: tierOfPlays(r.plays).id, ...r })),
@@ -184,20 +210,20 @@ async function lotteryOf(env: GiveawayEnv): Promise<GiveawayView['lottery'] | nu
 }
 
 /** What kind of gift this list is giving away, and the plays it carries: from the link on show or next up, else the last one. */
-async function dropOf(env: GiveawayEnv): Promise<Pick<GiveawayView, 'kind' | 'plays'>> {
+async function dropOf(env: GiveawayEnv, list: GiveawayList): Promise<Pick<GiveawayView, 'kind' | 'plays'>> {
   const join = 'SELECT g.player_id, g.amount FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash';
   type Row = { player_id: string | null; amount: number | null };
   // Extra detail for the page's wording: if it cannot be read, the page is told nothing rather than something wrong.
-  const row = await (async () => (await first<Row>(env, `${join} WHERE l.archived=0 AND l.ended_at IS NULL ORDER BY l.pos LIMIT 1`)) ?? (await first<Row>(env, `${join} WHERE l.archived=0 ORDER BY l.pos DESC LIMIT 1`)))().catch(() => null);
+  const row = await (async () => (await first<Row>(env, `${join} WHERE l.list=? AND l.archived=0 AND l.ended_at IS NULL ORDER BY l.pos LIMIT 1`, [list])) ?? (await first<Row>(env, `${join} WHERE l.list=? AND l.archived=0 ORDER BY l.pos DESC LIMIT 1`, [list])))().catch(() => null);
   if (!row) return {};
   const amount = Number(row.amount);
   const plays = Number.isSafeInteger(amount) && amount > 0 ? giftPlays(BigInt(amount)) : 0;
   return { kind: row.player_id ? 'album' : 'player', ...(plays > 0 ? { plays } : {}) };
 }
 
-async function viewOf(env: GiveawayEnv, now: number, s: State, link: Link | null, gift: GiftRow | null): Promise<GiveawayView> {
+async function viewOf(env: GiveawayEnv, now: number, s: State, link: Link | null, gift: GiftRow | null, list: GiveawayList): Promise<GiveawayView> {
   const counts = await first<{ claimed: number; left: number }>(env,
-    "SELECT SUM(CASE WHEN outcome='claimed' THEN 1 ELSE 0 END) AS claimed, SUM(CASE WHEN ended_at IS NULL THEN 1 ELSE 0 END) AS left FROM radio_giveaway_links WHERE archived=0");
+    "SELECT SUM(CASE WHEN outcome='claimed' THEN 1 ELSE 0 END) AS claimed, SUM(CASE WHEN ended_at IS NULL THEN 1 ELSE 0 END) AS left FROM radio_giveaway_links WHERE list=? AND archived=0", [list]);
   let claimed = Number(counts?.claimed ?? 0), left = Number(counts?.left ?? 0);
   const base = { claimed, left, now };
   if (s.paused) return { state: 'paused', ...base };
@@ -215,7 +241,7 @@ async function viewOf(env: GiveawayEnv, now: number, s: State, link: Link | null
   if (left <= 0) return { state: 'done', ...base };
   // Between links: congratulate the last winner and count down to the next.
   const last = await first<{ claimed_by: string | null }>(env,
-    "SELECT g.claimed_by FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash WHERE l.archived=0 AND l.outcome='claimed' AND g.claimed_by IS NOT NULL ORDER BY g.claimed_at DESC LIMIT 1");
+    "SELECT g.claimed_by FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash WHERE l.list=? AND l.archived=0 AND l.outcome='claimed' AND g.claimed_by IS NOT NULL ORDER BY g.claimed_at DESC LIMIT 1", [list]);
   return { state: 'waiting', ...base, ...(last?.claimed_by && s.next_at > now ? { wallet: shortAddress(last.claimed_by) } : {}), ...(s.next_at > now ? { nextAt: s.next_at } : {}) };
 }
 
@@ -246,8 +272,12 @@ export function giveawayAuthorised(env: GiveawayEnv, header: string | null): boo
  * Operator actions. `add` takes `text`, any blob with links or codes in it; only codes that are real, live gifts are
  * kept (a typo cannot sit in the list unnoticed) and the report says what was left out. No action ever returns a code.
  */
-export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; text?: unknown; minSeconds?: unknown; maxSeconds?: unknown; count?: unknown; shuffle?: unknown }, now: number) {
+export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; text?: unknown; minSeconds?: unknown; maxSeconds?: unknown; count?: unknown; shuffle?: unknown; list?: unknown }, now: number) {
   await ensureGiveawayTables(env);
+  // Which giveaway: `list` ("players" for the free-player page), or the album drop when none is named.
+  const list = giveawayList(body.list);
+  if (!list) throw new GiftError(`Unknown list. Lists: ${GIVEAWAY_LISTS.join(', ')}.`);
+  const x = st(list);
   const act = String(body.action ?? 'status');
   if (act === 'add') {
     if (typeof body.text !== 'string') throw new GiftError('text required (a list of gift links).');
@@ -272,50 +302,50 @@ export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; t
       }
     }
     for (const { code, hash } of good) {
-      const n = await exec(env, 'INSERT OR IGNORE INTO radio_giveaway_links(code, code_hash, added_at) VALUES(?,?,?)', [code, hash, now]);
+      const n = await exec(env, 'INSERT OR IGNORE INTO radio_giveaway_links(code, code_hash, added_at, list) VALUES(?,?,?,?)', [code, hash, now, list]);
       if (n) added++; else duplicates++;
     }
     // `notFound` / `notLive` are the positions (1 = first) of the entries in what was pasted, never the codes.
-    return { added, duplicates, notFound, notLive, ...(await adminStatus(env, now)) };
+    return { added, duplicates, notFound, notLive, ...(await adminStatus(env, now, list)) };
   }
   if (act === 'archive') {
     // Close the drop that is in the list and start from nothing: every link not yet given away is withdrawn from the
     // page (its gift is untouched: a link someone already holds still works, and an unclaimed one refunds to whoever
     // paid for it when it expires), the counts and the wall reset, and "held" goes back to none. Nothing is deleted.
-    const withdrawn = await exec(env, "UPDATE radio_giveaway_links SET ended_at=?, outcome='archived' WHERE archived=0 AND ended_at IS NULL", [now]);
-    const archived = await exec(env, 'UPDATE radio_giveaway_links SET archived=1 WHERE archived=0');
-    await exec(env, 'UPDATE radio_giveaway_state SET current=NULL, next_at=0, held=0, updated_at=? WHERE id=1', [now]);
-    return { archived, withdrawn, ...(await adminStatus(env, now)) };
+    const withdrawn = await exec(env, "UPDATE radio_giveaway_links SET ended_at=?, outcome='archived' WHERE list=? AND archived=0 AND ended_at IS NULL", [now, list]);
+    const archived = await exec(env, 'UPDATE radio_giveaway_links SET archived=1 WHERE list=? AND archived=0', [list]);
+    await exec(env, `UPDATE ${x.t} SET current=NULL, next_at=0, held=0, updated_at=? WHERE ${x.w}`, [now, ...x.b]);
+    return { archived, withdrawn, ...(await adminStatus(env, now, list)) };
   }
   if (act === 'pause' || act === 'resume') {
-    await exec(env, 'UPDATE radio_giveaway_state SET paused=?, updated_at=? WHERE id=1', [act === 'pause' ? 1 : 0, now]);
+    await exec(env, `UPDATE ${x.t} SET paused=?, updated_at=? WHERE ${x.w}`, [act === 'pause' ? 1 : 0, now, ...x.b]);
   } else if (act === 'gap') {
     const lo = Number(body.minSeconds), hi = Number(body.maxSeconds);
     if (![lo, hi].every((n) => Number.isFinite(n) && n >= 0 && n <= MAX_GAP_S) || hi < lo) throw new GiftError(`minSeconds and maxSeconds must be 0-${MAX_GAP_S}, min no larger than max.`);
-    await exec(env, 'UPDATE radio_giveaway_state SET gap_min=?, gap_max=?, updated_at=? WHERE id=1', [Math.round(lo), Math.round(hi), now]);
+    await exec(env, `UPDATE ${x.t} SET gap_min=?, gap_max=?, updated_at=? WHERE ${x.w}`, [Math.round(lo), Math.round(hi), now, ...x.b]);
   } else if (act === 'skip') {
     // Retire the link on show without waiting for it: it is simply never offered again, and the next one comes after the pause.
-    const s = await readState(env);
-    if (s.current && await exec(env, 'UPDATE radio_giveaway_state SET current=NULL, next_at=?, updated_at=? WHERE id=1 AND current=?', [now + gapMs(s, Math.random), now, s.current])) {
+    const s = await readState(env, list);
+    if (s.current && await exec(env, `UPDATE ${x.t} SET current=NULL, next_at=?, updated_at=? WHERE ${x.w} AND current=?`, [now + gapMs(s, Math.random), now, ...x.b, s.current])) {
       await exec(env, "UPDATE radio_giveaway_links SET ended_at=?, outcome='skipped' WHERE pos=?", [now, s.current]);
     }
   } else if (act === 'held') {
     const n = Number(body.count);
     if (!Number.isInteger(n) || n < 0 || n > 10_000) throw new GiftError('count must be a whole number from 0 to 10000.');
-    await exec(env, 'UPDATE radio_giveaway_state SET held=?, updated_at=? WHERE id=1', [n, now]);
+    await exec(env, `UPDATE ${x.t} SET held=?, updated_at=? WHERE ${x.w}`, [n, now, ...x.b]);
   } else if (act === 'now') {
-    await exec(env, 'UPDATE radio_giveaway_state SET next_at=0, updated_at=? WHERE id=1', [now]); // show the next link without waiting out the pause
+    await exec(env, `UPDATE ${x.t} SET next_at=0, updated_at=? WHERE ${x.w}`, [now, ...x.b]); // show the next link without waiting out the pause
   } else if (act !== 'status') throw new GiftError('Unknown action.');
-  return adminStatus(env, now);
+  return adminStatus(env, now, list);
 }
 
-async function adminStatus(env: GiveawayEnv, now: number) {
-  const { s, link } = await advance(env, now);
+async function adminStatus(env: GiveawayEnv, now: number, list: GiveawayList) {
+  const { s, link } = await advance(env, now, Math.random, list);
   const c = await first<{ total: number; claimed: number; lost: number; skipped: number; unseen: number }>(env,
     `SELECT COUNT(*) AS total, SUM(outcome='claimed') AS claimed, SUM(outcome='lost') AS lost, SUM(outcome='skipped') AS skipped,
-            SUM(shown_at IS NULL AND ended_at IS NULL) AS unseen FROM radio_giveaway_links WHERE archived=0`);
+            SUM(shown_at IS NULL AND ended_at IS NULL) AS unseen FROM radio_giveaway_links WHERE list=? AND archived=0`, [list]);
   return {
-    total: Number(c?.total ?? 0), claimed: Number(c?.claimed ?? 0), lost: Number(c?.lost ?? 0), skipped: Number(c?.skipped ?? 0), unseen: Number(c?.unseen ?? 0),
+    list, total: Number(c?.total ?? 0), claimed: Number(c?.claimed ?? 0), lost: Number(c?.lost ?? 0), skipped: Number(c?.skipped ?? 0), unseen: Number(c?.unseen ?? 0),
     onShow: link && !link.ended_at ? link.pos : null, held: s.held, paused: !!s.paused, gap: { minSeconds: s.gap_min, maxSeconds: s.gap_max },
     nextInSeconds: s.current ? null : Math.max(0, Math.ceil((s.next_at - now) / 1000))
   };
