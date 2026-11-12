@@ -111,6 +111,18 @@ panel for a gift without an album, and the wallet box's own screens (a separate 
 - **Giveaway page** (`public/giveaway.html`): one page for both kinds of drop. `GET /radio/giveaway` now also returns
   `kind` (`album` | `player`) and `plays`; the page words itself from them and sends a starter claim to
   `radio.html?novice=1#gift=…`. Still one link on show at a time. A tap-to-hold wall is not built.
+- **Player classes** (`src/lib/listening-wallet/tiers.ts`): Diamond 1,000+ plays, Gold 500+, Silver 250+, Bronze 100+,
+  Neon 50+, Classic below. Worked out from a starter gift's amount each time, never stored on a server; looks only.
+  Shown as a badge on the panel, a coloured record on the welcome screens (the reveal when plays land, and on every
+  return) and remembered on the device while locked. Suggested drop of 1,000: 5 / 10 / 20 / 100 / 265 / 600, which is
+  23.5875 STX including the 0.003 STX fee per player (locked by `tiers.test.ts`).
+- **Lottery drop**: make one batch per class, then `add` them all with `"shuffle": true`. When the list holds players
+  of different sizes, `GET /radio/giveaway` omits `plays` and returns `lottery` (range, what is left of each class,
+  the class of each player already claimed). The page keeps the live one a mystery, colours claimed discs by class,
+  and sends the claim with `&mystery=1` so the radio reveals the class only when the plays land.
+- **Make it yours** (panel fold, passkey-only listeners): what a .btc name is with a link to BNS One, linking to a
+  Stacks wallet they already have, bringing a friend. Each item closed until opened. Note: the wallet box cannot buy
+  or register a name itself; a name has to be sent to the player's address from another wallet.
 - **Radio controls**: hover text on every control and a "What do these do?" fold under the stations.
 
 ## 5. Where the Music Overhaul plan stands

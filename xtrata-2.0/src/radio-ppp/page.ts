@@ -29,6 +29,7 @@ import { hasBannedWord, markPreviewed, newPreview, PLAIN_CHECKING, PLAIN_LABEL, 
 import type { GiftStopReason } from './controller';
 import { createWelcomeView, type WelcomeMode } from './welcome';
 import { createRestockSheet, type RestockInput } from './restock-sheet';
+import { isTierId, tierById, tierOfAmount, type Tier } from '../lib/listening-wallet/tiers';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -191,6 +192,38 @@ function start(root: HTMLElement) {
     openPlayer: () => void ppp.openAlbum(0)
   };
   const albumView = albumMount ? createAlbumView(albumMount, albumDeps) : null;
+  // The player's class from the giveaway (tiers.ts): Diamond, Gold, Silver, Bronze, Neon or Classic, decided by the plays
+  // a free starter player was given. Shown every time the player loads: a badge on the panel, the page's trim
+  // (`html[data-tier]`, public/radio.html) and a coloured record on the welcome screens. Remembered on the device so a
+  // locked player still shows its colours before it is unlocked. Looks only: it changes nothing a player can do.
+  const TIER_KEY = 'xtrata.radio.tier.v1';
+  let tierNow: Tier | null = (() => { const v = flagStore.get(TIER_KEY); return isTierId(v) ? tierById(v) : null; })();
+  // A lottery link from the giveaway page (`?mystery=1`): the gift screen does not say what the player holds.
+  const mystery = (() => {
+    try {
+      if (new URLSearchParams(location.search).get('mystery') === '1') sessionStorage.setItem('xtrata.radio.mystery', '1');
+      return sessionStorage.getItem('xtrata.radio.mystery') === '1';
+    } catch { return false; }
+  })();
+  function syncTier(s: Snapshot) {
+    // Known only while the listener's own player is open: a starter gift (no album) gives it a class, anything else none.
+    if (s.listening && s.slot === 0 && ['fund', 'ready', 'over'].includes(s.step)) {
+      let next: Tier | null = null;
+      try { next = s.gift && !s.gift.player ? tierOfAmount(BigInt(s.gift.amount)) : null; } catch { next = null; }
+      if ((next?.id ?? null) !== (tierNow?.id ?? null)) { tierNow = next; flagStore.set(TIER_KEY, next ? next.id : null); }
+    }
+    const root = document.documentElement;
+    if (tierNow) root.dataset.tier = tierNow.id; else delete root.dataset.tier;
+    const head = document.querySelector('#ppp .ppp-head h3');
+    if (!head) return;
+    let badge = head.querySelector('.ppp-tier') as HTMLElement | null;
+    if (!tierNow) { badge?.remove(); return; }
+    if (!badge) { badge = el('span', '', 'ppp-tier'); head.append(badge); }
+    badge.dataset.tier = tierNow.id;
+    badge.textContent = `${tierNow.mark} ${tierNow.name.toUpperCase()} PLAYER`;
+    badge.title = `A ${tierNow.name} player from the Xtrata Music giveaway`;
+  }
+
   // Novice mode's first screen (welcome.ts): a newcomer with no player and no album sees one short page and one button,
   // not the whole radio. Until the page knows who this is, a quiet holding screen stands in (never the radio flashing by).
   const welcome = novice.on && albumMount ? createWelcomeView(albumMount) : null;
@@ -229,6 +262,7 @@ function start(root: HTMLElement) {
     welcome.render({
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
+      tier: tierNow, mystery,
       start: () => void ppp.create(), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => restock.open(),
       full: () => {
         // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.
@@ -802,6 +836,7 @@ function start(root: HTMLElement) {
     // A like refused only because the main listener wallet is empty is a note, not an error: the album is still playing.
     const softError = s.error === OUT_OF_LIKES;
     syncIdentity(s);
+    syncTier(raw);
     previewNow = readPreview(raw);
     syncGift(raw, s);
     syncOrder(s);
@@ -1206,6 +1241,29 @@ function start(root: HTMLElement) {
       const fold = $('.ppp-gifts') as HTMLDetailsElement;
       fold.open = true;
       requestAnimationFrame(() => fold.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    }
+    // "Make it yours": found, not pushed. Each item is closed until the listener opens it. Only for a passkey-only
+    // listener whose player is open; a player already linked to a Stacks wallet has done this.
+    const yours = document.querySelector('#ppp .ppp-yours') as HTMLDetailsElement | null;
+    if (yours) {
+      const show = s.solo && !!s.listening && s.slot === 0 && ['fund', 'ready'].includes(s.step);
+      yours.hidden = !show;
+      const body = yours.querySelector('.ppp-yours-body');
+      if (show && body && body.getAttribute('data-for') !== s.listening) {
+        body.setAttribute('data-for', s.listening!);
+        const item = (title: string, ...kids: (HTMLElement | string)[]) => { const d = el('details', '', 'ppp-yours-item'); d.append(el('summary', title), ...kids); return d; };
+        const name = el('p', 'Your player is a real account on Stacks, the network built on Bitcoin that Xtrata runs on. Right now it is known by a long code. A ');
+        name.append(el('b', '.btc name'), ' (for example yourname.btc) is a name you own on that network. Give your player one and your plays, likes and station show under that name everywhere on Xtrata.');
+        const how = el('p', 'Names are registered at BNS One. You need a little STX and a Stacks wallet to buy one; then send the name to your player using the code below.', 'ppp-mute');
+        const go = el('p'); go.append(link('Find a name at BNS One →', 'https://bns.one'));
+        const linkUp = el('p', 'Already have a Stacks wallet with a name (Xverse or Leather)? Connect it (top right) and link this player to it. The player stays on this device and keeps its plays; everything it does is then credited to your name, like a second device on one account.');
+        const friend = el('p', 'Know someone who loves music? When there is a giveaway on, send them the page and they can claim a free player of their own.');
+        const fl = el('p'); fl.append(link('See the giveaway →', 'https://xtrata.xyz/giveaway'));
+        body.replaceChildren(
+          item('Give your player a name', name, how, el('p', s.listening!, 'ppp-addr-full'), copyButton('copy-yours-address', 'Copy my player’s code', () => ppp.snapshot().listening || '', 'tiny', () => render(ppp.snapshot())), go),
+          item('Link it to a wallet you already have', linkUp),
+          item('Bring a friend in', friend, fl));
+      }
     }
     $('.ppp-body').replaceChildren(...lines);
     $('.ppp-actions').replaceChildren(...actions);

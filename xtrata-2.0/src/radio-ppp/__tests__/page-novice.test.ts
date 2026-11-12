@@ -46,7 +46,7 @@ async function open(over: object = {}, flag: string | null = '1') {
     <section id="ppp" hidden><div class="ppp-head"><h3><span class="ppp-badge"></span></h3><span class="ppp-state"></span></div><ol class="ppp-steps"></ol><p class="ppp-stage"></p>
     <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
-    <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section></aside></main>
+    <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-yours" hidden><summary></summary><div class="ppp-yours-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section></aside></main>
     <div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>`;
   h.state = { playing: false, nowPlaying: null };
   h.feeds = [];
@@ -67,7 +67,7 @@ const mainPath = (root: Element) => [root.querySelector('.ppp-key'), root.queryS
 const buttons = (root: Element | null) => [...(root?.querySelectorAll('button') ?? [])].map((b) => b.textContent);
 const say = (st: { playing: boolean; nowPlaying: any }) => { h.state = st; for (const fn of h.feeds) fn(st); };
 
-beforeEach(() => { vi.unstubAllGlobals(); delete (window as any).XtrataRadio; localStorage.clear(); sessionStorage.clear(); h.route = null; document.querySelectorAll('dialog').forEach((d) => d.remove()); for (const k of ['view', 'welcome', 'asking', 'noviceBoot']) delete document.documentElement.dataset[k]; });
+beforeEach(() => { vi.unstubAllGlobals(); delete (window as any).XtrataRadio; localStorage.clear(); sessionStorage.clear(); h.route = null; document.querySelectorAll('dialog').forEach((d) => d.remove()); for (const k of ['view', 'welcome', 'asking', 'noviceBoot', 'tier']) delete document.documentElement.dataset[k]; });
 
 const STEPS: [string, object][] = [
   ['a new listener', { step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null, giftStop: { reason: 'setup', text: 'SET UP YOUR PLAYER TO LISTEN' } }],
@@ -291,7 +291,7 @@ describe('a free starter player: claimed, arriving, landed', () => {
     expect(text(page())).toContain('Play any song you like');
     expect(text(page())).toContain('It pays the artist');
     expect(text(page())).not.toMatch(BANNED_WORDS);
-    named(/Claim my player/)!.click();
+    named(/Claim my free player/)!.click();
     expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1);
   });
 
@@ -311,7 +311,10 @@ describe('a free starter player: claimed, arriving, landed', () => {
     localStorage.removeItem('xtrata.radio.gift.incoming.v1');
     h.changed();
     await vi.waitFor(() => expect(html().dataset.welcome).toBe('landed'));
-    expect(text(page())).toContain('You’re in');
+    expect(text(page())).toContain('You got a Silver player'); // 277 plays: the class it turned out to be
+    expect(page().querySelector('.tier-disc')!.getAttribute('data-tier')).toBe('silver');
+    expect(html().dataset.tier).toBe('silver');
+    expect(text(document.querySelector('#ppp .ppp-tier'))).toBe('✦ SILVER PLAYER');
     expect(text(page())).toContain('277 plays');
     expect(text(page())).not.toMatch(BANNED_WORDS);
     named(/Start listening/)!.click();
@@ -370,5 +373,61 @@ describe('"Add plays": where running out leads', () => {
     press(root, /^Add plays$/);
     const packs = [...sheet()!.querySelectorAll('.ppp-restock__pack')] as HTMLButtonElement[];
     expect(packs.map((b) => b.disabled)).toEqual([false, false, false, true]);
+  });
+});
+
+describe('player classes from the giveaway', () => {
+  const page = () => document.getElementById('album')!;
+  const html = () => document.documentElement;
+  const gifted = (amount: string) => ({ player: null, from: null, source: 'batch', amount });
+
+  it('a Diamond player wears its colours every time it loads, and they are remembered while it is locked', async () => {
+    const root = await open({ entries: PLAYED, gift: gifted('353000'), giftPlays: 990 });
+    expect(html().dataset.tier).toBe('diamond');
+    expect(text(root.querySelector('.ppp-tier'))).toBe('◆ DIAMOND PLAYER');
+    expect(localStorage.getItem('xtrata.radio.tier.v1')).toBe('diamond');
+    // A later visit, still locked: the welcome-back screen already shows which player this is.
+    await open({ step: 'locked', balance: undefined, session: null, giftStop: { reason: 'locked', text: 'UNLOCK TO LISTEN' } });
+    expect(html().dataset.tier).toBe('diamond');
+    expect(text(page())).toContain('Your Diamond player');
+    expect(page().querySelector('.tier-disc')!.getAttribute('data-tier')).toBe('diamond');
+  });
+
+  it('a player that was not a giveaway gift has no class, and an album never gets one', async () => {
+    const root = await open({ entries: PLAYED });
+    expect(html().dataset.tier).toBeUndefined();
+    expect(root.querySelector('.ppp-tier')).toBeNull();
+    await open({ entries: PLAYED, slot: 2, gift: { player: PLAYER, from: null, source: 'batch', amount: '353000' }, likeFunds: { address: ME, balance: 300_000n, low: false, album: true, pending: false } });
+    expect(html().dataset.tier).toBeUndefined();
+  });
+
+  it('a lottery link keeps the surprise: the gift screen does not say how many plays', async () => {
+    localStorage.setItem('xtrata.radio.gift.incoming.v1', JSON.stringify({ code: 'ABCDEFGHJKMNPQRSTVWXYZ', at: Date.now() }));
+    h.route = (url) => (url.endsWith('/radio/gift/status') ? new Response(JSON.stringify({ status: 'live', amount: '353000', source: 'batch', from: null, label: '', expires: 0, player: null })) : undefined);
+    sessionStorage.setItem('xtrata.radio.mystery', '1');
+    await open({ step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null, giftStop: { reason: 'setup', text: 'SET UP YOUR PLAYER TO LISTEN' } });
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
+    expect(text(page())).toContain('Claim it to find out which one is yours');
+    expect(text(page())).not.toMatch(/1,000|plays are/);
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+  });
+});
+
+describe('"Make it yours": found, not pushed', () => {
+  it('a passkey-only listener can open what a name is and where to get one, with their player’s code to hand', async () => {
+    const root = await open({ entries: PLAYED });
+    const fold = root.querySelector('.ppp-yours') as HTMLDetailsElement;
+    expect(fold.hidden).toBe(false);
+    expect([...fold.querySelectorAll('.ppp-yours-item > summary')].map((x) => x.textContent)).toEqual(['Give your player a name', 'Link it to a wallet you already have', 'Bring a friend in']);
+    expect([...fold.querySelectorAll('.ppp-yours-item')].every((d) => !(d as HTMLDetailsElement).open)).toBe(true); // each stays closed until opened
+    expect(text(fold)).toContain('.btc name');
+    expect(text(fold)).toContain(ME);
+    expect((fold.querySelector('a[href="https://bns.one"]') as HTMLAnchorElement).textContent).toContain('BNS One');
+  });
+  it('is not shown before there is a player, or to someone already linked to a Stacks wallet', async () => {
+    const a = await open({ step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null });
+    expect((a.querySelector('.ppp-yours') as HTMLDetailsElement).hidden).toBe(true);
+    const b = await open({ solo: false, linked: FUNDER, main: FUNDER, mainConnected: true, gate: { ...base.gate, allowed: true } });
+    expect((b.querySelector('.ppp-yours') as HTMLDetailsElement).hidden).toBe(true);
   });
 });

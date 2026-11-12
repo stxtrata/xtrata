@@ -25,6 +25,10 @@ export interface WelcomeInput {
   /** gift: plays that come with it and who it is from. landed: plays the player now holds. */
   plays?: number | null;
   from?: string | null;
+  /** The player's class from the giveaway (tiers.ts), when it has one: shown as a coloured record. */
+  tier?: { id: string; name: string; mark: string } | null;
+  /** gift: do not say how many plays it holds yet (a lottery drop): that is the reveal when it lands. */
+  mystery?: boolean;
   start(): void;
   returning(): void;
   unlock(): void;
@@ -50,7 +54,7 @@ export const PLAYER_PROMISES = [
 ] as const;
 
 export const WELCOME_TEXT = {
-  gift: { title: 'Your free player is waiting', primary: 'Claim my player', hint: 'One tap with Face ID or your fingerprint. No app, no account, no password.', returning: 'I already have a player', full: 'Look around first' },
+  gift: { title: 'Your free player is waiting', primary: 'Claim my free player', hint: 'One tap with Face ID or your fingerprint. No app, no account, no password.', returning: 'I already have a player', full: 'Look around first' },
   new: { title: 'Music that pays the artist', body: 'Every play counts for whoever owns the song. Make your player once and you’re in.', primary: 'Make my player',
     hint: 'One tap with Face ID or your fingerprint. No app, no account, no password.', returning: 'I’ve listened here before', full: 'Look around first' },
   back: { title: 'Welcome back', body: 'Unlock your player and carry on listening.', primary: 'Unlock my player', hint: 'One tap with Face ID or your fingerprint.', returning: 'Use a different passkey', full: 'Look around first' },
@@ -61,10 +65,20 @@ export const WELCOME_TEXT = {
   asking: 'Continue in the box below.'
 } as const;
 
-export const giftBody = (plays: number | null | undefined, from: string | null | undefined) =>
-  `${from || 'Xtrata Music'} has covered ${plays ? `${count(plays)} plays` : 'your first plays'}. Play any song you like, and every play pays the artist.`;
+export const giftBody = (plays: number | null | undefined, from: string | null | undefined, mystery = false) =>
+  mystery ? `${from || 'Xtrata Music'} has loaded it with plays. Classic, Neon, Bronze, Silver, Gold or Diamond? Claim it to find out which one is yours.`
+    : `${from || 'Xtrata Music'} has covered ${plays ? `${count(plays)} plays` : 'your first plays'}. Play any song you like, and every play pays the artist.`;
 export const landedBody = (plays: number | null | undefined) =>
   plays ? `Your player holds ${count(plays)} plays. Play anything: each one pays the artist you’re hearing.` : 'Your player is ready. Play anything: each play pays the artist you’re hearing.';
+export const landedTitle = (tier: WelcomeInput['tier']) => (tier ? `You got a ${tier.name} player` : WELCOME_TEXT.landed.title);
+/** The record a tier is drawn as (public/radio.html styles `.tier-disc[data-tier]`). */
+export function tierDisc(tier: NonNullable<WelcomeInput['tier']>, big = true): HTMLElement {
+  const d = el('div', 'tier-disc' + (big ? ' tier-disc--big' : ''));
+  d.dataset.tier = tier.id;
+  d.setAttribute('role', 'img'); d.setAttribute('aria-label', `${tier.name} player`);
+  d.append(el('span', 'tier-disc__mark', tier.mark));
+  return d;
+}
 
 export function createWelcomeView(mount: HTMLElement) {
   const root = document.documentElement;
@@ -99,8 +113,10 @@ export function createWelcomeView(mount: HTMLElement) {
       if (m === 'checking') {
         box.append(el('p', 'al-welcome-wait', WELCOME_TEXT.checking));
       } else {
-        box.append(el('h1', '', WELCOME_TEXT[m].title));
-        box.append(el('p', '', m === 'gift' ? giftBody(input.plays, input.from) : m === 'landed' ? landedBody(input.plays) : WELCOME_TEXT[m].body));
+        // The player's class, as a record in its colours: the reveal when it lands, and there again on every return.
+        if (input.tier && (m === 'landed' || m === 'back' || m === 'empty')) box.append(tierDisc(input.tier));
+        box.append(el('h1', '', m === 'landed' ? landedTitle(input.tier) : m === 'back' && input.tier ? `Your ${input.tier.name} player` : WELCOME_TEXT[m].title));
+        box.append(el('p', '', m === 'gift' ? giftBody(input.plays, input.from, input.mystery) : m === 'landed' ? landedBody(input.plays) : WELCOME_TEXT[m].body));
         if (m === 'landed' || m === 'gift') box.append(promises());
         if (input.status.length) { const s = el('div', 'al-status'); s.setAttribute('role', 'status'); s.append(...input.status); box.append(s); }
         if (input.asking) box.append(el('p', 'al-hint al-hint--ask', WELCOME_TEXT.asking));

@@ -520,6 +520,35 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .al-welcome .al-welcome-note{font-size:13px;color:#8f97a3}
   .al-welcome .al-welcome-wait{font-size:14px;color:#8f97a3}
   .al-welcome .al-primary{margin-top:28px}
+  .ppp-yours-item{border-top:1px solid var(--line);padding:2px 0}
+  .ppp-yours-item summary{cursor:pointer;padding:9px 0;font-size:13.5px;font-weight:700}
+  .ppp-yours-item p{margin:0 0 9px;font-size:13px;line-height:1.5}
+  /* Player classes from the giveaway (src/lib/listening-wallet/tiers.ts). Looks only. */
+  :root{--tier-a:#7fe3f5;--tier-b:#0b0d10;--tier-ink:#0b0d10}
+  [data-tier=diamond]{--tier-a:#e8fbff;--tier-b:#8fd8ff;--tier-ink:#06202e}
+  [data-tier=gold]{--tier-a:#ffe9a3;--tier-b:#c8922a;--tier-ink:#2e1f02}
+  [data-tier=silver]{--tier-a:#f4f6fa;--tier-b:#9aa5b5;--tier-ink:#1b222c}
+  [data-tier=bronze]{--tier-a:#f0b98a;--tier-b:#a05f2c;--tier-ink:#2a1405}
+  [data-tier=neon]{--tier-a:#ff5fd2;--tier-b:#38f0c8;--tier-ink:#12021a}
+  [data-tier=classic]{--tier-a:#3a424e;--tier-b:#11151b;--tier-ink:#e6edf6}
+  .ppp-tier{display:inline-block;white-space:nowrap;font-size:10px;font-weight:800;letter-spacing:.7px;border-radius:999px;padding:3px 9px;margin-left:6px;vertical-align:middle;
+    color:var(--tier-ink);background:linear-gradient(110deg,var(--tier-b) 0%,var(--tier-a) 38%,#fff 50%,var(--tier-a) 62%,var(--tier-b) 100%);background-size:220% 100%;animation:tier-sheen 5s linear infinite}
+  .ppp-tier[data-tier=diamond]{background-image:linear-gradient(110deg,#8fd8ff,#e8fbff 30%,#ffd6f7 45%,#fff 50%,#c9ffe9 55%,#e8fbff 70%,#8fd8ff)}
+  .ppp-tier[data-tier=neon]{background-image:linear-gradient(110deg,#ff5fd2,#ffe45c 35%,#38f0c8 65%,#6aa8ff)}
+  .ppp-tier[data-tier=classic]{background-image:linear-gradient(110deg,#11151b,#3a424e 50%,#11151b);border:1px solid #4a5462}
+  @keyframes tier-sheen{from{background-position:220% 0}to{background-position:0 0}}
+  html[data-tier]:not([data-tier=classic]) .ppp{border-color:var(--tier-b);box-shadow:0 0 34px -14px var(--tier-a)}
+  .tier-disc{position:relative;width:64px;aspect-ratio:1;border-radius:50%;margin:0 auto;display:grid;place-items:center;
+    background:radial-gradient(circle,var(--tier-ink) 0 7%,var(--tier-a) 8% 26%,transparent 27%),repeating-radial-gradient(circle,rgba(0,0,0,.22) 0 1px,transparent 1px 4px),conic-gradient(from 20deg,var(--tier-b),var(--tier-a),var(--tier-b),var(--tier-a),var(--tier-b));
+    box-shadow:0 0 0 2px rgba(255,255,255,.08),0 14px 40px -6px var(--tier-a)}
+  .tier-disc--big{width:min(210px,56vw);margin-bottom:22px;animation:tier-spin 14s linear infinite}
+  .tier-disc[data-tier=diamond]{background:radial-gradient(circle,#06202e 0 7%,#fff 8% 26%,transparent 27%),repeating-radial-gradient(circle,rgba(0,40,70,.18) 0 1px,transparent 1px 4px),conic-gradient(from 0deg,#8fd8ff,#fff,#ffc9f3,#e8fbff,#b9ffe0,#fff,#b7c8ff,#8fd8ff);box-shadow:0 0 0 2px rgba(255,255,255,.5),0 0 60px 4px rgba(143,216,255,.75)}
+  .tier-disc[data-tier=neon]{background:radial-gradient(circle,#12021a 0 7%,#ffe45c 8% 26%,transparent 27%),repeating-radial-gradient(circle,rgba(0,0,0,.25) 0 1px,transparent 1px 4px),conic-gradient(from 0deg,#ff5fd2,#ffe45c,#38f0c8,#6aa8ff,#ff5fd2);box-shadow:0 0 50px 0 rgba(255,95,210,.55)}
+  .tier-disc[data-tier=classic]{background:radial-gradient(circle,#0b0d10 0 7%,#7fe3f5 8% 26%,transparent 27%),repeating-radial-gradient(circle,rgba(255,255,255,.07) 0 1px,transparent 1px 4px),#11151b;box-shadow:0 0 0 2px #2a313b,0 14px 34px -10px #000}
+  .tier-disc__mark{font-size:0}
+  .tier-disc--big .tier-disc__mark{font-size:0}
+  @keyframes tier-spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.ppp-tier,.tier-disc--big{animation:none}}
   .howto{margin:12px 0 0;border:1px solid var(--line);border-radius:12px;padding:0 14px}
   .howto summary{cursor:pointer;padding:11px 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
   .howto dl{margin:0 0 12px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;line-height:1.45}
@@ -758,6 +787,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
         <details class="ppp-fold ppp-recent" hidden><summary>♪ Recently played</summary><ol class="ppp-recent-list"></ol><details class="ppp-history" hidden></details></details>
         <details class="ppp-fold ppp-wallets" hidden><summary>◎ This device</summary><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div></details>
         <details class="ppp-fold ppp-more" hidden><summary>? How plays work</summary><div class="ppp-body"></div></details>
+        <details class="ppp-fold ppp-yours" hidden><summary>✦ Make it yours</summary><div class="ppp-yours-body"></div></details>
         <details class="ppp-fold ppp-gifts" hidden><summary>🎁 Albums (admin)</summary><div class="ppp-gift-body"></div></details>
       </div>
     </section>
@@ -1159,7 +1189,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=7c673588782b');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=bea690eb31d8');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
