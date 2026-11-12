@@ -52,9 +52,9 @@ names. If it leaked, someone could claim awards they did not win, but no money i
 | Art | Five framed records as self-contained HTML, shown first in the player and on the wall | Claude builds, Jim approves |
 | Masters | Inscribe the five on Xtrata (five ordinary inscriptions) | Jim |
 | Contract | Write, test in simulation, deploy to testnet, then mainnet | Claude writes and tests; Jim deploys |
-| Server | `GET /radio/award?wallet=…` returns the signed note for a claimed starter player; new secret `RADIO_AWARD_SIGNER` | Claude builds; Jim sets the secret |
-| Wallet box | One new action, "claim award": fixed contract and function, arguments checked, shown to the listener before signing | Claude builds; separate security review; Jim redeploys the box |
-| Player | "Claim your Gold record" on the landed screen and in "Make it yours"; afterwards the framed record shows on every return, with a link to see it on-chain | Claude |
+| Server | `GET /radio/award?wallet=…` returns progress, and the signed note once the player has used 10% of its plays; new secret `RADIO_AWARD_SIGNER` | Claude builds; Jim sets the secret |
+| Wallet box | Two new actions, "claim award" and "send my award": fixed contract and functions, arguments checked, shown to the listener before signing | Claude builds; separate security review; Jim redeploys the box |
+| Player | Progress to the award, then "Claim your Gold record"; afterwards the framed record shows on every return, with a link to see it on-chain. A plain look (below Classic) for a player whose award has gone | Claude |
 | Wall | A claimed disc's panel shows the framed record once it has been claimed | Claude |
 
 Unchanged: the passkey derivation labels and settings, the plays and likes contracts, the wallet box's CSP,
@@ -67,15 +67,32 @@ awards contract and shows what it is signing.
 - One-off: five master inscriptions, one contract deployment.
 - No float, no hot wallet holding funds or NFTs.
 
-## Decisions for Jim
+## Decided (Jim, 2026-11-12)
 
-1. **Can an award be moved?** Standard NFTs can be transferred. Options: transferable like any NFT, or fixed to the
-   player that won it (a trophy). Recommended: fixed for now, since the wallet box has no "send an NFT" action anyway.
-2. **Free to claim at once, or earned?** For example "play 10 songs to unlock your record". The server can hold the
-   note back until then; the contract does not need to know.
-3. **Who may deploy and own the contract** (which wallet), and which wallet inscribes the masters.
-4. **Where "see it on-chain" leads.** A standard NFT shows in Stacks wallets and explorers. The Xtrata explorer shows
-   Xtrata inscriptions, so it would need a small addition to show awards.
+1. **A standard SIP-009 NFT, owned and transferable.** Nothing special about it on-chain: it shows in Stacks wallets
+   and explorers like any NFT.
+2. **The player's look follows the award.**
+   - Not yet claimed: the player keeps the class look it won (as now).
+   - Claimed and held: the class look, plus the framed record.
+   - Claimed and then sent away: the player drops to a plain look, duller than Classic. The plays are untouched.
+   - Reading still to confirm with Jim: a player that is sent someone else's award takes on that award's look (the
+     best class it holds). That is what makes an award worth having or trading.
+   The page decides the look by asking the contract what the player holds (`get-award-of`, and owner of the token),
+   not by what the server remembers. If the chain cannot be read the look stays as it was last known: never a
+   downgrade on a failed read.
+3. **Earned at 10% of the plays it came with.** Diamond 100 plays, Gold 50, Silver 25, Bronze 10, Classic 5.
+   - The player shows progress ("3 of 5 plays to unlock your record").
+   - The server only signs the note once it can count that many confirmed paid plays from the player's address on
+     the chain. If the count cannot be read it says "unavailable, try again shortly" and signs nothing.
+   - The contract does not know the rule, so a later drop can use a different one.
+4. **Xtrata inscribes the masters and deploys the contract**, from the Xtrata project wallet, by Jim. Claude never
+   holds or uses that wallet: Claude delivers the five files, the contract source, its tests and the exact deploy steps.
+
+### What "transferable" needs
+
+The contract allows transfers from day one. The player itself cannot make one until the wallet box has a "send my
+award" action, which is a second new action after "claim award". Plan: review and ship both together, or ship claim
+first and add sending later. Either way the listener is told, before sending, that the player will lose its look.
 
 ## Order of work
 
