@@ -67,7 +67,7 @@ const mainPath = (root: Element) => [root.querySelector('.ppp-key'), root.queryS
 const buttons = (root: Element | null) => [...(root?.querySelectorAll('button') ?? [])].map((b) => b.textContent);
 const say = (st: { playing: boolean; nowPlaying: any }) => { h.state = st; for (const fn of h.feeds) fn(st); };
 
-beforeEach(() => { vi.unstubAllGlobals(); delete (window as any).XtrataRadio; localStorage.clear(); h.route = null; });
+beforeEach(() => { vi.unstubAllGlobals(); delete (window as any).XtrataRadio; localStorage.clear(); sessionStorage.clear(); h.route = null; for (const k of ['view', 'welcome', 'asking', 'noviceBoot']) delete document.documentElement.dataset[k]; });
 
 const STEPS: [string, object][] = [
   ['a new listener', { step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null, giftStop: { reason: 'setup', text: 'SET UP YOUR PLAYER TO LISTEN' } }],
@@ -183,5 +183,82 @@ describe('novice preview: one free first song from a shared album', () => {
     h.changed();
     expect(h.radio.setGiftStop).toHaveBeenLastCalledWith('YOUR PLAYS ARE ARRIVING');
     expect(h.radio.setGiftLock).toHaveBeenLastCalledWith(false);
+  });
+});
+
+describe('novice welcome: a newcomer sees one short page, not the whole radio', () => {
+  const NEW = { step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null, giftStop: { reason: 'setup', text: 'SET UP YOUR PLAYER TO LISTEN' } };
+  const page = () => document.getElementById('album')!;
+  const named = (re: RegExp) => [...page().querySelectorAll('button')].find((b) => re.test(b.textContent || '')) as HTMLButtonElement | undefined;
+  const html = () => document.documentElement;
+
+  it('no player on this device: one button makes it, and nothing on the page is a crypto word', async () => {
+    await open(NEW);
+    expect(html().dataset.view).toBe('album'); // the radio and the panel are hidden behind it
+    expect(html().dataset.welcome).toBe('new');
+    expect(text(page())).toContain('Music that pays the artist');
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+    expect(buttons(page())).toEqual(['Make my player', 'I’ve listened here before', 'Look around first']);
+    named(/Make my player/)!.click();
+    expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1);
+    named(/listened here before/)!.click();
+    expect(h.calls.filter(([n]) => n === 'unlock')).toEqual([['unlock', [true]]]);
+  });
+
+  it('while the box asks for a tap the page points to it, and a cancelled passkey is said plainly', async () => {
+    await open({ ...NEW, busy: 'Waiting for your passkey…' });
+    expect(html().dataset.asking).toBe('1');
+    expect(text(page())).toContain('Continue in the box below.');
+    expect(named(/Make my player/)).toBeUndefined();
+    h.snap = { ...h.snap, busy: null, error: 'The passkey request was cancelled or timed out. Try again when ready.' };
+    h.changed();
+    expect(html().dataset.asking).toBeUndefined();
+    expect(text(page())).toContain('cancelled or timed out');
+    expect(named(/Make my player/)).toBeTruthy();
+  });
+
+  it('"Look around first" opens the full radio for this visit', async () => {
+    await open(NEW);
+    named(/Look around first/)!.click();
+    expect(html().dataset.view).toBeUndefined();
+    expect(html().dataset.welcome).toBeUndefined();
+    expect(page().hidden).toBe(true);
+    expect(sessionStorage.getItem('xtrata.radio.novice.full')).toBe('1');
+  });
+
+  it('a locked player: welcome back, one tap to unlock', async () => {
+    await open({ step: 'locked', balance: undefined, session: null, giftStop: { reason: 'locked', text: 'UNLOCK TO LISTEN' } });
+    expect(html().dataset.welcome).toBe('back');
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+    named(/Unlock my player/)!.click();
+    expect(h.calls.filter(([n]) => n === 'unlock')).toEqual([['unlock', []]]);
+  });
+
+  it('a new player with no plays says so, and offers the radio', async () => {
+    await open({ step: 'fund', balance: 0n, playsLeft: 0, session: null, giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } });
+    expect(html().dataset.welcome).toBe('empty');
+    expect(text(page())).toContain('Your player is ready');
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+    expect(buttons(page())).toEqual(['Look around the radio']);
+  });
+
+  it('holds a quiet screen until it knows who this is, then gets out of the way for a listener with plays', async () => {
+    await open({ step: 'off', gate: null, solo: false });
+    expect(html().dataset.welcome).toBe('checking');
+    expect(text(page())).toContain('One moment');
+    h.snap = { ...base, entries: PLAYED };
+    h.changed();
+    expect(html().dataset.welcome).toBeUndefined();
+    expect(html().dataset.view).toBeUndefined();
+  });
+
+  it('never shows for a connected Stacks wallet, or with the flag off', async () => {
+    await open({ step: 'connect', solo: false, listening: undefined, balance: undefined, session: null });
+    expect(html().dataset.welcome).toBeUndefined();
+    localStorage.clear();
+    for (const k of ['view', 'welcome', 'asking']) delete html().dataset[k]; // a fresh page load
+    await open(NEW, null);
+    expect(html().dataset.welcome).toBeUndefined();
+    expect(html().dataset.view).toBeUndefined();
   });
 });

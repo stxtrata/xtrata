@@ -27,6 +27,7 @@ import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
 import { musicWalletOptions } from './connect-choice';
 import { hasBannedWord, markPreviewed, newPreview, PLAIN_CHECKING, PLAIN_LABEL, PLAIN_NUDGE, plainLines, plainStop, previewedAlbums, previewLive, readNovice, stepPreview } from './novice';
 import type { GiftStopReason } from './controller';
+import { createWelcomeView, type WelcomeMode } from './welcome';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -189,6 +190,42 @@ function start(root: HTMLElement) {
     openPlayer: () => void ppp.openAlbum(0)
   };
   const albumView = albumMount ? createAlbumView(albumMount, albumDeps) : null;
+  // Novice mode's first screen (welcome.ts): a newcomer with no player and no album sees one short page and one button,
+  // not the whole radio. Until the page knows who this is, a quiet holding screen stands in (never the radio flashing by).
+  const welcome = novice.on && albumMount ? createWelcomeView(albumMount) : null;
+  const welcomeSince = Date.now();
+  let welcomeKnown = false;      // the first real answer about this visitor has arrived
+  let welcomeLast: WelcomeMode | null = null;
+  let welcomeFull = (() => { try { return sessionStorage.getItem('xtrata.radio.novice.full') === '1'; } catch { return false; } })();
+  const showFull = () => { welcomeFull = true; try { sessionStorage.setItem('xtrata.radio.novice.full', '1'); } catch { /* this visit only anyway */ } render(ppp.snapshot()); };
+  const welcomeMode = (s: Snapshot, albumActive: boolean): WelcomeMode | null => {
+    if (!welcome || albumActive || welcomeFull) return null;
+    const waiting = !s.gate || s.step === 'loading';
+    if (!waiting) welcomeKnown = true;
+    // Not known yet: hold, but never for long (a page that cannot reach the server must still show the radio).
+    if (!welcomeKnown) return Date.now() - welcomeSince < 10_000 ? 'checking' : null;
+    if (!plainFor(s)) return null;
+    if (s.step === 'intro' || s.step === 'unsupported') return 'new';
+    if (s.step === 'locked') return 'back';
+    if (s.step === 'fund' && s.slot === 0 && !s.gift && !s.depositPending && !s.entries.some((e) => e.kind === 'play')) return 'empty';
+    return s.step === 'loading' && welcomeLast !== 'checking' ? welcomeLast : null; // a check in between: stay where we were
+  };
+  function syncWelcome(s: Snapshot, albumActive: boolean, lines: HTMLElement[] = []) {
+    if (!welcome) return;
+    const mode = welcomeMode(s, albumActive);
+    welcomeLast = mode;
+    delete document.documentElement.dataset.noviceBoot; // public/radio.html held the page blank until here
+    if (!mode) { welcome.render(null, albumActive); return; }
+    const status = [...lines];
+    if (s.step === 'unsupported') status.push(el('p', 'This browser cannot make a player. Open this page in Safari or Chrome.', 'ppp-warn'));
+    else if (s.error) status.push(el('p', s.error, 'ppp-warn'));
+    welcome.render({
+      mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
+      start: () => void ppp.create(), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), full: showFull
+    });
+  }
+  if (welcome) setTimeout(() => { if (!welcomeKnown) render(ppp.snapshot()); }, 10_100);
+
   // The open album's songs, with their artwork and the plays left, in the panel where "Your Station" is.
   const albumListMount = document.getElementById('albumList');
   const albumList = albumListMount ? createAlbumView(albumListMount, albumDeps, { list: true }) : null;
@@ -333,7 +370,7 @@ function start(root: HTMLElement) {
   const openElsewhere = (app: string, code: string | null): HTMLElement[] => {
     const ua = navigator.userAgent, browser = browserName(ua);
     const url = `${location.origin}${location.pathname}${code ? `#gift=${code}` : ''}`;
-    const out: HTMLElement[] = [el('p', `You are in ${app}'s built-in browser, where passkeys often do not work. Open this page in ${browser} to make your listening wallet${code ? ' and claim your gift' : ''}.`, 'ppp-warn')];
+    const out: HTMLElement[] = [el('p', `You are in ${app}'s built-in browser, where passkeys often do not work. Open this page in ${browser} to make your ${novice.on ? 'player' : 'listening wallet'}${code ? (novice.on ? ' and open your gift' : ' and claim your gift') : ''}.`, 'ppp-warn')];
     const row = el('div', '', 'ppp-open-row'); // not .ppp-actions: the panel refills the first element with that class
     const href = openInBrowserHref(url, ua);
     if (href) { const a = el('a', `Open in ${browser}`, 'primary ppp-open-in') as HTMLAnchorElement; a.href = href; a.dataset.homeAction = 'radio:open-in-browser'; row.append(a); }
@@ -741,7 +778,7 @@ function start(root: HTMLElement) {
       paidStatus.textContent = s.step === 'loading' || !s.gate ? (novice.on ? PLAIN_CHECKING : 'Checking your listening wallet…') : novice.on ? 'Xtrata Music is unavailable here. Reload to check again.' : 'Paid radio is unavailable. Reload to check again.';
     }
     root.hidden = s.step === 'off';
-    if (root.hidden) return;
+    if (root.hidden) { syncWelcome(s, false); return; }
     const [pill, tone] = statePill(s);
     const pillEl = $('.ppp-state');
     pillEl.textContent = pill;
@@ -1161,6 +1198,7 @@ function start(root: HTMLElement) {
       return row;
     }));
     albumView?.render(album ? albumInput(s, album, [...elsewhereLines, ...giftLines]) : null);
+    syncWelcome(s, !!album, elsewhereLines);
     albumList?.render(albumNow?.mode === 'open' ? albumInput(s, albumNow, []) : null);
   }
 

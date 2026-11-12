@@ -9,6 +9,16 @@
 <script>
 // Set before the audio engine loads so a slow or unavailable wallet check cannot open playback.
 if (location.hostname === 'radio.xtrata.xyz') document.documentElement.dataset.radioPaidOnly = 'true';
+// Novice mode (src/radio-ppp/novice.ts, off unless asked for): hold the page blank until the panel knows whether this
+// visitor gets the one-button welcome screen, so the full radio never flashes by first. Released after 10 s regardless.
+try {
+  var nv = new URLSearchParams(location.search).get('novice');
+  if (nv !== '0' && /^(1|preview)$/.test(nv === '1' || nv === 'preview' ? nv : localStorage.getItem('xtrata.radio.novice') || '') && sessionStorage.getItem('xtrata.radio.novice.full') !== '1') {
+    var de = document.documentElement;
+    de.dataset.view = 'album'; de.dataset.noviceBoot = '1';
+    setTimeout(function () { if (de.dataset.noviceBoot) { delete de.dataset.noviceBoot; delete de.dataset.view; } }, 10000);
+  }
+} catch (e) { /* storage blocked: the classic page */ }
 </script>
 <script>
 // Gift links carry their code after "#" (browsers never send it to a server). Move it to this device
@@ -503,6 +513,13 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .al-status button{margin-top:6px;min-height:40px;padding:0 14px!important;border:1px solid #343b46!important;border-radius:10px}
   .al-status a{color:#7fe3f5}
   .al-grow{flex:1;min-height:16px}
+  .al-body--welcome{justify-content:center;min-height:calc(100vh - 140px)}
+  .al-welcome{text-align:center;max-width:440px;margin:0 auto;width:100%}
+  .al-welcome h1{margin:0;font-size:30px;letter-spacing:-.02em;line-height:1.15;color:#f2f0ea}
+  .al-welcome>p{margin:12px 0 0;color:#a3aab5;font-size:16px;line-height:1.5}
+  .al-welcome .al-welcome-note{font-size:13px;color:#8f97a3}
+  .al-welcome .al-welcome-wait{font-size:14px;color:#8f97a3}
+  .al-welcome .al-primary{margin-top:28px}
   .al-primary{width:100%;height:56px;border-radius:14px;background:#7fe3f5!important;color:#0b0d10!important;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;gap:10px}
   .al-hint{margin:10px 0 0;font-size:12px;color:#8f97a3;text-align:center;line-height:1.5}
   .al-hint--ask{font-size:15px;color:#7fe3f5}
@@ -1103,7 +1120,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=ab45a5996f66');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=4e847f7d7555');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
