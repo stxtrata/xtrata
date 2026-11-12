@@ -9210,3 +9210,48 @@
 }
 .home-tile--daily.home-tone--cyan { --tone: #4ee6ff; }
 .home-tile--daily.home-tone--pink { --tone: #ffb3df; }
+
+/* Bitcoin Monkeys announcement: the whole square poster in a violet and orange frame, text and link in a band below. */
+.home-tile--poster {
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+  border: 2px solid #ff9a2e;
+  background: radial-gradient(circle at 50% 0%, #3a1366 0%, #12081f 70%);
+  box-shadow: 0 0 22px rgba(255, 154, 46, 0.35), 0 0 46px rgba(140, 70, 255, 0.3);
+  animation: home-poster-glow 3.2s ease-in-out infinite;
+}
+.home-tile--poster:hover,
+.home-tile--poster:focus-within { transform: none; }
+/* The image is positioned inside its box so its own size never stretches the wall's grid rows. */
+.home-tile--poster { min-height: 400px; }
+.home-tile__poster { position: relative; flex: 1 1 0; min-height: 0; background: #08040f; }
+.home-tile__poster-img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
+.home-tile__poster-band {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  padding: 10px 12px;
+  background: linear-gradient(90deg, #2b0f4d, #43200a);
+  border-top: 1px solid rgba(255, 154, 46, 0.6);
+}
+.home-tile__poster-words { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.home-tile--poster .home-tile__eyebrow { color: #ffb15c; }
+.home-tile__poster-copy { margin: 0; font-size: 12px; line-height: 1.35; color: #f6efff; }
+.home-tile__poster-cta { flex: none; min-height: 40px; background: #ff9a2e; border-color: transparent; color: #1a0b02; font-weight: 800; }
+.home-tile__poster-cta:hover { filter: brightness(1.08); }
+.home-tile__poster-cta:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@keyframes home-poster-glow {
+  0%, 100% { box-shadow: 0 0 18px rgba(255, 154, 46, 0.3), 0 0 40px rgba(140, 70, 255, 0.25); }
+  50% { box-shadow: 0 0 30px rgba(255, 154, 46, 0.55), 0 0 64px rgba(140, 70, 255, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) { .home-tile--poster { animation: none; } }
+@media (max-width: 720px) {
+  /* Full-width on phones: the square poster shows at full size, then the band. */
+  .home-tile--poster { min-height: 0; }
+  .home-tile__poster { flex: none; aspect-ratio: 1 / 1; }
+  .home-tile__poster-cta { width: 100%; }
+}

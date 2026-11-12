@@ -4162,7 +4162,7 @@
       if (dom.registryIntroLead) {
         dom.registryIntroLead.textContent =
           PAGE_MODE === 'home'
-            ? 'Every tile is a real inscription. Press one to play it, hear it or open it.'
+            ? 'Press a tile to play it, hear it or open it. Every one is on-chain or on its way.'
             : state.curatedGalleryTitle
               ? `${state.curatedGalleryTitle} is open below in Wallet Inscriptions.`
               : state.homeLatestView
