@@ -302,6 +302,11 @@ const v1 = JSON.parse(read(resolve(FT, 'ft-harness/registry/registry.v1.json')))
 // already inscribed keep resolving in the app) and in functions/ft/collections.json (those twins' token URIs
 // point at the resolver). They must NOT appear in registry.v2.json, its communities or the hub.
 const DELISTED = ['bitcoin-monkeys'];
+// Helpers the Explorer must recognise but that are not ours to list: they live in src/lib/twins/registry.ts only,
+// so their Xtrata inscriptions show "Bitcoin Monkey #N" next to the Xtrata ID. They are not in registry.v1.json
+// (that file pins the source hashes of helpers we audited and deployed) and must NOT be in registry.v2.json.
+// bitcoin-monkeys-fakfun: Rapha's fak.fun Monkeys helper, SP2P8BYK...btc-monkeys-fakfun-x (added 11 Nov 2026).
+const EXPLORER_ONLY = ['bitcoin-monkeys-fakfun'];
 await check('delisted collections are off v2, its communities and the hub, but still served by the resolver', () => {
   const resolver = JSON.parse(read(resolve(FT, '..', 'functions/ft/collections.json')));
   for (const k of DELISTED) {
@@ -332,7 +337,24 @@ await check('src/lib/twins/registry.ts lists the same helper, source and asset f
 });
 await check('registry.ts has no live collection that v2 does not know', () => {
   const keys = [...read(tsPath).matchAll(/^\s+key: '([a-z0-9-]+)'/gm)].map((m) => m[1]);
-  for (const k of keys.filter((x) => !DELISTED.includes(x))) assert.ok(R.getCollection(reg, k), `${k} is in registry.ts but not in registry.v2.json`);
+  for (const k of keys.filter((x) => !DELISTED.includes(x) && !EXPLORER_ONLY.includes(x))) assert.ok(R.getCollection(reg, k), `${k} is in registry.ts but not in registry.v2.json`);
+});
+await check('explorer-only helpers are in registry.ts and nowhere that lists or verifies collections', () => {
+  const ts = read(tsPath);
+  for (const k of EXPLORER_ONLY) {
+    assert.ok(ts.includes(`key: '${k}'`), `${k} is missing from registry.ts: its twins would stop showing the original id`);
+    assert.ok(!R.getCollection(reg, k), `${k} is explorer-only but is listed in registry.v2.json`);
+    assert.ok(!reg.communities.some((c) => c.slug === k || (c.collections || []).includes(k)), `${k} is explorer-only but has a community page`);
+    assert.ok(!v1.helpers.some((h) => h.key === k), `${k} is explorer-only but is in registry.v1.json, which pins audited helpers`);
+    assert.ok(!read(resolve(FT, 'index.html')).includes(`/forever-twins/collection/${k}`), `${k} is explorer-only but is on the hub`);
+  }
+});
+await check('registry.ts: each helper contract id appears once (the app looks a twin up by its owner)', () => {
+  const ids = [...read(tsPath).matchAll(/helperContractId:\s*'([^']+)'/g)].map((m) => m[1]);
+  assert.ok(ids.length >= 7, 'could not parse helperContractId entries');
+  assert.equal(new Set(ids).size, ids.length, `duplicate helperContractId in registry.ts: ${ids.filter((x, i) => ids.indexOf(x) !== i).join(', ')}`);
+  const keys = [...read(tsPath).matchAll(/^\s+key: '([a-z0-9-]+)'/gm)].map((m) => m[1]);
+  assert.equal(new Set(keys).size, keys.length, 'duplicate key in registry.ts: twin indexes are cached per key');
 });
 const hub = read(resolve(FT, 'index.html'));
 await check('hub COLLECTIONS entries match v2 (helper address+name, source address+name)', () => {

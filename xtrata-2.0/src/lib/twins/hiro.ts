@@ -78,6 +78,66 @@ export const callReadOnly = async (params: {
 export const uintArg = (value: bigint | number | string): ClarityValue =>
   uintCV(value);
 
+/**
+ * Outcome of a direct data-map read. `ok` separates "the node answered" from
+ * "the request failed": a failed read must never be treated as "no such entry"
+ * (see the `ownerOfChecked` convention in xtrata-2.0/CLAUDE.md).
+ *
+ *   { ok: true,  value: 1296n } - the map has an entry
+ *   { ok: true,  value: null  } - the node answered and there is no entry
+ *   { ok: false, value: null  } - the read failed; the caller should fall back
+ */
+export type MapUintResult = { ok: boolean; value: bigint | null };
+
+/**
+ * Read `(map-get? <mapName> <uint key>)` straight from a contract's data map via
+ * Hiro's `map_entry` endpoint, for maps whose value is a uint. This needs no
+ * read-only wrapper on the contract, which is what makes it usable against
+ * helpers (e.g. `BoundTwins` on the FACFUN Monkeys helper) that keep the reverse
+ * xtrata-id -> local-id map but never exposed a getter for it.
+ */
+export const readMapUint = async (params: {
+  contractId: string;
+  mapName: string;
+  key: bigint | number | string;
+  network: NetworkType;
+}): Promise<MapUintResult> => {
+  try {
+    const [address, name] = splitContractId(params.contractId);
+    const response = (await fetchJsonWithFallback(
+      `/v2/map_entry/${address}/${name}/${params.mapName}?proof=0`,
+      params.network,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // The body is the key's hex-encoded Clarity value, as a JSON string.
+        body: JSON.stringify(cvToHex(uintCV(params.key)))
+      }
+    )) as { data?: unknown };
+    if (typeof response?.data !== 'string') {
+      return { ok: false, value: null };
+    }
+    let node = cvToJSON(hexToCV(response.data)) as {
+      type?: string;
+      value?: unknown;
+    } | null;
+    // `(some u1296)` arrives as an optional wrapping the uint; `none` has a
+    // null value. Anything else is not a uint map and is reported as a failure.
+    while (node && typeof node.type === 'string' && node.type.startsWith('(optional')) {
+      if (node.value === null || node.value === undefined) {
+        return { ok: true, value: null };
+      }
+      node = node.value as typeof node;
+    }
+    if (node && node.type === 'uint' && typeof node.value === 'string') {
+      return { ok: true, value: BigInt(node.value) };
+    }
+    return { ok: false, value: null };
+  } catch {
+    return { ok: false, value: null };
+  }
+};
+
 export type ContractLogEvent = {
   /** Decoded print payload (cvToJSON value map), or null when not a print. */
   print: Record<string, unknown> | null;
