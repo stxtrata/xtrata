@@ -3,8 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { ensureGiftTables, type GiftEnv } from '../radio-gifts';
-import { advance, codesIn, giveawayAdmin, giveawayAuthorised, giveawayList, giveawayView, type GiveawayEnv } from '../radio-giveaway';
-import { PLAYERS_URL, playersPage } from '../players-page';
+import { advance, codesIn, giveawayAdmin, giveawayAuthorised, giveawayList, giveawayView, HOLD_MS, pickSpot, PICKS_PER_IP, spotView, wallView, type GiveawayEnv } from '../radio-giveaway';
 import { GIFT_EXPIRY_MS, giftCodeHash, newGiftCode } from '../../../src/lib/listening-wallet/gifts';
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
 
@@ -360,30 +359,30 @@ describe('radio giveaway', () => {
     expect((await call(['nothing'])).status).toBe(404);
     expect((await call([], {}, setup({ RADIO_GIFT_ENABLED: '0' }).env)).status).toBe(404);
   });
-  it('keeps each list to itself: the album drop and the free players run side by side', async () => {
+  it('keeps each list to itself: the album drop drips while the players wall stands open', async () => {
     const s = setup();
     const albums = await s.gifts(3, { player: 'p1' });
     const players = await s.gifts(2);
     await giveawayAdmin(s.env, { action: 'add', text: s.list(albums) }, T0);
     const added = await giveawayAdmin(s.env, { action: 'add', list: 'players', text: s.list(players) }, T0);
-    expect(added).toMatchObject({ list: 'players', added: 2, total: 2 });
-    const main = await giveawayView(s.env, T0);
-    const mine = await giveawayView(s.env, T0, Math.random, 'players');
-    expect(main).toMatchObject({ state: 'live', code: albums[0], left: 3, kind: 'album' });
-    expect(mine).toMatchObject({ state: 'live', code: players[0], left: 2, kind: 'player' });
-    // Pausing, pacing and archiving one list leaves the other exactly as it was.
+    expect(added).toMatchObject({ list: 'players', wall: true, added: 2, total: 2, free: 2 });
+    expect(await giveawayView(s.env, T0)).toMatchObject({ state: 'live', code: albums[0], left: 3, kind: 'album' });
+    const wall = await wallView(s.env, T0);
+    expect(wall).toMatchObject({ state: 'open', total: 2, free: 2, claimed: 0, spots: '..' });
+    expect(JSON.stringify(wall)).not.toContain(players[0]);
+    // Pausing and archiving one list leaves the other exactly as it was.
     await giveawayAdmin(s.env, { action: 'pause', list: 'players' }, T0);
-    expect((await giveawayView(s.env, T0, Math.random, 'players')).state).toBe('paused');
+    expect((await wallView(s.env, T0)).state).toBe('paused');
+    await expect(pickSpot(s.env, { spot: 1 }, T0, '1.1.1.1')).rejects.toThrow(/short break/);
     expect((await giveawayView(s.env, T0)).state).toBe('live');
     await giveawayAdmin(s.env, { action: 'resume', list: 'players' }, T0);
-    const gone = await giveawayAdmin(s.env, { action: 'archive', list: 'players' }, T0 + 1000);
-    expect(gone).toMatchObject({ list: 'players', withdrawn: 2, total: 0 });
-    expect(await giveawayView(s.env, T0 + 2000)).toMatchObject({ state: 'live', code: albums[0], left: 3 });
-    expect(await giveawayView(s.env, T0 + 2000, Math.random, 'players')).toMatchObject({ state: 'done', claimed: 0, left: 0 });
-    // A claim in one list moves only that list on.
     s.setStatus(albums[0], 'claimed', { claimed_at: T0 + 3000, claimed_by: 'SP3JNSAAAAAAAAAAAAAAAAAAAAAAAAAAAX743X' });
     expect((await giveawayView(s.env, T0 + 4000)).claimed).toBe(1);
-    expect((await giveawayView(s.env, T0 + 4000, Math.random, 'players')).claimed).toBe(0);
+    expect((await wallView(s.env, T0 + 4000)).claimed).toBe(0);
+    const gone = await giveawayAdmin(s.env, { action: 'archive', list: 'players' }, T0 + 5000);
+    expect(gone).toMatchObject({ list: 'players', withdrawn: 2, total: 0 });
+    expect(await wallView(s.env, T0 + 6000)).toMatchObject({ state: 'empty', total: 0 });
+    expect((await giveawayView(s.env, T0 + 6000)).left).toBe(2);
   });
 
   it('has only the lists it was built with', async () => {
@@ -394,18 +393,79 @@ describe('radio giveaway', () => {
     await expect(giveawayAdmin(s.env, { action: 'status', list: 'nope' }, T0)).rejects.toThrow(/Unknown list/);
   });
 
-  it('turns the giveaway page into the players page, and says so if it no longer can', () => {
-    const html = readFileSync('public/giveaway.html', 'utf8');
-    const out = playersPage(html)!;
-    expect(out).toContain('<html lang="en" data-list="players">');
-    expect(out).toContain('<title>1,000 Free Music Players · Xtrata Music</title>');
-    expect(out).toContain(`<link rel="canonical" href="${PLAYERS_URL}" />`);
-    expect(out).toContain(`<meta property="og:url" content="${PLAYERS_URL}" />`);
-    expect(out).not.toContain('Free Album Drop · Xtrata Music</title>');
-    expect(out.length).toBeGreaterThan(html.length - 400);
-    expect(playersPage('<html><head></head></html>')).toBeNull();
-    // The page's script reads that mark to pick its list and its own address.
-    expect(html).toContain("getAttribute('data-list')==='players'");
-    expect(html).toContain("fetch('/radio/giveaway'+(LIST?'/'+LIST:'')");
+  describe('the players wall', () => {
+    const amounts = (s: ReturnType<typeof setup>, codes: string[], plays: number[]) => codes.forEach((c, i) =>
+      s.sql.prepare('UPDATE radio_gifts SET amount=? WHERE code_hash=?').run(3000 + plays[i] * 350, giftCodeHash(c)));
+    const wallOf = async (n: number, plays?: number[]) => {
+      const s = setup();
+      const codes = await s.gifts(n);
+      if (plays) amounts(s, codes, plays);
+      await giveawayAdmin(s.env, { action: 'add', list: 'players', text: s.list(codes) }, T0);
+      return { s, codes };
+    };
+
+    it('holds a picked spot for three minutes, for that connection only, and hands over its link', async () => {
+      const { s, codes } = await wallOf(3);
+      const pick = await pickSpot(s.env, { spot: 2 }, T0, '1.1.1.1');
+      expect(pick).toEqual({ spot: 2, code: codes[1], holdUntil: T0 + HOLD_MS, now: T0 });
+      expect((await wallView(s.env, T0 + 1000)).spots).toBe('.h.');
+      await expect(pickSpot(s.env, { spot: 2 }, T0 + 1000, '2.2.2.2')).rejects.toThrow(/Someone is claiming/);
+      // The same connection asking again gets the same link and a fresh three minutes.
+      expect(await pickSpot(s.env, { spot: 2 }, T0 + 60_000, '1.1.1.1')).toMatchObject({ code: codes[1], holdUntil: T0 + 60_000 + HOLD_MS });
+      // Left unclaimed, it is free again and someone else can take it.
+      expect((await wallView(s.env, T0 + 60_000 + HOLD_MS + 1)).spots).toBe('...');
+      expect(await pickSpot(s.env, { spot: 2 }, T0 + 60_000 + HOLD_MS + 1, '2.2.2.2')).toMatchObject({ code: codes[1] });
+    });
+
+    it('lets a connection hold one spot at a time: choosing another lets go of the first', async () => {
+      const { s } = await wallOf(3);
+      await pickSpot(s.env, { spot: 1 }, T0, '1.1.1.1');
+      await pickSpot(s.env, { spot: 3 }, T0 + 1000, '1.1.1.1');
+      expect((await wallView(s.env, T0 + 2000)).spots).toBe('..h');
+    });
+
+    it('stops one connection walking the wall to collect every link', async () => {
+      const { s } = await wallOf(PICKS_PER_IP + 2);
+      for (let i = 1; i <= PICKS_PER_IP; i++) await pickSpot(s.env, { spot: i }, T0 + i, '1.1.1.1');
+      await expect(pickSpot(s.env, { spot: PICKS_PER_IP + 1 }, T0 + 100, '1.1.1.1')).rejects.toThrow(/come back tomorrow/);
+      expect(await pickSpot(s.env, { spot: PICKS_PER_IP + 1 }, T0 + 100, '2.2.2.2')).toMatchObject({ spot: PICKS_PER_IP + 1 });
+      expect(await pickSpot(s.env, { spot: PICKS_PER_IP + 2 }, T0 + 86_400_000 + 200, '1.1.1.1')).toMatchObject({ spot: PICKS_PER_IP + 2 });
+    });
+
+    it('shows what a spot held only once it is claimed, and never before', async () => {
+      const { s, codes } = await wallOf(4, [1000, 50, 250, 50]);
+      const before = await wallView(s.env, T0);
+      expect(before.spots).toBe('....');
+      expect(before.tiers).toEqual([
+        { id: 'diamond', plays: 1000, total: 1, left: 1 }, { id: 'silver', plays: 250, total: 1, left: 1 }, { id: 'classic', plays: 50, total: 2, left: 2 }
+      ]);
+      expect(await spotView(s.env, 1, T0)).toEqual({ spot: 1, state: 'free' });
+      await pickSpot(s.env, { spot: 1 }, T0, '1.1.1.1');
+      expect(await spotView(s.env, 1, T0 + 1)).toEqual({ spot: 1, state: 'held' });
+      s.setStatus(codes[0], 'claimed', { claimed_at: T0 + 5000, claimed_by: 'SP3JNSAAAAAAAAAAAAAAAAAAAAAAAAAAAX743X' });
+      s.setStatus(codes[3], 'claiming', { claimed_at: T0 + 6000, claimed_by: 'SP1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' });
+      const after = await wallView(s.env, T0 + 7000);
+      expect(after).toMatchObject({ spots: 'd..c', claimed: 2, free: 2, held: 0 });
+      expect(after.tiers![0]).toEqual({ id: 'diamond', plays: 1000, total: 1, left: 0 });
+      expect(await spotView(s.env, 1, T0 + 7000)).toEqual({ spot: 1, state: 'claimed', tier: 'diamond', plays: 1000, wallet: 'SP3JNSAAAAAAAAAAAAAAAAAAAAAAAAAAAX743X', claimedAt: T0 + 5000 });
+      await expect(pickSpot(s.env, { spot: 1 }, T0 + 7000, '2.2.2.2')).rejects.toThrow(/already been claimed/);
+      await expect(pickSpot(s.env, { spot: 9 }, T0, '2.2.2.2')).rejects.toThrow(/no player with that number/);
+    });
+
+    it('marks an expired spot as gone and says done when nothing is left', async () => {
+      const { s, codes } = await wallOf(2);
+      s.setStatus(codes[0], 'claimed', { claimed_at: T0, claimed_by: 'SP3JNSAAAAAAAAAAAAAAAAAAAAAAAAAAAX743X' });
+      s.setStatus(codes[1], 'refunded');
+      const w = await wallView(s.env, T0 + 1);
+      expect(w).toMatchObject({ state: 'done', free: 0, claimed: 1 });
+      expect(w.spots[1]).toBe('x');
+      await expect(pickSpot(s.env, { spot: 2 }, T0 + 1, '1.1.1.1')).rejects.toThrow(/no longer available/);
+    });
+
+    it('never drips: the sweep leaves a wall list alone', async () => {
+      const { s } = await wallOf(2);
+      await advance(s.env, T0, Math.random, 'players');
+      expect((await wallView(s.env, T0)).spots).toBe('..');
+    });
   });
 });

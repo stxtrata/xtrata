@@ -38,17 +38,29 @@ radio's own. The claim button opens `https://radio.xtrata.xyz/radio.html#gift=CO
 
 ## Two giveaways, two addresses
 
-| Address | What it gives away | List name |
-|---|---|---|
-| `xtrata.xyz/giveaway` | the album drop | (none: leave `list` out) |
-| `xtrata.xyz/players` | the 1,000 free starter players | `players` |
+| Address | What it gives away | How | List name |
+|---|---|---|---|
+| `xtrata.xyz/giveaway` | the album drop | one link at a time, a pause between | (none: leave `list` out) |
+| `xtrata.xyz/players` | the 1,000 free starter players | a wall: every spot on show, pick any free one | `players` |
 
-They are separate: each has its own links, counts, wall, pace and pause, and nothing done to one touches the other.
-Every operator action below works on the album drop unless it says `"list":"players"`, for example
+They are separate: each has its own links, counts and pause, and nothing done to one touches the other. Every operator
+action below works on the album drop unless it says `"list":"players"`, for example
 `call '{"action":"status","list":"players"}'` or
-`jq -Rs '{action:"add", list:"players", shuffle:true, text:.}' links.txt | curl ... -d @-`.
-The public reads are `GET /radio/giveaway` and `GET /radio/giveaway/players`. `/players` is the same page file
-(`public/giveaway.html`) served by `functions/players.ts` with its own title and share card.
+`pbpaste | jq -Rs '{action:"add", list:"players", shuffle:true, text:.}' | curl ... -d @-`.
+
+### The players wall (`public/players.html`)
+
+- `GET /radio/giveaway/players`: every spot as one character (free, being claimed, gone, or the class of a claimed
+  one), the counts, and how many of each class nobody has found yet. Never a link, and never the class of an unclaimed spot.
+- `POST /radio/giveaway/players/pick {spot}`: holds that spot for three minutes for the connection that asked and
+  returns its link. Nobody else can pick it meanwhile; unclaimed, it goes back on the wall.
+- `GET /radio/giveaway/players/spot/<n>`: a claimed spot's class, plays, player address and time.
+- Limits: a connection holds one spot at a time and can pick 6 in 24 hours (`PICKS_PER_IP`), on top of the claim
+  limits in `docs/radio/GIFTS.md`. The hold is 3 minutes (`HOLD_MS`).
+- Operator actions that apply: `add` (use `shuffle:true`), `pause`, `resume`, `archive`, `status`. `gap`, `skip`,
+  `now` and `held` belong to the one-at-a-time drop and do nothing useful here.
+- Spot numbers follow the order the links were loaded in. Load the whole drop shuffled in one go where you can;
+  links added later take the next numbers.
 
 All operator actions are one POST. Without the right secret the route answers 404 like any other missing page.
 

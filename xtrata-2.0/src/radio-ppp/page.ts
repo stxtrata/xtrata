@@ -249,6 +249,7 @@ function start(root: HTMLElement) {
     if (s.step === 'ready' && fresh && (welcomeLast === 'arriving' || welcomeLast === 'landed')) return 'landed';
     return s.step === 'loading' && welcomeLast !== 'checking' ? welcomeLast : null; // a check in between: stay where we were
   };
+  let autoClaimTried = false;
   function syncWelcome(s: Snapshot, albumActive: boolean, lines: HTMLElement[] = [], decided?: WelcomeMode | null) {
     if (!welcome) return;
     const mode = decided !== undefined ? decided : welcomeMode(s, albumActive);
@@ -260,6 +261,14 @@ function start(root: HTMLElement) {
     if (s.step === 'unsupported') status.push(el('p', 'This browser cannot make a player. Open this page in Safari or Chrome.', 'ppp-warn'));
     else if (s.error) status.push(el('p', s.error, 'ppp-warn'));
     const starter = mode === 'gift' ? gifts.incomingStarter() : null;
+    // Arriving with a free player to claim: the visitor has already pressed "claim" on the page that sent them, so the
+    // secure box is asked to offer its own button straight away instead of after a second, identical press here. Once
+    // only: if they close the box, this screen's button is there to ask again. The box's own button and its wait are
+    // untouched: making the passkey still takes the visitor's tap inside the box.
+    if (starter && !autoClaimTried && s.step === 'intro' && !s.busy && !s.armed && !s.error && !inApp) {
+      autoClaimTried = true;
+      void ppp.create();
+    }
     welcome.render({
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
