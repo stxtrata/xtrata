@@ -87,7 +87,7 @@ h1 em{font-style:normal;background:linear-gradient(90deg,var(--violet),var(--pin
 dialog{width:min(440px,calc(100vw - 32px));padding:0;border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink)}
 dialog::backdrop{background:rgba(0,0,0,.7)}
 .sheet{padding:22px;text-align:center}
-.sheet .d{width:96px;height:96px;margin:4px auto 14px;display:block;cursor:default;transform:none!important}
+.sheet iframe{display:block;width:min(240px,70vw);aspect-ratio:1;margin:0 auto 12px;border:0;border-radius:12px;background:#05060a;pointer-events:none}
 .sheet h2{margin:0;font-size:24px}
 .sheet .sub{margin:4px 0 14px;color:var(--muted);font-size:14px}
 .facts{margin:0 0 16px;padding:0;list-style:none;text-align:left;border:1px solid var(--line);border-radius:var(--radius)}
@@ -176,7 +176,7 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
 
 <dialog id="detail">
   <div class="sheet">
-    <i class="d" id="dt-disc"></i>
+    <iframe id="dt-award" title="The record this player won" tabindex="-1"></iframe>
     <h2 id="dt-title"></h2>
     <p class="sub" id="dt-sub"></p>
     <ul class="facts" id="dt-facts"></ul>
@@ -314,7 +314,8 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
   var dlg=$('detail');
   function fact(k,v){var li=document.createElement('li'),a=document.createElement('span'),b=document.createElement('b');a.textContent=k;b.textContent=v;li.appendChild(a);li.appendChild(b);return li;}
   function detail(n,tier){
-    $('dt-disc').className='d t-'+tier;
+    // The framed record for this class (public/awards/<class>.html), with the player's number on its plaque.
+    $('dt-award').src='/awards/'+tier+'?n='+n;
     $('dt-title').textContent='Player No. '+pad(n);
     $('dt-sub').textContent=NAME[tier]+' player · claimed';
     var ul=$('dt-facts');ul.textContent='';ul.appendChild(fact('Details','Loading…'));
