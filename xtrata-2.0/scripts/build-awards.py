@@ -43,7 +43,7 @@ def facets():
         out.append(f'<path d="M{pt(100,a0)}L{pt(100,a1)}L{pt(74,am)}z" fill="{pal[k%8]}" opacity=".85"/>'); k += 3
         out.append(f'<path d="M{pt(100,a0)}L{pt(74,am)}L{pt(52,a0)}L{pt(74,am-2*math.pi/N)}z" fill="{pal[k%8]}" opacity=".7"/>'); k += 5
         out.append(f'<path d="M{pt(74,am)}L{pt(52,a1)}L{pt(30,am)}L{pt(52,a0)}z" fill="{pal[k%8]}" opacity=".8"/>'); k += 3
-    return '<svg class="k" viewBox="-100 -100 200 200">' + ''.join(out) + '</svg>'
+    return '<symbol id="k" viewBox="-100 -100 200 200">' + ''.join(out) + '</symbol>'
 
 # Sizes are in em: 1em is 1% of the square the model sits in, so everything scales together.
 TPL = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Xtrata Music · @NAME@ Record</title>
@@ -62,17 +62,19 @@ body{display:grid;place-items:center}
 .fl{width:220em;height:220em;left:-110em;top:-110em;transform:rotateX(-90deg) translateZ(38em);background:repeating-linear-gradient(0deg,color-mix(in srgb,var(--e) 45%,transparent) 0 .15em,transparent .15em 11em),repeating-linear-gradient(90deg,color-mix(in srgb,var(--e) 45%,transparent) 0 .15em,transparent .15em 11em);-webkit-mask:radial-gradient(circle,#000 15%,transparent 62%);mask:radial-gradient(circle,#000 15%,transparent 62%)}
 .em{width:13em;height:13em;left:-6.5em;top:-33em}
 .w{width:38em;height:38em;left:-19em;top:-20em;animation:h 6s ease-in-out infinite}
+/* The record has two identical faces, back to back, so it looks the same from either side of the case. */
 .r,.rm{position:absolute;inset:0;border-radius:50%}
-.rm{background:@RIM@;transform:translateZ(-.5em)}
-.r{overflow:hidden;transform:translateZ(.01em)}
-.gl{position:absolute;inset:-4.5em;border-radius:50%;transform:translateZ(-1em);background:radial-gradient(circle,color-mix(in srgb,var(--t) @GLOW@%,transparent) 48%,transparent 71%);opacity:.75}
+.rm{background:@RIM@}
+.r{overflow:hidden;transform:translateZ(.3em);backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.r+.r{transform:rotateY(180deg) translateZ(.3em)}
+.gl{position:absolute;inset:-4.5em;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--t) @GLOW@%,transparent) 48%,transparent 71%);opacity:.75}
 .r>*{position:absolute;inset:0;border-radius:50%}
 .s{background:conic-gradient(@SHEEN@);animation:s 14s linear infinite}
 .g{background:repeating-radial-gradient(circle,@GROOVE@ 0 .16em,transparent .26em .62em);-webkit-mask:radial-gradient(circle,transparent 19%,#000 20%);mask:radial-gradient(circle,transparent 19%,#000 20%)}
 .h{background:conic-gradient(from 20deg,transparent 0 8%,#fff7 12%,transparent 17% 58%,#fff5 62%,transparent 67%);mix-blend-mode:screen;animation:s 9s linear infinite reverse}
 .l{inset:34%!important;background:@LABEL@;box-shadow:0 0 0 .35em #0005,inset 0 0 1.2em #0006;color:@X@;display:grid;place-items:center}
 .l svg{width:70%;height:70%}
-.k{mix-blend-mode:multiply;opacity:.55}
+.k{width:100%;height:100%;mix-blend-mode:multiply;opacity:.55}
 .q{width:22em;height:6.4em;left:-11em;top:24em;transform:translateZ(13em);backface-visibility:hidden;-webkit-backface-visibility:hidden;box-sizing:border-box;border:.2em solid var(--t);border-radius:.4em;background:#0a0c12cc;color:var(--t);display:grid;place-items:center}
 .q b{font:700 2.6em/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.12em}
 .q svg{width:5em;height:5em}
@@ -81,11 +83,11 @@ body{display:grid;place-items:center}
 @keyframes h{50%{transform:translateY(-1.2em)}}
 @media (prefers-reduced-motion:reduce){.w,.s,.h{animation:none}}
 </style>
-<svg width="0" height="0" style="position:absolute"><symbol id="x" viewBox="0 40 850 770"><path style="fill:var(--cw,#ececec)" fill-rule="evenodd" d="@LW@"/><path style="fill:var(--cb,#3a7db5)" fill-rule="evenodd" d="@LB@"/><path style="fill:var(--co,#e98a32)" fill-rule="evenodd" d="@LO@"/></symbol></svg>
+<svg width="0" height="0" style="position:absolute"><symbol id="x" viewBox="0 40 850 770"><path style="fill:var(--cw,#ececec)" fill-rule="evenodd" d="@LW@"/><path style="fill:var(--cb,#3a7db5)" fill-rule="evenodd" d="@LB@"/><path style="fill:var(--co,#e98a32)" fill-rule="evenodd" d="@LO@"/></symbol>@FACETS@</svg>
 <div class="a" id="a" tabindex="0" role="img" aria-label="@NAME@ record award. Drag to turn it.">
 <div class="m" id="m"><div class="fl"></div><div class="pl"></div><div class="f bk"></div><div class="f lf"></div><div class="f rt"></div><div class="f tp"></div><div class="f bt"></div>
 <svg class="em"><use href="#x"/></svg>
-<div class="w"><div class="gl"></div><div class="rm"></div><div class="r"><div class="s"></div>@FACETS@<div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div></div>
+<div class="w"><div class="gl"></div><div class="rm"></div><div class="r"><div class="s"></div>@K@<div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div><div class="r"><div class="s"></div>@K@<div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div></div>
 <div class="q" id="q"><svg class="o"><use href="#x"/></svg></div>
 <div class="f fr"></div></div>
 </div>
@@ -107,7 +109,7 @@ def main():
     for cid, c in CLASSES.items():
         h = TPL
         for k, v in dict(NAME=c['name'], T=c['t'], E=c['e'], SHEEN=c['sheen'], GROOVE=c['groove'], LABEL=c['label'], X=c['x'],
-                         GLOW=c['glow'], RIM=c['rim'], FACETS=facets() if cid == 'diamond' else '', LW=LOGO_W, LB=LOGO_B, LO=LOGO_O).items():
+                         GLOW=c['glow'], RIM=c['rim'], FACETS=facets() if cid == 'diamond' else '', K='<svg class="k"><use href="#k"/></svg>' if cid == 'diamond' else '', LW=LOGO_W, LB=LOGO_B, LO=LOGO_O).items():
             h = h.replace('@' + k + '@', v)
         assert not re.search(r'@[A-Z]+@', h)
         open(f'public/awards/{cid}.html', 'w').write(h)
