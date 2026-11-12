@@ -172,7 +172,7 @@ describe('radio giveaway', () => {
     await giveawayView(s.env, T0);
     s.setStatus(codes[0], 'claimed', { claimed_at: T0 });
     await giveawayView(s.env, T0 + 1000);
-    expect(await giveawayView(s.env, T0 + 10 * 60_000)).toEqual({ state: 'done', claimed: 1, left: 0, now: T0 + 10 * 60_000 });
+    expect(await giveawayView(s.env, T0 + 10 * 60_000)).toEqual({ state: 'done', claimed: 1, left: 0, now: T0 + 10 * 60_000, kind: 'player', plays: 277 });
     expect(await giveawayView(setup().env, T0)).toMatchObject({ state: 'done', claimed: 0, left: 0 });
   });
 
@@ -242,6 +242,25 @@ describe('radio giveaway', () => {
     expect(v.album).toMatchObject({ title: 'Night Drive', subtitle: 'Eight songs', cover: 77 });
     expect(v.album?.songs.map((x) => x.title)).toEqual(['One', 'Two']);
     expect(JSON.stringify(v)).not.toContain('Secret');
+  });
+
+  it('says what is being given away: a starter player (no album) with its plays, or an album', async () => {
+    const s = setup();
+    expect(await giveawayView(s.env, T0)).not.toHaveProperty('kind'); // an empty list says nothing
+    const codes = await s.gifts(2);
+    await giveawayAdmin(s.env, { action: 'add', text: s.list(codes) }, T0);
+    const live = await giveawayView(s.env, T0);
+    expect(live).toMatchObject({ state: 'live', kind: 'player', plays: 277 }); // (100,000 - 3,000) / 350
+    expect(live).not.toHaveProperty('album');
+    // Between links and after the last one it still says what the drop is.
+    s.setStatus(codes[0], 'claiming', { claimed_at: T0 + 1000, claimed_by: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7' });
+    expect(await giveawayView(s.env, T0 + 2000)).toMatchObject({ state: 'taken', kind: 'player', plays: 277 });
+    s.setStatus(codes[0], 'claimed', { claimed_at: T0 + 1000, claimed_by: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7' });
+    s.setStatus(codes[1], 'claimed', { claimed_at: T0 + 1000, claimed_by: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X' });
+    expect(await giveawayView(s.env, T0 + 3 * 3600_000)).toMatchObject({ state: 'done', kind: 'player', plays: 277 });
+    // An amount that cannot be read is left out, never shown as zero plays.
+    s.sql.exec('UPDATE radio_gifts SET amount = 0');
+    expect(await giveawayView(s.env, T0 + 4 * 3600_000)).not.toHaveProperty('plays');
   });
 
   it('advance alone (the sweep) is enough to move it on', async () => {

@@ -95,6 +95,24 @@ Known gaps in plain wording (not yet covered): the top bar's connect button (`sr
 (`title` attributes), messages raised by the controller mid-action (`.ppp-msg`), the gift banner on the classic
 panel for a gift without an album, and the wallet box's own screens (a separate deploy).
 
+## 4a. Starter players, the welcome screens and "Add plays" (branch `starter-players`)
+
+- **Starter player** = a prefunded gift with no album. It is claimed into the passkey's own first wallet, so it plays
+  any song and pays for its own likes. Nothing about claiming changed; one starter per new listener is still enforced
+  by the server, and someone who already has a player is now asked to pass the link on (with a copy button).
+- **Welcome screens** (`welcome.ts`, novice mode only): checking → gift / new / back → arriving → landed, and `empty`
+  for a player with no plays. One button each.
+- **Add plays** (`restock-sheet.ts`): opened from every out-of-plays or running-low state for a passkey-only
+  listener. Packs are in plays; STX is the live method.
+- **Restock methods** (`src/lib/listening-wallet/restock.ts`): `stx` on; `card` and `sbtc` are written (quotes,
+  order shape, one-way order states, tests) but OFF. They switch on per deployment through `gate.restock`
+  (`/radio/listening-wallet/config`), which nothing sets yet, and they need a restock service that takes the payment
+  and sends STX from a float. That service is not built: no route, no treasury code.
+- **Giveaway page** (`public/giveaway.html`): one page for both kinds of drop. `GET /radio/giveaway` now also returns
+  `kind` (`album` | `player`) and `plays`; the page words itself from them and sends a starter claim to
+  `radio.html?novice=1#gift=…`. Still one link on show at a time. A tap-to-hold wall is not built.
+- **Radio controls**: hover text on every control and a "What do these do?" fold under the stations.
+
 ## 5. Where the Music Overhaul plan stands
 
 The plan was written from the docs and a file survey. Reading the code closely changed several of its assumptions;

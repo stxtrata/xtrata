@@ -262,12 +262,13 @@ describe('novice welcome: a newcomer sees one short page, not the whole radio', 
     expect(html().dataset.view).toBeUndefined();
   });
 
-  // Its own test: a page opened earlier in the same test would still be alive and redraw from the shared fake.
+  // Checked on this page's own mount, not on <html>: pages opened by earlier tests are still alive (their timers
+  // redraw from the shared fake) and write to the same document element, but only this page owns this mount.
   it('never shows with the flag off', async () => {
     await open(NEW, null);
-    expect(html().dataset.welcome).toBeUndefined();
-    expect(html().dataset.view).toBeUndefined();
     expect(page().hidden).toBe(true);
+    expect(page().childElementCount).toBe(0);
+    expect(text(document.getElementById('ppp'))).toContain('Start listening'); // the classic panel, as before
   });
 });
 
@@ -322,7 +323,7 @@ describe('a free starter player: claimed, arriving, landed', () => {
     starter();
     const root = await open({ entries: PLAYED, createdHere: false });
     await vi.waitFor(() => expect(text(root.querySelector('.ppp-key'))).toContain('You already have a player'));
-    expect(text(root.querySelector('.ppp-key'))).toContain('Pass it on to a friend');
+    expect(text(root.querySelector('.ppp-key'))).toContain('Pass it on and bring them in');
     expect(buttons(root.querySelector('.ppp-key'))).toEqual(expect.arrayContaining(['Copy the link to pass on', 'Forget this gift link here']));
     expect(text(root.querySelector('.ppp-key'))).not.toMatch(/brand-new listening wallets/);
   });

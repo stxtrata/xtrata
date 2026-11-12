@@ -291,7 +291,10 @@ export function createGifts(deps: GiftDeps) {
     const out: HTMLElement[] = [];
     if (incoming!.claiming || incoming!.waiting) out.push(el('p', incoming!.waiting ? 'Another gift is on its way out first. Yours is next…' : sending, 'ppp-cyan'));
     else if (incoming!.retry) out.push(el('p', incoming!.retry.text, 'ppp-warn'), button('Try now', () => { clearTimeout(retryTimer); incoming!.retry = undefined; void claim(s); }, 'quiet'));
-    if (incoming!.error) out.push(el('p', incoming!.error, 'ppp-bad'), button('Try again', () => { incoming!.error = undefined; void claim(s); }));
+    // Already theirs (the server allows one copy of an album per passkey): not a failure. This copy can go to a friend.
+    if (incoming!.error && /already have this album/i.test(incoming!.error))
+      out.push(el('p', 'You already have this album: it is in My albums. This copy is still free, so pass it on to a friend who would love it.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet'));
+    else if (incoming!.error) out.push(el('p', incoming!.error, 'ppp-bad'), button('Try again', () => { incoming!.error = undefined; void claim(s); }));
     return out;
   }
 
@@ -326,7 +329,7 @@ export function createGifts(deps: GiftDeps) {
     // so it does not read as if this wallet were the gift.
     const notNew = !!s.listening && (!(s.createdHere || s.brandNew) || !!s.linked || !!s.creditedTo || (s.balance ?? 0n) > 0n || s.entries.length > 0);
     if (notNew)
-      return [el('p', '🎁 You already have a player, so this free one is not for you: it is for someone new. Pass it on to a friend or someone in your family who loves music.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet')];
+      return [el('p', '🎁 You already have a player, so this free one is for someone new. Know a friend or someone in your family who loves music? Pass it on and bring them in.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet')];
     const amount = BigInt(v.amount);
     const plays = giftPlays(amount).toLocaleString();
     const head = el('p',
@@ -341,8 +344,8 @@ export function createGifts(deps: GiftDeps) {
       else if (!incoming.claiming && !incoming.error && !incoming.waiting && !incoming.retry) later(() => claim(s));
       out.push(...claimLines(s, 'Sending your gift…'));
     } else if (s.step === 'intro') { if (!opts.bare) out.push(el('p', 'Tap below and use your face or fingerprint. Your gift arrives in a few seconds.', 'ppp-mute')); }
-    else if (s.listening && s.linked) out.push(el('p', 'You already have a player linked to your Stacks wallet, so this free one is not for you. It still works for someone new: pass it on to a friend who loves music.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet'));
-    else if (s.listening && (s.balance ?? 0n) > 0n) out.push(el('p', 'Your player already has plays, so this free one is not for you. Pass it on to a friend or someone in your family who loves music.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet'));
+    else if (s.listening && s.linked) out.push(el('p', 'You already have a player linked to your Stacks wallet, so this free one is for someone new. Know a friend who loves music? Pass it on and bring them in.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet'));
+    else if (s.listening && (s.balance ?? 0n) > 0n) out.push(el('p', 'Your player already has plays, so this free one is for someone new. Know a friend or someone in your family who loves music? Pass it on and bring them in.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet'));
     return out;
   }
 

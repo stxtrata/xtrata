@@ -17,7 +17,7 @@
  */
 import type { GiftEnv } from './radio-gifts';
 import { GiftError, playerView } from './radio-gifts';
-import { giftCodeHash, isGiftCode } from '../../src/lib/listening-wallet/gifts';
+import { giftCodeHash, giftPlays, isGiftCode } from '../../src/lib/listening-wallet/gifts';
 import { listedTracks } from '../../src/lib/listening-wallet/gift-players';
 
 export type GiveawayEnv = GiftEnv & { RADIO_GIVEAWAY_SECRET?: string };
@@ -132,13 +132,32 @@ export type GiveawayView = {
   now: number;
   /** Copies of the edition outside this list (set aside); they come first in the numbering. Omitted when none. */
   held?: number;
+  /**
+   * What is being given away: an album, or a starter player (a gift with no album: plays for any music). Read from the
+   * link on show, else the next one to come, else the last one given. Omitted when the list is empty.
+   */
+  kind?: 'album' | 'player';
+  /** Paid plays each link of this kind carries. Omitted when it cannot be read: never shown as zero. */
+  plays?: number;
 };
 
 /** The public answer: counts, and the one link on show. Never the list, never an upcoming code, never a time. */
 export async function giveawayView(env: GiveawayEnv, now: number, rand: () => number = Math.random): Promise<GiveawayView> {
   const { s, link, gift } = await advance(env, now, rand);
-  const v = await viewOf(env, now, s, link, gift);
+  const v = { ...(await viewOf(env, now, s, link, gift)), ...(await dropOf(env)) };
   return s.held > 0 ? { ...v, held: s.held } : v;
+}
+
+/** What kind of gift this list is giving away, and the plays it carries: from the link on show or next up, else the last one. */
+async function dropOf(env: GiveawayEnv): Promise<Pick<GiveawayView, 'kind' | 'plays'>> {
+  const join = 'SELECT g.player_id, g.amount FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash';
+  type Row = { player_id: string | null; amount: number | null };
+  // Extra detail for the page's wording: if it cannot be read, the page is told nothing rather than something wrong.
+  const row = await (async () => (await first<Row>(env, `${join} WHERE l.ended_at IS NULL ORDER BY l.pos LIMIT 1`)) ?? (await first<Row>(env, `${join} ORDER BY l.pos DESC LIMIT 1`)))().catch(() => null);
+  if (!row) return {};
+  const amount = Number(row.amount);
+  const plays = Number.isSafeInteger(amount) && amount > 0 ? giftPlays(BigInt(amount)) : 0;
+  return { kind: row.player_id ? 'album' : 'player', ...(plays > 0 ? { plays } : {}) };
 }
 
 async function viewOf(env: GiveawayEnv, now: number, s: State, link: Link | null, gift: GiftRow | null): Promise<GiveawayView> {
