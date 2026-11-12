@@ -27,6 +27,10 @@
  * - Guests (not signed in) see the room only when the Pages Function says so (`x-px-watch: 1`, from the Pages variable
  *   CASINO_ROOM_GUESTS). Otherwise they get the head count and nothing else: no seats, walkers, spins or arrivals
  *   (docs/plans/CASINO-ROOM-NEW-WALLETS-PLAN.md, step 6). Signed-in players always see everything.
+ * - Characters (docs/plans/CASINO-CHARACTER-PLAN.md; functions/lib/casino-look.ts): a signed-in player may be seen as a cube instead
+ *   of the human figure. Their look is one short code (at most 19 characters) kept in their profile, read with the profile when they
+ *   connect (no extra read), carried on the connection, listed with the players in the `room` message and passed on when it changes
+ *   (`look`). Changing it is one profile write and has its own limit. The room only checks the code's shape; it draws nothing.
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
@@ -34,6 +38,7 @@ import {
   ROOM_FEATURES,
   applyAway,
   applyLeave,
+  applyLook,
   applyMove,
   applySit,
   applyStand,
@@ -54,6 +59,7 @@ import {
   STALE_MS,
   SWEEP_MS,
   takeChatRate,
+  takeLookRate,
   takeMoveRate,
   takePlayRate,
   takeRate,
@@ -87,6 +93,7 @@ import {
   type WinEntry
 } from '../../functions/lib/casino-social';
 import { ROUND_TABLES, roundInfo } from '../../functions/lib/casino-rounds';
+import { parseLook } from '../../functions/lib/casino-look';
 import { CHESS_FEATURES } from '../../functions/lib/casino-bets';
 import { ChessDesk, type Conn, type DeskStore } from '../../functions/lib/casino-chess-room';
 import {
@@ -523,6 +530,7 @@ export class CasinoRoom extends DurableObject<Env> {
       try {
         const prof = await this.profile(who);
         peer.lv = levelOf(prof.xp); peer.bd = topBadge(prof);
+        const look = parseLook(prof.lk); if (look) peer.lk = look;      // their character (casino-look.ts): the room message lists it
         server.serializeAttachment(peer);
         const self = live.find((e) => e.ws === server); if (self) self.peer = peer;
       } catch (e) { console.warn('[casino-room] could not read a profile', e); }
@@ -542,6 +550,7 @@ export class CasinoRoom extends DurableObject<Env> {
     if (address && !others.some((e) => e.peer.a === address)) {
       this.broadcast(others, { t: 'join', who: { a: address, n: shortAddress(address) } });
       if (peer.lv) this.broadcast(others, { t: 'lvl', a: address, lv: peer.lv, bd: peer.bd ?? null, up: false });
+      if (peer.lk) this.broadcast(others, { t: 'look', a: address, v: peer.lk });
     }
     this.broadcast(others, { t: 'count', joined: view.joined, guests: view.guests }, true);
   }
@@ -691,6 +700,28 @@ export class CasinoRoom extends DurableObject<Env> {
         else await this.desk.onBet(cs, me, parsed.msg, now);
       } catch (e) { console.warn('[casino-room] chess message failed', e); this.send(ws, { t: 'err', code: parsed.msg.t + '-failed' }); }
       this.save([mine]);
+      return;
+    }
+    // A character change (casino-look.ts): its own limit, one profile write, and everyone who can see the room is told.
+    if (parsed.ok && parsed.msg.t === 'look') {
+      if (!takeLookRate(mine.peer, now)) { this.save([mine]); this.send(ws, { t: 'err', code: 'look-too-fast' }); return; }
+      const r = applyLook(entries.map((e) => e.peer), mine.peer.id, parsed.msg.v);
+      if (!r.ok) { this.save([mine]); this.send(ws, { t: 'err', code: r.code }); return; }
+      this.save(entries.filter((e) => e.ws === ws || r.changed.includes(e.peer.id)));
+      const who = mine.peer.k || mine.peer.a;
+      if (who) {
+        try {
+          const prof = await this.profile(who);
+          if (r.message.v) prof.lk = r.message.v; else delete prof.lk;
+          await this.ctx.storage.put(PROFILE_PREFIX + who, prof);
+        } catch (e) { console.warn('[casino-room] could not save a look', e); }
+      }
+      const text = JSON.stringify(r.message);
+      for (const e of entries) {
+        if (!r.to.includes(e.peer.id)) continue;
+        try { e.ws.send(text); } catch { /* closing; its close handler cleans up */ }
+      }
+      this.send(ws, { t: 'look', a: r.message.a, v: r.message.v, mine: true });
       return;
     }
     if (!takeRate(mine.peer, now)) {

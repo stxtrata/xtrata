@@ -12,6 +12,7 @@ import { ALL_MACHINES, ROTATION_MACHINES } from './casino-machines';
 import { parseProgressMessage, type ProgressMessage } from './casino-progress';
 import { parseChessMessage, type ChessMessage } from './casino-bets';
 import type { Bets, RoundTable } from './casino-rounds';
+import { LOOK_FEATURE, LOOK_MIN_GAP_MS, LOOK_PER_MINUTE, parseLook, parseLookMessage, type LookMessage } from './casino-look';
 
 
 /**
@@ -64,7 +65,7 @@ export const MAX_REPORT_LINE_CHARS = 200;
  * (every machine picks them first, from its own reel strips), so a spin is a few numbers, not a picture.
  * The room only passes spins on: it never checks or stores a result, and nothing here moves money.
  */
-export const ROOM_FEATURES = ['play', 'move', 'salon-bns', 'here'] as const;
+export const ROOM_FEATURES = ['play', 'move', 'salon-bns', 'here', LOOK_FEATURE, 'move-still'] as const;
 
 /**
  * Who is here (docs/plans/CASINO-WHO-IS-HERE-PLAN.md). A client that says `here` sends a bare "ping" every 30 s, which the room
@@ -88,8 +89,11 @@ export const MAX_BET = 1_000_000;
  * times a second while they move; everyone else draws them walking there, a moment behind. The room keeps only the last
  * position of each connection and never stores a history. `r` is the facing angle in the characters' convention.
  */
-export const MOVE_MIN_GAP_MS = 250;
-export const MOVE_PER_MINUTE = 200;   // the page sends at most 150 a minute (one every 0.4 s)
+/** The least time between two moves from one connection. It was 250 until 2026-11-12: a page now reports a stop 0.26 s after its
+ *  last position, and on an uneven connection those two could reach the room closer together than 250 ms, so the stop was refused.
+ *  The cap a minute is what bounds the cost, and it is unchanged. */
+export const MOVE_MIN_GAP_MS = 150;
+export const MOVE_PER_MINUTE = 200;   // the page sends at most 150 a minute walking (one every 0.4 s), plus two for each stop
 /** The floor is 26 x 22 m around the origin; anything beyond this is not a place in the room. */
 export const MOVE_BOUND = 20;
 
@@ -131,6 +135,9 @@ export type Peer = {
   /** Chess results and bets (casino-bets.ts, casino-social.ts SocialPeer): recent times for the limits, and the last seek. */
   cq?: number[]; cr?: number[]; ca?: number[];
   ls?: { tb: string; stake: number; at: number } | null;
+  /** The player's character (functions/lib/casino-look.ts): their look code, read from their profile when they connect (missing: the
+   *  human figure), and recent times for the look limit. Optional: older connections lack them. */
+  lk?: string; lo?: number[];
 };
 
 export const newPeer = (id: string, address: string | null, hash160: string | null, now: number, watch = true,
@@ -188,7 +195,7 @@ export const shortAddress = (address: string | null) =>
 
 export type SpotView = { a: string; n: string; since: number };
 /** One signed-in person in the room, listed once however many tabs they have open; `spot` is where they sit, if anywhere. */
-export type PlayerView = { a: string; n: string; spot: string | null; aw?: boolean };
+export type PlayerView = { a: string; n: string; spot: string | null; aw?: boolean; lk?: string };
 /** A signed-in player standing or walking on the floor (not seated), once per address: their latest position. */
 export type WalkerView = { a: string; n: string; x: number; z: number; r: number; at: number };
 export type RoomView = { spots: Record<string, SpotView>; players: PlayerView[]; walkers: WalkerView[]; joined: number; guests: number };
@@ -206,6 +213,7 @@ export const deriveView = (peers: Peer[]): RoomView => {
       if (peer.spot) entry.spot = peer.spot;
       // away only while every tab of theirs is away (one live tab means they are here)
       if (peer.aw && (!seen || seen.aw)) entry.aw = true; else delete entry.aw;
+      if (peer.lk) entry.lk = peer.lk;      // their character, when it is not the human figure (casino-look.ts)
       players.set(peer.a, entry);
     }
     if (peer.a && peer.spot) spots[peer.spot] = { a: peer.a, n: shortAddress(peer.a), since: peer.since };
@@ -267,9 +275,14 @@ export type ClientMessage =
   | { t: 'report'; who: string; why: ReportReason; lines: string[] }
   /** One spin by the player seated at `spot` (a cabinet): the reel stops in reel order, the bet, and whether it was a free spin. */
   | { t: 'play'; spot: string; s: number[]; b: number; f: boolean }
-  /** Where the player stands on the floor and which way they face; or `off`: they are not on the floor any more. */
-  | { t: 'move'; x: number; z: number; r: number }
+  /** Where the player stands on the floor and which way they face; or `off`: they are not on the floor any more.
+   *  `s` (feature `move-still`): true, they were standing still when this was taken, so the others bring them to rest exactly here;
+   *  false, they were walking, so a next position that has not come yet is only late. A page that does not say (an older one)
+   *  is passed on without it, and its walkers are drawn the old way. */
+  | { t: 'move'; x: number; z: number; r: number; s?: boolean }
   | { t: 'move'; off: true }
+  /** The player's character: a look code, or null for the human figure (casino-look.ts). */
+  | LookMessage
   | SocialMessage
   | ProgressMessage
   | ChessMessage;
@@ -336,8 +349,10 @@ export const parseClientMessage = (raw: unknown): ParseResult => {
       if (!inside(x) || !inside(z) || typeof r !== 'number' || !Number.isFinite(r)) return { ok: false, code: 'move-bad' };
       const facing = Math.atan2(Math.sin(r), Math.cos(r));      // any angle, folded into -pi..pi
       const round = (n: number, k: number) => Math.round(n * k) / k;
-      return { ok: true, msg: { t: 'move', x: round(x, 100), z: round(z, 100), r: round(facing, 1000) } };
+      const at = { t: 'move' as const, x: round(x, 100), z: round(z, 100), r: round(facing, 1000) };
+      return { ok: true, msg: value.s === true || value.s === 1 ? { ...at, s: true } : value.s === false || value.s === 0 ? { ...at, s: false } : at };
     }
+    case 'look': return parseLookMessage(value);
     default: return parseSocialMessage(value) ?? parseProgressMessage(value) ?? parseChessMessage(value) ?? { ok: false, code: 'bad-message' };
   }
 };
@@ -527,7 +542,7 @@ export const takeMoveRate = (peer: Peer, now: number): boolean => {
 };
 
 export type MoveMessage =
-  | { t: 'move'; a: string; x: number; z: number; r: number; at: number }
+  | { t: 'move'; a: string; x: number; z: number; r: number; at: number; s?: boolean }
   | { t: 'move'; a: string; off: true; at: number };
 
 /**
@@ -535,7 +550,7 @@ export type MoveMessage =
  * may move: a seat always wins over a position, so a late move after sitting down cannot pull someone off their seat.
  * Records the position on the connection, so later arrivals see it in the room view.
  */
-export const applyMove = (peers: Peer[], meId: string, msg: { x: number; z: number; r: number } | { off: true }, now: number):
+export const applyMove = (peers: Peer[], meId: string, msg: { x: number; z: number; r: number; s?: boolean } | { off: true }, now: number):
   Routed<MoveMessage> => {
   const me = peers.find((p) => p.id === meId);
   if (!me) return { ok: false, code: 'move-gone' };
@@ -548,7 +563,9 @@ export const applyMove = (peers: Peer[], meId: string, msg: { x: number; z: numb
   if (me.spot) return { ok: false, code: 'move-seated' };
   if (isInSalon(msg.x, msg.z) && salonRefusal(me)) return { ok: false, code: 'move-salon' };   // the Salon's floor needs a BNS name too
   me.p = [msg.x, msg.z, msg.r]; me.pt = now;
-  return { ok: true, message: { t: 'move', a: me.a, x: msg.x, z: msg.z, r: msg.r, at: now }, to };
+  const message: MoveMessage = { t: 'move', a: me.a, x: msg.x, z: msg.z, r: msg.r, at: now };
+  if (typeof msg.s === 'boolean') message.s = msg.s;
+  return { ok: true, message, to };
 };
 
 /**
@@ -559,4 +576,40 @@ export const leaveFloor = (others: Peer[], gone: Peer, now: number): MoveMessage
   if (!gone.a || !gone.p) return null;
   if (others.some((p) => p.a === gone.a && p.p)) return null;
   return { t: 'move', a: gone.a, off: true, at: now };
+};
+
+// ------------------------------------------------------------------ characters (functions/lib/casino-look.ts)
+
+/** Records one look change for this peer. False, recording nothing, when it comes too soon after the last or there are too many a minute. */
+export const takeLookRate = (peer: Peer, now: number): boolean => {
+  const recent = (Array.isArray(peer.lo) ? peer.lo : []).filter((t) => now - t < 60_000);
+  const last = recent[recent.length - 1];
+  if ((last !== undefined && now - last < LOOK_MIN_GAP_MS) || recent.length >= LOOK_PER_MINUTE) { peer.lo = recent; return false; }
+  recent.push(now);
+  peer.lo = recent;
+  return true;
+};
+
+export type LookChange = { t: 'look'; a: string; v: string | null };
+
+/**
+ * A signed-in player's new character. It is set on every connection of theirs (so a second tab and a later arrival agree), and
+ * everyone who can see the room is told, the player's other tabs included. `changed` are the connections whose record changed
+ * (for the Durable Object to save). The room only ever passes on a code that parseLook accepted.
+ */
+export const applyLook = (peers: Peer[], meId: string, v: string | null):
+  ({ ok: true; message: LookChange; to: string[]; changed: string[] } | { ok: false; code: string }) => {
+  const me = peers.find((p) => p.id === meId);
+  if (!me) return { ok: false, code: 'look-gone' };
+  if (!me.a) return { ok: false, code: 'look-sign-in-first' };
+  const code = v === null ? null : parseLook(v);
+  if (v !== null && !code) return { ok: false, code: 'look-bad' };
+  const changed: string[] = [];
+  for (const p of peers) {
+    if (p.a !== me.a) continue;
+    if (code) p.lk = code; else delete p.lk;
+    changed.push(p.id);
+  }
+  const to = peers.filter((p) => p.id !== meId && canSee(p)).map((p) => p.id);
+  return { ok: true, message: { t: 'look', a: me.a, v: code }, to, changed };
 };

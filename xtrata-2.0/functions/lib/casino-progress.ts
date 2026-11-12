@@ -10,15 +10,15 @@
  * record. Nothing here moves STX or touches a contract.
  */
 import { DAY_MS, TABLES, dayOf } from './casino-social';
-import { CORE_MACHINES, isAnyMachine } from './casino-machines';
+import { FLOOR_MACHINES, isAnyMachine, machineName } from './casino-machines';
 
 export const PROGRESS_FEATURES = ['progress', 'missions', 'boards', 'tourney', 'jackpot', 'bal', 'friends', 'hh'] as const;
 
 /**
- * The five core machines: the ones the daily missions, the slot tournament rotation and the Slot fan badge are built from. The
- * series machines that can be rotated onto the floor (casino-machines.ts) are not in this list on purpose.
+ * The five machines the daily missions, the slot tournament rotation and the Slot fan badge are built from: the five on the
+ * standard floor (FLOOR_MACHINES in casino-machines.ts, which explains why and how to change it).
  */
-export const MACHINES = CORE_MACHINES;
+export const MACHINES = FLOOR_MACHINES;
 export type Machine = (typeof MACHINES)[number];
 export const isMachine = (v: unknown): v is Machine => typeof v === 'string' && (MACHINES as readonly string[]).includes(v);
 /** Any machine whose spins the room accepts: the core five and every rotation machine. Their spins feed the progressive jackpot. */
@@ -131,6 +131,8 @@ export type Profile = {
   wk: { id: number; h: number; xp: number; gv: number };
   ms: { d: number; p: number[]; paid: boolean[]; all: boolean };
   nt: Array<{ why: string; v: number; at: number }>;
+  /** The player's character (functions/lib/casino-look.ts): a look code; missing means the human figure. */
+  lk?: string;
 };
 export const newProfile = (): Profile => ({
   v: 1, xp: 0, bd: [],
@@ -236,7 +238,7 @@ const PLAY_POOL: Mission[] = [
   // Sic Bo took Hold'em's place in the main room and in this list (docs/plans/CASINO-MAIN-ROOM-PLAN.md), so everyone else's missions stay as they were
   { id: 'hands-sicbo', kind: 'hand' as const, g: 'sicbo', need: 5, text: 'Play 5 rounds of Sic Bo', reward: 2_500 },
   ...['roulette', 'videopoker'].map((g) => ({ id: 'hands-' + g, kind: 'hand' as const, g, need: 5, text: `Play 5 hands of ${GAME_NAME[g]}`, reward: 2_500 })),
-  ...MACHINES.map((g) => ({ id: 'spins-' + g, kind: 'spin' as const, g, need: 20, text: `Spin ${GAME_NAME[g]} 20 times`, reward: 2_500 }))
+  ...MACHINES.map((g) => ({ id: 'spins-' + g, kind: 'spin' as const, g, need: 20, text: `Spin ${machineName(g)} 20 times`, reward: 2_500 }))
 ];
 const SOCIAL_POOL: Mission[] = [
   { id: 'drink', kind: 'gift', g: null, need: 1, text: 'Send someone a drink (or buy a round)', reward: 2_500 },

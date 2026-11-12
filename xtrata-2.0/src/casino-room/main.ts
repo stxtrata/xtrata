@@ -37,8 +37,8 @@ import { baccaratCards, rouletteResult, sicboDice, verifySeed } from '../../func
 
 type Person = { key: string; spot: string; label: string; since: number };
 type Spin = { a: string; s: number[]; b: number; f: boolean };
-type Walker = { key: string; label: string; x: number; z: number; r: number; at: number };
-type Pos = { x: number; z: number; r: number; at: number };
+type Walker = { key: string; label: string; x: number; z: number; r: number; at: number; s?: boolean };
+type Pos = { x: number; z: number; r: number; at: number; s?: boolean };      // s: taken standing still (true) or walking (false); missing from an older page
 interface PXRoomHost {
   version: number;
   currentSpot(): string | null;
@@ -47,8 +47,8 @@ interface PXRoomHost {
   play?(spot: string, spin: Spin): void;
   moves?(list: Walker[]): void;
   move?(one: Walker | { key: string; off: true }): void;
-  /** Whether the visitor is signed into the room (visible to others), and as which address. */
-  self?(info: { signed: boolean; address: string | null }): void;
+  /** Whether the visitor is signed into the room (visible to others), as which address, and the name others see (BNS name or short address). */
+  self?(info: { signed: boolean; address: string | null; label?: string }): void;
   /**
    * The Salon's door (docs/plans/CASINO-SALON-BNS-PLAN.md): whether the visitor may go into the Salon, as the room says.
    * `allowed` (with their primary BNS name), `no-name`, `unchecked` (the lookup failed: offer "try again"), `guest` (join the room
@@ -86,7 +86,7 @@ const S = {
   you: null as null | { a: string | null; n: string; guest: boolean },
   features: [] as string[],           // what the room says it can do ('play': spins, 'move': walking); an older room lists nothing
   walk: new Map<string, Pos>(),       // other signed-in players on the floor, by address: their latest position
-  ownMove: null as null | { x: number; z: number; r: number },   // the visitor's own last position on the floor (null: off it)
+  ownMove: null as null | { x: number; z: number; r: number; s?: boolean },   // the visitor's own last position on the floor (null: off it)
   ownSent: false,                     // whether the room currently holds a position for this connection
   spots: {} as Record<string, SpotView>,
   joined: 0,
@@ -146,7 +146,7 @@ const labelFor = (address: string) => {
 
 // ------------------------------------------------------------------ the page
 
-const walkerOf = (key: string, p: Pos): Walker => ({ key, label: labelFor(key), x: p.x, z: p.z, r: p.r, at: p.at });
+const walkerOf = (key: string, p: Pos): Walker => ({ key, label: labelFor(key), x: p.x, z: p.z, r: p.r, at: p.at, s: p.s });
 /** Everyone else walking on the floor, as one list (the page keeps whoever is still in it and drops the rest). */
 const pushWalkers = () => {
   if (!S.host?.moves || S.service !== 'ok') return;
@@ -173,7 +173,7 @@ const tellPage = (m: Record<string, unknown>) => {
   try { S.host?.on?.(m); } catch (e) { console.warn('[room] the page could not take a room message', e); }
 };
 /** Refusals of the page's own social messages (they go back to the page, never into the chat column). */
-const PAGE_CODES = /^(react|win|daily|round|gift|pvp|table|no-table|log|bal|board|friends|tourney|card|mission|cres|cbet)/;
+const PAGE_CODES = /^(react|win|daily|round|gift|pvp|table|no-table|log|bal|board|friends|tourney|card|mission|cres|cbet|look)/;
 
 const pushPeople = () => {
   if (!S.host || S.service !== 'ok') return;
@@ -247,7 +247,9 @@ const connect = () => {
         }
         tellPage({ t: 'room', features: S.features.slice(), wins: m.wins || [], bets: m.bets || {}, seekers: m.seekers || [], at: m.at, you: S.you, watch: S.watch,
           // phase 3: levels, the jackpot, the tournament, happy hour, and the visitor's own profile, balance, friends and notices
-          levels: m.levels || {}, jackpot: m.jackpot || null, tourney: m.tourney || null, hh: m.hh || null, me: m.me || null, bal: m.bal ?? null, friends: m.friends || null, notices: m.notices || [] });
+          levels: m.levels || {}, jackpot: m.jackpot || null, tourney: m.tourney || null, hh: m.hh || null, me: m.me || null, bal: m.bal ?? null, friends: m.friends || null, notices: m.notices || [],
+          // characters (functions/lib/casino-look.ts): everyone's look code by address; the page draws them (public/casino/cube-avatars.js)
+          looks: Object.fromEntries((Array.isArray(m.players) ? m.players : []).filter((p: any) => p && typeof p.a === 'string' && typeof p.lk === 'string').map((p: any) => [p.a, p.lk])) });
         break;
       case 'sat': S.spots[m.spot] = m.who; if (m.who?.a && S.walk.has(m.who.a)) walkOne(m.who.a, null); break;
       case 'stood': delete S.spots[m.spot]; if (S.standSent === m.spot) S.standSent = null; break;
@@ -261,6 +263,7 @@ const connect = () => {
       // chess results, stakes and spectator bets (functions/lib/casino-bets.ts): the page's chess layer does the showing
       case 'cres': case 'cgone': case 'cend': case 'cbet': case 'cpool': case 'cpay': tellPage(m); return;
       // phase 3 (functions/lib/casino-progress.ts)
+      case 'look': tellPage(m); return;       // somebody's character changed (or the visitor's own was saved)
       case 'me': case 'hh': case 'lvl': case 'badge': case 'mission-done': case 'bal': case 'board': case 'friends': case 'tourney': case 'tourney-end': case 'jp': case 'jackpot': case 'card': tellPage(m); return;
       case 'reported': chat?.reported(); return;
       case 'play':
@@ -273,7 +276,7 @@ const connect = () => {
         // Another player walking (or leaving the floor): the page draws them there, a moment behind.
         if (typeof m.a === 'string') {
           if (m.off) walkOne(m.a, null);
-          else if ([m.x, m.z, m.r, m.at].every((n) => typeof n === 'number' && Number.isFinite(n))) walkOne(m.a, { x: m.x, z: m.z, r: m.r, at: m.at });
+          else if ([m.x, m.z, m.r, m.at].every((n) => typeof n === 'number' && Number.isFinite(n))) walkOne(m.a, { x: m.x, z: m.z, r: m.r, at: m.at, s: typeof m.s === 'boolean' ? m.s : undefined });
         }
         return;
       case 'err':
@@ -652,9 +655,10 @@ function placePanel() {
 let toldSelf: string | null | undefined;
 const tellSelf = () => {
   const signed = !!(S.signed && S.you && !S.you.guest), address = signed ? S.signed!.address : null;
-  if (address === toldSelf) return;
-  toldSelf = address;
-  try { S.host?.self?.({ signed, address }); } catch (e) { console.warn('[room] the page could not take the sign-in state', e); }
+  const label = address ? labelFor(address) : '', key = address ? `${address}|${label}` : null;      // told again when the BNS name arrives
+  if (key === toldSelf) return;
+  toldSelf = key;
+  try { S.host?.self?.({ signed, address, label }); } catch (e) { console.warn('[room] the page could not take the sign-in state', e); }
 };
 
 /** The Salon's door, as the room sees the visitor (see PXRoomHost.salon). Told to the page whenever it changes. */
@@ -777,13 +781,30 @@ function paintIntro() {
     return box;
   };
   const count = (n: number) => `${n} ${n === 1 ? 'player is' : 'players are'} in the room now.`;
+  /** "Here now: bob.btc at Roulette · carol.btc walking · +2 more", for everyone signed in but `me`; null when nobody is listed. */
+  const hereLine = (me: string | null): HTMLElement | null => {
+    const others = [...S.players.values()].filter((p) => p.a !== me);
+    if (!others.length) return null;
+    const here = el('p', undefined, 'here');
+    here.append(document.createTextNode('Here now: '));
+    others.slice(0, 2).forEach((p, i) => {
+      const w = whereOf(p.a), at = p.aw ? 'away' : w === 'walking' || w === 'in the room' ? w : `at ${w}`;
+      if (i) here.append(document.createTextNode(' · '));
+      here.append(el('b', labelFor(p.a)), document.createTextNode(` ${at}`));
+    });
+    if (others.length > 2) here.append(document.createTextNode(' · '), el('b', `+${others.length - 2} more`));
+    return here;
+  };
 
   if (mode === 'join') {
     parts.push(head('1', 'Join the room'));
     const p = el('p'); p.append(document.createTextNode('Sign in so other players can see you, chat and play the shared tables with you. '));
     p.append(el('b', S.connected ? (S.joined ? count(S.joined) : 'Be the first one in tonight.') : 'Connecting to the room…'));
-    parts.push(p, walletButtons(true));
-    const fine = el('p', undefined, 'fine'); fine.append(el('b', 'One free signature.'), document.createTextNode(' No transaction, no fee, no permission to spend anything.'));
+    parts.push(p);
+    const who = S.connected ? hereLine(null) : null;      // who is here, by name, before anything is asked of the visitor
+    if (who) parts.push(who);
+    parts.push(walletButtons(true));
+    const fine = el('p', undefined, 'fine'); fine.append(el('b', 'One free signature.'), document.createTextNode(' No transaction, no fee, no permission to spend anything. Testnet only: every chip here is play money.'));
     parts.push(fine);
     if (S.error) parts.push(el('div', S.error, 'msg err'));
     parts.push(link('Or look around first, without signing in', () => { S.later = true; paint(); document.getElementById('walkin')?.click(); }, 'lnk guest'));
@@ -802,19 +823,7 @@ function paintIntro() {
     parts.push(head('✓', 'You are in the room', true));
     const via = S.wallet ? `${S.wallet.kind === 'casino' ? 'Casino wallet' : WALLET_NAME[S.wallet.kind]} · ` : '';
     parts.push(meBox(S.away ? 'away · do anything to come back' : `${via}the name others see on your tag`, 'Switch'));
-    const others = [...S.players.values()].filter((p) => p.a !== S.signed!.address);
-    const here = el('p', undefined, 'here');
-    if (!others.length) here.textContent = 'Nobody else is signed in yet. Sit down and they will see you when they arrive.';
-    else {
-      here.append(document.createTextNode('Here now: '));
-      others.slice(0, 2).forEach((p, i) => {
-        const w = whereOf(p.a), at = p.aw ? 'away' : w === 'walking' || w === 'in the room' ? w : `at ${w}`;
-        if (i) here.append(document.createTextNode(' · '));
-        here.append(el('b', labelFor(p.a)), document.createTextNode(` ${at}`));
-      });
-      if (others.length > 2) here.append(document.createTextNode(' · '), el('b', `+${others.length - 2} more`));
-    }
-    parts.push(here);
+    parts.push(hereLine(S.signed!.address) || el('p', 'Nobody else is signed in yet. Sit down and they will see you when they arrive.', 'here'));
   } else if (mode === 'back') {
     parts.push(el('p', 'Welcome back. You are still signed in from earlier, so you are already in the room.', 'lead2'));
     parts.push(meBox(S.away ? 'away · do anything to come back' : `signed in · ${S.joined} here now`, 'Not you?'));
@@ -958,7 +967,7 @@ const onOwnMove = (event: Event) => {
   const d = (event as CustomEvent).detail;
   if (!d) return;
   if (d.off) S.ownMove = null;
-  else if ([d.x, d.z, d.r].every((n) => typeof n === 'number' && Number.isFinite(n))) S.ownMove = { x: d.x, z: d.z, r: d.r };
+  else if ([d.x, d.z, d.r].every((n) => typeof n === 'number' && Number.isFinite(n))) S.ownMove = typeof d.s === 'boolean' ? { x: d.x, z: d.z, r: d.r, s: d.s } : { x: d.x, z: d.z, r: d.r };
   else return;
   sendOwnMove();
 };
@@ -971,7 +980,8 @@ const onOwnMove = (event: Event) => {
 const FEATURE_OF: Record<string, string> = {
   react: 'react', win: 'win', daily: 'daily', watch: 'table', round: 'rounds', bet: 'rounds', gift: 'gift', seek: 'pvp', pvp: 'pvp', spec: 'spec',
   cres: 'cres', cbet: 'cbet',
-  log: 'progress', mission: 'missions', card: 'progress', board: 'boards', tjoin: 'tourney', bal: 'bal', friends: 'friends'
+  log: 'progress', mission: 'missions', card: 'progress', board: 'boards', tjoin: 'tourney', bal: 'bal', friends: 'friends',
+  look: 'look'
 };
 const onPageSend = (event: Event) => {
   const msg = (event as CustomEvent).detail as Record<string, unknown> | undefined;

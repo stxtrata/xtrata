@@ -199,7 +199,7 @@ await leave(a); await leave(b);
 await until(a, () => !!window.__pxSocial.progress.me, null, 30000, 'A has a profile');
 const me0 = (await P(a)).me, m0 = me0.missions.list[0];
 assert.ok(/^(hands|spins)-/.test(m0.id) && !m0.done, 'the first mission is a play mission: ' + m0.id);
-const g0 = m0.id.split('-')[1], k0 = m0.id.startsWith('spins') ? 'spin' : 'hand';
+const g0 = m0.id.slice(m0.id.indexOf('-') + 1), k0 = m0.id.startsWith('spins') ? 'spin' : 'hand';      // a floor machine's id may have hyphens of its own (who-is-satoshi)
 const bank0 = await bank(a), credit0 = await cred(a);
 for (let i = 0; i < m0.need; i++) await send(a, { t: 'log', k: k0, g: g0, bet: 10, won: 0 });
 await until(a, () => window.__pxSocial.progress.me.missions.list[0].done, null, 30000, 'A completes a mission');

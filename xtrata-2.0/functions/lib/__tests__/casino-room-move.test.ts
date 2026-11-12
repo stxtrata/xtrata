@@ -86,6 +86,24 @@ describe('walking: who may move and who hears it', () => {
   });
 });
 
+describe('walking: standing still (move-still)', () => {
+  it('is a feature the room lists', () => { expect(ROOM_FEATURES).toContain('move-still'); });
+  it('keeps the mark as the page sent it (standing, walking, or not said), and passes it on', () => {
+    expect(parseClientMessage(move({ s: true }))).toEqual({ ok: true, msg: { t: 'move', x: 1.23, z: -5.68, r: 0.5, s: true } });
+    expect(parseClientMessage(move({ s: 1 }))).toEqual({ ok: true, msg: { t: 'move', x: 1.23, z: -5.68, r: 0.5, s: true } });
+    expect(parseClientMessage(move({ s: false }))).toEqual({ ok: true, msg: { t: 'move', x: 1.23, z: -5.68, r: 0.5, s: false } });
+    expect(parseClientMessage(move({ s: 0 }))).toEqual({ ok: true, msg: { t: 'move', x: 1.23, z: -5.68, r: 0.5, s: false } });
+    for (const odd of ['yes', null, {}, 2]) expect('s' in (parseClientMessage(move({ s: odd })) as any).msg).toBe(false);
+    const peers = [peer('1', ALICE), peer('2', BOB)];
+    const still = applyMove(peers, '1', { x: 1, z: 2, r: 0, s: true }, 5000);
+    expect(still.ok && still.message).toEqual({ t: 'move', a: ALICE, x: 1, z: 2, r: 0, at: 5000, s: true });
+    const walking = applyMove(peers, '1', { x: 1.5, z: 2, r: 0, s: false }, 5400);
+    expect(walking.ok && walking.message).toEqual({ t: 'move', a: ALICE, x: 1.5, z: 2, r: 0, at: 5400, s: false });
+    const older = applyMove(peers, '1', { x: 2, z: 2, r: 0 }, 5800);      // a page from before the mark existed
+    expect(older.ok && 's' in older.message).toBe(false);
+  });
+});
+
 describe('walking: the room view', () => {
   it('lists each walking player once, at their latest position, and never someone who is also seated', () => {
     const peers = [peer('a', ALICE), peer('a2', ALICE), peer('b', BOB), peer('g', null)];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DAY_MS } from '../casino-social';
-import { ROTATION_MACHINES } from '../casino-machines';
+import { FLOOR_MACHINES, ROTATION_MACHINES } from '../casino-machines';
 import {
   ALL_MISSIONS_BONUS, BADGES, DEFAULT_SCHEDULE, JACKPOT_SEED, TOURNEY_PRIZES, TOURNEY_SPINS, addXp, advanceMissions, applyBalance,
   applyLog, awardBadges, creditBalance, emptyBoards, feedJackpot, happyHour, jackpotStep, joinTourney, lastFinishedTourney,
@@ -198,14 +198,25 @@ describe('the rotation machines and the progressive jackpot', () => {
     expect(r.hit).toBe(true);
   });
 
-  it('keeps missions, the tournament rotation and the Slot fan badge on the five core machines', () => {
-    const rotation = new Set<string>(ROTATION_MACHINES);
-    for (let d = 0; d < 40; d++) expect(rotation.has(tourneyAt(T0 + d * DAY_MS).g)).toBe(false);
+  it('keeps missions, the tournament rotation and the Slot fan badge on the five machines on the standard floor', () => {
+    const floor = new Set<string>(FLOOR_MACHINES);
+    expect(floor.size).toBe(5);
+    const seen = new Set<string>();
+    for (let d = 0; d < 40; d++) { const g = tourneyAt(T0 + d * DAY_MS).g; expect(floor.has(g)).toBe(true); seen.add(g); }
+    expect(seen.size).toBe(5);                                    // every floor machine has its day
     const p = newProfile();
     applyLog(p, 'who', log({ k: 'spin', g: 'sat-hunter', bet: 100, won: 0 }), T0, false);
     expect(p.st.g).toContain('sat-hunter');
-    expect(BADGES.find((b) => b.id === 'slot-fan')!.test({ ...p.st, g: ['drop', 'twins', 'ds', 'bf'] } as never)).toBe(false);
-    expect(BADGES.find((b) => b.id === 'slot-fan')!.test({ ...p.st, g: ['drop', 'twins', 'ds', 'bf', 'nv'] } as never)).toBe(true);
+    const fan = BADGES.find((b) => b.id === 'slot-fan')!;
+    expect(fan.test({ ...p.st, g: FLOOR_MACHINES.slice(0, 4) } as never)).toBe(false);
+    expect(fan.test({ ...p.st, g: [...FLOOR_MACHINES] } as never)).toBe(true);
+    expect(fan.test({ ...p.st, g: ['drop', 'twins', 'ds', 'bf', 'nv'] } as never)).toBe(false);      // the old five alone no longer earn it
+    // every "spin a machine" mission names a machine that is on the floor, by its own name
+    const spins = new Map<string, string>();
+    for (let i = 0; i < 400; i++) { const m = missionsFor('player' + i, 20_000 + (i % 7))[0]; if (m.kind === 'spin') spins.set(m.g!, m.text); }
+    expect([...spins.keys()].sort()).toEqual([...FLOOR_MACHINES].sort());
+    expect(spins.get('twins')).toBe('Spin Forever Twins 20 times');
+    expect(spins.get('who-is-satoshi')).toBe('Spin Who Is Satoshi? 20 times');
   });
 });
 

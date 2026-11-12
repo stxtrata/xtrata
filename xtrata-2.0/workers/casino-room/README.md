@@ -326,3 +326,20 @@ and `claude/chess-betting-room-answers.md` (project docs).
 - **Tests:** `npx vitest run functions/lib/__tests__/casino-bets.test.ts functions/lib/__tests__/casino-chess-room.test.ts` and `node scripts/test-casino-chess-room.mjs` (the real Worker code, four connections, a hand-moved clock).
 - **Deploy:** room Worker first (`npx wrangler deploy --config workers/casino-room/wrangler.toml`), then the site. No migration, no new binding.
 
+## Characters and standing still (2026-11-12, docs/plans/CASINO-CHARACTER-PLAN.md, CASINO-OVERHAUL-PLAN.md)
+
+- **Looks (feature `look`).** A signed-in player may be seen as a cube instead of the human figure. The look is one code of at most
+  19 characters (`functions/lib/casino-look.ts`: one pattern, tested). `look {v: code | null}` sets it: its own limit (one every 1.5 s,
+  twelve a minute), one read and one write of the player's profile (`lk`), and `look {a, v}` to everyone who can see the room (the
+  sender gets it back with `mine: true`). The code rides in the connection's attachment (`lk`), so the `room` message lists it on
+  each cube player without a storage read, and it is read with the profile the room already reads when a player connects. The room
+  never draws anything and passes on nothing but a code that matched the pattern.
+- **Standing still (feature `move-still`).** A `move` may carry `s`: true (the position was taken standing still) or false (walking);
+  the room passes it on as sent and keeps nothing more. Pages use it to bring a walker to rest exactly there and to tell a late
+  position from a stop. A page that does not send it (an older one) has its walkers drawn the old way.
+- **Cost.** No timers, no alarms, no new storage reads on arrival. One profile write per saved look; two extra moves per stop.
+  `MOVE_MIN_GAP_MS` is 150 (was 250) so a stop reported 0.26 s after a position is not refused on an uneven connection;
+  `MOVE_PER_MINUTE` (200) is unchanged and is what bounds the cost.
+- **Missions, the tournament and the Slot fan badge** are built from `FLOOR_MACHINES` (`functions/lib/casino-machines.ts`), which a
+  test keeps equal to the standard floor in `public/casino/machine-rotation.js`. Rotating the floor now means editing both and
+  redeploying this Worker; the test fails until they agree.
