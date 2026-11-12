@@ -17,19 +17,19 @@ LOGO_O = "M834 687 831 684H822L817 686 812 684 811 685H606L427 490 423 491 413 5
 CLASSES = {
  'diamond': dict(name='Diamond', t='#bfe6ff', e='#b9a6ff',
    sheen='#bfe6ff,#fff,#ffd3f4,#c9ffe9,#bfe6ff,#fff,#d8ccff,#c9ffe9,#bfe6ff', groove='rgba(120,170,220,.10)',
-   label='radial-gradient(circle,#fff 0 30%,#cfeaff 60%,#9cc9f0)', x='#5f93c8', glow='95', rim='#9cc9f0'),
+   label='radial-gradient(circle,#fff 0 30%,#cfeaff 60%,#9cc9f0)', x='#5f93c8', glow='95', rim='#9cc9f0', lvl=4, sp=60),
  'gold': dict(name='Gold', t='#f5c542', e='#d9a6ff',
    sheen='#7a5410,#f7d774,#fff6c9,#c99a2e,#7a5410,#f7d774,#fff6c9,#c99a2e,#7a5410', groove='rgba(60,35,0,.30)',
-   label='radial-gradient(circle,#fff3bf 0 20%,#e0b23c 55%,#9a6f17)', x='#fff6c9', glow='75', rim='#9a6f17'),
+   label='radial-gradient(circle,#fff3bf 0 20%,#e0b23c 55%,#9a6f17)', x='#fff6c9', glow='75', rim='#9a6f17', lvl=3, sp=32),
  'silver': dict(name='Silver', t='#cfd8e3', e='#a9b8ff',
    sheen='#6c7684,#e9eef5,#fff,#aab4c2,#6c7684,#e9eef5,#fff,#aab4c2,#6c7684', groove='rgba(20,30,45,.28)',
-   label='radial-gradient(circle,#fff 0 20%,#c9d2de 55%,#7d8796)', x='#fff', glow='70', rim='#7d8796'),
+   label='radial-gradient(circle,#fff 0 20%,#c9d2de 55%,#7d8796)', x='#fff', glow='70', rim='#7d8796', lvl=2, sp=18),
  'bronze': dict(name='Bronze', t='#d98a5a', e='#f2a6d8',
    sheen='#6b3a18,#e9a877,#ffd9bd,#b4703f,#6b3a18,#e9a877,#ffd9bd,#b4703f,#6b3a18', groove='rgba(50,20,0,.30)',
-   label='radial-gradient(circle,#ffe0c8 0 20%,#cf8a59 55%,#7c4520)', x='#ffe6d3', glow='65', rim='#7c4520'),
+   label='radial-gradient(circle,#ffe0c8 0 20%,#cf8a59 55%,#7c4520)', x='#ffe6d3', glow='65', rim='#7c4520', lvl=1, sp=8),
  'classic': dict(name='Classic', t='#3fd0c9', e='#6fe3c4',
    sheen='#050608,#2b313b,#0b0d11,#050608,#3a414d,#0b0d11,#050608,#2b313b,#050608', groove='rgba(255,255,255,.07)',
-   label='radial-gradient(circle,#7df0e8 0 20%,#2bb8b0 55%,#167a75)', x='#06302e', glow='55', rim='#1b2029'),
+   label='radial-gradient(circle,#7df0e8 0 20%,#2bb8b0 55%,#167a75)', x='#06302e', glow='55', rim='#1b2029', lvl=0, sp=0),
 }
 
 def facets():
@@ -44,6 +44,40 @@ def facets():
         out.append(f'<path d="M{pt(100,a0)}L{pt(74,am)}L{pt(52,a0)}L{pt(74,am-2*math.pi/N)}z" fill="{pal[k%8]}" opacity=".7"/>'); k += 5
         out.append(f'<path d="M{pt(74,am)}L{pt(52,a1)}L{pt(30,am)}L{pt(52,a0)}z" fill="{pal[k%8]}" opacity=".8"/>'); k += 3
     return '<symbol id="k" viewBox="-100 -100 200 200">' + ''.join(out) + '</symbol>'
+
+def extras(c, cid):
+    """
+    The sparkle that sets the classes apart. Each step up adds to the one below:
+      Classic  nothing: a plain, handsome record
+      Bronze   a few slow twinkles in the case
+      Silver   more twinkles, and a band of light that sweeps across the glass
+      Gold     many twinkles, rays of light turning behind the record, a brighter case
+      Diamond  a case full of rainbow glitter, rainbow rays, and edges that shimmer through the colours
+    Returns (css, html inside the record wrapper, sparkle colours).
+    """
+    L = c['lvl']; css = ''; html = ''; cols = "['#fff']"
+    if L >= 1:
+        css += ("\n.sp{width:7em;height:7em;margin:-3.5em;background:linear-gradient(var(--c),var(--c)) center/100% 5% no-repeat,linear-gradient(var(--c),var(--c)) center/5% 100% no-repeat,radial-gradient(circle,#fff 0 7%,var(--c) 10%,transparent 26%);"
+                "-webkit-mask:radial-gradient(circle,#000 8%,transparent 68%);mask:radial-gradient(circle,#000 8%,transparent 68%);scale:0;animation:tw 3s ease-in-out infinite;pointer-events:none}"
+                "\n@keyframes tw{0%,100%{scale:0;rotate:0deg}35%,65%{scale:var(--s)}50%{rotate:30deg}}"
+                "\n@media (prefers-reduced-motion:reduce){.sp{animation:none;scale:var(--s);opacity:.7}}")
+        cols = "['#fff',getComputedStyle(a).getPropertyValue('--t')]"
+    if L >= 2:
+        css += ("\n.fr{background:linear-gradient(105deg,transparent 42%,#ffffff2e 50%,transparent 58%) 0 0/300% 100%,linear-gradient(135deg,#ffffff14,transparent 40%,#ffffff08);animation:sw 6s ease-in-out infinite}"
+                "\n@keyframes sw{0%,30%{background-position:120% 0,0 0}100%{background-position:-60% 0,0 0}}"
+                "\n@media (prefers-reduced-motion:reduce){.fr{animation:none}}")
+    if L >= 3:
+        ray = 'conic-gradient(#8fd8ff,#fff,#ffc9f3,#b9ffe0,#ffe9a3,#c7b8ff,#8fd8ff)' if L >= 4 else 'var(--t)'
+        css += ("\n.ry{position:absolute;inset:-13em;border-radius:50%;-webkit-mask:radial-gradient(circle,#000 40%,transparent 70%);mask:radial-gradient(circle,#000 40%,transparent 70%);animation:s 50s linear infinite;opacity:~O~}"
+                "\n.ry i{position:absolute;inset:0;background:~R~;-webkit-mask:repeating-conic-gradient(#000 0 3deg,transparent 3deg 13deg);mask:repeating-conic-gradient(#000 0 3deg,transparent 3deg 13deg)}"
+                "\n.f{box-shadow:inset 0 0 2em color-mix(in srgb,var(--e) 22%,transparent),0 0 ~G~em color-mix(in srgb,var(--e) 55%,transparent)}"
+                "\n@media (prefers-reduced-motion:reduce){.ry{animation:none}}").replace('~O~', '.85' if L >= 4 else '.55').replace('~R~', ray).replace('~G~', '2.4' if L >= 4 else '1.2')
+        html += '<div class="ry"><i></i></div>'
+    if L >= 4:
+        css += ("\n.f{animation:hu 7s linear infinite}\n@keyframes hu{to{filter:hue-rotate(360deg)}}"
+                "\n@media (prefers-reduced-motion:reduce){.f{animation:none}}")
+        cols = "['#fff','#8fd8ff','#ffc9f3','#b9ffe0','#ffe9a3','#c7b8ff']"
+    return css, html, cols
 
 # Sizes are in em: 1em is 1% of the square the model sits in, so everything scales together.
 TPL = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Xtrata Music · @NAME@ Record</title>
@@ -79,6 +113,7 @@ body{display:grid;place-items:center}
 .q b{font:700 2.6em/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.12em}
 .q svg{width:5em;height:5em}
 .o{--cw:currentColor;--cb:currentColor;--co:currentColor}
+@EXCSS@
 @keyframes s{to{transform:rotate(1turn)}}
 @keyframes h{50%{transform:translateY(-1.2em)}}
 @media (prefers-reduced-motion:reduce){.w,.s,.h{animation:none}}
@@ -87,13 +122,16 @@ body{display:grid;place-items:center}
 <div class="a" id="a" tabindex="0" role="img" aria-label="@NAME@ record award. Drag to turn it.">
 <div class="m" id="m"><div class="fl"></div><div class="pl"></div><div class="f bk"></div><div class="f lf"></div><div class="f rt"></div><div class="f tp"></div><div class="f bt"></div>
 <svg class="em"><use href="#x"/></svg>
-<div class="w"><div class="gl"></div><div class="rm"></div><div class="r"><div class="s"></div>@K@<div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div><div class="r"><div class="s"></div>@K@<div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div></div>
+<div class="w">@EXHTML@<div class="gl"></div><div class="rm"></div><div class="r"><div class="s"></div>@K@<div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div><div class="r"><div class="s"></div>@K@<div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div></div>
 <div class="q" id="q"><svg class="o"><use href="#x"/></svg></div>
 <div class="f fr"></div></div>
 </div>
 <script>/* ?n=412 engraves the player's number on the plaque. Drag, swipe or use the arrow keys to turn the model. */
 var n=(new URLSearchParams(location.search).get('n')||'').replace(/\\D/g,'').slice(0,6),a=document.getElementById('a'),m=document.getElementById('m');
 if(n)document.getElementById('q').innerHTML='<b>No. '+n.padStart(4,'0')+'</b>';
+/* The sparkles: the same every time (a fixed seed), scattered through the case, some turned to face the sides. */
+for(var i=0,z=7,C=@COLS@,R=function(){return(z=z*16807%2147483647)/2147483647};i<@SP@;i++){var e=document.createElement('i');e.className='sp';
+e.style.cssText='--c:'+C[i%C.length]+';--s:'+(.35+R()*.9)+';transform:translate3d('+(R()*46-23)+'em,'+(R()*64-32)+'em,'+(R()*27-13.5)+'em) rotateY('+(i%3?0:90)+'deg);animation-delay:-'+R()*5+'s;animation-duration:'+(1.8+R()*3)+'s';m.appendChild(e)}
 var rx=-8,ry=-18,v=0,d=0,px,py,still=matchMedia('(prefers-reduced-motion:reduce)').matches;
 a.onpointerdown=function(e){d=1;px=e.clientX;py=e.clientY;v=0;a.setPointerCapture(e.pointerId)};
 a.onpointermove=function(e){if(!d)return;v=(e.clientX-px)*.45;ry+=v;rx=Math.max(-40,Math.min(40,rx-(e.clientY-py)*.3));px=e.clientX;py=e.clientY};
@@ -108,6 +146,8 @@ def main():
     os.makedirs('public/awards', exist_ok=True)
     for cid, c in CLASSES.items():
         h = TPL
+        excss, exhtml, cols = extras(c, cid)
+        h = h.replace('@EXCSS@', excss.strip()).replace('@EXHTML@', exhtml).replace('@COLS@', cols).replace('@SP@', str(c['sp']))
         for k, v in dict(NAME=c['name'], T=c['t'], E=c['e'], SHEEN=c['sheen'], GROOVE=c['groove'], LABEL=c['label'], X=c['x'],
                          GLOW=c['glow'], RIM=c['rim'], FACETS=facets() if cid == 'diamond' else '', K='<svg class="k"><use href="#k"/></svg>' if cid == 'diamond' else '', LW=LOGO_W, LB=LOGO_B, LO=LOGO_O).items():
             h = h.replace('@' + k + '@', v)

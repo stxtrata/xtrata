@@ -31,6 +31,7 @@ body{display:grid;place-items:center}
 .q b{font:700 2.6em/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.12em}
 .q svg{width:5em;height:5em}
 .o{--cw:currentColor;--cb:currentColor;--co:currentColor}
+
 @keyframes s{to{transform:rotate(1turn)}}
 @keyframes h{50%{transform:translateY(-1.2em)}}
 @media (prefers-reduced-motion:reduce){.w,.s,.h{animation:none}}
@@ -46,6 +47,9 @@ body{display:grid;place-items:center}
 <script>/* ?n=412 engraves the player's number on the plaque. Drag, swipe or use the arrow keys to turn the model. */
 var n=(new URLSearchParams(location.search).get('n')||'').replace(/\D/g,'').slice(0,6),a=document.getElementById('a'),m=document.getElementById('m');
 if(n)document.getElementById('q').innerHTML='<b>No. '+n.padStart(4,'0')+'</b>';
+/* The sparkles: the same every time (a fixed seed), scattered through the case, some turned to face the sides. */
+for(var i=0,z=7,C=['#fff'],R=function(){return(z=z*16807%2147483647)/2147483647};i<0;i++){var e=document.createElement('i');e.className='sp';
+e.style.cssText='--c:'+C[i%C.length]+';--s:'+(.35+R()*.9)+';transform:translate3d('+(R()*46-23)+'em,'+(R()*64-32)+'em,'+(R()*27-13.5)+'em) rotateY('+(i%3?0:90)+'deg);animation-delay:-'+R()*5+'s;animation-duration:'+(1.8+R()*3)+'s';m.appendChild(e)}
 var rx=-8,ry=-18,v=0,d=0,px,py,still=matchMedia('(prefers-reduced-motion:reduce)').matches;
 a.onpointerdown=function(e){d=1;px=e.clientX;py=e.clientY;v=0;a.setPointerCapture(e.pointerId)};
 a.onpointermove=function(e){if(!d)return;v=(e.clientX-px)*.45;ry+=v;rx=Math.max(-40,Math.min(40,rx-(e.clientY-py)*.3));px=e.clientX;py=e.clientY};
