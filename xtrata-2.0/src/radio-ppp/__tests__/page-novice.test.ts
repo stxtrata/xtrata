@@ -252,13 +252,17 @@ describe('novice welcome: a newcomer sees one short page, not the whole radio', 
     expect(html().dataset.view).toBeUndefined();
   });
 
-  it('never shows for a connected Stacks wallet, or with the flag off', async () => {
+  it('never shows for a listener who connected a Stacks wallet', async () => {
     await open({ step: 'connect', solo: false, listening: undefined, balance: undefined, session: null });
     expect(html().dataset.welcome).toBeUndefined();
-    localStorage.clear();
-    for (const k of ['view', 'welcome', 'asking']) delete html().dataset[k]; // a fresh page load
+    expect(html().dataset.view).toBeUndefined();
+  });
+
+  // Its own test: a page opened earlier in the same test would still be alive and redraw from the shared fake.
+  it('never shows with the flag off', async () => {
     await open(NEW, null);
     expect(html().dataset.welcome).toBeUndefined();
     expect(html().dataset.view).toBeUndefined();
+    expect(page().hidden).toBe(true);
   });
 });
