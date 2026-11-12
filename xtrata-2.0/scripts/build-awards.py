@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""
+The five award records (docs/music/AWARDS-PLAN.md): one self-contained HTML file per class, written to public/awards/.
+Run from xtrata-2.0/:  python3 scripts/build-awards.py
+
+Each file is a small 3D model in plain HTML and CSS: a record floating in a glass case. Drag to turn it (or use the
+arrow keys); left alone it sways gently. `?n=412` engraves the player's number on the plaque. No images, fonts or
+outside files, so these same files are the masters that get inscribed. Change the look here, never in the five files.
+"""
+import math, os, re
+
+# The Xtrata mark: the three outlined forms of the logo, from the supplied vector (xtrata-logo-vector.svg).
+LOGO_W = "M17 65 18 66V191L243 192 424 391H427L609 192H729L730 191H833V66L834 65 833 64H558L426 209H424L292 64H18zM29 119 32 117 271 118 423 284H428L580 118H794L795 117 820 118 822 120V179L821 180H603L428 372 424 373 248 180H31L30 179zM29 77 31 75 287 76 425 227 447 205 564 76 816 75 822 77V105L820 107H582L574 107 426 268H424L277 107H31L29 105z"
+LOGO_B = "M812 193 809 197 760 238H620L605 253 589 272 436 439 541 555 621 641H759L764 643 809 681 825 682 826 681 822 676 784 645V643L792 641H837L758 555 753 552H742L640 440V437L734 333 741 326 755 325 807 268 836 239V238H784L783 235 791 227 828 196V194L826 193zM657 326H719L720 329 667 387H664V390L625 433 621 439 674 498 704 529 721 549 720 552H657L555 441 556 437zM626 251H802L803 254 748 313H651L537 438V440L648 562 652 565H750L797 616 804 625 803 628H627L455 441V439L463 429zM23 193 34 205 69 235 68 238H15V239L19 241 94 323 101 326H110L211 436V440L113 548 109 552H99L94 554 17 638 16 641H63L67 643V645L28 678 26 681 27 682 43 681 90 641H230L309 556 354 505 384 474 399 456 406 450 414 441V439L231 238H92L41 196 40 193zM136 326H193L195 327 295 437V442L279 458 194 552H131L130 549 230 439 179 381 174 377 132 331V328zM49 251H226L344 380 395 438V442L224 628H48L47 625 101 565H199L299 457 314 439 300 422 199 313H103L48 255z"
+LOGO_O = "M834 687 831 684H822L817 686 812 684 811 685H606L427 490 423 491 413 501 246 685H28L27 684 18 685 17 689 18 791H288L291 790 424 644H427L562 791H831L833 790zM30 700 32 697H252L424 509H427L597 695 601 697H818L821 701V775L819 778H567L460 660 427 626 422 627 411 638 284 778H32L30 773z"
+
+CLASSES = {
+ 'diamond': dict(name='Diamond', t='#bfe6ff', e='#b9a6ff',
+   sheen='#bfe6ff,#fff,#ffd3f4,#c9ffe9,#bfe6ff,#fff,#d8ccff,#c9ffe9,#bfe6ff', groove='rgba(120,170,220,.10)',
+   label='radial-gradient(circle,#fff 0 30%,#cfeaff 60%,#9cc9f0)', x='#5f93c8', glow='95', rim='#9cc9f0'),
+ 'gold': dict(name='Gold', t='#f5c542', e='#d9a6ff',
+   sheen='#7a5410,#f7d774,#fff6c9,#c99a2e,#7a5410,#f7d774,#fff6c9,#c99a2e,#7a5410', groove='rgba(60,35,0,.30)',
+   label='radial-gradient(circle,#fff3bf 0 20%,#e0b23c 55%,#9a6f17)', x='#fff6c9', glow='75', rim='#9a6f17'),
+ 'silver': dict(name='Silver', t='#cfd8e3', e='#a9b8ff',
+   sheen='#6c7684,#e9eef5,#fff,#aab4c2,#6c7684,#e9eef5,#fff,#aab4c2,#6c7684', groove='rgba(20,30,45,.28)',
+   label='radial-gradient(circle,#fff 0 20%,#c9d2de 55%,#7d8796)', x='#fff', glow='70', rim='#7d8796'),
+ 'bronze': dict(name='Bronze', t='#d98a5a', e='#f2a6d8',
+   sheen='#6b3a18,#e9a877,#ffd9bd,#b4703f,#6b3a18,#e9a877,#ffd9bd,#b4703f,#6b3a18', groove='rgba(50,20,0,.30)',
+   label='radial-gradient(circle,#ffe0c8 0 20%,#cf8a59 55%,#7c4520)', x='#ffe6d3', glow='65', rim='#7c4520'),
+ 'classic': dict(name='Classic', t='#3fd0c9', e='#6fe3c4',
+   sheen='#050608,#2b313b,#0b0d11,#050608,#3a414d,#0b0d11,#050608,#2b313b,#050608', groove='rgba(255,255,255,.07)',
+   label='radial-gradient(circle,#7df0e8 0 20%,#2bb8b0 55%,#167a75)', x='#06302e', glow='55', rim='#1b2029'),
+}
+
+def facets():
+    """A brilliant-cut look for the Diamond: three rings of flat facets, clipped to the disc."""
+    out = []; N = 16
+    pal = ['#fff', '#d6efff', '#a9d6fb', '#eaf7ff', '#c7b8ff', '#bff3e2', '#ffd9f3', '#8fc3ee']
+    pt = lambda r, a: f'{r*math.cos(a):.0f} {r*math.sin(a):.0f}'
+    k = 0
+    for i in range(N):
+        a0 = 2*math.pi*i/N; a1 = 2*math.pi*(i+1)/N; am = (a0+a1)/2
+        out.append(f'<path d="M{pt(100,a0)}L{pt(100,a1)}L{pt(74,am)}z" fill="{pal[k%8]}" opacity=".85"/>'); k += 3
+        out.append(f'<path d="M{pt(100,a0)}L{pt(74,am)}L{pt(52,a0)}L{pt(74,am-2*math.pi/N)}z" fill="{pal[k%8]}" opacity=".7"/>'); k += 5
+        out.append(f'<path d="M{pt(74,am)}L{pt(52,a1)}L{pt(30,am)}L{pt(52,a0)}z" fill="{pal[k%8]}" opacity=".8"/>'); k += 3
+    return '<svg class="k" viewBox="-100 -100 200 200">' + ''.join(out) + '</svg>'
+
+# Sizes are in em: 1em is 1% of the square the model sits in, so everything scales together.
+TPL = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Xtrata Music · @NAME@ Record</title>
+<style>
+html,body{margin:0;height:100%;background:#05060a;overflow:hidden}
+body{display:grid;place-items:center}
+.a{position:relative;width:min(100vw,100vh);aspect-ratio:1;font-size:calc(min(100vw,100vh)/100);--t:@T@;--e:@E@;perspective:150em;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;outline:0;background:radial-gradient(50% 42% at 50% 47%,color-mix(in srgb,var(--t) 34%,transparent),transparent 72%),radial-gradient(90% 40% at 50% 100%,color-mix(in srgb,var(--e) 18%,transparent),transparent 75%),#05060a}
+.a:active{cursor:grabbing}
+.m,.m>*,.w{position:absolute;transform-style:preserve-3d}
+.m{left:50%;top:51%;width:0;height:0}
+.f{border:.22em solid color-mix(in srgb,var(--e) 85%,transparent);box-sizing:border-box;background:linear-gradient(135deg,#ffffff14,transparent 40%,#ffffff08);box-shadow:inset 0 0 2em color-mix(in srgb,var(--e) 22%,transparent)}
+.fr,.bk{width:50em;height:70em;left:-25em;top:-35em}.fr{transform:translateZ(15em)}.bk{transform:translateZ(-15em)}
+.lf,.rt{width:30em;height:70em;left:-15em;top:-35em}.lf{transform:rotateY(-90deg) translateZ(25em)}.rt{transform:rotateY(90deg) translateZ(25em)}
+.tp,.bt{width:50em;height:30em;left:-25em;top:-15em}.tp{transform:rotateX(90deg) translateZ(35em)}.bt{transform:rotateX(-90deg) translateZ(35em);background:color-mix(in srgb,var(--t) 16%,#0a0c12)}
+.pl{width:66em;height:46em;left:-33em;top:-23em;transform:rotateX(-90deg) translateZ(35.6em);background:#090b11;border:.15em solid color-mix(in srgb,var(--e) 35%,transparent)}
+.fl{width:220em;height:220em;left:-110em;top:-110em;transform:rotateX(-90deg) translateZ(38em);background:repeating-linear-gradient(0deg,color-mix(in srgb,var(--e) 45%,transparent) 0 .15em,transparent .15em 11em),repeating-linear-gradient(90deg,color-mix(in srgb,var(--e) 45%,transparent) 0 .15em,transparent .15em 11em);-webkit-mask:radial-gradient(circle,#000 15%,transparent 62%);mask:radial-gradient(circle,#000 15%,transparent 62%)}
+.em{width:13em;height:13em;left:-6.5em;top:-33em}
+.w{width:38em;height:38em;left:-19em;top:-20em;animation:h 6s ease-in-out infinite}
+.r,.rm{position:absolute;inset:0;border-radius:50%}
+.rm{background:@RIM@;transform:translateZ(-.5em)}
+.r{overflow:hidden;transform:translateZ(.01em)}
+.gl{position:absolute;inset:-4.5em;border-radius:50%;transform:translateZ(-1em);background:radial-gradient(circle,color-mix(in srgb,var(--t) @GLOW@%,transparent) 48%,transparent 71%);opacity:.75}
+.r>*{position:absolute;inset:0;border-radius:50%}
+.s{background:conic-gradient(@SHEEN@);animation:s 14s linear infinite}
+.g{background:repeating-radial-gradient(circle,@GROOVE@ 0 .16em,transparent .26em .62em);-webkit-mask:radial-gradient(circle,transparent 19%,#000 20%);mask:radial-gradient(circle,transparent 19%,#000 20%)}
+.h{background:conic-gradient(from 20deg,transparent 0 8%,#fff7 12%,transparent 17% 58%,#fff5 62%,transparent 67%);mix-blend-mode:screen;animation:s 9s linear infinite reverse}
+.l{inset:34%!important;background:@LABEL@;box-shadow:0 0 0 .35em #0005,inset 0 0 1.2em #0006;color:@X@;display:grid;place-items:center}
+.l svg{width:70%;height:70%}
+.k{mix-blend-mode:multiply;opacity:.55}
+.q{width:22em;height:6.4em;left:-11em;top:24em;transform:translateZ(13em);backface-visibility:hidden;-webkit-backface-visibility:hidden;box-sizing:border-box;border:.2em solid var(--t);border-radius:.4em;background:#0a0c12cc;color:var(--t);display:grid;place-items:center}
+.q b{font:700 2.6em/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.12em}
+.q svg{width:5em;height:5em}
+.o{--cw:currentColor;--cb:currentColor;--co:currentColor}
+@keyframes s{to{transform:rotate(1turn)}}
+@keyframes h{50%{transform:translateY(-1.2em)}}
+@media (prefers-reduced-motion:reduce){.w,.s,.h{animation:none}}
+</style>
+<svg width="0" height="0" style="position:absolute"><symbol id="x" viewBox="0 40 850 770"><path style="fill:var(--cw,#ececec)" fill-rule="evenodd" d="@LW@"/><path style="fill:var(--cb,#3a7db5)" fill-rule="evenodd" d="@LB@"/><path style="fill:var(--co,#e98a32)" fill-rule="evenodd" d="@LO@"/></symbol></svg>
+<div class="a" id="a" tabindex="0" role="img" aria-label="@NAME@ record award. Drag to turn it.">
+<div class="m" id="m"><div class="fl"></div><div class="pl"></div><div class="f bk"></div><div class="f lf"></div><div class="f rt"></div><div class="f tp"></div><div class="f bt"></div>
+<svg class="em"><use href="#x"/></svg>
+<div class="w"><div class="gl"></div><div class="rm"></div><div class="r"><div class="s"></div>@FACETS@<div class="g"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div></div>
+<div class="q" id="q"><svg class="o"><use href="#x"/></svg></div>
+<div class="f fr"></div></div>
+</div>
+<script>/* ?n=412 engraves the player's number on the plaque. Drag, swipe or use the arrow keys to turn the model. */
+var n=(new URLSearchParams(location.search).get('n')||'').replace(/\\D/g,'').slice(0,6),a=document.getElementById('a'),m=document.getElementById('m');
+if(n)document.getElementById('q').innerHTML='<b>No. '+n.padStart(4,'0')+'</b>';
+var rx=-8,ry=-18,v=0,d=0,px,py,still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+a.onpointerdown=function(e){d=1;px=e.clientX;py=e.clientY;v=0;a.setPointerCapture(e.pointerId)};
+a.onpointermove=function(e){if(!d)return;v=(e.clientX-px)*.45;ry+=v;rx=Math.max(-40,Math.min(40,rx-(e.clientY-py)*.3));px=e.clientX;py=e.clientY};
+a.onpointerup=a.onpointercancel=function(){d=0};
+a.onkeydown=function(e){var k={ArrowLeft:-4,ArrowRight:4}[e.key];if(k){v=k;e.preventDefault()}};
+(function f(t){if(!d){ry+=v;v*=.94;if(Math.abs(v)<.05){var g=Math.round(ry/360)*360+(still?-18:24*Math.sin(t/2600));ry+=(g-ry)*.03;rx+=(-8-rx)*.03}}
+m.style.transform='rotateX('+rx+'deg) rotateY('+ry+'deg)';requestAnimationFrame(f)})(0);
+</script></html>
+'''
+
+def main():
+    os.makedirs('public/awards', exist_ok=True)
+    for cid, c in CLASSES.items():
+        h = TPL
+        for k, v in dict(NAME=c['name'], T=c['t'], E=c['e'], SHEEN=c['sheen'], GROOVE=c['groove'], LABEL=c['label'], X=c['x'],
+                         GLOW=c['glow'], RIM=c['rim'], FACETS=facets() if cid == 'diamond' else '', LW=LOGO_W, LB=LOGO_B, LO=LOGO_O).items():
+            h = h.replace('@' + k + '@', v)
+        assert not re.search(r'@[A-Z]+@', h)
+        open(f'public/awards/{cid}.html', 'w').write(h)
+        print(cid, len(h.encode()))
+
+if __name__ == '__main__':
+    main()

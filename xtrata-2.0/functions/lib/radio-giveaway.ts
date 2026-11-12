@@ -16,7 +16,7 @@
  * Operator: POST /radio/giveaway/admin with `Authorization: Bearer <RADIO_GIVEAWAY_SECRET>` (see the handler).
  */
 import type { GiftEnv } from './radio-gifts';
-import { GiftError, playerView } from './radio-gifts';
+import { GiftError, ipHash, playerView } from './radio-gifts';
 import { giftCodeHash, giftPlays, isGiftCode } from '../../src/lib/listening-wallet/gifts';
 import { listedTracks } from '../../src/lib/listening-wallet/gift-players';
 import { tierOfPlays, type TierId } from '../../src/lib/listening-wallet/tiers';
@@ -39,6 +39,12 @@ export type GiveawayList = typeof GIVEAWAY_LISTS[number];
 /** The list a request names (`main` when it names none), or null for a name that is not a list. */
 export const giveawayList = (v: unknown): GiveawayList | null =>
   v == null || v === '' ? 'main' : (GIVEAWAY_LISTS as readonly string[]).includes(String(v)) ? (String(v) as GiveawayList) : null;
+/**
+ * A wall list shows every spot at once and lets the visitor pick any free one (see "the wall" below). It never drips:
+ * `advance` leaves it alone. The other kind (`main`) shows one link at a time.
+ */
+export const WALL_LISTS: readonly GiveawayList[] = ['players'];
+export const isWall = (list: GiveawayList) => WALL_LISTS.includes(list);
 /** Where a list's state row lives: `main` keeps its original one-row table, the others share a table keyed by name. */
 const st = (list: GiveawayList) => list === 'main'
   ? { t: 'radio_giveaway_state', w: 'id=1', b: [] as unknown[] }
@@ -76,6 +82,11 @@ export async function ensureGiveawayTables(env: GiveawayEnv) {
     gap_min INTEGER NOT NULL DEFAULT ${DEFAULT_GAP_MIN_S}, gap_max INTEGER NOT NULL DEFAULT ${DEFAULT_GAP_MAX_S},
     held INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL DEFAULT 0)`);
   for (const name of GIVEAWAY_LISTS) if (name !== 'main') await exec(env, 'INSERT OR IGNORE INTO radio_giveaway_lists(name) VALUES(?)', [name]);
+  // Added with the wall: a spot someone picked is held for them for a few minutes (who: a hash of their connection).
+  await exec(env, 'ALTER TABLE radio_giveaway_links ADD COLUMN hold_until INTEGER').catch(() => undefined);
+  await exec(env, 'ALTER TABLE radio_giveaway_links ADD COLUMN hold_by TEXT').catch(() => undefined);
+  await exec(env, 'CREATE TABLE IF NOT EXISTS radio_giveaway_picks(ip_hash TEXT NOT NULL, at INTEGER NOT NULL, pos INTEGER NOT NULL)');
+  await exec(env, 'CREATE INDEX IF NOT EXISTS radio_giveaway_picks_ip ON radio_giveaway_picks(ip_hash, at)');
 }
 
 const readState = async (env: GiveawayEnv, list: GiveawayList = 'main') => {
@@ -103,6 +114,7 @@ const gapMs = (s: Pick<State, 'gap_min' | 'gap_max'>, rand: () => number) => Mat
 export async function advance(env: GiveawayEnv, now: number, rand: () => number = Math.random, list: GiveawayList = 'main') {
   await ensureGiveawayTables(env);
   const x = st(list);
+  if (isWall(list)) return { s: await readState(env, list), link: null as Link | null, gift: null as GiftRow | null };
   for (let pass = 0; pass < 12; pass++) {
     let s = await readState(env, list);
     if (s.paused) return { s, link: s.current ? await first<Link>(env, 'SELECT * FROM radio_giveaway_links WHERE pos=?', [s.current]) : null, gift: null as GiftRow | null };
@@ -340,6 +352,11 @@ export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; t
 }
 
 async function adminStatus(env: GiveawayEnv, now: number, list: GiveawayList) {
+  if (isWall(list)) {
+    const w = await wallView(env, now, list);
+    const s = await readState(env, list);
+    return { list, wall: true, total: w.total, free: w.free, held: w.held, claimed: w.claimed, gone: w.total - w.free - w.held - w.claimed, paused: !!s.paused, holdSeconds: HOLD_MS / 1000 };
+  }
   const { s, link } = await advance(env, now, Math.random, list);
   const c = await first<{ total: number; claimed: number; lost: number; skipped: number; unseen: number }>(env,
     `SELECT COUNT(*) AS total, SUM(outcome='claimed') AS claimed, SUM(outcome='lost') AS lost, SUM(outcome='skipped') AS skipped,
@@ -348,5 +365,122 @@ async function adminStatus(env: GiveawayEnv, now: number, list: GiveawayList) {
     list, total: Number(c?.total ?? 0), claimed: Number(c?.claimed ?? 0), lost: Number(c?.lost ?? 0), skipped: Number(c?.skipped ?? 0), unseen: Number(c?.unseen ?? 0),
     onShow: link && !link.ended_at ? link.pos : null, held: s.held, paused: !!s.paused, gap: { minSeconds: s.gap_min, maxSeconds: s.gap_max },
     nextInSeconds: s.current ? null : Math.max(0, Math.ceil((s.next_at - now) / 1000))
+  };
+}
+
+// ---------------------------------------------------------------------------- the wall
+
+/**
+ * The wall (list `players`, page public/players.html at /players): every spot is on show at once and the visitor picks
+ * any free one. Picking holds that spot for them for three minutes and hands their browser its link; nobody else can
+ * pick it meanwhile. If they do not finish, the hold lapses and the spot is free again.
+ *
+ *   - Whether a spot is claimed is read from its gift every time (as in the drip), so the wall cannot disagree with it.
+ *   - What a spot holds is told only once it is claimed. A free or held spot says nothing about its class.
+ *   - A link is given to one connection at a time, a connection holds one spot at a time, and a connection can pick
+ *     only a few spots a day: enough for a household, too few to walk the wall and collect every link.
+ */
+export const HOLD_MS = 180_000;
+/** Spots one connection may pick in 24 hours (picking the spot it already holds again is free). */
+export const PICKS_PER_IP = 6;
+
+type WallRow = { pos: number; hold_until: number | null; hold_by: string | null; status: string | null; expires_at: number | null; amount: number | null; claimed_by: string | null; claimed_at: number | null };
+const wallRows = (env: GiveawayEnv, list: GiveawayList) => q<WallRow>(env,
+  `SELECT l.pos, l.hold_until, l.hold_by, g.status, g.expires_at, g.amount, g.claimed_by, g.claimed_at
+   FROM radio_giveaway_links l LEFT JOIN radio_gifts g ON g.code_hash=l.code_hash WHERE l.list=? AND l.archived=0 ORDER BY l.pos`, [list]);
+
+type SpotState = 'free' | 'held' | 'claimed' | 'gone';
+const spotState = (r: WallRow, now: number): SpotState => {
+  if (r.status === 'claiming' || r.status === 'claimed') return 'claimed';
+  if (!r.status || r.status !== 'live' || (r.expires_at ?? 0) <= now) return 'gone';
+  return (r.hold_until ?? 0) > now ? 'held' : 'free';
+};
+const playsOfRow = (r: WallRow) => { const a = Number(r.amount); return Number.isSafeInteger(a) && a > 0 ? giftPlays(BigInt(a)) : 0; };
+
+export type WallView = {
+  /** open: there are spots to pick · paused · done: every spot has gone · empty: nothing loaded yet */
+  state: 'open' | 'paused' | 'done' | 'empty';
+  total: number; claimed: number; free: number; held: number;
+  /**
+   * One character per spot, in order (spot 1 first): `.` free · `h` being claimed by someone · `x` no longer available ·
+   * a claimed spot shows its class: `d` diamond, `g` gold, `s` silver, `b` bronze, `c` classic (`?` if it cannot be read).
+   */
+  spots: string;
+  /** The classes in this drop: how many of each, and how many nobody has claimed yet. Omitted when they cannot be read. */
+  tiers?: { id: TierId; plays: number; total: number; left: number }[];
+  holdSeconds: number;
+  now: number;
+};
+
+export async function wallView(env: GiveawayEnv, now: number, list: GiveawayList = 'players'): Promise<WallView> {
+  await ensureGiveawayTables(env);
+  const rows = await wallRows(env, list);
+  const s = await readState(env, list);
+  let claimed = 0, free = 0, held = 0, spots = '';
+  const tiers = new Map<number, { total: number; left: number }>();
+  let readable = true;
+  for (const r of rows) {
+    const state = spotState(r, now);
+    const plays = playsOfRow(r);
+    if (state !== 'gone') {
+      if (plays > 0) { const t = tiers.get(plays) ?? { total: 0, left: 0 }; t.total++; if (state !== 'claimed') t.left++; tiers.set(plays, t); }
+      else readable = false;
+    }
+    if (state === 'claimed') { claimed++; spots += plays > 0 ? tierOfPlays(plays).id[0] : '?'; }
+    else if (state === 'held') { held++; spots += 'h'; }
+    else if (state === 'free') { free++; spots += '.'; }
+    else spots += 'x';
+  }
+  const state = s.paused ? 'paused' : rows.length === 0 ? 'empty' : free + held > 0 ? 'open' : 'done';
+  const list2 = [...tiers.entries()].sort((a, b) => b[0] - a[0]).map(([plays, t]) => ({ id: tierOfPlays(plays).id, plays, ...t }));
+  return { state, total: rows.length, claimed, free, held, spots, ...(readable && list2.length ? { tiers: list2 } : {}), holdSeconds: HOLD_MS / 1000, now };
+}
+
+/**
+ * Pick a spot: hold it for this connection and hand over its link. `spot` counts from 1, as the wall shows it.
+ * Safe against two people tapping the same spot at once: the hold is one conditional update, and only one can win it.
+ */
+export async function pickSpot(env: GiveawayEnv, body: { spot?: unknown }, now: number, ip: string | null, list: GiveawayList = 'players') {
+  await ensureGiveawayTables(env);
+  if (!isWall(list)) throw new GiftError('Not found', 404);
+  if ((await readState(env, list)).paused) throw new GiftError('The giveaway is taking a short break. Try again in a little while.', 409);
+  const n = Number(body.spot);
+  const rows = await wallRows(env, list);
+  if (!Number.isInteger(n) || n < 1 || n > rows.length) throw new GiftError('There is no player with that number.', 404);
+  const row = rows[n - 1];
+  const me = ipHash(env, ip) ?? 'unknown';
+  const state = spotState(row, now);
+  if (state === 'claimed') throw new GiftError('This player has already been claimed. Pick another one.', 409);
+  if (state === 'gone') throw new GiftError('This player is no longer available. Pick another one.', 410);
+  const mine = state === 'held' && row.hold_by === me;
+  if (state === 'held' && !mine) throw new GiftError('Someone is claiming this one right now. Pick another, or try it again in a few minutes.', 409);
+  if (!mine) {
+    const today = await first<{ n: number }>(env, 'SELECT COUNT(*) AS n FROM radio_giveaway_picks WHERE ip_hash=? AND at>?', [me, now - 86_400_000]);
+    if (Number(today?.n ?? 0) >= PICKS_PER_IP) throw new GiftError('A few players have been picked on this connection today. Finish claiming one, or come back tomorrow.', 429);
+  }
+  const until = now + HOLD_MS;
+  const won = await exec(env, 'UPDATE radio_giveaway_links SET hold_until=?, hold_by=? WHERE pos=? AND archived=0 AND (hold_until IS NULL OR hold_until<=? OR hold_by=?)', [until, me, row.pos, now, me]);
+  if (!won) throw new GiftError('Someone is claiming this one right now. Pick another, or try it again in a few minutes.', 409);
+  // One spot at a time: choosing another lets go of the one held before.
+  await exec(env, 'UPDATE radio_giveaway_links SET hold_until=NULL, hold_by=NULL WHERE list=? AND hold_by=? AND pos<>?', [list, me, row.pos]);
+  if (!mine) await exec(env, 'INSERT INTO radio_giveaway_picks(ip_hash, at, pos) VALUES(?,?,?)', [me, now, row.pos]);
+  const link = await first<{ code: string }>(env, 'SELECT code FROM radio_giveaway_links WHERE pos=?', [row.pos]);
+  if (!link) throw new GiftError('This player is no longer available. Pick another one.', 410);
+  return { spot: n, code: link.code, holdUntil: until, now };
+}
+
+/** What anyone may know about one spot. A claimed spot: its class, the plays it came with, the player's address, and when. */
+export async function spotView(env: GiveawayEnv, spot: unknown, now: number, list: GiveawayList = 'players') {
+  await ensureGiveawayTables(env);
+  const n = Number(spot);
+  const rows = isWall(list) ? await wallRows(env, list) : [];
+  if (!Number.isInteger(n) || n < 1 || n > rows.length) throw new GiftError('There is no player with that number.', 404);
+  const r = rows[n - 1];
+  const state = spotState(r, now);
+  if (state !== 'claimed') return { spot: n, state };
+  const plays = playsOfRow(r);
+  return {
+    spot: n, state, ...(plays > 0 ? { tier: tierOfPlays(plays).id, plays } : {}),
+    ...(r.claimed_by ? { wallet: r.claimed_by } : {}), ...(r.claimed_at ? { claimedAt: r.claimed_at } : {})
   };
 }

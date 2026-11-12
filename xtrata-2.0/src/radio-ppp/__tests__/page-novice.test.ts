@@ -292,8 +292,11 @@ describe('a free starter player: claimed, arriving, landed', () => {
     expect(text(page())).toContain('It pays the artist');
     expect(text(page())).toContain('Likes build your playlist');
     expect(text(page())).not.toMatch(BANNED_WORDS);
-    named(/Claim my free player/)!.click();
+    // The secure box was asked for its button the moment the link opened (the visitor already pressed "claim" on the
+    // page that sent them): once, and never again by itself. This screen's button is there to ask again.
     expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1);
+    named(/Claim my free player/)!.click();
+    expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(2);
   });
 
   it('after the tap it waits calmly for the plays, then says "You’re in" and starts the music', async () => {

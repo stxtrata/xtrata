@@ -688,11 +688,9 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
   // A starter player opens in the radio's simple (novice) screens; an album link is unchanged.
   var RADIO_ALBUM='https://radio.xtrata.xyz/radio.html#gift=';
   var RADIO_PLAYER='https://radio.xtrata.xyz/radio.html?novice=1#gift=';
-  // One page, two addresses. /giveaway is the album drop. /players (functions/players.ts marks <html data-list="players">)
-  // is the free-player giveaway, with a list of its own on the server. The server says what the link on show is; with
-  // nothing loaded, or no answer yet, each address speaks for what it is for.
-  var LIST=document.documentElement.getAttribute('data-list')==='players'?'players':'';
-  var kind=LIST?'player':'album';
+  // This page is the album drop. (The free players have a page of their own: public/players.html at /players.) The
+  // server says what the link on show is; with nothing loaded, or no answer yet, it is the album page.
+  var kind='album';
   var plays=0;
   // A lottery drop: players hold different numbers of plays, and which one is live is a surprise until it is claimed.
   var lottery=null;
@@ -732,7 +730,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
     $('d-title').textContent=kind==='player'?'Every player has found a home':'Every copy has found a home';
     shareLinks();
   }
-  var PAGE=LIST?'https://xtrata.xyz/players':'https://xtrata.xyz/giveaway';
+  var PAGE='https://xtrata.xyz/giveaway';
   var $=function(id){return document.getElementById(id);};
   var panes=['loading','live','between','paused','done','error'];
   var last='', lastCode='', fails=0, timer=0, covers={}, nextAt=0, skew=0, lastCover=0, drawn=0, liveCode='';
@@ -767,7 +765,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
   function run(state,claimed,left,held){
     held=held>0?held:0;
     var total=held+claimed+left;
-    document.querySelectorAll('.total-inline').forEach(function(e){e.textContent=total>0?total:(kind==='player'?(LIST?'1,000':100):95);});
+    document.querySelectorAll('.total-inline').forEach(function(e){e.textContent=total>0?total:(kind==='player'?100:95);});
     if(total<1){$('run').hidden=true;return;}
     $('run').hidden=false;
     var box=$('discs');
@@ -861,7 +859,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
 
   function poll(){
     clearTimeout(timer);
-    fetch('/radio/giveaway'+(LIST?'/'+LIST:''),{cache:'no-store'}).then(function(r){
+    fetch('/radio/giveaway',{cache:'no-store'}).then(function(r){
       if(!r.ok)throw new Error('http '+r.status);
       return r.json();
     }).then(function(v){fails=0;render(v);}).catch(function(){
