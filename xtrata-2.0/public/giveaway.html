@@ -554,8 +554,8 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
         </div>
 
         <div class="state" id="s-paused" hidden>
-          <h2>Taking a short break</h2>
-          <p>The drop is paused for a moment. Check back soon.</p>
+          <h2 id="p-title">Taking a short break</h2>
+          <p id="p-sub">The drop is paused for a moment. Check back soon.</p>
         </div>
 
         <div class="state" id="s-done" hidden>
@@ -688,9 +688,9 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
   // A starter player opens in the radio's simple (novice) screens; an album link is unchanged.
   var RADIO_ALBUM='https://radio.xtrata.xyz/radio.html#gift=';
   var RADIO_PLAYER='https://radio.xtrata.xyz/radio.html?novice=1#gift=';
-  // What is being given away: 'player' (a starter player, no album) or 'album'. The server says which; until it has
-  // answered, the last answer seen on this device stands.
-  var kind=(function(){try{return localStorage.getItem('xtrata.giveaway.kind')==='album'?'album':'player';}catch(e){return 'player';}})();
+  // This page is the free-player giveaway. The server says what the link on show is ('player', or 'album' if an album
+  // drop is ever loaded here again); with nothing loaded, or no answer yet, it is the player page.
+  var kind='player';
   var plays=0;
   // A lottery drop: players hold different numbers of plays, and which one is live is a surprise until it is claimed.
   var lottery=null;
@@ -718,7 +718,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
     });
   }
   function setKind(k,p,l){
-    if(k==='album'||k==='player'){kind=k;try{localStorage.setItem('xtrata.giveaway.kind',k);}catch(e){}}
+    kind=k==='album'?'album':'player';
     plays=typeof p==='number'&&p>0&&isFinite(p)?Math.floor(p):0;
     lottery=kind==='player'?okLottery(l):null;
     prizes();
@@ -793,6 +793,11 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
     var code=typeof v.code==='string'&&/^[A-Za-z0-9_-]{22}$/.test(v.code)?v.code:'';
     if(state==='live'&&!code)state='waiting';
     setKind(v.kind,v.plays,v.lottery);
+    // Nothing loaded yet (a new drop being set up): say so, rather than "all gone".
+    var empty=state==='done'&&!(Number(v.claimed)>0)&&!(Number(v.left)>0);
+    if(empty)state='paused';
+    $('p-title').textContent=empty?'The players are on their way':'Taking a short break';
+    $('p-sub').textContent=empty?'The free players are being loaded. Keep this page open, or check back soon.':'The drop is paused for a moment. Check back soon.';
     show(state);
     liveCode='';
     if(state==='live'){
@@ -865,6 +870,7 @@ document.body.dataset.theme=t;window.__xtrataThemes=ids;})();
       var wait=document.hidden?15000:(last==='live'||last==='taken'||last==='waiting'?5000:20000);
       if(nextAt&&!document.hidden){var secs=(nextAt-(Date.now()+skew))/1000;wait=secs>30?15000:3000;} // far from zero: relax; near it: watch closely
       if(last==='done')wait=60000;
+      if(last==='paused')wait=30000;
       timer=setTimeout(poll,wait);
     });
   }
