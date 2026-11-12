@@ -10,7 +10,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
   BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
-  adminAddresses, giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv,
+  adminAddresses, featuredPlayers, giftStatus, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv,
   batchesFor, batchStatus, confirmBatch, createBatch, MAX_PENDING_BATCHES, REFUND_GROUP_MAX, runSweep, sweepAuthorised, SCAN_EVERY_MS, SCAN_WHILE_EXPECTING_MS
 } from '../radio-gifts';
 import { batchDeposit, batchRequestHash, type BatchRequest } from '../../../src/lib/listening-wallet/batches';
@@ -462,6 +462,18 @@ describe('radio gift players', () => {
     return { definition: def, request, signature };
   };
   const make = (s: ReturnType<typeof setup>, def = definition(), k = s.adminKey) => createPlayer(s.env, signed(s, def, k), s.deps(), s.request);
+  it('featured albums: the players named by the deployment, public, in order, without a hidden track', async () => {
+    const s = setup(); catalogue(s);
+    expect(await featuredPlayers(s.env)).toEqual({ players: [] }); // nothing set: nothing featured
+    const out = await make(s);
+    (s.env as GiftEnv).RADIO_FEATURED_PLAYERS = `${out.id}, not-an-id ${'0'.repeat(16)} ${out.id}`;
+    const { players } = await featuredPlayers(s.env);
+    expect(players).toHaveLength(1); // unknown ids and repeats are left out
+    expect(players[0]).toMatchObject({ id: out.id, title: 'Proof of Sound' });
+    expect(players[0].tracks.length).toBeGreaterThan(0);
+    expect(players[0].tracks.some((t) => t.hidden)).toBe(false);
+  });
+
   it('the admin signs a definition once; only its hash is signed and the catalogue supplies every title and artist', async () => {
     const s = setup(); catalogue(s);
     const out = await make(s);

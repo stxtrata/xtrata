@@ -520,6 +520,24 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .al-welcome .al-welcome-note{font-size:13px;color:#8f97a3}
   .al-welcome .al-welcome-wait{font-size:14px;color:#8f97a3}
   .al-welcome .al-primary{margin-top:28px}
+  .find-artists{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
+  .find-chip{font:inherit;font-size:12px;color:var(--ink);background:none;border:1px solid var(--line);border-radius:999px;padding:5px 10px;cursor:pointer;min-height:30px}
+  .find-chip.is-on{border-color:var(--cyan);color:var(--cyan);background:rgba(var(--glow),.1)}
+  .find-chip:hover,.find-chip:focus-visible{border-color:var(--cyan);outline:none}
+  .find-by{flex:none;font-size:11.5px;color:var(--mut);max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .find-list{max-height:340px}
+  #findBox .hint button{font:inherit;font-size:12px;color:var(--cyan);background:none;border:1px solid var(--line);border-radius:8px;padding:3px 8px;cursor:pointer}
+  html[data-view=album] #findBox{display:none!important}
+  @media (max-width:900px){#findBox{order:3}}
+  html[data-dock] #findBox{order:2}
+  .ppp-featured{margin:10px 0 0;display:grid;gap:8px}
+  .ppp-featured__h{margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+  .ppp-featured__a{font:inherit;color:inherit;text-align:left;background:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-height:48px}
+  .ppp-featured__a b{font-size:14px}.ppp-featured__a span{font-size:12px;color:var(--mut)}
+  .ppp-featured__a.is-on{border-color:var(--cyan);background:rgba(var(--glow),.1)}
+  .ppp-featured__a:hover:not(:disabled),.ppp-featured__a:focus-visible{border-color:var(--cyan);outline:none}
+  .al-album{width:100%;margin-top:8px;min-height:52px;border:1px solid #2a313b!important;border-radius:12px;padding:10px 14px!important;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;color:#f2f0ea!important}
+  .al-album b{font-size:15px}.al-album span{font-size:12.5px;color:#a3aab5}
   .ppp-yours-item{border-top:1px solid var(--line);padding:2px 0}
   .ppp-yours-item summary{cursor:pointer;padding:9px 0;font-size:13.5px;font-weight:700}
   .ppp-yours-item p{margin:0 0 9px;font-size:13px;line-height:1.5}
@@ -734,7 +752,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <button class="cbtn" id="prev" title="Previous song" aria-label="Previous song">⏮</button>
       <button class="cbtn big" id="pp" title="Play or pause" aria-label="Play or pause">▶</button>
       <button class="cbtn" id="next" title="Next song. Skipping is free: a song only counts once you have heard 30 seconds of it." aria-label="Next song">⏭</button>
-      <button class="cbtn heart" id="heart" title="Like this song: it joins your station and is saved on the public record">♥</button>
+      <button class="cbtn heart" id="heart" title="Like this song: it joins your playlist (the LIKED station) and is saved on the public record">♥</button>
       <span class="grow"></span>
       <button class="chip" id="presetBtn" type="button" title="What FM plays. ALL: hand-picked songs plus everything new. CURATED: hand-picked songs only. Tap to switch.">FM: ALL</button>
     </div>
@@ -752,11 +770,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <summary>What do these do?</summary>
       <dl>
         <dt>FM</dt><dd>Xtrata’s own mix: hand-picked songs and new arrivals. Start here to discover music. The <b>FM: ALL / CURATED</b> button chooses between everything and hand-picked only.</dd>
-        <dt>LIKED</dt><dd>Your own station. Tap ♥ on any song and it joins this list, in your order.</dd>
+        <dt>LIKED</dt><dd>Your own playlist. Tap ♥ on any song and it joins this list; drag them into your order.</dd>
         <dt>CHAIN</dt><dd>The whole catalogue, every song in the order it was added. Good for digging.</dd>
         <dt>The strip of lines</dt><dd>Every song side by side. Tap or drag to jump straight to one.</dd>
         <dt>⏭ Next</dt><dd>Skip whenever you like. A song only counts as a play once you have heard 30 seconds of it.</dd>
-        <dt>♥ Like</dt><dd>Saves the song to your station and to the public record, where the artist can see it too.</dd>
+        <dt>♥ Like</dt><dd>Adds the song to your playlist (LIKED) and saves it on the public record, where the artist can see it too. Tap again to take it off.</dd>
+        <dt>🔎 Find music</dt><dd>Search every song by title, artist or number, or pick an artist to see all their songs.</dd>
       </dl>
     </details>
     <div class="relwrap" id="relWrap" style="display:none">
@@ -777,6 +796,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <!-- My albums, right under the switcher: opened by the "View all albums" button (its own summary is hidden). -->
       <details class="ppp-fold ppp-shelf" hidden><summary>♪ My albums</summary><div class="ppp-shelf-body"></div></details>
       <div class="ppp-key"></div>
+      <div class="ppp-featured" hidden></div>
       <p class="ppp-frame-label" hidden><span>Listening wallet · approvals happen in this box</span></p>
       <div class="ppp-frame" hidden></div>
       <div class="ppp-actions"></div>
@@ -793,8 +813,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     </section>
     <!-- An open album's songs, with their artwork and plays left (src/radio-ppp/album.ts, list mode). Stands in for Your Station. -->
     <section class="albumlist" id="albumList" hidden aria-label="Album songs"></section>
+    <details class="likes" id="findBox">
+      <summary title="Search every song on Xtrata by title, artist or number, or browse by artist"><span>🔎 FIND MUSIC</span></summary>
+      <div id="findBody"></div>
+    </details>
     <details class="likes" id="likesBox" open>
-      <summary><span>♥ YOUR STATION</span><span class="count" id="likesCount"></span></summary>
+      <summary title="Your own playlist: every song you ♥ joins it, in your order, saved on the public record"><span>♥ YOUR STATION</span><span class="count" id="likesCount"></span></summary>
       <div class="likesTools">
         <input type="search" id="likesFilter" placeholder="Filter by title, artist or #" aria-label="Filter your likes" />
         <button type="button" id="likesPlay" title="Play the LIKED station in your order">Play</button>
@@ -1029,7 +1053,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     // likes
     var likesStatus=s.likesStatus||'disconnected';
     $('likesHint').style.display=likesStatus==='ready'&&s.likes.length?'none':'';
-    $('likesHint').textContent=likesStatus==='loading'?'Refreshing this wallet’s on-chain likes…':likesStatus==='partial'||likesStatus==='unavailable'?'Some likes could not be refreshed. Showing previously confirmed likes; retrying automatically.':likesStatus==='paused'?'The chain service is busy, so on-chain likes are paused'+(s.likesRetryAt?' until about '+new Date(s.likesRetryAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'')+'. Your likes are safe on-chain. Retrying automatically, or press Refresh.':likesStatus==='disconnected'?'Connect your wallet to see its on-chain likes.':'No confirmed on-chain likes for this wallet yet. Tap ♥ while a song plays.';
+    $('likesHint').textContent=likesStatus==='loading'?'Refreshing this wallet’s on-chain likes…':likesStatus==='partial'||likesStatus==='unavailable'?'Some likes could not be refreshed. Showing previously confirmed likes; retrying automatically.':likesStatus==='paused'?'The chain service is busy, so on-chain likes are paused'+(s.likesRetryAt?' until about '+new Date(s.likesRetryAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'')+'. Your likes are safe on-chain. Retrying automatically, or press Refresh.':likesStatus==='disconnected'?'Connect your wallet to see its on-chain likes.':'Your playlist starts here. Tap ♥ while a song plays and it joins this list, saved on the public record under your player. Drag them into your order.';
     renderLikes(s);
     renderRelatives(s.relatives||[]);
     kickSpectrum();
@@ -1189,7 +1213,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=bea690eb31d8');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=bbb947316628');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

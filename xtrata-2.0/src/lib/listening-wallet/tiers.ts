@@ -3,12 +3,13 @@
  * the giveaway (a Diamond player is rare), with no effect on what a player can do: every tier plays any song and
  * pays artists the same way. A tier is worked out from the gift's amount each time, so nothing extra is stored.
  *
- * The suggested drop of 1,000 (docs/music/HANDBOOK.md): 5 Diamond, 10 Gold, 20 Silver, 100 Bronze, 265 Neon,
- * 600 Classic. Change the mix freely; only the `min` thresholds here decide what a player is called.
+ * The suggested drop of 1,000 (docs/music/HANDBOOK.md): 5 Diamond, 10 Gold, 20 Silver, 100 Bronze, 865 Classic,
+ * with 50 plays as the least any player gets. Change the mix freely; only the `min` thresholds here decide what a
+ * player is called.
  */
 import { DEFAULT_PLAY_FEE, RESERVE, costPerPlay } from './policy';
 
-export type TierId = 'diamond' | 'gold' | 'silver' | 'bronze' | 'neon' | 'classic';
+export type TierId = 'diamond' | 'gold' | 'silver' | 'bronze' | 'classic';
 export interface Tier { id: TierId; name: string; /** A player with at least this many gifted plays is this tier. */ min: number; mark: string }
 
 /** Highest first. */
@@ -17,7 +18,6 @@ export const TIERS: readonly Tier[] = [
   { id: 'gold', name: 'Gold', min: 500, mark: '★' },
   { id: 'silver', name: 'Silver', min: 250, mark: '✦' },
   { id: 'bronze', name: 'Bronze', min: 100, mark: '●' },
-  { id: 'neon', name: 'Neon', min: 50, mark: '✺' },
   { id: 'classic', name: 'Classic', min: 0, mark: '♪' }
 ];
 export const isTierId = (v: unknown): v is TierId => typeof v === 'string' && TIERS.some((t) => t.id === v);
@@ -36,6 +36,5 @@ export const SUGGESTED_DROP: readonly { tier: TierId; plays: number; count: numb
   { tier: 'gold', plays: 500, count: 10 },
   { tier: 'silver', plays: 250, count: 20 },
   { tier: 'bronze', plays: 100, count: 100 },
-  { tier: 'neon', plays: 50, count: 265 },
-  { tier: 'classic', plays: 20, count: 600 }
+  { tier: 'classic', plays: 50, count: 865 }
 ];

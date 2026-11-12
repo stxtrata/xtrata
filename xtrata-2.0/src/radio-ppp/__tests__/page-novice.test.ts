@@ -44,7 +44,7 @@ async function open(over: object = {}, flag: string | null = '1') {
   document.body.innerHTML = `<header class="topbar"></header><p id="paidRadioStatus"></p><main><section class="album" id="album" hidden></section><section class="albumlist" id="albumList" hidden></section><section class="rx"></section>
     <aside class="side"><div class="sheet-bar"><b id="sheetTitle"></b><button id="sheetClose">×</button></div><div class="sheet-extra" id="sheetExtra"></div>
     <section id="ppp" hidden><div class="ppp-head"><h3><span class="ppp-badge"></span></h3><span class="ppp-state"></span></div><ol class="ppp-steps"></ol><p class="ppp-stage"></p>
-    <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
+    <div class="ppp-switch" hidden></div><div class="ppp-key"></div><div class="ppp-featured" hidden></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-yours" hidden><summary></summary><div class="ppp-yours-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section></aside></main>
     <div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>`;
@@ -290,6 +290,7 @@ describe('a free starter player: claimed, arriving, landed', () => {
     expect(text(page())).toContain('277 plays');
     expect(text(page())).toContain('Play any song you like');
     expect(text(page())).toContain('It pays the artist');
+    expect(text(page())).toContain('Likes build your playlist');
     expect(text(page())).not.toMatch(BANNED_WORDS);
     named(/Claim my free player/)!.click();
     expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1);
@@ -429,5 +430,36 @@ describe('"Make it yours": found, not pushed', () => {
     expect((a.querySelector('.ppp-yours') as HTMLDetailsElement).hidden).toBe(true);
     const b = await open({ solo: false, linked: FUNDER, main: FUNDER, mainConnected: true, gate: { ...base.gate, allowed: true } });
     expect((b.querySelector('.ppp-yours') as HTMLDetailsElement).hidden).toBe(true);
+  });
+});
+
+describe('albums every player comes loaded with', () => {
+  const OPERA = { id: 'aaaaaaaaaaaaaaaa', title: 'Audionals — The Opera', subtitle: 'Audionals', cover: null, paidOnly: true, tracks: [{ id: 501, title: 'Silence', artist: 'Audionals' }, { id: 502, title: 'Sound', artist: 'Audionals' }] };
+  const EP = { id: 'bbbbbbbbbbbbbbbb', title: '2007 EP: Reload', subtitle: 'melophonic', cover: null, paidOnly: true, tracks: [{ id: 315, title: 'Entertainment', artist: 'melophonic' }] };
+  const serve = () => { h.route = (url) => (url.endsWith('/radio/gift/featured') ? new Response(JSON.stringify({ players: [OPERA, EP] })) : undefined); };
+  const rows = (root: Element) => [...root.querySelectorAll('.ppp-featured__a')] as HTMLButtonElement[];
+
+  it('are offered in the player; one tap plays one from the player’s own plays, another goes back to the radio', async () => {
+    serve();
+    const root = await open({ entries: PLAYED });
+    await vi.waitFor(() => expect(rows(root)).toHaveLength(2));
+    expect(rows(root).map((b) => b.querySelector('b')!.textContent)).toEqual(['Audionals — The Opera', '2007 EP: Reload']);
+    expect(text(root.querySelector('.ppp-featured'))).not.toMatch(BANNED_WORDS);
+    rows(root)[0].click();
+    expect(h.radio.setGiftPlayer).toHaveBeenLastCalledWith(expect.objectContaining({ id: OPERA.id, tracks: [501, 502] }));
+    expect(h.radio.playToken).toHaveBeenCalledWith(501);
+    expect(h.radio.setGiftLock).not.toHaveBeenCalledWith(true); // the rest of the radio stays open
+    expect(text(rows(root)[0])).toContain('Playing now');
+    rows(root)[0].click();
+    expect(h.radio.setGiftPlayer).toHaveBeenLastCalledWith(null);
+  });
+
+  it('never replace an album wallet’s own album, and are not offered to a player with no plays', async () => {
+    serve();
+    const album = await open({ entries: PLAYED, slot: 2, gift: { player: PLAYER, from: null, source: 'batch', amount: '108000' }, likeFunds: { address: ME, balance: 300_000n, low: false, album: true, pending: false } });
+    await vi.waitFor(() => expect((fetch as any).mock.calls.some((c: any[]) => String(c[0]).endsWith('/radio/gift/featured'))).toBe(true));
+    expect((album.querySelector('.ppp-featured') as HTMLElement).hidden).toBe(true);
+    const empty = await open({ step: 'fund', balance: 3_100n, playsLeft: 0, session: null, entries: PLAYED, createdHere: false });
+    expect((empty.querySelector('.ppp-featured') as HTMLElement).hidden).toBe(true);
   });
 });

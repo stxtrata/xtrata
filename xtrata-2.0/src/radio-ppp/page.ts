@@ -29,6 +29,7 @@ import { hasBannedWord, markPreviewed, newPreview, PLAIN_CHECKING, PLAIN_LABEL, 
 import type { GiftStopReason } from './controller';
 import { createWelcomeView, type WelcomeMode } from './welcome';
 import { createRestockSheet, type RestockInput } from './restock-sheet';
+import { buildSongs, createFindBox } from './find';
 import { isTierId, tierById, tierOfAmount, type Tier } from '../lib/listening-wallet/tiers';
 
 const root = document.getElementById('ppp');
@@ -263,6 +264,7 @@ function start(root: HTMLElement) {
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
       tier: tierNow, mystery,
+      albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, run: () => { showFull(); openFeatured(p, true); } })) : [],
       start: () => void ppp.create(), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => restock.open(),
       full: () => {
         // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.
@@ -341,6 +343,32 @@ function start(root: HTMLElement) {
     void (window as any).XtrataRadio?.refreshLikes?.();
   };
 
+  // ---- albums every player comes loaded with (GET /radio/gift/featured, set by RADIO_FEATURED_PLAYERS) ----
+  // They are playlists, not wallets: the listener's own player plays them from its own plays, and each play pays the
+  // song's holder as any play does. Opening one hands it to the radio as its own band; the rest of the radio (FM,
+  // LIKED, CHAIN) stays one tap away, because nothing is locked.
+  let featured: PlayerView[] = [];
+  let featuredAsked = 0, featuredKnown = false;
+  let featuredOpen: PlayerView | null = null;
+  const loadFeatured = (s: Snapshot) => {
+    if (featuredKnown || !s.gate?.gifts?.enabled || Date.now() - featuredAsked < 60_000) return;
+    featuredAsked = Date.now();
+    json('/radio/gift/featured').then((r) => {
+      featured = (Array.isArray(r?.players) ? r.players : []).filter((p: any) => p && typeof p.id === 'string' && typeof p.title === 'string' && Array.isArray(p.tracks) && p.tracks.length > 0).slice(0, 6);
+      featuredKnown = true;
+      if (featured.length) render(ppp.snapshot());
+    }).catch(() => { /* asked again in a minute: no albums is not an error */ });
+  };
+  /** The loaded album the radio should be playing from: only in the listener's own player, never over an album wallet. */
+  const featuredFor = (s: Snapshot): PlayerView | null =>
+    featuredOpen && s.slot === 0 && !s.gift?.player && ['ready', 'fund', 'loading'].includes(s.step) ? featuredOpen : null;
+  const openFeatured = (p: PlayerView | null, play = false) => {
+    featuredOpen = p;
+    render(ppp.snapshot());
+    const first = p && play ? listedTracks(p)[0] : null;
+    if (first) (window as any).XtrataRadio?.playToken?.(first.id);
+  };
+
   // ---- the free first song (only with `?novice=preview`) ----
   let preview = newPreview();
   /** The shared album the radio may play right now as a preview, worked out once per render. */
@@ -374,7 +402,7 @@ function start(root: HTMLElement) {
     const said = gs ? (plainFor(raw) ? plainStop(gs.reason as GiftStopReason, gs.text) : gs.text) : null;
     const stop = pre ? null : said ?? (paidHost && (!raw.gate?.here || raw.step === 'off') ? 'PAID RADIO IS UNAVAILABLE' : null);
     if (stop && stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
-    const p = raw.step === 'off' || raw.step === 'elsewhere' ? null : raw.gift?.player ?? pre ?? null;
+    const p = raw.step === 'off' || raw.step === 'elsewhere' ? null : raw.gift?.player ?? pre ?? featuredFor(raw) ?? null;
     const id = p ? p.id + ':' + p.cover + ':' + p.tracks.map((t) => t.id).join(',') : '';
     if (id !== giftPushed) {
       radio.setGiftPlayer(p ? { id: p.id, title: p.title, subtitle: p.subtitle, tracks: listedTracks(p).map((t) => t.id), hidden: hiddenTrack(p)?.id ?? null, cover: p.cover } : null);
@@ -836,6 +864,7 @@ function start(root: HTMLElement) {
     // A like refused only because the main listener wallet is empty is a note, not an error: the album is still playing.
     const softError = s.error === OUT_OF_LIKES;
     syncIdentity(s);
+    loadFeatured(raw);
     syncTier(raw);
     previewNow = readPreview(raw);
     syncGift(raw, s);
@@ -1242,6 +1271,23 @@ function start(root: HTMLElement) {
       fold.open = true;
       requestAnimationFrame(() => fold.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     }
+    // The albums this player comes loaded with: one tap plays one, another tap goes back to the radio.
+    const feat = document.querySelector('#ppp .ppp-featured') as HTMLElement | null;
+    if (feat) {
+      const show = featured.length > 0 && s.slot === 0 && !s.gift?.player && s.step === 'ready';
+      feat.hidden = !show;
+      if (show) {
+        feat.replaceChildren(el('p', 'Albums in your player', 'ppp-featured__h'), ...featured.map((p) => {
+          const on = featuredOpen?.id === p.id;
+          const b = button('', () => openFeatured(on ? null : p, !on), 'ppp-featured__a' + (on ? ' is-on' : '')) as HTMLButtonElement;
+          const n = listedTracks(p).length;
+          b.append(el('b', p.title), el('span', on ? 'Playing now · tap to go back to the radio' : `${p.subtitle ? p.subtitle + ' · ' : ''}${n} ${n === 1 ? 'song' : 'songs'}`));
+          b.setAttribute('aria-pressed', String(on));
+          b.disabled = !!s.busy;
+          return b;
+        }));
+      }
+    }
     // "Make it yours": found, not pushed. Each item is closed until the listener opens it. Only for a passkey-only
     // listener whose player is open; a player already linked to a Stacks wallet has done this.
     const yours = document.querySelector('#ppp .ppp-yours') as HTMLDetailsElement | null;
@@ -1308,7 +1354,11 @@ function start(root: HTMLElement) {
     albumView?.render(album ? albumInput(s, album, [...elsewhereLines, ...giftLines]) : null);
     syncWelcome(s, !!album, giftScreen ? [...elsewhereLines, ...giftLines] : elsewhereLines, wMode);
     if (restock.isOpen()) restock.refresh();
-    albumList?.render(albumNow?.mode === 'open' ? albumInput(s, albumNow, []) : null);
+    syncFind();
+    // A loaded album's songs stand in for "Your Station" too, counted against the player's own plays.
+    const loaded = albumNow?.mode === 'open' ? null : featuredFor(s);
+    albumList?.render(albumNow?.mode === 'open' ? albumInput(s, albumNow, [])
+      : loaded ? { ...albumInput(s, { mode: 'open', player: loaded }, []), plays: s.balance === undefined ? null : s.playsLeft } : null);
   }
 
   type AlbumState = { mode: 'arrive' | 'locked' | 'open'; player: PlayerView; from?: string | null; offered?: number };
@@ -1371,6 +1421,26 @@ function start(root: HTMLElement) {
     };
   }
 
+  // "Find music" (find.ts): search and browse the whole catalogue by song, artist or number. Names are the catalogue's
+  // with Xtrata's corrections on top (artist-credits), the same as everywhere else on this page.
+  const findBox = document.getElementById('findBox') as HTMLDetailsElement | null;
+  const findBody = document.getElementById('findBody');
+  const find = findBox && findBody ? createFindBox(findBody, {
+    load: () => fetch('/radio/counts?range=all&chainLikes=0', { cache: 'no-store', signal: AbortSignal.timeout(20000) })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('catalogue unavailable'))))
+      .then((d) => buildSongs(d?.tracks, (id, raw) => ({ title: radioTitle(id, placeholder(raw.title) ? '' : raw.title!), artist: radioArtist(id, raw.artist || '') }))),
+    play: (id) => { (window as any).XtrataRadio?.playToken?.(id); },
+    current: () => { const n = Number((window as any).XtrataRadio?.getState?.()?.nowPlaying?.tokenId); return Number.isSafeInteger(n) ? n : null; },
+    locked: () => !!ppp.snapshot().albumLock?.locked
+  }) : null;
+  findBox?.addEventListener('toggle', () => { if (findBox.open) find?.load(); });
+  let findSeen = '';
+  const syncFind = () => {
+    if (!find || !findBox?.open) return;
+    const mark = `${!!ppp.snapshot().albumLock?.locked}|${(window as any).XtrataRadio?.getState?.()?.nowPlaying?.tokenId ?? ''}`;
+    if (mark !== findSeen) { findSeen = mark; find.refresh(); }
+  };
+
   // Song titles and artists from the radio itself, for history and messages.
   const titles = new Map<number, { title?: string; artist?: string }>();
   let previewSounding = false;
@@ -1380,6 +1450,7 @@ function start(root: HTMLElement) {
     api.subscribe((st: any) => {
       const np = st?.nowPlaying;
       if (np && Number.isSafeInteger(Number(np.tokenId))) titles.set(Number(np.tokenId), { title: np.title || undefined, artist: np.artist || undefined });
+      syncFind();
       if (previewLive(preview)) {
         const sounding = !!st?.playing;
         advancePreview({ kind: 'now', track: np && np.tokenId != null ? String(np.tokenId) : null, playing: sounding, at: Date.now() });

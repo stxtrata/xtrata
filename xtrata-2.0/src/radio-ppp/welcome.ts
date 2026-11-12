@@ -27,6 +27,8 @@ export interface WelcomeInput {
   from?: string | null;
   /** The player's class from the giveaway (tiers.ts), when it has one: shown as a coloured record. */
   tier?: { id: string; name: string; mark: string } | null;
+  /** landed: albums the player comes loaded with; tapping one starts it. */
+  albums?: { title: string; by: string; run(): void }[];
   /** gift: do not say how many plays it holds yet (a lottery drop): that is the reveal when it lands. */
   mystery?: boolean;
   start(): void;
@@ -50,7 +52,7 @@ const count = (n: number) => n.toLocaleString();
 export const PLAYER_PROMISES = [
   ['It pays the artist', 'Each play goes straight to whoever owns the song. Nobody in the middle.'],
   ['It’s yours', 'It lives on this device, opened by your face or fingerprint. No account, no password.'],
-  ['It keeps your taste', 'Your likes become your own station, on a public record no company can take away.']
+  ['Likes build your playlist', 'Tap ♥ on a song and it joins your own station, in your order, saved on a public record no company can take away.']
 ] as const;
 
 export const WELCOME_TEXT = {
@@ -66,7 +68,7 @@ export const WELCOME_TEXT = {
 } as const;
 
 export const giftBody = (plays: number | null | undefined, from: string | null | undefined, mystery = false) =>
-  mystery ? `${from || 'Xtrata Music'} has loaded it with plays. Classic, Neon, Bronze, Silver, Gold or Diamond? Claim it to find out which one is yours.`
+  mystery ? `${from || 'Xtrata Music'} has loaded it with plays. Classic, Bronze, Silver, Gold or Diamond? Claim it to find out which one is yours.`
     : `${from || 'Xtrata Music'} has covered ${plays ? `${count(plays)} plays` : 'your first plays'}. Play any song you like, and every play pays the artist.`;
 export const landedBody = (plays: number | null | undefined) =>
   plays ? `Your player holds ${count(plays)} plays. Play anything: each one pays the artist you’re hearing.` : 'Your player is ready. Play anything: each play pays the artist you’re hearing.';
@@ -125,7 +127,13 @@ export function createWelcomeView(mount: HTMLElement) {
           if (input.canStart) box.append(button('al-primary', w.primary, m === 'back' ? input.unlock : input.start, input.busy), el('p', 'al-hint', w.hint));
           if (input.canStart) box.append(button('al-link', w.returning, input.returning, input.busy));
           box.append(button('al-link', w.full, input.full));
-        } else if (m === 'landed') box.append(button('al-primary', WELCOME_TEXT.landed.primary, input.full));
+        } else if (m === 'landed') {
+          box.append(button('al-primary', WELCOME_TEXT.landed.primary, input.full));
+          if (input.albums?.length) {
+            box.append(el('p', 'al-hint', 'Or start with an album that comes with your player:'));
+            for (const a of input.albums) { const b = button('al-album', '', a.run); b.append(el('b', '', a.title), el('span', '', a.by)); box.append(b); }
+          }
+        }
         else if (m === 'empty') box.append(button('al-primary', WELCOME_TEXT.empty.primary, input.restock), button('al-link', WELCOME_TEXT.empty.full, input.full));
       }
       body.append(box);

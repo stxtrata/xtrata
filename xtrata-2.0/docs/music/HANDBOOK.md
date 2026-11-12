@@ -112,10 +112,16 @@ panel for a gift without an album, and the wallet box's own screens (a separate 
   `kind` (`album` | `player`) and `plays`; the page words itself from them and sends a starter claim to
   `radio.html?novice=1#gift=…`. Still one link on show at a time. A tap-to-hold wall is not built.
 - **Player classes** (`src/lib/listening-wallet/tiers.ts`): Diamond 1,000+ plays, Gold 500+, Silver 250+, Bronze 100+,
-  Neon 50+, Classic below. Worked out from a starter gift's amount each time, never stored on a server; looks only.
-  Shown as a badge on the panel, a coloured record on the welcome screens (the reveal when plays land, and on every
-  return) and remembered on the device while locked. Suggested drop of 1,000: 5 / 10 / 20 / 100 / 265 / 600, which is
-  23.5875 STX including the 0.003 STX fee per player (locked by `tiers.test.ts`).
+  Classic below. Worked out from a starter gift's amount each time, never stored on a server; looks only. Shown as a
+  badge on the panel, a coloured record on the welcome screens (the reveal when plays land, and on every return) and
+  remembered on the device while locked. Suggested drop of 1,000, none under 50 plays: 5 / 10 / 20 / 100 / 865, which
+  is 29.8875 STX including the 0.003 STX fee per player (locked by `tiers.test.ts`).
+- **Albums every player comes loaded with**: `RADIO_FEATURED_PLAYERS` (gift player ids) → `GET /radio/gift/featured`.
+  They are playlists, not wallets: opened from "Albums in your player" (or the "You're in" screen), played from the
+  listener's own plays, never locked, never shown over an album wallet's own album. Unset: nothing shows.
+- **Find music** (`find.ts`, the 🔎 box above Your Station): search by song, artist or number and browse by artist,
+  over `/radio/counts` with `artist-credits.mjs` corrections applied. The catalogue feed has no album field, so
+  "by album" today means the featured albums.
 - **Lottery drop**: make one batch per class, then `add` them all with `"shuffle": true`. When the list holds players
   of different sizes, `GET /radio/giveaway` omits `plays` and returns `lottery` (range, what is left of each class,
   the class of each player already claimed). The page keeps the live one a mystery, colours claimed discs by class,

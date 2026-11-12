@@ -57,6 +57,8 @@ export type GiftEnv = PppEnv & {
   RADIO_GIFT_TREASURY_KEY?: string;
   RADIO_GIFT_ADMIN?: string;
   RADIO_GIFT_ESCROW_CAP?: string;
+  /** Albums every player can load (ids of gift players, separated by commas or spaces). Unset: none. */
+  RADIO_FEATURED_PLAYERS?: string;
   /** Shared secret for the scheduled sweep (workers/radio-gift-sweep). Unset: the sweep endpoint does not exist. */
   RADIO_GIFT_SWEEP_SECRET?: string;
   RADIO_GIFT_TURNSTILE_SITE_KEY?: string;
@@ -610,6 +612,24 @@ export async function playerView(env: GiftEnv, id: string): Promise<PlayerView |
     tracks: ids.filter((n) => songs.has(n)).map((n) => ({ id: n, ...songs.get(n)! })),
     cover: p.cover ?? null, paidOnly: true
   };
+}
+
+/** How many albums a deployment may feature. */
+export const FEATURED_MAX = 6;
+/**
+ * The albums every player comes loaded with (GET /radio/gift/featured): the gift players named in
+ * RADIO_FEATURED_PLAYERS, in that order. Public: title, artist line, cover and listed songs only (a hidden track stays
+ * hidden). They are playlists, not wallets: a listener plays them from their own player's plays, and each play pays the
+ * song's holder as any play does. An id that is unknown or retired is left out.
+ */
+export async function featuredPlayers(env: GiftEnv): Promise<{ players: PlayerView[] }> {
+  const ids = [...new Set(String(env.RADIO_FEATURED_PLAYERS ?? '').split(/[\s,]+/).filter((id) => /^[0-9a-f]{16}$/.test(id)))].slice(0, FEATURED_MAX);
+  const players: PlayerView[] = [];
+  for (const id of ids) {
+    const p = await playerView(env, id).catch(() => null);
+    if (p) players.push({ ...p, tracks: p.tracks.filter((t) => !t.hidden) });
+  }
+  return { players };
 }
 
 /** Every song must be held by this wallet right now. A song held by a contract (for example listed for sale) does not count. */
