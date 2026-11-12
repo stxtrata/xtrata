@@ -28,6 +28,7 @@ import { musicWalletOptions } from './connect-choice';
 import { hasBannedWord, markPreviewed, newPreview, PLAIN_CHECKING, PLAIN_LABEL, PLAIN_NUDGE, plainLines, plainStop, previewedAlbums, previewLive, readNovice, stepPreview } from './novice';
 import type { GiftStopReason } from './controller';
 import { createWelcomeView, type WelcomeMode } from './welcome';
+import { createRestockSheet, type RestockInput } from './restock-sheet';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -205,26 +206,61 @@ function start(root: HTMLElement) {
     // Not known yet: hold, but never for long (a page that cannot reach the server must still show the radio).
     if (!welcomeKnown) return Date.now() - welcomeSince < 10_000 ? 'checking' : null;
     if (!plainFor(s)) return null;
-    if (s.step === 'intro' || s.step === 'unsupported') return 'new';
+    if (s.step === 'intro' || s.step === 'unsupported') return gifts.incomingStarter() ? 'gift' : 'new';
     if (s.step === 'locked') return 'back';
-    if (s.step === 'fund' && s.slot === 0 && !s.gift && !s.depositPending && !s.entries.some((e) => e.kind === 'play')) return 'empty';
+    // The listener's own player (not an album), never played from on this device.
+    const fresh = s.slot === 0 && !s.gift?.player && !s.entries.some((e) => e.kind === 'play');
+    if (s.step === 'fund' && fresh) return s.depositPending ? 'arriving' : 'empty';
+    // The plays this page was waiting for have landed: one screen that says what the player is, then the radio.
+    if (s.step === 'ready' && fresh && (welcomeLast === 'arriving' || welcomeLast === 'landed')) return 'landed';
     return s.step === 'loading' && welcomeLast !== 'checking' ? welcomeLast : null; // a check in between: stay where we were
   };
-  function syncWelcome(s: Snapshot, albumActive: boolean, lines: HTMLElement[] = []) {
+  function syncWelcome(s: Snapshot, albumActive: boolean, lines: HTMLElement[] = [], decided?: WelcomeMode | null) {
     if (!welcome) return;
-    const mode = welcomeMode(s, albumActive);
+    const mode = decided !== undefined ? decided : welcomeMode(s, albumActive);
     welcomeLast = mode;
     delete document.documentElement.dataset.noviceBoot; // public/radio.html held the page blank until here
     if (!mode) { welcome.render(null, albumActive); return; }
     const status = [...lines];
+    if (mode === 'arriving' && s.arrival) status.push(arrivalBar(s.arrival));
     if (s.step === 'unsupported') status.push(el('p', 'This browser cannot make a player. Open this page in Safari or Chrome.', 'ppp-warn'));
     else if (s.error) status.push(el('p', s.error, 'ppp-warn'));
+    const starter = mode === 'gift' ? gifts.incomingStarter() : null;
     welcome.render({
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
-      start: () => void ppp.create(), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), full: showFull
+      plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
+      start: () => void ppp.create(), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => restock.open(),
+      full: () => {
+        // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.
+        const radio = (window as any).XtrataRadio;
+        const begin = mode === 'landed' && !radio?.getState?.()?.playing;
+        showFull();
+        if (begin) radio?.playPause?.();
+      }
     });
   }
   if (welcome) setTimeout(() => { if (!welcomeKnown) render(ppp.snapshot()); }, 10_100);
+
+  // "Add plays" (restock-sheet.ts): where every "out of plays" and "running low" leads. It always restocks the
+  // listener's own player (the first wallet), which is also what tops up albums and pays for likes.
+  const restockInput = (): RestockInput | null => {
+    const s = ppp.snapshot();
+    if (!['fund', 'ready', 'over'].includes(s.step)) return null;
+    const mine = s.slot === 0 ? { address: s.listening, balance: s.balance } : { address: s.root, balance: s.likeFunds?.balance };
+    if (!mine.address) return null;
+    const own = s.slot === 0 ? s.entries : [];
+    const paid = own.filter((e) => e.kind === 'play' && e.status === 'confirmed');
+    return {
+      playsLeft: mine.balance === undefined ? null : playsOf(mine.balance), balance: mine.balance, incoming: 0n,
+      fee: BigInt(s.gate?.limits.playFee ?? '300'), address: mine.address, switches: s.gate?.restock ?? {},
+      done: paid.length ? { plays: paid.length, artists: new Set(paid.map((e) => e.recipient)).size, likes: own.filter((e) => e.kind === 'like' && e.status === 'confirmed' && e.liked).length } : null,
+      arriving: s.slot === 0 ? s.depositPending : !!s.likeFunds?.pending
+    };
+  };
+  const restock = createRestockSheet({
+    input: restockInput,
+    copyButton: (key, label, text, cls) => copyButton(key, label, text, cls, () => { render(ppp.snapshot()); })
+  });
 
   // The open album's songs, with their artwork and the plays left, in the panel where "Your Station" is.
   const albumListMount = document.getElementById('albumList');
@@ -451,6 +487,8 @@ function start(root: HTMLElement) {
     if (s.step === 'elsewhere' && s.gate?.radioUrl) { location.href = s.gate.radioUrl; return; }
     if (s.step === 'locked' && !s.armed && !s.busy) void ppp.unlock();
     if (s.step === 'ready' && s.giftStop?.reason === 'off' && !s.busy) void ppp.switchOn();
+    // Out of plays with no Stacks wallet to deposit from: straight to "Add plays".
+    if (s.step === 'fund' && s.solo && !s.depositPending && !s.busy) { restock.open(); return; }
     focusPanel();
   };
   if (top) top.onclick = go;
@@ -997,6 +1035,14 @@ function start(root: HTMLElement) {
         else if (s.allowance > 0n && s.balanceState !== 'ok' && !s.solo) actions.push(fromMain(s, `Top up ${stx(s.allowance)} STX`, () => void ppp.deposit()));
         break;
     }
+    // A passkey-only listener has no wallet to deposit from: "Add plays" is the way to restock, at every stage.
+    if (s.solo && s.listening && !s.depositPending) {
+      const playedOut = s.step === 'fund';
+      const low = s.step === 'ready' && (s.balanceState === 'low' || (!!s.gift && s.giftPlays <= 20));
+      if (playedOut) actions.unshift(button('Add plays', () => restock.open(), 'primary'));
+      else if (low) actions.push(button('Add plays', () => restock.open(), 'primary'));
+      else if (s.step === 'ready') more.push(button('Add plays', () => restock.open(), 'quiet'));
+    }
     if (s.solo && s.walletCannotSolo)
       lines.push(el('p', 'The listening wallet box is still updating. Paid plays work; returning to another address and likes start working once it has.', 'ppp-warn'));
     if (s.solo && ['fund', 'ready'].includes(s.step)) {
@@ -1092,7 +1138,11 @@ function start(root: HTMLElement) {
     const albumNow = albumState(s);
     const album = albumPage ? albumNow : null;
     // A gift link in play goes first: it is why this visitor is here. In the album view only its progress shows.
-    const giftLines = gifts.banner(raw, { bare: !!album });
+    // Novice screens are decided here, before the gift lines are drawn: on the gift and arriving screens only the
+    // gift's progress (the human check, "sending…", real errors) is wanted, as on the album view.
+    const wMode = welcomeMode(s, !!album);
+    const giftScreen = wMode === 'gift' || wMode === 'arriving' || wMode === 'new';
+    const giftLines = gifts.banner(raw, { bare: !!album || wMode === 'gift' || wMode === 'arriving' });
     const elsewhereLines = inApp && (gifts.pendingCode() || ['intro', 'locked', 'unsupported'].includes(s.step)) ? openElsewhere(inApp, gifts.pendingCode()) : [];
     if (!album) {
       key.unshift(...giftLines);
@@ -1198,7 +1248,8 @@ function start(root: HTMLElement) {
       return row;
     }));
     albumView?.render(album ? albumInput(s, album, [...elsewhereLines, ...giftLines]) : null);
-    syncWelcome(s, !!album, elsewhereLines);
+    syncWelcome(s, !!album, giftScreen ? [...elsewhereLines, ...giftLines] : elsewhereLines, wMode);
+    if (restock.isOpen()) restock.refresh();
     albumList?.render(albumNow?.mode === 'open' ? albumInput(s, albumNow, []) : null);
   }
 
