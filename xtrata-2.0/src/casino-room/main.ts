@@ -34,6 +34,7 @@ import { createChat, type Chat } from './chat';
 import { addressBlock } from './address-card';
 import { isChatError } from './chat-core';
 import { baccaratCards, rouletteResult, sicboDice, verifySeed } from '../../functions/lib/casino-rounds';
+import { SCREENS_ASSET, SCREENS_CONTRACT } from '../../functions/lib/casino-screens';
 
 type Person = { key: string; spot: string; label: string; since: number };
 type Spin = { a: string; s: number[]; b: number; f: boolean };
@@ -135,6 +136,11 @@ const mainnetOf = (a: string) => {
   if (a.startsWith('SP')) return a;
   const d = createAddress(a);
   return addressToString({ ...d, version: AddressVersion.MainnetSingleSig });
+};
+/** Where a signed-in visitor's inscriptions are held: the mainnet address of their key. Null for a guest. */
+const holderOf = (you: { a?: string | null; guest?: boolean } | null): string | null => {
+  if (!you || you.guest || typeof you.a !== 'string') return null;
+  try { return mainnetOf(you.a); } catch { return null; }
 };
 // Names are looked up on the mainnet address of the same key (BNS names live on mainnet; ST and SP share one key).
 const names = createNameCache((address) => resolvePrimaryBnsName({ address: mainnetOf(address), network: 'mainnet' }), () => { pushPeople(); pushWalkers(); chat?.refreshNames(); paint(); });
@@ -249,7 +255,12 @@ const connect = () => {
           // phase 3: levels, the jackpot, the tournament, happy hour, and the visitor's own profile, balance, friends and notices
           levels: m.levels || {}, jackpot: m.jackpot || null, tourney: m.tourney || null, hh: m.hh || null, me: m.me || null, bal: m.bal ?? null, friends: m.friends || null, notices: m.notices || [],
           // characters (functions/lib/casino-look.ts): everyone's look code by address; the page draws them (public/casino/cube-avatars.js)
-          looks: Object.fromEntries((Array.isArray(m.players) ? m.players : []).filter((p: any) => p && typeof p.a === 'string' && typeof p.lk === 'string').map((p: any) => [p.a, p.lk])) });
+          looks: Object.fromEntries((Array.isArray(m.players) ? m.players : []).filter((p: any) => p && typeof p.a === 'string' && typeof p.lk === 'string').map((p: any) => [p.a, p.lk])),
+          // and the inscriptions on their cubes' screens (functions/lib/casino-screens.ts), with what the page needs to offer the visitor their own:
+          // the contract, the NFT's name, and the mainnet address of the visitor's key (where their inscriptions are held)
+          screens: Object.fromEntries((Array.isArray(m.players) ? m.players : []).filter((p: any) => p && typeof p.a === 'string' && typeof p.sc === 'string').map((p: any) => [p.a, p.sc])),
+          ins: { contract: SCREENS_CONTRACT, asset: SCREENS_ASSET, holder: holderOf(S.you) },
+          scr: m.scr && typeof m.scr.v === 'string' ? { v: m.scr.v, at: Number(m.scr.at) || 0 } : null });
         break;
       case 'sat': S.spots[m.spot] = m.who; if (m.who?.a && S.walk.has(m.who.a)) walkOne(m.who.a, null); break;
       case 'stood': delete S.spots[m.spot]; if (S.standSent === m.spot) S.standSent = null; break;

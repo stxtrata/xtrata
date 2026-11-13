@@ -343,3 +343,24 @@ and `claude/chess-betting-room-answers.md` (project docs).
 - **Missions, the tournament and the Slot fan badge** are built from `FLOOR_MACHINES` (`functions/lib/casino-machines.ts`), which a
   test keeps equal to the standard floor in `public/casino/machine-rotation.js`. Rotating the floor now means editing both and
   redeploying this Worker; the test fails until they agree.
+
+## Screens, and three more reactions (2026-11-12, docs/plans/CASINO-CHARACTER-PLAN.md sections 8 and 9)
+
+- **Screens (feature `screens`).** A cube's six screens (the front, which is otherwise the face, included) may show Xtrata inscriptions the
+  player holds: one string of at most 65 characters, for example `f9,b12,l340,t7` (`functions/lib/casino-screens.ts`: one pattern, tested). **The room never reads
+  the chain.** The Pages Function `POST /casino/room/screens` checks `get-owner` for each token against the mainnet address of the
+  signed-in key (`functions/lib/casino-room-screens.ts`) and only then posts the string here.
+- **`POST /screens`** (through the binding only, like the WebSocket's trusted headers `x-px-addr` and `x-px-k`; body `{ sc }`):
+  sets `sc` on every connection of that player, writes `sc` and `scAt` to their profile (one read, one write; also when they are
+  not connected), and sends `look {a, v, sc}` to everyone who can see the room, the player's own pages included (`sc: null`
+  clears).
+- **Listing.** `sc` is on a player in the `room` message while they are a cube; a `look` for a cube carries it. On arrival the
+  profile's `sc` is used only if `scAt` is less than 7 days old (`SCREENS_KEEP_MS`). A signed-in player's welcome carries their own
+  saved set and its age (`scr: { v, at }`), whatever they are drawn as and however old it is: their page asks the Function for a
+  fresh check when it is due, which is what brings old screens back.
+- **Switching it off:** the Pages variable `CASINO_SCREENS_DISABLED = "1"` (the Function refuses to set any; clearing still works).
+  The room needs no change for that.
+- **Reactions (feature `react-more`).** `REACTIONS` gains `heart`, `dance` and `bow`. A page offers them only to a room that lists
+  the feature; the limits are the existing ones.
+- **Cost.** No timers, no alarms. One profile read and write per saved or re-checked set of screens; the `room` message grows by
+  at most 65 characters per cube player with screens.

@@ -13,6 +13,7 @@ import { parseProgressMessage, type ProgressMessage } from './casino-progress';
 import { parseChessMessage, type ChessMessage } from './casino-bets';
 import type { Bets, RoundTable } from './casino-rounds';
 import { LOOK_FEATURE, LOOK_MIN_GAP_MS, LOOK_PER_MINUTE, parseLook, parseLookMessage, type LookMessage } from './casino-look';
+import { SCREENS_FEATURE, normalizeScreens } from './casino-screens';
 
 
 /**
@@ -65,7 +66,7 @@ export const MAX_REPORT_LINE_CHARS = 200;
  * (every machine picks them first, from its own reel strips), so a spin is a few numbers, not a picture.
  * The room only passes spins on: it never checks or stores a result, and nothing here moves money.
  */
-export const ROOM_FEATURES = ['play', 'move', 'salon-bns', 'here', LOOK_FEATURE, 'move-still'] as const;
+export const ROOM_FEATURES = ['play', 'move', 'salon-bns', 'here', LOOK_FEATURE, 'move-still', SCREENS_FEATURE] as const;
 
 /**
  * Who is here (docs/plans/CASINO-WHO-IS-HERE-PLAN.md). A client that says `here` sends a bare "ping" every 30 s, which the room
@@ -138,6 +139,9 @@ export type Peer = {
   /** The player's character (functions/lib/casino-look.ts): their look code, read from their profile when they connect (missing: the
    *  human figure), and recent times for the look limit. Optional: older connections lack them. */
   lk?: string; lo?: number[];
+  /** Inscriptions on their cube's screens (functions/lib/casino-screens.ts), already checked against the chain by the Pages
+   *  Function that told the room. Missing: none. */
+  sc?: string;
 };
 
 export const newPeer = (id: string, address: string | null, hash160: string | null, now: number, watch = true,
@@ -195,7 +199,7 @@ export const shortAddress = (address: string | null) =>
 
 export type SpotView = { a: string; n: string; since: number };
 /** One signed-in person in the room, listed once however many tabs they have open; `spot` is where they sit, if anywhere. */
-export type PlayerView = { a: string; n: string; spot: string | null; aw?: boolean; lk?: string };
+export type PlayerView = { a: string; n: string; spot: string | null; aw?: boolean; lk?: string; sc?: string };
 /** A signed-in player standing or walking on the floor (not seated), once per address: their latest position. */
 export type WalkerView = { a: string; n: string; x: number; z: number; r: number; at: number };
 export type RoomView = { spots: Record<string, SpotView>; players: PlayerView[]; walkers: WalkerView[]; joined: number; guests: number };
@@ -214,6 +218,7 @@ export const deriveView = (peers: Peer[]): RoomView => {
       // away only while every tab of theirs is away (one live tab means they are here)
       if (peer.aw && (!seen || seen.aw)) entry.aw = true; else delete entry.aw;
       if (peer.lk) entry.lk = peer.lk;      // their character, when it is not the human figure (casino-look.ts)
+      if (peer.lk && peer.sc) entry.sc = peer.sc;      // and what is on its screens (casino-screens.ts)
       players.set(peer.a, entry);
     }
     if (peer.a && peer.spot) spots[peer.spot] = { a: peer.a, n: shortAddress(peer.a), since: peer.since };
@@ -590,7 +595,7 @@ export const takeLookRate = (peer: Peer, now: number): boolean => {
   return true;
 };
 
-export type LookChange = { t: 'look'; a: string; v: string | null };
+export type LookChange = { t: 'look'; a: string; v: string | null; sc?: string | null };
 
 /**
  * A signed-in player's new character. It is set on every connection of theirs (so a second tab and a later arrival agree), and
@@ -611,5 +616,28 @@ export const applyLook = (peers: Peer[], meId: string, v: string | null):
     changed.push(p.id);
   }
   const to = peers.filter((p) => p.id !== meId && canSee(p)).map((p) => p.id);
-  return { ok: true, message: { t: 'look', a: me.a, v: code }, to, changed };
+  const message: LookChange = { t: 'look', a: me.a, v: code };
+  if (me.sc) message.sc = me.sc;      // the screens go with the character, so a page that hears of one has the other
+  return { ok: true, message, to, changed };
+};
+
+/**
+ * A player's screens, as the Pages Function that checked them reports (functions/casino/room/screens.ts): set on every
+ * connection of theirs, and everyone who can see the room is told, the player's own pages included. "" clears them.
+ * `changed` are the connections to save. The player need not be connected (the profile is written either way).
+ */
+export const applyScreens = (peers: Peer[], address: string, sc: unknown):
+  ({ ok: true; sc: string; message: LookChange; to: string[]; changed: string[] } | { ok: false; code: string }) => {
+  const text = normalizeScreens(sc);
+  if (text === null) return { ok: false, code: 'screens-bad' };
+  if (!address) return { ok: false, code: 'screens-no-address' };
+  const changed: string[] = []; let look: string | null = null;
+  for (const p of peers) {
+    if (p.a !== address) continue;
+    if (text) p.sc = text; else delete p.sc;
+    if (p.lk) look = p.lk;
+    changed.push(p.id);
+  }
+  const to = peers.filter((p) => canSee(p)).map((p) => p.id);
+  return { ok: true, sc: text, message: { t: 'look', a: address, v: look, sc: text || null }, to, changed };
 };

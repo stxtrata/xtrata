@@ -133,6 +133,8 @@ export type Profile = {
   nt: Array<{ why: string; v: number; at: number }>;
   /** The player's character (functions/lib/casino-look.ts): a look code; missing means the human figure. */
   lk?: string;
+  /** Inscriptions on their cube's screens (functions/lib/casino-screens.ts), and when the chain was last asked about them. */
+  sc?: string; scAt?: number;
 };
 export const newProfile = (): Profile => ({
   v: 1, xp: 0, bd: [],

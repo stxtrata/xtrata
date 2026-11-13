@@ -1,7 +1,9 @@
 # ParallaX Casino: the overhaul (first pass)
 
-Status: **built 2026-11-12, not committed, not deployed.** Brief: `casino-overhaul-prompt.md` (project docs). Base: `origin/main`
-`465d1d2`. Branch to be: `casino-fable`. The cube characters have their own note, `CASINO-CHARACTER-PLAN.md`.
+Status: **on `casino-fable`, not pushed, not deployed.** The first pass (sections 1 to 8) was built 2026-11-12 and is the
+branch's first commit (`90d8898`). The second pass (section 9: inscriptions on screens, reactions and gestures, invite links, a
+guided minute, and a fix to the phone bar) was built 12 and 13 November and is its second commit. Brief: `casino-overhaul-prompt.md` (project docs). Base:
+`origin/main`. The cube characters have their own note, `CASINO-CHARACTER-PLAN.md`.
 
 This is what a whole-system look found, what was changed in this pass, and what was deliberately left. It is written to be read
 before reviewing the diff.
@@ -102,9 +104,8 @@ On the day of the Worker deploy, a player whose "play" mission for the day was a
    exact for layout, logic and draw counts and useless for frame rate.
 2. **Cubes as the default body on phones** for other players (drawing everyone as a cube on LITE would cut the heaviest thing a
    phone draws). Worth trying once the real-device numbers exist.
-3. **A first-steps coach** after entering (three dismissible hints: walk, sit, get chips). The welcome card and the balance button
-   cover the essentials; this would cover people who close the card unread.
-4. **Frame textures and per-face screens** for the cubes, and the Classic CubeBot body.
+3. ~~A first-steps coach after entering.~~ Built in the second pass (section 9).
+4. **Frame textures** for the cubes, and the Classic CubeBot body. (Per-face screens: built in the second pass, as inscriptions.)
 5. **`index.html` is still one 3.4 MB file.** Moving the presence and social code into their own files would make every later
    change smaller to review. Mechanical, but it touches everything, so not in a pass shared with other sessions.
 
@@ -115,3 +116,44 @@ On the day of the Worker deploy, a player whose "play" mission for the day was a
 - Desktop (1440 x 900, 1280 x 720), phone (390 x 844, touch emulated).
 - **Not tested: a real iPad or phone, two real devices on a real network, real wallets (Leather, Xverse, a passkey), the deployed
   Worker.** Frame rate could not be measured at all here.
+
+## 9. The second pass (2026-11-12): four additions and one fix
+
+Asked for after the first pass: programmable screens showing inscriptions from the player's wallet, reactions and gestures, invite
+links, and a guided minute that can be left. Nothing was removed.
+
+| | What | Where |
+| --- | --- | --- |
+| Inscriptions on cubes | All six of a cube's screens, the front included, can show Xtrata inscriptions the player's wallet holds (on the front an inscription takes the place of the face), chosen in Your character and checked on the chain before the room is told. Each visitor can hide them all; one Pages variable switches the feature off. Full account: `CASINO-CHARACTER-PLAN.md`, section 8. | `casino-screens.ts`, `casino-room-screens.ts`, `functions/casino/room/screens.ts` (new); `casino-room.ts`, the Worker, `main.ts`, `cube-avatars.js`, `character.js`, `index.html` |
+| Reactions and gestures | A cube wears the reaction on its face and moves to fit: twelve gestures, for the humanoid and the floating cube. Three more reactions (heart, dance, bow). `CASINO-CHARACTER-PLAN.md`, section 9. | `cube-avatars.js`, `index.html`, `casino-social.ts` |
+| Invite links | The link now says who asked (`?meet=<table>&by=<address>`; the old `?meet=` links still work). The friend is told who invited them and where that player is right now (a table, a machine, walking the floor), and "Take me to them" sits them at that table or stands them a step and a half away, facing them, with a wave. When the player is not in the room, the table in the link is offered instead. On a phone the link goes to the share sheet. Also in Menu, You, "Invite a friend". | `index.html` (`inviteLink`, `invite`, the arrival bar), `hud.js` |
+| A guided minute | The first time somebody walks into the room, a small card in a corner takes them through five steps: look around, walk, sit down and play, your chips, everything else. The first three finish themselves when the visitor does the thing. "Leave the tour" and "Next" are on every step (keys X and N while walking; at a table those keys are the game's, so only the buttons act). It is not a dialog: nothing waits for it and the room works under it. Once only; again from Menu, Help, "Show me around". `?tour=0` never starts it. | `tour.js` (new), `hud.js`, one getter in `index.html` |
+| **Fix: the phone bar when signed in** | A signed-in player has three more things in the top bar than a guest (their level, reactions, their name on the Room button). On a 390 px phone that pushed Chat, Explore and Menu off the right edge of the screen: **a fault in the first pass**, which I had only looked at as a guest on a phone. Now on phones the name and the level's progress line are dropped and Explore moves into the menu ("Walk the floor"), and a test checks the bar at 430, 390, 375, 360 and 340 px signed in. | `hud.js` |
+
+The page (`index.html`) changed by a further +120 / -30 lines; `tour.js` is 12 KB, and `cube-avatars.js`, `character.js` and `hud.js`
+are now 59, 39 and 19 KB.
+
+**Decision for Jim (also in the character note, section 6.5):** any still image a wallet holds is shown to everyone in the room,
+unreviewed. The controls are the holder check, each visitor's own switch, and `CASINO_SCREENS_DISABLED`.
+
+**The link carries an address.** `&by=` is the inviter's testnet address, which is public and already shown in the room. It is
+only added for a signed-in player; the page takes it only when it has the shape of a Stacks address.
+
+**Deploying the second pass (after or together with the first):**
+
+1. **The room Worker first**: `npx wrangler deploy --config workers/casino-room/wrangler.toml` (the same command; it now also
+   carries `screens`, `react-more`, the `/screens` route and `sc` on players). Not between 20:00 and 20:30 UTC, as before.
+2. **Then the site** (the page, `room.js?v=p5.9`, `tour.js`, and the new Pages Function `/casino/room/screens`, which uses the
+   variables the other room Functions already have: the room binding, `CASINO_ROOM_SECRET`, the Hiro key).
+3. Nothing new to configure. `CASINO_SCREENS_DISABLED = "1"` (Pages) is the switch if inscriptions need turning off.
+4. A new page against the old Worker: no screens section is offered, the three new reactions are not shown, everything else works.
+   The new Worker against an old page: old pages ignore `sc` and show a new reaction as a thumbs-up.
+
+**Tested** (headless Chromium, the real page and the real room code; one page at a time is all this machine holds):
+408 casino unit tests (22 new). End to end: screens (see the character note), all eleven reactions between two players, invite
+links (at a table, walking, not here, a table only, a bad link, your own link, the menu's entry), the tour with a real mouse and
+keyboard at 1280 x 720 and with real touch events at 390 x 844 (starts once, each step finishes itself, N and X while walking and not at a table, Finish, not
+again after a reload, again from the menu, `?tour=0`, typing never moves it), the phone bar at five widths. The earlier look,
+keyboard and touch tests were run again.
+**Not tested:** a real phone or tablet (including the share sheet, which a desktop test browser does not have), two real devices,
+real wallets, real inscriptions and thumbnails from the live site, the live Hiro API, the deployed Worker and Function.

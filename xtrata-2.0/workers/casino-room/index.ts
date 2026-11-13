@@ -31,6 +31,10 @@
  *   of the human figure. Their look is one short code (at most 19 characters) kept in their profile, read with the profile when they
  *   connect (no extra read), carried on the connection, listed with the players in the `room` message and passed on when it changes
  *   (`look`). Changing it is one profile write and has its own limit. The room only checks the code's shape; it draws nothing.
+ * - Screens (functions/lib/casino-screens.ts): a cube's six screens may show inscriptions the player holds. The Pages
+ *   Function POST /casino/room/screens checks the chain and then posts the string here (`/screens`, reachable only through the
+ *   binding, like the WebSocket's trusted headers). The room keeps it with the look (`sc`, and `scAt` on the profile), lists it
+ *   with the players and passes it on in `look`. It never reads the chain itself; screens not checked for 7 days are not shown.
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
@@ -39,6 +43,7 @@ import {
   applyAway,
   applyLeave,
   applyLook,
+  applyScreens,
   applyMove,
   applySit,
   applyStand,
@@ -94,6 +99,7 @@ import {
 } from '../../functions/lib/casino-social';
 import { ROUND_TABLES, roundInfo } from '../../functions/lib/casino-rounds';
 import { parseLook } from '../../functions/lib/casino-look';
+import { SCREENS_KEEP_MS, normalizeScreens } from '../../functions/lib/casino-screens';
 import { CHESS_FEATURES } from '../../functions/lib/casino-bets';
 import { ChessDesk, type Conn, type DeskStore } from '../../functions/lib/casino-chess-room';
 import {
@@ -299,6 +305,10 @@ export class CasinoRoom extends DurableObject<Env> {
     if (who && me.a) {
       const prof = await this.profile(who);
       extra.me = meView(prof, who, now);
+      // their own saved screens and when the chain was last asked, whatever they are drawn as and however old the check is:
+      // their page asks for a fresh check when it is due (casino-screens.ts), which is what brings old screens back
+      const mine = normalizeScreens(prof.sc);
+      if (mine) extra.scr = { v: mine, at: prof.scAt ?? 0 };
       extra.bal = (await this.ctx.storage.get<Balance>(BALANCE_PREFIX + who)) || null;
       extra.friends = (await this.ctx.storage.get<string[]>(FRIENDS_PREFIX + who)) || [];
       if (prof.nt.length) { extra.notices = prof.nt; prof.nt = []; await this.ctx.storage.put(PROFILE_PREFIX + who, prof); }
@@ -531,6 +541,8 @@ export class CasinoRoom extends DurableObject<Env> {
         const prof = await this.profile(who);
         peer.lv = levelOf(prof.xp); peer.bd = topBadge(prof);
         const look = parseLook(prof.lk); if (look) peer.lk = look;      // their character (casino-look.ts): the room message lists it
+        const screens = normalizeScreens(prof.sc);                      // and its screens, while the chain was asked recently enough
+        if (screens && Date.now() - (prof.scAt ?? 0) < SCREENS_KEEP_MS) peer.sc = screens;
         server.serializeAttachment(peer);
         const self = live.find((e) => e.ws === server); if (self) self.peer = peer;
       } catch (e) { console.warn('[casino-room] could not read a profile', e); }
@@ -550,7 +562,7 @@ export class CasinoRoom extends DurableObject<Env> {
     if (address && !others.some((e) => e.peer.a === address)) {
       this.broadcast(others, { t: 'join', who: { a: address, n: shortAddress(address) } });
       if (peer.lv) this.broadcast(others, { t: 'lvl', a: address, lv: peer.lv, bd: peer.bd ?? null, up: false });
-      if (peer.lk) this.broadcast(others, { t: 'look', a: address, v: peer.lk });
+      if (peer.lk) this.broadcast(others, { t: 'look', a: address, v: peer.lk, sc: peer.sc ?? null });
     }
     this.broadcast(others, { t: 'count', joined: view.joined, guests: view.guests }, true);
   }
@@ -574,6 +586,29 @@ export class CasinoRoom extends DurableObject<Env> {
       const stale = [...old.entries()].filter(([, v]) => typeof v !== 'number' || v < now).map(([k]) => k);
       if (stale.length) await this.ctx.storage.delete(stale);
       return Response.json({ ok: true });
+    }
+
+    // A player's screens, already checked against the chain by the Pages Function that calls this (functions/casino/room/screens.ts).
+    if (url.pathname === '/screens' && request.method === 'POST') {
+      const address = request.headers.get('x-px-addr') || '', hash160 = request.headers.get('x-px-k') || '';
+      let body: { sc?: unknown };
+      try { body = (await request.json()) as { sc?: unknown }; } catch { return new Response('bad', { status: 400 }); }
+      if (!address) return new Response('bad', { status: 400 });
+      const entries = this.peers();
+      const r = applyScreens(entries.map((e) => e.peer), address, body?.sc ?? '');
+      if (!r.ok) return Response.json({ ok: false, code: r.code }, { status: 400 });
+      this.save(entries.filter((e) => r.changed.includes(e.peer.id)));
+      try {
+        const who = hash160 || address, prof = await this.profile(who);
+        if (r.sc) { prof.sc = r.sc; prof.scAt = Date.now(); } else { delete prof.sc; delete prof.scAt; }
+        await this.ctx.storage.put(PROFILE_PREFIX + who, prof);
+      } catch (e) { console.warn('[casino-room] could not save screens', e); return Response.json({ ok: false }, { status: 500 }); }
+      const text = JSON.stringify(r.message);
+      for (const e of entries) {
+        if (!r.to.includes(e.peer.id)) continue;
+        try { e.ws.send(text); } catch { /* closing; its close handler cleans up */ }
+      }
+      return Response.json({ ok: true, sc: r.sc });
     }
 
     // The anonymous day counters, newest first (the Pages Function /casino/room/stats passes this on; nothing personal is in it).

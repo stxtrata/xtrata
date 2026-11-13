@@ -10,7 +10,8 @@ import { ALL_MACHINES } from './casino-machines';
 import { cleanBets, isRoundTable, betsOpen, roundAt, type Bets, type RoundTable } from './casino-rounds';
 
 /** Features the room offers on top of casino-room's ROOM_FEATURES (the client only uses what the room lists). */
-export const SOCIAL_FEATURES = ['react', 'win', 'daily', 'table', 'rounds', 'gift', 'pvp', 'spec'] as const;
+/** `react-more`: the room also takes the later reactions (heart, dance, bow); a page offers them only to a room that lists it. */
+export const SOCIAL_FEATURES = ['react', 'win', 'daily', 'table', 'rounds', 'gift', 'pvp', 'spec', 'react-more'] as const;
 
 // ------------------------------------------------------------------ the extra things a connection carries
 
@@ -74,7 +75,7 @@ export const tableOf = (peer: Pick<SocialPeer, 'spot' | 'wt'>): string | null =>
 
 // ------------------------------------------------------------------ messages a client may send
 
-export const REACTIONS = ['wave', 'cheer', 'clap', 'thumbs', 'laugh', 'wow', 'nooo', 'glass'] as const;
+export const REACTIONS = ['wave', 'cheer', 'clap', 'thumbs', 'laugh', 'wow', 'nooo', 'glass', 'heart', 'dance', 'bow'] as const;
 export type Reaction = (typeof REACTIONS)[number];
 export const DRINKS = ['champagne', 'cocktail', 'whisky', 'beer', 'espresso', 'water'] as const;
 export type Drink = (typeof DRINKS)[number];

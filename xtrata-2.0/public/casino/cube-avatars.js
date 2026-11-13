@@ -20,9 +20,18 @@
  * window.PXCubes:
  *   FRAMES, FINISHES, FACES, GAITS, BODIES, ACCENTS    the choices, for menus
  *   parseLook(code) -> look | null     encodeLook(look) -> code     fromLabLook(json) -> partial look | null
- *   kit(THREE, { lite, envMap }) -> { make(code, label) -> character, dispose() }
+ *   kit(THREE, { lite, envMap, inscriptions }) -> { make(code, label) -> character, inscriptions(config | null), dispose() }
  *     character: group (add it to the scene; you place and turn it), update(dt, { speed, seated }, far), setLook(code), setLabel(text),
- *                wave(), setGhost(on), height(seated) in metres, body ('h' | 'f'), dispose()
+ *                setScreens(text), gesture(kind), show({ emoji } | { text }, ms), wave(), setGhost(on), height(seated) in metres,
+ *                body ('h' | 'f'), dispose()
+ *
+ * Inscriptions on the screens (functions/lib/casino-screens.ts has the same pattern; casino-screens.test.ts checks they agree). The
+ * six screens may each show an Xtrata inscription the player holds: "f9,b12,l340,t7" (front, back, left, right, top, under; then the
+ * token id). On the front it takes the place of the face; a reaction still shows there for its moment. The kit is told where the pictures are with `inscriptions: { contract, base }`; without it (or
+ * after `kit.inscriptions(null)`, the viewer's own switch) every screen shows the lab's graphics. A picture is this site's stored
+ * thumbnail when there is one, else the inscription itself when it is a small still image; anything else is a numbered tile.
+ *   SCREEN_FACES, parseScreens(text) -> { b?: id, ... } | null, encodeScreens(map) -> text, pictureSource(contract, token, lite, base)
+ *   GESTURES    what gesture(kind) knows
  */
 (function (global) {
   'use strict';
@@ -109,6 +118,44 @@
     return out.frame || out.finish ? out : null;
   }
 
+  // ------------------------------------------------------------------ inscriptions on the screens
+
+  var SCREEN_FACES = ['f', 'b', 'l', 'r', 't', 'u'];      // front, back, left, right, top, under: cells 0 to 5 of the sheet, in that order
+  var SCREENS_PATTERN = /^[fblrtu](?:0|[1-9]\d{0,8})(?:,[fblrtu](?:0|[1-9]\d{0,8})){0,5}$/, SCREENS_MAX = 65;
+  /** "b12,l340" as { b: 12, l: 340 }; "" as {}; null when it is not a screens string. */
+  function parseScreens(text) {
+    if (text === null || text === undefined || text === '') return {};
+    if (typeof text !== 'string' || text.length > SCREENS_MAX || !SCREENS_PATTERN.test(text)) return null;
+    var out = {}, parts = text.split(',');
+    for (var i = 0; i < parts.length; i++) { var f = parts[i][0]; if (out[f] !== undefined) return null; out[f] = Number(parts[i].slice(1)); }
+    return out;
+  }
+  function encodeScreens(map) {
+    map = map || {};
+    return SCREEN_FACES.filter(function (f) { return typeof map[f] === 'number' && map[f] >= 0 && Math.floor(map[f]) === map[f] && map[f] < 1e9; })
+      .map(function (f) { return f + map[f]; }).join(',');
+  }
+  // Still pictures a canvas can take as they are. Not SVG (a document, and some browsers refuse to read a canvas back after drawing
+  // one), and nothing that is not a picture: those get a numbered tile.
+  var STILL = /^image\/(png|jpeg|jpg|webp|gif|avif|bmp)$/;
+  /**
+   * Where to get a picture of an inscription, from its row in this site's index (/index/page): the stored thumbnail when it has
+   * one, else the inscription itself when it is a still image small enough (3 MB; 300 KB on phones and tablets).
+   * -> { url, full, kind }: `url` null when there is nothing to draw; `kind` a word for the tile ("AUDIO", "HTML", "IMAGE"...).
+   */
+  function pictureSource(contract, token, lite, base) {
+    base = base || '';
+    var mime = String((token && token.mime) || '').toLowerCase().split(';')[0].trim(), size = +(token && token.totalSize) || 0;
+    var kind = (mime.indexOf('html') >= 0 ? 'html' : mime.indexOf('svg') >= 0 ? 'svg' : mime.split('/')[0] || '').toUpperCase().slice(0, 12);
+    var content = STILL.test(mime) && size > 0 && size <= (lite ? 300e3 : 3e6)
+      ? base + '/runtime/content?contractId=' + encodeURIComponent(contract) + '&tokenId=' + token.id + '&network=mainnet' : null;
+    if (token && typeof token.thumb === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(token.thumb))
+      return { url: base + '/thumb/' + encodeURIComponent(contract) + '/' + token.id + '?v=' + token.thumb, full: content, kind: kind };
+    return { url: content, full: null, kind: kind };
+  }
+  var GESTURES = ['greet', 'win', 'nod', 'look', 'lose', 'raise', 'clap', 'laugh', 'wow', 'dance', 'heart', 'bow'];
+  var GESTURE_SECONDS = { greet: 2.6, win: 2.4, nod: 1.3, look: 1.8, lose: 2.4, raise: 2.2, clap: 2, laugh: 2, wow: 1.8, dance: 3.4, heart: 2.2, bow: 2 };
+
   // ------------------------------------------------------------------ drawing the six screens (one cell each, in the lab's style)
 
   var SCREEN_BG = { glass: ['#1c2c35', '#0d1a20'], satin: ['#22333b', '#13222a'], matte: ['#27363c', '#1b2a30'], frosted: ['#33474f', '#22343c'], smoked: ['#11191e', '#070d10'], crt: ['#10261f', '#06120e'] };
@@ -186,11 +233,52 @@
       }
       if (!small) { g.fillStyle = 'rgba(233,247,243,.1)'; rr(g, 45, 203, 166, 22, 5); g.fill(); g.fillStyle = ink; g.font = '700 8px Arial,sans-serif'; g.textAlign = 'center'; g.fillText('XTRATA / CUBE', 128, 215); }
     }
-    // the finish, over the picture
+    drawFinish(g, look);
+    g.restore();
+  }
+  /** The finish, over whatever a screen shows (in the 256-unit square). */
+  function drawFinish(g, look) {
     if (look.finish === 'crt') { g.fillStyle = 'rgba(0,0,0,.2)'; for (var sy = 0; sy < 256; sy += 4) g.fillRect(0, sy, 256, 1.6); }
     else if (look.finish === 'frosted') { g.fillStyle = 'rgba(214,232,236,.2)'; g.fillRect(0, 0, 256, 256); }
     else if (look.finish === 'smoked') { g.fillStyle = 'rgba(0,0,0,.24)'; g.fillRect(0, 0, 256, 256); }
     else if (look.finish === 'glass') { var gl = g.createLinearGradient(0, 0, 200, 256); gl.addColorStop(0, 'rgba(255,255,255,.1)'); gl.addColorStop(0.42, 'rgba(255,255,255,0)'); g.fillStyle = gl; g.fillRect(0, 0, 256, 256); }
+  }
+  function cellOpen(g, ox, oy, size, look) {
+    g.save(); g.translate(ox, oy); g.scale(size / 256, size / 256); g.beginPath(); g.rect(0, 0, 256, 256); g.clip();
+    var bg = SCREEN_BG[look.finish] || SCREEN_BG.glass, gr = g.createLinearGradient(0, 0, 256, 256);
+    gr.addColorStop(0, bg[0]); gr.addColorStop(1, bg[1]); g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+    g.textBaseline = 'middle'; g.textAlign = 'center'; g.lineCap = 'round'; g.lineJoin = 'round';
+  }
+  /** An inscription on a screen: its picture when there is one (a square canvas), else a tile with its number and what it is. */
+  function drawInscription(g, ox, oy, size, look, id, picture, kind, waiting) {
+    cellOpen(g, ox, oy, size, look);
+    if (picture) g.drawImage(picture, 0, 0, 256, 256);
+    else {
+      var title = '#' + id, px = 64; g.fillStyle = '#e9f7f3'; g.font = '700 ' + px + 'px Arial,sans-serif';
+      while (px > 22 && g.measureText(title).width > 200) { px -= 4; g.font = '700 ' + px + 'px Arial,sans-serif'; }
+      g.fillText(title, 128, 122);
+      g.fillStyle = look.accent; g.font = '700 ' + (size < 200 ? 20 : 13) + 'px Arial,sans-serif';
+      g.fillText(waiting ? '· · ·' : (kind || 'INSCRIPTION'), 128, 176);
+      if (size >= 200) { g.fillStyle = 'rgba(233,247,243,.72)'; g.font = '700 8px Arial,sans-serif'; g.fillText('X T R A T A', 128, 30); }
+    }
+    drawFinish(g, look);
+    g.restore();
+  }
+  /** Something said with the face: a reaction's emoji, or a few words, in place of the face for a moment. */
+  function drawSaying(g, ox, oy, size, look, what) {
+    cellOpen(g, ox, oy, size, look);
+    if (what.emoji) {
+      g.font = '150px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.fillStyle = '#e9f7f3';
+      g.fillText(String(what.emoji).slice(0, 8), 128, 136);
+    } else {
+      var words = String(what.text || '').slice(0, 60).split(/\s+/), lines = [''], px = 34;
+      g.fillStyle = '#e9f7f3'; g.font = '700 ' + px + 'px Arial,sans-serif';
+      words.forEach(function (w) { var last = lines.length - 1, next = lines[last] ? lines[last] + ' ' + w : w; if (g.measureText(next).width > 214 && lines[last]) lines.push(w); else lines[last] = next; });
+      lines = lines.slice(0, 4);
+      lines.forEach(function (line, n) { g.fillText(line, 128, 128 + (n - (lines.length - 1) / 2) * (px + 6), 220); });
+    }
+    g.strokeStyle = look.accent; g.lineWidth = 5; g.beginPath(); g.moveTo(96, 226); g.lineTo(160, 226); g.stroke();
+    drawFinish(g, look);
     g.restore();
   }
   /** All six screens on one canvas, three across and two down (front, back, left / right, top, bottom). */
@@ -215,7 +303,72 @@
   function kit(THREE, options) {
     options = options || {};
     var lite = !!options.lite, env = options.envMap || null, CELL = options.cell || (lite ? 128 : 256);
-    var shared = {}, materials = {}, live = [], glowTex = null, tmpColor = new THREE.Color();
+    var shared = {}, materials = {}, live = [], glowTex = null;
+
+    // ---- pictures of inscriptions: one small square canvas per token, shared by every character that shows it
+    var ins = null, pics = {}, wanted = [], asking = null, PIC_MAX = lite ? 40 : 96, clock = 0;
+    function insOf(config) {
+      return config && typeof config.contract === 'string' && /^S[A-Z0-9]{20,60}\.[A-Za-z0-9-_]{1,40}$/.test(config.contract)
+        ? { contract: config.contract, base: String(config.base || '').replace(/\/+$/, '') } : null;
+    }
+    ins = insOf(options.inscriptions);
+    function settle(entry, state) {
+      entry.state = state; var subs = entry.subs; entry.subs = [];
+      subs.forEach(function (fn) { try { fn(); } catch (e) { /* a character that has gone */ } });
+    }
+    function keep(entry, img) {
+      // cover the square, then let the picture itself go: a big image would otherwise stay decoded for as long as it is on a cube
+      var c = document.createElement('canvas'); c.width = c.height = CELL;
+      var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      if (!w || !h) return false;
+      var side = Math.min(w, h), g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+      try { g.drawImage(img, (w - side) / 2, (h - side) / 2, side, side, 0, 0, CELL, CELL); } catch (e) { return false; }
+      entry.canvas = c;
+      var ids = Object.keys(pics).filter(function (k) { return pics[k].canvas; });
+      if (ids.length > PIC_MAX) {       // the least recently drawn go; they are fetched again (from the browser's cache) if a cube shows them again
+        ids.sort(function (a, b) { return pics[a].used - pics[b].used; }).slice(0, ids.length - PIC_MAX).forEach(function (k) { pics[k].canvas.width = pics[k].canvas.height = 0; delete pics[k]; });
+      }
+      return true;
+    }
+    function load(entry, url, fallback) {
+      var img = new Image(); img.decoding = 'async';
+      img.onload = function () { var ok = keep(entry, img); img.onload = img.onerror = null; img.src = ''; if (ok) settle(entry, 'ok'); else if (fallback) load(entry, fallback, null); else settle(entry, 'none'); };
+      img.onerror = function () { img.onload = img.onerror = null; if (fallback) load(entry, fallback, null); else settle(entry, 'none'); };
+      img.src = url;
+    }
+    function ask() {
+      asking = null;
+      var mine = ins, ids = wanted.splice(0, 100); if (!mine || !ids.length) return;
+      var fail = function () {
+        // could not ask: not the same as "no picture". The tiles stay, and the question is asked again a few times.
+        ids.forEach(function (id) { var e = pics[mine.contract + ':' + id]; if (!e) return; e.tries++; settle(e, 'fail'); });
+      };
+      fetch(mine.base + '/index/page?primary=' + encodeURIComponent(mine.contract) + '&ids=' + ids.join(','), { credentials: 'omit' })
+        .then(function (r) { if (!r.ok && r.status !== 400) throw new Error('index ' + r.status); return r.status === 400 ? { tokens: [] } : r.json(); })
+        .then(function (j) {
+          var rows = {}; (j && Array.isArray(j.tokens) ? j.tokens : []).forEach(function (t) { if (t && typeof t.id === 'number') rows[t.id] = t; });
+          ids.forEach(function (id) {
+            var e = pics[mine.contract + ':' + id]; if (!e) return;
+            var src = rows[id] ? pictureSource(mine.contract, rows[id], lite, mine.base) : { url: null, kind: '' };
+            e.kind = src.kind;
+            if (src.url) load(e, src.url, src.full); else settle(e, 'none');
+          });
+        }).catch(fail);
+      if (wanted.length) asking = setTimeout(ask, 60);
+    }
+    /** The picture of token `id`, as far as it is known: { state: 'wait' | 'ok' | 'none' | 'fail', canvas, kind }. `fn` is called once when that changes. */
+    function picture(id, fn) {
+      if (!ins) return null;
+      var key = ins.contract + ':' + id, e = pics[key];
+      if (e && e.state === 'fail' && e.tries < 4 && clock - e.at > 20 * e.tries) e = null;
+      if (!e) {
+        e = pics[key] = { state: 'wait', canvas: null, kind: '', subs: [], tries: (pics[key] && pics[key].tries) || 0, at: clock, used: clock };
+        wanted.push(id); if (!asking) asking = setTimeout(ask, 60);
+      }
+      e.used = clock;
+      if (fn && (e.state === 'wait' || e.state === 'fail') && e.subs.length < 64) e.subs.push(fn);
+      return e;
+    }
 
     function rbox(w, h, d, r, seg) {
       var n = seg * 2 + 1; r = Math.min(w / 2, h / 2, d / 2, r);
@@ -353,7 +506,8 @@
       // The screens are lit from inside: drawn exactly as painted, whatever the room's lights and tone mapping do (and no lighting to work out).
       var screenMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false });
       screenMat.name = 'Cube character screens';
-      var me = { group: group, body: null, look: look, label: String(label || '') };
+      var me = { group: group, body: null, look: look, label: String(label || ''), screens: '' };
+      var shots = {}, saying = null, sayLeft = 0, gest = null, gone = false, later = null, lastClock = 0;
       var ghost = false, parts = [], geos = [], nodes = null, t = Math.random() * 20, phase = Math.random() * 6, walk = 0, blinkAt = 2 + Math.random() * 4, blinking = 0, waveLeft = 0, lastYaw = null, turn = 0, seed = Math.random() * 10, palette = [];
 
       function colours() {
@@ -374,6 +528,50 @@
         if (!screens) { m.userData.slots = src.slots; parts.push(m); m.userData.shadow = !!shadow && !lite && !!options.shadows; m.castShadow = m.userData.shadow && !ghost; }      // only the big parts: every shadow light draws them again
         parent.add(m); return m;
       }
+      /**
+       * Draw the screens: the lab's graphics (the face in front), then the player's inscriptions over whichever screens they chose,
+       * then what is being said, which covers the front for its moment whatever is there. `onlyFront` redraws the front alone.
+       */
+      function paint(blink, onlyFront) {
+        if (gone) return;
+        var g = sheet.getContext('2d');
+        drawSheet(sheet, look, me.label, blink, onlyFront);
+        if (ins) {
+          var again = false;
+          SCREEN_FACES.forEach(function (f, i) {
+            if (shots[f] === undefined || (onlyFront && i > 0)) return;
+            var e = picture(shots[f], repaint);
+            if (!e) return;
+            var retry = e.state === 'fail' && e.tries < 4; if (retry) again = true;      // asked again a few times, then it is simply a numbered tile
+            drawInscription(g, (i % 3) * CELL, Math.floor(i / 3) * CELL, CELL, look, shots[f], e.state === 'ok' ? e.canvas : null, e.kind, e.state === 'wait' || retry);
+          });
+          if (again && !later) later = setTimeout(function () { later = null; paint(false); }, 25000);
+        }
+        if (saying) drawSaying(g, 0, 0, CELL, look, saying);
+        tex.needsUpdate = true;
+      }
+      function repaint() { if (!gone) paint(false); }
+      me.repaint = repaint;
+      /** What it is doing right now, for tests: the gesture in progress and what is on its face. */
+      Object.defineProperty(me, 'doing', { get: function () { return { gesture: gest ? gest.k : waveLeft > 0 ? 'greet' : null, saying: saying ? saying.emoji || saying.text : null }; } });
+      me.sheet = sheet;
+      /** Inscriptions for the screens: "f9,b12,l340" ("" for none). False when it is not a screens string. */
+      me.setScreens = function (text) {
+        var parsed = parseScreens(text); if (!parsed) return false;
+        var canon = encodeScreens(parsed); if (canon === me.screens) return true;
+        me.screens = canon; shots = parsed; paint(false); return true;
+      };
+      /** Put a reaction's emoji ({ emoji }) or a few words ({ text }) on the face for `ms` (2.6 s when not given). */
+      me.show = function (what, ms) {
+        if (!what || (!what.emoji && !what.text)) return;
+        saying = what.emoji ? { emoji: what.emoji } : { text: what.text }; sayLeft = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000 + Math.max(0.4, Math.min(12, (+ms || 2600) / 1000)); blinking = 0; paint(false, true);
+      };
+      /** A gesture: one of GESTURES. A new one replaces the one in progress. */
+      me.gesture = function (kind) {
+        if (GESTURES.indexOf(kind) < 0) return false;
+        if (kind === 'greet') { waveLeft = 2.6; gest = null; return true; }
+        gest = { k: kind, t: 0, d: GESTURE_SECONDS[kind] }; return true;
+      };
       function shine() { for (var i = 0; i < FINISHES.length; i++) if (FINISHES[i].id === look.finish) screenMat.color.setScalar(0.8 + FINISHES[i].glow * 0.4); }
       function frameOf() { for (var i = 0; i < FRAMES.length; i++) if (FRAMES[i].id === look.frame) return FRAMES[i]; return { rough: 0.4, metal: 0.2 }; }
       function pivot(parent, x, y, z) { var g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; }
@@ -399,7 +597,7 @@
         }
         colours();
         shine(); skin();
-        drawSheet(sheet, look, me.label, false); tex.needsUpdate = true;
+        paint(false);
       }
       function skin() {
         parts.forEach(function (p) { p.material = ghost ? ghostMaterial() : bodyMaterial(frameOf()); p.castShadow = p.userData.shadow && !ghost; });
@@ -418,30 +616,39 @@
           colours(); skin();
           if (nodes.ring) nodes.ring.material.color.set(look.accent);
           shine();
-          drawSheet(sheet, look, me.label, false); tex.needsUpdate = true;
+          paint(false);
         }
         return true;
       };
-      me.setLabel = function (text) { text = String(text || ''); if (text === me.label) return; me.label = text; drawSheet(sheet, look, me.label, false); tex.needsUpdate = true; };
+      me.setLabel = function (text) { text = String(text || ''); if (text === me.label) return; me.label = text; paint(false); };
       me.wave = function () { waveLeft = 2.6; };
       /** How tall it is, in metres above where it stands or sits (a seated humanoid sits high: its legs are short for a bar stool). */
       me.height = function (seated) { return look.body === 'f' ? (seated ? HOVER_Y - 0.1 : HOVER_Y) + 1.02 * HOVER_SCALE / 2 + 0.04 : seated ? SEAT_TALL : TALL; };
       /** state: { speed (m/s over the floor), seated }. Call once a frame while the character is shown; `far` skips the fine movement. */
       me.update = function (dt, state, far) {
         state = state || {}; dt = Math.min(0.1, Math.max(0, dt || 0)); t += dt;
+        clock = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+        // gestures run by the clock: where the room is drawn slowly (`dt` is capped), a wave still takes as long as a wave
+        var real = Math.max(dt, lastClock ? Math.min(1, clock - lastClock) : 0); lastClock = clock;
         var speed = Math.max(0, +state.speed || 0), seated = !!state.seated, moving = !seated && speed > 0.25 ? 1 : 0;
         walk += (moving - walk) * Math.min(1, dt * 9);
         var run = Math.max(0, Math.min(1, (speed - 3.3) / 1.3)), yaw = group.rotation.y;
         if (lastYaw !== null && dt > 0) { var d = Math.atan2(Math.sin(yaw - lastYaw), Math.cos(yaw - lastYaw)) / dt; turn += (Math.max(-2, Math.min(2, d)) - turn) * Math.min(1, dt * 6); }
         lastYaw = yaw;
         var swagger = look.gait === 's' ? walk : 0, tipsy = look.gait === 't' ? 0.35 + 0.65 * walk : 0;
-        if (waveLeft > 0) waveLeft = Math.max(0, waveLeft - dt);
+        if (waveLeft > 0) waveLeft = Math.max(0, waveLeft - real);
         var wv = waveLeft > 0 ? Math.sin(Math.PI * (1 - waveLeft / 2.6)) : 0;
-        // blinking: the front screen is redrawn twice per blink, and only for characters near enough to see it
-        if (!far && look.face !== 'cool') {
+        // what is being said leaves the face when its time is up
+        if (saying && clock >= sayLeft) { saying = null; paint(false, true); }      // by the clock, so it leaves with the bubble over the head however slowly the room is drawn
+        // a gesture in progress: G.e rises and falls over it, G.u runs 0 to 1, G.w is seconds into it; it is always drawn in full
+        var G = null;
+        if (gest) { gest.t += real; if (gest.t >= gest.d) gest = null; else { G = { k: gest.k, u: gest.t / gest.d, w: gest.t, e: Math.sin(Math.PI * gest.t / gest.d) }; far = false; } }
+        // blinking: the front screen is redrawn twice per blink, and only for characters near enough to see it (a face that is
+        // an inscription does not blink)
+        if (!far && !saying && look.face !== 'cool' && !(ins && shots.f !== undefined)) {
           blinkAt -= dt;
-          if (blinkAt <= 0 && !blinking) { blinking = 0.13; drawSheet(sheet, look, me.label, true, true); tex.needsUpdate = true; }
-          else if (blinking > 0 && (blinking -= dt) <= 0) { blinking = 0; blinkAt = 2.5 + Math.random() * 4; drawSheet(sheet, look, me.label, false, true); tex.needsUpdate = true; }
+          if (blinkAt <= 0 && !blinking) { blinking = 0.13; paint(true, true); }
+          else if (blinking > 0 && (blinking -= dt) <= 0) { blinking = 0; blinkAt = 2.5 + Math.random() * 4; paint(false, true); }
         }
         if (nodes.hover) {
           var f = nodes.float, ph = t * 0.785, drive = Math.min(1, speed / 4.6);
@@ -450,6 +657,22 @@
             0.012 * Math.sin(ph) + (seated ? 0.1 * Math.sin(t * 0.45 + seed) : 0),
             -0.07 * Math.max(-1, Math.min(1, turn / 1.35)) + 0.012 * Math.sin(ph * 2) + swagger * 0.05 * Math.sin(ph * 2) + tipsy * (0.045 * Math.sin(ph * 3) + 0.025 * Math.sin(ph * 5)) + 0.09 * wv * Math.sin(t * 9), 'YXZ');
           nodes.ring.material.opacity = 0.42 + 0.1 * Math.sin(ph * 2); nodes.ring.scale.setScalar(0.8 + 0.05 * Math.sin(ph * 2));
+          var size = HOVER_SCALE;
+          if (G) {
+            var he = G.e, hw = G.w;
+            if (G.k === 'win') { f.position.y += 0.2 * he * Math.abs(Math.sin(hw * 6)); f.rotation.y += G.u * 6.2832; }
+            else if (G.k === 'nod') f.rotation.x += 0.32 * he * Math.sin(hw * 9.5);
+            else if (G.k === 'look') f.rotation.y += 0.8 * Math.sin(G.u * 6.2832);
+            else if (G.k === 'lose') { f.position.y -= 0.24 * he; f.rotation.x += 0.45 * he; }
+            else if (G.k === 'raise') { f.position.y += 0.12 * he; f.rotation.x -= 0.25 * he; }
+            else if (G.k === 'clap') size = HOVER_SCALE * (1 + 0.07 * he * Math.abs(Math.sin(hw * 14)));
+            else if (G.k === 'laugh') { f.rotation.z += 0.16 * he * Math.sin(hw * 12); f.position.y += 0.04 * he * Math.abs(Math.sin(hw * 12)); }
+            else if (G.k === 'wow') { f.rotation.x -= 0.3 * he; f.position.y += 0.1 * he; }
+            else if (G.k === 'dance') { f.position.x += 0.1 * he * Math.sin(hw * 5.5); f.position.y += 0.07 * he * Math.abs(Math.sin(hw * 5.5)); f.rotation.z += 0.22 * he * Math.sin(hw * 5.5); f.rotation.y += G.u * 12.5664; }
+            else if (G.k === 'heart') size = HOVER_SCALE * (1 + 0.1 * he * Math.pow(Math.abs(Math.sin(hw * 5)), 3));
+            else if (G.k === 'bow') { f.rotation.x += 0.6 * he; f.position.y -= 0.08 * he; }
+          }
+          if (f.scale.x !== size) f.scale.setScalar(size);
           return;
         }
         var n = nodes, freq = Math.max(1, Math.min(2.8, speed / 1.7));
@@ -473,12 +696,62 @@
           n.armL.el.rotation.set(-(0.18 + 0.5 * walk + 0.3 * run), 0, 0); n.armR.el.rotation.set(-(0.18 + 0.5 * walk + 0.3 * run) * (1 - wv), 0, wv * (-0.5 + 0.45 * Math.sin(t * 9)));
         }
         if (far) return;
+        var ge = G ? G.e : 0, gw = G ? G.w : 0, gk = G ? G.k : '';
+        if (G) {
+          // arms: z lifts one sideways (left +, right -), x swings it forward (-); the elbow's x bends it forward (-)
+          var L = n.armL, R = n.armR, rest = 1 - ge;
+          if (gk === 'win') {
+            if (!seated) n.hip.position.y += 0.085 * ge * Math.abs(Math.sin(gw * 7));
+            L.sh.rotation.set(L.sh.rotation.x * rest, 0, 0.07 + 2.6 * ge + 0.16 * ge * Math.sin(gw * 10)); R.sh.rotation.set(R.sh.rotation.x * rest, 0, -0.07 - 2.6 * ge - 0.16 * ge * Math.sin(gw * 10 + 1));
+            L.el.rotation.x *= rest; R.el.rotation.x *= rest;
+          } else if (gk === 'raise') {
+            R.sh.rotation.set(R.sh.rotation.x * rest - 1.55 * ge, 0, R.sh.rotation.z * rest - 0.12 * ge); R.el.rotation.set(R.el.rotation.x * rest - 0.55 * ge, 0, 0);
+          } else if (gk === 'clap') {
+            var beat = 0.13 * ge * Math.sin(gw * 15);
+            L.sh.rotation.set(L.sh.rotation.x * rest - 0.95 * ge, 0, 0.07 * rest - (0.2 + beat) * ge); R.sh.rotation.set(R.sh.rotation.x * rest - 0.95 * ge, 0, -0.07 * rest + (0.2 + beat) * ge);
+            L.el.rotation.set(L.el.rotation.x * rest - 1.15 * ge, 0, 0); R.el.rotation.set(R.el.rotation.x * rest - 1.15 * ge, 0, 0);
+          } else if (gk === 'lose') {
+            n.spine.rotation.x += 0.26 * ge; if (!seated) n.hip.position.y -= 0.03 * ge;
+            L.sh.rotation.x *= rest; R.sh.rotation.x *= rest;
+          } else if (gk === 'laugh') {
+            n.spine.rotation.x -= 0.1 * ge; if (!seated) n.hip.position.y += 0.02 * ge * Math.abs(Math.sin(gw * 11));
+          } else if (gk === 'wow') {
+            n.spine.rotation.x -= 0.13 * ge;
+            L.sh.rotation.set(L.sh.rotation.x * rest, 0, 0.07 + 0.95 * ge); R.sh.rotation.set(R.sh.rotation.x * rest, 0, -0.07 - 0.95 * ge);
+            L.el.rotation.x = L.el.rotation.x * rest - 0.5 * ge; R.el.rotation.x = R.el.rotation.x * rest - 0.5 * ge;
+          } else if (gk === 'dance') {
+            var d1 = Math.sin(gw * 5.5), d2 = Math.sin(gw * 11);
+            if (!seated) { n.hip.position.x += 0.05 * ge * d1; n.hip.position.y -= 0.03 * ge * Math.abs(d2); }
+            n.spine.rotation.y += 0.3 * ge * d1; n.spine.rotation.z += 0.09 * ge * d1;
+            L.sh.rotation.set(L.sh.rotation.x * rest - 0.5 * ge, 0, 0.07 + (1.25 + 0.9 * d1) * ge); R.sh.rotation.set(R.sh.rotation.x * rest - 0.5 * ge, 0, -0.07 - (1.25 - 0.9 * d1) * ge);
+            L.el.rotation.x = L.el.rotation.x * rest - 0.9 * ge; R.el.rotation.x = R.el.rotation.x * rest - 0.9 * ge;
+          } else if (gk === 'heart') {
+            // both hands to the chest
+            L.sh.rotation.set(L.sh.rotation.x * rest - 0.55 * ge, 0, 0.07 * rest - 0.28 * ge); R.sh.rotation.set(R.sh.rotation.x * rest - 0.55 * ge, 0, -0.07 * rest + 0.28 * ge);
+            L.el.rotation.set(L.el.rotation.x * rest - 1.75 * ge, 0, 0); R.el.rotation.set(R.el.rotation.x * rest - 1.75 * ge, 0, 0);
+            n.spine.rotation.z += 0.05 * ge * Math.sin(gw * 4);
+          } else if (gk === 'bow') {
+            n.spine.rotation.x += 0.62 * ge;
+            L.sh.rotation.x = L.sh.rotation.x * rest + 0.25 * ge; R.sh.rotation.x = R.sh.rotation.x * rest + 0.25 * ge;
+          }
+        }
         // the head keeps level and looks about a little, as the lab's neck does
         n.head.rotation.set(-0.7 * n.spine.rotation.x + 0.015 * Math.sin(t * 2.2) + tipsy * 0.05 * Math.sin(t * 1.8),
           -0.6 * n.spine.rotation.y + (1 - walk) * 0.16 * Math.sin(t * 0.47 + seed) + 0.1 * Math.max(-1, Math.min(1, turn)),
           -0.8 * n.spine.rotation.z + tipsy * 0.04 * Math.sin(t * 2.3 + 0.7) + 0.05 * wv * Math.sin(t * 5));
+        if (G) {
+          if (gk === 'nod') n.head.rotation.x += 0.3 * ge * Math.sin(gw * 9.5);
+          else if (gk === 'look') n.head.rotation.y += 0.75 * Math.sin(G.u * 6.2832);
+          else if (gk === 'lose') n.head.rotation.x += 0.5 * ge;
+          else if (gk === 'laugh') n.head.rotation.x += -0.16 * ge + 0.09 * ge * Math.sin(gw * 11);
+          else if (gk === 'wow') n.head.rotation.x -= 0.1 * ge;
+          else if (gk === 'win') n.head.rotation.x -= 0.18 * ge;
+          else if (gk === 'bow') n.head.rotation.x += 0.62 * 0.7 * ge + 0.2 * ge;      // the head goes down with the bow (the neck would otherwise keep it level)
+          else if (gk === 'heart') n.head.rotation.z += 0.12 * ge * Math.sin(gw * 4);
+        }
       };
       me.dispose = function () {
+        gone = true; if (later) { clearTimeout(later); later = null; }
         geos.forEach(function (g) { g.dispose(); }); tex.dispose(); screenMat.dispose();
         if (nodes && nodes.ring) nodes.ring.material.dispose();
         if (group.parent) group.parent.remove(group);
@@ -492,6 +765,13 @@
     return {
       make: make,
       get count() { return live.length; },
+      /** Where inscriptions' pictures are ({ contract, base }), or null to show none (the viewer's own switch). Every character is redrawn. */
+      inscriptions: function (config) {
+        var next = insOf(config);
+        if ((next && ins && next.contract === ins.contract && next.base === ins.base) || (!next && !ins)) return;
+        ins = next; live.forEach(function (c) { c.repaint(); });
+      },
+      get showing() { return !!ins; },
       dispose: function () {
         live.slice().forEach(function (c) { c.dispose(); });
         Object.keys(materials).forEach(function (k) { materials[k].dispose(); }); materials = {};
@@ -502,6 +782,8 @@
     };
   }
 
-  global.PXCubes = { version: 1, FRAMES: FRAMES, FINISHES: FINISHES, FACES: FACES, GAITS: GAITS, BODIES: BODIES, ACCENTS: ACCENTS, MAX: MAX,
-    parseLook: parseLook, encodeLook: encodeLook, fromLabLook: fromLabLook, drawScreen: drawScreen, kit: kit };
+  global.PXCubes = { version: 2, FRAMES: FRAMES, FINISHES: FINISHES, FACES: FACES, GAITS: GAITS, BODIES: BODIES, ACCENTS: ACCENTS, MAX: MAX,
+    parseLook: parseLook, encodeLook: encodeLook, fromLabLook: fromLabLook, drawScreen: drawScreen, kit: kit,
+    SCREEN_FACES: SCREEN_FACES, SCREENS_PATTERN: SCREENS_PATTERN, SCREENS_MAX: SCREENS_MAX, parseScreens: parseScreens, encodeScreens: encodeScreens,
+    pictureSource: pictureSource, GESTURES: GESTURES };
 })(typeof window !== 'undefined' ? window : globalThis);

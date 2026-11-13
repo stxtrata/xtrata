@@ -25,6 +25,7 @@
   // What goes in the menu: [original button id, name, a line about it, 'go' closes the menu / 'set' keeps it open]
   var GROUPS = [
     ['Go to', [
+      ['@walk', 'Walk the floor', 'Explore the room on foot', 'go'],
       ['viewHall', 'Grand hall', 'The whole room, from the entrance', 'go'],
       ['viewLounge', 'The lounge', 'Sofas, chess tables and the house screen', 'go'],
       ['viewSalon', 'Private salon', 'Player against player · needs a BNS name', 'go'],
@@ -35,19 +36,35 @@
     ]],
     ['You', [
       ['@character', 'Your character', 'Human figure or cube, and how it looks', 'go'],
+      ['@invite', 'Invite a friend', 'A link that brings them to you', 'go'],
       ['chipsButton', 'LAYR house chips', 'What the chips are worth', 'go']
     ]],
     ['View and sound', [
       ['viewbtn', 'Camera', 'Behind you or through your eyes · key V', 'set'],
       ['music', 'Music', 'The lounge band', 'set'],
       ['mute', 'Sound', 'Everything you hear', 'set'],
+      ['@screens', 'Inscriptions on cubes', 'Pictures players put on their cube’s screens', 'set'],
       ['ambienceButton', 'Room ambience', 'Lighting, reflections and mood', 'go']
     ]],
     ['Help', [
+      ['@tour', 'Show me around', 'A one-minute tour · leave it whenever you like', 'go'],
       ['casinoGuideButton', 'Welcome guide', 'What there is to do, and where', 'go'],
       ['helpButton', 'Controls and help', 'Walking, sitting, chat, chips', 'go']
     ]]
   ];
+
+  // Entries that are not one of the page's own buttons: what they do, whether they can be offered now, and (for a setting) what they show.
+  var looksHost = function () { return window.PXRoomHost && window.PXRoomHost.looks; };
+  var modeBtn = function () { return $('modebtn'); };
+  var ACTIONS = {
+    // the bar's Explore button, which a phone has no room for: offered while the visitor is looking at the room from above
+    '@walk': { run: function () { modeBtn().click(); }, has: function () { var b = modeBtn(); return !!b && !b.hidden && /explore/i.test(b.textContent); } },
+    '@character': { run: function () { window.PXCharacter.open(); }, has: function () { return !!window.PXCharacter; } },
+    '@invite': { run: function () { window.__pxSocial.invite(); }, has: function () { return !!(window.__pxSocial && window.__pxSocial.invite); } },
+    '@tour': { run: function () { window.PXTour.start(true); }, has: function () { return !!window.PXTour; } },
+    '@screens': { run: function () { var l = looksHost(); l.show(!l.showing); }, has: function () { var l = looksHost(); return !!(l && l.show && window.PXCubes && window.PXCubes.parseScreens); },
+      state: function () { return looksHost().showing ? 'Shown' : 'Hidden'; } }
+  };
 
   var CSS =
     // the bars that are now in the menu
@@ -102,7 +119,14 @@
     'body.pxhud #tools #back::before{content:"\\2190";font-size:17px}' +
     'body.pxhud #tools .rt{order:2;margin-left:auto;gap:5px}' +
     'body.pxhud #tools #pxroom{gap:5px}' +
-    'body.pxhud #tools .rt button{width:auto;min-width:44px;padding:0 9px;font-size:11px;justify-content:center;overflow:visible}' +
+    'body.pxhud #tools .rt button{width:auto;min-width:40px;padding:0 7px;font-size:11px;justify-content:center;overflow:visible}' +
+    // A signed-in player has more in the bar (their level, reactions, their name on the Room button): on a phone the name and the
+    // level's progress line go, and Explore / Grand hall moves into the menu, so that Chat and Menu are always on the screen.
+    'body.pxhud #tools .rt,body.pxhud #tools #pxroom{gap:4px}' +
+    'body.pxhud #tools #pxroom-btn .lbl,body.pxhud #tools #pxMeBtn i{display:none}' +
+    'body.pxhud #tools #pxroom-btn i{margin:0 3px 0 0}' +
+    'body.pxhud #tools #modebtn{display:none}' +
+    'body.pxhud #tools #bankpill{padding:4px 8px}' +
     'body.pxhud #bankpill span{display:none}body.pxhud #bankpill b{font-size:13px}' +
     'body.pxhud #bankpill[data-empty="1"] b::after{font-size:11px}' +
     '#pxMenuBtn .tx{display:none}' +
@@ -113,6 +137,8 @@
     '#pxMenu .sheet{top:auto;right:0;left:0;bottom:0;width:auto;max-height:min(78dvh,calc(100dvh - 70px));border-radius:12px 12px 0 0;border-width:1px 0 0;padding:6px 8px calc(12px + env(safe-area-inset-bottom))}' +
     '#pxMenu .sheet::before{content:"";display:block;width:38px;height:4px;border-radius:2px;background:#ffffff33;margin:4px auto 2px}' +
     '}' +
+    '@media (max-width:379px){body.pxhud #bankpill b{font-size:12px}body.pxhud #bankpill em.up,body.pxhud #bankpill em.down{font-size:8px}body.pxhud #tools{left:8px;right:8px}}' +
+    '@media (max-width:349px){body.pxhud #tools{flex-wrap:wrap;row-gap:5px}}' +
     // at a table or a machine the page hides its own chrome; the menu follows
     'body.machine-connected #pxMenu,body.layr-cashier-open #pxMenu{display:none!important}' +
     '@media (prefers-reduced-motion:reduce){body.pxhud #bankpill[data-empty="1"]{animation:none}}';
@@ -139,9 +165,10 @@
       var side = d[3] === 'set' ? el('span', 'st') : el('span', 'go', '›');
       b.append(t, side);
       b.onclick = function () {
-        if (d[0] === '@character') { close(); if (window.PXCharacter) window.PXCharacter.open(); return; }
         if (d[3] === 'go') close();
-        orig.click();
+        var act = ACTIONS[d[0]];
+        if (act) { try { if (act.has()) act.run(); } catch (e) { console.warn('[menu] ' + d[0] + ' failed:', e); } }
+        else orig.click();
         setTimeout(refresh, 0);
       };
       items.push({ d: d, orig: orig, b: b, side: side }); made.push(b);
@@ -164,7 +191,8 @@
     buildLine.textContent = build && build.textContent.trim() ? 'Build ' + build.textContent.trim() : '';
     items.forEach(function (it) {
       if (it.orig) it.b.hidden = !!it.orig.hidden || it.orig.style.display === 'none';
-      if (it.d[0] === '@character') it.b.hidden = !window.PXCharacter;
+      var act = ACTIONS[it.d[0]];
+      if (act) { var can = false; try { can = act.has(); } catch (e) { } it.b.hidden = !can; if (can && act.state) { try { it.side.textContent = act.state(); } catch (e) { it.side.textContent = ''; } } }
       if (STATE[it.d[0]]) { try { it.side.textContent = STATE[it.d[0]](it.orig); } catch (e) { it.side.textContent = ''; } }
     });
   }
