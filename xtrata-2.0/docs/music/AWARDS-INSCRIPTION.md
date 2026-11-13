@@ -136,8 +136,22 @@ not only awards); fund in stages; or give awards to the top classes only.
 3. **The live fee settings and royalty recipient** (see Cost).
 4. **The size of a claim transaction** and so its network fee: it carries the note and about 300 bytes of record.
 
-## Decisions for Jim
+## Decided (Jim, 2026-11-13)
 
-1. Fund the award contract with about 0.102 STX per claim (this plan), lower the core's fee, or limit awards to some classes.
-2. A record is a snapshot (recommended): the name and address on it never change, even if it is sent on.
-3. If a player has no BNS name at claim time: mint with the address only (recommended), or let them wait and claim once they have a name.
+1. **Funding.** The award contract pays Xtrata's fee for every record from its own balance. Jim tops that balance up
+   from the sponsorship wallet (about 0.102 STX per expected claim, in stages). The money sits in the contract, not
+   behind a key on the server: Claude never holds or uses the sponsorship wallet.
+2. **A record is fixed to the Music Hero who paid those plays.** The number, address, name and plays on it never
+   change, whoever holds it later.
+3. **No BNS name at claim time: mint with the address only.**
+
+Note: a sponsored transaction can only cover the network fee, not Xtrata's own fee, which is why the balance has to
+be in the contract. The sponsorship service could also pay each claim's network fee so that claiming costs the
+player nothing at all; that is optional and not in this plan yet.
+
+## Done so far
+
+- Templates read the seed (`s`): same seed, same record, every time; a different seed, a visibly different record in
+  the same class. Checked for all five (identical on reload; a bad seed falls back to the standard look).
+- With the seed code the Diamond template is 16.5 KB, just over one 16,384-byte chunk, so it inscribes as two chunks
+  (0.002 STX more by the default fees). The other four are one chunk.

@@ -13,6 +13,10 @@ viewer drops the query):
   a  the address that claimed it    a=SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7
   b  its BNS name, if it has one    b=jim.btc
   p  paid plays made to earn it     p=100
+  s  the seed: up to 8 hex digits   s=9f3a61c2
+The seed makes one record different from every other in its class, and the same every time it is opened: it sets
+where and when the glints catch, the smoke's shape and the dust's drift, the Diamond's deal of facets, the angle
+the case rests at and where the two track gaps fall in the grooves. With no seed a file shows its standard look.
 The level is the file itself (gold.html is always the Gold record). Everything is checked and written as plain text:
 nothing passed in can add markup. The plaque always opens with "Xtrata Music Hero" above the Xtrata mark; with nothing passed
 in, the level sits below it.
@@ -68,9 +72,9 @@ CLASSES = {
 # facets trade between light and dark. That trade is the flash a diamond gives.
 FACETS_JS = ("var N=16,T=6.2832/N,W='fff,fff,fff,f3f8fc,e2ecf5,cfdbe6,b7c6d6,93a6ba,6d8096,3f4f63,fff,d5ecff,fff,eef4f9,fff1cc,ffe1f2'.split(','),"
              "pt=function(r,t){return(r*Math.cos(t)).toFixed(1)+' '+(r*Math.sin(t)).toFixed(1)};"
-             "$('.k').forEach(function(e,x){z=3+x%2*40;var F='',p=function(a,b,c){F+='<path fill=\"#'+W[R()*16|0]+'\" d=\"M'+a+'L'+b+'L'+c+'z\"/>'};"
+             "$('.k').forEach(function(e,x){z=(Z0+3+x%2*40)%2147483646+1;var F='',p=function(a,b,c){F+='<path fill=\"#'+W[R()*16|0]+'\" d=\"M'+a+'L'+b+'L'+c+'z\"/>'};"
              "for(i=0;i<N;i++){var a0=i*T,a1=a0+T,am=a0+T/2;p(pt(101,a0),pt(101,a1),pt(80,am));p(pt(101,a0),pt(80,am),pt(58,a0));p(pt(101,a0),pt(58,a0),pt(80,am-T));p(pt(80,am),pt(58,a1),pt(36,am));p(pt(80,am),pt(36,am),pt(58,a0))}"
-             "e.innerHTML=F});z=7;")
+             "e.innerHTML=F});")
 
 def extras(c):
     """The parts only some classes have. Returns (css, markup inside the case, markup on each face of the record, svg defs)."""
@@ -111,7 +115,7 @@ TPL = r"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewp
 <style>
 html,body{margin:0;height:100%;background:#040509;overflow:hidden}
 body{display:grid;place-items:center}
-.a{position:relative;width:min(100vw,100vh);aspect-ratio:1;font-size:calc(min(100vw,100vh)/100);--t:@T@;--e:@E@;perspective:150em;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;outline:0;background:radial-gradient(46% 40% at 50% 46%,color-mix(in srgb,var(--t) 16%,transparent),transparent 74%),#040509}
+.a{position:relative;width:min(100vw,100vh);aspect-ratio:1;font-size:calc(min(100vw,100vh)/100);--t:@T@;--e:@E@;--g1:58%;--g2:76%;perspective:150em;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;outline:0;background:radial-gradient(46% 40% at 50% 46%,color-mix(in srgb,var(--t) 16%,transparent),transparent 74%),#040509}
 .a:active{cursor:grabbing}
 .m,.m>*,.w{position:absolute;transform-style:preserve-3d}
 .m{left:50%;top:51%;width:0;height:0}
@@ -138,7 +142,7 @@ body{display:grid;place-items:center}
 .r>*{position:absolute;inset:0;border-radius:50%}
 .s{background:@BASE@}
 .g{background:repeating-radial-gradient(circle,@GROOVE@ 0 .16em,transparent .28em .62em);-webkit-mask:radial-gradient(circle closest-side,transparent 39%,#000 40% 96%,transparent 97%);mask:radial-gradient(circle closest-side,transparent 39%,#000 40% 96%,transparent 97%)}
-.v{background:radial-gradient(circle closest-side,transparent 57.5%,#ffffff26 58%,transparent 58.6% 75.5%,#ffffff26 76%,transparent 76.6%),radial-gradient(circle closest-side,transparent 68%,#0006);box-shadow:inset 0 0 0 .2em #fff7,inset 0 0 0 .5em #0003}
+.v{background:radial-gradient(circle closest-side,transparent calc(var(--g1) - .5%),#ffffff26 var(--g1),transparent calc(var(--g1) + .6%)),radial-gradient(circle closest-side,transparent calc(var(--g2) - .5%),#ffffff26 var(--g2),transparent calc(var(--g2) + .6%)),radial-gradient(circle closest-side,transparent 68%,#0006);box-shadow:inset 0 0 0 .2em #fff7,inset 0 0 0 .5em #0003}
 .h{--c:color-mix(in srgb,var(--t) 30%,#fff);background:conic-gradient(transparent 6deg,var(--c) 27deg,transparent 48deg 186deg,var(--c) 206deg,transparent 226deg);mix-blend-mode:screen;opacity:@SPEC@}
 .l{inset:34%!important;background:@LABEL@;box-shadow:0 0 0 .16em #fff5,0 0 0 .5em #0004,inset 0 0 1.2em #0006;color:@X@;display:grid;place-items:center}
 .l svg{width:70%;height:70%}
@@ -169,17 +173,19 @@ function L(t,x,c){var e=document.createElement(t);e.textContent=x;if(c)e.classNa
 if(n||ad||bn||pl){q.lastChild.remove();L('small','@NAME@ record'+(n?' · No. '+n.padStart(4,'0'):''));var sh=ad?ad.slice(0,6)+'…'+ad.slice(-5):'',w=bn||sh,r=[];
 if(w)L('b',w,w.length>24?'t3':w.length>15?'t2':'');if(bn&&sh)r.push(sh);if(pl)r.push((+pl).toLocaleString('en')+' paid play'+(pl==1?'':'s'));if(r.length)L('small',r.join(' · '),'lc')}
 function Z(){a.style.setProperty('--z',a.clientWidth/600)}Z();onresize=Z;
-/* glints on the record and dust in the light: the same every time (a fixed seed) */
-var z=7,R=function(){return(z=z*16807%2147483647)/2147483647},i,e;
-[[27,24,1],[74,70,.8],[84,34,.7],[18,62,.62],[52,9,.6],[63,89,.5],[38,81,.5],[91,56,.45]].slice(0,@GL@).forEach(function(g,j){$('.gs').forEach(function(s){e=document.createElement('i');e.innerHTML='<b></b>';e.style.cssText='left:'+g[0]+'%;top:'+g[1]+'%;--k:'+g[2]+';--d:'+(6+j*1.7)+'s;--o:-'+j*2.3+'s';s.appendChild(e)})});
+/* Everything scattered or timed is dealt from the seed (?s=, up to 8 hex digits): one record differs from the next, and each is the same every time. */
+var Z0=parseInt((G('s').match(/^[0-9a-f]{1,8}$/i)||['6'])[0],16)%2147483646+1,z=Z0,R=function(){return(z=z*16807%2147483647)/2147483647},i,e,A0=-18+R()*16-8,PH=R()*6.283;
+a.style.setProperty('--g1',52+R()*10+'%');a.style.setProperty('--g2',70+R()*10+'%');
+for(i=0;i<@GL@;i++){var ga=R()*6.283,gr=20+R()*27,gc='left:'+(50+gr*Math.cos(ga))+'%;top:'+(50+gr*Math.sin(ga))+'%;--k:'+(1-i*.07)+';--d:'+(6+R()*8)+'s;--o:-'+R()*12+'s';$('.gs').forEach(function(s){e=document.createElement('i');e.innerHTML='<b></b>';e.style.cssText=gc;s.appendChild(e)})}
 for(i=0;i<@DU@;i++){e=document.createElement('i');e.className='du';e.style.cssText='--p:'+(.25+R()*.6)+';--x:'+(R()*6-3)+'em;--d:'+(9+R()*10)+'s;--o:-'+R()*19+'s;scale:'+(.4+R()*.9)+';transform:translate3d('+(R()*40-20)+'em,'+(R()*56-26)+'em,'+(R()*24-12)+'em) rotateY('+(i%3?0:90)+'deg)';m.appendChild(e)}
+$('feTurbulence').forEach(function(e){e.setAttribute('seed',Z0%997)});$('.sm i').forEach(function(e){e.style.animationDelay=-R()*30+'s'});
 @FJS@
-var S=$('.s'),H=$('.h'),K=$('.kb'),C=$('.cx i'),rx=-8,ry=-18,v=0,d=0,px,py,still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+var S=$('.s'),H=$('.h'),K=$('.kb'),C=$('.cx i'),rx=-8,ry=A0,v=0,d=0,px,py,still=matchMedia('(prefers-reduced-motion:reduce)').matches;
 a.onpointerdown=function(e){d=1;px=e.clientX;py=e.clientY;v=0;a.setPointerCapture(e.pointerId)};
 a.onpointermove=function(e){if(!d)return;v=(e.clientX-px)*.45;ry+=v;rx=Math.max(-40,Math.min(40,rx-(e.clientY-py)*.3));px=e.clientX;py=e.clientY};
 a.onpointerup=a.onpointercancel=function(){d=0};
 a.onkeydown=function(e){var k={ArrowLeft:-4,ArrowRight:4}[e.key];if(k){v=k;e.preventDefault()}};
-(function f(t){if(!d){ry+=v;v*=.94;if(Math.abs(v)<.05){var g=Math.round(ry/360)*360+(still?-18:24*Math.sin(t/2600));ry+=(g-ry)*.03;rx+=(-8-rx)*.03}}
+(function f(t){if(!d){ry+=v;v*=.94;if(Math.abs(v)<.05){var g=Math.round(ry/360)*360+(still?A0:24*Math.sin(t/2600+PH));ry+=(g-ry)*.03;rx+=(-8-rx)*.03}}
 m.style.transform='rotateX('+rx+'deg) rotateY('+ry+'deg)';
 /* the light stays put while the case turns: highlights slide over the record, and the diamond's facets trade light for dark */
 S.forEach(function(e){e.style.transform='rotate('+(ry*1.1-rx*1.5)+'deg)'});H.forEach(function(e){e.style.transform='rotate('+(40+ry*1.9+rx)+'deg)'});
