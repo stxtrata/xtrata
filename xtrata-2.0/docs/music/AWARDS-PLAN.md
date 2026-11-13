@@ -1,7 +1,8 @@
 # Player awards: a framed record every player can claim (plan)
 
-See also `AWARDS-INSCRIPTION.md` (2026-11-13): how the five templates and the 1,000 records are inscribed. It proposes
-that the award is the Xtrata record itself, held and handed out by a small contract, in place of a separate NFT.
+See also `AWARDS-INSCRIPTION.md` (2026-11-13), which supersedes the contract design below: the award is an Xtrata
+inscription made at the moment of the claim, with the claimer's number, address, BNS name and plays fixed in it. The
+award contract inscribes it and pays Xtrata's fee from its own balance. Jim's decisions further down still hold.
 
 Status: plan only, written 2026-11-12. Nothing here is built or deployed. It needs a new contract (Jim deploys it), a
 new action in the wallet box (its own security review) and five pieces of art. It does not block the 1,000-player
