@@ -6,8 +6,9 @@ body{display:grid;place-items:center}
 .a:active{cursor:grabbing}
 .m,.m>*,.w{position:absolute;transform-style:preserve-3d}
 .m{left:50%;top:51%;width:0;height:0}
-/* the glass case */
-.f{box-sizing:border-box;border:.16em solid color-mix(in srgb,var(--e) 80%,#fff);background:linear-gradient(125deg,#ffffff12,transparent 35%,transparent 70%,#ffffff0a);box-shadow:inset 0 0 2.5em color-mix(in srgb,var(--e) 12%,transparent),0 0 1em color-mix(in srgb,var(--e) 16%,transparent)}
+/* the glass case. The glow at its edges is painted inside each pane: a shadow would spill past the pane, the panes
+   would then cut through one another in 3D, and the browser draws that as mismatched patches. */
+.f{--c:color-mix(in srgb,var(--e) 16%,transparent);box-sizing:border-box;border:.16em solid color-mix(in srgb,var(--e) 80%,#fff);background:linear-gradient(90deg,var(--c),transparent 2.2em),linear-gradient(270deg,var(--c),transparent 2.2em),linear-gradient(var(--c),transparent 2.2em),linear-gradient(0deg,var(--c),transparent 2.2em),linear-gradient(125deg,#ffffff12,transparent 35%,transparent 70%,#ffffff0a)}
 .fr,.bk{width:50em;height:70em;left:-25em;top:-35em}.fr{transform:translateZ(15em)}.bk{transform:translateZ(-15em)}
 .lf,.rt{width:30em;height:70em;left:-15em;top:-35em}.lf{transform:rotateY(-90deg) translateZ(25em)}.rt{transform:rotateY(90deg) translateZ(25em)}
 .tp,.bt{width:50em;height:30em;left:-25em;top:-15em}.tp{transform:rotateX(90deg) translateZ(35em)}.bt{transform:rotateX(-90deg) translateZ(35em);background:radial-gradient(60% 70%,color-mix(in srgb,var(--t) 20%,transparent),transparent 72%),#07090e}
@@ -15,9 +16,9 @@ body{display:grid;place-items:center}
 .fl{width:220em;height:220em;left:-110em;top:-110em;transform:rotateX(-90deg) translateZ(38em);background:repeating-linear-gradient(0deg,color-mix(in srgb,var(--e) 26%,transparent) 0 .12em,transparent .12em 11em),repeating-linear-gradient(90deg,color-mix(in srgb,var(--e) 26%,transparent) 0 .12em,transparent .12em 11em);-webkit-mask:radial-gradient(circle,#000 12%,transparent 58%);mask:radial-gradient(circle,#000 12%,transparent 58%)}
 /* one soft light from the top of the case */
 .dl{left:-23em;top:-35em;width:46em;height:68em;transform:translateZ(-1.5em);background:conic-gradient(from 166deg at 50% 0,transparent,color-mix(in srgb,var(--t) 25%,#fff) 10deg 18deg,transparent 28deg);-webkit-mask:linear-gradient(transparent,#000 14%,transparent 94%);mask:linear-gradient(transparent,#000 14%,transparent 94%);opacity:.14;pointer-events:none}
-.em{width:13em;height:13em;left:-6.5em;top:-33em}
+.em{width:12em;height:12em;left:-6em;top:-33.6em}
 /* the record: two identical faces back to back, with a few slices between them for an edge */
-.w{width:38em;height:38em;left:-19em;top:-20em;animation:h 7s ease-in-out infinite}
+.w{width:38em;height:38em;left:-19em;top:-21.4em;animation:h 7s ease-in-out infinite}
 .r,.rm,.gs{position:absolute;inset:0;border-radius:50%}
 .rm{background:linear-gradient(#e9a877,#4f2a11)}.rm+.rm{transform:translateZ(.16em)}.rm+.rm+.rm{transform:translateZ(-.16em)}
 .r{overflow:hidden;transform:translateZ(.3em);backface-visibility:hidden;-webkit-backface-visibility:hidden}
@@ -33,10 +34,11 @@ body{display:grid;place-items:center}
 .l{inset:34%!important;background:radial-gradient(circle,#ffe3cd 0 18%,#c98554 55%,#6f3d1c);box-shadow:0 0 0 .16em #fff5,0 0 0 .5em #0004,inset 0 0 1.2em #0006;color:#ffe6d3;display:grid;place-items:center}
 .l svg{width:70%;height:70%}
 /* the plaque */
-.q{width:34em;height:10.4em;left:-17em;top:23.4em;transform:translateZ(13em);backface-visibility:hidden;-webkit-backface-visibility:hidden;box-sizing:border-box;border:.16em solid color-mix(in srgb,var(--t) 70%,#000);border-radius:.3em;background:linear-gradient(#1c2029,#0b0d13 50%,#171b23);box-shadow:inset 0 .12em 0 #fff2;color:color-mix(in srgb,var(--t) 80%,#fff);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.35em;font-family:ui-sans-serif,system-ui,sans-serif;text-align:center;white-space:nowrap;overflow:hidden}
-.q svg{width:4.6em;height:4.2em}
+.q{width:34em;height:13.6em;left:-17em;top:20.9em;transform:translateZ(13em);backface-visibility:hidden;-webkit-backface-visibility:hidden;box-sizing:border-box;border:.16em solid color-mix(in srgb,var(--t) 70%,#000);border-radius:.3em;background:linear-gradient(#1c2029,#0b0d13 50%,#171b23);box-shadow:inset 0 .12em 0 #fff2;color:color-mix(in srgb,var(--t) 80%,#fff);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3em;font-family:ui-sans-serif,system-ui,sans-serif;text-align:center;white-space:nowrap;overflow:hidden}
+.q svg{width:3.7em;height:3.3em}
+.q .hr{font-size:1.1em;letter-spacing:.32em;opacity:.7}
 .q small{font-size:1.45em;font-weight:600;letter-spacing:.18em;text-transform:uppercase;opacity:.85}.q .lc{text-transform:none;letter-spacing:.06em}
-.q b{font-size:2.9em;line-height:1;letter-spacing:.03em;color:#fff}.q .t2{font-size:2.2em}.q .t3{font-size:1.6em}
+.q b{font-size:2.6em;line-height:1;letter-spacing:.03em;color:#fff}.q .t2{font-size:2.1em}.q .t3{font-size:1.55em}
 .o{--cw:currentColor;--cb:currentColor;--co:currentColor}
 .sm{left:-24.5em;top:-8em;width:49em;height:42.6em;overflow:hidden;transform:translateZ(-7em);opacity:.22;-webkit-mask:radial-gradient(110% 100% at 50% 100%,#000 25%,transparent 78%);mask:radial-gradient(110% 100% at 50% 100%,#000 25%,transparent 78%);pointer-events:none}
 .sm i{position:absolute;left:0;top:0;width:540px;height:262px;transform-origin:0 0;scale:var(--z,1);filter:url(#sm);animation:sm 38s ease-in-out infinite alternate}
@@ -56,7 +58,7 @@ body{display:grid;place-items:center}
 <div class="m" id="m"><div class="fl"></div><div class="pl"></div><div class="f bk"></div><div class="f lf"></div><div class="f rt"></div><div class="f tp"></div><div class="f bt"></div><div class="dl"></div><div class="sm"><i></i></div><div class="sm s2"><i></i></div>
 <svg class="em"><use href="#x"/></svg>
 <div class="w"><div class="gl"></div><div class="rm"></div><div class="rm"></div><div class="rm"></div><div class="r"><div class="s"></div><div class="g"></div><div class="v"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div><div class="r"><div class="s"></div><div class="g"></div><div class="v"></div><div class="h"></div><div class="l"><svg class="o"><use href="#x"/></svg></div></div><div class="gs"></div><div class="gs"></div></div>
-<div class="q" id="q"><svg class="o"><use href="#x"/></svg><small>Bronze record</small></div>
+<div class="q" id="q"><small class="hr">Xtrata Music Hero</small><svg class="o"><use href="#x"/></svg><small>Bronze record</small></div>
 <div class="f fr"></div></div>
 </div>
 <script>/* Drag, swipe or use the arrow keys to turn the model. The plaque is engraved from ?n= &a= &b= &p= (see scripts/build-awards.py). */
@@ -65,7 +67,7 @@ P=new URLSearchParams(location.search+'&'+location.hash.slice(1)),G=function(k){
 n=G('n').replace(/\D/g,'').slice(0,6),ad=G('a'),bn=G('b').toLowerCase(),pl=G('p').replace(/\D/g,'').slice(0,7);
 if(!/^S[PM][0-9A-Z]{28,41}$/.test(ad))ad='';if(!/^[a-z0-9_-]{1,37}(\.[a-z0-9_-]{1,20}){1,2}$/.test(bn))bn='';
 function L(t,x,c){var e=document.createElement(t);e.textContent=x;if(c)e.className=c;q.appendChild(e)}
-if(n||ad||bn||pl){q.textContent='';L('small','Bronze record'+(n?' · No. '+n.padStart(4,'0'):''));var sh=ad?ad.slice(0,6)+'…'+ad.slice(-5):'',w=bn||sh,r=[];
+if(n||ad||bn||pl){q.lastChild.remove();L('small','Bronze record'+(n?' · No. '+n.padStart(4,'0'):''));var sh=ad?ad.slice(0,6)+'…'+ad.slice(-5):'',w=bn||sh,r=[];
 if(w)L('b',w,w.length>24?'t3':w.length>15?'t2':'');if(bn&&sh)r.push(sh);if(pl)r.push((+pl).toLocaleString('en')+' paid play'+(pl==1?'':'s'));if(r.length)L('small',r.join(' · '),'lc')}
 function Z(){a.style.setProperty('--z',a.clientWidth/600)}Z();onresize=Z;
 /* glints on the record and dust in the light: the same every time (a fixed seed) */
