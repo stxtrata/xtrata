@@ -151,6 +151,26 @@ player nothing at all; that is optional and not in this plan yet.
 
 ## Done so far
 
+- **The award contract is written and passes in simulation** against the real core source: `contracts/live/xtrata-music-awards-v1.0.clar`,
+  tests in `contracts/clarinet/tests/xtrata-music-awards-v1.0.test.ts` (15 tests; run with `npx vitest run tests/xtrata-music-awards-v1.0.test.ts`
+  from `contracts/clarinet/`). Not deployed anywhere. What the tests show:
+  - a genuine claim inscribes the exact record bytes as HTML with the template as its dependency, takes 0.102 STX from the
+    contract's balance to Xtrata, and leaves the inscription owned by the hero;
+  - refused, with nothing inscribed, paid or recorded: a note signed by another key, a note used by another address, a record
+    changed by one character, a changed class, number, play count or drop, a note made for another deployment, a second claim
+    by the same hero or for the same wall number, a claim past the class cap, a claim when the balance cannot cover the fee;
+  - the award can be transferred like any inscription and still names the hero who earned it;
+  - only the owner can change settings or withdraw; while the core is paused claims stop unless Xtrata allow-lists the contract.
+  - Each safety check was also removed in turn to confirm the tests fail without it.
+- **Size of a claim:** the record is about 280 to 300 bytes and the whole claim transaction about 600 to 620 bytes before its
+  post-conditions (measured by building one). At roughly 1 microSTX per byte that is under 1,000 microSTX: two or three plays.
+  The real fee still has to be seen on testnet.
+- **Error numbers** (for the player's messages): 200 not owner, 201 paused, 202 no signer set, 203 note not valid, 204 wall
+  number already claimed, 205 this address already has its award, 206 class not set, 207 class full, 208 empty record,
+  209 bad arguments. Below 200 the error is the core's own (109 paused, 111 template missing) or 1 (balance cannot cover the fee).
+- **Still simulation only.** Not yet shown: the same thing on testnet, real fees, and that a record draws its template
+  correctly in each viewer.
+
 - Templates read the seed (`s`): same seed, same record, every time; a different seed, a visibly different record in
   the same class. Checked for all five (identical on reload; a bad seed falls back to the standard look).
 - With the seed code the Diamond template is 16.5 KB, just over one 16,384-byte chunk, so it inscribes as two chunks
