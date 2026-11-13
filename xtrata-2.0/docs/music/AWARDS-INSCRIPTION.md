@@ -168,8 +168,23 @@ player nothing at all; that is optional and not in this plan yet.
 - **Error numbers** (for the player's messages): 200 not owner, 201 paused, 202 no signer set, 203 note not valid, 204 wall
   number already claimed, 205 this address already has its award, 206 class not set, 207 class full, 208 empty record,
   209 bad arguments. Below 200 the error is the core's own (109 paused, 111 template missing) or 1 (balance cannot cover the fee).
-- **Still simulation only.** Not yet shown: the same thing on testnet, real fees, and that a record draws its template
-  correctly in each viewer.
+- **A record opening its template, tried locally** (a small server standing in for the gateway, the real Gold template, a
+  record built exactly as the contract tests build it, in Chromium). The template drew with the right plaque
+  ("Gold record · No. 0412 · jim.btc · SP10W2…69TM7 · 50 paid plays") when the record was: opened at its own address;
+  opened with the site's isolation header; shown in a sandboxed frame pointed at its address; shown in a sandboxed frame
+  given its markup (`srcdoc`, which is how the app's main preview shows HTML); written into the page by a launcher.
+  **It did not draw when the record was shown from a `blob:` address**: a `/i/<id>` reference has nothing to resolve
+  against there. Any surface that shows inscriptions from a blob would show an empty record. To settle before
+  mainnet: either confirm no surface does that for HTML, or have the record fall back to the full
+  `https://xtrata.xyz/i/<id>` address when it finds itself in a blob (about 80 more bytes per record).
+- **The testnet rehearsal is written but has not run.** `contracts/clarinet/scripts/awards-testnet-rehearsal.mjs` makes its
+  own throwaway wallets, uses the faucet, deploys the core as the simulation uses it, inscribes the Gold and Diamond
+  templates, deploys and funds the award contract, makes two claims, a forged claim and a second claim (both must be
+  refused), sends a record on, withdraws the balance, then reads everything back and reports the fee each step paid.
+  `--dry` builds all 20 transactions without a network; that passes. It could not be run from Claude's session: the
+  session's network rules refuse the Stacks testnet API. Sizes from the dry run: a claim is 626 to 657 bytes including
+  its post-condition; the award contract deploys at 9.2 KB; the Gold template inscribes in a 15.2 KB transaction.
+- **Still to show:** the flow on testnet with real fees, and the record drawing in the live app's own viewers.
 
 - Templates read the seed (`s`): same seed, same record, every time; a different seed, a visibly different record in
   the same class. Checked for all five (identical on reload; a bad seed falls back to the standard look).
