@@ -11,7 +11,11 @@
  *   arriving  a player was just made and its plays are on their way
  *   landed    the plays have arrived: what this player is, and "Start listening"
  *   empty     a player with no plays: say so plainly, and lead to "Add plays"
+ *
+ * Getting started is shown as three lights (stepLights), with the Xtrata mark at the top and a record to look at on
+ * every screen: a newcomer should see where they are without reading.
  */
+import { xtrataMark } from './brand';
 export type WelcomeMode = 'checking' | 'gift' | 'new' | 'back' | 'arriving' | 'landed' | 'empty';
 export interface WelcomeInput {
   mode: WelcomeMode;
@@ -48,11 +52,37 @@ const button = (cls: string, label: string, run: () => void, disabled = false) =
 };
 const count = (n: number) => n.toLocaleString();
 
+/**
+ * Where a newcomer is, as three lights: the ones behind them are lit, the one they are on glows. Shown from the first
+ * screen until they are in, so every step visibly moves them along. Words stay short: the lights do the telling.
+ */
+export const WELCOME_STEPS = { gift: ['Picked', 'Passkey', 'Listen'], fresh: ['Welcome', 'Passkey', 'Listen'] } as const;
+/** Which light glows: -1 when the screen is not part of getting started (a return visit, an empty player). */
+export const stepNow = (mode: WelcomeMode): number => (mode === 'gift' || mode === 'new' ? 1 : mode === 'arriving' ? 2 : mode === 'landed' ? 3 : -1);
+export function stepLights(labels: readonly string[], now: number): HTMLElement {
+  const list = el('ol', 'al-steps');
+  list.setAttribute('aria-label', now >= labels.length ? 'All steps done' : `Step ${now + 1} of ${labels.length}: ${labels[now]}`);
+  labels.forEach((label, i) => {
+    const li = el('li', i < now ? 'is-done' : i === now ? 'is-now' : '');
+    li.append(el('i', '', i < now ? '✓' : String(i + 1)), el('span', '', label));
+    list.append(li);
+  });
+  return list;
+}
+/** A player nobody has opened yet: a record in all the classes' colours with a question mark where its label would be. */
+export function mysteryDisc(): HTMLElement {
+  const d = el('div', 'tier-disc tier-disc--mid');
+  d.dataset.tier = 'mystery';
+  d.setAttribute('role', 'img'); d.setAttribute('aria-label', 'A player waiting to be opened');
+  d.append(el('span', 'tier-disc__mark', '?'));
+  return d;
+}
+
 /** The three things a player is, said the same way everywhere a newcomer meets one. */
 export const PLAYER_PROMISES = [
-  ['It pays the artist', 'Each play goes straight to whoever owns the song. Nobody in the middle.'],
-  ['It’s yours', 'It lives on this device, opened by your face or fingerprint. No account, no password.'],
-  ['Likes build your playlist', 'Tap ♥ on a song and it joins your own station, in your order, saved on a public record no company can take away.']
+  ['It pays the artist', 'Each play goes straight to whoever owns the song. Nobody in the middle.', '♪'],
+  ['It’s yours', 'It lives on this device, opened by your face or fingerprint. No account, no password.', '◉'],
+  ['Likes build your playlist', 'Tap ♥ on a song and it joins your own station, in your order, saved on a public record no company can take away.', '♥']
 ] as const;
 
 export const WELCOME_TEXT = {
@@ -87,7 +117,8 @@ export function createWelcomeView(mount: HTMLElement) {
   let on = false;
   const promises = () => {
     const list = el('ul', 'al-welcome-points');
-    for (const [title, text] of PLAYER_PROMISES) { const li = el('li'); li.append(el('b', '', title), el('span', '', text)); list.append(li); }
+    // Three tiles: a sign and a few words each. The longer line is there for anyone who wants it (hover, screen readers).
+    for (const [title, text, sign] of PLAYER_PROMISES) { const li = el('li'); li.title = text; const s = el('em', '', sign); s.setAttribute('aria-hidden', 'true'); li.append(s, el('b', '', title), el('span', '', text)); list.append(li); }
     return list;
   };
   return {
@@ -107,7 +138,7 @@ export function createWelcomeView(mount: HTMLElement) {
       const top = el('header', 'al-top');
       const brand = el('a', 'al-brand') as HTMLAnchorElement;
       brand.href = '/radio';
-      brand.append('Xtrata ', el('b', '', 'Music'));
+      brand.append(xtrataMark('al-logo'), el('span', '', 'Xtrata '), el('b', '', 'Music'));
       top.append(brand);
       const body = el('div', 'al-body al-body--welcome');
       const box = el('div', 'al-welcome');
@@ -115,8 +146,14 @@ export function createWelcomeView(mount: HTMLElement) {
       if (m === 'checking') {
         box.append(el('p', 'al-welcome-wait', WELCOME_TEXT.checking));
       } else {
-        // The player's class, as a record in its colours: the reveal when it lands, and there again on every return.
+        // Where they are, as three lights, from the first screen until they are in.
+        const now = stepNow(m);
+        if (now >= 0) box.append(stepLights(m === 'new' ? WELCOME_STEPS.fresh : WELCOME_STEPS.gift, now));
+        // Something to look at on every screen. The player's class, as a record in its colours: the reveal when it lands,
+        // and there again on every return. Before that: the unopened record, or the Xtrata mark for someone arriving cold.
         if (input.tier && (m === 'landed' || m === 'back' || m === 'empty')) box.append(tierDisc(input.tier));
+        else if (m === 'gift' || m === 'arriving') box.append(mysteryDisc());
+        else if (m === 'new') box.append(xtrataMark('al-hero-mark'));
         box.append(el('h1', '', m === 'landed' ? landedTitle(input.tier) : m === 'back' && input.tier ? `Your ${input.tier.name} player` : WELCOME_TEXT[m].title));
         box.append(el('p', '', m === 'gift' ? giftBody(input.plays, input.from, input.mystery) : m === 'landed' ? landedBody(input.plays) : WELCOME_TEXT[m].body));
         if (m === 'landed' || m === 'gift') box.append(promises());

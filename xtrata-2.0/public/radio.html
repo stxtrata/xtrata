@@ -486,7 +486,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   html[data-albumlist] #likesBox{display:none}
   .albumlist .al-listhead{margin-top:0}
   .al-top{height:56px;display:flex;align-items:center;justify-content:space-between}
-  .al-brand{font-weight:700;font-size:15px;letter-spacing:.02em;color:#f2f0ea;text-decoration:none}.al-brand b{color:#7fe3f5;font-weight:700}
+  .al-brand{display:flex;align-items:center;gap:6px;font-weight:700;font-size:15px;letter-spacing:.02em;color:#f2f0ea;text-decoration:none}.al-brand b{color:#7fe3f5;font-weight:700}
+  .al-logo{width:30px;height:27px;margin-right:4px}
   .al-icon{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;color:#c9ced6;border-radius:12px}
   .al-icon.is-on{color:#ff5d7d}
   .al-icon--big{width:52px;height:52px;color:#f2f0ea}
@@ -579,10 +580,30 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .howto dl{margin:0 0 12px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;line-height:1.45}
   .howto dt{font-weight:800;white-space:nowrap}.howto dd{margin:0;color:var(--mut)}
   @media (max-width:520px){.howto dl{grid-template-columns:1fr}.howto dd{margin-bottom:6px}}
-  .al-welcome-points{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:10px;text-align:left}
-  .al-welcome-points li{border:1px solid #262c35;border-radius:12px;padding:12px 14px;background:#12151a}
-  .al-welcome-points b{display:block;font-size:15px;color:#f2f0ea}
-  .al-welcome-points span{display:block;margin-top:2px;font-size:13.5px;line-height:1.45;color:#a3aab5}
+  /* What a player is: three tiles, a sign and a few words each. The longer line stays for screen readers and hover. */
+  .al-welcome-points{list-style:none;margin:22px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center}
+  .al-welcome-points li{border:1px solid #262c35;border-radius:12px;padding:12px 6px;background:#12151a}
+  .al-welcome-points em{display:block;font-style:normal;font-size:22px;line-height:1;color:#7fe3f5;margin-bottom:6px}
+  .al-welcome-points b{display:block;font-size:12.5px;line-height:1.25;color:#f2f0ea}
+  .al-welcome-points span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+  .al-welcome-points li{position:relative}
+  /* Getting started, as three lights: done ones lit, the current one glowing, a line joining them. */
+  .al-steps{list-style:none;display:flex;justify-content:center;margin:0 0 24px;padding:0}
+  .al-steps li{position:relative;flex:1;max-width:124px;display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6f7885}
+  .al-steps li::before{content:"";position:absolute;top:16px;right:50%;width:100%;height:2px;background:#262c35}
+  .al-steps li:first-child::before{display:none}
+  .al-steps i{position:relative;z-index:1;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:14px;background:#12151a;border:2px solid #2a313b;color:#8f97a3}
+  .al-steps .is-done{color:#7fe3f5}.al-steps .is-done i{background:#7fe3f5;border-color:#7fe3f5;color:#0b0d10}
+  .al-steps .is-done::before,.al-steps .is-now::before{background:#7fe3f5}
+  .al-steps .is-now{color:#f2f0ea}
+  .al-steps .is-now i{border-color:#7fe3f5;color:#7fe3f5;box-shadow:0 0 0 4px rgba(127,227,245,.18),0 0 18px rgba(127,227,245,.55);animation:step-now 1.6s ease-in-out infinite}
+  @keyframes step-now{50%{box-shadow:0 0 0 8px rgba(127,227,245,.07),0 0 28px rgba(127,227,245,.8)}}
+  /* An unopened player: every class's colour, and a question mark where the label would be. */
+  .tier-disc--mid{width:min(150px,40vw);margin-bottom:20px;animation:tier-spin 18s linear infinite}
+  .tier-disc[data-tier=mystery]{background:radial-gradient(circle,#0b0d10 0 6%,#f2f0ea 7% 27%,transparent 28%),repeating-radial-gradient(circle,rgba(0,0,0,.22) 0 1px,transparent 1px 4px),conic-gradient(from 0deg,#bfe6ff,#f5c542,#cfd8e3,#d98a5a,#3fd0c9,#bfe6ff);box-shadow:0 0 0 2px rgba(255,255,255,.25),0 0 46px rgba(127,227,245,.35)}
+  .tier-disc[data-tier=mystery] .tier-disc__mark{font-size:30px;font-weight:800;color:#0b0d10;animation:tier-spin 18s linear infinite reverse}
+  .al-hero-mark{display:block;width:min(150px,40vw);height:auto;margin:0 auto 20px;filter:drop-shadow(0 0 24px rgba(58,125,181,.45))}
+  @media (prefers-reduced-motion:reduce){.al-steps .is-now i,.tier-disc--mid,.tier-disc[data-tier=mystery] .tier-disc__mark{animation:none}}
   .al-welcome .al-status .ppp-wait{margin:8px 0 0}
   .ppp-restock{width:min(440px,calc(100vw - 24px));max-height:calc(100vh - 32px);overflow:auto}
   .ppp-restock p{margin:0 0 10px;font-size:14px;line-height:1.5}
@@ -1264,7 +1285,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=d9d7c4e5884e');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=ecf7529b1240');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
