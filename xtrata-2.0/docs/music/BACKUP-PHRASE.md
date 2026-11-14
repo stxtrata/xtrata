@@ -41,10 +41,20 @@ original, as it always was. The original labels in `derive.ts` and their known-a
 The words are never stored, never sent, never returned to the page. Closing the box part-way records nothing.
 The radio offers it under "Wallet & history": "Back up my player · 24 words".
 
+## The 1 STX rule, softened
+
+The warnings stay for everyone. For a player whose words are written down and checked on this device:
+
+- over 1 STX no longer stops paying or liking (the wallet box allows it only when its own record says `backedUp`);
+- the page shows a quiet line instead of the red stop: more than 1 STX, backed up, larger amounts are safer in a main wallet;
+- "Add plays" drops "holds up to 1 STX" for the same softer reminder.
+
+Unchanged for everyone: one approval still spends at most 1 STX, and a player that is not backed up still stops
+over 1 STX (the stop now also offers the backup as a way out).
+
 ## Not done yet
 
-- The 1 STX rule and its warnings are unchanged. Relaxing them for a backed-up player is a separate decision
-  (a backup covers losing the passkey, not the fact that the player signs plays from a web page).
+
 - Typing the 24 words back into Xtrata to rebuild a player on a new device. Until then: the synced passkey opens
   it, or the words open the same wallet in Leather or Xverse.
 - **Before launch: make a throwaway player on the deployed box, write its words down, import them into Leather and

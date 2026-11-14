@@ -1695,3 +1695,28 @@ describe('backup words', () => {
     expect(JSON.stringify(s.ppp.snapshot(), (_k, v) => (typeof v === 'bigint' ? v.toString() : v))).not.toMatch(/orchard|biology|sadness/);
   });
 });
+
+describe('over 1 STX', () => {
+  it('stops a player that is not backed up, exactly as before', async () => {
+    const s = setup({ passkeyOnly: true }); s.setMain(undefined);
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    s.chain.balance = TARGET + 500_000n;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'over', balanceState: 'over', aboveTarget: false, phrase: true });
+  });
+
+  it('a backed-up player carries on, and the page is told so it can say it quietly', async () => {
+    const s = setup({ passkeyOnly: true }); s.setMain(undefined);
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    // The wallet box records the backup (here: written straight into its store, as the box does after the word check).
+    const key = 'xtrata.listening-wallet.v1';
+    const stored = JSON.parse(s.walletStore.get(key)!);
+    stored.wallets[0].backedUp = 1;
+    s.walletStore.set(key, JSON.stringify(stored));
+    s.chain.balance = TARGET + 500_000n;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', balanceState: 'ok', aboveTarget: true, backedUp: true });
+    await s.ppp.onListened({ song: 7, id: rid(2), title: 'Night Drive' });
+    expect(s.chain.broadcasts).toHaveLength(1);
+  });
+});

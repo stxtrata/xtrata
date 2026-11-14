@@ -142,6 +142,8 @@ export interface Snapshot {
   phrase: boolean;
   /** The listener wrote the backup words down and checked them on this device. */
   backedUp: boolean;
+  /** A backed-up player holding more than 1 STX: allowed, and it keeps paying. The page says so quietly; nothing is blocked. */
+  aboveTarget: boolean;
   balance?: bigint;
   balanceState?: BalanceState;
   playsLeft: number;
@@ -528,7 +530,8 @@ export function createPppController(deps: PppDeps) {
     if (status.state === 'known') return 'locked';
     if (!solo() && status.linked !== main) return 'link';
     if (balance === undefined) return 'loading';
-    if (balance > TARGET) return 'over';
+    // More than 1 STX stops paying until the excess is returned, unless the player's backup words are written down.
+    if (balance > TARGET && !status.backedUp) return 'over';
     if (balance < RESERVE + costPerPlay(fee())) return 'fund';
     return 'ready';
   }
@@ -536,7 +539,8 @@ export function createPppController(deps: PppDeps) {
   const snapshot = (): Snapshot => ({
     step: step(), busy, message, error, notice: noticeText(), gate, main: creditMain(), mainConnected: !!deps.main(), standIn: standIn(),
     listening: status?.address, linked: status?.linked, unproven: !!status?.unproven, phrase: !!status?.phrase, backedUp: !!status?.backedUp, balance,
-    balanceState: balance === undefined ? undefined : balanceState(balance, fee()),
+    balanceState: balance === undefined ? undefined : ((b: BalanceState): BalanceState => (b === 'over' && status?.backedUp ? 'ok' : b))(balanceState(balance, fee())), // backed up: over 1 STX reads as a healthy balance
+    aboveTarget: balance !== undefined && balance > TARGET && !!status?.backedUp,
     playsLeft: balance === undefined ? 0 : playsCovered(balance, fee()),
     allowance: balance === undefined ? TARGET : fundingAllowance(balance, BigInt(pendingDeposit()?.amount ?? '0')),
     session: status?.session ?? null,

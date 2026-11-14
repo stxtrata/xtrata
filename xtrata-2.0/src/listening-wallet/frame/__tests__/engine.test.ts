@@ -869,3 +869,29 @@ describe('players with a backup phrase, and the original players beside them', (
     expect(s.panels.some((p) => p.kind === 'phrase')).toBe(false);
   });
 });
+
+describe('the 1 STX rule, softened for a backed-up player', () => {
+  const answering = () => { let words: string[] = []; return (p: Panel) => { if (p.kind === 'phrase') words = p.words!; if (p.kind === 'phrase-check') p.pick!.chosen = p.pick!.options.indexOf(words[Number(/word (\d+)/.exec(p.title)![1]) - 1]); }; };
+  const OVER = '1500000';
+
+  it('a player that is not backed up still stops paying and liking over 1 STX', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+    await expect(s.h['listening.signPlay'](play(OVER))).rejects.toThrow(/more than 1 STX/);
+    await expect(s.h['listening.signLike']({ song: 1, liked: true, fee: '200', nonce: '0', balance: OVER })).rejects.toThrow(/more than 1 STX/);
+  });
+
+  it('once its words are written down it keeps paying over 1 STX, within the same approved budget as before', async () => {
+    const s = setup({ onPanel: answering() });
+    await s.h['listening.unlock']({ mode: 'create', terms: s.terms(2) });
+    await s.h['listening.backup']();
+    const first = await s.h['listening.signPlay'](play(OVER));
+    expect(first.txid).toMatch(/^0x[0-9a-f]{64}$/);
+    s.tick(MIN_PLAY_INTERVAL_MS + 1);
+    await s.h['listening.signPlay'](play(OVER, '1'));
+    s.tick(MIN_PLAY_INTERVAL_MS + 1);
+    // The backup changes how much it may HOLD, not how much one approval may SPEND.
+    await expect(s.h['listening.signPlay'](play(OVER, '2'))).rejects.toThrow();
+    await expect(s.h['listening.approveSession']({ fee: '300', maxPlays: 3000, budget: '2000000', expires: s.now() + 3600_000 })).rejects.toThrow(/at most 1 STX/);
+  });
+});

@@ -271,6 +271,11 @@ export function createListeningEngine(deps: {
   /** Version 2 players can write down backup words; whether that was done on this device. */
   const backupOf = (w: WalletRecord | undefined): { phrase?: true; backedUp?: true } =>
     (w?.v === 2 ? { phrase: true as const, ...(w.backedUp ? { backedUp: true as const } : {}) } : {});
+  /**
+   * The open player's backup words were written down and checked on this device. Only then may it hold more than
+   * 1 STX and keep paying: losing the passkey no longer loses the money. What one approval may spend is unchanged.
+   */
+  const backedUpNow = () => !!record(credentialId)?.backedUp;
   const status = (main?: string): StatusResult => {
     if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
     if (identity) {
@@ -718,7 +723,7 @@ export function createListeningEngine(deps: {
       try {
         const p = params as SignPlayParams;
         const fee = bigintParam(p?.fee, 'fee'), nonce = bigintParam(p?.nonce, 'nonce'), balance = bigintParam(p?.balance, 'balance');
-        if (balance > TARGET) throw new Error('This wallet holds more than 1 STX. Return the excess to keep paying.');
+        if (balance > TARGET && !backedUpNow()) throw new Error('This wallet holds more than 1 STX. Return the excess to keep paying, or back up your player.');
         if (balance < RESERVE + costPerPlay(fee)) throw new Error('Balance too low for another paid play. Top up to keep paying.');
         const options = playCallOptions(id.address, id.publicKey, { core: p.core, song: p.song, receipt: p.receipt, fee, nonce });
         const session = ledger;
@@ -745,7 +750,7 @@ export function createListeningEngine(deps: {
       try {
         const p = params as SignLikeParams;
         const fee = bigintParam(p?.fee, 'fee'), nonce = bigintParam(p?.nonce, 'nonce'), balance = bigintParam(p?.balance, 'balance');
-        if (balance > TARGET) throw new Error('This wallet holds more than 1 STX. Return the excess first.');
+        if (balance > TARGET && !backedUpNow()) throw new Error('This wallet holds more than 1 STX. Return the excess first.');
         if (balance < RESERVE + fee) throw new Error('Your main listener wallet is out of funds. Top it up to like songs.');
         const options = likeCallOptions(id.publicKey, { song: p.song, liked: p.liked, fee, nonce });
         const session = ledger;

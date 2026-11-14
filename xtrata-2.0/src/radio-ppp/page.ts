@@ -302,7 +302,7 @@ function start(root: HTMLElement) {
     const paid = own.filter((e) => e.kind === 'play' && e.status === 'confirmed');
     return {
       playsLeft: mine.balance === undefined ? null : playsOf(mine.balance), balance: mine.balance, incoming: 0n,
-      fee: BigInt(s.gate?.limits.playFee ?? '300'), address: mine.address, switches: s.gate?.restock ?? {},
+      fee: BigInt(s.gate?.limits.playFee ?? '300'), address: mine.address, switches: s.gate?.restock ?? {}, backedUp: s.backedUp,
       done: paid.length ? { plays: paid.length, artists: new Set(paid.map((e) => e.recipient)).size, likes: own.filter((e) => e.kind === 'like' && e.status === 'confirmed' && e.liked).length } : null,
       arriving: s.slot === 0 ? s.depositPending : !!s.likeFunds?.pending
     };
@@ -1098,6 +1098,11 @@ function start(root: HTMLElement) {
       }
       case 'over':
         key.push(el('p', 'Over 1 STX · return the excess to keep paying', 'ppp-bad'));
+        // A player with backup words has a second way out: write them down, and it may hold more.
+        if (s.phrase) {
+          key.push(el('p', 'Or back up your player. With its 24 words written down it can hold more, because a lost passkey is no longer lost money.', 'ppp-mute'));
+          actions.push(button('Back up my player · 24 words', () => void ppp.backup(), ''));
+        }
         if (s.solo && !s.returnTo) {
           key.push(el('p', s.funderState === 'failed' ? 'Could not check who funded this wallet. Enter an address to send the excess to.' : 'Enter an address to send the excess to.'));
           key.push(returnPicker(s));
@@ -1117,6 +1122,8 @@ function start(root: HTMLElement) {
         }
         if (s.queued) key.push(el('p', s.queued === 1 ? '1 song waiting to be paid · sends as soon as the last transaction confirms' : `${s.queued} songs waiting to be paid · sent one at a time as each transaction confirms`, 'ppp-warn'));
         if (s.balanceState === 'low') key.push(el('p', 'Running low on plays', 'ppp-warn'));
+        // Softened, not gone: a backed-up player may hold more than 1 STX, and is reminded what kind of wallet this is.
+        if (s.aboveTarget) key.push(el('p', 'More than 1 STX here · backed up ✓ This player pays from this page as you listen, so keep larger amounts in your main wallet.', 'ppp-mute'));
         if (s.depositPending) key.push(el('p', 'Plays on their way…', 'ppp-warn'));
         else if (s.allowance > 0n && s.balanceState !== 'ok' && !s.solo) actions.push(fromMain(s, `Top up ${stx(s.allowance)} STX`, () => void ppp.deposit()));
         break;
