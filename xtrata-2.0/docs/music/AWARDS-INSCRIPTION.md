@@ -144,6 +144,14 @@ not only awards); fund in stages; or give awards to the top classes only.
 2. **A record is fixed to the Music Hero who paid those plays.** The number, address, name and plays on it never
    change, whoever holds it later.
 3. **No BNS name at claim time: mint with the address only.**
+4. **Whose address and whose name (14 Nov 2026).** The record is minted to the LISTENER address, and that is the
+   address on the plaque: it is the one that made the plays on chain. A name is added beside it, never in its place.
+   The name is the listener address's own .btc name if it holds one; otherwise the .btc name of the main wallet the
+   player is linked to. So a linked player's plaque reads "jim.btc" with the listener address beneath it.
+5. **Offer the name before the claim.** Because the plaque is fixed at claim time, the claim is preceded by one
+   screen, "Put your name on it?": I have a name in Leather or Xverse (connect, sign the link once, the preview
+   updates); I want a name (BNS One, and the record waits); use my address (straight to the claim). The preview shows
+   exactly what will be inscribed. Not built yet.
 
 Note: a sponsored transaction can only cover the network fee, not Xtrata's own fee, which is why the balance has to
 be in the contract. The sponsorship service could also pay each claim's network fee so that claiming costs the
