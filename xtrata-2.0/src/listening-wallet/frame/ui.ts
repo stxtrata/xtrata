@@ -4,6 +4,24 @@ import { CancelledError, type IdleView, type Panel, type UiPort } from './engine
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
 
+/**
+ * Decoration only: three small lights above the title while a passkey is being made (make it, confirm it, check it).
+ * It reads the panel's kind and sets class names on #p-steps, nothing else. A frame without that element (the casino
+ * wallet) is left as it is, and it can never stop a panel opening: any failure here is swallowed.
+ */
+const PASSKEY_STEP: Partial<Record<Panel['kind'], number>> = { create: 0, 'confirm-passkey': 1, 'verify-passkey': 2 };
+export function showPasskeySteps(kind: Panel['kind']) {
+  try {
+    const list = document.getElementById('p-steps');
+    if (!list) return;
+    const now = PASSKEY_STEP[kind];
+    list.hidden = now === undefined;
+    if (now === undefined) return;
+    Array.from(list.children).forEach((li, i) => { li.className = i < now ? 'done' : i === now ? 'now' : ''; });
+    list.setAttribute('aria-label', `Passkey: step ${now + 1} of 3`);
+  } catch { /* decoration must never get in the way of a panel */ }
+}
+
 /** Panels can't be confirmed until they have been on screen this long (clickjacking/keyboard guard). */
 export const ARM_DELAY_MS = 800;
 
@@ -51,6 +69,7 @@ export function panelUi(cancelledMessage?: string): Pick<UiPort, 'act' | 'cancel
       const altEl = document.getElementById('p-alt') as HTMLButtonElement | null;
       if (altEl) { altEl.hidden = !alt; altEl.onclick = null; }
       if (alt) alt.textContent = panel.altLabel!;
+      showPasskeySteps(panel.kind);
       $('p-title').textContent = panel.title;
       // With a summary, the button sits right under it and the full text folds into "Details".
       const folded = !!panel.summary;

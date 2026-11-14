@@ -4,6 +4,20 @@ html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45
 #app { padding: 12px 14px; }
 header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 8px; }
 .origin { color: var(--muted); font-size: 12px; font-family: ui-monospace, monospace; }
+/* Decoration only (the Xtrata mark, and three small lights for the passkey screens). Nothing here is tappable, and
+   none of it sits over or around the confirm button: no opacity, transform, filter or animation, which that button's
+   visibility check would read as "hidden". */
+.brand { display: inline-flex; align-items: center; gap: 8px; }
+.mark { width: 22px; height: 20px; flex: none; }
+.steps { list-style: none; display: flex; align-items: center; gap: 0; margin: 2px 0 8px; padding: 0; }
+.steps[hidden] { display: none; }
+.steps li { position: relative; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); background: var(--bg); margin-right: 26px; }
+.steps li:last-child { margin-right: 0; }
+.steps li + li::before { content: ""; position: absolute; top: 3px; right: 12px; width: 26px; height: 2px; background: var(--line); }
+.steps li.done { background: var(--accent); border-color: var(--accent); }
+.steps li.now { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 224, 201, .22), 0 0 10px rgba(79, 224, 201, .6); }
+.steps li.done + li::before, .steps li.now::before { background: var(--accent); }
+main.create:has(#c-done:not([hidden])) .steps--before { display: none; }
 h1 { font-size: 15px; margin: 4px 0 6px; }
 p { margin: 4px 0; }
 #p-warn { margin: 8px 0; padding: 8px 8px 8px 24px; border: 1px solid var(--warn); border-radius: 8px; color: var(--warn); }

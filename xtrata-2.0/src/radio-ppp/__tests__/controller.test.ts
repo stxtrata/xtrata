@@ -1637,3 +1637,44 @@ describe('gifted wallets and gift players', () => {
     });
   });
 });
+
+describe('a free starter player: one passkey check now, the second before anything is added', () => {
+  const solo = () => { const s = setup({ passkeyOnly: true }); s.setMain(undefined); return s; };
+  const sentTo = (s: ReturnType<typeof setup>, m: string) => s.requests.filter(([name]) => name === m);
+
+  it('asks the wallet box for a quick create, and plays are paid while the second check is still owed', async () => {
+    const s = solo();
+    await s.ppp.forceRefresh();
+    await s.ppp.create({ quick: true });
+    expect(sentTo(s, 'listening.unlock').at(-1)![1]).toMatchObject({ mode: 'create', quick: true });
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', unproven: true, error: '' });
+    s.chain.balance = TARGET;
+    await s.ppp.forceRefresh();
+    await s.ppp.onListened({ song: 7, id: rid(2), title: 'Night Drive' });
+    expect(s.chain.broadcasts).toHaveLength(1);
+  });
+
+  it('prove() runs the second check once and reports the player as proven', async () => {
+    const s = solo();
+    await s.ppp.forceRefresh();
+    await s.ppp.create({ quick: true });
+    expect(await s.ppp.prove()).toBe(true);
+    expect(s.ppp.snapshot().unproven).toBe(false);
+    expect(sentTo(s, 'listening.prove')).toHaveLength(1);
+    expect(await s.ppp.prove()).toBe(true);
+    expect(sentTo(s, 'listening.prove')).toHaveLength(1);
+  });
+
+  it('an ordinary create is never quick, and neither is one with a Stacks wallet connected', async () => {
+    const a = solo();
+    await a.ppp.forceRefresh();
+    await a.ppp.create();
+    expect(sentTo(a, 'listening.unlock').at(-1)![1]).not.toHaveProperty('quick');
+    expect(a.ppp.snapshot().unproven).toBe(false);
+    const b = setup();
+    await b.ppp.forceRefresh();
+    await b.ppp.create({ quick: true });
+    expect(sentTo(b, 'listening.unlock').at(-1)![1]).not.toHaveProperty('quick');
+    expect(b.ppp.snapshot().unproven).toBe(false);
+  });
+});

@@ -134,6 +134,8 @@ export interface Snapshot {
   main?: string;
   listening?: string;
   linked?: string;
+  /** A free starter player whose passkey has had one check, not two: `prove()` runs the second before anything is added. */
+  unproven: boolean;
   balance?: bigint;
   balanceState?: BalanceState;
   playsLeft: number;
@@ -527,7 +529,7 @@ export function createPppController(deps: PppDeps) {
 
   const snapshot = (): Snapshot => ({
     step: step(), busy, message, error, notice: noticeText(), gate, main: creditMain(), mainConnected: !!deps.main(), standIn: standIn(),
-    listening: status?.address, linked: status?.linked, balance,
+    listening: status?.address, linked: status?.linked, unproven: !!status?.unproven, balance,
     balanceState: balance === undefined ? undefined : balanceState(balance, fee()),
     playsLeft: balance === undefined ? 0 : playsCovered(balance, fee()),
     allowance: balance === undefined ? TARGET : fundingAllowance(balance, BigInt(pendingDeposit()?.amount ?? '0')),
@@ -1027,6 +1029,14 @@ export function createPppController(deps: PppDeps) {
     else say(`Returned ✓ ${steps.length - 1} more ${steps.length === 2 ? 'part' : 'parts'} to go. Return again once this one confirms.`);
   }
 
+  /** The second passkey check a quick starter player skipped (wallet box `listening.prove`). Nothing if already proven. */
+  async function proveNow() {
+    if (!status?.unproven) return;
+    const b = await ensureBridge();
+    await b.request('listening.prove');
+    status = await readStatus(b);
+  }
+
   const actions = {
     forceRefresh: () => refresh(true),
 
@@ -1044,9 +1054,10 @@ export function createPppController(deps: PppDeps) {
       await refresh(true);
     },
 
-    create: () => task('Waiting for your passkey…', async () => {
+    /** `quick`: a free starter player is being claimed, so the wallet box may put off its second passkey check. */
+    create: (opts?: { quick?: boolean }) => task('Waiting for your passkey…', async () => {
       const b = await ensureBridge();
-      await b.request('listening.unlock', { mode: 'create', terms: onTerms(), ...(deps.main() ? { main: deps.main() } : {}) });
+      await b.request('listening.unlock', { mode: 'create', terms: onTerms(), ...(deps.main() ? { main: deps.main() } : {}), ...(opts?.quick && !deps.main() ? { quick: true } : {}) });
       status = await readStatus(b);
       if (status.address) deps.store.set(key('created', status.address), '1');
       setPayingOn(true);
@@ -1134,8 +1145,19 @@ export function createPppController(deps: PppDeps) {
       say('Linked ✓');
     }),
 
+    /**
+     * Before the listener adds anything of their own: a starter player whose passkey was checked once gets its second
+     * check now. Resolves true once the wallet is proven (or always was); false if the check failed or was closed.
+     */
+    prove: async (): Promise<boolean> => {
+      if (!status?.unproven) return true;
+      await task('One more passkey check…', proveNow);
+      return !status?.unproven;
+    },
+
     deposit: () => task('Approve the deposit in your wallet…', async () => {
       guardMatch();
+      await proveNow();
       const main = deps.main();
       if (!main || !status?.address) throw new Error('Connect your main wallet first.');
       if (pendingDeposit()) throw new Error('A deposit is still confirming. Wait for it before adding more.');
@@ -1155,6 +1177,7 @@ export function createPppController(deps: PppDeps) {
      */
     topUpLikes: () => task('Approve the top-up in your wallet…', async () => {
       guardMatch();
+      await proveNow();
       const main = deps.main(), to = likeAddr();
       if (!main || !to) throw new Error('Connect your main wallet first, or send STX to the address shown.');
       if (pendingDepositOf(to)) throw new Error('A top-up is still confirming. Wait for it before adding more.');
