@@ -1,6 +1,6 @@
 # Music Hero awards: the server side (plan)
 
-Status: plan only, nothing here is built. It follows `AWARDS-PLAN.md` and `AWARDS-INSCRIPTION.md`; the contract
+Status (14 Nov 2026): the server side below is built and tested (steps 1 to 4 of "Order of work"); it is switched off until the contract is deployed. The client side is not built. It follows `AWARDS-PLAN.md` and `AWARDS-INSCRIPTION.md`; the contract
 (`contracts/live/xtrata-music-awards-v1.0.clar`) is written, tested in simulation and rehearsed on testnet.
 
 ## What the server is for
@@ -117,6 +117,28 @@ No personal data beyond what is already public on chain.
   "unavailable"; pending and failed transactions do not count.
 - Names: own name wins over the linked wallet's; "none" skips the lookup; a failed lookup signs nothing.
 - Every state in the table above, including a record that was sent away.
+
+## Built (14 Nov 2026)
+
+- `src/lib/music-awards/record.ts`: the one record builder. Its test holds the two records inscribed in the
+  testnet rehearsal and requires byte-for-byte equality.
+- `src/lib/music-awards/note.ts`: the note's hash and signature. Its test takes the signature the testnet contract
+  accepted (claim `0x6445…54a2`) and recovers that contract's signer from OUR hash of the same fields, so the hash
+  is the contract's. This stands in for the planned simulation test and is stronger: it is the deployed contract's
+  own verdict. (The rehearsal script keeps its own copy of the builder; the test pins the two together.)
+- `functions/lib/radio-awards.ts`: settings, play counting, status, plaque name, note, and the chain reads.
+- `functions/radio/awards/[[path]].ts`: `config`, `status`, `note`, `record`.
+- `wallPlayerOf` in `functions/lib/radio-giveaway.ts`: an address's wall number, plays and class.
+
+How plays are counted: once per address, then kept up to date. Each look pins itself to the last finished block and
+reads only transactions newer than the block already counted (one request to the chain API per 50 transactions, at
+most 20 per look; a longer history carries on at the next look and says "still counting" meanwhile). The shape of
+the chain API's answers was checked against the live API on 14 Nov.
+
+Not exercised against a live award contract on mainnet (there is none yet): the first real check is the canary.
+
+Wall numbers: a player's number is its disc's place among the wall's entries. Do not archive single entries once
+awards are open, or later numbers shift (the contract would still refuse a number twice).
 
 ## Order of work
 
