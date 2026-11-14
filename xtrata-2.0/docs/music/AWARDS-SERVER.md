@@ -35,8 +35,8 @@ address's transactions.
 | Bronze | 100 | 10 |
 | Classic | 50 | 5 |
 
-- Only plays from the player's own address count. Plays made from an album wallet are paid from that album's gift
-  and belong to a different address, so they do not count. (Decision 1 below.)
+- Plays from the player's own address and from album wallets bound to it all count (decision 1 below).
+- The targets in the table are today's setting of 10%; the setting can change until launch (decision 2).
 - If the chain cannot be read, the answer is "unavailable": never zero, and nothing is signed.
 - A count that has reached the target is remembered for good (it cannot go down); a count below it is re-read, at
   most once a minute per address.
@@ -50,7 +50,7 @@ address's transactions.
 - if a name was wanted and the lookup fails, nothing is signed ("try again in a moment"). A record goes out without
   a name only when the lookup answered "none" or the listener chose the address.
 
-The plays figure on the plaque is the class's target (5, 10, 25, 50 or 100): "the plays that earned it". (Decision 2.)
+The plays figure on the plaque is the class's target when the note is signed: "the plays that earned it".
 
 The record's bytes are built by one shared function, used by the server, by the testnet rehearsal script and by
 the tests, so all three always produce byte-identical records: title, the template's inscription number, and
@@ -131,11 +131,25 @@ Jim's part, when 1 to 4 are done: inscribe the five templates, deploy the contra
 template numbers, make the signer key and set its hash, add the secret, fund the contract, switch on, claim one
 record with a real player as the canary.
 
-## Decisions wanted
+## Decided (Jim, 14 Nov 2026)
 
-1. **Album plays.** Count only the player's own plays (recommended: it is the address on the plaque, and album
-   plays are paid from someone else's gift), or also plays made from its album wallets?
-2. **The plays figure on the plaque.** The class target, so every Gold says 50 (recommended: stable, and a retry
-   signs the same record), or the actual count at the moment of claiming?
-3. **Topped-up players.** A Classic player that adds its own plays still earns a Classic record at 5 plays
-   (recommended: the class is the disc they drew), or should heavy listeners be able to earn a higher class?
+1. **Every listen counts.** All confirmed paid plays by the player count: from its own address (this already
+   includes the albums that come loaded in a player, which pay from the player itself) and from any album wallets
+   bound to it (the server holds those signed bindings). The address on the plaque is still the player's own.
+2. **The target stays adjustable until launch.** It is a server setting, `RADIO_AWARDS_TARGET_PERCENT` (10 for
+   now; 100 would mean "play the player through"). Nothing in the contract fixes it: the contract only checks the
+   server's signature. The figure on the plaque is the target in force when the note is signed.
+3. **The class is the disc that was drawn.** Topping a player up does not change its class or its target: a Classic
+   earns a Classic record when it reaches the Classic target, however many plays were added on the way.
+
+Two things to weigh before choosing a high target:
+
+- **Likes come out of the same balance.** A like costs 0.0002 STX, a play 0.00035. A player that likes songs runs
+  out a play or two short of its full count, so at 100% it would have to add plays to finish. A target a little
+  under 100 (90, say) keeps "play it through" without that trap; or the target can stay a percentage and likes
+  simply mean a small top-up.
+- **The claim's own network fee** (about 0.0007 STX) has to be there after the last play. Every player keeps a
+  0.003 STX reserve that plays never spend, which covers it.
+
+Changing the target after claiming has opened is possible but unfair to whoever claimed first, so the value is
+settled at switch-on and written into `docs/music/AWARDS-INSCRIPTION.md` then.
