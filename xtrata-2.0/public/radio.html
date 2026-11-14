@@ -138,8 +138,11 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 
   /* tuning strip: every song, by inscription number */
   .tuner{position:relative;margin-top:18px;height:74px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#0b111b,#080c14);
-    cursor:pointer;touch-action:none;outline:none;overflow:hidden}
+    cursor:pointer;touch-action:pan-y;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;outline:none;overflow:hidden}
   .tuner:focus-visible{border-color:var(--cyan)}
+  .tuner.dragging{border-color:var(--amber);box-shadow:0 0 0 2px rgba(255,180,60,.25)}
+  .tuner-undo{margin-top:8px;text-align:center}
+  .tuner-undo .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ticks{position:absolute;left:16px;right:16px;top:12px;height:30px}
   .ticks i{position:absolute;bottom:0;width:2px;margin-left:-1px;height:12px;background:#2c3c55;border-radius:1px}
   .ticks i.liked{background:var(--heart);height:18px}
@@ -210,6 +213,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     .albumlist{order:1}
     .ppp{order:2}
     #likesBox{order:3}
+    /* Someone with a playlist, and nothing waiting on them: the playlist comes straight after the receiver. */
+    html[data-has-likes]:not([data-ppp-first]) #likesBox{order:1}
     html[data-ppp-first] .ppp{order:-1}
     .strap{order:10}
   }
@@ -528,7 +533,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .find-list{max-height:340px}
   #findBox .hint button{font:inherit;font-size:12px;color:var(--cyan);background:none;border:1px solid var(--line);border-radius:8px;padding:3px 8px;cursor:pointer}
   html[data-view=album] #findBox{display:none!important}
-  @media (max-width:900px){#findBox{order:3}}
+  @media (max-width:900px){#findBox{order:4}}
   html[data-dock] #findBox{order:2}
   .ppp-featured{margin:10px 0 0;display:grid;gap:8px}
   .ppp-featured__h{margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
@@ -763,6 +768,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <div class="needle" id="needle"></div>
       <div class="tunerLabel"><span id="tunerFrom"></span><b id="tunerNow">Tap or drag to tune</b><span id="tunerTo"></span></div>
     </div>
+    <!-- After the strip changes the song: one tap back to where you were. -->
+    <div class="tuner-undo" id="tunerUndoRow" hidden><button class="chip" id="tunerUndo" type="button"></button></div>
     <div class="stations" id="bands" role="group" aria-label="Stations">
       <button type="button" data-b="fm" title="Xtrata’s own mix: hand-picked songs and new arrivals. The place to discover music."><b><i class="lamp"></i>FM</b><span>Curated + new on-chain</span></button>
       <button type="button" data-b="liked" title="Your own station: only the songs you have liked, in your order."><b><i class="lamp"></i>LIKED</b><span>Your likes, your order</span></button>
@@ -774,7 +781,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
         <dt>FM</dt><dd>Xtrata’s own mix: hand-picked songs and new arrivals. Start here to discover music. The <b>FM: ALL / CURATED</b> button chooses between everything and hand-picked only.</dd>
         <dt>LIKED</dt><dd>Your own playlist. Tap ♥ on any song and it joins this list; drag them into your order.</dd>
         <dt>CHAIN</dt><dd>The whole catalogue, every song in the order it was added. Good for digging.</dd>
-        <dt>The strip of lines</dt><dd>Every song side by side. Tap or drag to jump straight to one.</dd>
+        <dt>The strip of lines</dt><dd>Every song side by side. With a mouse, tap or drag to jump straight to one. On a phone, hold a finger on it for a moment, then slide. Changed it by mistake? Tap “Back to…” underneath, or ⏮.</dd>
         <dt>⏭ Next</dt><dd>Skip whenever you like. A song only counts as a play once you have heard 30 seconds of it.</dd>
         <dt>♥ Like</dt><dd>Adds the song to your playlist (LIKED) and saves it on the public record, where the artist can see it too. Tap again to take it off.</dd>
         <dt>🔎 Find music</dt><dd>Search every song by title, artist or number, or pick an artist to see all their songs.</dd>
@@ -881,18 +888,54 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   }
   function preview(i){if(state&&state.giftLocked)return;tuneIndex=i;placeNeedle(i);var t=catalogue[i];$('tunerNow').textContent=nameOf(t.id)+' · #'+t.id}
   function tuneTo(i){if(!api||!catalogue[i]||(state&&state.giftLocked))return;preview(i);api.playToken(catalogue[i].id)}
+  /* How to use the strip, in the words for this device. On a touch screen it has to be held first (see below). */
+  var TOUCH=!!(window.matchMedia&&window.matchMedia('(pointer:coarse)').matches);
+  var TUNE_HINT=TOUCH?'Hold, then slide to tune':'Tap or drag to tune';
+  $('tunerNow').textContent=TUNE_HINT;
   (function(){
-    var tuner=$('tuner'),dragging=false;
-    tuner.addEventListener('pointerdown',function(e){if(!catalogue.length)return;dragging=true;tuner.classList.add('dragging');tuner.setPointerCapture(e.pointerId);preview(indexAt(e.clientX))});
-    tuner.addEventListener('pointermove',function(e){if(dragging)preview(indexAt(e.clientX))});
-    tuner.addEventListener('pointerup',function(e){if(!dragging)return;dragging=false;tuner.classList.remove('dragging');tuneTo(indexAt(e.clientX))});
-    tuner.addEventListener('pointercancel',function(){dragging=false;tuner.classList.remove('dragging');if(state)render(state)});
+    var tuner=$('tuner'),dragging=false,hold=0,pid=null,sx=0,sy=0,lx=0,undoTimer=0,hintTimer=0,undoId='';
+    var HOLD_MS=350,SLOP=10,UNDO_MS=20000;
+    /* The strip changed the song: offer one tap back to the song that was playing. */
+    function tuneFromStrip(i){
+      var np=state&&state.nowPlaying, was=np?String(np.tokenId):'', title=np?np.title:'';
+      if(!api||!catalogue[i]||(state&&state.giftLocked))return;
+      tuneTo(i);
+      if(was&&was!==String(catalogue[i].id)){
+        undoId=was;$('tunerUndo').textContent='↩ Back to '+(title||'#'+was);$('tunerUndoRow').hidden=false;
+        clearTimeout(undoTimer);undoTimer=setTimeout(function(){$('tunerUndoRow').hidden=true},UNDO_MS);
+      }
+    }
+    $('tunerUndo').addEventListener('click',function(){clearTimeout(undoTimer);$('tunerUndoRow').hidden=true;if(api&&undoId)api.playToken(Number(undoId));undoId=''});
+    function grab(pointerId,x){dragging=true;tuner.classList.add('dragging');try{tuner.setPointerCapture(pointerId)}catch(e){}preview(indexAt(x))}
+    function drop(){clearTimeout(hold);hold=0;pid=null}
+    function hint(){$('tunerNow').textContent=TUNE_HINT;clearTimeout(hintTimer);hintTimer=setTimeout(function(){if(state)render(state)},2500)}
+    /* A mouse or pen is deliberate: it takes hold at once. A finger brushes the strip while scrolling, and one brush
+       used to change the song. So on touch the strip only takes hold once a finger has rested on it for a moment; a
+       tap or a swipe does nothing and the page scrolls as usual. */
+    tuner.addEventListener('pointerdown',function(e){
+      if(!catalogue.length||(state&&state.giftLocked))return;
+      if(e.pointerType!=='touch'){grab(e.pointerId,e.clientX);return}
+      pid=e.pointerId;sx=lx=e.clientX;sy=e.clientY;
+      clearTimeout(hold);hold=setTimeout(function(){hold=0;if(pid!==null)grab(pid,lx)},HOLD_MS);
+    });
+    tuner.addEventListener('pointermove',function(e){
+      if(dragging){preview(indexAt(e.clientX));return}
+      if(hold&&e.pointerId===pid){lx=e.clientX;if(Math.abs(e.clientX-sx)>SLOP||Math.abs(e.clientY-sy)>SLOP){drop();hint()}}
+    });
+    tuner.addEventListener('pointerup',function(e){
+      if(dragging){dragging=false;drop();tuner.classList.remove('dragging');tuneFromStrip(indexAt(e.clientX));return}
+      if(hold){drop();hint()}
+    });
+    tuner.addEventListener('pointercancel',function(){var was=dragging;dragging=false;drop();tuner.classList.remove('dragging');if(was&&state)render(state)});
+    /* Once the strip has taken hold, sliding along it must not also scroll the page. */
+    tuner.addEventListener('touchmove',function(e){if(dragging)e.preventDefault()},{passive:false});
+    tuner.addEventListener('contextmenu',function(e){e.preventDefault()});
     tuner.addEventListener('keydown',function(e){
       if(!catalogue.length)return;
       var i=tuneIndex<0?0:tuneIndex;
       if(e.key==='ArrowRight'||e.key==='ArrowUp'){e.preventDefault();preview(Math.min(catalogue.length-1,i+1))}
       else if(e.key==='ArrowLeft'||e.key==='ArrowDown'){e.preventDefault();preview(Math.max(0,i-1))}
-      else if(e.key==='Enter'||e.key===' '){e.preventDefault();tuneTo(i)}
+      else if(e.key==='Enter'||e.key===' '){e.preventDefault();tuneFromStrip(i)}
     });
   })();
 
@@ -959,6 +1002,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     var np=s.nowPlaying?String(s.nowPlaying.tokenId):'';
     var sig=JSON.stringify([ids,q,np,shown.length]);
     $('likesCount').textContent=likes.length?(q?shown.length+' of '+likes.length:String(likes.length)):'';
+    document.documentElement.toggleAttribute('data-has-likes',likes.length>0);
     $('likesBox').classList.toggle('filtering',!!q);
     $('likesFoot').hidden=likes.length<2;
     $('likesReset').hidden=!savedOrder().length;
@@ -1050,7 +1094,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     if(!$('tuner').classList.contains('dragging')){
       var idx=np?catalogue.findIndex(function(t){return String(t.id)===String(np.tokenId)}):-1;
       tuneIndex=idx;placeNeedle(idx);
-      $('tunerNow').textContent=idx>=0?nameOf(np.tokenId)+' · #'+np.tokenId:(catalogue.length?'Tap or drag to tune':'');
+      $('tunerNow').textContent=idx>=0?nameOf(np.tokenId)+' · #'+np.tokenId:(catalogue.length?TUNE_HINT:'');
     }
     // likes
     var likesStatus=s.likesStatus||'disconnected';
@@ -1181,7 +1225,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     $('prev').addEventListener('click',function(){api.prev()});
     $('next').addEventListener('click',function(){api.next()});
     $('heart').addEventListener('click',function(){api.toggleLike()});
-    Array.prototype.forEach.call($('bands').children,function(b){b.addEventListener('click',function(){api.setBand(b.dataset.b)})});
+    Array.prototype.forEach.call($('bands').children,function(b){b.addEventListener('click',function(){
+      api.setBand(b.dataset.b);
+      // LIKED is your playlist: open it and, where it is off screen (a phone), bring it up into view.
+      if(b.dataset.b==='liked'){var box=$('likesBox');box.open=true;var r=box.getBoundingClientRect();
+        if(r.top<0||r.top>window.innerHeight*.55)box.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'start'})}
+    })});
     $('presetBtn').addEventListener('click',function(){api.cyclePreset()});
   }
   var tries=0,t=setInterval(function(){
