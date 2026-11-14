@@ -32,7 +32,7 @@ export interface WelcomeInput {
   /** The player's class from the giveaway (tiers.ts), when it has one: shown as a coloured record. */
   tier?: { id: string; name: string; mark: string } | null;
   /** landed: albums the player comes loaded with; tapping one starts it. */
-  albums?: { title: string; by: string; run(): void }[];
+  albums?: { title: string; by: string; cover?: string; run(): void }[];
   /** gift: do not say how many plays it holds yet (a lottery drop): that is the reveal when it lands. */
   mystery?: boolean;
   start(): void;
@@ -168,7 +168,10 @@ export function createWelcomeView(mount: HTMLElement) {
           box.append(button('al-primary', WELCOME_TEXT.landed.primary, input.full));
           if (input.albums?.length) {
             box.append(el('p', 'al-hint', 'Or start with an album that comes with your player:'));
-            for (const a of input.albums) { const b = button('al-album', '', a.run); b.append(el('b', '', a.title), el('span', '', a.by)); box.append(b); }
+            for (const a of input.albums) { const b = button('al-album', '', a.run);
+              // The album's own cover beside its name (art.ts finds it); a plain row until it is known.
+              if (a.cover) { const img = el('img', 'al-album__art') as HTMLImageElement; img.src = a.cover; img.alt = ''; b.classList.add('al-album--art'); b.append(img); }
+              const t = el('span', 'al-album__t'); t.append(el('b', '', a.title), el('span', '', a.by)); b.append(t); box.append(b); }
           }
         }
         else if (m === 'empty') box.append(button('al-primary', WELCOME_TEXT.empty.primary, input.restock), button('al-link', WELCOME_TEXT.empty.full, input.full));

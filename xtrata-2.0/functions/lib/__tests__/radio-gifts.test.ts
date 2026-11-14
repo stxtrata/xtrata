@@ -153,6 +153,18 @@ describe('radio gift wallets', () => {
     expect(r.status).toBe(404);
   });
 
+  it('says whether a gifted wallet is one of the numbered wall players: only a live entry on the players list counts', async () => {
+    const s = setup();
+    const [onWall, plain, archived, drip] = (await s.campaign(4)).codes;
+    const { ensureGiveawayTables } = await import('../radio-giveaway');
+    await ensureGiveawayTables(s.env as never);
+    const put = (code: string, list: string, gone = 0) => (s.env as any).DB.prepare('INSERT INTO radio_giveaway_links(code, code_hash, added_at, list, archived) VALUES(?,?,?,?,?)').bind(code, giftCodeHash(code), 1, list, gone).run();
+    await put(onWall, 'players'); await put(archived, 'players', 1); await put(drip, 'main');
+    const drops: unknown[] = [];
+    for (const code of [onWall, plain, archived, drip]) { const w = wallet(); await s.claim(code, w); await s.land(); drops.push((await giftForWallet(s.env, w)).gift!.drop); }
+    expect(drops).toEqual(['players', null, null, null]);
+  });
+
   it('a claim funds a brand-new wallet once, recorded before broadcast, and is claimed only when the chain confirms it', async () => {
     const s = setup();
     const [code] = (await s.campaign(1)).codes;

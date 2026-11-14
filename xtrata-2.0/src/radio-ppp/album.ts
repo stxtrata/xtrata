@@ -11,7 +11,9 @@ import type { PlayerView } from '../lib/listening-wallet/gift-players';
 export type AlbumMode = 'arrive' | 'locked' | 'open';
 export type AlbumSheet = '' | 'more' | 'music' | 'device' | 'gifts';
 
-import { onArt, shrink, thumb, thumbs } from './art';
+import { coverArt, onArt, shrink, thumb, thumbs } from './art';
+import { xtrataMark } from './brand';
+import { stepLights } from './welcome';
 
 export interface AlbumInput {
   /** arrive: a gift link with an album, not in a wallet yet. locked: the album this device had open, wallet locked. open: playing. */
@@ -33,6 +35,8 @@ export interface AlbumInput {
   /** The wallet box is asking for a tap: it is shown in its own sheet, so the view says where to look. */
   asking: boolean;
   busy: boolean;
+  /** Getting started with this album, as three lights (Album, Passkey, Listen): which one glows. Absent: no lights. */
+  step?: number;
   /** Plays My player could move into this album, when known. */
   myPlays?: number;
   topUps: readonly number[];
@@ -48,6 +52,8 @@ export interface AlbumDeps {
 }
 
 const LOW = 20;
+/** A new listener opening a gifted album: the same three lights as a free player, named for the album. */
+export const ALBUM_STEPS = ['Album', 'Passkey', 'Listen'] as const;
 
 const svg = (body: string, size = 22, fill = false) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" ${fill ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'} aria-hidden="true">${body}</svg>`;
@@ -107,28 +113,11 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps, opts: { lis
   // ---------------------------------------------------------------- cover art
   // The album's cover inscription: an image is used as it is; a page gives its first embedded image. The radio's own
   // resolved cover wins once it has one. Not found: the cover block shows the title instead, never an error.
-  const covers = new Map<number, string>();
-  const asked = new Set<number>();
   function cover(id: number | null | undefined): string {
     if (!id || !Number.isSafeInteger(id)) return '';
     const fromRadio = deps.radio()?.getState?.()?.albumCover;
     if (fromRadio?.url && Number(fromRadio.tokenId) === id) return fromRadio.url;
-    if (covers.has(id)) return covers.get(id)!;
-    if (!asked.has(id)) {
-      asked.add(id);
-      fetch('/inscription/' + id, { signal: AbortSignal.timeout(20_000) })
-        .then(async (r) => {
-          const type = (r.headers.get('content-type') || '').toLowerCase();
-          if (!r.ok) { await r.body?.cancel(); throw new Error('no cover'); }
-          if (type.startsWith('image/')) { await r.body?.cancel(); return '/inscription/' + id; }
-          if (type.includes('text/html')) return ((await r.text()).match(/<img[^>]+src="(data:image\/[^"]+)"/i)?.[1] ?? '').replace(/&amp;/g, '&');
-          await r.body?.cancel();
-          return '';
-        })
-        .then((url) => { covers.set(id, url); paint(); })
-        .catch(() => { asked.delete(id); });
-    }
-    return '';
+    return coverArt(id); // shared with the welcome screens and the strip above the wallet box; `onArt` draws again
   }
 
   const stopArt = onArt(() => paint());
@@ -206,6 +195,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps, opts: { lis
     const p = i.player;
     const songs = p.tracks.filter((t) => !t.hidden);
     const out: Node[] = [];
+    if (i.step !== undefined) out.push(stepLights(ALBUM_STEPS, i.step));
     if (i.mode === 'arrive' && i.from) out.push(h('p', { class: 'al-from' }, h('span', { html: ICON.gift }), h('span', {}, h('b', {}, i.from), ' sent you an album')));
     out.push(coverBox(p, true));
     out.push(h('div', { class: 'al-intro' },
@@ -368,7 +358,7 @@ export function createAlbumView(mount: HTMLElement, deps: AlbumDeps, opts: { lis
     watch();
     mount.hidden = false;
     const top = h('header', { class: 'al-top' },
-      h('a', { class: 'al-brand', href: '/radio' }, 'Xtrata ', h('b', {}, 'Music')),
+      h('a', { class: 'al-brand', href: '/radio' }, xtrataMark('al-logo'), 'Xtrata ', h('b', {}, 'Music')),
       i.mode === 'open' ? btn({ class: 'al-icon', 'aria-label': 'My music', onClick: () => setSheet('music'), html: ICON.grid }) : null);
     const body = h('div', { class: 'al-body al-body--' + i.mode }, ...(i.mode === 'open' ? player(i) : intro(i)));
     mount.replaceChildren(top, body, ...(sheet === 'more' ? [h('div', { class: 'al-scrim', onClick: () => setSheet('') }), moreSheet(i)] : []));

@@ -21,6 +21,7 @@ import { createGifts } from './gifts';
 import { hiddenTrack, listedTracks } from '../lib/listening-wallet/gift-players';
 import { createShelf } from './shelf';
 import { createAlbumView, type AlbumInput } from './album';
+import { coverArt, onArt } from './art';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
@@ -207,10 +208,12 @@ function start(root: HTMLElement) {
     } catch { return false; }
   })();
   function syncTier(s: Snapshot) {
-    // Known only while the listener's own player is open: a starter gift (no album) gives it a class, anything else none.
-    if (s.listening && s.slot === 0 && ['fund', 'ready', 'over'].includes(s.step)) {
+    // Known only while the listener's own player is open. Only a numbered free player from the giveaway wall has a
+    // class (the server says so: `gift.drop`); any other player, gifted or not and however many plays it came with,
+    // has none. While the server has not said either way (`drop` absent) what was known is kept.
+    if (s.listening && s.slot === 0 && ['fund', 'ready', 'over'].includes(s.step) && !(s.gift && s.gift.drop === undefined)) {
       let next: Tier | null = null;
-      try { next = s.gift && !s.gift.player ? tierOfAmount(BigInt(s.gift.amount)) : null; } catch { next = null; }
+      try { next = s.gift && !s.gift.player && s.gift.drop === 'players' ? tierOfAmount(BigInt(s.gift.amount)) : null; } catch { next = null; }
       if ((next?.id ?? null) !== (tierNow?.id ?? null)) { tierNow = next; flagStore.set(TIER_KEY, next ? next.id : null); }
     }
     const root = document.documentElement;
@@ -273,7 +276,7 @@ function start(root: HTMLElement) {
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
       tier: tierNow, mystery,
-      albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, run: () => { showFull(); openFeatured(p, true); } })) : [],
+      albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, cover: coverArt(p.cover), run: () => { showFull(); openFeatured(p, true); } })) : [],
       start: () => void ppp.create({ quick: !!gifts.incomingStarter() }), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
       full: () => {
         // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.
@@ -285,6 +288,8 @@ function start(root: HTMLElement) {
     });
   }
   if (welcome) setTimeout(() => { if (!welcomeKnown) render(ppp.snapshot()); }, 10_100);
+  // A cover that was just found: the welcome screen's album rows and the strip above the wallet box draw again.
+  onArt(() => { if (welcome?.showing() || document.documentElement.dataset.asking) render(ppp.snapshot()); });
 
   // "Add plays" (restock-sheet.ts): where every "out of plays" and "running low" leads. It always restocks the
   // listener's own player (the first wallet), which is also what tops up albums and pays for likes.
@@ -1369,6 +1374,7 @@ function start(root: HTMLElement) {
       return row;
     }));
     albumView?.render(album ? albumInput(s, album, [...elsewhereLines, ...giftLines]) : null);
+    syncSkin(s, album);
     syncWelcome(s, !!album, giftScreen ? [...elsewhereLines, ...giftLines] : elsewhereLines, wMode);
     if (restock.isOpen()) restock.refresh();
     syncFind();
@@ -1391,6 +1397,25 @@ function start(root: HTMLElement) {
     const last = readLastAlbum();
     if (last && (s.step === 'locked' || (resumeAlbum && s.step === 'loading'))) return { mode: 'locked', player: last.player };
     return null;
+  }
+
+  /**
+   * The album's cover, name and giver in a strip right above the wallet box while the box asks for a tap, so the
+   * passkey step still looks like the album being opened. The box itself loads nothing from outside (by design): this
+   * strip is the page's, sits outside the box and never covers it.
+   */
+  function syncSkin(s: Snapshot, a: AlbumState | null) {
+    const skinEl = document.querySelector<HTMLElement>('.ppp-skin');
+    if (!skinEl) return;
+    const on = !!a && (!!s.busy || s.armed);
+    skinEl.hidden = !on;
+    if (!on || !a) { skinEl.replaceChildren(); return; }
+    const url = coverArt(a.player.cover);
+    const art = url ? el('img', 'ppp-skin__art') as HTMLImageElement : el('span', 'ppp-skin__art ppp-skin__art--none', '♪');
+    if (url) { (art as HTMLImageElement).src = url; (art as HTMLImageElement).alt = ''; }
+    const text = el('span', 'ppp-skin__t');
+    text.append(el('b', '', a.player.title), el('span', '', a.mode === 'arrive' && a.from ? `A gift from ${a.from}` : a.player.subtitle || 'Your album'));
+    skinEl.replaceChildren(art, text);
   }
 
   function albumInput(s: Snapshot, a: AlbumState, lines: HTMLElement[]): AlbumInput {
@@ -1431,6 +1456,8 @@ function start(root: HTMLElement) {
     }
     return {
       mode: a.mode, player: a.player, from: a.from, offered: a.offered,
+      // A newcomer opening a gifted album: where they are, as three lights. Not for someone who already has a player.
+      step: a.mode === 'arrive' && s.step === 'intro' ? 1 : undefined,
       plays: a.mode === 'open' ? (s.balance === undefined ? null : s.giftPlays) : undefined,
       playsComing: s.depositPending,
       status, primary, secondary, hint: primary ? hint : undefined,
