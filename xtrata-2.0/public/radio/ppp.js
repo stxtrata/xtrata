@@ -11829,7 +11829,7 @@ function k5(t) {
       brandNew: !!(i != null && i.address) && o === 0n && (T == null ? void 0 : T.for) === i.address && T.unused,
       gift: (() => {
         const j = qt();
-        return j ? { player: j.player, from: j.from, source: j.source, amount: j.amount } : null;
+        return j ? { player: j.player, from: j.from, source: j.source, amount: j.amount, ...j.drop !== void 0 ? { drop: j.drop } : {} } : null;
       })(),
       giftPlays: qt() ? zt() : 0,
       playCost: rn(At()),
@@ -14656,10 +14656,10 @@ function LI(t) {
     }
   })();
   function P(f) {
-    if (f.listening && f.slot === 0 && ["fund", "ready", "over"].includes(f.step)) {
+    if (f.listening && f.slot === 0 && ["fund", "ready", "over"].includes(f.step) && !(f.gift && f.gift.drop === void 0)) {
       let p = null;
       try {
-        p = f.gift && !f.gift.player ? II(BigInt(f.gift.amount)) : null;
+        p = f.gift && !f.gift.player && f.gift.drop === "players" ? II(BigInt(f.gift.amount)) : null;
       } catch {
         p = null;
       }

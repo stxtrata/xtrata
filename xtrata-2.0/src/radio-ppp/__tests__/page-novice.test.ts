@@ -311,7 +311,7 @@ describe('a free starter player: claimed, arriving, landed', () => {
     expect(page().querySelector('.ppp-bad')).toBeNull(); // never looks failed while it is on its way
     expect(text(page())).not.toMatch(/No plays|out of plays|Add plays/i);
     // The plays land.
-    h.snap = { ...base, step: 'ready', balance: 100_000n, playsLeft: 277, gift: { player: null, from: null, source: 'batch', amount: '100000' }, giftPlays: 277 };
+    h.snap = { ...base, step: 'ready', balance: 100_000n, playsLeft: 277, gift: { player: null, from: null, source: 'batch', amount: '100000', drop: 'players' }, giftPlays: 277 };
     localStorage.removeItem('xtrata.radio.gift.incoming.v1');
     h.changed();
     await vi.waitFor(() => expect(html().dataset.welcome).toBe('landed'));
@@ -383,7 +383,7 @@ describe('"Add plays": where running out leads', () => {
 describe('player classes from the giveaway', () => {
   const page = () => document.getElementById('album')!;
   const html = () => document.documentElement;
-  const gifted = (amount: string) => ({ player: null, from: null, source: 'batch', amount });
+  const gifted = (amount: string, drop: 'players' | null | undefined = 'players') => ({ player: null, from: null, source: 'batch', amount, ...(drop !== undefined ? { drop } : {}) });
 
   it('a Diamond player wears its colours every time it loads, and they are remembered while it is locked', async () => {
     const root = await open({ entries: PLAYED, gift: gifted('353000'), giftPlays: 990 });
@@ -395,6 +395,26 @@ describe('player classes from the giveaway', () => {
     expect(html().dataset.tier).toBe('diamond');
     expect(text(page())).toContain('Your Diamond player');
     expect(page().querySelector('.tier-disc')!.getAttribute('data-tier')).toBe('diamond');
+  });
+
+  it('a gifted player that is not one of the numbered wall players has no class, however many plays it came with', async () => {
+    const root = await open({ entries: PLAYED, gift: gifted('353000', null), giftPlays: 990 });
+    expect(html().dataset.tier).toBeUndefined();
+    expect(root.querySelector('.ppp-tier')).toBeNull();
+    expect(localStorage.getItem('xtrata.radio.tier.v1')).toBeNull();
+  });
+
+  it('a class this device remembered wrongly is taken off once the server says the player is not from the wall', async () => {
+    localStorage.setItem('xtrata.radio.tier.v1', 'gold');
+    const root = await open({ entries: PLAYED, gift: gifted('178000', null), giftPlays: 500 });
+    expect(html().dataset.tier).toBeUndefined();
+    expect(root.querySelector('.ppp-tier')).toBeNull();
+  });
+
+  it('while the server has not said either way, what was known is kept', async () => {
+    await open({ entries: PLAYED, gift: gifted('353000'), giftPlays: 990 });
+    await open({ entries: PLAYED, gift: gifted('353000', undefined), giftPlays: 990 });
+    expect(html().dataset.tier).toBe('diamond');
   });
 
   it('a player that was not a giveaway gift has no class, and an album never gets one', async () => {

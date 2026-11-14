@@ -208,10 +208,12 @@ function start(root: HTMLElement) {
     } catch { return false; }
   })();
   function syncTier(s: Snapshot) {
-    // Known only while the listener's own player is open: a starter gift (no album) gives it a class, anything else none.
-    if (s.listening && s.slot === 0 && ['fund', 'ready', 'over'].includes(s.step)) {
+    // Known only while the listener's own player is open. Only a numbered free player from the giveaway wall has a
+    // class (the server says so: `gift.drop`); any other player, gifted or not and however many plays it came with,
+    // has none. While the server has not said either way (`drop` absent) what was known is kept.
+    if (s.listening && s.slot === 0 && ['fund', 'ready', 'over'].includes(s.step) && !(s.gift && s.gift.drop === undefined)) {
       let next: Tier | null = null;
-      try { next = s.gift && !s.gift.player ? tierOfAmount(BigInt(s.gift.amount)) : null; } catch { next = null; }
+      try { next = s.gift && !s.gift.player && s.gift.drop === 'players' ? tierOfAmount(BigInt(s.gift.amount)) : null; } catch { next = null; }
       if ((next?.id ?? null) !== (tierNow?.id ?? null)) { tierNow = next; flagStore.set(TIER_KEY, next ? next.id : null); }
     }
     const root = document.documentElement;

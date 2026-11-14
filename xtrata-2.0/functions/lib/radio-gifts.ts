@@ -538,7 +538,17 @@ export async function giftForWallet(env: GiftEnv, wallet: string) {
   if (!r) return { gift: null };
   // While it is on its way: whether the last broadcast went through, and why not if it did not.
   const send = r.status === 'claiming' ? await one<Send>(env, "SELECT * FROM radio_gift_sends WHERE gift_id=? AND kind='claim' AND status='sent'", [r.id]) : null;
+  // Was this gift one of the numbered free players on the giveaway wall (list 'players', not archived)? Only those have
+  // a class (Diamond ... Classic). Any other gift, however large, is a plain player. If the giveaway tables cannot be
+  // read the answer is left out (unknown), never "no": the page then keeps what it last knew.
+  let drop: 'players' | null | undefined;
+  try {
+    drop = (await one(env, "SELECT pos FROM radio_giveaway_links WHERE code_hash=? AND list='players' AND archived=0", [r.code_hash])) ? 'players' : null;
+  } catch (e) {
+    drop = /no such (table|column)/i.test(String((e as Error)?.message ?? e)) ? null : undefined;
+  }
   return { gift: {
+    ...(drop !== undefined ? { drop } : {}),
     returnTo: r.gifter ?? treasuryAddress(env), from: r.gifter, source: r.source, amount: String(r.amount), txid: r.claim_txid, label: r.label,
     state: r.status === 'claimed' ? 'arrived' : 'sending', problem: send?.last_error ?? null,
     // The gift treasury is where the gift's money came from: the page needs it to tell the gift from a later top-up.

@@ -1296,7 +1296,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=d705e2446bbe');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=55604995a1f6');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

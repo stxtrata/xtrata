@@ -47,6 +47,8 @@ export interface GiftInfo {
   state: 'arriving' | 'arrived' | 'sending';
   /** The album this gift came with. Null for a plain gift: the radio then carries on as normal. */
   player: PlayerView | null;
+  /** 'players': one of the numbered free players on the giveaway wall, so it has a class. null: it is not. Absent: not known. */
+  drop?: 'players' | null;
 }
 export interface StoredLink { listening: string; issued: number; mainSignature: string }
 
@@ -209,7 +211,7 @@ export interface Snapshot {
    */
   brandNew: boolean;
   /** This wallet was gifted (the server says so). `player` is the album that came with it, if any. */
-  gift: { player: PlayerView | null; from: string | null; source: string; amount: string } | null;
+  gift: { player: PlayerView | null; from: string | null; source: string; amount: string; drop?: 'players' | null } | null;
   /** Paid plays this gifted wallet still buys, counting payments in flight and songs waiting to be paid. */
   giftPlays: number;
   /** What one play costs right now (microSTX): turns plays into STX for top-ups, never shown to the listener. */
@@ -551,7 +553,7 @@ export function createPppController(deps: PppDeps) {
     creditedTo: solo() && status?.address && creditedRes?.for === status.address && creditedRes.main ? creditedRes.main : undefined,
     createdHere: !!status?.address && deps.store.get(key('created', status.address)) === '1',
     brandNew: !!status?.address && balance === 0n && unusedRes?.for === status.address && unusedRes.unused,
-    gift: (() => { const g = giftNow(); return g ? { player: g.player, from: g.from, source: g.source, amount: g.amount } : null; })(),
+    gift: (() => { const g = giftNow(); return g ? { player: g.player, from: g.from, source: g.source, amount: g.amount, ...(g.drop !== undefined ? { drop: g.drop } : {}) } : null; })(),
     giftPlays: giftNow() ? playsLeftNow() : 0,
     playCost: costPerPlay(fee()),
     giftStop: giftStop(),
